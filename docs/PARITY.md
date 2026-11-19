@@ -4325,7 +4325,7 @@ own bands cost (REQ 6 X1 1.00 s, Q10 X1 0.78, Facet's own four bands 1.14); API-
 RChannel 1.08, Scheps ≤ +0.62 s (≈ 1.8 % of a core), RVox 0.94, RDeEsser 1.11, C6 2.86, API-2500 0.91, MaxxBass 0.92, RBass
 1.15, Vitamin 1.47.
 
-**Tests:** `tests/Parity190mmTests.inc` (5), `Parity190mmSchepsTests.inc`, `Parity190mmDynTests.inc` (6); moved:
+**Tests:** `tests/Parity190mmTests.inc` (4), `Parity190mmSchepsTests.inc` (5), `Parity190mmDynTests.inc` (6); moved:
 Parity190mgNs1 (0 % is the NS1 engine's pair now), Parity190jh (Facet's stored count). Mini runner (round 190mg's list + the
 round's three files): **544 541 checks, 0 failures**. No full Linux / Windows build, no --selftest (no UI change, no new
 strings).
