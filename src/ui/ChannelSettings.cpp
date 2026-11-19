@@ -1223,6 +1223,10 @@ public:
         engine.addChangeListener (this);
         if (ref.index >= 0 && (! modelKnobs.empty() || ! partKnobs.empty() || transistorBass))
             startTimerHz (30);
+        // round 190mc (discussion #202): a page opened on a Transistor Bass whose notes moved its program while no page
+        // showed it starts on that program (no jump a moment after the window opens)
+        if (transistorBass && ref.index >= 0)
+            followTransistorBassProgram();
     }
 
     ~ModelPanel() override
@@ -1367,7 +1371,9 @@ public:
                 modelparams::setRawValue (c, index, v);
                 natives::followControl (c, index, flStudioAccess()); // (Harmless' compression type loads its preset)
             });
-            if (instrumentKind == InstrumentKind::transistorbass && index >= tbseq::length) // (a step's note moves its octave)
+            if (instrumentKind == InstrumentKind::transistorbass && (index == tbprog::program || index == tbprog::patch))
+                syncKnobs (true); // (round 190mc: another program or patch: every knob shows its values)
+            else if (instrumentKind == InstrumentKind::transistorbass && index >= tbseq::length) // (a step's note moves its octave)
                 syncKnobs();
             if (layout != nullptr)
             {
@@ -1380,6 +1386,8 @@ public:
             const auto target = [this, index] { return AutomationTarget { AutomationTargetKind::channelParam, ref.index, 0, index }; };
             ui::setOwnMenu (*knob);
             knob->onMenu = [this, k = knob.get(), target] { ui::showSliderMenu (*k, &engine, target()); };
+            if (instrumentKind == InstrumentKind::transistorbass && (index == tbprog::sequence || index == tbprog::patch))
+                knob->onMenu = [this, k = knob.get(), index] { showTransistorBassList (index == tbprog::patch, *k); }; // (FL: right-click to browse)
             knob->onDragStart = [this, target] { engine.noteTweaked (target(), true); };
             knob->onDragEnd = [this, target] { engine.tweakReleased (target()); };
         }
@@ -1810,6 +1818,9 @@ public:
                         const auto text = units != nullptr ? juce::String (units->unitString (units->unitOf ((float) k->getValue())))
                                         : juce::String (item.param).containsIgnoreCase ("oversampling") ? juce::String (1 << juce::jlimit (0, 8, (int) k->getValue())) + "x"
                                         : juce::String (item.param).endsWith (" note") ? juce::String (noteNames[((whole % 12) + 12) % 12]) + juce::String (whole / 12)
+                                        // Transistor Bass's PROGRAM reads as its key, SEQUENCE and PATCH count from 1 (FL's wheels; round 190mc)
+                                        : transistorBass && juce::String (item.param) == "Program" ? juce::String (noteNames[((whole % 12) + 12) % 12]) + juce::String (whole / 12)
+                                        : transistorBass && (juce::String (item.param) == "Sequence number" || juce::String (item.param) == "Patch number") ? juce::String (whole + 1)
                                                                                        : juce::String (whole);
                         g.drawFittedText (text, box.withTrimmedRight (8.0f * f).toNearestInt(), juce::Justification::centred, 1, 0.7f);
                         g.setColour (colour::textSecondary);
@@ -1835,6 +1846,8 @@ public:
                         paintTransistorBassSteps (g, r, f);
                     if (juce::String (item.display) == "tbseqtools")
                         paintTransistorBassTools (g, r, f);
+                    if (juce::String (item.display).startsWith ("tbrow"))
+                        paintTransistorBassRow (g, juce::String (item.display), r, f);
                     if (juce::String (item.display) == "xy")
                         if (auto* kx = knobFor (item.param); kx != nullptr)
                             if (auto* ky = knobFor (item.param2); ky != nullptr)
@@ -2166,6 +2179,12 @@ public:
                         showPage (o);
                 return;
             }
+        for (const auto& item : layout->items) // round 190mc: Transistor Bass's name fields and READ / WRITE
+            if (item.type == plugui::Item::display && juce::String (item.display).startsWith ("tbrow") && layoutRect (item).contains (e.position))
+            {
+                transistorBassRowClick (juce::String (item.display), layoutRect (item), e);
+                return;
+            }
         for (const auto& item : layout->items) // round 168q2: Transistor Bass's CLEAR / octave up / octave down
             if (item.type == plugui::Item::display && juce::String (item.display) == "tbseqtools" && layoutRect (item).contains (e.position))
             {
@@ -2187,6 +2206,11 @@ public:
                 || item.type == plugui::Item::knob || item.type == plugui::Item::vslider || item.type == plugui::Item::hslider
                 || item.type == plugui::Item::section || item.type == plugui::Item::label)
                 continue;
+            if (e.mods.isPopupMenu() && transistorBass && (k->getName() == "Sequence number" || k->getName() == "Patch number"))
+            {
+                showTransistorBassList (k->getName() == "Patch number", *k); // (FL: right-click the number to browse; round 190mc)
+                return;
+            }
             if (e.mods.isPopupMenu() && ref.index >= 0 && modelTable != nullptr) // a switch / tabs: FL's parameter menu
             {
                 if (const auto* p = modelparams::findByName (instrumentKind, k->getName().toStdString()))
@@ -2627,6 +2651,154 @@ private:
                         + (prog->sequencer ? tr ("sequencer on") : tr ("sequencer off"))
                         + (prog->transpose != 0 ? "   " + tr ("transpose {0}", { juce::String (prog->transpose) }) : juce::String());
         g.drawFittedText (text, r.reduced (6.0f * f, 0.0f).toNearestInt(), juce::Justification::centredLeft, 1, 0.7f);
+    }
+
+    // FL's program row (round 190mc, discussion #202; TSynthEditorForm): the sequence's and the patch's names (a click
+    // renames, as FL's name fields; a right-click lists the 128 to choose from, as FL's number wheels), their "shared"
+    // indicators (lit when more than one program uses it) and READ / WRITE (WRITE lit while the working patch differs
+    // from the stored one)
+    void paintTransistorBassRow (juce::Graphics& g, const juce::String& which, juce::Rectangle<float> r, float f)
+    {
+        using namespace theme;
+        const auto* bank = transistorBassBankNow();
+        if (bank == nullptr)
+            return;
+        g.setFont (font (juce::jmax (9.0f, 11.0f * f), false));
+        if (which == "tbrowseqname" || which == "tbrowpatchname")
+        {
+            const auto patch = which == "tbrowpatchname";
+            const auto& name = patch ? bank->patches[(std::size_t) bank->patch] : bank->sequences[(std::size_t) bank->sequence];
+            g.setColour (name.empty() ? colour::textDisabled : colour::textPrimary);
+            g.drawFittedText (name.empty() ? tr ("(no name)") : juce::String::fromUTF8 (name.c_str()), r.reduced (5.0f * f, 0.0f).withTrimmedRight (10.0f * f).toNearestInt(),
+                              juce::Justification::centredLeft, 1, 0.8f);
+            // FL's share glyph at the field's right end (three linked dots: "used by other programs" sits next to it)
+            const auto c = juce::Point<float> (r.getRight() - 7.0f * f, r.getCentreY());
+            const juce::Point<float> dots[] { { c.x - 2.5f * f, c.y }, { c.x + 2.5f * f, c.y - 3.5f * f }, { c.x + 2.5f * f, c.y + 3.5f * f } };
+            g.setColour (colour::textSecondary);
+            g.drawLine ({ dots[0], dots[1] }, 0.9f * f);
+            g.drawLine ({ dots[0], dots[2] }, 0.9f * f);
+            for (const auto& d : dots)
+                g.fillEllipse (juce::Rectangle<float> (2.6f * f, 2.6f * f).withCentre (d));
+        }
+        else if (which == "tbrowseqshared" || which == "tbrowpatchshared")
+        {
+            const auto users = which == "tbrowpatchshared" ? bank->patchUsers[(std::size_t) bank->patch] : bank->sequenceUsers[(std::size_t) bank->sequence];
+            const auto lit = users > 1;
+            const auto bar = r.reduced (2.0f * f, 3.0f * f);
+            g.setColour (lit ? accent : colour::bg4);
+            g.fillRoundedRectangle (bar, radius::sm * f);
+        }
+        else if (which == "tbrowreadwrite")
+        {
+            for (int i = 0; i < 2; ++i)
+            {
+                const auto cell = transistorBassRowButton (r, i);
+                skin::button (g, cell, i == 1 && bank->edited, false, accent, radius::sm * f);
+                g.setColour (colour::textPrimary);
+                g.setFont (font (juce::jmax (8.0f, 10.0f * f), true));
+                g.drawFittedText ((i == 0 ? tr ("Read") : tr ("Write")).toUpperCase(), cell.toNearestInt(), juce::Justification::centred, 1, 0.6f); // (FL: READ / WRITE)
+            }
+        }
+    }
+
+    // the page's five row parts read one parse of the state per change, not one each per paint (round 190mc)
+    const TransistorBassBank* transistorBassBankNow()
+    {
+        const auto* c = channelNow();
+        if (c == nullptr)
+            return nullptr;
+        if (c->pluginState != bankState)
+        {
+            bankState = c->pluginState;
+            bankCache = transistorBassBank (bankState);
+        }
+        return bankCache ? &*bankCache : nullptr;
+    }
+    std::vector<std::uint8_t> bankState;
+    std::optional<TransistorBassBank> bankCache;
+
+    static juce::Rectangle<float> transistorBassRowButton (juce::Rectangle<float> r, int i)
+    {
+        const auto w = r.getWidth() * 0.5f;
+        return juce::Rectangle<float> (r.getX() + w * (float) i, r.getY(), w, r.getHeight()).reduced (1.5f, 0.0f);
+    }
+
+    void transistorBassRowClick (const juce::String& which, juce::Rectangle<float> r, const juce::MouseEvent& e)
+    {
+        const auto* c = channelNow();
+        if (c == nullptr || ! transistorBassBank (c->pluginState))
+            return;
+        if (which == "tbrowreadwrite")
+        {
+            const auto read = transistorBassRowButton (r, 0).contains (e.position);
+            auto next = c->pluginState;
+            if (! (read ? transistorBassReadPatch (next) : transistorBassWritePatch (next)) || next == c->pluginState)
+                return;
+            ref.edit (engine, [next = std::move (next)] (ChannelDef& d) { d.pluginState = next; });
+            syncKnobs (true);
+            repaint();
+            return;
+        }
+        if (which != "tbrowseqname" && which != "tbrowpatchname")
+            return;
+        const auto patch = which == "tbrowpatchname";
+        if (e.mods.isPopupMenu())
+        {
+            if (auto* k = knobFor (patch ? "Patch number" : "Sequence number"))
+                showTransistorBassList (patch, *k);
+            return;
+        }
+        renameTransistorBass (patch);
+    }
+
+    // FL's right-click list on the SEQUENCE / PATCH wheels: the 128 with their names, the shown one ticked
+    void showTransistorBassList (bool patch, juce::Slider& knob)
+    {
+        const auto* c = channelNow();
+        const auto bank = c != nullptr ? transistorBassBank (c->pluginState) : std::nullopt;
+        if (! bank)
+            return;
+        juce::PopupMenu menu, more;
+        const auto current = patch ? bank->patch : bank->sequence;
+        for (int i = 0; i < 128; ++i)
+        {
+            const auto& name = patch ? bank->patches[(std::size_t) i] : bank->sequences[(std::size_t) i];
+            const auto text = juce::String (i + 1) + "  " + (name.empty() ? tr ("(no name)") : juce::String::fromUTF8 (name.c_str()));
+            auto& into = i < 64 ? menu : more;
+            into.addItem (text, true, i == current, [safe = juce::Component::SafePointer<juce::Slider> (&knob), i] {
+                if (safe != nullptr)
+                    safe->setValue ((double) i, juce::sendNotificationSync);
+            });
+        }
+        menu.addSeparator();
+        menu.addSubMenu ("65 - 128", more);
+        menu.showMenuAsync (juce::PopupMenu::Options().withMousePosition()); // (the page draws the number; its slider is hidden)
+    }
+
+    void renameTransistorBass (bool patch)
+    {
+        const auto* c = channelNow();
+        const auto bank = c != nullptr ? transistorBassBank (c->pluginState) : std::nullopt;
+        if (! bank)
+            return;
+        const auto index = patch ? bank->patch : bank->sequence;
+        const auto& old = patch ? bank->patches[(std::size_t) index] : bank->sequences[(std::size_t) index];
+        auto* box = new juce::AlertWindow (patch ? tr ("Patch name") : tr ("Sequence name"), {}, juce::MessageBoxIconType::NoIcon, this);
+        box->addTextEditor ("name", juce::String::fromUTF8 (old.c_str()));
+        box->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+        box->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        box->enterModalState (true, juce::ModalCallbackFunction::create ([safe = juce::Component::SafePointer<ModelPanel> (this), box, patch, index] (int result) {
+            if (safe == nullptr || result != 1)
+                return;
+            const auto* ch = safe->channelNow();
+            if (ch == nullptr)
+                return;
+            auto next = ch->pluginState;
+            if (! transistorBassRename (next, patch, index, box->getTextEditorContents ("name").toStdString()) || next == ch->pluginState)
+                return;
+            safe->ref.edit (safe->engine, [next = std::move (next)] (ChannelDef& d) { d.pluginState = next; });
+            safe->repaint();
+        }), true);
     }
 
     // the step numbers under the sequence, lit up to its length (round 168q2)
@@ -6022,6 +6194,7 @@ public:
         prev.onClick = [this] { step (-1); };
         next.onClick = [this] { step (1); };
         ui::setHint (*this, tr ("Presets: [LMB] the list, the arrows load the previous / next one"));
+        list(); // (round 190mc: the window opens showing its channel's preset, not "Presets" until the first click)
     }
 
     // Whether this channel's instrument has an FL preset folder (the bar is shown only then)
@@ -6095,16 +6268,37 @@ public:
             repaint(); // (the hovered part: the name, ◀ or ▶)
     }
 
+    // Round 190mc (discussion #202: "it randomly changes mode when you swap between Transistor Bass instances"): a click
+    // that only brings another channel's window to the front (its title bar, where ◀ ▶ sit at the right) loads nothing;
+    // ◀ ▶ step only when the press and the release are on the same arrow
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        pressedPart = partAt (e.getPosition());
+        armed = true;
+        if (auto* window = findParentComponentOfClass<juce::DocumentWindow>())
+            if (const auto at = (juce::uint32) (juce::int64) window->getProperties().getWithDefault ("lynxFrontAt", 0); at != 0)
+                armed = juce::Time::getMillisecondCounter() - at > 300;
+    }
+
     void mouseUp (const juce::MouseEvent& e) override
     {
-        if (e.mouseWasDraggedSinceMouseDown())
+        if (e.mouseWasDraggedSinceMouseDown() || ! armed || partAt (e.getPosition()) != pressedPart)
             return;
-        if (titleLook && prevArea.contains (e.getPosition()))
+        if (pressedPart == 1)
             step (-1);
-        else if (titleLook && nextArea.contains (e.getPosition()))
+        else if (pressedPart == 2)
             step (1);
-        else if (nameArea.contains (e.getPosition()))
+        else if (pressedPart == 3)
             showMenu();
+    }
+
+    int partAt (juce::Point<int> p) const
+    {
+        if (titleLook && prevArea.contains (p))
+            return 1;
+        if (titleLook && nextArea.contains (p))
+            return 2;
+        return nameArea.contains (p) ? 3 : 0;
     }
 
 private:
@@ -6338,6 +6532,8 @@ private:
     juce::TextButton prev { juce::String::fromUTF8 ("\xe2\x97\x80") }, next { juce::String::fromUTF8 ("\xe2\x96\xb6") };
     juce::Rectangle<int> nameArea, prevArea, nextArea;
     bool titleLook = false;
+    bool armed = true; // (round 190mc: the press did not just bring the window to the front)
+    int pressedPart = 0;
     std::vector<presetcycle::Preset> presets;
     InstrumentKind listedKind = InstrumentKind::synth;
     bool loaded = false;
@@ -7017,7 +7213,11 @@ private:
     juce::ResizableWindow& window;
 };
 
-class SettingsWindow final : public juce::DocumentWindow
+void openWindow (AudioEngine& engine, int channel, bool modulation);
+class SettingsWindow;
+std::vector<std::unique_ptr<SettingsWindow>>& windows();
+
+class SettingsWindow final : public juce::DocumentWindow, private juce::ChangeListener
 {
 public:
     // `shot` (round 190in): off the desktop, in the docked look (LYNX's title bar), for the snapshot routes
@@ -7029,6 +7229,12 @@ public:
           aspect (*this)
     {
         setUsingNativeTitleBar (! shot);
+        // round 190mc (discussion #202): the window belongs to its channel, not to a row of the rack — a clone, an insert
+        // or a move above it shifts the rows, and the window must not go on editing whatever lands on its old row
+        if (const auto& song = engine.getSong(); channel >= 0 && channel < (int) song.channels.size())
+            instanceId = song.channels[(std::size_t) channel].instance.id;
+        if (! shot)
+            engine.addChangeListener (this);
         // FL names the window after the channel and its mixer track (REA round 149 [EXEC]: "FL Studio VSTi (Master)",
         // "Synth Bass (Synth Bass)")
         if (const auto& song = engine.getSong(); channel >= 0 && channel < (int) song.channels.size())
@@ -7121,6 +7327,43 @@ public:
         }
     }
 
+    ~SettingsWindow() override { engineRef.removeChangeListener (this); }
+
+    // the channel moved to another row (or went away): the window follows it to its new row, in the same place (a new
+    // window: every page of the old one was made for the old row), or closes
+    void changeListenerCallback (juce::ChangeBroadcaster*) override
+    {
+        const auto& song = engineRef.getSong();
+        if (instanceId == 0 || (channel >= 0 && channel < (int) song.channels.size() && song.channels[(std::size_t) channel].instance.id == instanceId))
+            return;
+        int now = -1;
+        for (int i = 0; i < (int) song.channels.size() && now < 0; ++i)
+            if (song.channels[(std::size_t) i].instance.id == instanceId)
+                now = i;
+        instanceId = 0; // (once)
+        auto* self = this;
+        juce::MessageManager::callAsync ([self, safe = juce::Component::SafePointer<SettingsWindow> (this), now, mod = modulation, engine = &engineRef,
+                                          at = getScreenPosition()] {
+            if (safe == nullptr)
+                return;
+            auto& open = windows();
+            open.erase (std::remove_if (open.begin(), open.end(), [self] (auto& w) { return w.get() == self; }), open.end());
+            if (now < 0)
+                return;
+            openWindow (*engine, now, mod);
+            for (auto& w : open)
+                if (w->getChannel() == now && w->isModulation() == mod)
+                    setWindowScreenPosition (*w, at);
+        });
+    }
+
+    // (round 190mc: when this window came to the front — the preset arrows in its title bar ignore that click)
+    void broughtToFront() override
+    {
+        getProperties().set ("lynxFrontAt", (juce::int64) juce::Time::getMillisecondCounter());
+        juce::DocumentWindow::broughtToFront();
+    }
+
     int getChannel() const { return channel; }
     bool isModulation() const { return modulation; }
     juce::Component* page() const { return scaled != nullptr ? &scaled->page() : nullptr; }
@@ -7193,6 +7436,7 @@ private:
     int channel;
     bool modulation;
     AudioEngine& engineRef;
+    std::uint64_t instanceId = 0; // the channel's runtime identity (round 190mc)
     PageAspectConstrainer aspect;
     ScaledContent* scaled = nullptr; // (owned by the window: its content)
     wrappermenu::MenuArrow titleMenu;               // FL's ▸ in LYNX's title bar (docked)

@@ -61,6 +61,9 @@ const std::vector<Allowed>& allowed()
         // rows only, a filter's input comes from the FM layer (REA_rodada11 §1.5, FUN_0086dd40 [DECOMP + EXEC])
         { "Sytrus", "RM op * to filter *", "fl-inert: FL's voice assembly reads the RM layer for operators only; a filter's input is the FM layer's row (REA_rodada11 §1.5)" },
         { "Harmless", "Threaded", "non-audio: renders the voices on worker threads (same output)" },
+        // (round 190mc) FL's AF switch of Transistor Bass's program row: whether the editor follows the programs the notes
+        // pick (TSynthEditorForm ProgramAutoFollowCheckBox, REA_rodada169g2 §2); the engine plays the same either way
+        { "Transistor Bass", "Auto follow", "non-audio: which program the editor shows and edits (FL's AF), not what plays" },
         // (rollup 0.1.30) Helix keeps Live's HiQ switch for the .als round trip; its oscillators are always band-limited
         // (round 190ja: every table's mipmaps), so the switch changes nothing in LYNX
         { "Helix", "HiQ", "non-audio: Helix is always band-limited (round 190ja); HiQ is kept for Live's round trip" },

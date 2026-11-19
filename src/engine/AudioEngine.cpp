@@ -1,4 +1,6 @@
 #include "engine/AudioEngine.h"
+
+#include "core/TransistorBass.h"
 #include "core/AraRegions.h"
 #include "core/FlPluginDb.h"
 #include "core/HarmorResynth.h"
@@ -6981,6 +6983,15 @@ void AudioEngine::capturePluginStatesInto (Song& target, bool requireAll)
         if (! state && requireAll) throw RemoteError ("failed", "Cannot capture a live device; no project changes were made");
         return state;
     };
+    // round 190mc (discussion #202): a Transistor Bass whose notes chose another program (its sequencer on, FL's AF)
+    // saves that program, as FL does, whether or not its page showed it
+    for (std::size_t i = 0; i < target.channels.size(); ++i)
+        if (target.channels[i].instrument == InstrumentKind::transistorbass)
+            if (const auto instrument = getChannelInstrument ((int) i))
+                if (const auto selected = instrument->selectedProgram(); selected >= 0)
+                    if (const auto prog = transistorBassProgram (target.channels[i].pluginState); prog && prog->program != selected)
+                        transistorBassSelectProgram (target.channels[i].pluginState, selected);
+
     // Changes only the saved state (recreates nothing and doesn't enter the undo history).
     for (std::size_t i = 0; i < target.channels.size(); ++i)
         if (auto* p = dynamic_cast<PluginInstrument*> (getChannelInstrument ((int) i).get()))
