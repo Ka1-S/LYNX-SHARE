@@ -1,8 +1,8 @@
 // Round 190mg (sub-round ns1): Quell's NS1 law (hidden [6]) — an engine with the Waves NS1's own structure for 20 … 100 %
 // (REA of the NS1 trial's DSP for the structure, owner's permission of 2026-11-17; every number fitted on our probes and
 // renders: /mnt/e/lynx-work/waves3_190mg/ns1/HANDOFF.md, docs/analise/REA_rodada190mg_ns1.md). 0 for new instances and
-// every project saved before (bit for bit: ns1/lab/gold.sh); the NS1 translator sets it. Amount 0 keeps the zero law's
-// bare all-pass pair bit for bit.
+// every project saved before (bit for bit: ns1/lab/gold.sh); the NS1 translator sets it. Amount 0 runs the NS1 engine's
+// own open all-pass pair (round 190mm, owner's decision of 11-19; was the zero law's pair).
 #include <cmath>
 #include <random>
 
@@ -103,22 +103,22 @@ TEST (parity190mg_ns1_layout_follows_the_five_saved_states)
     }
 }
 
-TEST (parity190mg_ns1_amount_zero_keeps_the_zero_law_bit_for_bit)
+TEST (parity190mm_ns1_amount_zero_is_the_ns1_engines_open_pair)
 {
     using namespace lynx;
     for (const double sr : { 44100.0, 48000.0, 96000.0 })
     {
         std::vector<float> x ((std::size_t) sr), r ((std::size_t) sr);
         parity190mgns1::signal (x, r, sr, 0.01, 0.2, 0.5);
-        auto la = x, ra = r, lb = x, rb = r;
-        parity190mgns1::run (parity190mgns1::quell (0.0, false), sr, la, ra);
+        auto la = x, ra = r, lb = x, rb = r, lc = x, rc = r;
+        parity190mgns1::run (parity190mgns1::quell (0.0, false), sr, la, ra); // the zero law alone: round 124's pair
         parity190mgns1::run (parity190mgns1::quell (0.0, true), sr, lb, rb);
-        CHECK (la == lb && ra == rb);
-        // just above 0 % the NS1 engine is its own open pair (no cut yet, the depth fades in): 60 Hz Q 1 · 16 kHz Q 0.8992
-        // against round 124's 60.07 Hz Q 0.9998 · 16 kHz Q 0.8992 — no audible step
-        auto lc = x, rc = r;
         parity190mgns1::run (parity190mgns1::quell (1e-6, true), sr, lc, rc);
-        CHECK (parity190mgns1::distanceDb (lc, la) < -45.0);
+        // round 190mm: 0 % is the NS1 engine's own open pair (60 Hz Q 1 · 16 kHz Q 0.8992), continuous with just above
+        // it, and close to (not equal to) round 124's 60.07 Hz Q 0.9998 pair: no audible step either way
+        CHECK (! (la == lb && ra == rb));
+        CHECK (parity190mgns1::distanceDb (lb, lc) < -60.0);
+        CHECK (parity190mgns1::distanceDb (lb, la) < -45.0);
     }
 }
 
