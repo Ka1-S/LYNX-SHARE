@@ -67,9 +67,13 @@ reproduce them were found by fitting (complex response, Nelder–Mead).
   31 analog, 40 input) on Ridge Strip's measured E console through the E-Channel translation. The G's EQ (proportional-Q
   bells overshooting to ±18 dB at ±15, eq/fit_sslg.json) is not the E's: X1 / X2 / X3 score 5.
 - **RChannel**: its compressor block mirrors the Renaissance Compressor's list (42 attack, 43 release, 45 threshold, 46
-  ratio, 47 gain, 52 ARC), so it plays on Compressor's Renaissance law (round 190mg). The EQ and gate are not carried (one
-  slot). Tried: Ridge Strip's own engine with the EQ, comp and gate mapped — 4.88 against 5.16 (its own colouration costs
-  the D files 10 → 8 and its compressor is further from the reference's); not kept.
+  ratio, 47 gain, 52 ARC), so it plays on Compressor's Renaissance law (round 190mg); its EQ (the Renaissance EQ's four
+  bands: band k at 5 k = on, type, gain, Hz, Q; 20 EQ on; 26 routing) runs on a new hidden channel EQ of that law
+  (Compressor [48] on, [49] routing, [50 …] four bands as Facet design codes + values, digitised by Facet's Waves design
+  law; 0 = every other Compressor): 5.16 (compressor alone) → 5.96. The gate is not carried. Tried and not kept: Ridge
+  Strip's own engine with EQ, comp and gate mapped (4.88: its colouration costs the D files 10 → 8); the "RVox" compressor
+  type (44) on sub-round dyn's Vox law with its make-up taken back (X3 2 → 1 … 3, mean 5.92: the channel's RVox mode keeps
+  some make-up we could not pin down; X3 stays on the Renaissance law at 2).
 
 ## 5. Results (bank wv190mm, masked; before = fxr_base = round 190mg's final binary)
 | reference → LYNX | files | before → after |
@@ -83,7 +87,7 @@ reproduce them were found by fitting (complex response, Nelder–Mead).
 | API-550B → Facet (tables) | 25 | n = 0 → 8.04 |
 | API-560 → Facet (tables) | 25 | n = 0 → 8.44 |
 | SSL G-Channel → Ridge (E) | 25 | n = 0 → 6.44 |
-| RChannel → Compressor (Renaissance law) | 25 | n = 0 → 5.16 |
+| RChannel → Compressor (Renaissance law + channel EQ) | 25 | n = 0 → 5.96 |
 
 ## 6. Gates
 - Gold (lab/gold190mm.sh, base vs this branch): Facet (default, bells / shelves / cuts, steep cuts, a dynamic band, natural
@@ -96,6 +100,6 @@ reproduce them were found by fitting (complex response, Nelder–Mead).
 
 ## 7. Not done / open
 - Q10's bell Q prewarp: the cookbook bandwidth form is close (−75 dB) but wide bands above 3 kHz miss (−45 … −53 dB).
-- SSL G's own EQ curves and G compressor; RChannel's EQ / gate (a strip that can host the Renaissance compressor law and
-  the REQ bands would carry all three — e.g. Ridge's omni block of sub-round scheps).
+- SSL G's own EQ curves (identified as single biquads with gain-dependent real / complex poles: no Facet shape nulls
+  them; a measured-section engine would) and G compressor; RChannel's gate and its RVox compressor mode.
 - API-560's linear-phase oversampling (LYNX is minimum phase: X files −32 … −57 dB ESR at spectral distance ≤ 0.09 dB).

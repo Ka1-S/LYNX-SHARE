@@ -124,7 +124,7 @@ TEST (parity190mm_rchannel_eq_runs_on_the_renaissance_law)
         std::vector<float> l (48000), r (48000);
         for (std::size_t i = 0; i < l.size(); ++i) l[i] = r[i] = (float) (0.01 * std::sin (2.0 * M_PI * 1000.0 * (double) i / 48000.0));
         for (std::size_t o = 0; o < l.size(); o += 256)
-            fx->process (l.data() + o, r.data() + o, 256, slot.params, 120.0);
+            fx->process (l.data() + o, r.data() + o, (int) std::min<std::size_t> (256, l.size() - o), slot.params, 120.0);
         double e = 0.0;
         for (std::size_t i = 24000; i < l.size(); ++i) e += (double) l[i] * l[i];
         return 10.0 * std::log10 (e / 24000.0);
