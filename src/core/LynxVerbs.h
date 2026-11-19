@@ -247,6 +247,9 @@ constexpr int engineLaw = 24; // round 190bz: 0 = the classic engine (projects s
 constexpr int revision = paramCount; // round 190mb, hidden (no control, no string; saved while non-zero; read with the engine
                                      //   law): 1 = the 0.1.30 revision, ValhallaFutureVerb's per-mode tone and level (new
                                      //   instances, translated states); 0 = projects saved before, bit for bit
+constexpr int reaLaw = paramCount + 1; // round 190mj, hidden (no control, no string; saved while non-zero; read with the engine
+                                       //   law and revision 1): 1 = ValhallaFutureVerb's echo modes and Room / Chamber laws
+                                       //   (new instances, translated states); 0 = projects saved before, bit for bit
 constexpr int echoModeCount = 12;
 constexpr int reverbModeCount = 8;
 const char* echoModeName (int index) noexcept;

@@ -304,7 +304,11 @@ enum Param { mix, rate, depth, feedback, manual, mode,
              paramCount,
              // round 190mb, hidden (no control, no string; saved while non-zero): 1 = ValhallaSpaceModulator's wet level per
              // mode (set only by its translator, the substitute table's `replaced` items); 0 = as before
-             smLaw = paramCount };
+             smLaw = paramCount,
+             // round 190mj, hidden (no control, no string; saved while non-zero): 1 = ValhallaSpaceModulator's own voices per
+             // mode (measured on click-train and still probes of the reference: tap count, delay laws, crossfade windows,
+             // all-pass interpolation, per-mode filters, the feedback loop; set only by its translator); 0 = as before
+             voiceLaw };
 enum class Mode { rise, riseFall, throughZeroPlus, throughZeroMinus, tri, octo, doubler, driftRise, driftRiseFall, ensemble, symphonic };
 constexpr int modeCount = 11;
 double rateHz (float v) noexcept;    // ±10 Hz, |x|^3.333

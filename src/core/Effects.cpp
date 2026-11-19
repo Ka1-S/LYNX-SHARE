@@ -4850,6 +4850,8 @@ EffectSlot makeEffectSlot (EffectKind kind)
     if (kind == EffectKind::halo) slot.params[(std::size_t) verbs::halo::revision] = 1.0f;
     if (kind == EffectKind::horizon) // round 190mb: a new Horizon runs the 0.1.30 revision (ValhallaFutureVerb's per-mode tone)
         slot.params[(std::size_t) verbs::horizon::revision] = 1.0f;
+    if (kind == EffectKind::horizon) // round 190mj: … and its echo modes' and Room / Chamber's laws (hidden)
+        slot.params[(std::size_t) verbs::horizon::reaLaw] = 1.0f;
     if (kind == EffectKind::latticeMod) // round 190it: … and a new Lattice Mod its tap network's revision 1 (hidden)
         slot.params[(std::size_t) echosuite::lattice::revision] = 1.0f;
     if (kind == EffectKind::luxeVerb) // round 190kw: a new LuxeVerb's Space engine runs the Pro-R 2 laws' revision 1 (hidden)
@@ -5058,6 +5060,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
         // round 190ln: a Foil Plate saved before the reference's EQ / bass-decay laws keeps revision 1 as it was, bit for bit
         if (slot.kind == EffectKind::foilPlate && savedCount <= (std::size_t) verbs::foil::reaLaw)
             slot.params[(std::size_t) verbs::foil::reaLaw] = 0.0f;
+        // round 190mj: a Horizon saved before its echo-mode / Room / Chamber laws keeps revision 1 as it was, bit for bit
+        if (slot.kind == EffectKind::horizon && savedCount <= (std::size_t) verbs::horizon::reaLaw)
+            slot.params[(std::size_t) verbs::horizon::reaLaw] = 0.0f;
         // round 190ly: an Epoch Verb saved before Concert Hall's short-decay trim keeps revision 1 as it was, bit for bit
         if (slot.kind == EffectKind::epochVerb && savedCount <= (std::size_t) verbs::epoch::shortTrim)
             slot.params[(std::size_t) verbs::epoch::shortTrim] = 0.0f;
@@ -5074,6 +5079,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190do: a Gemini Doubler saved before the measured read head keeps the two crossfaded taps
     if (slot.kind == EffectKind::geminiDoubler && savedCount <= (std::size_t) voicetools::gemini::headLaw)
         slot.params[(std::size_t) voicetools::gemini::headLaw] = 0.0f;
+    // round 190mj: the SpaceModulator role's voices likewise (a translated SpaceModulator only)
+    if (slot.kind == EffectKind::orbit && savedCount <= (std::size_t) echosuite::orbit::voiceLaw)
+        slot.params[(std::size_t) echosuite::orbit::voiceLaw] = 0.0f;
     // round 190mb: the SpaceModulator role's level law is only ever saved with it (a translated SpaceModulator)
     if (slot.kind == EffectKind::orbit && savedCount <= (std::size_t) echosuite::orbit::smLaw)
         slot.params[(std::size_t) echosuite::orbit::smLaw] = 0.0f;

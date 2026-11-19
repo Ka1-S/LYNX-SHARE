@@ -4447,6 +4447,42 @@ its classic law under any revision. CPU (thread time, 20 s at 48 kHz, best of 5,
 → 0.49 … 0.50 % of a core (two followers and one gain computer a sample), Vari-mu 0.45 … 0.46 % → 0.81 … 0.84 % (+0.37
 point: two tanh, the tube curve twice and a log a sample).
 
+**Round 190mj, Crest TTM — Two-way = Pro-C 3's own TTM band processors (revision 1).** Read statically (REA notes
+docs/analise/REA_rodada190mj.md, part crest: `TTMCompressor`, its three `TTMCompressor_BandProcessor1`s, their knob
+update and run-time wiring) and rebuilt in LYNX's own code. The reference is a true three-band compressor (the plug-in
+level installs each band's gain on that band's audio) on its own split, fourth-order Linkwitz-Riley at 2^6.4622 =
+88.17 Hz and 2^11.2877 = 2.5 kHz (round 190al's measured 88 Hz left a 0.3° error at 100 Hz). Per band:
+- the level: the magnitude, held for the Hold time, held again over the look-ahead, squared, one follower on that power,
+  back to dB (an RMS-like reading); attack 1/2 / 1/4 / 1/8 of the knob's time (low / mid / high), release 1/4 / 1/4 /
+  0.1125 of the knob's, auto release k / (√y + 1), k = 3.6 (T / 2.5 s)² + 0.1;
+- a downward gain computer (the knob's knee, centred) at the threshold + 0 / + 3 / − 2 dB, ratio 2/3 / 2/3 / 1 × the knob's,
+  and an upward one (one-sided knee) at the threshold − 7 dB + half the knee, ratio 1 + 3.17 √((ratio − 1) / 99), within
+  0.6 × the range; the gain = lift − reduction, smoothed over the look-ahead (two moving averages);
+- [EXEC] a level-independent cut, the same in every band: 0.6 · (1 − 1 / ratio) · √a · (threshold + 0.6 × range) dB when
+  positive (trial190k's TTM grid: scale 0.601, 0.04 dB rms over 189 settings — Upward's cut at 0.6);
+- oversampled, the audio is split at the oversampled rate (the reference runs its graph there; the band gains at the
+  base rate are brought up through the audio's own up path).
+LYNX keeps issue #77's fade (no lift of floors under −80 dBFS, none by −100) and its threshold bound on the lift; revision
+0's 30 dB ceiling is not kept (the upward computer's 0.6 × the range bounds the lift). The reference lifts quiet floors:
+without the fade the TTM files score 8.62 instead of 8.54 (owner decision; recommended: keep it). Revision 1 still never
+shipped, so TTM joins it: a new Crest and a translated Pro-C 3 state run it; projects saved before keep 0.
+
+| bank (time-window scorer, before = parity190mj's fxr_b0) | files | before → after | up / same / down |
+|---|---|---|---|
+| refcap030 Pro-C 3, all blocks | 508 | 8.54 → **8.60** | 24 / 484 / 0 |
+| · TTM files (grid / prog / styles) | 26 (17 / 3 / 6) | 7.38 → **8.54** (7.24 / 7.67 / 7.67 → 8.53 / 8.33 / 8.67) | 24 / 2 / 0 (1x stairs ESR −42 … −45 → −53 … −59 dB; 2x … 16x tc −36 → −57 dB; mix −33 → −58) |
+| · every other style's file (all blocks) | 482 | unchanged file for file (score, rms, spectrum, ESR) | 0 / 482 / 0 |
+| refcap182 programme / tp172b (no TTM setting) | 25 / 20 | 7.64 / 8.0 = | identical metrics |
+| trial190k / trial187b TTM grids (evidence; round 190v's bank, traj = 5 ms gain-trajectory rms) | 506 | 7.53 → 8.32 (traj 0.30 / 0.14 / 0.25 → 0.05 / 0.11 / 0.16 dB) | 271 / 229 / 6 (the 6: level-step files at 2 : 1 / 0.25 ms, 0.02 dB louder: ESR −61 → −51 dB, past the scorer's −55 dB line) |
+
+Old projects: `gold/gold.sh` (fxrender with the revision forced off, index 53, against fxr_b0): 72 / 72 renders identical;
+every other style's translated state (Upward and Vari-Mu included) renders byte for byte as fxr_b0 (117 / 117, 44.1 / 48 /
+96 kHz); the revision-0 two-way fingerprints (tests/Parity190mjCrestGold.inc) equal the base's. CPU (thread time, 20 s at 48 kHz in blocks of 512, best of 5, three
+runs, load ~7): Two-way 1.10 … 1.18 % → 1.14 … 1.23 % of a core (+0.04 … 0.09 point: one follower, two gain computers and
+two logs per band and channel a sample). Oversampled, the audio's split runs at the oversampled rate (nine biquads per
+channel and up-sample, plus six gain up-samplers). Not tested on references: look-ahead, Hold, auto release (no capture
+sets them).
+
 ## Round 190kw (Timeless 3 translator): FabFilter Timeless 3 → Echoform (the hidden line law)
 
 0.1.30 plugin parity. Black-box on captures already on disk (lab and evidence: `/mnt/e/lynx-work/rea190kw/tl3/`,
@@ -4957,6 +4993,46 @@ hidden value; with it off every render is byte for byte the before binary's (`go
 
 Round 190ly's 140 % probe renders of ValhallaDelay (new references, not a gate bank): 105 % 2 → 4, 110 % 1 → 1 / 1 → 2,
 120 % 1 → 2 / 1 → 3, 140 % 3 → 2 / 3 → 2 (−2.3 dB under; verb183b's 140 % capture rose 1 → 3 with the same law) — listed.
+
+## Round 190mj (Valhalla, part 4): Orbit on ValhallaSpaceModulator's own voices, Horizon's echo modes and Room / Chamber
+
+Black-box (refcap030's host for new probe renders; clean-room: LYNX's own code and fits). Evidence:
+docs/analise/REA_rodada190mj.md, lab `/mnt/e/lynx-work/parity190mj/` (Horizon: `hz/`). Score: round 190lg's time-window scorer,
+the same copy before and after. Before = origin/parity190mb (ebbadbe4e, `bin/fxr_b0`). Every change is a hidden value; with it
+off every render is byte for byte the before binary's (`gold/gold.sh` 114 / 114, `hz/gold/gold.sh` 114 / 114).
+
+- **Orbit ← ValhallaSpaceModulator (hidden `orbit::voiceLaw`, #8, the translator only):** the reference's own voices,
+  measured black-box on click-train and still probes (`smcap/`): one sweep phase that runs on from load (a reset does not
+  restart it) at 10 |2 v − 1|^(10/3) Hz; every tap read through a first-order all-pass (Thiran) fractional delay; the
+  through-zero pair on smooth random paths over 0.5 … 2.5 × Depth (both at 1.75 × Depth at load, the − mode inverting one);
+  Octo's four-tap barber pole at 1/√2; Vari Up / Down's hard-wrapping ramps; two random taps for Ensemble / Symphonic; the
+  mode by the reference's own value law floor (11 v) − 1 (verb183b's saved 0.2727 / 0.5454 are Up / Down and TriFlange, which
+  the translator had played as Through-zero + / Octo). Up, Up / Down, Tri, Doubler and Vari Up keep round 190mb's voices
+  under the law (their new voices did not gate; for those files the sweep's start phase decides, which a render cannot
+  share with a capture made after minutes of earlier settings).
+
+| ValhallaSpaceModulator → Orbit (refcap030) | files | before → after | up / same / down |
+|---|---|---|---|
+| mode sweep | 48 | 3.23 → 3.38 | 7 / 41 / 0 |
+| pairs / sr48 / sr96 | 58 | 4.33 / 4.40 / 4.40 = | 0 / 58 / 0 |
+| verb183b captures | 17 | 4.18 = | 1 / 15 / 1 |
+| tp172d matched / refcap182 programme | 12 / 20 | 5.25 / 4.50 = | 0 / 32 / 0 |
+
+The one down is verb183b's single-impulse capture spM3 (3 → 2): its state's Mode 0.2727 is the reference's Up / Down (its
+own impulse shows the barber pole's two taps 5.0 ms apart); before, LYNX played it as Through-zero + (the wrong mode) and
+the impulse's spectrum happened to sit closer. Listed, not hidden: the mode correction is the parity fix.
+
+- **Horizon ← ValhallaFutureVerb (hidden `horizon::reaLaw`, #26):** Hidden `horizon::reaLaw` (#26; new instances and translated ValhallaFutureVerb states; read with the engine law and revision 1;
+a project saved before keeps revision 1 bit for bit). From this round's black-box probe renders of the reference (echo modes
+alone; Room / Chamber at five Sizes × three Decays): the Digital echo's slope-limited coder (impulse +19.2 → +2.2 dB), a
+four-head shifter for Reverse Up / Reverse Down / Sparkle, Analog / Reverse Up/Down / Lo-fi low-passes, and Room / Chamber's
+onset, late level and gain over Size. Time-window scorer, before → after, files up / same / down: probe bank mode 2.66 → 2.86
+(18 / 81 / 0), pairs 2.61 → 2.69 (3 / 33 / 0), sr44 / 48 / 96 2.25 / 2.19 / 2.25 → 2.44 / 2.38 / 2.44 (3 / 13 / 0 each),
+verb183b 2.82 → 2.89 (4 / 58 / 0), tp172d probes 3.20 → 3.25 (2 / 38 / 0), refcap182 programme 3.75 → 3.80 (1 / 19 / 0), tp172d
+matched =. Gold 114 / 114 byte-identical with the law off. CPU (instructions, 20 s): Digital +1.5 %, the four-head modes
++11 %, Analog +0.2 %, Room / Chamber +0.01 %. Still off: Digital's repeats under Feedback (the reference's die after one),
+Chamber's two-slope decay, the reference's level dependence (−20 dB input ~1.5 … 2 dB lower), Clean / Tape / Detune / Reverse /
+Swarm voicings (their fits lost on the bank).
 
 ## Round 190ls (Valhalla): Atrium on a dense late tank for the ValhallaRoom role
 

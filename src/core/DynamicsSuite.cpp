@@ -484,6 +484,8 @@ struct TwoWayBand
 };
 constexpr int twoWayBandCount = 3; // mid, low, high
 constexpr double twoWayLowHz = 88.0, twoWayHighHz = 2500.0;
+// round 190mj: the reference's own split frequencies (2^6.462166786 Hz, 2^11.287712097 Hz; REA_rodada190mj), TTM under revision 1
+constexpr double ttmLowHz = 88.167, ttmHighHz = 2500.0;
 constexpr TwoWayBand twoWayBands[twoWayBandCount] {
     { -7.2144, 3.0058, 0.2458, 0.3632, 0.5006, 0.5935, 0.2497, 0.6238, 0.8442, 0.9853, -0.0066, -0.0137, -0.0487, -0.0617, 0.1750, 0.1680, 0.0, 1.0112 }, // mid
     { -6.7508, 0.4605, 0.2400, 0.3538, 0.4901, 0.5810, 0.2523, 0.6282, 0.8564, 0.9994, 0.0595, 0.0678, 0.0614, 0.0778, 0.1724, 0.1717, 1.8325, 0.9783 }, // low
@@ -509,17 +511,18 @@ TwoWayLaw twoWayLaw (double thr, double r, double knee, double attMs, int band =
 struct TwoWaySplit
 {
     Biquad lowLp[2], lowHp[2], highLp[2], highHp[2], lowAp;
-    void set (double sr) noexcept
+    // (round 190mj: the splits' frequencies as parameters; revision 0 keeps 88 Hz / 2.5 kHz)
+    void set (double sr, double lowHz = twoWayLowHz, double highHz = twoWayHighHz) noexcept
     {
         constexpr double q = 0.7071067811865476, pi = 3.141592653589793;
         for (int k = 0; k < 2; ++k)
         {
-            lowLp[k].filter (sr, 0, twoWayLowHz, q);
-            lowHp[k].filter (sr, 1, twoWayLowHz, q);
-            highLp[k].filter (sr, 0, twoWayHighHz, q);
-            highHp[k].filter (sr, 1, twoWayHighHz, q);
+            lowLp[k].filter (sr, 0, lowHz, q);
+            lowHp[k].filter (sr, 1, lowHz, q);
+            highLp[k].filter (sr, 0, highHz, q);
+            highHp[k].filter (sr, 1, highHz, q);
         }
-        const auto w = 2.0 * pi * std::min (twoWayHighHz, sr * 0.45) / sr, cw = std::cos (w), alpha = std::sin (w) / (2.0 * q);
+        const auto w = 2.0 * pi * std::min (highHz, sr * 0.45) / sr, cw = std::cos (w), alpha = std::sin (w) / (2.0 * q);
         lowAp.set (1.0 - alpha, -2.0 * cw, 1.0 + alpha, 1.0 + alpha, -2.0 * cw, 1.0 - alpha);
     }
     void reset() noexcept
@@ -528,6 +531,14 @@ struct TwoWaySplit
             for (int k = 0; k < 2; ++k)
                 set[k].reset();
         lowAp.reset();
+    }
+    // round 190mj: one sample of one channel → out[0] mid, out[1] low, out[2] high (the same filters as process)
+    void split1 (float v, int ch, float* out) noexcept
+    {
+        out[1] = lowAp.process (lowLp[1].process (lowLp[0].process (v, ch), ch), ch);
+        const auto hp = lowHp[1].process (lowHp[0].process (v, ch), ch);
+        out[0] = highLp[1].process (highLp[0].process (hp, ch), ch);
+        out[2] = highHp[1].process (highHp[0].process (hp, ch), ch);
     }
     // a block of both channels → band[0] mid, band[1] low, band[2] high (each band[b][channel] holds n samples)
     template <typename Bands>
@@ -1082,6 +1093,42 @@ struct SlidingMax
         return v[(std::size_t) head];
     }
 };
+// round 190mj: the mean of the last n samples (n within the capacity; a running sum on fixed storage)
+struct Boxcar
+{
+    std::vector<double> v;
+    int pos = 0, len = 0;
+    double sum = 0.0;
+    void setup (int capacity)
+    {
+        v.assign ((std::size_t) std::max (1, capacity), 0.0);
+        clear();
+    }
+    void clear() noexcept
+    {
+        std::fill (v.begin(), v.end(), 0.0);
+        pos = len = 0;
+        sum = 0.0;
+    }
+    double push (double x, int n) noexcept
+    {
+        const int cap = (int) v.size();
+        n = std::clamp (n, 1, cap);
+        if (n != len) // (the length changed: the sum of the last n − 1 samples again)
+        {
+            len = n;
+            sum = 0.0;
+            for (int k = 1; k < n; ++k)
+                sum += v[(std::size_t) ((pos - k + cap) % cap)];
+        }
+        else
+            sum -= v[(std::size_t) ((pos - n + cap) % cap)]; // (the oldest of the window leaves)
+        v[(std::size_t) pos] = x;
+        sum += x;
+        pos = (pos + 1) % cap;
+        return sum / n;
+    }
+};
 
 // ---- round 190lg (REA_rodada190lg, Versatile): Pro-C 3's default style (LYNX's Allround), rebuilt from the reference's
 // own graph of generic elements: two gain computers (the usual quadratic knee, ratio and range, as the reduction share
@@ -1323,6 +1370,100 @@ inline double vmuOver (double y, double thrDb, double thrLin, double knee) noexc
     return over <= 0.0 ? 0.0 : (1.0 - std::exp (-over * 0.1151292546497023)) * y;
 }
 
+// ---- round 190mj (REA_rodada190mj, crest): Pro-C 3's TTM (LYNX's Two-way), rebuilt from the reference's band processors.
+// The three bands (fourth-order Linkwitz-Riley splits at the reference's own 2^6.4622 = 88.17 Hz and 2^11.2877 = 2.5 kHz:
+// round 190al's measured 88 Hz left a 0.3 degree phase error at 100 Hz) each run the same graph on their own band of the
+// side chain, and the band's audio is turned by that band's gain (a second split object of the reference, set to the same
+// frequencies at run time, is the side chain's):
+//  - the level: the magnitude, held for the Hold time (then falling at a rate set by the held level), held again over
+//    the look-ahead time, SQUARED, one follower on that power (attack / release per band, auto release T = k / (√y + 1)),
+//    back to the amplitude and to dB — an RMS-like reading;
+//  - two gain computers on that level: a downward one (the usual centred quadratic knee, × (1 − 1 / ratio) below 100 : 1,
+//    within the range) and an upward one (the expansion computer of round 190mb: a one-sided knee, × (1 − 1 / ratio_u),
+//    within 0.6 × the range), the gain = lift − reduction, smoothed by two moving averages of half the look-ahead time;
+//  - per band (mid / low / high): the downward threshold is the knob + 3 / + 0 / − 2 dB, its ratio 2/3 of the knob's
+//    (at least 1 : 1) / 2/3 / the knob's; the follower's attack 1/4 / 1/2 / 1/8 of the attack knob's time, its release
+//    1/4 / 1/4 / 0.1125 of the release knob's; the auto release's constant 3.6 (T_band / 2.5 s)² + 0.1 (T_band = the
+//    knob's release, × 0.45 on the high band);
+//  - the upward computer is the same for every band: threshold the knob − 7 dB + half the knee, ratio_u = 1 + 3.17 ·
+//    √((ratio − 1) / 99) (ratio within 1 … 100).
+// [EXEC] The reference's output also carries a level-independent cut, the same in every band and knee-independent, as
+// Upward's (round 190mb): 0.6 · (1 − 1 / ratio) · √a · (threshold + the upward range) dB when positive (a = the attack knob's
+// position 0 … 1; trial190k's threshold × ratio × knee × attack grid on the 1 kHz / 100 Hz / 8 kHz stairs: the scale fits
+// 0.601, 0.04 dB rms over 189 settings × 4 regions). The graph does not show where it is applied; LYNX applies it as
+// measured, with the upward range (0.6 × the range: 36 dB at every capture's 60) as Upward's inference.
+// LYNX keeps issue #77's fade under −80 dBFS and its threshold bound (a lift never takes the input's peak past the threshold).
+struct TtmLaw
+{
+    // per band in LYNX's order (mid, low, high)
+    double attShare[3] { 0.25, 0.5, 0.125 }, relShare[3] { 0.25, 0.25, 0.1125 }, autoShare[3] { 1.0, 1.0, 0.45 };
+    double downOffset[3] { 3.0, 0.0, -2.0 }, ratioScale[3] { 0.6667, 0.6667, 1.0 };
+    double upOffset = -7.0, upKnee = 0.5, upSpan = 3.17, upRange = 0.6, rangeMax = 60.0, ratioMax = 100.0;
+    double autoA = 3.6, autoB = 0.1, autoRef = 2.5;
+    double holdRel = 1.0e-4;      // the hold's fall: T = the held level × the hold time (ms) × this (s)
+    double smoothTrim = 0.125;    // the look-ahead smoothing: two moving averages of L / 2 − this (ms)
+    double cutScale = 0.6;        // the measured cut's scale (see above)
+    double liftSafe = 1.0;                 // issue #77's threshold bound (1 = on; see detectV2)
+    double liftFade = 1.0, fadeFloor = -100.0, fadeSpan = 20.0; // issue #77's fade: no lift under −100 dBFS, full from −80
+    double liftCap = 1.0e9;                // (lab) revision 0's 30 dB ceiling: off (the upward computer's 0.6 × range bounds it)
+    double baseAdd[3] { 0.0, 0.0, 0.0 };   // (lab) per-band additions to the cut (dB)
+};
+inline const TtmLaw& ttmLaw() noexcept
+{
+#ifdef LYNX_CLAB
+    static const TtmLaw law = [] {
+        TtmLaw t;
+        for (int b = 0; b < 3; ++b)
+        {
+            const std::string k = std::to_string (b);
+            t.attShare[b] = clab (("tA" + k).c_str(), t.attShare[b]);
+            t.relShare[b] = clab (("tR" + k).c_str(), t.relShare[b]);
+            t.downOffset[b] = clab (("tD" + k).c_str(), t.downOffset[b]);
+            t.baseAdd[b] = clab (("tB" + k).c_str(), t.baseAdd[b]);
+        }
+        t.upOffset = clab ("tUp", t.upOffset);
+        t.upRange = clab ("tUR", t.upRange);
+        t.cutScale = clab ("tCut", t.cutScale);
+        t.liftSafe = clab ("tSafe", t.liftSafe);
+        t.liftFade = clab ("tFade", t.liftFade);
+        t.liftCap = clab ("tCap", t.liftCap);
+        return t;
+    }();
+#else
+    static const TtmLaw law;
+#endif
+    return law;
+}
+// one band's static settings
+struct TtmBand
+{
+    double t1 = 0.0, r1 = 1.0, t2 = 0.0, s2 = 0.0, lim1 = 0.0, lim2 = 0.0, base = 0.0;
+};
+inline TtmBand ttmBand (const TtmLaw& t, int b, double thr, double rat, double kn, double rng, double attMs) noexcept
+{
+    TtmBand o;
+    const auto r = std::clamp (rat, 1.0, t.ratioMax);
+    o.t1 = thr + t.downOffset[b];
+    o.r1 = std::clamp (r * t.ratioScale[b], 1.0, t.ratioMax);
+    o.t2 = thr + t.upOffset + t.upKnee * kn;
+    o.s2 = 1.0 - 1.0 / (1.0 + t.upSpan * std::sqrt ((r - 1.0) / (t.ratioMax - 1.0)));
+    o.lim1 = rng;
+    o.lim2 = t.upRange * std::clamp (rng, 0.0, t.rangeMax);
+    // the measured cut (the same in every band): cutScale · (1 − 1 / ratio) · √a · (threshold + the upward range), when positive
+    const auto a = std::cbrt (std::clamp ((attMs - 0.005) / 250.0, 0.0, 1.0));
+    o.base = -t.cutScale * (rat < 1.0e8 ? 1.0 - 1.0 / rat : 1.0) * std::sqrt (a) * std::max (0.0, thr + o.lim2) + t.baseAdd[b];
+    return o;
+}
+// the band's gain (dB, + = up) for a level (dB) from the follower
+inline double ttmGain (const TtmBand& o, double lev, double kn) noexcept
+{
+    auto down = v2Knee (lev - o.t1, kn);
+    if (o.r1 < 100.0)
+        down -= down / o.r1;
+    down = std::max (0.0, std::min (down, o.lim1));
+    return upExpand (o.t2 - lev, kn, o.s2, o.lim2) - down + o.base;
+}
+
 bool revisionStaticDb (const EffectParams& p, double inputDb, double& gainDb) noexcept
 {
     if (! revisionOn (p))
@@ -1426,6 +1567,15 @@ bool revisionStaticDb (const EffectParams& p, double inputDb, double& gainDb) no
         gainDb = upExpand (thr - inputDb, kn, s, lim) - u.cutScale * s * std::sqrt (a) * std::max (0.0, thr + lim);
         return true;
     }
+    if (st == Style::twoWay && on (p[law]))
+    {
+        // round 190mj: a steady level in the mid band (the follower reads a steady power exactly)
+        const auto& t = ttmLaw();
+        gainDb = ttmGain (ttmBand (t, 0, thr, rat, kn, rng, attackMs (p[attack])), inputDb, kn);
+        if (gainDb > 0.0 && t.liftFade > 0.0) // (issue #77's fade, as the detector)
+            gainDb *= std::clamp ((inputDb - t.fadeFloor) / t.fadeSpan, 0.0, 1.0);
+        return true;
+    }
     if (st == Style::variMu && on (p[law]))
     {
         // round 190mb: a steady level (the stage's gain at the peak sample): the loop settles where the follower holds
@@ -1477,8 +1627,19 @@ public:
         fetTone.set (sr);
         splitAudio.set (sr);
         splitSide.set (sr);
+        // round 190mj: TTM's own split (the reference's 2^6.4622 Hz / 2^11.2877 Hz)
+        splitAudio1.set (sr, clab ("tLo", ttmLowHz), clab ("tHi", ttmHighHz));
+        splitSide1.set (sr, clab ("tLo", ttmLowHz), clab ("tHi", ttmHighHz));
         for (auto& h : holdMax) // round 190kw: Mastering's 10 ms hold at up to 8x oversampling
             h.setup ((int) (rate * 0.01 * 8.0) + 8);
+        for (auto& band : ttmLaMax) // round 190mj: TTM's look-ahead (up to 20 ms) and its smoothing (up to 10 ms), base rate
+            for (auto& h : band)
+                h.setup ((int) (rate * 0.02) + 8);
+        for (auto& band : ttmAvg)
+            for (auto& ch : band)
+                for (auto& a : ch)
+                    a.setup ((int) (rate * 0.01) + 8);
+        ttmUp.assign ((std::size_t) (6 * maxBlock * maxFactor), 0.0f); // round 190mj: TTM's band gains at the oversampled rate
         latencyMs = -1.0; // re-apply the delays
         configure (lastParams);
         reset();
@@ -1496,6 +1657,9 @@ public:
             o.reset();
         for (auto& o : osSide)
             o.reset();
+        for (auto& o : ttmOsGain)
+            o.reset();
+        splitAudioUp.reset();
         for (auto& b : scEq)
             for (auto& s : b)
                 s.reset();
@@ -1503,6 +1667,13 @@ public:
             d = {};
         for (auto& h : holdMax)
             h.clear();
+        for (auto& band : ttmLaMax)
+            for (auto& h : band)
+                h.clear();
+        for (auto& band : ttmAvg)
+            for (auto& ch : band)
+                for (auto& a : ch)
+                    a.clear();
         for (auto& pk : peaks)
             pk.fill (0.0f);
         dc.reset();
@@ -1510,6 +1681,8 @@ public:
         splitAudio.reset();
         oeZ = {};
         splitSide.reset();
+        splitAudio1.reset();
+        splitSide1.reset();
         for (auto& b : bandDet)
             for (auto& d : b)
                 d = {};
@@ -1572,6 +1745,8 @@ private:
         double va1 = 0.0, va2 = 0.0, vb1 = 0.0, vb2 = 0.0, vF = 0.0; // round 190lg: Versatile's two low-passes, its slew limiter
         double q3 = 0.0; // round 190lp: a fourth follower (Smooth's F1)
         V2Cache k3;
+        double tHeld = 0.0, tHold = 0.0; // round 190mj: TTM's hold (the held peak, the processor's output)
+        int tHoldLeft = 0;
     };
 
     // per-chunk settings at the rate the detector runs at
@@ -1618,6 +1793,12 @@ private:
         // round 190mb: Vari-Mu (v2 = 12): the loop gain r' − 1, the threshold (linear), the follower's coefficients
         double vmK = 0.0, vmThrLin = 1.0, vmAtt = 1.0, vmRel = 1.0, vmAutoK = 1.0;
         bool vmAuto = false;
+        // round 190mj: TTM (v2 = 13, Two-way under the revision): each band's computers and follower, the band being run,
+        // the hold (samples, fall factor), the look-ahead hold and smoothing lengths (samples)
+        std::array<TtmBand, 3> ttm {};
+        std::array<V2Follow, 3> ttmF {};
+        int ttmB = 0, ttmHoldN = 0, ttmLaN = 0, ttmAvgN = 1;
+        double ttmHoldRel = 0.0;
     };
     double styleGain (const Ctx& x, double level) const noexcept
     {
@@ -1646,6 +1827,10 @@ private:
         for (auto* set : { &os, &osSide })
             for (auto& o : *set)
                 o.setFactor (std::max (2, osFactor));
+        for (auto& o : ttmOsGain) // round 190mj: TTM's band gains to the oversampled rate, and its split there
+            o.setFactor (std::max (2, osFactor));
+        splitAudioUp.set (sr * std::max (2, osFactor), ttmLowHz, ttmHighHz);
+        splitAudioUp.reset();
         latency.store (laSamples + osLat, std::memory_order_relaxed);
     }
 
@@ -1916,6 +2101,33 @@ private:
             c.vmAutoK = v.autoA * r2 + v.autoB;
             c.window = 0;
         }
+        else if (revisionOn (p) && c.st == Style::twoWay && on (p[law]))
+        {
+            // round 190mj: TTM (see TtmLaw); the bands run at the base rate
+            const auto& t = ttmLaw();
+            const auto attS = 0.25 * std::clamp ((att - 0.005) / 250.0, 0.0, 1.0);
+            const auto relS = 0.01 + 2.49 * std::clamp ((releaseMs (p[release]) - 10.0) / 2490.0, 0.0, 1.0);
+            c.v2 = 13;
+            for (int b = 0; b < 3; ++b)
+            {
+                c.ttm[(std::size_t) b] = ttmBand (t, b, c.thr, c.rat, c.kn, c.rng, att);
+                auto& f = c.ttmF[(std::size_t) b];
+                f = {};
+                f.att = t.attShare[b] * attS;
+                f.rel = t.relShare[b] * relS;
+                f.autoRel = on (p[autoRelease]);
+                const auto tb = std::min (t.autoShare[b] * relS, t.autoRef) / t.autoRef;
+                f.autoK = t.autoA * tb * tb + t.autoB;
+            }
+            const auto holdT = holdMs (p[hold]);
+            c.ttmHoldN = (int) (holdT * 0.001 * rate);
+            c.ttmHoldRel = holdT * t.holdRel;
+            const auto la = std::max (0.0, std::min (lookaheadMs (p[lookahead]), latencyMs));
+            c.ttmLaN = (int) (la * 0.001 * rate);
+            c.ttmAvgN = (int) (rate * 0.001 * std::clamp (0.5 * la - t.smoothTrim, 0.0, 20.0)) + 1;
+            c.holdSamples = 0;
+            c.window = 0;
+        }
         else if (on (p[revision]) && c.st == Style::opEl)
         {
             // round 190lp: Op-El (see OpElLaw)
@@ -2155,6 +2367,51 @@ private:
                 d.q2 = mag * g;
                 gr = std::min (x.rng, g > 1e-10 ? -20.0 * std::log10 (g) : 200.0);
                 break;
+            }
+            case 13: // round 190mj: TTM (see TtmLaw): one band of one channel; returns the band's gain (dB, + = up); its own hold
+            {
+                const auto b = (std::size_t) x.ttmB;
+                auto lev = mag;
+                if (x.ttmHoldN > 0)
+                {
+                    // the hold processor: the peak over the hold time, then a fall timed by the held level
+                    if (lev >= d.tHeld)
+                    {
+                        d.tHeld = lev;
+                        d.tHoldLeft = x.ttmHoldN;
+                    }
+                    else if (d.tHoldLeft > 0)
+                        --d.tHoldLeft;
+                    else
+                        d.tHeld = lev;
+                    d.tHold = d.tHeld >= d.tHold ? d.tHeld : d.tHold + (d.tHeld - d.tHold) * v1Coef (d.tHeld * x.ttmHoldRel * rate);
+                    lev = d.tHold;
+                }
+                if (x.ttmLaN > 0) // the look-ahead: the peak over its time
+                    lev = ttmLaMax[b][(std::size_t) c].push (lev, x.ttmLaN);
+                // the follower on the power, read back in dB (√, then 20 log10, floor −180)
+                const auto y = v2Step (d.q0, lev * lev, x.ttmF[b], rate, d.k0);
+                const auto ld = y > 1.0e-18 ? std::max (-180.0, 10.0 * std::log10 (y)) : -180.0;
+                auto g = ttmGain (x.ttm[b], ld, x.kn);
+                if (x.ttmAvgN > 1) // the look-ahead smoothing: two moving averages
+                    g = ttmAvg[b][(std::size_t) c][1].push (ttmAvg[b][(std::size_t) c][0].push (g, x.ttmAvgN), x.ttmAvgN);
+                // issue #77's bounds on a lift (revision 0's two-way): it fades out under −80 dBFS (gone by −100: silence and
+                // noise are never raised; the reference lifts them, the bank's TTM files 8.62 without the fade, 8.54 with it,
+                // owner decision) and never takes the band's peak (instant attack) past the threshold, so a hit arriving into
+                // a lifted gap is pulled down on its first sample. Revision 0's 30 dB ceiling is not kept: the upward
+                // computer's own 0.6 × the range bounds the lift (36 dB at most)
+                d.peak = levelDb > d.peak ? levelDb : x.aP * d.peak + (1.0 - x.aP) * levelDb;
+                if (g > 0.0)
+                {
+                    const auto& tl = ttmLaw();
+                    if (tl.liftFade > 0.0)
+                        g *= std::clamp ((ld - tl.fadeFloor) / tl.fadeSpan, 0.0, 1.0);
+                    g = std::min (g, tl.liftCap);
+                    if (tl.liftSafe > 0.0)
+                        g = std::min (g, std::max (0.0, x.thr - d.peak));
+                }
+                d.sustain = x.slowCoef * d.sustain + (1.0 - x.slowCoef) * std::max (0.0, -g);
+                return g;
             }
             case 6: // Punch: one follower on the dB reduction
                 gr = v2Step (d.q0, curve (levelDb), x.f0, rate, d.k0);
@@ -2492,36 +2749,82 @@ private:
             // (the detector's signal is the audio itself unless a side-chain option or the look-ahead sets them apart:
             // then one split serves both)
             const bool own = ! std::equal (sideL.begin(), sideL.begin() + n, wl.begin()) || ! std::equal (sideR.begin(), sideR.begin() + n, wr.begin());
+            const bool ttm = x.v2 == 13; // round 190mj: TTM's own split
             if (own)
-                splitSide.process (sideL.data(), sideR.data(), n, bandSide);
-            splitAudio.process (wl.data(), wr.data(), n, bandAudio);
+                (ttm ? splitSide1 : splitSide).process (sideL.data(), sideR.data(), n, bandSide);
+            (ttm ? splitAudio1 : splitAudio).process (wl.data(), wr.data(), n, bandAudio);
             const auto& side = own ? bandSide : bandAudio;
-            std::fill (wl.begin(), wl.begin() + n, 0.0f);
-            std::fill (wr.begin(), wr.begin() + n, 0.0f);
-            for (int b = 0; b < twoWayBandCount; ++b)
+            if (ttm && factor > 1 && ! ttmUp.empty() && clab ("tOs", 1.0) > 0.0)
             {
-                x.twoWay = twoWayLaw (x.thr, x.rat, x.kn, att, b);
-                maxGr = std::max (maxGr, gains (side[(std::size_t) b][0].data(), side[(std::size_t) b][1].data(), n, detLink, bandLag, x,
-                                                gl.data(), gr.data(), b));
-                if (ms)
-                    routeMs (mode, gl.data(), gr.data(), n);
-                for (int i = 0; i < n; ++i)
+                // round 190mj: TTM oversampled — the reference runs its graph at the oversampled rate: the audio is split
+                // there (the split's phase and shares at 8 kHz move by up to 0.06 rad / 0.2 dB between 48 and 96 kHz), the
+                // band gains (at the base rate) are brought there through the audio's own up path, and the sum through the
+                // stage comes back down
+                for (int b = 0; b < twoWayBandCount; ++b)
                 {
-                    wl[(std::size_t) i] += bandAudio[(std::size_t) b][0][(std::size_t) i] * gl[(std::size_t) i];
-                    wr[(std::size_t) i] += bandAudio[(std::size_t) b][1][(std::size_t) i] * gr[(std::size_t) i];
+                    x.twoWay = twoWayLaw (x.thr, x.rat, x.kn, att, b);
+                    x.ttmB = b;
+                    auto& g = ttmBandGain[(std::size_t) b];
+                    maxGr = std::max (maxGr, gains (side[(std::size_t) b][0].data(), side[(std::size_t) b][1].data(), n, detLink, bandLag, x,
+                                                    g[0].data(), g[1].data(), b));
+                    if (ms)
+                        routeMs (mode, g[0].data(), g[1].data(), n);
+                }
+                const int m = n * factor, stride = maxBlock * maxFactor;
+                for (int b = 0; b < twoWayBandCount; ++b)
+                    for (int c = 0; c < 2; ++c)
+                    {
+                        auto* dst = ttmUp.data() + (std::size_t) ((b * 2 + c) * stride);
+                        int k = 0;
+                        ttmOsGain[(std::size_t) (b * 2 + c)].process (ttmBandGain[(std::size_t) b][(std::size_t) c].data(), n, [&] (float v) noexcept {
+                            dst[std::min (k++, m - 1)] = v;
+                            return 0.0f;
+                        });
+                    }
+                for (int c = 0; c < 2; ++c)
+                {
+                    const auto* g0 = ttmUp.data() + (std::size_t) (c * stride);
+                    const auto* g1 = ttmUp.data() + (std::size_t) ((2 + c) * stride);
+                    const auto* g2 = ttmUp.data() + (std::size_t) ((4 + c) * stride);
+                    int k = 0;
+                    os[(std::size_t) c].process (c == 0 ? wl.data() : wr.data(), n, [&] (float v) noexcept {
+                        float band[3];
+                        splitAudioUp.split1 (v, c, band);
+                        const auto i = std::min (k++, m - 1);
+                        return stage (band[0] * g0[i] + band[1] * g1[i] + band[2] * g2[i], makeup, ch, pre, drv);
+                    });
                 }
             }
-            if (factor == 1)
-                for (int i = 0; i < n; ++i)
-                {
-                    wl[(std::size_t) i] = stage (wl[(std::size_t) i], makeup, ch, pre, drv);
-                    wr[(std::size_t) i] = stage (wr[(std::size_t) i], makeup, ch, pre, drv);
-                }
             else
-                for (int c = 0; c < 2; ++c)
-                    os[(std::size_t) c].process (c == 0 ? wl.data() : wr.data(), n, [&] (float v) noexcept {
-                        return stage (v, makeup, ch, pre, drv);
-                    });
+            {
+                std::fill (wl.begin(), wl.begin() + n, 0.0f);
+                std::fill (wr.begin(), wr.begin() + n, 0.0f);
+                for (int b = 0; b < twoWayBandCount; ++b)
+                {
+                    x.twoWay = twoWayLaw (x.thr, x.rat, x.kn, att, b);
+                    x.ttmB = b; // round 190mj
+                    maxGr = std::max (maxGr, gains (side[(std::size_t) b][0].data(), side[(std::size_t) b][1].data(), n, detLink, bandLag, x,
+                                                    gl.data(), gr.data(), b));
+                    if (ms)
+                        routeMs (mode, gl.data(), gr.data(), n);
+                    for (int i = 0; i < n; ++i)
+                    {
+                        wl[(std::size_t) i] += bandAudio[(std::size_t) b][0][(std::size_t) i] * gl[(std::size_t) i];
+                        wr[(std::size_t) i] += bandAudio[(std::size_t) b][1][(std::size_t) i] * gr[(std::size_t) i];
+                    }
+                }
+                if (factor == 1)
+                    for (int i = 0; i < n; ++i)
+                    {
+                        wl[(std::size_t) i] = stage (wl[(std::size_t) i], makeup, ch, pre, drv);
+                        wr[(std::size_t) i] = stage (wr[(std::size_t) i], makeup, ch, pre, drv);
+                    }
+                else
+                    for (int c = 0; c < 2; ++c)
+                        os[(std::size_t) c].process (c == 0 ? wl.data() : wr.data(), n, [&] (float v) noexcept {
+                            return stage (v, makeup, ch, pre, drv);
+                        });
+            }
         }
         else if (factor == 1)
         {
@@ -2666,9 +2969,18 @@ private:
     Detector* detCur = det.data();
     std::array<std::array<Detector, 2>, 2> bandDet {};
     std::array<std::array<double, 2>, 2> oeZ {}; // round 190lp: Op-El's shelf state per side-chain channel
+    // round 190mj: TTM's look-ahead hold and smoothing per band and channel (sized in prepare)
+    std::array<std::array<SlidingMax, 2>, 3> ttmLaMax;
+    std::array<std::array<std::array<Boxcar, 2>, 2>, 3> ttmAvg;
     std::array<std::array<std::array<float, bandGainCapacity>, 2>, 2> bandGainDelay {};
     std::array<int, 2> bandGainPos {};
-    TwoWaySplit splitAudio, splitSide;
+    TwoWaySplit splitAudio, splitSide, splitAudio1, splitSide1; // (1: round 190mj's TTM, revision 1)
+    // round 190mj: TTM oversampled — the audio's split at the oversampled rate, each band's gain brought there through the
+    // audio's own up path (so they stay aligned), the band gains at the base rate and at the oversampled rate
+    TwoWaySplit splitAudioUp;
+    std::array<mixsuite::Oversampler, 6> ttmOsGain;
+    std::array<std::array<std::array<float, maxBlock>, 2>, 3> ttmBandGain {};
+    std::vector<float> ttmUp;
     std::array<std::array<std::array<float, maxBlock>, 2>, twoWayBandCount> bandSide {}, bandAudio {};
     DcBlock dc;
     const float* scL = nullptr;

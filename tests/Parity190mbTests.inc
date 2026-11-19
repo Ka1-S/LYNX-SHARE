@@ -121,7 +121,7 @@ TEST (parity190mb_orbit_spacemodulator_level_law)
     if (entry == nullptr)
         return;
     const auto sm = makeSubstituteSlot (*entry, &id);
-    CHECK (sm.params[(std::size_t) ob::smLaw] == 1.0f && savedEffectParamCount (sm) == (std::size_t) ob::smLaw + 1);
+    CHECK (sm.params[(std::size_t) ob::smLaw] == 1.0f && savedEffectParamCount (sm) >= (std::size_t) ob::smLaw + 1); // round 190mj: + voiceLaw
     auto old = sm;
     upgradeLoadedEffectParams (old, (std::size_t) ob::smLaw);
     CHECK (old.params[(std::size_t) ob::smLaw] == 0.0f);
@@ -173,7 +173,7 @@ TEST (parity190mb_horizon_revision_per_mode_trim)
     namespace hz = verbs::horizon;
     CHECK (hz::revision == hz::paramCount && effectInfo (EffectKind::horizon).params.size() == (std::size_t) hz::paramCount);
     const auto s = makeEffectSlot (EffectKind::horizon);
-    CHECK (s.params[(std::size_t) hz::revision] == 1.0f && savedEffectParamCount (s) == (std::size_t) hz::revision + 1);
+    CHECK (s.params[(std::size_t) hz::revision] == 1.0f && savedEffectParamCount (s) >= (std::size_t) hz::revision + 1); // (round 190mj: reaLaw follows)
     auto old = s;
     upgradeLoadedEffectParams (old, (std::size_t) hz::revision);
     CHECK (old.params[(std::size_t) hz::revision] == 0.0f);
@@ -183,6 +183,7 @@ TEST (parity190mb_horizon_revision_per_mode_trim)
         slot.params[0] = 1.0f; // Mix
         slot.params[22] = (float) mode / (float) (hz::reverbModeCount - 1); // Reverb mode
         slot.params[(std::size_t) hz::revision] = rev;
+        slot.params[(std::size_t) hz::reaLaw] = 0.0f; // (round 190mj: revision 1 alone, as this round left it)
         const int n = (int) (1.5 * sr);
         l.assign ((std::size_t) n, 0.0f), r.assign ((std::size_t) n, 0.0f);
         l[(std::size_t) (0.05 * sr)] = r[(std::size_t) (0.05 * sr)] = 0.5f;

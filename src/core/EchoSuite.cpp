@@ -2998,6 +2998,7 @@ public:
         sr = rate;
         for (auto& c : ch)
             c.line.allocate (sr * 0.25);
+        vPhase = 0.0; // round 190mj: the voice law's sweep runs on from here; reset() leaves it (the reference's does too)
         reset();
     }
 
@@ -3013,6 +3014,15 @@ public:
         }
         phase = fast = 0.0;
         speedRandom.seed (0x51ed27u);
+        std::uint32_t vseed = 0x2545f491u;
+        vRate = 0.0; // the voice law's filters are set again at the next block
+        for (auto& v : vs)
+        {
+            v = VoiceState {};
+            for (auto& w : v.wander)
+                w.seed (vseed += 0x9e3779b9u);
+            v.wander[0].from = v.wander[1].from = voiceFit().tzStart; // the through-zero pair starts together (17.5 ms at 10 ms)
+        }
     }
 
     void process (float* l, float* r, int n, const EffectParams& p, double) noexcept override
@@ -3021,7 +3031,15 @@ public:
             prepare (sr);
         float dryGain = 1.0f, wetGain = 0.0f;
         equalPowerMix (p[mix], dryGain, wetGain);
-        const auto m = modeOf (p[mode]);
+        // round 190mj: under the voice law the reference's own value law, floor (11 v) − 1 (Orbit's adds 0.001 so its own
+        // stored values land safely; the reference's saved values just under k / 11, e.g. 0.2727, belong to the mode below)
+        const auto m = p[voiceLaw] >= 0.5f ? (Mode) std::clamp ((int) std::floor ((double) clamp01 (p[mode]) * modeCount + 1e-5) - 1, 0, modeCount - 1)
+                                           : modeOf (p[mode]);
+        if (p[voiceLaw] >= 0.5f && voiceLawMode (m)) // round 190mj: ValhallaSpaceModulator's own voices
+        {
+            processVoices (l, r, n, p, m, dryGain, wetGain);
+            return;
+        }
         if (p[smLaw] >= 0.5f) // round 190mb: the SpaceModulator role's wet level per mode, with the feedback's resonance
             wetGain *= (float) std::pow (10.0, smModeDb (m) * std::min (1.0, std::abs (bipolar (p[feedback])) / 0.5) / 20.0);
         const auto hz = rateHz (p[rate]);
@@ -3164,6 +3182,266 @@ private:
         }
         return 0.0f;
     }
+
+    // ---- round 190mj [EXEC] (orbit::voiceLaw): ValhallaSpaceModulator's own voices -------------------------------------
+    // Measured black-box on the reference (refcap030's host, round 190mj's probes: click trains every 60 ms at Rate 0.1 /
+    // 1 Hz, Depth 2 / 10 / 30 ms, Manual 0 / 1.28 ms, Feedback 0 / +50 %, each mode, a click on L then on R; and still
+    // probes at Rate 0, Feedback 0 / ±50 / 100 %). LYNX's own code and fits; nothing of the reference is copied.
+    // - The sweep is one phase that runs on from load (a reset does not restart it), at 10 |2 v − 1|^(10/3) Hz.
+    // - Every tap is read through a first-order all-pass fractional delay (Thiran: η = (1 − d) / (1 + d), d the fraction
+    //   of the delay in samples) — flat in level at any position, where linear interpolation dulls the top.
+    // - Delays: 0.42 samples + |Manual| + Depth × the voice's shape (Depth × 0.99954, within 0.002 samples on the probes).
+    struct Wander // a smooth random value in [−1, 1]: a new random target every `1 / rate` seconds, cosine-eased
+    {
+        Noise noise;
+        double from = 0.0, to = 0.0, t = 0.0;
+        void seed (std::uint32_t s) noexcept { noise.s = s == 0 ? 1u : s; from = 0.0; to = noise.next(); t = 0.0; }
+        double next (double step) noexcept
+        {
+            t += step;
+            if (t >= 1.0)
+            {
+                t -= std::floor (t);
+                from = to;
+                to = noise.next();
+            }
+            return from + (to - from) * (0.5 - 0.5 * std::cos (pi * t));
+        }
+    };
+    struct Biquad // y = b0 x + b1 x1 + b2 x2 − a1 y1 − a2 y2; the measured 48 kHz sections, carried to the running rate by
+    {             // matching each real pole / zero (r → r^(48000 / rate), the DC gain kept)
+        double b0 = 1.0, b1 = 0.0, b2 = 0.0, a1 = 0.0, a2 = 0.0, x1 = 0.0, x2 = 0.0, y1 = 0.0, y2 = 0.0;
+        void set (const double (&c)[5], double scale, double rate) noexcept
+        {
+            b0 = c[0] * scale; b1 = c[1] * scale; b2 = c[2] * scale; a1 = c[3]; a2 = c[4];
+            if (std::abs (rate - 48000.0) < 1.0)
+                return;
+            const double k = 48000.0 / rate;
+            const auto roots = [] (double p, double q, double& r0, double& r1) { // z² + p z + q (real roots only)
+                const double d = p * p - 4.0 * q;
+                if (d < 0.0) return false;
+                r0 = 0.5 * (-p + std::sqrt (d)); r1 = 0.5 * (-p - std::sqrt (d)); return true;
+            };
+            const auto mapRoot = [k] (double r) { return r > 0.0 ? std::pow (r, k) : r; };
+            const double dc = (b0 + b1 + b2) / (1.0 + a1 + a2);
+            double p0, p1, z0, z1;
+            if (roots (a1, a2, p0, p1)) { p0 = mapRoot (p0); p1 = mapRoot (p1); a1 = -(p0 + p1); a2 = p0 * p1; }
+            if (b0 != 0.0 && roots (b1 / b0, b2 / b0, z0, z1)) { z0 = mapRoot (z0); z1 = mapRoot (z1); b1 = -b0 * (z0 + z1); b2 = b0 * z0 * z1; }
+            const double dcNow = (b0 + b1 + b2) / (1.0 + a1 + a2);
+            if (std::abs (dcNow) > 1e-9) { const double g = dc / dcNow; b0 *= g; b1 *= g; b2 *= g; }
+        }
+        double run (double x) noexcept
+        {
+            const double y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+            x2 = x1; x1 = x; y2 = y1; y1 = y;
+            return y;
+        }
+    };
+    struct VoiceState
+    {
+        std::array<double, 4> ap {}; // all-pass interpolators, one per tap
+        std::array<Wander, 4> wander;
+        std::array<double, 2> tri {}; // random-turn triangle (Doubler): position, direction
+        Biquad post, loop;
+        double fb = 0.0;
+        double xa = 0.0, ya = 0.0, xb = 0.0, yb = 0.0; // Tri's decorrelating all-passes
+    };
+
+    static double thiran (const Line& line, double D, double& y1) noexcept
+    {
+        D = std::clamp (D, 0.0, line.maxDelay() - 2.0);
+        const int I = (int) D;
+        const double d = D - (double) I, eta = (1.0 - d) / (1.0 + d);
+        const double y = eta * (double) line.tap (I + 1) + (double) line.tap (I + 2) - eta * y1; // after the push: tap (1) = x[n]
+        y1 = y;
+        return y;
+    }
+
+    // the measured per-mode constants (LYNX's own fits, output-error least squares on the still probes' impulse responses);
+    // LYNX_VERB_FIT builds read overrides from LYNX_ORBIT_V2 (k=v,...)
+    struct VoiceFit
+    {
+        // the feedback path at +50 % (loop gain 0.378 included): −0.41 at the lows, +0.20 at the top, crossing near 1 kHz
+        double loopUp[5] = { 0.37786, 0.0, 0.0, 0.0, 0.0 };
+        double loopVari[5] = { 0.37786, 0.0, 0.0, 0.0, 0.0 };
+        // Up / Down's output: +3.4 dB at the lows, −9.6 dB at the top (inverted); Vari's: −2.4 dB at the lows
+        double postUd[5] = { -0.01573, 0.29665, -0.37254, -1.01432, 0.07605 };
+        double postVari[5] = { 1.0, 0.0, 0.0, 0.0, 0.0 };
+        double triMid = 0.655, triAmp = 0.515;              // Tri's triangle (× Depth)
+        double tzMid = 1.5, tzAmp = 1.0, tzStart = 0.25;    // through-zero taps (× Depth): 5 … 25 ms at 10 ms, start 17.5 ms
+        double dbMid = 0.66, dbAmp = 0.31, dbSpeed = 1.33;  // Doubler: centre, half range (× Depth), speed (Depth × rate)
+        double rdOff = 0.0;                                 // Rise / fall: the right channel's phase offset (both centred at load)
+        double triAp = 0.6;                                 // Tri: the two decorrelating all-passes (±)
+        // bit k: mode k runs these voices. Gated per file (refcap030 / tp172d / verb183b / refcap182): Through-zero ±, Octo,
+        // Drift rise / fall, Ensemble, Symphonic. Rise, Rise / fall, Tri, Doubler and Drift rise keep round 190mb's voices:
+        // their new voices sounded no closer on the gate banks (the sweep's start phase, which the banks cannot share,
+        // decides those files; Tri's two-sided voice took verb183b's impulse capture spM6 3 → 2)
+        double modes = 1836;
+        double tzLoop = 0.70711;                            // the through-zero pair feeds back its sum / √2
+    };
+    static VoiceFit& voiceFit() noexcept
+    {
+        static VoiceFit f;
+       #ifdef LYNX_VERB_FIT
+        static const bool loaded = [] {
+            if (const char* v = std::getenv ("LYNX_ORBIT_V2"))
+            {
+                std::string str (v);
+                std::size_t at = 0;
+                while (at < str.size())
+                {
+                    auto end = str.find (',', at);
+                    if (end == std::string::npos) end = str.size();
+                    const auto item = str.substr (at, end - at);
+                    const auto eq = item.find ('=');
+                    if (eq != std::string::npos)
+                    {
+                        const auto k = item.substr (0, eq);
+                        const double x = std::atof (item.c_str() + eq + 1);
+                        double* t = k == "triMid" ? &f.triMid : k == "triAmp" ? &f.triAmp : k == "tzMid" ? &f.tzMid
+                                  : k == "tzAmp" ? &f.tzAmp : k == "tzStart" ? &f.tzStart : k == "dbMid" ? &f.dbMid
+                                  : k == "dbAmp" ? &f.dbAmp : k == "dbSpeed" ? &f.dbSpeed : k == "rdOff" ? &f.rdOff
+                                  : k == "tzLoop" ? &f.tzLoop : k == "triAp" ? &f.triAp : k == "modes" ? &f.modes : nullptr;
+                        if (t != nullptr) *t = x;
+                        double* arr = k == "loopUp" ? f.loopUp : k == "loopVari" ? f.loopVari : k == "postUd" ? f.postUd : k == "postVari" ? f.postVari : nullptr;
+                        if (arr != nullptr) // k=c0:c1:c2:c3:c4
+                            std::sscanf (item.c_str() + eq + 1, "%lf:%lf:%lf:%lf:%lf", &arr[0], &arr[1], &arr[2], &arr[3], &arr[4]);
+                    }
+                    at = end + 1;
+                }
+            }
+            return true;
+        }();
+        (void) loaded;
+       #endif
+        return f;
+    }
+
+    static bool voiceLawMode (Mode m) noexcept { return (((int) voiceFit().modes >> (int) m) & 1) != 0; }
+
+    void processVoices (float* l, float* r, int n, const EffectParams& p, Mode m, float dryGain, float wetGain) noexcept
+    {
+        const auto& F = voiceFit();
+        const double hz = 10.0 * signedPow (bipolar (p[rate]), 10.0 / 3.0);
+        const double dep = depthMs (p[depth]) * 0.99954 * 0.001 * sr;
+        const double base = 0.42 * sr / 48000.0 + std::abs (manualMs (p[manual])) * 0.001 * sr;
+        const double g = 0.7 * signedPow (bipolar (p[feedback]), 0.891);
+        const bool vari = m == Mode::driftRise || m == Mode::driftRiseFall;
+        const double loopScale = g / 0.37786 * (m == Mode::throughZeroPlus || m == Mode::throughZeroMinus ? F.tzLoop : 1.0);
+        if (m != vMode || sr != vRate)
+        {
+            vMode = m;
+            vRate = sr;
+            for (auto& v : vs)
+            {
+                v.post = Biquad {};
+                if (m == Mode::riseFall)
+                    v.post.set (F.postUd, 1.0, sr);
+                else if (vari)
+                    v.post.set (F.postVari, 1.0, sr);
+            }
+        }
+        for (auto& v : vs)
+        {
+            const double x1 = v.loop.x1, x2 = v.loop.x2, y1 = v.loop.y1, y2 = v.loop.y2;
+            v.loop.set (vari ? F.loopVari : F.loopUp, loopScale, sr);
+            v.loop.x1 = x1; v.loop.x2 = x2; v.loop.y1 = y1; v.loop.y2 = y2;
+        }
+        const double step = hz / sr, aStep = std::abs (hz) / sr;
+        for (int i = 0; i < n; ++i)
+        {
+            const float in[2] = { l[i], r[i] };
+            double y[2];
+            for (int c = 0; c < 2; ++c)
+            {
+                auto& s = ch[(std::size_t) c];
+                auto& v = vs[(std::size_t) c];
+                s.line.push ((float) (in[c] + v.fb));
+                y[c] = v.post.run (voice (s.line, v, c, m, base, dep, aStep, F));
+                v.fb = v.loop.run (y[c]); // the loop sections carry the feedback gain
+            }
+            if (m == Mode::tri) // Tri's voice reaches both sides through two different all-passes, half the power each
+            {
+                const auto ap = [] (double x, double a, double& x1, double& y1) { const double o = a * x + x1 - a * y1; x1 = x; y1 = o; return o; };
+                auto& L = vs[0];
+                auto& R = vs[1];
+                const double ll = ap (y[0], -F.triAp, L.xa, L.ya), lr = ap (y[0], F.triAp, L.xb, L.yb);
+                const double rr = ap (y[1], -F.triAp, R.xa, R.ya), rl = ap (y[1], F.triAp, R.xb, R.yb);
+                y[0] = 0.70711 * (ll + rl);
+                y[1] = 0.70711 * (rr + lr);
+            }
+            l[i] = dryGain * in[0] + wetGain * (float) y[0];
+            r[i] = dryGain * in[1] + wetGain * (float) y[1];
+            vPhase += step;
+            vPhase -= std::floor (vPhase);
+        }
+    }
+
+    double voice (const Line& line, VoiceState& v, int c, Mode m, double base, double dep, double aStep, const VoiceFit& F) noexcept
+    {
+        const auto barber = [&] (int taps, double off, bool down, double gain) {
+            double y = 0.0;
+            for (int k = 0; k < taps; ++k)
+            {
+                double q = vPhase + off + (double) k / taps;
+                q -= std::floor (q);
+                const double w = std::sin (pi * q);
+                y += gain * w * w * thiran (line, base + dep * (down ? q : 1.0 - q), v.ap[(std::size_t) k]);
+            }
+            return y;
+        };
+        switch (m)
+        {
+            case Mode::rise: return barber (2, c == 0 ? 0.0 : 0.25, false, 1.0);
+            case Mode::riseFall: return barber (2, c == 0 ? 0.0 : F.rdOff, c == 1, 1.0);
+            case Mode::octo: return barber (4, c == 0 ? 0.0 : 0.125, false, 0.70711);
+            case Mode::driftRise:
+            case Mode::driftRiseFall:
+            {
+                double q = vPhase + (c == 0 ? 0.0 : 0.25);
+                q -= std::floor (q);
+                const bool down = m == Mode::driftRiseFall && c == 1;
+                return thiran (line, base + dep * (down ? q : 1.0 - q), v.ap[0]);
+            }
+            case Mode::throughZeroPlus:
+            case Mode::throughZeroMinus:
+            {
+                const double a = v.wander[0].next (aStep), b = v.wander[1].next (aStep);
+                const double ya = thiran (line, base + dep * (F.tzMid + F.tzAmp * a), v.ap[0]);
+                const double yb = thiran (line, base + dep * (F.tzMid + F.tzAmp * b), v.ap[1]);
+                return 0.70711 * (ya + (m == Mode::throughZeroMinus ? -yb : yb));
+            }
+            case Mode::tri:
+            {
+                double q = vPhase + 0.175; // at load the tap sits 5 ms in at 10 ms, rising
+                q -= std::floor (q);
+                const double tri = 1.0 - 4.0 * std::abs (q - 0.5); // −1 … 1
+                return thiran (line, base + dep * (F.triMid + F.triAmp * tri), v.ap[0]);
+            }
+            case Mode::doubler:
+            {
+                auto& pos = v.tri[0];
+                auto& dir = v.tri[1];
+                if (dir == 0.0) dir = 1.0;
+                pos += dir * F.dbSpeed * aStep / std::max (F.dbAmp, 1e-3);
+                if (pos >= 1.0 || pos <= -1.0 || (double) v.wander[3].noise.next() > 1.0 - 2.0 * aStep)
+                    dir = pos >= 1.0 ? -1.0 : pos <= -1.0 ? 1.0 : -dir;
+                pos = std::clamp (pos, -1.0, 1.0);
+                return thiran (line, base + dep * (F.dbMid + F.dbAmp * pos), v.ap[0]);
+            }
+            case Mode::ensemble:
+            case Mode::symphonic:
+            {
+                const double a = v.wander[0].next (aStep), b = v.wander[1].next (aStep);
+                return 0.70711 * (thiran (line, base + dep * (0.5 + 0.5 * a), v.ap[0]) + thiran (line, base + dep * (0.5 + 0.5 * b), v.ap[1]));
+            }
+        }
+        return 0.0;
+    }
+
+    std::array<VoiceState, 2> vs;
+    double vPhase = 0.0, vRate = 0.0; // round 190mj: the voice law's sweep (runs on across resets); the rate its filters are set for
+    Mode vMode = Mode::rise;
 
     double sr = 48000.0;
     std::array<Channel, 2> ch;
