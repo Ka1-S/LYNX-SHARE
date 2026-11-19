@@ -128,5 +128,6 @@ TEST (details190lx_graph_note_and_shift_lanes)
     CHECK (std::abs (n.velocity - 0.25f) < 1.0e-6f && std::abs (graphValue (n, (int) Level::velocity, ticksPerStep) - 0.25f) < 1.0e-6f);
     CHECK (graphIsBipolar ((int) Level::pan) && ! graphIsBipolar (graphNote) && ! graphIsBipolar (graphShift));
     CHECK (graphDefault (graphShift) == 0.0f && std::abs (graphDefault (graphNote) - 60.0f / 127.0f) < 1.0e-5f);
-    CHECK (graphTabOrder[0] == graphNote && graphTabOrder[graphLaneCount - 1] == graphShift);
+    // (rollup 0.1.30 step 11: round 190ma's lanes — FL's ninth, Repeat, after Shift)
+    CHECK (graphTabOrder[0] == graphNote && graphTabOrder[graphLaneCount - 2] == graphShift && graphTabOrder[graphLaneCount - 1] == graphRepeat);
 }

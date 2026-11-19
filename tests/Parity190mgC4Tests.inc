@@ -49,14 +49,15 @@ TEST (parity190mg_c4_law_is_hidden_and_off_for_new_and_old_instances)
 {
     using namespace lynx;
     namespace pr = dyn::prism;
-    CHECK (effectInfo (EffectKind::prismMultiband).params.size() == (std::size_t) pr::count && pr::c4Law == pr::count && pr::c4Q == pr::count + 1);
+    // (rollup 0.1.30 step 11: after round 190lg's hidden revision / lookaheadSwitch [count, count + 1])
+    CHECK (effectInfo (EffectKind::prismMultiband).params.size() == (std::size_t) pr::count && pr::c4Law == pr::lookaheadSwitch + 1 && pr::c4Q == pr::c4Law + 1);
     auto s = makeEffectSlot (EffectKind::prismMultiband);
     const auto saved = savedEffectParamCount (s);
     CHECK (s.params[(std::size_t) pr::c4Law] == 0.0f && s.params[(std::size_t) pr::c4Q] == 0.0f && ! pr::c4Active (s.params));
     s.params[(std::size_t) pr::c4Law] = pr::c4LawValue (true);
-    CHECK (pr::c4Active (s.params) && pr::c4Opto (s.params) && savedEffectParamCount (s) == saved + 1);
+    CHECK (pr::c4Active (s.params) && pr::c4Opto (s.params) && saved <= (std::size_t) pr::revision && savedEffectParamCount (s) == (std::size_t) pr::c4Law + 1);
     s.params[(std::size_t) pr::c4Q] = pr::c4QValue (0.6);
-    CHECK (savedEffectParamCount (s) == saved + 2 && std::abs (pr::c4QOf (s.params) - 0.6) < 1e-6);
+    CHECK (savedEffectParamCount (s) == (std::size_t) pr::c4Q + 1 && std::abs (pr::c4QOf (s.params) - 0.6) < 1e-6);
     CHECK (std::abs (pr::c4AttackValue (0.5)) < 1e-6f && std::abs (pr::c4ReleaseValue (5000.0) - 1.0f) < 1e-6f);
 }
 
