@@ -105,6 +105,30 @@
                 offline.dispatchPendingMessages();
                 write (rack, "rack-graph-note");
             }
+            // FL's Alternate meter scale (DF-61): the same levels on the mixer meters, off and on
+            ui.selectTabForSnapshot (3);
+            offline.dispatchPendingMessages();
+            auto& strips = ui.getMixerForSnapshot().getStripsForSnapshot();
+            const auto feed = [&] {
+                offline.getTransport().playing.store (true);
+                double ms = 1000.0;
+                for (int f = 0; f < 30; ++f)
+                {
+                    for (int k = 0; k < 8; ++k)
+                        offline.getMeters().accumulate (k, 0.5f + 0.06f * (float) k, 0.45f + 0.06f * (float) k);
+                    strips.frameForSnapshot (ms += 1000.0 / 60.0);
+                }
+                offline.getTransport().playing.store (false);
+            };
+            const auto wells = strips.meterAreaForSnapshot (0).getUnion (strips.meterAreaForSnapshot (5)).expanded (6);
+            feed();
+            zoomShot (strips, wells, 3.0f, "mixer-meters-normal@3x");
+            meterscale::alternate() = true;
+            strips.repaint();
+            feed();
+            check ("Alternate meter scale: 0 dB at 85 % of the meter (FL's law)", std::abs (meterscale::positionOfDb (0.0f, meterscale::alternate()) - 0.847f) < 0.01f);
+            zoomShot (strips, wells, 3.0f, "mixer-meters-alternate@3x");
+            meterscale::alternate() = false;
         }
         {
             // ---- Simple layout: the Loops dock on the right narrows the timeline and the track dock (DS-42)
@@ -289,6 +313,34 @@
                     offline.undo();
                 }
             }
+        }
+        {
+            // ---- FL plugins: Transient Processor's lower trace (DP-31)
+            AudioEngine offline (false);
+            Song song;
+            song.mixer.resize (2);
+            song.mixer[0].name = "Master";
+            song.mixer[1].name = "Insert 1";
+            song.mixer[1].effects.push_back (makeEffectSlot (EffectKind::transientProcessor));
+            offline.setSong (std::move (song));
+            offline.dispatchPendingMessages();
+            auto editor = makeNativeEffectEditor (offline, 1, 0, 1.0f, 0);
+            check ("Transient Processor: the trace takes a history", transientTraceForSnapshot (*editor, false));
+            write (*editor, "plug-transient-trace");
+            auto hovered = makeNativeEffectEditor (offline, 1, 0, 1.0f, 0);
+            transientTraceForSnapshot (*hovered, true);
+            write (*hovered, "plug-transient-trace-hover");
+            // Gross Beat's time envelope with FL's Safety Line (DP-5)
+            Song gb;
+            gb.mixer.resize (2);
+            gb.mixer[0].name = "Master";
+            gb.mixer[1].name = "Insert 1";
+            gb.mixer[1].effects.push_back (makeEffectSlot (EffectKind::grossBeat));
+            offline.setSong (std::move (gb));
+            offline.dispatchPendingMessages();
+            auto gbEditor = makeNativeEffectEditor (offline, 1, 0, 1.0f, 0);
+            check ("Gross Beat editor on its time envelope", showGrossBeatEnvelopeForSnapshot (*gbEditor, 0));
+            write (*gbEditor, "plug-grossbeat-safety-line");
         }
         juce::File (prefix + "-checks.txt").replaceWithText (checks + (allOk ? "result=OK\n" : "result=FAIL\n"));
         return allOk;

@@ -11333,3 +11333,4 @@ countries: jp
 "Alternate meter scale" = "代替メータースケール"
 "Alternate scale for all peak meters" = "すべてのピークメーターに代替スケールを使用"
 "Drag: set  ·  Ctrl+drag: scale all  ·  Right-drag: ramp  ·  Alt+click: reset" = "ドラッグ: 設定  ·  Ctrl+ドラッグ: 全体をスケール  ·  右ドラッグ: ランプ  ·  Alt+クリック: リセット"
+"Edit slot name..." = "スロット名を編集..."

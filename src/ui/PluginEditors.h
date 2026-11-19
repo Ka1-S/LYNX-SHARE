@@ -48,6 +48,8 @@ bool showGrossBeatEnvelopeForSnapshot (juce::Component& editor, int envelopeKind
 juce::PopupMenu delay3TimeMenuForSnapshot (juce::Component& editor);
 bool setVocoderBandsForSnapshot (juce::Component& editor, const std::array<std::uint32_t, 8>& packed);
 bool pauseLimiterForSnapshot (juce::Component& editor, int steps);
+// round 190lx (--details190lxshot): Transient Processor's lower trace fed synthetic hits, the hover panel shown or not
+bool transientTraceForSnapshot (juce::Component& editor, bool hovered);
 // round 190ih (--uiperf): Gross Beat editors' paints since the last reset ("" when none): count, area, time
 juce::String grossBeatPaintStats (bool reset);
 // round 190ih (--uiperf A/B): Gross Beat's diagnostic switches at run time (the LYNX_GB_DIAG bits)

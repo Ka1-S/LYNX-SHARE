@@ -11333,3 +11333,4 @@ countries: ru by kz
 "Alternate meter scale" = "Альтернативная шкала индикаторов"
 "Alternate scale for all peak meters" = "Альтернативная шкала для всех пиковых индикаторов"
 "Drag: set  ·  Ctrl+drag: scale all  ·  Right-drag: ramp  ·  Alt+click: reset" = "Перетаскивание: задать  ·  Ctrl+перетаскивание: масштабировать все  ·  Правой кнопкой: рампа  ·  Alt+клик: сброс"
+"Edit slot name..." = "Изменить имя слота..."

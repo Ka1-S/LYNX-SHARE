@@ -152,7 +152,8 @@ public:
 
     void mouseUp (const juce::MouseEvent&) override { dragging = -1; }
 
-    static constexpr std::uint32_t animateCue = 0x40ffffff; // (the playing slice's cue)
+    // (the playing slice's cue, capture 190lx A5 fl-fslicer-animate.png: its ground ~21 % lighter, (57,68,90) -> (97,108,130))
+    static constexpr std::uint32_t animateCue = 0x36ffffff;
     // the columns of slice `i` (for a repaint of just them)
     juce::Rectangle<int> sliceBounds (int i) const
     {

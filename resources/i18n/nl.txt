@@ -11333,3 +11333,4 @@ countries: nl be
 "Alternate meter scale" = "Alternatieve meterschaal"
 "Alternate scale for all peak meters" = "Alternatieve schaal voor alle piekmeters"
 "Drag: set  ·  Ctrl+drag: scale all  ·  Right-drag: ramp  ·  Alt+click: reset" = "Slepen: instellen  ·  Ctrl+slepen: alles schalen  ·  Rechts slepen: ramp  ·  Alt+klik: resetten"
+"Edit slot name..." = "Slotnaam bewerken..."

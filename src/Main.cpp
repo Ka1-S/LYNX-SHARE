@@ -185,6 +185,7 @@
 #include "ui/DialogFrame.h"
 #include "ui/FileChoosers.h"
 #include "ui/TrackIcons.h"
+#include "core/MeterScale.h"
 #include "core/RackOps.h"
 #include "core/Layer.h"
 #include "core/XyController.h"

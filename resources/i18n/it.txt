@@ -11333,3 +11333,4 @@ countries: it ch sm
 "Alternate meter scale" = "Scala alternativa dei misuratori"
 "Alternate scale for all peak meters" = "Scala alternativa per tutti i misuratori di picco"
 "Drag: set  ·  Ctrl+drag: scale all  ·  Right-drag: ramp  ·  Alt+click: reset" = "Trascina: imposta  ·  Ctrl+trascina: scala tutto  ·  Trascina col destro: rampa  ·  Alt+clic: ripristina"
+"Edit slot name..." = "Modifica nome dello slot..."

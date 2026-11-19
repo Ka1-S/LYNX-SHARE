@@ -89,16 +89,21 @@ TEST (details190lx_alternate_meter_scale_law)
     using namespace lynx::meterscale;
     CHECK (std::abs (positionOfDb (-60.0f, false)) < 1.0e-6f && std::abs (positionOfDb (6.0f, false) - 1.0f) < 1.0e-6f);
     CHECK (std::abs (dbAtPosition (0.5f, false) + 27.0f) < 1.0e-4f);
+    // FL's Master meter (capture 190lx A1, H = 346 px, bottom 555): 0 dB at y 262, -6 dB at y 370; hint readings
+    CHECK (std::abs (positionOfDb (0.0f, true) - (555.0f - 262.0f) / 346.0f) < 0.004f);
+    CHECK (std::abs (positionOfDb (-6.0f, true) - (555.0f - 370.0f) / 346.0f) < 0.004f);
+    CHECK (std::abs (dbAtPosition ((555.0f - 304.0f) / 346.0f, true) + 2.14f) < 0.1f);
+    CHECK (std::abs (dbAtPosition ((555.0f - 480.0f) / 346.0f, true) + 15.79f) < 0.3f);
     float last = -1.0f;
-    for (float db = -60.0f; db <= 6.0f; db += 0.5f)
+    for (float db = -60.0f; db <= 2.0f; db += 0.5f)
     {
         const auto p = positionOfDb (db, true);
-        CHECK (p >= last - 1.0e-6f && p >= 0.0f && p <= 1.0f);
-        CHECK (std::abs (dbAtPosition (p, true) - db) < 0.05f || p <= 0.0f || p >= 1.0f);
+        CHECK (p > last && p >= 0.0f && p <= 1.0f);
+        CHECK (std::abs (dbAtPosition (p, true) - db) < 0.01f);
         last = p;
     }
     CHECK (std::abs (position (1.0f, false) - positionOfDb (0.0f, false)) < 1.0e-5f);
-    CHECK (position (0.0f, true) == positionOfDb (-60.0f, true));
+    CHECK (position (0.0f, true) == 0.0f && std::abs (position (1.0f, true) - positionOfDb (0.0f, true)) < 1.0e-5f);
 }
 
 // FL's Channel rack graph tabs Note and Shift (DE-30): Note is the key over the lane, Shift the start offset in the step

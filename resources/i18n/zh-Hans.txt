@@ -11333,3 +11333,4 @@ countries: cn sg
 "Alternate meter scale" = "备用电平表刻度"
 "Alternate scale for all peak meters" = "所有峰值表使用备用刻度"
 "Drag: set  ·  Ctrl+drag: scale all  ·  Right-drag: ramp  ·  Alt+click: reset" = "拖动：设置  ·  Ctrl+拖动：全部缩放  ·  右键拖动：斜坡  ·  Alt+单击：重置"
+"Edit slot name..." = "编辑槽位名称..."
