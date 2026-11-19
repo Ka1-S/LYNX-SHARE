@@ -523,6 +523,27 @@ inline std::vector<Hint> hintsFor (InstrumentKind kind, const std::vector<Contro
             named ("unison on (Classic)", { { "Unison Mode", 1.0f }, { "Unison Amount", 0.5f } });
             named ("mono, a legato second note", { { "Poly", 0.0f }, { "Glide", 0.3f } }, "pat:mono");
             named ("the amp envelope shaped, held long", { { "Amp Decay", 0.15f }, { "Amp Sustain", 0.3f }, { "Amp Loop Mode", 2.0f } }, "pat:long");
+            // (round 190mi) Helix+: a second warp needs its amount (and a mode), noise its switch, Unison+ a unison mode,
+            // the macros and drawn LFOs a matrix cell, the effects' knobs their effect on
+            named ("Helix+: both second warps Bend + at half, oscillator 2 on", { { "Osc 1 Warp 2", (float) warp::bendPlus }, { "Osc 1 Warp 2 Amount", 0.5f },
+                                                                              { "Osc 2 On", 1.0f }, { "Osc 2 Gain", 0.7f },
+                                                                              { "Osc 2 Warp 2", (float) warp::bendPlus }, { "Osc 2 Warp 2 Amount", 0.5f } });
+            named ("Helix+: noise on, darker", { { "Noise On", 1.0f }, { "Noise Level", 0.5f }, { "Noise Color", 0.3f } });
+            named ("Helix+: unison Classic, 6 voices", { { "Unison Mode", 1.0f }, { "Unison Amount", 0.5f }, { "Unison Voices", 6.0f } });
+            named ("Helix+: filter 2 on at 1 kHz, resonant", { { "Filter 2 On", 1.0f }, { "Filter 2 Freq", 1000.0f }, { "Filter 2 Res", 0.8f } });
+            named ("Helix+: the four macros on oscillator 1's pitch", { { "Filter 1 Freq", 1000.0f } });
+            out.back().apply = routed ({ { cellIndex (tgt::oscPitch, src::macro1), 0.2f }, { cellIndex (tgt::oscPitch, src::macro1 + 1), 0.3f },
+                                         { cellIndex (tgt::oscPitch, src::macro1 + 2), 0.4f }, { cellIndex (tgt::oscPitch, src::macro1 + 3), 0.5f } });
+            for (int k = 1; k <= 2; ++k)
+            {
+                const auto l = "LFO " + std::to_string (k);
+                named ("Helix+: " + l + " at 4 Hz on oscillator 1's pitch", { { l + " Rate", 4.0f }, { l + " Attack", 0.0f } });
+                out.back().apply = routed ({ { matrixIndex (tgt::oscPitch, k == 1 ? src::lfo1 : src::lfo2), 0.3f } });
+            }
+            named ("Helix+: distortion on", { { "Distortion On", 1.0f }, { "Distortion Drive", 0.5f }, { "Distortion Mix", 0.7f } });
+            named ("Helix+: chorus on", { { "Chorus On", 1.0f } });
+            named ("Helix+: delay on", { { "Delay On", 1.0f }, { "Delay Time", 3.0f }, { "Delay Mix", 0.5f } });
+            named ("Helix+: reverb on", { { "Reverb On", 1.0f } });
             break;
         }
         case InstrumentKind::braid:

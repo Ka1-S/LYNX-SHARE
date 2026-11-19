@@ -95,24 +95,26 @@ TEST (helix190ja_parameters_and_laws)
     namespace w = wt;
     // the automatable table: every parameter once, unique English names, defaults inside their ranges
     const auto& table = helixEngineParams();
-    CHECK ((int) table.size() == w::paramCount);
+    // (round 190mi: Live's values, then Helix+'s automatable values after Live's state)
+    CHECK ((int) table.size() == w::paramCount + w::ext::autoEnd - 1);
     std::set<std::string> names;
     for (int i = 0; i < (int) table.size(); ++i)
     {
         const auto& p = table[(std::size_t) i];
-        CHECK (p.index == i && ! p.name.empty() && p.high > p.low);
+        const auto index = i < w::paramCount ? i : w::extBase + 1 + (i - w::paramCount);
+        CHECK (p.index == index && ! p.name.empty() && p.high > p.low);
         names.insert (p.name);
-        const auto d = w::defaults()[(std::size_t) i];
+        const auto d = w::defaults()[(std::size_t) index];
         CHECK (d >= p.low - 1e-6 && d <= p.high + 1e-6);
-        CHECK (! w::paramText (i, d).empty());
-        CHECK (w::paramName (i) == p.name);
+        CHECK (! w::paramText (index, d).empty());
+        CHECK (w::paramName (index) == p.name);
     }
-    CHECK ((int) names.size() == w::paramCount);
+    CHECK (names.size() == table.size());
     CHECK (modelparams::tableOf (InstrumentKind::helix) != nullptr);
     CHECK (modelparams::findByName (InstrumentKind::helix, "Filter 1 Freq") != nullptr
            && modelparams::findByName (InstrumentKind::helix, "Filter 1 Freq")->index == w::filterBase (0) + w::flt::freq);
     // the layout: parameters, two tables, the matrix (13 × 52) [DATA: Live's InstrumentVector]
-    CHECK (w::tableBase == w::paramCount && w::matrixBase == w::paramCount + 2 && w::stateSize == w::matrixBase + 52 * 13);
+    CHECK (w::tableBase == w::paramCount && w::matrixBase == w::paramCount + 2 && w::liveStateSize == w::matrixBase + 52 * 13);
     CHECK (w::sourceName (w::src::slide) == "Slide" && w::sourceName (w::src::notePitchBend) == "Note PB");
     CHECK (w::targetName (w::tgt::oscFx1, w::effectModern) == "Osc 1 Warp" && w::targetName (w::tgt::oscFx2 + 6, 0, w::effectFm) == "Osc 2 FM Amt");
     CHECK (w::targetName (w::tgt::glide) == "Glide" && w::targetName (w::tgt::filterFreq + 4) == "Filter 2 Freq");

@@ -267,6 +267,7 @@ add_library(lynx_core STATIC
     src/core/VoiceShift.cpp
     src/core/NativeEngines.cpp
     src/core/LynxBanks.cpp
+    src/core/HelixBank.cpp
     src/core/ModelParams.cpp
     src/core/ToxicBank.cpp
     src/core/BeepMapBank.cpp

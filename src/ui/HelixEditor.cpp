@@ -22,6 +22,13 @@ namespace
 namespace w = wt;
 
 juce::String u8 (const std::string& s) { return juce::String::fromUTF8 (s.c_str()); }
+// an automatable parameter by its engine index (Live's 0 … 99, then Helix+'s after Live's state; round 190mi)
+const EngineParam& paramOf (int index)
+{
+    const auto* p = findEngineParam (helixEngineParams(), index);
+    return p != nullptr ? *p : helixEngineParams().front();
+}
+constexpr const char* modDragPrefix = "helixmod:"; // a modulation source dragged onto a knob (Helix+, round 190mi)
 
 // --- the two looks ----------------------------------------------------------------------------------------------------
 struct Look
@@ -88,9 +95,9 @@ struct Page
     }
     double value (int index) const
     {
-        if (channel >= 0 && index < w::paramCount)
+        if (channel >= 0 && w::automatable (index))
             if (const auto v = const_cast<AudioEngine&> (engine).getAutomationDisplay().valueOf ({ AutomationTargetKind::channelParam, channel, 0, index }))
-                return helixEngineParams()[(std::size_t) index].raw (*v);
+                return paramOf (index).raw (*v);
         if (const auto* c = def(); c != nullptr && index < (int) c->modelParams.size())
             return c->modelParams[(std::size_t) index];
         return w::defaults()[(std::size_t) index];
@@ -101,13 +108,7 @@ struct Page
             auto* c = l ? l (s) : nullptr;
             if (c == nullptr || c->instrument != InstrumentKind::helix)
                 return;
-            if ((int) c->modelParams.size() < w::stateSize)
-            {
-                const auto d = helixDefaults();
-                const auto have = c->modelParams.size();
-                c->modelParams.resize ((std::size_t) w::stateSize);
-                std::copy (d.begin() + (std::ptrdiff_t) have, d.end(), c->modelParams.begin() + (std::ptrdiff_t) have);
-            }
+            padHelixState (*c, index >= w::extBase); // (a Helix+ value makes the block live)
             c->modelParams[(std::size_t) index] = (float) v;
         }, undoable);
     }
@@ -117,6 +118,18 @@ struct Page
         return c != nullptr && ! c->name.empty() ? u8 (c->name) : juce::String ("Helix");
     }
     int oscParam (int p) const { return w::oscBase (osc) + p; }
+    double xv (int extIndex) const { return value (w::extBase + extIndex); }
+    bool plusLive() const { return value (w::extBase) >= 0.5; }
+    // the summed modulation amounts on a matrix row (the knob's ring)
+    double rowAmount (int row) const
+    {
+        double a = 0.0;
+        for (int src = 0; src < w::allSourceCount; ++src)
+            if (row < w::targetCount || ! live)
+                if (src < w::sourceCount || ! live)
+                    a += value (w::cellIndex (row, src));
+        return a;
+    }
 };
 
 void caption (juce::Graphics& g, const Look& l, juce::Rectangle<int> r, const juce::String& text, juce::Justification j = juce::Justification::centredLeft)
@@ -127,7 +140,7 @@ void caption (juce::Graphics& g, const Look& l, juce::Rectangle<int> r, const ju
 }
 
 // --- one parameter's control: a knob, a value box or a slider ---------------------------------------------------------
-class Ctl final : public juce::Component, public ui::HintSource
+class Ctl final : public juce::Component, public ui::HintSource, public juce::DragAndDropTarget
 {
 public:
     enum class Kind { knob, box, vslider };
@@ -137,7 +150,7 @@ public:
     }
     void setIndex (int i) { index = i; repaint(); }
     void setLabel (juce::String s) { label = std::move (s); repaint(); }
-    const EngineParam& param() const { return helixEngineParams()[(std::size_t) index]; }
+    const EngineParam& param() const { return paramOf (index); }
 
     ui::ValueSpec spec() const
     {
@@ -150,7 +163,7 @@ public:
         s.pixelsForRange = param().stepped ? std::clamp (8.0 * (param().high - param().low), 60.0, 300.0) : 180.0;
         const auto i = index;
         const auto c = curve;
-        s.toText = [i, c] (double x) { return u8 (w::paramText (i, toValue (c, x, helixEngineParams()[(std::size_t) i]))); };
+        s.toText = [i, c] (double x) { return u8 (w::paramText (i, toValue (c, x, paramOf (i)))); };
         s.fromText = ui::inverseOf (s.toText, 0.0, 1.0);
         if (page.channel >= 0)
             s.target = AutomationTarget { AutomationTargetKind::channelParam, page.channel, 0, index };
@@ -212,6 +225,22 @@ public:
         const auto arcColour = page.live ? l.accent2 : l.accent; // (Live: cyan arcs [SHOT live-wt-preset-*])
         g.setColour (hot ? arcColour.brighter (0.2f) : arcColour);
         g.strokePath (arc, juce::PathStrokeType (2.5f));
+        // Helix+ (LYNX's look): the modulation on this knob as a thin outer ring from the value (round 190mi)
+        if (! page.live)
+            if (const auto row = w::targetOfParam (index); row >= 0)
+                if (const auto amount = std::clamp (page.rowAmount (row), -1.0, 1.0); amount != 0.0)
+                {
+                    const auto b1 = std::clamp (a1 + (end - start) * (float) amount, start, end);
+                    juce::Path mod;
+                    mod.addCentredArc (c.x, c.y, size * 0.5f + 3.0f, size * 0.5f + 3.0f, 0.0f, std::min (a1, b1), std::max (a1, b1), true);
+                    g.setColour (l.accent2);
+                    g.strokePath (mod, juce::PathStrokeType (1.6f));
+                }
+        if (dropHot)
+        {
+            g.setColour (l.accent2.withAlpha (0.5f));
+            g.drawEllipse (c.x - size * 0.5f - 4.0f, c.y - size * 0.5f - 4.0f, size + 8.0f, size + 8.0f, 1.5f);
+        }
         const auto tip = c.getPointOnCircumference (size * 0.5f - 1.0f, a1);
         g.drawLine ({ c.getPointOnCircumference (size * 0.15f, a1), tip }, 1.6f);
         g.setColour (l.text);
@@ -261,6 +290,35 @@ public:
         }
     }
 
+    // a modulation source dropped on the knob (LYNX's look): the source modulates the knob's row by 50 %, or the
+    // amount it already has; the knob shows the ring, the matrix the cell (round 190mi)
+    static int sourceOf (const SourceDetails& d)
+    {
+        const auto t = d.description.toString();
+        return t.startsWith (modDragPrefix) ? t.fromFirstOccurrenceOf (modDragPrefix, false, false).getIntValue() : -1;
+    }
+    bool isInterestedInDragSource (const SourceDetails& d) override
+    {
+        const auto src = sourceOf (d);
+        return ! page.live && src >= 0 && src < w::allSourceCount && w::targetOfParam (index) >= 0;
+    }
+    void itemDragEnter (const SourceDetails&) override { dropHot = true, repaint(); }
+    void itemDragExit (const SourceDetails&) override { dropHot = false, repaint(); }
+    void itemDropped (const SourceDetails& d) override
+    {
+        dropHot = false;
+        const auto src = sourceOf (d), row = w::targetOfParam (index);
+        if (src < 0 || row < 0)
+            return;
+        const auto cell = w::cellIndex (row, src);
+        if (page.value (cell) == 0.0)
+            page.set (cell, 0.5);
+        ui::flashValueTip (*this, getLocalBounds(), tr (u8 (w::sourceName (src))) + juce::String::fromUTF8 (" \xe2\x86\x92 ") + tr (u8 (w::targetName (row))));
+        if (page.refresh)
+            page.refresh();
+        repaint();
+    }
+
 private:
     Page& page;
     int index;
@@ -268,6 +326,7 @@ private:
     Curve curve;
     juce::String label;
     ui::ValueDrag drag;
+    bool dropHot = false;
 };
 
 // --- a menu of a stepped parameter (or of anything, through callbacks) -------------------------------------------------
@@ -284,7 +343,7 @@ public:
             p, [&p, index] { return tr (u8 (w::paramText (index(), p.value (index())))); },
             [&p, index] (juce::PopupMenu& m) {
                 const auto i = index();
-                const auto& par = helixEngineParams()[(std::size_t) i];
+                const auto& par = paramOf (i);
                 const auto current = (int) std::lround (p.value (i));
                 for (int v = (int) par.low; v <= (int) par.high; ++v)
                     m.addItem (tr (u8 (w::paramText (i, (double) v))), true, v == current, [&p, i, v] {
@@ -362,6 +421,15 @@ public:
         onClick();
         if (page.refresh)
             page.refresh();
+    }
+    // a modulation source (LYNX's look): drag it onto a knob (Helix+, round 190mi)
+    int dragSource = -1;
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        if (dragSource < 0 || page.live || e.getDistanceFromDragStart() < 5)
+            return;
+        if (auto* c = juce::DragAndDropContainer::findParentDragContainerFor (this); c != nullptr && ! c->isDragAndDropActive())
+            c->startDragging (juce::String (modDragPrefix) + juce::String (dragSource), this);
     }
 
 private:
@@ -554,6 +622,11 @@ public:
         const auto b = w::lfoBase (page.source - 3);
         const auto type = (int) std::lround (page.value (b + w::lfo::type));
         const auto amount = page.value (b + w::lfo::amount), shaping = page.value (b + w::lfo::shaping), phase = page.value (b + w::lfo::phase) / 360.0;
+        if (drawn())
+        {
+            paintDrawn (g, l, r);
+            return;
+        }
         const auto cycles = 4.0;
         for (int i = 0; i <= 240; ++i)
         {
@@ -577,8 +650,155 @@ public:
         g.strokePath (path, juce::PathStrokeType (1.8f));
     }
 
+    // --- Helix+'s drawn LFO (round 190mi): one cycle, its points; LYNX's look edits it ---------------------------------
+    int lfo() const { return std::max (0, page.source - 3); }
+    bool drawn() const { return page.source >= 3 && page.plusLive() && page.xv (w::ext::lfoDraw + lfo()) > 0.5; }
+    int pointsBase() const { return w::extBase + w::ext::points + lfo() * w::ext::lfoPointsSize; }
+    std::vector<double> points() const
+    {
+        std::vector<double> p ((std::size_t) w::ext::lfoPointsSize);
+        for (int i = 0; i < w::ext::lfoPointsSize; ++i)
+            p[(std::size_t) i] = page.value (pointsBase() + i);
+        return p;
+    }
+    int count (const std::vector<double>& p) const { return std::clamp ((int) std::lround (p[0]), 0, w::ext::maxPoints); }
+    juce::Rectangle<float> area() const { return getLocalBounds().toFloat().reduced (10.0f, 10.0f); }
+    juce::Point<float> toScreen (double x, double y) const
+    {
+        const auto r = area();
+        return { r.getX() + (float) x * r.getWidth(), r.getCentreY() - (float) y * r.getHeight() * 0.48f };
+    }
+    void paintDrawn (juce::Graphics& g, const Look& l, juce::Rectangle<float> r)
+    {
+        const auto p = points();
+        g.setColour (l.line);
+        for (int q = 1; q < 8; ++q) // (a grid of eighths)
+            g.drawVerticalLine ((int) (r.getX() + r.getWidth() * (float) q / 8.0f), r.getY(), r.getBottom());
+        g.drawHorizontalLine ((int) r.getCentreY(), r.getX(), r.getRight());
+        juce::Path path;
+        for (int i = 0; i <= 240; ++i)
+        {
+            const auto x = (double) i / 240.0;
+            const auto pt = toScreen (x, (double) w::drawnLfo (p.data(), std::min (x, 0.999999)));
+            i == 0 ? path.startNewSubPath (pt) : path.lineTo (pt);
+        }
+        g.setColour (l.accent);
+        g.strokePath (path, juce::PathStrokeType (1.8f));
+        for (int i = 0; i < count (p); ++i)
+        {
+            const auto pt = toScreen (p[(std::size_t) (1 + i * w::ext::pointStride)], p[(std::size_t) (2 + i * w::ext::pointStride)]);
+            g.setColour (i == dragging ? l.accent : l.dark);
+            g.fillEllipse (juce::Rectangle<float> (8.0f, 8.0f).withCentre (pt));
+            g.setColour (l.accent);
+            g.drawEllipse (juce::Rectangle<float> (8.0f, 8.0f).withCentre (pt), 1.3f);
+        }
+    }
+    int pointAt (juce::Point<float> at) const
+    {
+        const auto p = points();
+        for (int i = 0; i < count (p); ++i)
+            if (toScreen (p[(std::size_t) (1 + i * w::ext::pointStride)], p[(std::size_t) (2 + i * w::ext::pointStride)]).getDistanceFrom (at) < 7.0f)
+                return i;
+        return -1;
+    }
+    void store (const std::vector<double>& p)
+    {
+        for (int i = 0; i < w::ext::lfoPointsSize; ++i)
+            if (page.value (pointsBase() + i) != p[(std::size_t) i])
+                page.set (pointsBase() + i, p[(std::size_t) i], false);
+        repaint();
+        if (page.refresh)
+            page.refresh();
+    }
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        if (! drawn() || page.live)
+            return;
+        auto p = points();
+        const auto n = count (p);
+        const auto r = area();
+        const auto x = std::clamp ((double) (e.position.x - r.getX()) / r.getWidth(), 0.0, 1.0);
+        const auto y = std::clamp ((double) (r.getCentreY() - e.position.y) / (r.getHeight() * 0.48), -1.0, 1.0);
+        dragging = pointAt (e.position);
+        if (dragging >= 0 && (e.mods.isPopupMenu() || e.getNumberOfClicks() > 1))
+        {
+            // delete (two points stay)
+            if (n > 2)
+            {
+                for (int i = dragging; i < n - 1; ++i)
+                    for (int j = 0; j < 3; ++j)
+                        p[(std::size_t) (1 + i * 3 + j)] = p[(std::size_t) (1 + (i + 1) * 3 + j)];
+                p[0] = n - 1;
+                page.set (pointsBase(), p[0]); // (one undo step for the delete)
+                store (p);
+            }
+            dragging = -1;
+            return;
+        }
+        if (dragging >= 0 || e.mods.isAltDown())
+            page.set (pointsBase(), p[0]); // (one undo step for the move / bend that follows)
+        if (dragging < 0 && e.mods.isAltDown())
+        {
+            bendFrom = e.position.y, bendSegment = -1;
+            for (int i = 0; i < n; ++i)
+                if (p[(std::size_t) (1 + i * 3)] <= x)
+                    bendSegment = i;
+            bendSegment = bendSegment < 0 ? n - 1 : bendSegment;
+            bendStart = p[(std::size_t) (3 + bendSegment * 3)];
+            return;
+        }
+        if (dragging < 0 && n < w::ext::maxPoints && ! e.mods.isPopupMenu())
+        {
+            // add a point, the list kept in x order
+            int at = 0;
+            while (at < n && p[(std::size_t) (1 + at * 3)] <= x)
+                ++at;
+            for (int i = n; i > at; --i)
+                for (int j = 0; j < 3; ++j)
+                    p[(std::size_t) (1 + i * 3 + j)] = p[(std::size_t) (1 + (i - 1) * 3 + j)];
+            p[(std::size_t) (1 + at * 3)] = x, p[(std::size_t) (2 + at * 3)] = y, p[(std::size_t) (3 + at * 3)] = 0.0;
+            p[0] = n + 1;
+            page.set (pointsBase(), p[0]); // (one undo step: the drag that follows is part of it)
+            store (p);
+            dragging = at;
+        }
+    }
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        if (! drawn() || page.live)
+            return;
+        auto p = points();
+        const auto n = count (p);
+        if (bendSegment >= 0 && bendSegment < n)
+        {
+            p[(std::size_t) (3 + bendSegment * 3)] = std::clamp (bendStart + (bendFrom - e.position.y) / 80.0, -1.0, 1.0);
+            store (p);
+            return;
+        }
+        if (dragging < 0 || dragging >= n)
+            return;
+        const auto r = area();
+        auto x = std::clamp ((double) (e.position.x - r.getX()) / r.getWidth(), 0.0, 1.0);
+        const auto lo = dragging > 0 ? p[(std::size_t) (1 + (dragging - 1) * 3)] : 0.0;
+        const auto hi = dragging + 1 < n ? p[(std::size_t) (1 + (dragging + 1) * 3)] : 1.0;
+        x = dragging == 0 && e.mods.isShiftDown() ? 0.0 : std::clamp (x, lo, hi);
+        if (e.mods.isCommandDown()) // (snap to sixteenths)
+            x = std::round (x * 16.0) / 16.0;
+        p[(std::size_t) (1 + dragging * 3)] = x;
+        p[(std::size_t) (2 + dragging * 3)] = std::clamp ((double) (r.getCentreY() - e.position.y) / (r.getHeight() * 0.48), -1.0, 1.0);
+        store (p);
+    }
+    void mouseUp (const juce::MouseEvent&) override
+    {
+        dragging = -1, bendSegment = -1;
+        repaint();
+    }
+
 private:
     Page& page;
+    int dragging = -1, bendSegment = -1;
+    float bendFrom = 0.0f;
+    double bendStart = 0.0;
 };
 
 // --- the modulation matrix: the rows with any amount, a column per source -----------------------------------------------
@@ -590,7 +810,11 @@ public:
     {
         switch (page.modTab)
         {
-            case 1: return { w::src::amp, w::src::env2, w::src::env3, w::src::lfo1, w::src::lfo2 };
+            case 1:
+                if (! page.live) // (LYNX's look: Helix+'s macros too, round 190mi)
+                    return { w::src::amp, w::src::env2, w::src::env3, w::src::lfo1, w::src::lfo2, w::src::macro1, w::src::macro1 + 1, w::src::macro1 + 2,
+                             w::src::macro1 + 3 };
+                return { w::src::amp, w::src::env2, w::src::env3, w::src::lfo1, w::src::lfo2 };
             case 2: return { w::src::velocity, w::src::note, w::src::pitchBend, w::src::pressure, w::src::modWheel, w::src::random };
             default: return { w::src::velocity, w::src::notePitchBend, w::src::slide, w::src::pressure };
         }
@@ -605,22 +829,26 @@ public:
             case w::src::modWheel: return tr ("Mod");
             case w::src::random: return tr ("Rand");
             case w::src::velocity: return tr ("Vel");
-            default: return tr (u8 (w::sourceName (s)));
+            default:
+                if (s >= w::src::macro1)
+                    return "M" + juce::String (s - w::src::macro1 + 1);
+                return tr (u8 (w::sourceName (s)));
         }
     }
     std::vector<int> rows() const
     {
         std::vector<int> r;
-        for (int t = 0; t < w::targetCount; ++t)
+        for (int t = 0; t < rowCount(); ++t)
         {
             bool any = std::find (extra.begin(), extra.end(), t) != extra.end();
-            for (int s = 0; s < w::sourceCount && ! any; ++s)
-                any = page.value (w::matrixIndex (t, s)) != 0.0;
+            for (int s = 0; s < (page.live ? w::sourceCount : w::allSourceCount) && ! any; ++s)
+                any = page.value (w::cellIndex (t, s)) != 0.0;
             if (any)
                 r.push_back (t);
         }
         return r;
     }
+    int rowCount() const { return page.live ? w::targetCount : w::allTargetCount; } // (Helix+'s rows in LYNX's look)
     juce::String rowName (int t) const
     {
         return tr (u8 (w::targetName (t, (int) std::lround (page.value (w::oscBase (0) + w::osc::effectMode)),
@@ -670,7 +898,7 @@ public:
             for (int c = 0; c < (int) cols.size(); ++c)
             {
                 const auto r = cell (i, c).reduced (1);
-                const auto a = page.value (w::matrixIndex (t, cols[(std::size_t) c]));
+                const auto a = page.value (w::cellIndex (t, cols[(std::size_t) c]));
                 g.setColour (l.bg.darker (0.2f));
                 g.fillRect (r);
                 if (a != 0.0)
@@ -704,7 +932,7 @@ public:
                 showAddMenu();
             return;
         }
-        dragTarget = t, dragSource = s, startValue = page.value (w::matrixIndex (t, s)), startY = e.y;
+        dragTarget = t, dragSource = s, startValue = page.value (w::cellIndex (t, s)), startY = e.y;
         if (e.mods.isPopupMenu())
         {
             juce::PopupMenu m;
@@ -733,7 +961,7 @@ public:
     }
     void setCell (int t, int s, double v)
     {
-        page.set (w::matrixIndex (t, s), v);
+        page.set (w::cellIndex (t, s), v);
         repaint();
         if (page.refresh)
             page.refresh();
@@ -742,7 +970,7 @@ public:
     {
         juce::PopupMenu m;
         const auto rs = rows();
-        for (int t = 0; t < w::targetCount; ++t)
+        for (int t = 0; t < rowCount(); ++t)
             if (std::find (rs.begin(), rs.end(), t) == rs.end())
                 m.addItem (rowName (t), [this, t] {
                     extra.push_back (t);
@@ -842,7 +1070,15 @@ public:
             modTab[(std::size_t) t] = tab (tr (modTabs[t]), [this, t] { return page.modTab == t; }, [this, t] { page.modTab = t; layoutMod(); });
         static const char* sources[5] { "Amp", "Env 2", "Env 3", "LFO 1", "LFO 2" };
         for (int s = 0; s < 5; ++s)
+        {
             sourceTab[(std::size_t) s] = tab (tr (sources[s]), [this, s] { return page.source == s; }, [this, s] { page.source = s; layoutMod(); });
+            if (! page.live) // (Helix+: drag a source onto a knob to modulate it)
+            {
+                static constexpr int ids[5] { w::src::amp, w::src::env2, w::src::env3, w::src::lfo1, w::src::lfo2 };
+                sourceTab[(std::size_t) s]->dragSource = ids[s];
+                sourceTab[(std::size_t) s]->setTooltip (tr ("Drag onto a knob to modulate it"));
+            }
+        }
         addAndMakeVisible (sourceView);
         addAndMakeVisible (matrix);
         static const char* envViews[3] { "Time", "Slope", "Value" };
@@ -1143,20 +1379,253 @@ private:
     std::array<Menu*, 2> fType {}, fCircuit {};
 };
 
-// the channel window's page: the device with a margin
-class HelixWindowPage final : public juce::Component
+// --- Helix+ (round 190mi): LYNX's own strip under the device in the channel window --------------------------------------
+// The second warps, the noise oscillator, unison stacking, the extra filter types, the macros (drag their handle onto a
+// knob), the drawn LFOs' switches and the effects rack, in LYNX's look. The Live-look device above stays as it is.
+class HelixPlusStrip final : public juce::Component, private juce::ChangeListener
 {
 public:
-    HelixWindowPage (AudioEngine& e, std::function<ChannelDef* (Song&)> locate, int channel) : panel (e, std::move (locate), channel, false)
+    static constexpr int stripHeight = 150;
+    HelixPlusStrip (AudioEngine& e, std::function<ChannelDef* (Song&)> locate, int channel) : page { e, std::move (locate), channel, false }
+    {
+        page.refresh = [this] { refreshAll(); };
+        const auto X = [] (int i) { return w::extBase + i; };
+        for (int k = 0; k < 2; ++k)
+        {
+            warpMenu[(std::size_t) k] = menu (Menu::of (page, [X, k] { return X (w::ext::warpMode + k * w::ext::warpStride); }));
+            warpMenu[(std::size_t) k]->setTooltip (tr ("Second warp: bends, syncs or cross-modulates the oscillator's read of its table"));
+            warpAmt[(std::size_t) k] = knob (X (w::ext::warpAmount + k * w::ext::warpStride), tr ("Amount"));
+        }
+        noiseOn = toggle (X (w::ext::noiseOn), tr ("On"));
+        noiseLevel = knob (X (w::ext::noiseLevel), tr ("Level"));
+        noiseColour = knob (X (w::ext::noiseColour), tr ("Color"));
+        unisonCount = menu (std::make_unique<Menu> (
+            page, [this] { return tr (u8 (w::paramText (w::extBase + w::ext::unisonCount, page.xv (w::ext::unisonCount)))); },
+            [this] (juce::PopupMenu& m) {
+                const auto now = (int) std::lround (page.xv (w::ext::unisonCount));
+                m.addItem (tr ("As device"), true, now < 2, [this] { setCount (0); });
+                for (int c = 2; c <= w::maxUnison; ++c)
+                    m.addItem (juce::String (c), true, now == c, [this, c] { setCount (c); });
+            }));
+        unisonCount->setTooltip (tr ("Unison voices (Live: the device's Voices; up to 16)"));
+        unisonBlend = knob (X (w::ext::unisonBlend), tr ("Blend"));
+        unisonWidth = knob (X (w::ext::unisonWidth), tr ("Width"));
+        unisonStack = menu (Menu::of (page, [X] { return X (w::ext::unisonStack); }));
+        unisonStack->setTooltip (tr ("Stack: unison voices an octave or a fifth apart"));
+        for (int k = 0; k < 2; ++k)
+            filterType[(std::size_t) k] = menu (Menu::of (page, [X, k] { return X (w::ext::filterType + k); }));
+        for (int j = 0; j < w::macroCount; ++j)
+        {
+            macros[(std::size_t) j] = knob (X (w::ext::macro + j), juce::String (j + 1));
+            macroHandle[(std::size_t) j] = tab ("M" + juce::String (j + 1), [] { return false; }, [] {});
+            macroHandle[(std::size_t) j]->dragSource = w::src::macro1 + j;
+            macroHandle[(std::size_t) j]->setTooltip (tr ("Drag onto a knob to modulate it"));
+        }
+        for (int k = 0; k < 2; ++k)
+        {
+            lfoDraw[(std::size_t) k] = toggle (X (w::ext::lfoDraw + k), "LFO " + juce::String (k + 1));
+            lfoDraw[(std::size_t) k]->setTooltip (tr ("Drawn LFO: click adds a point, drag moves it, double-click deletes it, Alt-drag bends a segment"));
+        }
+        fxOn[0] = toggle (X (w::ext::distOn), tr ("On"));
+        distMode = menu (Menu::of (page, [X] { return X (w::ext::distMode); }));
+        fxKnobs.push_back (knob (X (w::ext::distDrive), tr ("Drive")));
+        fxKnobs.push_back (knob (X (w::ext::distMix), tr ("Mix")));
+        fxOn[1] = toggle (X (w::ext::chorusOn), tr ("On"));
+        fxKnobs.push_back (knob (X (w::ext::chorusRate), tr ("Rate")));
+        fxKnobs.push_back (knob (X (w::ext::chorusDepth), tr ("Depth")));
+        fxKnobs.push_back (knob (X (w::ext::chorusMix), tr ("Mix")));
+        fxOn[2] = toggle (X (w::ext::delayOn), tr ("On"));
+        delayTime = menu (Menu::of (page, [X] { return X (w::ext::delayTime); }));
+        delayPing = toggle (X (w::ext::delayPingPong), tr ("Ping-Pong"));
+        fxKnobs.push_back (knob (X (w::ext::delayFeedback), tr ("Feedback")));
+        fxKnobs.push_back (knob (X (w::ext::delayMix), tr ("Mix")));
+        fxOn[3] = toggle (X (w::ext::reverbOn), tr ("On"));
+        fxKnobs.push_back (knob (X (w::ext::reverbSize), tr ("Size")));
+        fxKnobs.push_back (knob (X (w::ext::reverbDamp), tr ("Damp")));
+        fxKnobs.push_back (knob (X (w::ext::reverbMix), tr ("Mix")));
+        page.engine.addChangeListener (this);
+        setSize (helixDeviceWidth, stripHeight);
+    }
+    ~HelixPlusStrip() override { page.engine.removeChangeListener (this); }
+
+    void paint (juce::Graphics& g) override
+    {
+        const auto l = page.look();
+        g.fillAll (l.outer);
+        static const char* names[10] { "Warp 2", "Noise", "Unison+", "Filter+", "Macros", "LFO Draw", "Distortion", "Chorus", "Delay", "Reverb" };
+        for (int i = 0; i < 10; ++i)
+        {
+            const auto r = sections[(std::size_t) i];
+            g.setColour (l.bg);
+            g.fillRoundedRectangle (r.toFloat(), 4.0f);
+            caption (g, l, r.withHeight (14).translated (6, 1).withWidth (r.getWidth() - 12), tr (names[i]));
+        }
+        g.setColour (l.dim);
+        g.setFont (theme::font (9.5f));
+        const auto w0 = sections[0];
+        g.drawText ("1", w0.getX() + 3, w0.getY() + 34, 10, 16, juce::Justification::centred, false);
+        g.drawText ("2", w0.getX() + 131, w0.getY() + 34, 10, 16, juce::Justification::centred, false);
+        const auto u0 = sections[2];
+        g.drawText (tr ("Voices"), u0.getX() + 8, u0.getY() + 16, 80, 12, juce::Justification::centredLeft, false);
+        g.drawText (tr ("Stack"), u0.getX() + 8, u0.getY() + 43, 80, 12, juce::Justification::centredLeft, false);
+        const auto f0 = sections[3];
+        g.drawText ("1", f0.getX() + 4, f0.getY() + 20, 10, 16, juce::Justification::centred, false);
+        g.drawText ("2", f0.getX() + 4, f0.getY() + 42, 10, 16, juce::Justification::centred, false);
+    }
+
+    void resized() override
+    {
+        // two rows of sections, left to right
+        const int rowH = 72, gap = 4;
+        const int top[2] { 2, 2 + rowH + gap };
+        const int widths[10] { 264, 136, 220, 120, 236, 112, 208, 212, 236, 216 };
+        int x = 2;
+        for (int i = 0; i < 10; ++i)
+        {
+            if (i == 5)
+                x = 2;
+            sections[(std::size_t) i] = { x, top[i < 5 ? 0 : 1], widths[i], rowH };
+            x += widths[i] + gap;
+        }
+        const auto kn = [] (Ctl* c, juce::Rectangle<int> s, int col, int cols0 = 0) { c->setBounds (s.getX() + cols0 + col * 46, s.getY() + 16, 46, 54); };
+        // warp 2
+        const auto w0 = sections[0];
+        for (int k = 0; k < 2; ++k) // (per oscillator: the mode menu, the amount knob beside it)
+        {
+            const auto x0 = w0.getX() + 14 + k * 128;
+            warpMenu[(std::size_t) k]->setBounds (x0, w0.getY() + 34, 70, 16);
+            warpAmt[(std::size_t) k]->setBounds (x0 + 72, w0.getY() + 16, 46, 54);
+        }
+        // noise
+        const auto n0 = sections[1];
+        noiseOn->setBounds (n0.getX() + 6, n0.getY() + 34, 36, 16);
+        kn (noiseLevel, n0, 0, 44);
+        kn (noiseColour, n0, 1, 44);
+        // unison+
+        const auto u0 = sections[2];
+        unisonCount->setBounds (u0.getX() + 6, u0.getY() + 28, 80, 16);
+        unisonStack->setBounds (u0.getX() + 6, u0.getY() + 55, 80, 16);
+        kn (unisonBlend, u0, 0, 88);
+        kn (unisonWidth, u0, 1, 88);
+        // filter+
+        const auto f0 = sections[3];
+        for (int k = 0; k < 2; ++k)
+            filterType[(std::size_t) k]->setBounds (f0.getX() + 16, f0.getY() + 20 + k * 22, f0.getWidth() - 22, 16);
+        // macros: knob + handle
+        const auto m0 = sections[4];
+        for (int j = 0; j < w::macroCount; ++j)
+        {
+            macros[(std::size_t) j]->setBounds (m0.getX() + 4 + j * 58, m0.getY() + 16, 38, 54);
+            macroHandle[(std::size_t) j]->setBounds (m0.getX() + 42 + j * 58, m0.getY() + 34, 14, 16);
+        }
+        // LFO draw
+        const auto d0 = sections[5];
+        for (int k = 0; k < 2; ++k)
+            lfoDraw[(std::size_t) k]->setBounds (d0.getX() + 8, d0.getY() + 20 + k * 24, d0.getWidth() - 16, 18);
+        // effects
+        const auto e0 = sections[6], e1 = sections[7], e2 = sections[8], e3 = sections[9];
+        fxOn[0]->setBounds (e0.getX() + 6, e0.getY() + 20, 36, 16);
+        distMode->setBounds (e0.getX() + 6, e0.getY() + 44, 60, 16);
+        kn (fxKnobs[0], e0, 0, 72);
+        kn (fxKnobs[1], e0, 1, 72);
+        fxOn[1]->setBounds (e1.getX() + 6, e1.getY() + 34, 36, 16);
+        kn (fxKnobs[2], e1, 0, 44);
+        kn (fxKnobs[3], e1, 1, 44);
+        kn (fxKnobs[4], e1, 2, 44);
+        fxOn[2]->setBounds (e2.getX() + 6, e2.getY() + 20, 36, 16);
+        delayTime->setBounds (e2.getX() + 46, e2.getY() + 20, 50, 16);
+        delayPing->setBounds (e2.getX() + 6, e2.getY() + 44, 90, 16);
+        kn (fxKnobs[5], e2, 0, 100);
+        kn (fxKnobs[6], e2, 1, 100);
+        fxOn[3]->setBounds (e3.getX() + 6, e3.getY() + 34, 36, 16);
+        kn (fxKnobs[7], e3, 0, 44);
+        kn (fxKnobs[8], e3, 1, 44);
+        kn (fxKnobs[9], e3, 2, 44);
+    }
+
+private:
+    Ctl* knob (int index, juce::String cap)
+    {
+        ctls.push_back (std::make_unique<Ctl> (page, index, Ctl::Kind::knob, std::move (cap)));
+        addAndMakeVisible (*ctls.back());
+        return ctls.back().get();
+    }
+    Tab* tab (juce::String t, std::function<bool()> on, std::function<void()> click)
+    {
+        tabs.push_back (std::make_unique<Tab> (page, std::move (t), std::move (on), std::move (click)));
+        addAndMakeVisible (*tabs.back());
+        return tabs.back().get();
+    }
+    Tab* toggle (int index, juce::String t)
+    {
+        auto* b = tab (std::move (t), [this, index] { return page.value (index) > 0.5; }, [this, index] { page.set (index, page.value (index) > 0.5 ? 0.0 : 1.0); });
+        b->switchStyle = true;
+        return b;
+    }
+    Menu* menu (std::unique_ptr<Menu> m)
+    {
+        menus.push_back (std::move (m));
+        addAndMakeVisible (*menus.back());
+        return menus.back().get();
+    }
+    void setCount (int c)
+    {
+        page.set (w::extBase + w::ext::unisonCount, (double) c);
+        if (c >= 2 && (int) std::lround (page.value (w::unisonMode)) == w::unisonNone) // (a count needs a unison mode: Classic)
+            page.set (w::unisonMode, (double) w::unisonClassic);
+        refreshAll();
+    }
+    void refreshAll()
+    {
+        repaint();
+        for (auto* c : getChildren())
+            c->repaint();
+    }
+    void changeListenerCallback (juce::ChangeBroadcaster*) override
+    {
+        if (page.def() != nullptr)
+            refreshAll();
+    }
+
+    Page page;
+    std::vector<std::unique_ptr<Ctl>> ctls;
+    std::vector<std::unique_ptr<Tab>> tabs;
+    std::vector<std::unique_ptr<Menu>> menus;
+    std::array<juce::Rectangle<int>, 10> sections {};
+    std::array<Menu*, 2> warpMenu {}, filterType {};
+    std::array<Ctl*, 2> warpAmt {};
+    std::array<Ctl*, 4> macros {};
+    std::array<Tab*, 4> macroHandle {};
+    std::array<Tab*, 2> lfoDraw {};
+    std::array<Tab*, 4> fxOn {};
+    std::vector<Ctl*> fxKnobs;
+    Tab *noiseOn = nullptr, *delayPing = nullptr;
+    Ctl *noiseLevel = nullptr, *noiseColour = nullptr, *unisonBlend = nullptr, *unisonWidth = nullptr;
+    Menu *unisonCount = nullptr, *unisonStack = nullptr, *distMode = nullptr, *delayTime = nullptr;
+};
+
+// the channel window's page: the device with a margin, Helix+'s strip under it (round 190mi)
+class HelixWindowPage final : public juce::Component, public juce::DragAndDropContainer
+{
+public:
+    HelixWindowPage (AudioEngine& e, std::function<ChannelDef* (Song&)> locate, int channel) : panel (e, locate, channel, false), strip (e, locate, channel)
     {
         addAndMakeVisible (panel);
-        setSize (helixDeviceWidth + 16, helixDeviceHeight + 16);
+        addAndMakeVisible (strip);
+        setSize (helixDeviceWidth + 16, helixDeviceHeight + 16 + 6 + HelixPlusStrip::stripHeight);
     }
     void paint (juce::Graphics& g) override { g.fillAll (theme::colour::bg1); }
-    void resized() override { panel.setBounds (getLocalBounds().reduced (8)); }
+    void resized() override
+    {
+        auto r = getLocalBounds().reduced (8);
+        panel.setBounds (r.removeFromTop (helixDeviceHeight));
+        r.removeFromTop (6);
+        strip.setBounds (r.removeFromTop (HelixPlusStrip::stripHeight));
+    }
 
 private:
     HelixPanel panel;
+    HelixPlusStrip strip;
 };
 
 // the Device View's card

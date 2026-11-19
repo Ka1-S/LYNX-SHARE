@@ -198,7 +198,8 @@ TEST (ctlwake173d_generator_controls_drumaxx) { ctlwake173d::auditEngines ({ "Dr
 // (round 190ix: LYNX's own FM synth needs nothing of FL, so it runs on CI too; its contexts are Tetra hints in tools/CtlWake.h)
 TEST (ctlwake173d_generator_controls_tetra) { ctlwake173d::auditEngines ({ "Tetra" }, false, true); }
 // (rollup 0.1.30: Helix, LYNX's own wavetable synth (round 190ja), needs nothing of FL either; its contexts are Helix hints in
-// tools/CtlWake.h, its keys from a tools/ctlwake survey: 100 controls, 0 dead, HiQ allowed)
+// tools/CtlWake.h, its keys from a tools/ctlwake survey: 100 controls, 0 dead, HiQ allowed; round 190mi: + 36 Helix+ controls, their keys from
+// the Helix+ hints)
 TEST (ctlwake173d_generator_controls_helix) { ctlwake173d::auditEngines ({ "Helix" }, false, true); }
 // (rollup 0.1.30 step 7: Braid, LYNX's own two-engine macro synth (round 190ko), needs nothing of FL; its contexts are Braid
 // hints in tools/CtlWake.h)

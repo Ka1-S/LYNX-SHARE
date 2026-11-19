@@ -67,13 +67,72 @@ constexpr int tableBase = paramCount;
 constexpr int sourceCount = 13, targetCount = 52;
 constexpr int matrixBase = tableBase + 2;
 constexpr int matrixIndex (int target, int source) noexcept { return matrixBase + target * sourceCount + source; }
-constexpr int stateSize = matrixBase + targetCount * sourceCount;
+constexpr int liveStateSize = matrixBase + targetCount * sourceCount; // Live Wavetable's values (778): a project before 190mi
+
+// --- Helix+ (round 190mi): LYNX's own extension block after Live's values (Serum-class features, clean-room). Live's
+// import / export never touch it. `revision` 0 (a channel saved before 190mi: the block is missing and reads as its
+// defaults) ignores every value below, so old projects render bit for bit as before; 1 (new channels, the factory
+// presets, any edit of a Helix+ control) makes it live. Every value defaults to "off": a revision 1 channel that uses no
+// Helix+ control sounds exactly as revision 0.
+constexpr int extBase = liveStateSize;
+namespace ext
+{
+constexpr int revision = 0;                                   // (state, not automatable)
+constexpr int warpMode = 1, warpAmount = 2, warpStride = 2;   // + 2 k: oscillator k's second warp (menu, 0…1)
+constexpr int noiseOn = 5, noiseLevel = 6, noiseColour = 7;   // the noise oscillator
+constexpr int unisonCount = 8, unisonBlend = 9, unisonWidth = 10, unisonStack = 11; // 0 = Live's count; 2…16
+constexpr int filterType = 12;                                // + k: filter k's Helix+ type (0 = Live's own type)
+constexpr int macro = 14;                                     // + j: macros 1…4 (0…1)
+constexpr int lfoDraw = 18;                                   // + k: LFO k plays its drawn shape
+constexpr int distOn = 20, distMode = 21, distDrive = 22, distMix = 23;
+constexpr int chorusOn = 24, chorusRate = 25, chorusDepth = 26, chorusMix = 27;
+constexpr int delayOn = 28, delayTime = 29, delayFeedback = 30, delayPingPong = 31, delayMix = 32;
+constexpr int reverbOn = 33, reverbSize = 34, reverbDamp = 35, reverbMix = 36;
+constexpr int autoEnd = 37;                                   // the automatable values are 1 … autoEnd − 1
+constexpr int maxPoints = 16, pointStride = 3;                // a drawn LFO: count, then maxPoints × (x 0…1, y −1…1, curve −1…1)
+constexpr int points = autoEnd;                               // + k × lfoPointsSize
+constexpr int lfoPointsSize = 1 + maxPoints * pointStride;
+constexpr int macroCells = points + 2 * lfoPointsSize;        // Live's 52 targets × the 4 macros
+constexpr int extCells = macroCells + 52 * 4;                 // Helix+'s targets × every source (13 Live + 4 macros)
+constexpr int count = extCells + 4 * 17;
+} // namespace ext
+constexpr int stateSize = extBase + ext::count;
+constexpr int macroCount = 4;
+constexpr int allSourceCount = sourceCount + macroCount; // + Macro 1…4
+constexpr int extTargetCount = 4, allTargetCount = targetCount + extTargetCount;
+// a matrix cell's value index for any target (Live's 52 + Helix+'s 4) and any source (Live's 13 + the macros)
+constexpr int cellIndex (int target, int source) noexcept
+{
+    if (target < targetCount && source < sourceCount)
+        return matrixIndex (target, source);
+    if (target < targetCount)
+        return extBase + ext::macroCells + target * macroCount + (source - sourceCount);
+    return extBase + ext::extCells + (target - targetCount) * allSourceCount + source;
+}
+// an automatable value (Live's 0 … paramCount − 1 and Helix+'s)
+constexpr bool automatable (int index) noexcept
+{
+    return (index >= 0 && index < paramCount) || (index > extBase + ext::revision && index < extBase + ext::autoEnd);
+}
+// the warp modes of Helix+'s second warp
+namespace warp
+{
+constexpr int off = 0, sync = 1, windowSync = 2, bendPlus = 3, bendMinus = 4, bendBoth = 5, pwm = 6, asymPlus = 7, asymMinus = 8,
+              asymBoth = 9, mirror = 10, flip = 11, remap = 12, crush = 13, fm = 14, am = 15, rm = 16, count = 17;
+}
+// Helix+'s filter types (on top of Live's)
+namespace xfilter
+{
+constexpr int live = 0, combPlus = 1, combMinus = 2, formant = 3, phaser = 4, count = 5;
+}
+constexpr int maxPolyVoices = 32;
 
 // modulation sources (Live's matrix columns, in the set's order [DATA 190ja: 271 Core Library presets])
 namespace src
 {
 constexpr int amp = 0, env2 = 1, env3 = 2, lfo1 = 3, lfo2 = 4, velocity = 5, note = 6, pitchBend = 7, pressure = 8, modWheel = 9,
               random = 10, notePitchBend = 11, slide = 12;
+constexpr int macro1 = 13; // + j (Helix+, round 190mi)
 }
 // modulation targets (Live's rows, in the set's order; the effect rows are named by the oscillator's effect mode)
 namespace tgt
@@ -85,13 +144,15 @@ constexpr int ampAttack = 22, ampDecay = 23, ampRelease = 24, ampSustain = 25;
 constexpr int env2 = 26, env3 = 33; // attack, decay, release, initial, peak, sustain, final
 constexpr int lfo1 = 40, lfo2 = 43; // amount, shaping, rate
 constexpr int time = 46, globalMod = 47, unison = 48, amp = 49, pitch = 50, glide = 51;
+constexpr int warpAmount = 52, noiseLevel = 54, unisonBlend = 55; // Helix+ (round 190mi): warp amount + k
 }
 
 constexpr int effectNone = 0, effectFm = 1, effectClassic = 2, effectModern = 3;
 constexpr int routeSerial = 0, routeParallel = 1, routeSplit = 2;
 constexpr int unisonNone = 0, unisonClassic = 1, unisonShimmer = 2, unisonNoise = 3, unisonPhaseSync = 4, unisonPositionSpread = 5,
               unisonRandomNote = 6;
-constexpr int maxUnison = 8;
+constexpr int maxUnison = 16;    // (Live's Unison Voices reach 8; Helix+'s count 16)
+constexpr int liveMaxUnison = 8;
 
 // --- wave tables (core/WavetableTables.cpp): LYNX's own, generated from recipes on first use, then kept
 constexpr int frameCount = 64;                 // frames per table (the position moves through them)
@@ -144,6 +205,15 @@ double syncRatio (double sync) noexcept;        // Sync 0…1 → the synced wav
 double unisonCents (int mode, double amount) noexcept; // the widest unison voice's detune
 
 const std::array<double, stateSize>& defaults() noexcept;
+// Helix+ (round 190mi) laws, exposed for the tests and the editor
+double warpStretch (int mode, double amount, double otherRatio) noexcept; // how much faster the warped phase can run (mip)
+double warpPhase (int mode, double amount, double phase) noexcept;        // the phase warps (0…1 → 0…1)
+float drawnLfo (const double* points, double x) noexcept;                  // a drawn LFO at phase x (points: count, x/y/curve…)
+int unisonStackSemis (int stack, int voice) noexcept;                       // the stacked voice's offset in semitones
+double delayBeats (int index) noexcept;                                     // the FX delay's synced time
+std::array<double, 3> formantHz (double vowel) noexcept;                    // the formant filter's three bands at Morph 0…1 (A E I O U)
+// the matrix target a parameter's knob modulates (drag and drop; −1: none)
+int targetOfParam (int index) noexcept;
 
 // The engine as the instrument drives it (audio thread, except the constructor, prepare and setState)
 class Engine
@@ -208,6 +278,9 @@ std::unique_ptr<Instrument> makeHelixInstrument();
 std::vector<float> helixDefaults();
 // the channel's state as doubles (missing values = defaults)
 std::vector<double> helixState (const ChannelDef& channel);
+// grows a channel's values to the whole state (missing ones as they read: a missing Helix+ block stays revision 0);
+// `helixPlus`: a Helix+ value is about to be set, so the block goes live (revision 1) (round 190mi)
+void padHelixState (ChannelDef& channel, bool helixPlus);
 const std::vector<EngineParam>& helixEngineParams();
 namespace modelparams
 {
