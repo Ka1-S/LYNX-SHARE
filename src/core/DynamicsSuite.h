@@ -313,7 +313,12 @@ enum Param
     // over Release, whatever the level does meanwhile (the style's level curve, ratio and knee are not used). Measured
     // black-box on a drum-gate reference's probes (docs/PARITY.md "Round 190dm").
     trigger, sensitivity, releaseShape,
-    count
+    count,
+    // round 190lp, hidden (not in the info: no control, no text; saved while non-zero): revision 1 runs the level gate's
+    // algorithms refitted black-box on the reference gate's renders (the gain moves in dB: opening, a wait, a smooth
+    // closing curve per style). A new Sentry and a translated Pro-G state get 1; a project or preset saved before (and
+    // the Live maps / substitutes) keep 0, bit for bit
+    revision = count
 };
 enum class Shape { smooth, mid, sharp };
 bool transientTrigger (const EffectParams& p) noexcept;

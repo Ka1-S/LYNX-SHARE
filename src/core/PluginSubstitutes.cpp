@@ -11,6 +11,7 @@
 #include <map>
 #include <mutex>
 
+#include "core/ApexLimiter.h"
 #include "core/Effects.h"
 #include "core/FabFilterStates.h"
 #include "core/FacetEq.h"
@@ -4942,6 +4943,11 @@ EffectSlot makeSubstituteSlot (const SubstituteEntry& entry, const PluginIdentit
     // translator, applied below, sets 1)
     if (slot.kind == EffectKind::crestCompressor)
         slot.params[(std::size_t) dyn::crest::revision] = 0.0f;
+    // round 190lp: … and their Apex settings the laws before the styles' refit (the Pro-L 2 translator sets 1)
+    if (slot.kind == EffectKind::apexLimiter)
+        slot.params[(std::size_t) apex::pRevision] = 0.0f;
+    if (slot.kind == EffectKind::sentryGate)
+        slot.params[(std::size_t) dyn::sentry::revision] = 0.0f;
     for (const auto& [index, value] : entry.preset)
         if (index >= 0 && index < maxEffectParams)
             slot.params[(std::size_t) index] = value;

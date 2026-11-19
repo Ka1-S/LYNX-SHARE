@@ -405,6 +405,7 @@ int fromProG (const State& s, EffectSlot& slot)
     set (dryPan, expert ? linValue (s.at (23), -1.0, 1.0) : 0.5f);
     set (channelMode, s.at (27) >= 0.5f ? 1.0f : 0.0f);
     set (input, linValue (levelDb (s.at (28)), -24.0, 24.0));
+    p[(std::size_t) revision] = 1.0f; // round 190lp: the algorithms' black-box refit (hidden revision 1)
     return n;
 }
 
@@ -757,6 +758,7 @@ int fromProL2 (const State& s, EffectSlot& slot)
     set (apex::pUnity, s.at (15) >= 0.5f ? 1.0f : 0.0f);
     set (apex::pAudition, s.at (16) >= 0.5f ? 1.0f : 0.0f);
     set (apex::pCeiling, linValue (s.at (18), -30.0, 0.0));
+    p[(std::size_t) apex::pRevision] = 1.0f; // round 190lp: the styles' black-box refit (hidden revision 1)
     if (s.at (17) >= 0.5f)
         slot.enabled = false;
     return n;

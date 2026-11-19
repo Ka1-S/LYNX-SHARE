@@ -44,6 +44,10 @@ enum Param { pGain, pCeiling, pLookahead, pRelease, pStyle, pTruePeak, pLink, pA
              // round 190ar: the levelling stage before the limiter (off at 0 dB: nothing changes for existing projects)
              pLevelThreshold, pLevelAttack };
 constexpr double maxLookaheadMs = 5.0;
+// round 190lp, hidden (not in the info: no control, no text; saved while non-zero): revision 1 runs the styles' laws
+// refitted black-box on the reference limiter's renders (docs/PARITY.md "Round 190lp"). A new Apex and a translated
+// Pro-L 2 state get 1; a project or preset saved before (and the Live / substitute maps) keep 0, bit for bit.
+constexpr int pRevision = paramCount;
 
 // Round 128: 8 styles. The four original styles keep the positions their saved values round to (0, 1/3, 2/3, 1 of
 // the old 4-step list → 0, 2, 5, 7 of 8), the new ones sit between them.

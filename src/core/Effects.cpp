@@ -4827,6 +4827,10 @@ EffectSlot makeEffectSlot (EffectKind kind)
         slot.params[(std::size_t) echosuite::echoform::revision] = 1.0f;
     if (kind == EffectKind::crestCompressor) // round 190kw: a new Crest runs the V1 styles' revision 1 (hidden parameter)
         slot.params[(std::size_t) dyn::crest::revision] = 1.0f;
+    if (kind == EffectKind::apexLimiter) // round 190lp: a new Apex runs the styles' refit, revision 1 (hidden parameter)
+        slot.params[(std::size_t) apex::pRevision] = 1.0f;
+    if (kind == EffectKind::sentryGate) // round 190lp: … and a new Sentry the level gate's refit (hidden parameter)
+        slot.params[(std::size_t) dyn::sentry::revision] = 1.0f;
     if (kind == EffectKind::ember) // round 190kw: a new Ember runs the Saturn styles' own laws (hidden parameter)
         slot.params[(std::size_t) mixsuite::ember::revision] = 1.0f;
     // round 190it: a new Epoch Verb / Atrium / Foil Plate / Halo runs the 0.1.30 revision of the Measured law (hidden)
@@ -4951,6 +4955,12 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190kw: … and one saved before the V1 styles' revision keeps the fitted Clean / Classic / Opto (bit for bit)
     if (slot.kind == EffectKind::crestCompressor && savedCount <= (std::size_t) dyn::crest::revision)
         slot.params[(std::size_t) dyn::crest::revision] = 0.0f;
+    // round 190lp: an Apex saved before the styles' refit keeps the fitted laws of rounds tp172b … 190co (bit for bit)
+    if (slot.kind == EffectKind::apexLimiter && savedCount <= (std::size_t) apex::pRevision)
+        slot.params[(std::size_t) apex::pRevision] = 0.0f;
+    // round 190lp: … and a Sentry saved before the level gate's refit keeps the measured gate of rounds tp172b … 190dm
+    if (slot.kind == EffectKind::sentryGate && savedCount <= (std::size_t) dyn::sentry::revision)
+        slot.params[(std::size_t) dyn::sentry::revision] = 0.0f;
     // round 190lg: a Facet saved before keeps round 190jh / 190js's automatic-threshold law (bit for bit)
     if (slot.kind == EffectKind::facetEq && savedCount <= (std::size_t) facet::autoRevisionParam)
         slot.params[(std::size_t) facet::autoRevisionParam] = 0.0f;
