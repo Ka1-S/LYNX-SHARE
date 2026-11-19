@@ -242,25 +242,79 @@ juce::File pluginDatabaseEntry (const std::string& key, bool instruments)
     return path.empty() ? juce::File() : juce::File (juce::String::fromUTF8 (path.c_str()));
 }
 
+namespace
+{
+// Round 190mf: the Plugin database as last read, kept while nothing that it was read from changed. The Channel rack's
+// "+" menu read the whole folder every time it opened more than two seconds after the last read (~200-250 ms on a PC
+// with many plugins, round 190ma). With the folder watched (the app: ui/MainComponent's folderwatch::Watcher, which
+// reads it again by itself after a change made in the file manager, and markPluginDatabaseChanged), a menu only reads
+// it again when the plugin list changed (a scan, the Plugin manager: KnownPluginList's change messages, and its size
+// for a change whose message has not arrived yet) or when it was marked changed. Unwatched: the two-second throttle.
+struct PluginListStamp final : juce::ChangeListener
+{
+    int changes = 0;
+    void changeListenerCallback (juce::ChangeBroadcaster*) override { ++changes; }
+};
+PluginListStamp& pluginListStamp()
+{
+    static PluginListStamp stamp;
+    return stamp;
+}
+bool databaseWatched = false, databaseRead = false;
+const PluginHost* readHost = nullptr;
+int readListChanges = -1, readListSize = -1;
+RefreshTimes lastTimes;
+} // namespace
+
 void markPluginDatabaseChanged()
 {
     lastDatabaseRefresh = 0; // (the next menu, picker or Browser reads the folder again, without the two-second wait)
+    databaseRead = false;
 }
+
+void setPluginDatabaseWatched (bool watched) { databaseWatched = watched; }
+
+bool pluginDatabaseCurrent (AudioEngine& engine)
+{
+    auto& host = engine.getPluginHost();
+    return databaseWatched && databaseRead && readHost == &host && readListChanges == pluginListStamp().changes
+           && readListSize == host.getKnownPlugins().getNumTypes();
+}
+
+RefreshTimes lastRefreshTimes() { return lastTimes; }
 
 void refreshPluginDatabase (AudioEngine& engine, bool force)
 {
     auto& host = engine.getPluginHost();
     if (! host.isPersistent() || databaseBusy)
         return;
+    if (! force && pluginDatabaseCurrent (engine)) // (round 190mf: nothing it was read from changed)
+        return;
     const auto now = juce::Time::getMillisecondCounter();
-    if (! force && lastDatabaseRefresh != 0 && now - lastDatabaseRefresh < 2000)
+    if (! force && ! databaseWatched && lastDatabaseRefresh != 0 && now - lastDatabaseRefresh < 2000)
         return;
     const juce::ScopedValueSetter<bool> busy (databaseBusy, true);
+    if (readHost != &host)
+    {
+        host.getKnownPlugins().addChangeListener (&pluginListStamp());
+        readHost = &host;
+    }
+    const auto changes = pluginListStamp().changes;
+    const auto size = host.getKnownPlugins().getNumTypes();
+    const auto t0 = juce::Time::getMillisecondCounterHiRes();
     plugindb::State state { host.databaseFolders(), host.pluginNames() };
+    const auto plugins = databasePlugins (engine);
+    const auto t1 = juce::Time::getMillisecondCounterHiRes();
     // (Installed, the "copy from here" folder, is written on a thread of its own: round 190go)
-    if (plugindb::refresh (pluginDatabaseFolder().getFullPathName().toStdString(), databasePlugins (engine), state, true).ok)
+    const auto ok = plugindb::refresh (pluginDatabaseFolder().getFullPathName().toStdString(), plugins, state, true).ok;
+    if (ok)
         host.adoptDatabase (state.folders, state.names);
+    const auto t2 = juce::Time::getMillisecondCounterHiRes();
+    lastTimes = { t1 - t0, t2 - t1, lastTimes.reads + 1 };
     lastDatabaseRefresh = juce::Time::getMillisecondCounter();
+    databaseRead = ok;
+    readListChanges = changes;
+    readListSize = size;
 }
 
 void installPluginDatabase (AudioEngine& engine)
@@ -270,6 +324,8 @@ void installPluginDatabase (AudioEngine& engine)
         return;
     // (round 190go: not forced: the Browser, built just before, read the folder a moment ago; read twice in a row it
     // cost the start-up a second pass over every entry of the user's tree)
+    if (readHost != &host) // (round 190mf: a new host: what was read for another one does not count)
+        databaseRead = false;
     refreshPluginDatabase (engine);
     host.onDatabaseEdited = [&engine] {
         auto& h = engine.getPluginHost();

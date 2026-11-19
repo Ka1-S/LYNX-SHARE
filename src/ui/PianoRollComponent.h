@@ -227,6 +227,8 @@ public:
     void squeezeToolbarForSnapshot (int pixels); // the toolbar as in a window `pixels` narrower (negative: back)
     // zooms in (taller rows, wider steps) and hovers the right edge of the first note; returns its hint
     ui::Hint hoverForSnapshot();
+    // round 190mf (DL-80): docked in Live's look, the first note's velocity marker hovered (or dragged); its value
+    int liveVelocityHoverForSnapshot (bool dragging);
     // the lane box's note properties (ids; pattern event lanes follow from eventLaneIdBase)
     static constexpr int laneVelocity = 1, lanePan = 2, laneFinePitch = 3, laneRelease = 4, laneModX = 5, laneModY = 6, laneChance = 7,
                          laneVelocityRange = 8,
@@ -549,6 +551,15 @@ private:
     };
     Hover hover;
     juce::Point<int> lastMouse { -1, -1 };
+    // round 190mf (DL-80): the marker whose value Live's lane header shows (set while the lane paints)
+    struct LiveVelocityReadout
+    {
+        int note = -1;
+        float y = 0.0f;
+        int value = 0;
+    };
+    mutable LiveVelocityReadout liveVelocityReadout;
+    bool liveLaneHover = false;
     Hover hoverAt (juce::Point<int> p) const;
     gesture::Target targetAt (const Hover& h) const;
     void updateHover (juce::Point<int> p, juce::ModifierKeys mods);

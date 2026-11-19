@@ -42,6 +42,12 @@ void setNativeEditorDemo (bool on);
 bool tickNativeEffectEditor (juce::Component& editor);
 // round 190ih (--details190ihshot): Gross Beat's editor on its time (0) or volume (1) envelope
 bool showGrossBeatEnvelopeForSnapshot (juce::Component& editor, int envelopeKind);
+// round 190mf (DP-6 / DP-7): Gross Beat's Step / Slide / Freeze switches set, and its mapping options menu
+// round 190mf (DP-26): Fruity Limiter's KNEE knob held (its transfer curve on the display)
+// round 190mf (DP-29): Fruity Multiband Compressor's band meters with fixed levels
+bool multibandMetersForSnapshot (juce::Component& editor);
+bool limiterKneeHeldForSnapshot (juce::Component& editor, bool held);
+bool grossBeatToolsForSnapshot (juce::Component& editor, bool step, bool slide, bool frozen, juce::PopupMenu* optionsMenu);
 // round 190ld (--details190ldshot): Fruity Delay 3's Time-knob menu while TEMPO SYNC is on (empty otherwise); the
 // Vocoder's band columns as Vocoder::controlOutput 0…7 packs them; Fruity Limiter's graph fed `steps` synthetic frames
 // and paused (false: not a Limiter / Maximus monitor)

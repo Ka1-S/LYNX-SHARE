@@ -32,6 +32,8 @@ public:
     // the envelope tools: the envelope being edited over the audio (nullptr when none is shown)
     virtual audioedit::Envelope* toolEnvelope() = 0;
     virtual void toolEnvelopeChanged (bool commit, const juce::String& label) = 0;
+    // the level Create sequence's full steps get (Edison's volume envelope: 0.5 = unity; round 190mf, Gross Beat: 1)
+    virtual double toolEnvelopeUnity() const { return 0.5; }
     virtual juce::Component& toolComponent() = 0;
 };
 

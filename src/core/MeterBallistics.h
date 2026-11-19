@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <vector>
+#include <iterator>
 
 // Display ballistics of a peak meter (mixer strips): a fast-rising bar with a smooth falloff, a
 // peak-hold line that stays put for a while before it falls, and a clip latch that stays lit until
@@ -192,11 +193,11 @@ DirtyRows dirtyRows (const PeakHold& before, const PeakHold& after, int heightPx
     rows.bottom = std::min (heightPx, rows.bottom);
     return rows;
 }
-// The mixer meters' dB scale: -60 dB at the bottom, +6 dB at the top, linear in dB. 0..1 from the bottom.
+// The mixer meters' dB scale, 0..1 from the bottom: FL's normal law in the Pattern layout (round 190mf), -60 … +6 dB
+// linear in dB in the Clip-launch and Simple layouts, FL's alternate law when that option is on (round 190lx, DF-61).
 inline float scalePosition (float db) noexcept
 {
-    // (round 190lx, DF-61: FL's Alternate meter scale moves the marks with the meters)
-    return meterscale::positionOfDb (db, meterscale::alternate());
+    return meterscale::positionOfDb (db, meterscale::current());
 }
 
 // The dB values printed beside a meter `heightPx` tall (round 162, issue #9: FL prints +3, 0, -3, -6, -12...):
@@ -205,11 +206,19 @@ inline float scalePosition (float db) noexcept
 inline std::vector<int> scaleMarks (float heightPx, float minGapPx)
 {
     static const int candidates[] = { 0, -12, -24, -48, -6, -36, +3, -3, -18, -9 };
+    // (round 190mf: FL's normal law prints FL's own marks, every 3 dB from +3 down to -39 as FL's meter scale)
+    static const int flCandidates[] = { 0, -12, -24, -6, -18, -36, +3, -3, -9, -15, -21, -30, -27, -33, -39 };
+    const auto law = meterscale::current();
     std::vector<int> kept;
 
-    for (auto db : candidates)
+    const bool fl = law == meterscale::Law::flNormal;
+    const int* const first = fl ? flCandidates : candidates;
+    const int* const last = fl ? std::end (flCandidates) : std::end (candidates);
+
+    for (auto* it = first; it != last; ++it)
     {
-        if (db > 2 && meterscale::alternate()) // (FL's alternate scale ends at about +2.5 dB: no +3 mark)
+        const int db = *it;
+        if (db > 2 && law == meterscale::Law::flAlternate) // (FL's alternate scale ends at about +2.5 dB: no +3 mark)
             continue;
         const auto y = scalePosition ((float) db) * heightPx;
         const bool fits = std::all_of (kept.begin(), kept.end(), [&] (int k) { return std::abs (scalePosition ((float) k) * heightPx - y) >= minGapPx; });

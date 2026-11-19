@@ -17962,3 +17962,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issues190lwTests.inc" // round 190lw: issues #205 / #206 / #207 (row bands, second click, automation point editing)
 #include "Details190lxTests.inc" // round details4_190lx: Live slot-block clipboard, separate Punch-In / Punch-Out
 #include "Issue208Tests.inc" // round 190ma: issue #208, the graph editor's Note pitch, Shift and Repeat (FL note repeat)
+#include "Details190mfTests.inc" // round details5_190mf: FL normal meter law (Pattern default), Channel rack "+" menu cache, details pass 5

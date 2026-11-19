@@ -108,13 +108,11 @@ juce::String faderToDb (float volume)
     return (db > 0 ? "+" : "") + juce::String (db, 1);
 }
 
-// Meter level 0..1 on a dB scale (-60..+6); round 190lx (DF-61): FL's "Alternate meter scale" when it is on.
+// Meter level 0..1: FL's normal law in the Pattern layout (round 190mf), a -60..+6 dB axis in the other layouts, FL's
+// "Alternate meter scale" when it is on (round 190lx, DF-61).
 float meterPosition (float gain)
 {
-    if (meterscale::alternate())
-        return meterscale::position (gain, true);
-    const auto db = juce::Decibels::gainToDecibels (gain, -60.0f);
-    return juce::jlimit (0.0f, 1.0f, (db + 60.0f) / 66.0f);
+    return meterscale::position (gain, meterscale::current());
 }
 
 // Stereo separation: -1 = widest, 0 = normal, +1 = mono (MixerTrack::stereo).
@@ -3192,7 +3190,7 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
             // FL: "hovering your cursor over most peak meters will show the value at the pointer position" (round 190kn)
             const auto m = meterArea (t);
             const auto pos = juce::jlimit (0.0f, 1.0f, (float) (m.getBottom() - p.y) / (float) juce::jmax (1, m.getHeight()));
-            const auto db = meterscale::dbAtPosition (pos, meterscale::alternate()); // (FL's format, as its output meter: "-7.19dB 0.44")
+            const auto db = meterscale::dbAtPosition (pos, meterscale::current()); // (FL's format, as its output meter: "-7.19dB 0.44")
             h.value = juce::String (db, 2) + " dB  " + juce::String (juce::Decibels::decibelsToGain (db), 2);
             break;
         }

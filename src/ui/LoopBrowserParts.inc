@@ -1,6 +1,164 @@
 // Round gaps190kf (item 3; included at the end of ui/BrowserComponent.cpp inside namespace lynx): the Browser's Loop
 // Browser members (the panel itself is in ui/LoopBrowserPanel.inc; the logic in core/LoopKeywords.h).
 
+// --- the loops' lengths (round 190mf, DS-41) ---------------------------------------------------------------------------
+// BandLab's Sounds rows start with the loop's length in bars ("4 bars · Synth · Moody, Bright · 149bpm · B", capture B11).
+// The length is the audio file's (its header: frames / sample rate), read on a low-priority thread of its own, never
+// while listing or painting, and kept for the session; the rows that wait for one are filled in when it arrives
+// (loopLengthsRead() changes, the Browser updates those rows in place).
+class LoopLengths final : private juce::Thread,
+                          private juce::DeletedAtShutdown
+{
+public:
+    static LoopLengths& get()
+    {
+        if (instance == nullptr)
+            instance = new LoopLengths();
+        return *instance;
+    }
+
+    // message thread: the file's length in seconds; -1 = not read yet (call request), 0 = unreadable
+    double seconds (const std::string& path) const
+    {
+        const std::lock_guard<std::mutex> guard (lock);
+        const auto it = known.find (path);
+        return it == known.end() ? -1.0 : it->second;
+    }
+
+    // message thread: reads these (the ones not known or queued yet) in the background
+    void request (std::vector<std::string> paths)
+    {
+        if (paths.empty())
+            return;
+        {
+            const std::lock_guard<std::mutex> guard (lock);
+            for (auto& p : paths)
+                if (known.count (p) == 0 && queued.insert (p).second)
+                    todo.push_back (std::move (p));
+        }
+        if (! isThreadRunning())
+            startThread (juce::Thread::Priority::low);
+        notify();
+    }
+
+    juce::ChangeBroadcaster changed; // (sendChangeMessage: delivered on the message thread, coalesced)
+
+private:
+    LoopLengths() : juce::Thread ("LYNX loop lengths") { formats.registerBasicFormats(); }
+    ~LoopLengths() override
+    {
+        stopThread (4000);
+        instance = nullptr;
+    }
+    static inline LoopLengths* instance = nullptr;
+
+    void run() override
+    {
+        while (! threadShouldExit())
+        {
+            std::string path;
+            {
+                const std::lock_guard<std::mutex> guard (lock);
+                if (! todo.empty())
+                {
+                    path = std::move (todo.front());
+                    todo.pop_front();
+                }
+            }
+            if (path.empty())
+            {
+                wait (-1);
+                continue;
+            }
+            double secs = 0.0;
+            if (std::unique_ptr<juce::AudioFormatReader> reader { formats.createReaderFor (juce::File (juce::String::fromUTF8 (path.c_str()))) })
+                if (reader->sampleRate > 0.0)
+                    secs = (double) reader->lengthInSamples / reader->sampleRate;
+            bool last = false;
+            {
+                const std::lock_guard<std::mutex> guard (lock);
+                known[path] = secs;
+                queued.erase (path);
+                last = todo.empty();
+            }
+            // (every 32 files, and at the end of the queue: the rows are updated in batches)
+            if (last || ++sinceNotice >= 32)
+            {
+                sinceNotice = 0;
+                changed.sendChangeMessage();
+            }
+        }
+    }
+
+    mutable std::mutex lock;
+    std::unordered_map<std::string, double> known;
+    std::set<std::string> queued;
+    std::deque<std::string> todo;
+    int sinceNotice = 0;
+    juce::AudioFormatManager formats;
+};
+
+juce::ChangeBroadcaster& loopLengthsRead() { return LoopLengths::get().changed; }
+
+juce::String BrowserComponent::simpleLoopDetail (const loopkeys::LoopInfo& info, bool& lengthPending) const
+{
+    // round 190ld (details DS-41, BandLab B11 "4 bars · Synth · Moody, Bright · 149bpm · B"): in the Simple layout a row
+    // names its instrument and its moods (the loop's keywords) before the tempo and the key; round 190mf: and starts
+    // with its length in bars (the file's length at the loop's own tempo) once that has been read
+    juce::StringArray parts, moods;
+    juce::String instrument;
+    lengthPending = false;
+    if (info.tempo > 0.0 && factoryloops::itemOf (info.path) == nullptr)
+    {
+        const auto secs = LoopLengths::get().seconds (info.path);
+        if (secs < 0.0)
+            lengthPending = true;
+        else if (const auto bars = loopkeys::loopBars (secs, info.tempo); bars > 0)
+            parts.add (bars == 1 ? tr ("1 bar") : tr ("{0} bars", { juce::String (bars) }));
+    }
+    for (const auto& id : info.keywords)
+        if (const auto* k = loopkeys::find (id))
+        {
+            if (k->category == loopkeys::Category::instrument && instrument.isEmpty() && juce::String (k->id).startsWith ("all ") == false)
+                instrument = tr (k->label);
+            else if (k->category == loopkeys::Category::descriptor && moods.size() < 2)
+                moods.add (tr (k->label));
+        }
+    if (instrument.isNotEmpty())
+        parts.add (instrument);
+    if (! moods.isEmpty())
+        parts.add (moods.joinIntoString (", "));
+    const auto tempo = loopkeys::tempoText (info), key = loopkeys::keyText (info);
+    if (! tempo.empty())
+        parts.add (juce::String (tempo) + "bpm");
+    if (! key.empty())
+        parts.add (juce::String (key));
+    return parts.isEmpty() ? juce::String (" ") : parts.joinIntoString (juce::String::fromUTF8 (" \xc2\xb7 "));
+}
+
+void BrowserComponent::loopLengthsArrived()
+{
+    if (! loopsShown || layoutstyle::current() != layoutstyle::Style::simple || results == nullptr)
+        return;
+    std::unordered_map<std::string, const loopkeys::LoopInfo*> byPath;
+    for (const auto& info : loopInfos)
+        if (info.tempo > 0.0)
+            byPath.emplace (info.path, &info);
+    results->updateDetails ([this, &byPath] (FileTree::Node& n) {
+        if (n.file == juce::File())
+            return false;
+        const auto it = byPath.find (n.file.getFullPathName().toStdString());
+        if (it == byPath.end())
+            return false;
+        bool pending = false;
+        auto detail = simpleLoopDetail (*it->second, pending);
+        if (pending || detail == n.detail)
+            return false;
+        n.detail = std::move (detail);
+        return true;
+    });
+}
+
 // --- BrowserComponent's Loop Browser parts ------------------------------------------------------------------------------
 juce::Array<juce::File> BrowserComponent::loopPlaces() const
 {
@@ -335,6 +493,7 @@ void BrowserComponent::applyLoopFilter()
                 }
     loopCounts = loopkeys::keywordCounts (loopInfos, f, favourite);
     std::vector<std::unique_ptr<FileTree::Node>> nodes;
+    std::vector<std::string> unread; // (round 190mf: the Simple rows whose length is not known yet)
     for (std::size_t i = 0; i < loopInfos.size(); ++i)
     {
         const auto& info = loopInfos[i];
@@ -355,33 +514,17 @@ void BrowserComponent::applyLoopFilter()
         const auto tempo = loopkeys::tempoText (info), key = loopkeys::keyText (info);
         if (layoutstyle::current() == layoutstyle::Style::simple)
         {
-            // round 190ld (details DS-41, BandLab B11 "4 bars · Synth · Moody, Bright · 149bpm · B"): in the Simple layout a
-            // row names its instrument and its moods (the loop's keywords) before the tempo and the key
-            juce::StringArray parts, moods;
-            juce::String instrument;
-            for (const auto& id : info.keywords)
-                if (const auto* k = loopkeys::find (id))
-                {
-                    if (k->category == loopkeys::Category::instrument && instrument.isEmpty() && juce::String (k->id).startsWith ("all ") == false)
-                        instrument = tr (k->label);
-                    else if (k->category == loopkeys::Category::descriptor && moods.size() < 2)
-                        moods.add (tr (k->label));
-                }
-            if (instrument.isNotEmpty())
-                parts.add (instrument);
-            if (! moods.isEmpty())
-                parts.add (moods.joinIntoString (", "));
-            if (! tempo.empty())
-                parts.add (juce::String (tempo) + "bpm");
-            if (! key.empty())
-                parts.add (juce::String (key));
-            n->detail = parts.isEmpty() ? juce::String (" ") : parts.joinIntoString (juce::String::fromUTF8 (" \xc2\xb7 "));
+            bool pending = false;
+            n->detail = simpleLoopDetail (info, pending);
+            if (pending)
+                unread.push_back (info.path);
         }
         else if (! tempo.empty() || ! key.empty() || n->file != juce::File())
             n->detail = tempo.empty() && key.empty() ? juce::String (" ")
                                                       : juce::String (tempo) + (tempo.empty() || key.empty() ? "" : juce::String::fromUTF8 ("  \xc2\xb7  ")) + juce::String (key);
         nodes.push_back (std::move (n));
     }
+    LoopLengths::get().request (std::move (unread));
     const auto count = (int) nodes.size();
     resultsView->setVisible (true);
     treeView->setVisible (false);

@@ -188,6 +188,12 @@ int addPoint (std::vector<EditPoint>& points, double x, float y, std::uint8_t ty
 bool removePoint (std::vector<EditPoint>& points, int index);
 // moves a point between its neighbours (the first and the last only up and down)
 void movePoint (std::vector<EditPoint>& points, int index, double x, float y);
+// round 190mf: FL's "Slide remaining points": the point moves (not before the one before it) and every later point but the
+// bar's end moves by the same time, kept inside the bar and in order
+void slidePoint (std::vector<EditPoint>& points, int index, double x, float y);
+// round 190mf: FL's Step editing: a flat hold at `y` from x0 to x1 (the points strictly inside are replaced): a hold point
+// at x0 and, unless a point is there, one at x1 back at the curve's old level there
+void stepDraw (std::vector<EditPoint>& points, double x0, double x1, float y);
 // the slot's level at `beat` (0…4) as the engine plays it
 float levelAt (const Slot& slot, double beat);
 // n levels over the bar (for drawing)

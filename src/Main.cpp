@@ -214,6 +214,9 @@
 #include "ui/UiTrace.h"
 #include "core/MixerOps.h"
 #include "ui/QuickPick.h"
+#include "core/FolderWatcher.h"
+#include "core/FruityDynamics.h"
+#include "core/PluginDbFolder.h"
 #include "core/NoteTools.h"
 #include "engine/ProjectPackage.h"
 #include "ui/SetupWizard.h"
@@ -1568,6 +1571,69 @@ public:
             return;
         }
 
+        if (args.contains ("--plusmenutime"))
+        {
+            // LYNX --plusmenutime report.txt [watched] (round 190mf): the Channel rack "+" menu's build time (as
+            // showAddChannelMenu builds it, without showing it) with the profile's plugin list and Plugin database
+            // folder: the first one, then each one after the old two-second throttle ran out; then one after the
+            // folder was marked changed. "watched": as the app (a folder watcher), else as before round 190mf.
+            const auto i = args.indexOf ("--plusmenutime");
+            const auto watched = i + 2 < args.size() && args[i + 2] == "watched";
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            lynx::AudioEngine offline (false);
+            lynx::quickpick::installPluginDatabase (offline);
+            std::unique_ptr<lynx::folderwatch::Watcher> watcher;
+            if (watched)
+            {
+                const auto root = lynx::quickpick::pluginDatabaseFolder();
+                watcher = std::make_unique<lynx::folderwatch::Watcher> (
+                    std::vector<std::string> { root.getChildFile ("Effects").getFullPathName().toStdString(), root.getChildFile ("Generators").getFullPathName().toStdString() },
+                    [] { juce::MessageManager::callAsync ([] { lynx::quickpick::markPluginDatabaseChanged(); }); });
+                lynx::quickpick::setPluginDatabaseWatched (true);
+            }
+            juce::String report;
+            report << "types=" << offline.getPluginHost().getKnownPlugins().getNumTypes() << " watched=" << (watched ? 1 : 0) << "\n";
+            auto build = [&offline] (int& items) {
+                const auto t0 = juce::Time::getMillisecondCounterHiRes();
+                juce::PopupMenu menu;
+                auto picks = lynx::quickpick::renamedGenerators (offline, [] (lynx::ChannelDef) {});
+                lynx::quickpick::addPicks (menu, picks);
+                lynx::quickpick::addGeneratorMenu (menu, offline, [] (lynx::ChannelDef) {}, [] {}, nullptr, nullptr);
+                lynx::quickpick::addFolderViewItems (menu, offline);
+                items = menu.getNumItems();
+                return juce::Time::getMillisecondCounterHiRes() - t0;
+            };
+            auto line = [&report, &build] (const juce::String& what) {
+                const auto readsBefore = lynx::quickpick::lastRefreshTimes().reads;
+                int items = 0;
+                const auto ms = build (items);
+                const auto t = lynx::quickpick::lastRefreshTimes();
+                const auto read = t.reads != readsBefore;
+                report << what << " menu_ms=" << juce::String (ms, 2) << " items=" << items << " folder_read=" << (read ? 1 : 0);
+                if (read)
+                    report << " list_ms=" << juce::String (t.listMs, 2) << " read_ms=" << juce::String (t.readMs, 2);
+                report << "\n";
+            };
+            line ("first");
+            for (int k = 1; k <= 5; ++k)
+            {
+                juce::Thread::sleep (2100);
+                line ("again" + juce::String (k));
+            }
+            for (int k = 1; k <= 3; ++k)
+                line ("quick" + juce::String (k));
+            lynx::quickpick::markPluginDatabaseChanged();
+            line ("marked");
+            line ("after");
+            lynx::quickpick::setPluginDatabaseWatched (false);
+            watcher.reset();
+            lynx::plugindb::finishInstalledWrites();
+            juce::File (args[i + 1].unquoted()).replaceWithText (report);
+            setApplicationReturnValue (0);
+            quit();
+            return;
+        }
+
         if (args.contains ("--scantest"))
         {
             // LYNX.exe --scantest folder report.txt: scan (in child processes) without touching the user's list
@@ -2676,6 +2742,15 @@ public:
             const auto i = args.indexOf ("--capfix190jjshot");
             const auto set = i + 3 < args.size() && ! args[i + 3].startsWith ("--") ? args[i + 3].unquoted() : juce::String();
             runCapfix190jjShot (args[i + 1].unquoted(), args[i + 2].unquoted(), set);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--details190mfshot"))
+        {
+            // LYNX --details190mfshot prefix project.flp: round 190mf off screen (src/DetailsShot190mf.inc)
+            const auto i = args.indexOf ("--details190mfshot");
+            setApplicationReturnValue (runDetailsShot190mf (args[i + 1].unquoted(), i + 2 < args.size() ? args[i + 2].unquoted() : juce::String()) ? 0 : 1);
             quit();
             return;
         }
@@ -16998,6 +17073,7 @@ private:
 #include "DetailsShot190ld.inc" // round 190ld
 #include "DetailsShot190lr.inc" // round 190lr
 #include "DetailsShot190lx.inc" // round 190lx
+#include "DetailsShot190mf.inc" // round 190mf
     // --trackautoshot190gz (round 190gz): see the dispatch above
     bool runTrackAutoShot190gz (const juce::String& prefix)
     {

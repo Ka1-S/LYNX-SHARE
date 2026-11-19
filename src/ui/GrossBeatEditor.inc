@@ -11,6 +11,14 @@
     int gbEditKind = 0;
     // FL's Snap selector: at creation the editor's snap flag × 3 = "1/8 beat" (FUN_0083fcf0 → FUN_0084b8f0)
     int gbSnap = 3;
+    // Round 190mf (DP-6, capture 190lx GB4 fl-gb-tools.png): FL's three envelope tool switches under the snap cells —
+    // "Step editing (hold shift for pulse mode)", "Slide remaining points", "Freeze editing" (FL's MEnvEditor). All three
+    // off by default (capture 190mf A1: Gross Beat's are, unlike Slicex's Slide)
+    bool gbStepEdit = false, gbSlide = false, gbFrozen = false;
+    // FL's point selection (capture 190mf A1: Ctrl+A / Ctrl+D / Ctrl+I, the dragged point; a selected point = a 9 px ring
+    // with a dot); indexes into the slot's points
+    std::set<int> gbSelected;
+    double gbStepLastX = -1.0; // (step editing: where the drag was last)
     int gbDragPoint = -1, gbDragTension = -1, gbHoverPoint = -1, gbHoverHandle = -1;
     int gbHoverCell = -1; // the slot under the mouse in a grid (kind × 36 + slot)
     bool gbDragging = false;
@@ -349,6 +357,8 @@
 
     int gbPointAt (const LayoutItem& item, juce::Point<float> p) const
     {
+        if (gbFrozen) // (Freeze editing: no points to take)
+            return -1;
         const auto pts = grossbeat::editPoints (gbSlot());
         const auto a = gbArea (item);
         int best = -1;
@@ -374,6 +384,8 @@
 
     int gbHandleAt (const LayoutItem& item, juce::Point<float> p) const
     {
+        if (gbFrozen)
+            return -1;
         const auto slot = gbSlot();
         const auto pts = grossbeat::editPoints (slot);
         for (int i = 1; i < (int) pts.size(); ++i)
@@ -400,6 +412,10 @@
 
     bool gbEnvelopeDown (const juce::MouseEvent& e, const LayoutItem& item)
     {
+        if (gbFrozen) // (FL's Freeze editing: the envelope can't be edited, its points are hidden)
+            return false;
+        if (getWantsKeyboardFocus())
+            grabKeyboardFocus(); // (round 190mf: the points' Ctrl+A / Ctrl+D / Ctrl+I / Del)
         auto points = grossbeat::editPoints (gbState().slots[(std::size_t) gbSlotIndex()]);
         const auto point = gbPointAt (item, e.position);
         const auto handle = point < 0 ? gbHandleAt (item, e.position) : -1;
@@ -437,6 +453,7 @@
             x = snapped;
             if (e.mods.isShiftDown()) // Shift: on the curve
                 y = grossbeat::levelAt (slot, x);
+            gbSelected.clear();
             gbDragPoint = grossbeat::addPoint (points, x, y, 2, gbLastTension);
             gbDragPoints = points;
             gbDragging = true;
@@ -451,8 +468,19 @@
             gbWritePoints (points);
             return false;
         }
+        if (gbStepEdit) // FL's Step editing: a left drag draws hold steps (capture 190mf A1)
+        {
+            gbSelected.clear();
+            gbDragPoints = points;
+            gbDragging = true;
+            gbStepLastX = -1.0;
+            gbStepDraw (item, e, true);
+            return true;
+        }
         if (point >= 0)
         {
+            if (gbSelected.count (point) == 0) // (FL: the dragged point is the selection)
+                gbSelected = { point };
             gbDragPoint = point;
             gbDragPoints = points;
             gbDragging = true;
@@ -482,6 +510,11 @@
     {
         if (! gbDragging)
             return;
+        if (gbStepEdit && gbDragPoint < 0 && gbDragTension < 0)
+        {
+            gbStepDraw (item, e, false);
+            return;
+        }
         auto points = gbDragPoints;
         if (gbDragTension >= 0 && gbDragTension < (int) points.size())
         {
@@ -495,13 +528,84 @@
         {
             auto [x, y] = gbMouseValue (item, e.position);
             x = gbSnapX (x, e.mods);
-            grossbeat::movePoint (points, gbDragPoint, x, y);
+            if (gbSlide) // FL's Slide remaining points: the points after it move with it (inside the bar)
+                grossbeat::slidePoint (points, gbDragPoint, x, y);
+            else
+                grossbeat::movePoint (points, gbDragPoint, x, y);
             gbShowTip (item, points[(std::size_t) gbDragPoint].x, points[(std::size_t) gbDragPoint].y);
         }
         else
             return;
         gbDragPoints = points;
         gbWritePoints (points);
+    }
+
+    // FL's Step editing (capture 190mf A1, fl-gb-step*.png): with the snap off a drag draws one flat hold from where it
+    // started to where it is, at the height under the mouse (the points inside are replaced); with a snap, every snap
+    // cell the mouse passes gets a hold point at its left edge at the mouse's height there (a staircase). Shift (FL's
+    // "pulse mode") drew the same in the capture.
+    void gbStepDraw (const LayoutItem& item, const juce::MouseEvent& e, bool first)
+    {
+        auto [x, y] = gbMouseValue (item, e.position);
+        auto points = gbDragPoints;
+        const auto step = grossbeat::snapStep (gbSnap);
+        const auto snapOn = (step > 0.0) != e.mods.isAltDown();
+        if (! snapOn)
+        {
+            const auto [x0, unusedY] = gbMouseValue (item, e.mouseDownPosition);
+            juce::ignoreUnused (unusedY);
+            grossbeat::stepDraw (points, juce::jmin (x0, x), juce::jmax (x0, x), y);
+            gbWritePoints (points);
+            gbShowTip (item, x, y);
+            return;
+        }
+        const auto use = step > 0.0 ? step : grossbeat::snapStep (3);
+        const auto cell = std::floor (x / use) * use;
+        const auto from = first || gbStepLastX < 0.0 ? cell : std::floor (gbStepLastX / use) * use;
+        for (auto c = juce::jmin (from, cell); c <= juce::jmax (from, cell) + 1.0e-9; c += use)
+            grossbeat::stepDraw (points, c, juce::jmin (grossbeat::barBeats, c + use), y);
+        gbStepLastX = x;
+        gbDragPoints = points;
+        gbWritePoints (points);
+        gbShowTip (item, cell, y);
+    }
+
+    void gbSelectAll (int how) // 0 select all, 1 deselect all, 2 invert
+    {
+        const auto n = (int) grossbeat::editPoints (gbState().slots[(std::size_t) gbSlotIndex()]).size();
+        std::set<int> next;
+        for (int i = 0; i < n; ++i)
+            if (how == 0 || (how == 2 && gbSelected.count (i) == 0))
+                next.insert (i);
+        gbSelected = std::move (next);
+        repaint();
+    }
+
+    void gbDeleteSelected()
+    {
+        auto points = grossbeat::editPoints (gbState().slots[(std::size_t) gbSlotIndex()]);
+        for (auto it = gbSelected.rbegin(); it != gbSelected.rend(); ++it)
+            if (*it > 0 && *it + 1 < (int) points.size()) // (the first and the last point stay)
+                points.erase (points.begin() + *it);
+        gbSelected.clear();
+        gbWritePoints (points);
+    }
+
+    // Ctrl+A / Ctrl+D / Ctrl+I / Del on the envelope (FL's Points selection shortcuts)
+    bool gbKey (const juce::KeyPress& k)
+    {
+        const auto cmd = k.getModifiers().isCommandDown();
+        if (cmd && (k.getKeyCode() == 'A' || k.getKeyCode() == 'D' || k.getKeyCode() == 'I'))
+        {
+            gbSelectAll (k.getKeyCode() == 'A' ? 0 : k.getKeyCode() == 'D' ? 1 : 2);
+            return true;
+        }
+        if (! cmd && (k.getKeyCode() == juce::KeyPress::deleteKey) && ! gbSelected.empty())
+        {
+            gbDeleteSelected();
+            return true;
+        }
+        return false;
     }
 
     void gbEnvelopeUp()
@@ -514,6 +618,7 @@
 
     void gbDeletePoint (int point)
     {
+        gbSelected.clear();
         auto points = grossbeat::editPoints (gbState().slots[(std::size_t) gbSlotIndex()]);
         if (point == 0)
         {
@@ -580,7 +685,9 @@
 
     // --- the tool column: Options, Snap, Envelope (time travel / volume) -------------------------------------
 
-    // parts of the column in design units from its top: 0 = Options, 1…7 = snap cells, 8 / 9 = time / volume
+    // parts of the column in design units from its top: 0 = Options, 1…7 = snap cells, 8 / 9 = time / volume,
+    // 10 / 11 / 12 = Step editing / Slide remaining points / Freeze editing (round 190mf: FL's places, 272 / 298 / 325
+    // from the column's top in capture 190lx GB4)
     juce::Rectangle<float> gbToolCell (const LayoutItem& item, int part) const
     {
         const auto r = rectOf (item);
@@ -589,12 +696,14 @@
             return { r.getX(), r.getY(), r.getWidth(), 27.0f * s };
         if (part <= 7)
             return { r.getX(), r.getY() + (36.0f + 27.0f * (float) (part - 1)) * s, r.getWidth(), 26.0f * s };
+        if (part >= 10)
+            return { r.getX(), r.getY() + (271.0f + 27.0f * (float) (part - 10)) * s, r.getWidth(), 26.0f * s };
         return { r.getX(), r.getBottom() - (part == 8 ? 54.0f : 27.0f) * s, r.getWidth(), 26.0f * s };
     }
 
     int gbToolAt (const LayoutItem& item, juce::Point<float> p) const
     {
-        for (int part = 0; part <= 9; ++part)
+        for (int part = 0; part <= 12; ++part)
             if (gbToolCell (item, part).contains (p))
                 return part;
         return -1;
@@ -614,7 +723,13 @@
         else if (part >= 1 && part <= 7)
             gbSnap = part - 1;
         else if (part == 8 || part == 9)
-            gbEditKind = part - 8;
+            gbEditKind = part - 8, gbSelected.clear();
+        else if (part == 10)
+            gbStepEdit = ! gbStepEdit;
+        else if (part == 11)
+            gbSlide = ! gbSlide;
+        else if (part == 12)
+            gbFrozen = ! gbFrozen;
         repaint();
     }
 
@@ -669,40 +784,195 @@
         gbWriteSlot (slot);
     }
 
+    // Round 190mf (DP-7, capture 190lx GB3 fl-gb-mapping-menu.png): FL's mapping options menu (the ▾ at the top of the
+    // tool column), two columns as FL's: [State] Reset, Copy state, Paste state; [Tools] Insert point at locator, Flip
+    // vertically, Scale levels..., Normalize levels, Decimate points..., Filter..., Smooth up..., Turn all points
+    // smooth, Create sequence... (the forms are LYNX's Edison envelope tools, core/AudioEditTools.h: FL opens the same
+    // TMEnvEditor tool forms). Not built (yet): State › Presets / Open / Save state file / Prepare for smooth editing, the
+    // Points selection section, Analyze audio file..., Options › Focus on click, View › Background gradient / Invert grid.
+    // LYNX's own items (rename, factory slots, the locator's colours) follow under a line.
     void gbOptionsMenu (juce::Rectangle<float> at)
     {
+        gbBuildOptionsMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (at.toNearestInt())));
+    }
+
+    juce::PopupMenu gbBuildOptionsMenu()
+    {
         juce::PopupMenu menu;
-        const auto slotName = juce::String::fromUTF8 (gbState().slots[(std::size_t) gbSlotIndex()].name.c_str());
-        menu.addSectionHeader ((gbEditKind == 0 ? tr ("Time slot {0}", { juce::String (gbSlotOf (0) + 1) }) : tr ("Volume slot {0}", { juce::String (gbSlotOf (1) + 1) }))
-                               + (slotName.isEmpty() ? juce::String() : " - " + slotName));
-        menu.addItem (tr ("Copy"), [this] { gbClipboard = gbState().slots[(std::size_t) gbSlotIndex()]; });
-        menu.addItem (tr ("Paste"), gbClipboard.has_value(), false, [this] {
+        menu.addSectionHeader (tr ("State"));
+        menu.addItem (tr ("Reset"), [this] { gbResetSlot(); });
+        menu.addSeparator(); // (FL: a line between Reset and Copy state)
+        menu.addItem (tr ("Copy state"), [this] { gbClipboard = gbState().slots[(std::size_t) gbSlotIndex()]; });
+        menu.addItem (tr ("Paste state"), gbClipboard.has_value(), false, [this] {
             if (gbClipboard)
                 gbWriteSlot (*gbClipboard);
         });
+        menu.addSectionHeader (tr ("Points selection"));
+        { auto it = juce::PopupMenu::Item (tr ("Select all")).setAction ([this] { gbSelectAll (0); }); it.shortcutKeyDescription = "Ctrl+A"; menu.addItem (std::move (it)); }
+        { auto it = juce::PopupMenu::Item (tr ("Deselect all")).setAction ([this] { gbSelectAll (1); }); it.shortcutKeyDescription = "Ctrl+D"; menu.addItem (std::move (it)); }
+        { auto it = juce::PopupMenu::Item (tr ("Invert")).setAction ([this] { gbSelectAll (2); }); it.shortcutKeyDescription = "Ctrl+I"; menu.addItem (std::move (it)); }
+        { auto it = juce::PopupMenu::Item (tr ("Delete")).setEnabled (! gbSelected.empty()).setAction ([this] { gbDeleteSelected(); }); it.shortcutKeyDescription = "Del"; menu.addItem (std::move (it)); }
+        menu.addColumnBreak();
+        menu.addSectionHeader (tr ("Tools"));
+        const auto locator = gbLive.playing; // (FL greys it while the locator is not shown)
+        menu.addItem (tr ("Insert point at locator"), locator, false, [this] { gbInsertAtLocator(); });
         menu.addItem (tr ("Flip vertically"), [this] {
             auto pts = grossbeat::editPoints (gbState().slots[(std::size_t) gbSlotIndex()]);
             for (auto& p : pts)
                 p.y = 1.0f - p.y, p.tension = -p.tension;
             gbWritePoints (pts);
         });
-        menu.addItem (tr ("Reset"), [this] { // an empty slot: a flat bar at full level, unnamed
-            auto slot = gbState().slots[(std::size_t) gbSlotIndex()];
-            slot.name.clear();
-            grossbeat::setPoints (slot, { { 0.0, 1.0f, 0.0f, 2 }, { grossbeat::barBeats, 1.0f, 0.0f, 2 } });
-            gbWriteSlot (slot);
+        menu.addItem (tr ("Scale levels..."), [this] { gbOpenTool (audiotools::Tool::scaleLevels); });
+        menu.addItem (tr ("Normalize levels"), [this] {
+            auto pts = grossbeat::editPoints (gbState().slots[(std::size_t) gbSlotIndex()]);
+            if (pts.empty())
+                return;
+            const auto [lo, hi] = std::minmax_element (pts.begin(), pts.end(), [] (const auto& a, const auto& b) { return a.y < b.y; });
+            const auto low = lo->y, range = hi->y - lo->y;
+            if (range <= 1.0e-6f)
+                return;
+            for (auto& p : pts)
+                p.y = (p.y - low) / range;
+            gbWritePoints (pts);
         });
+        menu.addItem (tr ("Decimate points..."), [this] {
+            // FL refuses Gross Beat's hold, single-curve and smooth points (capture 190mf A1, its message box)
+            const auto pts = grossbeat::editPoints (gbState().slots[(std::size_t) gbSlotIndex()]);
+            if (std::any_of (pts.begin() + (pts.empty() ? 0 : 1), pts.end(), [] (const auto& p) { return p.type == 0 || p.type == 2 || p.type == 10; }))
+            {
+                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Can't decimate"),
+                                                        tr ("The envelope contains points with curve modes that aren't compatible with decimation."));
+                return;
+            }
+            gbOpenTool (audiotools::Tool::decimate);
+        });
+        menu.addItem (tr ("Filter..."), [this] { gbOpenTool (audiotools::Tool::envFilter); });
+        menu.addItem (tr ("Smooth up..."), [this] { gbOpenTool (audiotools::Tool::smoothUp); });
+        menu.addItem (tr ("Turn all points smooth"), [this] {
+            auto pts = grossbeat::editPoints (gbState().slots[(std::size_t) gbSlotIndex()]);
+            for (std::size_t i = 1; i < pts.size(); ++i)
+                pts[i].type = 10; // (FL's "Smooth" point mode)
+            gbWritePoints (pts);
+        });
+        menu.addItem (tr ("Create sequence..."), [this] { gbOpenTool (audiotools::Tool::createSequence); });
         menu.addSeparator();
         menu.addItem (tr ("Rename..."), [this] { gbRename(); });
         menu.addSubMenu (tr ("Factory slots"), gbFactorySlots());
         menu.addItem (tr ("Load LYNX SHARE's factory slots (keeps the selected slots)"), [this] { gbWriteState (gbWithFactory()); });
-        menu.addSeparator();
         // round 190jd: the playback locator in FL's colours (cream on the beat, fading to red) instead of LYNX's playhead
         menu.addItem (tr ("Playback locator in FL's colours"), true, gblocator::flStyle(), [this] {
             gblocator::setFlStyle (! gblocator::flStyle()); // (kept in ui-options "grossBeatFlLocator")
             repaint();
         });
-        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (at.toNearestInt())));
+        return menu;
+    }
+
+    // FL's Tools › Insert point at locator: a point on the curve where the playback locator is
+    void gbInsertAtLocator()
+    {
+        if (! gbLive.playing)
+            return;
+        const auto slot = gbState().slots[(std::size_t) gbSlotIndex()];
+        auto points = grossbeat::editPoints (slot);
+        const auto x = grossbeat::barBeats * (double) gbLive.position[(std::size_t) gbEditKind];
+        if (std::any_of (points.begin(), points.end(), [x] (const auto& p) { return std::abs (p.x - x) < 1.0e-6; }))
+            return;
+        grossbeat::addPoint (points, x, grossbeat::levelAt (slot, x), 2, gbLastTension);
+        gbWritePoints (points);
+    }
+
+    // The envelope tool forms on the selected slot (round 190mf): LYNX's Edison tool windows (ui/AudioEditorTools) see the
+    // slot's points as an envelope over 0…1 = the 4 beats; every change is written back to the slot (the window's Cancel
+    // puts the slot back). Points the tool kept keep their point mode; new ones are FL's "Single curve".
+    struct GbToolHost final : audiotools::Host
+    {
+        explicit GbToolHost (NativeEffectEditor& e) : editor (e)
+        {
+            doc.audio.sampleRate = 1.0; // (4 frames at 1 Hz = 4 s = the 4 beats at toolBpm's 60)
+            doc.audio.channels.assign (1, std::vector<float> (4, 0.0f));
+        }
+        NativeEffectEditor& editor;
+        audioedit::Document doc;
+        audioedit::Envelope env;
+        std::vector<grossbeat::EditPoint> original;
+        audioedit::NoiseProfile noise;
+        audioedit::Audio emptyClip;
+
+        void load (const std::vector<grossbeat::EditPoint>& points)
+        {
+            original = points;
+            env.points.clear();
+            for (const auto& p : points)
+                env.points.push_back ({ p.x / grossbeat::barBeats, (double) p.y, p.tension });
+        }
+        const audioedit::Document& toolDocument() const override { return doc; }
+        audioedit::Range toolSelection() const override { return { 0, 4 }; }
+        void toolApply (const juce::String&, audioedit::Document, audioedit::Range) override {}
+        void toolPreview (const audioedit::Audio&) override {}
+        void toolStopPreview() override {}
+        double toolBpm() const override { return 60.0; }
+        audioedit::NoiseProfile& toolNoiseProfile() override { return noise; }
+        const audioedit::Audio& toolClipboard() const override { return emptyClip; }
+        audioedit::Envelope* toolEnvelope() override { return &env; }
+        double toolEnvelopeUnity() const override { return 1.0; }
+        void toolEnvelopeChanged (bool, const juce::String&) override
+        {
+            if (! detached)
+                editor.gbWritePoints (gbPointsOf (env, original));
+        }
+        bool detached = false; // (the editor is closing: nothing is written any more)
+        juce::Component& toolComponent() override { return editor; }
+    };
+    std::unique_ptr<GbToolHost> gbToolHost;
+    juce::Component::SafePointer<juce::DocumentWindow> gbToolWindow;
+
+    // an envelope 0…1 back as the slot's points (at most maxEditPoints; the first at 0, the last at the bar's end)
+    static std::vector<grossbeat::EditPoint> gbPointsOf (audioedit::Envelope env, const std::vector<grossbeat::EditPoint>& original)
+    {
+        env.sort();
+        for (double threshold = 0.002; (int) env.points.size() > grossbeat::maxEditPoints && threshold < 1.0; threshold *= 2.0)
+            audioedit::decimatePoints (env, threshold);
+        if (! env.points.empty() && env.points.back().x < 1.0 - 1.0e-9)
+            env.points.push_back (audioedit::EnvPoint { 1.0, env.at (1.0), 0.0f });
+        if (! env.points.empty() && env.points.front().x > 1.0e-9)
+            env.points.insert (env.points.begin(), audioedit::EnvPoint { 0.0, env.at (0.0), 0.0f });
+        std::vector<grossbeat::EditPoint> out;
+        for (const auto& p : env.points)
+        {
+            grossbeat::EditPoint e;
+            e.x = juce::jlimit (0.0, grossbeat::barBeats, p.x * grossbeat::barBeats);
+            e.y = (float) juce::jlimit (0.0, 1.0, p.y);
+            e.tension = p.tension;
+            e.type = 0; // (a new point: FL's "Single curve")
+            for (const auto& o : original)
+                if (std::abs (o.x - e.x) < 1.0e-6)
+                {
+                    e.type = o.type;
+                    break;
+                }
+            out.push_back (e);
+        }
+        if (out.size() < 2) // (an envelope keeps two points)
+            out = { { 0.0, out.empty() ? 1.0f : out[0].y, 0.0f, 2 }, { grossbeat::barBeats, out.empty() ? 1.0f : out[0].y, 0.0f, 2 } };
+        return out;
+    }
+
+    void gbOpenTool (audiotools::Tool tool)
+    {
+        if (gbToolWindow != nullptr)
+            delete gbToolWindow.getComponent(); // (one tool window at a time: its Cancel puts the slot back first)
+        if (gbToolHost == nullptr)
+            gbToolHost = std::make_unique<GbToolHost> (*this);
+        gbToolHost->load (grossbeat::editPoints (gbState().slots[(std::size_t) gbSlotIndex()]));
+        gbToolWindow = openToolWindow (audiotools::makeToolPanel (*gbToolHost, tool), tr (audiotools::toolTitle (tool)), "grossbeat-tool");
+    }
+
+    void gbCloseTool() // (the editor closes: the tool window that works on it goes with it, the slot as it is now)
+    {
+        if (gbToolHost != nullptr)
+            gbToolHost->detached = true;
+        if (gbToolWindow != nullptr)
+            delete gbToolWindow.getComponent();
     }
 
     grossbeat::State gbWithFactory() const
@@ -901,6 +1171,7 @@
     {
         if (item.type == Item::radio && item.param != nullptr) // FL: a click in a slot grid shows that slot's envelope
         {
+            gbSelected.clear(); // (round 190mf: another slot's points)
             if (std::strcmp (item.param, "Time slot") == 0)
                 gbEditKind = 0;
             else if (std::strcmp (item.param, "Volume slot") == 0)
@@ -1045,6 +1316,12 @@
                 return tr ("Snap: {0} (Alt while editing: the other way)", { tr (gbSnapName (part - 1)) });
             if (part == 8 || part == 9)
                 return tr ("Envelope: {0}", { part == 8 ? tr ("time travel") : tr ("volume") });
+            if (part == 10) // (FL's hints, capture 190lx GB4)
+                return tr ("Step editing (hold shift for pulse mode)");
+            if (part == 11)
+                return tr ("Slide remaining points");
+            if (part == 12)
+                return tr ("Freeze editing");
             return {};
         }
         if (isGbItem (item, "gbslot"))
@@ -1142,6 +1419,40 @@
                 cell (i + 1, gbSnap == i, i == 0 ? tr ("off") : juce::String (snapShort[i]));
             cell (8, gbEditKind == 0, "T");
             cell (9, gbEditKind == 1, "V");
+            // round 190mf: Step editing (a stepped line with a pen dot), Slide remaining points (an arrow to the right),
+            // Freeze editing (a six-armed star): FL's glyphs, drawn by LYNX
+            for (int part = 10; part <= 12; ++part)
+            {
+                const auto lit = part == 10 ? gbStepEdit : part == 11 ? gbSlide : gbFrozen;
+                cell (part, lit, {});
+                const auto c = gbToolCell (item, part).getCentre();
+                const auto u = 4.0f * s;
+                g.setColour (lit ? colour::textPrimary : colour::textSecondary);
+                juce::Path p;
+                if (part == 10)
+                {
+                    p.startNewSubPath (c.x - u * 1.3f, c.y + u);
+                    p.lineTo (c.x - u * 0.3f, c.y + u);
+                    p.lineTo (c.x - u * 0.3f, c.y - u * 0.1f);
+                    p.lineTo (c.x + u * 0.7f, c.y - u * 0.1f);
+                    p.lineTo (c.x + u * 0.7f, c.y - u * 1.0f);
+                    g.strokePath (p, juce::PathStrokeType (juce::jmax (1.0f, 1.4f * s)));
+                    g.fillEllipse (juce::Rectangle<float> (u * 0.7f, u * 0.7f).withCentre ({ c.x + u * 1.2f, c.y - u * 1.0f }));
+                }
+                else if (part == 11)
+                {
+                    g.drawLine (c.x - u * 1.2f, c.y, c.x + u * 0.4f, c.y, juce::jmax (1.2f, 1.8f * s));
+                    p.addTriangle (c.x + u * 1.3f, c.y, c.x + u * 0.3f, c.y - u * 0.8f, c.x + u * 0.3f, c.y + u * 0.8f);
+                    g.fillPath (p);
+                }
+                else
+                    for (int k = 0; k < 3; ++k)
+                    {
+                        const auto a = juce::MathConstants<float>::pi * (float) k / 3.0f + juce::MathConstants<float>::halfPi;
+                        g.drawLine (c.x - std::cos (a) * u * 1.2f, c.y - std::sin (a) * u * 1.2f, c.x + std::cos (a) * u * 1.2f, c.y + std::sin (a) * u * 1.2f,
+                                    juce::jmax (1.0f, 1.3f * s));
+                    }
+            }
             return;
         }
 
@@ -1279,6 +1590,11 @@
         // the editor: grid (bars of the snap grid, beats stronger), the curve filled, points and tension handles
         g.setColour (colour::bg0);
         g.fillRoundedRectangle (r, radius::md * s);
+        if (gbFrozen) // (FL: Freeze editing turns the ground slightly bluer, (52,75,91) -> (45,78,97))
+        {
+            g.setColour (colour::info.withAlpha (0.05f));
+            g.fillRoundedRectangle (r, radius::md * s);
+        }
         const auto inner = gbArea (item);
         const auto step = grossbeat::snapStep (gbSnap > 0 ? gbSnap : 3);
         g.setColour (colour::gridBeat.withAlpha (0.45f));
@@ -1325,7 +1641,7 @@
         g.setColour (kindColour);
         g.strokePath (curve, juce::PathStrokeType (juce::jmax (1.5f, 2.0f * s), juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
-        const auto pts = grossbeat::editPoints (shown);
+        const auto pts = gbFrozen ? std::vector<grossbeat::EditPoint>() : grossbeat::editPoints (shown); // (Freeze editing: no points)
         for (int i = 1; i < (int) pts.size(); ++i)
             if (const auto h = gbHandlePos (item, shown, pts, i); h.x > -1000.0f)
             {
@@ -1337,6 +1653,13 @@
         {
             const auto hot = i == gbHoverPoint || i == gbDragPoint;
             const auto pt = gbPos (inner, pts[(std::size_t) i].x, pts[(std::size_t) i].y);
+            if (gbSelected.count (i) != 0) // (FL: a 9 px ring, a dark gap and a 3 px dot)
+            {
+                g.setColour (hot ? colour::textPrimary : kindColour);
+                g.drawEllipse (juce::Rectangle<float> (8.0f * s, 8.0f * s).withCentre (pt), juce::jmax (1.0f, 1.2f * s));
+                g.fillEllipse (juce::Rectangle<float> (3.0f * s, 3.0f * s).withCentre (pt));
+                continue;
+            }
             g.setColour (hot ? colour::textPrimary : kindColour);
             g.fillEllipse (juce::Rectangle<float> ((hot ? 8.0f : 6.0f) * s, (hot ? 8.0f : 6.0f) * s).withCentre (pt));
         }

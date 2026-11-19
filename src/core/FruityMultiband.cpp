@@ -624,6 +624,10 @@ struct Band
     float upper = 0.0f, lower = 0.0f; // mid band FIR edges (Hz)
     Detector det;
     std::vector<float> l, r;
+    // round 190mf (DP-29, FL's per-band IN and C meters): measured only while an editor shows them; the signal is not
+    // touched (peaks after the crossover, the compressor's lowest gain over the block)
+    bool metering = false;
+    float peakL = 0.0f, peakR = 0.0f, minGain = 1.0f;
 
     void redesignFir (float rate) noexcept
     {
@@ -670,6 +674,16 @@ struct Band
                 highPass.run (out[c], out[c], n, c);
             }
         }
+        if (metering)
+        {
+            peakL = peakR = 0.0f;
+            minGain = 1.0f;
+            for (int i = 0; i < n; ++i)
+            {
+                peakL = std::max (peakL, std::fabs (l[(std::size_t) i]));
+                peakR = std::max (peakR, std::fabs (r[(std::size_t) i]));
+            }
+        }
         if (compress)
         {
             // (round 190kr: on a local copy of the detector, written back after: its float state could otherwise alias
@@ -677,14 +691,18 @@ struct Band
             auto d = det;
             float* const bl = l.data();
             float* const br = r.data();
+            auto mg = minGain;
             for (int i = 0; i < n; ++i)
             {
                 const auto al = std::fabs (bl[i]), ar = std::fabs (br[i]);
                 const auto g = d.gainFor (d.smooth (d.peak (al > ar ? al : ar)));
                 bl[i] = g * bl[i];
                 br[i] = g * br[i];
+                if (metering && g < mg) // (round 190mf's band meter; rollup step 11: on a local, as the detector)
+                    mg = g;
             }
             det = d;
+            minGain = mg;
         }
         else
             det.reset();
@@ -769,6 +787,22 @@ public:
     bool linearPhase() const noexcept { return ! bands[0].iirMode; }
 
     // one FL block (≤ maxBlock), separate channels, in place
+    // round 190mf (DP-29): the bands' meters; band 0 low, 1 mid, 2 high (the editor's order)
+    void setMetering (bool on) noexcept
+    {
+        for (auto& b : bands)
+        {
+            b.metering = on;
+            b.peakL = b.peakR = 0.0f;
+            b.minGain = 1.0f;
+        }
+    }
+    float bandMeter (int band, int what) const noexcept
+    {
+        const auto& b = bands[(std::size_t) (2 - std::clamp (band, 0, 2))];
+        return what == 0 ? b.peakL : what == 1 ? b.peakR : b.minGain;
+    }
+
     void process (float* left, float* right, int n) noexcept
     {
         bool signal = false;
@@ -780,6 +814,8 @@ public:
         if (! signal)
         {
             reset(); // the plugin clears its states and passes the block through untouched
+            for (auto& b : bands)
+                b.peakL = b.peakR = 0.0f, b.minGain = 1.0f;
             return;
         }
         for (auto& b : bands)
@@ -965,6 +1001,20 @@ public:
 
     int latencySamples() const noexcept override { return configured && engine.linearPhase() ? linearPhaseLatency : 0; }
 
+    // round 190mf (DP-29): FL's per-band meters, only while an editor shows them (ProcessTimes::metersWanted):
+    // output band * 3 + 0 / 1 = the band's left / right peak after its crossover, + 2 = its compressor's lowest gain
+    void setMetersShown (bool shown) noexcept override
+    {
+        engine.setMetering (shown); // (every block: a setup in between makes the bands again)
+        metersShown = shown;
+    }
+    float controlOutput (int output) const noexcept override
+    {
+        if (! metersShown || output < 0 || output >= 9)
+            return output >= 0 && output < 9 && output % 3 == 2 ? 1.0f : 0.0f;
+        return engine.bandMeter (output / 3, output % 3);
+    }
+
 private:
     // a parameter still at its imported value (within the project file's 4-decimal rounding) keeps FL's exact control
     int control (int i, float v) const noexcept
@@ -983,7 +1033,7 @@ private:
     std::optional<State> imported;
     EffectParams params0 {};
     int sampleRate = 44100;
-    bool hasParams0 = false, prepared = false, configured = false;
+    bool hasParams0 = false, prepared = false, configured = false, metersShown = false;
 };
 
 std::int32_t i32 (const std::vector<std::uint8_t>& d, std::size_t at) noexcept
