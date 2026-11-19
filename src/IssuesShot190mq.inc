@@ -260,6 +260,7 @@
             else
             {
                 pl.setScrollTickForSnapshot ((double) (3 * bar));
+                pl.runAction ("playlist.deselect"); // (Ctrl+A's time selection would be Live's insert point)
                 engine.seek ((double) (4 * bar)); // (on a bar line: the Playlist snaps the position to its grid)
                 engine.getTransport().positionTicks.store ((double) (4 * bar)); // (offline: no audio thread applies the seek)
                 pl.frameStepForSnapshot();
