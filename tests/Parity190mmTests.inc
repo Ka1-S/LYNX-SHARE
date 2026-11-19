@@ -107,3 +107,29 @@ TEST (parity190mm_req_q10_api_and_ssl_g_translate)
     CHECK (g.kind == EffectKind::ridgeStrip && g.params[rg::voicing] == 1.0f && g.params[rg::lfBell] == 0.0f);
     CHECK (std::abs (g.params[rg::lmfFreq] - std::log (300.0 / 200.0) / std::log (2500.0 / 200.0)) < 1e-4);
 }
+
+TEST (parity190mm_rchannel_eq_runs_on_the_renaissance_law)
+{
+    using namespace lynx;
+    int n = 0;
+    // RChannel: EQ on (20), band 3 bell +6 dB at 1 kHz Q 1; compressor threshold 0 dB, ratio 1 (nothing compressed)
+    auto s = parity190jh::waves ("RChannel Stereo", "RChannel", parity190jh::list (137, { { 10, "1" }, { 11, "0" }, { 12, "6" }, { 13, "1000" },
+        { 14, "1" }, { 20, "1" }, { 42, "16" }, { 43, "160" }, { 45, "0" }, { 46, "1" } }), n);
+    CHECK (s.kind == EffectKind::compressor && n == 11);
+    CHECK (s.params[(std::size_t) compressorRenLaw] == 1.0f && s.params[(std::size_t) compressorChannelLaw] == 1.0f);
+    CHECK (facet::waveCode (s.params[(std::size_t) (compressorChannelBand0 + 8)]) == (int) facet::WaveCode::reqBell);
+    const auto level = [] (const EffectSlot& slot) {
+        auto fx = makeEffect (slot);
+        fx->prepare (48000.0);
+        std::vector<float> l (48000), r (48000);
+        for (std::size_t i = 0; i < l.size(); ++i) l[i] = r[i] = (float) (0.01 * std::sin (2.0 * M_PI * 1000.0 * (double) i / 48000.0));
+        for (std::size_t o = 0; o < l.size(); o += 256)
+            fx->process (l.data() + o, r.data() + o, 256, slot.params, 120.0);
+        double e = 0.0;
+        for (std::size_t i = 24000; i < l.size(); ++i) e += (double) l[i] * l[i];
+        return 10.0 * std::log10 (e / 24000.0);
+    };
+    auto plain = s;
+    plain.params[(std::size_t) compressorChannelLaw] = 0.0f;
+    CHECK (std::abs (level (s) - level (plain) - 6.0) < 0.2); // the bell's +6 dB at its frequency
+}

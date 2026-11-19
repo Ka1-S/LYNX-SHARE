@@ -63,6 +63,13 @@ std::size_t savedEffectParamCount (const EffectSlot& slot) noexcept;
 // round 190mg: Compressor's hidden law (after its named parameters; saved only while non-zero): 1 = the vintage voicing's
 // Renaissance law (core/VoiceMatch.h progcomp::Renaissance), set only by the Renaissance Compressor translator
 constexpr int compressorRenLaw = 20;
+// round 190mm: the Renaissance Channel's EQ around the Renaissance law (hidden like the above; 0 = off: every other
+// Compressor). [48] on, [49] routing (0 = EQ before the dynamics, 1 = after), [50 + 4 k …] band k = 0 … 3: its Facet
+// Waves design code (facet::WaveCode, k / 64), frequency / gain / Q as Facet's normalized values (facet::hzValue …).
+// The bands are digitised by Facet EQ's Waves design law (core/FacetEq.h), so they null against the Renaissance EQ's.
+constexpr int compressorChannelLaw = 48;
+constexpr int compressorChannelRouting = 49;
+constexpr int compressorChannelBand0 = 50; // + 4 k: code, hz, gain, Q
 // A parameter value as written to a file: rounded to 4 decimals when that reads back as the same float, else the
 // shortest decimal that does (FL's raw values, e.g. a frequency of raw/65536, survive a save and reload bit for bit)
 double savedEffectParamValue (float v) noexcept;

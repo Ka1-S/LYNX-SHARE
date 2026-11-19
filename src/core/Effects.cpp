@@ -240,6 +240,7 @@ public:
         autoGain = 1.0f;
         vintage.reset();
         ren.reset();
+        for (auto& z : channelState) z = {}; // round 190mm
     }
 
     // round 123: voicing 1 = the measured program-dependent compressor (core/VoiceMatch.h); it delays the audio
@@ -297,7 +298,13 @@ public:
             v.opto = params[10] >= 0.5f;
             v.smooth = params[11] >= 0.5f;
             v.limiter = params[12] >= 0.5f; // the reference's limiter sits inside its gain path
+            // round 190mm: the Renaissance Channel's EQ (hidden; set only by the RChannel translator)
+            const bool channel = params[(std::size_t) compressorChannelLaw] >= 0.5f;
+            const bool eqAfter = params[(std::size_t) compressorChannelRouting] >= 0.5f;
+            if (channel) channelDesign (params);
+            if (channel && ! eqAfter) channelEq (l, r, n);
             ren.process (l, r, n, v);
+            if (channel && eqAfter) channelEq (l, r, n);
             meterLimit.store (0.0f, std::memory_order_relaxed);
             for (int i = 0; i < n; ++i)
                 peakOut = std::max (peakOut, std::max (std::abs (l[i]), std::abs (r[i])));
@@ -459,6 +466,65 @@ public:
     int tailSamples() const noexcept override { return tail; }
 
 private:
+    // round 190mm: the Renaissance Channel's EQ — up to four bands of sections from Facet's Waves design law, redesigned
+    // when their parameters change; transposed direct form II per channel
+    void channelDesign (const EffectParams& params) noexcept
+    {
+        bool same = channelDesigned && channelRate == sampleRate;
+        for (int i = 0; i < 16 && same; ++i)
+            same = channelKey[(std::size_t) i] == params[(std::size_t) (compressorChannelBand0 + i)];
+        if (same) return;
+        EffectParams fp {};
+        fp[(std::size_t) facet::wavesLawParam] = 1.0f;
+        fp[(std::size_t) facet::scaleParam] = 0.5f; // 100 %
+        channelCount = 0;
+        for (int k = 0; k < 4; ++k)
+        {
+            const auto at = [&] (int f) { return params[(std::size_t) (compressorChannelBand0 + 4 * k + f)]; };
+            if (at (0) <= 0.0f) continue;
+            fp[(std::size_t) (facet::wavesBandParam0 + k)] = at (0);
+            fp[(std::size_t) facet::param (k, 0)] = facet::shapeValue (facet::Shape::bell);
+            fp[(std::size_t) facet::param (k, 1)] = at (1);
+            fp[(std::size_t) facet::param (k, 2)] = at (2);
+            fp[(std::size_t) facet::param (k, 3)] = at (3);
+            std::array<facet::Section, facet::maxSections> sec {};
+            const int c = facet::design (fp, k, sampleRate, sec, 0.0);
+            for (int j = 0; j < c && channelCount < (int) channelSec.size(); ++j)
+                channelSec[(std::size_t) channelCount++] = sec[(std::size_t) j];
+        }
+        for (int i = 0; i < 16; ++i)
+            channelKey[(std::size_t) i] = params[(std::size_t) (compressorChannelBand0 + i)];
+        if (! channelDesigned || channelRate != sampleRate)
+            for (auto& z : channelState) z = {};
+        channelDesigned = true;
+        channelRate = sampleRate;
+    }
+    void channelEq (float* l, float* r, int n) noexcept
+    {
+        for (int k = 0; k < channelCount; ++k)
+        {
+            const auto& c = channelSec[(std::size_t) k];
+            for (int ch = 0; ch < 2; ++ch)
+            {
+                float* x = ch == 0 ? l : r;
+                auto& z = channelState[(std::size_t) (2 * k + ch)];
+                for (int i = 0; i < n; ++i)
+                {
+                    const double in = x[i], out = c.b0 * in + z[0];
+                    z[0] = c.b1 * in - c.a1 * out + z[1];
+                    z[1] = c.b2 * in - c.a2 * out;
+                    x[i] = (float) out;
+                }
+            }
+        }
+    }
+    std::array<facet::Section, 8> channelSec {};
+    std::array<std::array<double, 2>, 16> channelState {};
+    std::array<float, 16> channelKey {};
+    int channelCount = 0;
+    bool channelDesigned = false;
+    double channelRate = 0.0;
+
     int tail = -1;
     std::atomic<float> meterGr { 0.0f }, meterIn { 0.0f }, meterOut { 0.0f }, meterLimit { 0.0f }, meterChange { 0.0f };
     float limitGain = 1.0f;

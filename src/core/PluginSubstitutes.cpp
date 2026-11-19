@@ -824,8 +824,8 @@ waves = API-550; API-550A; API-550B
 translate = waves-api-550
 
 # round 190mm: Renaissance Channel (no entry before) — its compressor is the Renaissance Compressor's, so it plays on
-# Compressor's Renaissance law (round 190mg); its EQ and gate are not carried (one slot: the compressor is what
-# changes its sound most in our captures; docs/analise/REA_rodada190mm.md §4)
+# Compressor's Renaissance law (round 190mg) with the law's hidden channel EQ (the Renaissance EQ's bands, Facet's Waves
+# design law) before / after it as routed; the gate is not carried (docs/analise/REA_rodada190mm.md §4)
 [waves-rchannel]
 product = Renaissance Channel (RChannel)
 vendor = Waves
@@ -2097,7 +2097,8 @@ int translateWavesQ10 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
 // Renaissance Channel (137 values: 0 … 19 the EQ's four bands like the Renaissance EQ's, 22 … 28 routing / side chain,
 // 42 attack ms, 43 release ms, 45 threshold dB, 46 ratio, 47 gain dB, 52 ARC (0) / manual, 58 … 62 the gate): its
 // compressor block mirrors the Renaissance Compressor's list (0 / 1 / 2 / 8 / 9 / 17 there), so it takes the same
-// translation onto Compressor's Renaissance law. The EQ and the gate are not carried.
+// translation onto Compressor's Renaissance law; its EQ runs on the law's hidden channel EQ (Facet's Waves design law),
+// before or after the dynamics as routed. The gate is not carried.
 int translateWavesRChannel (const std::vector<std::uint8_t>& state, EffectSlot& slot)
 {
     const auto rw = wavesRealWorldParams (state);
@@ -2126,7 +2127,32 @@ int translateWavesRChannel (const std::vector<std::uint8_t>& state, EffectSlot& 
     slot.params[17] = logNorm (release, 5.0, 5000.0);
     if (slot.params.size() > (std::size_t) compressorRenLaw)
         slot.params[(std::size_t) compressorRenLaw] = 1.0f;
-    return 7;
+    // the EQ (20 on; band k at 5 k: on, type, gain, Hz, Q; 26 routing 1 = dynamics first) on the Renaissance Channel law:
+    // the Renaissance EQ's own band structures through Facet's Waves design law
+    int bands = 0;
+    if (v (20, 1.0) >= 0.5 && slot.params.size() > (std::size_t) (compressorChannelBand0 + 15))
+    {
+        using C = facet::WaveCode;
+        for (int k = 0; k < 4; ++k)
+        {
+            const auto i = (std::size_t) (5 * k);
+            if (v (i, 0.0) < 0.5) continue;
+            const int type = (int) std::lround (v (i + 1, 0.0));
+            C code = C::reqBell;
+            if (type == 1) code = k <= 1 ? C::reqLowShelf : C::reqHighShelf;
+            else if (type == 2) code = k <= 1 ? C::rbjLowShelf : C::rbjHighShelf;
+            else if (type == 3) code = k == 0 ? C::reqHighPass : C::reqLowPass;
+            const auto b = (std::size_t) (compressorChannelBand0 + 4 * k);
+            slot.params[b] = facet::waveCodeValue (code);
+            slot.params[b + 1] = facet::hzValue (std::clamp (v (i + 3, 1000.0), 10.0, 22000.0));
+            slot.params[b + 2] = facet::gainValue (std::clamp (v (i + 2, 0.0), -18.0, 18.0));
+            slot.params[b + 3] = facet::qValue (std::clamp (v (i + 4, 1.0), 0.1, 10.0));
+            ++bands;
+        }
+        slot.params[(std::size_t) compressorChannelLaw] = 1.0f;
+        slot.params[(std::size_t) compressorChannelRouting] = v (26, 0.0) >= 0.5 ? 1.0f : 0.0f;
+    }
+    return 7 + 4 * bands;
 }
 
 namespace wavesApi
