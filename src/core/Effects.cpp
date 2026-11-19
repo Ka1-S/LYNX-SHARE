@@ -371,6 +371,7 @@ public:
             v.opto = params[10] >= 0.5f;
             v.smooth = params[11] >= 0.5f;
             v.limiter = params[12] >= 0.5f; // the reference's limiter sits inside its gain path
+            v.voxCurve = params[(std::size_t) compressorRVoxType] >= 0.5f; // round 190mt: RChannel's RVox type
             // round 190mm: the Renaissance Channel's EQ (hidden; set only by the RChannel translator)
             const bool channel = params[(std::size_t) compressorChannelLaw] >= 0.5f;
             const bool eqAfter = params[(std::size_t) compressorChannelRouting] >= 0.5f;

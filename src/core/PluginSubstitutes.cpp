@@ -2155,7 +2155,7 @@ int translateWavesQ10 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
             case 3: wavesEq::band (slot, k, S::highCut, C::butterLowPass, b.f, 0.0, 1.0, 12); break;
             case 4: wavesEq::band (slot, k, S::lowCut, C::butterHighPass, b.f, 0.0, 1.0, 12); break;
             case 5: wavesEq::band (slot, k, S::bell, C::q10PqBell, b.f, b.db, b.q / 4.0); break;
-            default: wavesEq::band (slot, k, S::bell, C::q10Bell, b.f, b.db, b.q / 4.0); break;
+            default: wavesEq::band (slot, k, S::bell, C::q10BellTan, b.f, b.db, b.q / 4.0); break; // round 190mt: exact law
         }
     }
     slot.params[(std::size_t) F::outputParam] = (float) std::clamp ((v (100, 0.0) + v (102, 0.0)) / 48.0 + 0.5, 0.0, 1.0);
@@ -2196,6 +2196,10 @@ int translateWavesRChannel (const std::vector<std::uint8_t>& state, EffectSlot& 
     slot.params[17] = logNorm (release, 5.0, 5000.0);
     if (slot.params.size() > (std::size_t) compressorRenLaw)
         slot.params[(std::size_t) compressorRenLaw] = 1.0f;
+    // round 190mt: the "RVox" compressor type (44 = 1): the vocal compressor's curve on the same law, the ratio ignored
+    // ([EXEC] ratios 0.5 / 1 / 2 / 50 and ARC give the same output; the attack / release still act)
+    if (v (44, 0.0) >= 0.5 && slot.params.size() > (std::size_t) compressorRVoxType)
+        slot.params[(std::size_t) compressorRVoxType] = 1.0f;
     // the EQ (20 on; band k at 5 k: on, type, gain, Hz, Q; 26 routing 1 = dynamics first) on the Renaissance Channel law:
     // the Renaissance EQ's own band structures through Facet's Waves design law
     int bands = 0;
@@ -2358,6 +2362,11 @@ int translateWavesApi560 (const std::vector<std::uint8_t>& state, EffectSlot& sl
         }
         wavesApi::put (slot, b++, e);
     }
+    // round 190mt: the API-560 law (Facet's hidden graphic-EQ network, core/Api560.h): it plays the ten sliders as the
+    // reference's structure does (65 samples of latency, reported to PDC); the bands above stay for the editor's curve
+    slot.params[(std::size_t) facet::api560LawParam] = 1.0f;
+    for (int k = 0; k < 10; ++k)
+        slot.params[(std::size_t) (facet::api560GainParam0 + k)] = facet::api560GainValue (gain[k]);
     return 1 + (int) on.size();
 }
 
@@ -3671,6 +3680,22 @@ int translateWavesSslG (const std::vector<std::uint8_t>& state, EffectSlot& slot
         p[r::lmfFreq] = logNorm (at (17, 0.5) * 1000.0 / 3.0, 200.0, 2500.0);
     if (at (56, 0.0) > 0.5)
         p[r::hmfFreq] = logNorm (at (20, 3.5) * 3000.0, 600.0, 7000.0);
+    // round 190mt: the G's own EQ sections (Ridge's hidden G law: gain-dependent bells and shelves on the G's ranges,
+    // LF / HF ±17 dB, LMF / HMF ±20 dB, its ÷3 / ×3 switches; REA_rodada190mt §1). The E fields above stay as they were.
+    namespace g = r::gch;
+    p[r::gEqLaw] = 1.0f;
+    p[r::gLfGain] = g::gainValue (at (14, 0.0));
+    p[r::gLfHz] = g::lfValue (at (15, 60.0));
+    p[r::gLmfGain] = g::gainValue (at (16, 0.0));
+    p[r::gLmfKHz] = g::lmfValue (at (17, 0.5));
+    p[r::gLmfQ] = g::qValue (at (18, 2.5));
+    p[r::gHmfGain] = g::gainValue (at (19, 0.0));
+    p[r::gHmfKHz] = g::hmfValue (at (20, 3.5));
+    p[r::gHmfQ] = g::qValue (at (21, 1.5));
+    p[r::gHfGain] = g::gainValue (at (23, 0.0));
+    p[r::gHfKHz] = g::hfValue (at (24, 8.0));
+    p[r::gLmfDiv3] = at (55, 0.0) > 0.5 ? 1.0f : 0.0f;
+    p[r::gHmfX3] = at (56, 0.0) > 0.5 ? 1.0f : 0.0f;
     return n + 2;
 }
 

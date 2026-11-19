@@ -341,10 +341,86 @@ double dialFromQ (double q) noexcept
     return 1.0;
 }
 
+// ---- round 190mt: the G-Channel EQ law (Settings::gLaw; REA_rodada190mt §1) ----
+// [EXEC] Identified black-box on our own demo-mode impulse responses of the reference (every band alone, two takes per
+// probe: shelves at 15 / 14 frequencies × every dB, bells at 11 / 12 frequencies × 20 gains × 10 Qs, the ÷3 / ×3 switches
+// on a coarser grid): each band is ONE second-order section (residual −100 … −150 dB) whose poles and zeros move with
+// the gain — the bells are peaking sections whose pole / zero Qs follow the gain (proportional Q) and whose centre
+// moves with the gain and Q; the LF shelf is (s² + βs + Wz²) / (s² + βs + Wp²) with a shared β of a few kHz (a first-
+// order slope below it), the HF shelf its mirror. LYNX keeps each probe's analog prototype (fitted, inverse bilinear at
+// 48 kHz) and interpolates ln of its coefficients over frequency (log), gain and Q; other rates keep the band's own
+// frequency (rateScale). The numbers are our fits, not vendor data.
+namespace gch
+{
+#include "core/SslGTables.inc"
+struct Ax { int i; double t; };
+Ax axisOf (const double* xs, int n, double x, bool logx) noexcept
+{
+    x = std::clamp (x, xs[0], xs[n - 1]);
+    int i = 0;
+    while (i < n - 2 && x > xs[i + 1])
+        ++i;
+    const double t = logx ? std::log (x / xs[i]) / std::log (xs[i + 1] / xs[i]) : (x - xs[i]) / (xs[i + 1] - xs[i]);
+    return { i, std::clamp (t, 0.0, 1.0) };
+}
+// a table [frequency][gain][Q][5] (nq = 1: shelves) at (af, ag, aq): multilinear in ln of the coefficients
+void lookup (const float* tab, int ng, int nq, Ax af, Ax ag, Ax aq, double u[5]) noexcept
+{
+    for (int k = 0; k < 5; ++k)
+        u[k] = 0.0;
+    for (int df = 0; df < 2; ++df)
+        for (int dg = 0; dg < 2; ++dg)
+            for (int dq = 0; dq < (nq > 1 ? 2 : 1); ++dq)
+            {
+                const double w = (df ? af.t : 1.0 - af.t) * (dg ? ag.t : 1.0 - ag.t) * (nq > 1 ? (dq ? aq.t : 1.0 - aq.t) : 1.0);
+                const float* c = tab + (((af.i + df) * ng + ag.i + dg) * nq + (nq > 1 ? aq.i + dq : 0)) * 5;
+                for (int k = 0; k < 5; ++k)
+                    u[k] += w * c[k];
+            }
+    for (int k = 0; k < 5; ++k)
+        u[k] = std::exp (u[k]);
+}
+bool band (int b, const Settings& s, double sampleRate, Biquad& out) noexcept
+{
+    constexpr int nShelfDb = (int) std::size (gShelfDb), nBellDb = (int) std::size (gBellDb), nBellQ = (int) std::size (gBellQ);
+    constexpr int nSubDb = (int) std::size (gSubDb), nSubQ = (int) std::size (gSubQ);
+    double u[5];
+    const Ax none { 0, 0.0 };
+    if (b == 0 || b == 3)
+    {
+        const double g = std::clamp (b == 0 ? s.lfGain : s.hfGain, -17.0, 17.0);
+        if (std::abs (g) < 1e-6)
+            return false;
+        const auto af = b == 0 ? axisOf (gLfHz, (int) std::size (gLfHz), s.lfHz, true) : axisOf (gHfKHz, (int) std::size (gHfKHz), s.hfKHz, true);
+        lookup (b == 0 ? gLf : gHf, nShelfDb, 1, af, axisOf (gShelfDb, nShelfDb, g, false), none, u);
+    }
+    else
+    {
+        const bool lo = b == 1, sub = lo ? s.lmfDiv3 : s.hmfX3;
+        const double g = std::clamp (lo ? s.lmfGain : s.hmfGain, -20.0, 20.0), q = lo ? s.lmfQ : s.hmfQ;
+        if (std::abs (g) < 1e-6)
+            return false;
+        const auto af = lo ? axisOf (gLmfKHz, (int) std::size (gLmfKHz), s.lmfKHz, true) : axisOf (gHmfKHz, (int) std::size (gHmfKHz), s.hmfKHz, true);
+        if (sub)
+            lookup (lo ? gLmfDiv3 : gHmfX3, nSubDb, nSubQ, af, axisOf (gSubDb, nSubDb, g, false), axisOf (gSubQ, nSubQ, q, false), u);
+        else
+            lookup (lo ? gLmf : gHmf, nBellDb, nBellQ, af, axisOf (gBellDb, nBellDb, g, false), axisOf (gBellQ, nBellQ, q, false), u);
+    }
+    constexpr double U = 2.0 * pi * 1000.0;
+    double n[3] = { u[0], u[1] * U, u[2] * U * U }, d[2] = { u[3] * U, u[4] * U * U };
+    const double a = rateScale (std::sqrt (d[1]), sampleRate);
+    n[1] *= a; n[2] *= a * a; d[0] *= a; d[1] *= a * a;
+    bilinear (n, d, 2.0 * sampleRate, out);
+    return true;
+}
+} // namespace gch
+
 bool bandBiquad (int band, const Settings& s, double sampleRate, Biquad& out)
 {
     if (s.model == 1)
         return k4::band (band, s, sampleRate, out);
+    if (s.gLaw == 1) // round 190mt: the G-Channel EQ law
+        return gch::band (band, s, sampleRate, out);
     double n[3], d[2], wref = 0.0;
     if (! bandAnalog (band, s, n, d, wref))
         return false;
@@ -573,7 +649,8 @@ void Channel::design (const Settings& s) noexcept
         return a.hpHz == b.hpHz && a.lpKHz == b.lpKHz && a.lfGain == b.lfGain && a.lfHz == b.lfHz && a.lfBell == b.lfBell
             && a.lmfGain == b.lmfGain && a.lmfKHz == b.lmfKHz && a.lmfQ == b.lmfQ && a.hmfGain == b.hmfGain && a.hmfKHz == b.hmfKHz
             && a.hmfQ == b.hmfQ && a.hfGain == b.hfGain && a.hfKHz == b.hfKHz && a.hfBell == b.hfBell
-            && a.model == b.model && a.colour == b.colour;
+            && a.model == b.model && a.colour == b.colour
+            && a.gLaw == b.gLaw && a.lmfDiv3 == b.lmfDiv3 && a.hmfX3 == b.hmfX3; // round 190mt
     };
     if (designedOnce && eq (s, designed))
         return;
@@ -1778,8 +1855,11 @@ void Renaissance::process (float* l, float* r, int n, const RenSettings& st) noe
         }
     }
     const auto at = [] (double u) noexcept { return (std::size_t) std::clamp ((int) (u * (tableSize - 1)), 0, tableSize - 1); };
-    const double ratio = std::clamp (st.ratio, 0.5, 50.0), a = renFloor (ratio), bend = a < 1.0 ? renBendComp : renBendExp;
-    const double invT = 1.0 / dbToGain (st.thresholdDb + renShiftDb (ratio));
+    const double ratio = std::clamp (st.ratio, 0.5, 50.0);
+    const double a = st.voxCurve ? 0.0 : renFloor (ratio), bend = st.voxCurve ? 0.0 : (a < 1.0 ? renBendComp : renBendExp);
+    // round 190mt: the RVox type's curve 1 / (1 + p (1/t − 0.1)) (no threshold shift; 0.1 fitted on our stair probes at
+    // thresholds −24 / −12 dB: the curve is the vocal compressor's t / (p (1 − t) + t) family, a little deeper)
+    const double invT = st.voxCurve ? 1.0 / dbToGain (st.thresholdDb) - 0.1 : 1.0 / dbToGain (st.thresholdDb + renShiftDb (ratio));
     const double aC = renCoef (std::max (0.01, st.attackMs) * renAttackK, sr), qF = renCoef (renSlowFallMs, sr), qR = renCoef (renSlowRiseMs, sr);
     const double makeup = dbToGain (st.gainDb), ceiling = 1.0 / makeup;
     const double lR = renCoef (renLimitMs * (st.manual ? renLimitManual : 1.0), sr), mC = renCoef (renMixMs, sr);

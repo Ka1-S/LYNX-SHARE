@@ -161,6 +161,27 @@ enum Param
 double compGrCapDb (float v) noexcept;   // 0 = no cap (a huge value), else 0 .. 60 dB
 double compAttackFineSeconds (float v) noexcept; // 0 .. 0.25 s
 
+// round 190mt, hidden like compGrCap (not in the info: no control, no text; saved while non-zero) at FIXED indices
+// 87 … 99: the SSL G-Channel EQ law on the E voicing (core/VoiceMatch.h echannel::Settings::gLaw; REA_rodada190mt §1).
+// gEqLaw 0 = off: new instances and every project saved before (the E bands, bit for bit); only the Waves SSL G-Channel
+// translator sets it. Its band values (the G's own ranges) are stored 0 … 1 through the gch:: scales below; the shared
+// controls (filters, dynamics, trims) stay the E voicing's.
+enum GParam
+{
+    gEqLaw = 87, gLfGain, gLfHz, gLmfGain, gLmfKHz, gLmfQ, gHmfGain, gHmfKHz, gHmfQ, gHfGain, gHfKHz, gLmfDiv3, gHmfX3, gEnd
+};
+static_assert (gEqLaw == compAttackFine + 1 && gEnd <= 100, "the G law sits between Ridge's hidden values and the omni law");
+namespace gch
+{
+float gainValue (double db) noexcept;  double gainDb (float v) noexcept;   // −20 … +20 dB
+float lfValue (double hz) noexcept;    double lfHz (float v) noexcept;     // 30 … 450 Hz (log)
+float hfValue (double khz) noexcept;   double hfKHz (float v) noexcept;    // 1.5 … 16 kHz (log)
+float lmfValue (double khz) noexcept;  double lmfKHz (float v) noexcept;   // 0.2 … 2.5 kHz (log)
+float hmfValue (double khz) noexcept;  double hmfKHz (float v) noexcept;   // 0.6 … 7 kHz (log)
+float qValue (double q) noexcept;      double q (float v) noexcept;        // 0.1 … 3.5
+bool lawOn (const EffectParams& p) noexcept;
+} // namespace gch
+
 // round 190mm (scheps), hidden like compGrCap (not in the info: no control, no text; saved while non-zero) at FIXED
 // indices 100 … 191: the "omni" law — a five-module channel strip (Pre, Gate, DS2, EQ, Comp in a stored order) that
 // stands in for a multi-module channel strip whose modules the user can reorder (REA_rodada190mm_scheps). omniLaw 0 =

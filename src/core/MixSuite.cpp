@@ -583,6 +583,23 @@ vmatch::echannel::Settings consoleSettingsOf (const EffectParams& p) noexcept
     e.dynamicsAfterEq = ! on (p[order]);
     e.filtersBeforeDynamics = on (p[filterSplit]);
     e.eqToSidechain = on (p[eqToSidechain]); // round 165
+    if (gch::lawOn (p) && ! k4Voicing (p)) // round 190mt: the G-Channel EQ law (its own band values and ranges)
+    {
+        e.gLaw = 1;
+        e.lfGain = gch::gainDb (p[gLfGain]);
+        e.lfHz = gch::lfHz (p[gLfHz]);
+        e.lmfGain = gch::gainDb (p[gLmfGain]);
+        e.lmfKHz = gch::lmfKHz (p[gLmfKHz]);
+        e.lmfQ = gch::q (p[gLmfQ]);
+        e.hmfGain = gch::gainDb (p[gHmfGain]);
+        e.hmfKHz = gch::hmfKHz (p[gHmfKHz]);
+        e.hmfQ = gch::q (p[gHmfQ]);
+        e.hfGain = gch::gainDb (p[gHfGain]);
+        e.hfKHz = gch::hfKHz (p[gHfKHz]);
+        e.lfBell = e.hfBell = false;
+        e.lmfDiv3 = on (p[gLmfDiv3]);
+        e.hmfX3 = on (p[gHmfX3]);
+    }
     if (k4Voicing (p)) // round 148: the 4K console (its own Q scale, colour, mic pre, VCA, make-up, mix)
     {
         e.model = 1;
@@ -665,6 +682,29 @@ double responseDb (const EffectParams& p, double sampleRate, double hz)
 
 double compGrCapDb (float v) noexcept { return v > 1e-6f ? 60.0 * std::min (1.0f, v) : 1e9; }
 double compAttackFineSeconds (float v) noexcept { return 0.25 * std::clamp (v, 0.0f, 1.0f); }
+
+// round 190mt: the G-Channel EQ law's stored values (MixSuite.h gch)
+namespace gch
+{
+namespace
+{
+float logValue (double x, double lo, double hi) noexcept { return (float) std::clamp (std::log (x / lo) / std::log (hi / lo), 0.0, 1.0); }
+double logOf (float v, double lo, double hi) noexcept { return lo * std::pow (hi / lo, std::clamp ((double) v, 0.0, 1.0)); }
+}
+float gainValue (double db) noexcept { return (float) std::clamp ((db + 20.0) / 40.0, 0.0, 1.0); }
+double gainDb (float v) noexcept { return 40.0 * std::clamp ((double) v, 0.0, 1.0) - 20.0; }
+float lfValue (double hz) noexcept { return logValue (hz, 30.0, 450.0); }
+double lfHz (float v) noexcept { return logOf (v, 30.0, 450.0); }
+float hfValue (double khz) noexcept { return logValue (khz, 1.5, 16.0); }
+double hfKHz (float v) noexcept { return logOf (v, 1.5, 16.0); }
+float lmfValue (double khz) noexcept { return logValue (khz, 0.2, 2.5); }
+double lmfKHz (float v) noexcept { return logOf (v, 0.2, 2.5); }
+float hmfValue (double khz) noexcept { return logValue (khz, 0.6, 7.0); }
+double hmfKHz (float v) noexcept { return logOf (v, 0.6, 7.0); }
+float qValue (double q) noexcept { return (float) std::clamp ((q - 0.1) / 3.4, 0.0, 1.0); }
+double q (float v) noexcept { return 0.1 + 3.4 * std::clamp ((double) v, 0.0, 1.0); }
+bool lawOn (const EffectParams& p) noexcept { return p[(std::size_t) gEqLaw] > 0.5f; }
+} // namespace gch
 
 double compressorCurveDb (const EffectParams& p, double inputDb)
 {

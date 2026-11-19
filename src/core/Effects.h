@@ -79,6 +79,9 @@ enum CompressorApi { compressorApiLaw = 25, compressorApiThreshold, compressorAp
 // Compressor). [48] on, [49] routing (0 = EQ before the dynamics, 1 = after), [50 + 4 k …] band k = 0 … 3: its Facet
 // Waves design code (facet::WaveCode, k / 64), frequency / gain / Q as Facet's normalized values (facet::hzValue …).
 // The bands are digitised by Facet EQ's Waves design law (core/FacetEq.h), so they null against the Renaissance EQ's.
+// round 190mt: the Renaissance Channel's "RVox" compressor type on the Renaissance law (hidden like the above; 1 = on, set
+// only by the RChannel translator; 0 = every other Compressor): the vocal compressor's curve, ratio ignored
+constexpr int compressorRVoxType = 38;
 constexpr int compressorChannelLaw = 48;
 constexpr int compressorChannelRouting = 49;
 constexpr int compressorChannelBand0 = 50; // + 4 k: code, hz, gain, Q

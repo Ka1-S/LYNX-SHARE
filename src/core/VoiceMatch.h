@@ -51,6 +51,12 @@ struct Settings
     // round 165 (model 0): "EQ to Dyn S.C." — [EXEC] the filters (unless split) and the EQ leave the audio and feed only
     // the dynamics' side chain; with the filter split on, the filters stay at the input of the audio path
     bool eqToSidechain = false;
+    // round 190mt (model 0): the G-Channel EQ law (Ridge Strip's hidden gEqLaw, set only by the Waves SSL G-Channel
+    // translator; 0 = the E bands above). The four bands become the G's own gain-dependent sections (proportional-Q
+    // bells, shelves whose corners and slope move with the gain; tables fitted on our probes, core/SslGTables.inc) on the
+    // G's ranges (LF / HF ±17 dB, LMF / HMF ±20 dB; no LF / HF bell), with its LMF ÷3 / HMF ×3 switches and flat gain
+    int gLaw = 0;
+    bool lmfDiv3 = false, hmfX3 = false;
 };
 
 // Q of the mid bands as the console's dial shows it, for a 0..1 dial position (3.5 at 0 .. 0.1 at 1)
@@ -296,6 +302,10 @@ struct RenSettings
 {
     double thresholdDb = 0.0, ratio = 1.0, attackMs = 16.0, releaseMs = 160.0, gainDb = 0.0, mix = 1.0, trimDb = 0.0;
     bool manual = false, opto = false, smooth = false, limiter = true;
+    // round 190mt: the Renaissance Channel's "RVox" compressor type — the one-knob vocal compressor's curve
+    // (g = 1 / (1 + p (1/t − 0.1)), t = the threshold: no ratio, no floor, no bend) on this law's detector and smoothing
+    // (its attack / release still apply); the ratio is ignored [EXEC]
+    bool voxCurve = false;
 };
 // the static law: the gain's floor (a < 1 compresses, a > 1 expands), the threshold shift (dB) and the curve
 double renFloor (double ratio) noexcept;

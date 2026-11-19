@@ -74,7 +74,7 @@ TEST (parity190jh_facet_auto_threshold_is_hidden_and_off_in_old_projects)
     using namespace lynx;
     const auto& info = effectInfo (EffectKind::facetEq);
     CHECK (info.params.size() == (std::size_t) facet::paramCount);          // hidden: no new control or string
-    CHECK (facet::autoThresholdParam0 == facet::paramCount && facet::puigLawParam == facet::paramCount + facet::bands && facet::wavesLawParam == facet::puigLawParam + 1 && facet::storedParamCount == facet::wavesBandParam0 + facet::bands); // round 190mg: + the PuigTec law; 190mm: + the Waves design law
+    CHECK (facet::autoThresholdParam0 == facet::paramCount && facet::puigLawParam == facet::paramCount + facet::bands && facet::wavesLawParam == facet::puigLawParam + 1 && facet::storedParamCount == facet::api560GainParam0 + 10); // round 190mg: + the PuigTec law; 190mm: + the Waves design law; 190mt: + the API-560 law
     auto s = makeEffectSlot (EffectKind::facetEq);
     for (int b = 0; b < facet::bands; ++b)
         CHECK (! facet::autoThreshold (s.params, b));
