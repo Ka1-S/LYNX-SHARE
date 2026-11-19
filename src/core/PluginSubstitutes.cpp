@@ -389,7 +389,8 @@ names = ValhallaSpaceModulator
 mix = 1
 # round 190mb: the reference's wet level per mode on Orbit's voices (Orbit's hidden smLaw, #7). Only a translated
 # SpaceModulator runs it. (Its mode order, read back from the plug-in, is Orbit's: the Mode map stays direct)
-replaced = #7=1
+# round 190mj: and the reference's own voices per mode (Orbit's hidden voiceLaw, #8), measured on click-train probes
+replaced = #7=1; #8=1
 map = xml:wetDry -> Mix
 map = xml:rate -> Rate
 map = xml:depth -> Depth

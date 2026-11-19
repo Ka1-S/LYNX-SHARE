@@ -4845,6 +4845,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190do: a Gemini Doubler saved before the measured read head keeps the two crossfaded taps
     if (slot.kind == EffectKind::geminiDoubler && savedCount <= (std::size_t) voicetools::gemini::headLaw)
         slot.params[(std::size_t) voicetools::gemini::headLaw] = 0.0f;
+    // round 190mj: the SpaceModulator role's voices likewise (a translated SpaceModulator only)
+    if (slot.kind == EffectKind::orbit && savedCount <= (std::size_t) echosuite::orbit::voiceLaw)
+        slot.params[(std::size_t) echosuite::orbit::voiceLaw] = 0.0f;
     // round 190mb: the SpaceModulator role's level law is only ever saved with it (a translated SpaceModulator)
     if (slot.kind == EffectKind::orbit && savedCount <= (std::size_t) echosuite::orbit::smLaw)
         slot.params[(std::size_t) echosuite::orbit::smLaw] = 0.0f;

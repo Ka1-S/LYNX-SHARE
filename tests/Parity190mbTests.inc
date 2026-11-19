@@ -121,7 +121,7 @@ TEST (parity190mb_orbit_spacemodulator_level_law)
     if (entry == nullptr)
         return;
     const auto sm = makeSubstituteSlot (*entry, &id);
-    CHECK (sm.params[(std::size_t) ob::smLaw] == 1.0f && savedEffectParamCount (sm) == (std::size_t) ob::smLaw + 1);
+    CHECK (sm.params[(std::size_t) ob::smLaw] == 1.0f && savedEffectParamCount (sm) >= (std::size_t) ob::smLaw + 1); // round 190mj: + voiceLaw
     auto old = sm;
     upgradeLoadedEffectParams (old, (std::size_t) ob::smLaw);
     CHECK (old.params[(std::size_t) ob::smLaw] == 0.0f);
