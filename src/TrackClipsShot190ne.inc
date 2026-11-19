@@ -294,12 +294,14 @@
         }
 
         // ---- Clip-launch: a new instrument track there owns its clips (the layout's default)
-        layoutstyle::setCurrent (layoutstyle::Style::clipLaunch);
         {
-            Song s = makeSong (false);
+            Song s = makeSong (false); // (made in the Pattern layout: FL's own instrument tracks)
+            layoutstyle::setCurrent (layoutstyle::Style::clipLaunch);
             s.channels.emplace_back().name = "Pad";
-            trackmodes::makeInstrumentTrack (s, 4, (int) s.channels.size() - 1);
-            check ("cliplaunch_new_track_owns_clips", trackclips::owns (s, 4) && ! trackclips::owns (s, 1));
+            const auto made = trackmodes::makeInstrumentTrack (s, 4, (int) s.channels.size() - 1);
+            check ("cliplaunch_new_track_owns_clips", made && trackclips::owns (s, 4) && ! trackclips::owns (s, 1),
+                   juce::String (made ? "made" : "not made") + " mixer " + juce::String ((int) s.mixer.size()) + " own " + juce::String ((int) s.playlistTracks[4].ownClips)
+                       + " mode " + juce::String ((int) s.playlistTracks[4].mode));
         }
         layoutstyle::setCurrent (layoutstyle::Style::pattern);
         return finish();
