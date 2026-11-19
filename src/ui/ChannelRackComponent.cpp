@@ -16,6 +16,7 @@
 #include "ui/UiTrace.h"
 #include "ui/TextCache.h"
 #include "ui/ChannelRackComponent.h"
+#include "core/NoteRepeat.h"
 #include "ui/PaintAB.h"
 #include "ui/ImageCaches.h"
 #include "ui/PluginOffTag.h"
@@ -1772,6 +1773,28 @@ void ChannelRackComponent::paintLane (juce::Graphics& g)
     const auto bipolar = notetools::levelIsBipolar (level);
     const auto base = bipolar ? (top + bottom) * 0.5f : bottom;
 
+    if (level == notetools::Level::notePitch) // FL's piano-roll rows: the black keys darker, the C rows named
+    {
+        const auto [lo, hi] = pitchLaneKeys();
+        const auto rowH = (bottom - top) / (float) (hi - lo + 1);
+        for (int key = lo; key <= hi; ++key)
+        {
+            const auto y = bottom - (float) (key - lo + 1) * rowH;
+            if (juce::MidiMessage::isMidiNoteBlack (key))
+            {
+                g.setColour (bg1);
+                g.fillRect (juce::Rectangle<float> ((float) gridLeft(), y, (float) (numSteps() * stepWidth), rowH));
+            }
+            if (key % 12 == 0 && rowH * 3.0f >= 9.0f)
+            {
+                g.setColour (textDisabled);
+                g.setFont (theme::font (theme::type::caption));
+                textcache::drawText (g, juce::String (notetools::levelText (level, (float) key / 127.0f)),
+                                     juce::Rectangle<int> (gridLeft() + 2, (int) (y + rowH - 10.0f), 28, 10), juce::Justification::bottomLeft);
+            }
+        }
+    }
+
     for (int step = 0; step < numSteps(); ++step)
     {
         const auto x = (float) (gridLeft() + step * stepWidth + 1);
@@ -1798,7 +1821,38 @@ void ChannelRackComponent::paintLane (juce::Graphics& g)
             continue;
         }
 
-        const auto v = notetools::levelValue (pattern.notes[(std::size_t) notes.front()], level);
+        const auto& first = pattern.notes[(std::size_t) notes.front()];
+        if (level == notetools::Level::notePitch) // FL: a block at the step's key, named
+        {
+            const auto [lo, hi] = pitchLaneKeys();
+            const auto rowH = (bottom - top) / (float) (hi - lo + 1);
+            const auto block = juce::Rectangle<float> (x + 1.0f, bottom - (float) (first.key - lo + 1) * rowH, w - 2.0f, juce::jmax (3.0f, rowH));
+            g.setColour (info.withAlpha (0.85f));
+            g.fillRoundedRectangle (block, 1.5f);
+            if (block.getHeight() >= 9.0f && block.getWidth() >= 14.0f)
+            {
+                g.setColour (bg0);
+                g.setFont (theme::font (theme::type::caption));
+                textcache::drawFittedText (g, juce::String (notetools::levelText (level, (float) first.key / 127.0f)), block.toNearestInt(),
+                                           juce::Justification::centred, 1, 0.6f);
+            }
+            continue;
+        }
+        if (level == notetools::Level::repeat) // FL: a block at the rate's height, a line for each extra strike in a step
+        {
+            if (first.repeat <= 7)
+                continue; // (no second strike inside a step: FL draws nothing)
+            const auto rowH = (bottom - top) / 8.0f;
+            const auto block = juce::Rectangle<float> (x + 1.0f, bottom - (float) (first.repeat - 6) * rowH, w - 2.0f, rowH);
+            g.setColour (info.withAlpha (0.85f));
+            g.fillRoundedRectangle (block, 1.5f);
+            const auto strikes = noterepeat::strikeCount (first, ticksPerStep);
+            g.setColour (bg0.withAlpha (0.55f));
+            for (int k = 1; k < strikes; ++k)
+                g.fillRect (block.getX() + 3.0f, block.getY() + block.getHeight() * (float) k / (float) strikes - 0.5f, block.getWidth() - 6.0f, 1.0f);
+            continue;
+        }
+        const auto v = notetools::levelValue (first, level);
         const auto y = bottom - v * (bottom - top);
         g.setColour ((level == notetools::Level::velocity ? accent : info).withAlpha (0.85f));
         g.fillRect (juce::Rectangle<float> (x + 2.0f, juce::jmin (y, base), w - 4.0f, juce::jmax (2.0f, std::abs (base - y))));
@@ -1813,11 +1867,45 @@ void ChannelRackComponent::paintLane (juce::Graphics& g)
     }
 }
 
+// FL's Note pitch lane is a small piano roll (issue #208, FL 2026 shot fl-note): the keys from a little below the
+// channel's lowest step to a little above its highest (two octaves at least), each step a block at its key
+std::pair<int, int> ChannelRackComponent::pitchLaneKeys() const
+{
+    const auto& pattern = engine.getSong().activePattern();
+    const auto channel = graphRow();
+    int lo = 127, hi = 0;
+    for (const auto& n : pattern.notes)
+        if (n.channel == channel)
+            lo = juce::jmin (lo, n.key), hi = juce::jmax (hi, n.key);
+    if (lo > hi)
+        lo = hi = 60;
+    const auto middle = (lo + hi) / 2;
+    lo = juce::jmin (lo - 2, middle - 12);
+    hi = juce::jmax (hi + 2, middle + 12);
+    if (lo < 0)
+        hi -= lo, lo = 0;
+    if (hi > 127)
+        lo = juce::jmax (0, lo - (hi - 127)), hi = 127;
+    return { lo, hi };
+}
+
 float ChannelRackComponent::laneValueAt (int y) const
 {
     const auto lane = laneBounds();
     const auto top = (float) lane.getY() + 6.0f, bottom = (float) lane.getBottom() - 6.0f;
-    return juce::jlimit (0.0f, 1.0f, (bottom - (float) y) / juce::jmax (1.0f, bottom - top));
+    const auto t = juce::jlimit (0.0f, 1.0f, (bottom - (float) y) / juce::jmax (1.0f, bottom - top));
+    const auto level = (notetools::Level) graphLevel;
+    if (level == notetools::Level::notePitch) // (the key row under the mouse)
+    {
+        const auto [lo, hi] = pitchLaneKeys();
+        return (float) juce::jlimit (0, 127, lo + (int) std::floor (t * (float) (hi - lo + 1))) / 127.0f;
+    }
+    if (level == notetools::Level::repeat) // FL's lane: 1/16 (one strike a step) at the bottom .. 1/64 triplet at the top
+    {
+        const auto index = juce::jlimit (7, noterepeat::rateCount, 7 + (int) std::floor (t * 8.0f));
+        return index <= 7 ? 0.0f : (float) index / (float) noterepeat::rateCount;
+    }
+    return t;
 }
 
 void ChannelRackComponent::setLaneValue (int step, float value)

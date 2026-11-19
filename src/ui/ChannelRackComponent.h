@@ -247,6 +247,7 @@ private:
     void setLaneValue (int step, float value);
     void applyLane (const juce::MouseEvent& e);
     float laneValueAt (int y) const;
+    std::pair<int, int> pitchLaneKeys() const; // the keys the Note pitch lane shows (issue #208)
     bool graphLanes = false;
     bool pianoRollView = false;
     int graphLevel = 0; // notetools::Level
