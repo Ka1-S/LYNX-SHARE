@@ -304,7 +304,7 @@ struct RenSettings
     bool manual = false, opto = false, smooth = false, limiter = true;
     // round 190mt: the Renaissance Channel's "RVox" compressor type — the one-knob vocal compressor's curve
     // (g = 1 / (1 + p (1/t − 0.1)), t = the threshold: no ratio, no floor, no bend) on this law's detector and smoothing
-    // (its attack / release still apply); the ratio is ignored [EXEC]
+    // (its attack / release still apply, with the Opto mode's release shape); the ratio is ignored [EXEC]
     bool voxCurve = false;
 };
 // the static law: the gain's floor (a < 1 compresses, a > 1 expands), the threshold shift (dB) and the curve

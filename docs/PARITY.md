@@ -4348,7 +4348,7 @@ Evidence: `docs/analise/REA_rodada190mt.md`. Before = round 190mm's final binary
 | SSL G-Channel → Ridge Strip (E voicing + hidden G EQ law) | 25 | 6.44 → 8.20 | 17 / 8 / 0 |
 | Q10 → Facet EQ (exact Bell law, Waves code 14) | 25 | 9.68 → 10.00 | 5 / 20 / 0 |
 | API-560 → Facet EQ (hidden API-560 network law, 65-sample latency) | 25 | 8.44 → 9.72 | 19 / 6 / 0 |
-| Renaissance Channel → Compressor (RVox type + gate) | 25 | 5.96 → 6.56 | 5 / 20 / 0 |
+| Renaissance Channel → Compressor (RVox type + gate) | 25 | 5.96 → 6.80 | 5 / 20 / 0 |
 | every other wv190mm / refcap182 Waves reference | — | same | 0 down |
 
 - **Ridge Strip — the SSL G EQ law** (hidden [87 … 99]; SSL G-Channel only): each band one second-order section whose
@@ -4362,9 +4362,9 @@ Evidence: `docs/analise/REA_rodada190mt.md`. Before = round 190mm's final binary
   graphic-EQ structure (two groups of five resonators in a node network, each slider a potentiometer that also loads its
   resonator, 4× oversampled, a linear-phase decimator), constants fitted on our single-slider probes (−62 … −70 dB);
   65 samples of latency at every rate, reported to PDC; a plain delay with every slider at 0. Old projects: 0 latency.
-- **Compressor — RChannel's RVox type** (hidden [38]): the vocal compressor's curve on the Renaissance law, the ratio
-  ignored; **its gate** (hidden [39 … 43]): a held detector, a one-pole fall to the floor with the release, gate / 1:2
-  expander. X3_bass (3) is the weak file: the type's dynamics on bass.
+- **Compressor — RChannel's RVox type** (hidden [38]): the vocal compressor's curve on the Renaissance law with the Opto
+  release shape, the ratio ignored (X3 2 → 5 … 7); **its gate** (hidden [39 … 43]): a held detector, a one-pole fall to the
+  floor with the release, gate / 1:2 expander. X1 / X2 / X4 stay on the RComp law's accuracy (5 … 8).
 - **Not changed:** RVerb / H-Reverb (round 190lf's ceiling stands: a sample-accurate network would need the reference's
   delay tables; REA_rodada190mt §5), the G's filters (probed, REA §1) and compressor.
 

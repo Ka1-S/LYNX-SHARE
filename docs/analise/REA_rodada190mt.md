@@ -33,8 +33,12 @@ Base: round 190mm's final binary and scores (bank wv190mm, masked).
   identical output) and so is ARC; attack and release still act; the static curve is the vocal compressor's family
   1 / (1 + p (1/t − c)) with NO make-up (−24.5 dB at 0 dBFS peak for a −24 dB threshold); c = 0.1 fitted on thresholds −24
   and −12 (the RVox plug-in's own law has c = 1).
+- **Release**: out of deep reduction the type recovers fast and slows near none (after −9.5 dB: −6.5, −5.3, −4.4 dB over
+  the first 30 ms at release 160 ms; at 1000 ms −8.9, −8.5, −8.2) — the Renaissance law's Opto release shape, not its
+  Electro one.
 - **LYNX**: Compressor's hidden [38] compressorRVoxType on the Renaissance law (RenSettings::voxCurve: that curve, no floor,
-  no bend, the all-passed detector copies), set by the RChannel translator from RealWorld 44.
+  no bend, the Opto release shape; the plain peak detector), set by the RChannel translator from RealWorld 44. Tried and not
+  kept: the all-passed detector copies (X3 6.56 → 6.44), the manual (non-ARC) release (6.48), the release × 0.6 (same).
 - **Gate** (RealWorld 57 on, 58 gate / expander, 59 threshold (−80 = −inf), 60 floor, 62 release) [EXEC]: its detector
   holds the last loud level and falls with max (0.14 s, release) (−18 → −40 dB in 0.35 s at release 22 and 100 ms; never
   within 0.2 s at 1 s); below the threshold the gain falls to the floor as a one-pole with the release as its time

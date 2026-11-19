@@ -1836,7 +1836,9 @@ void Renaissance::reset() noexcept
 
 void Renaissance::process (float* l, float* r, int n, const RenSettings& st) noexcept
 {
-    const int mode = (st.manual ? 1 : 0) | (st.opto ? 2 : 0);
+    // round 190mt: the RVox type releases like the Opto mode ([EXEC] fast out of deep reduction, slow near none)
+    const bool opto = st.opto || st.voxCurve;
+    const int mode = (st.manual ? 1 : 0) | (opto ? 2 : 0);
     if (st.releaseMs != tRelease || mode != tMode)
     {
         // the release coefficient = relT[q] · pdrT[min (s, q)]: the time constant set by the slow follower's position
@@ -1848,7 +1850,7 @@ void Renaissance::process (float* l, float* r, int n, const RenSettings& st) noe
         {
             // read at 256 steps, truncated (the reference's tables; the probes' ESR is 15 … 20 dB better than with a
             // continuous law)
-            const double v = st.opto ? 1.0 - k / 256.0 : k / 256.0;
+            const double v = opto ? 1.0 - k / 256.0 : k / 256.0;
             const double tau = std::max (renReleaseFloorMs, std::max (1.0, st.releaseMs) * renReleaseK * std::pow (1.0 - std::pow (v, renShapePow), renShapeExp));
             pdrT[(std::size_t) k] = std::exp2 (-d / ((double) k / (tableSize - 1) + renPdrOffset));
             relT[(std::size_t) k] = renCoef (tau, sr) / pdrT[(std::size_t) k];
