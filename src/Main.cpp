@@ -1220,6 +1220,10 @@ public:
         if (args.contains ("--selftest"))
         {
             const auto i = args.indexOf ("--selftest");
+            // round 190mo: a temp folder of this run alone (two runs at once shared the fixed temp names of its items),
+            // and on Linux room for its main-thread stack (it reached 7.4 of the usual 8 MB: AudioEngines on the stack)
+            selfTestTemp = lynx::platform::useOwnTempFolder ("lynx-selftest");
+            lynx::platform::allowMainThreadStack ((std::size_t) 64 << 20);
             runSelfTest (args[i + 1].unquoted(), args[i + 2].unquoted());
             return;
         }
@@ -7475,6 +7479,8 @@ private:
             if (reportPath.isNotEmpty())
                 juce::File (reportPath).replaceWithText (text);
             setApplicationReturnValue (all ? 0 : 1);
+            if (selfTestTemp != juce::File())
+                selfTestTemp.deleteRecursively(); // (round 190mo: this run's own temp folder)
             quit();
         });
     }
@@ -19430,6 +19436,7 @@ private:
         ~ParityShow() { window.reset(); editor.reset(); engine.reset(); }
     };
     std::shared_ptr<ParityShow> parityShow;
+    juce::File selfTestTemp; // --selftest: its own temp folder (round 190mo), deleted when the run ends
     bool parityShotFailed = false; // --parityshot: the effect name matched no built-in effect
 
     void runParityShot (const juce::String& path, const juce::String& effectName, const juce::String& paramsFile)
