@@ -1184,7 +1184,7 @@ juce::String MotionOverlay::selfTest()
             return "ERROR live window";
         RECT r {};
         GetWindowRect (window.window, &r);
-        if (r.right - r.left != 28 || r.bottom - r.top != 20 || GetPropW (window.window, liveGdiProp) == nullptr)
+        if (r.right - r.left != 30 || r.bottom - r.top != 20 || GetPropW (window.window, liveGdiProp) == nullptr) // (x 2, width 30)
             return "ERROR live window place";
         if (! window.show (hwnd, picture, 10, 12, { 2, 0, 30, 20 })) // (the next frame: the same window)
             return "ERROR live window frame";
