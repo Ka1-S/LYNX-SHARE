@@ -110,6 +110,7 @@ TEST (p190v_crest_vari_mu_follows_the_reference_grid)
     // the editor's curve says the same: a larger knee reduces less, a lower threshold barely more
     auto p = p190v::defaults (lynx::EffectKind::crestCompressor);
     p[c::style] = c::styleValue (c::Style::variMu);
+    p[c::revision] = 0.0f; // round 190mb: the measured law's editor curve (revision 1 runs Pro-C 3's tube node, Parity190mbCrestTests)
     p[c::threshold] = 0.6f;
     p[c::ratio] = c::ratioValue (4.0);
     p[c::knee] = 0.0f;
