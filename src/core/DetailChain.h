@@ -24,6 +24,30 @@ struct Chain
     bool empty() const noexcept { return channel < 0 && insert < 0; }
 };
 
+// Round 190mx (GitHub #198): `t` is a control of what the chain holds (one of its channels' or one of its inserts'),
+// so a move of it belongs to that track (Session Record writes it into the track's recorded clip). The Master is no
+// track's.
+inline bool holds (const Chain& c, const AutomationTarget& t)
+{
+    const auto has = [] (const std::vector<int>& list, int v) { return std::find (list.begin(), list.end(), v) != list.end(); };
+    switch (t.kind)
+    {
+        case AutomationTargetKind::channelVolume:
+        case AutomationTargetKind::channelPan:
+        case AutomationTargetKind::channelParam:
+        case AutomationTargetKind::channelAdjust:
+            return t.index >= 0 && (c.channel == t.index || has (c.channels, t.index));
+        case AutomationTargetKind::mixerVolume:
+        case AutomationTargetKind::mixerPan:
+        case AutomationTargetKind::effectParam:
+        case AutomationTargetKind::effectMix:
+        case AutomationTargetKind::mixerSend:
+            return t.index > 0 && (c.insert == t.index || has (c.inserts, t.index));
+        default:
+            return false;
+    }
+}
+
 // The channels a clip plays: an audio clip its channel, a pattern clip each channel with notes in the pattern.
 inline void channelsOfClip (const Song& song, const Clip& clip, std::vector<int>& out)
 {

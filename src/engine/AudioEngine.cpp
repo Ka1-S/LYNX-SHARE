@@ -26,6 +26,7 @@
 
 #include "core/ClipOps.h"
 #include "core/PlaylistOps.h"
+#include "core/LayoutStyle.h"
 #include "core/DetailChain.h"
 #include "core/SessionOps.h"
 #include "core/MarkerPlan.h"
@@ -5688,7 +5689,10 @@ void AudioEngine::takeRecordedBends()
 void AudioEngine::updateAutomationRecording (bool active)
 {
     const auto now = juce::Time::getMillisecondCounterHiRes();
-    const auto recording = active && recordOptions.recordAutomation;
+    // round 190mx (GitHub #198, Live's Session automation): Session Record (a clip slot recording, or overdubbing the
+    // playing clips) writes the moved parameters into those clips' envelopes (updateSlotRecording places them)
+    const auto sessionMode = ! active && transport.playing.load() && isSessionRecording();
+    const auto recording = (active || sessionMode) && recordOptions.recordAutomation;
     const auto grid = recordOptions.quantiseAutomation ? recordOptions.quantise : std::int64_t { 0 };
 
     auto writeFor = [this] (const AutomationTarget& target) -> AutomationWrite& {
@@ -5703,20 +5707,43 @@ void AudioEngine::updateAutomationRecording (bool active)
     };
 
     // writes what was sampled (one undo step for the whole take); `ended` = the gestures that are over
-    auto commit = [&] (const std::vector<AutomationTarget>& ended) {
+    auto commit = [&] (const std::vector<AutomationTarget>& ended, bool toSession) {
         if (std::none_of (touches.begin(), touches.end(), [] (const Touch& t) { return ! t.pending.empty(); }))
             return;
+        if (toSession) // (round 190mx: the session's clips take them when they exist; updateSlotRecording)
+        {
+            for (auto& t : touches)
+                if (! t.pending.empty())
+                {
+                    recordedAutomationPoints += (int) t.pending.size();
+                    routeSessionAutomation (t.target, std::move (t.pending));
+                    t.pending.clear();
+                }
+            return;
+        }
         const auto songMode = song.mode == PlayMode::song;
+        // round 190mx (GitHub #198): where Song mode writes depends on the layout. Clip-launch (Live's Arrangement
+        // automation): the parameter's lane under its track. Pattern (FL, live check 190mx): a generator's own parameter
+        // goes into the current pattern as event data, as in Pattern mode; the other targets make automation clips.
+        const auto style = layoutstyle::current();
         editSong ([&] (Song& s) {
             for (auto& t : touches)
                 if (! t.pending.empty())
                 {
                     auto& w = writeFor (t.target);
                     recordedAutomationPoints += (int) t.pending.size();
-                    if (songMode)
-                        commitAutomationPoints (s, w, std::move (t.pending), grid, automationLinear || noteTakeLinear);
-                    else
-                        commitEventPoints (s, automationPattern, w, std::move (t.pending), automationLoopLength, grid);
+                    switch (recordedAutomationDestination (songMode, (int) style, t.target))
+                    {
+                        case AutomationDestination::lane:
+                            commitLanePoints (s, w, std::move (t.pending), grid, automationLinear || noteTakeLinear);
+                            break;
+                        case AutomationDestination::automationClip:
+                            commitAutomationPoints (s, w, std::move (t.pending), grid, automationLinear || noteTakeLinear);
+                            break;
+                        case AutomationDestination::patternEvents:
+                            commitEventPoints (s, automationPattern, w, std::move (t.pending), automationLoopLength, grid);
+                            break;
+                    }
                     t.pending.clear();
                 }
         }, ! automationTakeHasUndoStep);
@@ -5765,7 +5792,7 @@ void AudioEngine::updateAutomationRecording (bool active)
 
     if (! recording)
     {
-        commit ({});
+        commit ({}, std::exchange (sessionAutomationPass, false));
         touches.clear();
         overrideTouched();
         if (! active)
@@ -5789,7 +5816,7 @@ void AudioEngine::updateAutomationRecording (bool active)
                                                            .effectiveLength (song.meter());
     }
 
-    const auto tick = estimatedPositionNow();
+    const auto tick = sessionMode ? slotClockNow() : estimatedPositionNow(); // (the session's clips run on the launcher's clock)
 
     // FL's "Record automation" of an internal-controller link (round 190cs): the controller's output, as the link maps
     // it, is written like a hand move for as long as automation is recorded
@@ -5834,19 +5861,20 @@ void AudioEngine::updateAutomationRecording (bool active)
     }
 
     // song mode without a loop region: from the first move on, the song plays on past its end until recording stops
-    if (! takeWrites.empty() || ! touches.empty())
+    if (! sessionMode && (! takeWrites.empty() || ! touches.empty()))
         if (! automationLinear && song.mode == PlayMode::song && ! song.loopPlays())
         {
             automationLinear = true;
             updateLinearSong();
         }
-    if (song.mode == PlayMode::song)
+    if (song.mode == PlayMode::song && ! sessionMode)
         lastAutomationTick = songTickForRecorded (song, tick, automationLinear || noteTakeLinear);
 
     if (! ended.empty() || --automationCommitCountdown <= 0)
     {
-        growClips (lastAutomationTick, false);
-        commit (ended);
+        if (! sessionMode)
+            growClips (lastAutomationTick, false);
+        commit (ended, sessionMode);
         automationCommitCountdown = 6; // about 5 writes per second while a control keeps moving
     }
 
@@ -5854,6 +5882,7 @@ void AudioEngine::updateAutomationRecording (bool active)
                                    [&] (const Touch& t) { return std::find (ended.begin(), ended.end(), t.target) != ended.end(); }),
                    touches.end());
     overrideTouched();
+    sessionAutomationPass = sessionMode;
 }
 
 void AudioEngine::applyControllers()
