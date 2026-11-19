@@ -40,7 +40,7 @@ void MainComponent::setUpLookParts()
     for (auto* c : std::initializer_list<juce::Component*> { &signatureBox, &quantBox, &saveStatus, &moreButton, &browserToggleButton,
                                                              &backToArrangementButton, &captureButton, &sessionRecordButton, &drawModeButton,
                                                              &keyMapButton, &midiMapButton, &sessionViewButton, &arrangementViewButton, &cycleButton, &metronomeMenuButton,
-                                                             &liveLoopButton, &punchOutButton })
+                                                             &liveLoopButton, &punchOutButton, &nudgeDownButton, &nudgeUpButton })
     {
         addChildComponent (c);
         c->setMouseClickGrabsKeyboardFocus (false);
@@ -356,7 +356,7 @@ std::vector<juce::Component*> MainComponent::lookOnlyParts()
 {
     std::vector<juce::Component*> parts { &signatureBox, &quantBox, &saveStatus, &moreButton, &browserToggleButton, &backToArrangementButton, &captureButton,
                                           &sessionRecordButton, &drawModeButton, &keyMapButton, &midiMapButton, &sessionViewButton, &arrangementViewButton, &cycleButton, &metronomeMenuButton,
-                                          &liveLoopButton, &punchOutButton };
+                                          &liveLoopButton, &punchOutButton, &nudgeDownButton, &nudgeUpButton };
     if (simpleWorkflow != nullptr)
         if (auto* finish = simpleWorkflow->finishComponent(); finish != nullptr && finish->getParentComponent() == this)
             parts.push_back (finish);
@@ -372,7 +372,7 @@ void MainComponent::hideToolbarParts()
                                           &songPosition, &masterVolume, &masterPitch, &metronomeButton, &typingPianoButton, &recordMenuButton, &countInButton,
                                           &waitInputButton, &blendButton, &loopRecordButton, &stepEditButton, &punchButton, &midiLight, &gridBox, &snapToggleButton,
                                           &patternBox, &newPatternButton, &patternMenuButton, &pluginPickerButton, &newButton, &openButton, &saveButton,
-                                          &exportButton, &undoButton, &redoButton, &perfMeter, &output, &chordPanel, &multilinkButton, &keyPanel, &linkToggle };
+                                          &exportButton, &undoButton, &redoButton, &audioEditorButton, &perfMeter, &output, &chordPanel, &multilinkButton, &keyPanel, &linkToggle };
     for (auto& b : panelButtons)
         parts.push_back (&b);
     for (auto* c : lookOnlyParts())
@@ -396,7 +396,7 @@ void MainComponent::applyFlTiles()
     using BL = IconButton::Look;
     const auto fl = toolbarLook == Look::fl;
     const auto box = fl ? flTileIconBox() : 0.0f;
-    for (auto* b : { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &recordMenuButton, &countInButton, &waitInputButton,
+    for (auto* b : { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &audioEditorButton, &recordMenuButton, &countInButton, &waitInputButton,
                      &loopRecordButton, &stepEditButton, &newPatternButton, &patternMenuButton, &pluginPickerButton, &snapToggleButton, &multilinkButton })
         b->setLook (fl ? BL::flTile : BL::standard, box);
     for (auto& b : panelButtons)
@@ -771,6 +771,8 @@ void MainComponent::layoutLiveControlBar (juce::Rectangle<int> bar, int menuWidt
             case I::browser: return &browserToggleButton;
             case I::tap: return &tapTempoButton;
             case I::tempo: return &tempoDisplay;
+            case I::nudgeDown: return &nudgeDownButton;
+            case I::nudgeUp: return &nudgeUpButton;
             case I::signature: return &signatureBox;
             case I::metronome: return &metronomeButton;
             case I::quantisation: return &quantBox;
@@ -967,7 +969,7 @@ juce::Component* MainComponent::toolbarPartForSnapshot (const juce::String& name
         { "play", &playButton }, { "stop", &stopButton }, { "record", &recordButton }, { "metronome", &metronomeButton }, { "tap", &tapTempoButton },
         { "tempo", &tempoDisplay }, { "signature", &signatureBox }, { "quantisation", &quantBox }, { "key", &keyPanel }, { "link", &linkToggle },
         { "browser", &browserToggleButton }, { "backToArrangement", &backToArrangementButton }, { "position", &timeDisplay },
-        { "overdub", &blendButton }, { "capture", &captureButton }, { "sessionRecord", &sessionRecordButton }, { "punch", &punchButton }, { "liveLoop", &liveLoopButton }, { "punchOut", &punchOutButton },
+        { "overdub", &blendButton }, { "capture", &captureButton }, { "sessionRecord", &sessionRecordButton }, { "punch", &punchButton }, { "liveLoop", &liveLoopButton }, { "punchOut", &punchOutButton }, { "nudgeDown", &nudgeDownButton }, { "nudgeUp", &nudgeUpButton },
         { "draw", &drawModeButton }, { "computerKeys", &typingPianoButton }, { "keyMap", &keyMapButton }, { "midiMap", &midiMapButton },
         { "cpu", &perfMeter }, { "more", &moreButton }, { "sessionView", &sessionViewButton }, { "arrangementView", &arrangementViewButton },
         { "status", &saveStatus }, { "masterVolume", &masterVolume }, { "masterPitch", &masterPitch }, { "undo", &undoButton }, { "redo", &redoButton },

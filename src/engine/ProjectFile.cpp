@@ -2765,6 +2765,8 @@ juce::var mixerTrackToVar (const MixerTrack& t)
     // round 190kc: Live's return tracks and Crossfade Assign
     if (t.liveReturn)
         o->setProperty ("liveReturn", true);
+    if (t.current) // (round 190mv: FL's Current track)
+        o->setProperty ("current", true);
     if (t.returnPre)
         o->setProperty ("returnPre", true);
     if (! t.returnSendsOn.empty())
@@ -2873,6 +2875,7 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
     track.monitor = monitorFromKey ((int) t.getProperty ("monitor", 0), t.hasProperty ("monitor"));
     track.recordSafe = (bool) t.getProperty ("recordSafe", false);
     track.liveReturn = (bool) t.getProperty ("liveReturn", false); // (round 190kc)
+    track.current = (bool) t.getProperty ("current", false); // (round 190mv)
     track.returnPre = (bool) t.getProperty ("returnPre", false);
     if (const auto* on = t["returnSendsOn"].getArray())
         for (const auto& target : *on)
@@ -4635,6 +4638,7 @@ std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error,
     for (const auto& c : song.channels)
         if (c.mixerTrack >= (int) song.mixer.size())
             mixerops::ensureInsert (song, c.mixerTrack);
+    mixerops::keepCurrentLast (song); // (round 190mv: FL's Current track stays the last one)
 
     // track modes (round 146a), after the mixer: an audio track's insert is checked against it (issue #122: read
     // before it, every audio track fell back to Unassigned on reopen)

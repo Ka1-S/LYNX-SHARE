@@ -1388,7 +1388,7 @@ public:
             knob->onMenu = [this, k = knob.get(), target] { ui::showSliderMenu (*k, &engine, target()); };
             if (instrumentKind == InstrumentKind::transistorbass && (index == tbprog::sequence || index == tbprog::patch))
                 knob->onMenu = [this, k = knob.get(), index] { showTransistorBassList (index == tbprog::patch, *k); }; // (FL: right-click to browse)
-            knob->onDragStart = [this, target] { engine.noteTweaked (target(), true); };
+            knob->onDragStart = [this, target] { engine.noteTweaked (target(), true); engine.controlTweakedForUndo(); };
             knob->onDragEnd = [this, target] { engine.tweakReleased (target()); };
         }
         modelKnobs.push_back ({ knob.get(), index });
@@ -1420,7 +1420,7 @@ public:
             };
             ui::setOwnMenu (*knob);
             knob->onMenu = [this, k = knob.get(), target] { ui::showSliderMenu (*k, &engine, target()); };
-            knob->onDragStart = [this, target] { engine.noteTweaked (target(), true); };
+            knob->onDragStart = [this, target] { engine.noteTweaked (target(), true); engine.controlTweakedForUndo(); };
             knob->onDragEnd = [this, target] { engine.tweakReleased (target()); };
         }
         partKnobs.push_back ({ knob.get(), control });
@@ -3527,7 +3527,7 @@ public:
             const auto target = [this, param] { return AutomationTarget { AutomationTargetKind::channelParam, ref.index, 0, param }; };
             ui::setOwnMenu (*slider);
             slider->onMenu = [this, slider, target] { ui::showSliderMenu (*slider, &engine, target()); };
-            slider->onDragStart = [this, target] { engine.noteTweaked (target(), true); };
+            slider->onDragStart = [this, target] { engine.noteTweaked (target(), true); engine.controlTweakedForUndo(); };
             slider->onDragEnd = [this, target] { engine.tweakReleased (target()); };
             tweakTargets.push_back ({ slider, param });
         }
@@ -4455,7 +4455,10 @@ private:
         });
         for (const auto& [slider, param] : tweakTargets)
             if (std::abs (samplerparam::get (before, param) - samplerparam::get (s, param)) > 1.0e-6f)
+            {
                 engine.noteTweaked ({ AutomationTargetKind::channelParam, ref.index, 0, param });
+                engine.controlTweakedForUndo(); // (round 190mv, DF-134)
+            }
     }
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override
@@ -4917,7 +4920,7 @@ private:
     {
         ui::setOwnMenu (slider);
         slider.onMenu = [this, &slider, k] { ui::showSliderMenu (slider, &engine, targetOf (k)); };
-        slider.onDragStart = [this, k] { engine.noteTweaked (targetOf (k), true); };
+        slider.onDragStart = [this, k] { engine.noteTweaked (targetOf (k), true); engine.controlTweakedForUndo(); };
         slider.onDragEnd = [this, k] { engine.tweakReleased (targetOf (k)); };
         wired.push_back ({ &slider, k });
     }

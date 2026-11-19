@@ -210,6 +210,11 @@ void soloTrack (Song& song, int track, int trackCount, flsettings::SoloMemory* m
 // ones with "Lock active/mute state"; on a channel already playing alone (among the unlocked ones) every channel the
 // solo touched plays again (`memory` / `restore`: as soloTrack's).
 void soloChannel (Song& song, int channel, flsettings::SoloMemory* memory = nullptr, bool restore = false);
+// FL's Alt+click on a channel's mute switch (round 190mv, DE-12; capture 190mv A4): the solo within the channel's filter
+// group — the channel plays and the other channels of its group are muted (the channels without a group are one group,
+// FL's "Unsorted"); other groups and the locked channels keep theirs. Again on the channel heard alone in its group:
+// the whole group plays.
+void soloChannelInGroup (Song& song, int channel);
 
 // --- Playlist track groups (FL's "Group with above track", REA round 104) -----------------------------
 // A track with `grouped` set belongs to the group of the nearest ungrouped track above it: the header.

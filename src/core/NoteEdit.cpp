@@ -882,6 +882,21 @@ void soloChannel (Song& song, int channel, flsettings::SoloMemory* memory, bool 
               [&c] (int i) { return ! c[(std::size_t) i].soloLock; });
 }
 
+void soloChannelInGroup (Song& song, int channel)
+{
+    auto& c = song.channels;
+    if (channel < 0 || channel >= (int) c.size())
+        return;
+    const auto group = c[(std::size_t) channel].group < 0 ? -1 : c[(std::size_t) channel].group;
+    soloRows ((int) c.size(), channel, nullptr, false,
+              [&c] (int i) { return c[(std::size_t) i].muted; },
+              [&c] (int i, bool on) { c[(std::size_t) i].muted = on; },
+              [&c, group] (int i) {
+                  const auto g = c[(std::size_t) i].group < 0 ? -1 : c[(std::size_t) i].group;
+                  return g == group && ! c[(std::size_t) i].soloLock;
+              });
+}
+
 // --- track groups ------------------------------------------------------------------------------------
 // Round 190jf (B17): nest-aware. A track's folder depth is `grouped ? 1 + nest : 0`; it belongs to the nearest track above
 // it with a smaller depth. With every `nest` 0 (FL's groups, every project before 190jf) each function below does what

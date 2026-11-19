@@ -2534,6 +2534,8 @@ void ChannelRackComponent::mouseDown (const juce::MouseEvent& e)
                 solo (row);
             else if (e.mods.isShiftDown()) // round 190ih (DE-11), FL's manual: "Lock state - (Shift+Click) a Mute icon"
                 toggleSoloLock (row);
+            else if (e.mods.isAltDown()) // round 190mv (DE-12): FL's Alt+click = the solo within the channel's filter group
+                engine.editSong ([row] (Song& s) { noteedit::soloChannelInGroup (s, row); });
             else
                 toggleMute (row);
             return;
@@ -2896,7 +2898,7 @@ ui::Hint ChannelRackComponent::hintAt (juce::Point<int> p)
     switch (area)
     {
         case Area::mute:
-            h.text = name + " - " + tr ("Click: mute.  Ctrl+click or right-click: solo.  Shift+click: lock the mute state");
+            h.text = name + " - " + tr ("Click: mute.  Ctrl+click or right-click: solo.  Alt+click: solo within its filter group.  Shift+click: lock the mute state");
             break;
         case Area::name:
             h.text = name + " - " + tr ("[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [LMB] drag up/down reorders  [RMB] channel menu");

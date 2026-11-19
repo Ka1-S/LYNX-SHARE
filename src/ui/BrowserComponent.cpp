@@ -4658,6 +4658,13 @@ juce::PopupMenu BrowserComponent::buildViewMenu()
         if (safe != nullptr && safe->onPreviewVolumeChanged != nullptr)
             safe->onPreviewVolumeChanged(); // (saved with the preview volume)
     });
+    // FL's Browser menu › View "Auto-hide" (round 190mv, DF-107; capture 190mv A2: only a floating Browser hides)
+    if (role != Role::samples && onAutoHideChanged != nullptr)
+        menu.addItem (tr ("Auto-hide"), true, autoHide, [safe] {
+            autoHide = ! autoHide;
+            if (safe != nullptr && safe->onAutoHideChanged != nullptr)
+                safe->onAutoHideChanged();
+        });
     // FL's Browser menu › View "Full sample preview" (round 190iz; off: a click plays the first 5 seconds, as FL)
     menu.addItem (tr ("Full sample preview"), true, engine.isFullSamplePreview(), [safe] {
         if (safe == nullptr)

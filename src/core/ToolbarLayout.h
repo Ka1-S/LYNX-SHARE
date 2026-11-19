@@ -531,8 +531,8 @@ inline constexpr int loopSectionWidth = 234;
 
 enum class Item
 {
-    // left
-    link, browser, tap, tempo, signature, metronome, quantisation, key,
+    // left (round 190mv, DL-51: Live's two phase-nudge buttons right of the tempo box, capture 190mv B2)
+    link, browser, tap, tempo, nudgeDown, nudgeUp, signature, metronome, quantisation, key,
     // centre
     backToArrangement, position, play, stop, record, overdub, capture, sessionRecord,
     // after the transport (Live: loop / punch; round 190lx DL-61: Punch-In, Loop, Punch-Out as Live's three switches)
@@ -553,8 +553,8 @@ inline Section sectionOf (Item i) noexcept
 inline int defaultWidth (Item i) noexcept
 {
     static constexpr std::array<int, itemCount> w {
-        // link browser tap tempo sig metro quant key
-        0, 18, 25, 41, 41, 38, 44, 112,
+        // link browser tap tempo nudge- nudge+ sig metro quant key
+        0, 18, 25, 41, 16, 16, 41, 38, 44, 112,
         // back pos play stop rec overdub capture sessionRec
         20, 82, 20, 20, 20, 16, 16, 16,
         // punch-in loop punch-out (capture190ji live-loop-punch-z3: 21 px switches)
@@ -570,7 +570,7 @@ inline int defaultWidth (Item i) noexcept
 inline int priority (Item i) noexcept
 {
     static constexpr std::array<int, itemCount> p {
-        58, 42, 50, 100, 60, 80, 75, 70,
+        58, 42, 50, 100, 38, 38, 60, 80, 75, 70,
         85, 100, 100, 100, 100, 45, 40, 78,
         35, 36, 35,
         55, 52, 30, 30, 65, 100, 100, 100

@@ -94,6 +94,7 @@ public:
     void holdRingForSnapshot (int elapsedMs) { holdSince = juce::Time::getMillisecondCounter() - (juce::uint32) elapsedMs; repaint(); }
     void fireHoldForSnapshot() { holdReadsMouse = false; holdFired (holdSerial); holdReadsMouse = true; }
     void releaseForSnapshot (juce::Point<int> at);
+    void dragForSnapshot (juce::Point<int> at, juce::ModifierKeys mods = juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier)); // (round 190mv)
     bool holdPendingForSnapshot() const noexcept { return hold != Hold::none; }
     std::int64_t gridTicksForSnapshot() const { return gridTicks(); }
     juce::PopupMenu moreMenuForSnapshot() { return moreMenu(); } // --userfixshot190ib (issue #183's item)

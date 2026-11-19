@@ -1362,6 +1362,9 @@ void RackState::applyVcas()
 void RackState::buildMixerGraph()
 {
     mixerOrder = song.mixerOrder();
+    currentTrack = mixerops::currentTrack (song); // (round 190mv: FL's Current track runs inside its source's processing)
+    if (currentTrack > 0)
+        mixerOrder.erase (std::remove (mixerOrder.begin(), mixerOrder.end(), currentTrack), mixerOrder.end());
     const auto audible = song.soloAudible();
     mixerAudible.assign (audible.begin(), audible.end());
     applyVcas();
@@ -1530,7 +1533,7 @@ void RackState::buildTaskGraph (const std::vector<int>& depth)
 
     const auto pinned = ! audioThreadChannels.empty()
                      || std::any_of (audioThreadLayers.begin(), audioThreadLayers.end(), [] (const std::vector<int>& l) { return ! l.empty(); });
-    if (pinned)
+    if (pinned || currentTrack > 0) // (round 190mv: with FL's Current track, the layers run the mixer)
         return;
 
     const auto tasks = graphChannels + tracks - 1;
@@ -5887,6 +5890,11 @@ void RackRenderer::chunkMaster (const RackState& state, int numSamples, float* l
             meters->bounceTap.push (0, left, right, numSamples);
     }
 
+    // FL's Current track on the Master (round 190mv: REA 190mv R, the Master selected — or the Current track itself — is its
+    // source): what leaves the Master, after its meter
+    if (state.currentTrack > 0 && currentSource.load (std::memory_order_relaxed) == 0)
+        runCurrentTrack (state, left, right, numSamples, meters);
+
     if (hwOut != nullptr && ! state.hwRoutes.empty() && hwOut->active.load (std::memory_order_relaxed))
         mixHardwareOutputs (state, numSamples);
     if (workers != nullptr)
@@ -7321,6 +7329,46 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
             meterPower (meters, t, l, r, n);
             meters->capture.push (t, l, r, n);
         }
+    }
+
+    // FL's Current (C) track (round 190mv, DF-82; capture 190mv A1): the selected track's output, after its own meter,
+    // goes through the Current track's effects and EQ before the tracks it feeds pull it
+    if (state.currentTrack > 0 && t == currentSource.load (std::memory_order_relaxed) && t != state.currentTrack)
+    {
+        auto* cl = trackBuffer (t, 0);
+        auto* cr = trackBuffer (t, 1);
+        runCurrentTrack (state, cl, cr, n, meters);
+        trackActive[(std::size_t) t] = isSilentBlock (cl, cr, n) ? 2 : 1;
+    }
+}
+
+void RackRenderer::runCurrentTrack (const RackState& state, float* l, float* r, int n, MeterBank* meters) noexcept
+{
+    const auto c = state.currentTrack;
+    if (c <= 0 || c >= (int) state.song.mixer.size() || foreignTrack (c))
+        return;
+    const auto& track = state.song.mixer[(std::size_t) c];
+    if (track.effects.empty() && (state.song.cleanMixer || ! track.eq.active()))
+    {
+        if (meters != nullptr) // (nothing on it: its meter shows the selected track's output)
+        {
+            meters->accumulate (c, peakOf (l, n), peakOf (r, n));
+            meterPower (meters, c, l, r, n);
+        }
+        return;
+    }
+    auto* cl = trackBuffer (c, 0);
+    auto* cr = trackBuffer (c, 1);
+    std::memcpy (cl, l, sizeof (float) * (std::size_t) n);
+    std::memcpy (cr, r, sizeof (float) * (std::size_t) n);
+    runEffects (state, c, n);
+    applyTrackEq (track, c, state.song.cleanMixer, cl, cr, n);
+    std::memcpy (l, cl, sizeof (float) * (std::size_t) n);
+    std::memcpy (r, cr, sizeof (float) * (std::size_t) n);
+    if (meters != nullptr)
+    {
+        meters->accumulate (c, peakOf (cl, n), peakOf (cr, n));
+        meterPower (meters, c, cl, cr, n);
     }
 }
 // ---- render-ahead (round 190gq, core/RenderAhead.h) ----------------------------------------------------------------

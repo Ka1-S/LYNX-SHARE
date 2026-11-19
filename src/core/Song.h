@@ -1701,6 +1701,12 @@ struct MixerTrack
     // letter is its place among the returns) and give every track a Sends row for it, as Live does. Set by the .als
     // import and by Create › Insert Return Track. Saved.
     bool liveReturn = false;
+    // FL's "Current" (C) mixer track (round 190mv, DF-82; capture 190mv A1): a utility track that takes in the selected
+    // track's output in line — its effects and EQ process what the selected track sends on (FL's manual: "If you add FX
+    // or change the EQ levels of the 'Current (C)' track these will apply to any selected track"), its meter shows the
+    // result. At most one, kept as the last mixer track (mixerops::currentTrack), with no inputs, routes or fader of its
+    // own; the mixer draws it as a meter-only strip left of the Master. Made when it is first clicked. Saved.
+    bool current = false;
     // A return's Pre / Post toggle (Live's SendsPre, per return): on, every send into it leaves before the sending
     // track's fader (MixerSend::pre); new sends take it. Saved.
     bool returnPre = false;

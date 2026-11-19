@@ -2467,7 +2467,7 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
     }
 
     if ((hit < 0 && flmods::ctrl (e.mods)) || tool == EditTool::lasso
-        || (hit < 0 && e.mods.isShiftDown() && tool != EditTool::brush && tool != EditTool::drumPaint))
+        || (hit < 0 && e.mods.isShiftDown() && tool != EditTool::brush && tool != EditTool::drumPaint && tool != EditTool::pencil))
     {
         drag = Drag::select;
         dragNote = hit; // a click without dragging selects this note (Lasso)
@@ -2651,6 +2651,10 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
     if (added.size() > 1)
         setSelection (added);
     drag = Drag::move;
+    // round 190mv (DE-69): FL's Draw tool "(Shift) add in stretch mode" (capture 190mv A3: Shift+press on the empty grid
+    // adds the note at the snapped spot and the drag stretches its end, the start stays; plain Draw moves it)
+    if (tool == EditTool::pencil && e.mods.isShiftDown())
+        drag = Drag::resize;
     grabOffset = 0;
     previewEdit (n.key, n.velocity);
     holdStep = n.porta ? 2 : n.slide ? 1 : 0;
@@ -2664,6 +2668,13 @@ void PianoRollComponent::pressForSnapshot (juce::Point<int> at, juce::ModifierKe
     const auto now = juce::Time::getCurrentTime();
     mouseDown (juce::MouseEvent (source, at.toFloat(), mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, this, this, now, at.toFloat(), now, 1, false));
     holdRingAt = at; // (off screen, the screen point of the press is not this view's)
+}
+
+void PianoRollComponent::dragForSnapshot (juce::Point<int> at, juce::ModifierKeys mods)
+{
+    auto source = juce::Desktop::getInstance().getMainMouseSource();
+    const auto now = juce::Time::getCurrentTime();
+    mouseDrag (juce::MouseEvent (source, at.toFloat(), mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, this, this, now, at.toFloat(), now, 1, false));
 }
 
 void PianoRollComponent::releaseForSnapshot (juce::Point<int> at)
