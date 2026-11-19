@@ -4008,12 +4008,13 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
     const auto linkBefore = autolink::snapshot (song);
     const auto channelsBefore = song.channels.size(); // (round 190iu: Track-only mode, core/TrackOnly.h)
     edit (song);
-    // round 190ne (core/TrackClips.h): a track clip goes with its last clip, in this undo step (ordinary patterns stay, as in FL)
+    song.keepOnePattern(); // (round 190ea: what follows, and every listener, may read the current pattern)
+    // round 190ne (core/TrackClips.h): a track clip goes with its last clip, in this undo step (ordinary patterns stay, as
+    // in FL; Song::removePattern keeps one pattern and the current one in range)
     if (std::vector<int> collected; trackclips::collect (song, &collected) > 0)
         for (auto it = collected.rbegin(); it != collected.rend(); ++it) // (followPatternLengths compares by index)
             if (*it < (int) lengthsBefore.size())
                 lengthsBefore.erase (lengthsBefore.begin() + *it);
-    song.keepOnePattern(); // (round 190ea: what follows, and every listener, may read the current pattern)
     if (trackonly::active() && song.channels.size() > channelsBefore) // each new instrument gets its own instrument track
         trackonly::follow (song, channelsBefore);
     if (song.linkTracksToMixer && linkBefore.on) // new content goes through its track's insert; renames follow the link
