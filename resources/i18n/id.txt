@@ -11396,4 +11396,4 @@ countries: id
 "Pen: drawing the curve freehand (thinned when you let go)" = "Pena: menggambar kurva bebas (dirampingkan saat dilepas)"
 "Selecting points: {0}  [Shift] adds" = "Memilih titik: {0}  [Shift] menambah"
 "Moving {0} point(s): then [Shift] keeps time  [Ctrl] keeps value  [Alt] no snap" = "Memindah {0} titik: lalu [Shift] menjaga waktu  [Ctrl] menjaga nilai  [Alt] tanpa snap"
-"Pen: [Ctrl] drag draws the curve freehand  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "Pena: [Ctrl] seret menggambar kurva bebas  [alat Pilih] seret memilih titik  [Del] menghapusnya  [Ctrl+C/V] salin, tempel"
+"Pen: drag draws the curve freehand, thinned when you let go  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "Pena: seret menggambar kurva bebas, dirampingkan saat dilepas  [alat Pilih] seret memilih titik  [Del] menghapusnya  [Ctrl+C/V] salin, tempel"

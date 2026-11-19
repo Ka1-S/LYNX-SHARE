@@ -11396,4 +11396,4 @@ countries: pl
 "Pen: drawing the curve freehand (thinned when you let go)" = "Pióro: rysowanie krzywej odręcznie (upraszczane po puszczeniu)"
 "Selecting points: {0}  [Shift] adds" = "Zaznaczanie punktów: {0}  [Shift] dodaje"
 "Moving {0} point(s): then [Shift] keeps time  [Ctrl] keeps value  [Alt] no snap" = "Przesuwanie {0} punktów: potem [Shift] zachowuje czas  [Ctrl] zachowuje wartość  [Alt] bez przyciągania"
-"Pen: [Ctrl] drag draws the curve freehand  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "Pióro: [Ctrl] przeciągnij rysuje krzywą odręcznie  [narzędzie Zaznacz] przeciągnij zaznacza punkty  [Del] usuwa je  [Ctrl+C/V] kopiuj, wklej"
+"Pen: drag draws the curve freehand, thinned when you let go  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "Pióro: przeciągnij rysuje krzywą odręcznie, upraszczaną po puszczeniu  [narzędzie Zaznacz] przeciągnij zaznacza punkty  [Del] usuwa je  [Ctrl+C/V] kopiuj, wklej"

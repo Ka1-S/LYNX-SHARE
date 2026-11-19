@@ -11396,4 +11396,4 @@ countries: tw hk mo
 "Pen: drawing the curve freehand (thinned when you let go)" = "畫筆：徒手繪製曲線（放開時精簡）"
 "Selecting points: {0}  [Shift] adds" = "正在選取點：{0}  [Shift] 加入"
 "Moving {0} point(s): then [Shift] keeps time  [Ctrl] keeps value  [Alt] no snap" = "正在移動 {0} 個點：然後 [Shift] 保持時間  [Ctrl] 保持數值  [Alt] 不吸附"
-"Pen: [Ctrl] drag draws the curve freehand  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "畫筆：[Ctrl] 拖曳徒手繪製曲線  [選取工具] 拖曳選取點  [Del] 刪除  [Ctrl+C/V] 複製、貼上"
+"Pen: drag draws the curve freehand, thinned when you let go  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "畫筆：拖曳徒手繪製曲線，放開時精簡  [選取工具] 拖曳選取點  [Del] 刪除  [Ctrl+C/V] 複製、貼上"

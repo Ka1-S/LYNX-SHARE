@@ -13041,9 +13041,9 @@ void PlaylistComponent::updateCursor (juce::ModifierKeys mods)
         setMouseCursor (juce::MouseCursor::UpDownResizeCursor); // (a locked row's band: a click unlocks it, no resize)
         return;
     }
-    // issue #207 (round 190lw): Ctrl held over a curve: the pen
-    if (flmods::ctrl (mods) && ! mods.isAltDown() && ! mods.isShiftDown()
-        && (tools.getTool() == EditTool::pencil || tools.getTool() == EditTool::brush || tools.getTool() == EditTool::lasso) && curveSpotAt (p).valid())
+    // issue #207 (round 190lw): Alt held over an automation clip's curve, Ctrl over an automation lane: the pen
+    if (const auto spot = curveSpotAt (p); spot.valid() && penModifier (spot.track >= 0, mods) && ! (spot.track >= 0 && drawmode::isOn())
+        && (tools.getTool() == EditTool::pencil || tools.getTool() == EditTool::brush || tools.getTool() == EditTool::lasso))
     {
         setMouseCursor (editorCursor (gesture::Cursor::draw));
         return;
@@ -13088,10 +13088,10 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
                    : tr ("Track {0}", { juce::String (t + 1) });
     };
 
-    // issue #207 (round 190lw): Ctrl held over a curve
-    if (flmods::ctrl (mods) && ! mods.isAltDown() && ! mods.isShiftDown() && curveSpotAt (p).valid())
+    // issue #207 (round 190lw): the pen's modifier held over a curve
+    if (const auto spot = curveSpotAt (p); spot.valid() && penModifier (spot.track >= 0, mods))
     {
-        hint.text = tr ("Pen: [Ctrl] drag draws the curve freehand  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste");
+        hint.text = tr ("Pen: drag draws the curve freehand, thinned when you let go  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste");
         return hint;
     }
 

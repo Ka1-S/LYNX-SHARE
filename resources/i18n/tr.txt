@@ -11396,4 +11396,4 @@ countries: tr
 "Pen: drawing the curve freehand (thinned when you let go)" = "Kalem: eğri serbest çiziliyor (bırakınca sadeleştirilir)"
 "Selecting points: {0}  [Shift] adds" = "Noktalar seçiliyor: {0}  [Shift] ekler"
 "Moving {0} point(s): then [Shift] keeps time  [Ctrl] keeps value  [Alt] no snap" = "{0} nokta taşınıyor: sonra [Shift] zamanı korur  [Ctrl] değeri korur  [Alt] yapışma yok"
-"Pen: [Ctrl] drag draws the curve freehand  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "Kalem: [Ctrl] sürükle eğriyi serbest çizer  [Seçim aracı] sürükle nokta seçer  [Del] siler  [Ctrl+C/V] kopyala, yapıştır"
+"Pen: drag draws the curve freehand, thinned when you let go  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "Kalem: sürükle eğriyi serbest çizer, bırakınca sadeleşir  [Seçim aracı] sürükle nokta seçer  [Del] siler  [Ctrl+C/V] kopyala, yapıştır"

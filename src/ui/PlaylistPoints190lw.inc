@@ -94,16 +94,26 @@ void PlaylistComponent::clearPointSelection()
     repaint();
 }
 
+// The pen's modifier: on an automation clip (or an audio clip's envelope) Alt, which FL 2026 leaves free there (its
+// Ctrl+drag starts the clips' rubber band, also on an automation clip; Alt+drag and Alt+click on the body do nothing,
+// capture 190lw c5 / c9); in an automation lane Ctrl (as in REAPER; the lanes' Alt bends a segment, as Live's).
+bool PlaylistComponent::penModifier (bool lane, juce::ModifierKeys mods)
+{
+    return ! mods.isShiftDown() && (lane ? flmods::ctrl (mods) && ! mods.isAltDown() : mods.isAltDown() && ! flmods::ctrl (mods));
+}
+
 bool PlaylistComponent::pointMouseDown (const juce::MouseEvent& e, int)
 {
     const auto p = e.getPosition();
     const auto spot = e.mods.isLeftButtonDown() ? curveSpotAt (p) : CurveSpot {};
     const auto tool = tools.getTool();
     const auto drawingTool = tool == EditTool::pencil || tool == EditTool::brush || tool == EditTool::lasso;
+    const auto lane = spot.track >= 0;
+    const auto onPoint = spot.valid() && spotPointAt (spot, p) >= 0;
 
-    // the pen: Ctrl+drag on a curve (Ctrl+click without moving keeps FL's meaning, on release)
-    if (spot.valid() && drawingTool && flmods::ctrl (e.mods) && ! e.mods.isAltDown() && ! e.mods.isShiftDown()
-        && ! (spot.track >= 0 && drawmode::isOn()))
+    // the pen (Alt+click on a point keeps deleting it; Draw Mode draws in the lanes already)
+    if (spot.valid() && drawingTool && penModifier (lane, e.mods) && ! onPoint && ! (lane && drawmode::isOn())
+        && (lane || automationHandleAt (spot.clip, p) < 0))
     {
         clearPointSelection();
         pointSpot = spot;
@@ -127,10 +137,15 @@ bool PlaylistComponent::pointMouseDown (const juce::MouseEvent& e, int)
             }
         }
 
-    // the Select tool's rubber band on a curve selects its points (Shift: adds to the selection of the same curve)
-    if (spot.valid() && tool == EditTool::lasso && ! flmods::ctrl (e.mods) && ! e.mods.isAltDown())
+    // the rubber band: the Select tool on a curve; and in the Clip-launch layout a drag in an automation lane's
+    // background, as Live's ("Clicking and dragging in the envelope's background defines a selection": the points in
+    // that time range, the whole height; a press on the line still adds a point, Draw Mode still draws)
+    const auto liveBackground = lane && layoutstyle::current() == layoutstyle::Style::clipLaunch && ! drawmode::isOn() && ! onPoint
+                                && ! flmods::ctrl (e.mods) && ! e.mods.isAltDown() && ! nearLaneLine (spot, p);
+    if (spot.valid() && ! flmods::ctrl (e.mods) && ! e.mods.isAltDown() && (tool == EditTool::lasso || liveBackground))
     {
         bandAdds = e.mods.isShiftDown() && spot == pointSpot;
+        bandWholeHeight = liveBackground && tool != EditTool::lasso;
         if (! bandAdds)
             selectedPoints.clear();
         pointSpot = spot;
@@ -144,6 +159,16 @@ bool PlaylistComponent::pointMouseDown (const juce::MouseEvent& e, int)
     if (! selectedPoints.empty() && ! e.mods.isMiddleButtonDown())
         clearPointSelection();
     return false;
+}
+
+bool PlaylistComponent::nearLaneLine (const CurveSpot& s, juce::Point<int> p) const
+{
+    const auto a = laneAutomation (s.track, s.lane);
+    if (a < 0)
+        return false;
+    const auto body = laneBody (s.track, s.lane);
+    const auto value = engine.getSong().automations[(std::size_t) a].valueAt (juce::jmax (0.0, xToTick (p.x)));
+    return std::abs (body.getBottom() - laneShown (a, value) * body.getHeight() - (float) p.y) <= 5.0f;
 }
 
 void PlaylistComponent::pointMouseDrag (const juce::MouseEvent& e)
@@ -180,6 +205,8 @@ void PlaylistComponent::pointMouseDrag (const juce::MouseEvent& e)
     {
         pointBand = juce::Rectangle<int> (pointPress, p).getIntersection (getLocalBounds());
         const auto body = spotBody (pointSpot);
+        if (bandWholeHeight) // (Live: a time range of the lane)
+            pointBand = juce::Rectangle<int>::leftTopRightBottom (pointBand.getX(), (int) body.getY(), pointBand.getRight(), (int) body.getBottom());
         const auto t0 = spotTickAt (pointSpot, (float) pointBand.getX()), t1 = spotTickAt (pointSpot, (float) pointBand.getRight());
         const auto v0 = spotValueAt (pointSpot, (float) juce::jmin ((float) pointBand.getBottom(), body.getBottom()));
         const auto v1 = spotValueAt (pointSpot, (float) juce::jmax ((float) pointBand.getY(), body.getY()));
@@ -250,7 +277,7 @@ void PlaylistComponent::pointMouseUp (const juce::MouseEvent& e)
         if (clicked)
         {
             // a click: the point under it alone, else (no point) the Select tool's click on the clip selects the clip
-            if (const auto point = spotPointAt (pointSpot, pointPress); point >= 0)
+            if (const auto point = spotPointAt (pointSpot, pointPress); point >= 0 && ! bandWholeHeight)
                 selectedPoints = { point };
             else
             {

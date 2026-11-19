@@ -11396,4 +11396,4 @@ countries: ru by kz
 "Pen: drawing the curve freehand (thinned when you let go)" = "Карандаш: кривая рисуется от руки (упрощается при отпускании)"
 "Selecting points: {0}  [Shift] adds" = "Выбор точек: {0}  [Shift] добавляет"
 "Moving {0} point(s): then [Shift] keeps time  [Ctrl] keeps value  [Alt] no snap" = "Перемещение точек ({0}): затем [Shift] сохраняет время  [Ctrl] сохраняет значение  [Alt] без привязки"
-"Pen: [Ctrl] drag draws the curve freehand  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "Карандаш: [Ctrl] перетаскивание рисует кривую от руки  [инструмент Выделение] перетаскивание выделяет точки  [Del] удаляет их  [Ctrl+C/V] копировать, вставить"
+"Pen: drag draws the curve freehand, thinned when you let go  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "Карандаш: перетаскивание рисует кривую от руки, упрощается при отпускании  [инструмент Выделение] перетаскивание выделяет точки  [Del] удаляет их  [Ctrl+C/V] копировать, вставить"

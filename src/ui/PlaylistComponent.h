@@ -279,6 +279,7 @@ public:
     std::vector<int> selectedPointsForTests() const { return selectedPoints; } // issue #207 (round 190lw)
     std::vector<int> clipSelectionForTests() const { return selection; }
     bool penCursorForTests (juce::Point<int> p) const { return curveSpotAt (p).valid(); }
+    juce::Rectangle<float> laneBodyForTests (int track, int lane) const { return laneBody (track, lane); }
     juce::Point<int> curvePointForTests (int clip, int point) const;          // a clip curve's point on screen
     juce::Point<int> curveSpotXYForTests (int clip, std::int64_t tick, float value) const; // a place in a clip's curve area
     juce::PopupMenu getTrackMenuForSnapshot (int track) { return buildTrackMenu (track); }
@@ -879,11 +880,12 @@ private:
     // inline automation editing: points of automation clips are dragged, added on the curve, deleted by right-click
     int autoClip = -1, autoPoint = -1;
     // Issue #207 (round 190lw, LYNX extras; core/AutoPointEdit.h). One curve's points selected together — an automation
-    // clip's, an audio clip's envelope lane's or an automation lane's: a rubber band (the Select tool, or Shift+drag in an
-    // automation lane) selects them; a drag on a selected point moves the group; Delete deletes them, Ctrl+C / Ctrl+X copy /
-    // cut, Ctrl+V pastes at the mouse on a curve; Esc or a click elsewhere drops the selection. The pen: Ctrl held over a
-    // curve shows a pencil, Ctrl+drag draws freehand and the stroke is thinned on release (Ctrl+click without moving
-    // keeps FL's meaning: the clip into / out of the selection).
+    // clip's, an audio clip's envelope lane's or an automation lane's: the Select tool's rubber band
+    // selects them; a drag on a selected point moves the group; Delete deletes them, Ctrl+C / Ctrl+X copy /
+    // cut, Ctrl+V pastes at the mouse on a curve; Esc or a click elsewhere drops the selection. In the Clip-launch layout a
+    // drag in an automation lane's background selects its points in that time range (Live). The pen: Alt held over an
+    // automation clip's curve (Ctrl over an automation lane) shows a pencil, a drag draws freehand and the stroke is
+    // thinned on release.
     struct CurveSpot
     {
         int clip = -1;             // a clip's curve, or
@@ -896,7 +898,7 @@ private:
     std::vector<AutomationPoint> pointsBefore; // a group move / pen stroke: the curve when it started
     juce::Point<int> pointPress;
     juce::Rectangle<int> pointBand;          // the rubber band on screen (empty: none)
-    bool penStarted = false, bandAdds = false;
+    bool penStarted = false, bandAdds = false, bandWholeHeight = false;
     std::int64_t penTick = 0, penLo = 0, penHi = 0;
     float penValue = 0.0f;
     static inline autopoints::Clipboard pointClipboard;
@@ -908,6 +910,8 @@ private:
     std::int64_t spotSongTick (const CurveSpot& s, std::int64_t tick) const; // and back to the song's
     float spotValueAt (const CurveSpot& s, float y) const;        // the stored value under y (0..1)
     int spotPointAt (const CurveSpot& s, juce::Point<int> p) const;
+    bool nearLaneLine (const CurveSpot& s, juce::Point<int> p) const; // within 5 px of an automation lane's line
+    static bool penModifier (bool lane, juce::ModifierKeys mods);    // Alt on a clip's curve, Ctrl in a lane
     bool pointMouseDown (const juce::MouseEvent& e, int clipHit); // true: handled
     void pointMouseDrag (const juce::MouseEvent& e);
     void pointMouseUp (const juce::MouseEvent& e);

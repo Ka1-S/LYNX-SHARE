@@ -11396,4 +11396,4 @@ countries: nl be
 "Pen: drawing the curve freehand (thinned when you let go)" = "Pen: curve uit de vrije hand tekenen (uitgedund bij loslaten)"
 "Selecting points: {0}  [Shift] adds" = "Punten selecteren: {0}  [Shift] voegt toe"
 "Moving {0} point(s): then [Shift] keeps time  [Ctrl] keeps value  [Alt] no snap" = "{0} punt(en) verplaatsen: daarna [Shift] houdt de tijd  [Ctrl] houdt de waarde  [Alt] geen snap"
-"Pen: [Ctrl] drag draws the curve freehand  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "Pen: [Ctrl] slepen tekent de curve uit de vrije hand  [Selectiegereedschap] slepen selecteert punten  [Del] verwijdert ze  [Ctrl+C/V] kopiëren, plakken"
+"Pen: drag draws the curve freehand, thinned when you let go  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "Pen: slepen tekent de curve uit de vrije hand, uitgedund bij loslaten  [Selectiegereedschap] slepen selecteert punten  [Del] verwijdert ze  [Ctrl+C/V] kopiëren, plakken"

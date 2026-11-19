@@ -11396,4 +11396,4 @@ countries: jp
 "Pen: drawing the curve freehand (thinned when you let go)" = "ペン: カーブをフリーハンドで描画中（離すと間引き）"
 "Selecting points: {0}  [Shift] adds" = "ポイントを選択中: {0}  [Shift] 追加"
 "Moving {0} point(s): then [Shift] keeps time  [Ctrl] keeps value  [Alt] no snap" = "{0} 個のポイントを移動中: その後 [Shift] 時間を固定  [Ctrl] 値を固定  [Alt] スナップなし"
-"Pen: [Ctrl] drag draws the curve freehand  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "ペン: [Ctrl] ドラッグでカーブをフリーハンド描画  [選択ツール] ドラッグでポイント選択  [Del] 削除  [Ctrl+C/V] コピー、貼り付け"
+"Pen: drag draws the curve freehand, thinned when you let go  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "ペン: ドラッグでカーブをフリーハンド描画（離すと間引き）  [選択ツール] ドラッグでポイント選択  [Del] 削除  [Ctrl+C/V] コピー、貼り付け"

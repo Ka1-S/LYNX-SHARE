@@ -11396,4 +11396,4 @@ countries: it ch sm
 "Pen: drawing the curve freehand (thinned when you let go)" = "Penna: disegno della curva a mano libera (semplificata al rilascio)"
 "Selecting points: {0}  [Shift] adds" = "Selezione punti: {0}  [Maiusc] aggiunge"
 "Moving {0} point(s): then [Shift] keeps time  [Ctrl] keeps value  [Alt] no snap" = "Spostamento di {0} punto/i: poi [Maiusc] mantiene il tempo  [Ctrl] mantiene il valore  [Alt] senza snap"
-"Pen: [Ctrl] drag draws the curve freehand  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "Penna: [Ctrl] trascina disegna la curva a mano libera  [strumento Selezione] trascina seleziona punti  [Canc] li elimina  [Ctrl+C/V] copia, incolla"
+"Pen: drag draws the curve freehand, thinned when you let go  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "Penna: trascina disegna la curva a mano libera, semplificata al rilascio  [strumento Selezione] trascina seleziona punti  [Canc] li elimina  [Ctrl+C/V] copia, incolla"

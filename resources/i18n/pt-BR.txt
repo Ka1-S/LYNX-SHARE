@@ -11525,4 +11525,4 @@ countries: br
 "Pen: drawing the curve freehand (thinned when you let go)" = "Caneta: desenhando a curva à mão livre (simplificada ao soltar)"
 "Selecting points: {0}  [Shift] adds" = "Selecionando pontos: {0}  [Shift] adiciona"
 "Moving {0} point(s): then [Shift] keeps time  [Ctrl] keeps value  [Alt] no snap" = "Movendo {0} ponto(s): depois [Shift] mantém o tempo  [Ctrl] mantém o valor  [Alt] sem snap"
-"Pen: [Ctrl] drag draws the curve freehand  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "Caneta: [Ctrl] arrastar desenha a curva à mão livre  [ferramenta Seleção] arrastar seleciona pontos  [Del] apaga  [Ctrl+C/V] copiar, colar"
+"Pen: drag draws the curve freehand, thinned when you let go  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "Caneta: arrastar desenha a curva à mão livre, simplificada ao soltar  [ferramenta Seleção] arrastar seleciona pontos  [Del] apaga  [Ctrl+C/V] copiar, colar"

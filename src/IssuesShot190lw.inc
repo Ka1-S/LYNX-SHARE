@@ -19,6 +19,7 @@
         const auto now = juce::Time::getCurrentTime();
         const juce::ModifierKeys left (juce::ModifierKeys::leftButtonModifier);
         const juce::ModifierKeys ctrlLeft (juce::ModifierKeys::leftButtonModifier | juce::ModifierKeys::commandModifier);
+        const juce::ModifierKeys altLeft (juce::ModifierKeys::leftButtonModifier | juce::ModifierKeys::altModifier);
         const auto pixel = [] (const juce::Image& im, juce::Point<int> p) {
             const auto s = shot::scale();
             return im.getPixelAt ((int) std::lround ((float) p.x * s), (int) std::lround ((float) p.y * s));
@@ -254,7 +255,7 @@
             engine.dispatchPendingMessages();
             check ("207_delete_points", points (1).size() == 2 && pl.selectedPointsForTests().empty(), juce::String ((int) points (1).size()));
 
-            // the pen: Ctrl+drag on the second clip draws a wave freehand, thinned on release
+            // the pen: Alt+drag on the second clip draws a wave freehand, thinned on release (FL leaves Alt free there)
             pl.setToolForSnapshot (EditTool::pencil);
             std::vector<juce::Point<int>> stroke;
             for (int k = 0; k <= 120; ++k)
@@ -265,14 +266,57 @@
             check ("207_pen_cursor_over_curve", pl.penCursorForTests (stroke.front()),
                    stroke.front().toString() + " row " + pl.trackRowForSnapshot (3).toString() + " p2 " + p2.toString());
             std::size_t raw = 0;
-            dragPath (stroke, ctrlLeft, [&] { raw = points (1).size(); shootPl ("-207-06-pen-drawing.png"); });
+            dragPath (stroke, altLeft, [&] { raw = points (1).size(); shootPl ("-207-06-pen-drawing.png"); });
             const auto thinned = points (1).size();
             check ("207_pen_draws_and_thins", raw > 30 && thinned < raw && thinned >= 8, juce::String ((int) raw) + " -> " + juce::String ((int) thinned));
             shootPl ("-207-07-pen-thinned.png");
-            // Ctrl+click without moving keeps FL's meaning: the clip into the selection
+            // Ctrl+click keeps its meaning: the clip into the selection (no pen on Ctrl over a clip: FL's rubber band)
             const auto spot = pl.curveSpotXYForTests (1, bar * 3, 0.2f);
             dragPath ({ spot }, ctrlLeft);
             check ("207_ctrl_click_selects_clip", pl.clipSelectionForTests() == std::vector<int> ({ 1 }), juce::String ((int) pl.clipSelectionForTests().size()));
+
+            // the Clip-launch layout's automation lane (Live): a drag in its background selects the points in that time
+            // range; Ctrl+drag is the pen there; Delete deletes the selection
+            pl.setToolForSnapshot (EditTool::pencil);
+            ui.setLayoutStyle (layoutstyle::Style::clipLaunch, false);
+            engine.editSong ([bar] (Song& s) {
+                Automation a;
+                a.name = "Reverb send";
+                a.target = { AutomationTargetKind::mixerVolume, 2, 0, 0 };
+                for (int k = 0; k <= 8; ++k)
+                    a.points.push_back ({ (std::int64_t) k * bar / 2, k % 2 == 0 ? 0.3f : 0.6f, 0.0f });
+                s.automations.push_back (a);
+                s.playlistTracks[5].lanes.push_back ({ (int) s.automations.size() - 1, 110 });
+            });
+            autolanes::setShown (true);
+            pl.setViewForSnapshot (200.0, 0, 0);
+            engine.dispatchPendingMessages();
+            const auto laneA = (int) engine.getSong().automations.size() - 1;
+            const auto body = pl.laneBodyForTests (5, 0);
+            const auto laneXY = [&] (std::int64_t tick, float value) {
+                return juce::Point<int> ((int) std::lround (pl.xOfTickForSnapshot ((double) tick)), (int) std::lround (body.getBottom() - value * body.getHeight()));
+            };
+            const auto shootLane = [&] (const juce::String& name) {
+                engine.dispatchPendingMessages();
+                savePng (shot::snapshot (pl, juce::Rectangle<int> (0, 0, juce::jmin (pl.getWidth(), 1100), juce::jmin (pl.getHeight(), (int) body.getBottom() + 40))), prefix + name);
+            };
+            check ("207_live_lane_shown", body.getHeight() > 20.0f, body.toString());
+            const auto f0 = laneXY (bar * 2 / 5, 0.95f), f1 = laneXY (bar * 13 / 5, 0.95f);
+            dragPath ({ f0, (f0 + f1) / 2, f1 }, left, [&] { shootLane ("-207-08-live-lane-band.png"); });
+            check ("207_live_lane_background_drag_selects_time_range", pl.selectedPointsForTests() == std::vector<int> ({ 1, 2, 3, 4, 5 }),
+                   juce::String ((int) pl.selectedPointsForTests().size()));
+            shootLane ("-207-09-live-lane-selected.png");
+            pl.handleKey (juce::KeyPress (juce::KeyPress::deleteKey));
+            engine.dispatchPendingMessages();
+            check ("207_live_lane_delete", points (laneA).size() == 4, juce::String ((int) points (laneA).size()));
+            std::vector<juce::Point<int>> laneStroke;
+            for (int k = 0; k <= 80; ++k)
+                laneStroke.push_back (laneXY (bar / 2 + (std::int64_t) k * bar / 40, 0.5f + 0.3f * std::sin ((float) k / 8.0f)));
+            dragPath (laneStroke, ctrlLeft);
+            check ("207_live_lane_ctrl_pen", points (laneA).size() > 8, juce::String ((int) points (laneA).size()));
+            shootLane ("-207-10-live-lane-pen.png");
+            autolanes::setShown (false);
+            ui.setLayoutStyle (layoutstyle::Style::pattern, false);
         }
 
         juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\n" + (allOk ? "ALL OK" : "SOME FAILED") + "\n");

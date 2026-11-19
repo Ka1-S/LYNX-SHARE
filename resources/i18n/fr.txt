@@ -11396,4 +11396,4 @@ countries: fr be ch ca lu
 "Pen: drawing the curve freehand (thinned when you let go)" = "Crayon : dessin de la courbe à main levée (allégée au relâchement)"
 "Selecting points: {0}  [Shift] adds" = "Sélection de points : {0}  [Maj] ajoute"
 "Moving {0} point(s): then [Shift] keeps time  [Ctrl] keeps value  [Alt] no snap" = "Déplacement de {0} point(s) : puis [Maj] garde le temps  [Ctrl] garde la valeur  [Alt] sans magnétisme"
-"Pen: [Ctrl] drag draws the curve freehand  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "Crayon : [Ctrl] glisser dessine la courbe à main levée  [outil Sélection] glisser sélectionne des points  [Suppr] les supprime  [Ctrl+C/V] copier, coller"
+"Pen: drag draws the curve freehand, thinned when you let go  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "Crayon : glisser dessine la courbe à main levée, allégée au relâchement  [outil Sélection] glisser sélectionne des points  [Suppr] les supprime  [Ctrl+C/V] copier, coller"
