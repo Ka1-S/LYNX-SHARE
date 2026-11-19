@@ -1539,6 +1539,11 @@ int translateWavesRComp (const std::vector<std::uint8_t>& state, EffectSlot& slo
     slot.params[15] = linNorm (wavesValue (rw, 2).value_or (0.0), -30.0, 30.0);
     slot.params[16] = logNorm (wavesValue (rw, 8).value_or (16.0), 0.5, 500.0);
     slot.params[17] = logNorm (wavesValue (rw, 0).value_or (160.0), 5.0, 5000.0);
+    // round 190mg: the vintage voicing's Renaissance law — LYNX's model of the reference's structure, every constant
+    // fitted on our probes (core/VoiceMatch.h progcomp::Renaissance, docs/analise/REA_rodada190mg_ren.md); hidden, saved
+    // while set (0 = the round-123 / 152 engine, every other Compressor)
+    if (slot.params.size() > (std::size_t) compressorRenLaw)
+        slot.params[(std::size_t) compressorRenLaw] = 1.0f;
     return 6;
 }
 

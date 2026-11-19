@@ -60,6 +60,9 @@ void setEffectMidiInPort (EffectSlot& slot, int port) noexcept; // −1…255
 // How many of a slot's parameters a project / preset saves (issue #67): the named ones plus any hidden ones after them
 // that hold a value (the Parametric EQ's FL law, processing, band mask and FL's own values: ParametricEqFl.h [36…47]).
 std::size_t savedEffectParamCount (const EffectSlot& slot) noexcept;
+// round 190mg: Compressor's hidden law (after its named parameters; saved only while non-zero): 1 = the vintage voicing's
+// Renaissance law (core/VoiceMatch.h progcomp::Renaissance), set only by the Renaissance Compressor translator
+constexpr int compressorRenLaw = 20;
 // A parameter value as written to a file: rounded to 4 decimals when that reads back as the same float, else the
 // shortest decimal that does (FL's raw values, e.g. a frequency of raw/65536, survive a save and reload bit for bit)
 double savedEffectParamValue (float v) noexcept;
