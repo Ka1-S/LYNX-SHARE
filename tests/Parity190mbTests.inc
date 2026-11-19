@@ -38,6 +38,7 @@ TEST (parity190mb_nebula_supermassive_tone_law_is_hidden_and_translator_only)
     const auto run = [sr] (float mode, float fb, float law, std::vector<float>& l, std::vector<float>& r) {
         auto slot = makeEffectSlot (EffectKind::nebula);
         slot.params[0] = 1.0f;  // Mix
+        slot.params[3] = 0.2f;  // Delay (short: the default's first pass lands after the render)
         slot.params[5] = fb;    // Feedback
         slot.params[12] = mode; // Mode
         slot.params[(std::size_t) nb::toneLaw] = law;

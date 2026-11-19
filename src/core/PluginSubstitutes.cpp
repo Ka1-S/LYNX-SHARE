@@ -387,6 +387,9 @@ lynx = Orbit
 vst3 = 535453564d707664616c68616c6c6173
 names = ValhallaSpaceModulator
 mix = 1
+# round 190mb: the reference's wet level per mode on Orbit's voices (Orbit's hidden smLaw, #7). Only a translated
+# SpaceModulator runs it. (Its mode order, read back from the plug-in, is Orbit's: the Mode map stays direct)
+replaced = #7=1
 map = xml:wetDry -> Mix
 map = xml:rate -> Rate
 map = xml:depth -> Depth

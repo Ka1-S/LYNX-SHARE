@@ -2087,15 +2087,14 @@ constexpr double nebulaToneFrom = 0.65, nebulaToneFull = 0.8; // Feedback
 LYNX_FIT_TABLE Rev1Trim horizonTrim[horizon::reverbModeCount] = {};
 // round 190mb (epoch::rateLaw): ValhallaVintageVerb is not rate-independent where Epoch is (Epoch's impulse at 96 kHz is its
 // 48 kHz one to 0.05 dB). Against its own 48 kHz renders the reference's sr96 captures (refcap182's D / S1 / S2 / S3 states)
-// lose 1.4 … 1.7 dB in the first 80 ms and ~0.9 dB to 300 ms at ColorMode 0.33 (D / S1 / S2), nothing in the tail, while at
-// 0.8 (S3) its tail sits ~0.5 dB higher. Per colour: the early field's and the whole wet level's change per octave of rate (dB)
+// lose 1.4 … 1.7 dB in the first 80 ms and ~0.9 dB to 300 ms in its 1970s colour (ColorMode 0.33: D / S1 / S2), nothing in the
+// tail, while in its 1980s colour (0.8: S3) its tail sits ~0.5 dB higher (colour names read back from the plug-in this round). Per colour: the early field's and the whole wet level's change per octave of rate (dB)
 struct EpochRate
 {
     double earlyDb, levelDb;
 };
-// Fitted on refcap030's sr96 block (20 files; lab/erate.sh grid): Epoch's colour 0 (the translated ColorMode 0.33 states D / S1 /
-// S2 / S4) −2 dB a rate octave on the early field, colour 1 (S3, ColorMode 0.8) +0.5 dB on the level; colour 2 has no capture
-// and stays. Every file keeps its score (the step scorer), the mean |level| error 0.88 → 0.76 dB and spectrum 2.18 → 2.11 dB;
+// Fitted on refcap030's sr96 block (20 files; lab/erate.sh grid): 1970s (D / S1 / S2 / S4) −2 dB a rate octave on the early
+// field, 1980s (S3) +0.5 dB on the level; Now has no capture and stays. Every file keeps its score (the step scorer), the mean |level| error 0.88 → 0.76 dB and spectrum 2.18 → 2.11 dB;
 // more early cut or a level cut on colour 0 took 1 … 3 files a step down
 LYNX_FIT_TABLE EpochRate epochRate[epoch::colourCount] = { { -2.0, 0.0 }, { 0.0, 0.5 }, { 0.0, 0.0 } };
 // round 190kw (revision 1 + loopLaw): Epoch's level over Decay and Size from the reference's loop (static REA of
