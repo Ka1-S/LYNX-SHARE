@@ -1228,6 +1228,10 @@ public:
         if (args.contains ("--selftest"))
         {
             const auto i = args.indexOf ("--selftest");
+            // round 190mo: a temp folder of this run alone (two runs at once shared the fixed temp names of its items),
+            // and on Linux room for its main-thread stack (it reached 7.4 of the usual 8 MB: AudioEngines on the stack)
+            selfTestTemp = lynx::platform::useOwnTempFolder ("lynx-selftest");
+            lynx::platform::allowMainThreadStack ((std::size_t) 64 << 20);
             runSelfTest (args[i + 1].unquoted(), args[i + 2].unquoted());
             return;
         }
@@ -6992,6 +6996,10 @@ private:
                 lineSlot.params[(std::size_t) lynx::echosuite::echoform::lineLaw] = 1.0f;
                 lineSlot.lockState = true;
                 song.mixer[16].effects.push_back (lineSlot);
+                // (round 190mo: track 4 is the fifth; the song had four tracks here, so this wrote one byte past the
+                // vector's end: the heap corruption of the Linux self-test, "corrupted size vs. prev_size" later on)
+                if (song.playlistTracks.size() < 5)
+                    song.playlistTracks.resize (5);
                 song.playlistTracks[4].soloLock = true;
                 song.mixer[1].lockState = true; // (the default mixer has inserts 1…16)
                 song.mixer[2].solo = true;
@@ -7647,6 +7655,8 @@ private:
             if (reportPath.isNotEmpty())
                 juce::File (reportPath).replaceWithText (text);
             setApplicationReturnValue (all ? 0 : 1);
+            if (selfTestTemp != juce::File())
+                selfTestTemp.deleteRecursively(); // (round 190mo: this run's own temp folder)
             quit();
         });
     }
@@ -19604,6 +19614,7 @@ private:
         ~ParityShow() { window.reset(); editor.reset(); engine.reset(); }
     };
     std::shared_ptr<ParityShow> parityShow;
+    juce::File selfTestTemp; // --selftest: its own temp folder (round 190mo), deleted when the run ends
     bool parityShotFailed = false; // --parityshot: the effect name matched no built-in effect
 
     void runParityShot (const juce::String& path, const juce::String& effectName, const juce::String& paramsFile)

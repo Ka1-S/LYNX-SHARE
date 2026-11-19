@@ -4,6 +4,7 @@
 #include "core/TestProfile.h"
 #include "platform/Package.h"
 
+#include <algorithm>
 #include <iterator>
 #include <string>
 
@@ -12,6 +13,9 @@
   #define NOMINMAX
  #endif
  #include <windows.h>
+#else
+ #include <cstdlib>
+ #include <sys/resource.h>
 #endif
 
 namespace lynx::platform
@@ -227,6 +231,45 @@ bool relaunchFromAsciiPath (int& exitCode)
    #else
     juce::ignoreUnused (exitCode);
     return false;
+   #endif
+}
+
+juce::File useOwnTempFolder (const juce::String& prefix)
+{
+   #if JUCE_MAC
+    (void) prefix; // (JUCE's temp folder there is ~/Library/Caches/<app>, not TMPDIR: it stays as it is)
+    return {};
+   #else
+    const auto base = juce::File::getSpecialLocation (juce::File::tempDirectory);
+    const auto own = base.getChildFile (prefix + "-" + juce::String::toHexString (juce::Random::getSystemRandom().nextInt64())
+                                        + juce::String::toHexString ((juce::int64) juce::Time::currentTimeMillis()));
+    if (! own.createDirectory())
+        return {};
+    const auto path = own.getFullPathName();
+   #if JUCE_WINDOWS
+    // (the process environment, which GetTempPath reads and child processes inherit)
+    if (! SetEnvironmentVariableW (L"TMP", path.toWideCharPointer()) || ! SetEnvironmentVariableW (L"TEMP", path.toWideCharPointer()))
+   #else
+    if (setenv ("TMPDIR", path.toRawUTF8(), 1) != 0)
+   #endif
+    {
+        own.deleteRecursively();
+        return {};
+    }
+    return own;
+   #endif
+}
+
+void allowMainThreadStack (std::size_t bytes)
+{
+   #if JUCE_LINUX || JUCE_BSD
+    rlimit limit {};
+    if (getrlimit (RLIMIT_STACK, &limit) != 0 || limit.rlim_cur == RLIM_INFINITY || limit.rlim_cur >= (rlim_t) bytes)
+        return;
+    limit.rlim_cur = limit.rlim_max == RLIM_INFINITY ? (rlim_t) bytes : std::min (limit.rlim_max, (rlim_t) bytes);
+    setrlimit (RLIMIT_STACK, &limit);
+   #else
+    (void) bytes;
    #endif
 }
 } // namespace lynx::platform
