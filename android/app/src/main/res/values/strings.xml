@@ -1,0 +1,28 @@
+<resources>
+    <string name="app_name">LYNX SHARE</string>
+    <string name="channel_rack">Channel Rack</string>
+    <string name="piano_roll">Piano Roll</string>
+    <string name="playlist">Playlist</string>
+    <string name="mixer">Mixer</string>
+    <string name="play">Play</string>
+    <string name="stop">Stop</string>
+    <string name="record">Record</string>
+    <string name="settings">Settings</string>
+    <string name="new_project">New Project</string>
+    <string name="open_project">Open Project</string>
+    <string name="save_project">Save Project</string>
+    <string name="export_audio">Export Audio</string>
+    <string name="tempo">Tempo</string>
+    <string name="transport">Transport</string>
+    <string name="save">Simpan</string>
+    <string name="load">Muat</string>
+    <string name="export_wav">Ekspor WAV</string>
+    <string name="import_flm">Impor FLM</string>
+    <string name="delay">Delay</string>
+    <string name="reverb">Reverb</string>
+    <string name="room">Room</string>
+    <string name="fb">FB</string>
+    <string name="error_audio_init">Gagal menginisialisasi audio</string>
+    <string name="msg_loading">Memuat…</string>
+    <string name="msg_ready">Siap</string>
+</resources>

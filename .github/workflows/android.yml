@@ -1,0 +1,157 @@
+name: Android
+
+# Builds the LYNX SHARE APK for Android (arm64-v8a primary, armeabi-v7a
+# secondary) using the NDK + CMake for the C++ engine and Gradle for the
+# Kotlin UI. Runs on pushes to main, pull requests, and manually.
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/android.yml"
+      - "android/**"
+      - "src/**"          # C++ engine sources referenced by android/app/src/main/cpp
+  pull_request:
+    paths:
+      - ".github/workflows/android.yml"
+      - "android/**"
+      - "src/**"
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "Build profile: release (small, signed) or debug (logcat)"
+        type: choice
+        default: release
+        options:
+          - release
+          - debug
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  NDK_VERSION: 27.2.12479018
+  COMPILE_SDK: 34
+  BUILD_TOOLS_VERSION: 34.0.0
+
+jobs:
+  apk:
+    name: APK (arm64-v8a + armeabi-v7a)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Android SDK platform, build-tools, and NDK
+        run: |
+          yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --install \
+            "platform-tools" \
+            "platforms;android-${COMPILE_SDK}" \
+            "build-tools;${BUILD_TOOLS_VERSION}" \
+            "ndk;${NDK_VERSION}"
+          echo "NDK_HOME=${ANDROID_HOME}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+
+      - name: Write local.properties (SDK + NDK paths)
+        run: |
+          echo "sdk.dir=${ANDROID_HOME}" > android/local.properties
+          echo "ndk.dir=${ANDROID_HOME}/ndk/${NDK_VERSION}" >> android/local.properties
+          cat android/local.properties
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.2
+
+      - name: Build APK with Gradle (NDK + CMake + Kotlin)
+        working-directory: android
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          # Restore signing keystore if secrets provided (persistent key lets
+          # new APKs install over old ones). Otherwise a throwaway key is used.
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
+            printf %s "$KEYSTORE_BASE64" | base64 -d > app/release.keystore
+            echo "SIGNING=persistent" >> "$GITHUB_ENV"
+          elif [ -f app/release.keystore ]; then
+            echo "SIGNING=committed" >> "$GITHUB_ENV"
+          else
+            keytool -genkeypair -v -keystore app/release.keystore \
+              -alias lynx -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass lynx-ci -keypass lynx-ci \
+              -dname "CN=LYNX CI, O=LYNX, C=ID"
+            echo "SIGNING=throwaway" >> "$GITHUB_ENV"
+          fi
+
+          if [ "${{ github.event.inputs.profile }}" = "debug" ]; then
+            gradle assembleDebug
+            APK=app/build/outputs/apk/debug/app-debug.apk
+          else
+            gradle assembleRelease
+            APK=app/build/outputs/apk/release/app-release-unsigned.apk
+          fi
+
+          mkdir -p dist
+          cp "$APK" dist/LYNX-android-${{ github.event.inputs.profile }}.apk
+
+      - name: Align and sign APK (release only)
+        if: ${{ github.event.inputs.profile != 'debug' }}
+        working-directory: android
+        run: |
+          APK=dist/LYNX-android-release.apk
+          "${ANDROID_HOME}/build-tools/${BUILD_TOOLS_VERSION}/zipalign" -f -p 4 "$APK" aligned.apk
+          mv aligned.apk "$APK"
+          "${ANDROID_HOME}/build-tools/${BUILD_TOOLS_VERSION}/apksigner" sign \
+            --ks app/release.keystore \
+            --ks-pass "pass:${KEYSTORE_PASSWORD:-lynx-ci}" \
+            --min-sdk-version 29 "$APK"
+          "${ANDROID_HOME}/build-tools/${BUILD_TOOLS_VERSION}/apksigner" verify "$APK"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LYNX-Android-APK
+          path: android/dist/*.apk
+          if-no-files-found: error
+
+      - name: Publish rolling pre-release (main, release only)
+        if: >-
+          ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+              github.event.inputs.profile != 'debug' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: android
+        run: |
+          VERSION=$(grep -m1 'versionName' app/build.gradle | sed -E 's/.*"([0-9.]+)".*/\1/')
+          {
+            echo "Version: ${VERSION} (commit ${GITHUB_SHA:0:7})"
+            echo
+            echo "Automatic build of ${GITHUB_SHA}."
+            echo
+            echo "- One APK for arm64-v8a and armeabi-v7a; Android 10 or newer."
+            echo "- JUCE-free C++ engine + Kotlin touch UI."
+            if [ "$SIGNING" = throwaway ]; then
+              echo "- Signed with a throwaway CI key: uninstall any earlier build before installing this one."
+            else
+              echo "- Signed with the persistent CI key: installs over any earlier build, no uninstall needed."
+            fi
+            echo "- Pre-release: for testing, not for the store."
+            echo
+            echo "Changes:"
+            git log --no-decorate --format='- %s' --max-count=20 || echo "- (commit list unavailable)"
+          } > dist/notes.md
+
+          gh release delete lynx-android --yes --cleanup-tag || true
+          gh release create lynx-android dist/LYNX-android-release.apk \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "LYNX SHARE for Android ${VERSION} (auto-build)" \
+            --notes-file dist/notes.md

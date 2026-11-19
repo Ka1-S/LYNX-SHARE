@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#0F172A</color>
+    <color name="colorPrimaryDark">#020617</color>
+    <color name="colorAccent">#3B82F6</color>
+    <color name="colorBackground">#0F172A</color>
+    <color name="colorSurface">#1E293B</color>
+    <color name="colorText">#F8FAFC</color>
+    <color name="colorTextSecondary">#94A3B8</color>
+    <color name="colorAccentSurface">#334155</color>
+    <color name="colorButtonActive">#22D3EE</color>
+    <color name="colorButtonInactive">#475569</color>
+    <color name="colorChannelRack">#8B5CF6</color>
+    <color name="colorPianoRoll">#10B981</color>
+    <color name="colorPlaylist">#F59E0B</color>
+    <color name="colorMixer">#EF4444</color>
+</resources>
