@@ -310,7 +310,10 @@
 #       128 distinct labels (Helix+ 2's channel window, round 190ml) shaped every label again on every whole repaint
 #       (fontconfig fallback look-ups included: 67 % of that window's paint; 22-25 ms a frame, 3-5 ms with either half
 #       of it hidden). drawSingleLineText's key now holds its justification flags too (it was left out of the key, so
-#       two calls that differ only there could get each other's line).
+#       two calls that differ only there could get each other's line). The four keys compare their cheap fields
+#       (position / area, justification, numbers) first, then the text, the font last: JUCE compared the font
+#       (FontOptions, strings first: ~1000 instructions) first, and a 1024-entry tree is three levels deeper (Windows
+#       inserts50 Playlist +4 % before this). Same fields, so the same equal keys and lines.
 #    b) juce_graphics/native/juce_RenderingHelpers.h, the software renderer's glyphs (each glyph's outline as an edge
 #       table, per font and size): every whole frame of the main views evicted and rebuilt glyphs (-6 ... -12 %
 #       paint instructions a whole frame with 1024). Its keys are ordered by the glyph, then a hash of the font's name,
@@ -525,7 +528,16 @@ function(lynx_patch_juce_file file)
             "        // LYNX patch (round 190ms, fix 190ms-glyph): 1024 shaped lines, not LruCache's default 128 (a busy window shows|NL|        // more labels than that and shaped them all again every whole repaint; cmake/LynxPatchJuce.cmake)|NL|        LruCache<ArrangementArgs, ConfiguredArrangement, 1024> cache;")
         lynx_juce_fix("drawSingleLineText's key holds its flags (fix 190ms-glyph)" "LYNX patch (round 190ms, fix 190ms-glyph): the flags"
             "        auto tie() const noexcept { return std::tie (font, text, startX, baselineY); }"
-            "        // LYNX patch (round 190ms, fix 190ms-glyph): the flags are part of the line (cmake/LynxPatchJuce.cmake)|NL|        auto tie() const noexcept { return std::tie (font, text, startX, baselineY, flags); }")
+            "        // LYNX patch (round 190ms, fix 190ms-glyph): the flags are part of the line; the cheap fields first, the font|NL|        // last (cmake/LynxPatchJuce.cmake)|NL|        auto tie() const noexcept { return std::tie (startX, baselineY, flags, text, font); }")
+        lynx_juce_fix("drawMultiLineText's key, cheap fields first (fix 190ms-glyph)" "LYNX patch (round 190ms, fix 190ms-glyph): key order, multi-line text"
+            "        auto tie() const noexcept { return std::tie (font, text, startX, baselineY, maximumLineWidth, justification, leading); }"
+            "        // LYNX patch (round 190ms, fix 190ms-glyph): key order, multi-line text: the cheap fields first, the font last|NL|        auto tie() const noexcept { return std::tie (startX, baselineY, maximumLineWidth, justification, leading, text, font); }")
+        lynx_juce_fix("drawText's key, cheap fields first (fix 190ms-glyph)" "LYNX patch (round 190ms, fix 190ms-glyph): key order, drawText"
+            "        auto tie() const noexcept { return std::tie (font, text, area, justificationType, useEllipsesIfTooBig); }"
+            "        // LYNX patch (round 190ms, fix 190ms-glyph): key order, drawText: the cheap fields first, the font last|NL|        auto tie() const noexcept { return std::tie (area, justificationType, useEllipsesIfTooBig, text, font); }")
+        lynx_juce_fix("drawFittedText's key, cheap fields first (fix 190ms-glyph)" "LYNX patch (round 190ms, fix 190ms-glyph): key order, drawFittedText"
+            "        auto tie() const noexcept { return std::tie (font, text, area, justification, maximumNumberOfLines, minimumHorizontalScale); }"
+            "        // LYNX patch (round 190ms, fix 190ms-glyph): key order, drawFittedText: the cheap fields first, the font last|NL|        auto tie() const noexcept { return std::tie (area, justification, maximumNumberOfLines, minimumHorizontalScale, text, font); }")
     elseif(file MATCHES "juce_SimpleShapedText.cpp$")
         lynx_juce_fix("no walk back over no glyphs" "LYNX patch (issue #142): no glyphs"
             "                        auto it = glyphs.cend();|NL||NL|                        while (--it != glyphs.begin())"
