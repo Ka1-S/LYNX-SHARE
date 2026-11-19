@@ -137,7 +137,20 @@
             const auto visible = strips.getParentComponent() != nullptr ? strips.getLocalArea (strips.getParentComponent(), strips.getParentComponent()->getLocalBounds())
                                                                          : strips.getLocalBounds();
             const auto at = strips.wheelScrollPointForPerf (centre, visible);
-            line ("Mixer centre " + centre.toString() + " -> wheel point " + at.toString());
+            line ("Mixer centre " + centre.toString() + " -> wheel point " + at.toString() + ", strips " + juce::String (strips.getWidth())
+                  + " px wide in a view of " + juce::String (visible.getWidth()) + " px at x " + juce::String (visible.getX()));
+            if (auto* holder = strips.getParentComponent())
+                if (auto* vp = holder->findParentComponentOfClass<juce::Viewport>())
+                {
+                    const auto before = vp->getViewPositionX();
+                    auto source = juce::Desktop::getInstance().getMainMouseSource();
+                    const auto now = juce::Time::getCurrentTime();
+                    const juce::MouseEvent e (source, at.toFloat(), {}, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &strips, &strips, now, at.toFloat(), now, 0, false);
+                    juce::MouseWheelDetails wheel { 0.0f, -0.25f, false, false, false };
+                    strips.mouseWheelMove (e, wheel);
+                    line ("wheel at that point: view x " + juce::String (before) + " -> " + juce::String (vp->getViewPositionX()));
+                    vp->setViewPosition (before, vp->getViewPositionY());
+                }
             check ("uiperf mixer scroll: a point on screen that scrolls the strips", at != centre || visible.contains (at));
         }
 
