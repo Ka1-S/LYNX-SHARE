@@ -54,6 +54,15 @@ public:
     juce::Rectangle<int> getMaximisedArea (Panel panel) const; // where a maximized panel goes now
     void browserTitleDropped (juce::Point<int> screenPosition, bool moved);
 
+    // FL's Browser options › View › "Auto-hide" (round 190mv, DF-107; capture 190mv A2): only a floating Browser hides —
+    // once the mouse has left it, it rolls up to its title strip; the mouse on the strip rolls it out again. Docked (left
+    // or right) or closed, it never hides (FL 2026). Not saved in the layout: the layout keeps the full height.
+    void setBrowserAutoHide (bool on);
+    bool isBrowserAutoHide() const noexcept { return browserAutoHide; }
+    bool isBrowserRolledUp() const noexcept { return browserRolled && browserCanRoll(); }
+    void browserHovered (bool inside); // (the Browser's frame: the mouse came in / went out)
+    void rollBrowserForSnapshot (bool up) { browserRolled = up; placeBrowserRoll(); }
+
     bool isPanelVisible (Panel panel) const;
     bool isMaximised (Panel panel) const;
     bool isDetached (Panel panel) const;
@@ -171,6 +180,9 @@ private:
 
     workspace::Layout layout;
     bool layoutReady = false, persistent = false;
+    bool browserAutoHide = false, browserRolled = false; // round 190mv (DF-107)
+    bool browserCanRoll() const;
+    void placeBrowserRoll();
     // The layout is still LYNX's default (no panel moved or resized by hand, nothing detached or loaded):
     // when the window changes size it takes the default rects for the new size instead of scaling them,
     // so a window that opens small and is then maximised gets a sensible desktop.

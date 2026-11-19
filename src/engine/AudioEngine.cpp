@@ -16,6 +16,7 @@
 #include "core/CountIn.h"
 #include "core/EdisonFx.h"
 #include "core/FlSettings.h"
+#include "core/MixerOps.h" // (round 190mv: keepCurrentLast)
 #include "core/LiveSession.h"
 
 #include "core/SessionIds.h"
@@ -750,6 +751,7 @@ void AudioEngine::buildInitialGraph()
         rackProcessor->setPerformance (performanceLive.get());
         rackProcessor->getRenderer().reserveFor (lastPublishedShape); // (round 190gn: a song published before the graph)
         rackProcessor->getRenderer().setHardwareMidiPorts (hardwareMidiPorts); // (round 190jl)
+        rackProcessor->getRenderer().setCurrentSource (currentSource); // (round 190mv)
         // FL's own metronome sounds from its install (Data\System), LYNX's stand-ins without it (round 165z-a2)
         const auto& flData = flStudioAccess().roots.data;
         rackProcessor->setMetronome (std::make_unique<Metronome> (transport, flData.empty() ? juce::File() : platform::localFile (flData)));
@@ -1448,6 +1450,17 @@ void AudioEngine::copyScope (float* destination, int count) const noexcept
     for (int i = 0; i < count; ++i)
     {
         destination[i] = scope[(std::size_t) r].load (std::memory_order_relaxed);
+        r = (r + 1) % scopeSize;
+    }
+}
+
+void AudioEngine::copyScopeSide (float* destination, int count) const noexcept
+{
+    count = juce::jmin (count, scopeSize);
+    auto r = (scopeWrite.load (std::memory_order_acquire) - count + scopeSize) % scopeSize;
+    for (int i = 0; i < count; ++i)
+    {
+        destination[i] = scopeSide[(std::size_t) r].load (std::memory_order_relaxed);
         r = (r + 1) % scopeSize;
     }
 }
@@ -3912,9 +3925,16 @@ void AudioEngine::saveUndoStep()
         gestureSaved = false;
     }
 
+    const auto nowMs = juce::Time::getMillisecondCounterHiRes();
+    if (! samePress && tweakSkipsStep (buttonDown, nowMs)) // (round 190mv: "Undo knob tweaks" off)
+        samePress = true;
+
     if (! samePress)
     {
         undoStack.push_back ({ song, remote });
+        lastPushSize = undoStack.size();
+        lastPushMs = nowMs;
+        lastPushPress = buttonDown ? juce::Desktop::getInstance().getMainMouseSource().getLastMouseDownTime() : juce::Time();
         redoStack.clear();
 
         if (undoStack.size() > maxUndoSteps)
@@ -3934,6 +3954,44 @@ void AudioEngine::saveUndoStep()
     }
     if (sessionHistory)
         sessionAfterOpen = true;
+}
+
+// round 190mv (DF-134): FL's "Undo knob tweaks" off. The tweak and its edit come within one press (a drag) or one
+// event (a wheel step, a click on a switch), in either order.
+bool AudioEngine::tweakSkipsStep (bool buttonDown, double nowMs) const noexcept
+{
+    if (flsettings::options().undoKnobTweaks.load() || sessionHistory)
+        return false;
+    if (buttonDown)
+        return tweakPress != juce::Time() && tweakPress == juce::Desktop::getInstance().getMainMouseSource().getLastMouseDownTime();
+    return nowMs - tweakMs < 60.0;
+}
+
+void AudioEngine::setCurrentTrackSource (int track) noexcept
+{
+    currentSource = track;
+    if (rackProcessor != nullptr)
+        rackProcessor->getRenderer().setCurrentSource (track);
+}
+
+void AudioEngine::controlTweakedForUndo()
+{
+    if (flsettings::options().undoKnobTweaks.load() || sessionHistory)
+        return;
+    const auto buttonDown = juce::ModifierKeys::currentModifiers.isAnyMouseButtonDown();
+    const auto press = buttonDown ? juce::Desktop::getInstance().getMainMouseSource().getLastMouseDownTime() : juce::Time();
+    const auto nowMs = juce::Time::getMillisecondCounterHiRes();
+    tweakPress = press;
+    tweakMs = nowMs;
+    // the edit came first and saved a step for this press / event: take it back (the project stays changed)
+    const auto samePush = buttonDown ? (press != juce::Time() && lastPushPress == press) : (lastPushPress == juce::Time() && nowMs - lastPushMs < 60.0);
+    if (samePush && lastPushSize > 0 && undoStack.size() == lastPushSize)
+    {
+        undoStack.pop_back();
+        lastPushSize = 0;
+        modified = true;
+        sendChangeMessage(); // (the Edit menu / history show one step less)
+    }
 }
 
 void AudioEngine::beginUndoGesture() noexcept
@@ -3969,6 +4027,7 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
     const auto channelsBefore = song.channels.size(); // (round 190iu: Track-only mode, core/TrackOnly.h)
     edit (song);
     song.keepOnePattern(); // (round 190ea: what follows, and every listener, may read the current pattern)
+    mixerops::keepCurrentLast (song); // (round 190mv: FL's Current track stays the last mixer track)
     if (trackonly::active() && song.channels.size() > channelsBefore) // each new instrument gets its own instrument track
         trackonly::follow (song, channelsBefore);
     if (song.linkTracksToMixer && linkBefore.on) // new content goes through its track's insert; renames follow the link
@@ -7679,6 +7738,7 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
             for (int i = 0; i < n; ++i)
             {
                 scope[(std::size_t) w].store (0.5f * (outputs[0][i] + right[i]), std::memory_order_relaxed);
+                scopeSide[(std::size_t) w].store (0.5f * (outputs[0][i] - right[i]), std::memory_order_relaxed);
                 w = (w + 1) % scopeSize;
                 peakL = juce::jmax (peakL, std::abs (outputs[0][i]));
                 peakR = juce::jmax (peakR, std::abs (right[i]));

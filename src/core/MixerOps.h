@@ -16,6 +16,15 @@ namespace lynx::mixerops
 // sends, sidechain inputs, automation and MIDI targets, controller sources).
 void swapTracks (Song& song, int a, int b);
 
+// FL's Current (C) track (round 190mv, DF-82; MixerTrack::current): its index (the last mixer track) or -1; whether `t`
+// is it; adds it when the song has none (returns its index, -1 when the mixer is full); and moves it back to the end
+// after an edit added inserts past it (every reference follows, as insertTracks). An insert added past the end of a
+// mixer with a Current track takes the Current track's place (its number) and the Current track moves one on.
+int currentTrack (const Song& song) noexcept;
+bool isCurrentTrack (const Song& song, int t) noexcept;
+int addCurrentTrack (Song& song);
+bool keepCurrentLast (Song& song);
+
 // Moves the selected inserts left (delta < 0) or right by one place as a block; the Master never moves.
 // `selection` is updated. Returns false when nothing moved.
 bool moveTracks (Song& song, std::vector<int>& selection, int delta);

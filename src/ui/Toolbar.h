@@ -279,6 +279,30 @@ private:
 // Control Bar"): "Link" while off; on, the number of other peers ("0 Links", "1 Link", "2 Links"), lit; the arrow beside
 // it opens the drop-down (Link on / off, Configure Link...). In FL's Pattern layout it is LYNX's own small switch,
 // hidden until the user shows it (Settings › Link › Show Link Toggle, or the toolbar's edit mode).
+// Live's phase-nudge buttons (round 190mv, DL-51; capture 190mv B2, live-phase-nudge.png): a 16 px box with four upright
+// bars, no box at rest, grey under the mouse, orange (255,194,129) with black bars while held. Held, the song runs a
+// little slower (down) or faster (up) — Live's "Temporarily decrease / increase song tempo to synchronize to external
+// music"; let go, the tempo is back. Clip-launch layout only.
+class PhaseNudge final : public juce::Component,
+                         public ui::HintSource
+{
+public:
+    PhaseNudge (AudioEngine& e, bool up) : engine (e), faster (up) { setRepaintsOnMouseActivity (true); }
+    ~PhaseNudge() override { release(); }
+    void paint (juce::Graphics& g) override;
+    void mouseDown (const juce::MouseEvent& e) override;
+    void mouseUp (const juce::MouseEvent&) override { release(); }
+    ui::Hint hintAt (juce::Point<int>) override;
+    bool isHeldForTests() const noexcept { return held; }
+
+private:
+    void release();
+    AudioEngine& engine;
+    bool faster;
+    bool held = false;
+    double base = 0.0;
+};
+
 class LinkToggle final : public juce::Component,
                          public ui::HintSource
 {
@@ -348,6 +372,10 @@ public:
     };
     static constexpr int modeCount = (int) modeCount_;
     static inline int mode = oscilloscope; // shared by every instance; saved in the UI options
+    // FL's Oscilloscope › "Stereo" (round 190mv, DF-24; capture 190mv A8: off = one line, on = the left side above the right,
+    // each its own line): saved in the UI options
+    static inline bool stereoScope = false;
+    void setScopeSidesForShot (float leftPhase, float rightPhase); // (--details190mvshot: two sines)
     static juce::String modeName (int m);
     std::function<void()> onModeChanged;   // the main window saves the choice
 
@@ -355,6 +383,7 @@ private:
     void setMode (int newMode);
     AudioEngine& engine;
     std::array<float, 1024> samples {};
+    std::array<float, 1024> sideSamples {}; // (round 190mv: Stereo)
     juce::Image scopeImage, scopeNative; // the oscilloscope's stroke, drawn in software, and its copy for the window (round 174e2)
     std::array<float, 256> history {};     // long view: one peak per 1/30 s, oldest first
     std::array<float, 128> bands {};       // spectrum: smoothed level per band, 0..1

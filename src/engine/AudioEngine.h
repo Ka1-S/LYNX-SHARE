@@ -791,6 +791,15 @@ public:
     // otherwise while the control keeps moving. While recording with the "Automation" filter, touched parameters are
     // written as automation.
     void noteTweaked (const AutomationTarget& target, bool held = false);
+    // A control on screen was tweaked by the mouse / wheel (knob, fader, slider, switch: ui::onTweak and the editors'
+    // drag starts). With FL's General › Undo history › "Undo knob tweaks" off (core/FlSettings.h undoKnobTweaks, round
+    // 190mv, DF-134) the tweak's press (or wheel step) makes no undo step: a step its edit already saved is taken back,
+    // later edits of the press save none. The project still counts as changed. Online Sessions keep every step.
+    void controlTweakedForUndo();
+    // FL's Current (C) mixer track (round 190mv, DF-82; core/MixerOps.h currentTrack): the mixer's selected track, whose
+    // output the Current track's effects process in line during live playback (−1 = none). The Mixer sets it.
+    void setCurrentTrackSource (int track) noexcept;
+    int getCurrentTrackSource() const noexcept { return currentSource; }
     void tweakReleased (const AutomationTarget& target);
     // 0 = the last tweaked parameter, 1 = the one before it.
     std::optional<AutomationTarget> getLastTweaked (int which = 0) const;
@@ -1125,6 +1134,9 @@ public:
 
     // Latest output samples (mono), for the oscilloscope. UI thread.
     void copyScope (float* destination, int count) const noexcept;
+    // round 190mv (DF-24, FL's output panel › Oscilloscope › Stereo): the same samples' side, (L - R) / 2, so a stereo
+    // scope shows L = mid + side and R = mid - side
+    void copyScopeSide (float* destination, int count) const noexcept;
     static constexpr int scopeSize = 2048;
     // round 190kn (FL's output panel, DF-23): the peak of the device output's left (0) / right (1) side since the last
     // read, for the toolbar's stereo bars. One reader (the toolbar's output display). UI thread.
@@ -1528,6 +1540,7 @@ private:
     CountInCatch takeCatch; // UI thread
     double lastCaptureMs = -1.0; // UI thread: the newest note Capture MIDI took
     std::array<std::atomic<float>, scopeSize> scope {}; // ring buffer of the output (written by audio)
+    std::array<std::atomic<float>, scopeSize> scopeSide {}; // (round 190mv) its side, (L - R) / 2
     std::atomic<int> scopeWrite { 0 };
     std::array<std::atomic<float>, 2> outputPeak {}; // (round 190kn) raised by audio, taken by the toolbar
     juce::MidiDeviceListConnection midiDevicesChanged;
@@ -1547,6 +1560,7 @@ private:
     // device's), under midiPrefsLock; and the hardware MIDI output ports (MidiSyncIo) the rack sends to
     std::vector<std::string> midiSourceNames;
     std::array<std::uint64_t, 4> hardwareMidiPorts {};
+    int currentSource = -1; // (round 190mv: setCurrentTrackSource)
     void configureMidiOutputs(); // message thread: MidiSyncIo's devices, the rack's ports
     std::array<RackRenderer::HardwareMidiEvent, RackRenderer::hardwareMidiCapacity> hardwareMidiTaken {}; // audio thread
     bool hardwareMidiWasPlaying = false; // audio thread
@@ -1719,6 +1733,13 @@ private:
     void sessionStep (bool redo);
     void historyStep (bool redo);
     juce::Time lastUndoPress; // mouse click that already produced an undo step
+    // FL's "Undo knob tweaks" off (round 190mv, DF-134): the press (or, without a button down, the moment) of the last
+    // control tweak, and the last undo step pushed (stack size, its press / moment) so a tweak that came after its
+    // edit's step can take that step back
+    juce::Time tweakPress, lastPushPress;
+    double tweakMs = -1.0e9, lastPushMs = -1.0e9;
+    std::size_t lastPushSize = 0;
+    bool tweakSkipsStep (bool buttonDown, double nowMs) const noexcept;
     // the open mouse gesture (beginUndoGesture): it already saved its undo step; it began with a real button down
     bool gestureOpen = false, gestureSaved = false, gestureRealMouse = false, gestureEnding = false;
     SnapshotExchange<RackState> rackExchange;

@@ -14,6 +14,7 @@
 //                    autoNameChannels        "Auto name channels"
 //   General › Adv.   readSampleTempo         "Read sample tempo information"
 //   General › Undo   historyNewestFirst      "Show recent changes at the top"
+//                    undoKnobTweaks          "Undo knob tweaks" (round 190mv; AudioEngine::controlTweakedForUndo)
 //
 // Header-only, no JUCE.
 
@@ -71,6 +72,7 @@ struct Options
     std::atomic<bool> readSampleTempo { true };
     std::atomic<bool> historyNewestFirst { false };
     std::atomic<bool> historyOnUndo { false };
+    std::atomic<bool> undoKnobTweaks { true }; // round 190mv (DF-134): FL's General › Undo history › "Undo knob tweaks"
     std::atomic<int> projectSizeWarnMb { projectSizeDefault };
     std::atomic<bool> clickHold { false }, bothButtonsSteps { false };
     std::atomic<bool> projectWindowLayout { true };
@@ -96,6 +98,7 @@ inline void reset() noexcept
     o.readSampleTempo = true;
     o.historyNewestFirst = false;
     o.historyOnUndo = false;
+    o.undoKnobTweaks = true;
     o.projectSizeWarnMb = projectSizeDefault;
     o.clickHold = o.bothButtonsSteps = false;
     o.projectWindowLayout = true;
@@ -137,6 +140,7 @@ inline bool parse (std::string_view key, std::string_view value) noexcept
     if (key == "flReadSampleTempo") return flag (o.readSampleTempo, true);
     if (key == "flHistoryNewestFirst") return flag (o.historyNewestFirst, false);
     if (key == "flHistoryOnUndo") return flag (o.historyOnUndo, false);
+    if (key == "flUndoKnobTweaks") return flag (o.undoKnobTweaks, true);
     if (key == "flClickHold") return flag (o.clickHold, false);
     if (key == "flBothButtonsSteps") return flag (o.bothButtonsSteps, false);
     if (key == "projectWindowLayout") return flag (o.projectWindowLayout, true);
@@ -170,6 +174,7 @@ inline std::string serialise()
            + flag ("flReadSampleTempo", o.readSampleTempo.load())
            + flag ("flHistoryNewestFirst", o.historyNewestFirst.load())
            + flag ("flHistoryOnUndo", o.historyOnUndo.load())
+           + flag ("flUndoKnobTweaks", o.undoKnobTweaks.load())
            + "\nflProjectSizeWarnMb=" + std::to_string (o.projectSizeWarnMb.load())
            + flag ("flClickHold", o.clickHold.load())
            + flag ("flBothButtonsSteps", o.bothButtonsSteps.load())

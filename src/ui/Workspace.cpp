@@ -310,6 +310,19 @@ public:
         return bare && e.getEventRelativeTo (this).y < Workspace::titleHeight;
     }
 
+    // round 190mv (DF-107): the floating Browser's Auto-hide follows the mouse in and out of the whole frame
+    void mouseEnter (const juce::MouseEvent&) override
+    {
+        if (panel == Panel::browser)
+            owner.browserHovered (true);
+    }
+
+    void mouseExit (const juce::MouseEvent&) override
+    {
+        if (panel == Panel::browser)
+            owner.browserHovered (false);
+    }
+
     void mouseMove (const juce::MouseEvent& e) override
     {
         if (e.eventComponent != this)
@@ -1000,8 +1013,70 @@ void Workspace::setFocusedPanel (Panel panel)
         onFocusChanged (panel);
 }
 
+bool Workspace::browserCanRoll() const
+{
+    const auto& b = layout[Panel::browser];
+    return browserAutoHide && b.visible && ! b.detached && ! b.maximised && ! layout.browserDocked();
+}
+
+void Workspace::setBrowserAutoHide (bool on)
+{
+    if (browserAutoHide == on)
+        return;
+    browserAutoHide = on;
+    browserRolled = false; // (switched on: it rolls up once the mouse leaves it)
+    applyLayout();
+}
+
+void Workspace::placeBrowserRoll()
+{
+    // only the Browser's frame moves (no new stacking order or focus: the mouse just passed over it)
+    if (! layoutReady || ! browserCanRoll())
+        return;
+    auto bounds = toJuce (layout[Panel::browser].bounds);
+    if (browserRolled)
+        bounds.setHeight (titleHeight);
+    placeFrame (*frames[(std::size_t) Panel::browser], bounds);
+}
+
+void Workspace::browserHovered (bool inside)
+{
+    if (! browserCanRoll())
+    {
+        browserRolled = false;
+        return;
+    }
+    if (inside)
+    {
+        if (browserRolled) // the mouse on the title strip: out at once (FL: under 150 ms)
+        {
+            browserRolled = false;
+            placeBrowserRoll();
+        }
+        return;
+    }
+    // out: rolls up once the mouse has stayed away a moment (FL: within 300 ms); not during a drag out of it
+    juce::Timer::callAfterDelay (200, [safe = juce::Component::SafePointer<Workspace> (this)] {
+        if (safe == nullptr || safe->browserRolled || ! safe->browserCanRoll())
+            return;
+        auto& frame = *safe->frames[(std::size_t) Panel::browser];
+        const auto mouse = juce::Desktop::getInstance().getMainMouseSource().getScreenPosition().roundToInt();
+        if (frame.isShowing() && frame.getScreenBounds().contains (mouse))
+            return;
+        if (juce::ModifierKeys::currentModifiers.isAnyMouseButtonDown()) // (a drag from it, a resize: it stays)
+        {
+            safe->browserHovered (false); // (looks again later)
+            return;
+        }
+        safe->browserRolled = true;
+        safe->placeBrowserRoll();
+    });
+}
+
 void Workspace::frameMoved (Panel panel, juce::Rectangle<int> bounds)
 {
+    if (panel == Panel::browser && isBrowserRolledUp()) // (round 190mv: the rolled-up strip keeps the full height saved)
+        bounds.setHeight (layout[panel].bounds.h);
     if (! (layout[panel].bounds == toRect (bounds)))
     {
         pristine = false; // moved or resized by hand
@@ -1539,7 +1614,10 @@ void Workspace::applyLayout (bool fadePanels)
             }
 
             // issue #192: a maximized panel fills what a docked Browser leaves (FL's desktop beside its dock site)
-            placeFrame (frame, state.maximised ? toJuce (layout.maximisedArea (panel)) : toJuce (state.bounds));
+            auto placed = state.maximised ? toJuce (layout.maximisedArea (panel)) : toJuce (state.bounds);
+            if (panel == Panel::browser && isBrowserRolledUp()) // round 190mv (DF-107): FL's Auto-hide rolls it up to its title
+                placed.setHeight (titleHeight);
+            placeFrame (frame, placed);
             if (nativechild::isAttached (frame))
             {
                 // a panel the user opens or closes fades as the plain ones below do, by its window's alpha (round 190i)

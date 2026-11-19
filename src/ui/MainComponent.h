@@ -263,6 +263,9 @@ public:
     void setMetersForSnapshot (double cpu, std::int64_t memory, int polyphony) { perfMeter.setValues (cpu, memory, polyphony); }
     // round 190kn (--details190knshot): the toolbar's output display, CPU panel and hint bar
     toolbar::OutputMonitor& getOutputForSnapshot() noexcept { return output; }
+    juce::Component& getAudioEditorButtonForSnapshot() noexcept { return audioEditorButton; } // (round 190mv, DF-35)
+    juce::Component& getMasterPitchForSnapshot() noexcept { return masterPitch; }             // (round 190mv, DF-22)
+    void openMasterAudioEditorForSnapshot (bool newOne) { openMasterAudioEditor (newOne); }
     toolbar::PerformanceMeter& getPerfMeterForSnapshot() noexcept { return perfMeter; }
     ui::HintBar& getHintBarForSnapshot() noexcept { return hintBar; }
     static std::unique_ptr<juce::Component> makeHelpContent (const keys::KeyMap* keyMap = nullptr); // nullptr: the defaults
@@ -604,6 +607,10 @@ private:
 
     IconButton newButton { "new", Icon::newFile }, openButton { "open", Icon::open }, saveButton { "save", Icon::save },
         exportButton { "export", Icon::exportAudio }, undoButton { "undo", Icon::undo }, redoButton { "redo", Icon::redo };
+    // FL's toolbar "Open audio editor / New audio editor" (round 190mv, DF-35; capture 190mv A9): left = the Master's audio
+    // editor (Edison into the Master's first empty slot, or the one there), right = a new one
+    IconButton audioEditorButton { "audioEditor", Icon::scissors };
+    void openMasterAudioEditor (bool newOne);
     IconButton playButton { "play", Icon::play };
     IconButton stopButton { "stop", Icon::stop };
     IconButton recordButton { "record", Icon::record };
@@ -840,6 +847,7 @@ private:
     // round 190lx (DL-61): Live's Loop and Punch-Out switches beside the Punch-In one (punchButton) in the Clip-launch bar
     IconButton liveLoopButton { "liveLoop", Icon::liveLoop };
     IconButton punchOutButton { "punchOut", Icon::punchOut };
+    toolbar::PhaseNudge nudgeDownButton { engine, false }, nudgeUpButton { engine, true }; // round 190mv (DL-51): Live's phase nudge
     void toggleLiveLoop();
     bool punchHintLive = false; // (the punch button's hint is Live's Punch-In one)
     IconButton metronomeMenuButton { "metronomeMenu", Icon::chevronDown }; // round 190ld (DS-1): BandLab's metronome popover

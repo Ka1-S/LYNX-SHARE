@@ -292,7 +292,7 @@ private:
     static constexpr int dockGap = 14, separatorGap = 8;
     int stripWidthOf (int track) const noexcept
     {
-        return track == 0 ? spec().masterWidth : isFoldTab (track) ? foldTabWidth : spec().stripWidth;
+        return track == 0 || track == currentStrip ? spec().masterWidth : isFoldTab (track) ? foldTabWidth : spec().stripWidth;
     }
     // Folded mixer groups (round 177a): how each strip shows (mixerops::foldView), the tab each hidden member's meter
     // feeds (-1 = none), and the fold chevron of a group's first strip. All empty / unused while no group is folded.
@@ -325,6 +325,25 @@ private:
     juce::String vcaNote (int track) const; // a member's fader hint: the VCAs and the level that plays
     int dragVca = -1;
     std::vector<float> vcaLevelsShown, vcaMetersShown;
+    // FL's Current (C) track (round 190mv, DF-82; capture 190mr A4 / 190mv A1): a meter-only strip left of the Master
+    // (left of the VCAs), always shown; it is the song's Current track (mixerops::currentTrack), made at its first click.
+    // Its pseudo index places it; selecting it shows its effect slots ("Current"). The engine's Current track source
+    // follows the selection (any other track).
+    static constexpr int currentStrip = -1000;
+    int currentX = hiddenX;
+    bool onCurrentStrip (juce::Point<int> p) const noexcept;
+    juce::Rectangle<int> currentMeter() const noexcept;
+    void paintCurrentStrip (juce::Graphics& g);
+    void paintCurrentMeter (juce::Graphics& g) const;
+    void currentMouseDown (const juce::MouseEvent& e);
+    ui::Hint currentHint() const;
+    void publishCurrentSource();
+    int selectCurrent(); // makes the Current track if needed and selects it (−1: the mixer is full)
+public:
+    int currentStripXForSnapshot() const noexcept { return stripX (currentStrip); }
+    int selectCurrentForSnapshot() { return selectCurrent(); }
+    juce::Rectangle<int> currentMeterForSnapshot() const noexcept { return currentMeter(); }
+private:
     // the strip's rows for the current layout and height (top to bottom)
     struct Rows
     {

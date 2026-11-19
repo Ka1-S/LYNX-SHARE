@@ -17910,3 +17910,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Details190mpTests.inc" // round details7_190mp: FL Half speed, Auto name clips, Restretch all, details pass 7
 #include "core/Details190mr.h"
 #include "Details190mrTests.inc" // round details8_190mr: click-and-hold, rack Auto Select, undo / warning / layout options, details pass 8
+#include "core/Details190mv.h"
+#include "Details190mvTests.inc" // round details9_190mv: undo knob tweaks and the rest of details pass 9

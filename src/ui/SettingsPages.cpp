@@ -171,7 +171,7 @@ public:
                                                                  &undoBox, &alternateUndo, &hintsTitle, &manageMessages, &messagesNote, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &backupQuiet, &longestWaitLabel, &longestWaitBox, &unusedTakes, &detachNew,
                                                                  &sandboxLabel, &sandboxBox, &sandboxNote, &substitutes, &substitutesNote, &sampleAccurate, &limitEditors, &managePlugins, &manageShortcuts, &shortcutsNote,
                                                                  &reportsTitle, &crashLabel, &crashBox, &crashNote, &updatesTitle, &checkUpdates, &checkNow, &updatesNote,
-                                                                 &previousLabel, &goBack, &autoNameChannels, &restoreAfterSolo, &readSampleTempo, &historyNewestFirst, &projectLayout, &historyOnUndo, &dataSizeLabel, &dataSizeBox, &clickHold, &bothButtons })
+                                                                 &previousLabel, &goBack, &autoNameChannels, &restoreAfterSolo, &readSampleTempo, &historyNewestFirst, &projectLayout, &historyOnUndo, &undoKnobTweaks, &dataSizeLabel, &dataSizeBox, &clickHold, &bothButtons })
             add (*c);
 
         setupFontRow();
@@ -426,6 +426,9 @@ public:
             flag (readSampleTempo, tr ("Read sample tempo information"),
                   tr ("Read tempo information stored in samples. Off: it is ignored for the samples loaded from then on"), fl.readSampleTempo);
             flag (historyNewestFirst, tr ("Show recent changes at the top"), tr ("Sort the undo history from new to old"), fl.historyNewestFirst);
+            // round 190mv (DF-134; FL's label, on as in FL — capture 190mr A1.1)
+            flag (undoKnobTweaks, tr ("Undo knob tweaks"),
+                  tr ("Knob, fader and slider moves are undo steps. Off: they are left out of the undo history"), fl.undoKnobTweaks);
             // round 190mr (DF-135; FL's label, off as in FL)
             flag (historyOnUndo, tr ("Show undo history in the browser when undoing changes"),
                   tr ("An undo opens the Browser at Current project › History"), fl.historyOnUndo);
@@ -655,6 +658,7 @@ private:
             t->setBounds (r.full (24));
         editInBox.setBounds (r.row (editInLabel, 0));
         undoBox.setBounds (r.row (undoLabel, 120));
+        undoKnobTweaks.setBounds (r.full (24)); // (round 190mv: FL's Undo history panel, after Maximum undo levels)
         alternateUndo.setBounds (r.full (24));
         historyOnUndo.setBounds (r.full (24)); // (round 190mr: FL's Undo history panel, before its last box)
         historyNewestFirst.setBounds (r.full (24)); // (FL's Undo history panel: its last box)
@@ -880,6 +884,7 @@ private:
     juce::ToggleButton detachNew, editorsInMain, stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, uiAnimations, gpuRendering, splash, startupSound, scanAtStart, supportNoteBox, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, autoClipsAtPlayback, firstChannel, monoPaint, altMeterScale, hoverValues, alternateUndo, substitutes, sampleAccurate, limitEditors, backupQuiet, unusedTakes, checkUpdates, noTypingPriority, autoSelectLinked;
     juce::ToggleButton autoNameChannels, restoreAfterSolo, readSampleTempo, historyNewestFirst; // FL's options of round 190bx (core/FlSettings.h)
     juce::ToggleButton projectLayout, historyOnUndo; // round 190mr (DF-141, DF-135)
+    juce::ToggleButton undoKnobTweaks; // round 190mv (DF-134)
     juce::Label dataSizeLabel;                        // round 190mr (DF-147)
     juce::ComboBox dataSizeBox;
     juce::ToggleButton clickHold, bothButtons; // round 190mr (DE-63, DE-16)

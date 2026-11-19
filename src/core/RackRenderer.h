@@ -238,6 +238,9 @@ struct RackState
 
     // Mixer: insert processing order and which ones sound with the current solo.
     std::vector<int> mixerOrder;
+    // FL's Current (C) track (round 190mv, DF-82; MixerTrack::current): its index, -1 = none. It is not in mixerOrder:
+    // the renderer runs its effects on the selected track's output (RackRenderer::setCurrentSource).
+    int currentTrack = -1;
     std::vector<char> mixerAudible;
     // VCA faders (round 177a slice 3): per insert, the VCAs acting on it (members and parents, empty = none: the whole
     // table is empty while the song has no VCA); per VCA, its automation slot (-1 = none). Built with the mixer graph.
@@ -762,6 +765,9 @@ public:
         std::array<std::uint8_t, 3> bytes {};
     };
     void setHardwareMidiPorts (const std::array<std::uint64_t, 4>& ports) noexcept;
+    // FL's Current (C) track (round 190mv, DF-82): the mixer track whose output it takes in line (the selected one; −1 =
+    // none). Only the live engine sets it: exports render without the Current track's effects.
+    void setCurrentSource (int track) noexcept { currentSource.store (track, std::memory_order_relaxed); }
     bool hardwareMidiPort (int port) const noexcept
     {
         return port >= 0 && port < 256 && (hwPorts[(std::size_t) port >> 6].load (std::memory_order_relaxed) >> (port & 63) & 1u) != 0;
@@ -985,6 +991,8 @@ private:
     void mixHardwareOutputs (const RackState& state, int n) noexcept;
     int liveInputOffset = 0; // of the chunk within the process() block
     // hardware MIDI outputs (round 190jl)
+    std::atomic<int> currentSource { -1 }; // (round 190mv)
+    void runCurrentTrack (const RackState& state, float* l, float* r, int n, MeterBank* meters) noexcept;
     std::array<std::atomic<std::uint64_t>, 4> hwPorts {};
     std::atomic<bool> hwPortsAny { false };
     std::array<HardwareMidiEvent, hardwareMidiCapacity> hwMidi {};

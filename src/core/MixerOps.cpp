@@ -359,6 +359,51 @@ void swapTracks (Song& song, int a, int b)
     remapTrackReferences (song, [a, b] (int t) { return t == a ? b : t == b ? a : t; });
 }
 
+int currentTrack (const Song& song) noexcept
+{
+    for (int t = (int) song.mixer.size() - 1; t > 0; --t)
+        if (song.mixer[(std::size_t) t].current)
+            return t;
+    return -1;
+}
+
+bool isCurrentTrack (const Song& song, int t) noexcept
+{
+    return t > 0 && t < (int) song.mixer.size() && song.mixer[(std::size_t) t].current;
+}
+
+int addCurrentTrack (Song& song)
+{
+    if (const auto c = currentTrack (song); c > 0)
+        return c;
+    if (song.mixer.empty() || (int) song.mixer.size() >= maxMixerTracks)
+        return -1;
+    auto& c = song.mixer.emplace_back();
+    c.name = "Current";
+    c.current = true;
+    c.toMaster = false; // (its output goes back into the selected track's, never to the Master)
+    return (int) song.mixer.size() - 1;
+}
+
+bool keepCurrentLast (Song& song)
+{
+    const auto c = currentTrack (song);
+    const auto last = (int) song.mixer.size() - 1;
+    if (c <= 0 || c == last)
+        return false;
+    // (more than one: the extra ones are plain inserts again)
+    for (int t = 1; t < c; ++t)
+        song.mixer[(std::size_t) t].current = false;
+    remapTrackReferences (song, [c, last] (int t) { return t == c ? last : t > c ? t - 1 : t; });
+    auto moved = std::move (song.mixer[(std::size_t) c]);
+    song.mixer.erase (song.mixer.begin() + c);
+    song.mixer.push_back (std::move (moved));
+    for (int t = c; t < last; ++t) // a default name follows the position (as swapTracks)
+        if (auto& name = song.mixer[(std::size_t) t].name; name == "Insert " + std::to_string (t + 1))
+            name = "Insert " + std::to_string (t);
+    return true;
+}
+
 bool moveTracks (Song& song, std::vector<int>& selection, int delta)
 {
     const auto count = (int) song.mixer.size();

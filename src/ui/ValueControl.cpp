@@ -6,6 +6,7 @@
 #include "ui/AutomationUi.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
+#include "ui/ToolWindow.h"
 #include "ui/WindowOwner.h"
 
 namespace lynx::ui
@@ -271,6 +272,104 @@ std::optional<double> wheelValue (double value, const juce::MouseEvent& e, const
 
 // --- menu --------------------------------------------------------------------------------------
 
+namespace
+{
+// FL's value menu › "Set..." (round 190mv, DF-146; capture 190mv A10, fl-knob-set.png): a 162 × 206 window "Knob" holding one
+// big knob for fine adjusting — the value on its cap, the control's name under it. A drag over the whole travel of the
+// big knob is three times the small control's, so each pixel moves the value a third as much (Ctrl / Shift finer still,
+// the wheel, Alt-click or a double-click reset, as on every LYNX control).
+class SetKnobPanel final : public juce::Component
+{
+public:
+    SetKnobPanel (ValueSpec s, double current, std::function<void (double)> set) : spec (std::move (s)), value (current), setter (std::move (set))
+    {
+        spec.pixelsForRange *= 3.0;
+        setRepaintsOnMouseActivity (true);
+        setSize (162, 206 - 26); // (the window's title bar makes FL's 206)
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        using namespace theme;
+        g.fillAll (colour::bg1);
+        auto area = getLocalBounds().toFloat().reduced (10.0f, 8.0f);
+        const auto caption = area.removeFromBottom (22.0f);
+        const auto size = juce::jmin (area.getWidth(), area.getHeight());
+        const auto box = juce::Rectangle<float> (size, size).withCentre (area.getCentre());
+        const auto v = (float) juce::jlimit (0.0, 1.0, (value - spec.minimum) / juce::jmax (1e-9, spec.maximum - spec.minimum));
+        constexpr float sweep = juce::MathConstants<float>::pi * 1.5f;
+        const auto radius = size * 0.5f - 4.0f;
+        juce::Path track, arc;
+        track.addCentredArc (box.getCentreX(), box.getCentreY(), radius, radius, 0.0f, -sweep * 0.5f, sweep * 0.5f, true);
+        g.setColour (colour::bg6);
+        g.strokePath (track, juce::PathStrokeType (6.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        // a bipolar control fills from its centre (FL's ring)
+        const auto from = spec.minimum < 0.0 && spec.maximum > 0.0 ? 0.5f : 0.0f;
+        arc.addCentredArc (box.getCentreX(), box.getCentreY(), radius, radius, 0.0f, -sweep * 0.5f + sweep * juce::jmin (from, v),
+                           -sweep * 0.5f + sweep * juce::jmax (from, v), true);
+        g.setColour (isMouseOverOrDragging() ? colour::accent : colour::knobArc);
+        g.strokePath (arc, juce::PathStrokeType (6.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        const auto cap = box.reduced (16.0f);
+        g.setColour (colour::bg4);
+        g.fillEllipse (cap);
+        g.setColour (colour::border);
+        g.drawEllipse (cap, 1.0f);
+        // the pointer
+        const auto angle = -sweep * 0.5f + sweep * v;
+        const auto tip = box.getCentre().getPointOnCircumference (cap.getWidth() * 0.5f - 3.0f, angle);
+        const auto base = box.getCentre().getPointOnCircumference (cap.getWidth() * 0.5f - 11.0f, angle);
+        g.setColour (colour::textPrimary);
+        g.drawLine ({ base, tip }, 2.5f);
+        g.setColour (colour::textPrimary);
+        g.setFont (font (type::body, true));
+        g.drawFittedText (spec.text (value), cap.reduced (8.0f).toNearestInt(), juce::Justification::centred, 2, 0.7f);
+        g.setColour (colour::textSecondary);
+        g.setFont (font (type::small));
+        g.drawFittedText (spec.name, caption.toNearestInt(), juce::Justification::centred, 1, 0.6f);
+    }
+
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        if (isResetClick (e))
+        {
+            apply (spec.defaultValue);
+            return;
+        }
+        drag.begin (e, value);
+    }
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        if (drag.isActive())
+            apply (drag.update (e, spec));
+    }
+    void mouseUp (const juce::MouseEvent&) override { drag.end(); }
+    void mouseDoubleClick (const juce::MouseEvent&) override { apply (spec.defaultValue); }
+    void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override
+    {
+        if (const auto v = wheelValue (value, e, wheel, spec))
+            apply (*v);
+    }
+    double valueForTests() const noexcept { return value; }
+
+private:
+    void apply (double v)
+    {
+        value = juce::jlimit (spec.minimum, spec.maximum, v);
+        setter (value);
+        repaint();
+    }
+    ValueSpec spec;
+    double value;
+    std::function<void (double)> setter;
+    ValueDrag drag;
+};
+} // namespace
+
+std::unique_ptr<juce::Component> makeSetKnob (const ValueSpec& spec, double current, std::function<void (double)> set)
+{
+    return std::make_unique<SetKnobPanel> (spec, current, std::move (set));
+}
+
 void addValueItems (juce::PopupMenu& menu, juce::Component& target, AudioEngine* engine, const ValueSpec& spec, double current,
                     std::function<void (double)> set)
 {
@@ -292,8 +391,16 @@ void addValueItems (juce::PopupMenu& menu, juce::Component& target, AudioEngine*
         set (juce::jlimit (spec.minimum, spec.maximum, spec.minimum + copied * range));
     });
     menu.addItem (tr ("Type in value..."), [safe, spec, current, set] {
-        if (safe != nullptr)
+        if (safe == nullptr)
+            return;
+        if (spec.typeInSpec != nullptr && spec.toTypeIn && spec.fromTypeIn) // (round 190mv: other units, FL's Master pitch in Hz)
+            typeValue (*safe, *spec.typeInSpec, spec.toTypeIn (current), [set, from = spec.fromTypeIn] (double v) { set (from (v)); });
+        else
             typeValue (*safe, spec, current, set);
+    });
+    // FL's "Set..." (round 190mv, DF-146): the big knob window
+    menu.addItem (tr ("Set..."), range > 0.0, false, [spec, current, set] {
+        openToolWindow (makeSetKnob (spec, current, set), tr ("Knob"), "set-knob");
     });
 }
 

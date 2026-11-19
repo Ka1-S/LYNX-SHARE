@@ -339,10 +339,13 @@ void MixerStrips::layoutStrips()
                 if (const auto bus = mixerops::groupBus (song, mixerops::groupOf (song, t)); bus > 0)
                     foldHead[(std::size_t) bus] = true;
     }
+    if (const auto c = mixerops::currentTrack (song); c > 0) // round 190mv: FL's Current track has its own strip
+        hidden[(std::size_t) c] = true;
     dockGaps.clear();
     separatorLines.clear();
     vcaXs.clear();
     loudnessX = hiddenX;
+    currentX = hiddenX;
 
     int x = 4;
     bool any = false, afterMaster = false;
@@ -375,6 +378,11 @@ void MixerStrips::layoutStrips()
             }
             else if (afterMaster)
                 x += 8;
+            if (t == 0) // FL's Current track: the leftmost strip, left of the Master (round 190mv, DF-82)
+            {
+                currentX = x;
+                x += stripWidthOf (currentStrip) + 4;
+            }
             if (t == 0 && ! song.vcas.empty()) // the VCA strips: their own block left of the Master (round 177a)
             {
                 for (std::size_t i = 0; i < song.vcas.size(); ++i)
@@ -436,6 +444,8 @@ int MixerStrips::pinOffset (MixerDock dock) const noexcept
 
 int MixerStrips::stripX (int track) const noexcept
 {
+    if (track == currentStrip) // (round 190mv: the Current track's strip, in the Master's dock)
+        return currentX == hiddenX ? hiddenX : currentX + pinOffset (dockOf (0));
     if (track <= -2) // a VCA strip (vcaStrip): it follows the Master's dock
     {
         const auto i = (std::size_t) (-2 - track);
@@ -943,6 +953,125 @@ void MixerStrips::paintVcaMeter (juce::Graphics& g, int i) const
         g.setColour ((level >= 1.0f ? colour::meterClip : level >= 0.5f ? colour::meterMid : colour::meterLow).withAlpha (0.8f));
         g.fillRect (bar.withTop (bar.getBottom() - h));
     }
+}
+
+// --- FL's Current (C) track (round 190mv, DF-82) ---------------------------------------------------------------------
+// FL (capture 190mr A4, fl-mixer-current.png): the leftmost strip, "Current" in grey at the top, a tall dB meter with its
+// scale inside (3, 0, 3 … down), no fader, pan, slots or send; selected: a green outline round the meter, the name white
+// and a green down arrow at the foot. Its meter shows the selected track's output after the Current track's effects
+// (capture 190mv A1: with Fruity Balance at -inf on C, the selected insert's meter still moved and the Master's was silent).
+
+bool MixerStrips::onCurrentStrip (juce::Point<int> p) const noexcept
+{
+    const auto x = stripX (currentStrip);
+    return currentX != hiddenX && p.x >= x && p.x < x + stripWidthOf (currentStrip) - spec().gap && p.y < laneTop();
+}
+
+juce::Rectangle<int> MixerStrips::currentMeter() const noexcept
+{
+    if (currentX == hiddenX)
+        return {};
+    const auto w = stripWidthOf (currentStrip) - spec().gap;
+    const auto boxWidth = juce::jmin (w - 8, 2 * spec().meterWidth + 2 + 12);
+    const auto top = rows().header + 10;
+    const auto bottom = juce::jmax (top + 40, faderArea (0).getBottom());
+    return { stripX (currentStrip) + (w - boxWidth) / 2, top, boxWidth, bottom - top };
+}
+
+void MixerStrips::paintCurrentMeter (juce::Graphics& g) const
+{
+    const auto& song = engine.getSong();
+    const auto c = mixerops::currentTrack (song);
+    // (before its first click the strip shows what it would take in: the selected track's output)
+    const auto shown = c > 0 ? c : juce::jmax (0, selected);
+    const auto box = currentMeter().reduced (2);
+    const auto half = (box.getWidth() - 2) / 2;
+    for (int ch = 0; ch < 2; ++ch)
+        paintMeterLevel (g, shown, ch, juce::Rectangle<int> (box.getX() + ch * (half + 2), box.getY(), half, box.getHeight()));
+}
+
+void MixerStrips::paintCurrentStrip (juce::Graphics& g)
+{
+    using namespace theme;
+    if (currentX == hiddenX)
+        return;
+    const auto x = stripX (currentStrip);
+    const auto w = stripWidthOf (currentStrip) - spec().gap;
+    if (! g.clipRegionIntersects ({ x, 0, w, laneTop() }))
+        return;
+    const auto& song = engine.getSong();
+    const auto c = mixerops::currentTrack (song);
+    const auto isSelected = c > 0 && selected == c;
+    const auto strip = juce::Rectangle<int> (x, 2, w, laneTop() - 2).toFloat();
+    theme::fillRoundRect (g, strip, radius::md, hoverTrack == currentStrip ? colour::bg3 : colour::bg2);
+    // the header with the name, as an insert's (grey; white while selected)
+    g.setColour (isSelected ? colour::textPrimary : colour::textSecondary);
+    g.setFont (font (mixerlayout::isCompact (layout) ? 9.5f : type::small));
+    textcache::drawFittedText (g, tr ("Current"), juce::Rectangle<int> (x + 3, 6, w - 6, 16), juce::Justification::centredLeft, 1, 0.6f);
+    // the meter: a dark box, its dB scale inside
+    const auto meter = currentMeter();
+    theme::fillRoundRect (g, meter.toFloat(), 2.0f, colour::bg0);
+    g.setFont (font (8.0f));
+    g.setColour (colour::textDisabled);
+    for (int db = 3; db >= -39; db -= 3)
+    {
+        const auto y = (float) meter.getBottom() - meterPosition (juce::Decibels::decibelsToGain ((float) db)) * (float) meter.getHeight();
+        if (y < (float) meter.getY() + 4.0f || y > (float) meter.getBottom() - 4.0f)
+            continue;
+        textcache::drawText (g, juce::String (std::abs (db)), juce::Rectangle<int> (meter.getX(), (int) y - 5, meter.getWidth(), 10), juce::Justification::centred);
+    }
+    if (! cachePainting) // (cached: drawn over the picture, paintMeterLevels)
+        paintCurrentMeter (g);
+    if (isSelected)
+    {
+        g.setColour (colour::ledOn);
+        g.drawRect (meter.expanded (1), 1);
+        // the green arrow at the foot (FL: the selected track's output goes on from here)
+        const auto foot = juce::Rectangle<float> ((float) x, (float) laneTop() - 22.0f, (float) w, 14.0f);
+        juce::Path arrow;
+        const auto cx = foot.getCentreX(), cy = foot.getCentreY();
+        arrow.addTriangle (cx - 5.0f, cy - 1.0f, cx + 5.0f, cy - 1.0f, cx, cy + 5.0f);
+        arrow.addRectangle (cx - 2.0f, cy - 6.0f, 4.0f, 5.0f);
+        g.fillPath (arrow);
+    }
+}
+
+int MixerStrips::selectCurrent()
+{
+    // the first click makes the song's Current track (an edit outside the undo history: nothing is heard differently
+    // until an effect goes on it)
+    auto c = mixerops::currentTrack (engine.getSong());
+    if (c <= 0)
+    {
+        engine.editSong ([] (Song& s) { mixerops::addCurrentTrack (s); }, false);
+        c = mixerops::currentTrack (engine.getSong());
+        updateSize();
+    }
+    if (c > 0)
+        selectTrack (c);
+    return c;
+}
+
+void MixerStrips::currentMouseDown (const juce::MouseEvent& e)
+{
+    if (const auto c = selectCurrent(); c > 0 && flmods::popup (e.mods))
+        showMenu (c); // FL: "Mixer track (Current)"
+}
+
+ui::Hint MixerStrips::currentHint() const
+{
+    ui::Hint h;
+    h.text = tr ("Current - the selected track's output goes through this track's effects and EQ, its meter shows the result  [LMB] select: its effect slots  [RMB] menu");
+    h.hasMenu = true;
+    return h;
+}
+
+void MixerStrips::publishCurrentSource()
+{
+    // FL (REA 190mv R, SelectMixerTrack): the Current track takes the selected track's output — the Master's when the
+    // Master or the Current track itself is selected
+    const auto& song = engine.getSong();
+    engine.setCurrentTrackSource (mixerops::isCurrentTrack (song, selected) ? 0 : juce::jmax (0, selected));
 }
 
 void MixerStrips::paintVcaStrip (juce::Graphics& g, int i)
@@ -1626,6 +1755,11 @@ void MixerStrips::setHover (Part part, int t)
 
 void MixerStrips::mouseMove (const juce::MouseEvent& e)
 {
+    if (onCurrentStrip (e.getPosition()))
+    {
+        setHover (Part::body, currentStrip);
+        return;
+    }
     if (const auto i = vcaAt (e.x); i >= 0)
     {
         setHover (vcaPartAt (i, e.getPosition()), vcaStrip (i));
@@ -2180,6 +2314,7 @@ void MixerStrips::paint (juce::Graphics& g)
     }
     if (pass == dockOf (0))
     {
+        paintCurrentStrip (g); // (round 190mv)
         for (int i = 0; i < (int) vcaXs.size(); ++i)
             paintVcaStrip (g, i);
         if (showLoudness && g.clipRegionIntersects (loudnessArea().expanded (3)))
@@ -2239,6 +2374,11 @@ void MixerStrips::paintRouting (juce::Graphics& g)
 
 void MixerStrips::mouseDown (const juce::MouseEvent& e)
 {
+    if (onCurrentStrip (e.getPosition())) // round 190mv: FL's Current track
+    {
+        currentMouseDown (e);
+        return;
+    }
     if (const auto i = vcaAt (e.x); i >= 0)
     {
         vcaMouseDown (e, i);
@@ -2317,7 +2457,7 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
                 selectTrack (free);
                 return;
             }
-        const auto added = (int) engine.getSong().mixer.size();
+        auto added = (int) engine.getSong().mixer.size();
         engine.editSong ([] (Song& s) {
             if (s.mixer.empty())
                 s.mixer = Song::defaultMixer (0);
@@ -2329,6 +2469,9 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
         });
         if (added < (int) engine.getSong().mixer.size())
         {
+            // (round 190mv: with FL's Current track, the new insert took its place and it moved one on)
+            if (const auto c = mixerops::currentTrack (engine.getSong()); c > 0)
+                added = c - 1;
             revealed.insert (added); // shown even while unused
             updateSize();
             selectTrack (added);
@@ -2831,6 +2974,7 @@ void MixerStrips::setSelection (std::vector<int> tracks, int primary)
     selected = primary;
     keepSelectionShown();
     repaint();
+    publishCurrentSource();
 
     if (changed && onSelectionChanged)
         onSelectionChanged (selected);
@@ -3100,6 +3244,8 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
 {
     if (dragVca >= 0)
         return vcaHint (dragVca, p);
+    if (onCurrentStrip (p) && dragPart == Part::none) // (round 190mv)
+        return currentHint();
     if (const auto i = vcaAt (p.x); i >= 0 && dragPart == Part::none)
         return vcaHint (i, p);
     if (showLoudness && dragPart == Part::none && loudnessArea().contains (p))
@@ -3302,6 +3448,7 @@ void MixerStrips::selectTrack (int track)
     selection = { selected };
     keepSelectionShown();
     repaint();
+    publishCurrentSource();
 
     if (onSelectionChanged)
         onSelectionChanged (selected);
@@ -4400,6 +4547,7 @@ void MixerStrips::changeListenerCallback (juce::ChangeBroadcaster*)
         shownLevels[t] = { mixer[t].volume, mixer[t].pan, mixer[t].stereo };
 
     selected = juce::jlimit (0, juce::jmax (0, (int) engine.getSong().mixer.size() - 1), selected);
+    publishCurrentSource(); // (round 190mv: a new project, an edit that moved the tracks)
     const auto count = (int) engine.getSong().mixer.size();
     selection.erase (std::remove_if (selection.begin(), selection.end(), [count] (int t) { return t >= count; }), selection.end());
     if (! std::binary_search (selection.begin(), selection.end(), selected))
@@ -4825,6 +4973,14 @@ void MixerStrips::paintMeterLevels (juce::Graphics& g) const
         if (barsShown)
             paintNameBars (g, t);
     }
+    if (currentMeter().intersects (clip)) // (round 190mv: the Current track's meter)
+    {
+        const juce::Graphics::ScopedSaveState state (g);
+        if (dockOf (0) == MixerDock::middle)
+            for (const auto& r : pinned)
+                g.excludeClipRegion (r);
+        paintCurrentMeter (g);
+    }
     for (int i = 0; i < (int) vcaXs.size(); ++i)
         if (meterArea (vcaStrip (i)).intersects (clip))
         {
@@ -4891,6 +5047,11 @@ bool MixerStrips::liveFrame (double nowMs)
     // against one repaint per meter favoured the single rectangle, within the noise of the machine)
     juce::Rectangle<int> dirty;
     int woken = -1;
+    // round 190mv: the Current track's strip shows its own meter, or the selected track's before it exists
+    const auto currentShown = [this] {
+        const auto c = mixerops::currentTrack (engine.getSong());
+        return c > 0 ? c : juce::jmax (0, selected);
+    }();
     for (std::size_t i = 0; i < levels.size(); ++i)
     {
         auto& m = levels[i];
@@ -4918,6 +5079,8 @@ bool MixerStrips::liveFrame (double nowMs)
             const juce::Rectangle<int> bar (stripX (tab) + foldTabWidth - 10, rail.getY() - 1, 8, rail.getHeight() + 2);
             dirty = dirty.isEmpty() ? bar : dirty.getUnion (bar);
         }
+        if (t == currentShown && currentX != hiddenX && (m.level != before.level || m.peak != before.peak))
+            dirty = dirty.isEmpty() ? currentMeter().expanded (1) : dirty.getUnion (currentMeter().expanded (1));
         if (isHidden (t) || isFoldTab (t))
             continue;
         const auto area = meterArea (t);

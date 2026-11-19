@@ -346,6 +346,9 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     redoButton.setTooltip (withKey (tr ("Redo"), "edit.redo"));
     redoButton.onClick = [this] { undoRedo (true); };
     redoButton.onRightClick = [this] { showHistory(); };
+    audioEditorButton.setTooltip (tr ("Open audio editor / New audio editor"));
+    audioEditorButton.onClick = [this] { openMasterAudioEditor (false); };
+    audioEditorButton.onRightClick = [this] { openMasterAudioEditor (true); };
     // FL's toolbar picker button (round 171c): a click opens the Plugin picker (F8); a right-click LYNX's quick-add palette
     pluginPickerButton.setTooltip (withKey (tr ("Plugin picker: every plugin as a picture; drag one onto the Channel Rack or the Mixer (right-click: quick-add palette)"),
                                             "view.pluginPicker"));
@@ -751,7 +754,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     recent.restoreFromString (PluginHost::settingsFolder().getChildFile ("recentes.txt").loadFileAsString());
     addAndMakeVisible (menuBar);
 
-    for (auto* c : std::initializer_list<juce::Component*> { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &playButton, &stopButton,
+    for (auto* c : std::initializer_list<juce::Component*> { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &audioEditorButton, &playButton, &stopButton,
                                                              &recordButton, &recordMenuButton, &patternModeButton, &songModeButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton,
                                                              &blendButton, &tapTempoButton, &loopRecordButton, &stepEditButton, &punchButton, &tempoDisplay, &patternBox, &newPatternButton, &patternMenuButton, &pluginPickerButton, &timeDisplay,
                                                              &songPosition, &masterVolume, &masterPitch, &perfMeter, &chordPanel, &keyPanel, &output, &hintBar, &tweakReadout, &workspace, &midiLight,
@@ -772,12 +775,12 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         b.setWantsKeyboardFocus (false);
     }
 
-    for (auto* b : std::initializer_list<juce::Component*> { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &playButton, &stopButton,
+    for (auto* b : std::initializer_list<juce::Component*> { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &audioEditorButton, &playButton, &stopButton,
                                                              &recordButton, &recordMenuButton, &patternModeButton, &songModeButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton,
                                                              &blendButton, &tapTempoButton, &loopRecordButton, &stepEditButton, &punchButton, &newPatternButton, &patternMenuButton, &pluginPickerButton })
         b->setWantsKeyboardFocus (false);
 
-    for (auto* b : { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &recordMenuButton, &newPatternButton, &patternMenuButton,
+    for (auto* b : { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &audioEditorButton, &recordMenuButton, &newPatternButton, &patternMenuButton,
                      &pluginPickerButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton, &blendButton, &tapTempoButton, &loopRecordButton, &stepEditButton, &punchButton })
         b->setFlat (true);
 
@@ -818,7 +821,10 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
     ui::installSliderContract();
     // FL's Last tweaked and automation recording (REA round 143): every automatable control reports its moves
-    ui::onTweak = [this] (const AutomationTarget& t) { engine.noteTweaked (t); };
+    ui::onTweak = [this] (const AutomationTarget& t) {
+        engine.noteTweaked (t);
+        engine.controlTweakedForUndo(); // (round 190mv, DF-134: FL's "Undo knob tweaks")
+    };
     // Options › Theme › Startup sound: its Play button (issue #12)
     themeui::previewStartupSound = [this] (const juce::String& path) {
         std::shared_ptr<const SampleData> sound;
@@ -1290,7 +1296,7 @@ void MainComponent::resized()
     widths[(std::size_t) Group::record] = 5 * h + 8; // five per row (round 170e3)
     widths[(std::size_t) Group::snap] = captionWidth + gridWidth;
     widths[(std::size_t) Group::windows] = 3 * h + 4;
-    widths[(std::size_t) Group::file] = 3 * h + 4;
+    widths[(std::size_t) Group::file] = 4 * h + 6; // (round 190mv: + FL's audio editor button)
     widths[(std::size_t) Group::meters] = 118;
     widths[(std::size_t) Group::output] = 116 + grow * 2;
     widths[(std::size_t) Group::chord] = 96; // (FL's panel: 96 px)
@@ -1480,7 +1486,7 @@ void MainComponent::resized()
                         hide ({ &b });
                     hide ({ &pluginPickerButton });
                     break;
-                case Group::file: hide ({ &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton }); break;
+                case Group::file: hide ({ &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &audioEditorButton }); break;
                 case Group::meters: hide ({ &perfMeter }); break;
                 case Group::output: hide ({ &output }); break;
                 case Group::chord: hide ({ &chordPanel }); break;
@@ -1583,6 +1589,7 @@ void MainComponent::resized()
                 break;
             case Group::file: // new, open, save over export, undo, redo
                 grid (panel, { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton });
+                put (audioEditorButton, juce::Rectangle<int> (panel.getX() + 3 * (h + 2), row1, h, h)); // (round 190mv, DF-35)
                 break;
             case Group::meters: put (perfMeter, panel.withY (row1).withHeight (2 * h + 2)); break;
             case Group::output: put (output, panel.withY (row1).withHeight (2 * h + 2)); break;
@@ -1656,7 +1663,7 @@ void MainComponent::applyIconSizing (toolbarlayout::IconSize size)
         toolbarHeight = toolbarlayout::livebar::menuRow + (toolbarLayout.visible ? toolbarlayout::livebar::band : 2);
 
     const auto fraction = toolbarlayout::iconFraction (size), maxPx = toolbarlayout::iconMaxPx (size);
-    for (auto* b : { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &recordMenuButton, &newPatternButton,
+    for (auto* b : { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &audioEditorButton, &recordMenuButton, &newPatternButton,
                      &patternMenuButton, &pluginPickerButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton, &snapToggleButton,
                      &blendButton, &tapTempoButton, &loopRecordButton, &stepEditButton, &punchButton })
         b->setIconSizing (fraction, maxPx);
@@ -2914,6 +2921,11 @@ void MainComponent::connectBrowser (BrowserComponent& b)
     // Drums track at the playhead, an effect chain goes on the selected track
     b.onFactoryItem = [this] (const std::string& key) { addFactoryItem (key); };
     b.onPreviewVolumeChanged = [this] { saveUiSettings(); };
+    if (b.getRole() == BrowserComponent::Role::main) // round 190mv (DF-107): FL's Browser › View › Auto-hide
+        b.onAutoHideChanged = [this] {
+            workspace.setBrowserAutoHide (BrowserComponent::autoHide);
+            saveUiSettings();
+        };
     // round 190ce: hot-swap (the main Browser only: it is the one the device buttons and the key link)
     b.onHotSwapChanged = [this] {
         if (detailView != nullptr)
@@ -3226,6 +3238,8 @@ void MainComponent::loadUiSettings()
             toolbar::PerformanceMeter::refresh = juce::jlimit (0, 2, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "cpuView") // round 190ld: FL's View voice count / View FPS
             toolbar::PerformanceMeter::secondView = juce::jlimit (0, 1, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
+        else if (key == "scopeStereo") // FL's output panel › Oscilloscope › Stereo (round 190mv)
+            toolbar::OutputMonitor::stereoScope = on;
         else if (key == "scopeMode")
             toolbar::OutputMonitor::mode = juce::jlimit (0, toolbar::OutputMonitor::modeCount - 1,
                                                          line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
@@ -3285,6 +3299,11 @@ void MainComponent::loadUiSettings()
             engine.setPreviewInTime (on);
         else if (key == "browserAutoPreview") // the Browser's "Preview files when they are selected" (round 190ce)
             BrowserComponent::autoPreview = on;
+        else if (key == "browserAutoHide") // the Browser's "Auto-hide" (round 190mv, DF-107)
+        {
+            BrowserComponent::autoHide = on;
+            workspace.setBrowserAutoHide (on);
+        }
         else if (key == "editorVolume")
             engine.setEditorVolume (line.fromFirstOccurrenceOf ("=", false, false).trim().getDoubleValue());
         else if (key == "rackPianoRollView")
@@ -3509,6 +3528,7 @@ void MainComponent::saveUiSettings()
                                       + "\nfollowChannelRack=" + juce::String (EditorGlobals::get().isFollowingView (EditorGlobals::FollowView::channelRack) ? 1 : 0)
                                       + "\nfollowAudioEditor=" + juce::String (EditorGlobals::get().isFollowingView (EditorGlobals::FollowView::audioEditor) ? 1 : 0)
                                       + "\nscopeMode=" + juce::String (toolbar::OutputMonitor::mode)
+                                      + "\nscopeStereo=" + juce::String (toolbar::OutputMonitor::stereoScope ? 1 : 0)
                                       + "\ncpuRefresh=" + juce::String (toolbar::PerformanceMeter::refresh)
                                       + "\ncpuView=" + juce::String (toolbar::PerformanceMeter::secondView)
                                       + "\ntoolbarGroups=" + juce::String (toolbarLayout.orderToString())
@@ -3536,6 +3556,7 @@ void MainComponent::saveUiSettings()
                                       + "\npreviewVolume=" + juce::String (engine.getPreviewVolume(), 2)
                                       + "\npreviewInTime=" + juce::String (engine.isPreviewInTime() ? 1 : 0)
                                       + "\nbrowserAutoPreview=" + juce::String (BrowserComponent::autoPreview ? 1 : 0)
+                                      + "\nbrowserAutoHide=" + juce::String (BrowserComponent::autoHide ? 1 : 0)
                                       + "\neditorVolume=" + juce::String (engine.getEditorVolume(), 2)
                                       + "\nrackPianoRollView=" + juce::String (rack.isPianoRollView() ? 1 : 0)
                                       + "\naskWhatToRecord=" + juce::String (engine.getRecordOptions().askWhatToRecord ? 1 : 0)
@@ -5724,6 +5745,29 @@ void MainComponent::showMetronomeVolume()
     juce::CallOutBox::launchAsynchronously (std::make_unique<VolumePanel> (*this), metronomeButton.getScreenBounds(), nullptr);
 }
 
+void MainComponent::openMasterAudioEditor (bool newOne)
+{
+    // FL (capture 190mv A9): the button puts Edison into the Master's first empty slot and opens it ("Edison (Master)");
+    // the right button a new instance. A Master with an audio editor already opens that one on a left click.
+    const auto& master = engine.getSong().mixer;
+    if (master.empty())
+        return;
+    if (! newOne)
+    {
+        const auto& effects = master.front().effects;
+        for (int i = 0; i < (int) effects.size(); ++i)
+            if (effects[(std::size_t) i].kind == EffectKind::edison)
+            {
+                openEdisonSlot (engine, 0, i);
+                return;
+            }
+    }
+    if (const auto at = addEdisonSlot (engine, 0); at >= 0)
+        openEdisonSlot (engine, 0, at);
+    else
+        openAudioEditor (engine); // (a full Master: the editor window, as the track menu's item does)
+}
+
 void MainComponent::openAudioEditorForSelection()
 {
     const auto& song = engine.getSong();
@@ -6691,6 +6735,7 @@ void MainComponent::setControlHints()
     ui::setHint (undoButton, with (tr ("Undo the last edit"), "edit.undo") + "  " + tr ("[RMB] undo history"), true);
     ui::setHint (redoButton, with (tr ("Redo"), "edit.redo") + "  " + tr ("[RMB] undo history"), true);
     ui::setHint (pluginPickerButton, with (tr ("Plugin picker: add an instrument or an effect by name"), "panel.quickAdd"));
+    ui::setHint (audioEditorButton, tr ("Open audio editor / New audio editor") + "  " + tr ("[LMB] the Master's audio editor  [RMB] a new one"), true);
 
     ui::setHint (playButton, with (tr ("Play: [LMB] play; again: stop and go back to where it started"), "transport.playStop")
                                  + "  " + keyMarkup ("transport.pause") + " " + tr ("pause"));
@@ -6772,6 +6817,7 @@ void MainComponent::setQuickTips()
     tip (undoButton, tr ("Undo"), "edit.undo");
     tip (redoButton, tr ("Redo"), "edit.redo");
     tip (pluginPickerButton, tr ("Plugin picker"), "panel.quickAdd");
+    tip (audioEditorButton, tr ("Audio editor"));
     tip (playButton, tr ("Play"), "transport.playStop");
     tip (stopButton, tr ("Stop"));
     tip (recordButton, tr ("Record"), "transport.record");

@@ -4,10 +4,12 @@
 
 #include "core/ClipLauncher.h"
 #include "core/CountIn.h"
+#include "core/Details190mv.h" // (round 190mv: Master pitch in Hz)
 #include "core/LayoutStyle.h"
 #include "core/MarkerPlan.h"
 #include "core/Timecode.h"
 #include "core/TempoMap.h"
+#include "core/ValueMath.h" // (round 190mv: the phase nudge)
 #include "ui/FrameTicker.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
@@ -588,6 +590,23 @@ ui::ValueSpec MasterKnob::spec() const
             return std::nullopt;
         return number.getDoubleValue();
     };
+    // FL's Master pitch › "Type in value..." (round 190mv, DF-22; capture 190mv A6: a box "Master pitch (Hz)" showing 440):
+    // the tuning of A in Hz, 440 = no shift; LYNX's range ±1200 cents = 220…880 Hz
+    auto hz = std::make_shared<ui::ValueSpec>();
+    hz->name = tr ("Master pitch (Hz)");
+    hz->minimum = 220.0;
+    hz->maximum = 880.0;
+    hz->defaultValue = 440.0;
+    hz->toText = [] (double v) { return std::abs (v - std::round (v)) < 0.005 ? juce::String ((int) std::round (v)) : juce::String (v, 2); };
+    hz->fromText = [] (const juce::String& t) -> std::optional<double> {
+        const auto number = t.retainCharacters ("0123456789.");
+        if (number.isEmpty() || number.getDoubleValue() <= 0.0)
+            return std::nullopt;
+        return juce::jlimit (220.0, 880.0, number.getDoubleValue());
+    };
+    s.typeInSpec = hz;
+    s.toTypeIn = [] (double cents) { return masterpitch::hzOfCents (cents); };
+    s.fromTypeIn = [] (double hzValue) { return masterpitch::centsOfHz (hzValue); };
     return s;
 }
 
@@ -843,6 +862,54 @@ ui::Hint MasterKnob::hintAt (juce::Point<int>)
                              ? tr ("level of everything you hear (the Master insert's fader)") + "  " + ui::valueGestures()
                              : tr ("tunes the built-in instruments  [LMB] drag (semitones)  [Shift] cents  [Wheel] semitone  [Ctrl][Wheel] cent  [Alt][LMB] reset  [RMB] menu");
     return ui::valueHint (spec(), value(), gesture);
+}
+
+// --- Live's phase nudge (round 190mv, DL-51) ----------------------------------------------------------------------
+
+void PhaseNudge::paint (juce::Graphics& g)
+{
+    const auto box = getLocalBounds();
+    if (held)
+        g.fillAll (juce::Colour (0xffffc281)); // (capture 190mv B2: 255,194,129)
+    else if (isMouseOver())
+        g.fillAll (juce::Colour (0xff464646));
+    g.setColour (held ? juce::Colours::black : juce::Colour (0xffb5b5b5));
+    // four bars, the pair on the side it nudges to drawn heavier (Live's "||||" glyphs mirror each other)
+    const auto h = (float) box.getHeight() * 0.62f, y = (float) box.getCentreY() - h * 0.5f;
+    const float xs[] = { -5.0f, -2.0f, 1.0f, 4.0f };
+    for (int i = 0; i < 4; ++i)
+    {
+        const auto heavy = faster ? i >= 2 : i < 2;
+        g.fillRect (juce::Rectangle<float> ((float) box.getCentreX() + xs[i] - (heavy ? 0.5f : 0.0f), y, heavy ? 2.0f : 1.0f, h));
+    }
+}
+
+void PhaseNudge::mouseDown (const juce::MouseEvent& e)
+{
+    if (! e.mods.isLeftButtonDown() || held)
+        return;
+    held = true;
+    base = engine.getSong().bpm;
+    const auto bpm = controls::nudgedTempo (base, faster);
+    engine.editSong ([bpm] (Song& song) { song.bpm = bpm; }, false); // (outside the history: the tempo comes back)
+    repaint();
+}
+
+void PhaseNudge::release()
+{
+    if (! held)
+        return;
+    held = false;
+    const auto bpm = base;
+    engine.editSong ([bpm] (Song& song) { song.bpm = bpm; }, false);
+    repaint();
+}
+
+ui::Hint PhaseNudge::hintAt (juce::Point<int>)
+{
+    return { faster ? tr ("Phase Nudge Up: Temporarily increase song tempo to synchronize to external music.")
+                    : tr ("Phase Nudge Down: Temporarily decrease song tempo to synchronize to external music."),
+             {}, false, false };
 }
 
 // --- CPU, memory, polyphony ----------------------------------------------------------------------
@@ -1489,6 +1556,8 @@ bool OutputMonitor::update (double nowMs)
     constexpr auto columnPeriod = 1000.0 / 30.0;
 
     engine.copyScope (samples.data(), (int) samples.size());
+    if (stereoScope) // (round 190mv: FL's Stereo, the sides from mid and side)
+        engine.copyScopeSide (sideSamples.data(), (int) sideSamples.size());
     float now = 0.0f;
     for (auto s : samples)
         now = juce::jmax (now, std::abs (s));
@@ -1617,6 +1686,14 @@ void OutputMonitor::mouseDown (const juce::MouseEvent& e)
         menu.addSectionHeader (tr ("Output display"));
         for (int m = 0; m < modeCount; ++m)
             menu.addItem (modeName (m), true, mode == m, [this, m] { setMode (m); });
+        // FL's output panel menu › Oscilloscope › "Stereo" (round 190mv, DF-24; capture 190mv A8)
+        menu.addSectionHeader (tr ("Oscilloscope"));
+        menu.addItem (tr ("Stereo"), true, stereoScope, [this] {
+            stereoScope = ! stereoScope;
+            repaint();
+            if (onModeChanged)
+                onModeChanged(); // (saved with the mode)
+        });
         menu.addSeparator();
         menu.addItem (tr ("Reset the peak hold and clip light"), [this] {
             held = 0.0f;
@@ -1698,20 +1775,28 @@ void OutputMonitor::paint (juce::Graphics& g)
     g.setColour (colour::border);
     g.drawHorizontalLine ((int) scope.getCentreY(), scope.getX(), scope.getRight());
     juce::Path wave;
-    const auto mid = scope.getCentreY();
-    const auto half = scope.getHeight() * 0.47f;
     const auto width = juce::jmax (1, (int) scope.getWidth());
-
-    for (int x = 0; x < width; ++x)
+    // FL's Stereo (round 190mv, DF-24; capture 190mv A8): the left side's line in the upper half, the right's in the
+    // lower half of the same box; off = one line of both
+    const auto addLine = [&] (float mid, float half, int side) {
+        for (int x = 0; x < width; ++x)
+        {
+            const auto index = (std::size_t) (x * (int) samples.size() / width);
+            const auto v = side == 0 ? samples[index] : side == 1 ? samples[index] + sideSamples[index] : samples[index] - sideSamples[index];
+            const auto y = mid - juce::jlimit (-1.0f, 1.0f, v) * half;
+            if (x == 0)
+                wave.startNewSubPath (scope.getX(), y);
+            else
+                wave.lineTo (scope.getX() + (float) x, y);
+        }
+    };
+    if (stereoScope)
     {
-        const auto index = (std::size_t) (x * (int) samples.size() / width);
-        const auto y = mid - juce::jlimit (-1.0f, 1.0f, samples[index]) * half;
-
-        if (x == 0)
-            wave.startNewSubPath (scope.getX(), y);
-        else
-            wave.lineTo (scope.getX() + (float) x, y);
+        addLine (scope.getY() + scope.getHeight() * 0.25f, scope.getHeight() * 0.23f, 1);
+        addLine (scope.getY() + scope.getHeight() * 0.75f, scope.getHeight() * 0.23f, 2);
     }
+    else
+        addLine (scope.getCentreY(), scope.getHeight() * 0.47f, 0);
 
     const auto stroke = juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
     // round 174e2: the same stroke drawn by the software renderer into a small image, then the image to the window.
@@ -1794,6 +1879,18 @@ juce::Rectangle<float> OutputMonitor::barArea (int side) const
 float OutputMonitor::levelAt (float x01) noexcept
 {
     return -60.0f + 60.0f * juce::jlimit (0.0f, 1.0f, x01);
+}
+
+void OutputMonitor::setScopeSidesForShot (float leftPhase, float rightPhase)
+{
+    for (std::size_t i = 0; i < samples.size(); ++i)
+    {
+        const auto t = (float) i / (float) samples.size() * juce::MathConstants<float>::twoPi * 6.0f;
+        const auto l = 0.45f * std::sin (t + leftPhase), r = 0.3f * std::sin (1.5f * t + rightPhase);
+        samples[i] = 0.5f * (l + r);
+        sideSamples[i] = 0.5f * (l - r);
+    }
+    repaint();
 }
 
 void OutputMonitor::setSidesForShot (float left, float right, bool clipLeft, bool clipRight)

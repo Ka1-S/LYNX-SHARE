@@ -290,6 +290,10 @@ public:
     // The automatic preview (the reference's headphone switch, its menu "browser pre-hear"): off = selecting a file
     // shows its waveform and details without playing it; the strip's Play button still plays it. A user setting.
     static inline bool autoPreview = true;
+    // FL's Browser options › View › "Auto-hide" (round 190mv, DF-107): kept with the UI settings; the main window's
+    // workspace rolls a floating Browser up to its title strip (ui/Workspace.h setBrowserAutoHide)
+    static inline bool autoHide = false;
+    std::function<void()> onAutoHideChanged;
 
     // --- Hot-swap (round 190ce, core/HotSwap.h; docs/analise/REA_rodada190ce.md §2) --------------------------------------
     // The Browser linked to a device: a bar over the tabs names it, and Enter / a double-click on a Plugin database
