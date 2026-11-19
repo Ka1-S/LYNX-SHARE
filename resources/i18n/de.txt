@@ -11851,3 +11851,11 @@ countries: de at ch li lu
 "Spectral Tilt" = "Spektral-Tilt"
 "Spectral Band" = "Spektral-Band"
 "Spectral Gain" = "Spektral-Gain"
+
+# --- rollup 0.1.30 step 13: Save a copy for 0.1.28 knows rounds 190mt / 190mv / 190mr
+"Ridge Strip's G-Channel EQ law (the Waves SSL G-Channel stand-in) plays Ridge's own E bands: {0}" = "Das G-Channel-EQ-Gesetz von Ridge Strip (der Ersatz für Waves SSL G-Channel) spielt Ridges eigene E-Bänder: {0}"
+"Facet EQ's API-560 law (the Waves API-560 stand-in) plays Facet's own bands: {0}" = "Das API-560-Gesetz von Facet EQ (der Ersatz für Waves API-560) spielt Facets eigene Bänder: {0}"
+"Compressor's RVox type (the Waves RChannel stand-in) plays the Renaissance law's own curve: {0}" = "Der RVox-Typ des Compressors (der Ersatz für Waves RChannel) spielt die eigene Kurve des Renaissance-Gesetzes: {0}"
+"Compressor's gate (the Waves RChannel stand-in) is left out: {0}" = "Das Gate des Compressors (der Ersatz für Waves RChannel) entfällt: {0}"
+"The Current mixer track shows as an ordinary insert: its effects no longer process the selected track: {0}" = "Die Mixer-Spur Aktuell erscheint als gewöhnlicher Insert: ihre Effekte bearbeiten die ausgewählte Spur nicht mehr: {0}"
+"The window layout saved with the project is not restored" = "Das mit dem Projekt gespeicherte Fensterlayout wird nicht wiederhergestellt"

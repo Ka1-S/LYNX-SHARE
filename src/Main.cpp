@@ -7271,6 +7271,28 @@ private:
                 m16.push_back (multiband); // [36]
                 song.channels[0].zipped = true;
             }
+            // rollup step 13 (round 190na): round 190mt's Waves laws (Facet's API-560 law, Compressor's RVox type and gate,
+            // Ridge's G-Channel EQ law) and round 190mv's FL Current mixer track (round 190mr's window layout: below)
+            int currentAt = -1;
+            {
+                auto& m16 = song.mixer[16].effects; // (after step 12's [27] … [36])
+                auto api560 = lynx::makeEffectSlot (lynx::EffectKind::facetEq);
+                api560.params[(std::size_t) lynx::facet::api560LawParam] = 1.0f;
+                api560.params[(std::size_t) lynx::facet::api560GainParam0 + 3] = lynx::facet::api560GainValue (6.0);
+                m16.push_back (api560); // [37]
+                auto rch = lynx::makeEffectSlot (lynx::EffectKind::compressor);
+                rch.params[(std::size_t) lynx::compressorRenLaw] = 1.0f;
+                rch.params[(std::size_t) lynx::compressorRVoxType] = 1.0f;
+                rch.params[(std::size_t) lynx::compressorRchGate] = 1.0f;
+                m16.push_back (rch); // [38]
+                auto sslG = lynx::makeEffectSlot (lynx::EffectKind::ridgeStrip);
+                sslG.params[(std::size_t) lynx::mixsuite::ridge::gEqLaw] = 1.0f;
+                sslG.params[(std::size_t) lynx::mixsuite::ridge::gHfKHz] = 0.5f;
+                m16.push_back (sslG); // [39]
+                currentAt = lynx::mixerops::addCurrentTrack (song);
+                if (currentAt >= 0)
+                    song.mixer[(std::size_t) currentAt].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::facetEq));
+            }
 
             const auto copy = lynx::olderlynx::forRelease (song, "0.1.28");
             juce::String why;
@@ -7427,6 +7449,18 @@ private:
                      || m16[35]["params"].size() > (int) lynx::mixsuite::ridge::k4Pink || m16[36].hasProperty ("displayView")
                      || copy.json.contains ("\"zipped\""))
                 rollup030Result = "ERROR step-12 items";
+            else if (const auto& m16 = parsed["mixer"][16]["effects"];
+                     ! said ("Facet EQ's API-560 law") || ! said ("Compressor's RVox type") || ! said ("Compressor's gate")
+                     || ! said ("Ridge Strip's G-Channel EQ law") || ! said ("The Current mixer track shows as an ordinary insert")
+                     || m16[37]["params"].size() > lynx::facet::autoThresholdParam0 || m16[38]["params"].size() > lynx::compressorRenLaw
+                     || m16[39]["params"].size() > (int) lynx::mixsuite::ridge::k4Pink || currentAt < 0
+                     || parsed["mixer"][currentAt].hasProperty ("current") || parsed["mixer"][currentAt]["effects"].size() != 1)
+                rollup030Result = "ERROR step-13 items";
+            else if (const auto laid = lynx::olderlynx::forRelease (lynx::ProjectFile::withWindowLayout (lynx::ProjectFile::toJson (lynx::Song::makeDefault()),
+                                                                                                         { 0, "rollup step 13" }), "0.1.28");
+                     ! laid.ok || laid.json.contains ("windowLayout")
+                     || std::none_of (laid.lost.begin(), laid.lost.end(), [] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).startsWith ("The window layout saved"); }))
+                rollup030Result = "ERROR step-13 window layout";
             else if (const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.28");
                      ! plain.ok || std::any_of (plain.lost.begin(), plain.lost.end(), [] (const lynx::olderlynx::Loss& l) {
                          const auto t = juce::String (l.text);
@@ -7444,7 +7478,7 @@ private:
                                 || t.contains ("scene follow") || t.startsWith ("Horizon") || t.startsWith ("Nebula") || t.startsWith ("Orbit")
                                 || t.startsWith ("Compressor's") || t.startsWith ("Gemini") || t.startsWith ("LYNX Tune") || t.contains ("Repeat")
                                 || t.startsWith ("Low Lifter") || t.startsWith ("Aether") || t.startsWith ("Ridge Strip's omni") || t.startsWith ("Hush De-esser's Renaissance")
-                                || t.startsWith ("Fruity Multiband") || t.contains ("zipped");
+                                || t.startsWith ("Fruity Multiband") || t.contains ("zipped") || t.contains ("Current mixer track") || t.contains ("window layout");
                      }))
                 rollup030Result = "ERROR a plain project reports a loss it does not have";
         }

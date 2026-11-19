@@ -11851,3 +11851,11 @@ countries: kr
 "Spectral Tilt" = "스펙트럴 틸트"
 "Spectral Band" = "스펙트럴 밴드"
 "Spectral Gain" = "스펙트럴 게인"
+
+# --- rollup 0.1.30 step 13: Save a copy for 0.1.28 knows rounds 190mt / 190mv / 190mr
+"Ridge Strip's G-Channel EQ law (the Waves SSL G-Channel stand-in) plays Ridge's own E bands: {0}" = "Ridge Strip의 G-Channel EQ 법칙(Waves SSL G-Channel 대체)은 Ridge 자체 E 밴드로 재생됩니다: {0}"
+"Facet EQ's API-560 law (the Waves API-560 stand-in) plays Facet's own bands: {0}" = "Facet EQ의 API-560 법칙(Waves API-560 대체)은 Facet 자체 밴드로 재생됩니다: {0}"
+"Compressor's RVox type (the Waves RChannel stand-in) plays the Renaissance law's own curve: {0}" = "Compressor의 RVox 유형(Waves RChannel 대체)은 Renaissance 법칙 자체 곡선으로 재생됩니다: {0}"
+"Compressor's gate (the Waves RChannel stand-in) is left out: {0}" = "Compressor의 게이트(Waves RChannel 대체)는 빠집니다: {0}"
+"The Current mixer track shows as an ordinary insert: its effects no longer process the selected track: {0}" = "믹서의 현재 트랙은 일반 인서트로 표시되며, 그 이펙트는 더 이상 선택한 트랙을 처리하지 않습니다: {0}"
+"The window layout saved with the project is not restored" = "프로젝트와 함께 저장된 창 배치는 복원되지 않습니다"

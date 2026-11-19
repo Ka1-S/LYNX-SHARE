@@ -11851,3 +11851,11 @@ countries: pl
 "Spectral Tilt" = "Tilt widma"
 "Spectral Band" = "Pasmo widma"
 "Spectral Gain" = "Gain widma"
+
+# --- rollup 0.1.30 step 13: Save a copy for 0.1.28 knows rounds 190mt / 190mv / 190mr
+"Ridge Strip's G-Channel EQ law (the Waves SSL G-Channel stand-in) plays Ridge's own E bands: {0}" = "Prawo korektora G-Channel w Ridge Strip (zamiennik Waves SSL G-Channel) gra własne pasma E Ridge: {0}"
+"Facet EQ's API-560 law (the Waves API-560 stand-in) plays Facet's own bands: {0}" = "Prawo API-560 w Facet EQ (zamiennik Waves API-560) gra własne pasma Facet: {0}"
+"Compressor's RVox type (the Waves RChannel stand-in) plays the Renaissance law's own curve: {0}" = "Typ RVox w Compressor (zamiennik Waves RChannel) gra własną krzywą prawa Renaissance: {0}"
+"Compressor's gate (the Waves RChannel stand-in) is left out: {0}" = "Bramka w Compressor (zamiennik Waves RChannel) jest pomijana: {0}"
+"The Current mixer track shows as an ordinary insert: its effects no longer process the selected track: {0}" = "Ścieżka miksera Bieżąca wyświetla się jako zwykły insert: jej efekty nie przetwarzają już zaznaczonej ścieżki: {0}"
+"The window layout saved with the project is not restored" = "Układ okien zapisany z projektem nie zostaje przywrócony"

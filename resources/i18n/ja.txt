@@ -11851,3 +11851,11 @@ countries: jp
 "Spectral Tilt" = "スペクトラルチルト"
 "Spectral Band" = "スペクトラルバンド"
 "Spectral Gain" = "スペクトラルゲイン"
+
+# --- rollup 0.1.30 step 13: Save a copy for 0.1.28 knows rounds 190mt / 190mv / 190mr
+"Ridge Strip's G-Channel EQ law (the Waves SSL G-Channel stand-in) plays Ridge's own E bands: {0}" = "Ridge Strip の G-Channel EQ 則（Waves SSL G-Channel の代替）は Ridge 独自の E バンドで再生されます: {0}"
+"Facet EQ's API-560 law (the Waves API-560 stand-in) plays Facet's own bands: {0}" = "Facet EQ の API-560 則（Waves API-560 の代替）は Facet 独自のバンドで再生されます: {0}"
+"Compressor's RVox type (the Waves RChannel stand-in) plays the Renaissance law's own curve: {0}" = "Compressor の RVox タイプ（Waves RChannel の代替）は Renaissance 則自身のカーブで再生されます: {0}"
+"Compressor's gate (the Waves RChannel stand-in) is left out: {0}" = "Compressor のゲート（Waves RChannel の代替）は省かれます: {0}"
+"The Current mixer track shows as an ordinary insert: its effects no longer process the selected track: {0}" = "ミキサーのカレントトラックは通常のインサートとして表示され、そのエフェクトは選択中のトラックを処理しなくなります: {0}"
+"The window layout saved with the project is not restored" = "プロジェクトと一緒に保存されたウィンドウ配置は復元されません"

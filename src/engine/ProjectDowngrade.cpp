@@ -285,7 +285,7 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
     // measured Allround timing (hidden parameters 0.1.28 ignores: it plays revision 0, Black, and the earlier timing)
     {
         juce::StringArray thump, pink, consoleFilters, lineLaw, hybridLoop, valhallaLoop, luxeSpace, hushTiming, hushVocal, echoVoicings, latticeTaps, luxeDucking, verbRevisions,
-            omni, hushRen;
+            omni, hushRen, gLaw;
         forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
             auto* params = arrayOf (e.getProperty ("params"));
             if (params == nullptr) // (a slot written without parameters)
@@ -304,6 +304,9 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
                 // rollup step 12: round 190mm's omni law [100 …] (set only by the Waves Scheps Omni Channel translator)
                 if (params->size() > mixsuite::ridge::omniLaw && (float) (double) (*params)[mixsuite::ridge::omniLaw] >= 0.5f)
                     addOnce (omni, where);
+                // rollup step 13: round 190mt's G-Channel EQ law [93 …] (set only by the Waves SSL G-Channel translator)
+                if (params->size() > mixsuite::ridge::gEqLaw && (float) (double) (*params)[mixsuite::ridge::gEqLaw] >= 0.5f)
+                    addOnce (gLaw, where);
                 // rollup step 8: round 190lb's SSL 4K G / 4K E filters (and the G's ceiling), round 190le's 32C voicing
                 for (const auto hidden : { mixsuite::ridge::k4gLaw, mixsuite::ridge::k4eHpLaw, mixsuite::ridge::h32 })
                     if (params->size() > hidden && (float) (double) (*params)[hidden] >= 0.5f)
@@ -394,6 +397,8 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("Hush De-esser's Single Vocal mode plays its earlier version: {0}"), listOf (hushVocal), true });
         if (! omni.isEmpty())
             lost.push_back ({ TR_NOOP ("Ridge Strip's omni law (the Waves Scheps Omni Channel stand-in) is left out: it plays Ridge's own strip: {0}"), listOf (omni), true });
+        if (! gLaw.isEmpty())
+            lost.push_back ({ TR_NOOP ("Ridge Strip's G-Channel EQ law (the Waves SSL G-Channel stand-in) plays Ridge's own E bands: {0}"), listOf (gLaw), true });
         if (! hushRen.isEmpty())
             lost.push_back ({ TR_NOOP ("Hush De-esser's Renaissance law (the Waves RDeEsser stand-in) plays Hush's own de-esser: {0}"), listOf (hushRen), true });
         if (! echoVoicings.isEmpty())
@@ -486,7 +491,7 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
     // rollup step 4, round 190jh: Facet EQ's automatic dynamic thresholds (hidden parameters past its count; 0.1.28 plays
     // those bands with their manual threshold)
     {
-        juce::StringArray autoBands, dispersion, puig, wavesEq;
+        juce::StringArray autoBands, dispersion, puig, wavesEq, api560;
         forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
             auto* params = arrayOf (e.getProperty ("params"));
             if (params == nullptr || e.getProperty ("kind").toString() != "facetEq" || params->size() <= facet::autoThresholdParam0)
@@ -505,6 +510,10 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             // Q10 / RChannel translators)
             if (params->size() > facet::wavesLawParam && (float) (double) (*params)[facet::wavesLawParam] >= 0.5f)
                 addOnce (wavesEq, where);
+            // rollup step 13: round 190mt's API-560 law [139] + slider gains [140 …] (set only by the Waves API-560 translator;
+            // its Q10 codes 14 / 15 go with the Waves design law above)
+            if (params->size() > facet::api560LawParam && (float) (double) (*params)[facet::api560LawParam] >= 0.5f)
+                addOnce (api560, where);
             params->removeRange (facet::autoThresholdParam0, params->size() - facet::autoThresholdParam0);
         });
         if (! autoBands.isEmpty())
@@ -515,6 +524,8 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("Facet EQ's PuigTec law (the Waves PuigTec stand-in: its output stage and mains hum) is left out: {0}"), listOf (puig), true });
         if (! wavesEq.isEmpty())
             lost.push_back ({ TR_NOOP ("Facet EQ's Waves design law (the Renaissance EQ and Q10 stand-ins) plays Facet's own band shapes: {0}"), listOf (wavesEq), true });
+        if (! api560.isEmpty())
+            lost.push_back ({ TR_NOOP ("Facet EQ's API-560 law (the Waves API-560 stand-in) plays Facet's own bands: {0}"), listOf (api560), true });
     }
 
     // rollup step 4, round 190jl: MIDI Out channels and the plugin wrappers' Output port reach hardware MIDI outputs from
@@ -934,7 +945,7 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
     // Waves Tune Real-Time law (each set only by its translator; Crest's FET amplifier goes with the FET law's line, the
     // L2 requantizer with the L2 law's, Prism's C4 law, Quell's NS1 law and Facet's PuigTec law have their lines above)
     {
-        juce::StringArray horizonLaws, nebulaTone, orbitLaws, renLaw, splice, wavesTune, voxLaw, apiLaw, channelEq, bassLaw, vitamin;
+        juce::StringArray horizonLaws, nebulaTone, orbitLaws, renLaw, splice, wavesTune, voxLaw, apiLaw, channelEq, bassLaw, vitamin, rvoxType, rchGate;
         forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
             auto* params = arrayOf (e.getProperty ("params"));
             if (params == nullptr)
@@ -975,7 +986,12 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
                     addOnce (apiLaw, where);
                 if (on (compressorChannelLaw))
                     addOnce (channelEq, where);
-                if (on (compressorRenLaw) || ! (on (compressorVoxLaw) || on (compressorApiLaw) || on (compressorChannelLaw)))
+                // rollup step 13: round 190mt's RVox type [38] and gate [39 …] (set only by the RChannel translator)
+                if (on (compressorRVoxType))
+                    addOnce (rvoxType, where);
+                if (on (compressorRchGate))
+                    addOnce (rchGate, where);
+                if (on (compressorRenLaw) || ! (on (compressorVoxLaw) || on (compressorApiLaw) || on (compressorChannelLaw) || on (compressorRVoxType) || on (compressorRchGate)))
                     cut (compressorRenLaw, renLaw);
                 else if (params->size() > compressorRenLaw)
                     params->removeRange (compressorRenLaw, params->size() - compressorRenLaw);
@@ -1007,6 +1023,10 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("Compressor's bus law (the Waves API-2500 stand-in) plays as the plain Compressor: {0}"), listOf (apiLaw), true });
         if (! channelEq.isEmpty())
             lost.push_back ({ TR_NOOP ("Compressor's channel EQ (the Waves RChannel stand-in) is left out: {0}"), listOf (channelEq), true });
+        if (! rvoxType.isEmpty())
+            lost.push_back ({ TR_NOOP ("Compressor's RVox type (the Waves RChannel stand-in) plays the Renaissance law's own curve: {0}"), listOf (rvoxType), true });
+        if (! rchGate.isEmpty())
+            lost.push_back ({ TR_NOOP ("Compressor's gate (the Waves RChannel stand-in) is left out: {0}"), listOf (rchGate), true });
         if (! bassLaw.isEmpty())
             lost.push_back ({ TR_NOOP ("Low Lifter's bass law (the Waves MaxxBass and Renaissance Bass stand-ins) plays as Low Lifter: {0}"), listOf (bassLaw), true });
         if (! vitamin.isEmpty())
@@ -1066,6 +1086,24 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
         });
         if (! edited.isEmpty())
             lost.push_back ({ TR_NOOP ("Audio clips with notes edited in the polyphonic note editor play without those edits: {0}"), listOf (edited), false });
+    }
+
+    // rollup step 13: round 190mv's FL Current mixer track (the last insert, "current"; 0.1.28 shows it as an ordinary insert
+    // that nothing routes into, so its effects no longer process the selected track) and round 190mr's window layout saved
+    // with the project (0.1.28 ignores it: the layout on screen stays)
+    {
+        juce::StringArray current;
+        if (auto* mixer = arrayOf (root["mixer"]))
+            for (int t = 0; t < mixer->size(); ++t)
+                if (auto* m = objectOf ((*mixer)[t]); m != nullptr && m->getProperty ("current").isBool() && (bool) m->getProperty ("current"))
+                {
+                    addOnce (current, insertName (root["mixer"], t));
+                    drop (*m, "current");
+                }
+        if (! current.isEmpty())
+            lost.push_back ({ TR_NOOP ("The Current mixer track shows as an ordinary insert: its effects no longer process the selected track: {0}"), listOf (current), true });
+        if (drop (o, "windowLayout"))
+            lost.push_back ({ TR_NOOP ("The window layout saved with the project is not restored"), {}, false });
     }
 }
 

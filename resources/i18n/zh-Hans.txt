@@ -11851,3 +11851,11 @@ countries: cn sg
 "Spectral Tilt" = "频谱倾斜"
 "Spectral Band" = "频谱频段"
 "Spectral Gain" = "频谱增益"
+
+# --- rollup 0.1.30 step 13: Save a copy for 0.1.28 knows rounds 190mt / 190mv / 190mr
+"Ridge Strip's G-Channel EQ law (the Waves SSL G-Channel stand-in) plays Ridge's own E bands: {0}" = "Ridge Strip 的 G-Channel EQ 规律（Waves SSL G-Channel 的替代）按 Ridge 自身的 E 频段播放：{0}"
+"Facet EQ's API-560 law (the Waves API-560 stand-in) plays Facet's own bands: {0}" = "Facet EQ 的 API-560 规律（Waves API-560 的替代）按 Facet 自身的频段播放：{0}"
+"Compressor's RVox type (the Waves RChannel stand-in) plays the Renaissance law's own curve: {0}" = "Compressor 的 RVox 类型（Waves RChannel 的替代）按 Renaissance 规律自身的曲线播放：{0}"
+"Compressor's gate (the Waves RChannel stand-in) is left out: {0}" = "Compressor 的门限（Waves RChannel 的替代）被省略：{0}"
+"The Current mixer track shows as an ordinary insert: its effects no longer process the selected track: {0}" = "混音器的当前轨道显示为普通插入轨：其效果不再处理所选轨道：{0}"
+"The window layout saved with the project is not restored" = "随项目保存的窗口布局不会恢复"
