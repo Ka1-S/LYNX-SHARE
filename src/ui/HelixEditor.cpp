@@ -1886,7 +1886,7 @@ public:
         // two rows of sections, left to right
         const int rowH = 72, gap = 4;
         const int top[5] { 2, 2 + rowH + gap, 2 + 2 * (rowH + gap), 2 + 3 * (rowH + gap), 2 + 4 * (rowH + gap) };
-        const int widths[20] { 264, 136, 220, 120, 236, 112, 208, 212, 236, 216, 440, 360, 188, 236, 204, 128, 200, 216, 436, 568 };
+        const int widths[20] { 264, 136, 220, 120, 236, 112, 208, 212, 236, 216, 440, 360, 188, 236, 204, 128, 200, 216, 430, 562 }; // (190mt: the fifth row fits the strip's 1000 px)
         const int rowOf[20] { 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4 };
         int x = 2;
         for (int i = 0; i < 20; ++i)
@@ -2024,11 +2024,11 @@ public:
         grainOn->setBounds (g0.getX() + 6, g0.getY() + 22, 44, 16);
         grainLoad->setBounds (g0.getX() + 6, g0.getY() + 46, 44, 16);
         for (int i = 0; i < (int) grainKnobs.size(); ++i)
-            kn (grainKnobs[(std::size_t) i], g0, i, 54, 47);
+            kn (grainKnobs[(std::size_t) i], g0, i, 56, 46);
         specOn->setBounds (s0.getX() + 6, s0.getY() + 22, 44, 16);
         specLoad->setBounds (s0.getX() + 6, s0.getY() + 46, 44, 16);
         for (int i = 0; i < (int) specKnobs.size(); ++i)
-            kn (specKnobs[(std::size_t) i], s0, i, 54, 51);
+            kn (specKnobs[(std::size_t) i], s0, i, 56, 50);
         grainName = { g0.getX() + 80, g0.getY() + 1, g0.getWidth() - 86, 14 };
         specName = { s0.getX() + 80, s0.getY() + 1, s0.getWidth() - 86, 14 };
     }
