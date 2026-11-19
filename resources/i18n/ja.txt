@@ -11784,3 +11784,16 @@ countries: jp
 "Macro 8" = "マクロ8"
 "Chaos 1" = "カオス1"
 "Chaos 2" = "カオス2"
+
+# --- rollup 0.1.30 step 12: Save a copy for 0.1.28 knows rounds 190mm / 190mk
+"Ridge Strip's omni law (the Waves Scheps Omni Channel stand-in) is left out: it plays Ridge's own strip: {0}" = "Ridge Strip の omni 則（Waves Scheps Omni Channel の代替）は省かれ、Ridge 独自のストリップで再生されます: {0}"
+"Hush De-esser's Renaissance law (the Waves RDeEsser stand-in) plays Hush's own de-esser: {0}" = "Hush De-esser の Renaissance 則（Waves RDeEsser の代替）は Hush 独自のディエッサーで再生されます: {0}"
+"Facet EQ's Waves design law (the Renaissance EQ and Q10 stand-ins) plays Facet's own band shapes: {0}" = "Facet EQ の Waves 設計則（Renaissance EQ と Q10 の代替）は Facet 独自のバンド形状で再生されます: {0}"
+"Prism Multiband's floating bands (the Waves C6 stand-in) are left out: {0}" = "Prism Multiband のフローティングバンド（Waves C6 の代替）は省かれます: {0}"
+"Compressor's Vox law (the Waves Renaissance Vox stand-in) plays as the plain Compressor: {0}" = "Compressor の Vox 則（Waves Renaissance Vox の代替）は通常の Compressor として再生されます: {0}"
+"Compressor's bus law (the Waves API-2500 stand-in) plays as the plain Compressor: {0}" = "Compressor のバス則（Waves API-2500 の代替）は通常の Compressor として再生されます: {0}"
+"Compressor's channel EQ (the Waves RChannel stand-in) is left out: {0}" = "Compressor のチャンネル EQ（Waves RChannel の代替）は省かれます: {0}"
+"Low Lifter's bass law (the Waves MaxxBass and Renaissance Bass stand-ins) plays as Low Lifter: {0}" = "Low Lifter のベース則（Waves MaxxBass と Renaissance Bass の代替）は Low Lifter として再生されます: {0}"
+"Aether's Vitamin law (the Waves Vitamin stand-in) plays Aether's own enhancer: {0}" = "Aether の Vitamin 則（Waves Vitamin の代替）は Aether 独自のエンハンサーで再生されます: {0}"
+"Fruity Multiband Compressor's display SPEED goes back to its default: {0}" = "Fruity Multiband Compressor の表示 SPEED は既定値に戻ります: {0}"
+"{0} zipped channel(s) show at full height in the Channel rack" = "Zip された {0} 個のチャンネルは Channel rack で通常の高さで表示されます"

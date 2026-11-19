@@ -11784,3 +11784,16 @@ countries: kr
 "Macro 8" = "매크로 8"
 "Chaos 1" = "카오스 1"
 "Chaos 2" = "카오스 2"
+
+# --- rollup 0.1.30 step 12: Save a copy for 0.1.28 knows rounds 190mm / 190mk
+"Ridge Strip's omni law (the Waves Scheps Omni Channel stand-in) is left out: it plays Ridge's own strip: {0}" = "Ridge Strip의 omni 법칙(Waves Scheps Omni Channel 대체)은 빠지고 Ridge 자체 스트립으로 재생됩니다: {0}"
+"Hush De-esser's Renaissance law (the Waves RDeEsser stand-in) plays Hush's own de-esser: {0}" = "Hush De-esser의 Renaissance 법칙(Waves RDeEsser 대체)은 Hush 자체 디에서로 재생됩니다: {0}"
+"Facet EQ's Waves design law (the Renaissance EQ and Q10 stand-ins) plays Facet's own band shapes: {0}" = "Facet EQ의 Waves 설계 법칙(Renaissance EQ와 Q10 대체)은 Facet 자체 밴드 모양으로 재생됩니다: {0}"
+"Prism Multiband's floating bands (the Waves C6 stand-in) are left out: {0}" = "Prism Multiband의 플로팅 밴드(Waves C6 대체)는 빠집니다: {0}"
+"Compressor's Vox law (the Waves Renaissance Vox stand-in) plays as the plain Compressor: {0}" = "Compressor의 Vox 법칙(Waves Renaissance Vox 대체)은 일반 Compressor로 재생됩니다: {0}"
+"Compressor's bus law (the Waves API-2500 stand-in) plays as the plain Compressor: {0}" = "Compressor의 버스 법칙(Waves API-2500 대체)은 일반 Compressor로 재생됩니다: {0}"
+"Compressor's channel EQ (the Waves RChannel stand-in) is left out: {0}" = "Compressor의 채널 EQ(Waves RChannel 대체)는 빠집니다: {0}"
+"Low Lifter's bass law (the Waves MaxxBass and Renaissance Bass stand-ins) plays as Low Lifter: {0}" = "Low Lifter의 베이스 법칙(Waves MaxxBass와 Renaissance Bass 대체)은 Low Lifter로 재생됩니다: {0}"
+"Aether's Vitamin law (the Waves Vitamin stand-in) plays Aether's own enhancer: {0}" = "Aether의 Vitamin 법칙(Waves Vitamin 대체)은 Aether 자체 인핸서로 재생됩니다: {0}"
+"Fruity Multiband Compressor's display SPEED goes back to its default: {0}" = "Fruity Multiband Compressor의 표시 SPEED는 기본값으로 돌아갑니다: {0}"
+"{0} zipped channel(s) show at full height in the Channel rack" = "접힌 채널 {0}개가 Channel rack에서 전체 높이로 표시됩니다"

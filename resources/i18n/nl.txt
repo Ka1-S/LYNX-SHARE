@@ -11784,3 +11784,16 @@ countries: nl be
 "Macro 8" = "Macro 8"
 "Chaos 1" = "Chaos 1"
 "Chaos 2" = "Chaos 2"
+
+# --- rollup 0.1.30 step 12: Save a copy for 0.1.28 knows rounds 190mm / 190mk
+"Ridge Strip's omni law (the Waves Scheps Omni Channel stand-in) is left out: it plays Ridge's own strip: {0}" = "De omni-wet van Ridge Strip (de vervanger van Waves Scheps Omni Channel) vervalt: Ridges eigen kanaalstrip speelt: {0}"
+"Hush De-esser's Renaissance law (the Waves RDeEsser stand-in) plays Hush's own de-esser: {0}" = "De Renaissance-wet van Hush De-esser (de vervanger van Waves RDeEsser) speelt Hushs eigen de-esser: {0}"
+"Facet EQ's Waves design law (the Renaissance EQ and Q10 stand-ins) plays Facet's own band shapes: {0}" = "De Waves-ontwerpwet van Facet EQ (de vervanger van Renaissance EQ en Q10) speelt Facets eigen bandvormen: {0}"
+"Prism Multiband's floating bands (the Waves C6 stand-in) are left out: {0}" = "De zwevende banden van Prism Multiband (de vervanger van Waves C6) vervallen: {0}"
+"Compressor's Vox law (the Waves Renaissance Vox stand-in) plays as the plain Compressor: {0}" = "De Vox-wet van Compressor (de vervanger van Waves Renaissance Vox) speelt als de gewone Compressor: {0}"
+"Compressor's bus law (the Waves API-2500 stand-in) plays as the plain Compressor: {0}" = "De buswet van Compressor (de vervanger van Waves API-2500) speelt als de gewone Compressor: {0}"
+"Compressor's channel EQ (the Waves RChannel stand-in) is left out: {0}" = "De kanaal-EQ van Compressor (de vervanger van Waves RChannel) vervalt: {0}"
+"Low Lifter's bass law (the Waves MaxxBass and Renaissance Bass stand-ins) plays as Low Lifter: {0}" = "De baswet van Low Lifter (de vervanger van Waves MaxxBass en Renaissance Bass) speelt als Low Lifter: {0}"
+"Aether's Vitamin law (the Waves Vitamin stand-in) plays Aether's own enhancer: {0}" = "De Vitamin-wet van Aether (de vervanger van Waves Vitamin) speelt Aethers eigen enhancer: {0}"
+"Fruity Multiband Compressor's display SPEED goes back to its default: {0}" = "De SPEED van de weergave van Fruity Multiband Compressor gaat terug naar de standaardwaarde: {0}"
+"{0} zipped channel(s) show at full height in the Channel rack" = "{0} ingeklapte kanalen worden op volle hoogte getoond in het Channel rack"

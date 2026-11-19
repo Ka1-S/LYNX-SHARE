@@ -11784,3 +11784,16 @@ countries: pl
 "Macro 8" = "Makro 8"
 "Chaos 1" = "Chaos 1"
 "Chaos 2" = "Chaos 2"
+
+# --- rollup 0.1.30 step 12: Save a copy for 0.1.28 knows rounds 190mm / 190mk
+"Ridge Strip's omni law (the Waves Scheps Omni Channel stand-in) is left out: it plays Ridge's own strip: {0}" = "Prawo omni w Ridge Strip (zamiennik Waves Scheps Omni Channel) jest pomijane: gra własny tor Ridge: {0}"
+"Hush De-esser's Renaissance law (the Waves RDeEsser stand-in) plays Hush's own de-esser: {0}" = "Prawo Renaissance w Hush De-esser (zamiennik Waves RDeEsser) gra własny de-esser Hush: {0}"
+"Facet EQ's Waves design law (the Renaissance EQ and Q10 stand-ins) plays Facet's own band shapes: {0}" = "Prawo projektowe Waves w Facet EQ (zamiennik Renaissance EQ i Q10) gra własne kształty pasm Facet: {0}"
+"Prism Multiband's floating bands (the Waves C6 stand-in) are left out: {0}" = "Pasma pływające w Prism Multiband (zamiennik Waves C6) są pomijane: {0}"
+"Compressor's Vox law (the Waves Renaissance Vox stand-in) plays as the plain Compressor: {0}" = "Prawo Vox w Compressor (zamiennik Waves Renaissance Vox) gra jako zwykły Compressor: {0}"
+"Compressor's bus law (the Waves API-2500 stand-in) plays as the plain Compressor: {0}" = "Prawo szyny w Compressor (zamiennik Waves API-2500) gra jako zwykły Compressor: {0}"
+"Compressor's channel EQ (the Waves RChannel stand-in) is left out: {0}" = "Korektor kanałowy w Compressor (zamiennik Waves RChannel) jest pomijany: {0}"
+"Low Lifter's bass law (the Waves MaxxBass and Renaissance Bass stand-ins) plays as Low Lifter: {0}" = "Prawo basu w Low Lifter (zamiennik Waves MaxxBass i Renaissance Bass) gra jako Low Lifter: {0}"
+"Aether's Vitamin law (the Waves Vitamin stand-in) plays Aether's own enhancer: {0}" = "Prawo Vitamin w Aether (zamiennik Waves Vitamin) gra własny wzmacniacz Aether: {0}"
+"Fruity Multiband Compressor's display SPEED goes back to its default: {0}" = "SPEED wyświetlacza Fruity Multiband Compressor wraca do wartości domyślnej: {0}"
+"{0} zipped channel(s) show at full height in the Channel rack" = "Zwinięte kanały ({0}) są pokazywane w pełnej wysokości w Channel rack"

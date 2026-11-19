@@ -54,6 +54,7 @@
 #include "core/VideoPlayer.h"
 #include "core/Effects.h"
 #include "core/MixSuite.h"
+#include "core/LowLifterFl.h" // (rollup step 12: the 0.1.28 copy item)
 #include "core/HardwareInsert.h"
 #include "core/EchoSuite.h"
 #include "core/LuxeVerb.h"
@@ -7199,6 +7200,47 @@ private:
                 repeated.repeat = 9;
                 song.patterns[0].notes.push_back (repeated);
             }
+            // rollup step 12 (round 190mu): round 190mm's Waves laws (Facet's Waves design law, Compressor's Vox / API-2500 /
+            // RChannel EQ, Prism's C6 floating bands, Hush's Renaissance law, Low Lifter's bass law, Aether's Vitamin law,
+            // Ridge's omni law), round 190mk's Multiband display SPEED and a zipped channel
+            {
+                auto& m16 = song.mixer[16].effects; // (after step 11's [18] … [26])
+                auto req = lynx::makeEffectSlot (lynx::EffectKind::facetEq);
+                req.params[(std::size_t) lynx::facet::wavesLawParam] = 1.0f;
+                req.params[(std::size_t) lynx::facet::wavesBandParam0] = lynx::facet::waveCodeValue (lynx::facet::WaveCode::reqBell);
+                m16.push_back (req); // [27]
+                auto vox = lynx::makeEffectSlot (lynx::EffectKind::compressor);
+                vox.params[8] = 1.0f;
+                vox.params[(std::size_t) lynx::compressorVoxLaw] = 1.0f;
+                m16.push_back (vox); // [28]
+                auto api = lynx::makeEffectSlot (lynx::EffectKind::compressor);
+                api.params[(std::size_t) lynx::compressorApiLaw] = 1.0f;
+                m16.push_back (api); // [29]
+                auto rchannel = lynx::makeEffectSlot (lynx::EffectKind::compressor);
+                rchannel.params[(std::size_t) lynx::compressorRenLaw] = 1.0f;
+                rchannel.params[(std::size_t) lynx::compressorChannelLaw] = 1.0f;
+                m16.push_back (rchannel); // [30]
+                auto c6 = lynx::makeEffectSlot (lynx::EffectKind::prismMultiband);
+                c6.params[(std::size_t) lynx::dyn::prism::c4Law] = lynx::dyn::prism::c4LawValue (false);
+                c6.params[(std::size_t) lynx::dyn::prism::c6Param (1, lynx::dyn::prism::c6On)] = 1.0f;
+                m16.push_back (c6); // [31]
+                auto rdeesser = lynx::makeEffectSlot (lynx::EffectKind::hushDeEsser);
+                rdeesser.params[(std::size_t) lynx::mixsuite::hush::essLaw] = 1.0f;
+                m16.push_back (rdeesser); // [32]
+                auto maxx = lynx::makeEffectSlot (lynx::EffectKind::flLowLifter);
+                maxx.params[(std::size_t) lynx::lowlifter::bassLaw] = 1.0f;
+                m16.push_back (maxx); // [33]
+                auto vitamin = lynx::makeEffectSlot (lynx::EffectKind::aether);
+                vitamin.params[(std::size_t) lynx::mixsuite::aether::vitLaw] = 1.0f;
+                m16.push_back (vitamin); // [34]
+                auto scheps = lynx::makeEffectSlot (lynx::EffectKind::ridgeStrip);
+                scheps.params[(std::size_t) lynx::mixsuite::ridge::omniLaw] = 1.0f;
+                m16.push_back (scheps); // [35]
+                auto multiband = lynx::makeEffectSlot (lynx::EffectKind::fruityMultiband);
+                multiband.displayView = 100;
+                m16.push_back (multiband); // [36]
+                song.channels[0].zipped = true;
+            }
 
             const auto copy = lynx::olderlynx::forRelease (song, "0.1.28");
             juce::String why;
@@ -7343,6 +7385,18 @@ private:
                      || m16[24]["params"].size() > (int) lynx::voicetools::gemini::spliceLaw || m16[25]["params"].size() > (int) lynx::lynxtune::wavesLaw
                      || m16[26]["params"].size() > lynx::facet::autoThresholdParam0)
                 rollup030Result = "ERROR step-11 items";
+            else if (const auto& m16 = parsed["mixer"][16]["effects"];
+                     ! said ("Facet EQ's Waves design law") || ! said ("Compressor's Vox law") || ! said ("Compressor's bus law")
+                     || ! said ("Compressor's channel EQ") || ! said ("Prism Multiband's floating bands") || ! said ("Hush De-esser's Renaissance law")
+                     || ! said ("Low Lifter's bass law") || ! said ("Aether's Vitamin law") || ! said ("Ridge Strip's omni law")
+                     || ! said ("Fruity Multiband Compressor's display SPEED") || ! said ("{0} zipped channel(s)")
+                     || m16[27]["params"].size() > lynx::facet::autoThresholdParam0 || m16[28]["params"].size() > lynx::compressorRenLaw
+                     || m16[29]["params"].size() > lynx::compressorRenLaw || m16[30]["params"].size() > lynx::compressorRenLaw
+                     || m16[31]["params"].size() > (int) lynx::dyn::prism::revision || m16[32]["params"].size() > (int) lynx::mixsuite::hush::timing
+                     || m16[33]["params"].size() > (int) lynx::lowlifter::bassLaw || m16[34]["params"].size() > (int) lynx::mixsuite::aether::vitLaw
+                     || m16[35]["params"].size() > (int) lynx::mixsuite::ridge::k4Pink || m16[36].hasProperty ("displayView")
+                     || copy.json.contains ("\"zipped\""))
+                rollup030Result = "ERROR step-12 items";
             else if (const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.28");
                      ! plain.ok || std::any_of (plain.lost.begin(), plain.lost.end(), [] (const lynx::olderlynx::Loss& l) {
                          const auto t = juce::String (l.text);
@@ -7358,7 +7412,9 @@ private:
                                 || t.contains ("L2 law") || t.startsWith ("Glow") || t.startsWith ("Reeverb 2") || t.startsWith ("Quell")
                                 || t.contains ("audio clip channels") || t.startsWith ("Apex") || t.startsWith ("Sentry") || t.startsWith ("Spiral")
                                 || t.contains ("scene follow") || t.startsWith ("Horizon") || t.startsWith ("Nebula") || t.startsWith ("Orbit")
-                                || t.startsWith ("Compressor's") || t.startsWith ("Gemini") || t.startsWith ("LYNX Tune") || t.contains ("Repeat");
+                                || t.startsWith ("Compressor's") || t.startsWith ("Gemini") || t.startsWith ("LYNX Tune") || t.contains ("Repeat")
+                                || t.startsWith ("Low Lifter") || t.startsWith ("Aether") || t.startsWith ("Ridge Strip's omni") || t.startsWith ("Hush De-esser's Renaissance")
+                                || t.startsWith ("Fruity Multiband") || t.contains ("zipped");
                      }))
                 rollup030Result = "ERROR a plain project reports a loss it does not have";
         }

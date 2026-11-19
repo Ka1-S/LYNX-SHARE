@@ -11784,3 +11784,16 @@ countries: ru by kz
 "Macro 8" = "Макро 8"
 "Chaos 1" = "Хаос 1"
 "Chaos 2" = "Хаос 2"
+
+# --- rollup 0.1.30 step 12: Save a copy for 0.1.28 knows rounds 190mm / 190mk
+"Ridge Strip's omni law (the Waves Scheps Omni Channel stand-in) is left out: it plays Ridge's own strip: {0}" = "Закон omni в Ridge Strip (замена Waves Scheps Omni Channel) не переносится: звучит собственная линейка Ridge: {0}"
+"Hush De-esser's Renaissance law (the Waves RDeEsser stand-in) plays Hush's own de-esser: {0}" = "Закон Renaissance в Hush De-esser (замена Waves RDeEsser) звучит собственным деэссером Hush: {0}"
+"Facet EQ's Waves design law (the Renaissance EQ and Q10 stand-ins) plays Facet's own band shapes: {0}" = "Закон проектирования Waves в Facet EQ (замена Renaissance EQ и Q10) звучит собственными формами полос Facet: {0}"
+"Prism Multiband's floating bands (the Waves C6 stand-in) are left out: {0}" = "Плавающие полосы Prism Multiband (замена Waves C6) не переносятся: {0}"
+"Compressor's Vox law (the Waves Renaissance Vox stand-in) plays as the plain Compressor: {0}" = "Закон Vox в Compressor (замена Waves Renaissance Vox) звучит как обычный Compressor: {0}"
+"Compressor's bus law (the Waves API-2500 stand-in) plays as the plain Compressor: {0}" = "Шинный закон Compressor (замена Waves API-2500) звучит как обычный Compressor: {0}"
+"Compressor's channel EQ (the Waves RChannel stand-in) is left out: {0}" = "Канальный эквалайзер Compressor (замена Waves RChannel) не переносится: {0}"
+"Low Lifter's bass law (the Waves MaxxBass and Renaissance Bass stand-ins) plays as Low Lifter: {0}" = "Басовый закон Low Lifter (замена Waves MaxxBass и Renaissance Bass) звучит как Low Lifter: {0}"
+"Aether's Vitamin law (the Waves Vitamin stand-in) plays Aether's own enhancer: {0}" = "Закон Vitamin в Aether (замена Waves Vitamin) звучит собственным энхансером Aether: {0}"
+"Fruity Multiband Compressor's display SPEED goes back to its default: {0}" = "SPEED дисплея Fruity Multiband Compressor возвращается к значению по умолчанию: {0}"
+"{0} zipped channel(s) show at full height in the Channel rack" = "Свёрнутые каналы ({0}) показываются в Channel rack в полную высоту"

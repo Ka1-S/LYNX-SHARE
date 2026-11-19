@@ -11784,3 +11784,16 @@ countries: fr be ch ca lu
 "Macro 8" = "Macro 8"
 "Chaos 1" = "Chaos 1"
 "Chaos 2" = "Chaos 2"
+
+# --- rollup 0.1.30 step 12: Save a copy for 0.1.28 knows rounds 190mm / 190mk
+"Ridge Strip's omni law (the Waves Scheps Omni Channel stand-in) is left out: it plays Ridge's own strip: {0}" = "La loi omni de Ridge Strip (le remplaçant de Waves Scheps Omni Channel) est omise : elle joue la tranche propre de Ridge : {0}"
+"Hush De-esser's Renaissance law (the Waves RDeEsser stand-in) plays Hush's own de-esser: {0}" = "La loi Renaissance de Hush De-esser (le remplaçant de Waves RDeEsser) joue le de-esser propre de Hush : {0}"
+"Facet EQ's Waves design law (the Renaissance EQ and Q10 stand-ins) plays Facet's own band shapes: {0}" = "La loi de conception Waves de Facet EQ (le remplaçant de Renaissance EQ et Q10) joue les formes de bande propres de Facet : {0}"
+"Prism Multiband's floating bands (the Waves C6 stand-in) are left out: {0}" = "Les bandes flottantes de Prism Multiband (le remplaçant de Waves C6) sont omises : {0}"
+"Compressor's Vox law (the Waves Renaissance Vox stand-in) plays as the plain Compressor: {0}" = "La loi Vox du Compressor (le remplaçant de Waves Renaissance Vox) joue comme le Compressor simple : {0}"
+"Compressor's bus law (the Waves API-2500 stand-in) plays as the plain Compressor: {0}" = "La loi de bus du Compressor (le remplaçant de Waves API-2500) joue comme le Compressor simple : {0}"
+"Compressor's channel EQ (the Waves RChannel stand-in) is left out: {0}" = "L'EQ de tranche du Compressor (le remplaçant de Waves RChannel) est omis : {0}"
+"Low Lifter's bass law (the Waves MaxxBass and Renaissance Bass stand-ins) plays as Low Lifter: {0}" = "La loi des graves de Low Lifter (le remplaçant de Waves MaxxBass et Renaissance Bass) joue comme Low Lifter : {0}"
+"Aether's Vitamin law (the Waves Vitamin stand-in) plays Aether's own enhancer: {0}" = "La loi Vitamin d'Aether (le remplaçant de Waves Vitamin) joue l'enhancer propre d'Aether : {0}"
+"Fruity Multiband Compressor's display SPEED goes back to its default: {0}" = "La SPEED de l'affichage de Fruity Multiband Compressor revient à sa valeur par défaut : {0}"
+"{0} zipped channel(s) show at full height in the Channel rack" = "{0} canal(aux) compacté(s) s'affichent en pleine hauteur dans le Channel rack"

@@ -11784,3 +11784,16 @@ countries: id
 "Macro 8" = "Makro 8"
 "Chaos 1" = "Kekacauan 1"
 "Chaos 2" = "Kekacauan 2"
+
+# --- rollup 0.1.30 step 12: Save a copy for 0.1.28 knows rounds 190mm / 190mk
+"Ridge Strip's omni law (the Waves Scheps Omni Channel stand-in) is left out: it plays Ridge's own strip: {0}" = "Hukum omni milik Ridge Strip (pengganti Waves Scheps Omni Channel) dihilangkan: yang diputar strip Ridge sendiri: {0}"
+"Hush De-esser's Renaissance law (the Waves RDeEsser stand-in) plays Hush's own de-esser: {0}" = "Hukum Renaissance milik Hush De-esser (pengganti Waves RDeEsser) memutar de-esser Hush sendiri: {0}"
+"Facet EQ's Waves design law (the Renaissance EQ and Q10 stand-ins) plays Facet's own band shapes: {0}" = "Hukum desain Waves milik Facet EQ (pengganti Renaissance EQ dan Q10) memutar bentuk band Facet sendiri: {0}"
+"Prism Multiband's floating bands (the Waves C6 stand-in) are left out: {0}" = "Band mengambang milik Prism Multiband (pengganti Waves C6) dihilangkan: {0}"
+"Compressor's Vox law (the Waves Renaissance Vox stand-in) plays as the plain Compressor: {0}" = "Hukum Vox milik Compressor (pengganti Waves Renaissance Vox) diputar sebagai Compressor biasa: {0}"
+"Compressor's bus law (the Waves API-2500 stand-in) plays as the plain Compressor: {0}" = "Hukum bus milik Compressor (pengganti Waves API-2500) diputar sebagai Compressor biasa: {0}"
+"Compressor's channel EQ (the Waves RChannel stand-in) is left out: {0}" = "EQ kanal milik Compressor (pengganti Waves RChannel) dihilangkan: {0}"
+"Low Lifter's bass law (the Waves MaxxBass and Renaissance Bass stand-ins) plays as Low Lifter: {0}" = "Hukum bas milik Low Lifter (pengganti Waves MaxxBass dan Renaissance Bass) diputar sebagai Low Lifter: {0}"
+"Aether's Vitamin law (the Waves Vitamin stand-in) plays Aether's own enhancer: {0}" = "Hukum Vitamin milik Aether (pengganti Waves Vitamin) memutar enhancer Aether sendiri: {0}"
+"Fruity Multiband Compressor's display SPEED goes back to its default: {0}" = "SPEED tampilan Fruity Multiband Compressor kembali ke nilai bawaannya: {0}"
+"{0} zipped channel(s) show at full height in the Channel rack" = "{0} kanal yang diringkas tampil dengan tinggi penuh di Channel rack"

@@ -11784,3 +11784,16 @@ countries: tr
 "Macro 8" = "Makro 8"
 "Chaos 1" = "Kaos 1"
 "Chaos 2" = "Kaos 2"
+
+# --- rollup 0.1.30 step 12: Save a copy for 0.1.28 knows rounds 190mm / 190mk
+"Ridge Strip's omni law (the Waves Scheps Omni Channel stand-in) is left out: it plays Ridge's own strip: {0}" = "Ridge Strip'in omni yasası (Waves Scheps Omni Channel yerine geçen) dışarıda kalır: Ridge'in kendi kanal şeridi çalar: {0}"
+"Hush De-esser's Renaissance law (the Waves RDeEsser stand-in) plays Hush's own de-esser: {0}" = "Hush De-esser'ın Renaissance yasası (Waves RDeEsser yerine geçen) Hush'ın kendi de-esser'ını çalar: {0}"
+"Facet EQ's Waves design law (the Renaissance EQ and Q10 stand-ins) plays Facet's own band shapes: {0}" = "Facet EQ'nun Waves tasarım yasası (Renaissance EQ ve Q10 yerine geçen) Facet'in kendi bant biçimlerini çalar: {0}"
+"Prism Multiband's floating bands (the Waves C6 stand-in) are left out: {0}" = "Prism Multiband'in yüzen bantları (Waves C6 yerine geçen) dışarıda kalır: {0}"
+"Compressor's Vox law (the Waves Renaissance Vox stand-in) plays as the plain Compressor: {0}" = "Compressor'ın Vox yasası (Waves Renaissance Vox yerine geçen) sade Compressor olarak çalar: {0}"
+"Compressor's bus law (the Waves API-2500 stand-in) plays as the plain Compressor: {0}" = "Compressor'ın bus yasası (Waves API-2500 yerine geçen) sade Compressor olarak çalar: {0}"
+"Compressor's channel EQ (the Waves RChannel stand-in) is left out: {0}" = "Compressor'ın kanal EQ'su (Waves RChannel yerine geçen) dışarıda kalır: {0}"
+"Low Lifter's bass law (the Waves MaxxBass and Renaissance Bass stand-ins) plays as Low Lifter: {0}" = "Low Lifter'ın bas yasası (Waves MaxxBass ve Renaissance Bass yerine geçen) Low Lifter olarak çalar: {0}"
+"Aether's Vitamin law (the Waves Vitamin stand-in) plays Aether's own enhancer: {0}" = "Aether'in Vitamin yasası (Waves Vitamin yerine geçen) Aether'in kendi güçlendiricisini çalar: {0}"
+"Fruity Multiband Compressor's display SPEED goes back to its default: {0}" = "Fruity Multiband Compressor'ın ekran SPEED değeri varsayılana döner: {0}"
+"{0} zipped channel(s) show at full height in the Channel rack" = "Daraltılmış {0} kanal Channel rack'te tam yükseklikte gösterilir"
