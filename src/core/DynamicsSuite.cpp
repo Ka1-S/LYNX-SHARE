@@ -1685,6 +1685,15 @@ int iirSlope (double dbOct) noexcept
     return s[code == 1 ? 0 : code / 2];
 }
 bool measuredDetector (const EffectParams& p) noexcept { return on (p[detectorLaw]); }
+// round 190mg: the C4 law's hidden values (1 / 8 electro, 2 / 8 opto; 0 = Prism's own engine)
+float c4LawValue (bool opto) noexcept { return opto ? 0.25f : 0.125f; }
+bool c4Active (const EffectParams& p) noexcept { return std::lround (std::clamp (p[c4Law], 0.0f, 1.0f) * 8.0f) >= 1; }
+bool c4Opto (const EffectParams& p) noexcept { return std::lround (std::clamp (p[c4Law], 0.0f, 1.0f) * 8.0f) == 2; }
+float c4QValue (double q) noexcept { return (float) std::clamp ((q - 0.1) / 0.65, 0.0, 1.0); }
+double c4QOf (const EffectParams& p) noexcept { return p[c4Q] <= 0.0f ? 0.6 : 0.1 + 0.65 * (double) std::clamp (p[c4Q], 0.0f, 1.0f); }
+float c4AttackValue (double ms) noexcept { return (float) std::clamp (std::log (std::max (ms, 0.5) / 0.5) / std::log (1000.0), 0.0, 1.0); }
+float c4ReleaseValue (double ms) noexcept { return (float) std::clamp (std::log (std::max (ms, 5.0) / 5.0) / std::log (1000.0), 0.0, 1.0); }
+int c4Lookahead (double sampleRate) noexcept { return sampleRate <= 50000.0 ? 64 : (sampleRate <= 100000.0 ? 128 : 256); }
 
 Layout layoutOf (const EffectParams& p) noexcept
 {
@@ -2103,6 +2112,245 @@ struct ScFilter
     }
 };
 
+// ---------------------------------------------------------------- round 190mg: the C4 law (REA_rodada190mg.md §2)
+// LYNX's own engine with the Waves C4's structure (static analysis of the structure, every number fitted on our demo-mode
+// probes, no vendor table read):
+//  * crossover k: Q(s) = 1 + s / (q w) + (s / w)², w set so that the low and high outputs are both -6 dB at the nominal
+//    frequency (bilinear, warped there); low = 1 / Q(s)², all-pass = Q(-s) / Q(s), high = all-pass - low: the two are in
+//    phase, the four bands (low, low-mid, high-mid, high; each compensated by the later all-passes) sum to the all-pass
+//    chain exactly (probes: < -86 dB ESR);
+//  * per band: peak of the band (stereo linked) → g = 1 / (1 + k · peak / threshold), the knee's cubic
+//    g + 2 knee · g² (1 − g) (≤ 1), the minimum over the look-ahead, attack / fast release, a slow follower (its release
+//    from the Release time), the deeper of the two, two 32-sample box filters, then the band's gain
+//    range + (1 − range) · g (linear), times its make-up; the audio is delayed by the look-ahead.
+//  k = 0.5 · 2^(-R / 12) at knee 0 (R = range dB; probes: ±0.5 %), times exp (s(R) · (knee / 0.5)^0.78) with s(R)
+//  measured at knee 0.5 (c4KneeNodes) — 0.003 dB rms on every stair.
+namespace c4
+{
+constexpr int bandsN = 4;
+constexpr double kneeR[9] { -24.0, -18.0, -12.0, -6.0, -3.0, 3.0, 6.0, 12.0, 18.0 };
+constexpr double kneeS[9] { 0.1608, 0.2068, 0.2601, 0.3216, 0.3525, 0.4330, 0.4737, 0.5603, 0.6567 };
+// time laws (fitted on the 1 kHz burst probes, 0.5 … 100 ms attack, 5 … 5000 ms release; electro)
+constexpr double attackScale = 1.0, fastReleaseMs = 0.048, slowAttackMs = 138.0, slowReleaseScale = 1.92, slowReleaseExp = 1.0;
+constexpr int boxLength = 32; // at 48 kHz (× the look-ahead's rate factor)
+
+inline double kOf (double rangeDb, double knee) noexcept
+{
+    const double r = std::clamp (rangeDb, kneeR[0], kneeR[8]);
+    int i = 0;
+    while (i < 7 && r > kneeR[i + 1])
+        ++i;
+    const double t = (r - kneeR[i]) / (kneeR[i + 1] - kneeR[i]);
+    const double s = kneeS[i] + t * (kneeS[i + 1] - kneeS[i]);
+    return 0.5 * std::pow (2.0, -rangeDb / 12.0) * (knee > 0.0 ? std::exp (s * std::pow (knee / 0.5, 0.78)) : 1.0);
+}
+
+struct Bq
+{
+    double b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0;
+    std::array<double, 4> z {};
+    double run (double x) noexcept
+    {
+        const double y = b0 * x + b1 * z[0] + b2 * z[1] - a1 * z[2] - a2 * z[3];
+        z[1] = z[0]; z[0] = x; z[3] = z[2]; z[2] = y;
+        return y;
+    }
+    void reset() noexcept { z.fill (0.0); }
+};
+
+struct Crossover
+{
+    Bq lpA, lpB, ap;
+    void design (double fc, double q, double sr) noexcept
+    {
+        const double b = 1.0 / (q * q) - 2.0, l2 = 0.5 * (-b + std::sqrt (b * b + 4.0));
+        const double K = 2.0 * sr, w = K * std::tan (M_PI * std::clamp (fc, 10.0, 0.49 * sr) / sr) / std::sqrt (l2);
+        const double al = K / (q * w), be = (K / w) * (K / w);
+        const double p0 = 1.0 + al + be, p1 = (2.0 - 2.0 * be) / p0, p2 = (1.0 - al + be) / p0;
+        for (auto* s : { &lpA, &lpB })
+        {
+            s->a1 = p1; s->a2 = p2; s->b0 = 1.0 / p0; s->b1 = 2.0 / p0; s->b2 = 1.0 / p0;
+        }
+        ap.a1 = p1; ap.a2 = p2; ap.b0 = p2; ap.b1 = p1; ap.b2 = 1.0;
+    }
+    void reset() noexcept { lpA.reset(); lpB.reset(); ap.reset(); }
+};
+
+class Engine
+{
+public:
+    void prepare (double rate) noexcept
+    {
+        sr = rate;
+        la = c4Lookahead (rate);
+        box = boxLength * la / 64;
+        key.fill (-1.0);
+        reset();
+    }
+    int latency() const noexcept { return la; }
+    void reset() noexcept
+    {
+        for (auto& ch : xo)
+            for (auto& x : ch)
+                x.reset();
+        for (auto& ch : comp)
+            for (auto& x : ch)
+                x.reset();
+        for (auto& ch : delay)
+            for (auto& d : ch)
+                d.fill (0.0);
+        dpos = 0;
+        for (int b = 0; b < bandsN; ++b)
+        {
+            s1[(std::size_t) b] = s2[(std::size_t) b] = 1.0;
+            qHead[(std::size_t) b] = qTail[(std::size_t) b] = 0;
+            for (auto& v : box1[(std::size_t) b]) v = one;
+            for (auto& v : box2[(std::size_t) b]) v = one;
+            acc1[(std::size_t) b] = acc2[(std::size_t) b] = one * box;
+        }
+        bpos = 0;
+        tick = 0;
+    }
+
+    // returns the four bands' gain reductions (dB, for the meters) of the last sample
+    void process (float* l, float* r, int n, const EffectParams& p, std::array<double, 6>& extreme) noexcept
+    {
+        configure (p);
+        for (int i = 0; i < n; ++i)
+        {
+            double bandS[2][bandsN];
+            const double in[2] { (double) l[i] * inGain, (double) r[i] * inGain };
+            for (int c = 0; c < 2; ++c)
+            {
+                auto& x = xo[(std::size_t) c];
+                auto& k = comp[(std::size_t) c];
+                const double v = in[c];
+                const double l1 = x[0].lpB.run (x[0].lpA.run (v)), h1 = x[0].ap.run (v) - l1;
+                const double l2 = x[1].lpB.run (x[1].lpA.run (h1)), h2 = x[1].ap.run (h1) - l2;
+                const double l3 = x[2].lpB.run (x[2].lpA.run (h2)), h3 = x[2].ap.run (h2) - l3;
+                bandS[c][0] = k[1].ap.run (k[0].ap.run (l1));
+                bandS[c][1] = k[2].ap.run (l2);
+                bandS[c][2] = l3;
+                bandS[c][3] = h3;
+            }
+            double y[2] { 0.0, 0.0 };
+            for (int b = 0; b < bandsN; ++b)
+            {
+                const auto bi = (std::size_t) b;
+                const double lev = std::max (std::abs (bandS[0][b]), std::abs (bandS[1][b]));
+                double g = 1.0 / (1.0 + kb[bi] * lev * invT[bi]);
+                g = std::min (g + cKnee[bi] * g * g * (1.0 - g), 1.0);
+                // sliding minimum over the look-ahead (monotonic queue)
+                auto& qv = qVal[bi];
+                auto& qt = qTime[bi];
+                auto& h = qHead[bi];
+                auto& t = qTail[bi];
+                while (t != h && qv[(std::size_t) ((t + qcap - 1) % qcap)] >= g)
+                    t = (t + qcap - 1) % qcap;
+                qv[(std::size_t) t] = g;
+                qt[(std::size_t) t] = tick;
+                t = (t + 1) % qcap;
+                while (qt[(std::size_t) h] + la <= tick)
+                    h = (h + 1) % qcap;
+                const double m = qv[(std::size_t) h];
+                s1[bi] = m + (s1[bi] - m) * (s1[bi] < m ? cFastRel : cAtt[bi]);
+                s2[bi] = s1[bi] + (s2[bi] - s1[bi]) * (s2[bi] < s1[bi] ? cSlowRel[bi] : cSlowAtt);
+                const double mm = std::min (s1[bi], s2[bi]);
+                // two box filters (64-bit fixed point: no drift)
+                const auto q = (std::int64_t) std::llround (mm * (double) one);
+                acc1[bi] += q - box1[bi][(std::size_t) bpos];
+                box1[bi][(std::size_t) bpos] = q;
+                const auto v1 = acc1[bi] / box;
+                acc2[bi] += v1 - box2[bi][(std::size_t) bpos];
+                box2[bi][(std::size_t) bpos] = v1;
+                const double gs = (double) acc2[bi] / (double) box / (double) one;
+                const double G = (active[bi] ? gr[bi] + (1.0 - gr[bi]) * gs : 1.0) * mk[bi];
+                extreme[bi] = std::min (extreme[bi], 20.0 * std::log10 (std::max (G / mk[bi], 1.0e-6)));
+                const double w = (soloAny && ! solo[bi]) ? 0.0 : mix * G + (1.0 - mix);
+                for (int c = 0; c < 2; ++c)
+                {
+                    auto& d = delay[(std::size_t) c][bi];
+                    const double old = d[(std::size_t) dpos];
+                    d[(std::size_t) dpos] = bandS[c][b];
+                    y[c] += old * w;
+                }
+            }
+            dpos = (dpos + 1) % la;
+            bpos = (bpos + 1) % box;
+            ++tick;
+            l[i] = (float) (y[0] * outGain);
+            r[i] = (float) (y[1] * outGain);
+        }
+    }
+
+private:
+    void configure (const EffectParams& p) noexcept
+    {
+        std::array<double, 4 + 6 * bandsN + 4> k {};
+        std::size_t n = 0;
+        const auto xs = crossovers (p);
+        for (int j = 0; j < 3; ++j)
+            k[n++] = xs[(std::size_t) j];
+        k[n++] = c4QOf (p);
+        if (k[0] != key[0] || k[1] != key[1] || k[2] != key[2] || k[3] != key[3])
+        {
+            for (int c = 0; c < 2; ++c)
+            {
+                for (int j = 0; j < 3; ++j)
+                    xo[(std::size_t) c][(std::size_t) j].design (xs[(std::size_t) j], k[3], sr);
+                comp[(std::size_t) c][0].design (xs[1], k[3], sr);
+                comp[(std::size_t) c][1].design (xs[2], k[3], sr);
+                comp[(std::size_t) c][2].design (xs[2], k[3], sr);
+            }
+            for (int j = 0; j < 4; ++j)
+                key[(std::size_t) j] = k[(std::size_t) j];
+        }
+        const auto at = [&] (int b, int f) { return p[(std::size_t) param (b, f)]; };
+        soloAny = false;
+        for (int b = 0; b < bandsN; ++b)
+        {
+            const auto bi = (std::size_t) b;
+            const double rng = rangeDb (at (b, fRange)), knee = kneeDb (at (b, fKnee)) / 64.0;
+            gr[bi] = dbToGain (rng);
+            invT[bi] = 1.0 / dbToGain (thresholdDb (at (b, fThreshold)));
+            kb[bi] = kOf (rng, knee);
+            cKnee[bi] = 2.0 * knee;
+            mk[bi] = dbToGain (levelDb (at (b, fLevel)));
+            active[bi] = on (at (b, fEnabled));
+            solo[bi] = on (at (b, fSolo));
+            soloAny = soloAny || solo[bi];
+            const double attMs = 0.5 * std::pow (1000.0, (double) std::clamp (at (b, fAttack), 0.0f, 1.0f));
+            const double relMs = 5.0 * std::pow (1000.0, (double) std::clamp (at (b, fRelease), 0.0f, 1.0f));
+            cAtt[bi] = std::exp (-1.0 / (attackScale * attMs * 1.0e-3 * sr));
+            cSlowRel[bi] = std::exp (-1.0 / (slowReleaseScale * std::pow (relMs, slowReleaseExp) * 1.0e-3 * sr));
+        }
+        cFastRel = std::exp (-1.0 / (fastReleaseMs * 1.0e-3 * sr));
+        cSlowAtt = std::exp (-1.0 / (slowAttackMs * 1.0e-3 * sr));
+        mix = std::clamp ((double) p[prism::mix], 0.0, 1.0);
+        inGain = dbToGain (trimDb (p[input]));
+        outGain = dbToGain (trimDb (p[output]));
+    }
+
+    static constexpr std::int64_t one = (std::int64_t) 1 << 40;
+    static constexpr int maxLa = 256, qcap = maxLa + 2, maxBox = 128;
+    double sr = 48000.0;
+    int la = 64, box = boxLength, dpos = 0, bpos = 0;
+    std::int64_t tick = 0;
+    std::array<double, 4> key {};
+    std::array<std::array<Crossover, 3>, 2> xo {}, comp {};
+    std::array<std::array<std::array<double, maxLa>, bandsN>, 2> delay {};
+    std::array<double, bandsN> s1 {}, s2 {}, gr {}, invT {}, kb {}, cKnee {}, mk {}, cAtt {}, cSlowRel {};
+    std::array<bool, bandsN> active {}, solo {};
+    bool soloAny = false;
+    double cFastRel = 0.0, cSlowAtt = 0.0, mix = 1.0, inGain = 1.0, outGain = 1.0;
+    std::array<std::array<double, qcap>, bandsN> qVal {};
+    std::array<std::array<std::int64_t, qcap>, bandsN> qTime {};
+    std::array<int, bandsN> qHead {}, qTail {};
+    std::array<std::array<std::int64_t, maxBox>, bandsN> box1 {}, box2 {};
+    std::array<std::int64_t, bandsN> acc1 {}, acc2 {};
+};
+} // namespace c4
+
 class Multiband final : public Effect
 {
 public:
@@ -2120,6 +2368,7 @@ public:
     {
         sr = rate;
         laMs = -1.0;
+        c4e.prepare (rate); // round 190mg
         // round 144: the linear-phase crossovers (one stereo FFT convolver per band below the top one) and the dry
         // delay that matches them, allocated here (process() never allocates)
         const auto size = linearFftSize (rate);
@@ -2174,6 +2423,7 @@ public:
         held.fill (0.0);
         held2.fill (0.0);
         gains.fill (1.0f);
+        c4e.reset();
     }
 
     int latencySamples() const noexcept override { return latency.load (std::memory_order_relaxed); }
@@ -2187,6 +2437,34 @@ public:
     void process (float* l, float* r, int n, const EffectParams& p, double) noexcept override
     {
         lastParams = p;
+        // round 190mg: the C4 law runs its own engine (Prism's is untouched while it is off)
+        if (c4Active (p))
+        {
+            if (! c4On)
+            {
+                c4e.reset();
+                c4On = true;
+            }
+            latency.store (c4e.latency(), std::memory_order_relaxed);
+            const auto inPk = blockPeak (l, r, n);
+            extreme.fill (0.0);
+            c4e.process (l, r, n, p, extreme);
+            for (int b = 0; b < bands; ++b)
+            {
+                meters.set (bandMeter (b), b < c4::bandsN ? (float) std::clamp (extreme[(std::size_t) b] / 30.0, -1.0, 1.0) : 0.0f);
+                meters.set (bandLevelMeter (b), 0.0f);
+            }
+            meters.set (4, inPk);
+            meters.set (5, blockPeak (l, r, n));
+            scL = scR = nullptr;
+            return;
+        }
+        if (c4On)
+        {
+            c4On = false;
+            laMs = -1.0;
+            mode = -1;
+        }
         configure (p);
         const auto inPeak = blockPeak (l, r, n);
         extreme.fill (0.0);
@@ -2848,6 +3126,11 @@ private:
 
     void configure (const EffectParams& p) noexcept
     {
+        if (c4Active (p)) // round 190mg: the C4 law's own look-ahead
+        {
+            latency.store (c4Lookahead (sr), std::memory_order_relaxed);
+            return;
+        }
         // round 144: the processing mode and the oversampling (at most 4x, and only up to 400 kHz)
         const int m = linSize > 0 ? (int) phaseOf (p[processingMode]) : (int) Phase::dynamic;
         int factor = oversamplingOf (p[oversampling]);
@@ -2894,6 +3177,8 @@ private:
 
     double sr = 48000.0, laMs = -1.0;
     std::atomic<int> latency { 0 };
+    c4::Engine c4e; // round 190mg
+    bool c4On = false;
     EffectParams lastParams = [] {
         EffectParams p {};
         const auto& info = prismInfo();

@@ -17,6 +17,7 @@
 #include "core/FlPluginDb.h"
 #include "core/FlWrapper.h"
 #include "core/LimiterLaw.h"
+#include "core/LynxVerbs.h"
 #include "core/LynxTune.h"
 #include "core/MixSuite.h"
 #include "core/VocalPitch.h"
@@ -731,6 +732,36 @@ lynx = Stereo Shaper
 # matrix (docs/analise/REA_rodada124_extras.md §4); without a readable state the slot stays neutral
 waves = S1 Imager; S1 Imager Stereo
 translate = waves-s1-imager
+
+[waves-c4]
+product = C4 Multiband Parametric Processor
+vendor = Waves
+lynx = Prism Multiband
+waves = C4
+# round 190mg: the four-band dynamics role (no entry before: such projects lost the plug-in). Its RealWorld list is
+# translated onto Prism's four bands, and Prism's hidden C4 law runs the C4's own structure (in-phase crossovers with its
+# Q, the rational gain law with its knee, look-ahead and two-stage release), fitted on our Waves-demo probes
+# (docs/analise/REA_rodada190mg.md §2)
+translate = waves-c4
+
+[waves-ar-plates]
+product = Abbey Road Reverb Plates
+vendor = Waves
+lynx = Foil Plate
+waves = Abbey Road Reverb Plates; Abbey Road Plates
+# round 190mg: the plate role (no entry before: such projects lost the plug-in); its decay (the plate and Damper as the
+# reference combines them), pre-delay, treble and bass cut on Foil Plate's measured plate voicing, 100 % wet
+translate = waves-ar-plates
+preset = Mix=1; Voicing=1
+
+[waves-atlas]
+product = Atlas Reverb
+vendor = Waves
+lynx = Atrium
+waves = Atlas Reverb
+# round 190mg: the room / hall role (no entry before); its decay and pre-delay on Atrium, 100 % wet
+translate = waves-atlas
+preset = Mix=1
 
 [waves-puigtec]
 product = PuigTec EQP1A
@@ -1719,6 +1750,94 @@ double knobAxis (double v, int& i) noexcept // the knob grid 0, 1.375 … 11 →
     return x - i;
 }
 } // namespace puigtec
+
+// round 190mg: Waves C4 (70 values; names from its ParamXML, every law measured on our demo-mode probes,
+// docs/analise/REA_rodada190mg.md §2): 0 / 1 / 2 crossovers Hz, 3 crossover Q, 7 output dB; band b (0 … 3) at 14 + 14 b:
+// +2 solo, +3 bypass, +4 gain dB, +5 threshold dB, +6 range dB (negative = downward), +7 knee (0 … 0.75), +8 attack ms,
+// +9 release ms, +11 behaviour (0 electro, 1 opto). Prism's four bands take them as they are and its hidden C4 law
+// (dyn::prism::c4Law) runs the C4's structure on them.
+int translateWavesC4 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace pr = dyn::prism;
+    const auto rw = wavesRealWorldParams (state);
+    if (slot.kind != EffectKind::prismMultiband || rw.size() < 70 || ! wavesValue (rw, 0) || ! wavesValue (rw, 19))
+        return 0;
+    auto& p = slot.params;
+    const auto v = [&rw] (std::size_t i, double fallback) { return wavesValue (rw, i).value_or (fallback); };
+    const auto set = [&p] (int k, float x) { p[(std::size_t) k] = std::clamp (x, 0.0f, 1.0f); };
+    set (pr::bandLayout, 0.0f);
+    set (pr::bandCountParam, pr::bandCountValue (4));
+    static constexpr double defaultsHz[3] { 92.0, 4000.0, 11071.0 };
+    for (int k = 0; k < 3; ++k)
+        set (pr::crossoverParam (k), pr::crossoverValue (v ((std::size_t) k, defaultsHz[k])));
+    bool opto = false;
+    for (int b = 0; b < 4; ++b)
+    {
+        const auto at = [&] (int f, double fallback) { return v ((std::size_t) (14 + 14 * b + f), fallback); };
+        set (pr::param (b, pr::fThreshold), pr::thresholdValue (std::clamp (at (5, -30.0), -90.0, 0.0)));
+        set (pr::param (b, pr::fRange), (float) ((std::clamp (at (6, -8.0), -30.0, 30.0) + 30.0) / 60.0));
+        set (pr::param (b, pr::fKnee), (float) (std::clamp (at (7, 0.5), 0.0, 0.75) * 64.0 / 48.0));
+        set (pr::param (b, pr::fAttack), pr::c4AttackValue (at (8, 10.0)));
+        set (pr::param (b, pr::fRelease), pr::c4ReleaseValue (at (9, 50.0)));
+        set (pr::param (b, pr::fLevel), (float) ((std::clamp (at (4, 0.0), -30.0, 30.0) + 30.0) / 60.0));
+        set (pr::param (b, pr::fMode), 0.0f);
+        set (pr::param (b, pr::fEnabled), at (3, 0.0) >= 0.5 ? 0.0f : 1.0f);
+        set (pr::param (b, pr::fSolo), at (2, 0.0) >= 0.5 ? 1.0f : 0.0f);
+        opto = opto || at (11, 0.0) >= 0.5;
+    }
+    set (pr::mix, 1.0f);
+    set (pr::input, 0.5f);
+    set (pr::output, (float) ((std::clamp (v (7, 0.0), -36.0, 36.0) + 36.0) / 72.0));
+    p[(std::size_t) pr::c4Law] = pr::c4LawValue (opto);
+    p[(std::size_t) pr::c4Q] = pr::c4QValue (v (3, 0.6));
+    return 40;
+}
+
+// round 190mg: Abbey Road Reverb Plates (409 values; the indices that move with the controls, read from refcap182's states):
+// 324 pre-delay ms, 326 the plate's decay s (the plate A … D and Damper 0 … 10 already combined by the reference), 334 plate,
+// 335 damper, 336 bass cut (0 off, 1 … 3), 378 treble dB, 382 drive. Foil Plate's measured plate voicing takes the decay
+// and pre-delay as they are, 100 % wet like the reference (no dry path: its states mix nothing dry).
+int translateWavesArPlates (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    const auto rw = wavesRealWorldParams (state);
+    if (slot.kind != EffectKind::foilPlate || rw.size() < 383 || ! wavesValue (rw, 326))
+        return 0;
+    auto& p = slot.params;
+    const auto v = [&rw] (std::size_t i, double fallback) { return wavesValue (rw, i).value_or (fallback); };
+    const double rt = std::clamp (v (326, 2.6), 0.3, 20.0);
+    double lo = 0.0, hi = 1.0;
+    for (int k = 0; k < 40; ++k)
+        (verbs::foil::decaySec ((float) (0.5 * (lo + hi))) < rt ? lo : hi) = 0.5 * (lo + hi);
+    p[0] = 1.0f;                                                                   // mix
+    p[1] = (float) verbs::skewInverse (std::clamp (v (324, 0.0), 0.0, 500.0), 0.0, 500.0, 2.3219); // pre-delay
+    p[2] = (float) (0.5 * (lo + hi));                                              // decay
+    const double treble = std::clamp (v (378, 0.0), -12.0, 12.0);
+    p[10] = (float) std::clamp (treble >= 0.0 ? 0.5 + treble / 24.0 : 0.5 + treble / 9.0, 0.0, 1.0);
+    static constexpr double bassCutHz[4] { 0.0, 80.0, 160.0, 320.0 };
+    const auto bc = std::clamp ((int) std::lround (v (336, 0.0)), 0, 3);
+    p[13] = bc == 0 ? 0.0f : (float) (std::log (bassCutHz[bc] / 20.0) / std::log (50.0));
+    p[14] = 1.0f; // the measured plate voicing
+    p[(std::size_t) verbs::foil::revision] = 1.0f;
+    slot.mix = 1.0f;
+    return 4;
+}
+
+// round 190mg: Atlas Reverb (488 values; indices read from refcap182's states): 2 decay s, 17 pre-delay ms, 7 size. Atrium
+// (the room / hall role) takes the decay and pre-delay as they are, 100 % wet like the reference.
+int translateWavesAtlas (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    const auto rw = wavesRealWorldParams (state);
+    if (slot.kind != EffectKind::atrium || rw.size() < 18 || ! wavesValue (rw, 2))
+        return 0;
+    auto& p = slot.params;
+    const auto v = [&rw] (std::size_t i, double fallback) { return wavesValue (rw, i).value_or (fallback); };
+    p[0] = 1.0f;
+    p[1] = (float) std::clamp (v (17, 10.0) / 500.0, 0.0, 1.0);
+    p[2] = (float) verbs::skewInverse (std::clamp (v (2, 2.5), 0.1, 100.0), 0.1, 100.0, 5.717);
+    p[(std::size_t) verbs::atrium::revision] = 1.0f;
+    slot.mix = 1.0f;
+    return 3;
+}
 
 int translateWavesPuigTec (const std::vector<std::uint8_t>& state, EffectSlot& slot)
 {
@@ -3436,6 +3555,12 @@ RawTranslator rawTranslatorNamed (std::string_view name)
         return translateWavesL2;
     if (name == "waves-puigtec")
         return translateWavesPuigTec;
+    if (name == "waves-c4")
+        return translateWavesC4;
+    if (name == "waves-ar-plates")
+        return translateWavesArPlates;
+    if (name == "waves-atlas")
+        return translateWavesAtlas;
     if (name == "waves-supertap")
         return translateWavesSuperTap;
     if (name == "waves-sslcomp")

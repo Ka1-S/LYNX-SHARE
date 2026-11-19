@@ -198,7 +198,24 @@ enum Global { xover1 = legacyBands * fieldsPerBand, xover2, xover3, slope, looka
               // round tp172b6 [EXEC] (Pro-MB's Audition, Expert panel): the output becomes what the band's detector hears (0 off,
               // k / 6 band k): level, range, threshold and mix don't touch it, the Output does, a switched-off band still sounds
               audition = rev152 + 1,
-              count = audition + 1 };
+              count = audition + 1,
+              // round 190mg, hidden (no control, no text; saved while non-zero; only the Waves C4 translator sets them):
+              // the C4 law — LYNX's own model of the Waves C4's structure, fitted black-box (REA_rodada190mg.md §2):
+              // in-phase squared-biquad crossovers (crossoverQ), per band peak detector → rational gain with a cubic
+              // knee → look-ahead minimum → two-stage release → triangular smoothing → gain between 0 dB and the
+              // range. 0 = Prism's own engine (every project saved before); c4LawValue (false) electro, (true) opto
+              c4Law = count,
+              c4Q };
+float c4LawValue (bool opto) noexcept;
+bool c4Active (const EffectParams& p) noexcept;
+bool c4Opto (const EffectParams& p) noexcept;
+float c4QValue (double q) noexcept;        // crossover Q 0.1 … 0.75 (0 = the C4's default 0.6)
+double c4QOf (const EffectParams& p) noexcept;
+// the C4 law reads Prism's controls in the C4's own units: knee = kneeDb / 64 (0 … 0.75), attack 0.5 · 1000^v ms,
+// release 5 · 1000^v ms (v = the control's 0 … 1 value); c4AttackValue / c4ReleaseValue are the inverses
+float c4AttackValue (double ms) noexcept;
+float c4ReleaseValue (double ms) noexcept;
+int c4Lookahead (double sampleRate) noexcept; // 64 samples up to 50 kHz, 128 up to 100 kHz, 256 above (measured)
 inline int param (int band, int field) noexcept
 {
     return band < legacyBands ? band * fieldsPerBand + field : band5 + (band - legacyBands) * fieldsPerBand + field;
