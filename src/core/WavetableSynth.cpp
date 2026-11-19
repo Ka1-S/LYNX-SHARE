@@ -307,10 +307,130 @@ double shiftHz (double shift) noexcept
     return 5000.0 * shift * shift * shift;
 }
 
+// --- Helix round 3 laws (round 190mt; LYNX's own [MODEL])
+double spectralShiftHz (double shift) noexcept
+{
+    // ±1 → ±2 kHz, cubic like the shifter's: fine near 0 (0.1 = 2 Hz, 0.3 = 54 Hz, 0.5 = 250 Hz)
+    shift = std::clamp (shift, -1.0, 1.0);
+    return 2000.0 * shift * shift * shift;
+}
+double spectralExponent (double stretch) noexcept { return 1.0 + 0.5 * std::clamp (stretch, -1.0, 1.0); } // (0.5 … 1.5)
+
+int sampleLevelFor (double ratio) noexcept
+{
+    // level k cuts above 0.5 × 2^(−k/2) of the sample's rate; read at `ratio`, its band reaches 0.5 × ratio × 2^(−k/2) of the
+    // output's rate. The level is the first whose images fold back no lower than 0.4 of the output's rate (19.2 kHz at
+    // 48 kHz): c × ratio ≤ 0.6, so up to a ratio of 1.2 the sample itself plays [MODEL]
+    if (! (ratio > 1.2))
+        return 0;
+    return std::min (2 * 12, (int) std::ceil (2.0 * std::log2 (ratio / 1.2) - 1.0e-9));
+}
+
+namespace
+{
+struct GrainWindowTable
+{
+    static constexpr int size = 1024;
+    std::array<float, size + 2> v {};
+    GrainWindowTable()
+    {
+        for (int i = 0; i <= size + 1; ++i) // (a Hann window; the guard past 1 is 0)
+            v[(std::size_t) i] = i > size ? 0.0f : (float) (0.5 - 0.5 * std::cos (2.0 * pi * (double) i / size));
+    }
+};
+const GrainWindowTable& grainTable() noexcept
+{
+    static const GrainWindowTable t;
+    return t;
+}
+HELIX_INLINE float grainWindowInline (const float* tab, float x) noexcept
+{
+    const auto f = x * (float) GrainWindowTable::size;
+    const auto i = (int) f;
+    return tab[i] + (tab[i + 1] - tab[i]) * (f - (float) i);
+}
+} // namespace
+
+float grainWindow (float x) noexcept { return grainWindowInline (grainTable().v.data(), std::clamp (x, 0.0f, 1.0f)); }
+
+namespace
+{
+// (round 190mt) the band-limited levels' read: an 8-point windowed sinc (Kaiser β 5, cut at 0.45 of the level's rate: flat
+// to 0.25, images from 0.646 down by ≥ 49 dB), 2048 phases (the nearest taken), each phase summing to 1; SIMD
+struct SincTable
+{
+    static constexpr int phases = 2048, taps = 8;
+    alignas (16) std::array<float, (phases + 1) * taps> k {};
+    SincTable()
+    {
+        const auto i0 = [] (double x) {
+            double sum = 1.0, term = 1.0;
+            for (int j = 1; j < 40; ++j)
+            {
+                term *= (x / (2.0 * j)) * (x / (2.0 * j));
+                sum += term;
+            }
+            return sum;
+        };
+        for (int p = 0; p <= phases; ++p)
+        {
+            const auto frac = (double) p / phases;
+            double row[taps], sum = 0.0;
+            for (int j = 0; j < taps; ++j)
+            {
+                const auto x = (double) (j - 3) - frac; // (the tap's distance from the read position)
+                const auto sinc = std::abs (x) < 1.0e-12 ? 1.0 : std::sin (pi * 0.9 * x) / (pi * 0.9 * x);
+                const auto r = x / 4.0;
+                row[j] = sinc * i0 (5.0 * std::sqrt (std::max (0.0, 1.0 - r * r))) / i0 (5.0);
+                sum += row[j];
+            }
+            for (int j = 0; j < taps; ++j)
+                k[(std::size_t) (p * taps + j)] = (float) (row[j] / sum);
+        }
+    }
+};
+const SincTable& sincTable() noexcept
+{
+    static const SincTable t;
+    return t;
+}
+// d: a level's samples (guards around), pos ≥ 0 inside them
+HELIX_INLINE float sincRead (const float* d, double pos, const float* table) noexcept
+{
+    const auto i = (int) pos;
+    const auto p = (int) ((pos - (double) i) * SincTable::phases + 0.5);
+    const float* kr = table + p * SincTable::taps;
+    const float* x = d + i - 3;
+    auto a = _mm_add_ps (_mm_mul_ps (_mm_loadu_ps (x), _mm_load_ps (kr)), _mm_mul_ps (_mm_loadu_ps (x + 4), _mm_load_ps (kr + 4)));
+    a = _mm_add_ps (a, _mm_movehl_ps (a, a));
+    a = _mm_add_ss (a, _mm_shuffle_ps (a, a, 0x55));
+    return _mm_cvtss_f32 (a);
+}
+} // namespace
+
 int targetOfParam (int index) noexcept
 {
     if (index < 0)
         return -1;
+    if (index >= ext3Base) // Helix round 3 (round 190mt)
+    {
+        switch (index - ext3Base)
+        {
+            case ext3::grainPosition: return tgt::grainPos;
+            case ext3::grainSize: return tgt::grainSize;
+            case ext3::grainDensity: return tgt::grainDensity;
+            case ext3::grainSpray: return tgt::grainSpray;
+            case ext3::grainPitch: return tgt::grainPitch;
+            case ext3::grainGain: return tgt::grainGain;
+            case ext3::specPosition: return tgt::specPos;
+            case ext3::specStretch: return tgt::specStretch;
+            case ext3::specShift: return tgt::specShift;
+            case ext3::specTilt: return tgt::specTilt;
+            case ext3::specBand: return tgt::specBand;
+            case ext3::specGain: return tgt::specGain;
+            default: return -1;
+        }
+    }
     if (index >= ext2Base) // Helix+ 2 (round 190ml)
     {
         const auto e = index - ext2Base;
@@ -474,6 +594,12 @@ const std::array<double, stateSize>& defaults() noexcept
         e2 (ext2::shift) = 0.2, e2 (ext2::shiftMix) = 1.0;
         e2 (ext2::eqMidFreq) = 1000.0;
         e2 (ext2::mbDepth) = 0.5, e2 (ext2::mbTime) = 0.3, e2 (ext2::mbUp) = 0.6, e2 (ext2::mbDown) = 0.6;
+        // Helix round 3 (round 190mt): the granular and spectral oscillators off (at usable settings when switched on), Clean
+        // off (new channels: helixDefaults() switches it on)
+        const auto e3 = [&s] (int i) -> double& { return s[(std::size_t) (ext3Base + i)]; };
+        e3 (ext3::grainSize) = 0.08, e3 (ext3::grainDensity) = 20.0, e3 (ext3::grainSpray) = 0.1, e3 (ext3::grainSpread) = 0.5;
+        e3 (ext3::grainGain) = 1.0;
+        e3 (ext3::specBand) = 1000.0, e3 (ext3::specWidth) = 10.0, e3 (ext3::specPartials) = 32.0, e3 (ext3::specGain) = 1.0;
         for (int k = 0; k < 2; ++k) // a drawn LFO starts as a triangle: 0 → +1 → −1 → 0
         {
             const auto b = ext::points + k * ext::lfoPointsSize;
@@ -803,6 +929,32 @@ struct Voice
     std::array<std::uint32_t, maxUnison> sSync {}, sSyncInc {};
     int sWarp = 0;
     float sWarpAmount = 0.0f;
+    // Helix round 3 (round 190mt): the step's switches (round 3 live, Clean, the granular and spectral oscillators), the
+    // grains (each from its own read position of the sample or of a band-limited level), the partials (each a rotating
+    // (cos, sin) pair with its amplitude, ramped over the step; SIMD four at a time)
+    bool plus3 = false, sClean = false, grainOn = false, specOn = false;
+    struct Grain
+    {
+        double pos = 0.0, inc = 0.0; // (the level's samples)
+        float w = 0.0f, wInc = 0.0f, gl = 0.0f, gr = 0.0f;
+        int level = 0, start = 0;    // (start: the step's sample it begins at)
+    };
+    std::array<Grain, maxGrains> grains {};
+    int grainCount = 0;
+    float grainNext = 0.0f;          // samples to the next grain
+    std::uint32_t grainSeed = 1u;
+    double gInc = 0.0;
+    float gPos = 0.0f, gSpray = 0.0f, gSpread = 0.0f, gPan = 0.0f, gGain = 0.0f, gInterval = 1.0f, gWinInc = 1.0f;
+    int spCount = 0, spLive = 0;     // the partials rendered this step / wanted after it (multiples of 4)
+    bool spStarted = false;
+    alignas (16) std::array<float, maxSpectralPartials> spC {};
+    alignas (16) std::array<float, maxSpectralPartials> spS {};
+    alignas (16) std::array<float, maxSpectralPartials> spA {};
+    alignas (16) std::array<float, maxSpectralPartials> spDA {};
+    alignas (16) std::array<float, maxSpectralPartials> spCr {};
+    alignas (16) std::array<float, maxSpectralPartials> spSr {};
+    float spGainL = 0.0f, spGainR = 0.0f;
+    std::array<double, 9> spKey {}; // (the inputs of the last step's targets: equal inputs keep them)
 };
 
 constexpr int maxVoices = maxPolyVoices;
@@ -819,6 +971,8 @@ struct Engine::Impl
     std::array<const Table*, oscCount> factory { nullptr, nullptr, nullptr }; // (the factory tables the values name)
     std::array<const Table*, oscCount> user { nullptr, nullptr, nullptr };    // Helix+ 2: the channel's user tables
     const SampleBuffer* sample = nullptr;                                       // Helix+ 2: the sample oscillator's sample
+    const SampleLevels* levels = nullptr;                                       // round 3: the sample band-limited
+    const SpectralData* spectral = nullptr;                                     // round 3: the sample's partials
     std::array<bool, chaosCount> chaosUsed {};
     bool newMacrosUsed = false; // (a cell reads Macro 5…8)
     std::array<Voice, maxVoices> voices {};
@@ -849,7 +1003,8 @@ struct Engine::Impl
             f |= wheelCell;
         if (s <= src::lfo2 || s >= src::chaos1)
             f |= internalCell;
-        if (t == tgt::amp || t == tgt::subGain || t == tgt::oscGain || t == tgt::oscGain + tgt::oscStride || t == tgt::osc3 + tgt::oscGain || t == tgt::sampleGain)
+        if (t == tgt::amp || t == tgt::subGain || t == tgt::oscGain || t == tgt::oscGain + tgt::oscStride || t == tgt::osc3 + tgt::oscGain || t == tgt::sampleGain
+            || t == tgt::grainGain || t == tgt::specGain)
             f |= levelCell;
         if (s == src::lfo1 || s == src::lfo2 || s == src::velocity || s == src::note || s == src::pitchBend || s == src::random || s == src::notePitchBend
             || s >= src::chaos1)
@@ -903,6 +1058,21 @@ struct Engine::Impl
     bool osc3On() const noexcept { return plus2() && xp2 (ext2::osc3 + osc::on) > 0.5; }
     bool sampleLive() const noexcept { return plus2() && xp2 (ext2::sampleOn) > 0.5 && sample != nullptr && sample->frames() > 1; }
     double xp (int i) const noexcept { return p[(std::size_t) (extBase + i)]; }
+    // (Helix round 3, round 190mt)
+    bool plus3() const noexcept { return p[(std::size_t) extBase] >= 2.5; }
+    double xp3 (int i) const noexcept { return p[(std::size_t) (ext3Base + i)]; }
+    bool grainLive() const noexcept { return xp3 (ext3::grainOn) > 0.5 && sample != nullptr && sample->frames() > 8; }
+    bool specLive() const noexcept { return xp3 (ext3::specOn) > 0.5 && spectral != nullptr && ! spectral->empty(); }
+    // (worked out when the values change, so a voice step of a channel that plays none of round 3 asks nothing more)
+    bool r3Live = false;  // round 3 live and something of it on (Clean on a playing sample, the grains, the partials)
+    bool r3Fill = false;  // its matrix rows are read or written (r3Live, or a cell on them)
+    bool r3Cells = false; // a cell on round 3's rows
+    void refreshRound3() noexcept
+    {
+        const auto p3 = plus3();
+        r3Live = p3 && ((xp3 (ext3::sampleClean) > 0.5 && xp2 (ext2::sampleOn) > 0.5) || xp3 (ext3::grainOn) > 0.5 || xp3 (ext3::specOn) > 0.5);
+        r3Fill = r3Live || (p3 && r3Cells);
+    }
     bool fxOn() const noexcept
     {
         return plus() && (xp (ext::distOn) > 0.5 || xp (ext::chorusOn) > 0.5 || xp (ext::delayOn) > 0.5 || xp (ext::reverbOn) > 0.5 || fx2On());
@@ -935,6 +1105,7 @@ struct Engine::Impl
 
     Impl()
     {
+        (void) sincTable(), (void) grainTable(); // (190mt: built here, never on the audio thread)
         const auto& d = defaults();
         std::copy (d.begin(), d.end(), p.begin());
         for (int m = 0; m < mipCount; ++m)
@@ -975,7 +1146,7 @@ struct Engine::Impl
         chaosUsed = {};
         newMacrosUsed = false;
         if (plus2()) // Helix+ 2: the new sources on the older rows, then the new rows (after: revision 1 sums as before)
-            for (int t = 0; t < allTargetCount; ++t)
+            for (int t = 0; t < rev2TargetCount; ++t)
                 for (int s = t < plusTargetCount ? plusSourceCount : 0; s < allSourceCount; ++s)
                     if (const auto a = (float) p[(std::size_t) cellIndex (t, s)]; a != 0.0f && std::isfinite (a))
                     {
@@ -985,6 +1156,20 @@ struct Engine::Impl
                         else if (s >= plusSourceCount)
                             newMacrosUsed = true;
                     }
+        r3Cells = false;
+        if (plus3()) // Helix round 3 (190mt): its rows, after (revision 2 sums as before)
+            for (int t = rev2TargetCount; t < allTargetCount; ++t)
+                for (int s = 0; s < allSourceCount; ++s)
+                    if (const auto a = (float) p[(std::size_t) cellIndex (t, s)]; a != 0.0f && std::isfinite (a))
+                    {
+                        r3Cells = true;
+                        cells[(std::size_t) cellCount++] = makeCell (t, s, a);
+                        if (s >= src::chaos1)
+                            chaosUsed[(std::size_t) (s - src::chaos1)] = true;
+                        else if (s >= plusSourceCount)
+                            newMacrosUsed = true;
+                    }
+        refreshRound3();
     }
 
     void takeTables() noexcept
@@ -1111,6 +1296,13 @@ struct Engine::Impl
             for (int k = 0; k < chaosCount; ++k)
                 v.chaos[(std::size_t) k].start ((std::uint32_t) (v.age * 2u + (std::uint64_t) k) ^ v.noise);
         }
+        if (plus3()) // Helix round 3 (190mt): no grain yet (the first one at once), the grains' own random from the voice
+        {
+            v.grainCount = 0;
+            v.grainNext = 0.0f;
+            v.grainSeed = ((std::uint32_t) (v.age * 2654435761u) ^ v.noise ^ 0x5bd1e995u) | 1u;
+            v.spStarted = false;
+        }
         v.subPhase = 0u;
         v.f1 = {}, v.f2 = {};
         v.noiseLp = 0.0f;
@@ -1219,8 +1411,13 @@ struct Engine::Impl
         std::fill (level, level + plusTargetCount, 1.0f);
         if (plus2On)
         {
-            std::fill (mod + plusTargetCount, mod + allTargetCount, 0.0f);
-            std::fill (level + plusTargetCount, level + allTargetCount, 1.0f);
+            std::fill (mod + plusTargetCount, mod + rev2TargetCount, 0.0f);
+            std::fill (level + plusTargetCount, level + rev2TargetCount, 1.0f);
+            if (r3Fill) // (round 3's rows only when something reads or writes them)
+            {
+                std::fill (mod + rev2TargetCount, mod + allTargetCount, 0.0f);
+                std::fill (level + rev2TargetCount, level + allTargetCount, 1.0f);
+            }
         }
         auto internalScale = std::clamp (fp (modAmount), 0.0f, 2.0f);
         auto applyCells = [&] (bool lfoRowsOnly) HELIX_LAMBDA_INLINE {
@@ -1529,6 +1726,24 @@ struct Engine::Impl
                 v.sGainL[(std::size_t) u] = (pp > 0.0f ? far : near) * g * ug;
                 v.sGainR[(std::size_t) u] = (pp > 0.0f ? near : far) * g * ug;
             }
+        }
+        // Helix round 3 (round 190mt): Clean, the grains' and the partials' step values (read only with Helix+ 2 live: the
+        // voice loop asks for them only then)
+        if (plus2On)
+        {
+            v.plus3 = r3Live;
+            if (v.plus3)
+            {
+                v.sClean = levels != nullptr && xp3 (ext3::sampleClean) > 0.5;
+                v.grainOn = grainLive();
+                v.specOn = specLive();
+                if (v.grainOn)
+                    grainControl (v, notePitch, mod, level);
+                if (v.specOn)
+                    spectralControl (v, n, notePitch, mod, level);
+            }
+            else
+                v.sClean = false;
         }
         // Helix+'s noise: white through a one-pole (Color < 0.5 darker, > 0.5 brighter) into the oscillators' bus
         v.noiseGain = 0.0f;
@@ -2070,6 +2285,18 @@ struct Engine::Impl
     // of a single cycle (Bend, PWM, Asym, Mirror, Flip, Remap) have no cycle to bend and leave the sample as it is.
     void sampleStep (Voice& v, int n, float* outL, float* outR) noexcept
     {
+        if (v.sClean) // (round 3's Clean: the band-limited levels; else 190ml's read, unchanged)
+            sampleStepClean (v, n, outL, outR);
+        else
+            sampleStepT<false> (v, n, outL, outR);
+    }
+#if defined(__GNUC__) || defined(__clang__)
+    __attribute__ ((noinline))
+#endif
+    void sampleStepClean (Voice& v, int n, float* outL, float* outR) noexcept { sampleStepT<true> (v, n, outL, outR); }
+    template <bool clean>
+    void sampleStepT (Voice& v, int n, float* outL, float* outR) noexcept
+    {
         const auto& smp = *sample;
         const auto frames = smp.frames();
         const float* sl = smp.l.data();
@@ -2122,6 +2349,30 @@ struct Engine::Impl
             const auto syncInc = v.sSyncInc[(std::size_t) u];
             auto oph = v.phaseAtStep[0][(std::size_t) u];
             const auto oinc = v.uInc[0][(std::size_t) u];
+            // (round 3, Clean: read from the band-limited level the speed asks for; up to 1.2 × the sample's own speed the
+            // sample itself, as before. The positions stay in the sample's own samples.)
+            const float* rl = sl;
+            const float* rr = sr;
+            double scale = 1.0;
+            bool sinc = false; // (a level: its 8-point read)
+            const float* sincK = nullptr;
+            if constexpr (clean)
+            {
+                if (const auto lv = std::min (sampleLevelFor (std::abs (inc)), (int) levels->levels.size()); lv > 0)
+                {
+                    const auto& lev = levels->levels[(std::size_t) (lv - 1)];
+                    rl = lev.l.data() + SampleLevels::guard;
+                    rr = sr == sl || lev.r.empty() ? rl : lev.r.data() + SampleLevels::guard;
+                    scale = std::ldexp (1.0, -lev.shift);
+                    sinc = true;
+                    sincK = sincTable().k.data();
+                }
+            }
+            // (Clean's read; without Clean the read below is 190ml's own expression)
+            const auto read = [sinc, sincK, &hermite] (const float* d, double at) HELIX_LAMBDA_INLINE {
+                return sinc ? sincRead (d, at, sincK) : hermite (d, at);
+            };
+            (void) read, (void) scale, (void) rl, (void) rr;
             for (int i = 0; i < n; ++i)
             {
                 if (pos >= end)
@@ -2134,7 +2385,11 @@ struct Engine::Impl
                         break;
                     }
                 }
-                auto yl = hermite (sl, pos), yr = sr == sl ? yl : hermite (sr, pos);
+                float yl, yr;
+                if constexpr (clean)
+                    yl = read (rl, pos * scale), yr = rr == rl ? yl : read (rr, pos * scale);
+                else
+                    yl = hermite (sl, pos), yr = sr == sl ? yl : hermite (sr, pos);
                 auto step = inc;
                 if (oa != nullptr)
                 {
@@ -2175,7 +2430,11 @@ struct Engine::Impl
                     if (sync + syncInc < sync)
                     {
                         const auto tau = std::clamp ((float) (4294967296.0 - (double) sync) / (float) std::max (syncInc, 1u), 0.0f, 1.0f);
-                        const auto jump = hermite (sl, start) - hermite (sl, std::min (pos + inc * tau, end));
+                        float jump;
+                        if constexpr (clean)
+                            jump = read (rl, start * scale) - read (rl, std::min (pos + inc * tau, end) * scale);
+                        else
+                            jump = hermite (sl, start) - hermite (sl, std::min (pos + inc * tau, end));
                         yl += jump * (1.0f - tau) * (1.0f - tau) * 0.5f;
                         yr += jump * (1.0f - tau) * (1.0f - tau) * 0.5f;
                         held = -jump * tau * tau * 0.5f;
@@ -2192,6 +2451,325 @@ struct Engine::Impl
         }
         if (! playing)
             v.sampleDone = true, v.sampleOn = false;
+    }
+
+    // --- Helix round 3 (round 190mt): the granular oscillator ------------------------------------------------------------
+    // Grains of the channel's sample (the sample oscillator's), Density a second, each Size long under a Hann window, from
+    // Position ± Spray × half the sample, at the note's speed over the root key + Pitch, on its own side (Pan ± Spread at
+    // random). Each grain reads the band-limited level its speed asks for. The randomness is the voice's own (seeded by the
+    // voice, no engine random drawn), so a note renders the same every time [MODEL].
+    float grainRandom (Voice& v) noexcept // (−1…1)
+    {
+        auto& x = v.grainSeed;
+        x ^= x << 13, x ^= x >> 17, x ^= x << 5;
+        return (float) ((double) (x >> 8) / 8388608.0 - 1.0);
+    }
+#if defined(__GNUC__) || defined(__clang__)
+    __attribute__ ((noinline))
+#endif
+    void grainControl (Voice& v, double notePitch, const float* mod, const float* level) noexcept
+    {
+        v.gPos = clamp01 ((float) xp3 (ext3::grainPosition) + mod[tgt::grainPos]);
+        // Size and Density rows: ±1 = 4 octaves of their value
+        const auto size = std::clamp (xp3 (ext3::grainSize) * std::exp2 (4.0 * mod[tgt::grainSize]), 0.002, 1.0);
+        const auto density = std::clamp (xp3 (ext3::grainDensity) * std::exp2 (4.0 * mod[tgt::grainDensity]), 0.5, 400.0);
+        v.gSpray = clamp01 ((float) xp3 (ext3::grainSpray) + mod[tgt::grainSpray]);
+        v.gSpread = clamp01 ((float) xp3 (ext3::grainSpread));
+        v.gPan = clampBi ((float) xp3 (ext3::grainPan));
+        const auto semis = notePitch + xp3 (ext3::grainPitch) + laws.oscPitchSemis * mod[tgt::grainPitch] - std::clamp (xp2 (ext2::sampleRoot), 0.0, 127.0);
+        v.gInc = std::exp2 (semis / 12.0) * sample->rate / rate;
+        v.gInterval = (float) (rate / density);
+        v.gWinInc = (float) (1.0 / (size * rate));
+        // overlapping grains add up as noise does: the level kept near one grain's
+        const auto overlap = density * size;
+        v.gGain = clamp01 ((float) xp3 (ext3::grainGain)) * level[tgt::grainGain] * (float) (overlap > 1.0 ? 1.0 / std::sqrt (overlap) : 1.0);
+    }
+    void spawnGrain (Voice& v, int start) noexcept
+    {
+        const auto r1 = grainRandom (v), r2 = grainRandom (v);
+        const auto span = (double) (sample->frames() - 4);
+        const auto at = std::clamp ((double) v.gPos + 0.5 * (double) v.gSpray * (double) r1, 0.0, 1.0) * span;
+        const auto lv = levels != nullptr ? std::min (sampleLevelFor (v.gInc), (int) levels->levels.size()) : 0;
+        const auto shift = lv > 0 ? levels->levels[(std::size_t) (lv - 1)].shift : 0;
+        auto& g = v.grains[(std::size_t) v.grainCount++];
+        g.level = lv;
+        g.pos = std::ldexp (at, -shift);
+        g.inc = std::ldexp (v.gInc, -shift);
+        g.w = 0.0f;
+        g.wInc = v.gWinInc;
+        g.start = start;
+        const auto pp = clampBi (v.gPan + v.gSpread * r2);
+        const auto c = (float) laws.centreGain * v.gGain;
+        const auto near = c * (1.0f + std::sqrt (std::abs (pp))), far = c * std::sqrt (1.0f - std::abs (pp));
+        g.gl = pp > 0.0f ? far : near;
+        g.gr = pp > 0.0f ? near : far;
+    }
+#if defined(__GNUC__) || defined(__clang__)
+    __attribute__ ((noinline))
+#endif
+    void grainStep (Voice& v, int n, float* outL, float* outR) noexcept
+    {
+        // the grains due in this step (a quarter of Spray jitters their times too)
+        auto t = v.grainNext;
+        while (t < (float) n)
+        {
+            if (v.grainCount < maxGrains)
+                spawnGrain (v, std::max (0, (int) t));
+            t += v.gInterval * (1.0f + 0.25f * v.gSpray * grainRandom (v));
+        }
+        v.grainNext = t - (float) n;
+        const auto& smp = *sample;
+        const float* tab = grainTable().v.data();
+        const float* sincK = sincTable().k.data();
+        const auto stereo = smp.r.size() == smp.l.size();
+        for (int k = 0; k < v.grainCount;)
+        {
+            auto& g = v.grains[(std::size_t) k];
+            const float* gl = smp.l.data();
+            const float* gr = stereo ? smp.r.data() : gl;
+            auto frames = smp.frames();
+            bool alive = g.level <= (levels != nullptr ? (int) levels->levels.size() : 0);
+            const bool sinc = alive && g.level > 0; // (a level: its 8-point read; the sample itself: 4-point Hermite)
+            if (sinc)
+            {
+                const auto& lev = levels->levels[(std::size_t) (g.level - 1)];
+                gl = lev.l.data() + SampleLevels::guard;
+                gr = stereo && ! lev.r.empty() ? lev.r.data() + SampleLevels::guard : gl;
+                frames = lev.frames;
+            }
+            const auto end = (double) (frames - 3);
+            // (the grain's values in locals: the output's stores cannot change them)
+            auto pos = g.pos, inc = g.inc;
+            auto wp = g.w;
+            const auto wInc = g.wInc, gainL = g.gl, gainR = g.gr;
+            // how many samples it plays in this step: to its window's end or the level's end, at most the step
+            int last = alive ? n : g.start;
+            if (alive)
+            {
+                const auto byWindow = (double) (1.0f - wp) / (double) wInc, byEnd = (end - pos) / inc;
+                const auto left = std::max (0.0, std::ceil (std::min (byWindow, byEnd)));
+                if (left < (double) (n - g.start))
+                    last = g.start + (int) left, alive = false;
+            }
+            const auto read = [sinc, sincK] (const float* d, double at) HELIX_LAMBDA_INLINE {
+                if (sinc)
+                    return sincRead (d, at, sincK);
+                const auto j = (int) at;
+                const auto f = (float) (at - (double) j);
+                const auto xm = d[j > 0 ? j - 1 : 0], x0 = d[j], x1 = d[j + 1], x2 = d[j + 2];
+                const auto c1 = 0.5f * (x1 - xm), c2 = xm - 2.5f * x0 + 2.0f * x1 - 0.5f * x2, c3 = 0.5f * (x2 - xm) + 1.5f * (x0 - x1);
+                return ((c3 * f + c2) * f + c1) * f + x0;
+            };
+            if (gr == gl)
+                for (int i = g.start; i < last; ++i)
+                {
+                    const auto y = read (gl, pos) * grainWindowInline (tab, std::min (wp, 0.99999994f));
+                    outL[i] += y * gainL;
+                    outR[i] += y * gainR;
+                    pos += inc;
+                    wp += wInc;
+                }
+            else
+                for (int i = g.start; i < last; ++i)
+                {
+                    const auto win = grainWindowInline (tab, std::min (wp, 0.99999994f));
+                    outL[i] += read (gl, pos) * win * gainL;
+                    outR[i] += read (gr, pos) * win * gainR;
+                    pos += inc;
+                    wp += wInc;
+                }
+            g.pos = pos, g.w = wp;
+            g.start = 0;
+            if (! alive || g.w >= 1.0f || g.pos >= end)
+            {
+                g = v.grains[(std::size_t) --v.grainCount]; // (the last grain takes its place)
+                continue;
+            }
+            ++k;
+        }
+    }
+
+    // --- Helix round 3 (round 190mt): the spectral oscillator ---------------------------------------------------------------
+    // The sample's partials (SpectralData: frames over the sample, tracks per frame) resynthesised as sines: Position moves
+    // through the frames, the note moves every partial's frequency over the root key; Stretch bends them around the root
+    // (f' = root × (f / root)^(1 + Stretch / 2)), Shift adds Hz to each (breaking the harmonics), the filter tilts them (±6
+    // dB an octave around 1 kHz) and keeps a band of them (Band, Width octaves, cosine skirts an octave wide). Partials
+    // at or above 0.475 × the rate are dropped (faded from 0.45): anti-aliased by construction [MODEL].
+#if defined(__GNUC__) || defined(__clang__)
+    __attribute__ ((noinline))
+#endif
+    void spectralControl (Voice& v, int n, double notePitch, const float* mod, const float* level) noexcept
+    {
+        const auto& sp = *spectral;
+        if (! v.spStarted) // (each partial from its own fixed phase: the sum stays smooth, every note starts the same)
+        {
+            for (int i = 0; i < maxSpectralPartials; ++i)
+            {
+                auto h = (std::uint32_t) i * 2654435761u + 0x9e3779b9u;
+                h ^= h >> 15, h *= 0x2c1b3c6du, h ^= h >> 12;
+                const auto ph = 2.0 * pi * (double) (h >> 8) / 16777216.0;
+                v.spC[(std::size_t) i] = (float) std::cos (ph);
+                v.spS[(std::size_t) i] = (float) std::sin (ph);
+                v.spA[(std::size_t) i] = 0.0f;
+                v.spCr[(std::size_t) i] = 1.0f, v.spSr[(std::size_t) i] = 0.0f;
+            }
+            v.spStarted = true;
+            v.spLive = 0;
+            v.spKey.fill (-1.0e300);
+        }
+        const auto want = std::min (sp.partials, std::clamp ((int) roundHalfAway (xp3 (ext3::specPartials)), 1, maxSpectralPartials));
+        const auto wanted = std::min ((want + 3) & ~3, maxSpectralPartials);
+        const auto run = std::max (wanted, v.spLive); // (partials dropped since the last step fade out in this one)
+        const std::array<double, 9> key { clamp01 ((float) xp3 (ext3::specPosition) + mod[tgt::specPos]),
+                                          std::clamp (xp3 (ext3::specStretch) + (double) mod[tgt::specStretch], -1.0, 1.0),
+                                          std::clamp (xp3 (ext3::specShift) + (double) mod[tgt::specShift], -1.0, 1.0),
+                                          std::clamp (xp3 (ext3::specTilt) + (double) mod[tgt::specTilt], -1.0, 1.0),
+                                          filterHz (filterNorm (xp3 (ext3::specBand)) + mod[tgt::specBand]),
+                                          std::clamp (xp3 (ext3::specWidth), 0.25, 10.0),
+                                          notePitch + xp3 (ext3::specTranspose) - std::clamp (xp2 (ext2::sampleRoot), 0.0, 127.0),
+                                          (double) want, rate };
+        // the output's gain and side (Live's pan law, as the oscillators')
+        const auto pan = clampBi ((float) xp3 (ext3::specPan));
+        const auto g = clamp01 ((float) xp3 (ext3::specGain)) * level[tgt::specGain] * (float) laws.centreGain;
+        const auto near = g * (1.0f + std::sqrt (std::abs (pan))), far = g * std::sqrt (1.0f - std::abs (pan));
+        v.spGainL = pan > 0.0f ? far : near;
+        v.spGainR = pan > 0.0f ? near : far;
+        v.spCount = run;
+        if (key == v.spKey && run == wanted) // (nothing moved: the amplitudes sit at their targets)
+        {
+            std::fill (v.spDA.begin(), v.spDA.begin() + run, 0.0f);
+            return;
+        }
+        v.spKey = key;
+        v.spLive = wanted;
+        const auto frames = sp.frames, K = sp.partials;
+        const auto fpos = key[0] * (double) (frames - 1);
+        const auto f0 = std::min ((int) fpos, std::max (0, frames - 2));
+        const auto f1 = std::min (f0 + 1, frames - 1);
+        const auto wf = (float) (fpos - (double) f0);
+        const auto ratio = std::exp2 (key[6] / 12.0);
+        const auto rootHz = 440.0 * std::exp2 ((std::clamp (xp2 (ext2::sampleRoot), 0.0, 127.0) - 69.0) / 12.0);
+        const auto e = spectralExponent (key[1]);
+        const auto add = spectralShiftHz (key[2]);
+        const auto tilt = key[3], band = key[4], width = key[5];
+        const auto top = 0.475 * rate, fade = 0.45 * rate;
+        const auto inv = 1.0f / (float) n;
+        for (int i = 0; i < run; ++i)
+        {
+            auto target = 0.0f;
+            auto w = 0.0;
+            if (i < want)
+            {
+                const auto a0 = sp.amp[(std::size_t) (f0 * K + i)], a1 = sp.amp[(std::size_t) (f1 * K + i)];
+                const auto h0 = (double) sp.hz[(std::size_t) (f0 * K + i)], h1 = (double) sp.hz[(std::size_t) (f1 * K + i)];
+                const auto a = a0 + (a1 - a0) * wf;
+                // (a track born or ending between the frames keeps its sounding frequency)
+                const auto hz = a0 > 0.0f && a1 > 0.0f ? h0 + (h1 - h0) * (double) wf : a0 > 0.0f ? h0 : h1;
+                auto f = e == 1.0 ? hz * ratio : rootHz * ratio * std::pow (std::max (hz, 1.0) / rootHz, e);
+                f += add;
+                auto gain = 1.0;
+                if (! (f >= 5.0 && f < top))
+                    gain = 0.0;
+                else
+                {
+                    if (f > fade)
+                        gain = (top - f) / (top - fade);
+                    if (tilt != 0.0)
+                        gain *= std::min (16.0, std::pow (f / 1000.0, tilt));
+                    if (width < 9.99)
+                    {
+                        const auto d = std::abs (std::log2 (f / band)), half = 0.5 * width;
+                        gain *= d <= half ? 1.0 : d < half + 1.0 ? 0.5 + 0.5 * std::cos (pi * (d - half)) : 0.0;
+                    }
+                }
+                target = (float) (a * gain);
+                if (gain > 0.0)
+                    w = 2.0 * pi * f / rate;
+            }
+            v.spDA[(std::size_t) i] = (target - v.spA[(std::size_t) i]) * inv;
+            if (w > 0.0) // (a silent partial keeps turning at its last speed)
+                v.spCr[(std::size_t) i] = (float) std::cos (w), v.spSr[(std::size_t) i] = (float) std::sin (w);
+        }
+    }
+#if defined(__GNUC__) || defined(__clang__)
+    __attribute__ ((noinline))
+#endif
+    void spectralStep (Voice& v, int n, float* outL, float* outR) noexcept
+    {
+        // four partials a vector: each turns its (cos, sin) by its step's rotation, its sine weighted by its ramped
+        // amplitude into four running sums per sample; the sums added at the end (the same order every time)
+        alignas (16) float acc[controlRate * 4] {};
+        const auto finish = [&v] (int q, __m128 c, __m128 s, __m128 a) HELIX_LAMBDA_INLINE {
+            // (the pair's length back to 1, once a step: 1.5 − 0.5 (c² + s²))
+            const auto len = _mm_add_ps (_mm_mul_ps (c, c), _mm_mul_ps (s, s));
+            const auto fix = _mm_sub_ps (_mm_set1_ps (1.5f), _mm_mul_ps (_mm_set1_ps (0.5f), len));
+            _mm_store_ps (v.spC.data() + q, _mm_mul_ps (c, fix));
+            _mm_store_ps (v.spS.data() + q, _mm_mul_ps (s, fix));
+            _mm_store_ps (v.spA.data() + q, a);
+        };
+        int q = 0;
+        for (; q + 8 <= v.spCount; q += 8) // (eight partials at a time: the sums' memory touched half as often)
+        {
+            auto c0 = _mm_load_ps (v.spC.data() + q), s0 = _mm_load_ps (v.spS.data() + q), a0 = _mm_load_ps (v.spA.data() + q);
+            auto c1 = _mm_load_ps (v.spC.data() + q + 4), s1 = _mm_load_ps (v.spS.data() + q + 4), a1 = _mm_load_ps (v.spA.data() + q + 4);
+            const auto da0 = _mm_load_ps (v.spDA.data() + q), cr0 = _mm_load_ps (v.spCr.data() + q), sr0 = _mm_load_ps (v.spSr.data() + q);
+            const auto da1 = _mm_load_ps (v.spDA.data() + q + 4), cr1 = _mm_load_ps (v.spCr.data() + q + 4), sr1 = _mm_load_ps (v.spSr.data() + q + 4);
+            const auto zero = _mm_setzero_ps();
+            if (_mm_movemask_ps (_mm_or_ps (_mm_cmpneq_ps (da0, zero), _mm_cmpneq_ps (da1, zero))) == 0)
+            {
+                // (the amplitudes hold this step: no ramp, fewer registers)
+                for (int i = 0; i < n; ++i)
+                {
+                    const auto sum = _mm_add_ps (_mm_mul_ps (a0, s0), _mm_mul_ps (a1, s1));
+                    _mm_store_ps (acc + 4 * i, _mm_add_ps (_mm_load_ps (acc + 4 * i), sum));
+                    const auto n0 = _mm_sub_ps (_mm_mul_ps (c0, cr0), _mm_mul_ps (s0, sr0));
+                    s0 = _mm_add_ps (_mm_mul_ps (s0, cr0), _mm_mul_ps (c0, sr0));
+                    c0 = n0;
+                    const auto n1 = _mm_sub_ps (_mm_mul_ps (c1, cr1), _mm_mul_ps (s1, sr1));
+                    s1 = _mm_add_ps (_mm_mul_ps (s1, cr1), _mm_mul_ps (c1, sr1));
+                    c1 = n1;
+                }
+                finish (q, c0, s0, a0);
+                finish (q + 4, c1, s1, a1);
+                continue;
+            }
+            for (int i = 0; i < n; ++i)
+            {
+                a0 = _mm_add_ps (a0, da0);
+                a1 = _mm_add_ps (a1, da1);
+                const auto sum = _mm_add_ps (_mm_mul_ps (a0, s0), _mm_mul_ps (a1, s1));
+                _mm_store_ps (acc + 4 * i, _mm_add_ps (_mm_load_ps (acc + 4 * i), sum));
+                const auto n0 = _mm_sub_ps (_mm_mul_ps (c0, cr0), _mm_mul_ps (s0, sr0));
+                s0 = _mm_add_ps (_mm_mul_ps (s0, cr0), _mm_mul_ps (c0, sr0));
+                c0 = n0;
+                const auto n1 = _mm_sub_ps (_mm_mul_ps (c1, cr1), _mm_mul_ps (s1, sr1));
+                s1 = _mm_add_ps (_mm_mul_ps (s1, cr1), _mm_mul_ps (c1, sr1));
+                c1 = n1;
+            }
+            finish (q, c0, s0, a0);
+            finish (q + 4, c1, s1, a1);
+        }
+        for (; q < v.spCount; q += 4)
+        {
+            auto c = _mm_load_ps (v.spC.data() + q), s = _mm_load_ps (v.spS.data() + q);
+            auto a = _mm_load_ps (v.spA.data() + q);
+            const auto da = _mm_load_ps (v.spDA.data() + q), cr = _mm_load_ps (v.spCr.data() + q), sr = _mm_load_ps (v.spSr.data() + q);
+            for (int i = 0; i < n; ++i)
+            {
+                a = _mm_add_ps (a, da);
+                _mm_store_ps (acc + 4 * i, _mm_add_ps (_mm_load_ps (acc + 4 * i), _mm_mul_ps (a, s)));
+                const auto c2 = _mm_sub_ps (_mm_mul_ps (c, cr), _mm_mul_ps (s, sr));
+                s = _mm_add_ps (_mm_mul_ps (s, cr), _mm_mul_ps (c, sr));
+                c = c2;
+            }
+            finish (q, c, s, a);
+        }
+        for (int i = 0; i < n; ++i)
+        {
+            const auto y = (acc[4 * i] + acc[4 * i + 1]) + (acc[4 * i + 2] + acc[4 * i + 3]);
+            outL[i] += y * v.spGainL;
+            outR[i] += y * v.spGainR;
+        }
     }
 
     void subStep (Voice& v, int n, float* outL, float* outR) noexcept
@@ -2753,8 +3331,18 @@ struct Engine::Impl
                     oscStep (v, 1, c, o1L, o1R);
                 if (v.oscs > 2) // (Helix+ 2: oscillator 3 and the sample join oscillator 1's bus)
                     osc3Step (v, c, o1L, o1R);
-                if (v.sampleOn)
-                    sampleStep (v, c, o1L, o1R);
+                if (v.plus2) // (Helix+ 2's sample; round 3's grains and partials join oscillator 1's bus too)
+                {
+                    if (v.sampleOn)
+                        sampleStep (v, c, o1L, o1R);
+                    if (v.plus3)
+                    {
+                        if (v.grainOn)
+                            grainStep (v, c, o1L, o1R);
+                        if (v.specOn)
+                            spectralStep (v, c, o1L, o1R);
+                    }
+                }
                 subStep (v, c, o1L, o1R);
                 noiseStep (v, c, o1L, o1R);
                 const auto& c1 = v.fc[0];
@@ -2838,6 +3426,8 @@ void Engine::setUserTable (int osc, const Table* t) noexcept
 }
 
 void Engine::setSample (const SampleBuffer* s) noexcept { impl->sample = s; }
+void Engine::setSampleLevels (const SampleLevels* l) noexcept { impl->levels = l; }
+void Engine::setSpectral (const SpectralData* s) noexcept { impl->spectral = s; }
 
 void Engine::setValues (const double* values) noexcept
 {
@@ -2854,6 +3444,8 @@ void Engine::setParam (int index, double value) noexcept
     impl->p[(std::size_t) index] = value;
     if (index >= ampEnv && index < lfoBase (0))
         impl->refresh();
+    else if (index >= ext2Base) // (round 3: what plays, worked out again)
+        impl->refreshRound3();
 }
 
 double Engine::param (int index) const noexcept { return index >= 0 && index < stateSize ? impl->p[(std::size_t) index] : 0.0; }
@@ -2952,6 +3544,21 @@ std::vector<float> renderReference (const std::vector<double>& state, const std:
             e.setUserTable (k, own[(std::size_t) k].get());
         e.setSample (data->sample.frames() > 0 ? &data->sample : nullptr);
     }
+    // (Helix round 3: the sample's levels and partials, made only when the state's round 3 block asks for them)
+    std::shared_ptr<const SampleLevels> levels;
+    SpectralData partials;
+    if (data != nullptr && data->sample.frames() > 3 && s[(std::size_t) extBase] >= 2.5)
+    {
+        const auto x3 = [&s] (int i) { return s[(std::size_t) (ext3Base + i)] > 0.5; };
+        if ((x3 (ext3::sampleClean) && s[(std::size_t) (ext2Base + ext2::sampleOn)] > 0.5) || x3 (ext3::grainOn))
+            levels = sampleLevels (data->sample);
+        if (x3 (ext3::specOn))
+            partials = data->spectral.empty() ? analyseSpectrum (data->sample) : data->spectral;
+    }
+    else if (data != nullptr)
+        partials = data->spectral;
+    e.setSampleLevels (levels.get());
+    e.setSpectral (partials.empty() ? nullptr : &partials);
     e.setState (s.data());
     std::vector<float> out ((std::size_t) length * 2, 0.0f);
     std::vector<float> l ((std::size_t) block), r ((std::size_t) block);
@@ -3178,6 +3785,35 @@ const std::vector<Spec>& ext2Specs()
     return list;
 }
 
+// Helix round 3's automatable values (round 190mt), ext3::reserved + 1 … ext3::autoEnd − 1, in order
+const std::vector<Spec>& ext3Specs()
+{
+    static const std::vector<Spec> list {
+        { "Grain On", 0.0f, 1.0f, true },
+        { "Grain Position", 0.0f, 1.0f, false },
+        { "Grain Size", 0.005f, 1.0f, false },
+        { "Grain Density", 1.0f, 200.0f, false },
+        { "Grain Spray", 0.0f, 1.0f, false },
+        { "Grain Pitch", -24.0f, 24.0f, false },
+        { "Grain Spread", 0.0f, 1.0f, false },
+        { "Grain Gain", 0.0f, 1.0f, false },
+        { "Grain Pan", -1.0f, 1.0f, false },
+        { "Spectral On", 0.0f, 1.0f, true },
+        { "Spectral Position", 0.0f, 1.0f, false },
+        { "Spectral Stretch", -1.0f, 1.0f, false },
+        { "Spectral Shift", -1.0f, 1.0f, false },
+        { "Spectral Tilt", -1.0f, 1.0f, false },
+        { "Spectral Band", 20.0f, 20000.0f, false },
+        { "Spectral Width", 0.25f, 10.0f, false },
+        { "Spectral Partials", 1.0f, (float) maxSpectralPartials, true },
+        { "Spectral Transpose", -48.0f, 48.0f, true },
+        { "Spectral Gain", 0.0f, 1.0f, false },
+        { "Spectral Pan", -1.0f, 1.0f, false },
+        { "Sample Clean", 0.0f, 1.0f, true },
+    };
+    return list;
+}
+
 std::string fmt (const char* f, double v)
 {
     char b[64];
@@ -3194,7 +3830,9 @@ std::string paramName (int index)
     if (index >= 0 && index < paramCount)
         return specs()[(std::size_t) index].name;
     if (automatable (index))
-        return index > ext2Base ? ext2Specs()[(std::size_t) (index - ext2Base - 1)].name : extSpecs()[(std::size_t) (index - extBase - 1)].name;
+        return index > ext3Base   ? ext3Specs()[(std::size_t) (index - ext3Base - 1)].name
+               : index > ext2Base ? ext2Specs()[(std::size_t) (index - ext2Base - 1)].name
+                                  : extSpecs()[(std::size_t) (index - extBase - 1)].name;
     return {};
 }
 
@@ -3211,7 +3849,14 @@ std::string sourceName (int source)
 
 std::string targetName (int target, int effectMode1, int effectMode2)
 {
-    if (target >= plusTargetCount && target < allTargetCount) // Helix+ 2's rows
+    if (target >= rev2TargetCount && target < allTargetCount) // Helix round 3's rows (190mt)
+    {
+        static const char* rows3[newTargetCount3] { "Grain Pos", "Grain Size", "Grain Density", "Grain Spray", "Grain Pitch", "Grain Gain",
+                                                    "Spectral Pos", "Spectral Stretch", "Spectral Shift", "Spectral Tilt", "Spectral Band",
+                                                    "Spectral Gain" };
+        return rows3[target - rev2TargetCount];
+    }
+    if (target >= plusTargetCount && target < rev2TargetCount) // Helix+ 2's rows
     {
         static const char* rows2[newTargetCount] { "Osc 3 Pitch", "Osc 3 Pos", "Osc 3 FX 1", "Osc 3 FX 2", "Osc 3 Pan", "Osc 3 Gain", "Osc 3 Warp 2",
                                                    "Sample Pitch", "Sample Gain", "Sample Pan", "Shift", "Multiband Depth" };
@@ -3258,6 +3903,30 @@ std::string paramText (int index, double v)
                                  "3/16", "1/6", "1/8", "1/12", "1/16", "1/24", "1/32", "1/48", "1/64" };
     const auto i = (int) std::lround (v);
     const auto onOff = [&] { return std::string (v > 0.5 ? "On" : "Off"); };
+    if (index >= ext3Base) // Helix round 3 (round 190mt)
+    {
+        switch (index - ext3Base)
+        {
+            case ext3::grainOn: case ext3::specOn: case ext3::sampleClean: return onOff();
+            case ext3::grainSize: return timeText (v);
+            case ext3::grainDensity: return fmt (v < 10.0 ? "%.1f /s" : "%.0f /s", v);
+            case ext3::grainPitch: return fmt ("%+.2f st", v);
+            case ext3::grainGain: case ext3::specGain: return dbText (v);
+            case ext3::grainPan: case ext3::specPan: return paramText (oscBase (0) + osc::pan, v);
+            case ext3::specStretch: return fmt ("%+.0f %%", v * 100.0);
+            case ext3::specShift:
+            {
+                const auto hz = spectralShiftHz (v);
+                return std::abs (hz) < 100.0 ? fmt ("%+.1f Hz", hz) : fmt ("%+.0f Hz", hz);
+            }
+            case ext3::specTilt: return fmt ("%+.1f dB/oct", v * 6.0);
+            case ext3::specBand: return v < 1000.0 ? fmt ("%.0f Hz", v) : fmt ("%.2f kHz", v / 1000.0);
+            case ext3::specWidth: return v >= 9.99 ? std::string ("Open") : fmt ("%.1f oct", v);
+            case ext3::specPartials: return std::to_string (std::clamp (i, 1, maxSpectralPartials));
+            case ext3::specTranspose: return fmt ("%+.0f st", v);
+            default: return pctText (v);
+        }
+    }
     if (index >= ext2Base) // Helix+ 2 (round 190ml)
     {
         const auto e = index - ext2Base;
@@ -3396,7 +4065,8 @@ std::vector<float> helixDefaults()
 {
     const auto& d = wt::defaults();
     std::vector<float> v (d.begin(), d.end());
-    v[(std::size_t) (wt::extBase + wt::ext::revision)] = (float) wt::currentRevision; // (a new channel: Helix+ and Helix+ 2 live)
+    v[(std::size_t) (wt::extBase + wt::ext::revision)] = (float) wt::currentRevision; // (a new channel: Helix+ … round 3 live)
+    v[(std::size_t) (wt::ext3Base + wt::ext3::sampleClean)] = 1.0f;                   // (190mt: a new channel's sample band-limited)
     return v;
 }
 
@@ -3445,6 +4115,17 @@ const std::vector<EngineParam>& helixEngineParams()
             p.low = x2[i].low;
             p.high = x2[i].high;
             p.stepped = x2[i].stepped;
+            v.push_back (std::move (p));
+        }
+        const auto& x3 = wt::ext3Specs(); // Helix round 3 (round 190mt): after Helix+ 2's block
+        for (std::size_t i = 0; i < x3.size(); ++i)
+        {
+            EngineParam p;
+            p.index = wt::ext3Base + 1 + (int) i;
+            p.name = x3[i].name;
+            p.low = x3[i].low;
+            p.high = x3[i].high;
+            p.stepped = x3[i].stepped;
             v.push_back (std::move (p));
         }
         return v;
@@ -3547,13 +4228,42 @@ public:
                     next.tables[(std::size_t) k] = d.tables[(std::size_t) k].empty() ? nullptr : wt::userTableBuilt (d.tables[(std::size_t) k]);
                 if (d.sample.frames() > 3)
                     next.sample = std::make_shared<wt::SampleBuffer> (std::move (d.sample));
+                if (! d.spectral.empty() && next.sample != nullptr) // (190mt: the partials kept with the data)
+                    next.spectral = std::make_shared<wt::SpectralData> (std::move (d.spectral));
                 for (int k = 0; k < wt::oscCount; ++k)
                     userPtr[(std::size_t) k].store (next.tables[(std::size_t) k].get());
                 samplePtr.store (next.sample.get());
+                levelsPtr.store (nullptr);
+                spectralPtr.store (next.spectral.get());
                 held.tag = version.load() + 1;
                 retired.push_back (std::move (held));
                 held = std::move (next);
                 changed = true;
+            }
+            catch (...)
+            {
+            }
+        }
+        // Helix round 3 (round 190mt): the sample's band-limited levels and its partials, made here (UI thread) once the
+        // values ask for them (Clean on a playing sample, the grains, the spectral oscillator); kept with the sample
+        if (held.sample != nullptr && values[(std::size_t) wt::extBase].load() >= 2.5f)
+        {
+            const auto on = [this] (int i) { return values[(std::size_t) (wt::ext3Base + i)].load() > 0.5f; };
+            try
+            {
+                if (held.levels == nullptr && ((on (wt::ext3::sampleClean) && values[(std::size_t) (wt::ext2Base + wt::ext2::sampleOn)].load() > 0.5f)
+                                               || on (wt::ext3::grainOn)))
+                {
+                    held.levels = wt::sampleLevels (*held.sample);
+                    levelsPtr.store (held.levels.get());
+                    changed = true;
+                }
+                if (held.spectral == nullptr && on (wt::ext3::specOn))
+                {
+                    held.spectral = std::make_shared<wt::SpectralData> (wt::analyseSpectrum (*held.sample));
+                    spectralPtr.store (held.spectral.get());
+                    changed = true;
+                }
             }
             catch (...)
             {
@@ -3675,6 +4385,8 @@ private:
         for (int k = 0; k < wt::oscCount; ++k)
             engine.setUserTable (k, userPtr[(std::size_t) k].load());
         engine.setSample (samplePtr.load());
+        engine.setSampleLevels (levelsPtr.load());
+        engine.setSpectral (spectralPtr.load());
         engine.setValues (state.data());
         taken.store (v);
     }
@@ -3684,6 +4396,8 @@ private:
     {
         std::array<std::shared_ptr<const wt::Table>, wt::oscCount> tables {};
         std::shared_ptr<const wt::SampleBuffer> sample;
+        std::shared_ptr<const wt::SampleLevels> levels;   // (190mt)
+        std::shared_ptr<const wt::SpectralData> spectral; // (190mt)
         std::uint32_t tag = 0;
     };
     Held held;
@@ -3691,6 +4405,8 @@ private:
     std::vector<std::uint8_t> dataBytes;
     std::array<std::atomic<const wt::Table*>, wt::oscCount> userPtr {};
     std::atomic<const wt::SampleBuffer*> samplePtr { nullptr };
+    std::atomic<const wt::SampleLevels*> levelsPtr { nullptr };
+    std::atomic<const wt::SpectralData*> spectralPtr { nullptr };
 
     static constexpr int chunk = 512;
     wt::Engine engine;

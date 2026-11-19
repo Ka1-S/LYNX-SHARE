@@ -1,7 +1,8 @@
 // LYNX's own Helix presets (round 190mi): designed for LYNX on Helix (core/WavetableSynth.h) and its Helix+ block
 // (second warps, unison stacking, noise, comb / formant / phaser filters, macros, drawn LFOs, the effects rack); round
 // 190ml adds presets for Helix+ 2 (oscillator 3, the sample oscillator with LYNX-made samples, user tables made from
-// formulas and harmonics, macros 5…8, chaos sources, the shifter / EQ / multiband).
+// formulas and harmonics, macros 5…8, chaos sources, the shifter / EQ / multiband); round 190mt adds presets for the
+// granular and spectral oscillators (Helix round 3).
 // Clean-room: no Serum, Live or other preset was read or converted; LYNX's own tables (core/WavetableTables.cpp).
 // The first preset ("Init") is Helix's own default, so a new Helix channel sounds as before.
 
@@ -31,6 +32,7 @@ struct Patch
     }
     Patch& x (int extIndex, double value) { return set (w::extBase + extIndex, value); }
     Patch& x2 (int ext2Index, double value) { return set (w::ext2Base + ext2Index, value); }
+    Patch& x3 (int ext3Index, double value) { return set (w::ext3Base + ext3Index, value); }
     Patch& osc3 (int param, double value) { return x2 (w::ext2::osc3 + param, value); }
     Patch& table3 (const char* name)
     {
@@ -165,6 +167,24 @@ w::SampleBuffer hitSample()
             const auto ring = std::sin (2.0 * 3.14159265 * (s == 0 ? 1870.0 : 1910.0) * i / b.rate) * std::exp (-(double) i / (0.15 * b.rate));
             (s == 0 ? b.l : b.r)[(std::size_t) i] = (float) (0.6 * lp[s] * e + 0.35 * ring);
         }
+    }
+    return b;
+}
+// (190mt) a struck glass: five inharmonic partials over A4 (440 Hz), each with its own decay, 1.5 s at 44.1 kHz, mono
+w::SampleBuffer glassSample()
+{
+    w::SampleBuffer b;
+    b.rate = 44100.0;
+    const int n = (int) (1.5 * b.rate);
+    b.l.resize ((std::size_t) n);
+    const double ratio[5] { 1.0, 2.32, 4.25, 6.63, 9.38 }, level[5] { 0.5, 0.3, 0.2, 0.12, 0.08 }, decay[5] { 1.2, 0.7, 0.45, 0.3, 0.2 };
+    for (int i = 0; i < n; ++i)
+    {
+        const auto t = (double) i / b.rate;
+        double y = 0.0;
+        for (int k = 0; k < 5; ++k)
+            y += level[k] * std::exp (-t / decay[k]) * std::sin (2.0 * 3.14159265 * 440.0 * ratio[k] * t);
+        b.l[(std::size_t) i] = (float) (y * std::min (1.0, t / 0.002));
     }
     return b;
 }
@@ -348,6 +368,47 @@ std::vector<Preset> helixBank()
     }, [] {
         w::HelixUserData d; // (a pulse whose width the position sweeps, drawn by a formula)
         d.tables[0] = formulaTable ("p < 0.08 + 0.84*t ? 0.9 : -0.9", "Drawn Pulse");
+        return d;
+    }));
+    // --- Helix round 3 (round 190mt): the granular and spectral oscillators on LYNX-made samples (their partials kept)
+    b.push_back (make ("Grain Cloud", "Pad", { "granular", "cloud", "ambient", "evolving" }, [] (Patch& p) {
+        p.osc (0, osc::on, 0).x2 (ext2::sampleRoot, 45);
+        p.x3 (ext3::grainOn, 1).x3 (ext3::grainPosition, 0.35).x3 (ext3::grainSize, 0.14).x3 (ext3::grainDensity, 28).x3 (ext3::grainSpray, 0.3)
+            .x3 (ext3::grainSpread, 0.85);
+        p.lfo (0, 1, 0.07).cell (tgt::grainPos, src::lfo1, 0.25).cell (tgt::grainSize, src::macro1, 0.5);
+        p.env (0, 0.9, 1.0, 1.0, 2.5).set (volume, 0.32).filter (0, flt::freq, 6500);
+        p.x (ext::chorusOn, 1).x (ext::chorusMix, 0.35).x (ext::reverbOn, 1).x (ext::reverbSize, 0.8).x (ext::reverbMix, 0.35);
+    }, [] {
+        w::HelixUserData d;
+        d.sampleName = "LYNX Vowel (made in Helix)";
+        d.sample = vowelSample();
+        return d;
+    }));
+    b.push_back (make ("Spectral Glass", "Keys", { "spectral", "glass", "bell", "inharmonic" }, [] (Patch& p) {
+        p.osc (0, osc::on, 0).x2 (ext2::sampleRoot, 69);
+        p.x3 (ext3::specOn, 1).x3 (ext3::specStretch, 0.12).x3 (ext3::specTilt, -0.25).x3 (ext3::specPartials, 16);
+        p.env (1, 0.0, 1.4, 0.0, 1.0).cell (tgt::specPos, src::env2, 0.8).cell (tgt::specStretch, src::velocity, 0.15);
+        p.env (0, 0.002, 1.8, 0.0, 1.2).set (volume, 0.4).filter (0, flt::freq, 12000);
+        p.x (ext::delayOn, 1).x (ext::delayMix, 0.18).x (ext::reverbOn, 1).x (ext::reverbMix, 0.25);
+    }, [] {
+        w::HelixUserData d;
+        d.sampleName = "LYNX Glass (made in Helix)";
+        d.sample = glassSample();
+        d.spectral = w::analyseSpectrum (d.sample);
+        return d;
+    }));
+    b.push_back (make ("Frozen Choir", "Pad", { "spectral", "granular", "choir", "frozen" }, [] (Patch& p) {
+        p.osc (0, osc::on, 0).x2 (ext2::sampleRoot, 45);
+        p.x3 (ext3::specOn, 1).x3 (ext3::specPosition, 0.5).x3 (ext3::specShift, 0.12).x3 (ext3::specPartials, 40).x3 (ext3::specGain, 0.8);
+        p.x3 (ext3::grainOn, 1).x3 (ext3::grainPosition, 0.6).x3 (ext3::grainSize, 0.25).x3 (ext3::grainDensity, 12).x3 (ext3::grainSpray, 0.15)
+            .x3 (ext3::grainPitch, 12).x3 (ext3::grainGain, 0.35);
+        p.lfo (0, 0, 0.11).cell (tgt::specPos, src::lfo1, 0.3).cell (tgt::specBand, src::macro1, 0.4).x3 (ext3::specBand, 900).x3 (ext3::specWidth, 6);
+        p.env (0, 1.2, 1.0, 1.0, 3.0).set (volume, 0.3).x (ext::reverbOn, 1).x (ext::reverbSize, 0.9).x (ext::reverbMix, 0.4);
+    }, [] {
+        w::HelixUserData d;
+        d.sampleName = "LYNX Vowel (made in Helix)";
+        d.sample = vowelSample();
+        d.spectral = w::analyseSpectrum (d.sample);
         return d;
     }));
     return b;

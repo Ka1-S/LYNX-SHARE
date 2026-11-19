@@ -576,8 +576,9 @@ bool importTable (const Page& page, int k, const juce::File& file, const w::Impo
     page.setUserData (d, [k] (ChannelDef& c) { c.modelParams[(std::size_t) (w::ext2Base + w::ext2::userTable + k)] = 1.0f; });
     return true;
 }
-// a file into the sample oscillator (10 s at most; it switches on)
-bool loadSample (const Page& page, const juce::File& file, juce::String& note)
+// a file into the channel's sample (10 s at most; its partials analysed and kept with it, round 190mt): `onIndex` (the
+// sample oscillator's, the granular or the spectral oscillator's switch) switches on
+bool loadSample (const Page& page, const juce::File& file, juce::String& note, int onIndex = w::ext2Base + w::ext2::sampleOn)
 {
     std::vector<float> l, r;
     double rate = 48000.0;
@@ -589,9 +590,26 @@ bool loadSample (const Page& page, const juce::File& file, juce::String& note)
     d.sample.r = std::move (r);
     d.sample.rate = rate;
     d.sampleName = file.getFileName().toStdString();
-    page.setUserData (d, [] (ChannelDef& c) { c.modelParams[(std::size_t) (w::ext2Base + w::ext2::sampleOn)] = 1.0f; });
+    d.spectral = w::analyseSpectrum (d.sample);
+    page.setUserData (d, [onIndex] (ChannelDef& c) { c.modelParams[(std::size_t) onIndex] = 1.0f; });
     note = cut ? tr ("Only the first 10 seconds were loaded.") : juce::String();
     return true;
+}
+// (round 190mt) the spectral oscillator's switch: on a sample whose partials are not kept yet, they are analysed and kept
+// with it in the same undoable step (so the sound stays the same in later versions)
+void switchSpectral (const Page& page)
+{
+    const auto index = w::ext3Base + w::ext3::specOn;
+    const bool on = page.value (index) > 0.5;
+    const auto& data = page.userData();
+    if (! on && data.sample.frames() > 0 && data.spectral.empty())
+    {
+        auto d = data;
+        d.spectral = w::analyseSpectrum (d.sample);
+        page.setUserData (d, [index] (ChannelDef& c) { c.modelParams[(std::size_t) index] = 1.0f; });
+        return;
+    }
+    const_cast<Page&> (page).set (index, on ? 0.0 : 1.0);
 }
 void openTableEditor (const Page& page, int osc); // (below)
 
@@ -1591,7 +1609,7 @@ private:
 class HelixPlusStrip final : public juce::Component, public juce::FileDragAndDropTarget, private juce::ChangeListener
 {
 public:
-    static constexpr int stripHeight = 150 + 2 * (72 + 4); // (190ml: two rows more for Helix+ 2)
+    static constexpr int stripHeight = 150 + 3 * (72 + 4); // (190ml: two rows more for Helix+ 2; 190mt: one for round 3)
     HelixPlusStrip (AudioEngine& e, std::function<ChannelDef* (Song&)> locate, int channel) : page { e, std::move (locate), channel, false }
     {
         page.refresh = [this] { refreshAll(); };
@@ -1758,6 +1776,34 @@ public:
         static const char* mbCaps[5] { "Depth", "Time", "Up", "Down", "Gain" };
         for (int i = 0; i < 5; ++i)
             fx2Knobs.push_back (knob (Y (w::ext2::mbDepth + i), tr (mbCaps[i])));
+        makeRound3();
+    }
+
+    // --- Helix round 3 (round 190mt): the granular and spectral oscillators (a fifth row) and the sample's Clean switch
+    void makeRound3()
+    {
+        const auto Z = [] (int i) { return w::ext3Base + i; };
+        sampleClean = toggle (Z (w::ext3::sampleClean), tr ("Clean"));
+        sampleClean->setTooltip (tr ("Clean: the sample pitched up reads band-limited copies of itself (no fold-over)"));
+        grainOn = toggle (Z (w::ext3::grainOn), tr ("On"));
+        grainLoad = tab (tr ("Load..."), [] { return false; }, [this] { chooseSample (w::ext3Base + w::ext3::grainOn); });
+        grainLoad->setTooltip (tr ("Load a sample (or drop an audio file on this section)"));
+        static const char* grainCaps[8] { "Position", "Size", "Density", "Spray", "Pitch", "Spread", "Gain", "Pan" };
+        const int grainParams[8] { w::ext3::grainPosition, w::ext3::grainSize, w::ext3::grainDensity, w::ext3::grainSpray, w::ext3::grainPitch,
+                                   w::ext3::grainSpread, w::ext3::grainGain, w::ext3::grainPan };
+        for (int i = 0; i < 8; ++i)
+            grainKnobs.push_back (knob (Z (grainParams[i]), tr (grainCaps[i]), i == 1 || i == 2 ? Curve::logRange : i == 6 ? Curve::gain : Curve::linear));
+        specOn = tab (tr ("On"), [this] { return page.value (w::ext3Base + w::ext3::specOn) > 0.5; }, [this] { switchSpectral (page); });
+        specOn->switchStyle = true;
+        specLoad = tab (tr ("Load..."), [] { return false; }, [this] { chooseSample (w::ext3Base + w::ext3::specOn); });
+        specLoad->setTooltip (tr ("Load a sample (or drop an audio file on this section)"));
+        static const char* specCaps[10] { "Position", "Stretch", "Shift", "Tilt", "Band", "Width", "Partials", "Semi", "Gain", "Pan" };
+        const int specParams[10] { w::ext3::specPosition, w::ext3::specStretch, w::ext3::specShift, w::ext3::specTilt, w::ext3::specBand,
+                                   w::ext3::specWidth, w::ext3::specPartials, w::ext3::specTranspose, w::ext3::specGain, w::ext3::specPan };
+        for (int i = 0; i < 10; ++i)
+            specKnobs.push_back (knob (Z (specParams[i]), tr (specCaps[i]), i == 4 || i == 5 ? Curve::logRange : i == 8 ? Curve::gain : Curve::linear));
+        grainOn->setTooltip (tr ("Granular: grains of the channel's sample (the Sample section's)"));
+        specOn->setTooltip (tr ("Spectral: the sample's partials played as sines, stretched, shifted and filtered"));
     }
 
     // an audio file dropped on oscillator 3's section or a user table's row makes that oscillator's table; on the
@@ -1771,6 +1817,10 @@ public:
         juce::String note;
         if (sections[11].contains (x, y))
             (void) loadSample (page, file, note);
+        else if (sections[18].contains (x, y)) // (190mt: the granular / spectral section: the channel's sample, that one on)
+            (void) loadSample (page, file, note, w::ext3Base + w::ext3::grainOn);
+        else if (sections[19].contains (x, y))
+            (void) loadSample (page, file, note, w::ext3Base + w::ext3::specOn);
         else if (sections[10].contains (x, y))
             (void) importTable (page, 2, file, {}, note);
         else if (sections[12].contains (x, y))
@@ -1785,9 +1835,10 @@ public:
     {
         const auto l = page.look();
         g.fillAll (l.outer);
-        static const char* names[18] { "Warp 2", "Noise", "Unison+", "Filter+", "Macros", "LFO Draw", "Distortion", "Chorus", "Delay", "Reverb",
-                                       "Oscillator 3", "Sample", "User tables", "Macros 5-8", "Chaos", "Shift", "EQ", "Multiband" };
-        for (int i = 0; i < 18; ++i)
+        static const char* names[20] { "Warp 2", "Noise", "Unison+", "Filter+", "Macros", "LFO Draw", "Distortion", "Chorus", "Delay", "Reverb",
+                                       "Oscillator 3", "Sample", "User tables", "Macros 5-8", "Chaos", "Shift", "EQ", "Multiband", "Granular",
+                                       "Spectral" };
+        for (int i = 0; i < 20; ++i)
         {
             const auto r = sections[(std::size_t) i];
             g.setColour (l.bg);
@@ -1810,6 +1861,13 @@ public:
         const auto& data = page.userData();
         g.setColour (data.sample.frames() > 0 ? l.text : l.dim);
         g.drawFittedText (data.sample.frames() > 0 ? u8 (data.sampleName) : tr ("No sample: drop an audio file here"), sampleName, juce::Justification::centredLeft, 1, 0.8f);
+        // (190mt) the granular and spectral sections say what they play: the channel's sample, its partials
+        g.setColour (l.dim);
+        const auto spectralNote = data.sample.frames() <= 0 ? tr ("No sample")
+                                  : data.spectral.empty() ? tr ("Partials made when switched on")
+                                                          : tr ("{0} partials", { juce::String (data.spectral.partials) });
+        g.drawFittedText (data.sample.frames() > 0 ? u8 (data.sampleName) : tr ("No sample"), grainName, juce::Justification::centredRight, 1, 0.7f);
+        g.drawFittedText (spectralNote, specName, juce::Justification::centredRight, 1, 0.7f);
         const auto t0 = sections[12];
         for (int k = 0; k < w::oscCount; ++k)
         {
@@ -1827,11 +1885,11 @@ public:
     {
         // two rows of sections, left to right
         const int rowH = 72, gap = 4;
-        const int top[4] { 2, 2 + rowH + gap, 2 + 2 * (rowH + gap), 2 + 3 * (rowH + gap) };
-        const int widths[18] { 264, 136, 220, 120, 236, 112, 208, 212, 236, 216, 440, 360, 188, 236, 204, 128, 200, 216 };
-        const int rowOf[18] { 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 3 };
+        const int top[5] { 2, 2 + rowH + gap, 2 + 2 * (rowH + gap), 2 + 3 * (rowH + gap), 2 + 4 * (rowH + gap) };
+        const int widths[20] { 264, 136, 220, 120, 236, 112, 208, 212, 236, 216, 440, 360, 188, 236, 204, 128, 200, 216, 430, 562 }; // (190mt: the fifth row fits the strip's 1000 px)
+        const int rowOf[20] { 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4 };
         int x = 2;
-        for (int i = 0; i < 18; ++i)
+        for (int i = 0; i < 20; ++i)
         {
             if (i > 0 && rowOf[i] != rowOf[i - 1])
                 x = 2;
@@ -1917,10 +1975,11 @@ public:
         x = s.getX() + 6;
         place (sampleOn, line (s), 34);
         place (sampleLoad, line (s), 46);
-        sampleName = { x, line (s), 128, 16 };
-        x += 132;
+        sampleName = { x, line (s), 84, 16 };
+        x += 88;
         place (sampleLoop, line (s), 40);
-        place (sampleWarp, line (s), 96);
+        place (sampleClean, line (s), 40);
+        place (sampleWarp, line (s), 92);
         for (int i = 0; i < (int) sampleBoxes.size(); ++i)
             sampleBoxes[(std::size_t) i]->setBounds (s.getX() + 6 + i * 50, s.getY() + 36, 46, 34);
         sampleRoot->setBounds (s.getX() + 6 + 6 * 50, s.getY() + 50, 48, 18);
@@ -1960,6 +2019,18 @@ public:
         fx2On[2]->setBounds (f2.getX() + 6, f2.getY() + 34, 34, 16);
         for (int i = 0; i < 5; ++i)
             kn (fx2Knobs[(std::size_t) (6 + i)], f2, i, 42, 34);
+        // (190mt) granular and spectral: the switch and Load... at the left, then their knobs; what they play at the top right
+        const auto g0 = sections[18], s0 = sections[19];
+        grainOn->setBounds (g0.getX() + 6, g0.getY() + 22, 44, 16);
+        grainLoad->setBounds (g0.getX() + 6, g0.getY() + 46, 44, 16);
+        for (int i = 0; i < (int) grainKnobs.size(); ++i)
+            kn (grainKnobs[(std::size_t) i], g0, i, 56, 46);
+        specOn->setBounds (s0.getX() + 6, s0.getY() + 22, 44, 16);
+        specLoad->setBounds (s0.getX() + 6, s0.getY() + 46, 44, 16);
+        for (int i = 0; i < (int) specKnobs.size(); ++i)
+            kn (specKnobs[(std::size_t) i], s0, i, 56, 50);
+        grainName = { g0.getX() + 80, g0.getY() + 1, g0.getWidth() - 86, 14 };
+        specName = { s0.getX() + 80, s0.getY() + 1, s0.getWidth() - 86, 14 };
     }
 
 private:
@@ -1975,16 +2046,17 @@ private:
         addAndMakeVisible (*ctls.back());
         return ctls.back().get();
     }
-    void chooseSample()
+    void chooseSample (int onIndex = w::ext2Base + w::ext2::sampleOn)
     {
         chooser = ui::makeFileChooser (tr ("Load a sample"), {}, audioPatterns());
         ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                           [safe = juce::Component::SafePointer<HelixPlusStrip> (this)] (const juce::FileChooser& c) {
+                           [safe = juce::Component::SafePointer<HelixPlusStrip> (this), onIndex] (const juce::FileChooser& c) {
                                if (safe == nullptr || ! c.getResult().existsAsFile())
                                    return;
                                juce::String note;
-                               if (! loadSample (safe->page, c.getResult(), note) || note.isNotEmpty())
-                                   ui::flashValueTip (*safe, safe->sections[11], note);
+                               const auto at = onIndex == w::ext3Base + w::ext3::grainOn ? 18 : onIndex == w::ext3Base + w::ext3::specOn ? 19 : 11;
+                               if (! loadSample (safe->page, c.getResult(), note, onIndex) || note.isNotEmpty())
+                                   ui::flashValueTip (*safe, safe->sections[(std::size_t) at], note);
                                safe->refreshAll();
                            });
     }
@@ -2029,7 +2101,7 @@ private:
     std::vector<std::unique_ptr<Ctl>> ctls;
     std::vector<std::unique_ptr<Tab>> tabs;
     std::vector<std::unique_ptr<Menu>> menus;
-    std::array<juce::Rectangle<int>, 18> sections {};
+    std::array<juce::Rectangle<int>, 20> sections {};
     std::array<Menu*, 2> warpMenu {}, filterType {};
     std::array<Ctl*, 2> warpAmt {};
     std::array<Ctl*, 4> macros {};
@@ -2050,6 +2122,10 @@ private:
     std::array<Menu*, w::chaosCount> chaosMode {};
     std::array<Tab*, 3> fx2On {};
     juce::Rectangle<int> sampleName;
+    // Helix round 3 (round 190mt)
+    Tab *sampleClean = nullptr, *grainOn = nullptr, *grainLoad = nullptr, *specOn = nullptr, *specLoad = nullptr;
+    std::vector<Ctl*> grainKnobs, specKnobs;
+    juce::Rectangle<int> grainName, specName;
     std::unique_ptr<juce::FileChooser> chooser;
 };
 
@@ -2545,6 +2621,10 @@ public:
         sampleGain = box (w::ext2Base + w::ext2::sampleGain, {}, Curve::gain);
         noiseOn = power (X (w::ext::noiseOn), tr ("Noise"));
         noiseLevel = box (X (w::ext::noiseLevel), {});
+        grainOn = power (w::ext3Base + w::ext3::grainOn, tr ("Granular")); // (190mt)
+        grainPos = box (w::ext3Base + w::ext3::grainPosition, {});
+        specOn = power (w::ext3Base + w::ext3::specOn, tr ("Spectral"));
+        specPos = box (w::ext3Base + w::ext3::specPosition, {});
         unisonCount = menu (std::make_unique<Menu> (
             page, [this] { return tr (u8 (w::paramText (w::extBase + w::ext::unisonCount, page.xv (w::ext::unisonCount)))); },
             [this] (juce::PopupMenu& m) {
@@ -2617,13 +2697,17 @@ public:
             warp[(std::size_t) k]->setBounds (s0.getX() + 50, s0.getY() + 18 + k * 20, 84, 16);
             warpAmt[(std::size_t) k]->setBounds (s0.getX() + 136, s0.getY() + 18 + k * 20, 42, 16);
         }
-        const auto row = [s0] (int i) { return s0.getY() + 84 + i * 22; };
+        const auto row = [s0] (int i) { return s0.getY() + 80 + i * 18; }; // (190mt: five rows, 18 px apart)
         osc3On->setBounds (s0.getX() + 6, row (0), 96, 16);
         osc3Pos->setBounds (s0.getX() + 136, row (0), 42, 16);
         sampleOn->setBounds (s0.getX() + 6, row (1), 96, 16);
         sampleGain->setBounds (s0.getX() + 136, row (1), 42, 16);
         noiseOn->setBounds (s0.getX() + 6, row (2), 96, 16);
         noiseLevel->setBounds (s0.getX() + 136, row (2), 42, 16);
+        grainOn->setBounds (s0.getX() + 6, row (3), 96, 16);
+        grainPos->setBounds (s0.getX() + 136, row (3), 42, 16);
+        specOn->setBounds (s0.getX() + 6, row (4), 96, 16);
+        specPos->setBounds (s0.getX() + 136, row (4), 42, 16);
         const auto s1 = sections[1];
         unisonCount->setBounds (s1.getX() + 48, s1.getY() + 18, 60, 16);
         unisonStack->setBounds (s1.getX() + 48, s1.getY() + 38, 60, 16);
@@ -2686,8 +2770,9 @@ private:
     std::array<juce::Rectangle<int>, 4> sections {};
     std::array<Menu*, w::oscCount> warp {};
     std::array<Ctl*, w::oscCount> warpAmt {};
-    Tab *osc3On = nullptr, *sampleOn = nullptr, *noiseOn = nullptr;
-    Ctl *osc3Pos = nullptr, *sampleGain = nullptr, *noiseLevel = nullptr, *unisonBlend = nullptr, *unisonWidth = nullptr;
+    Tab *osc3On = nullptr, *sampleOn = nullptr, *noiseOn = nullptr, *grainOn = nullptr, *specOn = nullptr;
+    Ctl *osc3Pos = nullptr, *sampleGain = nullptr, *noiseLevel = nullptr, *unisonBlend = nullptr, *unisonWidth = nullptr, *grainPos = nullptr,
+        *specPos = nullptr;
     Menu *unisonCount = nullptr, *unisonStack = nullptr;
     std::vector<Ctl*> macros, rackAmt;
     std::vector<Tab*> rack;

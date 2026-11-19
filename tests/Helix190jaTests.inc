@@ -95,14 +95,19 @@ TEST (helix190ja_parameters_and_laws)
     namespace w = wt;
     // the automatable table: every parameter once, unique English names, defaults inside their ranges
     const auto& table = helixEngineParams();
-    // (round 190mi: Live's values, then Helix+'s automatable values after Live's state; 190ml: then Helix+ 2's)
+    // (round 190mi: Live's values, then Helix+'s automatable values after Live's state; 190ml: then Helix+ 2's; 190mt:
+    // then round 3's)
     const auto plusEnd = w::paramCount + w::ext::autoEnd - 1;
-    CHECK ((int) table.size() == plusEnd + w::ext2::autoEnd - 1);
+    const auto plus2End = plusEnd + w::ext2::autoEnd - 1;
+    CHECK ((int) table.size() == plus2End + w::ext3::autoEnd - 1);
     std::set<std::string> names;
     for (int i = 0; i < (int) table.size(); ++i)
     {
         const auto& p = table[(std::size_t) i];
-        const auto index = i < w::paramCount ? i : i < plusEnd ? w::extBase + 1 + (i - w::paramCount) : w::ext2Base + 1 + (i - plusEnd);
+        const auto index = i < w::paramCount ? i
+                           : i < plusEnd     ? w::extBase + 1 + (i - w::paramCount)
+                           : i < plus2End    ? w::ext2Base + 1 + (i - plusEnd)
+                                             : w::ext3Base + 1 + (i - plus2End);
         CHECK (p.index == index && ! p.name.empty() && p.high > p.low);
         names.insert (p.name);
         const auto d = w::defaults()[(std::size_t) index];

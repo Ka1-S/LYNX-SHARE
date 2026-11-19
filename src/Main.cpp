@@ -3286,6 +3286,15 @@ public:
             quit();
             return;
         }
+        if (args.contains ("--helixshot190mt"))
+        {
+            // LYNX --helixshot190mt prefix: round 190mt off-screen: the Pattern layout's Helix channel window with round 3's
+            // row (Grain Cloud, Frozen Choir, Spectral Glass; Triple Stack for the side by side with 190ml), the Matrix page with
+            // the new rows, and the Clip-launch Device View card's Helix+ panel; paint costs in prefix-checks.txt.
+            runHelixShot190mt (args[args.indexOf ("--helixshot190mt") + 1].unquoted());
+            quit();
+            return;
+        }
         if (args.contains ("--helixshot190ml"))
         {
             // LYNX --helixshot190ml prefix: round 190ml off-screen: the Pattern layout's Helix channel window with Helix+ 2's
@@ -28134,6 +28143,142 @@ private:
             juce::FileOutputStream out (file);
             juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (*page), out);
             check ("channel window page", page->getWidth() > 0);
+        }
+        juce::File (prefix + "-checks.txt").replaceWithText (checks);
+    }
+
+    void runHelixShot190mt (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        juce::String checks;
+        const auto check = [&checks] (const juce::String& what, bool ok) { checks << (ok ? "ok   " : "FAIL ") << what << "\n"; };
+        const auto& bank = lynx::banks::bankOf (lynx::InstrumentKind::helix);
+        const auto load = [&] (const juce::String& name) {
+            int index = -1;
+            for (int b = 0; b < (int) bank.size(); ++b)
+                if (juce::String (bank[(std::size_t) b].name) == name)
+                    index = b;
+            check ("preset " + name, index >= 0);
+            offline.editSong ([index] (lynx::Song& s) {
+                if (s.channels.empty())
+                    s.channels.resize (1);
+                lynx::ChannelDef c;
+                c.instrument = lynx::InstrumentKind::helix;
+                c.name = "Helix";
+                c.mixerTrack = s.channels[0].mixerTrack;
+                if (auto loaded = lynx::banks::withPreset (c, std::max (index, 0)))
+                    c = *loaded;
+                s.channels[0] = c;
+            }, false);
+            offline.dispatchPendingMessages();
+        };
+        const auto locate = [] (lynx::Song& s) -> lynx::ChannelDef* { return s.channels.empty() ? nullptr : &s.channels[0]; };
+        const auto save = [&prefix, &offline] (juce::Component& c, const char* name) {
+            offline.dispatchPendingMessages();
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (c), out);
+        };
+        const auto paintCost = [&checks] (juce::Component& c, const char* what) {
+            double best = 1.0e9;
+            for (int run = 0; run < 3; ++run)
+            {
+                juce::Image image (juce::Image::ARGB, c.getWidth(), c.getHeight(), true);
+                const auto t0 = juce::Time::getMillisecondCounterHiRes();
+                for (int f = 0; f < 30; ++f)
+                {
+                    juce::Graphics g (image);
+                    c.paintEntireComponent (g, false);
+                }
+                best = std::min (best, (juce::Time::getMillisecondCounterHiRes() - t0) / 30.0);
+            }
+            checks << "paint " << what << " " << juce::String (best, 3) << " ms per frame (" << c.getWidth() << " x " << c.getHeight() << ")\n";
+        };
+        // the channel window (Pattern layout, LYNX's look): Helix+'s strip with round 3's row
+        load ("Grain Cloud");
+        {
+            auto page = lynx::makeHelixEditor (offline, locate, 0);
+            check ("window page holds the five strip rows", page->getHeight() >= lynx::helixDeviceHeight + 16 + 370);
+            save (*page, "01-window-granular");
+            paintCost (*page, "window (Grain Cloud)");
+            check ("Matrix tab", lynx::helixcards::showView (*page, 1, 0, 0) == 1);
+            save (*page, "04-matrix-granular");
+        }
+        load ("Frozen Choir");
+        {
+            auto page = lynx::makeHelixEditor (offline, locate, 0);
+            save (*page, "02-window-spectral");
+        }
+        load ("Spectral Glass");
+        {
+            auto page = lynx::makeHelixEditor (offline, locate, 0);
+            save (*page, "03-window-glass");
+        }
+        // the same preset as 190ml's first picture (the side by side)
+        load ("Triple Stack");
+        {
+            auto page = lynx::makeHelixEditor (offline, locate, 0);
+            save (*page, "05-window-triple");
+            paintCost (*page, "window (Triple Stack)");
+            for (int i = 0; i < page->getNumChildComponents(); ++i) // (each part alone)
+            {
+                auto* child = page->getChildComponent (i);
+                juce::Image image (juce::Image::ARGB, std::max (1, child->getWidth()), std::max (1, child->getHeight()), true);
+                double best = 1.0e9;
+                for (int run = 0; run < 3; ++run)
+                {
+                    const auto t0 = juce::Time::getMillisecondCounterHiRes();
+                    for (int f = 0; f < 10; ++f)
+                    {
+                        juce::Graphics g (image);
+                        child->paintEntireComponent (g, false);
+                    }
+                    best = std::min (best, (juce::Time::getMillisecondCounterHiRes() - t0) / 10.0);
+                }
+                checks << "  part " << juce::String (best, 3) << " ms " << typeid (*child).name() << " " << child->getBounds().toString() << "\n";
+            }
+        }
+        // the Clip-launch layout's Device View card (Live's look) with its Helix+ panel (Granular / Spectral discs)
+        load ("Frozen Choir");
+        {
+            lynx::MainComponent ui (offline, false);
+            ui.setSize (2560, 1080);
+            ui.setVisible (true);
+            lynx::DetailView::shownSetting = lynx::DetailView::devicesPage = true;
+            ui.setClipLaunchWorkflow (true);
+            ui.showPanelsForSnapshot ({ lynx::workspace::Panel::playlist });
+            offline.editSong ([] (lynx::Song& s) {
+                while (s.patterns.empty())
+                    s.patterns.emplace_back();
+                lynx::Note note;
+                note.channel = 0;
+                note.key = 60;
+                s.patterns[0].name = "Choir";
+                s.patterns[0].notes = { note };
+                s.patterns[0].lengthTicks = 4 * lynx::ppq;
+                s.playlistTracks.resize (std::max<std::size_t> (s.playlistTracks.size(), 2));
+                s.playlistTracks[0].name = "Helix";
+                lynx::Clip clip;
+                clip.pattern = 0;
+                clip.length = 4 * lynx::ppq;
+                lynx::launcher::setClip (s, 0, 0, clip);
+            }, false);
+            offline.dispatchPendingMessages();
+            auto* detail = ui.getDetailViewForSnapshot();
+            check ("detail view", detail != nullptr);
+            if (detail != nullptr)
+            {
+                detail->showSelection (0, 0);
+                detail->setPage (lynx::DetailView::Page::devices);
+                offline.dispatchPendingMessages();
+                check ("card's Helix+ panel", lynx::helixcards::showPlusInCard (*detail, true) == 1);
+                offline.dispatchPendingMessages();
+                save (ui, "06-card-plus");
+                checks << "detail " << detail->getScreenBounds().translated (-ui.getScreenX(), -ui.getScreenY()).toString() << "\n";
+                lynx::helixcards::showPlusInCard (*detail, false);
+            }
         }
         juce::File (prefix + "-checks.txt").replaceWithText (checks);
     }

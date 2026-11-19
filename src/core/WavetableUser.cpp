@@ -12,7 +12,10 @@
 #include <complex>
 #include <cstring>
 #include <functional>
+#include <mutex>
+#include <numeric>
 
+#include "core/Simd.h"
 #include "core/WavetableSynth.h"
 
 namespace lynx::wt
@@ -268,7 +271,7 @@ bool HelixUserData::empty() const noexcept
     for (const auto& t : tables)
         if (! t.empty())
             return false;
-    return sample.frames() == 0;
+    return sample.frames() == 0 && spectral.empty();
 }
 
 std::vector<std::uint8_t> encodeUserData (const HelixUserData& d)
@@ -319,6 +322,25 @@ std::vector<std::uint8_t> encodeUserData (const HelixUserData& d)
                 c.u16 ((std::uint16_t) (std::int16_t) std::lround (v * 32767.0f));
             }
         w.tag ("SMPL");
+        w.u32 ((std::uint32_t) c.b.size());
+        w.b.insert (w.b.end(), c.b.begin(), c.b.end());
+    }
+    if (! d.spectral.empty()) // (190mt: the sample's partials: frequency as 1/4096 octave above 5 Hz, amplitude as half float)
+    {
+        const auto& sp = d.spectral;
+        const auto frames = std::min (sp.frames, spectralFrames), partials = std::min (sp.partials, maxSpectralPartials);
+        Writer c;
+        c.u16 ((std::uint16_t) frames);
+        c.u16 ((std::uint16_t) partials);
+        for (int f = 0; f < frames; ++f)
+            for (int h = 0; h < partials; ++h)
+            {
+                const auto i = (std::size_t) (f * sp.partials + h);
+                const auto hz = std::isfinite (sp.hz[i]) ? std::max ((double) sp.hz[i], 5.0) : 5.0;
+                c.u16 ((std::uint16_t) std::clamp (std::lround (std::log2 (hz / 5.0) * 4096.0), 0L, 65535L));
+                c.u16 (toHalf (std::isfinite (sp.amp[i]) ? std::abs (sp.amp[i]) : 0.0f));
+            }
+        w.tag ("SPEC");
         w.u32 ((std::uint32_t) c.b.size());
         w.b.insert (w.b.end(), c.b.begin(), c.b.end());
     }
@@ -374,6 +396,22 @@ bool decodeUserData (const std::vector<std::uint8_t>& bytes, HelixUserData& out)
                 for (std::size_t i = 0; i < frames; ++i)
                     for (int s = 0; s < ch; ++s)
                         (s == 0 ? out.sample.l : out.sample.r)[i] = (float) (std::int16_t) r.u16() / 32767.0f;
+            }
+        }
+        else if (std::memcmp (tag, "SPEC", 4) == 0) // (190mt)
+        {
+            const auto frames = std::clamp ((int) r.u16(), 0, spectralFrames), partials = std::clamp ((int) r.u16(), 0, maxSpectralPartials);
+            if (frames > 0 && partials > 0 && r.need ((std::size_t) frames * (std::size_t) partials * 4))
+            {
+                auto& sp = out.spectral;
+                sp.frames = frames, sp.partials = partials;
+                sp.hz.resize ((std::size_t) frames * (std::size_t) partials);
+                sp.amp.resize (sp.hz.size());
+                for (std::size_t i = 0; i < sp.hz.size(); ++i)
+                {
+                    sp.hz[i] = (float) (5.0 * std::exp2 ((double) r.u16() / 4096.0));
+                    sp.amp[i] = fromHalf (r.u16());
+                }
             }
         }
         r.at = end; // (unknown chunks: skipped, so a later version's data still loads)
@@ -1064,5 +1102,287 @@ std::vector<std::uint8_t> userTableWav (const UserTable& t)
     w.b.resize (at + bytes);
     std::memcpy (w.b.data() + at, data.data(), bytes);
     return w.b;
+}
+
+// --- Helix round 3 (round 190mt): the sample's partials and its band-limited levels (LYNX's own designs [MODEL])
+namespace
+{
+// the stored form of a partial (SPEC chunk): its frequency on a 1/4096-octave grid above 5 Hz, its amplitude as half float;
+// the analysis gives exactly what the chunk keeps, so a stored and a freshly made analysis play the same
+float gridHz (double hz) { return (float) (5.0 * std::exp2 ((double) std::clamp (std::lround (std::log2 (std::max (hz, 5.0) / 5.0) * 4096.0), 0L, 65535L) / 4096.0)); }
+float gridAmp (double a) { return fromHalf (toHalf ((float) std::max (a, 0.0))); }
+} // namespace
+
+SpectralData analyseSpectrum (const SampleBuffer& smp)
+{
+    SpectralData out;
+    const auto n = smp.frames();
+    if (n < 16 || ! (smp.rate > 0.0))
+        return out;
+    const auto stereo = smp.r.size() == smp.l.size();
+    std::vector<float> x ((std::size_t) n);
+    for (int i = 0; i < n; ++i)
+        x[(std::size_t) i] = stereo ? 0.5f * (smp.l[(std::size_t) i] + smp.r[(std::size_t) i]) : smp.l[(std::size_t) i];
+    const auto rate = smp.rate;
+    int N = 1024; // (the window: ~85 ms or more, a power of two; zero-padded to twice its length)
+    while (N < 0.085 * rate && N < 16384)
+        N *= 2;
+    const int M = 2 * N;
+    const int frames = n > N ? spectralFrames : 1;
+    // Blackman-Harris (4 terms): side lobes at −92 dB, so a peak is a partial
+    std::vector<double> win ((std::size_t) N);
+    double wsum = 0.0;
+    for (int i = 0; i < N; ++i)
+    {
+        const auto t = 2.0 * pi * i / (N - 1);
+        win[(std::size_t) i] = 0.35875 - 0.48829 * std::cos (t) + 0.14128 * std::cos (2.0 * t) - 0.01168 * std::cos (3.0 * t);
+        wsum += win[(std::size_t) i];
+    }
+    struct Peak
+    {
+        double hz, amp;
+    };
+    std::vector<std::vector<Peak>> peaks ((std::size_t) frames);
+    double loudest = 0.0;
+    std::vector<std::complex<double>> a ((std::size_t) M);
+    std::vector<double> db ((std::size_t) M / 2 + 1);
+    for (int f = 0; f < frames; ++f)
+    {
+        const auto centre = frames > 1 ? N / 2 + (int) ((long long) f * (n - N) / (frames - 1)) : n / 2;
+        const auto start = centre - N / 2;
+        std::fill (a.begin(), a.end(), std::complex<double> {});
+        for (int i = 0; i < N; ++i)
+        {
+            const auto j = start + i;
+            a[(std::size_t) i] = j >= 0 && j < n ? (double) x[(std::size_t) j] * win[(std::size_t) i] : 0.0;
+        }
+        fft (a, false);
+        for (int k = 0; k <= M / 2; ++k)
+            db[(std::size_t) k] = 20.0 * std::log10 (std::max (std::abs (a[(std::size_t) k]) * 2.0 / wsum, 1.0e-12));
+        auto& list = peaks[(std::size_t) f];
+        for (int k = 2; k < M / 2 - 2; ++k)
+        {
+            const auto al = db[(std::size_t) k - 1], be = db[(std::size_t) k], ga = db[(std::size_t) k + 1];
+            if (! (be > al && be >= ga) || be < -100.0)
+                continue;
+            const auto den = al - 2.0 * be + ga;
+            const auto p = den < 0.0 ? std::clamp (0.5 * (al - ga) / den, -0.5, 0.5) : 0.0;
+            const auto hz = (k + p) * rate / M;
+            if (hz < 20.0 || hz > 0.48 * rate)
+                continue;
+            list.push_back ({ hz, std::pow (10.0, (be - 0.25 * (al - ga) * p) / 20.0) });
+        }
+        std::sort (list.begin(), list.end(), [] (const Peak& u, const Peak& v) { return u.amp > v.amp || (u.amp == v.amp && u.hz < v.hz); });
+        if (list.size() > (std::size_t) maxSpectralPartials)
+            list.resize ((std::size_t) maxSpectralPartials);
+        if (! list.empty())
+            loudest = std::max (loudest, list.front().amp);
+    }
+    if (loudest <= 0.0)
+        return out;
+    // tracks: each peak continues the nearest track of the frame before (within half a semitone or 15 Hz), else takes a
+    // free slot; the louder peaks choose first
+    constexpr int K = maxSpectralPartials;
+    std::vector<double> hz ((std::size_t) frames * K, 0.0), amp ((std::size_t) frames * K, 0.0);
+    for (int f = 0; f < frames; ++f)
+    {
+        const auto& list = peaks[(std::size_t) f];
+        const auto frameTop = list.empty() ? 0.0 : list.front().amp;
+        std::array<bool, K> taken {};
+        for (const auto& pk : list)
+        {
+            if (pk.amp < loudest * 1.0e-4 || pk.amp < frameTop * 3.16e-4) // (−80 dB of the loudest, −70 dB of the frame's)
+                continue;
+            int best = -1;
+            double bestDist = 1.0e30;
+            if (f > 0)
+                for (int s = 0; s < K; ++s)
+                {
+                    const auto ph = hz[(std::size_t) ((f - 1) * K + s)], pa = amp[(std::size_t) ((f - 1) * K + s)];
+                    const auto d = std::abs (pk.hz - ph);
+                    if (! taken[(std::size_t) s] && pa > 0.0 && d < std::max (15.0, 0.03 * ph) && d < bestDist)
+                        best = s, bestDist = d;
+                }
+            if (best < 0)
+                for (int s = 0; s < K; ++s)
+                    if (! taken[(std::size_t) s] && (f == 0 || amp[(std::size_t) ((f - 1) * K + s)] <= 0.0))
+                    {
+                        best = s;
+                        break;
+                    }
+            if (best < 0)
+                continue;
+            taken[(std::size_t) best] = true;
+            hz[(std::size_t) (f * K + best)] = pk.hz;
+            amp[(std::size_t) (f * K + best)] = pk.amp;
+        }
+        for (int s = 0; s < K; ++s) // (a silent slot holds its last frequency)
+            if (! taken[(std::size_t) s] && f > 0)
+                hz[(std::size_t) (f * K + s)] = hz[(std::size_t) ((f - 1) * K + s)];
+    }
+    // the slots in order of their energy (the loudest tracks first: Partials keeps the strongest); silent ones dropped
+    std::array<double, K> energy {};
+    for (int f = 0; f < frames; ++f)
+        for (int s = 0; s < K; ++s)
+            energy[(std::size_t) s] += amp[(std::size_t) (f * K + s)] * amp[(std::size_t) (f * K + s)];
+    std::array<int, K> order {};
+    std::iota (order.begin(), order.end(), 0);
+    std::stable_sort (order.begin(), order.end(), [&energy] (int u, int v) { return energy[(std::size_t) u] > energy[(std::size_t) v]; });
+    int used = 0;
+    while (used < K && energy[(std::size_t) order[(std::size_t) used]] > 0.0)
+        ++used;
+    if (used == 0)
+        return out;
+    out.frames = frames;
+    out.partials = used;
+    out.hz.resize ((std::size_t) frames * (std::size_t) used);
+    out.amp.resize (out.hz.size());
+    for (int f = 0; f < frames; ++f)
+        for (int s = 0; s < used; ++s)
+        {
+            const auto src = (std::size_t) (f * K + order[(std::size_t) s]);
+            // (a slot silent before its first peak takes that peak's frequency)
+            auto h = hz[src];
+            for (int g = f; h <= 0.0 && g < frames; ++g)
+                h = hz[(std::size_t) (g * K + order[(std::size_t) s])];
+            out.hz[(std::size_t) (f * used + s)] = gridHz (h > 0.0 ? h : 440.0);
+            out.amp[(std::size_t) (f * used + s)] = gridAmp (amp[src]);
+        }
+    return out;
+}
+
+namespace
+{
+double besselI0 (double x)
+{
+    double sum = 1.0, term = 1.0;
+    for (int k = 1; k < 64; ++k)
+    {
+        term *= (x / (2.0 * k)) * (x / (2.0 * k));
+        sum += term;
+        if (term < sum * 1.0e-16)
+            break;
+    }
+    return sum;
+}
+// a linear-phase low-pass (Kaiser window, β 7.86: ~80 dB), `taps` odd, cut at `cutoff` cycles a sample, unity gain at DC
+std::vector<float> kaiserLowpass (int taps, double cutoff)
+{
+    constexpr double beta = 7.86;
+    std::vector<double> h ((std::size_t) taps);
+    const auto m = (double) (taps - 1);
+    double sum = 0.0;
+    for (int i = 0; i < taps; ++i)
+    {
+        const auto x = (double) i - 0.5 * m;
+        const auto sinc = x == 0.0 ? 2.0 * cutoff : std::sin (2.0 * pi * cutoff * x) / (pi * x);
+        const auto r = 2.0 * x / m;
+        h[(std::size_t) i] = sinc * besselI0 (beta * std::sqrt (std::max (0.0, 1.0 - r * r))) / besselI0 (beta);
+        sum += h[(std::size_t) i];
+    }
+    std::vector<float> out ((std::size_t) taps);
+    for (int i = 0; i < taps; ++i)
+        out[(std::size_t) i] = (float) (h[(std::size_t) i] / sum);
+    return out;
+}
+// y[j] = Σ h[i] x[j × step + i − (taps − 1) / 2] (x 0 outside), for j < outFrames, into a level's layout (SampleLevels::guard
+// zeros before, 2 × guard after); x is a level's layout too when `guarded` (its samples from x[guard]). Four running sums
+// (SIMD), added in the same order every time.
+std::vector<float> filtered (const float* x, int frames, const std::vector<float>& h, int step, int outFrames)
+{
+    constexpr int g = SampleLevels::guard;
+    std::vector<float> y ((std::size_t) (outFrames + 3 * g), 0.0f);
+    const auto taps = (int) h.size(), half = (taps - 1) / 2;
+    std::vector<float> padded ((std::size_t) (frames + 2 * taps + 8), 0.0f); // (x with zeros around: no edge cases below)
+    std::copy (x, x + frames, padded.begin() + taps);
+    std::vector<float> hp ((std::size_t) ((taps + 3) & ~3), 0.0f);
+    std::copy (h.begin(), h.end(), hp.begin());
+    const auto tq = (int) hp.size();
+    for (int j = 0; j < outFrames; ++j)
+    {
+        const float* xs = padded.data() + taps + j * step - half;
+        auto acc = _mm_setzero_ps();
+        for (int i = 0; i < tq; i += 4)
+            acc = _mm_add_ps (acc, _mm_mul_ps (_mm_loadu_ps (hp.data() + i), _mm_loadu_ps (xs + i)));
+        alignas (16) float v[4];
+        _mm_store_ps (v, acc);
+        y[(std::size_t) (g + j)] = (v[0] + v[1]) + (v[2] + v[3]);
+    }
+    return y;
+}
+std::mutex levelsLock;
+struct LevelsEntry
+{
+    std::uint64_t hash = 0;
+    int frames = 0;
+    bool stereo = false;
+    std::weak_ptr<const SampleLevels> levels;
+};
+std::vector<LevelsEntry>& levelsBuilt()
+{
+    static std::vector<LevelsEntry> list;
+    return list;
+}
+} // namespace
+
+std::shared_ptr<const SampleLevels> sampleLevels (const SampleBuffer& smp)
+{
+    const auto n = smp.frames();
+    if (n < 8)
+        return nullptr;
+    const auto stereo = smp.r.size() == smp.l.size();
+    std::uint64_t h = 1469598103934665603ull ^ (std::uint64_t) n;
+    for (const auto* v : { &smp.l, &smp.r })
+        for (const auto f : *v)
+        {
+            std::uint32_t bits;
+            std::memcpy (&bits, &f, sizeof bits);
+            h = (h ^ bits) * 1099511628211ull;
+        }
+    {
+        std::lock_guard<std::mutex> lock (levelsLock);
+        auto& list = levelsBuilt();
+        list.erase (std::remove_if (list.begin(), list.end(), [] (const LevelsEntry& e) { return e.levels.expired(); }), list.end());
+        for (const auto& e : list)
+            if (e.hash == h && e.frames == n && e.stereo == stereo)
+                if (auto l = e.levels.lock())
+                    return l;
+    }
+    // half an octave apart, kept at twice the rate their band needs (so the 8-point read below rejects its images): level 1
+    // the sample below 0.354 of its rate; level 2m (m ≥ 1) below 0.5 × 2^−m, level 2m + 1 below 0.354 × 2^−m, both at every
+    // 2^(m − 1)-th sample (level 2 and 3 every sample). Each from the even level before it: pass bands 0.8 of the stop edges,
+    // ~80 dB from the stop edges (Kaiser).
+    static const auto kernel1 = kaiserLowpass (69, 0.3168);   // stop 0.354, the sample's rate
+    static const auto kernel2 = kaiserLowpass (101, 0.225);   // stop 0.25 (level 2 from the sample)
+    static const auto kernelOdd = kaiserLowpass (137, 0.1591); // stop 0.177 of an even level's rate (levels 3, 5, 7 …)
+    static const auto kernelEven = kaiserLowpass (201, 0.1125); // stop 0.125 of an even level's rate, every other sample kept
+    auto levels = std::make_shared<SampleLevels>();
+    levels->levels.reserve (24); // (the next level reads the one before: no reallocation)
+    const auto add = [&levels] (const float* l, const float* r, int frames, const std::vector<float>& h, int step, int shift) {
+        SampleLevels::Level lev;
+        lev.shift = shift;
+        lev.frames = (frames + step - 1) / step;
+        lev.l = filtered (l, frames, h, step, lev.frames);
+        if (r != nullptr)
+            lev.r = filtered (r, frames, h, step, lev.frames);
+        levels->levels.push_back (std::move (lev));
+        return &levels->levels.back();
+    };
+    const float* sr = stereo ? smp.r.data() : nullptr;
+    (void) add (smp.l.data(), sr, n, kernel1, 1, 0);
+    const auto* even = add (smp.l.data(), sr, n, kernel2, 1, 0);
+    constexpr int g = SampleLevels::guard;
+    for (int k = 3; k <= 24 && even->frames >= 32; k += 2)
+    {
+        const auto* el = even->l.data() + g;
+        const auto* er = even->r.empty() ? nullptr : even->r.data() + g;
+        (void) add (el, er, even->frames, kernelOdd, 1, even->shift);
+        if (k + 1 <= 24)
+            even = add (el, er, even->frames, kernelEven, 2, even->shift + 1);
+    }
+    std::shared_ptr<const SampleLevels> built = std::move (levels);
+    std::lock_guard<std::mutex> lock (levelsLock);
+    levelsBuilt().push_back ({ h, n, stereo, built });
+    return built;
 }
 } // namespace lynx::wt

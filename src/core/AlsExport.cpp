@@ -2031,7 +2031,8 @@ struct Exporter
                         bool plus = st[(std::size_t) wt::extBase] >= 0.5;
                         bool used = false;
                         for (int i = wt::extBase + 1; plus && i < wt::stateSize && ! used; ++i)
-                            used = (float) st[(std::size_t) i] != (float) wt::defaults()[(std::size_t) i]; // (the channel keeps floats)
+                            used = (float) st[(std::size_t) i] != (float) wt::defaults()[(std::size_t) i] // (the channel keeps floats)
+                                   && i != wt::ext3Base + wt::ext3::sampleClean; // (190mt: new channels read their sample band-limited: no feature)
                         if (used)
                             note ("Helix+ settings (second warps, noise, unison stack, extra filters, macros, drawn LFOs, effects) are LYNX-only "
                                   "and not in the Live set: "
