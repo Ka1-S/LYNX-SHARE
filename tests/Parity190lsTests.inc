@@ -43,7 +43,8 @@ TEST (parity190ls_atrium_dense_law_is_hidden_new_instances_run_it_old_projects_d
     CHECK (at::reaLaw == at::revision + 1);
     auto s = makeEffectSlot (EffectKind::atrium);
     CHECK (s.params[(std::size_t) at::revision] == 1.0f);
-    CHECK (s.params[(std::size_t) at::reaLaw] == 1.0f);
+    CHECK (s.params[(std::size_t) at::reaLaw] == 0.0f); // round 190ly: only a translated ValhallaRoom sets it (Parity190ly)
+    s.params[(std::size_t) at::reaLaw] = 1.0f;
     CHECK (savedEffectParamCount (s) == (std::size_t) at::reaLaw + 1);
     auto now = s; // saved with it: kept
     upgradeLoadedEffectParams (now, (std::size_t) at::reaLaw + 1);
@@ -109,6 +110,7 @@ TEST (parity190ls_atrium_dense_tank_decays_and_keeps_the_level)
         for (const float decay : { 0.35f, 0.75f })
         {
             auto a = makeEffectSlot (EffectKind::atrium);
+            a.params[(std::size_t) at::reaLaw] = 1.0f; // (round 190ly: set by the ValhallaRoom translator only)
             a.params[19] = (float) type / (float) (at::typeCount - 1);
             a.params[2] = decay;
             auto b = a;

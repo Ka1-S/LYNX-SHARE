@@ -732,6 +732,46 @@ int nearestPrime (int samples) noexcept
 }
 
 double feedbackGain (float v) noexcept { return 2.0 * clamp01 (v); }
+
+// round 190ly [EXEC]: the ValhallaDelay role's loop laws (echoform::valhallaLaw), fitted by the lab on refcap030's
+// ValhallaDelay captures (black-box; /mnt/e/lynx-work/valhalla2_190ly, docs/analise/REA_rodada190ly.md §2).
+// fbDb: the loop gain correction (dB) at Feedback 0, 0.2, 0.35, 0.5, 0.65, 0.8, 1 (linear between); diffLen: the loop
+// diffusers' lengths × this; diffGain: their all-pass gain at Diffusion 100 %; diffComp: the share of their delay read
+// back out of the echo time (the reference keeps the time: its diffused echo spreads around it)
+struct VdLaw
+{
+    double fbDb[7];
+    double diffLen, diffGain, diffComp;
+};
+static const VdLaw& vdLaw() noexcept
+{
+    static const VdLaw law = [] {
+        // Feedback 100 %: −1.1 dB a pass (the reference fades 1.5 dB a pass in energy where the tape loop grew; −1.0 … −1.2 score
+        // alike, −0.8 / −1.5 / −2 lower); 70 % (round 190dl's fit) and 160 % (the same growth as the reference) need none.
+        // The diffusers 3.5 × as long at 0.8 × Diffusion, read inside the echo time: the first echo's energy spreads from
+        // −88 to +203 ms around it at Diffusion 80 % (the reference −88 … +253 ms; without the law +12 … +62 ms: always late)
+        VdLaw r { { 0.0, 0.0, 0.0, -1.1, 0.0, 0.0, 0.0 }, 3.5, 0.8, 1.0 };
+       #ifdef LYNX_VD_FIT
+        if (const char* v = std::getenv ("VD_FB"))
+            std::sscanf (v, "%lf,%lf,%lf,%lf,%lf,%lf,%lf", &r.fbDb[0], &r.fbDb[1], &r.fbDb[2], &r.fbDb[3], &r.fbDb[4], &r.fbDb[5], &r.fbDb[6]);
+        if (const char* v = std::getenv ("VD_DIFF"))
+            std::sscanf (v, "%lf,%lf,%lf", &r.diffLen, &r.diffGain, &r.diffComp);
+       #endif
+        r.diffLen = std::clamp (r.diffLen, 0.25, 3.6); // (the diffusers' lines hold 50 ms)
+        return r;
+    }();
+    return law;
+}
+double valhallaLoopDb (float v) noexcept
+{
+    static constexpr double at[7] = { 0.0, 0.2, 0.35, 0.5, 0.65, 0.8, 1.0 };
+    const auto x = (double) clamp01 (v);
+    int i = 0;
+    while (i < 5 && x > at[i + 1])
+        ++i;
+    const auto& k = vdLaw().fbDb;
+    return k[i] + (k[i + 1] - k[i]) * (x - at[i]) / (at[i + 1] - at[i]);
+}
 double modRateHz (float v) noexcept { return 0.01 + 9.99 * std::pow ((double) clamp01 (v), 2.3277); }
 double shiftHz (float v) noexcept { return 1000.0 * signedPow (bipolar (v), 5.0); }
 double shiftDetuneHz (float v) noexcept { return 10.0 * signedPow (bipolar (v), 2.5); }
@@ -1262,7 +1302,9 @@ private:
             rCount = rhythmPattern (p, bpm, rTaps, rSlot0);
         }
 
-        const auto g = feedbackGain (p[feedback]);
+        // round 190ly: the ValhallaDelay role's loop laws (hidden, without a voicing)
+        const bool vdOn = vd == nullptr && p[valhallaLaw] >= 0.5f;
+        const auto g = vdOn ? feedbackGain (p[feedback]) * std::pow (10.0, valhallaLoopDb (p[feedback]) / 20.0) : feedbackGain (p[feedback]);
         const bool pairsOn = p[pairs] >= 0.5f;
         const auto polarityL = p[phaseL] >= 0.5f ? -1.0f : 1.0f, polarityR = p[phaseR] >= 0.5f ? -1.0f : 1.0f;
         const auto outGain = (float) std::pow (10.0, outputDb (p[output]) / 20.0);
@@ -1271,7 +1313,8 @@ private:
         const auto driveGain = (float) std::pow (10.0, 24.0 * (double) clamp01 (p[drive]) / 20.0);
         const auto widthV = (float) bipolar (p[width]);
         const auto diffAmount = std::max (clamp01 (p[diffusion]), vd != nullptr ? vd->diffusion : 0.0f); // round 147: the voicing's own
-        const auto diffScale = 0.25 + 0.75 * (double) clamp01 (p[diffSize]);
+        const auto diffScale = vdOn ? (0.25 + 0.75 * (double) clamp01 (p[diffSize])) * vdLaw().diffLen : 0.25 + 0.75 * (double) clamp01 (p[diffSize]);
+        const auto diffG = vdOn ? (float) (vdLaw().diffGain * diffAmount) : 0.65f * diffAmount;
         const auto duck = clamp01 (p[ducking]);
         // round 144: the LFO locked to a note value of the tempo (Mod sync), else its free rate
         const auto syncBeats = modSyncBeats (modSyncOf (p[modSync]));
@@ -1322,6 +1365,7 @@ private:
         const auto duckReleaseStep = 85.0 / sr;
         static constexpr double diffMs[4] = { 4.3, 6.7, 9.1, 12.7 };
         static constexpr double diffDelay = diffMs[0] + diffMs[1] + diffMs[2] + diffMs[3];
+        const auto vdComp = vdOn ? vdLaw().diffComp * diffDelay * diffScale * 0.001 * sr : 0.0; // (samples, the left side)
 
         // round 135w: quad taps / swell, groove / feel / accent, prime numbers, cross feedback, balance, freeze, start side
         const bool tapOn[4] = { p[tapA] >= 0.5f, p[tapB] >= 0.5f, p[tapC] >= 0.5f, p[tapD] >= 0.5f };
@@ -1476,6 +1520,8 @@ private:
                 // the reference's diffused styles keep the time (refcap030 EchoBoy, irlv): read that much earlier
                 if (rev1 && diffAmount > 0.0f && ! postDiff)
                     d[c] = std::max (2.0, d[c] - diffDelay * diffScale * 0.001 * sr * (c == 1 ? 1.07 : 1.0));
+                else if (vdOn && diffAmount > 0.0f && ! postDiff) // round 190ly: the ValhallaDelay role likewise (its share)
+                    d[c] = std::max (2.0, d[c] - vdComp * (c == 1 ? 1.07 : 1.0));
                 if (clockMod) // round 190dl: a swing of up to 1.5 x the time stays inside the line
                     d[c] = std::min (d[c], maxRead);
             }
@@ -1646,7 +1692,7 @@ private:
                 for (int c = 0; c < 2; ++c)
                     if (diffAmount > 0.0f && ! postDiff)
                         for (std::size_t k = 0; k < 4; ++k)
-                            rec[c] = ch[(std::size_t) c].diff[k].process (rec[c], diffMs[k] * diffScale * 0.001 * sr * (c == 1 ? 1.07 : 1.0), 0.65f * diffAmount);
+                            rec[c] = ch[(std::size_t) c].diff[k].process (rec[c], diffMs[k] * diffScale * 0.001 * sr * (c == 1 ? 1.07 : 1.0), diffG);
                 recordTape (rec, driveGain);
             }
 
@@ -1664,7 +1710,7 @@ private:
                     u = rec[c];
                 else if (diffAmount > 0.0f && ! postDiff)
                     for (std::size_t k = 0; k < 4; ++k)
-                        u = s.diff[k].process (u, diffMs[k] * diffScale * 0.001 * sr * (c == 1 ? 1.07 : 1.0), 0.65f * diffAmount);
+                        u = s.diff[k].process (u, diffMs[k] * diffScale * 0.001 * sr * (c == 1 ? 1.07 : 1.0), diffG);
                 if (stereoRecord)
                     ; // recorded above
                 else if (vd != nullptr) // round 147: the voicing's saturation and loop tone (every pass)
@@ -1696,7 +1742,7 @@ private:
                 auto u = (c == 0 ? fbL : fbR) * (float) loopG * oddEcho[c];
                 if (diffAmount > 0.0f && ! postDiff)
                     for (std::size_t k = 0; k < 4; ++k)
-                        u = b.diff[k].process (u, diffMs[k] * diffScale * 0.001 * sr * (c == 1 ? 1.07 : 1.0), 0.65f * diffAmount);
+                        u = b.diff[k].process (u, diffMs[k] * diffScale * 0.001 * sr * (c == 1 ? 1.07 : 1.0), diffG);
                 u = saturate (u, compEnvB[c]);
                 for (int k = 0; k < loopN; ++k)
                     u = loopQB[(std::size_t) k].process (u, c);
@@ -1731,7 +1777,7 @@ private:
             if (postDiff && diffAmount > 0.0f)
                 for (int c = 0; c < 2; ++c)
                     for (std::size_t k = 0; k < 4; ++k)
-                        echo[c] = ch[(std::size_t) c].diffOut[k].process (echo[c], diffMs[k] * diffScale * 0.001 * sr * (c == 1 ? 1.07 : 1.0), 0.65f * diffAmount);
+                        echo[c] = ch[(std::size_t) c].diffOut[k].process (echo[c], diffMs[k] * diffScale * 0.001 * sr * (c == 1 ? 1.07 : 1.0), diffG);
 
             if (measuredTape) // round 190dl: the tape's hiss on the echoes while the tape holds anything (an idle insert
             {                 // stays silent: the hiss fades once the input and the echoes have been under −110 dBFS for one
@@ -2662,12 +2708,57 @@ inline void bilinearSecond (Biquad& b, double hz, double q, double sr, int type)
         b.set (1.0 - alpha, -2.0 * cw, 1.0 + alpha, a0, -2.0 * cw, 1.0 - alpha);
 }
 
+} // namespace
+
+// round 190ly: the analytic filter (Hilbert, coefficients fixed per sample) gives its real branch another phase at every
+// rate — at 96 kHz about 70° away from 48 kHz's across the band — and a steady tone's level through the shifted loop is that
+// phase (the comb of the loop). Fit phase(48 kHz) − phase(rate) ≈ θ + 2π f τ over 48 log-spaced points, 60 Hz … 12 kHz
+void rateTurn (double sampleRate, double& theta, double& advanceSamples) noexcept
+{
+    theta = 0.0;
+    advanceSamples = 0.0;
+    if (! (sampleRate > 0.0) || sampleRate == 48000.0)
+        return;
+    const auto realBranch = [] (double f, double fs) {
+        const auto w = twoPi * f / fs;
+        std::complex<double> h = std::polar (1.0, -w); // the real branch's one-sample delay
+        const auto z2 = std::polar (1.0, -2.0 * w);
+        for (const auto k : Hilbert::a)
+        {
+            const auto c = (double) k * (double) k;
+            h *= (c - z2) / (1.0 - c * z2);
+        }
+        return h;
+    };
+    constexpr int n = 48;
+    double sx = 0.0, sy = 0.0, sxx = 0.0, sxy = 0.0, last = 0.0;
+    for (int i = 0; i < n; ++i)
+    {
+        const auto f = 60.0 * std::pow (200.0, (double) i / (double) (n - 1));
+        auto d = std::arg (realBranch (f, 48000.0) / realBranch (f, sampleRate));
+        if (i > 0) // unwrapped along the frequencies
+            d += twoPi * std::round ((last - d) / twoPi);
+        last = d;
+        const auto x = twoPi * f;
+        sx += x, sy += d, sxx += x * x, sxy += x * d;
+    }
+    const auto tau = (n * sxy - sx * sy) / (n * sxx - sx * sx);
+    theta = std::remainder ((sy - tau * sx) / n, twoPi);
+    advanceSamples = tau * sampleRate;
+}
+
+namespace
+{
+
 class SpiralEcho final : public Effect
 {
 public:
     void prepare (double rate) noexcept override
     {
         sr = rate;
+        rateTurn (sr, turnTheta, turnAdvance); // round 190ly
+        // (the analytic signal re + j·im runs at −f: im leads re by 90°, so a phase lead of θ is a turn by −θ)
+        turnC = std::cos (turnTheta), turnS = -std::sin (turnTheta);
         for (auto& c : ch)
             c.line.allocate (sr * 12.0);
         reset();
@@ -2744,7 +2835,11 @@ private:
         const bool rev1 = p[revision] >= 0.5f;
         const auto& k = rev1 ? rev1Law() : Rev1 { 1.0, -0.125, 2875.0, 0.3375 };
         const auto allpassHz = k.allpassHz, allpassQ = k.allpassQ;
-        const auto target = std::clamp (k.scale * ms * 0.001 * sr + k.offset * sr / 48000.0, rev1 ? 1.0 : 2.0, ch[0].line.maxDelay() - 4.0);
+        // round 190ly (rateLaw): the analytic filter's phase as at 48 kHz (identity at 48 kHz: the old path there)
+        const bool turn = p[rateLaw] >= 0.5f && (turnTheta != 0.0 || turnAdvance != 0.0);
+        const auto target = std::clamp (k.scale * ms * 0.001 * sr + k.offset * sr / 48000.0 - (turn ? turnAdvance : 0.0), rev1 ? 1.0 : 2.0,
+                                         ch[0].line.maxDelay() - 4.0);
+        const auto tc = (float) turnC, ts = (float) turnS;
         const auto hpHz = lowCutHz (p[lowCut]) * lowCutScale, lpHz = highCutHz (p[highCut]);
         if (hpHz != designedHp || lpHz != designedLp || sr != designedSr || allpassHz != designedAp || allpassQ != designedApQ)
         {
@@ -2781,6 +2876,12 @@ private:
                 const auto tapped = d >= 2.0 ? s.line.at (d) : s.line.tap (1) + (float) (d - 1.0) * (s.line.tap (2) - s.line.tap (1));
                 const auto banded = s.band.process (tapped, 0);
                 s.shifter.h.analytic (allpassHz > 0.0 ? s.ap.process (banded, 0) : banded, re, im);
+                if (turn)
+                {
+                    const auto r2 = re * tc - im * ts;
+                    im = re * ts + im * tc;
+                    re = r2;
+                }
                 const auto up = re * oc + im * os, down = re * oc - im * os;
                 s.line.push (x + g * (limitAt * std::tanh (up / limitAt)));
                 *io[c] = dry * x + wet * (c == 1 && stereoMode ? down : up);
@@ -2805,6 +2906,7 @@ private:
     Glide time;
     double designedHp = -1.0, designedLp = -1.0, designedSr = -1.0, designedAp = -1.0, designedApQ = -1.0;
     double rotC = 1.0, rotS = 0.0; // the measured loop's shifter phasor
+    double turnTheta = 0.0, turnAdvance = 0.0, turnC = 1.0, turnS = 0.0; // round 190ly: rateTurn () at this rate
 
     // round 190fy [EXEC] (black-box: the tp172d reference renders, checked on refcap0124's 36 one-parameter captures;
     // /mnt/e/lynx-work/parityfx190fy): revision 1 of the measured loop. Echo by echo, revision 0 was late against the

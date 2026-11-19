@@ -77,6 +77,9 @@ product = ValhallaRoom
 vendor = Valhalla DSP
 lynx = Atrium
 names = ValhallaRoom
+# round 190ly: a translated ValhallaRoom runs Atrium's dense 32-line late tank (hidden reaLaw, #24; round 190ls). The owner's
+# perf rule: new Atriums keep the light 8-line tank (+48 % CPU for +0.18 of score is only worth it in the ValhallaRoom role)
+replaced = #24=1
 map = xml:mix -> Mix
 map = xml:predelay -> Predelay
 map = xml:HiCut -> High cut
@@ -313,6 +316,9 @@ lynx = Echoform
 vst3 = 64545356614c7679616c68616c6c6164
 names = ValhallaDelay
 mix = 1
+# round 190ly: the ValhallaDelay role's loop laws (Echoform's hidden valhallaLaw, #115 since the 0.1.30 rollup step 10): diffusion inside the echo time,
+# the measured loop gain over Feedback. Only a translated ValhallaDelay runs them
+replaced = #115=1
 map = xml:Mix -> Mix
 # styles: Single, Dual, Ratio, PingPong, Quad onto Echoform's order (Single, Ratio, Quad, Dual, Ping-pong)
 map = xml:DelayStyle -> Style | steps 0:0.1 0.19:0.7 0.39:0.3 0.59:0.9 0.79:0.5
@@ -4662,7 +4668,7 @@ std::vector<SubstituteEntry> parseSubstituteTable (std::string_view text, int* e
     int bad = 0;
     std::optional<SubstituteEntry> current;
     std::string lynxName;
-    std::vector<std::string> presetItems, mapItems, defaultItems;
+    std::vector<std::string> presetItems, replacedItems, mapItems, defaultItems;
     bool entryBad = false;
 
     auto finish = [&] {
@@ -4676,7 +4682,8 @@ std::vector<SubstituteEntry> parseSubstituteTable (std::string_view text, int* e
             return;
         }
         current->effect = *kind;
-        for (const auto& item : presetItems)
+        for (int list = 0; list < 2; ++list)
+        for (const auto& item : list == 0 ? presetItems : replacedItems)
         {
             const auto eq = item.rfind ('=');
             float v = 0;
@@ -4694,7 +4701,7 @@ std::vector<SubstituteEntry> parseSubstituteTable (std::string_view text, int* e
                 ++bad;
                 continue;
             }
-            current->preset.push_back ({ index, std::clamp (v, 0.0f, 1.0f) });
+            (list == 0 ? current->preset : current->replacedPreset).push_back ({ index, std::clamp (v, 0.0f, 1.0f) });
         }
         for (const auto& item : mapItems)
         {
@@ -4765,6 +4772,7 @@ std::vector<SubstituteEntry> parseSubstituteTable (std::string_view text, int* e
             current->key = trim (std::string_view (line).substr (1, line.size() - 2));
             lynxName.clear();
             presetItems.clear();
+            replacedItems.clear();
             mapItems.clear();
             defaultItems.clear();
             entryBad = false;
@@ -4832,6 +4840,9 @@ std::vector<SubstituteEntry> parseSubstituteTable (std::string_view text, int* e
         else if (key == "preset")
             for (auto& item : splitList (value, ';'))
                 presetItems.push_back (std::move (item));
+        else if (key == "replaced") // round 190ly
+            for (auto& item : splitList (value, ';'))
+                replacedItems.push_back (std::move (item));
         else if (key == "default")
             defaultItems.push_back (value);
         else if (key == "mix")
@@ -4952,6 +4963,10 @@ EffectSlot makeSubstituteSlot (const SubstituteEntry& entry, const PluginIdentit
         if (index >= 0 && index < maxEffectParams)
             slot.params[(std::size_t) index] = value;
     slot.mix = entry.mix;
+    if (original != nullptr) // round 190ly: the entry's items for a translated device only
+        for (const auto& [index, value] : entry.replacedPreset)
+            if (index >= 0 && index < maxEffectParams)
+                slot.params[(std::size_t) index] = value;
     if (original != nullptr) // round 190ca: the replaced device's own default preset, when the entry carries one
     {
         std::vector<std::string> keys { matchKey (original->name) };

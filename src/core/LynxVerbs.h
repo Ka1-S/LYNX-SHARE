@@ -175,6 +175,9 @@ constexpr int revision = paramCount; // round 190it, hidden (no control, saved w
 constexpr int loopLaw = paramCount + 1; // round 190kw, hidden (read only with revision 1): 1 = the level follows the
                                         //   reference's loop law over Decay and Size, the early part holds (new instances,
                                         //   translated states); 0 = revision 1 as round 190it left it (projects saved before)
+constexpr int shortTrim = paramCount + 2; // round 190ly, hidden (read with the engine law and revision 1): 1 = Concert Hall's
+                                          //   short-decay trim (ValhallaVintageVerb's at 0.51 s, faded out by 2.9 s; new
+                                          //   instances, translated states); 0 = revision 1 as before
 constexpr int modeCount = 22;
 constexpr int colourCount = 3;
 const char* modeName (int index) noexcept;

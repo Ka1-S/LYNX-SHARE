@@ -4817,6 +4817,8 @@ EffectSlot makeEffectSlot (EffectKind kind)
         slot.state = grossbeat::factoryContainer();
     if (kind == EffectKind::spiralEcho) // round 190fy: a new Spiral Echo runs the measured loop's revision 1 (hidden parameter)
         slot.params[(std::size_t) echosuite::spiral::revision] = 1.0f;
+    if (kind == EffectKind::spiralEcho) // round 190ly: … and its shifted loop's phase independent of the sample rate (hidden)
+        slot.params[(std::size_t) echosuite::spiral::rateLaw] = 1.0f;
     if (kind == EffectKind::voiceShift) // round 190ho: a new Voice Shift runs the Measured law's revision 1 (hidden parameter)
         slot.params[(std::size_t) voiceshift::revision] = 1.0f;
     if (kind == EffectKind::hushDeEsser) // round 190iq: a new Hush runs the measured Allround timing (hidden)
@@ -4837,12 +4839,14 @@ EffectSlot makeEffectSlot (EffectKind kind)
     if (kind == EffectKind::epochVerb) slot.params[(std::size_t) verbs::epoch::revision] = 1.0f;
     if (kind == EffectKind::epochVerb) // round 190kw: … and Epoch's level the reference's loop law (hidden)
         slot.params[(std::size_t) verbs::epoch::loopLaw] = 1.0f;
+    if (kind == EffectKind::epochVerb) // round 190ly: … and Epoch Verb Concert Hall's short-decay trim (hidden)
+        slot.params[(std::size_t) verbs::epoch::shortTrim] = 1.0f;
     if (kind == EffectKind::atrium) slot.params[(std::size_t) verbs::atrium::revision] = 1.0f;
     if (kind == EffectKind::foilPlate) slot.params[(std::size_t) verbs::foil::revision] = 1.0f;
     if (kind == EffectKind::foilPlate) // round 190ln: … and Foil Plate the reference's EQ / bass-decay laws (hidden)
         slot.params[(std::size_t) verbs::foil::reaLaw] = 1.0f;
-    if (kind == EffectKind::atrium) // round 190ls: … and Atrium the ValhallaRoom role on the dense late tank (hidden)
-        slot.params[(std::size_t) verbs::atrium::reaLaw] = 1.0f;
+    // (round 190ly: Atrium's dense late tank, verbs::atrium::reaLaw, is set only by the ValhallaRoom translator — the owner's
+    // perf rule; a new Atrium keeps the light 8-line tank)
     if (kind == EffectKind::halo) slot.params[(std::size_t) verbs::halo::revision] = 1.0f;
     if (kind == EffectKind::latticeMod) // round 190it: … and a new Lattice Mod its tap network's revision 1 (hidden)
         slot.params[(std::size_t) echosuite::lattice::revision] = 1.0f;
@@ -5051,6 +5055,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
         // round 190ln: a Foil Plate saved before the reference's EQ / bass-decay laws keeps revision 1 as it was, bit for bit
         if (slot.kind == EffectKind::foilPlate && savedCount <= (std::size_t) verbs::foil::reaLaw)
             slot.params[(std::size_t) verbs::foil::reaLaw] = 0.0f;
+        // round 190ly: an Epoch Verb saved before Concert Hall's short-decay trim keeps revision 1 as it was, bit for bit
+        if (slot.kind == EffectKind::epochVerb && savedCount <= (std::size_t) verbs::epoch::shortTrim)
+            slot.params[(std::size_t) verbs::epoch::shortTrim] = 0.0f;
         // round 190ls: an Atrium saved before the dense tank keeps revision 1 as it was, bit for bit
         if (slot.kind == EffectKind::atrium && savedCount <= (std::size_t) verbs::atrium::reaLaw)
             slot.params[(std::size_t) verbs::atrium::reaLaw] = 0.0f;
@@ -5076,6 +5083,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190fy: … and one saved before the loop timing's revision (0.1.27: Law, no hidden revision) keeps round 190do's loop
     if (slot.kind == EffectKind::spiralEcho && savedCount <= (std::size_t) echosuite::spiral::revision)
         slot.params[(std::size_t) echosuite::spiral::revision] = 0.0f;
+    // round 190ly: a Spiral Echo saved before the rate-independent loop phase keeps its loop as it was, bit for bit
+    if (slot.kind == EffectKind::spiralEcho && savedCount <= (std::size_t) echosuite::spiral::rateLaw)
+        slot.params[(std::size_t) echosuite::spiral::rateLaw] = 0.0f;
     // round 190iq: a Hush saved before the measured Allround timing keeps tp172b's (bit for bit)
     if (slot.kind == EffectKind::hushDeEsser && savedCount <= (std::size_t) mixsuite::hush::timing)
         slot.params[(std::size_t) mixsuite::hush::timing] = 0.0f;
@@ -5094,6 +5104,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190kw: a LuxeVerb saved before the Space engine's revision keeps tp172b / 190it's Space engine (bit for bit)
     if (slot.kind == EffectKind::luxeVerb && savedCount <= (std::size_t) luxeVerbSpaceRevision)
         slot.params[(std::size_t) luxeVerbSpaceRevision] = 0.0f;
+    // round 190ly: the ValhallaDelay role's loop laws are only ever saved with it (a translated ValhallaDelay)
+    if (slot.kind == EffectKind::echoform && savedCount <= (std::size_t) echosuite::echoform::valhallaLaw)
+        slot.params[(std::size_t) echosuite::echoform::valhallaLaw] = 0.0f;
     // round 190ca: a Nebula saved before the cloud law keeps the classic engine in every mode
     if (slot.kind == EffectKind::nebula && savedCount <= (std::size_t) verbs::nebula::law)
         slot.params[(std::size_t) verbs::nebula::law] = 0.0f;

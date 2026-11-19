@@ -2024,6 +2024,16 @@ LYNX_FIT_TABLE Rev1Trim epochTrim[epoch::modeCount] = {
     { -6.17, { 1.19, -1.22, -1.27, 0.88, 0.86, 2.55, -1.82, -11.16 } }, // Vintage Chamber
     { -2.85, { 0.07, -5.03, -1.68, 1.48, 1.22, 4.32, -0.31, -12.19 } }, // Vintage Hall
 };
+// round 190ly (epoch::shortTrim): Concert Hall at short decays ← ValhallaVintageVerb's ColorMode sweep and Decay pairs at
+// 0.51 s (Concert Hall, the 1970s / 1980s and Now colours; closed loop on the impulses). Revision 1 left Concert Hall on its
+// 0.1.27 voicing, fitted at 2 … 4 s: at 0.51 s the reference's impulse sat 2 dB over ours. Full at 0.51 s and under, faded
+// out on the decay's logarithm by `epochShortEnd` s (S3 at 2.9 s already sits on the reference)
+// (three passes of lab/vvtrim.py on 11 impulse renders, 500 Hz up; the loop's cuts under 500 Hz — −5.4 dB at 125 Hz — took
+// the other banks' bass and impulse renders of the same setting 2 … 3 dB under their reference (tp172d S1, refcap182 S1_bass),
+// so the lows keep the 0.1.27 voicing. The level stays where the loop put it: +0.7 … +1.9 dB more lifted the 1 kHz staircase
+// files a step but took sr96 S1's impulse one down — Epoch sits 1.3 dB higher at 96 kHz than at 48 kHz there, a finding of its own)
+LYNX_FIT_TABLE Rev1Trim epochShort = { 0.0, { 0.0, 0.0, 0.0, 2.68, 1.76, 1.45, 2.07, 1.27 } };
+LYNX_FIT_TABLE double epochShortEnd = 2.9;
 // round 190kw (revision 1 + loopLaw): Epoch's level over Decay and Size from the reference's loop (static REA of
 // ValhallaVintageVerb, docs/analise/REA_rodada190kw.md §4 / §11). Each of its modes is one loop whose gain is the RT60 law
 // 10^(−3 L / (fs T)) split over N gain stages, the input entering after a stage, with no output gain of its own: its wet
@@ -2156,6 +2166,12 @@ bool loadTrims()
                                 &t.db[3], &t.db[4], &t.db[5], &t.db[6], &t.db[7]) == 11)
             {
                 const std::string n = name;
+                if (n == "eshort") // round 190ly: "eshort <end s> <gain> <8 × dB>"
+                {
+                    epochShortEnd = i > 0 ? (double) i / 10.0 : epochShortEnd; // (index = the end in tenths of a second)
+                    epochShort = t;
+                    continue;
+                }
                 Rev1Trim* table = n == "epoch" ? epochTrim : n == "atrium" ? atriumTrim : n == "foil" ? foilTrim : n == "halo" ? haloTrim : n == "room" ? roomTrim : nullptr;
                 const int count = n == "epoch" ? epoch::modeCount : n == "atrium" || n == "room" ? atrium::typeCount : n == "foil" ? foil::typeCount + 1 : 7;
                 if (table != nullptr && i >= 0 && i < count)
@@ -2359,6 +2375,9 @@ protected:
                 applyTrim (s, tone, fade);
                 s.gain *= std::pow (10.0, (levelDb + epochLoopDb (modeIndex, decay, size)) / 20.0);
             }
+            if (p[epoch::shortTrim] >= 0.5f && modeIndex == 0) // round 190ly: Concert Hall's short-decay trim (tone only)
+                if (const auto w = std::clamp (std::log (epochShortEnd / std::max (0.01, decay)) / std::log (epochShortEnd / 0.51), 0.0, 1.0); w > 0.0)
+                    applyTrim (s, epochShort, w);
         }
     }
 };
