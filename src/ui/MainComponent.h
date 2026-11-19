@@ -256,6 +256,7 @@ public:
     std::unique_ptr<juce::AlertWindow> makeConfirmDiscardWindow();
     PianoRollComponent& getPianoRollForSnapshot() { return pianoRoll; }
     ChannelRackComponent& getRackForSnapshot() { return rack; }
+    juce::PopupMenu rackMenuForSnapshot() { juce::PopupMenu m; addPanelMenuItems (Panel::channelRack, m); return m; } // (round 190mk)
     void scrollRackForSnapshot (int x) { rackViewport.setViewPosition (x, rackViewport.getViewPositionY()); }
     BrowserComponent& getBrowserForSnapshot() { return browser; }
     MixerComponent& getMixerForSnapshot() { return mixer; }

@@ -469,7 +469,9 @@ Layout fruityMultiband()
     v.push_back (knob (50, 118, 34, "Output gain", TR_NOOP ("Gain"), 144, bipolar));
     v.push_back (section (79, 7, 200, 142, nullptr, boxed));
     v.push_back (display (83, 11, 192, 78, "multiband"));
-    v.push_back (label (86, 90, 186, 12, TR_NOOP ("Crossovers"), dim));
+    // round 190mk (DP-30, capture 190mf A3 fl-mbc-playing.png): FL's SPEED slider under the display (the scroll rate of
+    // the peak display; 0 = off, the cutoff graph only), where LYNX had the "Crossovers" caption
+    v.push_back (display (86, 90, 186, 12, "mbspeed"));
     v.push_back (knob (103, 121, 34, "Low crossover", nullptr, 0, noCaption));
     v.push_back (knob (153, 121, 34, "Mid lower crossover", nullptr, 0, noCaption));
     v.push_back (knob (203, 121, 34, "Mid upper crossover", nullptr, 0, noCaption));

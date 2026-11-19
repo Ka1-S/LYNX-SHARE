@@ -206,6 +206,9 @@ std::vector<Action> makeActions()
         { "rack.filterNext", TR_NOOP ("Next filter group"), Context::channelRack, { chord (pageDown) } },
         // FL 2026's Channel rack menu › Options › "Show mixer track selectors" (Alt+M) (round 190ld, DE-26)
         { "rack.mixerSelectors", TR_NOOP ("Show mixer track selectors"), Context::channelRack, { chord ('M', alt) } },
+        // FL's Channel rack menu › Options › "Zip selected" (Alt+Z) / "Unzip all" (Alt+U) (round 190mk, DE-38)
+        { "rack.zipSelected", TR_NOOP ("Zip selected"), Context::channelRack, { chord ('Z', alt) } },
+        { "rack.unzipAll", TR_NOOP ("Unzip all"), Context::channelRack, { chord ('U', alt) } },
 
         // Piano Roll (focused): tool dialogs and zoom
         { "pianoRoll.toStart", TR_NOOP ("Move the playback marker to start"), Context::pianoRoll, { chord (home) } }, // (issue #195)

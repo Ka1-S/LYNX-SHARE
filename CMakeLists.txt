@@ -639,6 +639,7 @@ if(LYNX_BUILD_APP)
         src/ui/EventEditor.cpp
         src/ui/AudioEditor.cpp
         src/ui/AudioEditorTools.cpp
+        src/ui/ArticulatorTools.cpp
         src/ui/SampleProperties.cpp
         src/ui/ToolWindow.cpp
         src/ui/SpeechDialog.cpp

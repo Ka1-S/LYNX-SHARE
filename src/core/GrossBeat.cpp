@@ -2398,4 +2398,293 @@ std::vector<std::pair<int, float>> paramsForPicks (const MidiPicks& picks, const
             out.push_back ({ kind, paramFromRaw (kind, slot) });
     return out;
 }
+
+// --- round 190mk (DP-7): FL's envelope state files, Prepare for smooth editing, the point clipboard, Analyze audio ------
+std::optional<std::vector<EditPoint>> readEnvelopeFile (const std::uint8_t* d, std::size_t size)
+{
+    if (d == nullptr || size < 12 || i32 (d) != 3)
+        return std::nullopt;
+    const auto ev = i32 (d + 4);
+    const auto n = i32 (d + 8);
+    if (ev < 0 || ev >= 4 || n < 1 || n > maxEditPoints * 4)
+        return std::nullopt;
+    const auto pointBytes = (std::size_t) (ev < 2 ? 8 : 16) + (std::size_t) (ev < 1 ? 4 : 8);
+    std::size_t pos = 12;
+    if (pos + (std::size_t) n * pointBytes > size)
+        return std::nullopt;
+    std::vector<Point> pts ((std::size_t) n);
+    for (auto& p : pts)
+    {
+        if (ev < 2)
+        {
+            float x, y;
+            std::memcpy (&x, d + pos, 4);
+            std::memcpy (&y, d + pos + 4, 4);
+            p.dx = x, p.y = y;
+            pos += 8;
+        }
+        else
+        {
+            double x, y;
+            std::memcpy (&x, d + pos, 8);
+            std::memcpy (&y, d + pos + 8, 8);
+            p.dx = x, p.y = (float) y;
+            pos += 16;
+        }
+        std::memcpy (&p.tension, d + pos, 4);
+        if (ev >= 1)
+            p.type = d[pos + 4];
+        pos += ev < 1 ? 4 : 8;
+        if (! std::isfinite (p.dx) || p.dx < 0.0)
+            p.dx = 0.0;
+        if (! std::isfinite (p.y))
+            p.y = 1.0f;
+        if (! std::isfinite (p.tension))
+            p.tension = 0.0f;
+    }
+    normalise (pts); // (the plugin's own rule: a first point at 0, the Δx stretched to the bar)
+    std::vector<EditPoint> out;
+    double x = 0.0;
+    for (const auto& p : pts)
+    {
+        x += p.dx;
+        out.push_back ({ std::clamp (x, 0.0, barLength), std::clamp (p.y, 0.0f, 1.0f), std::clamp (p.tension, -1.0f, 1.0f), p.type });
+    }
+    if (out.size() < 2)
+        out.push_back ({ barLength, out.back().y, 0.0f, 2 });
+    if ((int) out.size() > maxEditPoints)
+        out.resize ((std::size_t) maxEditPoints), out.back().x = barLength;
+    return out;
+}
+
+std::vector<std::uint8_t> writeEnvelopeFile (const Slot& slot)
+{
+    std::vector<std::uint8_t> b;
+    put<std::int32_t> (b, 3); // the "map" stream, version 3 (as the plugin's state writes it)
+    put<std::int32_t> (b, 3);
+    put<std::int32_t> (b, (std::int32_t) slot.points.size());
+    for (const auto& p : slot.points)
+    {
+        put<double> (b, p.dx);
+        put<double> (b, (double) p.y);
+        put<float> (b, p.tension);
+        b.push_back (p.type);
+        b.push_back (0);
+        b.push_back (0);
+        b.push_back ((std::uint8_t) p.dir);
+    }
+    put<std::int32_t> (b, 0);
+    for (int i = 0; i < 4; ++i)
+        put<std::int32_t> (b, -1);
+    return b;
+}
+
+std::vector<EditPoint> prepareForSmoothEditing (const Slot& slot)
+{
+    const auto pts = editPoints (slot);
+    const auto at = [&] (double beat) {
+        float y = levelAt (slot, beat);
+        for (const auto& p : pts) // (a point on the beat: its level, the last one there)
+            if (std::abs (p.x - beat) < 1.0e-9)
+                y = p.y;
+        return y;
+    };
+    std::vector<EditPoint> out;
+    for (int beat = 0; beat < (int) barLength; ++beat)
+        out.push_back ({ (double) beat, at ((double) beat), 0.0f, 10 });
+    out.push_back ({ barLength, out.front().y, 0.0f, 10 }); // (the bar loops: its end takes the start's level)
+    out.front().type = 10;
+    return out;
+}
+
+namespace
+{
+std::vector<int> sortedSelection (const std::vector<EditPoint>& points, std::vector<int> selected)
+{
+    std::sort (selected.begin(), selected.end());
+    selected.erase (std::unique (selected.begin(), selected.end()), selected.end());
+    selected.erase (std::remove_if (selected.begin(), selected.end(), [&points] (int i) { return i < 0 || i >= (int) points.size(); }), selected.end());
+    return selected;
+}
+
+// the body points (all but the bar's end) with their select flags back as an envelope: in order, the first at 0, nothing
+// at or past the end, the end point kept at the bar's end
+std::pair<std::vector<EditPoint>, std::vector<int>> withEnd (std::vector<std::pair<EditPoint, bool>> body, const EditPoint& end)
+{
+    std::stable_sort (body.begin(), body.end(), [] (const auto& a, const auto& b) { return a.first.x < b.first.x; });
+    std::pair<std::vector<EditPoint>, std::vector<int>> r;
+    for (const auto& [p, sel] : body)
+    {
+        if (p.x >= barLength - 1.0e-9 && ! r.first.empty())
+            continue;
+        if (sel)
+            r.second.push_back ((int) r.first.size());
+        r.first.push_back (p);
+    }
+    if (r.first.empty())
+        r.first.push_back ({ 0.0, end.y, 0.0f, 2 });
+    r.first.front().x = 0.0;
+    auto last = end;
+    last.x = barLength;
+    r.first.push_back (last);
+    return r;
+}
+} // namespace
+
+PointClip copyPoints (const std::vector<EditPoint>& points, const std::vector<int>& selectedIn)
+{
+    PointClip clip;
+    const auto selected = sortedSelection (points, selectedIn);
+    if (selected.empty())
+        return clip;
+    const auto first = points[(std::size_t) selected.front()].x;
+    for (const auto i : selected)
+    {
+        auto p = points[(std::size_t) i];
+        p.x -= first;
+        clip.points.push_back (p);
+    }
+    return clip;
+}
+
+std::pair<std::vector<EditPoint>, std::vector<int>> pasteInsert (const std::vector<EditPoint>& points, const std::vector<int>& selectedIn,
+                                                                 const PointClip& clip, double at)
+{
+    if (points.size() < 2 || clip.points.empty())
+        return { points, sortedSelection (points, selectedIn) };
+    const auto selected = sortedSelection (points, selectedIn);
+    const auto endIndex = (int) points.size() - 1;
+    const auto last = selected.empty() ? -1 : selected.back();
+    const auto anchor = last >= 0 ? points[(std::size_t) last].x : std::clamp (at, 0.0, barLength);
+    const auto length = clip.length();
+    std::vector<std::pair<EditPoint, bool>> body;
+    for (int i = 0; i < endIndex; ++i)
+    {
+        auto p = points[(std::size_t) i];
+        const auto before = last >= 0 ? i <= last : p.x <= anchor;
+        if (! before)
+            p.x += length;
+        body.push_back ({ p, std::binary_search (selected.begin(), selected.end(), i) });
+    }
+    for (auto p : clip.points)
+    {
+        p.x += anchor;
+        body.push_back ({ p, true });
+    }
+    // (stable order: a pasted point at the same x as an original comes after it)
+    return withEnd (std::move (body), points.back());
+}
+
+std::pair<std::vector<EditPoint>, std::vector<int>> pasteReplace (const std::vector<EditPoint>& points, const std::vector<int>& selectedIn,
+                                                                  const PointClip& clip)
+{
+    const auto selected = sortedSelection (points, selectedIn);
+    if (points.size() < 2 || clip.points.empty() || selected.empty())
+        return { points, selected };
+    const auto endIndex = (int) points.size() - 1;
+    const auto start = points[(std::size_t) selected.front()].x;
+    const auto shift = clip.length() - (points[(std::size_t) selected.back()].x - start);
+    std::vector<std::pair<EditPoint, bool>> body;
+    for (int i = 0; i < endIndex; ++i)
+    {
+        if (std::binary_search (selected.begin(), selected.end(), i))
+            continue;
+        auto p = points[(std::size_t) i];
+        if (i > selected.back())
+            p.x += shift;
+        body.push_back ({ p, false });
+    }
+    for (auto p : clip.points)
+    {
+        p.x += start;
+        body.push_back ({ p, true });
+    }
+    std::stable_sort (body.begin(), body.end(), [] (const auto& a, const auto& b) { return a.first.x < b.first.x; });
+    return withEnd (std::move (body), points.back());
+}
+
+std::pair<std::vector<EditPoint>, std::vector<int>> duplicatePoints (const std::vector<EditPoint>& points, const std::vector<int>& selected)
+{
+    auto r = pasteInsert (points, selected, copyPoints (points, selected), 0.0);
+    // the copy becomes the selection: the pasted points are the selected ones after the originals' places
+    const auto originals = sortedSelection (points, selected);
+    if (r.second.size() > originals.size())
+        r.second.erase (r.second.begin(), r.second.begin() + (std::ptrdiff_t) originals.size());
+    else
+        r.second.clear(); // (the whole copy fell past the bar's end)
+    return r;
+}
+
+std::vector<EditPoint> cutPoints (const std::vector<EditPoint>& points, const std::vector<int>& selectedIn)
+{
+    auto selected = sortedSelection (points, selectedIn);
+    const auto endIndex = (int) points.size() - 1;
+    selected.erase (std::remove_if (selected.begin(), selected.end(), [endIndex] (int i) { return i == 0 || i == endIndex; }), selected.end());
+    if (points.size() < 3 || selected.empty())
+        return points;
+    const auto prevX = points[(std::size_t) selected.front() - 1].x;
+    const auto next = selected.back() + 1;
+    const auto gap = next < endIndex ? points[(std::size_t) next].x - prevX : 0.0; // (nothing after it but the end: no gap to close)
+    std::vector<std::pair<EditPoint, bool>> body;
+    for (int i = 0; i < endIndex; ++i)
+    {
+        if (std::binary_search (selected.begin(), selected.end(), i))
+            continue;
+        auto p = points[(std::size_t) i];
+        if (i > selected.back())
+            p.x = std::max (prevX, p.x - gap);
+        body.push_back ({ p, false });
+    }
+    return withEnd (std::move (body), points.back()).first;
+}
+
+std::vector<EditPoint> envelopeFromLevels (const std::vector<float>& peaks, int maxPoints)
+{
+    const auto n = (int) peaks.size();
+    if (n < 2)
+        return { { 0.0, 1.0f, 0.0f, 0 }, { barLength, 1.0f, 0.0f, 0 } };
+    const auto top = std::max (1.0e-9f, *std::max_element (peaks.begin(), peaks.end()));
+    std::vector<double> ys ((std::size_t) n);
+    for (int i = 0; i < n; ++i)
+        ys[(std::size_t) i] = std::clamp ((double) peaks[(std::size_t) i] / (double) top, 0.0, 1.0);
+    const auto xOf = [n] (int i) { return barLength * (double) i / (double) (n - 1); };
+    // Ramer-Douglas-Peucker on the level curve; the tolerance grows until at most maxPoints remain (dense where it moves)
+    const auto simplify = [&] (double tolerance) {
+        std::vector<char> keep ((std::size_t) n, 0);
+        keep.front() = keep.back() = 1;
+        std::vector<std::pair<int, int>> stack { { 0, n - 1 } };
+        while (! stack.empty())
+        {
+            const auto [a, b] = stack.back();
+            stack.pop_back();
+            int worst = -1;
+            double worstError = tolerance;
+            for (int i = a + 1; i < b; ++i)
+            {
+                const auto t = (double) (i - a) / (double) (b - a);
+                const auto e = std::abs (ys[(std::size_t) i] - (ys[(std::size_t) a] + (ys[(std::size_t) b] - ys[(std::size_t) a]) * t));
+                if (e > worstError)
+                    worst = i, worstError = e;
+            }
+            if (worst >= 0)
+            {
+                keep[(std::size_t) worst] = 1;
+                stack.push_back ({ a, worst });
+                stack.push_back ({ worst, b });
+            }
+        }
+        return keep;
+    };
+    auto tolerance = 0.01;
+    auto keep = simplify (tolerance);
+    for (int pass = 0; pass < 40 && (int) std::count (keep.begin(), keep.end(), (char) 1) > std::max (2, maxPoints); ++pass)
+        keep = simplify (tolerance *= 1.25);
+    std::vector<EditPoint> out;
+    for (int i = 0; i < n; ++i)
+        if (keep[(std::size_t) i] != 0)
+            out.push_back ({ xOf (i), (float) ys[(std::size_t) i], 0.0f, 0 }); // (FL: single-curve points)
+    out.front().x = 0.0;
+    out.back().x = barLength;
+    return out;
+}
 } // namespace lynx::grossbeat

@@ -46,7 +46,10 @@ bool showGrossBeatEnvelopeForSnapshot (juce::Component& editor, int envelopeKind
 // round 190mf (DP-26): Fruity Limiter's KNEE knob held (its transfer curve on the display)
 // round 190mf (DP-29): Fruity Multiband Compressor's band meters with fixed levels
 bool multibandMetersForSnapshot (juce::Component& editor);
+bool multibandHistoryForSnapshot (juce::Component& editor, float speed); // round 190mk (DP-30): a fixed peak history, SPEED at `speed`
 bool limiterKneeHeldForSnapshot (juce::Component& editor, bool held);
+// round 190mk: 1 = Prepare for smooth editing, 2 = points 2-3 copied and pasted (insert), 3 = View gradient on / grid inverted, 0 = views back
+bool grossBeatEditForSnapshot (juce::Component& editor, int what);
 bool grossBeatToolsForSnapshot (juce::Component& editor, bool step, bool slide, bool frozen, juce::PopupMenu* optionsMenu);
 // round 190ld (--details190ldshot): Fruity Delay 3's Time-knob menu while TEMPO SYNC is on (empty otherwise); the
 // Vocoder's band columns as Vocoder::controlOutput 0…7 packs them; Fruity Limiter's graph fed `steps` synthetic frames

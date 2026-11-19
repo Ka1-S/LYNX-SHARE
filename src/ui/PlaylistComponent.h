@@ -11,6 +11,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/ArrangeOps.h"
+#include "core/InsertMark.h"
 #include "core/MagicLasso.h"
 #include "core/MeterBallistics.h"
 #include "core/TrackHeaderGestures.h"
@@ -378,6 +379,8 @@ public:
     // controls panel (#363636) with the 46 px activator, and LYNX's 9 px selection / meter column
     static constexpr int liveHeaderWidth = 170;
     bool liveArrangeLook() const noexcept;
+    // round 190mk (DL-70): Live's insert marker after a click on an empty spot of a lane (the line, the status bar text)
+    bool insertMarkForSnapshot (int track, std::int64_t tick, juce::Rectangle<int>& line, juce::String& hint);
     // after View › "Tall Arrangement lanes" or the classic look changed: the rows, the header width and the picture again
     void liveLanesChanged();
     bool automationFollows() const noexcept;
@@ -756,6 +759,55 @@ private:
     void setDropLaneHot (bool hot);
     juce::Rectangle<int> dropLaneArea() const; // the lane in the grid (empty: none or not on screen)
     juce::Component dropLaneProbe; // its place for the first-song tour's ring ("simple.dropLane")
+    // Round 190mk (DL-70, capture 190mf B1; core/InsertMark.h): Live's insert marker, a 1 px line over the clicked lane
+    // pulsing cyan <-> white. Perf-first: an opaque child exactly the line's size, so a pulse repaints those 17 pixels and
+    // nothing of the Arrangement's cached picture under it; its timer runs only while it is shown (Live's look, a marker
+    // set, the line on screen). Placed from paint() (as dropLaneProbe), so scrolling and zooming move it.
+    class InsertMarkLine final : public juce::Component, private juce::Timer
+    {
+    public:
+        InsertMarkLine()
+        {
+            setOpaque (true);
+            setInterceptsMouseClicks (false, false);
+        }
+        void restart()
+        {
+            startedMs = juce::Time::getMillisecondCounterHiRes();
+            colour = insertmark::cyan;
+            repaint();
+        }
+        std::uint32_t colourNow() const noexcept { return colour; }
+        void setPhaseForSnapshot (double ms) { colour = insertmark::colourAt (ms); }
+        void paint (juce::Graphics& g) override { g.fillAll (juce::Colour (colour)); }
+        void visibilityChanged() override
+        {
+            if (isVisible())
+                startTimerHz (25);
+            else
+                stopTimer();
+        }
+
+    private:
+        void timerCallback() override
+        {
+            if (! isShowing())
+                return;
+            if (const auto c = insertmark::colourAt (juce::Time::getMillisecondCounterHiRes() - startedMs); c != colour)
+            {
+                colour = c;
+                repaint();
+            }
+        }
+        double startedMs = 0.0;
+        std::uint32_t colour = insertmark::cyan;
+    };
+    InsertMarkLine insertMarkLine;
+    int insertMarkTrack = -1;
+    std::int64_t insertMarkTick = -1;
+    void setInsertMark (int track, std::int64_t tick);
+    void updateInsertMarkLine();
+    juce::String insertMarkText() const;
     void updateDropLaneProbe();
     juce::Rectangle<int> trackSolo (int track) const;
     juce::Rectangle<int> trackVolume (int track) const;

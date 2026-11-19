@@ -66,6 +66,9 @@
 #include "ui/Theme.h"
 #include "ui/ValueControl.h"
 #include "ui/WindowOwner.h"
+#include "ui/FileChoosers.h"
+#include "engine/FlStudio.h"
+#include "platform/Paths.h"
 
 #include "ui/DesignDisplays.inc" // round 168r: the graphs of the designed editors
 
@@ -2778,7 +2781,7 @@ public: // (the class stays public from here, as before)
         using namespace theme;
         const auto s = scale();
         const juce::String id (item.display != nullptr ? item.display : "");
-        if (id != "faderscale" && id != "decayeq" && id != "pitchport") // round 137: the fader scale is bare text beside its fader (tp172b4: the decay EQ lies on the field)
+        if (id != "faderscale" && id != "decayeq" && id != "pitchport" && id != "mbspeed") // round 137: the fader scale is bare text beside its fader (tp172b4: the decay EQ lies on the field)
             skin::well (g, r, radius::md * s, fx.enabled ? accent : juce::Colours::transparentBlack);
         const auto curveColour = fx.enabled ? accent : colour::textDisabled;
         const auto inner = r.reduced (6.0f * s);
@@ -2935,6 +2938,16 @@ public: // (the class stays public from here, as before)
                 const auto y = u / std::pow (1.0f + std::pow (std::abs (u), knee * 2.0f), 1.0f / (knee * 2.0f));
                 return 0.5f + 0.5f * y;
             }, inner, false);
+        }
+        else if (id == "multiband" && mbPeakDisplay())
+        {
+            paintMbHistory (g, inner, fx.enabled); // round 190mk (DP-30): FL's scrolling peak display
+            return;
+        }
+        else if (id == "mbspeed")
+        {
+            paintMbSpeed (g, r, fx.enabled);
+            return;
         }
         else if (id == "multiband")
         {
@@ -4760,6 +4773,13 @@ public: // (the class stays public from here, as before)
                 repaint (r.getSmallestIntegerContainer());
                 return;
             }
+        if (mbSpeedItem (item) && ! e.mods.isPopupMenu()) // round 190mk (DP-30): FL's SPEED slider
+        {
+            mbSpeedDragging = true;
+            dragItem = index;
+            mbSetSpeedAt (item, e.position.x);
+            return;
+        }
         if (limiterViewItem (item) || tpTraceItem (item)) // round 190ld (DP-25): FL's "Click on the display to Pause" (again: it scrolls on)
         {
             if (! e.mods.isPopupMenu())
@@ -5160,6 +5180,11 @@ public: // (the class stays public from here, as before)
             tpSetSpeedAt (activeLayout().items[(std::size_t) dragItem], e.position.y);
             return;
         }
+        if (mbSpeedDragging && dragItem >= 0 && dragItem < (int) activeLayout().items.size()) // round 190mk (DP-30)
+        {
+            mbSetSpeedAt (activeLayout().items[(std::size_t) dragItem], e.position.x);
+            return;
+        }
         if (mxDragging && dragItem >= 0) // round 168x: Maximus' curve
         {
             mxMouseDrag (e, activeLayout().items[(std::size_t) dragItem]);
@@ -5264,6 +5289,14 @@ public: // (the class stays public from here, as before)
         if (kind == EffectKind::fruityLimiter) // (round 190mf, DP-26: the knee curve goes with the release)
             juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<juce::Component> (this)] { if (safe != nullptr) safe->repaint(); });
         tpSpeedDragging = false;
+        if (std::exchange (mbSpeedDragging, false)) // round 190mk (DP-30)
+        {
+            dragItem = -1;
+            mbCommitSpeed();
+            return;
+        }
+        if (kind == EffectKind::fruityMultiband && mbCrossoverHeld()) // (round 190mk: the peak display comes back on release)
+            juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<juce::Component> (this)] { if (safe != nullptr) safe->repaint(); });
         if (vocHoldParam >= 0) // round 190ld: the momentary HOLD lets go
         {
             setValue (std::exchange (vocHoldParam, -1), 0.0f);
@@ -5708,6 +5741,9 @@ private:
                          + (level > 1.0e-5f ? juce::String (juce::Decibels::gainToDecibels (level), 1) : juce::String ("-inf")) + "dB)",
                      {}, false, false };
         }
+        if (mbSpeedItem (item)) // round 190mk (DP-30): FL's SPEED
+            return { tr ("Speed of the peak display: [LMB] drag  (far left: off, only the crossover graph)"),
+                     mbSpeed() <= 0.0f ? tr ("Off") : juce::String (juce::roundToInt (mbSpeed() * 100.0f)) + "%", false, false };
         if (limiterViewItem (item) && limiterViewPartAt (item, p) >= 0) // round 190jd
             return { tr ("Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)"),
                      limiterViewPartAt (item, p) == 0 ? tr ("GRAPH") : tr ("CURVE"), false, false };
@@ -6171,7 +6207,9 @@ private:
             moved = moved || std::abs (shown - before) > 0.01f || std::abs (hold - holdBefore) > 0.01f;
         }
         if (monitorShown) // round 190jd: the scrolling display takes the peaks; it moves only while playing and shown
-            monitorStep (peaks[0], peaks[1], kind == EffectKind::transientProcessor ? elapsed * tpSpeedFactor() : elapsed,
+            monitorStep (peaks[0], peaks[1], kind == EffectKind::transientProcessor ? elapsed * tpSpeedFactor()
+                                             : kind == EffectKind::fruityMultiband    ? elapsed * mbSpeedFactor() // (round 190mk, DP-30)
+                                                                                      : elapsed,
                          engine.getTransport().playing.load (std::memory_order_relaxed) && isShowing());
         if (moved)
             for (const auto& item : activeLayout().items)
@@ -6209,6 +6247,124 @@ private:
         editSlot ([v = (std::uint8_t) view] (EffectSlot& target) { target.displayView = v; });
         repaint();
     }
+    // --- Fruity Multiband Compressor's peak display (round 190mk, DP-30; capture 190mf A3 films/mbc, fl-mbc-playing.png) ---
+    // FL's manual: SPEED "Controls the scroll rate of the peak/filter cutoff display"; at 0 "the peak display will be turned
+    // off and only the filter cutoff graph will be displayed"; touching a crossover knob "the display will change to show
+    // the cutoff graph". Captured: the history scrolls LEFT while the song plays, ~51 px/s at the default SPEED (the
+    // slider about halfway), a pink-red fill (249,48,96) with a violet peak edge (240,128,255) on (85,91,94) with a
+    // (63,70,73) grid. Here: the fill = the output's peak, the violet part = the input above it (what the bands took off),
+    // linear amplitude (FL's peaks of a mastered song reach ~90 % of the height). The slider is kept per slot in
+    // EffectSlot::displayView (0 = FL's default, else 1 + the slider x 254; editor only, the audio never reads it); the
+    // slot's levels are measured only while the editor shows (levelWanted), as the Limiter's display.
+    static constexpr float mbDefaultSpeed = 0.5f;
+    static constexpr double mbPixelsPerSecondAtFull = 102.0; // (51 px/s at the default, as captured)
+    bool mbSpeedDragging = false;
+    float mbSpeedLive = -1.0f; // the slider while it is dragged (written to the slot on release: one change)
+    float mbSpeed() const
+    {
+        if (mbSpeedLive >= 0.0f)
+            return mbSpeedLive;
+        const auto* fx = current();
+        return fx == nullptr || fx->displayView == 0 ? mbDefaultSpeed : (float) (fx->displayView - 1) / 254.0f;
+    }
+    double mbSpeedFactor() const { return mbSpeed() * mbPixelsPerSecondAtFull / dynhistory::flPixelsPerSecond; }
+    bool mbCrossoverHeld() const
+    {
+        if (dragItem < 0 || dragItem >= (int) activeLayout().items.size() || activeLayout().items[(std::size_t) dragItem].param == nullptr)
+            return false;
+        return juce::String (activeLayout().items[(std::size_t) dragItem].param).endsWith ("crossover");
+    }
+    bool mbPeakDisplay() const { return kind == EffectKind::fruityMultiband && mbSpeed() > 0.0f && ! mbCrossoverHeld(); }
+    void paintMbHistory (juce::Graphics& g, juce::Rectangle<float> area, bool enabled) const
+    {
+        const auto dim = [enabled] (juce::Colour c) { return enabled ? c : c.withMultipliedAlpha (0.35f); };
+        const juce::Graphics::ScopedSaveState state (g);
+        g.reduceClipRegion (area.getSmallestIntegerContainer());
+        g.setColour (dim (juce::Colour (85, 91, 94)));
+        g.fillRect (area);
+        g.setColour (dim (juce::Colour (63, 70, 73)));
+        for (int i = 1; i < 12; ++i)
+            g.fillRect (std::round (area.getX() + area.getWidth() * (float) i / 12.0f), area.getY(), 1.0f, area.getHeight());
+        for (int i = 1; i < 6; ++i)
+            g.fillRect (area.getX(), std::round (area.getY() + area.getHeight() * (float) i / 6.0f), area.getWidth(), 1.0f);
+        const auto n = monitor.size();
+        if (n == 0)
+            return;
+        const auto colW = juce::jmax (0.5f, scale());
+        const auto yOf = [&] (float level) { return area.getBottom() - area.getHeight() * juce::jlimit (0.0f, 1.0f, level); };
+        juce::RectangleList<float> fills, edges;
+        const auto columns = juce::jmin (n, (int) std::ceil (area.getWidth() / colW));
+        for (int a = 0; a < columns; ++a)
+        {
+            const auto& c = monitor.at (a);
+            const auto x1 = area.getRight() - (float) a * colW, x0 = juce::jmax (area.getX(), x1 - colW);
+            const auto top = juce::jmax (c.in, c.out);
+            if (top <= 1.0e-4f)
+                continue;
+            const auto yOut = yOf (juce::jmin (c.out, top)), yIn = yOf (top);
+            fills.addWithoutMerging ({ x0, yOut, x1 - x0, area.getBottom() - yOut });
+            if (yIn < yOut - 0.25f)
+                edges.addWithoutMerging ({ x0, yIn, x1 - x0, yOut - yIn });
+        }
+        g.setColour (dim (juce::Colour (249, 48, 96)));
+        g.fillRectList (fills);
+        g.setColour (dim (juce::Colour (240, 128, 255)));
+        g.fillRectList (edges);
+    }
+    // FL: "SPEED" at the left, the slider's groove and a small grey thumb to its right
+    juce::Rectangle<float> mbSpeedGroove (juce::Rectangle<float> r) const { return r.withTrimmedLeft (54.0f * scale()).reduced (4.0f * scale(), 0.0f); }
+    void paintMbSpeed (juce::Graphics& g, juce::Rectangle<float> r, bool enabled) const
+    {
+        const auto s = scale();
+        g.setColour ((enabled ? theme::colour::textSecondary : theme::colour::textDisabled));
+        g.setFont (theme::font (juce::jmax (7.0f, 9.0f * s)));
+        g.drawText (tr ("Speed").toUpperCase(), r.withWidth (54.0f * s).toNearestInt(), juce::Justification::centredRight, false);
+        const auto groove = mbSpeedGroove (r);
+        g.setColour (juce::Colour (0xff1c1f22));
+        g.fillRect (groove.withSizeKeepingCentre (groove.getWidth(), juce::jmax (2.0f, 2.0f * s)));
+        const auto x = groove.getX() + groove.getWidth() * mbSpeed();
+        g.setColour (juce::Colour (0xffb5bcc0).withMultipliedAlpha (enabled ? 1.0f : 0.5f));
+        g.fillRect (juce::Rectangle<float> (7.0f * s, juce::jmin (r.getHeight(), 10.0f * s)).withCentre ({ x, r.getCentreY() }));
+    }
+    bool mbSpeedItem (const LayoutItem& item) const
+    {
+        return kind == EffectKind::fruityMultiband && item.type == Item::display && item.display != nullptr && std::strcmp (item.display, "mbspeed") == 0;
+    }
+    void mbSetSpeedAt (const LayoutItem& item, float x)
+    {
+        const auto groove = mbSpeedGroove (rectOf (item));
+        mbSpeedLive = juce::jlimit (0.0f, 1.0f, (x - groove.getX()) / juce::jmax (1.0f, groove.getWidth()));
+        repaint();
+    }
+    void mbCommitSpeed()
+    {
+        if (mbSpeedLive < 0.0f)
+            return;
+        const auto v = (std::uint8_t) (1 + juce::roundToInt (mbSpeedLive * 254.0f));
+        mbSpeedLive = -1.0f;
+        if (const auto* fx = current(); fx != nullptr && fx->displayView != v)
+            editSlot ([v] (EffectSlot& target) { target.displayView = v; });
+        repaint();
+    }
+public:
+    // (--details190mkshot: the peak display with a fixed history, and the slider at `speed`)
+    bool multibandHistoryForShot (float speed)
+    {
+        if (kind != EffectKind::fruityMultiband)
+            return false;
+        mbSpeedLive = speed;
+        monitor.clear();
+        for (int i = 0; i < 260; ++i)
+        {
+            const auto beat = std::fmod ((float) i, 26.0f) / 26.0f;
+            const auto in = juce::jlimit (0.0f, 1.0f, 0.28f + 0.6f * std::exp (-beat * 7.0f) + 0.06f * std::sin ((float) i * 0.9f));
+            monitor.feed (in, in > 0.55f ? 0.55f + (in - 0.55f) * 0.35f : in);
+            monitor.advance (dynhistory::columnMs);
+        }
+        repaint();
+        return mbPeakDisplay();
+    }
+private:
     // --- Fruity Multiband Compressor's band meters (round 190mf, DP-29; capture 190mf A3 fl-mbc-band-meters.png) -------
     // Each band panel ends with FL's meters: "IN", two 4 px green bars (the band's left / right level after its
     // crossover), and "C", one 4 px red bar growing up from the bottom (the compressor's gain reduction), with short
@@ -6313,7 +6469,7 @@ private:
     bool monitorDisplay (const char* id) const
     {
         return id != nullptr && ((kind == EffectKind::fruityLimiter && std::strcmp (id, "limiter") == 0) || std::strcmp (id, "maxbands") == 0
-                                 || tpTraceDisplay (id));
+                                 || tpTraceDisplay (id) || (kind == EffectKind::fruityMultiband && std::strcmp (id, "multiband") == 0));
     }
     // round 190lx (DP-31): Transient Processor's lower trace (FL manual "Visualization Controls")
     bool tpTraceDisplay (const char* id) const { return kind == EffectKind::transientProcessor && id != nullptr && std::strcmp (id, "envelope") == 0; }
@@ -6781,6 +6937,12 @@ bool showGrossBeatEnvelopeForSnapshot (juce::Component& editor, int envelopeKind
     return true;
 }
 
+bool multibandHistoryForSnapshot (juce::Component& editor, float speed)
+{
+    auto* native = dynamic_cast<NativeEffectEditor*> (&editor);
+    return native != nullptr && native->multibandHistoryForShot (speed);
+}
+
 bool multibandMetersForSnapshot (juce::Component& editor)
 {
     auto* native = dynamic_cast<NativeEffectEditor*> (&editor);
@@ -6791,6 +6953,36 @@ bool limiterKneeHeldForSnapshot (juce::Component& editor, bool held)
 {
     auto* native = dynamic_cast<NativeEffectEditor*> (&editor);
     return native != nullptr && native->kneeHeldForShot (held);
+}
+
+bool grossBeatEditForSnapshot (juce::Component& editor, int what)
+{
+    auto* native = dynamic_cast<NativeEffectEditor*> (&editor);
+    if (native == nullptr)
+        return false;
+    const auto slot = native->gbState().slots[(std::size_t) native->gbSlotIndex()];
+    switch (what)
+    {
+        case 1: native->gbWritePoints (grossbeat::prepareForSmoothEditing (slot)); break;
+        case 2:
+            native->gbSelected = { 1, 2 };
+            native->gbClipboardCommand (1);
+            native->gbClipboardCommand (2);
+            break;
+        case 4: // FL's "Basic 4" time slot as captured (190mk A1): 0 / 1.5 beats -1.5 / 3 beats 0 / 3.5 beats -0.75 / end -0.75
+            native->gbWritePoints ({ { 0.0, 1.0f, 0.0f, 2 }, { 1.5, 0.8125f, 0.0f, 2 }, { 3.0, 1.0f, 0.0f, 2 }, { 3.5, 0.90625f, 0.0f, 2 }, { 4.0, 0.90625f, 0.0f, 2 } });
+            break;
+        case 3:
+            NativeEffectEditor::gbBackgroundGradient = true;
+            NativeEffectEditor::gbInvertGrid = false;
+            break;
+        default:
+            NativeEffectEditor::gbBackgroundGradient = false;
+            NativeEffectEditor::gbInvertGrid = true;
+            break;
+    }
+    native->repaint();
+    return true;
 }
 
 bool grossBeatToolsForSnapshot (juce::Component& editor, bool step, bool slide, bool frozen, juce::PopupMenu* optionsMenu)

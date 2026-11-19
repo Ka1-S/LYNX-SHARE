@@ -85,7 +85,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         add (S::root, "arrangements", S::arrangement, true);
         add (S::info, "title author genre comments");
         add (S::info, "url showOnOpen created workSeconds", S::readOnly);
-        add (S::channel, "name instrument volume pan muted ghostHidden soloLock sample controllerState pluginState modelParams zones "
+        add (S::channel, "name instrument volume pan muted ghostHidden soloLock zipped sample controllerState pluginState modelParams zones "
              "mixer maxPolyphony colour group swingMix arp cut keyRegion receiveFrom icon editorScale flWrapperFlags loopStarter uid "
              "cutOthersOnly cutAtNoteEnd simplePad engineRev"); // (engineRev: natives190kj, rollup step 6)
         add (S::channel, "freeze trackFreeze", S::readOnly); // (rendered stems: files LYNX wrote, and the live channel)

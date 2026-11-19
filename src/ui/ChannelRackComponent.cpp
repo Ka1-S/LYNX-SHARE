@@ -394,6 +394,7 @@ void ChannelRackComponent::groupSelected()
 
 void ChannelRackComponent::updateSize()
 {
+    refreshZipLayout(); // (round 190mk: zipped channels' strips)
     const auto rows = shownCount() + 1; // +1 = "add channel" row
     // FL's ghost steps: when the rack is wider than the pattern, the free width shows faint steps after its end;
     // clicking one adds a step there and makes the pattern longer (issue #11)
@@ -401,20 +402,148 @@ void ChannelRackComponent::updateSize()
     const auto loopColumn = advancedLoopShown() ? loopColumnWidth : 0; // (FL's advanced looping controls, at the right)
     if (const auto* holder = getParentComponent())
         ghostSteps = juce::jmax (0, (holder->getWidth() - gridLeft() - 8 - loopColumn) / stepWidth - numSteps());
-    setSize (gridLeft() + shownSteps() * stepWidth + 8 + loopColumn, rows * rowHeight + 8 + (graphRow() >= 0 ? laneHeight : 0));
+    setSize (gridLeft() + shownSteps() * stepWidth + 8 + loopColumn,
+             (zipLayout.top.empty() ? rows * rowHeight : zipLayout.total) + 8 + (graphRow() >= 0 ? laneHeight : 0));
+}
+
+// --- FL's Channel button width (round 190mk, DE-39) ---------------------------------------------------------------------
+void ChannelRackComponent::setButtonWidth (int percent)
+{
+    buttonWidthPercent = percent <= 0 ? 0 : juce::jlimit (100, 400, percent);
+    if (buttonWidthPercent > 0)
+        nameWidth = widthForPercent (buttonWidthPercent);
+    else // Size to fit: the longest name with the button's margins, between 100 % and 400 %
+    {
+        const auto font = theme::font (theme::type::body);
+        float widest = 0.0f;
+        for (const auto& c : engine.getSong().channels)
+            widest = juce::jmax (widest, juce::GlyphArrangement::getStringWidth (font, juce::String::fromUTF8 (c.name.c_str())));
+        nameWidth = juce::jlimit (widthForPercent (100), widthForPercent (400), (int) std::ceil (widest) + 34);
+    }
+    updateSize();
+    repaint();
+}
+
+// --- FL's zipped channels (round 190mk, DE-38; capture 190mf A4, core/RackZip.h) ----------------------------------------
+
+void ChannelRackComponent::refreshZipLayout()
+{
+    const auto& channels = engine.getSong().channels;
+    if (std::none_of (channels.begin(), channels.end(), [] (const ChannelDef& c) { return c.zipped; }))
+    {
+        zipLayout = {}; // (no zipped channel: FL's fixed rows, the code paths as before)
+        return;
+    }
+    std::vector<bool> zipped, shown;
+    zipped.reserve (channels.size());
+    shown.reserve (channels.size());
+    for (int r = 0; r < (int) channels.size(); ++r)
+    {
+        zipped.push_back (channels[(std::size_t) r].zipped);
+        shown.push_back (isShown (r));
+    }
+    zipLayout = rackzip::layout (zipped, shown, rowHeight);
+}
+
+juce::Rectangle<int> ChannelRackComponent::zipBar (int row) const
+{
+    if (! isZipped (row))
+        return {};
+    const auto slot = zipLayout.slot[(std::size_t) row];
+    const auto top = rowY (row), height = rowHeight / 2;
+    return { stickyX + nameLeft() + slot * (nameWidth + rackzip::barGap), top + (height - rackzip::barHeight) / 2, nameWidth, rackzip::barHeight };
+}
+
+int ChannelRackComponent::zipBarAt (int row, int x) const
+{
+    if (! isZipped (row))
+        return -1;
+    return rackzip::barAt (zipLayout, zipLayout.first[(std::size_t) row], x, stickyX + nameLeft(), nameWidth);
+}
+
+bool ChannelRackComponent::zipStripForSnapshot (int row, juce::Rectangle<int>& strip) const
+{
+    if (! isZipped (row))
+        return false;
+    strip = { 0, rowY (row), getWidth(), rowHeight / 2 };
+    return true;
+}
+
+void ChannelRackComponent::paintZipStrips (juce::Graphics& g)
+{
+    const auto& song = engine.getSong();
+    const auto clip = g.getClipBounds();
+    for (int row = 0; row < (int) song.channels.size(); ++row)
+    {
+        if (! isZipped (row) || ! isShown (row))
+            continue;
+        const auto bar = zipBar (row);
+        if (! bar.intersects (clip.expanded (0, 1)))
+            continue;
+        const auto& c = song.channels[(std::size_t) row];
+        // FL: the bar in the channel's colour, darker at the bottom (its channel buttons' colour when none is set)
+        const auto top = c.colour != 0 ? c.colour : (std::uint32_t) theme::colour::bg5.getARGB();
+        const auto r = bar.toFloat();
+        g.setGradientFill (juce::ColourGradient (juce::Colour (top), r.getX(), r.getY(), juce::Colour (rackzip::barBottom (top)), r.getX(), r.getBottom(), false));
+        g.fillRect (r);
+        if (hoverArea == Area::zipped && hoverRow == row)
+        {
+            g.setColour (theme::colour::textPrimary.withAlpha (0.6f));
+            g.drawRect (r.expanded (1.0f), 1.0f);
+        }
+    }
+}
+
+void ChannelRackComponent::zipSelected()
+{
+    const auto rows = engine.getSelectedChannels();
+    if (rows.empty())
+        return;
+    engine.editSong ([rows] (Song& s) {
+        for (const auto r : rows)
+            if (r >= 0 && r < (int) s.channels.size())
+                s.channels[(std::size_t) r].zipped = true;
+    });
+    updateSize();
+    repaint();
+}
+
+void ChannelRackComponent::unzipAll()
+{
+    const auto& channels = engine.getSong().channels;
+    if (std::none_of (channels.begin(), channels.end(), [] (const ChannelDef& c) { return c.zipped; }))
+        return;
+    engine.editSong ([] (Song& s) {
+        for (auto& c : s.channels)
+            c.zipped = false;
+    });
+    updateSize();
+    repaint();
+}
+
+void ChannelRackComponent::unzip (int row)
+{
+    if (row < 0 || row >= (int) engine.getSong().channels.size() || ! engine.getSong().channels[(std::size_t) row].zipped)
+        return;
+    engine.editSong ([row] (Song& s) { s.channels[(std::size_t) row].zipped = false; });
+    updateSize();
+    repaint();
 }
 
 int ChannelRackComponent::graphRow() const
 {
     const auto count = (int) engine.getSong().channels.size();
     const auto row = graphLanes && count > 0 ? juce::jlimit (0, count - 1, engine.getSelectedChannel()) : -1;
-    return row >= 0 && isShown (row) ? row : -1;
+    return row >= 0 && isShown (row) && ! isZipped (row) ? row : -1;
 }
 
 int ChannelRackComponent::rowY (int row) const
 {
     const auto lane = graphRow();
-    return 4 + visibleIndex (row) * rowHeight + (lane >= 0 && row > lane ? laneHeight : 0);
+    const auto offset = lane >= 0 && row > lane ? laneHeight : 0;
+    if (const auto count = (int) zipLayout.top.size() - 1; count >= 0 && row >= 0) // (round 190mk: zipped strips)
+        return (row <= count ? zipLayout.top[(std::size_t) row] : zipLayout.top[(std::size_t) count] + (row - count) * rowHeight) + offset;
+    return 4 + visibleIndex (row) * rowHeight + offset;
 }
 
 int ChannelRackComponent::rowAtY (int y) const
@@ -430,6 +559,9 @@ int ChannelRackComponent::rowAtY (int y) const
         if (y >= laneTop + laneHeight)
             y -= laneHeight;
     }
+
+    if (! zipLayout.top.empty()) // (round 190mk: zipped strips; a strip answers with its first row)
+        return rackzip::rowAt (zipLayout, y, rowHeight);
 
     const auto index = (y - 4) / rowHeight;
 
@@ -508,7 +640,7 @@ void ChannelRackComponent::paintLoopColumn (juce::Graphics& g)
     g.setFont (theme::font (theme::type::caption, true));
     for (int row = 0; row < (int) song.channels.size(); ++row)
     {
-        if (! isShown (row) || song.channels[(std::size_t) row].instrument == InstrumentKind::audioClip)
+        if (! isShown (row) || isZipped (row) || song.channels[(std::size_t) row].instrument == InstrumentKind::audioClip)
             continue;
         const auto box = loopBoxBounds (row);
         const auto setting = channelloops::effectiveSetting (p, row);
@@ -702,12 +834,23 @@ ChannelRackComponent::Area ChannelRackComponent::areaAt (int x, int y, int& row)
 {
     const auto channels = (int) engine.getSong().channels.size();
     row = rowAtY (y);
+    const auto rackX = x;
 
     if (x < stickyX + gridLeft()) // the controls column (painted at the visible left edge)
         x -= stickyX;
 
     if (row < 0 || row > channels)
         return Area::none;
+
+    if (isZipped (row)) // round 190mk (DE-38): a zipped strip; on a bar, that bar's channel
+    {
+        if (const auto bar = zipBarAt (row, rackX); bar >= 0)
+        {
+            row = bar;
+            return Area::zipped;
+        }
+        return Area::none;
+    }
 
     if (laneBounds().contains (x, y))
         return x < gridLeft() ? Area::laneLevels : Area::lane;
@@ -873,6 +1016,8 @@ void ChannelRackComponent::paint (juce::Graphics& g)
 
     for (int row = 0; row < (int) song.channels.size(); ++row)
     {
+        if (isZipped (row)) // (round 190mk: drawn as a bar in its strip, paintZipStrips)
+            continue;
         const auto y = rowY (row);
 
         if (! isShown (row) || y > clip.getBottom() || y + rowHeight < clip.getY())
@@ -1041,6 +1186,8 @@ void ChannelRackComponent::paint (juce::Graphics& g)
 
         for (int row = 0; row < (int) song.channels.size(); ++row)
         {
+            if (isZipped (row)) // (round 190mk)
+                continue;
             const auto y = rowY (row);
 
             if (! isShown (row) || y > column.getBottom() || y + rowHeight < column.getY())
@@ -1221,6 +1368,9 @@ void ChannelRackComponent::paint (juce::Graphics& g)
         }
     }
 
+    if (! zipLayout.top.empty())
+        paintZipStrips (g);
+
     if (advancedLoopShown())
         paintLoopColumn (g);
 }
@@ -1278,6 +1428,55 @@ void ChannelRackComponent::paintNotePreview (juce::Graphics& g, int row, const P
             g.fillRect (juce::Rectangle<float> (x, y, juce::jmin (w, inner.getRight() - x), noteHeight));
         }
     }
+
+    // round 190mk (DE-33, capture 190mk A2.3; FL's option "Show a mute button on the piano roll preview", on): a round
+    // mute button in the preview's middle while it is hovered; a muted channel's preview dims and keeps the crossed icon
+    const auto muted = row >= 0 && row < (int) engine.getSong().channels.size() && engine.getSong().channels[(std::size_t) row].muted;
+    if (muted)
+    {
+        g.setColour (bg1.withAlpha (0.55f));
+        g.fillRect (area);
+    }
+    if (previewMuteButton && (hoveredHere || muted))
+    {
+        const auto b = previewMuteBounds (row).toFloat();
+        const auto hot = hoveredHere && b.contains (getMouseXYRelative().toFloat());
+        g.setColour (hot ? bg5 : bg3);
+        g.fillEllipse (b);
+        g.setColour (border);
+        g.drawEllipse (b.reduced (0.5f), 1.0f);
+        // a speaker: box and cone, then sound waves (on) or a cross (muted)
+        const auto c = b.getCentre();
+        const auto u = b.getWidth() / 18.0f;
+        juce::Path speaker;
+        speaker.startNewSubPath (c.x - 5.0f * u, c.y - 2.0f * u);
+        speaker.lineTo (c.x - 2.5f * u, c.y - 2.0f * u);
+        speaker.lineTo (c.x + 0.5f * u, c.y - 5.0f * u);
+        speaker.lineTo (c.x + 0.5f * u, c.y + 5.0f * u);
+        speaker.lineTo (c.x - 2.5f * u, c.y + 2.0f * u);
+        speaker.lineTo (c.x - 5.0f * u, c.y + 2.0f * u);
+        speaker.closeSubPath();
+        g.setColour (muted ? textSecondary : textPrimary);
+        g.fillPath (speaker);
+        if (muted)
+        {
+            g.drawLine (c.x + 2.0f * u, c.y - 2.5f * u, c.x + 5.5f * u, c.y + 2.5f * u, 1.2f * u);
+            g.drawLine (c.x + 2.0f * u, c.y + 2.5f * u, c.x + 5.5f * u, c.y - 2.5f * u, 1.2f * u);
+        }
+        else
+        {
+            juce::Path wave;
+            wave.addCentredArc (c.x + 0.5f * u, c.y, 3.5f * u, 3.5f * u, 0.0f, 0.6f, 2.55f, true);
+            g.strokePath (wave, juce::PathStrokeType (1.1f * u));
+        }
+    }
+}
+
+juce::Rectangle<int> ChannelRackComponent::previewMuteBounds (int row) const
+{
+    const auto place = previewSpan();
+    const auto centre = juce::Point<int> (gridLeft() + place.x + place.width / 2, rowY (row) + rowHeight / 2);
+    return juce::Rectangle<int> (18, 18).withCentre (centre);
 }
 
 // --- the control contract for the knobs and the route box ----------------------------------------
@@ -2155,6 +2354,16 @@ void ChannelRackComponent::mouseDown (const juce::MouseEvent& e)
         case Area::none:
             return;
 
+        case Area::zipped: // round 190mk (FL's manual: "Right-Click the button of a zipped Channel to unzip it")
+            if (flmods::popup (e.mods))
+                unzip (row);
+            else
+            {
+                selectionAnchor = row;
+                selectRows ({ row }, row);
+            }
+            return;
+
         case Area::addRow:
             showAddChannelMenu();
             return;
@@ -2340,13 +2549,28 @@ void ChannelRackComponent::mouseDown (const juce::MouseEvent& e)
                 return;
             if (showsNotePreview (pattern, row, pianoRollView)) // the miniature opens the Piano Roll (steps would break the melody)
             {
-                if (! flmods::popup (e.mods))
+                // round 190mk (DE-33, FL's manual "Channel Rack › Piano roll preview"): "Left-click the preview to show/hide
+                // the Piano roll window"; "Right-Click to open the Piano roll centered on the notes clicked"
+                if (previewMuteButton && ! flmods::popup (e.mods) && previewMuteBounds (row).contains (e.getPosition()))
                 {
-                    selectionAnchor = row;
-                    selectRows ({ row }, row);
-                    if (onOpenPianoRoll)
-                        onOpenPianoRoll();
+                    toggleMute (row); // (FL: the preview's mute button; the preview stays)
+                    repaint (rowBounds (row));
+                    return;
                 }
+                const auto wasPrimary = engine.getSelectedChannel() == row;
+                selectionAnchor = row;
+                selectRows ({ row }, row);
+                if (flmods::popup (e.mods))
+                {
+                    const auto span = previewSpan();
+                    const auto at = juce::jlimit (0.0, 1.0, (double) (e.x - gridLeft() - span.x) / (double) juce::jmax (1, span.width));
+                    if (onPreviewRightClick)
+                        onPreviewRightClick (row, at * (double) numSteps() * (double) ticksPerStep);
+                }
+                else if (onPreviewClick)
+                    onPreviewClick (wasPrimary ? row : -1); // (-1: another channel's preview: show its notes, never hide)
+                else if (onOpenPianoRoll)
+                    onOpenPianoRoll();
                 return;
             }
 
@@ -2594,7 +2818,8 @@ ui::Hint ChannelRackComponent::hintAt (juce::Point<int> p)
             break;
         case Area::grid:
             if (! song.patterns.empty() && showsNotePreview (song.activePattern(), row, pianoRollView))
-                h.text = name + " - " + tr ("Piano Roll notes: [LMB] opens them in the Piano Roll");
+                h.text = name + " - " + (previewMuteButton && previewMuteBounds (row).contains (p) ? tr ("Mute / unmute the channel")
+                                                                                                     : tr ("Piano roll preview: [LMB] show / hide the Piano Roll  [RMB] open it centred on the notes clicked"));
             else
                 h.text = name + " - " + (hoverStep >= numSteps() ? tr ("After the pattern's end: [LMB] adds a step and makes the pattern longer")
                                          : loopStepsOf (row) > 0 && hoverStep >= loopStepsOf (row)
@@ -2606,6 +2831,15 @@ ui::Hint ChannelRackComponent::hintAt (juce::Point<int> p)
             break;
         case Area::addRow:
             h.text = tr ("Add a channel (or drop audio files on the rack)");
+            break;
+        case Area::zipped: // round 190mk: FL's hint is the channel's name, its type on the right
+            h.text = name + " - " + tr ("Zipped channel: [RMB] unzip  (Alt+U unzips all)");
+            if (row >= 0 && row < (int) song.channels.size())
+            {
+                const auto& c = song.channels[(std::size_t) row];
+                h.value = c.instrument == InstrumentKind::plugin && ! c.plugin.name.empty() ? juce::String::fromUTF8 (c.plugin.name.c_str())
+                                                                                             : instrumentLabel (c.instrument);
+            }
             break;
         case Area::loop:
             h.text = name + " - " + tr ("Loop point: [LMB] drag or [Wheel] sets it in steps  [2xLMB] next bar  [RMB] Don't loop / Step / Beat / Bar, Burn to pattern");

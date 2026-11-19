@@ -1286,7 +1286,7 @@ std::optional<EffectSlot> effectFromVar (const juce::var& e)
     slot.smartDisable = (bool) e.getProperty ("smartDisable", true);
     slot.row = juce::jlimit (-1, maxEffectSlots - 1, (int) e.getProperty ("row", -1));
     slot.look = (std::uint8_t) juce::jlimit (0, 255, (int) e.getProperty ("look", 0));
-    slot.displayView = (std::uint8_t) juce::jlimit (0, 1, (int) e.getProperty ("displayView", 0));
+    slot.displayView = (std::uint8_t) juce::jlimit (0, 255, (int) e.getProperty ("displayView", 0)); // (round 190mk: Multiband's SPEED)
     slot.lockState = (bool) e.getProperty ("lockState", false);
     slot.goal = (std::uint8_t) juce::jlimit (0, 255, (int) e.getProperty ("goal", 0));
     slot.goalAmount = juce::jlimit (0.0f, 1.0f, (float) (double) e.getProperty ("goalAmount", 0.5));
@@ -1957,6 +1957,8 @@ juce::var channelToVar (const ChannelDef& c)
     o->setProperty ("muted", c.muted);
     if (c.ghostHidden)
         o->setProperty ("ghostHidden", true);
+    if (c.zipped) // round 190mk (DE-38): FL's zipped channel
+        o->setProperty ("zipped", true);
     if (c.soloLock)
         o->setProperty ("soloLock", true);
 
@@ -2312,6 +2314,7 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
     def.pan = juce::jlimit (-1.0f, 1.0f, (float) c.getProperty ("pan", 0.0));
     def.muted = (bool) c.getProperty ("muted", false);
     def.ghostHidden = (bool) c.getProperty ("ghostHidden", false);
+    def.zipped = (bool) c.getProperty ("zipped", false);
     def.soloLock = (bool) c.getProperty ("soloLock", false);
     def.samplePath = c["sample"].toString().toStdString();
 

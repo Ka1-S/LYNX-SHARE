@@ -518,6 +518,18 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
     // the workspace panels
     rack.onOpenPianoRoll = [this] { openPianoRoll(); };
+    // round 190mk (DE-33, FL's manual): a click on a channel's piano roll preview shows / hides the Piano roll; a right-click
+    // opens it scrolled to the clicked spot
+    rack.onPreviewClick = [this] (int row) {
+        if (row >= 0 && workspace.isPanelVisible (Panel::pianoRoll))
+            togglePanel (Panel::pianoRoll);
+        else
+            openPianoRoll();
+    };
+    rack.onPreviewRightClick = [this] (int, double tick) {
+        openPianoRoll();
+        pianoRoll.centreOnTick (tick, 0.27); // (FL: the clicked spot about 27 % in from the left, capture 190mk A2.3)
+    };
     mixerinput::openAudioSettings = [this] { openSettings ((int) SettingsPage::audio); };
     PatcherWindows::onBrowsePluginDatabase = [this] (bool) {
         showPanel (Panel::browser);
@@ -2420,6 +2432,8 @@ bool MainComponent::runAction (const std::string& id)
         rack.repaint();
         saveUiSettings();
     }
+    else if (is ("rack.zipSelected")) rack.zipSelected(); // round 190mk (DE-38)
+    else if (is ("rack.unzipAll")) rack.unzipAll();
     else if (is ("rack.filterPrevious")) rack.stepFilterGroup (-1); // round 190ld (DE-37)
     else if (is ("rack.filterNext")) rack.stepFilterGroup (1);
     else if (is ("rack.rotateLeft")) rack.rotateSelected (-1);
@@ -2990,6 +3004,10 @@ void MainComponent::loadUiSettings()
             ChannelRackComponent::showMixerSelectors = on;
         else if (key == "rackNameAlignLeft") // round 190kd: FL's Channel name alignment
             ChannelRackComponent::nameAlignLeft = on;
+        else if (key == "rackPreviewMute") // round 190mk (DE-33): FL's "Show a mute button on the piano roll preview"
+            ChannelRackComponent::previewMuteButton = on;
+        else if (key == "rackButtonWidth") // round 190mk (DE-39): FL's Channel button width (0 = size to fit)
+            rack.setButtonWidth (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "audioTrackControls") // round 190w: Playlist › View › Track headers
             PlaylistComponent::showAudioTrackControls = on;
         else if (key == "audioTrackLevels")
@@ -3370,6 +3388,8 @@ void MainComponent::saveUiSettings()
                                       + "\nmuteRemovedSteps=" + juce::String (ChannelRackComponent::muteRemovedSteps ? 1 : 0)
                                       + "\nrackMixerSelectors=" + juce::String (ChannelRackComponent::showMixerSelectors ? 1 : 0)
                                       + "\nrackNameAlignLeft=" + juce::String (ChannelRackComponent::nameAlignLeft ? 1 : 0)
+                                      + "\nrackButtonWidth=" + juce::String (ChannelRackComponent::buttonWidthPercent)
+                                      + "\nrackPreviewMute=" + juce::String (ChannelRackComponent::previewMuteButton ? 1 : 0)
                                       + "\naudioTrackControls=" + juce::String (PlaylistComponent::showAudioTrackControls ? 1 : 0)
                                       + "\naudioTrackLevels=" + juce::String (PlaylistComponent::showAudioTrackLevels ? 1 : 0)
                                       + "\ninstrumentTrackLevels=" + juce::String (PlaylistComponent::showInstrumentTrackLevels ? 1 : 0)
@@ -4637,7 +4657,42 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             menu.addSubMenu (tr ("Sort channels"), sort);
             menu.addItem (tr ("Select unused channels"), [this] { rack.selectUnused(); });
             action (menu, "rack.groupSelected", tr ("Group selected..."));
+            // FL 2026's next part (capture 190mf A4, fl-rack-options-menu.png): Zip selected Alt+Z, Unzip all Alt+U (round 190mk)
+            menu.addSeparator();
+            action (menu, "rack.zipSelected", tr ("Zip selected"), ! engine.getSelectedChannels().empty());
+            action (menu, "rack.unzipAll", tr ("Unzip all"), std::any_of (engine.getSong().channels.begin(), engine.getSong().channels.end(),
+                                                                         [] (const ChannelDef& c) { return c.zipped; }));
             menu.addSectionHeader (tr ("Options")); // (FL's SSMenu: "Mute removed steps" is in its Options part)
+            {
+                // FL's "Channel button width" › 100 % ... 400 %, Custom (N%), Size to fit (round 190mk, DE-39; capture 190mk
+                // A2.1: radio items, before "Channel name alignment")
+                juce::PopupMenu widths;
+                const auto now = ChannelRackComponent::buttonWidthPercent;
+                const auto setWidth = [this] (int percent) {
+                    rack.setButtonWidth (percent);
+                    rack.resized();
+                    saveUiSettings();
+                };
+                for (const auto p : { 100, 200, 300, 400 })
+                    widths.addItem (juce::PopupMenu::Item (juce::String (p) + "%").setTicked (now == p).setAction ([setWidth, p] { setWidth (p); }));
+                const auto custom = now > 0 && now % 100 != 0;
+                widths.addItem (juce::PopupMenu::Item (tr ("Custom ({0}%)", { juce::String (custom ? now : 100) })).setTicked (custom).setAction ([this, setWidth] {
+                    auto* window = new juce::AlertWindow (tr ("Channel button width"), tr ("Width in percent (100 to 400):"), juce::MessageBoxIconType::NoIcon);
+                    window->addTextEditor ("percent", juce::String (juce::jmax (100, ChannelRackComponent::buttonWidthPercent)));
+                    window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+                    window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+                    window->enterModalState (true, juce::ModalCallbackFunction::create ([setWidth, window] (int result) {
+                                                 const auto v = window->getTextEditorContents ("percent").retainCharacters ("0123456789").getIntValue();
+                                                 if (result == 1 && v > 0)
+                                                     setWidth (juce::jlimit (100, 400, v));
+                                             }),
+                                             true);
+                    keepAboveMainWindow (*window);
+                }));
+                widths.addSeparator();
+                widths.addItem (juce::PopupMenu::Item (tr ("Size to fit")).setTicked (now == 0).setAction ([setWidth] { setWidth (0); }));
+                menu.addSubMenu (tr ("Channel button width"), widths);
+            }
             {
                 // FL's "Channel name alignment" › Left / Center (round 190kd; FL 2026: Options, before "Colorful channel controls",
                 // radio items, Center ticked by default)
@@ -4662,6 +4717,12 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             // "Show mixer track selectors"; it was in Settings > General): a row's miniature shows the whole pattern
             menu.addItem (tr ("Show complete piano roll preview"), true, ChannelRackComponent::completePreview.load(), [this] {
                 ChannelRackComponent::completePreview.store (! ChannelRackComponent::completePreview.load());
+                rack.repaint();
+                saveUiSettings();
+            });
+            // FL 2026's next item (capture 190mf A4; round 190mk, DE-33)
+            menu.addItem (tr ("Show a mute button on the piano roll preview"), true, ChannelRackComponent::previewMuteButton, [this] {
+                ChannelRackComponent::previewMuteButton = ! ChannelRackComponent::previewMuteButton;
                 rack.repaint();
                 saveUiSettings();
             });
@@ -5219,7 +5280,9 @@ void MainComponent::toggleRecording()
         return;
     }
 
-    if (! engine.getRecordOptions().askWhatToRecord || ! persistent)
+    // round 190mk (DF-6, FL): Alt+click on Record asks "What would you like to record?" even when the question is off
+    const auto altAsks = juce::ModifierKeys::currentModifiers.isAltDown();
+    if ((! engine.getRecordOptions().askWhatToRecord && ! altAsks) || ! persistent)
     {
         engine.setRecording (true);
         if (engine.getRecordOptions().startsPlayback && ! engine.getTransport().playing.load()) // FL's "Recording starts playback"

@@ -27,6 +27,7 @@
 #include "core/PickerDrop.h"
 #include "core/ChainPresets.h"
 #include "core/ClipLauncher.h"
+#include "ui/ArticulatorTools.h"
 #include "core/SessionKeys.h"
 
 #include "core/EventEdit.h"
@@ -1161,6 +1162,7 @@ PlaylistComponent::PlaylistComponent (AudioEngine& e)
     dropLaneProbe.setComponentID ("simple.dropLane");
     dropLaneProbe.setInterceptsMouseClicks (false, false);
     addChildComponent (dropLaneProbe);
+    addChildComponent (insertMarkLine); // round 190mk (DL-70)
     setWantsKeyboardFocus (false);
     setMouseClickGrabsKeyboardFocus (false);
 
@@ -1892,6 +1894,8 @@ void PlaylistComponent::paint (juce::Graphics& g)
         refreshTrackLayout();
     if (simpleHeaders || dropLaneProbe.isVisible())
         updateDropLaneProbe();
+    if (insertMarkTrack >= 0 || insertMarkLine.isVisible()) // round 190mk (DL-70)
+        updateInsertMarkLine();
 
     const auto& song = engine.getSong();
     const auto grid = gridArea();
@@ -5436,6 +5440,7 @@ std::int64_t PlaylistComponent::snapLine (double tick) const
 void PlaylistComponent::seekTo (int x, bool snapOn)
 {
     const auto tick = juce::jmax (0.0, snapOn ? (double) snapLine (xToTick (x)) : xToTick (x));
+    insertMarkTrack = -1; // (round 190mk: the ruler and the tools move the position elsewhere: Live's marker goes)
 
     if (engine.getSong().mode != PlayMode::song)
         engine.editSong ([] (Song& s) { s.mode = PlayMode::song; }, false);
@@ -7577,7 +7582,21 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
     // round 190jq (issue #191): a pointer click that was not dragged moves the song position (FL's Select tool clears the
     // selection on the press; Live's Arrangement moves the position)
     if (drag == Drag::select && pointerPress && e.getDistanceFromDragStart() < 3)
+    {
         seekTo (e.getMouseDownX(), ! e.mods.isAltDown());
+        // round 190mk (DL-70): Live's insert marker on the clicked lane
+        if (liveArrangeLook())
+            setInsertMark (yToTrack (e.getMouseDownY()), (std::int64_t) std::llround (juce::jmax (0.0, ! e.mods.isAltDown() ? (double) snapLine (xToTick (e.getMouseDownX())) : xToTick (e.getMouseDownX()))));
+    }
+    // round 190mk (DL-70): Live's Arrangement — a click (no drag) of the Select tool on an empty spot of a lane sets the
+    // insert marker there, and the song position with it (Live: playback starts at the insert marker)
+    else if (drag == Drag::select && ! pointerPress && dragClip < 0 && selectionBefore.empty() && liveArrangeLook()
+             && e.getDistanceFromDragStart() < 3 && ! e.mods.isShiftDown() && ! flmods::ctrl (e.mods) && tools.getTool() == EditTool::lasso
+             && gridArea().contains (e.getMouseDownPosition()) && ! projection.isChild (yToTrack (e.getMouseDownY())))
+    {
+        seekTo (e.getMouseDownX(), ! e.mods.isAltDown());
+        setInsertMark (yToTrack (e.getMouseDownY()), (std::int64_t) std::llround (juce::jmax (0.0, ! e.mods.isAltDown() ? (double) snapLine (xToTick (e.getMouseDownX())) : xToTick (e.getMouseDownX()))));
+    }
     pointerPress = false;
     if (drag == Drag::headerSelect && headerCtrlPending)
     {
@@ -7949,6 +7968,58 @@ bool& playlistTallLiveLanes() { return tallLiveLanes; }
 bool PlaylistComponent::liveArrangeLook() const noexcept
 {
     return liveStyle && theme::livelook::active();
+}
+
+// --- round 190mk (DL-70): Live's insert marker ----------------------------------------------------------------------------
+void PlaylistComponent::setInsertMark (int track, std::int64_t tick)
+{
+    insertMarkTrack = track >= 0 && track < numTracks() ? track : -1;
+    insertMarkTick = tick;
+    insertMarkLine.restart();
+    updateInsertMarkLine();
+}
+
+void PlaylistComponent::updateInsertMarkLine()
+{
+    juce::Rectangle<int> line;
+    if (insertMarkTrack >= 0 && insertMarkTrack < numTracks() && insertMarkTick >= 0 && liveArrangeLook() && selection.empty())
+    {
+        const auto height = heightOf (insertMarkTrack) - 2; // (Live: over the lane's 17 px, its 2 px separator below stays)
+        if (height > 0)
+            line = juce::Rectangle<int> ((int) std::floor (tickToX ((double) insertMarkTick)), trackToY (insertMarkTrack), 1, height).getIntersection (gridArea());
+    }
+    if (line.isEmpty())
+    {
+        if (insertMarkLine.isVisible())
+            insertMarkLine.setVisible (false);
+        return;
+    }
+    if (insertMarkLine.getBounds() != line)
+        insertMarkLine.setBounds (line);
+    if (! insertMarkLine.isVisible())
+        insertMarkLine.setVisible (true);
+}
+
+// Live's status bar: "Insert Mark 63.1.1 (Time: 1:29:102)"
+juce::String PlaylistComponent::insertMarkText() const
+{
+    const auto& song = engine.getSong();
+    const auto bar = song.barAt (insertMarkTick);
+    const auto sig = markers::signatureAt (song, insertMarkTick);
+    const auto beat = (std::int64_t) ppq * 4 / juce::jmax (1, sig.second);
+    const auto position = insertmark::positionText (bar.number, insertMarkTick - bar.tick, beat, ticksPerStep);
+    return tr ("Insert Mark {0} (Time: {1})", { juce::String (position), juce::String (insertmark::timeText (song.secondsForTicks (insertMarkTick))) });
+}
+
+bool PlaylistComponent::insertMarkForSnapshot (int track, std::int64_t tick, juce::Rectangle<int>& line, juce::String& hint)
+{
+    setSelection ({});
+    setInsertMark (track, tick);
+    insertMarkLine.setPhaseForSnapshot (0.0);
+    updateInsertMarkLine();
+    line = insertMarkLine.isVisible() ? insertMarkLine.getBounds() : juce::Rectangle<int>();
+    hint = insertMarkTrack >= 0 ? insertMarkText() : juce::String();
+    return ! line.isEmpty();
 }
 
 bool PlaylistComponent::liveHeaders() const
@@ -10684,6 +10755,9 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
             engine.editSong ([targets] (Song& s) { polish::makeClipsUnique (s, targets); });
         });
     else if (clip.kind == ClipKind::automation)
+    {
+        // FL's "Articulator tools" (capture 190mk A5: after Channel settings, before Make unique; round 190mk, DE-115)
+        menu.addSubMenu (tr ("Articulator tools"), articulator::menu (engine, clip.automation, clip.length, *this));
         menu.addItem (tr ("Make unique"), [this, index] {
             engine.editSong ([index] (Song& s) {
                 auto& c = s.playlist[(std::size_t) index];
@@ -10693,6 +10767,7 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
                 c.automation = (int) s.automations.size() - 1;
             });
         });
+    }
     // round 177b: with lanes on, an automation clip can become part of the lane of its target
     if (clip.kind == ClipKind::automation && autolanes::shown() && clip.automation >= 0 && clip.automation < (int) song.automations.size()
         && song.automations[(std::size_t) clip.automation].target.kind != AutomationTargetKind::none)
@@ -13113,6 +13188,9 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
     const gesture::Mods m { mods.isShiftDown(), flmods::ctrl (mods), mods.isAltDown() };
     hint.text = actionHint (gesture::leftAction (tools.getTool(), h.target, m, true), true);
     // round 190jq: the pointer-click switch, and an automation clip lane (nothing is placed there)
+    // round 190mk (DL-70): Live's status bar names the insert marker while the pointer is over the lanes
+    if (h.clip < 0 && insertMarkLine.isVisible() && insertMarkTrack >= 0 && liveArrangeLook())
+        return { insertMarkText(), {} };
     if (h.clip < 0 && ! m.ctrl && ! m.shift && (tools.getTool() == EditTool::pencil || tools.getTool() == EditTool::brush))
     {
         if (projection.isChild (h.track))
