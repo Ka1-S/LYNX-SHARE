@@ -50,7 +50,7 @@ public:
             for (auto& t : taps) t *= (double) M / sum; // unity gain after the zero-stuffing
         }
         firDelay = M > 1 ? firHalf : 0;
-        for (auto& b : ring) b.assign ((std::size_t) std::max (1, (int) taps.size()), 0.0);
+        ring.assign ((std::size_t) std::max (2, 2 * (int) taps.size()), V2 {});
         for (auto& d : line) d.assign ((std::size_t) latency + 1, 0.0f);
         designed = false;
         reset();
@@ -58,12 +58,12 @@ public:
 
     void reset() noexcept
     {
-        for (auto& c : st) for (auto& g : c) for (auto& s : g) s = {};
-        for (auto& c : node) c.fill (0.0);
-        for (auto& c : lfMem) for (auto& m : c) m.fill (0.0);
-        for (auto& b : ring) std::fill (b.begin(), b.end(), 0.0);
+        for (auto& g : st) for (auto& s : g) s = {};
+        for (auto& v : node) v = V2 {};
+        for (auto& g : lfMem) for (auto& v : g) v = V2 {};
+        std::fill (ring.begin(), ring.end(), V2 {});
         for (auto& d : line) std::fill (d.begin(), d.end(), 0.0f);
-        lp = 0; rpc[0] = rpc[1] = 0;
+        lp = 0; rw = 0;
     }
 
     // slider gains (dB, −12 … +12) in the order 31 Hz … 16 kHz
@@ -105,89 +105,89 @@ public:
 
     void process (float* l, float* r, int n) noexcept
     {
-        float* io[2] { l, r };
-        for (int ch = 0; ch < 2; ++ch)
+        // every slider at 0: a plain delay of the whole latency (the reference's), else the rest after the low pass
+        const int dly = flat ? latency : latency - firDelay;
+        int p = lp;
+        for (int i = 0; i < n; ++i)
         {
-            float* x = io[ch];
-            auto& d = line[(std::size_t) ch];
-            int p = lp;
-            // every slider at 0: a plain delay of the whole latency (the reference's), else the rest after the low pass
-            const int dly = flat ? latency : latency - firDelay;
-            for (int i = 0; i < n; ++i)
-            {
-                double y = (double) x[i];
-                if (! flat && M > 1)
-                    y = oversampled (ch, y);
-                else if (! flat)
-                    y = network (ch, y);
-                d[(std::size_t) p] = (float) y;
-                int q = p - dly; if (q < 0) q += latency + 1;
-                x[i] = d[(std::size_t) q];
-                if (++p > latency) p = 0;
-            }
-            if (ch == 1) lp = p;
+            V2 y = { (double) l[i], (double) r[i] };
+            if (! flat)
+                y = M > 1 ? oversampled (y) : network (y);
+            line[0][(std::size_t) p] = (float) y[0];
+            line[1][(std::size_t) p] = (float) y[1];
+            int q = p - dly; if (q < 0) q += latency + 1;
+            l[i] = line[0][(std::size_t) q];
+            r[i] = line[1][(std::size_t) q];
+            if (++p > latency) p = 0;
         }
+        lp = p;
     }
 
 private:
+    using V2 = double __attribute__ ((vector_size (16))); // (left, right)
     struct Sec { double b0 = 0, b1 = 0, b2 = 0, a1 = 0, a2 = 0; };
-    struct State { double s1 = 0, s2 = 0; };
+    struct State { V2 s1 {}, s2 {}; };
 
-    // one sample of the network at M·sr
-    double network (int ch, double x) noexcept
+    // one sample of the network at M·sr, both channels
+    V2 network (V2 x) noexcept
     {
-        double in = x;
+        V2 in = x;
         for (int gi = 0; gi < groups; ++gi)
         {
-            double fwd = 0.0, back = 0.0;
-            const double u0 = node[(std::size_t) ch][(std::size_t) gi]; // the node one sample ago
+            V2 fwd {}, back {};
+            const V2 u0 = node[gi]; // the node one sample ago
             for (int k = 0; k < perGroup; ++k)
             {
                 const auto& c = sec[gi][k];
-                auto& s = st[(std::size_t) ch][(std::size_t) gi][(std::size_t) k];
+                auto& s = st[gi][k];
                 // transposed direct form II
-                const double y = c.b0 * u0 + s.s1;
+                const V2 y = c.b0 * u0 + s.s1;
                 s.s1 = c.b1 * u0 - c.a1 * y + s.s2;
                 s.s2 = c.b2 * u0 - c.a2 * y;
                 fwd += (1.0 - pot[gi][k]) * y;
                 back += pot[gi][k] * y;
             }
-            const double u = in - back;
-            node[(std::size_t) ch][(std::size_t) gi] = u;
+            const V2 u = in - back;
+            node[gi] = u;
             in = u + fwd;
             if (lfOn[gi])
             {
-                auto& m = lfMem[(std::size_t) ch][(std::size_t) gi];
-                const double y = lf[gi][0] * in + lf[gi][1] * m[0] - lf[gi][2] * m[1];
-                m[0] = in; m[1] = y; in = y;
+                const V2 y = lf[gi][0] * in + lf[gi][1] * lfMem[gi][0] - lf[gi][2] * lfMem[gi][1];
+                lfMem[gi][0] = in; lfMem[gi][1] = y; in = y;
             }
         }
         return in;
     }
 
-    double oversampled (int ch, double x) noexcept
+    V2 oversampled (V2 x) noexcept
     {
-        auto& b = ring[(std::size_t) ch];
-        const int L = (int) taps.size();
-        int p = rpc[ch];
-        double acc = 0.0;
+        // the ring holds every sub-sample twice (at w and w + L) so the last L are always contiguous: [w + 1, w + L]
+        V2* b = ring.data();
+        const int L = (int) taps.size(), H = (L - 1) / 2;
+        V2 acc {};
         for (int m = 0; m < M; ++m)
         {
-            b[(std::size_t) p] = network (ch, m == 0 ? x : 0.0);
-            if (++p == L) p = 0;
+            const V2 y = network (m == 0 ? x : V2 {});
+            if (++rw == L) rw = 0;
+            b[rw] = b[rw + L] = y;
             if (m == 0)
             {
-                // the low pass's output on the base sample's own sub-sample (the newest; p = the oldest): an integer
-                // delay of half the taps = firHalf base samples
-                int q = p;
-                for (int t = L - 1; t >= 0; --t)
+                // the low pass's output on the base sample's own sub-sample (the newest): an integer delay of half the
+                // taps = firHalf base samples; the taps are symmetric (folded), two partial sums
+                const V2* c = b + rw + 1 + H; // the centre of the window
+                const double* t = taps.data();
+                V2 a0 = t[H] * c[0], a1 {};
+                int k = 1;
+                for (; k + 1 <= H; k += 2)
                 {
-                    acc += taps[(std::size_t) t] * b[(std::size_t) q];
-                    if (++q == L) q = 0;
+                    a0 += t[H - k] * (c[-k] + c[k]);
+                    a1 += t[H - k - 1] * (c[-k - 1] + c[k + 1]);
                 }
+                for (; k <= H; ++k)
+                    a0 += t[H - k] * (c[-k] + c[k]);
+                acc = a0 + a1;
             }
         }
-        rpc[ch] = p;
         return acc;
     }
 
@@ -195,17 +195,17 @@ private:
     static constexpr int firHalf = 40; // base samples (of the 65)
     int M = 4, firDelay = firHalf;
     std::vector<double> taps;
-    std::array<std::vector<double>, 2> ring;
+    std::vector<V2> ring;
     std::array<std::vector<float>, 2> line;
-    int lp = 0, rpc[2] {};
+    int lp = 0, rw = 0;
     Sec sec[groups][perGroup];
     double pot[groups][perGroup] {};
-    std::array<std::array<std::array<State, perGroup>, groups>, 2> st {};
-    std::array<std::array<double, groups>, 2> node {};
+    State st[groups][perGroup] {};
+    V2 node[groups] {};
     double gains[10] {};
     double lf[groups][3] {};
     bool lfOn[groups] {};
-    std::array<std::array<std::array<double, 2>, groups>, 2> lfMem {};
+    V2 lfMem[groups][2] {};
     bool designed = false, flat = true;
 };
 } // namespace lynx::api560
