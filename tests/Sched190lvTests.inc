@@ -261,3 +261,36 @@ TEST (sched190lv_live_controller_refusals_stay_piece_by_piece)
         check ("empty source slot", s);
     }
 }
+
+TEST (sched190lv_a_block_of_too_many_pieces_still_plays)
+{
+    // pattern events every 2 ticks for a beat (about ten per 480-sample block): more than maxPieces pieces. Such a block
+    // is not batched and plays piece by piece — before round 190lv it was counted and not rendered at all
+    using namespace lynx;
+    const sched190lv::Guard guard;
+    for (const auto live : { false, true })
+    {
+        auto s = live ? sched190lv::song() : sched190kz::song (false);
+        PatternEvents lane;
+        lane.target = { AutomationTargetKind::mixerVolume, 12, 0, 0 };
+        for (int i = 0; i < ppq / 2; ++i)
+            lane.events.push_back ({ (std::int64_t) i * 2, i % 2 == 0 ? 0.3f : 0.9f });
+        s.patterns[0].events.push_back (lane);
+        const auto alone = sched190lv::render (s, 480, 0, "rounds=block,live=1");
+        const auto perPiece = sched190lv::render (s, 480, 3, "rounds=chunk,live=1");
+        const auto batched = sched190lv::render (s, 480, 3, "rounds=block,live=1");
+        CHECK (perPiece.samples == alone.samples);
+        CHECK (batched.samples == alone.samples);
+        CHECK (batched.batched > 0);
+        auto state = RackState::build (s, nullptr, 48000.0);
+        WorkerPool workers (3);
+        RackRenderer r;
+        r.prepare (48000.0, 512);
+        r.setWorkerPool (&workers);
+        std::vector<float> l (480), rr (480);
+        const auto tps = ticksPerSample (s.bpm, 48000.0);
+        for (int b = 0; b < 100; ++b)
+            r.process (state.get(), true, b * 480 * tps, 480, l.data(), rr.data());
+        CHECK (r.batchRefusedCount (RackRenderer::BatchRefusal::manyPieces) > 0);
+    }
+}
