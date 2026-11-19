@@ -72,9 +72,26 @@ FL's 24-byte note record has no shift field: a shifted step is a note whose posi
 step it belongs to is the one its position falls in). The hint shows the shift as the part of a step ("0.00"). Note
 pitch is the note's key (0…131; C5 = 60).
 
-## 5. Behaviour checks (FL render, round 190ma)
+## 5. Behaviour checks (FL renders, round 190ma) [EXEC]
 
-See section 7 (filled in after the FL renders).
+Test projects written by LYNX's .flp export with the repeat bytes patched (sampler with a 4 ms click, 120 BPM), rendered
+with `FL64 /R /Ewav`, onsets measured (work folder /mnt/e/lynx-work/issues208_190ma/rep):
+
+- One note per bar, 24 cases (every index 0…14 on a one-beat note, step notes, 1/8, 1/4, 2 and 4 beats, lengths that
+  are not a multiple of the rate): FL strikes at start + k × interval while k × interval < the note's length, every strike
+  at the note's velocity. A rate equal to or slower than the note gives one strike. PPQ 96 and PPQ 960 files give the same
+  strikes (the byte is an index, not ticks).
+- Index 15 (outside FL's table; FL's UI never writes it) plays like index 9 in FL. LYNX imports anything above 14 as no
+  repeat.
+- 16 step notes with shift 0…23 ticks (PPQ 96), keys 48…78 and repeats 0…14: FL plays each step at its shifted position
+  for one step, its repeats inside that step.
+- LYNX (renderwav, this branch) on the same files: 23 of 24 bars with the same strike count and onsets within 0.1 ms
+  (the 24th is index 15), and the 30 step onsets within 0.07 ms.
+
+FL's graph editor (shots raw/fl-note.png, fl-shift.png, fl-rep.png): Note pitch is a small piano roll (C rows named,
+each step a block named with its key); Shift draws bars from the bottom; Repeat draws a block at the rate's height,
+1/16 (no second strike in a step) at the bottom, with one line per extra strike in a step; slower rates draw nothing.
+The hint bar shows "Repeat 1/32 (Half step)".
 
 ## 6. Issue #209: the Plugin picker's first opening [EXEC]
 
