@@ -88,5 +88,24 @@ sample-accurate LYNX network would need those lengths and gains: reading them ou
 full FDN of that size from impulse responses is a research project beyond this round's time box. Stopped here (the
 brief's acceptable result); no reverb code changed.
 
-## 6. Results (bank wv190mm, masked; before = round 190mm's final)
-See the HANDOFF for the final table, CPU and gold counts.
+## 6. Results (bank wv190mm, masked; before = round 190mm's final binary and scores)
+| reference → LYNX | files | before → after | up / same / down |
+|---|---|---|---|
+| SSL G-Channel → Ridge Strip (+ G EQ law) | 25 | 6.44 → 8.20 | 17 / 8 / 0 |
+| Q10 → Facet EQ (Bell / PQ-Bell laws) | 25 | 9.68 → 10.00 | 5 / 20 / 0 |
+| API-560 → Facet EQ (API-560 law) | 25 | 8.44 → 9.72 | 19 / 6 / 0 |
+| Renaissance Channel → Compressor (RVox type, gate) | 25 | 5.96 → 6.80 | 5 / 20 / 0 |
+| the other 12 wv190mm tags, the 21 refcap182 Waves tags | 835 | same | 0 down |
+
+## 7. Gates
+- Gold (lab/gold190mt.sh, round 190mm's final binary vs this round's): Facet (default, bands, cuts, dynamics, natural
+  phase, PuigTec, Pro-Q 4, REQ 6, API-550A, and the params round 190mm's Q10 / API-560 translations stored), Ridge Strip
+  (default, SSL E-Channel ×2, the stored SSL G params, the omni law), Compressor (default, vintage, RComp ×2, RVox, RChannel
+  X1, the stored RChannel X3 / X4 params) × 44.1 / 48 / 96 kHz × 3 signals: 234 renders, 0 mismatches.
+- CPU (lab/cpu190mt.sh, 35 s stereo mix at 48 kHz, best of 5 wall clock, one core, load ≈ 5; a plain copy 0.60 … 0.76 s):
+  API-560 X1 / X3 0.62 / 0.61 → 0.91 / 0.86 s (the 4× network + decimator, both channels as one vector: ≈ 0.8 % of a core
+  more than round 190mm's Facet bands); SSL G X1 / X3 0.77 / 0.94 → 0.80 / 0.67, Q10 X1 0.99 → 0.58, RChannel X3 / X4
+  0.66 / 0.62 → 0.58 / 0.59 s (same cost within the noise).
+- Tests: tests/Parity190mtTests.inc (7: the laws hidden / inert / saved only while set, their shapes, the translators,
+  API-560's 65-sample latency at 44.1 / 48 / 96 kHz and its plain delay when flat, the gate); mini runner 544 657 checks,
+  0 failures.
