@@ -11460,3 +11460,10 @@ countries: jp
 "Selecting points: {0}  [Shift] adds" = "ポイントを選択中: {0}  [Shift] 追加"
 "Moving {0} point(s): then [Shift] keeps time  [Ctrl] keeps value  [Alt] no snap" = "{0} 個のポイントを移動中: その後 [Shift] 時間を固定  [Ctrl] 値を固定  [Alt] スナップなし"
 "Pen: drag draws the curve freehand, thinned when you let go  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "ペン: ドラッグでカーブをフリーハンド描画（離すと間引き）  [選択ツール] ドラッグでポイント選択  [Del] 削除  [Ctrl+C/V] コピー、貼り付け"
+
+# --- rollup 0.1.30 step 10: Save a copy for 0.1.28 knows rounds 190lp / 190kw-190lz / 190ly
+"Echoform's ValhallaDelay loop law (the ValhallaDelay stand-in) plays as its own echo: {0}" = "Echoform の ValhallaDelay ループ則（ValhallaDelay の代替）は独自のエコーとして再生されます: {0}"
+"LuxeVerb's Space engine plays its earlier version (not the Pro-R 2 laws): {0}" = "LuxeVerb の Space エンジンは以前のバージョンで再生されます（Pro-R 2 の則ではありません）: {0}"
+"Apex Limiter's styles play their earlier fitted laws (not the reference's): {0}" = "Apex Limiter のスタイルは以前のフィット則で再生されます（リファレンスのものではありません）: {0}"
+"Sentry Gate plays its earlier measured gate (not the reference's): {0}" = "Sentry Gate は以前の測定ゲートで再生されます（リファレンスのものではありません）: {0}"
+"Spiral Echo's Measured loop plays its earlier phase at sample rates other than 48 kHz: {0}" = "Spiral Echo の Measured ループは 48 kHz 以外のサンプルレートで以前の位相で再生されます: {0}"

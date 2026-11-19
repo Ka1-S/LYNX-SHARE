@@ -11460,3 +11460,10 @@ countries: tr
 "Selecting points: {0}  [Shift] adds" = "Noktalar seçiliyor: {0}  [Shift] ekler"
 "Moving {0} point(s): then [Shift] keeps time  [Ctrl] keeps value  [Alt] no snap" = "{0} nokta taşınıyor: sonra [Shift] zamanı korur  [Ctrl] değeri korur  [Alt] yapışma yok"
 "Pen: drag draws the curve freehand, thinned when you let go  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "Kalem: sürükle eğriyi serbest çizer, bırakınca sadeleşir  [Seçim aracı] sürükle nokta seçer  [Del] siler  [Ctrl+C/V] kopyala, yapıştır"
+
+# --- rollup 0.1.30 step 10: Save a copy for 0.1.28 knows rounds 190lp / 190kw-190lz / 190ly
+"Echoform's ValhallaDelay loop law (the ValhallaDelay stand-in) plays as its own echo: {0}" = "Echoform'un ValhallaDelay döngü yasası (ValhallaDelay yerine geçen) kendi ekosu olarak çalar: {0}"
+"LuxeVerb's Space engine plays its earlier version (not the Pro-R 2 laws): {0}" = "LuxeVerb'ün Space motoru önceki sürümünü çalar (Pro-R 2 yasalarını değil): {0}"
+"Apex Limiter's styles play their earlier fitted laws (not the reference's): {0}" = "Apex Limiter'ın stilleri önceki uydurulmuş yasalarını çalar (referansınkileri değil): {0}"
+"Sentry Gate plays its earlier measured gate (not the reference's): {0}" = "Sentry Gate önceki ölçülmüş kapısını çalar (referansınkini değil): {0}"
+"Spiral Echo's Measured loop plays its earlier phase at sample rates other than 48 kHz: {0}" = "Spiral Echo'nun Measured döngüsü 48 kHz dışındaki örnekleme hızlarında önceki fazını çalar: {0}"

@@ -237,6 +237,7 @@
 #include "core/EventEdit.h"
 #include "core/FacetEq.h"
 #include "core/LimiterLaw.h" // (rollup step 9: the copy for 0.1.28 self-test)
+#include "core/ApexLimiter.h" // (rollup step 10: likewise)
 #include "core/Reeverb2.h"
 #include "core/VoiceTools.h"
 #include "platform/ThreadInstructions.h" // (rollup step 9: --paintbench counts instructions)
@@ -6911,6 +6912,28 @@ private:
                 hit.key = 67;
                 song.patterns[0].notes.push_back (hit);
             }
+            // rollup step 10 (round 190me): a new Apex Limiter and Sentry Gate (round 190lp's revision 1), a LuxeVerb on its
+            // Space engine (revision 1, round 190kw / 190lz), an Echoform on round 190ly's ValhallaDelay law, a new Spiral Echo
+            // on the Measured law (round 190ly's rate law) and a scene follow action (round 190lr)
+            {
+                auto& m17 = song.mixer[17].effects;
+                m17.push_back (lynx::makeEffectSlot (lynx::EffectKind::apexLimiter)); // [0]
+                m17.push_back (lynx::makeEffectSlot (lynx::EffectKind::sentryGate)); // [1]
+                auto luxe = lynx::makeEffectSlot (lynx::EffectKind::luxeVerb);
+                luxe.params[(std::size_t) lynx::luxeVerbSpaceFirst] = 1.0f;
+                m17.push_back (luxe); // [2]
+                auto valhalla = lynx::makeEffectSlot (lynx::EffectKind::echoform);
+                valhalla.params[(std::size_t) lynx::echosuite::echoform::valhallaLaw] = 1.0f;
+                m17.push_back (valhalla); // [3]
+                auto spiral = lynx::makeEffectSlot (lynx::EffectKind::spiralEcho);
+                spiral.params[(std::size_t) lynx::echosuite::spiral::law] = 1.0f;
+                m17.push_back (spiral); // [4]
+                if (! song.clipGrid)
+                    song.clipGrid.emplace();
+                if (song.clipGrid->scenes.empty())
+                    song.clipGrid->scenes.emplace_back();
+                song.clipGrid->scenes[0].follow.enabled = true;
+            }
 
             const auto copy = lynx::olderlynx::forRelease (song, "0.1.28");
             juce::String why;
@@ -7037,6 +7060,13 @@ private:
                      || m16[9]["params"].size() > lynx::reeverb2DirectLaw || m16[10]["params"].size() > lynx::voicetools::quell::zeroLaw
                      || m16[11]["params"].size() > lynx::facet::autoThresholdParam0 || m16[12]["params"].size() > lynx::echosuite::echoform::revision)
                 rollup030Result = "ERROR step-9 items";
+            else if (const auto& m17 = parsed["mixer"][17]["effects"];
+                     ! said ("Apex Limiter's styles") || ! said ("Sentry Gate plays its earlier") || ! said ("LuxeVerb's Space engine plays")
+                     || ! said ("Echoform's ValhallaDelay loop law") || ! said ("Spiral Echo's Measured loop") || ! said ("{0} scene follow action")
+                     || m17[0]["params"].size() > lynx::apex::pRevision || m17[1]["params"].size() > (int) lynx::dyn::sentry::revision
+                     || m17[2]["params"].size() > lynx::luxeVerbSpaceDucking || m17[3]["params"].size() > lynx::echosuite::echoform::revision
+                     || m17[4]["params"].size() > (int) lynx::echosuite::spiral::rateLaw || parsed["clipGrid"]["scenes"][0].hasProperty ("follow"))
+                rollup030Result = "ERROR step-10 items";
             else if (const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.28");
                      ! plain.ok || std::any_of (plain.lost.begin(), plain.lost.end(), [] (const lynx::olderlynx::Loss& l) {
                          const auto t = juce::String (l.text);
@@ -7050,7 +7080,8 @@ private:
                                 || t.contains ("Peak Controller") || t.contains ("console law") || t.startsWith ("Mixer lock") || t.contains ("take lane")
                                 || t.contains ("Crest") || t.startsWith ("Lock states") || t.startsWith ("Ember") || t.startsWith ("Prism")
                                 || t.contains ("L2 law") || t.startsWith ("Glow") || t.startsWith ("Reeverb 2") || t.startsWith ("Quell")
-                                || t.contains ("audio clip channels");
+                                || t.contains ("audio clip channels") || t.startsWith ("Apex") || t.startsWith ("Sentry") || t.startsWith ("Spiral")
+                                || t.contains ("scene follow");
                      }))
                 rollup030Result = "ERROR a plain project reports a loss it does not have";
         }

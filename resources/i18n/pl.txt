@@ -11460,3 +11460,10 @@ countries: pl
 "Selecting points: {0}  [Shift] adds" = "Zaznaczanie punktów: {0}  [Shift] dodaje"
 "Moving {0} point(s): then [Shift] keeps time  [Ctrl] keeps value  [Alt] no snap" = "Przesuwanie {0} punktów: potem [Shift] zachowuje czas  [Ctrl] zachowuje wartość  [Alt] bez przyciągania"
 "Pen: drag draws the curve freehand, thinned when you let go  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "Pióro: przeciągnij rysuje krzywą odręcznie, upraszczaną po puszczeniu  [narzędzie Zaznacz] przeciągnij zaznacza punkty  [Del] usuwa je  [Ctrl+C/V] kopiuj, wklej"
+
+# --- rollup 0.1.30 step 10: Save a copy for 0.1.28 knows rounds 190lp / 190kw-190lz / 190ly
+"Echoform's ValhallaDelay loop law (the ValhallaDelay stand-in) plays as its own echo: {0}" = "Prawo pętli ValhallaDelay w Echoform (zamiennik ValhallaDelay) gra jako jego własne echo: {0}"
+"LuxeVerb's Space engine plays its earlier version (not the Pro-R 2 laws): {0}" = "Silnik Space w LuxeVerb gra swoją wcześniejszą wersję (nie prawa Pro-R 2): {0}"
+"Apex Limiter's styles play their earlier fitted laws (not the reference's): {0}" = "Style Apex Limiter grają swoje wcześniejsze dopasowane prawa (nie te z referencji): {0}"
+"Sentry Gate plays its earlier measured gate (not the reference's): {0}" = "Sentry Gate gra swoją wcześniejszą zmierzoną bramkę (nie tę z referencji): {0}"
+"Spiral Echo's Measured loop plays its earlier phase at sample rates other than 48 kHz: {0}" = "Pętla Measured w Spiral Echo gra swoją wcześniejszą fazę przy częstotliwościach próbkowania innych niż 48 kHz: {0}"

@@ -2,6 +2,7 @@
 
 #include "engine/ProjectFile.h"
 
+#include "core/ApexLimiter.h"
 #include "core/DirectWaveState.h"
 #include "core/DynamicsSuite.h"
 #include "core/EchoSuite.h"
@@ -274,7 +275,7 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
     // effects (round 190ho): Voice Shift's Measured law revision 1, Ridge Strip's 4K Pink EQ; (round 190iq) Hush De-esser's
     // measured Allround timing (hidden parameters 0.1.28 ignores: it plays revision 0, Black, and the earlier timing)
     {
-        juce::StringArray thump, pink, consoleFilters, lineLaw, hybridLoop, hushTiming, hushVocal, echoVoicings, latticeTaps, luxeDucking, verbRevisions;
+        juce::StringArray thump, pink, consoleFilters, lineLaw, hybridLoop, valhallaLoop, luxeSpace, hushTiming, hushVocal, echoVoicings, latticeTaps, luxeDucking, verbRevisions;
         forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
             auto* params = arrayOf (e.getProperty ("params"));
             if (params == nullptr) // (a slot written without parameters)
@@ -320,6 +321,9 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
                 // hybrid engine on)
                 if (params->size() > echosuite::echoform::hybridLaw && (float) (double) (*params)[echosuite::echoform::hybridLaw] >= 0.5f)
                     addOnce (hybridLoop, where);
+                // rollup step 10: round 190ly's ValhallaDelay loop law (set only by a translated ValhallaDelay; without a voicing)
+                if (params->size() > echosuite::echoform::valhallaLaw && (float) (double) (*params)[echosuite::echoform::valhallaLaw] >= 0.5f)
+                    addOnce (valhallaLoop, where);
                 params->removeRange (echosuite::echoform::revision, params->size() - echosuite::echoform::revision);
             }
             else if (kind == "latticeMod" && params->size() > echosuite::lattice::revision)
@@ -332,6 +336,11 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             {
                 if ((float) (double) (*params)[luxeVerbSpaceDucking] > 0.0f)
                     addOnce (luxeDucking, where);
+                // rollup step 10: round 190kw / 190lp / 190lz's Space engine revision 1 (every new LuxeVerb; heard only with
+                // the Space engine on) and its Stereo Width past 100 % go with it
+                if (params->size() > luxeVerbSpaceRevision && (float) (double) (*params)[luxeVerbSpaceRevision] >= 0.5f
+                    && (float) (double) (*params)[luxeVerbSpaceFirst] >= 0.5f)
+                    addOnce (luxeSpace, where);
                 params->removeRange (luxeVerbSpaceDucking, params->size() - luxeVerbSpaceDucking);
             }
             else
@@ -357,6 +366,10 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("Ridge Strip's measured SSL 4K G / 4K E filters and its 32C voicing are left out: {0}"), listOf (consoleFilters), true });
         if (! lineLaw.isEmpty())
             lost.push_back ({ TR_NOOP ("Echoform's Timeless 3 line law plays as its own echo: {0}"), listOf (lineLaw), true });
+        if (! valhallaLoop.isEmpty())
+            lost.push_back ({ TR_NOOP ("Echoform's ValhallaDelay loop law (the ValhallaDelay stand-in) plays as its own echo: {0}"), listOf (valhallaLoop), true });
+        if (! luxeSpace.isEmpty())
+            lost.push_back ({ TR_NOOP ("LuxeVerb's Space engine plays its earlier version (not the Pro-R 2 laws): {0}"), listOf (luxeSpace), true });
         if (! hybridLoop.isEmpty())
             lost.push_back ({ TR_NOOP ("Echoform's H-Delay loop law (the Waves H-Delay stand-in) plays as its plain hybrid echo: {0}"), listOf (hybridLoop), true });
         if (! hushTiming.isEmpty())
@@ -800,6 +813,49 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("Reeverb 2's measured direct sound (the Waves TrueVerb stand-in) is left out: {0}"), listOf (direct), true });
         if (! zero.isEmpty())
             lost.push_back ({ TR_NOOP ("Quell's zero law (the Waves NS1 stand-in) is left out: its lowest Amount settings play the matched engine: {0}"), listOf (zero), true });
+    }
+
+    // rollup step 10: round 190lp's black-box revision 1 of Apex Limiter (Pro-L 2) and Sentry Gate (Pro-G), every new one
+    // (hidden, past the slot's count), and round 190ly's rate law of Spiral Echo (every new one; heard with Law = Measured
+    // at rates other than 48 kHz). Round 190lp's Crest Smooth / Op-El are part of Crest's revision 1 (its line above), round
+    // 190ls / 190ly's Atrium dense tank and Epoch's short-decay trim part of the reverbs' revision (the Measured law's line)
+    {
+        juce::StringArray apexLaws, sentryLaws, spiralRate;
+        forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
+            auto* params = arrayOf (e.getProperty ("params"));
+            if (params == nullptr)
+                return;
+            const auto kind = e.getProperty ("kind").toString();
+            const auto at = [params] (int i) { return i < params->size() ? (float) (double) (*params)[i] : 0.0f; };
+            const auto cutFrom = [params] (int from) {
+                if (params->size() > from)
+                    params->removeRange (from, params->size() - from);
+            };
+            if (kind == "apexLimiter")
+            {
+                if (at (apex::pRevision) >= 0.5f)
+                    addOnce (apexLaws, where);
+                cutFrom (apex::pRevision);
+            }
+            else if (kind == "sentryGate")
+            {
+                if (at (dyn::sentry::revision) >= 0.5f)
+                    addOnce (sentryLaws, where);
+                cutFrom (dyn::sentry::revision);
+            }
+            else if (kind == "spiralEcho")
+            {
+                if (at (echosuite::spiral::rateLaw) >= 0.5f && at (echosuite::spiral::law) >= 0.5f)
+                    addOnce (spiralRate, where);
+                cutFrom (echosuite::spiral::rateLaw);
+            }
+        });
+        if (! apexLaws.isEmpty())
+            lost.push_back ({ TR_NOOP ("Apex Limiter's styles play their earlier fitted laws (not the reference's): {0}"), listOf (apexLaws), true });
+        if (! sentryLaws.isEmpty())
+            lost.push_back ({ TR_NOOP ("Sentry Gate plays its earlier measured gate (not the reference's): {0}"), listOf (sentryLaws), true });
+        if (! spiralRate.isEmpty())
+            lost.push_back ({ TR_NOOP ("Spiral Echo's Measured loop plays its earlier phase at sample rates other than 48 kHz: {0}"), listOf (spiralRate), true });
     }
 
     // rollup step 9, round 190lq (issue #204): a channel's notes on an audio clip channel play as the channel's Sampler

@@ -11460,3 +11460,10 @@ countries: tw hk mo
 "Selecting points: {0}  [Shift] adds" = "正在選取點：{0}  [Shift] 加入"
 "Moving {0} point(s): then [Shift] keeps time  [Ctrl] keeps value  [Alt] no snap" = "正在移動 {0} 個點：然後 [Shift] 保持時間  [Ctrl] 保持數值  [Alt] 不吸附"
 "Pen: drag draws the curve freehand, thinned when you let go  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "畫筆：拖曳徒手繪製曲線，放開時精簡  [選取工具] 拖曳選取點  [Del] 刪除  [Ctrl+C/V] 複製、貼上"
+
+# --- rollup 0.1.30 step 10: Save a copy for 0.1.28 knows rounds 190lp / 190kw-190lz / 190ly
+"Echoform's ValhallaDelay loop law (the ValhallaDelay stand-in) plays as its own echo: {0}" = "Echoform 的 ValhallaDelay 迴路規律（ValhallaDelay 的替代）按其自身的回聲播放：{0}"
+"LuxeVerb's Space engine plays its earlier version (not the Pro-R 2 laws): {0}" = "LuxeVerb 的 Space 引擎按其早期版本播放（不是 Pro-R 2 的規律）：{0}"
+"Apex Limiter's styles play their earlier fitted laws (not the reference's): {0}" = "Apex Limiter 的風格按其早期擬合規律播放（不是參考的規律）：{0}"
+"Sentry Gate plays its earlier measured gate (not the reference's): {0}" = "Sentry Gate 按其早期測量的門播放（不是參考的門）：{0}"
+"Spiral Echo's Measured loop plays its earlier phase at sample rates other than 48 kHz: {0}" = "Spiral Echo 的 Measured 迴路在 48 kHz 以外的取樣率下按其早期相位播放：{0}"

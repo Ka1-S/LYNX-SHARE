@@ -11460,3 +11460,10 @@ countries: es mx ar co cl pe ve
 "Selecting points: {0}  [Shift] adds" = "Seleccionando puntos: {0}  [Mayús] añade"
 "Moving {0} point(s): then [Shift] keeps time  [Ctrl] keeps value  [Alt] no snap" = "Moviendo {0} punto(s): luego [Mayús] mantiene el tiempo  [Ctrl] mantiene el valor  [Alt] sin ajuste"
 "Pen: drag draws the curve freehand, thinned when you let go  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste" = "Lápiz: arrastrar dibuja la curva a mano alzada, simplificada al soltar  [herramienta Selección] arrastrar selecciona puntos  [Supr] los borra  [Ctrl+C/V] copiar, pegar"
+
+# --- rollup 0.1.30 step 10: Save a copy for 0.1.28 knows rounds 190lp / 190kw-190lz / 190ly
+"Echoform's ValhallaDelay loop law (the ValhallaDelay stand-in) plays as its own echo: {0}" = "La ley de bucle ValhallaDelay de Echoform (el sustituto de ValhallaDelay) suena como su propio eco: {0}"
+"LuxeVerb's Space engine plays its earlier version (not the Pro-R 2 laws): {0}" = "El motor Space de LuxeVerb suena con su versión anterior (no las leyes de Pro-R 2): {0}"
+"Apex Limiter's styles play their earlier fitted laws (not the reference's): {0}" = "Los estilos de Apex Limiter suenan con sus leyes ajustadas anteriores (no las de la referencia): {0}"
+"Sentry Gate plays its earlier measured gate (not the reference's): {0}" = "Sentry Gate suena con su puerta medida anterior (no la de la referencia): {0}"
+"Spiral Echo's Measured loop plays its earlier phase at sample rates other than 48 kHz: {0}" = "El bucle Measured de Spiral Echo suena con su fase anterior a frecuencias de muestreo distintas de 48 kHz: {0}"
