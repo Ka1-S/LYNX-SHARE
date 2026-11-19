@@ -116,7 +116,16 @@ constexpr int puigLawParam = dispersionCountParam + 3;
 // other band keep their behaviour.
 constexpr int wavesLawParam = puigLawParam + 1;
 constexpr int wavesBandParam0 = wavesLawParam + 1; // + band
-constexpr int storedParamCount = wavesBandParam0 + bands;
+// round 190mt (REA_rodada190mt §4), hidden like the above (saved while non-zero; 0 = every older project, bit for bit): [139]
+// (rollup 0.1.30 step 13: after the Waves design law's codes [131 … 138]; 135 on round 190mt's base)
+// the API-560 law (1 = on; set only by the Waves API-560 translator) and [140 + k] slider k's gain (31 Hz … 16 kHz,
+// (dB + 12) / 24). With the law on, Facet's bands are not run: core/Api560.h's graphic-EQ network (oversampled, a
+// linear-phase decimator) plays the ten sliders, 65 samples late at every rate (reported to PDC).
+constexpr int api560LawParam = wavesBandParam0 + bands;
+constexpr int api560GainParam0 = api560LawParam + 1; // + slider (10)
+constexpr int storedParamCount = api560GainParam0 + 10;
+float api560GainValue (double db) noexcept; // −12 … +12 dB -> 0 … 1
+double api560GainDb (float v) noexcept;
 // the band design codes of the Waves law
 enum class WaveCode
 {
@@ -134,6 +143,13 @@ enum class WaveCode
     highShelf1 = 11,
     butterHighPass = 12, // Q10 cuts: 12 dB/oct Butterworth, bilinear
     butterLowPass = 13,
+    // round 190mt: the Q10 bell's exact law (REA_rodada190mt §3): the cookbook section with alpha = tan (min (π f / (Q fs),
+    // π / 4)) / (0.090904 (√G + 1/√G)) (Q = the Q10's Q; Q field = Q / 4) — the bandwidth follows f / Q up to fs / 4 and is
+    // capped there (wide bands above 3 kHz). Set by the Q10 translator; code 2 keeps round 190mm's law for its projects
+    q10BellTan = 14,
+    // round 190mt: the Q10 PQ-Bell's law (REA_rodada190mt §3): the same section with alpha = θ (1 + β θ²) / k, θ as above,
+    // k = round 190mm's constant-Q factor and β fitted every 1.5 dB on our probes; code 3 keeps round 190mm's law
+    q10PqBellX = 15,
     count
 };
 int waveCode (float v) noexcept;           // 0 … count - 1

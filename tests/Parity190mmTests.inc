@@ -91,7 +91,7 @@ TEST (parity190mm_req_q10_api_and_ssl_g_translate)
     // Q10: band 5 in, PQ bell +5 dB at 500 Hz
     auto q = parity190jh::waves ("Q10 Stereo", "Q10", parity190jh::list (122, { { 20, "1" }, { 21, "5" }, { 22, "5" }, { 23, "500" }, { 24, "1" },
         { 48, "16000" } }), n);
-    CHECK (q.kind == EffectKind::facetEq && facet::waveCode (q.params[(std::size_t) facet::wavesBandParam0]) == (int) facet::WaveCode::q10PqBell);
+    CHECK (q.kind == EffectKind::facetEq && facet::waveCode (q.params[(std::size_t) facet::wavesBandParam0]) == (int) facet::WaveCode::q10PqBellX); // round 190mt: the PQ-Bell's own law (code 3 kept for 190mm's projects)
     CHECK (std::abs (parity190mm::peakDb (q, 500.0) - 5.0) < 0.1);
     // API-550A: mid −4 dB at 0.4 kHz -> one fitted band at the position, plus the flat response's two
     auto a = parity190jh::waves ("API-550A Stereo", "API-550", parity190jh::list (26, { { 2, "50" }, { 3, "-4" }, { 4, "0.4" }, { 6, "5" }, { 9, "1" }, { 17, "30" }, { 18, "75" }, { 19, "1.5" } }), n);

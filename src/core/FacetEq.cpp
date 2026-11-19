@@ -1,4 +1,5 @@
 #include "core/FacetEq.h"
+#include "core/Api560.h"
 
 #include <algorithm>
 #include <atomic>
@@ -836,6 +837,7 @@ public:
             mode = phase ((*initial)[(std::size_t) phaseParam]);
             allocRes = resolution ((*initial)[(std::size_t) resolutionParam]);
             puigNow = puigLaw ((*initial)[(std::size_t) puigLawParam]); // round 190mg: its latency known from the start
+            api560Now = (*initial)[(std::size_t) api560LawParam] >= 0.5f; // round 190mt: likewise
             initialParams = *initial;
             haveInitial = true;
         }
@@ -878,6 +880,7 @@ public:
             spectral.configure (q, attackMs (q[(std::size_t) attackParam]), releaseMs (q[(std::size_t) releaseParam]));
         }
         if (puigNow > 0) puigStage.configure (puigNow, sr); // round 190mg
+        api560.prepare (sr); // round 190mt (small; ready if the law is switched on later)
         configureMode (mode);
         reset();
     }
@@ -902,6 +905,7 @@ public:
         powSrc = powTgt = 0.0;
         tgtGain = 1.0f;
         if (puigNow > 0) puigStage.reset();
+        api560.reset(); // round 190mt
     }
 
     void setSidechain (const float* left, const float* right) noexcept override
@@ -964,7 +968,12 @@ public:
             spectral.pushDetector (dl, dr, n);
 
         constexpr int chunk = 32;
-        for (int off = 0; off < n; off += chunk)
+        if (api560Now) // round 190mt: the API-560 law plays the sliders instead of Facet's bands
+        {
+            api560.set (api560Gains); // (re-designs only when a slider or the rate changed)
+            api560.process (left, right, n);
+        }
+        for (int off = 0; off < (api560Now ? 0 : n); off += chunk)
         {
             const int m = std::min (chunk, n - off);
             if (anyDynamic)
@@ -1091,7 +1100,8 @@ private:
     // round 152: the phase mode's latency plus the spectral stage's when a band is spectral
     void storeLatency() noexcept
     {
-        latencyNow.store (latencyFor (mode, sampleRate, allocRes) + (spectral.active() ? spectral.latency() : 0) + (puigNow > 0 ? puigLatency : 0),
+        latencyNow.store (latencyFor (mode, sampleRate, allocRes) + (spectral.active() ? spectral.latency() : 0) + (puigNow > 0 ? puigLatency : 0)
+                          + (api560Now ? api560::latency : 0), // round 190mt
                           std::memory_order_relaxed);
     }
 
@@ -1208,6 +1218,13 @@ private:
             if (k > 0) puigStage.configure (k, sampleRate);
             storeLatency();
         }
+        if (const bool on = params[(std::size_t) api560LawParam] >= 0.5f; on != api560Now) // round 190mt
+        {
+            api560Now = on;
+            api560.reset();
+            storeLatency();
+        }
+        for (int k = 0; k < 10; ++k) api560Gains[k] = api560GainDb (params[(std::size_t) (api560GainParam0 + k)]);
 
         const int sb = soloBand (params[(std::size_t) soloParam]);
         const bool wasSolo = soloOn;
@@ -1504,6 +1521,9 @@ private:
     int characterNow = 0;
     int puigNow = 0; // round 190mg: the PuigTec law (0 = off)
     puig::Stage puigStage;
+    api560::Engine api560; // round 190mt
+    bool api560Now = false;
+    double api560Gains[10] {};
     std::array<Placement, bands> placed {};
     bool anyPlaced = false, anyMidSide = false, outMidSide = false;
     bool anyDynamic = false, soloOn = false, firLoaded = false, firDirty = true, sideGiven = false;
@@ -1558,6 +1578,8 @@ const std::array<Shape, shapeCount - 1>& menuShapes() noexcept
 int character (float v) noexcept { return std::clamp ((int) std::lround (v * 2.0f), 0, 2); }
 int puigLaw (float v) noexcept { return v > 0.0f ? std::clamp ((int) std::lround (v * 16.0f), 0, 3) : 0; }
 float puigLawValue (int k) noexcept { return (float) std::clamp (k, 0, 3) / 16.0f; }
+float api560GainValue (double db) noexcept { return (float) std::clamp ((db + 12.0) / 24.0, 0.0, 1.0); } // round 190mt
+double api560GainDb (float v) noexcept { return 24.0 * std::clamp ((double) v, 0.0, 1.0) - 12.0; }
 int waveCode (float v) noexcept { return v > 0.0f ? std::clamp ((int) std::lround (v * 64.0f), 0, (int) WaveCode::count - 1) : 0; }
 float waveCodeValue (WaveCode c) noexcept { return (float) std::clamp ((int) c, 0, (int) WaveCode::count - 1) / 64.0f; }
 double puigShape (double y) noexcept
@@ -1821,6 +1843,16 @@ double q10Qc (double db, double q, bool pq) noexcept
     const double f = x - i;
     return q * std::exp (std::log (pqK[i]) * (1.0 - f) + std::log (pqK[i + 1]) * f);
 }
+// round 190mt: the PQ-Bell's bandwidth warp β (alpha = θ (1 + β θ²) / k), fitted every 1.5 dB from 1.5 to 18 dB (ln β
+// interpolated; held below 1.5 dB and above 18 dB)
+constexpr double pqBeta[12] = { 0.20584, 0.13164, 0.07569, 0.04289, 0.02495, 0.01511, 0.00957, 0.00633, 0.00436, 0.00312, 0.00231, 0.00177 };
+double q10PqBeta (double db) noexcept
+{
+    const double x = std::clamp (std::abs (db) / 1.5 - 1.0, 0.0, 11.0);
+    const int i = std::min ((int) x, 10);
+    const double t = x - i;
+    return std::exp (std::log (pqBeta[i]) * (1.0 - t) + std::log (pqBeta[i + 1]) * t);
+}
 } // namespace wv
 } // namespace
 
@@ -1849,6 +1881,19 @@ int wavesDesign (const EffectParams& params, int band, double fs, std::array<Sec
             if (std::abs (db) < 1e-9) return 0;
             out[0] = wv::bandwidthBell (db, wv::q10Qc (db, 4.0 * qv, code == WaveCode::q10PqBell), w0);
             return 1;
+        case WaveCode::q10BellTan: // round 190mt: [EXEC] exact on 336 probes 0.5 … 20 kHz (−160 dB and better)
+        case WaveCode::q10PqBellX: // round 190mt: [EXEC] the PQ-Bell, 192 probes 3 … 12 kHz × ±1.5 … ±18 dB (alpha within 4e-3)
+        {
+            if (std::abs (db) < 1e-9) return 0;
+            const double th = std::min (pi * f / (std::max (4.0 * qv, 1e-3) * fs), 0.25 * pi);
+            const double al = code == WaveCode::q10PqBellX ? th * (1.0 + wv::q10PqBeta (db) * th * th) / wv::q10Qc (db, 1.0, true)
+                                                            : std::tan (th) / (0.090904 * (std::sqrt (G) + 1.0 / std::sqrt (G)));
+            const double wc = std::min (w0, 0.999 * pi), c = std::cos (wc), a0 = 1.0 + al / A;
+            Section& s = out[0];
+            s.b0 = (1.0 + al * A) / a0; s.b1 = -2.0 * c / a0; s.b2 = (1.0 - al * A) / a0;
+            s.a1 = -2.0 * c / a0; s.a2 = (1.0 - al / A) / a0;
+            return 1;
+        }
         case WaveCode::reqLowShelf:
         case WaveCode::reqHighShelf:
         {
