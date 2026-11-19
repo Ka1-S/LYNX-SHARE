@@ -186,9 +186,10 @@ std::string describeAddress (const void* address);
 //   action and unblocked on this thread (the kernel ends the process; async-signal-safe); Windows: wakes the thread
 //   prepared above, which ends the process with the crash's code (TerminateProcess) after the time limit. Whatever the
 //   handler then does, the process is gone within the limit.
-// - heapCorruptionCrash: the crash is a heap-corruption abort — Linux / macOS: SIGABRT with the C library's allocator
-//   (malloc, free, realloc…; macOS: libsystem_malloc) among the frames above abort(); Windows: STATUS_HEAP_CORRUPTION
-//   (0xC0000374). Allocation-free (backtrace + dladdr on a fixed array).
+// - heapCorruptionCrash: the crash is the C library's own abort — Linux: SIGABRT whose abort() was called from inside
+//   libc itself (its heap checks; also its fortify checks, which mean a damaged memory too), macOS: SIGABRT with a frame
+//   in libsystem_malloc; Windows: STATUS_HEAP_CORRUPTION (0xC0000374). Allocation-free (backtrace + dladdr on a fixed
+//   array). A C++ terminate, LYNX's or a plugin's own abort() keep the usual handling.
 // - writeHeapCrashFile: for that case, the crash file without the heap: "crash heap-corruption <time>.txt" in the
 //   prepared folder, written with open / write and the frames by backtrace_symbols_fd (Windows: CreateFileW / WriteFile,
 //   the exception code only). The caller then skips everything that allocates (the usual crash file, the session note,

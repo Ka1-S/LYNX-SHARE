@@ -2160,24 +2160,35 @@ void storeFolder (const std::string& folder) noexcept
 }
 
 #if ! defined(_WIN32)
-// the C library's allocator entry points (an abort below one of them is its heap check)
-bool allocatorFrame (const void* pc) noexcept
+// The C library aborted on its own (its heap checks: "free(): invalid next size", "corrupted double-linked list"...; its
+// fortify checks): the function that called abort() is the C library's. glibc's allocator entry points jump to static
+// functions, so their names are not among the frames (seen with glibc 2.42: free -> ?? -> ?? -> abort); only the module
+// tells. macOS: any frame in libsystem_malloc. A C++ terminate (libstdc++), LYNX's or a plugin's abort() do not count.
+bool inModule (const void* pc, const char* part, const char** symbol = nullptr) noexcept
 {
     Dl_info info {};
-    if (pc == nullptr || dladdr (pc, &info) == 0)
+    if (pc == nullptr || dladdr (pc, &info) == 0 || info.dli_fname == nullptr)
         return false;
+    if (symbol != nullptr)
+        *symbol = info.dli_sname;
+    const char* base = std::strrchr (info.dli_fname, '/');
+    base = base != nullptr ? base + 1 : info.dli_fname;
+    return std::strncmp (base, part, std::strlen (part)) == 0;
+}
+
+bool libraryAbort (void* const* frames, int n) noexcept
+{
+    for (int i = 0; i < n; ++i)
+    {
  #if defined(__APPLE__)
-    if (info.dli_fname != nullptr && std::strstr (info.dli_fname, "libsystem_malloc") != nullptr)
-        return true;
- #endif
-    if (info.dli_sname == nullptr || info.dli_fname == nullptr || std::strstr (info.dli_fname, "libc") == nullptr)
-        return false;
-    static const char* const names[] = { "malloc", "free", "realloc", "calloc", "cfree", "__libc_malloc", "__libc_free", "__libc_realloc",
-                                         "__libc_calloc", "__libc_memalign", "memalign", "posix_memalign", "aligned_alloc", "valloc",
-                                         "pvalloc", "malloc_trim", "__libc_fatal", "malloc_printerr" };
-    for (const auto* name : names)
-        if (std::strcmp (info.dli_sname, name) == 0)
+        if (inModule (frames[i], "libsystem_malloc"))
             return true;
+ #else
+        const char* name = nullptr;
+        if (inModule (frames[i], "libc.so", &name) && name != nullptr && std::strcmp (name, "abort") == 0)
+            return i + 1 < n && inModule (frames[i + 1], "libc.so"); // (abort's caller)
+ #endif
+    }
     return false;
 }
 
@@ -2267,10 +2278,7 @@ bool heapCorruptionCrash (void* exceptionPointers) noexcept
         return false;
     void* frames[64];
     const auto n = backtrace (frames, 64);
-    for (int i = 0; i < n; ++i)
-        if (allocatorFrame (frames[i]))
-            return true;
-    return false;
+    return libraryAbort (frames, n);
 #else
     (void) exceptionPointers;
     return false;
