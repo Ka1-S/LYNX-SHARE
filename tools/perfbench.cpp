@@ -625,6 +625,13 @@ int main (int argc, char** argv)
         const auto p99 = blockCpu[std::min (blockCpu.size() - 1, (std::size_t) (0.99 * (double) blockCpu.size()))];
         const auto budget = 1000.0 * blockSize / sampleRate;
         const auto h = hashSamples (left, right);
+        if (const char* dump = std::getenv ("LYNX_PB_DUMP"); dump != nullptr && rep == 0) // (round 190lv: the samples, for a diff)
+            if (auto* f = std::fopen (dump, "wb"); f != nullptr)
+            {
+                std::fwrite (left.data(), sizeof (float), left.size(), f);
+                std::fwrite (right.data(), sizeof (float), right.size(), f);
+                std::fclose (f);
+            }
         if (rep == 0)
             firstHash = h;
         sameHash = sameHash && h == firstHash;
