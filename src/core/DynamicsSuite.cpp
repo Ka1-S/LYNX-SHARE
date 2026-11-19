@@ -2159,7 +2159,7 @@ constexpr double kneeS[9] { 0.1608, 0.2068, 0.2601, 0.3216, 0.3525, 0.4330, 0.47
 // 2^(−d (1/(m + pe) − 1/(q + pe))), m = min (s, q), both read at 255 steps), every constant fitted on the C4's own probes
 struct TimeLaw { double attackScale, releaseScale, d, pe, qFallMs, qRiseMs, vpow, vexp; };
 // c4fit:begin
-constexpr TimeLaw c4Time { 1.0, 1.0, 1.0 / 255.0, 1.0 / 255.0, 150.0, 56.0, 4.0, 4.0 };
+constexpr TimeLaw c4Time { 0.999677, 0.998302, 0.003912, 0.005823, 149.78441, 56.044957, 4.015778, 4.006325 }; // c4/lab/fit5.py (19 probes, −65 … −84 dB)
 // c4fit:end
 constexpr int boxA = 27, boxB = 38; // the two box filters (27 + 38 − 1 = 64 samples at 48 kHz, × the look-ahead's rate factor)
 
