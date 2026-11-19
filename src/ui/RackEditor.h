@@ -100,6 +100,10 @@ public:
     // 2 Choke, 3 Audio To) of chain `chain`
     juce::PopupMenu padMenuForSnapshot (int key);
     void padLitForSnapshot (int key); // round 190lr (DL-94): pad `key` drawn as sounding
+    // round 190mr (DL-92): Auto Select's tick with these keys sounding (128 bits); returns the selected chain
+    int autoSelectForSnapshot (const std::array<std::uint64_t, 2>& keys);
+    void clickForSnapshot (juce::Point<int> at); // a left click there
+    juce::Rectangle<int> autoSelectButtonForSnapshot() const;
     juce::PopupMenu ioMenuForSnapshot (int chain, int column);
 
 private:

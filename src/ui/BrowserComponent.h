@@ -197,6 +197,8 @@ public:
     void selectFirstSampleForSnapshot();
     // --snapshot: the PROJECT tab with the patterns, generators and samples open, a sample selected
     void showProjectForSnapshot();
+    void showHistory(); // round 190mr (DF-135): Current project › History, opened and in view
+    bool historyShownForCheck() const;
     // round 190ke (--simplegb190keshot): "LYNX content" with these folders open ("lynx-content", "lynx-content/Beats"...),
     // and the rows listed now (tree / tag-filter results)
     void showFactoryContentForSnapshot (const juce::StringArray& openFolders);

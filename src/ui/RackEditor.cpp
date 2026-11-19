@@ -11,6 +11,7 @@
 #include "core/NoteNames.h"
 #include "core/Patcher.h"
 #include "core/Rack.h"
+#include "core/Details190mr.h"
 #include "core/Vfx.h"
 #include "engine/PluginHost.h"
 #include "engine/ProjectFile.h"
@@ -202,6 +203,86 @@ struct RackView::Impl
     {
         return key >= 0 && key < 128 && (soundingShown[(std::size_t) (key >> 6)] >> (key & 63) & 1u) != 0;
     }
+    // Round 190mr (DL-92, Live's chain list "Auto Select"): while it is on, the chains that process now are lit as
+    // selected and the first of them becomes the selected chain (its devices show), read on the view's 30 Hz tick.
+    // View only: the selection changes without an edit (no rebuild, no undo step); nothing runs while it is off.
+    std::vector<int> autoLit;
+    std::optional<std::array<std::uint64_t, 2>> keysForCheck; // (--details190mrshot)
+    int selectedBeforeAuto = -1;
+    // Live's info text (capture 190mr B2): "all chains which are able to process an incoming note will become selected in
+    // the Chain List for the duration of the note" — incoming notes (MIDI inputs, the typing keyboard) on the rack's
+    // channel when it is the selected one; the song playing a clip selects nothing (captured: no change while playing).
+    // An Audio Effect Rack: the chains its chain selector opens.
+    void watchAutoSelect()
+    {
+        const auto* r = rack();
+        if (r == nullptr || ! r->autoSelect || ! r->showChains)
+        {
+            if (! autoLit.empty())
+            {
+                autoLit.clear();
+                owner.repaint();
+            }
+            selectedBeforeAuto = -1;
+            return;
+        }
+        NoteMask keys {};
+        if (keysForCheck)
+            keys = *keysForCheck;
+        else if (const auto channel = channelOfRack(); channel >= 0 && channel == engine.getSelectedChannel())
+            for (int m = 0; m < 16; ++m)
+            {
+                const auto held = engine.heldInputKeyBits (m);
+                keys[0] |= held[0];
+                keys[1] |= held[1];
+            }
+        auto now = details190mr::processingChains (*r, keys);
+        if (now == autoLit)
+            return;
+        const auto wasLit = ! autoLit.empty();
+        autoLit = std::move (now);
+        auto select = -1;
+        if (! autoLit.empty() && std::find (autoLit.begin(), autoLit.end(), r->selectedChain) == autoLit.end() && emptyPadKey < 0)
+        {
+            if (! wasLit)
+                selectedBeforeAuto = r->selectedChain;
+            select = autoLit.front();
+        }
+        else if (autoLit.empty() && wasLit && r->kind != RackDoc::Kind::audioEffect && selectedBeforeAuto >= 0)
+            select = std::exchange (selectedBeforeAuto, -1); // (the note is over: the selection from before)
+        if (select >= 0)
+            if (auto* d = doc (const_cast<Song&> (engine.getSong())))
+                if (auto* live = rack::rackOf (*d))
+                    live->selectedChain = select; // (view only: no edit, no rebuild)
+        refresh();
+        owner.repaint();
+    }
+    bool autoSelected (int slot) const { return std::find (autoLit.begin(), autoLit.end(), slot) != autoLit.end(); }
+    // the switch's place (capture 190mr B2, live-rack-autoselect.png): the foot of the rack's left column, above the save
+    // button — Live: a square "‖▶" switch, lit #FFAD56 with dark ink, else #1E1E1E with grey ink
+    juce::Rectangle<int> autoSelectButton (const RackDoc&) const
+    {
+        const auto save = saveButton();
+        if (save.isEmpty())
+            return {};
+        const auto side = theme::livelook::active() ? 16 : viewColumn - 4;
+        return juce::Rectangle<int> (side, theme::livelook::active() ? 16 : 18).withCentre ({ column.getCentreX(), save.getY() - 4 - (theme::livelook::active() ? 8 : 9) });
+    }
+    void paintAutoSelect (juce::Graphics& g, const RackDoc& r, juce::Rectangle<float> b) const
+    {
+        const auto live = theme::livelook::active();
+        const auto on = r.autoSelect;
+        g.setColour (on ? (live ? juce::Colour (0xffffad56) : col::accent) : (live ? juce::Colour (0xff1e1e1e) : col::bg4));
+        g.fillRoundedRectangle (b, live ? 2.0f : theme::radius::sm);
+        g.setColour (on ? (live ? juce::Colour (0xff1a140d) : col::onAccent) : (live ? juce::Colour (0xffa0a0a0) : col::textSecondary));
+        const auto c = b.getCentre();
+        g.fillRect (juce::Rectangle<float> (c.x - 5.0f, c.y - 3.5f, 1.6f, 7.0f));
+        g.fillRect (juce::Rectangle<float> (c.x - 2.4f, c.y - 3.5f, 1.6f, 7.0f));
+        juce::Path tri;
+        tri.addTriangle (c.x + 0.2f, c.y - 4.0f, c.x + 0.2f, c.y + 4.0f, c.x + 5.2f, c.y);
+        g.fillPath (tri);
+    }
+
     void watchSounding()
     {
         const auto channel = channelOfRack();
@@ -735,6 +816,8 @@ struct RackView::Impl
             g.fillRect (d.withTrimmedTop (6.5f).reduced (2.5f, 0.0f).withTrimmedBottom (1.5f));
         }
 
+        if (const auto ab = autoSelectButton (*r); ! ab.isEmpty() && ab.getY() > (items.empty() ? column.getY() : columnButton ((int) items.size() - 1).getBottom()))
+            paintAutoSelect (g, *r, ab.toFloat()); // round 190mr (DL-92)
         if (! variations.isEmpty())
             paintVariations (g, *r);
         if (! macros.isEmpty())
@@ -911,7 +994,7 @@ struct RackView::Impl
                 g.setColour (col::borderStrong);
                 g.drawHorizontalLine (row.getY() - rowHeight / 2, (float) chains.getX() + 4.0f, (float) chains.getRight() - 4.0f);
             }
-            if (slot == r.selectedChain && emptyPadKey < 0)
+            if ((slot == r.selectedChain && emptyPadKey < 0) || (r.autoSelect && autoSelected (slot)))
             {
                 g.setColour (col::accentMuted);
                 g.fillRect (row);
@@ -1328,6 +1411,8 @@ struct RackView::Impl
                 edit ([item] (PatcherDoc& d) { toggleColumn (*rack::rackOf (d), item); });
                 return;
             }
+        if (const auto* now = rack(); now != nullptr && autoSelectButton (*now).contains (p) && ! e.mods.isPopupMenu()) // round 190mr (DL-92)
+            return edit ([on = ! now->autoSelect] (PatcherDoc& d) { rack::rackOf (d)->autoSelect = on; }, false);
         if (saveButton().contains (p) && ! e.mods.isPopupMenu())
             return saveLivePreset();
 
@@ -2737,6 +2822,32 @@ RackView::~RackView() = default;
 
 bool RackView::keyPressed (const juce::KeyPress& key) { return impl->padKey (key); }
 
+int RackView::autoSelectForSnapshot (const std::array<std::uint64_t, 2>& keys)
+{
+    impl->keysForCheck = keys;
+    impl->refresh();
+    impl->watchAutoSelect();
+    impl->keysForCheck.reset();
+    const auto* r = impl->rack();
+    return r != nullptr ? r->selectedChain : -1;
+}
+
+void RackView::clickForSnapshot (juce::Point<int> at)
+{
+    auto source = juce::Desktop::getInstance().getMainMouseSource();
+    const auto now = juce::Time::getCurrentTime();
+    const juce::MouseEvent e (source, at.toFloat(), juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                              this, this, now, at.toFloat(), now, 1, false);
+    mouseDown (e);
+    mouseUp (e.withNewPosition (at.toFloat()));
+}
+
+juce::Rectangle<int> RackView::autoSelectButtonForSnapshot() const
+{
+    const auto* r = impl->rack();
+    return r != nullptr ? impl->autoSelectButton (*r) : juce::Rectangle<int>();
+}
+
 void RackView::padLitForSnapshot (int key)
 {
     if (key >= 0 && key < 128)
@@ -3015,6 +3126,7 @@ void RackView::timerCallback()
     impl->stepGlide();
     impl->refresh();
     impl->watchSounding(); // round 190lr (DL-94)
+    impl->watchAutoSelect(); // round 190mr (DL-92)
 }
 
 // ---------------------------------------------------------------------------------------------------------------

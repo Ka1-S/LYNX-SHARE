@@ -172,7 +172,7 @@ public:
                                                                  &undoBox, &alternateUndo, &hintsTitle, &manageMessages, &messagesNote, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &backupQuiet, &longestWaitLabel, &longestWaitBox, &unusedTakes, &detachNew,
                                                                  &sandboxLabel, &sandboxBox, &sandboxNote, &substitutes, &substitutesNote, &sampleAccurate, &limitEditors, &managePlugins, &manageShortcuts, &shortcutsNote,
                                                                  &reportsTitle, &crashLabel, &crashBox, &crashNote, &updatesTitle, &checkUpdates, &checkNow, &updatesNote,
-                                                                 &previousLabel, &goBack, &autoNameChannels, &restoreAfterSolo, &readSampleTempo, &historyNewestFirst })
+                                                                 &previousLabel, &goBack, &autoNameChannels, &restoreAfterSolo, &readSampleTempo, &historyNewestFirst, &projectLayout, &historyOnUndo, &dataSizeLabel, &dataSizeBox, &clickHold, &bothButtons })
             add (*c);
 
         setupFontRow();
@@ -427,6 +427,13 @@ public:
             flag (readSampleTempo, tr ("Read sample tempo information"),
                   tr ("Read tempo information stored in samples. Off: it is ignored for the samples loaded from then on"), fl.readSampleTempo);
             flag (historyNewestFirst, tr ("Show recent changes at the top"), tr ("Sort the undo history from new to old"), fl.historyNewestFirst);
+            // round 190mr (DF-135; FL's label, off as in FL)
+            flag (historyOnUndo, tr ("Show undo history in the browser when undoing changes"),
+                  tr ("An undo opens the Browser at Current project › History"), fl.historyOnUndo);
+            // round 190mr (DF-141, owner F3; LYNX's switch: FL always does it): a project opens with the windows where they were
+            flag (projectLayout, tr ("Load the window layout saved with a project"),
+                  tr ("On: a project opens with its windows where they were when it was saved, as in FL Studio. Off: the layout on screen stays"),
+                  fl.projectWindowLayout);
         }
 
         styleLabel (autosaveLabel, tr ("Save a backup copy"));
@@ -503,6 +510,42 @@ public:
             messages::manageMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&manageMessages));
         };
         styleNote (messagesNote, tr ("Ticked messages are shown; untick one to skip its question."));
+        // FL's Hints and warnings › "Project data size warning" (round 190mr, DF-147): the size a saved project may reach
+        // before LYNX warns, or "Don't warn me"
+        styleLabel (dataSizeLabel, tr ("Project data size warning"));
+        for (const auto mb : flsettings::projectSizeChoices) // (FL's texts: "50MB", "100MB (default)", "1GB", "1.5GB")
+            dataSizeBox.addItem (mb == 0 ? tr ("Don't warn me")
+                                 : (mb >= 1024 ? juce::String ((double) mb / 1024.0, mb % 1024 == 0 ? 0 : 1) + "GB" : juce::String (mb) + "MB")
+                                       + (mb == flsettings::projectSizeDefault ? " " + tr ("(default)") : juce::String()),
+                                 mb + 1);
+        dataSizeBox.setSelectedId (flsettings::options().projectSizeWarnMb.load() + 1, juce::dontSendNotification);
+        dataSizeBox.setTooltip (tr ("Warn when a saved project is larger than this"));
+        dataSizeBox.onChange = [this] {
+            flsettings::options().projectSizeWarnMb = flsettings::clampProjectSizeWarning (dataSizeBox.getSelectedId() - 1);
+            if (mixeroptions::changed)
+                mixeroptions::changed(); // (ui-options.txt)
+        };
+        // FL's General › Input (round 190mr, capture 190mr A1.1: both off in FL)
+        {
+            auto& fl = flsettings::options();
+            const auto flagged = [] (juce::ToggleButton& t, const juce::String& text, const juce::String& hint, std::atomic<bool>& value) {
+                styleToggle (t, text);
+                t.setTooltip (hint);
+                t.setToggleState (value.load(), juce::dontSendNotification);
+                t.onClick = [&t, &value] {
+                    value.store (t.getToggleState());
+                    if (mixeroptions::changed)
+                        mixeroptions::changed();
+                };
+            };
+            flagged (clickHold, tr ("Click-and-hold & special gesture functions"),
+                     tr ("Extra functions when holding clicks in piano roll: hold a note to copy it, hold while adding a note to cycle "
+                         "slide / porta, hold between two touching notes to glue them"),
+                     fl.clickHold);
+            flagged (bothButtons, tr ("Use both mouse buttons in step sequencer"),
+                     tr ("On: a left click only switches steps on and a right click switches them off. Off: a left click toggles a step"),
+                     fl.bothButtonsSteps);
+        }
         managePlugins.onClick = [this] {
             if (hooks.managePlugins)
                 hooks.managePlugins();
@@ -539,7 +582,7 @@ public:
         for (auto* c : std::initializer_list<juce::Component*> { &updatesTitle, &checkUpdates, &checkNow, &updatesNote, &previousLabel, &goBack })
             c->setVisible (updater::offered());
 
-        for (auto* b : { &templateBox, &startupProjectBox, &longestWaitBox, &languageBox, &fontBox, &textSizeBox, &scaleBox, &menuBox, &wavesBox, &noteNamesBox, &blackNotesBox, &pluginStyleBox, &animationBox, &editInBox, &undoBox, &longestWaitBox, &autosaveBox, &keepBox, &crashBox, &sandboxBox })
+        for (auto* b : { &templateBox, &startupProjectBox, &longestWaitBox, &languageBox, &fontBox, &textSizeBox, &scaleBox, &menuBox, &wavesBox, &noteNamesBox, &blackNotesBox, &pluginStyleBox, &animationBox, &editInBox, &undoBox, &longestWaitBox, &autosaveBox, &keepBox, &crashBox, &sandboxBox, &dataSizeBox })
             styleCombo (*b);
         juce::ignoreUnused (engine, persistent);
     }
@@ -600,18 +643,21 @@ private:
         templateBox.setBounds (r.row (templateLabel, 260));
         startupProjectBox.setBounds (r.row (startupProjectLabel, 260));
         templateNote.setBounds (r.indented (32).translated (0, -3));
-        for (auto* t : { &splash, &startupSound, &scanAtStart, &supportNoteBox })
+        for (auto* t : { &projectLayout, &splash, &startupSound, &scanAtStart, &supportNoteBox })
             t->setBounds (r.full (24));
         if (menuEntry.isVisible())
             menuEntry.setBounds (r.full (24));
 
         r.section (editingTitle);
+        for (auto* t : { &clickHold, &bothButtons }) // (round 190mr: FL's General › Input)
+            t->setBounds (r.full (24));
         for (auto* t : { &typingPiano, &keepEditors, &autoNameChannels, &detachNew, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &monoPaint, &altMeterScale, &autoSelectLinked, &noTypingPriority,
                          &restoreAfterSolo, &readSampleTempo, &hoverValues })
             t->setBounds (r.full (24));
         editInBox.setBounds (r.row (editInLabel, 0));
         undoBox.setBounds (r.row (undoLabel, 120));
         alternateUndo.setBounds (r.full (24));
+        historyOnUndo.setBounds (r.full (24)); // (round 190mr: FL's Undo history panel, before its last box)
         historyNewestFirst.setBounds (r.full (24)); // (FL's Undo history panel: its last box)
 
         r.section (hintsTitle); // FL's General › Hints and warnings (round 186c)
@@ -621,6 +667,7 @@ private:
             row.removeFromLeft (12);
             messagesNote.setBounds (row.withTrimmedTop (6));
         }
+        dataSizeBox.setBounds (r.row (dataSizeLabel, 160)); // (round 190mr, DF-147)
 
         r.section (backupTitle);
         {
@@ -833,6 +880,10 @@ private:
     juce::ComboBox animationBox, crashBox, languageBox, scaleBox, menuBox, wavesBox, noteNamesBox, blackNotesBox, pluginStyleBox, editInBox, undoBox, autosaveBox, keepBox, longestWaitBox, sandboxBox;
     juce::ToggleButton detachNew, editorsInMain, stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, uiAnimations, gpuRendering, splash, startupSound, scanAtStart, supportNoteBox, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, autoClipsAtPlayback, firstChannel, monoPaint, altMeterScale, hoverValues, alternateUndo, substitutes, sampleAccurate, limitEditors, backupQuiet, unusedTakes, checkUpdates, noTypingPriority, autoSelectLinked;
     juce::ToggleButton autoNameChannels, restoreAfterSolo, readSampleTempo, historyNewestFirst; // FL's options of round 190bx (core/FlSettings.h)
+    juce::ToggleButton projectLayout, historyOnUndo; // round 190mr (DF-141, DF-135)
+    juce::Label dataSizeLabel;                        // round 190mr (DF-147)
+    juce::ComboBox dataSizeBox;
+    juce::ToggleButton clickHold, bothButtons; // round 190mr (DE-63, DE-16)
     juce::TextButton openBackups { tr ("Open backup folder") }, managePlugins { tr ("Plugin manager...") }, manageShortcuts { tr ("Manage shortcuts...") },
         checkNow { tr ("Check now") }, manageMessages { tr ("Manage messages") }, goBack;
     juce::Label messagesNote;

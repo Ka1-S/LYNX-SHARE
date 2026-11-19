@@ -66,6 +66,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         add (S::root, "warpLaw190ik", S::readOnly); // (round 190ik: the Beats detector / Texture / Complex Pro laws' mark)
         add (S::root, "clipNotes190lq", S::readOnly); // (round 190lq: FL's law for the notes of audio clip channels' mark)
         add (S::root, "sfModBase190he", S::readOnly); // (round 190he: the mark of a song saved with the real Soundfont modulator centre)
+        add (S::root, "windowLayout", S::readOnly); // (round 190mr, DF-141: each user's own window layout, never merged)
         add (S::root, "mixerLevelPdc190hq"); // (round 190hq: Mixer › Plugin delay compensation › compensate fader and route automations)
         add (S::root, "format version savedBy projectId nextUid session clipFadesPerClip", S::readOnly);
         // Not reviewed for document edits (yet): the groove pool (its ids are clip references), controller mappings

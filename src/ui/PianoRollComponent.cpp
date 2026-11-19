@@ -21,6 +21,8 @@
 #include "core/EventEdit.h"
 #include "core/MarkerPlan.h"
 #include "core/NoteEdit.h"
+#include "core/FlSettings.h"
+#include "core/Details190mr.h"
 #include "core/NoteTools.h"
 #include "core/ScaleDetect.h"
 #include "core/Mpe.h"
@@ -1869,6 +1871,22 @@ void PianoRollComponent::paint (juce::Graphics& g)
             }
         }
     }
+
+    // round 190mr (DE-63, capture 190mr prhold): FL's hold ring, a thin light arc at the mouse growing clockwise from 12
+    // o'clock between 390 and 750 ms of a still press
+    if (holdRing && hold != Hold::none)
+    {
+        const auto elapsed = (int) (juce::Time::getMillisecondCounter() - holdSince);
+        const auto t = juce::jlimit (0.0f, 1.0f, (float) (elapsed - holdRingFromMs) / (float) (holdMs - holdRingFromMs));
+        if (t > 0.0f)
+        {
+            juce::Path arc;
+            const auto c = holdRingAt.toFloat();
+            arc.addCentredArc (c.x, c.y, 6.5f, 6.5f, 0.0f, 0.0f, juce::MathConstants<float>::twoPi * t, true);
+            g.setColour (juce::Colour (0xffdfe6e6));
+            g.strokePath (arc, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        }
+    }
 }
 
 // --- mouse -------------------------------------------------------------------
@@ -2555,6 +2573,23 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
 
         drag = rightEdge ? Drag::resize : leftEdge ? Drag::resizeLeft : Drag::move;
         lastScaleDragKeys = 0; // (no scale step made yet)
+        // round 190mr (DE-63): FL's click-and-hold on a note (copy) or at the resize cursor between two touching notes (glue)
+        if (! e.mods.isShiftDown() && ! e.mods.isAltDown() && (tool == EditTool::pencil || tool == EditTool::brush))
+        {
+            if (drag == Drag::move && flsettings::options().clickHold.load())
+                armHold (Hold::copy, e.getScreenPosition());
+            else if (drag != Drag::move && flsettings::options().clickHold.load())
+            {
+                const auto& pat = currentPattern (engine.getSong());
+                const auto other = details190mr::touchingNeighbour (pat, hit, rightEdge);
+                if (other >= 0)
+                {
+                    glueA = rightEdge ? hit : other;
+                    glueB = rightEdge ? other : hit;
+                    armHold (Hold::glue, e.getScreenPosition());
+                }
+            }
+        }
         grabOffset = n.start - snap (xToTick (e.x), snapOn);
         lastLength = n.length;
         noteTemplate.takeFrom (n); // FL: new notes get the clicked note's properties (round 166e)
@@ -2618,6 +2653,109 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
     drag = Drag::move;
     grabOffset = 0;
     previewEdit (n.key, n.velocity);
+    holdStep = n.porta ? 2 : n.slide ? 1 : 0;
+    if (! e.mods.isShiftDown() && ! e.mods.isAltDown() && flsettings::options().clickHold.load())
+        armHold (Hold::cycle, e.getScreenPosition()); // round 190mr (DE-63): hold = slide, porta, plain…
+}
+
+void PianoRollComponent::pressForSnapshot (juce::Point<int> at, juce::ModifierKeys mods)
+{
+    auto source = juce::Desktop::getInstance().getMainMouseSource();
+    const auto now = juce::Time::getCurrentTime();
+    mouseDown (juce::MouseEvent (source, at.toFloat(), mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, this, this, now, at.toFloat(), now, 1, false));
+    holdRingAt = at; // (off screen, the screen point of the press is not this view's)
+}
+
+void PianoRollComponent::releaseForSnapshot (juce::Point<int> at)
+{
+    auto source = juce::Desktop::getInstance().getMainMouseSource();
+    const auto now = juce::Time::getCurrentTime();
+    mouseUp (juce::MouseEvent (source, at.toFloat(), {}, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, this, this, now, at.toFloat(), now, 1, false));
+}
+
+void PianoRollComponent::armHold (Hold kind, juce::Point<int> screenAt, bool ring)
+{
+    hold = kind;
+    holdDownAt = screenAt;
+    holdSince = juce::Time::getMillisecondCounter();
+    holdRing = ring; // (the cycle's later steps run without it)
+    holdRingAt = getLocalPoint (nullptr, screenAt);
+    const auto serial = ++holdSerial;
+    juce::Timer::callAfterDelay (holdMs, [safe = juce::Component::SafePointer<PianoRollComponent> (this), serial] {
+        if (safe != nullptr)
+            safe->holdFired (serial);
+    });
+}
+
+void PianoRollComponent::holdFired (int serial)
+{
+    if (serial != holdSerial || hold == Hold::none)
+        return;
+    const auto& mouse = juce::Desktop::getInstance().getMainMouseSource();
+    // (a hold is a press that stays where it was: a drag, a release or another button ends it)
+    if (holdReadsMouse && ! mouse.isDragging() && ! juce::ModifierKeys::currentModifiers.isLeftButtonDown())
+        return void (hold = Hold::none);
+    if (holdReadsMouse && (mouse.getScreenPosition().roundToInt().getDistanceFrom (holdDownAt) > 3 || juce::ModifierKeys::currentModifiers.isRightButtonDown()))
+        return void (hold = Hold::none);
+    const auto kind = std::exchange (hold, Hold::none);
+    if (std::exchange (holdRing, false))
+        repaint (holdRingArea());
+    const auto& notes = currentPattern (engine.getSong()).notes;
+    if (kind == Hold::copy && drag == Drag::move && ! dragIndices.empty())
+    {
+        // the copy is what the mouse drags from here on; the originals stay (as Shift+drag)
+        std::vector<Note> ordered;
+        for (auto i : dragIndices)
+            if (i >= 0 && i < (int) notes.size())
+                ordered.push_back (notes[(std::size_t) i]);
+        const auto grabbedAt = (std::size_t) juce::jmax<std::ptrdiff_t> (0, std::find (dragIndices.begin(), dragIndices.end(), dragNote) - dragIndices.begin());
+        // FL's "clone note": the clone lands one grid step later and is the one dragged from here on
+        const auto step = juce::jmax<std::int64_t> (1, gridTicks());
+        for (auto& n : ordered)
+            n.start += step;
+        std::vector<int> added;
+        editNotes ([&] (Pattern& p) {
+            added = noteedit::paste (p, ordered, 0);
+            notetools::regroup (p, added);
+        });
+        if (added.empty())
+            return;
+        setSelection (added);
+        dragIndices = added;
+        dragOriginals = ordered;
+        lastScaleDragKeys = -1000;
+        grabOffset += step;
+        dragNote = added[juce::jmin (grabbedAt, added.size() - 1)];
+        ui::postHint ({ tr ("Note cloned: drag it where it goes"), {}, false, false }, 1500);
+        repaint();
+        return;
+    }
+    if (kind == Hold::cycle && drag == Drag::move && ! dragIndices.empty())
+    {
+        holdStep = (holdStep + 1) % 3;
+        editNotes ([this] (Pattern& p) {
+            for (auto i : dragIndices)
+                if (i >= 0 && i < (int) p.notes.size())
+                    details190mr::setHoldCycle (p.notes[(std::size_t) i], holdStep);
+        });
+        static const char* const names[] = { TR_NOOP ("Plain note"), TR_NOOP ("Slide note"), TR_NOOP ("Porta note") };
+        ui::postHint ({ tr (names[holdStep]) + "  " + tr ("(keep holding to change it)"), {}, false, false }, holdMs + 400);
+        repaint();
+        armHold (Hold::cycle, holdDownAt, false); // (the next step, while the button stays down)
+        return;
+    }
+    if (kind == Hold::glue && (drag == Drag::resize || drag == Drag::resizeLeft) && glueA >= 0 && glueB >= 0)
+    {
+        const auto keep = juce::jmin (glueA, glueB);
+        editNotes ([a = glueA, b = glueB] (Pattern& p) { noteedit::join (p, { a, b }); });
+        drag = Drag::none;
+        dragIndices.clear();
+        dragOriginals.clear();
+        dragNote = -1;
+        setSelection ({ keep }); // (FL: the glued note is selected; join keeps the earlier index)
+        ui::postHint ({ tr ("Notes glued"), {}, false, false }, 1500);
+        repaint();
+    }
 }
 
 void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
@@ -3134,6 +3272,10 @@ void PianoRollComponent::postDragHint (const juce::MouseEvent& e)
 void PianoRollComponent::mouseUp (const juce::MouseEvent& e)
 {
     const AudioEngine::UndoGesture undoGesture (engine, AudioEngine::UndoGesture::end); // (closes when mouseUp returns)
+    hold = Hold::none; // (round 190mr: a pending click-and-hold ends with the press)
+    ++holdSerial;
+    if (std::exchange (holdRing, false))
+        repaint (holdRingArea());
     EditorGlobals::get().pauseFollowIfEdited (EditorGlobals::FollowView::pianoRoll, followEditStamp, engine.getPublishCount()); // (round 190im, R15)
     ui::clearPostedHint();
     if (drag == Drag::eventPaneBar) // round 190fz: remembered once the drag ends
@@ -5531,6 +5673,8 @@ NoteMask PianoRollComponent::soundingNow() const
 
 void PianoRollComponent::timerCallback()
 {
+    if (holdRing && hold != Hold::none) // round 190mr (DE-63): the hold ring grows
+        repaint (holdRingArea());
     if (channelBox.getSelectedId() != (allChannels ? allChannelsId : engine.getSelectedChannel() + 1))
         refreshChannelBox();
     updateChordReadout();

@@ -2094,6 +2094,21 @@ public:
     }
 
     // for snapshots: opens these project sections; returns the first row of a sample item
+    void scrollRowIntoView (int row) { scrollToRow (row); }
+    bool categoryOpen (Category c) const
+    {
+        const auto row = categoryRow (c);
+        return row >= 0 && rows[(std::size_t) row]->expanded;
+    }
+    // round 190mr (DF-135): the row of a project section's header (−1: not listed)
+    int categoryRow (Category c) const
+    {
+        for (int i = 0; i < (int) rows.size(); ++i)
+            if (rows[(std::size_t) i]->kind == Kind::category && rows[(std::size_t) i]->category == c)
+                return i;
+        return -1;
+    }
+
     int openProjectSections (std::initializer_list<Category> open)
     {
         for (auto* n : std::vector<Node*> (rows))
@@ -5931,6 +5946,20 @@ juce::StringArray BrowserComponent::loopRowTextsForCheck() const
     return out;
 }
 juce::StringArray BrowserComponent::resultLabelsForCheck() const { return results->rowLabels(); }
+
+// FL's General › Undo history › "Show undo history in the browser when undoing changes" (round 190mr, DF-135): the
+// Browser's Current project › History opens, its header scrolled into view
+void BrowserComponent::showHistory()
+{
+    setTab (projectTab);
+    tree->openProjectSections ({ Category::history });
+    tree->scrollRowIntoView (tree->categoryRow (Category::history));
+}
+
+bool BrowserComponent::historyShownForCheck() const
+{
+    return shownTab() == projectTab && tree->categoryOpen (Category::history);
+}
 
 void BrowserComponent::showProjectForSnapshot()
 {

@@ -3810,7 +3810,19 @@ juce::String toJsonExact (const Song& song)
     return toJson (song);
 }
 
+namespace
+{
+std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error, juce::String* savedBy, WindowLayout* layout);
+}
+
 std::optional<Song> fromJson (const juce::String& json, juce::String& error, juce::String* savedBy)
+{
+    return fromJsonImpl (json, error, savedBy, nullptr);
+}
+
+namespace
+{
+std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error, juce::String* savedBy, WindowLayout* layout)
 {
     juce::var root;
     const auto parsed = juce::JSON::parse (json, root);
@@ -3820,6 +3832,8 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
         error = utf8 ("invalid JSON: ") + parsed.getErrorMessage();
         return std::nullopt;
     }
+    if (layout != nullptr) // round 190mr (DF-141)
+        *layout = windowLayoutOf (root);
 
     // "daw-project" = projects saved before the project was named LYNX
     if (root["format"].toString() != "lynx-project" && root["format"].toString() != "daw-project")
@@ -4706,12 +4720,38 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
                 c.sampler.clipNoteLegacy = true;
     return song;
 }
+} // namespace
+
+juce::String withWindowLayout (const juce::String& json, const WindowLayout& layout)
+{
+    const auto end = json.lastIndexOfChar ('}');
+    if (layout.text.isEmpty() || end < 0)
+        return json;
+    const auto value = juce::JSON::toString (juce::var (juce::Array<juce::var> { layout.style, layout.text }), true);
+    return json.substring (0, end).trimEnd() + ",\n  \"windowLayout\": " + value + "\n" + json.substring (end);
+}
+
+WindowLayout windowLayoutOf (const juce::var& root)
+{
+    WindowLayout layout;
+    if (const auto& v = root["windowLayout"]; v.isArray() && v.size() == 2)
+    {
+        layout.style = (int) v[0];
+        layout.text = v[1].toString();
+    }
+    return layout;
+}
 
 bool save (const Song& song, const juce::File& file, juce::String& error)
 {
+    return save (song, file, error, WindowLayout {});
+}
+
+bool save (const Song& song, const juce::File& file, juce::String& error, const WindowLayout& layout)
+{
     // Write to a temp file and swap, so a mid-write error doesn't destroy the previous project.
     juce::TemporaryFile temp (file);
-    const auto json = toJson (song);
+    const auto json = withWindowLayout (toJson (song), layout);
 
     if (! temp.getFile().replaceWithText (json, false, false, nullptr) || ! temp.overwriteTargetFileWithTemporary())
     {
@@ -4736,13 +4776,18 @@ juce::File withProjectExtension (const juce::File& file)
 
 std::optional<Song> load (const juce::File& file, juce::String& error, juce::String* savedBy)
 {
+    return load (file, error, savedBy, nullptr);
+}
+
+std::optional<Song> load (const juce::File& file, juce::String& error, juce::String* savedBy, WindowLayout* layout)
+{
     if (! file.existsAsFile())
     {
         error = utf8 ("file not found");
         return std::nullopt;
     }
 
-    auto song = fromJson (file.loadFileAsString(), error, savedBy);
+    auto song = fromJsonImpl (file.loadFileAsString(), error, savedBy, layout);
 
     // samples saved relative to the project (a package) or moved along with it are found next to it (REA round 118)
     if (song)

@@ -28,6 +28,9 @@
 #include "ui/SimpleLook.h"
 #include "ui/SoundFontEditor.h"
 #include "ui/TrackIcons.h"
+#include "ui/Icons.h"
+#include "ui/HintBar.h"
+#include "core/AudioCapture.h"
 #include "ui/Motion.h"
 #include "ui/Theme.h"
 #include "ui/TouchKeyboard.h"
@@ -1779,6 +1782,19 @@ public:
             if (onBrowse)
                 onBrowse();
         };
+        // round 190mr (DS-36, BandLab's empty sampler, bandlab190p 21-sampler-empty.png + capture 190mr C1): an empty pad's
+        // three calls to action — Record via an audio input, import a file, Browse Sounds — each a pill under its icon
+        ctaRecord.setButtonText (tr ("Record"));
+        ctaRecord.onClick = [this] { recording ? stopPadRecording() : startPadRecording(); };
+        ctaImport.setButtonText (tr ("Import"));
+        ctaImport.onClick = [this] { chooseFile (selected); };
+        ctaBrowse.setButtonText (tr ("Browse"));
+        ctaBrowse.onClick = [this] {
+            if (onBrowse)
+                onBrowse();
+        };
+        for (auto* b : { &ctaRecord, &ctaImport, &ctaBrowse })
+            addChildComponent (*b);
         kit.setButtonText (tr ("Kit"));
         kit.setTooltip (tr ("Save the pads as a kit, open one of your kits, or fill the pads from a folder"));
         kit.onClick = [this] { showKitMenu(); };
@@ -1861,6 +1877,9 @@ public:
             comp->setEnabled (has);
         for (auto& k : knobs)
             k.setEnabled (has);
+        for (auto* b : { &ctaRecord, &ctaImport, &ctaBrowse }) // round 190mr (DS-36): an empty pad's calls to action
+            b->setVisible (! has || recording);
+        styleRecordCta();
         waveFor = {};
         resized();
         repaint();
@@ -1953,6 +1972,12 @@ public:
                 g.setColour (colour::accent);
                 g.drawRoundedRectangle (r.reduced (1.0f), radius::md, 2.0f);
             }
+            if (p == selected && recording) // round 190mr (DS-36, capture 190mr C1): the pad being recorded is red with a dot
+            {
+                fillRoundRect (g, r.reduced (2.0f), radius::md, colour::accent.withAlpha (0.55f));
+                g.setColour (colour::accent);
+                g.fillEllipse (juce::Rectangle<float> (9.0f, 9.0f).withCentre (r.getCentre()));
+            }
             if (p == dropTarget)
             {
                 g.setColour (colour::textPrimary);
@@ -1973,12 +1998,22 @@ public:
         g.drawFittedText (title, titleArea, juce::Justification::centredLeft, 1, 0.8f);
         const auto w = waveArea.toFloat();
         fillRoundRect (g, w, radius::md, colour::bg0);
-        if (! has)
+        if (! has || recording)
         {
-            g.setColour (colour::textSecondary);
-            g.setFont (font (type::small));
-            g.drawFittedText (tr ("Drop a sound on a pad, import a file or browse the sounds. Click a pad or press its key to play it."),
-                              waveArea.reduced (10, 4), juce::Justification::centred, 2, 0.9f);
+            // round 190mr (DS-36): BandLab's three columns — icon, caption, the pill under them (the pills are buttons)
+            static const char* const captions[] { TR_NOOP ("Record via an audio input"), TR_NOOP ("Drag and drop or import an audio file"),
+                                                  TR_NOOP ("Browse Sounds") };
+            const Icon glyphs[] { Icon::mic, Icon::audioFile, Icon::listen };
+            for (int k = 0; k < 3; ++k)
+            {
+                const auto column = ctaColumn (k);
+                const auto icon = juce::Rectangle<float> (22.0f, 22.0f).withCentre ({ (float) column.getCentreX(), (float) column.getY() + 14.0f });
+                icons::draw (g, glyphs[k], icon, k == 0 && recording ? colour::accent : colour::textPrimary);
+                g.setColour (k == 0 && recording ? colour::accent : colour::textSecondary);
+                g.setFont (font (type::small));
+                g.drawFittedText (k == 0 && recording ? tr ("Recording...") : tr (captions[k]),
+                                  column.withTrimmedTop (32).withHeight (18), juce::Justification::centred, 1, 0.8f);
+            }
             return;
         }
         drawWave (g, *c, w, padColour (c->simplePad.colour, trackColour));
@@ -2001,6 +2036,12 @@ public:
         r.removeFromTop (4);
         auto controls = r.removeFromBottom (juce::jmin (84, r.getHeight() / 2 + 8));
         waveArea = r.reduced (0, 2);
+        for (int k = 0; k < 3; ++k) // round 190mr (DS-36): each pill under its column's caption
+        {
+            auto* b = k == 0 ? &ctaRecord : k == 1 ? &ctaImport : &ctaBrowse;
+            const auto column = ctaColumn (k);
+            b->setBounds (juce::Rectangle<int> (juce::jmin (84, column.getWidth() - 8), 26).withCentre ({ column.getCentreX(), column.getY() + 70 }));
+        }
         auto row = controls.removeFromTop (24);
         for (auto& b : modes)
             b.setBounds (row.removeFromLeft (84)), row.removeFromLeft (2);
@@ -2657,6 +2698,142 @@ private:
         }
     }
 
+public:
+    ~PadsPage() override
+    {
+        if (recording) // (closed while recording: the tap and the input are let go, nothing is kept)
+        {
+            recorder.stopTimer();
+            engine.getMeters().capture.setSource (AudioCapture::off);
+            releaseInput();
+        }
+    }
+    bool recordingForCheck() const noexcept { return recording; }
+    void startRecordingForCheck() { startPadRecording(); }
+    void recordingLookForSnapshot (bool on) // (the look only: no input is opened)
+    {
+        recording = on;
+        recordingPad = on ? selected : -1;
+        update();
+    }
+    void stopRecordingForCheck() { stopPadRecording(); }
+    juce::Component* ctaForCheck (int k) { return k == 0 ? &ctaRecord : k == 1 ? (juce::Component*) &ctaImport : &ctaBrowse; }
+
+private:
+    // --- round 190mr (DS-36): recording into the selected pad (BandLab: Record starts at once, no count-in; the dock says
+    // "Recording...", the button turns into a red Stop and the pad turns red; Stop puts the take on the pad) ---------
+    juce::Rectangle<int> ctaColumn (int k) const
+    {
+        const auto area = waveArea.reduced (8, 0);
+        const auto w = area.getWidth() / 3;
+        const auto top = area.getY() + juce::jmax (4, (area.getHeight() - 100) / 2);
+        return { area.getX() + k * w, top, w, 100 };
+    }
+    void styleRecordCta()
+    {
+        ctaRecord.setButtonText (recording ? tr ("Stop") : tr ("Record"));
+        ctaRecord.setColour (juce::TextButton::buttonColourId, recording ? colour::accent : colour::bg4);
+        ctaRecord.setColour (juce::TextButton::textColourOffId, colour::textPrimary);
+    }
+    struct PadRecorder final : juce::Timer
+    {
+        std::function<void()> tick;
+        void timerCallback() override { tick(); }
+    };
+    void startPadRecording()
+    {
+        if (recording || track < 0)
+            return;
+        if (! engine.hasAudioInput())
+        {
+            if (const auto result = engine.openAudioInput(); result.issue != AudioEngine::InputIssue::none)
+            {
+                ui::postNotice ({ result.detail.isNotEmpty() ? result.detail : tr ("No active audio input (Settings > Audio)"), {}, false, false });
+                return;
+            }
+            openedInput = true;
+        }
+        auto* device = engine.getDeviceManager().getCurrentAudioDevice();
+        if (device == nullptr || device->getActiveInputChannels().countNumberOfSetBits() == 0)
+        {
+            ui::postNotice ({ tr ("No active audio input (Settings > Audio)"), {}, false, false });
+            releaseInput();
+            return;
+        }
+        recRate = device->getCurrentSampleRate();
+        recStereo = device->getActiveInputChannels().countNumberOfSetBits() > 1;
+        recL.clear();
+        recR.clear();
+        recordingPad = selected;
+        engine.getMeters().capture.setSource (AudioCapture::input);
+        recording = true;
+        recorder.tick = [this] { pullRecording(); };
+        recorder.startTimerHz (20);
+        update();
+    }
+    void pullRecording()
+    {
+        std::vector<float> l, r;
+        engine.getMeters().capture.pull (l, r);
+        recL.insert (recL.end(), l.begin(), l.end());
+        recR.insert (recR.end(), r.begin(), r.end());
+        if ((double) recL.size() >= recRate * maxPadSeconds) // (a pad holds a sound, not a song: it stops by itself)
+            stopPadRecording();
+    }
+    void releaseInput()
+    {
+        if (std::exchange (openedInput, false))
+            engine.releaseAudioInputIfUnused();
+    }
+    void stopPadRecording()
+    {
+        if (! recording)
+            return;
+        pullRecording();
+        recorder.stopTimer();
+        engine.getMeters().capture.setSource (AudioCapture::off);
+        releaseInput();
+        recording = false;
+        const auto pad = std::exchange (recordingPad, -1);
+        if (recL.empty() || recRate <= 0.0)
+        {
+            ui::postHint ({ tr ("Nothing was recorded"), {}, false, false }, 3000);
+            update();
+            return;
+        }
+        const auto folder = engine.getRecordingFolder();
+        folder.createDirectory();
+        const auto file = folder.getNonexistentChildFile (tr ("Pad {0}", { juce::String (pad + 1) }) + " " + juce::Time::getCurrentTime().formatted ("%Y-%m-%d %H%M%S"), ".wav", false);
+        juce::AudioBuffer<float> buffer (recStereo ? 2 : 1, (int) recL.size());
+        buffer.copyFrom (0, 0, recL.data(), (int) recL.size());
+        if (recStereo)
+            buffer.copyFrom (1, 0, recR.data(), (int) juce::jmin (recR.size(), recL.size()));
+        bool written = false;
+        if (auto out = std::unique_ptr<juce::FileOutputStream> (file.createOutputStream()))
+        {
+            juce::WavAudioFormat wav;
+            if (auto writer = std::unique_ptr<juce::AudioFormatWriter> (wav.createWriterFor (out.get(), recRate, (unsigned) buffer.getNumChannels(), 24, {}, 0)))
+            {
+                out.release();
+                written = writer->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples());
+            }
+        }
+        recL.clear();
+        recR.clear();
+        if (written)
+            loadFile (pad, file);
+        else
+            ui::postNotice ({ tr ("Could not write {0}", { file.getFullPathName() }), {}, false, false });
+        update();
+    }
+    static constexpr double maxPadSeconds = 60.0;
+    PadRecorder recorder;
+    bool recording = false, recStereo = false, openedInput = false;
+    int recordingPad = -1;
+    double recRate = 0.0;
+    std::vector<float> recL, recR;
+    juce::TextButton ctaRecord, ctaImport, ctaBrowse;
+
     AudioEngine& engine;
     int track = -1, selected = 0, dragFrom = -1, dropTarget = -1, regionDrag = 0, clipboard = -1, heldChannel = -1;
     std::vector<int> channels;
@@ -2897,6 +3074,10 @@ void SimpleDock::padsKnobForCheck (int knob, float v) { padsPage->turnForCheck (
 void SimpleDock::padsRegionForCheck (float start, float end) { padsPage->setRegionForCheck (start, end); }
 void SimpleDock::padsNormalizeForCheck() { padsPage->normalizeForCheck(); }
 void SimpleDock::padsHitForCheck (int pad) { padsPage->hit (pad); }
+juce::Component* SimpleDock::padsCtaForCheck (int k) { return padsPage->ctaForCheck (k); }
+bool SimpleDock::padsRecordingForCheck() const { return padsPage->recordingForCheck(); }
+void SimpleDock::padsRecordForCheck() { padsPage->startRecordingForCheck(); }
+void SimpleDock::padsRecordingLookForSnapshot (bool on) { padsPage->recordingLookForSnapshot (on); }
 void SimpleDock::controlsTurnForCheck (int knob, float value) { controlsPage->turnForCheck (knob, value); }
 juce::String SimpleDock::controlsNameForCheck (int knob) const { return controlsPage->nameForCheck (knob); }
 float SimpleDock::controlsValueForCheck (int knob) const { return controlsPage->valueForCheck (knob); }

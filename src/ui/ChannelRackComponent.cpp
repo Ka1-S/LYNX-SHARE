@@ -2674,10 +2674,12 @@ void ChannelRackComponent::mouseDown (const juce::MouseEvent& e)
                 return;
             }
 
+            // FL's General › Input › "Use both mouse buttons in step sequencer" (round 190mr, DE-16 / owner E2; off as in FL,
+            // capture 190mr A1.1): on, the left button only switches steps on, the right one off; off, the left toggles
             if (e.mods.isRightButtonDown())
                 paintMode = PaintMode::remove;
             else
-                paintMode = pattern.hasStep (row, step) ? PaintMode::remove : PaintMode::add;
+                paintMode = pattern.hasStep (row, step) && ! flsettings::options().bothButtonsSteps.load() ? PaintMode::remove : PaintMode::add;
 
             lastPaintedRow = lastPaintedStep = -1;
             applyPaint (e);

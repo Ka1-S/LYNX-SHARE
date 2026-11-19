@@ -154,6 +154,11 @@ public:
     juce::Component* keyboardForSnapshot() { return keyboardPage.get(); }
     void padsDragForCheck (int from, int to, bool copy);
     void padsUpdateForCheck();
+    // round 190mr (DS-36): the empty pad's calls to action (0 Record, 1 Import, 2 Browse), recording into the pad
+    juce::Component* padsCtaForCheck (int k);
+    bool padsRecordingForCheck() const;
+    void padsRecordForCheck();
+    void padsRecordingLookForSnapshot (bool on);
     juce::PopupMenu padMenuForSnapshot (int pad);
     juce::PopupMenu kitMenuForSnapshot();
     bool saveKitForCheck (const juce::String& name);

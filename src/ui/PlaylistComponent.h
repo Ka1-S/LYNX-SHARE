@@ -169,6 +169,17 @@ public:
     // fade in / out handle, 3 / 4 = the fade in / out tension handle), and the hint a drag of one of them posts
     void hoverFadeForSnapshot (int index, int target);
     ui::Hint fadeDragHintForSnapshot (int index, int target);
+    // round 190mr (DL-68): clip `index`'s fade-out handle (fadeIn: its fade-in handle) dragged to `tick`, as the mouse does
+    bool crossfadeDragForSnapshot (int index, std::int64_t tick, bool fadeIn = false, bool newDrag = true)
+    {
+        drag = fadeIn ? Drag::fadeIn : Drag::fadeOut;
+        dragClip = index;
+        if (newDrag)
+            crossPair = -1;
+        const auto made = crossfadeDragOver (tick);
+        drag = Drag::none;
+        return made;
+    }
     juce::Point<float> fadeHandlePointForSnapshot (int index, int side) const { return fadeHandlePoint (index, side); }
     juce::Point<float> fadeTensionPointForSnapshot (int index, int side) const { return fadeTensionPoint (index, side).value_or (juce::Point<float> { -1.0f, -1.0f }); }
     // FL's gain handle menu of clip `index` (round 166e; Normalize items round 189n): what showGainMenu opens; public for
@@ -460,6 +471,11 @@ private:
                       tempoMarker, headerMove, regionLoop, headerWidth, fadeTension,
                       pointBand, pointsMove, pen }; // (round 190lw, issue #207)
     void swipeTimeSelectionToComp (int lane);
+    // round 190mr (DL-68): Live's crossfade drag-over (the neighbour found when the handle passes the edge, both clips as
+    // they were then: earlier first)
+    bool crossfadeDragOver (std::int64_t tick);
+    int crossPair = -1;
+    std::array<Clip, 2> crossOriginals {};
     // a swipe on a take lane (round 177c): the lane and the range so far
     int swipeLane = -1;
     std::int64_t swipeAnchor = 0, swipeEnd = 0;
