@@ -141,6 +141,8 @@ public:
 // (what the grid copied last, with its slot settings; the Playlist's clipboard holds the same clip for a paste there)
 std::optional<session::SlotClip> copiedSlot;
 std::uint64_t copiedSlotStamp = 0;
+// (round 190lx, DL-29: a rectangle of slots copied or cut; the Playlist's clipboard gets its first clip)
+std::optional<session::SlotBlock> copiedBlock;
 
 class ClipGridComponent final : public juce::Component,
                                 public ui::HintSource,
@@ -2320,11 +2322,48 @@ public:
     }
 
     // --- the clipboard (round 190bv): shared with the Playlist, so a clip goes both ways -----------------------------
+    // round 190lx (DL-29): the rectangle selection's corners (t0 <= t1, s0 <= s1); false without one around (track, scene)
+    bool rangeAround (int track, int scene, int& t0, int& s0, int& t1, int& s1) const noexcept
+    {
+        if (! rangeLive() || ! inRange (track, scene))
+            return false;
+        t0 = juce::jmin (rangeTrack0, selectedTrack), t1 = juce::jmax (rangeTrack0, selectedTrack);
+        s0 = juce::jmin (rangeScene0, selectedScene), s1 = juce::jmax (rangeScene0, selectedScene);
+        return t0 != t1 || s0 != s1;
+    }
+    void selectRectangle (int t0, int s0, int t1, int s1)
+    {
+        t1 = juce::jmin (t1, columnCount() - 1);
+        sceneSelected = titleSelected = false;
+        rangeTrack0 = t0, rangeScene0 = s0, selectedTrack = juce::jmax (t0, t1), selectedScene = s1;
+        markRangeEnd();
+        revealSelection();
+        notify (GridPick::select);
+    }
     void copySlot (int track, int scene, bool cutToo)
     {
+        if (int t0, s0, t1, s1; rangeAround (track, scene, t0, s0, t1, s1)) // round 190lx (DL-29): the whole rectangle
+        {
+            auto block = session::copyBlock (engine.getSong(), t0, s0, t1, s1);
+            if (block.empty())
+                return;
+            auto first = block.clips.front().content.clip;
+            first.gridSlot = -1;
+            first.uid = 0;
+            first.start = 0;
+            PlaylistComponent::setCopiedClips ({ first });
+            copiedBlock = std::move (block);
+            copiedSlot.reset();
+            copiedSlotStamp = PlaylistComponent::copiedStamp();
+            if (cutToo)
+                engine.editSong ([=] (Song& s) { session::clearBlock (s, t0, s0, t1, s1); });
+            repaint();
+            return;
+        }
         auto content = session::copyOf (engine.getSong(), track, scene);
         if (! content)
             return;
+        copiedBlock.reset();
         auto clip = content->clip;
         clip.gridSlot = -1;
         clip.uid = 0;
@@ -2338,13 +2377,21 @@ public:
     }
     static bool canPaste()
     {
-        if (copiedSlot && copiedSlotStamp == PlaylistComponent::copiedStamp())
+        if ((copiedSlot || copiedBlock) && copiedSlotStamp == PlaylistComponent::copiedStamp())
             return true;
         const auto& clips = PlaylistComponent::copiedClips();
         return std::any_of (clips.begin(), clips.end(), [] (const Clip& c) { return c.kind == ClipKind::pattern || c.kind == ClipKind::audio; });
     }
     void pasteSlot (int track, int scene)
     {
+        if (copiedBlock && copiedSlotStamp == PlaylistComponent::copiedStamp()) // round 190lx (DL-29): top-left on the slot
+        {
+            engine.editSong ([=, block = *copiedBlock] (Song& s) { session::pasteBlock (s, track, scene, block); });
+            if (copiedBlock->tracks > 1 || copiedBlock->scenes > 1)
+                selectRectangle (track, scene, track + copiedBlock->tracks - 1, scene + copiedBlock->scenes - 1);
+            repaint();
+            return;
+        }
         if (copiedSlot && copiedSlotStamp == PlaylistComponent::copiedStamp())
             engine.editSong ([=, content = *copiedSlot] (Song& s) { session::paste (s, track, scene, content); });
         else
@@ -2360,6 +2407,15 @@ public:
     }
     void duplicateSlot (int track, int scene)
     {
+        if (int t0, s0, t1, s1; rangeAround (track, scene, t0, s0, t1, s1)) // round 190lx (DL-29): the rectangle, under it
+        {
+            auto at = -1;
+            engine.editSong ([&] (Song& s) { at = session::duplicateBlock (s, t0, s0, t1, s1); });
+            if (at >= 0)
+                selectRectangle (t0, at, t1, at + (s1 - s0));
+            repaint();
+            return;
+        }
         auto to = -1;
         engine.editSong ([&] (Song& s) { to = session::duplicate (s, track, scene); });
         if (to >= 0)

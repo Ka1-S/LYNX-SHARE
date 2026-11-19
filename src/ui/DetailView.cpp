@@ -1822,6 +1822,12 @@ private:
             const auto v01 = range > 0.0 ? (float) ((value - spec.minimum) / range) : 0.0f;
             const auto home = range > 0.0 ? (float) ((juce::jlimit (spec.minimum, spec.maximum, spec.defaultValue) - spec.minimum) / range) : 0.0f;
             ll::drawKnob (g, knob, juce::jlimit (0.0f, 1.0f, v01), home);
+            if (spec.target) // round 190lx (DL-59, capture 190lx L04): Live's red LED on an automated device knob
+            {
+                const auto& automated = engine.getAutomationDisplay().automatedTargets();
+                if (std::find (automated.begin(), automated.end(), *spec.target) != automated.end())
+                    theme::drawLiveKnobAutomationLed (g, knob);
+            }
             g.setColour (hot ? colour::textPrimary : ll::text);
             g.drawText (spec.text (value), rr.removeFromTop (14), juce::Justification::centred, true);
         }

@@ -67,9 +67,13 @@ enum class Icon
     marker, region, setLoop, equalizer, denoise, reverb, spectrogram,
     pointer,           // round 190jq: the Playlist's pointer-click switch, a mouse pointer (issue #191)
     scrub,             // round natives190kj: Edison's Scrub button (a film reel: a ring with four holes around a hub)
-    cycle              // round 190ld: BandLab's Cycle (loop) switch, two arrows round a rounded box (B07 at 966,74)
+    cycle,             // round 190ld: BandLab's Cycle (loop) switch, two arrows round a rounded box (B07 at 966,74)
+    // round 190lx (DL-61, capture190ji live-loop-punch-z3): Live's Punch-In, Loop and Punch-Out switch glyphs
+    punchIn,           // a high run, a slope down, a low run
+    liveLoop,          // an open box with an arrow head pointing left in its bottom gap
+    punchOut           // a low run, a slope up, a high run
 };
-constexpr int iconCount = (int) Icon::cycle + 1;
+constexpr int iconCount = (int) Icon::punchOut + 1;
 
 namespace icons
 {

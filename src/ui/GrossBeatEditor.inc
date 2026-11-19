@@ -216,6 +216,12 @@
         {
             if (! visible (item))
                 continue;
+            if (isGbItem (item, "gbjog")) // round 190lx (DP-9): the dial's read-position ring, only when it moved a degree
+            {
+                if (std::lround (gbDialAngle (before)) != std::lround (gbDialAngle (now)) || before.playing != now.playing)
+                    repaint (rectOf (item).getSmallestIntegerContainer());
+                continue;
+            }
             if (isGbItem (item, "grossbeat"))
             {
                 if (gbLocatorOnGpu()) // (round 190iy: the overlay moves it; nothing under it is painted)
@@ -249,6 +255,20 @@
                     repaint (cell.expanded (1));
             }
         }
+    }
+
+    // Round 190lx (DP-9, capture 190lx films/gbdial): FL's scratch dial does not turn; while playing, a small ring shows
+    // the read position: on the 12 o'clock dot with no delay, moving counter-clockwise 45° per beat of delay (one turn =
+    // the time envelope's 8 beats). Degrees counter-clockwise from 12 o'clock; -1 when stopped.
+    float gbDialAngle (const GbLive& live) const
+    {
+        if (! live.playing)
+            return -1.0f;
+        const auto index = live.slot[0] >= 0 ? live.slot[0] : gbSlotOf (0);
+        if (index < 0 || index >= grossbeat::slotsPerKind)
+            return -1.0f;
+        const auto level = grossbeat::levelAt (gbState().slots[(std::size_t) index], (double) live.position[0] * grossbeat::barBeats);
+        return juce::jlimit (0.0f, 360.0f, (1.0f - level) * 8.0f * 45.0f);
     }
 
     const grossbeat::State& gbState() const
@@ -598,6 +618,57 @@
         repaint();
     }
 
+    // Round 190lx (DP-4, capture 190lx GB2 fl-gb-slot-menu.png): FL's right-click menu of a time / volume slot — Reset,
+    // Edit slot name..., Move slot left, Move slot right, then the slot selector's parameter menu (Automation: Edit events,
+    // Init song with this position, Create automation clip...; Remote control: Link to controller...; Value: Copy value,
+    // Paste value, Type in value...). LYNX's own slot items (copy / paste the slot, flip, factory slots) follow under a line.
+    void gbSlotMenu (juce::Rectangle<float> at)
+    {
+        juce::PopupMenu menu;
+        const auto k = gbEditKind, slot = gbSlotOf (gbEditKind);
+        menu.addItem (tr ("Reset"), [this] { gbResetSlot(); });
+        menu.addItem (tr ("Edit slot name..."), [this] { gbRename(); });
+        menu.addItem (tr ("Move slot left"), slot > 0, false, [this, k, slot] { gbMoveSlot (k, slot, -1); });
+        menu.addItem (tr ("Move slot right"), slot + 1 < grossbeat::slotsPerKind, false, [this, k, slot] { gbMoveSlot (k, slot, 1); });
+        LayoutItem selector;
+        selector.type = Item::knob;
+        selector.param = k == 0 ? "Time slot" : "Volume slot";
+        selector.steps = grossbeat::slotsPerKind - 1;
+        if (const auto param = paramOf (selector); param >= 0)
+        {
+            // (LYNX's parameter menu starts with its own "Reset (value)": FL's slot menu has the slot's Reset above instead)
+            juce::PopupMenu items;
+            ui::addValueItems (items, *this, node.locate ? nullptr : &engine, specFor (selector), param01 (selector.param),
+                               [this, param] (double v) { setParams ({ { param, (float) v } }); });
+            bool first = true;
+            for (juce::PopupMenu::MenuItemIterator it (items); it.next();)
+                if (! std::exchange (first, false))
+                    menu.addItem (it.getItem());
+        }
+        menu.addSeparator();
+        menu.addItem (tr ("Copy"), [this] { gbClipboard = gbState().slots[(std::size_t) gbSlotIndex()]; });
+        menu.addItem (tr ("Paste"), gbClipboard.has_value(), false, [this] {
+            if (gbClipboard)
+                gbWriteSlot (*gbClipboard);
+        });
+        menu.addItem (tr ("Flip vertically"), [this] {
+            auto pts = grossbeat::editPoints (gbState().slots[(std::size_t) gbSlotIndex()]);
+            for (auto& p : pts)
+                p.y = 1.0f - p.y, p.tension = -p.tension;
+            gbWritePoints (pts);
+        });
+        menu.addSubMenu (tr ("Factory slots"), gbFactorySlots());
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (at.toNearestInt())));
+    }
+
+    void gbResetSlot() // an empty slot: a flat bar at full level, unnamed
+    {
+        auto slot = gbState().slots[(std::size_t) gbSlotIndex()];
+        slot.name.clear();
+        grossbeat::setPoints (slot, { { 0.0, 1.0f, 0.0f, 2 }, { grossbeat::barBeats, 1.0f, 0.0f, 2 } });
+        gbWriteSlot (slot);
+    }
+
     void gbOptionsMenu (juce::Rectangle<float> at)
     {
         juce::PopupMenu menu;
@@ -760,6 +831,19 @@
         repaint();
     }
 
+    // Round 190lx (DP-4, FL manual "Right-click the slot button and select Move slot left / Move slot right"): the slot
+    // trades places with its neighbour in the same row of 36; the selection goes with it
+    void gbMoveSlot (int kindIndex, int slot, int delta)
+    {
+        const auto to = slot + delta;
+        if (to < 0 || to >= grossbeat::slotsPerKind || slot < 0 || slot >= grossbeat::slotsPerKind)
+            return;
+        auto state = gbState();
+        std::swap (state.slots[(std::size_t) (kindIndex * grossbeat::slotsPerKind + slot)], state.slots[(std::size_t) (kindIndex * grossbeat::slotsPerKind + to)]);
+        gbWriteState (state);
+        gbSelect (kindIndex, to);
+    }
+
     juce::String gbSlotTitle (int kindIndex, int slot) const
     {
         const auto& name = gbState().slots[(std::size_t) (kindIndex * grossbeat::slotsPerKind + slot)].name;
@@ -849,8 +933,8 @@
             if (const auto slot = gbGridAt (item, e.position); slot >= 0)
             {
                 gbSelect (k, slot);
-                if (e.mods.isPopupMenu()) // right-click: the slot's menu (copy, paste, factory slots…)
-                    gbOptionsMenu (gbGridCell (item, slot));
+                if (e.mods.isPopupMenu()) // right-click: FL's slot menu (round 190lx, DP-4)
+                    gbSlotMenu (gbGridCell (item, slot));
             }
             return true;
         }
@@ -1031,6 +1115,14 @@
                 g.setColour (i == 0 ? (fx.enabled ? accent : colour::textSecondary) : colour::textDisabled);
                 g.fillEllipse (juce::Rectangle<float> (4.0f * s, 4.0f * s).withCentre ({ c.x + std::sin (a) * radius * 0.85f, c.y - std::cos (a) * radius * 0.85f }));
             }
+            // round 190lx (DP-9): FL's read-position ring (1 px, ~11 px across) while playing, counter-clockwise with the delay
+            if (const auto deg = gbDialAngle (gbLive); deg >= 0.0f)
+            {
+                const auto a = -juce::degreesToRadians (deg);
+                g.setColour (fx.enabled ? accent : colour::textSecondary);
+                g.drawEllipse (juce::Rectangle<float> (11.0f * s, 11.0f * s).withCentre ({ c.x + std::sin (a) * radius * 0.85f, c.y - std::cos (a) * radius * 0.85f }),
+                               juce::jmax (1.0f, s));
+            }
             return;
         }
 
@@ -1200,6 +1292,14 @@
             g.drawHorizontalLine ((int) (inner.getY() + inner.getHeight() * (float) i / 8.0f), inner.getX(), inner.getRight());
         g.setColour (colour::gridBar);
         g.drawRect (inner, 1.0f);
+        // round 190lx (DP-5, FL manual "The single dark 'Safety Line' cuts across the first 4 beats"; capture 190lx GB5
+        // fl-gb-env-basic1.png: a 1 px line ~10 / 255 darker than the grid, from "now" at the bar's start to 4 beats back
+        // at its end, the slope of a pause): above it the audio is buffered even in the song's first bar. Time slots only.
+        if (gbEditKind == 0)
+        {
+            g.setColour (juce::Colours::black.withAlpha (0.32f)); // (LYNX's darker ground: the same visible step as FL's)
+            g.drawLine (juce::Line<float> (gbPos (inner, 0.0, 1.0f), gbPos (inner, grossbeat::barBeats, 1.0f - (float) (grossbeat::barBeats / 8.0))), 1.0f);
+        }
 
         const auto shown = gbSlot();
         const auto n = juce::jmax (16, (int) inner.getWidth());

@@ -1292,9 +1292,11 @@ void AudioEngine::startPlayback()
     if (audioArmed && recordOptions.recordAudio)
     {
         const auto here = (std::int64_t) std::llround (transport.positionTicks.load());
-        const auto punching = recordOptions.punchLoopRegion && song.mode == PlayMode::song && song.hasLoop();
-        const auto in = punching ? song.loopStart : here;
-        const auto out = punching ? song.loopEnd : std::numeric_limits<std::int64_t>::max() / 4;
+        const auto punching = recordOptions.punchLoopRegion && song.mode == PlayMode::song && song.hasLoop()
+                              && (recordOptions.punchIn || recordOptions.punchOut);
+        const auto ends = recordloop::punchEnds (here, song.loopStart, song.loopEnd, punching, recordOptions.punchIn, recordOptions.punchOut,
+                                                 std::numeric_limits<std::int64_t>::max() / 4); // (round 190lx: in / out each on its own)
+        const auto in = ends.in, out = ends.out;
         // (seconds: the ADR window's pre-roll, round 174d)
         auto secondsBack = [this] (std::int64_t at, double seconds) {
             const auto from = std::max (0.0, song.secondsForTicks (at) - seconds);
@@ -1308,7 +1310,7 @@ void AudioEngine::startPlayback()
         if (punching || pre > 0)
         {
             activePunch = PunchRange { in, out };
-            if (punching)
+            if (ends.stopsAtOut)
                 punchStopAt = out + (recordOptions.postRollSeconds >= 0.0 ? secondsOn (out, recordOptions.postRollSeconds)
                                      : recordOptions.postRollBars > 0 ? countInLength (song, recordOptions.postRollBars, out) : 0);
             startAt = std::max<std::int64_t> (0, in - pre);

@@ -45,6 +45,7 @@ struct GeneralOptions
     // FL's General › "Select first channel with notes when the pattern changes" (off by default; REA round 167j §5)
     bool selectFirstChannelWithNotes = false;
     bool monophonicPainting = false; // FL's "Monophonic painting in piano roll" (round 189o)
+    bool alternateMeterScale = false; // FL's General › Miscellaneous "Alternate meter scale" (round 190lx, DF-61; off as in FL)
     // FL's General › "Detach all new plugins" (issue #116, off as in FL): new plugin windows open detached
     bool detachNewPlugins = false;
     bool autoSelectLinked = true; // FL's General › "Auto select linked modules" (on, round 187a)

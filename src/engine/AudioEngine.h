@@ -384,6 +384,11 @@ public:
         // song plays straight through it), pre-roll before the punch-in (or before the position recording starts at)
         // and post-roll after the punch-out (then playback stops). Bars; 0 = off.
         bool punchLoopRegion = false;
+        // round 190lx (DL-61, Live's separate Punch-In / Punch-Out switches, manual 19.3.1): which ends of the loop region
+        // the punch uses while punchLoopRegion is on. In only: the take starts at the region's start and runs on until
+        // stopped; out only: it starts where recording starts and ends at the region's end (then the post-roll).
+        // Both (the default, the other looks' one switch): round 163's punch in/out.
+        bool punchIn = true, punchOut = true;
         int preRollBars = 0;
         int postRollBars = 0;
         // round 174d (ADR): pre / post-roll in seconds instead of bars while ≥ 0 (the ADR window sets them for its

@@ -139,6 +139,8 @@ public:
     void openGeneratorWindow (int row, InstrumentKind kind) { openNewGenerator (row, kind); }
     ui::Hint getChannelHintForSnapshot (int channel); // the hint of the channel's name button (--freezetest)
     void setGraphLevelForSnapshot (int level) { graphLevel = level; graphLanes = true; updateSize(); repaint(); }
+    // round 190lx (DE-31): where step `step`'s column sits at `value` in the graph lane (for synthetic mouse events)
+    juce::Point<int> laneSpotForSnapshot (int step, float value) const;
     void rotateSelected (int steps);
     void fillSelected (int every);
     void showEuclideanFill (int channel);
@@ -252,6 +254,10 @@ private:
     int graphLevel = 0; // notetools::Level
     int laneDownStep = -1;
     float laneDownValue = 0.0f;
+    // round 190lx (DE-31, FL manual "Scale all values simultaneously - Hold Ctrl and adjust one column, the others will
+    // follow"): the lane's notes and values at a Ctrl press; the drag scales them all by the pressed column's change
+    std::vector<std::pair<std::size_t, float>> laneScaleFrom;
+    float laneScaleBase = -1.0f; // the pressed column's value at the press (< 0: no Ctrl scaling)
     static constexpr int laneHeight = 72;
     juce::Rectangle<int> stepBounds (int row, int step) const;
     bool cellHasNote (int channel, int step) const;

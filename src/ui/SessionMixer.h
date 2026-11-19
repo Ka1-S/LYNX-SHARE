@@ -95,6 +95,7 @@ public:
     }
 
 private:
+    bool isAutomated (const AutomationTarget& t) const; // (round 190lx, DL-59)
     void refreshCache() const;
     sessionmixer::Strip stripFor (int column) const;
     int insertFor (int column) const; // Main: 0

@@ -190,6 +190,7 @@
 #include "ui/DialogFrame.h"
 #include "ui/FileChoosers.h"
 #include "ui/TrackIcons.h"
+#include "core/MeterScale.h"
 #include "core/RackOps.h"
 #include "core/Layer.h"
 #include "core/XyController.h"
@@ -2655,6 +2656,16 @@ public:
             const auto i = args.indexOf ("--capfix190jjshot");
             const auto set = i + 3 < args.size() && ! args[i + 3].startsWith ("--") ? args[i + 3].unquoted() : juce::String();
             runCapfix190jjShot (args[i + 1].unquoted(), args[i + 2].unquoted(), set);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--details190lxshot"))
+        {
+            // LYNX --details190lxshot prefix project.flp [set.als]: round 190lx off screen (src/DetailsShot190lx.inc)
+            const auto i = args.indexOf ("--details190lxshot");
+            const auto set = i + 3 < args.size() && ! args[i + 3].startsWith ("--") ? args[i + 3].unquoted() : juce::String();
+            setApplicationReturnValue (runDetailsShot190lx (args[i + 1].unquoted(), args[i + 2].unquoted(), set) ? 0 : 1);
             quit();
             return;
         }
@@ -16966,6 +16977,7 @@ private:
 #include "DetailsShot190kn.inc" // round 190kn
 #include "DetailsShot190ld.inc" // round 190ld
 #include "DetailsShot190lr.inc" // round 190lr
+#include "DetailsShot190lx.inc" // round 190lx
     // --trackautoshot190gz (round 190gz): see the dispatch above
     bool runTrackAutoShot190gz (const juce::String& prefix)
     {

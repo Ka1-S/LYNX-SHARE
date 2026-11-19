@@ -96,6 +96,18 @@ struct ButtonColours
 ButtonColours buttonColours (themes::ButtonKind kind, bool on, float hover, bool down, bool enabled);
 
 // --- typography ----------------------------------------------------------------------------------
+// Round 190lx (DL-59, capture 190lx B1 live-led-send.png / live-led-device-knob.png): Live's automation LED on a knob,
+// a red (255,77,71) 4 px dot with a dark ring (about 6 px in all) at the knob's top-left, just outside its ring.
+inline void drawLiveKnobAutomationLed (juce::Graphics& g, juce::Rectangle<float> knob)
+{
+    const auto r = juce::jmin (knob.getWidth(), knob.getHeight()) * 0.5f;
+    const juce::Point<float> at { knob.getCentreX() - 0.82f * r, knob.getCentreY() - 0.88f * r };
+    g.setColour (juce::Colour (0xff060606));
+    g.fillEllipse (juce::Rectangle<float> (6.0f, 6.0f).withCentre (at));
+    g.setColour (juce::Colour (0xffff4d47));
+    g.fillEllipse (juce::Rectangle<float> (4.0f, 4.0f).withCentre (at));
+}
+
 namespace type
 {
 // The text roles at 100 %. Settings › General › Text size (issue #189, round 190ir) scales them per role at start-up

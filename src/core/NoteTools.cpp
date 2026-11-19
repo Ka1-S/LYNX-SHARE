@@ -97,6 +97,54 @@ bool levelIsBipolar (Level level) noexcept
     return level == Level::pan || level == Level::finePitch;
 }
 
+const char* graphLaneName (int lane)
+{
+    return lane == graphNote ? TR_NOOP ("Note") : lane == graphShift ? TR_NOOP ("Shift") : levelName ((Level) std::clamp (lane, 0, levelCount - 1));
+}
+
+float graphValue (const Note& n, int lane, std::int64_t stepTicks) noexcept
+{
+    if (lane == graphNote)
+        return std::clamp ((float) n.key / 127.0f, 0.0f, 1.0f);
+    if (lane == graphShift)
+    {
+        if (stepTicks <= 0)
+            return 0.0f;
+        const auto into = ((n.start % stepTicks) + stepTicks) % stepTicks;
+        return std::clamp ((float) ((double) into / (0.99 * (double) stepTicks)), 0.0f, 1.0f);
+    }
+    return levelValue (n, (Level) std::clamp (lane, 0, levelCount - 1));
+}
+
+void setGraphValue (Note& n, int lane, float v, std::int64_t stepTicks) noexcept
+{
+    v = std::clamp (v, 0.0f, 1.0f);
+    if (lane == graphNote)
+        n.key = (int) std::lround (v * 127.0f);
+    else if (lane == graphShift)
+    {
+        if (stepTicks > 0)
+        {
+            const auto base = n.start - (((n.start % stepTicks) + stepTicks) % stepTicks);
+            n.start = base + (std::int64_t) std::llround ((double) v * 0.99 * (double) stepTicks);
+        }
+    }
+    else
+        setLevelValue (n, (Level) std::clamp (lane, 0, levelCount - 1), v);
+}
+
+float graphDefault (int lane) noexcept
+{
+    if (lane == graphShift)
+        return 0.0f;
+    return graphValue (Note {}, lane, 1);
+}
+
+bool graphIsBipolar (int lane) noexcept
+{
+    return lane >= 0 && lane < levelCount && levelIsBipolar ((Level) lane);
+}
+
 // --- scales -----------------------------------------------------------------------------------
 
 const std::vector<ScaleInfo>& scales()

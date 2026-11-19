@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/MeterScale.h"
 #include <algorithm>
 #include <cmath>
 #include <vector>
@@ -194,7 +195,8 @@ DirtyRows dirtyRows (const PeakHold& before, const PeakHold& after, int heightPx
 // The mixer meters' dB scale: -60 dB at the bottom, +6 dB at the top, linear in dB. 0..1 from the bottom.
 inline float scalePosition (float db) noexcept
 {
-    return std::clamp ((db + 60.0f) / 66.0f, 0.0f, 1.0f);
+    // (round 190lx, DF-61: FL's Alternate meter scale moves the marks with the meters)
+    return meterscale::positionOfDb (db, meterscale::alternate());
 }
 
 // The dB values printed beside a meter `heightPx` tall (round 162, issue #9: FL prints +3, 0, -3, -6, -12...):
@@ -207,6 +209,8 @@ inline std::vector<int> scaleMarks (float heightPx, float minGapPx)
 
     for (auto db : candidates)
     {
+        if (db > 2 && meterscale::alternate()) // (FL's alternate scale ends at about +2.5 dB: no +3 mark)
+            continue;
         const auto y = scalePosition ((float) db) * heightPx;
         const bool fits = std::all_of (kept.begin(), kept.end(), [&] (int k) { return std::abs (scalePosition ((float) k) * heightPx - y) >= minGapPx; });
         if (fits)
