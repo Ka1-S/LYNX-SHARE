@@ -46,7 +46,7 @@ inline std::string list (std::initializer_list<std::pair<int, double>> values, i
 }
 // the bank's defaults (every module present, values of a full reset) with some changes
 inline std::string pre (std::initializer_list<std::pair<int, double>> c = {}) { auto s = list ({ { 15, 1 }, { 16, 20 }, { 17, 1 }, { 19, 1 }, { 20, 20000 }, { 21, 1 } }, 60); return c.size() ? list (c, 60) : s; }
-inline std::string comp (std::initializer_list<std::pair<int, double>> c) { return list (c, 88); }
+inline std::string compModule (std::initializer_list<std::pair<int, double>> c) { return list (c, 88); }
 inline lynx::EffectSlot translate (const std::vector<std::uint8_t>& st, int* n = nullptr)
 {
     lynx::PluginIdentity id;
@@ -129,7 +129,7 @@ TEST (parity190mm_scheps_state_translates_modules_order_and_bypass)
     namespace o = rg::omni;
     // the bank's X4 compressor (VCA 16 : 1, -35 dB, 0.84 / 88.9 ms, +6 dB, 40 %) with the other modules bypassed
     const std::string mods[5] = { pre(), list ({}, 68), list ({}, 62), list ({ { 1, 1 }, { 7, 1 }, { 13, 1 }, { 19, 1 } }, 71),
-                                  comp ({ { 29, 0 }, { 34, 6 }, { 38, 16 }, { 40, -35 }, { 42, 88.9 }, { 44, 0.84 }, { 78, 40 } }) };
+                                  compModule ({ { 29, 0 }, { 34, 6 }, { 38, 16 }, { 40, -35 }, { 42, 88.9 }, { 44, 0.84 }, { 78, 40 } }) };
     const bool bypass[5] = { true, true, true, true, false };
     int n = 0;
     const auto s = translate (state ("153426", mods, bypass), &n);
@@ -151,7 +151,7 @@ TEST (parity190mm_scheps_bypassed_strip_passes_the_signal)
 {
     using namespace lynx;
     using namespace parity190mmscheps;
-    const std::string mods[5] = { pre(), list ({}, 68), list ({}, 62), list ({ { 1, 1 } }, 71), comp ({ { 38, 3.5 } }) };
+    const std::string mods[5] = { pre(), list ({}, 68), list ({}, 62), list ({ { 1, 1 } }, 71), compModule ({ { 38, 3.5 } }) };
     const bool bypass[5] = { true, true, true, true, true };
     const auto s = translate (state ("153426", mods, bypass));
     auto l = sine (48000, 440, -3, 4800), r = sine (48000, 660, -12, 4800);
