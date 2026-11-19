@@ -51,6 +51,9 @@ lynx = Epoch Verb
 # [DATA] class ID from FL wrapper records of real projects
 vst3 = 7654535665657633616c68616c6c6176
 names = ValhallaVintageVerb
+# round 190mb: the reference's own level change away from 48 kHz (Epoch's hidden rateLaw, #21). Only a translated
+# VintageVerb runs it
+replaced = #21=1
 map = xml:Mix -> Mix
 map = xml:PreDelay -> Predelay
 map = xml:Decay -> Decay
@@ -123,6 +126,9 @@ product = Valhalla Supermassive
 vendor = Valhalla DSP
 lynx = Nebula
 names = ValhallaSupermassive
+# round 190mb: the classic networks' per-mode tone and level (Nebula's hidden toneLaw, #15). Only a translated
+# Supermassive runs it
+replaced = #15=1
 map = xml:Mix -> Mix
 map = xml:Delay_Ms -> Delay
 map = xml:DelayWarp -> Warp

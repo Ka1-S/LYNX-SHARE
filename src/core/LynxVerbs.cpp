@@ -1667,6 +1667,14 @@ struct Engine::Impl
             L[t] = (mid + side) * gain;
             R[t] = (mid - side) * gain;
         }
+        if (s.classicTone == 1) // round 190mb: law 1's tone corrector after the classic loop (Nebula's Supermassive role)
+        {
+            designTone (s);
+            if (toneOn)
+                for (int k = 0; k < engineBands; ++k)
+                    if (geqOn[k])
+                        geq[k].processBlock (L, R, n);
+        }
         if (outLowOn)
             outLow.processBlock (L, R, n);
         if (outHighOn)
@@ -2032,8 +2040,64 @@ LYNX_FIT_TABLE Rev1Trim epochTrim[epoch::modeCount] = {
 // the other banks' bass and impulse renders of the same setting 2 … 3 dB under their reference (tp172d S1, refcap182 S1_bass),
 // so the lows keep the 0.1.27 voicing. The level stays where the loop put it: +0.7 … +1.9 dB more lifted the 1 kHz staircase
 // files a step but took sr96 S1's impulse one down — Epoch sits 1.3 dB higher at 96 kHz than at 48 kHz there, a finding of its own)
-LYNX_FIT_TABLE Rev1Trim epochShort = { 0.0, { 0.0, 0.0, 0.0, 2.68, 1.76, 1.45, 2.07, 1.27 } };
+// Round 190mb (the merge with round 190kw's loopLaw, which lifts Concert Hall's level at 0.51 s by its own law): the trim
+// above stacked on the loop law's level took the impulses 1.9 dB over the reference (refcap030 mode / pairs files 4 → 3).
+// Refitted on top of the loop law (three more passes of lab/vvtrim.py): −2.7 dB with the 500 Hz … 8 kHz bands, the lows
+// cancelled out (they stay where the loop law puts them, as round 190ly kept them), and the 1 kHz band 2.5 dB over the
+// impulse fit — the test signal's 1 kHz staircase sat 2.8 … 4.3 dB under the reference where the impulse sat on it
+// (+1.5 / +2.5 / +3.5 dB tried: 2.5 takes every refcap030 / tp172d / refcap182 / verb183b file up or level)
+LYNX_FIT_TABLE Rev1Trim epochShort = { -2.70, { 2.70, 2.70, 2.70, 4.56, 5.26, 2.58, 3.47, 2.03 } };
 LYNX_FIT_TABLE double epochShortEnd = 2.9;
+// round 190mb (nebula::toneLaw): ValhallaSupermassive's per-mode tone and level on Nebula's classic networks (law 0; the
+// six cloud networks keep theirs), from refcap030's Mode sweep (impulse and test signal: Mix 100 %, Feedback 80 %,
+// Density 0, Delay 50 %). There the classic networks' lows ran 2 … 8 dB over the reference and their top 1 … 3 dB under.
+// At Feedback 50 % (tp172d's mode probes, the same states otherwise) the same kind of fit took 12 files down (the
+// time-window spectra of music and bursts, not the long-term one the fit sees): the trim comes in from Feedback 65 % to
+// its full value at 80 % and holds above. Gain (dB) + the tone corrector's octave bands 63 Hz … 8 kHz (dB)
+// (three closed-loop passes of lab/nbtrim.py, each channel's power; Haze and Plateau 1 dB under the fit: their test-signal
+// renders sat 2 dB louder than their impulse ones against the reference, the fit's full level took them a step down)
+LYNX_FIT_TABLE Rev1Trim nebulaTone[nebula::modeCount] = {
+    {}, // Ripple (a cloud network)
+    { 1.14, { -2.89, -2.20, -1.08, -0.15, 0.76, 0.95, 1.72, 4.26 } }, // Swell
+    {}, // Fold (a cloud network)
+    {}, // Drift (a cloud network)
+    {}, // Abyss (a cloud network)
+    { 1.72, { -2.19, -2.35, -1.18, 0.20, 1.00, 0.94, 1.37, 3.41 } }, // Vortex
+    {}, // Glint (a cloud network)
+    { -2.46, { 2.69, -0.18, -1.46, -0.83, -0.36, 0.80, 2.03, 3.01 } }, // Pulse
+    { 2.19, { -4.92, -4.71, -2.46, 1.62, 2.66, 1.34, 1.54, 2.05 } }, // Expanse
+    { 0.54, { -4.89, -3.53, -0.91, 0.69, 0.68, 1.41, 1.65, 1.80 } }, // Haze
+    { 0.34, { -3.16, -2.50, -1.07, 0.32, 0.58, 0.98, 1.67, 1.62 } }, // Veil
+    { -0.10, { -2.62, -1.76, -0.74, 0.17, 0.89, 0.73, 0.69, 1.66 } }, // Mist
+    { 1.53, { -4.93, -3.55, -0.86, 0.70, 0.65, 1.42, 1.64, 1.80 } }, // Monolith
+    { -1.10, { 0.34, -0.42, -0.71, 0.33, 0.07, -0.26, 0.98, 0.78 } }, // Eternity
+    { -0.25, { -2.52, -1.68, -0.70, 0.12, 0.71, 0.74, 0.82, 1.75 } }, // Tide
+    { -0.37, { -2.05, -1.61, -0.89, 0.05, 0.87, 0.66, 0.94, 2.67 } }, // Shoal
+    { -3.40, { 4.95, 3.28, 0.17, -1.24, -1.19, -0.86, -0.16, 0.80 } }, // Spark
+    { 1.20, { -5.99, -2.90, 0.01, 0.69, 0.26, 1.33, 0.61, -1.10 } }, // Plateau
+    { 3.94, { -6.25, -4.96, -2.22, 1.93, 2.96, 1.63, 0.65, -1.52 } }, // Dusk
+    {}, // Mirage (a cloud network)
+    { -0.87, { -0.80, -1.64, -1.29, -0.19, 0.94, 1.12, 1.05, 1.82 } }, // Cluster
+    { -0.43, { -2.64, -1.81, -0.77, 0.13, 0.88, 0.76, 0.80, 1.89 } }, // Beacon
+};
+constexpr double nebulaToneFrom = 0.65, nebulaToneFull = 0.8; // Feedback
+// round 190mb (horizon::revision): ValhallaFutureVerb's tone and level per reverb mode on Horizon's 0.1.27 law, from this
+// round's probe renders of the reference (every reverb mode at its own value, Mix 100 %, Decay 25 %: impulse, test signal,
+// music) and verb183b's / tp172d's captures. Gain (dB) + the tone corrector's octave bands 63 Hz … 8 kHz (dB)
+LYNX_FIT_TABLE Rev1Trim horizonTrim[horizon::reverbModeCount] = {};
+// round 190mb (epoch::rateLaw): ValhallaVintageVerb is not rate-independent where Epoch is (Epoch's impulse at 96 kHz is its
+// 48 kHz one to 0.05 dB). Against its own 48 kHz renders the reference's sr96 captures (refcap182's D / S1 / S2 / S3 states)
+// lose 1.4 … 1.7 dB in the first 80 ms and ~0.9 dB to 300 ms at ColorMode 0.33 (D / S1 / S2), nothing in the tail, while at
+// 0.8 (S3) its tail sits ~0.5 dB higher. Per colour: the early field's and the whole wet level's change per octave of rate (dB)
+struct EpochRate
+{
+    double earlyDb, levelDb;
+};
+// Fitted on refcap030's sr96 block (20 files; lab/erate.sh grid): Epoch's colour 0 (the translated ColorMode 0.33 states D / S1 /
+// S2 / S4) −2 dB a rate octave on the early field, colour 1 (S3, ColorMode 0.8) +0.5 dB on the level; colour 2 has no capture
+// and stays. Every file keeps its score (the step scorer), the mean |level| error 0.88 → 0.76 dB and spectrum 2.18 → 2.11 dB;
+// more early cut or a level cut on colour 0 took 1 … 3 files a step down
+LYNX_FIT_TABLE EpochRate epochRate[epoch::colourCount] = { { -2.0, 0.0 }, { 0.0, 0.5 }, { 0.0, 0.0 } };
 // round 190kw (revision 1 + loopLaw): Epoch's level over Decay and Size from the reference's loop (static REA of
 // ValhallaVintageVerb, docs/analise/REA_rodada190kw.md §4 / §11). Each of its modes is one loop whose gain is the RT60 law
 // 10^(−3 L / (fs T)) split over N gain stages, the input entering after a stage, with no output gain of its own: its wet
@@ -2166,14 +2230,21 @@ bool loadTrims()
                                 &t.db[3], &t.db[4], &t.db[5], &t.db[6], &t.db[7]) == 11)
             {
                 const std::string n = name;
+                if (n == "erate") // round 190mb: "erate <colour> <early dB> <level dB> + 7 unused"
+                {
+                    if (i >= 0 && i < epoch::colourCount)
+                        epochRate[i] = { t.gainDb, t.db[0] };
+                    continue;
+                }
                 if (n == "eshort") // round 190ly: "eshort <end s> <gain> <8 × dB>"
                 {
                     epochShortEnd = i > 0 ? (double) i / 10.0 : epochShortEnd; // (index = the end in tenths of a second)
                     epochShort = t;
                     continue;
                 }
-                Rev1Trim* table = n == "epoch" ? epochTrim : n == "atrium" ? atriumTrim : n == "foil" ? foilTrim : n == "halo" ? haloTrim : n == "room" ? roomTrim : nullptr;
-                const int count = n == "epoch" ? epoch::modeCount : n == "atrium" || n == "room" ? atrium::typeCount : n == "foil" ? foil::typeCount + 1 : 7;
+                Rev1Trim* table = n == "epoch" ? epochTrim : n == "atrium" ? atriumTrim : n == "foil" ? foilTrim : n == "halo" ? haloTrim : n == "room" ? roomTrim
+                                : n == "nebula" ? nebulaTone : n == "horizon" ? horizonTrim : nullptr;
+                const int count = n == "epoch" ? epoch::modeCount : n == "nebula" ? nebula::modeCount : n == "horizon" ? horizon::reverbModeCount : n == "atrium" || n == "room" ? atrium::typeCount : n == "foil" ? foil::typeCount + 1 : 7;
                 if (table != nullptr && i >= 0 && i < count)
                     table[i] = t;
             }
@@ -2378,6 +2449,15 @@ protected:
             if (p[epoch::shortTrim] >= 0.5f && modeIndex == 0) // round 190ly: Concert Hall's short-decay trim (tone only)
                 if (const auto w = std::clamp (std::log (epochShortEnd / std::max (0.01, decay)) / std::log (epochShortEnd / 0.51), 0.0, 1.0); w > 0.0)
                     applyTrim (s, epochShort, w);
+            if (p[epoch::rateLaw] >= 0.5f && rate != 48000.0) // round 190mb: the reference's level away from 48 kHz
+            {
+               #ifdef LYNX_VERB_FIT
+                applyTrim (s, Rev1Trim {}, 0.0); // (loads the fit file's erate lines)
+               #endif
+                const auto octaves = std::log2 (rate / 48000.0);
+                s.earlyLevel *= std::pow (10.0, epochRate[colour].earlyDb * octaves / 20.0);
+                s.gain *= std::pow (10.0, epochRate[colour].levelDb * octaves / 20.0);
+            }
         }
     }
 };
@@ -2954,6 +3034,12 @@ protected:
         // The level is re-measured with the full width: −0.9 dB at Density 0, −4.2 dB from Density 50 % up (the dense
         // network's sides were nearly mono before)
         s.gain *= (0.9 - 0.28 * std::min (1.0, dens / 0.5)) * std::pow (10.0, 5.0 * std::exp (-(double) p[11] / 0.1) / 20.0);
+        if (p[nebula::toneLaw] >= 0.5f) // round 190mb: the Supermassive role's per-mode tone and level (classic networks)
+        {
+            s.classicTone = 1;
+            const auto k = choice (p[12], nebula::modeCount);
+            applyTrim (s, nebulaTone[k], std::clamp ((fb - nebulaToneFrom) / (nebulaToneFull - nebulaToneFrom), 0.0, 1.0));
+        }
     }
 };
 
@@ -3287,6 +3373,8 @@ protected:
         s.gain *= std::min (1.0, 0.56 + 0.88 * size) * std::pow (10.0, 2.2 * std::min (1.0, 2.0 * (1.0 - (double) p[15])) / 20.0);
         if (p[horizon::engineLaw] >= 0.5f)
             applyLaw (s, horizonLaw[mode]);
+        if (p[horizon::engineLaw] >= 0.5f && p[horizon::revision] >= 0.5f) // round 190mb: the reference's tone and level per mode
+            applyTrim (s, horizonTrim[mode]);
     }
 
     // round 183b: the echo section as the reference's manual has it. Echo → Reverb: the echo's output (not the dry

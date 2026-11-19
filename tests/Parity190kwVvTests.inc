@@ -74,6 +74,7 @@ TEST (parity190kw_vv_revision1_renders_as_the_base_commit_did)
         auto slot = makeEffectSlot (EffectKind::epochVerb);
         slot.params[(std::size_t) verbs::epoch::revision] = 1.0f;
         slot.params[(std::size_t) verbs::epoch::loopLaw] = 0.0f;
+        slot.params[(std::size_t) verbs::epoch::shortTrim] = 0.0f; // (190mb merge: round 190ly's trim, not in the base commit)
         slot.params[16] = g.mode; slot.params[2] = g.decay; slot.params[3] = g.size; slot.params[15] = g.colour;
         const int n = (int) (1.6 * 48000.0);
         std::vector<float> l ((std::size_t) n), r ((std::size_t) n);

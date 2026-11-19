@@ -4651,6 +4651,8 @@ EffectSlot makeEffectSlot (EffectKind kind)
     // (round 190ly: Atrium's dense late tank, verbs::atrium::reaLaw, is set only by the ValhallaRoom translator — the owner's
     // perf rule; a new Atrium keeps the light 8-line tank)
     if (kind == EffectKind::halo) slot.params[(std::size_t) verbs::halo::revision] = 1.0f;
+    if (kind == EffectKind::horizon) // round 190mb: a new Horizon runs the 0.1.30 revision (ValhallaFutureVerb's per-mode tone)
+        slot.params[(std::size_t) verbs::horizon::revision] = 1.0f;
     if (kind == EffectKind::latticeMod) // round 190it: … and a new Lattice Mod its tap network's revision 1 (hidden)
         slot.params[(std::size_t) echosuite::lattice::revision] = 1.0f;
 
@@ -4816,6 +4818,7 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
             case EffectKind::atrium: rev = verbs::atrium::revision; break;
             case EffectKind::foilPlate: rev = verbs::foil::revision; break;
             case EffectKind::halo: rev = verbs::halo::revision; break;
+            case EffectKind::horizon: rev = verbs::horizon::revision; break; // round 190mb
             default: break;
         }
         if (rev >= 0 && savedCount <= (std::size_t) rev)
@@ -4826,6 +4829,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
         // round 190ly: an Epoch Verb saved before Concert Hall's short-decay trim keeps revision 1 as it was, bit for bit
         if (slot.kind == EffectKind::epochVerb && savedCount <= (std::size_t) verbs::epoch::shortTrim)
             slot.params[(std::size_t) verbs::epoch::shortTrim] = 0.0f;
+        // round 190mb: Epoch's rate law is only ever saved with a translated ValhallaVintageVerb
+        if (slot.kind == EffectKind::epochVerb && savedCount <= (std::size_t) verbs::epoch::rateLaw)
+            slot.params[(std::size_t) verbs::epoch::rateLaw] = 0.0f;
         // round 190ls: an Atrium saved before the dense tank keeps revision 1 as it was, bit for bit
         if (slot.kind == EffectKind::atrium && savedCount <= (std::size_t) verbs::atrium::reaLaw)
             slot.params[(std::size_t) verbs::atrium::reaLaw] = 0.0f;
@@ -4878,6 +4884,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190ca: a Nebula saved before the cloud law keeps the classic engine in every mode
     if (slot.kind == EffectKind::nebula && savedCount <= (std::size_t) verbs::nebula::law)
         slot.params[(std::size_t) verbs::nebula::law] = 0.0f;
+    // round 190mb: the Supermassive role's tone law is only ever saved with it (a translated ValhallaSupermassive)
+    if (slot.kind == EffectKind::nebula && savedCount <= (std::size_t) verbs::nebula::toneLaw)
+        slot.params[(std::size_t) verbs::nebula::toneLaw] = 0.0f;
 }
 
 std::unique_ptr<Effect> makeParallelEffect (const EffectSlot& slot)
