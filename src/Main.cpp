@@ -363,6 +363,16 @@ void onCrash (void* exceptionPointers)
     static std::atomic<bool> reported { false };
     if (reported.exchange (true))
         return;
+    // rollup 0.1.30 step 12 (owner decision after round 190mo): whatever follows, the process ends within the watchdog's
+    // time (60 s): after a heap corruption everything below that allocates can wait for ever on the allocator's lock
+    lynx::crashguard::armCrashWatchdog (exceptionPointers);
+    // ... and after the C library's (or Windows') heap-corruption abort, nothing that allocates runs at all: a crash file
+    // written without the heap, no session note, no emergency save (the project in memory may be what was broken)
+    if (lynx::crashguard::heapCorruptionCrash (exceptionPointers))
+    {
+        lynx::crashguard::writeHeapCrashFile (exceptionPointers);
+        return;
+    }
     const auto folder = crashFolderForTest != juce::File() ? crashFolderForTest : lynx::platform::settingsFile ("autosave");
     folder.createDirectory();
     const auto stamp = juce::Time::getCurrentTime().formatted ("%Y-%m-%d %H-%M-%S");
@@ -371,6 +381,9 @@ void onCrash (void* exceptionPointers)
     folder.getChildFile ("crash " + stamp + ".txt").replaceWithText (juce::SystemStats::getStackBacktrace() + "\n--- frames (module+offset)\n"
                                                                     + juce::String::fromUTF8 (lynx::crashguard::exceptionBacktrace (exceptionPointers).c_str()));
     lynx::crashguard::note (("crashed: backtrace in autosave\\crash " + stamp + ".txt").toStdString());
+    if (lynx::crashguard::hangInCrashHandlerForTest()) // (--faulttest hang: a handler that never returns; the watchdog ends it)
+        for (;;)
+            std::this_thread::sleep_for (std::chrono::seconds (1));
 
     if (crashEngine != nullptr)
     {
@@ -690,6 +703,8 @@ public:
 
         // a crash in any mode (UI, command line) writes its backtrace to %APPDATA%\LYNX\autosave
         juce::SystemStats::setApplicationCrashHandler (onCrash);
+        // rollup step 12: the crash handler's watchdog and its allocation-free crash file (platform/CrashGuard.h)
+        lynx::crashguard::prepareCrashWatchdog (lynx::platform::settingsFile ("autosave").getFullPathName().toStdString());
         // rollup 0.1.28 (REA 190hb action 4, FL's "Init DWM"): the compositor on MMCSS, steadier frames under CPU load
         // (Windows; LYNX_DWM_MMCSS=0 leaves it off)
         lynx::powerhints::enableCompositorMmcss();
@@ -703,7 +718,20 @@ public:
             // before any window, so that --selftest can check that the crash file gets written (into <folder>)
             const auto i = args.indexOf ("--faulttest");
             crashFolderForTest = juce::File (args[i + 2].unquoted());
+            lynx::crashguard::setCrashFolder (crashFolderForTest.getFullPathName().toStdString());
             lynx::crashguard::quietCrashReports();
+            // rollup step 12: heap = the C library's heap-corruption abort (no recovered project may be written: an
+            // engine is set for the emergency save on purpose); hang = a crash handler that never returns (the watchdog
+            // must end the process: LYNX_CRASH_WATCHDOG_S makes the test short)
+            if (args[i + 1] == "heap" || args[i + 1] == "hang")
+            {
+                static lynx::AudioEngine* engine = new lynx::AudioEngine (false);
+                crashEngine = engine;
+                if (args[i + 1] == "heap")
+                    lynx::crashguard::heapCorruptionForTest();
+                lynx::crashguard::setHangInCrashHandlerForTest();
+                lynx::crashguard::faultForTest (false);
+            }
             // round 190dt: guarded / guarded-libc = LYNX's own fault inside a guarded plugin call (Linux / macOS): it must
             // reach the crash handler like any other; a return means the guard swallowed it
             // round 190gg: thread / thread-libc = a fault on a thread of LYNX's own, with LYNX's executable watched as
@@ -4647,18 +4675,33 @@ private:
         const auto root = juce::File::getSpecialLocation (juce::File::tempDirectory)
                               .getChildFile ("lynx-faulttest-" + juce::String::toHexString (juce::Random::getSystemRandom().nextInt64()));
         juce::StringArray problems;
+       // (rollup step 12: + hang = the crash handler's watchdog ends a handler that never returns, within its time limit
+       // (3 s here); heap = the C library's heap-corruption abort leaves the allocation-free crash file and no recovered
+       // project, at once (before the watchdog: the old handler waited for ever on the allocator's lock); Linux / macOS)
        #if JUCE_WINDOWS
-        const char* const kinds[] = { "plain", "unwalkable" };
+        const char* const kinds[] = { "plain", "unwalkable", "hang" };
        #else
-        const char* const kinds[] = { "plain", "guarded", "guarded-libc", "thread", "thread-libc" };
+        const char* const kinds[] = { "plain", "guarded", "guarded-libc", "thread", "thread-libc", "hang", "heap" };
        #endif
         for (const auto* kind : kinds)
         {
             const auto folder = root.getChildFile (kind);
             folder.createDirectory();
+            const auto watchdogTest = juce::String (kind) == "hang" || juce::String (kind) == "heap";
+           #if JUCE_WINDOWS
+            _putenv_s ("LYNX_CRASH_WATCHDOG_S", watchdogTest ? "3" : "");
+           #else
+            if (watchdogTest)
+                setenv ("LYNX_CRASH_WATCHDOG_S", "3", 1);
+            else
+                unsetenv ("LYNX_CRASH_WATCHDOG_S");
+           #endif
             juce::ChildProcess child;
+            const auto t0 = juce::Time::getMillisecondCounterHiRes();
             const auto started = child.start (juce::StringArray { exe.getFullPathName(), "--faulttest", kind, folder.getFullPathName() }, 0);
-            if (! started || ! child.waitForProcessToFinish (60000))
+            const auto ended = started && child.waitForProcessToFinish (60000);
+            const auto seconds = (juce::Time::getMillisecondCounterHiRes() - t0) / 1000.0;
+            if (! ended)
             {
                 child.kill();
                 problems.add (juce::String (kind) + ": " + (started ? "did not end" : "did not start"));
@@ -4667,6 +4710,16 @@ private:
             juce::String text;
             for (const auto& file : folder.findChildFiles (juce::File::findFiles, false, "crash *.txt"))
                 text = file.loadFileAsString();
+            if (watchdogTest)
+            {
+                const auto recovered = folder.findChildFiles (juce::File::findFiles, false, "recovered *").size();
+                if (juce::String (kind) == "hang" && (seconds < 2.5 || seconds > 30.0 || text.isEmpty()))
+                    problems.add ("hang: ended after " + juce::String (seconds, 1) + " s (the watchdog: 3 s)" + (text.isEmpty() ? ", no crash file" : ""));
+                if (juce::String (kind) == "heap" && (seconds > 20.0 || ! text.contains ("heap-corruption abort") || recovered != 0))
+                    problems.add ("heap: " + juce::String (seconds, 1) + " s, " + (text.isEmpty() ? juce::String ("no crash file") : text.upToFirstOccurrenceOf ("\n", false, false))
+                                  + ", " + juce::String (recovered) + " recovered project(s)");
+                continue;
+            }
            #if JUCE_WINDOWS
             const auto found = text.contains ("0xc0000005");
            #else
@@ -4680,6 +4733,11 @@ private:
                               + " (exit code 0x" + juce::String::toHexString ((juce::int64) child.getExitCode()) + ")");
         }
         root.deleteRecursively();
+       #if JUCE_WINDOWS
+        _putenv_s ("LYNX_CRASH_WATCHDOG_S", "");
+       #else
+        unsetenv ("LYNX_CRASH_WATCHDOG_S");
+       #endif
         return problems.isEmpty() ? juce::String ("OK") : "ERROR " + problems.joinIntoString ("; ");
        #else
         return "SKIPPED (Windows x64, Linux / macOS x86-64 / ARM64 only)";

@@ -175,6 +175,37 @@ std::uint32_t faultInGuardedCallForTest (bool inCLibrary) noexcept;
 // "module+0xoffset" of one code address ("" when unknown)
 std::string describeAddress (const void* address);
 
+// Crash handler watchdog (rollup 0.1.30 step 12, owner decision after round 190mo). The crash handler writes a file and
+// saves the project: both allocate. After the C library's heap-corruption abort (glibc aborts while it holds the
+// arena's lock) the first allocation waits for that lock for ever, so a crash became a hang (25 minutes until a test's
+// timeout). Now:
+// - prepareCrashWatchdog (startup, message thread, after the crash handler is installed): the folder the handler writes
+//   to, the time limit (60 s; LYNX_CRASH_WATCHDOG_S = 1 … 600 for tests), Windows' idle watchdog thread, a first
+//   backtrace() (the C library loads its unwinder then, which allocates). setCrashFolder: another folder (--faulttest).
+// - armCrashWatchdog: the FIRST thing the crash handler does. Linux / macOS: alarm() with SIGALRM back at its default
+//   action and unblocked on this thread (the kernel ends the process; async-signal-safe); Windows: wakes the thread
+//   prepared above, which ends the process with the crash's code (TerminateProcess) after the time limit. Whatever the
+//   handler then does, the process is gone within the limit.
+// - heapCorruptionCrash: the crash is a heap-corruption abort — Linux / macOS: SIGABRT with the C library's allocator
+//   (malloc, free, realloc…; macOS: libsystem_malloc) among the frames above abort(); Windows: STATUS_HEAP_CORRUPTION
+//   (0xC0000374). Allocation-free (backtrace + dladdr on a fixed array).
+// - writeHeapCrashFile: for that case, the crash file without the heap: "crash heap-corruption <time>.txt" in the
+//   prepared folder, written with open / write and the frames by backtrace_symbols_fd (Windows: CreateFileW / WriteFile,
+//   the exception code only). The caller then skips everything that allocates (the usual crash file, the session note,
+//   the emergency save: the project in memory may be what the corruption broke).
+void prepareCrashWatchdog (const std::string& crashFolderUtf8) noexcept;
+void setCrashFolder (const std::string& crashFolderUtf8) noexcept;
+int crashWatchdogSeconds() noexcept;
+void armCrashWatchdog (void* exceptionPointers) noexcept;
+bool heapCorruptionCrash (void* exceptionPointers) noexcept;
+void writeHeapCrashFile (void* exceptionPointers) noexcept;
+// --faulttest heap / hang (tests of the above): `heap` breaks a heap chunk's header and frees its neighbour, so the C
+// library aborts inside free() holding the arena lock (Linux; macOS: frees a pointer it never handed out); `hang`
+// makes the crash handler wait for ever after it armed the watchdog (setHangInCrashHandlerForTest), then faults.
+[[noreturn]] void heapCorruptionForTest() noexcept;
+void setHangInCrashHandlerForTest() noexcept;
+bool hangInCrashHandlerForTest() noexcept;
+
 // UI hang watch (round 157a). A frozen message thread leaves no crash file: Windows shows "not responding" and the
 // user closes LYNX. startHangWatch (on the message thread) starts a watcher thread; heartbeat() (the message thread,
 // from a timer, several times a second) proves the UI is alive. When no heartbeat arrives for `stallMs`, the watcher
