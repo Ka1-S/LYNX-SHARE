@@ -10,6 +10,7 @@
 #include "core/MixSnapshots.h"
 #include "ui/PluginOffTag.h"
 #include "ui/SlotWatch.h"
+#include "ui/RemoteControl.h"
 #include "core/AlsImport.h"
 #include "core/ValueMath.h"
 #include "ui/UiTrace.h"
@@ -7823,25 +7824,47 @@ void EffectsPanel::showSlotMenu (int slot)
     }));
     quickpick::addFolderViewItems (replace, engine);
 
+    // FL's FX slot ▸ menu (round 190mp, DF-77; capture 190mp A5, fl-mixer-slot-menu.png; hint "FX slot N options"): FL's
+    // items in FL's order — Replace ▸, Delete... | Patcherize, Patcherize all | Presets | Spare state | Parameters | CPU |
+    // Move up / down | View editor, Rename, color and icon... F2, Change color..., Random color, Change icon... | Scaling ▸,
+    // Help. An item a mixer slot can't do in LYNX is greyed, never left out (as ui/WrapperMenu.h). LYNX's own items follow
+    // under a line.
+    const auto& fx = (*slots())[(std::size_t) slot];
+    const auto isPlugin = fx.kind == EffectKind::plugin;
+    auto* livePlugin = isPlugin ? dynamic_cast<PluginEffect*> (engine.getEffect (track, slot).get()) : nullptr;
     juce::PopupMenu menu;
     if (extendSlotMenu != nullptr) // (round 183a: the Device View's card adds Fold / Unfold first; the Mixer adds nothing)
         extendSlotMenu (menu, slot);
-    menu.addSubMenu (tr ("Replace with"), replace);
-    // round 190ce: hot-swap from the Mixer too (the Device View's card has its own item and button)
-    if (extendSlotMenu == nullptr && onHotSwapSlot != nullptr)
-        menu.addItem (tr ("Hot-swap in the Browser"), [t = track, slot] {
-            if (onHotSwapSlot != nullptr)
-                onHotSwapSlot (t, slot);
-        });
-    menu.addItem (tr ("Audio editor (record this insert)..."), [this] { openAudioEditorForInsert (engine, track); });
+    menu.addSubMenu (tr ("Replace"), replace);
+    menu.addItem (tr ("Delete...") + "\tDel", [this, slot] { deleteSlot (slot); });
 
-    // FL presets (Plugin presets\Effects\<plugin>) that map to this effect
+    // FL's Patcherize / Patcherize all (round 165m): the effect (or the whole chain) into a new Patcher, same sound
+    menu.addSeparator();
+    menu.addItem (tr ("Patcherize"), patcherize::canPatcherizeSlot (engine.getSong(), track, slot), false, [this, slot] {
+        engine.capturePluginStates(); // (the plugins' current settings go with them)
+        int placed = -1;
+        engine.editSong ([t = track, slot, &placed] (Song& song) { placed = patcherize::patcherizeSlots (song, t, slot, false); });
+        if (placed >= 0)
+            selectedSlot = placed;
+        repaint();
+    });
+    menu.addItem (tr ("Patcherize all"), patcherize::slotsForAll (engine.getSong(), track).size() > 1, false, [this, slot] {
+        engine.capturePluginStates();
+        int placed = -1;
+        engine.editSong ([t = track, slot, &placed] (Song& song) { placed = patcherize::patcherizeSlots (song, t, slot, true); });
+        if (placed >= 0)
+            selectedSlot = placed;
+        repaint();
+    });
+
+    // Presets: FL's presets (Plugin presets\Effects\<plugin>) that map to this effect
+    menu.addSectionHeader (tr ("Presets"));
     {
         juce::PopupMenu presets;
         const auto roots = findFlStudioRoots();
         const auto base = juce::File (juce::String::fromUTF8 (roots.data.c_str())).getChildFile ("Patches/Plugin presets/Effects");
 
-        for (const auto& plugin : flPluginsForEffect ((*slots())[(std::size_t) slot].kind))
+        for (const auto& plugin : flPluginsForEffect (fx.kind))
         {
             juce::PopupMenu sub;
             auto files = base.getChildFile (juce::String::fromUTF8 (plugin.c_str())).findChildFiles (juce::File::findFiles, true, "*.fst");
@@ -7853,12 +7876,12 @@ void EffectsPanel::showSlotMenu (int slot)
                     if (! f.loadFileAsData (data))
                         return;
                     const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
-                    if (auto fx = effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), engine.getSong().bpm, natives::flDataReader (flStudioAccess())))
-                        engine.editSong ([t = track, slot, fx = *fx] (Song& song) {
+                    if (auto loaded = effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), engine.getSong().bpm, natives::flDataReader (flStudioAccess())))
+                        engine.editSong ([t = track, slot, loaded = *loaded] (Song& song) {
                             auto& target = song.mixer[(std::size_t) t].effects[(std::size_t) slot];
                             const auto enabled = target.enabled;
                             const auto mix = target.mix;
-                            target = fx;
+                            target = loaded;
                             target.enabled = enabled;
                             target.mix = mix;
                         });
@@ -7867,14 +7890,102 @@ void EffectsPanel::showSlotMenu (int slot)
             if (sub.getNumItems() > 0)
                 presets.addSubMenu (juce::String::fromUTF8 (plugin.c_str()), sub);
         }
-
-        if (presets.getNumItems() > 0)
-            menu.addSubMenu (tr ("FL presets"), presets);
+        menu.addSubMenu (tr ("Presets"), presets, presets.getNumItems() > 0);
     }
+    menu.addItem (tr ("Browse presets"), false, false, [] {});
+    menu.addItem (tr ("Save preset as..."), false, false, [] {});
+    if (isPlugin)
+    {
+        // FL's "Add to plugin database (flag as favorite)": LYNX's favourites (the picker's stars), as the wrapper menu
+        const auto id = fx.plugin.id;
+        auto& host = engine.getPluginHost();
+        menu.addItem (tr ("Add to plugin database (flag as favorite)"), ! id.empty(), host.favourites().count (id) > 0, [this, id] {
+            auto& h = engine.getPluginHost();
+            h.setFavourite (id, h.favourites().count (id) == 0);
+        });
+    }
+    else
+        menu.addItem (tr ("Add to plugin database (flag as favorite)"), false, false, [] {});
+    menu.addItem (tr ("Display preset name in preset selector"), false, true, [] {});
+
+    // Spare state (FL): LYNX's A/B copy of the settings (the same store as the A/B compare items below)
+    const auto spareKey = std::make_pair (track, slot);
+    const auto hasSpare = spare.count (spareKey) > 0 && spare[spareKey].kind == fx.kind;
+    menu.addSectionHeader (tr ("Spare state"));
+    menu.addItem (tr ("Store in spare state"), [this, spareKey, slot] { spare[spareKey] = (*slots())[(std::size_t) slot]; });
+    menu.addItem (tr ("Flip with spare state"), hasSpare, false, [this, spareKey, slot] {
+        const auto stored = spare[spareKey];
+        spare[spareKey] = (*slots())[(std::size_t) slot];
+        engine.editSong ([t = track, slot, stored] (Song& song) {
+            auto& target = song.mixer[(std::size_t) t].effects[(std::size_t) slot];
+            const auto enabled = target.enabled;
+            target = stored;
+            target.enabled = enabled;
+        });
+    });
+
+    menu.addSectionHeader (tr ("Parameters"));
+    {
+        std::vector<AutomationTarget> targets;
+        if (livePlugin != nullptr)
+            targets = allPluginParameterTargets (livePlugin->getInstance(), { AutomationTargetKind::effectParam, track, slot, 0 });
+        menu.addItem (tr ("Link all parameters..."), ! targets.empty(), false, [this, targets] { openRemoteControlSettings (engine, targets, false); });
+    }
+    menu.addItem (tr ("Browse parameters"), false, false, [] {});
+
+    // FL's slot menu "CPU" section (REA round 139): Allow threaded processing (plugins), Smart disable
+    menu.addSectionHeader (tr ("CPU"));
+    menu.addItem (tr ("Allow threaded processing"), isPlugin, isPlugin && fx.plugin.threaded, [this, slot] {
+        engine.editSong ([t = track, slot] (Song& song) {
+            if (t < (int) song.mixer.size() && slot < (int) song.mixer[(std::size_t) t].effects.size())
+                song.mixer[(std::size_t) t].effects[(std::size_t) slot].plugin.threaded = ! song.mixer[(std::size_t) t].effects[(std::size_t) slot].plugin.threaded;
+        });
+    });
+    // FL's per-plugin "Smart disable": skipped while its input and output are silent
+    menu.addItem (tr ("Smart disable"), true, fx.smartDisable, [this, slot] {
+        engine.editSong ([t = track, slot] (Song& song) {
+            if (t < (int) song.mixer.size() && slot < (int) song.mixer[(std::size_t) t].effects.size())
+                song.mixer[(std::size_t) t].effects[(std::size_t) slot].smartDisable = ! song.mixer[(std::size_t) t].effects[(std::size_t) slot].smartDisable;
+        });
+    });
+    menu.addSeparator();
+    // FL's Move up / Move down (REA FUN_01233de0 / FUN_01235190): one slot, into an empty one too, wrapping around
+    auto move = [this, slot] (int delta) {
+        int now = -1;
+        engine.editSongStructural ([t = track, slot, delta, &now] (Song& song) { now = mixerops::moveEffectBy (song, t, slot, delta); });
+        if (now >= 0)
+            selectedSlot = now;
+        repaint();
+    };
+    menu.addItem (tr ("Move up"), [move] { move (-1); });
+    menu.addItem (tr ("Move down"), [move] { move (1); });
+    menu.addSeparator();
+    {
+        // FL's "View editor": ticked while the effect's window shows (the slot name's click, round 170b)
+        const auto shown = livePlugin != nullptr ? PluginWindows::isOpen (livePlugin->getInstance()) : ui::SlotGoneWatcher::isWindowOpen (engine, track, slot);
+        menu.addItem (tr ("View editor"), true, shown, [this, slot] { toggleEditor (slot); });
+    }
+    menu.addItem (tr ("Rename, color and icon...") + "\tF2", false, false, [] {});
+    menu.addItem (tr ("Change color..."), false, false, [] {});
+    menu.addItem (tr ("Random color"), false, false, [] {});
+    menu.addItem (tr ("Change icon..."), false, false, [] {});
+    menu.addSeparator();
+    menu.addSubMenu (tr ("Scaling"), juce::PopupMenu(), false);
+    menu.addItem (tr ("Help"), false, false, [] {});
+
+    // LYNX's own items
+    menu.addSeparator();
+    // round 190ce: hot-swap from the Mixer too (the Device View's card has its own item and button)
+    if (extendSlotMenu == nullptr && onHotSwapSlot != nullptr)
+        menu.addItem (tr ("Hot-swap in the Browser"), [t = track, slot] {
+            if (onHotSwapSlot != nullptr)
+                onHotSwapSlot (t, slot);
+        });
+    menu.addItem (tr ("Audio editor (record this insert)..."), [this] { openAudioEditorForInsert (engine, track); });
 
     // side inputs: another track's output feeds the compressor's detector, or the vocoder's modulator/carrier. Round
     // 177b: every effect with a side input (plugins with a sidechain bus too) gets the picker, which makes the route
-    const auto kind = (*slots())[(std::size_t) slot].kind;
+    const auto kind = fx.kind;
     auto sideMenu = [&] (const juce::String& title, bool second) {
         juce::PopupMenu side;
         pluginheader::addSidechainPicker (side, engine, track, slot, second);
@@ -7890,7 +8001,6 @@ void EffectsPanel::showSlotMenu (int slot)
     if (kind == EffectKind::newtone || kind == EffectKind::newtime)
     {
         // the sample the plugin plays in slave mode (REA_rodada73): FL's edits are kept in the state but not reproduced
-        const auto& fx = (*slots())[(std::size_t) slot];
         const auto current = juce::File (juce::String::fromUTF8 (fx.samplePath.c_str()));
         juce::PopupMenu source;
         source.addItem (fx.samplePath.empty() ? tr ("No sample") : current.getFileName(), false, false, [] {});
@@ -7918,15 +8028,13 @@ void EffectsPanel::showSlotMenu (int slot)
     }
     {
         // A/B compare: keep a copy of the settings, then swap between it and the current ones
-        const auto key = std::make_pair (track, slot);
-        const auto hasSpare = spare.count (key) > 0 && spare[key].kind == (*slots())[(std::size_t) slot].kind;
         juce::PopupMenu ab;
-        ab.addItem (tr ("Store the current settings as B"), [this, key, slot] {
-            spare[key] = (*slots())[(std::size_t) slot];
+        ab.addItem (tr ("Store the current settings as B"), [this, spareKey, slot] {
+            spare[spareKey] = (*slots())[(std::size_t) slot];
         });
-        ab.addItem (tr ("Swap with B"), hasSpare, false, [this, key, slot] {
-            const auto stored = spare[key];
-            spare[key] = (*slots())[(std::size_t) slot];
+        ab.addItem (tr ("Swap with B"), hasSpare, false, [this, spareKey, slot] {
+            const auto stored = spare[spareKey];
+            spare[spareKey] = (*slots())[(std::size_t) slot];
             engine.editSong ([t = track, slot, stored] (Song& song) {
                 auto& target = song.mixer[(std::size_t) t].effects[(std::size_t) slot];
                 const auto enabled = target.enabled;
@@ -7934,88 +8042,40 @@ void EffectsPanel::showSlotMenu (int slot)
                 target.enabled = enabled;
             });
         });
-        ab.addItem (tr ("Forget B"), hasSpare, false, [key] { spare.erase (key); });
+        ab.addItem (tr ("Forget B"), hasSpare, false, [spareKey] { spare.erase (spareKey); });
         menu.addSubMenu (hasSpare ? tr ("A/B compare (B stored)") : tr ("A/B compare"), ab);
     }
-    if ((*slots())[(std::size_t) slot].isSubstitute()) // A/B of every substitute of the project at once (round 113)
+    if (fx.isSubstitute()) // A/B of every substitute of the project at once (round 113)
         menu.addItem (tr ("Bypass all LYNX SHARE substitutes of this project"), true, engine.getSong().substitutesBypassed, [this] {
             engine.editSong ([] (Song& song) { song.substitutesBypassed = ! song.substitutesBypassed; });
             repaint();
         });
-    // FL's slot menu "CPU" section (REA round 139): Allow threaded processing (plugins), Smart disable
-    menu.addSectionHeader (tr ("CPU"));
-    if ((*slots())[(std::size_t) slot].kind == EffectKind::plugin)
-        menu.addItem (tr ("Allow threaded processing"), true, (*slots())[(std::size_t) slot].plugin.threaded, [this, slot] {
-            engine.editSong ([t = track, slot] (Song& song) {
-                if (t < (int) song.mixer.size() && slot < (int) song.mixer[(std::size_t) t].effects.size())
-                    song.mixer[(std::size_t) t].effects[(std::size_t) slot].plugin.threaded = ! song.mixer[(std::size_t) t].effects[(std::size_t) slot].plugin.threaded;
-            });
-        });
-    // FL's per-plugin "Smart disable": skipped while its input and output are silent
-    menu.addItem (tr ("Smart disable"), true, (*slots())[(std::size_t) slot].smartDisable, [this, slot] {
-        engine.editSong ([t = track, slot] (Song& song) {
-            if (t < (int) song.mixer.size() && slot < (int) song.mixer[(std::size_t) t].effects.size())
-                song.mixer[(std::size_t) t].effects[(std::size_t) slot].smartDisable = ! song.mixer[(std::size_t) t].effects[(std::size_t) slot].smartDisable;
-        });
-    });
-    menu.addSeparator();
-    // FL's Move up / Move down (REA FUN_01233de0 / FUN_01235190): one slot, into an empty one too, wrapping around
-    auto move = [this, slot] (int delta) {
-        int now = -1;
-        engine.editSongStructural ([t = track, slot, delta, &now] (Song& song) { now = mixerops::moveEffectBy (song, t, slot, delta); });
-        if (now >= 0)
-            selectedSlot = now;
-        repaint();
-    };
-    menu.addItem (tr ("Move up"), [move] { move (-1); });
-    menu.addItem (tr ("Move down"), [move] { move (1); });
-    if ((*slots())[(std::size_t) slot].kind == EffectKind::plugin)
+    if (isPlugin)
     {
         // round 190ao: only while the plugin is down (it crashed, or its separate process died)
         if (engine.hostedPluginDown ({ -1, track, slot }))
             menu.addItem (tr ("Reload crashed plugin"), [this, t = track, slot] { PluginWindows::reload (engine, { { -1, t, slot } }); });
-        auto* live = dynamic_cast<PluginEffect*> (engine.getEffect (track, slot).get());
-        menu.addSubMenu (tr ("Processing"), pluginProcessingMenu (engine, (*slots())[(std::size_t) slot].plugin, live != nullptr ? &live->getInstance() : nullptr,
+        menu.addSubMenu (tr ("Processing"), pluginProcessingMenu (engine, fx.plugin, livePlugin != nullptr ? &livePlugin->getInstance() : nullptr,
                                                                 [t = track, slot] (Song& song) -> PluginRef* {
                                                                     if (t >= (int) song.mixer.size() || slot >= (int) song.mixer[(std::size_t) t].effects.size())
                                                                         return nullptr;
                                                                     return &song.mixer[(std::size_t) t].effects[(std::size_t) slot].plugin;
                                                                 }));
+        if (livePlugin != nullptr)
+            addPluginParameterItems (menu, engine, livePlugin->getInstance(), { AutomationTargetKind::effectParam, track, slot, 0 });
     }
-    if ((*slots())[(std::size_t) slot].kind == EffectKind::plugin)
-    {
-        if (auto* p = dynamic_cast<PluginEffect*> (engine.getEffect (track, slot).get()))
-            addPluginParameterItems (menu, engine, p->getInstance(), { AutomationTargetKind::effectParam, track, slot, 0 });
-    }
-    if ((*slots())[(std::size_t) slot].kind == EffectKind::patcher) // its published parameters (round 171b)
-        addPatcherParameterItems (menu, engine, (*slots())[(std::size_t) slot].patcher, { AutomationTargetKind::effectParam, track, slot, 0 });
+    if (fx.kind == EffectKind::patcher) // its published parameters (round 171b)
+        addPatcherParameterItems (menu, engine, fx.patcher, { AutomationTargetKind::effectParam, track, slot, 0 });
 
-    // FL's Patcherize / Patcherize all (round 165m): the effect (or the whole chain) into a new Patcher, same sound
-    menu.addSeparator();
-    menu.addItem (tr ("Patcherize"), patcherize::canPatcherizeSlot (engine.getSong(), track, slot), false, [this, slot] {
-        engine.capturePluginStates(); // (the plugins' current settings go with them)
-        int placed = -1;
-        engine.editSong ([t = track, slot, &placed] (Song& song) { placed = patcherize::patcherizeSlots (song, t, slot, false); });
-        if (placed >= 0)
-            selectedSlot = placed;
-        repaint();
-    });
-    menu.addItem (tr ("Patcherize all"), patcherize::slotsForAll (engine.getSong(), track).size() > 1, false, [this, slot] {
-        engine.capturePluginStates();
-        int placed = -1;
-        engine.editSong ([t = track, slot, &placed] (Song& song) { placed = patcherize::patcherizeSlots (song, t, slot, true); });
-        if (placed >= 0)
-            selectedSlot = placed;
-        repaint();
-    });
     // round 183c: Live's Group (Ctrl+G): the effect (or the whole chain) into a new Audio Effect Rack, same sound; the
     // automation of the moved effects' parameters drives the rack's macros
+    menu.addSeparator();
     menu.addItem (tr ("Group into Audio Effect Rack"), patcherize::canPatcherizeSlot (engine.getSong(), track, slot), false, [this, slot] { groupIntoRack (slot, false); });
     menu.addItem (tr ("Group all into Audio Effect Rack"), patcherize::slotsForAll (engine.getSong(), track).size() > 1, false, [this, slot] { groupIntoRack (slot, true); });
     // Live's Ungroup: a one-chain Audio Effect Rack's devices back into the slots
-    if (const auto* list = slots(); list != nullptr && slot < (int) list->size() && rack::isRack ((*list)[(std::size_t) slot]))
+    if (rack::isRack (fx))
     {
-        const auto* r = rack::rackOf ((*list)[(std::size_t) slot].patcher);
+        const auto* r = rack::rackOf (fx.patcher);
         const auto canUngroup = r != nullptr && r->kind == RackDoc::Kind::audioEffect && r->chains.size() == 1;
         menu.addItem (tr ("Ungroup"), canUngroup, false, [this, slot] {
             engine.capturePluginStates();
@@ -8026,8 +8086,6 @@ void EffectsPanel::showSlotMenu (int slot)
             repaint();
         });
     }
-    menu.addSeparator();
-    menu.addItem (tr ("Delete") + "\tDel", [this, slot] { deleteSlot (slot); });
 
     if (slotMenuForSnapshot != nullptr) // (the shot routes: the menu itself, nothing opens)
     {

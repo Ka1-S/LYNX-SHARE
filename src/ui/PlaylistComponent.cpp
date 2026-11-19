@@ -1206,6 +1206,11 @@ PlaylistComponent::PlaylistComponent (AudioEngine& e)
     snapBox.onChange = [this] { repaint(); };
     addAndMakeVisible (snapBox);
     tools.onChange = [this] (EditTool) { updateCursor (juce::ModifierKeys::currentModifiers); };
+    tools.onZoomMenu = [this] (juce::Component& button) { // (round 190mp, DE-74)
+        quickZoomMenu ("playlist.", [this] (const std::string& id) { return runAction (id); }, shortcutText,
+                       engine.getSong().performanceZoneEnd() > 0)
+            .showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&button));
+    };
     setOpaque (true); // paints every pixel: nothing behind it is redrawn while scrolling
     if (const auto* v = std::getenv ("LYNX_PLAYLIST_CACHE"); v == nullptr || juce::String (v) != "0")
     {
@@ -5728,6 +5733,17 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
     gliding = false;
     pointerPress = placedByDoubleClick = false; // (round 190jq)
 
+    // FL's middle + right click (round 190mp, DE-62; FL manual Playlist §8, captured in the Piano roll 190mp A3.2): the
+    // second button opens the main menu at the mouse with the tools' "Mode" column on its left
+    if (e.mods.isMiddleButtonDown() && e.mods.isRightButtonDown() && e.x >= headerWidth)
+    {
+        drag = Drag::none;
+        setMouseCursor (juce::MouseCursor::NormalCursor);
+        toolModeMenu (tools, [this] (EditTool t) { tools.setTool (t); }, mainMenu != nullptr ? mainMenu() : juce::PopupMenu())
+            .showMenuAsync (juce::PopupMenu::Options().withMousePosition());
+        return;
+    }
+
     if (e.mods.isMiddleButtonDown() && e.x >= headerWidth) // middle-drag pans, in every tool
     {
         const auto onClips = gridArea().contains (e.getPosition());
@@ -9669,6 +9685,8 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
                 pltracks::autoName (s, t);
         });
     });
+    // FL's "Auto name clips" (round 190mp, DE-127; EEPLTrackAutoNameChildMenuClick, capture 190mp A1): after "Auto name"
+    menu.addItem (tr ("Auto name clips"), [this, track, tracks = tracksForMenu (track)] { autoNameClipsFromMenu (track, tracks); });
     menu.addItem (tr ("Reset"), [this, track] {
         editTrack (track, [] (PlaylistTrack& t) {
             t.name.clear();
@@ -10027,17 +10045,17 @@ void PlaylistComponent::freezeTrackChannels (std::vector<std::uint64_t> uids)
     }
 }
 
-void PlaylistComponent::renameTrack (int track)
+void PlaylistComponent::renameTrack (int track, std::function<void (Song&)> alsoEdit)
 {
     const auto& tracks = engine.getSong().playlistTracks;
     const auto current = track < (int) tracks.size() ? juce::String::fromUTF8 (tracks[(std::size_t) track].name.c_str()) : juce::String();
     const auto colour = track < (int) tracks.size() ? tracks[(std::size_t) track].colour : 0u;
     // issue #201 (round 190ll, core/SelectionRename.h): a new colour goes to every selected track (the name to this one)
     showNameAndColourDialog (tr ("Rename track"), current.isNotEmpty() ? current : tr ("Track {0}", { juce::String (track + 1) }), colour,
-                             [this, track, colour, targets = tracksForMenu (track)] (const juce::String& newName, std::uint32_t newColour) {
+                             [this, track, colour, targets = tracksForMenu (track), alsoEdit] (const juce::String& newName, std::uint32_t newColour) {
                                  const auto name = newName.trim().toStdString();
                                  const auto together = simpleHeaders && simpletracks::kindOf (engine.getSong(), track).has_value();
-                                 engine.editSong ([track, name, newColour, together, colour, targets] (Song& s) {
+                                 engine.editSong ([track, name, newColour, together, colour, targets, alsoEdit] (Song& s) {
                                      if ((int) s.playlistTracks.size() <= track)
                                          s.playlistTracks.resize ((std::size_t) track + 1);
                                      if (together) // (the Simple workflow: the track, its insert and its channel, round 184a)
@@ -10048,11 +10066,44 @@ void PlaylistComponent::renameTrack (int track)
                                              for (const auto t : targets)
                                                  if (t != track)
                                                      recolourTrack (s, t, newColour, true);
-                                         return;
                                      }
-                                     selrename::applyToPlaylistTracks (s, track, targets, { {}, name, colour, newColour });
+                                     else
+                                         selrename::applyToPlaylistTracks (s, track, targets, { {}, name, colour, newColour });
+                                     // (round 190mp: FL's Auto name clips asks for a name first, then names the clips)
+                                     if (alsoEdit != nullptr && ! name.empty())
+                                         alsoEdit (s);
                                  });
                              });
+}
+
+// FL's Auto name clips (FUN_01213040, round 190mp REA): a track without a name asks for one first (FL's name box; Cancel
+// changes nothing); then the other selected tracks without a name take it ("Name #2"…, FUN_012eb350) and every selected
+// track's clips are named after their track (FUN_012ef5f0; FUN_012eafa0 mask 0x40). One undo step.
+void PlaylistComponent::autoNameClipsFromMenu (int track, const std::vector<int>& tracks)
+{
+    const auto apply = [track, tracks] (Song& s) {
+        if (track < 0 || track >= (int) s.playlistTracks.size() || s.playlistTracks[(std::size_t) track].name.empty())
+            return;
+        const auto name = s.playlistTracks[(std::size_t) track].name;
+        int suffix = 2;
+        for (std::size_t i = 0; i < tracks.size(); ++i)
+        {
+            const auto t = tracks[i];
+            if ((int) s.playlistTracks.size() <= t)
+                s.playlistTracks.resize ((std::size_t) t + 1);
+            if (s.playlistTracks[(std::size_t) t].name.empty())
+                s.playlistTracks[(std::size_t) t].name = i > 0 ? name + " #" + std::to_string (suffix++) : name;
+        }
+        pltracks::autoNameClips (s, track);
+        for (const auto t : tracks)
+            if (t != track)
+                pltracks::autoNameClips (s, t);
+    };
+    const auto& song = engine.getSong();
+    if (track >= (int) song.playlistTracks.size() || song.playlistTracks[(std::size_t) track].name.empty())
+        renameTrack (track, apply);
+    else
+        engine.editSong (apply);
 }
 
 juce::String PlaylistComponent::markerLabel (const Marker& m)
@@ -13839,6 +13890,18 @@ void PlaylistComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::M
     const auto wheel = flmods::normalisedWheel (rawWheel); // Windows touchpads: pieces of a notch (round 170e)
     const auto ctrl = flmods::ctrl (e.mods), alt = e.mods.isAltDown(), shift = e.mods.isShiftDown();
 
+    // FL's right-hold + wheel (round 190mp, DE-61; FL manual, captured in the Piano roll 190mp A3.3): over the clips each
+    // notch down picks the next tool to the right, up the one to the left (no wrap); the held press does nothing more
+    if (e.mods.isRightButtonDown() && ! e.mods.isLeftButtonDown() && ! e.mods.isMiddleButtonDown() && e.x >= headerWidth)
+    {
+        if (wheel.deltaY != 0.0f)
+        {
+            drag = Drag::none;
+            tools.step (wheel.deltaY < 0.0f ? 1 : -1);
+        }
+        return;
+    }
+
     // issue #154: the wheel scrolls a linked header's effects list when it has more rows than fit
     if (! shift && ! ctrl && ! alt && insertsWheel (e, wheel.deltaY))
         return;
@@ -15357,6 +15420,28 @@ void PatternPicker::mouseDown (const juce::MouseEvent& e)
         return;
 
     const auto& row = list[(std::size_t) i];
+    // FL's Alt+right-hold on a pattern (round 190mp, DE-134; capture 190mp A6, fl-pl-picker-preview.png): the entry is
+    // selected, the pattern becomes the current one, the transport switches to pattern mode and plays it from its start
+    // while the button is held; no menu. The release stops it and puts SONG mode back (mouseUp).
+    if (row.kind == ClipKind::pattern && e.mods.isAltDown() && e.mods.isRightButtonDown() && ! e.mods.isLeftButtonDown())
+    {
+        pickersel::clamp (picked, (int) engine.getSong().patterns.size());
+        picked.clear();
+        picked.add (row.index);
+        playlist.brush = { row.kind, row.index, {} };
+        seenBrush = row.kind;
+        if (engine.getTransport().playing.load())
+            engine.stop();
+        previewModeBefore = (int) engine.getSong().mode;
+        engine.editSong ([p = row.index] (Song& s) {
+            s.currentPattern = p;
+            s.mode = PlayMode::pattern;
+        }, false);
+        engine.seek (0.0);
+        engine.play();
+        repaint();
+        return;
+    }
     if (! flmods::popup (e.mods))
         dragRow = i; // (issue #177: a drag from here places it on the Playlist)
     // issue #175 (FL 2026, checked live: shots/FL-175-picker-choice-paints-plain.png): a click on the item the clicked
@@ -15499,6 +15584,12 @@ juce::Image PatternPicker::dragImageOf (int listRow)
     return image;
 }
 
+int PatternPicker::rowCentreForSnapshot (int pattern) const
+{
+    const auto r = listRowOfPattern (pattern);
+    return r < 0 ? -1 : headerHeight + (r - scroll) * rowHeight + rowHeight / 2;
+}
+
 int PatternPicker::listRowOfPattern (int pattern) const
 {
     const auto list = rows();
@@ -15511,6 +15602,16 @@ int PatternPicker::listRowOfPattern (int pattern) const
 void PatternPicker::mouseUp (const juce::MouseEvent& e)
 {
     const AudioEngine::UndoGesture undoGesture (engine, AudioEngine::UndoGesture::end); // (closes when mouseUp returns)
+    if (previewModeBefore >= 0) // (round 190mp, DE-134: the Alt+right-hold preview ends: stop, the mode it had, the start)
+    {
+        engine.stop();
+        if (engine.getSong().mode != (PlayMode) previewModeBefore)
+            engine.editSong ([m = (PlayMode) previewModeBefore] (Song& s) { s.mode = m; }, false);
+        engine.seek (0.0);
+        previewModeBefore = -1;
+        repaint();
+        return;
+    }
     if (dragging) // (issue #177: the drag ended; the press changed nothing more)
     {
         dragging = false;
@@ -15599,7 +15700,7 @@ ui::Hint PatternPicker::hintAt (juce::Point<int> p)
     {
         hint.value = list[(std::size_t) i].name;
         hint.text = list[(std::size_t) i].kind == ClipKind::pattern
-                        ? tr ("Pattern: [LMB] paint it with the pencil  [drag] place it on the Playlist (Shift on drop: one after another)  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu")
+                        ? tr ("Pattern: [LMB] paint it with the pencil  [drag] place it on the Playlist (Shift on drop: one after another)  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu  [Alt+RMB] hold to hear it")
                         : tr ("Clip source: [LMB] paint it with the pencil  [drag] place it on the Playlist");
         hint.hasMenu = list[(std::size_t) i].kind == ClipKind::pattern;
     }

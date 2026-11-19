@@ -777,6 +777,9 @@ public:
     double songBpm() const noexcept { return ownBpm; }
     // > 0: the tempo of an external MIDI clock LYNX follows (round 165f), over the song's tempo and its automation
     void setTempoOverride (double b) noexcept { tempoOverride = b; }
+    // FL's tempo menu "Half speed" (round 190mp, DF-16; capture 190mp A4): 0.5 plays everything at half the tempo it has
+    // (automation and an override included) while the tempo shown stays; 1 = normal. Live playback only.
+    void setPlaySpeed (double s) noexcept { playSpeed = s > 0.0 ? s : 1.0; }
 
     // ---- Hardware MIDI outputs (round 190jl) ------------------------------------------------------------------------
     // The ports the output devices have (FL's Options › MIDI › Output "Port"; a 256-bit set, any thread; none = off). A
@@ -1049,6 +1052,7 @@ private:
     double bpm = 120.0;
     double ownBpm = 120.0;
     double tempoOverride = 0.0;
+    double playSpeed = 1.0;
     bool wasPlaying = false;
     double expectedTick = -1.0; // where the next block should start, to detect jumps
     bool resumeAudio = false;

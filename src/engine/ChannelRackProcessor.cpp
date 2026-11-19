@@ -37,6 +37,8 @@ void ChannelRackProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
     // foresee, 190gq's `external`: a Link session keeps render-ahead off, as an external MIDI clock does)
     const auto external = transport.overrideBpm();
     renderer.setTempoOverride (external);
+    const auto speed = transport.playSpeed.load (std::memory_order_relaxed); // (round 190mp: FL's Half speed)
+    renderer.setPlaySpeed (speed);
 
     // the metronome's click for this block, into its mixer track (FL: never in an export, so neither in an offline
     // render nor in a real-time bounce)
@@ -82,7 +84,7 @@ void ChannelRackProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
         model.throughRegion = liveInput != nullptr && liveInput->noLoopRegion.load (std::memory_order_relaxed);
         model.markers = &markers;
         model.pendingAt = transport.pendingJumpAt.load (std::memory_order_relaxed);
-        model.predictable = external <= 0.0 && transport.countIn.load (std::memory_order_relaxed) <= 0.0;
+        model.predictable = external <= 0.0 && speed == 1.0 && transport.countIn.load (std::memory_order_relaxed) <= 0.0;
         block.model = &model;
     }
 
@@ -112,7 +114,7 @@ void ChannelRackProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
     // tempo automation: the transport advances at the tempo the renderer used
     const auto* state = ahead->currentState();
     if (state != nullptr && state->tempoMap && transport.overrideBpm() <= 0.0)
-        transport.bpm.store (renderer.currentBpm(), std::memory_order_relaxed);
+        transport.bpm.store (renderer.currentBpm() / speed, std::memory_order_relaxed); // (the transport scales it itself)
     // (round 190gl) the song's own tempo now, for the Link session: it proposes the song's tempo automation to the peers
     if (state != nullptr)
     {

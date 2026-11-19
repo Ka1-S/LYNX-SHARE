@@ -263,6 +263,7 @@ public:
     // the Multilink button's right-click menu (round 190ey: shown by it, and the shot route's)
     juce::PopupMenu getMultilinkMenuForSnapshot();
     PlaylistComponent& getPlaylistForSnapshot() { return playlist; }
+    juce::PopupMenu tempoMenuForSnapshot() { return tempoDisplay.buildMenu(); } // (round 190mp, DF-16)
     juce::Component& getRackViewportForSnapshot() { return rackViewport; }
     std::unique_ptr<juce::Component> makeQuickAddForSnapshot();
     PatternPicker& getPickerForSnapshot() { return picker; }
@@ -637,6 +638,7 @@ private:
         void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
         ui::Hint hintAt (juce::Point<int> position) override;
         void showMenu();
+        juce::PopupMenu buildMenu(); // (round 190mp: the shots read it)
         void showTap();
 
     private:

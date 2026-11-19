@@ -2761,6 +2761,15 @@ public:
             return;
         }
 
+        if (args.contains ("--details190mpshot"))
+        {
+            // LYNX --details190mpshot prefix project.flp: round 190mp off screen (src/DetailsShot190mp.inc)
+            const auto i = args.indexOf ("--details190mpshot");
+            setApplicationReturnValue (runDetailsShot190mp (args[i + 1].unquoted(), i + 2 < args.size() ? args[i + 2].unquoted() : juce::String()) ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--details190mkshot"))
         {
             // LYNX --details190mkshot prefix project.flp: round 190mk off screen (src/DetailsShot190mk.inc)
@@ -17165,6 +17174,7 @@ private:
 #include "DetailsShot190lx.inc" // round 190lx
 #include "DetailsShot190mf.inc" // round 190mf
 #include "DetailsShot190mk.inc" // round 190mk
+#include "DetailsShot190mp.inc" // round 190mp
     // --trackautoshot190gz (round 190gz): see the dispatch above
     bool runTrackAutoShot190gz (const juce::String& prefix)
     {

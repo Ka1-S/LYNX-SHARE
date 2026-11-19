@@ -103,6 +103,9 @@ public:
     // FL's "+" at the top left of the track headers (AddInstrBtn, round 190dx): left click = this menu ("Audio track":
     // Add audio track; "Instrument track": More plugins..., the generators), right click = addAudioTrackNow
     juce::PopupMenu getAddTrackMenuForSnapshot() { return buildAddTrackMenu(); }
+    juce::PopupMenu trackMenuForSnapshot (int track) { return buildTrackMenu (track); }            // (round 190mp)
+    void autoNameClipsForSnapshot (int track) { autoNameClipsFromMenu (track, { track }); }        // (round 190mp, DE-127)
+    const ToolStrip& toolsForSnapshot() const noexcept { return tools; }                           // (round 190mp)
     juce::Component* getAddTrackButtonForSnapshot() const noexcept { return addTrackButton.get(); }
     int addAudioTrackNow(); // FL's Add audio track: the new track (selected, in view), −1 when none could be made
 
@@ -175,6 +178,8 @@ public:
     juce::PopupMenu selectMenu();
     // The shortcut text of a key map action for menus ("\tShift+C"; empty when unbound), set by the main window.
     static inline std::function<juce::String (const std::string& id)> shortcutText;
+    // The Playlist's main menu (its window's ▾ items), for FL's middle + right click tool menu (round 190mp, DE-62).
+    std::function<juce::PopupMenu()> mainMenu;
     // Issue #170 (round 190ib): turns the project's "Link Playlist tracks to mixer tracks" on or off. Switching on first
     // lists what it will change (core/PlaylistOps.h autolink::planOn: inserts moved, channels routed, tracks that only
     // repeat others) and asks when it changes more than links; it is one undo step. `done (applied)` runs after.
@@ -749,7 +754,9 @@ private:
     void refreshArrangementBox();
     void arrangementChosen();
     void renameArrangement();
-    void renameTrack (int track);
+    // `alsoEdit` (round 190mp): run in the same edit (one undo step) after a non-empty name was given
+    void renameTrack (int track, std::function<void (Song&)> alsoEdit = nullptr);
+    void autoNameClipsFromMenu (int track, const std::vector<int>& tracks);
     void freezeTrackChannels (std::vector<std::uint64_t> uids); // round 190fo: the Simple track menu's Freeze
     void showTrackMenu (int track);
     juce::PopupMenu buildTrackMenu (int track);
@@ -1183,6 +1190,7 @@ public:
     static juce::Point<int> dragImageOffset() noexcept { return { -34, 40 }; }
     int listRowOfPattern (int pattern) const;
     const std::vector<int>& playingForCheck() const noexcept { return playingPatterns; }
+    int rowCentreForSnapshot (int pattern) const; // (round 190mp: the y of a pattern's row, -1 = not listed)
 
     // the kind listed: 0 = patterns, 1 = audio clips, 2 = automation clips
     void setView (int newView);
@@ -1211,6 +1219,9 @@ private:
     int scroll = 0; // in rows
     pickersel::Selection picked; // pattern indices (pattern view)
     bool deselectOnUp = false;   // a Ctrl+click on a picked pattern takes it out on release (FL)
+    // FL's Alt+right-hold preview (round 190mp, DE-134; capture 190mp A6): while held the pattern plays in pattern mode;
+    // the release stops it and puts back the mode it had (-1 = no preview running)
+    int previewModeBefore = -1;
     int pressedRow = -1;
     int dragRow = -1;      // the row a left press landed on (issue #177: a drag from it goes to the Playlist)
     bool dragging = false; // that drag has started

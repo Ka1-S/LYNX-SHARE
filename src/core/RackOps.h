@@ -19,6 +19,19 @@ const std::array<std::uint32_t, 12>& lynxPalette();
 // A palette colour different from `current`, chosen from `seed` (any integer, e.g. a counter or time).
 std::uint32_t randomPaletteColour (std::uint32_t current, std::uint32_t seed);
 
+// FL's Channel rack "Restretch all" (round 190mp, DE-38; REA FUN_00fe7510 stretches every channel stretched offline
+// again): the channels LYNX plays a copy stretched ahead of time for (a sampler / audio clip with pitch kept and a length
+// in beats). Their count: 0 = the menu item is greyed.
+inline int restretchableChannels (const Song& song) noexcept
+{
+    int count = 0;
+    for (const auto& c : song.channels)
+        if ((c.instrument == InstrumentKind::sampler || c.instrument == InstrumentKind::audioClip) && ! c.samplePath.empty()
+            && c.sampler.keepPitch && c.sampler.stretchBeats > 0.0f)
+            ++count;
+    return count;
+}
+
 // --- patterns ----------------------------------------------------------------------------------
 
 // True when the pattern has no notes (its name and colour don't count).

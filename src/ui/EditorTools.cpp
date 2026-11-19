@@ -128,6 +128,11 @@ ToolStrip::ToolStrip (bool includeSlip)
                     onChange (t);
             }
         };
+        if (info.tool == EditTool::zoom) // FL: right-clicking the Zoom icon gives quick-zoom options (round 190mp, DE-74)
+            button->onRightClick = [this, b = button.get()] {
+                if (onZoomMenu != nullptr)
+                    onZoomMenu (*b);
+            };
         addAndMakeVisible (*button);
         buttons.push_back (std::move (button));
         tools.push_back (info.tool);
@@ -221,12 +226,77 @@ void ToolStrip::paint (juce::Graphics& g)
 
 void ToolStrip::mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& wheel)
 {
-    if (wheel.deltaY == 0.0f || tools.empty())
-        return;
+    if (wheel.deltaY != 0.0f)
+        step (wheel.deltaY < 0.0f ? 1 : -1);
+}
 
+void ToolStrip::step (int direction)
+{
+    if (tools.empty() || direction == 0)
+        return;
     const auto at = (int) (std::find (tools.begin(), tools.end(), tool) - tools.begin());
-    const auto next = juce::jlimit (0, (int) tools.size() - 1, at + (wheel.deltaY < 0.0f ? 1 : -1));
-    setTool (tools[(std::size_t) next]);
+    const auto next = juce::jlimit (0, (int) tools.size() - 1, at + (direction > 0 ? 1 : -1));
+    if (tools[(std::size_t) next] != tool)
+        setTool (tools[(std::size_t) next]);
+}
+
+juce::PopupMenu quickZoomMenu (const std::string& prefix, const std::function<bool (const std::string&)>& run,
+                               const std::function<juce::String (const std::string&)>& keyText, bool performanceClips)
+{
+    juce::PopupMenu menu;
+    const auto add = [&] (const char* id, const juce::String& text, bool enabled = true) {
+        const auto full = prefix + id;
+        menu.addItem (text + (keyText != nullptr ? keyText (full) : juce::String()), enabled, false, [run, full] {
+            if (run != nullptr)
+                run (full);
+        });
+    };
+    add ("zoomIn", tr ("Zoom in"));
+    add ("zoomOut", tr ("Zoom out"));
+    menu.addSeparator();
+    add ("zoom1", tr ("Quick zoom 1"));
+    add ("zoom2", tr ("Quick zoom 2"));
+    add ("zoom3", tr ("Quick zoom 3"));
+    menu.addSeparator();
+    add ("zoomAll", tr ("Zoom out far"));
+    add ("zoomSelection", tr ("Zoom on selection"));
+    menu.addSeparator();
+    if (prefix == "playlist.")
+        add ("zoomPerformance", tr ("Zoom on performance clips"), performanceClips);
+    else
+        menu.addItem (tr ("Step sequencer mode zoom"), false, false, [] {}); // (FL's Shift+6 in the Piano roll; not in LYNX)
+    return menu;
+}
+
+juce::PopupMenu toolModeMenu (const ToolStrip& strip, const std::function<void (EditTool)>& choose, const juce::PopupMenu& mainMenu)
+{
+    juce::PopupMenu menu;
+    menu.addSectionHeader (tr ("Mode"));
+    for (const auto t : strip.toolList())
+    {
+        const auto& info = editToolInfo (t);
+        juce::PopupMenu::Item item (tr (info.name));
+        item.isTicked = t == strip.getTool();
+        // FL's column shows each tool's icon (capture 190mp A3.2); the one in use in the accent colour (a picture at twice
+        // the size, so it stays sharp)
+        constexpr int px = 32;
+        juce::Image picture (juce::Image::ARGB, px, px, true);
+        {
+            juce::Graphics g (picture);
+            icons::draw (g, info.icon, juce::Rectangle<float> (2.0f, 2.0f, px - 4.0f, px - 4.0f),
+                         item.isTicked ? theme::colour::accent : theme::colour::textSecondary);
+        }
+        item.setImage (std::make_unique<juce::DrawableImage> (picture));
+        item.action = [choose, t] {
+            if (choose != nullptr)
+                choose (t);
+        };
+        menu.addItem (std::move (item));
+    }
+    menu.addColumnBreak();
+    for (juce::PopupMenu::MenuItemIterator it (mainMenu); it.next();)
+        menu.addItem (it.getItem());
+    return menu;
 }
 
 // --- cursors ---------------------------------------------------------------------------
