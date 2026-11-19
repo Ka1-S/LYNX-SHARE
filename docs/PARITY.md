@@ -4500,6 +4500,42 @@ its classic law under any revision. CPU (thread time, 20 s at 48 kHz, best of 5,
 → 0.49 … 0.50 % of a core (two followers and one gain computer a sample), Vari-mu 0.45 … 0.46 % → 0.81 … 0.84 % (+0.37
 point: two tanh, the tube curve twice and a log a sample).
 
+**Round 190mj, Crest TTM — Two-way = Pro-C 3's own TTM band processors (revision 1).** Read statically (REA notes
+docs/analise/REA_rodada190mj.md, part crest: `TTMCompressor`, its three `TTMCompressor_BandProcessor1`s, their knob
+update and run-time wiring) and rebuilt in LYNX's own code. The reference is a true three-band compressor (the plug-in
+level installs each band's gain on that band's audio) on its own split, fourth-order Linkwitz-Riley at 2^6.4622 =
+88.17 Hz and 2^11.2877 = 2.5 kHz (round 190al's measured 88 Hz left a 0.3° error at 100 Hz). Per band:
+- the level: the magnitude, held for the Hold time, held again over the look-ahead, squared, one follower on that power,
+  back to dB (an RMS-like reading); attack 1/2 / 1/4 / 1/8 of the knob's time (low / mid / high), release 1/4 / 1/4 /
+  0.1125 of the knob's, auto release k / (√y + 1), k = 3.6 (T / 2.5 s)² + 0.1;
+- a downward gain computer (the knob's knee, centred) at the threshold + 0 / + 3 / − 2 dB, ratio 2/3 / 2/3 / 1 × the knob's,
+  and an upward one (one-sided knee) at the threshold − 7 dB + half the knee, ratio 1 + 3.17 √((ratio − 1) / 99), within
+  0.6 × the range; the gain = lift − reduction, smoothed over the look-ahead (two moving averages);
+- [EXEC] a level-independent cut, the same in every band: 0.6 · (1 − 1 / ratio) · √a · (threshold + 0.6 × range) dB when
+  positive (trial190k's TTM grid: scale 0.601, 0.04 dB rms over 189 settings — Upward's cut at 0.6);
+- oversampled, the audio is split at the oversampled rate (the reference runs its graph there; the band gains at the
+  base rate are brought up through the audio's own up path).
+LYNX keeps issue #77's fade (no lift of floors under −80 dBFS, none by −100) and its threshold bound on the lift; revision
+0's 30 dB ceiling is not kept (the upward computer's 0.6 × the range bounds the lift). The reference lifts quiet floors:
+without the fade the TTM files score 8.62 instead of 8.54 (owner decision; recommended: keep it). Revision 1 still never
+shipped, so TTM joins it: a new Crest and a translated Pro-C 3 state run it; projects saved before keep 0.
+
+| bank (time-window scorer, before = parity190mj's fxr_b0) | files | before → after | up / same / down |
+|---|---|---|---|
+| refcap030 Pro-C 3, all blocks | 508 | 8.54 → **8.60** | 24 / 484 / 0 |
+| · TTM files (grid / prog / styles) | 26 (17 / 3 / 6) | 7.38 → **8.54** (7.24 / 7.67 / 7.67 → 8.53 / 8.33 / 8.67) | 24 / 2 / 0 (1x stairs ESR −42 … −45 → −53 … −59 dB; 2x … 16x tc −36 → −57 dB; mix −33 → −58) |
+| · every other style's file (all blocks) | 482 | unchanged file for file (score, rms, spectrum, ESR) | 0 / 482 / 0 |
+| refcap182 programme / tp172b (no TTM setting) | 25 / 20 | 7.64 / 8.0 = | identical metrics |
+| trial190k / trial187b TTM grids (evidence; round 190v's bank, traj = 5 ms gain-trajectory rms) | 506 | 7.53 → 8.32 (traj 0.30 / 0.14 / 0.25 → 0.05 / 0.11 / 0.16 dB) | 271 / 229 / 6 (the 6: level-step files at 2 : 1 / 0.25 ms, 0.02 dB louder: ESR −61 → −51 dB, past the scorer's −55 dB line) |
+
+Old projects: `gold/gold.sh` (fxrender with the revision forced off, index 53, against fxr_b0): 72 / 72 renders identical;
+every other style's translated state (Upward and Vari-Mu included) renders byte for byte as fxr_b0 (117 / 117, 44.1 / 48 /
+96 kHz); the revision-0 two-way fingerprints (tests/Parity190mjCrestGold.inc) equal the base's. CPU (thread time, 20 s at 48 kHz in blocks of 512, best of 5, three
+runs, load ~7): Two-way 1.10 … 1.18 % → 1.14 … 1.23 % of a core (+0.04 … 0.09 point: one follower, two gain computers and
+two logs per band and channel a sample). Oversampled, the audio's split runs at the oversampled rate (nine biquads per
+channel and up-sample, plus six gain up-samplers). Not tested on references: look-ahead, Hold, auto release (no capture
+sets them).
+
 ## Round 190kw (Timeless 3 translator): FabFilter Timeless 3 → Echoform (the hidden line law)
 
 0.1.30 plugin parity. Black-box on captures already on disk (lab and evidence: `/mnt/e/lynx-work/rea190kw/tl3/`,
