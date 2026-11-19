@@ -96,24 +96,71 @@ constexpr int macroCells = points + 2 * lfoPointsSize;        // Live's 52 targe
 constexpr int extCells = macroCells + 52 * 4;                 // Helix+'s targets × every source (13 Live + 4 macros)
 constexpr int count = extCells + 4 * 17;
 } // namespace ext
-constexpr int stateSize = extBase + ext::count;
-constexpr int macroCount = 4;
-constexpr int allSourceCount = sourceCount + macroCount; // + Macro 1…4
-constexpr int extTargetCount = 4, allTargetCount = targetCount + extTargetCount;
-// a matrix cell's value index for any target (Live's 52 + Helix+'s 4) and any source (Live's 13 + the macros)
+constexpr int plusMacroCount = 4;                                  // 190mi's macros (their cells' layout above)
+constexpr int plusSourceCount = sourceCount + plusMacroCount;      // 17: Live's 13 + Macro 1…4
+constexpr int extTargetCount = 4, plusTargetCount = targetCount + extTargetCount; // 56: Live's 52 + Helix+'s 4
+
+// --- Helix+ 2 (round 190ml): a second block after Helix+'s, gated by the same revision value (2 = this block live; 0 and 1
+// render exactly as before). Oscillator 3 (Live's oscillator set + a second warp), the sample oscillator, user tables
+// (their data in ChannelDef::pluginState, see HelixUserData), macros 5…8, two chaos sources, the frequency shifter, the
+// EQ and the multiband compressor in the rack, anti-aliased hard-edged warps. Every value defaults to "off".
+constexpr int revision190mi = 1, revision190ml = 2, currentRevision = revision190ml;
+constexpr int newSourceCount = 6;  // Macro 5…8, Chaos 1, Chaos 2
+constexpr int newTargetCount = 12; // oscillator 3's six rows and Warp 2, the sample's pitch / gain / pan, Shift, Multiband
+constexpr int allSourceCount = plusSourceCount + newSourceCount;   // 23
+constexpr int allTargetCount = plusTargetCount + newTargetCount;   // 68
+constexpr int macroCount = 8;
+constexpr int chaosCount = 2;
+constexpr int ext2Base = extBase + ext::count;
+namespace ext2
+{
+constexpr int reserved = 0;                                         // (state, not automatable)
+constexpr int osc3 = 1;                                             // + osc::on … osc::gain: oscillator 3 (Live's set)
+constexpr int osc3WarpMode = osc3 + osc::stride, osc3WarpAmount = osc3WarpMode + 1; // 10, 11
+constexpr int sampleOn = 12, sampleTranspose = 13, sampleDetune = 14, sampleGain = 15, samplePan = 16, sampleStart = 17,
+              sampleLoop = 18, sampleWarpMode = 19, sampleWarpAmount = 20;
+constexpr int macro5 = 21;                                          // + j: macros 5…8 (0…1)
+constexpr int chaosMode = 25, chaosRate = 26, chaosAmount = 27, chaosStride = 3; // + 3 k: chaos k + 1
+constexpr int shiftOn = 31, shift = 32, shiftMix = 33;              // the frequency shifter (shift −1…1)
+constexpr int eqOn = 34, eqLow = 35, eqMidFreq = 36, eqMid = 37, eqHigh = 38;
+constexpr int mbOn = 39, mbDepth = 40, mbTime = 41, mbUp = 42, mbDown = 43, mbGain = 44;
+constexpr int autoEnd = 45;                                         // the automatable values are 1 … autoEnd − 1
+constexpr int osc3Table = autoEnd;                                  // oscillator 3's factory table (state)
+constexpr int userTable = 46;                                       // + k: oscillator k plays its user table (0 / 1)
+constexpr int sampleRoot = 49;                                      // the sample's root key
+constexpr int cellsA = 50;                                          // 190mi's 56 targets × the new sources
+constexpr int cellsB = cellsA + plusTargetCount * newSourceCount;   // the new targets × every source
+constexpr int count = cellsB + newTargetCount * allSourceCount;
+} // namespace ext2
+constexpr int stateSize = ext2Base + ext2::count;
+
+// a matrix cell's value index for any target (Live's 52, Helix+'s 4, Helix+ 2's 12) and any source (Live's 13, the 8
+// macros, the chaos sources)
 constexpr int cellIndex (int target, int source) noexcept
 {
+    if (source >= plusSourceCount && target < plusTargetCount)
+        return ext2Base + ext2::cellsA + target * newSourceCount + (source - plusSourceCount);
+    if (target >= plusTargetCount)
+        return ext2Base + ext2::cellsB + (target - plusTargetCount) * allSourceCount + source;
     if (target < targetCount && source < sourceCount)
         return matrixIndex (target, source);
     if (target < targetCount)
-        return extBase + ext::macroCells + target * macroCount + (source - sourceCount);
-    return extBase + ext::extCells + (target - targetCount) * allSourceCount + source;
+        return extBase + ext::macroCells + target * plusMacroCount + (source - sourceCount);
+    return extBase + ext::extCells + (target - targetCount) * plusSourceCount + source;
 }
-// an automatable value (Live's 0 … paramCount − 1 and Helix+'s)
+// an automatable value (Live's 0 … paramCount − 1, Helix+'s and Helix+ 2's)
 constexpr bool automatable (int index) noexcept
 {
-    return (index >= 0 && index < paramCount) || (index > extBase + ext::revision && index < extBase + ext::autoEnd);
+    return (index >= 0 && index < paramCount) || (index > extBase + ext::revision && index < extBase + ext::autoEnd)
+           || (index > ext2Base + ext2::reserved && index < ext2Base + ext2::autoEnd);
 }
+// oscillator k's (0…2) value of Live's oscillator set (osc::on … osc::gain), its table value and its second warp's values
+constexpr int oscIndex (int k, int field) noexcept { return k < 2 ? oscBase (k) + field : ext2Base + ext2::osc3 + field; }
+constexpr int oscTableIndex (int k) noexcept { return k < 2 ? tableBase + k : ext2Base + ext2::osc3Table; }
+constexpr int warpModeIndex (int k) noexcept { return k < 2 ? extBase + ext::warpMode + k * ext::warpStride : ext2Base + ext2::osc3WarpMode; }
+constexpr int warpAmountIndex (int k) noexcept { return k < 2 ? extBase + ext::warpAmount + k * ext::warpStride : ext2Base + ext2::osc3WarpAmount; }
+constexpr int macroIndex (int j) noexcept { return j < plusMacroCount ? extBase + ext::macro + j : ext2Base + ext2::macro5 + j - plusMacroCount; }
+constexpr int oscCount = 3;
 // the warp modes of Helix+'s second warp
 namespace warp
 {
@@ -132,7 +179,8 @@ namespace src
 {
 constexpr int amp = 0, env2 = 1, env3 = 2, lfo1 = 3, lfo2 = 4, velocity = 5, note = 6, pitchBend = 7, pressure = 8, modWheel = 9,
               random = 10, notePitchBend = 11, slide = 12;
-constexpr int macro1 = 13; // + j (Helix+, round 190mi)
+constexpr int macro1 = 13; // + j (Helix+, round 190mi: Macro 1…4; 190ml: 5…8 follow at 17…20)
+constexpr int chaos1 = 21; // + k (Helix+ 2, round 190ml)
 }
 // modulation targets (Live's rows, in the set's order; the effect rows are named by the oscillator's effect mode)
 namespace tgt
@@ -145,6 +193,11 @@ constexpr int env2 = 26, env3 = 33; // attack, decay, release, initial, peak, su
 constexpr int lfo1 = 40, lfo2 = 43; // amount, shaping, rate
 constexpr int time = 46, globalMod = 47, unison = 48, amp = 49, pitch = 50, glide = 51;
 constexpr int warpAmount = 52, noiseLevel = 54, unisonBlend = 55; // Helix+ (round 190mi): warp amount + k
+// Helix+ 2 (round 190ml): oscillator 3's rows (+ oscPitch … oscGain), its Warp 2, the sample's, the shifter, the multiband
+constexpr int osc3 = 56, osc3Warp = 62, samplePitch = 63, sampleGain = 64, samplePan = 65, shift = 66, mbDepth = 67;
+// oscillator k's (0…2) row of Live's oscillator rows (oscPitch … oscGain)
+constexpr int oscRow (int k, int row) noexcept { return k < 2 ? k * oscStride + row : osc3 + row; }
+constexpr int warpRow (int k) noexcept { return k < 2 ? warpAmount + k : osc3Warp; }
 }
 
 constexpr int effectNone = 0, effectFm = 1, effectClassic = 2, effectModern = 3;
@@ -194,6 +247,57 @@ std::string liveTableFor (int index);
 // a LYNX table by its own name (−1: none)
 int tableByName (const std::string& name) noexcept;
 
+// --- user tables and the sample oscillator's sample (Helix+ 2, round 190ml): the channel's own data, kept in
+// ChannelDef::pluginState (encodeUserData), saved with the project and its presets, undoable as any channel edit
+constexpr int maxUserPartials = 1023;
+constexpr int userFrameLength = 2048; // a frame's samples when a table is drawn, imported, exported
+struct UserTable
+{
+    std::string name;
+    int partials = 0;              // per frame (0 = none)
+    std::vector<float> amp, phase; // frameCount × partials: partial h + 1 of frame f at [f × partials + h]; sin (2π h x + φ)
+    bool empty() const noexcept { return partials <= 0 || (int) amp.size() < frameCount * partials; }
+};
+struct SampleBuffer
+{
+    std::vector<float> l, r; // r empty: mono
+    double rate = 44100.0;
+    int frames() const noexcept { return (int) l.size(); }
+};
+struct HelixUserData
+{
+    std::array<UserTable, oscCount> tables; // per oscillator
+    std::string sampleName;
+    SampleBuffer sample; // (no frames: none)
+    bool empty() const noexcept;
+};
+std::vector<std::uint8_t> encodeUserData (const HelixUserData& data); // (empty bytes when the data is empty)
+bool decodeUserData (const std::vector<std::uint8_t>& bytes, HelixUserData& out); // false: not Helix data (out = empty)
+// a user table's mipmaps (UI thread, never the audio thread): the same object while anyone holds it for the same data
+std::shared_ptr<const Table> userTableBuilt (const UserTable& table);
+// --- making user tables (the editor, the import; UI thread)
+UserTable userTableOf (int factoryIndex);                         // a factory table's spectra (to edit it)
+// cycles of `length` samples each (frames of them, spread over the 64 frames) → a table; DC dropped
+UserTable userTableFromCycles (const std::vector<float>& cycles, int length, int frames, const std::string& name);
+std::vector<float> userTableCycle (const UserTable& table, int frame, int length); // a frame's cycle (the editor's drawing)
+void setUserTableCycle (UserTable& table, int frame, const std::vector<float>& cycle); // a frame from its cycle
+enum class Slicing { pitch, fixed, spread };
+struct ImportOptions
+{
+    Slicing slicing = Slicing::pitch;
+    int frameSize = 2048;     // samples per frame (fixed; the window of spread)
+    bool normalise = true;    // every frame at the same peak
+    bool phaseAlign = true;   // every frame's fundamental starts at the same phase (no phasing as the position moves)
+};
+// audio (mono, at `rate`) → a table; `note` says what was found (the period, the frames used)
+UserTable userTableFromAudio (const float* audio, int samples, double rate, const ImportOptions& options, const std::string& name,
+                              std::string* note = nullptr);
+double detectPeriod (const float* audio, int samples, double rate); // the strongest period in samples (YIN), 0: none
+// a formula → a table: x the phase (−1…1 over the cycle), t the position (0…1 over the frames); `error` says why not
+bool userTableFromFormula (const std::string& formula, UserTable& out, std::string& error);
+// the cycle as a WAV (float, 64 frames of userFrameLength) and back (a WAV of whole frames of `frameSize`, or any audio)
+std::vector<std::uint8_t> userTableWav (const UserTable& table);
+
 // --- laws (each is the engine's own code path; exposed for the tests, the editor and the import)
 double filterHz (double normalised) noexcept;   // 0…1 → 20 Hz … 20.48 kHz (Live's frequency knob)
 double filterNorm (double hz) noexcept;
@@ -207,6 +311,17 @@ double unisonCents (int mode, double amount) noexcept; // the widest unison voic
 const std::array<double, stateSize>& defaults() noexcept;
 // Helix+ (round 190mi) laws, exposed for the tests and the editor
 double warpStretch (int mode, double amount, double otherRatio) noexcept; // how much faster the warped phase can run (mip)
+// a chaos source (Helix+ 2): mode 0 Smooth Random, 1 Lorenz, 2 Rössler; `cycles` = rate × time since the last step;
+// returns the next value −1…1
+struct ChaosState
+{
+    float x = 1.0f, y = 1.0f, z = 1.0f;   // the attractor's point
+    float from = 0.0f, to = 0.0f, phase = 1.0f; // smooth random: the values it glides between, 0…1 between them
+    std::uint32_t seed = 1u;
+    void start (std::uint32_t s) noexcept;      // a voice's own start (no engine random drawn)
+};
+float chaosStep (int mode, ChaosState& state, double cycles) noexcept;
+double shiftHz (double shift) noexcept;                                     // the frequency shifter's −1…1 → Hz
 double warpPhase (int mode, double amount, double phase) noexcept;        // the phase warps (0…1 → 0…1)
 float drawnLfo (const double* points, double x) noexcept;                  // a drawn LFO at phase x (points: count, x/y/curve…)
 int unisonStackSemis (int stack, int voice) noexcept;                       // the stacked voice's offset in semitones
@@ -228,6 +343,10 @@ public:
     // the same without building tables (audio thread): a table not built yet keeps the oscillator's previous one
     void setValues (const double* values) noexcept;
     void setParam (int index, double value) noexcept; // one automatable value (audio thread)
+    // Helix+ 2 (round 190ml, audio thread): oscillator k's user table and the sample oscillator's sample (nullptr: none);
+    // the caller keeps them alive while the engine may play them
+    void setUserTable (int osc, const Table* table) noexcept;
+    void setSample (const SampleBuffer* sample) noexcept;
     double param (int index) const noexcept;
     // velocity 0…1 (0 = note off), the note's own pitch offset in semitones, its slide (0…1, −1 = none) and pressure
     void note (int key, float velocity, float pitch = 0.0f, float slide = -1.0f, float pressure = 0.0f) noexcept;
@@ -263,7 +382,7 @@ struct RefNote
 };
 // Renders a state (stateSize values) with notes in blocks of `block` samples, at tempo `bpm`; interleaved stereo
 std::vector<float> renderReference (const std::vector<double>& state, const std::vector<RefNote>& notes, double sampleRate,
-                                    int length, int block = 256, double bpm = 120.0);
+                                    int length, int block = 256, double bpm = 120.0, const HelixUserData* data = nullptr);
 
 // the parameter's display text (the editor and automation) and English name ("Osc 1 Pos", "Filter 1 Freq"...)
 std::string paramText (int index, double v);
@@ -279,7 +398,7 @@ std::vector<float> helixDefaults();
 // the channel's state as doubles (missing values = defaults)
 std::vector<double> helixState (const ChannelDef& channel);
 // grows a channel's values to the whole state (missing ones as they read: a missing Helix+ block stays revision 0);
-// `helixPlus`: a Helix+ value is about to be set, so the block goes live (revision 1) (round 190mi)
+// `helixPlus`: a Helix+ value is about to be set, so the blocks go live (revision 2, round 190ml; 190mi: 1)
 void padHelixState (ChannelDef& channel, bool helixPlus);
 const std::vector<EngineParam>& helixEngineParams();
 namespace modelparams

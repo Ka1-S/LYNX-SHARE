@@ -515,11 +515,17 @@ const std::vector<Recipe>& recipes()
 }
 
 // --- building
+// the gain rule of a table's mips (190ml: one builder for the factory recipes and the user tables)
+enum class Gain
+{
+    peak,  // the loudest frame of mip 0 peaks at 1 (additive recipes, user tables)
+    fixed, // the shape recipe's own peak (`ref`)
+    noise  // the noise tables' level (−8.4 dB RMS, frame 0 of mip 0)
+};
+std::unique_ptr<Table> buildMips (const std::vector<Spectrum>& frames, Gain rule, double ref);
+
 std::unique_ptr<Table> build (const Recipe& recipe)
 {
-    auto t = std::make_unique<Table>();
-    t->category = recipe.category;
-    t->name = recipe.name;
     std::vector<Spectrum> frames ((std::size_t) frameCount);
     std::vector<double> wave ((std::size_t) shapeLength);
     double shapePeak = 0.0; // a shape recipe's own peak (its band-limited frames may overshoot it a little, as Live's do)
@@ -544,6 +550,16 @@ std::unique_ptr<Table> build (const Recipe& recipe)
             s.amp[0] = 0.0;
         }
     }
+    const auto noiseTable = std::string (recipe.category) == "Noise" || std::string (recipe.name) == "White Noise";
+    auto t = buildMips (frames, noiseTable ? Gain::noise : recipe.shape ? Gain::fixed : Gain::peak, shapePeak);
+    t->category = recipe.category;
+    t->name = recipe.name;
+    return t;
+}
+
+std::unique_ptr<Table> buildMips (const std::vector<Spectrum>& frames, Gain rule, double shapePeak)
+{
+    auto t = std::make_unique<Table>();
     // the mips, richest first; mip 0 sets the table's gain (below), then every frame is scaled and kept once: a frame bit for
     // bit equal to one already kept (same length) points at it (190js: a static table's frames, the mips of a table whose
     // partials stop below a mip's limit; the values are the same floats as one array per mip held, so the sound is too)
@@ -591,7 +607,7 @@ std::unique_ptr<Table> build (const Recipe& recipe)
             // band-limited edges overshoot it as Live's do [MEASURED 190ja a0: sine −3.0 dB, square's fundamental 4/π at the
             // centre]); an additive one is scaled so its loudest frame peaks at 1
             // noise tables: every frame at Live's level for its white noise table, −8.4 dB RMS full band [MEASURED 190ja a8]
-            const auto noiseTable = std::string (recipe.category) == "Noise" || std::string (recipe.name) == "White Noise";
+            const auto noiseTable = rule == Gain::noise;
             double rms = 0.0;
             if (noiseTable)
             {
@@ -599,7 +615,7 @@ std::unique_ptr<Table> build (const Recipe& recipe)
                     rms += (double) d[(std::size_t) i] * d[(std::size_t) i];
                 rms = std::sqrt (rms / len) / 0.38;
             }
-            const auto ref = noiseTable ? rms : recipe.shape ? shapePeak : peak;
+            const auto ref = noiseTable ? rms : rule == Gain::fixed ? shapePeak : peak;
             g = ref > 1.0e-12 ? (float) (1.0 / ref) : 1.0f;
         }
         for (auto& v : d)
@@ -634,6 +650,21 @@ std::unique_ptr<Table> build (const Recipe& recipe)
         for (int f = 0; f < frameCount; ++f)
             t->frames[(std::size_t) m][(std::size_t) f] = t->pool.data() + at[(std::size_t) m][(std::size_t) f];
     return t;
+}
+
+// --- user tables (Helix+ 2, round 190ml): built from their spectra by the same mip builder (the same anti-aliasing as
+// the factory tables), shared by content while anyone holds them
+struct UserKey
+{
+    std::uint64_t hash = 0;
+    std::vector<float> amp, phase; // (compared in full on a hash match)
+    int partials = 0;
+};
+std::mutex userLock;
+std::vector<std::pair<UserKey, std::weak_ptr<const Table>>>& userBuilt()
+{
+    static std::vector<std::pair<UserKey, std::weak_ptr<const Table>>> list;
+    return list;
 }
 
 std::mutex buildLock;
@@ -727,6 +758,55 @@ void tableSpectrum (int index, int frame, float* amplitude, float* phase, int pa
         if (phase != nullptr)
             phase[h] = h + 1 <= maxPartials ? (float) s.phase[(std::size_t) h + 1] : 0.0f;
     }
+}
+
+std::shared_ptr<const Table> userTableBuilt (const UserTable& u)
+{
+    if (u.empty())
+        return nullptr;
+    UserKey key;
+    key.partials = std::clamp (u.partials, 1, maxPartials);
+    const auto n = (std::size_t) frameCount * (std::size_t) u.partials;
+    key.amp.assign (u.amp.begin(), u.amp.begin() + (std::ptrdiff_t) n);
+    key.phase.assign (u.phase.begin(), u.phase.begin() + (std::ptrdiff_t) std::min (n, u.phase.size()));
+    key.phase.resize (n, 0.0f);
+    std::uint64_t h = 1469598103934665603ull ^ (std::uint64_t) key.partials;
+    for (const auto* v : { &key.amp, &key.phase })
+        for (const auto f : *v)
+        {
+            std::uint32_t bits;
+            std::memcpy (&bits, &f, sizeof bits);
+            h = (h ^ bits) * 1099511628211ull;
+        }
+    key.hash = h;
+    {
+        std::lock_guard<std::mutex> lock (userLock);
+        auto& list = userBuilt();
+        list.erase (std::remove_if (list.begin(), list.end(), [] (const auto& e) { return e.second.expired(); }), list.end());
+        for (const auto& [k, w] : list)
+            if (k.hash == key.hash && k.partials == key.partials && k.amp == key.amp && k.phase == key.phase)
+                if (auto t = w.lock())
+                    return t;
+    }
+    std::vector<Spectrum> frames ((std::size_t) frameCount);
+    for (int f = 0; f < frameCount; ++f)
+    {
+        auto& s = frames[(std::size_t) f];
+        s.clear();
+        for (int p = 0; p < u.partials && p + 1 <= maxPartials; ++p)
+        {
+            const auto a = key.amp[(std::size_t) (f * u.partials + p)];
+            s.amp[(std::size_t) p + 1] = std::isfinite (a) ? std::abs ((double) a) : 0.0;
+            const auto ph = key.phase[(std::size_t) (f * u.partials + p)];
+            s.phase[(std::size_t) p + 1] = std::isfinite (ph) ? (double) ph : 0.0;
+        }
+    }
+    std::shared_ptr<const Table> t (buildMips (frames, Gain::peak, 0.0).release());
+    const_cast<Table&> (*t).category = "User";
+    const_cast<Table&> (*t).name = u.name;
+    std::lock_guard<std::mutex> lock (userLock);
+    userBuilt().emplace_back (std::move (key), t);
+    return t;
 }
 
 int tableByName (const std::string& name) noexcept
