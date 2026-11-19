@@ -88,8 +88,9 @@ TEST (parity190it_revisions_are_hidden_new_instances_run_them_old_projects_do_no
         CHECK (effectInfo (kind).params.size() == (std::size_t) rev); // hidden: no new control, no new string
         auto s = makeEffectSlot (kind);
         CHECK (s.params[(std::size_t) rev] == 1.0f);
-        // saved, since it is not zero (round 190kw: Epoch's loop law, round 190ln: Foil Plate's REA law, one further, is saved with it)
-        CHECK (savedEffectParamCount (s) == (std::size_t) rev + (kind == EffectKind::epochVerb || kind == EffectKind::foilPlate ? 2 : 1));
+        // saved, since it is not zero (round 190kw: Epoch's loop law, round 190ln: Foil Plate's REA law, round 190ls: Atrium's
+        // dense law, one further, is saved with it)
+        CHECK (savedEffectParamCount (s) == (std::size_t) rev + (kind == EffectKind::epochVerb || kind == EffectKind::foilPlate || kind == EffectKind::atrium ? 2 : 1));
         auto now = s;
         upgradeLoadedEffectParams (now, (std::size_t) rev + 1);
         CHECK (now.params[(std::size_t) rev] == 1.0f);
