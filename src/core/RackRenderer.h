@@ -216,6 +216,7 @@ struct RackState
     // plan, those slots: active slots of these inserts whose latency is above 0. They are skipped by the renderer and
     // count as 0 in the plan. The song itself is not changed.
     std::vector<char> lowLatencyTracks;                 // [track]
+    int pdcCurrentSource = -1;                          // (round 190my: Factories::currentSource, for buildPdc)
     std::vector<lowlatency::SlotMask> lowLatencySlots;  // [track] bit s = slot s is bypassed
     // The latency of each bypassed slot when the plan was made ([track][slot], 0 elsewhere), for the UI.
     std::vector<std::vector<int>> lowLatencySaved;
@@ -386,6 +387,9 @@ struct RackState
         std::unordered_set<std::uint64_t> freshInstances;
         // round 190aq: the inserts whose latency-adding slots are bypassed (lowlatency::bypassTracks); empty = none
         std::vector<char> lowLatencyTracks;
+        // Round 190my (DF-82): the mixer track FL's Current track runs on (the renderer's setCurrentSource), for the PDC
+        // plan: its latency is added to that track's (−1 = none)
+        int currentSource = -1;
         // Round 190jb (FL renders with the instances that play): an export's hosted plugin channels / slots and its
         // Patchers that host plugins take the unit these return (the live engine's running one); nullptr or unset: built
         // new as usual
@@ -766,7 +770,8 @@ public:
     };
     void setHardwareMidiPorts (const std::array<std::uint64_t, 4>& ports) noexcept;
     // FL's Current (C) track (round 190mv, DF-82): the mixer track whose output it takes in line (the selected one; −1 =
-    // none). Only the live engine sets it: exports render without the Current track's effects.
+    // none). The live engine sets it from the Mixer's selection; an export engine sets the Master (round 190my: FL's
+    // render window selects the Master, live check 190my A2).
     void setCurrentSource (int track) noexcept { currentSource.store (track, std::memory_order_relaxed); }
     bool hardwareMidiPort (int port) const noexcept
     {

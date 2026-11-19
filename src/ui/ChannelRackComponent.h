@@ -180,6 +180,7 @@ public:
     // Opens or closes the channel's editor (plugin window or settings window; built-in drums and audio
     // clips have none). `keepOthers`: don't close the previously opened editor.
     void toggleEditor (int channel, bool keepOthers);
+    void showEditor (int channel) { if (! isEditorOpen (channel)) toggleEditor (channel, true); } // (round 190my: opens it, never closes)
 
     void updateSize();
 

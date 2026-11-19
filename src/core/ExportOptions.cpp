@@ -805,6 +805,9 @@ StemTap planStemTap (const Song& shared, int track, const std::vector<int>& chan
         return fail ("stand-ins or frozen channels");
     if (shared.mixer[(std::size_t) track].muted)
         return fail ("the insert is muted (its own render plays it)");
+    // round 190my: FL's Current track renders on the mixer's selected track (each render takes it from there)
+    if (std::any_of (shared.mixer.begin(), shared.mixer.end(), [] (const MixerTrack& m) { return m.current && ! m.effects.empty(); }))
+        return fail ("the Current track");
 
     // the stem render takes the Master's automation, events and effects out: its blocks would be cut differently, and
     // what the Master's effects control is not in it

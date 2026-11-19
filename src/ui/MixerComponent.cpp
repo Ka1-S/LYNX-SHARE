@@ -1648,6 +1648,24 @@ juce::Rectangle<int> MixerStrips::sendArea (int t) const
     return { stripX (t), laneTop() + 2 + switchHeight, stripWidthOf (t) - spec().gap, sendKnobHeight };
 }
 
+juce::Point<int> MixerStrips::wheelScrollPointForPerf (juce::Point<int> preferred, juce::Rectangle<int> within) const
+{
+    const auto tracks = (int) engine.getSong().mixer.size();
+    within = within.getIntersection (getLocalBounds());
+    auto scrolls = [this, tracks, within] (juce::Point<int> p) {
+        const auto t = trackAt (p.x);
+        return t >= 0 && t < tracks && within.contains (p) && partAt (t, p) == Part::body && ! insertsArea (t).contains (p);
+    };
+    // the same row first (outwards from the preferred x), then rows above and below
+    for (int dy = 0; dy < getHeight(); dy += 4)
+        for (const auto y : { preferred.y + dy, preferred.y - dy })
+            for (int dx = 0; dx < 600; dx += 2)
+                for (const auto x : { preferred.x + dx, preferred.x - dx })
+                    if (scrolls ({ x, y }))
+                        return { x, y };
+    return preferred;
+}
+
 MixerStrips::Part MixerStrips::partAt (int t, juce::Point<int> p) const
 {
     const auto& song = engine.getSong();
@@ -3000,7 +3018,10 @@ bool MixerStrips::moveSelected (int delta)
 void MixerStrips::deleteTracks (std::vector<int> tracks)
 {
     const auto count = (int) engine.getSong().mixer.size();
-    tracks.erase (std::remove_if (tracks.begin(), tracks.end(), [count] (int t) { return t < 1 || t >= count; }), tracks.end());
+    // (round 190my: FL's Current track can't be deleted — its Delete is greyed, Del passes it by)
+    tracks.erase (std::remove_if (tracks.begin(), tracks.end(), [count, &song = engine.getSong()] (int t) {
+                      return t < 1 || t >= count || mixerops::isCurrentTrack (song, t);
+                  }), tracks.end());
     if (tracks.empty())
         return;
 
@@ -3941,6 +3962,10 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
     // the tracks the "selected track(s)" items act on: the selection when the clicked track is in it
     const auto targets = std::find (selection.begin(), selection.end(), t) != selection.end() ? selection : std::vector<int> { t };
     const auto trackName = juce::String::fromUTF8 (song.mixer[(std::size_t) t].name.c_str());
+    // FL's Current track (round 190my, DF-82; capture 190my A1): its menu is an insert's with what can't apply to it
+    // greyed — Assign to new Audio track(s), Track routing, Compensate for master latency, Auto color group, Delete and
+    // the Insert items; its title is "Mixer track (Current)"
+    const auto isCurrent = mixerops::isCurrentTrack (song, t);
 
     auto rename = [this, t] {
         if (t >= (int) engine.getSong().mixer.size())
@@ -3960,7 +3985,7 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
     // the title band in the insert's colour (FL tints the whole menu); a double-click on it renames (issue #12)
     // FL: "Mixer tracks (N selected)" when the menu acts on several tracks
     const auto several = targets.size() > 1;
-    ui::addItemHeader (menu, several ? juce::String() : t == 0 ? tr ("Master") : tr ("Mixer track {0}", { juce::String (t) }),
+    ui::addItemHeader (menu, several ? juce::String() : t == 0 ? tr ("Master") : isCurrent ? tr ("Mixer track (Current)") : tr ("Mixer track {0}", { juce::String (t) }),
                        several ? tr ("Mixer tracks ({0} selected)", { juce::String ((int) targets.size()) }) : trackName,
                        song.mixer[(std::size_t) t].colour != 0 ? juce::Colour (song.mixer[(std::size_t) t].colour) : juce::Colour(), rename);
 
@@ -4017,7 +4042,7 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         };
         const auto anyLinked = std::any_of (targets.begin(), targets.end(), [&] (int x) { return x > 0 && linked (x); });
         const auto anyFree = std::any_of (targets.begin(), targets.end(), [&] (int x) { return x > 0 && ! linked (x); });
-        menu.addItem (tr ("Assign to new Audio track(s)"), anyFree, false,
+        menu.addItem (tr ("Assign to new Audio track(s)"), anyFree && ! isCurrent, false,
                       [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::assignNewAudioTracks (s, targets); }); });
         menu.addItem (tr ("Unassign from Audio track(s)"), anyLinked, false,
                       [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::unassignAudioTracks (s, targets); }); });
@@ -4097,16 +4122,16 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
     menu.addSectionHeader (tr ("Routing"));
     {
         juce::PopupMenu channels;
-        channels.addItem (tr ("Route selected channels to this track") + "\tCtrl+L", [this, t] {
+        channels.addItem (tr ("Route selected channels to this track") + "\tCtrl+L", ! isCurrent, false, [this, t] {
             setSelection (selection, t);
             linkSelectedChannels (false);
         });
-        channels.addItem (tr ("Route selected channels starting from this track") + "\tCtrl+Shift+L", [this, t] {
+        channels.addItem (tr ("Route selected channels starting from this track") + "\tCtrl+Shift+L", ! isCurrent, false, [this, t] {
             setSelection (selection, t);
             linkSelectedChannels (true);
         });
         if (channel < (int) song.channels.size())
-            channels.addItem (tr ("Route channel \"{0}\" here", { juce::String::fromUTF8 (song.channels[(std::size_t) channel].name.c_str()) }),
+            channels.addItem (tr ("Route channel \"{0}\" here", { juce::String::fromUTF8 (song.channels[(std::size_t) channel].name.c_str()) }), ! isCurrent, false,
                               [this, channel, t] { engine.editSong ([channel, t] (Song& s) { s.channels[(std::size_t) channel].mixerTrack = t; }); });
         menu.addSubMenu (tr ("Channel routing"), channels);
     }
@@ -4144,7 +4169,7 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         routing.addItem (tr ("Route this track to selected only"), any && thisIsInsert, false, [thisToSel] { thisToSel (K::routeOnly); });
         routing.addItem (tr ("Sidechain this track to selected"), any && thisIsInsert, false, [thisToSel] { thisToSel (K::sidechain); });
         routing.addItem (tr ("Sidechain this track to selected only"), any && thisIsInsert, false, [thisToSel] { thisToSel (K::sidechainOnly); });
-        menu.addSubMenu (tr ("Track routing"), routing, any);
+        menu.addSubMenu (tr ("Track routing"), routing, any && ! isCurrent);
         // round 186c's option: the sends this insert lost when their insert was deleted (greyed in the routing lane)
         if (t > 0 && ! song.mixer[(std::size_t) t].lostSends.empty())
         {
@@ -4243,7 +4268,7 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                     engine.setInsertArmed (x, false);
         });
     }
-    menu.addItem (tr ("Compensate for master latency"), song.mixer[(std::size_t) t].outputChannel >= 0, song.mixer[(std::size_t) t].compensateMasterLatency, [this, t] {
+    menu.addItem (tr ("Compensate for master latency"), song.mixer[(std::size_t) t].outputChannel >= 0 && ! isCurrent, song.mixer[(std::size_t) t].compensateMasterLatency, [this, t] {
         engine.editSong ([t] (Song& s) { s.mixer[(std::size_t) t].compensateMasterLatency = ! s.mixer[(std::size_t) t].compensateMasterLatency; });
     });
     // FL's track latency (the "Track latency compensation" label's menu, REA round 165f-mixer)
@@ -4287,7 +4312,7 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
             engine.editSong ([targets, on] (Song& s) { mixerops::setSeparator (s, targets, ! on); });
         });
         menu.addItem (tr ("Create group"), [this, targets, t] { engine.editSong ([targets, t] (Song& s) { mixerops::createGroup (s, targets, t); }); });
-        menu.addItem (tr ("Auto color group"), song.mixer[(std::size_t) t].colour != 0, false,
+        menu.addItem (tr ("Auto color group"), song.mixer[(std::size_t) t].colour != 0 && ! isCurrent, false,
                       [this, t] { engine.editSong ([t] (Song& s) { mixerops::autoColorGroup (s, t); }); });
         // LYNX's addition (round 177a): a group folds to its bus strip, or to a slim tab when it has no bus
         const auto canFold = mixerops::canFold (song, t);
@@ -4360,8 +4385,8 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
             moveSelected (1);
         });
         menu.addSeparator();
-        menu.addItem (tr ("Delete") + "\tDel", [this, targets] { deleteTracks (targets); });
-        const auto room = (int) song.mixer.size() < maxMixerTracks;
+        menu.addItem (tr ("Delete") + "\tDel", ! isCurrent, false, [this, targets] { deleteTracks (targets); });
+        const auto room = (int) song.mixer.size() < maxMixerTracks && ! isCurrent;
         menu.addItem (tr ("Insert one"), room, false, [this, t] {
             engine.editSong ([t] (Song& s) { mixerops::insertTrack (s, t); });
             setSelection ({ t }, t);

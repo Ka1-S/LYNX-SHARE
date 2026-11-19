@@ -38,6 +38,7 @@ struct PdcPlan
     // slots' latencies; the manual latency delays nothing inside the insert) — Song::compensateMixerLevels (round 190hq)
     std::vector<int> levelLag;
     int total = 0;                              // latency at the Master output
+    int currentLatency = 0;                     // (round 190my) FL's Current track's active slots' latency, whatever its source
 
     bool any() const noexcept;
 };
@@ -45,8 +46,11 @@ struct PdcPlan
 // `channelLatency[c]` = latency of the channel's instrument; `slotLatency[t][s]` = of the slot's
 // effect (0 if disabled). Vectors smaller than the Song count as 0.
 // `sampleRate` converts the tracks' manual latencies (ms) to samples.
+// `currentSource` (round 190my, DF-82): the mixer track FL's Current (C) track runs on (the selected one, 0 = the
+// Master; −1 = none, as in a render that leaves C out). C's active slots' latency is added to that track's output latency
+// (REA 190mv: FUN_010ff3b0 / FUN_010ffca0 add C's latency to its target's), after its fader: levelLag leaves it out.
 PdcPlan computePdc (const Song& song, const std::vector<int>& channelLatency, const std::vector<std::vector<int>>& slotLatency,
-                    double sampleRate = 44100.0);
+                    double sampleRate = 44100.0, int currentSource = -1);
 
 // The inserts a slot of insert `track` listens to besides its own input (round 190hq): {side-chain, second side-chain,
 // routed Connections main source, routed Connections side source}; −1 = none (an insert ≥ 1 otherwise, never `track`).

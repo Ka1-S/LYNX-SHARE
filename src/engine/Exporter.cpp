@@ -1,4 +1,5 @@
 #include "engine/Exporter.h"
+#include "core/MixerOps.h" // (round 190my: the Current track)
 
 #include "core/Mastering.h"
 
@@ -381,6 +382,12 @@ ExportJob::ExportJob (const Song& project, const Options& o, const juce::File& f
             engine->setLiveUnits ([lender] (const ChannelDef& c, double rate) { return lender->lendInstrument (c, rate); },
                                   [lender] (const EffectSlot& e, double rate) { return lender->lendEffect (e, rate); });
         }
+    // round 190my (DF-82; REA 190my R1, live check 190my A2): FL's render runs the same per-track process as playback,
+    // with the Current track on the Mixer's selection — and its render window selects the Master when it opens (FormShow
+    // FUN_00c51750 → FUN_00c4d0b0; the Mixer title turned "Mixer - Master", Fruity Balance at -inf on C silenced every
+    // export whatever was selected before). So a render plays C on the Master's output.
+    if (mixerops::currentTrack (copy) > 0)
+        engine->setCurrentTrackSource (0);
     engine->setSong (std::move (copy));
 }
 

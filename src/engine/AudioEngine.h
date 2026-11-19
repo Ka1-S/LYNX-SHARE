@@ -798,7 +798,9 @@ public:
     void controlTweakedForUndo();
     // FL's Current (C) mixer track (round 190mv, DF-82; core/MixerOps.h currentTrack): the mixer's selected track, whose
     // output the Current track's effects process in line during live playback (−1 = none). The Mixer sets it.
-    void setCurrentTrackSource (int track) noexcept;
+    // A Current track whose effects add latency moves that latency into the newly selected track's delay compensation
+    // (round 190my: the rack is published again).
+    void setCurrentTrackSource (int track);
     int getCurrentTrackSource() const noexcept { return currentSource; }
     void tweakReleased (const AutomationTarget& target);
     // 0 = the last tweaked parameter, 1 = the one before it.
@@ -819,6 +821,17 @@ public:
     std::uint32_t getMidiActivity() const noexcept { return midiActivity.load (std::memory_order_relaxed); }
     // round 190ld (Simple › Finish, details DS-44): a gain on what the device plays only (never in a render or an
     // export), so the "Hear without" A/B is heard at the mastered song's loudness; 1 = off. Faded over one block.
+    // FL's tempo tapper "now" / "Mute" (round 190my, DF-17; REA 190my R3: FUN_00f12170 → the master volume stage in
+    // FUN_00d0d4c0): the output drops to 1 % at once and comes back over `ticks` of playback (the song's time, counted
+    // only while it plays) along FL's curve 0.01 + 0.99 · cos¹⁸(π/2 · left / ticks) — near silent most of the way, back
+    // in the last part. Stopping ends it. 0 lifts it.
+    void muteOutputForTicks (double ticks) noexcept
+    {
+        muteTicksTotal.store (std::max (0.0, ticks), std::memory_order_relaxed);
+        muteTicksLeft.store (std::max (0.0, ticks), std::memory_order_relaxed);
+    }
+    bool outputMutedForTicks() const noexcept { return muteTicksLeft.load (std::memory_order_relaxed) > 0.0; }
+    static float tapperMuteGain (double left, double total) noexcept; // (round 190my: FL's curve, 1 when done)
     void setListenGain (float gain) noexcept { listenGain.store (gain, std::memory_order_relaxed); }
     float getListenGain() const noexcept { return listenGain.load (std::memory_order_relaxed); }
     // round 190ld (FL's Sync indicator colours): messages a project link / mapping and a global link / mapping took
@@ -1552,6 +1565,7 @@ private:
     std::atomic<std::uint32_t> midiActivity { 0 }, midiPlayed { 0 };
     std::uint32_t midiProjectLinked = 0, midiGlobalLinked = 0; // (message thread, round 190ld)
     std::atomic<float> listenGain { 1.0f };
+    std::atomic<double> muteTicksLeft { 0.0 }, muteTicksTotal { 0.0 }; // (round 190my: muteOutputForTicks; the audio thread counts down)
     float listenGainNow = 1.0f; // (audio thread: the gain the last block ended at)
     prefs::MidiPrefs midiPrefs;                      // UI thread
     juce::SpinLock midiPrefsLock;                    // guards midiPrefsShared (UI writes, MIDI thread reads)

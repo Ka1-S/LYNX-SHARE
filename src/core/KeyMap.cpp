@@ -87,6 +87,8 @@ std::vector<Action> makeActions()
         // FL's F8 (ShowPluginPickerAction, ShortCut 119): the Plugin picker view, again = closed (round 169k; the
         // quick-add palette that F8 opened since round 167o stays on the toolbar's plug button)
         { "view.pluginPicker", TR_NOOP ("Plugin picker: every generator and effect, the categories as tabs (press again to close)"), Context::global, { chord (f8) } },
+        // FL's Ctrl+F8 (View › Project picker; round 190my): the patterns and channels in the picker's form, again = closed
+        { "view.projectPicker", TR_NOOP ("Project picker: the patterns and channels (press again to close)"), Context::global, { chord (f8, ctrl) } },
         { "panel.mixer", TR_NOOP ("Show, focus or hide the Mixer"), Context::global, { chord (f9) } },
         // FL 2026's other window keys (its shortcut list, REA round 165a)
         { "view.pluginDatabase", TR_NOOP ("Plugin database (in the Browser)"), Context::global, { chord (f8, shift) } },

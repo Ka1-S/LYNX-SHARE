@@ -2065,6 +2065,22 @@ public:
         return -1;
     }
 
+    // round 190my (FL's Project picker, right-click on a pattern tile): the pattern's row in Current project › Patterns,
+    // selected and in view; −1 when it isn't listed
+    int revealPattern (int index)
+    {
+        openProjectSections ({ Category::patterns });
+        for (int i = 0; i < (int) rows.size(); ++i)
+            if (rows[(std::size_t) i]->kind == Kind::item && rows[(std::size_t) i]->item.kind == projectcontents::Kind::pattern
+                && rows[(std::size_t) i]->item.index == index)
+            {
+                select (i, false);
+                scrollToRow (i);
+                return i;
+            }
+        return -1;
+    }
+
     // round 190iz (FL: "drag animations", details DF-100): the drag picture of a file, for the preview strip's drags too
     juce::Image dragImageForFile (const juce::File& f) const
     {
@@ -5780,6 +5796,12 @@ void BrowserComponent::showHistory()
 bool BrowserComponent::historyShownForCheck() const
 {
     return shownTab() == projectTab && tree->categoryOpen (Category::history);
+}
+
+bool BrowserComponent::revealProjectPattern (int pattern)
+{
+    setTab (projectTab);
+    return tree->revealPattern (pattern) >= 0;
 }
 
 void BrowserComponent::showProjectForSnapshot()

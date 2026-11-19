@@ -4,7 +4,8 @@
 // follows the taps from the second one on (core/ValueMath.h TapTempo); "Apply tempo" off only measures, "Sync"
 // puts the playhead on the nearest beat at each tap during playback, and the nudge buttons run the song a little
 // slower or faster while held, to drift the beat into place. The workflow follows FL Studio's tempo tapper
-// (REA_rodada132: its form has Tap, Apply tempo, Sync and the two nudge buttons); the window is LYNX's own.
+// (REA_rodada132: its form has Tap, Apply tempo, Sync and the two nudge buttons; round 190my added FL's Mute and "now",
+// REA 190my R3); the window is LYNX's own.
 
 #include <memory>
 

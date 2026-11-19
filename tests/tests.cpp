@@ -17912,3 +17912,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Details190mrTests.inc" // round details8_190mr: click-and-hold, rack Auto Select, undo / warning / layout options, details pass 8
 #include "core/Details190mv.h"
 #include "Details190mvTests.inc" // round details9_190mv: undo knob tweaks and the rest of details pass 9
+#include "Details190myTests.inc" // round details10_190my: the Current track follow-ups and details pass 10

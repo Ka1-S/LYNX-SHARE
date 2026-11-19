@@ -76,6 +76,7 @@
 #include "ui/QuickPick.h"
 #include "core/FolderWatcher.h"
 #include "ui/PluginPickerView.h"
+#include "ui/ProjectPickerView.h"
 #include "ui/PatcherEditor.h"
 #include "ui/ToolWindow.h"
 #include "ui/RackEditor.h"
@@ -273,6 +274,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     };
     mixeroptions::renderTracks = [safe = juce::Component::SafePointer<MainComponent> (this)] (std::vector<int> tracks,
                                                                                              std::function<void (const std::vector<juce::File>&)> done) {
+        if (safe != nullptr)
+            safe->mixer.selectTrack (0); // (round 190my: FL's render window selects the Master, see exportAudio)
         if (safe != nullptr)
             showExportDialogForTracks (safe->engine, safe->currentFile.getParentDirectory(), safe->projectName, tracks, std::move (done));
     };
@@ -2287,6 +2290,7 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("pattern.moveDown")) movePatternNow (1);
     else if (id.rfind ("pattern.select", 0) == 0) selectPattern (std::stoi (id.substr (14)) - 1);
     else if (is ("view.pluginPicker")) togglePluginPicker();
+    else if (is ("view.projectPicker")) toggleProjectPicker();
     else if (is ("panel.quickAdd"))
     {
         // FL's F8 opens the plugin picker or closes it (FLEngine 0xebf510, round 167o)
@@ -4990,6 +4994,56 @@ void MainComponent::togglePluginPicker()
     pluginPickerView->setVisible (true);
     pluginPickerView->toFront (true);
     pluginPickerView->grabKeyboardFocus();
+}
+
+void MainComponent::toggleProjectPicker()
+{
+    // FL's Project picker (View › Project picker, Ctrl+F8; round 190my, DF-143): the Plugin picker's form over the screen
+    // with the project's patterns and channels; again = closed
+    if (projectPickerView != nullptr)
+    {
+        auto old = std::move (projectPickerView);
+        juce::MessageManager::callAsync ([keep = std::shared_ptr<juce::Component> (std::move (old))] {}); // (it may be on the stack)
+        return;
+    }
+    ProjectPickerTargets targets;
+    auto safe = juce::Component::SafePointer<MainComponent> (this);
+    targets.pickPattern = [safe] (int index) {
+        if (safe == nullptr)
+            return;
+        if (index < 0)
+            safe->newPatternButton.onClick();
+        else
+            safe->selectPattern (index);
+    };
+    targets.pickChannel = [safe] (int channel) {
+        if (safe == nullptr)
+            return;
+        safe->engine.setSelectedChannel (channel); // (FL, capture 190my A4: the channel's window opens)
+        safe->rack.showEditor (channel);
+    };
+    targets.revealPattern = [safe] (int pattern) {
+        if (safe == nullptr)
+            return;
+        safe->showPanel (Panel::browser);
+        safe->browser.revealProjectPattern (pattern);
+    };
+    targets.close = [safe] {
+        if (safe != nullptr && safe->projectPickerView != nullptr)
+            safe->toggleProjectPicker();
+    };
+    targets.dragOwner = [safe]() -> juce::Component* { return safe.getComponent(); };
+    projectPickerView = makeProjectPickerView (engine, std::move (targets));
+    const auto* top = getTopLevelComponent();
+    const auto& displays = juce::Desktop::getInstance().getDisplays();
+    const auto* display = displays.getDisplayForRect (top != nullptr ? top->getScreenBounds() : getScreenBounds());
+    const auto area = display != nullptr ? display->userArea : getScreenBounds();
+    takeProjectPickerBackdrop (*projectPickerView, area);
+    projectPickerView->setBounds (area);
+    projectPickerView->addToDesktop (0); // (no frame, not on the taskbar)
+    projectPickerView->setVisible (true);
+    projectPickerView->toFront (true);
+    projectPickerView->grabKeyboardFocus();
 }
 
 void MainComponent::showQuickAdd()
@@ -9283,6 +9337,9 @@ void MainComponent::switchSmartDisableForAll()
 
 void MainComponent::exportAudio (int format)
 {
+    // FL's render window selects the Master in the Mixer as it opens (round 190my, live check 190my A2: "Mixer - Master",
+    // still after Cancel; REA FormShow FUN_00c51750 → FUN_00c4d0b0) — so the Current track renders on the Master
+    mixer.selectTrack (0);
     showExportDialog (engine, currentFile.getParentDirectory(), projectName, format);
 }
 
@@ -9931,6 +9988,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Align all channel editors") + shortcutText ("view.alignChannelEditors"), [this] { runAction ("view.alignChannelEditors"); });
         menu.addSeparator();
         menu.addItem (tr ("Plugin database (in the Browser)") + shortcutText ("view.pluginDatabase"), [this] { runAction ("view.pluginDatabase"); });
+        menu.addItem (tr ("Project picker") + shortcutText ("view.projectPicker"), [this] { toggleProjectPicker(); }); // (round 190my, FL's View menu)
         menu.addItem (tr ("Audio editor") + shortcutText ("view.audioEditor"), [this] { openAudioEditorForSelection(); });
         menu.addItem (tr ("Tempo tapper") + shortcutText ("view.tempoTapper"), [this] { openTempoTapper (engine); });
         menu.addItem (tr ("Sample browser (separate window)") + shortcutText ("view.sampleBrowser"), true, findToolWindow ("sampleBrowser") != nullptr,

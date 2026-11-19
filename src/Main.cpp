@@ -10,6 +10,7 @@
 #include "core/KeyGuess.h"
 #include "core/EditorPolish.h"
 #include "core/FlpExport.h"
+#include "core/FruityBasicFx.h" // (round 190my: Fruity Balance in --details190myshot)
 #include "core/Groove.h"
 #include "core/DrawMode.h"
 #include "core/SessionOps.h"
@@ -236,6 +237,7 @@
 #include "ui/AudioEditor.h"
 #include "ui/SampleProperties.h"
 #include "ui/TempoTapper.h"
+#include "ui/ProjectPickerView.h" // (round 190my)
 #include "core/EventEdit.h"
 #include "core/FacetEq.h"
 #include "ui/FacetEqEditor.h"
@@ -2550,6 +2552,14 @@ public:
             return;
         }
 
+        if (args.contains ("--details190myshot"))
+        {
+            // LYNX --details190myshot prefix project.flp: round 190my off screen (src/DetailsShot190my.inc)
+            const auto i = args.indexOf ("--details190myshot");
+            setApplicationReturnValue (runDetailsShot190my (args[i + 1].unquoted(), i + 2 < args.size() ? args[i + 2].unquoted() : juce::String()) ? 0 : 1);
+            quit();
+            return;
+        }
         if (args.contains ("--details190mvshot"))
         {
             // LYNX --details190mvshot prefix project.flp: round 190mv off screen (src/DetailsShot190mv.inc)
@@ -12671,7 +12681,23 @@ private:
                                    }
                                    return juce::String ("    mixer picture: spoiled ") + juce::String (spoiled) + " times, drawn again " + juce::String (refills) + " times\n";
                                } });
-        run->steps.push_back ({ "mixer scroll", {}, [wheelAt, ui, none] (int f) { wheelAt (ui->getMixerForSnapshot(), 0.0f, f < 30 ? -0.25f : 0.25f, none); }, 60 });
+        // (round 190my: on a strip's blank body near the Mixer's centre — since FL's Current strip moved the strips, the
+        // centre itself is a control, which the wheel turns instead of scrolling)
+        run->steps.push_back ({ "mixer scroll", {}, [this, ui] (int f) {
+                                   auto& mixer = ui->getMixerForSnapshot();
+                                   auto& strips = mixer.getStripsForSnapshot();
+                                   auto* peer = mainWindow->getPeer();
+                                   if (peer == nullptr || ! strips.isShowing())
+                                       return;
+                                   const auto centre = strips.getLocalPoint (&mixer, mixer.getLocalBounds().getCentre());
+                                   const auto at = strips.wheelScrollPointForPerf (centre, strips.getParentComponent() != nullptr
+                                                                                              ? strips.getLocalArea (strips.getParentComponent(), strips.getParentComponent()->getLocalBounds())
+                                                                                              : strips.getLocalBounds());
+                                   const auto local = peer->globalToLocal (strips.localPointToGlobal (at).toFloat());
+                                   juce::ModifierKeys::currentModifiers = {};
+                                   juce::MouseWheelDetails wheel { 0.0f, f < 30 ? -0.25f : 0.25f, false, false, false };
+                                   peer->handleMouseWheel (juce::MouseInputSource::InputSourceType::mouse, local, juce::Time::currentTimeMillis(), wheel);
+                               }, 60 });
         // a fader dragged while the song plays (round 171c, discussion #10): 4 mouse moves per frame on insert 1's fader,
         // through the old path (a whole snapshot per move) and through editLevels
         auto faderMove = [this] (bool levels, int f) {
@@ -16725,6 +16751,7 @@ private:
 #include "DetailsShot190mp.inc" // round 190mp
 #include "DetailsShot190mr.inc" // round 190mr
 #include "DetailsShot190mv.inc" // round 190mv
+#include "DetailsShot190my.inc" // round 190my
     // --trackautoshot190gz (round 190gz): see the dispatch above
     bool runTrackAutoShot190gz (const juce::String& prefix)
     {

@@ -33,6 +33,9 @@ int insertEffectsLatency (const PdcPlan& plan, const Song& song, int track, doub
 {
     if (track < 0 || (std::size_t) track >= plan.outLat.size() || (std::size_t) track >= plan.inAlign.size() || (std::size_t) track >= song.mixer.size())
         return 0;
+    // (round 190my: levelLag leaves out FL's Current track run after the insert's fader; the take is tapped before it)
+    if ((std::size_t) track < plan.levelLag.size())
+        return std::max (0, plan.levelLag[(std::size_t) track] - plan.inAlign[(std::size_t) track]);
     return std::max (0, plan.outLat[(std::size_t) track] - plan.inAlign[(std::size_t) track]
                             - manualLatencySamples (song.mixer[(std::size_t) track], sampleRate));
 }
@@ -52,7 +55,7 @@ std::array<int, 4> sideSources (const Song& song, int track, const EffectSlot& s
 }
 
 PdcPlan computePdc (const Song& song, const std::vector<int>& channelLatency, const std::vector<std::vector<int>>& slotLatency,
-                    double sampleRate)
+                    double sampleRate, int currentSource)
 {
     const auto tracks = std::max<int> (1, (int) song.mixer.size());
     PdcPlan plan;
@@ -135,10 +138,25 @@ PdcPlan computePdc (const Song& song, const std::vector<int>& channelLatency, co
         }
     };
 
+    // FL's Current (C) track (round 190my, DF-82): its slots run in line on its source's output, after the source's
+    // fader, so its latency makes the source's output that much later (REA 190mv R: FUN_010ff3b0 / FUN_010ffca0)
+    int currentIndex = -1;
+    for (int t = (int) song.mixer.size() - 1; t > 0 && currentIndex < 0; --t)
+        if (song.mixer[(std::size_t) t].current)
+            currentIndex = t;
+    const auto currentOn = currentIndex > 0 && currentSource >= 0 && currentSource < tracks && currentSource != currentIndex;
+    // (REA 190my R2, FUN_010ff3b0: C's latency +0xc4 = its plugins' latencies plus its manual track latency; it has no
+    // input of its own)
+    plan.currentLatency = currentIndex > 0 ? effectsLatency (currentIndex) + manual (currentIndex) : 0;
+    const auto currentLatency = currentOn ? plan.currentLatency : 0;
+    auto currentAdds = [&] (int t) { return currentOn && t == currentSource ? currentLatency : 0; };
+
     for (auto t : order)
     {
+        if (t == currentIndex)
+            continue; // (no input, no route: done after its source below)
         alignSides (t);
-        plan.outLat[(std::size_t) t] = plan.inAlign[(std::size_t) t] + effectsLatency (t) + manual (t);
+        plan.outLat[(std::size_t) t] = plan.inAlign[(std::size_t) t] + effectsLatency (t) + manual (t) + currentAdds (t);
         planned[(std::size_t) t] = 1;
         const auto& track = song.mixer[(std::size_t) t];
 
@@ -155,8 +173,19 @@ PdcPlan computePdc (const Song& song, const std::vector<int>& channelLatency, co
     }
 
     alignSides (0);
-    plan.outLat[0] = plan.inAlign[0] + effectsLatency (0) + manual (0);
+    plan.outLat[0] = plan.inAlign[0] + effectsLatency (0) + manual (0) + currentAdds (0);
     plan.total = std::max (0, plan.outLat[0]);
+
+    // the Current track's own slots see its source's output as it leaves the source's fader (their automation lags)
+    if (currentIndex > 0)
+    {
+        planned[(std::size_t) currentIndex] = 1;
+        if (currentOn)
+        {
+            plan.inAlign[(std::size_t) currentIndex] = plan.outLat[(std::size_t) currentSource] - currentLatency;
+            plan.outLat[(std::size_t) currentIndex] = plan.outLat[(std::size_t) currentSource];
+        }
+    }
 
     plan.slotInput.assign ((std::size_t) tracks, {});
     for (int t = 0; t < (int) song.mixer.size(); ++t)
@@ -175,7 +204,7 @@ PdcPlan computePdc (const Song& song, const std::vector<int>& channelLatency, co
 
     plan.levelLag.assign ((std::size_t) tracks, 0);
     for (int t = 0; t < tracks; ++t)
-        plan.levelLag[(std::size_t) t] = std::max (0, plan.outLat[(std::size_t) t] - manual (t));
+        plan.levelLag[(std::size_t) t] = std::max (0, plan.outLat[(std::size_t) t] - manual (t) - currentAdds (t));
 
     // the side inputs' delays (sources bypassed "Always" are not delayed, as their routes)
     plan.sideDelay.assign ((std::size_t) tracks, {});
