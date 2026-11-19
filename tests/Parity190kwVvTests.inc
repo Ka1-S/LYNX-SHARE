@@ -40,8 +40,7 @@ TEST (parity190kw_vv_loop_law_is_hidden_new_instances_run_it_old_projects_do_not
     auto s = makeEffectSlot (EffectKind::epochVerb);
     CHECK (s.params[(std::size_t) ep::revision] == 1.0f);
     CHECK (s.params[(std::size_t) ep::loopLaw] == 1.0f);
-    // (rollup 0.1.30 step 10: round 190ly's short-decay trim, one further, is saved with it)
-    CHECK (savedEffectParamCount (s) == (std::size_t) ep::shortTrim + 1);
+    CHECK (savedEffectParamCount (s) == (std::size_t) ep::loopLaw + 1);
     auto now = s; // saved with it: kept
     upgradeLoadedEffectParams (now, (std::size_t) ep::loopLaw + 1);
     CHECK (now.params[(std::size_t) ep::loopLaw] == 1.0f && now.params[(std::size_t) ep::revision] == 1.0f);

@@ -4840,6 +4840,12 @@ Black-box (refcap030 captures; clean-room: LYNX's own code and fits). Evidence: 
 `/mnt/e/lynx-work/valhalla2_190ly/`. Score: round 190lg's scorer, the same copy before and after. Every change is a hidden value;
 with it off the round renders byte for byte as round 190ls (126 / 126 fxrender renders, `gold/gold.sh`).
 
+**0.1.30 rollup, step 10 (round 190me):** in the rollup, Epoch Verb already runs round 190kw's loop law (level over Decay and
+Size, step 9). With both on, ValhallaVintageVerb's refcap030 bank scored lower than with the loop law alone (mode 2.74 → 2.55,
+pairs 3.89 → 3.61, sr48 3.70 → 3.60, sr96 3.70 → 3.65; 37 files down, 11 up): the trim was fitted without the loop law. So a
+new Epoch keeps the trim **off** (the law stays, hidden index 20 after loopLaw 19, for a refit on top of the loop law); the
+Echoform ValhallaDelay law (index 115 in the rollup) and Spiral's rate law are merged as the round left them.
+
 - **Atrium (owner decision, perf-first):** the dense 32-line tank (`atrium::reaLaw`) is set only by the ValhallaRoom translator
   (the substitute table's new `replaced = …` items, applied only when a slot replaces a device). A new Atrium is the light
   8-line tank again (−29 % instructions against round 190ls); translated ValhallaRoom states keep the dense tank (scores as 190ls).

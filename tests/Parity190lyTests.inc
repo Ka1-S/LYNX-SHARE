@@ -196,7 +196,8 @@ TEST (parity190ly_epoch_concert_hall_short_decay_trim)
     // (rollup 0.1.30 step 10: after round 190kw's loopLaw, which a new Epoch also runs)
     CHECK (ep::shortTrim == ep::loopLaw + 1 && effectInfo (EffectKind::epochVerb).params.size() == (std::size_t) ep::paramCount);
     const auto s = makeEffectSlot (EffectKind::epochVerb);
-    CHECK (s.params[(std::size_t) ep::shortTrim] == 1.0f && savedEffectParamCount (s) == (std::size_t) ep::shortTrim + 1);
+    // (rollup 0.1.30 step 10: a new Epoch runs round 190kw's loop law and not the trim, which was fitted without it)
+    CHECK (s.params[(std::size_t) ep::shortTrim] == 0.0f && savedEffectParamCount (s) == (std::size_t) ep::loopLaw + 1);
     auto rev1 = s; // saved by 0.1.30 before this round
     upgradeLoadedEffectParams (rev1, (std::size_t) ep::revision + 1);
     CHECK (rev1.params[(std::size_t) ep::shortTrim] == 0.0f && rev1.params[(std::size_t) ep::revision] == 1.0f);

@@ -4839,8 +4839,10 @@ EffectSlot makeEffectSlot (EffectKind kind)
     if (kind == EffectKind::epochVerb) slot.params[(std::size_t) verbs::epoch::revision] = 1.0f;
     if (kind == EffectKind::epochVerb) // round 190kw: … and Epoch's level the reference's loop law (hidden)
         slot.params[(std::size_t) verbs::epoch::loopLaw] = 1.0f;
-    if (kind == EffectKind::epochVerb) // round 190ly: … and Epoch Verb Concert Hall's short-decay trim (hidden)
-        slot.params[(std::size_t) verbs::epoch::shortTrim] = 1.0f;
+    // (round 190ly's Concert Hall short-decay trim, verbs::epoch::shortTrim, stays off in a new Epoch since the 0.1.30 rollup
+    // step 10: it was fitted without round 190kw's loop law, and on top of it ValhallaVintageVerb's refcap030 bank scores
+    // lower than the loop law alone — mode 2.74 → 2.55, pairs 3.89 → 3.61, 37 files down / 11 up. The law stays, to be
+    // refitted on the loop law; a project that saved it on keeps it)
     if (kind == EffectKind::atrium) slot.params[(std::size_t) verbs::atrium::revision] = 1.0f;
     if (kind == EffectKind::foilPlate) slot.params[(std::size_t) verbs::foil::revision] = 1.0f;
     if (kind == EffectKind::foilPlate) // round 190ln: … and Foil Plate the reference's EQ / bass-decay laws (hidden)
