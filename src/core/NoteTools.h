@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <array>
+#include <string>
 #include <vector>
 
 #include "core/Song.h"
@@ -24,11 +25,25 @@ enum class Level
     release,   // 0..1
     finePitch, // -120..120 cents -> 0..1
     modX,      // 0..1
-    modY       // 0..1
+    modY,      // 0..1
+    // the Channel Rack graph editor's own lanes (issue #208; FL 2026's Note pitch, Shift and Repeat)
+    notePitch, // key 0..127 -> 0..1
+    shift,     // the start's offset in its step: 0..(ticksPerStep - 1) -> 0..1 (setting it moves the note in its step)
+    repeat     // FL's repeat rate index 0..noterepeat::rateCount -> 0..1
 };
 
-constexpr int levelCount = 6;
+constexpr int levelCount = 6; // the Piano roll's lanes (velocity .. Mod Y)
 const char* levelName (Level level); // English, for tr()
+
+// The Channel Rack graph editor's lanes in FL's order and with FL's names (FL Studio 2026, FLEngine 0x15d81e8):
+// Note pitch, Velocity, Release velocity, Fine pitch, Panning, Mod X, Mod Y, Shift, Repeat
+constexpr int stepLevelCount = 9;
+Level stepLevel (int tab) noexcept;
+// FL's tab names: `size` 2 = full ("Release velocity"), 1 = medium ("Release", "Repeats"), 0 = short ("Rel", "Rep")
+const char* stepLevelName (int tab, int size = 2);
+// FL's hint-bar value of the graph editor's own lanes: Note pitch "C5", Shift "0.25" (of a step), Repeat "1/32 triplet"
+// (English; "No repeat" goes through tr()); "" for the other lanes
+std::string levelText (Level level, float normalised);
 float levelValue (const Note& note, Level level) noexcept;
 void setLevelValue (Note& note, Level level, float normalised) noexcept;
 float levelDefault (Level level) noexcept; // normalised value of a fresh note

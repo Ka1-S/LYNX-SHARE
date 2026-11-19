@@ -14,6 +14,7 @@
 #include "core/MixerOps.h"
 #include "core/PlaylistOps.h"
 #include "core/NoteEdit.h" // round 190jf: normalizeFolders
+#include "core/NoteRepeat.h" // issue #208
 
 #include <algorithm>
 #include <tuple>
@@ -3100,8 +3101,10 @@ juce::String toJson (const Song& song, bool stampVersion)
             // [.., colour, group, chance, velocity range, chance group, play one] (round 187c)
             // [.., chance group, play one, curves] (issue #108, MPE stage 2: core/NoteCurves.h): the note's pitch / timbre /
             // pressure curves, each a flat [tick, value, tick, value, ...] list (ticks from the note's start), only with curves
+            // [.., curves, repeat] (issue #208: FL's note repeat; the curves slot is null without curves)
+            const auto repeated = n.repeat != 0;
             const auto curved = n.curves.has();
-            const auto chanced = n.hasChance() || (exactNumbers && n.chanceOne) || curved;
+            const auto chanced = n.hasChance() || (exactNumbers && n.chanceOne) || curved || repeated;
             const auto extra = n.release != 0.5f || n.modX != 0.5f || n.modY != 0.5f || n.colour != 0 || n.group != 0 || chanced;
             if (n.pan != 0.0f || n.finePitch != 0.0f || n.muted || n.slide || n.porta || extra)
             {
@@ -3140,6 +3143,10 @@ juce::String toJson (const Song& song, bool stampVersion)
                     }
                     note.add (lanes);
                 }
+                else if (repeated)
+                    note.add (juce::var());
+                if (repeated)
+                    note.add (n.repeat);
             }
 
             notes.add (note);
@@ -3976,6 +3983,8 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
                                             curves.lanes[(std::size_t) lane].push_back ({ (float) (double) (*points)[i], (float) (double) (*points)[i + 1] });
                                 note.curves = std::move (curves);
                             }
+                        if (n.size() >= 21) // (issue #208: FL's note repeat)
+                            note.repeat = juce::jlimit (0, noterepeat::rateCount, (int) n[20]);
                     }
 
                     if (note.channel >= 0 && note.channel < (int) song.channels.size())

@@ -240,7 +240,7 @@ private:
     int rowAtY (int y) const;       // row under y (the lane counts as its channel's row)
     int graphRow() const;           // the row the lane belongs to (the primary selection), -1 when hidden
     juce::Rectangle<int> laneBounds() const;
-    juce::Rectangle<int> levelButtonBounds (int level) const;
+    juce::Rectangle<int> levelButtonBounds (int tab) const; // tab = FL's lane order (notetools::stepLevel)
     void paintLane (juce::Graphics& g);
     void paintNotePreview (juce::Graphics& g, int row, const Pattern& pattern, std::uint32_t channelColour);
     PreviewSpan previewSpan() const; // where the miniatures are drawn (core/RackOps.h notePreviewSpan)
@@ -252,7 +252,7 @@ private:
     int graphLevel = 0; // notetools::Level
     int laneDownStep = -1;
     float laneDownValue = 0.0f;
-    static constexpr int laneHeight = 72;
+    static constexpr int laneHeight = 96; // (three rows of FL's nine lane tabs, issue #208)
     juce::Rectangle<int> stepBounds (int row, int step) const;
     bool cellHasNote (int channel, int step) const;
     std::vector<std::uint8_t> noteCellBits; // (paint: [channel * steps + step] a Piano Roll note starts there; round 190gr)

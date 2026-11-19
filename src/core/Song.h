@@ -1767,6 +1767,10 @@ struct Note
     float modX = 0.5f, modY = 0.5f; // two free per-note modulation values 0..1 (stored, not yet routed)
     int colour = 0;           // note colour group 0..15 (FL's note colours; .flp note byte 'extra' bits 0-3)
     int group = 0;            // note group (FL's Group, Shift+G: clicking one note selects the group); 0 = none
+    // FL's note repeat (issue #208; the Channel Rack graph editor's "Repeat" lane and the Piano roll's note properties,
+    // .flp note byte 0x11): 0 = none, 1..14 = the index of FL's repeat rate (core/NoteRepeat.h: 1/4 beat ... 1/64
+    // triplet); the note is struck again at that rate while it lasts
+    int repeat = 0;
     // Live 12's note Chance and Velocity Range (round 187c, LYNX additions; FL has neither; core/NoteChance.h): each time
     // the note comes round it plays with this probability (0..1, .als Probability), at a velocity drawn evenly between
     // `velocity` and `velocity + velocityRange` (-1..1 = Live's VelocityDeviation / 127). Drawn from Song::chanceSeed,

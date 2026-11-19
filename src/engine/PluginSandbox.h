@@ -1,5 +1,8 @@
 #pragma once
 
+#include <functional>
+#include <optional>
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -44,6 +47,16 @@ bool bridge32Supported();               // this build can run them (Windows x64)
 juce::File bridge32Executable();        // LYNX-bridge32.exe beside LYNX.exe (it may be missing)
 bool isModule32Bit (const juce::String& fileOrIdentifier); // a 32-bit x86 VST2 DLL / VST3 bundle or file
 bool isPlugin32Bit (const juce::PluginDescription& description);
+// Issue #209: the answer without touching the plugin's file — what this run or an earlier one found (kept in
+// plugin-bits.txt in the settings folder), nullopt when nobody looked yet. Opening hundreds of plugin modules to read
+// their headers froze the Plugin picker's first opening (each first read of a DLL waits for the virus scanner:
+// 99 s for 486 modules on the test PC, 0.4 s the second time). Lists use this and refreshPluginBitness().
+std::optional<bool> knownPlugin32Bit (const juce::PluginDescription& description);
+// Looks at the plugins whose answer is missing or whose file changed, on a background thread (one at a time), keeps
+// the answers in plugin-bits.txt and then calls `changed` on the message thread when any answer is new.
+void refreshPluginBitness (const juce::Array<juce::PluginDescription>& types, std::function<void()> changed);
+// Tests: wait for a running refresh (at most `ms`); true when none is running
+bool waitForPluginBitness (int ms);
 // A sandbox proxy running in the 32-bit bridge.
 bool isBridged32 (const juce::AudioPluginInstance& plugin);
 // Any sandbox proxy (Options' separate process, "Make bridged" or the 32-bit bridge): its editor is a window of another

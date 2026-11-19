@@ -120,7 +120,8 @@ inline juce::var toValue (const Note& n)
              { "slide", n.slide }, { "porta", n.porta }, { "release", (double) n.release },
              { "modX", (double) n.modX }, { "modY", (double) n.modY }, { "colour", n.colour }, { "group", n.group },
              { "chance", (double) n.chance }, { "velocityRange", (double) n.velocityRange },
-             { "chanceGroup", n.chanceGroup }, { "chanceOne", n.chanceOne }, { "expression", detail::curvesValue (n) } })
+             { "chanceGroup", n.chanceGroup }, { "chanceOne", n.chanceOne }, { "expression", detail::curvesValue (n) },
+             { "repeat", n.repeat } })
         result->setProperty (name, value);
     return result;
 }
@@ -133,7 +134,9 @@ inline Note fromValue (const juce::var& value, std::size_t channels)
     for (const auto* field : detail::fields)
         if (! value.hasProperty (field))
             detail::invalid (juce::String ("Every replacement note must include ") + field + "; read the complete notes first");
-    if (object->getProperties().size() != (int) detail::fields.size())
+    // "repeat" (issue #208, FL's note repeat rate 0..14) is optional: clients written before it may leave it out
+    const auto withRepeat = value.hasProperty ("repeat");
+    if (object->getProperties().size() != (int) detail::fields.size() + (withRepeat ? 1 : 0))
         detail::invalid ("Replacement note contains an unsupported field");
     if (channels == 0)
         detail::invalid ("Cannot add a note without a channel");
@@ -160,6 +163,8 @@ inline Note fromValue (const juce::var& value, std::size_t channels)
     n.chanceGroup = (int) detail::integer (value, "chanceGroup", 0, std::numeric_limits<int>::max());
     n.chanceOne = detail::boolean (value, "chanceOne");
     n.curves = detail::curvesFrom (value);
+    if (withRepeat)
+        n.repeat = (int) detail::integer (value, "repeat", 0, 14);
     return n;
 }
 } // namespace lynx::remote_notes

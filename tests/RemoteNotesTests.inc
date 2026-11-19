@@ -25,10 +25,12 @@ void remoteNotesRoundtrip()
         c.lane (NoteCurveLane::pressure) = { { 0.0f, 0.0f }, { 240.0f, 1.0f } };
         curved.curves = c;
     }
-    for (const auto& note : { expressive, inactiveChance, tiny, Note {}, curved })
+    auto repeated = expressive; // (issue #208: FL's note repeat, an optional field)
+    repeated.repeat = 12;
+    for (const auto& note : { expressive, inactiveChance, tiny, Note {}, curved, repeated })
     {
         const auto value = remote_notes::toValue (note);
-        check (value.getDynamicObject()->getProperties().size() == 20, "Note read omitted an expression field");
+        check (value.getDynamicObject()->getProperties().size() == 21, "Note read omitted an expression field");
         check (remote_notes::fromValue (value, 1) == note, "Note codec changed native expression values");
         // Use the socket writer's JSON precision, rather than only testing an in-memory var.
         const auto wire = json (juce::JSON::toString (value, true).toRawUTF8());
@@ -43,6 +45,15 @@ void remoteNotesRoundtrip()
         auto missing = complete.clone();
         missing.getDynamicObject()->removeProperty (field);
         refuses ([&] { remote_notes::fromValue (missing, 1); });
+    }
+    // a client written before "repeat" may leave it out: the note has no repeat
+    {
+        auto older = remote_notes::toValue (repeated).clone();
+        older.getDynamicObject()->removeProperty ("repeat");
+        check (remote_notes::fromValue (older, 1).repeat == 0, "A note without the optional repeat field kept a repeat");
+        auto tooFast = remote_notes::toValue (repeated).clone();
+        tooFast.getDynamicObject()->setProperty ("repeat", 15);
+        refuses ([&] { remote_notes::fromValue (tooFast, 1); });
     }
     auto unknown = complete.clone();
     unknown.getDynamicObject()->setProperty ("futureExpression", 1);

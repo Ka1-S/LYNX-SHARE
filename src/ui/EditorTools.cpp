@@ -6,6 +6,7 @@
 
 #include "core/NoteEdit.h"
 #include "core/NoteTools.h"
+#include "core/NoteRepeat.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
@@ -855,6 +856,15 @@ public:
         addRow (finePitch, TR_NOOP ("Fine pitch"), -120.0, 120.0, " ct");
         addRow (modX, TR_NOOP ("Mod X"), 0.0, 100.0, "%");
         addRow (modY, TR_NOOP ("Mod Y"), 0.0, 100.0, "%");
+        // FL's Note properties' REPEAT (issue #208, core/NoteRepeat.h): the note struck again at one of FL's rates
+        addRow (repeat, TR_NOOP ("Repeat"), 0.0, (double) noterepeat::rateCount, "");
+        repeat.slider.textFromValueFunction = [] (double v) {
+            auto text = tr (juce::String (noterepeat::rateName (juce::roundToInt (v))));
+            for (const char* word : { TR_NOOP ("dotted"), TR_NOOP ("triplet"), TR_NOOP ("Beat"), TR_NOOP ("Half step"), TR_NOOP ("Quarter step") })
+                text = text.replace (word, tr (word));
+            return text.replace ("(Step)", "(" + tr ("Step") + ")");
+        };
+        repeat.slider.setTextBoxStyle (juce::Slider::TextBoxRight, true, 110, 20);
         // FL's Note properties also have the colour group (its "Color group / MIDI channel" button, 1..16; round 168g)
         addRow (colour, TR_NOOP ("Colour group"), 1.0, (double) noteColourCount, "");
         // Live 12's note Chance and Velocity Range (round 187c, LYNX additions)
@@ -905,7 +915,7 @@ public:
         addAndMakeVisible (resetButton);
 
         load();
-        setSize (320, 34 + 9 * rowHeight + rowHeight + (single ? 2 * rowHeight : 0) + 44);
+        setSize (320, 34 + 10 * rowHeight + rowHeight + (single ? 2 * rowHeight : 0) + 44);
     }
 
     void paint (juce::Graphics& g) override
@@ -918,7 +928,7 @@ public:
         auto area = getLocalBounds().reduced (12, 8);
         title.setBounds (area.removeFromTop (26));
 
-        for (auto* row : { &velocity, &pan, &release, &finePitch, &modX, &modY, &colour, &chance, &velocityRange })
+        for (auto* row : { &velocity, &pan, &release, &finePitch, &modX, &modY, &repeat, &colour, &chance, &velocityRange })
         {
             auto r = area.removeFromTop (rowHeight);
             row->label.setBounds (r.removeFromLeft (80));
@@ -959,6 +969,7 @@ public:
         set (modY, std::round (defaults.modY * 100.0f));
         set (chance, 100.0);
         set (velocityRange, 0.0);
+        set (repeat, 0.0);
     }
 
 private:
@@ -1004,6 +1015,7 @@ private:
         set (finePitch, std::round (shown.finePitch));
         set (modX, std::round (shown.modX * 100.0f));
         set (modY, std::round (shown.modY * 100.0f));
+        set (repeat, (double) shown.repeat);
         set (colour, (double) (shown.colour + 1));
         set (chance, std::round (shown.chance * 100.0f));
         set (velocityRange, std::round (shown.velocityRange * 100.0f));
@@ -1063,6 +1075,7 @@ private:
                 if (finePitch.touched) n.finePitch = (float) finePitch.slider.getValue();
                 if (modX.touched) n.modX = (float) modX.slider.getValue() / 100.0f;
                 if (modY.touched) n.modY = (float) modY.slider.getValue() / 100.0f;
+                if (repeat.touched) n.repeat = juce::jlimit (0, noterepeat::rateCount, (int) repeat.slider.getValue());
                 if (colour.touched) n.colour = juce::jlimit (0, noteColourCount - 1, (int) colour.slider.getValue() - 1);
                 if (chance.touched) n.chance = (float) chance.slider.getValue() / 100.0f;
                 if (velocityRange.touched) n.velocityRange = (float) velocityRange.slider.getValue() / 100.0f;
@@ -1092,7 +1105,7 @@ private:
     Note shown;
     bool single = false, slideTouched = false, portaTouched = false;
     juce::Label title;
-    SliderRow velocity, pan, release, finePitch, modX, modY, colour, chance, velocityRange;
+    SliderRow velocity, pan, release, finePitch, modX, modY, repeat, colour, chance, velocityRange;
     juce::ToggleButton slide, porta;
     TextRow time, length;
     juce::TextButton applyButton, revertButton, resetButton;

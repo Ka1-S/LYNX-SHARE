@@ -137,6 +137,7 @@
 #include "ui/VideoMedia.h"
 #include "ui/VideoTracks.h"
 #include "ui/AdrWindow.h"
+#include "ui/PluginPicker.h"
 #include "ui/PlaylistComponent.h"
 #include "ui/PictureCheck.h"
 #include "ui/PatternBlocksView.h"
@@ -1541,6 +1542,25 @@ public:
             }
             step (juce::String ("result=") + (ok ? "OK" : "FAILED"));
             setApplicationReturnValue (ok ? 0 : 1);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--pickertime"))
+        {
+            // LYNX.exe --pickertime report.txt (issue #209): the plugin lists' opening times with the profile's plugin
+            // list (LYNX_PROFILE_MAIN samples the message thread meanwhile)
+            const auto i = args.indexOf ("--pickertime");
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            if (const auto profile = juce::SystemStats::getEnvironmentVariable ("LYNX_PROFILE_MAIN", {}); profile.isNotEmpty())
+                lynx::crashguard::startMainProfiler (profile.toStdString());
+            const auto t0 = juce::Time::getMillisecondCounterHiRes();
+            lynx::AudioEngine offline (false);
+            const auto engineMs = juce::Time::getMillisecondCounterHiRes() - t0;
+            const auto report = "engine_ms=" + juce::String (engineMs) + "\n" + lynx::pluginPickerTimings (offline);
+            juce::File (args[i + 1].unquoted()).replaceWithText (report);
+            lynx::crashguard::stopMainProfiler();
+            setApplicationReturnValue (0);
             quit();
             return;
         }
@@ -34506,6 +34526,13 @@ private:
             saveSnapshot (ui, prefix + "-rack-graph.png");
             ui.getRackForSnapshot().setGraphLevelForSnapshot (1);
             saveSnapshot (ui, prefix + "-rack-graph-pan.png");
+            // FL's Note pitch, Shift and Repeat lanes (issue #208)
+            ui.getRackForSnapshot().setGraphLevelForSnapshot ((int) lynx::notetools::Level::notePitch);
+            saveSnapshot (ui, prefix + "-rack-graph-pitch.png");
+            ui.getRackForSnapshot().setGraphLevelForSnapshot ((int) lynx::notetools::Level::shift);
+            saveSnapshot (ui, prefix + "-rack-graph-shift.png");
+            ui.getRackForSnapshot().setGraphLevelForSnapshot ((int) lynx::notetools::Level::repeat);
+            saveSnapshot (ui, prefix + "-rack-graph-repeat.png");
             ui.getRackForSnapshot().toggleGraphLanes();
             saveWindow (ui.getRackForSnapshot().makeEuclideanPanel (0), "-euclidean.png");
 

@@ -18,4 +18,6 @@ namespace lynx
 // entries; choosing one hands over a new channel of it.
 void showPluginPicker (AudioEngine& engine, bool instruments, std::function<void (PluginRef)> onChosen,
                        std::function<void (ChannelDef)> onBuiltIn = nullptr);
+// --pickertime (issue #209): the time each plugin list takes to open (first / second), report lines "name=ms"
+juce::String pluginPickerTimings (AudioEngine& engine);
 } // namespace lynx

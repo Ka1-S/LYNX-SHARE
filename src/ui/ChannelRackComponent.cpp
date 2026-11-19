@@ -1722,11 +1722,11 @@ void ChannelRackComponent::toggleEditor (int channel, bool keepOthers)
 
 // --- step graph lanes (docs/WORKFLOW_FL.md P2, C4) --------------------------------------------------
 
-juce::Rectangle<int> ChannelRackComponent::levelButtonBounds (int level) const
+juce::Rectangle<int> ChannelRackComponent::levelButtonBounds (int tab) const
 {
     const auto lane = laneBounds();
     const auto width = (gridLeft() - 24) / 3;
-    return { 12 + (level % 3) * width, lane.getY() + 8 + (level / 3) * 24, width - 4, 20 };
+    return { 12 + (tab % 3) * width, lane.getY() + 6 + (tab / 3) * 22, width - 4, 19 };
 }
 
 void ChannelRackComponent::paintLane (juce::Graphics& g)
@@ -1748,13 +1748,19 @@ void ChannelRackComponent::paintLane (juce::Graphics& g)
     g.drawHorizontalLine (lane.getY(), 0.0f, (float) getWidth());
     g.drawHorizontalLine (lane.getBottom() - 1, 0.0f, (float) getWidth());
 
-    for (int l = 0; l < notetools::levelCount; ++l)
+    // FL's nine lanes in FL's order (issue #208); like FL, a narrow tab takes the shorter name
+    for (int tab = 0; tab < notetools::stepLevelCount; ++tab)
     {
-        const auto r = levelButtonBounds (l).toFloat();
+        const auto l = (int) notetools::stepLevel (tab);
+        const auto r = levelButtonBounds (tab).toFloat();
         theme::fillRoundRect (g, r, theme::radius::sm, l == graphLevel ? accent : bg4);
         g.setColour (l == graphLevel ? onAccent : textSecondary);
-        g.setFont (theme::font (theme::type::caption, l == graphLevel));
-        textcache::drawFittedText (g, tr (notetools::levelName ((notetools::Level) l)), r.toNearestInt(), juce::Justification::centred, 1, 0.8f);
+        const auto font = theme::font (theme::type::caption, l == graphLevel);
+        g.setFont (font);
+        auto name = tr (notetools::stepLevelName (tab, 2));
+        for (int size = 1; size >= 0 && juce::GlyphArrangement::getStringWidth (font, name) > r.getWidth() - 6.0f; --size)
+            name = tr (notetools::stepLevelName (tab, size));
+        textcache::drawFittedText (g, name, r.toNearestInt(), juce::Justification::centred, 1, 0.8f);
     }
 
     g.setColour (textDisabled);
@@ -1822,6 +1828,8 @@ void ChannelRackComponent::setLaneValue (int step, float value)
         auto& p = s.activePattern();
         for (auto i : notesInStep (p, channel, step))
             notetools::setLevelValue (p.notes[(std::size_t) i], level, value);
+        if (level == notetools::Level::shift) // (Shift moves the notes inside their step)
+            p.sortNotes();
     });
 }
 
@@ -1845,6 +1853,8 @@ void ChannelRackComponent::applyLane (const juce::MouseEvent& e)
                 for (auto i : notesInStep (p, channel, st))
                     notetools::setLevelValue (p.notes[(std::size_t) i], level, v0 + (v1 - v0) * t);
             }
+            if (level == notetools::Level::shift)
+                p.sortNotes();
         });
         return;
     }
@@ -2155,10 +2165,10 @@ void ChannelRackComponent::mouseDown (const juce::MouseEvent& e)
         }
 
         case Area::laneLevels:
-            for (int l = 0; l < notetools::levelCount; ++l)
-                if (levelButtonBounds (l).contains (e.getPosition().translated (-stickyX, 0)))
+            for (int tab = 0; tab < notetools::stepLevelCount; ++tab)
+                if (levelButtonBounds (tab).contains (e.getPosition().translated (-stickyX, 0)))
                 {
-                    graphLevel = l;
+                    graphLevel = (int) notetools::stepLevel (tab);
                     repaint();
                 }
             return;
@@ -2347,7 +2357,13 @@ void ChannelRackComponent::mouseDrag (const juce::MouseEvent& e)
         const auto v = laneValueAt (e.y);
         const auto bipolar = notetools::levelIsBipolar ((notetools::Level) graphLevel);
         const auto shown = juce::roundToInt ((bipolar ? v * 2.0f - 1.0f : v) * 100.0f);
-        const auto valueText = (bipolar && shown > 0 ? "+" : "") + juce::String (shown) + "%";
+        // Note pitch, Shift and Repeat show FL's own values (a key, the part of a step, the repeat rate: issue #208)
+        const auto own = notetools::levelText ((notetools::Level) graphLevel, v);
+        auto ownText = tr (juce::String::fromUTF8 (own.c_str())); // ("No repeat"; FL's rate names keep their notation)
+        for (const char* word : { TR_NOOP ("dotted"), TR_NOOP ("triplet"), TR_NOOP ("Beat"), TR_NOOP ("Half step"), TR_NOOP ("Quarter step") })
+            ownText = ownText.replace (word, tr (word));
+        ownText = ownText.replace ("(Step)", "(" + tr ("Step") + ")");
+        const auto valueText = ! own.empty() ? ownText : (bipolar && shown > 0 ? "+" : "") + juce::String (shown) + "%";
         const auto levelText = tr (notetools::levelName ((notetools::Level) graphLevel));
         ui::showValueTip (*this, controlBounds (Area::lane, graphRow()), levelText + ": " + valueText);
         ui::Hint live;

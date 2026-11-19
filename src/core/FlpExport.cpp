@@ -1,5 +1,6 @@
 #include "core/ClipEnvelope.h"
 #include "core/FlCurve.h"
+#include "core/NoteRepeat.h"
 #include "core/PlaylistOps.h"
 #include "core/FlpExport.h"
 #include "core/Fpc.h"
@@ -1328,6 +1329,7 @@ struct Converter
                 f.flags = (std::uint16_t) (0x4000 | (n.slide ? 8 : 0));
                 f.extra = (std::uint8_t) ((n.colour & 0x0F) | (n.porta ? 0x10 : 0) | (n.muted ? 0x20 : 0));
                 f.group = (std::uint16_t) std::max (0, n.group);
+                f.repeats = (std::uint8_t) std::clamp (n.repeat, 0, noterepeat::rateCount); // (issue #208)
                 p.notes.push_back (f);
             }
             std::stable_sort (p.notes.begin(), p.notes.end(), [] (const flp::Note& a, const flp::Note& b) { return a.position < b.position; });
