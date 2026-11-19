@@ -1,15 +1,15 @@
 ---
-source: a79e43f031
+source: 98a5eb9945
 ---
-LYNX SHARE projeleri `.lynx` dosyası olarak kaydeder. Ayrıca başka programların projelerini açar, yaygın ses dosyalarını yükler ve ses, MIDI ve diğer programlar için projeleri dışa aktarır. Tablo, 0.1.26 alpha sürümünün bütün formatlarını listeler.
+LYNX SHARE projeleri `.lynx` dosyası olarak kaydeder. Ayrıca başka programların projelerini açar, yaygın ses dosyalarını yükler ve ses, MIDI ve diğer programlar için projeleri dışa aktarır. Tablo, 0.1.30 alpha sürümünün bütün formatlarını listeler.
 
 Başka bir programın formatından açılan proje bir içe aktarmadır. `Dosya › Kaydet` o zaman bir `.lynx` dosyasını nereye yazacağını sorar ve özgün dosya asla değişmez.
 
 ## Başka bir programın projesini açmak
 
 1. `Dosya › Aç...` (`Ctrl+O`) yolunu seçin.
-2. Bir `.flp`, `.als`, `.flm`, `.mid` veya `.zip` dosyası seçin.
-3. Bir `.flp` için nelerin yaklaşık karşılandığını veya dışarıda bırakıldığını okumak üzere `Yardım › Last FL Studio import report` yolunu seçin.
+2. Bir `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx`, `.mid` veya `.zip` dosyası seçin.
+3. Nelerin yaklaşık karşılandığını veya dışarıda bırakıldığını okumak üzere `Yardım › Son proje içe aktarma raporu` yolunu seçin.
 4. `Dosya › Kaydet` yolunu seçin ve `.lynx` dosyasının yazılacağı yeri seçin.
 
 ## Formatlar
@@ -22,14 +22,21 @@ Başka bir programın formatından açılan proje bir içe aktarmadır. `Dosya �
 | `.flp` | `Dosya › Aç...` | `Dosya › Dışa aktar › FL Studio projesi...`, bir FL Studio 2026 projesi veya sıkıştırılmış loop paketi | Yerel plugin'ler, değişen doğrulukta yeniden oluşturulmuş motorlarda çalar. FLEX paketleri asla açılmaz. Dışa aktarırken yalnızca LYNX'e özgü enstrümanlar ve efektler sese render edilir ya da en yakın FL plugin'iyle değiştirilir, modülatörler dışarıda bırakılır. Bkz. [FL Studio'dan geliyorsanız](/wiki/coming-from-fl-studio/) |
 | `.flm` | `Dosya › Aç...` | Hayır | FL Studio Mobile projesi. Kısmi: MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, DW Sampler, Slicer ve DirectWave dışındaki enstrümanlar dahili synth ile çalar |
 | `.als` | `Dosya › Aç...`, Live 11 ve 12 setleri | `Dosya › Dışa aktar › Ableton Live seti (.als)...`, Live 12 veya Live 11 için | İçe aktarırken Live'ın LYNX SHARE karşılığı olmayan cihazları atılır. Dışa aktarırken LYNX SHARE'in kendi enstrümanları ve efektleri dönüştürülmez, efekt parametresi otomasyonu ve insert'ten insert'e yönlendirmeler atılır. Bkz. [Ableton Live'dan geliyorsanız](/wiki/coming-from-ableton/) |
+| `.dawproject` | `Dosya › Aç...` | `Dosya › Dışa aktar › DAWproject (.dawproject)...` | Bitwig, Studio One, Cubase ve diğer uygulamaların açık alışveriş formatı: track'ler, klasörler, klipler, notalar, warp işaretleriyle ses, otomasyon, tempo, işaretler, send'li mixer ve durumlarıyla VST3, VST2 ve CLAP plugin'leri. İçe aktarırken nota efektleri ve MIDI ifadeleri dışarıda kalır; dışa aktarırken klip ızgarası, diğer aranjmanlar ve nota başına bazı ayrıntılar. Her iki yönde de nelerin dışarıda kaldığı listelenir |
+| `.band` | `Dosya › Aç...` (paket, içindeki `projectData` dosyası veya onun zip'i) | Hayır | GarageBand 10 veya iOS için GarageBand projesi, Basit iş akışı track'leri olarak. Kısmi: enstrüman track'leri, iOS için GarageBand'de yapılan Sampler enstrümanları dışında dahili synth'i ve davulları çalar. GarageBand 11 ve öncesinin projeleri okunamaz |
+| `.blx` | `Dosya › Aç...` veya klasörü, Basit iş akışının `Klasör...` içe aktarmasıyla | Hayır | Cakewalk veya Sonar'ın indirdiği BandLab projesi, region'lar, tempo, tonalite, mix, ses seviyesi ve pan otomasyonu ile yaygın efektlerle Basit iş akışı track'leri olarak. Kısmi: BandLab'in enstrüman sesleri ve diğer pedalları içe aktarma raporunda listelenir |
 | `.mid`, `.midi` | `Dosya › Aç...` yeni bir proje oluşturur. `Dosya › İçe aktar › MIDI dosyası...` ve Piano Roll mevcut projeye içe aktarır | `Dosya › Dışa aktar › MIDI dosyası...` (`Ctrl+Shift+M`) | |
 | `.wav` | Sample veya ses klibi olarak | `Dosya › Dışa aktar › Wave dosyası...`, 16 bit, 24 bit veya 32 bit float | İsteğe bağlı dither, tempo bilgisi, döngü işaretçileri ve Playlist işaretçileri |
 | `.mp3` | Sample veya ses klibi olarak | `Dosya › Dışa aktar › MP3 dosyası...` | Sabit bit hızı |
 | `.ogg` | Sample veya ses klibi olarak | `Dosya › Dışa aktar › OGG dosyası...` | |
 | `.flac` | Sample veya ses klibi olarak | `Dosya › Dışa aktar › FLAC dosyası...`, sıkıştırma 0 ile 8 arası | Her düzeyde kayıpsız |
-| `.aif`, `.aiff` | Sample veya ses klibi olarak | Hayır | |
+| `.aif`, `.aiff` | Sample veya ses klibi olarak | `Dosya › Dışa aktar › AIFF dosyası...`, 16 bit veya 24 bit | |
+| `.m4a` | – | `Dosya › Dışa aktar › M4A dosyası...` | Yalnızca dışa aktarma. Windows ve macOS'ta sistemin kodlayıcısıyla AAC; Linux'ta sunulmaz |
 | `.wv` | Sample olarak | Hayır | FL Studio'nun paketlerinde gelen WavPack sample'ları |
 | `.sf2`, `.sf3` | LYNX Soundfont ile çalınır | Hayır | SoundFont'lar |
+| `.dwp`, `.dwb` | Browser'da çift tıklama, Channel Rack'e bırakma veya DirectWave'in `Program / bank aç...` komutu | DirectWave'in program ve banka kaydı | DirectWave programları ve bankaları. Sample'lar DirectWave'in aradığı yerlerde aranır |
+| `.gig` | Bir DirectWave kanalı olarak | Hayır | GigaStudio enstrümanları: velocity katmanları, round robin, loop'lar, akort ve amp zarfı. Release-trigger sample'ları, keyswitch'ler ve sıkıştırılmış sample'lar henüz okunmaz |
+| `.ncw` | Sample veya ses klibi olarak | Hayır | Kontakt'ın sıkıştırılmış sample'ları. Kontakt `.nki` enstrümanları için Kontakt'ın kendisi plugin olarak gerekir; korumalı kütüphanelerin şifresi asla çözülmez |
 | `.fst` | Browser'dan | Hayır | Bir FL Studio yerel plugin'inin preset'i. Yalnızca LYNX SHARE'in motoru olan plugin'ler için |
 | `.fsc` | Piano Roll ve Olay editörü | Piano Roll ve Olay editörü | FL Studio skor ve otomasyon dosyası |
 | `.lynxpreset`, `.fxp`, `.fxb`, `.vstpreset` | Barındırılan bir plugin'in preset menüsündeki `Preset dosyası yükle...` | `Preset kaydet...` ve `Preset dosyası dışa aktar...` | Üçüncü taraf plugin preset'leri. `.fxp` ve `.fxb` VST2 plugin'leri, `.vstpreset` VST3 plugin'leri içindir ve yalnızca plugin LYNX SHARE içinde çalışırken geçerlidir |
@@ -63,7 +70,7 @@ LYNX.exe --export-flp project.lynx out.flp  write an FL Studio project
 ## Bilmekte fayda var
 
 - 30 saniyeden uzun ses dosyaları bir disk önbelleğinden akıtılır.
-- Kaydettiğinizde bir `.flp`, `.als` veya `.flm` asla yazılmaz. Dışa aktarma komutları yeni dosyalar yazar.
+- Kaydettiğinizde bir `.flp`, `.als`, `.flm`, `.dawproject`, `.band` veya `.blx` asla yazılmaz. Dışa aktarma komutları yeni dosyalar yazar.
 - `.wv` dosyaları yalnızca okunur.
 - Bir `.zip` önce bir klasöre çıkarılır, sonra içindeki proje açılır.
 

@@ -67,6 +67,36 @@ Spotify AB (http://www.spotify.com/).
 (The rest of Basic Pitch's NOTICE names Python libraries its own package uses — librosa, mir_eval, numpy, pretty-midi,
 resampy, scipy, tensorflow — and test audio from the Vocadito dataset; none of them is part of LYNX.)
 
+## ARA SDK (Apache-2.0)
+
+LYNX includes the `ARA_API` headers and the `ARA_Library` Debug / Dispatch / Utilities sources of Celemony's ARA Audio
+Random Access SDK 2.1.0, unmodified, under the Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0; full
+text in `third_party/ara/ARA_API/LICENSE.txt` and `third_party/ara/ARA_Library/LICENSE.txt`). The parts of the SDK's
+NOTICE file that apply to what LYNX includes (`third_party/ara/NOTICE.txt` has all of it; the SDK's examples, its
+bundled cpp-base64, pugixml, ICST AudioFile, VST3 SDK subset, CoreAudio Utility Classes and JUCE_ARA fork are not part of
+LYNX):
+
+```
+This module bundles the ARA API, ARA Library and ARA Examples
+by Celemony Software GmbH as ARA Audio Random Access SDK,
+available under the Apache License 2.0.
+
+THIS SOFTWARE IS PROVIDED BY CELEMONY SOFTWARE GMBH AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL CELEMONY SOFTWARE GMBH AND/OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+ARA is a trademark of Celemony Software GmbH; LYNX is not affiliated with Celemony. Melodyne is a trademark of
+Celemony Software GmbH.
+
 ## Faust Libraries `re.valhallaSupermassive` (MIT)
 
 `src/core/NebulaCloud.h` and `src/core/NebulaCloud.cpp` are a C++ port of the function `valhallaSupermassive` of

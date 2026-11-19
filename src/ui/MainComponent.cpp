@@ -6499,7 +6499,7 @@ void MainComponent::setControlHints()
     };
 
     ui::setHint (newButton, with (tr ("New project"), "file.new"));
-    ui::setHint (openButton, with (tr ("Open a project (.lynx, FL Studio .flp, Ableton Live .als, FL Studio Mobile .flm, MIDI)"), "file.open"));
+    ui::setHint (openButton, with (tr ("Open a project (.lynx, FL Studio .flp, Ableton Live .als, FL Studio Mobile .flm, DAWproject, GarageBand .band, BandLab .blx, MIDI)"), "file.open"));
     ui::setHint (saveButton, with (tr ("Save the project"), "file.save") + "  " + tr ("save as:") + " " + keyMarkup ("file.saveAs"));
     ui::setHint (exportButton, with (tr ("Export audio: WAV, FLAC or OGG"), "file.export"));
     ui::setHint (undoButton, with (tr ("Undo the last edit"), "edit.undo") + "  " + tr ("[RMB] undo history"), true);
@@ -9878,7 +9878,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
                 && engine.getMissingPlugins().isEmpty() && engine.getMatchedPlugins().isEmpty() && engine.getPluginsWithoutState().isEmpty()
                 && engine.getPluginHost().getLoadFailures().isEmpty())
                 juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Project import"),
-                                                        tr ("Nothing to report (no .flp, .als or .flm project imported in this session, or everything was converted)."));
+                                                        tr ("Nothing to report (no project from another app imported in this session, or everything was converted)."));
             else
                 showImportReport();
         });
@@ -9954,7 +9954,9 @@ std::unique_ptr<juce::AlertWindow> MainComponent::makeAboutWindow()
             add (version, tr ("Version {0}", { JUCE_APPLICATION_VERSION_STRING }), theme::font (theme::type::body), quiet);
             add (about,
                  tr ("Lightweight C++/JUCE DAW: FL Studio-style patterns and Ableton Live-style clips.\n"
-                     "Independent implementation: no Image-Line or Ableton code was copied."),
+                     "Independent implementation: no Image-Line or Ableton code was copied.")
+                     // round 190mw (owner rule: the app lists every project format it opens and exports)
+                     + "\n" + tr ("Opens .flp, .als, .flm, .dawproject, .band and .blx projects; exports .flp, .als and .dawproject."),
                  theme::font (theme::type::body), theme::colour::textPrimary);
             add (credits,
                  tr ("Logo by {0}", { "w3teal" }) // the community member who made it

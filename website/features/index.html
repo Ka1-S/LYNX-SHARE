@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Features · LYNX SHARE</title>
-<meta name="description" content="What LYNX SHARE does in the current release: the windows, its three workflows (FL Studio, Clip-launch and Simple), .flp, .als and .flm projects, built-in instruments and effects, and the plugin formats it hosts.">
+<meta name="description" content="What LYNX SHARE does in the current release: the windows, its three workflows (FL Studio, Clip-launch and Simple), .flp, .als, .flm, .dawproject, .band and .blx projects, built-in instruments and effects, and the plugin formats it hosts.">
 <meta property="og:title" content="Features · LYNX SHARE">
-<meta property="og:description" content="What LYNX SHARE does in the current release: the windows, its three workflows (FL Studio, Clip-launch and Simple), .flp, .als and .flm projects, built-in instruments and effects, and the plugin formats it hosts.">
+<meta property="og:description" content="What LYNX SHARE does in the current release: the windows, its three workflows (FL Studio, Clip-launch and Simple), .flp, .als, .flm, .dawproject, .band and .blx projects, built-in instruments and effects, and the plugin formats it hosts.">
 <meta property="og:site_name" content="LYNX SHARE">
 <meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.28">
 <meta property="og:url" content="https://lynx-share.com/features/">
@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="8c6ce8ed";
+window.LYNX_LANG=lang;window.LYNX_V="64430758";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=8c6ce8ed">
+<link rel="stylesheet" href="/assets/site.css?v=64430758">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -165,10 +165,14 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
       <thead><tr><th data-i18n="fe.fmH1">Format</th><th data-i18n="fe.fmH2">Open</th><th data-i18n="fe.fmH3">Export</th><th data-i18n="fe.fmH4">Limits</th></tr></thead>
       <tbody>
         <tr><td>.flp<br><span class="muted">FL Studio</span></td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.fmFlp">Channels, samples, patterns, arrangement, automation and mixer come in. FL Studio's native plugins play on LYNX SHARE's engines (see the list below). On export, what FL Studio does not have is rendered to audio or left out.</td></tr>
-        <tr><td>.als<br><span class="muted">Ableton Live 11, 12</span></td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.fmAls">Tracks, clips, mixer settings, automation, racks, Drum Racks and VST2 / VST3 plugins. Many of Live's own effects and instruments (EQ Eight, Compressor, Reverb, Auto Filter, Simpler, Drift and more) become LYNX SHARE's own; the others are dropped. On export, LYNX SHARE's own instruments and effects are not converted.</td></tr>
+        <tr><td>.als<br><span class="muted">Ableton Live 11, 12</span></td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.fmAls">Tracks, clips, mixer settings, automation, racks, Drum Racks and VST2 / VST3 plugins. Many of Live's own effects and instruments (EQ Eight, Compressor, Reverb, Auto Filter, Simpler, Drift, Operator, Wavetable, Meld and more) become LYNX SHARE's own; the others are dropped and listed. On export, LYNX SHARE's own instruments and effects are not converted.</td></tr>
+        <tr><td>.dawproject<br><span class="muted">DAWproject (Bitwig, Studio One, Cubase…)</span></td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.fmDaw">Tracks, folders, clips, notes, audio with its warp markers, automation, tempo, markers, the mixer with sends, and VST3 / VST2 / CLAP plugins with their state. The clip grid and other arrangements are not exported.</td></tr>
         <tr><td>.flm<br><span class="muted">FL Studio Mobile</span></td><td data-i18n="fe.part">Partial</td><td data-i18n="fe.no">No</td><td data-i18n="fe.fmFlm">Arrangement, samples, drum kits, DW Sampler and DirectWave programs, the Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth and SuperSaw, the effects, the automation and the chord sets. Other instruments play the built-in synth.</td></tr>
+        <tr><td>.band<br><span class="muted">GarageBand</span></td><td data-i18n="fe.part">Partial</td><td data-i18n="fe.no">No</td><td data-i18n="fe.fmBand">GarageBand 10 and GarageBand for iOS: tracks, MIDI and audio regions, tempo, key, levels, pan and mute, as Simple-workflow tracks. Instruments play LYNX SHARE's built-in synth and drums.</td></tr>
+        <tr><td>.blx<br><span class="muted">BandLab</span></td><td data-i18n="fe.part">Partial</td><td data-i18n="fe.no">No</td><td data-i18n="fe.fmBlx">A BandLab project downloaded by Cakewalk or Sonar: tracks, regions with their loops, tempo, key, the mix, volume and pan automation and BandLab's common effects, as Simple-workflow tracks.</td></tr>
+        <tr><td>.dwp, .dwb, .gig, .ncw<br><span class="muted">DirectWave, GigaStudio, Kontakt</span></td><td data-i18n="fe.yes">Yes</td><td>.dwp, .dwb</td><td data-i18n="fe.fmInst">DirectWave programs and banks open and save; .gig instruments open as DirectWave channels; Kontakt's .ncw samples open like other audio files. Kontakt .nki instruments need Kontakt itself.</td></tr>
         <tr><td>.mid</td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.fmMid">As a new project, or into the current one from the Piano roll.</td></tr>
-        <tr><td data-i18n="fe.fmAudio">Audio</td><td>WAV, AIFF, FLAC, OGG, MP3</td><td>WAV, MP3, FLAC, OGG</td><td data-i18n="fe.fmAud">WAV at 16-bit, 24-bit or 32-bit float. Stems: one file per mixer insert, per channel or per Playlist track.</td></tr>
+        <tr><td data-i18n="fe.fmAudio">Audio</td><td>WAV, AIFF, FLAC, OGG, MP3, M4A</td><td>WAV, MP3, FLAC, OGG, AIFF, M4A</td><td data-i18n="fe.fmAud">WAV at 16-bit, 24-bit or 32-bit float, AIFF at 16 or 24-bit, M4A (AAC) with the system's encoder on Windows and macOS. Stems: one file per mixer insert, per channel or per Playlist track.</td></tr>
       </tbody>
     </table></div>
     <p class="muted"><a class="tlink" href="/wiki/file-formats/" data-i18n="fe.fmMore">Every format and its limits</a></p>
@@ -208,7 +212,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <div class="wrap">
     <h2 data-i18n="fe.pluT">FL Studio's plugins, recreated</h2>
     <div class="prose" style="max-width:780px">
-      <p data-i18n="cat.sub" data-args='[&quot;205&quot;, &quot;0.1.29&quot;]' data-count="205">205 instruments, effects and tools are built into LYNX SHARE 0.1.29. Each picture is the plugin's own editor, drawn by the released program. Third-party plugins (VST3, CLAP and others) load next to them.</p>
+      <p data-i18n="cat.sub" data-args='[&quot;205&quot;, &quot;0.1.30&quot;]' data-count="205">205 instruments, effects and tools are built into LYNX SHARE 0.1.30. Each picture is the plugin's own editor, drawn by the released program. Third-party plugins (VST3, CLAP and others) load next to them.</p>
       <p data-i18n="why.fl.p1">FL Studio's own plugins cannot be loaded by another program. LYNX SHARE has its own engine for most of them, written from scratch, and reads each plugin's saved settings from the .flp or from an .fst preset. A Sytrus channel opens as LYNX SHARE's Sytrus engine with the same patch, a Fruity Limiter slot as its limiter with the same values.</p>
       <p data-i18n="why.fl.x2">Some engines need wave data or samples that belong to FL Studio. LYNX SHARE reads those from your own FL Studio installation and ships none of them.</p>
     </div>
@@ -278,8 +282,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=8c6ce8ed" defer></script>
-<script src="/assets/features.js?v=8c6ce8ed" defer></script>
-<script src="/assets/motion.js?v=8c6ce8ed" defer></script>
+<script src="/assets/site.js?v=64430758" defer></script>
+<script src="/assets/features.js?v=64430758" defer></script>
+<script src="/assets/motion.js?v=64430758" defer></script>
 </body>
 </html>

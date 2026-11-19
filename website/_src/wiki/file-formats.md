@@ -1,17 +1,17 @@
 ---
 title: File formats
-summary: Every format LYNX SHARE 0.1.26 opens, imports, saves and exports, with its limits.
+summary: Every format LYNX SHARE 0.1.30 opens, imports, saves and exports, with its limits.
 status: full
 ---
-LYNX SHARE saves projects as `.lynx` files. It also opens projects of other programs, loads the usual audio files and exports audio, MIDI and projects for other programs. The table lists every format of 0.1.26 alpha.
+LYNX SHARE saves projects as `.lynx` files. It also opens projects of other programs, loads the usual audio files and exports audio, MIDI and projects for other programs. The table lists every format of 0.1.30 alpha.
 
 A project opened from another program's format is an import. `File › Save` then asks where to write a `.lynx` file, and the original file is never changed.
 
 ## Open a project from another program
 
 1. Choose `File › Open...` (`Ctrl+O`).
-2. Pick a `.flp`, `.als`, `.flm`, `.mid` or `.zip` file.
-3. For a `.flp`, choose `Help › Last FL Studio import report` to read what was approximated or left out.
+2. Pick a `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx`, `.mid` or `.zip` file.
+3. Choose `Help › Last project import report` to read what was approximated or left out.
 4. Choose `File › Save` and pick where to write the `.lynx` file.
 
 ## Formats
@@ -24,14 +24,21 @@ A project opened from another program's format is an import. `File › Save` the
 | `.flp` | `File › Open...` | `File › Export › FL Studio project...`, an FL Studio 2026 project or a zipped loop package | Native plugins play on recreated engines of varying exactness. FLEX packs are never opened. On export, LYNX-only instruments and effects are rendered to audio or swapped for the nearest FL plugin, and modulators are left out. See [Coming from FL Studio](/wiki/coming-from-fl-studio/) |
 | `.flm` | `File › Open...` | No | FL Studio Mobile project. Partial: instruments other than MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, DW Sampler, the Slicer and DirectWave play the built-in synth |
 | `.als` | `File › Open...`, sets of Live 11 and 12 | `File › Export › Ableton Live set (.als)...`, for Live 12 or Live 11 | On import, Live's devices with no LYNX SHARE equivalent are dropped. On export, LYNX SHARE's own instruments and effects are not converted, and effect-parameter automation and insert-to-insert routes are dropped. See [Coming from Ableton Live](/wiki/coming-from-ableton/) |
+| `.dawproject` | `File › Open...` | `File › Export › DAWproject (.dawproject)...` | The open exchange format of Bitwig, Studio One, Cubase and other apps: tracks, folders, clips, notes, audio with its warp markers, automation, tempo, markers, the mixer with sends, and VST3, VST2 and CLAP plugins with their state. Note effects and MIDI expressions are left out on import; the clip grid, other arrangements and some per-note details on export. Both directions list what was left out |
+| `.band` | `File › Open...` (the package, its `projectData` file or a zip of it) | No | GarageBand 10 or GarageBand for iOS project, as Simple-workflow tracks. Partial: instrument tracks play the built-in synth and drums, except Sampler instruments made in GarageBand for iOS. Projects from GarageBand 11 and older are not readable |
+| `.blx` | `File › Open...`, or its folder with the Simple workflow's `Folder...` import | No | BandLab project downloaded by Cakewalk or Sonar, as Simple-workflow tracks with regions, tempo, key, the mix, volume and pan automation and the common effects. Partial: BandLab's instrument sounds and other pedals are listed in the import report |
 | `.mid`, `.midi` | `File › Open...` makes a new project. `File › Import › MIDI file...` and the Piano roll import into the current one | `File › Export › MIDI file...` (`Ctrl+Shift+M`) | |
 | `.wav` | As a sample or an audio clip | `File › Export › Wave file...`, 16-bit, 24-bit or 32-bit float | Optional dither, tempo information, loop markers and Playlist markers |
 | `.mp3` | As a sample or an audio clip | `File › Export › MP3 file...` | Constant bitrate |
 | `.ogg` | As a sample or an audio clip | `File › Export › OGG file...` | |
 | `.flac` | As a sample or an audio clip | `File › Export › FLAC file...`, compression 0 to 8 | Lossless at every level |
-| `.aif`, `.aiff` | As a sample or an audio clip | No | |
+| `.aif`, `.aiff` | As a sample or an audio clip | `File › Export › AIFF file...`, 16-bit or 24-bit | |
+| `.m4a` | – | `File › Export › M4A file...` | Export only. AAC with the system's encoder on Windows and macOS; not offered on Linux |
 | `.wv` | As a sample | No | WavPack samples, as shipped in FL Studio's packs |
 | `.sf2`, `.sf3` | Played by LYNX Soundfont | No | SoundFonts |
+| `.dwp`, `.dwb` | Double-click in the Browser, a drop on the Channel rack, or DirectWave's `Open program / bank...` | DirectWave's program and bank save | DirectWave programs and banks. The samples are looked for where DirectWave looks for them |
+| `.gig` | As a DirectWave channel | No | GigaStudio instruments: velocity layers, round robin, loops, tuning and the amp envelope. Release-trigger samples, keyswitches and compressed samples are not read yet |
+| `.ncw` | As a sample or an audio clip | No | Kontakt's compressed samples. Kontakt `.nki` instruments need Kontakt itself as a plugin; protected libraries are never decrypted |
 | `.fst` | From the Browser | No | Preset of an FL Studio native plugin. Only for the plugins LYNX SHARE has an engine for |
 | `.fsc` | Piano roll and Event editor | Piano roll and Event editor | FL Studio score and automation file |
 | `.lynxpreset`, `.fxp`, `.fxb`, `.vstpreset` | `Load preset file...` in a hosted plugin's preset menu | `Save preset...` and `Export preset file...` | Third-party plugin presets. `.fxp` and `.fxb` are for VST2 plugins and `.vstpreset` for VST3 plugins, and only while the plugin runs inside LYNX SHARE |
@@ -65,7 +72,7 @@ LYNX.exe --export-flp project.lynx out.flp  write an FL Studio project
 ## Good to know
 
 - Audio files longer than 30 seconds are streamed from a disk cache.
-- A `.flp`, `.als` or `.flm` is never written when you save. The export commands write new files.
+- A `.flp`, `.als`, `.flm`, `.dawproject`, `.band` or `.blx` is never written when you save. The export commands write new files.
 - `.wv` files are read only.
 - A `.zip` is extracted to a folder first, then the project inside is opened.
 

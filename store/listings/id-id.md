@@ -8,7 +8,7 @@ LYNX SHARE
 
 ## Short description
 
-DAW gratis dan open source dengan tiga alur kerja dalam satu program: pattern ala FL Studio (Channel Rack, Piano Roll, Playlist, Mixer), peluncuran klip ala Ableton Live, dan mode sederhana satu jendela bergaya BandLab dan FL Studio Mobile. Membuka proyek .flp, .als, dan .flm.
+DAW gratis dan open source dengan tiga alur kerja dalam satu program: pattern ala FL Studio (Channel Rack, Piano Roll, Playlist, Mixer), peluncuran klip ala Ableton Live, dan mode sederhana satu jendela bergaya BandLab dan FL Studio Mobile. Membuka proyek .flp, .als, .flm, .dawproject, .band GarageBand, dan .blx BandLab.
 
 ## Description
 
@@ -26,11 +26,10 @@ Dibuat agar tetap ringan dan cepat di PC mana pun.
 • Ringan: mesin audio lock-free yang membagi channel dan track mixer ke seluruh core CPU, melewati channel yang tidak aktif, dan melakukan streaming audio panjang langsung dari disk.
 • Lengkap: lebih dari 100 instrumen dan efek bawaan — synth, drum machine, sampler, EQ, compressor, limiter, reverb, delay, koreksi pitch, visualizer, dan banyak lagi.
 • Plugin Anda: mendukung instrumen dan efek VST3, CLAP, dan VST2, masing-masing opsional berjalan di proses sandbox tersendiri sehingga plugin yang crash tidak bisa merusak sesi Anda.
-• Proyekmu: membuka proyek FL Studio (.flp) beserta pattern, not, mixer, otomasi, dan sample; membuka dan menyimpan
-set Ableton Live 11/12 (.als), termasuk klip Session; mengekspor .flp kembali ke FL Studio; mengimpor proyek FL Studio
-Mobile (.flm, sebagian) dan file MIDI.
+• Proyekmu: membuka proyek FL Studio (.flp) beserta pattern, not, mixer, otomasi, dan sample; membuka dan menyimpan set Ableton Live 11/12 (.als), termasuk klip Session; membuka dan menyimpan file DAWproject (.dawproject) untuk Bitwig, Studio One, Cubase, dan aplikasi lain; mengekspor .flp kembali ke FL Studio; mengimpor proyek FL Studio Mobile (.flm, sebagian), GarageBand (.band, sebagian), BandLab (.blx, sebagian), dan file MIDI.
+• Pengeditan audio: plugin ARA 2 seperti Melodyne bekerja langsung pada klip audio, editor not polifonik menggeser dan menyetel ulang not tunggal di dalam akor, dan audio bisa diubah menjadi MIDI.
 • Latensi rendah: ASIO (termasuk driver ASIO milik LYNX SHARE sendiri untuk perangkat apa pun), WASAPI mode shared dan exclusive.
-• Rekam audio dan MIDI, edit audio, otomatisasi apa saja, render ke WAV, FLAC, MP3, OGG, atau stem.
+• Rekam audio dan MIDI (MPE juga), edit audio, otomatisasi apa saja, render ke WAV, FLAC, MP3, OGG, AIFF, M4A, atau stem.
 • Antarmuka dalam 15 bahasa, termasuk bahasa Indonesia, Inggris, Portugis, Spanyol, Prancis, Jerman, Italia, Belanda, Polandia, Rusia, Turki, Jepang, Korea, dan Tionghoa.
 
 Tanpa akun, tanpa langganan, tanpa iklan, dan tanpa telemetri. LYNX SHARE adalah perangkat lunak bebas (GNU AGPL-3.0); kode sumbernya ada di GitHub.
@@ -43,27 +42,21 @@ LYNX SHARE masih dalam tahap alfa: mungkin masih ada kekurangan di sana-sini, ja
 
 ## What's new
 
-LYNX SHARE 0.1.28: lebih ringan dan cepat, dengan jendela siap dalam sekitar satu detik, proyek besar yang terbuka
-lebih cepat dan memakai lebih sedikit memori, pemutaran lebih mulus, stem diekspor sekali jalan, dan render lebih dulu
-untuk proyek berat pada buffer kecil; Ableton Link; Freeze dan Bounce di Alur kerja peluncuran klip; envelope klip;
-sample yang di-drag ke plugin; lebih banyak perangkat bawaan Ableton Live yang dibuka dari set .als; suara bawaan
-pabrik FL Studio Mobile dari salinan aplikasinya milikmu sendiri; Sampler 16 pad di Alur kerja sederhana; Simpan
-preset untuk instrumen bawaan; Remote Control API eksperimental; track Playlist yang bisa diubah ukurannya dari
-tepinya, Ctrl+klik untuk memilih beberapa track, dan track Playlist yang tertaut ke track mixer; serta banyak
-perbaikan.
+LYNX SHARE 0.1.30: lebih ringan dari sebelumnya, memakai sekitar separuh CPU FL Studio 2026 saat demo Thief dari FL diputar di PC uji kami; hosting ARA 2, sehingga Melodyne dan plugin ARA lain mengedit klip audio langsung di tempatnya; editor not polifonik dan audio ke MIDI polifonik; Newtone yang lebih natural; Helix, synth wavetable baru, dan Tetra, synth FM 4 operator; asisten akor; Drum Machine bergaya BandLab, tuner, dan Loop Browser di Alur kerja sederhana; track return, send, dan crossfader di Alur kerja peluncuran klip; MPE dan MIDI Out perangkat keras; editor DirectWave; proyek DAWproject, GarageBand, dan BandLab, instrumen dan sample .gig, .dwp, dan .ncw, serta ekspor AIFF dan M4A; lebih dari 40 pengganti plugin yang dirombak; dan perbaikan untuk sekitar 40 masalah yang dilaporkan.
 
 ## Features
 
 1. Tiga alur kerja dalam satu program: pattern ala FL Studio secara bawaan, peluncuran klip ala Ableton Live, atau Alur kerja sederhana bergaya BandLab dan FL Studio Mobile
-2. Membuka proyek FL Studio (.flp), Ableton Live (.als), dan FL Studio Mobile (.flm) serta file MIDI; menyimpan .als dan .flp
+2. Membuka proyek FL Studio (.flp), Ableton Live (.als), FL Studio Mobile (.flm), DAWproject, GarageBand, dan BandLab serta file MIDI; menyimpan .flp, .als, dan .dawproject
 3. Lebih dari 100 instrumen dan efek bawaan
 4. Mendukung plugin VST3, CLAP, dan VST2, opsional diisolasi di proses tersendiri
 5. Audio latensi rendah: ASIO, WASAPI shared dan exclusive
 6. Mesin multi-core yang tetap ringan di PC lama
 7. Rekaman audio dan MIDI, editor audio, klip otomasi
-8. Ekspor ke WAV, FLAC, MP3, OGG, dan stem
+8. Ekspor ke WAV, FLAC, MP3, OGG, AIFF, M4A, dan stem
 9. Antarmuka dalam 15 bahasa, termasuk bahasa Indonesia
 10. Gratis dan open source (AGPL-3.0): tanpa akun, tanpa iklan, tanpa telemetri
+11. Hosting plugin ARA 2, editor not polifonik, dan konversi audio ke MIDI
 
 ## Search terms
 

@@ -29,7 +29,7 @@ Partly. A `.flm` opens with its arrangement, samples, drum kits, DW Sampler and 
 
 ## Can I send a project back to FL Studio or Live?
 
-Yes. `File › Export › FL Studio project...` writes a `.flp`, and `File › Export › Ableton Live set (.als)...` writes a set for Live 12 or Live 11. What the other program does not have is rendered to audio or left out, and a report says which. The limits are on the [File formats](/wiki/file-formats/) page.
+Yes. `File › Export › FL Studio project...` writes a `.flp`, `File › Export › Ableton Live set (.als)...` writes a set for Live 12 or Live 11, and `File › Export › DAWproject (.dawproject)...` writes a file that Bitwig, Studio One, Cubase and other apps open. What the other program does not have is rendered to audio or left out, and a report says which. The limits are on the [File formats](/wiki/file-formats/) page.
 
 ## Do my VST plugins work?
 
@@ -70,3 +70,7 @@ No, not on purpose. When one of LYNX SHARE's effects is refitted to sound closer
 ## Can I use FL Studio's own plugins in LYNX SHARE?
 
 Yes, through the FL Studio plugin that comes with FL Studio. FL Studio installs itself as a plugin too: `FL Studio VSTi` and `FL Studio VSTi (Multi)` (VST2) on Windows, and an Audio Unit on macOS. Put it on a channel in LYNX SHARE and FL Studio runs inside it, with its Channel rack, Patcher, Sytrus, Harmor and the other plugins your FL Studio licence covers. It needs FL Studio installed and your own licence. LYNX SHARE does not load FL Studio's plugin files directly, because they are made to run only inside FL Studio. If an older version of LYNX SHARE listed the FL Studio plugin as `Failed to load`, right-click it in `Options › Plugin manager...` and choose `Try again (scan this file now)`.
+
+## Does it open GarageBand, BandLab or DAWproject files?
+
+Yes. `File › Open...` reads DAWproject files (`.dawproject`) with their tracks, folders, clips, automation, mixer and plugins, and can write them back. GarageBand projects (`.band`, from GarageBand 10 or GarageBand for iOS) and BandLab projects downloaded by Cakewalk or Sonar (`.blx`) open as Simple-workflow tracks with their regions, tempo, key and mix; their instrument sounds are not stored in a readable form, so instrument tracks play LYNX SHARE's built-in synth and drums. Sampler instruments also open: DirectWave programs (`.dwp`, `.dwb`), `.gig` instruments and Kontakt's `.ncw` samples.
