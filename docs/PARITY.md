@@ -5339,3 +5339,78 @@ meet the rule** (four more 1 kHz-tone files, two D-state impulses on low single 
 at S1 in refcap030 and refcap182): not merged; the list goes to the owner. Old projects: revision 0 byte-identical
 (gold 15 / 15, fxrender revision 0 = fxr_m4 12 / 12); every other effect byte-identical to 190lp (158 / 158). CPU of
 the Space engine 3.5 … 4.5 % → 3.7 … 4.7 % of a core (two biquads per channel on the taps; within the noise).
+## Round 190mg: REA of the Waves DSP, fourth pass — C4 on Prism's C4 law, the Renaissance Compressor law, NS1 at 20 … 100 %, Doubler's splice law, Waves Tune's pass-through, the 190lf leftovers
+
+Rounds 190kt / 190ky / 190lf's path (clean-room: structure from the unprotected Waves V17 DSP DLLs, every LYNX constant
+fitted on our Waves demo-mode probes with a 1.5 s silent lead and the demo's mutes masked; no vendor code, table or preset
+read out). Scorer: scripts/fxparity.py with round 190lg's time window (refcap182 is 48 kHz: identical results). Evidence:
+`docs/analise/REA_rodada190mg.md` (C4, the new entries, the survey), `_ren.md`, `_ns1.md`, `_voc.md`, `_dyn.md`.
+
+| reference → LYNX | files | before → after | up / same / down |
+|---|---|---|---|
+| C4 → Prism Multiband (C4 law; new entry) | 25 | n = 0 → 9.52 | — |
+| Renaissance Compressor → Compressor (Renaissance law) | 30 | 6.57 → 9.80 | 25 / 5 / 0 |
+| NS1 → Quell (NS1 law, 20 … 100 %) | 25 | 5.40 → 7.04 | 16 / 9 / 0 |
+| Doubler2 → Gemini Doubler (splice law) | 25 | 4.48 → 4.76 | 4 / 21 / 0 |
+| Waves Tune Real-Time → LYNX Tune (pass-through law) | 25 | 5.36 → 5.72 | 6 / 19 / 0 |
+| PuigTec EQP1A → Facet EQ (PuigTec law) | 25 | 7.60 → 7.84 | 6 / 19 / 0 |
+| L2 → Limiter (L2 law + IDR) | 25 | 9.52 → 9.52 | 0 / 25 / 0 |
+| CLA-76 → Crest (amp modelled, not set) | 25 | 7.16 → 7.16 | 0 / 25 / 0 |
+| Abbey Road Plates → Foil Plate (new entry) | 25 | n = 0 → 2.40 | — |
+| Atlas Reverb → Atrium (new entry) | 25 | n = 0 → 2.96 | — |
+| CLA-2A, DeEsser, H-Delay, RVerb, H-Reverb, TrueVerb, S1, SSLChannel, SSLComp, SuperTap (unchanged) | 265 | all same | — |
+
+- **Prism Multiband — the C4 law** (hidden [157], crossover Q [158]; Waves C4 only; a new entry: C4 projects had no
+  stand-in). The C4's own structure in LYNX's engine: in-phase squared-biquad crossovers (−6 dB at the nominal
+  frequency, all four bands summing to the all-pass chain: −90 dB ESR against the probes), per band a linked peak →
+  g = 1 / (1 + k · peak / threshold) with the knee's cubic (k = 0.5 · 2^(−range / 12) at knee 0, measured on nine ranges
+  at knee 0.5; every stair within 0.003 dB), the look-ahead minimum (64 samples at 44.1 / 48 kHz, 128 at 96 kHz), the
+  Renaissance-family release (a slow follower, the release shaped by it and by the smoother's depth, read at 255 steps),
+  the deeper of smoother and follower, two box filters, gain range + (1 − range) · g. 19 burst probes −65 … −84 dB ESR.
+- **Compressor — the Renaissance law** (hidden [20]; RComp only; sub-round ren): linked peak (Smooth: + three all-pass
+  copies), 64-sample look-ahead max, the same rational gain law with the ratio as the gain's floor, the release law
+  above, the 0 dBFS limiter inside the gain path, two box filters. Probes −71 … −107 dB ESR; about half the old CPU.
+- **Quell — the NS1 law** (hidden [6]; NS1 at 20 … 100 %; sub-round ns1): NS1's two moving all-pass splits and cuts (from
+  its saved states), six bands × three Regalia–Mitra cuts, slewing floor and level per band, the soft fourth-power
+  weight, open / close smoothing, the pause flag. Constants fitted with the scorer's score of the refcap182 renders in
+  the objective (probes as a check; stated). 0 % keeps 190lf's zero law bit for bit.
+- **Gemini Doubler — the splice law** (hidden; Doubler only; sub-round voc): one read head per voice in the delay
+  ± 256 samples, jumping by the best of 20 candidate lags (running autocorrelation) at a quiet moment or a good zero
+  crossing, the old head fading out over 256 samples. The waveform stays unmatched by design (the reference's heads
+  free-run through silence and the host's reset).
+- **LYNX Tune — the Waves pass-through law** (hidden; Waves Tune RT only; sub-round voc): what is not being corrected
+  (< 1 cent for 80 ms, or unvoiced) fades to the delayed input itself, as the reference does; back to the corrected
+  signal at once from 3 cents. No conflict with round 190li (applies cleanly to origin/vocal190li-tune; 190li's tunelab
+  12 / 12 renders byte-identical).
+- **Facet EQ — the PuigTec law** (hidden [125]) and **the Limiter's IDR** (hidden [6 … 8]) (sub-round dyn, finished by
+  the coordinator): PuigTec's output-stage waveshaper (H2 … H5 within 0.1 dB), the resampler's 0.226-sample fractional
+  delay (a Thiran all-pass), the Mains hum + noise floor; L2's word length / TPDF / three fitted noise-shaping filters.
+  CLA-76's output amplifier was modelled (Crest's hidden fetAmp) but is not set: it cost two files a step.
+- **New entries:** Abbey Road Reverb Plates → Foil Plate (measured plate voicing; decay, pre-delay, treble, bass cut, a
+  +5 dB high shelf measured on impulse probes), Atlas Reverb → Atrium (decay, pre-delay). Both 100 % wet like the
+  references; their scores sit at the reverb ceiling (the plates are strongly coloured per plate).
+
+**Old projects.** Every new behaviour runs only with its hidden law, set only by the Waves translators. Gold renders
+(base = round 190lf's binary 2c893d3ca, final binary = this branch, 44.1 / 48 / 96 kHz × 3 programme signals,
+byte-identical): Prism Multiband 90; Facet EQ / Limiter / Crest (+ SSLComp's translation) 162; Quell 180; Compressor
+(classic, vintage, SSLComp) 108; Gemini Doubler / LYNX Tune 108 — **648 renders, 0 differ**.
+
+**CPU** (35 s stereo at 48 kHz incl. file I/O, one core): C4 law ≈ 3.9 % of a core (Prism's own default 7.8 %; C4 had no
+stand-in); Renaissance law about half the old vintage voicing (0.44 → 0.19 … 0.25 s user); NS1 law 4.6 → 1.2 % of a core;
+Doubler's splice law +19 % instructions on translated Doubler states (the measured detector, owner decision below); Waves
+Tune law +1 %; PuigTec law and L2 IDR within the wall-clock noise (L2 X4 +0.4 s / 35 s at most).
+
+**Tests:** `tests/Parity190mgC4Tests.inc` (5), `Parity190mgRenTests.inc`, `Parity190mgNs1Tests.inc`, `Parity190mgVocTests.inc`,
+`Parity190mgDynTests.inc` (2); expectations moved: Parity190jh (Facet's stored count + the PuigTec law), VoiceToolsTests119 /
+Parity190lfNs1 (NS1: 4 values). Mini runner (round 190lf's list + the round's files): **544 249 checks, 0 failures**. No full
+Linux / Windows build, no --selftest (no UI change, no new strings).
+
+**Owner decisions (reversible; the recommended option taken):** (1) Doubler's splice law kept despite +19 % instructions on
+translated Doubler states (alternative: drop it, −0.28); (2) C4 ships with the constants fitted on its own probes (9.52; the
+RComp constants gave 9.56 on the programme); (3) Abbey Road Plates / Atlas Reverb get stand-ins although they score 2.40 /
+2.96 (before: the plug-in was lost); (4) CLA-76's amplifier law stays unset (it cost two files a step). **Open:** NS1 at 0 %
+could move onto the new engine's own pair (D mix −54 → −76 dB ESR), which changes 190lf's zero-law renders (not done).
+
+**Still off:** Scheps Omni Channel 2 (no stand-in; five inner modules); the three reverbs on Reeverb 2; Doubler2's waveform
+(the reference's heads free-run through the host's reset); references for the common Waves without any (demo mode mutes).
+

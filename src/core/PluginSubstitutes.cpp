@@ -19,6 +19,7 @@
 #include "core/FlPluginDb.h"
 #include "core/FlWrapper.h"
 #include "core/LimiterLaw.h"
+#include "core/LynxVerbs.h"
 #include "core/LynxTune.h"
 #include "core/LynxVerbs.h"
 #include "core/MixSuite.h"
@@ -797,6 +798,36 @@ lynx = Stereo Shaper
 # matrix (docs/analise/REA_rodada124_extras.md §4); without a readable state the slot stays neutral
 waves = S1 Imager; S1 Imager Stereo
 translate = waves-s1-imager
+
+[waves-c4]
+product = C4 Multiband Parametric Processor
+vendor = Waves
+lynx = Prism Multiband
+waves = C4
+# round 190mg: the four-band dynamics role (no entry before: such projects lost the plug-in). Its RealWorld list is
+# translated onto Prism's four bands, and Prism's hidden C4 law runs the C4's own structure (in-phase crossovers with its
+# Q, the rational gain law with its knee, look-ahead and two-stage release), fitted on our Waves-demo probes
+# (docs/analise/REA_rodada190mg.md §2)
+translate = waves-c4
+
+[waves-ar-plates]
+product = Abbey Road Reverb Plates
+vendor = Waves
+lynx = Foil Plate
+waves = Abbey Road Reverb Plates; Abbey Road Plates
+# round 190mg: the plate role (no entry before: such projects lost the plug-in); its decay (the plate and Damper as the
+# reference combines them), pre-delay, treble and bass cut on Foil Plate's measured plate voicing, 100 % wet
+translate = waves-ar-plates
+preset = Mix=1; Voicing=1
+
+[waves-atlas]
+product = Atlas Reverb
+vendor = Waves
+lynx = Atrium
+waves = Atlas Reverb
+# round 190mg: the room / hall role (no entry before); its decay and pre-delay on Atrium, 100 % wet
+translate = waves-atlas
+preset = Mix=1
 
 [waves-puigtec]
 product = PuigTec EQP1A
@@ -1757,6 +1788,8 @@ int translateWavesTune (const std::vector<std::uint8_t>& state, EffectSlot& slot
         slot.params[lynxtune::speedLink] = *speed < 5.0 ? 0.0f : 1.0f;
         ++n;
     }
+    // round 190mg: what the reference does not correct passes as the input itself (REA_rodada190mg_voc.md; hidden)
+    slot.params[lynxtune::wavesLaw] = 1.0f;
     // RealWorld 22 = 100 in every state of her corpus, Correction % by its default [model]
     if (const auto amount = wavesValue (rw, 22); amount && *amount >= 1.0 && *amount <= 100.0)
         slot.params[lynxtune::correction] = (float) (*amount / 100.0);
@@ -1835,6 +1868,11 @@ int translateWavesRComp (const std::vector<std::uint8_t>& state, EffectSlot& slo
     slot.params[15] = linNorm (wavesValue (rw, 2).value_or (0.0), -30.0, 30.0);
     slot.params[16] = logNorm (wavesValue (rw, 8).value_or (16.0), 0.5, 500.0);
     slot.params[17] = logNorm (wavesValue (rw, 0).value_or (160.0), 5.0, 5000.0);
+    // round 190mg: the vintage voicing's Renaissance law — LYNX's model of the reference's structure, every constant
+    // fitted on our probes (core/VoiceMatch.h progcomp::Renaissance, docs/analise/REA_rodada190mg_ren.md); hidden, saved
+    // while set (0 = the round-123 / 152 engine, every other Compressor)
+    if (slot.params.size() > (std::size_t) compressorRenLaw)
+        slot.params[(std::size_t) compressorRenLaw] = 1.0f;
     return 6;
 }
 
@@ -1942,8 +1980,8 @@ constexpr double superTapLossDb = 0.3, superTapHardDb = 3.0, superTapFeedback = 
 // (core/LimiterLaw.h). L2 limits the input at the threshold and adds the make-up ceiling − threshold (measured: the
 // small-signal gain is exactly that, and 0.999 at Ceiling 0 dB) — the Limiter's Gain knob is that make-up (a threshold
 // above the ceiling: the hidden trim takes the gain below 0 dB), its Ceiling the ceiling, ARC the law's programme-
-// dependent release, else the Release knob (L2's dial: the 90 % recovery time, 10 … 1000 ms here). IDR dither is not
-// modelled (noise far below the scores' thresholds).
+// dependent release, else the Release knob (L2's dial: the 90 % recovery time, 10 … 1000 ms here). Round 190mg: IDR's
+// requantizer (word length, dither, noise shaping) on the law's output.
 int translateWavesL2 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
 {
     namespace ll = limiterlaw;
@@ -1961,13 +1999,19 @@ int translateWavesL2 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
     slot.params[(std::size_t) ll::lawParam] = ll::l2LawValue;
     slot.params[(std::size_t) ll::arcParam] = arc ? 1.0f : 0.0f;
     slot.params[(std::size_t) ll::trimParam] = (float) (std::max (-gainDb, 0.0) / 24.0);
+    // round 190mg (REA_rodada190mg_dyn §2, measured): IDR — 8 Quantize 0 … 4 = 24 / 22 / 20 / 18 / 16 bits, 11 the dither
+    // setting (1 = Type 1, TPDF), 12 the shaping (0 none, 1 moderate, 2 normal, 3 ultra)
+    const int quantize = std::clamp ((int) std::lround (wavesValue (rw, 8).value_or (0.0)), 0, 4);
+    slot.params[(std::size_t) ll::ditherBitsParam] = (float) (24 - 2 * quantize) / 32.0f;
+    slot.params[(std::size_t) ll::ditherTypeParam] = (float) (std::clamp ((int) std::lround (wavesValue (rw, 11).value_or (1.0)), 0, 2) + 1) / 4.0f;
+    slot.params[(std::size_t) ll::ditherShapeParam] = (float) (std::clamp ((int) std::lround (wavesValue (rw, 12).value_or (2.0)), 0, 3) + 1) / 8.0f;
     return 6;
 }
 
 // PuigTec EQP1A (round 190lf [EXEC]: crafted states through loadcomponent on refcap030's host, impulse responses;
 // docs/analise/REA_rodada190lf.md §3): RealWorld 0 output gain dB, 6 high boost, 7 bandwidth, 8 high frequency (1 … 7 =
 // 3, 4, 5, 8, 10, 12, 16 kHz), 9 low atten, 10 atten select (1 … 3 = 5, 10, 20 kHz), 11 low frequency (1 … 4 = 20, 30,
-// 60, 100 Hz), 12 low boost, 14 high atten (the knobs 0 … 11), 15 in (1) / out, 16 mains hum (not modelled). The
+// 60, 100 Hz), 12 low boost, 14 high atten (the knobs 0 … 11), 15 in (1) / out, 16 mains (round 190mg: modelled). The
 // reference is an oversampled passive-EQ model (REA of the DSP: a block convolution / resampling frame, a hum generator,
 // per-instance component tolerances): its curves are minimum phase plus a linear-phase resampler (149 samples at 48 kHz,
 // a −0.46 dB roll-off at 20 kHz, a +1.1 dB insertion gain). LYNX plays them on Facet EQ's zero-latency bands: the low
@@ -2016,6 +2060,96 @@ double knobAxis (double v, int& i) noexcept // the knob grid 0, 1.375 … 11 →
 }
 } // namespace puigtec
 
+// round 190mg: Waves C4 (70 values; names from its ParamXML, every law measured on our demo-mode probes,
+// docs/analise/REA_rodada190mg.md §2): 0 / 1 / 2 crossovers Hz, 3 crossover Q, 7 output dB; band b (0 … 3) at 14 + 14 b:
+// +2 solo, +3 bypass, +4 gain dB, +5 threshold dB, +6 range dB (negative = downward), +7 knee (0 … 0.75), +8 attack ms,
+// +9 release ms, +11 behaviour (0 electro, 1 opto). Prism's four bands take them as they are and its hidden C4 law
+// (dyn::prism::c4Law) runs the C4's structure on them.
+int translateWavesC4 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace pr = dyn::prism;
+    const auto rw = wavesRealWorldParams (state);
+    if (slot.kind != EffectKind::prismMultiband || rw.size() < 70 || ! wavesValue (rw, 0) || ! wavesValue (rw, 19))
+        return 0;
+    auto& p = slot.params;
+    const auto v = [&rw] (std::size_t i, double fallback) { return wavesValue (rw, i).value_or (fallback); };
+    const auto set = [&p] (int k, float x) { p[(std::size_t) k] = std::clamp (x, 0.0f, 1.0f); };
+    set (pr::bandLayout, 0.0f);
+    set (pr::bandCountParam, pr::bandCountValue (4));
+    static constexpr double defaultsHz[3] { 92.0, 4000.0, 11071.0 };
+    for (int k = 0; k < 3; ++k)
+        set (pr::crossoverParam (k), pr::crossoverValue (v ((std::size_t) k, defaultsHz[k])));
+    bool opto = false;
+    for (int b = 0; b < 4; ++b)
+    {
+        const auto at = [&] (int f, double fallback) { return v ((std::size_t) (14 + 14 * b + f), fallback); };
+        set (pr::param (b, pr::fThreshold), pr::thresholdValue (std::clamp (at (5, -30.0), -90.0, 0.0)));
+        set (pr::param (b, pr::fRange), (float) ((std::clamp (at (6, -8.0), -30.0, 30.0) + 30.0) / 60.0));
+        set (pr::param (b, pr::fKnee), (float) (std::clamp (at (7, 0.5), 0.0, 0.75) * 64.0 / 48.0));
+        set (pr::param (b, pr::fAttack), pr::c4AttackValue (at (8, 10.0)));
+        set (pr::param (b, pr::fRelease), pr::c4ReleaseValue (at (9, 50.0)));
+        set (pr::param (b, pr::fLevel), (float) ((std::clamp (at (4, 0.0), -30.0, 30.0) + 30.0) / 60.0));
+        set (pr::param (b, pr::fMode), 0.0f);
+        set (pr::param (b, pr::fEnabled), at (3, 0.0) >= 0.5 ? 0.0f : 1.0f);
+        set (pr::param (b, pr::fSolo), at (2, 0.0) >= 0.5 ? 1.0f : 0.0f);
+        opto = opto || at (11, 0.0) >= 0.5;
+    }
+    set (pr::mix, 1.0f);
+    set (pr::input, 0.5f);
+    set (pr::output, (float) ((std::clamp (v (7, 0.0), -36.0, 36.0) + 36.0) / 72.0));
+    p[(std::size_t) pr::c4Law] = pr::c4LawValue (opto);
+    p[(std::size_t) pr::c4Q] = pr::c4QValue (v (3, 0.6));
+    return 40;
+}
+
+// round 190mg: Abbey Road Reverb Plates (409 values; the indices that move with the controls, read from refcap182's states):
+// 324 pre-delay ms, 326 the plate's decay s (the plate A … D and Damper 0 … 10 already combined by the reference), 334 plate,
+// 335 damper, 336 bass cut (0 off, 1 … 3), 378 treble dB, 382 drive. Foil Plate's measured plate voicing takes the decay
+// and pre-delay as they are, 100 % wet like the reference (no dry path: its states mix nothing dry).
+int translateWavesArPlates (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    const auto rw = wavesRealWorldParams (state);
+    if (slot.kind != EffectKind::foilPlate || rw.size() < 383 || ! wavesValue (rw, 326))
+        return 0;
+    auto& p = slot.params;
+    const auto v = [&rw] (std::size_t i, double fallback) { return wavesValue (rw, i).value_or (fallback); };
+    const double rt = std::clamp (v (326, 2.6), 0.3, 20.0);
+    double lo = 0.0, hi = 1.0;
+    for (int k = 0; k < 40; ++k)
+        (verbs::foil::decaySec ((float) (0.5 * (lo + hi))) < rt ? lo : hi) = 0.5 * (lo + hi);
+    p[0] = 1.0f;                                                                   // mix
+    p[1] = (float) verbs::skewInverse (std::clamp (v (324, 0.0), 0.0, 500.0), 0.0, 500.0, 2.3219); // pre-delay
+    p[2] = (float) (0.5 * (lo + hi));                                              // decay
+    // the reference plates are brighter than this tank above 5 kHz (impulse probes of refcap182's five states: 8 / 16 kHz
+    // octaves -1 … -5 / -2 … -7 dB, -4 / -5 on average): Foil's high shelf +5 dB at 5 kHz, then the Treble on top
+    const double treble = 5.0 + std::clamp (v (378, 0.0), -12.0, 12.0);
+    p[10] = (float) std::clamp (treble >= 0.0 ? 0.5 + treble / 24.0 : 0.5 + treble / 9.0, 0.0, 1.0);
+    static constexpr double bassCutHz[4] { 0.0, 80.0, 160.0, 320.0 };
+    const auto bc = std::clamp ((int) std::lround (v (336, 0.0)), 0, 3);
+    p[13] = bc == 0 ? 0.0f : (float) (std::log (bassCutHz[bc] / 20.0) / std::log (50.0));
+    p[14] = 1.0f; // the measured plate voicing
+    p[(std::size_t) verbs::foil::revision] = 1.0f;
+    slot.mix = 1.0f;
+    return 4;
+}
+
+// round 190mg: Atlas Reverb (488 values; indices read from refcap182's states): 2 decay s, 17 pre-delay ms, 7 size. Atrium
+// (the room / hall role) takes the decay and pre-delay as they are, 100 % wet like the reference.
+int translateWavesAtlas (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    const auto rw = wavesRealWorldParams (state);
+    if (slot.kind != EffectKind::atrium || rw.size() < 18 || ! wavesValue (rw, 2))
+        return 0;
+    auto& p = slot.params;
+    const auto v = [&rw] (std::size_t i, double fallback) { return wavesValue (rw, i).value_or (fallback); };
+    p[0] = 1.0f;
+    p[1] = (float) std::clamp (v (17, 10.0) / 500.0, 0.0, 1.0);
+    p[2] = (float) verbs::skewInverse (std::clamp (v (2, 2.5), 0.1, 100.0), 0.1, 100.0, 5.717);
+    p[(std::size_t) verbs::atrium::revision] = 1.0f;
+    slot.mix = 1.0f;
+    return 3;
+}
+
 int translateWavesPuigTec (const std::vector<std::uint8_t>& state, EffectSlot& slot)
 {
     namespace pt = puigtec;
@@ -2039,6 +2173,10 @@ int translateWavesPuigTec (const std::vector<std::uint8_t>& state, EffectSlot& s
     setBand (5, facet::Shape::lowShelf, std::exp (pt::flat[4]), pt::flat[5], std::exp (pt::flat[6]), 12);
     setBand (6, facet::Shape::highShelf, std::exp (pt::lift[lf][0]), pt::lift[lf][1], std::exp (pt::lift[lf][2]), 12);
     setBand (7, facet::Shape::lowShelf, std::exp (pt::lift[lf][3]), pt::lift[lf][4], std::exp (pt::lift[lf][5]), 12);
+    // round 190mg (REA_rodada190mg_dyn §1): the output stage's tube harmonics, the resampler's fractional delay and, with
+    // the Mains switch (16: 0 off, 1 = 60 Hz, 2 = 50 Hz — measured), the hum and noise floor: Facet's PuigTec law
+    const int mains = std::clamp ((int) std::lround (v (16, 0.0)), 0, 2);
+    p[(std::size_t) facet::puigLawParam] = facet::puigLawValue (mains == 1 ? 2 : mains == 2 ? 3 : 1);
     if (v (15, 1.0) < 0.5) // the In switch off: the curves out, the reference's flat response stays
         return 8;
 
@@ -2413,6 +2551,9 @@ int translateWavesCla76 (const std::vector<std::uint8_t>& state, EffectSlot& slo
     const auto outGain = cla76Interp (outDb, cla76OutLabel, cla76OutGain, cla76OutPoints);
     p[c::threshold] = linNorm (f.t1 - inGain, -60.0, 0.0);
     consoleMix (p, at (103, 100.0) / 100.0, inGain + outGain + f.plateauDb, at (104, 0.0));
+    // round 190mg (REA_rodada190mg_dyn §3): the output amplifier's harmonics were measured and modelled (Crest's hidden
+    // fetAmp), but not set here: on refcap182 it cost two files a step (X1_bass 8 → 7, X4_vocal 6 → 5, ESR 0.2 … 0.8 dB
+    // worse). Auto make-up (105): no steady change measured (only a start-up ramp after reset), so it is not translated.
     slot.mix = 1.0f;
     return 13;
 }
@@ -3297,7 +3438,10 @@ int translateWavesNs1 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
     slot.params[voicetools::quell::matched] = 1.0f; // round 124: the engine fitted to the trial (REA_rodada124 §6)
     // round 190lf: 0 % is NS1's bare all-pass pair, the engine fades in up to 20 % (REA_rodada190lf_ns1.md)
     slot.params[voicetools::quell::zeroLaw] = 1.0f;
-    return 3;
+    // round 190mg (ns1): above 0 % the engine with NS1's own structure (REA_rodada190mg_ns1.md); its layout follows the
+    // Amount by the law through NS1's five saved states (voicetools::quell::ns1Layout)
+    slot.params[voicetools::quell::ns1Law] = 1.0f;
+    return 4;
 }
 
 // Doubler (RealWorld list, round 119): 0 output dB, 1 direct on, 2 direct gain dB, 3 direct pan deg, 4 align,
@@ -3330,6 +3474,8 @@ int translateWavesDoubler (const std::vector<std::uint8_t>& state, EffectSlot& s
     p[g::highOn] = flag (14, 0.0);
     p[g::feedbackCut] = g::freqValue (at (15, 16.0));
     p[g::range] = flag (18, 0.0);
+    // round 190mg: the Waves DSP's splice law for the read head (REA_rodada190mg_voc.md; hidden, Align off only)
+    p[g::spliceLaw] = 1.0f;
     // round 135w: a four-voice doubler's voices 3 and 4 (blocks 46 / 56, the same layout as 26 / 36 [model]: a two-voice
     // state carries those blocks too, so they are read only when the state names the four-voice plug-in; their source
     // indices are not probed yet: own side)
@@ -4329,6 +4475,12 @@ RawTranslator rawTranslatorNamed (std::string_view name)
         return translateWavesL2;
     if (name == "waves-puigtec")
         return translateWavesPuigTec;
+    if (name == "waves-c4")
+        return translateWavesC4;
+    if (name == "waves-ar-plates")
+        return translateWavesArPlates;
+    if (name == "waves-atlas")
+        return translateWavesAtlas;
     if (name == "waves-supertap")
         return translateWavesSuperTap;
     if (name == "waves-sslcomp")

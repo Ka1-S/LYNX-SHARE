@@ -224,15 +224,18 @@ class Compressor final : public Effect
 public:
     // `initial` (may be null): the slot's parameters, so the voicing's latency is known after prepare(), before the
     // first block (issue #113: a Patcher plans its delay compensation right after building its nodes)
-    explicit Compressor (const EffectParams* initial = nullptr) : vintageAtStart (initial != nullptr && (*initial)[8] >= 0.5f) {}
+    explicit Compressor (const EffectParams* initial = nullptr)
+        : vintageAtStart (initial != nullptr && (*initial)[8] >= 0.5f),
+          renAtStart (initial != nullptr && (*initial)[8] >= 0.5f && (*initial)[(std::size_t) compressorRenLaw] >= 0.5f) {}
 
     void prepare (double sr) noexcept override
     {
         sampleRate = sr;
         vintage.prepare (sr);
+        ren.prepare (sr);
         reset();
         if (vintageAtStart)
-            latency.store (vintage.latency(), std::memory_order_relaxed);
+            latency.store (renAtStart ? ren.latency() : vintage.latency(), std::memory_order_relaxed);
     }
     void reset() noexcept override
     {
@@ -240,6 +243,7 @@ public:
         inPower = outPower = 0.0f;
         autoGain = 1.0f;
         vintage.reset();
+        ren.reset();
     }
 
     // round 123: voicing 1 = the measured program-dependent compressor (core/VoiceMatch.h); it delays the audio
@@ -275,6 +279,39 @@ public:
 
     void process (float* l, float* r, int n, const EffectParams& params, double) noexcept override
     {
+        if (params[8] >= 0.5f && params[(std::size_t) compressorRenLaw] >= 0.5f)
+        {
+            // round 190mg: the vintage voicing's Renaissance law (core/VoiceMatch.h progcomp::Renaissance; set only by the
+            // Renaissance Compressor translator)
+            tail = -1;
+            latency.store (ren.latency(), std::memory_order_relaxed);
+            float peakIn = 0.0f, peakOut = 0.0f;
+            for (int i = 0; i < n; ++i)
+                peakIn = std::max (peakIn, std::max (std::abs (l[i]), std::abs (r[i])));
+            vmatch::progcomp::RenSettings v;
+            const bool rc = params[13] >= 0.5f;
+            v.thresholdDb = compThresholdDb (params[0]);
+            v.ratio = rc ? rcRatio (params[14]) : compRatio (params[1]);
+            v.attackMs = rc ? rcAttackMs (params[16]) : compAttackMs (params[2]);
+            v.releaseMs = rc ? rcReleaseMs (params[17]) : compReleaseMs (params[3]);
+            v.gainDb = rc ? rcGainDb (params[15]) : compMakeupDb (params[4]);
+            v.mix = std::clamp ((double) params[6], 0.0, 1.0);
+            v.trimDb = -18.0 + 36.0 * std::clamp ((double) params[7], 0.0, 1.0);
+            v.manual = params[9] >= 0.5f;
+            v.opto = params[10] >= 0.5f;
+            v.smooth = params[11] >= 0.5f;
+            v.limiter = params[12] >= 0.5f; // the reference's limiter sits inside its gain path
+            ren.process (l, r, n, v);
+            meterLimit.store (0.0f, std::memory_order_relaxed);
+            for (int i = 0; i < n; ++i)
+                peakOut = std::max (peakOut, std::max (std::abs (l[i]), std::abs (r[i])));
+            useSidechain = false;
+            meterGr.store (std::clamp (ren.reductionDb() / 30.0f, 0.0f, 1.0f), std::memory_order_relaxed);
+            meterChange.store (ren.changeDb(), std::memory_order_relaxed);
+            meterIn.store (std::min (peakIn, 1.0f), std::memory_order_relaxed);
+            meterOut.store (std::min (peakOut, 1.0f), std::memory_order_relaxed);
+            return;
+        }
         if (params[8] >= 0.5f)
         {
             tail = -1; // (round 190gp: the measured voicing keeps the fixed hold)
@@ -431,7 +468,8 @@ private:
     float limitGain = 1.0f;
     std::atomic<int> latency { 0 };
     vmatch::progcomp::Compressor vintage;
-    bool vintageAtStart = false;
+    vmatch::progcomp::Renaissance ren; // round 190mg
+    bool vintageAtStart = false, renAtStart = false;
     double sampleRate = 44100.0;
     float envelopeDb = 0.0f;
     float inPower = 0.0f, outPower = 0.0f, autoGain = 1.0f;
@@ -1082,6 +1120,10 @@ private:
         const double manual = std::exp (-1.0 / (releaseS * sampleRate));
         tail = tailOf (l2Window + 16.0 * (arc ? ll::arcFollowReleaseS : releaseS) * sampleRate + 64.0);
         const int capacity = (int) l2MinValues.size();
+        // round 190mg: the requantizer's settings (0 bits = off: the law's output as before)
+        ditherBits = params[(std::size_t) ll::ditherBitsParam] > 0.0f ? std::clamp ((int) std::lround (params[(std::size_t) ll::ditherBitsParam] * 32.0f), 8, 24) : 0;
+        ditherTpdf = std::lround (params[(std::size_t) ll::ditherTypeParam] * 4.0f) == 2;
+        ditherShape = std::clamp ((int) std::lround (params[(std::size_t) ll::ditherShapeParam] * 8.0f) - 1, 0, 3);
 
         for (int i = 0; i < n; ++i)
         {
@@ -1155,9 +1197,45 @@ private:
             l2Delay[1][p] = b;
             if (++l2Position >= l2Window)
                 l2Position = 0;
+            if (ditherBits > 0) // round 190mg: IDR (LimiterLaw.h)
+            {
+                l[i] = (float) requantize (outL, 0);
+                r[i] = (float) requantize (outR, 1);
+                continue;
+            }
             l[i] = (float) outL;
             r[i] = (float) outR;
         }
+    }
+
+    // round 190mg: IDR — rounding to ditherBits through the error-feedback shaper, TPDF dither at Type 1
+    double requantize (double x, int c) noexcept
+    {
+        namespace ll = limiterlaw;
+        const double scale = std::ldexp (1.0, ditherBits - 1);
+        if (ditherShape == 0 && x == 0.0) // no shaping: digital silence stays silent (measured)
+            return 0.0;
+        double v = std::clamp (x, -1.0, 1.0) * scale;
+        auto& hist = ditherHist[c];
+        if (ditherShape > 0)
+        {
+            const auto& h = ll::ditherShaping[ditherShape - 1];
+            for (int k = 0; k < ll::ditherTaps; ++k)
+                v += h[k] * hist[(std::size_t) ((ditherPos[c] + k) % ll::ditherTaps)];
+        }
+        double d = 0.0;
+        if (ditherTpdf)
+        {
+            auto next = [this, c]() noexcept { auto& s = ditherSeed[c]; s ^= s << 13; s ^= s >> 17; s ^= s << 5; return (double) s * (1.0 / 4294967296.0); };
+            d = next() - next(); // TPDF, ±1 LSB
+        }
+        const double y = std::clamp (std::floor (v + d + 0.5), -scale, scale - 1.0);
+        if (ditherShape > 0) // the newest error first (index ditherPos), clamped so an overload cannot run away
+        {
+            ditherPos[c] = (ditherPos[c] + ll::ditherTaps - 1) % ll::ditherTaps;
+            hist[(std::size_t) ditherPos[c]] = std::clamp (y - v, -8.0, 8.0);
+        }
+        return y / scale;
     }
 
     void resetL2() noexcept
@@ -1175,6 +1253,10 @@ private:
         l2Count = 1;
         l2MinValues[0] = 1.0;
         l2MinTimes[0] = -1;
+        for (auto& h : ditherHist) h.fill (0.0); // round 190mg: the requantizer (LYNX's renders stay deterministic)
+        ditherPos[0] = ditherPos[1] = 0;
+        ditherSeed[0] = 0x6C078965u;
+        ditherSeed[1] = 0x5DEECE66u;
     }
 
     double sampleRate = 44100.0;
@@ -1187,6 +1269,10 @@ private:
     std::int64_t clock = 0;
     int tail = -1;
 
+    int ditherBits = 0, ditherShape = 0, ditherPos[2] {};
+    bool ditherTpdf = false;
+    std::array<std::array<double, 48>, 2> ditherHist {};
+    std::uint32_t ditherSeed[2] { 0x6C078965u, 0x5DEECE66u };
     std::atomic<bool> l2Active { false };
     int l2Window = 64, l2BoxALength = 27, l2BoxBLength = 38, l2Position = 0, l2IndexA = 0, l2IndexB = 0;
     double l2Attack = 0.0, l2Release = 0.0, l2Follow = 1.0, l2Gain = 1.0, l2SumA = 27.0, l2SumB = 38.0;
@@ -5076,6 +5162,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 152: a Compressor saved before the measured vintage curve keeps the round-150 curve
     if (slot.kind == EffectKind::compressor && savedCount <= 18 && slot.params.size() > 18)
         slot.params[18] = 0.0f;
+    // round 190mg: … and one saved before the Renaissance law keeps the vintage voicing's round-123 / 152 engine
+    if (slot.kind == EffectKind::compressor && savedCount <= (std::size_t) compressorRenLaw && slot.params.size() > (std::size_t) compressorRenLaw)
+        slot.params[(std::size_t) compressorRenLaw] = 0.0f;
     // round 190do: a Gemini Doubler saved before the measured read head keeps the two crossfaded taps
     if (slot.kind == EffectKind::geminiDoubler && savedCount <= (std::size_t) voicetools::gemini::headLaw)
         slot.params[(std::size_t) voicetools::gemini::headLaw] = 0.0f;

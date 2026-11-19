@@ -88,10 +88,10 @@ TEST (parity190lf_ns1_is_translated_with_the_zero_law)
     namespace q = voicetools::quell;
     int n = 0;
     const auto zero = parity190jh::waves ("NS1 Stereo", "NS1", parity190jh::list (253, { { 85, "60" }, { 86, "16000" } }), n);
-    CHECK (zero.kind == EffectKind::quellDenoiser && n == 3 && zero.params[q::amount] == 0.0f);
+    CHECK (zero.kind == EffectKind::quellDenoiser && n == 4 && zero.params[q::amount] == 0.0f);
     CHECK (zero.params[q::matched] == 1.0f && zero.params[q::zeroLaw] == 1.0f);
     const auto half = parity190jh::waves ("NS1 Stereo", "NS1", parity190jh::list (253, { { 229, "50" } }), n);
-    CHECK (n == 3 && std::abs (half.params[q::amount] - 0.5f) < 1e-6f && half.params[q::zeroLaw] == 1.0f);
+    CHECK (n == 4 && std::abs (half.params[q::amount] - 0.5f) < 1e-6f && half.params[q::zeroLaw] == 1.0f);
 }
 
 TEST (parity190lf_ns1_zero_amount_is_the_bare_all_pass_pair)

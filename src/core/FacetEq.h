@@ -100,7 +100,19 @@ constexpr int dispersionFreqParam = dispersionCountParam + 1;
 constexpr int dispersionQParam = dispersionCountParam + 2;
 constexpr int maxDispersionSections = 64;
 int dispersionSections (float v) noexcept; // 0 … 64
-constexpr int storedParamCount = dispersionCountParam + 3;
+// round 190mg (REA of the Waves PuigTec EQP1A + our demo-mode probes, docs/analise/REA_rodada190mg_dyn.md §1), hidden like
+// the above (saved while non-zero; 0 = every older project, bit for bit): [129] the PuigTec law (rollup 0.1.30 step 11: after round 190lg's [125] and round 190ln's [126 … 128]) — after the output stage,
+// the passive-EQ model's output stage as LYNX measured it: a static tube-style waveshaper (level-dependent H2 / H3 …,
+// −50 dB at −4 dBFS), the resampler's fractional delay (a 3rd-order all-pass; 3 samples of latency) and, with the Mains
+// switch, a hum generator (a triangle at the mains frequency with an even term through a low and a high pass) plus a
+// coloured noise floor. k / 16: 1 = the stage, 2 = + mains 60 Hz, 3 = + mains 50 Hz (set by the PuigTec translator).
+constexpr int puigLawParam = dispersionCountParam + 3;
+constexpr int storedParamCount = puigLawParam + 1;
+int puigLaw (float v) noexcept;          // 0 off, 1 stage, 2 stage + 60 Hz mains, 3 stage + 50 Hz mains
+float puigLawValue (int k) noexcept;     // k / 16
+constexpr int puigLatency = 3;           // the fractional delay's all-pass order (samples of latency at every rate)
+// the stage's waveshaper on one sample (y = the linear output, ±1 = 0 dBFS); unity gain at low level
+double puigShape (double y) noexcept;
 constexpr int maxSections = 8; // 96 dB/oct = 16th order
 
 enum class Shape { off, bell, lowShelf, highShelf, lowCut, highCut, notch, bandPass, tiltShelf, flatTilt, allPass };

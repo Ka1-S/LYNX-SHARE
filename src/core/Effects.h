@@ -64,6 +64,9 @@ std::size_t savedEffectParamCount (const EffectSlot& slot) noexcept;
 // the effect's own panel, by the name the layout gives them (Ridge Strip's "32C voicing"); −1 / nullptr = none
 int hiddenEffectParamIndex (EffectKind kind, const char* name) noexcept;
 const char* hiddenEffectParamName (EffectKind kind, int index) noexcept;
+// round 190mg: Compressor's hidden law (after its named parameters; saved only while non-zero): 1 = the vintage voicing's
+// Renaissance law (core/VoiceMatch.h progcomp::Renaissance), set only by the Renaissance Compressor translator
+constexpr int compressorRenLaw = 20;
 // A parameter value as written to a file: rounded to 4 decimals when that reads back as the same float, else the
 // shortest decimal that does (FL's raw values, e.g. a frequency of raw/65536, survive a save and reload bit for bit)
 double savedEffectParamValue (float v) noexcept;

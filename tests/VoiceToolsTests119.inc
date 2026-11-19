@@ -255,8 +255,8 @@ TEST (waves_h_delay_ns1_doubler_translate_round119)
             values += i == 229 ? "23.1 " : "0 ";
         int n = 0;
         const auto s = slotFor ("NS1", values, n);
-        // round 190lf: three parameters (the zero law too: 0 % = NS1's bare all-pass pair)
-        CHECK (n == 3 && s.kind == EffectKind::quellDenoiser && std::abs (s.params[voicetools::quell::amount] - 0.231f) < 1e-5f);
+        // round 190lf: the zero law too (0 % = NS1's bare all-pass pair); round 190mg: and the NS1 law (four parameters)
+        CHECK (n == 4 && s.kind == EffectKind::quellDenoiser && std::abs (s.params[voicetools::quell::amount] - 0.231f) < 1e-5f);
         CHECK (s.params[voicetools::quell::matched] == 1.0f); // round 124: the engine fitted to the trial
         CHECK (s.params[voicetools::quell::zeroLaw] == 1.0f);
     }

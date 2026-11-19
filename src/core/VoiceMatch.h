@@ -300,6 +300,59 @@ private:
 };
 // round 152: the measured static correction (dB of gain added) at a ratio ≥ 1 and a level `over` dB above the threshold
 double measuredStaticDelta (double ratio, double over) noexcept;
+
+// ---- round 190mg (REA_rodada190mg_ren): the "Renaissance law" of the vintage voicing — LYNX's model of the reference's
+// structure (clean-room: structure from REA, every constant fitted on our own demo-mode probes). Compressor's hidden law
+// parameter selects it; only the Renaissance Compressor translator sets it.
+struct RenSettings
+{
+    double thresholdDb = 0.0, ratio = 1.0, attackMs = 16.0, releaseMs = 160.0, gainDb = 0.0, mix = 1.0, trimDb = 0.0;
+    bool manual = false, opto = false, smooth = false, limiter = true;
+};
+// the static law: the gain's floor (a < 1 compresses, a > 1 expands), the threshold shift (dB) and the curve
+double renFloor (double ratio) noexcept;
+double renShiftDb (double ratio) noexcept;
+// the gain (linear) of a steady peak `x` (linear) at a ratio and threshold, before the make-up
+double renStaticGain (double x, double thresholdDb, double ratio) noexcept;
+
+class Renaissance
+{
+public:
+    void prepare (double sampleRate) noexcept;
+    void reset() noexcept;
+    void process (float* l, float* r, int n, const RenSettings& s) noexcept;
+    int latency() const noexcept { return win; }
+    float reductionDb() const noexcept { return last; }
+    float changeDb() const noexcept { return change; }
+    // the look-ahead window (= the audio delay) at a rate: 64 samples under 64 kHz, 128 under 128 kHz, else 256
+    static int windowFor (double sampleRate) noexcept;
+
+private:
+    static constexpr int cap = 512, tableSize = 256;
+    double sr = 48000.0;
+    int win = 64, boxA = 27, boxB = 38;
+    // detector all-passes (first order) per channel
+    double apc[3] {}, apx[2][3] {}, apy[2][3] {};
+    // sliding maximum (monotonic queue) of the detector over the window
+    std::array<double, cap> qv {};
+    std::array<int, cap> qi {};
+    int qh = 0, qt = 0, n0 = 0;
+    // the gain path: smoothed curve gain s, its slow follower q, the limiter's gain
+    double s = 1.0, q = 1.0, lim = 1.0;
+    // two running boxcars over the gain (fixed point, exact) and the audio delay
+    std::array<std::int64_t, cap> b1 {}, b2 {};
+    std::int64_t sum1 = 0, sum2 = 0;
+    int p1 = 0, p2 = 0;
+    std::array<float, cap> dl {}, dr {};
+    int dp = 0;
+    double wetG = 1.0, dryG = 0.0;
+    bool started = false;
+    // release tables (rebuilt when the release, mode or curve change)
+    std::array<double, tableSize> relT {}, pdrT {};
+    double tRelease = -1.0;
+    int tMode = -1;
+    float last = 0.0f, change = 0.0f;
+};
 } // namespace progcomp
 } // namespace lynx::vmatch
 

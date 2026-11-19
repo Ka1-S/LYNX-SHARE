@@ -379,6 +379,13 @@ double fetLawDb (double levelDb, double t1, double w1, double s1, const FetVoice
 // prewarped), fitted on the third-octave balance of refcap182's CLA-76 programme against LYNX without it (−0.35 dB at
 // 60 Hz, −0.12 dB at 200 Hz; the probes' low-level response: −0.37 / −0.25 dB) [EXEC: lab/tone76.py, lab/fittone.py]
 constexpr double fetLowShelfDb = -0.423, fetLowShelfHz = 131.0, fetHighShelfDb = -0.816, fetHighShelfHz = 16906.0;
+// round 190mg: the output amplifier (the hidden fetAmp parameter) on the signal s at the amplifier's reference level
+// (0 dBFS there = 0 dBFS at the Output knob's −30 mark): z = s + q(n) + lead·(q(n) − q(n − 1)), q = a·s² + b·s·|s| — the
+// even part H2 (and a DC part, kept as the reference keeps it), the odd part H3 / H5 (−9 dB under H2, both 1 dB per dB),
+// led by lead samples at 48 kHz (the harmonics' measured phase lead: +14° / +20° / +34° at 2 / 3 / 5 kHz). Fitted on the
+// complex H2 / H3 / H5 of the Comp Off stairs at Input −36 … 0 (below the clip): 0.2 dB / 1 dB / 1 dB, the phases within
+// 5° [EXEC: waves3_190mg/dyn/lab/ampfit.py]. The amplifier's clip (above about −11 dBFS at the reference level) is not modelled.
+constexpr double fetAmpA = 0.139751, fetAmpB = 0.116562, fetAmpLead = 1.10438;
 struct FetTone
 {
     double b0[2] {}, b1[2] {}, a1[2] {};
@@ -835,6 +842,8 @@ double staticGainDb (const EffectParams& p, double inputDb)
 }
 
 float fetLawValue (int voice) noexcept { return (float) (std::clamp (voice, 0, fetVoices - 1) + 1) / 16.0f; }
+double fetAmpDb (float v) noexcept { return (double) v * 128.0 - 64.0; }
+float fetAmpValue (double db) noexcept { return (float) std::clamp ((db + 64.0) / 128.0, 1.0 / 128.0, 1.0); }
 
 double fetSteadyDb (const EffectParams& p, double peakDb) noexcept
 {
@@ -1678,6 +1687,7 @@ public:
             pk.fill (0.0f);
         dc.reset();
         fetTone.reset();
+        ampPrev[0] = ampPrev[1] = 0.0;
         splitAudio.reset();
         oeZ = {};
         splitSide.reset();
@@ -2876,9 +2886,22 @@ private:
         }
         const bool panned = wetA != 1.0f || wetB != 1.0f || dryA != 1.0f || dryB != 1.0f;
         const bool fetToneOn = fetVoiceOf (p) >= 0;
+        const bool ampOn = fetToneOn && p[fetAmp] > 0.0f;
+        const double ampK = ampOn ? std::pow (10.0, fetAmpDb (p[fetAmp]) / 20.0) : 1.0, ampLead = fetAmpLead * sr / 48000.0;
         for (int i = 0; i < n; ++i)
         {
             float a = wl[(std::size_t) i], b = wr[(std::size_t) i];
+            if (ampOn) // round 190mg: the output amplifier at its reference level
+            {
+                const auto amp = [&] (float v, int c) noexcept {
+                    const double s = (double) v * ampK, q = fetAmpA * s * s + fetAmpB * s * std::abs (s);
+                    const double z = s + q + ampLead * (q - ampPrev[c]);
+                    ampPrev[c] = q;
+                    return (float) (z / ampK);
+                };
+                a = amp (a, 0);
+                b = amp (b, 1);
+            }
             if (fetToneOn) // round 190ky: the FET law's static tone, on the compressed path only
             {
                 a = fetTone.process (a, 0);
@@ -2944,6 +2967,7 @@ private:
 
     double sr = 48000.0, latencyMs = -1.0;
     FetTone fetTone; // round 190ky: the FET law's wet-path tone
+    double ampPrev[2] {}; // round 190mg: the output amplifier's previous non-linear term
     double programSum = 0.0, programMs = 1e-4, programDb = -40.0; // auto threshold: the programme's slow RMS
     int osFactor = 0, laSamples = 0;
     std::atomic<int> latency { 0 };
@@ -3075,6 +3099,15 @@ int iirSlope (double dbOct) noexcept
     return s[code == 1 ? 0 : code / 2];
 }
 bool measuredDetector (const EffectParams& p) noexcept { return on (p[detectorLaw]); }
+// round 190mg: the C4 law's hidden values (1 / 8 electro, 2 / 8 opto; 0 = Prism's own engine)
+float c4LawValue (bool opto) noexcept { return opto ? 0.25f : 0.125f; }
+bool c4Active (const EffectParams& p) noexcept { return std::lround (std::clamp (p[c4Law], 0.0f, 1.0f) * 8.0f) >= 1; }
+bool c4Opto (const EffectParams& p) noexcept { return std::lround (std::clamp (p[c4Law], 0.0f, 1.0f) * 8.0f) == 2; }
+float c4QValue (double q) noexcept { return (float) std::clamp ((q - 0.1) / 0.65, 0.0, 1.0); }
+double c4QOf (const EffectParams& p) noexcept { return p[c4Q] <= 0.0f ? 0.6 : 0.1 + 0.65 * (double) std::clamp (p[c4Q], 0.0f, 1.0f); }
+float c4AttackValue (double ms) noexcept { return (float) std::clamp (std::log (std::max (ms, 0.5) / 0.5) / std::log (1000.0), 0.0, 1.0); }
+float c4ReleaseValue (double ms) noexcept { return (float) std::clamp (std::log (std::max (ms, 5.0) / 5.0) / std::log (1000.0), 0.0, 1.0); }
+int c4Lookahead (double sampleRate) noexcept { return sampleRate <= 50000.0 ? 64 : (sampleRate <= 100000.0 ? 128 : 256); }
 
 Layout layoutOf (const EffectParams& p) noexcept
 {
@@ -3599,6 +3632,264 @@ struct ScFilter
     }
 };
 
+// ---------------------------------------------------------------- round 190mg: the C4 law (REA_rodada190mg.md §2)
+// LYNX's own engine with the Waves C4's structure (static analysis of the structure, every number fitted on our demo-mode
+// probes, no vendor table read):
+//  * crossover k: Q(s) = 1 + s / (q w) + (s / w)², w set so that the low and high outputs are both -6 dB at the nominal
+//    frequency (bilinear, warped there); low = 1 / Q(s)², all-pass = Q(-s) / Q(s), high = all-pass - low: the two are in
+//    phase, the four bands (low, low-mid, high-mid, high; each compensated by the later all-passes) sum to the all-pass
+//    chain exactly (probes: < -86 dB ESR);
+//  * per band: peak of the band (stereo linked) → g = 1 / (1 + k · peak / threshold), the knee's cubic
+//    g + 2 knee · g² (1 − g) (≤ 1), the minimum over the look-ahead, the smoother with its programme-dependent release
+//    (TimeLaw) and its slow follower, the deeper of the two (unlike RComp, which takes the smoother), two box filters, then the band's gain range + (1 − range) · g (linear), times its make-up; the audio is
+//    delayed by the look-ahead.
+//  k = 0.5 · 2^(-R / 12) at knee 0 (R = range dB; probes: ±0.5 %), times exp (s(R) · (knee / 0.5)^0.78) with s(R)
+//  measured at knee 0.5 (c4KneeNodes) — 0.003 dB rms on every stair.
+namespace c4
+{
+constexpr int bandsN = 4;
+constexpr double kneeR[9] { -24.0, -18.0, -12.0, -6.0, -3.0, 3.0, 6.0, 12.0, 18.0 };
+constexpr double kneeS[9] { 0.1608, 0.2068, 0.2601, 0.3216, 0.3525, 0.4330, 0.4737, 0.5603, 0.6567 };
+// time law: the Renaissance family's (the same structure round 190mg ren read in RComp: a one-pole smoother s on the gain,
+// a slow follower q of s, s released with tau = release · (1 − v^vpow)^vexp (v = q electro, 1 − q opto) times the factor
+// 2^(−d (1/(m + pe) − 1/(q + pe))), m = min (s, q), both read at 255 steps), every constant fitted on the C4's own probes
+struct TimeLaw { double attackScale, releaseScale, d, pe, qFallMs, qRiseMs, vpow, vexp; };
+// c4fit:begin
+constexpr TimeLaw c4Time { 0.999677, 0.998302, 0.003912, 0.005823, 149.78441, 56.044957, 4.015778, 4.006325 }; // c4/lab/fit5.py (19 probes, −65 … −84 dB)
+// c4fit:end
+constexpr int boxA = 27, boxB = 38; // the two box filters (27 + 38 − 1 = 64 samples at 48 kHz, × the look-ahead's rate factor)
+
+inline double kOf (double rangeDb, double knee) noexcept
+{
+    const double r = std::clamp (rangeDb, kneeR[0], kneeR[8]);
+    int i = 0;
+    while (i < 7 && r > kneeR[i + 1])
+        ++i;
+    const double t = (r - kneeR[i]) / (kneeR[i + 1] - kneeR[i]);
+    const double s = kneeS[i] + t * (kneeS[i + 1] - kneeS[i]);
+    return 0.5 * std::pow (2.0, -rangeDb / 12.0) * (knee > 0.0 ? std::exp (s * std::pow (knee / 0.5, 0.78)) : 1.0);
+}
+
+struct Bq
+{
+    double b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0;
+    std::array<double, 4> z {};
+    double run (double x) noexcept
+    {
+        const double y = b0 * x + b1 * z[0] + b2 * z[1] - a1 * z[2] - a2 * z[3];
+        z[1] = z[0]; z[0] = x; z[3] = z[2]; z[2] = y;
+        return y;
+    }
+    void reset() noexcept { z.fill (0.0); }
+};
+
+struct Crossover
+{
+    Bq lpA, lpB, ap;
+    void design (double fc, double q, double sr) noexcept
+    {
+        const double b = 1.0 / (q * q) - 2.0, l2 = 0.5 * (-b + std::sqrt (b * b + 4.0));
+        const double K = 2.0 * sr, w = K * std::tan (M_PI * std::clamp (fc, 10.0, 0.49 * sr) / sr) / std::sqrt (l2);
+        const double al = K / (q * w), be = (K / w) * (K / w);
+        const double p0 = 1.0 + al + be, p1 = (2.0 - 2.0 * be) / p0, p2 = (1.0 - al + be) / p0;
+        for (auto* s : { &lpA, &lpB })
+        {
+            s->a1 = p1; s->a2 = p2; s->b0 = 1.0 / p0; s->b1 = 2.0 / p0; s->b2 = 1.0 / p0;
+        }
+        ap.a1 = p1; ap.a2 = p2; ap.b0 = p2; ap.b1 = p1; ap.b2 = 1.0;
+    }
+    void reset() noexcept { lpA.reset(); lpB.reset(); ap.reset(); }
+};
+
+class Engine
+{
+public:
+    void prepare (double rate) noexcept
+    {
+        sr = rate;
+        la = c4Lookahead (rate);
+        boxLenA = boxA * la / 64;
+        boxLenB = la + 1 - boxLenA;
+        key.fill (-1.0);
+        reset();
+    }
+    int latency() const noexcept { return la; }
+    void reset() noexcept
+    {
+        for (auto& ch : xo)
+            for (auto& x : ch)
+                x.reset();
+        for (auto& ch : comp)
+            for (auto& x : ch)
+                x.reset();
+        for (auto& ch : delay)
+            for (auto& d : ch)
+                d.fill (0.0);
+        dpos = 0;
+        for (int b = 0; b < bandsN; ++b)
+        {
+            s1[(std::size_t) b] = s2[(std::size_t) b] = 1.0;
+            qHead[(std::size_t) b] = qTail[(std::size_t) b] = 0;
+            for (auto& v : box1[(std::size_t) b]) v = one;
+            for (auto& v : box2[(std::size_t) b]) v = one;
+            acc1[(std::size_t) b] = one * boxLenA;
+            acc2[(std::size_t) b] = one * boxLenB;
+        }
+        bposA = bposB = 0;
+        tick = 0;
+    }
+
+    // returns the four bands' gain reductions (dB, for the meters) of the last sample
+    void process (float* l, float* r, int n, const EffectParams& p, std::array<double, 6>& extreme) noexcept
+    {
+        configure (p);
+        for (int i = 0; i < n; ++i)
+        {
+            double bandS[2][bandsN];
+            const double in[2] { (double) l[i] * inGain, (double) r[i] * inGain };
+            for (int c = 0; c < 2; ++c)
+            {
+                auto& x = xo[(std::size_t) c];
+                auto& k = comp[(std::size_t) c];
+                const double v = in[c];
+                const double l1 = x[0].lpB.run (x[0].lpA.run (v)), h1 = x[0].ap.run (v) - l1;
+                const double l2 = x[1].lpB.run (x[1].lpA.run (h1)), h2 = x[1].ap.run (h1) - l2;
+                const double l3 = x[2].lpB.run (x[2].lpA.run (h2)), h3 = x[2].ap.run (h2) - l3;
+                bandS[c][0] = k[1].ap.run (k[0].ap.run (l1));
+                bandS[c][1] = k[2].ap.run (l2);
+                bandS[c][2] = l3;
+                bandS[c][3] = h3;
+            }
+            double y[2] { 0.0, 0.0 };
+            for (int b = 0; b < bandsN; ++b)
+            {
+                const auto bi = (std::size_t) b;
+                const double lev = std::max (std::abs (bandS[0][b]), std::abs (bandS[1][b]));
+                double g = 1.0 / (1.0 + kb[bi] * lev * invT[bi]);
+                g = std::min (g + cKnee[bi] * g * g * (1.0 - g), 1.0);
+                // sliding minimum over the look-ahead (monotonic queue)
+                auto& qv = qVal[bi];
+                auto& qt = qTime[bi];
+                auto& h = qHead[bi];
+                auto& t = qTail[bi];
+                while (t != h && qv[(std::size_t) ((t + qcap - 1) % qcap)] >= g)
+                    t = (t + qcap - 1) % qcap;
+                qv[(std::size_t) t] = g;
+                qt[(std::size_t) t] = tick;
+                t = (t + 1) % qcap;
+                while (qt[(std::size_t) h] + la <= tick)
+                    h = (h + 1) % qcap;
+                const double m = qv[(std::size_t) h];
+                double co = cAtt[bi];
+                if (m >= s1[bi]) // release: the programme-dependent law
+                {
+                    const double q = s2[bi];
+                    const double qv8 = std::floor (q * 255.0) / 256.0, mv8 = std::floor (std::min (s1[bi], q) * 255.0) / 255.0;
+                    const double qq = std::floor (q * 255.0) / 255.0;
+                    const double v = std::clamp (opto ? 1.0 - qv8 : qv8, 0.0, 1.0);
+                    const double tau = std::max (0.002, relMs[bi] * std::pow (1.0 - std::pow (v, c4Time.vpow), c4Time.vexp));
+                    co = std::exp (-1.0 / (tau * 1.0e-3 * sr)) * std::exp2 (-c4Time.d * (1.0 / (mv8 + c4Time.pe) - 1.0 / (qq + c4Time.pe)));
+                }
+                s1[bi] = (s1[bi] - m) * co + m;
+                s2[bi] = (s2[bi] - s1[bi]) * (s1[bi] < s2[bi] ? cqFall : cqRise) + s1[bi];
+                // two box filters (64-bit fixed point: no drift)
+                const auto qn = (std::int64_t) std::llround (std::min (s1[bi], s2[bi]) * (double) one); // the deeper of the two
+                acc1[bi] += qn - box1[bi][(std::size_t) bposA];
+                box1[bi][(std::size_t) bposA] = qn;
+                const auto v1 = acc1[bi] / boxLenA;
+                acc2[bi] += v1 - box2[bi][(std::size_t) bposB];
+                box2[bi][(std::size_t) bposB] = v1;
+                const double gs = (double) acc2[bi] / (double) boxLenB / (double) one;
+                const double G = (active[bi] ? gr[bi] + (1.0 - gr[bi]) * gs : 1.0) * mk[bi];
+                extreme[bi] = std::min (extreme[bi], 20.0 * std::log10 (std::max (G / mk[bi], 1.0e-6)));
+                const double w = (soloAny && ! solo[bi]) ? 0.0 : mix * G + (1.0 - mix);
+                for (int c = 0; c < 2; ++c)
+                {
+                    auto& d = delay[(std::size_t) c][bi];
+                    const double old = d[(std::size_t) dpos];
+                    d[(std::size_t) dpos] = bandS[c][b];
+                    y[c] += old * w;
+                }
+            }
+            dpos = (dpos + 1) % la;
+            bposA = (bposA + 1) % boxLenA;
+            bposB = (bposB + 1) % boxLenB;
+            ++tick;
+            l[i] = (float) (y[0] * outGain);
+            r[i] = (float) (y[1] * outGain);
+        }
+    }
+
+private:
+    void configure (const EffectParams& p) noexcept
+    {
+        std::array<double, 4 + 6 * bandsN + 4> k {};
+        std::size_t n = 0;
+        const auto xs = crossovers (p);
+        for (int j = 0; j < 3; ++j)
+            k[n++] = xs[(std::size_t) j];
+        k[n++] = c4QOf (p);
+        if (k[0] != key[0] || k[1] != key[1] || k[2] != key[2] || k[3] != key[3])
+        {
+            for (int c = 0; c < 2; ++c)
+            {
+                for (int j = 0; j < 3; ++j)
+                    xo[(std::size_t) c][(std::size_t) j].design (xs[(std::size_t) j], k[3], sr);
+                comp[(std::size_t) c][0].design (xs[1], k[3], sr);
+                comp[(std::size_t) c][1].design (xs[2], k[3], sr);
+                comp[(std::size_t) c][2].design (xs[2], k[3], sr);
+            }
+            for (int j = 0; j < 4; ++j)
+                key[(std::size_t) j] = k[(std::size_t) j];
+        }
+        const auto at = [&] (int b, int f) { return p[(std::size_t) param (b, f)]; };
+        opto = c4Opto (p);
+        soloAny = false;
+        for (int b = 0; b < bandsN; ++b)
+        {
+            const auto bi = (std::size_t) b;
+            const double rng = rangeDb (at (b, fRange)), knee = kneeDb (at (b, fKnee)) / 64.0;
+            gr[bi] = dbToGain (rng);
+            invT[bi] = 1.0 / dbToGain (thresholdDb (at (b, fThreshold)));
+            kb[bi] = kOf (rng, knee);
+            cKnee[bi] = 2.0 * knee;
+            mk[bi] = dbToGain (levelDb (at (b, fLevel)));
+            active[bi] = on (at (b, fEnabled));
+            solo[bi] = on (at (b, fSolo));
+            soloAny = soloAny || solo[bi];
+            const double attMs = 0.5 * std::pow (1000.0, (double) std::clamp (at (b, fAttack), 0.0f, 1.0f));
+            const double relMs0 = 5.0 * std::pow (1000.0, (double) std::clamp (at (b, fRelease), 0.0f, 1.0f));
+            cAtt[bi] = std::exp (-1.0 / (c4Time.attackScale * attMs * 1.0e-3 * sr));
+            relMs[bi] = c4Time.releaseScale * relMs0;
+        }
+        cqFall = std::exp (-1.0 / (c4Time.qFallMs * 1.0e-3 * sr));
+        cqRise = std::exp (-1.0 / (c4Time.qRiseMs * 1.0e-3 * sr));
+        mix = std::clamp ((double) p[prism::mix], 0.0, 1.0);
+        inGain = dbToGain (trimDb (p[input]));
+        outGain = dbToGain (trimDb (p[output]));
+    }
+
+    static constexpr std::int64_t one = (std::int64_t) 1 << 40;
+    static constexpr int maxLa = 256, qcap = maxLa + 2, maxBox = 160;
+    double sr = 48000.0;
+    int la = 64, boxLenA = boxA, boxLenB = boxB, dpos = 0, bposA = 0, bposB = 0;
+    std::int64_t tick = 0;
+    std::array<double, 4> key {};
+    std::array<std::array<Crossover, 3>, 2> xo {}, comp {};
+    std::array<std::array<std::array<double, maxLa>, bandsN>, 2> delay {};
+    std::array<double, bandsN> s1 {}, s2 {}, gr {}, invT {}, kb {}, cKnee {}, mk {}, cAtt {}, relMs {};
+    bool opto = false;
+    std::array<bool, bandsN> active {}, solo {};
+    bool soloAny = false;
+    double cqFall = 0.0, cqRise = 0.0, mix = 1.0, inGain = 1.0, outGain = 1.0;
+    std::array<std::array<double, qcap>, bandsN> qVal {};
+    std::array<std::array<std::int64_t, qcap>, bandsN> qTime {};
+    std::array<int, bandsN> qHead {}, qTail {};
+    std::array<std::array<std::int64_t, maxBox>, bandsN> box1 {}, box2 {};
+    std::array<std::int64_t, bandsN> acc1 {}, acc2 {};
+};
+} // namespace c4
+
 class Multiband final : public Effect
 {
 public:
@@ -3616,6 +3907,7 @@ public:
     {
         sr = rate;
         laMs = -1.0;
+        c4e.prepare (rate); // round 190mg
         // round 144: the linear-phase crossovers (one stereo FFT convolver per band below the top one) and the dry
         // delay that matches them, allocated here (process() never allocates)
         const auto size = linearFftSize (rate);
@@ -3677,6 +3969,7 @@ public:
         held.fill (0.0);
         held2.fill (0.0);
         gains.fill (1.0f);
+        c4e.reset();
     }
 
     int latencySamples() const noexcept override { return latency.load (std::memory_order_relaxed); }
@@ -3690,6 +3983,34 @@ public:
     void process (float* l, float* r, int n, const EffectParams& p, double) noexcept override
     {
         lastParams = p;
+        // round 190mg: the C4 law runs its own engine (Prism's is untouched while it is off)
+        if (c4Active (p))
+        {
+            if (! c4On)
+            {
+                c4e.reset();
+                c4On = true;
+            }
+            latency.store (c4e.latency(), std::memory_order_relaxed);
+            const auto inPk = blockPeak (l, r, n);
+            extreme.fill (0.0);
+            c4e.process (l, r, n, p, extreme);
+            for (int b = 0; b < bands; ++b)
+            {
+                meters.set (bandMeter (b), b < c4::bandsN ? (float) std::clamp (extreme[(std::size_t) b] / 30.0, -1.0, 1.0) : 0.0f);
+                meters.set (bandLevelMeter (b), 0.0f);
+            }
+            meters.set (4, inPk);
+            meters.set (5, blockPeak (l, r, n));
+            scL = scR = nullptr;
+            return;
+        }
+        if (c4On)
+        {
+            c4On = false;
+            laMs = -1.0;
+            mode = -1;
+        }
         configure (p);
         const auto inPeak = blockPeak (l, r, n);
         extreme.fill (0.0);
@@ -4467,6 +4788,11 @@ private:
 
     void configure (const EffectParams& p) noexcept
     {
+        if (c4Active (p)) // round 190mg: the C4 law's own look-ahead
+        {
+            latency.store (c4Lookahead (sr), std::memory_order_relaxed);
+            return;
+        }
         // round 144: the processing mode and the oversampling (at most 4x, and only up to 400 kHz)
         const int m = linSize > 0 ? (int) phaseOf (p[processingMode]) : (int) Phase::dynamic;
         int factor = oversamplingOf (p[oversampling]);
@@ -4514,6 +4840,8 @@ private:
 
     double sr = 48000.0, laMs = -1.0;
     std::atomic<int> latency { 0 };
+    c4::Engine c4e; // round 190mg
+    bool c4On = false;
     EffectParams lastParams = [] {
         EffectParams p {};
         const auto& info = prismInfo();

@@ -86,8 +86,16 @@ enum Param
     // own law for Clean, Classic and Opto (REA_rodada190kw §1: the reduction smoothed by each style's two-stage follower,
     // its knee shape, its attack / release scaling). A new Crest and a translated Pro-C 3 state get 1; a project or
     // preset saved before keeps 0 (the fitted laws, bit for bit)
-    revision
+    revision,
+    // round 190mg, hidden like fetLaw (after round 190kw's revision since the 0.1.30 rollup, step 11; saved while
+    // non-zero; 0 = off, every project before): the FET law's output
+    // amplifier — LYNX's own static law of the amplifier stage after the FET (level-dependent H2 / H3, a DC part, the
+    // harmonics led by a first-order pre-emphasis), fitted on our Comp Off / Comp On stairs of the reference (REA_rodada190mg_dyn
+    // §3). The value carries the compressed path's level at the amplifier: (dB + 64) / 128 (the translator's Input + voicing gain)
+    fetAmp
 };
+double fetAmpDb (float v) noexcept;   // the wet path's gain to the amplifier's reference level (dB)
+float fetAmpValue (double db) noexcept;
 constexpr int fetVoices = 10;
 float fetLawValue (int voice) noexcept; // voice 0 … 9 → the fetLaw value (voice + 1) / 16
 enum class Trigger { off, hostSync, midi };
@@ -211,7 +219,24 @@ enum Global { xover1 = legacyBands * fieldsPerBand, xover2, xover3, slope, looka
               // downward or expand upward; `lookaheadSwitch` is the reference's look-ahead switch under revision 1
               // (1 on: each band's detector leads by 500 / its centre frequency + its own look-ahead, the audio waits
               // 20 ms). Only the Pro-MB translator sets them; a project saved before keeps 0 (bit for bit)
-              revision = count, lookaheadSwitch = count + 1 };
+              revision = count, lookaheadSwitch = count + 1,
+              // round 190mg, hidden (no control, no text; saved while non-zero; only the Waves C4 translator sets them):
+              // the C4 law — LYNX's own model of the Waves C4's structure, fitted black-box (REA_rodada190mg.md §2):
+              // in-phase squared-biquad crossovers (crossoverQ), per band peak detector → rational gain with a cubic
+              // knee → look-ahead minimum → two-stage release → triangular smoothing → gain between 0 dB and the
+              // range. 0 = Prism's own engine (every project saved before); c4LawValue (false) electro, (true) opto
+              c4Law = count + 2, // (rollup 0.1.30 step 11: after round 190lg's revision / lookaheadSwitch)
+              c4Q };
+float c4LawValue (bool opto) noexcept;
+bool c4Active (const EffectParams& p) noexcept;
+bool c4Opto (const EffectParams& p) noexcept;
+float c4QValue (double q) noexcept;        // crossover Q 0.1 … 0.75 (0 = the C4's default 0.6)
+double c4QOf (const EffectParams& p) noexcept;
+// the C4 law reads Prism's controls in the C4's own units: knee = kneeDb / 64 (0 … 0.75), attack 0.5 · 1000^v ms,
+// release 5 · 1000^v ms (v = the control's 0 … 1 value); c4AttackValue / c4ReleaseValue are the inverses
+float c4AttackValue (double ms) noexcept;
+float c4ReleaseValue (double ms) noexcept;
+int c4Lookahead (double sampleRate) noexcept; // 64 samples up to 50 kHz, 128 up to 100 kHz, 256 above (measured)
 inline int param (int band, int field) noexcept
 {
     return band < legacyBands ? band * fieldsPerBand + field : band5 + (band - legacyBands) * fieldsPerBand + field;
