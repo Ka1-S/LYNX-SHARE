@@ -17830,6 +17830,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Parity190lnVrTests.inc" // round 190ln: Foil Plate on ValhallaPlate's own EQ / bass-decay laws (after Parity190it: its gold helpers)
 #include "Parity190lsTests.inc" // round 190ls: Atrium on a dense late tank for the ValhallaRoom role (after Parity190it: its gold helpers)
 #include "Parity190lyTests.inc" // round 190ly: Atrium's dense tank only for a translated ValhallaRoom; Valhalla stand-ins part 2
+#include "Parity190mbTests.inc" // round 190mb: Valhalla stand-ins part 3 (Supermassive tone, FutureVerb, SpaceModulator modes; after Parity190ly: its helpers)
 #include "Parity190jhTests.inc" // round 190jh: Facet's automatic threshold, Pro-Q 4 dynamic bands, Waves L2 / SuperTap / SSLComp / CLA-76
 #include "Parity190jsTests.inc" // round 190js: the Waves reverbs on Reeverb 2, Hush's Single Vocal revision, Facet's auto-threshold refit
 #include "Parity190ktTests.inc" // round 190kt: REA of the Waves SSLComp DSP, Crest's console law, SSLComp on Crest
@@ -17840,6 +17841,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Parity190kwTests.inc" // round 190kw: static REA — Crest's Pro-C 3 V1 / V2 style laws (hidden revision)
 #include "Parity190lgVersTests.inc" // round 190lg: Crest Allround = Pro-C 3 Versatile (revision 1; after Parity190kw: its helpers)
 #include "Parity190lpCrestTests.inc" // round 190lp: Crest Smooth / Op-El = Pro-C 3's own graphs (revision 1; after Parity190kw: its helpers)
+#include "Parity190mbCrestTests.inc" // round 190mb: Crest Upward / Vari-mu = Pro-C 3's own Upward graph and Vari-Mu tube node (revision 1; after Parity190kw: its helpers)
 #include "Parity190lgMbTests.inc" // round 190lg: Prism revision 1 on Pro-MB's own band compander graph (after DynamicsTests108: its helpers)
 #include "Parity190lpLgTests.inc" // round 190lp: Apex Limiter / Sentry Gate revision 1, black-box refit on Pro-L 2 / Pro-G (after DynamicsTests108: its helpers)
 #include "Parity190kwTl3Tests.inc" // round 190kw: Timeless 3 states on Echoform (the hidden line law)

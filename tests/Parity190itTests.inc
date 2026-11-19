@@ -88,10 +88,10 @@ TEST (parity190it_revisions_are_hidden_new_instances_run_them_old_projects_do_no
         CHECK (effectInfo (kind).params.size() == (std::size_t) rev); // hidden: no new control, no new string
         auto s = makeEffectSlot (kind);
         CHECK (s.params[(std::size_t) rev] == 1.0f);
-        // saved, since it is not zero (round 190kw: Epoch's loop law, round 190ln: Foil Plate's REA law, one further, is saved
-        // with it; round 190ly's Epoch short-decay trim stays off in a new one since rollup step 10, and Atrium's dense law
-        // (round 190ls) is set only by the ValhallaRoom translator, so a new Atrium saves the revision only)
-        CHECK (savedEffectParamCount (s) == (std::size_t) rev + (kind == EffectKind::epochVerb || kind == EffectKind::foilPlate ? 2 : 1));
+        // saved, since it is not zero (round 190ln: Foil Plate's REA law, one further, is saved with it; round 190kw: Epoch's
+        // loop law and round 190ly: its Concert Hall short-decay trim, two further, likewise; Atrium's dense law is set only by
+        // the ValhallaRoom translator, so a new Atrium saves the revision only)
+        CHECK (savedEffectParamCount (s) == (std::size_t) rev + (kind == EffectKind::epochVerb ? 3 : kind == EffectKind::foilPlate ? 2 : 1));
         auto now = s;
         upgradeLoadedEffectParams (now, (std::size_t) rev + 1);
         CHECK (now.params[(std::size_t) rev] == 1.0f);

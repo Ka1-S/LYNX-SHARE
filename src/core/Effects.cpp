@@ -4837,12 +4837,10 @@ EffectSlot makeEffectSlot (EffectKind kind)
         slot.params[(std::size_t) mixsuite::ember::revision] = 1.0f;
     // round 190it: a new Epoch Verb / Atrium / Foil Plate / Halo runs the 0.1.30 revision of the Measured law (hidden)
     if (kind == EffectKind::epochVerb) slot.params[(std::size_t) verbs::epoch::revision] = 1.0f;
+    if (kind == EffectKind::epochVerb) // round 190ly: … and Epoch Verb Concert Hall's short-decay trim (hidden)
+        slot.params[(std::size_t) verbs::epoch::shortTrim] = 1.0f;
     if (kind == EffectKind::epochVerb) // round 190kw: … and Epoch's level the reference's loop law (hidden)
         slot.params[(std::size_t) verbs::epoch::loopLaw] = 1.0f;
-    // (round 190ly's Concert Hall short-decay trim, verbs::epoch::shortTrim, stays off in a new Epoch since the 0.1.30 rollup
-    // step 10: it was fitted without round 190kw's loop law, and on top of it ValhallaVintageVerb's refcap030 bank scores
-    // lower than the loop law alone — mode 2.74 → 2.55, pairs 3.89 → 3.61, 37 files down / 11 up. The law stays, to be
-    // refitted on the loop law; a project that saved it on keeps it)
     if (kind == EffectKind::atrium) slot.params[(std::size_t) verbs::atrium::revision] = 1.0f;
     if (kind == EffectKind::foilPlate) slot.params[(std::size_t) verbs::foil::revision] = 1.0f;
     if (kind == EffectKind::foilPlate) // round 190ln: … and Foil Plate the reference's EQ / bass-decay laws (hidden)
@@ -4850,6 +4848,8 @@ EffectSlot makeEffectSlot (EffectKind kind)
     // (round 190ly: Atrium's dense late tank, verbs::atrium::reaLaw, is set only by the ValhallaRoom translator — the owner's
     // perf rule; a new Atrium keeps the light 8-line tank)
     if (kind == EffectKind::halo) slot.params[(std::size_t) verbs::halo::revision] = 1.0f;
+    if (kind == EffectKind::horizon) // round 190mb: a new Horizon runs the 0.1.30 revision (ValhallaFutureVerb's per-mode tone)
+        slot.params[(std::size_t) verbs::horizon::revision] = 1.0f;
     if (kind == EffectKind::latticeMod) // round 190it: … and a new Lattice Mod its tap network's revision 1 (hidden)
         slot.params[(std::size_t) echosuite::lattice::revision] = 1.0f;
     if (kind == EffectKind::luxeVerb) // round 190kw: a new LuxeVerb's Space engine runs the Pro-R 2 laws' revision 1 (hidden)
@@ -5047,6 +5047,7 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
             case EffectKind::atrium: rev = verbs::atrium::revision; break;
             case EffectKind::foilPlate: rev = verbs::foil::revision; break;
             case EffectKind::halo: rev = verbs::halo::revision; break;
+            case EffectKind::horizon: rev = verbs::horizon::revision; break; // round 190mb
             default: break;
         }
         if (rev >= 0 && savedCount <= (std::size_t) rev)
@@ -5060,6 +5061,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
         // round 190ly: an Epoch Verb saved before Concert Hall's short-decay trim keeps revision 1 as it was, bit for bit
         if (slot.kind == EffectKind::epochVerb && savedCount <= (std::size_t) verbs::epoch::shortTrim)
             slot.params[(std::size_t) verbs::epoch::shortTrim] = 0.0f;
+        // round 190mb: Epoch's rate law is only ever saved with a translated ValhallaVintageVerb
+        if (slot.kind == EffectKind::epochVerb && savedCount <= (std::size_t) verbs::epoch::rateLaw)
+            slot.params[(std::size_t) verbs::epoch::rateLaw] = 0.0f;
         // round 190ls: an Atrium saved before the dense tank keeps revision 1 as it was, bit for bit
         if (slot.kind == EffectKind::atrium && savedCount <= (std::size_t) verbs::atrium::reaLaw)
             slot.params[(std::size_t) verbs::atrium::reaLaw] = 0.0f;
@@ -5070,6 +5074,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190do: a Gemini Doubler saved before the measured read head keeps the two crossfaded taps
     if (slot.kind == EffectKind::geminiDoubler && savedCount <= (std::size_t) voicetools::gemini::headLaw)
         slot.params[(std::size_t) voicetools::gemini::headLaw] = 0.0f;
+    // round 190mb: the SpaceModulator role's level law is only ever saved with it (a translated SpaceModulator)
+    if (slot.kind == EffectKind::orbit && savedCount <= (std::size_t) echosuite::orbit::smLaw)
+        slot.params[(std::size_t) echosuite::orbit::smLaw] = 0.0f;
     // round 190do: an Orbit saved before the measured sweep keeps the classic voices
     if (slot.kind == EffectKind::orbit && savedCount <= (std::size_t) echosuite::orbit::law)
         slot.params[(std::size_t) echosuite::orbit::law] = 0.0f;
@@ -5112,6 +5119,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190ca: a Nebula saved before the cloud law keeps the classic engine in every mode
     if (slot.kind == EffectKind::nebula && savedCount <= (std::size_t) verbs::nebula::law)
         slot.params[(std::size_t) verbs::nebula::law] = 0.0f;
+    // round 190mb: the Supermassive role's tone law is only ever saved with it (a translated ValhallaSupermassive)
+    if (slot.kind == EffectKind::nebula && savedCount <= (std::size_t) verbs::nebula::toneLaw)
+        slot.params[(std::size_t) verbs::nebula::toneLaw] = 0.0f;
 }
 
 std::unique_ptr<Effect> makeParallelEffect (const EffectSlot& slot)

@@ -735,12 +735,14 @@ double feedbackGain (float v) noexcept { return 2.0 * clamp01 (v); }
 
 // round 190ly [EXEC]: the ValhallaDelay role's loop laws (echoform::valhallaLaw), fitted by the lab on refcap030's
 // ValhallaDelay captures (black-box; /mnt/e/lynx-work/valhalla2_190ly, docs/analise/REA_rodada190ly.md §2).
-// fbDb: the loop gain correction (dB) at Feedback 0, 0.2, 0.35, 0.5, 0.65, 0.8, 1 (linear between); diffLen: the loop
+// fbDb: the loop gain correction (dB) at the knob values vdKnots (linear between); diffLen: the loop
 // diffusers' lengths × this; diffGain: their all-pass gain at Diffusion 100 %; diffComp: the share of their delay read
 // back out of the echo time (the reference keeps the time: its diffused echo spreads around it)
+constexpr int vdKnotCount = 9;
+constexpr double vdKnots[vdKnotCount] = { 0.0, 0.2, 0.35, 0.40, 0.5, 0.6, 0.7, 0.8, 1.0 }; // Feedback knob (× 2 = %)
 struct VdLaw
 {
-    double fbDb[7];
+    double fbDb[vdKnotCount];
     double diffLen, diffGain, diffComp;
 };
 static const VdLaw& vdLaw() noexcept
@@ -750,10 +752,17 @@ static const VdLaw& vdLaw() noexcept
         // alike, −0.8 / −1.5 / −2 lower); 70 % (round 190dl's fit) and 160 % (the same growth as the reference) need none.
         // The diffusers 3.5 × as long at 0.8 × Diffusion, read inside the echo time: the first echo's energy spreads from
         // −88 to +203 ms around it at Diffusion 80 % (the reference −88 … +253 ms; without the law +12 … +62 ms: always late)
-        VdLaw r { { 0.0, 0.0, 0.0, -1.1, 0.0, 0.0, 0.0 }, 3.5, 0.8, 1.0 };
+        // Round 190mb: the probe renders at 80 / 90 / 95 / 100 / 105 / 110 / 120 / 140 % (round 190ly's script, refcap030's
+        // host; base S1, Diffusion 20 %) showed Echoform fading 0.4 … 0.9 dB a pass slower than the reference at every one
+        // of them; at 105 … 120 % it held or grew where the reference faded 0.7 … 1.1 dB a pass (impulses +4 … +15 dB
+        // loud). Up to 100 % the law stays (a deeper cut there, −1.3 / −1.5 dB at 80 / 100 %, took refcap182 / tp172d's S2
+        // at 80 % and a pairs file down: their other settings fade faster); over it the cut holds −1.1 dB to 120 % and
+        // eases to 0 by 160 % (knot 80 % = the old line's value there)
+        VdLaw r { { 0.0, 0.0, 0.0, -1.1 / 3.0, -1.1, -1.1, -0.5, 0.0, 0.0 }, 3.5, 0.8, 1.0 };
        #ifdef LYNX_VD_FIT
         if (const char* v = std::getenv ("VD_FB"))
-            std::sscanf (v, "%lf,%lf,%lf,%lf,%lf,%lf,%lf", &r.fbDb[0], &r.fbDb[1], &r.fbDb[2], &r.fbDb[3], &r.fbDb[4], &r.fbDb[5], &r.fbDb[6]);
+            std::sscanf (v, "%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf", &r.fbDb[0], &r.fbDb[1], &r.fbDb[2], &r.fbDb[3], &r.fbDb[4], &r.fbDb[5],
+                         &r.fbDb[6], &r.fbDb[7], &r.fbDb[8]);
         if (const char* v = std::getenv ("VD_DIFF"))
             std::sscanf (v, "%lf,%lf,%lf", &r.diffLen, &r.diffGain, &r.diffComp);
        #endif
@@ -764,13 +773,12 @@ static const VdLaw& vdLaw() noexcept
 }
 double valhallaLoopDb (float v) noexcept
 {
-    static constexpr double at[7] = { 0.0, 0.2, 0.35, 0.5, 0.65, 0.8, 1.0 };
     const auto x = (double) clamp01 (v);
     int i = 0;
-    while (i < 5 && x > at[i + 1])
+    while (i < vdKnotCount - 2 && x > vdKnots[i + 1])
         ++i;
     const auto& k = vdLaw().fbDb;
-    return k[i] + (k[i + 1] - k[i]) * (x - at[i]) / (at[i + 1] - at[i]);
+    return k[i] + (k[i + 1] - k[i]) * (x - vdKnots[i]) / (vdKnots[i + 1] - vdKnots[i]);
 }
 double modRateHz (float v) noexcept { return 0.01 + 9.99 * std::pow ((double) clamp01 (v), 2.3277); }
 double shiftHz (float v) noexcept { return 1000.0 * signedPow (bipolar (v), 5.0); }
@@ -2949,6 +2957,30 @@ double feedbackGain (float v) noexcept { return 0.7 * signedPow (bipolar (v), 1.
 Mode modeOf (float v) noexcept { return (Mode) std::clamp ((int) std::floor (clamp01 (v) * (float) modeCount + 1e-3f) - 1, 0, modeCount - 1); }
 float modeValue (Mode m) noexcept { return ((float) m + 1.0f) / (float) modeCount; }
 
+// round 190mb [EXEC] (orbit::smLaw): ValhallaSpaceModulator's wet level per mode against Orbit's voices (refcap030's Mode
+// sweep, steady tone + test signal at the sweep's base: Mix 100 %, Feedback 75 %). The reference's own mode names, read back
+// through its host after each value had been processed (round 190ly's texts were stale), run Up, Up/Down, TZFlange+,
+// TZFlange−, TriFlange, Ocho, Doubler, VariUp, VariUpDown, Ensemble360, Symphonic with the value law floor (11 v) − 1 (Up
+// below 2/11, Symphonic at 1 only): Orbit's own order and law, so the map stands; what differs is each voice's level.
+// Fitted on the sweep (three variants scored, the best kept): Up/Down −3.5, Through-zero + / − +4.8 / +4.0, Octo −6.5, Drift
+// rise +0.8 dB; the others 0 (Tri's steady tone and test signal sit ±2.5 dB either side: no level fits both). Those levels
+// are the feedback's: at Feedback 0 (verb183b's mode captures, refcap182 S2) the voices already sat on the reference and the
+// full trim took 4 files down, so it scales with |feedback| up to the sweep's ±50 % (held beyond; negative feedback assumed
+// alike, not captured)
+double smModeDb (Mode m) noexcept
+{
+    static double db[modeCount] = { 0.0, -3.5, 4.8, 4.0, 0.0, -6.5, 0.0, 0.8, 0.0, 0.0, 0.0 };
+   #ifdef LYNX_VERB_FIT
+    static const bool loaded = [] {
+        if (const char* v = std::getenv ("LYNX_ORBIT_DB"))
+            std::sscanf (v, "%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf", &db[0], &db[1], &db[2], &db[3], &db[4], &db[5], &db[6], &db[7], &db[8], &db[9], &db[10]);
+        return true;
+    }();
+    (void) loaded;
+   #endif
+    return db[std::clamp ((int) m, 0, modeCount - 1)];
+}
+
 const char* modeName (Mode m) noexcept
 {
     static const char* const names[modeCount] = { "Rise", "Rise / fall", "Through-zero +", "Through-zero −", "Tri chorus", "Octo chorus",
@@ -2990,6 +3022,8 @@ public:
         float dryGain = 1.0f, wetGain = 0.0f;
         equalPowerMix (p[mix], dryGain, wetGain);
         const auto m = modeOf (p[mode]);
+        if (p[smLaw] >= 0.5f) // round 190mb: the SpaceModulator role's wet level per mode, with the feedback's resonance
+            wetGain *= (float) std::pow (10.0, smModeDb (m) * std::min (1.0, std::abs (bipolar (p[feedback])) / 0.5) / 20.0);
         const auto hz = rateHz (p[rate]);
         const auto dm = depthMs (p[depth]) * 0.001 * sr;
         // round 190do [EXEC] (tp172d renders, black-box): the measured sweep reads from the manual delay alone (the

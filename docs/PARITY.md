@@ -4350,9 +4350,9 @@ identical; fingerprints of both revisions in tests/Parity190kwGold.inc. The edit
 0.38 … 0.42 → 0.52 … 0.60. Bus / Mastering / Pumping cost up to +0.3 point of one core (three followers whose times move
 with every step: one exp each per sample; the coefficient is cached while the time holds). No latency change.
 
-**Still off:** Upward 6.62, Two-way (TTM) 7.38 and Vari-Mu 6.19 keep their fitted laws (the reference builds them as
-generated graph classes — `VariMuCompressor` is a balanced tube-pair model — read but not rebuilt); Clean / Classic / Opto's
-auto release. (Allround / Versatile: built in round 190lg; Smooth 5.08 and Op-El 5.85: built in round 190lp; both below.)
+**Still off:** Two-way (TTM) 7.38 keeps its measured three-band law (the reference's separate multiband object: read, not
+rebuilt); Clean / Classic / Opto's auto release. (Allround / Versatile: built in round 190lg; Smooth 5.08 and Op-El 5.85:
+built in round 190lp; Upward 6.62 and Vari-Mu 6.19: built in round 190mb; all below.)
 **Round 190lg — Allround = Pro-C 3's Versatile (its default style), revision 1.** Rebuilt from the reference's own graph
 (`VersatileCompressor_MainCompressorAlgorithm`, read statically; REA notes docs/analise/REA_rodada190lg.md): two gain
 computers on two readings of the linked side-chain level, working on the reduction share 1 − 10^(−GR / 20) — slow: 0.979 ×
@@ -4411,6 +4411,41 @@ Pro-C 3 style's state, the style values and the Smooth / Op-El voicings at 44.1 
 load ~27): Smooth 0.62 … 0.68 % → 1.27 … 1.39 % of a core (+0.65 point: four followers, two gain computers and their
 exp / log a sample), Op-El 0.61 … 0.73 % → 1.03 … 1.16 % (+0.43 point: three followers, two gain computers, the shelf;
 Allround in the same runs 0.65 … 0.66 → 0.93 … 1.06, as round 190lg measured).
+
+**Round 190mb — Upward and Vari-mu = Pro-C 3's own Upward graph and Vari-Mu tube node (revision 1).** Read statically (REA
+notes docs/analise/REA_rodada190mb.md, part crest) and rebuilt in LYNX's own code:
+- **Upward** — the side chain's level (instant attack, 5 ms release, dB) into an expansion gain computer (the dB under the
+  threshold through a one-sided quadratic knee, × (1 − 1 / ratio), within the upward range = the range knob, at most 36 dB);
+  the lift is L − follower (L − E (level)), L the lift at silence, the follower on the knob times (attack 0.25 s · a³,
+  release 0.2 + 2.3 F (r) s, F LYNX's smooth fit of the reference's curve; auto 9 r² + 1). Measured on the reference's
+  stairs [EXEC] and applied as such: a level-independent cut of (1 − 1 / ratio) · √a · (threshold + the upward range) dB
+  (0 / 2.63 / 5.26 / 10.53 dB at threshold −48 / −30 / −24 / −12, ratio 4, attack 10 ms; the 5 dB round 190lp's build
+  missed). Without any bound the rebuild is near-exact (the 26 Upward files 9.92, ESR −63 … −98 dB); LYNX keeps issue
+  #77's bound (a lift never takes the instantaneous level above the threshold: no boosted first hit after a lifted gap),
+  which costs the programme and level-step files 9.92 → 8.65 (owner decision).
+- **Vari-mu** — a push-pull tube stage: the side chain's sample 6 dB down swings around a bias b on both sides of LYNX's
+  own tube curve (a quintic fitted to the reference's shape) and a tanh; the gain is (tanh T (b + d) − tanh T (b − d)) / 2d.
+  Feedback: the stage's own output over the threshold (linear; the knee in dB) drives one follower (attack 0.249 (a² + a³ −
+  a⁴) + 0.001 s, release 0.005 + 0.97 tan (1.2 r²) s, auto 3.6 r² + 0.1), b = (r' − 1) × that, r' = (1 − 0.5 √(knee / 60)) ×
+  the ratio's own scale (1 / 40 / 80 at 1 / 10 / 100 : 1, LYNX's smooth fit). The stairs land within 0.06 dB.
+- **TTM** (not rebuilt): the reference's multiband object splits at 88 Hz / 2.5 kHz (LR4), the split LYNX's measured
+  two-way law already runs; its band processors (hold, look-ahead smoother) are the next step.
+
+| bank (time-window scorer, before = parity190mb's fxr_m0) | files | before → after | up / same / down |
+|---|---|---|---|
+| refcap030 Pro-C 3, all blocks | 508 | 8.35 → **8.54** | 48 / 460 / 0 |
+| · Upward files | 26 | 6.62 → **8.65** | 22 / 4 / 0 (stairs ESR −28 … −34 → −55 … −97 dB) |
+| · Vari-Mu files | 26 | 6.19 → **7.96** | 26 / 0 / 0 (stairs ESR −21 … −28 → −45 … −48 dB) |
+| · grid / prog / styles blocks | 238 / 42 / 84 | 8.33 / 7.79 / 8.31 → 8.63 / 7.93 / 8.56 | the 48 up |
+| · every other style's file (all blocks) | 456 | unchanged file for file (score, rms, spectrum, ESR) | 0 / 456 / 0 |
+| refcap182 programme / tp172b (no Upward or Vari-Mu setting) | 25 / 20 | 7.64 / 7.95 = | identical metrics |
+
+Old projects: `gold/gold.sh` (fxrender with the revision forced off, index 53, against fxr_m0): 72 / 72 renders identical;
+every other style's translated state renders byte for byte as fxr_m0 (108 / 108, 44.1 / 48 / 96 kHz); revision-0
+fingerprints (tests/Parity190mbCrestGold.inc) equal the base's. A Vari-mu project saved before round 190v (law off) keeps
+its classic law under any revision. CPU (thread time, 20 s at 48 kHz, best of 5, three runs, load ~11): Upward 0.54 … 0.56 %
+→ 0.49 … 0.50 % of a core (two followers and one gain computer a sample), Vari-mu 0.45 … 0.46 % → 0.81 … 0.84 % (+0.37
+point: two tanh, the tube curve twice and a log a sample).
 
 ## Round 190kw (Timeless 3 translator): FabFilter Timeless 3 → Echoform (the hidden line law)
 
@@ -4876,6 +4911,52 @@ Echoform ValhallaDelay law (index 115 in the rollup) and Spiral's rate law are m
 
 CPU (fxrender, 20 s incl. file I/O, instructions): Echoform's ValhallaDelay role +0.9 %, Spiral Echo at 96 kHz +1.8 % (0 at
 48 kHz), Epoch's short trim +0.01 %, a new Atrium −29 % (light tank).
+
+## Round 190mb (Valhalla, part 3): Supermassive's tone, FutureVerb, SpaceModulator levels, Epoch's merge and rate laws
+
+Black-box (refcap030's host for new probe renders; clean-room: LYNX's own code and fits). Evidence:
+docs/analise/REA_rodada190mb.md, lab `/mnt/e/lynx-work/parity190mb/`. Score: round 190lg's time-window scorer, the same copy
+before and after. Before = origin/valhalla2_190ly merged with origin/rea3_190lp (621cd37bd, `bin/fxr_m0`). Every change is a
+hidden value; with it off every render is byte for byte the before binary's (`gold/gold.sh`).
+
+- **Names:** the Valhalla plug-ins' own mode / colour names, read back through the host after each value was processed
+  (their value texts were stale): every translator map already agrees — SpaceModulator's modes run in Orbit's order.
+- **Nebula ← ValhallaSupermassive (hidden `nebula::toneLaw`, the translator only):** law 1's octave-band tone corrector after
+  the classic networks' loop, a per-mode gain + tone fitted on the Mode sweep, from Feedback 65 % to full at 80 %.
+- **Epoch Verb ← ValhallaVintageVerb:** the merge stacked round 190kw's loop-law level and round 190ly's short trim (+1.9 dB at
+  0.51 s); the short trim is refitted on top of the loop law (lows left to it, 1 kHz +2.5 dB for the staircase). Hidden
+  `epoch::rateLaw` (the translator only): the reference's own level change away from 48 kHz (Epoch itself is
+  rate-independent; the reference loses 1.4 … 1.7 dB of its early field at 96 kHz in the 1970s colour).
+- **Orbit ← ValhallaSpaceModulator (hidden `orbit::smLaw`, the translator only):** the wet level per mode (Up/Down −3.5, the
+  through-zero pair +4.8 / +4.0, Octo −6.5, Drift rise +0.8 dB), scaled by |feedback| (none at Feedback 0).
+- **Echoform ← ValhallaDelay (valhallaLaw):** from round 190ly's 80 … 140 % probe renders: −1.1 dB held from 100 to 120 %,
+  −0.5 dB at 140 %, 0 from 160 % (up to 100 % as round 190ly left it).
+- **Horizon ← ValhallaFutureVerb (hidden `horizon::revision`, new instances / translated):** the reference's tone and level per
+  reverb mode (Plate −0.8, Cathedral −3.4, Freeze +2.0, Gated −4.0 dB with their 500 Hz … 8 kHz tone; Hall and Space the tone
+  only; Room and Chamber untouched), from this round's FutureVerb probe renders (one host process per setting: its demo
+  opens holes ~40 s after load).
+
+| Bank (refcap030 → LYNX) | files | before → after | up / same / down |
+|---|---|---|---|
+| ValhallaSupermassive → Nebula, mode sweep | 48 | 3.23 → 3.75 | 19 / 29 / 0 |
+| … pairs / sr48 / sr96 | 58 | 5.39 / 5.60 / 5.70 = | 0 / 58 / 0 |
+| ValhallaVintageVerb → Epoch Verb, mode | 96 | 2.55 → 3.02 | 45 / 51 / 0 |
+| … pairs / sr48 / sr96 | 18 / 20 / 20 | 3.61 / 3.60 / 3.65 → 3.78 / 3.70 / 3.75 | 7 / 51 / 0 |
+| ValhallaSpaceModulator → Orbit, mode | 48 | 2.85 → 3.23 | 16 / 32 / 0 |
+| … pairs / sr48 / sr96 | 58 | 4.33 / 4.40 / 4.40 = | 0 / 58 / 0 |
+| ValhallaDelay → Echoform (mode / pairs / sr48 / sr96) | 164 | 4.04 = | 0 / 164 / 0 |
+| ValhallaFutureVerb → Horizon, this round's probe bank (mode) | 99 | 2.53 → 2.66 | 10 / 89 / 0 |
+| … pairs / sr44 / sr48 / sr96 | 84 | 2.61 / 2.25 / 2.19 / 2.25 = | 0 / 84 / 0 |
+
+| Gate bank (other captures of the same plug-ins, all ten Valhalla tags) | files | before → after | up / same / down |
+|---|---|---|---|
+| verb183b captures (FutureVerb / VintageVerb / Delay; the other 6 tags =) | 62 / 18 / 25 (+105) | 2.68 → 2.82 / 3.83 → 3.89 / 2.92 → 3.00 | 9 / 201 / 0 |
+| tp172d probes (FutureVerb / Supermassive) | 40 / 94 | 3.17 → 3.20 / 4.59 = | 1 / 133 / 0 |
+| refcap182 programme (VintageVerb; 9 other tags =) | 25 (+190) | 3.48 → 3.56 | 2 / 213 / 0 |
+| tp172d matched settings (10 tags) | 137 | = | 0 / 137 / 0 |
+
+Round 190ly's 140 % probe renders of ValhallaDelay (new references, not a gate bank): 105 % 2 → 4, 110 % 1 → 1 / 1 → 2,
+120 % 1 → 2 / 1 → 3, 140 % 3 → 2 / 3 → 2 (−2.3 dB under; verb183b's 140 % capture rose 1 → 3 with the same law) — listed.
 
 ## Round 190ls (Valhalla): Atrium on a dense late tank for the ValhallaRoom role
 

@@ -143,6 +143,10 @@ struct Settings
     // inside each half, the halves rotated into each other by crossFeed; no loop all-passes): Atrium's ValhallaRoom role,
     // whose late network has 32 lines (static REA). Needs an engine made with dense = true; 0 = the 8-line tank
     int dense = 0;
+    // round 190mb, law 0 only: 1 = the tone corrector (bandDb, the octave-band EQ law 1 runs after its loop) also after the
+    // classic engine's loop: Nebula's Supermassive role (the reference's per-mode tone, which the classic networks miss).
+    // 0 = the classic engine as it was (every other effect, every project saved before)
+    int classicTone = 0;
 };
 constexpr int engineBands = 8;
 // the octave-band RT60 (s, 63 Hz … 8 kHz) the engine aims at for a line of lineMs under law 1 (tests, fitting)
@@ -178,6 +182,9 @@ constexpr int loopLaw = paramCount + 1; // round 190kw, hidden (read only with r
 constexpr int shortTrim = paramCount + 2; // round 190ly, hidden (read with the engine law and revision 1): 1 = Concert Hall's
                                           //   short-decay trim (ValhallaVintageVerb's at 0.51 s, faded out by 2.9 s; new
                                           //   instances, translated states); 0 = revision 1 as before
+constexpr int rateLaw = paramCount + 3; // round 190mb, hidden (read with the engine law and revision 1): 1 = the reference's
+                                        //   own level change away from 48 kHz (its early field and tail per colour; only a
+                                        //   translated ValhallaVintageVerb sets it); 0 = the same sound at every rate (as before)
 constexpr int modeCount = 22;
 constexpr int colourCount = 3;
 const char* modeName (int index) noexcept;
@@ -219,6 +226,9 @@ namespace nebula
 constexpr int paramCount = 13;
 constexpr int modeCount = 22;
 constexpr int law = 14; // round 190ca: 1 = the cloud law (core/NebulaCloud.h; new instances), 0 = the classic engine
+constexpr int toneLaw = law + 1; // round 190mb, hidden (no control, no string; saved while non-zero): 1 = the classic
+                                 //   networks' per-mode tone and level of ValhallaSupermassive (set only by its translator, the
+                                 //   substitute table's `replaced` items); 0 = as before (a new Nebula, every project saved before)
 const char* modeName (int index) noexcept;
 double delayMs (float v) noexcept;
 bool cloudMode (int mode) noexcept; // whether the cloud law has a network for this mode (the others stay classic)
@@ -234,6 +244,9 @@ namespace horizon
 {
 constexpr int paramCount = 25;
 constexpr int engineLaw = 24; // round 190bz: 0 = the classic engine (projects saved before), 1 = the 0.1.27 law
+constexpr int revision = paramCount; // round 190mb, hidden (no control, no string; saved while non-zero; read with the engine
+                                     //   law): 1 = the 0.1.30 revision, ValhallaFutureVerb's per-mode tone and level (new
+                                     //   instances, translated states); 0 = projects saved before, bit for bit
 constexpr int echoModeCount = 12;
 constexpr int reverbModeCount = 8;
 const char* echoModeName (int index) noexcept;

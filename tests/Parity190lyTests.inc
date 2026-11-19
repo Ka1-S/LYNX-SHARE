@@ -222,7 +222,7 @@ TEST (parity190ly_epoch_concert_hall_short_decay_trim)
     run (0.2f, 0.0f, 1.0f, l1, r1);
     const auto d = parity190ly::windowDb (l1, r1, sr, 0.0, 1.5) - parity190ly::windowDb (l0, r0, sr, 0.0, 1.5);
     std::printf ("  Epoch Concert Hall 0.51 s: short-decay trim %+.2f dB\n", d);
-    CHECK (d > 0.5 && d < 3.5);
+    CHECK (d > 0.2 && d < 3.5); // (round 190mb: refitted on top of round 190kw's loop law, which now carries the level: +0.5 dB)
     // from 2.9 s (Decay ≈ 0.38) and in other modes: bit for bit as without it
     run (0.40f, 0.0f, 0.0f, l0, r0);
     run (0.40f, 0.0f, 1.0f, l1, r1);

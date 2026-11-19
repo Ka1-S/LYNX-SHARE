@@ -301,7 +301,10 @@ namespace orbit
 {
 enum Param { mix, rate, depth, feedback, manual, mode,
              law, // round 190do (appended): 0 = the classic voices (projects saved before), 1 = the measured sweep
-             paramCount };
+             paramCount,
+             // round 190mb, hidden (no control, no string; saved while non-zero): 1 = ValhallaSpaceModulator's wet level per
+             // mode (set only by its translator, the substitute table's `replaced` items); 0 = as before
+             smLaw = paramCount };
 enum class Mode { rise, riseFall, throughZeroPlus, throughZeroMinus, tri, octo, doubler, driftRise, driftRiseFall, ensemble, symphonic };
 constexpr int modeCount = 11;
 double rateHz (float v) noexcept;    // ±10 Hz, |x|^3.333
@@ -311,6 +314,7 @@ double feedbackGain (float v) noexcept; // ±0.7·|x|^1.5 (sign kept)
 Mode modeOf (float v) noexcept;
 float modeValue (Mode m) noexcept;
 const char* modeName (Mode m) noexcept;
+double smModeDb (Mode m) noexcept; // round 190mb: the SpaceModulator role's wet level per mode (dB, smLaw)
 } // namespace orbit
 
 namespace lattice
