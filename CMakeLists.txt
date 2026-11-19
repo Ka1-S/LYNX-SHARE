@@ -572,6 +572,7 @@ if(LYNX_BUILD_APP)
         src/ui/ProjectLoading.cpp
         src/ui/WindowOwner.cpp
         src/ui/PluginKeysTest.cpp
+        src/ui/ZOrder191Test.cpp
         src/ui/ParametricEqEditor.cpp
         src/ui/FacetEqEditor.cpp
         src/ui/ProEditors.cpp

@@ -334,6 +334,7 @@ public:
     void mouseDown (const juce::MouseEvent& e) override
     {
         owner.activate (panel);
+        keepPressRaisedEditorsInFront (e); // (issue #191: a window this press opened stays in front of the panel)
         dragging = false;
         const auto onTitle = isOnTitleBar (e);
 

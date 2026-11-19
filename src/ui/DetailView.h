@@ -126,6 +126,7 @@ public:
     bool groupCardForCheck (int card, bool ungroup); // (round 190hr: Ctrl+G / Ctrl+Shift+G on the instrument card)
     juce::PopupMenu cardMenuForSnapshot (int card); // an effect card's right-click menu
     int cardCountForCheck() const;
+    juce::Rectangle<int> windowButtonForCheck (int card) const; // (issue #191: in this component's coordinates)
     int chainInsertForCheck() const;
     int chainChannelForCheck() const;
     bool isFoldedForCheck (int card) const;

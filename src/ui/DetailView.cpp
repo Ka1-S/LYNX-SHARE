@@ -258,6 +258,13 @@ public:
     int insertShown() const noexcept { return insert; }
     int channelShown() const noexcept { return channel; }
     int cardCount() const noexcept { return (int) cards.size(); }
+    // (issue #191's check: where the card's window button is, in this component's coordinates; empty: none)
+    juce::Rectangle<int> windowButtonOf (int i) const
+    {
+        if (i < 0 || i >= (int) cards.size() || cards[(std::size_t) i].kind == Card::add || cards[(std::size_t) i].folded)
+            return {};
+        return windowBounds (cards[(std::size_t) i]);
+    }
     bool isCardFolded (int i) const { return i >= 0 && i < (int) cards.size() && cards[(std::size_t) i].folded; }
     void toggleCardFold (int i)
     {
@@ -4157,6 +4164,11 @@ juce::PopupMenu DetailView::cardMenuForSnapshot (int card)
     return menu;
 }
 int DetailView::cardCountForCheck() const { return chain->cardCount(); }
+juce::Rectangle<int> DetailView::windowButtonForCheck (int card) const
+{
+    const auto r = chain->windowButtonOf (card);
+    return r.isEmpty() ? r : getLocalArea (chain.get(), r);
+}
 int DetailView::chainInsertForCheck() const { return chain->insertShown(); }
 int DetailView::chainChannelForCheck() const { return chain->channelShown(); }
 bool DetailView::isFoldedForCheck (int card) const { return chain->isCardFolded (card); }

@@ -20,6 +20,7 @@
 #include "core/FlWrapper.h"
 #include "core/MixerOps.h"
 #include "core/LastTweaked.h"
+#include "core/LayoutStyle.h"
 #include "engine/PluginHost.h"
 #include "engine/PluginSandbox.h"
 #include "engine/Text.h"
@@ -1862,6 +1863,7 @@ public:
         useClassicRendering();
         setVisible (true);
         toFront (false);
+        noteEditorRaised (*this); // (issue #191: opened by a press in a panel, it stays in front of that panel)
         nativechild::raiseOverlays();
         startHost();
     }
@@ -1902,6 +1904,7 @@ public:
         if (minimised)
             setMinimisedFrame (false);
         toFront (true);
+        noteEditorRaised (*this); // (issue #191)
         nativechild::raiseOverlays();
         lastUsed() = key();
         editorlimit::touch (key()); // (round 189o: the limit closes the least recently used editors)
@@ -2150,7 +2153,10 @@ void pinnedWindowsChanged()
 std::unique_ptr<EditorHost> makeHost (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const juce::String& title,
                                       PluginWindows::WrapperContext context)
 {
-    if (! opensDetached (plugin, context))
+    // issue #191: opened from a floating panel window in the Clip-launch or Simple layout, a docked frame would be behind
+    // that window (it lives in the main window): the editor opens as a window of its own this time (not saved)
+    const auto fromFloating = layoutstyle::current() != layoutstyle::Style::pattern && openedFromFloatingPanel();
+    if (! opensDetached (plugin, context) && ! fromFloating)
         return std::make_unique<DockedPluginFrame> (std::move (owner), plugin, title, std::move (context), *dockWorkspace());
     return std::make_unique<PluginWindow> (std::move (owner), plugin, title, std::move (context));
 }
