@@ -1,3 +1,4 @@
+#include "core/LynxVerbs.h" // (round 190mb: Epoch's rate law index in the VintageVerb substitute test)
 // --- LYNX substitutes for missing third-party plugins (core/PluginSubstitutes.h) - round 98 -------------------------
 
 namespace substtest

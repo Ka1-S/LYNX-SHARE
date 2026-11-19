@@ -159,10 +159,10 @@ TEST (parity190mb_orbit_spacemodulator_level_law)
 TEST (parity190mb_echoform_valhalla_loop_law_over_feedback)
 {
     using namespace lynx::echosuite::echoform;
-    CHECK (std::abs (valhallaLoopDb (0.35f)) < 1e-9 && std::abs (valhallaLoopDb (0.5f) + 1.1) < 1e-9);
+    CHECK (std::abs (valhallaLoopDb (0.35f)) < 1e-5 && std::abs (valhallaLoopDb (0.5f) + 1.1) < 1e-5);
     CHECK (std::abs (valhallaLoopDb (0.425f) + 1.1 * 0.5) < 1e-6);             // 85 %: on round 190ly's line
-    CHECK (std::abs (valhallaLoopDb (0.6f) + 1.1) < 1e-9 && std::abs (valhallaLoopDb (0.7f) + 0.5) < 1e-9);
-    CHECK (std::abs (valhallaLoopDb (0.8f)) < 1e-9 && std::abs (valhallaLoopDb (1.0f)) < 1e-9);
+    CHECK (std::abs (valhallaLoopDb (0.6f) + 1.1) < 1e-5 && std::abs (valhallaLoopDb (0.7f) + 0.5) < 1e-5); // (float knob values)
+    CHECK (std::abs (valhallaLoopDb (0.8f)) < 1e-5 && std::abs (valhallaLoopDb (1.0f)) < 1e-9);
 }
 
 // 5. ValhallaFutureVerb → Horizon (hidden horizon::revision: new instances, translated states): the reference's tone and

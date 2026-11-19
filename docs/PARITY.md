@@ -4262,11 +4262,32 @@ hidden value; with it off every render is byte for byte the before binary's (`go
   through-zero pair +4.8 / +4.0, Octo −6.5, Drift rise +0.8 dB), scaled by |feedback| (none at Feedback 0).
 - **Echoform ← ValhallaDelay (valhallaLaw):** from round 190ly's 80 … 140 % probe renders: −1.1 dB held from 100 to 120 %,
   −0.5 dB at 140 %, 0 from 160 % (up to 100 % as round 190ly left it).
-- **Horizon ← ValhallaFutureVerb (hidden `horizon::revision`, new instances / translated):** HORIZON_LINE
+- **Horizon ← ValhallaFutureVerb (hidden `horizon::revision`, new instances / translated):** the reference's tone and level per
+  reverb mode (Plate −0.8, Cathedral −3.4, Freeze +2.0, Gated −4.0 dB with their 500 Hz … 8 kHz tone; Hall and Space the tone
+  only; Room and Chamber untouched), from this round's FutureVerb probe renders (one host process per setting: its demo
+  opens holes ~40 s after load).
 
 | Bank (refcap030 → LYNX) | files | before → after | up / same / down |
 |---|---|---|---|
-TABLE_ROWS
+| ValhallaSupermassive → Nebula, mode sweep | 48 | 3.23 → 3.75 | 19 / 29 / 0 |
+| … pairs / sr48 / sr96 | 58 | 5.39 / 5.60 / 5.70 = | 0 / 58 / 0 |
+| ValhallaVintageVerb → Epoch Verb, mode | 96 | 2.55 → 3.02 | 45 / 51 / 0 |
+| … pairs / sr48 / sr96 | 18 / 20 / 20 | 3.61 / 3.60 / 3.65 → 3.78 / 3.70 / 3.75 | 7 / 51 / 0 |
+| ValhallaSpaceModulator → Orbit, mode | 48 | 2.85 → 3.23 | 16 / 32 / 0 |
+| … pairs / sr48 / sr96 | 58 | 4.33 / 4.40 / 4.40 = | 0 / 58 / 0 |
+| ValhallaDelay → Echoform (mode / pairs / sr48 / sr96) | 164 | 4.04 = | 0 / 164 / 0 |
+| ValhallaFutureVerb → Horizon, this round's probe bank (mode) | 99 | 2.53 → 2.66 | 10 / 89 / 0 |
+| … pairs / sr44 / sr48 / sr96 | 84 | 2.61 / 2.25 / 2.19 / 2.25 = | 0 / 84 / 0 |
+
+| Gate bank (other captures of the same plug-ins, all ten Valhalla tags) | files | before → after | up / same / down |
+|---|---|---|---|
+| verb183b captures (FutureVerb / VintageVerb / Delay; the other 6 tags =) | 62 / 18 / 25 (+105) | 2.68 → 2.82 / 3.83 → 3.89 / 2.92 → 3.00 | 9 / 201 / 0 |
+| tp172d probes (FutureVerb / Supermassive) | 40 / 94 | 3.17 → 3.20 / 4.59 = | 1 / 133 / 0 |
+| refcap182 programme (VintageVerb; 9 other tags =) | 25 (+190) | 3.48 → 3.56 | 2 / 213 / 0 |
+| tp172d matched settings (10 tags) | 137 | = | 0 / 137 / 0 |
+
+Round 190ly's 140 % probe renders of ValhallaDelay (new references, not a gate bank): 105 % 2 → 4, 110 % 1 → 1 / 1 → 2,
+120 % 1 → 2 / 1 → 3, 140 % 3 → 2 / 3 → 2 (−2.3 dB under; verb183b's 140 % capture rose 1 → 3 with the same law) — listed.
 
 ## Round 190ls (Valhalla): Atrium on a dense late tank for the ValhallaRoom role
 
