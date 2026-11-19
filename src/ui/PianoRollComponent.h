@@ -122,6 +122,10 @@ public:
     // default): a selection of 2 to 10 different keys shows its chord name over the grid's top-left corner. The main
     // window saves both with the UI options.
     static inline bool gridHighlights = true, showChordName = false;
+    // View › Scale highlighting › "Black notes" / "Default" (FL 2026, round 190mq, issue #212): with no scale chosen, the
+    // rows of the black keys are shaded (FL's Black notes, LYNX's "No scale": on) or none is (FL's Default: off). A
+    // chosen scale (or Automatic) shades by the scale instead, whatever this says. Saved with the UI options.
+    static inline bool blackKeyRows = true;
     // View › Keyboard style (round 190j, discussion #136; LYNX's own): flat = FL's keyboard (the default), piano = a
     // traditional keyboard with a line between every two white keys (core/PianoKeys.h). Saved with the UI options.
     static inline pianokeys::Style keyStyle = pianokeys::Style::flat;
@@ -258,6 +262,16 @@ public:
     void resetEventPane();
     int eventPaneBarTopForTests() const noexcept { return eventPaneBarTop; }
     // --undogesture190jv (round 190jv): the middle of the row of `key` at `tick`, in this component's coordinates
+    // round 190mq (issues #211, #212, #213): the view and the time selection, for --issueshot190mq
+    void setViewForTests (double firstTick, int rowPixels, int centreKey)
+    {
+        scrollTicks = firstTick;
+        setRowHeightAround (rowPixels, centreKey, gridArea().getCentreY());
+        repaint();
+    }
+    std::pair<std::int64_t, std::int64_t> timeSelectionForTests() const { return { timeFrom, timeTo }; }
+    void setTimeSelectionForTests (std::int64_t from, std::int64_t to) { setTimeSelection (from, to); }
+    int rulerYForTests() const { return rulerTop + timelineHeight / 2; }
     juce::Point<int> pointForTests (std::int64_t tick, int key) const { return { (int) tickToX ((double) tick), (keyToY (key) + keyToY (key - 1)) / 2 }; }
 
     static constexpr int keyboardWidth = 72;
@@ -412,6 +426,7 @@ private:
     std::vector<Note> visibleGhostNotes() const; // round 177d: the ghost notes on show, as notes (song pattern ticks)
     void copyGhostNotes();
     void paste();
+    std::int64_t pasteOffset() const; // issue #211: how far Ctrl+V moves the clipboard (core/PastePlace.h)
     void duplicateSelection();
     void nudge (std::int64_t ticks, int keys);
 
@@ -697,6 +712,7 @@ private:
 
     // round 168g
     std::int64_t timeFrom = -1, timeTo = -1;   // the time selection (ticks; -1 = none)
+    std::int64_t rulerMark = -1; // issue #211 (round 190mq): the last single click on the ruler, FL's paste anchor; -1 = none
     juce::Label chordBubble;                   // "Show chord name for selection"
     juce::uint32 chordBubbleUntil = 0;
     std::vector<int> chordBubbleSelection;     // the selection it was shown for

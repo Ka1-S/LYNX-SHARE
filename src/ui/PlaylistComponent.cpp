@@ -3,6 +3,7 @@
 #include "core/FlCurve.h"
 #include "core/DrawMode.h"
 #include "core/LayoutStyle.h"
+#include "core/PastePlace.h"
 #include "ui/NewtoneEditor.h"
 #include "ui/PolyEditor.h"
 #include "ui/AraMenu.h"
@@ -6130,6 +6131,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         }
 
         drag = Drag::seek;
+        rulerMark = tick; // (issue #211: FL's paste anchor, kept until the ruler's double click clears it)
         seekTo (e.x, snapOn); // (it remembers the position for Stop: "Remember seek time")
         return;
     }
@@ -7036,6 +7038,8 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
         case Drag::seek:
         case Drag::listen:
             seekTo (e.x, snapOn);
+            if (drag == Drag::seek)
+                rulerMark = juce::jmax<std::int64_t> (0, snap (xToTick (e.x), snapOn));
             return;
 
         case Drag::tempoMarker: // (round 190hq: the tag follows the mouse; the marker moves on release)
@@ -7734,8 +7738,14 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
 
     // Ctrl+click on the ruler without dragging clears the time selection (and so does a double click); a right click
     // in place keeps what it did (FL: moved the nearer edge) and, with no selection, opens LYNX's ruler menu
+    // (FL 2026, round 190mq: the double click also deselects the clips and drops the paste anchor, issue #213)
     if (drag == Drag::loop && e.getDistanceFromDragStart() < 3 && ! flmods::of (downMods).right)
+    {
         setTimeSelection (0, 0);
+        rulerMark = -1;
+        if (! flmods::of (downMods).shift)
+            setSelection ({});
+    }
     else if (drag == Drag::loop && rulerMenuOnClick && ruler::isClick (e.getDistanceFromDragStartX(), e.getDistanceFromDragStartY()))
     {
         rulerMenuOnClick = false;
@@ -11978,6 +11988,7 @@ bool PlaylistComponent::runAction (const std::string& id)
     else if (is ("playlist.deselect"))
     {
         setSelection ({}); // (FL's EEDeselAction, FUN_00eb1a90: the clips and the time selection)
+        rulerMark = -1;
         if (engine.getSong().hasLoop())
             engine.editSong ([] (Song& s) { s.loopStart = s.loopEnd = 0; }, false);
     }
@@ -12621,13 +12632,27 @@ void PlaylistComponent::pasteClips (std::int64_t at)
     if (clipboard.empty())
         return;
 
-    // pastes at `at` (the clip menu's click), else at the playback cursor (or where the first clip was),
+    // pastes at `at` (the clip menu's "Paste here"), else where the layout puts it (issue #211, round 190mq,
+    // core/PastePlace.h: FL's rule in the Pattern layout, Live's insert marker in Clip-launch, the playhead in Simple),
     // keeping tracks and spacing
-    std::int64_t first = clipboard.front().start;
+    const auto& song = engine.getSong();
+    pasteplace::Where w;
+    w.first = clipboard.front().start;
     for (const auto& c : clipboard)
-        first = juce::jmin (first, c.start);
-
-    const auto target = at >= 0 ? at : playheadTick >= 0.0 ? snap (playheadTick, true) : first;
+        w.first = juce::jmin (w.first, c.start);
+    w.viewFrom = (std::int64_t) std::max (0.0, scrollTicks);
+    w.viewTo = (std::int64_t) xToTick (gridArea().getRight());
+    if (song.hasLoop())
+        w.selection = song.loopStart;
+    w.rulerMark = rulerMark;
+    w.grid = gridTicks();
+    w.position = snap ((double) songPositionTick(), true); // (Live's insert marker / BandLab's playhead)
+    const auto first = w.first;
+    const auto target = at >= 0 ? at
+                                : pasteplace::start (pasteplace::ruleFor (layoutstyle::current()), w, [&song] (std::int64_t tick) {
+                                      const auto bar = song.barAt (tick);
+                                      return pasteplace::Bar { bar.tick, juce::jmax<std::int64_t> (1, bar.length) };
+                                  });
     std::vector<int> added;
 
     engine.editSong ([&added, target, first] (Song& s) {

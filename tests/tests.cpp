@@ -17959,3 +17959,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issues190llTests.inc" // round 190ll: issues #199 (hosted synth from the piano roll), #200, #201, #203
 #include "Details190lrTests.inc" // round details3_190lr: the Simple Drum Machine (BandLab steps), Live scene follow actions
 #include "Issues190lwTests.inc" // round 190lw: issues #205 / #206 / #207 (row bands, second click, automation point editing)
+#include "Issues190mqTests.inc" // round 190mq: issues #211 / #212 / #213 (paste per layout, key-row shading, ruler double click)

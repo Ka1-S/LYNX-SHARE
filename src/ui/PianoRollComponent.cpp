@@ -6,6 +6,8 @@
 #include "ui/PaintAB.h"
 #include "core/ChordReadout.h"
 #include "core/RowBands.h"
+#include "core/PastePlace.h"
+#include "core/LayoutStyle.h"
 #include "core/KeyMap.h"
 #include "core/NoteNames.h"
 
@@ -1172,7 +1174,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
                 continue;
 
             // Note grid highlights (Alt+B, round 168g): off, every row looks the same (FL's "BlackKeys" option)
-            auto row = gridHighlights && isBlackKey (key) ? prRowBlack : rowWhite;
+            auto row = gridHighlights && blackKeyRows && isBlackKey (key) ? prRowBlack : rowWhite; // (FL's Default: none, #212)
             if (gridHighlights && autoRows) // FL's Automatic (round 190jv): the rows out of the guessed key dark; no guess, none
                 row = autoKey >= 0 && ! scaledetect::inScale (autoKey, key) ? prRowBlack : rowWhite;
             else if (gridHighlights && chosenScale)
@@ -2252,6 +2254,7 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
     if (e.y >= rulerTop && e.y < headerHeight && e.x >= keyboardWidth && e.mods.isLeftButtonDown() && ! e.mods.isShiftDown())
     {
         drag = Drag::seek;
+        rulerMark = juce::jmax<std::int64_t> (0, e.mods.isAltDown() ? (std::int64_t) xToTick (e.x) : snap (xToTick (e.x), true)); // (FL's paste anchor, issue #211)
         seekAt (e.x, ! e.mods.isAltDown());
         return;
     }
@@ -2809,6 +2812,7 @@ void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
 
         case Drag::seek:
             seekAt (e.x, snapOn);
+            rulerMark = juce::jmax<std::int64_t> (0, snapOn ? snap (xToTick (e.x), true) : (std::int64_t) xToTick (e.x));
             return;
 
         case Drag::drumPaint:
@@ -3123,6 +3127,17 @@ void PianoRollComponent::mouseUp (const juce::MouseEvent& e)
         else
             s.push_back (dragNote);
         setSelection (s);
+    }
+
+    // issue #213 (round 190mq): a double click (or a Ctrl+click) on the ruler released in place clears the time
+    // selection, as the Playlist's ruler does; FL 2026 also deselects the notes (capture f30 / f31) and drops the paste
+    // anchor (issue #211)
+    if (drag == Drag::rulerSelect && downMods.isLeftButtonDown() && e.getDistanceFromDragStart() < 3)
+    {
+        setTimeSelection (-1, -1);
+        rulerMark = -1;
+        if (! downMods.isShiftDown())
+            setSelection ({});
     }
 
     if (drag == Drag::listen)
@@ -4794,15 +4809,43 @@ void PianoRollComponent::paste()
     if (clipboard.empty())
         return;
 
-    // as in FL: pastes at the same position, already selected for dragging
+    // issue #211 (round 190mq): where the notes go depends on the layout (core/PastePlace.h): FL's rule in the Pattern
+    // layout (the part of the pattern in view), Live's insert marker in Clip-launch, the playhead in Simple. Pasted
+    // notes are selected, ready to drag.
+    const auto offset = pasteOffset();
     std::vector<int> added;
     const auto channel = allChannels ? -1 : engine.getSelectedChannel(); // ("All": each note keeps its channel)
-    editNotes ([&added, channel] (Pattern& p) {
-        added = noteedit::paste (p, clipboard, 0, channel);
+    editNotes ([&added, channel, offset] (Pattern& p) {
+        added = noteedit::paste (p, clipboard, offset, channel);
         notetools::regroup (p, added); // copies of grouped notes form groups of their own
     });
     setSelection (added);
     sortNotes();
+}
+
+std::int64_t PianoRollComponent::pasteOffset() const
+{
+    if (clipboard.empty())
+        return 0;
+    pasteplace::Where w;
+    w.first = clipboard.front().start;
+    for (const auto& n : clipboard)
+        w.first = std::min (w.first, n.start);
+    w.rulerMark = rulerMark;
+    w.grid = gridTicks();
+    w.viewFrom = (std::int64_t) std::max (0.0, scrollTicks);
+    w.viewTo = (std::int64_t) xToTick (gridArea().getRight());
+    if (timeFrom >= 0 && timeTo > timeFrom)
+        w.selection = timeFrom;
+    // the song position in this pattern (the playhead while it plays; stopped, where it would start)
+    const auto& song = engine.getSong();
+    const auto position = playheadTick >= 0.0 ? playheadTick
+                                              : transportedit::patternPlayhead (song, song.currentPattern, engine.getTransport().positionTicks.load(),
+                                                                                engine.patternLinearOrigin());
+    if (position >= 0.0)
+        w.position = snap (position, true);
+    const auto rule = pasteplace::ruleFor (layoutstyle::current());
+    return pasteplace::start (rule, w, pasteplace::UniformBars { song.barTicks() }) - w.first;
 }
 
 void PianoRollComponent::duplicateSelection()
@@ -5028,6 +5071,7 @@ bool PianoRollComponent::handleKey (const juce::KeyPress& key)
     {
         setSelection ({});
         setTimeSelection (-1, -1);
+        rulerMark = -1;
         return true;
     }
 
@@ -5148,7 +5192,10 @@ void PianoRollComponent::changeListenerCallback (juce::ChangeBroadcaster*)
         }
 
         if (song.currentPattern != knownPattern)
+        {
             timeFrom = timeTo = -1; // (the time selection belongs to the pattern it was made in)
+            rulerMark = -1;
+        }
         knownPattern = song.currentPattern;
         knownChannel = engine.getSelectedChannel();
         knownNoteCount = count;
@@ -5836,7 +5883,17 @@ juce::PopupMenu PianoRollComponent::scaleHighlightMenu()
     menu.addColumnBreak();
     menu.addSectionHeader (tr ("Scale"));
     menu.addItem (tr ("Snap notes to the scale") + keyText ("pianoRoll.scaleSnap"), scale > 0, scaleSnap, [this] { setScaleSnap (! scaleSnap); });
-    menu.addItem (tr (notetools::scales()[0].name), true, scaleBox.getSelectedId() == 1, [this] { setScale (0, 0); });
+    // FL's radio group Default / Black notes / Automatic (round 190mq, issue #212: Default = no black-key rows)
+    menu.addItem (tr ("Default"), true, scaleBox.getSelectedId() == 1 && ! blackKeyRows, [this] {
+        blackKeyRows = false;
+        setScale (0, 0);
+        repaint();
+    });
+    menu.addItem (tr (notetools::scales()[0].name), true, scaleBox.getSelectedId() == 1 && blackKeyRows, [this] {
+        blackKeyRows = true;
+        setScale (0, 0);
+        repaint();
+    });
     menu.addItem (tr ("Automatic"), true, isAutoScale(), [this] { setAutoScale (true); });
     menu.addSeparator();
     for (int s = 1; s < (int) notetools::scales().size(); ++s)
