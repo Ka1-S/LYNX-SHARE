@@ -3115,6 +3115,8 @@ void MainComponent::loadUiSettings()
             trackmodes::headerDropOptions().selectTracks = on;
         else if (key == "prGridHighlights") // (round 168g: the Piano roll's View items)
             PianoRollComponent::gridHighlights = on;
+        else if (key == "prBlackKeyRows") // (round 190mq: Scale highlighting › Black notes / Default)
+            PianoRollComponent::blackKeyRows = on;
         else if (key == "prShowChordName")
             PianoRollComponent::showChordName = on;
         else if (key == "prSongBars")
@@ -3451,6 +3453,7 @@ void MainComponent::saveUiSettings()
                                       + "\ndropLocksToContent=" + juce::String (trackmodes::headerDropOptions().lockToContent ? 1 : 0)
                                       + "\nselectTracksOnDrop=" + juce::String (trackmodes::headerDropOptions().selectTracks ? 1 : 0)
                                       + "\nprGridHighlights=" + juce::String (PianoRollComponent::gridHighlights ? 1 : 0)
+                                      + "\nprBlackKeyRows=" + juce::String (PianoRollComponent::blackKeyRows ? 1 : 0)
                                       + "\nprShowChordName=" + juce::String (PianoRollComponent::showChordName ? 1 : 0)
                                       + "\nprSongBars=" + juce::String (PianoRollComponent::songBarsRuler ? 1 : 0)
                                       + "\npolyPrepareOnOpen=" + juce::String (PolyEditorWindows::prepareOnOpen ? 1 : 0)

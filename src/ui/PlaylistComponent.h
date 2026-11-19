@@ -284,6 +284,7 @@ public:
     juce::PopupMenu getAutomationPointMenuForSnapshot (int clip, int point); // FL's point menu of an automation clip's point (round 190bw)
     std::vector<int> selectedPointsForTests() const { return selectedPoints; } // issue #207 (round 190lw)
     std::vector<int> clipSelectionForTests() const { return selection; }
+    std::int64_t gridForSnapshot() const { return gridTicks(); } // round 190mq
     bool penCursorForTests (juce::Point<int> p) const { return curveSpotAt (p).valid(); }
     juce::Rectangle<float> laneBodyForTests (int track, int lane) const { return laneBody (track, lane); }
     juce::Point<int> curvePointForTests (int clip, int point) const;          // a clip curve's point on screen
@@ -916,6 +917,7 @@ private:
     std::vector<int> selection, selectionBefore;
     juce::Rectangle<int> rubberBand;
     std::int64_t loopAnchor = 0;
+    std::int64_t rulerMark = -1; // issue #211 (round 190mq): the last single click on the ruler, FL's paste anchor; -1 = none
     juce::ModifierKeys downMods;
     bool startedOnEmpty = false, erasedSomething = false, holdExpired = false;
     std::vector<int> touchedClips;
