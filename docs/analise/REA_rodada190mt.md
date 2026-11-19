@@ -49,9 +49,12 @@ Base: round 190mm's final binary and scores (bank wv190mm, masked).
   cookbook peaking section (b1 = a1, gain and centre exact) with
   alpha = tan (min (π f / (Q fs), π / 4)) / (0.090904 (√G + 1/√G)) — exact to 4e-5 over 336 probes: the bandwidth
   follows f / Q and is capped at fs / 4 (round 190mm's bandwidth-prewarped law missed the wide bands above 3 kHz by
-  −45 … −53 dB). PQ-Bell's alpha also depends on f / Q only: α k(g) = θ (1 + β(g) θ²) with β 0.041 at ±6 dB, 0.0058 at ±12 dB (two gains
-  probed: its law in g not pinned down; kept on round 190mm's law, which is close below 3 kHz).
-- **LYNX**: Facet's Waves design code 14 q10BellTan (code 2 stays for round 190mm's projects); the Q10 translator uses it.
+  −45 … −53 dB). PQ-Bell (eq/out/q10pq: 3 … 12 kHz × Q 0.5 / 1 × every 1.5 dB to ±18): the same section with
+  alpha = θ (1 + β θ²) / k, θ as above, k round 190mm's constant-Q factor (refound to 4 digits) and β falling from 0.206 at
+  1.5 dB to 0.0018 at 18 dB (fitted every 1.5 dB; alpha within 4e-3 at 1.5 dB, 1.3e-4 from 7.5 dB).
+- **LYNX**: Facet's Waves design codes 14 q10BellTan and 15 q10PqBellX (codes 2 / 3 stay for round 190mm's projects); the
+  Q10 translator uses them. Through the translator (crafted states): Bell 10 kHz Q 1 −30.7 → −98.5 dB, PQ 12 kHz / 9 kHz /
+  16 kHz −33 / −19 / −50 → −81 / −95 / −94 dB.
 
 ## 4. API-560: a graphic-EQ network, oversampled, 65 samples late
 - **Black box [EXEC]**: with every slider at 0 the output is the input delayed by exactly 65 samples (bypass); with any

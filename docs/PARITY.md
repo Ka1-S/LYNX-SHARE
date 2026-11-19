@@ -4355,8 +4355,9 @@ Evidence: `docs/analise/REA_rodada190mt.md`. Before = round 190mm's final binary
   poles and zeros move with the gain (proportional-Q bells, shelves that overshoot their dial, the G's ±17 / ±20 dB);
   LYNX keeps each probed section's analog prototype (7 900 probes) and interpolates it (core/SslGTables.inc). Filters and
   dynamics stay the E voicing's (the G compressor is the remaining gap: X1 / X2 / X4 at 7 … 8).
-- **Facet EQ — Q10 bell** (Waves code 14): the cookbook section with alpha = tan (min (π f / (Q fs), π / 4)) /
-  (0.090904 (√G + 1/√G)), exact on 336 probes up to 20 kHz (the wide bands above 3 kHz were −45 … −53 dB).
+- **Facet EQ — Q10 bells** (Waves codes 14 / 15): the cookbook section with alpha = tan (min (π f / (Q fs), π / 4)) /
+  (0.090904 (√G + 1/√G)) for the Bell, θ (1 + β θ²) / k for the PQ-Bell (θ = min (π f / (Q fs), π / 4), β fitted every
+  1.5 dB): −80 … −99 dB through the translator up to 16 kHz (the wide bands above 3 kHz were −19 … −50 dB).
 - **Facet EQ — the API-560 law** (hidden [135] + ten slider gains [136 …]; API-560 only; core/Api560.h): the reference's
   graphic-EQ structure (two groups of five resonators in a node network, each slider a potentiometer that also loads its
   resonator, 4× oversampled, a linear-phase decimator), constants fitted on our single-slider probes (−62 … −70 dB);
@@ -4365,5 +4366,5 @@ Evidence: `docs/analise/REA_rodada190mt.md`. Before = round 190mm's final binary
   ignored; **its gate** (hidden [39 … 43]): a held detector, a one-pole fall to the floor with the release, gate / 1:2
   expander. X3_bass (3) is the weak file: the type's dynamics on bass.
 - **Not changed:** RVerb / H-Reverb (round 190lf's ceiling stands: a sample-accurate network would need the reference's
-  delay tables; REA_rodada190mt §5), the G's filters and compressor, the PQ-Bell above 3 kHz.
+  delay tables; REA_rodada190mt §5), the G's filters (probed, REA §1) and compressor.
 

@@ -1749,6 +1749,16 @@ double q10Qc (double db, double q, bool pq) noexcept
     const double f = x - i;
     return q * std::exp (std::log (pqK[i]) * (1.0 - f) + std::log (pqK[i + 1]) * f);
 }
+// round 190mt: the PQ-Bell's bandwidth warp β (alpha = θ (1 + β θ²) / k), fitted every 1.5 dB from 1.5 to 18 dB (ln β
+// interpolated; held below 1.5 dB and above 18 dB)
+constexpr double pqBeta[12] = { 0.20584, 0.13164, 0.07569, 0.04289, 0.02495, 0.01511, 0.00957, 0.00633, 0.00436, 0.00312, 0.00231, 0.00177 };
+double q10PqBeta (double db) noexcept
+{
+    const double x = std::clamp (std::abs (db) / 1.5 - 1.0, 0.0, 11.0);
+    const int i = std::min ((int) x, 10);
+    const double t = x - i;
+    return std::exp (std::log (pqBeta[i]) * (1.0 - t) + std::log (pqBeta[i + 1]) * t);
+}
 } // namespace wv
 } // namespace
 
@@ -1778,10 +1788,12 @@ int wavesDesign (const EffectParams& params, int band, double fs, std::array<Sec
             out[0] = wv::bandwidthBell (db, wv::q10Qc (db, 4.0 * qv, code == WaveCode::q10PqBell), w0);
             return 1;
         case WaveCode::q10BellTan: // round 190mt: [EXEC] exact on 336 probes 0.5 … 20 kHz (−160 dB and better)
+        case WaveCode::q10PqBellX: // round 190mt: [EXEC] the PQ-Bell, 192 probes 3 … 12 kHz × ±1.5 … ±18 dB (alpha within 4e-3)
         {
             if (std::abs (db) < 1e-9) return 0;
             const double th = std::min (pi * f / (std::max (4.0 * qv, 1e-3) * fs), 0.25 * pi);
-            const double al = std::tan (th) / (0.090904 * (std::sqrt (G) + 1.0 / std::sqrt (G)));
+            const double al = code == WaveCode::q10PqBellX ? th * (1.0 + wv::q10PqBeta (db) * th * th) / wv::q10Qc (db, 1.0, true)
+                                                            : std::tan (th) / (0.090904 * (std::sqrt (G) + 1.0 / std::sqrt (G)));
             const double wc = std::min (w0, 0.999 * pi), c = std::cos (wc), a0 = 1.0 + al / A;
             Section& s = out[0];
             s.b0 = (1.0 + al * A) / a0; s.b1 = -2.0 * c / a0; s.b2 = (1.0 - al * A) / a0;

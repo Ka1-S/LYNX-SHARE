@@ -136,11 +136,29 @@ TEST (parity190mt_q10_bell_tan_law_is_exact)
             }
             CHECK (std::abs (parity190mm::peakDb (s, f) - db) < 1e-3);
         }
-    // the Q10 translator picks it for its Bell (type 0); PQ-Bell keeps round 190mm's law
+    // the PQ-Bell: alpha = θ (1 + β θ²) / k — at 12 kHz, Q 1, +6 dB (θ = π / 4): the probe's alpha 1.4648 (β 0.04289, k 0.5503)
+    s.params[(std::size_t) facet::wavesBandParam0] = facet::waveCodeValue (facet::WaveCode::q10PqBellX);
+    s.params[(std::size_t) facet::param (0, 1)] = facet::hzValue (12000.0);
+    s.params[(std::size_t) facet::param (0, 2)] = facet::gainValue (6.0);
+    s.params[(std::size_t) facet::param (0, 3)] = facet::qValue (0.25);
+    {
+        const double f = facet::hz (s.params[(std::size_t) facet::param (0, 1)]), q = facet::q (s.params[(std::size_t) facet::param (0, 3)]) * 4.0;
+        const double db = facet::gainDb (s.params[(std::size_t) facet::param (0, 2)]), A = std::pow (10.0, db / 40.0), w0 = 2.0 * M_PI * f / 48000.0;
+        const double th = std::min (M_PI * f / (q * 48000.0), 0.25 * M_PI), al = th * (1.0 + 0.04289 * th * th) / 0.5503;
+        CHECK (std::abs (al - 1.4648) < 0.01);
+        const std::complex<double> z1 = std::exp (std::complex<double> (0.0, -2.0 * M_PI * 6000.0 / 48000.0));
+        const auto num = (1.0 + al * A) - 2.0 * std::cos (w0) * z1 + (1.0 - al * A) * z1 * z1;
+        const auto den = (1.0 + al / A) - 2.0 * std::cos (w0) * z1 + (1.0 - al / A) * z1 * z1;
+        CHECK (std::abs (parity190mm::peakDb (s, 6000.0) - 20.0 * std::log10 (std::abs (num / den))) < 0.01);
+    }
+    // the Q10 translator picks code 14 for its Bell (type 0) and 15 for its PQ-Bell (type 5)
     int n = 0;
     auto q = parity190jh::waves ("Q10 Stereo", "Q10", parity190jh::list (122, { { 20, "1" }, { 21, "0" }, { 22, "3" }, { 23, "4000" }, { 24, "1" },
         { 48, "16000" } }), n);
     CHECK (facet::waveCode (q.params[(std::size_t) facet::wavesBandParam0]) == (int) facet::WaveCode::q10BellTan);
+    auto pq = parity190jh::waves ("Q10 Stereo", "Q10", parity190jh::list (122, { { 20, "1" }, { 21, "5" }, { 22, "3" }, { 23, "8000" }, { 24, "1" },
+        { 48, "16000" } }), n);
+    CHECK (facet::waveCode (pq.params[(std::size_t) facet::wavesBandParam0]) == (int) facet::WaveCode::q10PqBellX);
 }
 
 TEST (parity190mt_api560_law_latency_and_network)

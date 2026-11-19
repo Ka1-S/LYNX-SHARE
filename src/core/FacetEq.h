@@ -130,6 +130,9 @@ enum class WaveCode
     // π / 4)) / (0.090904 (√G + 1/√G)) (Q = the Q10's Q; Q field = Q / 4) — the bandwidth follows f / Q up to fs / 4 and is
     // capped there (wide bands above 3 kHz). Set by the Q10 translator; code 2 keeps round 190mm's law for its projects
     q10BellTan = 14,
+    // round 190mt: the Q10 PQ-Bell's law (REA_rodada190mt §3): the same section with alpha = θ (1 + β θ²) / k, θ as above,
+    // k = round 190mm's constant-Q factor and β fitted every 1.5 dB on our probes; code 3 keeps round 190mm's law
+    q10PqBellX = 15,
     count
 };
 int waveCode (float v) noexcept;           // 0 … count - 1

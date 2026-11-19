@@ -2154,7 +2154,7 @@ int translateWavesQ10 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
             case 2: wavesEq::band (slot, k, S::highShelf, C::highShelf1, b.f, b.db, 0.7071, 6); break;
             case 3: wavesEq::band (slot, k, S::highCut, C::butterLowPass, b.f, 0.0, 1.0, 12); break;
             case 4: wavesEq::band (slot, k, S::lowCut, C::butterHighPass, b.f, 0.0, 1.0, 12); break;
-            case 5: wavesEq::band (slot, k, S::bell, C::q10PqBell, b.f, b.db, b.q / 4.0); break;
+            case 5: wavesEq::band (slot, k, S::bell, C::q10PqBellX, b.f, b.db, b.q / 4.0); break; // round 190mt: its law above 3 kHz
             default: wavesEq::band (slot, k, S::bell, C::q10BellTan, b.f, b.db, b.q / 4.0); break; // round 190mt: exact law
         }
     }
