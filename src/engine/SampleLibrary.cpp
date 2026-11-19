@@ -83,8 +83,9 @@ bool sameContent (const SampleData& a, const SampleData& b) noexcept
            && a.acidBeats == b.acidBeats && a.sliceMarkers == b.sliceMarkers && a.bitsPerSample == b.bitsPerSample && a.floatData == b.floatData
            && a.cropped == b.cropped && a.cropFrom == b.cropFrom && a.cropTo == b.cropTo && a.left.size() == b.left.size()
            && a.right.size() == b.right.size() && ! a.isMapped() && ! b.isMapped()
-           && std::memcmp (a.left.data(), b.left.data(), a.left.size() * sizeof (float)) == 0
-           && std::memcmp (a.right.data(), b.right.data(), a.right.size() * sizeof (float)) == 0;
+           // (an empty channel's data() may be null: memcmp only on samples, round 190mo's UBSan run)
+           && (a.left.empty() || std::memcmp (a.left.data(), b.left.data(), a.left.size() * sizeof (float)) == 0)
+           && (a.right.empty() || std::memcmp (a.right.data(), b.right.data(), a.right.size() * sizeof (float)) == 0);
 }
 
 // the data already in RAM with the same content, else `data` itself (then remembered); under the cache's lock
