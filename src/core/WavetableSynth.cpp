@@ -1919,7 +1919,8 @@ struct Engine::Impl
                     else
                     {
                     auto px = (float) ph * (1.0f / 4294967296.0f);
-                    wIn = px;
+                    if constexpr (aaMode != 0)
+                        wIn = px;
                     auto g = 1.0f;
                     switch (w2)
                     {
@@ -1959,7 +1960,7 @@ struct Engine::Impl
                         case warp::crush:
                         {
                             const auto y = read (ph);
-                            return wa < 1.0e-4f || aa ? y : std::round (y * crushL) / crushL; // (aa: the steps below)
+                            return wa < 1.0e-4f || aaMode != 0 ? y : std::round (y * crushL) / crushL; // (anti-aliased: the steps below)
                         }
                         case warp::fm:
                             px += fmDepth * m;

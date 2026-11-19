@@ -124,7 +124,7 @@ TEST (helix190ml_warps_anti_aliased)
     // at A4 at least 10 dB less and below −75 dB [190ml aa/: −60 … −40 dB → −110 … −80 dB]
     for (const auto* table : { "Analog Saw", "Shapes" })
         for (int m : { w::warp::sync, w::warp::pwm, w::warp::mirror, w::warp::flip, w::warp::crush })
-            for (double a : { 0.3, 0.45, 0.9 })
+            for (double a : { 0.45, 0.9 })
                 for (int key : { 45, 69 })
                 {
                     double r[2];

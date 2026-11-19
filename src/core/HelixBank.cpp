@@ -280,7 +280,7 @@ std::vector<Preset> helixBank()
         p.x2 (ext2::chaosMode, 1).x2 (ext2::chaosRate, 0.15).x2 (ext2::chaosMode + ext2::chaosStride, 0).x2 (ext2::chaosRate + ext2::chaosStride, 0.4);
         p.cell (tgt::oscPos, src::chaos1, 0.45).cell (tgt::osc3 + tgt::oscPos, src::chaos1 + 1, 0.5).cell (tgt::filterFreq, src::chaos1 + 1, 0.12);
         p.set (unisonMode, unisonClassic).set (unisonVoices, 4).set (unisonAmount, 0.2);
-        p.filter (0, flt::freq, 3500).env (0, 1.5, 1.0, 1.0, 3.0).set (volume, 0.3);
+        p.filter (0, flt::freq, 3500).env (0, 0.5, 1.0, 1.0, 2.0).set (volume, 0.3);
         p.x (ext::reverbOn, 1).x (ext::reverbSize, 0.9).x (ext::reverbMix, 0.4);
     }));
     b.push_back (make ("Shifted Bells", "FX", { "frequency shifter", "bells", "metallic", "inharmonic" }, [] (Patch& p) {

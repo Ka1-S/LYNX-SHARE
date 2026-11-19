@@ -27870,6 +27870,14 @@ private:
                 }
             };
             walk (*page, 0);
+            for (int i = 0; i < page->getNumChildComponents(); ++i) // (the page with one child hidden)
+            {
+                auto* child = page->getChildComponent (i);
+                child->setVisible (false);
+                paintCost (*page, (juce::String ("window without child ") + juce::String (i)).toRawUTF8());
+                child->setVisible (true);
+            }
+            paintCost (*page, "window again");
             std::sort (parts.begin(), parts.end(), [] (const auto& x, const auto& y) { return x.first > y.first; });
             for (std::size_t i = 0; i < parts.size() && i < 12; ++i)
                 checks << "  part " << juce::String (parts[i].first, 3) << " ms " << parts[i].second << "\n";

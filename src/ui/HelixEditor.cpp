@@ -2604,7 +2604,7 @@ public:
     void resized() override
     {
         const auto h = getHeight() - 4;
-        const int widths[4] { 196, 128, 160, 104 };
+        const int widths[4] { 182, 112, 160, 104 }; // (the card's width rounds with its scale: some room kept at the right)
         int x = 2;
         for (int i = 0; i < 4; ++i)
         {
@@ -2614,19 +2614,19 @@ public:
         const auto s0 = sections[0];
         for (int k = 0; k < w::oscCount; ++k)
         {
-            warp[(std::size_t) k]->setBounds (s0.getX() + 52, s0.getY() + 18 + k * 20, 92, 16);
-            warpAmt[(std::size_t) k]->setBounds (s0.getX() + 148, s0.getY() + 18 + k * 20, 42, 16);
+            warp[(std::size_t) k]->setBounds (s0.getX() + 50, s0.getY() + 18 + k * 20, 84, 16);
+            warpAmt[(std::size_t) k]->setBounds (s0.getX() + 136, s0.getY() + 18 + k * 20, 42, 16);
         }
         const auto row = [s0] (int i) { return s0.getY() + 84 + i * 22; };
         osc3On->setBounds (s0.getX() + 6, row (0), 96, 16);
-        osc3Pos->setBounds (s0.getX() + 148, row (0), 42, 16);
+        osc3Pos->setBounds (s0.getX() + 136, row (0), 42, 16);
         sampleOn->setBounds (s0.getX() + 6, row (1), 96, 16);
-        sampleGain->setBounds (s0.getX() + 148, row (1), 42, 16);
+        sampleGain->setBounds (s0.getX() + 136, row (1), 42, 16);
         noiseOn->setBounds (s0.getX() + 6, row (2), 96, 16);
-        noiseLevel->setBounds (s0.getX() + 148, row (2), 42, 16);
+        noiseLevel->setBounds (s0.getX() + 136, row (2), 42, 16);
         const auto s1 = sections[1];
-        unisonCount->setBounds (s1.getX() + 52, s1.getY() + 18, 70, 16);
-        unisonStack->setBounds (s1.getX() + 52, s1.getY() + 38, 70, 16);
+        unisonCount->setBounds (s1.getX() + 48, s1.getY() + 18, 60, 16);
+        unisonStack->setBounds (s1.getX() + 48, s1.getY() + 38, 60, 16);
         unisonBlend->setBounds (s1.getX() + 6, s1.getY() + 64, s1.getWidth() - 12, 30);
         unisonWidth->setBounds (s1.getX() + 6, s1.getY() + 100, s1.getWidth() - 12, 30);
         const auto s2 = sections[2];
