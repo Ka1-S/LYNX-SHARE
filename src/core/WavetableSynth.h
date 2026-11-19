@@ -104,11 +104,13 @@ constexpr int extTargetCount = 4, plusTargetCount = targetCount + extTargetCount
 // render exactly as before). Oscillator 3 (Live's oscillator set + a second warp), the sample oscillator, user tables
 // (their data in ChannelDef::pluginState, see HelixUserData), macros 5…8, two chaos sources, the frequency shifter, the
 // EQ and the multiband compressor in the rack, anti-aliased hard-edged warps. Every value defaults to "off".
-constexpr int revision190mi = 1, revision190ml = 2, currentRevision = revision190ml;
+constexpr int revision190mi = 1, revision190ml = 2, revision190mt = 3, currentRevision = revision190mt;
 constexpr int newSourceCount = 6;  // Macro 5…8, Chaos 1, Chaos 2
 constexpr int newTargetCount = 12; // oscillator 3's six rows and Warp 2, the sample's pitch / gain / pan, Shift, Multiband
 constexpr int allSourceCount = plusSourceCount + newSourceCount;   // 23
-constexpr int allTargetCount = plusTargetCount + newTargetCount;   // 68
+constexpr int rev2TargetCount = plusTargetCount + newTargetCount;  // 68 (Helix+ 2's rows end here)
+constexpr int newTargetCount3 = 12; // Helix round 3 (190mt): the granular and spectral oscillators' rows
+constexpr int allTargetCount = rev2TargetCount + newTargetCount3;  // 80
 constexpr int macroCount = 8;
 constexpr int chaosCount = 2;
 constexpr int ext2Base = extBase + ext::count;
@@ -132,12 +134,36 @@ constexpr int cellsA = 50;                                          // 190mi's 5
 constexpr int cellsB = cellsA + plusTargetCount * newSourceCount;   // the new targets × every source
 constexpr int count = cellsB + newTargetCount * allSourceCount;
 } // namespace ext2
-constexpr int stateSize = ext2Base + ext2::count;
+
+// --- Helix round 3 (round 190mt): a third block after Helix+ 2's, gated by the same revision value (3 = this block live; 0,
+// 1 and 2 render exactly as before). The granular oscillator (grains of the channel's sample), the spectral oscillator
+// (the sample's partials resynthesised, warped and filtered) and the sample oscillator's band limit ("Clean"). Every value
+// in defaults() is "off" (Clean included: a revision 2 channel taken to 3 keeps its sound); new channels and presets
+// take helixDefaults() (Clean on).
+constexpr int ext3Base = ext2Base + ext2::count;
+namespace ext3
+{
+constexpr int reserved = 0;                                          // (state, not automatable)
+constexpr int grainOn = 1, grainPosition = 2, grainSize = 3, grainDensity = 4, grainSpray = 5, grainPitch = 6, grainSpread = 7,
+              grainGain = 8, grainPan = 9;
+constexpr int specOn = 10, specPosition = 11, specStretch = 12, specShift = 13, specTilt = 14, specBand = 15, specWidth = 16,
+              specPartials = 17, specTranspose = 18, specGain = 19, specPan = 20;
+constexpr int sampleClean = 21;                                      // the sample oscillator reads band-limited levels
+constexpr int autoEnd = 22;                                          // the automatable values are 1 … autoEnd − 1
+constexpr int cells = autoEnd;                                       // the new rows × every source
+constexpr int count = cells + newTargetCount3 * allSourceCount;
+} // namespace ext3
+constexpr int stateSize = ext3Base + ext3::count;
+constexpr int maxGrains = 16;        // grains sounding at once per voice
+constexpr int maxSpectralPartials = 64;
+constexpr int spectralFrames = 64;   // analysis frames over the sample
 
 // a matrix cell's value index for any target (Live's 52, Helix+'s 4, Helix+ 2's 12) and any source (Live's 13, the 8
 // macros, the chaos sources)
 constexpr int cellIndex (int target, int source) noexcept
 {
+    if (target >= rev2TargetCount) // (round 3's rows)
+        return ext3Base + ext3::cells + (target - rev2TargetCount) * allSourceCount + source;
     if (source >= plusSourceCount && target < plusTargetCount)
         return ext2Base + ext2::cellsA + target * newSourceCount + (source - plusSourceCount);
     if (target >= plusTargetCount)
@@ -152,7 +178,8 @@ constexpr int cellIndex (int target, int source) noexcept
 constexpr bool automatable (int index) noexcept
 {
     return (index >= 0 && index < paramCount) || (index > extBase + ext::revision && index < extBase + ext::autoEnd)
-           || (index > ext2Base + ext2::reserved && index < ext2Base + ext2::autoEnd);
+           || (index > ext2Base + ext2::reserved && index < ext2Base + ext2::autoEnd)
+           || (index > ext3Base + ext3::reserved && index < ext3Base + ext3::autoEnd);
 }
 // oscillator k's (0…2) value of Live's oscillator set (osc::on … osc::gain), its table value and its second warp's values
 constexpr int oscIndex (int k, int field) noexcept { return k < 2 ? oscBase (k) + field : ext2Base + ext2::osc3 + field; }
@@ -195,6 +222,9 @@ constexpr int time = 46, globalMod = 47, unison = 48, amp = 49, pitch = 50, glid
 constexpr int warpAmount = 52, noiseLevel = 54, unisonBlend = 55; // Helix+ (round 190mi): warp amount + k
 // Helix+ 2 (round 190ml): oscillator 3's rows (+ oscPitch … oscGain), its Warp 2, the sample's, the shifter, the multiband
 constexpr int osc3 = 56, osc3Warp = 62, samplePitch = 63, sampleGain = 64, samplePan = 65, shift = 66, mbDepth = 67;
+// Helix round 3 (round 190mt): the granular and spectral oscillators
+constexpr int grainPos = 68, grainSize = 69, grainDensity = 70, grainSpray = 71, grainPitch = 72, grainGain = 73, specPos = 74,
+              specStretch = 75, specShift = 76, specTilt = 77, specBand = 78, specGain = 79;
 // oscillator k's (0…2) row of Live's oscillator rows (oscPitch … oscGain)
 constexpr int oscRow (int k, int row) noexcept { return k < 2 ? k * oscStride + row : osc3 + row; }
 constexpr int warpRow (int k) noexcept { return k < 2 ? warpAmount + k : osc3Warp; }
@@ -264,11 +294,35 @@ struct SampleBuffer
     double rate = 44100.0;
     int frames() const noexcept { return (int) l.size(); }
 };
+// Helix round 3 (round 190mt): the sample's partials for the spectral oscillator, analysed once (analyseSpectrum) and kept
+// with the channel's data: `frames` analysis frames spread over the sample, each `partials` tracks (a track keeps its
+// slot from frame to frame; the loudest tracks first); hz / amp at [frame × partials + track], amp 0 = silent there
+struct SpectralData
+{
+    int frames = 0, partials = 0;
+    std::vector<float> hz, amp;
+    bool empty() const noexcept { return frames <= 0 || partials <= 0 || (int) amp.size() < frames * partials || hz.size() != amp.size(); }
+};
+// the sample read band-limited (round 190mt): level k (1 …) holds the sample low-passed below 0.5 × 2^(−k/2) of its rate,
+// every 2^shift-th sample kept (shift = max (0, k / 2 − 1): twice the rate its band needs); a level's samples start at
+// index `guard`, with zeros before and after them
+struct SampleLevels
+{
+    static constexpr int guard = 4;
+    struct Level
+    {
+        std::vector<float> l, r; // (r empty: mono)
+        int shift = 0;
+        int frames = 0;          // its samples (the guards not counted)
+    };
+    std::vector<Level> levels;
+};
 struct HelixUserData
 {
     std::array<UserTable, oscCount> tables; // per oscillator
     std::string sampleName;
     SampleBuffer sample; // (no frames: none)
+    SpectralData spectral; // (190mt: the sample's partials; empty: not analysed)
     bool empty() const noexcept;
 };
 std::vector<std::uint8_t> encodeUserData (const HelixUserData& data); // (empty bytes when the data is empty)
@@ -293,6 +347,10 @@ struct ImportOptions
 UserTable userTableFromAudio (const float* audio, int samples, double rate, const ImportOptions& options, const std::string& name,
                               std::string* note = nullptr);
 double detectPeriod (const float* audio, int samples, double rate); // the strongest period in samples (YIN), 0: none
+// --- Helix round 3 (round 190mt; any thread but the audio thread): the sample's partials (deterministic), and its
+// band-limited levels (shared by content while anyone holds them)
+SpectralData analyseSpectrum (const SampleBuffer& sample);
+std::shared_ptr<const SampleLevels> sampleLevels (const SampleBuffer& sample);
 // a formula → a table: x the phase (−1…1 over the cycle), t the position (0…1 over the frames); `error` says why not
 bool userTableFromFormula (const std::string& formula, UserTable& out, std::string& error);
 // the cycle as a WAV (float, 64 frames of userFrameLength) and back (a WAV of whole frames of `frameSize`, or any audio)
@@ -322,6 +380,11 @@ struct ChaosState
 };
 float chaosStep (int mode, ChaosState& state, double cycles) noexcept;
 double shiftHz (double shift) noexcept;                                     // the frequency shifter's −1…1 → Hz
+// Helix round 3 (round 190mt) laws, exposed for the tests and the editor
+double spectralShiftHz (double shift) noexcept;   // the spectral oscillator's Shift −1…1 → Hz added to every partial
+double spectralExponent (double stretch) noexcept; // Stretch −1…1 → the partials' exponent around the root (1: none)
+int sampleLevelFor (double ratio) noexcept;        // the band-limited level a read at `ratio` source samples per sample takes
+float grainWindow (float x) noexcept;              // the grains' window at 0…1
 double warpPhase (int mode, double amount, double phase) noexcept;        // the phase warps (0…1 → 0…1)
 float drawnLfo (const double* points, double x) noexcept;                  // a drawn LFO at phase x (points: count, x/y/curve…)
 int unisonStackSemis (int stack, int voice) noexcept;                       // the stacked voice's offset in semitones
@@ -347,6 +410,10 @@ public:
     // the caller keeps them alive while the engine may play them
     void setUserTable (int osc, const Table* table) noexcept;
     void setSample (const SampleBuffer* sample) noexcept;
+    // Helix round 3 (round 190mt, audio thread): the sample's band-limited levels (for Clean and the grains) and its partials
+    // (the spectral oscillator); nullptr: none (the grains then read the sample itself; the spectral oscillator is silent)
+    void setSampleLevels (const SampleLevels* levels) noexcept;
+    void setSpectral (const SpectralData* spectral) noexcept;
     double param (int index) const noexcept;
     // velocity 0…1 (0 = note off), the note's own pitch offset in semitones, its slide (0…1, −1 = none) and pressure
     void note (int key, float velocity, float pitch = 0.0f, float slide = -1.0f, float pressure = 0.0f) noexcept;
@@ -398,7 +465,7 @@ std::vector<float> helixDefaults();
 // the channel's state as doubles (missing values = defaults)
 std::vector<double> helixState (const ChannelDef& channel);
 // grows a channel's values to the whole state (missing ones as they read: a missing Helix+ block stays revision 0);
-// `helixPlus`: a Helix+ value is about to be set, so the blocks go live (revision 2, round 190ml; 190mi: 1)
+// `helixPlus`: a Helix+ value is about to be set, so the blocks go live (revision 3, round 190mt; 190ml: 2; 190mi: 1)
 void padHelixState (ChannelDef& channel, bool helixPlus);
 const std::vector<EngineParam>& helixEngineParams();
 namespace modelparams

@@ -588,6 +588,38 @@ inline std::vector<Hint> hintsFor (InstrumentKind kind, const std::vector<Contro
             named ("Helix+ 2: the shifter on", { { "Shift On", 1.0f }, { "Shift", 0.3f }, { "Shift Mix", 1.0f } });
             named ("Helix+ 2: the EQ on, its bands moved", { { "EQ On", 1.0f }, { "EQ Low", 6.0f }, { "EQ Mid", -6.0f }, { "EQ High", 6.0f } });
             named ("Helix+ 2: the multiband on", { { "Multiband On", 1.0f } });
+            // (round 190mt) Helix round 3: the granular and spectral oscillators need switching on and a sample in the
+            // channel's data (the spectral one a rich one, its band narrowed and few partials, so Band, Width and Partials
+            // are heard); Clean a rich sample played an octave up
+            const auto withRich = [] (ChannelDef& d) {
+                if ((int) d.modelParams.size() < wt::stateSize)
+                {
+                    const auto def = helixDefaults();
+                    const auto have = d.modelParams.size();
+                    d.modelParams.resize ((std::size_t) wt::stateSize);
+                    std::copy (def.begin() + (std::ptrdiff_t) have, def.end(), d.modelParams.begin() + (std::ptrdiff_t) have);
+                }
+                wt::HelixUserData data; // (0.4 s of a falling tone with 30 harmonics)
+                data.sample.rate = 44100.0;
+                data.sample.l.resize (17640);
+                double ph = 0.0;
+                for (std::size_t i = 0; i < data.sample.l.size(); ++i)
+                {
+                    ph += (330.0 - 150.0 * (double) i / 17640.0) / 44100.0;
+                    double y = 0.0;
+                    for (int h = 1; h <= 30; ++h)
+                        y += std::sin (2.0 * 3.14159265358979 * h * ph) / h;
+                    data.sample.l[i] = (float) (0.4 * y);
+                }
+                d.pluginState = wt::encodeUserData (data);
+            };
+            named ("Helix 3: the grains on (a falling tone)", { { "Grain On", 1.0f } });
+            out.back().apply = withSample;
+            named ("Helix 3: the spectral oscillator on (a rich falling tone), a band of four partials",
+                   { { "Spectral On", 1.0f }, { "Spectral Width", 2.0f }, { "Spectral Partials", 4.0f } });
+            out.back().apply = withRich;
+            named ("Helix 3: the sample on an octave up (a rich falling tone)", { { "Sample On", 1.0f }, { "Sample Transpose", 12.0f } });
+            out.back().apply = withRich;
             break;
         }
         case InstrumentKind::braid:

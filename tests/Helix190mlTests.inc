@@ -44,8 +44,8 @@ TEST (helix190ml_layout_and_parameters)
     using namespace lynx;
     namespace w = wt;
     // the second block follows Helix+'s; every (target, source) pair has its own value, none inside another's
-    CHECK (w::ext2Base == w::extBase + w::ext::count && w::stateSize == w::ext2Base + w::ext2::count);
-    CHECK (w::allSourceCount == 23 && w::allTargetCount == 68 && w::src::macro1 + 7 == 20 && w::src::chaos1 == 21);
+    CHECK (w::ext2Base == w::extBase + w::ext::count && w::stateSize >= w::ext2Base + w::ext2::count); // (190mt: round 3's block follows)
+    CHECK (w::allSourceCount == 23 && w::rev2TargetCount == 68 && w::src::macro1 + 7 == 20 && w::src::chaos1 == 21);
     std::set<int> cells;
     for (int t = 0; t < w::allTargetCount; ++t)
         for (int s = 0; s < w::allSourceCount; ++s)
@@ -68,13 +68,13 @@ TEST (helix190ml_layout_and_parameters)
            && ! w::automatable (w::ext2Base + w::ext2::userTable));
     CHECK (findEngineParam (t, w::extBase + w::ext::distOn)->name == "Distortion On"); // (190mi's names stay where they were)
     // revision 2 for a new channel; a Helix+ value set on an older channel takes it to 2, Live's values leave it alone
-    CHECK (helixDefaults()[(std::size_t) w::extBase] == 2.0f && (int) helixDefaults().size() == w::stateSize);
+    CHECK (helixDefaults()[(std::size_t) w::extBase] >= 2.0f && (int) helixDefaults().size() == w::stateSize); // (190mt: 3)
     ChannelDef old;
     old.instrument = InstrumentKind::helix;
     old.modelParams.assign ((std::size_t) w::liveStateSize, 0.25f);
     auto a = old;
     CHECK (modelparams::setRawValue (a, w::volume, 0.5f) && a.modelParams[(std::size_t) w::extBase] == 0.0f);
-    CHECK (modelparams::setRawValue (a, w::ext2Base + w::ext2::macro5 + 2, 0.7f) && a.modelParams[(std::size_t) w::extBase] == 2.0f);
+    CHECK (modelparams::setRawValue (a, w::ext2Base + w::ext2::macro5 + 2, 0.7f) && a.modelParams[(std::size_t) w::extBase] == (float) w::currentRevision);
     // texts and names
     CHECK (w::paramText (w::ext2Base + w::ext2::chaosMode, 1) == "Lorenz" && w::paramText (w::ext2Base + w::ext2::osc3 + w::osc::effectMode, 3) == "Modern");
     CHECK (w::paramText (w::ext2Base + w::ext2::shift, 0.2) == "+40.0 Hz" && w::paramText (w::ext2Base + w::ext2::eqMidFreq, 2500.0) == "2.50 kHz");
