@@ -40,7 +40,8 @@ TEST (parity190kw_vv_loop_law_is_hidden_new_instances_run_it_old_projects_do_not
     auto s = makeEffectSlot (EffectKind::epochVerb);
     CHECK (s.params[(std::size_t) ep::revision] == 1.0f);
     CHECK (s.params[(std::size_t) ep::loopLaw] == 1.0f);
-    CHECK (savedEffectParamCount (s) == (std::size_t) ep::loopLaw + 1);
+    // (rollup 0.1.30 step 10: round 190ly's short-decay trim, one further, is saved with it)
+    CHECK (savedEffectParamCount (s) == (std::size_t) ep::shortTrim + 1);
     auto now = s; // saved with it: kept
     upgradeLoadedEffectParams (now, (std::size_t) ep::loopLaw + 1);
     CHECK (now.params[(std::size_t) ep::loopLaw] == 1.0f && now.params[(std::size_t) ep::revision] == 1.0f);
@@ -74,6 +75,7 @@ TEST (parity190kw_vv_revision1_renders_as_the_base_commit_did)
         auto slot = makeEffectSlot (EffectKind::epochVerb);
         slot.params[(std::size_t) verbs::epoch::revision] = 1.0f;
         slot.params[(std::size_t) verbs::epoch::loopLaw] = 0.0f;
+        slot.params[(std::size_t) verbs::epoch::shortTrim] = 0.0f; // (rollup step 10: round 190ly's trim off too, as at the base commit)
         slot.params[16] = g.mode; slot.params[2] = g.decay; slot.params[3] = g.size; slot.params[15] = g.colour;
         const int n = (int) (1.6 * 48000.0);
         std::vector<float> l ((std::size_t) n), r ((std::size_t) n);
