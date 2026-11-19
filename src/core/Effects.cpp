@@ -4923,7 +4923,11 @@ EffectSlot makeEffectSlot (EffectKind kind)
         slot.params[(std::size_t) mixsuite::ember::revision] = 1.0f;
     // round 190it: a new Epoch Verb / Atrium / Foil Plate / Halo runs the 0.1.30 revision of the Measured law (hidden)
     if (kind == EffectKind::epochVerb) slot.params[(std::size_t) verbs::epoch::revision] = 1.0f;
-    if (kind == EffectKind::epochVerb) // round 190ly: … and Epoch Verb Concert Hall's short-decay trim (hidden)
+    // round 190ly: … and Epoch Verb Concert Hall's short-decay trim (hidden). Off in new Epochs at the 0.1.30 rollup step 10 (it
+    // was fitted without round 190kw's loop law); round 190mb refitted it on top of the loop law, so it is on again since step
+    // 11 — ValhallaVintageVerb's refcap030 bank against step 10: mode 2.74 → 3.02 (27 up / 0 down), pairs 3.89 → 3.78 and
+    // sr48 = (3 files one step down), sr96 3.70 → 3.75
+    if (kind == EffectKind::epochVerb)
         slot.params[(std::size_t) verbs::epoch::shortTrim] = 1.0f;
     if (kind == EffectKind::epochVerb) // round 190kw: … and Epoch's level the reference's loop law (hidden)
         slot.params[(std::size_t) verbs::epoch::loopLaw] = 1.0f;
