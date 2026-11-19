@@ -102,6 +102,7 @@
 #include "ui/Icons.h"
 #include "ui/SimpleLook.h"
 #include "core/LoopAnalysis.h" // round 190kx
+#include "core/TrackClips.h" // round 190ne
 #include "ui/LoopInfo.h"
 
 #include <map>
@@ -2294,6 +2295,14 @@ void PlaylistComponent::paint (juce::Graphics& g)
             veilIfMuted (c, r);
             if (! liveLook || selected) // (Live: no outline around a clip; the selection keeps LYNX's)
                 paintClipOutline (g, r, base, selected, liveLook ? false : current);
+            // round 190ne (core/TrackClips.h): a track clip other clips share (a linked copy): a link at the name strip's end
+            if (song.patterns[(std::size_t) c.pattern].trackClip && r.getWidth() >= 44.0f && trackClipUseCount (c.pattern) > 1)
+            {
+                const auto title = juce::jmin (clipHeaderHeight (r), 14.0f);
+                if (title >= 8.0f)
+                    icons::draw (g, Icon::link, juce::Rectangle<float> (r.getRight() - title - 2.0f, r.getY() + 1.0f, title - 1.0f, title - 1.0f).reduced (1.0f),
+                                 (liveLook ? liveLook->content : simpleLook ? simpleLook->content : clipTitleText (base)).withAlpha (0.85f));
+            }
         }
 
         {
@@ -2961,6 +2970,18 @@ void PlaylistComponent::paint (juce::Graphics& g)
                     textcache::drawText (g, "+A", plus, juce::Justification::centred);
                     textRight = juce::jmin (textRight, (float) plus.getX());
                 }
+                // round 190ne (core/TrackClips.h, LYNX's own marks): a track whose clips own their notes (a note) and a bus
+                // track (lines joining into one), on a small plate left of the name's end
+                if (trackHeight >= 14 && textRight - (float) textLeft > 52.0f)
+                    if (const auto mark = trackclips::owns (song, t) ? Icon::note : trackclips::isBusTrack (song, t) ? Icon::blend : Icon::none; mark != Icon::none)
+                    {
+                        const auto size = (float) juce::jmin (14, trackHeight - 4);
+                        const auto box = juce::Rectangle<float> (textRight - size - 2.0f, (float) led.getCentreY() - size * 0.5f, size, size);
+                        g.setColour ((mark == Icon::note ? colour::accent : colour::textSecondary).withAlpha (muted ? 0.12f : 0.24f));
+                        g.fillRoundedRectangle (box, radius::sm);
+                        icons::draw (g, mark, box.reduced (2.0f), muted ? colour::textDisabled : colour::textPrimary.withAlpha (0.9f));
+                        textRight = box.getX() - 2.0f;
+                    }
                 const auto flTall = fl && trackHeight >= flTallHeader;
                 if (fl)
                 {
@@ -6645,6 +6666,8 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
 
         // Shift+V held: the copies get their own pattern / automation (FL's "make unique" while cloning)
         const auto unique = juce::KeyPress::isKeyCurrentlyDown ('V') || juce::KeyPress::isKeyCurrentlyDown ('v');
+        // round 190ne (core/TrackClips.h): a copy of a track clip is unique by default; Shift+L+drag makes a linked one
+        const auto linked = juce::KeyPress::isKeyCurrentlyDown ('L') || juce::KeyPress::isKeyCurrentlyDown ('l');
 
         engine.editSong ([&] (Song& s) {
             for (const auto& c : copies)
@@ -6655,11 +6678,12 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
 
             if (unique)
                 polish::makeClipsUnique (s, added);
+            else if (! linked)
+                trackclips::makeCopiesUnique (s, added);
         });
 
-        if (unique)
-            for (std::size_t j = 0; j < added.size(); ++j)
-                copies[j] = engine.getSong().playlist[(std::size_t) added[j]];
+        for (std::size_t j = 0; j < added.size(); ++j) // (the copies' own patterns, when they got some)
+            copies[j] = engine.getSong().playlist[(std::size_t) added[j]];
         setSelection (added);
         dragIndices = added;
         dragOriginals = copies;
@@ -6736,6 +6760,40 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
 
     // paints what is chosen in the Picker (the current pattern, an audio clip or an automation clip)
     setSelection ({});
+    // round 190ne (core/TrackClips.h): on a track whose clips own their notes the pencil and the brush draw a NEW empty
+    // clip of the track (Live / Bitwig), one bar long or as long as the last one drawn or resized there
+    if (const auto track = yToTrack (e.y); brush.kind == ClipKind::pattern && trackclips::owns (engine.getSong(), track))
+    {
+        const auto at = juce::jmax<std::int64_t> (0, snap (xToTick (e.x), snapOn));
+        const auto length = lastTrackClipLength > 0 ? lastTrackClipLength : engine.getSong().barTicks();
+        Clip c;
+        engine.editSong ([&c, track, at, length] (Song& s) {
+            c.kind = ClipKind::pattern;
+            c.pattern = trackclips::newClip (s, track, length);
+            c.track = track;
+            c.start = at;
+            c.length = length;
+            s.playlist.push_back (c);
+            s.currentPattern = c.pattern;
+            s.mode = PlayMode::song; // someone arranging wants to hear the song
+        });
+        engine.setSelectedChannel (engine.getSong().playlistTracks[(std::size_t) track].channel); // its piano roll is the channel's
+        brush.index = -1;
+        brush.picked.reset();
+        dragClip = (int) engine.getSong().playlist.size() - 1;
+        dragIndices = { dragClip };
+        dragOriginals = { c };
+        grabOffset = 0;
+        if (tool == EditTool::brush)
+        {
+            drag = Drag::paint;
+            paintClip = c;
+            nextPaintTick = c.end();
+            return;
+        }
+        drag = Drag::move;
+        return;
+    }
     // an instrument track places its own pattern (FL: named after the channel, made on the first click; round 151)
     if (const auto track = yToTrack (e.y); brush.kind == ClipKind::pattern && track >= 0 && track < (int) engine.getSong().playlistTracks.size()
                                            && engine.getSong().playlistTracks[(std::size_t) track].mode == PlaylistTrackMode::instrument)
@@ -7321,7 +7379,10 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
                     continue;
                 if (noteedit::paintWouldStack (engine.getSong().playlist, c))
                     continue; // (FL: no copy over a clip of the same source, round 169d)
-                engine.editSong ([c] (Song& s) { s.playlist.push_back (c); });
+                engine.editSong ([c] (Song& s) {
+                    s.playlist.push_back (c);
+                    trackclips::makeCopiesUnique (s, std::vector<int> { (int) s.playlist.size() - 1 }); // (round 190ne: a track clip's copy is its own)
+                });
             }
             return;
         }
@@ -7920,7 +7981,13 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
         sortClips (painted);
     }
     else if (drag == Drag::resize || drag == Drag::trimLeft || drag == Drag::timeMove || drag == Drag::regionLoop)
+    {
+        // round 190ne: the pencil draws the next clip of an own-clips track as long as the one resized there last
+        if (const auto& song = engine.getSong(); drag == Drag::resize && dragClip >= 0 && dragClip < (int) song.playlist.size())
+            if (const auto& c = song.playlist[(std::size_t) dragClip]; c.kind == ClipKind::pattern && trackclips::owns (song, c.track) && c.length > 0)
+                lastTrackClipLength = c.length;
         sortClips();
+    }
 
     rippleOriginals.clear();
     timeMoveOriginals.clear();
@@ -8377,22 +8444,38 @@ void PlaylistComponent::timeCommand (int which)
         if (timeClipboard.length <= 0)
             return;
         setSelection ({});
-        engine.editSong ([at = time ? from : snap ((double) songPositionTick(), true), clip = timeClipboard] (Song& s) { arrange::pasteTime (s, at, clip); });
+        engine.editSong ([at = time ? from : snap ((double) songPositionTick(), true), clip = timeClipboard, carried = timePatterns] (Song& s) mutable {
+            trackclips::materialize (s, clip.clips, carried); // (round 190ne: pasted track clips are unique copies)
+            arrange::pasteTime (s, at, clip);
+        });
     }
     else if (! time)
         return;
     else if (which == 2)
+    {
         timeClipboard = arrange::copyTime (song, from, to);
+        timePatterns = trackclips::carry (song, timeClipboard.clips);
+    }
     else if (which == 4)
         engine.editSong ([from, to, clips = selection] (Song& s) { arrange::cropClips (s, clips, from, to); });
     else
     {
         setSelection ({});
         if (which == 1)
+        {
             timeClipboard = arrange::copyTime (song, from, to);
+            timePatterns = trackclips::carry (song, timeClipboard.clips);
+        }
         engine.editSong ([from, to, which] (Song& s) {
             if (which == 0)
+            {
+                const auto before = s.playlist.size();
                 arrange::duplicateTime (s, from, to);
+                std::vector<int> copies; // (round 190ne: the copies of track clips are unique)
+                for (auto i = before; i < s.playlist.size(); ++i)
+                    copies.push_back ((int) i);
+                trackclips::makeCopiesUnique (s, copies);
+            }
             else
             {
                 arrange::deleteTime (s, from, to);
@@ -8629,6 +8712,8 @@ juce::PopupMenu PlaylistComponent::editMenu()
     m.addItem (tr ("Copy") + "\tCtrl+C", any, false, [this] { copySelection(); });
     m.addItem (tr ("Paste") + "\tCtrl+V", ! clipboard.empty(), false, [this] { pasteClips(); });
     m.addItem (tr ("Duplicate") + "\tCtrl+B", any || time, false, [this] { duplicateSelection(); });
+    // round 190ne (core/TrackClips.h): copies that keep sharing the clip's notes (only track clips differ from Duplicate)
+    m.addItem (tr ("Duplicate as linked copies") + key ("playlist.duplicateLinked"), any || time, false, [this] { duplicateSelection (true); });
     m.addItem (tr ("Delete") + "\tDel", any, false, [this] { if (ripple) rippleDeleteSelection(); else deleteSelection(); });
     m.addSeparator();
     m.addItem (tr ("Shift left") + key ("playlist.shiftLeft"), [this] { runAction ("playlist.shiftLeft"); });
@@ -9945,6 +10030,33 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         menu.addItem (tr ("Lock to content"), true, info.lockedToContent, [this, tracks = tracksForMenu (track)] {
             engine.editSong ([tracks] (Song& s) { pltracks::toggleLockToContent (s, tracks); });
         });
+        // round 190ne (LYNX extra, core/TrackClips.h): an instrument track whose clips own their notes; the selected
+        // instrument tracks follow this one's new state, one undo step
+        menu.addItem (tr ("Clips own their notes"), info.mode == PlaylistTrackMode::instrument, info.ownClips && info.mode == PlaylistTrackMode::instrument,
+                      [this, on = ! info.ownClips, tracks = tracksForMenu (track)] {
+                          engine.editSong ([tracks, on] (Song& s) {
+                              for (const auto t : tracks)
+                                  if (t >= 0 && t < (int) s.playlistTracks.size() && s.playlistTracks[(std::size_t) t].mode == PlaylistTrackMode::instrument)
+                                      trackclips::setOwnClips (s, t, on);
+                          });
+                      });
+        // round 190ne: a bus track (an audio track whose insert other inserts send into) shows its insert's volume and
+        // pan as lanes under its header (round 177b's lanes; LYNX extra)
+        if (trackclips::isBusTrack (song, track))
+            menu.addItem (tr ("Show the bus insert's volume and pan lanes"), [this, track, insert = info.mixerTrack] {
+                for (const auto kind : { AutomationTargetKind::mixerVolume, AutomationTargetKind::mixerPan })
+                {
+                    const AutomationTarget target { kind, insert, 0, 0 };
+                    const auto& song = engine.getSong();
+                    const auto& lanes = song.playlistTracks[(std::size_t) track].lanes;
+                    if (std::none_of (lanes.begin(), lanes.end(), [&song, &target] (const AutomationLane& l) {
+                            return l.automation >= 0 && l.automation < (int) song.automations.size() && song.automations[(std::size_t) l.automation].target == target;
+                        }))
+                        createAutomationLane (engine, target, track);
+                }
+                if (! autolanes::shown())
+                    toggleAutomationLanes();
+            });
         auto muteAll = [this, track] (bool mute) {
             engine.editSong ([track, mute] (Song& s) {
                 for (auto& c : s.playlist)
@@ -10966,9 +11078,17 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
     }
 
     if (clip.kind == ClipKind::pattern)
+    {
         menu.addItem (tr ("Make unique") + "\tShift+V+drag", [this, targets] {
             engine.editSong ([targets] (Song& s) { polish::makeClipsUnique (s, targets); });
         });
+        // round 190ne (core/TrackClips.h): a track clip's copies are unique; this one keeps sharing its notes
+        if (trackclips::isTrackClip (song, clip.pattern))
+            menu.addItem (tr ("Make linked copy") + "\tCtrl+Alt+B", [this, targets] {
+                setSelection (targets);
+                duplicateSelection (true);
+            });
+    }
     else if (clip.kind == ClipKind::automation)
     {
         // FL's "Articulator tools" (capture 190mk A5: after Channel settings, before Make unique; round 190mk, DE-115)
@@ -12169,6 +12289,7 @@ bool PlaylistComponent::runAction (const std::string& id)
             engine.editSong ([factor = is ("playlist.loopHalve") ? 0.5 : 2.0] (Song& s) { arrange::scaleLoop (s, factor); }, false);
     }
     else if (is ("playlist.duplicateTime")) timeCommand (0);
+    else if (is ("playlist.duplicateLinked")) duplicateSelection (true); // (round 190ne)
     else if (is ("playlist.cutTime")) timeCommand (1);
     else if (is ("playlist.copyTime")) timeCommand (2);
     else if (is ("playlist.pasteTime")) timeCommand (3);
@@ -12820,6 +12941,8 @@ void PlaylistComponent::copySelection()
 
     for (auto i : selection)
         clipboard.push_back (engine.getSong().playlist[(std::size_t) i]);
+    // round 190ne: the track clips travel with the clipboard (a cut deletes a track clip with its last clip)
+    clipboardPatterns = trackclips::carry (engine.getSong(), clipboard);
 }
 
 void PlaylistComponent::pasteClips (std::int64_t at)
@@ -12851,7 +12974,9 @@ void PlaylistComponent::pasteClips (std::int64_t at)
     std::vector<int> added;
 
     engine.editSong ([&added, target, first] (Song& s) {
-        for (auto c : clipboard)
+        auto pasted = clipboard;
+        trackclips::materialize (s, pasted, clipboardPatterns); // (round 190ne: a pasted track clip is a unique copy)
+        for (auto c : pasted)
         {
             if (c.kind == ClipKind::pattern && c.pattern >= (int) s.patterns.size())
                 continue;
@@ -12869,7 +12994,7 @@ void PlaylistComponent::pasteClips (std::int64_t at)
     sortClips (added);
 }
 
-void PlaylistComponent::duplicateSelection()
+void PlaylistComponent::duplicateSelection (bool linked)
 {
     const auto& song = engine.getSong();
 
@@ -12887,6 +13012,8 @@ void PlaylistComponent::duplicateSelection()
         std::vector<int> added;
         engine.editSong ([&] (Song& s) {
             added = noteedit::repeatTime (s.playlist, from, to, sources);
+            if (! linked) // (round 190ne: copies of track clips are unique unless asked for linked ones)
+                trackclips::makeCopiesUnique (s, added);
             s.loopStart = to;
             s.loopEnd = to + (to - from);
         });
@@ -12911,7 +13038,7 @@ void PlaylistComponent::duplicateSelection()
     const auto source = selection;
     std::vector<int> added;
 
-    engine.editSong ([&added, &source, offset] (Song& s) {
+    engine.editSong ([&added, &source, offset, linked] (Song& s) {
         for (auto i : source)
         {
             auto c = s.playlist[(std::size_t) i];
@@ -12919,6 +13046,8 @@ void PlaylistComponent::duplicateSelection()
             added.push_back ((int) s.playlist.size());
             s.playlist.push_back (c);
         }
+        if (! linked) // (round 190ne: copies of track clips are unique unless asked for linked ones)
+            trackclips::makeCopiesUnique (s, added);
     });
     setSelection (added);
     sortClips (added);
@@ -13021,9 +13150,9 @@ bool PlaylistComponent::handleKey (const juce::KeyPress& key)
         return true;
     }
 
-    if (cmd && ! mods.isShiftDown() && letter == 'B') // (Ctrl+Shift+B: playlist.cloneTracks)
+    if (cmd && ! mods.isShiftDown() && letter == 'B') // (Ctrl+Shift+B: playlist.cloneTracks; Ctrl+Alt+B: linked copies, round 190ne)
     {
-        duplicateSelection();
+        duplicateSelection (mods.isAltDown());
         return true;
     }
 
@@ -13152,6 +13281,17 @@ juce::Rectangle<int> PlaylistComponent::clipMenuButton (int index) const
         return {};
 
     return { r.getX() + 2, r.getY() + 1, 13, (int) clipTitleHeight - 2 };
+}
+
+int PlaylistComponent::trackClipUseCount (int pattern) const
+{
+    // round 190ne: how many clips play a track clip (core/TrackClips.h uses()), counted once per published song
+    if (const auto stamp = engine.getPublishCount(); stamp != trackClipUsesStamp)
+    {
+        trackClipUsesStamp = stamp;
+        trackClipUses = trackclips::count (engine.getSong()) > 0 ? trackclips::uses (engine.getSong()) : std::vector<int> {};
+    }
+    return pattern >= 0 && pattern < (int) trackClipUses.size() ? trackClipUses[(std::size_t) pattern] : 0;
 }
 
 PlaylistComponent::Hover PlaylistComponent::hoverAt (juce::Point<int> p) const
@@ -13445,8 +13585,15 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
         if (h.led && h.track < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) h.track].soloLock) // round 190ld
             hint.value << "  " << tr ("(state locked)");
         if (const auto mode = trackmodes::describe (song, h.track); ! mode.empty()) // FL's "(Instrument track)" / "(Audio track, ...)"
+        {
             hint.value += " " + (mode.rfind ("(Audio", 0) == 0 ? tr ("(Audio track, linked to mixer track {0})", { juce::String (song.playlistTracks[(std::size_t) h.track].mixerTrack) })
                                                                  : tr ("(Instrument track)"));
+            // round 190ne (core/TrackClips.h): LYNX's own track clips and bus tracks
+            if (trackclips::owns (song, h.track))
+                hint.value += " " + tr ("(its clips own their notes: the pencil draws a new clip, copies are unique)");
+            else if (const auto sources = trackclips::busSources (song, h.track); sources > 0)
+                hint.value += " " + tr ("(bus: {0} mixer track(s) send into it; \"+A\" adds its volume and pan lanes)", { juce::String (sources) });
+        }
         else if (linkedHeaders()) // issue #170 (round 190ib): a track that only repeats a track above it
             if (const auto repeats = autolink::repeatedTracks (song); h.track >= 0 && h.track < (int) repeats.size() && repeats[(std::size_t) h.track] >= 0)
                 hint.value += " " + tr ("(repeats Track {0}'s instruments: plays through insert {0})", { juce::String (repeats[(std::size_t) h.track] + 1) });
@@ -13485,6 +13632,8 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
     {
         if (projection.isChild (h.track))
             hint.text = tr ("Automation lane: [LMB] song position  [LMB] drag: select  (its clips: drag left / right)");
+        else if (trackclips::owns (song, h.track) && brush.kind == ClipKind::pattern) // round 190ne
+            hint.text = tr ("Track clips: [LMB] draw a new empty clip  [Shift] drag a clip: a unique copy  [Shift+L] drag: a linked copy  [Ctrl+Alt+B] linked copies");
         else if (pointerclick::on)
             hint.text = tr ("Pointer click: [LMB] song position and deselect  [LMB] drag: select  [2xLMB] place the clip");
     }
@@ -15229,9 +15378,10 @@ void PatternPicker::setPlayingPatterns (std::vector<int> now)
     playingPatterns = std::move (now);
     if (view != 0)
         return;
-    for (const auto p : changed)
-        if (const auto y = headerHeight + (p - scroll) * rowHeight; p >= scroll && y < listBottom())
-            repaint (0, y, getWidth(), rowHeight);
+    for (const auto p : changed) // (round 190ne: a pattern's row is found in the list: track clips sit in their group)
+        if (const auto row = listRowOfPattern (p); row >= scroll)
+            if (const auto y = headerHeight + (row - scroll) * rowHeight; y < listBottom())
+                repaint (0, y, getWidth(), rowHeight);
 }
 
 void PatternPicker::changeListenerCallback (juce::ChangeBroadcaster*)
@@ -15253,15 +15403,53 @@ void PatternPicker::setView (int newView)
     repaint();
 }
 
-std::vector<PatternPicker::Row> PatternPicker::rows() const
+const std::vector<PatternPicker::Row>& PatternPicker::rows() const
 {
     const auto& song = engine.getSong();
-    std::vector<Row> list;
+    // round 190ne: built once per published song (and view, group state, clip look), not at every paint and mouse move
+    const auto key = view | (trackClipsOpen ? 4 : 0) | (flClipLook() ? 8 : 0);
+    if (engine.getPublishCount() == rowCacheStamp && key == rowCacheKey)
+        return rowCache;
+    rowCacheStamp = engine.getPublishCount();
+    rowCacheKey = key;
+    auto& list = rowCache;
+    list.clear();
 
     if (view == 0)
+    {
+        // FL's list: every ordinary pattern; then (round 190ne, core/TrackClips.h) the track clips in a folded group, by
+        // track. Without track clips the list is exactly FL's.
+        int trackClips = 0;
         for (int i = 0; i < (int) song.patterns.size(); ++i)
-            list.push_back ({ ClipKind::pattern, i, juce::String::fromUTF8 (song.patterns[(std::size_t) i].name.c_str()),
-                              PlaylistComponent::patternColour (song, i) });
+            if (song.patterns[(std::size_t) i].trackClip)
+                ++trackClips;
+            else
+                list.push_back ({ ClipKind::pattern, i, juce::String::fromUTF8 (song.patterns[(std::size_t) i].name.c_str()),
+                                  PlaylistComponent::patternColour (song, i) });
+        if (trackClips > 0)
+        {
+            list.push_back ({ ClipKind::pattern, -1, tr ("Track clips ({0})", { juce::String (trackClips) }), juce::Colour(), true });
+            if (trackClipsOpen)
+            {
+                const auto owners = trackclips::ownerTracks (song);
+                const auto uses = trackclips::uses (song);
+                std::vector<int> order;
+                for (int i = 0; i < (int) song.patterns.size(); ++i)
+                    if (song.patterns[(std::size_t) i].trackClip)
+                        order.push_back (i);
+                std::stable_sort (order.begin(), order.end(), [&owners] (int a, int b) {
+                    return (unsigned) owners[(std::size_t) a] < (unsigned) owners[(std::size_t) b]; // (by track; unused last)
+                });
+                for (const auto i : order)
+                {
+                    Row row { ClipKind::pattern, i, juce::String::fromUTF8 (song.patterns[(std::size_t) i].name.c_str()), PlaylistComponent::patternColour (song, i) };
+                    row.trackClip = true;
+                    row.uses = uses[(std::size_t) i];
+                    list.push_back (std::move (row));
+                }
+            }
+        }
+    }
 
     if (view == 1)
         for (int c = 0; c < (int) song.channels.size(); ++c)
@@ -15293,6 +15481,13 @@ juce::Rectangle<int> PatternPicker::addBounds() const
     return view == 0 ? juce::Rectangle<int> (4, getHeight() - footerHeight + 2, getWidth() - 8, footerHeight - 4) : juce::Rectangle<int>();
 }
 
+juce::Rectangle<int> PatternPicker::groupSwitchBounds (int listRow) const
+{
+    // the group row's "shown" switch, at its right end
+    const auto y = headerHeight + (listRow - scroll) * rowHeight;
+    return { getWidth() - 4 - 46, y + 6, 42, rowHeight - 12 };
+}
+
 int PatternPicker::rowAt (int y) const
 {
     if (y < headerHeight || y >= listBottom())
@@ -15305,7 +15500,7 @@ int PatternPicker::rowAt (int y) const
 void PatternPicker::paint (juce::Graphics& g)
 {
     const auto& song = engine.getSong();
-    const auto list = rows();
+    const auto& list = rows();
     using namespace theme;
     g.fillAll (colour::bg2);
     g.setColour (colour::bg3);
@@ -15338,7 +15533,35 @@ void PatternPicker::paint (juce::Graphics& g)
                 break;
 
             const auto& row = list[(std::size_t) i];
-            const auto r = juce::Rectangle<int> (4, y + 2, getWidth() - 8, rowHeight - 4);
+            if (row.group) // round 190ne: the track clips' group row (LYNX's own: a fold arrow, its name, the "shown" switch)
+            {
+                const auto band = juce::Rectangle<int> (4, y + 3, getWidth() - 8, rowHeight - 6).toFloat();
+                g.setColour (i == hoverRow ? colour::bg4 : colour::bg3);
+                g.fillRoundedRectangle (band, radius::sm);
+                const auto a = juce::Rectangle<float> (band.getX() + 6.0f, band.getCentreY() - 4.0f, 8.0f, 8.0f);
+                juce::Path tri;
+                if (trackClipsOpen) // open: points down
+                    tri.addTriangle (a.getX(), a.getY() + 1.5f, a.getRight(), a.getY() + 1.5f, a.getCentreX(), a.getBottom() - 1.5f);
+                else
+                    tri.addTriangle (a.getX() + 1.5f, a.getY(), a.getX() + 1.5f, a.getBottom(), a.getRight() - 1.5f, a.getCentreY());
+                g.setColour (colour::textSecondary);
+                g.fillPath (tri);
+                const auto toggle = groupSwitchBounds (i);
+                const auto shown = trackclips::shownInSelector();
+                g.setColour (shown ? colour::accent.withAlpha (0.35f) : colour::bg2);
+                g.fillRoundedRectangle (toggle.toFloat(), radius::sm);
+                g.setColour (shown ? colour::accent : colour::border);
+                g.drawRoundedRectangle (toggle.toFloat().reduced (0.5f), radius::sm, 1.0f);
+                g.setColour (shown ? colour::textPrimary : colour::textSecondary);
+                g.setFont (font (type::caption, shown));
+                textcache::drawText (g, tr ("shown"), toggle, juce::Justification::centred, true);
+                g.setColour (colour::textPrimary);
+                g.setFont (font (type::small, true));
+                textcache::drawText (g, row.name, juce::Rectangle<int> ((int) a.getRight() + 5, y + 2, toggle.getX() - (int) a.getRight() - 8, rowHeight - 4),
+                                     juce::Justification::centredLeft, true);
+                continue;
+            }
+            const auto r = juce::Rectangle<int> (row.trackClip ? 12 : 4, y + 2, getWidth() - (row.trackClip ? 16 : 8), rowHeight - 4);
             const auto current = row.kind == ClipKind::pattern ? (playlist.brush.kind == ClipKind::pattern && row.index == song.currentPattern)
                                                                : (playlist.brush.kind == row.kind && playlist.brush.index == row.index);
             const auto rowColour = tame (row.colour);
@@ -15404,7 +15627,13 @@ void PatternPicker::paint (juce::Graphics& g)
 
             g.setColour (flClipLook() ? flHeaderInk (fill) : clipTitleText (fill));
             g.setFont (font (type::small, current));
-            textcache::drawText (g, row.name, r.withTrimmedLeft (9).withTrimmedRight (4), juce::Justification::centredLeft, true);
+            auto text = r.withTrimmedLeft (9).withTrimmedRight (4);
+            if (row.trackClip && row.uses > 1) // round 190ne: linked copies, "x2" (the Playlist marks them with a link)
+            {
+                const auto count = juce::String::fromUTF8 ("\xc3\x97") + juce::String (row.uses);
+                textcache::drawText (g, count, text.removeFromRight (22), juce::Justification::centredRight, false);
+            }
+            textcache::drawText (g, row.name, text, juce::Justification::centredLeft, true);
         }
     }
 
@@ -15445,6 +15674,24 @@ void PatternPicker::mouseDown (const juce::MouseEvent& e)
         return;
 
     const auto& row = list[(std::size_t) i];
+    if (row.group) // round 190ne: the group row folds / unfolds; its switch lists track clips in the pattern selector
+    {
+        if (groupSwitchBounds (i).contains (e.getPosition()))
+        {
+            trackclips::setShownInSelector (! trackclips::shownInSelector());
+            engine.sendChangeMessage(); // (the toolbar's pattern selector refills)
+            if (playlist.onViewOptionChanged)
+                playlist.onViewOptionChanged(); // (an app setting: saved now)
+        }
+        else
+        {
+            trackClipsOpen = ! trackClipsOpen;
+            const auto visible = juce::jmax (1, (listBottom() - headerHeight) / rowHeight);
+            scroll = juce::jlimit (0, juce::jmax (0, (int) rows().size() - visible), scroll);
+        }
+        repaint();
+        return;
+    }
     // FL's Alt+right-hold on a pattern (round 190mp, DE-134; capture 190mp A6, fl-pl-picker-preview.png): the entry is
     // selected, the pattern becomes the current one, the transport switches to pattern mode and plays it from its start
     // while the button is held; no menu. The release stops it and puts SONG mode back (mouseUp).
@@ -15654,7 +15901,7 @@ void PatternPicker::mouseUp (const juce::MouseEvent& e)
     }
     pressedRow = -1;
     const auto list = rows();
-    if (i >= (int) list.size() || list[(std::size_t) i].kind != ClipKind::pattern)
+    if (i >= (int) list.size() || list[(std::size_t) i].kind != ClipKind::pattern || list[(std::size_t) i].group)
         return;
     pickersel::leftUp (picked, list[(std::size_t) i].index, flmods::ctrl (e.mods), e.mods.isShiftDown(), deselectOnUp);
     deselectOnUp = false;
@@ -15673,7 +15920,7 @@ void PatternPicker::mouseDoubleClick (const juce::MouseEvent& e)
     const auto list = rows();
     const auto i = rowAt (e.y);
 
-    if (i >= 0 && list[(std::size_t) i].kind == ClipKind::pattern && onOpenPattern)
+    if (i >= 0 && list[(std::size_t) i].kind == ClipKind::pattern && ! list[(std::size_t) i].group && onOpenPattern)
         onOpenPattern();
 }
 
@@ -15721,9 +15968,19 @@ ui::Hint PatternPicker::hintAt (juce::Point<int> p)
     }
 
     const auto list = rows();
+    if (const auto i = rowAt (p.y); i >= 0 && list[(std::size_t) i].group) // round 190ne
+    {
+        hint.value = list[(std::size_t) i].name;
+        hint.text = groupSwitchBounds (i).contains (p)
+                        ? tr ("Shown: [LMB] list the track clips in the pattern selector too (on / off)")
+                        : tr ("Track clips: the clips of tracks whose clips own their notes, kept out of the pattern list  [LMB] fold / unfold");
+        return hint;
+    }
     if (const auto i = rowAt (p.y); i >= 0)
     {
         hint.value = list[(std::size_t) i].name;
+        if (list[(std::size_t) i].trackClip && list[(std::size_t) i].uses > 1)
+            hint.value << "  " << tr ("({0} linked clips)", { juce::String (list[(std::size_t) i].uses) });
         hint.text = list[(std::size_t) i].kind == ClipKind::pattern
                         ? tr ("Pattern: [LMB] paint it with the pencil  [drag] place it on the Playlist (Shift on drop: one after another)  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu  [Alt+RMB] hold to hear it")
                         : tr ("Clip source: [LMB] paint it with the pencil  [drag] place it on the Playlist");

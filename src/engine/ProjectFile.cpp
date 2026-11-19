@@ -3077,6 +3077,8 @@ juce::String toJson (const Song& song, bool stampVersion)
         // the Channel Rack's looping (round 165f-rack): on, type, and the loop points [channel, setting]
         if (p.loopOn)
             o->setProperty ("loopOn", true);
+        if (p.trackClip) // round 190ne: a track clip (core/TrackClips.h); an older LYNX lists it as an ordinary pattern
+            o->setProperty ("trackClip", true);
         if (! p.loopStarterGenre.empty()) // FL's Loop Starter genre (round 168b)
             o->setProperty ("loopStarterGenre", str (p.loopStarterGenre));
         if (p.loopMode != RackLoopMode::steps)
@@ -3656,6 +3658,14 @@ juce::String toJson (const Song& song, bool stampVersion)
         if (! soloLocks.isEmpty())
             root->setProperty ("playlistTrackSoloLocks", soloLocks);
 
+        // "Clips own their notes" (round 190ne, core/TrackClips.h): the indices of the tracks with the switch on
+        juce::Array<juce::var> ownClips;
+        for (std::size_t i = 0; i < song.playlistTracks.size(); ++i)
+            if (song.playlistTracks[i].ownClips)
+                ownClips.add ((int) i);
+        if (! ownClips.isEmpty())
+            root->setProperty ("playlistOwnClips", ownClips);
+
         // automation lanes (round 177b): [track, folded 0/1, [automation, height], ...]
         juce::Array<juce::var> lanes;
         for (std::size_t i = 0; i < song.playlistTracks.size(); ++i)
@@ -3934,6 +3944,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
                 pattern.colour = 0xFF000000u | (std::uint32_t) p["colour"].toString().getHexValue32();
 
             pattern.loopOn = (bool) p.getProperty ("loopOn", false);
+            pattern.trackClip = (bool) p.getProperty ("trackClip", false); // (round 190ne)
             pattern.loopStarterGenre = p.getProperty ("loopStarterGenre", "").toString().toStdString();
             pattern.loopMode = (RackLoopMode) juce::jlimit (1, 3, (int) p.getProperty ("loopMode", 1));
             if (auto* loops = p["channelLoops"].getArray())
@@ -4504,6 +4515,16 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
                     song.playlistTracks.resize (index + 1);
                 song.playlistTracks[index].lockedToContent = (int) t[1] != 0;
                 song.playlistTracks[index].lockedHeight = juce::jlimit (-1000, 1000, (int) t[2]);
+            }
+
+    if (auto* ownClips = root["playlistOwnClips"].getArray()) // round 190ne
+        for (const auto& t : *ownClips)
+            if ((int) t >= 0 && (int) t < 500)
+            {
+                const auto index = (std::size_t) (int) t;
+                if (song.playlistTracks.size() <= index)
+                    song.playlistTracks.resize (index + 1);
+                song.playlistTracks[index].ownClips = true;
             }
 
     if (auto* soloLocks = root["playlistTrackSoloLocks"].getArray()) // round 190ld

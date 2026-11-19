@@ -11,6 +11,7 @@
 #include "core/KeyGuess.h"
 #include "core/EditorPolish.h"
 #include "core/FlpExport.h"
+#include "core/TrackClips.h"
 #include "core/Groove.h"
 #include "core/DrawMode.h"
 #include "core/SessionOps.h"
@@ -3098,6 +3099,14 @@ public:
         if (args.contains ("--playlistshot190jq"))
         {
             setApplicationReturnValue (runPlaylistShot190jq (args[args.indexOf ("--playlistshot190jq") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
+        // --trackclips190neshot <prefix> (round 190ne, 0.1.31: track clips): src/TrackClipsShot190ne.inc
+        if (args.contains ("--trackclips190neshot"))
+        {
+            setApplicationReturnValue (runTrackClipsShot190ne (args[args.indexOf ("--trackclips190neshot") + 1].unquoted()) ? 0 : 1);
             quit();
             return;
         }
@@ -7670,6 +7679,83 @@ private:
             const auto tiles = lynx::flTileCacheSelfTest();
             paintCachesResult = tiles == "OK" ? paintCachesResult + ", FL tiles exact at x1 / x2" : tiles;
         }
+        // round 190ne (0.1.31, core/TrackClips.h): track clips. A .lynx round trip keeps the flags and an older file opens
+        // unchanged; in a real engine a track clip goes with its last clip in the same undo step (Undo brings both back),
+        // ordinary patterns stay; the copy for 0.1.28 drops the flags with a loss line; an .flp export merges identical
+        // track clips.
+        juce::String trackclips190neResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            if (song.patterns.empty())
+                song.patterns.emplace_back().name = "Pattern 1";
+            lynx::ChannelDef synth;
+            synth.name = "Lead";
+            song.channels.push_back (synth);
+            const auto channel = (int) song.channels.size() - 1;
+            lynx::trackmodes::makeInstrumentTrack (song, 2, channel);
+            lynx::trackclips::setOwnClips (song, 2, true);
+            const auto a = lynx::trackclips::newClip (song, 2, 4 * lynx::ppq);
+            song.patterns[(std::size_t) a].notes.push_back ({});
+            song.patterns[(std::size_t) a].notes.back().channel = channel;
+            song.patterns[(std::size_t) a].notes.back().key = 60;
+            song.patterns[(std::size_t) a].notes.back().length = lynx::ppq;
+            const auto b = lynx::trackclips::newClip (song, 2, 4 * lynx::ppq);
+            song.patterns[(std::size_t) b].notes = song.patterns[(std::size_t) a].notes;
+            for (const auto p : { a, a, b })
+            {
+                lynx::Clip c;
+                c.pattern = p;
+                c.track = 2;
+                c.start = (std::int64_t) song.playlist.size() * 4 * lynx::ppq;
+                c.length = 4 * lynx::ppq;
+                song.playlist.push_back (c);
+            }
+            juce::String why;
+            const auto json = lynx::ProjectFile::toJson (song);
+            const auto back = lynx::ProjectFile::fromJson (json, why);
+            if (! back || back->patterns != song.patterns || back->playlistTracks.size() <= 2 || ! back->playlistTracks[2].ownClips
+                || ! back->patterns[(std::size_t) a].trackClip || back->playlist.size() != song.playlist.size())
+                trackclips190neResult = "ERROR round trip " + why;
+            // an older project (no flags): opens unchanged, nothing becomes a track clip
+            const auto plain = lynx::Song::makeDefault();
+            const auto plainJson = lynx::ProjectFile::toJson (plain);
+            if (trackclips190neResult == "OK" && (plainJson.contains ("trackClip") || plainJson.contains ("playlistOwnClips")))
+                trackclips190neResult = "ERROR flags written for a project without track clips";
+            if (const auto reread = lynx::ProjectFile::fromJson (plainJson, why); trackclips190neResult == "OK"
+                && (! reread || lynx::trackclips::count (*reread) != 0 || lynx::ProjectFile::toJson (*reread) != plainJson))
+                trackclips190neResult = "ERROR an older project changed";
+            // the copy for 0.1.28: no flags, one loss line
+            const auto copy = lynx::olderlynx::forRelease (song, "0.1.28");
+            const auto said = [&copy] (const char* text) {
+                return std::any_of (copy.lost.begin(), copy.lost.end(), [text] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).contains (text); });
+            };
+            if (trackclips190neResult == "OK" && (! copy.ok || copy.json.contains ("\"trackClip\"") || copy.json.contains ("playlistOwnClips") || ! said ("track clip(s) show as ordinary patterns")))
+                trackclips190neResult = "ERROR copy for 0.1.28";
+            // .flp export: clips a and b hold the same notes: one pattern in FL, every clip kept
+            lynx::flpexport::Report flpReport;
+            const auto flp = flp::parseProject (lynx::flpexport::exportFlp (song, {}, flpReport));
+            auto other = song; // (b with other notes: nothing to merge)
+            other.patterns[(std::size_t) b].notes.front().key += 1;
+            const auto flpOther = flp::parseProject (lynx::flpexport::exportFlp (other, {}, flpReport));
+            if (trackclips190neResult == "OK" && flp.patterns.size() + 1 != flpOther.patterns.size())
+                trackclips190neResult = "ERROR flp merge " + juce::String ((int) flp.patterns.size()) + " / " + juce::String ((int) flpOther.patterns.size());
+            // a real engine: delete the last clip of b -> b goes in the same undo step; Undo brings it back
+            lynx::AudioEngine e (false);
+            e.editSong ([&song] (lynx::Song& s) { s = song; });
+            const auto before = e.getSong().patterns.size();
+            e.editSong ([] (lynx::Song& s) { s.playlist.pop_back(); }); // (the only clip of b)
+            if (trackclips190neResult == "OK" && (e.getSong().patterns.size() + 1 != before || e.getSong().playlist.size() != 2))
+                trackclips190neResult = "ERROR auto-delete " + juce::String ((int) e.getSong().patterns.size());
+            e.undo();
+            if (trackclips190neResult == "OK" && (e.getSong().patterns.size() != before || e.getSong().playlist.size() != 3))
+                trackclips190neResult = "ERROR undo of the auto-delete";
+            // an ordinary pattern without clips stays (FL)
+            e.editSong ([] (lynx::Song& s) { s.patterns.emplace_back().name = "Kept"; });
+            e.editSong ([] (lynx::Song& s) { s.playlist.erase (s.playlist.begin()); }); // (a's first clip: a still has one)
+            if (trackclips190neResult == "OK" && (e.getSong().patterns.size() != before + 1 || e.getSong().patterns.back().name != "Kept"))
+                trackclips190neResult = "ERROR an ordinary pattern or a linked clip went";
+        }
+
         const auto motionOverlayResult = lynx::ui::MotionOverlay::selfTest(); // (round 190ip)
         // round 190bm (0.1.25 showed the Mixer and the Playlist black): their cached pictures shown on native and
         // software targets against straight paints (ui/PictureCheck.h; --picturetest runs more sizes and scales)
@@ -7709,7 +7795,7 @@ private:
                         && mixerBasics == "OK" && fontsResult == "OK" && paintCachesResult.startsWith ("OK") && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && takeoverOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && exportParity.startsWith ("OK") && exportLive.startsWith ("OK") && midiHotplug.startsWith ("OK") && midiOutPorts.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
-                        && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
+                        && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK")
@@ -7782,6 +7868,7 @@ private:
                << "livescr190dr=" << livescr190drResult << "\n"
                << "livewf190ef=" << livewf190efResult << "\n"
                << "livewf190em=" << livewf190emResult << "\n"
+               << "trackclips190ne=" << trackclips190neResult << "\n"
                << "midigen190fm_saved=" << midigen190fmResult << "\n"
                << "trackauto190gz_saved=" << trackauto190gzResult << "\n"
                << "clipenv190gi_saved=" << clipenv190giResult << "\n"
@@ -17299,6 +17386,7 @@ private:
 #include "IssuesShot190jz.inc" // round 190jz
 #include "IssuesShot190lw.inc" // round 190lw
 #include "IssuesShot190mq.inc" // round 190mq
+#include "TrackClipsShot190ne.inc" // round 190ne
 #include "DetailsShot190kn.inc" // round 190kn
 #include "DetailsShot190ld.inc" // round 190ld
 #include "DetailsShot190lr.inc" // round 190lr

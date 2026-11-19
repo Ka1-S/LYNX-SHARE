@@ -7,6 +7,7 @@
 #include "core/HarmorResynth.h"
 #include "core/BrowserSend.h" // round 190iz (FL's preview length)
 #include "core/LiveNote.h"
+#include "core/TrackClips.h"
 #include "core/TrackOnly.h" // round 190iu
 #include "core/VideoPlayer.h"
 #include "core/TempoMap.h"
@@ -3999,7 +4000,7 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
         modified = true;
     }
 
-    const auto lengthsBefore = patternLengths (song);
+    auto lengthsBefore = patternLengths (song);
     const auto auditioned = comp::auditionedTrack (song);
     const auto pluginsBefore = detachNewPluginsOn ? freshPluginCounts (song) : std::map<std::string, int>();
     // LYNX's "Link Playlist tracks to mixer tracks" (rounds 190gz, 190ib): each instrument's home track and the linked
@@ -4007,6 +4008,11 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
     const auto linkBefore = autolink::snapshot (song);
     const auto channelsBefore = song.channels.size(); // (round 190iu: Track-only mode, core/TrackOnly.h)
     edit (song);
+    // round 190ne (core/TrackClips.h): a track clip goes with its last clip, in this undo step (ordinary patterns stay, as in FL)
+    if (std::vector<int> collected; trackclips::collect (song, &collected) > 0)
+        for (auto it = collected.rbegin(); it != collected.rend(); ++it) // (followPatternLengths compares by index)
+            if (*it < (int) lengthsBefore.size())
+                lengthsBefore.erase (lengthsBefore.begin() + *it);
     song.keepOnePattern(); // (round 190ea: what follows, and every listener, may read the current pattern)
     if (trackonly::active() && song.channels.size() > channelsBefore) // each new instrument gets its own instrument track
         trackonly::follow (song, channelsBefore);

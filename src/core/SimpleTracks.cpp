@@ -1,4 +1,5 @@
 #include "core/SimpleTracks.h"
+#include "core/TrackClips.h"
 #include "core/SimplePads.h"
 
 #include <algorithm>
@@ -130,6 +131,7 @@ void placeInstrumentNotes (Song& song, int track, int channel, const std::string
         pattern.lengthTicks = (std::int64_t) request.emptyBars * song.barTicks();
     pattern.name = name;
     pattern.colour = colour;
+    pattern.trackClip = trackclips::owns (song, track); // (round 190ne: the track's own clip, core/TrackClips.h)
     for (auto& n : pattern.notes)
         n.channel = channel;
     pattern.sortNotes();
@@ -708,6 +710,7 @@ int ensurePattern (Song& song, int track, int bars, bool* made)
     pattern.name = ! t.name.empty() ? t.name : song.channels[(std::size_t) t.channel].name;
     pattern.colour = song.channels[(std::size_t) t.channel].colour;
     pattern.lengthTicks = (std::int64_t) std::max (1, bars) * song.barTicks();
+    pattern.trackClip = trackclips::owns (song, track); // (round 190ne)
     song.patterns.push_back (std::move (pattern));
     Clip clip;
     clip.kind = ClipKind::pattern;

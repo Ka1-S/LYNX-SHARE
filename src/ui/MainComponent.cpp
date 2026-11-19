@@ -142,6 +142,7 @@
 
 #include "core/HintMarkup.h"
 #include "core/SongStats.h"
+#include "core/TrackClips.h"
 
 #if JUCE_PLUGINHOST_VST3
 namespace juce
@@ -490,7 +491,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     gridBox.setScrollWheelEnabled (true);
     patternBox.onChange = [this]
     {
-        const auto index = patternBox.getSelectedItemIndex();
+        const auto index = patternBox.getSelectedId() - 1; // (round 190ne: ids are pattern indices + 1)
 
         if (index >= 0 && index != engine.getSong().currentPattern)
             selectPattern (index);
@@ -4614,8 +4615,7 @@ void MainComponent::stepPatternFromSelector (int delta)
 {
     // FL's selector goes on past the last pattern (rack ops stepPatternCreating: one new empty pattern at most)
     const auto& song = engine.getSong();
-    const auto last = (int) song.patterns.size() - 1;
-    if (delta > 0 && last >= 0 && song.currentPattern + delta > last && ! isPatternEmpty (song.patterns[(std::size_t) last]))
+    if (stepCreatesPattern (song, delta)) // (round 190ne: counted over the listed patterns, track clips left out)
         engine.editSong ([delta] (Song& s) { s.currentPattern = stepPatternCreating (s, delta); });
     else
         selectPattern (stepPattern (song, delta));
@@ -5795,10 +5795,16 @@ void MainComponent::refreshToolbar()
     const auto& song = engine.getSong();
     patternBox.clear (juce::dontSendNotification);
 
+    // (round 190ne: track clips stay out of the list unless the Picker's "shown" switch is on; an item's id is its
+    // pattern's index + 1, and a current track clip still shows its name)
     for (std::size_t i = 0; i < song.patterns.size(); ++i)
-        patternBox.addItem (juce::String::fromUTF8 (song.patterns[i].name.c_str()), (int) i + 1);
+        if (trackclips::listedInSelector (song, (int) i))
+            patternBox.addItem (juce::String::fromUTF8 (song.patterns[i].name.c_str()), (int) i + 1);
 
-    patternBox.setSelectedItemIndex (song.currentPattern, juce::dontSendNotification);
+    if (trackclips::listedInSelector (song, song.currentPattern))
+        patternBox.setSelectedId (song.currentPattern + 1, juce::dontSendNotification);
+    else
+        patternBox.setText (juce::String::fromUTF8 (song.activePattern().name.c_str()), juce::dontSendNotification);
     swingSlider.setValue (song.swing, juce::dontSendNotification);
     tempoDisplay.repaint();
     refreshModeButton();
@@ -5828,7 +5834,8 @@ void MainComponent::showRackPatternList()
     juce::PopupMenu menu;
 
     for (int i = 0; i < (int) song.patterns.size(); ++i)
-        menu.addItem (juce::String::fromUTF8 (song.patterns[(std::size_t) i].name.c_str()), true, i == song.currentPattern, [this, i] { selectPattern (i); });
+        if (trackclips::listedInSelector (song, i) || i == song.currentPattern) // (round 190ne: track clips only while shown)
+            menu.addItem (juce::String::fromUTF8 (song.patterns[(std::size_t) i].name.c_str()), true, i == song.currentPattern, [this, i] { selectPattern (i); });
 
     menu.addSeparator();
     menu.addItem (tr ("New pattern"), [this] { newPatternButton.onClick(); });
@@ -6294,10 +6301,22 @@ void MainComponent::changeListenerCallback (juce::ChangeBroadcaster*)
             if (const auto first = firstChannelWithNotes (song, song.currentPattern); first >= 0 && first != engine.getSelectedChannel())
                 engine.setSelectedChannel (first);
     }
-    bool namesChanged = patternBox.getNumItems() != (int) song.patterns.size();
-
-    for (int i = 0; ! namesChanged && i < patternBox.getNumItems(); ++i)
-        namesChanged = patternBox.getItemText (i) != juce::String::fromUTF8 (song.patterns[(std::size_t) i].name.c_str());
+    // (round 190ne: the box lists the patterns the selector shows, each item's id its pattern's index + 1)
+    bool namesChanged = false;
+    {
+        int item = 0;
+        for (int i = 0; ! namesChanged && i < (int) song.patterns.size(); ++i)
+            if (trackclips::listedInSelector (song, i))
+            {
+                namesChanged = item >= patternBox.getNumItems() || patternBox.getItemId (item) != i + 1
+                               || patternBox.getItemText (item) != juce::String::fromUTF8 (song.patterns[(std::size_t) i].name.c_str());
+                ++item;
+            }
+        namesChanged = namesChanged || item != patternBox.getNumItems();
+    }
+    const auto boxShowsCurrent = trackclips::listedInSelector (song, song.currentPattern)
+                                     ? patternBox.getSelectedId() == song.currentPattern + 1
+                                     : patternBox.getText() == juce::String::fromUTF8 (song.activePattern().name.c_str());
 
     refreshModeButton();
     tempoDisplay.repaint();
@@ -6317,7 +6336,7 @@ void MainComponent::changeListenerCallback (juce::ChangeBroadcaster*)
         fitChannelRack (false);
 
     refreshKeyPanel(); // (undo, another project; cheap: it repaints only on a change)
-    if (namesChanged || patternBox.getSelectedItemIndex() != song.currentPattern || std::abs (swingSlider.getValue() - song.swing) > 1e-6)
+    if (namesChanged || ! boxShowsCurrent || std::abs (swingSlider.getValue() - song.swing) > 1e-6)
         refreshToolbar();
     else
     {

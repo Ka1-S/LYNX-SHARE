@@ -1,5 +1,7 @@
 #include "ui/WorkflowExtras.h"
 
+#include "core/TrackClips.h"
+
 #include "core/LaneView.h"
 #include "core/LayoutStyle.h"
 #include "core/MidiDrop.h"
@@ -81,6 +83,8 @@ bool readUiOption (const juce::String& key, bool on)
         transportedit::setWGoesToStart (on);
     else if (key == "simpleLoopDetect") // round 190kx: Simple drops take the tempo and key found in the audio
         loopanalysis::dropDetects() = on;
+    else if (key == "trackClipsShown") // round 190ne: track clips listed in the pattern selector too (the Picker group's switch)
+        trackclips::setShownInSelector (on);
     else
         return false;
     return true;
@@ -103,7 +107,8 @@ juce::String uiOptionsText()
            + "\npointerClickButton=" + juce::String (pointerclick::buttonShown ? 1 : 0) + "\npointerClick=" + juce::String (pointerclick::on ? 1 : 0)
            + "\nclipLanesPattern=" + juce::String (cliplanes::patternOn ? 1 : 0) + "\nclipLanesLive=" + juce::String (cliplanes::liveOn ? 1 : 0)
            + "\nwToStart=" + juce::String (transportedit::wGoesToStart() ? 1 : 0) // (round 190jz, issue #195)
-           + "\nsimpleLoopDetect=" + juce::String (loopanalysis::dropDetects().load() ? 1 : 0); // (round 190kx)
+           + "\nsimpleLoopDetect=" + juce::String (loopanalysis::dropDetects().load() ? 1 : 0) // (round 190kx)
+           + "\ntrackClipsShown=" + juce::String (trackclips::shownInSelector() ? 1 : 0); // (round 190ne)
 }
 
 std::optional<bool> extraOn (std::string_view id)

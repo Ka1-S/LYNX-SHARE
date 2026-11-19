@@ -1,4 +1,5 @@
 #include "core/AlsImport.h"
+#include "core/TrackClips.h"
 #include "core/ClipEnvelope.h"
 #include "core/AlsDevices.h"
 #include "core/Braid.h"
@@ -3692,6 +3693,12 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
     }
 
     std::stable_sort (song.playlist.begin(), song.playlist.end(), [] (const Clip& a, const Clip& b) { return a.start < b.start; });
+    // round 190ne (core/TrackClips.h): Live's MIDI tracks own their clips, so each MIDI track is an instrument track with
+    // "Clips own their notes" on and its clips are track clips: the pattern list stays clean after an import, in every
+    // layout (each Live clip is its own pattern, as before)
+    for (int t = 0; t < (int) song.playlistTracks.size(); ++t)
+        if (song.playlistTracks[(std::size_t) t].mode == PlaylistTrackMode::instrument)
+            trackclips::setOwnClips (song, t, true);
     if (song.patterns.empty())
     {
         Pattern first;

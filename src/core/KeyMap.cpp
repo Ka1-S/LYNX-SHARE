@@ -412,6 +412,8 @@ std::vector<Action> makeActions()
         { "playlist.loopHalve", TR_NOOP ("Halve the time selection"), Context::playlist, {} },
         { "playlist.loopDouble", TR_NOOP ("Double the time selection"), Context::playlist, {} },
         { "playlist.duplicateTime", TR_NOOP ("Duplicate time"), Context::playlist, {} },
+        // round 190ne (core/TrackClips.h): Bitwig's "Duplicate as Alias" (Ctrl+Alt+D) on FL's Duplicate key
+        { "playlist.duplicateLinked", TR_NOOP ("Duplicate the selected clips as linked copies (track clips share their notes)"), Context::playlist, { chord ('B', ctrl | alt) } },
         { "playlist.cutTime", TR_NOOP ("Cut time"), Context::playlist, {} },
         { "playlist.copyTime", TR_NOOP ("Copy time"), Context::playlist, {} },
         { "playlist.pasteTime", TR_NOOP ("Paste time"), Context::playlist, {} },

@@ -1,4 +1,5 @@
 #include "core/RackOps.h"
+#include "core/TrackClips.h"
 
 #include "core/MidiControls.h"
 #include "core/PatternBlocks.h"
@@ -47,7 +48,8 @@ int stepPattern (const Song& song, int delta) noexcept
     if (song.patterns.empty())
         return 0;
 
-    return std::clamp (song.currentPattern + delta, 0, (int) song.patterns.size() - 1);
+    // (round 190ne: over the patterns the selector lists; track clips only while the Picker shows them there)
+    return trackclips::stepListed (song, delta);
 }
 
 int findNextEmptyPattern (const Song& song, int from) noexcept
@@ -58,7 +60,7 @@ int findNextEmptyPattern (const Song& song, int from) noexcept
     {
         const auto index = ((from + i) % count + count) % count;
 
-        if (isPatternEmpty (song.patterns[(std::size_t) index]))
+        if (isPatternEmpty (song.patterns[(std::size_t) index]) && ! song.patterns[(std::size_t) index].trackClip) // (round 190ne: never a track's clip)
             return index;
     }
 
@@ -83,7 +85,7 @@ int gotoNextEmptyPattern (Song& song)
 
     if (index < 0)
     {
-        if (! song.patterns.empty() && isPatternEmpty (song.activePattern()))
+        if (! song.patterns.empty() && isPatternEmpty (song.activePattern()) && ! song.activePattern().trackClip)
             return song.currentPattern;
 
         Pattern p;
@@ -99,7 +101,7 @@ int gotoNextEmptyPattern (Song& song)
 int gotoFirstEmptyPattern (Song& song)
 {
     for (int i = 0; i < (int) song.patterns.size(); ++i)
-        if (isPatternEmpty (song.patterns[(std::size_t) i]))
+        if (isPatternEmpty (song.patterns[(std::size_t) i]) && ! song.patterns[(std::size_t) i].trackClip)
         {
             song.currentPattern = i;
             return i;
@@ -1133,20 +1135,33 @@ bool pasteChannelSteps (Pattern& pattern, const ChannelStepsClipboard& clipboard
     return true;
 }
 
+bool stepCreatesPattern (const Song& song, int delta) noexcept
+{
+    if (delta <= 0 || song.patterns.empty())
+        return false;
+    // (round 190ne: over the listed patterns: a track clip at the end of the list is not "the last pattern")
+    int after = 0, lastListed = -1;
+    for (int i = 0; i < (int) song.patterns.size(); ++i)
+        if (trackclips::listedInSelector (song, i))
+        {
+            lastListed = i;
+            after += i > song.currentPattern ? 1 : 0;
+        }
+    return after < delta && (lastListed < 0 || ! isPatternEmpty (song.patterns[(std::size_t) lastListed]));
+}
+
 int stepPatternCreating (Song& song, int delta)
 {
     if (song.patterns.empty())
         return 0;
-    const auto last = (int) song.patterns.size() - 1;
-    const auto target = song.currentPattern + delta;
-    if (delta > 0 && target > last && ! isPatternEmpty (song.patterns[(std::size_t) last]))
+    if (stepCreatesPattern (song, delta))
     {
         Pattern p;
         p.name = newPatternName (song);
         song.patterns.push_back (std::move (p));
-        return last + 1;
+        return (int) song.patterns.size() - 1;
     }
-    return std::clamp (target, 0, last);
+    return stepPattern (song, delta);
 }
 
 int audioClipsAmong (const Song& song, const std::vector<int>& channels)

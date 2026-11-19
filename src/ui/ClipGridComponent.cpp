@@ -2351,7 +2351,7 @@ public:
             first.gridSlot = -1;
             first.uid = 0;
             first.start = 0;
-            PlaylistComponent::setCopiedClips ({ first });
+            PlaylistComponent::setCopiedClips ({ first }, carriedOf (block.clips.front().content)); // (round 190ne: a track clip travels along)
             copiedBlock = std::move (block);
             copiedSlot.reset();
             copiedSlotStamp = PlaylistComponent::copiedStamp();
@@ -2368,12 +2368,20 @@ public:
         clip.gridSlot = -1;
         clip.uid = 0;
         clip.start = 0;
-        PlaylistComponent::setCopiedClips ({ clip });
+        PlaylistComponent::setCopiedClips ({ clip }, carriedOf (*content)); // (round 190ne: a track clip travels along)
         copiedSlot = std::move (content);
         copiedSlotStamp = PlaylistComponent::copiedStamp();
         if (cutToo)
             engine.editSong ([=] (Song& s) { launcher::clearClip (s, track, scene); });
         repaint();
+    }
+    // round 190ne (core/TrackClips.h): what a copied slot's track clip gives the shared clipboard
+    static trackclips::Carried carriedOf (const session::SlotClip& content)
+    {
+        trackclips::Carried carried;
+        if (content.trackClip)
+            carried.patterns.emplace_back (content.clip.pattern, *content.trackClip);
+        return carried;
     }
     static bool canPaste()
     {
@@ -2401,7 +2409,11 @@ public:
             const auto it = std::find_if (clips.begin(), clips.end(), [] (const Clip& c) { return c.kind == ClipKind::pattern || c.kind == ClipKind::audio; });
             if (it == clips.end())
                 return;
-            engine.editSong ([=, clip = *it] (Song& s) { session::putClip (s, clip, track, scene); });
+            engine.editSong ([=, clip = *it, carried = PlaylistComponent::copiedPatterns()] (Song& s) {
+                std::vector<Clip> one { clip };
+                trackclips::materialize (s, one, carried); // (round 190ne: a copied track clip comes back as a copy of its own)
+                session::putClip (s, one.front(), track, scene);
+            });
         }
         repaint();
     }

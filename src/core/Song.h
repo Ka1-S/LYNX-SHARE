@@ -1911,6 +1911,11 @@ struct Pattern
     // end (polyrhythms). The loop points stay stored while it is off.
     bool loopOn = false;
     RackLoopMode loopMode = RackLoopMode::steps;
+    // LYNX extra, round 190ne (0.1.31, core/TrackClips.h): a track clip, a pattern that belongs to one own-clips
+    // instrument track (PlaylistTrack::ownClips). It stays out of the pattern selector, sits in the Picker's folded
+    // "Track clips" group, and goes when its last clip goes. false = every FL pattern and every pattern saved before. In
+    // the padding after loopMode: Pattern keeps its size.
+    bool trackClip = false;
     std::vector<ChannelLoop> channelLoops; // at most one per channel
     std::uint64_t uid = 0; // stable id (Online Sessions, round 168a)
     // FL's pattern time markers (the Piano roll's ruler; .flp 0x94 / 0x21 / 0x22 / 0xCD inside the pattern's events,
@@ -2391,6 +2396,12 @@ struct PlaylistTrack
     // FL's Shift+click on a Playlist track's mute switch = lock its state (manual Playlist › Mute / Solo, round 190ld): a
     // solo of another track leaves it as it is. Saved ("playlistTrackSoloLocks").
     bool soloLock = false;
+    // LYNX extra, round 190ne (0.1.31, core/TrackClips.h): "Clips own their notes" on an FL instrument track. The pencil
+    // draws a new empty clip of its own on empty space, and copies are unique (a linked copy by choice); its clips'
+    // patterns are track clips (Pattern::trackClip). Meaningful only while `mode` is instrument. Off by default in the
+    // Pattern layout (FL's own instrument track), on for new instrument tracks in the Clip-launch and Simple layouts.
+    // Saved ("playlistOwnClips"); an .flp keeps FL's instrument track.
+    bool ownClips = false;
     bool operator== (const PlaylistTrack&) const = default;
 };
 

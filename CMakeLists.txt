@@ -40,6 +40,7 @@ add_library(lynx_core STATIC
     src/core/Performance.cpp
     src/core/ClipLauncher.cpp
     src/core/SessionOps.cpp
+    src/core/TrackClips.cpp
     src/core/RemoteMap.cpp
     src/core/DrawMode.cpp
     src/core/AutoPointEdit.cpp
