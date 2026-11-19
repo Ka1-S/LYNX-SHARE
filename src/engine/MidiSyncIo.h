@@ -73,8 +73,10 @@ public:
     // stop, panic), in the device's queue after what was already played (the sender thread sends them)
     void requestPortNotesOff() noexcept;
     // tests: a sink that gets every message the sender sends or (dry run) would send: device name, bytes, due and send
-    // times (ms, Time::getMillisecondCounterHiRes)
-    std::function<void (const std::string&, const std::uint8_t*, int, double, double)> testSink;
+    // times (ms, Time::getMillisecondCounterHiRes) and (round 190mh) a port message's sample in the device's stream:
+    // the samples of the blocks since deviceStarted + its offset in its block (−1: not a port message, e.g. a note off
+    // of a stop / panic marker)
+    std::function<void (const std::string&, const std::uint8_t*, int, double, double, std::int64_t)> testSink;
     // LYNX --selftest (round 190jl): ports, timing, echo guard and notes off through the sender thread (dry run)
     static juce::String portSelfTest (bool& ok);
 
@@ -106,6 +108,7 @@ private:
     {
         double dueMs = 0.0;
         midisync::Message message;
+        std::int64_t deviceSample = -1; // (round 190mh) a port message: its sample in the device's stream (testSink)
     };
     struct Slot
     {
@@ -136,7 +139,7 @@ private:
     std::array<std::uint64_t, 4> portBits {}; // message thread (configure)
     std::atomic<std::uint32_t> portReleaseSlots { 0 }; // the slots whose port changed: their notes end (message thread sets)
     void releasePortNotes (Slot& slot); // sender thread, under outputLock
-    void sendNow (Slot& slot, const std::uint8_t* bytes, int size, double dueMs); // sender thread, under outputLock
+    void sendNow (Slot& slot, const std::uint8_t* bytes, int size, double dueMs, std::int64_t deviceSample = -1); // sender thread, under outputLock
     std::atomic<std::uint32_t> notesOffRequests { 0 };
     std::uint32_t notesOffHandled = 0;       // sender thread
     std::atomic<std::uint64_t> transportNotesOffCount { 0 };
@@ -145,6 +148,7 @@ private:
     // timing: the device block clock mapped to milliseconds (smoothed: callbacks wake up with jitter)
     double sampleRate = 44100.0, latencyMs = 0.0, rackLatencyMs = 0.0;
     double blockStartMs = 0.0, predictedMs = -1.0;
+    std::int64_t blockSample = 0, nextBlockSample = 0; // audio thread: the device samples before this block / the next
     midisync::BlockMessages scratch;
 
     // external clock

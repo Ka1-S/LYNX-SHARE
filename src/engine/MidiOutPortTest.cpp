@@ -3,7 +3,9 @@
 //  1. MidiSyncIo::portSelfTest: ports, due times, the echo guard and notes off through the sender thread (dry run);
 //  2. end to end: the live engine on a stand-in audio device (real-time blocks of 256 at 48 kHz) plays a pattern on a
 //     MIDI Out channel on port 1; a stand-in output device on port 1 (the sender's dry run, no device opened) must get
-//     the exact note bytes, a beat apart to the sample (due times), and a stop must end the note that still sounds.
+//     the exact note bytes, a beat apart to the sample (counted in the device's sample stream: round 190mh, the wall
+//     clock's due times are only reported, a loaded CI runner's callbacks wake up late), and a stop must end the note
+//     that still sounds with exactly one note off.
 
 #include <mutex>
 
@@ -120,6 +122,7 @@ juce::String AudioEngine::midiOutPortSelfTest()
     {
         std::vector<std::uint8_t> bytes;
         double due = 0.0, at = 0.0;
+        std::int64_t sample = -1; // (in the device's stream; −1: a stop marker's note off)
     };
     std::mutex lock;
     std::vector<Sent> sent; // (before the engine: its sender thread, which fills them, ends first)
@@ -150,11 +153,11 @@ juce::String AudioEngine::midiOutPortSelfTest()
     song.mode = PlayMode::pattern;
     live.setSong (song);
 
-    live.midiSync.testSink = [&] (const std::string& device, const std::uint8_t* bytes, int size, double due, double at) {
+    live.midiSync.testSink = [&] (const std::string& device, const std::uint8_t* bytes, int size, double due, double at, std::int64_t sample) {
         if (device != "Stand-in synth")
             return;
         const std::lock_guard<std::mutex> g (lock);
-        sent.push_back ({ { bytes, bytes + size }, due, at });
+        sent.push_back ({ { bytes, bytes + size }, due, at, sample });
     };
     prefs::MidiPrefs prefs;
     prefs::MidiOutputPrefs device;
@@ -210,18 +213,27 @@ juce::String AudioEngine::midiOutPortSelfTest()
         errors.add ("notes " + seen.trim());
     else
     {
-        // a beat = 500 ms at 120 BPM: the due times follow the samples (24000 a beat), whatever the callbacks' jitter
+        // a beat = 24000 samples at 120 BPM and 48 kHz: the notes the rack played, counted in the device's sample stream
+        // (exact, whatever the callbacks' wake-up jitter). Round 190mh: this was a 1 ms check of the wall-clock due times,
+        // which follow the callbacks' times smoothed (MidiSyncIo::beginBlock) and missed it on loaded macOS CI runners;
+        // the due time of a sample is MidiSyncIo::portSelfTest's exact check ("due +7.417 ms")
+        const auto at = [&notes] (std::size_t k) { return notes[k].sample - notes[0].sample; };
+        report << "samples: C on→off " << (juce::int64) at (1) << " (12000), C→E " << (juce::int64) at (2) << " (24000), E on→off "
+               << (juce::int64) (at (3) - at (2)) << " (12000), C→G " << (juce::int64) at (4) << " (48000)\n";
+        if (notes[0].sample < 0 || at (1) != 12000 || at (2) != 24000 || at (3) != 36000 || at (4) != 48000)
+            errors.add ("note samples " + juce::String ((juce::int64) at (1)) + " / " + juce::String ((juce::int64) at (2)) + " / "
+                        + juce::String ((juce::int64) at (3)) + " / " + juce::String ((juce::int64) at (4)));
         const auto beat = notes[2].due - notes[0].due, half = notes[1].due - notes[0].due, third = notes[4].due - notes[0].due;
-        report << "due: C→E " << juce::String (beat, 3) << " ms (500), C on→off " << juce::String (half, 3) << " ms (250), C→G "
-               << juce::String (third, 3) << " ms (1000)\n";
-        if (std::abs (beat - 500.0) > 1.0 || std::abs (half - 250.0) > 1.0 || std::abs (third - 1000.0) > 1.0)
-            errors.add ("note timing " + juce::String (beat, 3) + " / " + juce::String (half, 3) + " / " + juce::String (third, 3));
+        report << "due (wall clock, smoothed): C→E " << juce::String (beat, 3) << " ms (500), C on→off " << juce::String (half, 3)
+               << " ms (250), C→G " << juce::String (third, 3) << " ms (1000)\n";
         double late = 0.0;
         for (const auto& m : notes)
             late = juce::jmax (late, m.at - m.due);
         report << "sent at most " << juce::String (late, 3) << " ms after the due time\n";
         if (notes.size() != expected.size())
             errors.add ("extra notes after the stop");
+        else
+            report << "G's note off: " << (notes[5].sample >= 0 ? "the rack's, at the stop" : "the stop's notes off") << "\n";
     }
     if (! errors.isEmpty())
         return "ERROR " + errors.joinIntoString ("; ") + "\n" + report;

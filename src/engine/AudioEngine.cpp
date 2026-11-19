@@ -7744,11 +7744,15 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
                 const auto& h = hardwareMidiTaken[(std::size_t) k];
                 midiSync.channelMessage (h.port, done + h.sample, h.bytes.data(), h.size, h.source);
             }
-            // the transport stopped: every note the port devices still sound ends ("Send all notes off": CC 123 too)
-            if (hardwareMidiWasPlaying && ! transport.playing.load (std::memory_order_relaxed))
+            // the transport stopped: every note the port devices still sound ends ("Send all notes off": CC 123 too).
+            // Round 190mh: from the state this part was PLAYED with (`playing`, what the rack saw), not a fresh read of
+            // the transport: a stop that lands while the rack renders a part used to ask here already, so the notes-off
+            // marker went into the queue (next block's beginBlock) BEFORE the rack's own note off of the next, stopped
+            // part, and the held note got two note offs (the macOS CI flake "extra notes after the stop")
+            if (hardwareMidiWasPlaying && ! playing)
                 midiSync.requestPortNotesOff();
         }
-        hardwareMidiWasPlaying = transport.playing.load (std::memory_order_relaxed);
+        hardwareMidiWasPlaying = playing;
         takePluginNotes (done); // GitHub #198 (round 190ks): what plugin windows played in this part
 
         if (takesLocked) // the tapped takes' part of this block, now rendered (round 168x)
