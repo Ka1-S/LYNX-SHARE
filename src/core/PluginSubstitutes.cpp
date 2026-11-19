@@ -2998,7 +2998,10 @@ int translateWavesNs1 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
     slot.params[voicetools::quell::matched] = 1.0f; // round 124: the engine fitted to the trial (REA_rodada124 §6)
     // round 190lf: 0 % is NS1's bare all-pass pair, the engine fades in up to 20 % (REA_rodada190lf_ns1.md)
     slot.params[voicetools::quell::zeroLaw] = 1.0f;
-    return 3;
+    // round 190mg (ns1): above 0 % the engine with NS1's own structure (REA_rodada190mg_ns1.md); its layout follows the
+    // Amount by the law through NS1's five saved states (voicetools::quell::ns1Layout)
+    slot.params[voicetools::quell::ns1Law] = 1.0f;
+    return 4;
 }
 
 // Doubler (RealWorld list, round 119): 0 output dB, 1 direct on, 2 direct gain dB, 3 direct pan deg, 4 align,
