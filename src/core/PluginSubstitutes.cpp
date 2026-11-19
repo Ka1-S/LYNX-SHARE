@@ -13,6 +13,7 @@
 #include "core/Effects.h"
 #include "core/FabFilterStates.h"
 #include "core/FacetEq.h"
+#include "core/WavesApiEq.h"
 #include "core/FlEffects.h"
 #include "core/FlPluginDb.h"
 #include "core/FlWrapper.h"
@@ -800,6 +801,33 @@ vendor = Waves
 lynx = Facet EQ
 waves = REQ; REQ 2; REQ 4; REQ 6
 translate = waves-req
+
+# round 190mm: the API-550A / 550B / 560 EQs on Facet EQ (no entry before): every control position probed on our demo-mode
+# impulse responses and fitted with one Facet band each (core/WavesApiEq.h; docs/analise/REA_rodada190mm.md §3), plus the
+# 550s' own flat response; the RealWorld list is translated band by band
+[waves-api-550]
+product = API 550A / 550B
+vendor = Waves
+lynx = Facet EQ
+waves = API-550; API-550A; API-550B
+translate = waves-api-550
+
+# round 190mm: Renaissance Channel (no entry before) — its compressor is the Renaissance Compressor's, so it plays on
+# Compressor's Renaissance law (round 190mg); its EQ and gate are not carried (one slot: the compressor is what
+# changes its sound most in our captures; docs/analise/REA_rodada190mm.md §4)
+[waves-rchannel]
+product = Renaissance Channel (RChannel)
+vendor = Waves
+lynx = Compressor
+waves = RChannel
+translate = waves-rchannel
+
+[waves-api-560]
+product = API 560
+vendor = Waves
+lynx = Facet EQ
+waves = API-560
+translate = waves-api-560
 
 [waves-q10]
 product = Q10 Equalizer
@@ -2053,6 +2081,177 @@ int translateWavesQ10 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
     slot.params[(std::size_t) F::outputParam] = (float) std::clamp ((v (100, 0.0) + v (102, 0.0)) / 48.0 + 0.5, 0.0, 1.0);
     slot.params[(std::size_t) F::wavesLawParam] = 1.0f;
     return 3 + 5 * (int) in.size();
+}
+
+// Renaissance Channel (137 values: 0 … 19 the EQ's four bands like the Renaissance EQ's, 22 … 28 routing / side chain,
+// 42 attack ms, 43 release ms, 45 threshold dB, 46 ratio, 47 gain dB, 52 ARC (0) / manual, 58 … 62 the gate): its
+// compressor block mirrors the Renaissance Compressor's list (0 / 1 / 2 / 8 / 9 / 17 there), so it takes the same
+// translation onto Compressor's Renaissance law. The EQ and the gate are not carried.
+int translateWavesRChannel (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    const auto rw = wavesRealWorldParams (state);
+    const auto threshold = wavesValue (rw, 45), ratio = wavesValue (rw, 46);
+    if (slot.kind != EffectKind::compressor || rw.size() < 63 || ! threshold || ! ratio)
+        return 0;
+    const auto v = [&rw] (std::size_t i, double fallback) { return wavesValue (rw, i).value_or (fallback); };
+    const double attack = v (42, 16.0), release = v (43, 160.0), gain = v (47, 0.0);
+    slot.params[0] = linNorm (*threshold, -60.0, 0.0);
+    slot.params[1] = linNorm (*ratio, 1.0, 20.0);
+    slot.params[2] = logNorm (attack, 0.1, 100.0);
+    slot.params[3] = logNorm (release, 10.0, 1000.0);
+    slot.params[4] = linNorm (gain, 0.0, 24.0);
+    slot.params[5] = 0.0f;
+    slot.params[6] = 1.0f;
+    slot.params[7] = linNorm (0.0, -18.0, 18.0);
+    slot.params[8] = 1.0f;
+    slot.params[9] = v (52, 0.0) >= 0.5 ? 1.0f : 0.0f;
+    slot.params[10] = slot.params[11] = 0.0f;
+    slot.params[12] = 1.0f;
+    const auto r = std::clamp (*ratio, 0.5, 50.0);
+    slot.params[13] = 1.0f;
+    slot.params[14] = (float) (r >= 1.0 ? 0.625 * (1.0 - std::log (r) / std::log (50.0)) : 0.625 + 0.375 * std::log (r) / std::log (0.5));
+    slot.params[15] = linNorm (gain, -30.0, 30.0);
+    slot.params[16] = logNorm (attack, 0.5, 500.0);
+    slot.params[17] = logNorm (release, 5.0, 5000.0);
+    if (slot.params.size() > (std::size_t) compressorRenLaw)
+        slot.params[(std::size_t) compressorRenLaw] = 1.0f;
+    return 7;
+}
+
+namespace wavesApi
+{
+void put (EffectSlot& slot, int b, const wavesApiEq::Band& e, double dbScale = 1.0)
+{
+    using S = facet::Shape;
+    static constexpr S shapes[6] = { S::off, S::bell, S::lowShelf, S::highShelf, S::lowShelf, S::highShelf };
+    const int k = std::clamp (e.shape, 0, 5);
+    auto& p = slot.params;
+    p[(std::size_t) facet::param (b, 0)] = facet::shapeValue (shapes[k]);
+    p[(std::size_t) facet::param (b, 1)] = facet::hzValue (e.hz);
+    p[(std::size_t) facet::param (b, 2)] = facet::gainValue (e.db * dbScale);
+    p[(std::size_t) facet::param (b, 3)] = facet::qValue (e.q);
+    p[(std::size_t) facet::param (b, 4)] = facet::slopeValue (k >= 4 ? 6 : 12);
+}
+int nearest (const float* xs, int n, double x, bool logScale)
+{
+    int best = 0;
+    for (int i = 1; i < n; ++i)
+        if (logScale ? std::abs (std::log (xs[i] / x)) < std::abs (std::log (xs[best] / x)) : std::abs (xs[i] - x) < std::abs (xs[best] - x))
+            best = i;
+    return best;
+}
+} // namespace wavesApi
+
+// API-550A (26 values: 0 Filter, 1 / 2 low gain dB / Hz, 3 / 4 mid gain / kHz, 5 / 6 high gain / kHz, 14 / 15 low / high
+// bell) and API-550B (the same name "API-550" in its state: 1 / 17 low gain / Hz, 21 / 18 low-mid gain / Hz, 3 / 19 high-mid
+// gain / kHz, 5 / 20 high gain / kHz, 14 / 15 low / high bell; told apart by the state's sub-component). Each band is the
+// fitted Facet band of its nearest control position (the reference's gains and frequencies are stepped), on top of the 550s'
+// flat response (two bands) and the 550A's Filter (a low and a high cut).
+int translateWavesApi550 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace A = wavesApiEq;
+    const auto rw = wavesRealWorldParams (state);
+    if (slot.kind != EffectKind::facetEq || rw.size() < 22 || ! wavesValue (rw, 1) || ! wavesValue (rw, 6))
+        return 0;
+    const auto v = [&rw] (std::size_t i, double fallback) { return wavesValue (rw, i).value_or (fallback); };
+    for (int b = 0; b < facet::bands; ++b)
+        slot.params[(std::size_t) facet::param (b, 0)] = facet::shapeValue (facet::Shape::off);
+    // the two share the name "API-550" and one RealWorld layout; the state's sub-component says which ("A5BS" / "A5BM")
+    const bool typeB = findBytes (state, "<PluginSubComp>A5B") != std::string::npos;
+    int b = 0, n = 0;
+    const auto add = [&] (const A::Band& e) { if (b < facet::bands && e.shape > 0) wavesApi::put (slot, b++, e); };
+    const auto gainPos = [] (double db, int& g) { if (std::abs (db) < 1.0) return false; g = wavesApi::nearest (A::gains550, 10, db, false); return true; };
+    if (! typeB)
+    {
+        const double gain[3] = { v (1, 0.0), v (3, 0.0), v (5, 0.0) }, hzv[3] = { v (2, 50.0), v (4, 0.4) * 1000.0, v (6, 5.0) * 1000.0 };
+        const int bell[3] = { v (14, 0.0) > 0.5 ? 1 : 0, 0, v (15, 0.0) > 0.5 ? 1 : 0 };
+        for (int k = 0; k < 3; ++k)
+        {
+            int g = 0;
+            if (! gainPos (gain[k], g)) continue;
+            add (A::api550a[k][bell[k]][wavesApi::nearest (A::freqs550a[k], 5, hzv[k], true)][g]);
+            ++n;
+        }
+        add (A::flat550a[0]);
+        add (A::flat550a[1]);
+        if (v (0, 0.0) > 0.5 && b + 2 <= facet::bands)
+        {
+            using S = facet::Shape;
+            for (int k = 0; k < 2; ++k, ++b)
+            {
+                auto& p = slot.params;
+                p[(std::size_t) facet::param (b, 0)] = facet::shapeValue (k == 0 ? S::lowCut : S::highCut);
+                p[(std::size_t) facet::param (b, 1)] = facet::hzValue (A::filterBands[k][0]);
+                p[(std::size_t) facet::param (b, 3)] = facet::qValue (A::filterBands[k][1]);
+                p[(std::size_t) facet::param (b, 4)] = facet::slopeValue (A::filterSlopes[k]);
+            }
+        }
+    }
+    else
+    {
+        const double gain[4] = { v (1, 0.0), v (21, 0.0), v (3, 0.0), v (5, 0.0) };
+        const double hzv[4] = { v (17, 30.0), v (18, 75.0), v (19, 1.5) * 1000.0, v (20, 2.5) * 1000.0 };
+        const int bell[4] = { v (14, 0.0) > 0.5 ? 1 : 0, 0, 0, v (15, 0.0) > 0.5 ? 1 : 0 };
+        for (int k = 0; k < 4; ++k)
+        {
+            int g = 0;
+            if (! gainPos (gain[k], g)) continue;
+            add (A::api550b[k][bell[k]][wavesApi::nearest (A::freqs550b[k], 7, hzv[k], true)][g]);
+            ++n;
+        }
+        add (A::flat550b[0]);
+        add (A::flat550b[1]);
+        slot.params[(std::size_t) facet::outputParam] = (float) std::clamp (A::flatOutput550b / 48.0 + 0.5, 0.0, 1.0);
+    }
+    return 2 + 2 * n;
+}
+
+// API-560 (23 values: the ten bands' gains dB at 1 … 10 in the order 63, 250, 1k, 4k, 16k, 31, 125, 500, 2k, 8k Hz). Its
+// gain is continuous: each band's fitted Facet bell is interpolated between the probed gains (frequency and Q in log),
+// scaled below ±1.5 dB. Facet has eight bands: the eight largest gains are kept.
+int translateWavesApi560 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace A = wavesApiEq;
+    const auto rw = wavesRealWorldParams (state);
+    if (slot.kind != EffectKind::facetEq || rw.size() < 11 || ! wavesValue (rw, 1) || ! wavesValue (rw, 10))
+        return 0;
+    static constexpr int order[10] = { 1, 3, 5, 7, 9, 0, 2, 4, 6, 8 }; // RealWorld 1 … 10 -> band 31 Hz … 16 kHz (0 … 9)
+    std::vector<std::pair<double, int>> on;
+    double gain[10] {};
+    for (int i = 0; i < 10; ++i)
+    {
+        gain[order[i]] = std::clamp (wavesValue (rw, (std::size_t) (1 + i)).value_or (0.0), -12.0, 12.0);
+        if (std::abs (gain[order[i]]) > 0.05) on.push_back ({ std::abs (gain[order[i]]), order[i] });
+    }
+    std::stable_sort (on.begin(), on.end(), [] (auto& x, auto& y) { return x.first > y.first; });
+    if (on.size() > (std::size_t) facet::bands) on.resize ((std::size_t) facet::bands);
+    for (int b = 0; b < facet::bands; ++b)
+        slot.params[(std::size_t) facet::param (b, 0)] = facet::shapeValue (facet::Shape::off);
+    int b = 0;
+    for (const auto& [mag, k] : on)
+    {
+        const double g = gain[k];
+        A::Band e {};
+        if (std::abs (g) <= 1.5)
+        {
+            e = A::api560[k][g < 0 ? 4 : 5];
+            e.db = (float) (e.db * std::abs (g) / 1.5);
+        }
+        else
+        {
+            int i = 0;
+            while (i < 8 && A::gains560[i + 1] < g) ++i;
+            const auto& lo = A::api560[k][i];
+            const auto& hi = A::api560[k][i + 1];
+            const double t = std::clamp ((g - A::gains560[i]) / (A::gains560[i + 1] - A::gains560[i]), 0.0, 1.0);
+            e.shape = 1;
+            e.hz = (float) std::exp (std::log (lo.hz) * (1 - t) + std::log (hi.hz) * t);
+            e.db = (float) (lo.db * (1 - t) + hi.db * t);
+            e.q = (float) std::exp (std::log (lo.q) * (1 - t) + std::log (hi.q) * t);
+        }
+        wavesApi::put (slot, b++, e);
+    }
+    return 1 + (int) on.size();
 }
 
 // SuperTap 2-Taps (98 values; round 190jh [EXEC]: refcap182's states against the settings set through the trial's own
@@ -3731,6 +3930,12 @@ RawTranslator rawTranslatorNamed (std::string_view name)
         return translateWavesL2;
     if (name == "waves-ssl-g-channel")
         return translateWavesSslG;
+    if (name == "waves-rchannel")
+        return translateWavesRChannel;
+    if (name == "waves-api-550")
+        return translateWavesApi550;
+    if (name == "waves-api-560")
+        return translateWavesApi560;
     if (name == "waves-req")
         return translateWavesReq;
     if (name == "waves-q10")
