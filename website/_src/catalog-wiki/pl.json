@@ -1496,7 +1496,7 @@
 "intro": "Drum Rack to Instrument Rack, którego łańcuchy są padami. Każdy pad odbiera jedną nutę i gra instrument oraz efekty swojego łańcucha. Dodaj go z wyboru pluginów jako Drum Rack. Nowy Drum Rack pokazuje tylko pady i panel urządzeń, z zaznaczonym C1. Upuść sample na pady albo kliknij prawym przyciskiem pusty pad, aby wczytać sample lub instrument. Drum Rack w secie Ableton Live (.als) otwiera się jako jeden Drum Rack z padami, sendami i łańcuchami return, a Drum Racki są zapisywane przy eksporcie setu Live.",
 "controls": [
 [
-"Pads",
+"Pady",
 "Widok 4 x 4 padów, a nad nim pasek przeglądu wszystkich 128: kliknij, przeciągnij lub przewiń go, aby przesunąć widok. Wypełniony pad pokazuje swoją nazwę z M (mute), przyciskiem odtwarzania i S (solo). Przeciągnij pad na inny, aby je zamienić. Upuszczenie kilku sampli wypełnia kolejne pady."
 ],
 [
@@ -1615,7 +1615,7 @@
 "intro": "FPC to sampler perkusyjny z 32 padami w dwóch bankach po 16, BANK A i BANK B. Każdy pad zawiera jedną lub więcej warstw sampli, wybieranych według velocity. Jeden kanał mieści cały zestaw. Otwiera kanały FPC z pliku .flp, a presety zestawów .fst z FL wczytują się na kanał. Bez FL Studio nowy FPC to pusty zestaw FL: 32 pady na domyślnych nutach FL, bez sampli.",
 "controls": [
 [
-"Pads",
+"Pady",
 "Kliknij pad, by go zaznaczyć i zagrać. Upuść sample na pad, by go wczytać."
 ],
 [
@@ -6545,7 +6545,7 @@
 "intro": "Transporter to looper transjentów: ośmiopasmowy detektor wyzwala pętle A i B, które odtwarzają wejście. Dodaj go do insertu dla stutterów i glitchowych powtórzeń.",
 "controls": [
 [
-"Dry level",
+"Poziom dry",
 "Poziom sygnału nieprzetworzonego."
 ],
 [
@@ -8248,7 +8248,7 @@
 "Pokazuje, czy formuła się skompilowała."
 ],
 [
-"Monitor",
+"Odsłuch",
 "Wykres wartości wyjściowej."
 ]
 ],
@@ -8667,7 +8667,7 @@
 "Skala wyjścia."
 ],
 [
-"Polarity",
+"Polaryzacja",
 "Offset bipolarny lub unipolarny."
 ],
 [
@@ -8897,7 +8897,7 @@
 "Wycisza dźwięk wideo."
 ],
 [
-"Podporządkuj odtwarzanie hostowi",
+"Synchronizuj odtwarzanie z hostem",
 "Pozycja utworu steruje wideo; po wyłączeniu używane są własne Play i Stop odtwarzacza."
 ],
 [

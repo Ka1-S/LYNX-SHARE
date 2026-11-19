@@ -1,1 +1,5 @@
-{}
+{
+"u.0.1.29.t": "Versione correttiva di 0.1.28: Torna alla versione precedente funziona",
+"u.0.1.29.s": "Una piccola versione correttiva di 0.1.28. Aiuto › Torna alla versione precedente ora installa la versione che avevi prima, e una versione più vecchia a cui torni non ti propone più subito quella più nuova.",
+"u.0.1.29.b0": "<strong>Aiuto › Torna alla versione precedente</strong> (novità di 0.1.28) proponeva la stessa 0.1.28. Ora installa la versione che avevi prima, con lo stesso controllo del checksum di un aggiornamento, e il controllo automatico salta la versione che hai lasciato."
+}

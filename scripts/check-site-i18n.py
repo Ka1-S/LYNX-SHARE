@@ -86,6 +86,10 @@ def label(text, app):
     def one(x):
         if x in app:
             return app[x]
+        # a page writes the app's {0} placeholder as a <name> ("Always run <plugin> in a separate process")
+        ph = re.findall(r"<[^<>\s]+>", x)
+        if len(ph) == 1 and x.replace(ph[0], "{0}") in app:
+            return app[x.replace(ph[0], "{0}")].replace("{0}", ph[0])
         for suf in ("...", ":"):
             if x.endswith(suf) and x[:-len(suf)] in app:
                 return app[x[:-len(suf)]] + suf

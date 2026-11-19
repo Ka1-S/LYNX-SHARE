@@ -1,1 +1,5 @@
-{}
+{
+"u.0.1.29.t": "Herstelversie voor 0.1.28: Terug naar de vorige versie werkt",
+"u.0.1.29.s": "Een kleine herstelversie voor 0.1.28. Help › Terug naar de vorige versie installeert nu de versie die je eerder had, en een oudere versie waar je naar teruggaat, biedt de nieuwere niet meer meteen opnieuw aan.",
+"u.0.1.29.b0": "<strong>Help › Terug naar de vorige versie</strong> (nieuw in 0.1.28) bood 0.1.28 zelf aan. Het installeert nu de versie die je eerder had, met dezelfde checksumcontrole als een update, en de automatische controle slaat de versie die je verliet over."
+}

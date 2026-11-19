@@ -1496,7 +1496,7 @@
 "intro": "Drum Rack, zincirleri pad olan bir Instrument Rack'tir. Her pad bir nota alır ve zincirinin enstrümanını ve efektlerini çalar. Eklenti seçicisinden Drum Rack olarak ekleyin. Yeni bir Drum Rack yalnızca pad'leri ve device bölmesini gösterir; C1 seçilidir. Pad'lere sample bırakın ya da bir sample veya enstrüman yüklemek için boş bir pad'e sağ tıklayın. Bir Ableton Live set'indeki (.als) Drum Rack, pad'leri, send'leri ve return zincirleriyle tek bir Drum Rack olarak açılır ve bir Live set'i dışa aktardığınızda Drum Rack'ler yazılır.",
 "controls": [
 [
-"Pads",
+"Pad'ler",
 "Pad'lerin 4 x 4 görünümü; üstünde 128'in tamamını gösteren bir genel bakış şeridi vardır: görünümü kaydırmak için tıklayın, sürükleyin veya kaydırın. Dolu bir pad adını M (mute), bir play düğmesi ve S (solo) ile gösterir. Bir pad'i başka birinin üzerine sürükleyerek yer değiştirin. Birkaç sample bırakmak ardışık pad'leri doldurur."
 ],
 [
@@ -1615,7 +1615,7 @@
 "intro": "FPC, 16'lık iki bankta, BANK A ve BANK B, 32 pad'li bir davul sampler'ıdır. Her pad, velocity'ye göre seçilen bir veya daha fazla sample katmanı tutar. Tüm kit tek bir kanalda durur. Bir .flp'nin FPC kanallarını açar ve FL'nin .fst kit preset'leri bir kanala yüklenir. FL Studio olmadan yeni bir FPC, FL'nin boş kitidir: FL'nin varsayılan notalarında 32 pad, sample yok.",
 "controls": [
 [
-"Pads",
+"Pad'ler",
 "Bir pad'i seçmek ve çalmak için tıklayın. Yüklemek için bir pad'in üzerine sample bırakın."
 ],
 [
@@ -6545,7 +6545,7 @@
 "intro": "Transporter bir transient looper'dır: sekiz bantlı bir dedektör, girişi yeniden çalan A ve B loop'larını tetikler. Stutter'lar ve glitch tekrarları için bir insert'e ekleyin.",
 "controls": [
 [
-"Dry level",
+"Dry seviyesi",
 "İşlenmemiş sinyalin seviyesi."
 ],
 [
@@ -8248,7 +8248,7 @@
 "Formülün derlenip derlenmediğini gösterir."
 ],
 [
-"Monitor",
+"İzleme",
 "Çıkış değerinin grafiği."
 ]
 ],
@@ -8667,7 +8667,7 @@
 "Bir çıkışın ölçeği."
 ],
 [
-"Polarity",
+"Polarite",
 "Bipolar veya unipolar ofset."
 ],
 [
@@ -8897,7 +8897,7 @@
 "Videonun sesini susturur."
 ],
 [
-"Çalmayı host'a bağla",
+"Çalmayı ana uygulamaya bağla",
 "Şarkı konumu videoyu sürer; kapalıyken oynatıcının kendi Çal ve Durdur düğmeleri kullanılır."
 ],
 [

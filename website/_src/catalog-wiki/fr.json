@@ -6545,7 +6545,7 @@
 "intro": "Transporter est un looper de transitoires : un détecteur à huit bandes déclenche les boucles A et B qui rejouent l'entrée. Ajoutez-le à un insert pour des stutters et des répétitions glitch.",
 "controls": [
 [
-"Dry level",
+"Niveau dry",
 "Niveau du signal non traité."
 ],
 [
@@ -8248,7 +8248,7 @@
 "Indique si la formule a été compilée."
 ],
 [
-"Monitor",
+"Écoute",
 "Graphique de la valeur de sortie."
 ]
 ],
@@ -8667,7 +8667,7 @@
 "Échelle d'une sortie."
 ],
 [
-"Polarity",
+"Polarité",
 "Décalage bipolaire ou unipolaire."
 ],
 [
@@ -8897,7 +8897,7 @@
 "Coupe le son de la vidéo."
 ],
 [
-"Asservir la lecture à l'hôte",
+"Synchroniser la lecture sur l'hôte",
 "La position dans le morceau pilote la vidéo ; désactivé, ce sont les boutons de lecture et d'arrêt du lecteur qui servent."
 ],
 [

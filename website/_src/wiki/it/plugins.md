@@ -62,7 +62,7 @@ Di default un plugin gira dentro LYNX SHARE, quindi un plugin che va in crash pu
 
 Se un plugin così va in crash o smette di rispondere, viene silenziato, appare un messaggio e LYNX SHARE continua a funzionare. `Ricarica` in quel messaggio riavvia il plugin con le impostazioni dell'ultimo salvataggio o backup, senza riaprire il progetto. L'editor del plugin si apre nella sua finestra e non può essere agganciato né fissato.
 
-Per farlo solo per un plugin, usa `Esegui in un processo separato` o `Always run <plugin> in a separate process` nel menu del wrapper della finestra del plugin. Quando l'editor di un plugin va in crash, il messaggio che appare propone anche la seconda.
+Per farlo solo per un plugin, usa `Esegui in un processo separato` o `Esegui sempre <plugin> in un processo separato` nel menu del wrapper della finestra del plugin. Quando l'editor di un plugin va in crash, il messaggio che appare propone anche la seconda.
 
 Funziona su Windows e Linux, e su macOS dalla 0.1.25.
 

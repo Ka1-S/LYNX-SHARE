@@ -89,7 +89,7 @@ O host faz assim:
 
 Um convidado faz assim:
 
-1. Abra o menu de plugins de um dos seus canais ou slots de efeito. Os plugins compartilhados vêm primeiro, em `On <host>'s computer`.
+1. Abra o menu de plugins de um dos seus canais ou slots de efeito. Os plugins compartilhados vêm primeiro, em `No computador de <host>`.
 2. Escolha um. A janela dele lista os parâmetros do plugin como sliders, com `Buscar parâmetros`.
 3. Adicione notas e mova os sliders. A janela mostra `Updating...` enquanto o computador do host renderiza, e depois `Atualizado`.
 

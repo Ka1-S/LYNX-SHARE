@@ -62,7 +62,7 @@ Par défaut, un plugin tourne à l'intérieur de LYNX SHARE : un plugin qui plan
 
 Si un tel plugin plante ou cesse de répondre, il est coupé, un message apparaît et LYNX SHARE continue de tourner. `Recharger` dans ce message relance le plugin avec les réglages de la dernière sauvegarde, sans rouvrir le projet. L'éditeur du plugin s'ouvre dans sa propre fenêtre et ne peut être ni ancré ni épinglé.
 
-Pour ne le faire que pour un seul plugin, utilisez `Exécuter dans un processus séparé` ou `Always run <plugin> in a separate process` dans le menu d'enveloppe de la fenêtre du plugin. Quand l'éditeur d'un plugin plante, le message qui apparaît propose aussi le second.
+Pour ne le faire que pour un seul plugin, utilisez `Exécuter dans un processus séparé` ou `Toujours exécuter <plugin> dans un processus séparé` dans le menu d'enveloppe de la fenêtre du plugin. Quand l'éditeur d'un plugin plante, le message qui apparaît propose aussi le second.
 
 Cela fonctionne sous Windows et Linux, et depuis la 0.1.25 sous macOS.
 

@@ -89,7 +89,7 @@ L'host fa così:
 
 Un ospite fa così:
 
-1. Apri il menu dei plugin di uno dei tuoi canali o slot degli effetti. I plugin condivisi vengono per primi, sotto `On <host>'s computer`.
+1. Apri il menu dei plugin di uno dei tuoi canali o slot degli effetti. I plugin condivisi vengono per primi, sotto `Sul computer di <host>`.
 2. Scegline uno. La sua finestra elenca i parametri del plugin come slider, con `Cerca parametri`.
 3. Aggiungi note e muovi gli slider. La finestra mostra `Updating...` mentre il computer dell'host esegue il render, poi `Aggiornato`.
 

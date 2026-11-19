@@ -64,7 +64,7 @@ chmod +x LYNX-*.AppImage
 
 ## 更新
 
-啟動時，LYNX SHARE 會向 GitHub 詢問最新的版本號。不會傳送任何關於你的資料。有新版本時，會出現一個列，顯示 `LYNX SHARE <version> is available`，並帶有 `新功能` 按鈕和更新按鈕。`說明 › 檢查更新...` 可隨時查詢。
+啟動時，LYNX SHARE 會向 GitHub 詢問最新的版本號。不會傳送任何關於你的資料。有新版本時，會出現一個列，顯示 `LYNX SHARE <version> 已推出`，並帶有 `新功能` 按鈕和更新按鈕。`說明 › 檢查更新...` 可隨時查詢。
 
 | 版本 | 更新方式 |
 |---|---|

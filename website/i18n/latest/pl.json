@@ -1,1 +1,5 @@
-{}
+{
+"u.0.1.29.t": "Wydanie poprawkowe 0.1.28: Wróć do poprzedniej wersji działa",
+"u.0.1.29.s": "Małe wydanie poprawkowe 0.1.28. Pomoc › Wróć do poprzedniej wersji instaluje teraz wersję, którą miałeś wcześniej, a starsza wersja, do której wracasz, nie proponuje już od razu ponownie nowszej.",
+"u.0.1.29.b0": "<strong>Pomoc › Wróć do poprzedniej wersji</strong> (nowość w 0.1.28) proponowało samą wersję 0.1.28. Teraz instaluje wersję, którą miałeś wcześniej, z tym samym sprawdzeniem sumy kontrolnej co aktualizacja, a automatyczne sprawdzanie pomija wersję, którą opuściłeś."
+}

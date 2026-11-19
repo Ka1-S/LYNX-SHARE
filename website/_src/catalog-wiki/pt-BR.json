@@ -6545,7 +6545,7 @@
 "intro": "O Transporter é um looper de transientes: um detector de oito bandas dispara os loops A e B, que repetem a entrada. Adicione-o a um insert para stutters e repetições glitch.",
 "controls": [
 [
-"Dry level",
+"Nível seco",
 "Nível do sinal sem processamento."
 ],
 [
@@ -8248,7 +8248,7 @@
 "Mostra se a fórmula foi compilada."
 ],
 [
-"Monitor",
+"Monitorar",
 "Gráfico do valor de saída."
 ]
 ],
@@ -8667,7 +8667,7 @@
 "Escala de uma saída."
 ],
 [
-"Polarity",
+"Polaridade",
 "Offset bipolar ou unipolar."
 ],
 [
@@ -8897,7 +8897,7 @@
 "Silencia o som do vídeo."
 ],
 [
-"Reprodução escrava do host",
+"Sincronizar a reprodução com o host",
 "A posição da música conduz o vídeo; desligado, usa o Tocar e o Parar do próprio player."
 ],
 [

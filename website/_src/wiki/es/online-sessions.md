@@ -89,7 +89,7 @@ El host hace esto:
 
 Un invitado hace esto:
 
-1. Abre el menú de plugins de uno de tus canales o ranuras de efecto. Los plugins compartidos aparecen primero, bajo `On <host>'s computer`.
+1. Abre el menú de plugins de uno de tus canales o ranuras de efecto. Los plugins compartidos aparecen primero, bajo `En el equipo de <host>`.
 2. Elige uno. Su ventana lista los parámetros del plugin como deslizadores, con `Buscar parámetros`.
 3. Añade notas y mueve los deslizadores. La ventana muestra `Updating...` mientras el ordenador del host renderiza, y luego `Al día`.
 
