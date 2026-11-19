@@ -554,6 +554,16 @@ vst3 = 5354535648437353736c6368616e6e65
 waves = SSLChannel
 translate = waves-ssl-channel
 
+# round 190mm: the G-series channel (no entry before: such projects lost the plug-in). Its RealWorld list has the E
+# channel's layout (55 = LMF ÷3, 56 = HMF ×3; LF / HF are shelves only), translated onto Ridge Strip's measured E
+# console like the SSL E-Channel; scored on our demo-mode captures (docs/analise/REA_rodada190mm.md §4)
+[waves-ssl-g-channel]
+product = SSL G-Channel
+vendor = Waves
+lynx = Ridge Strip
+waves = SSLGChannel
+translate = waves-ssl-g-channel
+
 [ssl-native-channel]
 product = SSL Native Channel Strip / 4K E
 vendor = Solid State Logic
@@ -774,10 +784,29 @@ waves = PuigTec EQP1A; PuigTec EQP-1A; EQP1A
 translate = waves-puigtec
 
 [waves-eqs]
-product = Waves EQ (Q10 / Renaissance EQ / SSL EQ)
+product = Waves EQ (SSL EQ)
 vendor = Waves
 lynx = Parametric EQ
-waves = Q10; REQ; SSLEQ
+# round 190mm: Renaissance EQ and Q10 have their own entries below
+waves = SSLEQ
+
+# round 190mm: Renaissance EQ (REQ 2 / 4 / 6) and Q10 on Facet EQ's Waves design law — every band shape identified on our
+# demo-mode impulse responses (docs/analise/REA_rodada190mm.md §2: the bell's prescribed-Nyquist-gain design, the shelves'
+# shared-s-term law, the resonant shelves, the 18 dB/oct cuts; Q10's bandwidth-prewarped bells, first-order shelves,
+# Butterworth cuts), the RealWorld list translated band by band (no entry before: a flat Parametric EQ)
+[waves-req]
+product = Renaissance Equalizer (REQ)
+vendor = Waves
+lynx = Facet EQ
+waves = REQ; REQ 2; REQ 4; REQ 6
+translate = waves-req
+
+[waves-q10]
+product = Q10 Equalizer
+vendor = Waves
+lynx = Facet EQ
+waves = Q10
+translate = waves-q10
 
 [fabfilter-pro-q]
 product = FabFilter Pro-Q
@@ -1925,6 +1954,107 @@ int translateWavesPuigTec (const std::vector<std::uint8_t>& state, EffectSlot& s
     return 8;
 }
 
+// ---- round 190mm: Waves EQs on Facet EQ's Waves design law (docs/analise/REA_rodada190mm.md §2) ----------------------
+namespace wavesEq
+{
+void band (EffectSlot& slot, int b, facet::Shape shape, facet::WaveCode code, double hzv, double db, double qv, int slope = 12)
+{
+    auto& p = slot.params;
+    p[(std::size_t) facet::param (b, 0)] = facet::shapeValue (shape);
+    p[(std::size_t) facet::param (b, 1)] = facet::hzValue (hzv);
+    p[(std::size_t) facet::param (b, 2)] = facet::gainValue (db);
+    p[(std::size_t) facet::param (b, 3)] = facet::qValue (qv);
+    p[(std::size_t) facet::param (b, 4)] = facet::slopeValue (slope);
+    p[(std::size_t) (facet::wavesBandParam0 + b)] = facet::waveCodeValue (code);
+}
+void off (EffectSlot& slot, int b)
+{
+    slot.params[(std::size_t) facet::param (b, 0)] = facet::shapeValue (facet::Shape::off);
+    slot.params[(std::size_t) (facet::wavesBandParam0 + b)] = 0.0f;
+}
+} // namespace wavesEq
+
+// Renaissance EQ (REQ 2 / 4 / 6: one layout, 140 values): band k = 0 … 5 at 5 k: on, type, gain dB, frequency Hz, Q (the
+// left channel; the right copy at 30 + 5 k), 60 / 61 the output gain left / right. Types by band: 1st: bell, low shelf,
+// high pass, resonant low shelf; 2nd / 3rd: bell, low shelf; 4th / 5th: bell, high shelf; 6th: bell, high shelf, low pass,
+// resonant high shelf. REQ 2 uses the 1st and 6th, REQ 4 the 1st, 2nd, 5th and 6th. Facet's bands 0 … 5 take them.
+int translateWavesReq (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace F = facet;
+    const auto rw = wavesRealWorldParams (state);
+    if (slot.kind != EffectKind::facetEq || rw.size() < 62 || ! wavesValue (rw, 3) || ! wavesValue (rw, 28))
+        return 0;
+    const auto v = [&rw] (std::size_t i, double fallback) { return wavesValue (rw, i).value_or (fallback); };
+    int n = 0;
+    for (int k = 0; k < 6; ++k)
+    {
+        const auto i = (std::size_t) (5 * k);
+        const bool on = v (i, 0.0) >= 0.5;
+        const int type = (int) std::lround (v (i + 1, 0.0));
+        const double db = std::clamp (v (i + 2, 0.0), -18.0, 18.0), f = std::clamp (v (i + 3, 1000.0), 10.0, 22000.0);
+        const double q = std::clamp (v (i + 4, 1.0), 0.1, 10.0);
+        if (! on) { wavesEq::off (slot, k); continue; }
+        ++n;
+        using S = F::Shape; using C = F::WaveCode;
+        if (type == 0) wavesEq::band (slot, k, S::bell, C::reqBell, f, db, q);
+        else if (k == 0 && type == 2) wavesEq::band (slot, k, S::lowCut, C::reqHighPass, f, 0.0, q, 18);
+        else if (k == 5 && type == 2) wavesEq::band (slot, k, S::highCut, C::reqLowPass, f, 0.0, q, 18);
+        else if (k == 0 && type == 3) wavesEq::band (slot, k, S::lowShelf, C::rbjLowShelf, f, db, q);
+        else if (k == 5 && type == 3) wavesEq::band (slot, k, S::highShelf, C::rbjHighShelf, f, db, q);
+        else if (k <= 2) wavesEq::band (slot, k, S::lowShelf, C::reqLowShelf, f, db, q);
+        else wavesEq::band (slot, k, S::highShelf, C::reqHighShelf, f, db, q);
+    }
+    wavesEq::off (slot, 6);
+    wavesEq::off (slot, 7);
+    slot.params[(std::size_t) F::outputParam] = (float) std::clamp (v (60, 0.0) / 48.0 + 0.5, 0.0, 1.0);
+    slot.params[(std::size_t) F::wavesLawParam] = 1.0f;
+    return 2 + 5 * n;
+}
+
+// Q10 (122 values): band k = 0 … 9 at 5 k: in, type (0 bell, 1 low shelf, 2 high shelf, 3 low pass, 4 high pass, 5 PQ
+// bell), gain dB, frequency Hz, Q (the left channel; the right copy at 50 + 5 k); 100 / 102 the input / output gain left.
+// Facet has eight bands: when more than eight Q10 bands are in, the eight with the largest effect (cuts first, then by
+// |gain|) are kept.
+int translateWavesQ10 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace F = facet;
+    const auto rw = wavesRealWorldParams (state);
+    if (slot.kind != EffectKind::facetEq || rw.size() < 103 || ! wavesValue (rw, 3) || ! wavesValue (rw, 48))
+        return 0;
+    const auto v = [&rw] (std::size_t i, double fallback) { return wavesValue (rw, i).value_or (fallback); };
+    struct B { int type; double db, f, q, weight; };
+    std::vector<B> in;
+    for (int k = 0; k < 10; ++k)
+    {
+        const auto i = (std::size_t) (5 * k);
+        if (v (i, 0.0) < 0.5) continue;
+        B b { (int) std::lround (v (i + 1, 0.0)), std::clamp (v (i + 2, 0.0), -18.0, 18.0), std::clamp (v (i + 3, 1000.0), 10.0, 22000.0),
+              std::clamp (v (i + 4, 7.0), 0.5, 100.0), 0.0 };
+        b.weight = b.type == 3 || b.type == 4 ? 1e9 : std::abs (b.db);
+        in.push_back (b);
+    }
+    std::stable_sort (in.begin(), in.end(), [] (const B& x, const B& y) { return x.weight > y.weight; });
+    if (in.size() > (std::size_t) F::bands) in.resize ((std::size_t) F::bands);
+    for (int k = 0; k < F::bands; ++k)
+    {
+        if (k >= (int) in.size()) { wavesEq::off (slot, k); continue; }
+        const auto& b = in[(std::size_t) k];
+        using S = F::Shape; using C = F::WaveCode;
+        switch (b.type)
+        {
+            case 1: wavesEq::band (slot, k, S::lowShelf, C::lowShelf1, b.f, b.db, 0.7071, 6); break;
+            case 2: wavesEq::band (slot, k, S::highShelf, C::highShelf1, b.f, b.db, 0.7071, 6); break;
+            case 3: wavesEq::band (slot, k, S::highCut, C::butterLowPass, b.f, 0.0, 1.0, 12); break;
+            case 4: wavesEq::band (slot, k, S::lowCut, C::butterHighPass, b.f, 0.0, 1.0, 12); break;
+            case 5: wavesEq::band (slot, k, S::bell, C::q10PqBell, b.f, b.db, b.q / 4.0); break;
+            default: wavesEq::band (slot, k, S::bell, C::q10Bell, b.f, b.db, b.q / 4.0); break;
+        }
+    }
+    slot.params[(std::size_t) F::outputParam] = (float) std::clamp ((v (100, 0.0) + v (102, 0.0)) / 48.0 + 0.5, 0.0, 1.0);
+    slot.params[(std::size_t) F::wavesLawParam] = 1.0f;
+    return 3 + 5 * (int) in.size();
+}
+
 // SuperTap 2-Taps (98 values; round 190jh [EXEC]: refcap182's states against the settings set through the trial's own
 // parameters, and the tap times / levels read off its programme renders): 4 tempo BPM, 10 feedback on, 11 feedback %,
 // 13 feedback delay; tap k (k = 0, 1) at 33 + 10 k: on, gain dB, pan (−45 … +45°), delay, 6 filter kHz, 8 filter on.
@@ -3042,6 +3172,25 @@ int translateWavesSslChannel (const std::vector<std::uint8_t>& state, EffectSlot
     return 32;
 }
 
+// round 190mm: SSL G-Channel (57 values: the E channel's layout; 55 LMF ÷3, 56 HMF ×3, no LF / HF bell switches) on
+// Ridge Strip's E voicing through the E-Channel's translation, then the G's own switches
+int translateWavesSslG (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace r = mixsuite::ridge;
+    const int n = translateWavesSslChannel (state, slot);
+    if (n == 0)
+        return 0;
+    const auto rw = wavesRealWorldParams (state);
+    const auto at = [&rw] (std::size_t i, double fallback) { return wavesValue (rw, i).value_or (fallback); };
+    auto& p = slot.params;
+    p[r::lfBell] = p[r::hfBell] = 0.0f;
+    if (at (55, 0.0) > 0.5)
+        p[r::lmfFreq] = logNorm (at (17, 0.5) * 1000.0 / 3.0, 200.0, 2500.0);
+    if (at (56, 0.0) > 0.5)
+        p[r::hmfFreq] = logNorm (at (20, 3.5) * 3000.0, 600.0, 7000.0);
+    return n + 2;
+}
+
 // H-Delay (RealWorld list, round 119): 1 sync (0 BPM, 1 host, 2 ms), 2 BPM, 3 delay ms, 4 note (3 per length: triplet,
 // straight, dotted from 1/64; 18 = 1 bar, 19 = 2 bars), 6 mix %, 7 feedback, 10 ping-pong (1) / stereo (0), 14 output dB,
 // 15 low-pass Hz (20100 = off), 17 high-pass Hz (19 = off), 19 / 20 modulation depth % / rate Hz, 23 analog (0 = off).
@@ -3580,6 +3729,12 @@ RawTranslator rawTranslatorNamed (std::string_view name)
         return translateWavesCla76;
     if (name == "waves-l2")
         return translateWavesL2;
+    if (name == "waves-ssl-g-channel")
+        return translateWavesSslG;
+    if (name == "waves-req")
+        return translateWavesReq;
+    if (name == "waves-q10")
+        return translateWavesQ10;
     if (name == "waves-puigtec")
         return translateWavesPuigTec;
     if (name == "waves-c4")

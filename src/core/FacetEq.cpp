@@ -1469,6 +1469,8 @@ const std::array<Shape, shapeCount - 1>& menuShapes() noexcept
 int character (float v) noexcept { return std::clamp ((int) std::lround (v * 2.0f), 0, 2); }
 int puigLaw (float v) noexcept { return v > 0.0f ? std::clamp ((int) std::lround (v * 16.0f), 0, 3) : 0; }
 float puigLawValue (int k) noexcept { return (float) std::clamp (k, 0, 3) / 16.0f; }
+int waveCode (float v) noexcept { return v > 0.0f ? std::clamp ((int) std::lround (v * 64.0f), 0, (int) WaveCode::count - 1) : 0; }
+float waveCodeValue (WaveCode c) noexcept { return (float) std::clamp ((int) c, 0, (int) WaveCode::count - 1) / 64.0f; }
 double puigShape (double y) noexcept
 {
     using namespace puig;
@@ -1617,8 +1619,204 @@ std::string paramText (int p, float v)
     }
 }
 
+// ---- round 190mm: the Waves design law (FacetEq.h wavesLawParam; docs/analise/REA_rodada190mm.md §2) ----------------
+// Every structure below was identified black-box on our own demo-mode impulse responses of the references (each band
+// alone, a grid of frequencies / gains / Qs, two takes against the demo mutes): a Prony fit of the exact IR gives each
+// section's coefficients, and the analog prototype + digitisation that reproduce them to −100 dB and better were found by
+// fitting (eq/lab in the round folder). The constants are LYNX's own fits; the bell's digitisation is the published
+// prescribed-Nyquist-gain design (Orfanidis, JAES 1997), the others bilinear transforms.
+namespace
+{
+namespace wv
+{
+// analog (n2 s² + n1 s + n0) / (d2 s² + d1 s + d0), s in rad/s, through s = K (1 − z⁻¹) / (1 + z⁻¹)
+Section bilinear (double n2, double n1, double n0, double d2, double d1, double d0, double K) noexcept
+{
+    Section s;
+    if (n2 == 0.0 && d2 == 0.0) // first order: (n1 s + n0) / (d1 s + d0), no (1 + z⁻¹) pair on the unit circle
+    {
+        const double a0 = d1 * K + d0;
+        s.b0 = (n1 * K + n0) / a0;
+        s.b1 = (n0 - n1 * K) / a0;
+        s.a1 = (d0 - d1 * K) / a0;
+        return s;
+    }
+    const double K2 = K * K, a0 = d2 * K2 + d1 * K + d0;
+    s.b0 = (n2 * K2 + n1 * K + n0) / a0;
+    s.b1 = 2.0 * (n0 - n2 * K2) / a0;
+    s.b2 = (n2 * K2 - n1 * K + n0) / a0;
+    s.a1 = 2.0 * (d0 - d2 * K2) / a0;
+    s.a2 = (d2 * K2 - d1 * K + d0) / a0;
+    return s;
+}
+// the bilinear constant prewarped at w rad/s (kept just below Nyquist)
+double prewarp (double w, double fs) noexcept
+{
+    w = std::min (w, 0.999 * pi * fs);
+    return w / std::tan (w / (2.0 * fs));
+}
+// a bell with gain G at w0 (digital rad), DC gain 1, Nyquist gain G1 and bandwidth dw at the level GB (Orfanidis 1997)
+Section prescribedBell (double G, double GB, double G1, double w0, double dw) noexcept
+{
+    Section s;
+    const double G0 = 1.0;
+    const double F = std::abs (G * G - GB * GB), G00 = std::abs (G * G - G0 * G0), F00 = std::abs (GB * GB - G0 * G0);
+    if (F < 1e-15 || G00 < 1e-15)
+        return s;
+    const double G01 = std::abs (G * G - G0 * G1), G11 = std::abs (G * G - G1 * G1);
+    const double F01 = std::abs (GB * GB - G0 * G1), F11 = std::max (std::abs (GB * GB - G1 * G1), 1e-30);
+    const double W2 = std::sqrt (G11 / G00) * std::pow (std::tan (w0 * 0.5), 2.0);
+    const double DW = (1.0 + std::sqrt (F00 / F11) * W2) * std::tan (std::min (dw, 0.999 * pi) * 0.5);
+    const double C = F11 * DW * DW - 2.0 * W2 * (F01 - std::sqrt (F00 * F11));
+    const double D = 2.0 * W2 * (G01 - std::sqrt (G00 * G11));
+    const double A = std::sqrt (std::max (0.0, (C + D) / F)), B = std::sqrt (std::max (0.0, (G * G * C + GB * GB * D) / F));
+    const double n = 1.0 + W2 + A;
+    s.b0 = (G1 + G0 * W2 + B) / n;
+    s.b1 = -2.0 * (G1 - G0 * W2) / n;
+    s.b2 = (G1 - B + G0 * W2) / n;
+    s.a1 = -2.0 * (1.0 - W2) / n;
+    s.a2 = (1.0 + W2 - A) / n;
+    return s;
+}
+// the cookbook bell with its bandwidth prewarped (Q given as the analog Q; bandwidth in octaves kept at w0)
+Section bandwidthBell (double db, double Qc, double w0) noexcept
+{
+    Section s;
+    const double A = std::pow (10.0, db / 40.0), w = std::min (w0, 0.999 * pi);
+    const double bw = 2.0 / std::log (2.0) * std::asinh (1.0 / (2.0 * Qc));
+    const double al = std::sin (w) * std::sinh (std::log (2.0) * 0.5 * bw * w / std::sin (w));
+    const double a0 = 1.0 + al / A;
+    s.b0 = (1.0 + al * A) / a0; s.b1 = -2.0 * std::cos (w) / a0; s.b2 = (1.0 - al * A) / a0;
+    s.a1 = -2.0 * std::cos (w) / a0; s.a2 = (1.0 - al / A) / a0;
+    return s;
+}
+// Renaissance EQ shelf law (fitted, 8 gains × 6 Qs, 1.2e-4 relative): the centre is m × the set frequency (low) or the
+// set frequency / m (high), the shared s-term b = beta × centre; Q clamped to 0.707 … 1.414
+constexpr double shelfM[15] = { 0.420647, -0.0204507, -0.0102655, -0.003422, -0.0007764, -0.6859482, 0.0217492, 0.0117397,
+                                0.004093, 0.3618043, 0.0080709, 0.0034372, 0.0855262, -0.0184951, -0.1371341 };
+constexpr double shelfCb[5] = { -0.001115, -0.0049426, -0.0145809, -0.0289102, 0.9716466 }; // descending powers of g / 18
+void reqShelfLaw (double db, double q, double& m, double& beta) noexcept
+{
+    const double qq = std::clamp (q, 0.70711, 1.41421), x = std::log (qq), y = std::clamp (db, -18.0, 18.0) / 18.0;
+    double lm = 0.0;
+    int k = 0;
+    for (int i = 0; i <= 4; ++i)
+        for (int j = 0; i + j <= 4; ++j)
+            lm += shelfM[k++] * std::pow (x, i) * std::pow (y, j);
+    double cb = 0.0;
+    for (double c : shelfCb) cb = cb * y + c;
+    m = std::exp (lm);
+    beta = cb / qq;
+}
+// Renaissance EQ cut law: the second-order section's Q (ln Q2 = poly (ln q), q clamped 0.707 … 1.414); its zeros at
+// s² = −(1 − 1/Q2) w0² (a notch for Q2 > 1, a shelf-like floor below)
+double reqCutQ (double q) noexcept
+{
+    const double x = std::log (std::clamp (q, 0.70711, 1.41421));
+    return std::exp ((((-0.1107541 * x + 0.15263) * x - 0.1760575) * x + 1.1589371) * x - 2.1e-6);
+}
+// Q10's Q → the bell's analog Q: Bell Qc = q · 0.0908542 (√G + 1/√G); PQ-Bell Qc = q · k(|g|), k measured every 1.5 dB
+constexpr double pqK[13] = { 0.2355, 0.2542, 0.3119, 0.4093, 0.5503, 0.7408, 0.9882, 1.3020, 1.6938, 2.1775, 2.7695, 3.4892, 4.3591 };
+double q10Qc (double db, double q, bool pq) noexcept
+{
+    const double G = std::pow (10.0, db / 20.0);
+    if (! pq)
+        return q * 0.0908542 * (std::sqrt (G) + 1.0 / std::sqrt (G));
+    const double x = std::clamp (std::abs (db) / 1.5, 0.0, 12.0);
+    const int i = std::min ((int) x, 11);
+    const double f = x - i;
+    return q * std::exp (std::log (pqK[i]) * (1.0 - f) + std::log (pqK[i + 1]) * f);
+}
+} // namespace wv
+} // namespace
+
+// the sections of a band under the Waves law (code > 0); returns the count
+int wavesDesign (const EffectParams& params, int band, double fs, std::array<Section, maxSections>& out) noexcept
+{
+    if (! bandPower (params, band)) return 0;
+    const auto code = (WaveCode) waveCode (params[(std::size_t) (wavesBandParam0 + band)]);
+    const double f = hz (params[(std::size_t) param (band, 1)]);
+    const double db = gainDb (params[(std::size_t) param (band, 2)]) * gainScale (params[(std::size_t) scaleParam]);
+    const double qv = q (params[(std::size_t) param (band, 3)]);
+    const double w = 2.0 * pi * f, w0 = w / fs;
+    const double G = std::pow (10.0, db / 20.0), A = std::pow (10.0, db / 40.0);
+    switch (code)
+    {
+        case WaveCode::reqBell:
+        {
+            if (std::abs (db) < 1e-9) return 0;
+            const std::complex<double> s (0.0, 0.5 * fs / f);
+            const double G1 = std::abs ((s * s + s * (G / qv) + 1.0) / (s * s + s / qv + 1.0));
+            out[0] = wv::prescribedBell (G, std::sqrt ((1.0 + G * G) * 0.5), G1, std::min (w0, 0.999 * pi), w0 / qv);
+            return 1;
+        }
+        case WaveCode::q10Bell:
+        case WaveCode::q10PqBell:
+            if (std::abs (db) < 1e-9) return 0;
+            out[0] = wv::bandwidthBell (db, wv::q10Qc (db, 4.0 * qv, code == WaveCode::q10PqBell), w0);
+            return 1;
+        case WaveCode::reqLowShelf:
+        case WaveCode::reqHighShelf:
+        {
+            if (std::abs (db) < 1e-9) return 0;
+            double m = 1.0, beta = 1.0;
+            wv::reqShelfLaw (db, qv, m, beta);
+            const bool high = code == WaveCode::reqHighShelf;
+            const double wc = high ? w / m : w * m, b = beta * wc, K = wv::prewarp (wc, fs);
+            out[0] = high ? wv::bilinear (A, b, wc * wc, 1.0 / A, b, wc * wc, K) : wv::bilinear (1.0, b, A * wc * wc, 1.0, b, wc * wc / A, K);
+            return 1;
+        }
+        case WaveCode::rbjLowShelf:
+        case WaveCode::rbjHighShelf:
+        {
+            if (std::abs (db) < 1e-9) return 0;
+            const double Qs = std::clamp (qv, 0.70711, 1.41421), sa = std::sqrt (A), K = wv::prewarp (w, fs);
+            out[0] = code == WaveCode::rbjLowShelf ? wv::bilinear (A, A * sa / Qs * w, A * A * w * w, A, sa / Qs * w, w * w, K)
+                                                   : wv::bilinear (A * A, A * sa / Qs * w, A * w * w, 1.0, sa / Qs * w, A * w * w, K);
+            return 1;
+        }
+        case WaveCode::reqHighPass:
+        case WaveCode::reqLowPass:
+        {
+            const double Q2 = wv::reqCutQ (qv), z = 1.0 - 1.0 / Q2, K = wv::prewarp (w, fs);
+            if (code == WaveCode::reqHighPass)
+            {
+                out[0] = wv::bilinear (0.0, 1.0, 0.0, 0.0, 1.0, w, K);                       // s / (s + w)
+                out[1] = wv::bilinear (1.0, 0.0, z * w * w, 1.0, w / Q2, w * w, K);          // (s² + z w²) / (s² + s w/Q2 + w²)
+            }
+            else
+            {
+                out[0] = wv::bilinear (0.0, 0.0, w, 0.0, 1.0, w, K);                         // w / (s + w)
+                out[1] = wv::bilinear (z, 0.0, w * w, 1.0, w / Q2, w * w, K);                // (z s² + w²) / (s² + s w/Q2 + w²)
+            }
+            return 2;
+        }
+        case WaveCode::lowShelf1:
+        case WaveCode::highShelf1:
+        {
+            if (std::abs (db) < 1e-9) return 0;
+            const double K = wv::prewarp (w, fs);
+            out[0] = code == WaveCode::lowShelf1 ? wv::bilinear (0.0, 1.0, A * w, 0.0, 1.0, w / A, K)
+                                                 : wv::bilinear (0.0, A, w, 0.0, 1.0 / A, w, K);
+            return 1;
+        }
+        case WaveCode::butterHighPass:
+        case WaveCode::butterLowPass:
+        {
+            const double K = wv::prewarp (w, fs), qb = std::sqrt (0.5);
+            out[0] = code == WaveCode::butterHighPass ? wv::bilinear (1.0, 0.0, 0.0, 1.0, w / qb, w * w, K)
+                                                      : wv::bilinear (0.0, 0.0, w * w, 1.0, w / qb, w * w, K);
+            return 1;
+        }
+        default: return 0;
+    }
+}
+
 int design (const EffectParams& params, int band, double sampleRate, std::array<Section, maxSections>& out, double extraDb) noexcept
 {
+    // round 190mm: a band under the Waves law (only the Waves EQ translators set it; 0 for every other project)
+    if (params[(std::size_t) wavesLawParam] > 0.0f && params[(std::size_t) (wavesBandParam0 + band)] > 0.0f)
+        return wavesDesign (params, band, sampleRate, out);
     Analog a[maxSections];
     const int n = analogSections (params, band, a, extraDb);
     const double f0 = std::min (hz (params[(std::size_t) param (band, 1)]), 0.4999 * sampleRate);
