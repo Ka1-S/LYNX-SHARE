@@ -6866,6 +6866,10 @@ private:
                 lineSlot.params[(std::size_t) lynx::echosuite::echoform::lineLaw] = 1.0f;
                 lineSlot.lockState = true;
                 song.mixer[16].effects.push_back (lineSlot);
+                // (round 190mo: track 4 is the fifth; the song had four tracks here, so this wrote one byte past the
+                // vector's end: the heap corruption of the Linux self-test, "corrupted size vs. prev_size" later on)
+                if (song.playlistTracks.size() < 5)
+                    song.playlistTracks.resize (5);
                 song.playlistTracks[4].soloLock = true;
                 song.mixer[1].lockState = true; // (the default mixer has inserts 1…16)
                 song.mixer[2].solo = true;
