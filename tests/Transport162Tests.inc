@@ -208,6 +208,8 @@ TEST (transport162_follow_and_stop)
 TEST (transport162_meter_scale_marks)
 {
     using namespace lynx::meters;
+    // (round 190mf: the straight -60 … +6 dB axis is the Clip-launch and Simple layouts' scale; Pattern uses FL's law)
+    lynx::layoutstyle::setCurrent (lynx::layoutstyle::Style::clipLaunch);
     CHECK (scalePosition (-60.0f) == 0.0f && scalePosition (6.0f) == 1.0f && std::abs (scalePosition (0.0f) - 60.0f / 66.0f) < 1e-6f);
     // a tall meter shows the whole FL-like set, top down
     const auto tall = scaleMarks (400.0f, 11.0f);
@@ -223,4 +225,5 @@ TEST (transport162_meter_scale_marks)
         for (std::size_t i = 1; i < marks.size(); ++i)
             CHECK ((scalePosition ((float) marks[i - 1]) - scalePosition ((float) marks[i])) * h >= 11.0f - 1e-3f);
     }
+    lynx::layoutstyle::setCurrent (lynx::layoutstyle::Style::pattern);
 }

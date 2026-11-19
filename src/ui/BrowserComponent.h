@@ -500,6 +500,10 @@ private:
     void runLoopSearch();
     void loopsAnswered (std::uint64_t id, std::vector<loopkeys::LoopInfo> infos, bool partial, bool truncated);
     void applyLoopFilter();
+    // round 190mf (DS-41): the Simple layout's loop row detail ("4 bars · Synth · Moody, Bright · 149bpm · B"); the
+    // length is read in the background (ui/LoopBrowserParts.inc LoopLengths) and filled in when it arrives
+    juce::String simpleLoopDetail (const loopkeys::LoopInfo& info, bool& lengthPending) const;
+    void loopLengthsArrived();
     std::unique_ptr<LoopPanel> loopPanel;
     std::unique_ptr<LoopsButton> loopsButton;
     bool loopsShown = false, loopsAnswer = false, loopsTruncated = false, loopNearKey = false;

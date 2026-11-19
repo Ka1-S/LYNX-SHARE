@@ -17905,3 +17905,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Details190ldPluginTests.inc" // round details2_190ld: Vocoder band levels published while watched, Patcher activity measured only while watched
 #include "Details190lrTests.inc" // round details3_190lr: the Simple Drum Machine (BandLab steps), Live scene follow actions
 #include "Details190lxTests.inc" // round details4_190lx: Live slot-block clipboard, separate Punch-In / Punch-Out
+#include "Details190mfTests.inc" // round details5_190mf: FL normal meter law (Pattern default), Channel rack "+" menu cache, details pass 5

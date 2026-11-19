@@ -71,6 +71,10 @@ void compressorToParams (const CompressorState& s, float* params) noexcept;
 const char* limiterParamName (int index) noexcept;
 const char* compressorParamName (int index) noexcept;
 std::string limiterParamText (int index, float value);
+// Round 190mf (DP-26, capture 190mf A2): the compressor's static transfer (FL's curve while the KNEE knob is held): the
+// output level (linear, before the gain knob) for an input level, from the slot's parameters (threshold, ratio, knee):
+// the same arithmetic as the engine's compressor gain; level 1 = 0 dB.
+float limiterCompTransfer (const EffectParams& params, float level) noexcept;
 std::string compressorParamText (int index, float value);
 
 // `initial` (may be null): the slot's parameters, so the latency is known after prepare(), before the first block

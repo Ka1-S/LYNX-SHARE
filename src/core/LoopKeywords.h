@@ -173,6 +173,9 @@ inline int rootDistance (int a, int b) noexcept
 
 // "120", "Am", "C#" — the results list's Tempo and Key columns
 std::string tempoText (const LoopInfo& loop);
+// Round 190mf (DS-41, BandLab's "4 bars · Synth · …"): a loop's length in whole bars of `beatsPerBar` beats at its own
+// tempo (0: the tempo or the length is not known, or it is under half a bar).
+int loopBars (double seconds, double tempo, int beatsPerBar = 4) noexcept;
 std::string keyText (const LoopInfo& loop);
 
 // The keyword-button layout the user changed (GarageBand: Control-click a button for another keyword, drag one onto

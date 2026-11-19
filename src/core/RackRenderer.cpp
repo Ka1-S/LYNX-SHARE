@@ -3758,7 +3758,8 @@ static bool hasLiveMeters (EffectKind kind) noexcept
            || kind == EffectKind::xyController || kind == EffectKind::xyzController // round 164: the pad's target and outputs
            || kind == EffectKind::peakController // issue #66: its display's Peak + LFO, Peak and LFO lines
            || kind == EffectKind::grossBeat // round 190ih: its playback locator and the playing / queued slots
-           || kind == EffectKind::vocoder; // round 190ld: Fruity Vocoder's live band levels (only while its editor shows them)
+           || kind == EffectKind::vocoder // round 190ld: Fruity Vocoder's live band levels (only while its editor shows them)
+           || kind == EffectKind::fruityMultiband; // round 190mf: Fruity Multiband Compressor's band meters (the same)
 }
 
 RackState::SlotPlan RackState::planSlot (const RackState& state, int track, std::size_t i) noexcept

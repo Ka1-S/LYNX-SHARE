@@ -1057,6 +1057,57 @@ private:
 };
 } // namespace
 
+float limiterCompTransfer (const EffectParams& params, float level) noexcept
+{
+    std::array<int, limiterControls> p {};
+    bool exact = false;
+    readLimiter (params, p, exact);
+    if (! (level > 0.0f))
+        return 0.0f;
+    if (p[8] >= 1000) // (compressor off)
+        return level;
+    // LimiterEngine::setThreshold / setRatio / setKnee / compressorGain, without the gain knob
+    const auto t = law7 (p[8]);
+    const auto threshold = t <= 0.001f ? 0.001f : t;
+    const auto thresholdDb = (float) (std::log10 ((double) threshold) * 20.0);
+    const auto clampLevel = threshold * 100.0f;
+    const auto rv = p[9];
+    const auto re = std::exp ((double) ((float) std::abs (rv) * 0.001f) * std::log (51.0));
+    const auto ratioFactor = rv < 1 ? (float) ((double) (float) (re - 1.0) * 0.06 + 1.0) : (float) (1.0 / ((double) (float) (re - 1.0) * 0.38 + 1.0));
+    const auto ratioSlope = ratioFactor - 1.0f;
+    const auto kv = p[10];
+    const int knee = kv == 0 ? 0 : (kv > 0 ? 1 : -1);
+    const auto ke = std::exp ((double) std::fabs ((float) kv * 0.001f) * std::log (201.0));
+    float kneeAmount, kneeScale, kneeInverse = 1.0f;
+    if (kv < 1)
+    {
+        kneeAmount = (float) ((double) (float) (ke - 1.0) * 0.001);
+        kneeScale = (float) std::log ((double) (kneeAmount + 1.0f));
+        kneeInverse = kneeAmount > 0.0f ? 1.0f / kneeAmount : 1.0f;
+    }
+    else
+    {
+        kneeAmount = (float) ((double) (float) (ke - 1.0) * 0.005);
+        kneeScale = (float) (1.0 / std::log ((double) (kneeAmount + 1.0f)));
+    }
+    const auto v = level > clampLevel ? clampLevel : level;
+    auto over = (float) std::log10 ((double) v) * 20.0f - thresholdDb;
+    float d;
+    if (knee != 0)
+    {
+        auto c = over + 1.0f;
+        if (knee > 0)
+            c = (float) std::log ((double) (c * kneeAmount + 1.0f)) * kneeScale;
+        else
+            c = ((float) std::exp ((double) (c * kneeScale)) - 1.0f) * kneeInverse;
+        d = (c - 1.0f) * ratioFactor - over;
+    }
+    else
+        d = over * ratioSlope;
+    const auto g = (float) std::exp ((double) (d * 0.115129255f));
+    return std::isfinite (g) ? std::min (g, 1.0f) * level : level;
+}
+
 // --- states ----------------------------------------------------------------------------------------------------
 
 std::optional<LimiterState> parseLimiter (const std::vector<std::uint8_t>& d)

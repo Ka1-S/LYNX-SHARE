@@ -414,6 +414,14 @@ std::pair<double, double> tempoBounds (int index, double bpm)
     return { r[(std::size_t) index].min, r[(std::size_t) index].max };
 }
 
+int loopBars (double seconds, double tempo, int beatsPerBar) noexcept
+{
+    if (! (seconds > 0.0) || ! (tempo > 0.0) || beatsPerBar <= 0)
+        return 0;
+    const auto bars = seconds * tempo / 60.0 / beatsPerBar;
+    return bars < 0.5 ? 0 : (int) std::lround (bars);
+}
+
 std::string tempoText (const LoopInfo& loop)
 {
     if (! (loop.tempo > 0.0))

@@ -220,6 +220,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
                         safe->readPluginDatabaseAgain();
                 });
             });
+        quickpick::setPluginDatabaseWatched (true); // (round 190mf: the menus read it again only after a change)
     }
     addChildComponent (updateBar);
     addChildComponent (remoteControlBar);
@@ -1043,6 +1044,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 MainComponent::~MainComponent()
 {
     EffectsPanel::onHotSwapSlot = nullptr; // (round 190ce: it calls this window)
+    if (pluginDatabaseWatcher != nullptr) // (round 190mf: nobody watches the folder any more)
+        quickpick::setPluginDatabaseWatched (false);
     workflowextras::bind (nullptr); // (round 190iu)
     workflowextras::onChanged = nullptr;
     workflowextras::tempTools().toolKey (temptool::Editor::none, 0, EditTool::pencil, EditTool::pencil, nullptr, nullptr);
@@ -4127,7 +4130,10 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
     if (! clipLaunch && detailView != nullptr) // (round 183a: a docked Piano roll goes back to its panel)
         detailView->releaseEditor();
     layoutStyle = style;
+    const bool meterLawChanged = layoutstyle::current() != style && ! meterscale::alternate();
     layoutstyle::setCurrent (style); // (round 190cm: the clip grid's and the audio editor's Ableton-style keys follow it)
+    if (meterLawChanged) // (round 190mf: FL's meter law in Pattern, the straight axis in the other layouts)
+        mixer.repaint();
     BrowserComponent::layoutStyleChanged(); // (round 190ke: "LYNX content" and its tags in the Simple layout)
     if (! clipLaunch && getMapMode() != remotemap::Mode::off) // (round 190ef: the map modes belong to the Clip-launch layout)
         setMapMode (remotemap::Mode::off);

@@ -1135,6 +1135,62 @@ void movePoint (std::vector<EditPoint>& points, int index, double x, float y)
     p.x = std::clamp (x, points[(std::size_t) index - 1].x, points[(std::size_t) index + 1].x);
 }
 
+void slidePoint (std::vector<EditPoint>& points, int index, double x, float y)
+{
+    if (index < 0 || index >= (int) points.size())
+        return;
+    auto& p = points[(std::size_t) index];
+    p.y = std::clamp (y, 0.0f, 1.0f);
+    if (index == 0 || index + 1 == (int) points.size())
+        return;
+    const auto end = points.back().x;
+    const auto from = p.x;
+    p.x = std::clamp (x, points[(std::size_t) index - 1].x, end);
+    const auto dx = p.x - from;
+    auto prev = p.x;
+    for (auto i = (std::size_t) index + 1; i + 1 < points.size(); ++i)
+    {
+        points[i].x = std::clamp (points[i].x + dx, prev, end);
+        prev = points[i].x;
+    }
+}
+
+void stepDraw (std::vector<EditPoint>& points, double x0, double x1, float y)
+{
+    if (points.size() < 2)
+        return;
+    x0 = std::clamp (x0, 0.0, barLength);
+    x1 = std::clamp (x1, x0, barLength);
+    y = std::clamp (y, 0.0f, 1.0f);
+    // the old level where the step ends (a hold segment keeps the level of the point it starts from)
+    Slot old;
+    setPoints (old, points);
+    const auto after = levelAt (old, x1);
+    constexpr double eps = 1.0e-9;
+    // the points strictly inside the step go (the first and the last of the envelope stay, moved in level only)
+    std::vector<EditPoint> out;
+    for (std::size_t i = 0; i < points.size(); ++i)
+    {
+        const auto& p = points[i];
+        const auto edge = i == 0 || i + 1 == points.size();
+        if (! edge && p.x > x0 - eps && p.x < x1 - eps)
+            continue;
+        out.push_back (p);
+    }
+    // the step's start: the first point when it starts at 0, else a hold point
+    if (x0 <= eps)
+        out.front().y = y;
+    else
+        addPoint (out, x0, y, 2, 0.0f);
+    // its end: back to the old level, unless a point is there already
+    const bool endHasPoint = std::any_of (out.begin(), out.end(), [x1] (const EditPoint& p) { return std::abs (p.x - x1) < eps; });
+    if (! endHasPoint && x1 < barLength - eps)
+        addPoint (out, x1, after, 2, 0.0f);
+    if (x1 >= barLength - eps) // (a step to the bar's end: the end point holds the step's level)
+        out.back().y = y;
+    points = std::move (out);
+}
+
 float levelAt (const Slot& slot, double beat)
 {
     if (slot.points.empty())

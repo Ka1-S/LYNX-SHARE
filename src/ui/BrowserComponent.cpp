@@ -59,7 +59,9 @@
  #endif
 #endif
 
+#include <deque>
 #include <mutex>
+#include <unordered_map>
 #include "engine/PluginHost.h"
 #include "engine/Text.h"
 #include "ui/HintBar.h"
@@ -82,6 +84,7 @@
 
 namespace lynx
 {
+juce::ChangeBroadcaster& loopLengthsRead(); // (round 190mf, ui/LoopBrowserParts.inc: the Simple loop rows' lengths read)
 namespace
 {
 bool isAudio (const juce::File& f)
@@ -1171,6 +1174,16 @@ public:
         flatNodes = std::move (nodes);
         selected = hovered = -1;
         rebuild();
+    }
+
+    // round 190mf: flat mode: changes some rows' dimmed detail in place (the Simple loop list's lengths as they are read)
+    void updateDetails (const std::function<bool (Node&)>& change)
+    {
+        bool any = false;
+        for (auto& n : flatNodes)
+            any = change (*n) || any;
+        if (any)
+            repaint();
     }
 
     void setStatus (const juce::String& text)
@@ -3510,6 +3523,7 @@ BrowserComponent::BrowserComponent (AudioEngine& e, Role r)
     searcher = SearchShared::get();
     searcher->statusChanged.addChangeListener (this);
     searcher->indexChanged.addChangeListener (this);
+    loopLengthsRead().addChangeListener (this); // (round 190mf: the Simple loop rows' lengths)
     juce::Timer::callAfterDelay (4000, [safe = juce::Component::SafePointer<BrowserComponent> (this)] {
         if (safe != nullptr && safe->role == Role::main && ! safe->allRoots.isEmpty())
             safe->searcher->refreshInBackground (toPaths (safe->withMerged (safe->allRoots))); // (round 190hd: the indexer process)
@@ -5075,6 +5089,11 @@ void BrowserComponent::setProjectFile (const juce::File& file)
 
 void BrowserComponent::changeListenerCallback (juce::ChangeBroadcaster* source)
 {
+    if (source == &loopLengthsRead())
+    {
+        loopLengthsArrived();
+        return;
+    }
     if (source == &searcher->statusChanged)
     {
         indexStatusChanged();
@@ -5149,6 +5168,7 @@ BrowserComponent::~BrowserComponent()
     engine.removeChangeListener (this);
     searcher->statusChanged.removeChangeListener (this);
     searcher->indexChanged.removeChangeListener (this);
+    loopLengthsRead().removeChangeListener (this);
     searcher->service->cancelSearch();
     similar->statusChanged.removeChangeListener (this);
     if (similarId != 0)

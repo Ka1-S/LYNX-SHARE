@@ -1416,6 +1416,11 @@ void PianoRollComponent::paint (juce::Graphics& g)
             textcache::drawText (g, laneBox.getText(), lane.reduced (8, 3).removeFromTop (14), juce::Justification::topLeft, true);
         }
 
+        // round 190mf (DL-80, capture 190mf B2): in the Clip View's Live look the hovered note's velocity marker and its
+        // stem turn Live's blue (91,140,255); while a velocity is dragged the selected markers are Live's light cyan
+        // (176,221,235), and the lane header shows the value at the marker's height (paint's lane label below)
+        const auto liveVelocity = liveNotes() && laneBox.getSelectedId() == laneVelocity;
+        liveVelocityReadout = {};
         for (int i = 0; i < (int) pattern.notes.size() && ! eventLaneTarget() && mpeLanes.empty(); ++i)
         {
             const auto& n = pattern.notes[(std::size_t) i];
@@ -1434,6 +1439,12 @@ void PianoRollComponent::paint (juce::Graphics& g)
             if (n.muted)
                 colour = noteMuted;
             const auto hovered = i == hover.note && drag == Drag::none;
+            if (liveVelocity && hovered)
+                colour = juce::Colour (91, 140, 255);
+            else if (liveVelocity && drag == Drag::velocity && isSelected (i))
+                colour = juce::Colour (176, 221, 235);
+            if (liveVelocity && ((hovered && lane.contains (lastMouse)) || (drag == Drag::velocity && isSelected (i) && liveVelocityReadout.note < 0)))
+                liveVelocityReadout = { i, top, juce::roundToInt (n.velocity * 127.0f) };
             // the velocity lane shows a note's Velocity Range (round 187c) as a shaded box over the note's length, from
             // its velocity to where the range reaches, as Live 12 draws it [LIVE 12.4 shot, live-02]
             if (laneBox.getSelectedId() == laneVelocity && n.velocityRange != 0.0f)
@@ -1699,7 +1710,15 @@ void PianoRollComponent::paint (juce::Graphics& g)
         const auto lane = velocityArea();
         g.setColour (bg2);
         g.fillRect (0, lane.getY(), keyboardWidth, lane.getHeight());
-        juce::ignoreUnused (lane); // the property combo sits here
+        // the property combo sits here; round 190mf (DL-80): Live's value at the hovered / dragged marker's height
+        if (liveVelocityReadout.note >= 0)
+        {
+            g.setColour (juce::Colour (181, 181, 181));
+            g.setFont (theme::font (theme::type::caption, true));
+            const auto y = juce::jlimit ((float) lane.getY() + 24.0f, (float) lane.getBottom() - 12.0f, liveVelocityReadout.y - 6.0f);
+            textcache::drawText (g, juce::String (liveVelocityReadout.value), juce::Rectangle<float> (4.0f, y, (float) keyboardWidth - 10.0f, 12.0f),
+                                 juce::Justification::centredRight, false);
+        }
     }
     if (mpeStacked) // round 190jd: the MPE tab's left column (icons, scales), its footer and the hovered value
         paintMpeTabFrame (g);
@@ -2610,6 +2629,8 @@ void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
         case Drag::velocity:
             applyVelocity (lastVelocityX, e.x, e.y);
             lastVelocityX = e.x;
+            if (liveNotes()) // (round 190mf, DL-80: Live's value in the lane header follows the drag)
+                repaint (0, velocityArea().getY(), keyboardWidth, velocityArea().getHeight());
             return;
 
         case Drag::eventDraw:
@@ -3083,6 +3104,11 @@ void PianoRollComponent::mouseMove (const juce::MouseEvent& e)
     if (mpeStacked) // round 190jd: the value ghost point on a lane's line
         updateMpeGhost (e.getPosition());
     updateHover (e.getPosition(), e.mods);
+    if (const auto inLane = velocityArea().contains (e.getPosition()); liveNotes() && inLane != liveLaneHover) // (round 190mf, DL-80)
+    {
+        liveLaneHover = inLane;
+        repaint (0, velocityArea().getY(), getWidth(), velocityArea().getHeight());
+    }
 }
 
 void PianoRollComponent::mouseExit (const juce::MouseEvent&)
@@ -3380,6 +3406,31 @@ std::unique_ptr<juce::Component> PianoRollComponent::makeNoteInspectorForSnapsho
         return nullptr;
 
     return makeNoteInspector (engine, singleNote ? std::vector<int> { selection.front() } : selection, selection.front());
+}
+
+int PianoRollComponent::liveVelocityHoverForSnapshot (bool dragging)
+{
+    setDocked (true);
+    liveNoteColour = juce::Colour (0xff3fb7c9);
+    rowHeight = 18;
+    pixelsPerTick = 64.0 / ticksPerStep;
+    resized();
+    scrollToNotes (false);
+    const auto notes = channelNotes();
+    if (notes.empty())
+        return -1;
+    const auto& n = currentPattern (engine.getSong()).notes[(std::size_t) notes.front()];
+    const auto lane = velocityArea();
+    const auto at = juce::Point<int> ((int) tickToX ((double) n.start), lane.getBottom() - 2 - juce::roundToInt ((float) (lane.getHeight() - 8) * n.velocity));
+    lastMouse = at;
+    updateHover (at, {});
+    if (dragging)
+    {
+        selection = { notes.front() };
+        drag = Drag::velocity;
+    }
+    repaint();
+    return juce::roundToInt (n.velocity * 127.0f);
 }
 
 ui::Hint PianoRollComponent::hoverForSnapshot()
