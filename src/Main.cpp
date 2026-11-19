@@ -235,6 +235,9 @@
 #include "ui/ShortcutManager.h"
 #include "ui/NoteToolDialogs.h"
 #include "ui/ChordStripView.h" // round 190kd (--prchord190kd)
+#include "ui/ChordHelper.h" // round 190mc (--modal190mc)
+#include "core/TransistorBass.h" // round 190mc (--modal190mc)
+#include "core/ModelParams.h" // round 190mc (--modal190mc)
 #include "ui/EventEditor.h"
 #include "ui/AudioEditor.h"
 #include "ui/SampleProperties.h"
@@ -2159,6 +2162,13 @@ public:
         if (args.contains ("--prchord190kd"))
         {
             setApplicationReturnValue (runPrChordShot190kd (juce::File (args[args.indexOf ("--prchord190kd") + 1].unquoted())) ? 0 : 1);
+            quit();
+            return;
+        }
+        // --modal190mc <folder> (round 190mc: the Chord helper, Transistor Bass's program row): src/ModalShot190mc.inc
+        if (args.contains ("--modal190mc"))
+        {
+            setApplicationReturnValue (runModalShot190mc (juce::File (args[args.indexOf ("--modal190mc") + 1].unquoted())) ? 0 : 1);
             quit();
             return;
         }
@@ -35182,6 +35192,7 @@ private:
 #include "UndoGesture190jv.inc" // round 190jv
 #include "TrimShot190jv.inc" // round 190jv
 #include "PrChordShot190kd.inc" // round 190kd
+#include "ModalShot190mc.inc" // round 190mc
 #include "PrShot190jv.inc" // round 190jv
 #include "HostPlay190ll.inc" // round 190ll (issue #199)
 #include "IssuesShot190ll.inc" // round 190ll (issues #200, #201, #203)

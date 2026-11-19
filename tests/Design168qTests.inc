@@ -115,7 +115,7 @@ TEST (design168q_engine_param_tables)
     }
     CHECK (keplerParams().size() == 36);
     CHECK (sawerParams().size() == 94);
-    CHECK (transistorBassParams().size() == 42 + 2 + 5 * 16); // (the sequence rows: round 168q2)
+    CHECK (transistorBassParams().size() == 42 + 2 + 5 + 5 * 16); // (the sequence rows: round 168q2; FL's program row: round 190mc)
     const auto* scale = findEngineParam (beepMapEngineParams(), 2);
     CHECK (scale != nullptr && scale->stepped && scale->raw (1.0f) == 2.0f && scale->raw (0.5f) == 1.0f);
     const auto* wave = findEngineParam (granulizerEngineParams(), 3);

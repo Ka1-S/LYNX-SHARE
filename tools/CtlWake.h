@@ -702,6 +702,11 @@ inline bool context (const std::string& key, const ChannelDef& c, const std::vec
             for (std::size_t j = 0; j < controls.size(); ++j)
             {
                 const auto& k = controls[j];
+                // (round 190mc) Transistor Bass's program row picks WHICH program / patch / sequence the other controls
+                // edit (FL's PROGRAM, AF, SEQUENCE, TRANSP., PATCH): a random setting keeps them, and draws no number for
+                // them, so the other controls get the values they had before the row existed
+                if (ctx.instrument == InstrumentKind::transistorbass && k.index >= tbprog::program && k.index <= tbprog::patch)
+                    continue;
                 std::string lower = k.name;
                 std::transform (lower.begin(), lower.end(), lower.begin(), [] (unsigned char ch) { return (char) std::tolower (ch); });
                 const auto r = rnd();

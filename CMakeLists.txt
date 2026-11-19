@@ -693,6 +693,7 @@ if(LYNX_BUILD_APP)
         src/ui/SessionMixer.cpp
         src/ui/MapMode.cpp
         src/ui/MidiToolsPanel.cpp
+        src/ui/ChordHelper.cpp
         src/ui/TouchKeyboard.cpp
         src/ui/QuickAddPalette.cpp
         src/ui/PluginPickerView.cpp

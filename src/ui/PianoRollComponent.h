@@ -22,6 +22,8 @@
 
 namespace lynx
 {
+class ChordHelperPanel; // (round 190mc, ui/ChordHelper.h)
+
 // Piano Roll for the selected channel in the current pattern.
 //  - a tool strip (Pencil, Brush, Eraser, Mute, Knife, Lasso, Zoom, Listen; the wheel over it switches);
 //    with the Pencil: left click on empty space creates a note (default length, or the last used one)
@@ -175,8 +177,15 @@ public:
     // nothing is selected: `selected` false), and its result becomes the selection.
     std::vector<int> midiToolNotes (bool& selected) const { selected = ! selection.empty(); return selectionOrAll(); }
     void selectMidiToolResult (std::vector<int> indices) { setSelection (std::move (indices)); }
+    // round 190mc: notes another panel of this editor just added (the Chord helper's insert) become the selection; the
+    // note count it made is this editor's own, not an outside change that drops the selection
+    void selectOwnNewNotes (std::vector<int> indices);
     std::int64_t midiToolGrid() const { return gridTicks(); }
     void openMidiTools(); // Tools › MIDI Tools: the panel in its own small window
+    // Tools › Chord helper (round 190mc, discussion #105): modal interchange from the selected chord, in its own small
+    // window in the shown layout's look; it follows this editor's selection while it is open
+    void openChordHelper();
+    ChordHelperPanel* chordHelperForTests() const noexcept;
     std::int64_t markerKeyTickForTests() const { return markerKeyTick(); }
     juce::String chordBubbleTextForTests() const { return chordBubble.isVisible() ? chordBubble.getText() : juce::String(); }
 
@@ -712,6 +721,7 @@ private:
     juce::uint32 chordBubbleUntil = 0;
     std::vector<int> chordBubbleSelection;     // the selection it was shown for
     std::vector<int> chordPanelSelection;      // the selection the toolbar's chord panel last heard of
+    juce::Component::SafePointer<juce::Component> chordHelper; // the open Chord helper (round 190mc)
     void updateChordBubble();
     void paintBackgroundWave (juce::Graphics& g, juce::Rectangle<int> grid);
     void spaceOperation (int kind);            // 0 insert, 1 slice & insert, 2 delete, 3 trim
