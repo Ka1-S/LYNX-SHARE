@@ -20,6 +20,7 @@
 #include "core/LynxVerbs.h"
 #include "core/LynxTune.h"
 #include "core/MixSuite.h"
+#include "core/LowLifterFl.h"
 #include "core/VocalPitch.h"
 #include "core/VoiceTools.h"
 #include "core/VoiceShift.h"
@@ -502,10 +503,10 @@ translate = waves-sslcomp-bus
 preset = Style=0.9; Threshold=1
 
 [waves-compressors]
-product = Waves compressor (CLA-3A / C1 / API-2500)
+product = Waves compressor (CLA-3A / C1)
 vendor = Waves
 lynx = Compressor
-waves = CLA-3A; C1 comp; C1comp; API-2500
+waves = CLA-3A; C1 comp; C1comp
 preset = Threshold=0.75; Ratio=0.0526; Auto gain=1
 # round 190jh: an SSLComp state's RealWorld list is translated (threshold, ratio, attack, release, make-up, mix),
 # measured on refcap182's SSLComp programme captures; the others keep the preset
@@ -743,6 +744,74 @@ waves = C4
 # Q, the rational gain law with its knee, look-ahead and two-stage release), fitted on our Waves-demo probes
 # (docs/analise/REA_rodada190mg.md §2)
 translate = waves-c4
+
+# ---------------------------------------------------------------- round 190mm (sub-round dyn): Waves without a stand-in
+# before (such projects lost the plug-in). Each law is LYNX's own model of the structure REA read in the reference's DSP,
+# every constant fitted on our demo-mode probes (docs/analise/REA_rodada190mm_dyn.md)
+[waves-rvox]
+product = Renaissance Vox
+vendor = Waves
+lynx = Compressor
+waves = Renaissance Vox; RVox
+# the one-knob vocal compressor on Compressor's hidden Vox law: the threshold with its automatic make-up, the gate and
+# the output gain. Without a readable state: Compressor at a 0 dBFS threshold (the reference's default compresses nothing)
+translate = waves-rvox
+preset = Threshold=1
+
+[waves-rdeesser]
+product = Renaissance DeEsser
+vendor = Waves
+lynx = Hush De-esser
+waves = RDeEsser; Renaissance DeEsser
+# the split / wide-band de-esser on Hush's hidden Renaissance de-esser law (its crossover, the threshold that rises with
+# the level below the band, the Renaissance smoother): threshold, range, frequency, high-pass / band-pass, split /
+# wide-band. Without a readable state: Hush's own engine at its defaults
+translate = waves-rdeesser
+
+[waves-c6]
+product = C6 Multiband Compressor
+vendor = Waves
+lynx = Prism Multiband
+waves = C6; C6-SideChain
+# the C4's four crossover bands on Prism's C4 law (round 190mg) and the C6's two floating dynamic bands on the law's hidden
+# floating bands (a band-pass of the crossovers' sum through the same gain law and smoother)
+translate = waves-c6
+
+[waves-api-2500]
+product = API-2500
+vendor = Waves
+lynx = Compressor
+waves = API-2500
+# the VCA bus compressor on Compressor's hidden bus law: threshold, ratio, attack, release (incl. variable), knee,
+# thrust, type (feed-forward / feedback), make-up (auto / manual), mix, trim. Was the generic Waves compressor entry
+# (Compressor preset). Without a readable state: that preset
+translate = waves-api-2500
+preset = Threshold=0.75; Ratio=0.0526; Auto gain=1
+
+[waves-rbass]
+product = Renaissance Bass
+vendor = Waves
+lynx = Low Lifter
+waves = Renaissance Bass; RBass
+# the psycho-acoustic bass enhancer on Low Lifter's hidden bass law: its crossover at Frequency, the harmonics of the band
+# below it at Intensity, the original bass in / out, the output gain. Without a readable state: Low Lifter's default
+translate = waves-rbass
+
+[waves-maxxbass]
+product = MaxxBass
+vendor = Waves
+lynx = Low Lifter
+waves = MaxxBass
+# the same bass law in the MaxxBass role: input gain, frequency, original bass gain, harmonics gain
+translate = waves-maxxbass
+
+[waves-vitamin]
+product = Vitamin
+vendor = Waves
+lynx = Aether
+waves = Vitamin
+# the five-band harmonic enhancer on Aether's hidden Vitamin law: the four crossovers, each band's gain, the direct gain
+translate = waves-vitamin
 
 [waves-ar-plates]
 product = Abbey Road Reverb Plates
@@ -1994,6 +2063,183 @@ int translateWavesSuperTap (const std::vector<std::uint8_t>& state, EffectSlot& 
         p[e::highCut] = linNorm (lp, 200.0, 20000.0);
     return (int) taps.size() * 4 + 2;
 }
+
+// ======================================================================= round 190mm (sub-round dyn): Renaissance Vox,
+// RDeEsser, RBass / MaxxBass, API-2500, C6, Vitamin (docs/analise/REA_rodada190mm_dyn.md). Every law below is LYNX's own
+// model of the structure REA read in the reference's DSP, with every constant fitted on our demo-mode probes.
+
+// Renaissance Vox (RealWorld [EXEC] the bank's states vs the settings read back: 0 compression dB (−36 … 0), 1 gate dB
+// (−80 = off … 0), 2 gate release ms (10 … 250), 7 output gain dB (−36 … 0)) → Compressor's hidden Vox law
+int translateWavesRVox (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    const auto rw = wavesRealWorldParams (state);
+    const auto comp = wavesValue (rw, 0);
+    if (slot.kind != EffectKind::compressor || ! comp || slot.params.size() <= (std::size_t) compressorVoxGain)
+        return 0;
+    slot.params[0] = linNorm (std::clamp (*comp, -36.0, 0.0), -60.0, 0.0);
+    slot.params[8] = 1.0f; // the vintage voicing (its laws)
+    const auto gate = std::clamp (wavesValue (rw, 1).value_or (-80.0), -80.0, 0.0);
+    slot.params[(std::size_t) compressorVoxGate] = gate > -79.95 ? (float) std::max (1e-4, (gate + 80.0) / 80.0) : 0.0f;
+    slot.params[(std::size_t) compressorVoxGateRelease] = linNorm (wavesValue (rw, 2).value_or (130.0), 10.0, 250.0);
+    slot.params[(std::size_t) compressorVoxGain] = (float) std::clamp (-wavesValue (rw, 7).value_or (0.0) / 36.0, 0.0, 1.0);
+    slot.params[(std::size_t) compressorVoxLaw] = 1.0f;
+    return 4;
+}
+// RDeEsser (RealWorld [EXEC] the bank's states vs the settings read back: 0 threshold dB, 1 range dB, 11 frequency Hz,
+// 13 filter type (0 high-pass, 1 band-pass), 14 mode (0 split, 1 wide-band), 15 monitor (not translated); 2 … 7 and 12
+// hold the reference's hidden detector values, the same in every state we have: the law uses them as constants) →
+// Hush De-esser's hidden Renaissance de-esser law
+int translateWavesRDeEsser (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace h = mixsuite::hush;
+    const auto rw = wavesRealWorldParams (state);
+    const auto thr = wavesValue (rw, 0), hz = wavesValue (rw, 11);
+    if (slot.kind != EffectKind::hushDeEsser || ! thr || ! hz || slot.params.size() <= (std::size_t) h::essWideBand)
+        return 0;
+    slot.params[h::essLaw] = 1.0f;
+    slot.params[h::essThreshold] = (float) std::clamp (-*thr / 80.0, 0.0, 1.0);
+    slot.params[h::essRange] = (float) std::clamp (-wavesValue (rw, 1).value_or (-16.0) / 48.0, 0.0, 1.0);
+    slot.params[h::essFreq] = linNorm (*hz, 2000.0, 16000.0);
+    slot.params[h::essBandPass] = wavesValue (rw, 13).value_or (0.0) >= 0.5 ? 1.0f : 0.0f;
+    slot.params[h::essWideBand] = wavesValue (rw, 14).value_or (0.0) >= 0.5 ? 1.0f : 0.0f;
+    return 5;
+}
+// C6 (123 values; [EXEC] the bank's states vs the settings read back): the C4's layout — 0 … 2 crossovers Hz, 3 crossover
+// Q, 7 output dB, the bands at 14 + 14 b (+2 solo, +3 bypass, +4 gain, +5 threshold, +6 range, +7 knee, +8 attack ms,
+// +9 release ms, +10 / +11 release mode and behaviour (Opto = 1)) — for b = 0 … 3 the crossover bands (the C6's bands 2 … 5)
+// and b = 4, 5 its floating bands 1 and 6, whose frequency and Q are 98 / 99 and 102 / 103 → Prism's C4 law plus its
+// hidden floating bands
+int translateWavesC6 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace pr = dyn::prism;
+    const auto rw = wavesRealWorldParams (state);
+    if (slot.kind != EffectKind::prismMultiband || rw.size() < 104 || ! wavesValue (rw, 0) || ! wavesValue (rw, 19)
+        || slot.params.size() <= (std::size_t) pr::c6Param (1, pr::c6Rel))
+        return 0;
+    if (translateWavesC4 (state, slot) == 0)
+        return 0;
+    auto& p = slot.params;
+    const auto v = [&rw] (std::size_t i, double fallback) { return wavesValue (rw, i).value_or (fallback); };
+    const auto set = [&p] (int k, float x) { p[(std::size_t) k] = std::clamp (x, 0.0f, 1.0f); };
+    static constexpr std::size_t freqAt[2] { 98, 102 };
+    for (int f = 0; f < 2; ++f)
+    {
+        const auto at = [&] (int fld, double fallback) { return v ((std::size_t) (14 + 14 * (4 + f) + fld), fallback); };
+        const double range = std::clamp (at (6, 0.0), -30.0, 30.0), gain = std::clamp (at (4, 0.0), -30.0, 30.0);
+        const bool on = at (3, 0.0) < 0.5 && (range != 0.0 || gain != 0.0);
+        set (pr::c6Param (f, pr::c6On), on ? 1.0f : 0.0f);
+        if (! on)
+            continue;
+        set (pr::c6Param (f, pr::c6Freq), pr::c6FreqValue (v (freqAt[f], f == 0 ? 1000.0 : 5003.0)));
+        set (pr::c6Param (f, pr::c6Width), pr::c6WidthValue (v (freqAt[f] + 1, 1.65)));
+        set (pr::c6Param (f, pr::c6Thr), pr::thresholdValue (std::clamp (at (5, 0.0), -90.0, 0.0)));
+        set (pr::c6Param (f, pr::c6Range), (float) ((range + 30.0) / 60.0));
+        set (pr::c6Param (f, pr::c6Gain), (float) ((gain + 30.0) / 60.0));
+        set (pr::c6Param (f, pr::c6Att), pr::c4AttackValue (at (8, 16.03)));
+        set (pr::c6Param (f, pr::c6Rel), pr::c4ReleaseValue (at (9, 160.31)));
+    }
+    return 50;
+}
+// API-2500 (RealWorld [EXEC] the bank's states vs the settings read back: 0 threshold (+10 … −20), 1 ratio step (1.5, 2, 3,
+// 4, 6, 10, ∞), 2 attack step (0.03 … 30 ms), 3 release step (0.05 … 2 s, 6 = Var), 5 In, 7 thrust (Norm, Med, Loud),
+// 8 knee (Soft, Med, Hard), 11 variable release s, 12 type (1 = Old: feedback), 13 make-up (0 = Auto), 14 make-up dB,
+// 37 mix %, 39 trim dB) → Compressor's hidden bus compressor law
+int translateWavesApi2500 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    const auto rw = wavesRealWorldParams (state);
+    const auto thr = wavesValue (rw, 0), ratio = wavesValue (rw, 1);
+    if (slot.kind != EffectKind::compressor || ! thr || ! ratio || slot.params.size() <= (std::size_t) compressorApiTrim
+        || wavesPluginName (state) != "API-2500")
+        return 0;
+    auto& p = slot.params;
+    const auto v = [&rw] (std::size_t i, double fallback) { return wavesValue (rw, i).value_or (fallback); };
+    const auto put = [&p] (int k, double x) { p[(std::size_t) k] = (float) std::clamp (x, 0.0, 1.0); };
+    p[8] = 0.0f; // no vintage voicing (no latency)
+    put (compressorApiLaw, 1.0);
+    put (compressorApiThreshold, (10.0 - std::clamp (*thr, -20.0, 10.0)) / 30.0);
+    put (compressorApiRatio, std::round (std::clamp (*ratio, 0.0, 6.0)) / 6.0);
+    put (compressorApiAttack, std::round (std::clamp (v (2, 3.0), 0.0, 6.0)) / 6.0);
+    put (compressorApiRelease, std::round (std::clamp (v (3, 6.0), 0.0, 6.0)) / 6.0);
+    put (compressorApiVar, (std::clamp (v (11, 0.5), 0.05, 3.0) - 0.05) / 2.95);
+    put (compressorApiKnee, (2.0 - std::round (std::clamp (v (8, 2.0), 0.0, 2.0))) / 2.0);
+    put (compressorApiThrust, std::round (std::clamp (v (7, 0.0), 0.0, 2.0)) / 2.0);
+    put (compressorApiFeedback, v (12, 0.0) >= 0.5 ? 1.0 : 0.0);
+    put (compressorApiManual, v (13, 0.0) >= 0.5 ? 1.0 : 0.0);
+    const double mk = std::clamp (v (14, 0.0), -24.0, 24.0), trim = std::clamp (v (39, 0.0), -18.0, 18.0);
+    put (compressorApiMakeup, mk == 0.0 ? 0.0 : std::max (1.0e-4, (mk + 24.0) / 48.0));
+    put (compressorApiTrim, trim == 0.0 ? 0.0 : std::max (1.0e-4, (trim + 18.0) / 36.0));
+    const bool in = v (5, 1.0) >= 0.5;
+    put (compressorApiDry, in ? 1.0 - std::clamp (v (37, 100.0), 0.0, 100.0) / 100.0 : 1.0);
+    return 12;
+}
+
+// MaxxBass (RealWorld [EXEC] the bank's states vs the settings read back: 0 input gain dB, 1 frequency Hz, 12 original bass
+// gain dB, 13 harmonics gain dB (−144 = off); 2 decay, 3 response, 4 ratio and 10 the high-pass, which move only the
+// harmonics, are not translated) → Low Lifter's hidden bass law (the MaxxBass role)
+int translateWavesMaxxBass (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace ll = lowlifter;
+    const auto rw = wavesRealWorldParams (state);
+    const auto hz = wavesValue (rw, 1);
+    if (slot.kind != EffectKind::flLowLifter || ! hz || slot.params.size() <= (std::size_t) ll::bassOut || wavesPluginName (state) != "MaxxBass")
+        return 0;
+    auto& p = slot.params;
+    p[4] = 0.0f; // Low Lifter's own look-ahead off (the law has no latency)
+    p[(std::size_t) ll::bassLaw] = 1.0f;
+    p[(std::size_t) ll::bassMaxx] = 1.0f;
+    p[(std::size_t) ll::bassFreq] = ll::bassFreqValue (*hz);
+    p[(std::size_t) ll::bassInput] = ll::bassLevelValue (wavesValue (rw, 0).value_or (0.0));
+    const double orig = wavesValue (rw, 12).value_or (0.0);
+    p[(std::size_t) ll::bassOrig] = orig <= -143.0 ? 0.0f : (float) std::min (4.0, std::pow (10.0, orig / 20.0));
+    p[(std::size_t) ll::bassHarm] = ll::bassLevelValue (wavesValue (rw, 13).value_or (-144.0));
+    p[(std::size_t) ll::bassOut] = ll::bassLevelValue (0.0);
+    return 4;
+}
+
+// Renaissance Bass (RealWorld [EXEC] the bank's states vs the settings read back: 1 frequency Hz, 5 intensity dB, 6 original
+// in (0) / out (1), 7 output gain dB) → Low Lifter's hidden bass law (the Renaissance Bass role)
+int translateWavesRBass (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace ll = lowlifter;
+    const auto rw = wavesRealWorldParams (state);
+    const auto hz = wavesValue (rw, 1), intensity = wavesValue (rw, 5);
+    if (slot.kind != EffectKind::flLowLifter || ! hz || ! intensity || slot.params.size() <= (std::size_t) ll::bassOut)
+        return 0;
+    auto& p = slot.params;
+    p[4] = 0.0f;
+    p[(std::size_t) ll::bassLaw] = 1.0f;
+    p[(std::size_t) ll::bassMaxx] = 0.0f;
+    p[(std::size_t) ll::bassFreq] = ll::bassFreqValue (*hz);
+    p[(std::size_t) ll::bassInput] = ll::bassLevelValue (0.0);
+    p[(std::size_t) ll::bassOrig] = wavesValue (rw, 6).value_or (0.0) >= 0.5 ? 0.0f : 1.0f;
+    p[(std::size_t) ll::bassHarm] = ll::bassLevelValue (std::clamp (*intensity, -24.0, 24.0));
+    p[(std::size_t) ll::bassOut] = ll::bassLevelValue (std::clamp (wavesValue (rw, 7).value_or (0.0), -30.0, 0.0));
+    return 4;
+}
+
+// Vitamin (145 values; [EXEC] the bank's states vs the settings read back: 0 … 3 crossovers Hz, 91 … 95 the bands' gains
+// A … E (0 = Off), 100 direct gain dB; 103 punch and 125 … 129 the bands' widths are not translated) → Aether's hidden
+// five-band harmonic enhancer law
+int translateWavesVitamin (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace a = mixsuite::aether;
+    const auto rw = wavesRealWorldParams (state);
+    if (slot.kind != EffectKind::aether || rw.size() < 101 || ! wavesValue (rw, 0) || slot.params.size() <= (std::size_t) a::vitEnd)
+        return 0;
+    auto& p = slot.params;
+    p[(std::size_t) a::vitLaw] = 1.0f;
+    static constexpr double defaults[4] { 90.0, 500.0, 2594.0, 9310.0 };
+    for (int k = 0; k < 4; ++k)
+    {
+        const double hz = wavesValue (rw, (std::size_t) k).value_or (defaults[k]);
+        p[(std::size_t) (a::vitCross0 + k)] = std::abs (hz - defaults[k]) < 0.5 ? 0.0f : a::vitCrossValue (hz);
+    }
+    for (int b = 0; b < 5; ++b)
+        p[(std::size_t) (a::vitGain0 + b)] = (float) std::clamp (wavesValue (rw, (std::size_t) (91 + b)).value_or (0.0) / 48.0, 0.0, 1.0);
+    p[(std::size_t) a::vitDirect] = a::vitDirectValue (wavesValue (rw, 100).value_or (0.0));
+    return 10;
+}
+// ======================================================================= end of round 190mm (dyn) translators
 
 // round 190js: the Waves reverbs on Reeverb 2 (the stand-in since round 129, now with their states translated). Black-box on
 // refcap182's programme (D, X1 … X4 x drums, bass, guitar, vocal, mix; the RealWorld lists read against the settings set
@@ -3584,6 +3830,20 @@ RawTranslator rawTranslatorNamed (std::string_view name)
         return translateWavesPuigTec;
     if (name == "waves-c4")
         return translateWavesC4;
+    if (name == "waves-rvox") // round 190mm (dyn)
+        return translateWavesRVox;
+    if (name == "waves-rdeesser")
+        return translateWavesRDeEsser;
+    if (name == "waves-c6")
+        return translateWavesC6;
+    if (name == "waves-api-2500")
+        return translateWavesApi2500;
+    if (name == "waves-maxxbass")
+        return translateWavesMaxxBass;
+    if (name == "waves-rbass")
+        return translateWavesRBass;
+    if (name == "waves-vitamin")
+        return translateWavesVitamin;
     if (name == "waves-ar-plates")
         return translateWavesArPlates;
     if (name == "waves-atlas")

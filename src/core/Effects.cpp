@@ -5,6 +5,8 @@
 #include "core/RhythmPan.h"
 #include "core/MixSuite.h"
 #include "core/VoiceMatch.h"
+#include "core/RenDynamics.h"
+#include "core/BusComp2500.h"
 #include "core/EchoSuite.h"
 #include "core/LynxTune.h"
 #include "core/LynxVerbs.h"
@@ -222,16 +224,19 @@ public:
     // first block (issue #113: a Patcher plans its delay compensation right after building its nodes)
     explicit Compressor (const EffectParams* initial = nullptr)
         : vintageAtStart (initial != nullptr && (*initial)[8] >= 0.5f),
-          renAtStart (initial != nullptr && (*initial)[8] >= 0.5f && (*initial)[(std::size_t) compressorRenLaw] >= 0.5f) {}
+          renAtStart (initial != nullptr && (*initial)[8] >= 0.5f && (*initial)[(std::size_t) compressorRenLaw] >= 0.5f),
+          voxAtStart (initial != nullptr && (*initial)[8] >= 0.5f && (*initial)[(std::size_t) compressorVoxLaw] >= 0.5f) {}
 
     void prepare (double sr) noexcept override
     {
         sampleRate = sr;
         vintage.prepare (sr);
         ren.prepare (sr);
+        vox.prepare (sr);
+        apiOn = false;
         reset();
         if (vintageAtStart)
-            latency.store (renAtStart ? ren.latency() : vintage.latency(), std::memory_order_relaxed);
+            latency.store (voxAtStart ? vox.latency() : renAtStart ? ren.latency() : vintage.latency(), std::memory_order_relaxed);
     }
     void reset() noexcept override
     {
@@ -240,6 +245,7 @@ public:
         autoGain = 1.0f;
         vintage.reset();
         ren.reset();
+        vox.reset();
     }
 
     // round 123: voicing 1 = the measured program-dependent compressor (core/VoiceMatch.h); it delays the audio
@@ -275,6 +281,73 @@ public:
 
     void process (float* l, float* r, int n, const EffectParams& params, double) noexcept override
     {
+        if (params[(std::size_t) compressorApiLaw] >= 0.5f)
+        {
+            // round 190mm (dyn): the VCA bus compressor law (core/BusComp2500.h; set only by the API-2500 translator)
+            static constexpr double ratios[7] { 1.5, 2.0, 3.0, 4.0, 6.0, 10.0, 1.0e6 }, attacks[7] { 0.03, 0.1, 0.3, 1.0, 3.0, 10.0, 30.0 };
+            static constexpr double releases[6] { 0.05, 0.1, 0.2, 0.5, 1.0, 2.0 };
+            const auto step = [&] (int k, int top) { return std::clamp ((int) std::lround (params[(std::size_t) k] * (float) top), 0, top); };
+            tail = -1;
+            latency.store (0, std::memory_order_relaxed);
+            float peakIn = 0.0f, peakOut = 0.0f;
+            for (int i = 0; i < n; ++i)
+                peakIn = std::max (peakIn, std::max (std::abs (l[i]), std::abs (r[i])));
+            buscomp::Settings v;
+            v.thresholdDb = 10.0 - 30.0 * std::clamp ((double) params[(std::size_t) compressorApiThreshold], 0.0, 1.0);
+            v.ratio = ratios[step (compressorApiRatio, 6)];
+            v.attackMs = attacks[step (compressorApiAttack, 6)];
+            const int rel = step (compressorApiRelease, 6);
+            v.releaseS = rel < 6 ? releases[rel] : 0.05 + 2.95 * std::clamp ((double) params[(std::size_t) compressorApiVar], 0.0, 1.0);
+            v.knee = 2 - step (compressorApiKnee, 2);
+            v.thrust = step (compressorApiThrust, 2);
+            v.feedback = params[(std::size_t) compressorApiFeedback] >= 0.5f;
+            v.autoMakeup = params[(std::size_t) compressorApiManual] < 0.5f;
+            v.makeupDb = params[(std::size_t) compressorApiMakeup] > 0.0f ? 48.0 * (double) params[(std::size_t) compressorApiMakeup] - 24.0 : 0.0;
+            v.mix = 1.0 - std::clamp ((double) params[(std::size_t) compressorApiDry], 0.0, 1.0);
+            v.trimDb = params[(std::size_t) compressorApiTrim] > 0.0f ? 36.0 * (double) params[(std::size_t) compressorApiTrim] - 18.0 : 0.0;
+            if (! apiOn)
+            {
+                api.prepare (sampleRate);
+                apiOn = true;
+            }
+            api.process (l, r, n, v);
+            for (int i = 0; i < n; ++i)
+                peakOut = std::max (peakOut, std::max (std::abs (l[i]), std::abs (r[i])));
+            useSidechain = false;
+            meterLimit.store (0.0f, std::memory_order_relaxed);
+            meterGr.store (std::clamp (api.reductionDb() / 30.0f, 0.0f, 1.0f), std::memory_order_relaxed);
+            meterChange.store (-api.reductionDb(), std::memory_order_relaxed);
+            meterIn.store (std::min (peakIn, 1.0f), std::memory_order_relaxed);
+            meterOut.store (std::min (peakOut, 1.0f), std::memory_order_relaxed);
+            return;
+        }
+        apiOn = false;
+        if (params[8] >= 0.5f && params[(std::size_t) compressorVoxLaw] >= 0.5f)
+        {
+            // round 190mm: the one-knob vocal compressor (core/RenDynamics.h rendyn::Vox; set only by the
+            // Renaissance Vox translator): the threshold knob, the gate and the output gain in hidden parameters
+            tail = -1;
+            latency.store (vox.latency(), std::memory_order_relaxed);
+            float peakIn = 0.0f, peakOut = 0.0f;
+            for (int i = 0; i < n; ++i)
+                peakIn = std::max (peakIn, std::max (std::abs (l[i]), std::abs (r[i])));
+            rendyn::VoxSettings v;
+            v.compressionDb = std::min (0.0, (double) compThresholdDb (params[0]));
+            const float gate = params[(std::size_t) compressorVoxGate];
+            v.gateDb = gate > 0.0f ? -80.0 + 80.0 * std::clamp ((double) gate, 0.0, 1.0) : -80.0;
+            v.gateReleaseMs = 10.0 + 240.0 * std::clamp ((double) params[(std::size_t) compressorVoxGateRelease], 0.0, 1.0);
+            v.gainDb = -36.0 * std::clamp ((double) params[(std::size_t) compressorVoxGain], 0.0, 1.0);
+            vox.process (l, r, n, v);
+            meterLimit.store (0.0f, std::memory_order_relaxed);
+            for (int i = 0; i < n; ++i)
+                peakOut = std::max (peakOut, std::max (std::abs (l[i]), std::abs (r[i])));
+            useSidechain = false;
+            meterGr.store (std::clamp (vox.reductionDb() / 30.0f, 0.0f, 1.0f), std::memory_order_relaxed);
+            meterChange.store (-vox.reductionDb(), std::memory_order_relaxed);
+            meterIn.store (std::min (peakIn, 1.0f), std::memory_order_relaxed);
+            meterOut.store (std::min (peakOut, 1.0f), std::memory_order_relaxed);
+            return;
+        }
         if (params[8] >= 0.5f && params[(std::size_t) compressorRenLaw] >= 0.5f)
         {
             // round 190mg: the vintage voicing's Renaissance law (core/VoiceMatch.h progcomp::Renaissance; set only by the
@@ -465,7 +538,10 @@ private:
     std::atomic<int> latency { 0 };
     vmatch::progcomp::Compressor vintage;
     vmatch::progcomp::Renaissance ren; // round 190mg
-    bool vintageAtStart = false, renAtStart = false;
+    rendyn::Vox vox; // round 190mm (dyn)
+    buscomp::Engine api; // round 190mm (dyn)
+    bool apiOn = false;
+    bool vintageAtStart = false, renAtStart = false, voxAtStart = false;
     double sampleRate = 44100.0;
     float envelopeDb = 0.0f;
     float inPower = 0.0f, outPower = 0.0f, autoGain = 1.0f;
@@ -4756,6 +4832,24 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190mg: … and one saved before the Renaissance law keeps the vintage voicing's round-123 / 152 engine
     if (slot.kind == EffectKind::compressor && savedCount <= (std::size_t) compressorRenLaw && slot.params.size() > (std::size_t) compressorRenLaw)
         slot.params[(std::size_t) compressorRenLaw] = 0.0f;
+    // round 190mm: … and the Vox law's own hidden values (only a law-2 slot reads them)
+    if (slot.kind == EffectKind::compressor)
+        for (const int k : { compressorVoxLaw, compressorVoxGate, compressorVoxGateRelease, compressorVoxGain })
+            if (savedCount <= (std::size_t) k && slot.params.size() > (std::size_t) k)
+                slot.params[(std::size_t) k] = 0.0f;
+    if (slot.kind == EffectKind::compressor)
+        for (int k = compressorApiLaw; k < compressorApiEnd; ++k)
+            if (savedCount <= (std::size_t) k && slot.params.size() > (std::size_t) k)
+                slot.params[(std::size_t) k] = 0.0f;
+    // … a Low Lifter / Aether saved before keeps its own engine (the round's hidden laws off)
+    if (slot.kind == EffectKind::flLowLifter)
+        for (int k = lowlifter::bassLaw; k < lowlifter::bassEnd; ++k)
+            if (savedCount <= (std::size_t) k && slot.params.size() > (std::size_t) k)
+                slot.params[(std::size_t) k] = 0.0f;
+    if (slot.kind == EffectKind::aether)
+        for (int k = mixsuite::aether::vitLaw; k < mixsuite::aether::vitEnd; ++k)
+            if (savedCount <= (std::size_t) k && slot.params.size() > (std::size_t) k)
+                slot.params[(std::size_t) k] = 0.0f;
     // round 190do: a Gemini Doubler saved before the measured read head keeps the two crossfaded taps
     if (slot.kind == EffectKind::geminiDoubler && savedCount <= (std::size_t) voicetools::gemini::headLaw)
         slot.params[(std::size_t) voicetools::gemini::headLaw] = 0.0f;
@@ -4780,6 +4874,11 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190js: … and one saved before Single Vocal's revision keeps round 148's Single Vocal (bit for bit)
     if (slot.kind == EffectKind::hushDeEsser && savedCount <= (std::size_t) mixsuite::hush::vocalRevision)
         slot.params[(std::size_t) mixsuite::hush::vocalRevision] = 0.0f;
+    // round 190mm (dyn): a Hush saved before the Renaissance de-esser law keeps Hush's engines (and its law values 0)
+    if (slot.kind == EffectKind::hushDeEsser)
+        for (int k = mixsuite::hush::essLaw; k <= mixsuite::hush::essWideBand; ++k)
+            if (savedCount <= (std::size_t) k && slot.params.size() > (std::size_t) k)
+                slot.params[(std::size_t) k] = 0.0f;
     // round 190is: an Echoform saved before the voicings' revision keeps rounds 147 / 150's voicings
     if (slot.kind == EffectKind::echoform && savedCount <= (std::size_t) echosuite::echoform::revision)
         slot.params[(std::size_t) echosuite::echoform::revision] = 0.0f;
