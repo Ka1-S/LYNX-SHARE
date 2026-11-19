@@ -17783,6 +17783,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Parity190lfNs1Tests.inc" // round 190lf (ns1): Quell's zero law (REA of the Waves NS1: 0 % = its bare all-pass pair), NS1 on it
 #include "Parity190mgC4Tests.inc" // round 190mg: Prism's hidden C4 law (REA of the Waves C4), C4 on it
 #include "Parity190mgRenTests.inc" // round 190mg (ren): Compressor's Renaissance law (REA of the Waves Renaissance Compressor), RComp on it
+#include "Parity190mgNs1Tests.inc" // round 190mg (ns1): Quell's NS1 law (REA of the Waves NS1: its own structure for 20 … 100 %), NS1 on it
 #include "Sampler190dhTests.inc"
 #include "Fix190eaTests.inc"
 #include "Iss158Tests.inc"

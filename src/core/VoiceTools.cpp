@@ -141,6 +141,8 @@ struct Bq
         return y;
     }
     void ap (double sr, double fc, double qq) noexcept { const auto w = twoPi * fc / sr, a = std::sin (w) / (2 * qq), c = std::cos (w); set (1 - a, -2 * c, 1 + a, 1 + a, -2 * c, 1 - a); }
+    // round 190mg (ns1): the first-order all-pass (bilinear, corner prewarped)
+    void ap1 (double sr, double fc) noexcept { const auto K = std::tan (0.5 * twoPi * fc / sr); set (K - 1, K + 1, 0, K + 1, K - 1, 0); }
     void lp (double sr, double fc, double qq) noexcept { const auto w = twoPi * fc / sr, a = std::sin (w) / (2 * qq), c = std::cos (w); set ((1 - c) / 2, 1 - c, (1 - c) / 2, 1 + a, -2 * c, 1 - a); }
     void bp (double sr, double fc, double qq) noexcept { const auto w = twoPi * fc / sr, a = std::sin (w) / (2 * qq), c = std::cos (w); set (a, 0, -a, 1 + a, -2 * c, 1 - a); }
     void shelf (double sr, double fc, double g, bool high) noexcept
@@ -391,6 +393,246 @@ private:
 };
 } // namespace fitted
 
+// ---- the NS1 law (round 190mg ns1) ------------------------------------------------------------------------------------
+// [REA of the NS1 trial's DSP for the structure only; every number fitted on our own probes and renders of the trial,
+// docs/analise/REA_rodada190mg_ns1.md] Zero latency, per sample:
+// - front end: two complementary all-pass splits in cascade (a first- and a second-order all-pass: low part = their
+//   half sum, high part = their half difference), the low part of the first (at the low corner) and the high part of
+//   the second (at the high corner) multiplied by the cut; at cut 0 dB each split is exactly its second-order all-pass;
+// - six bands (centres from the low to the high corner, geometric), each three cascaded Regalia–Mitra sections
+//   y = (x + A x) / 2 + g (x − A x) / 2 on the same all-pass A, one gain g per band (g = 1: exactly transparent);
+// - per band, from the mid signal: a band-pass detector, rectified; a noise floor that slews up / down by fixed dB per
+//   second (frozen under a gate), a level follower that slews the same way, a threshold between floor and level
+//   (the layout's position), kept within fixed distances above the floor, lifted while a voice-activity flag says
+//   "pause"; a soft weight w = T⁴ / (e⁴ + T⁴), the gain 1 − (1 − g_min) w², opening / closing smoothing.
+namespace ns1
+{
+struct Fit // (the fitted values: lowFit / highFit below, in this field order)
+{
+    double q1;                       // the low split's second-order Q
+    double depthDb, bandQ;           // the cut at a band centre (dB, the three sections together); the RM all-passes' Q
+    double detQ, detScale;           // the detector: two band-passes of this Q in cascade; its input scale
+    double floorUp, floorDown, gateDb, levUp, levDown; // floor / level slews (dB per second), the floor's gate (dBFS)
+    double aboveDb, capDb, ktDb;     // the threshold: at least / at most this far over the floor (dB); its scale (dB)
+    double openMs, closeMs;          // gain smoothing
+    double vadDb, vadBoostDb, vadHoldMs, vadLo, vadHi; // the pause flag: band over its floor (dB), lift (dB), hold, range (Hz)
+    double floorInitDb;              // floor / level start (dBFS)
+    double absAtt, absRel;           // the rectified detector's envelope (ms; release 0 = none)
+};
+// fitted at 20 … 50 % (the three measured settings share one set) and at 100 %; in between, each value linearly
+constexpr Fit lowFit { 1, 8.5, 0.7, 2.7, 0.5, 0.75, 13, -80, 118600, 32, 9, 21, -10, 3.4, 38, 23, 3, 60, 100, 998, -70, 0, 0 };
+constexpr Fit highFit { 1, 9.9, 0.5, 1.2, 0.5, 1.5, 47, -80, 118600, 38, 9, 25, 1, 2.4, 30, 36, 3, 60, 100, 998, -60, 0.1, 0.5 };
+inline Fit fitAt (double amt) noexcept
+{
+    const auto t = std::clamp ((amt - 0.5) / 0.5, 0.0, 1.0);
+    if (t <= 0.0)
+        return lowFit;
+    const auto mix = [t] (double a, double b) { return a + (b - a) * t; };
+    Fit f;
+    f.q1 = mix (lowFit.q1, highFit.q1);
+    f.depthDb = mix (lowFit.depthDb, highFit.depthDb);
+    f.bandQ = mix (lowFit.bandQ, highFit.bandQ);
+    f.detQ = mix (lowFit.detQ, highFit.detQ);
+    f.detScale = mix (lowFit.detScale, highFit.detScale);
+    f.floorUp = mix (lowFit.floorUp, highFit.floorUp);
+    f.floorDown = mix (lowFit.floorDown, highFit.floorDown);
+    f.gateDb = mix (lowFit.gateDb, highFit.gateDb);
+    f.levUp = mix (lowFit.levUp, highFit.levUp);
+    f.levDown = mix (lowFit.levDown, highFit.levDown);
+    f.aboveDb = mix (lowFit.aboveDb, highFit.aboveDb);
+    f.capDb = mix (lowFit.capDb, highFit.capDb);
+    f.ktDb = mix (lowFit.ktDb, highFit.ktDb);
+    f.openMs = mix (lowFit.openMs, highFit.openMs);
+    f.closeMs = mix (lowFit.closeMs, highFit.closeMs);
+    f.vadDb = mix (lowFit.vadDb, highFit.vadDb);
+    f.vadBoostDb = mix (lowFit.vadBoostDb, highFit.vadBoostDb);
+    f.vadHoldMs = mix (lowFit.vadHoldMs, highFit.vadHoldMs);
+    f.vadLo = mix (lowFit.vadLo, highFit.vadLo);
+    f.vadHi = mix (lowFit.vadHi, highFit.vadHi);
+    f.floorInitDb = mix (lowFit.floorInitDb, highFit.floorInitDb);
+    f.absAtt = mix (lowFit.absAtt, highFit.absAtt);
+    f.absRel = mix (lowFit.absRel, highFit.absRel);
+    return f;
+}
+constexpr int nb = 6, sections = 3;
+
+class Engine
+{
+public:
+    void prepare (double rate) noexcept
+    {
+        sr = rate;
+        designedAmount = -1.0;
+        reset();
+    }
+    void reset() noexcept
+    {
+        for (auto* f : { &s1a1, &s1a2, &s2a1, &s2a2 })
+            f->reset();
+        for (auto& row : rm)
+            for (auto& f : row)
+                f.reset();
+        for (auto& f : det)
+            f.reset();
+        for (auto& f : det2)
+            f.reset();
+        const auto init = std::pow (10.0, fitAt (designedAmount < 0.0 ? 0.0 : designedAmount).floorInitDb / 20.0);
+        floorv.fill (init);
+        lev.fill (init);
+        gain.fill (1.0);
+        env.fill (0.0);
+        noiseCount = 0;
+        flag = 1.0;
+    }
+    // in place; returns the mean reduction (dB) of the block for the meter
+    double process (float* l, float* r, int n, double amt, bool listenOnly, float out) noexcept
+    {
+        if (amt != designedAmount)
+            design (amt);
+        double sumRed = 0.0;
+        for (int i = 0; i < n; ++i)
+        {
+            const double xs[2] { l[i], r[i] };
+            double w[2];
+            for (int c = 0; c < 2; ++c)
+            {
+                const auto a1 = s1a1.run (xs[c], c), a2 = s1a2.run (xs[c], c);
+                const auto u = 0.5 * (a2 - a1) + gLow * 0.5 * (a2 + a1);
+                const auto b1 = s2a1.run (u, c), b2 = s2a2.run (u, c);
+                w[c] = 0.5 * (b2 + b1) + gHigh * 0.5 * (b2 - b1);
+            }
+            const auto mid = 0.5 * (w[0] + w[1]) * detScale;
+            double e[nb];
+            for (int b = 0; b < nb; ++b)
+            {
+                const auto ad = std::abs (det2[(std::size_t) b].run (det[(std::size_t) b].run (mid, 0), 0));
+                if (useEnv)
+                {
+                    auto& v = env[(std::size_t) b];
+                    v = ad > v ? ad + (v - ad) * envA : ad + (v - ad) * envR;
+                    e[b] = v + 1e-9;
+                }
+                else
+                    e[b] = ad + 1e-9;
+            }
+            // the voice flag: a band of its range over its floor -> voice; else, after the hold, a pause
+            bool voice = false;
+            for (int b = 0; b < nb; ++b)
+                if (vadBand[(std::size_t) b] && e[b] > floorv[(std::size_t) b] * vadK)
+                    voice = true;
+            if (voice)
+            {
+                noiseCount = 0;
+                flag = 1.0;
+            }
+            else if (++noiseCount >= holdN)
+            {
+                noiseCount = holdN;
+                flag = boost;
+            }
+            double red = 0.0;
+            for (int b = 0; b < nb; ++b)
+            {
+                auto& fl = floorv[(std::size_t) b];
+                auto& lv = lev[(std::size_t) b];
+                const auto level = lv;
+                if (e[b] >= gate)
+                {
+                    fl *= e[b] > fl ? up : down;
+                    lv *= e[b] > level ? lu : ld;
+                }
+                const auto thr = fl + position * (level - fl);
+                const auto T = std::max (aboveK * fl, std::min (kT * thr, capK * fl)) * flag;
+                const auto t2 = T * T, q2 = e[b] * e[b], T4 = t2 * t2;
+                const auto wt = T4 / (q2 * q2 + T4);
+                const auto target = 1.0 - (1.0 - gmin) * wt * wt;
+                auto& g = gain[(std::size_t) b];
+                g = target > g ? target + (g - target) * go : target + (g - target) * gc;
+                red += g;
+            }
+            for (int c = 0; c < 2; ++c)
+            {
+                auto y = w[c];
+                for (int b = 0; b < nb; ++b)
+                    for (int k = 0; k < sections; ++k)
+                    {
+                        const auto A = rm[(std::size_t) b][(std::size_t) k].run (y, c);
+                        y = 0.5 * (y + A) + gain[(std::size_t) b] * 0.5 * (y - A);
+                    }
+                // Listen: what is taken away (the open chain minus the processed one)
+                const auto v = listenOnly ? w[c] - y : y;
+                (c == 0 ? l[i] : r[i]) = (float) v * out;
+            }
+            sumRed += red;
+        }
+        // the meter: the mean band cut at the centres (dB)
+        const auto meanGain = n > 0 ? sumRed / (n * nb) : 1.0;
+        return -20.0 * sections * std::log10 (std::max (1e-6, meanGain));
+    }
+
+private:
+    void design (double amt) noexcept
+    {
+        const bool first = designedAmount < 0.0;
+        designedAmount = amt;
+        const auto lay = ns1Layout (amt);
+        const auto fit = fitAt (amt);
+        s1a1.ap1 (sr, lay.minFc);
+        s1a2.ap (sr, lay.minFc, fit.q1);
+        s2a1.ap1 (sr, std::min (lay.maxFc, 0.49 * sr));
+        s2a2.ap (sr, std::min (lay.maxFc, 0.49 * sr), lay.q2);
+        gLow = gHigh = dbToGain (lay.cutDb);
+        position = lay.position;
+        // the depth fades in up to the first measured setting (20 %)
+        const auto depth = fit.depthDb * std::min (1.0, std::max (0.0, amt) / zeroFade);
+        gmin = std::pow (10.0, -depth / (20.0 * sections));
+        for (int b = 0; b < nb; ++b)
+        {
+            const auto fc = std::min (lay.minFc * std::pow (lay.maxFc / lay.minFc, b / (nb - 1.0)), 0.45 * sr);
+            for (auto& f : rm[(std::size_t) b])
+                f.ap (sr, fc, fit.bandQ);
+            det[(std::size_t) b].bp (sr, fc, fit.detQ);
+            det2[(std::size_t) b].bp (sr, fc, fit.detQ);
+            vadBand[(std::size_t) b] = fc >= fit.vadLo && fc <= fit.vadHi;
+        }
+        const auto ln10_20 = std::log (10.0) / 20.0;
+        up = std::exp (ln10_20 * fit.floorUp / sr);
+        down = std::exp (-ln10_20 * fit.floorDown / sr);
+        lu = std::exp (ln10_20 * fit.levUp / sr);
+        ld = std::exp (-ln10_20 * fit.levDown / sr);
+        go = coef (fit.openMs, sr);
+        gc = coef (fit.closeMs, sr);
+        holdN = std::max (1, (int) std::lround (fit.vadHoldMs * 0.001 * sr));
+        detScale = fit.detScale;
+        useEnv = fit.absRel > 0.0;
+        envA = coef (fit.absAtt, sr);
+        envR = coef (fit.absRel, sr);
+        gate = std::pow (10.0, fit.gateDb / 20.0);
+        aboveK = std::pow (10.0, fit.aboveDb / 20.0);
+        capK = std::pow (10.0, fit.capDb / 20.0);
+        kT = std::pow (10.0, fit.ktDb / 20.0);
+        vadK = std::pow (10.0, fit.vadDb / 20.0);
+        boost = std::pow (10.0, fit.vadBoostDb / 20.0);
+        if (first)
+        {
+            const auto init = std::pow (10.0, fit.floorInitDb / 20.0);
+            floorv.fill (init);
+            lev.fill (init);
+        }
+    }
+    double sr = 48000.0, designedAmount = -1.0;
+    double up = 1.0, down = 1.0, lu = 1.0, ld = 1.0, go = 0.0, gc = 0.0, gLow = 1.0, gHigh = 1.0, position = 0.0, gmin = 1.0;
+    double gate = 0.0, aboveK = 1.0, capK = 1.0, kT = 1.0, vadK = 1.0, boost = 1.0, flag = 1.0, detScale = 0.5, envA = 0.0, envR = 0.0;
+    bool useEnv = false;
+    int holdN = 1, noiseCount = 0;
+    fitted::Bq s1a1, s1a2, s2a1, s2a2;
+    std::array<std::array<fitted::Bq, sections>, nb> rm;
+    std::array<fitted::Bq, nb> det, det2;
+    std::array<double, nb> floorv {}, lev {}, gain {}, env {};
+    std::array<bool, nb> vadBand {};
+};
+} // namespace ns1
+
 class Quell final : public Effect
 {
 public:
@@ -421,6 +663,7 @@ public:
                 a.reset();
         power.fill (0.0);
         gainDb.fill (0.0);
+        ns1On = false; // round 190mg: the NS1 law's engine restarts (prepared again at the current rate)
     }
 
     void process (float* l, float* r, int n, const EffectParams& p, double) noexcept override
@@ -430,6 +673,20 @@ public:
         const auto out = (float) dbToGain (outputDb (p[output]));
         if (on (p[matched]))
         {
+            // round 190mg (ns1): the NS1 law above 0 % (and from then on, so that automation down to 0 stays continuous;
+            // its Amount 0 is the same bare pair); Amount 0 from the start keeps the zero law's path bit for bit
+            if (on (p[ns1Law]) && (amt > 0.0 || ns1On))
+            {
+                if (! ns1On)
+                {
+                    ns1Engine.prepare (sr);
+                    ns1On = true;
+                }
+                const auto red = ns1Engine.process (l, r, n, amt, listenOnly, out);
+                meter[0].store ((float) std::clamp (red / 30.0, 0.0, 1.0), std::memory_order_relaxed);
+                return;
+            }
+            ns1On = false;
             if (! matchedOn)
             {
                 matchedEngine.prepare (sr);
@@ -505,8 +762,34 @@ private:
     std::array<std::atomic<float>, bands + 1> meter {};
     fitted::Engine matchedEngine;
     bool matchedOn = false;
+    ns1::Engine ns1Engine; // round 190mg
+    bool ns1On = false;
 };
 } // namespace
+
+Ns1Layout ns1Layout (double amount) noexcept
+{
+    // the reference's five saved states (RealWorld 85 / 86 = the corners, 206 / 203 = the cuts, 226 = the position) at
+    // 0 / 20 / 35 / 50 / 100 %; the high split's Q measured on our probes / renders (REA_rodada190mg_ns1.md §2)
+    static constexpr double at[] { 0.0, 0.2, 0.35, 0.5, 1.0 };
+    static constexpr double lo[] { 60.0, 60.0, 65.0, 70.0, 110.0 }, hi[] { 16000.0, 14000.0, 13500.0, 13000.0, 8000.0 };
+    static constexpr double cut[] { 0.0, -10.0, -25.0, -40.0, -70.0 }, pos[] { 0.0, 0.02, 0.0325, 0.045, 0.8 };
+    static constexpr double q[] { 0.8992, 0.370, 0.392, 0.432, 0.6992 };
+    const auto a = std::clamp (amount, 0.0, 1.0);
+    int k = 0;
+    while (k < 3 && a > at[k + 1])
+        ++k;
+    const auto t = (a - at[k]) / (at[k + 1] - at[k]);
+    const auto lin = [&] (const double* v) { return v[k] + (v[k + 1] - v[k]) * t; };
+    const auto lg = [&] (const double* v) { return v[k] * std::pow (v[k + 1] / v[k], t); };
+    Ns1Layout l;
+    l.minFc = lg (lo);
+    l.maxFc = lg (hi);
+    l.cutDb = lin (cut);
+    l.position = lin (pos);
+    l.q2 = lin (q);
+    return l;
+}
 
 std::unique_ptr<Effect> make (const Tuning& t) { return std::make_unique<Quell> (t); }
 std::unique_ptr<Effect> makeTracked (const Track& t) { return std::make_unique<Quell> (defaultTuning(), &t); }
