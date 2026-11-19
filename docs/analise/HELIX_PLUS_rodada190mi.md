@@ -44,11 +44,14 @@ their inputs change, same arithmetic, so the same bits) made Helix's own paths c
 
 | Patch | before | after |
 |---|---|---|
-| default (Modern, filter) | 154.8 M | 127.6 M (−17.6 %) |
-| unison Classic 8 | 401.8 M | 329.8 M (−17.9 %) |
-| 2 osc + sub | 197.4 M | 171.0 M (−13.3 %) |
+| default (Modern, filter) | 154.8 M | 127.3 M (−17.8 %) |
+| unison Classic 8 | 401.8 M | 331.5 M (−17.5 %) |
+| 2 osc + sub | 197.4 M | 170.0 M (−13.9 %) |
 
-Helix+ features' own cost: see HANDOFF.md of round 190mi (cpu/cg_all.txt).
+Wall clock (indicative, one pinned core, min of 7, µs per second of audio per voice): default 2497 … 2682 → 1873 …
+1958, unison 8 7211 … 7507 → 4922 … 5005. Helix+'s own costs (instructions per voice-sample, the default patch = 344 at
+revision 1): Warp 2 440 … 515, unison 16 1452, stack + blend 1015, noise 390, Comb 431, Formant 519, Phaser 449, drawn
+LFO 388; the FX rack (all four, per channel) 833 per sample. Full table: /mnt/e/lynx-work/helix190mi/cpu/cg_table.md.
 
 ## Not done (next rounds)
 
