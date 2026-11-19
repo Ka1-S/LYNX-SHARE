@@ -473,6 +473,8 @@ public:
         det.reset();
         psola.reset();
         activity = 0.0;
+        passGain = 1.0; // round 190mg
+        passQuiet = 0.0;
         hpX[0] = hpX[1] = hpY[0] = hpY[1] = 0.0;
         std::fill (dry.begin(), dry.end(), 0.0f);
         dryPos = 0;
@@ -612,6 +614,8 @@ public:
         // `latency` samples ago
         const auto voicedDelay = std::clamp (latency - det.windowCentre(), 0, dryRing - 1);
         const auto wet = std::clamp (p[mix], 0.0f, 1.0f);
+        const bool waves = p[wavesLaw] >= 0.5f; // round 190mg (hidden, the Waves translator's)
+        const auto passSmooth = 1.0 - std::exp (-1.0 / (0.005 * sr));
         const auto dt = 1.0 / sr;
         const auto stereo = r != nullptr && r != l;
         float peakIn = 0.0f, peakOut = 0.0f; // round 135w: the input / output meters
@@ -846,6 +850,22 @@ public:
                 y[0] += nz;
                 y[1] += nz;
             }
+            if (waves) // round 190mg: the reference is the input itself while nothing is being corrected
+            {
+                auto aim = unvoicedFor > 0.0 ? 0.0 : std::clamp ((std::abs (semis - trans) - passFloor) / passSpan, 0.0, 1.0);
+                // the dry signal only once the condition has held for passHold; back to the corrected one at once
+                passQuiet = aim < 1.0 ? passQuiet + dt : 0.0;
+                if (passQuiet < passHold)
+                    aim = 1.0;
+                passGain += passSmooth * (aim - passGain);
+                // half-way between a linear and an equal-power fade (the two signals are partly coherent: a linear fade lost
+                // 0.1 … 0.6 dB, an equal-power one gained 0.1 … 0.3 dB on refcap182)
+                const auto hp = 0.5 * 3.141592653589793 * passGain;
+                const auto gw = 0.5 * (passGain + std::sin (hp)), gd = 0.5 * (1.0 - passGain + std::cos (hp));
+                y[0] = (float) (gd * d0 + gw * y[0]);
+                if (stereo)
+                    y[1] = (float) (gd * d1 + gw * y[1]);
+            }
             if (vibLevel != 0.0) // round 166c: the created vibrato's level swing
                 for (auto& v : y)
                     v = (float) (v * (1.0 + vibLevel));
@@ -946,6 +966,13 @@ private:
     std::atomic<float> meterSung { -1.0f }, meterTarget { -1.0f }, meterShift { 0.0f }, meterHeld { 0.0f };
     std::atomic<float> meterIn { 0.0f }, meterOut { 0.0f };
     double activity = 0.0, hpX[2] {}, hpY[2] {}; // round 148: the high-frequency make-up
+    // round 190mg (wavesLaw): the share of the corrected signal over the dry one (0 = the delayed input itself); it
+    // follows the applied correction: the dry signal below passFloor (semitones) once that has held for passHold (s),
+    // and on unvoiced sounds, all of the corrected one from passFloor + passSpan, back to it at once; a 5 ms one-pole fade
+    // [fit] refcap182 (Waves Tune RT, five settings x five signals: 10 / 30 ms fades and 40 ms hold scored lower)
+    double passGain = 1.0;
+    static constexpr double passFloor = 0.01, passSpan = 0.02, passHold = 0.08;
+    double passQuiet = 0.0; // round 190mg: how long the pass condition has held (s)
     double candidateTime = 0.0; // round 135w: Tolerance time
     int candidate = -1;
     int scaleOffset = 0; // round 166c: transpose in scale — the current target's offset (semitones)

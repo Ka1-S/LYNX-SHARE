@@ -623,6 +623,7 @@ public:
     void prepare (double sampleRate) noexcept override
     {
         sr = sampleRate > 0.0 ? sampleRate : 48000.0;
+        spliceReady = false; // round 190mg: the splice law's coefficients follow the rate
         // longest read: 100 ms of delay + the 53 ms window (+ the octave's doubled sweep) + margin
         const auto n = (int) std::ceil (0.25 * sr) + 8;
         for (auto& v : voice)
@@ -644,6 +645,9 @@ public:
             v.lfo = 0.0;
             v.last = 0.0f;
             v.fbHp.reset();
+            v.sPos = v.sOther = v.sEnergy = 0.0; // round 190mg
+            v.sFade = 1.0;
+            v.sCorr.fill (0.0);
         }
         for (auto& d : direct)
             d.clear();
@@ -681,6 +685,13 @@ public:
         const auto voiceExtra = (aligned ? 0.0103 * sr : 0.0) - 0.5 * window;
         const bool lowOnV = on (p[lowOn]), highOnV = on (p[highOn]);
         const bool headLaw = p[gemini::headLaw] >= 0.5f;
+        const bool splice = p[gemini::spliceLaw] >= 0.5f; // round 190mg (hidden, the Waves translator's)
+        if (splice)
+        {
+            if (! spliceReady)
+                prepareSplice();
+            setSpliceRange (on (p[range]));
+        }
         const auto headRange = 252.0 * sr / 48000.0; // round 190do [EXEC]: the measured head's range (samples at 48 kHz)
 
         struct VoiceSetup
@@ -771,6 +782,13 @@ public:
                     v.last = y;
                     wetL += s.gl * y;
                     wetR += s.gr * y;
+                    continue;
+                }
+                if (! s.octave && splice)
+                {
+                    v.last = spliceVoice (v, s.delay, ratio, src);
+                    wetL += s.gl * v.last;
+                    wetR += s.gr * v.last;
                     continue;
                 }
                 if (! s.octave && headLaw)
@@ -922,6 +940,7 @@ private:
     static constexpr double downMin = 79.4, downMax = 575.7, fade = 1.3;
     static constexpr double upMin = 62.0, upMax = 558.4, upOverlap = 4.2, upFadeIn = 0.7;
 
+    static constexpr int spliceLags = 20; // round 190mg: the splice law's candidate lags
     struct Voice
     {
         Line line;
@@ -930,7 +949,80 @@ private:
         double phase = 0.0, lfo = 0.0;
         float last = 0.0f;
         Biquad fbHp;
+        // round 190mg: the splice law's state — the head's lag (samples ago, 0 = unset), the old head's distance from it
+        // during a crossfade, the crossfade gain, the running autocorrelation at the candidate lags and the energy
+        double sPos = 0.0, sOther = 0.0, sFade = 1.0, sEnergy = 0.0;
+        std::array<double, spliceLags> sCorr {};
     };
+
+    // round 190mg [REA, the Waves doubler's DSP] — one read head per voice at `lag` samples ago, drifting by (1 − ratio)
+    // per sample. Its free band is the delay ± W (W = 256 samples, ×4 with Range); past it the head jumps by the
+    // candidate lag with the highest running autocorrelation of the source (20 lags 256·2^(k/20)·W/256, one-pole 20 ms
+    // average) as soon as the source is quiet (mean square < 0.001), or the head sits on a near-zero sample (|x| < 0.01)
+    // while that autocorrelation exceeds 0.1 × the mean square; 32 samples further the jump is forced. The old head fades
+    // out linearly over W samples. Linear reads. Every number is from the DSP (sizes in samples, not time).
+    std::array<int, spliceLags> lagList {};
+    bool spliceReady = false;
+    double spliceW = 256.0, spliceC = 0.0, spliceFadeInc = 1.0;
+    void prepareSplice() noexcept
+    {
+        spliceReady = true;
+        spliceC = std::exp (-1.0 / (0.020 * sr));
+    }
+    void setSpliceRange (bool wide) noexcept
+    {
+        const auto w = wide ? 4.0 : 1.0;
+        if (spliceW == 256.0 * w && lagList[0] != 0)
+            return;
+        spliceW = 256.0 * w;
+        spliceFadeInc = 1.0 / spliceW; // [EXEC] the old head fades out linearly over W samples (fitted on noise probes: 256)
+        for (int k = 0; k < spliceLags; ++k)
+            lagList[(std::size_t) k] = (int) std::floor (std::pow (2.0, 0.05 * k) * w * 256.0 + 0.5);
+    }
+    float spliceVoice (Voice& v, double delay, double ratio, float src) noexcept
+    {
+        const auto size = (int) v.line.buf.size();
+        const auto ago = [&v, size] (int d) { auto i = v.line.pos - d; return v.line.buf[(std::size_t) (i < 0 ? i + size : i)]; };
+        // the detector: running energy and autocorrelation of the source (the sample just pushed is 1 ago)
+        const auto c = spliceC, x = (double) src;
+        v.sEnergy = c * v.sEnergy + (1.0 - c) * x * x;
+        double best = 0.0;
+        int bestLag = lagList[0];
+        for (int k = 0; k < spliceLags; ++k)
+        {
+            auto& r = v.sCorr[(std::size_t) k];
+            r = c * r + (1.0 - c) * x * (double) ago (1 + lagList[(std::size_t) k]);
+            if (best <= r)
+                best = r, bestLag = lagList[(std::size_t) k];
+        }
+        // the delay is at least W + 64 samples (the DSP's minimum without Align)
+        const auto centre = std::max (delay, spliceW + 64.0);
+        if (v.sPos <= 0.0)
+            v.sPos = centre;
+        v.sPos += 1.0 - ratio;
+        const auto lo = centre - spliceW, hi = centre + spliceW;
+        if (v.sPos <= lo || v.sPos >= hi)
+        {
+            const bool up = v.sPos <= lo;
+            const auto at = std::clamp ((int) std::lround (v.sPos), 1, size - 4);
+            const bool forced = up ? v.sPos <= lo - 32.0 : v.sPos >= hi + 32.0;
+            if (forced || v.sEnergy < 0.001 || (std::abs (ago (at)) < 0.01f && 0.1 * v.sEnergy < best))
+            {
+                const auto step = up ? (double) bestLag : -(double) bestLag;
+                v.sPos += step;
+                v.sOther = -step;
+                v.sFade = 0.0;
+            }
+        }
+        const auto read = [&v, size] (double d) { return v.line.linear (std::clamp (1.0 + d, 1.0, (double) size - 5.0)); };
+        auto y = read (v.sPos);
+        if (v.sFade < 1.0)
+        {
+            v.sFade = std::min (1.0, v.sFade + spliceFadeInc);
+            y = (float) (read (v.sPos + v.sOther) + (double) (y - read (v.sPos + v.sOther)) * v.sFade);
+        }
+        return y;
+    }
 
     double sr = 48000.0;
     std::array<Voice, voices> voice;

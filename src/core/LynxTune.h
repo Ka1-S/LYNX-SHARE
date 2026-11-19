@@ -105,7 +105,14 @@ enum Param : int
     scaleTranspose,          // −7 … +7 steps of the scale (default 0)
     // round 190bb (appended, issue #103; LYNX's own, 0 by default = the old sound, the stage is skipped):
     breathiness,             // 0 … 100 %: aspiration noise with the corrected voice's own formants, on voiced sounds
-    count
+    count,
+    // round 190mg, hidden (not in the info: no control, no text; saved while non-zero): the Waves Tune Real-Time law —
+    // only its translator sets it. [EXEC] black-box, refcap182: what the reference does not correct comes out as the
+    // input itself (the in-tune bass: −20 … −36 dB from the dry signal), where LYNX's overlap-add re-synthesised it
+    // (−7 dB) and added 3 … 10 dB of low-frequency grain noise under the guitar's strums. On: the output fades (5 ms) to
+    // the delayed input once the applied correction has stayed under a cent, or the sound unvoiced, for 80 ms, and back
+    // at once when a correction starts. 0 = the old sound, bit for bit (new instances and every project saved before)
+    wavesLaw = count
 };
 // round 190bb: the breath noise's level for a value (0 … breathFull, a square law: half travel = −12 dB)
 constexpr double breathFull = 2.0;

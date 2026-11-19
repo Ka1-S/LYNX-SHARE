@@ -1461,6 +1461,8 @@ int translateWavesTune (const std::vector<std::uint8_t>& state, EffectSlot& slot
         slot.params[lynxtune::speedLink] = *speed < 5.0 ? 0.0f : 1.0f;
         ++n;
     }
+    // round 190mg: what the reference does not correct passes as the input itself (REA_rodada190mg_voc.md; hidden)
+    slot.params[lynxtune::wavesLaw] = 1.0f;
     // RealWorld 22 = 100 in every state of her corpus, Correction % by its default [model]
     if (const auto amount = wavesValue (rw, 22); amount && *amount >= 1.0 && *amount <= 100.0)
         slot.params[lynxtune::correction] = (float) (*amount / 100.0);
@@ -3031,6 +3033,8 @@ int translateWavesDoubler (const std::vector<std::uint8_t>& state, EffectSlot& s
     p[g::highOn] = flag (14, 0.0);
     p[g::feedbackCut] = g::freqValue (at (15, 16.0));
     p[g::range] = flag (18, 0.0);
+    // round 190mg: the Waves DSP's splice law for the read head (REA_rodada190mg_voc.md; hidden, Align off only)
+    p[g::spliceLaw] = 1.0f;
     // round 135w: a four-voice doubler's voices 3 and 4 (blocks 46 / 56, the same layout as 26 / 36 [model]: a two-voice
     // state carries those blocks too, so they are read only when the state names the four-voice plug-in; their source
     // indices are not probed yet: own side)
