@@ -8,6 +8,7 @@
 // band, normalised again and added back. Written from that structure in our own code; every constant fitted on our
 // demo-mode probes (§3, lab/fitrb2.py). Header-only.
 
+#include <numbers>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -110,7 +111,7 @@ private:
     struct Ap1
     {
         double c = 0, x1 = 0, y1 = 0;
-        void set (double f, double sr) noexcept { const double t = std::tan (M_PI * std::clamp (f, 5.0, 0.45 * sr) / sr); c = (t - 1.0) / (t + 1.0); }
+        void set (double f, double sr) noexcept { const double t = std::tan (std::numbers::pi * std::clamp (f, 5.0, 0.45 * sr) / sr); c = (t - 1.0) / (t + 1.0); }
         double run (double x) noexcept { const double y = c * x + x1 - c * y1; x1 = x; y1 = y; return y; }
         void clear() noexcept { x1 = y1 = 0.0; }
     };
@@ -119,7 +120,7 @@ private:
         double b1 = 0, b2 = 0, u1 = 0, u2 = 0, v1 = 0, v2 = 0;
         void set (double f, double sr) noexcept
         {
-            const double K = 1.0 / std::tan (M_PI * std::clamp (f, 5.0, 0.45 * sr) / sr), p0 = 1.0 + K + K * K;
+            const double K = 1.0 / std::tan (std::numbers::pi * std::clamp (f, 5.0, 0.45 * sr) / sr), p0 = 1.0 + K + K * K;
             b1 = (2.0 - 2.0 * K * K) / p0;
             b2 = (1.0 - K + K * K) / p0;
         }

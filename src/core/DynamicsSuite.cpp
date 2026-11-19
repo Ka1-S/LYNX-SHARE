@@ -1,5 +1,6 @@
 #include "core/DynamicsSuite.h"
 
+#include <numbers>
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -3924,7 +3925,7 @@ private:
                 fHz[fi] = hz;
                 fQ[fi] = q;
                 // a band-pass with 0 dB at its centre (bilinear, warped there)
-                const double w0 = 2.0 * M_PI * std::clamp (hz, 10.0, 0.49 * sr) / sr, al = std::sin (w0) / (2.0 * q), a0 = 1.0 + al;
+                const double w0 = 2.0 * std::numbers::pi * std::clamp (hz, 10.0, 0.49 * sr) / sr, al = std::sin (w0) / (2.0 * q), a0 = 1.0 + al;
                 for (int c = 0; c < 2; ++c)
                 {
                     auto& b = fBp[(std::size_t) c][fi];
