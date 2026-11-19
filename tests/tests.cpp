@@ -17787,6 +17787,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Parity190mgVocTests.inc" // round 190mg (voc): the Waves Doubler DSP's splice law on Gemini, the Waves Tune RT law on LYNX Tune
 #include "Parity190mgDynTests.inc" // round 190mg (dyn): Facet's PuigTec law, L2's IDR on the Limiter (REA of the Waves PuigTec / L2 DSP)
 #include "Parity190mmTests.inc" // round 190mm: Facet's Waves design law (REQ, Q10), API-550 / 560 on Facet, SSL G-Channel on Ridge
+#include "Parity190mmSchepsTests.inc" // round 190mm (scheps): the Scheps Omni Channel on Ridge Strip's hidden omni law (five modules, order)
 #include "Sampler190dhTests.inc"
 #include "Fix190eaTests.inc"
 #include "Iss158Tests.inc"

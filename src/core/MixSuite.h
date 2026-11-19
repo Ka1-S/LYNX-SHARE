@@ -160,6 +160,42 @@ enum Param
 };
 double compGrCapDb (float v) noexcept;   // 0 = no cap (a huge value), else 0 .. 60 dB
 double compAttackFineSeconds (float v) noexcept; // 0 .. 0.25 s
+
+// round 190mm (scheps), hidden like compGrCap (not in the info: no control, no text; saved while non-zero) at FIXED
+// indices 100 … 191: the "omni" law — a five-module channel strip (Pre, Gate, DS2, EQ, Comp in a stored order) that
+// stands in for a multi-module channel strip whose modules the user can reorder (REA_rodada190mm_scheps). omniLaw 0 =
+// off: new instances and every project saved before (Ridge's engines above, bit for bit); only the Waves translator
+// sets it. Values are stored 0 … 1 through the omni:: scales below.
+enum OmniParam
+{
+    omniLaw = 100, omniOrder, omniIn, omniOut, omniInvL, omniInvR, omniLimOn, omniLimThr,
+    // Pre: saturation, thump, high- / low-pass
+    oPreOn = 110, oHpOn, oHpHz, oHpSlope, oHpQ, oLpOn, oLpHz, oLpSlope, oLpQ, oThump, oSatOn, oSatType, oSatAmount,
+    // Gate / expander
+    oGateOn = 125, oGateThr, oGateFloor, oGateClose, oGateAtt, oGateRel, oGateExp, oGateHpOn, oGateHpHz, oGateLpOn, oGateLpHz,
+    // DS2 (two dynamic bands)
+    oDsOn = 140, oDs1On, oDs1Thr, oDs1Type, oDs1Hz, oDs1Range, oDs2On, oDs2Thr, oDs2Type, oDs2Hz, oDs2Range, oDsOut, oDsAtt, oDsRel,
+    // EQ: four bands (LF, Tone, Mid, HF) × on, type, frequency, gain, Q
+    oEqOn = 155, oEqBand0,
+    // Compressor
+    oCompOn = 176, oCompType, oCompRatio, oCompAtt, oCompRel, oCompThr, oCompMix, oCompOut,
+    oScHpOn, oScHpHz, oScBellOn, oScBellHz, oScBellDb, oScShelfOn, oScShelfHz, oScShelfDb,
+    omniEnd
+};
+namespace omni
+{
+enum Module { pre = 1, gate, ds2, eq, comp };
+float dbValue (double db) noexcept;      double db (float v) noexcept;      // −72 … +24 dB
+float hzValue (double hz) noexcept;      double hz (float v) noexcept;      // 20 Hz … 20 kHz (log)
+float qValue (double q) noexcept;        double q (float v) noexcept;       // 0.1 … 10 (log)
+float msValue (double ms) noexcept;      double ms (float v) noexcept;      // 0.01 ms … 10 s (log)
+float ratioValue (double r) noexcept;    double ratio (float v) noexcept;   // 1 … 20 : 1 (∞ = 20)
+float indexValue (int k) noexcept;       int index (float v) noexcept;      // a selector position k / 8
+// the module order: five digits (module ids above, first to last) / 100000; a bad value = the default order
+float orderValue (const int (&order)[5]) noexcept;
+void orderOf (float v, int (&order)[5]) noexcept;
+bool omniLawOn (const EffectParams& p) noexcept;
+} // namespace omni
 // round tp172c6: the drive models (DRIVE section), in the Model selector's order
 enum DriveModel { driveSaturate, driveConsoleE, driveConsoleG, driveConsoleA, driveConsoleN, driveConsoleY, driveTube,
                   driveGuitarAmp, driveBassAmp, driveModels };

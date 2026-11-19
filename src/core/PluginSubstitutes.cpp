@@ -755,6 +755,17 @@ waves = C4
 # (docs/analise/REA_rodada190mg.md §2)
 translate = waves-c4
 
+# round 190mm (scheps): the multi-module channel strip role (no entry before: such projects lost the plug-in). Its five
+# modules (Pre, Gate, DS2, EQ, Comp), their on / off and the module order are read from the state and run by Ridge
+# Strip's hidden omni law: LYNX's own model of each module, fitted on our Waves-demo probes (EQ shapes, filters, thump,
+# saturation, the compressor types with their automatic make-up; docs/analise/REA_rodada190mm_scheps.md)
+[waves-scheps-omni]
+product = Scheps Omni Channel
+vendor = Waves
+lynx = Ridge Strip
+waves = Scheps Omni Channel; Scheps Omni Channel 2
+translate = waves-scheps-omni
+
 [waves-ar-plates]
 product = Abbey Road Reverb Plates
 vendor = Waves
@@ -3881,6 +3892,186 @@ int translateFittedMap (const std::vector<std::uint8_t>& state, EffectSlot& slot
     return 0;
 }
 
+// ---- round 190mm (scheps): Scheps Omni Channel -> Ridge Strip's hidden omni law (MixSuite.h OmniParam) ----
+// The state holds the strip's own RealWorld list (input / output, phase, limiter, PARAM_SLOT_SERILIZATION_PLUGIN = the
+// module order as slot numbers 1 … 6, first to last) and one <slot index="k"> per module with the module's own preset
+// (its SETUP_A RealWorld list) and <plugin_bypass>. Indices below: REA_rodada190mm_scheps §1 (states of the bank and
+// the module presets compared value by value); the left / mid values are taken (both sides linked).
+namespace
+{
+std::vector<double> omniNumbers (std::string_view text)
+{
+    std::vector<double> out;
+    std::size_t p = 0;
+    while (p < text.size())
+    {
+        while (p < text.size() && std::isspace ((unsigned char) text[p])) ++p;
+        const auto s = p;
+        while (p < text.size() && ! std::isspace ((unsigned char) text[p])) ++p;
+        if (p == s) break;
+        const std::string tok (text.substr (s, p - s));
+        char* end = nullptr;
+        const auto v = std::strtod (tok.c_str(), &end);
+        out.push_back (tok != "*" && end != nullptr && *end == 0 ? v : std::numeric_limits<double>::quiet_NaN());
+    }
+    return out;
+}
+std::string_view omniBetween (std::string_view t, std::string_view a, std::string_view b, std::size_t from = 0)
+{
+    const auto i = t.find (a, from);
+    if (i == std::string_view::npos) return {};
+    const auto j = t.find (b, i + a.size());
+    return j == std::string_view::npos ? std::string_view {} : t.substr (i + a.size(), j - i - a.size());
+}
+struct OmniModule { int kind = 0; bool bypass = true; std::vector<double> rw; };
+} // namespace
+
+int translateWavesSchepsOmni (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace o = mixsuite::ridge::omni;
+    namespace rg = mixsuite::ridge;
+    if (slot.kind != EffectKind::ridgeStrip)
+        return 0;
+    const auto start = findBytes (state, "<PresetChunkXMLTree");
+    if (start == std::string::npos)
+        return 0;
+    const std::string xml (state.begin() + (std::ptrdiff_t) start, state.end());
+    const std::string_view x (xml);
+    if (omniBetween (x, "<PluginName>", "</PluginName>").find ("Scheps Omni Channel") == std::string_view::npos)
+        return 0;
+    const auto outer = wavesRealWorldParams (state);
+    const auto a = x.find ("<PresetData Setup=\"SETUP_A\"");
+    const auto slotsEnd = a == std::string_view::npos ? a : x.find ("</PluginSpecificXMLData>", a);
+    if (outer.size() < 58 || slotsEnd == std::string_view::npos)
+        return 0;
+    OmniModule slots[6];
+    for (int k = 0; k < 6; ++k)
+    {
+        const auto tag = "<slot index=\"" + std::to_string (k) + "\">";
+        const auto i = x.find (tag, a);
+        if (i == std::string_view::npos || i > slotsEnd) continue;
+        const auto j = x.find ("</slot>", i);
+        const auto t = x.substr (i, (j == std::string_view::npos ? slotsEnd : j) - i);
+        const auto name = omniBetween (t, "<plugin_name>", "</plugin_name>");
+        auto& m = slots[k];
+        m.kind = name == "Internal_SOC_Pre" ? o::pre : name == "Internal_SOC_Gate" ? o::gate : name == "Internal_SOC_DeEsser" ? o::ds2
+               : name == "Internal_SOC_EQ" ? o::eq : name == "Internal_SOC_Comp" ? o::comp : 0;
+        m.bypass = omniBetween (t, "<plugin_bypass>", "</plugin_bypass>") != "false";
+        const auto pd = t.find ("<PresetData Setup=\"SETUP_A\"");
+        if (pd != std::string_view::npos)
+            m.rw = omniNumbers (omniBetween (t, "<Parameters Type=\"RealWorld\">", "</Parameters>", pd));
+    }
+    auto& p = slot.params;
+    const auto set = [&p] (int k, float v) { p[(std::size_t) k] = std::clamp (v, 0.0f, 1.0f); };
+    const auto val = [] (const std::vector<double>& rw, std::size_t i, double fallback) {
+        return i < rw.size() && std::isfinite (rw[i]) ? rw[i] : fallback;
+    };
+    for (int k = rg::omniLaw; k < rg::omniEnd; ++k) p[(std::size_t) k] = 0.0f;
+    set (rg::omniLaw, 1.0f);
+    // the order: the slot numbers, first to last (the insert slot, 6, holds no LYNX module)
+    int order[5] = {}, n = 0;
+    const auto code = (long) std::llround (val (outer, 57, 153426.0));
+    const auto digits = std::to_string (code);
+    for (const auto c : digits)
+    {
+        const auto s = c - '1';
+        if (s >= 0 && s < 6 && slots[s].kind != 0 && n < 5) order[n++] = slots[s].kind;
+    }
+    set (rg::omniOrder, n == 5 ? o::orderValue (order) : 0.0f);
+    set (rg::omniIn, o::dbValue (std::max (-72.0, val (outer, 0, 0.0))));
+    set (rg::omniOut, o::dbValue (std::max (-72.0, val (outer, 4, 0.0))));
+    set (rg::omniInvL, val (outer, 2, 0.0) >= 0.5 ? 1.0f : 0.0f);
+    set (rg::omniInvR, val (outer, 3, 0.0) >= 0.5 ? 1.0f : 0.0f);
+    set (rg::omniLimOn, val (outer, 35, 0.0) >= 0.5 ? 1.0f : 0.0f);
+    set (rg::omniLimThr, o::dbValue (val (outer, 36, 0.0)));
+    int modules = 0;
+    for (const auto& m : slots)
+    {
+        if (m.kind == 0 || m.rw.empty()) continue;
+        const auto& rw = m.rw;
+        const auto on = ! m.bypass;
+        modules += on ? 1 : 0;
+        switch (m.kind)
+        {
+            case o::pre:
+                set (rg::oPreOn, on ? 1.0f : 0.0f);
+                set (rg::oSatAmount, (float) (val (rw, 9, 0.0) / 100.0));
+                set (rg::oSatOn, val (rw, 10, 0.0) >= 0.5 ? 1.0f : 0.0f);
+                set (rg::oSatType, o::indexValue ((int) std::lround (val (rw, 11, 0.0))));
+                set (rg::oThump, val (rw, 12, 0.0) >= 0.5 ? (val (rw, 13, 0.0) >= 0.5 ? 1.0f : 0.5f) : 0.0f);
+                set (rg::oHpOn, val (rw, 14, 0.0) >= 0.5 ? 1.0f : 0.0f);
+                set (rg::oHpSlope, o::indexValue ((int) std::lround (val (rw, 15, 1.0))));
+                set (rg::oHpHz, o::hzValue (val (rw, 16, 20.0)));
+                set (rg::oHpQ, o::qValue (val (rw, 17, 1.0)));
+                set (rg::oLpOn, val (rw, 18, 0.0) >= 0.5 ? 1.0f : 0.0f);
+                set (rg::oLpSlope, o::indexValue ((int) std::lround (val (rw, 19, 1.0))));
+                set (rg::oLpHz, o::hzValue (val (rw, 20, 20000.0)));
+                set (rg::oLpQ, o::qValue (val (rw, 21, 1.0)));
+                break;
+            case o::gate:
+                set (rg::oGateOn, on ? 1.0f : 0.0f);
+                set (rg::oGateThr, val (rw, 18, -144.0) <= -72.0 ? 0.0f : o::dbValue (val (rw, 18, -144.0)));
+                set (rg::oGateFloor, o::dbValue (val (rw, 23, -60.0)));
+                set (rg::oGateClose, o::dbValue (val (rw, 28, 0.0)));
+                set (rg::oGateAtt, o::msValue (val (rw, 24, 1.0)));
+                set (rg::oGateRel, o::msValue (val (rw, 25, 100.0)));
+                set (rg::oGateExp, val (rw, 26, 0.0) >= 0.5 ? 1.0f : 0.0f);
+                set (rg::oGateHpOn, val (rw, 13, 0.0) >= 0.5 ? 1.0f : 0.0f);
+                set (rg::oGateHpHz, o::hzValue (val (rw, 14, 60.0)));
+                set (rg::oGateLpOn, val (rw, 15, 0.0) >= 0.5 ? 1.0f : 0.0f);
+                set (rg::oGateLpHz, o::hzValue (val (rw, 16, 15000.0)));
+                break;
+            case o::ds2:
+                set (rg::oDsOn, on ? 1.0f : 0.0f);
+                for (int b = 0; b < 2; ++b)
+                {
+                    const auto i0 = (std::size_t) (b == 0 ? 20 : 28); const int k0 = b == 0 ? rg::oDs1On : rg::oDs2On;
+                    set (k0, val (rw, i0, 0.0) >= 0.5 ? 1.0f : 0.0f);
+                    set (k0 + 1, o::dbValue (val (rw, i0 + 1, 0.0)));
+                    set (k0 + 4, o::dbValue (val (rw, i0 + 2, -12.0)));
+                    set (k0 + 3, o::hzValue (val (rw, i0 + 3, b == 0 ? 4490.0 : 300.0)));
+                    set (k0 + 2, o::indexValue ((int) std::lround (val (rw, i0 + 4, b == 0 ? 3.0 : 1.0))));
+                }
+                set (rg::oDsOut, o::dbValue (val (rw, 17, 0.0)));
+                set (rg::oDsAtt, o::msValue (val (rw, 12, 42.0) * 0.1));
+                set (rg::oDsRel, o::msValue (val (rw, 15, 50.0)));
+                break;
+            case o::eq:
+                set (rg::oEqOn, on ? 1.0f : 0.0f);
+                for (int b = 0; b < 4; ++b)
+                {
+                    const auto i0 = (std::size_t) (6 * b); const int k0 = rg::oEqBand0 + 5 * b;
+                    set (k0, val (rw, i0 + 1, 1.0) >= 0.5 ? 1.0f : 0.0f);
+                    set (k0 + 1, o::indexValue ((int) std::lround (val (rw, i0 + 2, 1.0))));
+                    set (k0 + 2, o::hzValue (val (rw, i0 + 4, 1000.0)));
+                    set (k0 + 3, o::dbValue (val (rw, i0 + 3, 0.0)));
+                    set (k0 + 4, o::qValue (val (rw, i0 + 5, 1.0)));
+                }
+                break;
+            case o::comp:
+                set (rg::oCompOn, on ? 1.0f : 0.0f);
+                set (rg::oCompType, o::indexValue ((int) std::lround (val (rw, 29, 0.0))));
+                set (rg::oCompRatio, o::ratioValue (val (rw, 38, 3.5)));
+                set (rg::oCompAtt, o::msValue (val (rw, 44, 3.0)));
+                set (rg::oCompRel, o::msValue (val (rw, 42, 200.0)));
+                set (rg::oCompThr, o::dbValue (val (rw, 40, 0.0)));
+                set (rg::oCompMix, (float) (val (rw, 78, 100.0) / 100.0));
+                set (rg::oCompOut, o::dbValue (val (rw, 34, 0.0)));
+                set (rg::oScHpOn, val (rw, 47, 0.0) >= 0.5 ? 1.0f : 0.0f);
+                set (rg::oScHpHz, o::hzValue (val (rw, 49, 80.0)));
+                set (rg::oScBellOn, val (rw, 51, 0.0) >= 0.5 ? 1.0f : 0.0f);
+                set (rg::oScBellDb, o::dbValue (val (rw, 53, 0.0)));
+                set (rg::oScBellHz, o::hzValue (val (rw, 55, 500.0)));
+                set (rg::oScShelfOn, val (rw, 59, 0.0) >= 0.5 ? 1.0f : 0.0f);
+                set (rg::oScShelfDb, o::dbValue (val (rw, 61, 0.0)));
+                set (rg::oScShelfHz, o::hzValue (val (rw, 63, 8000.0)));
+                break;
+            default: break;
+        }
+    }
+    return 8 + modules;
+}
+
 RawTranslator rawTranslatorNamed (std::string_view name)
 {
     if (name == "fitted-map")
@@ -3956,6 +4147,8 @@ RawTranslator rawTranslatorNamed (std::string_view name)
         return translateWavesSslCompBus;
     if (name == "waves-reverb")
         return translateWavesReverb;
+    if (name == "waves-scheps-omni") // round 190mm (scheps)
+        return translateWavesSchepsOmni;
     return nullptr;
 }
 
