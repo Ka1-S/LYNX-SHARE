@@ -2024,7 +2024,19 @@ struct Exporter
                 {
                     Node d;
                     if (helixDevice (ch, d))
+                    {
                         addDevice (n, std::move (d));
+                        // (round 190mi) Helix+'s values are LYNX's own: Live's Wavetable has no place for them
+                        const auto st = helixState (ch);
+                        bool plus = st[(std::size_t) wt::extBase] >= 0.5;
+                        bool used = false;
+                        for (int i = wt::extBase + 1; plus && i < wt::stateSize && ! used; ++i)
+                            used = (float) st[(std::size_t) i] != (float) wt::defaults()[(std::size_t) i]; // (the channel keeps floats)
+                        if (used)
+                            note ("Helix+ settings (second warps, noise, unison stack, extra filters, macros, drawn LFOs, effects) are LYNX-only "
+                                  "and not in the Live set: "
+                                  + ch.name);
+                    }
                     else
                         note ("Helix not exported (this Live version's set has no Wavetable skeleton): " + ch.name);
                 }

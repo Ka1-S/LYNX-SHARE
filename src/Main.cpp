@@ -3196,6 +3196,16 @@ public:
             quit();
             return;
         }
+        if (args.contains ("--helixshot190mi"))
+        {
+            // LYNX --helixshot190mi prefix [bank preset name]: round 190mi off-screen, the Pattern layout's Helix channel
+            // window with Helix+'s strip, from a factory preset (default "Growl FM"): the device + strip, LFO 1 (drawn),
+            // the Matrix page (macros, Helix+'s rows); --shot-scale 1.5 --shot-suffix @150 for the 150 % pictures.
+            const auto i = args.indexOf ("--helixshot190mi");
+            runHelixShot190mi (args[i + 1].unquoted(), i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String ("Growl FM"));
+            quit();
+            return;
+        }
         if (args.contains ("--helixshot190ja"))
         {
             // LYNX --helixshot190ja prefix [Wavetable preset .adv]: round 190ja off-screen, the Clip-launch layout's Device
@@ -27889,6 +27899,62 @@ private:
             juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (*page), out);
             check ("channel window page", page->getWidth() > 0);
         }
+        juce::File (prefix + "-checks.txt").replaceWithText (checks);
+    }
+
+    void runHelixShot190mi (const juce::String& prefix, const juce::String& presetName)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        juce::String checks;
+        const auto check = [&checks] (const juce::String& what, bool ok) { checks << (ok ? "ok   " : "FAIL ") << what << "\n"; };
+        const auto& bank = lynx::banks::bankOf (lynx::InstrumentKind::helix);
+        int index = -1;
+        for (int b = 0; b < (int) bank.size(); ++b)
+            if (juce::String (bank[(std::size_t) b].name) == presetName)
+                index = b;
+        check ("preset " + presetName, index >= 0);
+        offline.editSong ([index] (lynx::Song& s) {
+            if (s.channels.empty())
+                s.channels.resize (1);
+            lynx::ChannelDef c;
+            c.instrument = lynx::InstrumentKind::helix;
+            c.mixerTrack = s.channels[0].mixerTrack;
+            if (auto loaded = lynx::banks::withPreset (c, std::max (index, 0)))
+                c = *loaded;
+            s.channels[0] = c;
+        }, false);
+        offline.dispatchPendingMessages();
+        auto page = lynx::makeHelixEditor (offline, [] (lynx::Song& s) -> lynx::ChannelDef* { return s.channels.empty() ? nullptr : &s.channels[0]; }, 0);
+        const auto write = [&prefix, &page, &offline] (const char* name) {
+            offline.dispatchPendingMessages();
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (*page), out);
+        };
+        check ("window page", page->getWidth() > 0 && page->getHeight() > lynx::helixDeviceHeight + 100);
+        check ("Helix panel inside", lynx::helixcards::showView (*page, 0, 0, 0) == 1);
+        write ("01-window");
+        lynx::helixcards::showView (*page, 0, 3, 0);
+        write ("02-lfo1-drawn");
+        lynx::helixcards::showView (*page, 1, 0, 0);
+        write ("03-matrix");
+        // the window's paint cost (device + strip, the Mod Sources page): 60 whole frames off screen, the best of 3 runs
+        lynx::helixcards::showView (*page, 0, 0, 0);
+        double best = 1.0e9;
+        for (int run = 0; run < 3; ++run)
+        {
+            juce::Image image (juce::Image::ARGB, page->getWidth(), page->getHeight(), true);
+            const auto t0 = juce::Time::getMillisecondCounterHiRes();
+            for (int f = 0; f < 60; ++f)
+            {
+                juce::Graphics g (image);
+                page->paintEntireComponent (g, false);
+            }
+            best = std::min (best, (juce::Time::getMillisecondCounterHiRes() - t0) / 60.0);
+        }
+        checks << "paint " << juce::String (best, 3) << " ms per frame (" << page->getWidth() << " x " << page->getHeight() << ")\n";
         juce::File (prefix + "-checks.txt").replaceWithText (checks);
     }
 
