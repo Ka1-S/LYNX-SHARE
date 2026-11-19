@@ -1715,7 +1715,8 @@ void PianoRollComponent::paint (juce::Graphics& g)
         {
             g.setColour (juce::Colour (181, 181, 181));
             g.setFont (theme::font (theme::type::caption, true));
-            const auto y = juce::jlimit ((float) lane.getY() + 24.0f, (float) lane.getBottom() - 12.0f, liveVelocityReadout.y - 6.0f);
+            const auto low = (float) lane.getBottom() - 12.0f, high = juce::jmin (low, (float) lane.getY() + 24.0f); // (under the lane's combo)
+            const auto y = juce::jlimit (high, low, liveVelocityReadout.y - 6.0f);
             textcache::drawText (g, juce::String (liveVelocityReadout.value), juce::Rectangle<float> (4.0f, y, (float) keyboardWidth - 10.0f, 12.0f),
                                  juce::Justification::centredRight, false);
         }
@@ -3411,6 +3412,7 @@ std::unique_ptr<juce::Component> PianoRollComponent::makeNoteInspectorForSnapsho
 int PianoRollComponent::liveVelocityHoverForSnapshot (bool dragging)
 {
     setDocked (true);
+    velocityHeight = defaultVelocityHeight; // (the lane enlarged by its divider, as in capture 190mf B2)
     liveNoteColour = juce::Colour (0xff3fb7c9);
     rowHeight = 18;
     pixelsPerTick = 64.0 / ticksPerStep;
@@ -3419,14 +3421,15 @@ int PianoRollComponent::liveVelocityHoverForSnapshot (bool dragging)
     const auto notes = channelNotes();
     if (notes.empty())
         return -1;
-    const auto& n = currentPattern (engine.getSong()).notes[(std::size_t) notes.front()];
+    const auto pick = notes[juce::jmin ((std::size_t) 1, notes.size() - 1)]; // (the second note: clear of the lane's left edge)
+    const auto& n = currentPattern (engine.getSong()).notes[(std::size_t) pick];
     const auto lane = velocityArea();
     const auto at = juce::Point<int> ((int) tickToX ((double) n.start), lane.getBottom() - 2 - juce::roundToInt ((float) (lane.getHeight() - 8) * n.velocity));
     lastMouse = at;
     updateHover (at, {});
     if (dragging)
     {
-        selection = { notes.front() };
+        selection = { pick };
         drag = Drag::velocity;
     }
     repaint();
