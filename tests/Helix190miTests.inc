@@ -71,7 +71,7 @@ TEST (helix190mi_layout_and_parameters)
     using namespace lynx;
     namespace w = wt;
     // Live's values stay where they were; Helix+'s block follows them
-    CHECK (w::liveStateSize == 778 && w::extBase == w::liveStateSize && w::stateSize == w::extBase + w::ext::count);
+    CHECK (w::liveStateSize == 778 && w::extBase == w::liveStateSize && w::ext2Base == w::extBase + w::ext::count); // (190ml: Helix+ 2 follows)
     CHECK (w::ext::points == w::ext::autoEnd && w::ext::macroCells == w::ext::points + 2 * w::ext::lfoPointsSize);
     std::set<int> cells;
     for (int t = 0; t < w::allTargetCount; ++t)
@@ -90,8 +90,8 @@ TEST (helix190mi_layout_and_parameters)
     CHECK (drive != nullptr && drive->name == "Distortion Drive" && w::automatable (drive->index));
     CHECK (! w::automatable (w::extBase) && ! w::automatable (w::tableBase) && ! w::automatable (w::extBase + w::ext::points));
     CHECK (modelparams::findByName (InstrumentKind::helix, "Osc 1 Warp 2 Amount") != nullptr);
-    // revision: 0 in the defaults (a project before 190mi reads its missing block so), 1 for a new channel
-    CHECK (w::defaults()[(std::size_t) w::extBase] == 0.0 && helixDefaults()[(std::size_t) w::extBase] == 1.0f);
+    // revision: 0 in the defaults (a project before 190mi reads its missing block so), the current one for a new channel
+    CHECK (w::defaults()[(std::size_t) w::extBase] == 0.0 && helixDefaults()[(std::size_t) w::extBase] == (float) w::currentRevision);
     CHECK ((int) helixDefaults().size() == w::stateSize);
     // a Helix+ value set on an old channel makes the block live; one of Live's values leaves it as it was
     ChannelDef old;
@@ -100,7 +100,7 @@ TEST (helix190mi_layout_and_parameters)
     auto a = old;
     CHECK (modelparams::setRawValue (a, w::volume, 0.5f) && (int) a.modelParams.size() == w::stateSize && a.modelParams[(std::size_t) w::extBase] == 0.0f);
     CHECK (a.modelParams[(std::size_t) w::liveStateSize - 1] == 0.25f);
-    CHECK (modelparams::setRawValue (a, w::extBase + w::ext::macro, 0.7f) && a.modelParams[(std::size_t) w::extBase] == 1.0f);
+    CHECK (modelparams::setRawValue (a, w::extBase + w::ext::macro, 0.7f) && a.modelParams[(std::size_t) w::extBase] == (float) w::currentRevision);
     // texts and names
     CHECK (w::paramText (w::extBase + w::ext::warpMode, w::warp::fm) == "FM <- Osc" && w::paramText (w::extBase + w::ext::unisonCount, 0) == "As device");
     CHECK (w::paramText (w::extBase + w::ext::delayTime, 5) == "1/8 D" && w::paramText (w::extBase + w::ext::filterType, 3) == "Formant");
@@ -402,12 +402,14 @@ TEST (helix190mi_factory_bank)
         CHECK (loaded && names.insert (bank[(std::size_t) i].name).second && ! bank[(std::size_t) i].tags.empty());
         if (! loaded)
             continue;
-        CHECK ((int) loaded->modelParams.size() == wt::stateSize && loaded->modelParams[(std::size_t) wt::extBase] == 1.0f);
+        CHECK ((int) loaded->modelParams.size() == wt::stateSize && loaded->modelParams[(std::size_t) wt::extBase] >= 1.0f);
         const auto state = helixState (*loaded);
         for (int t = 0; t < 2; ++t)
             CHECK (state[(std::size_t) wt::tableBase + (std::size_t) t] >= 0.0);
         std::vector<wt::RefNote> notes { { 0, 48, 0.9f, 48000 }, { 0, 55, 0.9f, 48000 }, { 0, 60, 0.9f, 48000 } };
-        const auto out = wt::renderReference (state, notes, 48000.0, 48000 * 2);
+        wt::HelixUserData data; // (190ml: a preset's user tables and sample)
+        (void) wt::decodeUserData (loaded->pluginState, data);
+        const auto out = wt::renderReference (state, notes, 48000.0, 48000 * 2, 256, 120.0, &data);
         auto peak = 0.0f;
         for (auto f : out)
             peak = std::max (peak, std::fabs (f));

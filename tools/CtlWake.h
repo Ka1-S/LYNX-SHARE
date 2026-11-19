@@ -544,6 +544,50 @@ inline std::vector<Hint> hintsFor (InstrumentKind kind, const std::vector<Contro
             named ("Helix+: chorus on", { { "Chorus On", 1.0f } });
             named ("Helix+: delay on", { { "Delay On", 1.0f }, { "Delay Time", 3.0f }, { "Delay Mix", 0.5f } });
             named ("Helix+: reverb on", { { "Reverb On", 1.0f } });
+            // (round 190ml) Helix+ 2: oscillator 3 and the sample need switching on (the sample a sample in the channel's
+            // data), their effects / second warps an amount and a mode, macros 5…8 and the chaos sources a matrix cell, the
+            // shifter / EQ / multiband their switch (the EQ its bands away from 0 dB)
+            named ("Helix+ 2: oscillator 3 on, a fifth up", { { "Osc 3 On", 1.0f }, { "Osc 3 Gain", 0.7f }, { "Osc 3 Transpose", 7.0f } });
+            named ("Helix+ 2: oscillator 3's effect at half", { { "Osc 3 On", 1.0f }, { "Osc 3 Gain", 0.7f }, { "Osc 3 Effect Mode", 3.0f },
+                                                               { "Osc 3 Effect 1", 0.5f }, { "Osc 3 Effect 2", 0.5f } });
+            named ("Helix+ 2: oscillator 3's second warp Bend + at half", { { "Osc 3 On", 1.0f }, { "Osc 3 Gain", 0.7f },
+                                                                           { "Osc 3 Warp 2", (float) warp::bendPlus }, { "Osc 3 Warp 2 Amount", 0.5f } });
+            const auto withSample = [] (ChannelDef& d) {
+                if ((int) d.modelParams.size() < wt::stateSize)
+                {
+                    const auto def = helixDefaults();
+                    const auto have = d.modelParams.size();
+                    d.modelParams.resize ((std::size_t) wt::stateSize);
+                    std::copy (def.begin() + (std::ptrdiff_t) have, def.end(), d.modelParams.begin() + (std::ptrdiff_t) have);
+                }
+                wt::HelixUserData data; // (a 0.3 s tone with a falling pitch: Start, Loop and the pitch all heard)
+                data.sample.rate = 44100.0;
+                data.sample.l.resize (13230);
+                double ph = 0.0;
+                for (std::size_t i = 0; i < data.sample.l.size(); ++i)
+                {
+                    ph += (330.0 - 200.0 * (double) i / 13230.0) / 44100.0;
+                    data.sample.l[i] = (float) (0.7 * std::sin (2.0 * 3.14159265358979 * ph));
+                }
+                d.pluginState = wt::encodeUserData (data);
+            };
+            named ("Helix+ 2: the sample on (a falling tone)", { { "Sample On", 1.0f } });
+            out.back().apply = withSample;
+            named ("Helix+ 2: the sample's second warp Sync at half", { { "Sample On", 1.0f }, { "Sample Warp 2", (float) warp::sync },
+                                                                       { "Sample Warp 2 Amount", 0.5f } });
+            out.back().apply = withSample;
+            named ("Helix+ 2: macros 5 to 8 on oscillator 1's pitch", { { "Filter 1 Freq", 1000.0f } });
+            out.back().apply = routed ({ { cellIndex (tgt::oscPitch, src::macro1 + 4), 0.2f }, { cellIndex (tgt::oscPitch, src::macro1 + 5), 0.3f },
+                                         { cellIndex (tgt::oscPitch, src::macro1 + 6), 0.4f }, { cellIndex (tgt::oscPitch, src::macro1 + 7), 0.5f } });
+            for (int k = 1; k <= chaosCount; ++k)
+            {
+                const auto c = "Chaos " + std::to_string (k);
+                named ("Helix+ 2: " + c + " at 4 Hz on oscillator 1's pitch", { { c + " Rate", 4.0f }, { c + " Amount", 1.0f } });
+                out.back().apply = routed ({ { cellIndex (tgt::oscPitch, src::chaos1 + k - 1), 0.3f } });
+            }
+            named ("Helix+ 2: the shifter on", { { "Shift On", 1.0f }, { "Shift", 0.3f }, { "Shift Mix", 1.0f } });
+            named ("Helix+ 2: the EQ on, its bands moved", { { "EQ On", 1.0f }, { "EQ Low", 6.0f }, { "EQ Mid", -6.0f }, { "EQ High", 6.0f } });
+            named ("Helix+ 2: the multiband on", { { "Multiband On", 1.0f } });
             break;
         }
         case InstrumentKind::braid:

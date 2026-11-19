@@ -154,6 +154,7 @@ add_library(lynx_core STATIC
     src/core/AlsDevicesFm.cpp
     src/core/WavetableSynth.cpp
     src/core/WavetableTables.cpp
+    src/core/WavetableUser.cpp
     src/core/AlsDevicesWt.cpp
     src/core/Braid.cpp
     src/core/BraidParams.cpp
