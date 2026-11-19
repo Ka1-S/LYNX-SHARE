@@ -6,7 +6,7 @@
 //   190mq, /mnt/e/lynx-work/issues211_190mq/s/notes.md, shots f04..f28 and p05..p17):
 //   1. the anchor: the start of the time selection made on the ruler, else the spot of the last single click on the
 //      ruler (the ruler's double click clears both; Stop does not). When it is in view, the earliest note / clip lands
-//      on it and the rest keep their distance from it.
+//      on it and the rest keep their distance from it. (One at the very start is none: see anchorInView.)
 //   2. no anchor in view: into the bar line nearest the view's left edge (more than half a bar in: the next one), the
 //      earliest item keeping its place within its bar (FL's manual: "pasted starting from the leftmost bar that is
 //      visible"), the rest keeping their distance from it.
@@ -58,6 +58,10 @@ struct Where
 
 constexpr bool inView (const Where& w, std::int64_t tick) noexcept { return tick >= 0 && tick >= w.viewFrom && tick < w.viewTo; }
 
+// An anchor at the very start does not count: FL keeps "no time selection" as 0..0, so its Ctrl+A selection from bar 1
+// (capture f04: Ctrl+A, Ctrl+C, Ctrl+V pasted by rule 2 and 3, not onto bar 1) is no anchor.
+constexpr bool anchorInView (const Where& w, std::int64_t tick) noexcept { return tick > 0 && inView (w, tick); }
+
 // The bar line nearest `tick` (FL FUN_01229d20, the same choice as the time markers' key: past half the bar, the next).
 template <typename BarAt>
 constexpr std::int64_t nearestBarLine (std::int64_t tick, BarAt barAt) noexcept
@@ -70,9 +74,9 @@ template <typename BarAt>
 constexpr std::int64_t flStart (const Where& w, BarAt barAt) noexcept
 {
     std::int64_t target = -1;
-    if (inView (w, w.selection))
+    if (anchorInView (w, w.selection))
         target = w.selection;
-    else if (inView (w, w.rulerMark))
+    else if (anchorInView (w, w.rulerMark))
         target = w.rulerMark;
     else
         target = nearestBarLine (w.viewFrom, barAt) + (w.first - barAt (w.first < 0 ? 0 : w.first).start);

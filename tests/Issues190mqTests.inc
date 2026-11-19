@@ -65,6 +65,14 @@ TEST (issues190mq_fl_paste_rule_matches_the_capture)
     w.viewFrom = 7 * bar;
     w.viewTo = 9 * bar;
     CHECK (start (Rule::flView, w, bars) == 7 * bar + 2 * beat + step);
+    // an anchor at the very start is none (FL's 0..0 = no selection; f04: Ctrl+A's selection from bar 1 is no anchor)
+    Where atStart;
+    atStart.first = 2 * beat + step;
+    atStart.viewTo = 3 * bar;
+    atStart.selection = 0;
+    atStart.rulerMark = 0;
+    atStart.grid = step;
+    CHECK (start (Rule::flView, atStart, bars) == 2 * beat + 2 * step);
     // the anchor exactly on the source: moved a grid step too
     Where same;
     same.first = 2 * beat;

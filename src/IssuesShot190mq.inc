@@ -64,6 +64,7 @@
             roll.setBounds (0, 0, 1100, 520);
             roll.setVisible (true);
             roll.setViewForTests (0.0, 14, 70);
+            engine.editSong ([] (Song&) {}); // (the editor's change listener learns the pattern first, as in use)
             engine.dispatchPendingMessages();
             roll.selectAll();
             roll.handleKey (juce::KeyPress ('c', juce::ModifierKeys::commandModifier, 0));
@@ -143,7 +144,9 @@
             {
                 // Live (insert marker) / BandLab (playhead): the song position, here bar 5 beat 2 of the pattern
                 roll.setViewForTests ((double) (3 * bar), 14, 70);
+                engine.editSong ([] (Song& s) { s.mode = PlayMode::pattern; });
                 engine.seek ((double) (4 * bar + beat));
+                engine.getTransport().positionTicks.store ((double) (4 * bar + beat)); // (offline: no audio thread applies the seek)
                 roll.frameStepForSnapshot();
                 engine.dispatchPendingMessages();
                 const auto got = paste();
@@ -180,10 +183,11 @@
             pl.setBounds (0, 0, 1100, 420);
             pl.setVisible (true);
             pl.setViewForSnapshot (80.0, 0, 0);
+            engine.editSong ([] (Song&) {}); // (the editor's change listener learns the song first, as in use)
             engine.dispatchPendingMessages();
             pl.handleKey (juce::KeyPress ('a', juce::ModifierKeys::commandModifier, 0));
             pl.handleKey (juce::KeyPress ('c', juce::ModifierKeys::commandModifier, 0));
-            pl.handleKey (juce::KeyPress ('d', juce::ModifierKeys::commandModifier, 0)); // (Ctrl+A may have made a time selection)
+            // (Ctrl+A also makes a time selection from bar 1, as in FL (capture p01): no anchor, FL's f04)
             // a clip at bar 41 (after the copy) makes the song long enough to scroll far right
             engine.editSong ([bar] (Song& s) {
                 Clip far;
@@ -257,6 +261,7 @@
             {
                 pl.setScrollTickForSnapshot ((double) (3 * bar));
                 engine.seek ((double) (4 * bar)); // (on a bar line: the Playlist snaps the position to its grid)
+                engine.getTransport().positionTicks.store ((double) (4 * bar)); // (offline: no audio thread applies the seek)
                 pl.frameStepForSnapshot();
                 engine.dispatchPendingMessages();
                 const auto got = paste();
@@ -280,7 +285,7 @@
             roll.setVisible (true);
             roll.setViewForTests (16.0 * bar, 8, 102);
             engine.dispatchPendingMessages();
-            const auto spot = [&] (int key) { return roll.pointForTests (17 * bar, key); };
+            const auto spot = [&] (int key) { return roll.pointForTests (16 * bar + beat + ticksPerStep / 2, key); }; // (between step lines)
             const auto grid = PianoRollComponent::gridHighlights;
             PianoRollComponent::gridHighlights = true;
             roll.setScaleForSnapshot (0, 0);
@@ -422,7 +427,11 @@
             check ("213_pl_double_click_clears", ! engine.getSong().hasLoop());
             savePng (shot::snapshot (pl), prefix + "-213-pl-02-cleared.png");
             pl.setTimeSelectionForSnapshot (1, 3);
-            pl.handleKey (juce::KeyPress ('d', juce::ModifierKeys::commandModifier, 0));
+            // Ctrl+D: the key map's "playlist.deselect" (the main window routes the key to it)
+            const auto* deselect = keys::findAction ("playlist.deselect");
+            check ("213_pl_ctrl_d_is_deselect", deselect != nullptr && ! deselect->defaults.empty()
+                                                    && deselect->defaults.front() == keys::Chord { (int) 'D', keys::ctrl });
+            pl.runAction ("playlist.deselect");
             engine.dispatchPendingMessages();
             check ("213_pl_ctrl_d_clears", ! engine.getSong().hasLoop());
         }
