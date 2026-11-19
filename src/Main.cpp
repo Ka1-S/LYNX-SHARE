@@ -12681,9 +12681,10 @@ private:
                                    }
                                    return juce::String ("    mixer picture: spoiled ") + juce::String (spoiled) + " times, drawn again " + juce::String (refills) + " times\n";
                                } });
-        // (round 190my: the strips scroll only when they are wider than the view. Thief's 28 inserts fit FL's Wide layout
-        // at 1920 px since 0.1.30's strips (the step turned a control at the Mixer's centre until 293333ae6, nothing
-        // after): the step uses Extra large when they fit, and turns the wheel on a strip's blank body near the centre)
+        // (round 190my: the wheel goes to a strip's blank body near the Mixer's centre — since 293333ae6's Current strip the
+        // centre itself can be a control, which the wheel would turn instead of scrolling; trace 190my: the strips then
+        // move from x -56 to -325 in a 1113 px view. Strips that fit their view can't scroll: the step uses Extra large
+        // then, e.g. at a wide window.)
         auto scrollLayout = std::make_shared<std::optional<lynx::mixerlayout::Layout>>();
         auto scrollTrace = std::make_shared<juce::String>();
         run->steps.push_back ({ "mixer scroll",
