@@ -4249,3 +4249,90 @@ for fitting), each rendered twice (1.5 s and 9 s of silence after the reset). Th
 every 20 s of processed audio, ≈ 10 ms fades) are found as silence runs of take A that take B plays, widened over the
 fades, and stored next to the reference (`<name>.mask.json`); scripts/fxparity.py leaves those spans out of every metric.
 References without a sidecar score exactly as before.
+
+| reference → LYNX | files | before → after | up / same / down |
+|---|---|---|---|
+| NS1 → Quell (NS1 law at 0 % too; refcap182) | 25 | 7.04 → 7.24 | 3 / 22 / 0 |
+| Scheps Omni Channel 2 → Ridge Strip (omni law; new entry; refcap182) | 25 | n = 0 → 6.32 | — |
+| Renaissance EQ 6 → Facet EQ (Waves design law; was a flat Parametric EQ) | 25 | 4.92 → 9.76 | 20 / 5 / 0 |
+| Renaissance EQ 4 → Facet EQ | 25 | 5.16 → 9.92 | 20 / 5 / 0 |
+| Renaissance EQ 2 → Facet EQ | 25 | 5.64 → 9.80 | 20 / 5 / 0 |
+| Q10 → Facet EQ (Waves design law; was a flat Parametric EQ) | 25 | 4.64 → 9.68 | 20 / 5 / 0 |
+| API-550A → Facet EQ (fitted band tables; new entry) | 25 | n = 0 → 7.92 | — |
+| API-550B → Facet EQ | 25 | n = 0 → 8.04 | — |
+| API-560 → Facet EQ | 25 | n = 0 → 8.44 | — |
+| SSL G-Channel → Ridge Strip (E voicing; new entry) | 25 | n = 0 → 6.44 | — |
+| Renaissance Channel → Compressor (Renaissance law + channel EQ; new entry) | 25 | n = 0 → 5.96 | — |
+| Renaissance Vox → Compressor (Vox law; new entry) | 25 | n = 0 → 9.52 | — |
+| RDeEsser → Hush De-esser (Renaissance de-esser law; new entry) | 25 | n = 0 → 9.92 | — |
+| C6 → Prism Multiband (C4 law + floating bands; new entry) | 25 | n = 0 → 8.56 | — |
+| API-2500 → Compressor (bus law; own entry, was the generic Waves compressor preset) | 25 | 2.36 → 5.88 | 25 / 0 / 0 |
+| MaxxBass → Low Lifter (bass law; new entry) | 25 | n = 0 → 9.56 | — |
+| Renaissance Bass → Low Lifter (bass law; new entry) | 25 | n = 0 → 4.92 | — |
+| Vitamin → Aether (Vitamin law; new entry) | 25 | n = 0 → 7.16 | — |
+| the other 19 refcap182 Waves references | 455 | same | 0 down |
+
+- **Facet EQ — the Waves design law** (hidden [126] + a design code per band [127 … 134]; Renaissance EQ / Q10 / the
+  Renaissance Channel only): each band's sections from the reference's own structure, identified on demo-mode impulse
+  responses (Prony on the exact IR, −110 … −176 dB): the Renaissance EQ bell is (s² + s·G/q + 1)/(s² + s/q + 1) digitised
+  with a prescribed Nyquist gain (Orfanidis 1997), its shelves a shared-s-term pair bilinear at their centre (a fitted law of
+  gain and Q, the Q clamped 0.707 … 1.414), the resonant shelves the cookbook shelf, the cuts 18 dB/oct with Q-dependent
+  zeros; Q10's bells the cookbook form with its Q laws (Bell, PQ-Bell), first-order shelves, Butterworth cuts.
+- **API-550A / 550B / 560** on Facet EQ as it is: every control position probed and fitted with one Facet band
+  (core/WavesApiEq.h, generated), the 550s' flat response fitted in magnitude and phase; the 560's continuous gain
+  interpolated between probed gains (it is a 65-sample linear-phase design: X files −32 … −57 dB ESR at ≤ 0.09 dB spectral
+  distance).
+- **SSL G-Channel** on Ridge Strip's measured E console through the SSL E-Channel translation (same RealWorld layout; LMF ÷3
+  / HMF ×3 at 55 / 56). Its own EQ is not the E's (X1 / X2 / X3 at 5): open.
+- **Compressor — the Renaissance Channel EQ** (hidden [48] on, [49] routing, [50 …] four bands; RChannel only) on the
+  Renaissance law; the gate and the RVox compressor type are not carried (X3 / X4 the weak files).
+- **Ridge Strip — the omni law** (hidden [100 … 191]; Scheps Omni Channel only): the five modules, their switches and
+  order read from the state, each module LYNX's own fitted model (REA_rodada190mm_scheps.md).
+- **Compressor — the Vox law** (hidden [21], gate [22], gate release [23], gain [24]; Renaissance Vox only): the Renaissance
+  family's chain read from the reference's DSP — linked peak with three all-pass copies, g = T / (p (1 − T) + T) (one knob,
+  no ratio), the 64-sample look-ahead minimum, a slow follower, the deeper of gain and follower released through two
+  256-step tables, the gate's linear expander, two boxcars, make-up 0.99 · gain / T. Follower / release constants fitted
+  on our bank (−59 → −70 dB on the fit set).
+- **Hush De-esser — the Renaissance de-esser law** (hidden [29] … [34]; RDeEsser only): squared-section crossover with its
+  all-pass complement (high-pass / band-pass), a threshold that rises with the low band (absolute → relative at the
+  hidden −12 dB corner), the sibilance detector on the high bands' mid through 0.6 · Freq high-passes, the same chain
+  (follower 15 / 30 ms), split (low + G · high) or wide-band.
+- **Prism — C6 floating bands** (hidden c6Float0 … +15, after the C4 law's [157 / 158]): the C6's four crossover bands are
+  the C4 law; its two floating bands (our model) are a band-pass (Q × 0.67, fitted) of the crossovers' sum through the
+  same gain law and smoother, added as (G − 1) · band.
+- **Compressor — the bus law** (hidden [25] … [37]; API-2500 only; core/BusComp2500.h): our own simple model of the
+  reference's VCA circuit — mean-square detector, threshold cal + slope · knob, per-knee soft knee, dB ballistics, thrust
+  as a side-chain high-pass share, feedback type with loop gain k (r − 1), auto make-up; 13 constants fitted on the bank.
+- **Low Lifter — the bass law** (hidden [15] … [21]; MaxxBass / Renaissance Bass only; core/BassHarmonics.h): the
+  references' exact crossover (a first- and a second-order all-pass: the third-order Butterworth pair; MaxxBass with
+  harmonics off is linear and nulls: −46 … −95 dB) and a harmonic generator written from the read structure (level-
+  normalised band × (1 + its own clamped high band), a second high band, an output normaliser, a limit), fitted on the
+  RBass bank (spectrum close, waveform not: 4.92).
+- **Aether — the Vitamin law** (hidden [10] … [20]; Vitamin only; core/VitaminLaw.h): five bands on the C4-type crossover
+  (the default state's all-pass fitted to −56 dB on its impulse), direct gain, our own per-band saturated enhancement
+  (fitted on the 20 X renders).
+- Old projects: every law 0 for new instances and projects saved before (upgradeLoadedEffectParams resets them for a
+  slot saved with fewer values); gold 225 renders, 0 differ. Tests: tests/Parity190mmDynTests.inc (6).
+
+**Old projects.** Every new behaviour runs only with its hidden law, set only by the Waves translators. Gold renders (base =
+round 190mg's final binary, final binary = this branch, 44.1 / 48 / 96 kHz × 3 programme signals, byte-identical):
+coordinator 189 (Facet incl. the PuigTec and Pro-Q 4 translations, Quell, Ridge's E-Channel translation, Compressor incl.
+the Renaissance law), dyn 225 (Compressor, Hush, Prism, Low Lifter, Aether incl. RComp / SSLComp / Pro-C / DeEsser / Pro-DS /
+C4 / Pro-MB states), scheps 72 (Ridge: default, E, Vocal, 4K, Modern, DRIVE) — **486 renders, 0 differ**.
+
+**CPU** (35 s mix at 48 kHz incl. file I/O, one core, best of 5; a copy ≈ 0.9 s): the Waves design law costs what Facet's
+own bands cost (REQ 6 X1 1.00 s, Q10 X1 0.78, Facet's own four bands 1.14); API-550A 0.94, API-560 1.10, SSL G 1.21,
+RChannel 1.08, Scheps ≤ +0.62 s (≈ 1.8 % of a core), RVox 0.94, RDeEsser 1.11, C6 2.86, API-2500 0.91, MaxxBass 0.92, RBass
+1.15, Vitamin 1.47.
+
+**Tests:** `tests/Parity190mmTests.inc` (5), `Parity190mmSchepsTests.inc`, `Parity190mmDynTests.inc` (6); moved:
+Parity190mgNs1 (0 % is the NS1 engine's pair now), Parity190jh (Facet's stored count). Mini runner (round 190mg's list + the
+round's three files): **544 541 checks, 0 failures**. No full Linux / Windows build, no --selftest (no UI change, no new
+strings).
+
+**Owner decisions (reversible; the recommended option taken):** NS1 0 % moved (decision 1); the masked demo-mode bank and the
+stand-ins (decision 2: every listed plug-in now has one; Renaissance EQ covers REQ 2 / 4 / 6); Scheps on Ridge Strip's hidden
+omni law (decision 3); RChannel on Compressor (its compressor law + channel EQ) rather than a strip; SSL G on the E voicing
+(the Modern voicing's G curve scored 5.20 against 6.44); API-2500 on its own Compressor law (not Crest); the bass family on
+Low Lifter, Vitamin on Aether. **Still off:** SSL G's own EQ curves; RChannel's gate / RVox type; RBass's waveform (4.92);
+API-2500 (5.88); Q10's wide bells above 3 kHz (−45 … −53 dB); the reverbs on Reeverb 2.
