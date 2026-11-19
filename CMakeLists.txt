@@ -42,6 +42,7 @@ add_library(lynx_core STATIC
     src/core/SessionOps.cpp
     src/core/RemoteMap.cpp
     src/core/DrawMode.cpp
+    src/core/AutoPointEdit.cpp
     src/core/Groove.cpp
     src/core/Patcherize.cpp
     src/core/Instruments.cpp

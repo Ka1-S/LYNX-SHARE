@@ -11,6 +11,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/ArrangeOps.h"
+#include "core/AutoPointEdit.h"
 #include "core/MagicLasso.h"
 #include "core/MeterBallistics.h"
 #include "core/TrackHeaderGestures.h"
@@ -275,6 +276,12 @@ public:
     static stripsilence::Options& splitSilenceOptions(); // the dialog's last values (this run of LYNX)
     std::unique_ptr<juce::Component> makeSplitSilenceDialogForSnapshot (int index);
     juce::PopupMenu getAutomationPointMenuForSnapshot (int clip, int point); // FL's point menu of an automation clip's point (round 190bw)
+    std::vector<int> selectedPointsForTests() const { return selectedPoints; } // issue #207 (round 190lw)
+    std::vector<int> clipSelectionForTests() const { return selection; }
+    bool penCursorForTests (juce::Point<int> p) const { return curveSpotAt (p).valid(); }
+    juce::Rectangle<float> laneBodyForTests (int track, int lane) const { return laneBody (track, lane); }
+    juce::Point<int> curvePointForTests (int clip, int point) const;          // a clip curve's point on screen
+    juce::Point<int> curveSpotXYForTests (int clip, std::int64_t tick, float value) const; // a place in a clip's curve area
     juce::PopupMenu getTrackMenuForSnapshot (int track) { return buildTrackMenu (track); }
     // hovers the right edge of the first clip in view (grip, outline, menu button); returns its hint
     ui::Hint hoverForSnapshot();
@@ -441,7 +448,8 @@ public:
 private:
     enum class Drag { none, move, resize, trimLeft, slip, erase, seek, loop, select, fadeIn, fadeOut, paint, muting, knife, zoomRange, listen, pan, timeMove, timeShift, autoPoint, autoTension,
                       lanePoint, laneTension, laneDraw, trackResize, headerSelect, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe, warpMarker,
-                      tempoMarker, headerMove, regionLoop, headerWidth, fadeTension };
+                      tempoMarker, headerMove, regionLoop, headerWidth, fadeTension,
+                      pointBand, pointsMove, pen }; // (round 190lw, issue #207)
     void swipeTimeSelectionToComp (int lane);
     // a swipe on a take lane (round 177c): the lane and the range so far
     int swipeLane = -1;
@@ -874,6 +882,47 @@ private:
     gesture::MuteSweep muteSweep;        // the mute drag takes its target (mute / unmute) from the first clip crossed
     // inline automation editing: points of automation clips are dragged, added on the curve, deleted by right-click
     int autoClip = -1, autoPoint = -1;
+    // Issue #207 (round 190lw, LYNX extras; core/AutoPointEdit.h). One curve's points selected together — an automation
+    // clip's, an audio clip's envelope lane's or an automation lane's: the Select tool's rubber band
+    // selects them; a drag on a selected point moves the group; Delete deletes them, Ctrl+C / Ctrl+X copy /
+    // cut, Ctrl+V pastes at the mouse on a curve; Esc or a click elsewhere drops the selection. In the Clip-launch layout a
+    // drag in an automation lane's background selects its points in that time range (Live). The pen: Alt held over an
+    // automation clip's curve (Ctrl over an automation lane) shows a pencil, a drag draws freehand and the stroke is
+    // thinned on release.
+    struct CurveSpot
+    {
+        int clip = -1;             // a clip's curve, or
+        int track = -1, lane = -1; // an automation lane's
+        bool valid() const noexcept { return clip >= 0 || (track >= 0 && lane >= 0); }
+        bool operator== (const CurveSpot&) const = default;
+    };
+    CurveSpot pointSpot;                     // the curve of the selection (and of a band / move / pen in progress)
+    std::vector<int> selectedPoints;         // its selected points (ascending)
+    std::vector<AutomationPoint> pointsBefore; // a group move / pen stroke: the curve when it started
+    juce::Point<int> pointPress;
+    juce::Rectangle<int> pointBand;          // the rubber band on screen (empty: none)
+    bool penStarted = false, bandAdds = false, bandWholeHeight = false;
+    std::int64_t penTick = 0, penLo = 0, penHi = 0;
+    float penValue = 0.0f;
+    static inline autopoints::Clipboard pointClipboard;
+    CurveSpot curveSpotAt (juce::Point<int> p) const; // the editable curve whose area is under p (none: invalid)
+    const std::vector<AutomationPoint>* spotPoints (const CurveSpot& s) const;
+    juce::Rectangle<float> spotBody (const CurveSpot& s) const;
+    void editSpot (const CurveSpot& s, const std::function<void (std::vector<AutomationPoint>&)>& fn);
+    std::int64_t spotTickAt (const CurveSpot& s, float x) const;  // the curve's own tick under x (not snapped)
+    std::int64_t spotSongTick (const CurveSpot& s, std::int64_t tick) const; // and back to the song's
+    float spotValueAt (const CurveSpot& s, float y) const;        // the stored value under y (0..1)
+    int spotPointAt (const CurveSpot& s, juce::Point<int> p) const;
+    bool nearLaneLine (const CurveSpot& s, juce::Point<int> p) const; // within 5 px of an automation lane's line
+    static bool penModifier (bool lane, juce::ModifierKeys mods);    // Alt on a clip's curve, Ctrl in a lane
+    bool pointMouseDown (const juce::MouseEvent& e, int clipHit); // true: handled
+    void pointMouseDrag (const juce::MouseEvent& e);
+    void pointMouseUp (const juce::MouseEvent& e);
+    bool pointKeyPressed (const juce::KeyPress& key);             // true: handled
+    void clearPointSelection();
+    bool isPointSelected (const CurveSpot& s, int point) const;
+    void paintPointSelection (juce::Graphics& g);                 // the selected points' rings and the rubber band
+    bool makePointDragHint (ui::Hint& hint);
     // FL 2026's audio clip gain handle (round 166e): a semicircle at the bottom centre of the clip; a vertical drag
     // changes the gain of the clip (or of every selected audio clip, each from its own value) by 0.05 dB per pixel
     juce::Rectangle<float> gainHandle (int clip) const; // empty: the clip has none (not audio, too small)

@@ -24,6 +24,7 @@
 #include "core/LiveInput.h"
 #include "core/HardwareOutput.h"
 #include "core/MixerOps.h"
+#include "core/SecondClick.h"
 #include "ui/PluginHeader.h"
 #include "core/ProjectSafety.h"
 #include "core/Templates.h"
@@ -58,6 +59,8 @@
 #include "ui/AudioEditor.h"
 #include "ui/Dialogs.h"
 #include "ui/QuickPick.h"
+#include "ui/QuickAddPalette.h"
+#include "ui/ToolWindow.h"
 #include "ui/TrackIcons.h"
 #include "core/TrackIcons.h"
 #include "core/DetailChain.h"
@@ -5098,8 +5101,72 @@ EffectsPanel::EffectsPanel (AudioEngine& e)
     showingTimer = std::make_unique<ui::TimerWhileShowing> (*this, static_cast<juce::Timer&> (*this), 30); // (stopped while hidden; round 174f)
 }
 
+// issue #206 (round 190lw): the second press of a double-click on an empty slot. The first press opened the slot's menu at
+// the mouse, so the second one reaches that menu's window: a desktop-wide listener sees it there, closes the menu (no
+// item is chosen: the menu is dismissed before the button comes up) and opens the effect search. Any later press ends
+// the watch; nothing runs while no slot menu was just opened.
+struct EffectsPanel::SecondClickWatch final : public juce::MouseListener
+{
+    explicit SecondClickWatch (EffectsPanel& p) : panel (p) {}
+    ~SecondClickWatch() override { stop(); }
+
+    void start (secondclick::Press press, int slotRow)
+    {
+        first = press;
+        row = slotRow;
+        if (! listening)
+            juce::Desktop::getInstance().addGlobalMouseListener (this);
+        listening = true;
+    }
+    void stop()
+    {
+        if (listening)
+            juce::Desktop::getInstance().removeGlobalMouseListener (this);
+        listening = false;
+        first = {};
+    }
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        if (e.eventComponent == &panel) // (the panel's own presses arm the watch again)
+            return;
+        const auto at = e.getScreenPosition();
+        const auto second = e.mods.isLeftButtonDown()
+                            && secondclick::isSecond (first, { at.x, at.y, (std::int64_t) juce::Time::getMillisecondCounter() },
+                                                      (std::int64_t) juce::MouseEvent::getDoubleClickTimeout());
+        const auto slot = row;
+        stop();
+        if (! second)
+            return;
+        juce::PopupMenu::dismissAllActiveMenus();
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<EffectsPanel> (&panel), slot] {
+            if (safe != nullptr)
+                safe->showSlotSearch (slot);
+        });
+    }
+
+    EffectsPanel& panel;
+    secondclick::Press first;
+    int row = -1;
+    bool listening = false;
+};
+
+void EffectsPanel::armSecondClick (const juce::MouseEvent& e, int row)
+{
+    if (secondClick == nullptr)
+        secondClick = std::make_unique<SecondClickWatch> (*this);
+    const auto at = e.getScreenPosition();
+    secondClick->start ({ at.x, at.y, (std::int64_t) juce::Time::getMillisecondCounter() }, row);
+}
+
+void EffectsPanel::disarmSecondClick()
+{
+    if (secondClick != nullptr)
+        secondClick->stop();
+}
+
 EffectsPanel::~EffectsPanel()
 {
+    secondClick.reset();
     engine.removeChangeListener (this);
 }
 
@@ -6708,6 +6775,9 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
         const auto i = effectIn (row);
         if (i < 0)
         {
+            // issue #206: a second press soon after, on the menu, is a double-click: the effect search instead
+            if (e.mods.isLeftButtonDown() && ! e.mods.isAnyModifierKeyDown())
+                armSecondClick (e, row);
             showAddMenu (row); // (FL: the plugin lands in this slot)
             return;
         }
@@ -7323,6 +7393,16 @@ void EffectsPanel::mouseDoubleClick (const juce::MouseEvent& e)
         return;
     }
 
+    // issue #206: a double-click on an empty slot that reached the panel (no menu came between the clicks)
+    if (! e.mods.isAnyModifierKeyDown())
+        for (int row = 0; row < maxEffectSlots; ++row)
+            if (slotBounds (row).contains (e.getPosition()) && effectIn (row) < 0)
+            {
+                juce::PopupMenu::dismissAllActiveMenus();
+                showSlotSearch (row);
+                return;
+            }
+
     for (int i = 0; slots() != nullptr && i < (int) slots()->size(); ++i)
         if (mixBounds (rowOf (i)).contains (e.getPosition()))
         {
@@ -7641,27 +7721,7 @@ void EffectsPanel::showAddMenu (int row)
     juce::PopupMenu menu;
 
     // the effect lands in the clicked empty slot (FL's slot places, round 170b); returns its index, -1 = not added
-    auto place = [this, row] (EffectSlot fx) {
-        int at = -1;
-        engine.editSong ([t = track, row, &fx, &at] (Song& song) {
-            if (t < 0 || t >= (int) song.mixer.size() || (int) song.mixer[(std::size_t) t].effects.size() >= maxEffectSlots)
-                return;
-            at = mixerops::insertEffectAtRow (song, t, fx, row);
-            if (at < 0)
-            {
-                song.mixer[(std::size_t) t].effects.push_back (std::move (fx));
-                at = (int) song.mixer[(std::size_t) t].effects.size() - 1;
-            }
-            mixerops::linkAddedSidechain (song, t, at); // round 170h: the sole sidechain sender feeds a new compressor
-        });
-        if (at < 0)
-            return at;
-        selectedSlot = at;
-        if ((*slots())[(std::size_t) at].kind != EffectKind::plugin) // (plugins: their own window, below)
-            openEditor (at); // FL opens the effect's window when it is loaded (round 170h, fl-09)
-        repaint();
-        return at;
-    };
+    auto place = [this, row] (EffectSlot fx) { return placeEffectAtRow (row, std::move (fx)); };
 
     // FL's renamed plugins first (issue #11): "1_EQ" renamed in the Browser's Plugin database is added by typing 1
     auto addFx = [this, place] (EffectSlot fx) {
@@ -7699,6 +7759,53 @@ void EffectsPanel::showAddMenu (int row)
     quickpick::addFolderViewItems (menu, engine); // FL: Categories / Simple / Tree at the bottom
 
     quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (menuOwner()).withMousePosition(), std::move (picks));
+}
+
+int EffectsPanel::placeEffectAtRow (int row, EffectSlot fx)
+{
+    int at = -1;
+    engine.editSong ([t = track, row, &fx, &at] (Song& song) {
+        if (t < 0 || t >= (int) song.mixer.size() || (int) song.mixer[(std::size_t) t].effects.size() >= maxEffectSlots)
+            return;
+        at = mixerops::insertEffectAtRow (song, t, fx, row);
+        if (at < 0)
+        {
+            song.mixer[(std::size_t) t].effects.push_back (std::move (fx));
+            at = (int) song.mixer[(std::size_t) t].effects.size() - 1;
+        }
+        mixerops::linkAddedSidechain (song, t, at); // round 170h: the sole sidechain sender feeds a new compressor
+    });
+    if (at < 0)
+        return at;
+    selectedSlot = at;
+    if ((*slots())[(std::size_t) at].kind != EffectKind::plugin) // (plugins: their own window, below)
+        openEditor (at); // FL opens the effect's window when it is loaded (round 170h, fl-09)
+    repaint();
+    return at;
+}
+
+std::unique_ptr<juce::Component> EffectsPanel::makeSlotSearch (int row)
+{
+    QuickAddTargets targets;
+    targets.effectsOnly = true;
+    targets.effectsFirst = true;
+    targets.effectsTitle = tr ("Effects: into slot {0}", { juce::String (row + 1) });
+    targets.addInstrument = [] (ChannelDef) {};
+    targets.addEffect = [safe = juce::Component::SafePointer<EffectsPanel> (this), row, t = track] (EffectSlot fx) {
+        if (safe == nullptr || safe->track != t)
+            return;
+        if (const auto at = safe->placeEffectAtRow (row, std::move (fx)); at >= 0 && (*safe->slots())[(std::size_t) at].kind == EffectKind::plugin)
+            safe->openPluginWindow (at);
+    };
+    return makeQuickAddPalette (engine, std::move (targets));
+}
+
+void EffectsPanel::showSlotSearch (int row)
+{
+    disarmSecondClick();
+    if (row < 0 || row >= maxEffectSlots || effectIn (row) >= 0)
+        return; // (the slot was filled meanwhile)
+    openToolWindow (makeSlotSearch (row), tr ("Find an effect"), "slotsearch");
 }
 
 void EffectsPanel::showSlotMenu (int slot)

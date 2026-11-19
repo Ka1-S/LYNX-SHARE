@@ -17,6 +17,10 @@ struct QuickAddTargets
     std::function<void (ChannelDef)> addInstrument;
     std::function<void (EffectSlot)> addEffect;
     bool effectsFirst = false; // opened from the Mixer: typing and Enter go to the effects list
+    // issue #206 (round 190lw): opened by a double-click on an empty mixer insert slot — the effects alone, full width,
+    // under `effectsTitle` (e.g. "Effects: into slot 3"); the search box has the keyboard focus as always
+    bool effectsOnly = false;
+    juce::String effectsTitle;
 };
 
 std::unique_ptr<juce::Component> makeQuickAddPalette (AudioEngine& engine, QuickAddTargets targets);
