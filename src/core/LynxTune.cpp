@@ -615,7 +615,7 @@ public:
         const auto voicedDelay = std::clamp (latency - det.windowCentre(), 0, dryRing - 1);
         const auto wet = std::clamp (p[mix], 0.0f, 1.0f);
         const bool waves = p[wavesLaw] >= 0.5f; // round 190mg (hidden, the Waves translator's)
-        const auto passSmooth = 1.0 - std::exp (-1.0 / (0.005 * sr));
+        const auto passSmooth = waves ? 1.0 - std::exp (-1.0 / (0.005 * sr)) : 0.0;
         const auto dt = 1.0 / sr;
         const auto stereo = r != nullptr && r != l;
         float peakIn = 0.0f, peakOut = 0.0f; // round 135w: the input / output meters
@@ -851,21 +851,7 @@ public:
                 y[1] += nz;
             }
             if (waves) // round 190mg: the reference is the input itself while nothing is being corrected
-            {
-                auto aim = unvoicedFor > 0.0 ? 0.0 : std::clamp ((std::abs (semis - trans) - passFloor) / passSpan, 0.0, 1.0);
-                // the dry signal only once the condition has held for passHold; back to the corrected one at once
-                passQuiet = aim < 1.0 ? passQuiet + dt : 0.0;
-                if (passQuiet < passHold)
-                    aim = 1.0;
-                passGain += passSmooth * (aim - passGain);
-                // half-way between a linear and an equal-power fade (the two signals are partly coherent: a linear fade lost
-                // 0.1 … 0.6 dB, an equal-power one gained 0.1 … 0.3 dB on refcap182)
-                const auto hp = 0.5 * 3.141592653589793 * passGain;
-                const auto gw = 0.5 * (passGain + std::sin (hp)), gd = 0.5 * (1.0 - passGain + std::cos (hp));
-                y[0] = (float) (gd * d0 + gw * y[0]);
-                if (stereo)
-                    y[1] = (float) (gd * d1 + gw * y[1]);
-            }
+                passThrough (y, d0, d1, unvoicedFor > 0.0 ? -1.0 : std::abs (semis - trans), stereo, dt, passSmooth);
             if (vibLevel != 0.0) // round 166c: the created vibrato's level swing
                 for (auto& v : y)
                     v = (float) (v * (1.0 + vibLevel));
@@ -933,6 +919,35 @@ public:
 
 private:
     static constexpr int dryRing = 16384;
+
+    // round 190mg (wavesLaw): the fade between the corrected signal and the delayed input (`applied` = the correction
+    // in semitones, < 0 = unvoiced), out of line so the loop without the law stays as it was
+    [[gnu::noinline]] void passThrough (float* y, float d0, float d1, double applied, bool stereo, double dt, double passSmooth) noexcept
+    {
+        auto aim = applied < 0.0 ? 0.0 : std::clamp ((applied - passFloor) / passSpan, 0.0, 1.0);
+        // the dry signal only once the condition has held for passHold; back to the corrected one at once
+        passQuiet = aim < 1.0 ? passQuiet + dt : 0.0;
+        if (passQuiet < passHold)
+            aim = 1.0;
+        passGain += passSmooth * (aim - passGain);
+        if (std::abs (aim - passGain) < 1e-6)
+            passGain = aim; // settled: the plain corrected signal (1) or the input itself (0), no fade maths
+        if (passGain <= 0.0)
+        {
+            y[0] = d0;
+            y[1] = d1;
+        }
+        else if (passGain < 1.0)
+        {
+            // half-way between a linear and an equal-power fade (the two signals are partly coherent: a linear fade lost
+            // 0.1 … 0.6 dB, an equal-power one gained 0.1 … 0.3 dB on refcap182)
+            const auto hp = 0.5 * 3.141592653589793 * passGain;
+            const auto gw = 0.5 * (passGain + std::sin (hp)), gd = 0.5 * (1.0 - passGain + std::cos (hp));
+            y[0] = (float) (gd * d0 + gw * y[0]);
+            if (stereo)
+                y[1] = (float) (gd * d1 + gw * y[1]);
+        }
+    }
 
     void configure (int rg, bool low) noexcept
     {
