@@ -974,6 +974,8 @@ void SessionMixerComponent::paintStrip (juce::Graphics& g, int column)
             const auto pos = sessionmixer::sendPosition (song, strip.insert, rows[(std::size_t) r]);
             const auto enabled = sessionmixer::sendEnabled (song, strip.insert, rows[(std::size_t) r]);
             theme::drawKnob (g, knob.toFloat(), std::max (0.0f, pos), false, pos > 0.0f ? c::info : c::knobArc.withAlpha (enabled ? 0.5f : 0.2f), enabled && hot (Part::send, r));
+            if (isAutomated ({ AutomationTargetKind::mixerSend, strip.insert, rows[(std::size_t) r], 0 })) // round 190lx (DL-59)
+                theme::drawLiveKnobAutomationLed (g, knob.toFloat());
             g.setColour (pos >= 0.0f && enabled ? c::textSecondary : c::textDisabled);
             g.setFont (theme::font (theme::type::caption));
             textcache::drawText (g, utf8 (sessionmixer::returnTitle (song, rows[(std::size_t) r])), juce::Rectangle<int> (knob.getRight() + 3, knob.getY(), x0 + w - pad - knob.getRight() - 3, knob.getHeight()),
@@ -1013,6 +1015,8 @@ void SessionMixerComponent::paintStrip (juce::Graphics& g, int column)
             drawBox (g, partBounds (column, Part::volume), utf8 (sessionmixer::volumeText (m->volume)), false, hot (Part::volume));
             const auto pan = partBounds (column, Part::pan).toFloat();
             theme::drawKnob (g, pan, (m->pan + 1.0f) * 0.5f, true, c::knobArc, hot (Part::pan));
+            if (isAutomated ({ AutomationTargetKind::mixerPan, strip.insert, 0, 0 })) // round 190lx (DL-59)
+                theme::drawLiveKnobAutomationLed (g, pan);
             if (! main)
             {
                 // the Track Activator carries the track's number (a return's: its letter), lit while the insert plays
@@ -1260,6 +1264,8 @@ void SessionMixerComponent::paintStripLive (juce::Graphics& g, int column, int s
                 drawLiveKnob (g, knob.toFloat(), std::max (0.0f, pos));
             else
                 drawLiveKnobOff (g, knob.toFloat(), std::max (0.0f, pos));
+            if (isAutomated ({ AutomationTargetKind::mixerSend, strip.insert, rows[(std::size_t) r], 0 })) // round 190lx (DL-59)
+                theme::drawLiveKnobAutomationLed (g, knob.toFloat());
             // (the letter: the row's return, A for the first; Live's -inf send keeps its letter lit)
             const auto letter = sessionmixer::returnLetter (song, rows[(std::size_t) r]);
             text (letter.empty() ? juce::String::charToString ((juce::juce_wchar) ('A' + r % 26)) : utf8 (letter), { knob.getX(), knob.getY() + 21, knob.getWidth(), 8 },
@@ -1318,6 +1324,8 @@ void SessionMixerComponent::paintStripLive (juce::Graphics& g, int column, int s
         const auto pan = partBounds (column, Part::pan).toFloat();
         lv::fillDownMark (g, pan.getCentreX(), pan.getY() - 6.0f, 7, lv::knobRing);
         drawLiveKnob (g, pan, (m->pan + 1.0f) * 0.5f);
+        if (isAutomated ({ AutomationTargetKind::mixerPan, strip.insert, 0, 0 })) // round 190lx (DL-59)
+            theme::drawLiveKnobAutomationLed (g, pan);
 
         if (! main)
         {
@@ -1436,6 +1444,12 @@ void SessionMixerComponent::paintMeterLive (juce::Graphics& g, int insert, juce:
         g.setColour (juce::Colour (0xff009aac));
         g.fillEllipse (juce::Rectangle<float> (4.0f, 4.0f).withCentre (tip));
     }
+}
+
+bool SessionMixerComponent::isAutomated (const AutomationTarget& t) const
+{
+    const auto& automated = engine.getAutomationDisplay().automatedTargets();
+    return std::find (automated.begin(), automated.end(), t) != automated.end();
 }
 
 void SessionMixerComponent::setMeterForSnapshot (int insert, float left, float right, float holdLeft, float holdRight, float maxPeak)

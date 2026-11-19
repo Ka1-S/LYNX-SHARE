@@ -241,6 +241,19 @@
             if (gridView != nullptr && offline.getSong().clipGrid.has_value())
             {
                 refreshClipGrid (*gridView);
+                // Live's automation LEDs on knobs (DL-59): the set's automated sends / pans / device knobs
+                {
+                    int sends = 0, pans = 0, devices = 0;
+                    for (const auto& t : offline.getAutomationDisplay().automatedTargets())
+                        sends += t.kind == AutomationTargetKind::mixerSend ? 1 : 0, pans += t.kind == AutomationTargetKind::mixerPan ? 1 : 0,
+                            devices += t.kind == AutomationTargetKind::effectParam || t.kind == AutomationTargetKind::channelParam ? 1 : 0;
+                    for (const auto& t : offline.getAutomationDisplay().automatedTargets())
+                        if (t.kind == AutomationTargetKind::mixerSend)
+                            line ("send automated: insert " + juce::String (t.index) + " -> " + juce::String (t.slot));
+                    line ("automated in the set: sends " + juce::String (sends) + ", pans " + juce::String (pans) + ", device knobs " + juce::String (devices));
+                    if (auto* mixer = clipGridMixer (*gridView))
+                        write (*mixer, "session-mixer-knob-leds");
+                }
                 const auto& grid = *offline.getSong().clipGrid;
                 // a 2 x 2 block with at least two clips, and an empty 2 x 2 area under the last scene to paste into
                 int t0 = -1, s0 = -1;

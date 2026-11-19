@@ -6233,7 +6233,7 @@ private:
         }
     }
     // Round 190lx (DP-31, FL manual Transient Processor "Visualization Controls"; capture 190lx A6 fl-tp-editor.png,
-    // fl-tp-hover-controls.png, films/tpgraph): the lower trace scrolls right to left while the song plays (~81 px/s at
+    // fl-tp-hover-controls.png, films/tpgraph): the lower trace scrolls right to left while the song plays (~83 px/s at
     // FL's default speed) on a (38,47,49) ground with faint quarter lines (42,53,55): the input peaks (green) and the output
     // peaks (purple, (83,75,110)) rise from the bottom, grey (117,124,110) where they overlap, and the transient processing
     // alone is a 2 px red (192,47,9) line about the middle (zero) line: above = a boost, below = a cut, flat = none. It is
@@ -6241,7 +6241,7 @@ private:
     // at the left: the I / O / S traces' switches and the scroll-speed slider.
     bool tpShowIn = true, tpShowOut = true, tpShowProc = true, tpSpeedDragging = false;
     float tpSpeed = 0.5f; // the slider, 0..1 (0.5 = FL's default speed)
-    double tpSpeedFactor() const { return (81.0 / dynhistory::flPixelsPerSecond) * std::pow (4.0, ((double) tpSpeed - 0.5) * 2.0); }
+    double tpSpeedFactor() const { return (83.0 / dynhistory::flPixelsPerSecond) * std::pow (4.0, ((double) tpSpeed - 0.5) * 2.0); }
     juce::Rectangle<float> tpPanel (juce::Rectangle<float> area) const
     {
         const auto s = scale();
