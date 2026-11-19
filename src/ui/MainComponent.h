@@ -778,6 +778,7 @@ private:
     void applyFlTiles();          // round 190jo: FL's tiles on the Pattern toolbar (design190ia FM-1)
     float flTileIconBox() const;  // their glyph box for the row height
     std::uint64_t toolbarBackdropStamp (juce::Rectangle<int> buttonBounds) const; // round 190ki: the tiles' cached backdrop
+    juce::Rectangle<int> lastPaintClip; // round 190mh: paint()'s clip bounds in a frame (the tiles' atlas on the software renderer)
     void applyToolbarLook();                                // the widgets' looks for the layout style now shown
     void layoutSimpleToolbar (juce::Rectangle<int> bar, int menuWidth);
     void layoutLiveControlBar (juce::Rectangle<int> bar, int menuWidth);

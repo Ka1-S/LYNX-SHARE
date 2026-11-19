@@ -140,10 +140,16 @@ public:
     // within the button's bounds (in the parent; 0: not cacheable). The atlas is an image of the parent's band at the
     // parent's coordinates; each button keeps its region of it drawn for its current state (the backdrop and the body,
     // by the same calls, pixels and clip as the frame) and blits it; the glyph is drawn straight over it. Hover fades,
-    // fractional scales, translucent components, the software renderer and LYNX_PAINT_CACHE=0 paint straight. Opt-in:
-    // LYNX_TILE_MODE=2 (Icons.cpp tileModeSetting: Direct2D then draws a later path of the frame a little differently).
+    // fractional scales, translucent components and LYNX_PAINT_CACHE=0 paint straight. On by default on JUCE's software
+    // renderer (round 190mh: pixel-exact there), opt-in on the native ones with LYNX_TILE_MODE=2 (Icons.cpp
+    // tileModeSetting: Direct2D then draws a later path of the frame a little differently); LYNX_TILE_MODE=0: off.
     // Empty: no cache.
-    void setFlTileBackdrop (std::function<std::uint64_t (juce::Rectangle<int>)> stamp);
+    // `parentClip` (round 190mh; JUCE's software renderer, where the atlas is on by default, paints straight without it):
+    // the parent's clip bounds when it last painted into a frame (in the parent; it paints just before its children),
+    // recorded by the parent's paint() unless paintingTileAtlas() (its paint into the atlas), so the atlas paints the
+    // backdrop with the frame's clip edge (Icons.cpp tileCacheOnSoftwareSetting)
+    void setFlTileBackdrop (std::function<std::uint64_t (juce::Rectangle<int>)> stamp, std::function<juce::Rectangle<int>()> parentClip = nullptr);
+    static bool paintingTileAtlas() noexcept { return paintingTileAtlasFlag(); }
 
     // Optional extra gestures: when set, a right-click calls onRightClick instead of clicking the button,
     // and a double-click calls onDoubleClick (after the two single clicks).
@@ -177,6 +183,8 @@ private:
     friend juce::String flTileCacheSelfTest();
     Look look = Look::standard;
     std::function<std::uint64_t (juce::Rectangle<int>)> tileBackdrop;
+    std::function<juce::Rectangle<int>()> tileParentClip;
+    static bool& paintingTileAtlasFlag();
     float lookIconBox = 0.0f;
     bool hoverShowsOn = false;
     float hover = 0.0f; // 0 = at rest, 1 = under the mouse (animated)

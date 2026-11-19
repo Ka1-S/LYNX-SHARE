@@ -1,5 +1,6 @@
 #include "ui/Theme.h"
 #include "ui/LiveLook.h"
+#include "ui/TextCache.h"
 
 #include "core/MenuMnemonic.h"
 
@@ -460,11 +461,26 @@ juce::Colour lightTint (juce::Colour c, juce::Colour background, juce::Colour fa
 juce::String fitMiddle (const juce::String& text, const juce::Font& font, float width)
 {
     // (message thread only, as every paint; a project switch or a long session starts the cache again)
-    static std::unordered_map<juce::String, juce::String> cache;
-    const auto key = text + "\x01" + juce::String (font.getHeight(), 2) + "\x01" + font.getTypefaceName() + "\x01" + font.getTypefaceStyle()
-                     + "\x01" + juce::String (juce::roundToInt (width * 4.0f));
-    if (const auto it = cache.find (key); it != cache.end())
-        return it->second;
+    // Round 190mh (perf): found by a hash of the call instead of a key string built at every call (a float formatted and
+    // five strings joined per clip / channel name and frame); the same fields as the key string held (the font's height
+    // to 2 decimals, its names, the width in quarter pixels), so the same calls share an entry and give the same text.
+    struct Entry
+    {
+        juce::String text, name, style;
+        std::int64_t height;
+        int quarters;
+        juce::String fitted;
+    };
+    static std::unordered_multimap<std::uint64_t, Entry> cache;
+    const auto height = std::llround ((double) font.getHeight() * 100.0);
+    const auto quarters = juce::roundToInt (width * 4.0f);
+    const auto name = font.getTypefaceName(), style = font.getTypefaceStyle();
+    const auto h = mix (mix (mix (mix (mix (0x9b05688c2b3e6c1full, (std::uint64_t) text.hashCode64()), (std::uint64_t) height), (std::uint64_t) (std::uint32_t) quarters),
+                             (std::uint64_t) name.hashCode64()),
+                        (std::uint64_t) style.hashCode64());
+    for (auto [it, end] = cache.equal_range (h); it != end; ++it)
+        if (it->second.quarters == quarters && it->second.height == height && it->second.text == text && it->second.name == name && it->second.style == style)
+            return it->second.fitted;
     if (cache.size() > 4000)
         cache.clear();
     const auto n = text.length();
@@ -473,7 +489,7 @@ juce::String fitMiddle (const juce::String& text, const juce::Font& font, float 
     auto fitted = tail == 0 && head == n ? text
                   : head == 0               ? text.substring (0, 1) // (nothing fits: the drawText that follows clips it)
                                             : text.substring (0, head).trimEnd() + ".." + text.substring (n - tail).trimStart();
-    cache.emplace (key, fitted);
+    cache.emplace (h, Entry { text, name, style, height, quarters, fitted });
     return fitted;
 }
 
@@ -567,6 +583,50 @@ void drawStepStrip (juce::Graphics& g, juce::Rectangle<int> firstCell, int pitch
                                ghost ? 1u : 0u), paletteStamp);
     if (! tilesForPaths() || ! drawTile (g, cache, bounds.toFloat(), 0.0f, key, nativeTiles, a, direct))
         direct (g, bounds.toFloat());
+}
+
+void drawStepStripOver (juce::Graphics& g, juce::Rectangle<int> firstCell, int pitch, juce::Colour a, juce::Colour b, bool ghost, juce::Colour background)
+{
+    const auto bounds = firstCell.withWidth (7 * pitch + firstCell.getWidth());
+    if (! g.clipRegionIntersects (bounds))
+        return;
+    // only where drawStepStrip blits its tile (tilesForPaths, a whole scale, a tile of at most 256 px) with JUCE's software
+    // renderer into the frame: the tile's pixels blended over `background` here are the frame's (PixelARGB and PixelRGB
+    // blend an opaque pixel alike), and an opaque RGB image is then copied (PixelARGB::blend (PixelRGB) = set)
+    const auto scale = spriteScale (g);
+    if (! tilesForPaths() || scale == 0 || ! background.isOpaque() || bounds.getWidth() * scale > 256 || bounds.getHeight() * scale > 256
+        || dynamic_cast<juce::LowLevelGraphicsSoftwareRenderer*> (&g.getInternalContext()) == nullptr)
+    {
+        drawStepStrip (g, firstCell, pitch, a, b, ghost);
+        return;
+    }
+    static std::unordered_map<std::uint64_t, juce::Image> cache;
+    static const bool registered = lynx::ui::registerImageCache ([] { cache.clear(); }); (void) registered;
+    auto key = mix (mix (mix (mix (mix (0x510e527fade682d1ull, (std::uint64_t) a.getARGB()), (std::uint64_t) b.getARGB()), (std::uint64_t) pitch),
+                         ghost ? 1u : 0u), paletteStamp);
+    key = mix (mix (mix (mix (key, (std::uint64_t) background.getARGB()), (std::uint64_t) firstCell.getWidth()), (std::uint64_t) firstCell.getHeight()),
+               (std::uint64_t) scale);
+    auto it = cache.find (key);
+    if (it == cache.end())
+    {
+        if (cache.size() > 200)
+            cache.clear();
+        juce::Image image (juce::Image::RGB, bounds.getWidth() * scale, bounds.getHeight() * scale, false, juce::SoftwareImageType());
+        {
+            juce::Graphics ig (image);
+            ig.addTransform (juce::AffineTransform::scale ((float) scale));
+            ig.setColour (background);
+            ig.fillRect (juce::Rectangle<int> (bounds.getWidth(), bounds.getHeight()));
+            drawStepStrip (ig, firstCell.withPosition (0, 0), pitch, a, b, ghost);
+        }
+        it = cache.emplace (key, std::move (image)).first;
+    }
+    g.setColour (juce::Colours::black); // (an image is drawn with the current colour's alpha as its opacity)
+    if (scale == 1)
+        g.drawImageAt (it->second, bounds.getX(), bounds.getY());
+    else
+        g.drawImage (it->second, bounds.toFloat(), juce::RectanglePlacement::stretchToFit);
+    g.setColour (a); // (the colour drawStepStrip leaves set)
 }
 
 void fillPlate (juce::Graphics& g, juce::Rectangle<float> r, float corner, juce::Colour top, juce::Colour bottom, bool squareBottom)
@@ -1015,8 +1075,30 @@ void setPalette (const themes::Palette& p)
 
 ButtonColours buttonColours (themes::ButtonKind kind, bool on, float hover, bool down, bool enabled)
 {
+    // (round 190mh, perf: the state rule mixes colours and checks contrast at every button paint; its answer is kept per
+    // palette and state. Message thread only, as every paint.)
+    std::uint32_t hoverBits = 0;
+    static_assert (sizeof (hoverBits) == sizeof (hover));
+    std::memcpy (&hoverBits, &hover, sizeof (hover));
+    const auto key = mix (mix (mix (0x2545f4914f6cdd1dull, paletteStamp), (std::uint64_t) hoverBits),
+                          (std::uint64_t) ((int) kind * 8 + (on ? 4 : 0) + (down ? 2 : 0) + (enabled ? 1 : 0)));
+    struct Entry
+    {
+        std::uint64_t stamp;
+        std::uint32_t hover;
+        int state;
+        ButtonColours colours;
+    };
+    static std::unordered_map<std::uint64_t, Entry> cache;
+    const auto state = (int) kind * 8 + (on ? 4 : 0) + (down ? 2 : 0) + (enabled ? 1 : 0);
+    if (const auto it = cache.find (key); it != cache.end() && it->second.stamp == paletteStamp && it->second.hover == hoverBits && it->second.state == state)
+        return it->second.colours;
     const auto look = themes::buttonLook (paletteInUse(), kind, on, (double) hover, down, enabled);
-    return { juce::Colour (look.fill), juce::Colour (look.edge), juce::Colour (look.content) };
+    const ButtonColours colours { juce::Colour (look.fill), juce::Colour (look.edge), juce::Colour (look.content) };
+    if (cache.size() > 1024) // (fades step through hover levels)
+        cache.clear();
+    cache[key] = { paletteStamp, hoverBits, state, colours };
+    return colours;
 }
 
 juce::String mnemonic (const juce::String& text, char key)
@@ -1995,7 +2077,9 @@ void LookAndFeel::drawMenuBarItem (juce::Graphics& g, int width, int height, int
     // (round 190jo FM-4: the Pattern toolbar's menu titles in textPrimary at rest, as FL's bright caps)
     g.setColour (active || (bool) bar.getProperties().getWithDefault ("lynxFlMenuBar", false) ? textPrimary : textSecondary.brighter (0.2f));
     g.setFont (getMenuBarFont (bar, itemIndex, itemText));
-    g.drawFittedText (itemText, 0, 0, width, height, juce::Justification::centred, 1);
+    // (round 190mh, perf: the laid-out title from the text cache, the same glyphs at the item's origin; round 190jo's larger
+    // Pattern-toolbar titles were shaped again on every paint)
+    textcache::drawFittedText (g, itemText, 0, 0, width, height, juce::Justification::centred, 1);
 }
 
 // --- sliders ---------------------------------------------------------------------------------------

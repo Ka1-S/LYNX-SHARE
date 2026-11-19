@@ -939,7 +939,7 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                 if (kind == 1)
                     drawIdleStepStrip (g, first, stepWidth, theme::stepOff (start), theme::stepOff (start + 4), selected ? bg3 : bg2);
                 else
-                    theme::drawStepStrip (g, first, stepWidth, theme::stepOff (start), theme::stepOff (start + 4), true);
+                    theme::drawStepStripOver (g, first, stepWidth, theme::stepOff (start), theme::stepOff (start + 4), true, selected ? bg3 : bg2);
             }
 
         for (int step = 0; step < steps; ++step)

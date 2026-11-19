@@ -1115,6 +1115,8 @@ MainComponent::~MainComponent()
 void MainComponent::paint (juce::Graphics& g)
 {
     const uitrace::Scope trace ("MainComponent paint", true, g.getClipBounds());
+    if (! IconButton::paintingTileAtlas()) // (round 190mh: the FL tiles' atlas paints its backdrop with this clip edge)
+        lastPaintClip = g.getClipBounds();
     using namespace theme;
     g.fillAll (colour::bg1);
     if (toolbarLook != toolbarlayout::Look::fl) // round 190iv: the Simple and Clip-launch toolbars

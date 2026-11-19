@@ -394,13 +394,16 @@ void MainComponent::applyFlTiles()
         for (auto* b : { &metronomeButton, &tapTempoButton, &blendButton, &punchButton, &typingPianoButton })
             b->setLook (BL::flTile, box);
     }
-    // round 190ki (perf, opt-in LYNX_TILE_MODE=2): the tiles' bodies from an atlas of this component's toolbar band
-    // (toolbarBackdropStamp)
+    // round 190ki (perf; on by default on the software renderer since round 190mh, opt-in LYNX_TILE_MODE=2 on the native
+    // ones): the tiles' bodies from an atlas of this component's toolbar band (toolbarBackdropStamp, and paint()'s clip)
     for (auto* c : getChildren())
         if (auto* b = dynamic_cast<IconButton*> (c))
-            b->setFlTileBackdrop (fl && b->getLook() == BL::flTile
-                                      ? std::function<std::uint64_t (juce::Rectangle<int>)> ([this] (juce::Rectangle<int> r) { return toolbarBackdropStamp (r); })
-                                      : nullptr);
+        {
+            if (fl && b->getLook() == BL::flTile)
+                b->setFlTileBackdrop ([this] (juce::Rectangle<int> r) { return toolbarBackdropStamp (r); }, [this] { return lastPaintClip; });
+            else
+                b->setFlTileBackdrop (nullptr);
+        }
 }
 
 // Round 190ki: everything MainComponent::paint draws within `b` (a toolbar button's bounds) as one number, for the tiles'
