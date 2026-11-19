@@ -2120,9 +2120,9 @@ struct ScFilter
 //    phase, the four bands (low, low-mid, high-mid, high; each compensated by the later all-passes) sum to the all-pass
 //    chain exactly (probes: < -86 dB ESR);
 //  * per band: peak of the band (stereo linked) → g = 1 / (1 + k · peak / threshold), the knee's cubic
-//    g + 2 knee · g² (1 − g) (≤ 1), the minimum over the look-ahead, attack / fast release, a slow follower (its release
-//    from the Release time), the deeper of the two, two 32-sample box filters, then the band's gain
-//    range + (1 − range) · g (linear), times its make-up; the audio is delayed by the look-ahead.
+//    g + 2 knee · g² (1 − g) (≤ 1), the minimum over the look-ahead, the smoother with its programme-dependent release
+//    (TimeLaw), two box filters, then the band's gain range + (1 − range) · g (linear), times its make-up; the audio is
+//    delayed by the look-ahead.
 //  k = 0.5 · 2^(-R / 12) at knee 0 (R = range dB; probes: ±0.5 %), times exp (s(R) · (knee / 0.5)^0.78) with s(R)
 //  measured at knee 0.5 (c4KneeNodes) — 0.003 dB rms on every stair.
 namespace c4
@@ -2130,9 +2130,14 @@ namespace c4
 constexpr int bandsN = 4;
 constexpr double kneeR[9] { -24.0, -18.0, -12.0, -6.0, -3.0, 3.0, 6.0, 12.0, 18.0 };
 constexpr double kneeS[9] { 0.1608, 0.2068, 0.2601, 0.3216, 0.3525, 0.4330, 0.4737, 0.5603, 0.6567 };
-// time laws (fitted on the 1 kHz burst probes, 0.5 … 100 ms attack, 5 … 5000 ms release; electro)
-constexpr double attackScale = 1.0, fastReleaseMs = 0.048, slowAttackMs = 138.0, slowReleaseScale = 1.92, slowReleaseExp = 1.0;
-constexpr int boxLength = 32; // at 48 kHz (× the look-ahead's rate factor)
+// time law: the Renaissance family's (the same structure round 190mg ren read in RComp: a one-pole smoother s on the gain,
+// a slow follower q of s, s released with tau = release · (1 − v^vpow)^vexp (v = q electro, 1 − q opto) times the factor
+// 2^(−d (1/(m + pe) − 1/(q + pe))), m = min (s, q), both read at 255 steps), every constant fitted on the C4's own probes
+struct TimeLaw { double attackScale, releaseScale, d, pe, qFallMs, qRiseMs, vpow, vexp; };
+// c4fit:begin
+constexpr TimeLaw c4Time { 1.0, 1.0, 1.0 / 255.0, 1.0 / 255.0, 150.0, 56.0, 4.0, 4.0 };
+// c4fit:end
+constexpr int boxA = 27, boxB = 38; // the two box filters (27 + 38 − 1 = 64 samples at 48 kHz, × the look-ahead's rate factor)
 
 inline double kOf (double rangeDb, double knee) noexcept
 {
@@ -2183,7 +2188,8 @@ public:
     {
         sr = rate;
         la = c4Lookahead (rate);
-        box = boxLength * la / 64;
+        boxLenA = boxA * la / 64;
+        boxLenB = la + 1 - boxLenA;
         key.fill (-1.0);
         reset();
     }
@@ -2206,9 +2212,10 @@ public:
             qHead[(std::size_t) b] = qTail[(std::size_t) b] = 0;
             for (auto& v : box1[(std::size_t) b]) v = one;
             for (auto& v : box2[(std::size_t) b]) v = one;
-            acc1[(std::size_t) b] = acc2[(std::size_t) b] = one * box;
+            acc1[(std::size_t) b] = one * boxLenA;
+            acc2[(std::size_t) b] = one * boxLenB;
         }
-        bpos = 0;
+        bposA = bposB = 0;
         tick = 0;
     }
 
@@ -2253,17 +2260,26 @@ public:
                 while (qt[(std::size_t) h] + la <= tick)
                     h = (h + 1) % qcap;
                 const double m = qv[(std::size_t) h];
-                s1[bi] = m + (s1[bi] - m) * (s1[bi] < m ? cFastRel : cAtt[bi]);
-                s2[bi] = s1[bi] + (s2[bi] - s1[bi]) * (s2[bi] < s1[bi] ? cSlowRel[bi] : cSlowAtt);
-                const double mm = std::min (s1[bi], s2[bi]);
+                double co = cAtt[bi];
+                if (m >= s1[bi]) // release: the programme-dependent law
+                {
+                    const double q = s2[bi];
+                    const double qv8 = std::floor (q * 255.0) / 256.0, mv8 = std::floor (std::min (s1[bi], q) * 255.0) / 255.0;
+                    const double qq = std::floor (q * 255.0) / 255.0;
+                    const double v = std::clamp (opto ? 1.0 - qv8 : qv8, 0.0, 1.0);
+                    const double tau = std::max (0.002, relMs[bi] * std::pow (1.0 - std::pow (v, c4Time.vpow), c4Time.vexp));
+                    co = std::exp (-1.0 / (tau * 1.0e-3 * sr)) * std::exp2 (-c4Time.d * (1.0 / (mv8 + c4Time.pe) - 1.0 / (qq + c4Time.pe)));
+                }
+                s1[bi] = (s1[bi] - m) * co + m;
+                s2[bi] = (s2[bi] - s1[bi]) * (s1[bi] < s2[bi] ? cqFall : cqRise) + s1[bi];
                 // two box filters (64-bit fixed point: no drift)
-                const auto q = (std::int64_t) std::llround (mm * (double) one);
-                acc1[bi] += q - box1[bi][(std::size_t) bpos];
-                box1[bi][(std::size_t) bpos] = q;
-                const auto v1 = acc1[bi] / box;
-                acc2[bi] += v1 - box2[bi][(std::size_t) bpos];
-                box2[bi][(std::size_t) bpos] = v1;
-                const double gs = (double) acc2[bi] / (double) box / (double) one;
+                const auto qn = (std::int64_t) std::llround (s1[bi] * (double) one);
+                acc1[bi] += qn - box1[bi][(std::size_t) bposA];
+                box1[bi][(std::size_t) bposA] = qn;
+                const auto v1 = acc1[bi] / boxLenA;
+                acc2[bi] += v1 - box2[bi][(std::size_t) bposB];
+                box2[bi][(std::size_t) bposB] = v1;
+                const double gs = (double) acc2[bi] / (double) boxLenB / (double) one;
                 const double G = (active[bi] ? gr[bi] + (1.0 - gr[bi]) * gs : 1.0) * mk[bi];
                 extreme[bi] = std::min (extreme[bi], 20.0 * std::log10 (std::max (G / mk[bi], 1.0e-6)));
                 const double w = (soloAny && ! solo[bi]) ? 0.0 : mix * G + (1.0 - mix);
@@ -2276,7 +2292,8 @@ public:
                 }
             }
             dpos = (dpos + 1) % la;
-            bpos = (bpos + 1) % box;
+            bposA = (bposA + 1) % boxLenA;
+            bposB = (bposB + 1) % boxLenB;
             ++tick;
             l[i] = (float) (y[0] * outGain);
             r[i] = (float) (y[1] * outGain);
@@ -2306,6 +2323,7 @@ private:
                 key[(std::size_t) j] = k[(std::size_t) j];
         }
         const auto at = [&] (int b, int f) { return p[(std::size_t) param (b, f)]; };
+        opto = c4Opto (p);
         soloAny = false;
         for (int b = 0; b < bandsN; ++b)
         {
@@ -2320,29 +2338,30 @@ private:
             solo[bi] = on (at (b, fSolo));
             soloAny = soloAny || solo[bi];
             const double attMs = 0.5 * std::pow (1000.0, (double) std::clamp (at (b, fAttack), 0.0f, 1.0f));
-            const double relMs = 5.0 * std::pow (1000.0, (double) std::clamp (at (b, fRelease), 0.0f, 1.0f));
-            cAtt[bi] = std::exp (-1.0 / (attackScale * attMs * 1.0e-3 * sr));
-            cSlowRel[bi] = std::exp (-1.0 / (slowReleaseScale * std::pow (relMs, slowReleaseExp) * 1.0e-3 * sr));
+            const double relMs0 = 5.0 * std::pow (1000.0, (double) std::clamp (at (b, fRelease), 0.0f, 1.0f));
+            cAtt[bi] = std::exp (-1.0 / (c4Time.attackScale * attMs * 1.0e-3 * sr));
+            relMs[bi] = c4Time.releaseScale * relMs0;
         }
-        cFastRel = std::exp (-1.0 / (fastReleaseMs * 1.0e-3 * sr));
-        cSlowAtt = std::exp (-1.0 / (slowAttackMs * 1.0e-3 * sr));
+        cqFall = std::exp (-1.0 / (c4Time.qFallMs * 1.0e-3 * sr));
+        cqRise = std::exp (-1.0 / (c4Time.qRiseMs * 1.0e-3 * sr));
         mix = std::clamp ((double) p[prism::mix], 0.0, 1.0);
         inGain = dbToGain (trimDb (p[input]));
         outGain = dbToGain (trimDb (p[output]));
     }
 
     static constexpr std::int64_t one = (std::int64_t) 1 << 40;
-    static constexpr int maxLa = 256, qcap = maxLa + 2, maxBox = 128;
+    static constexpr int maxLa = 256, qcap = maxLa + 2, maxBox = 160;
     double sr = 48000.0;
-    int la = 64, box = boxLength, dpos = 0, bpos = 0;
+    int la = 64, boxLenA = boxA, boxLenB = boxB, dpos = 0, bposA = 0, bposB = 0;
     std::int64_t tick = 0;
     std::array<double, 4> key {};
     std::array<std::array<Crossover, 3>, 2> xo {}, comp {};
     std::array<std::array<std::array<double, maxLa>, bandsN>, 2> delay {};
-    std::array<double, bandsN> s1 {}, s2 {}, gr {}, invT {}, kb {}, cKnee {}, mk {}, cAtt {}, cSlowRel {};
+    std::array<double, bandsN> s1 {}, s2 {}, gr {}, invT {}, kb {}, cKnee {}, mk {}, cAtt {}, relMs {};
+    bool opto = false;
     std::array<bool, bandsN> active {}, solo {};
     bool soloAny = false;
-    double cFastRel = 0.0, cSlowAtt = 0.0, mix = 1.0, inGain = 1.0, outGain = 1.0;
+    double cqFall = 0.0, cqRise = 0.0, mix = 1.0, inGain = 1.0, outGain = 1.0;
     std::array<std::array<double, qcap>, bandsN> qVal {};
     std::array<std::array<std::int64_t, qcap>, bandsN> qTime {};
     std::array<int, bandsN> qHead {}, qTail {};

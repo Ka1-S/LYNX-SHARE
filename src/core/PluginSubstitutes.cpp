@@ -1811,7 +1811,9 @@ int translateWavesArPlates (const std::vector<std::uint8_t>& state, EffectSlot& 
     p[0] = 1.0f;                                                                   // mix
     p[1] = (float) verbs::skewInverse (std::clamp (v (324, 0.0), 0.0, 500.0), 0.0, 500.0, 2.3219); // pre-delay
     p[2] = (float) (0.5 * (lo + hi));                                              // decay
-    const double treble = std::clamp (v (378, 0.0), -12.0, 12.0);
+    // the reference plates are brighter than this tank above 5 kHz (impulse probes of refcap182's five states: 8 / 16 kHz
+    // octaves -1 … -5 / -2 … -7 dB, -4 / -5 on average): Foil's high shelf +5 dB at 5 kHz, then the Treble on top
+    const double treble = 5.0 + std::clamp (v (378, 0.0), -12.0, 12.0);
     p[10] = (float) std::clamp (treble >= 0.0 ? 0.5 + treble / 24.0 : 0.5 + treble / 9.0, 0.0, 1.0);
     static constexpr double bassCutHz[4] { 0.0, 80.0, 160.0, 320.0 };
     const auto bc = std::clamp ((int) std::lround (v (336, 0.0)), 0, 3);
