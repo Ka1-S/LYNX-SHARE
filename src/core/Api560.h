@@ -30,13 +30,14 @@ public:
     {
         sr = sampleRate;
         M = std::max (1, (int) std::lround (192000.0 / sr));
-        // the decimating low pass at M·sr: a Kaiser-windowed sinc, cut-off at the base Nyquist, ±2.5 kHz (at 48 kHz)
-        // transition scaled with the rate, β 8 (−80 dB); its delay is 24 base samples, the rest of the latency a line
+        // the decimating low pass at M·sr: a Kaiser-windowed sinc (β 8), its cut-off at 0.4924 × the base rate and its
+        // length (40 base samples each side) fitted to the reference's measured roll-off (−0.15 dB at 22.5 kHz, −1.1 at
+        // 23, −5.9 at 23.9 kHz at 48 kHz: 0.03 dB rms; passband within 0.0003 dB); the rest of the latency is a line
         taps.clear();
         if (M > 1)
         {
-            const int half = 24 * M; // 24 base samples
-            const double fc = 0.5 / M, beta = 8.0;
+            const int half = firHalf * M;
+            const double fc = 0.4924 / M, beta = 8.0;
             auto i0 = [] (double x) { double s = 1.0, t = 1.0; for (int k = 1; k < 30; ++k) { t *= (x / (2.0 * k)) * (x / (2.0 * k)); s += t; } return s; };
             double sum = 0.0;
             for (int i = -half; i <= half; ++i)
@@ -48,7 +49,7 @@ public:
             }
             for (auto& t : taps) t *= (double) M / sum; // unity gain after the zero-stuffing
         }
-        firDelay = M > 1 ? 24 : 0;
+        firDelay = M > 1 ? firHalf : 0;
         for (auto& b : ring) b.assign ((std::size_t) std::max (1, (int) taps.size()), 0.0);
         for (auto& d : line) d.assign ((std::size_t) latency + 1, 0.0f);
         designed = false;
@@ -177,7 +178,7 @@ private:
             if (m == 0)
             {
                 // the low pass's output on the base sample's own sub-sample (the newest; p = the oldest): an integer
-                // delay of half the taps = 24 base samples
+                // delay of half the taps = firHalf base samples
                 int q = p;
                 for (int t = L - 1; t >= 0; --t)
                 {
@@ -191,7 +192,8 @@ private:
     }
 
     double sr = 48000.0;
-    int M = 4, firDelay = 24;
+    static constexpr int firHalf = 40; // base samples (of the 65)
+    int M = 4, firDelay = firHalf;
     std::vector<double> taps;
     std::array<std::vector<double>, 2> ring;
     std::array<std::vector<float>, 2> line;

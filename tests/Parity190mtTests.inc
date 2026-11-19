@@ -71,10 +71,11 @@ TEST (parity190mt_ssl_g_law_follows_the_measured_sections)
     namespace rg = mixsuite::ridge;
     auto s = parity190mt::gSlot();
     s.params[rg::gEqLaw] = 1.0f;
-    // LF +12 dB at 120 Hz: [EXEC] the probe's section reaches +14.1 dB at DC (its gain law overshoots), flat at 10 kHz
+    // LF +12 dB at 120 Hz: [EXEC] the probe's section reaches +14.1 dB at DC (its gain law overshoots) and returns to 0
+    // above its shared upper corner (−0.2 dB at 10 kHz, within 0.1 dB at 20 kHz)
     parity190mt::gBands (s, 12.0, 120.0, 0.0, 1.0, 1.5, 0.0, 3.0, 1.5, 0.0, 8.0);
     CHECK (std::abs (rg::responseDb (s.params, 48000.0, 10.0) - 14.08) < 0.3);
-    CHECK (std::abs (rg::responseDb (s.params, 48000.0, 10000.0)) < 0.15);
+    CHECK (std::abs (rg::responseDb (s.params, 48000.0, 10000.0)) < 0.35 && std::abs (rg::responseDb (s.params, 48000.0, 20000.0)) < 0.1);
     // the other rates keep the shelf where it was
     CHECK (std::abs (rg::responseDb (s.params, 96000.0, 10.0) - rg::responseDb (s.params, 48000.0, 10.0)) < 0.3);
     CHECK (std::abs (rg::responseDb (s.params, 44100.0, 120.0) - rg::responseDb (s.params, 48000.0, 120.0)) < 0.3);
@@ -200,4 +201,21 @@ TEST (parity190mt_rchannel_rvox_type)
     auto r50 = parity190jh::waves ("RChannel Stereo", "RChannel", parity190jh::list (137, { { 20, "0" }, { 41, "1" }, { 42, "16" }, { 43, "160" },
         { 44, "1" }, { 45, "-24" }, { 46, "50" } }), n);
     CHECK (std::abs (parity190mt::sineGainDb (r50, 1000.0, 48000.0, 1.0) - g) < 1e-6);
+}
+
+TEST (parity190mt_rchannel_gate)
+{
+    using namespace lynx;
+    int n = 0;
+    // gate on (57), gate mode (58), threshold −40 dB, floor −30 dB, release 100 ms; the compressor at 1:1, EQ off
+    auto s = parity190jh::waves ("RChannel Stereo", "RChannel", parity190jh::list (137, { { 20, "0" }, { 41, "1" }, { 42, "16" }, { 43, "160" },
+        { 45, "0" }, { 46, "1" }, { 57, "1" }, { 58, "1" }, { 59, "-40" }, { 60, "-30" }, { 61, "130" }, { 62, "100" } }), n);
+    CHECK (s.params[(std::size_t) compressorRchGate] == 1.0f && s.params[(std::size_t) compressorRchGateMode] == 1.0f);
+    // its threshold at −80 (the slider's −inf) leaves the gate off; a plain Compressor has none
+    auto off = parity190jh::waves ("RChannel Stereo", "RChannel", parity190jh::list (137, { { 20, "0" }, { 41, "1" }, { 45, "0" }, { 46, "1" },
+        { 57, "1" }, { 58, "1" }, { 59, "-80" }, { 60, "-80" }, { 62, "250" } }), n);
+    CHECK (off.params[(std::size_t) compressorRchGate] == 0.0f && makeEffectSlot (EffectKind::compressor).params[(std::size_t) compressorRchGate] == 0.0f);
+    // a tone 20 dB under the threshold settles at the floor; 20 dB over it passes
+    const double quiet = parity190mt::sineGainDb (s, 1000.0, 48000.0, 0.001), loud = parity190mt::sineGainDb (s, 1000.0, 48000.0, 0.1);
+    CHECK (std::abs (quiet + 30.0) < 1.0 && std::abs (loud) < 0.5);
 }

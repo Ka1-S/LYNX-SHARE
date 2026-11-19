@@ -2200,6 +2200,15 @@ int translateWavesRChannel (const std::vector<std::uint8_t>& state, EffectSlot& 
     // ([EXEC] ratios 0.5 / 1 / 2 / 50 and ARC give the same output; the attack / release still act)
     if (v (44, 0.0) >= 0.5 && slot.params.size() > (std::size_t) compressorRVoxType)
         slot.params[(std::size_t) compressorRVoxType] = 1.0f;
+    // round 190mt: the gate (57 on, 58 1 = gate / 0 = expander, 59 threshold dB (−80 = −inf: off), 60 floor dB, 62 release ms)
+    if (v (57, 0.0) >= 0.5 && v (59, -80.0) > -79.95 && slot.params.size() > (std::size_t) compressorRchGateMode)
+    {
+        slot.params[(std::size_t) compressorRchGate] = 1.0f;
+        slot.params[(std::size_t) compressorRchGateThreshold] = (float) std::clamp ((v (59, -80.0) + 90.0) / 108.0, 0.0, 1.0);
+        slot.params[(std::size_t) compressorRchGateFloor] = (float) std::clamp ((v (60, -80.0) + 90.0) / 90.0, 0.0, 1.0);
+        slot.params[(std::size_t) compressorRchGateRelease] = (float) std::clamp (std::log (std::clamp (v (62, 250.0), 10.0, 5000.0) / 10.0) / std::log (500.0), 0.0, 1.0);
+        slot.params[(std::size_t) compressorRchGateMode] = v (58, 0.0) >= 0.5 ? 1.0f : 0.0f;
+    }
     // the EQ (20 on; band k at 5 k: on, type, gain, Hz, Q; 26 routing 1 = dynamics first) on the Renaissance Channel law:
     // the Renaissance EQ's own band structures through Facet's Waves design law
     int bands = 0;

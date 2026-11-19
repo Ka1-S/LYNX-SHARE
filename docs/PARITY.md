@@ -4336,3 +4336,34 @@ omni law (decision 3); RChannel on Compressor (its compressor law + channel EQ) 
 (the Modern voicing's G curve scored 5.20 against 6.44); API-2500 on its own Compressor law (not Crest); the bass family on
 Low Lifter, Vitamin on Aether. **Still off:** SSL G's own EQ curves; RChannel's gate / RVox type; RBass's waveform (4.92);
 API-2500 (5.88); Q10's wide bells above 3 kHz (−45 … −53 dB); the reverbs on Reeverb 2.
+
+## Round 190mt: Waves, part 5 — SSL G-Channel's own EQ, the Q10 bell's exact law, the API-560 network, RChannel's RVox type and gate
+
+Clean-room as before: black-box identification on our demo-mode probes (two takes each) and one 5-minute headless Ghidra
+session on the API-560 / H-Reverb DSP libraries, read for structure only; every LYNX constant is a fit on our probes.
+Evidence: `docs/analise/REA_rodada190mt.md`. Before = round 190mm's final binary (bank wv190mm, masked).
+
+| reference → LYNX | files | before → after | up / same / down |
+|---|---|---|---|
+| SSL G-Channel → Ridge Strip (E voicing + hidden G EQ law) | 25 | 6.44 → 8.20 | 17 / 8 / 0 |
+| Q10 → Facet EQ (exact Bell law, Waves code 14) | 25 | 9.68 → 10.00 | 5 / 20 / 0 |
+| API-560 → Facet EQ (hidden API-560 network law, 65-sample latency) | 25 | 8.44 → 9.72 | 19 / 6 / 0 |
+| Renaissance Channel → Compressor (RVox type + gate) | 25 | 5.96 → 6.56 | 5 / 20 / 0 |
+| every other wv190mm / refcap182 Waves reference | — | same | 0 down |
+
+- **Ridge Strip — the SSL G EQ law** (hidden [87 … 99]; SSL G-Channel only): each band one second-order section whose
+  poles and zeros move with the gain (proportional-Q bells, shelves that overshoot their dial, the G's ±17 / ±20 dB);
+  LYNX keeps each probed section's analog prototype (7 900 probes) and interpolates it (core/SslGTables.inc). Filters and
+  dynamics stay the E voicing's (the G compressor is the remaining gap: X1 / X2 / X4 at 7 … 8).
+- **Facet EQ — Q10 bell** (Waves code 14): the cookbook section with alpha = tan (min (π f / (Q fs), π / 4)) /
+  (0.090904 (√G + 1/√G)), exact on 336 probes up to 20 kHz (the wide bands above 3 kHz were −45 … −53 dB).
+- **Facet EQ — the API-560 law** (hidden [135] + ten slider gains [136 …]; API-560 only; core/Api560.h): the reference's
+  graphic-EQ structure (two groups of five resonators in a node network, each slider a potentiometer that also loads its
+  resonator, 4× oversampled, a linear-phase decimator), constants fitted on our single-slider probes (−62 … −70 dB);
+  65 samples of latency at every rate, reported to PDC; a plain delay with every slider at 0. Old projects: 0 latency.
+- **Compressor — RChannel's RVox type** (hidden [38]): the vocal compressor's curve on the Renaissance law, the ratio
+  ignored; **its gate** (hidden [39 … 43]): a held detector, a one-pole fall to the floor with the release, gate / 1:2
+  expander. X3_bass (3) is the weak file: the type's dynamics on bass.
+- **Not changed:** RVerb / H-Reverb (round 190lf's ceiling stands: a sample-accurate network would need the reference's
+  delay tables; REA_rodada190mt §5), the G's filters and compressor, the PQ-Bell above 3 kHz.
+

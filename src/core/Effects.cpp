@@ -246,6 +246,7 @@ public:
         vintage.reset();
         ren.reset();
         for (auto& z : channelState) z = {}; // round 190mm
+        rchGate.reset(); // round 190mt
         vox.reset();
     }
 
@@ -377,6 +378,8 @@ public:
             const bool eqAfter = params[(std::size_t) compressorChannelRouting] >= 0.5f;
             if (channel) channelDesign (params);
             if (channel && ! eqAfter) channelEq (l, r, n);
+            if (params[(std::size_t) compressorRchGate] >= 0.5f) // round 190mt: the RChannel's gate (hidden)
+                rchGate.process (l, r, n, params, sampleRate);
             ren.process (l, r, n, v);
             if (channel && eqAfter) channelEq (l, r, n);
             meterLimit.store (0.0f, std::memory_order_relaxed);
@@ -606,6 +609,31 @@ private:
     vmatch::progcomp::Compressor vintage;
     vmatch::progcomp::Renaissance ren; // round 190mg
     rendyn::Vox vox; // round 190mm (dyn)
+    // round 190mt: the Renaissance Channel's gate (Effects.h CompressorRchGate)
+    struct RchGate
+    {
+        double env = 0.0, g = 1.0;
+        void reset() noexcept { env = 0.0; g = 1.0; }
+        void process (float* l, float* r, int n, const EffectParams& p, double sr) noexcept
+        {
+            const double thrDb = 108.0 * std::clamp ((double) p[(std::size_t) compressorRchGateThreshold], 0.0, 1.0) - 90.0;
+            const double floorDb = 90.0 * std::clamp ((double) p[(std::size_t) compressorRchGateFloor], 0.0, 1.0) - 90.0;
+            const double relMs = 10.0 * std::pow (500.0, std::clamp ((double) p[(std::size_t) compressorRchGateRelease], 0.0, 1.0));
+            const bool gate = p[(std::size_t) compressorRchGateMode] >= 0.5f;
+            const double thr = std::pow (10.0, thrDb / 20.0), fl = std::pow (10.0, floorDb / 20.0);
+            const double dC = std::exp (-1.0 / (std::max (0.14, relMs * 0.001) * sr)), rC = std::exp (-1.0 / (relMs * 0.001 * sr));
+            const double aC = std::exp (-1.0 / (0.001 * sr));
+            for (int i = 0; i < n; ++i)
+            {
+                const double x = std::max (std::abs ((double) l[i]), std::abs ((double) r[i]));
+                env = x > env ? x : env * dC;
+                const double target = env >= thr ? 1.0 : (gate ? fl : std::max (fl, env / thr));
+                g = target + (g - target) * (target > g ? aC : rC);
+                l[i] = (float) (l[i] * g);
+                r[i] = (float) (r[i] * g);
+            }
+        }
+    } rchGate;
     buscomp::Engine api; // round 190mm (dyn)
     bool apiOn = false;
     bool vintageAtStart = false, renAtStart = false, voxAtStart = false;

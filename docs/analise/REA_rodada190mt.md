@@ -35,17 +35,22 @@ Base: round 190mm's final binary and scores (bank wv190mm, masked).
   and −12 (the RVox plug-in's own law has c = 1).
 - **LYNX**: Compressor's hidden [38] compressorRVoxType on the Renaissance law (RenSettings::voxCurve: that curve, no floor,
   no bend, the all-passed detector copies), set by the RChannel translator from RealWorld 44.
-- **Gate** (RealWorld 57 on, 58 gate / expander, 59 threshold, 60 floor, 62 release): its detector falls from the last loud
-  level for ≈ 0.35 s before a −40 dB threshold closes (independent of the release between 22 and 100 ms, never within
-  0.2 s at 1 s); the gain then ramps to the floor (≈ 60 ms at 22 ms, ≈ 250 ms at 100 ms). Not modelled this round
-  (X4's error is dominated by its compressor, as X1 / X2's).
+- **Gate** (RealWorld 57 on, 58 gate / expander, 59 threshold (−80 = −inf), 60 floor, 62 release) [EXEC]: its detector
+  holds the last loud level and falls with max (0.14 s, release) (−18 → −40 dB in 0.35 s at release 22 and 100 ms; never
+  within 0.2 s at 1 s); below the threshold the gain falls to the floor as a one-pole with the release as its time
+  constant (≈ 9 dB per release time far from the floor), and opens within a millisecond; the expander mode is a 1:2
+  expander down to the floor. LYNX: Compressor hidden [39 … 43] (on, threshold, floor, release, mode) before the
+  Renaissance law, set by the RChannel translator when the gate is on with a finite threshold; on the probes the gate's
+  closing time and ramp land within one 20 ms column (the expander closes ≈ 80 ms later than the reference's). The bank's
+  X4 (−40 dB threshold) does not move: programme rarely falls under −40 dBFS; X4's error is its compressor's (as X1 / X2).
 
 ## 3. Q10: the bell's exact law
 - **Probes** (eq/out/q10c: 14 frequencies 0.5 … 20 kHz × ±6 / ±12 dB × Q 0.5 … 15, Bell and PQ-Bell): the Bell is the
   cookbook peaking section (b1 = a1, gain and centre exact) with
   alpha = tan (min (π f / (Q fs), π / 4)) / (0.090904 (√G + 1/√G)) — exact to 4e-5 over 336 probes: the bandwidth
   follows f / Q and is capped at fs / 4 (round 190mm's bandwidth-prewarped law missed the wide bands above 3 kHz by
-  −45 … −53 dB). PQ-Bell's alpha also depends on f / Q but with a gain-dependent warp (kept on round 190mm's law).
+  −45 … −53 dB). PQ-Bell's alpha also depends on f / Q only: α k(g) = θ (1 + β(g) θ²) with β 0.041 at ±6 dB, 0.0058 at ±12 dB (two gains
+  probed: its law in g not pinned down; kept on round 190mm's law, which is close below 3 kHz).
 - **LYNX**: Facet's Waves design code 14 q10BellTan (code 2 stays for round 190mm's projects); the Q10 translator uses it.
 
 ## 4. API-560: a graphic-EQ network, oversampled, 65 samples late
@@ -62,8 +67,9 @@ Base: round 190mm's final binary and scores (bank wv190mm, masked).
 - **LYNX** (core/Api560.h + Api560Law.inc, eq/lab/g560c.py / gen560.py): that network with LYNX's own constants fitted
   on our single-slider probes (M = 4 at 48 kHz: per band w, Q, a and a numerator s + d0 + d2 s²; B = 24.00 / 23.99 and
   C = 4.76 / 4.78 — the two groups alike): −70 dB (group A) / −62 dB (group B) over all probes, the bank's X1 … X4
-  responses −53 … −100 dB per octave band; a Kaiser decimator (β 8, 24 base samples) + a 41-sample line = 65 samples, a
-  plain 65-sample delay with every slider at 0. Facet EQ's hidden [135] api560 law + [136 …] slider gains (saved while
+  responses −53 … −100 dB per octave band (the 31 / 63 Hz bands are the weakest: −44 … −56 dB below 80 Hz); a Kaiser
+  decimator (β 8, 40 base samples each side, cut-off 0.4924 fs: fitted to the reference's measured roll-off, 0.03 dB rms
+  from 18 to 23.9 kHz) + a 25-sample line = 65 samples; a plain 65-sample delay with every slider at 0. Facet EQ's hidden [135] api560 law + [136 …] slider gains (saved while
   non-zero, set only by the API-560 translator); Facet's latency includes the 65 samples (PDC), old projects report 0.
 
 ## 5. RVerb / H-Reverb
