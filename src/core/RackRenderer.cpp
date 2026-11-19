@@ -4709,10 +4709,13 @@ void RackRenderer::process (const RackState* state,
 
     // round 190kz (sched): the same pieces with one task-graph round for the whole block, where that is exact
     const auto batch = batchable (*state, numSamples);
-    if (batch && planPieces (*state, playing, startTick, numSamples, tps, chunk, grid))
-        processBatched (*state, playing, numSamples, left, right, meters);
-    else if (batch && pieceCount < 0) // (more than maxPieces: pattern events close together)
+    const auto batched = batch && planPieces (*state, playing, startTick, numSamples, tps, chunk, grid);
+    // (round 190lv: a refused plan is counted, and the block then plays piece by piece below — before, it was not rendered
+    // at all: a block of more than maxPieces pieces came out as whatever the output buffers held)
+    if (batch && ! batched && pieceCount < 0) // (more than maxPieces: pattern events close together)
         ++batchRefused[(std::size_t) BatchRefusal::manyPieces];
+    if (batched)
+        processBatched (*state, playing, numSamples, left, right, meters);
     else
     for (int done = 0; done < numSamples;)
     {
