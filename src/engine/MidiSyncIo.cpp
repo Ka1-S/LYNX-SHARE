@@ -203,7 +203,7 @@ void MidiSyncIo::channelMessage (int port, int sample, const std::uint8_t* bytes
         // clock's alone, FLEngine 0xbb0b00 / 0x15e05e8). Rollup 0.1.30: the rack's delay compensation too (round
         // 190hq's heardLatencyMs, as the clock): the block's audio is heard that much later behind latent plugins
         t.dueMs = blockStartMs + heardLatencyMs() + 1000.0 * sample / sampleRate;
-        t.message.sample = sample;
+        t.message.sample = (int) ((blockSample + sample) & 0x7fffffff); // (the stream's sample: Timed's note in the header)
         t.message.size = (std::uint8_t) size;
         std::copy (bytes, bytes + size, t.message.bytes.begin());
         if (! slot.portQueue.push (t))
@@ -217,7 +217,7 @@ void MidiSyncIo::requestPortNotesOff() noexcept
         portNotesOffRequests.fetch_add (1, std::memory_order_release);
 }
 
-void MidiSyncIo::sendNow (Slot& slot, const std::uint8_t* bytes, int size, double dueMs)
+void MidiSyncIo::sendNow (Slot& slot, const std::uint8_t* bytes, int size, double dueMs, std::int64_t deviceSample)
 {
     const auto isDry = dry.load (std::memory_order_relaxed);
     if (slot.device == nullptr && ! isDry)
@@ -226,7 +226,7 @@ void MidiSyncIo::sendNow (Slot& slot, const std::uint8_t* bytes, int size, doubl
         slot.device->sendMessageNow (juce::MidiMessage (bytes, size));
     const auto now = juce::Time::getMillisecondCounterHiRes();
     if (testSink)
-        testSink (slot.name, bytes, size, dueMs, now);
+        testSink (slot.name, bytes, size, dueMs, now, deviceSample);
     if (size >= 2 && (bytes[0] & 0xE0) == 0x80) // (a note on / off: the notes each port device still sounds)
     {
         const auto ch = bytes[0] & 15, key = bytes[1] & 127;
@@ -307,6 +307,7 @@ void MidiSyncIo::deviceStarted (double rate, int bufferSize, int outputLatencySa
     // its samples are due then
     latencyMs = 1000.0 * (bufferSize + std::max (0, outputLatencySamples)) / sampleRate;
     predictedMs = -1.0;
+    blockSample = nextBlockSample = 0;
     for (auto& s : slots)
         s.generator.reset();
 }
@@ -320,6 +321,8 @@ void MidiSyncIo::beginBlock (Transport& transport, double callbackMs, int numSam
     else
         blockStartMs = predictedMs + 0.02 * (callbackMs - predictedMs);
     predictedMs = blockStartMs + 1000.0 * numSamples / sampleRate;
+    blockSample = nextBlockSample;
+    nextBlockSample += std::max (0, numSamples);
 
     // round 190jl: notes off asked for (stop, panic): in each port device's queue, after what was already played
     if (const auto asked = portNotesOffRequests.load (std::memory_order_acquire); asked != portNotesOffSeen)
@@ -497,7 +500,7 @@ void MidiSyncIo::run()
                         if (t.message.size == 0)
                             releasePortNotes (slot); // (a stop / panic marker)
                         else
-                            sendNow (slot, t.message.bytes.data(), (int) t.message.size, t.dueMs);
+                            sendNow (slot, t.message.bytes.data(), (int) t.message.size, t.dueMs, queue == &pendingPort[(std::size_t) i] ? t.message.sample : -1);
                         queue->pop_front();
                         now = juce::Time::getMillisecondCounterHiRes();
                     }
@@ -586,7 +589,7 @@ juce::String MidiSyncIo::portSelfTest (bool& ok)
     std::mutex lock;
     std::vector<Sent> sent;
     MidiSyncIo io;
-    io.testSink = [&] (const std::string& device, const std::uint8_t* bytes, int size, double due, double at) {
+    io.testSink = [&] (const std::string& device, const std::uint8_t* bytes, int size, double due, double at, std::int64_t) {
         const std::lock_guard<std::mutex> g (lock);
         sent.push_back ({ device, { bytes, bytes + size }, due, at });
     };

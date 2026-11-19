@@ -332,6 +332,10 @@ void drawKeycap (juce::Graphics& g, juce::Rectangle<int> r, juce::Colour fill, b
 // Eight step keycaps in a row (the Channel rack's idle steps, two groups of four: `a` then `b`) at `pitch` from `firstCell`,
 // one tile per row instead of eight; `ghost`: the faint outlined steps past a pattern's end (round 190io).
 void drawStepStrip (juce::Graphics& g, juce::Rectangle<int> firstCell, int pitch, juce::Colour a, juce::Colour b, bool ghost);
+// Round 190mh (perf): drawStepStrip's strip where the frame shows the opaque `background` under it (a Channel rack row):
+// on JUCE's software renderer the strip's translucent tile is composed over `background` once, into an opaque image
+// that is copied afterwards (the same pixel blends: the same pixels); elsewhere drawStepStrip as before.
+void drawStepStripOver (juce::Graphics& g, juce::Rectangle<int> firstCell, int pitch, juce::Colour a, juce::Colour b, bool ghost, juce::Colour background);
 // A plate filled top-down from `top` to `bottom` (one colour: equal), rounded `corner` (only on top with `squareBottom`):
 // FL's colour-filled channel buttons and Mixer header bands (round 190io). From a cached tile.
 void fillPlate (juce::Graphics& g, juce::Rectangle<float> r, float corner, juce::Colour top, juce::Colour bottom, bool squareBottom = false);

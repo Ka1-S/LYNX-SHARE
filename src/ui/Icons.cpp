@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <map>
 #include <vector>
 
@@ -1270,17 +1271,18 @@ void IconButton::paintLook (juce::Graphics& g, bool highlighted, bool down)
     g.drawFittedText (text, content.toNearestInt(), icon == Icon::none ? juce::Justification::centred : juce::Justification::centredLeft, 1, 0.8f);
 }
 
-// Round 190ki: whether the FL tiles' bodies come from the parent's atlas (LYNX_TILE_MODE=2, opt-in) or are painted
-// straight (0, the default). The atlas gives the toolbar's own pixels, but Direct2D anti-aliases a later path a little
-// differently when the frame's draw calls change (the Piano roll's 4/4 flag: 8 pixels, up to 44 levels, --paintbench
-// Thief), so it stays off until a pixel-exact frame is not required; it saves ~0.25 ms more per whole frame there.
+// Round 190ki: whether the FL tiles' bodies come from the parent's atlas. LYNX_TILE_MODE=2: everywhere (opt-in on the
+// native renderers), 0: nowhere, unset: on JUCE's software renderer only (round 190mh). The atlas gives the toolbar's own
+// pixels, but Direct2D anti-aliases a later path a little differently when the frame's draw calls change (the Piano
+// roll's 4/4 flag: 8 pixels, up to 44 levels, --paintbench Thief), so it stays opt-in there; it saves ~0.25 ms more per
+// whole frame there.
 namespace
 {
 int& tileModeSetting()
 {
     static int mode = [] {
-        const auto v = juce::SystemStats::getEnvironmentVariable ("LYNX_TILE_MODE", "0").getIntValue();
-        return v == 2 ? 2 : 0;
+        const auto v = juce::SystemStats::getEnvironmentVariable ("LYNX_TILE_MODE", {});
+        return v.isEmpty() ? -1 : v.getIntValue() == 2 ? 2 : 0;
     }();
     return mode;
 }
@@ -1301,11 +1303,17 @@ std::vector<TileAtlasEntry>& tileAtlases()
 
 int IconButton::tileCacheMode() { return tileModeSetting(); }
 
-// JUCE's software renderer (Linux, a software snapshot): the atlas came out 1 level apart at a few corner pixels of the
-// body in --selftest, so it paints straight there (the self-test switches it on to report that difference)
+// JUCE's software renderer (Linux, a software snapshot). Round 190ki's atlas came out 1 level apart at the last column
+// of a button there: JUCE's EdgeTable clamps a path's edges right of its clip to the clip's last column (x = right − 1/256
+// of a pixel, EdgeTable's path constructor), so the backdrop's well that runs on past the button covered that column
+// 255/256 in the atlas (its clip: the button) and fully in a frame whose clip runs on past the button. (Left, top and
+// bottom clip edges change no pixel of a path there.) Round 190mh paints the backdrop into the atlas with the frame's
+// clip edge: the parent's clip when it painted this frame (setFlTileBackdrop's `parentClip`) reaching past the button =
+// the atlas's clip reaches past it too (one pixel in a spare row below the tiles), ending at its edge = the button alone;
+// a clip that ends inside the button (a playhead column) paints it straight.
 static bool& tileCacheOnSoftwareSetting()
 {
-    static bool on = false;
+    static bool on = true;
     return on;
 }
 bool IconButton::tileCacheOnSoftware() { return tileCacheOnSoftwareSetting(); }
@@ -1323,8 +1331,11 @@ IconButton::TileAtlas& IconButton::tileAtlasFor (juce::Component& parent, int bo
         it = std::prev (list.end());
     }
     auto& a = it->atlas;
-    const auto width = parent.getWidth() * scale, height = juce::jmax (bottom, a.image.isNull() ? 0 : a.image.getHeight() / juce::jmax (1, a.scale)) * scale;
-    if (a.image.isNull() || a.scale != scale || a.software != software || a.image.getWidth() != width || a.image.getHeight() < bottom * scale)
+    // (round 190mh: one spare row below the lowest tile, where a software atlas's clip reaches past a button; no button's
+    // region is ever there)
+    const auto rows = juce::jmax (bottom + 1, a.image.isNull() ? 0 : a.image.getHeight() / juce::jmax (1, a.scale));
+    const auto width = parent.getWidth() * scale, height = rows * scale;
+    if (a.image.isNull() || a.scale != scale || a.software != software || a.image.getWidth() != width || a.image.getHeight() < (bottom + 1) * scale)
     {
         static std::uint64_t generations = 0;
         a.image = juce::Image (juce::Image::ARGB, width, height, true,
@@ -1334,6 +1345,34 @@ IconButton::TileAtlas& IconButton::tileAtlasFor (juce::Component& parent, int bo
         a.generation = ++generations;
     }
     return a;
+}
+
+// Round 190mh: an FL tile's fill and its stroked edge as JUCE's software renderer builds them for fillRoundedRectangle (tile,
+// r) and drawRoundedRectangle (tile.reduced (line / 2), r - line / 2, line) at the context scale `contextScale`, kept per
+// (tile, r, line, scale): the tiles of one toolbar share a few sizes. Bit-equal keys only.
+static const std::pair<juce::Path, juce::Path>& flTileBodyPaths (juce::Rectangle<float> tile, float r, float line, float contextScale)
+{
+    struct Entry
+    {
+        float x, y, w, h, r, line, scale;
+        std::pair<juce::Path, juce::Path> paths;
+    };
+    static std::vector<Entry> cache;
+    static const bool registered = ui::registerImageCache ([] { cache.clear(); }); (void) registered;
+    const auto same = [] (float a, float b) { return std::memcmp (&a, &b, sizeof (float)) == 0; };
+    for (const auto& e : cache)
+        if (same (e.x, tile.getX()) && same (e.y, tile.getY()) && same (e.w, tile.getWidth()) && same (e.h, tile.getHeight()) && same (e.r, r)
+            && same (e.line, line) && same (e.scale, contextScale))
+            return e.paths;
+    if (cache.size() >= 32)
+        cache.clear();
+    Entry e { tile.getX(), tile.getY(), tile.getWidth(), tile.getHeight(), r, line, contextScale, {} };
+    e.paths.first.addRoundedRectangle (tile, r);
+    juce::Path edge;
+    edge.addRoundedRectangle (tile.reduced (line * 0.5f), r - line * 0.5f);
+    juce::PathStrokeType (line).createStrokedPath (e.paths.second, edge, {}, contextScale);
+    cache.push_back (std::move (e));
+    return cache.back().paths;
 }
 
 // Round 190jo (design190ia FM-1/FM-2/FM-3, decision (d) with FL's metrics; the Pattern toolbar only): FL's tile. FL's
@@ -1394,6 +1433,18 @@ void IconButton::paintFlTile (juce::Graphics& g, bool highlighted, bool down)
                                                                       snap (b.getBottom() - 0.5f));
         const auto line = std::round (scale) / scale; // one device pixel or more: never a blend
         const auto r = 4.0f;
+        // (round 190mh) JUCE's software renderer: the two paths from a cache, filled as its own fillRoundedRectangle and
+        // drawRoundedRectangle fill them (LowLevelGraphicsContext's defaults: the same Path, stroked with the context's
+        // scale as the extra accuracy, then fillPath with no transform): the same pixels without making them each paint
+        if (dynamic_cast<juce::LowLevelGraphicsSoftwareRenderer*> (&k.getInternalContext()) != nullptr && ui::paintCache())
+        {
+            const auto& paths = flTileBodyPaths (tile, r, line, k.getInternalContext().getPhysicalPixelScaleFactor());
+            k.setColour (fill);
+            k.fillPath (paths.first);
+            k.setColour (edge);
+            k.fillPath (paths.second);
+            return;
+        }
         k.setColour (fill);
         k.fillRoundedRectangle (tile, r);
         k.setColour (edge);
@@ -1408,7 +1459,17 @@ void IconButton::paintFlTile (juce::Graphics& g, bool highlighted, bool down)
     // differently, up to 23 levels at an edge in --selftest.)
     int scale = 0;
     const auto software = dynamic_cast<juce::LowLevelGraphicsSoftwareRenderer*> (&g.getInternalContext()) != nullptr;
-    const auto backdrop = tileCacheMode() != 0 && (! software || tileCacheOnSoftware()) && tileCacheUsable (g, scale) ? tileBackdrop (getBounds()) : 0;
+    const auto mode = tileCacheMode();
+    auto backdrop = mode != 0 && (software ? tileCacheOnSoftware() : mode == 2) && tileCacheUsable (g, scale) ? tileBackdrop (getBounds()) : 0;
+    // (round 190mh) the software renderer: where the parent's clip ended when it painted under the button this frame
+    auto past = false; // (past the button's right edge: else exactly at it)
+    if (backdrop != 0 && software)
+    {
+        const auto clip = tileParentClip != nullptr ? tileParentClip() : juce::Rectangle<int>();
+        if (! clip.intersects (getBounds()) || clip.getRight() < getRight())
+            backdrop = 0;
+        past = clip.getRight() > getRight();
+    }
     if (backdrop == 0)
     {
         drawBody (g);
@@ -1419,14 +1480,25 @@ void IconButton::paintFlTile (juce::Graphics& g, bool highlighted, bool down)
     auto key = mix (mix (mix (0x243f6a8885a308d3ull, fill.getARGB()), edge.getARGB()), (std::uint64_t) scale);
     key = mix (mix (mix (mix (key, (std::uint64_t) (std::uint32_t) getX()), (std::uint64_t) (std::uint32_t) getY()), (std::uint64_t) getWidth()),
                (std::uint64_t) getHeight());
-    key = mix (mix (key, backdrop), software ? 5u : 6u);
+    key = mix (mix (key, backdrop), software ? (past ? 7u : 5u) : 6u);
     auto& atlas = tileAtlasFor (*getParentComponent(), getBottom(), scale, software);
     if (key != atlasKey || atlasGeneration != atlas.generation)
     {
         juce::Graphics k (atlas.image);
         k.addTransform (juce::AffineTransform::scale ((float) scale));
+        if (past) // (the clip's bounds reach a pixel past the button, through the spare row: no edge is clamped in the button)
+        {
+            juce::RectangleList<int> region (getBounds());
+            region.addWithoutMerging ({ getRight(), atlas.image.getHeight() / scale - 1, 1, 1 });
+            k.reduceClipRegion (region);
+        }
+        else
+            k.reduceClipRegion (getBounds());
+        {
+            const juce::ScopedValueSetter<bool> inAtlas (paintingTileAtlasFlag(), true); // (the parent's paint into the atlas: not a frame's)
+            getParentComponent()->paint (k);
+        }
         k.reduceClipRegion (getBounds());
-        getParentComponent()->paint (k);
         k.setOrigin (getPosition());
         drawBody (k);
         atlasKey = key;
@@ -1445,9 +1517,16 @@ void IconButton::paintFlTile (juce::Graphics& g, bool highlighted, bool down)
     drawGlyph (g);
 }
 
-void IconButton::setFlTileBackdrop (std::function<std::uint64_t (juce::Rectangle<int>)> stamp)
+bool& IconButton::paintingTileAtlasFlag()
+{
+    static bool painting = false;
+    return painting;
+}
+
+void IconButton::setFlTileBackdrop (std::function<std::uint64_t (juce::Rectangle<int>)> stamp, std::function<juce::Rectangle<int>()> parentClip)
 {
     tileBackdrop = std::move (stamp);
+    tileParentClip = std::move (parentClip);
     atlasKey = 0; // (its region of the atlas is drawn again)
     repaint();
 }
@@ -1460,6 +1539,9 @@ bool IconButton::tileCacheUsable (juce::Graphics& g, int& scale) const
         return false;
     auto* parent = getParentComponent();
     if (parent == nullptr || getAlpha() < 1.0f || parent->getAlpha() < 1.0f || isTransformed() || parent->isTransformed())
+        return false;
+    // (round 190mh) the parent at its window's origin: the atlas's paths then get the frame's own float coordinates
+    if (auto* top = parent->getTopLevelComponent(); top != parent && top->getLocalPoint (parent, juce::Point<int>()) != juce::Point<int>())
         return false;
     const auto s = g.getInternalContext().getPhysicalPixelScaleFactor();
     const auto whole = std::round (s);
@@ -1573,6 +1655,8 @@ juce::String flTileCacheSelfTest()
     {
         void paint (juce::Graphics& g) override
         {
+            if (! IconButton::paintingTileAtlas())
+                clip = g.getClipBounds();
             g.fillAll (colour::bg3);
             const auto well = juce::Rectangle<float> (2.0f, 3.0f, 70.5f, 38.0f);
             g.setColour (colour::bg1.withAlpha (0.55f));
@@ -1580,6 +1664,7 @@ juce::String flTileCacheSelfTest()
             g.setColour (colour::border);
             g.drawRoundedRectangle (well.reduced (0.5f), 6.0f, 1.0f);
         }
+        juce::Rectangle<int> clip; // (round 190mh: the tiles' parentClip)
     };
     Backdrop parent;
     parent.setSize (132, 46);
@@ -1597,11 +1682,14 @@ juce::String flTileCacheSelfTest()
         parent.addAndMakeVisible (*b);
         x += 33; // (the first and the third over the well's rounded ends)
     }
-    const auto render = [&parent] (int scale, bool native) {
+    // (round 190mh) `clip`: the frame's region (empty: all), e.g. a button's own repaint or a playhead column
+    const auto render = [&parent] (int scale, bool native, juce::Rectangle<int> clip = {}) {
         juce::Image image (juce::Image::ARGB, parent.getWidth() * scale, parent.getHeight() * scale, true,
                            native ? (const juce::ImageType&) juce::NativeImageType() : (const juce::ImageType&) juce::SoftwareImageType());
         juce::Graphics g (image);
         g.addTransform (juce::AffineTransform::scale ((float) scale));
+        if (! clip.isEmpty())
+            g.reduceClipRegion (clip);
         parent.paintEntireComponent (g, true);
         return image;
     };
@@ -1630,8 +1718,9 @@ juce::String flTileCacheSelfTest()
         juce::FileOutputStream out (file);
         juce::PNGImageFormat().writeImageToStream (image, out);
     };
-    // the native renderer: the cached bodies must give the straight pixels; the software renderer (which paints straight
-    // in the app) is only reported (stderr). Where the native kind is the software renderer (Linux), nothing to compare.
+    // the cached bodies must give the straight pixels on JUCE's software renderer (round 190mh: the atlas is on there) and
+    // on Direct2D; CoreGraphics (opt-in) is only reported (stderr). Where the native kind is the software renderer
+    // (Linux), it is compared once.
     const auto nativeIsSoftware = [] {
         juce::Image probe (juce::Image::ARGB, 4, 4, true, juce::NativeImageType());
         juce::Graphics g (probe);
@@ -1651,36 +1740,46 @@ juce::String flTileCacheSelfTest()
             for (auto* b : { &rest, &on, &off, &corner })
                 b->setFlTileBackdrop (nullptr);
             const auto straight = render (scale, native), again = render (scale, native);
+            // (round 190mh) frames whose clip ends at a button's right edge (its own repaint), inside one (a column: painted
+            // straight) and past one, painted straight first
+            const juce::Rectangle<int> clips[] { rest.getBounds(), { 20, 0, 30, parent.getHeight() }, { 70, 0, 40, parent.getHeight() } };
+            std::vector<juce::Image> straightClipped;
+            for (const auto& c : clips)
+                straightClipped.push_back (render (scale, native, c));
             for (auto* b : { &rest, &on, &off, &corner })
-                b->setFlTileBackdrop ([] (juce::Rectangle<int>) { return (std::uint64_t) 42; });
+                b->setFlTileBackdrop ([] (juce::Rectangle<int>) { return (std::uint64_t) 42; }, [&parent] { return parent.clip; });
             const auto made = render (scale, native), blitted = render (scale, native); // (the first paint fills the atlas)
+            const auto restUsed = rest.atlasKey != 0;
+            int worst = 0, worstAgain = 0;
+            auto n = compare (straight, made, worst) + compare (straight, blitted, worst);
+            for (std::size_t c = 0; c < straightClipped.size(); ++c)
+                n += compare (straightClipped[c], render (scale, native, clips[c]), worst) + compare (straight, render (scale, native), worst);
             tileCacheOnSoftwareSetting() = softwareBefore;
-            if (rest.atlasKey == 0)
+            if (! restUsed)
             {
                 tileModeSetting() = modeBefore;
                 return "ERROR the FL tile cache was not used (" + tag + ")";
             }
-            int worst = 0, worstAgain = 0;
-            const auto n = compare (straight, made, worst) + compare (straight, blitted, worst);
             const auto nAgain = compare (straight, again, worstAgain);
             save (straight, "tile-" + tag + "-straight");
             save (made, "tile-" + tag + "-cached");
             save (IconButton::tileAtlasFor (parent, 35, scale, ! native).image, "tile-" + tag + "-atlas");
             // (rollup 0.1.30 step 7: the exact match is required of Direct2D, which round 190ki measured the atlas on;
-            // macOS's CoreGraphics came out 1 level apart at 2 pixels of native-x1 on CI, so there, as on the software
-            // renderer, the difference is only reported — the atlas is opt-in, LYNX_TILE_MODE=2, and the app paints straight)
+            // macOS's CoreGraphics came out 1 level apart at 2 pixels of native-x1 on CI, so there the difference is only
+            // reported — the atlas is opt-in there, LYNX_TILE_MODE=2, and the app paints straight. Round 190mh: required of
+            // JUCE's software renderer too, where the atlas is on by default)
            #if JUCE_WINDOWS
-            constexpr bool exactRequired = true;
+            constexpr bool nativeExactRequired = true;
            #else
-            constexpr bool exactRequired = false;
+            constexpr bool nativeExactRequired = false;
            #endif
             if (n > 0 || nAgain > 0)
-                (native && exactRequired ? failures : info) << tag << ": " << n << " pixels differ, up to " << worst << " levels (straight twice: " << nAgain << ", "
-                                           << worstAgain << "); ";
+                (! native || nativeExactRequired ? failures : info) << tag << ": " << n << " pixels differ, up to " << worst << " levels (straight twice: " << nAgain
+                                                                    << ", " << worstAgain << "); ";
         }
     tileModeSetting() = modeBefore;
     if (info.isNotEmpty())
-        std::fprintf (stderr, "fl tiles off Direct2D (painted straight in the app): %s\n", info.toRawUTF8());
+        std::fprintf (stderr, "fl tiles on CoreGraphics (painted straight in the app): %s\n", info.toRawUTF8());
     if (failures.isNotEmpty())
         return "ERROR cached FL tiles differ from the tiles painted straight: " + failures;
     return "OK";
