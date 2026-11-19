@@ -63,6 +63,7 @@ public:
 
     // --bandlabshot
     void selectForSnapshot (int index);
+    void previewLookForSnapshot (int index); // round 190mr (DS-47): row `index` drawn as previewing (no sound)
     int entryCountForSnapshot() const noexcept { return (int) list.size(); }
     bool openForSnapshot (int index);
 

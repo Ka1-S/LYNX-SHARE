@@ -6494,6 +6494,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             dragClip = hit;
             dragIndices = { hit };
             drag = fade == 1 ? Drag::fadeIn : Drag::fadeOut;
+            crossPair = -1; // (round 190mr, DL-68: no crossfade drag-over yet)
             postDragHint();
             return;
         }
@@ -7094,6 +7095,12 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
             // them (FL 2026's hint "Hold Alt to snap", round 190jz); on, Alt lets them move freely
             const auto snapFade = snapOn && (EditorGlobals::get().snapFadeHandles != e.mods.isAltDown());
             const auto tick = snapFade ? snap (xToTick (e.x) + gridTicks() / 2.0, true) : (std::int64_t) xToTick (e.x);
+            if (crossfadeDragOver (tick)) // round 190mr (DL-68): Live's crossfade by dragging over the neighbour's edge
+            {
+                postDragHint();
+                repaint();
+                return;
+            }
             auto length = drag == Drag::fadeIn ? tick - clip.start : clip.end() - tick;
             length = juce::jlimit<std::int64_t> (0, clip.length, length);
             const auto in = drag == Drag::fadeIn;
@@ -11415,6 +11422,84 @@ juce::PopupMenu PlaylistComponent::fitToTempoMenu (int index, std::shared_ptr<co
     fit.addSeparator();
     fit.addItem (tr ("Original speed (no stretch)"), true, channel.sampler.stretchBeats <= 0.0f, [fitTo, kp = channel.sampler.keepPitch] { fitTo (0.0f, kp); });
     return fit;
+}
+
+// Round 190mr (DL-68; capture 190mr B1, live-crossfade-drag.png): Live's Arrangement makes a crossfade when a fade
+// handle is dragged over the edge of the adjacent clip — the fade-out handle of a clip whose neighbour starts where it
+// ends, dragged right, or the neighbour's fade-in handle dragged left. The clip goes on under its neighbour with audio
+// from beyond its edge (none there: nothing happens, as in Live) and the overlap becomes a crossfade (both fades = the
+// overlap, ClipOps createCrossfade). The Clip-launch layout only (Live's look); FL's handles stop at the clip's edge.
+// Returns true while the drag is such a crossfade (the handle's own fade is then not changed).
+bool PlaylistComponent::crossfadeDragOver (std::int64_t tick)
+{
+    if (! theme::livelook::active() || dragClip < 0)
+        return false;
+    const auto& song = engine.getSong();
+    const auto out = drag == Drag::fadeOut;
+    if (crossPair < 0)
+    {
+        // the pair is found once per drag, when the handle first passes the clip's edge
+        const auto& c = song.playlist[(std::size_t) dragClip];
+        if (c.kind != ClipKind::audio || (out ? tick <= c.end() : tick >= c.start))
+            return false;
+        for (int i = 0; i < (int) song.playlist.size(); ++i)
+        {
+            const auto& o = song.playlist[(std::size_t) i];
+            if (i != dragClip && o.kind == ClipKind::audio && o.track == c.track && (out ? o.start == c.end() : o.end() == c.start))
+            {
+                crossPair = i;
+                crossOriginals = { out ? c : o, out ? o : c };
+                break;
+            }
+        }
+        if (crossPair < 0)
+            return false;
+    }
+    const auto& a = crossOriginals[0];
+    const auto& b = crossOriginals[1];
+    const auto boundary = b.start;
+    // how far the moving clip can go on: audio left in its file past its end (a), or before its start (b)
+    const auto room = [this, &song] (const Clip& clip, bool after) -> std::int64_t {
+        if (clip.channel < 0 || clip.channel >= (int) song.channels.size())
+            return 0;
+        const auto& channel = song.channels[(std::size_t) clip.channel];
+        const auto sample = engine.getSampleLibrary().load (juce::String::fromUTF8 (channel.samplePath.c_str()));
+        if (sample == nullptr || sample->frames() == 0 || sample->sampleRate <= 0.0 || clipops::playsBackwards (channel, clip))
+            return 0;
+        const auto span = clipops::clipSpan (channel, sample);
+        const auto perTick = clipops::framesPerTick (channel, clip, (double) span.frames, sample->sampleRate, song.bpm);
+        if (perTick <= 0.0)
+            return 0;
+        return after ? juce::jmax<std::int64_t> (0, (std::int64_t) ((double) span.frames / perTick) - clip.offset - clip.length)
+                     : juce::jmax<std::int64_t> (0, clip.offset);
+    };
+    const auto wanted = out ? tick - boundary : boundary - tick;
+    const auto limit = juce::jmin (out ? room (a, true) : room (b, false), (out ? b.length : a.length) - 1);
+    const auto overlap = juce::jlimit<std::int64_t> (0, juce::jmax<std::int64_t> (0, limit), wanted);
+    const auto pair = crossPair, moving = dragClip;
+    engine.editSong ([this, pair, moving, out, overlap] (Song& s) {
+        if (moving >= (int) s.playlist.size() || pair >= (int) s.playlist.size())
+            return;
+        auto& m = s.playlist[(std::size_t) moving];
+        auto& n = s.playlist[(std::size_t) pair];
+        m = out ? crossOriginals[0] : crossOriginals[1];
+        n = out ? crossOriginals[1] : crossOriginals[0];
+        if (overlap <= 0)
+            return;
+        if (out)
+            m.length += overlap; // a goes on under b
+        else
+        {
+            m.start -= overlap; // b starts earlier, under a
+            m.offset -= overlap;
+            m.length += overlap;
+        }
+        clipops::createCrossfade (out ? m : n, out ? n : m);
+    });
+    // back to the clip's own edge: the drag is a plain fade again
+    if (overlap <= 0 && wanted <= 0)
+        crossPair = -1;
+    return overlap > 0 || wanted > 0;
 }
 
 // The audio clip menu's "Detect tempo" (round 190dz: out of buildClipMenu; round 190ey: FL's dialog)

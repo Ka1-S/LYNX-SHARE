@@ -28,6 +28,20 @@ bool save (const Song& song, const juce::File& file, juce::String& error);
 // `file` named as a project: "beat.v2" -> "beat.v2.lynx" (File::withFileExtension would make it "beat.lynx").
 juce::File withProjectExtension (const juce::File& file);
 std::optional<Song> load (const juce::File& file, juce::String& error, juce::String* savedBy = nullptr);
+// Round 190mr (DF-141, owner decision F3): the window layout saved with a project, as FL keeps its windows' places in
+// the .flp. View only, so it stays outside the Song: a save is given it, a load hands it back. `style` =
+// layoutstyle::Style it belongs to; `text` = the workspace's layout text ("" = none: every project before this round).
+struct WindowLayout
+{
+    int style = 0;
+    juce::String text;
+};
+bool save (const Song& song, const juce::File& file, juce::String& error, const WindowLayout& layout);
+std::optional<Song> load (const juce::File& file, juce::String& error, juce::String* savedBy, WindowLayout* layout);
+// the project text with the layout added at the end of its root object (unchanged when the layout is empty)
+juce::String withWindowLayout (const juce::String& json, const WindowLayout& layout);
+// the layout a project text holds (empty text: none)
+WindowLayout windowLayoutOf (const juce::var& root);
 
 // One mixer track as stored in a project (sends, input and effects included).
 juce::var mixerTrackToVar (const MixerTrack& track);

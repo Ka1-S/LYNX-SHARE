@@ -103,7 +103,7 @@ TEST (settings190bx_options_file)
         ++lines;
         at = end;
     }
-    CHECK (lines == 9);
+    CHECK (lines == 9 + 5); // (round 190mr: + history on undo, data size warning, click-and-hold, both buttons, layout with project)
     CHECK (o.interpolation == 7 && ! o.multithreadGenerators && ! o.multithreadMixer && ! o.smartDisable && o.autoCloseDevice);
     CHECK (o.restoreStateAfterSolo && ! o.autoNameChannels && ! o.readSampleTempo && o.historyNewestFirst);
 

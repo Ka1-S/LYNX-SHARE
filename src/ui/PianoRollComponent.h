@@ -87,6 +87,13 @@ public:
 
     // The key map's pianoRoll.* actions (tool dialogs, zoom presets). Returns false for unknown ids.
     bool runAction (const std::string& id);
+    // round 190mr (DE-63): a left press at `at` held still, its ring as after `elapsedMs`, its action now, the release
+    void pressForSnapshot (juce::Point<int> at, juce::ModifierKeys mods = juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier));
+    void holdRingForSnapshot (int elapsedMs) { holdSince = juce::Time::getMillisecondCounter() - (juce::uint32) elapsedMs; repaint(); }
+    void fireHoldForSnapshot() { holdReadsMouse = false; holdFired (holdSerial); holdReadsMouse = true; }
+    void releaseForSnapshot (juce::Point<int> at);
+    bool holdPendingForSnapshot() const noexcept { return hold != Hold::none; }
+    std::int64_t gridTicksForSnapshot() const { return gridTicks(); }
     juce::PopupMenu moreMenuForSnapshot() { return moreMenu(); } // --userfixshot190ib (issue #183's item)
     // The shortcut text of a key map action for menus ("\tCtrl+Q"; empty when unbound), set by the main window.
     static inline std::function<juce::String (const std::string& id)> shortcutText;
@@ -664,6 +671,23 @@ private:
     int lastDrumKey = -1;
     bool resizeFromLeft = true;       // the left edge of a note resizes it (Ctrl+Alt+Home turns it off)
     bool startedOnEmpty = false, erasedSomething = false, holdExpired = false;
+    // Round 190mr (DE-63; capture 190mr A1.2): FL's click-and-hold functions (F10 › General › Input › "Click-and-hold &
+    // special gesture functions", core/FlSettings.h clickHold, off as in FL). A press that stays still: from 390 ms a
+    // thin ring grows clockwise from 12 o'clock at the mouse, and at 750 ms — on a note: a clone one grid step later is
+    // what the mouse drags; on a note just added: slide, then every 750 ms porta, plain, slide…; at the resize cursor
+    // between two touching notes: they are glued (and selected). A one-shot timer per press; the ring repaints on the
+    // view's own timer only while a hold is pending.
+    enum class Hold { none, copy, cycle, glue };
+    Hold hold = Hold::none;
+    int holdSerial = 0, holdStep = 0, glueA = -1, glueB = -1;
+    juce::Point<int> holdDownAt, holdRingAt;
+    juce::uint32 holdSince = 0;
+    bool holdRing = false; // (the ring shows until the first action)
+    static constexpr int holdMs = 750, holdRingFromMs = 390;
+    void armHold (Hold kind, juce::Point<int> screenAt, bool ring = true);
+    bool holdReadsMouse = true; // (--details190mrshot: the hold fires without a real mouse)
+    void holdFired (int serial);
+    juce::Rectangle<int> holdRingArea() const { return juce::Rectangle<int> (20, 20).withCentre (holdRingAt); }
     juce::uint32 createdAt = 0;       // when the last click created a note (a double click there is not an edit)
     std::int64_t nextPaintTick = 0, paintLength = 0;
     bool muteTarget = false;

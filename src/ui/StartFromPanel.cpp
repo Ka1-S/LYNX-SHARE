@@ -118,7 +118,9 @@ public:
         // round 190jp (design190ia SG-19, BandLab's square play buttons): a ▶ icon (■ while it plays, … while it renders);
         // a row with nothing to play shows none
         play.setVisible (! known || e.playable);
-        play.setIcon (owner.previewing == index ? Icon::stop : owner.rendering == index ? Icon::more : Icon::play);
+        // round 190mr (DS-47, capture 190mr C2 bl-kit-preview.png): BandLab's preview button shows ⏸ while it plays (no ring
+        // or bar) and ▶ again when the preview ends by itself
+        play.setIcon (owner.previewing == index ? Icon::pause : owner.rendering == index ? Icon::more : Icon::play);
         play.setTitle (owner.previewing == index ? tr ("Stop") : tr ("Play"));
         repaint();
     }
@@ -260,6 +262,13 @@ bool StartFromPanel::openForSnapshot (int index)
         return false;
     open (index);
     return true;
+}
+
+void StartFromPanel::previewLookForSnapshot (int index)
+{
+    previewing = index;
+    for (auto& r : rows)
+        r->update();
 }
 
 void StartFromPanel::stopPreview()

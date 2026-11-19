@@ -128,6 +128,8 @@
 #include "ui/LiveRemoteUi.h"
 #include "ui/GamepadInput.h"
 #include "ui/SettingsPages.h"
+#include "ui/ExtendedHintPanel.h"
+#include "core/FlSettings.h"
 #include "ui/OtherAppsExport.h"
 #include "ui/TimerWhileShowing.h"
 #include "ui/MixerBasicsCheck.h"
@@ -2543,6 +2545,15 @@ public:
             const auto i = args.indexOf ("--capfix190jjshot");
             const auto set = i + 3 < args.size() && ! args[i + 3].startsWith ("--") ? args[i + 3].unquoted() : juce::String();
             runCapfix190jjShot (args[i + 1].unquoted(), args[i + 2].unquoted(), set);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--details190mrshot"))
+        {
+            // LYNX --details190mrshot prefix project.flp: round 190mr off screen (src/DetailsShot190mr.inc)
+            const auto i = args.indexOf ("--details190mrshot");
+            setApplicationReturnValue (runDetailsShot190mr (args[i + 1].unquoted(), i + 2 < args.size() ? args[i + 2].unquoted() : juce::String()) ? 0 : 1);
             quit();
             return;
         }
@@ -16702,6 +16713,7 @@ private:
 #include "DetailsShot190mf.inc" // round 190mf
 #include "DetailsShot190mk.inc" // round 190mk
 #include "DetailsShot190mp.inc" // round 190mp
+#include "DetailsShot190mr.inc" // round 190mr
     // --trackautoshot190gz (round 190gz): see the dispatch above
     bool runTrackAutoShot190gz (const juce::String& prefix)
     {

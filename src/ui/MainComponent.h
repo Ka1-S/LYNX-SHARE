@@ -21,6 +21,7 @@
 #include "core/ValueMath.h"
 #include "engine/AudioEngine.h"
 #include "engine/MidiFileIo.h"
+#include "engine/ProjectFile.h"
 #include "ui/BrowserComponent.h"
 #include "ui/MapMode.h"
 #include "ui/Icons.h"
@@ -168,6 +169,23 @@ public:
     void showReferenceMatch();
     LyricsPanel* getLyricsPanelForSnapshot(); // (docked, made if needed)
     void commitSongNotes(); // what is being typed in the Lyrics / Notes panel reaches the project now (before a save)
+    // Round 190mr (DF-141, owner F3): the window layout goes into the project file with every save (view only: not part
+    // of the Song), and a project that has one opens with it (Settings › General › "Load the window layout saved with a
+    // project")
+    ProjectFile::WindowLayout currentWindowLayout() const;
+    void applyProjectWindowLayout (const ProjectFile::WindowLayout& layout);
+    bool layoutInSaves = false; // (--details190mrshot: the off-screen window keeps its layout in saves too)
+    void warnIfProjectTooBig (const juce::File& file); // round 190mr (DF-147)
+    // round 190mr (DF-34): something dragged inside LYNX over a window button shows that window in front (FL's toolbar)
+    void revealPanelUnderDrag();
+    int dragRevealPanel = -1;
+    // round 190mr (DF-49): FL's Extended Hint Panel (View › Toolbars › Hint bar; ui/ExtendedHintPanel.h), off by default;
+    // its place is kept as an offset from the desktop's lower left (−1: FL's corner)
+    std::unique_ptr<juce::Component> extendedHint;
+    juce::Point<int> extendedHintOffset { -1, -1 };
+    bool showExtendedHintAfterLoad = false;
+    void showExtendedHint (bool on);
+    void placeExtendedHint();
     juce::PopupMenu getKeyMenuForSnapshot() { return makeKeyMenu(); } // --simpleshot (round 184a S11)
     // --uiperf (round 173f): the default layout with these panels shown too (the reporter's Channel Rack + Mixer)
     void showPanelsForSnapshot (std::initializer_list<workspace::Panel> panels);
@@ -264,6 +282,13 @@ public:
     juce::PopupMenu getMultilinkMenuForSnapshot();
     PlaylistComponent& getPlaylistForSnapshot() { return playlist; }
     juce::PopupMenu tempoMenuForSnapshot() { return tempoDisplay.buildMenu(); } // (round 190mp, DF-16)
+    // round 190mr (--details190mrshot): the Extended Hint Panel, saves that keep the layout, the undo key, the drag reveal
+    void showExtendedHintForSnapshot (bool on) { showExtendedHint (on); }
+    juce::Component* extendedHintForSnapshot() const noexcept { return extendedHint.get(); }
+    void keepLayoutInSavesForSnapshot() { layoutInSaves = true; }
+    juce::String layoutTextForSnapshot() const { return workspace.getLayoutText(); }
+    void undoForSnapshot() { undoRedo (false); }
+    juce::Component& panelButtonForSnapshot (workspace::Panel p) { return panelButtons[(std::size_t) p]; }
     juce::Component& getRackViewportForSnapshot() { return rackViewport; }
     std::unique_ptr<juce::Component> makeQuickAddForSnapshot();
     PatternPicker& getPickerForSnapshot() { return picker; }

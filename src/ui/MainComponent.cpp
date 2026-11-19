@@ -100,6 +100,7 @@
 #include "ui/TouchKeyboard.h"
 #include "engine/MidiFileIo.h"
 #include "engine/ProjectFile.h"
+#include "ui/ExtendedHintPanel.h"
 #include "engine/ProjectDowngrade.h"
 #include "engine/ProjectPackage.h"
 #include "engine/SessionPack.h"
@@ -279,6 +280,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     {
         engine.getRollingLog().setEnabled (true); // on by default, as in FL (Tools › Audio logger)
         loadUiSettings();
+        if (std::exchange (showExtendedHintAfterLoad, false)) // round 190mr (DF-49)
+            showExtendedHint (true);
         // the start-up song follows Options › Mixer too (round 163) and the automatic crossfades of new projects (166e)
         engine.setSong (makeNewProject());
         skin::onStyleSettingsChanged = [safe = juce::Component::SafePointer<MainComponent> (this)] { // an editor's own style was picked
@@ -1591,6 +1594,7 @@ void MainComponent::resized()
         }
     }
     layoutUnderToolbar();
+    placeExtendedHint(); // round 190mr (DF-49)
 }
 
 void MainComponent::layoutUnderToolbar()
@@ -1742,6 +1746,8 @@ juce::PopupMenu MainComponent::makeToolbarMenu()
             setToolbarLayout (layout);
         });
     }
+    // FL 2026's View › Toolbars › "Hint bar" (round 190mr, DF-49, capture 190mr A2): the floating Extended Hint Panel
+    menu.addItem (tr ("Hint bar (extended hint panel)"), true, extendedHint != nullptr, [this] { showExtendedHint (extendedHint == nullptr); });
 
     menu.addSeparator();
     menu.addItem (tr ("Show detected MIDI chords near the hint bar"), true, chordShowNearHint, [this] {
@@ -1859,6 +1865,14 @@ void MainComponent::undoRedo (bool redo)
         engine.redo();
     else
         engine.undo();
+    // FL's General › "Show undo history in the browser when undoing changes" (off as in FL; round 190mr, DF-135): the
+    // Browser shows Current project › History on an undo
+    if (! redo && flsettings::options().historyOnUndo.load())
+    {
+        if (! workspace.isPanelVisible (Panel::browser))
+            workspace.show (Panel::browser);
+        browser.showHistory();
+    }
     ui::Hint h;
     h.text = (redo ? tr ("Redone: {0}", { tr (label.text, { juce::String::fromUTF8 (label.arg.c_str()) }) })
                    : tr ("Undone: {0}", { tr (label.text, { juce::String::fromUTF8 (label.arg.c_str()) }) }));
@@ -2985,6 +2999,14 @@ void MainComponent::loadUiSettings()
             ChannelRackComponent::selectFirstChannelWithNotes = on;
         else if (key == "prPaintMode") // FL's PRPaintMode (round 189o)
             PianoRollComponent::monophonicPainting = on;
+        else if (key == "extendedHint") // round 190mr (DF-49): FL's Extended Hint Panel and its place
+            showExtendedHintAfterLoad = on;
+        else if (key == "extendedHintAt")
+        {
+            const auto xy = juce::StringArray::fromTokens (line.fromFirstOccurrenceOf ("=", false, false), ",", {});
+            if (xy.size() == 2)
+                extendedHintOffset = { xy[0].getIntValue(), xy[1].getIntValue() };
+        }
         else if (key == "altMeterScale") // round 190lx (DF-61): FL's "Alternate meter scale"
             meterscale::alternate() = on;
         else if (key == "prPreviewPlaying") // issue #183: the Piano roll's "Preview notes while playing" (off)
@@ -3390,6 +3412,8 @@ void MainComponent::saveUiSettings()
                                       + "\nsampleAccurateAutomation=" + juce::String (sampleAccurateAutomation() ? 1 : 0)
                                       + "\ndetachNewPlugins=" + juce::String (engine.detachesNewPlugins() ? 1 : 0)
                                       + "\nautoSelectLinked=" + juce::String (ChannelRackComponent::autoSelectLinked ? 1 : 0)
+                                      + "\nextendedHint=" + juce::String (extendedHint != nullptr ? 1 : 0)
+                                      + "\nextendedHintAt=" + juce::String (extendedHintOffset.x) + "," + juce::String (extendedHintOffset.y)
                                       + "\neditorsInMain=" + juce::String (editorsInMainWindowSetting() ? 1 : 0)
                                       + "\nmuteRemovedSteps=" + juce::String (ChannelRackComponent::muteRemovedSteps ? 1 : 0)
                                       + "\nrackMixerSelectors=" + juce::String (ChannelRackComponent::showMixerSelectors ? 1 : 0)
@@ -5101,6 +5125,94 @@ void MainComponent::commitSongNotes()
         static_cast<LyricsPanel&> (*lyricsDock).commit();
     if (auto* panel = dynamic_cast<LyricsPanel*> (lyricsWindowPanel.getComponent()))
         panel->commit();
+}
+
+// FL's General › Hints and warnings › "Project data size warning" (round 190mr, DF-147): a project saved larger than the
+// chosen size says so once per save (FL: plugins that keep sample data in the project make it big). Off = "Don't warn me".
+void MainComponent::warnIfProjectTooBig (const juce::File& file)
+{
+    const auto limit = flsettings::options().projectSizeWarnMb.load();
+    const auto bytes = (long long) file.getSize();
+    if (! flsettings::projectTooBig (bytes, limit))
+        return;
+    platform::testModeLog ("project data size warning");
+    if (platform::testMode())
+        return;
+    juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Project data size warning"),
+                                            tr ("{0} was saved at {1} MB, more than the {2} MB set in Settings › General › Project data size "
+                                                "warning. Audio kept inside the project (recordings in the audio editor, sliced samples) "
+                                                "makes it large; File › Export project with samples keeps such audio as files instead.",
+                                                { file.getFileName(), juce::String ((double) bytes / (1024.0 * 1024.0), 1), juce::String (limit) }));
+}
+
+// FL's toolbar (manual, Toolbar shortcut icons: "drag a sample onto the Channel Rack button to automatically reveal it";
+// round 190mr, DF-34): while something is dragged inside LYNX (a Browser file, a clip, a channel), the window button under
+// it shows its window in front, once each time the drag enters a button. Nothing is read while no drag runs.
+void MainComponent::showExtendedHint (bool on)
+{
+    if (on == (extendedHint != nullptr))
+        return;
+    if (! on)
+        extendedHint = nullptr;
+    else
+    {
+        auto panel = std::make_unique<ui::ExtendedHintPanel>();
+        panel->onMoved = [this] (juce::Point<int> at) {
+            extendedHintOffset = { at.x - workspace.getX(), workspace.getBottom() - (at.y + ui::ExtendedHintPanel::panelHeight) };
+            saveUiSettings();
+        };
+        panel->setHint (hintBar.getHint(), false);
+        addAndMakeVisible (*panel);
+        extendedHint = std::move (panel);
+        placeExtendedHint();
+    }
+    saveUiSettings();
+}
+
+void MainComponent::placeExtendedHint()
+{
+    if (extendedHint == nullptr)
+        return;
+    // FL's corner: the panel's left end just past the window's edge, its bottom on the desktop's
+    const auto offset = extendedHintOffset.x < -1000 || extendedHintOffset.y < 0 ? juce::Point<int> (-4, 2) : extendedHintOffset;
+    extendedHint->setTopLeftPosition (workspace.getX() + offset.x, workspace.getBottom() - offset.y - ui::ExtendedHintPanel::panelHeight);
+    extendedHint->toFront (false);
+}
+
+void MainComponent::revealPanelUnderDrag()
+{
+    if (! isDragAndDropActive())
+    {
+        dragRevealPanel = -1;
+        return;
+    }
+    const auto at = juce::Desktop::getMousePosition();
+    auto over = -1;
+    for (int i = 0; i < workspace::panelCount; ++i)
+        if (const auto& b = panelButtons[(std::size_t) i]; b.isShowing() && b.getScreenBounds().contains (at))
+            over = i;
+    if (over == std::exchange (dragRevealPanel, over) || over < 0)
+        return;
+    workspace.show ((Panel) over);
+    platform::testModeLog ("drag revealed panel " + juce::String (over));
+}
+
+ProjectFile::WindowLayout MainComponent::currentWindowLayout() const
+{
+    if (! persistent && ! layoutInSaves) // (the command-line modes: no layout of their own to keep)
+        return {};
+    return { (int) layoutStyle, workspace.getLayoutText() };
+}
+
+void MainComponent::applyProjectWindowLayout (const ProjectFile::WindowLayout& layout)
+{
+    // FL opens a project with the windows where they were saved; LYNX does so for the layout style the project was saved
+    // in (each style keeps a layout of its own), and only when the option is on (on, as FL)
+    if ((! persistent && ! layoutInSaves) || layout.text.isEmpty() || layout.style != (int) layoutStyle
+        || ! flsettings::options().projectWindowLayout.load())
+        return;
+    if (workspace.applyLayoutText (layout.text))
+        platform::testModeLog ("project window layout applied");
 }
 
 void MainComponent::refreshSongNotes()
@@ -7082,6 +7194,7 @@ void MainComponent::timerCallback()
     }
     if (engine.isStepEdit())
         applyStepEdit();
+    revealPanelUnderDrag(); // round 190mr (DF-34)
 
     if (engine.isModified() != lastModified)
     {
@@ -7260,6 +7373,8 @@ void MainComponent::timerCallback()
         }
 
         hintBar.setHint (hint, live && hint.value.isNotEmpty());
+        if (auto* panel = static_cast<ui::ExtendedHintPanel*> (extendedHint.get())) // round 190mr (DF-49)
+            panel->setHint (hintBar.getHint(), live && hint.value.isNotEmpty());
         if (detailView != nullptr && detailView->isShowing()) // (round 190jn: Live's Info View; repaints only on a change)
             detailView->setInfoHint (hint);
         if (hoverValues)
@@ -7585,11 +7700,12 @@ void MainComponent::autosave()
         engine.capturePluginStates();
     }
     auto copy = std::make_shared<Song> (engine.getSong());
+    auto layout = currentWindowLayout();
     const auto file = newBackupFile (folder, stem, safety::BackupKind::autosaved);
     autosaveRunning->store (true);
-    juce::Thread::launch ([copy, file, running = autosaveRunning, safe = juce::Component::SafePointer<MainComponent> (this), stem] {
+    juce::Thread::launch ([copy, layout = std::move (layout), file, running = autosaveRunning, safe = juce::Component::SafePointer<MainComponent> (this), stem] {
         juce::String error;
-        const auto ok = ProjectFile::save (*copy, file, error);
+        const auto ok = ProjectFile::save (*copy, file, error, layout);
         running->store (false);
         juce::MessageManager::callAsync ([safe, ok, error, stem] {
             if (safe == nullptr)
@@ -7667,7 +7783,7 @@ void MainComponent::saveNewVersion()
     const auto file = folder.getChildFile (juce::String::fromUTF8 (name.c_str()) + ProjectFile::extension);
     juce::String error;
     engine.capturePluginStates();
-    if (! ProjectFile::save (engine.getSong(), file, error))
+    if (! ProjectFile::save (engine.getSong(), file, error, currentWindowLayout()))
     {
         juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not save"), error);
         return;
@@ -8039,7 +8155,7 @@ void MainComponent::saveToNewProjectFolder()
         const auto file = folder.getChildFile (name + ProjectFile::extension);
         juce::String error;
         self.engine.capturePluginStates();
-        if (! ProjectFile::save (self.engine.getSong(), file, error))
+        if (! ProjectFile::save (self.engine.getSong(), file, error, self.currentWindowLayout()))
         {
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not save"), error);
             return;
@@ -8601,7 +8717,8 @@ void MainComponent::showPluginsOff()
 void MainComponent::openLynxProject (const juce::File& file, bool withoutPlugins)
 {
     juce::String error, savedBy;
-    auto song = ProjectFile::load (file, error, &savedBy);
+    ProjectFile::WindowLayout layout; // round 190mr (DF-141)
+    auto song = ProjectFile::load (file, error, &savedBy, &layout);
 
     if (! song)
     {
@@ -8631,6 +8748,7 @@ void MainComponent::openLynxProject (const juce::File& file, bool withoutPlugins
     rememberRecent (file);
     updateTitle();
     playlist.showSongAfterOpen();
+    applyProjectWindowLayout (layout); // round 190mr (DF-141)
 
     // pain point 37 (round 177d): a project from a newer LYNX SHARE opens, but saving it here would drop what that
     // version added, so say so once (FL warns about a project from a more recent version too)
@@ -9220,9 +9338,10 @@ void MainComponent::save (bool askForFile, std::function<void()> afterSaved)
         engine.capturePluginStates(); // plugin state lives in the plugins; copy it before saving
         keepOverwrittenCopy (file);   // the version this save replaces goes to the backup folder (like FL)
 
-        if (ProjectFile::save (engine.getSong(), file, error))
+        if (ProjectFile::save (engine.getSong(), file, error, currentWindowLayout()))
         {
             engine.markSaved();
+            warnIfProjectTooBig (file); // round 190mr (DF-147)
             rememberRecent (file);
             currentFile = file;
             projectName = file.getFileNameWithoutExtension();
