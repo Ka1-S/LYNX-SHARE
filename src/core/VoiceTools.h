@@ -145,7 +145,13 @@ enum Param
     // round 190do (appended): the voices' read head with Align off — 1 = measured (one head that jumps back by a fixed
     // range), 0 = two crossfaded taps half a window apart (projects saved before)
     headLaw,
-    paramCount
+    paramCount,
+    // round 190mg, hidden (not in the info: no control, no text; saved while non-zero): the splice law of the Waves
+    // doubler's read head with Align off (REA of its DSP, docs/analise/REA_rodada190mg_voc.md). On (only the Waves
+    // translator sets it): the head drifts inside ±256 samples of the delay and jumps by the best of 20 candidate lags
+    // (a running autocorrelation of the voice's source) at a quiet moment or a zero crossing with good correlation,
+    // forced 32 samples further. 0 = the head law above (new instances and every project saved before, bit for bit)
+    spliceLaw = paramCount
 };
 enum VoiceParam { vOn, vGain, vPan, vDelay, vFeedback, vDetune, vDepth, vRate, vOctave, vSource, voiceParams };
 inline int voiceParam (int voice, VoiceParam p) noexcept { return voice1 + voice * voiceParams + (int) p; }

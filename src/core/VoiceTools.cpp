@@ -906,6 +906,10 @@ public:
     void prepare (double sampleRate) noexcept override
     {
         sr = sampleRate > 0.0 ? sampleRate : 48000.0;
+        spliceReady = false; // round 190mg: the splice law's coefficients follow the rate
+        for (auto& z : spl)
+            z.hist.assign (2 * spliceHist, 0.0f); // (here, not on the audio thread)
+        spliceUsed = false;
         // longest read: 100 ms of delay + the 53 ms window (+ the octave's doubled sweep) + margin
         const auto n = (int) std::ceil (0.25 * sr) + 8;
         for (auto& v : voice)
@@ -930,6 +934,15 @@ public:
         }
         for (auto& d : direct)
             d.clear();
+        for (auto& z : spl) // round 190mg (the history is cleared only once the law has run)
+        {
+            z.pos = z.other = z.energy = 0.0;
+            z.fade = 1.0;
+            z.corr.fill (0.0f);
+            z.at = 0;
+            if (spliceUsed)
+                std::fill (z.hist.begin(), z.hist.end(), 0.0f);
+        }
         lowShelf.reset();
         highShelf.reset();
         designed = false;
@@ -964,6 +977,13 @@ public:
         const auto voiceExtra = (aligned ? 0.0103 * sr : 0.0) - 0.5 * window;
         const bool lowOnV = on (p[lowOn]), highOnV = on (p[highOn]);
         const bool headLaw = p[gemini::headLaw] >= 0.5f;
+        const bool splice = p[gemini::spliceLaw] >= 0.5f; // round 190mg (hidden, the Waves translator's)
+        if (splice)
+        {
+            if (! spliceReady)
+                prepareSplice();
+            setSpliceRange (on (p[range]));
+        }
         const auto headRange = 252.0 * sr / 48000.0; // round 190do [EXEC]: the measured head's range (samples at 48 kHz)
 
         struct VoiceSetup
@@ -992,127 +1012,141 @@ public:
             s.source = sourceOf (p[(std::size_t) voiceParam (k, vSource)]);
         }
 
-        for (int i = 0; i < n; ++i)
-        {
-            const float inL = l[i], inR = r[i];
-            float wetL = 0.0f, wetR = 0.0f;
-            for (int k = 0; k < voices; ++k)
+        // round 190mg: the sample loop is instantiated twice, so the paths without the splice law compile as before
+        const auto run = [&]<bool kSplice>() {
+            for (int i = 0; i < n; ++i)
             {
-                auto& v = voice[k];
-                const auto& s = vs[k];
-                const auto own = k % 2 == 0 ? inL : inR, other = k % 2 == 0 ? inR : inL; // odd voices: the left side
-                const auto src = s.source == 0 ? own : (s.source == 1 ? 0.5f * (own + other) : 0.5f * (own - other));
-                // feedback from the voice's last output through the low cut
-                v.line.push (src + s.fb * v.fbHp.process (v.last, 0));
-                if (! s.active)
+                const float inL = l[i], inR = r[i];
+                float wetL = 0.0f, wetR = 0.0f;
+                for (int k = 0; k < voices; ++k)
                 {
-                    v.last = 0.0f;
-                    continue;
-                }
-                // triangle LFO on the pitch
-                v.lfo += s.lfoInc;
-                v.lfo -= std::floor (v.lfo);
-                const auto tri = v.lfo < 0.5 ? 4.0 * v.lfo - 1.0 : 3.0 - 4.0 * v.lfo;
-                auto ratio = std::pow (2.0, (s.cents + s.depth * tri) / 1200.0);
-                if (s.octave)
-                    ratio *= 0.5;
-                if (! s.octave && aligned)
-                {
-                    // [EXEC] round 124 (official trial, impulse trains at ±1 … ±100 cents, 44.1 / 48 kHz): ONE read head
-                    // at delay + offset, the offset starting at 495 samples (so 0 cents = delay + 495 exactly) and
-                    // drifting by (1 − ratio) per sample inside a 496-sample range; at the range's end the head fades
-                    // out over 1.3 samples of offset, jumps back by the range and fades in again (pitch down), or a
-                    // second head enters at the top while the first finishes at the bottom (pitch up); linear reads
-                    const auto drift = 1.0 - ratio;
-                    float y = 0.0f;
-                    if (drift >= 0.0)
+                    auto& v = voice[k];
+                    const auto& s = vs[k];
+                    const auto own = k % 2 == 0 ? inL : inR, other = k % 2 == 0 ? inR : inL; // odd voices: the left side
+                    const auto src = s.source == 0 ? own : (s.source == 1 ? 0.5f * (own + other) : 0.5f * (own - other));
+                    // feedback from the voice's last output through the low cut
+                    v.line.push (src + s.fb * v.fbHp.process (v.last, 0));
+                    if (! s.active)
                     {
-                        v.offset += drift;
-                        if (v.offset >= downMax)
-                            v.offset -= downMax - downMin;
-                        const auto g = std::min ({ 1.0, (downMax - v.offset) / fade, (v.offset - downMin) / fade });
-                        y = (float) std::max (0.0, g) * v.line.linear (1.0 + s.delay + v.offset);
-                        v.second = -1.0;
+                        v.last = 0.0f;
+                        continue;
                     }
-                    else
+                    // triangle LFO on the pitch
+                    v.lfo += s.lfoInc;
+                    v.lfo -= std::floor (v.lfo);
+                    const auto tri = v.lfo < 0.5 ? 4.0 * v.lfo - 1.0 : 3.0 - 4.0 * v.lfo;
+                    auto ratio = std::pow (2.0, (s.cents + s.depth * tri) / 1200.0);
+                    if (s.octave)
+                        ratio *= 0.5;
+                    if (! s.octave && aligned)
                     {
-                        v.offset += drift;
-                        if (v.second < 0.0 && v.offset <= upMin + upOverlap)
-                            v.second = v.offset + (upMax - upMin - upOverlap);
-                        if (v.second >= 0.0)
-                            v.second += drift;
-                        if (v.offset <= upMin)
+                        // [EXEC] round 124 (official trial, impulse trains at ±1 … ±100 cents, 44.1 / 48 kHz): ONE read head
+                        // at delay + offset, the offset starting at 495 samples (so 0 cents = delay + 495 exactly) and
+                        // drifting by (1 − ratio) per sample inside a 496-sample range; at the range's end the head fades
+                        // out over 1.3 samples of offset, jumps back by the range and fades in again (pitch down), or a
+                        // second head enters at the top while the first finishes at the bottom (pitch up); linear reads
+                        const auto drift = 1.0 - ratio;
+                        float y = 0.0f;
+                        if (drift >= 0.0)
                         {
-                            v.offset = v.second >= 0.0 ? v.second : v.offset + (upMax - upMin);
+                            v.offset += drift;
+                            if (v.offset >= downMax)
+                                v.offset -= downMax - downMin;
+                            const auto g = std::min ({ 1.0, (downMax - v.offset) / fade, (v.offset - downMin) / fade });
+                            y = (float) std::max (0.0, g) * v.line.linear (1.0 + s.delay + v.offset);
                             v.second = -1.0;
                         }
-                        const auto gIn = std::clamp ((upMax - v.offset) / upFadeIn, 0.0, 1.0);
-                        y = (float) gIn * v.line.linear (1.0 + s.delay + v.offset);
-                        if (v.second >= 0.0)
-                            y += (float) std::clamp ((upMax - v.second) / upFadeIn, 0.0, 1.0) * v.line.linear (1.0 + s.delay + v.second);
+                        else
+                        {
+                            v.offset += drift;
+                            if (v.second < 0.0 && v.offset <= upMin + upOverlap)
+                                v.second = v.offset + (upMax - upMin - upOverlap);
+                            if (v.second >= 0.0)
+                                v.second += drift;
+                            if (v.offset <= upMin)
+                            {
+                                v.offset = v.second >= 0.0 ? v.second : v.offset + (upMax - upMin);
+                                v.second = -1.0;
+                            }
+                            const auto gIn = std::clamp ((upMax - v.offset) / upFadeIn, 0.0, 1.0);
+                            y = (float) gIn * v.line.linear (1.0 + s.delay + v.offset);
+                            if (v.second >= 0.0)
+                                y += (float) std::clamp ((upMax - v.second) / upFadeIn, 0.0, 1.0) * v.line.linear (1.0 + s.delay + v.second);
+                        }
+                        v.last = y;
+                        wetL += s.gl * y;
+                        wetR += s.gr * y;
+                        continue;
+                    }
+                    if (kSplice && ! s.octave)
+                    {
+                        v.last = spliceVoice (v, spl[(std::size_t) k], s.delay, ratio, src);
+                        wetL += s.gl * v.last;
+                        wetR += s.gr * v.last;
+                        continue;
+                    }
+                    if (! s.octave && headLaw)
+                    {
+                        // round 190do [EXEC] (tp172d renders, Align off: the voices' delays tracked over 8 s of music): ONE
+                        // read head at delay + offset; the offset drifts by (1 − ratio) per sample away from the delay (pitch
+                        // down: later, up to +R; pitch up: earlier, down to −R) and jumps back by R towards the delay, a
+                        // second head crossfading in over the last X samples of offset; linear reads
+                        v.head += 1.0 - ratio;
+                        if (v.head >= headRange)
+                            v.head -= headRange;
+                        else if (v.head <= -headRange)
+                            v.head += headRange;
+                        const auto edge = headRange - std::abs (v.head);
+                        const auto g1 = std::clamp (edge / headFade, 0.0, 1.0);
+                        const auto read = [&v, &s] (double o) { return v.line.linear (std::max (1.0, 1.0 + s.delay + o)); };
+                        auto y = (float) g1 * read (v.head);
+                        if (g1 < 1.0)
+                            y += (float) (1.0 - g1) * read (v.head - (v.head > 0.0 ? headRange : -headRange));
+                        v.last = y;
+                        wetL += s.gl * y;
+                        wetR += s.gr * y;
+                        continue;
+                    }
+                    // two read taps half a window apart sweep the window at (1 − ratio) samples per sample
+                    v.phase += (1.0 - ratio) / window;
+                    v.phase -= std::floor (v.phase);
+                    float y = 0.0f;
+                    for (int t = 0; t < 2; ++t)
+                    {
+                        auto ph = v.phase + 0.5 * t;
+                        ph -= std::floor (ph);
+                        const auto w = (float) std::sin (pi * ph); // power-complementary crossfade of the two grains
+                        y += w * v.line.at (1.0 + s.delay + voiceExtra + ph * window);
                     }
                     v.last = y;
                     wetL += s.gl * y;
                     wetR += s.gr * y;
-                    continue;
                 }
-                if (! s.octave && headLaw)
+                if (lowOnV)
                 {
-                    // round 190do [EXEC] (tp172d renders, Align off: the voices' delays tracked over 8 s of music): ONE
-                    // read head at delay + offset; the offset drifts by (1 − ratio) per sample away from the delay (pitch
-                    // down: later, up to +R; pitch up: earlier, down to −R) and jumps back by R towards the delay, a
-                    // second head crossfading in over the last X samples of offset; linear reads
-                    v.head += 1.0 - ratio;
-                    if (v.head >= headRange)
-                        v.head -= headRange;
-                    else if (v.head <= -headRange)
-                        v.head += headRange;
-                    const auto edge = headRange - std::abs (v.head);
-                    const auto g1 = std::clamp (edge / headFade, 0.0, 1.0);
-                    const auto read = [&v, &s] (double o) { return v.line.linear (std::max (1.0, 1.0 + s.delay + o)); };
-                    auto y = (float) g1 * read (v.head);
-                    if (g1 < 1.0)
-                        y += (float) (1.0 - g1) * read (v.head - (v.head > 0.0 ? headRange : -headRange));
-                    v.last = y;
-                    wetL += s.gl * y;
-                    wetR += s.gr * y;
-                    continue;
+                    wetL = lowShelf.process (wetL, 0);
+                    wetR = lowShelf.process (wetR, 1);
                 }
-                // two read taps half a window apart sweep the window at (1 − ratio) samples per sample
-                v.phase += (1.0 - ratio) / window;
-                v.phase -= std::floor (v.phase);
-                float y = 0.0f;
-                for (int t = 0; t < 2; ++t)
+                if (highOnV)
                 {
-                    auto ph = v.phase + 0.5 * t;
-                    ph -= std::floor (ph);
-                    const auto w = (float) std::sin (pi * ph); // power-complementary crossfade of the two grains
-                    y += w * v.line.at (1.0 + s.delay + voiceExtra + ph * window);
+                    wetL = highShelf.process (wetL, 0);
+                    wetR = highShelf.process (wetR, 1);
                 }
-                v.last = y;
-                wetL += s.gl * y;
-                wetR += s.gr * y;
+                // the direct signal: rotated in the stereo field, delayed by half a window when aligned with the voices
+                direct[0].push (inL);
+                direct[1].push (inR);
+                const auto dL = alignSamples > 0.0 ? direct[0].at (1.0 + alignSamples) : inL;
+                const auto dR = alignSamples > 0.0 ? direct[1].at (1.0 + alignSamples) : inR;
+                const auto oL = dirGain * (rc * dL + rs * dR), oR = dirGain * (rc * dR - rs * dL);
+                l[i] = master * (oL + wetL);
+                r[i] = master * (oR + wetR);
+                peakOut = std::max (peakOut, std::max (std::abs (l[i]), std::abs (r[i])));
             }
-            if (lowOnV)
-            {
-                wetL = lowShelf.process (wetL, 0);
-                wetR = lowShelf.process (wetR, 1);
-            }
-            if (highOnV)
-            {
-                wetL = highShelf.process (wetL, 0);
-                wetR = highShelf.process (wetR, 1);
-            }
-            // the direct signal: rotated in the stereo field, delayed by half a window when aligned with the voices
-            direct[0].push (inL);
-            direct[1].push (inR);
-            const auto dL = alignSamples > 0.0 ? direct[0].at (1.0 + alignSamples) : inL;
-            const auto dR = alignSamples > 0.0 ? direct[1].at (1.0 + alignSamples) : inR;
-            const auto oL = dirGain * (rc * dL + rs * dR), oR = dirGain * (rc * dR - rs * dL);
-            l[i] = master * (oL + wetL);
-            r[i] = master * (oR + wetR);
-            peakOut = std::max (peakOut, std::max (std::abs (l[i]), std::abs (r[i])));
-        }
+        };
+        if (splice)
+            run.template operator()<true>();
+        else
+            run.template operator()<false>();
         meterIn.store (std::min (peakIn, 1.0f), std::memory_order_relaxed);
         meterOut.store (std::min (peakOut, 1.0f), std::memory_order_relaxed);
     }
@@ -1205,6 +1239,7 @@ private:
     static constexpr double downMin = 79.4, downMax = 575.7, fade = 1.3;
     static constexpr double upMin = 62.0, upMax = 558.4, upOverlap = 4.2, upFadeIn = 0.7;
 
+    static constexpr int spliceLags = 20; // round 190mg: the splice law's candidate lags
     struct Voice
     {
         Line line;
@@ -1214,6 +1249,102 @@ private:
         float last = 0.0f;
         Biquad fbHp;
     };
+    // round 190mg: the splice law's state per voice (apart from Voice: the old paths keep their layout) — the head's lag
+    // (samples ago, 0 = unset), the old head's distance from it during a fade, the fade's gain, the running energy and
+    // autocorrelation at the candidate lags, and the source's recent history written twice (reads never wrap)
+    static constexpr int spliceHist = 4096; // > the longest candidate lag (495 · 4 at Range 1), a power of two
+    struct Splice
+    {
+        double pos = 0.0, other = 0.0, fade = 1.0, energy = 0.0;
+        std::array<float, spliceLags> corr {}; // (single precision, as the DSP keeps them)
+        std::vector<float> hist; // 2 · spliceHist, allocated when the law is first used
+        int at = 0;
+    };
+    std::array<Splice, voices> spl;
+
+    // round 190mg [REA, the Waves doubler's DSP] — one read head per voice at `lag` samples ago, drifting by (1 − ratio)
+    // per sample. Its free band is the delay ± W (W = 256 samples, ×4 with Range); past it the head jumps by the
+    // candidate lag with the highest running autocorrelation of the source (20 lags 256·2^(k/20)·W/256, one-pole 20 ms
+    // average) as soon as the source is quiet (mean square < 0.001), or the head sits on a near-zero sample (|x| < 0.01)
+    // while that autocorrelation exceeds 0.1 × the mean square; 32 samples further the jump is forced. The old head fades
+    // out linearly over W samples. Linear reads. Every number is from the DSP (sizes in samples, not time).
+    std::array<int, spliceLags> lagList {};
+    bool spliceReady = false, spliceUsed = false;
+    double spliceW = 256.0, spliceC = 0.0, spliceFadeInc = 1.0;
+    float spliceC4 = 0.0f; // the autocorrelation's weight per update (every 4th sample)
+    void prepareSplice() noexcept
+    {
+        spliceReady = true;
+        spliceUsed = true;
+        spliceC = std::exp (-1.0 / (0.020 * sr));
+        spliceC4 = (float) (1.0 - std::pow (spliceC, 4.0));
+    }
+    void setSpliceRange (bool wide) noexcept
+    {
+        const auto w = wide ? 4.0 : 1.0;
+        if (spliceW == 256.0 * w && lagList[0] != 0)
+            return;
+        spliceW = 256.0 * w;
+        spliceFadeInc = 1.0 / spliceW; // [EXEC] the old head fades out linearly over W samples (fitted on noise probes: 256)
+        for (int k = 0; k < spliceLags; ++k)
+            lagList[(std::size_t) k] = (int) std::floor (std::pow (2.0, 0.05 * k) * w * 256.0 + 0.5);
+    }
+    [[gnu::noinline]] float spliceVoice (Voice& v, Splice& z, double delay, double ratio, float src) noexcept
+    {
+        const auto size = (int) v.line.buf.size();
+        const auto ago = [&v, size] (int d) { auto i = v.line.pos - d; return v.line.buf[(std::size_t) (i < 0 ? i + size : i)]; };
+        // the detector: running energy and autocorrelation of the source (one-pole averages)
+        z.at = (z.at + 1) & (spliceHist - 1);
+        z.hist[(std::size_t) z.at] = z.hist[(std::size_t) (z.at + spliceHist)] = src;
+        const float* h = z.hist.data() + z.at + spliceHist; // h[0] = this sample, h[-d] = d samples before
+        const auto a = 1.0 - spliceC, x = (double) src;
+        z.energy += a * (x * x - z.energy);
+        // the autocorrelation every 4th sample (the same 20 ms average: the DSP updates it every sample; a quarter of the
+        // work, the jump decisions still every sample)
+        if ((z.at & 3) == 0)
+        {
+            const auto af = spliceC4, xf = src;
+            for (int k = 0; k < spliceLags; ++k)
+            {
+                auto& r = z.corr[(std::size_t) k];
+                r += af * (xf * h[-lagList[(std::size_t) k]] - r);
+            }
+        }
+        // the delay is at least W + 64 samples (the DSP's minimum without Align)
+        const auto centre = std::max (delay, spliceW + 64.0);
+        if (z.pos <= 0.0)
+            z.pos = centre;
+        z.pos += 1.0 - ratio;
+        const auto lo = centre - spliceW, hi = centre + spliceW;
+        if (z.pos <= lo || z.pos >= hi)
+        {
+            // the candidate with the highest autocorrelation (the last of equals)
+            float best = 0.0f;
+            int bestLag = lagList[0];
+            for (int k = 0; k < spliceLags; ++k)
+                if (best <= z.corr[(std::size_t) k])
+                    best = z.corr[(std::size_t) k], bestLag = lagList[(std::size_t) k];
+            const bool up = z.pos <= lo;
+            const auto at = std::clamp ((int) std::lround (z.pos), 1, size - 4);
+            const bool forced = up ? z.pos <= lo - 32.0 : z.pos >= hi + 32.0;
+            if (forced || z.energy < 0.001 || (std::abs (ago (at)) < 0.01f && 0.1 * z.energy < (double) best))
+            {
+                const auto step = up ? (double) bestLag : -(double) bestLag;
+                z.pos += step;
+                z.other = -step;
+                z.fade = 0.0;
+            }
+        }
+        const auto read = [&v, size] (double d) { return v.line.linear (std::clamp (1.0 + d, 1.0, (double) size - 5.0)); };
+        auto y = read (z.pos);
+        if (z.fade < 1.0)
+        {
+            z.fade = std::min (1.0, z.fade + spliceFadeInc);
+            const auto old = read (z.pos + z.other);
+            y = (float) (old + (double) (y - old) * z.fade);
+        }
+        return y;
+    }
 
     double sr = 48000.0;
     std::array<Voice, voices> voice;
