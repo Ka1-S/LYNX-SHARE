@@ -378,6 +378,17 @@ void HintBar::mouseDown (const juce::MouseEvent& e)
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
 }
 
+// rollup 0.1.30 step 13 (CI paint gate, stream playlist +5 %): the laid-out text kept between paints
+struct HintBar::LaidOut
+{
+    juce::String text;
+    float width = -1.0f;
+    juce::Font big { juce::FontOptions() }, bigKey { juce::FontOptions() }, small { juce::FontOptions() }, smallKey { juce::FontOptions() };
+    bool larger = false;
+    bool oneLine = false, fits = false;
+    std::vector<std::vector<Item>> lines;
+};
+
 void HintBar::paint (juce::Graphics& g)
 {
     using namespace theme;
@@ -415,22 +426,37 @@ void HintBar::paint (juce::Graphics& g)
 
     // the text: one line if it fits, else two smaller lines, else two lines cut at the end
     const auto text = withMarkup (current.text);
-    std::vector<std::vector<Item>> lines;
 
     // (round 190jo FM-7: the Pattern toolbar's hint one step larger, its words in the primary text colour)
     const auto plain = larger ? colour::textPrimary.withAlpha (0.88f) : colour::textSecondary;
     const juce::Font big (font (larger ? type::body + 1.0f : type::small)), bigKey (font (larger ? type::caption : type::caption - 1.0f, true));
     const auto bigGlyph = larger ? 16.0f : 15.0f;
-    if (auto items = makeItems (text, big, bigKey, bigGlyph); layOut (items, r.getWidth(), 1, lines))
+    const juce::Font smallFont (font (larger ? type::small : type::caption)), smallKey (font (larger ? type::caption - 1.0f : type::caption - 2.0f, true));
+    const auto smallGlyph = larger ? 13.0f : 12.0f;
+    if (laidOut == nullptr)
+        laidOut = std::make_shared<LaidOut>();
+    auto& laid = *laidOut;
+    if (laid.text != text || laid.width != r.getWidth() || laid.larger != larger || laid.big != big || laid.bigKey != bigKey
+        || laid.small != smallFont || laid.smallKey != smallKey)
+    {
+        laid.text = text;
+        laid.width = r.getWidth();
+        laid.larger = larger;
+        laid.big = big;
+        laid.bigKey = bigKey;
+        laid.small = smallFont;
+        laid.smallKey = smallKey;
+        laid.oneLine = layOut (makeItems (text, big, bigKey, bigGlyph), r.getWidth(), 1, laid.lines);
+        laid.fits = laid.oneLine || layOut (makeItems (text, smallFont, smallKey, smallGlyph), r.getWidth(), 2, laid.lines);
+    }
+    const auto& lines = laid.lines;
+    if (laid.oneLine)
     {
         drawLine (g, lines.front(), r.withSizeKeepingCentre (r.getWidth(), larger ? 19.0f : 17.0f), big, bigKey, bigGlyph, plain);
         return;
     }
 
-    const juce::Font smallFont (font (larger ? type::small : type::caption)), smallKey (font (larger ? type::caption - 1.0f : type::caption - 2.0f, true));
-    const auto smallGlyph = larger ? 13.0f : 12.0f;
-    const auto items = makeItems (text, smallFont, smallKey, smallGlyph);
-    const auto fits = layOut (items, r.getWidth(), 2, lines);
+    const auto fits = laid.fits;
     const auto lineHeight = juce::jmin (larger ? 14.0f : 13.0f, r.getHeight() / 2.0f);
     auto area = r.withSizeKeepingCentre (r.getWidth(), lineHeight * 2.0f);
 

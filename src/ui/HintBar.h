@@ -97,6 +97,10 @@ private:
     Hint current;
     bool live = false;
     bool larger = false;
+    // rollup 0.1.30 step 13: the text's items and lines as last laid out (HintBar.cpp), made again only when the text, the
+    // width or the fonts change — a hint that needs the two-line fallback no longer shapes its words twice per frame
+    struct LaidOut;
+    std::shared_ptr<LaidOut> laidOut;
 };
 // Ableton Live's Info View (round 190jn, design190ia CL-23) for the Clip-launch layout's Live look: the same hint as the
 // hint bar, as Live shows it at the bottom left — a 17 px #464646 title bar with the control's name, then the text in
