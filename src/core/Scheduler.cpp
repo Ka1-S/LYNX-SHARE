@@ -1,4 +1,5 @@
 #include "core/Scheduler.h"
+#include "core/NoteRepeat.h"
 #include "core/ClipEnvelope.h"
 
 #include "core/ClipOps.h"
@@ -270,25 +271,35 @@ void schedulePatternLoop (const Pattern& pattern,
             continue; // slide has no "off": the original note continues until its own end
         }
 
-        on.lengthTicks = (float) timing.length;
-        emit ((double) start, on);
-        if (chase && (double) start + tps <= position && (double) (start + timing.length) > position)
-        {
-            on.sampleOffset = 0; // a note crossing the start position ("Play truncated notes on transport")
-            on.lengthTicks = (float) ((double) (start + timing.length) - position);
-            auto velocity = on.velocity;
-            if (roll == nullptr || chance::plays (*roll, linear ? 0 : passAt (startTick, (double) patternLength), velocity))
+        // FL's note repeat (issue #208, core/NoteRepeat.h): each strike is a note of its own, to the next strike
+        noterepeat::forEachStrike (note, start, timing.length, [&] (std::int64_t strikeStart, std::int64_t strikeLength, int) {
+            on.lengthTicks = (float) strikeLength;
+            emit ((double) strikeStart, on);
+            if (chase && (double) strikeStart + tps <= position && (double) (strikeStart + strikeLength) > position)
             {
                 auto chased = on;
-                chased.velocity = velocity;
-                if (curved) // (it starts where its curves are at that point)
+                chased.sampleOffset = 0; // a note crossing the start position ("Play truncated notes on transport")
+                chased.lengthTicks = (float) ((double) (strikeStart + strikeLength) - position);
+                auto velocity = on.velocity;
+                if (roll == nullptr || chance::plays (*roll, linear ? 0 : passAt (startTick, (double) patternLength), velocity))
                 {
-                    const auto v = curveValuesAt (note, position - (double) start);
-                    chased.cents = v.cents, chased.modX = v.modX, chased.modY = v.modY;
+                    chased.velocity = velocity;
+                    if (curved) // (it starts where its curves are at that point)
+                    {
+                        const auto v = curveValuesAt (note, position - (double) start);
+                        chased.cents = v.cents, chased.modX = v.modX, chased.modY = v.modY;
+                    }
+                    out.add (chased);
                 }
-                out.add (chased);
             }
-        }
+            if (strikeStart + strikeLength < start + timing.length) // (the last strike's "off" is the note's own, below)
+            {
+                NoteEvent cut = on;
+                cut.type = NoteEvent::Type::off;
+                cut.velocity = 0.0f;
+                emit ((double) (strikeStart + strikeLength), cut);
+            }
+        });
         if (curved)
         {
             // the note's repetitions sounding in this block (a loop: every pass; once: at the origin)
@@ -823,24 +834,28 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
                 continue;
             }
 
-            e.lengthTicks = (float) (off - on);
-            emitOccurrences ((double) on, loop, startTick, endTick, tps, numSamples, e, out, roll);
-            if (chase && (double) on + tps <= loopStart && (double) off > loopStart)
-            {
-                e.sampleOffset = 0; // a note crossing the start position ("Play truncated notes on transport")
-                e.lengthTicks = (float) ((double) off - loopStart);
-                auto velocity = e.velocity;
-                if (roll == nullptr || chance::plays (*roll, passAt (startTick, (double) loop), velocity))
+            // FL's note repeat (issue #208, core/NoteRepeat.h): each strike a note of its own, to the next strike
+            noterepeat::forEachStrike (note, on, off - on, [&] (std::int64_t strikeOn, std::int64_t strikeLength, int) {
+                const auto strikeOff = strikeOn + strikeLength;
+                auto s = e;
+                s.lengthTicks = (float) strikeLength;
+                emitOccurrences ((double) strikeOn, loop, startTick, endTick, tps, numSamples, s, out, roll);
+                if (chase && (double) strikeOn + tps <= loopStart && (double) strikeOff > loopStart)
                 {
-                    auto chased = e;
-                    chased.velocity = velocity;
-                    out.add (chased);
+                    s.sampleOffset = 0; // a note crossing the start position ("Play truncated notes on transport")
+                    s.lengthTicks = (float) ((double) strikeOff - loopStart);
+                    auto velocity = s.velocity;
+                    if (roll == nullptr || chance::plays (*roll, passAt (startTick, (double) loop), velocity))
+                    {
+                        auto chased = s;
+                        chased.velocity = velocity;
+                        out.add (chased);
+                    }
                 }
-            }
-
-            e.type = NoteEvent::Type::off;
-            e.velocity = 0.0f;
-            emitOccurrences ((double) off, loop, startTick, endTick, tps, numSamples, e, out, roll);
+                s.type = NoteEvent::Type::off;
+                s.velocity = 0.0f;
+                emitOccurrences ((double) strikeOff, loop, startTick, endTick, tps, numSamples, s, out, roll);
+            });
         }
     };
 

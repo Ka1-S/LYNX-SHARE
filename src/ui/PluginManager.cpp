@@ -222,9 +222,14 @@ private:
         if (bridge32Supported())
         {
             std::vector<std::pair<std::string, bool>> builds;
+            // issue #209: what is known (no plugin file opened here); the rest is looked at on a background thread
             for (const auto& t : types)
-                builds.emplace_back (PluginHost::bitnessKey (t), isPlugin32Bit (t));
+                builds.emplace_back (PluginHost::bitnessKey (t), knownPlugin32Bit (t).value_or (false));
             bits = plugincatalog::combinedBits (builds);
+            refreshPluginBitness (types, [safe = juce::Component::SafePointer<PluginManagerPanel> (this)] {
+                if (safe != nullptr)
+                    safe->reload();
+            });
         }
         for (int i = 0; i < types.size(); ++i)
         {

@@ -16,6 +16,7 @@
 #include "ui/UiTrace.h"
 #include "ui/TextCache.h"
 #include "ui/ChannelRackComponent.h"
+#include "core/NoteRepeat.h"
 #include "ui/PaintAB.h"
 #include "ui/ImageCaches.h"
 #include "ui/PluginOffTag.h"
@@ -1723,11 +1724,11 @@ void ChannelRackComponent::toggleEditor (int channel, bool keepOthers)
 
 // --- step graph lanes (docs/WORKFLOW_FL.md P2, C4) --------------------------------------------------
 
-juce::Rectangle<int> ChannelRackComponent::levelButtonBounds (int level) const
+juce::Rectangle<int> ChannelRackComponent::levelButtonBounds (int tab) const
 {
     const auto lane = laneBounds();
-    const auto width = (gridLeft() - 24) / 4; // (round 190lx, DE-30: FL's eight tabs in two rows of four)
-    return { 12 + (level % 4) * width, lane.getY() + 8 + (level / 4) * 24, width - 4, 20 };
+    const auto width = (gridLeft() - 24) / 3;
+    return { 12 + (tab % 3) * width, lane.getY() + 6 + (tab / 3) * 22, width - 4, 19 };
 }
 
 void ChannelRackComponent::paintLane (juce::Graphics& g)
@@ -1741,6 +1742,7 @@ void ChannelRackComponent::paintLane (juce::Graphics& g)
     const auto& song = engine.getSong();
     const auto& pattern = song.activePattern();
     const auto channel = graphRow();
+    const auto level = (notetools::Level) graphLevel;
 
     g.setColour (bg0);
     g.fillRect (lane);
@@ -1748,14 +1750,19 @@ void ChannelRackComponent::paintLane (juce::Graphics& g)
     g.drawHorizontalLine (lane.getY(), 0.0f, (float) getWidth());
     g.drawHorizontalLine (lane.getBottom() - 1, 0.0f, (float) getWidth());
 
-    for (int t = 0; t < notetools::graphLaneCount; ++t) // (round 190lx, DE-30: FL's tab order)
+    // FL's nine lanes in FL's order (issue #208); like FL, a narrow tab takes the shorter name
+    for (int tab = 0; tab < notetools::stepLevelCount; ++tab)
     {
-        const auto l = notetools::graphTabOrder[t];
-        const auto r = levelButtonBounds (t).toFloat();
+        const auto l = (int) notetools::stepLevel (tab);
+        const auto r = levelButtonBounds (tab).toFloat();
         theme::fillRoundRect (g, r, theme::radius::sm, l == graphLevel ? accent : bg4);
         g.setColour (l == graphLevel ? onAccent : textSecondary);
-        g.setFont (theme::font (theme::type::caption, l == graphLevel));
-        textcache::drawFittedText (g, tr (notetools::graphLaneName (l)), r.toNearestInt(), juce::Justification::centred, 1, 0.7f);
+        const auto font = theme::font (theme::type::caption, l == graphLevel);
+        g.setFont (font);
+        auto name = tr (notetools::stepLevelName (tab, 2));
+        for (int size = 1; size >= 0 && juce::GlyphArrangement::getStringWidth (font, name) > r.getWidth() - 6.0f; --size)
+            name = tr (notetools::stepLevelName (tab, size));
+        textcache::drawFittedText (g, name, r.toNearestInt(), juce::Justification::centred, 1, 0.8f);
     }
 
     g.setColour (textDisabled);
@@ -1766,6 +1773,28 @@ void ChannelRackComponent::paintLane (juce::Graphics& g)
     const auto top = (float) lane.getY() + 6.0f, bottom = (float) lane.getBottom() - 6.0f;
     const auto bipolar = notetools::graphIsBipolar (graphLevel);
     const auto base = bipolar ? (top + bottom) * 0.5f : bottom;
+
+    if (level == notetools::Level::notePitch) // FL's piano-roll rows: the black keys darker, the C rows named
+    {
+        const auto [lo, hi] = pitchLaneKeys();
+        const auto rowH = (bottom - top) / (float) (hi - lo + 1);
+        for (int key = lo; key <= hi; ++key)
+        {
+            const auto y = bottom - (float) (key - lo + 1) * rowH;
+            if (juce::MidiMessage::isMidiNoteBlack (key))
+            {
+                g.setColour (bg1);
+                g.fillRect (juce::Rectangle<float> ((float) gridLeft(), y, (float) (numSteps() * stepWidth), rowH));
+            }
+            if (key % 12 == 0 && rowH * 3.0f >= 9.0f)
+            {
+                g.setColour (textDisabled);
+                g.setFont (theme::font (theme::type::caption));
+                textcache::drawText (g, juce::String (notetools::levelText (level, (float) key / 127.0f)),
+                                     juce::Rectangle<int> (gridLeft() + 2, (int) (y + rowH - 10.0f), 28, 10), juce::Justification::bottomLeft);
+            }
+        }
+    }
 
     for (int step = 0; step < numSteps(); ++step)
     {
@@ -1793,7 +1822,38 @@ void ChannelRackComponent::paintLane (juce::Graphics& g)
             continue;
         }
 
-        const auto v = notetools::graphValue (pattern.notes[(std::size_t) notes.front()], graphLevel, ticksPerStep);
+        const auto& first = pattern.notes[(std::size_t) notes.front()];
+        if (level == notetools::Level::notePitch) // FL: a block at the step's key, named
+        {
+            const auto [lo, hi] = pitchLaneKeys();
+            const auto rowH = (bottom - top) / (float) (hi - lo + 1);
+            const auto block = juce::Rectangle<float> (x + 1.0f, bottom - (float) (first.key - lo + 1) * rowH, w - 2.0f, juce::jmax (3.0f, rowH));
+            g.setColour (info.withAlpha (0.85f));
+            g.fillRoundedRectangle (block, 1.5f);
+            if (block.getHeight() >= 9.0f && block.getWidth() >= 14.0f)
+            {
+                g.setColour (bg0);
+                g.setFont (theme::font (theme::type::caption));
+                textcache::drawFittedText (g, juce::String (notetools::levelText (level, (float) first.key / 127.0f)), block.toNearestInt(),
+                                           juce::Justification::centred, 1, 0.6f);
+            }
+            continue;
+        }
+        if (level == notetools::Level::repeat) // FL: a block at the rate's height, a line for each extra strike in a step
+        {
+            if (first.repeat <= 7)
+                continue; // (no second strike inside a step: FL draws nothing)
+            const auto rowH = (bottom - top) / 8.0f;
+            const auto block = juce::Rectangle<float> (x + 1.0f, bottom - (float) (first.repeat - 6) * rowH, w - 2.0f, rowH);
+            g.setColour (info.withAlpha (0.85f));
+            g.fillRoundedRectangle (block, 1.5f);
+            const auto strikes = noterepeat::strikeCount (first, ticksPerStep);
+            g.setColour (bg0.withAlpha (0.55f));
+            for (int k = 1; k < strikes; ++k)
+                g.fillRect (block.getX() + 3.0f, block.getY() + block.getHeight() * (float) k / (float) strikes - 0.5f, block.getWidth() - 6.0f, 1.0f);
+            continue;
+        }
+        const auto v = notetools::levelValue (first, level);
         const auto y = bottom - v * (bottom - top);
         g.setColour ((graphLevel == (int) notetools::Level::velocity ? accent : info).withAlpha (0.85f));
         g.fillRect (juce::Rectangle<float> (x + 2.0f, juce::jmin (y, base), w - 4.0f, juce::jmax (2.0f, std::abs (base - y))));
@@ -1808,11 +1868,45 @@ void ChannelRackComponent::paintLane (juce::Graphics& g)
     }
 }
 
+// FL's Note pitch lane is a small piano roll (issue #208, FL 2026 shot fl-note): the keys from a little below the
+// channel's lowest step to a little above its highest (two octaves at least), each step a block at its key
+std::pair<int, int> ChannelRackComponent::pitchLaneKeys() const
+{
+    const auto& pattern = engine.getSong().activePattern();
+    const auto channel = graphRow();
+    int lo = 127, hi = 0;
+    for (const auto& n : pattern.notes)
+        if (n.channel == channel)
+            lo = juce::jmin (lo, n.key), hi = juce::jmax (hi, n.key);
+    if (lo > hi)
+        lo = hi = 60;
+    const auto middle = (lo + hi) / 2;
+    lo = juce::jmin (lo - 2, middle - 12);
+    hi = juce::jmax (hi + 2, middle + 12);
+    if (lo < 0)
+        hi -= lo, lo = 0;
+    if (hi > 127)
+        lo = juce::jmax (0, lo - (hi - 127)), hi = 127;
+    return { lo, hi };
+}
+
 float ChannelRackComponent::laneValueAt (int y) const
 {
     const auto lane = laneBounds();
     const auto top = (float) lane.getY() + 6.0f, bottom = (float) lane.getBottom() - 6.0f;
-    return juce::jlimit (0.0f, 1.0f, (bottom - (float) y) / juce::jmax (1.0f, bottom - top));
+    const auto t = juce::jlimit (0.0f, 1.0f, (bottom - (float) y) / juce::jmax (1.0f, bottom - top));
+    const auto level = (notetools::Level) graphLevel;
+    if (level == notetools::Level::notePitch) // (the key row under the mouse)
+    {
+        const auto [lo, hi] = pitchLaneKeys();
+        return (float) juce::jlimit (0, 127, lo + (int) std::floor (t * (float) (hi - lo + 1))) / 127.0f;
+    }
+    if (level == notetools::Level::repeat) // FL's lane: 1/16 (one strike a step) at the bottom .. 1/64 triplet at the top
+    {
+        const auto index = juce::jlimit (7, noterepeat::rateCount, 7 + (int) std::floor (t * 8.0f));
+        return index <= 7 ? 0.0f : (float) index / (float) noterepeat::rateCount;
+    }
+    return t;
 }
 
 juce::Point<int> ChannelRackComponent::laneSpotForSnapshot (int step, float value) const
@@ -1825,11 +1919,13 @@ juce::Point<int> ChannelRackComponent::laneSpotForSnapshot (int step, float valu
 void ChannelRackComponent::setLaneValue (int step, float value)
 {
     const auto channel = graphRow();
-    const auto level = graphLevel;
+    const auto level = (notetools::Level) graphLevel;
     engine.editSong ([channel, step, value, level] (Song& s) {
         auto& p = s.activePattern();
         for (auto i : notesInStep (p, channel, step))
-            notetools::setGraphValue (p.notes[(std::size_t) i], level, value, ticksPerStep);
+            notetools::setLevelValue (p.notes[(std::size_t) i], level, value);
+        if (level == notetools::Level::shift) // (Shift moves the notes inside their step)
+            p.sortNotes();
     });
 }
 
@@ -1859,7 +1955,7 @@ void ChannelRackComponent::applyLane (const juce::MouseEvent& e)
     {
         const auto from = juce::jmin (laneDownStep, step), to = juce::jmax (laneDownStep, step);
         const auto channel = graphRow();
-        const auto level = graphLevel;
+        const auto level = (notetools::Level) graphLevel;
         const auto v0 = laneDownStep <= step ? laneDownValue : value, v1 = laneDownStep <= step ? value : laneDownValue;
         engine.editSong ([=] (Song& s) {
             auto& p = s.activePattern();
@@ -1867,8 +1963,10 @@ void ChannelRackComponent::applyLane (const juce::MouseEvent& e)
             {
                 const auto t = to > from ? (float) (st - from) / (float) (to - from) : 0.0f;
                 for (auto i : notesInStep (p, channel, st))
-                    notetools::setGraphValue (p.notes[(std::size_t) i], level, v0 + (v1 - v0) * t, ticksPerStep);
+                    notetools::setLevelValue (p.notes[(std::size_t) i], level, v0 + (v1 - v0) * t);
             }
+            if (level == notetools::Level::shift)
+                p.sortNotes();
         });
         return;
     }
@@ -2179,10 +2277,10 @@ void ChannelRackComponent::mouseDown (const juce::MouseEvent& e)
         }
 
         case Area::laneLevels:
-            for (int t = 0; t < notetools::graphLaneCount; ++t)
-                if (levelButtonBounds (t).contains (e.getPosition().translated (-stickyX, 0)))
+            for (int tab = 0; tab < notetools::stepLevelCount; ++tab)
+                if (levelButtonBounds (tab).contains (e.getPosition().translated (-stickyX, 0)))
                 {
-                    graphLevel = notetools::graphTabOrder[t];
+                    graphLevel = (int) notetools::stepLevel (tab);
                     repaint();
                 }
             return;
@@ -2390,9 +2488,14 @@ void ChannelRackComponent::mouseDrag (const juce::MouseEvent& e)
         const auto v = laneValueAt (e.y);
         const auto bipolar = notetools::graphIsBipolar (graphLevel);
         const auto shown = juce::roundToInt ((bipolar ? v * 2.0f - 1.0f : v) * 100.0f);
-        const auto valueText = graphLevel == notetools::graphNote ? juce::String (notenames::keyName ((int) std::lround (v * 127.0f))) // (round 190lx)
-                                                                  : (bipolar && shown > 0 ? "+" : "") + juce::String (shown) + "%";
-        const auto levelText = tr (notetools::graphLaneName (graphLevel));
+        // Note pitch, Shift and Repeat show FL's own values (a key, the part of a step, the repeat rate: issue #208)
+        const auto own = notetools::levelText ((notetools::Level) graphLevel, v);
+        auto ownText = tr (juce::String::fromUTF8 (own.c_str())); // ("No repeat"; FL's rate names keep their notation)
+        for (const char* word : { TR_NOOP ("dotted"), TR_NOOP ("triplet"), TR_NOOP ("Beat"), TR_NOOP ("Half step"), TR_NOOP ("Quarter step") })
+            ownText = ownText.replace (word, tr (word));
+        ownText = ownText.replace ("(Step)", "(" + tr ("Step") + ")");
+        const auto valueText = ! own.empty() ? ownText : (bipolar && shown > 0 ? "+" : "") + juce::String (shown) + "%";
+        const auto levelText = tr (notetools::levelName ((notetools::Level) graphLevel));
         ui::showValueTip (*this, controlBounds (Area::lane, graphRow()), levelText + ": " + valueText);
         ui::Hint live;
         live.text = channelName (engine.getSong(), graphRow()) + " - " + levelText;
@@ -2470,6 +2573,8 @@ void ChannelRackComponent::mouseUp (const juce::MouseEvent& e)
     ui::clearPostedHint();
     paintMode = PaintMode::none;
     laneDownStep = -1;
+    if (laneScaleBase >= 0.0f && graphLevel == notetools::graphShift) // (rollup step 11: a Ctrl-scaled Shift moved notes in their
+        engine.editSong ([] (Song& s) { s.activePattern().sortNotes(); }); //  steps; sorted once the drag ends, as round 190ma's lane does)
     laneScaleBase = -1.0f; // (round 190lx)
     laneScaleFrom.clear();
 

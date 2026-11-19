@@ -76,6 +76,7 @@
 #include "core/SoundFont.h"
 #include "core/SynthPresets.h"
 #include "core/NewtoneFx.h"
+#include "core/NoteRepeat.h"
 
 #include <algorithm>
 #include <cstring>
@@ -3592,6 +3593,11 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             note.porta = n.porta();
             note.colour = n.extra & 0x0F;
             note.group = n.group;
+            // the graph editor's other per-note levels (issue #208): release velocity, Mod X / Mod Y and repeat
+            note.release = std::clamp (n.release / 128.0f, 0.0f, 1.0f);
+            note.modX = std::clamp (n.modX / 256.0f, 0.0f, 1.0f);
+            note.modY = std::clamp (n.modY / 256.0f, 0.0f, 1.0f);
+            note.repeat = n.repeats <= noterepeat::rateCount ? (int) n.repeats : 0;
             p.notes.push_back (note);
         }
 

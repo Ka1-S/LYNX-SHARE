@@ -17961,3 +17961,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Details190lrTests.inc" // round details3_190lr: the Simple Drum Machine (BandLab steps), Live scene follow actions
 #include "Issues190lwTests.inc" // round 190lw: issues #205 / #206 / #207 (row bands, second click, automation point editing)
 #include "Details190lxTests.inc" // round details4_190lx: Live slot-block clipboard, separate Punch-In / Punch-Out
+#include "Issue208Tests.inc" // round 190ma: issue #208, the graph editor's Note pitch, Shift and Repeat (FL note repeat)

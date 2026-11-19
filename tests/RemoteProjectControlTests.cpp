@@ -104,6 +104,7 @@ Song fixture()
     note.chance = 1.0f;
     note.velocityRange = 0.0f;
     note.chanceGroup = 0;
+    note.repeat = 9; // (issue #208: FL's note repeat survives the project document)
     pattern.notes.push_back (note); // Exact documents also preserve the inactive play-one flag.
     PatternEvents lane;
     lane.target = { AutomationTargetKind::channelVolume, 0 };
@@ -197,6 +198,7 @@ void noteCurvesDocuments()
     curves.lane (NoteCurveLane::timbre) = { { 10.0f, 0.123456f } };
     curves.lane (NoteCurveLane::pressure) = { { 0.0f, 0.0f }, { 333.33f, 1.0f } };
     source.patterns[0].notes[1].curves = curves;
+    source.patterns[0].notes[1].repeat = 0; // (the saved form of a note with curves only; repeats: noteRepeatDocuments)
     juce::String error;
     const auto ordinary = ProjectFile::fromJson (ProjectFile::toJson (source), error);
     check (ordinary.has_value(), "A project with note curves did not load");
@@ -225,6 +227,29 @@ void noteCurvesDocuments()
     patch->setProperty ("value", withCurve);
     const auto staged = remote_document::stage (source, juce::Array<juce::var> { juce::var (patch) });
     check (staged.patterns[0].notes[0].curves == source.patterns[0].notes[1].curves, "A document edit could not set note curves");
+}
+
+// Issue #208: FL's note repeat is saved after the curves slot (null without curves) and loads back; older files and
+// notes without a repeat keep their form.
+void noteRepeatDocuments()
+{
+    auto source = fixture();
+    source.patterns[0].notes[0].repeat = 0;
+    source.patterns[0].notes[1].repeat = 12;
+    juce::String error;
+    const auto ordinary = ProjectFile::fromJson (ProjectFile::toJson (source), error);
+    check (ordinary.has_value(), "A project with a note repeat did not load");
+    check (ordinary->patterns[0].notes[1].repeat == 12 && ordinary->patterns[0].notes[0].repeat == 0, "A note repeat was not saved");
+    const auto document = json (ProjectFile::toJson (source).toRawUTF8());
+    const auto& notes = document["patterns"][0]["notes"];
+    check (notes[1].size() == 21 && notes[1][19].isVoid() && (int) notes[1][20] == 12, "A note repeat is not after an empty curves slot");
+    check (notes[0].size() < 20, "A note without a repeat changed its saved form");
+    NoteCurves bend;
+    bend.lane (NoteCurveLane::pitch) = { { 0.0f, 100.0f }, { 240.0f, 0.0f } };
+    source.patterns[0].notes[1].curves = bend;
+    const auto both = ProjectFile::fromJson (ProjectFile::toJson (source), error);
+    check (both.has_value() && both->patterns[0].notes[1].repeat == 12 && both->patterns[0].notes[1].curves.has(),
+           "A note with curves and a repeat lost one of them");
 }
 
 void transactionValidation()
@@ -858,6 +883,7 @@ int main()
         run ("exactDocuments", exactDocuments);
         run ("remoteNotesRoundtrip", remoteNotesRoundtrip);
         run ("noteCurvesDocuments", noteCurvesDocuments);
+        run ("noteRepeatDocuments", noteRepeatDocuments);
         run ("transactionValidation", transactionValidation);
         run ("currentModelDocuments", currentModelDocuments);
         run ("documentIoPolicy", documentIoPolicy);

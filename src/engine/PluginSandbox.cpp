@@ -228,24 +228,145 @@ pearch::Arch moduleArch (const juce::String& path)
 }
 } // namespace
 
+namespace
+{
+// The answers by module path: the file's date when it was read and whether it is 32-bit. Kept in plugin-bits.txt
+// ("<0|1>\t<date ms>\t<path>" lines, issue #209) so a new run need not open the plugins' files again.
+struct BitsCache
+{
+    std::mutex lock;
+    std::map<juce::String, std::pair<juce::int64, bool>> entries;
+    bool loaded = false, dirty = false;
+    std::atomic<bool> refreshing { false };
+
+    static juce::File file() { return PluginHost::settingsFolder().getChildFile ("plugin-bits.txt"); }
+
+    void loadLocked()
+    {
+        if (loaded)
+            return;
+        loaded = true;
+        juce::StringArray lines;
+        lines.addLines (file().loadFileAsString());
+        for (const auto& line : lines)
+        {
+            const auto bits = line.upToFirstOccurrenceOf ("\t", false, false);
+            const auto rest = line.fromFirstOccurrenceOf ("\t", false, false);
+            const auto path = rest.fromFirstOccurrenceOf ("\t", false, false);
+            if ((bits == "0" || bits == "1") && path.isNotEmpty())
+                entries[path] = { rest.upToFirstOccurrenceOf ("\t", false, false).getLargeIntValue(), bits == "1" };
+        }
+    }
+
+    void saveLocked()
+    {
+        if (! dirty)
+            return;
+        dirty = false;
+        juce::String text;
+        for (const auto& [path, entry] : entries)
+            text << (entry.second ? "1" : "0") << "\t" << juce::String (entry.first) << "\t" << path << "\n";
+        file().replaceWithText (text);
+    }
+};
+
+BitsCache& bitsCache()
+{
+    static auto* cache = new BitsCache(); // (never destroyed: a background refresh may still run at exit)
+    return *cache;
+}
+
+juce::int64 moduleStamp (const juce::String& fileOrIdentifier)
+{
+    const juce::File f (juce::File::isAbsolutePath (fileOrIdentifier) ? fileOrIdentifier : juce::String());
+    return f.getFullPathName().isEmpty() ? 0 : f.getLastModificationTime().toMilliseconds();
+}
+
+bool hasModuleFile (const juce::PluginDescription& d)
+{
+    return d.pluginFormatName == "VST" || d.pluginFormatName == "VST3";
+}
+} // namespace
+
 bool isModule32Bit (const juce::String& fileOrIdentifier)
 {
     if (! bridge32Supported())
         return false;
     // cached by path and date: the plugin menus and the scan ask often, and the answer only changes with the file
-    static std::mutex lock;
-    static std::map<juce::String, std::pair<juce::int64, bool>> cache;
-    const juce::File f (juce::File::isAbsolutePath (fileOrIdentifier) ? fileOrIdentifier : juce::String());
-    const auto stamp = f.getFullPathName().isEmpty() ? 0 : f.getLastModificationTime().toMilliseconds();
+    auto& cache = bitsCache();
+    const auto stamp = moduleStamp (fileOrIdentifier);
     {
-        const std::scoped_lock l (lock);
-        if (const auto it = cache.find (fileOrIdentifier); it != cache.end() && it->second.first == stamp)
+        const std::scoped_lock l (cache.lock);
+        cache.loadLocked();
+        if (const auto it = cache.entries.find (fileOrIdentifier); it != cache.entries.end() && it->second.first == stamp)
             return it->second.second;
     }
     const auto is32 = moduleArch (fileOrIdentifier) == pearch::Arch::x86;
-    const std::scoped_lock l (lock);
-    cache[fileOrIdentifier] = { stamp, is32 };
+    const std::scoped_lock l (cache.lock);
+    cache.entries[fileOrIdentifier] = { stamp, is32 };
+    cache.dirty = true;
     return is32;
+}
+
+std::optional<bool> knownPlugin32Bit (const juce::PluginDescription& description)
+{
+    if (! bridge32Supported() || ! hasModuleFile (description))
+        return false;
+    auto& cache = bitsCache();
+    const std::scoped_lock l (cache.lock);
+    cache.loadLocked();
+    if (const auto it = cache.entries.find (description.fileOrIdentifier); it != cache.entries.end())
+        return it->second.second;
+    return std::nullopt;
+}
+
+void refreshPluginBitness (const juce::Array<juce::PluginDescription>& types, std::function<void()> changed)
+{
+    if (! bridge32Supported())
+        return;
+    auto& cache = bitsCache();
+    if (cache.refreshing.exchange (true))
+        return; // (one at a time: the running one answers the same plugins)
+    juce::StringArray paths;
+    for (const auto& t : types)
+        if (hasModuleFile (t))
+            paths.addIfNotAlreadyThere (t.fileOrIdentifier);
+    const auto launched = juce::Thread::launch (juce::Thread::Priority::low, [paths, changed = std::move (changed), &cache] {
+        bool any = false;
+        for (const auto& path : paths)
+        {
+            const auto stamp = moduleStamp (path); // (the date: no read of the file itself)
+            {
+                const std::scoped_lock l (cache.lock);
+                cache.loadLocked();
+                if (const auto it = cache.entries.find (path); it != cache.entries.end() && it->second.first == stamp)
+                    continue;
+            }
+            const auto is32 = moduleArch (path) == pearch::Arch::x86;
+            const std::scoped_lock l (cache.lock);
+            const auto it = cache.entries.find (path);
+            any = any || it == cache.entries.end() || it->second.second != is32;
+            cache.entries[path] = { stamp, is32 };
+            cache.dirty = true;
+        }
+        {
+            const std::scoped_lock l (cache.lock);
+            cache.saveLocked();
+        }
+        cache.refreshing = false;
+        if (any && changed)
+            juce::MessageManager::callAsync (changed);
+    });
+    if (! launched)
+        cache.refreshing = false;
+}
+
+bool waitForPluginBitness (int ms)
+{
+    const auto until = juce::Time::getMillisecondCounter() + (juce::uint32) juce::jmax (0, ms);
+    while (bitsCache().refreshing && juce::Time::getMillisecondCounter() < until)
+        juce::Thread::sleep (5);
+    return ! bitsCache().refreshing;
 }
 
 bool isPlugin32Bit (const juce::PluginDescription& description)

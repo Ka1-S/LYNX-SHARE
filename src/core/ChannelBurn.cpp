@@ -1,4 +1,5 @@
 #include "core/ChannelBurn.h"
+#include "core/NoteRepeat.h"
 
 #include <algorithm>
 #include <cmath>
@@ -110,10 +111,15 @@ std::vector<Note> playedNotes (const Song& song, int patternIndex, int channel)
         for (auto n : source)
         {
             const auto t = playedTiming (n, song.swing, &c);
-            n.start = t.start;
-            n.length = std::max<std::int64_t> (1, t.length);
-            if (n.start < patternLength)
-                out.push_back (n);
+            // FL's note repeat (issue #208): each strike becomes a note of its own
+            noterepeat::forEachStrike (n, t.start, std::max<std::int64_t> (1, t.length), [&] (std::int64_t at, std::int64_t length, int) {
+                auto strike = n;
+                strike.start = at;
+                strike.length = std::max<std::int64_t> (1, length);
+                strike.repeat = 0;
+                if (strike.start < patternLength)
+                    out.push_back (strike);
+            });
         }
         std::stable_sort (out.begin(), out.end(), [] (const Note& a, const Note& b) { return a.start < b.start; });
         return out;
@@ -133,8 +139,10 @@ std::vector<Note> playedNotes (const Song& song, int patternIndex, int channel)
             out.push_back (copy);
             continue;
         }
-        events.push_back ({ t.start, eventOf (n, NoteEvent::Type::on, channel) });
-        events.push_back ({ t.start + std::max<std::int64_t> (1, t.length), eventOf (n, NoteEvent::Type::off, channel) });
+        noterepeat::forEachStrike (n, t.start, std::max<std::int64_t> (1, t.length), [&] (std::int64_t at, std::int64_t length, int) {
+            events.push_back ({ at, eventOf (n, NoteEvent::Type::on, channel) });
+            events.push_back ({ at + std::max<std::int64_t> (1, length), eventOf (n, NoteEvent::Type::off, channel) });
+        });
         lastEvent = std::max (lastEvent, t.start + std::max<std::int64_t> (1, t.length));
     }
     std::stable_sort (events.begin(), events.end(), [] (const Timed& a, const Timed& b) {

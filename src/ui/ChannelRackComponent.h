@@ -242,13 +242,14 @@ private:
     int rowAtY (int y) const;       // row under y (the lane counts as its channel's row)
     int graphRow() const;           // the row the lane belongs to (the primary selection), -1 when hidden
     juce::Rectangle<int> laneBounds() const;
-    juce::Rectangle<int> levelButtonBounds (int level) const;
+    juce::Rectangle<int> levelButtonBounds (int tab) const; // tab = FL's lane order (notetools::stepLevel)
     void paintLane (juce::Graphics& g);
     void paintNotePreview (juce::Graphics& g, int row, const Pattern& pattern, std::uint32_t channelColour);
     PreviewSpan previewSpan() const; // where the miniatures are drawn (core/RackOps.h notePreviewSpan)
     void setLaneValue (int step, float value);
     void applyLane (const juce::MouseEvent& e);
     float laneValueAt (int y) const;
+    std::pair<int, int> pitchLaneKeys() const; // the keys the Note pitch lane shows (issue #208)
     bool graphLanes = false;
     bool pianoRollView = false;
     int graphLevel = 0; // notetools::Level
@@ -258,7 +259,7 @@ private:
     // follow"): the lane's notes and values at a Ctrl press; the drag scales them all by the pressed column's change
     std::vector<std::pair<std::size_t, float>> laneScaleFrom;
     float laneScaleBase = -1.0f; // the pressed column's value at the press (< 0: no Ctrl scaling)
-    static constexpr int laneHeight = 72;
+    static constexpr int laneHeight = 96; // (three rows of FL's nine lane tabs, issue #208)
     juce::Rectangle<int> stepBounds (int row, int step) const;
     bool cellHasNote (int channel, int step) const;
     std::vector<std::uint8_t> noteCellBits; // (paint: [channel * steps + step] a Piano Roll note starts there; round 190gr)

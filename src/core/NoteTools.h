@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <array>
+#include <string>
 #include <vector>
 
 #include "core/Song.h"
@@ -24,28 +25,40 @@ enum class Level
     release,   // 0..1
     finePitch, // -120..120 cents -> 0..1
     modX,      // 0..1
-    modY       // 0..1
+    modY,      // 0..1
+    // the Channel Rack graph editor's own lanes (issue #208; FL 2026's Note pitch, Shift and Repeat)
+    notePitch, // key 0..127 -> 0..1
+    shift,     // the start's offset in its step, FL's "100 % = 99 % of a step" -> 0..1 (setting it moves the note in its step)
+    repeat     // FL's repeat rate index 0..noterepeat::rateCount -> 0..1
 };
 
-constexpr int levelCount = 6;
+constexpr int levelCount = 6; // the Piano roll's lanes (velocity .. Mod Y)
 const char* levelName (Level level); // English, for tr()
+
+// The Channel Rack graph editor's lanes in FL's order and with FL's names (FL Studio 2026, FLEngine 0x15d81e8):
+// Note pitch, Velocity, Release velocity, Fine pitch, Panning, Mod X, Mod Y, Shift, Repeat
+constexpr int stepLevelCount = 9;
+Level stepLevel (int tab) noexcept;
+// FL's tab names: `size` 2 = full ("Release velocity"), 1 = medium ("Release", "Repeats"), 0 = short ("Rel", "Rep")
+const char* stepLevelName (int tab, int size = 2);
+// Round 190lx's names for the same lanes (DE-30; kept so its Channel Rack code and this round's merge cleanly): lane ids
+// are Level values, 6 = Note (pitch), 7 = Shift, 8 = Repeat, in FL's tab order
+constexpr int graphLaneCount = stepLevelCount, graphNote = (int) Level::notePitch, graphShift = (int) Level::shift, graphRepeat = (int) Level::repeat;
+inline constexpr int graphTabOrder[graphLaneCount] { graphNote, (int) Level::velocity, (int) Level::release, (int) Level::finePitch,
+                                                     (int) Level::pan, (int) Level::modX, (int) Level::modY, graphShift, graphRepeat };
+const char* graphLaneName (int lane);                                                        // FL's full tab name, for tr()
+float graphValue (const Note& note, int lane, std::int64_t stepTicks = ticksPerStep) noexcept; // = levelValue
+void setGraphValue (Note& note, int lane, float normalised, std::int64_t stepTicks = ticksPerStep) noexcept;
+float graphDefault (int lane) noexcept;
+bool graphIsBipolar (int lane) noexcept;
+
+// FL's hint-bar value of the graph editor's own lanes: Note pitch "C5", Shift "0.25" (of a step), Repeat "1/32 triplet"
+// (English; "No repeat" goes through tr()); "" for the other lanes
+std::string levelText (Level level, float normalised);
 float levelValue (const Note& note, Level level) noexcept;
 void setLevelValue (Note& note, Level level, float normalised) noexcept;
 float levelDefault (Level level) noexcept; // normalised value of a fresh note
 bool levelIsBipolar (Level level) noexcept; // drawn from the centre line (pan, fine pitch)
-
-// Round 190lx (DE-30, FL manual Channel rack "Graph editor": tabs Note, Velocity, Release, Fine Pitch, Pan, Mod X, Mod Y,
-// Shift): the Channel rack graph's lanes. 0…5 are the Levels above; 6 = Note (the key, 0…127 over the lane), 7 = Shift
-// (the note's start offset in its step: "100% shift equals 99% of the note position equal to one 16th note").
-// FL's Rep (note repeat) has no lane: LYNX's notes have no repeat yet.
-constexpr int graphLaneCount = 8, graphNote = 6, graphShift = 7;
-inline constexpr int graphTabOrder[graphLaneCount] { graphNote, (int) Level::velocity, (int) Level::release, (int) Level::finePitch,
-                                                     (int) Level::pan, (int) Level::modX, (int) Level::modY, graphShift };
-const char* graphLaneName (int lane);                         // English, for tr()
-float graphValue (const Note& note, int lane, std::int64_t stepTicks) noexcept;
-void setGraphValue (Note& note, int lane, float normalised, std::int64_t stepTicks) noexcept;
-float graphDefault (int lane) noexcept;
-bool graphIsBipolar (int lane) noexcept;
 
 // --- scales -----------------------------------------------------------------------------------
 struct ScaleInfo
