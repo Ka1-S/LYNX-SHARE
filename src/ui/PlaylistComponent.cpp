@@ -27,6 +27,7 @@
 #include "ui/PlaylistComponent.h"
 #include "core/TempoMarkers.h"
 #include "core/PaintTemplate.h"
+#include "ui/PaintAB.h" // (round 190md: LYNX_PAINT_SAVINGS=0 paints the end veil as before)
 #include "core/PickerDrop.h"
 #include "core/ChainPresets.h"
 #include "core/ClipLauncher.h"
@@ -1922,7 +1923,53 @@ void PlaylistComponent::paint (juce::Graphics& g)
     }
 
     using namespace theme;
-    g.fillAll (colour::bg1);
+    const auto live = liveArrangeLook();
+    const auto rows = this->paintedRows(); // (round 190jc, SG-2: the Simple layout's real tracks and its drop lane only)
+    const auto beatPixels = ppq * pixelsPerTick;
+    const auto fl = flClipLook();
+
+    // round 190md (perf): the grid past the song's end in one pass. Since FL's opening zoom (round 190ig, FM-24) a short
+    // song leaves most of the grid past its end, and the end-of-song veil (bg0 at 45 %, below) blended each of those
+    // pixels once more over the lanes and lines: +46 % paint instructions on the performance gate's inserts50 Playlist
+    // vs 0.1.29. With the software renderer at a whole-pixel scale the grid right of the veil's first whole column is
+    // now painted once, every colour already veiled by the renderer's own blend (the same pixels), and the window
+    // background is no longer painted under the grid (it paints its own). Anything see-through there (half-beat lines,
+    // automation lanes, the loop), another renderer or LYNX_PAINT_SAVINGS=0: as before.
+    const auto veil = colour::bg0.withAlpha (0.45f);
+    const auto veilSplit = [&]() -> std::optional<int> {
+        const auto& context = g.getInternalContext();
+        const auto scale = context.getPhysicalPixelScaleFactor();
+        if (live || ! ui::paintSavings() || song.playlist.empty() || grid.isEmpty() || dynamic_cast<const juce::LowLevelGraphicsSoftwareRenderer*> (&context) == nullptr
+            || scale < 1.0f || scale != std::round (scale)
+            || ! (colour::bg0.isOpaque() && colour::bg1.isOpaque() && colour::bg2.isOpaque() && colour::textPrimary.isOpaque()
+                  && colour::gridBar.isOpaque() && colour::gridBeat.isOpaque())
+            || (fl && beatPixels >= flHalfBeatLinesFrom && ppq >= 2))
+            return std::nullopt;
+        const auto endX = tickToX ((double) song.songLength());
+        if (! std::isfinite (endX) || endX >= (double) grid.getRight() - 1.0)
+            return std::nullopt; // (nothing, or a column or less, to veil)
+        const auto split = juce::jmax (grid.getX(), (int) std::ceil (juce::jmax (endX, (double) grid.getX())));
+        if (song.hasLoop() && juce::jmax (tickToX ((double) song.loopStart), tickToX ((double) song.loopEnd)) + 2.0 >= (double) split)
+            return std::nullopt;
+        for (int t = 0; t < rows; ++t)
+            if (const auto lanes = laneBlockHeight (t); lanes > 0)
+            {
+                const auto top = trackToY (t) + heightOf (t);
+                if (top <= grid.getBottom() && top + lanes >= grid.getY())
+                    return std::nullopt;
+            }
+        return split;
+    }();
+    if (veilSplit.has_value())
+    {
+        const juce::Graphics::ScopedSaveState keep (g);
+        g.excludeClipRegion (grid);
+        g.fillAll (colour::bg1);
+    }
+    else
+    {
+        g.fillAll (colour::bg1);
+    }
 
     // --- tracks and grid ---------------------------------------------------
     {
@@ -1930,118 +1977,140 @@ void PlaylistComponent::paint (juce::Graphics& g)
         juce::Graphics::ScopedSaveState state (g);
         g.reduceClipRegion (grid);
         const auto paintedRows = g.getClipBounds();
-        const auto rows = this->paintedRows(); // (round 190jc, SG-2: the Simple layout's real tracks and its drop lane only)
         // round 190jn (CL-17): Live's lanes — the bar groups' shading and grid over the whole grid, a 2 px separator under each lane
-        const auto live = liveArrangeLook();
         const auto liveLanesCached = live && paintLiveLanesCached (g, grid, rows);
         if (live && ! liveLanesCached)
             paintLiveGrid (g, grid);
 
-        for (int t = 0; t < rows; ++t)
+        // (round 190md) one pass; with the veil's split two: left of it as always, right of it every colour veiled
+        const auto veiled = [&veil] (juce::Colour c) {
+            auto p = c.getPixelARGB();
+            p.blend (veil.getPixelARGB()); // (what the software renderer does to an opaque pixel under the veil)
+            return juce::Colour (p);
+        };
+        for (int pass = 0; pass < (veilSplit.has_value() ? 2 : 1); ++pass)
         {
-            const auto y = trackToY (t);
-            const auto trackHeight = heightOf (t);
-            const auto rowsHeight = trackHeight + laneBlockHeight (t);
-
-            if (y > grid.getBottom() || y + rowsHeight < grid.getY() || y > paintedRows.getBottom() || y + rowsHeight < paintedRows.getY())
+            const juce::Graphics::ScopedSaveState passState (g);
+            const auto rightOfSplit = pass == 1;
+            if (veilSplit.has_value() && ! g.reduceClipRegion (rightOfSplit ? grid.withLeft (*veilSplit) : grid.withRight (*veilSplit)))
                 continue;
-            const uitrace::Part tally (uitrace::part::lanes);
-
-            if (live)
+            const auto ink = [&veiled, rightOfSplit] (juce::Colour c) { return rightOfSplit ? veiled (c) : c; };
+            if (veilSplit.has_value()) // the grid's own background where no lane covers it (the window's was left out)
             {
-                if (! liveLanesCached) // (the cached image holds them)
+                juce::RectangleList<int> background (grid);
+                for (int t = 0; t < rows; ++t)
+                    if (const auto trackHeight = heightOf (t); trackHeight > 0)
+                        background.subtract (juce::Rectangle<int> (grid.getX(), trackToY (t), grid.getWidth(), trackHeight));
+                g.setColour (ink (colour::bg1));
+                g.fillRectList (background);
+            }
+
+            for (int t = 0; t < rows; ++t)
+            {
+                const auto y = trackToY (t);
+                const auto trackHeight = heightOf (t);
+                const auto rowsHeight = trackHeight + laneBlockHeight (t);
+
+                if (y > grid.getBottom() || y + rowsHeight < grid.getY() || y > paintedRows.getBottom() || y + rowsHeight < paintedRows.getY())
+                    continue;
+                const uitrace::Part tally (uitrace::part::lanes);
+
+                if (live)
                 {
-                    g.setColour (liveLaneSeparator);
-                    g.fillRect (grid.getX(), y + trackHeight - 2, grid.getWidth(), 2);
+                    if (! liveLanesCached) // (the cached image holds them)
+                    {
+                        g.setColour (liveLaneSeparator);
+                        g.fillRect (grid.getX(), y + trackHeight - 2, grid.getWidth(), 2);
+                    }
+                }
+                else
+                {
+                    auto lane = projection.row (t) % 2 == 0 ? colour::bg2 : colour::bg2.interpolatedWith (colour::bg1, 0.5f); // (by drawn row)
+                    if (projection.isChild (t)) // round 190jq: an automation clip lane, in the lanes' colour (round 177b)
+                        lane = colour::bg1.interpolatedWith (colour::bg2, 0.35f);
+                    if (t == hover.track && drag == Drag::none)
+                        lane = lane.interpolatedWith (colour::textPrimary, 0.025f); // the track under the mouse
+                    g.setColour (ink (lane));
+                    g.fillRect (grid.getX(), y, grid.getWidth(), trackHeight);
+                    g.setColour (ink (colour::bg0));
+                    g.drawHorizontalLine (y + trackHeight - 1, (float) grid.getX(), (float) grid.getRight());
+                }
+
+                if (const auto lanes = laneBlockHeight (t); lanes > 0) // round 177b: the track's automation lanes
+                {
+                    g.setColour (colour::bg1.interpolatedWith (colour::bg2, 0.35f));
+                    g.fillRect (grid.getX(), y + trackHeight, grid.getWidth(), lanes);
+                    g.setColour (colour::bg0.withAlpha (0.6f));
+                    for (int i = 0; i < (int) song.playlistTracks[(std::size_t) t].lanes.size(); ++i)
+                        g.drawHorizontalLine (laneRow (t, i).getBottom() - 1, (float) grid.getX(), (float) grid.getRight());
                 }
             }
-            else
+
+            // (only the bars of the repainted columns: a playhead strip is 16 px wide, the view can hold hundreds of bars,
+            // and every line is a renderer call even where it is clipped away; round 174e)
+            const auto paintedX = grid.getIntersection (g.getClipBounds());
+            // round 190ig (Pattern layout, FL): FM-29 — each line on whole physical pixels (at 150 % a 1 px line at x = 37 fell on
+            // 55.5 device px and blurred over two columns); FM-24 — bars closer than 12 px: every 4th bar line only, as FL
+            // thins its grid when zoomed out (LYNX's 1 650 px "barcode" of the whole song)
+            const auto lineScale = juce::jmax (1.0f, g.getInternalContext().getPhysicalPixelScaleFactor());
+            const auto lineWidth = juce::jmax (1.0f, std::round (lineScale)) / lineScale;
+            const auto vline = [&g, &grid, fl, lineScale, lineWidth] (double x) {
+                if (fl)
+                    g.fillRect (juce::Rectangle<float> ((float) std::floor (x * lineScale) / lineScale, (float) grid.getY(), lineWidth, (float) grid.getHeight()));
+                else
+                    g.drawVerticalLine ((int) x, (float) grid.getY(), (float) grid.getBottom());
+            };
+            const auto barEvery = fl && bar * pixelsPerTick < 12.0 ? 4 : 1;
+            if (! live) // (Live's grid: paintLiveGrid)
+            for (const auto& b : song.barsBetween (juce::jmax ((std::int64_t) std::max (0.0, scrollTicks), (std::int64_t) xToTick (paintedX.getX()) - bar),
+                                                   juce::jmin ((std::int64_t) xToTick (grid.getRight()), (std::int64_t) xToTick (paintedX.getRight())) + 1))
             {
-                auto lane = projection.row (t) % 2 == 0 ? colour::bg2 : colour::bg2.interpolatedWith (colour::bg1, 0.5f); // (by drawn row)
-                if (projection.isChild (t)) // round 190jq: an automation clip lane, in the lanes' colour (round 177b)
-                    lane = colour::bg1.interpolatedWith (colour::bg2, 0.35f);
-                if (t == hover.track && drag == Drag::none)
-                    lane = lane.interpolatedWith (colour::textPrimary, 0.025f); // the track under the mouse
-                g.setColour (lane);
-                g.fillRect (grid.getX(), y, grid.getWidth(), trackHeight);
-                g.setColour (colour::bg0);
-                g.drawHorizontalLine (y + trackHeight - 1, (float) grid.getX(), (float) grid.getRight());
+                if (barEvery > 1 && (b.number - 1) % barEvery != 0)
+                    continue;
+                g.setColour (ink (colour::gridBar));
+                vline (fl ? tickToX ((double) b.tick) : (double) (int) tickToX ((double) b.tick));
+
+                // zoomed far out: bar lines only (FL: no beat lines yet at 10 px a beat, fl-playlist-zoom-audioclips.png)
+                if (beatPixels < (fl ? flBeatLinesFrom : 8.0))
+                    continue;
+
+                g.setColour (ink (colour::gridBeat));
+                for (auto tick = b.tick + ppq; tick < b.tick + b.length; tick += ppq)
+                    vline (fl ? tickToX ((double) tick) : (double) (int) tickToX ((double) tick));
+
+                if (fl && beatPixels >= flHalfBeatLinesFrom && ppq >= 2)
+                {
+                    g.setColour (colour::gridBeat.withMultipliedAlpha (flHalfBeatAlpha));
+                    for (auto tick = b.tick + ppq / 2; tick < b.tick + b.length; tick += ppq)
+                        vline (tickToX ((double) tick));
+                }
             }
 
-            if (const auto lanes = laneBlockHeight (t); lanes > 0) // round 177b: the track's automation lanes
+            if (rightOfSplit)
+                continue; // (round 190md: no lanes, loop or half-beat lines right of the split; the veil is in its colours)
+
+            paintLanes (g, grid); // round 177b (nothing when lanes are off)
+
+            // loop region
+            if (song.hasLoop())
             {
-                g.setColour (colour::bg1.interpolatedWith (colour::bg2, 0.35f));
-                g.fillRect (grid.getX(), y + trackHeight, grid.getWidth(), lanes);
-                g.setColour (colour::bg0.withAlpha (0.6f));
-                for (int i = 0; i < (int) song.playlistTracks[(std::size_t) t].lanes.size(); ++i)
-                    g.drawHorizontalLine (laneRow (t, i).getBottom() - 1, (float) grid.getX(), (float) grid.getRight());
+                const auto lx0 = (float) tickToX ((double) song.loopStart), lx1 = (float) tickToX ((double) song.loopEnd);
+                const auto tint = song.loopOff ? colour::textSecondary : colour::accent; // (round 190cg: grey while the loop is switched off)
+                g.setColour (tint.withAlpha (0.06f));
+                g.fillRect (juce::Rectangle<float> (lx0, (float) grid.getY(), lx1 - lx0, (float) grid.getHeight()));
+                g.setColour (tint.withAlpha (0.45f));
+                g.drawVerticalLine ((int) lx0, (float) grid.getY(), (float) grid.getBottom());
+                g.drawVerticalLine ((int) lx1, (float) grid.getY(), (float) grid.getBottom());
             }
-        }
 
-        const auto beatPixels = ppq * pixelsPerTick;
-
-        // (only the bars of the repainted columns: a playhead strip is 16 px wide, the view can hold hundreds of bars,
-        // and every line is a renderer call even where it is clipped away; round 174e)
-        const auto paintedX = grid.getIntersection (g.getClipBounds());
-        // round 190ig (Pattern layout, FL): FM-29 — each line on whole physical pixels (at 150 % a 1 px line at x = 37 fell on
-        // 55.5 device px and blurred over two columns); FM-24 — bars closer than 12 px: every 4th bar line only, as FL
-        // thins its grid when zoomed out (LYNX's 1 650 px "barcode" of the whole song)
-        const auto fl = flClipLook();
-        const auto lineScale = juce::jmax (1.0f, g.getInternalContext().getPhysicalPixelScaleFactor());
-        const auto lineWidth = juce::jmax (1.0f, std::round (lineScale)) / lineScale;
-        const auto vline = [&g, &grid, fl, lineScale, lineWidth] (double x) {
-            if (fl)
-                g.fillRect (juce::Rectangle<float> ((float) std::floor (x * lineScale) / lineScale, (float) grid.getY(), lineWidth, (float) grid.getHeight()));
-            else
-                g.drawVerticalLine ((int) x, (float) grid.getY(), (float) grid.getBottom());
-        };
-        const auto barEvery = fl && bar * pixelsPerTick < 12.0 ? 4 : 1;
-        if (! live) // (Live's grid: paintLiveGrid)
-        for (const auto& b : song.barsBetween (juce::jmax ((std::int64_t) std::max (0.0, scrollTicks), (std::int64_t) xToTick (paintedX.getX()) - bar),
-                                               juce::jmin ((std::int64_t) xToTick (grid.getRight()), (std::int64_t) xToTick (paintedX.getRight())) + 1))
-        {
-            if (barEvery > 1 && (b.number - 1) % barEvery != 0)
-                continue;
-            g.setColour (colour::gridBar);
-            vline (fl ? tickToX ((double) b.tick) : (double) (int) tickToX ((double) b.tick));
-
-            // zoomed far out: bar lines only (FL: no beat lines yet at 10 px a beat, fl-playlist-zoom-audioclips.png)
-            if (beatPixels < (fl ? flBeatLinesFrom : 8.0))
-                continue;
-
-            g.setColour (colour::gridBeat);
-            for (auto tick = b.tick + ppq; tick < b.tick + b.length; tick += ppq)
-                vline (fl ? tickToX ((double) tick) : (double) (int) tickToX ((double) tick));
-
-            if (fl && beatPixels >= flHalfBeatLinesFrom && ppq >= 2)
+            // end of song (Live does not shade past the end: round 190jn)
+            if (! song.playlist.empty() && ! live)
             {
-                g.setColour (colour::gridBeat.withMultipliedAlpha (flHalfBeatAlpha));
-                for (auto tick = b.tick + ppq / 2; tick < b.tick + b.length; tick += ppq)
-                    vline (tickToX ((double) tick));
+                const auto endX = (float) tickToX ((double) song.songLength());
+                g.setColour (veil);
+                g.fillRect (juce::Rectangle<float> (endX, (float) grid.getY(), (float) grid.getRight() - endX, (float) grid.getHeight()));
             }
-        }
-
-        paintLanes (g, grid); // round 177b (nothing when lanes are off)
-
-        // loop region
-        if (song.hasLoop())
-        {
-            const auto lx0 = (float) tickToX ((double) song.loopStart), lx1 = (float) tickToX ((double) song.loopEnd);
-            const auto tint = song.loopOff ? colour::textSecondary : colour::accent; // (round 190cg: grey while the loop is switched off)
-            g.setColour (tint.withAlpha (0.06f));
-            g.fillRect (juce::Rectangle<float> (lx0, (float) grid.getY(), lx1 - lx0, (float) grid.getHeight()));
-            g.setColour (tint.withAlpha (0.45f));
-            g.drawVerticalLine ((int) lx0, (float) grid.getY(), (float) grid.getBottom());
-            g.drawVerticalLine ((int) lx1, (float) grid.getY(), (float) grid.getBottom());
-        }
-
-        // end of song (Live does not shade past the end: round 190jn)
-        if (! song.playlist.empty() && ! live)
-        {
-            const auto endX = (float) tickToX ((double) song.songLength());
-            g.setColour (colour::bg0.withAlpha (0.45f));
-            g.fillRect (juce::Rectangle<float> (endX, (float) grid.getY(), (float) grid.getRight() - endX, (float) grid.getHeight()));
-        }
+        } // (the passes)
 
         // Performance mode (round 165m): the zone before the Start marker, where clips are launched instead of played
         if (const auto zoneEnd = song.performanceZoneEnd(); zoneEnd > 0)
