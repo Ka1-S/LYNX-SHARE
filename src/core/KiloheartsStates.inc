@@ -198,6 +198,12 @@ struct Model
     }
 };
 
+// round 190nb: the measured revision of the maps (1). A stand-in is built from the original's state when a project
+// opens without the plug-in; a project saved with the stand-in keeps the stand-in's own values, so nothing saved changes.
+// 0 = round 190ln's maps (kept for A / B against the measured references).
+constexpr int translatorRevision = 1;
+constexpr bool revision190nb = translatorRevision >= 1;
+constexpr double kReverbWet = 1.0, kReverbEarly = 1.0; // kHs Reverb's tank / early level on Reeverb 2's (round 190nb)
 constexpr int volumeGateSteps = 32; // Volume gate: 32 steps per 4-beat bar (core/Effects.cpp)
 double linToDb (double g) noexcept { return 20.0 * std::log10 (std::max (g, 1e-9)); }
 
@@ -419,6 +425,27 @@ int translateKilohearts (const std::vector<std::uint8_t>& state, EffectSlot& slo
         slot.params[(std::size_t) f::outputParam] = (float) std::clamp ((md + 24.0) / 48.0, 0.0, 1.0);
         return 6;
     }
+    if (type == "vocal_filter" && kind == EffectKind::facetEq && revision190nb)
+    {
+        // round 190nb [STATIC, HeartCore 2.4: VocalFilterDsp's process + the shared cookbook biquad designer]: two biquads
+        // in a row — at the lower cutoff a peak (Lows on) or a high pass (off), at the higher one a peak (Highs on) or
+        // a low pass (off), every one at the plug-in's Q; the peaks' gain is 20·log10 (Q) dB (Q = 4: +12 dB)
+        namespace f = facet;
+        const double q = std::clamp (m.num ("q", 4.0), 0.1, 40.0);
+        const double c1 = m.num ("cutoff_1", 550.0), c2 = m.num ("cutoff_2", 1500.0);
+        const double lo = std::min (c1, c2), hi = std::max (c1, c2);
+        const double peakDb = 20.0 * std::log10 (q);
+        auto band = [&] (int b, double hz, bool peak, f::Shape cut) {
+            slot.params[(std::size_t) f::param (b, 0)] = f::shapeValue (peak ? f::Shape::bell : cut);
+            slot.params[(std::size_t) f::param (b, 1)] = f::hzValue (hz);
+            slot.params[(std::size_t) f::param (b, 2)] = f::gainValue (peak ? peakDb : 0.0);
+            slot.params[(std::size_t) f::param (b, 3)] = f::qValue (peak ? q : q / std::sqrt (0.5)); // (Facet's Q 1 = Butterworth for cuts)
+            slot.params[(std::size_t) f::param (b, 4)] = f::slopeValue (12);
+        };
+        band (0, lo, m.flag ("lows", true), f::Shape::lowCut);
+        band (1, hi, m.flag ("highs", true), f::Shape::highCut);
+        return 5;
+    }
     if (type == "vocal_filter" && kind == EffectKind::facetEq)
     {
         // two formant peaks (bells of the plug-in's Q, +12 dB) and, with Lows / Highs off, cuts outside them
@@ -533,7 +560,18 @@ int translateKilohearts (const std::vector<std::uint8_t>& state, EffectSlot& slo
         // attack / sustain −100 … +100 % → Strike Shaper's attack / sustain gains (±12 dB taken for the ends: not
         // measured, the plug-in renders only its defaults here); its output clip → Strike's guard
         unit ("Attack", 12.0 * std::clamp (m.num ("attack", 0.0), -1.0, 1.0));
-        unit ("Sustain", 12.0 * std::clamp (m.num ("sustain", 0.0), -1.0, 1.0));
+        if (revision190nb)
+        {
+            // round 190nb [MEASURED on kHs Transient Shaper]: Sustain is a level-independent gain on the steady part,
+            // 17.93 dB × sustain (the stairs probe: −17.93 / −8.97 / +8.97 / +17.93 dB at −100 / −50 / +50 / +100 % on
+            // every step from −62 to −12 dBFS); Strike Shaper's Sustain shapes decays instead, so the gain goes on its
+            // Output (−20 … +6 dB: a boost above +6 dB is cut there)
+            unit ("Sustain", 0.0);
+            if (const double sus = std::clamp (m.num ("sustain", 0.0), -1.0, 1.0); sus != 0.0)
+                unit ("Output", std::clamp (17.93 * sus, -20.0, 6.0)); // (at 0 the default, exactly 0 dB)
+        }
+        else
+            unit ("Sustain", 12.0 * std::clamp (m.num ("sustain", 0.0), -1.0, 1.0));
         raw ("Guard", m.flag ("clip", false) ? 1.0 : 0.0);
         return n;
     }
@@ -614,8 +652,18 @@ int translateKilohearts (const std::vector<std::uint8_t>& state, EffectSlot& slo
         unit ("Feed", 100.0 * std::abs (fb));
         raw ("Invert feed", fb < 0.0 ? 1.0 : 0.0);
         raw ("Invert wet", 0.0);
-        unit ("Dry", 100.0);
-        unit ("Wet", 100.0 * mix);
+        if (revision190nb)
+        {
+            // round 190nb [STATIC, FlangerDsp's process]: dry cos and wet sin of mix × 45° (100 %: an equal blend)
+            unit ("Dry", 100.0 * std::cos (0.25 * khsdsp::pi * mix));
+            unit ("Wet", 100.0 * std::sin (0.25 * khsdsp::pi * mix));
+            raw ("Cross", 0.0); // (Fruity Flanger's default 50 % adds the other channel's wet; the plug-in has none)
+        }
+        else
+        {
+            unit ("Dry", 100.0);
+            unit ("Wet", 100.0 * mix);
+        }
         unit ("Phase", 180.0 * std::clamp (m.num ("spread", 0.25), 0.0, 1.0));
         return n;
     }
@@ -627,9 +675,22 @@ int translateKilohearts (const std::vector<std::uint8_t>& state, EffectSlot& slo
         unit ("Room size", 50.0 * std::clamp (m.num ("size", 1.0), 0.5, 2.0));
         unit ("High damping", 16000.0 / (1.0 + std::max (0.0, m.num ("damping", 24.0)) / 8.0));
         unit ("Stereo sep.", 100.0 * (std::clamp (m.num ("width", 1.0), 0.0, 2.0) - 1.0));
-        unit ("Early ref.", 100.0 * std::clamp (m.num ("early", 0.25), 0.0, 1.0));
-        unit ("Dry", 100.0 * (1.0 - mix));
-        unit ("Wet", 100.0 * mix);
+        if (! revision190nb)
+        {
+            unit ("Early ref.", 100.0 * std::clamp (m.num ("early", 0.25), 0.0, 1.0));
+            unit ("Dry", 100.0 * (1.0 - mix));
+            unit ("Wet", 100.0 * mix);
+            return n;
+        }
+        // round 190nb [MEASURED]: the plug-in's mix is equal-power (an impulse at 25 % keeps cos 22.5° = 0.924 of its
+        // level); Reeverb 2's Dry / Wet / Early are FL's level law (gain = (e^(2.398 x) − 1) / 10, x = raw / 128 for the
+        // dry, raw / 256 for wet and early; normalised = raw / 160, raw / 320), so the gains are set through that law;
+        // the tank's level against the plug-in's (kReverbWet) measured on the impulse renders
+        auto levelRaw = [] (double gain, double den) { return std::round (den * std::log (10.0 * std::max (0.0, gain) + 1.0) / 2.397895273); };
+        const double a = 0.5 * khsdsp::pi * mix;
+        raw ("Dry", levelRaw (std::cos (a), 128.0) / 160.0);
+        raw ("Wet", std::min (320.0, levelRaw (kReverbWet * std::sin (a), 256.0)) / 320.0);
+        raw ("Early ref.", std::min (320.0, levelRaw (kReverbEarly * std::sin (a) * std::clamp (m.num ("early", 0.25), 0.0, 1.0), 256.0)) / 320.0);
         return n;
     }
     if ((type == "delay" || type == "dualdelay") && kind == EffectKind::echoform)
@@ -674,12 +735,34 @@ int translateKilohearts (const std::vector<std::uint8_t>& state, EffectSlot& slo
         {
             raw ("Sync L", 0.0);
             raw ("Sync R", 0.0);
-            unit ("Time L", 1000.0 * sec);
-            unit ("Time R", 1000.0 * sec * (dual ? std::clamp (m.num ("ratio", 1.618), 0.2, 2.0) : 1.0));
+            if (revision190nb)
+            {
+                // round 190nb [MEASURED, kHs Delay / Dual Delay at 48 kHz]: every echo comes one sample after its time
+                // (9 601 samples at 200 ms); set exactly through Echoform's own time law
+                raw ("Time L", echosuite::echoform::timeValue (1000.0 * sec + 1000.0 / 48000.0));
+                raw ("Time R", echosuite::echoform::timeValue (1000.0 * sec * (dual ? std::clamp (m.num ("ratio", 1.618), 0.2, 2.0) : 1.0) + 1000.0 / 48000.0));
+            }
+            else
+            {
+                unit ("Time L", 1000.0 * sec);
+                unit ("Time R", 1000.0 * sec * (dual ? std::clamp (m.num ("ratio", 1.618), 0.2, 2.0) : 1.0));
+            }
         }
         unit ("Feedback", 100.0 * std::clamp (m.num ("feedback", 0.5), 0.0, 1.0));
         unit ("Ducking", 100.0 * std::clamp (m.num ("duck", 0.0), 0.0, 1.0));
-        raw ("Mix", mix);
+        if (revision190nb && ! dual)
+        {
+            // round 190nb [MEASURED]: the plug-in's mix is linear (dry 1 − m, wet m: an impulse at 25 / 50 / 75 % gives
+            // 0.75 / 0.5 / 0.25 dry and 0.25 / 0.5 / 0.75 on the first echo); Echoform's is equal-power (dry cos, wet sin
+            // of Mix × 90°) and its Output scales the echoes only: Mix gives the dry 1 − m, Output brings the echoes to m.
+            // (Dual Delay's mix is linear too, but its two spread taps and cross-talk are not Echoform's dual: the
+            // linear mix scored worse there, so it keeps round 190ln's)
+            const double mm = std::acos (std::clamp (1.0 - mix, 0.0, 1.0)) / (0.5 * khsdsp::pi);
+            raw ("Mix", mm);
+            unit ("Output", 20.0 * std::log10 (std::max (1e-6, mix / std::max (1e-6, std::sin (0.5 * khsdsp::pi * mm)))));
+        }
+        else
+            raw ("Mix", mix);
         return n;
     }
     if (type == "tape_stop" && kind == EffectKind::pocketTapeStop)
@@ -755,6 +838,90 @@ int translateKilohearts (const std::vector<std::uint8_t>& state, EffectSlot& slo
         unit ("Attack", 1000.0 * std::min (a, 0.25));
         unit ("Release", 1000.0 * m.num ("release", 0.02));
         return n + volumeGateSteps;
+    }
+    // round 190nb: the five snapins without a LYNX effect of their own play Kilohearts laws hidden in FL's Effector
+    // (core/KiloheartsDsp.h; structures read statically in HeartCore 2.4, measured on kHs Essentials): the visible Type
+    // names the nearest Effector algorithm, Wet is the snapin's mix, the law and its values sit in the hidden [12 …]
+    if (kind == EffectKind::effector
+        && (type == "ring_mod" || type == "reverser" || type == "resonator" || type == "phase_distortion" || type == "shaper"))
+    {
+        namespace k = khsdsp;
+        auto hidden = [&] (int index, double v) { slot.params[(std::size_t) index] = (float) std::clamp (v, 0.0, 1.0); ++n; };
+        auto typeIs = [&] (int effectorType) { raw ("Type", effectorType / 11.0); };
+        raw ("Wet", mix);
+        raw ("Input", 1.0);
+        raw ("Output", 0.5);
+        if (type == "ring_mod")
+        {
+            typeIs (11); // Ring
+            hidden (k::lawParam, k::lawValue (k::Law::ringMod));
+            hidden (k::valueParam, k::enc::ringHzValue (m.num ("frequency", 440.0)));
+            hidden (k::valueParam + 1, m.num ("spread", 0.0));
+            hidden (k::valueParam + 2, m.num ("bias", 0.0));
+            hidden (k::valueParam + 3, 0.5 * (std::clamp (m.num ("rectify", 0.0), -1.0, 1.0) + 1.0));
+        }
+        else if (type == "reverser")
+        {
+            typeIs (9); // Stutter
+            hidden (k::lawParam, k::lawValue (k::Law::reverser));
+            hidden (k::valueParam, m.num ("delay_time", 0.2) / 5.0);
+            hidden (k::valueParam + 1, m.str ("sync_mode") == "ms" ? 0.0 : 1.0);
+            hidden (k::valueParam + 2, std::clamp (m.num ("delay_numerator", 4.0), 1.0, 64.0) / 64.0);
+            // denominator_4, _4t, _8, _8t, _16, _16t, _32 → 0 … 6
+            static constexpr const char* dens[7] { "denominator_4", "denominator_4t", "denominator_8", "denominator_8t",
+                                                    "denominator_16", "denominator_16t", "denominator_32" };
+            int d = 4;
+            for (int i = 0; i < 7; ++i)
+                if (m.str ("delay_denominator") == dens[i])
+                    d = i;
+            hidden (k::valueParam + 3, d / 6.0);
+            hidden (k::valueParam + 4, m.num ("crossfade", 0.1));
+        }
+        else if (type == "resonator")
+        {
+            typeIs (10); // Vowel (a resonant filter)
+            hidden (k::lawParam, k::lawValue (k::Law::resonator));
+            hidden (k::valueParam, std::clamp (m.num ("pitch", 69.0), 0.0, 127.0) / 128.0);
+            hidden (k::valueParam + 1, k::enc::resonatorDecayValue (m.num ("decay", 0.01)));
+            hidden (k::valueParam + 2, m.num ("intensity", 0.5));
+            hidden (k::valueParam + 3, m.flag ("harmonics", false) ? 1.0 : 0.0);
+        }
+        else if (type == "phase_distortion")
+        {
+            typeIs (0); // Distort
+            hidden (k::lawParam, k::lawValue (k::Law::phaseDistortion));
+            hidden (k::valueParam, m.num ("drive", 0.5));
+            hidden (k::valueParam + 1, 4.0 * std::clamp (m.num ("spread", 0.0), 0.0, 0.25)); // the plug-in's 0 … 0.25 (0 … 90°)
+            hidden (k::valueParam + 2, m.num ("normalize", 0.5));
+            hidden (k::valueParam + 3, k::enc::toneValue (m.num ("tone", 640.0)));
+            hidden (k::valueParam + 4, std::clamp (m.num ("bias", 0.0), -0.5, 0.5) + 0.5);
+        }
+        else // shaper
+        {
+            typeIs (0); // Distort
+            hidden (k::lawParam, k::lawValue (k::Law::shaper));
+            hidden (k::valueParam, std::clamp (m.num ("drive", 1.0), 0.0, 10.0) / 10.0);
+            hidden (k::valueParam + 1, m.flag ("dcFilter", true) ? 1.0 : 0.0);
+            const auto loop = m.str ("loop");
+            hidden (k::valueParam + 2, loop == "mirror" ? 0.5 : loop == "repeat" ? 1.0 : 0.0);
+            // the curve's points (model.curve.data.segments[k].x / y, −1 … 1), straight lines between them
+            const auto* curve = m.m.get ("curve");
+            const auto* data = curve != nullptr ? curve->get ("data") : nullptr;
+            const auto* segs = data != nullptr ? data->get ("segments") : nullptr;
+            int count = 0;
+            if (segs != nullptr && segs->type == Json::Type::array)
+                for (const auto& s : segs->items)
+                {
+                    if (count >= k::maxShaperPoints)
+                        break;
+                    const Model sm { s };
+                    hidden (k::shaperPointParam + 2 * count, 0.5 * (std::clamp (sm.num ("x", 0.0), -1.0, 1.0) + 1.0));
+                    hidden (k::shaperPointParam + 2 * count + 1, 0.5 * (std::clamp (sm.num ("y", 0.0), -1.0, 1.0) + 1.0));
+                    ++count;
+                }
+            hidden (k::shaperCountParam, count / 16.0);
+        }
+        return n;
     }
     return n;
 }
