@@ -116,7 +116,8 @@
     "Pocket Tape Stop": {"own": false},
     "Pocket Comb Filter": {"own": false},
     "Volume gate": {"own": false},
-    "Effector": {"own": false}
+    "Effector": {"own": false},
+    "Low Lifter": {"own": false}
   },
   "products": {
     "valhalla-vintageverb": {"short": "VintageVerb"},
