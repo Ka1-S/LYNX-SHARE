@@ -181,6 +181,13 @@ ChannelRackComponent::ChannelRackComponent (AudioEngine& e)
 {
     setWantsKeyboardFocus (false);
     setMouseClickGrabsKeyboardFocus (false);
+    // paints every pixel (paint() starts with an opaque fillAll): the panel behind it is no longer filled under it on every
+    // frame (round 190ms, perf: the window frame's fill under the rack was ~2.5 M instructions a whole frame on JUCE's
+    // software renderer). Linux only: on Direct2D the frame's clip then becomes a rectangle list (a geometry layer), and
+    // the rack's frame got 2-9 % slower (round 190ms, Windows --paintbench); macOS was not measured.
+   #if JUCE_LINUX || JUCE_BSD
+    setOpaque (true);
+   #endif
     engine.addChangeListener (this);
     engine.getLevelsBroadcaster().addChangeListener (this);
     previews.setSender ([this] (int channel, int key, float velocity, bool on) { engine.sendLiveNote (channel, key, velocity, on); });

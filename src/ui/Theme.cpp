@@ -19,6 +19,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <tuple>
 #include <unordered_map>
 #include <vector>
 
@@ -1047,7 +1048,120 @@ juce::String paintCacheSelfTest()
         // plate's; reported, not a failure. The alpha must be applied once: the plates' middles are the same.)
         detail << ", translucent plates " << worst << " at a corner";
     }
+    // round 190ms (JUCE fix 190ms): the software renderer builds a path's edge table over the clip cut to the path's
+    // bounds + 1 px (not the whole clip), and copies an RGB image's rows into ARGB pixels four bytes at a time
+    if (const auto renderer = softwareRendererSelfTest(); renderer != "OK")
+        return renderer;
+    detail << ", edge tables over the path's rows and RGB rows exact";
     return "OK (" + detail + ")";
+}
+
+// Round 190ms: the two claims JUCE fix 190ms rests on (cmake/LynxPatchJuce.cmake), checked with JUCE's own classes:
+// (a) an edge table built over the clip's rows from one above the path's bounds to one below (every column of the clip)
+//     covers every pixel as the one built over the whole clip does (shapes at sub-pixel places, strokes, ellipses, curves
+//     of many nearly flat segments, scaled; clips that cut through them or not). Not its columns: EdgeTable extrapolates
+//     a nearly flat segment from its rounded start row, so an edge point can land pixels beyond the path's bounds, and
+//     it is clamped to the table's columns (round 190ms: a 2-D cut changed 3 pixels of Helix+ 2's filter curve by 1 level).
+// (b) an opaque RGB image drawn into an ARGB one gives every pixel 0xff000000 | its RGB (rows of any width and offset).
+juce::String softwareRendererSelfTest()
+{
+    struct Coverage // EdgeTable::iterate's callback: the coverage of each pixel in a W x H map
+    {
+        std::vector<int>& map;
+        int width, height, y = 0;
+        void setEdgeTableYPos (int row) noexcept { y = row; }
+        void put (int x, int alpha) noexcept
+        {
+            if (x >= 0 && x < width && y >= 0 && y < height)
+                map[(std::size_t) (y * width + x)] += alpha + 1; // (+1: a pixel set at alpha 0 still counts as visited)
+        }
+        void handleEdgeTablePixel (int x, int alpha) noexcept { put (x, alpha); }
+        void handleEdgeTablePixelFull (int x) noexcept { put (x, 255); }
+        void handleEdgeTableLine (int x, int w, int alpha) noexcept { for (int i = 0; i < w; ++i) put (x + i, alpha); }
+        void handleEdgeTableLineFull (int x, int w) noexcept { for (int i = 0; i < w; ++i) put (x + i, 255); }
+        void handleEdgeTableRectangle (int x, int y0, int w, int h, int alpha) noexcept
+        {
+            for (int row = y0; row < y0 + h; ++row) { y = row; handleEdgeTableLine (x, w, alpha); }
+        }
+        void handleEdgeTableRectangleFull (int x, int y0, int w, int h) noexcept { handleEdgeTableRectangle (x, y0, w, h, 255); }
+    };
+    constexpr int W = 160, H = 120;
+    juce::Random random (190);
+    int cases = 0;
+    for (int i = 0; i < 1200; ++i)
+    {
+        const auto x = random.nextFloat() * 150.0f - 10.0f, y = random.nextFloat() * 110.0f - 10.0f;
+        const auto w = 1.0f + random.nextFloat() * 60.0f, h = 1.0f + random.nextFloat() * 40.0f;
+        juce::Path path;
+        // a curve as many short, nearly flat segments (a response or envelope curve): its edge points can land well
+        // outside its own bounds (EdgeTable extrapolates a flat segment's slope from a rounded start row)
+        const auto curve = [&] {
+            juce::Path c;
+            for (int k = 0; k <= 120; ++k)
+            {
+                const auto px = x + w * (float) k / 120.0f, py = y + h * 0.5f * (1.0f + std::sin ((float) k * 0.05f + w)) * (k < 60 ? 0.02f : 1.0f);
+                k == 0 ? c.startNewSubPath (px, py) : c.lineTo (px, py);
+            }
+            return c;
+        };
+        switch (i % 6)
+        {
+            case 0: path.addRoundedRectangle (x, y, w, h, random.nextFloat() * 6.0f); break;
+            case 1: juce::PathStrokeType (0.5f + random.nextFloat() * 2.0f).createStrokedPath (path, [&] { juce::Path p; p.addRoundedRectangle (x, y, w, h, 2.0f); return p; }()); break;
+            case 2: path.addEllipse (x, y, w, h); break;
+            case 3: juce::PathStrokeType (0.75f + random.nextFloat() * 1.5f).createStrokedPath (path, curve()); break;
+            case 4: path = curve(); path.lineTo (x + w, y + h); path.lineTo (x, y + h); path.closeSubPath(); break;
+            default: path.addTriangle (x, y, x + w, y + h * 0.5f, x, y + h); break;
+        }
+        const auto transform = i % 5 == 4 ? juce::AffineTransform::scale (1.5f) : i % 7 == 6 ? juce::AffineTransform::scale (2.0f).translated (-3.0f, 1.0f)
+                                                                                           : juce::AffineTransform();
+        // the clip: the whole picture, or a part that cuts through the shape
+        const auto clip = i % 3 == 0 ? juce::Rectangle<int> (W, H)
+                                     : juce::Rectangle<int> (random.nextInt (W / 2), random.nextInt (H / 2), 10 + random.nextInt (W / 2), 10 + random.nextInt (H / 2));
+        const auto pathArea = path.getBoundsTransformed (transform).getSmallestIntegerContainer();
+        if (! pathArea.intersects (clip))
+            continue;
+        // (fix 190ms: the clip's rows from one above the path's to one below; every column of the clip)
+        const auto rows = juce::Rectangle<int>::leftTopRightBottom (clip.getX(), juce::jmax (clip.getY(), pathArea.getY() - 1), clip.getRight(),
+                                                                   juce::jmin (clip.getBottom(), pathArea.getBottom() + 1));
+        std::vector<int> whole ((std::size_t) (W * H), 0), cut ((std::size_t) (W * H), 0);
+        Coverage a { whole, W, H }, b { cut, W, H };
+        juce::EdgeTable (clip, path, transform).iterate (a);
+        juce::EdgeTable (rows, path, transform).iterate (b);
+        if (whole != cut)
+            return "ERROR a path's edge table over its own rows covers other pixels than over the whole clip (case " + juce::String (i) + ")";
+        ++cases;
+    }
+    // (b) RGB rows into ARGB pixels, the image placed at odd offsets and clipped
+    juce::Image rgb (juce::Image::RGB, 37, 9, false, juce::SoftwareImageType());
+    {
+        juce::Image::BitmapData data (rgb, juce::Image::BitmapData::writeOnly);
+        for (int y = 0; y < data.height; ++y)
+            for (int x = 0; x < data.width; ++x)
+                data.setPixelColour (x, y, juce::Colour ((juce::uint8) random.nextInt (256), (juce::uint8) random.nextInt (256), (juce::uint8) random.nextInt (256)));
+    }
+    const std::tuple<int, int, int> placesAndClips[] { { 0, 0, 64 }, { 3, 2, 64 }, { -5, 1, 64 }, { 7, -2, 20 }, { 30, 4, 64 } };
+    for (const auto& [dx, dy, clipWidth] : placesAndClips)
+    {
+        juce::Image argb (juce::Image::ARGB, 64, 16, true, juce::SoftwareImageType());
+        {
+            juce::Graphics g (argb);
+            g.reduceClipRegion (0, 0, clipWidth, 16);
+            g.setColour (juce::Colours::black);
+            g.drawImageAt (rgb, dx, dy);
+        }
+        const juce::Image::BitmapData from (rgb, juce::Image::BitmapData::readOnly), to (argb, juce::Image::BitmapData::readOnly);
+        for (int y = 0; y < 16; ++y)
+            for (int x = 0; x < 64; ++x)
+            {
+                const auto sx = x - dx, sy = y - dy;
+                const auto inside = x < clipWidth && sx >= 0 && sy >= 0 && sx < rgb.getWidth() && sy < rgb.getHeight();
+                const auto want = inside ? from.getPixelColour (sx, sy).withAlpha ((juce::uint8) 255) : juce::Colour();
+                if (to.getPixelColour (x, y) != want)
+                    return "ERROR an RGB image drawn into an ARGB one: pixel " + juce::String (x) + ", " + juce::String (y);
+            }
+    }
+    return cases > 300 ? "OK" : "ERROR too few edge table cases (" + juce::String (cases) + ")";
 }
 
 void setPalette (const themes::Palette& p)
