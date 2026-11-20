@@ -92,7 +92,7 @@ void start (Context c)
     w->addTextEditor ("me", myName(), tr ("Your name"));
     w->addComboBox ("edit", { tr ("Only their own channels, patterns, inserts and rows (recommended)"), tr ("Everything") }, tr ("Guests may edit"));
     w->addComboBox ("keep", { tr ("Only their own part (recommended)"), tr ("A full copy of the project") }, tr ("When the session ends, guests keep"));
-    w->addButton (tr ("Start"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    w->addButton (trc ("@action button: Start"), 1, juce::KeyPress (juce::KeyPress::returnKey));
     w->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
     w->enterModalState (true, juce::ModalCallbackFunction::create ([c, w] (int result) {
                             if (result != 1)

@@ -10015,6 +10015,7 @@ countries: nl be
 
 # --- Round 190gk: FL's render window Start, the Sampler waveform menu's Slicer / Slicex items
 "@render button: Start" = "Start"
+"@action button: Start" = "Start"
 "Start rendering" = "Renderen starten"
 "Open in new Fruity Slicer channel" = "Openen in een nieuw Fruity Slicer-kanaal"
 "Open in new Slicex channel" = "Openen in een nieuw Slicex-kanaal"

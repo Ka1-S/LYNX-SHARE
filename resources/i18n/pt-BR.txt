@@ -112,7 +112,7 @@ countries: br
 "Ctrl+drag" = "Ctrl+arrastar"
 "Select (Ctrl+click adds to the selection)" = "Seleciona (Ctrl+clique adiciona à seleção)"
 "Shift+drag" = "Shift+arrastar"
-"Copy" = "Copia"
+"Copy" = "Copiar"
 "Select all, copy, cut, paste" = "Selecionar tudo, copiar, recortar, colar"
 "Duplicate / quantize" = "Duplicar / quantizar"
 "Mute / portamento" = "Mutar / portamento"
@@ -10143,6 +10143,7 @@ countries: br
 
 # --- Round 190gk: FL's render window Start, the Sampler waveform menu's Slicer / Slicex items
 "@render button: Start" = "Iniciar"
+"@action button: Start" = "Iniciar"
 "Start rendering" = "Iniciar a renderização"
 "Open in new Fruity Slicer channel" = "Abrir num novo canal Fruity Slicer"
 "Open in new Slicex channel" = "Abrir num novo canal Slicex"

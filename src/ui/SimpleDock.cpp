@@ -3112,7 +3112,10 @@ bool SimpleDock::inputMeterShown() const
 juce::Rectangle<int> SimpleDock::inputMeterArea() const
 {
     const auto right = followButton.isVisible() ? followButton.getX() - 10 : getWidth() - 10; // (round 190jj merge: 190jc moved the hide button to the left)
-    return { right - 232, 0, 232, stripHeight() };
+    // the label ("Input Level") takes its text's width, at least 70 px: "Nível de entrada" (pt-BR) was cut to "Nível de en..." (190nx)
+    const auto label = juce::jmax (70, juce::GlyphArrangement::getStringWidthInt (font (type::small, true), tr ("Input Level")) + 6);
+    const auto width = 162 + label;
+    return { right - width, 0, width, stripHeight() };
 }
 
 juce::Rectangle<int> SimpleDock::inputMeterBar() const

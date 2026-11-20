@@ -195,7 +195,7 @@ public:
         }
         spacer.setSize (320, 14); // AlertWindow puts the buttons right under the last custom component
         addCustomComponent (&spacer);
-        addButton (tr ("Start"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+        addButton (trc ("@action button: Start"), 1, juce::KeyPress (juce::KeyPress::returnKey));
         addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
     }
 

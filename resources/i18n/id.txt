@@ -10015,6 +10015,7 @@ countries: id
 
 # --- Round 190gk: FL's render window Start, the Sampler waveform menu's Slicer / Slicex items
 "@render button: Start" = "Mulai"
+"@action button: Start" = "Mulai"
 "Start rendering" = "Mulai render"
 "Open in new Fruity Slicer channel" = "Buka di channel Fruity Slicer baru"
 "Open in new Slicex channel" = "Buka di channel Slicex baru"
