@@ -58,6 +58,7 @@
 #include "ui/PluginSkin.h"
 #include "platform/Paths.h"
 #include "ui/SetupWizard.h"
+#include "ui/DemoMode.h" // (round 190np)
 #include "core/FlPluginDb.h"
 #include "core/Preferences.h"
 
@@ -291,10 +292,14 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         if (safe != nullptr)
             showExportDialogForTracks (safe->engine, safe->currentFile.getParentDirectory(), safe->projectName, tracks, std::move (done));
     };
+    // round 190np: LYNX_EMPTY_HINTS=1 shows the empty-state hints in an off-screen window too (--paintbench measures them)
+    onboardingOn = ! persistent && juce::SystemStats::getEnvironmentVariable ("LYNX_EMPTY_HINTS", {}) == "1";
     if (persistent)
     {
         engine.getRollingLog().setEnabled (true); // on by default, as in FL (Tools › Audio logger)
         loadUiSettings();
+        loadOnboarding(); // round 190np: the welcome card's answer, the Next-3 ticks, the tips seen
+        onboardingOn = true;
         if (std::exchange (showExtendedHintAfterLoad, false)) // round 190mr (DF-49)
             showExtendedHint (true);
         // the start-up song follows Options › Mixer too (round 163) and the automatic crossfades of new projects (166e)
@@ -372,6 +377,13 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
     // transport: Play toggles play / stop-and-back; Stop returns to the start; double-click Stop = all notes off
     playButton.setTooltip (tr ("Play; pressed again, stops and goes back to where it started") + " (Space; Ctrl+Space pauses)");
+    // round 190np: the transport's controls by component ID (--demo, the tips' anchors)
+    playButton.setComponentID ("toolbar.play");
+    stopButton.setComponentID ("toolbar.stop");
+    recordButton.setComponentID ("toolbar.record");
+    patternModeButton.setComponentID ("toolbar.patternMode");
+    songModeButton.setComponentID ("toolbar.songMode");
+    tempoDisplay.setComponentID ("toolbar.tempo");
     playButton.onClick = [this] {
         // round 190jj: the Simple capsule's Play shows Pause while the song runs (BandLab), and pauses
         if (toolbarlayout::transportStates (toolbarLook).stopWhilePlaying
@@ -1766,6 +1778,8 @@ void MainComponent::layoutUnderToolbar()
         setupOverlay->toFront (false);
     }
     layoutMapMode(); // (round 190ef)
+    if (next3Card != nullptr || tipCard != nullptr) // (round 190np)
+        placeOnboardingCards();
 }
 
 void MainComponent::hostSetupOverlayNatively()
@@ -3846,6 +3860,9 @@ void MainComponent::playStop()
         notePlayStart (transportPaused);
         transportPaused = false;
         engine.startPlayback();
+        // round 190np: Play in Song mode with an empty Playlist (the Pattern layout) is a confusion signal: one tip
+        if (onboardingOn && onboarding::songModeEmptySignal (engine.getSong().mode == PlayMode::song, engine.getSong(), layoutStyle))
+            maybeShowTip (onboarding::Tip::songModeEmpty, &songModeButton);
     }
 }
 
@@ -4257,6 +4274,11 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
             playlistArea.setOverlay (c);
             if (hadKeys && c == nullptr && isShowing())
                 grabKeyboardFocus();
+            if (onboardingOn) // (round 190np: the New-track card closed by hand on an empty song: the empty-state hint)
+                juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<MainComponent> (this)] {
+                    if (safe != nullptr)
+                        safe->updateEmptyHint();
+                });
         };
         host.showKeys = [this] {
             if (! isTouchKeyboardOpen()) // (round 190p: a new instrument can be played at once, with the mouse too)
@@ -4479,6 +4501,11 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
     applyToolbarLook(); // round 190iv: the toolbar of this layout style (Pattern: FL's, as it was)
     if (trackonly::active()) // round 190iu: Track-only mode keeps the Channel rack hidden (core/TrackOnly.h)
         hidePanelForTrackOnly();
+    if (onboardingOn) // round 190np: another layout, another empty-state hint (and the cards' place)
+    {
+        updateEmptyHint();
+        placeOnboardingCards();
+    }
 }
 
 void MainComponent::hidePanelForTrackOnly()
@@ -5711,6 +5738,7 @@ void MainComponent::toggleRecording()
         engine.setRecording (true);
         if (engine.getRecordOptions().startsPlayback && ! engine.getTransport().playing.load()) // FL's "Recording starts playback"
             engine.startPlayback();
+        checkRecordTip(); // (round 190np)
         return;
     }
 
@@ -5739,6 +5767,7 @@ void MainComponent::toggleRecording()
         safe->engine.setRecording (true);
         if (o.startsPlayback && ! safe->engine.getTransport().playing.load()) // FL's "Recording starts playback"
             safe->engine.startPlayback();
+        safe->checkRecordTip(); // (round 190np)
     });
 }
 
@@ -6763,6 +6792,8 @@ void MainComponent::changeListenerCallback (juce::ChangeBroadcaster*)
         refreshRackPatternSelector(); // a new pattern colour
         refreshRackLengthBox();       // (notes added: the automatic length grows)
     }
+    if (onboardingOn) // round 190np: the Next-3 items and the empty-state hint follow the song
+        updateOnboarding();
 }
 
 // --- tempo display -------------------------------------------------------------------------------
@@ -7522,7 +7553,9 @@ void MainComponent::autoCloseDevice()
 void MainComponent::timerCallback()
 {
     const auto remoteHistoryError = engine.getRemoteHistoryError();
-    const auto showRemote = remoteui::enabled() || remoteui::active() || remoteHistoryError.isNotEmpty();
+    const auto showRemote = (remoteui::enabled() || remoteui::active() || remoteHistoryError.isNotEmpty()) && ! demo::active(); // (round 190np: --demo hides it)
+    if (next3Card != nullptr && ++onboardingTicks % 15 == 0) // (round 190np: what the Next-3 items read from the view)
+        onboardingTick();
     remoteControlBar.setText (remoteHistoryError.isNotEmpty() ? remoteHistoryError : tr (remoteui::status()), juce::dontSendNotification);
     if (remoteControlBar.isVisible() != showRemote)
     {
@@ -8913,6 +8946,9 @@ void MainComponent::openFileRequest (const juce::File& file)
 
 void MainComponent::openFile (const juce::File& file)
 {
+    // round 190np: the Next-3 items "Open one of your .flp projects / .als sets"
+    onboardCtx.openedFlp = onboardCtx.openedFlp || file.hasFileExtension ("flp");
+    onboardCtx.openedAls = onboardCtx.openedAls || file.hasFileExtension ("als");
     forgetSeekMark(); // (another project: FL's mark and a pause don't carry over)
     juce::String error;
     crashguard::note (("opening project " + file.getFileName()).toStdString()); // session breadcrumb (round 111)
@@ -10485,22 +10521,27 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
     }
     else
     {
-        // round 190dv: the Simple workflow's Welcome screen and first-song tour (only in that workflow)
+        // round 190np: the welcome card, the first-song tour and Getting started in every layout (round 190dv had the tour
+        // and the Simple Welcome screen in the Simple layout only)
+        menu.addItem (tr ("Welcome..."), [this] { showWelcomeCard (false); });
+        menu.addItem (simpleWorkflow != nullptr && simpleWorkflow->tourCanContinue()
+                          ? tr ("Continue the first-song tour (step {0} of {1})", { juce::String (simpleWorkflow->tourStep() + 1), juce::String (tour::stepCount) })
+                          : tr ("First-song tour"),
+                      [this] { startFirstSongTourAnywhere(); });
+        menu.addItem (tr ("Getting started"), [this] { showGettingStarted(); });
         if (layoutStyle == layoutstyle::Style::simple && simpleWorkflow != nullptr)
-        {
-            menu.addItem (simpleWorkflow->tourCanContinue() ? tr ("Continue the first-song tour (step {0} of {1})", { juce::String (simpleWorkflow->tourStep() + 1),
-                                                                                                                      juce::String (tour::stepCount) })
-                                                            : tr ("First-song tour"),
-                          [this] {
-                              if (simpleWorkflow != nullptr)
-                                  simpleWorkflow->startOrContinueTour();
-                          });
             menu.addItem (tr ("Welcome screen..."), [this] {
                 if (simpleWorkflow != nullptr)
                     simpleWorkflow->showWelcome();
             });
-            menu.addSeparator();
-        }
+        menu.addItem (tr ("Show tips and hints"), true, ! onboard.hintsOff, [this] {
+            onboard.hintsOff = ! onboard.hintsOff;
+            saveOnboarding();
+            if (onboard.hintsOff)
+                closeTip();
+            updateEmptyHint();
+        });
+        menu.addSeparator();
         menu.addItem (tr ("Search actions...") + "\t?", [this] { showActionSearch(); }); // #228 (round 190nq)
         menu.addItem (tr ("Shortcuts") + shortcutText ("help.shortcuts"), [this] { showHelp(); });
         menu.addItem (tr ("Missing files..."), [this] { showMissingFiles (false); });

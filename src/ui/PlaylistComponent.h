@@ -471,6 +471,7 @@ public:
     // the game controller's D-pad).
     int getCurrentTrack() const noexcept { return currentTrack; }
     void selectTrack (int track);
+    juce::Rectangle<int> gridAreaForHints() const { return gridArea(); } // (round 190np: the empty-state hint goes over it)
     // Several tracks selected, the first current and scrolled into view (round 190fl: the mixer's "Select › Channels and
     // playlist tracks routed to this track")
     void selectTracks (const std::vector<int>& tracks);

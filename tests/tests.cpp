@@ -17793,6 +17793,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "SimpleGate190dgTests.inc"
 #include "SimpleNext190dsTests.inc"
 #include "FirstSongTour190dvTests.inc"
+#include "Onboarding190npTests.inc" // round 190np: first-run onboarding (core/Onboarding.h)
 #include "SimplePads190foTests.inc"
 #include "Rollup027Tests.inc"
 #include "Edison190cdTests.inc"

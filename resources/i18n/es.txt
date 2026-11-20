@@ -10599,9 +10599,10 @@ countries: es mx ar co cl pe ve
 "The recording is silent: the audio input sent nothing but silence. Check that the insert's input is the channel your microphone or instrument is plugged into (the input box above its effect slots), that the interface's input is not muted, and that LYNX SHARE may use the microphone (Windows: Settings > Privacy > Microphone; macOS: System Settings > Privacy & Security > Microphone)." = "La grabación está en silencio: la entrada de audio solo envió silencio. Comprueba que la entrada del insert es el canal donde está conectado tu micrófono o instrumento (el cuadro de entrada sobre sus ranuras de efectos), que la entrada de la interfaz no está silenciada y que LYNX SHARE puede usar el micrófono (Windows: Configuración > Privacidad > Micrófono; macOS: Ajustes del Sistema > Privacidad y seguridad > Micrófono)."
 "Choose an input to record" = "Elige una entrada para grabar"
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "Con qué frecuencia se mueven el cursor de reproducción, los medidores y los osciloscopios. Pantalla sigue la frecuencia de actualización de tu monitor (lo más fluido); Equilibrado la reduce a la mitad en pantallas rápidas (72 Hz en una pantalla de 144 Hz); 60 Hz o 30 Hz usan la menor CPU (portátiles, equipos más lentos)."
+"Pitch-aware" = "Sensible al tono"
+"Beats law: Classic plays as LYNX did before 0.1.28, Measured as 0.1.28 and 0.1.29 did (this project was saved then); Pitch-aware also cuts where the pitch of a held note steps" = "Ley de Beats: Clásico suena como LYNX antes de la 0.1.28, Medido como la 0.1.28 y la 0.1.29 (este proyecto se guardó entonces); Sensible al tono también corta donde la altura de una nota sostenida cambia"
+"Texture and Complex Pro law: Classic plays as LYNX did before 0.1.30 (this project was saved then); Measured follows Live 12.4's renders (grains and Flux, formants kept)" = "Ley de Texture y Complex Pro: Clásico suena como LYNX antes de la 0.1.30 (este proyecto se guardó entonces); Medido sigue los renders de Live 12.4 (granos y Flux, formantes conservados)"
 "Large controls (touch size)" = "Controles grandes (tamaño táctil)"
-
-# round 190iv: the toolbar per layout style
 "Nothing to save yet" = "Nada que guardar todavía"
 "LYNX backs your work up by itself. Click to save the project (Ctrl+S)" = "LYNX hace copias de seguridad de tu trabajo por sí solo. Haz clic para guardar el proyecto (Ctrl+S)"
 "More: the panels and options this toolbar leaves out" = "Más: los paneles y opciones que esta barra deja fuera"
@@ -10610,9 +10611,6 @@ countries: es mx ar co cl pe ve
 "Control bar" = "Barra de control"
 "Punch in / out" = "Punch in / out"
 "Show the Session button row" = "Mostrar la fila de botones de Session"
-"Pitch-aware" = "Sensible al tono"
-"Beats law: Classic plays as LYNX did before 0.1.28, Measured as 0.1.28 and 0.1.29 did (this project was saved then); Pitch-aware also cuts where the pitch of a held note steps" = "Ley de Beats: Clásico suena como LYNX antes de la 0.1.28, Medido como la 0.1.28 y la 0.1.29 (este proyecto se guardó entonces); Sensible al tono también corta donde la altura de una nota sostenida cambia"
-"Texture and Complex Pro law: Classic plays as LYNX did before 0.1.30 (this project was saved then); Measured follows Live 12.4's renders (grains and Flux, formants kept)" = "Ley de Texture y Complex Pro: Clásico suena como LYNX antes de la 0.1.30 (este proyecto se guardó entonces); Medido sigue los renders de Live 12.4 (granos y Flux, formantes conservados)"
 "Tension: {0}" = "Tensión: {0}"
 "Track title: [LMB] selects the track  [RMB] track menu  [Ctrl][R] renames it" = "Título de pista: [LMB] selecciona la pista  [RMB] menú de pista  [Ctrl][R] la renombra"
 "Arm Session Recording: [LMB] arms this track (the others disarm)  [Ctrl][LMB] keeps the others armed" = "Armar grabación de sesión: [LMB] arma esta pista (las demás se desarman)  [Ctrl][LMB] mantiene armadas las demás"
@@ -10684,8 +10682,6 @@ countries: es mx ar co cl pe ve
 "User Library" = "Biblioteca de usuario"
 "Current Project" = "Proyecto actual"
 "Add Folder..." = "Añadir carpeta..."
-
-# round 190iv: the toolbar per layout style
 
 # --- round 190ja: Helix (LYNX's wavetable synth)
 "Add a modulation target" = "Añadir un destino de modulación"
@@ -10766,27 +10762,6 @@ countries: es mx ar co cl pe ve
 "CURVE" = "CURVA"
 "Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "Pantalla: el gráfico desplazable de FL o la curva de transferencia de LYNX  [LMB] cambiar (se guarda para este efecto)"
 
-# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
-"Hide collapsed grouped tracks" = "Ocultar pistas agrupadas contraídas"
-"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Pista: [LMB] silenciar / reactivar  [Ctrl][LMB] o [RMB] solo  [Alt][LMB] silenciar el grupo  [Alt][RMB] solo del grupo"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Pista: [LMB] seleccionar  [Ctrl][LMB] añadir / quitar  [Ctrl] arrastrar: pistas con sus clips  [Shift][LMB] rango  [RMB] menú  [2xLMB] abrir el origen del clip  [Shift][Wheel] subir / bajar  [Alt] arrastrar: meter en / sacar de un grupo"
-"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Moviendo la pista con su grupo  [Alt] arrastrar a la derecha / izquierda: más adentro / fuera del grupo"
-"In a group, level {0}" = "En un grupo, nivel {0}"
-"Not in a group" = "Fuera de grupo"
-"Nest under the track above (a group in the group)" = "Anidar bajo la pista de arriba (un grupo dentro del grupo)"
-"Move out of its group (one level up)" = "Sacar de su grupo (un nivel arriba)"
-"Hiding collapsed tracks" = "Ocultar pistas contraídas"
-"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Esta opción oculta las pistas contraídas de la Playlist. La pista principal mostrará una flecha hacia abajo para abrir las pistas ocultas. ¿Continuar?"
-
-# --- Round 190jf: B22 DAWproject import / export
-"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
-"(imported from DAWproject)" = "(importado de DAWproject)"
-"Export DAWproject" = "Exportar DAWproject"
-"The DAWproject file could not be written" = "No se pudo escribir el archivo DAWproject"
-"Everything went over to the DAWproject file." = "Todo pasó al archivo DAWproject."
-"Not carried over or approximated:" = "No trasladado o aproximado:"
-"... and {0} more" = "... y {0} más"
-
 # --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 "Wheel: scroll over the track headers, zoom over the arrangement" = "Rueda: desplazar sobre las cabeceras de pista, zoom sobre el arreglo"
 "Hold a tool key for a temporary tool" = "Mantener la tecla de una herramienta para usarla temporalmente"
@@ -10816,8 +10791,25 @@ countries: es mx ar co cl pe ve
 "Delete (with its {0} clips)" = "Eliminar (con sus {0} clips)"
 
 # --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
-# --- Round 190jf: B22 DAWproject import / export
+"Hide collapsed grouped tracks" = "Ocultar pistas agrupadas contraídas"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Pista: [LMB] silenciar / reactivar  [Ctrl][LMB] o [RMB] solo  [Alt][LMB] silenciar el grupo  [Alt][RMB] solo del grupo"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Pista: [LMB] seleccionar  [Ctrl][LMB] añadir / quitar  [Ctrl] arrastrar: pistas con sus clips  [Shift][LMB] rango  [RMB] menú  [2xLMB] abrir el origen del clip  [Shift][Wheel] subir / bajar  [Alt] arrastrar: meter en / sacar de un grupo"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Moviendo la pista con su grupo  [Alt] arrastrar a la derecha / izquierda: más adentro / fuera del grupo"
+"In a group, level {0}" = "En un grupo, nivel {0}"
+"Not in a group" = "Fuera de grupo"
+"Nest under the track above (a group in the group)" = "Anidar bajo la pista de arriba (un grupo dentro del grupo)"
+"Move out of its group (one level up)" = "Sacar de su grupo (un nivel arriba)"
+"Hiding collapsed tracks" = "Ocultar pistas contraídas"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Esta opción oculta las pistas contraídas de la Playlist. La pista principal mostrará una flecha hacia abajo para abrir las pistas ocultas. ¿Continuar?"
 
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "(importado de DAWproject)"
+"Export DAWproject" = "Exportar DAWproject"
+"The DAWproject file could not be written" = "No se pudo escribir el archivo DAWproject"
+"Everything went over to the DAWproject file." = "Todo pasó al archivo DAWproject."
+"Not carried over or approximated:" = "No trasladado o aproximado:"
+"... and {0} more" = "... y {0} más"
 
 # --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
 "Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "Los umbrales dinámicos automáticos de Facet EQ suenan con el umbral manual de las bandas: {0}"
@@ -10871,6 +10863,7 @@ countries: es mx ar co cl pe ve
 "Pitch & Time" = "Tono y tiempo"
 "Bar : Step : Tick" = "Compás : Paso : Tic"
 "Time: bar : step : tick" = "Tiempo: compás : paso : tic"
+
 # --- round 190jq: Playlist header width (#164), pointer click (#191), automation clip lanes (#191.3)
 "Pointer click: a click on an empty spot selects and moves the song position; a double click places the clip (LYNX)" = "Clic de puntero: un clic en un espacio vacío selecciona y mueve la posición de la canción; un doble clic coloca el clip (LYNX)"
 "Click on an empty spot selects and moves the song position (pointer click)" = "Un clic en un espacio vacío selecciona y mueve la posición de la canción (clic de puntero)"
@@ -10897,8 +10890,10 @@ countries: es mx ar co cl pe ve
 "This will |delete| {0} unused mixer track(s). Are you sure?" = "Esto va a |eliminar| {0} pista(s) del Mixer sin usar. ¿Seguro?"
 "Trim unused mixer tracks" = "Recortar pistas del Mixer sin usar"
 "No unused mixer tracks" = "No hay pistas del Mixer sin usar"
+
 # --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
 "Scale highlighting" = "Resaltado de escala"
+
 # --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
 "FL arpeggiator pattern" = "Patrón del arpegiador de FL"
 "None (the arpeggiator above)" = "Ninguno (el arpegiador de arriba)"
@@ -10942,8 +10937,6 @@ countries: es mx ar co cl pe ve
 "Corrode (an imported Live Erosion) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Corrode (un Erosion importado de Live) no existe en esta versión: pasa a ser un Utility desactivado en su ranura, y su automatización no hace nada ({0})"
 "Platter (an imported Live Vinyl Distortion) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Platter (un Vinyl Distortion importado de Live) no existe en esta versión: pasa a ser un Utility desactivado en su ranura, y su automatización no hace nada ({0})"
 "Soundboard (an imported Live Corpus) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Soundboard (un Corpus importado de Live) no existe en esta versión: pasa a ser un Utility desactivado en su ranura, y su automatización no hace nada ({0})"
-
-# round 190jz: issues #192 (docked Browser), #194 (fade handles), #195 (Home, W)
 "Move the playback marker to the start of the song or pattern" = "Mover el marcador de reproducción al inicio de la canción o del patrón"
 "Move the playback marker to start" = "Mover el marcador de reproducción al inicio"
 "W moves the playback marker to the start (as Home)" = "W mueve el marcador de reproducción al inicio (como Inicio)"
@@ -11224,16 +11217,13 @@ countries: es mx ar co cl pe ve
 "Paused" = "En pausa"
 "Scrub: hold and drag right to play forward, left to play backward; the further, the faster" = "Scrub: mantén pulsado y arrastra a la derecha para reproducir hacia delante, a la izquierda hacia atrás; cuanto más lejos, más rápido"
 
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] abrir/cerrar el editor  [Alt]+[LMB] mantener los demás abiertos  [Ctrl]+[LMB] preescuchar  [2xLMB] Piano Roll  [LMB] arrastrar arriba/abajo reordena  [RMB] menú del canal"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Medidor de picos (izquierda/derecha) con retención de picos  [LMB] apaga el indicador de saturación"
-
 # --- rollup 0.1.30 step 6: Save a copy for 0.1.28 knows rounds 190kc / 190ke / natives190kj
 "The crossfader (Live's Crossfade Assign) is not in this release: these inserts play at their full level, and its automation does nothing: {0}" = "El crossfader (Crossfade Assign de Live) no está en esta versión: estos inserts suenan a su nivel completo y su automatización no hace nada: {0}"
 "Live return tracks show as ordinary mixer inserts: {0}" = "Las pistas de retorno de Live se muestran como inserts normales del mezclador: {0}"
 "The Simple Controls tab's own knob mappings: {0}" = "Las asignaciones de perillas propias de la pestaña Controls de Simple: {0}"
 "Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}" = "Las partes de Harmor con una muestra en la sección IMG tocan sus timbres en lugar de la resíntesis: {0}"
 "Newtone's detected key and note velocities are left out: {0}" = "Se omiten la tonalidad detectada y las velocidades de las notas de Newtone: {0}"
+
 # --- round 190kl: the Peak Controller's LYNX LFO shapes (issue #197)
 "LYNX shapes" = "Formas de LYNX"
 "Ramp down" = "Rampa descendente"
@@ -12004,3 +11994,73 @@ countries: es mx ar co cl pe ve
 "Could not open a new window" = "No se pudo abrir una ventana nueva"
 "Open in new window" = "Abrir en una ventana nueva"
 "Start-up project" = "Proyecto de inicio"
+
+# --- round 190np: first-run onboarding (welcome card, Next-3 card, empty-state hints, tips)
+"Welcome..." = "Bienvenida..."
+"Getting started" = "Primeros pasos"
+"BandLab, FL Studio Mobile or GarageBand" = "BandLab, FL Studio Mobile o GarageBand"
+"FL Studio" = "FL Studio"
+"Ableton Live or Bitwig" = "Ableton Live o Bitwig"
+"Logic, Cubase, Reaper, Pro Tools or Studio One" = "Logic, Cubase, Reaper, Pro Tools o Studio One"
+"I'm new to making music" = "Estoy empezando con la música"
+"A mobile or simple app. Simple layout: tracks, loops, a drum machine and quick recording." = "Una app móvil o sencilla. Diseño simple: pistas, loops, una caja de ritmos y grabación rápida."
+"Pattern layout: Channel Rack, Piano roll, Playlist and Mixer, with FL's shortcuts. Your .flp projects open." = "Diseño Patrón: Channel Rack, Piano roll, Playlist y Mixer, con los atajos de FL. Tus proyectos .flp se abren."
+"Clip-launch layout: a clip grid with scenes beside the arrangement. Your .als sets open." = "Diseño de lanzamiento de clips: una cuadrícula de clips con escenas junto al arreglo. Tus sets .als se abren."
+"Simple layout with the Mixer at hand: one track per instrument on a timeline." = "Diseño simple con el Mixer a mano: una pista por instrumento en una línea de tiempo."
+"Simple layout and a short first-song tour (about five minutes)." = "Diseño simple y un breve recorrido por tu primera canción (unos cinco minutos)."
+"Press Space to hear the starter beat" = "Pulsa Espacio para oír el ritmo inicial"
+"Add a loop: drag one onto the timeline" = "Añade un loop: arrastra uno a la línea de tiempo"
+"Record your voice on a new Voice track" = "Graba tu voz en una nueva pista de Voz"
+"Click steps in the Channel Rack to make a beat" = "Haz clic en los pasos del Channel Rack para crear un ritmo"
+"Open one of your .flp projects" = "Abre uno de tus proyectos .flp"
+"Find your plugins (VST, CLAP)" = "Encuentra tus plugins (VST, CLAP)"
+"Drag a loop into a slot of the clip grid" = "Arrastra un loop a un slot de la cuadrícula de clips"
+"Launch a clip or a scene" = "Lanza un clip o una escena"
+"Open one of your .als sets" = "Abre uno de tus sets .als"
+"Add an instrument track and play it with the computer keys" = "Añade una pista de instrumento y tócala con las teclas del ordenador"
+"Record audio on a Voice or Guitar track" = "Graba audio en una pista de Voz o de Guitarra"
+"Open the Mixer (F9)" = "Abre el Mixer (F9)"
+"Open Loops" = "Abrir Loops"
+"+ Voice track" = "+ Pista de voz"
+"Browse loops" = "Explorar loops"
+"+ Instrument" = "+ Instrumento"
+"Your starter beat is ready in the Simple layout." = "Tu ritmo inicial está listo en el diseño simple."
+"The Pattern layout works like FL Studio." = "El diseño Patrón funciona como FL Studio."
+"The Clip-launch layout: clips and scenes beside the arrangement." = "El diseño de lanzamiento de clips: clips y escenas junto al arreglo."
+"One track per instrument, with the Mixer at hand." = "Una pista por instrumento, con el Mixer a mano."
+"Your song is built here" = "Tu canción se construye aquí"
+"Launch clips from this grid" = "Lanza clips desde esta cuadrícula"
+"Drag a loop here" = "Arrastra un loop aquí"
+"Click in the Playlist to place the pattern you're editing, or drag a loop, audio or MIDI file in from the Browser." = "Haz clic en la Playlist para colocar el patrón que estás editando, o arrastra un loop, un audio o un archivo MIDI desde el Browser."
+"Drag a loop or a sample from the Browser into any slot. Double-click an empty slot for a new MIDI clip. The play button at the end of a row launches the whole scene." = "Arrastra un loop o un sample desde el Browser a cualquier slot. Haz doble clic en un slot vacío para crear un clip MIDI. El botón de reproducir al final de una fila lanza la escena entera."
+"Drop a loop, an audio or a MIDI file on the timeline, or add a track: drums, an instrument or your voice." = "Suelta un loop, un audio o un archivo MIDI en la línea de tiempo, o añade una pista: batería, un instrumento o tu voz."
+"Nothing to play in Song mode yet" = "Aún no hay nada que reproducir en el modo Canción"
+"No input to record from yet" = "Aún no hay entrada desde la que grabar"
+"Song mode plays the Playlist, and it's empty. Switch to Pattern to hear the pattern you're editing, or place it in the Playlist." = "El modo Canción reproduce la Playlist, y está vacía. Cambia a Patrón para oír el patrón que estás editando, o colócalo en la Playlist."
+"To record your voice or an instrument, choose an input in the audio settings and arm a track. Notes from the computer keys or a MIDI keyboard record without one." = "Para grabar tu voz o un instrumento, elige una entrada en la configuración de audio y arma una pista. Las notas del teclado del ordenador o de un teclado MIDI se graban sin ella."
+"Switch to Pattern" = "Cambiar a Patrón"
+"Show tips and hints" = "Mostrar consejos y sugerencias"
+"Speakers (system default)" = "Altavoces (predeterminado del sistema)"
+"Plugins: scanning in the background" = "Plugins: buscando en segundo plano"
+"Plugins: {0} found" = "Plugins: {0} encontrados"
+"Channel Rack (F6)" = "Channel Rack (F6)"
+"Open an .flp project..." = "Abrir un proyecto .flp..."
+"Open an .als set..." = "Abrir un set .als..."
+"+ Add track" = "+ Añadir pista"
+"{0} are trademarks of their owners; LYNX SHARE is not affiliated with them." = "{0} son marcas comerciales de sus propietarios; LYNX SHARE no está afiliado a ellos."
+"Skip: keep the FL-style Pattern layout" = "Omitir: mantener el diseño Patrón al estilo FL"
+"Sound:" = "Sonido:"
+"More setup (audio driver, plugin folders)..." = "Más ajustes (controlador de audio, carpetas de plugins)..."
+"Where are you coming from?" = "¿De dónde vienes?"
+"LYNX SHARE sets itself up to feel familiar. One click and you're in; change it any time in View > Layout style." = "LYNX SHARE se adapta para resultarte familiar. Un clic y estás dentro; cámbialo cuando quieras en Ver > Estilo de diseño."
+"Hide (Help > Getting started shows it again)" = "Ocultar (Ayuda > Primeros pasos lo muestra de nuevo)"
+"Learn more..." = "Más información..."
+"Next: 3 things to try" = "Siguiente: 3 cosas que probar"
+"Nice, that's the basics." = "Bien, eso es lo básico."
+"Help > Getting started shows this again" = "Ayuda > Primeros pasos vuelve a mostrar esto"
+"Got it" = "Entendido"
+"No more tips" = "No más consejos"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] abrir/cerrar el editor  [Alt]+[LMB] mantener los demás abiertos  [Ctrl]+[LMB] preescuchar  [2xLMB] Piano Roll  [LMB] arrastrar arriba/abajo reordena  [RMB] menú del canal"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Medidor de picos (izquierda/derecha) con retención de picos  [LMB] apaga el indicador de saturación"

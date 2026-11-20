@@ -11,6 +11,10 @@ removes its discovery record. Automated launches can explicitly set
 `LYNX_CONTROL_ENABLED=1`; setting a discovery path alone does not enable access.
 The ordinary update preference and automatic update check are unchanged.
 
+`LYNX --demo` (a developer mode for scripted recordings, [DEMO_MODE.md](DEMO_MODE.md)) turns Remote Control on for
+that run, hides its status strip and adds view operations (`ui.*`, `session.*`) that find and click controls by
+component ID.
+
 ## Discovery and authentication
 
 The default record is `control/connection.json` inside LYNX's settings folder:

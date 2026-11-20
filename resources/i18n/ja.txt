@@ -10599,9 +10599,10 @@ countries: jp
 "The recording is silent: the audio input sent nothing but silence. Check that the insert's input is the channel your microphone or instrument is plugged into (the input box above its effect slots), that the interface's input is not muted, and that LYNX SHARE may use the microphone (Windows: Settings > Privacy > Microphone; macOS: System Settings > Privacy & Security > Microphone)." = "録音が無音です：オーディオ入力から無音しか届きませんでした。インサートの入力がマイクや楽器をつないだチャンネルになっているか（エフェクトスロットの上の入力ボックス）、インターフェースの入力がミュートされていないか、LYNX SHARE がマイクを使えるか（Windows：設定 > プライバシー > マイク、macOS：システム設定 > プライバシーとセキュリティ > マイク）を確認してください。"
 "Choose an input to record" = "録音する入力を選んでください"
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "再生ヘッド、メーター、スコープが動く頻度です。ディスプレイは画面のリフレッシュレートに合わせます（最も滑らか）。バランスは高速な画面でその半分にします（144 Hz の画面で 72 Hz）。60 Hz または 30 Hz は CPU 使用量が最も少なくなります（ノート PC、低速なコンピューター）。"
+"Pitch-aware" = "ピッチ対応"
+"Beats law: Classic plays as LYNX did before 0.1.28, Measured as 0.1.28 and 0.1.29 did (this project was saved then); Pitch-aware also cuts where the pitch of a held note steps" = "Beats の法則: クラシックは 0.1.28 より前の LYNX と同じ、実測は 0.1.28 と 0.1.29 と同じ再生 (このプロジェクトはその頃に保存されました)。ピッチ対応は伸ばした音のピッチが変わる位置でもカットします"
+"Texture and Complex Pro law: Classic plays as LYNX did before 0.1.30 (this project was saved then); Measured follows Live 12.4's renders (grains and Flux, formants kept)" = "Texture と Complex Pro の法則: クラシックは 0.1.30 より前の LYNX と同じ再生 (このプロジェクトはその頃に保存されました)。実測は Live 12.4 のレンダーに従います (グレインと Flux、フォルマント保持)"
 "Large controls (touch size)" = "大きなコントロール（タッチ向けサイズ）"
-
-# round 190iv: the toolbar per layout style
 "Nothing to save yet" = "まだ保存するものはありません"
 "LYNX backs your work up by itself. Click to save the project (Ctrl+S)" = "LYNX は作業を自動でバックアップします。クリックでプロジェクトを保存 (Ctrl+S)"
 "More: the panels and options this toolbar leaves out" = "その他: このバーに表示されないパネルとオプション"
@@ -10610,9 +10611,6 @@ countries: jp
 "Control bar" = "コントロールバー"
 "Punch in / out" = "パンチイン / アウト"
 "Show the Session button row" = "Session のボタン列を表示"
-"Pitch-aware" = "ピッチ対応"
-"Beats law: Classic plays as LYNX did before 0.1.28, Measured as 0.1.28 and 0.1.29 did (this project was saved then); Pitch-aware also cuts where the pitch of a held note steps" = "Beats の法則: クラシックは 0.1.28 より前の LYNX と同じ、実測は 0.1.28 と 0.1.29 と同じ再生 (このプロジェクトはその頃に保存されました)。ピッチ対応は伸ばした音のピッチが変わる位置でもカットします"
-"Texture and Complex Pro law: Classic plays as LYNX did before 0.1.30 (this project was saved then); Measured follows Live 12.4's renders (grains and Flux, formants kept)" = "Texture と Complex Pro の法則: クラシックは 0.1.30 より前の LYNX と同じ再生 (このプロジェクトはその頃に保存されました)。実測は Live 12.4 のレンダーに従います (グレインと Flux、フォルマント保持)"
 "Tension: {0}" = "テンション: {0}"
 "Track title: [LMB] selects the track  [RMB] track menu  [Ctrl][R] renames it" = "トラックタイトル: [LMB] トラックを選択  [RMB] トラックメニュー  [Ctrl][R] 名前を変更"
 "Arm Session Recording: [LMB] arms this track (the others disarm)  [Ctrl][LMB] keeps the others armed" = "セッション録音の待機: [LMB] このトラックを待機 (他は解除)  [Ctrl][LMB] 他も待機のまま"
@@ -10684,8 +10682,6 @@ countries: jp
 "User Library" = "ユーザーライブラリ"
 "Current Project" = "現在のプロジェクト"
 "Add Folder..." = "フォルダーを追加..."
-
-# round 190iv: the toolbar per layout style
 
 # --- round 190ja: Helix (LYNX's wavetable synth)
 "Add a modulation target" = "モジュレーション先を追加"
@@ -10766,27 +10762,6 @@ countries: jp
 "CURVE" = "カーブ"
 "Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "表示: FL のスクロールグラフ、または LYNX の伝達カーブ  [LMB] 切り替え (このエフェクトに保存)"
 
-# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
-"Hide collapsed grouped tracks" = "折りたたんだグループのトラックを隠す"
-"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "トラック: [LMB] ミュート / ミュート解除  [Ctrl][LMB] または [RMB] ソロ  [Alt][LMB] グループをミュート  [Alt][RMB] グループをソロ"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "トラック: [LMB] 選択  [Ctrl][LMB] 追加 / 解除  [Ctrl] ドラッグ: トラックをクリップごと  [Shift][LMB] 範囲  [RMB] メニュー  [2xLMB] クリップのソースを開く  [Shift][Wheel] 上 / 下に移動  [Alt] ドラッグ: グループに入れる / グループから出す"
-"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "トラックをグループごと移動中  [Alt] 右 / 左へドラッグ: より深く / グループの外へ"
-"In a group, level {0}" = "グループ内、レベル {0}"
-"Not in a group" = "グループ外"
-"Nest under the track above (a group in the group)" = "上のトラックの下に入れ子にする (グループ内のグループ)"
-"Move out of its group (one level up)" = "グループから出す (1 レベル上へ)"
-"Hiding collapsed tracks" = "折りたたんだトラックを隠す"
-"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "このオプションは Playlist の折りたたんだトラックを隠します。親トラックには隠れたトラックを開く下向き矢印が表示されます。続けますか?"
-
-# --- Round 190jf: B22 DAWproject import / export
-"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
-"(imported from DAWproject)" = "(DAWproject から読み込み)"
-"Export DAWproject" = "DAWproject を書き出す"
-"The DAWproject file could not be written" = "DAWproject ファイルを書き込めませんでした"
-"Everything went over to the DAWproject file." = "すべて DAWproject ファイルに移りました。"
-"Not carried over or approximated:" = "移せなかったもの / 近似したもの:"
-"... and {0} more" = "... ほか {0} 件"
-
 # --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 "Wheel: scroll over the track headers, zoom over the arrangement" = "ホイール：トラックヘッダー上でスクロール、アレンジメント上でズーム"
 "Hold a tool key for a temporary tool" = "ツールのキーを押している間だけそのツールを使う"
@@ -10816,8 +10791,25 @@ countries: jp
 "Delete (with its {0} clips)" = "削除（{0} 個のクリップごと）"
 
 # --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
-# --- Round 190jf: B22 DAWproject import / export
+"Hide collapsed grouped tracks" = "折りたたんだグループのトラックを隠す"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "トラック: [LMB] ミュート / ミュート解除  [Ctrl][LMB] または [RMB] ソロ  [Alt][LMB] グループをミュート  [Alt][RMB] グループをソロ"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "トラック: [LMB] 選択  [Ctrl][LMB] 追加 / 解除  [Ctrl] ドラッグ: トラックをクリップごと  [Shift][LMB] 範囲  [RMB] メニュー  [2xLMB] クリップのソースを開く  [Shift][Wheel] 上 / 下に移動  [Alt] ドラッグ: グループに入れる / グループから出す"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "トラックをグループごと移動中  [Alt] 右 / 左へドラッグ: より深く / グループの外へ"
+"In a group, level {0}" = "グループ内、レベル {0}"
+"Not in a group" = "グループ外"
+"Nest under the track above (a group in the group)" = "上のトラックの下に入れ子にする (グループ内のグループ)"
+"Move out of its group (one level up)" = "グループから出す (1 レベル上へ)"
+"Hiding collapsed tracks" = "折りたたんだトラックを隠す"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "このオプションは Playlist の折りたたんだトラックを隠します。親トラックには隠れたトラックを開く下向き矢印が表示されます。続けますか?"
 
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "(DAWproject から読み込み)"
+"Export DAWproject" = "DAWproject を書き出す"
+"The DAWproject file could not be written" = "DAWproject ファイルを書き込めませんでした"
+"Everything went over to the DAWproject file." = "すべて DAWproject ファイルに移りました。"
+"Not carried over or approximated:" = "移せなかったもの / 近似したもの:"
+"... and {0} more" = "... ほか {0} 件"
 
 # --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
 "Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "Facet EQ の自動ダイナミックしきい値は、各バンドの手動しきい値で再生されます: {0}"
@@ -10871,6 +10863,7 @@ countries: jp
 "Pitch & Time" = "ピッチとタイム"
 "Bar : Step : Tick" = "小節 : ステップ : ティック"
 "Time: bar : step : tick" = "時間: 小節 : ステップ : ティック"
+
 # --- round 190jq: Playlist header width (#164), pointer click (#191), automation clip lanes (#191.3)
 "Pointer click: a click on an empty spot selects and moves the song position; a double click places the clip (LYNX)" = "ポインタークリック：空いている場所をクリックすると選択とソング位置の移動、ダブルクリックでクリップを配置 (LYNX)"
 "Click on an empty spot selects and moves the song position (pointer click)" = "空いている場所のクリックで選択とソング位置の移動（ポインタークリック）"
@@ -10897,8 +10890,10 @@ countries: jp
 "This will |delete| {0} unused mixer track(s). Are you sure?" = "未使用のミキサートラック {0} 個を|削除|します。よろしいですか？"
 "Trim unused mixer tracks" = "未使用ミキサートラックの整理"
 "No unused mixer tracks" = "未使用のミキサートラックはありません"
+
 # --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
 "Scale highlighting" = "スケールのハイライト"
+
 # --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
 "FL arpeggiator pattern" = "FL アルペジエーターのパターン"
 "None (the arpeggiator above)" = "なし (上のアルペジエーター)"
@@ -10942,8 +10937,6 @@ countries: jp
 "Corrode (an imported Live Erosion) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Corrode(読み込んだ Live の Erosion)はこのバージョンにはありません: そのスロットでオフのUtilityになり、オートメーションは何もしません ({0})"
 "Platter (an imported Live Vinyl Distortion) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Platter(読み込んだ Live の Vinyl Distortion)はこのバージョンにはありません: そのスロットでオフのUtilityになり、オートメーションは何もしません ({0})"
 "Soundboard (an imported Live Corpus) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Soundboard(読み込んだ Live の Corpus)はこのバージョンにはありません: そのスロットでオフのUtilityになり、オートメーションは何もしません ({0})"
-
-# round 190jz: issues #192 (docked Browser), #194 (fade handles), #195 (Home, W)
 "Move the playback marker to the start of the song or pattern" = "再生マーカーをソングまたはパターンの先頭に移動"
 "Move the playback marker to start" = "再生マーカーを先頭に移動"
 "W moves the playback marker to the start (as Home)" = "W で再生マーカーを先頭に移動 (Home と同じ)"
@@ -11224,16 +11217,13 @@ countries: jp
 "Paused" = "一時停止"
 "Scrub: hold and drag right to play forward, left to play backward; the further, the faster" = "スクラブ: 押したまま右にドラッグで順再生、左で逆再生。遠いほど速くなります"
 
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] エディターを開く/閉じる  [Alt]+[LMB] 他を開いたまま  [Ctrl]+[LMB] 試聴  [2xLMB] ピアノロール  [LMB] 上下ドラッグで並べ替え  [RMB] チャンネルメニュー"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "ピークメーター (左/右) とピークホールド  [LMB] クリップランプをクリア"
-
 # --- rollup 0.1.30 step 6: Save a copy for 0.1.28 knows rounds 190kc / 190ke / natives190kj
 "The crossfader (Live's Crossfade Assign) is not in this release: these inserts play at their full level, and its automation does nothing: {0}" = "クロスフェーダー（Live の Crossfade Assign）はこのリリースにありません: これらのインサートはフルレベルで再生され、そのオートメーションは何もしません: {0}"
 "Live return tracks show as ordinary mixer inserts: {0}" = "Live のリターントラックは通常のミキサーインサートとして表示されます: {0}"
 "The Simple Controls tab's own knob mappings: {0}" = "Simple の Controls タブ独自のノブ割り当て: {0}"
 "Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}" = "IMG セクションにサンプルがある Harmor のパートは、リシンセシスではなく音色で再生されます: {0}"
 "Newtone's detected key and note velocities are left out: {0}" = "Newtone が検出したキーとノートのベロシティは省かれます: {0}"
+
 # --- round 190kl: the Peak Controller's LYNX LFO shapes (issue #197)
 "LYNX shapes" = "LYNX の波形"
 "Ramp down" = "下降ランプ"
@@ -12004,3 +11994,73 @@ countries: jp
 "Could not open a new window" = "新しいウィンドウを開けませんでした"
 "Open in new window" = "新しいウィンドウで開く"
 "Start-up project" = "起動時のプロジェクト"
+
+# --- round 190np: first-run onboarding (welcome card, Next-3 card, empty-state hints, tips)
+"Welcome..." = "ようこそ..."
+"Getting started" = "はじめに"
+"BandLab, FL Studio Mobile or GarageBand" = "BandLab、FL Studio Mobile、または GarageBand"
+"FL Studio" = "FL Studio"
+"Ableton Live or Bitwig" = "Ableton Live または Bitwig"
+"Logic, Cubase, Reaper, Pro Tools or Studio One" = "Logic、Cubase、Reaper、Pro Tools、または Studio One"
+"I'm new to making music" = "音楽づくりは初めて"
+"A mobile or simple app. Simple layout: tracks, loops, a drum machine and quick recording." = "モバイルまたはシンプルなアプリ。シンプルレイアウト：トラック、ループ、ドラムマシン、クイック録音。"
+"Pattern layout: Channel Rack, Piano roll, Playlist and Mixer, with FL's shortcuts. Your .flp projects open." = "パターンレイアウト：チャンネルラック、ピアノロール、プレイリスト、ミキサー、FLのショートカット付き。.flpプロジェクトを開けます。"
+"Clip-launch layout: a clip grid with scenes beside the arrangement. Your .als sets open." = "クリップ起動レイアウト：アレンジの横にシーン付きのクリップグリッド。.alsセットを開けます。"
+"Simple layout with the Mixer at hand: one track per instrument on a timeline." = "ミキサーを手元に置いたシンプルレイアウト：タイムライン上に楽器ごとに1トラック。"
+"Simple layout and a short first-song tour (about five minutes)." = "シンプルレイアウトと、最初の曲づくりの短いツアー（約5分）。"
+"Press Space to hear the starter beat" = "Spaceキーでスターターのビートを聴く"
+"Add a loop: drag one onto the timeline" = "ループを追加：タイムラインにドラッグ"
+"Record your voice on a new Voice track" = "新しいボイストラックに声を録音"
+"Click steps in the Channel Rack to make a beat" = "チャンネルラックのステップをクリックしてビートを作る"
+"Open one of your .flp projects" = ".flpプロジェクトを開く"
+"Find your plugins (VST, CLAP)" = "プラグインを探す（VST、CLAP）"
+"Drag a loop into a slot of the clip grid" = "ループをクリップグリッドのスロットにドラッグ"
+"Launch a clip or a scene" = "クリップまたはシーンを起動"
+"Open one of your .als sets" = ".alsセットを開く"
+"Add an instrument track and play it with the computer keys" = "楽器トラックを追加してパソコンのキーで演奏"
+"Record audio on a Voice or Guitar track" = "ボイスまたはギタートラックにオーディオを録音"
+"Open the Mixer (F9)" = "ミキサーを開く（F9）"
+"Open Loops" = "ループを開く"
+"+ Voice track" = "+ ボイストラック"
+"Browse loops" = "ループを探す"
+"+ Instrument" = "+ 楽器"
+"Your starter beat is ready in the Simple layout." = "スターターのビートがシンプルレイアウトに用意されています。"
+"The Pattern layout works like FL Studio." = "パターンレイアウトはFL Studioと同じように使えます。"
+"The Clip-launch layout: clips and scenes beside the arrangement." = "クリップ起動レイアウト：アレンジの横にクリップとシーン。"
+"One track per instrument, with the Mixer at hand." = "楽器ごとに1トラック、ミキサーは手元に。"
+"Your song is built here" = "ここで曲を組み立てます"
+"Launch clips from this grid" = "このグリッドからクリップを起動"
+"Drag a loop here" = "ここにループをドラッグ"
+"Click in the Playlist to place the pattern you're editing, or drag a loop, audio or MIDI file in from the Browser." = "プレイリストをクリックして編集中のパターンを配置するか、ブラウザーからループ、オーディオ、MIDIファイルをドラッグします。"
+"Drag a loop or a sample from the Browser into any slot. Double-click an empty slot for a new MIDI clip. The play button at the end of a row launches the whole scene." = "ブラウザーからループやサンプルを好きなスロットにドラッグします。空のスロットをダブルクリックすると新しいMIDIクリップを作成します。行末の再生ボタンでシーン全体を起動します。"
+"Drop a loop, an audio or a MIDI file on the timeline, or add a track: drums, an instrument or your voice." = "ループ、オーディオ、MIDIファイルをタイムラインにドロップするか、トラックを追加します：ドラム、楽器、または声。"
+"Nothing to play in Song mode yet" = "ソングモードではまだ再生するものがありません"
+"No input to record from yet" = "録音できる入力がまだありません"
+"Song mode plays the Playlist, and it's empty. Switch to Pattern to hear the pattern you're editing, or place it in the Playlist." = "ソングモードはプレイリストを再生しますが、空です。パターンに切り替えて編集中のパターンを聴くか、プレイリストに配置してください。"
+"To record your voice or an instrument, choose an input in the audio settings and arm a track. Notes from the computer keys or a MIDI keyboard record without one." = "声や楽器を録音するには、オーディオ設定で入力を選び、トラックを録音待機にします。パソコンのキーやMIDIキーボードのノートは、それがなくても録音されます。"
+"Switch to Pattern" = "パターンに切り替え"
+"Show tips and hints" = "ヒントを表示"
+"Speakers (system default)" = "スピーカー（システムの既定）"
+"Plugins: scanning in the background" = "プラグイン：バックグラウンドでスキャン中"
+"Plugins: {0} found" = "プラグイン：{0}件見つかりました"
+"Channel Rack (F6)" = "チャンネルラック（F6）"
+"Open an .flp project..." = ".flpプロジェクトを開く..."
+"Open an .als set..." = ".alsセットを開く..."
+"+ Add track" = "+ トラックを追加"
+"{0} are trademarks of their owners; LYNX SHARE is not affiliated with them." = "{0}は各所有者の商標です。LYNX SHAREはこれらと提携していません。"
+"Skip: keep the FL-style Pattern layout" = "スキップ：FLスタイルのパターンレイアウトのままにする"
+"Sound:" = "サウンド："
+"More setup (audio driver, plugin folders)..." = "その他の設定（オーディオドライバー、プラグインフォルダー）..."
+"Where are you coming from?" = "これまで何を使っていましたか？"
+"LYNX SHARE sets itself up to feel familiar. One click and you're in; change it any time in View > Layout style." = "LYNX SHAREは使い慣れた形に自動で設定されます。ワンクリックで開始、いつでも表示 > レイアウトスタイルで変更できます。"
+"Hide (Help > Getting started shows it again)" = "隠す（ヘルプ > はじめにで再表示）"
+"Learn more..." = "詳しく見る..."
+"Next: 3 things to try" = "次へ：試したい3つのこと"
+"Nice, that's the basics." = "いいですね、基本はこれだけです。"
+"Help > Getting started shows this again" = "ヘルプ > はじめに でもう一度表示できます"
+"Got it" = "わかりました"
+"No more tips" = "ヒントを表示しない"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] エディターを開く/閉じる  [Alt]+[LMB] 他を開いたまま  [Ctrl]+[LMB] 試聴  [2xLMB] ピアノロール  [LMB] 上下ドラッグで並べ替え  [RMB] チャンネルメニュー"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "ピークメーター (左/右) とピークホールド  [LMB] クリップランプをクリア"

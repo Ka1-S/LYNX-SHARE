@@ -10599,9 +10599,10 @@ countries: kr
 "The recording is silent: the audio input sent nothing but silence. Check that the insert's input is the channel your microphone or instrument is plugged into (the input box above its effect slots), that the interface's input is not muted, and that LYNX SHARE may use the microphone (Windows: Settings > Privacy > Microphone; macOS: System Settings > Privacy & Security > Microphone)." = "녹음이 무음입니다: 오디오 입력이 무음만 보냈습니다. 인서트의 입력이 마이크나 악기를 연결한 채널인지(이펙트 슬롯 위의 입력 상자), 인터페이스 입력이 음소거되지 않았는지, LYNX SHARE가 마이크를 사용할 수 있는지(Windows: 설정 > 개인 정보 > 마이크, macOS: 시스템 설정 > 개인정보 보호 및 보안 > 마이크) 확인하세요."
 "Choose an input to record" = "녹음할 입력을 선택하세요"
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "재생 헤드, 미터, 스코프가 움직이는 빈도입니다. 디스플레이는 모니터의 주사율을 따릅니다(가장 부드러움). 균형은 빠른 화면에서 이를 절반으로 줄입니다(144 Hz 화면에서 72 Hz). 60 Hz 또는 30 Hz는 CPU를 가장 적게 씁니다(노트북, 느린 컴퓨터)."
+"Pitch-aware" = "음높이 인식"
+"Beats law: Classic plays as LYNX did before 0.1.28, Measured as 0.1.28 and 0.1.29 did (this project was saved then); Pitch-aware also cuts where the pitch of a held note steps" = "Beats 법칙: 클래식은 0.1.28 이전의 LYNX처럼, 측정은 0.1.28과 0.1.29처럼 재생합니다 (이 프로젝트는 그때 저장됨). 음높이 인식은 지속음의 음높이가 바뀌는 곳에서도 자릅니다"
+"Texture and Complex Pro law: Classic plays as LYNX did before 0.1.30 (this project was saved then); Measured follows Live 12.4's renders (grains and Flux, formants kept)" = "Texture 및 Complex Pro 법칙: 클래식은 0.1.30 이전의 LYNX처럼 재생합니다 (이 프로젝트는 그때 저장됨). 측정은 Live 12.4의 렌더를 따릅니다 (그레인과 Flux, 포먼트 유지)"
 "Large controls (touch size)" = "큰 컨트롤 (터치 크기)"
-
-# round 190iv: the toolbar per layout style
 "Nothing to save yet" = "아직 저장할 내용이 없습니다"
 "LYNX backs your work up by itself. Click to save the project (Ctrl+S)" = "LYNX는 작업을 스스로 백업합니다. 클릭하면 프로젝트를 저장합니다 (Ctrl+S)"
 "More: the panels and options this toolbar leaves out" = "더 보기: 이 바에서 빠진 패널과 옵션"
@@ -10610,9 +10611,6 @@ countries: kr
 "Control bar" = "컨트롤 바"
 "Punch in / out" = "펀치 인 / 아웃"
 "Show the Session button row" = "Session 버튼 줄 표시"
-"Pitch-aware" = "음높이 인식"
-"Beats law: Classic plays as LYNX did before 0.1.28, Measured as 0.1.28 and 0.1.29 did (this project was saved then); Pitch-aware also cuts where the pitch of a held note steps" = "Beats 법칙: 클래식은 0.1.28 이전의 LYNX처럼, 측정은 0.1.28과 0.1.29처럼 재생합니다 (이 프로젝트는 그때 저장됨). 음높이 인식은 지속음의 음높이가 바뀌는 곳에서도 자릅니다"
-"Texture and Complex Pro law: Classic plays as LYNX did before 0.1.30 (this project was saved then); Measured follows Live 12.4's renders (grains and Flux, formants kept)" = "Texture 및 Complex Pro 법칙: 클래식은 0.1.30 이전의 LYNX처럼 재생합니다 (이 프로젝트는 그때 저장됨). 측정은 Live 12.4의 렌더를 따릅니다 (그레인과 Flux, 포먼트 유지)"
 "Tension: {0}" = "텐션: {0}"
 "Track title: [LMB] selects the track  [RMB] track menu  [Ctrl][R] renames it" = "트랙 제목: [LMB] 트랙 선택  [RMB] 트랙 메뉴  [Ctrl][R] 이름 바꾸기"
 "Arm Session Recording: [LMB] arms this track (the others disarm)  [Ctrl][LMB] keeps the others armed" = "세션 녹음 대기: [LMB] 이 트랙 대기 (다른 트랙 해제)  [Ctrl][LMB] 다른 트랙도 대기 유지"
@@ -10684,8 +10682,6 @@ countries: kr
 "User Library" = "사용자 라이브러리"
 "Current Project" = "현재 프로젝트"
 "Add Folder..." = "폴더 추가..."
-
-# round 190iv: the toolbar per layout style
 
 # --- round 190ja: Helix (LYNX's wavetable synth)
 "Add a modulation target" = "모듈레이션 대상 추가"
@@ -10766,27 +10762,6 @@ countries: kr
 "CURVE" = "곡선"
 "Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "표시: FL의 스크롤 그래프 또는 LYNX의 전달 곡선  [LMB] 전환 (이 이펙트에 저장)"
 
-# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
-"Hide collapsed grouped tracks" = "접힌 그룹 트랙 숨기기"
-"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "트랙: [LMB] 뮤트 / 뮤트 해제  [Ctrl][LMB] 또는 [RMB] 솔로  [Alt][LMB] 그룹 뮤트  [Alt][RMB] 그룹 솔로"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "트랙: [LMB] 선택  [Ctrl][LMB] 추가 / 제거  [Ctrl] 드래그: 클립까지 포함한 트랙  [Shift][LMB] 범위  [RMB] 메뉴  [2xLMB] 클립 소스 열기  [Shift][Wheel] 위 / 아래로 이동  [Alt] 드래그: 그룹 안으로 / 그룹 밖으로"
-"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "트랙을 그룹과 함께 이동 중  [Alt] 오른쪽 / 왼쪽으로 드래그: 더 깊게 / 그룹 밖으로"
-"In a group, level {0}" = "그룹 안, 레벨 {0}"
-"Not in a group" = "그룹 밖"
-"Nest under the track above (a group in the group)" = "위 트랙 아래에 중첩 (그룹 안의 그룹)"
-"Move out of its group (one level up)" = "그룹에서 빼기 (한 레벨 위로)"
-"Hiding collapsed tracks" = "접힌 트랙 숨기기"
-"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "이 옵션은 Playlist의 접힌 트랙을 숨깁니다. 상위 트랙에 숨겨진 트랙을 여는 아래쪽 화살표가 표시됩니다. 계속할까요?"
-
-# --- Round 190jf: B22 DAWproject import / export
-"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
-"(imported from DAWproject)" = "(DAWproject에서 가져옴)"
-"Export DAWproject" = "DAWproject 내보내기"
-"The DAWproject file could not be written" = "DAWproject 파일을 쓸 수 없습니다"
-"Everything went over to the DAWproject file." = "모든 것이 DAWproject 파일로 옮겨졌습니다."
-"Not carried over or approximated:" = "옮기지 못했거나 근사한 항목:"
-"... and {0} more" = "... 외 {0}개"
-
 # --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 "Wheel: scroll over the track headers, zoom over the arrangement" = "휠: 트랙 헤더 위에서는 스크롤, 어레인지먼트 위에서는 확대/축소"
 "Hold a tool key for a temporary tool" = "도구 키를 누르고 있는 동안 그 도구를 임시로 사용"
@@ -10816,8 +10791,25 @@ countries: kr
 "Delete (with its {0} clips)" = "삭제 (클립 {0}개 포함)"
 
 # --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
-# --- Round 190jf: B22 DAWproject import / export
+"Hide collapsed grouped tracks" = "접힌 그룹 트랙 숨기기"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "트랙: [LMB] 뮤트 / 뮤트 해제  [Ctrl][LMB] 또는 [RMB] 솔로  [Alt][LMB] 그룹 뮤트  [Alt][RMB] 그룹 솔로"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "트랙: [LMB] 선택  [Ctrl][LMB] 추가 / 제거  [Ctrl] 드래그: 클립까지 포함한 트랙  [Shift][LMB] 범위  [RMB] 메뉴  [2xLMB] 클립 소스 열기  [Shift][Wheel] 위 / 아래로 이동  [Alt] 드래그: 그룹 안으로 / 그룹 밖으로"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "트랙을 그룹과 함께 이동 중  [Alt] 오른쪽 / 왼쪽으로 드래그: 더 깊게 / 그룹 밖으로"
+"In a group, level {0}" = "그룹 안, 레벨 {0}"
+"Not in a group" = "그룹 밖"
+"Nest under the track above (a group in the group)" = "위 트랙 아래에 중첩 (그룹 안의 그룹)"
+"Move out of its group (one level up)" = "그룹에서 빼기 (한 레벨 위로)"
+"Hiding collapsed tracks" = "접힌 트랙 숨기기"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "이 옵션은 Playlist의 접힌 트랙을 숨깁니다. 상위 트랙에 숨겨진 트랙을 여는 아래쪽 화살표가 표시됩니다. 계속할까요?"
 
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "(DAWproject에서 가져옴)"
+"Export DAWproject" = "DAWproject 내보내기"
+"The DAWproject file could not be written" = "DAWproject 파일을 쓸 수 없습니다"
+"Everything went over to the DAWproject file." = "모든 것이 DAWproject 파일로 옮겨졌습니다."
+"Not carried over or approximated:" = "옮기지 못했거나 근사한 항목:"
+"... and {0} more" = "... 외 {0}개"
 
 # --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
 "Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "Facet EQ의 자동 다이내믹 임계값은 밴드의 수동 임계값으로 재생됩니다: {0}"
@@ -10871,6 +10863,7 @@ countries: kr
 "Pitch & Time" = "피치 & 타임"
 "Bar : Step : Tick" = "마디 : 스텝 : 틱"
 "Time: bar : step : tick" = "시간: 마디 : 스텝 : 틱"
+
 # --- round 190jq: Playlist header width (#164), pointer click (#191), automation clip lanes (#191.3)
 "Pointer click: a click on an empty spot selects and moves the song position; a double click places the clip (LYNX)" = "포인터 클릭: 빈 곳을 클릭하면 선택하고 곡 위치를 옮기며, 더블 클릭하면 클립을 놓습니다 (LYNX)"
 "Click on an empty spot selects and moves the song position (pointer click)" = "빈 곳 클릭으로 선택하고 곡 위치 이동 (포인터 클릭)"
@@ -10897,8 +10890,10 @@ countries: kr
 "This will |delete| {0} unused mixer track(s). Are you sure?" = "사용하지 않는 믹서 트랙 {0}개를 |삭제|합니다. 계속할까요?"
 "Trim unused mixer tracks" = "사용하지 않는 믹서 트랙 정리"
 "No unused mixer tracks" = "사용하지 않는 믹서 트랙이 없습니다"
+
 # --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
 "Scale highlighting" = "스케일 하이라이트"
+
 # --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
 "FL arpeggiator pattern" = "FL 아르페지에이터 패턴"
 "None (the arpeggiator above)" = "없음 (위의 아르페지에이터)"
@@ -10942,8 +10937,6 @@ countries: kr
 "Corrode (an imported Live Erosion) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Corrode(가져온 Live Erosion)는 이 버전에 없습니다: 해당 슬롯에서 꺼진 Utility가 되며, 오토메이션은 아무 일도 하지 않습니다 ({0})"
 "Platter (an imported Live Vinyl Distortion) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Platter(가져온 Live Vinyl Distortion)는 이 버전에 없습니다: 해당 슬롯에서 꺼진 Utility가 되며, 오토메이션은 아무 일도 하지 않습니다 ({0})"
 "Soundboard (an imported Live Corpus) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Soundboard(가져온 Live Corpus)는 이 버전에 없습니다: 해당 슬롯에서 꺼진 Utility가 되며, 오토메이션은 아무 일도 하지 않습니다 ({0})"
-
-# round 190jz: issues #192 (docked Browser), #194 (fade handles), #195 (Home, W)
 "Move the playback marker to the start of the song or pattern" = "재생 마커를 송 또는 패턴의 시작으로 이동"
 "Move the playback marker to start" = "재생 마커를 시작으로 이동"
 "W moves the playback marker to the start (as Home)" = "W로 재생 마커를 시작으로 이동 (Home과 같음)"
@@ -11224,16 +11217,13 @@ countries: kr
 "Paused" = "일시 정지"
 "Scrub: hold and drag right to play forward, left to play backward; the further, the faster" = "스크럽: 누른 채 오른쪽으로 끌면 정방향, 왼쪽으로 끌면 역방향 재생, 멀수록 빨라집니다"
 
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 에디터 열기/닫기  [Alt]+[LMB] 다른 에디터 유지  [Ctrl]+[LMB] 미리 듣기  [2xLMB] 피아노 롤  [LMB] 위/아래 드래그로 순서 변경  [RMB] 채널 메뉴"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "피크 홀드 기능이 있는 피크 미터(좌/우)  [LMB] 클립 표시등 지우기"
-
 # --- rollup 0.1.30 step 6: Save a copy for 0.1.28 knows rounds 190kc / 190ke / natives190kj
 "The crossfader (Live's Crossfade Assign) is not in this release: these inserts play at their full level, and its automation does nothing: {0}" = "크로스페이더(Live의 Crossfade Assign)는 이 릴리스에 없습니다: 이 인서트들은 최대 레벨로 재생되며 그 오토메이션은 아무 효과가 없습니다: {0}"
 "Live return tracks show as ordinary mixer inserts: {0}" = "Live 리턴 트랙은 일반 믹서 인서트로 표시됩니다: {0}"
 "The Simple Controls tab's own knob mappings: {0}" = "Simple Controls 탭의 사용자 노브 매핑: {0}"
 "Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}" = "IMG 섹션에 샘플이 있는 Harmor 파트는 리신시스 대신 음색으로 재생됩니다: {0}"
 "Newtone's detected key and note velocities are left out: {0}" = "Newtone이 감지한 키와 노트 벨로시티는 제외됩니다: {0}"
+
 # --- round 190kl: the Peak Controller's LYNX LFO shapes (issue #197)
 "LYNX shapes" = "LYNX 파형"
 "Ramp down" = "하강 램프"
@@ -12004,3 +11994,73 @@ countries: kr
 "Could not open a new window" = "새 창을 열 수 없습니다"
 "Open in new window" = "새 창에서 열기"
 "Start-up project" = "시작 프로젝트"
+
+# --- round 190np: first-run onboarding (welcome card, Next-3 card, empty-state hints, tips)
+"Welcome..." = "시작 화면..."
+"Getting started" = "시작하기"
+"BandLab, FL Studio Mobile or GarageBand" = "BandLab, FL Studio Mobile 또는 GarageBand"
+"FL Studio" = "FL Studio"
+"Ableton Live or Bitwig" = "Ableton Live 또는 Bitwig"
+"Logic, Cubase, Reaper, Pro Tools or Studio One" = "Logic, Cubase, Reaper, Pro Tools 또는 Studio One"
+"I'm new to making music" = "음악 만들기가 처음이에요"
+"A mobile or simple app. Simple layout: tracks, loops, a drum machine and quick recording." = "모바일 또는 간단한 앱. 간단한 레이아웃: 트랙, 루프, 드럼 머신, 빠른 녹음."
+"Pattern layout: Channel Rack, Piano roll, Playlist and Mixer, with FL's shortcuts. Your .flp projects open." = "패턴 레이아웃: 채널 랙, 피아노 롤, 플레이리스트, 믹서, FL 단축키 지원. .flp 프로젝트를 열 수 있습니다."
+"Clip-launch layout: a clip grid with scenes beside the arrangement. Your .als sets open." = "클립 실행 레이아웃: 어레인지먼트 옆에 장면이 있는 클립 그리드. .als 세트를 열 수 있습니다."
+"Simple layout with the Mixer at hand: one track per instrument on a timeline." = "믹서를 가까이 둔 간단한 레이아웃: 타임라인에 악기당 트랙 하나."
+"Simple layout and a short first-song tour (about five minutes)." = "간단한 레이아웃과 첫 곡 만들기 짧은 투어(약 5분)."
+"Press Space to hear the starter beat" = "Space를 눌러 스타터 비트 듣기"
+"Add a loop: drag one onto the timeline" = "루프 추가: 타임라인으로 드래그하세요"
+"Record your voice on a new Voice track" = "새 보이스 트랙에 목소리 녹음하기"
+"Click steps in the Channel Rack to make a beat" = "채널 랙의 스텝을 클릭해 비트 만들기"
+"Open one of your .flp projects" = ".flp 프로젝트 하나 열기"
+"Find your plugins (VST, CLAP)" = "플러그인 찾기 (VST, CLAP)"
+"Drag a loop into a slot of the clip grid" = "루프를 클립 그리드의 슬롯으로 드래그하기"
+"Launch a clip or a scene" = "클립이나 장면 실행하기"
+"Open one of your .als sets" = ".als 세트 하나 열기"
+"Add an instrument track and play it with the computer keys" = "악기 트랙을 추가하고 컴퓨터 키로 연주하기"
+"Record audio on a Voice or Guitar track" = "보이스 또는 기타 트랙에 오디오 녹음하기"
+"Open the Mixer (F9)" = "믹서 열기 (F9)"
+"Open Loops" = "루프 열기"
+"+ Voice track" = "+ 보이스 트랙"
+"Browse loops" = "루프 둘러보기"
+"+ Instrument" = "+ 악기"
+"Your starter beat is ready in the Simple layout." = "스타터 비트가 간단한 레이아웃에 준비되어 있습니다."
+"The Pattern layout works like FL Studio." = "패턴 레이아웃은 FL Studio처럼 작동합니다."
+"The Clip-launch layout: clips and scenes beside the arrangement." = "클립 실행 레이아웃: 어레인지먼트 옆에 클립과 장면이 있습니다."
+"One track per instrument, with the Mixer at hand." = "악기당 트랙 하나, 믹서는 가까이에."
+"Your song is built here" = "여기서 곡을 만듭니다"
+"Launch clips from this grid" = "이 그리드에서 클립 실행"
+"Drag a loop here" = "여기로 루프 드래그"
+"Click in the Playlist to place the pattern you're editing, or drag a loop, audio or MIDI file in from the Browser." = "플레이리스트를 클릭해 편집 중인 패턴을 배치하거나, 브라우저에서 루프, 오디오 또는 MIDI 파일을 드래그하세요."
+"Drag a loop or a sample from the Browser into any slot. Double-click an empty slot for a new MIDI clip. The play button at the end of a row launches the whole scene." = "브라우저에서 루프나 샘플을 원하는 슬롯으로 드래그하세요. 빈 슬롯을 더블 클릭하면 새 MIDI 클립이 만들어집니다. 행 끝의 재생 버튼은 장면 전체를 실행합니다."
+"Drop a loop, an audio or a MIDI file on the timeline, or add a track: drums, an instrument or your voice." = "루프, 오디오 또는 MIDI 파일을 타임라인에 놓거나 트랙을 추가하세요: 드럼, 악기 또는 목소리."
+"Nothing to play in Song mode yet" = "송 모드에서 아직 재생할 것이 없습니다"
+"No input to record from yet" = "아직 녹음할 입력이 없습니다"
+"Song mode plays the Playlist, and it's empty. Switch to Pattern to hear the pattern you're editing, or place it in the Playlist." = "송 모드는 플레이리스트를 재생하는데, 비어 있습니다. 패턴으로 전환해 편집 중인 패턴을 듣거나, 플레이리스트에 배치하세요."
+"To record your voice or an instrument, choose an input in the audio settings and arm a track. Notes from the computer keys or a MIDI keyboard record without one." = "목소리나 악기를 녹음하려면 오디오 설정에서 입력을 고르고 트랙을 녹음 대기로 두세요. 컴퓨터 키나 MIDI 키보드의 노트는 그렇지 않아도 녹음됩니다."
+"Switch to Pattern" = "패턴으로 전환"
+"Show tips and hints" = "팁과 힌트 표시"
+"Speakers (system default)" = "스피커 (시스템 기본값)"
+"Plugins: scanning in the background" = "플러그인: 백그라운드에서 검색 중"
+"Plugins: {0} found" = "플러그인: {0}개 발견"
+"Channel Rack (F6)" = "채널 랙 (F6)"
+"Open an .flp project..." = ".flp 프로젝트 열기..."
+"Open an .als set..." = ".als 세트 열기..."
+"+ Add track" = "+ 트랙 추가"
+"{0} are trademarks of their owners; LYNX SHARE is not affiliated with them." = "{0}은(는) 각 소유자의 상표이며, LYNX SHARE는 이들과 제휴 관계가 아닙니다."
+"Skip: keep the FL-style Pattern layout" = "건너뛰기: FL 스타일 패턴 레이아웃 유지"
+"Sound:" = "사운드:"
+"More setup (audio driver, plugin folders)..." = "추가 설정 (오디오 드라이버, 플러그인 폴더)..."
+"Where are you coming from?" = "어떤 프로그램을 쓰셨나요?"
+"LYNX SHARE sets itself up to feel familiar. One click and you're in; change it any time in View > Layout style." = "LYNX SHARE는 익숙하게 느껴지도록 스스로 설정됩니다. 한 번 클릭하면 시작되며, 보기 > 레이아웃 스타일에서 언제든 바꿀 수 있습니다."
+"Hide (Help > Getting started shows it again)" = "숨기기 (도움말 > 시작하기에서 다시 표시)"
+"Learn more..." = "자세히 알아보기..."
+"Next: 3 things to try" = "다음: 해볼 만한 3가지"
+"Nice, that's the basics." = "좋아요, 기본은 이게 전부예요."
+"Help > Getting started shows this again" = "도움말 > 시작하기에서 이 내용을 다시 볼 수 있습니다"
+"Got it" = "확인"
+"No more tips" = "팁 그만 보기"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 에디터 열기/닫기  [Alt]+[LMB] 다른 에디터 유지  [Ctrl]+[LMB] 미리 듣기  [2xLMB] 피아노 롤  [LMB] 위/아래 드래그로 순서 변경  [RMB] 채널 메뉴"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "피크 홀드 기능이 있는 피크 미터(좌/우)  [LMB] 클립 표시등 지우기"
