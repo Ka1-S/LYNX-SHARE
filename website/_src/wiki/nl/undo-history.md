@@ -1,5 +1,5 @@
 ---
-source: 9f36c60cc7
+source: 2298a70fec
 ---
 ![Het venster Bewerkgeschiedenis: zes stappen van Start tot Add notes, met Mute: Kick als de huidige](/assets/img/wiki/history.webp)
 
@@ -15,18 +15,17 @@ Elke bewerking van het project is een stap in de geschiedenis van ongedaan maken
 
 ## De toetsen voor ongedaan maken
 
-`Ctrl+Z` werkt niet zoals in de meeste programma's. Het maakt de laatste stap ongedaan en, nogmaals ingedrukt, doet het die opnieuw, zodat het wisselt tussen de laatste twee staten. Gebruik `Ctrl+Alt+Z` om verder terug te gaan.
+`Ctrl+Z` gaat terug door de geschiedenis, één stap per druk, zoals in FL Studio 2026 en de meeste programma's. `Ctrl+Y` of `Ctrl+Shift+Z` gaat weer vooruit.
 
 | Opdracht | Toets | Wat het doet |
 |---|---|---|
-| `Ongedaan maken` | `Ctrl+Z` | Maakt de laatste stap ongedaan. Na een ongedaan maken doet het de volgende stap opnieuw, en het menu-item luidt `Ongedaan maken (opnieuw)` |
-| `Achterwaarts ongedaan maken` | `Ctrl+Alt+Z` | Gaat altijd terug, één stap per druk |
+| `Ongedaan maken` | `Ctrl+Z` | Gaat één stap terug per druk |
 | `Opnieuw` | `Ctrl+Y` of `Ctrl+Shift+Z` | Gaat vooruit |
 | `Bewerkgeschiedenis...` | `Ctrl+Alt+H` | Opent de lijst |
 
-Na elk ongedaan maken of opnieuw doen noemt de hintbalk de stap en toont het niveau, bijvoorbeeld `Level 2/3`.
+Het menu `Bewerken` noemt de stap waarop elk item werkt, bijvoorbeeld `Undo Add notes: Pattern 1`. Na elk ongedaan maken of opnieuw doen noemt de hintbalk de stap en toont het niveau, bijvoorbeeld `Level 2/3`.
 
-Heb je liever het gebruikelijke gedrag, zet dan `Alternatieve modus voor ongedaan maken (klassiek ongedaan maken, in plaats van ongedaan maken/opnieuw op dezelfde sneltoets)` aan in `Opties › Algemene instellingen...`. `Ctrl+Z` gaat dan altijd terug.
+De andere modus van FL Studio is er ook: zet `Alternatieve modus voor ongedaan maken` uit in `Opties › Algemene instellingen...`. `Ctrl+Z` maakt dan de laatste stap ongedaan en doet die, nogmaals ingedrukt, opnieuw, zodat het wisselt tussen de laatste twee staten. `Ctrl+Alt+Z` (`Achterwaarts ongedaan maken`) gaat verder terug, en `Ctrl+Y` of `Ctrl+Shift+Z` doen nog steeds opnieuw.
 
 ## Wat een stap is en wat niet
 
@@ -43,7 +42,7 @@ Beide staan in `Opties › Algemene instellingen...`.
 | Instelling | Wat het doet |
 |---|---|
 | `Maximaal aantal ongedaan-maakstappen` | Hoeveel stappen er bewaard worden: 25, 50, 100, 200, 500 of 1000. Standaard is 100 |
-| `Alternatieve modus voor ongedaan maken` | Maakt van `Ctrl+Z` een klassiek ongedaan maken |
+| `Alternatieve modus voor ongedaan maken` | Standaard aan: `Ctrl+Z` gaat terug door de geschiedenis. Uit: `Ctrl+Z` wisselt tussen ongedaan maken en opnieuw doen van de laatste stap |
 
 ## Back-ups
 
