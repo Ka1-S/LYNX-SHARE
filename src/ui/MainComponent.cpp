@@ -1332,6 +1332,22 @@ void MainComponent::resized()
     auto minHint = juce::jmax (menuWidth + 8, 320);
     const auto maxHint = room >= 3000 ? 1000 : 620;
     auto visible = toolbarlayout::fit (toolbarLayout, widths, gap, room, minHint);
+    // round 190nk (0.1.30 release QA): round 190mv's audio-editor button made the File panel one column wider, and at
+    // 1920 px the default toolbar then dropped the output scope (and on Windows clipped the meters), which 0.1.29 and FL
+    // show there. The button is the first thing to go: the File panel keeps its three columns whenever the fourth would
+    // cost a whole panel (an audio editor still opens from the Master's effect slots).
+    fileWide = true;
+    {
+        auto narrowFile = widths;
+        narrowFile[(std::size_t) Group::file] = 3 * h + 4;
+        const auto threeColumns = toolbarlayout::fit (toolbarLayout, narrowFile, gap, room, minHint);
+        if (std::count (threeColumns.begin(), threeColumns.end(), true) > std::count (visible.begin(), visible.end(), true))
+        {
+            widths = narrowFile;
+            visible = threeColumns;
+            fileWide = false;
+        }
+    }
     // round 181b: the Chord detection panel is on the default toolbar, as in FL. At 1920 px it misses by about 90 px:
     // tighter displays and gaps make the room (they get wider again when there is more); all the panels stay
     if (toolbarLayout.visible && toolbarLayout.isShown (Group::chord) && ! visible[(std::size_t) Group::chord] && visible[(std::size_t) Group::record])
@@ -1612,7 +1628,10 @@ void MainComponent::resized()
                 break;
             case Group::file: // new, open, save over export, undo, redo
                 grid (panel, { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton });
-                put (audioEditorButton, juce::Rectangle<int> (panel.getX() + 3 * (h + 2), row1, h, h)); // (round 190mv, DF-35)
+                if (fileWide)
+                    put (audioEditorButton, juce::Rectangle<int> (panel.getX() + 3 * (h + 2), row1, h, h)); // (round 190mv, DF-35)
+                else
+                    hide ({ &audioEditorButton }); // (round 190nk: no room for a fourth column)
                 break;
             case Group::meters: put (perfMeter, panel.withY (row1).withHeight (2 * h + 2)); break;
             case Group::output: put (output, panel.withY (row1).withHeight (2 * h + 2)); break;
