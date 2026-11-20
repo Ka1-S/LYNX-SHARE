@@ -238,6 +238,8 @@ APP_SOURCES+=(src/ui/TetraEditor.cpp) # round 190hs
 APP_SOURCES+=(src/ui/LynxModelEditor.cpp) # round 190ni
 APP_SOURCES+=(src/ui/DirectWaveEditor.cpp) # round 190hz
 APP_SOURCES+=(src/ui/HelixEditor.cpp) # round 190ja
+APP_SOURCES+=(src/ui/ActionSearch.cpp) # round 190nq (#228)
+APP_SOURCES+=(src/ui/Onboarding.cpp src/ui/MainOnboarding.cpp src/ui/DemoMode.cpp) # round 190np (first-run onboarding, --demo)
 # Windows file association (.lynx) and its icon
 APP_SOURCES+=(src/platform/FileTypes.cpp src/platform/Paths.cpp src/platform/Package.cpp src/platform/NativeEmbed.cpp)
 # SEH guard around calls into hosted plugins (round 111): the only unit built with -fms-extensions (__try / __except)
