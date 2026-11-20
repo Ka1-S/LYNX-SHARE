@@ -8942,6 +8942,9 @@ void MainComponent::openLynxProject (const juce::File& file, bool withoutPlugins
         return;
     }
     withoutPlugins = withoutPlugins || std::exchange (nextOpenWithoutPlugins, false);
+    // issue #235 (round 190ns): with "Link Playlist tracks to mixer tracks" on, a linked track and insert show one colour
+    if (const auto matched = autolink::matchLinkedColours (*song); matched > 0)
+        platform::testModeLog ("linked track colours matched on open: " + juce::String (matched));
 
     engine.stop();
     engine.rewind();

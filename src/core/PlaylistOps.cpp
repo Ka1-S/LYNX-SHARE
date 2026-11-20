@@ -570,6 +570,51 @@ bool linkToMixerTrack (Song& song, int track, int mixer)
     return true;
 }
 
+LinkedNames linkedNames (const Song& song)
+{
+    LinkedNames n;
+    for (int t = 0; t < (int) song.playlistTracks.size(); ++t)
+    {
+        const auto& pt = song.playlistTracks[(std::size_t) t];
+        if (pt.mode != PlaylistTrackMode::audio || pt.mixerTrack <= 0 || pt.mixerTrack >= (int) song.mixer.size())
+            continue;
+        const auto& mt = song.mixer[(std::size_t) pt.mixerTrack];
+        n.pairs.push_back ({ t, pt.mixerTrack, pt.name, pt.colour, mt.name, mt.colour });
+    }
+    return n;
+}
+
+int followLinkedNames (Song& song, const LinkedNames& before)
+{
+    int changed = 0;
+    for (const auto& p : before.pairs)
+    {
+        if (p.track >= (int) song.playlistTracks.size() || p.mixer >= (int) song.mixer.size())
+            continue;
+        auto& t = song.playlistTracks[(std::size_t) p.track];
+        if (t.mode != PlaylistTrackMode::audio || t.mixerTrack != p.mixer)
+            continue; // (unlinked or relinked by the edit: the link itself set both)
+        auto& m = song.mixer[(std::size_t) p.mixer];
+        const auto trackChanged = t.name != p.trackName || t.colour != p.trackColour;
+        const auto insertChanged = m.name != p.insertName || m.colour != p.insertColour;
+        if (trackChanged && ! insertChanged)
+        {
+            // FUN_012e6010: the mixer track takes the track's colour and name (an unnamed track: FL's empty mixer name)
+            m.colour = t.colour;
+            m.name = t.name.empty() ? "Insert " + std::to_string (p.mixer) : t.name;
+            ++changed;
+        }
+        else if (insertChanged && ! trackChanged)
+        {
+            // FUN_012be6f0: the linked Playlist track takes the mixer track's name and colour
+            t.colour = m.colour;
+            t.name = hasOwnName (song, p.mixer) ? m.name : std::string();
+            ++changed;
+        }
+    }
+    return changed;
+}
+
 int assignAudioTracks (Song& song, const std::vector<int>& tracks, int mixer)
 {
     if (mixer != newMixerTrack && (mixer <= 0 || mixer >= (int) song.mixer.size()))
@@ -1662,6 +1707,27 @@ int followNewContent (Song& song, const Snapshot& before)
             ++linked;
     }
     return linked;
+}
+
+int matchLinkedColours (Song& song)
+{
+    if (! song.linkTracksToMixer)
+        return 0;
+    int changed = 0;
+    for (int t = 0; t < (int) song.playlistTracks.size(); ++t)
+        if (const auto m = linkedInsertOf (song, t); validInsert (song, m))
+        {
+            auto& track = song.playlistTracks[(std::size_t) t];
+            auto& insert = song.mixer[(std::size_t) m];
+            if (track.colour == insert.colour || (track.colour != 0 && insert.colour != 0))
+                continue;
+            if (track.colour == 0)
+                track.colour = insert.colour;
+            else
+                insert.colour = track.colour;
+            ++changed;
+        }
+    return changed;
 }
 
 int pairedTakeTrack (const Song& song, int insert)
