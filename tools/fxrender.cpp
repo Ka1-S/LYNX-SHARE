@@ -18,6 +18,7 @@
 //     --ticks <ppq> [mode]     also split blocks at song ticks (a host that cuts its buffers on a <ppq> grid; mode 0 floor,
 //                              1 round, 2 ceil of the tick's sample position)
 //     --settle <s>             silence processed before each file (default 0.5 s, after a reset)
+//     --settlesong             with --songpos: the song position runs through the settle too (round 190nh)
 //     --slotmix                apply the slot's dry / wet (a substitute's or translator's slot mix) as the mixer does
 //                              (round 190jh: dry + (wet - dry) * mix below 0.999; off by default so older banks reproduce)
 //     --list                   print the parameters (index, name, value, text) and exit
@@ -202,7 +203,7 @@ int main (int argc, char** argv)
     auto kind = (EffectKind) kindIndex;
     auto slot = makeEffectSlot (kind);
     double rate = 0.0, settle = 0.5;
-    bool songPos = false;
+    bool songPos = false, settleSong = false;
     double songOffset = 0.0; // samples
     int block = 512;
     double tickPpq = 0.0;
@@ -223,6 +224,8 @@ int main (int argc, char** argv)
             tickPpq = std::atof (argv[++i]), tickMode = std::atoi (argv[++i]);
         else if (a == "--slotmix")
             slotMix = true;
+        else if (a == "--settlesong")
+            settleSong = true;
         else if (a == "--settle" && i + 1 < argc)
             settle = std::atof (argv[++i]);
         else if (a == "--list")
@@ -307,11 +310,15 @@ int main (int argc, char** argv)
         fx->prepare (sr);
         fx->reset();
         std::vector<float> l ((std::size_t) block), r ((std::size_t) block);
-        for (int left = (int) (settle * sr); left > 0; left -= block)
+        const int settleN = (int) (settle * sr);
+        for (int left = settleN; left > 0; left -= block)
         {
             const int n = std::min (block, left);
             std::fill (l.begin(), l.end(), 0.0f);
             std::fill (r.begin(), r.end(), 0.0f);
+            // round 190nh: --settlesong: the play head runs through the settle too (as fxmeasure's does)
+            if (songPos && settleSong)
+                fx->setSongPosition (((double) (settleN - left) - settleN + songOffset) / sr * 2.0 * (double) ppq);
             fx->process (l.data(), r.data(), n, slot.params, 120.0);
         }
         Audio out;

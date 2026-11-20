@@ -1042,7 +1042,9 @@ translate = fresh-air
 # Round 190ln mapped them from the plug-ins' parameter texts and manuals (Slate's unlicensed builds rendered only their
 # input); round 190nb measured the licensed kHs Essentials (Kilohearts' own build) and refitted the maps (REA_rodada190nb).
 # Disperser plays on Facet EQ's hidden all-pass cascade (its structure read statically). Round 190nb: Ring Mod, Reverser,
-# Resonator, Phase Distortion and Shaper play Kilohearts laws hidden in Effector (below).
+# Resonator, Phase Distortion and Shaper play Kilohearts laws hidden in Effector (below). Round 190nh: Comb Filter, Chorus,
+# Trance Gate, Phaser, Distortion, Bitcrush, Frequency Shifter and Ensemble too (their DSP read in HeartCore 2.4,
+# REA_rodada190nh); a slot saved with the earlier stand-in keeps it.
 [kilohearts-disperser]
 product = Disperser
 vendor = Kilohearts
@@ -1165,7 +1167,7 @@ translate = kilohearts
 [khs-distortion]
 product = kHs Distortion
 vendor = Kilohearts
-lynx = Distortion
+lynx = Effector
 names = kHs Distortion
 translate = kilohearts
 
@@ -1179,14 +1181,14 @@ translate = kilohearts
 [khs-bitcrush]
 product = kHs Bitcrush
 vendor = Kilohearts
-lynx = Lo-fi
+lynx = Effector
 names = kHs Bitcrush
 translate = kilohearts
 
 [khs-frequency-shifter]
 product = kHs Frequency Shifter
 vendor = Kilohearts
-lynx = Frequency shifter
+lynx = Effector
 names = kHs Frequency Shifter
 translate = kilohearts
 
@@ -1200,21 +1202,21 @@ translate = kilohearts
 [khs-chorus]
 product = kHs Chorus
 vendor = Kilohearts
-lynx = Chorus
+lynx = Effector
 names = kHs Chorus
 translate = kilohearts
 
 [khs-ensemble]
 product = kHs Ensemble
 vendor = Kilohearts
-lynx = Chorus
+lynx = Effector
 names = kHs Ensemble
 translate = kilohearts
 
 [khs-phaser]
 product = kHs Phaser
 vendor = Kilohearts
-lynx = Fruity Phaser
+lynx = Effector
 names = kHs Phaser
 translate = kilohearts
 
@@ -1256,14 +1258,14 @@ translate = kilohearts
 [khs-comb-filter]
 product = kHs Comb Filter
 vendor = Kilohearts
-lynx = Pocket Comb Filter
+lynx = Effector
 names = kHs Comb Filter
 translate = kilohearts
 
 [khs-trance-gate]
 product = kHs Trance Gate
 vendor = Kilohearts
-lynx = Volume gate
+lynx = Effector
 names = kHs Trance Gate
 translate = kilohearts
 

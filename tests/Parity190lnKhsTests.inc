@@ -11,6 +11,8 @@
 #include "core/PluginSubstitutes.h"
 #include "core/ZipLite.h"
 
+#include "core/KiloheartsDsp.h" // round 190nh: the Trance Gate test reads the law
+
 namespace parity190lnkhs
 {
 inline std::vector<std::uint8_t> state (const std::string& modelFields)
@@ -105,7 +107,7 @@ TEST (parity190lnkhs_delay_time_and_synced_notes)
     CHECK (text (u, named (u, "Sync L")) == "ms" && text (u, named (u, "Time L")) == "625.0 ms");
 }
 
-TEST (parity190lnkhs_trance_gate_pattern_on_volume_gate)
+TEST (parity190lnkhs_trance_gate_pattern_on_volume_gate) // (round 190nh: on Effector's Trance Gate law)
 {
     using namespace lynx;
     using namespace parity190lnkhs;
@@ -116,9 +118,11 @@ TEST (parity190lnkhs_trance_gate_pattern_on_volume_gate)
     auto t = load ("kHs Trance Gate", state ("\"attack\": \"0.005\", \"decay\": \"0.005\", \"sustain\": \"1\", \"depth\": \"1\", \"release\": \"0.02\", "
                                              "\"rate\": \"one_16th\", \"swing\": \"0.5\", \"pattern\": \"1\", \"$type\": \"trance_gate\", "
                                              "\"patterns\": [{\"length\": \"16\", \"steps\": [" + steps + "]}]"), n);
-    CHECK (t.kind == EffectKind::volumeGate && n > 32);
-    // 1/16 steps over Volume gate's 32 per bar: each plug-in step covers two; on / off alternate
-    CHECK (t.params[0] > 0.9f && t.params[1] > 0.9f && t.params[2] == 0.0f && t.params[3] == 0.0f && t.params[4] > 0.9f);
+    // round 190nh: the gate opens on Effector's hidden Trance Gate law (tests/Parity190nhKhsTests.inc), its steps as read
+    CHECK (t.kind == EffectKind::effector && n > 16);
+    namespace k = khsdsp;
+    CHECK (k::lawOf (t.params[(std::size_t) k::lawParam]) == k::Law::tranceGate);
+    CHECK (t.params[(std::size_t) k::gateStepParam] > 0.3f && t.params[(std::size_t) k::gateStepParam + 1] == 0.0f);
 }
 
 TEST (parity190lnkhs_disperser_is_an_all_pass_cascade_on_facet_and_off_by_default)
