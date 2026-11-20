@@ -5422,7 +5422,7 @@ std::unique_ptr<Effect> makeEffect (const EffectSlot& slot)
     if (slot.kind == EffectKind::distructor)
         return distructor::make (slot.state);
     if (slot.kind == EffectKind::effector && khsdsp::lawOf (slot.params[(std::size_t) khsdsp::lawParam]) != khsdsp::Law::none)
-        return effector::make (true); // round 190nb: a Kilohearts snapin law (core/KiloheartsDsp.h)
+        return effector::make (true, khsdsp::lawLatency (khsdsp::lawOf (slot.params[(std::size_t) khsdsp::lawParam]))); // round 190nb: a Kilohearts snapin law (core/KiloheartsDsp.h)
     if (slot.kind == EffectKind::fruityWaveShaper)
         return flshape::makeWaveShaper (slot.state);
     if (slot.kind == EffectKind::parametricEq && peq::flLaw (slot.params))

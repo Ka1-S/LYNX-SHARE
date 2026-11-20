@@ -237,7 +237,7 @@ private:
 class Effector final : public Effect
 {
 public:
-    explicit Effector (bool kiloheartsLaw = false) : khsBuffers (kiloheartsLaw)
+    explicit Effector (bool kiloheartsLaw = false, int kiloheartsLatency = 0) : khsBuffers (kiloheartsLaw), khsLatency (kiloheartsLatency)
     {
         delayLine[0].assign ((std::size_t) (1.5 * maxRate) + 8, 0.0f);
         delayLine[1].assign (delayLine[0].size(), 0.0f);
@@ -291,6 +291,8 @@ public:
     }
 
     void setSongPosition (double ticks) noexcept override { songBeats = ticks / ppq; }
+    // round 190nh: a Kilohearts law's latency (the Comb Filter's 7 samples), fixed when the slot is created
+    int latencySamples() const noexcept override { return khsLatency; }
 
     void process (float* l, float* r, int n, const EffectParams& p, double bpm) noexcept override
     {
@@ -745,6 +747,7 @@ private:
     float wetSmooth = -1.0f;
     EffectorReverb rev;
     bool khsBuffers = false;
+    int khsLatency = 0;
     khsdsp::Engine khs;
 };
 } // namespace
@@ -790,8 +793,8 @@ std::string formatParam (int param, float v, double bpm)
     }
 }
 
-std::unique_ptr<Effect> make (bool kiloheartsLaw)
+std::unique_ptr<Effect> make (bool kiloheartsLaw, int kiloheartsLatency)
 {
-    return std::make_unique<Effector> (kiloheartsLaw);
+    return std::make_unique<Effector> (kiloheartsLaw, kiloheartsLatency);
 }
 } // namespace lynx::effector
