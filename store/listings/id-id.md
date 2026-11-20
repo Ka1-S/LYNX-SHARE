@@ -75,3 +75,7 @@ LYNX SHARE 0.1.30: lebih ringan dari sebelumnya, memakai sekitar separuh CPU FL 
 - 03-piano-roll.png — Tulis melodi dan akor di Piano Roll
 - 04-mixer.png — Mixing dengan insert, send, sidechain, dan efek bawaan
 - 05-instruments-effects.png — Step sequencer, synth bawaan, dan EQ parametrik
+- 06-audio-editing.png — Edit not tunggal di dalam akor dengan editor not polifonik, atau buka klip audio di Melodyne dan plugin ARA 2 lainnya
+- 07-chord-helper.png — Asisten akor menyarankan kunci terkait dan akor pinjaman untuk akor yang dipilih
+- 08-drum-machine.png — Program beat di Drum Machine bergaya BandLab pada Alur kerja sederhana
+- 09-helix-plus.png — Helix, synth wavetable, dengan Helix+: osilator ketiga, lapisan granular dan spektral, 8 makro, LFO yang digambar, dan efek

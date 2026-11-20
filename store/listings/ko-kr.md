@@ -70,3 +70,7 @@ LYNX SHARE 0.1.30: 그 어느 때보다 가볍게. 테스트 PC에서 FL의 Thie
 - 03-piano-roll.png — Piano Roll에서 멜로디와 코드를 찍어 보세요
 - 04-mixer.png — 인서트, 센드, 사이드체인, 내장 이펙트로 믹싱
 - 05-instruments-effects.png — 스텝 시퀀서, 내장 신스, 파라메트릭 EQ
+- 06-audio-editing.png — 폴리포닉 노트 에디터로 코드 안의 음을 하나씩 편집하거나, 오디오 클립을 Melodyne 등 ARA 2 플러그인에서 열어 보세요
+- 07-chord-helper.png — 코드 도우미가 선택한 코드에 맞는 관련 키와 차용 화음을 제안합니다
+- 08-drum-machine.png — 간단한 워크플로의 BandLab 스타일 드럼 머신으로 비트를 찍어 보세요
+- 09-helix-plus.png — 웨이브테이블 신스 Helix와 Helix+: 세 번째 오실레이터, 그래뉼러·스펙트럴 레이어, 매크로 8개, 직접 그리는 LFO, 이펙트

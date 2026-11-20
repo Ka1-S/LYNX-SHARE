@@ -77,3 +77,7 @@ LYNX SHARE 0.1.30 : plus léger que jamais, avec environ la moitié du CPU de FL
 - 03-piano-roll.png — Écrivez mélodies et accords dans le Piano Roll
 - 04-mixer.png — Mixez avec inserts, sends, sidechain et effets intégrés
 - 05-instruments-effects.png — Séquenceur pas à pas, synthés intégrés et égaliseur paramétrique
+- 06-audio-editing.png — Éditez des notes isolées dans les accords avec l'éditeur de notes polyphonique, ou ouvrez les clips audio dans Melodyne et d'autres plugins ARA 2
+- 07-chord-helper.png — L'assistant d'accords propose des tonalités voisines et des accords d'emprunt pour l'accord sélectionné
+- 08-drum-machine.png — Programmez un rythme dans la boîte à rythmes façon BandLab du Flux simple
+- 09-helix-plus.png — Helix, le synthé wavetable, avec Helix+ : un troisième oscillateur, des couches granulaire et spectrale, 8 macros, des LFO dessinés et des effets

@@ -113,7 +113,7 @@ menu (split, chop, reverse, fit to tempo and more).
 <td width="50%" valign="top">
 <img src="docs/img/mixer.png" alt="Mixer">
 
-**Mixer.** Up to 127 inserts with 10 effect slots each, sends, sidechain, delay compensation and smart disable, plus
+**Mixer.** Up to 500 inserts with 10 effect slots each, sends, sidechain, delay compensation and smart disable, plus
 any insert to any hardware output.
 
 </td>
@@ -142,6 +142,11 @@ works: the tracks and the timeline in one window, loops and pads, and quick reco
 stems and MIDI from another app, program a beat in the Drum Machine, tune up with the tuner, shape the sound with eight one-knob effects, play chords on a Chord pad and save the song as a file from the Finish dock. *Make my first song*
 walks you through it step by step. The setup wizard offers all three workflows at the first start.
 
+<p align="center">
+  <img src="docs/img/drum-machine.png" alt="The Simple workflow with the Drum Machine open under a drum track" width="100%">
+  <br><sub>The Simple workflow: a drum track and its BandLab-style Drum Machine.</sub>
+</p>
+
 ### Instruments and effects
 
 <table>
@@ -165,6 +170,44 @@ Edison (the audio editor) on any mixer slot, and Patcher for building your own c
 
 Every one of them is listed, with a picture of its editor, in the
 [catalogue of instruments and effects](https://lynx-share.com/instruments-and-effects/).
+
+### Audio editing, chords and sound design
+
+<table>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/img/poly-note-editor.png" alt="The polyphonic note editor: a chord inside a piano recording moved up a semitone">
+
+**Polyphonic note editor.** *Edit notes (polyphonic)* in an audio clip's menu finds the single notes inside chords
+and mixes: move, retune, stretch or mute one of them, shape its modulation and drift, and hear it while you drag.
+
+</td>
+<td width="50%" valign="top">
+<img src="docs/img/ara-edit.png" alt="An audio clip's menu with Edit in ARA plugin and Melodyne">
+
+**ARA 2 plugins.** *Edit in ARA plugin* (clip menu › LYNX extras) opens an audio clip in Melodyne or another ARA 2
+plugin, which edits it in place, in time with the project.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/img/chord-helper.png" alt="The Chord helper next to the Piano Roll: related keys and borrowed chords">
+
+**Chord helper.** *Tools › Chord helper* in the Piano Roll reads the selected chord and suggests related keys and
+borrowed chords, with how each one moves and feels; hear one on hover, click it to insert it.
+
+</td>
+<td width="50%" valign="top">
+<img src="docs/img/helix-plus.png" alt="Helix with the Helix+ strip">
+
+**Helix and Helix+.** Helix, the wavetable synth, gets a Helix+ strip in its channel window: a third oscillator,
+sample, granular and spectral layers, your own wavetables, more warp modes, unison and filter types, eight macros,
+drawn LFOs, chaos sources and a rack of effects.
+
+</td>
+</tr>
+</table>
 
 ### Everything else
 
