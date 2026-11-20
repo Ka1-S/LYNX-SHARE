@@ -476,6 +476,13 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # SPDX 2.3 software bill of materials of the third-party components (round 190nr): THIRD_PARTY.md + licenses/.
+      - uses: actions/checkout@v5
+        with:
+          path: src
+      - name: SBOM
+        run: src/scripts/make-sbom.sh "$LABEL" "dist/LYNX-$LABEL-sbom.spdx.json"
+
       # The in-app updater (src/core/UpdateCheck.cpp, round 166b) picks the release files by these names: keep them stable.
       # LYNX-<label>-setup-x64.exe, LYNX-<label>-windows-x64.zip, LYNX-<label>-macos-universal.dmg (any *.dmg),
       # LYNX-<label>-x86_64.AppImage (+ .zsync; versions up to 0.1.24 find it by this name, later ones through scripts/publish-appimage-update.sh), LYNX-<label>-linux-x86_64.tar.gz,
