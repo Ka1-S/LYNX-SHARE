@@ -208,6 +208,7 @@
 #include "ui/QuickAddPalette.h"
 #include "ui/I18n.h"
 #include "ui/KeyFocus.h"
+#include "core/TrackIconScale.h"
 #include "core/EscClose.h"
 #include "ui/MainComponent.h"
 #include "ui/SimpleDock.h"

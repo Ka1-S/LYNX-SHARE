@@ -266,6 +266,7 @@ public:
     // round 190ef (--drawshot190ef): where a lane's curve is drawn, and the x of a tick
     juce::Rectangle<float> laneBodyForSnapshot (int track, int lane) const { return laneBody (track, lane); }
     juce::Rectangle<int> trackRowForSnapshot (int track) const { return { 0, trackToY (track), getWidth(), heightOf (track) }; } // (round 190fc)
+    void setTrackHeightsForTest (std::vector<int> tracks, int height) { setTrackHeights (std::move (tracks), height); } // (round 190ng, issue #222)
     std::vector<int> selectedTracksForSnapshot() const { return sortedTrackSelection(); } // (round 190ft)
     int numTracksForSnapshot() const { return numTracks(); } // (round 190gw)
     juce::Rectangle<int> trackLedForSnapshot (int track) const { return trackLed (track); } // (round 190jf)
