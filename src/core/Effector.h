@@ -20,5 +20,7 @@ const char* typeName (int type) noexcept;     // "Distort", "Lo-fi", …
 double rateBeats (float modRate, float tempoReduce) noexcept; // LFO period in beats
 std::string formatParam (int param, float value, double bpm);
 
-std::unique_ptr<Effect> make();
+// kiloheartsLaw (round 190nb): the slot holds a Kilohearts snapin law (core/KiloheartsDsp.h, hidden [12]): its buffers
+// are allocated at prepare()
+std::unique_ptr<Effect> make (bool kiloheartsLaw = false);
 } // namespace lynx::effector

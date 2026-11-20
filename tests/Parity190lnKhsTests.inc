@@ -93,7 +93,8 @@ TEST (parity190lnkhs_delay_time_and_synced_notes)
     CHECK (d.kind == EffectKind::echoform);
     CHECK (text (d, named (d, "Time L")) == "250.0 ms" && text (d, named (d, "Style")) == "Ping-pong");
     CHECK (text (d, named (d, "Feedback")) == "40%" && text (d, named (d, "Mode")) == "Clean");
-    CHECK (std::abs (d.params[(std::size_t) named (d, "Mix")] - 0.3f) < 1e-6f);
+    // (round 190nb: the measured linear mix — dry 1 − m through Echoform's equal-power Mix: cos (Mix × 90°) = 0.7)
+    CHECK (std::abs (std::cos (0.5 * M_PI * d.params[(std::size_t) named (d, "Mix")]) - 0.7) < 1e-5);
     // synced 3/16 = a dotted eighth: Echoform's dotted 1/8
     auto s = load ("kHs Delay", state ("\"delay_numerator\": \"3\", \"delay_time\": \"0.2\", \"delay_denominator\": \"denominator_16\", "
                                        "\"sync_mode\": \"sync\", \"feedback\": \"0\", \"mix\": \"0.5\", \"$type\": \"delay\""), n);

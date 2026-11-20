@@ -115,7 +115,8 @@
     "Fruity Flanger": {"own": false},
     "Pocket Tape Stop": {"own": false},
     "Pocket Comb Filter": {"own": false},
-    "Volume gate": {"own": false}
+    "Volume gate": {"own": false},
+    "Effector": {"own": false}
   },
   "products": {
     "valhalla-vintageverb": {"short": "VintageVerb"},

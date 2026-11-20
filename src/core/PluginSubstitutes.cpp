@@ -15,6 +15,7 @@
 #include "core/Effects.h"
 #include "core/FabFilterStates.h"
 #include "core/FacetEq.h"
+#include "core/KiloheartsDsp.h"
 #include "core/WavesApiEq.h"
 #include "core/FlEffects.h"
 #include "core/FlPluginDb.h"
@@ -1038,9 +1039,10 @@ translate = fresh-air
 # ---------------------------------------------------------------- Kilohearts (round 190ln)
 # The kHs snapins (kHs Essentials) and Faturator. Their state is a ZIP with state.json whose model holds every setting in
 # the plug-in's own units (core/KiloheartsStates.inc); one translator ("kilohearts") sets the stand-in to those units.
-# The plug-ins on this PC run without a licence (Slate's iLok builds): they render only their start-up settings and ignore
-# every change, so the maps follow the plug-ins' own parameter texts and public manuals, scored on those defaults only.
-# Disperser plays on Facet EQ's hidden all-pass cascade (its structure read statically). Ring Mod, Reverser, Resonator, Shaper and Phase Distortion have no stand-in yet (bypass).
+# Round 190ln mapped them from the plug-ins' parameter texts and manuals (Slate's unlicensed builds rendered only their
+# input); round 190nb measured the licensed kHs Essentials (Kilohearts' own build) and refitted the maps (REA_rodada190nb).
+# Disperser plays on Facet EQ's hidden all-pass cascade (its structure read statically). Round 190nb: Ring Mod, Reverser,
+# Resonator, Phase Distortion and Shaper play Kilohearts laws hidden in Effector (below).
 [kilohearts-disperser]
 product = Disperser
 vendor = Kilohearts
@@ -1263,6 +1265,43 @@ product = kHs Trance Gate
 vendor = Kilohearts
 lynx = Volume gate
 names = kHs Trance Gate
+translate = kilohearts
+
+# round 190nb: the five snapins without a LYNX effect of their own play Kilohearts laws hidden in FL's Effector
+# (core/KiloheartsDsp.h), read statically in HeartCore 2.4 and measured on the licensed kHs Essentials.
+[khs-ring-mod]
+product = kHs Ring Mod
+vendor = Kilohearts
+lynx = Effector
+names = kHs Ring Mod
+translate = kilohearts
+
+[khs-reverser]
+product = kHs Reverser
+vendor = Kilohearts
+lynx = Effector
+names = kHs Reverser
+translate = kilohearts
+
+[khs-resonator]
+product = kHs Resonator
+vendor = Kilohearts
+lynx = Effector
+names = kHs Resonator
+translate = kilohearts
+
+[khs-phase-distortion]
+product = kHs Phase Distortion
+vendor = Kilohearts
+lynx = Effector
+names = kHs Phase Distortion
+translate = kilohearts
+
+[khs-shaper]
+product = kHs Shaper
+vendor = Kilohearts
+lynx = Effector
+names = kHs Shaper
 translate = kilohearts
 
 [soundtoys-decapitator]
