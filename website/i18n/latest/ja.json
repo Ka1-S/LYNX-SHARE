@@ -1,7 +1,7 @@
 {
 "u.0.1.30.t": "曲の再生中のCPU使用率がFL Studioの約半分に。ARA、ポリフォニックのノートエディター、DAWprojectなど多数",
-"u.0.1.30.s": "Windows PC 1台で、FLのデモ曲Thiefを再生したときのCPU使用率は、LYNX SHAREでは1コアの34.6 % (FL Studio 2026: 74.4 %、0.1.29: 77.8 %) で、音は同じです。このリリースでは、MelodyneなどのARAプラグイン向けのARA 2ホスト、ポリフォニックのノートエディター、ポリフォニックのオーディオからMIDIへの変換、より自然なNewtone、Helix+付きのウェーブテーブルシンセHelix、Chordヘルパー、BandLab風のドラムマシン、MPE、ハードウェアMIDI出力、DirectWaveエディター、DAWproject、GarageBandとBandLabのプロジェクト、.gig / .dwp / .ncwインストゥルメント、AIFFとM4Aのエクスポート、40以上の作り直したプラグイン代替、約40件のGitHub issueの修正が加わります。",
-"u.0.1.30.n0": "<strong>曲の再生中、FL Studioより軽い動作</strong> (Windows PC 1台、静かな状態、1コアに対する%): Thief 34.6 % (FL Studio 2026: 74.4 %)、Exoplanet 47.3 % (FL Studio: 86.0 %)、空のプロジェクト 11.1 % (FL Studio: 22.5 %)。エンジンの変更後も出力はビット単位で同じです。",
+"u.0.1.30.s": "Windows PC 1台で、FLのデモ曲Thiefを再生したときのCPU使用率は、LYNX SHAREでは1コアの27.5 % (FL Studio 2026: 59.5 %、0.1.29: 77.8 %) で、音は同じです。このリリースでは、MelodyneなどのARAプラグイン向けのARA 2ホスト、ポリフォニックのノートエディター、ポリフォニックのオーディオからMIDIへの変換、より自然なNewtone、Helix+付きのウェーブテーブルシンセHelix、Chordヘルパー、BandLab風のドラムマシン、MPE、ハードウェアMIDI出力、DirectWaveエディター、DAWproject、GarageBandとBandLabのプロジェクト、.gig / .dwp / .ncwインストゥルメント、AIFFとM4Aのエクスポート、40以上の作り直したプラグイン代替、約40件のGitHub issueの修正が加わります。",
+"u.0.1.30.n0": "<strong>曲の再生中、FL Studioより軽い動作</strong> (Windows PC 1台、静かな状態、1コアに対する%): Thief 27.5 % (FL Studio 2026: 59.5 %)、Exoplanet 45.9 % (FL Studio: 59.5 %)、空のプロジェクト 11.1 % (FL Studio: 22.5 %)。エンジンの変更後も出力はビット単位で同じです。",
 "u.0.1.30.n1": "<strong>ARA 2ホスト</strong>: オーディオクリップのメニュー › LYNX extras › Edit in ARA plugin で、MelodyneなどのARA 2プラグインがクリップ上で開き、LYNX SHAREのタイムラインに表示されます。編集内容はプロジェクトに保存され、エクスポートにも反映されます。",
 "u.0.1.30.n2": "<strong>ポリフォニック編集</strong>: Edit notes (polyphonic) は、コードやミックスの中の個々のノートを動かしたりチューニングし直したりし、Convert to MIDI (polyphonic) はそれらをノートに変換します。",
 "u.0.1.30.n3": "<strong>Newtoneのナチュラルエンジン</strong>: 新しいNewtoneのスロットは、声の母音、子音、レベルを保ち、ノートごとにPitch modulationとPitch driftがあります。",

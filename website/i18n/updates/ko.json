@@ -1,7 +1,7 @@
 {
 "u.0.1.30.t": "곡 재생 중 CPU 사용량이 FL Studio의 절반 정도. ARA, 폴리포닉 노트 에디터, DAWproject 등 다수",
-"u.0.1.30.s": "Windows PC 한 대에서 FL의 Thief 데모를 재생하면 LYNX SHARE는 CPU 코어 하나의 34.6 %를 씁니다(FL Studio 2026: 74.4 %, 0.1.29: 77.8 %). 소리는 같습니다. 이번 릴리스에는 Melodyne 등 ARA 플러그인을 위한 ARA 2 호스팅, 폴리포닉 노트 에디터, 폴리포닉 오디오-MIDI 변환, 더 자연스러운 Newtone, Helix+가 있는 웨이브테이블 신스 Helix, Chord 도우미, BandLab 스타일 드럼 머신, MPE, 하드웨어 MIDI 출력, DirectWave 에디터, DAWproject, GarageBand와 BandLab 프로젝트, .gig / .dwp / .ncw 악기, AIFF와 M4A 내보내기, 다시 맞춘 40개 이상의 플러그인 대체품, 그리고 약 40개 GitHub 이슈 수정이 들어 있습니다.",
-"u.0.1.30.n0": "<strong>곡 재생 중 FL Studio보다 가볍습니다</strong>(Windows PC 한 대, 조용한 상태, 코어 하나 기준 %): Thief 34.6 %(FL Studio 2026: 74.4 %), Exoplanet 47.3 %(FL Studio: 86.0 %), 빈 프로젝트 11.1 %(FL Studio: 22.5 %). 엔진을 바꿔도 출력은 비트 단위로 같습니다.",
+"u.0.1.30.s": "Windows PC 한 대에서 FL의 Thief 데모를 재생하면 LYNX SHARE는 CPU 코어 하나의 27.5 %를 씁니다(FL Studio 2026: 59.5 %, 0.1.29: 77.8 %). 소리는 같습니다. 이번 릴리스에는 Melodyne 등 ARA 플러그인을 위한 ARA 2 호스팅, 폴리포닉 노트 에디터, 폴리포닉 오디오-MIDI 변환, 더 자연스러운 Newtone, Helix+가 있는 웨이브테이블 신스 Helix, Chord 도우미, BandLab 스타일 드럼 머신, MPE, 하드웨어 MIDI 출력, DirectWave 에디터, DAWproject, GarageBand와 BandLab 프로젝트, .gig / .dwp / .ncw 악기, AIFF와 M4A 내보내기, 다시 맞춘 40개 이상의 플러그인 대체품, 그리고 약 40개 GitHub 이슈 수정이 들어 있습니다.",
+"u.0.1.30.n0": "<strong>곡 재생 중 FL Studio보다 가볍습니다</strong>(Windows PC 한 대, 조용한 상태, 코어 하나 기준 %): Thief 27.5 %(FL Studio 2026: 59.5 %), Exoplanet 45.9 %(FL Studio: 59.5 %), 빈 프로젝트 11.1 %(FL Studio: 22.5 %). 엔진을 바꿔도 출력은 비트 단위로 같습니다.",
 "u.0.1.30.n1": "<strong>ARA 2 호스팅</strong>: 오디오 클립의 메뉴 › LYNX extras › Edit in ARA plugin은 클립에서 Melodyne 등 ARA 2 플러그인을 LYNX SHARE의 타임라인 위에 엽니다. 편집 내용은 프로젝트에 저장되고 내보내기에도 반영됩니다.",
 "u.0.1.30.n2": "<strong>폴리포닉 편집</strong>: Edit notes (polyphonic)는 코드와 믹스 안의 개별 노트를 옮기고 튜닝을 바꾸며, Convert to MIDI (polyphonic)는 그것을 노트로 바꿉니다.",
 "u.0.1.30.n3": "<strong>Newtone의 자연스러운 엔진</strong>: 새 Newtone 슬롯은 목소리의 모음, 자음, 레벨을 유지하며, 노트별로 Pitch modulation과 Pitch drift가 있습니다.",

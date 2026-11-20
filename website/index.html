@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="5f81df03";
+window.LYNX_LANG=lang;window.LYNX_V="69805082";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=5f81df03">
+<link rel="stylesheet" href="/assets/site.css?v=69805082">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -150,7 +150,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <section class="sec" id="latest">
   <div class="wrap">
     <h2 data-i18n="home.latestT">Latest update</h2>
-    <div class="latest"><div><div class="ver">0.1.30-alpha</div><time datetime="2026-11-20">2026-11-20</time><a class="tlink" href="https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.30-alpha" data-i18n="up.gh">Full notes on GitHub</a></div><div><h3 data-i18n="u.0.1.30.t">About half of FL Studio's CPU while a song plays; ARA, a polyphonic note editor, DAWproject and much more</h3><p class="muted" data-i18n="u.0.1.30.s">On one Windows PC, FL's Thief demo plays with 34.6 % of one CPU core in LYNX SHARE (FL Studio 2026: 74.4 %; 0.1.29: 77.8 %), with the same sound. The release adds ARA 2 hosting for Melodyne and other ARA plugins, a polyphonic note editor, polyphonic audio to MIDI, a more natural Newtone, the Helix wavetable synth with Helix+, a Chord helper, a BandLab-style Drum Machine, MPE, hardware MIDI Out, a DirectWave editor, DAWproject, GarageBand and BandLab projects, .gig / .dwp / .ncw instruments, AIFF and M4A export, more than 40 refitted plugin stand-ins and fixes for around 40 GitHub issues.</p><ul style="margin-top:12px"><li data-i18n="u.0.1.30.n0"><strong>Lighter than FL Studio while a song plays</strong> (one Windows PC, quiet machine, % of one core): Thief 34.6 % (FL Studio 2026: 74.4 %), Exoplanet 47.3 % (FL Studio: 86.0 %), an empty project 11.1 % (FL Studio: 22.5 %). The engine changes keep the output bit for bit.</li><li data-i18n="u.0.1.30.n1"><strong>ARA 2 hosting</strong>: an audio clip's menu › LYNX extras › Edit in ARA plugin opens Melodyne or another ARA 2 plugin on the clip, on LYNX SHARE's timeline. The edits are saved in the project and rendered in exports.</li><li data-i18n="u.0.1.30.n2"><strong>Polyphonic editing</strong>: Edit notes (polyphonic) moves and retunes single notes inside chords and mixes, and Convert to MIDI (polyphonic) turns them into notes.</li><li data-i18n="u.0.1.30.n3"><strong>Newtone's natural engine</strong>: new Newtone slots keep the voice's vowels, consonants and level, with Pitch modulation and Pitch drift per note.</li></ul><p class="more"><a class="tlink" href="/updates/#v0.1.30-alpha" data-i18n="home.latestAll">Everything in this release, and earlier ones</a></p></div></div>
+    <div class="latest"><div><div class="ver">0.1.30-alpha</div><time datetime="2026-11-20">2026-11-20</time><a class="tlink" href="https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.30-alpha" data-i18n="up.gh">Full notes on GitHub</a></div><div><h3 data-i18n="u.0.1.30.t">About half of FL Studio's CPU while a song plays; ARA, a polyphonic note editor, DAWproject and much more</h3><p class="muted" data-i18n="u.0.1.30.s">On one Windows PC, FL's Thief demo plays with 27.5 % of one CPU core in LYNX SHARE (FL Studio 2026: 59.5 %; 0.1.29: 77.8 %), with the same sound. The release adds ARA 2 hosting for Melodyne and other ARA plugins, a polyphonic note editor, polyphonic audio to MIDI, a more natural Newtone, the Helix wavetable synth with Helix+, a Chord helper, a BandLab-style Drum Machine, MPE, hardware MIDI Out, a DirectWave editor, DAWproject, GarageBand and BandLab projects, .gig / .dwp / .ncw instruments, AIFF and M4A export, more than 40 refitted plugin stand-ins and fixes for around 40 GitHub issues.</p><ul style="margin-top:12px"><li data-i18n="u.0.1.30.n0"><strong>Lighter than FL Studio while a song plays</strong> (one Windows PC, quiet machine, % of one core): Thief 27.5 % (FL Studio 2026: 59.5 %), Exoplanet 45.9 % (FL Studio: 59.5 %), an empty project 11.1 % (FL Studio: 22.5 %). The engine changes keep the output bit for bit.</li><li data-i18n="u.0.1.30.n1"><strong>ARA 2 hosting</strong>: an audio clip's menu › LYNX extras › Edit in ARA plugin opens Melodyne or another ARA 2 plugin on the clip, on LYNX SHARE's timeline. The edits are saved in the project and rendered in exports.</li><li data-i18n="u.0.1.30.n2"><strong>Polyphonic editing</strong>: Edit notes (polyphonic) moves and retunes single notes inside chords and mixes, and Convert to MIDI (polyphonic) turns them into notes.</li><li data-i18n="u.0.1.30.n3"><strong>Newtone's natural engine</strong>: new Newtone slots keep the voice's vowels, consonants and level, with Pitch modulation and Pitch drift per note.</li></ul><p class="more"><a class="tlink" href="/updates/#v0.1.30-alpha" data-i18n="home.latestAll">Everything in this release, and earlier ones</a></p></div></div>
   </div>
 </section>
 
@@ -223,7 +223,7 @@ LYNX --showcase Demo.lynx     # writes the demo project</code></pre>
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=5f81df03" defer></script>
-<script src="/assets/motion.js?v=5f81df03" defer></script>
+<script src="/assets/site.js?v=69805082" defer></script>
+<script src="/assets/motion.js?v=69805082" defer></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 {
 "u.0.1.30.t": "約為 FL Studio 一半的 CPU 用量（播放歌曲時）；ARA、複音音符編輯器、DAWproject 等更多內容",
-"u.0.1.30.s": "在一台 Windows 電腦上，FL 的 Thief 示範歌曲在 LYNX SHARE 中播放時佔用一個 CPU 核心的 34.6 %（FL Studio 2026：74.4 %；0.1.29：77.8 %），聲音完全相同。這個版本加入了對 Melodyne 和其他 ARA 外掛的 ARA 2 代管、複音音符編輯器、複音音訊轉 MIDI、更自然的 Newtone、帶 Helix+ 的 Helix 波表合成器、和弦助手、BandLab 風格的鼓機、MPE、硬體 MIDI Out、DirectWave 編輯器、DAWproject、GarageBand 和 BandLab 專案、.gig / .dwp / .ncw 樂器、AIFF 和 M4A 匯出、40 多個重新調校的外掛替身，以及約 40 個 GitHub 問題的修正。",
-"u.0.1.30.n0": "<strong>播放歌曲時比 FL Studio 更輕</strong>（一台 Windows 電腦，安靜的機器，佔一個核心的百分比）：Thief 34.6 %（FL Studio 2026：74.4 %），Exoplanet 47.3 %（FL Studio：86.0 %），空專案 11.1 %（FL Studio：22.5 %）。引擎的改動讓輸出維持逐位元一致。",
+"u.0.1.30.s": "在一台 Windows 電腦上，FL 的 Thief 示範歌曲在 LYNX SHARE 中播放時佔用一個 CPU 核心的 27.5 %（FL Studio 2026：59.5 %；0.1.29：77.8 %），聲音完全相同。這個版本加入了對 Melodyne 和其他 ARA 外掛的 ARA 2 代管、複音音符編輯器、複音音訊轉 MIDI、更自然的 Newtone、帶 Helix+ 的 Helix 波表合成器、和弦助手、BandLab 風格的鼓機、MPE、硬體 MIDI Out、DirectWave 編輯器、DAWproject、GarageBand 和 BandLab 專案、.gig / .dwp / .ncw 樂器、AIFF 和 M4A 匯出、40 多個重新調校的外掛替身，以及約 40 個 GitHub 問題的修正。",
+"u.0.1.30.n0": "<strong>播放歌曲時比 FL Studio 更輕</strong>（一台 Windows 電腦，安靜的機器，佔一個核心的百分比）：Thief 27.5 %（FL Studio 2026：59.5 %），Exoplanet 45.9 %（FL Studio：59.5 %），空專案 11.1 %（FL Studio：22.5 %）。引擎的改動讓輸出維持逐位元一致。",
 "u.0.1.30.n1": "<strong>ARA 2 代管</strong>：音訊片段的選單 › LYNX 附加功能 › 在 ARA 外掛中編輯 會在該片段上開啟 Melodyne 或其他 ARA 2 外掛，使用 LYNX SHARE 的時間軸。編輯內容會存在專案中，並在匯出時渲染。",
 "u.0.1.30.n2": "<strong>複音編輯</strong>：編輯音符（複音）可移動和修正和弦與混音中單一音符的音高，轉換為 MIDI（複音）會把它們變成音符。",
 "u.0.1.30.n3": "<strong>Newtone 的自然引擎</strong>：新的 Newtone 欄位會保留人聲的母音、子音和電平，並為每個音符提供音高調變和音高漂移。",

@@ -6,8 +6,8 @@ The short version of each release. The full notes, with measurements, known issu
 ## 0.1.30 alpha
 
 **Performance**
-- While FL's *Thief* demo plays, LYNX SHARE uses 34.6 % of one CPU core (0.1.29: 77.8 %; FL Studio 2026: 74.4 %), and
-  *Exoplanet* 47.3 % (0.1.29: 99.7 %; FL Studio: 86.0 %), on one Windows PC in a quiet-machine run. Output unchanged.
+- While FL's *Thief* demo plays, LYNX SHARE uses 27.5 % of one CPU core (0.1.29: 77.8 %; FL Studio 2026: 59.5 %), and
+  *Exoplanet* 45.9 % (0.1.29: 99.7 %; FL Studio: 59.5 %), on one Windows PC in a quiet-machine run. Output unchanged.
 - The playhead is drawn on its own layer on Windows and Linux; covered windows stop drawing; every view draws a frame
   with fewer instructions than in 0.1.29; the plugin picker's first open no longer freezes (#209); Helix, SoundFonts,
   DirectWave and exports use less memory.
