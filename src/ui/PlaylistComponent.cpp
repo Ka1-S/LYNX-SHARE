@@ -3664,6 +3664,9 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
             style.gain = juce::jmin (style.gain, 8.0f);
         if (fl || liveLook)
             style.silenceLine = style.classic; // FL's 1 px silence line, in the waveform's colour (Live draws one too: audiolane y 476)
+        // #230 (round 190nq): FL's View › "Show fade previews" (on by default): the waveform with the clip's fades applied
+        if (showFadePreviews && (c.effectiveFadeIn() > 0 || c.effectiveFadeOut() > 0))
+            style.envelope = [&c, left = r.getX(), ppt = pixelsPerTick] (float x) { return clipops::fadePreviewGain (c, (double) (x - left) / ppt); };
         const uitrace::Part tally (uitrace::part::waveform);
         // warp markers that bend the tempo (round 175a): each stretch between two markers drawn at its own speed
         auto markers = forward ? warpedit::playedMarkers (channel.sampler, total / summary->sampleRate) : std::vector<WarpPoint> {};

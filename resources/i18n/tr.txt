@@ -11934,3 +11934,6 @@ countries: tr
 "Search every LYNX action: what it does, its panel or its key" = "Herhangi bir LYNX eylemini ara: ne yaptığı, paneli ya da tuşu"
 "{0} action(s)   Up / Down: pick   Enter: run   Esc: close" = "{0} eylem   Yukarı / Aşağı: seç   Enter: çalıştır   Esc: kapat"
 "That action can't run here: open or click its panel first." = "Bu eylem burada çalışamaz: önce panelini aç veya paneline tıkla."
+
+# --- round 190nq: issue #230 (Show fade previews)
+"Show fade previews" = "Fade önizlemelerini göster"

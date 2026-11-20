@@ -106,3 +106,32 @@ TEST (issues190nq_228_action_search_finds_and_ranks)
     }
     CHECK (keys::findAction ("help.searchActions") != nullptr);
 }
+
+TEST (issues190nq_230_fade_preview_gain_follows_the_drawn_curve)
+{
+    using namespace lynx;
+    Clip c;
+    c.kind = ClipKind::audio;
+    c.length = 1000;
+    CHECK (clipops::fadePreviewGain (c, 500.0) == 1.0f); // no fades: untouched
+    c.fadeIn = 100;
+    c.fadeOut = 200;
+    CHECK (clipops::fadePreviewGain (c, 0.0) == 0.0f);
+    CHECK (std::abs (clipops::fadePreviewGain (c, 50.0) - clipops::fadeLevel (0.5f, true, false, 0.0f)) < 1.0e-6f);
+    CHECK (clipops::fadePreviewGain (c, 100.0) == 1.0f);
+    CHECK (clipops::fadePreviewGain (c, 500.0) == 1.0f);
+    CHECK (std::abs (clipops::fadePreviewGain (c, 900.0) - clipops::fadeLevel (0.5f, false, false, 0.0f)) < 1.0e-6f);
+    CHECK (clipops::fadePreviewGain (c, 1000.0) < 1.0e-6f);
+    c.linearFades = 2; // a straight fade out
+    CHECK (std::abs (clipops::fadePreviewGain (c, 950.0) - 0.25f) < 1.0e-5f);
+    c.crossfadeOut = 300; // an automatic crossfade replaces the fade: FL's S over the overlap
+    CHECK (std::abs (clipops::fadePreviewGain (c, 850.0) - clipops::crossfadeCurve (0.5f)) < 1.0e-6f);
+    // every value stays in 0..1, and the curve falls along a fade out
+    float last = 2.0f;
+    for (double t = 700.0; t <= 1000.0; t += 10.0)
+    {
+        const auto g = clipops::fadePreviewGain (c, t);
+        CHECK (g >= 0.0f && g <= 1.0f && g <= last + 1.0e-6f);
+        last = g;
+    }
+}

@@ -11934,3 +11934,6 @@ countries: jp
 "Search every LYNX action: what it does, its panel or its key" = "LYNXのあらゆるアクションを検索：機能、パネル、キー"
 "{0} action(s)   Up / Down: pick   Enter: run   Esc: close" = "{0} 件のアクション   上 / 下: 選択   Enter: 実行   Esc: 閉じる"
 "That action can't run here: open or click its panel first." = "このアクションはここでは実行できません。先にそのパネルを開くかクリックしてください。"
+
+# --- round 190nq: issue #230 (Show fade previews)
+"Show fade previews" = "フェードのプレビューを表示"

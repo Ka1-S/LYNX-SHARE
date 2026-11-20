@@ -3200,6 +3200,8 @@ void MainComponent::loadUiSettings()
             PlaylistComponent::showInstrumentTrackLevels = on;
         else if (key == "hideCollapsedGroups") // round 190jf: Playlist › View › Hide collapsed grouped tracks
             PlaylistComponent::hideCollapsedGroups = on;
+        else if (key == "fadePreviews") // #230 (round 190nq): Playlist › View › Show fade previews
+            PlaylistComponent::showFadePreviews = on;
         else if (key == "automationLanes") // round 177b: Playlist › Automation lanes
             autolanes::setShown (on);
         else if (key == "trackInserts") // round 190ht (issue #154): Playlist › Edit › Show insert effects on linked tracks
@@ -3596,6 +3598,7 @@ void MainComponent::saveUiSettings()
                                       + "\naudioTrackLevels=" + juce::String (PlaylistComponent::showAudioTrackLevels ? 1 : 0)
                                       + "\ninstrumentTrackLevels=" + juce::String (PlaylistComponent::showInstrumentTrackLevels ? 1 : 0)
                                       + "\nhideCollapsedGroups=" + juce::String (PlaylistComponent::hideCollapsedGroups ? 1 : 0)
+                                      + "\nfadePreviews=" + juce::String (PlaylistComponent::showFadePreviews ? 1 : 0)
                                       + "\nautomationLanes=" + juce::String (autolanes::shown() ? 1 : 0)
                                       + "\ntrackInserts=" + juce::String (PlaylistComponent::showTrackInserts ? 1 : 0)
                                       + workflowextras::uiOptionsText() // round 190iu
@@ -5013,6 +5016,12 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
                         if (result == 1)
                             apply();
                     });
+                });
+                // FL's View › "Show fade previews" (#230, round 190nq; EEEnablePreviewFadesAction, on by default)
+                view.addItem (tr ("Show fade previews"), true, PlaylistComponent::showFadePreviews, [this] {
+                    PlaylistComponent::showFadePreviews = ! PlaylistComponent::showFadePreviews;
+                    playlist.headerOptionsChanged();
+                    saveUiSettings();
                 });
                 menu.addSubMenu (tr ("View"), view);
             }

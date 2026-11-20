@@ -119,6 +119,9 @@ public:
     // FL's Playlist menu › View › "Hide collapsed grouped tracks" (EEHideCollapsedAction, HideCollapsedSubTracks; FL manual:
     // "Collapsed grouped tracks will be hidden"; round 190jf): the members of a collapsed group get no row at all
     static inline bool hideCollapsedGroups = false;
+    // #230 (round 190nq): FL 2026's Playlist menu › View › "Show fade previews" (EEEnablePreviewFadesAction, on by default,
+    // [SHOT] 190nq f08c / f12c / f13c): an audio clip's waveform is drawn with its fades applied
+    static inline bool showFadePreviews = true;
     void headerOptionsChanged(); // repaints and saves
     std::function<void()> onViewOptionChanged; // an app-wide view option changed (round 177b: Automation lanes): save it
 

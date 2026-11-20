@@ -11934,3 +11934,6 @@ countries: cn sg
 "Search every LYNX action: what it does, its panel or its key" = "搜索任意 LYNX 操作：它的作用、所在面板或按键"
 "{0} action(s)   Up / Down: pick   Enter: run   Esc: close" = "{0} 个操作   上 / 下：选择   Enter：运行   Esc：关闭"
 "That action can't run here: open or click its panel first." = "此操作无法在这里运行：请先打开或点击它的面板。"
+
+# --- round 190nq: issue #230 (Show fade previews)
+"Show fade previews" = "显示淡化预览"

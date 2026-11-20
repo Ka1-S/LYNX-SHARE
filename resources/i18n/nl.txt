@@ -11934,3 +11934,6 @@ countries: nl be
 "Search every LYNX action: what it does, its panel or its key" = "Zoek elke LYNX-actie: wat ze doet, haar paneel of haar toets"
 "{0} action(s)   Up / Down: pick   Enter: run   Esc: close" = "{0} acties   Omhoog / Omlaag: kiezen   Enter: uitvoeren   Esc: sluiten"
 "That action can't run here: open or click its panel first." = "Die actie kan hier niet worden uitgevoerd: open of klik eerst op haar paneel."
+
+# --- round 190nq: issue #230 (Show fade previews)
+"Show fade previews" = "Fade-voorbeelden tonen"

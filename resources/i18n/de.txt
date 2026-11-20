@@ -11934,3 +11934,6 @@ countries: de at ch li lu
 "Search every LYNX action: what it does, its panel or its key" = "Jede LYNX-Aktion suchen: was sie tut, ihr Bereich oder ihre Taste"
 "{0} action(s)   Up / Down: pick   Enter: run   Esc: close" = "{0} Aktionen   Auf / Ab: wählen   Enter: ausführen   Esc: schließen"
 "That action can't run here: open or click its panel first." = "Diese Aktion kann hier nicht laufen: öffne oder klicke zuerst ihren Bereich."
+
+# --- round 190nq: issue #230 (Show fade previews)
+"Show fade previews" = "Fade-Vorschau anzeigen"
