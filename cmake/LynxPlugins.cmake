@@ -24,10 +24,17 @@ elseif(APPLE)
     set_source_files_properties(src/ui/VideoMediaMac.mm PROPERTIES COMPILE_OPTIONS "-fno-objc-arc")
     target_link_libraries(lynx_plugin_runtime PRIVATE "-framework AVFoundation" "-framework CoreMedia" "-framework CoreVideo"
                           "-framework AudioToolbox" "-framework CoreFoundation" ${CMAKE_DL_LIBS}) # (AudioToolbox: M4A export)
+    # the moving marks' backend, as in the app: ui/MotionOverlay.cpp (in LYNX_APP_SOURCES) calls it (round 190nk)
+    target_sources(lynx_plugin_runtime PRIVATE src/ui/MotionOverlayMac.mm)
+    set_source_files_properties(src/ui/MotionOverlayMac.mm PROPERTIES COMPILE_OPTIONS "-fno-objc-arc")
+    target_link_libraries(lynx_plugin_runtime PRIVATE "-framework QuartzCore")
 else()
     list(APPEND LYNX_PLUGIN_DEFINES JUCE_ALSA=1 JUCE_JACK=1 JUCE_PLUGINHOST_LV2=1)
     target_include_directories(lynx_plugin_runtime SYSTEM PRIVATE third_party/pipewire/include/pipewire-0.3 third_party/pipewire/include/spa-0.2)
     target_link_libraries(lynx_plugin_runtime PRIVATE ${CMAKE_DL_LIBS})
+    # the moving marks' X11 backend, as in the app: ui/MotionOverlay.cpp (in LYNX_APP_SOURCES) calls it (round 190nk; the
+    # 0.1.30 release run's Linux plugin link failed without it)
+    target_sources(lynx_plugin_runtime PRIVATE src/ui/MotionOverlayX11.cpp)
 endif()
 target_compile_definitions(lynx_plugin_runtime PUBLIC ${LYNX_PLUGIN_DEFINES})
 target_include_directories(lynx_plugin_runtime
