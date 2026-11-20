@@ -10349,6 +10349,11 @@ void PlaylistComponent::showRulerMenu (int x)
         });
     }
 
+    // #227 (round 190nq): the LYNX extra "A click on the ruler moves the song position with every tool", also here
+    menu.addSeparator();
+    menu.addItem (tr ("A click on the ruler moves the song position with every tool"), true, ruler::seekWithAnyTool(),
+                  [] { workflowextras::setExtra ("playlist.rulerSeeksAnyTool", ! ruler::seekWithAnyTool()); });
+
     // FL's Playlist menu › Time markers (REA_rodada165f-markers §1.4)
     {
         juce::PopupMenu timeMarkers;

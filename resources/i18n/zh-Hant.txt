@@ -11926,7 +11926,7 @@ countries: tw hk mo
 
 # --- round 190nq: issue #227 (ruler click with every tool)
 "A click on the ruler moves the song position with every tool" = "點擊尺規可用任何工具移動歌曲位置"
-"In FL Studio a click on the Playlist's or Piano roll's ruler with the Select or Zoom tool selects or zooms a time range and leaves the song position. On: those tools move the song position too, like the others; Ctrl+drag, a double-click drag or a right drag still select a range. Off by default." = "在 FL Studio 中，用選取或縮放工具點擊播放清單或鋼琴捲簾的尺規會選取或縮放一段時間範圍，歌曲位置不變。開啟：這些工具也會像其他工具一樣移動歌曲位置；Ctrl+拖曳、雙擊後拖曳或右鍵拖曳仍會選取範圍。預設關閉。"
+"In FL Studio a click on the Playlist's or Piano roll's ruler with the Select or Zoom tool selects or zooms a time range and leaves the song position. On: those tools move the song position too, like the others; Ctrl+drag, a double-click drag or a right drag still select a range. Off by default. Also in the Playlist ruler's right-click menu." = "在 FL Studio 中，用選取或縮放工具點擊播放清單或鋼琴捲簾的尺規會選取或縮放一段時間範圍，歌曲位置不變。開啟：這些工具也會像其他工具一樣移動歌曲位置；Ctrl+拖曳、雙擊後拖曳或右鍵拖曳仍會選取範圍。預設關閉。 也在播放清單尺規的右鍵選單中。"
 
 # --- round 190nq: issue #228 (action search)
 "Search every LYNX action and run it" = "搜尋任何 LYNX 動作並執行"

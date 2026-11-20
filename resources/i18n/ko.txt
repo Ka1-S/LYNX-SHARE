@@ -11926,7 +11926,7 @@ countries: kr
 
 # --- round 190nq: issue #227 (ruler click with every tool)
 "A click on the ruler moves the song position with every tool" = "눈금자를 클릭하면 모든 도구에서 곡 위치가 이동"
-"In FL Studio a click on the Playlist's or Piano roll's ruler with the Select or Zoom tool selects or zooms a time range and leaves the song position. On: those tools move the song position too, like the others; Ctrl+drag, a double-click drag or a right drag still select a range. Off by default." = "FL Studio에서는 선택 또는 확대/축소 도구로 플레이리스트나 피아노 롤의 눈금자를 클릭하면 시간 범위를 선택하거나 확대하며 곡 위치는 그대로입니다. 켜짐: 이 도구들도 다른 도구처럼 곡 위치를 이동합니다. Ctrl+드래그, 더블클릭 후 드래그, 오른쪽 드래그는 여전히 범위를 선택합니다. 기본값은 꺼짐."
+"In FL Studio a click on the Playlist's or Piano roll's ruler with the Select or Zoom tool selects or zooms a time range and leaves the song position. On: those tools move the song position too, like the others; Ctrl+drag, a double-click drag or a right drag still select a range. Off by default. Also in the Playlist ruler's right-click menu." = "FL Studio에서는 선택 또는 확대/축소 도구로 플레이리스트나 피아노 롤의 눈금자를 클릭하면 시간 범위를 선택하거나 확대하며 곡 위치는 그대로입니다. 켜짐: 이 도구들도 다른 도구처럼 곡 위치를 이동합니다. Ctrl+드래그, 더블클릭 후 드래그, 오른쪽 드래그는 여전히 범위를 선택합니다. 기본값은 꺼짐. 플레이리스트 눈금자의 오른쪽 클릭 메뉴에도 있습니다."
 
 # --- round 190nq: issue #228 (action search)
 "Search every LYNX action and run it" = "모든 LYNX 동작을 검색하고 실행"

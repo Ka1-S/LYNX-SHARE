@@ -11926,7 +11926,7 @@ countries: pl
 
 # --- round 190nq: issue #227 (ruler click with every tool)
 "A click on the ruler moves the song position with every tool" = "Kliknięcie linijki przesuwa pozycję utworu każdym narzędziem"
-"In FL Studio a click on the Playlist's or Piano roll's ruler with the Select or Zoom tool selects or zooms a time range and leaves the song position. On: those tools move the song position too, like the others; Ctrl+drag, a double-click drag or a right drag still select a range. Off by default." = "W FL Studio kliknięcie linijki Playlisty lub Piano rolla narzędziem Zaznaczanie lub Powiększenie zaznacza lub powiększa zakres czasu i nie zmienia pozycji utworu. Włączone: te narzędzia też przesuwają pozycję utworu, jak pozostałe; Ctrl+przeciągnięcie, przeciągnięcie po dwukliku lub prawym przyciskiem nadal zaznaczają zakres. Domyślnie wyłączone."
+"In FL Studio a click on the Playlist's or Piano roll's ruler with the Select or Zoom tool selects or zooms a time range and leaves the song position. On: those tools move the song position too, like the others; Ctrl+drag, a double-click drag or a right drag still select a range. Off by default. Also in the Playlist ruler's right-click menu." = "W FL Studio kliknięcie linijki Playlisty lub Piano rolla narzędziem Zaznaczanie lub Powiększenie zaznacza lub powiększa zakres czasu i nie zmienia pozycji utworu. Włączone: te narzędzia też przesuwają pozycję utworu, jak pozostałe; Ctrl+przeciągnięcie, przeciągnięcie po dwukliku lub prawym przyciskiem nadal zaznaczają zakres. Domyślnie wyłączone. Także w menu prawego przycisku linijki Playlisty."
 
 # --- round 190nq: issue #228 (action search)
 "Search every LYNX action and run it" = "Wyszukaj dowolną akcję LYNX i ją uruchom"
