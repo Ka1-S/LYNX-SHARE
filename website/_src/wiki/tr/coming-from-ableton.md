@@ -1,9 +1,24 @@
 ---
-source: d5cc625221
+source: 0c7a99b3bc
 ---
 ![Klip başlatma yerleşimi: Playlist'in yanında sahneli bir klip ızgarası](/assets/img/cliplaunch.webp)
 
 LYNX SHARE Pattern iş akışıyla açılır: bir Channel Rack, pattern'ler ve bir Playlist. Klip başlatma iş akışı isteğe bağlıdır ve Playlist'in yanına sahneli bir klip ızgarası ekler. LYNX SHARE `.als` set'lerini okur ve yazar. Ableton ile bağlantısı yoktur.
+
+Bu sayfa Bitwig Studio kullanıcıları için de geçerlidir: klip ızgarası aynı şekilde çalışır ve Bitwig'in DAWproject dosyaları (`.dawproject`) `Dosya › Aç...` ile açılır, `Dosya › Dışa aktar › DAWproject (.dawproject)...` ile yazılır.
+
+## İlk adımlarınız
+
+1. **Yerleşimi seçin.** LYNX SHARE ilk açıldığında bir karşılama kartı nereden geldiğinizi sorar (0.1.31). `Ableton Live or Bitwig` düğmesine tıklayın: Klip başlatma yerleşimi açılır. 0.1.30'da `Görünüm › Yerleşim stili › Klip başlatma iş akışı` yolunu seçin.
+2. **Bir yuvayı doldurun.** Browser'dan bir sample'ı veya pattern'i bir yuvaya sürükleyin ya da boş bir yuvaya sağ tıklayıp `Buraya bir pattern koy` seçeneğini seçin.
+3. **Başlatın.** Bir klibin solundaki üçgene ya da tüm satırı başlatmak için `Sahneler` sütunundaki bir sahnenin üçgenine tıklayın. Ya da `.als` set'lerinizden birini açın (aşağıda).
+
+Live'dan farklı olanlar:
+
+- Playlist aranjmandır ve izleri ızgaranın sütunlarıdır. Bir klip başlatmış iz, `Playlist'e dön` düğmesine basana kadar ızgarada kalır.
+- Izgara dışında tuşlar FL Studio'yu izler. `Ctrl+Z` bir adımı geri alır, tekrar basılırsa yineler.
+- Live'ın kendi cihazlarından yalnızca bazıları dönüştürülür (bkz. Bilmekte fayda var). Üçüncü taraf plugin'ler durumlarıyla birlikte gelir.
+- Pattern yerleşimi, yani FL Studio'nun Channel Rack ve pattern'lerle çalışma biçimi, aynı proje üzerinde çalışır.
 
 ## Bir Live set'i açma
 
@@ -83,3 +98,4 @@ Dışa aktarmadan sonra bir rapor, dışarıda bırakılanları listeler.
 - [Proje içe aktarma](/wiki/importing-projects/)
 - [Dosya formatları](/wiki/file-formats/)
 - [Tek programda iki iş akışı](/why/#workflows)
+- [Learn: eğitimler](/learn/)

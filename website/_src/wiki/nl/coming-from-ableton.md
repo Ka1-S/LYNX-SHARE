@@ -1,9 +1,24 @@
 ---
-source: d5cc625221
+source: 0c7a99b3bc
 ---
 ![De Clip-launch-indeling: een clipraster met scènes naast de Playlist](/assets/img/cliplaunch.webp)
 
 LYNX SHARE start in de Pattern-werkwijze: een Channel Rack, patterns en een Playlist. De Clipstart-werkwijze is optioneel en voegt naast de Playlist een clipraster met scènes toe. LYNX SHARE leest en schrijft `.als`-sets. Het is niet gelieerd aan Ableton.
+
+Deze pagina is ook voor Bitwig Studio-gebruikers: het clipraster werkt op dezelfde manier, en de DAWproject-bestanden (`.dawproject`) van Bitwig openen met `Bestand › Openen...` en worden geschreven door `Bestand › Exporteren › DAWproject (.dawproject)...`.
+
+## Je eerste stappen
+
+1. **Kies de lay-out.** De eerste keer dat LYNX SHARE start, vraagt een welkomstkaart waar je van komt (0.1.31). Klik op `Ableton Live or Bitwig`: de Clipstart-lay-out opent. In 0.1.30 kies je `Beeld › Lay-outstijl › Clipstart-werkwijze`.
+2. **Vul een slot.** Sleep een sample of een pattern uit de Browser naar een slot, of klik met rechts op een leeg slot en kies `Patroon hier plaatsen`.
+3. **Start.** Klik op de driehoek links van een clip, of op de driehoek van een scène in de kolom `Scènes` om de hele rij te starten. Of open een van je `.als`-sets (hieronder).
+
+Wat anders is dan in Live:
+
+- De Playlist is het arrangement, en de tracks ervan zijn de kolommen van het raster. Een track die een clip heeft gestart, blijft op het raster totdat je op `Terug naar Playlist` drukt.
+- Buiten het raster volgen de toetsen FL Studio. `Ctrl+Z` maakt één stap ongedaan en doet die opnieuw als je nogmaals drukt.
+- Alleen een deel van de eigen devices van Live wordt omgezet (zie Goed om te weten). Plugins van derden komen mee met hun staat.
+- De Patroonlay-out, de werkwijze van FL Studio met een Channel Rack en patterns, werkt op hetzelfde project.
 
 ## Een Live-set openen
 
@@ -83,3 +98,4 @@ Een rapport na de export toont wat is weggelaten.
 - [Projecten importeren](/wiki/importing-projects/)
 - [Bestandsformaten](/wiki/file-formats/)
 - [Twee werkwijzen in één programma](/why/#workflows)
+- [Leren: tutorials](/learn/)

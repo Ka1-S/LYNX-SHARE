@@ -1,9 +1,24 @@
 ---
-source: d5cc625221
+source: 0c7a99b3bc
 ---
 ![Il layout a lancio di clip: una griglia di clip con le scene accanto alla Playlist](/assets/img/cliplaunch.webp)
 
 LYNX SHARE parte nel flusso a pattern: un Channel Rack, i pattern e una Playlist. Il flusso a lancio di clip è facoltativo e aggiunge una griglia di clip con le scene accanto alla Playlist. LYNX SHARE legge e scrive i set `.als`. Non è affiliato ad Ableton.
+
+Questa pagina è anche per chi usa Bitwig Studio: la griglia di clip funziona allo stesso modo, e i file DAWproject di Bitwig (`.dawproject`) si aprono con `File › Apri...` e si scrivono con `File › Esporta › DAWproject (.dawproject)...`.
+
+## I tuoi primi passi
+
+1. **Scegli il layout.** La prima volta che LYNX SHARE si avvia, una scheda di benvenuto chiede da dove vieni (0.1.31). Clicca `Ableton Live or Bitwig`: si apre il layout a lancio di clip. Nella 0.1.30, scegli `Vista › Stile del layout › Flusso a lancio di clip`.
+2. **Riempi uno slot.** Trascina un sample o un pattern dal Browser in uno slot, oppure clicca con il tasto destro su uno slot vuoto e scegli `Metti un pattern qui`.
+3. **Lancia.** Clicca il triangolo a sinistra di una clip, oppure il triangolo di una scena nella colonna `Scene` per lanciare l'intera riga. Oppure apri uno dei tuoi set `.als` (sotto).
+
+Cosa cambia rispetto a Live:
+
+- La Playlist è l'arrangiamento, e le sue tracce sono le colonne della griglia. Una traccia che ha lanciato una clip resta sulla griglia finché non premi `Torna alla Playlist`.
+- I tasti seguono FL Studio fuori dalla griglia. `Ctrl+Z` annulla un passo e, premuto di nuovo, lo ripete.
+- Solo alcuni dispositivi propri di Live vengono convertiti (vedi Da sapere). I plugin di terze parti arrivano con il loro stato.
+- Il layout a pattern, il modo di lavorare di FL Studio con un Channel Rack e i pattern, lavora sullo stesso progetto.
 
 ## Aprire un set di Live
 
@@ -83,3 +98,4 @@ Un report dopo l'esportazione elenca ciò che è stato lasciato fuori.
 - [Importare progetti](/wiki/importing-projects/)
 - [Formati di file](/wiki/file-formats/)
 - [Due flussi di lavoro in un solo programma](/why/#workflows)
+- [Impara: i tutorial](/learn/)

@@ -1,9 +1,24 @@
 ---
-source: d5cc625221
+source: 0c7a99b3bc
 ---
 ![La disposition Clip-launch : une grille de clips avec des scènes à côté de la Playlist](/assets/img/cliplaunch.webp)
 
 LYNX SHARE démarre dans le flux par patterns : un Channel Rack, des patterns et une Playlist. Le flux par lancement de clips est facultatif et ajoute une grille de clips avec des scènes à côté de la Playlist. LYNX SHARE lit et écrit les sets `.als`. Il n'est pas affilié à Ableton.
+
+Cette page convient aussi aux utilisateurs de Bitwig Studio : la grille de clips fonctionne de la même façon, et les fichiers DAWproject (`.dawproject`) de Bitwig s'ouvrent avec `Fichier › Ouvrir...` et sont écrits par `Fichier › Exporter › DAWproject (.dawproject)...`.
+
+## Vos premiers pas
+
+1. **Choisissez la disposition.** Au premier démarrage de LYNX SHARE, une carte de bienvenue demande d'où vous venez (0.1.31). Cliquez sur `Ableton Live or Bitwig` : la disposition Lancement de clips s'ouvre. En 0.1.30, choisissez `Vue › Style de disposition › Flux par lancement de clips`.
+2. **Remplissez un slot.** Glissez un sample ou un pattern du Browser dans un slot, ou faites un clic droit sur un slot vide et choisissez `Placer un pattern ici`.
+3. **Lancez.** Cliquez sur le triangle à gauche d'un clip, ou sur le triangle d'une scène dans la colonne `Scènes` pour lancer toute la ligne. Ou ouvrez l'un de vos sets `.als` (ci-dessous).
+
+Ce qui est différent de Live :
+
+- La Playlist est l'arrangement, et ses pistes sont les colonnes de la grille. Une piste qui a lancé un clip reste sur la grille jusqu'à ce que vous appuyiez sur `Retour à la Playlist`.
+- En dehors de la grille, les touches suivent FL Studio. `Ctrl+Z` annule une étape, et rétablit si vous appuyez de nouveau.
+- Seuls certains appareils propres à Live sont convertis (voir Bon à savoir). Les plugins tiers sont repris avec leur état.
+- La disposition Patterns, la façon de travailler de FL Studio avec un Channel Rack et des patterns, fonctionne sur le même projet.
 
 ## Ouvrir un set Live
 
@@ -83,3 +98,4 @@ Un rapport après l'export liste ce qui a été laissé de côté.
 - [Importer des projets](/wiki/importing-projects/)
 - [Formats de fichiers](/wiki/file-formats/)
 - [Deux flux de travail dans un seul programme](/why/#workflows)
+- [Apprendre : tutoriels](/learn/)

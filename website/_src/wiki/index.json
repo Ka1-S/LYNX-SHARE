@@ -1,6 +1,7 @@
 [
   {"key": "wkg.start", "title": "Getting started", "pages": ["getting-started", "install", "audio-setup", "tour", "first-song"]},
-  {"key": "wkg.work", "title": "The workspace", "pages": ["channel-rack", "piano-roll", "playlist", "mixer", "browser", "layouts", "automation", "recording", "exporting", "midi-controllers", "undo-history", "online-sessions", "importing-projects", "plugins", "coming-from-fl-studio", "coming-from-ableton"], "hidden": ["simple-layout"]},
+  {"key": "wkg.from", "title": "Coming from another program", "pages": ["coming-from-bandlab", "coming-from-fl-studio", "coming-from-ableton", "coming-from-other-daws", "simple-layout"], "links": [["/learn/", "nav.learn", "Learn"]]},
+  {"key": "wkg.work", "title": "The workspace", "pages": ["channel-rack", "piano-roll", "playlist", "mixer", "browser", "layouts", "automation", "recording", "exporting", "midi-controllers", "undo-history", "online-sessions", "importing-projects", "plugins"], "hidden": []},
   {"key": "wkg.plug", "title": "Instruments and effects", "pages": ["built-in"], "catalog": true},
   {"key": "wkg.ref", "title": "Reference", "pages": ["settings", "shortcuts", "file-formats", "command-line", "build-from-source", "troubleshooting"], "links": [["/faq/", "nav.faq", "FAQ"]]}
 ]

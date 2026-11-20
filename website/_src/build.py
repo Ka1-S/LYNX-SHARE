@@ -36,7 +36,7 @@ LANGS = [["en", "English"], ["zh-Hans", "简体中文"], ["zh-Hant", "繁體中�
          ["pl", "Polski"], ["pt-BR", "Português (Brasil)"], ["ru", "Русский"], ["es", "Español"], ["tr", "Türkçe"]]
 OGL = {"zh-Hans": "zh_CN", "zh-Hant": "zh_TW", "nl": "nl_NL", "fr": "fr_FR", "de": "de_DE", "id": "id_ID", "it": "it_IT",
        "ja": "ja_JP", "ko": "ko_KR", "pl": "pl_PL", "pt-BR": "pt_BR", "ru": "ru_RU", "es": "es_ES", "tr": "tr_TR"}
-NAV = [("features", "/features/", "nav.features", "Features"), ("why", "/why/", "nav.why", "Why LYNX"),
+NAV = [("features", "/features/", "nav.features", "Features"), ("learn", "/learn/", "nav.learn", "Learn"), ("why", "/why/", "nav.why", "Why LYNX"),
        ("cat", "/instruments-and-effects/", "nav.cat", "Plugins"), ("download", "/download/", "nav.download", "Download"),
        ("updates", "/updates/", "nav.updates", "Updates"), ("wiki", "/wiki/", "nav.wiki", "Wiki"),
        ("faq", "/faq/", "nav.faq", "FAQ")]
@@ -530,7 +530,7 @@ def plugin_source(w):
     return json.dumps([w["intro"], w.get("controls", []), w.get("tips", [])], ensure_ascii=False)
 
 
-def wiki_bodies(index, pages, cat):
+def wiki_bodies(index, pages, cat, learn=None):
     """The wiki bodies in other languages, shown in place of the English body by assets/site.js.
 
     Articles: _src/wiki/<lang>/<page>.md (front matter "source": digest of the English body it was made from).
@@ -555,6 +555,19 @@ def wiki_bodies(index, pages, cat):
             files["i18n/wiki/%s/%s.html" % (lang, s)] = prose + "\n"
             heads[url] = [[i, re.sub(r"<[^>]+>", "", t)] for i, t in re.findall(r'<h2 id="([^"]+)">(.*?)</h2>', prose)]
             BODY_LANGS.setdefault(url, []).append(lang)
+        for s, p in (learn or {}).items():          # tutorial pages: _src/learn/<lang>/<slug>.md
+            f = SRC / "learn" / lang / (s + ".md")
+            if not f.exists():
+                continue
+            meta, body = front(f)
+            if meta.get("source") != digest(p["body"]):
+                continue
+            ids = re.findall(r'<h[23] id="([^"]+)"', p["prose"])
+            prose = markdown(body, iter(ids))
+            if re.findall(r'<h[23] id="([^"]*)"', prose) != ids:
+                sys.exit("build: %s has other headings than the English page" % f)
+            files["i18n/wiki/%s/learn/%s.html" % (lang, s)] = prose + "\n"
+            BODY_LANGS.setdefault("/learn/%s/" % s, []).append(lang)
         f = SRC / "catalog-wiki" / (lang + ".json")
         mine = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
         for p in cat:
@@ -596,6 +609,124 @@ def render_faq():
         out.append('<section id="%s"><h2 data-i18n="faq.q%d">%s</h2><div data-i18n="faq.a%d">%s</div></section>' % (slug(q)[:48].strip("-"), n, inline(q.strip()), n, markdown(a).replace("\n", "")))
     out.append("</div></div>")
     return "".join(out)
+
+
+# ---------------------------------------------------------------- learn: tutorials (a video + its written steps)
+# _src/learn/index.json: the tutorials in order; _src/learn/<slug>.md: title, summary and the written steps (the same
+# markdown as the wiki; translations in _src/learn/<lang>/<slug>.md with the "source" digest, shown by assets/site.js
+# from i18n/wiki/<lang>/learn/<slug>.html like a wiki body); _src/learn/media.json: the big files (MP4) that live on the
+# repository's `media` branch under site/ and are put into the site by scripts/site-media.sh (deploy-site.sh runs it).
+MEDIA = "/assets/media/learn/"
+LAYOUT_KEYS = {"simple": "lr.l.simple", "pattern": "lr.l.pattern", "clipLaunch": "lr.l.clip", "any": "lr.l.any"}
+
+
+def learn_data():
+    data = json.loads((SRC / "learn/index.json").read_text(encoding="utf-8"))
+    pages = {}
+    for t in data["tutorials"]:
+        s = t["slug"]
+        meta, body = front(SRC / "learn" / (s + ".md"))
+        pages[s] = {"slug": s, "meta": meta, "body": body, "prose": markdown(body), "t": t}
+        T["lt.%s.t" % s] = meta["title"]
+        T["lt.%s.s" % s] = meta["summary"]
+        for i, (_, name) in enumerate(t.get("chapters", [])):
+            T["lt.%s.c%d" % (s, i)] = name
+    return data, pages
+
+
+def media_files():
+    """The files of _src/learn/media.json (site address -> {"size", "sha256"}): on the `media` branch, not in this tree."""
+    f = SRC / "learn/media.json"
+    return json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
+
+
+def youtube_id(url):
+    m = re.search(r"(?:youtu\.be/|[?&]v=|/shorts/|/embed/)([\w-]{11})", url or "")
+    return m.group(1) if m else ""
+
+
+def mmss(sec):
+    sec = int(round(float(sec)))
+    return "%d:%02d" % (sec // 60, sec % 60)
+
+
+def mb(n):
+    return "%.1f MB" % (n / 1e6)
+
+
+def tutorial_video(t, files):
+    """The self-hosted video: the 1080p file on wide screens, else 720p; captions in every language that has a .vtt.
+    Nothing loads before Play (preload="none"); width/height + aspect-ratio keep the page from moving.
+    assets/learn.js swaps in the narration of the reader's language (t["voices"]) and turns its captions on.
+    A YouTube address in index.json adds a click-to-load player: nothing comes from YouTube before that click."""
+    v, voices = t["video"], t["voices"]
+    caps = [l for l, _ in LANGS if (OUT / ("assets/media/learn/%s-%s.vtt" % (v, l))).is_file()]
+    names = dict(LANGS)
+    src = lambda l, q: "%s%s-%s-%s.mp4" % (MEDIA, v, l, q)
+    sources = ('<source src="%s" type="video/mp4" media="(min-width: 1100px)"><source src="%s" type="video/mp4">' % (src("en", "1080"), src("en", "720")))
+    tracks = "".join('<track kind="captions" srclang="%s" label="%s" src="%s%s-%s.vtt">' % (l, esc(names[l]), MEDIA, v, l) for l in caps)
+    yt = {l: youtube_id(u) for l, u in (t.get("youtube") or {}).items() if youtube_id(u)}
+    attrs = ' data-voices="%s" data-v="%s"' % (" ".join(voices), v) + (" data-yt='%s'" % esc(json.dumps(yt)) if yt else "")
+    dl = " · ".join('<a href="%s" download>%s</a>' % (src("en", q), "%sp, %s" % (q, mb(files.get(src("en", q)[1:], {}).get("size", 0)))) for q in ("720", "1080"))
+    ytb = ('<p class="ytline"><button type="button" class="btn btn-ghost btn-sm ytbtn" data-i18n="lr.yt">Watch on YouTube</button> '
+           '<span data-i18n="lr.ytN">The YouTube player loads only after this click.</span></p>') if yt else ""
+    return ('<figure class="tvid"%s><div class="vbox"><video controls preload="none" playsinline width="1920" height="1080" poster="/assets/img/learn/%s-en.webp">%s%s</video></div>'
+            '<figcaption><span data-i18n="lr.dl">Download the video:</span> %s · <span data-i18n="lr.capN">Captions in every language of this site (CC button).</span></figcaption>%s</figure>'
+            % (attrs, v, sources, tracks, dl, ytb))
+
+
+def tutorial_meta(t):
+    return '<span data-i18n="%s">%s</span> · <span>%s</span> · <span data-i18n="lr.lv.%s">%s</span>' % (
+        LAYOUT_KEYS[t["layout"]], T[LAYOUT_KEYS[t["layout"]]], mmss(t["length"]), t["level"], T["lr.lv." + t["level"]])
+
+
+def render_tutorial(data, pages, s, files):
+    p = pages[s]
+    t = p["t"]
+    order = [x["slug"] for x in data["tutorials"]]
+    n = order.index(s)
+    chapters = "".join('<li><button type="button" data-seek="%s"><b>%s</b> <span data-i18n="lt.%s.c%d">%s</span></button></li>' % (c[0], mmss(c[0]), s, i, esc(c[1]))
+                       for i, c in enumerate(t.get("chapters", [])))
+    pn = lambda k, key, align: ('<a href="/learn/%s/"%s><span data-i18n="%s">%s</span><b data-i18n="lt.%s.t">%s</b></a>' % (
+        k, ' style="text-align:right"' if align else "", key, T[key], k, esc(T["lt.%s.t" % k])))
+    prev = pn(order[n - 1], "wiki.prev", False) if n > 0 else "<span></span>"
+    nxt = pn(order[n + 1], "wiki.next", True) if n < len(order) - 1 else "<span></span>"
+    url = "/learn/%s/" % s
+    return ('<div class="phead"><div class="wrap"><p class="crumb"><a href="/learn/" data-i18n="nav.learn">Learn</a></p>'
+            '<h1 data-i18n="lt.%s.t">%s</h1><p data-i18n="lt.%s.s">%s</p><p class="tmeta">%s</p></div></div>'
+            '<div class="wrap learn"><div class="lgrid">%s<aside class="chap"><h2 data-i18n="lr.chap">Chapters</h2><ol>%s</ol></aside></div>'
+            '<article class="lsteps">%s<div class="prose" id="wprose">%s</div><nav class="wpn">%s%s</nav></article></div>'
+            % (s, esc(T["lt.%s.t" % s]), s, esc(T["lt.%s.s" % s]), tutorial_meta(t), tutorial_video(t, files), chapters,
+               enonly(url), p["prose"], prev, nxt))
+
+
+COMING = [   # the "Coming from..." cards of the Learn hub: wiki page, string key, English
+    ("coming-from-bandlab", "lr.from.mobile", "BandLab, FL Studio Mobile or GarageBand"),
+    ("coming-from-fl-studio", "lr.from.fl", "FL Studio"),
+    ("coming-from-ableton", "lr.from.live", "Ableton Live or Bitwig"),
+    ("coming-from-other-daws", "lr.from.other", "Logic, Cubase or Reaper"),
+]
+
+
+def render_learn(data, pages):
+    cards = []
+    for t in data["tutorials"]:
+        s = t["slug"]
+        cards.append('<article class="tcard"><a class="tthumb" href="/learn/%s/" tabindex="-1" aria-hidden="true"><img src="/assets/img/learn/%s-en.webp" alt="" loading="lazy" width="640" height="360"><span class="tlen">%s</span></a>'
+                     '<div class="tb"><h3><a href="/learn/%s/" data-i18n="lt.%s.t">%s</a></h3><p data-i18n="lt.%s.s">%s</p><p class="tmeta">%s</p></div></article>'
+                     % (s, t["video"], mmss(t["length"]), s, s, esc(T["lt.%s.t" % s]), s, esc(T["lt.%s.s" % s]), tutorial_meta(t)))
+    froms = "".join('<a class="fcard" href="/wiki/%s/"><small data-i18n="lr.from">Coming from</small><b data-i18n="%s">%s</b></a>' % (w, k, en) for w, k, en in COMING)
+    froms += '<a class="fcard" href="/learn/simple-beat/"><small data-i18n="lr.newS">New to music software?</small><b data-i18n="lr.newB">Start with the Simple layout</b></a>'
+    return ('<div class="phead"><div class="wrap"><h1 data-i18n="lr.h1">Learn LYNX SHARE</h1><p data-i18n="lr.sub">Short videos with the same steps written out, and a page for each program you may be coming from.</p></div></div>'
+            '<div class="wrap learnhub">'
+            '<ol class="start3"><li><b data-i18n="lr.s1">Download</b><span data-i18n="lr.s1d">Free for Windows, macOS and Linux. <a href="/download/">Download page</a></span></li>'
+            '<li><b data-i18n="lr.s2">Pick how you like to work</b><span data-i18n="lr.s2d">From 0.1.31 the first start asks where you are coming from and opens the layout that fits. In 0.1.30: View › Layout style.</span></li>'
+            '<li><b data-i18n="lr.s3">Watch a first video</b><span data-i18n="lr.s3d">One minute: <a href="/learn/simple-beat/">make a beat in the Simple layout</a>.</span></li></ol>'
+            '<h2 data-i18n="lr.tutT">Tutorials</h2><div class="tcards">%s</div>'
+            '<h2 id="coming-from" data-i18n="lr.fromT">Coming from another program?</h2><p class="lead" data-i18n="lr.fromL">What is the same, what is different, which layout to pick and where things are.</p><div class="fcards">%s</div>'
+            '<p class="note" data-i18n="lr.tm">Program names on this page are trademarks of their owners. LYNX SHARE is an independent program, not affiliated with or endorsed by them.</p>'
+            '<p class="note" data-i18n="lr.more">More in the <a href="/wiki/">wiki</a>: <a href="/wiki/first-song/">your first song</a>, <a href="/wiki/layouts/">the three layouts</a> and <a href="/wiki/shortcuts/">every shortcut</a>.</p>'
+            '</div>' % ("".join(cards), froms))
 
 
 # ---------------------------------------------------------------- English strings out of the built pages
@@ -643,7 +774,9 @@ def main():
     index, pages = wiki_pages()
     cat = catalog()
     order = wiki_order(index, cat)
-    body_files = wiki_bodies(index, pages, cat)
+    ldata, lpages = learn_data()
+    mfiles = media_files()
+    body_files = wiki_bodies(index, pages, cat, lpages)
     full = [l for l, _ in LANGS[1:] if all(l in BODY_LANGS.get(e[0], ()) for e in order)]
     if full:
         BODY_LANGS["/wiki/"] = full                # the index page: languages with every body
@@ -670,7 +803,9 @@ def main():
         ("/updates/", "updates", "up.h1", "m.updates.d", render_updates(rels), (), "updates"),
         ("/wiki/", "wiki", "wiki.h1", "m.wiki.d", render_wiki_index(index, cat, pages), ("/assets/wiki.js",), ""),
         ("/faq/", "faq", "faq.h1", "m.faq.d", render_faq(), (), ""),
-    ] + [("/wiki/%s/" % s, "wiki", "wk.%s.t" % s, "wk.%s.s" % s, render_wiki_page(index, cat, order, pages, s), ("/assets/wiki.js",), "")
+        ("/learn/", "learn", "lr.h1", "m.learn.d", render_learn(ldata, lpages), (), ""),
+    ] + [("/learn/%s/" % s, "learn", "lt.%s.t" % s, "lt.%s.s" % s, render_tutorial(ldata, lpages, s, mfiles), ("/assets/learn.js",), "")
+         for s in lpages] + [("/wiki/%s/" % s, "wiki", "wk.%s.t" % s, "wk.%s.s" % s, render_wiki_page(index, cat, order, pages, s), ("/assets/wiki.js",), "")
          for g in index for s in g["pages"] + g.get("hidden", [])
     ] + [("/wiki/built-in/%s/" % p["id"], "wiki", ("", p["name"]), "c." + p["id"], render_plugin_page(index, cat, order, p), ("/assets/wiki.js",), "catalog")
          for p in cat if p.get("wiki")]
@@ -697,7 +832,7 @@ def main():
     files["i18n/latest/en.json"] = dump({k: v for k, v in upd.items() if k.startswith(lk)})
     # one version stamp for css/js/json addresses: changes when any of them does
     stamp = hashlib.sha1()
-    for name in ("assets/site.css", "assets/site.js", "assets/features.js", "assets/catalog.js", "assets/wiki.js", "assets/motion.js"):
+    for name in ("assets/site.css", "assets/site.js", "assets/features.js", "assets/catalog.js", "assets/wiki.js", "assets/learn.js", "assets/motion.js"):
         stamp.update((OUT / name).read_bytes())
     for name in sorted(files):
         stamp.update(files[name].encode())
@@ -707,7 +842,7 @@ def main():
     version = stamp.hexdigest()[:8]
     for path, cur, tk, dk, body, scripts, part in bodies:
         files[(path.strip("/") + "/index.html").lstrip("/")] = frame(path, cur, tk, dk, body, version, scripts, part, home=path == "/",
-                                                                     wt=" ".join(BODY_LANGS.get(path, ())) if path.startswith("/wiki/") else "")
+                                                                     wt=" ".join(BODY_LANGS.get(path, ())) if path.startswith(("/wiki/", "/learn/")) else "")
 
     files = {name: sized(text) if name.endswith(".html") else text for name, text in files.items()}
     stale = [str(f.relative_to(OUT)) for f in sorted((OUT / "i18n/wiki").glob("**/*.*")) if str(f.relative_to(OUT)) not in files]

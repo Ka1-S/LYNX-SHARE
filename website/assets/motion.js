@@ -63,6 +63,14 @@ function start(){
   const co = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting){ co.unobserve(e.target); count(e.target); } }), {threshold: .6});
   $$('[data-count]').forEach(el => co.observe(el));
 
+  /* muted looping clips (<video class="lp" preload="none">): they play only while on screen, so nothing is fetched
+     before they scroll into view; visitors who asked for reduced motion (no html.mo) keep the still poster */
+  const lo = new IntersectionObserver(es => es.forEach(e => {
+    const v = e.target;
+    if (e.isIntersecting){ const p = v.play(); if (p && p.catch) p.catch(() => {}); } else v.pause();
+  }), {rootMargin: '100px 0px'});
+  $$('video.lp').forEach(v => lo.observe(v));
+
   /* the hero's glow rests while the hero is off screen */
   const hero = document.querySelector('.hero');
   if (hero) new IntersectionObserver(e => hero.classList.toggle('off', !e[0].isIntersecting)).observe(hero);

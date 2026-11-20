@@ -1,9 +1,22 @@
 ---
-source: 3bf7e0c0ab
+source: 68d518394b
 ---
 LYNX SHARE mantiene el flujo de trabajo que ya conoces: un Channel Rack, patrones, una Playlist y un Mixer, con las mismas teclas. Abre proyectos `.flp` directamente y puede escribir uno de vuelta.
 
 LYNX SHARE es un programa independiente. No está afiliado a Image-Line, ni cuenta con su aval o patrocinio, y no contiene código de Image-Line. FL Studio es una marca registrada de Image-Line Software.
+
+## Tus primeros pasos
+
+1. **Elige el flujo.** La primera vez que arranca LYNX SHARE, una tarjeta de bienvenida pregunta de dónde vienes (0.1.31). Haz clic en `FL Studio`: obtienes el Flujo por patrones, el predeterminado, con el Channel Rack, el Piano Roll, la Playlist y el Mixer. Skip en la tarjeta hace lo mismo.
+2. **Abre un proyecto.** Abre uno de tus proyectos `.flp` (abajo), o haz clic en los pasos del Channel Rack para hacer un beat.
+3. **Encuentra tus plugins.** LYNX SHARE explora en segundo plano las carpetas de plugins habituales. Para una carpeta tuya, abre `Opciones › Gestor de plugins...`, haz clic en `Carpetas de plugins...`, añádela y haz clic en `Buscar plugins nuevos`.
+
+Qué es distinto de FL Studio:
+
+- Los plugins propios de FL Studio suenan con motores que LYNX SHARE recreó, cada uno con un nivel de calidad (abajo). No hace falta FL Studio para abrir un `.flp`.
+- Las incorporaciones propias de LYNX SHARE están desactivadas hasta que las actives en `Opciones › Extras de LYNX...`.
+- Otros dos flujos funcionan sobre el mismo proyecto: el de lanzamiento de clips (una cuadrícula de clips con escenas) y el Simple (una ventana con pistas, loops y grabación rápida).
+- Una [sesión en línea](/learn/online-session/) reúne hasta 4 personas en un proyecto, en directo.
 
 ## Abrir un proyecto .flp
 
@@ -90,3 +103,4 @@ El archivo es un proyecto de FL Studio 2026. Los samplers, clips de audio, gener
 - [Formatos de archivo](/wiki/file-formats/)
 - [Atajos](/wiki/shortcuts/)
 - [Lo que solo hace LYNX SHARE con los ajustes de FL](/why/#fl-settings)
+- [Aprende: tutoriales](/learn/)

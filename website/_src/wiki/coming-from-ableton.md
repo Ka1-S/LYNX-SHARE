@@ -1,11 +1,26 @@
 ---
 title: Coming from Ableton Live
-summary: The optional Clip-launch layout, opening and exporting .als sets, and warp modes.
+summary: The optional Clip-launch layout, first steps for Live and Bitwig users, opening and exporting .als sets, and warp modes.
 status: full
 ---
 ![The Clip-launch layout: a clip grid with scenes beside the Playlist](/assets/img/cliplaunch.webp)
 
 LYNX SHARE starts in the Pattern workflow: a Channel rack, patterns and a Playlist. The Clip-launch workflow is optional and adds a clip grid with scenes beside the Playlist. LYNX SHARE reads and writes `.als` sets. It is not affiliated with Ableton.
+
+This page is for Bitwig Studio users too: the clip grid works the same way, and Bitwig's DAWproject files (`.dawproject`) open with `File › Open...` and are written by `File › Export › DAWproject (.dawproject)...`.
+
+## Your first steps
+
+1. **Pick the layout.** The first time LYNX SHARE starts, a welcome card asks where you are coming from (0.1.31). Click `Ableton Live or Bitwig`: the Clip-launch layout opens. In 0.1.30, choose `View › Layout style › Clip-launch workflow`.
+2. **Fill a slot.** Drag a sample or a pattern from the Browser into a slot, or right-click an empty slot and choose `Put a pattern here`.
+3. **Launch.** Click the triangle at the left of a clip, or the triangle of a scene in the `Scenes` column to launch the whole row. Or open one of your `.als` sets (below).
+
+What is different from Live:
+
+- The Playlist is the arrangement, and its tracks are the columns of the grid. A track that launched a clip stays on the grid until you press `Back to Playlist`.
+- The keys follow FL Studio outside the grid. `Ctrl+Z` undoes one step, and pressed again redoes it.
+- Only some of Live's own devices are converted (see Good to know). Third-party plugins come over with their state.
+- The Pattern layout, FL Studio's way of working with a Channel rack and patterns, works on the same project.
 
 ## Open a Live set
 
@@ -85,3 +100,4 @@ A report after the export lists what was left out.
 - [Importing projects](/wiki/importing-projects/)
 - [File formats](/wiki/file-formats/)
 - [Two workflows in one program](/why/#workflows)
+- [Learn: tutorials](/learn/)
