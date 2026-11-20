@@ -131,6 +131,7 @@ public:
     juce::PopupMenu cardMenuForSnapshot (int card); // an effect card's right-click menu
     int cardCountForCheck() const;
     juce::Rectangle<int> windowButtonForCheck (int card) const; // (issue #191: in this component's coordinates)
+    bool pressWindowButtonForCheck (int card); // (--zorder191test: the button's action when an editor covers it on screen)
     int chainInsertForCheck() const;
     int chainChannelForCheck() const;
     bool isFoldedForCheck (int card) const;

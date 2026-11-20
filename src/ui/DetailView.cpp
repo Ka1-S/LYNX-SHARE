@@ -266,6 +266,14 @@ public:
         return windowBounds (cards[(std::size_t) i]);
     }
     bool isCardFolded (int i) const { return i >= 0 && i < (int) cards.size() && cards[(std::size_t) i].folded; }
+    // (--zorder191test, rollup 0.1.31 step 2: the card's window button pressed when a plugin editor covers it on screen)
+    bool pressWindowButtonForCheck (int i)
+    {
+        if (i < 0 || i >= (int) cards.size())
+            return false;
+        toggleWindow (cards[(std::size_t) i]);
+        return true;
+    }
     void toggleCardFold (int i)
     {
         if (i >= 0 && i < (int) cards.size() && cards[(std::size_t) i].kind != Card::add)
@@ -4178,6 +4186,7 @@ juce::Rectangle<int> DetailView::windowButtonForCheck (int card) const
     const auto r = chain->windowButtonOf (card);
     return r.isEmpty() ? r : getLocalArea (chain.get(), r);
 }
+bool DetailView::pressWindowButtonForCheck (int card) { return chain->pressWindowButtonForCheck (card); }
 int DetailView::chainInsertForCheck() const { return chain->insertShown(); }
 int DetailView::chainChannelForCheck() const { return chain->channelShown(); }
 bool DetailView::isFoldedForCheck (int card) const { return chain->isCardFolded (card); }

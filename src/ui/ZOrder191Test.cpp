@@ -68,42 +68,67 @@ struct ZOrderTest final : juce::Timer
     DetailView* detail() const { return ui != nullptr ? ui->getDetailViewForSnapshot() : nullptr; }
     juce::Component& playlistFrame() const { return ui->workspaceForTest().getFrame (workspace::Panel::playlist); }
 
-    // A press (and its release) at `local` in `c`, through the peer that holds `c`, as the system delivers a click
-    bool click (juce::Component& c, juce::Point<int> local)
+    // The native window on screen at `local` in `c` (Windows: WindowFromPoint), for the report
+    juce::String windowAt (juce::Component& c, juce::Point<int> local) const
+    {
+#if JUCE_WINDOWS
+        const auto screen = c.localPointToGlobal (local).toFloat() * juce::Desktop::getInstance().getGlobalScaleFactor();
+        auto* h = WindowFromPoint ({ (LONG) screen.x, (LONG) screen.y });
+        juce::String what = h == nullptr ? "none" : h == (HWND) window->getWindowHandle() ? "main" : h == (HWND) playlistHandle() ? "playlist" : "other";
+        if (h != nullptr && what == "other")
+        {
+            wchar_t name[64] {};
+            GetClassNameW (h, name, 63);
+            RECT r {};
+            GetWindowRect (h, &r);
+            what << "(" << juce::String (name) << " " << (int) r.left << "," << (int) r.top << "-" << (int) r.right << "," << (int) r.bottom << ")";
+        }
+        return what + "@" + juce::String ((int) screen.x) + "," + juce::String ((int) screen.y);
+#else
+        juce::ignoreUnused (c, local);
+        return "-";
+#endif
+    }
+
+    // A press (and its release) at `local` in `c`, through the peer that holds `c`, as the system delivers a click.
+    // Rollup 0.1.31 step 2 (190nr item 4): the press goes where JUCE finds `c` under the mouse. A peer's positions carry the
+    // Desktop's global scale (LYNX_ZTEST_SCALE runs); the first move that finds `c` (or a child) decides the factor. When a
+    // native window covers `local` on screen (at 150 % the docked Surge XT editor nearly fills the 1240 x 648 window),
+    // `scanRow` tries the rest of that row of `c`, as a user clicks the part they see. Returns whether `c` took the press.
+    bool click (juce::Component& c, juce::Point<int> local, bool scanRow = false)
     {
         auto* peer = c.getPeer();
         if (peer == nullptr)
             return false;
         using MIS = juce::MouseInputSource;
-        // (a top-level peer's positions are not divided by the Desktop's global scale: LYNX_ZTEST_SCALE runs.) Rollup 0.1.31
-        // step 2 (190nr item 4): a native child peer (the Playlist docked as its own child window, nativechild) does not
-        // take the factor on Windows, so the title-bar click at 150 % landed 1.5x too far right, on the docked editor. The
-        // factor is now found by a move: the first position whose component under the mouse is `c` (or inside it).
-        const auto base = peer->getComponent().getLocalPoint (&c, local).toFloat();
         const auto global = juce::Desktop::getInstance().getGlobalScaleFactor();
         const auto source = juce::Desktop::getInstance().getMainMouseSource();
-        auto at = base * global;
-        juce::String tried;
-        for (const auto factor : { global, 1.0f, peer->getComponent().getDesktopScaleFactor() })
-        {
-            const auto p = base * factor;
-            peer->handleMouseEvent (MIS::InputSourceType::mouse, p, juce::ModifierKeys(), MIS::defaultPressure, MIS::defaultOrientation, juce::Time::currentTimeMillis());
+        const auto name = c.getName().isNotEmpty() ? c.getName() : juce::String (typeid (c).name());
+        const auto hits = [&] (juce::Point<int> p, float factor) {
+            const auto at = peer->getComponent().getLocalPoint (&c, p).toFloat() * factor;
+            peer->handleMouseEvent (MIS::InputSourceType::mouse, at, juce::ModifierKeys(), MIS::defaultPressure, MIS::defaultOrientation, juce::Time::currentTimeMillis());
             auto* under = source.getComponentUnderMouse();
-            tried << juce::String (factor, 2) << ":" << (under == nullptr ? juce::String ("-") : under->getName().isNotEmpty() ? under->getName() : juce::String (typeid (*under).name()))
-                  << (under == &c || (under != nullptr && c.isParentOf (under)) ? "(hit) " : " ");
-            if (under == &c || (under != nullptr && c.isParentOf (under)))
-            {
-                at = p;
-                break;
-            }
-        }
-        line ("click_" + (c.getName().isNotEmpty() ? c.getName() : juce::String (typeid (c).name())) + "=" + tried.trim());
-        const auto now = juce::Time::currentTimeMillis();
-        peer->handleMouseEvent (MIS::InputSourceType::mouse, at, juce::ModifierKeys(), MIS::defaultPressure, MIS::defaultOrientation, now);
-        peer->handleMouseEvent (MIS::InputSourceType::mouse, at, juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier), MIS::defaultPressure,
-                                MIS::defaultOrientation, now + 1);
-        peer->handleMouseEvent (MIS::InputSourceType::mouse, at, juce::ModifierKeys(), MIS::defaultPressure, MIS::defaultOrientation, now + 60);
-        return true;
+            return under == &c || (under != nullptr && c.isParentOf (under));
+        };
+        std::vector<juce::Point<int>> points { local };
+        if (scanRow)
+            for (int x = 8; x < c.getWidth() - 8; x += 16)
+                points.push_back ({ x, local.y });
+        line ("click_" + name + "_screen=" + windowAt (c, local));
+        for (const auto& p : points)
+            for (const auto factor : { global, 1.0f })
+                if (hits (p, factor))
+                {
+                    const auto at = peer->getComponent().getLocalPoint (&c, p).toFloat() * factor;
+                    line ("click_" + name + "=hit at " + p.toString() + " factor " + juce::String (factor, 2));
+                    const auto now = juce::Time::currentTimeMillis();
+                    peer->handleMouseEvent (MIS::InputSourceType::mouse, at, juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier), MIS::defaultPressure,
+                                            MIS::defaultOrientation, now + 1);
+                    peer->handleMouseEvent (MIS::InputSourceType::mouse, at, juce::ModifierKeys(), MIS::defaultPressure, MIS::defaultOrientation, now + 60);
+                    return true;
+                }
+        line ("click_" + name + "=covered (no visible point)");
+        return false;
     }
 
     bool clickWindowButton (int card)
@@ -113,7 +138,13 @@ struct ZOrderTest final : juce::Timer
             return false;
         const auto r = dv->windowButtonForCheck (card);
         line ("window_button_" + juce::String (card) + "=" + r.toString());
-        return ! r.isEmpty() && click (*dv, r.getCentre());
+        if (r.isEmpty())
+            return false;
+        if (click (*dv, r.getCentre()))
+            return true;
+        // covered on screen by a plugin editor (a user would move it first): the button's own action, logged
+        line ("window_button_" + juce::String (card) + "_pressed_directly=1");
+        return dv->pressWindowButtonForCheck (card);
     }
 
     void snapshotDesktop()
@@ -279,7 +310,7 @@ struct ZOrderTest final : juce::Timer
                 startTimer (700);
                 // a click on the Playlist's title bar: the Playlist comes in front (FL's / issue #116's rule stays)
                 auto& frame = playlistFrame();
-                click (frame, { frame.getWidth() / 2, 8 });
+                expect ("playlist_title_bar_clicked_" + name, click (frame, { frame.getWidth() / 2, 8 }, true));
                 return 3;
             }
             case 3:
