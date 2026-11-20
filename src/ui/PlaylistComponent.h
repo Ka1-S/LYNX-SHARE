@@ -20,6 +20,7 @@
 #include "core/PlaylistOps.h"
 #include "core/PlaylistViewOptions.h"
 #include "core/StripSilence.h"
+#include "core/TrackClips.h" // round 190ne
 #include "engine/AudioEngine.h"
 #include "ui/EditorTools.h"
 #include "ui/FrameTicker.h"
@@ -722,12 +723,14 @@ private:
 public:
     // round 190bv: the clipboard is shared with the clip grid (a clip copied in a slot pastes here and the other way);
     // the stamp tells the grid whether its own copy is still the newest
-    static void setCopiedClips (std::vector<Clip> clips)
+    static void setCopiedClips (std::vector<Clip> clips, trackclips::Carried patterns = {})
     {
         clipboard = std::move (clips);
+        clipboardPatterns = std::move (patterns); // (round 190ne: the copied track clips, core/TrackClips.h)
         ++clipboardStamp;
     }
     static const std::vector<Clip>& copiedClips() noexcept { return clipboard; }
+    static const trackclips::Carried& copiedPatterns() noexcept { return clipboardPatterns; }
     static std::uint64_t copiedStamp() noexcept { return clipboardStamp; }
     // round 190ld (--details190ldshot): the Simple header's Fx pill and its chain preset
     juce::Rectangle<int> trackFxForSnapshot (int track) const { return trackFx (track); }
@@ -746,7 +749,7 @@ private:
     juce::PopupMenu fitToTempoMenu (int index, std::shared_ptr<const SampleData> sample);
     void showDetectTempo (int index, std::shared_ptr<const SampleData> sample);
     std::shared_ptr<loopinfo::Shared> loopInfo; // round 190kx: the loop analysis (ui/LoopInfo), made when a clip menu first asks
-    void duplicateSelection();
+    void duplicateSelection (bool linked = false); // linked: copies of track clips share their notes (round 190ne)
     void seekTo (int x, bool snapOn = true); // Alt held while scrubbing: snapOn false (free position, FL)
     void paintAudioClip (juce::Graphics& g, const Clip& clip, juce::Rectangle<float> bounds);
     // Clips a few pixels wide (zoomed far out), gathered and filled per colour at the end (round 151)
@@ -785,6 +788,12 @@ private:
     bool liveStyle = false;
     bool dragCopies = false; // the clips being moved are copies made at the press
     arrange::TimeClip timeClipboard;
+    trackclips::Carried timePatterns; // round 190ne: the track clips of timeClipboard
+    std::int64_t lastTrackClipLength = 0; // round 190ne: the length a new track clip is drawn with (0: one bar)
+    // round 190ne: how many clips play each pattern while the song has track clips (the link mark on shared ones)
+    int trackClipUseCount (int pattern) const;
+    mutable std::vector<int> trackClipUses;
+    mutable std::uint64_t trackClipUsesStamp = ~(std::uint64_t) 0;
     // the Simple headers' row and the height that shows their second row (round 190jc, SG-3: 64 / 54; Large controls 88 / 76)
     static int simpleTrackHeight();
     static int simpleTwoRows();
@@ -943,6 +952,7 @@ private:
     juce::Point<int> knifeFrom, knifeTo;
     std::size_t knownClipCount = 0;
     static inline std::vector<Clip> clipboard;
+    static inline trackclips::Carried clipboardPatterns; // round 190ne: the track clips the clipboard's clips play
     static inline std::uint64_t clipboardStamp = 0;
     std::int64_t grabOffset = 0;
     double playheadTick = -1.0;
@@ -1210,6 +1220,20 @@ public:
     int listRowOfPattern (int pattern) const;
     const std::vector<int>& playingForCheck() const noexcept { return playingPatterns; }
     int rowCentreForSnapshot (int pattern) const; // (round 190mp: the y of a pattern's row, -1 = not listed)
+    // round 190ne: the track clips' group (folded by default) and its row's "shown" switch, for --trackclips190neshot
+    void setTrackClipsOpen (bool open) { trackClipsOpen = open; repaint(); }
+    bool trackClipsOpenNow() const noexcept { return trackClipsOpen; }
+    int groupRowForSnapshot() const
+    {
+        const auto& list = rows();
+        for (int i = 0; i < (int) list.size(); ++i)
+            if (list[(std::size_t) i].group)
+                return i;
+        return -1;
+    }
+    juce::Rectangle<int> groupSwitchForSnapshot (int listRow) const { return groupSwitchBounds (listRow); }
+    int listedRowsForSnapshot() const { return (int) rows().size(); }
+    int rowYForSnapshot (int listRow) const { return headerHeight + (listRow - scroll) * rowHeight + rowHeight / 2; }
 
     // the kind listed: 0 = patterns, 1 = audio clips, 2 = automation clips
     void setView (int newView);
@@ -1221,11 +1245,20 @@ private:
     struct Row
     {
         ClipKind kind;
-        int index;            // pattern, audio or automation channel
+        int index;            // pattern, audio or automation channel (-1: the track clips' group row)
         juce::String name;
         juce::Colour colour;
+        bool group = false;   // round 190ne: the "Track clips (N)" group row (folded by default)
+        bool trackClip = false; // round 190ne: a track clip, listed under the group
+        int uses = 0;         // round 190ne: a track clip: how many clips play it (shared = linked copies)
     };
-    std::vector<Row> rows() const;
+    // The list (cached per published song, view, group state and clip look: round 190ne, the Picker repaints often)
+    const std::vector<Row>& rows() const;
+    mutable std::vector<Row> rowCache;
+    mutable std::uint64_t rowCacheStamp = ~(std::uint64_t) 0;
+    mutable int rowCacheKey = -1;
+    bool trackClipsOpen = false; // round 190ne: the group is unfolded
+    juce::Rectangle<int> groupSwitchBounds (int listRow) const; // round 190ne: the group row's "shown" switch
     int rowAt (int y) const;
     juce::Rectangle<int> tabBounds (int tab) const;
     juce::Rectangle<int> addBounds() const; // the "+" (pattern view only)

@@ -759,6 +759,20 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("Crest Compressor's styles play their earlier laws (not the reference's): {0}"), listOf (crestLaws), true });
         if (! locked.isEmpty())
             lost.push_back ({ TR_NOOP ("Mixer lock states (a solo silences these inserts, and Unmute all unmutes them): {0}"), listOf (locked), soloed });
+        // round 190ne (0.1.31, core/TrackClips.h; until a 0.1.30 step exists): track clips and "Clips own their notes".
+        // Nothing they play changes: the clips are patterns; 0.1.28 lists them with the others and its pencil places
+        // the track's pattern, as FL does
+        {
+            int trackClips = 0;
+            if (auto* patterns = arrayOf (root["patterns"]))
+                for (auto& p : *patterns)
+                    if (auto* po = objectOf (p))
+                        trackClips += drop (*po, "trackClip") ? 1 : 0;
+            const auto ownTracks = drop (o, "playlistOwnClips");
+            if (trackClips > 0 || ownTracks)
+                lost.push_back ({ TR_NOOP ("{0} track clip(s) show as ordinary patterns, and instrument tracks lose \"Clips own their notes\""),
+                                  juce::String (trackClips), false });
+        }
         if (auto* lanes = arrayOf (root["playlistTakeLanes"]))
         {
             const auto count = lanes->size();

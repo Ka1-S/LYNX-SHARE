@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "core/TrackClips.h"
 #include "core/Song.h"
 
 namespace lynx::polish
@@ -260,9 +261,15 @@ inline void makeClipsUnique (Song& song, const std::vector<int>& clips)
             if (to < 0)
             {
                 auto copy = song.patterns[(std::size_t) c.pattern];
-                copy.name = freeName (copy.name, [&song] (const std::string& n) {
-                    return std::any_of (song.patterns.begin(), song.patterns.end(), [&n] (const Pattern& p) { return p.name == n; });
-                });
+                if (copy.trackClip) // (round 190ne: a track clip's copy is a new clip of its track, core/TrackClips.h)
+                {
+                    copy.name = trackclips::newClipName (song, c.track);
+                    copy.uid = 0;
+                }
+                else
+                    copy.name = freeName (copy.name, [&song] (const std::string& n) {
+                        return std::any_of (song.patterns.begin(), song.patterns.end(), [&n] (const Pattern& p) { return p.name == n; });
+                    });
                 song.patterns.push_back (std::move (copy));
                 to = (int) song.patterns.size() - 1;
                 patterns.push_back ({ c.pattern, to });

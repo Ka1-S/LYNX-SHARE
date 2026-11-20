@@ -1,6 +1,7 @@
 #include "core/FlControlMenus.h"
 #include "core/MixerOps.h"
 #include "core/PlaylistOps.h"
+#include "core/TrackClips.h"
 #include "core/QuickRender.h"
 
 #include <algorithm>
@@ -477,6 +478,8 @@ bool makeInstrumentTrack (Song& song, int track, int channel)
     if (mixer <= 0)
         return false;
     auto* t = trackAt (song, track);
+    if (t->mode != PlaylistTrackMode::instrument) // round 190ne: a new instrument track takes the layout's "Clips own their notes"
+        t->ownClips = trackclips::defaultOn();
     t->mode = PlaylistTrackMode::instrument;
     t->channel = channel;
     t->mixerTrack = mixer;

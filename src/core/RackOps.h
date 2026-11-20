@@ -80,6 +80,8 @@ struct Wheel
 // on ([SHOT] round 170a: a drag up from "Pattern 1" made "Pattern 769"). LYNX creates at most one: stepping forward
 // from the last pattern appends a new empty one unless the last one is already empty. Returns the index to select.
 int stepPatternCreating (Song& song, int delta);
+// Whether stepPatternCreating would append a new pattern (round 190ne: counted over the patterns the selector lists).
+bool stepCreatesPattern (const Song& song, int delta) noexcept;
 
 // The first empty pattern after `from` (wrapping around, never `from` itself); -1 if there is none.
 int findNextEmptyPattern (const Song& song, int from) noexcept;

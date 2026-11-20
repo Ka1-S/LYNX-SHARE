@@ -1,4 +1,5 @@
 #include "core/SessionOps.h"
+#include "core/TrackClips.h"
 
 #include <algorithm>
 #include <cmath>
@@ -171,6 +172,7 @@ int placeRecordedPattern (Song& song, int track, int scene, std::vector<Note> no
     p.name = name.empty() ? newPatternName (song) : name;
     p.notes = std::move (notes);
     p.lengthTicks = length;
+    p.trackClip = true; // round 190ne: a slot's own clip (core/TrackClips.h): out of the pattern list, gone with its clip
     p.sortNotes();
     song.patterns.push_back (std::move (p));
     const auto pattern = (int) song.patterns.size() - 1;
@@ -233,13 +235,24 @@ std::optional<SlotClip> copyOf (const Song& song, int track, int scene)
     const auto* clip = launcher::clipAt (*song.clipGrid, track, scene);
     if (clip == nullptr)
         return std::nullopt;
-    return SlotClip { *clip, song.clipGrid->slots[(std::size_t) clip->gridSlot] };
+    SlotClip content { *clip, song.clipGrid->slots[(std::size_t) clip->gridSlot], std::nullopt };
+    if (clip->kind == ClipKind::pattern && trackclips::isTrackClip (song, clip->pattern))
+        content.trackClip = song.patterns[(std::size_t) clip->pattern];
+    return content;
 }
 
 bool paste (Song& song, int track, int scene, const SlotClip& content)
 {
     auto clip = content.clip;
     clip.uid = 0; // (a copy is a clip of its own)
+    if (content.trackClip && clip.kind == ClipKind::pattern) // round 190ne: a track clip's copy is unique (Live)
+    {
+        trackclips::Carried carried;
+        carried.patterns.emplace_back (clip.pattern, *content.trackClip);
+        std::vector<Clip> one { clip };
+        trackclips::materialize (song, one, carried);
+        clip = one.front();
+    }
     const auto slot = launcher::setClip (song, track, scene, clip);
     if (slot < 0)
         return false;
@@ -265,9 +278,11 @@ bool moveClip (Song& song, int fromTrack, int fromScene, int toTrack, int toScen
 {
     if (fromTrack == toTrack && fromScene == toScene)
         return false;
-    const auto content = copyOf (song, fromTrack, fromScene);
+    auto content = copyOf (song, fromTrack, fromScene);
     if (! content)
         return false;
+    if (! copy)
+        content->trackClip.reset(); // (a moved clip keeps its pattern; a copied one gets its own, round 190ne)
     const auto uid = content->clip.uid;
     if (! paste (song, toTrack, toScene, *content))
         return false;
@@ -354,6 +369,7 @@ bool toPlaylist (Song& song, int track, int scene, int playlistTrack, std::int64
     clip.track = playlistTrack;
     clip.start = std::max<std::int64_t> (0, tick);
     song.playlist.push_back (clip);
+    trackclips::makeCopiesUnique (song, std::vector<int> { (int) song.playlist.size() - 1 }); // (round 190ne: a copy of a track clip is its own)
     return true;
 }
 
@@ -373,7 +389,14 @@ bool fromPlaylist (Song& song, std::size_t playlistIndex, int track, int scene, 
 {
     if (playlistIndex >= song.playlist.size())
         return false;
-    if (! putClip (song, song.playlist[playlistIndex], track, scene))
+    auto clip = song.playlist[playlistIndex];
+    if (! move) // (round 190ne: a copy of a track clip is its own; a moved one keeps its pattern)
+    {
+        std::vector<Clip> one { clip };
+        trackclips::makeCopiesUnique (song, one);
+        clip = one.front();
+    }
+    if (! putClip (song, clip, track, scene))
         return false;
     if (move)
         song.playlist.erase (song.playlist.begin() + (std::ptrdiff_t) playlistIndex);

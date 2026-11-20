@@ -17996,3 +17996,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Mixer221_190ngTests.inc" // round 190ng: issue #221 (Del with only the used inserts shown)
 #include "Issues190ngTests.inc" // round 190ng: issues #215, #217, #219, #220, #222
 #include "Rack190ncTests.inc" // round 190nc (0.1.31): Live's Solo / Cue (DL-110) and the Macro Map pick (DL-95)
+#include "TrackClips190neTests.inc" // round 190ne (0.1.31): track clips, "Clips own their notes" (core/TrackClips.h)

@@ -3,6 +3,7 @@
 #include "core/NoteRepeat.h"
 #include "core/PlaylistOps.h"
 #include "core/FlpExport.h"
+#include "core/TrackClips.h"
 #include "core/Fpc.h"
 #include "core/SamplerPage.h"
 
@@ -1861,6 +1862,14 @@ flp::Project toProject (const Song& input, const Options& options, Report& repor
         if (! m.routes.empty())
             report.dropped.push_back ("Modulator '" + m.name + "' (" + std::to_string (m.routes.size())
                                       + " target(s)): FL has no modulators; the targets keep their own values");
+    // track clips (round 190ne, core/TrackClips.h): FL has no such flag, so each is an ordinary pattern on FL's
+    // instrument track; identical ones are merged first (the owner's choice: silently), and more patterns than FL's
+    // 999 are reported
+    trackclips::mergeIdentical (song);
+    if ((int) song.patterns.size() > trackclips::flPatternLimit)
+        report.notes.push_back ("Warning: " + std::to_string (song.patterns.size()) + " patterns are more than the "
+                                + std::to_string (trackclips::flPatternLimit) + " FL Studio can hold: the patterns past "
+                                + std::to_string (trackclips::flPatternLimit) + " may be missing in FL");
     Converter c (song, options, report);
     c.run();
     return std::move (c.out);

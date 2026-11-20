@@ -1,6 +1,8 @@
 #include "ui/WorkflowExtras.h"
 #include "core/EscClose.h"
 
+#include "core/TrackClips.h"
+
 #include "core/LaneView.h"
 #include "core/LayoutStyle.h"
 #include "core/MidiDrop.h"
@@ -84,6 +86,8 @@ bool readUiOption (const juce::String& key, bool on)
         loopanalysis::dropDetects() = on;
     else if (key == "escClosesWindows") // issue #217 (round 190ng): FL's Esc closes the focused window
         escclose::enabled() = on;
+    else if (key == "trackClipsShown") // round 190ne: track clips listed in the pattern selector too (the Picker group's switch)
+        trackclips::setShownInSelector (on);
     else
         return false;
     return true;
@@ -107,7 +111,8 @@ juce::String uiOptionsText()
            + "\nclipLanesPattern=" + juce::String (cliplanes::patternOn ? 1 : 0) + "\nclipLanesLive=" + juce::String (cliplanes::liveOn ? 1 : 0)
            + "\nwToStart=" + juce::String (transportedit::wGoesToStart() ? 1 : 0) // (round 190jz, issue #195)
            + "\nsimpleLoopDetect=" + juce::String (loopanalysis::dropDetects().load() ? 1 : 0) // (round 190kx)
-           + "\nescClosesWindows=" + juce::String (escclose::enabled() ? 1 : 0); // (round 190ng, issue #217)
+           + "\nescClosesWindows=" + juce::String (escclose::enabled() ? 1 : 0) // (round 190ng, issue #217)
+           + "\ntrackClipsShown=" + juce::String (trackclips::shownInSelector() ? 1 : 0); // (round 190ne)
 }
 
 std::optional<bool> extraOn (std::string_view id)
