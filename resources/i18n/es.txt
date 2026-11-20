@@ -11916,3 +11916,6 @@ countries: es mx ar co cl pe ve
 "Insert a wildcard at the cursor" = "Insertar un comodín en el cursor"
 "File:" = "Archivo:"
 "Stems:" = "Stems:"
+
+# --- round 190nq: Discord 11-18 (Missing files text for projects not from FL)
+"{0} plugin(s) will not sound as they did when the project was saved (not installed, not loaded, or without their settings): see what LYNX SHARE did with each." = "{0} plugin(s) no sonarán como cuando se guardó el proyecto (no instalados, no cargados o sin sus ajustes): mira qué hizo LYNX SHARE con cada uno."

@@ -11916,3 +11916,6 @@ countries: kr
 "Insert a wildcard at the cursor" = "커서 위치에 와일드카드 삽입"
 "File:" = "파일:"
 "Stems:" = "스템:"
+
+# --- round 190nq: Discord 11-18 (Missing files text for projects not from FL)
+"{0} plugin(s) will not sound as they did when the project was saved (not installed, not loaded, or without their settings): see what LYNX SHARE did with each." = "플러그인 {0}개가 프로젝트를 저장했을 때처럼 소리 나지 않습니다(설치되지 않음, 불러오지 못함 또는 설정 없음). LYNX SHARE가 각각을 어떻게 처리했는지 확인하세요."

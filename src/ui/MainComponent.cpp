@@ -9244,6 +9244,7 @@ void MainComponent::showMissingFiles (bool afterOpening)
     MissingFilesInfo info;
     info.projectName = projectName;
     const auto fromFlp = importedFlpFile.existsAsFile() && currentFile == juce::File();
+    info.fromFlStudio = fromFlp && importedFlpFile.hasFileExtension ("flp");
     const auto exists = [] (const std::string& path) { return juce::File::isAbsolutePath (juce::String::fromUTF8 (path.c_str())) && juce::File (juce::String::fromUTF8 (path.c_str())).existsAsFile(); };
 
     if (fromFlp)

@@ -11916,3 +11916,6 @@ countries: nl be
 "Insert a wildcard at the cursor" = "Voeg een jokerteken in bij de cursor"
 "File:" = "Bestand:"
 "Stems:" = "Stems:"
+
+# --- round 190nq: Discord 11-18 (Missing files text for projects not from FL)
+"{0} plugin(s) will not sound as they did when the project was saved (not installed, not loaded, or without their settings): see what LYNX SHARE did with each." = "{0} plug-in(s) klinken niet zoals toen het project werd opgeslagen (niet geïnstalleerd, niet geladen of zonder hun instellingen): bekijk wat LYNX SHARE met elk ervan deed."

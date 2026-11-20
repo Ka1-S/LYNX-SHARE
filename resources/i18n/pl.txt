@@ -11916,3 +11916,6 @@ countries: pl
 "Insert a wildcard at the cursor" = "Wstaw symbol zastępczy w miejscu kursora"
 "File:" = "Plik:"
 "Stems:" = "Stemy:"
+
+# --- round 190nq: Discord 11-18 (Missing files text for projects not from FL)
+"{0} plugin(s) will not sound as they did when the project was saved (not installed, not loaded, or without their settings): see what LYNX SHARE did with each." = "{0} wtyczka(-ek) nie zabrzmi tak jak przy zapisie projektu (nie zainstalowane, nie wczytane lub bez ustawień): zobacz, co LYNX SHARE zrobił z każdą."

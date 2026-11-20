@@ -11916,3 +11916,6 @@ countries: ru by kz
 "Insert a wildcard at the cursor" = "Вставить подстановку в позицию курсора"
 "File:" = "Файл:"
 "Stems:" = "Стемы:"
+
+# --- round 190nq: Discord 11-18 (Missing files text for projects not from FL)
+"{0} plugin(s) will not sound as they did when the project was saved (not installed, not loaded, or without their settings): see what LYNX SHARE did with each." = "{0} плагин(ов) не будут звучать так, как при сохранении проекта (не установлены, не загружены или без настроек): посмотрите, что LYNX SHARE сделал с каждым."
