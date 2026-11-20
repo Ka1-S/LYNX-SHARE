@@ -11862,3 +11862,6 @@ countries: kr
 "Only Yes is remembered. Settings › General › Manage messages asks again" = "'예'만 기억됩니다. 설정 › 일반 › 메시지 관리에서 다시 묻습니다"
 "Deleted {0} mixer track(s)" = "믹서 인서트 {0}개 삭제됨"
 "Ticked messages are shown; untick one to skip its question. A question answered with \"Remember my choice\" is unticked here: tick it, or Show all, to be asked again." = "체크된 메시지는 표시됩니다. 질문을 건너뛰려면 체크를 해제하세요. \"선택 기억하기\"로 답한 질문은 여기서 체크가 해제되어 있습니다. 다시 묻게 하려면 체크하거나 모두 표시를 사용하세요."
+"Snap on/off (the main snap)" = "스냅 켜기/끄기 (메인 스냅)"
+"Snap on/off, from any window (the main snap)" = "모든 창에서 스냅 켜기/끄기 (메인 스냅)"
+"Snap (magnet): [LMB] turns the snap off and back on; lit while it snaps. The Playlist and Piano Roll snap boxes show the same magnet" = "스냅 (자석): [LMB]로 스냅을 껐다 켭니다. 스냅 중에는 불이 켜집니다. 플레이리스트와 피아노 롤의 스냅 상자에도 같은 자석이 표시됩니다"

@@ -11862,3 +11862,6 @@ countries: es mx ar co cl pe ve
 "Only Yes is remembered. Settings › General › Manage messages asks again" = "Solo se recuerda Sí. Configuración › General › Gestionar mensajes vuelve a preguntar"
 "Deleted {0} mixer track(s)" = "{0} insert(s) del Mixer eliminado(s)"
 "Ticked messages are shown; untick one to skip its question. A question answered with \"Remember my choice\" is unticked here: tick it, or Show all, to be asked again." = "Se muestran los mensajes marcados; desmarca uno para omitir su pregunta. Una pregunta respondida con \"Recordar mi elección\" aparece desmarcada aquí: márcala, o usa Mostrar todo, para que vuelva a preguntar."
+"Snap on/off (the main snap)" = "Ajuste activado/desactivado (el ajuste principal)"
+"Snap on/off, from any window (the main snap)" = "Ajuste activado/desactivado, desde cualquier ventana (el ajuste principal)"
+"Snap (magnet): [LMB] turns the snap off and back on; lit while it snaps. The Playlist and Piano Roll snap boxes show the same magnet" = "Ajuste (imán): [LMB] desactiva y vuelve a activar el ajuste; encendido mientras ajusta. Las casillas de ajuste de la Playlist y del Piano roll muestran el mismo imán"

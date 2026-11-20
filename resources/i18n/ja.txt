@@ -11862,3 +11862,6 @@ countries: jp
 "Only Yes is remembered. Settings › General › Manage messages asks again" = "記憶されるのは「はい」のみです。設定 › 全般 › メッセージの管理 で再び確認されます"
 "Deleted {0} mixer track(s)" = "ミキサーインサートを {0} 個削除しました"
 "Ticked messages are shown; untick one to skip its question. A question answered with \"Remember my choice\" is unticked here: tick it, or Show all, to be asked again." = "チェックされたメッセージは表示されます。質問を省略するにはチェックを外してください。「選択を記憶する」で答えた質問はここではチェックが外れています。再び確認するには、チェックを入れるか「すべて表示」を使ってください。"
+"Snap on/off (the main snap)" = "スナップのオン/オフ (メインのスナップ)"
+"Snap on/off, from any window (the main snap)" = "スナップのオン/オフ (どのウィンドウからでも、メインのスナップ)"
+"Snap (magnet): [LMB] turns the snap off and back on; lit while it snaps. The Playlist and Piano Roll snap boxes show the same magnet" = "スナップ (マグネット): [LMB] でスナップをオフ/オンにします。スナップ中は点灯します。プレイリストとピアノロールのスナップボックスにも同じマグネットが表示されます"

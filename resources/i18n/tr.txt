@@ -11862,3 +11862,6 @@ countries: tr
 "Only Yes is remembered. Settings › General › Manage messages asks again" = "Yalnızca Evet hatırlanır. Ayarlar › Genel › Mesajları yönet yeniden sorar"
 "Deleted {0} mixer track(s)" = "{0} mixer insert'i silindi"
 "Ticked messages are shown; untick one to skip its question. A question answered with \"Remember my choice\" is unticked here: tick it, or Show all, to be asked again." = "İşaretli mesajlar gösterilir; sorusunu atlamak için işareti kaldırın. \"Seçimimi hatırla\" ile yanıtlanan bir soru burada işaretsizdir: tekrar sorulması için işaretleyin veya Tümünü göster'i kullanın."
+"Snap on/off (the main snap)" = "Snap açık/kapalı (ana snap)"
+"Snap on/off, from any window (the main snap)" = "Snap açık/kapalı, herhangi bir pencereden (ana snap)"
+"Snap (magnet): [LMB] turns the snap off and back on; lit while it snaps. The Playlist and Piano Roll snap boxes show the same magnet" = "Snap (mıknatıs): [LMB] snap'i kapatır ve yeniden açar; snap yaparken yanar. Playlist ve Piyano rulosu snap kutuları aynı mıknatısı gösterir"

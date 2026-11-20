@@ -11862,3 +11862,6 @@ countries: fr be ch ca lu
 "Only Yes is remembered. Settings › General › Manage messages asks again" = "Seul Oui est mémorisé. Réglages › Général › Gérer les messages redemande"
 "Deleted {0} mixer track(s)" = "{0} insert(s) du Mixer supprimé(s)"
 "Ticked messages are shown; untick one to skip its question. A question answered with \"Remember my choice\" is unticked here: tick it, or Show all, to be asked again." = "Les messages cochés sont affichés ; décochez-en un pour ignorer sa question. Une question répondue avec \"Mémoriser mon choix\" est décochée ici : cochez-la, ou utilisez Tout afficher, pour qu'elle soit reposée."
+"Snap on/off (the main snap)" = "Magnétisme activé/désactivé (le magnétisme principal)"
+"Snap on/off, from any window (the main snap)" = "Magnétisme activé/désactivé, depuis n'importe quelle fenêtre (le magnétisme principal)"
+"Snap (magnet): [LMB] turns the snap off and back on; lit while it snaps. The Playlist and Piano Roll snap boxes show the same magnet" = "Magnétisme (aimant) : [LMB] désactive puis réactive le magnétisme ; allumé quand il accroche. Les cases de magnétisme de la Playlist et du Piano roll montrent le même aimant"

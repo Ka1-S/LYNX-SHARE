@@ -11862,3 +11862,6 @@ countries: de at ch li lu
 "Only Yes is remembered. Settings › General › Manage messages asks again" = "Nur Ja wird gemerkt. Einstellungen › Allgemein › Meldungen verwalten fragt erneut"
 "Deleted {0} mixer track(s)" = "{0} Mixer-Insert(s) gelöscht"
 "Ticked messages are shown; untick one to skip its question. A question answered with \"Remember my choice\" is unticked here: tick it, or Show all, to be asked again." = "Angehakte Meldungen werden angezeigt; Haken entfernen, um die Rückfrage zu überspringen. Eine mit \"Meine Auswahl merken\" beantwortete Rückfrage ist hier nicht angehakt: Haken setzen oder Alle anzeigen, um wieder gefragt zu werden."
+"Snap on/off (the main snap)" = "Raster ein/aus (das Haupt-Raster)"
+"Snap on/off, from any window (the main snap)" = "Raster ein/aus, aus jedem Fenster (das Haupt-Raster)"
+"Snap (magnet): [LMB] turns the snap off and back on; lit while it snaps. The Playlist and Piano Roll snap boxes show the same magnet" = "Raster (Magnet): [LMB] schaltet das Raster aus und wieder ein; leuchtet, solange es einrastet. Die Raster-Felder von Playlist und Piano Roll zeigen denselben Magneten"

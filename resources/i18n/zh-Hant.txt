@@ -11862,3 +11862,6 @@ countries: tw hk mo
 "Only Yes is remembered. Settings › General › Manage messages asks again" = "只記住「是」。設定 › 一般 › 管理訊息 會再次詢問"
 "Deleted {0} mixer track(s)" = "已刪除 {0} 個混音插入軌"
 "Ticked messages are shown; untick one to skip its question. A question answered with \"Remember my choice\" is unticked here: tick it, or Show all, to be asked again." = "勾選的訊息會顯示；取消勾選可略過其提問。用「記住我的選擇」回答過的提問在此處為未勾選：勾選它，或使用「全部顯示」，即可再次詢問。"
+"Snap on/off (the main snap)" = "貼齊開/關（主貼齊）"
+"Snap on/off, from any window (the main snap)" = "貼齊開/關，可在任何視窗使用（主貼齊）"
+"Snap (magnet): [LMB] turns the snap off and back on; lit while it snaps. The Playlist and Piano Roll snap boxes show the same magnet" = "貼齊（磁鐵）：[LMB] 可關閉並重新開啟貼齊；貼齊時亮起。播放清單和鋼琴捲簾的貼齊方塊顯示同一塊磁鐵"

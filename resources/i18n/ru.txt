@@ -11862,3 +11862,6 @@ countries: ru by kz
 "Only Yes is remembered. Settings › General › Manage messages asks again" = "Запоминается только «Да». Настройки › Общие › Управление сообщениями — спросит снова"
 "Deleted {0} mixer track(s)" = "Удалено инсертов микшера: {0}"
 "Ticked messages are shown; untick one to skip its question. A question answered with \"Remember my choice\" is unticked here: tick it, or Show all, to be asked again." = "Отмеченные сообщения показываются; снимите отметку, чтобы пропустить вопрос. Вопрос, на который ответили «Запомнить выбор», здесь без отметки: отметьте его или нажмите «Показать все», чтобы он снова задавался."
+"Snap on/off (the main snap)" = "Привязка вкл/выкл (основная привязка)"
+"Snap on/off, from any window (the main snap)" = "Привязка вкл/выкл из любого окна (основная привязка)"
+"Snap (magnet): [LMB] turns the snap off and back on; lit while it snaps. The Playlist and Piano Roll snap boxes show the same magnet" = "Привязка (магнит): [LMB] выключает и снова включает привязку; горит, пока привязывает. Поля привязки в Playlist и Пианоролле показывают тот же магнит"

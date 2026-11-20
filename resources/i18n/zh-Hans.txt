@@ -11862,3 +11862,6 @@ countries: cn sg
 "Only Yes is remembered. Settings › General › Manage messages asks again" = "只记住“是”。设置 › 常规 › 管理消息 会再次询问"
 "Deleted {0} mixer track(s)" = "已删除 {0} 个混音插入轨"
 "Ticked messages are shown; untick one to skip its question. A question answered with \"Remember my choice\" is unticked here: tick it, or Show all, to be asked again." = "勾选的消息会显示；取消勾选可跳过其提问。用“记住我的选择”回答过的提问在此处为未勾选：勾选它，或使用“全部显示”，即可再次询问。"
+"Snap on/off (the main snap)" = "吸附开/关（主吸附）"
+"Snap on/off, from any window (the main snap)" = "吸附开/关，可在任何窗口使用（主吸附）"
+"Snap (magnet): [LMB] turns the snap off and back on; lit while it snaps. The Playlist and Piano Roll snap boxes show the same magnet" = "吸附（磁铁）：[LMB] 可关闭并重新开启吸附；吸附时亮起。播放列表和钢琴卷帘的吸附框显示同一块磁铁"

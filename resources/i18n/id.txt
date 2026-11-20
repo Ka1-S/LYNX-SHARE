@@ -11862,3 +11862,6 @@ countries: id
 "Only Yes is remembered. Settings › General › Manage messages asks again" = "Hanya Ya yang diingat. Pengaturan › Umum › Kelola pesan akan bertanya lagi"
 "Deleted {0} mixer track(s)" = "{0} insert mixer dihapus"
 "Ticked messages are shown; untick one to skip its question. A question answered with \"Remember my choice\" is unticked here: tick it, or Show all, to be asked again." = "Pesan yang dicentang ditampilkan; hilangkan centang untuk melewati pertanyaannya. Pertanyaan yang dijawab dengan \"Ingat pilihan saya\" tidak dicentang di sini: centang, atau gunakan Tampilkan semua, agar ditanya lagi."
+"Snap on/off (the main snap)" = "Snap aktif/nonaktif (snap utama)"
+"Snap on/off, from any window (the main snap)" = "Snap aktif/nonaktif, dari jendela mana pun (snap utama)"
+"Snap (magnet): [LMB] turns the snap off and back on; lit while it snaps. The Playlist and Piano Roll snap boxes show the same magnet" = "Snap (magnet): [LMB] mematikan dan menyalakan kembali snap; menyala saat snap bekerja. Kotak snap Playlist dan Piano roll menampilkan magnet yang sama"

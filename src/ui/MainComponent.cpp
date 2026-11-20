@@ -2232,6 +2232,14 @@ bool MainComponent::runAction (const std::string& id)
         toggleHotSwap (target);
         return true;
     }
+    // issue #219 (round 190ng): the main snap on / off (FL's Backspace in the Playlist and the Piano roll; any key the user
+    // gives "snap.toggle" from any window)
+    if (id == "playlist.snapToggle" || id == "pianoRoll.snapToggle" || id == "snap.toggle")
+    {
+        EditorGlobals::get().toggleGrid();
+        snapToggleButton.setToggleState (EditorGlobals::get().getGridOption() != grid::noneOption, juce::dontSendNotification);
+        return true;
+    }
     if (id == "rack.follow")
     {
         auto& g = EditorGlobals::get();
@@ -6797,8 +6805,9 @@ void MainComponent::setControlHints()
     ui::setHint (tapTempoButton, with (tr ("Tempo tapper: tap the beat to set the tempo"), "view.tempoTapper"));
     ui::setHint (typingPianoButton, with (tr ("Typing keyboard to piano: Z..M and Q..P play the selected channels; letter shortcuts pause"),
                                           "view.typingPiano"));
-    ui::setHint (snapToggleButton, tr ("Snap (magnet): [LMB] turns the snap off and back on (as [Backspace]); lit while it snaps. "
-                                       "The Playlist and Piano Roll snap boxes show the same magnet"));
+    ui::setHint (snapToggleButton, with (tr ("Snap (magnet): [LMB] turns the snap off and back on; lit while it snaps. "
+                                             "The Playlist and Piano Roll snap boxes show the same magnet"),
+                                         "playlist.snapToggle")); // (round 190ng, issue #219: the key from the key map)
     ui::setHint (gridBox, tr ("Global snap: the grid of the Piano Roll and Playlist (when they follow it) and the quantise of recorded notes  "
                               "[LMB] choose  [Wheel] step  [RMB] length of new notes  [Backspace] snap on/off  [Alt] while dragging: no snap"),
                  true);

@@ -13023,11 +13023,8 @@ bool PlaylistComponent::handleKey (const juce::KeyPress& key)
     if (pointKeyPressed (key)) // issue #207 (round 190lw): Delete / Esc / Ctrl+C / X / V on selected points
         return true;
 
-    if (code == juce::KeyPress::backspaceKey)
-    {
-        EditorGlobals::get().toggleGrid();
-        return true;
-    }
+    // (issue #219, round 190ng: Backspace's snap on / off is the key map's playlist.snapToggle / pianoRoll.snapToggle now, so it
+    // can be given another key)
 
     // round 190im (R12): Live's Split (Ctrl+E), only in the Clip-launch layout (core/SessionKeys.h; elsewhere Ctrl+E
     // stays FL's Step edit): the selected clips are cut at the time selection's edges, or at the playhead without one
