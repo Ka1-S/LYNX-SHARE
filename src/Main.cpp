@@ -72,6 +72,7 @@
 #include "core/GoalKnobs.h"
 #include "core/MasterLooks.h"
 #include "core/Harmor.h"
+#include "core/KiloheartsDsp.h" // (rollup step 14: the copy for 0.1.28 self-test)
 #include "flp/Flp.h"
 #include "core/DemoSongs.h"
 #include "core/FirstSongTour.h"
@@ -7326,6 +7327,19 @@ private:
                 if (currentAt >= 0)
                     song.mixer[(std::size_t) currentAt].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::facetEq));
             }
+            // rollup step 14 (round 190nf): round 190nb's Kilohearts law on Effector, round 190mx's launched pattern clip that
+            // plays its pattern's events (the grid's slot clip above plays pattern 1)
+            {
+                auto khs = lynx::makeEffectSlot (lynx::EffectKind::effector);
+                khs.params[(std::size_t) lynx::khsdsp::lawParam] = lynx::khsdsp::lawValue (lynx::khsdsp::Law::resonator);
+                khs.params[(std::size_t) lynx::khsdsp::valueParam] = 0.5f;
+                song.mixer[16].effects.push_back (khs); // [40]
+                lynx::PatternEvents knob;
+                knob.target.kind = lynx::AutomationTargetKind::channelVolume;
+                knob.target.index = 0;
+                knob.events = { { 0, 0.2f }, { lynx::ppq, 0.8f } };
+                song.patterns[0].events.push_back (knob);
+            }
 
             const auto copy = lynx::olderlynx::forRelease (song, "0.1.28");
             juce::String why;
@@ -7494,6 +7508,10 @@ private:
                      ! laid.ok || laid.json.contains ("windowLayout")
                      || std::none_of (laid.lost.begin(), laid.lost.end(), [] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).startsWith ("The window layout saved"); }))
                 rollup030Result = "ERROR step-13 window layout";
+            else if (const auto& m16 = parsed["mixer"][16]["effects"];
+                     ! said ("Effector's Kilohearts laws") || ! said ("Launched pattern clips play without their pattern's events")
+                     || m16[40]["params"].size() > lynx::khsdsp::lawParam || parsed["patterns"][0]["events"].size() != 1)
+                rollup030Result = "ERROR step-14 items";
             else if (const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.28");
                      ! plain.ok || std::any_of (plain.lost.begin(), plain.lost.end(), [] (const lynx::olderlynx::Loss& l) {
                          const auto t = juce::String (l.text);
@@ -7511,7 +7529,8 @@ private:
                                 || t.contains ("scene follow") || t.startsWith ("Horizon") || t.startsWith ("Nebula") || t.startsWith ("Orbit")
                                 || t.startsWith ("Compressor's") || t.startsWith ("Gemini") || t.startsWith ("LYNX Tune") || t.contains ("Repeat")
                                 || t.startsWith ("Low Lifter") || t.startsWith ("Aether") || t.startsWith ("Ridge Strip's omni") || t.startsWith ("Hush De-esser's Renaissance")
-                                || t.startsWith ("Fruity Multiband") || t.contains ("zipped") || t.contains ("Current mixer track") || t.contains ("window layout");
+                                || t.startsWith ("Fruity Multiband") || t.contains ("zipped") || t.contains ("Current mixer track") || t.contains ("window layout")
+                                || t.startsWith ("Effector's Kilohearts") || t.startsWith ("Launched pattern clips");
                      }))
                 rollup030Result = "ERROR a plain project reports a loss it does not have";
         }

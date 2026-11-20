@@ -11873,3 +11873,7 @@ countries: id
 "Project picker: the patterns and channels (press again to close)" = "Pemilih proyek: pattern dan channel (tekan lagi untuk menutup)"
 "Find first empty" = "Cari yang kosong pertama"
 "[RMB] show it in the Browser" = "[RMB] tampilkan di Browser"
+
+# --- rollup 0.1.30 step 14: Save a copy for 0.1.28 knows rounds 190nb / 190mx
+"Effector's Kilohearts laws (the Ring Mod, Reverser, Resonator, Phase Distortion and Shaper stand-ins) play Effector's own algorithm: {0}" = "Hukum Kilohearts milik Effector (pengganti Ring Mod, Reverser, Resonator, Phase Distortion dan Shaper) memutar algoritme Effector sendiri: {0}"
+"Launched pattern clips play without their pattern's events (recorded knob moves): {0}" = "Klip pola yang diluncurkan diputar tanpa event polanya (gerakan kenop yang direkam): {0}"

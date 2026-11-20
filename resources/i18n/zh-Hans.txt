@@ -11873,3 +11873,7 @@ countries: cn sg
 "Project picker: the patterns and channels (press again to close)" = "项目选择器: 模式和通道 (再按一次关闭)"
 "Find first empty" = "查找第一个空的"
 "[RMB] show it in the Browser" = "[RMB] 在浏览器中显示"
+
+# --- rollup 0.1.30 step 14: Save a copy for 0.1.28 knows rounds 190nb / 190mx
+"Effector's Kilohearts laws (the Ring Mod, Reverser, Resonator, Phase Distortion and Shaper stand-ins) play Effector's own algorithm: {0}" = "Effector 的 Kilohearts 规律（Ring Mod、Reverser、Resonator、Phase Distortion 和 Shaper 的替代）按 Effector 自身的算法播放：{0}"
+"Launched pattern clips play without their pattern's events (recorded knob moves): {0}" = "启动的模式片段播放时不带其模式的事件（录制的旋钮动作）：{0}"

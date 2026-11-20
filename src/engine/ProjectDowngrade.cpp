@@ -9,6 +9,7 @@
 #include "core/FacetEq.h"
 #include "core/GeneratorPresets.h"
 #include "core/Harmor.h"
+#include "core/KiloheartsDsp.h"
 #include "core/Effects.h"
 #include "core/LimiterLaw.h"
 #include "core/LowLifterFl.h"
@@ -1104,6 +1105,35 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("The Current mixer track shows as an ordinary insert: its effects no longer process the selected track: {0}"), listOf (current), true });
         if (drop (o, "windowLayout"))
             lost.push_back ({ TR_NOOP ("The window layout saved with the project is not restored"), {}, false });
+    }
+
+    // rollup step 14: round 190nb's Kilohearts laws on Effector (hidden [12 …], set only by the Kilohearts translator for
+    // Ring Mod, Reverser, Resonator, Phase Distortion and Shaper; 0.1.28 plays the Effector algorithm the visible Type
+    // names) and round 190mx's launched pattern clips playing their pattern's events (#198, Session Record writes knob
+    // moves there; 0.1.28's clip grid plays a launched clip's notes only: engine behaviour, nothing to drop)
+    {
+        juce::StringArray khsLaws, launchedEvents;
+        forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
+            auto* params = arrayOf (e.getProperty ("params"));
+            if (params == nullptr || e.getProperty ("kind").toString() != "effector" || params->size() <= khsdsp::lawParam)
+                return;
+            if (khsdsp::lawOf ((float) (double) (*params)[khsdsp::lawParam]) != khsdsp::Law::none)
+                addOnce (khsLaws, where);
+            params->removeRange (khsdsp::lawParam, params->size() - khsdsp::lawParam);
+        });
+        if (auto* slots = arrayOf (root["clipGrid"]["clips"]))
+            for (const auto& s : *slots)
+                if (const auto* c = arrayOf (s["clip"]); c != nullptr && c->size() >= 4 && (c->size() < 7 || (int) (*c)[5] == 0))
+                {
+                    const auto pattern = (int) (*c)[0];
+                    const auto& p = root["patterns"][pattern];
+                    if (const auto* lanes = arrayOf (p["events"]); lanes != nullptr && ! lanes->isEmpty())
+                        addOnce (launchedEvents, p["name"].toString().isNotEmpty() ? "\"" + p["name"].toString() + "\"" : "#" + juce::String (pattern + 1));
+                }
+        if (! khsLaws.isEmpty())
+            lost.push_back ({ TR_NOOP ("Effector's Kilohearts laws (the Ring Mod, Reverser, Resonator, Phase Distortion and Shaper stand-ins) play Effector's own algorithm: {0}"), listOf (khsLaws), true });
+        if (! launchedEvents.isEmpty())
+            lost.push_back ({ TR_NOOP ("Launched pattern clips play without their pattern's events (recorded knob moves): {0}"), listOf (launchedEvents), true });
     }
 }
 

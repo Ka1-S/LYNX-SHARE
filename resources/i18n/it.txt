@@ -11873,3 +11873,7 @@ countries: it ch sm
 "Project picker: the patterns and channels (press again to close)" = "Selettore del progetto: i pattern e i canali (premi di nuovo per chiudere)"
 "Find first empty" = "Trova il primo vuoto"
 "[RMB] show it in the Browser" = "[RMB] lo mostra nel Browser"
+
+# --- rollup 0.1.30 step 14: Save a copy for 0.1.28 knows rounds 190nb / 190mx
+"Effector's Kilohearts laws (the Ring Mod, Reverser, Resonator, Phase Distortion and Shaper stand-ins) play Effector's own algorithm: {0}" = "Le leggi Kilohearts di Effector (i sostituti di Ring Mod, Reverser, Resonator, Phase Distortion e Shaper) suonano l'algoritmo proprio di Effector: {0}"
+"Launched pattern clips play without their pattern's events (recorded knob moves): {0}" = "Le clip di pattern lanciate suonano senza gli eventi del loro pattern (movimenti delle manopole registrati): {0}"
