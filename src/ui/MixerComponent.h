@@ -247,6 +247,11 @@ public:
     void stepHeldRail(); // one step of the rail press being held (also called by --selftest, without the timer)
     // --uiperf: how many repaints spoiled the strips' picture and how often it was drawn again, since the last call
     std::pair<int, int> cacheCountersForPerf() noexcept { return { std::exchange (pictureInvalidations, 0), std::exchange (pictureRefills, 0) }; }
+    // --uiperf "mixer scroll" (round 190my): the point nearest `preferred` (this component's coordinates, same row first)
+    // where the wheel scrolls the strips — a strip's blank body, not a control (FL's Current strip moved every strip
+    // right, so the Mixer's centre landed on a control and turned it), inside `within` (the part on screen). `preferred`
+    // itself when none is found.
+    juce::Point<int> wheelScrollPointForPerf (juce::Point<int> preferred, juce::Rectangle<int> within) const;
 
 private:
     enum class Part { none, pan, stereo, fader, meter, mute, solo, route, send, header, body, add, arm, input, fold, tab, inserts, invert, swap };
@@ -342,6 +347,7 @@ private:
 public:
     int currentStripXForSnapshot() const noexcept { return stripX (currentStrip); }
     int selectCurrentForSnapshot() { return selectCurrent(); }
+    void deleteTracksForSnapshot (std::vector<int> tracks) { deleteTracks (std::move (tracks)); } // (round 190my)
     juce::Rectangle<int> currentMeterForSnapshot() const noexcept { return currentMeter(); }
 private:
     // the strip's rows for the current layout and height (top to bottom)

@@ -50,13 +50,24 @@ public:
         };
         sync.setButtonText (tr ("Sync"));
         sync.onClick = [this] { refreshHints(); };
+        // FL's Mute and "now" (round 190my, DF-17; REA 190my R3: TTapTempoForm TapMuteBoxClick / MuteNowBtnClick →
+        // FUN_00f12170): ticking Mute during playback mutes at once for 8 beats; with it ticked (and Apply tempo on)
+        // the 2nd to 5th taps of a run each mute for 7 beats, so the old tempo is not heard while the new one is found;
+        // "now" mutes for 8 beats. Playback only; stopping ends it.
+        mute.setButtonText (tr ("Mute"));
+        mute.onClick = [this] {
+            if (mute.getToggleState())
+                muteFor (8.0);
+        };
+        now.setButtonText (tr ("now"));
+        now.onClick = [this] { muteFor (8.0); };
 
         nudgeSlower.setButtonText (tr ("- nudge"));
         nudgeFaster.setButtonText (tr ("nudge +"));
         nudgeSlower.onHold = [this] (bool down) { nudge (down, false); };
         nudgeFaster.onHold = [this] (bool down) { nudge (down, true); };
 
-        for (auto* c : std::initializer_list<juce::Component*> { &applyTempo, &sync, &nudgeSlower, &nudgeFaster })
+        for (auto* c : std::initializer_list<juce::Component*> { &applyTempo, &sync, &nudgeSlower, &nudgeFaster, &mute, &now })
         {
             c->setWantsKeyboardFocus (false);
             c->setMouseClickGrabsKeyboardFocus (false);
@@ -64,7 +75,7 @@ public:
         }
 
         refreshHints();
-        setSize (240, 330);
+        setSize (240, 362);
         startTimerHz (30);
     }
 
@@ -76,9 +87,9 @@ public:
 
     void tap()
     {
-        const auto now = juce::Time::getMillisecondCounterHiRes();
+        const auto nowMs = juce::Time::getMillisecondCounterHiRes();
 
-        if (const auto bpm = taps.tap (now))
+        if (const auto bpm = taps.tap (nowMs))
         {
             lastBpm = *bpm;
             if (applyTempo.getToggleState())
@@ -89,6 +100,12 @@ public:
         auto& transport = engine.getTransport();
         if (sync.getToggleState() && transport.playing.load())
             engine.seek (controls::nearestBeatTicks (transport.positionTicks.load()));
+
+        // FL (REA 190my R3, FUN_00f11ce0): with Mute ticked and Apply tempo on, the 2nd to 5th taps of a run (the ones
+        // that set a tempo while its count is under 5) each mute for 7 beats; capture 190my A3: back about 2 s after the
+        // 6th of six taps
+        if (mute.getToggleState() && applyTempo.getToggleState() && taps.count() >= 2 && taps.count() <= 5)
+            muteFor (7.0);
 
         flash = 1.0f;
         repaint();
@@ -139,6 +156,10 @@ public:
         auto toggles = r.removeFromTop (24);
         applyTempo.setBounds (toggles.removeFromLeft (toggles.getWidth() * 3 / 5));
         sync.setBounds (toggles);
+        r.removeFromTop (6);
+        auto muting = r.removeFromTop (24);
+        mute.setBounds (muting.removeFromLeft (muting.getWidth() * 3 / 5));
+        now.setBounds (muting.reduced (2, 0));
     }
 
     void mouseDown (const juce::MouseEvent& e) override
@@ -228,10 +249,18 @@ private:
         }
     }
 
+    void muteFor (double beats)
+    {
+        if (engine.getTransport().playing.load())
+            engine.muteOutputForTicks (beats * (double) ppq);
+    }
+
     void refreshHints()
     {
         ui::setHint (applyTempo, tr ("Apply tempo: the song's tempo follows the taps (off: the tapper only measures)"));
         ui::setHint (sync, tr ("Sync: during playback each tap puts the playhead on the nearest beat"));
+        ui::setHint (mute, tr ("Mute all audio during first taps (during playback)"));
+        ui::setHint (now, tr ("Mute now, for a few bars (during playback)"));
         ui::setHint (nudgeSlower, tr ("Hold to run the song 4% slower and drift the beat back ([Left] key)"));
         ui::setHint (nudgeFaster, tr ("Hold to run the song 4% faster and drift the beat forward ([Right] key)"));
         ui::setHint (*this, tr ("Tempo tapper: click the pad or press any key on each beat; the tempo follows from the second tap"));
@@ -253,7 +282,8 @@ private:
     float flash = 0.0f;
     bool nudging = false;
     std::array<bool, 2> keyNudge {};
-    juce::ToggleButton applyTempo, sync;
+    juce::ToggleButton applyTempo, sync, mute;
+    juce::TextButton now;
     HoldButton nudgeSlower, nudgeFaster;
 };
 } // namespace

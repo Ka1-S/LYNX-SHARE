@@ -1274,6 +1274,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
     {
         const loadtrace::Scope timing ("pdc");
         state->lowLatencyTracks = factories.lowLatencyTracks; // (round 190aq; empty in exports)
+        state->pdcCurrentSource = factories.currentSource; // (round 190my)
         state->buildPdc (previous);
     }
     state->buildMixerGraph();
@@ -1677,7 +1678,7 @@ void RackState::buildPdc (const RackState* previous)
         for (std::size_t s = 0; s < effects[t].size(); ++s)
             slotLatency[t].push_back (*next++);
 
-    pdc = computePdc (song, channelLatency, slotLatency, sampleRate);
+    pdc = computePdc (song, channelLatency, slotLatency, sampleRate, pdcCurrentSource);
 
     // reuses lines of the same length: editing the song must not click the audio
     auto line = [] (int length, const std::shared_ptr<DelayLine>* old) -> std::shared_ptr<DelayLine> {

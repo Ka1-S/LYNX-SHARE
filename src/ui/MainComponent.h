@@ -116,6 +116,8 @@ public:
     // --uiperf / tests: F8's Plugin picker (round 171c), and whether it is open
     void togglePluginPickerForSnapshot() { togglePluginPicker(); }
     juce::Component* pluginPickerForSnapshot() const noexcept { return pluginPickerView.get(); }
+    void toggleProjectPickerForSnapshot() { toggleProjectPicker(); }
+    juce::Component* projectPickerForSnapshot() const noexcept { return projectPickerView.get(); }
     void showDesktopForSnapshot (bool extraPanels);
     // The Clip-launch workflow's layout (round 181a): the clip grid beside the Playlist, or flipped. Nothing exists until
     // it is first turned on. Moves panels only; the project does not change, except that it gets an (empty) grid.
@@ -479,6 +481,7 @@ private:
     void setPickerPanelOn (bool on);
     std::unique_ptr<toolbar::EditOverlay> toolbarEditor;
     std::unique_ptr<juce::Component> pluginPickerView; // FL's Plugin picker (F8), its own window over the screen (rounds 169k, 175b)
+    std::unique_ptr<juce::Component> projectPickerView; // FL's Project picker (Ctrl+F8; round 190my)
     // round 184a, S16: the game controller, made only while Settings › MIDI › "Use a game controller" is on (no timer
     // otherwise); the hints overlay while Back is held
     std::unique_ptr<GamepadInput> gamepadInput;
@@ -487,6 +490,7 @@ private:
     void gamepadChanges (const gamepad::Changes& changes, const gamepad::State& state, double seconds);
     int gamepadInsert() const; // the selected track's insert (its track mode's link, else the selected channel's)
     void togglePluginPicker();
+    void toggleProjectPicker(); // (round 190my, DF-143)
     std::unique_ptr<juce::Component> setupOverlay; // the first-start / Options > Setup wizard, over everything
     std::unique_ptr<support::StartupNote> supportNote; // round 190fq (made on first use)
     void hostSetupOverlayNatively(); // issue #116: in front of the native panels (ui/NativeChild.h)

@@ -198,6 +198,9 @@ public:
     // --snapshot: the PROJECT tab with the patterns, generators and samples open, a sample selected
     void showProjectForSnapshot();
     void showHistory(); // round 190mr (DF-135): Current project › History, opened and in view
+    // round 190my (DF-143, FL's Project picker: a right-click on a pattern tile): Current project › Patterns opened, that
+    // pattern selected and in view; false when it isn't listed
+    bool revealProjectPattern (int pattern);
     bool historyShownForCheck() const;
     // round 190ke (--simplegb190keshot): "LYNX content" with these folders open ("lynx-content", "lynx-content/Beats"...),
     // and the rows listed now (tree / tag-filter results)

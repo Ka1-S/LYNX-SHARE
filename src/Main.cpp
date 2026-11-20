@@ -11,6 +11,7 @@
 #include "core/KeyGuess.h"
 #include "core/EditorPolish.h"
 #include "core/FlpExport.h"
+#include "core/FruityBasicFx.h" // (round 190my: Fruity Balance in --details190myshot)
 #include "core/Groove.h"
 #include "core/DrawMode.h"
 #include "core/SessionOps.h"
@@ -246,6 +247,7 @@
 #include "ui/AudioEditor.h"
 #include "ui/SampleProperties.h"
 #include "ui/TempoTapper.h"
+#include "ui/ProjectPickerView.h" // (round 190my)
 #include "core/EventEdit.h"
 #include "core/FacetEq.h"
 #include "core/LimiterLaw.h" // (rollup step 9: the copy for 0.1.28 self-test)
@@ -2806,6 +2808,14 @@ public:
             return;
         }
 
+        if (args.contains ("--details190myshot"))
+        {
+            // LYNX --details190myshot prefix project.flp: round 190my off screen (src/DetailsShot190my.inc)
+            const auto i = args.indexOf ("--details190myshot");
+            setApplicationReturnValue (runDetailsShot190my (args[i + 1].unquoted(), i + 2 < args.size() ? args[i + 2].unquoted() : juce::String()) ? 0 : 1);
+            quit();
+            return;
+        }
         if (args.contains ("--details190mvshot"))
         {
             // LYNX --details190mvshot prefix project.flp: round 190mv off screen (src/DetailsShot190mv.inc)
@@ -13339,7 +13349,55 @@ private:
                                    }
                                    return juce::String ("    mixer picture: spoiled ") + juce::String (spoiled) + " times, drawn again " + juce::String (refills) + " times\n";
                                } });
-        run->steps.push_back ({ "mixer scroll", {}, [wheelAt, ui, none] (int f) { wheelAt (ui->getMixerForSnapshot(), 0.0f, f < 30 ? -0.25f : 0.25f, none); }, 60 });
+        // (round 190my: the wheel goes to a strip's blank body near the Mixer's centre — since 293333ae6's Current strip the
+        // centre itself can be a control, which the wheel would turn instead of scrolling; trace 190my: the strips then
+        // move from x -56 to -325 in a 1113 px view. Strips that fit their view can't scroll: the step uses Extra large
+        // then, e.g. at a wide window.)
+        auto scrollLayout = std::make_shared<std::optional<lynx::mixerlayout::Layout>>();
+        auto scrollTrace = std::make_shared<juce::String>();
+        run->steps.push_back ({ "mixer scroll",
+                                [ui, scrollLayout, scrollTrace] {
+                                    scrollTrace->clear();
+                                    auto& strips = ui->getMixerForSnapshot().getStripsForSnapshot();
+                                    const auto* holder = strips.getParentComponent();
+                                    if (holder != nullptr && strips.getWidth() <= holder->getWidth() + 200)
+                                    {
+                                        *scrollLayout = lynx::MixerStrips::layout;
+                                        strips.setLayout (lynx::mixerlayout::Layout::extraLarge);
+                                    }
+                                },
+                                [this, ui, scrollTrace] (int f) {
+                                   auto& mixer = ui->getMixerForSnapshot();
+                                   auto& strips = mixer.getStripsForSnapshot();
+                                   auto* peer = mainWindow->getPeer();
+                                   if (peer == nullptr || ! strips.isShowing())
+                                       return;
+                                   const auto centre = strips.getLocalPoint (&mixer, mixer.getLocalBounds().getCentre());
+                                   const auto at = strips.wheelScrollPointForPerf (centre, strips.getParentComponent() != nullptr
+                                                                                              ? strips.getLocalArea (strips.getParentComponent(), strips.getParentComponent()->getLocalBounds())
+                                                                                              : strips.getLocalBounds());
+                                   const auto local = peer->globalToLocal (strips.localPointToGlobal (at).toFloat());
+                                   juce::ModifierKeys::currentModifiers = {};
+                                   juce::MouseWheelDetails wheel { 0.0f, f < 30 ? -0.25f : 0.25f, false, false, false };
+                                   peer->handleMouseWheel (juce::MouseInputSource::InputSourceType::mouse, local, juce::Time::currentTimeMillis(), wheel);
+                                   if (f == 0 || f == 29)
+                                   {
+                                       auto* under = peer->getComponent().getComponentAt (local.roundToInt());
+                                       const auto* holder = strips.getParentComponent();
+                                       *scrollTrace << "    mixer scroll frame " << f << ": wheel at " << at.toString() << " (strips), under it "
+                                                    << (under == &strips ? juce::String ("the strips") : under != nullptr ? juce::String (typeid (*under).name()) : juce::String ("nothing"))
+                                                    << ", view " << (holder != nullptr ? holder->getBounds().toString() : juce::String()) << ", strips at x " << strips.getX() << "\n";
+                                   }
+                               }, 60,
+                                [ui, scrollLayout, scrollTrace] {
+                                    auto& strips = ui->getMixerForSnapshot().getStripsForSnapshot();
+                                    const auto width = strips.getWidth();
+                                    juce::String used = scrollLayout->has_value() ? "Extra large (the strips fit the view in their layout)" : "the project's layout";
+                                    if (scrollLayout->has_value())
+                                        strips.setLayout (**scrollLayout);
+                                    scrollLayout->reset();
+                                    return juce::String ("    mixer scroll: strips ") + juce::String (width) + " px, " + used + "\n" + *scrollTrace;
+                                } });
         // a fader dragged while the song plays (round 171c, discussion #10): 4 mouse moves per frame on insert 1's fader,
         // through the old path (a whole snapshot per move) and through editLevels
         auto faderMove = [this] (bool levels, int f) {
@@ -17395,6 +17453,7 @@ private:
 #include "DetailsShot190mp.inc" // round 190mp
 #include "DetailsShot190mr.inc" // round 190mr
 #include "DetailsShot190mv.inc" // round 190mv
+#include "DetailsShot190my.inc" // round 190my
     // --trackautoshot190gz (round 190gz): see the dispatch above
     bool runTrackAutoShot190gz (const juce::String& prefix)
     {

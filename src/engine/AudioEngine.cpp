@@ -4007,11 +4007,24 @@ bool AudioEngine::tweakSkipsStep (bool buttonDown, double nowMs) const noexcept
     return nowMs - tweakMs < 60.0;
 }
 
-void AudioEngine::setCurrentTrackSource (int track) noexcept
+float AudioEngine::tapperMuteGain (double left, double total) noexcept
 {
+    if (! (left > 0.0) || ! (total > 0.0))
+        return 1.0f;
+    const auto c = std::cos (juce::MathConstants<double>::halfPi * juce::jlimit (0.0, 1.0, left / total));
+    return (float) (0.01 + 0.99 * std::pow (c, 18.0));
+}
+
+void AudioEngine::setCurrentTrackSource (int track)
+{
+    const auto changed = track != currentSource;
     currentSource = track;
     if (rackProcessor != nullptr)
         rackProcessor->getRenderer().setCurrentSource (track);
+    // round 190my (DF-82, REA 190mv: FUN_010ff3b0 adds C's latency to its target's): a Current track with latency moves
+    // that latency to the newly selected track's PDC — the plan is made again (nothing to do while C adds none)
+    if (changed && lastPublishedShape.pdc.currentLatency > 0)
+        publishSong();
 }
 
 void AudioEngine::controlTweakedForUndo()
@@ -5417,6 +5430,7 @@ void AudioEngine::publishSong()
         araHost->sync (played, transport.sampleRate.load());
         factories.araInstrument = [this] (const ChannelDef& c, double rate) { return araHost->instrumentFor (c, rate); };
     }
+    factories.currentSource = currentSource; // (round 190my: FL's Current track's latency in the PDC plan)
     auto state = RackState::build (played, &lastPublishedShape, transport.sampleRate.load(), factories);
     if (traceEdits)
         platform::settingsFile ("edits.log").appendText (juce::String (juce::Time::getMillisecondCounterHiRes() - buildStart, 1) + " ms rack build\n"
@@ -7911,6 +7925,27 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
                             out[i] *= listenGainNow + (want - listenGainNow) * (float) (i + 1) / (float) n;
                 }
             listenGainNow = want;
+        }
+
+        // round 190my (DF-17): the tempo tapper's mute (FL's curve, counted in song ticks while playing; stop ends it)
+        if (const auto left = muteTicksLeft.load (std::memory_order_relaxed); left > 0.0)
+        {
+            auto expected = left; // (the UI may have started a new count meanwhile: it wins)
+            if (! transport.playing.load (std::memory_order_relaxed))
+                muteTicksLeft.compare_exchange_strong (expected, 0.0, std::memory_order_relaxed);
+            else
+            {
+                const auto total = juce::jmax (left, muteTicksTotal.load (std::memory_order_relaxed));
+                const auto tpsNow = transport.ticksPerSample();
+                // (the gain moves along the curve within the block: from its start to its end, linearly)
+                const auto rest = juce::jmax (0.0, left - n * tpsNow);
+                const auto g0 = tapperMuteGain (left, total), g1 = tapperMuteGain (rest, total);
+                for (int ch = 0; ch < numOutputChannels; ++ch)
+                    if (auto* out = outputs[(std::size_t) ch]; out != nullptr)
+                        for (int i = 0; i < n; ++i)
+                            out[i] *= g0 + (g1 - g0) * (float) i / (float) n;
+                muteTicksLeft.compare_exchange_strong (expected, rest, std::memory_order_relaxed);
+            }
         }
 
         for (int ch = 0; ch < numOutputChannels; ++ch)
