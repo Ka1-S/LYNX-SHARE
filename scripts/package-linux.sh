@@ -24,6 +24,7 @@ install -m 755 "$BIN" "$PKG/LYNX"
 strip --strip-unneeded "$PKG/LYNX" 2> /dev/null || true
 ./scripts/fetch-onnxruntime.sh linux "$PKG"
 install -m 644 resources/linux/lynx.desktop resources/linux/lynx-mime.xml LICENSE THIRD_PARTY.md PRIVACY.md "$PKG/"
+./scripts/collect-licenses.sh "$PKG/licenses"   # third-party licence texts (round 190nk)
 install -m 644 resources/lynx_icon_256.png "$PKG/lynx.png"
 cp -r resources/linux/icons "$PKG/icons"     # hicolor 16-512 px (tools/make_logo.py; 16 and 24 px: the small-size form)
 install -m 755 resources/linux/install.sh "$PKG/install.sh"
@@ -45,6 +46,7 @@ install -m 644 resources/lynx_icon_256.png "$APPDIR/lynx.png"
 ln -sf lynx.png "$APPDIR/.DirIcon"
 install -m 644 resources/linux/lynx-mime.xml "$APPDIR/usr/share/mime/packages/lynx-mime.xml"
 for f in LICENSE THIRD_PARTY.md PRIVACY.md; do install -m 644 "$f" "$APPDIR/usr/share/$f"; done
+cp -r "$PKG/licenses" "$APPDIR/usr/share/licenses"
 cat > "$APPDIR/AppRun" <<'EOF'
 #!/bin/sh
 here="$(dirname "$(readlink -f "$0")")"

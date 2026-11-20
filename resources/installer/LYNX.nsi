@@ -96,6 +96,9 @@ Section "!$(SecApp)" SecMain
     File "${STAGE}\LICENSE"
     File "${STAGE}\THIRD_PARTY.md"
     File /nonfatal "${STAGE}\PRIVACY.md"
+    SetOutPath "$INSTDIR\licenses" ; third-party licence texts (scripts/collect-licenses.sh, round 190nk)
+    File /nonfatal /r "${STAGE}\licenses\*"
+    SetOutPath "$INSTDIR"
     File /nonfatal "${STAGE}\Demo.lynx"
     File /nonfatal "${STAGE}\LYNX-bridge32.exe" ; 32-bit plugins run in it (round 176a)
     ; LYNX ASIO (REA round 97): LYNX loads it directly; the .bat files register it for other programs (administrator)
@@ -160,6 +163,7 @@ Section "Uninstall"
     Delete "$INSTDIR\LICENSE"
     Delete "$INSTDIR\THIRD_PARTY.md"
     Delete "$INSTDIR\PRIVACY.md"
+    RMDir /r "$INSTDIR\licenses"
     Delete "$INSTDIR\Demo.lynx"
     ; LYNX ASIO registered for other programs: unregister it first (Windows asks for administrator rights).
     ; The 64-bit registration lives in the 64-bit registry view (this uninstaller is a 32-bit program).

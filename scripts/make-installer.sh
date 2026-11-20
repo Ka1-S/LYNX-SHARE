@@ -29,6 +29,7 @@ mkdir -p "$STAGE"
 cp "$EXE" "$STAGE/LYNX.exe"
 [[ -f "$(dirname "$EXE")/onnxruntime.dll" ]] && cp "$(dirname "$EXE")/onnxruntime.dll" "$STAGE/"
 cp LICENSE THIRD_PARTY.md "$STAGE/"
+./scripts/collect-licenses.sh "$STAGE/licenses" > /dev/null   # third-party licence texts (round 190nk)
 # LYNX ASIO driver (built next to LYNX.exe by build-windows-zig.sh) and its registration helpers
 if [[ -f "$(dirname "$EXE")/lynx-asio.dll" ]]; then
     cp "$(dirname "$EXE")/lynx-asio.dll" "asio/Register LYNX ASIO.bat" "asio/Unregister LYNX ASIO.bat" "$STAGE/"
