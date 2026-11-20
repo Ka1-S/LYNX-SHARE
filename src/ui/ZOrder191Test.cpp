@@ -11,6 +11,7 @@
 #include "ui/Workspace.h"
 
 #include <set>
+#include <typeinfo>
 
 #if JUCE_WINDOWS
  #ifndef NOMINMAX
@@ -73,9 +74,30 @@ struct ZOrderTest final : juce::Timer
         auto* peer = c.getPeer();
         if (peer == nullptr)
             return false;
-        // (a peer's positions are not divided by the Desktop's global scale: LYNX_ZTEST_SCALE runs)
-        const auto at = peer->getComponent().getLocalPoint (&c, local).toFloat() * juce::Desktop::getInstance().getGlobalScaleFactor();
         using MIS = juce::MouseInputSource;
+        // (a top-level peer's positions are not divided by the Desktop's global scale: LYNX_ZTEST_SCALE runs.) Rollup 0.1.31
+        // step 2 (190nr item 4): a native child peer (the Playlist docked as its own child window, nativechild) does not
+        // take the factor on Windows, so the title-bar click at 150 % landed 1.5x too far right, on the docked editor. The
+        // factor is now found by a move: the first position whose component under the mouse is `c` (or inside it).
+        const auto base = peer->getComponent().getLocalPoint (&c, local).toFloat();
+        const auto global = juce::Desktop::getInstance().getGlobalScaleFactor();
+        const auto source = juce::Desktop::getInstance().getMainMouseSource();
+        auto at = base * global;
+        juce::String tried;
+        for (const auto factor : { global, 1.0f, peer->getComponent().getDesktopScaleFactor() })
+        {
+            const auto p = base * factor;
+            peer->handleMouseEvent (MIS::InputSourceType::mouse, p, juce::ModifierKeys(), MIS::defaultPressure, MIS::defaultOrientation, juce::Time::currentTimeMillis());
+            auto* under = source.getComponentUnderMouse();
+            tried << juce::String (factor, 2) << ":" << (under == nullptr ? juce::String ("-") : under->getName().isNotEmpty() ? under->getName() : juce::String (typeid (*under).name()))
+                  << (under == &c || (under != nullptr && c.isParentOf (under)) ? "(hit) " : " ");
+            if (under == &c || (under != nullptr && c.isParentOf (under)))
+            {
+                at = p;
+                break;
+            }
+        }
+        line ("click_" + (c.getName().isNotEmpty() ? c.getName() : juce::String (typeid (c).name())) + "=" + tried.trim());
         const auto now = juce::Time::currentTimeMillis();
         peer->handleMouseEvent (MIS::InputSourceType::mouse, at, juce::ModifierKeys(), MIS::defaultPressure, MIS::defaultOrientation, now);
         peer->handleMouseEvent (MIS::InputSourceType::mouse, at, juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier), MIS::defaultPressure,
