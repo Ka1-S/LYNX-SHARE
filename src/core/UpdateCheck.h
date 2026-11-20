@@ -188,6 +188,21 @@ struct InstallingNote
 std::string formatInstalling (const InstallingNote&);
 InstallingNote parseInstalling (const std::string& text);
 
+// --- leftovers of a newer version (round 190nr) --------------------------------------------------------------------
+// Going back runs the OLDER version's installer over the folder, and its uninstall list doesn't know what newer
+// versions added (0.1.29 left 0.1.30's licenses\ behind, round 190nk). The helper of the version being left (a copy
+// of the NEWER LYNX.exe, --apply-update) removes, after the older installer succeeded, every install-folder entry that
+// arrived after the version installed. Add an entry here whenever the installer (resources/installer/LYNX.nsi) gets a
+// new top-level file or folder. Names are top-level entries of the install folder.
+struct InstallEntry
+{
+    const char* name;
+    const char* since; // the first version whose installer writes it
+};
+const std::vector<InstallEntry>& installEntries();
+// The entries a version older than them doesn't install (empty when `installed` is not valid).
+std::vector<std::string> entriesNewerThan (const Version& installed);
+
 // An automatic check reuses the cached release list for this long (GitHub allows 60 unauthenticated calls an hour
 // per address; LYNX started many times a day asks once every few hours).
 constexpr std::int64_t cacheLifetimeMs = 3LL * 60 * 60 * 1000;

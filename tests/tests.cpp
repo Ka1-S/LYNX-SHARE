@@ -17995,3 +17995,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Details190myTests.inc" // round details10_190my: the Current track follow-ups and details pass 10
 #include "Mixer221_190ngTests.inc" // round 190ng: issue #221 (Del with only the used inserts shown)
 #include "Issues190ngTests.inc" // round 190ng: issues #215, #217, #219, #220, #222
+#include "Leftovers190nrTests.inc" // round 190nr: leftovers of the 0.1.30 release

@@ -2384,6 +2384,42 @@ public:
             return;
         }
 
+        if (args.contains ("--leftovers190nrtest"))
+        {
+            // round 190nr: going back to an older version removes what newer versions added to the install folder
+            // (the --apply-update helper's step after the installer). Prints "result=OK" or the failing check.
+            const auto root = juce::File::createTempFile ("lynx-leftovers190nr");
+            juce::StringArray fails;
+            auto run = [&] (const juce::String& version, bool licensesGone, bool listGone) {
+                root.deleteRecursively();
+                root.getChildFile ("install/licenses").createDirectory();
+                root.getChildFile ("install/licenses/onnxruntime-LICENSE.txt").replaceWithText ("x");
+                root.getChildFile ("install/LYNX.exe").replaceWithText ("x");
+                root.getChildFile ("install/installed-files.txt").replaceWithText ("LYNX.exe\r\nlicenses\r\n");
+                root.getChildFile ("install/My notes.txt").replaceWithText ("x");
+                root.getChildFile ("update/installing.txt").create();
+                if (version.isNotEmpty())
+                    root.getChildFile ("update/installing.txt").replaceWithText ("from=0.1.31\nrollback=1\nversion=" + version + "\n");
+                const auto removed = lynx::updater::removeNewerLeftovers (root.getChildFile ("install"), root.getChildFile ("update/installing.txt"));
+                const auto in = root.getChildFile ("install");
+                if (in.getChildFile ("licenses").exists() == licensesGone) fails.add (version + ": licenses");
+                if (in.getChildFile ("installed-files.txt").exists() == listGone) fails.add (version + ": installed-files.txt");
+                if (! in.getChildFile ("LYNX.exe").existsAsFile() || ! in.getChildFile ("My notes.txt").existsAsFile()) fails.add (version + ": removed too much");
+                std::printf ("%s -> removed [%s]\n", version.toRawUTF8(), removed.joinIntoString (", ").toRawUTF8());
+            };
+            run ("0.1.29-alpha", true, true);   // going back to 0.1.29: both newer entries go
+            run ("0.1.28.1-alpha", true, true);
+            run ("0.1.30-alpha", false, true);  // 0.1.30 installs licenses itself
+            run ("0.1.31-alpha", false, false); // same or newer: nothing goes
+            run ("0.1.32", false, false);
+            run ("", false, false);             // unreadable note: nothing goes
+            root.deleteRecursively();
+            std::printf ("result=%s%s\n", fails.isEmpty() ? "OK" : "FAILED ", fails.joinIntoString ("; ").toRawUTF8());
+            setApplicationReturnValue (fails.isEmpty() ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--send-test-report"))
         {
             // LYNX.exe --send-test-report out.txt [--dry]: builds a crash report marked "test" from the newest crash /

@@ -987,6 +987,25 @@ void afterStart()
     });
 }
 
+juce::StringArray removeNewerLeftovers (const juce::File& folder, const juce::File& installingTxt)
+{
+    juce::StringArray removed;
+    if (! installingTxt.existsAsFile() || ! folder.isDirectory())
+        return removed;
+    const auto note = update::parseInstalling (utf8 (installingTxt.loadFileAsString()));
+    for (const auto& name : update::entriesNewerThan (update::parseVersion (note.version)))
+    {
+        const auto entry = folder.getChildFile (fromUtf8 (name));
+        if (! entry.exists())
+            continue;
+        const auto ok = entry.isDirectory() ? entry.deleteRecursively() : entry.deleteFile();
+        log ("helper: " + juce::String (ok ? "removed " : "could not remove ") + entry.getFullPathName() + " (newer than " + fromUtf8 (note.version) + ")");
+        if (ok)
+            removed.add (fromUtf8 (name));
+    }
+    return removed;
+}
+
 bool runApplyHelper (const juce::StringArray& args)
 {
     const auto at = args.indexOf ("--apply-update");
@@ -1053,7 +1072,12 @@ bool runApplyHelper (const juce::StringArray& args)
     if (waited == WAIT_TIMEOUT)
         finish (false, "the installer did not finish");
     else
+    {
+        // round 190nr: an older version's installer leaves what newer versions added (0.1.29 kept 0.1.30's licenses\)
+        if (code == 0)
+            removeNewerLeftovers (folder, setup.getSiblingFile ("installing.txt"));
         finish (code == 0, code == 0 ? juce::String() : "installer exit code " + juce::String ((int) code));
+    }
    #else
     juce::ignoreUnused (at);
    #endif
