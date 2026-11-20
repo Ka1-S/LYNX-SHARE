@@ -490,8 +490,15 @@ void MainComponent::placeOnboardingCards()
         const auto w = onboardui::Next3Card::width, h = next3Card->idealHeight();
         if (area.getWidth() < w + 40 || area.getHeight() < h + PlaylistComponent::toolbarHeight + 60)
             area = getLocalBounds().withTrimmedTop (toolbarHeight);
-        const auto bounds = juce::Rectangle<int> (area.getRight() - w - 28, area.getBottom() - h - 36, w, h)
-                                .constrainedWithin (getLocalBounds().withTrimmedTop (toolbarHeight));
+        auto bounds = juce::Rectangle<int> (area.getRight() - w - 28, area.getBottom() - h - 36, w, h)
+                          .constrainedWithin (getLocalBounds().withTrimmedTop (toolbarHeight));
+        // never over the Mixer (shown with the timeline choice, or by F9): above it, else at the Playlist's top
+        if (mixer.isShowing() || (! persistent && mixer.isVisible()))
+            if (const auto m = onboardui::areaIn (*this, mixer); m.intersects (bounds))
+            {
+                const auto top = area.getY() + PlaylistComponent::toolbarHeight + 16;
+                bounds.setY (m.getY() - h - 16 >= top ? m.getY() - h - 16 : top);
+            }
         onboardui::hostOnTop (*next3Card, *this, bounds);
     }
     if (tipCard != nullptr)
