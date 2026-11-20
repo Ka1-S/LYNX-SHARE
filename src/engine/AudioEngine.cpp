@@ -4079,6 +4079,7 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
     // LYNX's "Link Playlist tracks to mixer tracks" (rounds 190gz, 190ib): each instrument's home track and the linked
     // tracks' names before the edit
     const auto linkBefore = autolink::snapshot (song);
+    const auto namesBefore = trackmodes::linkedNames (song); // (round 190ns, issue #235: FL's audio track ⇄ mixer track)
     const auto channelsBefore = song.channels.size(); // (round 190iu: Track-only mode, core/TrackOnly.h)
     edit (song);
     song.keepOnePattern(); // (round 190ea: what follows, and every listener, may read the current pattern)
@@ -4091,6 +4092,7 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
                 lengthsBefore.erase (lengthsBefore.begin() + *it);
     if (trackonly::active() && song.channels.size() > channelsBefore) // each new instrument gets its own instrument track
         trackonly::follow (song, channelsBefore);
+    trackmodes::followLinkedNames (song, namesBefore); // FL: an audio track and its mixer track keep one name and colour
     if (song.linkTracksToMixer && linkBefore.on) // new content goes through its track's insert; renames follow the link
         autolink::followNewContent (song, linkBefore);
     if (detachNewPluginsOn)
@@ -6991,6 +6993,13 @@ void AudioEngine::markCreatedNow()
 {
     if (song.info.created <= 0.0)
         song.info.created = (double) juce::Time::currentTimeMillis() / 1000.0;
+}
+
+void AudioEngine::markCreatedFrom (const juce::File& file)
+{
+    if (song.info.created <= 0.0)
+        if (const auto born = platform::fileBirthSeconds (file); born > 0.0)
+            song.info.created = born;
 }
 
 void AudioEngine::pumpGrossBeatPicks()

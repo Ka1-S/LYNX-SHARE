@@ -8,6 +8,7 @@
 #include "platform/Package.h"
 #include "platform/Paths.h"
 #include "ui/I18n.h"
+#include "ui/SetupWizard.h"
 #include "ui/Theme.h"
 #include "ui/WindowOwner.h"
 
@@ -798,6 +799,10 @@ void startAutomaticCheck()
         return;
     }
     if (! offered() || ! automatic() || justUpdated)
+        return;
+    // issue #233 (round 190ns): never before the first start's welcome wizard was answered (it shows this choice; its
+    // Finish starts the check when it is ticked)
+    if (! setupWizardDone())
         return;
     // LYNX_TEST_MODE: no network, unless a test fixture is named
     if (platform::testMode() && overrideUrl().isEmpty())

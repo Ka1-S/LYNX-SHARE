@@ -11997,3 +11997,10 @@ countries: cn sg
 
 # --- round 190nq: issue #230 (Show fade previews)
 "Show fade previews" = "显示淡化预览"
+"A few seconds after start-up LYNX SHARE asks GitHub for the newest version number; nothing about you is sent. It is the only connection LYNX SHARE makes by itself: plugin scans and everything else stay on this computer." = "启动几秒后，LYNX SHARE 会向 GitHub 询问最新版本号；不会发送任何关于你的信息。这是 LYNX SHARE 自己发起的唯一连接：插件扫描和其他一切都留在这台电脑上。"
+"Off, LYNX SHARE never goes online by itself: plugin scans and everything else stay on this computer." = "关闭后，LYNX SHARE 绝不会自行联网：插件扫描和其他一切都留在这台电脑上。"
+"Every shortcut can be changed:" = "每个快捷键都可以更改："
+"Change, add or reset the keys of every action" = "更改、添加或重置每个操作的按键"
+"Could not open a new window" = "无法打开新窗口"
+"Open in new window" = "在新窗口中打开"
+"Start-up project" = "启动项目"

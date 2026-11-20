@@ -11997,3 +11997,10 @@ countries: id
 
 # --- round 190nq: issue #230 (Show fade previews)
 "Show fade previews" = "Tampilkan pratinjau fade"
+"A few seconds after start-up LYNX SHARE asks GitHub for the newest version number; nothing about you is sent. It is the only connection LYNX SHARE makes by itself: plugin scans and everything else stay on this computer." = "Beberapa detik setelah dimulai, LYNX SHARE menanyakan nomor versi terbaru ke GitHub; tidak ada data tentang Anda yang dikirim. Ini satu-satunya koneksi yang dibuat LYNX SHARE sendiri: pemindaian plugin dan semua hal lain tetap di komputer ini."
+"Off, LYNX SHARE never goes online by itself: plugin scans and everything else stay on this computer." = "Jika dimatikan, LYNX SHARE tidak pernah terhubung ke internet sendiri: pemindaian plugin dan semua hal lain tetap di komputer ini."
+"Every shortcut can be changed:" = "Setiap pintasan bisa diubah:"
+"Change, add or reset the keys of every action" = "Ubah, tambah, atau setel ulang tombol setiap tindakan"
+"Could not open a new window" = "Tidak dapat membuka jendela baru"
+"Open in new window" = "Buka di jendela baru"
+"Start-up project" = "Proyek awal"

@@ -110,6 +110,11 @@ public:
     // template as a new untitled project (nothing changes while it is LYNX's default), an empty project or the last one.
     void openStartupProject();
 
+    // issue #232 (round 190ns, LYNX extra, stage 1 of docs/design/PROJECT_TABS.md): File › Open in new window: another
+    // LYNX SHARE window (its own process, as a second start already is) with `file`, or with the start-up project when
+    // `file` is empty. False when it could not be started.
+    bool openInNewWindow (const juce::File& file);
+
     // For --snapshot mode: 0 = Channel Rack, 1 = Piano Roll (on the channel with the most notes), 2 = Playlist, 3 = Mixer,
     // each maximized on the workspace; showDesktopForSnapshot shows the default layout (with `extraPanels`, the
     // Piano Roll and Mixer floating too).
@@ -274,7 +279,9 @@ public:
     void openMasterAudioEditorForSnapshot (bool newOne) { openMasterAudioEditor (newOne); }
     toolbar::PerformanceMeter& getPerfMeterForSnapshot() noexcept { return perfMeter; }
     ui::HintBar& getHintBarForSnapshot() noexcept { return hintBar; }
-    static std::unique_ptr<juce::Component> makeHelpContent (const keys::KeyMap* keyMap = nullptr); // nullptr: the defaults
+    // `onManageShortcuts` (issue #234, round 190ns): the sheet's "Manage shortcuts..." link (none when empty)
+    static std::unique_ptr<juce::Component> makeHelpContent (const keys::KeyMap* keyMap = nullptr, // nullptr: the defaults
+                                                             std::function<void()> onManageShortcuts = {});
     static std::unique_ptr<juce::AlertWindow> makeAboutWindow(); // result 1 = OK, 2 = "Support LYNX SHARE"
     // round 190fq: the start-up support note (ui/SupportLynx.h), once per normal start; `quietRun` = test mode / CI
     void startSupportNote (bool quietRun);
@@ -323,6 +330,7 @@ private:
     // round 190ap: "Open without third-party plugins" (File menu; --no-plugins on the command line): the project opens
     // with every hosted plugin switched off, its settings kept; the panel switches them back on
     void chooseFileToOpenWithoutPlugins();
+    void chooseFileToOpenInNewWindow();
     void showPluginsOff();
     // The "Missing files" window (ui/MissingFilesDialog.h) for the current project; `afterOpening`: shown by opening a
     // project (only when something is missing; the FL import report follows it), else from the menu (always).

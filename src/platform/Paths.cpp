@@ -16,6 +16,10 @@
 #else
  #include <cstdlib>
  #include <sys/resource.h>
+ #include <sys/stat.h>
+#endif
+#if JUCE_LINUX
+ #include <fcntl.h>
 #endif
 
 namespace lynx::platform
@@ -272,4 +276,28 @@ void allowMainThreadStack (std::size_t bytes)
     (void) bytes;
    #endif
 }
+double fileBirthSeconds (const juce::File& file)
+{
+    if (! file.exists())
+        return 0.0;
+   #if JUCE_WINDOWS
+    const auto t = file.getCreationTime().toMilliseconds();
+    return t > 0 ? (double) t / 1000.0 : 0.0;
+   #elif JUCE_MAC
+    struct stat info {};
+    if (stat (file.getFullPathName().toRawUTF8(), &info) != 0 || info.st_birthtimespec.tv_sec <= 0)
+        return 0.0;
+    return (double) info.st_birthtimespec.tv_sec + (double) info.st_birthtimespec.tv_nsec / 1.0e9;
+   #elif JUCE_LINUX && defined (STATX_BTIME)
+    // (glibc 2.28+; LYNX needs 2.35)
+    struct statx info {};
+    if (statx (AT_FDCWD, file.getFullPathName().toRawUTF8(), 0, STATX_BTIME, &info) != 0
+        || (info.stx_mask & STATX_BTIME) == 0 || info.stx_btime.tv_sec <= 0)
+        return 0.0;
+    return (double) info.stx_btime.tv_sec + (double) info.stx_btime.tv_nsec / 1.0e9;
+   #else
+    return 0.0;
+   #endif
+}
+
 } // namespace lynx::platform

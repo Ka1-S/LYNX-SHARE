@@ -8129,6 +8129,7 @@ void MainComponent::saveNewVersion()
     const auto file = folder.getChildFile (juce::String::fromUTF8 (name.c_str()) + ProjectFile::extension);
     juce::String error;
     engine.capturePluginStates();
+    engine.markCreatedNow(); // (issue #231)
     if (! ProjectFile::save (engine.getSong(), file, error, currentWindowLayout()))
     {
         juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not save"), error);
@@ -8501,6 +8502,7 @@ void MainComponent::saveToNewProjectFolder()
         const auto file = folder.getChildFile (name + ProjectFile::extension);
         juce::String error;
         self.engine.capturePluginStates();
+        self.engine.markCreatedNow(); // (issue #231)
         if (! ProjectFile::save (self.engine.getSong(), file, error, self.currentWindowLayout()))
         {
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not save"), error);
@@ -8667,7 +8669,10 @@ void MainComponent::openStartupProject()
             break;
     }
     if (defaultTemplate().isLynxDefault())
+    {
+        engine.markCreatedNow(); // issue #231: the start-up song is a new project, started now (FL dates every new one)
         return; // (the start-up song is LYNX's default already)
+    }
     bool missing = false;
     auto song = makeDefaultTemplateProject (&missing);
     if (missing)
@@ -9034,6 +9039,54 @@ void MainComponent::flpImported (const juce::File& file)
     }
 }
 
+bool MainComponent::openInNewWindow (const juce::File& file)
+{
+    if (platform::testMode()) // (tests: no second program is started)
+    {
+        platform::testModeLog ("open in new window: " + (file == juce::File() ? juce::String ("(start-up project)") : file.getFileName()));
+        return true;
+    }
+    juce::StringArray args;
+   #if JUCE_MAC
+    // (`open -n`: a new copy of the app even though one runs; a plain start would hand the file to this one)
+    args = { "open", "-n", juce::File::getSpecialLocation (juce::File::currentApplicationFile).getFullPathName() };
+    if (file != juce::File())
+        args.addArray ({ "--args", file.getFullPathName() });
+   #else
+    auto program = juce::File::getSpecialLocation (juce::File::currentExecutableFile);
+   #if JUCE_LINUX
+    // the AppImage itself, not the program inside its mount (which goes away with this window)
+    if (const auto appImage = juce::SystemStats::getEnvironmentVariable ("APPIMAGE", {}); juce::File::isAbsolutePath (appImage) && juce::File (appImage).existsAsFile())
+        program = juce::File (appImage);
+   #endif
+    args.add (program.getFullPathName());
+    if (file != juce::File())
+        args.add (file.getFullPathName());
+   #endif
+    // kept until this window closes (the other window is a program of its own: it keeps running after this one)
+    static std::vector<std::unique_ptr<juce::ChildProcess>> started;
+    auto child = std::make_unique<juce::ChildProcess>();
+    if (! child->start (args, 0))
+    {
+        ui::postHint ({ tr ("Could not open a new window") }, 5000);
+        return false;
+    }
+    started.push_back (std::move (child));
+    return true;
+}
+
+void MainComponent::chooseFileToOpenInNewWindow()
+{
+    fileChooser = lynx::ui::makeFileChooser (tr ("Open in new window"), currentFile.getParentDirectory(),
+                                             juce::String ("*") + ProjectFile::extension
+                                                 + ";*.dawproj;*.dawproject;*.flp;*.als;*.flm;*.band;projectData;ProjectData;*.blx;*.zip;*.lynxpack;*.mid;*.midi");
+    lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                             [safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::FileChooser& chooser) {
+                                 if (const auto result = chooser.getResult(); safe != nullptr && (result.existsAsFile() || result.isDirectory()))
+                                     safe->openInNewWindow (result);
+                             });
+}
+
 void MainComponent::chooseFileToOpenWithoutPlugins()
 {
     confirmDiscard ([this] {
@@ -9072,6 +9125,9 @@ void MainComponent::openLynxProject (const juce::File& file, bool withoutPlugins
         return;
     }
     withoutPlugins = withoutPlugins || std::exchange (nextOpenWithoutPlugins, false);
+    // issue #235 (round 190ns): with "Link Playlist tracks to mixer tracks" on, a linked track and insert show one colour
+    if (const auto matched = autolink::matchLinkedColours (*song); matched > 0)
+        platform::testModeLog ("linked track colours matched on open: " + juce::String (matched));
 
     engine.stop();
     engine.rewind();
@@ -9088,6 +9144,9 @@ void MainComponent::openLynxProject (const juce::File& file, bool withoutPlugins
         engine.setSong (std::move (*song));
     }
     currentFile = file;
+    // issue #231 (round 190ns): a project saved without a date (the start-up song before 0.1.31) shows the file's
+    // creation date as Project info › Created, kept by the next save
+    engine.markCreatedFrom (file);
     importedFlpFile = juce::File();
     projectName = file.getFileNameWithoutExtension();
     // round 190lo (LYNX extra, off by default): clips with polyphonic note edits get their analysis ready in the background
@@ -9690,6 +9749,7 @@ void MainComponent::save (bool askForFile, std::function<void()> afterSaved)
         juce::String error;
         engine.capturePluginStates(); // plugin state lives in the plugins; copy it before saving
         keepOverwrittenCopy (file);   // the version this save replaces goes to the backup folder (like FL)
+        engine.markCreatedNow();      // issue #231: every saved project carries Project info › Created (FL's "started on")
 
         if (ProjectFile::save (engine.getSong(), file, error, currentWindowLayout()))
         {
@@ -10070,6 +10130,22 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Open...") + shortcutText ("file.open"), [this] { chooseFileToOpen(); });
         // round 190ap: a project that will not open, or crashes while it loads: its plugins stay off until switched on
         menu.addItem (tr ("Open without third-party plugins..."), [this] { chooseFileToOpenWithoutPlugins(); });
+        {
+            // issue #232 (round 190ns, LYNX extra; FL Studio opens one project at a time): another project beside this one,
+            // in a window of its own, without closing this one; the recent projects one click away
+            juce::PopupMenu newWindow;
+            newWindow.addItem (tr ("Open..."), [this] { chooseFileToOpenInNewWindow(); });
+            newWindow.addItem (tr ("Start-up project"), [this] { openInNewWindow ({}); });
+            if (recent.getNumFiles() > 0)
+                newWindow.addSectionHeader (tr ("Recent projects"));
+            for (int i = 0; i < juce::jmin (recent.getNumFiles(), 10); ++i)
+            {
+                const auto file = recent.getFile (i);
+                newWindow.addItem (file.getFileName() + "  (" + file.getParentDirectory().getFileName() + ")", file.existsAsFile() && file != currentFile,
+                                   false, [this, file] { openInNewWindow (file); });
+            }
+            menu.addSubMenu (tr ("Open in new window"), newWindow);
+        }
         if (engine.pluginsOff())
             menu.addItem (tr ("Switch plugins back on..."), [this] { showPluginsOff(); });
         menu.addSeparator();
@@ -10666,7 +10742,7 @@ void MainComponent::rememberRecent (const juce::File& file)
     menuItemsChanged();
 }
 
-std::unique_ptr<juce::Component> MainComponent::makeHelpContent (const keys::KeyMap* keyMapIn)
+std::unique_ptr<juce::Component> MainComponent::makeHelpContent (const keys::KeyMap* keyMapIn, std::function<void()> onManageShortcuts)
 {
     // shortcut sheet: sections of "keys - action" rows, in two columns
     struct Row
@@ -10751,9 +10827,41 @@ std::unique_ptr<juce::Component> MainComponent::makeHelpContent (const keys::Key
 
     struct Sheet final : juce::Component
     {
-        explicit Sheet (std::vector<std::pair<juce::String, juce::String>> f) : fkeys (std::move (f))
+        Sheet (std::vector<std::pair<juce::String, juce::String>> f, std::function<void()> onManage) : fkeys (std::move (f))
         {
-            setSize (1500, juce::jmax (520, 20 + 28 + (int) fkeys.size() * 22 + 20));
+            // issue #234 (round 190ns): the way to change these keys, in the free space under the first columns (FL's
+            // shortcut list and its Manage shortcuts window are apart too; LYNX's sheet links them so the keys are found)
+            if (onManage)
+            {
+                manageNote.setText (tr ("Every shortcut can be changed:"), juce::dontSendNotification);
+                manageNote.setFont (theme::font (theme::type::body));
+                manageNote.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+                manageNote.setJustificationType (juce::Justification::centredLeft);
+                manageNote.setBorderSize ({});
+                manage.setButtonText (tr ("Manage shortcuts..."));
+                manage.setFont (theme::font (theme::type::body, true), false, juce::Justification::centredLeft);
+                manage.setColour (juce::HyperlinkButton::textColourId, theme::colour::accent);
+                manage.setTooltip (tr ("Change, add or reset the keys of every action"));
+                manage.onClick = std::move (onManage);
+                addAndMakeVisible (manageNote);
+                addAndMakeVisible (manage);
+            }
+            auto firstColumn = 20; // (where paint() ends the first column: General and Workspace)
+            for (std::size_t i = 0; i < 2 && i < sections.size(); ++i)
+                firstColumn += 28 + (int) sections[i].rows.size() * 24 + 14;
+            setSize (1500, std::max ({ 520, 20 + 28 + (int) fkeys.size() * 22 + 20, onManageShown() ? firstColumn + 8 + 24 + 20 : 0 }));
+        }
+
+        bool onManageShown() const { return manage.isVisible(); }
+
+        void resized() override
+        {
+            // bottom left, on the first column's left edge
+            const auto y = getHeight() - 20 - 24;
+            const auto noteWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (manageNote.getFont(), manageNote.getText())) + 8;
+            manageNote.setBounds (24, y, noteWidth, 24);
+            const auto linkWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (theme::font (theme::type::body, true), manage.getButtonText())) + 8;
+            manage.setBounds (manageNote.getRight(), y, linkWidth, 24);
         }
 
         void paint (juce::Graphics& g) override
@@ -10826,15 +10934,23 @@ std::unique_ptr<juce::Component> MainComponent::makeHelpContent (const keys::Key
         }
 
         std::vector<std::pair<juce::String, juce::String>> fkeys;
+        juce::Label manageNote;
+        juce::HyperlinkButton manage;
     };
 
-    return std::make_unique<Sheet> (std::move (functionKeys));
+    return std::make_unique<Sheet> (std::move (functionKeys), std::move (onManageShortcuts));
 }
 
 void MainComponent::showHelp()
 {
     juce::DialogWindow::LaunchOptions options;
-    options.content.setOwned (makeHelpContent (&keyMap).release());
+    // issue #234: the sheet's "Manage shortcuts..." link closes it and opens the Shortcut manager
+    options.content.setOwned (makeHelpContent (&keyMap, [safe = juce::Component::SafePointer<MainComponent> (this)] {
+                                  if (safe == nullptr)
+                                      return;
+                                  safe->closeHelp();
+                                  safe->showShortcutManager();
+                              }).release());
     options.dialogTitle = tr ("LYNX SHARE shortcuts");
     options.dialogBackgroundColour = theme::colour::bg2;
     options.useNativeTitleBar = true;

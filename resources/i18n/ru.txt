@@ -11997,3 +11997,10 @@ countries: ru by kz
 
 # --- round 190nq: issue #230 (Show fade previews)
 "Show fade previews" = "Показывать предпросмотр фейдов"
+"A few seconds after start-up LYNX SHARE asks GitHub for the newest version number; nothing about you is sent. It is the only connection LYNX SHARE makes by itself: plugin scans and everything else stay on this computer." = "Через несколько секунд после запуска LYNX SHARE запрашивает у GitHub номер самой новой версии; ничего о вас не отправляется. Это единственное соединение, которое LYNX SHARE устанавливает сам: поиск плагинов и всё остальное остаётся на этом компьютере."
+"Off, LYNX SHARE never goes online by itself: plugin scans and everything else stay on this computer." = "Если выключено, LYNX SHARE никогда сам не выходит в сеть: поиск плагинов и всё остальное остаётся на этом компьютере."
+"Every shortcut can be changed:" = "Любое сочетание клавиш можно изменить:"
+"Change, add or reset the keys of every action" = "Изменить, добавить или сбросить клавиши любого действия"
+"Could not open a new window" = "Не удалось открыть новое окно"
+"Open in new window" = "Открыть в новом окне"
+"Start-up project" = "Стартовый проект"

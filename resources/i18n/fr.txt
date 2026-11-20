@@ -11997,3 +11997,10 @@ countries: fr be ch ca lu
 
 # --- round 190nq: issue #230 (Show fade previews)
 "Show fade previews" = "Afficher l'aperçu des fondus"
+"A few seconds after start-up LYNX SHARE asks GitHub for the newest version number; nothing about you is sent. It is the only connection LYNX SHARE makes by itself: plugin scans and everything else stay on this computer." = "Quelques secondes après le démarrage, LYNX SHARE demande à GitHub le numéro de la version la plus récente ; rien vous concernant n'est envoyé. C'est la seule connexion que LYNX SHARE établit de lui-même : la recherche de plugins et tout le reste restent sur cet ordinateur."
+"Off, LYNX SHARE never goes online by itself: plugin scans and everything else stay on this computer." = "Désactivé, LYNX SHARE ne se connecte jamais à Internet de lui-même : la recherche de plugins et tout le reste restent sur cet ordinateur."
+"Every shortcut can be changed:" = "Chaque raccourci peut être modifié :"
+"Change, add or reset the keys of every action" = "Modifier, ajouter ou réinitialiser les touches de chaque action"
+"Could not open a new window" = "Impossible d'ouvrir une nouvelle fenêtre"
+"Open in new window" = "Ouvrir dans une nouvelle fenêtre"
+"Start-up project" = "Projet de démarrage"

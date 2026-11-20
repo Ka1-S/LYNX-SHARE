@@ -131,6 +131,30 @@ bool makeInstrumentTrack (Song& song, int track, int channel);
 // The audio clips already on the track follow it (followAudioTracks). False when canLinkToMixerTrack says no; the
 // insert the track already has changes nothing.
 bool linkToMixerTrack (Song& song, int track, int mixer);
+// FL 2026 keeps an audio track and its mixer track under one name and colour after the link, both ways (issue #235,
+// round 190ns; FLEngine 2026 [DECOMP]): the Playlist track's "Rename / color" (FUN_012e60f0) sets the track's name and
+// colour and then (FUN_012e6010, audio tracks only: mode 1 with a mixer track > 0) gives its mixer track the track's
+// colour (FL's default track colour = the mixer's default), icon and name; a mixer track's name / colour / icon change
+// (FUN_012be6f0, called by every mixer rename, recolour, group, route...) is copied to the Playlist track linked to it
+// (FUN_012a7810) in every arrangement. Instrument tracks are not synced by FL (LYNX's "Link Playlist tracks to mixer
+// tracks" switch syncs them too: autolink::followNewContent).
+// AudioEngine::editSong takes `linkedNames` before an edit and `followLinkedNames` after it: whichever side the edit
+// changed (name or colour) is copied to the other; when both changed (a link that sets both) nothing is touched.
+struct LinkedNames
+{
+    struct Pair
+    {
+        int track = -1, mixer = -1;
+        std::string trackName;
+        std::uint32_t trackColour = 0;
+        std::string insertName;
+        std::uint32_t insertColour = 0;
+    };
+    std::vector<Pair> pairs; // the audio tracks linked to an existing insert
+};
+LinkedNames linkedNames (const Song& song);
+// Returns how many tracks or inserts changed.
+int followLinkedNames (Song& song, const LinkedNames& before);
 // Whether `track` can be linked to `mixer`: an existing insert (never the Master), not linked to another Playlist
 // track (one track per insert, as makeAudioTrack keeps it) and not reserved for another participant of an online
 // session.
@@ -346,6 +370,11 @@ Snapshot snapshot (const Song& song);
 // that changes nothing that already sounded. A track set to Track mode › Unassigned that had content stays unassigned.
 // Returns how many tracks were newly linked.
 int followNewContent (Song& song, const Snapshot& before);
+// Issue #235 (round 190ns): a project saved with the switch on by an older version can hold a linked track and insert
+// of two colours (links kept from older rules, or edits before the colours were synced). On open (MainComponent::
+// openLynxProject), while the switch is on, a pair where one side has the default colour takes the other's colour; two
+// different colours of their own are left as they are. Returns how many pairs changed.
+int matchLinkedColours (Song& song);
 // Recording (core/TakeRecording.h) while the switch is on: the Playlist track a take of insert `insert` goes to when no
 // audio track is linked to it yet — track insert − 1 when it is unassigned, ungrouped and holds no clip; -1 otherwise.
 int pairedTakeTrack (const Song& song, int insert);

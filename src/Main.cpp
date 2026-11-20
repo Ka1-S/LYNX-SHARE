@@ -3228,6 +3228,13 @@ public:
             quit();
             return;
         }
+        // --issuesshot190ns <prefix> (round 190ns, issues #231-#235): src/IssuesShot190ns.inc
+        if (args.contains ("--issuesshot190ns"))
+        {
+            setApplicationReturnValue (runIssuesShot190ns (args[args.indexOf ("--issuesshot190ns") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
         // --issuesshot190ng <prefix> (round 190ng, issues #215, #217, #219, #220, #222): src/IssuesShot190ng.inc
         if (args.contains ("--issuesshot190ng"))
         {
@@ -17712,6 +17719,7 @@ private:
 #include "IssuesShot190ng.inc" // round 190ng (issues #215, #217, #219, #220, #222)
 #include "TrackClipsShot190ne.inc" // round 190ne
 #include "IssuesShot190nq.inc" // round 190nq (issues #193, #225-#230)
+#include "IssuesShot190ns.inc" // round 190ns (issues #231-#235)
 #include "DetailsShot190kn.inc" // round 190kn
 #include "DetailsShot190ld.inc" // round 190ld
 #include "DetailsShot190lr.inc" // round 190lr
@@ -35161,7 +35169,7 @@ private:
             saveIconSheet (prefix + "-icons-150.png", 1.5f);
             saveStateSheet (prefix + "-states190je.png", 1.0f); // round 190je: the one state rule, per button kind
             saveStateSheet (prefix + "-states190je-z3.png", 3.0f);
-            saveWindow (lynx::MainComponent::makeHelpContent(), "-help.png");
+            saveWindow (lynx::MainComponent::makeHelpContent (nullptr, [] {}), "-help.png"); // (round 190ns: with its Manage shortcuts link)
             saveWindow (lynx::ui::makeTrackIconGrid (5, {}), "-trackicons168h.png"); // round 168h: the icon picker
             saveWindow (std::make_unique<lynx::toolbar::CustomizePanel> (lynx::toolbarlayout::Layout::makeDefault()), "-customize-toolbar.png");
             // two moved controls: Tools › Last tweaked and Add › Automation for last tweaked parameter show them (REA round 143)
