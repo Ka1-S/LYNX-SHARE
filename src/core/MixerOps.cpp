@@ -636,9 +636,19 @@ bool deleteTrack (Song& song, int t)
     if (t < 1 || t >= count)
         return false;
 
+    // #226 (round 190nq): an automation clip whose target goes with the insert (its fader, a send to it...) keeps its
+    // points but controls nothing: its name says so, instead of still naming the deleted track
+    std::vector<std::size_t> targeted;
+    for (std::size_t a = 0; a < song.automations.size(); ++a)
+        if (song.automations[a].target.kind != AutomationTargetKind::none)
+            targeted.push_back (a);
+
     // one shift of every reference: the deleted insert's links go, the following inserts move one place left and a
     // blank insert takes the last place (the count stays)
     remapTrackReferences (song, [t] (int x) { return x == t ? -1 : x > t ? x - 1 : x; });
+    for (const auto a : targeted)
+        if (auto& automation = song.automations[a]; automation.target.kind == AutomationTargetKind::none)
+            automation.name = targetDeletedName (automation.name);
     song.mixer.erase (song.mixer.begin() + t);
     song.mixer.emplace_back();
     renumberDefaultNames (song, t, -1);

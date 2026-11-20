@@ -21,3 +21,35 @@ TEST (bugs190nq_229_narrow_title_bar_drops_the_caption_then_hides_tools)
     // a panel without title tools always shows its caption
     CHECK (titleCaptionFits (900, 0, 300));
 }
+
+TEST (bugs190nq_226_automation_of_a_deleted_insert_says_so)
+{
+    using namespace lynx;
+    Song song;
+    song.mixer.resize (6);
+    for (int t = 1; t < 6; ++t)
+        song.mixer[(std::size_t) t].name = "Insert " + std::to_string (t);
+    song.mixer[1].name = "BEAT BUS";
+    song.mixer[2].name = "VERB";
+    song.mixer[1].sends.push_back ({ 2, 0.5f });
+    Automation send;
+    send.name = "BEAT BUS \xe2\x86\x92 VERB - Send level";
+    send.target = { AutomationTargetKind::mixerSend, 1, 2, 0 };
+    send.points = { { 0, 0.2f }, { 960, 0.8f } };
+    Automation volume;
+    volume.name = "Insert 4 - Volume";
+    volume.target = { AutomationTargetKind::mixerVolume, 4, 0, 0 };
+    song.automations = { send, volume };
+
+    CHECK (mixerops::deleteTrack (song, 2)); // the reverb track goes
+    CHECK (song.automations[0].target.kind == AutomationTargetKind::none);
+    CHECK (song.automations[0].name == "BEAT BUS \xe2\x86\x92 VERB - Send level (target deleted)");
+    CHECK (song.automations[0].points.size() == 2); // (its points stay: undo or a new target brings it back)
+    // the other clip follows its insert (4 -> 3) and keeps its name
+    CHECK (song.automations[1].target.kind == AutomationTargetKind::mixerVolume && song.automations[1].target.index == 3);
+    CHECK (song.automations[1].name == "Insert 4 - Volume");
+    // deleting another track later doesn't add the mark twice
+    CHECK (mixerops::deleteTrack (song, 1));
+    CHECK (song.automations[0].name == "BEAT BUS \xe2\x86\x92 VERB - Send level (target deleted)");
+    CHECK (mixerops::targetDeletedName ("A (target deleted)") == "A (target deleted)");
+}
