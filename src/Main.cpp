@@ -34671,6 +34671,15 @@ private:
             }
             ui.selectTabForSnapshot (2);
             saveSnapshot (ui, prefix + "-playlist.png");
+            {
+                // round 190nr: the same with the song zoomed to fit (the site's and the Store's Playlist picture: at FL's
+                // open zoom the demo song fills only the first fifth)
+                auto& pl = ui.getPlaylistForSnapshot();
+                const auto view = pl.viewForSnapshot();
+                pl.zoomAllForSnapshot();
+                saveSnapshot (ui, prefix + "-playlist-fit.png");
+                pl.restoreViewForSnapshot (view);
+            }
             if (const auto strip = ui.getToolStripAreaForSnapshot (true); ! strip.isEmpty())
                 saveArea (ui, strip, prefix + "-playlist-tools.png");
             ui.setHintForSnapshot (ui.getPlaylistForSnapshot().hoverForSnapshot());
