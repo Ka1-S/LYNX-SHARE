@@ -36,7 +36,7 @@
         const auto settle = [&offline] {
             for (int k = 0; k < 4; ++k)
                 offline.dispatchPendingMessages();
-#if JUCE_LINUX
+#if JUCE_LINUX || JUCE_WINDOWS // (rollup 0.1.31 step 2: on Windows the cards' callAsync never ran: 29 checks failed there)
             for (int i = 0; i < 256 && juce::detail::dispatchNextMessageOnSystemQueue (true); ++i) {} // (clicks and the cards' async callbacks)
 #endif
         };
