@@ -168,6 +168,8 @@ public:
     bool saveScore (const juce::File& file) const;
     // File › Copy to / Paste from MIDI clipboard (a Standard MIDI File of the channel's notes; Ctrl+Shift+V pastes)
     bool copyToMidiClipboard() const;
+    // Round 190nr: notes made elsewhere (Transistor Bass's "Copy as MIDI") on the note clipboard: Ctrl+V pastes them
+    static void setNoteClipboard (std::vector<Note> notes);
     void pasteFromMidiClipboard();
     // File › Browse scores: the main window opens the Browser at FL's score folder
     std::function<void()> onBrowseScores;

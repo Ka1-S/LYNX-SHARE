@@ -70,6 +70,9 @@
 #include "ui/GeneratorPresetMenu.h"
 #include "ui/ControllerEditors.h"
 #include "ui/HintBar.h"
+#include "ui/MidiClipboard.h"
+#include "ui/PianoRollComponent.h"
+#include "engine/MidiFileIo.h"
 #include "ui/ValueControl.h"
 #include "ui/I18n.h"
 #include "ui/PluginSkin.h"
@@ -1846,6 +1849,8 @@ public:
                         paintTransistorBassSteps (g, r, f);
                     if (juce::String (item.display) == "tbseqtools")
                         paintTransistorBassTools (g, r, f);
+                    if (juce::String (item.display).startsWith ("tbseqmidi"))
+                        paintTransistorBassMidi (g, juce::String (item.display), r, f);
                     if (juce::String (item.display).startsWith ("tbrow"))
                         paintTransistorBassRow (g, juce::String (item.display), r, f);
                     if (juce::String (item.display) == "xy")
@@ -2192,6 +2197,12 @@ public:
                     transistorBassToolAction (button);
                 return;
             }
+        for (const auto& item : layout->items) // round 190nr: Transistor Bass's Copy as MIDI / Export MIDI...
+            if (item.type == plugui::Item::display && juce::String (item.display).startsWith ("tbseqmidi") && layoutRect (item).contains (e.position))
+            {
+                juce::String (item.display) == "tbseqmidicopy" ? transistorBassCopyMidi() : transistorBassExportMidi();
+                return;
+            }
         for (const auto& item : layout->items) // round 168q: BeepMap's Open / Paste
             if (item.type == plugui::Item::display && juce::String (item.display) == "beepmapfile" && layoutRect (item).contains (e.position))
             {
@@ -2361,6 +2372,13 @@ public:
 
     juce::String getTooltip() override
     {
+        if (transistorBass && layout != nullptr) // round 190nr: the MIDI buttons of the sequence
+            for (const auto& item : layout->items)
+                if (item.type == plugui::Item::display && juce::String (item.display).startsWith ("tbseqmidi")
+                    && layoutRect (item).contains (getMouseXYRelative().toFloat()))
+                    return juce::String (item.display) == "tbseqmidicopy"
+                               ? tr ("Copies the sequence as notes, with its gate lengths, slides and accents: Ctrl+V pastes them in the Piano roll")
+                               : tr ("Saves the sequence as a MIDI file, with its gate lengths, slides and accents");
         const auto full = description();
         if (layout != nullptr && ! engineFilesMissing) // round 190in (FW-6): the line left the page; the page says it
             return full;
@@ -2848,6 +2866,66 @@ private:
             if (transistorBassToolCell (layoutRect (item), i).contains (p))
                 return i;
         return -1;
+    }
+
+    // Round 190nr (GitHub discussion #202, a LYNX extra: FL's Transistor Bass copies a sequence only to another
+    // Transistor Bass): the shown program's sequence as notes (core: transistorBassSequenceNotes) for the Piano roll's
+    // note clipboard and the MIDI clipboard, or a MIDI file
+    void paintTransistorBassMidi (juce::Graphics& g, const juce::String& which, juce::Rectangle<float> r, float f)
+    {
+        using namespace theme;
+        const auto cell = r.reduced (1.0f * f);
+        skin::button (g, cell, false, false, accent, radius::sm * f);
+        g.setColour (colour::textPrimary);
+        g.setFont (font (juce::jmax (8.0f, juce::jmin (10.0f * f, cell.getHeight() * 0.5f)), true));
+        g.drawFittedText (which == "tbseqmidicopy" ? tr ("Copy as MIDI") : tr ("Export MIDI..."), cell.toNearestInt(), juce::Justification::centred, 1, 0.6f);
+    }
+
+    std::vector<Note> transistorBassNotes() const
+    {
+        const auto* c = channelNow();
+        return c != nullptr ? transistorBassSequenceNotes (c->pluginState, engine.getSong().bpm) : std::vector<Note> {};
+    }
+
+    void transistorBassCopyMidi()
+    {
+        auto notes = transistorBassNotes();
+        if (notes.empty())
+        {
+            ui::postHint ({ tr ("The sequence has no notes: turn on the gate of a step first") }, 2500);
+            return;
+        }
+        const auto* c = channelNow();
+        midiclipboard::put (MidiFileIo::writeNotes (engine.getSong(), notes, c != nullptr ? c->name : std::string()));
+        const auto count = (int) notes.size();
+        PianoRollComponent::setNoteClipboard (std::move (notes));
+        ui::postHint ({ tr ("Copied {0} notes of the sequence: Ctrl+V pastes them in the Piano roll", { juce::String (count) }) }, 2500);
+    }
+
+    void transistorBassExportMidi()
+    {
+        const auto notes = transistorBassNotes();
+        if (notes.empty())
+        {
+            ui::postHint ({ tr ("The sequence has no notes: turn on the gate of a step first") }, 2500);
+            return;
+        }
+        const auto* c = channelNow();
+        const auto name = c != nullptr && ! c->name.empty() ? juce::File::createLegalFileName (juce::String::fromUTF8 (c->name.c_str())) : juce::String ("Transistor Bass");
+        auto smf = std::make_shared<juce::MemoryBlock> (MidiFileIo::writeNotes (engine.getSong(), notes, c != nullptr ? c->name : std::string()));
+        chooser = lynx::ui::makeFileChooser (tr ("Export the sequence as a MIDI file"),
+                                             juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile (name + ".mid"), "*.mid");
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+                                 [smf] (const juce::FileChooser& fc) {
+                                     auto file = fc.getResult();
+                                     if (file == juce::File())
+                                         return;
+                                     if (! file.hasFileExtension ("mid;midi"))
+                                         file = file.withFileExtension ("mid");
+                                     if (! file.replaceWithData (smf->getData(), smf->getSize()))
+                                         juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, juce::String ("MIDI"),
+                                                                                 tr ("Could not write {0}", { file.getFullPathName() }));
+                                 });
     }
 
     // FL's CLEAR (gates, slides and accents off, notes C5) and its octave up / down buttons on the whole sequence

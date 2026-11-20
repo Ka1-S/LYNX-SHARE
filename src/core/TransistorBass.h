@@ -70,6 +70,16 @@ struct TransistorBassProgram
     std::array<Step, 32> steps {};
 };
 std::optional<TransistorBassProgram> transistorBassProgram (const std::vector<std::uint8_t>& state);
+// Round 190nr (GitHub discussion #202, a LYNX extra: FL's Transistor Bass copies a sequence only to another Transistor
+// Bass, as its own "TransistorBass_Pattern" clipboard data): the shown program's sequence as notes, the way its
+// sequencer plays it while a key is held (stepEvent / clockSequencer): one note per step whose gate is on, at the
+// step's start (16th notes at `songTempo`, or at the sequence's own BPM when it has one; the sequence's shuffle delays
+// the odd steps), key = the step's note + the program's transpose, the sequence's gate length (0.66 of a step); a slide
+// step lasts until the next gated step and overlaps it by an eighth of a step (overlapping notes glide on Transistor
+// Bass and on mono / legato synths; the last one ends with the sequence); an accent step has velocity 1.0 (≥ 110 of
+// 127: Transistor Bass's accent), the others 0.78. Channel 0, starting at tick 0; `lengthTicks` gets the sequence's
+// length. Empty when the state can't be read or no step has its gate on.
+std::vector<Note> transistorBassSequenceNotes (const std::vector<std::uint8_t>& state, double songTempo, std::int64_t* lengthTicks = nullptr);
 // FL's editor shows and edits its "edit program"; with the sequencer on and the state's follow flag set, a note makes
 // both the playing and the edit program the note's key (engine_x64 FUN_18000d5a0, REA_rodada169g2): the state's
 // program and edit program become `program` (0…127), in place; false when the state is not usable (round 169g2)

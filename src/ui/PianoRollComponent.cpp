@@ -5972,6 +5972,11 @@ bool PianoRollComponent::saveScore (const juce::File& file) const
     return file.replaceWithData (bytes.data(), bytes.size());
 }
 
+void PianoRollComponent::setNoteClipboard (std::vector<Note> notes)
+{
+    clipboard = std::move (notes);
+}
+
 bool PianoRollComponent::copyToMidiClipboard() const
 {
     const auto& song = engine.getSong();
