@@ -190,6 +190,7 @@ public:
     void stepsClickForCheck (int row, int step);
     void stepsLetterForCheck (int letter);
     void stepsAddClipForCheck();
+    int stepsMessagesShownForCheck() const; // round 190nr: visible "Make a beat first..." bubbles
     void stepsLengthForCheck (int bars);
     void stepsSwingForCheck (float v);
     void stepsPreviewForCheck();

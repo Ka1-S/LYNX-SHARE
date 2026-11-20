@@ -24,6 +24,7 @@ public:
             stopPreview();
         }
         track = newTrack;
+        hideMessage();
         update();
     }
 
@@ -86,6 +87,13 @@ public:
     void clickStepForCheck (int row, int step) { toggle (row, step); }
     void pickLetterForCheck (int l) { pickLetter (l); }
     void addClipForCheck() { addClip(); }
+    int messagesShownForCheck() const // visible bubbles on the page
+    {
+        int n = 0;
+        for (auto* c : getChildren())
+            n += dynamic_cast<juce::BubbleMessageComponent*> (c) != nullptr && c->isVisible() ? 1 : 0;
+        return n;
+    }
     void setLengthForCheck (int bars) { setLength (bars); }
     void setSwingForCheck (float v) { setSwing (v); }
     void previewForCheck() { togglePreview(); }
@@ -412,6 +420,7 @@ private:
 public:
     juce::String lastMessage; // (the last bubble's text, for the checks)
 private:
+    std::unique_ptr<juce::BubbleMessageComponent> bubble; // "Make a beat first..." (round 190nr: one, owned)
     int paintRow = -1, lastPainted = -1, litRow = -1;
     juce::uint32 litAt = 0, previewStarted = 0;
     const Pattern emptyPattern {};
@@ -567,10 +576,17 @@ private:
         repaint (column (shownStep));
     }
 
+    void hideMessage()
+    {
+        if (bubble != nullptr)
+            bubble->setVisible (false);
+    }
+
     void toggle (int row, int step)
     {
         if (row < 0 || row >= (int) rows.size() || pattern < 0 || step < 0 || step >= steps)
             return;
+        hideMessage();
         engine.editSong ([p = pattern, ch = rows[(std::size_t) row], step] (Song& s) {
             if (p < (int) s.patterns.size())
                 s.patterns[(std::size_t) p].toggleStep (ch, step);
@@ -582,6 +598,7 @@ private:
     {
         if (step == lastPainted || paintRow < 0 || pattern < 0)
             return;
+        hideMessage();
         lastPainted = step;
         const auto ch = rows[(std::size_t) paintRow];
         const auto& pat = engine.getSong().patterns[(std::size_t) pattern];
@@ -619,6 +636,7 @@ private:
         if (simplesteps::letterPattern (engine.getSong(), track, l) < 0)
             engine.editSong ([t = track, l] (Song& s) { simplesteps::ensureLetter (s, t, l); });
         letter = l;
+        hideMessage();
         const auto wasPreviewing = previewing;
         update();
         if (wasPreviewing && pattern >= 0)
@@ -630,9 +648,14 @@ private:
         // BandLab (capture C e): an empty pattern is not put on the track: "Make a beat first before exporting it to a track."
         if (pattern < 0 || engine.getSong().patterns[(std::size_t) pattern].notes.empty())
         {
-            auto* bubble = new juce::BubbleMessageComponent (300);
-            addChildComponent (bubble);
-            bubble->showAt (addButton, juce::AttributedString (tr ("Make a beat first before exporting it to a track.")), 2500, true, true);
+            // round 190nr: one bubble, kept (a new click shows it again instead of stacking another), and gone as soon as
+            // the pattern gets a step (the 0.1.30 shot route showed it over the grid after the beat was made)
+            if (bubble == nullptr)
+            {
+                bubble = std::make_unique<juce::BubbleMessageComponent> (300);
+                addChildComponent (*bubble);
+            }
+            bubble->showAt (addButton, juce::AttributedString (tr ("Make a beat first before exporting it to a track.")), 2500, true, false);
             lastMessage = tr ("Make a beat first before exporting it to a track.");
             return;
         }
