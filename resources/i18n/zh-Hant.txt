@@ -11965,3 +11965,7 @@ countries: tw hk mo
 "Strike point: drag along the bar (Position). At a mode's node that mode is not excited" = "敲擊點: 沿音條拖動 (位置)。在某個模態的節點上, 該模態不會被激發"
 "Modes fitted to CC0 recordings (VCSL). No samples are played." = "模態按 CC0 錄音 (VCSL) 擬合。不播放任何取樣。"
 "LYNX Model is not in this release: its channels become empty Samplers and play nothing: {0}" = "LYNX Model 不在此版本中: 其通道變為空的取樣器, 不發出任何聲音: {0}"
+
+# --- rollup 0.1.31 step 1: Save a copy for 0.1.30 (rounds 190nh / 190nc)
+"Effector's newer Kilohearts laws (the Comb Filter, Chorus, Trance Gate, Phaser, Distortion, Bitcrush, Frequency Shifter and Ensemble stand-ins) play Effector's own algorithm: {0}" = "Effector 較新的 Kilohearts 規律（Comb Filter、Chorus、Trance Gate、Phaser、Distortion、Bitcrush、Frequency Shifter 和 Ensemble 的替代）按 Effector 自身的演算法播放：{0}"
+"Live's Solo/Cue settings (Cue mode, Cue Out, Cue Volume and the tracks' Cue switches); the Main mix plays the same" = "Live 的 Solo/Cue 設定（Cue 模式、Cue Out、Cue 音量和軌道的 Cue 開關）；Main 混音聽起來不變"

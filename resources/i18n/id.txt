@@ -11965,3 +11965,7 @@ countries: id
 "Strike point: drag along the bar (Position). At a mode's node that mode is not excited" = "Titik pukul: seret di sepanjang bilah (Posisi). Di simpul sebuah mode, mode itu tidak tereksitasi"
 "Modes fitted to CC0 recordings (VCSL). No samples are played." = "Mode dicocokkan dengan rekaman CC0 (VCSL). Tidak ada sampel yang diputar."
 "LYNX Model is not in this release: its channels become empty Samplers and play nothing: {0}" = "LYNX Model tidak ada di rilis ini: kanalnya menjadi Sampler kosong dan tidak memainkan apa pun: {0}"
+
+# --- rollup 0.1.31 step 1: Save a copy for 0.1.30 (rounds 190nh / 190nc)
+"Effector's newer Kilohearts laws (the Comb Filter, Chorus, Trance Gate, Phaser, Distortion, Bitcrush, Frequency Shifter and Ensemble stand-ins) play Effector's own algorithm: {0}" = "Hukum Kilohearts yang lebih baru milik Effector (pengganti Comb Filter, Chorus, Trance Gate, Phaser, Distortion, Bitcrush, Frequency Shifter dan Ensemble) memutar algoritme Effector sendiri: {0}"
+"Live's Solo/Cue settings (Cue mode, Cue Out, Cue Volume and the tracks' Cue switches); the Main mix plays the same" = "Pengaturan Solo/Cue Live (mode Cue, Cue Out, volume Cue dan sakelar Cue trek); mix Main tetap sama"

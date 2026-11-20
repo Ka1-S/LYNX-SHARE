@@ -170,12 +170,12 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
     // (silent) keeps the channel, its notes and its routing; DirectWave states (rounds 190hz / 190ii) get their short zone
     // records completed as DirectWave reads them, since 0.1.28 skipped them (FL's version-36 programs lost their loops)
     {
-        juce::StringArray tetra, helix, braid, lynxModel;
+        juce::StringArray tetra, helix, braid;
         forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
             const auto instrument = c.getProperty ("instrument").toString();
-            if (instrument == "tetra" || instrument == "helix" || instrument == "braid" || instrument == "lynxmodel") // (rollup step 3: Helix, round 190ja, as Tetra; Braid, 190ko; LYNX Model, 190ni)
+            if (instrument == "tetra" || instrument == "helix" || instrument == "braid") // (rollup step 3: Helix, round 190ja, as Tetra; Braid, 190ko; LYNX Model, 190ni: the 0.1.30 step)
             {
-                (instrument == "tetra" ? tetra : instrument == "helix" ? helix : instrument == "braid" ? braid : lynxModel).add (channelName (juce::var (&c), i));
+                (instrument == "tetra" ? tetra : instrument == "helix" ? helix : braid).add (channelName (juce::var (&c), i));
                 c.setProperty ("instrument", "sampler");
                 drop (c, "modelParams");
                 drop (c, "pluginState");
@@ -201,8 +201,6 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("Helix is not in this release: its channels become empty Samplers and play nothing: {0}"), listOf (helix), true });
         if (! braid.isEmpty())
             lost.push_back ({ TR_NOOP ("Braid is not in this release: its channels become empty Samplers and play nothing: {0}"), listOf (braid), true });
-        if (! lynxModel.isEmpty())
-            lost.push_back ({ TR_NOOP ("LYNX Model is not in this release: its channels become empty Samplers and play nothing: {0}"), listOf (lynxModel), true });
     }
 
     // notes: index 19 holds a note's MPE curves (round 190hy); rollup step 11: index 20 its FL note repeat (round 190ma,
@@ -761,20 +759,6 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("Crest Compressor's styles play their earlier laws (not the reference's): {0}"), listOf (crestLaws), true });
         if (! locked.isEmpty())
             lost.push_back ({ TR_NOOP ("Mixer lock states (a solo silences these inserts, and Unmute all unmutes them): {0}"), listOf (locked), soloed });
-        // round 190ne (0.1.31, core/TrackClips.h; until a 0.1.30 step exists): track clips and "Clips own their notes".
-        // Nothing they play changes: the clips are patterns; 0.1.28 lists them with the others and its pencil places
-        // the track's pattern, as FL does
-        {
-            int trackClips = 0;
-            if (auto* patterns = arrayOf (root["patterns"]))
-                for (auto& p : *patterns)
-                    if (auto* po = objectOf (p))
-                        trackClips += drop (*po, "trackClip") ? 1 : 0;
-            const auto ownTracks = drop (o, "playlistOwnClips");
-            if (trackClips > 0 || ownTracks)
-                lost.push_back ({ TR_NOOP ("{0} track clip(s) show as ordinary patterns, and instrument tracks lose \"Clips own their notes\""),
-                                  juce::String (trackClips), false });
-        }
         if (auto* lanes = arrayOf (root["playlistTakeLanes"]))
         {
             const auto count = lanes->size();
@@ -1397,13 +1381,87 @@ void toRelease0127 (juce::var& root, Losses& lost)
         lost.push_back ({ TR_NOOP ("The Playlist's row height"), {}, false });
 }
 
+// --- 0.1.31 → 0.1.30 ------------------------------------------------------------------------------------------------------
+// Rollup 0.1.31 (round 190no): what the 0.1.31 rounds save that 0.1.30 cannot hold, each loss reported only when the
+// project has it. A copy for an older release runs this step first, so the later steps never see these. Round 190nc's
+// Macro Map writes ordinary macro mappings (targets 0.1.30 has): nothing to change for it.
+void toRelease0130 (juce::var& root, Losses& lost)
+{
+    auto& o = *objectOf (root);
+
+    // round 190ni: LYNX Model. 0.1.30 would play an unknown instrument as its basic synth: an empty Sampler (silent) keeps
+    // the channel, its notes and its routing, as Tetra / Helix / Braid in the copy for 0.1.28
+    {
+        juce::StringArray lynxModel;
+        forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
+            if (c.getProperty ("instrument").toString() != "lynxmodel")
+                return;
+            lynxModel.add (channelName (juce::var (&c), i));
+            c.setProperty ("instrument", "sampler");
+            drop (c, "modelParams");
+            drop (c, "pluginState");
+            drop (c, "samplePath");
+        });
+        if (! lynxModel.isEmpty())
+            lost.push_back ({ TR_NOOP ("LYNX Model is not in this release: its channels become empty Samplers and play nothing: {0}"), listOf (lynxModel), true });
+    }
+
+    // round 190nh: the Kilohearts part-2 laws on Effector (hidden [12] codes 41 … 48, 49 kept for the Nonlinear Filter;
+    // set only by the Kilohearts translator). 0.1.30 reads [12] in eighths (round 190nb's five laws, codes 8 … 40, which
+    // stay), so codes 41 … 43 would play its Shaper law on these values: [12 …] are cut and Effector plays the algorithm
+    // its visible Type names
+    {
+        juce::StringArray laws;
+        forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
+            auto* params = arrayOf (e.getProperty ("params"));
+            if (params == nullptr || e.getProperty ("kind").toString() != "effector" || params->size() <= khsdsp::lawParam)
+                return;
+            if (khsdsp::lawCode (khsdsp::lawOf ((float) (double) (*params)[khsdsp::lawParam])) < 41)
+                return;
+            addOnce (laws, where);
+            params->removeRange (khsdsp::lawParam, params->size() - khsdsp::lawParam);
+        });
+        if (! laws.isEmpty())
+            lost.push_back ({ TR_NOOP ("Effector's newer Kilohearts laws (the Comb Filter, Chorus, Trance Gate, Phaser, Distortion, Bitcrush, Frequency Shifter and Ensemble stand-ins) play Effector's own algorithm: {0}"),
+                              listOf (laws), true });
+    }
+
+    // round 190ne (core/TrackClips.h): track clips and "Clips own their notes". Nothing they play changes: the clips are
+    // patterns; 0.1.30 lists them with the others and its pencil places the track's pattern, as FL does
+    {
+        int trackClips = 0;
+        if (auto* patterns = arrayOf (root["patterns"]))
+            for (auto& p : *patterns)
+                if (auto* po = objectOf (p))
+                    trackClips += drop (*po, "trackClip") ? 1 : 0;
+        const auto ownTracks = drop (o, "playlistOwnClips");
+        if (trackClips > 0 || ownTracks)
+            lost.push_back ({ TR_NOOP ("{0} track clip(s) show as ordinary patterns, and instrument tracks lose \"Clips own their notes\""),
+                              juce::String (trackClips), false });
+    }
+
+    // round 190nc (DL-110): Live's Solo / Cue: the Main strip's Solo/Cue switch, Cue Out and Cue Volume (the clip grid's
+    // "cue") and the tracks' Cue switches. A monitoring path: the Main mix is the same without them
+    {
+        bool cue = false;
+        if (auto* grid = objectOf (root["clipGrid"]))
+            cue = drop (*grid, "cue");
+        if (auto* mixer = arrayOf (root["mixer"]))
+            for (auto& t : *mixer)
+                if (auto* track = objectOf (t))
+                    cue = drop (*track, "cue") || cue;
+        if (cue)
+            lost.push_back ({ TR_NOOP ("Live's Solo/Cue settings (Cue mode, Cue Out, Cue Volume and the tracks' Cue switches); the Main mix plays the same"), {}, false });
+    }
+}
+
 struct Step
 {
     const char* release;                    // the release this step's output is for
     void (*apply) (juce::var&, Losses&);
 };
 // newest first: a copy for release R runs every step down to R's
-constexpr Step steps[] = { { "0.1.28", toRelease0128 }, { "0.1.27", toRelease0127 } };
+constexpr Step steps[] = { { "0.1.30", toRelease0130 }, { "0.1.28", toRelease0128 }, { "0.1.27", toRelease0127 } };
 } // namespace
 
 juce::StringArray releases()

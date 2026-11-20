@@ -7590,6 +7590,71 @@ private:
                 rollup030Result = "ERROR a plain project reports a loss it does not have";
         }
 
+        // rollup 0.1.31 step 1 (round 190no): File › "Save a copy for an older LYNX" for 0.1.30 drops or converts what the
+        // 0.1.31 rounds save (190ni LYNX Model, 190nh Kilohearts part-2 laws, 190ne track clips, 190nc Solo / Cue); round
+        // 190nb's laws (0.1.30 has them) stay; the copy for 0.1.28 runs this step first; a plain project loses nothing
+        juce::String rollup031Result = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            lynx::ChannelDef model;
+            model.name = "Bars";
+            model.instrument = lynx::InstrumentKind::lynxModel;
+            model.modelParams = { 0.0f, 0.5f, 0.3f };
+            song.channels.push_back (model);
+            auto comb = lynx::makeEffectSlot (lynx::EffectKind::effector);
+            comb.params[(std::size_t) lynx::khsdsp::lawParam] = lynx::khsdsp::lawValue (lynx::khsdsp::Law::comb);
+            comb.params[(std::size_t) lynx::khsdsp::valueParam] = 0.4f;
+            auto resonator = lynx::makeEffectSlot (lynx::EffectKind::effector);
+            resonator.params[(std::size_t) lynx::khsdsp::lawParam] = lynx::khsdsp::lawValue (lynx::khsdsp::Law::resonator);
+            resonator.params[(std::size_t) lynx::khsdsp::valueParam] = 0.5f;
+            song.mixer[3].effects.push_back (comb);      // [0]
+            song.mixer[3].effects.push_back (resonator); // [1]
+            song.patterns[0].trackClip = true;
+            if (song.playlistTracks.empty())
+                song.playlistTracks.resize (1);
+            song.playlistTracks[0].ownClips = true;
+            lynx::launcher::ensureGrid (song);
+            song.clipGrid->cue.cueMode = true;
+            song.clipGrid->cue.out = 2;
+            song.mixer[2].cue = true;
+
+            const auto copy = lynx::olderlynx::forRelease (song, "0.1.30");
+            const auto older = lynx::olderlynx::forRelease (song, "0.1.28");
+            juce::String why;
+            const auto back = copy.ok ? lynx::ProjectFile::fromJson (copy.json, why) : std::optional<lynx::Song> {};
+            const auto count = [] (const lynx::olderlynx::Copy& c, const char* start) {
+                return (int) std::count_if (c.lost.begin(), c.lost.end(), [start] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).startsWith (start); });
+            };
+            const auto parsed = juce::JSON::parse (copy.json);
+            const auto& fx = parsed["mixer"][3]["effects"];
+            juce::String bars;
+            if (const auto* channels = parsed["channels"].getArray())
+                for (const auto& c : *channels)
+                    if (c["name"].toString() == "Bars")
+                        bars = c["instrument"].toString() + (c.hasProperty ("modelParams") ? "+params" : "");
+            const char* lines[] = { "LYNX Model is not in this release", "Effector's newer Kilohearts laws", "{0} track clip(s) show as ordinary patterns",
+                                    "Live's Solo/Cue settings" };
+            if (! copy.ok || ! back)
+                rollup031Result = "ERROR copy " + copy.error + why;
+            else if (! parsed["savedBy"].toString().equalsIgnoreCase ("0.1.30") || lynx::olderlynx::releases()[0] != "0.1.30")
+                rollup031Result = "ERROR release list / stamp";
+            else if (bars != "sampler")
+                rollup031Result = "ERROR LYNX Model channel: " + bars;
+            else if (fx[0]["params"].size() > lynx::khsdsp::lawParam || fx[1]["params"].size() <= lynx::khsdsp::lawParam
+                     || lynx::khsdsp::lawOf ((float) (double) fx[1]["params"][lynx::khsdsp::lawParam]) != lynx::khsdsp::Law::resonator)
+                rollup031Result = "ERROR Kilohearts laws (comb params " + juce::String (fx[0]["params"].size()) + ")";
+            else if (copy.json.contains ("\"trackClip\"") || copy.json.contains ("playlistOwnClips") || parsed["clipGrid"].hasProperty ("cue")
+                     || parsed["mixer"][2].hasProperty ("cue"))
+                rollup031Result = "ERROR 0.1.31 keys left in the copy";
+            else if (std::any_of (std::begin (lines), std::end (lines), [&] (const char* l) { return count (copy, l) != 1 || count (older, l) != 1; }))
+                rollup031Result = "ERROR loss lines (each once, in both copies)";
+            else if (! older.ok || older.json.contains ("lynxmodel") || juce::JSON::parse (older.json)["mixer"][3]["effects"][1]["params"].size() > lynx::khsdsp::lawParam
+                     || count (older, "Effector's Kilohearts laws") != 1)
+                rollup031Result = "ERROR copy for 0.1.28 after the 0.1.30 step";
+            else if (const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.30"); ! plain.ok || ! plain.lost.empty())
+                rollup031Result = "ERROR a plain project loses something in the copy for 0.1.30";
+        }
+
         // round 190dr: the Session mixer's sections come back from a project (a project without them: Live's defaults);
         // a device dragged to another track and a Warp switch are one undo step each in a real engine
         juce::String livescr190drResult = "OK";
@@ -7958,7 +8023,7 @@ private:
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && exportParity.startsWith ("OK") && exportLive.startsWith ("OK") && midiHotplug.startsWith ("OK") && midiOutPorts.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
-                        && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK"
+                        && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK")
                         && danceWindowResult == "OK" && clickActivationResult == "OK" && motionOverlayResult.startsWith ("OK")
@@ -8040,6 +8105,7 @@ private:
                << "sf_mod_base190he=" << sfModBase190heResult << "\n"
                << "community190hq_saved=" << community190hqResult << "\n"
                << "rollup030_copy_for_0128=" << rollup030Result << "\n"
+               << "rollup031_copy_for_0130=" << rollup031Result << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 

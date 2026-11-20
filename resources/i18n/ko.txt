@@ -11965,3 +11965,7 @@ countries: kr
 "Strike point: drag along the bar (Position). At a mode's node that mode is not excited" = "타격 지점: 음판을 따라 드래그 (위치). 모드의 마디에서는 그 모드가 여기되지 않습니다"
 "Modes fitted to CC0 recordings (VCSL). No samples are played." = "모드는 CC0 녹음(VCSL)에 맞춰졌습니다. 샘플을 재생하지 않습니다."
 "LYNX Model is not in this release: its channels become empty Samplers and play nothing: {0}" = "LYNX Model은 이 버전에 없습니다: 채널이 빈 샘플러가 되어 아무것도 재생하지 않습니다: {0}"
+
+# --- rollup 0.1.31 step 1: Save a copy for 0.1.30 (rounds 190nh / 190nc)
+"Effector's newer Kilohearts laws (the Comb Filter, Chorus, Trance Gate, Phaser, Distortion, Bitcrush, Frequency Shifter and Ensemble stand-ins) play Effector's own algorithm: {0}" = "Effector의 새 Kilohearts 법칙(Comb Filter, Chorus, Trance Gate, Phaser, Distortion, Bitcrush, Frequency Shifter, Ensemble 대체)은 Effector 자체 알고리즘으로 재생됩니다: {0}"
+"Live's Solo/Cue settings (Cue mode, Cue Out, Cue Volume and the tracks' Cue switches); the Main mix plays the same" = "Live의 Solo/Cue 설정(Cue 모드, Cue Out, Cue 볼륨, 트랙의 Cue 스위치). Main 믹스는 그대로 재생됩니다"

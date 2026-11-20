@@ -11965,3 +11965,7 @@ countries: de at ch li lu
 "Strike point: drag along the bar (Position). At a mode's node that mode is not excited" = "Anschlagpunkt: entlang des Klangstabs ziehen (Position). Am Knoten einer Mode wird diese Mode nicht angeregt"
 "Modes fitted to CC0 recordings (VCSL). No samples are played." = "Moden an CC0-Aufnahmen (VCSL) angepasst. Es werden keine Samples abgespielt."
 "LYNX Model is not in this release: its channels become empty Samplers and play nothing: {0}" = "LYNX Model gibt es in dieser Version nicht: seine Kanäle werden zu leeren Samplern und spielen nichts: {0}"
+
+# --- rollup 0.1.31 step 1: Save a copy for 0.1.30 (rounds 190nh / 190nc)
+"Effector's newer Kilohearts laws (the Comb Filter, Chorus, Trance Gate, Phaser, Distortion, Bitcrush, Frequency Shifter and Ensemble stand-ins) play Effector's own algorithm: {0}" = "Die neueren Kilohearts-Gesetze von Effector (die Ersatz-Plugins für Comb Filter, Chorus, Trance Gate, Phaser, Distortion, Bitcrush, Frequency Shifter und Ensemble) spielen Effectors eigenen Algorithmus: {0}"
+"Live's Solo/Cue settings (Cue mode, Cue Out, Cue Volume and the tracks' Cue switches); the Main mix plays the same" = "Lives Solo/Cue-Einstellungen (Cue-Modus, Cue Out, Cue-Lautstärke und die Cue-Schalter der Spuren); der Main-Mix klingt gleich"

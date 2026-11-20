@@ -11965,3 +11965,7 @@ countries: ru by kz
 "Strike point: drag along the bar (Position). At a mode's node that mode is not excited" = "Точка удара: перетащите вдоль пластины (Позиция). В узле моды эта мода не возбуждается"
 "Modes fitted to CC0 recordings (VCSL). No samples are played." = "Моды подогнаны по записям CC0 (VCSL). Сэмплы не воспроизводятся."
 "LYNX Model is not in this release: its channels become empty Samplers and play nothing: {0}" = "LYNX Model отсутствует в этой версии: его каналы становятся пустыми Sampler и ничего не играют: {0}"
+
+# --- rollup 0.1.31 step 1: Save a copy for 0.1.30 (rounds 190nh / 190nc)
+"Effector's newer Kilohearts laws (the Comb Filter, Chorus, Trance Gate, Phaser, Distortion, Bitcrush, Frequency Shifter and Ensemble stand-ins) play Effector's own algorithm: {0}" = "Более новые законы Kilohearts в Effector (замены Comb Filter, Chorus, Trance Gate, Phaser, Distortion, Bitcrush, Frequency Shifter и Ensemble) звучат собственным алгоритмом Effector: {0}"
+"Live's Solo/Cue settings (Cue mode, Cue Out, Cue Volume and the tracks' Cue switches); the Main mix plays the same" = "Настройки Solo/Cue из Live (режим Cue, Cue Out, громкость Cue и переключатели Cue у дорожек); основной микс (Main) звучит так же"
