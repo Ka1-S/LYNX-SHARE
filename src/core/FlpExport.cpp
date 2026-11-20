@@ -25,6 +25,7 @@
 #include "core/MixerOps.h"
 #include "core/Transmitter.h"
 #include "core/Vocodex.h"
+#include "core/KeyRegions.h"
 
 namespace lynx::flpexport
 {
@@ -1364,6 +1365,13 @@ struct Converter
         }
         else
             t.type = m.action;
+        if (m.action == Marker::keyScale) // round 190nu: the key, as FL 2026 writes it
+        {
+            t.keyRoot = m.keyRoot;
+            t.keyScale = m.keyFlScale;
+            if (const auto key = keyregions::keyOf (m))
+                t.keyMask = keyregions::flOutOfScaleMask (*key);
+        }
         return t;
     }
 

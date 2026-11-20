@@ -4,6 +4,7 @@
 #include "ui/FileChoosers.h"
 #include "ui/PianoRollComponent.h"
 #include "ui/ChordHelper.h"
+#include "ui/MixerComponent.h"
 #include "ui/PaintAB.h"
 #include "core/ChordReadout.h"
 #include "core/RowBands.h"
@@ -311,8 +312,15 @@ PianoRollComponent::PianoRollComponent (AudioEngine& e)
     }
 
     for (int i = 0; i < (int) chords().size(); ++i)
+    {
         chordBox.addItem (tr (chords()[(std::size_t) i].name), i + 1);
+        if (i == 0) // round 190nu (LYNX extra, discussion #105): the clicked degree's chord in the key of its region
+            chordBox.addItem (tr ("Scale degree chord"), degreeStampId);
+    }
     chordBox.setSelectedId (1, juce::dontSendNotification);
+    chordBox.onPopup = [this] { // (round 190nu: FL's stamp button opens the Stamp menu; the options of the degree chord on top)
+        stampMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&chordBox).withMinimumWidth (chordBox.getWidth()));
+    };
     chordBox.setTooltip (tr ("Clicking creates this chord (the clicked note is the root)"));
 
     // scale: root x type
@@ -404,7 +412,7 @@ PianoRollComponent::PianoRollComponent (AudioEngine& e)
     chordBubble.setInterceptsMouseClicks (false, false);
     addChildComponent (chordBubble);
 
-    for (auto* box : { &chordBox, static_cast<IconComboBox*> (&scaleBox) })
+    for (auto* box : { static_cast<IconComboBox*> (&chordBox), static_cast<IconComboBox*> (&scaleBox) })
     {
         box->setWantsKeyboardFocus (false);
         box->setMouseClickGrabsKeyboardFocus (false);
@@ -827,6 +835,67 @@ std::vector<int> PianoRollComponent::chordIntervals() const
     return intervals;
 }
 
+// --- round 190nu: key regions and the Scale degree chord (core/KeyRegions.h) ------------------------------------------
+keyregions::Degrees PianoRollComponent::scaleDegreesAt (std::int64_t tick) const
+{
+    const auto state = keyregions::stateAt (currentPattern (engine.getSong()), tick);
+    if (state.kind == keyregions::State::key)
+        return keyregions::degreesOf (state.value);
+    if (state.kind == keyregions::State::none)
+        return {};
+    if (isAutoScale()) // (the guessed key: 0..11 major, 12..23 minor)
+    {
+        if (autoKey < 0)
+            return {};
+        return autoKey < 12 ? keyregions::Degrees { autoKey, { 0, 2, 4, 5, 7, 9, 11 } } : keyregions::Degrees { autoKey - 12, { 0, 2, 3, 5, 7, 8, 10 } };
+    }
+    if (scaleIndex() > 0)
+        return { scaleRoot(), notetools::scales()[(std::size_t) scaleIndex()].intervals };
+    return {};
+}
+
+std::vector<int> PianoRollComponent::stampKeys (int key, std::int64_t tick) const
+{
+    std::vector<int> out;
+    const auto add = [&out] (int k) {
+        if (k >= 0 && k <= 127 && std::find (out.begin(), out.end(), k) == out.end())
+            out.push_back (k);
+    };
+    if (isDegreeStamp())
+    {
+        int root = key;
+        const auto chord = keyregions::diatonicChord (scaleDegreesAt (tick), key, degreeSize, degreeInversion, root);
+        if (chord.empty())
+            add (key); // (no key here: a single note; the hint says so)
+        else
+        {
+            // the root leads the drag, then the other notes from the lowest up
+            const auto rootAt = std::find_if (chord.begin(), chord.end(), [] (int i) { return ((i % 12) + 12) % 12 == 0; });
+            add (root + (rootAt != chord.end() ? *rootAt : 0));
+            for (const auto i : chord)
+                add (root + i);
+        }
+        return out;
+    }
+    const auto snapped = snapKey (key);
+    for (const auto interval : chordIntervals())
+        if (snapped + interval <= 127 && snapped + interval >= 0)
+            add (snapKey (snapped + interval)); // with scale snap the chord follows the scale
+    return out;
+}
+
+void PianoRollComponent::addKeyMarker (std::int64_t tick, const keyregions::State& state)
+{
+    engine.editSong ([tick, state] (Song& s) { keyregions::addKeyMarker (currentPattern (s), tick, state); });
+    repaint();
+}
+
+void PianoRollComponent::addKeyRegion (std::int64_t from, std::int64_t to, const keyregions::State& state)
+{
+    engine.editSong ([from, to, state] (Song& s) { keyregions::addKeyRegion (currentPattern (s), from, to, state); });
+    repaint();
+}
+
 int PianoRollComponent::scaleIndex() const
 {
     const auto id = scaleBox.getSelectedId();
@@ -1174,6 +1243,29 @@ void PianoRollComponent::paint (juce::Graphics& g)
         auto bandRows = rowbands::of (pattern.notes, selection);
         if (noteDrag)
             bandRows |= rowbands::of (pattern.notes, dragIndices);
+        // round 190nu (core/KeyRegions.h): FL's key markers shade each region's rows for its own key (before the first one,
+        // and after a Default one, the editor's own scale as before); only the regions in view, none without key markers
+        struct RegionRows
+        {
+            int x0, x1;
+            keyregions::State state;
+            keyregions::Degrees degrees;
+        };
+        std::vector<RegionRows> regionRows;
+        if (gridHighlights && ! liveLookNotes && keyregions::hasKeyMarkers (pattern))
+        {
+            const auto rightTick = (std::int64_t) xToTick (grid.getRight()) + 1;
+            for (const auto& span : keyregions::spans (pattern, std::max<std::int64_t> (rightTick, 1)))
+            {
+                auto x0 = (int) std::floor (tickToX ((double) span.from)), x1 = (int) std::ceil (tickToX ((double) span.to));
+                x0 = std::max (x0, grid.getX());
+                x1 = std::min (x1, grid.getRight());
+                if (x1 > x0)
+                    regionRows.push_back ({ x0, x1, span.state, span.state.kind == keyregions::State::key ? keyregions::degreesOf (span.state.value) : keyregions::Degrees {} });
+            }
+            if (! regionRows.empty()) // (the last region goes on past the right edge)
+                regionRows.back().x1 = grid.getRight();
+        }
         for (int key = 0; key < 128; ++key)
         {
             const auto y = keyToY (key);
@@ -1196,8 +1288,27 @@ void PianoRollComponent::paint (juce::Graphics& g)
                 row = rowBand (row, liveLookNotes);
             else if (key == hover.key && drag == Drag::none)
                 row = row.interpolatedWith (textPrimary, 0.04f); // the row under the mouse
-            g.setColour (row);
-            g.fillRect (grid.getX(), y, grid.getWidth(), rowHeight);
+            if (regionRows.empty())
+            {
+                g.setColour (row);
+                g.fillRect (grid.getX(), y, grid.getWidth(), rowHeight);
+            }
+            else
+                for (const auto& r : regionRows)
+                {
+                    auto shade = row; // (the editor's own scale)
+                    if (r.state.kind != keyregions::State::editor)
+                    {
+                        shade = r.state.kind == keyregions::State::key ? (r.degrees.contains (key) ? rowWhite : prRowBlack)
+                                                                       : (blackKeyRows && isBlackKey (key) ? prRowBlack : rowWhite);
+                        if (bandRows.test ((std::size_t) key))
+                            shade = rowBand (shade, false);
+                        else if (key == hover.key && drag == Drag::none)
+                            shade = shade.interpolatedWith (textPrimary, 0.04f);
+                    }
+                    g.setColour (shade);
+                    g.fillRect (r.x0, y, r.x1 - r.x0, rowHeight);
+                }
             // (round 190jn: Live's darker line under each row; round 190jo FM-15: FL's 1 px line under every row, the note
             // sits above it)
             if (liveLookNotes || rowHeight >= 10)
@@ -1399,6 +1510,40 @@ void PianoRollComponent::paint (juce::Graphics& g)
 
         if (! mpeLaneAreas().empty()) // (round 190hy: as Live's MPE view, each note's pitch curve over it)
             paintMpePitchOnNotes (g, grid);
+
+        // round 190nu: the Scale degree chord a click would write, as outlines with its numeral and name (LYNX's look: the
+        // accent outline, a faint fill; only while the degree stamp is chosen and the mouse rests on the empty grid)
+        if (degreeGhost.tick >= 0 && ! degreeGhost.keys.empty())
+        {
+            const auto x = (float) tickToX ((double) degreeGhost.tick);
+            const auto w = juce::jmax (6.0f, (float) ((double) degreeGhost.length * pixelsPerTick) - 1.0f);
+            float top = (float) grid.getBottom(), bottom = (float) grid.getY();
+            for (const auto k : degreeGhost.keys)
+                if (rows.shown (k))
+                {
+                    const auto r = juce::Rectangle<float> (x, (float) keyToY (k) + 1.0f, w, (float) rowHeight - 2.0f);
+                    g.setColour (accent.withAlpha (0.16f));
+                    g.fillRoundedRectangle (r, 2.0f);
+                    g.setColour (accent.withAlpha (0.85f));
+                    g.drawRoundedRectangle (r.reduced (0.5f), 2.0f, 1.0f);
+                    top = juce::jmin (top, r.getY());
+                    bottom = juce::jmax (bottom, r.getBottom());
+                }
+            if (top - 20.0f < (float) grid.getY()) // (no room above the chord: the label goes under it)
+                top = bottom + 20.0f;
+            if (degreeGhost.label.isNotEmpty())
+            {
+                g.setFont (theme::font (theme::type::caption, true));
+                const auto tw = juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), degreeGhost.label) + 10;
+                const auto tag = juce::Rectangle<float> (x, top - 18.0f, (float) tw, 16.0f);
+                g.setColour (bg4.withAlpha (0.94f));
+                g.fillRoundedRectangle (tag, 3.0f);
+                g.setColour (accent.withAlpha (0.8f));
+                g.drawRoundedRectangle (tag.reduced (0.5f), 3.0f, 1.0f);
+                g.setColour (textPrimary);
+                g.drawText (degreeGhost.label, tag.toNearestInt(), juce::Justification::centred, false);
+            }
+        }
 
         if (! rubberBand.isEmpty())
         {
@@ -1612,7 +1757,16 @@ void PianoRollComponent::paint (juce::Graphics& g)
             auto label = juce::String::fromUTF8 (m.name.c_str());
             if (label.isEmpty() && m.action != 0)
                 label = tr (markers::actionName (m.action));
-            textcache::drawText (g, label, (int) x + 8, rulerTop + 10, 110, timelineHeight - 11, juce::Justification::centredLeft);
+            auto textX = (int) x + 8;
+            if (keyregions::isKeyMarker (m)) // round 190nu: FL's key marker shows a note before its key ("♪ C Major (Ionian)")
+            {
+                const auto cy = (float) rulerTop + 10.0f + (float) (timelineHeight - 11) * 0.5f;
+                g.fillEllipse ((float) textX, cy + 1.0f, 4.5f, 3.5f);
+                g.fillRect ((float) textX + 3.5f, cy - 6.0f, 1.0f, 8.0f);
+                g.fillRect ((float) textX + 3.5f, cy - 6.0f, 3.0f, 1.0f);
+                textX += 9;
+            }
+            textcache::drawText (g, label, textX, rulerTop + 10, keyregions::isKeyMarker (m) ? 160 : 110, timelineHeight - 11, juce::Justification::centredLeft);
         }
 
         if (playheadTick >= 0.0 && ! gpuPlayhead.isShowing())
@@ -2105,14 +2259,12 @@ void PianoRollComponent::paintNoteAt (std::int64_t start, int key, bool monophon
     n.colour = noteColour;
 
     std::vector<Note> stamp;
-    for (auto interval : chordIntervals())
-        if (n.key + interval <= 127 && n.key + interval >= 0)
-        {
-            auto chordNote = n;
-            chordNote.key = snapKey (n.key + interval); // with scale snap the chord follows the scale
-            if (std::none_of (stamp.begin(), stamp.end(), [&chordNote] (const Note& o) { return o.key == chordNote.key; }))
-                stamp.push_back (chordNote);
-        }
+    for (const auto k : stampKeys (n.key, n.start)) // (the chord stamp; round 190nu: or the Scale degree chord)
+    {
+        auto chordNote = n;
+        chordNote.key = k;
+        stamp.push_back (chordNote);
+    }
 
     editNotes ([&] (Pattern& p) {
         if (monophonic) // Shift (or no Shift with "Monophonic painting"): the new note replaces what this channel plays then
@@ -2626,20 +2778,21 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
     noteTemplate.applyTo (n);
     n.start = juce::jmax<std::int64_t> (0, snap (xToTick (e.x), snapOn));
     n.length = newNoteLength();
-    n.key = snapKey (yToKey (e.y));
     n.channel = engine.getSelectedChannel();
     n.slide = slideButton.getToggleState();
     n.colour = noteColour;
 
+    // the chord stamp's notes on the clicked key (round 190nu: or the Scale degree chord in the key of the click's region);
+    // the first one leads the drag
     std::vector<Note> stamp;
-    for (auto interval : chordIntervals())
-        if (n.key + interval <= 127 && n.key + interval >= 0)
-        {
-            auto chordNote = n;
-            chordNote.key = snapKey (n.key + interval); // with scale snap the chord follows the scale
-            if (std::none_of (stamp.begin(), stamp.end(), [&chordNote] (const Note& o) { return o.key == chordNote.key; }))
-                stamp.push_back (chordNote);
-        }
+    for (const auto k : stampKeys (isDegreeStamp() ? yToKey (e.y) : snapKey (yToKey (e.y)), n.start))
+    {
+        auto chordNote = n;
+        chordNote.key = k;
+        stamp.push_back (chordNote);
+    }
+    n.key = stamp.empty() ? snapKey (yToKey (e.y)) : stamp.front().key;
+    clearDegreeGhost();
 
     std::vector<int> added;
     editNotes ([&] (Pattern& p) { added = noteedit::paste (p, stamp, 0); });
@@ -3359,6 +3512,7 @@ void PianoRollComponent::mouseMove (const juce::MouseEvent& e)
     if (mpeStacked) // round 190jd: the value ghost point on a lane's line
         updateMpeGhost (e.getPosition());
     updateHover (e.getPosition(), e.mods);
+    updateDegreeGhost (e.getPosition()); // (round 190nu: nothing unless the Scale degree chord is the stamp)
     feedMagicLasso (e.getPosition(), false); // (round 190mp, DE-71: nothing while the option is off)
     if (const auto inLane = velocityArea().contains (e.getPosition()); liveNotes() && inLane != liveLaneHover) // (round 190mf, DL-80)
     {
@@ -3374,6 +3528,7 @@ void PianoRollComponent::mouseExit (const juce::MouseEvent&)
         repaint (zoomWheelArea());
     if (mpeGhost.x >= 0.0f)
         updateMpeGhost ({ -1, -1 });
+    clearDegreeGhost();
 
     if (! (hover == Hover {}))
     {
@@ -6210,6 +6365,13 @@ juce::PopupMenu PianoRollComponent::stampMenu()
     for (int i = 0; i < chordBox.getNumItems(); ++i)
     {
         const auto id = chordBox.getItemId (i);
+        if (id == degreeStampId) // round 190nu: the Scale degree chord, its options beside it
+        {
+            menu.addItem (chordBox.getItemText (i), true, isDegreeStamp(), [this] { setDegreeStamp (true); });
+            menu.addSubMenu (tr ("Scale degree chord options"), degreeOptionsMenu());
+            menu.addSeparator();
+            continue;
+        }
         menu.addItem (chordBox.getItemText (i) + (id == 1 ? keyText ("pianoRoll.stampNone") : juce::String()), true, chordBox.getSelectedId() == id,
                       [this, id] { chordBox.setSelectedId (id, juce::sendNotificationSync); });
     }
@@ -6281,6 +6443,150 @@ juce::PopupMenu PianoRollComponent::scaleHighlightMenu()
     return menu;
 }
 
+// --- round 190nu: the Scale degree chord's ghost and its preview (core/KeyRegions.h) -----------------------------------
+juce::Rectangle<int> PianoRollComponent::degreeGhostArea() const
+{
+    if (degreeGhost.tick < 0 || degreeGhost.keys.empty())
+        return {};
+    const auto lo = *std::min_element (degreeGhost.keys.begin(), degreeGhost.keys.end());
+    const auto hi = *std::max_element (degreeGhost.keys.begin(), degreeGhost.keys.end());
+    const auto x = (int) tickToX ((double) degreeGhost.tick);
+    const auto w = juce::jmax (6, (int) ((double) degreeGhost.length * pixelsPerTick)) + 200; // (and its label)
+    return juce::Rectangle<int>::leftTopRightBottom (x - 2, keyToY (hi) - 22, x + w, keyToY (lo) + rowHeight + 22).getIntersection (gridArea());
+}
+
+void PianoRollComponent::clearDegreeGhost()
+{
+    stopDegreeHear();
+    if (degreeGhost.tick < 0)
+        return;
+    repaint (degreeGhostArea());
+    degreeGhost = {};
+}
+
+void PianoRollComponent::updateDegreeGhost (juce::Point<int> at)
+{
+    const auto tool = tools.getTool();
+    bool right = false;
+    if (! isDegreeStamp() || drag != Drag::none || ! gridArea().contains (at) || (tool != EditTool::pencil && tool != EditTool::brush)
+        || noteAt (at.x, at.y, right) >= 0)
+        return clearDegreeGhost();
+    DegreeGhost next;
+    next.tick = juce::jmax<std::int64_t> (0, snap (xToTick (at.x), true));
+    next.length = newNoteLength();
+    const auto clicked = yToKey (at.y);
+    next.keys = stampKeys (clicked, next.tick);
+    const auto scale = scaleDegreesAt (next.tick);
+    if (! scale.valid())
+        next.label = tr ("No key here: add a key marker (Time markers) or choose a scale");
+    else
+    {
+        int root = clicked;
+        const auto shape = keyregions::diatonicChord (scale, clicked, degreeSize, degreeInversion, root);
+        std::vector<int> keys;
+        for (const auto i : shape)
+            keys.push_back (root + i);
+        const auto numeral = keyregions::degreeNumeral (scale, root, keys, degreeSize);
+        const auto detected = prtools::detectChord (keys, notenames::currentFlats.load() || keyregions::prefersFlats (scale));
+        next.label = juce::String::fromUTF8 (numeral.c_str()) + (detected ? juce::String::fromUTF8 ("  \xc2\xb7  ") + juce::String::fromUTF8 (detected->name.c_str()) : juce::String());
+    }
+    if (next.tick == degreeGhost.tick && next.keys == degreeGhost.keys && next.label == degreeGhost.label)
+        return;
+    repaint (degreeGhostArea());
+    degreeGhost = std::move (next);
+    repaint (degreeGhostArea());
+    // the preview: the chord sounds once the mouse rests on it (a quarter of a second), not while it moves on
+    stopDegreeHear();
+    if (degreeHear && scale.valid())
+    {
+        degreeHearStage = 0;
+        degreeHearTimer.startTimer (300);
+    }
+}
+
+void PianoRollComponent::degreeHearStep()
+{
+    for (const auto k : degreeSounding)
+        engine.sendLiveNote (degreeSoundingChannel, k, 0.0f, false);
+    degreeSounding.clear();
+    if (degreeHearStage == 0 && degreeGhost.tick >= 0)
+    {
+        degreeSoundingChannel = engine.getSelectedChannel();
+        for (const auto k : degreeGhost.keys)
+        {
+            engine.sendLiveNote (degreeSoundingChannel, k, noteTemplate.velocity, true);
+            degreeSounding.push_back (k);
+        }
+        degreeHearStage = 1;
+        degreeHearTimer.startTimer (700); // (how long it sounds)
+        return;
+    }
+    degreeHearTimer.stopTimer();
+}
+
+void PianoRollComponent::stopDegreeHear()
+{
+    degreeHearTimer.stopTimer();
+    for (const auto k : degreeSounding)
+        engine.sendLiveNote (degreeSoundingChannel, k, 0.0f, false);
+    degreeSounding.clear();
+    degreeHearStage = 0;
+}
+
+juce::PopupMenu PianoRollComponent::degreeOptionsMenu()
+{
+    juce::PopupMenu menu;
+    const auto pick = [this] (keyregions::DegreeSize size) {
+        degreeSize = size;
+        degreeGhost.label.clear(); // (the ghost takes the new shape at the next mouse move)
+        if (mixeroptions::changed) mixeroptions::changed();   // (saved with the UI options)
+    };
+    menu.addSectionHeader (tr ("Chord"));
+    menu.addItem (tr ("Triad"), true, degreeSize == keyregions::DegreeSize::triad, [pick] { pick (keyregions::DegreeSize::triad); });
+    menu.addItem (tr ("6th"), true, degreeSize == keyregions::DegreeSize::sixth, [pick] { pick (keyregions::DegreeSize::sixth); });
+    menu.addItem (tr ("7th"), true, degreeSize == keyregions::DegreeSize::seventh, [pick] { pick (keyregions::DegreeSize::seventh); });
+    menu.addItem (tr ("9th"), true, degreeSize == keyregions::DegreeSize::ninth, [pick] { pick (keyregions::DegreeSize::ninth); });
+    menu.addSectionHeader (tr ("Inversion"));
+    const char* names[] = { TR_NOOP ("Root position"), TR_NOOP ("1st inversion"), TR_NOOP ("2nd inversion"), TR_NOOP ("3rd inversion"), TR_NOOP ("4th inversion") };
+    const auto most = degreeSize == keyregions::DegreeSize::triad ? 2 : degreeSize == keyregions::DegreeSize::ninth ? 4 : 3;
+    for (int i = 0; i <= most; ++i)
+        menu.addItem (tr (names[i]), true, degreeInversion == i, [this, i] {
+            degreeInversion = i;
+            if (mixeroptions::changed) mixeroptions::changed();
+        });
+    menu.addSeparator();
+    menu.addItem (tr ("Hear the chord before clicking"), true, degreeHear, [this] {
+        degreeHear = ! degreeHear;
+        if (! degreeHear)
+            stopDegreeHear();
+        if (mixeroptions::changed) mixeroptions::changed();
+    });
+    return menu;
+}
+
+// FL's key menu (View › Scale highlighting's, on a key marker: "Root note" and "Scale" side by side; Default and Black
+// notes first): a root keeps the scale, a scale keeps the root; for a new marker the root shown is the key in force there
+juce::PopupMenu PianoRollComponent::keyChoiceMenu (const keyregions::State& current, std::function<void (keyregions::State)> pick)
+{
+    juce::PopupMenu menu;
+    const auto isKey = current.kind == keyregions::State::key;
+    const auto root = isKey ? current.value.root : juce::jmax (0, scaleTonic());
+    const auto scale = isKey ? current.value.flScale : keyregions::majorScale();
+    menu.addSectionHeader (tr ("Root note"));
+    for (int r = 0; r < 12; ++r)
+        menu.addItem (juce::String (notenames::pitchName (r)), true, isKey && root == r,
+                      [pick, r, scale] { pick ({ keyregions::State::key, { r, scale } }); });
+    menu.addColumnBreak();
+    menu.addSectionHeader (tr ("Scale"));
+    menu.addItem (tr ("Default"), true, current.kind == keyregions::State::editor, [pick] { pick ({ keyregions::State::editor, {} }); });
+    menu.addItem (tr ("Black notes"), true, current.kind == keyregions::State::none, [pick] { pick ({ keyregions::State::none, {} }); });
+    menu.addSeparator();
+    const auto& list = notetools::flReferenceScales();
+    for (int i = 0; i < (int) list.size(); ++i)
+        menu.addItem (tr (list[(std::size_t) i].name), true, isKey && scale == i, [pick, root, i] { pick ({ keyregions::State::key, { root, i } }); });
+    return menu;
+}
+
 // --- the pattern's time markers (round 168g, docs/analise/REA_rodada168g.md §M13) --------------------------------------
 juce::PopupMenu PianoRollComponent::markersMenu()
 {
@@ -6289,6 +6595,19 @@ juce::PopupMenu PianoRollComponent::markersMenu()
     menu.addItem (tr ("Add one...") + keyText ("pianoRoll.markerAdd"), [this] { runAction ("pianoRoll.markerAdd"); });
     menu.addItem (tr ("Add auto") + keyText ("pianoRoll.markerAuto"), [this] { runAction ("pianoRoll.markerAuto"); });
     menu.addItem (tr ("Add time signature change...") + keyText ("pianoRoll.markerSignature"), [this] { runAction ("pianoRoll.markerSignature"); });
+    {
+        // round 190nu: FL's "Add key marker" (at the time selection's start, else the playhead, as the other markers here)
+        // and LYNX's key region over the time selection (its end brings back what was there)
+        const auto tick = markerKeyTick();
+        const auto here = keyregions::stateAt (currentPattern (engine.getSong()), tick);
+        menu.addSubMenu (tr ("Add key marker"), keyChoiceMenu (here, [this, tick] (keyregions::State s) { addKeyMarker (tick, s); }));
+        const auto hasTime = timeFrom >= 0 && timeTo > timeFrom;
+        const auto from = timeFrom, to = timeTo;
+        menu.addSubMenu (tr ("Key region for the time selection"),
+                         keyChoiceMenu (hasTime ? keyregions::stateAt (currentPattern (engine.getSong()), from) : here,
+                                        [this, from, to] (keyregions::State s) { addKeyRegion (from, to, s); }),
+                         hasTime);
+    }
     const auto any = ! currentPattern (engine.getSong()).markers.empty();
     menu.addSeparator();
     menu.addItem (tr ("Delete all markers"), any, false, [this] {
@@ -6389,7 +6708,21 @@ int PianoRollComponent::markerAtX (int x) const
 
 void PianoRollComponent::showPatternMarkerMenu (int index)
 {
+    patternMarkerMenu (index).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+}
+
+juce::PopupMenu PianoRollComponent::patternMarkerMenu (int index)
+{
     juce::PopupMenu menu;
+    const auto& markers = currentPattern (engine.getSong()).markers;
+    if (index >= 0 && index < (int) markers.size()) // (FL's heading: "C Minor Natural (Aeolian) - Key/Scale at 3:01:00")
+    {
+        const auto& m = markers[(std::size_t) index];
+        auto title = juce::String::fromUTF8 (m.name.c_str());
+        if (m.action != 0)
+            title += " - " + tr (markers::actionName (m.action));
+        menu.addSectionHeader (title);
+    }
     menu.addItem (tr ("Rename marker..."), [this, index] { editPatternMarker (0, index); });
     menu.addItem (tr ("Delete marker"), [this, index] {
         engine.editSong ([index] (Song& s) {
@@ -6399,9 +6732,24 @@ void PianoRollComponent::showPatternMarkerMenu (int index)
         });
         repaint();
     });
+    // round 190nu: FL's Action › Key/scale (on any marker: it becomes a key marker, named after its key)
+    if (index >= 0 && index < (int) markers.size())
+    {
+        const auto& m = markers[(std::size_t) index];
+        const auto now = keyregions::isKeyMarker (m) ? keyregions::stateOf (m) : keyregions::stateAt (currentPattern (engine.getSong()), m.tick);
+        menu.addSubMenu (tr ("Key/scale"), keyChoiceMenu (now, [this, index] (keyregions::State s) {
+                             engine.editSong ([index, s] (Song& song) {
+                                 auto& list = currentPattern (song).markers;
+                                 if (index >= 0 && index < (int) list.size())
+                                     keyregions::setState (list[(std::size_t) index], s);
+                             });
+                             repaint();
+                         }),
+                         true, juce::Image(), keyregions::isKeyMarker (m));
+    }
     menu.addSeparator();
     menu.addSubMenu (tr ("Time markers"), markersMenu());
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    return menu;
 }
 // --- MPE lanes (round 190hy, issue #108; core/NoteCurves.h, docs/analise/REA_rodada190hy-mpe.md) -------------------
 // Each note's own pitch bend / slide / pressure curve, edited as Live 11+ edits its note expression: the lane shows the

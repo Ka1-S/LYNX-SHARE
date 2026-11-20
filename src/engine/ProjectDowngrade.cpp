@@ -1381,13 +1381,38 @@ void toRelease0127 (juce::var& root, Losses& lost)
         lost.push_back ({ TR_NOOP ("The Playlist's row height"), {}, false });
 }
 
+// --- 0.1.31 → 0.1.30 ------------------------------------------------------------------------------------------------------
+// Round 190nu (core/KeyRegions.h): the Piano roll's key markers keep their keys in "markerKeys" beside each pattern's
+// marker list. 0.1.30 keeps such markers as named Key/Scale markers with no effect: their keys go, the names stay.
+// (The integration round folds this into rollup 0.1.31's own 0.1.30 step: call it from there.)
+void keyMarkersFor0130 (juce::var& root, Losses& lost)
+{
+    int keyMarkers = 0;
+    if (auto* patterns = arrayOf (root["patterns"]))
+        for (auto& p : *patterns)
+            if (auto* po = objectOf (p))
+            {
+                if (auto* keys = arrayOf (po->getProperty ("markerKeys")))
+                    keyMarkers += keys->size();
+                drop (*po, "markerKeys");
+            }
+    if (keyMarkers > 0)
+        lost.push_back ({ TR_NOOP ("{0} key marker(s) in the Piano roll keep their names but not their keys (the rows show the Piano roll's own scale)"),
+                          juce::String (keyMarkers), false });
+}
+
+void toRelease0130 (juce::var& root, Losses& lost)
+{
+    keyMarkersFor0130 (root, lost);
+}
+
 struct Step
 {
     const char* release;                    // the release this step's output is for
     void (*apply) (juce::var&, Losses&);
 };
 // newest first: a copy for release R runs every step down to R's
-constexpr Step steps[] = { { "0.1.28", toRelease0128 }, { "0.1.27", toRelease0127 } };
+constexpr Step steps[] = { { "0.1.30", toRelease0130 }, { "0.1.28", toRelease0128 }, { "0.1.27", toRelease0127 } };
 } // namespace
 
 juce::StringArray releases()

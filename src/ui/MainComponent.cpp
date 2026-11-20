@@ -45,6 +45,7 @@
 #include "ui/UiTrace.h"
 #include "core/LoadTrace.h"
 #include "ui/MainComponent.h"
+#include "ui/ChordHelper.h"
 #include "ui/Motion.h"
 #include "ui/RemoteControlSettings.h"
 #include "ui/NativeChild.h"
@@ -3249,6 +3250,16 @@ void MainComponent::loadUiSettings()
             PianoRollComponent::blackKeyRows = on;
         else if (key == "prShowChordName")
             PianoRollComponent::showChordName = on;
+        else if (key == "prDegreeSize") // (round 190nu: the Scale degree chord's options)
+            PianoRollComponent::degreeSize = (keyregions::DegreeSize) juce::jlimit (0, 3, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
+        else if (key == "prDegreeInversion")
+            PianoRollComponent::degreeInversion = juce::jlimit (0, 4, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
+        else if (key == "prDegreeHear")
+            PianoRollComponent::degreeHear = on;
+        else if (key == "chordFavourites") // (round 190nu: the Chord helper's pinned relationships)
+            ChordHelperPanel::favourites = modalhelp::favouritesFrom (line.fromFirstOccurrenceOf ("=", false, false).trim().toStdString());
+        else if (key == "chordPinnedFirst")
+            ChordHelperPanel::pinnedFirst = on;
         else if (key == "prSongBars")
             PianoRollComponent::songBarsRuler = on;
         else if (key == "polyPrepareOnOpen") // (round 190lo: a LYNX extra, ui/PolyEditor.h)
@@ -3596,6 +3607,11 @@ void MainComponent::saveUiSettings()
                                       + "\nprGridHighlights=" + juce::String (PianoRollComponent::gridHighlights ? 1 : 0)
                                       + "\nprBlackKeyRows=" + juce::String (PianoRollComponent::blackKeyRows ? 1 : 0)
                                       + "\nprShowChordName=" + juce::String (PianoRollComponent::showChordName ? 1 : 0)
+                                      + "\nprDegreeSize=" + juce::String ((int) PianoRollComponent::degreeSize)
+                                      + "\nprDegreeInversion=" + juce::String (PianoRollComponent::degreeInversion)
+                                      + "\nprDegreeHear=" + juce::String (PianoRollComponent::degreeHear ? 1 : 0)
+                                      + "\nchordFavourites=" + juce::String (modalhelp::favouritesText (ChordHelperPanel::favourites))
+                                      + "\nchordPinnedFirst=" + juce::String (ChordHelperPanel::pinnedFirst ? 1 : 0)
                                       + "\nprSongBars=" + juce::String (PianoRollComponent::songBarsRuler ? 1 : 0)
                                       + "\npolyPrepareOnOpen=" + juce::String (PolyEditorWindows::prepareOnOpen ? 1 : 0)
                                       + "\nprKeyStyle=" + juce::String ((int) PianoRollComponent::keyStyle)

@@ -3,6 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/EventPaneSplit.h"
+#include "core/KeyRegions.h"
 #include "core/LiveGrid.h"
 #include "core/MagicLasso.h"
 #include "core/MpeTab.h"
@@ -486,13 +487,6 @@ private:
     IconButton followButton { "follow", Icon::follow }; // Follow (auto scrolling) on/off, EditorGlobals (round 162)
     void quantizeOperation (int kind); // 0 = starts, 1 = starts and lengths (quick quantize), 2 = starts 50% toward the grid
     juce::ComboBox laneBox; // what the bottom lane edits: velocity, pan or fine pitch
-    IconComboBox chordBox { Icon::chord }; // chord created on each click (like FL's "stamp")
-    IconButton slideButton { "slide", Icon::slide }; // new notes slide (like FL's slide tool)
-    // scale highlighted on the keyboard rows. Issue #203 (round 190ll): its list held every scale on each of the 12
-    // roots (C Major, C# Major, ... B Locrian). In the FL layout a click opens FL's View › Scale highlighting menu
-    // instead (its "Root note" and "Scale" sections: one root, one scale); docked in the Clip-launch and Simple layouts
-    // the root and the scale are two boxes side by side, as Live's Clip View "Scale" (root | scale name) and BandLab's
-    // Smart View (key | scale). This box stays the one place the choice lives (its ids, the saved data, the tests).
     class ScaleBox final : public IconComboBox
     {
     public:
@@ -506,6 +500,15 @@ private:
                 IconComboBox::showPopup();
         }
     };
+    // chord created on each click (like FL's "stamp"); round 190nu: a click opens the Stamp menu (FL's stamp button opens
+    // its menu), with the Scale degree chord and its options on top
+    ScaleBox chordBox { Icon::chord };
+    IconButton slideButton { "slide", Icon::slide }; // new notes slide (like FL's slide tool)
+    // scale highlighted on the keyboard rows. Issue #203 (round 190ll): its list held every scale on each of the 12
+    // roots (C Major, C# Major, ... B Locrian). In the FL layout a click opens FL's View › Scale highlighting menu
+    // instead (its "Root note" and "Scale" sections: one root, one scale); docked in the Clip-launch and Simple layouts
+    // the root and the scale are two boxes side by side, as Live's Clip View "Scale" (root | scale name) and BandLab's
+    // Smart View (key | scale). This box stays the one place the choice lives (its ids, the saved data, the tests).
     ScaleBox scaleBox { Icon::keyboard };
     juce::ComboBox scaleRootBox, scaleNameBox; // (issue #203: docked in the Clip-launch / Simple layouts)
     int splitRoot = 0;                         // the root box's choice while no scale is chosen
@@ -533,6 +536,51 @@ private:
     void showKeyMenu (int key); // right-click on the keyboard: key labels of the channel
     std::vector<int> chordIntervals() const;
     bool chordTopDown = false; // the chord stamp puts the clicked key on top (FL 2026's top-down mode)
+    // --- round 190nu (discussion #105; core/KeyRegions.h): key regions and the Scale degree chord ----------------------
+    static constexpr int degreeStampId = 1000; // the chord box's "Scale degree chord" item
+public:
+    bool isDegreeStamp() const { return chordBox.getSelectedId() == degreeStampId; }
+    void setDegreeStamp (bool on) { chordBox.setSelectedId (on ? degreeStampId : 1, juce::sendNotificationSync); }
+    // its options (saved with the UI options): the chord's size, the inversion, and "Hear the chord before clicking"
+    static inline keyregions::DegreeSize degreeSize = keyregions::DegreeSize::triad;
+    static inline int degreeInversion = 0;
+    static inline bool degreeHear = true;
+    // the scale in force at `tick`: its key region's (a key marker), else this editor's own (the scale box / Automatic)
+    keyregions::Degrees scaleDegreesAt (std::int64_t tick) const;
+    // the keys a click on `key` at `tick` writes with the chosen stamp (the first leads the drag): the chord shape on the
+    // scale-snapped key, or the Scale degree chord in the region's key; one key without a stamp (or without a key)
+    std::vector<int> stampKeys (int key, std::int64_t tick) const;
+    // key markers (FL's Time markers › Add key marker; LYNX: a key region over the time selection)
+    void addKeyMarker (std::int64_t tick, const keyregions::State& state);
+    void addKeyRegion (std::int64_t from, std::int64_t to, const keyregions::State& state);
+    juce::PopupMenu getMarkersMenuForSnapshot() { return markersMenu(); }
+    juce::PopupMenu getPatternMarkerMenuForSnapshot (int index) { return patternMarkerMenu (index); }
+    // the ghost of the chord a click would write (the Scale degree chord), at the mouse; its keys and label
+    void hoverDegreeForSnapshot (juce::Point<int> at) { updateDegreeGhost (at); }
+    std::vector<int> degreeGhostKeys() const { return degreeGhost.keys; }
+    juce::String degreeGhostLabel() const { return degreeGhost.label; }
+    bool degreeHearRunning() const { return degreeHearTimer.isTimerRunning(); }
+    juce::Point<int> pointForSnapshot (int key, std::int64_t tick) const { return { (int) tickToX ((double) tick) + 4, keyToY (key) + rowHeight / 2 }; }
+private:
+    struct DegreeGhost
+    {
+        std::int64_t tick = -1, length = 0;
+        std::vector<int> keys;
+        juce::String label;
+    } degreeGhost;
+    void updateDegreeGhost (juce::Point<int> at);
+    void clearDegreeGhost();
+    juce::Rectangle<int> degreeGhostArea() const;
+    juce::PopupMenu keyChoiceMenu (const keyregions::State& current, std::function<void (keyregions::State)> pick);
+    juce::PopupMenu degreeOptionsMenu();
+    juce::PopupMenu patternMarkerMenu (int index);
+    // "Hear the chord before clicking": after a short rest of the mouse, the ghost chord sounds (no timer otherwise)
+    juce::TimedCallback degreeHearTimer { [this] { degreeHearStep(); } };
+    void degreeHearStep();
+    void stopDegreeHear();
+    int degreeHearStage = 0;
+    std::vector<int> degreeSounding;
+    int degreeSoundingChannel = -1;
     bool inScale (int key) const;
     int scaleRoot() const;  // 0..11
     int scaleIndex() const; // index into notetools::scales(), 0 = none (also Automatic)

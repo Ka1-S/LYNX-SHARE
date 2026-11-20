@@ -69,6 +69,17 @@ public:
     void setAudition (bool on) { audition = on; repaint(); }
     void overrideKey (std::optional<int> tonic, std::optional<modalhelp::Mode> mode);
     int computations() const noexcept { return computeCount; } // how often the analysis ran
+
+    // --- favourites (round 190nu, discussion #105): pinned relationships (modalhelp::favouriteId: no fixed key, so they
+    // show in every key); with "Pinned first" (on by default) they float to the top of their list, keeping the ranking
+    // among them; off, they are only highlighted. App-wide, saved with the UI options.
+    static inline std::vector<std::string> favourites;
+    static inline bool pinnedFirst = true;
+    bool isPinnedKey (int row) const;
+    bool isPinnedChord (int row) const;
+    void togglePinKey (int row);
+    void togglePinChord (int row);
+    void setPinnedFirst (bool on);
     bool previewRunning() const noexcept { return isTimerRunning(); }
 
 private:
@@ -91,7 +102,10 @@ private:
     int headHeight() const;
     int keyRowAt (juce::Point<int> p) const;
     int chordRowAt (juce::Point<int> p) const;
-    int sideItemAt (juce::Point<int> p) const; // 0…4 inversions, 10…15 extensions, −1 none
+    int sideItemAt (juce::Point<int> p) const; // 0…4 inversions, 10…15 extensions, 20 Pinned first, −1 none
+    juce::Rectangle<int> starOf (juce::Rectangle<int> area, int row, int scroll) const; // a row's pin (round 190nu)
+    void order();                                 // the pinned rows first (round 190nu)
+    static void favouritesChanged();
     juce::Rectangle<int> sideItem (int id) const;
 
     juce::String signatureText (const modalhelp::Scale& s) const;

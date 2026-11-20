@@ -28,6 +28,7 @@
 #include "core/GrossBeat.h"
 #include "core/LovePhilter.h"
 #include "core/DrumSynthLive.h"
+#include "core/KeyRegions.h"
 #include "core/Gms.h"
 #include "core/Harmless.h"
 #include "core/Morphine.h"
@@ -3543,6 +3544,13 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         {
             marker.numerator = m.numerator;
             marker.denominator = m.denominator;
+        }
+        if (m.type == Marker::keyScale) // round 190nu: FL's key marker (core/KeyRegions.h)
+        {
+            if (const auto key = keyregions::keyFromFl (m.keyRoot, m.keyScale, m.keyMask))
+                marker.keyRoot = key->root, marker.keyFlScale = key->flScale;
+            else
+                marker.keyFlScale = m.keyScale == -1 ? keyregions::defaultScale : keyregions::noScale;
         }
         return marker;
     };

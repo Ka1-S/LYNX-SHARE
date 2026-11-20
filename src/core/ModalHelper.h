@@ -1076,4 +1076,48 @@ inline std::vector<int> voice (const prtools::Chord& chord, const std::vector<in
         }
     return best;
 }
+// --- favourites (round 190nu, esiowry in #105: pin the relationships that define a style) ------------------------------
+// A pinned relationship holds no fixed key, so it shows again in any key: a related key is its mode and how far its tonic
+// lies above the home tonic, a borrowed chord its root above the home tonic and its quality; both for a major-type or a
+// minor-type home (Ionian / Lydian / Mixolydian vs the others). "K:maj:0:5" = a major home's parallel Aeolian;
+// "C:maj:5:1" = a major home's iv.
+inline std::string homeFamily (Mode home) { return majorType (home) ? "maj" : "min"; }
+inline std::string favouriteId (const Scale& home, const RelatedKey& k)
+{
+    return "K:" + homeFamily (home.mode) + ":" + std::to_string (pc (k.scale.tonic - home.tonic)) + ":" + std::to_string ((int) k.scale.mode);
+}
+inline std::string favouriteId (const Scale& home, const Borrowed& b)
+{
+    return "C:" + homeFamily (home.mode) + ":" + std::to_string (pc (b.chord.root - home.tonic)) + ":" + std::to_string ((int) b.quality);
+}
+
+// The pinned ones first, each group in its own (ranked) order. Returns how many are pinned.
+template <typename T, typename IsPinned>
+inline int pinnedFirst (std::vector<T>& list, IsPinned isPinned)
+{
+    const auto mid = std::stable_partition (list.begin(), list.end(), isPinned);
+    return (int) std::distance (list.begin(), mid);
+}
+
+// The favourites as one line of text ("id;id;..."; ids hold no ';') and back.
+inline std::string favouritesText (const std::vector<std::string>& ids)
+{
+    std::string out;
+    for (const auto& id : ids)
+        out += (out.empty() ? "" : ";") + id;
+    return out;
+}
+inline std::vector<std::string> favouritesFrom (const std::string& text)
+{
+    std::vector<std::string> out;
+    std::size_t at = 0;
+    while (at <= text.size())
+    {
+        const auto end = std::min (text.find (';', at), text.size());
+        if (end > at && std::find (out.begin(), out.end(), text.substr (at, end - at)) == out.end())
+            out.push_back (text.substr (at, end - at));
+        at = end + 1;
+    }
+    return out;
+}
 } // namespace lynx::modalhelp
