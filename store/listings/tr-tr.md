@@ -75,3 +75,7 @@ LYNX SHARE 0.1.30: hiç olmadığı kadar hafif; test PC'mizde FL'nin Thief demo
 - 03-piano-roll.png — Piano Roll'da melodi ve akor yazın
 - 04-mixer.png — Insert, send, sidechain ve dahili efektlerle miks yapın
 - 05-instruments-effects.png — Step sequencer, dahili synth'ler ve parametrik EQ
+- 06-audio-editing.png — Polifonik nota editöründe akorların içindeki tek tek notaları düzenleyin ya da ses kliplerini Melodyne ve diğer ARA 2 plugin'lerinde açın
+- 07-chord-helper.png — Akor yardımcısı, seçili akor için ilgili tonları ve ödünç akorları önerir
+- 08-drum-machine.png — Basit iş akışındaki BandLab tarzı Drum Machine'de bir ritim programlayın
+- 09-helix-plus.png — Wavetable synth Helix, Helix+ ile: üçüncü bir osilatör, granüler ve spektral katmanlar, 8 makro, çizilen LFO'lar ve efektler

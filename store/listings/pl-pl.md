@@ -75,3 +75,7 @@ LYNX SHARE 0.1.30: lżejszy niż kiedykolwiek, z około połową obciążenia CP
 - 03-piano-roll.png — Pisz melodie i akordy w Piano Roll
 - 04-mixer.png — Miksuj z insertami, sendami, sidechainem i wbudowanymi efektami
 - 05-instruments-effects.png — Sekwencer krokowy, wbudowane syntezatory i parametryczny korektor EQ
+- 06-audio-editing.png — Edytuj pojedyncze nuty wewnątrz akordów w polifonicznym edytorze nut albo otwieraj klipy audio w Melodyne i innych pluginach ARA 2
+- 07-chord-helper.png — Pomocnik akordów podpowiada pokrewne tonacje i akordy zapożyczone do zaznaczonego akordu
+- 08-drum-machine.png — Zaprogramuj bit w automacie perkusyjnym w stylu BandLab w Prostym sposobie pracy
+- 09-helix-plus.png — Helix, syntezator wavetable, z Helix+: trzeci oscylator, warstwy granularna i widmowa, 8 makr, rysowane LFO i efekty

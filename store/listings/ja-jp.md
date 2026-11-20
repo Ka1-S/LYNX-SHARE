@@ -70,3 +70,7 @@ LYNX SHARE 0.1.30: これまでで最も軽く。テストPCでFLのThiefデモ�
 - 03-piano-roll.png — Piano Rollでメロディーやコードを打ち込み
 - 04-mixer.png — インサート、センド、サイドチェイン、内蔵エフェクトでミックス
 - 05-instruments-effects.png — ステップシーケンサー、内蔵シンセ、パラメトリックEQ
+- 06-audio-editing.png — ポリフォニックのノートエディターでコードの中の音を1音ずつ編集、またはオーディオクリップをMelodyneなどのARA 2プラグインで開く
+- 07-chord-helper.png — コードヘルパーが、選んだコードに合う関連キーと借用和音を提案
+- 08-drum-machine.png — シンプルワークフローのBandLab風ドラムマシンでビートを打ち込み
+- 09-helix-plus.png — ウェーブテーブルシンセHelixとHelix+：3つ目のオシレーター、グラニュラーとスペクトラルのレイヤー、8つのマクロ、描けるLFO、エフェクト

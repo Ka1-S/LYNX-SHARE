@@ -70,3 +70,7 @@ LYNX SHARE 0.1.30：前所未有地輕量，在我們的測試電腦上播放FL�
 - 03-piano-roll.png — 在 Piano Roll 中寫旋律與和弦
 - 04-mixer.png — 用 Insert、Send、側鏈與內建效果器混音
 - 05-instruments-effects.png — 步進音序器、內建合成器與參數式 EQ
+- 06-audio-editing.png — 在複音音符編輯器中逐一編輯和弦裡的音符，或在Melodyne等ARA 2外掛中開啟音訊片段
+- 07-chord-helper.png — 和弦助手為選取的和弦推薦相關調性與借用和弦
+- 08-drum-machine.png — 在簡易工作流程的BandLab風格鼓機中編排節拍
+- 09-helix-plus.png — 波表合成器Helix與Helix+：第三個振盪器、顆粒與頻譜層、8個巨集、可繪製的LFO與效果器

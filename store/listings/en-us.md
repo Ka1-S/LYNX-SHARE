@@ -93,3 +93,7 @@ for around 40 reported issues.
 - 03-piano-roll.png — Write melodies and chords in the Piano Roll
 - 04-mixer.png — Mix with inserts, sends, sidechain and built-in effects
 - 05-instruments-effects.png — Step sequencer, built-in synths and the parametric EQ
+- 06-audio-editing.png — Edit single notes inside chords in the polyphonic note editor, or open audio clips in Melodyne and other ARA 2 plugins
+- 07-chord-helper.png — The Chord helper suggests related keys and borrowed chords for the selected chord
+- 08-drum-machine.png — Program a beat in the BandLab-style Drum Machine of the Simple workflow
+- 09-helix-plus.png — Helix, the wavetable synth, with Helix+: a third oscillator, granular and spectral layers, 8 macros, drawn LFOs and effects

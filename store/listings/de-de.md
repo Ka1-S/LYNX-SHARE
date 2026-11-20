@@ -75,3 +75,7 @@ LYNX SHARE 0.1.30: leichter denn je, mit etwa der halben CPU-Last von FL Studio 
 - 03-piano-roll.png — Melodien und Akkorde in der Piano Roll schreiben
 - 04-mixer.png — Mischen mit Inserts, Sends, Sidechain und integrierten Effekten
 - 05-instruments-effects.png — Step-Sequencer, integrierte Synthesizer und der parametrische EQ
+- 06-audio-editing.png — Einzelne Noten in Akkorden im polyphonen Noteneditor bearbeiten oder Audio-Clips in Melodyne und anderen ARA-2-Plugins öffnen
+- 07-chord-helper.png — Der Akkord-Helfer schlägt verwandte Tonarten und geliehene Akkorde für den ausgewählten Akkord vor
+- 08-drum-machine.png — Einen Beat in der Drum Machine im Stil von BandLab im Einfachen Arbeitsablauf programmieren
+- 09-helix-plus.png — Helix, der Wavetable-Synthesizer, mit Helix+: dritter Oszillator, Granular- und Spektral-Ebenen, 8 Makros, gezeichnete LFOs und Effekte

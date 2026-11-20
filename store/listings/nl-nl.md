@@ -75,3 +75,7 @@ LYNX SHARE 0.1.30: lichter dan ooit, met ongeveer de helft van de CPU van FL Stu
 - 03-piano-roll.png — Schrijf melodieën en akkoorden in de Piano Roll
 - 04-mixer.png — Mix met inserts, sends, sidechain en ingebouwde effecten
 - 05-instruments-effects.png — Stepsequencer, ingebouwde synths en de parametrische EQ
+- 06-audio-editing.png — Bewerk losse noten binnen akkoorden in de polyfone noteneditor, of open audioclips in Melodyne en andere ARA 2-plugins
+- 07-chord-helper.png — De akkoordhulp stelt verwante toonsoorten en geleende akkoorden voor bij het geselecteerde akkoord
+- 08-drum-machine.png — Programmeer een beat in de drummachine in BandLab-stijl van de Eenvoudige werkwijze
+- 09-helix-plus.png — Helix, de wavetable-synth, met Helix+: een derde oscillator, granulaire en spectrale lagen, 8 macro's, getekende LFO's en effecten
