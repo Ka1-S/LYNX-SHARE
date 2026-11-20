@@ -606,6 +606,9 @@ Layout transistorBassLayout()
     v.push_back (toggle (20, 436, 96, 14, "Sequencer", TR_NOOP ("Sequencer")));
     v.push_back (label (500, 434, 80, 18, TR_NOOP ("Length"), dim | alignLeft));
     v.push_back (stepper (580, 433, 50, 20, "Sequence length", nullptr));
+    // round 190nr (GitHub discussion #202, a LYNX extra): the sequence as notes for the Piano roll / a MIDI file
+    v.push_back (display (290, 433, 100, 20, "tbseqmidicopy"));
+    v.push_back (display (394, 433, 100, 20, "tbseqmidiexport"));
     static const char* const rows[] = { TR_NOOP ("Pitch"), TR_NOOP ("Octave"), TR_NOOP ("Gate"), TR_NOOP ("Slide"), TR_NOOP ("Accent") };
     static const float rowY[] = { 458, 479, 499, 519, 539 };
     for (int r = 0; r < 5; ++r)

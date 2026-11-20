@@ -263,6 +263,12 @@ public:
     void setScrollTickForSnapshot (double tick) { scrollTicks = tick; repaint(); }
     // round 190ig (--design190igshot): the vertical scroll in px, and one frame step (the playhead, FL's activity column)
     void setScrollYForSnapshot (int y) { scrollY = juce::jmax (0, y); updateScrollBars(); repaint(); }
+    // round 190nr: the site / Store picture "-playlist-fit.png" (the song zoomed to fit, as before 0.1.30's FL open zoom),
+    // then the view as it was
+    struct ViewForSnapshot { double pixelsPerTick, scrollTicks; int scrollY; };
+    ViewForSnapshot viewForSnapshot() const noexcept { return { pixelsPerTick, scrollTicks, scrollY }; }
+    void zoomAllForSnapshot() { zoomAll(); }
+    void restoreViewForSnapshot (const ViewForSnapshot& v) { pixelsPerTick = v.pixelsPerTick; scrollTicks = v.scrollTicks; scrollY = v.scrollY; updateScrollBars(); repaint(); }
     void frameStepForSnapshot() { liveFrame (juce::Time::getMillisecondCounterHiRes()); }
     // round 190ef (--drawshot190ef): where a lane's curve is drawn, and the x of a tick
     juce::Rectangle<float> laneBodyForSnapshot (int track, int lane) const { return laneBody (track, lane); }

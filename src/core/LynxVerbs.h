@@ -261,6 +261,11 @@ double echoMs (float v) noexcept;
 const EffectInfo& info (EffectKind kind);
 std::string paramText (EffectKind kind, int param, float v, double bpm);
 std::unique_ptr<Effect> make (EffectKind kind);
+// Round 190nr: Atrium's dense late tank (round 190ls, 32 lines: ~2 MB at 48 kHz) is allocated only for a slot that runs it
+// (atrium::reaLaw on, set only by the ValhallaRoom translator); make (EffectKind::atrium) keeps it (the parameters are
+// unknown there). The rack builds a new instance when the switch differs (RackRenderer / Patcher reuse checks).
+bool atriumDense (const EffectParams& params) noexcept;
+std::unique_ptr<Effect> makeAtrium (bool dense);
 bool isLynxVerb (EffectKind kind) noexcept;
 } // namespace verbs
 } // namespace lynx

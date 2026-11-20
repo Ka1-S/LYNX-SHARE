@@ -1,5 +1,5 @@
 ---
-source: a5c1d056c8
+source: 327d10fb40
 ---
 O LYNX SHARE também roda sem abrir a janela. Uma opção renderiza um projeto em áudio, outras o convertem em um projeto do FL Studio ou em um set do Ableton Live, e várias existem para testes. As verificações do próprio projeto usam as mesmas opções.
 
@@ -18,7 +18,7 @@ O programa é `LYNX.exe` no Windows e `LYNX` no macOS e no Linux. No macOS o cam
 LYNX.exe project.lynx
 ```
 
-Inicia o LYNX SHARE com a janela e abre o arquivo. Aceita `.lynx`, `.flp`, `.als`, `.flm` e `.mid`. Um caminho relativo é tomado a partir da pasta atual.
+Inicia o LYNX SHARE com a janela e abre o arquivo. Aceita `.lynx`, `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx`, `.zip` e `.mid`. Um caminho relativo é tomado a partir da pasta atual.
 
 ```
 LYNX.exe --no-plugins project.lynx
@@ -30,7 +30,7 @@ Abre um projeto `.lynx` sem carregar os plugins de terceiros dele, como faz `Arq
 
 | Opção | O que faz |
 |---|---|
-| `--export <project> <out>` | Renderiza a música inteira com a cauda, como a janela de exportação. A extensão de `<out>` escolhe o formato: `.wav` (24 bits), `.flac`, `.ogg` ou `.mp3` (320 kbps) |
+| `--export <project> <out>` | Renderiza a música inteira com a cauda, como a janela de exportação. A extensão de `<out>` escolhe o formato: `.wav` (24 bits), `.flac`, `.ogg`, `.mp3` (320 kbps), `.aif` / `.aiff` (24 bits) ou `.m4a` (192 kbps, não no Linux) |
 | `--export ... --pattern` | Renderiza só o pattern atual |
 | `--export ... --insert N` | Renderiza só a saída do insert N do Mixer |
 | `--export ... --rate N` | Renderiza com outra taxa de amostragem, em Hz |

@@ -1004,6 +1004,26 @@ std::string formatInstalling (const InstallingNote& note)
     return out + "version=" + note.version + "\n"; // (last: see the header)
 }
 
+const std::vector<InstallEntry>& installEntries()
+{
+    static const std::vector<InstallEntry> entries {
+        { "licenses", "0.1.30" },           // third-party licence texts (round 190nk)
+        { "installed-files.txt", "0.1.31" } // the installer's own list of what it wrote (round 190nr)
+    };
+    return entries;
+}
+
+std::vector<std::string> entriesNewerThan (const Version& installed)
+{
+    std::vector<std::string> out;
+    if (! installed.valid)
+        return out;
+    for (const auto& e : installEntries())
+        if (compare (installed, parseVersion (e.since)) < 0)
+            out.emplace_back (e.name);
+    return out;
+}
+
 InstallingNote parseInstalling (const std::string& text)
 {
     InstallingNote note;

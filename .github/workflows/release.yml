@@ -264,6 +264,15 @@ jobs:
           $inst = "$env:RUNNER_TEMP\lynx-inst"
           Start-Process "dist\LYNX-$env:LABEL-setup-x64.exe" -ArgumentList '/S', "/D=$inst" -Wait
           if (-not (Test-Path "$inst\LYNX.exe")) { throw "installer did not install LYNX.exe" }
+          # round 190nr: installing over a NEWER version removes what that version's installed-files.txt lists and this
+          # version doesn't own (resources/installer/InstalledFiles.nsh); files that no list names stay
+          if (-not (Test-Path "$inst\installed-files.txt")) { throw "installer did not write installed-files.txt" }
+          New-Item -ItemType Directory "$inst\newer-only" | Out-Null; Set-Content "$inst\newer-only\a.txt" "x"
+          Set-Content "$inst\My notes.txt" "x"; Add-Content "$inst\installed-files.txt" "newer-only"
+          Start-Process "dist\LYNX-$env:LABEL-setup-x64.exe" -ArgumentList '/S', "/D=$inst" -Wait
+          if (Test-Path "$inst\newer-only") { throw "install over a newer version left its newer-only folder" }
+          if (-not (Test-Path "$inst\My notes.txt")) { throw "the installer removed a file no list names" }
+          Remove-Item "$inst\My notes.txt"
           Start-Process "$inst\Uninstall.exe" -ArgumentList '/S', "_?=$inst" -Wait
           if (Test-Path "$inst\LYNX.exe") { throw "uninstaller left LYNX.exe" }
 
@@ -475,6 +484,13 @@ jobs:
           pattern: LYNX-${{ env.LABEL }}-*
           path: dist
           merge-multiple: true
+
+      # SPDX 2.3 software bill of materials of the third-party components (round 190nr): THIRD_PARTY.md + licenses/.
+      - uses: actions/checkout@v5
+        with:
+          path: src
+      - name: SBOM
+        run: src/scripts/make-sbom.sh "$LABEL" "dist/LYNX-$LABEL-sbom.spdx.json"
 
       # The in-app updater (src/core/UpdateCheck.cpp, round 166b) picks the release files by these names: keep them stable.
       # LYNX-<label>-setup-x64.exe, LYNX-<label>-windows-x64.zip, LYNX-<label>-macos-universal.dmg (any *.dmg),

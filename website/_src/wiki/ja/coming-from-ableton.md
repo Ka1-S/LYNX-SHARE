@@ -1,5 +1,5 @@
 ---
-source: d5cc625221
+source: cee352e3d5
 ---
 ![クリップ起動レイアウト: プレイリストの横にシーン付きのクリップグリッドがある](/assets/img/cliplaunch.webp)
 
@@ -59,7 +59,7 @@ LYNX SHAREは、パターンワークフローで起動します。チャンネ�
 
 | 書き出されるもの | 書き出されないもの |
 |---|---|
-| チャンネルごとのMIDIトラック。ノートはMIDIクリップになる | LYNX SHARE独自のインストゥルメントとエフェクト。そのトラックとノートは残る |
+| チャンネルごとのMIDIトラック。ノートはMIDIクリップになる | LYNX SHARE独自のインストゥルメントとエフェクト。ただしHelixはWavetableになる。そのトラックとノートは残る |
 | ストレッチ、トランスポーズ、ゲイン、フェード、ワープモードを含むオーディオトラック | エフェクトのパラメーターのオートメーション |
 | グループ、リターン、センド | インサートからインサートへのルート |
 | 状態を含むVST2とVST3のプラグイン | |
@@ -70,8 +70,8 @@ LYNX SHAREは、パターンワークフローで起動します。チャンネ�
 
 ## 知っておくと便利なこと
 
-- Live標準のデバイスの多くは、設定とオートメーションごと、LYNX SHARE独自のものとして読み込まれます: EQ Eight、EQ Three、Channel EQ、Compressor、Glue Compressor、Multiband Dynamics、Limiter、Gate、Utility、Reverb、Delay、Echo、Auto Filter、Saturator、Overdrive、Chorus-Ensemble、Redux、Auto Pan、Drum Buss、Simpler、Drift、Operator (FMなし)。ほかは外され、インポートレポートに一覧で出ます。
-- Instrument RackとAudio Effect Rackは、チェーン、ゾーン、マクロごと読み込まれ、Drum RackはLYNX SHAREのDrum Rackになります。LiveのMIDI Effect Rackはまだ変換されず、インポートレポートに一覧で出ます。
+- Live標準のデバイスの多くは、設定とオートメーションごと、LYNX SHARE独自のものとして読み込まれます: EQ Eight、EQ Three、Channel EQ、Compressor、Glue Compressor、Multiband Dynamics、Limiter、Gate、Utility、Reverb、Hybrid Reverb、Delay、Echo、Grain Delay、Auto Filter、Saturator、Overdrive、Roar、Erosion、Vinyl Distortion、Corpus、Chorus-Ensemble、Redux、Auto Pan、Drum Buss、Spectral Time、Spectral Resonator、Looper、Simpler、Sampler、Drift、Operator、Wavetable、Meld。ほかは外され、インポートレポートに一覧で出ます。
+- Instrument RackとAudio Effect Rackは、チェーン、ゾーン、マクロごと読み込まれ、Drum RackはLYNX SHAREのDrum Rackになります。LiveのArpeggiatorは、チャンネルのアルペジエーターになります。Pitch、Velocity、Chord、Note Length、MIDI Effect Rackは、ノートに書き込まれます。
 - 省かれたものは、読み込みレポートに一覧で載ります。
 - 書き出したセットでは、重なっているオーディオクリップをLiveがトリムします。
 - Liveのセットのワープマーカーは、読み込み時に保持され、エクスポート時に書き戻されます。

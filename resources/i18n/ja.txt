@@ -11969,3 +11969,10 @@ countries: jp
 # --- rollup 0.1.31 step 1: Save a copy for 0.1.30 (rounds 190nh / 190nc)
 "Effector's newer Kilohearts laws (the Comb Filter, Chorus, Trance Gate, Phaser, Distortion, Bitcrush, Frequency Shifter and Ensemble stand-ins) play Effector's own algorithm: {0}" = "Effector の新しい Kilohearts 則（Comb Filter、Chorus、Trance Gate、Phaser、Distortion、Bitcrush、Frequency Shifter、Ensemble の代替）は Effector 自身のアルゴリズムで再生されます: {0}"
 "Live's Solo/Cue settings (Cue mode, Cue Out, Cue Volume and the tracks' Cue switches); the Main mix plays the same" = "Live の Solo/Cue 設定（Cue モード、Cue Out、Cue ボリューム、トラックの Cue スイッチ）。Main ミックスの音は同じです"
+"Copy as MIDI" = "MIDIとしてコピー"
+"Export MIDI..." = "MIDIをエクスポート..."
+"Copies the sequence as notes, with its gate lengths, slides and accents: Ctrl+V pastes them in the Piano roll" = "シーケンスをゲート長・スライド・アクセント込みのノートとしてコピーします。Ctrl+Vでピアノロールに貼り付けます"
+"Saves the sequence as a MIDI file, with its gate lengths, slides and accents" = "シーケンスをゲート長・スライド・アクセント込みでMIDIファイルに保存します"
+"The sequence has no notes: turn on the gate of a step first" = "シーケンスにノートがありません。先にステップのゲートをオンにしてください"
+"Copied {0} notes of the sequence: Ctrl+V pastes them in the Piano roll" = "シーケンスのノートを{0}個コピーしました。Ctrl+Vでピアノロールに貼り付けます"
+"Export the sequence as a MIDI file" = "シーケンスをMIDIファイルにエクスポート"

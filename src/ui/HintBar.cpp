@@ -386,6 +386,7 @@ struct HintBar::LaidOut
     juce::Font big { juce::FontOptions() }, bigKey { juce::FontOptions() }, small { juce::FontOptions() }, smallKey { juce::FontOptions() };
     bool larger = false;
     bool oneLine = false, fits = false;
+    bool tiny = false; // round 190nr: the two lines in the next smaller font (a long hint that the small font cut)
     std::vector<std::vector<Item>> lines;
 };
 
@@ -433,6 +434,8 @@ void HintBar::paint (juce::Graphics& g)
     const auto bigGlyph = larger ? 16.0f : 15.0f;
     const juce::Font smallFont (font (larger ? type::small : type::caption)), smallKey (font (larger ? type::caption - 1.0f : type::caption - 2.0f, true));
     const auto smallGlyph = larger ? 13.0f : 12.0f;
+    const juce::Font tinyFont (font (larger ? type::caption : type::caption - 1.0f)), tinyKey (font (larger ? type::caption - 2.0f : type::caption - 3.0f, true));
+    const auto tinyGlyph = smallGlyph - 1.0f;
     if (laidOut == nullptr)
         laidOut = std::make_shared<LaidOut>();
     auto& laid = *laidOut;
@@ -448,6 +451,18 @@ void HintBar::paint (juce::Graphics& g)
         laid.smallKey = smallKey;
         laid.oneLine = layOut (makeItems (text, big, bigKey, bigGlyph), r.getWidth(), 1, laid.lines);
         laid.fits = laid.oneLine || layOut (makeItems (text, smallFont, smallKey, smallGlyph), r.getWidth(), 2, laid.lines);
+        // round 190nr (0.1.30 release QA, 1920 px on Windows): a long hint that needs a third line in the small font gets
+        // two lines one step smaller before it is cut (the line pitch stays)
+        laid.tiny = false;
+        if (! laid.fits)
+        {
+            std::vector<std::vector<Item>> tinyLines;
+            if (layOut (makeItems (text, tinyFont, tinyKey, tinyGlyph), r.getWidth(), 2, tinyLines))
+            {
+                laid.lines = std::move (tinyLines);
+                laid.fits = laid.tiny = true;
+            }
+        }
     }
     const auto& lines = laid.lines;
     if (laid.oneLine)
@@ -461,7 +476,8 @@ void HintBar::paint (juce::Graphics& g)
     auto area = r.withSizeKeepingCentre (r.getWidth(), lineHeight * 2.0f);
 
     for (std::size_t i = 0; i < lines.size() && i < 2; ++i)
-        drawLine (g, lines[i], area.removeFromTop (lineHeight), smallFont, smallKey, smallGlyph, plain);
+        drawLine (g, lines[i], area.removeFromTop (lineHeight), laid.tiny ? tinyFont : smallFont, laid.tiny ? tinyKey : smallKey,
+                  laid.tiny ? tinyGlyph : smallGlyph, plain);
 
     if (! fits) // the rest did not fit: a fade at the end of the second line says so
     {

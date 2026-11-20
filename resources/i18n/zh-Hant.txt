@@ -11969,3 +11969,10 @@ countries: tw hk mo
 # --- rollup 0.1.31 step 1: Save a copy for 0.1.30 (rounds 190nh / 190nc)
 "Effector's newer Kilohearts laws (the Comb Filter, Chorus, Trance Gate, Phaser, Distortion, Bitcrush, Frequency Shifter and Ensemble stand-ins) play Effector's own algorithm: {0}" = "Effector 較新的 Kilohearts 規律（Comb Filter、Chorus、Trance Gate、Phaser、Distortion、Bitcrush、Frequency Shifter 和 Ensemble 的替代）按 Effector 自身的演算法播放：{0}"
 "Live's Solo/Cue settings (Cue mode, Cue Out, Cue Volume and the tracks' Cue switches); the Main mix plays the same" = "Live 的 Solo/Cue 設定（Cue 模式、Cue Out、Cue 音量和軌道的 Cue 開關）；Main 混音聽起來不變"
+"Copy as MIDI" = "複製為 MIDI"
+"Export MIDI..." = "匯出MIDI..."
+"Copies the sequence as notes, with its gate lengths, slides and accents: Ctrl+V pastes them in the Piano roll" = "將序列複製為音符，包含門限長度、滑音和重音：按 Ctrl+V 貼到鋼琴捲簾"
+"Saves the sequence as a MIDI file, with its gate lengths, slides and accents" = "將序列儲存為 MIDI 檔案，包含門限長度、滑音和重音"
+"The sequence has no notes: turn on the gate of a step first" = "序列中沒有音符：請先開啟某個步進的門限"
+"Copied {0} notes of the sequence: Ctrl+V pastes them in the Piano roll" = "已複製序列的 {0} 個音符：按 Ctrl+V 貼到鋼琴捲簾"
+"Export the sequence as a MIDI file" = "將序列匯出為 MIDI 檔案"

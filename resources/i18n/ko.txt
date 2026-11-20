@@ -11969,3 +11969,10 @@ countries: kr
 # --- rollup 0.1.31 step 1: Save a copy for 0.1.30 (rounds 190nh / 190nc)
 "Effector's newer Kilohearts laws (the Comb Filter, Chorus, Trance Gate, Phaser, Distortion, Bitcrush, Frequency Shifter and Ensemble stand-ins) play Effector's own algorithm: {0}" = "Effector의 새 Kilohearts 법칙(Comb Filter, Chorus, Trance Gate, Phaser, Distortion, Bitcrush, Frequency Shifter, Ensemble 대체)은 Effector 자체 알고리즘으로 재생됩니다: {0}"
 "Live's Solo/Cue settings (Cue mode, Cue Out, Cue Volume and the tracks' Cue switches); the Main mix plays the same" = "Live의 Solo/Cue 설정(Cue 모드, Cue Out, Cue 볼륨, 트랙의 Cue 스위치). Main 믹스는 그대로 재생됩니다"
+"Copy as MIDI" = "MIDI로 복사"
+"Export MIDI..." = "MIDI 내보내기..."
+"Copies the sequence as notes, with its gate lengths, slides and accents: Ctrl+V pastes them in the Piano roll" = "시퀀스를 게이트 길이, 슬라이드, 악센트를 포함한 노트로 복사합니다. Ctrl+V로 피아노 롤에 붙여넣습니다"
+"Saves the sequence as a MIDI file, with its gate lengths, slides and accents" = "시퀀스를 게이트 길이, 슬라이드, 악센트를 포함해 MIDI 파일로 저장합니다"
+"The sequence has no notes: turn on the gate of a step first" = "시퀀스에 노트가 없습니다. 먼저 스텝의 게이트를 켜세요"
+"Copied {0} notes of the sequence: Ctrl+V pastes them in the Piano roll" = "시퀀스 노트 {0}개를 복사했습니다. Ctrl+V로 피아노 롤에 붙여넣습니다"
+"Export the sequence as a MIDI file" = "시퀀스를 MIDI 파일로 내보내기"

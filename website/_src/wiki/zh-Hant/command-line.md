@@ -1,5 +1,5 @@
 ---
-source: a5c1d056c8
+source: 327d10fb40
 ---
 LYNX SHARE 也可以不開啟視窗直接執行。有一個選項能把專案渲染成音訊，有些能把它轉成 FL Studio 專案或 Ableton Live 套裝，另外還有幾個用於測試。專案自己的檢查也使用這些選項。
 
@@ -18,7 +18,7 @@ LYNX SHARE 也可以不開啟視窗直接執行。有一個選項能把專案渲
 LYNX.exe project.lynx
 ```
 
-啟動 LYNX SHARE 並顯示視窗，然後開啟該檔案。它接受 `.lynx`、`.flp`、`.als`、`.flm` 和 `.mid`。相對路徑以目前資料夾為準。
+啟動 LYNX SHARE 並顯示視窗，然後開啟該檔案。它接受 `.lynx`、`.flp`、`.als`、`.flm`、`.dawproject`、`.band`、`.blx`、`.zip` 和 `.mid`。相對路徑以目前資料夾為準。
 
 ```
 LYNX.exe --no-plugins project.lynx
@@ -30,7 +30,7 @@ LYNX.exe --no-plugins project.lynx
 
 | 選項 | 作用 |
 |---|---|
-| `--export <project> <out>` | 渲染整首歌，包含尾音，與匯出視窗相同。`<out>` 的副檔名決定格式：`.wav`（24 位元）、`.flac`、`.ogg` 或 `.mp3`（320 kbps） |
+| `--export <project> <out>` | 渲染整首歌，包含尾音，與匯出視窗相同。`<out>` 的副檔名決定格式：`.wav`（24 位元）、`.flac`、`.ogg`、`.mp3`（320 kbps）、`.aif` / `.aiff`（24 位元）或 `.m4a`（192 kbps，Linux 上不可用） |
 | `--export ... --pattern` | 只渲染目前樣式 |
 | `--export ... --insert N` | 只渲染混音插入軌 N 的輸出 |
 | `--export ... --rate N` | 以另一個取樣率渲染，單位為 Hz |

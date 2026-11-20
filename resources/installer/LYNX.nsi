@@ -14,6 +14,7 @@ ManifestDPIAware true
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 !include "Sections.nsh"
+!include "TextFunc.nsh"
 
 !define APP "LYNX SHARE" ; the product name shown (v0.1.20 rename); folders, keys and LYNX.exe keep "LYNX"
 !define PROGID "LYNX.Project"
@@ -86,11 +87,14 @@ FunctionEnd
     ${EndIf}
 !macroend
 
+!include "InstalledFiles.nsh" ; round 190nr: installed-files.txt, removing a newer version's leftovers
+
 Section "!$(SecApp)" SecMain
     SectionIn RO
     SetShellVarContext current
     !insertmacro CheckNotRunning
     SetOutPath "$INSTDIR"
+    Call RemoveNewerLeftovers
     File "${STAGE}\LYNX.exe"
     File /nonfatal "${STAGE}\onnxruntime.dll" ; Extract stems from sample
     File "${STAGE}\LICENSE"
@@ -107,6 +111,7 @@ Section "!$(SecApp)" SecMain
     File /nonfatal "${STAGE}\Register LYNX ASIO.bat"
     File /nonfatal "${STAGE}\Unregister LYNX ASIO.bat"
     WriteUninstaller "$INSTDIR\Uninstall.exe"
+    Call WriteInstalledFiles
 
     Delete "$SMPROGRAMS\LYNX.lnk" ; the shortcut before the v0.1.20 rename
     CreateShortCut "$SMPROGRAMS\LYNX SHARE.lnk" "$INSTDIR\LYNX.exe" "" "$INSTDIR\LYNX.exe" 0
@@ -186,6 +191,7 @@ Section "Uninstall"
     Delete "$INSTDIR\lynx-asio32.dll"
     Delete "$INSTDIR\Register LYNX ASIO.bat"
     Delete "$INSTDIR\Unregister LYNX ASIO.bat"
+    Delete "$INSTDIR\installed-files.txt"
     Delete "$INSTDIR\Uninstall.exe"
     RMDir "$INSTDIR"
     Delete "$SMPROGRAMS\LYNX.lnk"

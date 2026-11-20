@@ -11969,3 +11969,10 @@ countries: ru by kz
 # --- rollup 0.1.31 step 1: Save a copy for 0.1.30 (rounds 190nh / 190nc)
 "Effector's newer Kilohearts laws (the Comb Filter, Chorus, Trance Gate, Phaser, Distortion, Bitcrush, Frequency Shifter and Ensemble stand-ins) play Effector's own algorithm: {0}" = "Более новые законы Kilohearts в Effector (замены Comb Filter, Chorus, Trance Gate, Phaser, Distortion, Bitcrush, Frequency Shifter и Ensemble) звучат собственным алгоритмом Effector: {0}"
 "Live's Solo/Cue settings (Cue mode, Cue Out, Cue Volume and the tracks' Cue switches); the Main mix plays the same" = "Настройки Solo/Cue из Live (режим Cue, Cue Out, громкость Cue и переключатели Cue у дорожек); основной микс (Main) звучит так же"
+"Copy as MIDI" = "Копировать как MIDI"
+"Export MIDI..." = "Экспорт MIDI..."
+"Copies the sequence as notes, with its gate lengths, slides and accents: Ctrl+V pastes them in the Piano roll" = "Копирует секвенцию как ноты, с длительностями гейта, slide и акцентами: Ctrl+V вставляет их в пианоролл"
+"Saves the sequence as a MIDI file, with its gate lengths, slides and accents" = "Сохраняет секвенцию в MIDI-файл, с длительностями гейта, slide и акцентами"
+"The sequence has no notes: turn on the gate of a step first" = "В секвенции нет нот: сначала включите гейт у шага"
+"Copied {0} notes of the sequence: Ctrl+V pastes them in the Piano roll" = "Скопировано нот секвенции: {0}. Ctrl+V вставляет их в пианоролл"
+"Export the sequence as a MIDI file" = "Экспорт секвенции в MIDI-файл"

@@ -1,5 +1,5 @@
 ---
-source: d5cc625221
+source: cee352e3d5
 ---
 ![片段啟動版面：播放清單旁邊有帶場景的片段格線](/assets/img/cliplaunch.webp)
 
@@ -59,7 +59,7 @@ LYNX SHARE 預設採用模式工作流程：通道機架、樣式和播放清單
 
 | 會寫出 | 不會寫出 |
 |---|---|
-| 每個通道一條 MIDI 軌道，音符以 MIDI 片段呈現 | LYNX SHARE 自己的樂器和效果器。它們的軌道和音符會保留 |
+| 每個通道一條 MIDI 軌道，音符以 MIDI 片段呈現 | LYNX SHARE 自己的樂器和效果器，但 Helix 會變成 Wavetable。它們的軌道和音符會保留 |
 | 帶有拉伸、移調、增益、淡化和變速模式的音訊軌道 | 效果器參數的自動化 |
 | 群組、回傳和傳送 | 插入軌到插入軌的路由 |
 | VST2 和 VST3 外掛及其狀態 | |
@@ -70,8 +70,8 @@ LYNX SHARE 預設採用模式工作流程：通道機架、樣式和播放清單
 
 ## 須知
 
-- Live 自己的許多裝置會變成 LYNX SHARE 自己的，並保留其設定和自動化：EQ Eight、EQ Three、Channel EQ、Compressor、Glue Compressor、Multiband Dynamics、Limiter、Gate、Utility、Reverb、Delay、Echo、Auto Filter、Saturator、Overdrive、Chorus-Ensemble、Redux、Auto Pan、Drum Buss、Simpler、Drift 和 Operator（不含 FM）。其他的會被捨棄並列在匯入報告中。
-- 樂器機架和音訊效果器機架會連同其鏈、區域和巨集一起匯入，鼓機架會變成 LYNX SHARE 的鼓機架。Live 的 MIDI Effect Rack 還不會轉換，會列在匯入報告中。
+- Live 自己的許多裝置會變成 LYNX SHARE 自己的，並保留其設定和自動化：EQ Eight、EQ Three、Channel EQ、Compressor、Glue Compressor、Multiband Dynamics、Limiter、Gate、Utility、Reverb、Hybrid Reverb、Delay、Echo、Grain Delay、Auto Filter、Saturator、Overdrive、Roar、Erosion、Vinyl Distortion、Corpus、Chorus-Ensemble、Redux、Auto Pan、Drum Buss、Spectral Time、Spectral Resonator、Looper、Simpler、Sampler、Drift、Operator、Wavetable 和 Meld。其他的會被捨棄並列在匯入報告中。
+- 樂器機架和音訊效果器機架會連同其鏈、區域和巨集一起匯入，鼓機架會變成 LYNX SHARE 的鼓機架。Live 的 Arpeggiator 會變成通道的琶音器。Pitch、Velocity、Chord、Note Length 和 MIDI Effect Rack 會寫入音符。
 - 匯入報告會列出被省略的內容。
 - 在匯出的套裝中，Live 會修剪彼此重疊的音訊片段。
 - Live 套裝中的變速標記在匯入時會保留，匯出時會寫回去。

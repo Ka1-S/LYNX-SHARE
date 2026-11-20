@@ -1,9 +1,9 @@
 ---
-source: da5e41c322
+source: 850a06503b
 ---
 ![Het exportvenster met WAV gekozen: bereik, staart en bestanden links, formaat rechts, mixopties eronder](/assets/img/wiki/export.webp)
 
-Alles wat LYNX SHARE verlaat gaat via `Bestand › Exporteren`. De audioformaten (WAV, MP3, OGG en FLAC) delen één exportvenster. MIDI, FL Studio-projecten, Ableton Live-sets en gezipte projecten hebben eigen items in hetzelfde menu.
+Alles wat LYNX SHARE verlaat gaat via `Bestand › Exporteren`. De audioformaten (WAV, MP3, OGG, FLAC, AIFF en M4A) delen één exportvenster. MIDI, FL Studio-projecten, Ableton Live-sets, DAWproject-bestanden en gezipte projecten hebben eigen items in hetzelfde menu.
 
 ## Het nummer als WAV exporteren
 
@@ -28,7 +28,7 @@ Alles wat LYNX SHARE verlaat gaat via `Bestand › Exporteren`. De audioformaten
 
 ## Uitvoerformaat
 
-De vier knoppen kiezen het formaat. Met `Ook opslaan` schrijf je andere formaten uit dezelfde render, met dezelfde naam.
+De knoppen kiezen het formaat. M4A is er alleen als het systeem een AAC-encoder heeft: op Windows en macOS, niet op Linux. Met `Ook opslaan` schrijf je andere formaten uit dezelfde render, met dezelfde naam.
 
 | Formaat | Opties |
 |---|---|
@@ -36,6 +36,8 @@ De vier knoppen kiezen het formaat. Met `Ook opslaan` schrijf je andere formaten
 | MP3 | `Bitrate`, constant |
 | OGG | Bitrate |
 | FLAC | `Bitdiepte`, `Compressie` van `0 (snelst)` tot `8 (kleinst)`, `Dither`. Verliesvrij op elk niveau |
+| AIFF | `Bitdiepte`: 16 bits of 24 bits. `Dither` |
+| M4A | `Bitrate`: 96, 128, 160 of 192 kbps. AAC, geschreven door de encoder van het systeem |
 
 `Samplefrequentie` en `Kanalen` gelden voor elk formaat. `Kanalen` is `Stereo`, `Mono (beide kanten gemixt)`, `Mono (alleen links)` of `Mono (alleen rechts)`.
 
@@ -76,17 +78,21 @@ Vink `Ook de volledige mix` aan om de mix naast de stems te krijgen. De regel on
 | `Project met samples (.zip)...` | none | Het project en zijn samples in één archief |
 | `FL Studio-project...` | none | Een `.flp`, of een gezipt looppakket met elke sample |
 | `Ableton Live-set (.als)...` | none | Een set voor Live 12 of Live 11 |
+| `DAWproject (.dawproject)...` | none | Een project voor Bitwig Studio, Studio One, Cubase en andere apps die DAWproject lezen |
+| `Voor andere apps...` | none | Eén map met stems, MIDI-bestanden, een Live-set, een FL Studio-project, de mixdown en een README, gezipt als je wilt |
 | `Projectbotten...` | none | Kanaal- en effectpresets en scores, in een map |
 
-## Exporteren naar FL Studio en Ableton Live
+## Exporteren naar FL Studio, Ableton Live en DAWproject
 
 De `.flp` is een FL Studio 2026-project. Samplers, audioclips, de eigen generators en effecten van FL Studio, plugins van derden, patterns, de Playlist, de Mixer en automatisering gaan mee met hun instellingen. Voor dingen die FL Studio niet heeft, kies je tussen `Naar audio renderen (klinkt hetzelfde)` en `De dichtstbijzijnde FL-plugin gebruiken (blijft bewerkbaar, kan anders klinken)`. Bij de tweede keuze worden instrumenten die alleen in LYNX bestaan weggelaten. Modulators worden altijd weggelaten. Een rapport toont wat gerenderd, vervangen of weggelaten is. Details staan in [Overstappen van FL Studio](/wiki/coming-from-fl-studio/).
 
-De `.als` bevat een MIDI-track per kanaal, audiotracks, groepen, returns, sends, racks en Drum Racks, VST2- en VST3-plugins met hun staat, markers, en automatisering van volume, pan en tempo. De eigen instrumenten en effecten van LYNX SHARE worden niet omgezet, maar hun tracks en noten blijven behouden. Automatisering van effectparameters en routes van insert naar insert vervallen. Details staan in [Overstappen van Ableton Live](/wiki/coming-from-ableton/).
+De `.als` bevat een MIDI-track per kanaal, audiotracks, groepen, returns, sends, racks en Drum Racks, VST2- en VST3-plugins met hun staat, markers, en automatisering van volume, pan en tempo. De eigen instrumenten en effecten van LYNX SHARE worden niet omgezet, maar hun tracks en noten blijven behouden. Helix is de uitzondering: dat wordt de Wavetable van Live. Automatisering van effectparameters en routes van insert naar insert vervallen. Details staan in [Overstappen van Ableton Live](/wiki/coming-from-ableton/).
+
+De `.dawproject` bevat tracks, mappen, clips, noten, audio met zijn warpmarkers, automatisering, tempo, markers, de mixer met sends, en VST3-, VST2- en CLAP-plugins met hun staat. De eigen instrumenten en effecten van LYNX SHARE worden zo geschreven dat LYNX SHARE ze weer kan openen. Het clipraster, andere arrangementen en enkele details per noot worden weggelaten, en een rapport somt ze op.
 
 ## Goed om te weten
 
-- `Dither` is grijs bij MP3, en de opties voor tempo en markers zijn grijs bij elk formaat behalve WAV.
+- `Dither` is grijs bij MP3, OGG, M4A en 32-bit WAV, en de opties voor tempo en markers zijn grijs bij elk formaat behalve WAV.
 - Bij `Playlist-selectie` zonder selectie in de Playlist wordt het hele nummer gerenderd. Het venster waarschuwt je.
 - Als de Master-insert gemute is, waarschuwt het venster dat het bestand stil zal zijn.
 - `Ook een video met deze mix schrijven` verschijnt alleen als het project een videotrack heeft, en het heeft FFmpeg nodig.

@@ -1,5 +1,5 @@
 ---
-source: 98a5eb9945
+source: 49950b37a3
 ---
 LYNX SHARE는 프로젝트를 `.lynx` 파일로 저장합니다. 다른 프로그램의 프로젝트도 열고, 흔히 쓰는 오디오 파일을 불러오며, 오디오와 MIDI, 다른 프로그램용 프로젝트를 내보냅니다. 표에 0.1.30 알파의 모든 형식이 있습니다.
 
@@ -16,12 +16,12 @@ LYNX SHARE는 프로젝트를 `.lynx` 파일로 저장합니다. 다른 프로�
 
 | 형식 | 열기 | 저장 / 내보내기 | 참고 |
 |---|---|---|---|
-| `.lynx` | `파일 › 열기...` | `파일 › 저장`, 자동 저장 포함 | LYNX SHARE 고유의 프로젝트 형식(JSON) |
+| `.lynx` | `파일 › 열기...` | `파일 › 저장`, 자동 저장 포함 | LYNX SHARE 고유의 프로젝트 형식(JSON). `파일 › 이전 LYNX용 사본 저장...`는 0.1.27 또는 0.1.28에서 열 수 있는 사본을 쓰고, 그 버전이 유지하지 못하는 것을 목록으로 보여 줍니다 |
 | `.zip` | `파일 › 열기...`이 폴더에 풀고 그 안의 프로젝트를 엽니다 | `파일 › 내보내기 › 샘플 포함 프로젝트(.zip)...` | FL Studio의 압축 루프 패키지도 엽니다 |
 | `.lynxpack` | 요약을 보여 준 뒤 엽니다. 파트는 호스트의 프로젝트에 병합됩니다 | `파일 › 온라인 세션 › 프로젝트 보내기...` | [온라인 세션](/wiki/online-sessions/)에서 보낸 프로젝트 또는 파트입니다. 서드파티 플러그인 파트는 오디오 렌더링과 플러그인 설정으로 전달됩니다 |
 | `.flp` | `파일 › 열기...` | `파일 › 내보내기 › FL Studio 프로젝트...`, FL Studio 2026 프로젝트 또는 압축 루프 패키지 | 기본 플러그인은 정확도가 제각각인 재현 엔진으로 재생됩니다. FLEX 팩은 열지 않습니다. 내보낼 때 LYNX 전용 악기와 이펙트는 오디오로 렌더링하거나 가장 가까운 FL 플러그인으로 바꾸고, 모듈레이터는 뺍니다. [FL Studio에서 넘어오기](/wiki/coming-from-fl-studio/)를 참고하세요 |
 | `.flm` | `파일 › 열기...` | 불가 | FL Studio Mobile 프로젝트. 일부만 가져옵니다. MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, DW Sampler, Slicer, DirectWave 외의 악기는 내장 신스로 재생됩니다 |
-| `.als` | `파일 › 열기...`, Live 11과 12의 세트 | `파일 › 내보내기 › Ableton Live 세트 (.als)...`, Live 12 또는 Live 11용 | 가져올 때 LYNX SHARE에 대응하는 것이 없는 Live 디바이스는 빠집니다. 내보낼 때 LYNX SHARE 자체의 악기와 이펙트는 변환되지 않고, 이펙트 파라미터 오토메이션과 인서트 간 라우트는 빠집니다. [Ableton Live에서 넘어오기](/wiki/coming-from-ableton/)를 참고하세요 |
+| `.als` | `파일 › 열기...`, Live 11과 12의 세트 | `파일 › 내보내기 › Ableton Live 세트 (.als)...`, Live 12 또는 Live 11용 | 가져올 때 LYNX SHARE에 대응하는 것이 없는 Live 디바이스는 빠집니다. 내보낼 때 LYNX SHARE 자체의 악기와 이펙트는 변환되지 않고(Helix는 Wavetable이 됩니다), 이펙트 파라미터 오토메이션과 인서트 간 라우트는 빠집니다. [Ableton Live에서 넘어오기](/wiki/coming-from-ableton/)를 참고하세요 |
 | `.dawproject` | `파일 › 열기...` | `파일 › 내보내기 › DAWproject (.dawproject)...` | Bitwig, Studio One, Cubase 등이 쓰는 개방형 교환 형식: 트랙, 폴더, 클립, 노트, 워프 마커가 있는 오디오, 오토메이션, 템포, 마커, 센드가 있는 믹서, 상태가 담긴 VST3, VST2, CLAP 플러그인. 가져올 때는 노트 이펙트와 MIDI 표현이 빠지고, 내보낼 때는 클립 그리드, 다른 어레인지먼트, 노트별 세부 정보 일부가 빠집니다. 두 방향 모두 빠진 것을 목록으로 보여 줍니다 |
 | `.band` | `파일 › 열기...`(패키지, 그 안의 `projectData` 파일 또는 그 zip) | 불가 | GarageBand 10 또는 GarageBand for iOS 프로젝트를 간단한 워크플로 트랙으로 엽니다. 일부 지원: 악기 트랙은 내장 신스와 드럼으로 재생됩니다(GarageBand for iOS에서 만든 Sampler 악기는 예외). GarageBand 11 및 이전 버전의 프로젝트는 읽을 수 없습니다 |
 | `.blx` | `파일 › 열기...` 또는 간단한 워크플로의 `폴더...` 가져오기로 그 폴더 | 불가 | Cakewalk 또는 Sonar가 내려받은 BandLab 프로젝트를 리전, 템포, 키, 믹스, 볼륨과 팬 오토메이션, 흔한 이펙트와 함께 간단한 워크플로 트랙으로 엽니다. 일부 지원: BandLab의 악기 소리와 다른 페달은 가져오기 보고서에 목록으로 나옵니다 |
@@ -50,6 +50,7 @@ LYNX SHARE는 프로젝트를 `.lynx` 파일로 저장합니다. 다른 프로�
 | `파일 › 내보내기 › 모든 Playlist 트랙` | 플레이리스트 트랙마다 파일 하나 |
 | `파일 › 내보내기 › 모든 Playlist 트랙 그룹` | 트랙 그룹마다 파일 하나 |
 | `파일 › 내보내기 › 마스터링...` | 프로젝트를 렌더링하고 라우드니스 목표에 맞춰 마스터링합니다. 컴퓨터 안에서 처리됩니다 |
+| `파일 › 내보내기 › 다른 앱용...` | 스템, MIDI 파일, Ableton Live 세트, FL Studio 프로젝트, 믹스다운, README를 담은 폴더 하나. 원하면 zip으로 압축합니다 |
 | `파일 › 내보내기 › 프로젝트 본...` | 채널과 이펙트 프리셋, 스코어를 폴더에 씁니다 |
 
 내보내기 창은 곡, 현재 패턴, 플레이리스트 선택 영역을 렌더링합니다.
@@ -59,8 +60,8 @@ LYNX SHARE는 프로젝트를 `.lynx` 파일로 저장합니다. 다른 프로�
 Windows에서 프로그램은 `LYNX.exe`입니다. macOS와 Linux에서는 `LYNX`입니다.
 
 ```
-LYNX.exe project.lynx                       open a project (.lynx, .flp, .als, .flm or .mid)
-LYNX.exe --export project.flp out.flac      render the song (wav, flac or ogg)
+LYNX.exe project.lynx                       open a project (any file File › Open takes)
+LYNX.exe --export project.flp out.flac      render the song (wav, flac, ogg, mp3, aif; m4a on Windows and macOS)
 LYNX.exe --stems project.flp base.wav       one WAV per mixer insert that has sound
 LYNX.exe --export-flp project.lynx out.flp  write an FL Studio project
 ```

@@ -1,9 +1,9 @@
 ---
-source: da5e41c322
+source: 850a06503b
 ---
 ![Jendela ekspor dengan WAV terpilih: rentang, tail, dan file di kiri, format di kanan, opsi mix di bawah](/assets/img/wiki/export.webp)
 
-Semua yang keluar dari LYNX SHARE lewat `File › Ekspor`. Format audio (WAV, MP3, OGG, dan FLAC) memakai satu jendela ekspor. MIDI, proyek FL Studio, set Ableton Live, dan proyek zip punya entri sendiri di menu yang sama.
+Semua yang keluar dari LYNX SHARE lewat `File › Ekspor`. Format audio (WAV, MP3, OGG, FLAC, AIFF, dan M4A) memakai satu jendela ekspor. MIDI, proyek FL Studio, set Ableton Live, file DAWproject, dan proyek zip punya entri sendiri di menu yang sama.
 
 ## Mengekspor lagu sebagai WAV
 
@@ -28,7 +28,7 @@ Semua yang keluar dari LYNX SHARE lewat `File › Ekspor`. Format audio (WAV, MP
 
 ## Format output
 
-Empat tombol memilih formatnya. `Simpan juga` menulis format lain dari render yang sama, dengan nama yang sama.
+Tombol-tombolnya memilih format. M4A hanya tersedia kalau sistem punya encoder AAC: di Windows dan macOS, tidak di Linux. `Simpan juga` menulis format lain dari render yang sama, dengan nama yang sama.
 
 | Format | Opsi |
 |---|---|
@@ -36,6 +36,8 @@ Empat tombol memilih formatnya. `Simpan juga` menulis format lain dari render ya
 | MP3 | `Bitrate`, konstan |
 | OGG | Bitrate |
 | FLAC | `Bit depth`, `Kompresi` dari `0 (tercepat)` sampai `8 (terkecil)`, `Dither`. Lossless di setiap level |
+| AIFF | `Bit depth`: 16 bit atau 24 bit. `Dither` |
+| M4A | `Bitrate`: 96, 128, 160, atau 192 kbps. AAC, ditulis oleh encoder sistem |
 
 `Sample rate` dan `Channel` berlaku untuk semua format. `Channel` adalah `Stereo`, `Mono (kedua sisi dicampur)`, `Mono (kiri saja)`, atau `Mono (kanan saja)`.
 
@@ -76,17 +78,21 @@ Centang `Juga mix penuh` untuk mendapatkan mix di samping stem. Baris di bagian 
 | `Proyek beserta sample (.zip)...` | tidak ada | Proyek beserta sample-nya dalam satu arsip |
 | `Proyek FL Studio...` | tidak ada | Sebuah `.flp`, atau paket loop zip dengan semua sample |
 | `Set Ableton Live (.als)...` | tidak ada | Set untuk Live 12 atau Live 11 |
+| `DAWproject (.dawproject)...` | tidak ada | Proyek untuk Bitwig Studio, Studio One, Cubase, dan aplikasi lain yang membaca DAWproject |
+| `Untuk aplikasi lain...` | tidak ada | Satu folder berisi stem, file MIDI, set Live, proyek FL Studio, mixdown, dan README, di-zip kalau kamu mau |
 | `Tulang proyek...` | tidak ada | Preset dan skor channel dan efek, dalam sebuah folder |
 
-## Mengekspor ke FL Studio dan Ableton Live
+## Mengekspor ke FL Studio, Ableton Live, dan DAWproject
 
 `.flp` adalah proyek FL Studio 2026. Sampler, clip audio, generator dan efek bawaan FL Studio, plugin pihak ketiga, pattern, Playlist, Mixer, dan otomasi ikut terbawa beserta pengaturannya. Untuk hal-hal yang tidak dimiliki FL Studio, kamu memilih antara `Render ke audio (suaranya sama)` dan `Pakai plugin FL terdekat (tetap bisa diedit, suaranya bisa berbeda)`. Pada pilihan kedua, instrumen yang hanya ada di LYNX dilewati. Modulator selalu dilewati. Sebuah laporan mencantumkan apa yang di-render, diganti, atau dilewati. Rinciannya ada di [Pindahan dari FL Studio](/wiki/coming-from-fl-studio/).
 
-`.als` berisi track MIDI per channel, track audio, grup, return, send, rack dan Drum Rack, plugin VST2 dan VST3 beserta state-nya, marker, serta otomasi volume, pan, dan tempo. Instrumen dan efek bawaan LYNX SHARE tidak dikonversi, tetapi track dan not-nya tetap disimpan. Otomasi parameter efek dan rute antar insert dibuang. Rinciannya ada di [Pindahan dari Ableton Live](/wiki/coming-from-ableton/).
+`.als` berisi track MIDI per channel, track audio, grup, return, send, rack dan Drum Rack, plugin VST2 dan VST3 beserta state-nya, marker, serta otomasi volume, pan, dan tempo. Instrumen dan efek bawaan LYNX SHARE tidak dikonversi, tetapi track dan not-nya tetap disimpan. Helix adalah pengecualian: ia menjadi Wavetable milik Live. Otomasi parameter efek dan rute antar insert dibuang. Rinciannya ada di [Pindahan dari Ableton Live](/wiki/coming-from-ableton/).
+
+`.dawproject` berisi track, folder, clip, not, audio beserta penanda warp-nya, otomasi, tempo, marker, mixer dengan send, dan plugin VST3, VST2, dan CLAP beserta state-nya. Instrumen dan efek bawaan LYNX SHARE ditulis sedemikian rupa sehingga LYNX SHARE bisa membukanya lagi. Grid clip, aransemen lain, dan beberapa detail per not dilewati, dan sebuah laporan mencantumkannya.
 
 ## Baik diketahui
 
-- `Dither` tampil abu-abu untuk MP3, dan opsi tempo serta marker tampil abu-abu untuk semua format selain WAV.
+- `Dither` tampil abu-abu untuk MP3, OGG, M4A, dan WAV 32-bit, dan opsi tempo serta marker tampil abu-abu untuk semua format selain WAV.
 - Dengan `Pilihan Playlist` dan tanpa seleksi di Playlist, seluruh lagu di-render. Jendela memperingatkanmu.
 - Kalau insert Master di-mute, jendela memperingatkan bahwa file-nya akan senyap.
 - `Tulis juga video dengan mix ini` hanya muncul saat proyek punya track video, dan membutuhkan FFmpeg.

@@ -3191,6 +3191,7 @@ int SimpleDock::stepsCountForCheck() const { return stepsPage->stepCountForCheck
 void SimpleDock::stepsClickForCheck (int row, int step) { stepsPage->clickStepForCheck (row, step); }
 void SimpleDock::stepsLetterForCheck (int letter) { stepsPage->pickLetterForCheck (letter); }
 void SimpleDock::stepsAddClipForCheck() { stepsPage->addClipForCheck(); }
+int SimpleDock::stepsMessagesShownForCheck() const { return stepsPage->messagesShownForCheck(); }
 void SimpleDock::stepsLengthForCheck (int bars) { stepsPage->setLengthForCheck (bars); }
 void SimpleDock::stepsSwingForCheck (float v) { stepsPage->setSwingForCheck (v); }
 void SimpleDock::stepsPreviewForCheck() { stepsPage->previewForCheck(); }

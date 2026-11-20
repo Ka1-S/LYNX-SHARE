@@ -1,5 +1,5 @@
 ---
-source: 98a5eb9945
+source: 49950b37a3
 ---
 LYNX SHARE 將專案儲存為 `.lynx` 檔案。它也能開啟其他程式的專案、載入常見的音訊檔案，並匯出音訊、MIDI 和給其他程式使用的專案。下表列出 0.1.30 alpha 的所有格式。
 
@@ -16,12 +16,12 @@ LYNX SHARE 將專案儲存為 `.lynx` 檔案。它也能開啟其他程式的專
 
 | 格式 | 開啟 | 儲存 / 匯出 | 備註 |
 |---|---|---|---|
-| `.lynx` | `檔案 › 開啟...` | `檔案 › 儲存`，並有自動儲存 | LYNX SHARE 自己的專案格式（JSON） |
+| `.lynx` | `檔案 › 開啟...` | `檔案 › 儲存`，並有自動儲存 | LYNX SHARE 自己的專案格式（JSON）。`檔案 › 為舊版 LYNX 儲存副本...` 會寫出一份 0.1.27 或 0.1.28 能開啟的副本，並列出該版本無法保留的內容 |
 | `.zip` | `檔案 › 開啟...` 會把它解壓縮到資料夾，並開啟裡面的專案 | `檔案 › 匯出 › 專案及取樣（.zip）...` | 也能開啟 FL Studio 的壓縮循環包 |
 | `.lynxpack` | 先顯示摘要再開啟。其中一部分會合併到主持人的專案 | `檔案 › 線上工作階段 › 傳送專案...` | 在[線上協作](/wiki/online-sessions/)中傳送的專案或部分內容。第三方外掛的部分會以音訊算繪加上外掛設定的方式傳送 |
 | `.flp` | `檔案 › 開啟...` | `檔案 › 匯出 › FL Studio 專案...`，一個 FL Studio 2026 專案或壓縮循環包 | 原生外掛在重新製作的引擎上播放，精確度各不相同。FLEX 套件絕不會被開啟。匯出時，僅限 LYNX 的樂器和效果器會被算繪為音訊，或換成最接近的 FL 外掛，調變器則會被略過。見[從 FL Studio 轉換](/wiki/coming-from-fl-studio/) |
 | `.flm` | `檔案 › 開啟...` | 否 | FL Studio Mobile 專案。部分支援：MiniSynth、Transistor Bass、3x Osc、GMSynth、SuperSaw、DW Sampler、Slicer 和 DirectWave 以外的樂器會改用內建合成器播放 |
-| `.als` | `檔案 › 開啟...`，Live 11 和 12 的套裝 | `檔案 › 匯出 › Ableton Live 套裝 (.als)...`，適用於 Live 12 或 Live 11 | 匯入時，Live 中沒有 LYNX SHARE 對應項目的裝置會被捨棄。匯出時，LYNX SHARE 自己的樂器和效果器不會被轉換，效果器參數的自動化和插入軌之間的路由會被捨棄。見[從 Ableton Live 轉換](/wiki/coming-from-ableton/) |
+| `.als` | `檔案 › 開啟...`，Live 11 和 12 的套裝 | `檔案 › 匯出 › Ableton Live 套裝 (.als)...`，適用於 Live 12 或 Live 11 | 匯入時，Live 中沒有 LYNX SHARE 對應項目的裝置會被捨棄。匯出時，LYNX SHARE 自己的樂器和效果器不會被轉換（Helix 會變成 Wavetable），效果器參數的自動化和插入軌之間的路由會被捨棄。見[從 Ableton Live 轉換](/wiki/coming-from-ableton/) |
 | `.dawproject` | `檔案 › 開啟...` | `檔案 › 匯出 › DAWproject (.dawproject)...` | Bitwig、Studio One、Cubase 等程式使用的開放交換格式：軌道、資料夾、片段、音符、帶 warp 標記的音訊、自動化、速度、標記、帶傳送的混音器，以及帶狀態的 VST3、VST2 和 CLAP 外掛。匯入時，音符效果器和 MIDI 表情會被略過；匯出時，片段網格、其他編排和部分逐音符的細節會被略過。兩個方向都會列出被略過的內容 |
 | `.band` | `檔案 › 開啟...`（專案套件、其中的 `projectData` 檔案或它的 zip） | 否 | GarageBand 10 或 GarageBand for iOS 專案，作為簡易工作流程的音軌。部分匯入：樂器音軌用內建合成器和鼓來播放，GarageBand for iOS 中製作的 Sampler 樂器除外。GarageBand 11 及更早版本的專案無法讀取 |
 | `.blx` | `檔案 › 開啟...`，或用簡易工作流程的 `資料夾...` 匯入其資料夾 | 否 | 由 Cakewalk 或 Sonar 下載的 BandLab 專案，作為簡易工作流程的音軌，帶區域、速度、調性、混音、音量和聲像自動化以及常用效果器。部分匯入：BandLab 的樂器音色和其他踏板效果會列在匯入報告中 |
@@ -50,6 +50,7 @@ LYNX SHARE 將專案儲存為 `.lynx` 檔案。它也能開啟其他程式的專
 | `檔案 › 匯出 › 所有 Playlist 軌道` | 每條播放清單軌道一個檔案 |
 | `檔案 › 匯出 › 所有 Playlist 軌道群組` | 每個軌道群組一個檔案 |
 | `檔案 › 匯出 › 母帶處理...` | 算繪專案並在你的電腦上母帶處理到響度目標 |
+| `檔案 › 匯出 › 用於其他應用程式...` | 一個資料夾，內含分軌、MIDI 檔案、Ableton Live 套裝、FL Studio 專案、完整混音和 README，可依需要壓縮成 zip |
 | `檔案 › 匯出 › 專案骨架...` | 把通道與效果器預設集及樂譜寫到資料夾 |
 
 匯出視窗可以算繪歌曲、目前的樣式或播放清單的選取範圍。
@@ -59,8 +60,8 @@ LYNX SHARE 將專案儲存為 `.lynx` 檔案。它也能開啟其他程式的專
 在 Windows 上，程式是 `LYNX.exe`。在 macOS 和 Linux 上是 `LYNX`。
 
 ```
-LYNX.exe project.lynx                       open a project (.lynx, .flp, .als, .flm or .mid)
-LYNX.exe --export project.flp out.flac      render the song (wav, flac or ogg)
+LYNX.exe project.lynx                       open a project (any file File › Open takes)
+LYNX.exe --export project.flp out.flac      render the song (wav, flac, ogg, mp3, aif; m4a on Windows and macOS)
 LYNX.exe --stems project.flp base.wav       one WAV per mixer insert that has sound
 LYNX.exe --export-flp project.lynx out.flp  write an FL Studio project
 ```

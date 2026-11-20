@@ -1,5 +1,5 @@
 ---
-source: 98a5eb9945
+source: 49950b37a3
 ---
 LYNX SHARE zapisuje projekty jako pliki `.lynx`. Otwiera też projekty innych programów, wczytuje typowe pliki audio oraz eksportuje audio, MIDI i projekty dla innych programów. Tabela wylicza każdy format wersji 0.1.30 alpha.
 
@@ -16,12 +16,12 @@ Projekt otwarty z formatu innego programu to import. `Plik › Zapisz` pyta wted
 
 | Format | Otwieranie | Zapis / eksport | Uwagi |
 |---|---|---|---|
-| `.lynx` | `Plik › Otwórz...` | `Plik › Zapisz`, z autozapisem | Własny format projektu LYNX SHARE (JSON) |
+| `.lynx` | `Plik › Otwórz...` | `Plik › Zapisz`, z autozapisem | Własny format projektu LYNX SHARE (JSON). `Plik › Zapisz kopię dla starszego LYNX...` zapisuje kopię, którą otworzy 0.1.27 lub 0.1.28, i wymienia, czego ta wersja nie zachowa |
 | `.zip` | `Plik › Otwórz...` rozpakowuje go do folderu i otwiera projekt w środku | `Plik › Eksportuj › Projekt z samplami (.zip)...` | Otwiera też spakowaną paczkę pętli FL Studio |
 | `.lynxpack` | Otwiera się po podsumowaniu. Partia jest scalana z projektem gospodarza | `Plik › Sesja online › Wyślij projekt...` | Projekt lub partia wysłana w [sesji online](/wiki/online-sessions/). Partie pluginów zewnętrznych podróżują jako rendery audio plus ustawienia pluginu |
 | `.flp` | `Plik › Otwórz...` | `Plik › Eksportuj › Projekt FL Studio...`, projekt FL Studio 2026 albo spakowana paczka pętli | Natywne pluginy grają na odtworzonych silnikach o różnej dokładności. Paczki FLEX nigdy nie są otwierane. Przy eksporcie instrumenty i efekty tylko z LYNX są renderowane do audio albo zamieniane na najbliższy plugin FL, a modulatory są pomijane. Zobacz [Przejście z FL Studio](/wiki/coming-from-fl-studio/) |
 | `.flm` | `Plik › Otwórz...` | Nie | Projekt FL Studio Mobile. Częściowo: instrumenty inne niż MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, DW Sampler, Slicer i DirectWave grają wbudowanym syntezatorem |
-| `.als` | `Plik › Otwórz...`, sety Live 11 i 12 | `Plik › Eksportuj › Set Ableton Live (.als)...`, dla Live 12 lub Live 11 | Przy imporcie urządzenia Live bez odpowiednika w LYNX SHARE są pomijane. Przy eksporcie własne instrumenty i efekty LYNX SHARE nie są konwertowane, a automatyka parametrów efektów i trasy insert do insertu są pomijane. Zobacz [Przejście z Ableton Live](/wiki/coming-from-ableton/) |
+| `.als` | `Plik › Otwórz...`, sety Live 11 i 12 | `Plik › Eksportuj › Set Ableton Live (.als)...`, dla Live 12 lub Live 11 | Przy imporcie urządzenia Live bez odpowiednika w LYNX SHARE są pomijane. Przy eksporcie własne instrumenty i efekty LYNX SHARE nie są konwertowane (Helix staje się Wavetable), a automatyka parametrów efektów i trasy insert do insertu są pomijane. Zobacz [Przejście z Ableton Live](/wiki/coming-from-ableton/) |
 | `.dawproject` | `Plik › Otwórz...` | `Plik › Eksportuj › DAWproject (.dawproject)...` | Otwarty format wymiany Bitwiga, Studio One, Cubase i innych programów: ścieżki, foldery, klipy, nuty, audio ze znacznikami warp, automatyka, tempo, markery, mikser z wysyłkami oraz pluginy VST3, VST2 i CLAP z ich stanem. Efekty nut i wyrażenia MIDI są pomijane przy imporcie; siatka klipów, inne aranżacje i niektóre szczegóły pojedynczych nut przy eksporcie. Oba kierunki wymieniają, co pominięto |
 | `.band` | `Plik › Otwórz...` (pakiet, jego plik `projectData` lub jego zip) | Nie | Projekt GarageBand 10 lub GarageBand na iOS, jako ścieżki Prostego sposobu pracy. Częściowo: ścieżki instrumentów grają wbudowanym syntezatorem i perkusją, z wyjątkiem instrumentów Sampler z GarageBand na iOS. Projekty z GarageBand 11 i starszych nie są czytelne |
 | `.blx` | `Plik › Otwórz...` lub jego folder przez import `Folder...` Prostego sposobu pracy | Nie | Projekt BandLab pobrany przez Cakewalk lub Sonar, jako ścieżki Prostego sposobu pracy z regionami, tempem, tonacją, miksem, automatyką głośności i panoramy oraz typowymi efektami. Częściowo: brzmienia instrumentów BandLab i inne pedały są wymienione w raporcie importu |
@@ -50,6 +50,7 @@ Projekt otwarty z formatu innego programu to import. `Plik › Zapisz` pyta wted
 | `Plik › Eksportuj › Wszystkie ścieżki Playlisty` | Jeden plik na ścieżkę Playlisty |
 | `Plik › Eksportuj › Wszystkie grupy ścieżek Playlisty` | Jeden plik na grupę ścieżek |
 | `Plik › Eksportuj › Mastering...` | Renderuje projekt i masteruje go do docelowej głośności, na twoim komputerze |
+| `Plik › Eksportuj › Dla innych aplikacji...` | Jeden folder ze stemami, plikami MIDI, setem Ableton Live, projektem FL Studio, zgranym miksem i plikiem README, spakowany, jeśli chcesz |
 | `Plik › Eksportuj › Kości projektu...` | Zapisuje presety i wyniki kanałów oraz efektów do folderu |
 
 Okno eksportu renderuje utwór, bieżący pattern albo zaznaczenie w Playliście.
@@ -59,8 +60,8 @@ Okno eksportu renderuje utwór, bieżący pattern albo zaznaczenie w Playliście
 W Windows program to `LYNX.exe`. W macOS i Linuksie to `LYNX`.
 
 ```
-LYNX.exe project.lynx                       open a project (.lynx, .flp, .als, .flm or .mid)
-LYNX.exe --export project.flp out.flac      render the song (wav, flac or ogg)
+LYNX.exe project.lynx                       open a project (any file File › Open takes)
+LYNX.exe --export project.flp out.flac      render the song (wav, flac, ogg, mp3, aif; m4a on Windows and macOS)
 LYNX.exe --stems project.flp base.wav       one WAV per mixer insert that has sound
 LYNX.exe --export-flp project.lynx out.flp  write an FL Studio project
 ```

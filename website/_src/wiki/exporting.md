@@ -5,7 +5,7 @@ status: full
 ---
 ![The export window with WAV selected: range, tail and files on the left, format on the right, mix options below](/assets/img/wiki/export.webp)
 
-Everything that leaves LYNX SHARE goes through `File › Export`. The audio formats (WAV, MP3, OGG and FLAC) share one export window. MIDI, FL Studio projects, Ableton Live sets and zipped projects have their own entries in the same menu.
+Everything that leaves LYNX SHARE goes through `File › Export`. The audio formats (WAV, MP3, OGG, FLAC, AIFF and M4A) share one export window. MIDI, FL Studio projects, Ableton Live sets, DAWproject files and zipped projects have their own entries in the same menu.
 
 ## Export the song as a WAV
 
@@ -30,7 +30,7 @@ Everything that leaves LYNX SHARE goes through `File › Export`. The audio form
 
 ## Output format
 
-The four buttons choose the format. `Also save` writes other formats from the same render, with the same name.
+The buttons choose the format. M4A is offered only where the system has an AAC encoder: on Windows and macOS, not on Linux. `Also save` writes other formats from the same render, with the same name.
 
 | Format | Options |
 |---|---|
@@ -38,6 +38,8 @@ The four buttons choose the format. `Also save` writes other formats from the sa
 | MP3 | `Bitrate`, constant |
 | OGG | Bitrate |
 | FLAC | `Bit depth`, `Compression` from `0 (fastest)` to `8 (smallest)`, `Dither`. Lossless at every level |
+| AIFF | `Bit depth`: 16 bits or 24 bits. `Dither` |
+| M4A | `Bitrate`: 96, 128, 160 or 192 kbps. AAC, written by the system's encoder |
 
 `Sample rate` and `Channels` apply to every format. `Channels` is `Stereo`, `Mono (both sides mixed)`, `Mono (left only)` or `Mono (right only)`.
 
@@ -78,17 +80,21 @@ Tick `Also the full mix` to get the mix next to the stems. The line at the botto
 | `Project with samples (.zip)...` | none | The project and its samples in one archive |
 | `FL Studio project...` | none | An `.flp`, or a zipped loop package with every sample |
 | `Ableton Live set (.als)...` | none | A set for Live 12 or Live 11 |
+| `DAWproject (.dawproject)...` | none | A project for Bitwig Studio, Studio One, Cubase and other apps that read DAWproject |
+| `For other apps...` | none | One folder with stems, MIDI files, a Live set, an FL Studio project, the mixdown and a README, zipped if you want |
 | `Project bones...` | none | Channel and effect presets and scores, in a folder |
 
-## Exporting to FL Studio and Ableton Live
+## Exporting to FL Studio, Ableton Live and DAWproject
 
 The `.flp` is an FL Studio 2026 project. Samplers, audio clips, FL Studio's own generators and effects, third-party plugins, patterns, the Playlist, the Mixer and automation go over with their settings. For the things FL Studio does not have, you choose between `Render them to audio (sounds the same)` and `Use the nearest FL plugin (stays editable, may sound different)`. With the second choice, LYNX-only instruments are left out. Modulators are always left out. A report lists what was rendered, replaced or left out. Details are in [Coming from FL Studio](/wiki/coming-from-fl-studio/).
 
-The `.als` holds a MIDI track per channel, audio tracks, groups, returns, sends, racks and Drum Racks, VST2 and VST3 plugins with their state, markers, and volume, pan and tempo automation. LYNX SHARE's own instruments and effects are not converted, though their tracks and notes are kept. Automation of effect parameters and insert-to-insert routes are dropped. Details are in [Coming from Ableton Live](/wiki/coming-from-ableton/).
+The `.als` holds a MIDI track per channel, audio tracks, groups, returns, sends, racks and Drum Racks, VST2 and VST3 plugins with their state, markers, and volume, pan and tempo automation. LYNX SHARE's own instruments and effects are not converted, though their tracks and notes are kept. Helix is the exception: it becomes Live's Wavetable. Automation of effect parameters and insert-to-insert routes are dropped. Details are in [Coming from Ableton Live](/wiki/coming-from-ableton/).
+
+The `.dawproject` holds tracks, folders, clips, notes, audio with its warp markers, automation, tempo, markers, the mixer with sends, and VST3, VST2 and CLAP plugins with their state. LYNX SHARE's own instruments and effects are written so that LYNX SHARE can open them again. The clip grid, other arrangements and some per-note details are left out, and a report lists them.
 
 ## Good to know
 
-- `Dither` is greyed out for MP3, and the tempo and marker options are greyed out for every format but WAV.
+- `Dither` is greyed out for MP3, OGG, M4A and 32-bit WAV, and the tempo and marker options are greyed out for every format but WAV.
 - With `Playlist selection` and no selection in the Playlist, the whole song is rendered. The window warns you.
 - If the Master insert is muted, the window warns that the file will be silent.
 - `Also write a video with this mix` appears only when the project has a video track, and it needs FFmpeg.

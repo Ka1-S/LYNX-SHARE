@@ -1,5 +1,5 @@
 ---
-source: d5cc625221
+source: cee352e3d5
 ---
 ![O layout de disparo de clipes: uma grade de clipes com cenas ao lado da Playlist](/assets/img/cliplaunch.webp)
 
@@ -59,7 +59,7 @@ As follow actions rodam depois de um número de compassos ou de passagens do cli
 
 | Gravado | Não gravado |
 |---|---|
-| Uma faixa MIDI por canal, com as notas como clipes MIDI | Os instrumentos e efeitos próprios do LYNX SHARE. As faixas e as notas deles são mantidas |
+| Uma faixa MIDI por canal, com as notas como clipes MIDI | Os instrumentos e efeitos próprios do LYNX SHARE, exceto o Helix, que vira Wavetable. As faixas e as notas deles são mantidas |
 | Faixas de áudio com stretch, transposição, ganho, fades e modo de warp | Automação de parâmetros de efeitos |
 | Grupos, retornos e sends | Rotas de insert para insert |
 | Plugins VST2 e VST3 com o estado deles | |
@@ -70,8 +70,8 @@ Um relatório depois da exportação lista o que ficou de fora.
 
 ## Bom saber
 
-- Muitos dos devices do próprio Live entram como os do LYNX SHARE, com suas configurações e automação: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Delay, Echo, Auto Filter, Saturator, Overdrive, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Simpler, Drift e Operator (sem FM). Os outros são descartados e listados no relatório de importação.
-- Os Instrument Racks e Audio Effect Racks entram com suas cadeias, zonas e macros, e um Drum Rack vira o Drum Rack do LYNX SHARE. Os MIDI Effect Racks do Live ainda não são convertidos e aparecem no relatório de importação.
+- Muitos dos devices do próprio Live entram como os do LYNX SHARE, com suas configurações e automação: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Hybrid Reverb, Delay, Echo, Grain Delay, Auto Filter, Saturator, Overdrive, Roar, Erosion, Vinyl Distortion, Corpus, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Spectral Time, Spectral Resonator, Looper, Simpler, Sampler, Drift, Operator, Wavetable e Meld. Os outros são descartados e listados no relatório de importação.
+- Os Instrument Racks e Audio Effect Racks entram com suas cadeias, zonas e macros, e um Drum Rack vira o Drum Rack do LYNX SHARE. O Arpeggiator do Live vira o arpejador do canal. Pitch, Velocity, Chord, Note Length e os MIDI Effect Racks são gravados nas notas.
 - O relatório de importação lista o que ficou de fora.
 - O Live corta os clipes de áudio que se sobrepõem em um set exportado.
 - Os warp markers de um set do Live são mantidos na importação e gravados de volta na exportação.

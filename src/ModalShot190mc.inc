@@ -184,6 +184,15 @@
                     return modelparams::rawValue (engine.getSong().channels[(std::size_t) index], param).value_or (-1.0f);
                 };
                 check ("tb_program_65_shown", value (tbprog::program) == 65.0f);
+                {
+                    // round 190nr (discussion #202): the page's "Copy as MIDI" / "Export MIDI..." on FL's factory program
+                    std::int64_t length = 0;
+                    const auto notes = transistorBassSequenceNotes (engine.getSong().channels[(std::size_t) index].pluginState, engine.getSong().bpm, &length);
+                    juce::String keys;
+                    for (const auto& n : notes)
+                        keys << n.key << "@" << (int) n.start << "/" << (int) n.length << (n.velocity >= 0.99f ? "A" : "") << " ";
+                    check ("tb_sequence_as_notes_190nr", ! notes.empty() && length > 0, keys.trim());
+                }
                 // another program, as the PROGRAM wheel does
                 engine.editSong ([index] (Song& s) { modelparams::setRawValue (s.channels[(std::size_t) index], tbprog::program, 36.0f); });
                 engine.dispatchPendingMessages();

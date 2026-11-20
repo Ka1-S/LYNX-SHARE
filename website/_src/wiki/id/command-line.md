@@ -1,5 +1,5 @@
 ---
-source: a5c1d056c8
+source: 327d10fb40
 ---
 LYNX SHARE juga bisa berjalan tanpa membuka jendelanya. Satu opsi merender proyek menjadi audio, opsi lain mengonversinya ke proyek FL Studio atau set Ableton Live, dan beberapa lagi ada untuk pengujian. Pemeriksaan milik proyek ini sendiri memakai opsi yang sama.
 
@@ -18,7 +18,7 @@ Programnya adalah `LYNX.exe` di Windows dan `LYNX` di macOS dan Linux. Di macOS 
 LYNX.exe project.lynx
 ```
 
-Memulai LYNX SHARE dengan jendelanya dan membuka file itu. Format yang diterima: `.lynx`, `.flp`, `.als`, `.flm`, dan `.mid`. Path relatif dihitung dari folder saat ini.
+Memulai LYNX SHARE dengan jendelanya dan membuka file itu. Format yang diterima: `.lynx`, `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx`, `.zip`, dan `.mid`. Path relatif dihitung dari folder saat ini.
 
 ```
 LYNX.exe --no-plugins project.lynx
@@ -30,7 +30,7 @@ Membuka proyek `.lynx` tanpa memuat plugin pihak ketiganya, seperti yang dilakuk
 
 | Opsi | Fungsinya |
 |---|---|
-| `--export <project> <out>` | Merender seluruh song beserta tail-nya, seperti jendela Ekspor. Ekstensi `<out>` menentukan format: `.wav` (24-bit), `.flac`, `.ogg`, atau `.mp3` (320 kbps) |
+| `--export <project> <out>` | Merender seluruh song beserta tail-nya, seperti jendela Ekspor. Ekstensi `<out>` menentukan format: `.wav` (24-bit), `.flac`, `.ogg`, `.mp3` (320 kbps), `.aif` / `.aiff` (24-bit), atau `.m4a` (192 kbps, tidak di Linux) |
 | `--export ... --pattern` | Hanya merender pattern saat ini |
 | `--export ... --insert N` | Hanya merender output insert Mixer N |
 | `--export ... --rate N` | Merender dengan sample rate lain, dalam Hz |

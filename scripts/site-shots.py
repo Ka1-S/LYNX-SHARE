@@ -40,7 +40,7 @@ from PIL import Image, ImageDraw
 # Home / Features pictures: name -> (render, crop box at 1x or None)
 TOP = {
     "hero": ("snap/s-desktop-all.png", None),       # Channel Rack, Piano Roll, Playlist and Mixer (the page's alt text)
-    "playlist": ("snap/s-playlist.png", None),
+    "playlist": ("snap/s-playlist-fit.png", None),  # (round 190nr: the song zoomed to fit; --snapshot's -playlist-fit.png)
     "pianoroll": ("snap/s-pianoroll.png", None),
     "mixer": ("snap/s-mixer.png", None),
     "rack": ("snap/s-rack.png", (0, 0, 1074, 420)),
@@ -66,7 +66,7 @@ README_PICTURES = {
 # put together by hand (Channel Rack + a synth + Parametric EQ) and is not written here
 STORE = {
     "01-workspace": "snap/s-desktop-all.png",
-    "02-playlist": "snap/s-playlist.png",
+    "02-playlist": "snap/s-playlist-fit.png",
     "03-piano-roll": "snap/s-pianoroll-narrow150.png",
     "04-mixer": "snap/s-mixer.png",
 }
