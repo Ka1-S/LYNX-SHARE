@@ -207,6 +207,7 @@
 #include "ui/ExportDialog.h"
 #include "ui/QuickAddPalette.h"
 #include "ui/I18n.h"
+#include "ui/KeyFocus.h"
 #include "ui/MainComponent.h"
 #include "ui/SimpleDock.h"
 #include "core/ScaleKeys.h"
@@ -3123,6 +3124,13 @@ public:
             return;
         }
 
+        // --focus218shot190ng <prefix> (round 190ng, issue #218): src/Focus218Shot190ng.inc
+        if (args.contains ("--focus218shot190ng"))
+        {
+            setApplicationReturnValue (runFocus218Shot190ng (args[args.indexOf ("--focus218shot190ng") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
         // --issueshot190mq <prefix> (round 190mq, issues #211, #212, #213): src/IssuesShot190mq.inc
         if (args.contains ("--issueshot190mq"))
         {
@@ -17363,6 +17371,7 @@ private:
 #include "IssuesShot190jz.inc" // round 190jz
 #include "IssuesShot190lw.inc" // round 190lw
 #include "IssuesShot190mq.inc" // round 190mq
+#include "Focus218Shot190ng.inc" // round 190ng (issue #218)
 #include "DetailsShot190kn.inc" // round 190kn
 #include "DetailsShot190ld.inc" // round 190ld
 #include "DetailsShot190lr.inc" // round 190lr

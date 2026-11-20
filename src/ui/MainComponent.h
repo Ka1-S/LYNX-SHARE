@@ -276,6 +276,8 @@ public:
     supportnote::Moment supportNoteMoment(); // a dialog / overlay in front, playing, recording
     std::unique_ptr<juce::AlertWindow> makeConfirmDiscardWindow();
     PianoRollComponent& getPianoRollForSnapshot() { return pianoRoll; }
+    juce::ComboBox& patternBoxForTest() { return patternBox; } // (round 190ng, issue #218)
+    juce::ComboBox& gridBoxForTest() { return gridBox; }
     ChannelRackComponent& getRackForSnapshot() { return rack; }
     juce::PopupMenu rackMenuForSnapshot() { juce::PopupMenu m; addPanelMenuItems (Panel::channelRack, m); return m; } // (round 190mk)
     void scrollRackForSnapshot (int x) { rackViewport.setViewPosition (x, rackViewport.getViewPositionY()); }

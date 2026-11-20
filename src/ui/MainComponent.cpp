@@ -1,4 +1,5 @@
 #include "ui/ControllerBridge.h"
+#include "ui/KeyFocus.h"
 #include "core/DetailChain.h"
 #include "core/MeterScale.h"
 #include "core/FactoryContent.h"
@@ -939,6 +940,18 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     hintBar.setHint ({ idleHint(), {}, false, false });
     setWantsKeyboardFocus (true);
     installDialogTextFocus(); // dialogs open with their text field focused (round 165q)
+    // issue #218 (round 190ng): the toolbar's drop-downs (Pattern, snap) never keep the PC keyboard; any drop-down or button
+    // of this window or a panel window that gets it hands it back (ui/KeyFocus.h)
+    // (LYNX_FIX218=0: as before, for the before / after check of --focus218shot190ng)
+    if (juce::SystemStats::getEnvironmentVariable ("LYNX_FIX218", "1") != "0")
+    {
+        for (auto* box : std::initializer_list<juce::Component*> { &patternBox, &gridBox })
+        {
+            box->setWantsKeyboardFocus (false);
+            box->setMouseClickGrabsKeyboardFocus (false);
+        }
+        ui::keyfocus::install (*this);
+    }
     if (startupMark != nullptr) startupMark ("main window: toolbar, menus, controllers");
     setSize (1180, 642);
     startTimerHz (30);
@@ -1069,6 +1082,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
 MainComponent::~MainComponent()
 {
+    ui::keyfocus::uninstall (*this); // (round 190ng)
     EffectsPanel::onHotSwapSlot = nullptr; // (round 190ce: it calls this window)
     if (pluginDatabaseWatcher != nullptr) // (round 190mf: nobody watches the folder any more)
         quickpick::setPluginDatabaseWatched (false);
@@ -2028,6 +2042,10 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
         return true;
     }
     const auto pianoKeys = typingPiano && ! isPlainKey (chord); // (a FREE plain key is a shortcut as with the piano off)
+
+    // issue #218 (round 190ng): Esc gives the keys back when a drop-down or button holds them (ui/KeyFocus.h)
+    if (key.isKeyCode (juce::KeyPress::escapeKey) && ! key.getModifiers().isAnyModifierKeyDown() && ui::keyfocus::releaseOnEscape (*this))
+        return true;
 
     // round 190ce: Esc ends hot-swap (the reference's key for it) before it means anything else
     if (key.isKeyCode (juce::KeyPress::escapeKey) && ! key.getModifiers().isAnyModifierKeyDown() && browser.isHotSwapping())
