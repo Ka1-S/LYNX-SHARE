@@ -44,8 +44,14 @@ Round 190nm settings (per instrument in INSTRUMENTS, or --set for a variant):
   cover, peaks   the `long` extra modes chosen by what they add to their third-octave band (select_modes); peaks: how
                  many spectral peaks are analysed (56)
   onset          the strike's slow start as the whole note's onset 1 - e^(-t / rise) (LPM header byte 14) instead of the
-                 resonated modes' build-up twins
+                 resonated modes' build-up twins; onset_law=2 (round 190nn): the table asks for the S-shaped onset
+                 (1 - e^(-t / rise))^2 (the fit's first guess still emulates the exponential one; refine.py retunes the
+                 rise through the engine)
   fade='power'   between two recorded keys a mode only one of them has fades by its power (LPM header byte 15)
+  fmin_hz        (round 190nn) the analysis floor in Hz where fmin x the key lies above it (the lines under a high key)
+  sympathetic    'flag': lines found in 3+ other takes are kept absolute (in Hz, LPM family 255), and with fmin_hz so is
+                 every line below fmin x the key; 'below' (round 190nn): only the lines below fmin x the key (the body,
+                 the frame, the other tubes ringing along) are absolute
 """
 import datetime
 import hashlib
@@ -62,7 +68,7 @@ import keyfit  # noqa: E402
 import lpm  # noqa: E402
 import modal_analysis as ma  # noqa: E402
 
-TOOL_VERSION = '190nm-1'
+TOOL_VERSION = '190nn-1'
 NOTE = {'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11}
 
 # the instruments: VCSL folder (as fetch_vcsl.py names it), velocity layers in order, modes kept, mode series (ratios to
@@ -88,15 +94,17 @@ INSTRUMENTS = {
     # (fmin 0.3: the lower tines ring along too, below the plucked one; round 190nl)
     # (round 190nm: the window-exact levels, two-component modes, band-covering long modes from 80 peaks, the whole
     # note's onset - a pluck starts in 2-10 ms - and the equal-power fade of the lines only one neighbour has)
+    # (round 190nn: fmin_hz 60 - under a high tine the analysis reaches the lower tines and the body ringing along, kept
+    # in Hz -, and the S-shaped onset (LPM onset 2): a pluck's quiet first moment, then the rise)
     'kalimba': dict(set='kalimba', layers=[None], modes=28, series=[1.0, 6.27, 17.55, 34.39], beam=1,
                     pos=(0.2, 0.95, 0.55), fmin=0.3, seconds=6.0, sympathetic='flag', window_exact=True, split=True,
-                    cover=True, long=16, peaks=80, onset=True, fade='power'),
+                    cover=True, long=16, peaks=80, onset=True, fade='power', fmin_hz=60.0, onset_law=2),
 }
 
 
 PIPELINE = ('calibrate.py fit (modes, tuning, strike first guess), then refine.py (the strike refined through the engine '
             'against the timbre score\'s attack and spectro-temporal parts; round 190nm: then each anchor\'s level matched '
-            'through the engine, --level); rounds 190nl, 190nm')
+            'through the engine, --level); rounds 190nl, 190nm, 190nn')
 LONG_MODES = 12     # (the default `long`)
 NOISE_ORDER = 2     # the engine's strike noise: two band-pass sections (LPM header byte 13)
 MAX_LANES = 44      # modes per anchor at most: the engine's 48 lanes less the build-up twins
@@ -470,7 +478,10 @@ def fit_note(path, cfg, sympathetic_lines=None):
     name = os.path.basename(path)
     key = label_key(name)
     f_nom = hz(key)
-    modes = ma.analyse_modes(x, sr, fmin=cfg['fmin'] * f_nom, k=cfg.get('peaks', 56), prom_db=10.0, window_exact=cfg.get('window_exact', False))
+    # (round 190nn: fmin_hz - the analysis reaches down to this many Hz where fmin x the key lies above it; with
+    # sympathetic='flag' a line found there - below fmin x the key, another tine or the body - is kept in Hz, absolute)
+    floor_hz = min(cfg['fmin'] * f_nom, cfg.get('fmin_hz', 1e9))
+    modes = ma.analyse_modes(x, sr, fmin=floor_hz, k=cfg.get('peaks', 56), prom_db=10.0, window_exact=cfg.get('window_exact', False))
     if not modes:
         raise ValueError('no modes: %s' % name)
     top = max(m['a0'] for m in modes)
@@ -482,13 +493,21 @@ def fit_note(path, cfg, sympathetic_lines=None):
     octave_check = round(float(np.log2(strongest['f'] / f_nom)), 2)
     f_tuned = f_nom * 2 ** (offset / 1200)
     dropped = []
-    if sympathetic_lines is not None:
+    if cfg.get('sympathetic') == 'below':
+        # (round 190nn: only the lines below fmin x the key - the body, the frame, the other tubes - kept in Hz)
+        for m in modes:
+            if m['f'] < cfg['fmin'] * f_nom and m is not main:
+                m['absolute'] = True
+    elif sympathetic_lines is not None:
         keep = []
         for m in modes:
             r = m['f'] / main['f']
             own = any(abs(cents(r, s)) < 60 for s in cfg['series']) or m is main
             hits = sum(1 for other in sympathetic_lines if any(abs(cents(m['f'], g)) < 8 for g in other))
-            if hits >= 3 and not own:
+            if m['f'] < cfg['fmin'] * f_nom and m is not main and cfg.get('sympathetic') == 'flag':
+                m['absolute'] = True
+                keep.append(m)
+            elif hits >= 3 and not own:
                 if cfg.get('sympathetic') == 'flag':
                     m['absolute'] = True
                     keep.append(m)
@@ -571,7 +590,7 @@ def calibrate(instrument, root, manifest, outdir, holdout=0, inc_dir=None, repor
     held.discard(keys[0]); held.discard(keys[-1])  # (the range's ends stay: held-out notes test interpolation only)
     use = [t for t in takes if t[0] not in held]
     sym = None
-    if cfg.get('sympathetic'):
+    if cfg.get('sympathetic') and cfg.get('sympathetic') != 'below':
         sym = []
         for t in takes:
             x, sr = ma.read_wav(os.path.join(root, cfg['set'], t[2]))
@@ -620,7 +639,7 @@ def calibrate(instrument, root, manifest, outdir, holdout=0, inc_dir=None, repor
     pbytes = json.dumps(provenance, indent=1, sort_keys=True).encode()
     os.makedirs(outdir, exist_ok=True)
     data = lpm.write(os.path.join(outdir, tag + '.lpm'), instrument, cfg['beam'], pos_ref, u0, u1, gain_offset, anchors, pbytes,
-                     NOISE_ORDER, 1 if cfg.get('onset') else 0, 1 if cfg.get('fade') == 'power' else 0)
+                     NOISE_ORDER, cfg.get('onset_law', 1) if cfg.get('onset') else 0, 1 if cfg.get('fade') == 'power' else 0)
     open(os.path.join(outdir, tag + '.provenance.json'), 'wb').write(pbytes)
     report = {'instrument': instrument, 'bytes': len(data), 'anchors': len(anchors), 'modes': sum(len(a['modes']) for a in anchors),
               'gain_offset_db': gain_offset, 'held_out_keys': sorted(held),

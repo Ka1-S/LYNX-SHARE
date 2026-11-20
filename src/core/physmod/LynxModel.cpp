@@ -273,7 +273,7 @@ std::optional<Table> parseTable (const std::uint8_t* d, std::size_t size, std::s
     const int anchors = u16 (d + 8), modes = u16 (d + 10);
     t.beam = d[12];
     t.noiseOrder = d[13] == 2 ? 2 : 1; // (round 190nl; 0 in older tables)
-    t.onset = d[14] == 1 ? 1 : 0;      // (round 190nm; 0 in older tables)
+    t.onset = d[14] == 1 || d[14] == 2 ? d[14] : 0; // (round 190nm; 0 in older tables; 2: round 190nn)
     t.fade = d[15] == 1 ? 1 : 0;       // (round 190nm; 0 in older tables)
     t.posRef = f32 (d + 16);
     t.posU0 = f32 (d + 20);
@@ -559,6 +559,7 @@ struct Engine::Impl
         float nPeak = 1.0f;
         std::uint32_t rng = 1;
         float onLeft = 0.0f, onMul = 0.0f; // (round 190nm) the onset: the output is scaled by 1 - onLeft, onLeft *= onMul
+        bool onSquared = false;            // (round 190nn) by (1 - onLeft)^2: the S-shaped onset of Table::onset 2
         float amGain = 1.0f;     // the motor's gain applied to the resonated modes now
         float pitchUsed = 0.0f;  // the pitch offset (semitones) the poles were set with
         float peakEnergy = 0.0f;
@@ -676,10 +677,11 @@ struct Engine::Impl
                 }
         }
         // (round 190nm) the whole note's onset: the voice's output rises as 1 - e^(-t / rise)
-        if (t.onset == 1 && nm.riseMs > 0.05f)
+        if (t.onset != 0 && nm.riseMs > 0.05f)
         {
             v.onMul = (float) std::exp (-1.0 / (nm.riseMs * 0.001 * rate));
             v.onLeft = 1.0f;
+            v.onSquared = t.onset == 2;
         }
         v.modes = m;
         v.bank.groups = (m + laneGroup - 1) / laneGroup;
@@ -758,11 +760,19 @@ struct Engine::Impl
         std::fill (own, own + n, 0.0f);
         renderVoiceInto (v, own, n);
         auto left = v.onLeft;
-        for (int i = 0; i < n; ++i)
-        {
-            out[i] += own[i] * (1.0f - left);
-            left *= v.onMul;
-        }
+        if (v.onSquared)
+            for (int i = 0; i < n; ++i)
+            {
+                const auto g = 1.0f - left;
+                out[i] += own[i] * g * g;
+                left *= v.onMul;
+            }
+        else
+            for (int i = 0; i < n; ++i)
+            {
+                out[i] += own[i] * (1.0f - left);
+                left *= v.onMul;
+            }
         v.onLeft = left;
     }
 

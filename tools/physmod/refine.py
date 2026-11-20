@@ -114,8 +114,9 @@ def main():
         y = y[ma.onset(y, rate):][:int(min(cfg['seconds'], 8.0) * rate)]
         refs.append((ts.StrikeLoss(y, rate), n.get('tuning_offset_cents', 0.0)))
     GRIDS['noiseHz'] = (list(np.geomspace(150.0, 0.4 * sr, 11)), 'log', 1.0)
-    if head.get('onset', 0) == 1:
-        # (round 190nm: riseMs is the whole note's onset there - a 10-90 % rise of about 2.2 x rise - finer steps)
+    if head.get('onset', 0) in (1, 2):
+        # (round 190nm: riseMs is the whole note's onset there - a 10-90 % rise of about 2.2 x rise (2.6 x for the
+        # S-shaped onset 2, round 190nn) - finer steps)
         GRIDS['riseMs'] = ([0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0], 'lin', 1.0)
 
     def losses(cands):

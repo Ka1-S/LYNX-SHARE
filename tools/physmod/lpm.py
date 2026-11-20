@@ -8,7 +8,7 @@ Little endian. Fitted parameters only: no audio, no recorded attack (owner decis
     5 kalimba) · u16 anchors · u16 modes (all anchors) · u8 beam (0 free-free bar or tube, 1 clamped-free tine) · u8 noise
     order (round 190nl: 2 = the strike noise through two band-pass sections, -12 dB / octave skirts; 0 or 1 = one) · u8 onset
     (round 190nm: 1 = an anchor's riseMs is the whole note's onset, the voice's output rising as 1 - e^(-t / rise); 0 = the
-    resonated modes' build-up twins, as before) · u8 fade (round 190nm: between two recorded keys a mode only one of
+    resonated modes' build-up twins, as before; round 190nn: 2 = the S-shaped onset (1 - e^(-t / rise))^2) · u8 fade (round 190nm: between two recorded keys a mode only one of
     them has fades by 1 = its power (equal power), 0 = its amplitude, as before)
     f32 posRef (the position knob's value the recordings were struck at) · f32 posU0, posU1 (the strike point along the
     bar, 0..1, at position 0 and 1) · f32 gainOffsetDb (instrument level) · u8[8] first bytes of the SHA-256 of the

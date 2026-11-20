@@ -98,7 +98,8 @@ struct Table
                              // body's lines of two neighbours keep their summed energy in the middle of a gap)
     int onset = 0;           // (round 190nm, LPM header byte 14) 1: an anchor's riseMs is the whole note's onset - the voice's
                              // output rises as 1 - e^(-t / rise) (a bell's, a tine's slow start) - instead of the resonated
-                             // modes' build-up twins; 0: the twins (tables before 190nm)
+                             // modes' build-up twins; 0: the twins (tables before 190nm); 2 (round 190nn): the S-shaped onset
+                             // (1 - e^(-t / rise))^2 - a pluck's or a strike's quiet first moment, then the rise
     float posRef = 0.25f, posU0 = 0.5f, posU1 = 0.95f, gainOffsetDb = 0.0f;
     std::array<std::uint8_t, 8> provenance {}; // the first bytes of the provenance record's SHA-256
     std::vector<TableAnchor> anchors;
