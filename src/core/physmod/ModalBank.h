@@ -9,7 +9,8 @@
 
 namespace lynx::lm
 {
-constexpr int maxModes = 32;  // per voice: four groups of eight
+constexpr int maxModes = 48;  // per voice: six groups of eight (round 190nl; 32 before: the bells' and the kalimba's
+                              // long, quiet upper partials did not fit)
 constexpr int laneGroup = 8;
 constexpr int maxBlock = 256; // samples per runModes call
 

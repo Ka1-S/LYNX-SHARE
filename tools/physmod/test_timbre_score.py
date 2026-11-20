@@ -145,6 +145,41 @@ class TimbreScoreTests(unittest.TestCase):
             self.assertLess(np.abs(x - self.ref).max(), 2e-7)
             self.assertEqual(score(self.ref, x)['timbre_score'], 10.0)
 
+    def test_clean_note_against_a_noisy_take(self):
+        # (round 190nl) a take with a fluctuating room rumble: the clean note itself must score about as well as a
+        # copy of the take with the same note, and better than a clean note one semitone off
+        rng = np.random.default_rng(11)
+        n = len(self.ref)
+        t = np.arange(n) / SR
+        rumble = np.convolve(rng.standard_normal(n), np.ones(400) / 400, 'same') * (1 + 0.8 * np.sin(2 * np.pi * 0.7 * t)) * 0.02
+        take = self.ref + rumble
+        clean = score(take, self.ref)
+        self.assertGreaterEqual(clean['subscores']['spectime'], 5.0, clean.get('spectime_db'))
+        self.assertLess(clean['spectime_db'], clean['spectime_190ni']['db'] - 1.0)  # (the 190ni rule counted the room as missing)
+        self.assertGreater(clean['timbre_score'], score(take, note(cents=100.0))['timbre_score'] + 2.0)
+        # (the 190ni rule is reported beside, never above the new one for a clean note)
+        self.assertLessEqual(clean['timbre_score_190ni'], clean['timbre_score'] + 1e-9)
+
+    def test_strike_loss_matches_the_score_parts(self):
+        # (round 190nl) refine.py's loss: zero for the note itself, larger for a slower attack and for a darker strike
+        sl = ts.StrikeLoss(self.ref, SR)
+        self.assertLess(sl.loss(self.ref), 1e-6)
+        slow = sl.loss(note(rise=0.012))
+        dark = sl.loss(note(partials=BAR[:2]))
+        self.assertGreater(slow, 0.01)
+        self.assertGreater(dark, 0.01)
+
+
+class TuningTests(unittest.TestCase):
+    def test_long_ringing_fundamental(self):
+        # (round 190nl) evaluate.tuning_of on a vibraphone-like note: a 20 s fundamental 12 cents flat with a -50 dB
+        # line 50 cents below it; the tuning is the fundamental's, not the line's
+        import evaluate
+        f = 440.0 * 2 ** (-12 / 1200.0)
+        x = note(partials=[(f, 0.0, 20.0), (440.0 * 2 ** (-50 / 1200.0), -50.0, 20.0), (4 * f, -12.0, 3.0)], seconds=2.0)
+        x = x[int(0.01 * SR):]
+        self.assertAlmostEqual(evaluate.tuning_of(x, SR, 69), -12.0, delta=1.0)
+
 
 if __name__ == '__main__':
     unittest.main()

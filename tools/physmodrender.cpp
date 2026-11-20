@@ -12,6 +12,7 @@
 //   physmodrender info      the compiled-in tables: anchors, modes, bytes, provenance hash
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -178,7 +179,7 @@ std::vector<std::pair<int, double>> parseSets (const std::vector<std::string>& w
 {
     std::vector<std::pair<int, double>> sets;
     for (const auto& w : words)
-        if (const auto eq = w.find ('='); eq != std::string::npos)
+        if (const auto eq = w.find ('='); eq != std::string::npos && eq > 0 && std::isdigit ((unsigned char) w[0]))
             sets.push_back ({ std::atoi (w.substr (0, eq).c_str()), std::atof (w.substr (eq + 1).c_str()) });
     return sets;
 }

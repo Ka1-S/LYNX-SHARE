@@ -11,7 +11,11 @@
 // offline from CC0 recordings (tools/physmod/calibrate.py; provenance per file in resources/physmod/*.provenance.json):
 // per recorded key and velocity layer, each mode's frequency ratio, level and T60, its bending-mode number for the
 // strike-position law, the contact width that reproduces the recorded attack, and the strike noise. A note between
-// recorded keys / layers interpolates the tables (modes matched by frequency ratio).
+// recorded keys / layers interpolates the tables: modes of the same family (round 190nl: the same physical mode in a
+// layer's neighbouring anchors, however far its ratio drifts) blend as one mode; untagged modes pair by ratio within 4 %.
+// Round 190nl: up to 48 modes per voice (the bells' and the kalimba's long, quiet upper partials), and the strike noise
+// through two band-pass sections where the table asks for it (-12 dB / octave skirts; the recordings' strikes are not
+// as broad as one section's -6 dB).
 //
 // The knobs act on that physics: Hardness scales the contact width (a harder mallet excites the high modes more and
 // clicks more), Position moves the strike point along the bar (each mode weighted by its shape there: the free-free
@@ -65,7 +69,10 @@ struct TableMode
 {
     float ratio = 1.0f, ampDb = 0.0f, t60 = 1.0f;
     std::uint8_t shape = 0;
+    std::uint8_t family = 0; // (round 190nl) the same mode in a layer's neighbouring anchors; 0 = none (pair by ratio);
+                             // absoluteFamily: a line at its own pitch (another tine ringing along), kept in Hz
 };
+constexpr std::uint8_t absoluteFamily = 255;
 struct TableAnchor
 {
     float key = 60.0f, velocity = 1.0f, gainDb = 0.0f, contact = 0.0005f; // contact: the force pulse's time constant (s)
@@ -76,6 +83,7 @@ struct TableAnchor
 struct Table
 {
     int model = 0, beam = 0; // beam 0: free-free bar / tube, 1: clamped-free tine
+    int noiseOrder = 1;      // (round 190nl) strike-noise band-pass sections: 1 = -6 dB / octave skirts, 2 = -12 dB / octave
     float posRef = 0.25f, posU0 = 0.5f, posU1 = 0.95f, gainOffsetDb = 0.0f;
     std::array<std::uint8_t, 8> provenance {}; // the first bytes of the provenance record's SHA-256
     std::vector<TableAnchor> anchors;

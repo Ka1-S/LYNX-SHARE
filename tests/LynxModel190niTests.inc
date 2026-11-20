@@ -198,29 +198,33 @@ TEST (lynxmodel190ni_mode_shapes)
 TEST (lynxmodel190ni_simd_paths_same_bits)
 {
     using namespace lynx;
-    lm::ModalBank a;
     std::uint32_t r = 12345u;
     const auto rnd = [&r] { r = r * 1664525u + 1013904223u; return (float) (r >> 8) / 16777216.0f; };
-    a.groups = 4;
-    for (int k = 0; k < lm::maxModes; ++k)
+    // (every group in use, and one fewer: the AVX path runs groups in pairs, an odd count ends on a single group)
+    for (const int groups : { lm::maxModes / lm::laneGroup, lm::maxModes / lm::laneGroup - 1 })
     {
-        const auto w = 0.02 + 2.5 * rnd(), rr = 0.999 + 0.000999 * rnd();
-        a.pr[k] = (float) (rr * std::cos (w));
-        a.pi[k] = (float) (rr * std::sin (w));
-        a.drive[k] = rnd() - 0.5f;
-        a.re[k] = rnd() - 0.5f;
-        a.im[k] = rnd() - 0.5f;
+        lm::ModalBank a;
+        a.groups = groups;
+        for (int k = 0; k < groups * lm::laneGroup; ++k)
+        {
+            const auto w = 0.02 + 2.5 * rnd(), rr = 0.999 + 0.000999 * rnd();
+            a.pr[k] = (float) (rr * std::cos (w));
+            a.pi[k] = (float) (rr * std::sin (w));
+            a.drive[k] = rnd() - 0.5f;
+            a.re[k] = rnd() - 0.5f;
+            a.im[k] = rnd() - 0.5f;
+        }
+        auto b = a;
+        float force[lm::maxBlock], outA[lm::maxBlock] {}, outB[lm::maxBlock] {};
+        for (int i = 0; i < lm::maxBlock; ++i)
+            force[i] = rnd();
+        lm::runModes (a, force, outA, lm::maxBlock);
+        lm::runModesBaseline (b, force, outB, lm::maxBlock);
+        lm::runModes (a, nullptr, outA, 100);
+        lm::runModesBaseline (b, nullptr, outB, 100);
+        CHECK (std::memcmp (outA, outB, sizeof (outA)) == 0);
+        CHECK (std::memcmp (a.re, b.re, sizeof (a.re)) == 0 && std::memcmp (a.im, b.im, sizeof (a.im)) == 0);
     }
-    auto b = a;
-    float force[lm::maxBlock], outA[lm::maxBlock] {}, outB[lm::maxBlock] {};
-    for (int i = 0; i < lm::maxBlock; ++i)
-        force[i] = rnd();
-    lm::runModes (a, force, outA, lm::maxBlock);
-    lm::runModesBaseline (b, force, outB, lm::maxBlock);
-    lm::runModes (a, nullptr, outA, 100);
-    lm::runModesBaseline (b, nullptr, outB, 100);
-    CHECK (std::memcmp (outA, outB, sizeof (outA)) == 0);
-    CHECK (std::memcmp (a.re, b.re, sizeof (a.re)) == 0 && std::memcmp (a.im, b.im, sizeof (a.im)) == 0);
     // a whole note on both paths: the same bits
     const auto s = lynxmodel190ni::state (lm::vibraphone);
     const auto fast = lynxmodel190ni::render (s, 72, 0.5);

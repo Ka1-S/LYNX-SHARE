@@ -1,6 +1,6 @@
 # LYNX Model: provenance of the parameter tables
 
-LYNX Model (`src/core/physmod/LynxModel.h`, round 190ni) ships **fitted parameters only**: one table per instrument
+LYNX Model (`src/core/physmod/LynxModel.h`, rounds 190ni and 190nl) ships **fitted parameters only**: one table per instrument
 (`<name>.lpm`, format in `tools/physmod/lpm.py`), compiled in as `src/core/physmod/tables/<name>.inc`. No audio from
 any recording is shipped or played. The strike is synthesised: a contact force `t e^(-t / tau)` and band-pass noise,
 whose parameters are fitted. No recorded transient or attack table is used, by owner decision (design study 190nd §3
@@ -41,10 +41,16 @@ Takes of a key a table already has (a second take, a second tine on the same not
 curl -o tree.json "https://api.github.com/repos/sgossner/VCSL/git/trees/c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e?recursive=1"
 curl -o LICENSE https://raw.githubusercontent.com/sgossner/VCSL/c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e/LICENSE
 python3 -I tools/physmod/fetch_vcsl.py tree.json LICENSE <notes> c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e
-python3 -I tools/physmod/calibrate.py fit all <notes> <notes>/manifest.json resources/physmod \
-        --inc-dir src/core/physmod/tables --report-dir <reports>
-python3 -I tools/physmod/calibrate.py fit all <notes> <notes>/manifest.json <reports> --holdout 3 --report-dir <reports>
-python3 -I tools/physmod/evaluate.py build/physmodrender <notes> <reports> <evaluation> --tables resources/physmod
+# 1. modes, tuning, a first strike (and the provenance records) for every instrument
+python3 -I tools/physmod/calibrate.py fit all <notes> <notes>/manifest.json <fit>
+cp <fit>/*.provenance.json resources/physmod/
+# 2. the strike refined through the engine (round 190nl): the shipped table and its include, per instrument
+python3 -I tools/physmod/refine.py build/physmodrender <notes> <fit>/<name>.fit.json <fit>/<name>.lpm resources/physmod/<name>.lpm \
+        --inc-dir src/core/physmod/tables --report <fit>/<name>.refine.json
+# held-out tables (three folds: every inner recorded key held out once), refined the same way, then the report
+python3 -I tools/physmod/calibrate.py fit all <notes> <notes>/manifest.json <fit> --holdout 3 [--fold 1|2]
+python3 -I tools/physmod/refine.py build/physmodrender <notes> <fit>/<name>-holdout3[f1|f2].fit.json <fit>/<name>-holdout3[f1|f2].lpm <eval-fit>/...
+python3 -I tools/physmod/evaluate.py build/physmodrender <notes> <eval-fit> <evaluation> --tables resources/physmod
 ```
 
 Keep the downloaded notes outside the repository. The fit is deterministic: the same notes give the same parameters

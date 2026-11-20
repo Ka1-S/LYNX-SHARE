@@ -89,28 +89,32 @@ Table fallbackTable (int model)
 double keyHz (double key) noexcept { return 440.0 * std::pow (2.0, (key - 69.0) / 12.0); }
 
 // --- interpolation of mode sets ----------------------------------------------------------------------------------------
-constexpr int setCap = 64;
+constexpr int setCap = 96; // (two anchors' modes, before the strongest maxModes are kept)
 struct ModeSet
 {
     int n = 0;
     float ratio[setCap] {}, ampDb[setCap] {}, t60[setCap] {};
-    std::uint8_t shape[setCap] {};
+    std::uint8_t shape[setCap] {}, fam[setCap] {};
     float gainDb = 0.0f, contact = 0.0005f, noiseDb = -60.0f, noiseHz = 2000.0f, noiseQ = 1.0f, noiseMs = 10.0f, riseMs = 0.0f;
 };
 
-ModeSet fromAnchor (const Table& t, const TableAnchor& a)
+// (a mode of family absoluteFamily is a line at its own pitch - another tine or bar ringing along - so played at another
+// key it keeps its frequency in Hz: its ratio re that key)
+ModeSet fromAnchor (const Table& t, const TableAnchor& a, float key)
 {
     ModeSet s;
+    const auto toKey = std::pow (2.0f, (a.key - key) / 12.0f);
     for (int k = 0; k < a.count && s.n < setCap; ++k)
     {
         const auto idx = (std::size_t) a.first + (std::size_t) k;
         if (idx >= t.modes.size())
             break;
         const auto& m = t.modes[idx];
-        s.ratio[s.n] = m.ratio;
+        s.ratio[s.n] = m.family == absoluteFamily ? m.ratio * toKey : m.ratio;
         s.ampDb[s.n] = m.ampDb;
         s.t60[s.n] = m.t60;
         s.shape[s.n] = m.shape;
+        s.fam[s.n] = m.family;
         ++s.n;
     }
     s.gainDb = a.gainDb;
@@ -129,9 +133,10 @@ float energyOf (const ModeSet& s, int k) noexcept
     return a * a * std::min (s.t60[k], 3.0f);
 }
 
-// a weighted blend of two sets (t = the weight of b): modes within 4 % of each other are one mode (frequency, level,
-// T60 blended); the others fade with their side's weight
-ModeSet blend (const ModeSet& a, const ModeSet& b, float t)
+// a weighted blend of two sets (t = the weight of b): the same mode on both sides (the same family id, round 190nl, when
+// `families` - two keys of one layer; for modes without one, and across layers: within 4 % of each other) is one mode
+// (frequency, level, T60 blended); the others fade with their side's weight
+ModeSet blend (const ModeSet& a, const ModeSet& b, float t, bool families = true)
 {
     if (t <= 0.0f)
         return a;
@@ -149,12 +154,21 @@ ModeSet blend (const ModeSet& a, const ModeSet& b, float t)
         float d;
         int i, j;
     };
-    Pair pairs[setCap * 4];
+    Pair pairs[setCap * 8];
     int np = 0;
+    // (a family pairs across any distance; a tagged mode never pairs with a mode of another family)
     for (int i = 0; i < a.n; ++i)
-        for (int j = 0; j < b.n && np < setCap * 4; ++j)
-            if (const auto d = std::abs (std::log (b.ratio[j] / a.ratio[i])); d < 0.0392f) // (4 %)
+        for (int j = 0; j < b.n && np < setCap * 8; ++j)
+        {
+            const auto d = std::abs (std::log (b.ratio[j] / a.ratio[i]));
+            if (families && a.fam[i] != 0 && b.fam[j] != 0 && a.fam[i] != absoluteFamily && b.fam[j] != absoluteFamily)
+            {
+                if (a.fam[i] == b.fam[j])
+                    pairs[np++] = { -1.0f + d * 1.0e-3f, i, j };
+            }
+            else if (d < 0.0392f) // (4 %; absolute lines pair so too)
                 pairs[np++] = { d, i, j };
+        }
     std::sort (pairs, pairs + np, [] (const Pair& x, const Pair& y) { return x.d < y.d || (x.d == y.d && (x.i < y.i || (x.i == y.i && x.j < y.j))); });
     for (int k = 0; k < np; ++k)
         if (pairOf[pairs[k].i] < 0 && ! used[pairs[k].j])
@@ -170,6 +184,7 @@ ModeSet blend (const ModeSet& a, const ModeSet& b, float t)
             o.ampDb[o.n] = lerp (a.ampDb[i], b.ampDb[best]);
             o.t60[o.n] = glerp (a.t60[i], b.t60[best]);
             o.shape[o.n] = a.shape[i] != 0 ? a.shape[i] : b.shape[best];
+            o.fam[o.n] = a.fam[i];
         }
         else
         {
@@ -177,6 +192,7 @@ ModeSet blend (const ModeSet& a, const ModeSet& b, float t)
             o.ampDb[o.n] = a.ampDb[i] + 20.0f * std::log10 (1.0f - t);
             o.t60[o.n] = a.t60[i];
             o.shape[o.n] = a.shape[i];
+            o.fam[o.n] = a.fam[i];
         }
         ++o.n;
     }
@@ -187,6 +203,7 @@ ModeSet blend (const ModeSet& a, const ModeSet& b, float t)
             o.ampDb[o.n] = b.ampDb[j] + 20.0f * std::log10 (t);
             o.t60[o.n] = b.t60[j];
             o.shape[o.n] = b.shape[j];
+            o.fam[o.n] = b.fam[j];
             ++o.n;
         }
     o.gainDb = lerp (a.gainDb, b.gainDb);
@@ -201,13 +218,13 @@ ModeSet blend (const ModeSet& a, const ModeSet& b, float t)
 
 // one recorded key's layers at velocity v (outside the layers: the nearest one, its level following the velocity and
 // its contact the Hertz law tau ~ v^-1/5)
-ModeSet atVelocity (const Table& t, std::size_t first, std::size_t end, float v)
+ModeSet atVelocity (const Table& t, std::size_t first, std::size_t end, float v, float key)
 {
     const auto& lo = t.anchors[first];
     const auto& hi = t.anchors[end - 1];
     if (v <= lo.velocity || end - first == 1)
     {
-        auto s = fromAnchor (t, v <= lo.velocity ? lo : hi);
+        auto s = fromAnchor (t, v <= lo.velocity ? lo : hi, key);
         const auto ref = v <= lo.velocity ? lo.velocity : hi.velocity;
         const auto r = std::max (v, 0.02f) / std::max (ref, 0.02f);
         s.gainDb += 20.0f * std::log10 (r);
@@ -215,16 +232,17 @@ ModeSet atVelocity (const Table& t, std::size_t first, std::size_t end, float v)
         return s;
     }
     if (v >= hi.velocity)
-        return fromAnchor (t, hi);
+        return fromAnchor (t, hi, key);
     for (auto i = first; i + 1 < end; ++i)
         if (v <= t.anchors[i + 1].velocity)
         {
             const auto& a = t.anchors[i];
             const auto& b = t.anchors[i + 1];
             const auto w = (v - a.velocity) / std::max (b.velocity - a.velocity, 1e-6f);
-            return blend (fromAnchor (t, a), fromAnchor (t, b), w);
+            // (family ids belong to one layer: two layers of a key pair their modes by ratio)
+            return blend (fromAnchor (t, a, key), fromAnchor (t, b, key), w, false);
         }
-    return fromAnchor (t, hi);
+    return fromAnchor (t, hi, key);
 }
 
 // --- the strike-position law ------------------------------------------------------------------------------------------
@@ -247,6 +265,7 @@ std::optional<Table> parseTable (const std::uint8_t* d, std::size_t size, std::s
     t.model = u16 (d + 6);
     const int anchors = u16 (d + 8), modes = u16 (d + 10);
     t.beam = d[12];
+    t.noiseOrder = d[13] == 2 ? 2 : 1; // (round 190nl; 0 in older tables)
     t.posRef = f32 (d + 16);
     t.posU0 = f32 (d + 20);
     t.posU1 = f32 (d + 24);
@@ -285,6 +304,7 @@ std::optional<Table> parseTable (const std::uint8_t* d, std::size_t size, std::s
         x.ampDb = f16 (m + 4);
         x.t60 = f16 (m + 6);
         x.shape = m[8];
+        x.family = m[9];
         if (! (x.ratio > 0.0f) || ! std::isfinite (x.ratio) || ! (x.t60 > 0.0f) || ! std::isfinite (x.ampDb))
             return fail ("bad LPM mode");
         t.modes.push_back (x);
@@ -354,12 +374,12 @@ NoteModes interpolate (const Table& t, float key, float velocity)
     const auto v = std::clamp (velocity, 0.0f, 1.0f);
     ModeSet s;
     if (lo == hi)
-        s = atVelocity (t, lo, endOf (lo), v);
+        s = atVelocity (t, lo, endOf (lo), v, key);
     else
     {
         const auto k0 = t.anchors[lo].key, k1 = t.anchors[hi].key;
         const auto w = (key - k0) / std::max (k1 - k0, 1e-6f);
-        s = blend (atVelocity (t, lo, endOf (lo), v), atVelocity (t, hi, endOf (hi), v), w);
+        s = blend (atVelocity (t, lo, endOf (lo), v, key), atVelocity (t, hi, endOf (hi), v, key), w);
     }
     // beyond the recorded keys: the nearest key's modes transposed, the T60s shorter by 2^-0.5 per octave up (higher
     // bars ring shorter) and longer by 2^0.25 per octave down
@@ -520,6 +540,8 @@ struct Engine::Impl
         // the strike noise: white noise through a unity-peak band-pass (TPT state-variable filter); its envelope
         // follows the contact force up to the force's peak, then decays
         float nAmp = 0.0f, nEnv = 0.0f, nMul = 0.0f, a1 = 0.0f, a2 = 0.0f, a3 = 0.0f, nk = 1.0f, ic1 = 0.0f, ic2 = 0.0f;
+        float ic3 = 0.0f, ic4 = 0.0f; // (the second band-pass section, tables with noiseOrder 2)
+        bool nTwo = false;
         int nPos = 0, nPeakAt = 0;
         float nPeak = 1.0f;
         std::uint32_t rng = 1;
@@ -651,6 +673,7 @@ struct Engine::Impl
             const auto q = std::clamp ((double) nm.noiseQ, 0.4, 8.0);
             const auto g = std::tan (3.141592653589793 * fc / rate);
             v.nk = (float) (1.0 / q);
+            v.nTwo = t.noiseOrder == 2;
             v.a1 = (float) (1.0 / (1.0 + g * (g + 1.0 / q)));
             v.a2 = (float) (g * v.a1);
             v.a3 = (float) (g * v.a2);
@@ -745,6 +768,16 @@ struct Engine::Impl
                 const auto v2 = v.ic2 + v.a2 * v.ic1 + v.a3 * v3;
                 v.ic1 = 2.0f * v1 - v.ic1;
                 v.ic2 = 2.0f * v2 - v.ic2;
+                auto bp = v1 * v.nk; // (unity at the centre)
+                if (v.nTwo)
+                {
+                    const auto w3 = bp - v.ic4;
+                    const auto w1 = v.a1 * v.ic3 + v.a2 * w3;
+                    const auto w2 = v.ic4 + v.a2 * v.ic3 + v.a3 * w3;
+                    v.ic3 = 2.0f * w1 - v.ic3;
+                    v.ic4 = 2.0f * w2 - v.ic4;
+                    bp = w1 * v.nk;
+                }
                 float env;
                 if (v.nPos < v.nPeakAt)
                     env = i < done ? force[i] / v.nPeak : 1.0f; // (rising with the contact force)
@@ -754,7 +787,7 @@ struct Engine::Impl
                     v.nEnv *= v.nMul;
                 }
                 ++v.nPos;
-                out[i] += v1 * v.nk * v.nAmp * env;
+                out[i] += bp * v.nAmp * env;
             }
         }
         const auto e = modalEnergy (v.bank);

@@ -8,6 +8,8 @@ attack is synthesised by the engine (a Gaussian contact pulse + band-pass noise)
         <notes-root>/<set>/*.wav as fetched with the manifest (path, git blob SHA-1, SHA-256, commit, licence per file).
         --holdout N: leave out every N-th note (by key, starting with the 2nd) and list them in the report: the held-out
         notes test the key interpolation; the shipped tables are fitted on every note (no --holdout).
+        --fold F (round 190nl): start with the (2 + F)-th key instead, F < N; the table is <instrument>-holdoutNfF
+        (fold 0 keeps the name <instrument>-holdoutN). N folds together hold every inner key out once.
         --inc-dir: also write <instrument>.inc there (tools/make_model_inc.py's format) for src/core/physmod/tables/.
         --report-dir: the fit reports (<instrument>.fit.json, per note: modes, tuning, contact, noise, fit losses) go
         there instead of <out-dir> (the shipped run: tables and provenance in resources/physmod/, reports elsewhere).
@@ -18,7 +20,7 @@ Per recorded note (one velocity layer):
   2. modes: prominent peaks (modal_analysis.pick_peaks), each tracked and fitted with an exponential decay (a0, T60);
      modes below the instrument's lowest useful frequency (room rumble), 60 dB under the strongest, and (kalimba) the
      other tines' sympathetic lines (the same absolute frequency in >= 3 other notes, off the note's own series) dropped;
-     the strongest M by energy kept
+     the strongest M by energy kept, then (round 190nl) up to `long` more by audible duration, at most 44 per anchor
   3. tuning: the main mode (the strongest within 70 cents of the label) defines the note's tuning offset, removed so
      the instrument plays in tune; mode ratios refer to the key's equal-tempered frequency
   4. strike position law: each mode's bending-mode number (shape) from the instrument's mode series
@@ -26,6 +28,8 @@ Per recorded note (one velocity layer):
      constant tau (the engine's force t e^(-t / tau)) and the noise's level, centre and decay fitted through the
      engine's own first 150 ms, emulated in closed form (fit_attack_noise): the timbre score's spectro-temporal grid and
      attack measures are the loss (automated refinement against the recording)
+  6. (round 190nl) mode families across each layer's keys (keyfit.families, the LPM mode's family byte); the strike is
+     then refined through the engine itself by tools/physmod/refine.py, which writes the shipped tables and includes
 """
 import datetime
 import hashlib
@@ -38,14 +42,17 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+import keyfit  # noqa: E402
 import lpm  # noqa: E402
 import modal_analysis as ma  # noqa: E402
 
-TOOL_VERSION = '190ni-1'
+TOOL_VERSION = '190nl-1'
 NOTE = {'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11}
 
 # the instruments: VCSL folder (as fetch_vcsl.py names it), velocity layers in order, modes kept, mode series (ratios to
 # the main mode; None = the uniform free-free law (2k+1)^2), beam (0 free-free, 1 clamped-free), position mapping
+# (round 190nl) long=N: after the `modes` strongest by energy, up to N more by audible duration (the quiet partials that
+# ring longest: the score's spectro-temporal part sees every slice they are heard in); fmin re the key's frequency
 INSTRUMENTS = {
     'marimba': dict(set='marimba', layers=['soft', 'med', 'loud'], modes=24, series=[1.0, 3.95, 9.5, 16.5, 25.0], beam=0,
                     pos=(0.25, 0.5, 0.95), fmin=0.85, seconds=8.0),
@@ -57,11 +64,51 @@ INSTRUMENTS = {
                          pos=(0.25, 0.5, 0.95), fmin=0.85, seconds=8.0),
     'tubularbells': dict(set='tubularbells', layers=['v2', 'v4'], modes=32, series=None, beam=0, pos=(0.0, 0.02, 0.35),
                          fmin=0.4, seconds=14.0),
-    # (the kalimba's other tines ring along in every take: their lines stay in each key's modes - 25 of its keys are
-    # recorded, so a key plays its own take; sympathetic=True would drop them as other tines' lines)
+    # (the kalimba's other tines ring along in every take: sympathetic='flag' (round 190nl) keeps their lines and marks
+    # them absolute - LPM family 255, played at their own pitch whatever key is struck, so a key between two recorded
+    # ones hears the same tines ring; sympathetic=True would drop them)
+    # (fmin 0.3: the lower tines ring along too, below the plucked one; round 190nl)
     'kalimba': dict(set='kalimba', layers=[None], modes=28, series=[1.0, 6.27, 17.55, 34.39], beam=1,
-                    pos=(0.2, 0.95, 0.55), fmin=0.85, seconds=6.0, sympathetic=False),
+                    pos=(0.2, 0.95, 0.55), fmin=0.3, seconds=6.0, sympathetic='flag'),
 }
+
+
+LONG_MODES = 12     # (the default `long`)
+NOISE_ORDER = 2     # the engine's strike noise: two band-pass sections (LPM header byte 13)
+MAX_LANES = 44      # modes per anchor at most: the engine's 48 lanes less the build-up twins
+
+
+def audible_seconds(m, top_a0):
+    """how long a mode stays within 50 dB of the note's strongest one: its T60 x (its level + 50 dB) / 60 dB"""
+    lvl = 20 * np.log10(max(m['a0'], 1e-12) / max(top_a0, 1e-12))
+    return max(lvl + 50.0, 0.0) / 60.0 * min(m['t60'], 60.0)
+
+
+def select_modes(modes, main, n_energy, n_long):
+    """the `n_energy` strongest modes by energy (a0^2 min(T60, 3 s)), then up to `n_long` more by audible duration
+    (round 190nl), the main mode always"""
+    top = max(m['a0'] for m in modes)
+    by_e = sorted(modes, key=lambda m: -m['a0'] ** 2 * min(m['t60'], 3.0))
+    kept = by_e[:n_energy]
+    rest = sorted(by_e[n_energy:], key=lambda m: -audible_seconds(m, top))
+    kept += [m for m in rest[:n_long] if audible_seconds(m, top) > 0.05]
+    kept = kept[:MAX_LANES]
+    if main not in kept:
+        kept = [main] + kept[:-1]
+    return kept
+
+
+def write_inc(instrument, data, inc_dir):
+    """src/core/physmod/tables/<instrument>.inc: the table's bytes as a C array"""
+    os.makedirs(inc_dir, exist_ok=True)
+    name = 'lpm_' + instrument
+    lines = [', '.join(str(b) for b in data[i:i + 40]) + ',' for i in range(0, len(data), 40)]
+    with open(os.path.join(inc_dir, instrument + '.inc'), 'w', newline='\n') as f:
+        f.write('// Generated by tools/physmod/calibrate.py from resources/physmod/%s.lpm (%d bytes, SHA-256 %s). Do not edit.\n'
+                % (instrument, len(data), hashlib.sha256(data).hexdigest()))
+        f.write('alignas (16) static const unsigned char %s[%d] = {\n' % (name, len(data)))
+        f.write('\n'.join(lines))
+        f.write('\n};\n')
 
 
 FREE_BETA = [4.730040745, 7.853204624, 10.99560784, 14.13716549, 17.27875966, 20.42035225, 23.56194490, 26.70353756]
@@ -242,16 +289,16 @@ def noise_env(sr, n, tau, T):
     return env
 
 
-def noise_carrier(sr, n, fc, q, seed=7):
+def noise_carrier(sr, n, fc, q, seed=7, order=None):
     """white noise of RMS 1/sqrt(3) (the engine's uniform noise) through a unity-peak band-pass at fc, Q (the TPT
-    state-variable filter's analog prototype, pre-warped)"""
+    state-variable filter's analog prototype, pre-warped), `order` sections (NOISE_ORDER)"""
     rng = np.random.default_rng(seed)
     N = 1 << int(np.ceil(np.log2(n * 2)))
     X = np.fft.rfft(rng.standard_normal(N) / np.sqrt(3.0))
     f = np.fft.rfftfreq(N, 1.0 / sr)
     W = np.tan(np.pi * np.minimum(f, 0.499 * sr) / sr) / np.tan(np.pi * fc / sr)
     H = (W / q) / np.sqrt((1 - W * W) ** 2 + (W / q) ** 2 + 1e-30)
-    return np.fft.irfft(X * H, N)[:n]
+    return np.fft.irfft(X * H ** (order or NOISE_ORDER), N)[:n]
 
 
 def fit_attack_noise(x, sr, modes, main_a0, fc0, q0, floor=None, main_f=None):
@@ -341,13 +388,15 @@ def fit_note(path, cfg, sympathetic_lines=None):
             own = any(abs(cents(r, s)) < 60 for s in cfg['series']) or m is main
             hits = sum(1 for other in sympathetic_lines if any(abs(cents(m['f'], g)) < 8 for g in other))
             if hits >= 3 and not own:
-                dropped.append(round(m['f'], 1))
+                if cfg.get('sympathetic') == 'flag':
+                    m['absolute'] = True
+                    keep.append(m)
+                else:
+                    dropped.append(round(m['f'], 1))
             else:
                 keep.append(m)
         modes = keep
-    kept = sorted(modes, key=lambda m: -m['a0'] ** 2 * min(m['t60'], 3.0))[:cfg['modes']]
-    if main not in kept:
-        kept = [main] + kept[:-1]
+    kept = select_modes(modes, main, cfg['modes'], cfg.get('long', LONG_MODES))
     if cfg['series'] is None:
         shapes, kmain = uniform_shapes(sorted(kept, key=lambda m: -m['energy']), main['f'])
         order = sorted(kept, key=lambda m: -m['energy'])
@@ -375,8 +424,11 @@ def fit_note(path, cfg, sympathetic_lines=None):
     contact = nz.pop('contact')
     rise = nz['rise_ref_ms'] / 1000.0
     # (ratio = f / (the key's equal-tempered frequency x the tuning offset): the main mode lands on ratio 1, in tune)
-    out_modes = [{'ratio': float(m['f'] / f_tuned),
-                  'ampDb': float(20 * np.log10(m['a0'] / main['a0'])), 't60': float(min(m['t60'], 60.0)), 'shape': int(shape[id(m)]),
+    # (an absolute line - another tine - refers to the key's equal-tempered frequency, not the take's tuning: played at
+    # the take's tuning it must land on its own frequency, the engine keeps it in Hz)
+    out_modes = [{'ratio': float(m['f'] / (f_nom if m.get('absolute') else f_tuned)),
+                  'ampDb': float(20 * np.log10(m['a0'] / main['a0'])), 't60': float(min(m['t60'], 60.0)),
+                  'shape': 0 if m.get('absolute') else int(shape[id(m)]), 'absolute': bool(m.get('absolute')),
                   'f_hz': m['f'], 'fit_rms_db': m['rms_db']}
                  for m in sorted(kept, key=lambda m: m['f'])]
     return {'file': name, 'key': key, 'tuning_offset_cents': round(float(offset), 2), 'label_octave_check': octave_check,
@@ -403,11 +455,11 @@ def notes_of(root, cfg, manifest):
     return first, extra
 
 
-def calibrate(instrument, root, manifest, outdir, holdout=0, inc_dir=None, report_dir=None):
+def calibrate(instrument, root, manifest, outdir, holdout=0, inc_dir=None, report_dir=None, fold=0):
     cfg = INSTRUMENTS[instrument]
     takes, extra = notes_of(root, cfg, manifest)
     keys = sorted(set(t[0] for t in takes))
-    held = set(keys[1::holdout]) if holdout else set()
+    held = set(keys[1 + fold::holdout]) if holdout else set()
     held.discard(keys[0]); held.discard(keys[-1])  # (the range's ends stay: held-out notes test interpolation only)
     use = [t for t in takes if t[0] not in held]
     sym = None
@@ -439,11 +491,15 @@ def calibrate(instrument, root, manifest, outdir, holdout=0, inc_dir=None, repor
     pos_ref, u0, u1 = cfg['pos']
     anchors = [{'key': float(f['key']), 'velocity': float(f['velocity']), 'gainDb': float(f['gainDb']), 'contact': f['contact'], 'riseMs': f['riseMs'],
                 'noiseDb': f['noiseDb'], 'noiseHz': f['noiseHz'], 'noiseQ': f['noiseQ'], 'noiseMs': f['noiseMs'],
-                'modes': [{k: m[k] for k in ('ratio', 'ampDb', 't60', 'shape')} for m in f['modes']]} for f in fits]
-    tag = instrument + ('-holdout%d' % holdout if holdout else '')
+                'modes': [dict({k: m[k] for k in ('ratio', 'ampDb', 't60', 'shape')}, **({'fam': lpm.ABSOLUTE} if m.get('absolute') else {}))
+                          for m in f['modes']]} for f in fits]
+    keyfit.families(anchors)  # (round 190nl: the engine pairs the same mode across keys by its family)
+    tag = instrument + ('-holdout%d' % holdout if holdout else '') + ('f%d' % fold if holdout and fold else '')
     provenance = {
         'instrument': instrument, 'table': tag + '.lpm', 'tool': 'tools/physmod/calibrate.py ' + TOOL_VERSION,
         'date': datetime.date.today().isoformat(),
+        'pipeline': 'calibrate.py fit (modes, tuning, strike first guess), then refine.py (the strike refined through the engine '
+                    'against the timbre score\'s attack and spectro-temporal parts); round 190nl',
         'data_policy': 'CC0 only; fitted parameters ship, no audio; synthesised attack (no recorded transient)',
         'source': {'library': 'Versilian Community Sample Library (VCSL)', 'url': manifest['source'], 'commit': manifest['commit'],
                    'licence': manifest['licence'], 'licence_sha256': manifest.get('licence_sha256'),
@@ -455,25 +511,18 @@ def calibrate(instrument, root, manifest, outdir, holdout=0, inc_dir=None, repor
     }
     pbytes = json.dumps(provenance, indent=1, sort_keys=True).encode()
     os.makedirs(outdir, exist_ok=True)
-    data = lpm.write(os.path.join(outdir, tag + '.lpm'), instrument, cfg['beam'], pos_ref, u0, u1, gain_offset, anchors, pbytes)
+    data = lpm.write(os.path.join(outdir, tag + '.lpm'), instrument, cfg['beam'], pos_ref, u0, u1, gain_offset, anchors, pbytes,
+                     NOISE_ORDER)
     open(os.path.join(outdir, tag + '.provenance.json'), 'wb').write(pbytes)
     report = {'instrument': instrument, 'bytes': len(data), 'anchors': len(anchors), 'modes': sum(len(a['modes']) for a in anchors),
               'gain_offset_db': gain_offset, 'held_out_keys': sorted(held),
               'held_out_takes': [{'file': t[2], 'key': t[0], 'layer': cfg['layers'][t[1]]} for t in takes if t[0] in held],
               'extra_takes': [{'file': t[2], 'key': t[0], 'layer': cfg['layers'][t[1]]} for t in extra],
-              'notes': [{k: v for k, v in f.items() if k != 'source'} for f in fits]}
+              'notes': fits}
     os.makedirs(report_dir or outdir, exist_ok=True)
     json.dump(report, open(os.path.join(report_dir or outdir, tag + '.fit.json'), 'w'), indent=1)
     if inc_dir and not holdout:
-        os.makedirs(inc_dir, exist_ok=True)
-        name = 'lpm_' + instrument
-        lines = [', '.join(str(b) for b in data[i:i + 40]) + ',' for i in range(0, len(data), 40)]
-        with open(os.path.join(inc_dir, instrument + '.inc'), 'w', newline='\n') as f:
-            f.write('// Generated by tools/physmod/calibrate.py from resources/physmod/%s.lpm (%d bytes, SHA-256 %s). Do not edit.\n'
-                    % (instrument, len(data), hashlib.sha256(data).hexdigest()))
-            f.write('alignas (16) static const unsigned char %s[%d] = {\n' % (name, len(data)))
-            f.write('\n'.join(lines))
-            f.write('\n};\n')
+        write_inc(instrument, data, inc_dir)
     print('%s: %d anchors, %d modes, %d bytes, gain offset %.1f dB, held out %s' % (
         tag, len(anchors), report['modes'], len(data), gain_offset, sorted(held)), flush=True)
     return report
@@ -486,10 +535,11 @@ def main():
         return 2
     inst, root, man, out = a[1], a[2], json.load(open(a[3])), a[4]
     holdout = int(a[a.index('--holdout') + 1]) if '--holdout' in a else 0
+    fold = int(a[a.index('--fold') + 1]) if '--fold' in a else 0
     inc = a[a.index('--inc-dir') + 1] if '--inc-dir' in a else None
     rep = a[a.index('--report-dir') + 1] if '--report-dir' in a else None
     for i in (INSTRUMENTS if inst == 'all' else inst.split(',')):
-        calibrate(i, root, man, out, holdout, inc, rep)
+        calibrate(i, root, man, out, holdout, inc, rep, fold)
     return 0
 
 

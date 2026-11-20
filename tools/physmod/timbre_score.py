@@ -60,6 +60,34 @@ def band_floor(grid):
     return grid.min(axis=1, keepdims=True)
 
 
+def spectime(gr, gc, lev, rule='190nl'):
+    """the spectro-temporal part from the two notes' band-energy grids (dB; rows = third-octave bands, columns = time
+    slices) and the candidate's level offset `lev` (dB): {'miss' 0..1, 'db' mean dB difference or None}.
+    A cell is part of the note where it stands within 50 dB of the top and FLOOR_MARGIN dB above the reference's
+    background in that band (its quietest slice: the room, the take's noise) in either note.
+    Rule '190nl' (round 190nl): (1) the overall offset removed is the median difference over the cells audible in BOTH
+    notes (190ni took it over every audible cell, so a clean note against a noisy take - every cell the room fills and
+    the note leaves empty reads 30 dB down - had its real partials pushed up by the room's level); (2) a candidate cell
+    below the reference's background reads as that background (what the take's room would let one hear of it: a clean
+    synthesis is not missing the room's rumble). Rule '190ni': the score as round 190ni shipped it (reported beside)."""
+    top = max(gr.max(), gc.max() - lev)
+    floor = band_floor(gr)
+    ra = (gr > top - 50) & (gr > floor + FLOOR_MARGIN)
+    ca = (gc - lev > top - 50) & (gc - lev > floor + FLOOR_MARGIN)
+    aud = ra | ca
+    if not aud.any():
+        return {'miss': 1.0, 'db': None}
+    if rule == '190ni':
+        d = (gc - lev) - gr
+        d = d - np.median(d[aud])
+    else:
+        both = ra & ca
+        d = np.maximum(gc - lev, floor) - gr
+        d = d - np.median(d[both] if both.sum() >= 3 else d[aud])
+    v = float(np.mean(np.minimum(np.abs(d[aud]), 30.0)))
+    return {'miss': v / FULL['spectime'], 'db': round(v, 2)}
+
+
 def cents(a, b):
     return 1200.0 * np.log2(a / b)
 
@@ -133,6 +161,69 @@ def align(r, c, sr):
 def prepare(x, sr, dur):
     on = ma.onset(x, sr)
     return x[on:on + int(dur * sr)]
+
+
+def attack_part(r, c, sr):
+    """the attack part of two aligned notes: (miss 0..1, measures) - see the module doc"""
+    rr, rc = ma.rise_time(r, sr), ma.rise_time(c, sr)
+    a30 = int(0.03 * sr)
+    cr, cc = ma.centroid(r[:a30], sr), ma.centroid(c[:a30], sr)
+    er, ec = envelope_db(r, sr), envelope_db(c, sr)
+    k = min(len(er), len(ec))
+    # (on a log time grid 0.5 ... 150 ms: the first milliseconds weigh as much as the rest)
+    grid = np.unique(np.clip((np.geomspace(0.0005, 0.15, 32) * sr).astype(int), 0, k - 1))
+    er, ec = er[grid], ec[grid]
+    m = er > -40
+    curve = float(np.mean(np.minimum(np.abs(er[m] - ec[m]), 30.0))) if m.any() else 30.0
+    am = {'rise': abs(np.log2(max(rc, 1e-5) / max(rr, 1e-5))) / ATTACK_FULL['rise'],
+          'centroid': abs(np.log2(max(cc, 1.0) / max(cr, 1.0))) / ATTACK_FULL['centroid'],
+          'curve': curve / ATTACK_FULL['curve']}
+    return float(np.mean([min(v, 1.0) for v in am.values()])), {
+        'rise_ms': [round(rr * 1000, 3), round(rc * 1000, 3)], 'centroid_hz': [round(cr, 1), round(cc, 1)], 'curve_db': round(curve, 2)}
+
+
+class StrikeLoss:
+    """the parts of the score a strike's parameters move (round 190nl, tools/physmod/refine.py): the attack and the
+    spectro-temporal cells of the first `span` s, against one reference note, the reference analysed once.
+    loss(cand) = (WEIGHT spectime * spectime miss^2 + attack miss^2) / (WEIGHT spectime + 1), the score's own parts;
+    the candidate's level offset is taken over the first 2 s as the score does (render at least that long)."""
+
+    def __init__(self, ref, sr, dur=8.0, span=0.4):
+        self.sr = sr
+        self.r = prepare(np.asarray(ref, np.float64), sr, dur)
+        self.span = span
+        self.edges = time_edges(len(self.r) / sr)
+        self.gr = ma.band_energy_grid(self.r, sr, self.edges)
+        self.cols = int(np.searchsorted(self.edges, span + 1e-9)) - 1
+
+    def loss(self, cand, detail=False):
+        sr = self.sr
+        c = prepare(np.asarray(cand, np.float64), sr, len(self.r) / sr)
+        c = align(self.r, c, sr)
+        n = min(len(self.r), len(c))
+        r = self.r[:n]
+        c = c[:n]
+        m2 = int(min(n, 2 * sr))
+        lev = 10 * np.log10((np.mean(c[:m2] ** 2) + 1e-30) / (np.mean(r[:m2] ** 2) + 1e-30))
+        e = self.edges[:self.cols + 1]
+        gc = ma.band_energy_grid(c, sr, e)
+        # (the reference's top and background from its whole note, as score_pair sees them)
+        top = max(self.gr.max(), gc.max() - lev)
+        floor = band_floor(self.gr)
+        gr = self.gr[:, :self.cols]
+        ra = (gr > top - 50) & (gr > floor + FLOOR_MARGIN)
+        ca = (gc - lev > top - 50) & (gc - lev > floor + FLOOR_MARGIN)
+        aud, both = ra | ca, ra & ca
+        if aud.any():
+            d = np.maximum(gc - lev, floor) - gr
+            d = d - np.median(d[both] if both.sum() >= 3 else d[aud])
+            spec = float(np.mean(np.minimum(np.abs(d[aud]), 30.0))) / FULL['spectime']
+        else:
+            spec = 1.0
+        att, info = attack_part(r, c, sr)
+        w = WEIGHT['spectime']
+        loss = (w * min(spec, 1.0) ** 2 + att ** 2) / (w + 1.0)
+        return (loss, {'spec': spec, 'attack': att, **info}) if detail else loss
 
 
 def score_pair(ref, cand, sr, f0=None, dur=8.0, partials=16, wave=True):
@@ -217,42 +308,24 @@ def score_pair(ref, cand, sr, f0=None, dur=8.0, partials=16, wave=True):
     # spectral envelope over time
     edges = time_edges(secs)
     gr, gc = ma.band_energy_grid(r, sr, edges), ma.band_energy_grid(c, sr, edges)
-    top = max(gr.max(), gc.max() - lev)
-    # the reference's own background (room rumble, the recording's noise floor): each band's quietest slice; a cell
-    # is part of the note where it stands FLOOR_MARGIN dB above that in either note
-    floor = band_floor(gr)
-    aud = ((gr > top - 50) & (gr > floor + FLOOR_MARGIN)) | ((gc - lev > top - 50) & (gc - lev > floor + FLOOR_MARGIN))
-    if aud.any():
-        d = (gc - lev) - gr
-        d = d - np.median(d[aud])  # (the overall level is its own part)
-        miss['spectime'] = float(np.mean(np.minimum(np.abs(d[aud]), 30.0))) / FULL['spectime']
-        out['spectime_db'] = round(float(np.mean(np.minimum(np.abs(d[aud]), 30.0))), 2)
-    else:
-        miss['spectime'] = 1.0
+    st = spectime(gr, gc, lev)
+    st_old = spectime(gr, gc, lev, rule='190ni')
+    miss['spectime'] = st['miss']
+    if st['db'] is not None:
+        out['spectime_db'] = st['db']
+    out['spectime_190ni'] = {'db': st_old['db'], 'miss': round(st_old['miss'], 4)}
 
     # attack
-    rr, rc = ma.rise_time(r, sr), ma.rise_time(c, sr)
-    a30 = int(0.03 * sr)
-    cr, cc = ma.centroid(r[:a30], sr), ma.centroid(c[:a30], sr)
-    er, ec = envelope_db(r, sr), envelope_db(c, sr)
-    k = min(len(er), len(ec))
-    # (on a log time grid 0.5 ... 150 ms: the first milliseconds weigh as much as the rest)
-    grid = np.unique(np.clip((np.geomspace(0.0005, 0.15, 32) * sr).astype(int), 0, k - 1))
-    er, ec = er[grid], ec[grid]
-    m = er > -40
-    curve = float(np.mean(np.minimum(np.abs(er[m] - ec[m]), 30.0))) if m.any() else 30.0
-    am = {'rise': abs(np.log2(max(rc, 1e-5) / max(rr, 1e-5))) / ATTACK_FULL['rise'],
-          'centroid': abs(np.log2(max(cc, 1.0) / max(cr, 1.0))) / ATTACK_FULL['centroid'],
-          'curve': curve / ATTACK_FULL['curve']}
-    miss['attack'] = float(np.mean([min(v, 1.0) for v in am.values()]))
-    out['attack'] = {'rise_ms': [round(rr * 1000, 3), round(rc * 1000, 3)], 'centroid_hz': [round(cr, 1), round(cc, 1)],
-                     'curve_db': round(curve, 2)}
+    miss['attack'], out['attack'] = attack_part(r, c, sr)
 
     sub = {k2: round(10.0 * (1.0 - min(v, 1.0)), 2) for k2, v in miss.items()}
     tw = sum(WEIGHT.values())
     agg = np.sqrt(sum(WEIGHT[k2] * min(v, 1.0) ** 2 for k2, v in miss.items()) / tw)
     out['subscores'] = sub
     out['timbre_score'] = round(float(10.0 * (1.0 - agg)), 2)
+    # (the same score with round 190ni's spectro-temporal rule, for comparison with its reports)
+    m_old = dict(miss, spectime=out['spectime_190ni']['miss'])
+    out['timbre_score_190ni'] = round(float(10.0 * (1.0 - np.sqrt(sum(WEIGHT[k2] * min(v, 1.0) ** 2 for k2, v in m_old.items()) / tw))), 2)
     if wave:
         out['wave'] = wave_metrics(r, c, sr)
     return out
