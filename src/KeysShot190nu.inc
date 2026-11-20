@@ -84,6 +84,35 @@
                                        && p.markers[2].name == "C Major (Ionian)");
             roll.scrollToNotes (true);
             shoot (roll, "keys-01-regions");
+            // the paint cost of the regions: instructions per whole frame of the Piano roll (median of 15) with the three
+            // key markers and with the same view after they are taken out (the rows' single fill path)
+            {
+                const lynx::platform::ThreadInstructions counter;
+                const auto frameInstructions = [&roll, &counter] {
+                    std::vector<long long> v;
+                    juce::Image image (juce::Image::ARGB, roll.getWidth(), roll.getHeight(), true);
+                    for (int f = 0; f < 18; ++f)
+                    {
+                        juce::Graphics g (image);
+                        const auto i0 = counter.now();
+                        roll.paintEntireComponent (g, true);
+                        if (f >= 3)
+                            v.push_back (counter.now() - i0);
+                    }
+                    std::sort (v.begin(), v.end());
+                    return v[v.size() / 2];
+                };
+                const auto withRegions = frameInstructions();
+                const auto markers = engine.getSong().patterns.front().markers;
+                engine.editSong ([] (Song& s) { s.patterns.front().markers.clear(); });
+                engine.dispatchPendingMessages();
+                const auto without = frameInstructions();
+                engine.editSong ([markers] (Song& s) { s.patterns.front().markers = markers; });
+                engine.dispatchPendingMessages();
+                check ("paint_instructions_with_regions", counter.available() ? withRegions > 0 : true,
+                       juce::String (withRegions) + " vs " + juce::String (without) + " without key markers ("
+                           + juce::String (without > 0 ? 100.0 * (double) (withRegions - without) / (double) without : 0.0, 2) + " %)");
+            }
             // the menus (FL's Add key marker ▸ Root note | Scale; a key marker's menu; the Stamp menu)
             saveMenus (juce::StringArray { "Add key marker" }, std::vector<juce::PopupMenu> { subMenu (roll.getMarkersMenuForSnapshot(), tr ("Add key marker")) },
                        folder.getChildFile ("keys-02-add-key-marker-menu.png").getFullPathName());
