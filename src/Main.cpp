@@ -12961,7 +12961,8 @@ private:
         engine = std::make_unique<lynx::AudioEngine>();
         juce::String error;
         auto ok = false;
-        if (project.hasFileExtension ("flp"))
+        // (round 190nq: a Live set, FL Studio Mobile project or DAWproject takes the same import, issue #193's set)
+        if (project.hasFileExtension ("flp;als;flm;dawproject"))
             ok = engine->importFlpFile (project, error);
         else if (auto song = lynx::ProjectFile::load (project, error))
         {
@@ -12971,6 +12972,7 @@ private:
         juce::String text = "project: " + project.getFullPathName() + "\n";
         if (ok)
         {
+            text << "video tracks: " << (int) engine->getSong().videoTracks.size() << "\n";
             auto playlist = std::make_unique<lynx::PlaylistComponent> (*engine);
             playlist->setBounds (0, 0, 1466, 930);
             playlist->setVisible (true);

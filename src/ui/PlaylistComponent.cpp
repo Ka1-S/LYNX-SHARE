@@ -926,8 +926,12 @@ PlaylistComponent::CacheShift PlaylistComponent::cacheShift (const CacheView& fr
                 shift.stickyTitles.add (titles);
         }
     }
-    else
-        shift.area = { 0, headerHeight, grid.getRight(), grid.getHeight() };
+    else // (#193, round 190nq: from the clip tracks' top, not the ruler's foot: the pinned video lanes between them stay put;
+         // from headerHeight the picture slid them down with the tracks, and the rows at the bottom were never shifted)
+    {
+        static const bool fix193 = [] { const auto* v = std::getenv ("LYNX_FIX193"); return v == nullptr || juce::String (v) != "0"; }(); // (0: the old area, A/B)
+        shift.area = { 0, fix193 ? grid.getY() : headerHeight, grid.getRight(), grid.getHeight() };
+    }
     shift.dx = dx;
     shift.dy = dy;
     if (std::abs (dx) >= shift.area.getWidth() || std::abs (dy) >= shift.area.getHeight())
