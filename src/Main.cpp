@@ -47,6 +47,10 @@
 #include "core/Rack.h"
 #include "ui/RackEditor.h"
 #include "ui/HelixEditor.h"
+#include "ui/LynxModelEditor.h"
+#include "core/physmod/LynxModel.h"
+#include "core/PluginCatalog.h"
+#include "engine/GeneratorCatalog.h"
 #include "core/AlsDevices.h"
 #include "core/XmlLite.h"
 #include "ui/DrumRackShot.h"
@@ -2277,6 +2281,14 @@ public:
         if (args.contains ("--loopshot190kf"))
         {
             setApplicationReturnValue (runLoopShot190kf (juce::File (args[args.indexOf ("--loopshot190kf") + 1].unquoted())) ? 0 : 1);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--lynxmodelshot190ni"))
+        {
+            // LYNX --lynxmodelshot190ni prefix: round 190ni, LYNX Model's window per preset, its Browser entry, checks
+            setApplicationReturnValue (runLynxModelShot190ni (args[args.indexOf ("--lynxmodelshot190ni") + 1].unquoted()) ? 0 : 1);
             quit();
             return;
         }
@@ -36177,6 +36189,7 @@ private:
     // --snapshot: 8 s of a synthetic stereo beat whose parts sit in different bands (kick = low, chord = mid,
     // hats and the noise riser = high), to show the spectral waveform colours
 #include "BrowserShot190iz.inc" // round 190iz
+#include "LynxModelShot190ni.inc" // round 190ni
 #include "UndoGesture190jv.inc" // round 190jv
 #include "TrimShot190jv.inc" // round 190jv
 #include "PrChordShot190kd.inc" // round 190kd

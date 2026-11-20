@@ -82,6 +82,7 @@
 #include "ui/DirectWaveEditor.h"
 #include "ui/FpcEditor.h"
 #include "ui/TetraEditor.h"
+#include "ui/LynxModelEditor.h"
 #include "ui/HelixEditor.h"
 #include "ui/FruitySlicerEditor.h"
 #include "ui/FlVoicePanel.h"
@@ -7084,6 +7085,8 @@ std::unique_ptr<juce::Component> makeInstrumentPage (AudioEngine& engine, const 
         return makeFpcEditor (engine, ref.locate, ref.index); // round 190q
     if (kind == InstrumentKind::tetra)
         return makeTetraEditor (engine, ref.locate, ref.index); // round 190hs
+    if (kind == InstrumentKind::lynxModel)
+        return makeLynxModelEditor (engine, ref.locate, ref.index); // round 190ni
     if (kind == InstrumentKind::directwave)
         return makeDirectWaveEditor (engine, ref.locate, ref.index); // round 190hz
     if (kind == InstrumentKind::helix)
@@ -7581,6 +7584,7 @@ bool hasChannelSettings (InstrumentKind kind) noexcept
         case InstrumentKind::tetra:
         case InstrumentKind::helix:
         case InstrumentKind::braid:
+        case InstrumentKind::lynxModel:
             return true;
         default:
             return false;
@@ -7714,6 +7718,10 @@ std::unique_ptr<juce::Component> makeChannelSettingsPanel (AudioEngine& engine, 
         return makeTetraEditor (engine, [channel] (Song& s) -> ChannelDef* {
             return channel >= 0 && channel < (int) s.channels.size() ? &s.channels[(std::size_t) channel] : nullptr;
         }, channel); // round 190hs
+    if (engine.getSong().channels[(std::size_t) channel].instrument == InstrumentKind::lynxModel)
+        return makeLynxModelEditor (engine, [channel] (Song& s) -> ChannelDef* {
+            return channel >= 0 && channel < (int) s.channels.size() ? &s.channels[(std::size_t) channel] : nullptr;
+        }, channel); // round 190ni
     if (engine.getSong().channels[(std::size_t) channel].instrument == InstrumentKind::directwave)
         return makeDirectWaveEditor (engine, [channel] (Song& s) -> ChannelDef* {
             return channel >= 0 && channel < (int) s.channels.size() ? &s.channels[(std::size_t) channel] : nullptr;
@@ -7743,7 +7751,8 @@ std::unique_ptr<juce::Component> makeChannelSettingsPanel (AudioEngine& engine, 
 bool hasNodeEditor (const ChannelDef& channel) noexcept
 {
     return channel.instrument == InstrumentKind::synth || channel.instrument == InstrumentKind::sampler || isModelKind (channel.instrument)
-           || channel.instrument == InstrumentKind::tetra || channel.instrument == InstrumentKind::helix; // rounds 190hs, 190ja
+           || channel.instrument == InstrumentKind::tetra || channel.instrument == InstrumentKind::helix // rounds 190hs, 190ja
+           || channel.instrument == InstrumentKind::lynxModel; // round 190ni
 }
 
 std::unique_ptr<juce::Component> makeNodeChannelFrame (AudioEngine& engine, std::function<ChannelDef* (Song&)> locate)

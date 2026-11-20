@@ -26,5 +26,6 @@ LYNX_MODEL_PARAMS (beepmap, beepMapModelTable)               // round 168q
 LYNX_MODEL_PARAMS (granulizer, granulizerModelTable)         // round 168q
 LYNX_MODEL_PARAMS (pocketSuperSaw, pocketSuperSawModelTable)   // round 190by (core/PocketSuperSaw.h)
 LYNX_MODEL_PARAMS (tetra, tetraModelTable)                     // round 190hs (core/FmSynth.h)
+LYNX_MODEL_PARAMS (lynxModel, lynxModelModelTable)             // round 190ni (core/physmod/LynxModel.h)
 LYNX_MODEL_PARAMS (helix, helixModelTable)                     // round 190ja (core/WavetableSynth.h)
 LYNX_MODEL_PARAMS (braid, braidModelTable)                     // round 190ko (core/Braid.h)

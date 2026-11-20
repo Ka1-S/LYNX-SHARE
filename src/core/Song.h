@@ -183,8 +183,11 @@ enum class InstrumentKind : std::uint8_t
                     // its values in Operator's units in modelParams (fm::stateSize: parameters, then the user waves' partials)
     helix,          // Helix (round 190ja, core/WavetableSynth.h): LYNX's own wavetable synth (Live's Wavetable imports onto it);
                     // its values in Wavetable's units in modelParams (wt::stateSize: parameters, the two tables, the matrix)
-    braid           // Braid (round 190ko, core/Braid.h): LYNX's own two-engine macro synth (Live's Meld imports onto it); its
+    braid,          // Braid (round 190ko, core/Braid.h): LYNX's own two-engine macro synth (Live's Meld imports onto it); its
                     // values in Meld's units in modelParams (braid::stateSize: parameters, then the modulation matrix)
+    lynxModel       // LYNX Model (round 190ni, core/physmod/LynxModel.h): LYNX's own physical-modelling instrument (mallets on
+                    // a modal core: marimba, vibraphone, xylophone, glockenspiel, tubular bells, kalimba); its knobs in
+                    // modelParams (lm::stateSize, the units of lm::p), the instrument's fitted tables compiled in
 };
 
 // External plugin: format identifier (the app knows how to find the file) + saved state.

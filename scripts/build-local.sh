@@ -52,6 +52,8 @@ CORE="$CORE src/core/GmsMobile.cpp"
 CORE="$CORE src/core/PocketSuperSaw.cpp"
 # Tetra: LYNX's own FM synth and the import of Live's Operator onto it (round 190hs)
 CORE="$CORE src/core/FmSynth.cpp src/core/AlsDevicesFm.cpp"
+# LYNX Model: LYNX's own physical-modelling instrument, mallets on a modal core (round 190ni)
+CORE="$CORE src/core/physmod/ModalBank.cpp src/core/physmod/LynxModel.cpp src/core/LynxModelBank.cpp"
 # Helix: LYNX's own wavetable synth and the import of Live's Wavetable onto it (round 190ja)
 CORE="$CORE src/core/WavetableSynth.cpp src/core/WavetableTables.cpp src/core/WavetableUser.cpp src/core/AlsDevicesWt.cpp"
 # Braid (Live's Meld) and the spectral effects' import, round 190ko
@@ -280,6 +282,8 @@ $CXX $FLAGS src/flp/Flp.cpp tools/flpdump.cpp -o build-local/flpdump 2> >(grep -
 $CXX $FLAGS $CORE $WAVPACK tools/renderwav.cpp -o build-local/renderwav 2> >(grep -v 'glibc version' >&2)
 # a Live set, one WAV per MIDI track (round 190hs: the LYNX side of the Operator / Tetra quality gate)
 $CXX $FLAGS $CORE $WAVPACK tools/alsrender.cpp -o build-local/alsrender 2> >(grep -v 'glibc version' >&2)
+# LYNX Model's renderer / cost per voice (round 190ni: the timbre score's and the calibration's renders)
+$CXX $FLAGS $CORE $WAVPACK tools/physmodrender.cpp -o build-local/physmodrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/OggVorbis.cpp $(ls build-local/vorbis/*.o | tr '\n' ' ') tools/oggdecode.cpp -o build-local/oggdecode 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS $CORE $WAVPACK tools/comparewav.cpp -o build-local/comparewav 2> >(grep -v 'glibc version' >&2)
 # LYNX effects offline, the LYNX side of the third-party parity harness (round tp172b)

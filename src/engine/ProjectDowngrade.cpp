@@ -170,12 +170,12 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
     // (silent) keeps the channel, its notes and its routing; DirectWave states (rounds 190hz / 190ii) get their short zone
     // records completed as DirectWave reads them, since 0.1.28 skipped them (FL's version-36 programs lost their loops)
     {
-        juce::StringArray tetra, helix, braid;
+        juce::StringArray tetra, helix, braid, lynxModel;
         forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
             const auto instrument = c.getProperty ("instrument").toString();
-            if (instrument == "tetra" || instrument == "helix" || instrument == "braid") // (rollup step 3: Helix, round 190ja, as Tetra; Braid, 190ko)
+            if (instrument == "tetra" || instrument == "helix" || instrument == "braid" || instrument == "lynxmodel") // (rollup step 3: Helix, round 190ja, as Tetra; Braid, 190ko; LYNX Model, 190ni)
             {
-                (instrument == "tetra" ? tetra : instrument == "helix" ? helix : braid).add (channelName (juce::var (&c), i));
+                (instrument == "tetra" ? tetra : instrument == "helix" ? helix : instrument == "braid" ? braid : lynxModel).add (channelName (juce::var (&c), i));
                 c.setProperty ("instrument", "sampler");
                 drop (c, "modelParams");
                 drop (c, "pluginState");
@@ -201,6 +201,8 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("Helix is not in this release: its channels become empty Samplers and play nothing: {0}"), listOf (helix), true });
         if (! braid.isEmpty())
             lost.push_back ({ TR_NOOP ("Braid is not in this release: its channels become empty Samplers and play nothing: {0}"), listOf (braid), true });
+        if (! lynxModel.isEmpty())
+            lost.push_back ({ TR_NOOP ("LYNX Model is not in this release: its channels become empty Samplers and play nothing: {0}"), listOf (lynxModel), true });
     }
 
     // notes: index 19 holds a note's MPE curves (round 190hy); rollup step 11: index 20 its FL note repeat (round 190ma,

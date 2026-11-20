@@ -21,8 +21,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       # (the runners' package mirror sometimes fails to resolve for a minute: try again instead of failing the job)
-      - run: for i in 1 2 3 4 5 6; do sudo apt-get update -q && sudo apt-get install -y -q python3-aiohttp && break; [ $i = 6 ] && exit 1; sleep 30; done
+      # (python3-numpy: LYNX Model's timbre-score tests, tools/physmod; Ubuntu's system Python takes packages from apt, not pip)
+      - run: for i in 1 2 3 4 5 6; do sudo apt-get update -q && sudo apt-get install -y -q python3-aiohttp python3-numpy && break; [ $i = 6 ] && exit 1; sleep 30; done
       - run: /usr/bin/python3 -m unittest discover -s server/tests -p 'test_*.py' -v
+      - run: /usr/bin/python3 -m unittest discover -s tools/physmod -p 'test_*.py' -v
 
   # Round speed185a: a Core job took 76-130 min, ~90 % of it compiling the core again for every tool (now once, in
   # parallel: scripts/cxx-once.sh) and the rest running the tests one by one (now in parallel shards, then the
