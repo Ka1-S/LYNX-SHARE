@@ -11920,3 +11920,6 @@ countries: tr
 "Off, LYNX SHARE never goes online by itself: plugin scans and everything else stay on this computer." = "Kapalıyken LYNX SHARE kendiliğinden asla internete bağlanmaz: eklenti taraması ve diğer her şey bu bilgisayarda kalır."
 "Every shortcut can be changed:" = "Her kısayol değiştirilebilir:"
 "Change, add or reset the keys of every action" = "Her eylemin tuşlarını değiştir, ekle veya sıfırla"
+"Could not open a new window" = "Yeni pencere açılamadı"
+"Open in new window" = "Yeni pencerede aç"
+"Start-up project" = "Başlangıç projesi"

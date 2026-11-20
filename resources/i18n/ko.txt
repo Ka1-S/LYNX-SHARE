@@ -11920,3 +11920,6 @@ countries: kr
 "Off, LYNX SHARE never goes online by itself: plugin scans and everything else stay on this computer." = "끄면 LYNX SHARE는 스스로 인터넷에 연결하지 않습니다. 플러그인 스캔을 비롯한 나머지는 모두 이 컴퓨터 안에서 이루어집니다."
 "Every shortcut can be changed:" = "모든 단축키는 바꿀 수 있습니다:"
 "Change, add or reset the keys of every action" = "각 동작의 키를 바꾸거나 추가하거나 초기화"
+"Could not open a new window" = "새 창을 열 수 없습니다"
+"Open in new window" = "새 창에서 열기"
+"Start-up project" = "시작 프로젝트"

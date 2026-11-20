@@ -11920,3 +11920,6 @@ countries: tw hk mo
 "Off, LYNX SHARE never goes online by itself: plugin scans and everything else stay on this computer." = "關閉後，LYNX SHARE 絕不會自行連線上網：外掛掃描和其他一切都留在這台電腦上。"
 "Every shortcut can be changed:" = "每個快捷鍵都可以變更："
 "Change, add or reset the keys of every action" = "變更、新增或重設每個動作的按鍵"
+"Could not open a new window" = "無法開啟新視窗"
+"Open in new window" = "在新視窗中開啟"
+"Start-up project" = "啟動專案"

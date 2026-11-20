@@ -11920,3 +11920,6 @@ countries: jp
 "Off, LYNX SHARE never goes online by itself: plugin scans and everything else stay on this computer." = "オフにすると、LYNX SHARE が自分からオンラインに接続することはありません。プラグインのスキャンなどはすべてこのコンピューター内で行われます。"
 "Every shortcut can be changed:" = "すべてのショートカットは変更できます:"
 "Change, add or reset the keys of every action" = "各アクションのキーを変更・追加・リセット"
+"Could not open a new window" = "新しいウィンドウを開けませんでした"
+"Open in new window" = "新しいウィンドウで開く"
+"Start-up project" = "起動時のプロジェクト"

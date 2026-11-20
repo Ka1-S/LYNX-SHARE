@@ -11920,3 +11920,6 @@ countries: ru by kz
 "Off, LYNX SHARE never goes online by itself: plugin scans and everything else stay on this computer." = "Если выключено, LYNX SHARE никогда сам не выходит в сеть: поиск плагинов и всё остальное остаётся на этом компьютере."
 "Every shortcut can be changed:" = "Любое сочетание клавиш можно изменить:"
 "Change, add or reset the keys of every action" = "Изменить, добавить или сбросить клавиши любого действия"
+"Could not open a new window" = "Не удалось открыть новое окно"
+"Open in new window" = "Открыть в новом окне"
+"Start-up project" = "Стартовый проект"

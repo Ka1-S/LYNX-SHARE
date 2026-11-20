@@ -8904,6 +8904,54 @@ void MainComponent::flpImported (const juce::File& file)
     }
 }
 
+bool MainComponent::openInNewWindow (const juce::File& file)
+{
+    if (platform::testMode()) // (tests: no second program is started)
+    {
+        platform::testModeLog ("open in new window: " + (file == juce::File() ? juce::String ("(start-up project)") : file.getFileName()));
+        return true;
+    }
+    juce::StringArray args;
+   #if JUCE_MAC
+    // (`open -n`: a new copy of the app even though one runs; a plain start would hand the file to this one)
+    args = { "open", "-n", juce::File::getSpecialLocation (juce::File::currentApplicationFile).getFullPathName() };
+    if (file != juce::File())
+        args.addArray ({ "--args", file.getFullPathName() });
+   #else
+    auto program = juce::File::getSpecialLocation (juce::File::currentExecutableFile);
+   #if JUCE_LINUX
+    // the AppImage itself, not the program inside its mount (which goes away with this window)
+    if (const auto appImage = juce::SystemStats::getEnvironmentVariable ("APPIMAGE", {}); juce::File::isAbsolutePath (appImage) && juce::File (appImage).existsAsFile())
+        program = juce::File (appImage);
+   #endif
+    args.add (program.getFullPathName());
+    if (file != juce::File())
+        args.add (file.getFullPathName());
+   #endif
+    // kept until this window closes (the other window is a program of its own: it keeps running after this one)
+    static std::vector<std::unique_ptr<juce::ChildProcess>> started;
+    auto child = std::make_unique<juce::ChildProcess>();
+    if (! child->start (args, 0))
+    {
+        ui::postHint ({ tr ("Could not open a new window") }, 5000);
+        return false;
+    }
+    started.push_back (std::move (child));
+    return true;
+}
+
+void MainComponent::chooseFileToOpenInNewWindow()
+{
+    fileChooser = lynx::ui::makeFileChooser (tr ("Open in new window"), currentFile.getParentDirectory(),
+                                             juce::String ("*") + ProjectFile::extension
+                                                 + ";*.dawproj;*.dawproject;*.flp;*.als;*.flm;*.band;projectData;ProjectData;*.blx;*.zip;*.lynxpack;*.mid;*.midi");
+    lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                             [safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::FileChooser& chooser) {
+                                 if (const auto result = chooser.getResult(); safe != nullptr && (result.existsAsFile() || result.isDirectory()))
+                                     safe->openInNewWindow (result);
+                             });
+}
+
 void MainComponent::chooseFileToOpenWithoutPlugins()
 {
     confirmDiscard ([this] {
@@ -9946,6 +9994,22 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Open...") + shortcutText ("file.open"), [this] { chooseFileToOpen(); });
         // round 190ap: a project that will not open, or crashes while it loads: its plugins stay off until switched on
         menu.addItem (tr ("Open without third-party plugins..."), [this] { chooseFileToOpenWithoutPlugins(); });
+        {
+            // issue #232 (round 190ns, LYNX extra; FL Studio opens one project at a time): another project beside this one,
+            // in a window of its own, without closing this one; the recent projects one click away
+            juce::PopupMenu newWindow;
+            newWindow.addItem (tr ("Open..."), [this] { chooseFileToOpenInNewWindow(); });
+            newWindow.addItem (tr ("Start-up project"), [this] { openInNewWindow ({}); });
+            if (recent.getNumFiles() > 0)
+                newWindow.addSectionHeader (tr ("Recent projects"));
+            for (int i = 0; i < juce::jmin (recent.getNumFiles(), 10); ++i)
+            {
+                const auto file = recent.getFile (i);
+                newWindow.addItem (file.getFileName() + "  (" + file.getParentDirectory().getFileName() + ")", file.existsAsFile() && file != currentFile,
+                                   false, [this, file] { openInNewWindow (file); });
+            }
+            menu.addSubMenu (tr ("Open in new window"), newWindow);
+        }
         if (engine.pluginsOff())
             menu.addItem (tr ("Switch plugins back on..."), [this] { showPluginsOff(); });
         menu.addSeparator();

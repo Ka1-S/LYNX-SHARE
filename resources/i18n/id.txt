@@ -11920,3 +11920,6 @@ countries: id
 "Off, LYNX SHARE never goes online by itself: plugin scans and everything else stay on this computer." = "Jika dimatikan, LYNX SHARE tidak pernah terhubung ke internet sendiri: pemindaian plugin dan semua hal lain tetap di komputer ini."
 "Every shortcut can be changed:" = "Setiap pintasan bisa diubah:"
 "Change, add or reset the keys of every action" = "Ubah, tambah, atau setel ulang tombol setiap tindakan"
+"Could not open a new window" = "Tidak dapat membuka jendela baru"
+"Open in new window" = "Buka di jendela baru"
+"Start-up project" = "Proyek awal"

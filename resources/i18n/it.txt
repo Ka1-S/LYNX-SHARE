@@ -11920,3 +11920,6 @@ countries: it ch sm
 "Off, LYNX SHARE never goes online by itself: plugin scans and everything else stay on this computer." = "Disattivato, LYNX SHARE non va mai online da solo: la ricerca dei plugin e tutto il resto restano su questo computer."
 "Every shortcut can be changed:" = "Ogni scorciatoia si può cambiare:"
 "Change, add or reset the keys of every action" = "Cambia, aggiungi o ripristina i tasti di ogni azione"
+"Could not open a new window" = "Impossibile aprire una nuova finestra"
+"Open in new window" = "Apri in una nuova finestra"
+"Start-up project" = "Progetto di avvio"
