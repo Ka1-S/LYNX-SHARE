@@ -7587,11 +7587,13 @@ private:
             n.key = 62;
             n.length = lynx::ppq;
             p.notes.push_back (n);
+            p.lengthTicks = 3 * bar; // (a MIDI file gets the key changes within the pattern's length)
             juce::String why;
             const auto json = lynx::ProjectFile::toJson (song);
             const auto back = lynx::ProjectFile::fromJson (json, why);
             bool oldShape = true; // (every marker array as 0.1.30 reads it: 4 or 5 items)
-            if (auto* patterns = juce::JSON::parse (json)["patterns"].getArray())
+            const auto parsedJson = juce::JSON::parse (json); // (kept: operator[] refers into it)
+            if (auto* patterns = parsedJson["patterns"].getArray())
                 for (const auto& pv : *patterns)
                     if (auto* ms = pv["markers"].getArray())
                         for (const auto& m : *ms)
