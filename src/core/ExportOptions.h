@@ -127,6 +127,8 @@ struct Options
     // markers and each section becomes a file named after its marker ("<name> - 02 Verse"); with stems, each section
     // gets its stems. Song range only (markerSections).
     bool sections = false;
+    // Issue #215 (round 190ng): the file name's template with wildcards (core/ExportNaming.h; "$project" = as before)
+    std::string nameTemplate = "$project";
 
     bool operator== (const Options&) const = default;
 };

@@ -1,4 +1,5 @@
 #include "core/ExportOptions.h"
+#include "core/ExportNaming.h"
 #include "core/Scheduler.h"
 
 #include <algorithm>
@@ -251,6 +252,10 @@ double toDouble (const std::map<std::string, std::string>& kv, const char* key, 
 Options clamped (Options o)
 {
     const Options d;
+    // (round 190ng: the name template is one line; an empty one is the default "$project")
+    o.nameTemplate.erase (std::remove_if (o.nameTemplate.begin(), o.nameTemplate.end(), [] (char c) { return c == '\n' || c == '\r'; }), o.nameTemplate.end());
+    if (o.nameTemplate.find_first_not_of (' ') == std::string::npos)
+        o.nameTemplate = d.nameTemplate;
     if ((int) o.format < 0 || (int) o.format >= formatCount) o.format = d.format;
     if (o.wavBits != 16 && o.wavBits != 24 && o.wavBits != 32) o.wavBits = d.wavBits;
     if (o.flacBits != 16 && o.flacBits != 24) o.flacBits = d.flacBits;
@@ -425,7 +430,8 @@ std::string toText (const Options& o)
       << "loopMarkers=" << (o.loopMarkers ? 1 : 0) << "\n"
       << "playlistMarkers=" << (o.playlistMarkers ? 1 : 0) << "\n"
       << "masterLufs=" << o.masterLufs << "\n"
-      << "sections=" << (o.sections ? 1 : 0) << "\n";
+      << "sections=" << (o.sections ? 1 : 0) << "\n"
+      << "nameTemplate=" << o.nameTemplate << "\n"; // (issue #215, round 190ng)
     return s.str();
 }
 
@@ -465,6 +471,8 @@ Options fromText (const std::string& text)
     o.playlistMarkers = toInt (kv, "playlistMarkers", d.playlistMarkers ? 1 : 0) != 0;
     o.masterLufs = toDouble (kv, "masterLufs", d.masterLufs);
     o.sections = toInt (kv, "sections", d.sections ? 1 : 0) != 0;
+    if (const auto it = kv.find ("nameTemplate"); it != kv.end() && ! it->second.empty())
+        o.nameTemplate = it->second;
     return clamped (o);
 }
 
@@ -684,6 +692,13 @@ Song makeChannelStemSong (const Song& song, int channel, bool dry)
 
 std::string stemFileName (const std::string& base, int number, const std::string& name, const char* ext)
 {
+    // issue #215 (round 190ng): a name made with "$track" / "$insert" (core/ExportNaming.h) is filled per stem
+    if (exportnaming::hasStemWildcard (base))
+    {
+        exportnaming::Context c;
+        c.track = name.empty() ? "Insert " + std::to_string (number) : name;
+        return exportnaming::sanitise (exportnaming::substitute (base, c, 1)) + ext; // (the rest was filled before the file dialog)
+    }
     std::string clean;
     for (auto ch : name)
         clean += std::string ("<>:\"/\\|?*").find (ch) != std::string::npos || (unsigned char) ch < 32 ? '_' : ch;

@@ -3140,6 +3140,13 @@ public:
             quit();
             return;
         }
+        // --issuesshot190ng <prefix> (round 190ng, issues #215, #217, #219, #220, #222): src/IssuesShot190ng.inc
+        if (args.contains ("--issuesshot190ng"))
+        {
+            setApplicationReturnValue (runIssuesShot190ng (args[args.indexOf ("--issuesshot190ng") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
         // --issueshot190mq <prefix> (round 190mq, issues #211, #212, #213): src/IssuesShot190mq.inc
         if (args.contains ("--issueshot190mq"))
         {
@@ -17382,6 +17389,7 @@ private:
 #include "IssuesShot190mq.inc" // round 190mq
 #include "Focus218Shot190ng.inc" // round 190ng (issue #218)
 #include "Mixer221Shot190ng.inc" // round 190ng (issue #221)
+#include "IssuesShot190ng.inc" // round 190ng (issues #215, #217, #219, #220, #222)
 #include "DetailsShot190kn.inc" // round 190kn
 #include "DetailsShot190ld.inc" // round 190ld
 #include "DetailsShot190lr.inc" // round 190lr
