@@ -8,14 +8,17 @@ The short version of each release. The full notes, with measurements, known issu
 **Performance**
 - While FL's *Thief* demo plays, LYNX SHARE uses 34.6 % of one CPU core (0.1.29: 77.8 %; FL Studio 2026: 74.4 %), and
   *Exoplanet* 47.3 % (0.1.29: 99.7 %; FL Studio: 86.0 %), on one Windows PC in a quiet-machine run. Output unchanged.
-- The playhead is drawn on its own layer on Windows and Linux; covered windows stop drawing; the plugin picker's first
-  open no longer freezes (#209); Helix, SoundFonts, DirectWave and exports use less memory.
+- The playhead is drawn on its own layer on Windows and Linux; covered windows stop drawing; every view draws a frame
+  with fewer instructions than in 0.1.29; the plugin picker's first open no longer freezes (#209); Helix, SoundFonts,
+  DirectWave and exports use less memory.
 
 **New**
 - ARA 2 hosting: Melodyne and other ARA 2 plugins edit audio clips in place (clip menu › LYNX extras).
 - Polyphonic note editor and polyphonic audio to MIDI (Basic Pitch) for chords and mixed audio.
 - Newtone's natural pitch engine with per-note pitch modulation and drift.
-- New instruments and devices: Helix (wavetable) with Helix+, Tetra (4-operator FM), and Live's Meld, Erosion, Vinyl
+- Undo as in FL Studio 2026: Ctrl+Z steps back through the history (#214); Esc closes the focused window (#217).
+- FL's Current mixer track, FL's Project picker, Piano roll click-and-hold, the window layout saved with a project.
+- New instruments and devices: Helix (wavetable) with Helix+ (granular and spectral oscillators too), Tetra (4-operator FM), and Live's Meld, Erosion, Vinyl
   Distortion, Corpus, Spectral Resonator / Time and Looper as LYNX SHARE devices.
 - Chord helper (Piano roll, Simple editor, Clip View), FL's chord strip, MPE (#108), hardware MIDI Out, DirectWave
   editor (#157), Slicex snapping (#172), FL's Browser tabs and favourites, docked Browser (#192), audio clip fade
@@ -37,10 +40,12 @@ The short version of each release. The full notes, with measurements, known issu
 **Plugin parity**
 - More than 40 stand-ins refitted against the plugins they replace, among them FabFilter Pro-C 3 (6.30 → 8.60),
   Waves L2 (3.44 → 9.52), Timeless 3 (2.37 → 6.93), Harrison 32C (5.88 → 8.54) and Eiosis AirEQ (5.78 → 8.85), and new
-  stand-ins for Waves C4, PuigTec and others. Projects saved earlier keep their sound.
+  stand-ins for Waves C4, PuigTec, Q10 (10.00), API-560 and others, and Kilohearts' own laws for five kHs effects.
+  Projects saved earlier keep their sound.
 
 **Fixed**
-- #108, #127, #138, #149, #154, #157, #164, #165, #170, #172, #177–#189, #191–#195, #197–#201, #203–#209, #211–#213,
+- #108, #127, #138, #149, #154, #157, #164, #165, #170, #172, #177–#189, #191–#195, #197–#201, #203–#209, #211–#215,
+  #217–#222,
   discussions #105 and #202. PR #176 by @FKHR26.
 
 ## 0.1.29 alpha
