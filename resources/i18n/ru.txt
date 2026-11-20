@@ -10599,9 +10599,10 @@ countries: ru by kz
 "The recording is silent: the audio input sent nothing but silence. Check that the insert's input is the channel your microphone or instrument is plugged into (the input box above its effect slots), that the interface's input is not muted, and that LYNX SHARE may use the microphone (Windows: Settings > Privacy > Microphone; macOS: System Settings > Privacy & Security > Microphone)." = "Запись беззвучна: аудиовход передал только тишину. Проверьте, что вход инсерта — это канал, к которому подключены микрофон или инструмент (поле входа над слотами эффектов), что вход интерфейса не заглушён и что LYNX SHARE разрешён доступ к микрофону (Windows: Параметры > Конфиденциальность > Микрофон; macOS: Системные настройки > Конфиденциальность и безопасность > Микрофон)."
 "Choose an input to record" = "Выберите вход для записи"
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "Как часто движутся курсор воспроизведения, индикаторы и осциллографы. «Дисплей» следует частоте обновления вашего монитора (плавнее всего); «Сбалансированно» делит её пополам на быстрых экранах (72 Гц на экране 144 Гц); 60 Гц или 30 Гц нагружают процессор меньше всего (ноутбуки, медленные компьютеры)."
+"Pitch-aware" = "С учётом высоты"
+"Beats law: Classic plays as LYNX did before 0.1.28, Measured as 0.1.28 and 0.1.29 did (this project was saved then); Pitch-aware also cuts where the pitch of a held note steps" = "Закон Beats: Классический играет как LYNX до 0.1.28, Измеренный как 0.1.28 и 0.1.29 (проект сохранён тогда); С учётом высоты также режет там, где меняется высота выдержанной ноты"
+"Texture and Complex Pro law: Classic plays as LYNX did before 0.1.30 (this project was saved then); Measured follows Live 12.4's renders (grains and Flux, formants kept)" = "Закон Texture и Complex Pro: Классический играет как LYNX до 0.1.30 (проект сохранён тогда); Измеренный следует рендерам Live 12.4 (гранулы и Flux, форманты сохраняются)"
 "Large controls (touch size)" = "Крупные элементы управления (для касания)"
-
-# round 190iv: the toolbar per layout style
 "Nothing to save yet" = "Пока нечего сохранять"
 "LYNX backs your work up by itself. Click to save the project (Ctrl+S)" = "LYNX сам делает резервные копии вашей работы. Нажмите, чтобы сохранить проект (Ctrl+S)"
 "More: the panels and options this toolbar leaves out" = "Ещё: панели и параметры, которых нет на этой панели"
@@ -10610,9 +10611,6 @@ countries: ru by kz
 "Control bar" = "Панель управления"
 "Punch in / out" = "Punch in / out"
 "Show the Session button row" = "Показать ряд кнопок Session"
-"Pitch-aware" = "С учётом высоты"
-"Beats law: Classic plays as LYNX did before 0.1.28, Measured as 0.1.28 and 0.1.29 did (this project was saved then); Pitch-aware also cuts where the pitch of a held note steps" = "Закон Beats: Классический играет как LYNX до 0.1.28, Измеренный как 0.1.28 и 0.1.29 (проект сохранён тогда); С учётом высоты также режет там, где меняется высота выдержанной ноты"
-"Texture and Complex Pro law: Classic plays as LYNX did before 0.1.30 (this project was saved then); Measured follows Live 12.4's renders (grains and Flux, formants kept)" = "Закон Texture и Complex Pro: Классический играет как LYNX до 0.1.30 (проект сохранён тогда); Измеренный следует рендерам Live 12.4 (гранулы и Flux, форманты сохраняются)"
 "Tension: {0}" = "Натяжение: {0}"
 "Track title: [LMB] selects the track  [RMB] track menu  [Ctrl][R] renames it" = "Заголовок дорожки: [LMB] выбирает дорожку  [RMB] меню дорожки  [Ctrl][R] переименовывает"
 "Arm Session Recording: [LMB] arms this track (the others disarm)  [Ctrl][LMB] keeps the others armed" = "Готовность к записи сессии: [LMB] включает эту дорожку (остальные выключаются)  [Ctrl][LMB] оставляет остальные"
@@ -10684,8 +10682,6 @@ countries: ru by kz
 "User Library" = "Библиотека пользователя"
 "Current Project" = "Текущий проект"
 "Add Folder..." = "Добавить папку..."
-
-# round 190iv: the toolbar per layout style
 
 # --- round 190ja: Helix (LYNX's wavetable synth)
 "Add a modulation target" = "Добавить цель модуляции"
@@ -10766,27 +10762,6 @@ countries: ru by kz
 "CURVE" = "КРИВАЯ"
 "Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "Дисплей: бегущий график FL или передаточная кривая LYNX  [LMB] переключить (сохраняется для этого эффекта)"
 
-# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
-"Hide collapsed grouped tracks" = "Скрывать свёрнутые сгруппированные дорожки"
-"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Дорожка: [LMB] заглушить / включить  [Ctrl][LMB] или [RMB] соло  [Alt][LMB] заглушить группу  [Alt][RMB] соло группы"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Дорожка: [LMB] выбрать  [Ctrl][LMB] добавить / убрать  [Ctrl] перетаскивание: дорожки с их клипами  [Shift][LMB] диапазон  [RMB] меню  [2xLMB] открыть источник клипа  [Shift][Wheel] вверх / вниз  [Alt] перетаскивание: в группу / из группы"
-"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Перемещение дорожки вместе с её группой  [Alt] вправо / влево: глубже / из группы"
-"In a group, level {0}" = "В группе, уровень {0}"
-"Not in a group" = "Вне группы"
-"Nest under the track above (a group in the group)" = "Вложить под дорожку выше (группа в группе)"
-"Move out of its group (one level up)" = "Вынуть из группы (на уровень выше)"
-"Hiding collapsed tracks" = "Скрытие свёрнутых дорожек"
-"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Этот параметр скрывает свёрнутые дорожки Playlist. На родительской дорожке появится стрелка вниз, чтобы открыть скрытые дорожки. Продолжить?"
-
-# --- Round 190jf: B22 DAWproject import / export
-"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
-"(imported from DAWproject)" = "(импортировано из DAWproject)"
-"Export DAWproject" = "Экспорт в DAWproject"
-"The DAWproject file could not be written" = "Не удалось записать файл DAWproject"
-"Everything went over to the DAWproject file." = "Всё перенесено в файл DAWproject."
-"Not carried over or approximated:" = "Не перенесено или передано приближённо:"
-"... and {0} more" = "... и ещё {0}"
-
 # --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 "Wheel: scroll over the track headers, zoom over the arrangement" = "Колесо: прокрутка над заголовками дорожек, масштаб над аранжировкой"
 "Hold a tool key for a temporary tool" = "Удерживать клавишу инструмента для временного инструмента"
@@ -10816,8 +10791,25 @@ countries: ru by kz
 "Delete (with its {0} clips)" = "Удалить (вместе с клипами: {0})"
 
 # --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
-# --- Round 190jf: B22 DAWproject import / export
+"Hide collapsed grouped tracks" = "Скрывать свёрнутые сгруппированные дорожки"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Дорожка: [LMB] заглушить / включить  [Ctrl][LMB] или [RMB] соло  [Alt][LMB] заглушить группу  [Alt][RMB] соло группы"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Дорожка: [LMB] выбрать  [Ctrl][LMB] добавить / убрать  [Ctrl] перетаскивание: дорожки с их клипами  [Shift][LMB] диапазон  [RMB] меню  [2xLMB] открыть источник клипа  [Shift][Wheel] вверх / вниз  [Alt] перетаскивание: в группу / из группы"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Перемещение дорожки вместе с её группой  [Alt] вправо / влево: глубже / из группы"
+"In a group, level {0}" = "В группе, уровень {0}"
+"Not in a group" = "Вне группы"
+"Nest under the track above (a group in the group)" = "Вложить под дорожку выше (группа в группе)"
+"Move out of its group (one level up)" = "Вынуть из группы (на уровень выше)"
+"Hiding collapsed tracks" = "Скрытие свёрнутых дорожек"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Этот параметр скрывает свёрнутые дорожки Playlist. На родительской дорожке появится стрелка вниз, чтобы открыть скрытые дорожки. Продолжить?"
 
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "(импортировано из DAWproject)"
+"Export DAWproject" = "Экспорт в DAWproject"
+"The DAWproject file could not be written" = "Не удалось записать файл DAWproject"
+"Everything went over to the DAWproject file." = "Всё перенесено в файл DAWproject."
+"Not carried over or approximated:" = "Не перенесено или передано приближённо:"
+"... and {0} more" = "... и ещё {0}"
 
 # --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
 "Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "Автоматические динамические пороги Facet EQ играют с ручным порогом полос: {0}"
@@ -10871,6 +10863,7 @@ countries: ru by kz
 "Pitch & Time" = "Высота и время"
 "Bar : Step : Tick" = "Такт : Шаг : Тик"
 "Time: bar : step : tick" = "Время: такт : шаг : тик"
+
 # --- round 190jq: Playlist header width (#164), pointer click (#191), automation clip lanes (#191.3)
 "Pointer click: a click on an empty spot selects and moves the song position; a double click places the clip (LYNX)" = "Клик указателем: клик по пустому месту выделяет и переносит позицию песни; двойной клик ставит клип (LYNX)"
 "Click on an empty spot selects and moves the song position (pointer click)" = "Клик по пустому месту выделяет и переносит позицию песни (клик указателем)"
@@ -10897,8 +10890,10 @@ countries: ru by kz
 "This will |delete| {0} unused mixer track(s). Are you sure?" = "Будет |удалено| неиспользуемых дорожек микшера: {0}. Продолжить?"
 "Trim unused mixer tracks" = "Удаление неиспользуемых дорожек микшера"
 "No unused mixer tracks" = "Нет неиспользуемых дорожек микшера"
+
 # --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
 "Scale highlighting" = "Подсветка гаммы"
+
 # --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
 "FL arpeggiator pattern" = "Паттерн арпеджиатора FL"
 "None (the arpeggiator above)" = "Нет (арпеджиатор выше)"
@@ -10942,8 +10937,6 @@ countries: ru by kz
 "Corrode (an imported Live Erosion) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Corrode (импортированный Erosion из Live) в этой версии нет: он станет выключенным Utility в своём слоте, а его автоматизация ничего не делает ({0})"
 "Platter (an imported Live Vinyl Distortion) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Platter (импортированный Vinyl Distortion из Live) в этой версии нет: он станет выключенным Utility в своём слоте, а его автоматизация ничего не делает ({0})"
 "Soundboard (an imported Live Corpus) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Soundboard (импортированный Corpus из Live) в этой версии нет: он станет выключенным Utility в своём слоте, а его автоматизация ничего не делает ({0})"
-
-# round 190jz: issues #192 (docked Browser), #194 (fade handles), #195 (Home, W)
 "Move the playback marker to the start of the song or pattern" = "Переместить маркер воспроизведения в начало песни или паттерна"
 "Move the playback marker to start" = "Переместить маркер воспроизведения в начало"
 "W moves the playback marker to the start (as Home)" = "W перемещает маркер воспроизведения в начало (как Home)"
@@ -11224,16 +11217,13 @@ countries: ru by kz
 "Paused" = "Пауза"
 "Scrub: hold and drag right to play forward, left to play backward; the further, the faster" = "Скраб: удерживайте и тяните вправо для воспроизведения вперёд, влево — назад; чем дальше, тем быстрее"
 
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] открыть/закрыть редактор  [Alt]+[LMB] не закрывать другие  [Ctrl]+[LMB] прослушать  [2xLMB] Piano Roll  [LMB] перетаскивание вверх/вниз меняет порядок  [RMB] меню канала"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Пиковый индикатор (левый/правый) с удержанием пика  [LMB] сбрасывает индикатор клиппинга"
-
 # --- rollup 0.1.30 step 6: Save a copy for 0.1.28 knows rounds 190kc / 190ke / natives190kj
 "The crossfader (Live's Crossfade Assign) is not in this release: these inserts play at their full level, and its automation does nothing: {0}" = "Кроссфейдера (Crossfade Assign из Live) нет в этой версии: эти инсерты звучат на полном уровне, а его автоматизация ничего не делает: {0}"
 "Live return tracks show as ordinary mixer inserts: {0}" = "Возвратные дорожки Live показываются как обычные инсерты микшера: {0}"
 "The Simple Controls tab's own knob mappings: {0}" = "Собственные назначения ручек вкладки Controls в Simple: {0}"
 "Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}" = "Партии Harmor с сэмплом в секции IMG играют своими тембрами вместо ресинтеза: {0}"
 "Newtone's detected key and note velocities are left out: {0}" = "Найденная Newtone тональность и velocity нот не сохраняются: {0}"
+
 # --- round 190kl: the Peak Controller's LYNX LFO shapes (issue #197)
 "LYNX shapes" = "Формы LYNX"
 "Ramp down" = "Пила вниз"
@@ -11916,3 +11906,74 @@ countries: ru by kz
 "Insert a wildcard at the cursor" = "Вставить подстановку в позицию курсора"
 "File:" = "Файл:"
 "Stems:" = "Стемы:"
+
+# --- round 190np: first-run onboarding (welcome card, Next-3 card, empty-state hints, tips)
+"Welcome..." = "Приветствие..."
+"Getting started" = "Первые шаги"
+"BandLab, FL Studio Mobile or GarageBand" = "BandLab, FL Studio Mobile или GarageBand"
+"FL Studio" = "FL Studio"
+"Ableton Live or Bitwig" = "Ableton Live или Bitwig"
+"Logic, Cubase, Reaper, Pro Tools or Studio One" = "Logic, Cubase, Reaper, Pro Tools или Studio One"
+"I'm new to making music" = "Я только начинаю делать музыку"
+"A mobile or simple app. Simple layout: tracks, loops, a drum machine and quick recording." = "Мобильное или простое приложение. Простая раскладка: дорожки, лупы, драм-машина и быстрая запись."
+"Pattern layout: Channel Rack, Piano roll, Playlist and Mixer, with FL's shortcuts. Your .flp projects open." = "Раскладка Pattern: Channel Rack, пианоролл, Playlist и Mixer, с горячими клавишами FL. Ваши проекты .flp открываются."
+"Clip-launch layout: a clip grid with scenes beside the arrangement. Your .als sets open." = "Раскладка с запуском клипов: сетка клипов со сценами рядом с аранжировкой. Ваши сеты .als открываются."
+"Simple layout with the Mixer at hand: one track per instrument on a timeline." = "Простая раскладка с Mixer под рукой: одна дорожка на инструмент на временной шкале."
+"Simple layout and a short first-song tour (about five minutes)." = "Простая раскладка и короткий тур по первой песне (около пяти минут)."
+"Press Space to hear the starter beat" = "Нажмите Пробел, чтобы услышать стартовый бит"
+"Add a loop: drag one onto the timeline" = "Добавьте луп: перетащите его на временную шкалу"
+"Record your voice on a new Voice track" = "Запишите свой голос на новой дорожке Голос"
+"Click steps in the Channel Rack to make a beat" = "Щёлкайте шаги в Channel Rack, чтобы сделать бит"
+"Open one of your .flp projects" = "Откройте один из своих проектов .flp"
+"Find your plugins (VST, CLAP)" = "Найдите свои плагины (VST, CLAP)"
+"Drag a loop into a slot of the clip grid" = "Перетащите луп в ячейку сетки клипов"
+"Launch a clip or a scene" = "Запустите клип или сцену"
+"Open one of your .als sets" = "Откройте один из своих сетов .als"
+"Add an instrument track and play it with the computer keys" = "Добавьте дорожку инструмента и играйте на клавишах компьютера"
+"Record audio on a Voice or Guitar track" = "Запишите аудио на дорожку Голос или Гитара"
+"Open the Mixer (F9)" = "Откройте Mixer (F9)"
+"Open Loops" = "Открыть лупы"
+"+ Voice track" = "+ Дорожка голоса"
+"Browse loops" = "Обзор лупов"
+"+ Instrument" = "+ Инструмент"
+"Your starter beat is ready in the Simple layout." = "Ваш стартовый бит готов в простой раскладке."
+"The Pattern layout works like FL Studio." = "Раскладка Pattern работает как FL Studio."
+"The Clip-launch layout: clips and scenes beside the arrangement." = "Раскладка с запуском клипов: клипы и сцены рядом с аранжировкой."
+"One track per instrument, with the Mixer at hand." = "Одна дорожка на инструмент, Mixer под рукой."
+"Your song is built here" = "Здесь собирается ваша песня"
+"Launch clips from this grid" = "Запускайте клипы из этой сетки"
+"Drag a loop here" = "Перетащите сюда луп"
+"Click in the Playlist to place the pattern you're editing, or drag a loop, audio or MIDI file in from the Browser." = "Щёлкните в Playlist, чтобы поставить редактируемый паттерн, или перетащите луп, аудио- или MIDI-файл из Browser."
+"Drag a loop or a sample from the Browser into any slot. Double-click an empty slot for a new MIDI clip. The play button at the end of a row launches the whole scene." = "Перетащите луп или сэмпл из Browser в любую ячейку. Двойной щелчок по пустой ячейке создаёт MIDI-клип. Кнопка воспроизведения в конце строки запускает всю сцену."
+"Drop a loop, an audio or a MIDI file on the timeline, or add a track: drums, an instrument or your voice." = "Перетащите луп, аудио- или MIDI-файл на временную шкалу или добавьте дорожку: ударные, инструмент или свой голос."
+"Nothing to play in Song mode yet" = "В режиме песни пока нечего играть"
+"No input to record from yet" = "Пока нет входа для записи"
+"Song mode plays the Playlist, and it's empty. Switch to Pattern to hear the pattern you're editing, or place it in the Playlist." = "Режим песни играет Playlist, а он пуст. Переключитесь на паттерн, чтобы услышать редактируемый паттерн, или поставьте его в Playlist."
+"To record your voice or an instrument, choose an input in the audio settings and arm a track. Notes from the computer keys or a MIDI keyboard record without one." = "Чтобы записать голос или инструмент, выберите вход в настройках аудио и подготовьте дорожку к записи. Ноты с клавиш компьютера или MIDI-клавиатуры записываются и без этого."
+"Switch to Pattern" = "Переключиться на паттерн"
+"Show tips and hints" = "Показывать подсказки и советы"
+"Speakers (system default)" = "Динамики (системные по умолчанию)"
+"No audio device" = "Нет аудиоустройства"
+"Plugins: scanning in the background" = "Плагины: сканирование в фоне"
+"Plugins: {0} found" = "Плагины: найдено {0}"
+"Channel Rack (F6)" = "Channel Rack (F6)"
+"Open an .flp project..." = "Открыть проект .flp..."
+"Open an .als set..." = "Открыть сет .als..."
+"+ Add track" = "+ Добавить дорожку"
+"{0} are trademarks of their owners; LYNX SHARE is not affiliated with them." = "{0} являются товарными знаками их владельцев; LYNX SHARE не связан с ними."
+"Skip: keep the FL-style Pattern layout" = "Пропустить: оставить раскладку Pattern в стиле FL"
+"Sound:" = "Звук:"
+"More setup (audio driver, plugin folders)..." = "Больше настроек (аудиодрайвер, папки плагинов)..."
+"Where are you coming from?" = "Откуда вы пришли?"
+"LYNX SHARE sets itself up to feel familiar. One click and you're in; change it any time in View > Layout style." = "LYNX SHARE настраивается так, чтобы выглядеть знакомо. Один щелчок, и вы внутри; изменить можно в любой момент в меню Вид > Стиль раскладки."
+"Hide (Help > Getting started shows it again)" = "Скрыть (Справка > Первые шаги покажет снова)"
+"Learn more..." = "Подробнее..."
+"Next: 3 things to try" = "Далее: 3 вещи, которые стоит попробовать"
+"Nice, that's the basics." = "Отлично, это основы."
+"Help > Getting started shows this again" = "Справка > Первые шаги покажет это снова"
+"Got it" = "Понятно"
+"No more tips" = "Больше не показывать советы"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] открыть/закрыть редактор  [Alt]+[LMB] не закрывать другие  [Ctrl]+[LMB] прослушать  [2xLMB] Piano Roll  [LMB] перетаскивание вверх/вниз меняет порядок  [RMB] меню канала"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Пиковый индикатор (левый/правый) с удержанием пика  [LMB] сбрасывает индикатор клиппинга"

@@ -10599,9 +10599,10 @@ countries: nl be
 "The recording is silent: the audio input sent nothing but silence. Check that the insert's input is the channel your microphone or instrument is plugged into (the input box above its effect slots), that the interface's input is not muted, and that LYNX SHARE may use the microphone (Windows: Settings > Privacy > Microphone; macOS: System Settings > Privacy & Security > Microphone)." = "De opname is stil: de audio-ingang stuurde alleen stilte. Controleer of de ingang van de insert het kanaal is waarop je microfoon of instrument is aangesloten (het ingangsvak boven de effectslots), of de ingang van de interface niet gedempt is en of LYNX SHARE de microfoon mag gebruiken (Windows: Instellingen > Privacy > Microfoon; macOS: Systeeminstellingen > Privacy en beveiliging > Microfoon)."
 "Choose an input to record" = "Kies een ingang om op te nemen"
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "Hoe vaak de afspeelkop, meters en scopes bewegen. Scherm volgt de verversingsfrequentie van je monitor (het vloeiendst); Gebalanceerd halveert die op snelle schermen (72 Hz op een 144 Hz-scherm); 60 Hz of 30 Hz gebruiken de minste CPU (laptops, tragere computers)."
+"Pitch-aware" = "Toonhoogtebewust"
+"Beats law: Classic plays as LYNX did before 0.1.28, Measured as 0.1.28 and 0.1.29 did (this project was saved then); Pitch-aware also cuts where the pitch of a held note steps" = "Beats-wet: Classic speelt zoals LYNX vóór 0.1.28, Gemeten zoals 0.1.28 en 0.1.29 (dit project is toen opgeslagen); Toonhoogtebewust knipt ook waar de toonhoogte van een aangehouden noot verspringt"
+"Texture and Complex Pro law: Classic plays as LYNX did before 0.1.30 (this project was saved then); Measured follows Live 12.4's renders (grains and Flux, formants kept)" = "Wet voor Texture en Complex Pro: Classic speelt zoals LYNX vóór 0.1.30 (dit project is toen opgeslagen); Gemeten volgt de renders van Live 12.4 (grains en Flux, formanten behouden)"
 "Large controls (touch size)" = "Grote bedieningselementen (aanraakformaat)"
-
-# round 190iv: the toolbar per layout style
 "Nothing to save yet" = "Nog niets om op te slaan"
 "LYNX backs your work up by itself. Click to save the project (Ctrl+S)" = "LYNX maakt zelf back-ups van je werk. Klik om het project op te slaan (Ctrl+S)"
 "More: the panels and options this toolbar leaves out" = "Meer: de panelen en opties die deze balk weglaat"
@@ -10610,9 +10611,6 @@ countries: nl be
 "Control bar" = "Bedieningsbalk"
 "Punch in / out" = "Punch in / out"
 "Show the Session button row" = "Session-knoppenrij tonen"
-"Pitch-aware" = "Toonhoogtebewust"
-"Beats law: Classic plays as LYNX did before 0.1.28, Measured as 0.1.28 and 0.1.29 did (this project was saved then); Pitch-aware also cuts where the pitch of a held note steps" = "Beats-wet: Classic speelt zoals LYNX vóór 0.1.28, Gemeten zoals 0.1.28 en 0.1.29 (dit project is toen opgeslagen); Toonhoogtebewust knipt ook waar de toonhoogte van een aangehouden noot verspringt"
-"Texture and Complex Pro law: Classic plays as LYNX did before 0.1.30 (this project was saved then); Measured follows Live 12.4's renders (grains and Flux, formants kept)" = "Wet voor Texture en Complex Pro: Classic speelt zoals LYNX vóór 0.1.30 (dit project is toen opgeslagen); Gemeten volgt de renders van Live 12.4 (grains en Flux, formanten behouden)"
 "Tension: {0}" = "Spanning: {0}"
 "Track title: [LMB] selects the track  [RMB] track menu  [Ctrl][R] renames it" = "Spoortitel: [LMB] selecteert het spoor  [RMB] spoormenu  [Ctrl][R] hernoemt het"
 "Arm Session Recording: [LMB] arms this track (the others disarm)  [Ctrl][LMB] keeps the others armed" = "Sessie-opname inschakelen: [LMB] schakelt dit spoor in (de andere uit)  [Ctrl][LMB] houdt de andere ingeschakeld"
@@ -10684,8 +10682,6 @@ countries: nl be
 "User Library" = "Gebruikersbibliotheek"
 "Current Project" = "Huidig project"
 "Add Folder..." = "Map toevoegen..."
-
-# round 190iv: the toolbar per layout style
 
 # --- round 190ja: Helix (LYNX's wavetable synth)
 "Add a modulation target" = "Modulatiedoel toevoegen"
@@ -10766,27 +10762,6 @@ countries: nl be
 "CURVE" = "CURVE"
 "Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "Weergave: de scrollende grafiek van FL of de overdrachtscurve van LYNX  [LMB] wisselen (bewaard voor dit effect)"
 
-# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
-"Hide collapsed grouped tracks" = "Ingeklapte gegroepeerde tracks verbergen"
-"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Track: [LMB] mute / unmute  [Ctrl][LMB] of [RMB] solo  [Alt][LMB] groep muten  [Alt][RMB] groep solo"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Track: [LMB] selecteren  [Ctrl][LMB] toevoegen / weghalen  [Ctrl] slepen: tracks met hun clips  [Shift][LMB] bereik  [RMB] menu  [2xLMB] bron van de clip openen  [Shift][Wheel] omhoog / omlaag verplaatsen  [Alt] slepen: in / uit een groep"
-"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Track wordt met zijn groep verplaatst  [Alt] naar rechts / links slepen: dieper / uit de groep"
-"In a group, level {0}" = "In een groep, niveau {0}"
-"Not in a group" = "Niet in een groep"
-"Nest under the track above (a group in the group)" = "Onder de track erboven nesten (een groep in de groep)"
-"Move out of its group (one level up)" = "Uit zijn groep halen (een niveau hoger)"
-"Hiding collapsed tracks" = "Ingeklapte tracks verbergen"
-"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Deze optie verbergt ingeklapte Playlist-tracks. De bovenliggende track toont een pijl omlaag om de verborgen tracks te openen. Doorgaan?"
-
-# --- Round 190jf: B22 DAWproject import / export
-"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
-"(imported from DAWproject)" = "(geïmporteerd uit DAWproject)"
-"Export DAWproject" = "DAWproject exporteren"
-"The DAWproject file could not be written" = "Het DAWproject-bestand kon niet worden geschreven"
-"Everything went over to the DAWproject file." = "Alles is meegegaan naar het DAWproject-bestand."
-"Not carried over or approximated:" = "Niet meegenomen of benaderd:"
-"... and {0} more" = "... en nog {0}"
-
 # --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 "Wheel: scroll over the track headers, zoom over the arrangement" = "Muiswiel: scrollen boven de trackkoppen, zoomen boven het arrangement"
 "Hold a tool key for a temporary tool" = "Houd de toets van een gereedschap ingedrukt voor tijdelijk gebruik"
@@ -10816,8 +10791,25 @@ countries: nl be
 "Delete (with its {0} clips)" = "Verwijderen (met zijn {0} clips)"
 
 # --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
-# --- Round 190jf: B22 DAWproject import / export
+"Hide collapsed grouped tracks" = "Ingeklapte gegroepeerde tracks verbergen"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Track: [LMB] mute / unmute  [Ctrl][LMB] of [RMB] solo  [Alt][LMB] groep muten  [Alt][RMB] groep solo"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Track: [LMB] selecteren  [Ctrl][LMB] toevoegen / weghalen  [Ctrl] slepen: tracks met hun clips  [Shift][LMB] bereik  [RMB] menu  [2xLMB] bron van de clip openen  [Shift][Wheel] omhoog / omlaag verplaatsen  [Alt] slepen: in / uit een groep"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Track wordt met zijn groep verplaatst  [Alt] naar rechts / links slepen: dieper / uit de groep"
+"In a group, level {0}" = "In een groep, niveau {0}"
+"Not in a group" = "Niet in een groep"
+"Nest under the track above (a group in the group)" = "Onder de track erboven nesten (een groep in de groep)"
+"Move out of its group (one level up)" = "Uit zijn groep halen (een niveau hoger)"
+"Hiding collapsed tracks" = "Ingeklapte tracks verbergen"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Deze optie verbergt ingeklapte Playlist-tracks. De bovenliggende track toont een pijl omlaag om de verborgen tracks te openen. Doorgaan?"
 
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "(geïmporteerd uit DAWproject)"
+"Export DAWproject" = "DAWproject exporteren"
+"The DAWproject file could not be written" = "Het DAWproject-bestand kon niet worden geschreven"
+"Everything went over to the DAWproject file." = "Alles is meegegaan naar het DAWproject-bestand."
+"Not carried over or approximated:" = "Niet meegenomen of benaderd:"
+"... and {0} more" = "... en nog {0}"
 
 # --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
 "Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "De automatische dynamische drempels van Facet EQ spelen met de handmatige drempel van de banden: {0}"
@@ -10871,6 +10863,7 @@ countries: nl be
 "Pitch & Time" = "Toonhoogte & tijd"
 "Bar : Step : Tick" = "Maat : Step : Tik"
 "Time: bar : step : tick" = "Tijd: maat : step : tik"
+
 # --- round 190jq: Playlist header width (#164), pointer click (#191), automation clip lanes (#191.3)
 "Pointer click: a click on an empty spot selects and moves the song position; a double click places the clip (LYNX)" = "Aanwijzerklik: een klik op een lege plek selecteert en verplaatst de songpositie; een dubbelklik plaatst de clip (LYNX)"
 "Click on an empty spot selects and moves the song position (pointer click)" = "Klik op een lege plek selecteert en verplaatst de songpositie (aanwijzerklik)"
@@ -10897,8 +10890,10 @@ countries: nl be
 "This will |delete| {0} unused mixer track(s). Are you sure?" = "Hiermee worden {0} ongebruikte mixersporen |verwijderd|. Weet je het zeker?"
 "Trim unused mixer tracks" = "Ongebruikte mixersporen opruimen"
 "No unused mixer tracks" = "Geen ongebruikte mixersporen"
+
 # --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
 "Scale highlighting" = "Toonladder markeren"
+
 # --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
 "FL arpeggiator pattern" = "FL-arpeggiatorpatroon"
 "None (the arpeggiator above)" = "Geen (de arpeggiator hierboven)"
@@ -10942,8 +10937,6 @@ countries: nl be
 "Corrode (an imported Live Erosion) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Corrode (een geïmporteerde Live Erosion) zit niet in deze versie: hij wordt een uitgeschakelde Utility op zijn plek, en zijn automatisering doet niets ({0})"
 "Platter (an imported Live Vinyl Distortion) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Platter (een geïmporteerde Live Vinyl Distortion) zit niet in deze versie: hij wordt een uitgeschakelde Utility op zijn plek, en zijn automatisering doet niets ({0})"
 "Soundboard (an imported Live Corpus) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Soundboard (een geïmporteerde Live Corpus) zit niet in deze versie: hij wordt een uitgeschakelde Utility op zijn plek, en zijn automatisering doet niets ({0})"
-
-# round 190jz: issues #192 (docked Browser), #194 (fade handles), #195 (Home, W)
 "Move the playback marker to the start of the song or pattern" = "Afspeelmarkering naar het begin van het nummer of patroon verplaatsen"
 "Move the playback marker to start" = "Afspeelmarkering naar het begin verplaatsen"
 "W moves the playback marker to the start (as Home)" = "W zet de afspeelmarkering op het begin (zoals Home)"
@@ -11224,16 +11217,13 @@ countries: nl be
 "Paused" = "Gepauzeerd"
 "Scrub: hold and drag right to play forward, left to play backward; the further, the faster" = "Scrub: ingedrukt houden en naar rechts slepen speelt vooruit, naar links achteruit; hoe verder, hoe sneller"
 
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editor openen/sluiten  [Alt]+[LMB] andere open houden  [Ctrl]+[LMB] voorbeluisteren  [2xLMB] Piano Roll  [LMB] omhoog/omlaag slepen herschikt  [RMB] kanaalmenu"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Piekmeter (links/rechts) met peak hold  [LMB] wist het cliplampje"
-
 # --- rollup 0.1.30 step 6: Save a copy for 0.1.28 knows rounds 190kc / 190ke / natives190kj
 "The crossfader (Live's Crossfade Assign) is not in this release: these inserts play at their full level, and its automation does nothing: {0}" = "De crossfader (Live's Crossfade Assign) zit niet in deze versie: deze inserts spelen op volle sterkte en de automatisering ervan doet niets: {0}"
 "Live return tracks show as ordinary mixer inserts: {0}" = "Live-returnsporen verschijnen als gewone mixerinserts: {0}"
 "The Simple Controls tab's own knob mappings: {0}" = "De eigen knoptoewijzingen van het Simple-tabblad Controls: {0}"
 "Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}" = "Harmor-parts met een sample in de IMG-sectie spelen hun klankkleuren in plaats van de resynthese: {0}"
 "Newtone's detected key and note velocities are left out: {0}" = "De door Newtone gevonden toonsoort en nootvelocity's vervallen: {0}"
+
 # --- round 190kl: the Peak Controller's LYNX LFO shapes (issue #197)
 "LYNX shapes" = "LYNX-vormen"
 "Ramp down" = "Aflopende ramp"
@@ -11916,3 +11906,74 @@ countries: nl be
 "Insert a wildcard at the cursor" = "Voeg een jokerteken in bij de cursor"
 "File:" = "Bestand:"
 "Stems:" = "Stems:"
+
+# --- round 190np: first-run onboarding (welcome card, Next-3 card, empty-state hints, tips)
+"Welcome..." = "Welkom..."
+"Getting started" = "Aan de slag"
+"BandLab, FL Studio Mobile or GarageBand" = "BandLab, FL Studio Mobile of GarageBand"
+"FL Studio" = "FL Studio"
+"Ableton Live or Bitwig" = "Ableton Live of Bitwig"
+"Logic, Cubase, Reaper, Pro Tools or Studio One" = "Logic, Cubase, Reaper, Pro Tools of Studio One"
+"I'm new to making music" = "Ik ben nieuw met muziek maken"
+"A mobile or simple app. Simple layout: tracks, loops, a drum machine and quick recording." = "Een mobiele of eenvoudige app. Eenvoudige lay-out: sporen, loops, een drumcomputer en snel opnemen."
+"Pattern layout: Channel Rack, Piano roll, Playlist and Mixer, with FL's shortcuts. Your .flp projects open." = "Pattern-lay-out: Channel Rack, Pianorol, Playlist en Mixer, met de sneltoetsen van FL. Je .flp-projecten gaan open."
+"Clip-launch layout: a clip grid with scenes beside the arrangement. Your .als sets open." = "Clipstart-lay-out: een clipraster met scènes naast het arrangement. Je .als-sets gaan open."
+"Simple layout with the Mixer at hand: one track per instrument on a timeline." = "Eenvoudige lay-out met de Mixer binnen handbereik: één spoor per instrument op een tijdlijn."
+"Simple layout and a short first-song tour (about five minutes)." = "Eenvoudige lay-out en een korte rondleiding door je eerste song (ongeveer vijf minuten)."
+"Press Space to hear the starter beat" = "Druk op Spatie om de startbeat te horen"
+"Add a loop: drag one onto the timeline" = "Voeg een loop toe: sleep er een naar de tijdlijn"
+"Record your voice on a new Voice track" = "Neem je stem op op een nieuw Voice-spoor"
+"Click steps in the Channel Rack to make a beat" = "Klik op steps in het Channel Rack om een beat te maken"
+"Open one of your .flp projects" = "Open een van je .flp-projecten"
+"Find your plugins (VST, CLAP)" = "Vind je plugins (VST, CLAP)"
+"Drag a loop into a slot of the clip grid" = "Sleep een loop naar een slot van het clipraster"
+"Launch a clip or a scene" = "Start een clip of een scène"
+"Open one of your .als sets" = "Open een van je .als-sets"
+"Add an instrument track and play it with the computer keys" = "Voeg een instrumentspoor toe en speel het met de computertoetsen"
+"Record audio on a Voice or Guitar track" = "Neem audio op op een Voice- of Guitar-spoor"
+"Open the Mixer (F9)" = "Open de Mixer (F9)"
+"Open Loops" = "Loops openen"
+"+ Voice track" = "+ Voice-spoor"
+"Browse loops" = "Loops doorbladeren"
+"+ Instrument" = "+ Instrument"
+"Your starter beat is ready in the Simple layout." = "Je startbeat staat klaar in de eenvoudige lay-out."
+"The Pattern layout works like FL Studio." = "De Pattern-lay-out werkt zoals FL Studio."
+"The Clip-launch layout: clips and scenes beside the arrangement." = "De clipstart-lay-out: clips en scènes naast het arrangement."
+"One track per instrument, with the Mixer at hand." = "Eén spoor per instrument, met de Mixer binnen handbereik."
+"Your song is built here" = "Hier bouw je je song"
+"Launch clips from this grid" = "Start clips vanuit dit raster"
+"Drag a loop here" = "Sleep hier een loop naartoe"
+"Click in the Playlist to place the pattern you're editing, or drag a loop, audio or MIDI file in from the Browser." = "Klik in de Playlist om het pattern te plaatsen dat je bewerkt, of sleep een loop, audio- of MIDI-bestand vanuit de Browser."
+"Drag a loop or a sample from the Browser into any slot. Double-click an empty slot for a new MIDI clip. The play button at the end of a row launches the whole scene." = "Sleep een loop of sample uit de Browser naar een willekeurig slot. Dubbelklik op een leeg slot voor een nieuwe MIDI-clip. De afspeelknop aan het eind van een rij start de hele scène."
+"Drop a loop, an audio or a MIDI file on the timeline, or add a track: drums, an instrument or your voice." = "Zet een loop, audio- of MIDI-bestand op de tijdlijn, of voeg een spoor toe: drums, een instrument of je stem."
+"Nothing to play in Song mode yet" = "Nog niets om af te spelen in Song-modus"
+"No input to record from yet" = "Nog geen ingang om van op te nemen"
+"Song mode plays the Playlist, and it's empty. Switch to Pattern to hear the pattern you're editing, or place it in the Playlist." = "De Song-modus speelt de Playlist af, en die is leeg. Schakel over naar Pattern om het pattern te horen dat je bewerkt, of plaats het in de Playlist."
+"To record your voice or an instrument, choose an input in the audio settings and arm a track. Notes from the computer keys or a MIDI keyboard record without one." = "Kies om je stem of een instrument op te nemen een ingang in de audio-instellingen en arm een spoor. Noten van de computertoetsen of een MIDI-keyboard worden ook zonder opgenomen."
+"Switch to Pattern" = "Naar Pattern schakelen"
+"Show tips and hints" = "Tips en hints tonen"
+"Speakers (system default)" = "Luidsprekers (systeemstandaard)"
+"No audio device" = "Geen audioapparaat"
+"Plugins: scanning in the background" = "Plugins: op de achtergrond aan het scannen"
+"Plugins: {0} found" = "Plugins: {0} gevonden"
+"Channel Rack (F6)" = "Channel Rack (F6)"
+"Open an .flp project..." = "Een .flp-project openen..."
+"Open an .als set..." = "Een .als-set openen..."
+"+ Add track" = "+ Spoor toevoegen"
+"{0} are trademarks of their owners; LYNX SHARE is not affiliated with them." = "{0} zijn handelsmerken van hun eigenaren; LYNX SHARE is er niet aan gelieerd."
+"Skip: keep the FL-style Pattern layout" = "Overslaan: de Pattern-lay-out in FL-stijl houden"
+"Sound:" = "Geluid:"
+"More setup (audio driver, plugin folders)..." = "Meer instellingen (audiodriver, pluginmappen)..."
+"Where are you coming from?" = "Waar kom je vandaan?"
+"LYNX SHARE sets itself up to feel familiar. One click and you're in; change it any time in View > Layout style." = "LYNX SHARE stelt zichzelf in zodat het vertrouwd aanvoelt. Eén klik en je bent binnen; wijzig het altijd in Beeld > Lay-outstijl."
+"Hide (Help > Getting started shows it again)" = "Verbergen (Help > Aan de slag toont dit weer)"
+"Learn more..." = "Meer info..."
+"Next: 3 things to try" = "Hierna: 3 dingen om te proberen"
+"Nice, that's the basics." = "Mooi, dat zijn de basics."
+"Help > Getting started shows this again" = "Help > Aan de slag toont dit weer"
+"Got it" = "Begrepen"
+"No more tips" = "Geen tips meer"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editor openen/sluiten  [Alt]+[LMB] andere open houden  [Ctrl]+[LMB] voorbeluisteren  [2xLMB] Piano Roll  [LMB] omhoog/omlaag slepen herschikt  [RMB] kanaalmenu"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Piekmeter (links/rechts) met peak hold  [LMB] wist het cliplampje"

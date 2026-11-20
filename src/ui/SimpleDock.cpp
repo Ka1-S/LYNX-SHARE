@@ -1,4 +1,5 @@
 #include "ui/SimpleDock.h"
+#include "ui/DemoMode.h" // (round 190np: the Drum Machine is a demo::CellSource)
 
 #include <algorithm>
 #include <array>

@@ -10599,9 +10599,10 @@ countries: id
 "The recording is silent: the audio input sent nothing but silence. Check that the insert's input is the channel your microphone or instrument is plugged into (the input box above its effect slots), that the interface's input is not muted, and that LYNX SHARE may use the microphone (Windows: Settings > Privacy > Microphone; macOS: System Settings > Privacy & Security > Microphone)." = "Rekaman hening: input audio hanya mengirim keheningan. Periksa bahwa input insert adalah kanal tempat mikrofon atau instrumen Anda tersambung (kotak input di atas slot efeknya), input interface tidak dibisukan, dan LYNX SHARE boleh memakai mikrofon (Windows: Pengaturan > Privasi > Mikrofon; macOS: Pengaturan Sistem > Privasi & Keamanan > Mikrofon)."
 "Choose an input to record" = "Pilih input untuk direkam"
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "Seberapa sering playhead, meter, dan skop bergerak. Layar mengikuti laju penyegaran monitor Anda (paling mulus); Seimbang membaginya dua pada layar cepat (72 Hz pada layar 144 Hz); 60 Hz atau 30 Hz memakai CPU paling sedikit (laptop, komputer yang lebih lambat)."
+"Pitch-aware" = "Peka nada"
+"Beats law: Classic plays as LYNX did before 0.1.28, Measured as 0.1.28 and 0.1.29 did (this project was saved then); Pitch-aware also cuts where the pitch of a held note steps" = "Hukum Beats: Classic berbunyi seperti LYNX sebelum 0.1.28, Terukur seperti 0.1.28 dan 0.1.29 (proyek ini disimpan saat itu); Peka nada juga memotong di tempat nada dari not yang ditahan berpindah"
+"Texture and Complex Pro law: Classic plays as LYNX did before 0.1.30 (this project was saved then); Measured follows Live 12.4's renders (grains and Flux, formants kept)" = "Hukum Texture dan Complex Pro: Classic berbunyi seperti LYNX sebelum 0.1.30 (proyek ini disimpan saat itu); Terukur mengikuti render Live 12.4 (grain dan Flux, forman dipertahankan)"
 "Large controls (touch size)" = "Kontrol besar (ukuran sentuh)"
-
-# round 190iv: the toolbar per layout style
 "Nothing to save yet" = "Belum ada yang perlu disimpan"
 "LYNX backs your work up by itself. Click to save the project (Ctrl+S)" = "LYNX mencadangkan pekerjaan Anda sendiri. Klik untuk menyimpan proyek (Ctrl+S)"
 "More: the panels and options this toolbar leaves out" = "Lainnya: panel dan opsi yang tidak ada di bilah ini"
@@ -10610,9 +10611,6 @@ countries: id
 "Control bar" = "Bilah kontrol"
 "Punch in / out" = "Punch in / out"
 "Show the Session button row" = "Tampilkan baris tombol Session"
-"Pitch-aware" = "Peka nada"
-"Beats law: Classic plays as LYNX did before 0.1.28, Measured as 0.1.28 and 0.1.29 did (this project was saved then); Pitch-aware also cuts where the pitch of a held note steps" = "Hukum Beats: Classic berbunyi seperti LYNX sebelum 0.1.28, Terukur seperti 0.1.28 dan 0.1.29 (proyek ini disimpan saat itu); Peka nada juga memotong di tempat nada dari not yang ditahan berpindah"
-"Texture and Complex Pro law: Classic plays as LYNX did before 0.1.30 (this project was saved then); Measured follows Live 12.4's renders (grains and Flux, formants kept)" = "Hukum Texture dan Complex Pro: Classic berbunyi seperti LYNX sebelum 0.1.30 (proyek ini disimpan saat itu); Terukur mengikuti render Live 12.4 (grain dan Flux, forman dipertahankan)"
 "Tension: {0}" = "Tegangan: {0}"
 "Track title: [LMB] selects the track  [RMB] track menu  [Ctrl][R] renames it" = "Judul trek: [LMB] memilih trek  [RMB] menu trek  [Ctrl][R] mengganti namanya"
 "Arm Session Recording: [LMB] arms this track (the others disarm)  [Ctrl][LMB] keeps the others armed" = "Siapkan Rekaman Sesi: [LMB] menyiapkan trek ini (yang lain dilepas)  [Ctrl][LMB] tetap menyiapkan yang lain"
@@ -10684,8 +10682,6 @@ countries: id
 "User Library" = "Pustaka pengguna"
 "Current Project" = "Proyek saat ini"
 "Add Folder..." = "Tambah folder..."
-
-# round 190iv: the toolbar per layout style
 
 # --- round 190ja: Helix (LYNX's wavetable synth)
 "Add a modulation target" = "Tambah target modulasi"
@@ -10766,27 +10762,6 @@ countries: id
 "CURVE" = "KURVA"
 "Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "Tampilan: grafik bergulir FL atau kurva transfer LYNX  [LMB] ganti (disimpan untuk efek ini)"
 
-# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
-"Hide collapsed grouped tracks" = "Sembunyikan track grup yang diciutkan"
-"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Track: [LMB] mute / bunyikan lagi  [Ctrl][LMB] atau [RMB] solo  [Alt][LMB] mute grupnya  [Alt][RMB] solo grupnya"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Track: [LMB] pilih  [Ctrl][LMB] tambah / buang  [Ctrl] seret: track beserta clip-nya  [Shift][LMB] rentang  [RMB] menu  [2xLMB] buka sumber clip  [Shift][Wheel] pindah ke atas / bawah  [Alt] seret: masuk ke / keluar dari grup"
-"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Memindahkan track bersama grupnya  [Alt] seret ke kanan / kiri: lebih dalam / keluar dari grup"
-"In a group, level {0}" = "Dalam grup, level {0}"
-"Not in a group" = "Tidak dalam grup"
-"Nest under the track above (a group in the group)" = "Sarangkan di bawah track di atas (grup di dalam grup)"
-"Move out of its group (one level up)" = "Keluarkan dari grupnya (naik satu level)"
-"Hiding collapsed tracks" = "Menyembunyikan track yang diciutkan"
-"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Opsi ini menyembunyikan track Playlist yang diciutkan. Track induk akan menampilkan ikon panah bawah untuk membuka track yang tersembunyi. Lanjutkan?"
-
-# --- Round 190jf: B22 DAWproject import / export
-"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
-"(imported from DAWproject)" = "(diimpor dari DAWproject)"
-"Export DAWproject" = "Ekspor DAWproject"
-"The DAWproject file could not be written" = "File DAWproject tidak dapat ditulis"
-"Everything went over to the DAWproject file." = "Semuanya masuk ke file DAWproject."
-"Not carried over or approximated:" = "Tidak terbawa atau didekati:"
-"... and {0} more" = "... dan {0} lagi"
-
 # --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 "Wheel: scroll over the track headers, zoom over the arrangement" = "Roda: gulir di atas kepala track, zoom di atas aransemen"
 "Hold a tool key for a temporary tool" = "Tahan tombol alat untuk alat sementara"
@@ -10816,8 +10791,25 @@ countries: id
 "Delete (with its {0} clips)" = "Hapus (beserta {0} klipnya)"
 
 # --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
-# --- Round 190jf: B22 DAWproject import / export
+"Hide collapsed grouped tracks" = "Sembunyikan track grup yang diciutkan"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Track: [LMB] mute / bunyikan lagi  [Ctrl][LMB] atau [RMB] solo  [Alt][LMB] mute grupnya  [Alt][RMB] solo grupnya"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Track: [LMB] pilih  [Ctrl][LMB] tambah / buang  [Ctrl] seret: track beserta clip-nya  [Shift][LMB] rentang  [RMB] menu  [2xLMB] buka sumber clip  [Shift][Wheel] pindah ke atas / bawah  [Alt] seret: masuk ke / keluar dari grup"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Memindahkan track bersama grupnya  [Alt] seret ke kanan / kiri: lebih dalam / keluar dari grup"
+"In a group, level {0}" = "Dalam grup, level {0}"
+"Not in a group" = "Tidak dalam grup"
+"Nest under the track above (a group in the group)" = "Sarangkan di bawah track di atas (grup di dalam grup)"
+"Move out of its group (one level up)" = "Keluarkan dari grupnya (naik satu level)"
+"Hiding collapsed tracks" = "Menyembunyikan track yang diciutkan"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Opsi ini menyembunyikan track Playlist yang diciutkan. Track induk akan menampilkan ikon panah bawah untuk membuka track yang tersembunyi. Lanjutkan?"
 
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "(diimpor dari DAWproject)"
+"Export DAWproject" = "Ekspor DAWproject"
+"The DAWproject file could not be written" = "File DAWproject tidak dapat ditulis"
+"Everything went over to the DAWproject file." = "Semuanya masuk ke file DAWproject."
+"Not carried over or approximated:" = "Tidak terbawa atau didekati:"
+"... and {0} more" = "... dan {0} lagi"
 
 # --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
 "Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "Ambang dinamis otomatis Facet EQ diputar dengan ambang manual band: {0}"
@@ -10871,6 +10863,7 @@ countries: id
 "Pitch & Time" = "Nada & Waktu"
 "Bar : Step : Tick" = "Bar : Step : Tick"
 "Time: bar : step : tick" = "Waktu: bar : step : tick"
+
 # --- round 190jq: Playlist header width (#164), pointer click (#191), automation clip lanes (#191.3)
 "Pointer click: a click on an empty spot selects and moves the song position; a double click places the clip (LYNX)" = "Klik penunjuk: klik di tempat kosong memilih dan memindahkan posisi lagu; klik ganda menaruh klip (LYNX)"
 "Click on an empty spot selects and moves the song position (pointer click)" = "Klik di tempat kosong memilih dan memindahkan posisi lagu (klik penunjuk)"
@@ -10897,8 +10890,10 @@ countries: id
 "This will |delete| {0} unused mixer track(s). Are you sure?" = "Ini akan |menghapus| {0} trek Mixer tak terpakai. Yakin?"
 "Trim unused mixer tracks" = "Pangkas trek Mixer tak terpakai"
 "No unused mixer tracks" = "Tidak ada trek Mixer tak terpakai"
+
 # --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
 "Scale highlighting" = "Sorotan tangga nada"
+
 # --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
 "FL arpeggiator pattern" = "Pola arpeggiator FL"
 "None (the arpeggiator above)" = "Tidak ada (arpeggiator di atas)"
@@ -10942,8 +10937,6 @@ countries: id
 "Corrode (an imported Live Erosion) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Corrode (Erosion Live yang diimpor) tidak ada di rilis ini: ia menjadi Utility yang dimatikan di slotnya, dan otomasinya tidak berfungsi ({0})"
 "Platter (an imported Live Vinyl Distortion) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Platter (Vinyl Distortion Live yang diimpor) tidak ada di rilis ini: ia menjadi Utility yang dimatikan di slotnya, dan otomasinya tidak berfungsi ({0})"
 "Soundboard (an imported Live Corpus) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Soundboard (Corpus Live yang diimpor) tidak ada di rilis ini: ia menjadi Utility yang dimatikan di slotnya, dan otomasinya tidak berfungsi ({0})"
-
-# round 190jz: issues #192 (docked Browser), #194 (fade handles), #195 (Home, W)
 "Move the playback marker to the start of the song or pattern" = "Pindahkan penanda putar ke awal lagu atau pattern"
 "Move the playback marker to start" = "Pindahkan penanda putar ke awal"
 "W moves the playback marker to the start (as Home)" = "W memindahkan penanda putar ke awal (seperti Home)"
@@ -11224,16 +11217,13 @@ countries: id
 "Paused" = "Dijeda"
 "Scrub: hold and drag right to play forward, left to play backward; the further, the faster" = "Scrub: tahan dan seret ke kanan untuk memutar maju, ke kiri untuk mundur; makin jauh, makin cepat"
 
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] buka/tutup editor  [Alt]+[LMB] biarkan yang lain terbuka  [Ctrl]+[LMB] dengarkan  [2xLMB] Piano Roll  [LMB] seret naik/turun mengubah urutan  [RMB] menu channel"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak meter (kiri/kanan) dengan peak hold  [LMB] mematikan lampu clip"
-
 # --- rollup 0.1.30 step 6: Save a copy for 0.1.28 knows rounds 190kc / 190ke / natives190kj
 "The crossfader (Live's Crossfade Assign) is not in this release: these inserts play at their full level, and its automation does nothing: {0}" = "Crossfader (Crossfade Assign milik Live) tidak ada di rilis ini: insert ini diputar dengan level penuh, dan otomasinya tidak berpengaruh: {0}"
 "Live return tracks show as ordinary mixer inserts: {0}" = "Track return Live tampil sebagai insert mixer biasa: {0}"
 "The Simple Controls tab's own knob mappings: {0}" = "Pemetaan kenop sendiri pada tab Controls di Simple: {0}"
 "Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}" = "Part Harmor dengan sampel di bagian IMG memainkan timbre-nya alih-alih resintesis: {0}"
 "Newtone's detected key and note velocities are left out: {0}" = "Kunci nada yang terdeteksi dan velocity not Newtone dihilangkan: {0}"
+
 # --- round 190kl: the Peak Controller's LYNX LFO shapes (issue #197)
 "LYNX shapes" = "Bentuk LYNX"
 "Ramp down" = "Ramp turun"
@@ -11916,3 +11906,74 @@ countries: id
 "Insert a wildcard at the cursor" = "Sisipkan wildcard di kursor"
 "File:" = "File:"
 "Stems:" = "Stem:"
+
+# --- round 190np: first-run onboarding (welcome card, Next-3 card, empty-state hints, tips)
+"Welcome..." = "Selamat datang..."
+"Getting started" = "Memulai"
+"BandLab, FL Studio Mobile or GarageBand" = "BandLab, FL Studio Mobile, atau GarageBand"
+"FL Studio" = "FL Studio"
+"Ableton Live or Bitwig" = "Ableton Live atau Bitwig"
+"Logic, Cubase, Reaper, Pro Tools or Studio One" = "Logic, Cubase, Reaper, Pro Tools, atau Studio One"
+"I'm new to making music" = "Saya baru membuat musik"
+"A mobile or simple app. Simple layout: tracks, loops, a drum machine and quick recording." = "Aplikasi seluler atau sederhana. Tata letak sederhana: trek, loop, drum machine, dan rekaman cepat."
+"Pattern layout: Channel Rack, Piano roll, Playlist and Mixer, with FL's shortcuts. Your .flp projects open." = "Tata letak Pattern: Channel Rack, Piano roll, Playlist, dan Mixer, dengan pintasan FL. Proyek .flp Anda bisa dibuka."
+"Clip-launch layout: a clip grid with scenes beside the arrangement. Your .als sets open." = "Tata letak peluncuran klip: kisi klip dengan scene di samping arransemen. Set .als Anda bisa dibuka."
+"Simple layout with the Mixer at hand: one track per instrument on a timeline." = "Tata letak sederhana dengan Mixer di dekat Anda: satu trek per instrumen pada lini masa."
+"Simple layout and a short first-song tour (about five minutes)." = "Tata letak sederhana dan tur singkat lagu pertama (sekitar lima menit)."
+"Press Space to hear the starter beat" = "Tekan Space untuk mendengar beat awal"
+"Add a loop: drag one onto the timeline" = "Tambah loop: seret satu ke lini masa"
+"Record your voice on a new Voice track" = "Rekam suara Anda di trek Voice baru"
+"Click steps in the Channel Rack to make a beat" = "Klik step di Channel Rack untuk membuat beat"
+"Open one of your .flp projects" = "Buka salah satu proyek .flp Anda"
+"Find your plugins (VST, CLAP)" = "Temukan plugin Anda (VST, CLAP)"
+"Drag a loop into a slot of the clip grid" = "Seret loop ke slot di kisi klip"
+"Launch a clip or a scene" = "Luncurkan klip atau scene"
+"Open one of your .als sets" = "Buka salah satu set .als Anda"
+"Add an instrument track and play it with the computer keys" = "Tambah trek instrumen dan mainkan dengan tombol komputer"
+"Record audio on a Voice or Guitar track" = "Rekam audio di trek Voice atau Gitar"
+"Open the Mixer (F9)" = "Buka Mixer (F9)"
+"Open Loops" = "Buka Loop"
+"+ Voice track" = "+ Trek voice"
+"Browse loops" = "Telusuri loop"
+"+ Instrument" = "+ Instrumen"
+"Your starter beat is ready in the Simple layout." = "Beat awal Anda sudah siap di tata letak sederhana."
+"The Pattern layout works like FL Studio." = "Tata letak Pattern bekerja seperti FL Studio."
+"The Clip-launch layout: clips and scenes beside the arrangement." = "Tata letak peluncuran klip: klip dan scene di samping arransemen."
+"One track per instrument, with the Mixer at hand." = "Satu trek per instrumen, dengan Mixer di dekat Anda."
+"Your song is built here" = "Lagu Anda dibangun di sini"
+"Launch clips from this grid" = "Luncurkan klip dari kisi ini"
+"Drag a loop here" = "Seret loop ke sini"
+"Click in the Playlist to place the pattern you're editing, or drag a loop, audio or MIDI file in from the Browser." = "Klik di Playlist untuk menaruh pattern yang sedang Anda edit, atau seret loop, file audio, atau MIDI dari Browser."
+"Drag a loop or a sample from the Browser into any slot. Double-click an empty slot for a new MIDI clip. The play button at the end of a row launches the whole scene." = "Seret loop atau sampel dari Browser ke slot mana pun. Klik dua kali slot kosong untuk membuat klip MIDI. Tombol putar di ujung baris meluncurkan seluruh scene."
+"Drop a loop, an audio or a MIDI file on the timeline, or add a track: drums, an instrument or your voice." = "Jatuhkan loop, file audio, atau MIDI ke lini masa, atau tambah trek: drum, instrumen, atau suara Anda."
+"Nothing to play in Song mode yet" = "Belum ada yang diputar di mode Song"
+"No input to record from yet" = "Belum ada input untuk merekam"
+"Song mode plays the Playlist, and it's empty. Switch to Pattern to hear the pattern you're editing, or place it in the Playlist." = "Mode Song memutar Playlist, dan isinya kosong. Beralih ke Pattern untuk mendengar pattern yang sedang Anda edit, atau taruh di Playlist."
+"To record your voice or an instrument, choose an input in the audio settings and arm a track. Notes from the computer keys or a MIDI keyboard record without one." = "Untuk merekam suara atau instrumen, pilih input di pengaturan audio dan siagakan sebuah trek. Not dari tombol komputer atau keyboard MIDI terekam tanpa itu."
+"Switch to Pattern" = "Beralih ke Pattern"
+"Show tips and hints" = "Tampilkan tips dan petunjuk"
+"Speakers (system default)" = "Speaker (default sistem)"
+"No audio device" = "Tidak ada perangkat audio"
+"Plugins: scanning in the background" = "Plugin: memindai di latar belakang"
+"Plugins: {0} found" = "Plugin: {0} ditemukan"
+"Channel Rack (F6)" = "Channel Rack (F6)"
+"Open an .flp project..." = "Buka proyek .flp..."
+"Open an .als set..." = "Buka set .als..."
+"+ Add track" = "+ Tambah trek"
+"{0} are trademarks of their owners; LYNX SHARE is not affiliated with them." = "{0} adalah merek dagang pemiliknya; LYNX SHARE tidak berafiliasi dengan mereka."
+"Skip: keep the FL-style Pattern layout" = "Lewati: pertahankan tata letak Pattern gaya FL"
+"Sound:" = "Suara:"
+"More setup (audio driver, plugin folders)..." = "Pengaturan lainnya (driver audio, folder plugin)..."
+"Where are you coming from?" = "Anda berasal dari mana?"
+"LYNX SHARE sets itself up to feel familiar. One click and you're in; change it any time in View > Layout style." = "LYNX SHARE menyiapkan diri agar terasa familier. Satu klik dan Anda langsung masuk; ubah kapan saja di Tampilan > Gaya tata letak."
+"Hide (Help > Getting started shows it again)" = "Sembunyikan (Bantuan > Mulai menampilkannya lagi)"
+"Learn more..." = "Pelajari lebih lanjut..."
+"Next: 3 things to try" = "Berikutnya: 3 hal untuk dicoba"
+"Nice, that's the basics." = "Bagus, itu dasarnya."
+"Help > Getting started shows this again" = "Bantuan > Mulai menampilkan ini lagi"
+"Got it" = "Mengerti"
+"No more tips" = "Tidak perlu tips lagi"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] buka/tutup editor  [Alt]+[LMB] biarkan yang lain terbuka  [Ctrl]+[LMB] dengarkan  [2xLMB] Piano Roll  [LMB] seret naik/turun mengubah urutan  [RMB] menu channel"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak meter (kiri/kanan) dengan peak hold  [LMB] mematikan lampu clip"

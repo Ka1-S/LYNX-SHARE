@@ -10599,9 +10599,10 @@ countries: tw hk mo
 "The recording is silent: the audio input sent nothing but silence. Check that the insert's input is the channel your microphone or instrument is plugged into (the input box above its effect slots), that the interface's input is not muted, and that LYNX SHARE may use the microphone (Windows: Settings > Privacy > Microphone; macOS: System Settings > Privacy & Security > Microphone)." = "錄音是靜音的：音訊輸入只送來了靜音。請檢查插槽的輸入是否為麥克風或樂器所接的通道（效果槽上方的輸入框）、音訊介面的輸入是否被靜音，以及 LYNX SHARE 是否可以使用麥克風（Windows：設定 > 隱私權 > 麥克風；macOS：系統設定 > 隱私權與安全性 > 麥克風）。"
 "Choose an input to record" = "請選擇要錄製的輸入"
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "播放頭、電平表和示波器的移動頻率。顯示器跟隨螢幕的更新率（最流暢）；平衡在高更新率螢幕上將其減半（144 Hz 螢幕上為 72 Hz）；60 Hz 或 30 Hz 佔用的 CPU 最少（筆電、較慢的電腦）。"
+"Pitch-aware" = "感知音高"
+"Beats law: Classic plays as LYNX did before 0.1.28, Measured as 0.1.28 and 0.1.29 did (this project was saved then); Pitch-aware also cuts where the pitch of a held note steps" = "Beats 規則：Classic 依 0.1.28 之前的 LYNX 播放，實測 依 0.1.28 與 0.1.29 播放（此專案於當時儲存）；感知音高 也會在持續音的音高變化處切分"
+"Texture and Complex Pro law: Classic plays as LYNX did before 0.1.30 (this project was saved then); Measured follows Live 12.4's renders (grains and Flux, formants kept)" = "Texture 與 Complex Pro 規則：Classic 依 0.1.30 之前的 LYNX 播放（此專案於當時儲存）；實測 遵循 Live 12.4 的渲染（顆粒與 Flux，保留共振峰）"
 "Large controls (touch size)" = "大型控制項（觸控尺寸）"
-
-# round 190iv: the toolbar per layout style
 "Nothing to save yet" = "尚無需要儲存的內容"
 "LYNX backs your work up by itself. Click to save the project (Ctrl+S)" = "LYNX 會自動備份你的工作。點擊以儲存專案 (Ctrl+S)"
 "More: the panels and options this toolbar leaves out" = "更多：此工具列未顯示的面板與選項"
@@ -10610,9 +10611,6 @@ countries: tw hk mo
 "Control bar" = "控制列"
 "Punch in / out" = "穿插錄音入 / 出"
 "Show the Session button row" = "顯示 Session 按鈕列"
-"Pitch-aware" = "感知音高"
-"Beats law: Classic plays as LYNX did before 0.1.28, Measured as 0.1.28 and 0.1.29 did (this project was saved then); Pitch-aware also cuts where the pitch of a held note steps" = "Beats 規則：Classic 依 0.1.28 之前的 LYNX 播放，實測 依 0.1.28 與 0.1.29 播放（此專案於當時儲存）；感知音高 也會在持續音的音高變化處切分"
-"Texture and Complex Pro law: Classic plays as LYNX did before 0.1.30 (this project was saved then); Measured follows Live 12.4's renders (grains and Flux, formants kept)" = "Texture 與 Complex Pro 規則：Classic 依 0.1.30 之前的 LYNX 播放（此專案於當時儲存）；實測 遵循 Live 12.4 的渲染（顆粒與 Flux，保留共振峰）"
 "Tension: {0}" = "張力：{0}"
 "Track title: [LMB] selects the track  [RMB] track menu  [Ctrl][R] renames it" = "軌道標題：[LMB] 選擇軌道  [RMB] 軌道選單  [Ctrl][R] 重新命名"
 "Arm Session Recording: [LMB] arms this track (the others disarm)  [Ctrl][LMB] keeps the others armed" = "預備工作階段錄音：[LMB] 預備此軌道（其他軌道取消）  [Ctrl][LMB] 保留其他軌道的預備"
@@ -10684,8 +10682,6 @@ countries: tw hk mo
 "User Library" = "使用者資料庫"
 "Current Project" = "目前的專案"
 "Add Folder..." = "新增資料夾..."
-
-# round 190iv: the toolbar per layout style
 
 # --- round 190ja: Helix (LYNX's wavetable synth)
 "Add a modulation target" = "新增調變目標"
@@ -10766,27 +10762,6 @@ countries: tw hk mo
 "CURVE" = "曲線"
 "Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "顯示：FL 的捲動圖形或 LYNX 的傳輸曲線  [LMB] 切換（為此效果保存）"
 
-# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
-"Hide collapsed grouped tracks" = "隱藏已摺疊的群組軌道"
-"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "軌道：[LMB] 靜音/取消靜音  [Ctrl][LMB] 或 [RMB] 獨奏  [Alt][LMB] 靜音整個群組  [Alt][RMB] 獨奏整個群組"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "軌道：[LMB] 選取  [Ctrl][LMB] 加入 / 移除  [Ctrl] 拖曳：連同片段選取軌道  [Shift][LMB] 範圍  [RMB] 選單  [2xLMB] 開啟片段來源  [Shift][Wheel] 向上 / 向下移動  [Alt] 拖曳：移入 / 移出群組"
-"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "正在連同群組移動軌道  [Alt] 向右 / 向左拖曳：更深一層 / 移出群組"
-"In a group, level {0}" = "在群組中，第 {0} 層"
-"Not in a group" = "不在群組中"
-"Nest under the track above (a group in the group)" = "巢狀放到上方軌道之下（群組中的群組）"
-"Move out of its group (one level up)" = "移出所在群組（上移一層）"
-"Hiding collapsed tracks" = "隱藏已摺疊的軌道"
-"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "此選項會隱藏 Playlist 中已摺疊的軌道。父軌道會顯示一個向下箭頭，用來展開隱藏的軌道。要繼續嗎？"
-
-# --- Round 190jf: B22 DAWproject import / export
-"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
-"(imported from DAWproject)" = "（從 DAWproject 匯入）"
-"Export DAWproject" = "匯出 DAWproject"
-"The DAWproject file could not be written" = "無法寫入 DAWproject 檔案"
-"Everything went over to the DAWproject file." = "所有內容都已寫入 DAWproject 檔案。"
-"Not carried over or approximated:" = "未帶過去或近似處理的內容："
-"... and {0} more" = "……還有 {0} 項"
-
 # --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 "Wheel: scroll over the track headers, zoom over the arrangement" = "滾輪：在軌道標題上捲動，在編排區上縮放"
 "Hold a tool key for a temporary tool" = "按住工具鍵暫時使用該工具"
@@ -10816,8 +10791,25 @@ countries: tw hk mo
 "Delete (with its {0} clips)" = "刪除（連同其 {0} 個片段）"
 
 # --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
-# --- Round 190jf: B22 DAWproject import / export
+"Hide collapsed grouped tracks" = "隱藏已摺疊的群組軌道"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "軌道：[LMB] 靜音/取消靜音  [Ctrl][LMB] 或 [RMB] 獨奏  [Alt][LMB] 靜音整個群組  [Alt][RMB] 獨奏整個群組"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "軌道：[LMB] 選取  [Ctrl][LMB] 加入 / 移除  [Ctrl] 拖曳：連同片段選取軌道  [Shift][LMB] 範圍  [RMB] 選單  [2xLMB] 開啟片段來源  [Shift][Wheel] 向上 / 向下移動  [Alt] 拖曳：移入 / 移出群組"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "正在連同群組移動軌道  [Alt] 向右 / 向左拖曳：更深一層 / 移出群組"
+"In a group, level {0}" = "在群組中，第 {0} 層"
+"Not in a group" = "不在群組中"
+"Nest under the track above (a group in the group)" = "巢狀放到上方軌道之下（群組中的群組）"
+"Move out of its group (one level up)" = "移出所在群組（上移一層）"
+"Hiding collapsed tracks" = "隱藏已摺疊的軌道"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "此選項會隱藏 Playlist 中已摺疊的軌道。父軌道會顯示一個向下箭頭，用來展開隱藏的軌道。要繼續嗎？"
 
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "（從 DAWproject 匯入）"
+"Export DAWproject" = "匯出 DAWproject"
+"The DAWproject file could not be written" = "無法寫入 DAWproject 檔案"
+"Everything went over to the DAWproject file." = "所有內容都已寫入 DAWproject 檔案。"
+"Not carried over or approximated:" = "未帶過去或近似處理的內容："
+"... and {0} more" = "……還有 {0} 項"
 
 # --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
 "Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "Facet EQ 的自動動態閾值將以各頻段的手動閾值播放：{0}"
@@ -10871,6 +10863,7 @@ countries: tw hk mo
 "Pitch & Time" = "音高與時間"
 "Bar : Step : Tick" = "小節 : 步 : 滴答"
 "Time: bar : step : tick" = "時間：小節 : 步 : 滴答"
+
 # --- round 190jq: Playlist header width (#164), pointer click (#191), automation clip lanes (#191.3)
 "Pointer click: a click on an empty spot selects and moves the song position; a double click places the clip (LYNX)" = "指標點擊：點擊空白處會選取並移動歌曲位置；雙擊放置片段 (LYNX)"
 "Click on an empty spot selects and moves the song position (pointer click)" = "點擊空白處選取並移動歌曲位置（指標點擊）"
@@ -10897,8 +10890,10 @@ countries: tw hk mo
 "This will |delete| {0} unused mixer track(s). Are you sure?" = "這將|刪除| {0} 條未使用的混音器軌道。確定嗎？"
 "Trim unused mixer tracks" = "清理未使用的混音器軌道"
 "No unused mixer tracks" = "沒有未使用的混音器軌道"
+
 # --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
 "Scale highlighting" = "音階醒目提示"
+
 # --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
 "FL arpeggiator pattern" = "FL 琶音器模式"
 "None (the arpeggiator above)" = "無（上面的琶音器）"
@@ -10942,8 +10937,6 @@ countries: tw hk mo
 "Corrode (an imported Live Erosion) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "此版本中沒有 Corrode（匯入的 Live Erosion）：它會在原插槽中變成一個已關閉的 Utility，其自動化不起作用 ({0})"
 "Platter (an imported Live Vinyl Distortion) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "此版本中沒有 Platter（匯入的 Live Vinyl Distortion）：它會在原插槽中變成一個已關閉的 Utility，其自動化不起作用 ({0})"
 "Soundboard (an imported Live Corpus) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "此版本中沒有 Soundboard（匯入的 Live Corpus）：它會在原插槽中變成一個已關閉的 Utility，其自動化不起作用 ({0})"
-
-# round 190jz: issues #192 (docked Browser), #194 (fade handles), #195 (Home, W)
 "Move the playback marker to the start of the song or pattern" = "將播放標記移到歌曲或模式的開頭"
 "Move the playback marker to start" = "將播放標記移到開頭"
 "W moves the playback marker to the start (as Home)" = "W 將播放標記移到開頭（同 Home）"
@@ -11224,16 +11217,13 @@ countries: tw hk mo
 "Paused" = "已暫停"
 "Scrub: hold and drag right to play forward, left to play backward; the further, the faster" = "拖曳試聽: 按住並向右拖曳正向播放，向左拖曳反向播放；越遠越快"
 
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 開啟/關閉編輯器  [Alt]+[LMB] 保持其他編輯器開啟  [Ctrl]+[LMB] 試聽  [2xLMB] 鋼琴捲軸  [LMB] 上下拖曳重新排序  [RMB] 通道選單"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值電平表（左/右）帶峰值保持  [LMB] 清除削波指示燈"
-
 # --- rollup 0.1.30 step 6: Save a copy for 0.1.28 knows rounds 190kc / 190ke / natives190kj
 "The crossfader (Live's Crossfade Assign) is not in this release: these inserts play at their full level, and its automation does nothing: {0}" = "此版本沒有交叉推桿（Live 的 Crossfade Assign）：這些插入軌以滿電平播放，其自動化不起作用: {0}"
 "Live return tracks show as ordinary mixer inserts: {0}" = "Live 的返回軌顯示為一般的混音器插入軌: {0}"
 "The Simple Controls tab's own knob mappings: {0}" = "Simple 的 Controls 分頁的自訂旋鈕對應: {0}"
 "Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}" = "IMG 區段帶有取樣的 Harmor 聲部改為播放其音色，而不是重新合成: {0}"
 "Newtone's detected key and note velocities are left out: {0}" = "Newtone 偵測到的調性和音符力度會被省略: {0}"
+
 # --- round 190kl: the Peak Controller's LYNX LFO shapes (issue #197)
 "LYNX shapes" = "LYNX 波形"
 "Ramp down" = "下降斜坡"
@@ -11916,3 +11906,74 @@ countries: tw hk mo
 "Insert a wildcard at the cursor" = "在游標處插入萬用字元"
 "File:" = "檔案："
 "Stems:" = "分軌："
+
+# --- round 190np: first-run onboarding (welcome card, Next-3 card, empty-state hints, tips)
+"Welcome..." = "歡迎..."
+"Getting started" = "入門"
+"BandLab, FL Studio Mobile or GarageBand" = "BandLab、FL Studio Mobile 或 GarageBand"
+"FL Studio" = "FL Studio"
+"Ableton Live or Bitwig" = "Ableton Live 或 Bitwig"
+"Logic, Cubase, Reaper, Pro Tools or Studio One" = "Logic、Cubase、Reaper、Pro Tools 或 Studio One"
+"I'm new to making music" = "我剛開始做音樂"
+"A mobile or simple app. Simple layout: tracks, loops, a drum machine and quick recording." = "行動版或簡單的應用程式。簡易版面：音軌、循環素材、鼓機和快速錄音。"
+"Pattern layout: Channel Rack, Piano roll, Playlist and Mixer, with FL's shortcuts. Your .flp projects open." = "樣式版面：通道機架、鋼琴捲簾、播放清單和混音器，沿用 FL 的快速鍵。可開啟你的 .flp 專案。"
+"Clip-launch layout: a clip grid with scenes beside the arrangement. Your .als sets open." = "片段啟動版面：片段格線，場景位於編排旁邊。可開啟你的 .als 工程。"
+"Simple layout with the Mixer at hand: one track per instrument on a timeline." = "混音器觸手可及的簡易版面：時間軸上每件樂器一條音軌。"
+"Simple layout and a short first-song tour (about five minutes)." = "簡易版面，外加第一首歌的簡短導覽（約五分鐘）。"
+"Press Space to hear the starter beat" = "按空白鍵試聽起步節拍"
+"Add a loop: drag one onto the timeline" = "新增循環素材：拖一個到時間軸上"
+"Record your voice on a new Voice track" = "在新的聲部音軌上錄下你的聲音"
+"Click steps in the Channel Rack to make a beat" = "點擊通道機架中的步進來製作節拍"
+"Open one of your .flp projects" = "開啟你的一個 .flp 專案"
+"Find your plugins (VST, CLAP)" = "尋找你的外掛（VST、CLAP）"
+"Drag a loop into a slot of the clip grid" = "把循環素材拖到片段格線的一個插槽"
+"Launch a clip or a scene" = "啟動一個片段或場景"
+"Open one of your .als sets" = "開啟你的一個 .als 工程"
+"Add an instrument track and play it with the computer keys" = "新增樂器音軌，用電腦鍵盤演奏"
+"Record audio on a Voice or Guitar track" = "在聲部或吉他音軌上錄製音訊"
+"Open the Mixer (F9)" = "開啟混音器（F9）"
+"Open Loops" = "開啟循環素材"
+"+ Voice track" = "+ 聲部音軌"
+"Browse loops" = "瀏覽循環素材"
+"+ Instrument" = "+ 樂器"
+"Your starter beat is ready in the Simple layout." = "你的起步節拍已在簡易版面中準備好。"
+"The Pattern layout works like FL Studio." = "樣式版面的用法和 FL Studio 一樣。"
+"The Clip-launch layout: clips and scenes beside the arrangement." = "片段啟動版面：片段和場景位於編排旁邊。"
+"One track per instrument, with the Mixer at hand." = "每件樂器一條音軌，混音器觸手可及。"
+"Your song is built here" = "你的歌曲在這裡建構"
+"Launch clips from this grid" = "從這個格線啟動片段"
+"Drag a loop here" = "把循環素材拖到這裡"
+"Click in the Playlist to place the pattern you're editing, or drag a loop, audio or MIDI file in from the Browser." = "點擊播放清單來放置正在編輯的樣式，或從瀏覽器拖入循環素材、音訊或 MIDI 檔案。"
+"Drag a loop or a sample from the Browser into any slot. Double-click an empty slot for a new MIDI clip. The play button at the end of a row launches the whole scene." = "把瀏覽器中的循環素材或取樣拖到任一插槽。雙擊空插槽可新增 MIDI 片段。列尾的播放按鈕會啟動整個場景。"
+"Drop a loop, an audio or a MIDI file on the timeline, or add a track: drums, an instrument or your voice." = "把循環素材、音訊或 MIDI 檔案放到時間軸上，或新增音軌：鼓、樂器或你的聲音。"
+"Nothing to play in Song mode yet" = "歌曲模式下還沒有可播放的內容"
+"No input to record from yet" = "還沒有可用於錄音的輸入"
+"Song mode plays the Playlist, and it's empty. Switch to Pattern to hear the pattern you're editing, or place it in the Playlist." = "歌曲模式播放播放清單，而它是空的。切換到樣式可聽到正在編輯的樣式，或把它放進播放清單。"
+"To record your voice or an instrument, choose an input in the audio settings and arm a track. Notes from the computer keys or a MIDI keyboard record without one." = "要錄製你的聲音或樂器，請在音訊設定中選擇輸入並預備一條音軌。來自電腦鍵盤或 MIDI 鍵盤的音符無需這些也能錄製。"
+"Switch to Pattern" = "切換到樣式"
+"Show tips and hints" = "顯示提示與小技巧"
+"Speakers (system default)" = "喇叭（系統預設）"
+"No audio device" = "沒有音訊裝置"
+"Plugins: scanning in the background" = "外掛：正在背景掃描"
+"Plugins: {0} found" = "外掛：找到 {0} 個"
+"Channel Rack (F6)" = "通道機架（F6）"
+"Open an .flp project..." = "開啟 .flp 專案..."
+"Open an .als set..." = "開啟 .als 工程..."
+"+ Add track" = "+ 新增音軌"
+"{0} are trademarks of their owners; LYNX SHARE is not affiliated with them." = "{0} 是其各自擁有者的商標；LYNX SHARE 與它們無關聯。"
+"Skip: keep the FL-style Pattern layout" = "跳過：保留 FL 風格的樣式版面"
+"Sound:" = "聲音："
+"More setup (audio driver, plugin folders)..." = "更多設定（音訊驅動程式、外掛資料夾）..."
+"Where are you coming from?" = "你之前用的是什麼？"
+"LYNX SHARE sets itself up to feel familiar. One click and you're in; change it any time in View > Layout style." = "LYNX SHARE 會自動設定成你熟悉的樣子。一鍵進入；隨時可在 檢視 > 版面樣式 中變更。"
+"Hide (Help > Getting started shows it again)" = "隱藏（說明 > 入門 可再次顯示）"
+"Learn more..." = "瞭解更多..."
+"Next: 3 things to try" = "接下來：值得一試的 3 件事"
+"Nice, that's the basics." = "不錯，基礎就是這些。"
+"Help > Getting started shows this again" = "說明 > 入門 可再次顯示此內容"
+"Got it" = "知道了"
+"No more tips" = "不再提示"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 開啟/關閉編輯器  [Alt]+[LMB] 保持其他編輯器開啟  [Ctrl]+[LMB] 試聽  [2xLMB] 鋼琴捲軸  [LMB] 上下拖曳重新排序  [RMB] 通道選單"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值電平表（左/右）帶峰值保持  [LMB] 清除削波指示燈"

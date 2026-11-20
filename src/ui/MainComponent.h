@@ -24,6 +24,7 @@
 #include "engine/ProjectFile.h"
 #include "ui/BrowserComponent.h"
 #include "ui/MapMode.h"
+#include "ui/Onboarding.h" // (round 190np)
 #include "ui/Icons.h"
 #include "ui/ChannelRackComponent.h"
 #include "ui/PianoRollComponent.h"
@@ -198,6 +199,29 @@ public:
     Workspace& workspaceForTest() { return workspace; } // --plugwintest dock mode (issue #116)
     const keys::KeyMap& getKeyMapForSnapshot() const { return keyMap; }
     juce::Component* setupOverlayForTest() const { return setupOverlay.get(); }
+    // --- round 190np: first-run onboarding (core/Onboarding.h, ui/Onboarding.h, ui/MainOnboarding.cpp) ---------------------
+    // The welcome card ("Where are you coming from?"): at the first start of a fresh profile, and from Help › Welcome...
+    // in every layout. `firstRun`: the background plugin scan starts and the answer is what setup-done.txt records.
+    void showWelcomeCard (bool firstRun);
+    // A choice (Choice::none = Skip / × / Esc): its layout through the runtime switch (as View › Layout style), its starter,
+    // then the "Next: 3 things" card. Skip changes nothing (the Pattern layout).
+    void applyWelcomeChoice (onboarding::Choice choice);
+    void showGettingStarted(); // Help › Getting started: the Next-3 card of the remembered choice (or of this layout)
+    void hideGettingStarted();
+    void startFirstSongTourAnywhere(); // Help › First-song tour in every layout (the Simple layout first)
+    // A confusion signal: shows its tip beside `anchor` unless a tip was shown this session or tips are off
+    bool maybeShowTip (onboarding::Tip tip, juce::Component* anchor);
+    void closeTip();
+    // shots / tests: the cards and hints in an off-screen window (they are only made in the real window otherwise)
+    void setOnboardingForSnapshot (bool on);
+    onboardui::Next3Card* next3ForSnapshot() const noexcept { return next3Card.get(); }
+    onboardui::TipCard* tipForSnapshot() const noexcept { return tipCard.get(); }
+    onboardui::EmptyHintCard* emptyHintForSnapshot() const noexcept { return emptyHint.get(); }
+    const onboarding::State& onboardingStateForCheck() const noexcept { return onboard; }
+    onboarding::Context& onboardingContextForCheck() noexcept { return onboardCtx; }
+    void updateOnboarding(); // the song or the view changed: the Next-3 ticks and the empty-state hint
+    // --demo (ui/DemoMode.cpp): the Remote Control API's ui.* / session.* operations, run on the message thread
+    juce::var handleDemoOp (const juce::String& op, const juce::var& args);
     juce::Component* danceStageForTest() const { return danceStage.get(); } // (a DanceStage, ui/DanceView.h)
     void waitForBrowserForSnapshot() { browser.waitForListing (5000); }
     // --no-plugins project.lynx (round 190ap): the next .lynx project opens with its third-party plugins off
@@ -1031,6 +1055,24 @@ private:
     void readPluginDatabaseAgain();
     // Online Sessions P2 (round 169b): the live session (last: it ends, and tells the others, before anything goes)
     std::unique_ptr<LiveSessionManager> live;
+
+    // round 190np: onboarding (destroyed first: the hint is a child of the Playlist or the grid, the cards of the window)
+    onboarding::State onboard;
+    onboarding::Context onboardCtx;
+    onboarding::TipGate tipGate;
+    bool onboardingOn = false; // the real window (or a shot that asked for it)
+    int onboardingTicks = 0;
+    std::unique_ptr<onboardui::Next3Card> next3Card;
+    std::unique_ptr<onboardui::TipCard> tipCard;
+    juce::Component::SafePointer<juce::Component> tipAnchor;
+    std::unique_ptr<onboardui::EmptyHintCard> emptyHint;
+    void loadOnboarding();
+    void saveOnboarding();
+    void placeOnboardingCards();
+    void updateEmptyHint();
+    void onboardingTick(); // (from the window's timer, only while the Next-3 card shows)
+    void next3Act (onboarding::Item item);
+    void checkRecordTip(); // Record (audio) with no input to record from: one tip
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
 };

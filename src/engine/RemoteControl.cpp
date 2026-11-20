@@ -99,7 +99,25 @@ int indexFor (const juce::var& args, std::size_t size)
 using remote_files::randomToken;
 using remote_files::writeDiscovery;
 
+// round 190np: the --demo view operations (message thread only)
+juce::StringArray& extensionOperations()
+{
+    static juce::StringArray ops;
+    return ops;
+}
+RemoteControl::Extension& extensionHandler()
+{
+    static RemoteControl::Extension handler;
+    return handler;
+}
+
 } // namespace
+
+void RemoteControl::setExtension (juce::StringArray operations, Extension handler)
+{
+    extensionOperations() = std::move (operations);
+    extensionHandler() = std::move (handler);
+}
 
 struct RemoteControl::Impl final : juce::Thread
 {
@@ -205,6 +223,8 @@ struct RemoteControl::Impl final : juce::Thread
             const auto& s = engine.getSong();
             observe();
             if (op == "status") return status();
+            if (extensionHandler() && extensionOperations().contains (op)) // (round 190np: --demo)
+                return extensionHandler() (op, args);
             if (op == "device.state") return object ({ { "deviceStateHash", engine.remoteDeviceStateHash() } });
             if (op == "changes")
             {
@@ -222,7 +242,12 @@ struct RemoteControl::Impl final : juce::Thread
                 return object ({ { "protocol", protocol }, { "apiVersion", 1 }, { "projectFormat", "lynx-json/1" },
                     { "maxRequestBytes", (int) maxMessage }, { "maxResponseBytes", (int) maxMessage },
                     { "authentication", "hmac-sha256-mutual" }, { "capabilities", status()["capabilities"] },
-                    { "operations", juce::var (juce::StringArray { "api.describe", "status", "changes", "session.inspect", "device.state", "project.read", "project.edit", "pattern.create", "pattern.clone", "pattern.set", "pattern.notes", "plugin.inspect", "effect.catalog", "instrument.catalog", "playlist.inspect", "tempo.set", "mixer.set", "channel.set", "channel.create", "instrument.replace", "pattern.replace_notes", "plugin.parameters_set", "effect.load", "effect.remove", "playlist.edit", "transport.play", "transport.stop", "history.undo", "history.redo" }) } });
+                    { "operations", juce::var ([] {
+                          juce::StringArray ops { "api.describe", "status", "changes", "session.inspect", "device.state", "project.read", "project.edit", "pattern.create", "pattern.clone", "pattern.set", "pattern.notes", "plugin.inspect", "effect.catalog", "instrument.catalog", "playlist.inspect", "tempo.set", "mixer.set", "channel.set", "channel.create", "instrument.replace", "pattern.replace_notes", "plugin.parameters_set", "effect.load", "effect.remove", "playlist.edit", "transport.play", "transport.stop", "history.undo", "history.redo" };
+                          if (extensionHandler())
+                              ops.addArray (extensionOperations()); // (round 190np: --demo)
+                          return ops;
+                      }()) } });
             if (op == "project.read") return projectControl.dispatch (op, args, cancelled);
             if (op == "session.inspect")
                 return inspect();

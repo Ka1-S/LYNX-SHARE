@@ -1,4 +1,5 @@
 #include "ui/SimpleWorkflow.h"
+#include "ui/DemoMode.h"
 
 #include <algorithm>
 
@@ -1473,7 +1474,9 @@ void SimpleWorkflow::addDrums (const std::string& genre, bool steps, bool useTem
     if (sources.config == nullptr)
         return;
     const auto id = genre.empty() ? sources.config->defaultGenre : genre;
-    const auto plan = loopstarter::generate (sources, id, (std::uint64_t) juce::Random::getSystemRandom().nextInt64());
+    // (round 190np: LYNX --demo records tutorials in several languages: the same starter beat in every take)
+    const auto seed = demo::active() ? (std::uint64_t) 190 : (std::uint64_t) juce::Random::getSystemRandom().nextInt64();
+    const auto plan = loopstarter::generate (sources, id, seed);
     simpletracks::Request q;
     q.kind = Kind::drums;
     q.name = trackNameFor (Kind::drums);

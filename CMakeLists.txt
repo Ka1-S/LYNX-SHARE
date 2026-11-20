@@ -641,6 +641,9 @@ if(LYNX_BUILD_APP)
         src/ui/ValueControl.cpp
         src/ui/Dialogs.cpp
         src/ui/SetupWizard.cpp
+        src/ui/Onboarding.cpp
+        src/ui/MainOnboarding.cpp
+        src/ui/DemoMode.cpp
         src/ui/Splash.cpp)
 
     # main window chrome: hint bar and toolbar widgets

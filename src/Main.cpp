@@ -229,6 +229,11 @@
 #include "core/NoteTools.h"
 #include "engine/ProjectPackage.h"
 #include "ui/SetupWizard.h"
+#include "ui/DemoMode.h" // (round 190np)
+#if JUCE_LINUX
+namespace juce::detail { bool dispatchNextMessageOnSystemQueue (bool returnIfNoPendingMessages); } // juce_Messaging_linux.cpp (--onboard190npshot)
+#endif
+#include "ui/Onboarding.h"
 #include "engine/FlStudio.h"
 #include "ui/HistoryPanel.h"
 #include "ui/VersionsPanel.h"
@@ -794,6 +799,11 @@ public:
         // picture route, taken out here so the routes' own arguments keep their places
         const auto args = lynx::shot::takeArguments (juce::StringArray::fromTokens (commandLine, true));
 
+        // round 190np: whether this profile already had LYNX's UI settings before this start (an upgrade keeps what it had:
+        // no welcome card), and --demo (ui/DemoMode.h: the tutorial-video pipeline's automation mode)
+        lynx::onboardui::profileExistedAtStart() = lynx::PluginHost::settingsFolder().getChildFile ("ui-options.txt").existsAsFile();
+        if (args.contains ("--demo"))
+            lynx::demo::setActive (true);
         // interface language: saved in %APPDATA%\LYNX\language.txt; --lang pt-BR overrides it for this run
         lynx::i18n::initialise (args);
         // interface font: saved in Settings › General; --uifont "Name" overrides it for this run
@@ -2812,6 +2822,15 @@ public:
             return;
         }
 
+        if (args.contains ("--onboard190npshot"))
+        {
+            // LYNX --onboard190npshot prefix: round 190np off screen (src/OnboardShot190np.inc): the welcome card, the choices,
+            // the Next-3 card, the empty-state hints, the tips and the Help menu, 100 % and @150, with <prefix>-checks.txt
+            const auto i = args.indexOf ("--onboard190npshot");
+            setApplicationReturnValue (runOnboardShot190np (args[i + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
         if (args.contains ("--details190myshot"))
         {
             // LYNX --details190myshot prefix project.flp: round 190my off screen (src/DetailsShot190my.inc)
@@ -3900,6 +3919,8 @@ public:
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
         lynx::themeui::loadSaved(); // the user's theme (Options › Theme, round 162d)
         startupOptions = lynx::StartupOptions::load();
+        if (lynx::demo::active()) // (round 190np: --demo records from the first frame: no splash card, no start-up sound)
+            startupOptions.splash = startupOptions.sound = false;
         lynx::registerFileTypes();
         startupTrace.mark ("options + file types");
         // Double-clicking a .lynx/.flp opens LYNX with the file as an argument; a path typed in a terminal may be relative
@@ -3958,7 +3979,7 @@ public:
             mainWindow->whenPainted ([this] {
                 openAudioDevice();
                 openMidiDevices();
-                startAfterWindow (false);
+                startAfterWindow (lynx::demo::active()); // (round 190np: --demo has no splash; its first run still gets the welcome card)
             });
             return;
         }
@@ -4102,17 +4123,30 @@ public:
         openStartupFile();
         startupTrace.mark ("startup file opened");
         startOpenTimeProbe();
-        startUpdateCheck();
-        startSupportNote(); // (round 190fq)
+        if (! lynx::demo::active()) // (round 190np: --demo records videos: no update prompt, no support note)
+        {
+            startUpdateCheck();
+            startSupportNote(); // (round 190fq)
+        }
         startupTrace.mark ("after the window: probes, update check scheduled");
         juce::MessageManager::callAsync ([] { startupTrace.mark ("first message loop turn"); });
         markSettled(); // (round 190gd)
         // first run: language, audio, plugin folders (FL Studio's included) and a background scan
         if (! offerSetupWizard)
             return;
-        if (! lynx::setupWizardDone() && lynx::platform::testMode())
-            lynx::platform::testModeLog ("setup wizard");
-        else if (! lynx::setupWizardDone())
+        // round 190np: a fresh profile gets the welcome card ("Where are you coming from?"); a profile that had LYNX's
+        // settings and never finished the old wizard keeps the old wizard; an answered one gets nothing (core/Onboarding.h)
+        const auto action = lynx::onboarding::startAction (lynx::setupWizardDone(), lynx::onboardui::profileExistedAtStart(),
+                                                           mainWindow->getContent().onboardingStateForCheck().pending);
+        using StartAction = lynx::onboarding::StartAction;
+        if (action != StartAction::none && lynx::platform::testMode())
+            lynx::platform::testModeLog (action == StartAction::welcomeCard ? "setup wizard: welcome card" : "setup wizard");
+        else if (action == StartAction::welcomeCard)
+        {
+            mainWindow->getContent().showWelcomeCard (true);
+            startupTrace.mark ("after the window: welcome card shown");
+        }
+        else if (action == StartAction::setupWizard)
         {
             mainWindow->showSetupWizard();
             startupTrace.mark ("after the window: setup wizard shown");
@@ -4249,6 +4283,12 @@ public:
                 });
             lynx::remoteui::setRuntimeStatus (remoteControl != nullptr && remoteControl->active());
         });
+        if (lynx::demo::active()) // round 190np: --demo's view operations (ui.find, ui.click, ui.layout...) on the API
+            lynx::RemoteControl::setExtension (lynx::demo::operations(), [this] (const juce::String& op, const juce::var& args) -> juce::var {
+                if (mainWindow == nullptr)
+                    throw std::runtime_error ("No main window");
+                return mainWindow->getContent().handleDemoOp (op, args);
+            });
         markGraphicsDevice();
     }
 
@@ -17502,6 +17542,7 @@ private:
 #include "DetailsShot190mr.inc" // round 190mr
 #include "DetailsShot190mv.inc" // round 190mv
 #include "DetailsShot190my.inc" // round 190my
+#include "OnboardShot190np.inc" // round 190np
     // --trackautoshot190gz (round 190gz): see the dispatch above
     bool runTrackAutoShot190gz (const juce::String& prefix)
     {

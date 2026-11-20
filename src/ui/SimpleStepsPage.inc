@@ -7,11 +7,13 @@
 // two columns whose state changed repaint.
 
 class SimpleDock::StepsPage final : public juce::Component,
-                                    public juce::SettableTooltipClient
+                                    public juce::SettableTooltipClient,
+                                    public demo::CellSource
 {
 public:
     explicit StepsPage (AudioEngine& e) : engine (e)
     {
+        setComponentID ("simple.dock.drumMachine"); // (round 190np: --demo finds it, and its cells, by this ID)
         setWantsKeyboardFocus (false);
         setRepaintsOnMouseActivity (false);
     }
@@ -94,6 +96,11 @@ public:
     void velocityToolForSnapshot (bool on) { velocityTool = on; repaint(); }
     juce::PopupMenu lengthMenuForSnapshot() const { return lengthMenu(); }
     juce::Rectangle<int> gridBoundsForSnapshot() const { return gridArea; }
+    // round 190np (--demo): a step's cell (row 0 = the bottom row, as drawn), for ui.find / ui.click with "cell"
+    juce::Rectangle<int> demoCellBounds (int row, int column) const override
+    {
+        return row >= 0 && row < (int) rows.size() && column >= 0 && column < steps ? cellBounds (row, column) : juce::Rectangle<int>();
+    }
     // a typing key (BandLab's row keys): plays the row and lights its header; −1 when the key is not one of them
     int channelForKey (int keyCode)
     {
