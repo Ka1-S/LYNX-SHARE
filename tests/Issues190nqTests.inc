@@ -1,6 +1,7 @@
 // Round 190nq: issues #225 (Mixer Left / Right select), #227 (ruler click with every tool, LYNX extra), #228 (the action
 // search, LYNX extra), #230 (FL's "Show fade previews").
 
+#include "core/ActionSearch.h"
 #include "core/ClipOps.h"
 #include "core/KeyMap.h"
 #include "core/LynxExtras.h"
@@ -71,4 +72,37 @@ TEST (issues190nq_227_ruler_click_moves_the_song_position_with_every_tool)
         if (item.id == "playlist.rulerSeeksAnyTool")
             listed = item.settingsKey == "ui-options.txt:rulerSeeksAnyTool";
     CHECK (listed);
+}
+
+TEST (issues190nq_228_action_search_finds_and_ranks)
+{
+    using namespace lynx;
+    std::vector<actionsearch::Entry> e {
+        { "a", "Toggle the metronome", "Toggle the metronome", "Everywhere", "Ctrl+M" },
+        { "b", "Metronome sound", "Metronome sound", "Everywhere", "" },
+        { "c", "Select the next mixer track", "Select the next mixer track", "Mixer", "Right" },
+        { "d", "Metronome-Klang", "Metronome sound (de)", "Überall", "" },
+    };
+    auto ids = [&] (const std::string& q) {
+        std::string s;
+        for (auto i : actionsearch::find (e, q))
+            s += e[(std::size_t) i].id;
+        return s;
+    };
+    CHECK (ids ("") == "abcd");          // everything, in the key map's order
+    CHECK (ids ("metro") == "bda");      // names that start with it first, then names with a word that starts with it
+    CHECK (ids ("mixer next") == "c");   // every word
+    CHECK (ids ("ctrl+m") == "a");       // by its key
+    CHECK (ids ("Mixer") == "c");        // by its panel
+    CHECK (ids ("?") == "abcd");         // ("?" is no wildcard here)
+    CHECK (ids ("zzz").empty());
+
+    // every action of the key map is listed once, with a description
+    std::set<std::string> seen;
+    for (const auto& a : keys::actions())
+    {
+        CHECK (seen.insert (a.id).second);
+        CHECK (a.description != nullptr && *a.description != 0);
+    }
+    CHECK (keys::findAction ("help.searchActions") != nullptr);
 }

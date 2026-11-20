@@ -11927,3 +11927,10 @@ countries: ru by kz
 # --- round 190nq: issue #227 (ruler click with every tool)
 "A click on the ruler moves the song position with every tool" = "Щелчок по линейке перемещает позицию песни любым инструментом"
 "In FL Studio a click on the Playlist's or Piano roll's ruler with the Select or Zoom tool selects or zooms a time range and leaves the song position. On: those tools move the song position too, like the others; Ctrl+drag, a double-click drag or a right drag still select a range. Off by default." = "В FL Studio щелчок по линейке Playlist или Piano roll инструментом «Выделение» или «Масштаб» выделяет или приближает отрезок времени и не меняет позицию песни. Вкл.: эти инструменты тоже перемещают позицию песни, как остальные; Ctrl+перетаскивание, перетаскивание после двойного щелчка или правой кнопкой по-прежнему выделяют отрезок. По умолчанию выкл."
+
+# --- round 190nq: issue #228 (action search)
+"Search every LYNX action and run it" = "Найти любое действие LYNX и выполнить его"
+"Search actions..." = "Поиск действий..."
+"Search every LYNX action: what it does, its panel or its key" = "Найдите любое действие LYNX: что оно делает, его панель или клавишу"
+"{0} action(s)   Up / Down: pick   Enter: run   Esc: close" = "{0} действий   Вверх / Вниз: выбор   Enter: выполнить   Esc: закрыть"
+"That action can't run here: open or click its panel first." = "Это действие нельзя выполнить здесь: сначала откройте его панель или щёлкните по ней."

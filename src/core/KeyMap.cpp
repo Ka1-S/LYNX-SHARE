@@ -179,6 +179,9 @@ std::vector<Action> makeActions()
         { "edit.history", TR_NOOP ("Undo history"), Context::global, { chord ('H', ctrl | alt) } },
         { "tools.stopSound", TR_NOOP ("Stop sound (all notes off)"), Context::global, { chord ('H', ctrl) } },
         { "help.shortcuts", TR_NOOP ("Shortcut sheet (press again to close)"), Context::global, { chord (f1) } },
+        // #228 (round 190nq, LYNX extra): the action search. "?" opens it wherever the Clip-launch Info View (Live's "?")
+        // doesn't use the key (MainComponent::keyPressed); no other key until the user gives it one
+        { "help.searchActions", TR_NOOP ("Search every LYNX action and run it"), Context::global, {} },
         { "browser.search", TR_NOOP ("Search the Browser"), Context::global, { chord ('F', ctrl) } },
 
         // Channel Rack (focused)

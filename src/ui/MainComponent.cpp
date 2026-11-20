@@ -130,6 +130,7 @@
 #include "engine/AacEncoder.h"
 #include "ui/AudioCheck.h"
 #include "ui/AlsExportDialog.h"
+#include "ui/ActionSearch.h" // round 190nq (#228)
 #include "ui/DawProjectExport.h" // round 190jf (B22)
 #include "ui/OtherAppsExport.h"
 #include "ui/FlStudioExportDialog.h"
@@ -2148,6 +2149,15 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     if (const auto action = keyMap.find (chord, focusContext(), pianoKeys); ! action.empty() && runAction (action))
         return true;
 
+    // #228 (round 190nq, LYNX extra): "?" (on any keyboard layout) that nothing above used — the Clip-launch Info View
+    // keeps it in Live's look — opens the action search
+    if (key.getTextCharacter() == '?' && ! key.getModifiers().isCommandDown() && ! key.getModifiers().isAltDown()
+        && dynamic_cast<juce::TextEditor*> (juce::Component::getCurrentlyFocusedComponent()) == nullptr)
+    {
+        showActionSearch();
+        return true;
+    }
+
     // issue #217 (round 190ng): Esc that nothing above used closes the focused panel, as FL 2026 (core/EscClose.h)
     if (key.isKeyCode (juce::KeyPress::escapeKey) && ! key.getModifiers().isAnyModifierKeyDown() && focused != Panel::browser
         && escclose::closesPanel (escclose::enabled(), layoutStyle == layoutstyle::Style::pattern, panelShown))
@@ -2252,6 +2262,30 @@ bool MainComponent::keyFromPluginView (const juce::KeyPress& key, bool optionOn)
     if (typingKey (key).taken)
         return keyPressed (key);
     return optionOn && keyFromSecondaryWindow (key);
+}
+
+// #228 (round 190nq): the action search over the main window ("?"); Enter runs the action as its keys would
+void MainComponent::showActionSearch()
+{
+    if (actionSearch != nullptr)
+        return;
+    actionSearch = std::make_unique<ActionSearchOverlay> (keyMap, [this] (const std::string& id) {
+        if (id == "help.searchActions")
+            return true;
+        return runAction (id);
+    });
+    actionSearch->onClose = [safe = juce::Component::SafePointer<MainComponent> (this)] {
+        juce::MessageManager::callAsync ([safe] {
+            if (safe != nullptr && safe->actionSearch != nullptr)
+            {
+                safe->actionSearch = nullptr;
+                safe->grabKeyboardFocus();
+            }
+        });
+    };
+    addAndMakeVisible (*actionSearch);
+    actionSearch->setBounds (getLocalBounds());
+    actionSearch->toFront (false);
 }
 
 bool MainComponent::runAction (const std::string& id)
@@ -2618,6 +2652,8 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("edit.undo")) flUndo();
     else if (is ("edit.undoBackwards")) flUndoBackwards();
     else if (is ("edit.redo")) undoRedo (true);
+    else if (is ("help.searchActions")) // #228 (round 190nq)
+        showActionSearch();
     else if (is ("help.shortcuts"))
     {
         if (helpWindow != nullptr) // F1 again closes the sheet (issue #23)
@@ -10297,6 +10333,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             });
             menu.addSeparator();
         }
+        menu.addItem (tr ("Search actions...") + "\t?", [this] { showActionSearch(); }); // #228 (round 190nq)
         menu.addItem (tr ("Shortcuts") + shortcutText ("help.shortcuts"), [this] { showHelp(); });
         menu.addItem (tr ("Missing files..."), [this] { showMissingFiles (false); });
         menu.addItem (tr ("Last project import report"), [this] {

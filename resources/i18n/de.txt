@@ -11927,3 +11927,10 @@ countries: de at ch li lu
 # --- round 190nq: issue #227 (ruler click with every tool)
 "A click on the ruler moves the song position with every tool" = "Ein Klick auf das Lineal bewegt die Song-Position mit jedem Werkzeug"
 "In FL Studio a click on the Playlist's or Piano roll's ruler with the Select or Zoom tool selects or zooms a time range and leaves the song position. On: those tools move the song position too, like the others; Ctrl+drag, a double-click drag or a right drag still select a range. Off by default." = "In FL Studio wählt ein Klick auf das Lineal der Playlist oder des Piano Rolls mit dem Auswahl- oder Zoom-Werkzeug einen Zeitbereich aus oder zoomt ihn und lässt die Song-Position stehen. Ein: diese Werkzeuge bewegen die Song-Position auch, wie die anderen; Strg+Ziehen, Ziehen nach Doppelklick oder Ziehen mit der rechten Taste wählen weiterhin einen Bereich. Standardmäßig aus."
+
+# --- round 190nq: issue #228 (action search)
+"Search every LYNX action and run it" = "Jede LYNX-Aktion suchen und ausführen"
+"Search actions..." = "Aktionen suchen..."
+"Search every LYNX action: what it does, its panel or its key" = "Jede LYNX-Aktion suchen: was sie tut, ihr Bereich oder ihre Taste"
+"{0} action(s)   Up / Down: pick   Enter: run   Esc: close" = "{0} Aktionen   Auf / Ab: wählen   Enter: ausführen   Esc: schließen"
+"That action can't run here: open or click its panel first." = "Diese Aktion kann hier nicht laufen: öffne oder klicke zuerst ihren Bereich."

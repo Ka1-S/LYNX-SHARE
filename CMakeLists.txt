@@ -688,6 +688,7 @@ if(LYNX_BUILD_APP)
         src/ui/KeyFocus.cpp
         src/ui/PluginManager.cpp
         src/ui/ShortcutManager.cpp
+        src/ui/ActionSearch.cpp
         src/ui/NewProjectDialog.cpp
         src/ui/ClipProperties.cpp
         src/ui/PluginMonitorWindow.cpp
