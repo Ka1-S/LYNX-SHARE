@@ -7511,7 +7511,9 @@ private:
             else if (const auto& m16 = parsed["mixer"][16]["effects"];
                      ! said ("Effector's Kilohearts laws") || ! said ("Launched pattern clips play without their pattern's events")
                      || m16[40]["params"].size() > lynx::khsdsp::lawParam || parsed["patterns"][0]["events"].size() != 1)
-                rollup030Result = "ERROR step-14 items";
+                rollup030Result = juce::String ("ERROR step-14 items (") + (said ("Effector's Kilohearts laws") ? "" : "no Kilohearts line, ")
+                                  + (said ("Launched pattern clips play without their pattern's events") ? "" : "no launched-clip line, ")
+                                  + "Effector params " + juce::String (m16[40]["params"].size()) + ", events " + juce::String (parsed["patterns"][0]["events"].size()) + ")";
             else if (const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.28");
                      ! plain.ok || std::any_of (plain.lost.begin(), plain.lost.end(), [] (const lynx::olderlynx::Loss& l) {
                          const auto t = juce::String (l.text);

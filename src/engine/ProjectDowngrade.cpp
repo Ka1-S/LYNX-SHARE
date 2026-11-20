@@ -1123,13 +1123,15 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
         });
         if (auto* slots = arrayOf (root["clipGrid"]["clips"]))
             for (const auto& s : *slots)
-                if (const auto* c = arrayOf (s["clip"]); c != nullptr && c->size() >= 4 && (c->size() < 7 || (int) (*c)[5] == 0))
-                {
-                    const auto pattern = (int) (*c)[0];
-                    const auto& p = root["patterns"][pattern];
-                    if (const auto* lanes = arrayOf (p["events"]); lanes != nullptr && ! lanes->isEmpty())
-                        addOnce (launchedEvents, p["name"].toString().isNotEmpty() ? "\"" + p["name"].toString() + "\"" : "#" + juce::String (pattern + 1));
-                }
+                if (const auto* list = arrayOf (s["clip"])) // (the slot's clip in the Playlist's clip form: a list of one)
+                    for (const auto& one : *list)
+                        if (const auto* c = arrayOf (one); c != nullptr && c->size() >= 4 && (c->size() < 6 || (int) (*c)[5] == 0))
+                        {
+                            const auto pattern = (int) (*c)[0];
+                            const auto& p = root["patterns"][pattern];
+                            if (const auto* lanes = arrayOf (p["events"]); lanes != nullptr && ! lanes->isEmpty())
+                                addOnce (launchedEvents, p["name"].toString().isNotEmpty() ? "\"" + p["name"].toString() + "\"" : "#" + juce::String (pattern + 1));
+                        }
         if (! khsLaws.isEmpty())
             lost.push_back ({ TR_NOOP ("Effector's Kilohearts laws (the Ring Mod, Reverser, Resonator, Phase Distortion and Shaper stand-ins) play Effector's own algorithm: {0}"), listOf (khsLaws), true });
         if (! launchedEvents.isEmpty())
