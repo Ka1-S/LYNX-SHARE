@@ -54,6 +54,8 @@ CORE="$CORE src/core/PocketSuperSaw.cpp"
 CORE="$CORE src/core/FmSynth.cpp src/core/AlsDevicesFm.cpp"
 # LYNX Model: LYNX's own physical-modelling instrument, mallets on a modal core (round 190ni)
 CORE="$CORE src/core/physmod/ModalBank.cpp src/core/physmod/LynxModel.cpp src/core/LynxModelBank.cpp"
+# Track clips: "Clips own their notes" on FL's instrument tracks (round 190ne)
+CORE="$CORE src/core/TrackClips.cpp"
 # Helix: LYNX's own wavetable synth and the import of Live's Wavetable onto it (round 190ja)
 CORE="$CORE src/core/WavetableSynth.cpp src/core/WavetableTables.cpp src/core/WavetableUser.cpp src/core/AlsDevicesWt.cpp"
 # Braid (Live's Meld) and the spectral effects' import, round 190ko
