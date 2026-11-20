@@ -13074,6 +13074,9 @@ bool PlaylistComponent::handleKey (const juce::KeyPress& key)
 
     if (code == juce::KeyPress::escapeKey)
     {
+        // (issue #217, round 190ng: an Esc with nothing selected is left to the main window, which closes the Playlist as FL)
+        if (selection.empty())
+            return false;
         setSelection ({});
         return true;
     }

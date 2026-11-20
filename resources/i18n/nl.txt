@@ -11865,3 +11865,6 @@ countries: nl be
 "Snap on/off (the main snap)" = "Snap aan/uit (de hoofdsnap)"
 "Snap on/off, from any window (the main snap)" = "Snap aan/uit, vanuit elk venster (de hoofdsnap)"
 "Snap (magnet): [LMB] turns the snap off and back on; lit while it snaps. The Playlist and Piano Roll snap boxes show the same magnet" = "Snap (magneet): [LMB] zet de snap uit en weer aan; brandt zolang hij snapt. De snapvakjes van de Playlist en de Pianorol tonen dezelfde magneet"
+"Windows" = "Vensters"
+"As in FL Studio, on by default: Esc closes the focused Playlist, Channel rack, Piano roll or Mixer (Pattern layout) and plugin and tool windows. While the Playlist or the Piano roll has a selection, the first Esc clears it. Off: Esc leaves the windows open. Also on the General page." = "Net als in FL Studio standaard aan: Esc sluit de gefocuste Playlist, Channel Rack, Pianorol of Mixer (Pattern-indeling) en plugin- en toolvensters. Als de Playlist of de Pianorol een selectie heeft, wist de eerste Esc die. Uit: Esc laat de vensters open. Ook op de pagina Algemeen."
+"Esc closes the focused window" = "Esc sluit het gefocuste venster"

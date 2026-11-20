@@ -1,4 +1,5 @@
 #include "ui/WorkflowExtras.h"
+#include "core/EscClose.h"
 
 #include "core/LaneView.h"
 #include "core/LayoutStyle.h"
@@ -81,6 +82,8 @@ bool readUiOption (const juce::String& key, bool on)
         transportedit::setWGoesToStart (on);
     else if (key == "simpleLoopDetect") // round 190kx: Simple drops take the tempo and key found in the audio
         loopanalysis::dropDetects() = on;
+    else if (key == "escClosesWindows") // issue #217 (round 190ng): FL's Esc closes the focused window
+        escclose::enabled() = on;
     else
         return false;
     return true;
@@ -103,7 +106,8 @@ juce::String uiOptionsText()
            + "\npointerClickButton=" + juce::String (pointerclick::buttonShown ? 1 : 0) + "\npointerClick=" + juce::String (pointerclick::on ? 1 : 0)
            + "\nclipLanesPattern=" + juce::String (cliplanes::patternOn ? 1 : 0) + "\nclipLanesLive=" + juce::String (cliplanes::liveOn ? 1 : 0)
            + "\nwToStart=" + juce::String (transportedit::wGoesToStart() ? 1 : 0) // (round 190jz, issue #195)
-           + "\nsimpleLoopDetect=" + juce::String (loopanalysis::dropDetects().load() ? 1 : 0); // (round 190kx)
+           + "\nsimpleLoopDetect=" + juce::String (loopanalysis::dropDetects().load() ? 1 : 0) // (round 190kx)
+           + "\nescClosesWindows=" + juce::String (escclose::enabled() ? 1 : 0); // (round 190ng, issue #217)
 }
 
 std::optional<bool> extraOn (std::string_view id)
@@ -126,6 +130,8 @@ std::optional<bool> extraOn (std::string_view id)
         return transportedit::wGoesToStart();
     if (id == "simple.loopDetect") // round 190kx
         return loopanalysis::dropDetects().load();
+    if (id == "general.escCloses") // round 190ng (issue #217)
+        return escclose::enabled();
     return std::nullopt;
 }
 
@@ -153,6 +159,8 @@ bool setExtra (std::string_view id, bool on)
         transportedit::setWGoesToStart (on);
     else if (id == "simple.loopDetect") // round 190kx
         loopanalysis::dropDetects() = on;
+    else if (id == "general.escCloses") // round 190ng (issue #217)
+        escclose::enabled() = on;
     else
         return false;
     if (onChanged)

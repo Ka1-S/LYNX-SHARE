@@ -11865,3 +11865,6 @@ countries: fr be ch ca lu
 "Snap on/off (the main snap)" = "Magnétisme activé/désactivé (le magnétisme principal)"
 "Snap on/off, from any window (the main snap)" = "Magnétisme activé/désactivé, depuis n'importe quelle fenêtre (le magnétisme principal)"
 "Snap (magnet): [LMB] turns the snap off and back on; lit while it snaps. The Playlist and Piano Roll snap boxes show the same magnet" = "Magnétisme (aimant) : [LMB] désactive puis réactive le magnétisme ; allumé quand il accroche. Les cases de magnétisme de la Playlist et du Piano roll montrent le même aimant"
+"Windows" = "Fenêtres"
+"As in FL Studio, on by default: Esc closes the focused Playlist, Channel rack, Piano roll or Mixer (Pattern layout) and plugin and tool windows. While the Playlist or the Piano roll has a selection, the first Esc clears it. Off: Esc leaves the windows open. Also on the General page." = "Comme dans FL Studio, activé par défaut : Esc ferme la Playlist, le Channel Rack, le Piano roll ou le Mixer (disposition Pattern) au premier plan, ainsi que les fenêtres de plugins et d'outils. Quand la Playlist ou le Piano roll a une sélection, le premier Esc l'efface. Désactivé : Esc laisse les fenêtres ouvertes. Aussi dans la page Général."
+"Esc closes the focused window" = "Esc ferme la fenêtre active"

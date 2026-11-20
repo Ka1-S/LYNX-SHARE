@@ -11865,3 +11865,6 @@ countries: id
 "Snap on/off (the main snap)" = "Snap aktif/nonaktif (snap utama)"
 "Snap on/off, from any window (the main snap)" = "Snap aktif/nonaktif, dari jendela mana pun (snap utama)"
 "Snap (magnet): [LMB] turns the snap off and back on; lit while it snaps. The Playlist and Piano Roll snap boxes show the same magnet" = "Snap (magnet): [LMB] mematikan dan menyalakan kembali snap; menyala saat snap bekerja. Kotak snap Playlist dan Piano roll menampilkan magnet yang sama"
+"Windows" = "Jendela"
+"As in FL Studio, on by default: Esc closes the focused Playlist, Channel rack, Piano roll or Mixer (Pattern layout) and plugin and tool windows. While the Playlist or the Piano roll has a selection, the first Esc clears it. Off: Esc leaves the windows open. Also on the General page." = "Seperti di FL Studio, aktif secara default: Esc menutup Playlist, Channel Rack, Piano roll, atau Mixer (layout Pattern) yang sedang fokus serta jendela plugin dan alat. Saat Playlist atau Piano roll memiliki seleksi, Esc pertama menghapusnya. Nonaktif: Esc membiarkan jendela tetap terbuka. Juga ada di halaman Umum."
+"Esc closes the focused window" = "Esc menutup jendela yang sedang fokus"

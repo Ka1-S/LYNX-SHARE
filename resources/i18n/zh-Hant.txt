@@ -11865,3 +11865,6 @@ countries: tw hk mo
 "Snap on/off (the main snap)" = "貼齊開/關（主貼齊）"
 "Snap on/off, from any window (the main snap)" = "貼齊開/關，可在任何視窗使用（主貼齊）"
 "Snap (magnet): [LMB] turns the snap off and back on; lit while it snaps. The Playlist and Piano Roll snap boxes show the same magnet" = "貼齊（磁鐵）：[LMB] 可關閉並重新開啟貼齊；貼齊時亮起。播放清單和鋼琴捲簾的貼齊方塊顯示同一塊磁鐵"
+"Windows" = "視窗"
+"As in FL Studio, on by default: Esc closes the focused Playlist, Channel rack, Piano roll or Mixer (Pattern layout) and plugin and tool windows. While the Playlist or the Piano roll has a selection, the first Esc clears it. Off: Esc leaves the windows open. Also on the General page." = "與 FL Studio 一樣，預設開啟：Esc 會關閉取得焦點的播放清單、通道機架、鋼琴捲簾或混音器（樣式版面）以及外掛程式和工具視窗。播放清單或鋼琴捲簾中有選取範圍時，第一次按 Esc 會清除選取。關閉後：Esc 會讓視窗保持開啟。「一般」頁面中也有此選項。"
+"Esc closes the focused window" = "Esc 會關閉取得焦點的視窗"

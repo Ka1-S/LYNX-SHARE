@@ -11994,3 +11994,6 @@ countries: br
 "Snap on/off (the main snap)" = "Grade ligada/desligada (a grade principal)"
 "Snap on/off, from any window (the main snap)" = "Grade ligada/desligada, de qualquer janela (a grade principal)"
 "Snap (magnet): [LMB] turns the snap off and back on; lit while it snaps. The Playlist and Piano Roll snap boxes show the same magnet" = "Grade (ímã): [LMB] desliga e religa a grade; acesa enquanto ela prende. As caixas de grade da Playlist e do Piano roll mostram o mesmo ímã"
+"Windows" = "Janelas"
+"As in FL Studio, on by default: Esc closes the focused Playlist, Channel rack, Piano roll or Mixer (Pattern layout) and plugin and tool windows. While the Playlist or the Piano roll has a selection, the first Esc clears it. Off: Esc leaves the windows open. Also on the General page." = "Como no FL Studio, ligado por padrão: Esc fecha a Playlist, o Channel Rack, o Piano roll ou o Mixer (layout Pattern) em foco e as janelas de plugins e ferramentas. Enquanto a Playlist ou o Piano roll tem uma seleção, o primeiro Esc a limpa. Desligado: Esc deixa as janelas abertas. Também na página Geral."
+"Esc closes the focused window" = "Esc fecha a janela em foco"

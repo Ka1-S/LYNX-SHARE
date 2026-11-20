@@ -11865,3 +11865,6 @@ countries: ru by kz
 "Snap on/off (the main snap)" = "Привязка вкл/выкл (основная привязка)"
 "Snap on/off, from any window (the main snap)" = "Привязка вкл/выкл из любого окна (основная привязка)"
 "Snap (magnet): [LMB] turns the snap off and back on; lit while it snaps. The Playlist and Piano Roll snap boxes show the same magnet" = "Привязка (магнит): [LMB] выключает и снова включает привязку; горит, пока привязывает. Поля привязки в Playlist и Пианоролле показывают тот же магнит"
+"Windows" = "Окна"
+"As in FL Studio, on by default: Esc closes the focused Playlist, Channel rack, Piano roll or Mixer (Pattern layout) and plugin and tool windows. While the Playlist or the Piano roll has a selection, the first Esc clears it. Off: Esc leaves the windows open. Also on the General page." = "Как в FL Studio, по умолчанию включено: Esc закрывает окно Playlist, Channel Rack, Пианоролл или Mixer (раскладка Pattern) в фокусе, а также окна плагинов и инструментов. Если в Playlist или Пианоролле есть выделение, первое нажатие Esc снимает его. Выключено: Esc оставляет окна открытыми. Также на странице «Общие»."
+"Esc closes the focused window" = "Esc закрывает окно в фокусе"

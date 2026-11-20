@@ -11865,3 +11865,6 @@ countries: pl
 "Snap on/off (the main snap)" = "Przyciąganie wł./wył. (główne przyciąganie)"
 "Snap on/off, from any window (the main snap)" = "Przyciąganie wł./wył. z dowolnego okna (główne przyciąganie)"
 "Snap (magnet): [LMB] turns the snap off and back on; lit while it snaps. The Playlist and Piano Roll snap boxes show the same magnet" = "Przyciąganie (magnes): [LMB] wyłącza i ponownie włącza przyciąganie; świeci, gdy przyciąga. Pola przyciągania w Playlist i Piano roll pokazują ten sam magnes"
+"Windows" = "Okna"
+"As in FL Studio, on by default: Esc closes the focused Playlist, Channel rack, Piano roll or Mixer (Pattern layout) and plugin and tool windows. While the Playlist or the Piano roll has a selection, the first Esc clears it. Off: Esc leaves the windows open. Also on the General page." = "Tak jak w FL Studio, domyślnie włączone: Esc zamyka aktywne okno Playlist, Channel Rack, Piano roll lub Mixer (układ Pattern) oraz okna wtyczek i narzędzi. Gdy Playlist lub Piano roll ma zaznaczenie, pierwszy Esc je czyści. Wyłączone: Esc zostawia okna otwarte. Także na stronie Ogólne."
+"Esc closes the focused window" = "Esc zamyka aktywne okno"

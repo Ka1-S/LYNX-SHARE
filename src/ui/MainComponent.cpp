@@ -1,5 +1,6 @@
 #include "ui/ControllerBridge.h"
 #include "ui/KeyFocus.h"
+#include "core/EscClose.h"
 #include "core/DetailChain.h"
 #include "core/MeterScale.h"
 #include "core/FactoryContent.h"
@@ -2097,6 +2098,15 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     // 4. the key map
     if (const auto action = keyMap.find (chord, focusContext(), pianoKeys); ! action.empty() && runAction (action))
         return true;
+
+    // issue #217 (round 190ng): Esc that nothing above used closes the focused panel, as FL 2026 (core/EscClose.h)
+    if (key.isKeyCode (juce::KeyPress::escapeKey) && ! key.getModifiers().isAnyModifierKeyDown() && focused != Panel::browser
+        && escclose::closesPanel (escclose::enabled(), layoutStyle == layoutstyle::Style::pattern, panelShown))
+    {
+        workspace.hide (focused);
+        refreshPanelButtons();
+        return true;
+    }
 
     // 5. issue #182: in the Browser, a typed character no key above took jumps to the row that starts with it (the
     // typing piano, FL's L / R and the hot-swap Q keep their keys)

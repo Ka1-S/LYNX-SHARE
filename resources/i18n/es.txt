@@ -11865,3 +11865,6 @@ countries: es mx ar co cl pe ve
 "Snap on/off (the main snap)" = "Ajuste activado/desactivado (el ajuste principal)"
 "Snap on/off, from any window (the main snap)" = "Ajuste activado/desactivado, desde cualquier ventana (el ajuste principal)"
 "Snap (magnet): [LMB] turns the snap off and back on; lit while it snaps. The Playlist and Piano Roll snap boxes show the same magnet" = "Ajuste (imán): [LMB] desactiva y vuelve a activar el ajuste; encendido mientras ajusta. Las casillas de ajuste de la Playlist y del Piano roll muestran el mismo imán"
+"Windows" = "Ventanas"
+"As in FL Studio, on by default: Esc closes the focused Playlist, Channel rack, Piano roll or Mixer (Pattern layout) and plugin and tool windows. While the Playlist or the Piano roll has a selection, the first Esc clears it. Off: Esc leaves the windows open. Also on the General page." = "Como en FL Studio, activado por defecto: Esc cierra la Playlist, el Channel Rack, el Piano roll o el Mixer (disposición Pattern) con el foco, y las ventanas de plugins y herramientas. Mientras la Playlist o el Piano roll tienen una selección, el primer Esc la borra. Desactivado: Esc deja las ventanas abiertas. También en la página General."
+"Esc closes the focused window" = "Esc cierra la ventana con el foco"

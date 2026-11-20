@@ -11865,3 +11865,6 @@ countries: kr
 "Snap on/off (the main snap)" = "스냅 켜기/끄기 (메인 스냅)"
 "Snap on/off, from any window (the main snap)" = "모든 창에서 스냅 켜기/끄기 (메인 스냅)"
 "Snap (magnet): [LMB] turns the snap off and back on; lit while it snaps. The Playlist and Piano Roll snap boxes show the same magnet" = "스냅 (자석): [LMB]로 스냅을 껐다 켭니다. 스냅 중에는 불이 켜집니다. 플레이리스트와 피아노 롤의 스냅 상자에도 같은 자석이 표시됩니다"
+"Windows" = "창"
+"As in FL Studio, on by default: Esc closes the focused Playlist, Channel rack, Piano roll or Mixer (Pattern layout) and plugin and tool windows. While the Playlist or the Piano roll has a selection, the first Esc clears it. Off: Esc leaves the windows open. Also on the General page." = "FL Studio처럼 기본값은 켜짐입니다. Esc는 포커스된 플레이리스트, 채널 랙, 피아노 롤, 믹서(Pattern 레이아웃)와 플러그인 및 도구 창을 닫습니다. 플레이리스트나 피아노 롤에 선택 영역이 있으면 첫 번째 Esc가 선택을 해제합니다. 끄면 Esc는 창을 열어 둡니다. 일반 페이지에도 있습니다."
+"Esc closes the focused window" = "Esc는 포커스된 창을 닫습니다"

@@ -1,3 +1,4 @@
+#include "core/EscClose.h"
 #include "ui/ToolWindow.h"
 
 #include "ui/Theme.h"
@@ -23,7 +24,7 @@ public:
 
     bool keyPressed (const juce::KeyPress& k) override
     {
-        if (k == juce::KeyPress::escapeKey)
+        if (k == juce::KeyPress::escapeKey && escclose::enabled()) // (issue #217: the switch keeps it open)
         {
             closeSoon();
             return true;
