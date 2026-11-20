@@ -1048,7 +1048,7 @@ juce::String paintCacheSelfTest()
         // plate's; reported, not a failure. The alpha must be applied once: the plates' middles are the same.)
         detail << ", translucent plates " << worst << " at a corner";
     }
-    // round 190ms (JUCE fix 190ms): the software renderer builds a path's edge table over the clip cut to the path's
+    // round 190ms (JUCE fix 45): the software renderer builds a path's edge table over the clip cut to the path's
     // bounds + 1 px (not the whole clip), and copies an RGB image's rows into ARGB pixels four bytes at a time
     if (const auto renderer = softwareRendererSelfTest(); renderer != "OK")
         return renderer;
@@ -1056,7 +1056,7 @@ juce::String paintCacheSelfTest()
     return "OK (" + detail + ")";
 }
 
-// Round 190ms: the two claims JUCE fix 190ms rests on (cmake/LynxPatchJuce.cmake), checked with JUCE's own classes:
+// Round 190ms: the two claims JUCE fix 45 rests on (cmake/LynxPatchJuce.cmake), checked with JUCE's own classes:
 // (a) an edge table built over the clip's rows from one above the path's bounds to one below (every column of the clip)
 //     covers every pixel as the one built over the whole clip does (shapes at sub-pixel places, strokes, ellipses, curves
 //     of many nearly flat segments, scaled; clips that cut through them or not). Not its columns: EdgeTable extrapolates
@@ -1121,7 +1121,7 @@ juce::String softwareRendererSelfTest()
         const auto pathArea = path.getBoundsTransformed (transform).getSmallestIntegerContainer();
         if (! pathArea.intersects (clip))
             continue;
-        // (fix 190ms: the clip's rows from one above the path's to one below; every column of the clip)
+        // (fix 45: the clip's rows from one above the path's to one below; every column of the clip)
         const auto rows = juce::Rectangle<int>::leftTopRightBottom (clip.getX(), juce::jmax (clip.getY(), pathArea.getY() - 1), clip.getRight(),
                                                                    juce::jmin (clip.getBottom(), pathArea.getBottom() + 1));
         std::vector<int> whole ((std::size_t) (W * H), 0), cut ((std::size_t) (W * H), 0);
