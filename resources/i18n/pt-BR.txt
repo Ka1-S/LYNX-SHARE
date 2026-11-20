@@ -12105,3 +12105,24 @@ countries: br
 "The sequence has no notes: turn on the gate of a step first" = "A sequência não tem notas: ligue o gate de um passo primeiro"
 "Copied {0} notes of the sequence: Ctrl+V pastes them in the Piano roll" = "{0} notas da sequência copiadas: Ctrl+V cola no Piano roll"
 "Export the sequence as a MIDI file" = "Exportar a sequência como arquivo MIDI"
+
+# --- round 190nq: Discord 11-18 (Missing files text for projects not from FL)
+"{0} plugin(s) will not sound as they did when the project was saved (not installed, not loaded, or without their settings): see what LYNX SHARE did with each." = "{0} plugin(s) não vão soar como quando o projeto foi salvo (não instalados, não carregados ou sem as configurações): veja o que o LYNX SHARE fez com cada um."
+
+# --- round 190nq: issue #225 (Mixer: Left / Right select)
+"Select the previous mixer track" = "Selecionar a faixa do mixer anterior"
+"Select the next mixer track" = "Selecionar a próxima faixa do mixer"
+
+# --- round 190nq: issue #227 (ruler click with every tool)
+"A click on the ruler moves the song position with every tool" = "Um clique na régua move a posição da música com qualquer ferramenta"
+"In FL Studio a click on the Playlist's or Piano roll's ruler with the Select or Zoom tool selects or zooms a time range and leaves the song position. On: those tools move the song position too, like the others; Ctrl+drag, a double-click drag or a right drag still select a range. Off by default. Also in the Playlist ruler's right-click menu." = "No FL Studio, um clique na régua da Playlist ou do Piano roll com a ferramenta Seleção ou Zoom seleciona ou amplia um trecho de tempo e não muda a posição da música. Ligado: essas ferramentas também movem a posição da música, como as outras; Ctrl+arrastar, arrastar com clique duplo ou arrastar com o botão direito continuam selecionando um trecho. Desligado por padrão. Também no menu do botão direito da régua da Playlist."
+
+# --- round 190nq: issue #228 (action search)
+"Search every LYNX action and run it" = "Pesquisar qualquer ação do LYNX e executá-la"
+"Search actions..." = "Pesquisar ações..."
+"Search every LYNX action: what it does, its panel or its key" = "Pesquise qualquer ação do LYNX: o que ela faz, seu painel ou sua tecla"
+"{0} action(s)   Up / Down: pick   Enter: run   Esc: close" = "{0} ações   Cima / Baixo: escolher   Enter: executar   Esc: fechar"
+"That action can't run here: open or click its panel first." = "Essa ação não pode ser executada aqui: abra ou clique no painel dela primeiro."
+
+# --- round 190nq: issue #230 (Show fade previews)
+"Show fade previews" = "Mostrar prévias de fade"

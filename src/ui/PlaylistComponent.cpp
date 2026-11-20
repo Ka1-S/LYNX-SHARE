@@ -927,8 +927,12 @@ PlaylistComponent::CacheShift PlaylistComponent::cacheShift (const CacheView& fr
                 shift.stickyTitles.add (titles);
         }
     }
-    else
-        shift.area = { 0, headerHeight, grid.getRight(), grid.getHeight() };
+    else // (#193, round 190nq: from the clip tracks' top, not the ruler's foot: the pinned video lanes between them stay put;
+         // from headerHeight the picture slid them down with the tracks, and the rows at the bottom were never shifted)
+    {
+        static const bool fix193 = [] { const auto* v = std::getenv ("LYNX_FIX193"); return v == nullptr || juce::String (v) != "0"; }(); // (0: the old area, A/B)
+        shift.area = { 0, fix193 ? grid.getY() : headerHeight, grid.getRight(), grid.getHeight() };
+    }
     shift.dx = dx;
     shift.dy = dy;
     if (std::abs (dx) >= shift.area.getWidth() || std::abs (dy) >= shift.area.getHeight())
@@ -2974,13 +2978,16 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 // issue #222 (round 190ng): FL 2026 also draws a track's icon big in the middle of a tall header (captured
                 // 2026-11-19 with Alt+wheel zoom: rows 56 / 68 / 80 px none, 92 / 104 / 116 px a centred icon of half the
                 // row's height in the plate's colour x 0.85); the small icon stays where it is (core/TrackIconScale.h)
+                // (#222 follow-up, round 190nq: with the LYNX extra's insert effects column shown, the icon is centred in the
+                // name / controls part of the header, the column left out: trackiconscale::bigIconArea)
+                const auto iconArea = trackiconscale::bigIconArea (plateArea.getX(), plateArea.getWidth(), (float) insertsColumn());
                 if (! live && ! simpleHeaders)
-                    if (const auto big = trackiconscale::bigIconSize (trackHeight, (int) plateArea.getWidth()); big > 0)
+                    if (const auto big = trackiconscale::bigIconSize (trackHeight, (int) iconArea.second); big > 0)
                         if (const auto icon = trackicons::iconFor (t < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) t].icon : 0);
                             icon != trackicons::Icon::none)
                         {
                             const auto box = juce::Rectangle<float> ((float) big, (float) big)
-                                                 .withCentre ({ plateArea.getCentreX(), (float) y + (float) trackHeight * 0.5f });
+                                                 .withCentre ({ iconArea.first + iconArea.second * 0.5f, (float) y + (float) trackHeight * 0.5f });
                             ui::drawTrackIcon (g, icon, box, trackiconscale::shade (plate));
                         }
                 // round 190ne (core/TrackClips.h, LYNX's own marks): a track whose clips own their notes (a note) and a bus
@@ -3678,6 +3685,9 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
             style.gain = juce::jmin (style.gain, 8.0f);
         if (fl || liveLook)
             style.silenceLine = style.classic; // FL's 1 px silence line, in the waveform's colour (Live draws one too: audiolane y 476)
+        // #230 (round 190nq): FL's View › "Show fade previews" (on by default): the waveform with the clip's fades applied
+        if (showFadePreviews && (c.effectiveFadeIn() > 0 || c.effectiveFadeOut() > 0))
+            style.envelope = [&c, left = r.getX(), ppt = pixelsPerTick] (float x) { return clipops::fadePreviewGain (c, (double) (x - left) / ppt); };
         const uitrace::Part tally (uitrace::part::waveform);
         // warp markers that bend the tempo (round 175a): each stretch between two markers drawn at its own speed
         auto markers = forward ? warpedit::playedMarkers (channel.sampler, total / summary->sampleRate) : std::vector<WarpPoint> {};
@@ -6176,6 +6186,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         press.mods = fl;
         press.clicks = e.getNumberOfClicks();
         press.tool = tools.getTool();
+        press.anyToolSeeks = ruler::seekWithAnyTool(); // #227 (round 190nq, LYNX extra)
         press.onMarkerTag = markerHit >= 0;
         press.hasSelection = song.hasLoop();
         press.insideSelection = song.hasLoop() && xToTick (e.x) >= (double) song.loopStart && xToTick (e.x) < (double) song.loopEnd;
@@ -10449,6 +10460,11 @@ void PlaylistComponent::showRulerMenu (int x)
             engine.performanceCommand (c);
         });
     }
+
+    // #227 (round 190nq): the LYNX extra "A click on the ruler moves the song position with every tool", also here
+    menu.addSeparator();
+    menu.addItem (tr ("A click on the ruler moves the song position with every tool"), true, ruler::seekWithAnyTool(),
+                  [] { workflowextras::setExtra ("playlist.rulerSeeksAnyTool", ! ruler::seekWithAnyTool()); });
 
     // FL's Playlist menu › Time markers (REA_rodada165f-markers §1.4)
     {

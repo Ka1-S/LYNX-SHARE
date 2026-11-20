@@ -248,11 +248,15 @@ public:
         juce::ignoreUnused (buttonsRight);
 
         menuButton.setBounds (4, 3, menuSize, Workspace::titleHeight - 6);
-        const auto labelWidth = titleWidth() - (accessory != nullptr ? accessoryWidth + 8 : 0);
+        // #229 (round 190nq): a narrow panel first drops its caption, as FL's Channel rack does, then gives the title tools
+        // only the room left before the buttons (they hide what doesn't fit) instead of running under them
+        const auto fullLabel = titleWidth() - (accessory != nullptr ? accessoryWidth + 8 : 0);
+        const auto labelWidth = workspace::titleCaptionFits (fullLabel, accessory != nullptr ? accessoryWidth : 0, strip.getRight())
+                                    ? fullLabel : 4 + menuSize + 6;
         titleLabel.setBounds (0, 0, labelWidth, Workspace::titleHeight - 1);
 
         if (accessory != nullptr)
-            accessory->setBounds (labelWidth, 1, accessoryWidth, Workspace::titleHeight - 2);
+            accessory->setBounds (labelWidth, 1, workspace::titleToolsRoom (labelWidth, accessoryWidth, strip.getRight()), Workspace::titleHeight - 2);
 
         if (content != nullptr)
         {

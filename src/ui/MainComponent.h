@@ -42,6 +42,7 @@
 #include "ui/Updater.h"
 #include "ui/ValueControl.h"
 #include "ui/Workspace.h"
+#include "ui/ActionSearch.h" // round 190nq (#228)
 
 namespace lynx
 {
@@ -330,6 +331,11 @@ private:
     int lastSettingsPage = 3; // the page openSettings showed last (SettingsPage::general at first): Ctrl+, opens it (issue #181)
     void showPluginManager();
     void showShortcutManager();
+    void showActionSearch(); // #228 (round 190nq): "?"
+public:
+    ActionSearchOverlay* actionSearchForSnapshot() const { return actionSearch.get(); }
+private:
+    std::unique_ptr<ActionSearchOverlay> actionSearch;
     int scansSeen = 0; // background plugin scans already announced in the hint bar
     int pluginCrashesSeen = 0; // hosted plugins that crashed (engine/PluginHost.h) and were already announced
     int editorCrashesSeen = 0; // faults in plugin editor windows (ui/PluginWindow.h, issue #32) already announced

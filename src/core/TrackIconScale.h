@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <utility>
 
 namespace lynx::trackiconscale
 {
@@ -22,6 +23,15 @@ constexpr int bigIconSize (int rowHeight, int plateWidth) noexcept
         return 0;
     const auto side = std::min (rowHeight / 2, plateWidth - 16);
     return side >= 24 ? side : 0;
+}
+
+// #222 follow-up (round 190nq): the part of a header plate (x, width) the big icon is centred in: the whole plate, or with
+// the LYNX extra's insert effects column (Playlist › Edit › Show insert effects on linked tracks; FL has no such column)
+// the part left of it. Returns { x, width }.
+constexpr std::pair<float, float> bigIconArea (float plateX, float plateWidth, float insertsColumn) noexcept
+{
+    const auto width = plateWidth - (insertsColumn > 0.0f ? insertsColumn : 0.0f);
+    return { plateX, width > 0.0f ? width : 0.0f };
 }
 
 // FL's shade: each RGB channel x 0.85 (alpha kept).

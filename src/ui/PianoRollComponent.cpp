@@ -3,6 +3,7 @@
 #include "ui/Motion.h"
 #include "ui/FileChoosers.h"
 #include "ui/PianoRollComponent.h"
+#include "core/RulerGestures.h" // round 190nq (#227)
 #include "ui/ChordHelper.h"
 #include "ui/PaintAB.h"
 #include "core/ChordReadout.h"
@@ -2294,7 +2295,7 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
     // TimePanelMouseDown 0xe56bf0, REA_rodada168t.md): Ctrl+drag, a double click held and dragged, the Select tool, or
     // a right-drag (on a Mac Cmd or Control: core/ModifierMap.h)
     if (e.y >= rulerTop && e.y < headerHeight && e.x >= keyboardWidth
-        && ((e.mods.isLeftButtonDown() && (flmods::ctrl (e.mods) || e.getNumberOfClicks() >= 2 || tools.getTool() == EditTool::lasso))
+        && ((e.mods.isLeftButtonDown() && (flmods::ctrl (e.mods) || e.getNumberOfClicks() >= 2 || (tools.getTool() == EditTool::lasso && ! ruler::seekWithAnyTool()))) // (#227: LYNX extra)
             || (e.mods.isRightButtonDown() && ! flmods::ctrl (e.mods))))
     {
         drag = Drag::rulerSelect;

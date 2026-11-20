@@ -280,6 +280,8 @@ void appendCleanWaveform (juce::Path& wave, float scale, juce::Rectangle<float> 
             const auto p = from < 0.0 ? wave::Point {} : summary.query (from, to, lanes == 2 ? lane : -1);
             valid[(std::size_t) x] = p.valid ? 1 : 0;
             peak[(std::size_t) x] = p.valid ? std::min (1.0f, std::max (std::abs (p.hi), std::abs (p.lo)) * style.gain) : 0.0f;
+            if (style.envelope && p.valid) // #230 (round 190nq): a fade's gain, column by column
+                peak[(std::size_t) x] *= juce::jlimit (0.0f, 1.0f, style.envelope (visible.getX() + (float) x / scale));
         }
 
         for (int x = 0; x < columns; ++x)
@@ -410,7 +412,14 @@ void paintWaveform (juce::Graphics& g, juce::Rectangle<float> body, const wave::
             {
                 const auto top = (int) std::round ((float) lane * laneHeight);
                 const auto bottom = (int) std::round ((float) (lane + 1) * laneHeight);
-                const auto p = summary.query (from, to, lanes == 2 ? lane : -1);
+                auto p = summary.query (from, to, lanes == 2 ? lane : -1);
+                if (style.envelope && p.valid) // #230 (round 190nq): a fade's gain, column by column
+                {
+                    const auto k = juce::jlimit (0.0f, 1.0f, style.envelope (visible.getX() + (float) x / scale));
+                    p.hi *= k;
+                    p.lo *= k;
+                    p.rms *= k;
+                }
 
                 if (! p.valid)
                 {

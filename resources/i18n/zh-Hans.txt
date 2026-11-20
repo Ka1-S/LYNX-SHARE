@@ -11976,3 +11976,24 @@ countries: cn sg
 "The sequence has no notes: turn on the gate of a step first" = "序列中没有音符：请先打开某个步进的门限"
 "Copied {0} notes of the sequence: Ctrl+V pastes them in the Piano roll" = "已复制序列的 {0} 个音符：按 Ctrl+V 粘贴到钢琴卷帘"
 "Export the sequence as a MIDI file" = "将序列导出为 MIDI 文件"
+
+# --- round 190nq: Discord 11-18 (Missing files text for projects not from FL)
+"{0} plugin(s) will not sound as they did when the project was saved (not installed, not loaded, or without their settings): see what LYNX SHARE did with each." = "{0} 个插件的声音将与保存工程时不同（未安装、未加载或缺少设置）：请查看 LYNX SHARE 对每个插件的处理。"
+
+# --- round 190nq: issue #225 (Mixer: Left / Right select)
+"Select the previous mixer track" = "选择上一个混音器轨道"
+"Select the next mixer track" = "选择下一个混音器轨道"
+
+# --- round 190nq: issue #227 (ruler click with every tool)
+"A click on the ruler moves the song position with every tool" = "点击标尺可用任何工具移动歌曲位置"
+"In FL Studio a click on the Playlist's or Piano roll's ruler with the Select or Zoom tool selects or zooms a time range and leaves the song position. On: those tools move the song position too, like the others; Ctrl+drag, a double-click drag or a right drag still select a range. Off by default. Also in the Playlist ruler's right-click menu." = "在 FL Studio 中，用选择或缩放工具点击播放列表或钢琴卷帘的标尺会选择或缩放一段时间范围，歌曲位置不变。开启：这些工具也会像其他工具一样移动歌曲位置；Ctrl+拖动、双击后拖动或右键拖动仍会选择范围。默认关闭。 也在播放列表标尺的右键菜单中。"
+
+# --- round 190nq: issue #228 (action search)
+"Search every LYNX action and run it" = "搜索任意 LYNX 操作并运行"
+"Search actions..." = "搜索操作..."
+"Search every LYNX action: what it does, its panel or its key" = "搜索任意 LYNX 操作：它的作用、所在面板或按键"
+"{0} action(s)   Up / Down: pick   Enter: run   Esc: close" = "{0} 个操作   上 / 下：选择   Enter：运行   Esc：关闭"
+"That action can't run here: open or click its panel first." = "此操作无法在这里运行：请先打开或点击它的面板。"
+
+# --- round 190nq: issue #230 (Show fade previews)
+"Show fade previews" = "显示淡化预览"

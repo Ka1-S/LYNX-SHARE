@@ -1,5 +1,6 @@
 #include "ui/WorkflowExtras.h"
 #include "core/EscClose.h"
+#include "core/RulerGestures.h" // round 190nq (#227)
 
 #include "core/TrackClips.h"
 
@@ -88,6 +89,8 @@ bool readUiOption (const juce::String& key, bool on)
         escclose::enabled() = on;
     else if (key == "trackClipsShown") // round 190ne: track clips listed in the pattern selector too (the Picker group's switch)
         trackclips::setShownInSelector (on);
+    else if (key == "rulerSeeksAnyTool") // issue #227 (round 190nq, LYNX extra)
+        ruler::seekWithAnyTool() = on;
     else
         return false;
     return true;
@@ -112,7 +115,8 @@ juce::String uiOptionsText()
            + "\nwToStart=" + juce::String (transportedit::wGoesToStart() ? 1 : 0) // (round 190jz, issue #195)
            + "\nsimpleLoopDetect=" + juce::String (loopanalysis::dropDetects().load() ? 1 : 0) // (round 190kx)
            + "\nescClosesWindows=" + juce::String (escclose::enabled() ? 1 : 0) // (round 190ng, issue #217)
-           + "\ntrackClipsShown=" + juce::String (trackclips::shownInSelector() ? 1 : 0); // (round 190ne)
+           + "\ntrackClipsShown=" + juce::String (trackclips::shownInSelector() ? 1 : 0) // (round 190ne)
+           + "\nrulerSeeksAnyTool=" + juce::String (ruler::seekWithAnyTool() ? 1 : 0); // (round 190nq, issue #227)
 }
 
 std::optional<bool> extraOn (std::string_view id)
@@ -137,6 +141,8 @@ std::optional<bool> extraOn (std::string_view id)
         return loopanalysis::dropDetects().load();
     if (id == "general.escCloses") // round 190ng (issue #217)
         return escclose::enabled();
+    if (id == "playlist.rulerSeeksAnyTool") // round 190nq (issue #227)
+        return ruler::seekWithAnyTool();
     return std::nullopt;
 }
 
@@ -166,6 +172,8 @@ bool setExtra (std::string_view id, bool on)
         loopanalysis::dropDetects() = on;
     else if (id == "general.escCloses") // round 190ng (issue #217)
         escclose::enabled() = on;
+    else if (id == "playlist.rulerSeeksAnyTool") // round 190nq (issue #227)
+        ruler::seekWithAnyTool() = on;
     else
         return false;
     if (onChanged)

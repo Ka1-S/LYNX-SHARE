@@ -11976,3 +11976,24 @@ countries: nl be
 "The sequence has no notes: turn on the gate of a step first" = "De sequentie heeft geen noten: zet eerst de gate van een stap aan"
 "Copied {0} notes of the sequence: Ctrl+V pastes them in the Piano roll" = "{0} noten van de sequentie gekopieerd: Ctrl+V plakt ze in de pianorol"
 "Export the sequence as a MIDI file" = "Sequentie exporteren als MIDI-bestand"
+
+# --- round 190nq: Discord 11-18 (Missing files text for projects not from FL)
+"{0} plugin(s) will not sound as they did when the project was saved (not installed, not loaded, or without their settings): see what LYNX SHARE did with each." = "{0} plug-in(s) klinken niet zoals toen het project werd opgeslagen (niet geïnstalleerd, niet geladen of zonder hun instellingen): bekijk wat LYNX SHARE met elk ervan deed."
+
+# --- round 190nq: issue #225 (Mixer: Left / Right select)
+"Select the previous mixer track" = "Vorige mixertrack selecteren"
+"Select the next mixer track" = "Volgende mixertrack selecteren"
+
+# --- round 190nq: issue #227 (ruler click with every tool)
+"A click on the ruler moves the song position with every tool" = "Een klik op de liniaal verplaatst de songpositie met elk gereedschap"
+"In FL Studio a click on the Playlist's or Piano roll's ruler with the Select or Zoom tool selects or zooms a time range and leaves the song position. On: those tools move the song position too, like the others; Ctrl+drag, a double-click drag or a right drag still select a range. Off by default. Also in the Playlist ruler's right-click menu." = "In FL Studio selecteert of zoomt een klik op de liniaal van de Playlist of Piano roll met het selectie- of zoomgereedschap een tijdsbereik en blijft de songpositie staan. Aan: deze gereedschappen verplaatsen de songpositie ook, net als de andere; Ctrl+slepen, slepen na een dubbelklik of slepen met de rechterknop selecteren nog steeds een bereik. Standaard uit. Ook in het rechtsklikmenu van de liniaal van de Playlist."
+
+# --- round 190nq: issue #228 (action search)
+"Search every LYNX action and run it" = "Elke LYNX-actie zoeken en uitvoeren"
+"Search actions..." = "Acties zoeken..."
+"Search every LYNX action: what it does, its panel or its key" = "Zoek elke LYNX-actie: wat ze doet, haar paneel of haar toets"
+"{0} action(s)   Up / Down: pick   Enter: run   Esc: close" = "{0} acties   Omhoog / Omlaag: kiezen   Enter: uitvoeren   Esc: sluiten"
+"That action can't run here: open or click its panel first." = "Die actie kan hier niet worden uitgevoerd: open of klik eerst op haar paneel."
+
+# --- round 190nq: issue #230 (Show fade previews)
+"Show fade previews" = "Fade-voorbeelden tonen"

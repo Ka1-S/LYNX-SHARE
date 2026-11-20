@@ -384,6 +384,26 @@ inline float equalPowerCurve (float x) noexcept
     return std::sin (1.57079632679490f * x);
 }
 
+// #230 (round 190nq): FL's "Show fade previews" — the gain an audio clip's fades give the sound at `tick` ticks from the
+// clip's start (the same curves the Playlist draws over the clip: a crossfade's S, a comp's equal power, FL's S or a
+// straight line bent by the tension); 1 outside the fades.
+inline float fadePreviewGain (const Clip& c, double tick) noexcept
+{
+    const auto fadeIn = (double) c.effectiveFadeIn(), fadeOut = (double) c.effectiveFadeOut(), length = (double) c.length;
+    auto gain = 1.0f;
+    if (fadeIn > 0.0 && tick < fadeIn)
+    {
+        const auto t = (float) std::max (0.0, tick / fadeIn);
+        gain *= (c.fadeCurve & 1) != 0 ? equalPowerCurve (t) : c.crossfadeIn > 0 ? crossfadeCurve (t) : fadeLevel (t, true, (c.linearFades & 1) != 0, c.fadeInTension);
+    }
+    if (fadeOut > 0.0 && tick > length - fadeOut)
+    {
+        const auto t = (float) std::min (1.0, (tick - (length - fadeOut)) / fadeOut);
+        gain *= (c.fadeCurve & 2) != 0 ? equalPowerCurve (1.0f - t) : c.crossfadeOut > 0 ? crossfadeCurve (1.0f - t) : fadeLevel (t, false, (c.linearFades & 2) != 0, c.fadeOutTension);
+    }
+    return std::clamp (gain, 0.0f, 1.0f);
+}
+
 // FL's audio clip gain handle (round 166e §2): −96.1 dB (shown "-INF") … +36 dB, 0.05 dB per pixel of drag.
 constexpr double clipGainMinDb = -96.1, clipGainMaxDb = 36.0, clipGainDbPerPixel = 0.05;
 inline double clipGainToDb (float gain) noexcept

@@ -11976,3 +11976,24 @@ countries: tr
 "The sequence has no notes: turn on the gate of a step first" = "Dizide nota yok: önce bir adımın gate'ini açın"
 "Copied {0} notes of the sequence: Ctrl+V pastes them in the Piano roll" = "Dizinin {0} notası kopyalandı: Ctrl+V bunları Piyano rulosuna yapıştırır"
 "Export the sequence as a MIDI file" = "Diziyi MIDI dosyası olarak dışa aktar"
+
+# --- round 190nq: Discord 11-18 (Missing files text for projects not from FL)
+"{0} plugin(s) will not sound as they did when the project was saved (not installed, not loaded, or without their settings): see what LYNX SHARE did with each." = "{0} eklenti, proje kaydedildiğindeki gibi çalmayacak (yüklü değil, yüklenemedi veya ayarları yok): LYNX SHARE'in her biriyle ne yaptığına bakın."
+
+# --- round 190nq: issue #225 (Mixer: Left / Right select)
+"Select the previous mixer track" = "Önceki mikser kanalını seç"
+"Select the next mixer track" = "Sonraki mikser kanalını seç"
+
+# --- round 190nq: issue #227 (ruler click with every tool)
+"A click on the ruler moves the song position with every tool" = "Cetvele tıklamak şarkı konumunu her araçla taşır"
+"In FL Studio a click on the Playlist's or Piano roll's ruler with the Select or Zoom tool selects or zooms a time range and leaves the song position. On: those tools move the song position too, like the others; Ctrl+drag, a double-click drag or a right drag still select a range. Off by default. Also in the Playlist ruler's right-click menu." = "FL Studio'da Seçim veya Yakınlaştırma aracıyla Playlist ya da Piano roll cetveline tıklamak bir zaman aralığı seçer veya yakınlaştırır ve şarkı konumunu değiştirmez. Açık: bu araçlar da diğerleri gibi şarkı konumunu taşır; Ctrl+sürükleme, çift tıklayıp sürükleme veya sağ tuşla sürükleme yine aralık seçer. Varsayılan olarak kapalı. Ayrıca Playlist cetvelinin sağ tık menüsünde."
+
+# --- round 190nq: issue #228 (action search)
+"Search every LYNX action and run it" = "Herhangi bir LYNX eylemini ara ve çalıştır"
+"Search actions..." = "Eylem ara..."
+"Search every LYNX action: what it does, its panel or its key" = "Herhangi bir LYNX eylemini ara: ne yaptığı, paneli ya da tuşu"
+"{0} action(s)   Up / Down: pick   Enter: run   Esc: close" = "{0} eylem   Yukarı / Aşağı: seç   Enter: çalıştır   Esc: kapat"
+"That action can't run here: open or click its panel first." = "Bu eylem burada çalışamaz: önce panelini aç veya paneline tıkla."
+
+# --- round 190nq: issue #230 (Show fade previews)
+"Show fade previews" = "Fade önizlemelerini göster"

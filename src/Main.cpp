@@ -3221,6 +3221,13 @@ public:
             quit();
             return;
         }
+        // --issuesshot190nq <prefix> (round 190nq, issues #193, #225-#230): src/IssuesShot190nq.inc
+        if (args.contains ("--issuesshot190nq"))
+        {
+            setApplicationReturnValue (runIssuesShot190nq (args[args.indexOf ("--issuesshot190nq") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
         // --issuesshot190ng <prefix> (round 190ng, issues #215, #217, #219, #220, #222): src/IssuesShot190ng.inc
         if (args.contains ("--issuesshot190ng"))
         {
@@ -13170,7 +13177,8 @@ private:
         engine = std::make_unique<lynx::AudioEngine>();
         juce::String error;
         auto ok = false;
-        if (project.hasFileExtension ("flp"))
+        // (round 190nq: a Live set, FL Studio Mobile project or DAWproject takes the same import, issue #193's set)
+        if (project.hasFileExtension ("flp;als;flm;dawproject"))
             ok = engine->importFlpFile (project, error);
         else if (auto song = lynx::ProjectFile::load (project, error))
         {
@@ -13180,6 +13188,7 @@ private:
         juce::String text = "project: " + project.getFullPathName() + "\n";
         if (ok)
         {
+            text << "video tracks: " << (int) engine->getSong().videoTracks.size() << "\n";
             auto playlist = std::make_unique<lynx::PlaylistComponent> (*engine);
             playlist->setBounds (0, 0, 1466, 930);
             playlist->setVisible (true);
@@ -17702,6 +17711,7 @@ private:
 #include "Mixer221Shot190ng.inc" // round 190ng (issue #221)
 #include "IssuesShot190ng.inc" // round 190ng (issues #215, #217, #219, #220, #222)
 #include "TrackClipsShot190ne.inc" // round 190ne
+#include "IssuesShot190nq.inc" // round 190nq (issues #193, #225-#230)
 #include "DetailsShot190kn.inc" // round 190kn
 #include "DetailsShot190ld.inc" // round 190ld
 #include "DetailsShot190lr.inc" // round 190lr

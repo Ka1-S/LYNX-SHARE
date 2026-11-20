@@ -1286,6 +1286,15 @@ public:
             browser.fileSelected (rows[(std::size_t) row]->file, preview && ! rows[(std::size_t) row]->folder);
     }
 
+    // #218 follow-up (round 190nq): FL 2026's Enter on a selected folder opens or closes it ([SHOT] 190nq h04c -> h05c -> h06c)
+    bool toggleSelectedFolder()
+    {
+        if (! juce::isPositiveAndBelow (selected, (int) rows.size()) || ! rows[(std::size_t) selected]->folder)
+            return false;
+        toggle (*rows[(std::size_t) selected]);
+        return true;
+    }
+
     // Left / Right: close the selected folder (or go to its parent) / open it
     void openSelected (bool open)
     {
@@ -6525,9 +6534,15 @@ bool BrowserComponent::previewSelected()
     return true;
 }
 
+int BrowserComponent::rowCountForSnapshot() const { return tree->numRows(); }
+int BrowserComponent::selectedRowForSnapshot() const { return tree->getSelectedRow(); }
+void BrowserComponent::selectRowIndexForSnapshot (int row) { tree->select (row, false); }
+
 void BrowserComponent::loadSelected()
 {
     if (hotSwapLoadSelected()) // round 190ce: while linked, Enter replaces the linked device
+        return;
+    if (! resultsView->isVisible() && tree->toggleSelectedFolder()) // #218 follow-up (round 190nq): FL's Enter on a folder
         return;
     const auto file = getSelectedFile();
 

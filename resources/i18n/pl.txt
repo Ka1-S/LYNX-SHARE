@@ -11976,3 +11976,24 @@ countries: pl
 "The sequence has no notes: turn on the gate of a step first" = "Sekwencja nie ma nut: najpierw włącz gate kroku"
 "Copied {0} notes of the sequence: Ctrl+V pastes them in the Piano roll" = "Skopiowano nuty sekwencji: {0}. Ctrl+V wkleja je w Piano roll"
 "Export the sequence as a MIDI file" = "Eksportuj sekwencję jako plik MIDI"
+
+# --- round 190nq: Discord 11-18 (Missing files text for projects not from FL)
+"{0} plugin(s) will not sound as they did when the project was saved (not installed, not loaded, or without their settings): see what LYNX SHARE did with each." = "{0} wtyczka(-ek) nie zabrzmi tak jak przy zapisie projektu (nie zainstalowane, nie wczytane lub bez ustawień): zobacz, co LYNX SHARE zrobił z każdą."
+
+# --- round 190nq: issue #225 (Mixer: Left / Right select)
+"Select the previous mixer track" = "Zaznacz poprzednią ścieżkę miksera"
+"Select the next mixer track" = "Zaznacz następną ścieżkę miksera"
+
+# --- round 190nq: issue #227 (ruler click with every tool)
+"A click on the ruler moves the song position with every tool" = "Kliknięcie linijki przesuwa pozycję utworu każdym narzędziem"
+"In FL Studio a click on the Playlist's or Piano roll's ruler with the Select or Zoom tool selects or zooms a time range and leaves the song position. On: those tools move the song position too, like the others; Ctrl+drag, a double-click drag or a right drag still select a range. Off by default. Also in the Playlist ruler's right-click menu." = "W FL Studio kliknięcie linijki Playlisty lub Piano rolla narzędziem Zaznaczanie lub Powiększenie zaznacza lub powiększa zakres czasu i nie zmienia pozycji utworu. Włączone: te narzędzia też przesuwają pozycję utworu, jak pozostałe; Ctrl+przeciągnięcie, przeciągnięcie po dwukliku lub prawym przyciskiem nadal zaznaczają zakres. Domyślnie wyłączone. Także w menu prawego przycisku linijki Playlisty."
+
+# --- round 190nq: issue #228 (action search)
+"Search every LYNX action and run it" = "Wyszukaj dowolną akcję LYNX i ją uruchom"
+"Search actions..." = "Szukaj akcji..."
+"Search every LYNX action: what it does, its panel or its key" = "Wyszukaj dowolną akcję LYNX: co robi, jej panel lub klawisz"
+"{0} action(s)   Up / Down: pick   Enter: run   Esc: close" = "{0} akcji   Góra / Dół: wybór   Enter: uruchom   Esc: zamknij"
+"That action can't run here: open or click its panel first." = "Tej akcji nie można tu uruchomić: najpierw otwórz lub kliknij jej panel."
+
+# --- round 190nq: issue #230 (Show fade previews)
+"Show fade previews" = "Pokaż podgląd zanikania"
