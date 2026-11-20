@@ -79,7 +79,7 @@ Een aantal van deze toetsen doet iets anders binnen een editor die de focus heef
 
 ## Clip View en Device View
 
-Deze toetsen werken alleen in de Clipstart-werkwijze.
+Deze toetsen werken alleen in de Clipstart-lay-out.
 
 | Toets | Wat hij doet |
 |---|---|

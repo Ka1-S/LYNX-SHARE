@@ -79,7 +79,7 @@ Niektóre z tych klawiszy robią coś innego w edytorze, który ma fokus. W Pian
 
 ## Clip View i Device View
 
-Te klawisze działają tylko w pracy z uruchamianiem klipów.
+Te klawisze działają tylko w układu z uruchamianiem klipów.
 
 | Klawisz | Co robi |
 |---|---|

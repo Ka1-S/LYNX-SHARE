@@ -117,7 +117,7 @@ Gdy wybierzesz wejście zewnętrzne dla insertu, który nagrywa też inne audio,
 - Przełączniki tras pojawiają się na innych paskach, nie na zaznaczonym.
 - Limit to 500 insertów na projekt i dziesięć slotów efektów na insert.
 - Nagranie Edisona jest przechowywane jako plik WAV w folderze projektu, a nie w pliku projektu.
-- Mikser sesji pod siatką klipów należy tylko do sposobu pracy Clip-launch. Pokazuje te same inserty co ten Mixer. Zobacz [Układy](/wiki/layouts/).
+- Mikser sesji pod siatką klipów należy tylko do układu Clip-launch. Pokazuje te same inserty co ten Mixer. Zobacz [Układy](/wiki/layouts/).
 
 ## Powiązane
 

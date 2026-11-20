@@ -3,22 +3,22 @@ source: cee352e3d5
 ---
 ![El diseño de lanzamiento de clips: una cuadrícula de clips con escenas junto a la Playlist](/assets/img/cliplaunch.webp)
 
-LYNX SHARE arranca en el flujo por patrones: un Channel Rack, patrones y una Playlist. El flujo por lanzamiento de clips es opcional y añade una cuadrícula de clips con escenas junto a la Playlist. LYNX SHARE lee y escribe sets `.als`. No está afiliado a Ableton.
+LYNX SHARE arranca en el diseño Patrón: un Channel Rack, patrones y una Playlist. El diseño de lanzamiento de clips es opcional y añade una cuadrícula de clips con escenas junto a la Playlist. LYNX SHARE lee y escribe sets `.als`. No está afiliado a Ableton.
 
 ## Abrir un set de Live
 
 1. Elige `Archivo › Abrir...` (`Ctrl+O`) y selecciona el `.als`. Se leen los sets guardados con Live 11 y Live 12.
-2. Elige `Ver › Estilo de diseño › Flujo por lanzamiento de clips` para trabajar con la cuadrícula de clips, donde van los clips de sesión y las escenas del set.
+2. Elige `Ver › Estilo de diseño › Diseño de lanzamiento de clips` para trabajar con la cuadrícula de clips, donde van los clips de sesión y las escenas del set.
 3. Usa el selector `Grid / Both / Song` de la barra de título de la Playlist para mostrar la cuadrícula, la Playlist o ambas.
 4. Elige `Archivo › Guardar`. Pregunta dónde escribir un archivo `.lynx`. El `.als` no se modifica.
 
-`Ver › Estilo de diseño › Flujo por patrones (predeterminado)` vuelve atrás. La misma opción está en `Opciones › Configuración general...`. Los patrones y el Channel Rack siguen disponibles en ambos diseños.
+`Ver › Estilo de diseño › Diseño Patrón (predeterminado)` vuelve atrás. La misma opción está en `Opciones › Configuración general...`. Los patrones y el Channel Rack siguen disponibles en ambos diseños.
 
 ## Qué equivale a qué
 
 | En Live | En LYNX SHARE |
 |---|---|
-| Vista Session | La cuadrícula de clips del flujo por lanzamiento de clips |
+| Vista Session | La cuadrícula de clips del diseño de lanzamiento de clips |
 | Vista Arrangement | La Playlist |
 | Pistas | Pistas de la Playlist, que son las columnas de la cuadrícula de clips |
 | Escenas | Escenas, las filas de la cuadrícula de clips. Una escena puede fijar el tempo al lanzarse |
@@ -82,4 +82,4 @@ Un informe tras la exportación lista lo que quedó fuera.
 - [Disposiciones](/wiki/layouts/)
 - [Importar proyectos](/wiki/importing-projects/)
 - [Formatos de archivo](/wiki/file-formats/)
-- [Dos flujos de trabajo en un solo programa](/why/#workflows)
+- [Dos diseños en un solo programa](/why/#workflows)

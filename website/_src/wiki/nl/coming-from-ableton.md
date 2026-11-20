@@ -3,22 +3,22 @@ source: cee352e3d5
 ---
 ![De Clip-launch-indeling: een clipraster met scènes naast de Playlist](/assets/img/cliplaunch.webp)
 
-LYNX SHARE start in de Pattern-werkwijze: een Channel Rack, patterns en een Playlist. De Clipstart-werkwijze is optioneel en voegt naast de Playlist een clipraster met scènes toe. LYNX SHARE leest en schrijft `.als`-sets. Het is niet gelieerd aan Ableton.
+LYNX SHARE start in de Pattern-lay-out: een Channel Rack, patterns en een Playlist. De Clipstart-lay-out is optioneel en voegt naast de Playlist een clipraster met scènes toe. LYNX SHARE leest en schrijft `.als`-sets. Het is niet gelieerd aan Ableton.
 
 ## Een Live-set openen
 
 1. Kies `Bestand › Openen...` (`Ctrl+O`) en selecteer het `.als`-bestand. Sets die zijn opgeslagen door Live 11 en Live 12 worden gelezen.
-2. Kies `Beeld › Lay-outstijl › Clipstart-werkwijze` om met het clipraster te werken, waar de Session-clips en scènes van de set terechtkomen.
+2. Kies `Beeld › Lay-outstijl › Clipstart-lay-out` om met het clipraster te werken, waar de Session-clips en scènes van de set terechtkomen.
 3. Gebruik de schakelaar `Grid / Both / Song` in de titelbalk van de Playlist om het raster, de Playlist of beide te tonen.
 4. Kies `Bestand › Opslaan`. Het vraagt waar een `.lynx`-bestand moet komen. Het `.als`-bestand blijft ongewijzigd.
 
-`Beeld › Lay-outstijl › Patroonwerkwijze (standaard)` gaat terug. Dezelfde keuze staat in `Opties › Algemene instellingen...`. Patterns en het Channel Rack blijven in beide indelingen beschikbaar.
+`Beeld › Lay-outstijl › Pattern-lay-out (standaard)` gaat terug. Dezelfde keuze staat in `Opties › Algemene instellingen...`. Patterns en het Channel Rack blijven in beide indelingen beschikbaar.
 
 ## Wat waarmee overeenkomt
 
 | In Live | In LYNX SHARE |
 |---|---|
-| Session-weergave | Het clipraster van de Clipstart-werkwijze |
+| Session-weergave | Het clipraster van de Clipstart-lay-out |
 | Arrangement-weergave | De Playlist |
 | Tracks | Playlist-tracks, de kolommen van het clipraster |
 | Scènes | Scènes, de rijen van het clipraster. Een scène kan bij het starten het tempo instellen |
@@ -82,4 +82,4 @@ Een rapport na de export toont wat is weggelaten.
 - [Lay-outs](/wiki/layouts/)
 - [Projecten importeren](/wiki/importing-projects/)
 - [Bestandsformaten](/wiki/file-formats/)
-- [Twee werkwijzen in één programma](/why/#workflows)
+- [Twee lay-outs in één programma](/why/#workflows)

@@ -3,22 +3,22 @@ source: cee352e3d5
 ---
 ![O layout de disparo de clipes: uma grade de clipes com cenas ao lado da Playlist](/assets/img/cliplaunch.webp)
 
-O LYNX SHARE começa no fluxo por padrões: um Channel Rack, patterns e uma Playlist. O fluxo por disparo de clipes é opcional e acrescenta uma grade de clipes com cenas ao lado da Playlist. O LYNX SHARE lê e grava sets `.als`. Não tem nenhuma ligação com a Ableton.
+O LYNX SHARE começa no layout Pattern: um Channel Rack, patterns e uma Playlist. O layout de lançamento de clipes é opcional e acrescenta uma grade de clipes com cenas ao lado da Playlist. O LYNX SHARE lê e grava sets `.als`. Não tem nenhuma ligação com a Ableton.
 
 ## Abrir um set do Live
 
 1. Escolha `Arquivo › Abrir...` (`Ctrl+O`) e selecione o `.als`. Sets salvos pelo Live 11 e pelo Live 12 são lidos.
-2. Escolha `Exibir › Estilo de layout › Fluxo por disparo de clipes` para trabalhar com a grade de clipes, para onde vão os clipes de Session e as cenas do set.
+2. Escolha `Exibir › Estilo de layout › Layout de lançamento de clipes` para trabalhar com a grade de clipes, para onde vão os clipes de Session e as cenas do set.
 3. Use a chave `Grid / Both / Song` na barra de título da Playlist para mostrar a grade, a Playlist ou as duas.
 4. Escolha `Arquivo › Salvar`. Ele pergunta onde gravar um arquivo `.lynx`. O `.als` não é alterado.
 
-`Exibir › Estilo de layout › Fluxo por padrões (padrão)` volta ao anterior. A mesma escolha está em `Opções › Configurações gerais...`. Patterns e o Channel Rack continuam disponíveis nos dois layouts.
+`Exibir › Estilo de layout › Layout Pattern (padrão)` volta ao anterior. A mesma escolha está em `Opções › Configurações gerais...`. Patterns e o Channel Rack continuam disponíveis nos dois layouts.
 
 ## O que corresponde a quê
 
 | No Live | No LYNX SHARE |
 |---|---|
-| Session view | A grade de clipes do fluxo por disparo de clipes |
+| Session view | A grade de clipes do layout de lançamento de clipes |
 | Vista de arranjo | A Playlist |
 | Faixas | Faixas da Playlist, que são as colunas da grade de clipes |
 | Cenas | Cenas, as linhas da grade de clipes. Uma cena pode definir o tempo ao ser disparada |
@@ -82,4 +82,4 @@ Um relatório depois da exportação lista o que ficou de fora.
 - [Layouts](/wiki/layouts/)
 - [Importar projetos](/wiki/importing-projects/)
 - [Formatos de arquivo](/wiki/file-formats/)
-- [Dois fluxos de trabalho em um só programa](/why/#workflows)
+- [Dois layouts em um só programa](/why/#workflows)

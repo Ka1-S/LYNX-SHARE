@@ -117,7 +117,7 @@ Quando você escolhe uma entrada externa para um insert que também grava outro 
 - Os interruptores de rota aparecem nas outras faixas, não na selecionada.
 - O limite é de 500 inserts por projeto e dez slots de efeito por insert.
 - A gravação do Edison é guardada como arquivo WAV na pasta do projeto, não dentro do arquivo do projeto.
-- O mixer Session sob a grade de clipes pertence só ao fluxo por disparo de clipes. Ele mostra os mesmos inserts deste Mixer. Veja [Layouts](/wiki/layouts/).
+- O mixer Session sob a grade de clipes pertence só ao layout de lançamento de clipes. Ele mostra os mesmos inserts deste Mixer. Veja [Layouts](/wiki/layouts/).
 
 ## Veja também
 

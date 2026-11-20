@@ -23,8 +23,8 @@ LYNX SHARE는 프로젝트를 `.lynx` 파일로 저장합니다. 다른 프로�
 | `.flm` | `파일 › 열기...` | 불가 | FL Studio Mobile 프로젝트. 일부만 가져옵니다. MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, DW Sampler, Slicer, DirectWave 외의 악기는 내장 신스로 재생됩니다 |
 | `.als` | `파일 › 열기...`, Live 11과 12의 세트 | `파일 › 내보내기 › Ableton Live 세트 (.als)...`, Live 12 또는 Live 11용 | 가져올 때 LYNX SHARE에 대응하는 것이 없는 Live 디바이스는 빠집니다. 내보낼 때 LYNX SHARE 자체의 악기와 이펙트는 변환되지 않고(Helix는 Wavetable이 됩니다), 이펙트 파라미터 오토메이션과 인서트 간 라우트는 빠집니다. [Ableton Live에서 넘어오기](/wiki/coming-from-ableton/)를 참고하세요 |
 | `.dawproject` | `파일 › 열기...` | `파일 › 내보내기 › DAWproject (.dawproject)...` | Bitwig, Studio One, Cubase 등이 쓰는 개방형 교환 형식: 트랙, 폴더, 클립, 노트, 워프 마커가 있는 오디오, 오토메이션, 템포, 마커, 센드가 있는 믹서, 상태가 담긴 VST3, VST2, CLAP 플러그인. 가져올 때는 노트 이펙트와 MIDI 표현이 빠지고, 내보낼 때는 클립 그리드, 다른 어레인지먼트, 노트별 세부 정보 일부가 빠집니다. 두 방향 모두 빠진 것을 목록으로 보여 줍니다 |
-| `.band` | `파일 › 열기...`(패키지, 그 안의 `projectData` 파일 또는 그 zip) | 불가 | GarageBand 10 또는 GarageBand for iOS 프로젝트를 간단한 워크플로 트랙으로 엽니다. 일부 지원: 악기 트랙은 내장 신스와 드럼으로 재생됩니다(GarageBand for iOS에서 만든 Sampler 악기는 예외). GarageBand 11 및 이전 버전의 프로젝트는 읽을 수 없습니다 |
-| `.blx` | `파일 › 열기...` 또는 간단한 워크플로의 `폴더...` 가져오기로 그 폴더 | 불가 | Cakewalk 또는 Sonar가 내려받은 BandLab 프로젝트를 리전, 템포, 키, 믹스, 볼륨과 팬 오토메이션, 흔한 이펙트와 함께 간단한 워크플로 트랙으로 엽니다. 일부 지원: BandLab의 악기 소리와 다른 페달은 가져오기 보고서에 목록으로 나옵니다 |
+| `.band` | `파일 › 열기...`(패키지, 그 안의 `projectData` 파일 또는 그 zip) | 불가 | GarageBand 10 또는 GarageBand for iOS 프로젝트를 간단한 레이아웃 트랙으로 엽니다. 일부 지원: 악기 트랙은 내장 신스와 드럼으로 재생됩니다(GarageBand for iOS에서 만든 Sampler 악기는 예외). GarageBand 11 및 이전 버전의 프로젝트는 읽을 수 없습니다 |
+| `.blx` | `파일 › 열기...` 또는 간단한 레이아웃의 `폴더...` 가져오기로 그 폴더 | 불가 | Cakewalk 또는 Sonar가 내려받은 BandLab 프로젝트를 리전, 템포, 키, 믹스, 볼륨과 팬 오토메이션, 흔한 이펙트와 함께 간단한 레이아웃 트랙으로 엽니다. 일부 지원: BandLab의 악기 소리와 다른 페달은 가져오기 보고서에 목록으로 나옵니다 |
 | `.mid`, `.midi` | `파일 › 열기...`은 새 프로젝트를 만듭니다. `파일 › 가져오기 › MIDI 파일...`과 피아노 롤은 현재 프로젝트로 가져옵니다 | `파일 › 내보내기 › MIDI 파일...`(`Ctrl+Shift+M`) | |
 | `.wav` | 샘플 또는 오디오 클립으로 | `파일 › 내보내기 › Wave 파일...`, 16비트, 24비트, 32비트 부동소수점 | 디더, 템포 정보, 루프 마커, 플레이리스트 마커는 선택 사항입니다 |
 | `.mp3` | 샘플 또는 오디오 클립으로 | `파일 › 내보내기 › MP3 파일...` | 고정 비트레이트 |

@@ -79,7 +79,7 @@ Certaines de ces touches font autre chose dans un éditeur qui a le focus. Dans 
 
 ## Vue du clip et Vue des appareils
 
-Ces touches ne fonctionnent que dans le flux par lancement de clips.
+Ces touches ne fonctionnent que dans la disposition par lancement de clips.
 
 | Touche | Ce qu'elle fait |
 |---|---|

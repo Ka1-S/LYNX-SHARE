@@ -3,22 +3,22 @@ source: cee352e3d5
 ---
 ![Układ Clip-launch: siatka klipów ze scenami obok Playlisty](/assets/img/cliplaunch.webp)
 
-LYNX SHARE startuje w trybie pracy na wzorcach: Channel Rack, patterny i Playlist. Praca z uruchamianiem klipów jest opcjonalna i dodaje obok Playlisty siatkę klipów ze scenami. LYNX SHARE odczytuje i zapisuje sety `.als`. Nie jest powiązany z firmą Ableton.
+LYNX SHARE startuje w układzie Pattern: Channel Rack, patterny i Playlist. Układ z uruchamianiem klipów jest opcjonalny i dodaje obok Playlisty siatkę klipów ze scenami. LYNX SHARE odczytuje i zapisuje sety `.als`. Nie jest powiązany z firmą Ableton.
 
 ## Otwórz set Live
 
 1. Wybierz `Plik › Otwórz...` (`Ctrl+O`) i wskaż plik `.als`. Odczytywane są sety zapisane w Live 11 i Live 12.
-2. Wybierz `Widok › Styl układu › Praca z uruchamianiem klipów`, aby pracować z siatką klipów, do której trafiają klipy sesji i sceny z setu.
+2. Wybierz `Widok › Styl układu › Układ z uruchamianiem klipów`, aby pracować z siatką klipów, do której trafiają klipy sesji i sceny z setu.
 3. Przełącznik `Grid / Both / Song` na pasku tytułu Playlisty pokazuje siatkę, Playlist albo oba naraz.
 4. Wybierz `Plik › Zapisz`. Program zapyta, gdzie zapisać plik `.lynx`. Plik `.als` nie jest zmieniany.
 
-`Widok › Styl układu › Praca na wzorcach (domyślnie)` wraca do poprzedniego trybu. Ten sam wybór jest w `Opcje › Ustawienia ogólne...`. Patterny i Channel Rack są dostępne w obu układach.
+`Widok › Styl układu › Układ Pattern (domyślnie)` wraca do poprzedniego trybu. Ten sam wybór jest w `Opcje › Ustawienia ogólne...`. Patterny i Channel Rack są dostępne w obu układach.
 
 ## Co odpowiada czemu
 
 | W Live | W LYNX SHARE |
 |---|---|
-| Widok Session | Siatka klipów w trybie pracy z uruchamianiem klipów |
+| Widok Session | Siatka klipów w trybie układu z uruchamianiem klipów |
 | Widok Arrangement | Playlist |
 | Ścieżki | Ścieżki Playlisty, które są kolumnami siatki klipów |
 | Sceny | Sceny, czyli wiersze siatki klipów. Scena może ustawiać tempo przy uruchomieniu |

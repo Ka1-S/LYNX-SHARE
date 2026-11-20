@@ -1,7 +1,7 @@
 ---
 source: 2ccec7b23f
 ---
-`Beeld › Lay-outstijl › Eenvoudige werkwijze` toont één venster met de tracks en de tijdlijn. Het brengt de toegankelijke stijl met één venster van BandLab samen met de werkwijze van FL Studio Mobile (tracks, loops, pads en snel opnemen), en past goed bij een eerste nummer. FL Studio Mobile-projecten (`.flm`) gaan erin open, net als in de andere werkwijzen. De installatiewizard biedt het aan bij de eerste start, naast de Patroonwerkwijze (de standaard) en de Clipstart-werkwijze.
+`Beeld › Lay-outstijl › Eenvoudige lay-out` toont één venster met de tracks en de tijdlijn. Het brengt de toegankelijke stijl met één venster van BandLab samen met de werkwijze van FL Studio Mobile (tracks, loops, pads en snel opnemen), en past goed bij een eerste nummer. FL Studio Mobile-projecten (`.flm`) gaan erin open, net als in de andere lay-outs. De installatiewizard biedt het aan bij de eerste start, naast de Pattern-lay-out (de standaard) en de Clipstart-lay-out.
 
 ## Wat erin zit
 
@@ -15,6 +15,6 @@ source: 2ccec7b23f
 ## Goed om te weten
 
 - Er wordt niets weggenomen: de Channel Rack, Piano Roll, Playlist en Mixer blijven één klik verwijderd.
-- Hetzelfde menu schakelt op elk moment terug naar de Patroonwerkwijze.
+- Hetzelfde menu schakelt op elk moment terug naar de Pattern-lay-out.
 
 Zie [Lay-outs](/wiki/layouts/) voor de andere twee.

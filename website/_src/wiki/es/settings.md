@@ -47,7 +47,7 @@ La ventana Configuración tiene ocho páginas: Audio, MIDI, General, Tema, Archi
 
 | Ajuste | Qué hace |
 |---|---|
-| `Estilo de diseño` | Flujo por patrones (por defecto), flujo por lanzamiento de clips o flujo simple |
+| `Estilo de diseño` | Diseño Patrón (por defecto), diseño de lanzamiento de clips o diseño simple |
 | `Plantilla predeterminada`, `Proyecto al iniciar` | La plantilla que se abre con `Archivo › Nuevo`, y lo que se abre al iniciar: `Proyecto vacío`, `Plantilla predeterminada` o `Último proyecto usado`. `Archivo › Guardar como plantilla...` añade las tuyas |
 | `Clips de sesión de sets de Live` | Adónde van los clips de Session de un set de Live importado: la cuadrícula de clips, o la Playlist tras el arreglo |
 | `Idioma`, `Fuente de la interfaz` | Se aplican en el siguiente arranque |

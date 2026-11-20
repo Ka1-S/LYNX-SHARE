@@ -1,7 +1,7 @@
 ---
 source: 2ccec7b23f
 ---
-`Exibir › Estilo de layout › Fluxo simples` mostra uma janela com as faixas e a linha do tempo. Ele mistura o estilo acessível de janela única do BandLab com o jeito de trabalhar do FL Studio Mobile (faixas, loops, pads e gravação rápida) e serve bem para uma primeira música. Projetos do FL Studio Mobile (`.flm`) abrem nele, como nos outros fluxos. O assistente de configuração o oferece na primeira vez que o programa abre, ao lado do Fluxo por padrões (o padrão) e do Fluxo por disparo de clipes.
+`Exibir › Estilo de layout › Layout Simple` mostra uma janela com as faixas e a linha do tempo. Ele mistura o estilo acessível de janela única do BandLab com o jeito de trabalhar do FL Studio Mobile (faixas, loops, pads e gravação rápida) e serve bem para uma primeira música. Projetos do FL Studio Mobile (`.flm`) abrem nele, como nos outros layouts. O assistente de configuração o oferece na primeira vez que o programa abre, ao lado do Layout Pattern (o padrão) e do Layout de lançamento de clipes.
 
 ## O que ele tem
 
@@ -15,6 +15,6 @@ source: 2ccec7b23f
 ## Bom saber
 
 - Nada é tirado: o Channel Rack, o Piano Roll, a Playlist e o Mixer ficam a um clique.
-- O mesmo menu volta ao Fluxo por padrões a qualquer momento.
+- O mesmo menu volta ao Layout Pattern a qualquer momento.
 
 Veja [Layouts](/wiki/layouts/) para os outros dois.
