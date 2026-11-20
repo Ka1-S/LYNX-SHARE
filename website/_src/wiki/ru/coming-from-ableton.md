@@ -1,5 +1,5 @@
 ---
-source: d5cc625221
+source: cee352e3d5
 ---
 ![Раскладка Clip-launch: сетка клипов со сценами рядом с Playlist](/assets/img/cliplaunch.webp)
 
@@ -59,7 +59,7 @@ LYNX SHARE стартует в рабочем процессе с паттерн
 
 | Записывается | Не записывается |
 |---|---|
-| MIDI-дорожка для каждого канала, ноты в виде MIDI-клипов | Собственные инструменты и эффекты LYNX SHARE. Их дорожки и ноты сохраняются |
+| MIDI-дорожка для каждого канала, ноты в виде MIDI-клипов | Собственные инструменты и эффекты LYNX SHARE, кроме Helix, который становится Wavetable. Их дорожки и ноты сохраняются |
 | Аудиодорожки с растяжением, транспонированием, усилением, фейдами и режимом варпа | Автоматизация параметров эффектов |
 | Группы, возвраты и посылы | Маршруты между инсертами |
 | Плагины VST2 и VST3 с их состоянием | |
@@ -70,8 +70,8 @@ LYNX SHARE стартует в рабочем процессе с паттерн
 
 ## Что стоит знать
 
-- Многие собственные устройства Live приходят как собственные устройства LYNX SHARE, со своими настройками и автоматизацией: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Delay, Echo, Auto Filter, Saturator, Overdrive, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Simpler, Drift и Operator (без FM). Остальные отбрасываются и перечисляются в отчете об импорте.
-- Рэки инструментов и аудиоэффектов приходят со своими цепочками, зонами и макросами, а Драм-рэк становится Драм-рэком LYNX SHARE. Рэки MIDI-эффектов из Live пока не преобразуются и перечислены в отчете об импорте.
+- Многие собственные устройства Live приходят как собственные устройства LYNX SHARE, со своими настройками и автоматизацией: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Hybrid Reverb, Delay, Echo, Grain Delay, Auto Filter, Saturator, Overdrive, Roar, Erosion, Vinyl Distortion, Corpus, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Spectral Time, Spectral Resonator, Looper, Simpler, Sampler, Drift, Operator, Wavetable и Meld. Остальные отбрасываются и перечисляются в отчете об импорте.
+- Рэки инструментов и аудиоэффектов приходят со своими цепочками, зонами и макросами, а Драм-рэк становится Драм-рэком LYNX SHARE. Arpeggiator из Live становится арпеджиатором канала. Pitch, Velocity, Chord, Note Length и рэки MIDI-эффектов записываются в ноты.
 - Отчет об импорте перечисляет, что было пропущено.
 - Live обрезает перекрывающиеся аудиоклипы в экспортированном сете.
 - Варп-маркеры из сета Live сохраняются при импорте и записываются обратно при экспорте.

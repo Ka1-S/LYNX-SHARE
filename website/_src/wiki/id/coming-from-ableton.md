@@ -1,5 +1,5 @@
 ---
-source: d5cc625221
+source: cee352e3d5
 ---
 ![Layout Clip-launch: kisi klip dengan scene di samping Playlist](/assets/img/cliplaunch.webp)
 
@@ -59,7 +59,7 @@ Follow action berjalan setelah sejumlah bar atau putaran clip. Aksinya adalah `T
 
 | Ditulis | Tidak ditulis |
 |---|---|
-| Satu track MIDI per channel, dengan not-nya sebagai clip MIDI | Instrumen dan efek milik LYNX SHARE sendiri. Track dan not-nya tetap disimpan |
+| Satu track MIDI per channel, dengan not-nya sebagai clip MIDI | Instrumen dan efek milik LYNX SHARE sendiri, kecuali Helix, yang menjadi Wavetable. Track dan not-nya tetap disimpan |
 | Track audio dengan stretch, transpose, gain, fade, dan mode warp | Otomasi parameter efek |
 | Grup, return, dan send | Rute dari insert ke insert |
 | Plugin VST2 dan VST3 beserta state-nya | |
@@ -70,8 +70,8 @@ Laporan setelah ekspor mencantumkan apa yang tidak ikut ditulis.
 
 ## Perlu diketahui
 
-- Banyak device bawaan Live masuk sebagai milik LYNX SHARE sendiri, beserta pengaturan dan otomasinya: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Delay, Echo, Auto Filter, Saturator, Overdrive, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Simpler, Drift, dan Operator (tanpa FM). Sisanya dibuang dan dicantumkan di laporan impor.
-- Instrument Rack dan Audio Effect Rack masuk beserta rantai, zona, dan makronya, dan Drum Rack menjadi Drum Rack milik LYNX SHARE. MIDI Effect Rack milik Live belum dikonversi dan dicantumkan di laporan impor.
+- Banyak device bawaan Live masuk sebagai milik LYNX SHARE sendiri, beserta pengaturan dan otomasinya: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Hybrid Reverb, Delay, Echo, Grain Delay, Auto Filter, Saturator, Overdrive, Roar, Erosion, Vinyl Distortion, Corpus, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Spectral Time, Spectral Resonator, Looper, Simpler, Sampler, Drift, Operator, Wavetable, dan Meld. Sisanya dibuang dan dicantumkan di laporan impor.
+- Instrument Rack dan Audio Effect Rack masuk beserta rantai, zona, dan makronya, dan Drum Rack menjadi Drum Rack milik LYNX SHARE. Arpeggiator milik Live menjadi arpeggiator channel. Pitch, Velocity, Chord, Note Length, dan MIDI Effect Rack ditulis ke dalam not.
 - Laporan impor mencantumkan apa yang tidak ikut diimpor.
 - Live memangkas clip audio yang saling tumpang tindih dalam set yang diekspor.
 - Warp marker dari set Live dipertahankan saat impor dan ditulis kembali saat ekspor.

@@ -12,14 +12,21 @@ Piano Roll, Playlist, Mixer) see [WORKFLOW_FL.md](WORKFLOW_FL.md); for the built
 | `.flp` | FL Studio | imported: channels, samples, patterns, arrangement, automation, mixer and FL's native plugins |
 | `.als` | Ableton Live 11 / 12 | imported: tracks, clips (warped audio too), groups, returns, mixer and automation, racks and Drum Racks, and many of Live's own devices as LYNX's; Session clips go to the clip grid (Settings › Session clips of Live sets: or onto the Playlist) |
 | `.flm` | FL Studio Mobile | imported, partial: arrangement, samples, drum kits, levels and routing, automation, the effects (as Pocket effects), MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, DW Sampler and Slicer, chord sets and the key; other instruments play a built-in synth for now |
+| `.dawproject` | Bitwig Studio, Studio One, Cubase and other apps | imported: tracks, folders, clips, notes, audio with its warp markers, automation, tempo, markers, the mixer with sends, scenes (into the clip grid) and VST3 / VST2 / CLAP plugins with their state; note effects and per-note expressions are listed in the report |
+| `.band` | GarageBand 10, GarageBand for iOS | imported, partial, as Simple-workflow tracks: MIDI and audio regions, tempo, key, sections, levels, pan and mute; instrument tracks play the built-in synth and drums (Sampler instruments made in GarageBand for iOS play their own recordings) |
+| `.blx` | BandLab (a project downloaded by Cakewalk / Sonar) | imported, partial, as Simple-workflow tracks: regions with their loops, tempo, key, the mix, volume and pan automation and the common effects; tested on made-up projects only |
 | `.mid` | any app | opened as a project |
+| `.zip` | LYNX SHARE (Export › Project with samples) or FL Studio's zipped loop package | extracted to a folder, then the project inside is opened |
 
 After an import, **Help › Last project import report** lists what was converted, approximated or left out, and
 **Help › Missing files...** helps find samples that moved. Save the result as a `.lynx` project.
 
-To go back, **File › Export** has **FL Studio project...** (`.flp`, or a zip with the samples) and **Ableton Live set
-(.als)...** (Live 12 or Live 11, with the samples collected). Each export shows what did not go over: LYNX-only
-instruments and effects are rendered to audio or replaced in an `.flp`, and are not converted yet in an `.als`.
+To go back, **File › Export** has **FL Studio project...** (`.flp`, or a zip with the samples), **Ableton Live set
+(.als)...** (Live 12 or Live 11, with the samples collected) and **DAWproject (.dawproject)...**; **For other apps...**
+writes one folder with stems, MIDI files, a Live set, an FL Studio project, the mixdown and a README. Each export shows
+what did not go over: LYNX-only instruments and effects are rendered to audio or replaced in an `.flp`, and are not
+converted yet in an `.als` (except Helix, which becomes Live's Wavetable). **File › Save a copy for an older LYNX...**
+writes a `.lynx` that 0.1.27 or 0.1.28 opens, with a list of what that version cannot keep.
 
 **Layout style** (Settings, or View › Layout style): **Pattern workflow** (FL Studio-style, the default),
 **Clip-launch workflow** (an Ableton Live-style clip grid with scenes beside the Playlist, with a Clip View and a Device

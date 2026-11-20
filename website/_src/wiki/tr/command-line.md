@@ -1,5 +1,5 @@
 ---
-source: a5c1d056c8
+source: 327d10fb40
 ---
 LYNX SHARE penceresini açmadan da çalışır. Bir seçenek projeyi sese render eder, diğerleri onu FL Studio projesine veya Ableton Live set'ine dönüştürür, birkaçı da test içindir. Projenin kendi kontrolleri de aynı seçenekleri kullanır.
 
@@ -18,7 +18,7 @@ Program Windows'ta `LYNX.exe`, macOS ve Linux'ta `LYNX` adını taşır. macOS't
 LYNX.exe project.lynx
 ```
 
-LYNX SHARE'i pencereyle başlatır ve dosyayı açar. `.lynx`, `.flp`, `.als`, `.flm` ve `.mid` kabul eder. Göreli yol, geçerli klasörden alınır.
+LYNX SHARE'i pencereyle başlatır ve dosyayı açar. `.lynx`, `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx`, `.zip` ve `.mid` kabul eder. Göreli yol, geçerli klasörden alınır.
 
 ```
 LYNX.exe --no-plugins project.lynx
@@ -30,7 +30,7 @@ Bir `.lynx` projesini, `Dosya › Üçüncü taraf plugin'ler olmadan aç...` gi
 
 | Seçenek | Ne yapar |
 |---|---|
-| `--export <project> <out>` | Tüm şarkıyı kuyruğuyla birlikte render eder; tıpkı Dışa aktarma penceresi gibi. `<out>` uzantısı formatı belirler: `.wav` (24 bit), `.flac`, `.ogg` veya `.mp3` (320 kbps) |
+| `--export <project> <out>` | Tüm şarkıyı kuyruğuyla birlikte render eder; tıpkı Dışa aktarma penceresi gibi. `<out>` uzantısı formatı belirler: `.wav` (24 bit), `.flac`, `.ogg`, `.mp3` (320 kbps), `.aif` / `.aiff` (24 bit) veya `.m4a` (192 kbps, Linux'ta yok) |
 | `--export ... --pattern` | Yalnızca geçerli pattern'i render eder |
 | `--export ... --insert N` | Yalnızca N numaralı Mixer insert'inin çıkışını render eder |
 | `--export ... --rate N` | Başka bir örnekleme hızında render eder, Hz cinsinden |

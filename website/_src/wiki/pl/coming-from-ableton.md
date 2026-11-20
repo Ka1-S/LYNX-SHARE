@@ -1,5 +1,5 @@
 ---
-source: d5cc625221
+source: cee352e3d5
 ---
 ![Układ Clip-launch: siatka klipów ze scenami obok Playlisty](/assets/img/cliplaunch.webp)
 
@@ -59,7 +59,7 @@ Akcje następcze uruchamiają się po określonej liczbie taktów lub przejść 
 
 | Zapisywane | Niezapisywane |
 |---|---|
-| Ścieżka MIDI na każdy kanał, z nutami jako klipami MIDI | Własne instrumenty i efekty LYNX SHARE. Ich ścieżki i nuty zostają |
+| Ścieżka MIDI na każdy kanał, z nutami jako klipami MIDI | Własne instrumenty i efekty LYNX SHARE, poza Helix, który staje się Wavetable. Ich ścieżki i nuty zostają |
 | Ścieżki audio z rozciąganiem, transpozycją, wzmocnieniem, fade'ami i trybem warp | Automatyka parametrów efektów |
 | Grupy, returny i wysyłki | Trasy między insertami |
 | Pluginy VST2 i VST3 wraz ze stanem | |
@@ -70,8 +70,8 @@ Raport po eksporcie wymienia, co pominięto.
 
 ## Warto wiedzieć
 
-- Wiele własnych urządzeń Live wchodzi jako własne urządzenia LYNX SHARE, z ustawieniami i automatyką: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Delay, Echo, Auto Filter, Saturator, Overdrive, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Simpler, Drift i Operator (bez FM). Pozostałe są pomijane i wymienione w raporcie importu.
-- Racki Instrument i Audio Effect wchodzą ze swoimi łańcuchami, strefami i makrami, a Rack perkusyjny staje się Rackiem perkusyjnym LYNX SHARE. Racki MIDI Effect z Live nie są jeszcze konwertowane i są wymienione w raporcie importu.
+- Wiele własnych urządzeń Live wchodzi jako własne urządzenia LYNX SHARE, z ustawieniami i automatyką: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Hybrid Reverb, Delay, Echo, Grain Delay, Auto Filter, Saturator, Overdrive, Roar, Erosion, Vinyl Distortion, Corpus, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Spectral Time, Spectral Resonator, Looper, Simpler, Sampler, Drift, Operator, Wavetable i Meld. Pozostałe są pomijane i wymienione w raporcie importu.
+- Racki Instrument i Audio Effect wchodzą ze swoimi łańcuchami, strefami i makrami, a Rack perkusyjny staje się Rackiem perkusyjnym LYNX SHARE. Arpeggiator z Live staje się arpeggiatorem kanału. Pitch, Velocity, Chord, Note Length i Racki MIDI Effect są zapisywane w nutach.
 - Raport importu wymienia, co pominięto.
 - Live przycina klipy audio, które na siebie nachodzą, w wyeksportowanym secie.
 - Znaczniki warp z setu Live są zachowywane przy imporcie i zapisywane z powrotem przy eksporcie.

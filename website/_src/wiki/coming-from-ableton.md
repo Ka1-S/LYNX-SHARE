@@ -61,7 +61,7 @@ Follow actions run after a number of bars or passes of the clip. The actions are
 
 | Written | Not written |
 |---|---|
-| A MIDI track per channel, with its notes as MIDI clips | LYNX SHARE's own instruments and effects. Their tracks and notes are kept |
+| A MIDI track per channel, with its notes as MIDI clips | LYNX SHARE's own instruments and effects, except Helix, which becomes Wavetable. Their tracks and notes are kept |
 | Audio tracks with stretch, transpose, gain, fades and warp mode | Automation of effect parameters |
 | Groups, returns and sends | Insert-to-insert routes |
 | VST2 and VST3 plugins with their state | |
@@ -72,8 +72,8 @@ A report after the export lists what was left out.
 
 ## Good to know
 
-- Many of Live's own devices come in as LYNX SHARE's own, with their settings and automation: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Delay, Echo, Auto Filter, Saturator, Overdrive, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Simpler, Drift and Operator (without FM). The others are dropped and listed in the import report.
-- Instrument and Audio Effect Racks come in with their chains, zones and macros, and a Drum Rack becomes LYNX SHARE's Drum Rack. Live's MIDI Effect Racks are not converted yet and are listed in the import report.
+- Many of Live's own devices come in as LYNX SHARE's own, with their settings and automation: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Hybrid Reverb, Delay, Echo, Grain Delay, Auto Filter, Saturator, Overdrive, Roar, Erosion, Vinyl Distortion, Corpus, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Spectral Time, Spectral Resonator, Looper, Simpler, Sampler, Drift, Operator, Wavetable and Meld. The others are dropped and listed in the import report.
+- Instrument and Audio Effect Racks come in with their chains, zones and macros, and a Drum Rack becomes LYNX SHARE's Drum Rack. Live's Arpeggiator becomes the channel's arpeggiator. Pitch, Velocity, Chord, Note Length and MIDI Effect Racks are written into the notes.
 - The import report lists what was left out.
 - Live trims audio clips that overlap in an exported set.
 - Warp markers from a Live set are kept on import and written back on export.

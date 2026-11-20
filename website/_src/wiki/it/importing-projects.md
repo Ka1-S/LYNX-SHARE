@@ -1,11 +1,11 @@
 ---
-source: c4e89e7e72
+source: 2d8c9a0f61
 ---
-`File › Apri...` (`Ctrl+O`) apre i progetti `.lynx` di LYNX SHARE e anche i file `.flp`, `.als`, `.flm` e `.mid`. Un progetto di un altro programma è un'importazione: diventa un nuovo progetto LYNX SHARE non salvato, e il file originale non viene mai scritto.
+`File › Apri...` (`Ctrl+O`) apre i progetti `.lynx` di LYNX SHARE e anche i file `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx` e `.mid`. Un progetto di un altro programma è un'importazione: diventa un nuovo progetto LYNX SHARE non salvato, e il file originale non viene mai scritto.
 
 ## Aprire un progetto di un altro programma
 
-1. Scegli `File › Apri...` e seleziona il file `.flp`, `.als`, `.flm` o `.mid`.
+1. Scegli `File › Apri...` e seleziona il file `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx` o `.mid`.
 2. Aspetta mentre LYNX SHARE cerca i plugin e i sample del progetto.
 3. Se qualcosa non è stato trovato, si apre la finestra `File mancanti`. Indicale dove sono i tuoi sample, oppure chiudila.
 4. La barra del titolo ora mostra da dove viene il progetto, per esempio "(importato da FL Studio)".
@@ -16,11 +16,14 @@ source: c4e89e7e72
 | Formato | Convertito | Non convertito |
 |---|---|---|
 | `.flp` (FL Studio) | Canali, sample, pattern, note slide e porta, ogni arrangiamento, marker, cambi di indicazione di tempo, automazione, collegamenti ai controller, il Mixer con l'instradamento, sidechain, EQ di traccia ed effetti nativi | I pacchetti FLEX sono cifrati e non vengono mai aperti. Un canale FLEX riceve una patch di synth scelta in base al nome del suo preset |
-| `.als` (Live 11 e 12) | Tracce MIDI, audio, di gruppo e di ritorno, tempo, indicazione di tempo, locator, il loop, volume, pan, mute, solo e mandate con la loro automazione, clip di sessione e scene, marker di warp, rack e Drum Rack, e molti dispositivi propri di Live (EQ Eight, Compressor, Glue Compressor, Reverb, Delay, Auto Filter, Saturator, Utility, Simpler, Drift e altri) come quelli di LYNX SHARE | I dispositivi di Live senza equivalente in LYNX SHARE (Hybrid Reverb, Grain Delay, Amp, Roar, patch FM di Operator e altri) vengono scartati ed elencati. I MIDI Effect Rack non vengono convertiti |
+| `.als` (Live 11 e 12) | Tracce MIDI, audio, di gruppo e di ritorno, tempo, indicazione di tempo, locator, il loop, volume, pan, mute, solo e mandate con la loro automazione, clip di sessione e scene, marker di warp, rack e Drum Rack, e molti dispositivi propri di Live (EQ Eight, Compressor, Glue Compressor, Reverb, Hybrid Reverb, Delay, Grain Delay, Auto Filter, Saturator, Roar, Utility, Simpler, Drift, Operator, Wavetable e altri) come quelli di LYNX SHARE | I dispositivi di Live senza equivalente in LYNX SHARE (Amp, Cabinet, Beat Repeat, Vocoder e altri) vengono scartati ed elencati |
 | `.flm` (FL Studio Mobile) | Tempo, indicazione di tempo, un insert del mixer per canale, una traccia della Playlist per corsia, pattern, clip audio con offset e pitch, drum kit, DW Sampler e programmi `.dwp`, lo Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth e SuperSaw, gli effetti, l'automazione e i set di accordi | Gli altri generatori di FLM suonano con il synth integrato |
+| `.dawproject` (Bitwig Studio, Studio One, Cubase e altre app) | Tracce, cartelle, clip, note, audio con i suoi marker di warp, automazione, tempo, marker, il mixer con i send, scene nella griglia di clip e plugin VST3, VST2 e CLAP con il loro stato. L'EQ, il compressore, il gate e il limiter del formato diventano quelli di LYNX SHARE | Gli effetti di note, le espressioni per nota e i dispositivi propri dell'altra app sono elencati nel report di importazione |
+| `.band` (GarageBand 10, GarageBand per iOS) | Tracce, regioni MIDI e audio, tempo, indicazione di tempo, tonalità, sezioni come marker, livello, pan e mute, come tracce del flusso semplice. Strumenti Sampler creati in GarageBand per iOS | Le tracce di strumento suonano con il synth e la batteria integrati. Le regioni di Drummer, le cartelle di take e i cambi di tempo vengono elencati. I progetti di GarageBand 11 e precedenti non sono leggibili |
+| `.blx` (BandLab) | Tracce, regioni MIDI e audio con i loro loop, tempo, indicazione di tempo, tonalità, volume, pan e mute, automazione di volume e pan, e gli effetti comuni, come tracce del flusso semplice | Le tracce di strumento suonano con il synth e la batteria integrati. Gli altri effetti e il preset Mastering vengono lasciati fuori ed elencati. Testato solo su progetti inventati |
 | `.mid` | Note, indicazioni di tempo e ogni cambio di tempo | Un file MIDI non contiene suoni: i canali ricevono il synth di LYNX SHARE o un canale MIDI Out |
 
-I plugin di terze parti VST2, VST3 e CLAP in un `.flp`, e i plugin VST2 e VST3 in un `.als`, si caricano con il loro stato salvato se lo stesso plugin è installato sul tuo computer.
+I plugin di terze parti VST2, VST3 e CLAP in un `.flp` o in un `.dawproject`, e i plugin VST2 e VST3 in un `.als`, si caricano con il loro stato salvato se lo stesso plugin è installato sul tuo computer.
 
 ## I plugin propri di FL Studio
 
@@ -86,7 +89,7 @@ Per riavere il plugin vero, installalo, scegli `Opzioni › Cerca plugin`, poi a
 
 ## Da sapere
 
-- `Aiuto › File mancanti...` riapre la finestra più tardi. `Aiuto › Last FL Studio import report` elenca ciò che è stato approssimato, lasciato fuori o non installato.
+- `Aiuto › File mancanti...` riapre la finestra più tardi. `Aiuto › Ultimo report di importazione del progetto` elenca ciò che è stato approssimato, lasciato fuori o non installato.
 - Le clip di sessione di un set di Live vanno nella griglia di clip del layout a lancio di clip. `Clip di sessione dei set di Live` in `Opzioni › Impostazioni generali...` le mette invece sulla Playlist.
 
 ## Correlati

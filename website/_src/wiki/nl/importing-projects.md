@@ -1,11 +1,11 @@
 ---
-source: c4e89e7e72
+source: 2d8c9a0f61
 ---
-`Bestand › Openen...` (`Ctrl+O`) opent de eigen `.lynx`-projecten van LYNX SHARE en ook `.flp`-, `.als`-, `.flm`- en `.mid`-bestanden. Een project uit een ander programma is een import: het wordt een nieuw, niet-opgeslagen LYNX SHARE-project, en het originele bestand wordt nooit overschreven.
+`Bestand › Openen...` (`Ctrl+O`) opent de eigen `.lynx`-projecten van LYNX SHARE en ook `.flp`-, `.als`-, `.flm`-, `.dawproject`-, `.band`-, `.blx`- en `.mid`-bestanden. Een project uit een ander programma is een import: het wordt een nieuw, niet-opgeslagen LYNX SHARE-project, en het originele bestand wordt nooit overschreven.
 
 ## Een project uit een ander programma openen
 
-1. Kies `Bestand › Openen...` en selecteer het `.flp`-, `.als`-, `.flm`- of `.mid`-bestand.
+1. Kies `Bestand › Openen...` en selecteer het `.flp`-, `.als`-, `.flm`-, `.dawproject`-, `.band`-, `.blx`- of `.mid`-bestand.
 2. Wacht terwijl LYNX SHARE de plugins en samples van het project zoekt.
 3. Als iets niet is gevonden, opent het venster `Ontbrekende bestanden`. Wijs het naar je samples, of sluit het.
 4. De titelbalk toont nu waar het project vandaan komt, bijvoorbeeld "(imported from FL Studio)".
@@ -16,11 +16,14 @@ source: c4e89e7e72
 | Formaat | Omgezet | Niet omgezet |
 |---|---|---|
 | `.flp` (FL Studio) | Kanalen, samples, patterns, slide- en portanoten, elk arrangement, markers, wijzigingen van de maatsoort, automatisering, controllerkoppelingen, de Mixer met routing, sidechains, track-EQ en native effecten | FLEX-packs zijn versleuteld en worden nooit geopend. Een FLEX-kanaal krijgt een synthpatch die op de naam van de preset wordt gekozen |
-| `.als` (Live 11 en 12) | MIDI-, audio-, groeps- en returntracks, tempo, maatsoort, locators, de loop, volume, pan, mute, solo en sends met hun automatisering, Session-clips en scènes, warp-markeringen, racks en Drum Racks, en veel eigen devices van Live (EQ Eight, Compressor, Glue Compressor, Reverb, Delay, Auto Filter, Saturator, Utility, Simpler, Drift en meer) als die van LYNX SHARE | Devices van Live zonder equivalent in LYNX SHARE (Hybrid Reverb, Grain Delay, Amp, Roar, FM Operator-patches en andere) worden weggelaten en vermeld. MIDI Effect Racks worden niet omgezet |
+| `.als` (Live 11 en 12) | MIDI-, audio-, groeps- en returntracks, tempo, maatsoort, locators, de loop, volume, pan, mute, solo en sends met hun automatisering, Session-clips en scènes, warp-markeringen, racks en Drum Racks, en veel eigen devices van Live (EQ Eight, Compressor, Glue Compressor, Reverb, Hybrid Reverb, Delay, Grain Delay, Auto Filter, Saturator, Roar, Utility, Simpler, Drift, Operator, Wavetable en meer) als die van LYNX SHARE | Devices van Live zonder equivalent in LYNX SHARE (Amp, Cabinet, Beat Repeat, Vocoder en andere) worden weggelaten en vermeld |
 | `.flm` (FL Studio Mobile) | Tempo, maatsoort, één mixer-insert per kanaal, één Playlist-track per baan, patterns, audioclips met offset en pitch, drumkits, DW Sampler en `.dwp`-programma's, de Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth en SuperSaw, de effecten, de automatisering en de akkoordensets | Andere FLM-generators spelen de ingebouwde synth |
+| `.dawproject` (Bitwig Studio, Studio One, Cubase en andere apps) | Tracks, mappen, clips, noten, audio met zijn warpmarkers, automatisering, tempo, markers, de mixer met sends, scènes in het clipraster, en VST3-, VST2- en CLAP-plugins met hun staat. De EQ, compressor, gate en limiter van het formaat worden die van LYNX SHARE | Noteneffecten, expressies per noot en de eigen devices van de andere app staan in het importrapport |
+| `.band` (GarageBand 10, GarageBand voor iOS) | Tracks, MIDI- en audioregio's, tempo, maatsoort, toonsoort, secties als markers, niveau, pan en mute, als tracks van de Eenvoudige werkwijze. Sampler-instrumenten die in GarageBand voor iOS zijn gemaakt | Instrumenttracks spelen de ingebouwde synth en drums. Drummer-regio's, take-mappen en tempowijzigingen worden vermeld. Projecten van GarageBand 11 en ouder zijn niet leesbaar |
+| `.blx` (BandLab) | Tracks, MIDI- en audioregio's met hun loops, tempo, maatsoort, toonsoort, volume, pan en mute, volume- en panautomatisering en de gebruikelijke effecten, als tracks van de Eenvoudige werkwijze | Instrumenttracks spelen de ingebouwde synth en drums. Andere effecten en de Mastering-preset worden weggelaten en vermeld. Alleen getest op verzonnen projecten |
 | `.mid` | Noten, maatsoorten en elke tempowijziging | Een MIDI-bestand bevat geen geluiden: kanalen krijgen de LYNX SHARE-synth of een MIDI Out-kanaal |
 
-Plugins van derden in VST2-, VST3- en CLAP-formaat in een `.flp`, en VST2- en VST3-plugins in een `.als`, laden met hun opgeslagen staat als dezelfde plugin op je computer is geïnstalleerd.
+Plugins van derden in VST2-, VST3- en CLAP-formaat in een `.flp` of een `.dawproject`, en VST2- en VST3-plugins in een `.als`, laden met hun opgeslagen staat als dezelfde plugin op je computer is geïnstalleerd.
 
 ## De eigen plugins van FL Studio
 
@@ -86,7 +89,7 @@ Om de echte plugin terug te krijgen, installeer je hem, kies je `Opties › Plug
 
 ## Goed om te weten
 
-- `Help › Ontbrekende bestanden...` opent het venster later opnieuw. `Help › Last FL Studio import report` toont wat is benaderd, weggelaten of niet geïnstalleerd.
+- `Help › Ontbrekende bestanden...` opent het venster later opnieuw. `Help › Laatste projectimportrapport` toont wat is benaderd, weggelaten of niet geïnstalleerd.
 - Session-clips van een Live-set komen in het clipraster van de Clip-launch-indeling. `Sessieclips uit Live-sets` in `Opties › Algemene instellingen...` zet ze in plaats daarvan op de Playlist.
 
 ## Gerelateerd

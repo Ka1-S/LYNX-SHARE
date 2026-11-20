@@ -1,5 +1,5 @@
 ---
-source: d5cc625221
+source: cee352e3d5
 ---
 ![Klip başlatma yerleşimi: Playlist'in yanında sahneli bir klip ızgarası](/assets/img/cliplaunch.webp)
 
@@ -59,7 +59,7 @@ Follow action'lar, klibin belirli sayıda ölçüsünden veya geçişinden sonra
 
 | Yazılanlar | Yazılmayanlar |
 |---|---|
-| Kanal başına bir MIDI izi, notaları MIDI klibi olarak | LYNX SHARE'in kendi enstrümanları ve efektleri. İzleri ve notaları korunur |
+| Kanal başına bir MIDI izi, notaları MIDI klibi olarak | LYNX SHARE'in kendi enstrümanları ve efektleri; Helix ise Wavetable olur. İzleri ve notaları korunur |
 | Stretch, transpoze, gain, fade ve warp moduyla ses izleri | Efekt parametrelerinin otomasyonu |
 | Gruplar, return'ler ve send'ler | Insert'ten insert'e yönlendirmeler |
 | Durumlarıyla VST2 ve VST3 plugin'leri | |
@@ -70,8 +70,8 @@ Dışa aktarmadan sonra bir rapor, dışarıda bırakılanları listeler.
 
 ## Bilmekte fayda var
 
-- Live'ın kendi cihazlarının çoğu LYNX SHARE'in kendi cihazları olarak ayarları ve otomasyonlarıyla gelir: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Delay, Echo, Auto Filter, Saturator, Overdrive, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Simpler, Drift ve Operator (FM'siz). Diğerleri atılır ve içe aktarma raporunda listelenir.
-- Instrument ve Audio Effect Rack'leri zincirleri, bölgeleri ve makrolarıyla gelir ve bir Drum Rack, LYNX SHARE'in Drum Rack'i olur. Live'ın MIDI Effect Rack'leri henüz dönüştürülmez ve içe aktarma raporunda listelenir.
+- Live'ın kendi cihazlarının çoğu LYNX SHARE'in kendi cihazları olarak ayarları ve otomasyonlarıyla gelir: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Hybrid Reverb, Delay, Echo, Grain Delay, Auto Filter, Saturator, Overdrive, Roar, Erosion, Vinyl Distortion, Corpus, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Spectral Time, Spectral Resonator, Looper, Simpler, Sampler, Drift, Operator, Wavetable ve Meld. Diğerleri atılır ve içe aktarma raporunda listelenir.
+- Instrument ve Audio Effect Rack'leri zincirleri, bölgeleri ve makrolarıyla gelir ve bir Drum Rack, LYNX SHARE'in Drum Rack'i olur. Live'ın Arpeggiator'ı kanalın arpejiatörü olur. Pitch, Velocity, Chord, Note Length ve MIDI Effect Rack'ler notalara yazılır.
 - İçe aktarma raporu dışarıda bırakılanları listeler.
 - Live, dışa aktarılmış bir set'te üst üste binen ses kliplerini kırpar.
 - Bir Live set'indeki warp işaretçileri içe aktarmada korunur ve dışa aktarmada geri yazılır.

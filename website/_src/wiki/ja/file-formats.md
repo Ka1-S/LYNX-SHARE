@@ -1,5 +1,5 @@
 ---
-source: 98a5eb9945
+source: 49950b37a3
 ---
 LYNX SHAREは、プロジェクトを `.lynx` ファイルとして保存します。ほかのプログラムのプロジェクトを開いたり、一般的なオーディオファイルを読み込んだり、オーディオ、MIDI、他のプログラム向けのプロジェクトをエクスポートしたりもできます。表には、0.1.30 alphaのすべての形式を載せています。
 
@@ -16,12 +16,12 @@ LYNX SHAREは、プロジェクトを `.lynx` ファイルとして保存しま�
 
 | フォーマット | 開く | 保存 / エクスポート | 備考 |
 |---|---|---|---|
-| `.lynx` | `ファイル › 開く...` | `ファイル › 保存`、自動保存あり | LYNX SHARE独自のプロジェクト形式 (JSON) |
+| `.lynx` | `ファイル › 開く...` | `ファイル › 保存`、自動保存あり | LYNX SHARE独自のプロジェクト形式 (JSON)。`ファイル › 古いLYNX用にコピーを保存...` は、0.1.27や0.1.28で開けるコピーを書き出し、そのバージョンで保てないものを一覧にします |
 | `.zip` | `ファイル › 開く...` でフォルダーに展開し、中のプロジェクトを開きます | `ファイル › エクスポート › サンプルを含むプロジェクト (.zip)...` | FL StudioのZipループパッケージも開けます |
 | `.lynxpack` | 概要を表示してから開きます。パートはホストのプロジェクトに統合されます | `ファイル › オンラインセッション › プロジェクトを送信...` | [オンラインセッション](/wiki/online-sessions/)で送られるプロジェクトまたはパート。サードパーティのプラグインのパートは、オーディオのレンダリングとプラグインの設定で受け渡されます |
 | `.flp` | `ファイル › 開く...` | `ファイル › エクスポート › FL Studio プロジェクト...`。FL Studio 2026のプロジェクト、またはZipループパッケージ | ネイティブプラグインは、再現されたエンジンで再生され、精度はまちまちです。FLEXパックは開かれません。エクスポートでは、LYNX専用のインストゥルメントとエフェクトはオーディオにレンダリングされるか、最も近いFLプラグインに置き換えられ、モジュレーターは省かれます。[FL Studioから移る方へ](/wiki/coming-from-fl-studio/)をご覧ください |
 | `.flm` | `ファイル › 開く...` | 不可 | FL Studio Mobileのプロジェクト。部分対応: MiniSynth、Transistor Bass、3x Osc、GMSynth、SuperSaw、DW Sampler、Slicer、DirectWave以外のインストゥルメントは、内蔵シンセで再生されます |
-| `.als` | `ファイル › 開く...`。Live 11と12のセット | `ファイル › エクスポート › Ableton Live セット (.als)...`。Live 12またはLive 11用 | インポートでは、LYNX SHAREに同等のものがないLiveのデバイスは外されます。エクスポートでは、LYNX SHARE独自のインストゥルメントとエフェクトは変換されず、エフェクトのパラメーターのオートメーションとインサート間のルートは外されます。[Ableton Liveから移る方へ](/wiki/coming-from-ableton/)をご覧ください |
+| `.als` | `ファイル › 開く...`。Live 11と12のセット | `ファイル › エクスポート › Ableton Live セット (.als)...`。Live 12またはLive 11用 | インポートでは、LYNX SHAREに同等のものがないLiveのデバイスは外されます。エクスポートでは、LYNX SHARE独自のインストゥルメントとエフェクトは変換されず (HelixはWavetableになります)、エフェクトのパラメーターのオートメーションとインサート間のルートは外されます。[Ableton Liveから移る方へ](/wiki/coming-from-ableton/)をご覧ください |
 | `.dawproject` | `ファイル › 開く...` | `ファイル › エクスポート › DAWproject (.dawproject)...` | Bitwig、Studio One、Cubaseなどのオープンな交換形式: トラック、フォルダー、クリップ、ノート、ワープマーカー付きのオーディオ、オートメーション、テンポ、マーカー、センド付きのミキサー、状態つきのVST3、VST2、CLAPプラグイン。インポートではノートエフェクトとMIDIエクスプレッションが外され、エクスポートではクリップグリッド、ほかのアレンジメント、ノートごとの細かな情報の一部が外されます。どちらの方向でも、外されたものが一覧に出ます |
 | `.band` | `ファイル › 開く...` (パッケージ、その `projectData` ファイル、またはそのZip) | 不可 | GarageBand 10またはGarageBand for iOSのプロジェクトを、シンプルなワークフローのトラックとして開きます。部分対応: インストゥルメントトラックは内蔵シンセとドラムで再生されます (GarageBand for iOSで作ったSamplerインストゥルメントを除く)。GarageBand 11以前のプロジェクトは読めません |
 | `.blx` | `ファイル › 開く...`、またはそのフォルダーをシンプルなワークフローの `フォルダー...` インポートで | 不可 | CakewalkまたはSonarでダウンロードしたBandLabプロジェクトを、リージョン、テンポ、キー、ミックス、ボリュームとパンのオートメーション、よく使うエフェクトとともにシンプルなワークフローのトラックとして開きます。部分対応: BandLabの楽器の音とそのほかのペダルはインポートレポートに一覧されます |
@@ -50,6 +50,7 @@ LYNX SHAREは、プロジェクトを `.lynx` ファイルとして保存しま�
 | `ファイル › エクスポート › Playlist のすべてのトラック` | プレイリストのトラックごとに1ファイル |
 | `ファイル › エクスポート › Playlist のすべてのトラックグループ` | トラックグループごとに1ファイル |
 | `ファイル › エクスポート › マスタリング...` | プロジェクトをレンダリングし、お使いのコンピューター上でラウドネス目標にマスタリングします |
+| `ファイル › エクスポート › 他のアプリ用...` | ステム、MIDIファイル、Ableton Liveセット、FL Studioのプロジェクト、ミックスダウン、READMEを1つのフォルダーに。必要ならZipにします |
 | `ファイル › エクスポート › プロジェクトのボーン...` | チャンネルとエフェクトのプリセットとスコアをフォルダーに書き出します |
 
 エクスポートウィンドウは、曲、現在のパターン、プレイリストの選択範囲をレンダリングします。
@@ -59,8 +60,8 @@ LYNX SHAREは、プロジェクトを `.lynx` ファイルとして保存しま�
 Windowsではプログラムは `LYNX.exe`、macOSとLinuxでは `LYNX` です。
 
 ```
-LYNX.exe project.lynx                       open a project (.lynx, .flp, .als, .flm or .mid)
-LYNX.exe --export project.flp out.flac      render the song (wav, flac or ogg)
+LYNX.exe project.lynx                       open a project (any file File › Open takes)
+LYNX.exe --export project.flp out.flac      render the song (wav, flac, ogg, mp3, aif; m4a on Windows and macOS)
 LYNX.exe --stems project.flp base.wav       one WAV per mixer insert that has sound
 LYNX.exe --export-flp project.lynx out.flp  write an FL Studio project
 ```
