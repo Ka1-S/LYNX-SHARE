@@ -91,3 +91,24 @@ steps, the tempo, and the Next-3 card's Open Loops.
 `post.py` draws the cursor, the ripple and the callouts there, and its zoom keyframes can name a target too
 (`["t", "target", zoom]`). Captions, titles, end cards and chapters come from the script, with one text file per
 language.
+
+### Vertical cut (TikTok, YouTube Shorts, Instagram Reels)
+
+`vertical.py` makes a 1080×1920 (9:16) video from the same script and the same take as `post.py`:
+
+```sh
+python3 $T/vertical.py script.json rec-en/ out/name-en-vertical --voice-dir out/name-en-voice
+python3 $T/vertical.py script.json rec-pt/ out/name-pt-BR-vertical --texts script.pt-BR.json --voice-dir out/name-pt-BR-voice
+```
+
+- **The cut:** the script's `vertical` block gives `from` / `to` in the take (at most 60 s), a `hook` title card for
+  the first `hook_seconds` (title and one line), the `strip` title over the picture, and `endcard_from`. Captions,
+  narration and chapters move with the cut; the per-language texts file may override `vertical.hook` and
+  `vertical.strip`.
+- **The picture:** a 1080×1080 (1:1) window on the 1920×1080 take that follows the action. When the script zooms, it
+  follows the zoom's target (the `--demo` rectangle), otherwise the drawn cursor. The motion is smoothed, so the
+  window never jumps. The cursor, the click ripples and the callouts are drawn in the window.
+- **Safe areas:** the apps put their own controls along the top (~120 px), the right edge and the bottom (~380 px).
+  The title strip sits under the top bar, and the captions sit in a box from x 60 to 940 under the picture that ends 390 px above the
+  bottom.
+- **Narration:** the WAVs `post.py` wrote for the horizontal video (`--voice-dir`), or Piper again (`--voice`).
