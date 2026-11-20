@@ -1,5 +1,6 @@
 #include "core/Crossfader.h"
 #include "core/RackRenderer.h"
+#include "core/LynxVerbs.h"
 #include "core/PolyEdit.h"
 #include "core/Dropouts.h"
 #include "core/HostTimelineScope.h"
@@ -1187,6 +1188,8 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                 && (kind != EffectKind::facetEq
                     || facet::resolution (previous->song.mixer[pt].effects[pi].params[(std::size_t) facet::resolutionParam])
                            == facet::resolution (slots[i].params[(std::size_t) facet::resolutionParam]))
+                // round 190nr: Atrium's dense late tank is allocated only for the slots that run it: a new instance when that differs
+                && (kind != EffectKind::atrium || verbs::atriumDense (previous->song.mixer[pt].effects[pi].params) == verbs::atriumDense (slots[i].params))
                 && (kind != EffectKind::plugin
                     || (previous->song.mixer[pt].effects[pi].plugin.id == slots[i].plugin.id && previous->sampleRate == sampleRate
                         && samePluginProcessing (previous->song.mixer[pt].effects[pi].plugin, slots[i].plugin) && ! rebuilds (factories, slots[i].plugin)

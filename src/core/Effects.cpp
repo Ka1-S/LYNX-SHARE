@@ -5436,6 +5436,8 @@ std::unique_ptr<Effect> makeEffect (const EffectSlot& slot)
     }
     if (slot.kind == EffectKind::formulaController)
         return formula::makeEffect (slot.state);
+    if (slot.kind == EffectKind::atrium) // round 190nr: the dense late tank only where it runs
+        return verbs::makeAtrium (verbs::atriumDense (slot.params));
     if (slot.kind == EffectKind::vocodex)
         return vocodex::make (slot.state);
     if (slot.kind == EffectKind::maximus)

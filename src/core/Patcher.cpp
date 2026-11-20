@@ -1,4 +1,5 @@
 #include "core/Patcher.h"
+#include "core/LynxVerbs.h"
 #include "core/Rack.h"
 #include "core/ControlSurface.h"
 #include "core/VfxScript.h"
@@ -45,6 +46,8 @@ bool sameEffectSetup (const EffectSlot& a, const EffectSlot& b)
     // ping result builds the graph again
     if (a.kind == EffectKind::hardwareInsert)
         return a.params[(std::size_t) hwinsert::roundTrip] == b.params[(std::size_t) hwinsert::roundTrip];
+    if (a.kind == EffectKind::atrium) // round 190nr: its dense late tank is allocated only where it runs
+        return verbs::atriumDense (a.params) == verbs::atriumDense (b.params);
     // effects whose setup depends on parameters at creation (latency, mode) are rebuilt by the rack as well
     return true;
 }

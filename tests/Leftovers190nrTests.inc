@@ -112,3 +112,38 @@ TEST (leftovers190nr_transistor_bass_sequence_as_notes)
     }
 }
 
+// Patience +69 MB private in 0.1.30 (round 190nr, heaptrack of 0.1.29 / 0.1.30 on the same set): part of it was Atrium's
+// dense late tank (round 190ls, 32 lines, ~2 MB at 48 kHz) allocated in every Atrium although only a translated
+// ValhallaRoom (atrium::reaLaw) runs it. The rack's instance now has it only then; renders stay bit-identical.
+#include "core/LynxVerbs.h"
+TEST (leftovers190nr_atrium_dense_tank_only_where_it_runs)
+{
+    using namespace lynx;
+    namespace at = verbs::atrium;
+    auto render = [] (std::unique_ptr<Effect> fx, const EffectSlot& slot) {
+        std::vector<float> l (48000), r (48000);
+        std::uint32_t seed = 12345u;
+        for (std::size_t i = 0; i < l.size(); ++i)
+        {
+            seed = seed * 1664525u + 1013904223u;
+            l[i] = i < 4800 ? (float) ((int) (seed >> 9) - (1 << 22)) / (float) (1 << 22) * 0.5f : 0.0f;
+            r[i] = 0.7f * l[i];
+        }
+        fx->prepare (48000.0);
+        for (int off = 0; off < (int) l.size(); off += 256)
+            fx->process (l.data() + off, r.data() + off, std::min (256, (int) l.size() - off), slot.params, 120.0);
+        l.insert (l.end(), r.begin(), r.end());
+        return l;
+    };
+    auto light = makeEffectSlot (EffectKind::atrium); // a new Atrium: revision 1, reaLaw 0
+    CHECK (! verbs::atriumDense (light.params));
+    // the rack's instance (makeEffect (slot), no dense tank) renders exactly as the full one (make (kind))
+    CHECK (render (makeEffect (light), light) == render (verbs::make (EffectKind::atrium), light));
+    // a translated ValhallaRoom's slot: the dense tank, the same as the full instance (and not the light tank's sound)
+    auto dense = light;
+    dense.params[(std::size_t) at::reaLaw] = 1.0f;
+    CHECK (verbs::atriumDense (dense.params));
+    const auto denseOut = render (makeEffect (dense), dense);
+    CHECK (denseOut == render (verbs::make (EffectKind::atrium), dense));
+    CHECK (denseOut != render (verbs::makeAtrium (false), dense)); // (without the tank it would fall back to the light one)
+}
