@@ -7745,6 +7745,67 @@ private:
                 rollup031Result = "ERROR a plain project loses something in the copy for 0.1.30";
         }
 
+        // rollup 0.1.31 step 2 (round 190nv): what the step's rounds save needs nothing in the copies for 0.1.30 / 0.1.28 —
+        // 190ns's Created date (#231, ProjectInfo.created: 0.1.30 reads it), its linked audio track ⇄ insert names and
+        // colours (#235: the same mixerTrack / name / colour fields; only the syncing is new), 190nq's "(target deleted)"
+        // automation names (#226: text) — and 190np's onboarding, 190nq's ruler / fade switches and 190nr's installed-files
+        // list live in the profile, never in a project. Checked: the copy keeps them, reports no loss and has every key of
+        // the project (the copy keeps every key the project has, none dropped or renamed)
+        juce::String rollup031s2Result = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            song.info.created = 1763600000.0;
+            if (song.mixer.size() < 3)
+                song.mixer.resize (3);
+            song.playlistTracks.resize (juce::jmax ((std::size_t) 2, song.playlistTracks.size()));
+            auto& vox = song.playlistTracks[1];
+            vox.mode = lynx::PlaylistTrackMode::audio;
+            vox.mixerTrack = 2;
+            vox.name = song.mixer[2].name = "Vox";
+            vox.colour = song.mixer[2].colour = 0xff8040c0;
+            song.patterns[0].name = lynx::mixerops::targetDeletedName ("BEAT BUS - Send level");
+            const auto keysOf = [] (const juce::var& v) {
+                std::set<juce::String> keys;
+                std::function<void (const juce::var&, const juce::String&)> walk = [&] (const juce::var& x, const juce::String& path) {
+                    if (auto* o = x.getDynamicObject())
+                        for (const auto& p : o->getProperties())
+                        {
+                            if (path.isEmpty() && p.name.toString() == "savedBy")
+                                continue;
+                            keys.insert (path + "/" + p.name.toString());
+                            walk (p.value, path + "/" + p.name.toString());
+                        }
+                    else if (auto* a = x.getArray())
+                        for (const auto& e : *a)
+                            walk (e, path + "[]");
+                };
+                walk (v, {});
+                return keys;
+            };
+            const auto original = juce::JSON::parse (lynx::ProjectFile::toJson (song));
+            for (const auto* release : { "0.1.30", "0.1.28" })
+            {
+                const auto copy = lynx::olderlynx::forRelease (song, release);
+                juce::String why;
+                const auto back = copy.ok ? lynx::ProjectFile::fromJson (copy.json, why) : std::optional<lynx::Song> {};
+                if (! copy.ok || ! back)
+                    rollup031s2Result = juce::String ("ERROR copy ") + release + " " + copy.error + why;
+                else if (back->info.created != song.info.created)
+                    rollup031s2Result = juce::String ("ERROR Created date in the copy for ") + release;
+                else if (back->playlistTracks.size() < 2 || back->playlistTracks[1].mixerTrack != 2 || back->playlistTracks[1].colour != vox.colour
+                         || back->playlistTracks[1].name != "Vox" || back->mixer[2].colour != vox.colour || back->mixer[2].name != "Vox")
+                    rollup031s2Result = juce::String ("ERROR linked track / insert in the copy for ") + release;
+                else if (back->patterns[0].name != song.patterns[0].name)
+                    rollup031s2Result = juce::String ("ERROR automation name in the copy for ") + release;
+                else if (! copy.lost.empty())
+                    rollup031s2Result = juce::String ("ERROR loss lines in the copy for ") + release + ": " + juce::String (copy.lost.front().text);
+                else if (juce::String (release) == "0.1.30" && keysOf (juce::JSON::parse (copy.json)) != keysOf (original))
+                    rollup031s2Result = "ERROR keys differ in the copy for 0.1.30";
+                if (rollup031s2Result != "OK")
+                    break;
+            }
+        }
+
         // round 190dr: the Session mixer's sections come back from a project (a project without them: Live's defaults);
         // a device dragged to another track and a Warp switch are one undo step each in a real engine
         juce::String livescr190drResult = "OK";
@@ -8113,7 +8174,7 @@ private:
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && exportParity.startsWith ("OK") && exportLive.startsWith ("OK") && midiHotplug.startsWith ("OK") && midiOutPorts.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
-                        && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK"
+                        && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK")
                         && danceWindowResult == "OK" && clickActivationResult == "OK" && motionOverlayResult.startsWith ("OK")
@@ -8196,6 +8257,7 @@ private:
                << "community190hq_saved=" << community190hqResult << "\n"
                << "rollup030_copy_for_0128=" << rollup030Result << "\n"
                << "rollup031_copy_for_0130=" << rollup031Result << "\n"
+               << "rollup031s2_copy_for_0130=" << rollup031s2Result << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 
