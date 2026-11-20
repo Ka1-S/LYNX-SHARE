@@ -11923,3 +11923,7 @@ countries: fr be ch ca lu
 # --- round 190nq: issue #225 (Mixer: Left / Right select)
 "Select the previous mixer track" = "Sélectionner la piste de mixage précédente"
 "Select the next mixer track" = "Sélectionner la piste de mixage suivante"
+
+# --- round 190nq: issue #227 (ruler click with every tool)
+"A click on the ruler moves the song position with every tool" = "Un clic sur la règle déplace la position du morceau avec tous les outils"
+"In FL Studio a click on the Playlist's or Piano roll's ruler with the Select or Zoom tool selects or zooms a time range and leaves the song position. On: those tools move the song position too, like the others; Ctrl+drag, a double-click drag or a right drag still select a range. Off by default." = "Dans FL Studio, un clic sur la règle de la Playlist ou du Piano roll avec l'outil Sélection ou Zoom sélectionne ou agrandit une plage de temps et laisse la position du morceau. Activé : ces outils déplacent aussi la position du morceau, comme les autres ; Ctrl+glisser, un glisser après un double clic ou un glisser avec le bouton droit sélectionnent toujours une plage. Désactivé par défaut."

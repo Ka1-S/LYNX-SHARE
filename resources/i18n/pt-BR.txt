@@ -12052,3 +12052,7 @@ countries: br
 # --- round 190nq: issue #225 (Mixer: Left / Right select)
 "Select the previous mixer track" = "Selecionar a faixa do mixer anterior"
 "Select the next mixer track" = "Selecionar a próxima faixa do mixer"
+
+# --- round 190nq: issue #227 (ruler click with every tool)
+"A click on the ruler moves the song position with every tool" = "Um clique na régua move a posição da música com qualquer ferramenta"
+"In FL Studio a click on the Playlist's or Piano roll's ruler with the Select or Zoom tool selects or zooms a time range and leaves the song position. On: those tools move the song position too, like the others; Ctrl+drag, a double-click drag or a right drag still select a range. Off by default." = "No FL Studio, um clique na régua da Playlist ou do Piano roll com a ferramenta Seleção ou Zoom seleciona ou amplia um trecho de tempo e não muda a posição da música. Ligado: essas ferramentas também movem a posição da música, como as outras; Ctrl+arrastar, arrastar com clique duplo ou arrastar com o botão direito continuam selecionando um trecho. Desligado por padrão."

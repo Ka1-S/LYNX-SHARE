@@ -11923,3 +11923,7 @@ countries: cn sg
 # --- round 190nq: issue #225 (Mixer: Left / Right select)
 "Select the previous mixer track" = "选择上一个混音器轨道"
 "Select the next mixer track" = "选择下一个混音器轨道"
+
+# --- round 190nq: issue #227 (ruler click with every tool)
+"A click on the ruler moves the song position with every tool" = "点击标尺可用任何工具移动歌曲位置"
+"In FL Studio a click on the Playlist's or Piano roll's ruler with the Select or Zoom tool selects or zooms a time range and leaves the song position. On: those tools move the song position too, like the others; Ctrl+drag, a double-click drag or a right drag still select a range. Off by default." = "在 FL Studio 中，用选择或缩放工具点击播放列表或钢琴卷帘的标尺会选择或缩放一段时间范围，歌曲位置不变。开启：这些工具也会像其他工具一样移动歌曲位置；Ctrl+拖动、双击后拖动或右键拖动仍会选择范围。默认关闭。"

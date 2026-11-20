@@ -37,3 +37,38 @@ TEST (issues190nq_225_mixer_left_right_select_the_neighbour)
     CHECK (map.find (keys::Chord { keys::left, keys::ctrl }, Context::playlist, false) == "playlist.timePrevious");
     CHECK (map.find (keys::Chord { keys::left, keys::none }, Context::browser, false) == "browser.closeFolder");
 }
+
+TEST (issues190nq_227_ruler_click_moves_the_song_position_with_every_tool)
+{
+    using namespace lynx::ruler;
+    using lynx::EditTool;
+    Press p;
+    p.mods.left = true;
+    p.tool = EditTool::lasso;
+    CHECK (press (p) == Action::select); // FL 2026 (and the default): the Select tool keeps the song position
+    p.tool = EditTool::zoom;
+    CHECK (press (p) == Action::zoomRange);
+    p.anyToolSeeks = true; // the LYNX extra
+    CHECK (press (p) == Action::seek);
+    p.tool = EditTool::lasso;
+    CHECK (press (p) == Action::seek);
+    p.mods.ctrl = true; // Ctrl+drag still selects a range
+    CHECK (press (p) == Action::select);
+    p.mods.ctrl = false;
+    p.clicks = 2; // and a double-click drag
+    CHECK (press (p) == Action::select);
+    p.clicks = 1;
+    p.onMarkerTag = true;
+    CHECK (press (p) == Action::marker);
+    Press r;
+    r.mods.right = true;
+    r.tool = EditTool::lasso;
+    r.anyToolSeeks = true; // the right button keeps its range
+    CHECK (press (r) == Action::select);
+    CHECK (! seekWithAnyTool()); // off by default
+    bool listed = false;
+    for (const auto& item : lynx::extras::items)
+        if (item.id == "playlist.rulerSeeksAnyTool")
+            listed = item.settingsKey == "ui-options.txt:rulerSeeksAnyTool";
+    CHECK (listed);
+}

@@ -45,11 +45,26 @@ struct Press
     bool onMarkerTag = false;
     bool hasSelection = false;
     bool insideSelection = false;
+    bool anyToolSeeks = false; // #227 (round 190nq): the LYNX extra below is on
 };
+
+// #227 (round 190nq), a LYNX extra, off by default (FL 2026 checked: with the Select tool a click on the Playlist's ruler
+// leaves the song position where it is, [SHOT] 190nq f03c / f04c; with the Paint tool it moves it, f05c): "A click on the
+// ruler moves the song position with every tool". On: the Select and Zoom tools' plain left press on the ruler scrubs as
+// the other tools' does (Ctrl, a double click or the right button still select / zoom a range). Settings › LYNX extras,
+// ui-options.txt "rulerSeeksAnyTool". Playlist and Piano roll.
+inline bool& seekWithAnyTool() noexcept
+{
+    static bool on = false;
+    return on;
+}
 
 constexpr Action press (const Press& p) noexcept
 {
     const auto selectTool = p.tool == EditTool::lasso, zoomTool = p.tool == EditTool::zoom;
+
+    if (p.anyToolSeeks && (selectTool || zoomTool) && ! p.mods.right) // #227: as with every other tool
+        return press (Press { p.mods, p.clicks, EditTool::pencil, p.onMarkerTag, p.hasSelection, p.insideSelection, false });
 
     if (p.mods.right)
     {

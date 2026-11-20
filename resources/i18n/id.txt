@@ -11923,3 +11923,7 @@ countries: id
 # --- round 190nq: issue #225 (Mixer: Left / Right select)
 "Select the previous mixer track" = "Pilih trek mixer sebelumnya"
 "Select the next mixer track" = "Pilih trek mixer berikutnya"
+
+# --- round 190nq: issue #227 (ruler click with every tool)
+"A click on the ruler moves the song position with every tool" = "Klik pada penggaris memindahkan posisi lagu dengan alat apa pun"
+"In FL Studio a click on the Playlist's or Piano roll's ruler with the Select or Zoom tool selects or zooms a time range and leaves the song position. On: those tools move the song position too, like the others; Ctrl+drag, a double-click drag or a right drag still select a range. Off by default." = "Di FL Studio, klik pada penggaris Playlist atau Piano roll dengan alat Pilih atau Zoom memilih atau memperbesar rentang waktu dan tidak mengubah posisi lagu. Aktif: alat-alat itu juga memindahkan posisi lagu, seperti yang lain; Ctrl+seret, seret setelah klik ganda, atau seret dengan tombol kanan tetap memilih rentang. Nonaktif secara bawaan."

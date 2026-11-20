@@ -111,6 +111,10 @@ inline constexpr Item items[] = {
     { "general.escCloses", TR_NOOP ("Windows"), TR_NOOP ("Esc closes the focused window"),
       TR_NOOP ("As in FL Studio, on by default: Esc closes the focused Playlist, Channel rack, Piano roll or Mixer (Pattern layout) and plugin and tool windows. While the Playlist or the Piano roll has a selection, the first Esc clears it. Off: Esc leaves the windows open. Also on the General page."),
       "ui-options.txt:escClosesWindows" },
+    // round 190nq (issue #227): FL keeps the song position when the Select tool clicks the ruler; this makes every tool scrub
+    { "playlist.rulerSeeksAnyTool", TR_NOOP ("Playlist"), TR_NOOP ("A click on the ruler moves the song position with every tool"),
+      TR_NOOP ("In FL Studio a click on the Playlist's or Piano roll's ruler with the Select or Zoom tool selects or zooms a time range and leaves the song position. On: those tools move the song position too, like the others; Ctrl+drag, a double-click drag or a right drag still select a range. Off by default."),
+      "ui-options.txt:rulerSeeksAnyTool" },
     { "midi.gamepad", TR_NOOP ("Controllers"), TR_NOOP ("Use a game controller"),
       TR_NOOP ("A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page."),
       "midi-settings.txt:gamepad" },

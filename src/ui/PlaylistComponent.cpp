@@ -6162,6 +6162,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         press.mods = fl;
         press.clicks = e.getNumberOfClicks();
         press.tool = tools.getTool();
+        press.anyToolSeeks = ruler::seekWithAnyTool(); // #227 (round 190nq, LYNX extra)
         press.onMarkerTag = markerHit >= 0;
         press.hasSelection = song.hasLoop();
         press.insideSelection = song.hasLoop() && xToTick (e.x) >= (double) song.loopStart && xToTick (e.x) < (double) song.loopEnd;
