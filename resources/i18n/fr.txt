@@ -11916,3 +11916,5 @@ countries: fr be ch ca lu
 "Insert a wildcard at the cursor" = "Insérer un joker au curseur"
 "File:" = "Fichier :"
 "Stems:" = "Stems :"
+"A few seconds after start-up LYNX SHARE asks GitHub for the newest version number; nothing about you is sent. It is the only connection LYNX SHARE makes by itself: plugin scans and everything else stay on this computer." = "Quelques secondes après le démarrage, LYNX SHARE demande à GitHub le numéro de la version la plus récente ; rien vous concernant n'est envoyé. C'est la seule connexion que LYNX SHARE établit de lui-même : la recherche de plugins et tout le reste restent sur cet ordinateur."
+"Off, LYNX SHARE never goes online by itself: plugin scans and everything else stay on this computer." = "Désactivé, LYNX SHARE ne se connecte jamais à Internet de lui-même : la recherche de plugins et tout le reste restent sur cet ordinateur."

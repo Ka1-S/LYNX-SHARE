@@ -11916,3 +11916,5 @@ countries: pl
 "Insert a wildcard at the cursor" = "Wstaw symbol zastępczy w miejscu kursora"
 "File:" = "Plik:"
 "Stems:" = "Stemy:"
+"A few seconds after start-up LYNX SHARE asks GitHub for the newest version number; nothing about you is sent. It is the only connection LYNX SHARE makes by itself: plugin scans and everything else stay on this computer." = "Kilka sekund po uruchomieniu LYNX SHARE pyta GitHub o numer najnowszej wersji; nic o Tobie nie jest wysyłane. To jedyne połączenie, które LYNX SHARE nawiązuje sam: wyszukiwanie wtyczek i wszystko inne zostaje na tym komputerze."
+"Off, LYNX SHARE never goes online by itself: plugin scans and everything else stay on this computer." = "Gdy wyłączone, LYNX SHARE nigdy sam nie łączy się z internetem: wyszukiwanie wtyczek i wszystko inne zostaje na tym komputerze."

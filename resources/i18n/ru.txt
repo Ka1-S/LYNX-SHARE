@@ -11916,3 +11916,5 @@ countries: ru by kz
 "Insert a wildcard at the cursor" = "Вставить подстановку в позицию курсора"
 "File:" = "Файл:"
 "Stems:" = "Стемы:"
+"A few seconds after start-up LYNX SHARE asks GitHub for the newest version number; nothing about you is sent. It is the only connection LYNX SHARE makes by itself: plugin scans and everything else stay on this computer." = "Через несколько секунд после запуска LYNX SHARE запрашивает у GitHub номер самой новой версии; ничего о вас не отправляется. Это единственное соединение, которое LYNX SHARE устанавливает сам: поиск плагинов и всё остальное остаётся на этом компьютере."
+"Off, LYNX SHARE never goes online by itself: plugin scans and everything else stay on this computer." = "Если выключено, LYNX SHARE никогда сам не выходит в сеть: поиск плагинов и всё остальное остаётся на этом компьютере."

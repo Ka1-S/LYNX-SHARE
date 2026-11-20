@@ -11916,3 +11916,5 @@ countries: de at ch li lu
 "Insert a wildcard at the cursor" = "Platzhalter an der Cursorposition einfügen"
 "File:" = "Datei:"
 "Stems:" = "Stems:"
+"A few seconds after start-up LYNX SHARE asks GitHub for the newest version number; nothing about you is sent. It is the only connection LYNX SHARE makes by itself: plugin scans and everything else stay on this computer." = "Einige Sekunden nach dem Start fragt LYNX SHARE bei GitHub die neueste Versionsnummer ab; nichts über dich wird gesendet. Das ist die einzige Verbindung, die LYNX SHARE von sich aus herstellt: Plugin-Suche und alles andere bleiben auf diesem Computer."
+"Off, LYNX SHARE never goes online by itself: plugin scans and everything else stay on this computer." = "Ausgeschaltet geht LYNX SHARE nie von sich aus online: Plugin-Suche und alles andere bleiben auf diesem Computer."

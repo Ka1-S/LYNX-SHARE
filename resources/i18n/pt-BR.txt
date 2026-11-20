@@ -12045,3 +12045,5 @@ countries: br
 "Insert a wildcard at the cursor" = "Inserir um curinga no cursor"
 "File:" = "Arquivo:"
 "Stems:" = "Stems:"
+"A few seconds after start-up LYNX SHARE asks GitHub for the newest version number; nothing about you is sent. It is the only connection LYNX SHARE makes by itself: plugin scans and everything else stay on this computer." = "Alguns segundos depois de iniciar, o LYNX SHARE pergunta ao GitHub qual é o número da versão mais nova; nada sobre você é enviado. É a única conexão que o LYNX SHARE faz por conta própria: a busca de plugins e todo o resto ficam neste computador."
+"Off, LYNX SHARE never goes online by itself: plugin scans and everything else stay on this computer." = "Desligado, o LYNX SHARE nunca se conecta à internet por conta própria: a busca de plugins e todo o resto ficam neste computador."

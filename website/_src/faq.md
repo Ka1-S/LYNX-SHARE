@@ -45,7 +45,7 @@ The Windows executable is not code-signed yet, so SmartScreen may warn: click `M
 
 ## Does it send any data?
 
-There is no telemetry, analytics, account or licence check. It checks GitHub for a new version (you can turn this off in `Settings › General › Updates`), and it sends a crash report only if you agree each time or set it to always send. It also connects when you ask for a stem model download or take part in a live online session. The [privacy policy](https://github.com/Ka1-S/LYNX-SHARE/blob/main/PRIVACY.md) has the details.
+There is no telemetry, analytics, account or licence check. By itself LYNX SHARE makes one connection: a few seconds after start-up it asks GitHub for the newest version number, which you can switch off on the first start or in `Settings › General › Updates`. Everything else goes online only when you ask for it: a crash report you agree to send, the stem model download, or a live online session. The [privacy policy](https://github.com/Ka1-S/LYNX-SHARE/blob/main/PRIVACY.md) lists every address it contacts.
 
 ## How do updates arrive?
 
@@ -74,3 +74,7 @@ Yes, through the FL Studio plugin that comes with FL Studio. FL Studio installs 
 ## Does it open GarageBand, BandLab or DAWproject files?
 
 Yes. `File › Open...` reads DAWproject files (`.dawproject`) with their tracks, folders, clips, automation, mixer and plugins, and can write them back. GarageBand projects (`.band`, from GarageBand 10 or GarageBand for iOS) and BandLab projects downloaded by Cakewalk or Sonar (`.blx`) open as Simple-workflow tracks with their regions, tempo, key and mix; their instrument sounds are not stored in a readable form, so instrument tracks play LYNX SHARE's built-in synth and drums. Sampler instruments also open: DirectWave programs (`.dwp`, `.dwb`), `.gig` instruments and Kontakt's `.ncw` samples.
+
+## Does it work without an internet connection?
+
+Yes. LYNX SHARE starts and works fully offline, also in a sandbox without network access such as `firejail --net=none`, with nothing waiting for the network. The plugin scan never uses the internet: it reads the plugin files on your computer and looks only at files that are new or changed since the last scan. Third-party plugins are other programs and may try to connect by themselves, for example to check their licence.

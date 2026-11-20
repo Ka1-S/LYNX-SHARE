@@ -577,7 +577,9 @@ public:
         toggle (checkUpdates, tr ("Check for updates automatically"), options.checkUpdates, [this] (bool on) { options.checkUpdates = on; });
         checkNow.onClick = [] { updater::checkNow(); };
         styleNote (updatesNote, tr ("At start-up LYNX SHARE asks GitHub for the newest version number (nothing about you is sent) and shows a bar "
-                                    "when a new version is out. Help > Check for updates... asks at any time."));
+                                    "when a new version is out. Help > Check for updates... asks at any time.")
+                                    // round 190ns (issue #233)
+                                    + " " + tr ("Off, LYNX SHARE never goes online by itself: plugin scans and everything else stay on this computer."));
         // round 190gh (B2): the version before the last update, and the way back to it (Help › Go back to... too)
         {
             const auto previous = persistent ? updater::previousVersion() : juce::String ("0.1.27");
