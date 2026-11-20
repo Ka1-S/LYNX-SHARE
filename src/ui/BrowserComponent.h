@@ -306,6 +306,10 @@ public:
     // Pattern workflow keeps the "Collections" sub-menu). Set by the main window with the workflow.
     void setLiveItemMenus (bool on) noexcept { liveItemMenus = on; }
     void selectRowForSnapshot (const juce::String& label);   // --shots: the first row with this name
+    // round 190nq (#218 follow-up): the folder tree's rows, by index
+    int rowCountForSnapshot() const;
+    int selectedRowForSnapshot() const;
+    void selectRowIndexForSnapshot (int row);
     juce::PopupMenu collectionsMenuForSnapshot (const std::string& item);
 
     // The automatic preview (the reference's headphone switch, its menu "browser pre-hear"): off = selecting a file
