@@ -131,7 +131,8 @@ TEST (issue14_pitch_audit_of_the_instruments)
     // Slicex (in the list since round 190r) likewise: a new one has empty decks, and its keys pick regions, not pitches
     const std::set<std::string> unreadable { "FL Slayer", "Fruity Granulizer", "Wave Traveller", "Fruity Slicer", "Slicex", "Drumaxx", "Fruit Kick", "BassDrum", "Drumpad", "FPC", "Sakura", "Ogun", "DirectWave" }; // (round 190hz: a new DirectWave has no zones, silent as FL's)
     // Plucked! reads Final.Pitch only when a voice starts (REA_rodada65 §1.2: it sizes the delay line): FL can't glide it
-    const std::set<std::string> noSlide { "Plucked!" };
+    // (rollup 0.1.31: LYNX Model, a struck bar / tine model, follows neither slides nor the channel porta: the rack retriggers it, as Plucked!)
+    const std::set<std::string> noSlide { "Plucked!", "LYNX Model" };
     const auto fl = natives142::flAccess();
     std::vector<std::pair<std::string, ChannelDef>> list;
     {
