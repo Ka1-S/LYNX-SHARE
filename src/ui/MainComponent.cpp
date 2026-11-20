@@ -84,6 +84,7 @@
 #include "ui/PatcherEditor.h"
 #include "ui/ToolWindow.h"
 #include "ui/RackEditor.h"
+#include "ui/ShotShowing.h"
 #include "ui/HelixEditor.h"
 #include "ui/LoopStarterWindow.h"
 #include "ui/WindowOwner.h"
@@ -209,6 +210,10 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 {
     if (startupMark != nullptr) startupMark ("main window: panels constructed (rack, piano roll, playlist, mixer, browser)"); // (round 190gd)
     rackcards::install(); // (round 183c: racks show as their own card in the Device View)
+    // round 190nc (DL-95): Live's Macro Mappings list takes the Browser's place while a rack maps (Live's look)
+    rackcards::setMappingsHost ([this]() -> juce::Component* {
+        return (browser.isShowing() || ui::showingForShots()) && browser.isVisible() && browser.getWidth() > 0 ? &browser : nullptr;
+    });
     helixcards::install(); // (round 190ja: Helix shows as Live's Wavetable in the Device View)
     heldKeys.setSender ([this] (int channel, int key, float velocity, bool on) { engine.sendLiveNote (channel, key, velocity, on, true); });
     connectBrowser (browser);

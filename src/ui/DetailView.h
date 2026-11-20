@@ -37,6 +37,10 @@ public:
     // extra title-bar buttons (e.g. a rack's Rand / Map), placed left of the window button; nullptr = none
     virtual juce::Component* titleAccessory() { return nullptr; }
     virtual int titleAccessoryWidth() const { return 0; }
+    // Round 190nc (DL-95, Live's rack with its chain's devices inline): > 0 = the shared title bar spans only this many px
+    // from the card's left (its buttons at its right end), and the body takes the card's whole height; the body keeps the
+    // title strip over that width free (no paint, no clicks) and draws its own title bars to the right of it
+    virtual int titleBarWidth() const { return 0; }
     std::function<void()> onPreferredWidthChanged; // set by the Device View: call it when the card grows or shrinks
     // Set by the Device View before preferredWidth: the room from the card's place to the chain's right edge with the
     // chain scrolled to its start (0 = no limit). A wide card may keep to it so its title bar stays in view (round 183c-card).

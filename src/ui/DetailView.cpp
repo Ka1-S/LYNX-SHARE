@@ -1030,12 +1030,13 @@ private:
             if (c.custom != nullptr)
             {
                 shown.insert (c.custom);
-                c.custom->setBounds (c.bounds.withTrimmedTop (titleHeight + 2).reduced (2, 0).withTrimmedBottom (2) - origin);
+                const auto besideTitle = c.custom->titleBarWidth() > 0; // (round 190nc: Live's inline chain devices)
+                c.custom->setBounds ((besideTitle ? c.bounds : c.bounds.withTrimmedTop (titleHeight + 2)).reduced (2, 0).withTrimmedBottom (2) - origin);
                 c.custom->setVisible (! c.folded);
                 if (auto* extra = c.custom->titleAccessory())
                 {
                     const auto w = c.custom->titleAccessoryWidth();
-                    extra->setBounds (juce::Rectangle<int> (c.bounds.getRight() - 4 - titleButtonsWidth (c) - w, c.bounds.getY() + 2, w, titleHeight - 4) - origin);
+                    extra->setBounds (juce::Rectangle<int> (barRight (c) - 4 - titleButtonsWidth (c) - w, c.bounds.getY() + 2, w, titleHeight - 4) - origin);
                     extra->setVisible (! c.folded);
                 }
             }
@@ -1380,16 +1381,16 @@ private:
         if (! (c.kind == Card::effect && canSavePreset (c.index)))
             return {};
         if (theme::livelook::active())
-            return { c.bounds.getRight() - 32, c.bounds.getY() + 2, 13, 13 };
-        return juce::Rectangle<int> (c.bounds.getRight() - 38, c.bounds.getY() + 3, 16, 14);
+            return { barRight (c) - 32, c.bounds.getY() + 2, 13, 13 };
+        return juce::Rectangle<int> (barRight (c) - 38, c.bounds.getY() + 3, 16, 14);
     }
     juce::Rectangle<int> swapBounds (const Card& c) const
     {
         if (c.kind == Card::add)
             return {};
         if (theme::livelook::active())
-            return { c.bounds.getRight() - 32 - (saveBounds (c).isEmpty() ? 0 : 16), c.bounds.getY() + 2, 13, 13 };
-        return { c.bounds.getRight() - 38 - (saveBounds (c).isEmpty() ? 0 : 18), c.bounds.getY() + 3, 16, 14 };
+            return { barRight (c) - 32 - (saveBounds (c).isEmpty() ? 0 : 16), c.bounds.getY() + 2, 13, 13 };
+        return { barRight (c) - 38 - (saveBounds (c).isEmpty() ? 0 : 18), c.bounds.getY() + 3, 16, 14 };
     }
     void showInsertMenu()
     {
@@ -1557,7 +1558,15 @@ private:
 
     // --- hit testing ---------------------------------------------------------------------------------------------
     juce::Rectangle<int> pickerBounds() const { return { 8, 40, contextWidth - 16, 20 }; }
-    static juce::Rectangle<int> titleBounds (const Card& c) { return c.bounds.withHeight (titleHeight); }
+    // round 190nc (DL-95): a rack with its chain's devices inline has its title bar over its own part only
+    static int barRight (const Card& c)
+    {
+        if (! c.folded && c.custom != nullptr)
+            if (const auto w = c.custom->titleBarWidth(); w > 0)
+                return c.bounds.getX() + std::min (w, c.bounds.getWidth());
+        return c.bounds.getRight();
+    }
+    static juce::Rectangle<int> titleBounds (const Card& c) { return c.bounds.withHeight (titleHeight).withRight (barRight (c)); }
     // Live's look (round 190jn, CL-21): the 13 px power disc 3 px in, 2 px down; the title bar's round 13 px wells on a
     // 16 px pitch, the last 3 px from the right edge (live-session.png Utility: disc x 1078..1090, wells 1166 / 1182 / 1198)
     static juce::Rectangle<int> ledBounds (const Card& c)
@@ -1569,8 +1578,8 @@ private:
     static juce::Rectangle<int> windowBounds (const Card& c)
     {
         if (theme::livelook::active())
-            return { c.bounds.getRight() - 16, c.bounds.getY() + 2, 13, 13 };
-        return { c.bounds.getRight() - 20, c.bounds.getY() + 3, 16, 14 };
+            return { barRight (c) - 16, c.bounds.getY() + 2, 13, 13 };
+        return { barRight (c) - 20, c.bounds.getY() + 3, 16, 14 };
     }
 
     Hit hitAt (juce::Point<int> p) const
@@ -1762,7 +1771,7 @@ private:
         if (! c.folded)
         {
             juce::Path title;
-            title.addRoundedRectangle (box.getX(), box.getY(), box.getWidth(), (float) (int) titleHeight, 3.0f, 3.0f, true, true, false, false);
+            title.addRoundedRectangle (box.getX(), box.getY(), (float) titleBounds (c).getWidth(), (float) (int) titleHeight, 3.0f, 3.0f, true, true, false, false);
             g.setColour (bar);
             g.fillPath (title);
         }

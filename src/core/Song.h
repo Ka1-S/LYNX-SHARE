@@ -1618,6 +1618,9 @@ struct MixerTrack
     float pan = 0.0f;          // -1..1
     bool muted = false;
     bool solo = false;
+    // Round 190nc (DL-110, Live's Solo/Cue): the track's Cue switch (Live's headphone button in Cue mode): its output is
+    // heard through the Cue Out too, at the Cue Volume (core/SessionMixer.h cueActive; Live 12 manual 18.6)
+    bool cue = false;
     // with solo: the tracks that feed this one are heard too (LYNX's solo switch, FL's "Alt solo"); off = FL's "Solo
     // selected track(s)": only this track and its path to Master (REA_rodada167l §4)
     bool soloSources = true;
@@ -2554,6 +2557,19 @@ struct SessionMixerView
     bool operator== (const SessionMixerView&) const = default;
 };
 
+// Round 190nc (DL-110, Live 12 manual 18.6 "Soloing and Cueing"; the Main strip's controls captured in 190mv B1
+// live-solo-cue.png): the Main track's Solo/Cue Mode switch, its Cue Out (device outputs: a stereo pair or one channel;
+// outputDefault = the same as Main Out, Live's default) and its Cue Volume (0..1 on Live's volume taper, 0.85 = 0 dB).
+// Cue mode works only while the Cue Out is an output other than the Main Out's (sessionmixer::cueOutputSeparate).
+struct SessionCue
+{
+    bool cueMode = false;
+    int out = outputDefault;
+    OutputMode outMode = OutputMode::stereo;
+    float volume = 0.85f;
+    bool operator== (const SessionCue&) const = default;
+};
+
 struct ClipGrid
 {
     // Columns are Playlist tracks (Clip::track), rows are scenes (ClipGridSlot::scene). Every Clip has start 0: it has no
@@ -2566,6 +2582,7 @@ struct ClipGrid
     bool followActions = true; // follow actions on the whole grid (off: edit playing clips with no jumps)
     bool backOnStop = false; // "Give tracks back to the Playlist when the transport stops" (off: they stay taken until asked)
     SessionMixerView mixerView; // round 190dr: the Session mixer's sections
+    SessionCue cue;             // round 190nc (DL-110): the Main strip's Solo/Cue switch, Cue Out and Cue Volume
     bool operator== (const ClipGrid&) const = default;
 };
 

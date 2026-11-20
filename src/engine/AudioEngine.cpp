@@ -1,4 +1,5 @@
 #include "engine/AudioEngine.h"
+#include "core/SessionMixer.h"
 
 #include "core/TransistorBass.h"
 #include "core/AraRegions.h"
@@ -5283,6 +5284,13 @@ void AudioEngine::publishSong()
     // the Master's hardware output target, read by the device callback
     masterOutChannel.store (song.mixer.empty() ? outputDefault : song.mixer[0].outputChannel, std::memory_order_relaxed);
     masterOutMode.store (song.mixer.empty() ? 0 : (int) song.mixer[0].outputMode, std::memory_order_relaxed);
+    hwOutput.cueGain.store (sessionmixer::cueGain (sessionmixer::cueOf (song).volume), std::memory_order_relaxed); // (round 190nc)
+    if (preview != nullptr) // round 190nc (DL-110): Browser previews to the Cue Out while Cue mode is in effect
+    {
+        const auto cueOn = sessionmixer::cueOf (song).cueMode && sessionmixer::cueActive (song, outputChannelCount());
+        const auto& cue = sessionmixer::cueOf (song);
+        preview->setCueOutput (&hwOutput, cueOn ? sessionmixer::cueOutChannels (song).first : -1, cue.out == outputDefault ? OutputMode::stereo : cue.outMode);
+    }
     selectedChannel = juce::jlimit (0, juce::jmax (0, (int) song.channels.size() - 1), selectedChannel);
     {
         const auto count = (int) song.channels.size();
@@ -8261,6 +8269,37 @@ void AudioEngine::openHardwareInsertIo()
             notify (result.issue, 0, result.detail);
 }
 
+void AudioEngine::setCueOutput (int channel, OutputMode mode)
+{
+    editSong ([=] (Song& s) {
+        if (! s.clipGrid)
+            s.clipGrid.emplace();
+        s.clipGrid->cue.out = channel < 0 ? outputDefault : channel;
+        s.clipGrid->cue.outMode = mode;
+    });
+    openTargetedOutputs();
+}
+
+void AudioEngine::setCueMode (bool cue)
+{
+    editSong ([cue] (Song& s) {
+        if (! s.clipGrid)
+            s.clipGrid.emplace();
+        s.clipGrid->cue.cueMode = cue;
+    });
+    openTargetedOutputs();
+}
+
+void AudioEngine::setCueVolume (float position, bool undoable)
+{
+    editSong ([p = juce::jlimit (0.0f, 1.0f, position)] (Song& s) {
+        if (! s.clipGrid)
+            s.clipGrid.emplace();
+        s.clipGrid->cue.volume = p;
+    },
+              undoable);
+}
+
 void AudioEngine::openTargetedOutputs()
 {
     auto* device = deviceManager.getCurrentAudioDevice();
@@ -8277,6 +8316,14 @@ void AudioEngine::openTargetedOutputs()
         const auto [first, count] = outputChannelsOf (t.outputChannel, t.outputMode);
         for (int c = first; c < first + count; ++c)
             if (c < available)
+                wanted.setBit (c);
+    }
+    // round 190nc (DL-110): the Cue Out while Cue mode is on
+    if (sessionmixer::cueOf (song).cueMode)
+    {
+        const auto [first, count] = sessionmixer::cueOutChannels (song);
+        for (int c = first; c < first + count; ++c)
+            if (c >= 0 && c < available)
                 wanted.setBit (c);
     }
     // the hardware inserts' sends (round 164d; inside Patchers too, round 165c)

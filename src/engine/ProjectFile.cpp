@@ -1749,6 +1749,15 @@ juce::var clipGridToVar (const ClipGrid& grid, const std::vector<int>* envelopes
         juce::Array<juce::var> view { m.shown, m.io, m.sends, m.volume, m.trackOptions, m.returns, m.crossfader }; // (round 190kc: + returns, crossfader)
         root->setProperty ("mixerView", view);
     }
+    if (grid.cue != SessionCue {}) // round 190nc (DL-110): the Main strip's Solo/Cue switch, Cue Out and Cue Volume
+    {
+        auto c = std::make_unique<juce::DynamicObject>();
+        c->setProperty ("mode", grid.cue.cueMode);
+        c->setProperty ("out", grid.cue.out);
+        c->setProperty ("outMode", (int) grid.cue.outMode);
+        c->setProperty ("volume", grid.cue.volume);
+        root->setProperty ("cue", juce::var (c.release()));
+    }
     juce::Array<juce::var> scenes;
     for (const auto& scene : grid.scenes)
     {
@@ -1836,6 +1845,13 @@ std::optional<ClipGrid> clipGridFromVar (const juce::var& v, const Song& song)
             grid.mixerView.returns = (bool) (*view)[5];
             grid.mixerView.crossfader = (bool) (*view)[6];
         }
+    }
+    if (const auto& c = v["cue"]; c.isObject()) // round 190nc
+    {
+        grid.cue.cueMode = (bool) c.getProperty ("mode", false);
+        grid.cue.out = juce::jlimit (outputDefault, 255, (int) c.getProperty ("out", outputDefault));
+        grid.cue.outMode = (OutputMode) juce::jlimit (0, (int) OutputMode::monoRight, (int) c.getProperty ("outMode", 0));
+        grid.cue.volume = juce::jlimit (0.0f, 1.0f, (float) c.getProperty ("volume", 0.85));
     }
     if (const auto* scenes = v["scenes"].getArray())
         for (const auto& o : *scenes)
@@ -2727,6 +2743,8 @@ juce::var mixerTrackToVar (const MixerTrack& t)
     o->setProperty ("pan", t.pan);
     o->setProperty ("muted", t.muted);
     o->setProperty ("solo", t.solo);
+    if (t.cue)
+        o->setProperty ("cue", true); // round 190nc (DL-110)
     if (! t.soloSources)
         o->setProperty ("soloSources", false);
     if (t.lockState)
@@ -2856,6 +2874,7 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
     track.pan = juce::jlimit (-1.0f, 1.0f, (float) t.getProperty ("pan", 0.0));
     track.muted = (bool) t.getProperty ("muted", false);
     track.solo = (bool) t.getProperty ("solo", false);
+    track.cue = (bool) t.getProperty ("cue", false);
     track.soloSources = (bool) t.getProperty ("soloSources", true);
     track.lockState = (bool) t.getProperty ("lockState", false);
     track.threaded = (bool) t.getProperty ("threaded", true);

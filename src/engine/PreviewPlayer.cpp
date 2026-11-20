@@ -81,7 +81,7 @@ void PreviewPlayer::playBrowser (std::shared_ptr<const SampleData> sample, float
     }
 }
 
-void PreviewPlayer::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+void PreviewPlayer::renderBlock (juce::AudioBuffer<float>& buffer)
 {
     buffer.clear();
 
@@ -223,5 +223,29 @@ void PreviewPlayer::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBu
     }
 
     playPosition.store (position < last ? position : -1.0, std::memory_order_relaxed);
+}
+
+void PreviewPlayer::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+{
+    renderBlock (buffer);
+    // round 190nc (DL-110, Live 12 manual 18.6): while Cue mode is in effect a Browser preview is heard through the Cue
+    // Out (at the Cue Volume) instead of the main output
+    const auto first = cueFirst.load (std::memory_order_relaxed);
+    if (first < 0 || ! browser || current == nullptr || cueOut == nullptr || ! cueOut->active.load (std::memory_order_relaxed)
+        || buffer.getNumChannels() < 2)
+        return;
+    const auto n = buffer.getNumSamples();
+    const auto mode = (OutputMode) cueMode.load (std::memory_order_relaxed);
+    const auto g = cueOut->cueGain.load (std::memory_order_relaxed);
+    auto* l = buffer.getWritePointer (0);
+    auto* r = buffer.getWritePointer (1);
+    auto* a = cueOut->bus (first, 0, n);
+    auto* b = mode == OutputMode::stereo ? cueOut->bus (first + 1, 0, n) : nullptr;
+    if (a == nullptr)
+        return;
+    juce::FloatVectorOperations::multiply (l, g, n);
+    juce::FloatVectorOperations::multiply (r, g, n);
+    addToOutput (l, r, mode, a, b, n);
+    buffer.clear();
 }
 } // namespace lynx
