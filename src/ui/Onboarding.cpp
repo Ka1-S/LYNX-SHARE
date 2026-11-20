@@ -257,6 +257,7 @@ public:
         moreButton.setComponentID ("welcome.more");
         styleSecondary (moreButton);
         moreButton.onClick = [this] {
+            applyUpdates();
             if (host.moreSetup)
                 host.moreSetup();
         };
@@ -266,6 +267,25 @@ public:
         styleSecondary (skipButton);
         skipButton.onClick = [this] { pick (Choice::none); };
         addAndMakeVisible (skipButton);
+        // issue #233 (rollup 0.1.31 step 2, round 190ns's choice): the one connection LYNX SHARE makes by itself, chosen
+        // here before it ever runs; ticked by default, and every answer (Skip / × / Esc too) applies what it shows
+        updatesToggle.setButtonText (tr ("Check for updates automatically"));
+        updatesToggle.setComponentID ("welcome.updates");
+        updatesToggle.setToggleState (host.updatesOn, juce::dontSendNotification);
+        updatesToggle.setTooltip (tr ("A few seconds after start-up LYNX SHARE asks GitHub for the newest version number; nothing about you is sent. "
+                                      "It is the only connection LYNX SHARE makes by itself: plugin scans and everything else stay on this computer."));
+        updatesToggle.setColour (juce::ToggleButton::textColourId, cardText());
+        updatesNote.setText (tr ("Only the newest version number is asked for; nothing about you is sent."), juce::dontSendNotification);
+        updatesNote.setFont (theme::font (theme::type::caption));
+        updatesNote.setColour (juce::Label::textColourId, cardGrey());
+        updatesNote.setJustificationType (juce::Justification::centredLeft);
+        updatesNote.setMinimumHorizontalScale (0.75f);
+        updatesNote.setBorderSize ({});
+        if (host.updatesShown)
+        {
+            addAndMakeVisible (updatesToggle);
+            addAndMakeVisible (updatesNote);
+        }
         refreshStatus();
         setSize (welcomeWidth, idealHeight (welcomeWidth, 100000));
     }
@@ -353,6 +373,15 @@ public:
         const auto textWidth = [] (juce::Button& b) { return juce::roundToInt (juce::GlyphArrangement::getStringWidth (theme::font (theme::type::body), b.getButtonText())) + 30; };
         moreButton.setBounds (buttons.removeFromLeft (juce::jmin (buttons.getWidth() / 2 - 6, textWidth (moreButton))));
         skipButton.setBounds (buttons.removeFromRight (juce::jmin (buttons.getWidth() - 12, textWidth (skipButton))));
+        if (host.updatesShown) // the bottom row (issue #233): the toggle, its note beside it (two lines where it is long)
+        {
+            r.removeFromTop (updatesGap);
+            auto row2 = r.removeFromTop (updatesRow);
+            const auto toggleWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (theme::font (theme::type::body), updatesToggle.getButtonText())) + 34;
+            updatesToggle.setBounds (row2.removeFromLeft (juce::jmin (toggleWidth, row2.getWidth() / 2)));
+            row2.removeFromLeft (10);
+            updatesNote.setBounds (row2);
+        }
     }
 
     bool keyPressed (const juce::KeyPress& key) override
@@ -382,7 +411,7 @@ public:
     }
 
 private:
-    static constexpr int pad = 24, headingHeight = 30, tileGap = 10;
+    static constexpr int pad = 24, headingHeight = 30, tileGap = 10, updatesGap = 8, updatesRow = 26;
 
     juce::String subtitle() const
     {
@@ -401,7 +430,8 @@ private:
     int fixedHeight (int width) const
     {
         // title row, heading, subtitle, (tiles), divider + setup row + buttons, trademark line
-        return titleRow + 1 + 14 + headingHeight + subtitleHeight (width) + 14 + 4 + 12 + 28 + 12 + 30 + 14 + footerTextHeight (width) + 10;
+        return titleRow + 1 + 14 + headingHeight + subtitleHeight (width) + 14 + 4 + 12 + 28 + 12 + 30 + (host.updatesShown ? updatesGap + updatesRow : 0) + 14
+               + footerTextHeight (width) + 10;
     }
 
     void pick (Choice c)
@@ -410,8 +440,15 @@ private:
             return;
         picked = true;
         stopTimer();
+        applyUpdates();
         if (host.choose)
             host.choose (c); // (may delete this)
+    }
+
+    void applyUpdates()
+    {
+        if (host.updatesShown && host.updates)
+            host.updates (updatesToggle.getToggleState());
     }
 
     WelcomeHost host;
@@ -420,6 +457,8 @@ private:
     juce::Label languageLabel, soundLabel, deviceLabel, scanLabel;
     juce::ComboBox languageBox;
     juce::TextButton testButton, moreButton, skipButton;
+    juce::ToggleButton updatesToggle;
+    juce::Label updatesNote;
     mutable int tileHeight = 82;
     int dividerY = 0;
     bool picked = false;

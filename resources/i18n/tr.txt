@@ -12061,6 +12061,9 @@ countries: tr
 "Got it" = "Anladım"
 "No more tips" = "Başka ipucu yok"
 
+# rollup 0.1.31 step 2 (issue #233 on the welcome card)
+"Only the newest version number is asked for; nothing about you is sent." = "Yalnızca en yeni sürüm numarası sorulur; sizinle ilgili hiçbir şey gönderilmez."
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak hold'lu tepe ölçer (sol/sağ)  [LMB] clip ışığını temizler"

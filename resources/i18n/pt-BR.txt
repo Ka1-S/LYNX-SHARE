@@ -12199,3 +12199,6 @@ countries: br
 "Help > Getting started shows this again" = "Ajuda > Primeiros passos mostra isto de novo"
 "Got it" = "Entendi"
 "No more tips" = "Chega de dicas"
+
+# rollup 0.1.31 step 2 (issue #233 on the welcome card)
+"Only the newest version number is asked for; nothing about you is sent." = "Só o número da versão mais nova é consultado; nada sobre você é enviado."

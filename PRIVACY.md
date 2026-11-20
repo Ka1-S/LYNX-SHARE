@@ -11,7 +11,7 @@ user or the person installing or operating it.
 
   | What | Address | When | Turn it off |
   |---|---|---|---|
-  | Update check | `https://api.github.com/repos/Ka1-S/LYNX-SHARE/releases` | a few seconds after start-up, at most every three hours; never before the first start's welcome window was answered, which shows the choice | the welcome window, or *Settings › General › Updates › Check for updates automatically* |
+  | Update check | `https://api.github.com/repos/Ka1-S/LYNX-SHARE/releases` | a few seconds after start-up, at most every three hours; never before the first start's welcome card was answered, which shows the choice | the welcome card, or *Settings › General › Updates › Check for updates automatically* |
   | Update download / going back | `https://github.com/Ka1-S/LYNX-SHARE/releases/...` (Linux AppImage: AppImageUpdate, `https://lynx-share.com/update/...`) | only when you click *Update* or *Go back to ...* | — |
   | Crash report | `https://lynx-share.com/api/crash.php` | only when you click *Send* (or chose *Always send*), and a report that could not be sent is retried once at the next start | *Settings › General › Crash reports › Never send* |
   | Stem model | `https://huggingface.co/...` | only after you choose *Extract stems from sample* and agree to the download, once | — |
@@ -66,8 +66,9 @@ user or the person installing or operating it.
 
 ## Update check (on by default, chosen on the first start, switchable)
 
-On the very first start the welcome window shows *Check for updates automatically* (ticked) beside the other first
-choices; nothing is asked before you answered it (*Finish* or *Skip*). From then on, a few seconds after it starts,
+On the very first start the welcome card ("Where are you coming from?") shows *Check for updates automatically*
+(ticked) on its bottom row; nothing is asked before you answered the card: any choice, *Skip*, ✕ or Esc applies the
+box as it is shown, and *More setup* carries it into the setup wizard (*Finish*). From then on, a few seconds after it starts,
 LYNX SHARE asks GitHub's public API for the list of LYNX SHARE releases
 (`https://api.github.com/repos/Ka1-S/LYNX-SHARE/releases`) and compares the newest version number with its own. If a
 newer version exists, a bar under the toolbar says so (*What's new*, *Update*, and ✕ to skip that version). The list

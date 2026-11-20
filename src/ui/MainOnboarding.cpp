@@ -11,6 +11,7 @@
 #include "ui/FirstSongTour.h"
 #include "ui/I18n.h"
 #include "ui/SetupWizard.h"
+#include "ui/Updater.h"
 #include "platform/Paths.h"
 
 namespace lynx
@@ -82,7 +83,13 @@ void MainComponent::showWelcomeCard (bool firstRun)
                 return;
             safe->setupOverlay.reset();
             if (firstRun && safe->persistent)
+            {
                 markSetupWizardDone();
+                // issue #233: the automatic update check waits for this answer (updater::startAutomaticCheck returns
+                // while setup-done.txt is missing); answered with the toggle ticked, the first check runs now
+                if (safe->welcomeUpdates)
+                    updater::startAutomaticCheck();
+            }
             safe->applyWelcomeChoice (choice);
             if (safe->isShowing())
                 safe->grabKeyboardFocus();
@@ -97,7 +104,7 @@ void MainComponent::showWelcomeCard (bool firstRun)
             safe->saveOnboarding();
             if (firstRun && safe->persistent)
                 markSetupWizardDone();
-            safe->showSetupWizard();
+            safe->showSetupWizard(); // (its Updates section shows the card's choice; its Finish runs the first check)
         });
     };
     host.language = [safe] (const juce::String& id) {
@@ -124,6 +131,18 @@ void MainComponent::showWelcomeCard (bool firstRun)
         if (s.running)
             return tr ("Plugins: scanning in the background");
         return tr ("Plugins: {0} found", { juce::String (known) });
+    };
+    // issue #233 (rollup 0.1.31 step 2): round 190ns's Updates choice on the card's bottom row, ticked by default; any answer
+    // applies it (the snapshot / test windows only remember it: welcomeUpdatesForCheck)
+    host.updatesShown = updater::offered();
+    host.updatesOn = persistent ? updater::automatic() : true;
+    welcomeUpdates = host.updatesOn;
+    host.updates = [safe] (bool on) {
+        if (safe == nullptr)
+            return;
+        safe->welcomeUpdates = on;
+        if (safe->persistent)
+            updater::setAutomatic (on);
     };
     setupOverlay = onboardui::makeWelcomeOverlay (std::move (host));
     addAndMakeVisible (*setupOverlay);

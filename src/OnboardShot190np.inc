@@ -95,6 +95,17 @@
                        && card->findChildWithID ("welcome.more") != nullptr && card->findChildWithID ("welcome.language") != nullptr
                        && card->findChildWithID ("welcome.test") != nullptr);
             line ("card " + card->getBounds().toString());
+            // issue #233 (rollup 0.1.31 step 2): round 190ns's Updates choice on the card's bottom row, ticked by default
+            {
+                auto* updates = dynamic_cast<juce::ToggleButton*> (card->findChildWithID ("welcome.updates"));
+                const auto* more = card->findChildWithID ("welcome.more");
+                check ("#233: \"Check for updates automatically\" on the card's bottom row, ticked by default",
+                       ! updater::offered()
+                           || (updates != nullptr && updates->isVisible() && updates->getToggleState() && more != nullptr
+                               && updates->getY() >= more->getBottom() && card->getLocalBounds().contains (updates->getBounds())));
+                if (updates != nullptr)
+                    write (*card, updates->getBounds().getUnion (more != nullptr ? more->getBounds() : updates->getBounds()).expanded (8), "welcome-updates-row");
+            }
             onboardui::setWelcomeHoverForSnapshot (*overlay, 0);
             write (*card, card->getLocalBounds(), "welcome-card-hover");
             onboardui::setWelcomeHoverForSnapshot (*overlay, -1);
@@ -108,6 +119,9 @@
             const auto* skip = card->findChildWithID ("welcome.skip");
             check ("at 1280x720 the card fits the window and its Skip button is inside it",
                    ui.getLocalBounds().contains (card->getBounds()) && skip != nullptr && card->getLocalBounds().contains (skip->getBounds()));
+            const auto* updates = card->findChildWithID ("welcome.updates");
+            check ("#233: at 1280x720 the Updates toggle is inside the card",
+                   ! updater::offered() || (updates != nullptr && card->getLocalBounds().contains (updates->getBounds())));
         }
         ui.setSize (1920, 1080);
         settle();
@@ -121,7 +135,26 @@
             check ("Skip keeps the Pattern layout and the project as it was",
                    ui.getLayoutStyle() == layoutstyle::Style::pattern && offline.getSong().channels.size() == before && ui.next3ForSnapshot() == nullptr);
             check ("Skip is remembered as the answer", ui.onboardingStateForCheck().choice == "skip" && ! ui.onboardingStateForCheck().pending);
+            check ("#233: Esc counts as answered with updates on (the toggle as shown: ticked)", ui.welcomeUpdatesForCheck());
         }
+        // #233: an untick is what Skip applies; ticked again for the rest of the route
+        if (updater::offered())
+            for (const bool on : { false, true })
+            {
+                ui.showWelcomeCard (false);
+                settle();
+                if (auto* o = ui.setupOverlayForTest())
+                    if (auto* card = o->findChildWithID ("welcome.card"))
+                    {
+                        if (auto* t = dynamic_cast<juce::ToggleButton*> (card->findChildWithID ("welcome.updates")))
+                            t->setToggleState (on, juce::dontSendNotification);
+                        if (auto* b = dynamic_cast<juce::Button*> (card->findChildWithID ("welcome.skip")))
+                            b->triggerClick();
+                    }
+                settle();
+                check (juce::String ("#233: Skip with the Updates toggle ") + (on ? "ticked applies on" : "unticked applies off"),
+                       ui.setupOverlayForTest() == nullptr && ui.welcomeUpdatesForCheck() == on);
+            }
         // the Skip button and × do the same
         for (const auto* id : { "welcome.skip", "welcome.close" })
         {

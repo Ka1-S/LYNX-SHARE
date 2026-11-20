@@ -36,6 +36,12 @@ struct WelcomeHost
     std::function<void()> testSound;                    // the Sound row's Test button
     std::function<juce::String()> deviceName;           // "Speakers (system default)" or the open device's name
     std::function<juce::String()> scanStatus;           // "Plugins: scanning in the background" ... (polled at 1 Hz)
+    // issue #233 on the welcome card (rollup 0.1.31 step 2: round 190ns's Updates choice of the old wizard, moved here): the
+    // bottom row's "Check for updates automatically" (only where LYNX updates itself, not in the Store build). `updates`
+    // gets the toggle's state right before `choose` / `moreSetup`: every answer (a choice, Skip, ×, Esc) applies it.
+    bool updatesShown = false;
+    bool updatesOn = true;
+    std::function<void (bool)> updates;
 };
 
 // The card over a dimmed window (the caller adds it over its whole area); Esc = Skip

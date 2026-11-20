@@ -12061,6 +12061,9 @@ countries: nl be
 "Got it" = "Begrepen"
 "No more tips" = "Geen tips meer"
 
+# rollup 0.1.31 step 2 (issue #233 on the welcome card)
+"Only the newest version number is asked for; nothing about you is sent." = "Alleen het nieuwste versienummer wordt opgevraagd; er wordt niets over jou verstuurd."
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editor openen/sluiten  [Alt]+[LMB] andere open houden  [Ctrl]+[LMB] voorbeluisteren  [2xLMB] Piano Roll  [LMB] omhoog/omlaag slepen herschikt  [RMB] kanaalmenu"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Piekmeter (links/rechts) met peak hold  [LMB] wist het cliplampje"

@@ -12061,6 +12061,9 @@ countries: it ch sm
 "Got it" = "Capito"
 "No more tips" = "Basta suggerimenti"
 
+# rollup 0.1.31 step 2 (issue #233 on the welcome card)
+"Only the newest version number is asked for; nothing about you is sent." = "Viene chiesto solo il numero della versione più recente; non viene inviato nulla su di te."
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] apri/chiudi l'editor  [Alt]+[LMB] lascia aperti gli altri  [Ctrl]+[LMB] ascolta  [2xLMB] Piano Roll  [LMB] trascina su/giù riordina  [RMB] menu del canale"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Meter di picco (sinistra/destra) con peak hold  [LMB] spegne la spia di clip"

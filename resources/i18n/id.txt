@@ -12061,6 +12061,9 @@ countries: id
 "Got it" = "Mengerti"
 "No more tips" = "Tidak perlu tips lagi"
 
+# rollup 0.1.31 step 2 (issue #233 on the welcome card)
+"Only the newest version number is asked for; nothing about you is sent." = "Hanya nomor versi terbaru yang ditanyakan; tidak ada data tentang Anda yang dikirim."
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] buka/tutup editor  [Alt]+[LMB] biarkan yang lain terbuka  [Ctrl]+[LMB] dengarkan  [2xLMB] Piano Roll  [LMB] seret naik/turun mengubah urutan  [RMB] menu channel"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak meter (kiri/kanan) dengan peak hold  [LMB] mematikan lampu clip"

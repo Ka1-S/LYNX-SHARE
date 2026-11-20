@@ -224,6 +224,7 @@ public:
     onboardui::TipCard* tipForSnapshot() const noexcept { return tipCard.get(); }
     onboardui::EmptyHintCard* emptyHintForSnapshot() const noexcept { return emptyHint.get(); }
     const onboarding::State& onboardingStateForCheck() const noexcept { return onboard; }
+    bool welcomeUpdatesForCheck() const noexcept { return welcomeUpdates; } // (rollup 0.1.31 step 2, issue #233)
     onboarding::Context& onboardingContextForCheck() noexcept { return onboardCtx; }
     bool mixerShownForCheck() const { return workspace.isPanelVisible (workspace::Panel::mixer); }
     void updateOnboarding(); // the song or the view changed: the Next-3 ticks and the empty-state hint
@@ -1078,6 +1079,7 @@ private:
     bool onboardingOn = false; // the real window (or a shot that asked for it)
     int onboardingTicks = 0;
     bool mixerAfterFirstTrack = false; // the timeline group's Mixer: shown with the first track
+    bool welcomeUpdates = true; // the welcome card's "Check for updates automatically" as last answered (issue #233)
     std::unique_ptr<onboardui::Next3Card> next3Card;
     std::unique_ptr<onboardui::TipCard> tipCard;
     juce::Component::SafePointer<juce::Component> tipAnchor;
