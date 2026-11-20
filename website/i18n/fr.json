@@ -520,7 +520,7 @@
 "fix.24.l": "Convertir en MIDI transforme la mélodie, l'harmonie ou la batterie d'un clip audio en nouveau pattern. Cela tourne sur votre propre ordinateur.",
 "fix.25.t": "Des touches d'annulation qui diffèrent d'un programme à l'autre",
 "fix.25.c": "Dans FL Studio, Ctrl+Z annule et rétablit seulement la dernière étape. Les personnes venues d'autres programmes s'attendent à ce qu'il continue de remonter en arrière.",
-"fix.25.l": "Par défaut, les touches sont celles de FL Studio : Ctrl+Z annule et rétablit la dernière étape, et Ctrl+Alt+Z remonte dans l'historique. « Mode d'annulation alternatif » dans les réglages généraux échange les deux.",
+"fix.25.l": "Par défaut, Ctrl+Z remonte dans l'historique, comme dans FL Studio 2026 (son « Mode d'annulation alternatif », activé d'office), et le menu Éditer nomme l'étape. Désactivez ce mode dans les réglages généraux pour retrouver les autres touches de FL : Ctrl+Z annule et rétablit la dernière étape, Ctrl+Alt+Z remonte dans l'historique.",
 "fix.26.t": "Trop de fenêtres dès le premier jour",
 "fix.26.c": "Un DAW complet montre à un débutant des dizaines de fenêtres et de commandes avant le premier son.",
 "fix.26.l": "Vue › Style de disposition › Flux simple affiche une fenêtre avec les pistes et la timeline. Une nouvelle piste est une voix, un instrument, un sampler ou un beat de départ en un clic, et les autres fenêtres restent à un clic. L'assistant de configuration le propose au premier démarrage.",

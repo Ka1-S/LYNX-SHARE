@@ -520,7 +520,7 @@
 "fix.24.l": "MIDI'ye dönüştür, bir ses klibinin melodisini, armonisini ya da davulunu yeni bir pattern'e çevirir. Kendi bilgisayarınızda çalışır.",
 "fix.25.t": "Programlar arasında farklı geri alma tuşları",
 "fix.25.c": "FL Studio'da Ctrl+Z yalnızca son adımı geri alır ve yineler. Başka programlardan gelenler onun geriye doğru adım adım gitmesini bekler.",
-"fix.25.l": "Varsayılan olarak tuşlar FL Studio'nunkilerdir: Ctrl+Z son adımı geri alır ve yineler, Ctrl+Alt+Z ise geçmişte geriye doğru adım atar. Genel ayarlardaki \"Alternatif geri alma modu\" ikisini değiştirir.",
+"fix.25.l": "Varsayılan olarak Ctrl+Z geçmişte geriye gider; FL Studio 2026'daki gibi (onun \"Alternatif geri alma modu\" kutudan açık çıkar) ve Düzen menüsü adımı adlandırır. FL'nin diğer tuşları için bu modu genel ayarlardan kapatın: Ctrl+Z son adımı geri alır ve yineler, Ctrl+Alt+Z geriye doğru adım atar.",
 "fix.26.t": "İlk günde çok fazla pencere",
 "fix.26.c": "Tam bir DAW yeni başlayana ilk sesten önce düzinelerce pencere ve kontrol gösterir.",
 "fix.26.l": "Görünüm › Yerleşim stili › Basit iş akışı, parçaların ve zaman çizelgesinin olduğu tek bir pencere gösterir. Yeni bir parça tek tıkla bir ses, enstrüman, sampler veya başlangıç ritmidir ve diğer pencereler bir tık uzakta kalır. Kurulum sihirbazı bunu ilk açılışta sunar.",

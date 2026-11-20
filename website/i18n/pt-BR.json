@@ -520,7 +520,7 @@
 "fix.24.l": "Converter para MIDI transforma a melodia, a harmonia ou a bateria de um clipe de áudio em um novo pattern. Roda no seu próprio computador.",
 "fix.25.t": "Teclas de desfazer que mudam de um programa para outro",
 "fix.25.c": "No FL Studio, Ctrl+Z desfaz e refaz só o último passo. Quem vem de outros programas espera que ele continue voltando.",
-"fix.25.l": "Por padrão as teclas são as do FL Studio: Ctrl+Z desfaz e refaz o último passo, e Ctrl+Alt+Z volta pelo histórico. \"Modo de desfazer alternativo\" nas configurações gerais troca as duas.",
+"fix.25.l": "Por padrão o Ctrl+Z volta pelo histórico, como no FL Studio 2026 (o \"Modo de desfazer alternativo\" dele já vem ligado), e o menu Editar nomeia o passo. Desligue esse modo nas configurações gerais para ter as outras teclas do FL: Ctrl+Z desfaz e refaz o último passo, Ctrl+Alt+Z volta pelo histórico.",
 "fix.26.t": "Janelas demais no primeiro dia",
 "fix.26.c": "Uma DAW completa mostra a um iniciante dezenas de janelas e controles antes do primeiro som.",
 "fix.26.l": "Exibir › Estilo de layout › Fluxo simples mostra uma janela com as faixas e a linha do tempo. Uma nova faixa é uma voz, um instrumento, um sampler ou uma batida inicial com um clique, e as outras janelas ficam a um clique. O assistente de configuração a oferece na primeira vez que o programa abre.",

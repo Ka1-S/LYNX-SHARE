@@ -520,7 +520,7 @@
 "fix.24.l": "Convertir a MIDI convierte la melodía, la armonía o la batería de un clip de audio en un patrón nuevo. Se ejecuta en tu propio ordenador.",
 "fix.25.t": "Teclas de deshacer que cambian entre programas",
 "fix.25.c": "En FL Studio, Ctrl+Z deshace y rehace solo el último paso. Quien viene de otros programas espera que siga retrocediendo.",
-"fix.25.l": "Por defecto las teclas son las de FL Studio: Ctrl+Z deshace y rehace el último paso, y Ctrl+Alt+Z retrocede por el historial. \"Modo de deshacer alternativo\" en la configuración general intercambia las dos.",
+"fix.25.l": "Por defecto, Ctrl+Z retrocede por el historial, como en FL Studio 2026 (su \"Modo de deshacer alternativo\", activado de fábrica), y el menú Editar nombra el paso. Desactiva ese modo en la configuración general para tener las otras teclas de FL: Ctrl+Z deshace y rehace el último paso, Ctrl+Alt+Z retrocede.",
 "fix.26.t": "Demasiadas ventanas el primer día",
 "fix.26.c": "Un DAW completo muestra a quien empieza decenas de ventanas y controles antes del primer sonido.",
 "fix.26.l": "Ver › Estilo de diseño › Flujo simple muestra una ventana con las pistas y la línea de tiempo. Una pista nueva es una voz, un instrumento, un sampler o un ritmo de partida con un clic, y las demás ventanas quedan a un clic. El asistente de configuración lo ofrece en el primer inicio.",

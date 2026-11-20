@@ -520,7 +520,7 @@
 "fix.24.l": "Konwertuj na MIDI zamienia melodię, harmonię lub perkusję klipu audio w nowy pattern. Działa na twoim własnym komputerze.",
 "fix.25.t": "Skróty cofania, które różnią się między programami",
 "fix.25.c": "W FL Studio Ctrl+Z cofa i ponawia tylko ostatni krok. Osoby przychodzące z innych programów oczekują, że będzie cofać dalej.",
-"fix.25.l": "Domyślnie skróty są takie jak w FL Studio: Ctrl+Z cofa i ponawia ostatni krok, a Ctrl+Alt+Z cofa po historii. „Alternatywny tryb cofania” w ustawieniach ogólnych zamienia je miejscami.",
+"fix.25.l": "Domyślnie Ctrl+Z cofa po historii, tak jak w FL Studio 2026 (jego „Alternatywny tryb cofania” jest włączony od razu), a menu Edycja nazywa krok. Wyłącz ten tryb w ustawieniach ogólnych, żeby mieć drugie skróty FL: Ctrl+Z cofa i ponawia ostatni krok, a Ctrl+Alt+Z cofa po historii.",
 "fix.26.t": "Za dużo okien pierwszego dnia",
 "fix.26.c": "Pełny DAW pokazuje początkującym dziesiątki okien i kontrolek jeszcze przed pierwszym dźwiękiem.",
 "fix.26.l": "Widok › Styl układu › Prosty sposób pracy pokazuje jedno okno ze ścieżkami i osią czasu. Nowa ścieżka to głos, instrument, sampler lub gotowy beat jednym kliknięciem, a pozostałe okna są oddalone o jedno kliknięcie. Kreator konfiguracji proponuje go przy pierwszym uruchomieniu.",

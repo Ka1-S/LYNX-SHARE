@@ -520,7 +520,7 @@
 "fix.24.l": "Konversi ke MIDI mengubah melodi, harmoni, atau drum dari clip audio menjadi pattern baru. Ini berjalan di komputermu sendiri.",
 "fix.25.t": "Tombol urungkan yang berbeda antarprogram",
 "fix.25.c": "Di FL Studio, Ctrl+Z hanya mengurungkan dan mengulangi langkah terakhir. Orang yang datang dari program lain mengharapkannya terus mundur.",
-"fix.25.l": "Secara bawaan tombolnya seperti FL Studio: Ctrl+Z mengurungkan dan mengulangi langkah terakhir, dan Ctrl+Alt+Z mundur melalui riwayat. \"Mode urungkan alternatif\" di pengaturan umum menukar keduanya.",
+"fix.25.l": "Secara bawaan Ctrl+Z mundur melalui riwayat, seperti di FL Studio 2026 (\"Mode urungkan alternatif\"-nya aktif dari awal), dan menu Edit menyebut langkahnya. Matikan mode itu di pengaturan umum untuk tombol FL yang lain: Ctrl+Z mengurungkan dan mengulangi langkah terakhir, Ctrl+Alt+Z mundur.",
 "fix.26.t": "Terlalu banyak jendela di hari pertama",
 "fix.26.c": "DAW lengkap menampilkan puluhan jendela dan kontrol kepada pemula sebelum bunyi pertama.",
 "fix.26.l": "Tampilan › Gaya tata letak › Alur kerja sederhana menampilkan satu jendela berisi track dan linimasa. Track baru berupa suara, instrumen, sampler, atau beat awal dengan satu klik, dan jendela lainnya tetap sejauh satu klik. Wizard pengaturan menawarkannya saat pertama kali dijalankan.",

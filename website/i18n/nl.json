@@ -520,7 +520,7 @@
 "fix.24.l": "Omzetten naar MIDI maakt van de melodie, de harmonie of de drums van een audioclip een nieuw pattern. Het draait op je eigen computer.",
 "fix.25.t": "Toetsen voor ongedaan maken die per programma verschillen",
 "fix.25.c": "In FL Studio maakt Ctrl+Z alleen de laatste stap ongedaan en weer opnieuw. Wie van andere programma's komt, verwacht dat het blijft teruggaan.",
-"fix.25.l": "Standaard zijn de toetsen die van FL Studio: Ctrl+Z maakt de laatste stap ongedaan en weer opnieuw, en Ctrl+Alt+Z gaat stap voor stap terug door de geschiedenis. \"Alternatieve modus voor ongedaan maken\" in de algemene instellingen verwisselt de twee.",
+"fix.25.l": "Standaard gaat Ctrl+Z terug door de geschiedenis, zoals in FL Studio 2026 (de \"Alternatieve modus voor ongedaan maken\" staat daar standaard aan), en het menu Bewerken noemt de stap. Zet die modus uit in de algemene instellingen voor de andere toetsen van FL: Ctrl+Z maakt de laatste stap ongedaan en weer opnieuw, Ctrl+Alt+Z gaat terug.",
 "fix.26.t": "Te veel vensters op de eerste dag",
 "fix.26.c": "Een volledige DAW toont een beginner tientallen vensters en knoppen vóór het eerste geluid.",
 "fix.26.l": "Beeld › Lay-outstijl › Eenvoudige werkwijze toont één venster met de tracks en de tijdlijn. Een nieuwe track is met één klik een stem, een instrument, een sampler of een startbeat, en de andere vensters blijven één klik verwijderd. De installatiewizard biedt het aan bij de eerste start.",

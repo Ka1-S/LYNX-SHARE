@@ -520,7 +520,7 @@
 "fix.24.l": "In MIDI umwandeln macht aus der Melodie, der Harmonie oder den Drums eines Audioclips ein neues Pattern. Das läuft auf deinem eigenen Computer.",
 "fix.25.t": "Rückgängig-Tasten, die sich zwischen Programmen unterscheiden",
 "fix.25.c": "In FL Studio macht Ctrl+Z nur den letzten Schritt rückgängig und stellt ihn wieder her. Wer von anderen Programmen kommt, erwartet, dass es weiter zurückgeht.",
-"fix.25.l": "Standardmäßig gelten die Tasten von FL Studio: Ctrl+Z macht den letzten Schritt rückgängig und stellt ihn wieder her, und Ctrl+Alt+Z geht den Verlauf zurück. „Alternativer Rückgängig-Modus“ in den allgemeinen Einstellungen vertauscht die beiden.",
+"fix.25.l": "Standardmäßig geht Ctrl+Z im Verlauf zurück, wie in FL Studio 2026 (dort ist der „Alternative Rückgängig-Modus“ von Haus aus an), und das Menü Bearbeiten nennt den Schritt. Schalte diesen Modus in den allgemeinen Einstellungen aus, um die anderen Tasten von FL zu bekommen: Ctrl+Z macht den letzten Schritt rückgängig und stellt ihn wieder her, Ctrl+Alt+Z geht zurück.",
 "fix.26.t": "Zu viele Fenster am ersten Tag",
 "fix.26.c": "Eine vollständige DAW zeigt Einsteigern Dutzende Fenster und Regler vor dem ersten Klang.",
 "fix.26.l": "Ansicht › Layout-Stil › Einfacher Arbeitsablauf zeigt ein Fenster mit den Spuren und der Zeitleiste. Eine neue Spur ist mit einem Klick eine Stimme, ein Instrument, ein Sampler oder ein Starter-Beat, und die anderen Fenster sind einen Klick entfernt. Der Einrichtungsassistent bietet es beim ersten Start an.",

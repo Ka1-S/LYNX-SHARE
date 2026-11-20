@@ -520,7 +520,7 @@
 "fix.24.l": "Converti in MIDI trasforma la melodia, l'armonia o la batteria di una clip audio in un nuovo pattern. Funziona sul tuo computer.",
 "fix.25.t": "Tasti di annullamento diversi tra i programmi",
 "fix.25.c": "In FL Studio, Ctrl+Z annulla e ripristina solo l'ultimo passo. Chi viene da altri programmi si aspetta che continui a tornare indietro.",
-"fix.25.l": "Per impostazione predefinita i tasti sono quelli di FL Studio: Ctrl+Z annulla e ripristina l'ultimo passo, e Ctrl+Alt+Z torna indietro nella cronologia. \"Modalità annulla alternativa\" nelle impostazioni generali scambia i due.",
+"fix.25.l": "Per impostazione predefinita Ctrl+Z torna indietro nella cronologia, come in FL Studio 2026 (la sua \"Modalità annulla alternativa\", attiva di serie), e il menu Modifica nomina il passo. Disattiva quella modalità nelle impostazioni generali per i tasti dell'altra modalità di FL: Ctrl+Z annulla e ripristina l'ultimo passo, Ctrl+Alt+Z torna indietro.",
 "fix.26.t": "Troppe finestre il primo giorno",
 "fix.26.c": "Una DAW completa mostra a chi comincia decine di finestre e controlli prima del primo suono.",
 "fix.26.l": "Vista › Stile del layout › Flusso semplice mostra una sola finestra con le tracce e la timeline. Una nuova traccia è una voce, uno strumento, un sampler o un beat di partenza con un clic, e le altre finestre restano a un clic di distanza. La procedura guidata di configurazione lo offre al primo avvio.",
