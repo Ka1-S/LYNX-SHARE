@@ -11918,3 +11918,5 @@ countries: jp
 "Stems:" = "ステム:"
 "A few seconds after start-up LYNX SHARE asks GitHub for the newest version number; nothing about you is sent. It is the only connection LYNX SHARE makes by itself: plugin scans and everything else stay on this computer." = "起動の数秒後、LYNX SHARE は GitHub に最新バージョンの番号を問い合わせます。あなたに関する情報は何も送信されません。LYNX SHARE が自分から行う接続はこれだけです。プラグインのスキャンなどはすべてこのコンピューター内で行われます。"
 "Off, LYNX SHARE never goes online by itself: plugin scans and everything else stay on this computer." = "オフにすると、LYNX SHARE が自分からオンラインに接続することはありません。プラグインのスキャンなどはすべてこのコンピューター内で行われます。"
+"Every shortcut can be changed:" = "すべてのショートカットは変更できます:"
+"Change, add or reset the keys of every action" = "各アクションのキーを変更・追加・リセット"

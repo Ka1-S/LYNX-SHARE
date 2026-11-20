@@ -34931,7 +34931,7 @@ private:
             saveIconSheet (prefix + "-icons-150.png", 1.5f);
             saveStateSheet (prefix + "-states190je.png", 1.0f); // round 190je: the one state rule, per button kind
             saveStateSheet (prefix + "-states190je-z3.png", 3.0f);
-            saveWindow (lynx::MainComponent::makeHelpContent(), "-help.png");
+            saveWindow (lynx::MainComponent::makeHelpContent (nullptr, [] {}), "-help.png"); // (round 190ns: with its Manage shortcuts link)
             saveWindow (lynx::ui::makeTrackIconGrid (5, {}), "-trackicons168h.png"); // round 168h: the icon picker
             saveWindow (std::make_unique<lynx::toolbar::CustomizePanel> (lynx::toolbarlayout::Layout::makeDefault()), "-customize-toolbar.png");
             // two moved controls: Tools › Last tweaked and Add › Automation for last tweaked parameter show them (REA round 143)

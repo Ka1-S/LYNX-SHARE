@@ -273,7 +273,9 @@ public:
     void openMasterAudioEditorForSnapshot (bool newOne) { openMasterAudioEditor (newOne); }
     toolbar::PerformanceMeter& getPerfMeterForSnapshot() noexcept { return perfMeter; }
     ui::HintBar& getHintBarForSnapshot() noexcept { return hintBar; }
-    static std::unique_ptr<juce::Component> makeHelpContent (const keys::KeyMap* keyMap = nullptr); // nullptr: the defaults
+    // `onManageShortcuts` (issue #234, round 190ns): the sheet's "Manage shortcuts..." link (none when empty)
+    static std::unique_ptr<juce::Component> makeHelpContent (const keys::KeyMap* keyMap = nullptr, // nullptr: the defaults
+                                                             std::function<void()> onManageShortcuts = {});
     static std::unique_ptr<juce::AlertWindow> makeAboutWindow(); // result 1 = OK, 2 = "Support LYNX SHARE"
     // round 190fq: the start-up support note (ui/SupportLynx.h), once per normal start; `quietRun` = test mode / CI
     void startSupportNote (bool quietRun);

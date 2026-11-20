@@ -11918,3 +11918,5 @@ countries: tr
 "Stems:" = "Stem'ler:"
 "A few seconds after start-up LYNX SHARE asks GitHub for the newest version number; nothing about you is sent. It is the only connection LYNX SHARE makes by itself: plugin scans and everything else stay on this computer." = "LYNX SHARE başladıktan birkaç saniye sonra GitHub'a en yeni sürüm numarasını sorar; sizinle ilgili hiçbir şey gönderilmez. LYNX SHARE'in kendiliğinden kurduğu tek bağlantı budur: eklenti taraması ve diğer her şey bu bilgisayarda kalır."
 "Off, LYNX SHARE never goes online by itself: plugin scans and everything else stay on this computer." = "Kapalıyken LYNX SHARE kendiliğinden asla internete bağlanmaz: eklenti taraması ve diğer her şey bu bilgisayarda kalır."
+"Every shortcut can be changed:" = "Her kısayol değiştirilebilir:"
+"Change, add or reset the keys of every action" = "Her eylemin tuşlarını değiştir, ekle veya sıfırla"

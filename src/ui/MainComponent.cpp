@@ -10541,7 +10541,7 @@ void MainComponent::rememberRecent (const juce::File& file)
     menuItemsChanged();
 }
 
-std::unique_ptr<juce::Component> MainComponent::makeHelpContent (const keys::KeyMap* keyMapIn)
+std::unique_ptr<juce::Component> MainComponent::makeHelpContent (const keys::KeyMap* keyMapIn, std::function<void()> onManageShortcuts)
 {
     // shortcut sheet: sections of "keys - action" rows, in two columns
     struct Row
@@ -10626,9 +10626,41 @@ std::unique_ptr<juce::Component> MainComponent::makeHelpContent (const keys::Key
 
     struct Sheet final : juce::Component
     {
-        explicit Sheet (std::vector<std::pair<juce::String, juce::String>> f) : fkeys (std::move (f))
+        Sheet (std::vector<std::pair<juce::String, juce::String>> f, std::function<void()> onManage) : fkeys (std::move (f))
         {
-            setSize (1500, juce::jmax (520, 20 + 28 + (int) fkeys.size() * 22 + 20));
+            // issue #234 (round 190ns): the way to change these keys, in the free space under the first columns (FL's
+            // shortcut list and its Manage shortcuts window are apart too; LYNX's sheet links them so the keys are found)
+            if (onManage)
+            {
+                manageNote.setText (tr ("Every shortcut can be changed:"), juce::dontSendNotification);
+                manageNote.setFont (theme::font (theme::type::body));
+                manageNote.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+                manageNote.setJustificationType (juce::Justification::centredLeft);
+                manageNote.setBorderSize ({});
+                manage.setButtonText (tr ("Manage shortcuts..."));
+                manage.setFont (theme::font (theme::type::body, true), false, juce::Justification::centredLeft);
+                manage.setColour (juce::HyperlinkButton::textColourId, theme::colour::accent);
+                manage.setTooltip (tr ("Change, add or reset the keys of every action"));
+                manage.onClick = std::move (onManage);
+                addAndMakeVisible (manageNote);
+                addAndMakeVisible (manage);
+            }
+            auto firstColumn = 20; // (where paint() ends the first column: General and Workspace)
+            for (std::size_t i = 0; i < 2 && i < sections.size(); ++i)
+                firstColumn += 28 + (int) sections[i].rows.size() * 24 + 14;
+            setSize (1500, std::max ({ 520, 20 + 28 + (int) fkeys.size() * 22 + 20, onManageShown() ? firstColumn + 8 + 24 + 20 : 0 }));
+        }
+
+        bool onManageShown() const { return manage.isVisible(); }
+
+        void resized() override
+        {
+            // bottom left, on the first column's left edge
+            const auto y = getHeight() - 20 - 24;
+            const auto noteWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (manageNote.getFont(), manageNote.getText())) + 8;
+            manageNote.setBounds (24, y, noteWidth, 24);
+            const auto linkWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (theme::font (theme::type::body, true), manage.getButtonText())) + 8;
+            manage.setBounds (manageNote.getRight(), y, linkWidth, 24);
         }
 
         void paint (juce::Graphics& g) override
@@ -10701,15 +10733,23 @@ std::unique_ptr<juce::Component> MainComponent::makeHelpContent (const keys::Key
         }
 
         std::vector<std::pair<juce::String, juce::String>> fkeys;
+        juce::Label manageNote;
+        juce::HyperlinkButton manage;
     };
 
-    return std::make_unique<Sheet> (std::move (functionKeys));
+    return std::make_unique<Sheet> (std::move (functionKeys), std::move (onManageShortcuts));
 }
 
 void MainComponent::showHelp()
 {
     juce::DialogWindow::LaunchOptions options;
-    options.content.setOwned (makeHelpContent (&keyMap).release());
+    // issue #234: the sheet's "Manage shortcuts..." link closes it and opens the Shortcut manager
+    options.content.setOwned (makeHelpContent (&keyMap, [safe = juce::Component::SafePointer<MainComponent> (this)] {
+                                  if (safe == nullptr)
+                                      return;
+                                  safe->closeHelp();
+                                  safe->showShortcutManager();
+                              }).release());
     options.dialogTitle = tr ("LYNX SHARE shortcuts");
     options.dialogBackgroundColour = theme::colour::bg2;
     options.useNativeTitleBar = true;

@@ -11918,3 +11918,5 @@ countries: es mx ar co cl pe ve
 "Stems:" = "Stems:"
 "A few seconds after start-up LYNX SHARE asks GitHub for the newest version number; nothing about you is sent. It is the only connection LYNX SHARE makes by itself: plugin scans and everything else stay on this computer." = "Unos segundos después de iniciarse, LYNX SHARE pregunta a GitHub cuál es el número de la versión más reciente; no se envía nada sobre ti. Es la única conexión que LYNX SHARE hace por sí solo: la búsqueda de plugins y todo lo demás se quedan en este ordenador."
 "Off, LYNX SHARE never goes online by itself: plugin scans and everything else stay on this computer." = "Desactivado, LYNX SHARE nunca se conecta a internet por sí solo: la búsqueda de plugins y todo lo demás se quedan en este ordenador."
+"Every shortcut can be changed:" = "Todos los atajos se pueden cambiar:"
+"Change, add or reset the keys of every action" = "Cambiar, añadir o restablecer las teclas de cada acción"
