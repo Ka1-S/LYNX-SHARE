@@ -53,3 +53,16 @@ TEST (bugs190nq_226_automation_of_a_deleted_insert_says_so)
     CHECK (song.automations[0].name == "BEAT BUS \xe2\x86\x92 VERB - Send level (target deleted)");
     CHECK (mixerops::targetDeletedName ("A (target deleted)") == "A (target deleted)");
 }
+
+TEST (bugs190nq_222_big_icon_centred_beside_the_insert_effects_column)
+{
+    using namespace lynx::trackiconscale;
+    // no column: the whole plate
+    CHECK ((bigIconArea (4.0f, 200.0f, 0.0f) == std::pair<float, float> { 4.0f, 200.0f }));
+    // with the LYNX extra's insert effects column (104 px at the plate's right): the part left of it
+    const auto [x, w] = bigIconArea (4.0f, 300.0f, 104.0f);
+    CHECK (x == 4.0f && w == 196.0f);
+    CHECK (x + w * 0.5f == 102.0f); // the icon's centre: the middle of the name / controls part
+    CHECK (bigIconArea (4.0f, 50.0f, 104.0f).second == 0.0f);
+    CHECK (bigIconSize (112, (int) w) == 56);
+}

@@ -2969,13 +2969,16 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 // issue #222 (round 190ng): FL 2026 also draws a track's icon big in the middle of a tall header (captured
                 // 2026-11-19 with Alt+wheel zoom: rows 56 / 68 / 80 px none, 92 / 104 / 116 px a centred icon of half the
                 // row's height in the plate's colour x 0.85); the small icon stays where it is (core/TrackIconScale.h)
+                // (#222 follow-up, round 190nq: with the LYNX extra's insert effects column shown, the icon is centred in the
+                // name / controls part of the header, the column left out: trackiconscale::bigIconArea)
+                const auto iconArea = trackiconscale::bigIconArea (plateArea.getX(), plateArea.getWidth(), (float) insertsColumn());
                 if (! live && ! simpleHeaders)
-                    if (const auto big = trackiconscale::bigIconSize (trackHeight, (int) plateArea.getWidth()); big > 0)
+                    if (const auto big = trackiconscale::bigIconSize (trackHeight, (int) iconArea.second); big > 0)
                         if (const auto icon = trackicons::iconFor (t < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) t].icon : 0);
                             icon != trackicons::Icon::none)
                         {
                             const auto box = juce::Rectangle<float> ((float) big, (float) big)
-                                                 .withCentre ({ plateArea.getCentreX(), (float) y + (float) trackHeight * 0.5f });
+                                                 .withCentre ({ iconArea.first + iconArea.second * 0.5f, (float) y + (float) trackHeight * 0.5f });
                             ui::drawTrackIcon (g, icon, box, trackiconscale::shade (plate));
                         }
                 const auto flTall = fl && trackHeight >= flTallHeader;
