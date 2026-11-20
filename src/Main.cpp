@@ -235,8 +235,8 @@
 #include "engine/ProjectPackage.h"
 #include "ui/SetupWizard.h"
 #include "ui/DemoMode.h" // (round 190np)
-#if JUCE_LINUX
-namespace juce::detail { bool dispatchNextMessageOnSystemQueue (bool returnIfNoPendingMessages); } // juce_Messaging_linux.cpp (--onboard190npshot)
+#if JUCE_LINUX || JUCE_WINDOWS // (rollup 0.1.31 step 2: Windows too, so --onboard190npshot runs its async callbacks there)
+namespace juce::detail { bool dispatchNextMessageOnSystemQueue (bool returnIfNoPendingMessages); } // juce_Messaging_linux / _windows.cpp (--onboard190npshot)
 #endif
 #include "ui/Onboarding.h"
 #include "engine/FlStudio.h"
@@ -7770,7 +7770,7 @@ private:
                     if (auto* o = x.getDynamicObject())
                         for (const auto& p : o->getProperties())
                         {
-                            if (path.isEmpty() && p.name.toString() == "savedBy")
+                            if (path.isEmpty() && (p.name.toString() == "savedBy" || p.name.toString() == "copiedFrom")) // (the copy's stamp)
                                 continue;
                             keys.insert (path + "/" + p.name.toString());
                             walk (p.value, path + "/" + p.name.toString());
@@ -7799,8 +7799,17 @@ private:
                     rollup031s2Result = juce::String ("ERROR automation name in the copy for ") + release;
                 else if (! copy.lost.empty())
                     rollup031s2Result = juce::String ("ERROR loss lines in the copy for ") + release + ": " + juce::String (copy.lost.front().text);
-                else if (juce::String (release) == "0.1.30" && keysOf (juce::JSON::parse (copy.json)) != keysOf (original))
-                    rollup031s2Result = "ERROR keys differ in the copy for 0.1.30";
+                else if (const auto kept = keysOf (juce::JSON::parse (copy.json)), all = keysOf (original); juce::String (release) == "0.1.30" && kept != all)
+                {
+                    juce::StringArray diff;
+                    for (const auto& k : all)
+                        if (kept.count (k) == 0)
+                            diff.add ("-" + k);
+                    for (const auto& k : kept)
+                        if (all.count (k) == 0)
+                            diff.add ("+" + k);
+                    rollup031s2Result = "ERROR keys differ in the copy for 0.1.30: " + diff.joinIntoString (" ").substring (0, 300);
+                }
                 if (rollup031s2Result != "OK")
                     break;
             }
