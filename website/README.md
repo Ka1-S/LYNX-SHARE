@@ -105,6 +105,16 @@ of that script (name, formats opened and exported, plugin formats, platforms, re
 run it again, never edit the picture; keep them in line with the README. The preview is uploaded by hand in the
 repository's Settings > Social preview.
 
+## 0.1.30 release: pictures
+
+Branch shots190nk (round 190nk): every picture re-drawn with `scripts/site-shots.sh` from the 0.1.30 Windows build
+(cloud run 44676172330 of 66d9c87ab, fresh profile, test mode, no `--logo-was`); `?v=` bumped to 0.1.30 for the Home /
+Features pictures, the poster and the og:image. Since 0.1.30 the Playlist opens at FL's default zoom, so the demo song
+fills only the first fifth of `playlist.webp` and Store 02 (as the program shows it); the README's `docs/img/playlist.png`
+is cut to the part with the song (`README_PICTURES` in site-shots.py). New in the README and the Store (not on the
+site's pages yet): the polyphonic note editor, Edit in ARA plugin, the Chord helper, Helix+ and the Simple workflow's
+Drum Machine, from the rounds' off-screen shot routes. Not re-made: `media/demo.mp3` / `peaks.json` and `lynx-tour.mp4`.
+
 ## 0.1.28 release
 
 Branch wip/release0128 (round 190hj): the Updates entry (dated 2026-11-15: change it if the tag is later, build,

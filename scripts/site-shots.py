@@ -52,7 +52,8 @@ TOP = {
 # the README's pictures (docs/img/<name>.png): the 1600 x 900 window for the wide ones, as the README had them
 README_PICTURES = {
     "workspace": ("snap1600/s-desktop-all.png", None),  # the same four windows as the hero (the README's caption)
-    "playlist": ("snap/s-playlist.png", (150, 75, 1920, 800)),
+    # (the part with the song: since 0.1.30 the Playlist opens at FL's default zoom, the demo fills its first fifth)
+    "playlist": ("snap/s-playlist.png", (0, 75, 1000, 482)),
     "channel-rack": ("snap/s-rack.png", (0, 0, 1074, 420)),
     "piano-roll": ("snap1600/s-pianoroll.png", None),
     "mixer": ("snap1600/s-mixer.png", None),
