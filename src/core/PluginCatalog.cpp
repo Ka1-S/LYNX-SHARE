@@ -505,7 +505,7 @@ const std::vector<CategoryList>& flGeneratorFolders()
         { "Synth classic", { "3x Osc", "Braid", "FLEX", "Fruity DX10", "GMS", "Harmless", "Helix", "Kepler", "Kepler Exo", "MiniSynth", "Pocket SuperSaw", "PoiZone", "Sawer", "SimSynth", "Sytrus",
                              "Tetra", "Toxic Biohazard", "Transistor Bass" } },
         // (FL lists Ogun under Drum and Synth special; one folder per plugin here: Synth special)
-        { "Synth special", { "Autogun", "BeepMap", "Harmor", "Morphine", "Ogun", "Plucked!", "Sakura" } },
+        { "Synth special", { "Autogun", "BeepMap", "Harmor", "LYNX Model", "Morphine", "Ogun", "Plucked!", "Sakura" } },
         { "Visual", { "Fruity Dance", "Fruity Video Player" } },
     };
     return list;

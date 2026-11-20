@@ -11,6 +11,7 @@
 #include "core/ModelParamsSynths.h"
 #include "core/PocketSuperSaw.h"
 #include "core/FmSynth.h"
+#include "core/physmod/LynxModel.h"
 #include "core/WavetableSynth.h"
 #include "core/Braid.h"
 #include "core/PoiZone.h"

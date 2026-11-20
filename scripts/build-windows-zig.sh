@@ -235,6 +235,7 @@ APP_SOURCES+=(src/core/SlicexInstrument.cpp)
 APP_SOURCES+=(src/ui/SlicexEditor.cpp)
 APP_SOURCES+=(src/ui/FpcEditor.cpp) # round 190q
 APP_SOURCES+=(src/ui/TetraEditor.cpp) # round 190hs
+APP_SOURCES+=(src/ui/LynxModelEditor.cpp) # round 190ni
 APP_SOURCES+=(src/ui/DirectWaveEditor.cpp) # round 190hz
 APP_SOURCES+=(src/ui/HelixEditor.cpp) # round 190ja
 # Windows file association (.lynx) and its icon
@@ -256,6 +257,8 @@ APP_SOURCES+=(src/core/GmsMobile.cpp)
 APP_SOURCES+=(src/core/PocketSuperSaw.cpp)
 # Tetra: LYNX's own FM synth and the import of Live's Operator onto it (round 190hs)
 APP_SOURCES+=(src/core/FmSynth.cpp src/core/AlsDevicesFm.cpp)
+# LYNX Model: LYNX's own physical-modelling instrument, mallets on a modal core (round 190ni)
+APP_SOURCES+=(src/core/physmod/ModalBank.cpp src/core/physmod/LynxModel.cpp src/core/LynxModelBank.cpp)
 # Helix: LYNX's own wavetable synth and the import of Live's Wavetable onto it (round 190ja)
 APP_SOURCES+=(src/core/WavetableSynth.cpp src/core/WavetableTables.cpp src/core/WavetableUser.cpp src/core/AlsDevicesWt.cpp)
 # Braid (Live's Meld) and the spectral effects' import, round 190ko

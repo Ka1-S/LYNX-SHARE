@@ -133,6 +133,7 @@ juce::String instrumentName (InstrumentKind k)
         case InstrumentKind::tetra: return "Tetra";
         case InstrumentKind::helix: return "Helix";
         case InstrumentKind::braid: return "Braid";
+        case InstrumentKind::lynxModel: return "LYNX Model";
     }
     return "?";
 }

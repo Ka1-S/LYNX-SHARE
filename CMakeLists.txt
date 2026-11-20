@@ -151,6 +151,8 @@ add_library(lynx_core STATIC
     src/core/GmsMobile.cpp
     src/core/PocketSuperSaw.cpp
     src/core/FmSynth.cpp
+    src/core/physmod/ModalBank.cpp
+    src/core/physmod/LynxModel.cpp
     src/core/AlsDevicesFm.cpp
     src/core/WavetableSynth.cpp
     src/core/WavetableTables.cpp
@@ -269,6 +271,7 @@ add_library(lynx_core STATIC
     src/core/NativeEngines.cpp
     src/core/LynxBanks.cpp
     src/core/HelixBank.cpp
+    src/core/LynxModelBank.cpp
     src/core/ModelParams.cpp
     src/core/ToxicBank.cpp
     src/core/BeepMapBank.cpp
@@ -444,6 +447,10 @@ add_executable(perfbench tools/perfbench.cpp)
 target_link_libraries(perfbench PRIVATE lynx_core)
 target_include_directories(perfbench PRIVATE tools)
 
+# LYNX Model (round 190ni): renders notes for the timbre score / calibration and measures the cost per voice
+add_executable(physmodrender tools/physmodrender.cpp)
+target_link_libraries(physmodrender PRIVATE lynx_core)
+
 enable_testing()
 add_test(NAME lynx_tests COMMAND lynx_tests)
 add_test(NAME lynx_remote_playlist_tests COMMAND lynx_remote_playlist_tests)
@@ -607,6 +614,7 @@ if(LYNX_BUILD_APP)
         src/ui/WaveTravellerEditor.cpp
         src/ui/FpcEditor.cpp
         src/ui/TetraEditor.cpp
+        src/ui/LynxModelEditor.cpp
         src/ui/DirectWaveEditor.cpp
         src/ui/HelixEditor.cpp
         src/ui/FruitySlicerEditor.cpp

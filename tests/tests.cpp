@@ -17642,6 +17642,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Meld190koTests.inc" // round 190ko: Meld → Braid, Spectral Time → Timeprism, Spectral Resonator → Harmonia (uses als190cf::)
 #include "AlsDevices190ekTests.inc"
 #include "Tetra190hsTests.inc" // round 190hs
+#include "LynxModel190niTests.inc" // round 190ni
 #include "Tetra190ixTests.inc" // round 190ix
 #include "Helix190jaTests.inc" // round 190ja
 #include "Helix190miTests.inc" // round 190mi
