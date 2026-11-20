@@ -1,5 +1,5 @@
 ---
-source: 9f36c60cc7
+source: 2298a70fec
 ---
 ![La fenêtre Historique des annulations : six étapes de Start à Add notes, avec Muet : Kick comme étape actuelle](/assets/img/wiki/history.webp)
 
@@ -15,18 +15,17 @@ Chaque modification du projet est une étape de l'historique d'annulation : une 
 
 ## Les touches d'annulation
 
-`Ctrl+Z` ne fonctionne pas comme dans la plupart des programmes. Il annule la dernière étape, et si on appuie de nouveau, il la rétablit : il alterne donc entre les deux derniers états. Pour remonter plus loin, utilisez `Ctrl+Alt+Z`.
+`Ctrl+Z` remonte l'historique, d'une étape par appui, comme dans FL Studio 2026 et la plupart des programmes. `Ctrl+Y` ou `Ctrl+Shift+Z` avance de nouveau.
 
 | Commande | Touche | Ce qu'elle fait |
 |---|---|---|
-| `Annuler` | `Ctrl+Z` | Annule la dernière étape. Après une annulation, il rétablit l'étape suivante, et l'entrée de menu affiche `Annuler (rétablir)` |
-| `Annuler en arrière` | `Ctrl+Alt+Z` | Recule toujours, d'une étape par appui |
+| `Annuler` | `Ctrl+Z` | Recule d'une étape par appui |
 | `Rétablir` | `Ctrl+Y` ou `Ctrl+Shift+Z` | Avance |
 | `Historique des annulations...` | `Ctrl+Alt+H` | Ouvre la liste |
 
-Après chaque annulation ou rétablissement, la barre d'aide nomme l'étape et indique le niveau, par exemple `Level 2/3`.
+Le menu `Éditer` nomme l'étape sur laquelle agit chaque élément, par exemple `Undo Add notes: Pattern 1`. Après chaque annulation ou rétablissement, la barre d'aide nomme l'étape et indique le niveau, par exemple `Level 2/3`.
 
-Si vous préférez le comportement habituel, activez `Mode d'annulation alternatif (annulation classique, au lieu d'annuler/rétablir sur le même raccourci)` dans `Options › Réglages généraux...`. `Ctrl+Z` recule alors toujours.
+L'autre mode d'annulation de FL Studio est là aussi : désactivez `Mode d'annulation alternatif` dans `Options › Réglages généraux...`. `Ctrl+Z` annule alors la dernière étape et, si on appuie de nouveau, la rétablit : il alterne donc entre les deux derniers états. `Ctrl+Alt+Z` (`Annuler en arrière`) remonte plus loin, et `Ctrl+Y` ou `Ctrl+Shift+Z` rétablissent toujours.
 
 ## Ce qui est une étape et ce qui n'en est pas une
 
@@ -43,7 +42,7 @@ Les deux se trouvent dans `Options › Réglages généraux...`.
 | Réglage | Ce qu'il fait |
 |---|---|
 | `Niveaux d'annulation maximum` | Combien d'étapes sont conservées : 25, 50, 100, 200, 500 ou 1000. La valeur par défaut est 100 |
-| `Mode d'annulation alternatif` | Fait de `Ctrl+Z` une annulation classique |
+| `Mode d'annulation alternatif` | Activé par défaut : `Ctrl+Z` remonte l'historique. Désactivé : `Ctrl+Z` alterne entre annuler et rétablir la dernière étape |
 
 ## Sauvegardes
 

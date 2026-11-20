@@ -1,5 +1,5 @@
 ---
-source: 9f36c60cc7
+source: 2298a70fec
 ---
 ![Geri alma geçmişi penceresi: Start'tan Add notes'a altı adım, geçerli adım olarak Mute: Kick](/assets/img/wiki/history.webp)
 
@@ -15,18 +15,17 @@ Projede yaptığınız her düzenleme geri alma geçmişinde bir adımdır: ekle
 
 ## Geri alma tuşları
 
-`Ctrl+Z` çoğu programdaki gibi çalışmaz. Son adımı geri alır ve yeniden basılırsa yineler; yani son iki durum arasında geçiş yapar. Daha geriye gitmek için `Ctrl+Alt+Z` kullanın.
+`Ctrl+Z`, FL Studio 2026 ve çoğu programda olduğu gibi her basışta geçmişte bir adım geri gider. `Ctrl+Y` veya `Ctrl+Shift+Z` yeniden ileri gider.
 
 | Komut | Tuş | Ne yapar |
 |---|---|---|
-| `Geri al` | `Ctrl+Z` | Son adımı geri alır. Geri almadan sonra bir sonraki adımı yineler ve menü öğesi `Geri al (yinele)` yazar |
-| `Geriye doğru geri al` | `Ctrl+Alt+Z` | Her zaman geri gider, her basışta bir adım |
+| `Geri al` | `Ctrl+Z` | Her basışta bir adım geri gider |
 | `Yinele` | `Ctrl+Y` veya `Ctrl+Shift+Z` | İleri gider |
 | `Geri alma geçmişi...` | `Ctrl+Alt+H` | Listeyi açar |
 
-Her geri alma veya yinelemeden sonra ipucu çubuğu adımın adını ve seviyeyi gösterir, örneğin `Level 2/3`.
+`Düzen` menüsü her öğenin etkileyeceği adımın adını gösterir, örneğin `Undo Add notes: Pattern 1`. Her geri alma veya yinelemeden sonra ipucu çubuğu adımın adını ve seviyeyi gösterir, örneğin `Level 2/3`.
 
-Olağan davranışı tercih ederseniz `Seçenekler › Genel ayarlar...` içinde `Alternatif geri alma modu (aynı kısayolda geri al/yinele yerine klasik geri alma)` seçeneğini açın. O zaman `Ctrl+Z` her zaman geri gider.
+FL Studio'nun diğer geri alma modu da var: `Seçenekler › Genel ayarlar...` içinde `Alternatif geri alma modu` seçeneğini kapatın. O zaman `Ctrl+Z` son adımı geri alır ve yeniden basılırsa yineler; yani son iki durum arasında geçiş yapar. `Ctrl+Alt+Z` (`Geriye doğru geri al`) daha geriye gider, `Ctrl+Y` veya `Ctrl+Shift+Z` ise yinelemeye devam eder.
 
 ## Neler adımdır, neler değildir
 
@@ -43,7 +42,7 @@ Olağan davranışı tercih ederseniz `Seçenekler › Genel ayarlar...` içinde
 | Ayar | Ne yapar |
 |---|---|
 | `Maksimum geri alma seviyesi` | Kaç adımın tutulacağı: 25, 50, 100, 200, 500 veya 1000. Varsayılan 100'dür |
-| `Alternatif geri alma modu` | `Ctrl+Z`'yi klasik bir geri almaya çevirir |
+| `Alternatif geri alma modu` | Varsayılan olarak açık: `Ctrl+Z` geçmişte geri gider. Kapalı: `Ctrl+Z` son adımı geri alma ile yineleme arasında geçiş yapar |
 
 ## Yedekler
 

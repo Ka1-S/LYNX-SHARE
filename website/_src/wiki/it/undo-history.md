@@ -1,5 +1,5 @@
 ---
-source: 9f36c60cc7
+source: 2298a70fec
 ---
 ![La finestra Cronologia annullamenti: sei passi da Start a Add notes, con Mute: Kick come passo corrente](/assets/img/wiki/history.webp)
 
@@ -15,18 +15,17 @@ Ogni modifica al progetto è un passo nella cronologia degli annullamenti: una n
 
 ## I tasti di annullamento
 
-`Ctrl+Z` non funziona come nella maggior parte dei programmi. Annulla l'ultimo passo e, premuto di nuovo, lo ripete, quindi alterna tra gli ultimi due stati. Per andare più indietro, usa `Ctrl+Alt+Z`.
+`Ctrl+Z` torna indietro nella cronologia, un passo per pressione, come in FL Studio 2026 e nella maggior parte dei programmi. `Ctrl+Y` o `Ctrl+Shift+Z` va di nuovo avanti.
 
 | Comando | Tasto | Cosa fa |
 |---|---|---|
-| `Annulla` | `Ctrl+Z` | Annulla l'ultimo passo. Dopo un annullamento ripete il passo successivo, e la voce di menu diventa `Annulla (ripeti)` |
-| `Annulla all'indietro` | `Ctrl+Alt+Z` | Torna sempre indietro, un passo per pressione |
+| `Annulla` | `Ctrl+Z` | Torna indietro di un passo per pressione |
 | `Ripeti` | `Ctrl+Y` o `Ctrl+Shift+Z` | Va avanti |
 | `Cronologia annullamenti...` | `Ctrl+Alt+H` | Apre l'elenco |
 
-Dopo ogni annullamento o ripetizione, la barra dei suggerimenti nomina il passo e mostra il livello, per esempio `Level 2/3`.
+Il menu `Modifica` nomina il passo su cui agisce ogni voce, per esempio `Undo Add notes: Pattern 1`. Dopo ogni annullamento o ripetizione, la barra dei suggerimenti nomina il passo e mostra il livello, per esempio `Level 2/3`.
 
-Se preferisci il comportamento abituale, attiva `Modalità annulla alternativa (annulla classico, invece di annulla/ripeti sulla stessa scorciatoia)` in `Opzioni › Impostazioni generali...`. `Ctrl+Z` allora torna sempre indietro.
+C'è anche l'altra modalità di annullamento di FL Studio: disattiva `Modalità annulla alternativa` in `Opzioni › Impostazioni generali...`. `Ctrl+Z` allora annulla l'ultimo passo e, premuto di nuovo, lo ripete, quindi alterna tra gli ultimi due stati. `Ctrl+Alt+Z` (`Annulla all'indietro`) va più indietro, e `Ctrl+Y` o `Ctrl+Shift+Z` continuano a ripetere.
 
 ## Cosa è un passo e cosa no
 
@@ -43,7 +42,7 @@ Entrambe sono in `Opzioni › Impostazioni generali...`.
 | Impostazione | Cosa fa |
 |---|---|
 | `Livelli massimi di annullamento` | Quanti passi si conservano: 25, 50, 100, 200, 500 o 1000. Il valore predefinito è 100 |
-| `Modalità annulla alternativa` | Fa di `Ctrl+Z` un annulla classico |
+| `Modalità annulla alternativa` | Attiva di default: `Ctrl+Z` torna indietro nella cronologia. Disattiva: `Ctrl+Z` alterna tra annullare e ripetere l'ultimo passo |
 
 ## Backup
 

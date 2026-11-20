@@ -1,5 +1,5 @@
 ---
-source: 9f36c60cc7
+source: 2298a70fec
 ---
 ![Das Fenster Rückgängig-Verlauf: sechs Schritte von Start bis Add notes, mit Mute: Kick als aktuellem](/assets/img/wiki/history.webp)
 
@@ -15,18 +15,17 @@ Jede Änderung am Projekt ist ein Schritt im Rückgängig-Verlauf: eine Note, di
 
 ## Die Rückgängig-Tasten
 
-`Ctrl+Z` funktioniert nicht wie in den meisten Programmen. Es macht den letzten Schritt rückgängig, und noch einmal gedrückt stellt es ihn wieder her, es wechselt also zwischen den letzten beiden Zuständen. Um weiter zurückzugehen, nimm `Ctrl+Alt+Z`.
+`Ctrl+Z` geht im Verlauf zurück, ein Schritt pro Druck, wie in FL Studio 2026 und den meisten Programmen. `Ctrl+Y` oder `Ctrl+Shift+Z` geht wieder vorwärts.
 
 | Befehl | Taste | Was er tut |
 |---|---|---|
-| `Rückgängig` | `Ctrl+Z` | Macht den letzten Schritt rückgängig. Nach einem Rückgängig stellt es den nächsten Schritt wieder her, und der Menüeintrag lautet `Rückgängig (Wiederholen)` |
-| `Rückwärts rückgängig` | `Ctrl+Alt+Z` | Geht immer zurück, ein Schritt pro Druck |
+| `Rückgängig` | `Ctrl+Z` | Geht pro Druck einen Schritt zurück |
 | `Wiederholen` | `Ctrl+Y` oder `Ctrl+Shift+Z` | Geht vorwärts |
 | `Rückgängig-Verlauf...` | `Ctrl+Alt+H` | Öffnet die Liste |
 
-Nach jedem Rückgängig oder Wiederholen nennt die Hinweisleiste den Schritt und zeigt die Ebene, zum Beispiel `Level 2/3`.
+Das Menü `Bearbeiten` nennt den Schritt, auf den sich jeder Eintrag bezieht, zum Beispiel `Undo Add notes: Pattern 1`. Nach jedem Rückgängig oder Wiederholen nennt die Hinweisleiste den Schritt und zeigt die Ebene, zum Beispiel `Level 2/3`.
 
-Wenn du das übliche Verhalten bevorzugst, schalte unter `Optionen › Allgemeine Einstellungen...` `Alternativer Rückgängig-Modus (klassisches Rückgängig statt Rückgängig/Wiederholen auf demselben Kürzel)` ein. `Ctrl+Z` geht dann immer zurück.
+Der andere Rückgängig-Modus von FL Studio ist auch da: Schalte `Alternativer Rückgängig-Modus` unter `Optionen › Allgemeine Einstellungen...` aus. `Ctrl+Z` macht dann den letzten Schritt rückgängig und stellt ihn bei erneutem Druck wieder her, es wechselt also zwischen den letzten beiden Zuständen. `Ctrl+Alt+Z` (`Rückwärts rückgängig`) geht weiter zurück, und `Ctrl+Y` oder `Ctrl+Shift+Z` stellen weiterhin wieder her.
 
 ## Was ein Schritt ist und was nicht
 
@@ -43,7 +42,7 @@ Beide stehen unter `Optionen › Allgemeine Einstellungen...`.
 | Einstellung | Was sie tut |
 |---|---|
 | `Maximale Rückgängig-Schritte` | Wie viele Schritte behalten werden: 25, 50, 100, 200, 500 oder 1000. Standard ist 100 |
-| `Alternativer Rückgängig-Modus` | Macht `Ctrl+Z` zu einem klassischen Rückgängig |
+| `Alternativer Rückgängig-Modus` | Standardmäßig an: `Ctrl+Z` geht im Verlauf zurück. Aus: `Ctrl+Z` wechselt zwischen Rückgängig und Wiederholen des letzten Schritts |
 
 ## Backups
 

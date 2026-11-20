@@ -1,5 +1,5 @@
 ---
-source: 9f36c60cc7
+source: 2298a70fec
 ---
 ![Jendela Riwayat urungkan: enam langkah dari Start sampai Add notes, dengan Mute: Kick sebagai langkah saat ini](/assets/img/wiki/history.webp)
 
@@ -15,18 +15,17 @@ Setiap suntingan pada proyek adalah satu langkah dalam riwayat urungkan: not yan
 
 ## Tombol urungkan
 
-`Ctrl+Z` tidak bekerja seperti di kebanyakan program. Ia mengurungkan langkah terakhir, dan kalau ditekan lagi ia mengulanginya, jadi ia berganti antara dua keadaan terakhir. Untuk mundur lebih jauh, pakai `Ctrl+Alt+Z`.
+`Ctrl+Z` mundur menelusuri riwayat, satu langkah per tekanan, seperti di FL Studio 2026 dan kebanyakan program. `Ctrl+Y` atau `Ctrl+Shift+Z` maju lagi.
 
 | Perintah | Tombol | Fungsinya |
 |---|---|---|
-| `Urungkan` | `Ctrl+Z` | Mengurungkan langkah terakhir. Setelah urungkan, ia mengulangi langkah berikutnya, dan item menu berbunyi `Urungkan (ulangi)` |
-| `Urungkan mundur` | `Ctrl+Alt+Z` | Selalu mundur, satu langkah per tekanan |
+| `Urungkan` | `Ctrl+Z` | Mundur satu langkah per tekanan |
 | `Ulangi` | `Ctrl+Y` atau `Ctrl+Shift+Z` | Maju satu langkah |
 | `Riwayat urungkan...` | `Ctrl+Alt+H` | Membuka daftar |
 
-Setelah setiap urungkan atau ulangi, bilah petunjuk menyebut langkahnya dan menampilkan levelnya, misalnya `Level 2/3`.
+Menu `Edit` menyebut langkah yang dikenai tiap item, misalnya `Undo Add notes: Pattern 1`. Setelah setiap urungkan atau ulangi, bilah petunjuk menyebut langkahnya dan menampilkan levelnya, misalnya `Level 2/3`.
 
-Kalau kamu lebih suka perilaku yang biasa, aktifkan `Mode urungkan alternatif (urungkan klasik, bukan urungkan/ulangi pada pintasan yang sama)` di `Opsi › Pengaturan umum...`. `Ctrl+Z` lalu selalu mundur.
+Mode urungkan FL Studio yang lain juga ada: matikan `Mode urungkan alternatif` di `Opsi › Pengaturan umum...`. `Ctrl+Z` lalu mengurungkan langkah terakhir dan, kalau ditekan lagi, mengulanginya, jadi ia berganti antara dua keadaan terakhir. `Ctrl+Alt+Z` (`Urungkan mundur`) mundur lebih jauh, dan `Ctrl+Y` atau `Ctrl+Shift+Z` tetap mengulangi.
 
 ## Apa yang menjadi langkah dan apa yang bukan
 
@@ -43,7 +42,7 @@ Keduanya ada di `Opsi › Pengaturan umum...`.
 | Pengaturan | Fungsinya |
 |---|---|
 | `Tingkat urungkan maksimum` | Berapa banyak langkah yang disimpan: 25, 50, 100, 200, 500, atau 1000. Bawaannya 100 |
-| `Mode urungkan alternatif` | Membuat `Ctrl+Z` urungkan klasik |
+| `Mode urungkan alternatif` | Aktif secara bawaan: `Ctrl+Z` mundur menelusuri riwayat. Mati: `Ctrl+Z` berganti antara urungkan dan ulangi untuk langkah terakhir |
 
 ## Cadangan
 
