@@ -1,0 +1,131 @@
+# REA round 190kv — the Soundtoys factory presets, captured through the public API and recognised in LYNX
+
+Branch `stoys190kv` off `rea190ku` (`b6315261f`). English-first, clean-room. Follows round 190ku (the state container,
+docs/analise/REA_rodada190ku.md). Lab and evidence outside git: `/mnt/e/lynx-work/stoys190kv` (HANDOFF.md). Markers:
+[EXEC] measured here · [model] LYNX's own law.
+
+**Method (the round's limits).** Only the installed plug-ins' public VST3 API, in our own hidden host
+(`refcap030/fxmeasure_b.exe`, no window, no input): the preset's archive set as the component state, every parameter
+read back as its normalised value and display text, the state re-saved. One host process per preset; a load that stalls
+past the timeout is stopped by its own PID. No Frida, no debugger, nothing patched, PACE untouched. What LYNX ships is
+hashes (fingerprints) and its own parameter values; no vendor preset, payload or table.
+
+## 1. The 190ku blocker was our wrapper, not a modal [EXEC]
+
+Round 190ku's second load "hung", and some presets hung on the first load. The hidden host's windows at the stall
+(listed per PID by `fr/batch.ps1`, observation only) showed a visible `ALERT` box: *"SoundToys EchoBoy, Version 5.5.5 —
+Syntax Error Expected '{'"* — the plug-in's archive parser rejecting the payload, not the "deprecated format" notice.
+Two bugs in 190ku's `mkwrap.py`:
+
+1. It looked only for `ARCHIVE =`; most factory `.toy` files carry `PRESET =` (only a few, e.g. `Default.toy`, use
+   `ARCHIVE =`), so `find` returned −1 and the wrapper sent the wrong bytes.
+2. It fixed the `CcnK` size but not the fxb chunk's own byte size (big-endian u32 at offset 172, right before `WIDGET`).
+
+`scripts/wrap2.py` puts the `.toy`'s whole text archive (its own `WIDGET` / `VERSION` header, `ARCHIVE =` renamed
+`PRESET =`) behind the plug-in's own `VstW` / `CcnK` / `FBCh` header and sets both sizes. With it every factory preset
+loads, also several in one instance (as round 136 already did with her states). No modal appeared again; nothing needed
+the GUI.
+
+## 2. The capture [EXEC]
+
+Every factory preset of the eight Soundtoys plug-ins this PC runs: EchoBoy 344, EchoBoy Jr 71, PrimalTap 60, Little
+PrimalTap 29, Decapitator 47, PanMan 43, Little AlterBoy 12, Little Plate 25 = **631 presets, 631 captured** in one
+hidden host per preset (`scripts/gen.py`, `fr/batch.ps1`, `scripts/parse.py` → `cap/<plug-in>.json`). A few hosts were
+slow (EchoBoy's CustomBeats rhythm presets: 10–18 s under load 30+) and were simply run again with a longer timeout;
+some hosts exited mid-run while the machine was at load 35 and loaded normally minutes later (re-run). **No preset
+needed the GUI.**
+
+A second pass loaded 60 presets per host (`scripts/genmulti.py` → `capM/`). Loading a preset over another one leaves the
+parameters the preset does not store at the previous preset's values (EchoBoy: Echo1Note in 100 presets whose Echo 1 is
+in Time mode, Rhythm fields, …) — but only inactive ones: the values LYNX maps (`scripts/leak.py`) are identical to the
+fresh instance's on **every** preset both passes read (EchoBoy 344 / 344, EchoBoy Jr 69 / 69, Little PrimalTap 16 / 16,
+Decapitator 34 / 34, Little AlterBoy 4 / 4; PanMan and Little Plate raw-identical).
+
+The 15 other installed Soundtoys plug-ins (Crystallizer, EffectRack, FilterFreak 1 / 2, PhaseMistress, Tremolator, …)
+also load in the hidden host; their presets were read in the multi pass for the record (lab only — LYNX has no
+substitute mapped for them).
+
+## 3. The payload is not canonical, but its volatile fields are few [EXEC]
+
+Two saves of the same setting never give the same payload (her 187 distinct state hashes for a few dozen settings were
+this, round 136). Comparing saves character by character (fresh instance, same instance 1 s later, after other loads,
+her FL-saved states re-saved):
+
+- the last ~20 characters change on every save (two 11-character fields and a short tail);
+- characters ~309 … 362 change with what the instance loaded before (11-character fields: EchoBoy 309–319, Little
+  PrimalTap / Little AlterBoy 320–330, Decapitator / PanMan up to 362);
+- nothing else changes. (So the payload is not a range coder as 190ku guessed: a change stays local unless a parameter
+  changes. LYNX still does not decode it.)
+
+**Fingerprint** [model]: FNV-1a 64 over the payload length and every character except 300 … 369 and the last 24
+(`soundtoysFingerprint`, Python twin `scripts/pay.py: masked`). Checks:
+
+- stable: 160 / 160 EchoBoy presets captured twice in separate fresh hosts give the same fingerprint (the full hash: 0 / 160);
+- discriminating: across the 631 presets a fingerprint is shared only by duplicate presets (11 EchoBoy pairs such as
+  `01 Classics/Space Echo` / `02 Style Tour/04-Space Echo`, identical values); 0 fingerprints map to two different LYNX
+  settings.
+
+## 4. What ships
+
+`src/core/SoundtoysFactory190kv.inc` (generated by `scripts/gentab.py`): per plug-in the fingerprints of each preset's
+re-saved states (fresh host, second fresh host, multi pass) and of the `.toy` payload itself → LYNX's own values
+(round 190is `vmap.eb_args` / `jr_args` / `pt_args` / `lpt_args` on Echoform, tp172d's Decapitator → Ember Classic map
+with Auto, round 136's Little AlterBoy → LYNX Tune mapping).
+
+**Quality gate per preset** [EXEC]. Every candidate preset was rendered by the official plug-in in its own fresh host
+(`stim`, 7 s; `scripts/genfb.py` / `genfb2.py`) and by LYNX through `--sub` with an
+*independent* re-save of that preset (the state a DAW would hold), before (the fallback) and after (the mapped values),
+scored with `scripts/fxparity.py` (`scripts/fbfull.py`); 101 of the candidates also on `mix` (35 s, `scripts/fbscore.py`). A preset
+ships only if its mapped values score at least the fallback on **every** file (`scripts/ship.py`). EchoBoy presets
+with an *Edited Style* (192 of 344: their style lives in parameters the API does not expose; 8 of the 9 drops on the first
+sample were these) are not candidates.
+
+| plug-in | presets | candidates | shipped | fingerprints | LYNX effect |
+|---|---|---|---|---|---|
+| EchoBoy | 344 | 152 (named styles) | 143 | 308 | Echoform |
+| EchoBoy Jr | 71 | 71 | 61 | 99 | Echoform |
+| PrimalTap | 60 | 60 | 47 | 94 | Echoform |
+| Little PrimalTap | 29 | 29 | 14 | 39 | Echoform |
+| Decapitator | 47 | 47 | 38 | 76 | Ember Classic |
+| Little AlterBoy | 12 | 12 | 11 | 23 | LYNX Tune |
+
+All 112 independent re-saves of the sampled presets were recognised (fingerprint hit 112 / 112).
+
+`translateSoundtoysFactory` runs only when the round-136 tables (her own states, full hash) do not know the state: the
+fingerprint is looked up for the state's `WIDGET`, and a hit sets the LYNX effect's new-instance values (its current
+revisions, e.g. Echoform `revision` 1 — what the value maps were measured on) with the preset's values on top. A miss
+returns 0 and the substitute's preset stays bit for bit. PrimalTap and Little PrimalTap gain `translate =
+soundtoys-factory`; EchoBoy / EchoBoy Jr / Decapitator / Little AlterBoy chain it after their round-136 tables.
+**Not shipped:** PanMan (its patterns are not in the parameter list, so the read-back cannot say what a preset does),
+Little Plate (no substitute value map yet), the 15 other plug-ins.
+
+**Old projects:** a `.lynx` project stores the substitute's parameters, so it loads bit for bit. An `.flp` / `.als`
+opened again now plays a factory preset's own settings instead of the generic fallback (the point of the round); any
+other state is translated exactly as before (`tests/Stoys190kvTests.inc`).
+
+## 5. Reach — honest limits [EXEC]
+
+- Her corpus (round 136, 187 FL-saved states): **0** are untouched factory presets (two default-instance files match).
+  Her states are her own tweaks; the factory table does not change her projects.
+- A preset loaded over another one in a running instance can carry the earlier preset's inactive fields into the
+  payload; such a save is matched only when it happens to equal one of the captured variants.
+- refcap030's parity bank holds parameter sweeps saved through the API, not factory presets: of its 373 Soundtoys
+  states only Little PrimalTap's and Little AlterBoy's default-instance states are in the table (their mapped values
+  equal the existing fallback, `--list` identical). The bank's means therefore cannot move; the value-map ceilings
+  (EchoBoy 4.47, PrimalTap 3.76, Little PrimalTap 3.66, EchoBoy Jr 4.26) need arbitrary states decoded, which this
+  round does not do.
+
+## 6. Scores (final binary; `fxparity` 0–10)
+
+| bank | files | before | after | per file |
+|---|---|---|---|---|
+| refcap030 PrimalTap / Little PrimalTap / EchoBoy Jr | 165 / 108 / 186 | 3.39 / 3.53 / 3.82 | same | all identical |
+| factory EchoBoy (named styles), stim | 152 | 3.19 | 3.93 | 90 up, 0 down |
+| factory EchoBoy Jr, stim | 71 | 3.56 | 4.06 | 22 up, 0 down |
+| factory PrimalTap, stim | 60 | 2.78 | 3.27 | 25 up, 0 down |
+| factory Little PrimalTap, stim | 29 | 2.97 | 3.14 | 3 up, 0 down |
+| factory Decapitator, stim | 47 | 2.77 | 4.26 | 33 up, 0 down |
+| factory Little AlterBoy, stim | 12 | 2.42 | 3.33 | 9 up, 0 down |
+| factory sample, stim + mix (20 presets per plug-in) | 224 | 3.01 | 3.84 | 103 up, 0 down |
+
+Value-map lab ceilings (round 190is, refcap030) are not reachable this way (§5).

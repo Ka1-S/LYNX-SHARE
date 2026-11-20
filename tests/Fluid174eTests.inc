@@ -137,3 +137,58 @@ TEST (fluid174e2_frame_pacing)
         CHECK (burst <= 2);
     }
 }
+
+// Round 190ip (proposal 3 of round 190hc): the Animation rate caps run on every n-th frame, a whole divisor of the
+// refresh (evenly paced); Balanced = the refresh halved until it is at most 100 Hz (Live's rule).
+TEST (overlay190ip_even_frame_rate)
+{
+    using lynx::framepace::evenDivisor;
+    using lynx::framepace::balancedCap;
+    CHECK (evenDivisor (144.0, 0.0) == 1);
+    CHECK (evenDivisor (144.0, 60.0) == 3);   // 48 a second, every 3rd frame (was every 2nd / 3rd)
+    CHECK (evenDivisor (144.0, 30.0) == 5);
+    CHECK (evenDivisor (120.0, 60.0) == 2);
+    CHECK (evenDivisor (60.0, 60.0) == 1);
+    CHECK (evenDivisor (59.94, 60.0) == 1);
+    CHECK (evenDivisor (60.0, 30.0) == 2);
+    CHECK (evenDivisor (165.0, 60.0) == 3);
+    CHECK (evenDivisor (144.0, balancedCap) == 2); // 72
+    CHECK (evenDivisor (120.0, balancedCap) == 2); // 60
+    CHECK (evenDivisor (165.0, balancedCap) == 2); // 82.5
+    CHECK (evenDivisor (240.0, balancedCap) == 4); // 60
+    CHECK (evenDivisor (100.0, balancedCap) == 1);
+    CHECK (evenDivisor (60.0, balancedCap) == 1);
+
+    // every n-th blank exactly, with jittered stamps; the same blank asked twice gets the same answer
+    for (const auto n : { 2, 3, 5 })
+    {
+        lynx::framepace::Divider divider;
+        const auto period = 1000.0 / 144.0;
+        int runs = 0, last = -1;
+        auto even = true;
+        for (int i = 0; i < 144 * 4; ++i)
+        {
+            const auto stamp = 52'000'000.0 + i * period + ((i * 7919) % 11 - 5) * 0.06;
+            const auto ran = divider.runs (stamp, period, n);
+            CHECK (divider.runs (stamp, period, n) == ran);
+            if (! ran)
+                continue;
+            if (last >= 0 && i - last != n)
+                even = false;
+            last = i;
+            ++runs;
+        }
+        CHECK (even);
+        CHECK (runs >= 144 * 4 / n - 1 && runs <= 144 * 4 / n + 1);
+    }
+    // a stall of half a second: one frame at once, then every n-th again (no burst)
+    {
+        lynx::framepace::Divider divider;
+        const auto period = 1000.0 / 144.0;
+        for (int i = 0; i < 100; ++i)
+            divider.runs (i * period, period, 2);
+        CHECK (divider.runs (172 * period, period, 2));
+        CHECK (! divider.runs (173 * period, period, 2));
+        CHECK (divider.runs (174 * period, period, 2));
+    }
+}

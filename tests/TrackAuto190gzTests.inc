@@ -1,6 +1,6 @@
 // Round 190gz (issue #170): LYNX's "Link Playlist tracks to mixer tracks" (core/PlaylistOps.h autolink): an optional
-// project switch that makes every Playlist track holding clips FL's own audio / instrument track of a mixer track (Track
-// N with insert N where that changes nothing in the sound), followed by new content, recording and the file formats.
+// project switch that makes every Playlist track holding content of its own FL's own audio / instrument track of mixer
+// insert N (round 190ib's rule: Track N = insert N), followed by new content, recording and the file formats.
 
 #include <cstring>
 
@@ -147,45 +147,41 @@ TEST (trackauto190gz_off_by_default_and_new_projects)
 
 TEST (trackauto190gz_switch_on_links_tracks_by_their_content)
 {
+    // (round 190ib: the rule is now "Track N = insert N" for every track with content of its own, core/PlaylistOps.h)
     using namespace lynx;
-    using autolink::Plan;
     trackauto190gz::Setup s;
-    // the plans before anything changes
-    CHECK (autolink::planFor (s.song, 0) == (Plan { Plan::Kind::instrument, 0, 0 }));
-    CHECK (autolink::planFor (s.song, 1) == (Plan { Plan::Kind::audio, 0, -1 }));
-    CHECK (autolink::planFor (s.song, 2).kind == Plan::Kind::none); // two instruments' patterns
-    CHECK (autolink::planFor (s.song, 3).kind == Plan::Kind::none); // automation only
-    CHECK (autolink::planFor (s.song, 4) == (Plan { Plan::Kind::audio, 12, -1 }));
-    CHECK (autolink::planFor (s.song, 5).kind == Plan::Kind::none); // already an audio track
-    CHECK (autolink::planFor (s.song, 6) == (Plan { Plan::Kind::instrument, 9, 1 }));
-    CHECK (autolink::planFor (s.song, 7).kind == Plan::Kind::none); // audio and patterns
-    CHECK (autolink::planFor (s.song, 8).kind == Plan::Kind::none); // empty
     CHECK (autolink::isNeutralFree (s.song, 1) && ! autolink::isNeutralFree (s.song, 9) && ! autolink::isNeutralFree (s.song, 10)
            && ! autolink::isNeutralFree (s.song, 6) && ! autolink::isNeutralFree (s.song, 0));
+    // each instrument's home is the first track that plays it; Tracks 7 and 8 only repeat tracks above them
+    const auto homes = autolink::homeTracks (s.song);
+    CHECK (homes[0] == 0 && homes[1] == 2 && homes[2] == 1 && homes[3] == 4 && homes[4] == 5 && homes[5] == 9 && homes[6] == -1);
+    const auto repeats = autolink::repeatedTracks (s.song);
+    CHECK (repeats[6] == 2 && repeats[7] == 1 && repeats[0] == -1 && repeats[3] == -1 && repeats[8] == -1);
 
-    const auto pads = s.track (5);
-    CHECK (autolink::setOn (s.song, true) == 5); // (Tracks 1, 2, 5, 7 and 10)
+    const auto plan = autolink::planOn (s.song);
+    CHECK (plan.changesRouting() && ! plan.changesSound() && plan.repeats.size() == 2);
+    CHECK (autolink::setOn (s.song, true) == 5); // (Tracks 1, 2, 3, 5 and 10; Track 6 was linked already)
     CHECK (s.song.linkTracksToMixer);
-    // Track 1 (Kick's pattern, Kick on the Master): Kick's instrument track on insert 1, which takes Kick's name
+    // Track 1 (Kick's pattern): Kick's instrument track on insert 1, which takes Kick's name
     CHECK (s.track (0).mode == PlaylistTrackMode::instrument && s.track (0).channel == 0 && s.track (0).mixerTrack == 1);
     CHECK (s.song.channels[0].mixerTrack == 1 && s.song.mixer[1].name == "Kick" && s.track (0).name == "Kick");
-    // Track 2 (the Loop sample on the Master): an audio track on insert 2, named after the sample, the channel routed there
+    // Track 2 (the Loop sample): an audio track on insert 2, named after the sample
     CHECK (s.track (1).mode == PlaylistTrackMode::audio && s.track (1).mixerTrack == 2 && s.song.channels[2].mixerTrack == 2);
     CHECK (s.track (1).name == "Loop" && s.song.mixer[2].name == "Loop");
-    // Track 3 and 4 stay unassigned
-    CHECK (s.track (2).mode == PlaylistTrackMode::unassigned && s.track (3).mode == PlaylistTrackMode::unassigned);
-    // Track 5 (Vox already on insert 12): linked where it plays, insert 5 left alone
-    CHECK (s.track (4).mode == PlaylistTrackMode::audio && s.track (4).mixerTrack == 12 && s.song.channels[3].mixerTrack == 12);
-    CHECK (s.song.mixer[5].name == "Insert 5");
-    // Track 6: an existing link is never changed
-    CHECK (s.track (5) == pads);
-    // Track 7 (Synth on insert 9): its instrument track on insert 9
-    CHECK (s.track (6).mode == PlaylistTrackMode::instrument && s.track (6).channel == 1 && s.track (6).mixerTrack == 9);
-    CHECK (s.song.mixer[9].name == "Insert 9"); // (an insert the user routed to keeps its name)
-    CHECK (s.track (7).mode == PlaylistTrackMode::unassigned);
-    // Track 10 (Bell on the Master, insert 10 carries an EQ): the first unused, neutral insert instead (3)
-    CHECK (s.track (9).mode == PlaylistTrackMode::audio && s.track (9).mixerTrack == 3 && s.song.channels[5].mixerTrack == 3);
-    CHECK (s.song.mixer[10].effects.size() == 1 && s.song.mixer[10].name == "Insert 10");
+    // Track 3 (Kick + Synth): Synth lives here (Kick lives on Track 1), so Synth leaves its neutral insert 9 for insert 3
+    CHECK (s.track (2).mode == PlaylistTrackMode::audio && s.track (2).mixerTrack == 3 && s.song.channels[1].mixerTrack == 3);
+    // Track 4 (automation only) stays unassigned
+    CHECK (s.track (3).mode == PlaylistTrackMode::unassigned);
+    // Track 5 (Vox on neutral insert 12): insert 5
+    CHECK (s.track (4).mode == PlaylistTrackMode::audio && s.track (4).mixerTrack == 5 && s.song.channels[3].mixerTrack == 5);
+    // Track 6 (an audio track on insert 6 already): its Pad goes through it, one name
+    CHECK (s.track (5).mode == PlaylistTrackMode::audio && s.track (5).mixerTrack == 6 && s.song.channels[4].mixerTrack == 6
+           && s.song.mixer[6].name == "Pads");
+    // Tracks 7 and 8 only repeat Tracks 3 and 2: unassigned (their LED mutes their clips)
+    CHECK (s.track (6).mode == PlaylistTrackMode::unassigned && s.track (7).mode == PlaylistTrackMode::unassigned);
+    // Track 10 (Bell on the Master): insert 10 carries an EQ nothing uses, so that insert moves to 11 and Bell takes 10
+    CHECK (s.track (9).mode == PlaylistTrackMode::audio && s.track (9).mixerTrack == 10 && s.song.channels[5].mixerTrack == 10);
+    CHECK (s.song.mixer[10].effects.empty() && s.song.mixer[11].effects.size() == 1);
     // the headers' insert is the link's (simpletracks::insertOf's rule)
     CHECK (trackmodes::armableInsert (s.song, 1) == 2 && trackmodes::armableInsert (s.song, 0) == -1);
 
@@ -197,6 +193,7 @@ TEST (trackauto190gz_switch_on_links_tracks_by_their_content)
             r.push_back (c.mixerTrack);
         return r;
     };
+    CHECK (autolink::planOn (s.song).changes.empty());
     CHECK (autolink::setOn (s.song, true) == 0 && s.song.playlistTracks == once.playlistTracks && routes (s.song) == routes (once)
            && s.song.mixer.size() == once.mixer.size());
     CHECK (autolink::setOn (s.song, false) == 0 && ! s.song.linkTracksToMixer && s.track (1).mixerTrack == 2);
@@ -231,18 +228,17 @@ TEST (trackauto190gz_new_content_follows_and_unassigned_stays)
     using namespace lynx;
     trackauto190gz::Setup s;
     autolink::setOn (s.song, true);
-    // a first clip on empty Track 9 (Hat's pattern, Hat on the Master): linked; insert 9 is the Synth's, so the first
-    // unused neutral insert (4)
-    auto before = autolink::contentKinds (s.song);
+    // a first clip on empty Track 9 (Hat's pattern, Hat on the Master): Hat's instrument track on insert 9 (Synth left it)
+    auto before = autolink::snapshot (s.song);
     auto& hat = s.song.patterns.emplace_back();
     hat.name = "Hat";
     hat.toggleStep (6, 2);
     s.clip (8, ClipKind::pattern, (int) s.song.patterns.size() - 1);
     CHECK (autolink::followNewContent (s.song, before) == 1);
-    CHECK (s.track (8).mode == PlaylistTrackMode::instrument && s.track (8).channel == 6 && s.track (8).mixerTrack == 4
-           && s.song.channels[6].mixerTrack == 4);
+    CHECK (s.track (8).mode == PlaylistTrackMode::instrument && s.track (8).channel == 6 && s.track (8).mixerTrack == 9
+           && s.song.channels[6].mixerTrack == 9);
     // a sample dropped on a track past the mixer's end: inserts up to its number are added and it takes its own
-    before = autolink::contentKinds (s.song);
+    before = autolink::snapshot (s.song);
     ChannelDef c;
     c.name = "Strings";
     c.instrument = InstrumentKind::audioClip;
@@ -253,10 +249,10 @@ TEST (trackauto190gz_new_content_follows_and_unassigned_stays)
            && s.song.channels.back().mixerTrack == 20 && s.song.mixer[20].name == "Strings");
     // Track mode › Unassigned on a linked track: it stays unassigned through the next edits (its content did not change)
     trackmodes::unassign (s.song, 1);
-    before = autolink::contentKinds (s.song);
+    before = autolink::snapshot (s.song);
     s.clip (1, ClipKind::audio, 2, 16 * ppq);
     CHECK (autolink::followNewContent (s.song, before) == 0 && s.track (1).mode == PlaylistTrackMode::unassigned);
-    // an empty pattern clip links nothing; its first notes do
+    // an empty pattern clip links nothing; its first notes do (insert 11, where the unused EQ insert went, moves on)
     auto& empty = s.song.patterns.emplace_back();
     empty.name = "Later";
     const auto later = (int) s.song.patterns.size() - 1;
@@ -265,43 +261,38 @@ TEST (trackauto190gz_new_content_follows_and_unassigned_stays)
     synth.instrument = InstrumentKind::synth;
     s.song.channels.push_back (synth);
     const auto bass = (int) s.song.channels.size() - 1;
-    before = autolink::contentKinds (s.song);
+    before = autolink::snapshot (s.song);
     s.clip (10, ClipKind::pattern, later);
     CHECK (autolink::followNewContent (s.song, before) == 0 && s.track (10).mode == PlaylistTrackMode::unassigned);
-    before = autolink::contentKinds (s.song);
+    before = autolink::snapshot (s.song);
     s.song.patterns[(std::size_t) later].toggleStep (bass, 0);
     CHECK (autolink::followNewContent (s.song, before) == 1);
-    CHECK (s.track (10).mode == PlaylistTrackMode::instrument && s.track (10).channel == bass && s.track (10).mixerTrack == 11);
+    CHECK (s.track (10).mode == PlaylistTrackMode::instrument && s.track (10).channel == bass && s.track (10).mixerTrack == 11
+           && s.song.channels[(std::size_t) bass].mixerTrack == 11 && s.song.mixer[11].effects.empty());
+    CHECK (std::any_of (s.song.mixer.begin() + 12, s.song.mixer.end(), [] (const MixerTrack& m) { return m.effects.size() == 1; }));
+    // the Pad clip moved from Track 6 to empty Track 13: Pad follows it to insert 13
+    before = autolink::snapshot (s.song);
+    for (auto& clip : s.song.playlist)
+        if (clip.kind == ClipKind::audio && clip.channel == 4)
+            clip.track = 12;
+    CHECK (autolink::followNewContent (s.song, before) == 1);
+    CHECK (s.track (12).mode == PlaylistTrackMode::audio && s.track (12).mixerTrack == 13 && s.song.channels[4].mixerTrack == 13
+           && s.track (12).name == "Pad");
     // switched off: nothing follows
     autolink::setOn (s.song, false);
-    before = autolink::contentKinds (s.song);
-    s.clip (11, ClipKind::audio, 5);
-    CHECK (autolink::followNewContent (s.song, before) == 0);
+    before = autolink::snapshot (s.song);
+    ChannelDef late;
+    late.name = "Late";
+    late.instrument = InstrumentKind::audioClip;
+    s.song.channels.push_back (late);
+    s.clip (14, ClipKind::audio, (int) s.song.channels.size() - 1);
+    CHECK (autolink::followNewContent (s.song, before) == 0 && s.song.channels.back().mixerTrack == 0);
 }
 
 TEST (trackauto190gz_refusals)
 {
     using namespace lynx;
-    using autolink::Plan;
-    trackauto190gz::Setup s;
-    // a channel whose insert another track is linked to: the track stays unassigned (its sound stays where it is)
-    s.song.channels[4].mixerTrack = 6; // Pad plays through Track 6's insert
-    s.clip (8, ClipKind::audio, 4, 8 * ppq);
-    CHECK (autolink::planFor (s.song, 8).kind == Plan::Kind::none);
-    // samples on two different inserts: none; the same insert: an audio track there
-    s.song.channels[2].mixerTrack = 13;
-    s.clip (11, ClipKind::audio, 2);
-    s.clip (11, ClipKind::audio, 3, 8 * ppq);
-    CHECK (autolink::planFor (s.song, 11).kind == Plan::Kind::none);
-    s.song.channels[2].mixerTrack = 12;
-    CHECK (autolink::planFor (s.song, 11) == (Plan { Plan::Kind::audio, 12, -1 }));
-    // a channel that already has an instrument track
-    s.song.playlistTracks[6].mode = PlaylistTrackMode::instrument;
-    s.song.playlistTracks[6].channel = 1;
-    s.song.playlistTracks[6].mixerTrack = 9;
-    s.clip (12, ClipKind::pattern, 2);
-    CHECK (autolink::planFor (s.song, 12).kind == Plan::Kind::none);
-    // an insert reserved for another participant of an online session is never taken
+    // an insert reserved for another participant of an online session is never taken: Tracks 1 and 2 stay unassigned
     trackauto190gz::Setup t;
     SessionParticipant host, guest;
     host.tag = session::hostTag;
@@ -309,14 +300,20 @@ TEST (trackauto190gz_refusals)
     guest.insertFirst = 1;
     guest.insertCount = 2;
     t.song.session.participants = { host, guest };
-    CHECK (! autolink::isNeutralFree (t.song, 1) && autolink::insertForTrack (t.song, 0) == 3);
-    // a full mixer: nothing is linked, nothing added
+    CHECK (! autolink::isNeutralFree (t.song, 1));
+    autolink::setOn (t.song, true);
+    CHECK (t.track (0).mode == PlaylistTrackMode::unassigned && t.track (1).mode == PlaylistTrackMode::unassigned
+           && t.track (2).mode == PlaylistTrackMode::audio && t.track (2).mixerTrack == 3);
+    CHECK (t.song.channels[0].mixerTrack == 0 && t.song.channels[2].mixerTrack == 0);
+    // a full mixer whose inserts all carry effects: nothing is linked, nothing added, nothing routed
     trackauto190gz::Setup full;
     full.song.mixer = Song::defaultMixer (maxMixerTracks - 1);
     for (int m = 1; m < (int) full.song.mixer.size(); ++m)
         full.song.mixer[(std::size_t) m].effects.push_back (makeEffectSlot (EffectKind::parametricEq));
     const auto inserts = full.song.mixer.size();
-    CHECK (! autolink::linkTrack (full.song, 1) && full.song.mixer.size() == inserts && full.track (1).mode == PlaylistTrackMode::unassigned);
+    CHECK (autolink::setOn (full.song, true) == 0);
+    CHECK (full.song.mixer.size() == inserts && full.track (0).mode == PlaylistTrackMode::unassigned && full.track (1).mode == PlaylistTrackMode::unassigned
+           && full.song.channels[0].mixerTrack == 0 && full.song.channels[2].mixerTrack == 0);
 }
 
 TEST (trackauto190gz_recording_goes_to_the_paired_track)
@@ -325,10 +322,11 @@ TEST (trackauto190gz_recording_goes_to_the_paired_track)
     trackauto190gz::Setup s;
     autolink::setOn (s.song, true);
     s.song.mixer[14].name = "Mic";
-    // off: FL's rule (a post-EQ take of an insert no audio track is linked to plays through the Master, on a new track)
+    // off: FL's rule (a post-EQ take of an insert no audio track is linked to plays through the Master, on the first
+    // track it doesn't overlap: Track 8, whose clips start later; round 190ir, it used to be a new track after the last one)
     auto off = s.song;
     off.linkTracksToMixer = false;
-    CHECK (takes::playbackInsert (off, 14, RecordSource::postEq) == 0 && takes::takeTrack (off, 14, 0, 960) == 10);
+    CHECK (takes::playbackInsert (off, 14, RecordSource::postEq) == 0 && takes::takeTrack (off, 14, 0, 960) == 7);
     // on: insert 14's take goes to Track 14 (index 13), which becomes its audio track; the clip plays through insert 14
     CHECK (autolink::pairedTakeTrack (s.song, 14) == 13);
     CHECK (takes::playbackInsert (s.song, 14, RecordSource::postEq) == 14 && takes::takeTrack (s.song, 14, 0, 960) == 13);
@@ -339,7 +337,7 @@ TEST (trackauto190gz_recording_goes_to_the_paired_track)
     CHECK (s.track (13).mode == PlaylistTrackMode::audio && s.track (13).mixerTrack == 14 && s.track (13).name == "Mic");
     // the next take of the same insert finds its audio track (free there) as before
     CHECK (takes::takeTrack (s.song, 14, 2000, 3000) == 13 && autolink::pairedTakeTrack (s.song, 14) == -1);
-    // an insert whose paired track holds clips: FL's rule (a new track after the last one used)
+    // an insert whose paired track holds clips: FL's rule (the first track the take doesn't overlap)
     CHECK (autolink::pairedTakeTrack (s.song, 4) == -1); // (Track 4 holds an automation clip)
     CHECK (takes::playbackInsert (s.song, 4, RecordSource::postEq) == 0);
     // the linked audio track's insert records into it (Track 2: Loop on insert 2)
@@ -351,6 +349,7 @@ TEST (trackauto190gz_flp_keeps_the_links)
     using namespace lynx;
     trackauto190gz::Setup s;
     autolink::setOn (s.song, true);
+    CHECK (autolink::repeatedTracks (s.song)[6] == 2);
     flpexport::Options options;
     flpexport::Report report;
     const auto back = importFlp (flp::parseProject (flpexport::exportFlp (s.song, options, report)));
@@ -362,10 +361,12 @@ TEST (trackauto190gz_flp_keeps_the_links)
         const auto mixer = [&back] (int t) { return back.playlistTracks[(std::size_t) t].mixerTrack; };
         CHECK (mode (0) == PlaylistTrackMode::instrument && mixer (0) == 1);
         CHECK (mode (1) == PlaylistTrackMode::audio && mixer (1) == 2);
-        CHECK (mode (2) == PlaylistTrackMode::unassigned);
-        CHECK (mode (4) == PlaylistTrackMode::audio && mixer (4) == 12);
-        CHECK (mode (6) == PlaylistTrackMode::instrument && mixer (6) == 9);
-        CHECK (mode (9) == PlaylistTrackMode::audio && mixer (9) == 3);
+        CHECK (mode (2) == PlaylistTrackMode::audio && mixer (2) == 3); // (round 190ib: Synth's home, insert 3)
+        CHECK (mode (4) == PlaylistTrackMode::audio && mixer (4) == 5);
+        CHECK (mode (5) == PlaylistTrackMode::audio && mixer (5) == 6);
+        CHECK (mode (6) == PlaylistTrackMode::unassigned && mode (7) == PlaylistTrackMode::unassigned);
+        CHECK (mode (9) == PlaylistTrackMode::audio && mixer (9) == 10);
+        CHECK (back.channels.size() > 5 && back.channels[1].mixerTrack == 3 && back.channels[5].mixerTrack == 10);
         const auto ch = back.playlistTracks[0].channel;
         CHECK (ch >= 0 && ch < (int) back.channels.size() && back.channels[(std::size_t) ch].name == "Kick" && back.channels[(std::size_t) ch].mixerTrack == 1);
         CHECK (back.mixer.size() > 3 && back.mixer[2].name == "Loop");

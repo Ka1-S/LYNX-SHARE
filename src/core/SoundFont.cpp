@@ -2,6 +2,7 @@
 // core/SoundFont.h and docs/analise/REA_rodada158.md.
 
 #include "core/SoundFont.h"
+#include "core/HostSlide.h"
 
 #include <algorithm>
 #include <chrono>
@@ -817,6 +818,8 @@ struct Voice
     float baseCents = 0, gainBase = 1, panL = 1, panR = 1, reverb = 0, chorus = 0;
     float lastGain = 0;
     float slideCents = 0, slideStep = 0; int slideLeft = 0;
+    // FL's stepped slide note (round 190jv, core/HostSlide.h Steps): slideStep at the control block where stepDue reaches 0
+    int stepsLeft = 0; double stepDue = 0.0, stepEvery = 0.0;
     float restAtStart = 0; // the channel's fine tune + main pitch in baseCents (they move it live: setChannelPitchNow)
     float filterBaseCents = 13500, filterQ = 0.7071f;
     bool oneShot = false;
@@ -1038,11 +1041,11 @@ public:
 
     void noteOn (int key, float velocity) noexcept override
     {
-        pending.push ({ key, velocity, true, nextPan, nextCents, startingNoteId() });
+        pending.push ({ key, velocity, NoteMsg::on, nextPan, nextCents, startingNoteId() });
         nextPan = 0, nextCents = 0;
     }
     // (round 190ej: the note's own voices — FL's SoundFont Player plays on the other note of the key [EXEC: /R render])
-    void noteOff (int key) noexcept override { pending.push ({ key, 0.0f, false, 0, 0, endingNoteId() }); }
+    void noteOff (int key) noexcept override { pending.push ({ key, 0.0f, NoteMsg::off, 0, 0, endingNoteId() }); }
     void setNextNoteExpression (float pan, float cents, bool) noexcept override { nextPan = pan, nextCents = cents; }
     // The channel's PITCH knob (issue #73: an FL project's SoundFont Player detuned −400 cents played undetuned) and its
     // fine tune + main pitch, before every render. FL's generators follow both on the sounding notes (round 167a): the
@@ -1076,13 +1079,33 @@ public:
     }
 
     bool followsSlides() const noexcept override { return true; } // (round 168l: a Mono channel's notes)
+    // Queued behind the notes like noteOn / noteOff (issue #165 follow-up, round 190ib): a slide note on the step of a
+    // note arrives right after that note's "on", which only becomes a voice in render(); applied at once, the slide found
+    // no voice and the note stayed flat (karatmep232's guitar, an FL SoundFont Player channel).
     void slideTo (int key, float cents, float samples) noexcept override
     {
-        // the sounding voices glide to the new key (FL's slide notes)
+        // (round 190jv: FL's steps ride along — the tick count in `id`, a tick's share of the slide in `pan`)
+        const auto stepped = HostSlide::pendingSteps();
+        pending.push ({ key, samples, NoteMsg::slide, stepped.fraction, cents, (std::uint32_t) std::max (0, stepped.ticks) });
+    }
+
+    void applySlide (int key, float cents, float samples, int ticks = 0, float fraction = 0.0f) noexcept
+    {
+        // the sounding voices glide to the new key (FL's slide notes); round 190jv: in FL's n + 1 steps on its ticks
         for (auto& v : voices)
             if (v.active && ! v.released)
             {
                 const auto target = (float) (key - v.key) * 100.0f + cents;
+                if (ticks > 0)
+                {
+                    v.stepsLeft = ticks + 1;
+                    v.slideStep = (target - v.slideCents) / (float) v.stepsLeft;
+                    v.slideLeft = 0;
+                    v.stepEvery = (double) std::max (1.0f, samples) * (double) fraction;
+                    v.stepDue = 0.0;
+                    continue;
+                }
+                v.stepsLeft = 0;
                 const auto steps = std::max (1, (int) (samples / (float) block));
                 v.slideStep = (target - v.slideCents) / (float) steps;
                 v.slideLeft = steps;
@@ -1149,7 +1172,9 @@ public:
         for (int i = 0; i < pending.count; ++i)
         {
             const auto& e = pending.events[(std::size_t) i];
-            if (e.on)
+            if (e.kind == NoteMsg::slide)
+                applySlide (e.key, e.cents, e.velocity, (int) e.id, e.pan); // (velocity = the slide's length in samples)
+            else if (e.kind == NoteMsg::on)
             {
                 startingId = e.id;
                 startNote (*font, e.key, e.velocity, e.pan, e.cents);
@@ -1180,7 +1205,11 @@ public:
     }
 
 private:
-    struct NoteMsg { int key; float velocity; bool on; float pan, cents; std::uint32_t id; };
+    struct NoteMsg
+    {
+        enum Kind : std::uint8_t { off, on, slide };
+        int key; float velocity; Kind kind; float pan, cents; std::uint32_t id;
+    };
     struct Pending
     {
         std::array<NoteMsg, 256> events {};
@@ -1553,6 +1582,12 @@ private:
             const auto modLfo = v.modLfo.value(), vibLfo = v.vibLfo.value();
             if (v.slideLeft > 0)
                 v.slideCents += v.slideStep, --v.slideLeft;
+            if (v.stepsLeft > 0) // (round 190jv: FL's steps, each at the control block that starts on its tick)
+            {
+                while (v.stepsLeft > 0 && v.stepDue <= 1.0e-3 * v.stepEvery + 1.0e-6)
+                    v.slideCents += v.slideStep, --v.stepsLeft, v.stepDue += v.stepEvery;
+                v.stepDue -= (double) n;
+            }
             auto cents = v.baseCents + knobCents + (restCents - v.restAtStart) + v.slideCents + bendCents + modLevel * (float) r.modEnvToPitch + modLfo * (float) r.modLfoToPitch;
             cents += vibLfo * ((lfoOverride ? lfoDepth : (float) r.vibLfoToPitch) + (std::max (modWheel, param (pModWheel)) + pressure) * 50.0f);
             const auto step = (double) centsToRatio (cents) * (double) r.sampleRate / (double) rate;

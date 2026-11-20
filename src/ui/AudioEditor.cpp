@@ -1,6 +1,7 @@
 #include "ui/AudioEditor.h"
 #include "ui/AudioEditorTools.h"
 #include "ui/AudioToMidi.h"
+#include "ui/PolyEditor.h"
 #include "ui/BrowserComponent.h"
 #include "ui/EditorTools.h"
 
@@ -17,6 +18,9 @@
 #include "core/AudioCapture.h"
 #include "core/AudioEditTools.h"
 #include "core/AutoWarp.h"
+#include "core/SampleProps.h"
+#include "core/TempoDetect.h"
+#include "core/WarpEngines.h"
 #include "core/EdisonFx.h"
 #include "core/EdisonScript.h"
 #include "core/SessionKeys.h"
@@ -30,12 +34,15 @@
 #include "core/WarpTools.h"
 #include "core/WarpView.h"
 #include "core/ClipLauncher.h"
+#include "core/ClipBrace.h"
+#include "core/EdisonView.h"
 #include "engine/SampleLibrary.h"
 #include "engine/Text.h"
 #include "platform/Paths.h"
 #include "ui/AudioClipboard.h"
 #include "ui/FileChoosers.h"
 #include "ui/HintBar.h"
+#include "ui/SampleProperties.h"
 #include "ui/ScriptPanel.h"
 #include "ui/ValueControl.h"
 #include "ui/I18n.h"
@@ -50,6 +57,22 @@ namespace lynx
 namespace
 {
 namespace ae = audioedit;
+
+// FL Edison's Edit › "Click-free (smooth) editing" (key C; on by default as FL's: round gaps190kf, core AudioEdit's
+// clickfree). One switch for every audio editor window of the session.
+bool& clickFreeEditing()
+{
+    static bool on = true;
+    return on;
+}
+
+// round 190ld (DP-58, owner decision PL2): FL Edison's wheel (zoom; Shift+wheel scrolls) by default; View › "Wheel
+// scrolls (LYNX)" switches every audio editor of the session to LYNX's earlier mapping (wheel scrolls, Ctrl+wheel zooms)
+bool& wheelScrollsLynx()
+{
+    static bool on = false;
+    return on;
+}
 
 // one clipboard for every editor window (copy in one, paste in another); Tools › Clipboard saves it (round 181b)
 ae::Audio& clipboard()
@@ -76,7 +99,10 @@ bool readAudioFile (const juce::File& file, ae::Audio& out)
 }
 
 // the clean clip look (docs/analise/UI_STUDY_playlist_clips.md): one light filled shape in a tint of the audio colour
-juce::Colour waveColour() { return theme::colour::audioClip.interpolatedWith (juce::Colours::white, 0.7f); }
+// Round 190jo (design190ia FW-24): Edison's canvas. FL's navy #353C4C read a step darker so it sits with LYNX's dark
+// panels (the waveform keeps 9.2:1 on it), its grid lines, and the light waveform.
+juce::Colour waveColour() { return juce::Colour (0xffd2d9e9); }
+const juce::Colour canvasColour { 0xff2b3140 }, canvasGrid { 0xff363d4e }, canvasGridStrong { 0xff434b5e };
 
 enum class TimeFormat
 {
@@ -249,6 +275,7 @@ class AudioEditor final : public juce::Component,
                           public juce::FileDragAndDropTarget,
                           public audiotools::Host,
                           public juce::DragAndDropTarget,
+                          public ui::HintSource,
                           private juce::Timer
 {
 public:
@@ -266,6 +293,8 @@ public:
         setupIcon (recordButton, tr ("Record") + " (R)");
         setupIcon (recordMenuButton, tr ("What and when to record"));
         setupIcon (playButton, tr ("Play / stop the selection") + " (Space)");
+        setupIcon (scrubButton, tr ("Scrub: hold and drag right to play forward, left to play backward; the further, the faster"));
+        scrubButton.addMouseListener (this, false); // (round natives190kj: FL's ScrubBtn, a shuttle)
         setupIcon (stopButton, tr ("Stop"));
         setupIcon (snapButton, snapCaption (snapMode)); // FL: the hint names the snap mode (round 190ee)
         setupIcon (fitButton, tr ("Zoom out full"));
@@ -348,9 +377,10 @@ public:
             b.setTooltip (tip);
             addAndMakeVisible (b);
         };
-        setupText (loopButton, tr ("Loop"), tr ("Loop the playback") + " (L)");
+        // round 190jo (design190ia FW-22): Loop, Spectrum and the envelope mode are icon buttons in Edison's places (the loop
+        // in the transport capsule; the view switches in the small icon row); their tooltips keep the texts
+        setupIcon (loopButton, tr ("Loop") + ": " + tr ("Loop the playback") + " (L)");
         loopButton.setClickingTogglesState (true);
-        loopButton.setColour (juce::TextButton::buttonOnColourId, theme::colour::accent);
         loopButton.onClick = [this] {
             loopPlay = loopButton.getToggleState();
             if (slotMode())
@@ -373,14 +403,13 @@ public:
         };
         addAndMakeVisible (volumeKnob);
         refreshVolumeKnob();
-        setupText (viewButton, tr ("Spectrum"), tr ("Show the waveform or the spectrogram") + " (S)");
+        setupIcon (viewButton, tr ("Spectrum") + ": " + tr ("Show the waveform or the spectrogram") + " (S)");
         viewButton.setClickingTogglesState (true);
-        viewButton.setColour (juce::TextButton::buttonOnColourId, theme::colour::accent);
         viewButton.onClick = [this] {
             spectrumView = viewButton.getToggleState();
             repaint();
         };
-        setupText (envButton, tr ("Edit: Wave"), tr ("What the mouse edits: the waveform, or the volume / panning / stereo separation envelope drawn over it (E)"));
+        setupIcon (envButton, tr ("Edit: Wave") + ": " + tr ("What the mouse edits: the waveform, or the volume / panning / stereo separation envelope drawn over it (E)"));
         envButton.onClick = [this] { envModeMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&envButton)); };
         setupText (sendButton, tr ("Send"), tr ("Send to the Playlist as an audio clip, to a new Sampler channel or back to the channel"));
         sendButton.setColour (juce::TextButton::buttonColourId, theme::colour::accentMuted);
@@ -392,32 +421,45 @@ public:
             const char* text;
             const char* tip;
             std::function<void()> action;
+            Icon icon; // (round 190jo: Edison's icon tools; 0-3 sit in the small icon row, the rest in the 2 x 9 grid)
         };
         const Quick quick[] = {
-            { TR_NOOP ("Cut"), TR_NOOP ("Cut the selection (Ctrl+X)"), [this] { cutSelection(); } },
-            { TR_NOOP ("Copy"), TR_NOOP ("Copy the selection (Ctrl+C)"), [this] { copySelection(); } },
-            { TR_NOOP ("Paste"), TR_NOOP ("Paste at the cursor, or over the selection (Ctrl+V)"), [this] { paste (false); } },
-            { TR_NOOP ("Delete"), TR_NOOP ("Delete the selection (Del)"), [this] { deleteSelection(); } },
-            { TR_NOOP ("Trim"), TR_NOOP ("Keep only the selection"), [this] { trimSelection(); } },
-            { TR_NOOP ("Silence"), TR_NOOP ("Silence the selection (Clear)"), [this] { edit (tr ("Silence"), [] (ae::Document& d, ae::Range r) { ae::clear (d, r); }, true); } },
-            { TR_NOOP ("Fade in"), TR_NOOP ("Fade in over the selection (curve: the arrow next to Fade out)"), [this] { fade (true); } },
-            { TR_NOOP ("Fade out"), TR_NOOP ("Fade out over the selection"), [this] { fade (false); } },
-            { "~", TR_NOOP ("Fade curve"), [this] { curveMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (quickButtons[8])); } },
-            { TR_NOOP ("Normalize"), TR_NOOP ("Normalize the selection (or everything) to 0 dB"), [this] { edit (tr ("Normalize"), [] (ae::Document& d, ae::Range r) { ae::normalize (d, r); }); } },
-            { TR_NOOP ("Amp..."), TR_NOOP ("Volume and panning"), [this] { showAmp(); } },
-            { TR_NOOP ("Reverse"), TR_NOOP ("Reverse the selection (or everything)"), [this] { edit (tr ("Reverse"), [] (ae::Document& d, ae::Range r) { ae::reverse (d, r); }); } },
-            { TR_NOOP ("Invert"), TR_NOOP ("Reverse the polarity"), [this] { edit (tr ("Reverse polarity"), [] (ae::Document& d, ae::Range r) { ae::invert (d, r); }); } },
-            { TR_NOOP ("Center"), TR_NOOP ("Remove the DC offset"), [this] { edit (tr ("Remove DC offset"), [] (ae::Document& d, ae::Range r) { ae::removeDc (d, r); }); } },
-            { TR_NOOP ("Stretch..."), TR_NOOP ("Time stretch / pitch shift"), [this] { openEdisonTool (audiotools::Tool::stretch); } },
-            { TR_NOOP ("Resample..."), TR_NOOP ("Change the sample rate"), [this] { showResample(); } },
-            { TR_NOOP ("Marker"), TR_NOOP ("Add a marker at the cursor (M)"), [this] { addMarkerAtCursor(); } },
-            { TR_NOOP ("Region"), TR_NOOP ("Make the selection a region"), [this] { addRegionFromSelection(); } },
-            { TR_NOOP ("Set loop"), TR_NOOP ("Make the selection the loop"), [this] { setLoopFromSelection(); } },
+            { TR_NOOP ("Cut"), TR_NOOP ("Cut the selection (Ctrl+X)"), [this] { cutSelection(); }, Icon::scissors },
+            { TR_NOOP ("Copy"), TR_NOOP ("Copy the selection (Ctrl+C)"), [this] { copySelection(); }, Icon::copy },
+            { TR_NOOP ("Paste"), TR_NOOP ("Paste at the cursor, or over the selection (Ctrl+V)"), [this] { paste (false); }, Icon::paste },
+            { TR_NOOP ("Delete"), TR_NOOP ("Delete the selection (Del)"), [this] { deleteSelection(); }, Icon::trash },
+            { TR_NOOP ("Trim"), TR_NOOP ("Keep only the selection"), [this] { trimSelection(); }, Icon::trim },
+            { TR_NOOP ("Silence"), TR_NOOP ("Silence the selection (Clear)"), [this] { edit (tr ("Silence"), [] (ae::Document& d, ae::Range r) { clickFreeEditing() ? ae::clickfree::clearClickFree (d, r) : ae::clear (d, r); }, true); }, Icon::silence }, // (gaps190kf: click-free)
+            { TR_NOOP ("Fade in"), TR_NOOP ("Fade in over the selection (curve: the arrow next to Fade out)"), [this] { fade (true); }, Icon::fadeIn },
+            { TR_NOOP ("Fade out"), TR_NOOP ("Fade out over the selection"), [this] { fade (false); }, Icon::fadeOut },
+            { "~", TR_NOOP ("Fade curve"), [this] { curveMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (quickButtons[8])); }, Icon::fadeCurve },
+            { TR_NOOP ("Normalize"), TR_NOOP ("Normalize the selection (or everything) to 0 dB"), [this] { edit (tr ("Normalize"), [] (ae::Document& d, ae::Range r) { ae::normalize (d, r); }); }, Icon::normalize },
+            { TR_NOOP ("Amp..."), TR_NOOP ("Volume and panning"), [this] { showAmp(); }, Icon::amp },
+            { TR_NOOP ("Reverse"), TR_NOOP ("Reverse the selection (or everything)"), [this] { edit (tr ("Reverse"), [] (ae::Document& d, ae::Range r) { ae::reverse (d, r); }); }, Icon::reverse },
+            { TR_NOOP ("Invert"), TR_NOOP ("Reverse the polarity"), [this] { edit (tr ("Reverse polarity"), [] (ae::Document& d, ae::Range r) { ae::invert (d, r); }); }, Icon::invert },
+            { TR_NOOP ("Center"), TR_NOOP ("Remove the DC offset"), [this] { edit (tr ("Remove DC offset"), [] (ae::Document& d, ae::Range r) { ae::removeDc (d, r); }); }, Icon::dcCenter },
+            { TR_NOOP ("Stretch..."), TR_NOOP ("Time stretch / pitch shift"), [this] { openEdisonTool (audiotools::Tool::stretch); }, Icon::stretch },
+            { TR_NOOP ("Resample..."), TR_NOOP ("Change the sample rate"), [this] { showResample(); }, Icon::resample },
+            { TR_NOOP ("Marker"), TR_NOOP ("Add a marker at the cursor (M)"), [this] { addMarkerAtCursor(); }, Icon::marker },
+            { TR_NOOP ("Region"), TR_NOOP ("Make the selection a region"), [this] { addRegionFromSelection(); }, Icon::region },
+            { TR_NOOP ("Set loop"), TR_NOOP ("Make the selection the loop"), [this] { setLoopFromSelection(); }, Icon::setLoop },
+            // round 190jo: three of Edison's tool forms in the grid too (they stay in the Tools menu)
+            { "", nullptr, [this] { openEdisonTool (audiotools::Tool::equalize); }, Icon::equalizer },
+            { "", nullptr, [this] { openEdisonTool (audiotools::Tool::denoise); }, Icon::denoise },
+            { "", nullptr, [this] { openEdisonTool (audiotools::Tool::reverb); }, Icon::reverb },
         };
         for (const auto& q : quick)
         {
-            auto* b = quickButtons.add (new juce::TextButton (q.text[0] == '~' ? juce::String (juce::CharPointer_UTF8 ("\xe2\x96\xbe")) : tr (q.text)));
-            b->setTooltip (tr (q.tip));
+            auto* b = quickButtons.add (new IconButton (q.text, q.icon));
+            b->setFlat (true);
+            if (quickButtons.size() > 4) // (Edison's tool grid: raised tiles, as the Pattern toolbar's; cut / copy / paste / delete stay flat)
+                b->setLook (IconButton::Look::flTile, 18.0f);
+            // the tool's name, then what it does (both existing texts); a tool form: its title
+            const auto toolIndex = quickButtons.size() - 1 - 19;
+            static const audiotools::Tool forms[] = { audiotools::Tool::equalize, audiotools::Tool::denoise, audiotools::Tool::reverb };
+            b->setTooltip (q.tip == nullptr ? tr (audiotools::toolTitle (forms[juce::jlimit (0, 2, toolIndex)]))
+                           : q.text[0] == '~' ? tr (q.tip)
+                                              : tr (q.text) + ": " + tr (q.tip));
             b->onClick = q.action;
             addAndMakeVisible (b);
         }
@@ -694,10 +736,19 @@ public:
                     if (marks.hasLoop())
                         ae::setLoop (d, { marks.loopStart, marks.loopEnd });
                 }
+                ae::decodeWavProps (static_cast<const std::uint8_t*> (bytes.getData()), bytes.getSize(), d); // (round gaps190kf)
             }
         }
 
         d.title = file.getFileNameWithoutExtension().toStdString();
+        // round 190jo: the file's bit depth for the info strip's FORMAT (the header only; the save format stays as chosen)
+        fileBits = 0;
+        {
+            juce::AudioFormatManager formats;
+            formats.registerBasicFormats();
+            if (std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (file)); reader != nullptr)
+                fileBits = reader->usesFloatingPointData ? 32 : (int) reader->bitsPerSample;
+        }
         setDocument (std::move (d), tr ("Open"));
         lastFile = file;
         return true;
@@ -749,9 +800,30 @@ public:
     std::vector<WarpPoint> warpMarkers() const
     {
         const auto* c = warpChannel();
+        // (round gaps190kf: an unwarped clip's Clip View shows no warp markers, as Live's — they are kept for Warp on)
+        if (clipRulerBelow())
+            return {};
         return c != nullptr && c->sampler.keepPitch && c->sampler.warp.size() >= 2 ? c->sampler.warp : std::vector<WarpPoint> {};
     }
     void setWarpModeForPanel (bool on) { setWarpMode (on); }
+    void selectBraceForSnapshot (bool selected)
+    {
+        braceSelected = selected;
+        repaint();
+    }
+    void holdBraceForSnapshot (int part, std::int64_t tick)
+    {
+        const ClipGridSlot* slot = nullptr;
+        const auto* c = gridClip (&slot);
+        braceHeld = part > 0 && c != nullptr;
+        if (! braceHeld)
+            return;
+        auto clip = *c;
+        auto s = *slot;
+        clipbrace::move (clip, s, (clipbrace::Part) juce::jlimit (0, 5, part), tick, braceGridTicks());
+        braceShown = clipbrace::of (clip, s);
+        repaint();
+    }
     // --warpshot (round 190cy): ÷2 / ×2 as the buttons do it; a marker held in the middle of a drag
     void scaleWarpTempoForSnapshot (double factor) { scaleWarpTempo (factor); }
     void holdWarpDragForSnapshot (int index, double beatOrSeconds, bool slides)
@@ -779,6 +851,9 @@ public:
     {
         source.gridTrack = track;
         source.gridScene = scene;
+        resized(); // (round gaps190kf: the loop brace lane)
+        syncAxis();
+        repaint();
     }
     void setWarpMode (bool on)
     {
@@ -859,19 +934,36 @@ public:
     // Pattern workflow (unless chosen in the Warp markers menu) keep the file-time view.
     bool beatTimeChosen() const noexcept { return beatTimeChoice < 0 ? EditorGlobals::get().clipLaunchWorkflow : beatTimeChoice > 0; }
     double unitOfFrame (double frame) const noexcept { return axis.valid() ? axis.unitOfFrame (frame) : frame; }
+    // frames per pixel over the view (in the beat-time view, the frames the view's beats play / its width)
+    double samplesPerPixel() const
+    {
+        if (! axis.valid())
+            return fpp;
+        const auto w = juce::jmax (1, waveArea.getWidth());
+        return std::abs (frameOfUnit (viewStart + (double) w * fpp) - frameOfUnit (viewStart)) / (double) w;
+    }
     double frameOfUnit (double unit) const noexcept { return axis.valid() ? axis.frameOfUnit (unit) : unit; }
     bool warpDragHeld() const noexcept { return drag == Drag::warp && warpDrag > 0 && warpDrag < (int) warpDragBefore.size(); }
     // brings `axis` up to the channel's markers (or the held drag's preview); the view keeps its place. True on a change.
     bool syncAxis()
     {
         warpview::BeatAxis next;
-        if (warpMode && beatTimeChosen() && ! doc.audio.empty() && doc.audio.sampleRate > 0.0)
+        if (rulerBelow != clipRulerBelow())
+            resized();
+        if (warpMode && beatTimeChosen() && ! doc.audio.empty() && doc.audio.sampleRate > 0.0 && ! rulerBelow)
         {
             if (warpDragHeld() && dragAxis.valid())
                 next = warpview::withScaleOf (dragAxis, warpDragSlides ? warpview::slidePreview (warpDragBefore, warpDrag, warpDragSeconds)
                                                                        : warpview::stretchPreview (warpDragBefore, warpDrag, warpDragBeat));
             else if (const auto markers = warpMarkers(); markers.size() >= 2)
                 next = warpview::makeAxis (markers, (double) doc.audio.frames(), doc.audio.sampleRate);
+            // round gaps190kf: a warped clip with no markers of its own still has Live's beat-time ruler in the Clip View
+            // (its file spans its beats at one tempo)
+            else if (gridClipShown())
+                if (const auto* c = warpChannel(); c != nullptr && c->sampler.stretchBeats > 0.0f)
+                    if (const auto seconds = (double) doc.audio.frames() / doc.audio.sampleRate; seconds > 0.0)
+                        next = warpview::makeAxis ({ { 0.0, 0.0 }, { seconds, (double) c->sampler.stretchBeats } }, (double) doc.audio.frames(),
+                                                   doc.audio.sampleRate);
         }
         if (next.valid() == axis.valid() && (! next.valid() || (next.markers == axis.markers && next.beat0 == axis.beat0 && next.unitsPerBeat == axis.unitsPerBeat && next.frames == axis.frames)))
             return false;
@@ -1342,130 +1434,201 @@ public:
     void setSnapForSnapshot (int mode) { setSnapMode (mode); }
     juce::String snapTooltipForSnapshot() { return snapButton.getTooltip() + (snapButton.getToggleState() ? " [on]" : " [off]"); }
     std::int64_t snapFrameForSnapshot (std::int64_t f) const { return snapFrame (f); }
+    // round natives190kj: the view (spectrogram, Dual view, a zoom of `range`) and FL's commands for the shot route
+    void setViewForSnapshot (bool spectrum, bool dual, ae::Range range)
+    {
+        viewButton.setToggleState (spectrum, juce::sendNotification);
+        dualView = dual;
+        if (! range.empty())
+            zoomTo (range);
+        repaint();
+    }
+    juce::String commandForSnapshot (const juce::String& what)
+    {
+        if (what.startsWith ("grid-") && what != "grid")
+        {
+            if (what.endsWith ("-all")) // (no selection: the whole sample, as FL slices without one)
+                selection = {};
+            flGridSlice (what.startsWith ("grid-small") ? 0 : what.startsWith ("grid-medium") ? 1 : 2);
+        }
+        else if (what == "pitch-regions")
+            detectPitchRegions();
+        else if (what == "grid")
+        {
+            const auto g = flGrid();
+            return "units " + juce::String (g.framesPerUnit) + " frames; step " + juce::String (g.grid.step) + " units (" + juce::String (g.grid.step * g.framesPerUnit)
+                   + " frames); medium every " + juce::String (g.grid.mediumEvery) + ", large every " + juce::String (g.grid.largeEvery) + "; frames per pixel " + juce::String (fpp);
+        }
+        juce::StringArray marks;
+        for (const auto& m : doc.markers)
+            marks.add (juce::String (m.start) + (m.isRegion() ? ".." + juce::String (m.end) : juce::String()) + (m.name.empty() ? juce::String() : " " + juce::String (m.name)));
+        return what + ": " + juce::String ((int) doc.markers.size()) + " markers: " + marks.joinIntoString (", ");
+    }
+    void setSamplePropsForSnapshot (const ae::SampleProps& props) { doc.props = props; repaint(); }
 
     // --- layout and painting ---------------------------------------------------------------------------------
+    // Round 190jo (design190ia FW-22/23/24): Edison's layout. A 92 px panel: at the left the transport capsule (loop,
+    // play, stop), the round Record button with the record controls, and under them a small icon row (file, edit,
+    // undo, view switches); at the right a 2 x 9 grid of icon tools. Under the panel a 30 px info strip (sample rate,
+    // format, tempo, title / length, bar:beat:tick); then the navy canvas and a 28 px overview. A short or narrow editor
+    // (the Clip View's panel) keeps a compact form: one icon row and the tools wrapping in rows of small icon buttons.
+    static constexpr int panelHeight = 92, stripHeight = 30, toolW = 36, toolH = 28, toolGap = 4, toolColumns = 9;
+    bool edisonLayout() const noexcept { return getWidth() >= 900 && getHeight() >= 420; }
+
     void resized() override
     {
         auto area = getLocalBounds();
-        auto bar = area.removeFromTop (36).reduced (6, 4);
-        auto place = [&bar] (juce::Component& c, int w, int gap = 2) {
-            c.setBounds (bar.removeFromLeft (w));
-            bar.removeFromLeft (gap);
-        };
-        place (menuButton, 28, 8);
-        place (undoButton, 28);
-        place (redoButton, 28);
-        place (historyButton, 18, 12);
-        place (recordButton, 30);
-        place (recordMenuButton, 18, 6);
-        place (playButton, 30);
-        place (stopButton, 30, 6);
-        place (loopButton, 54, 4);
-        place (volumeKnob, 26, 12);
-        place (viewButton, 76, 6);
-        place (envButton, 120, 6);
-        place (snapButton, 28);
-        place (fitButton, 28);
-        place (followButton, 28, 8);
-        if (warpButton.isVisible())
-            place (warpButton, 100);
-        if (autoWarpButton.isVisible())
-            place (autoWarpButton, 78);
-        if (warpBpmBox.isVisible())
-        {
-            place (warpBpmBox, 58);
-            place (warpHalveButton, 26);
-            place (warpDoubleButton, 26);
-        }
-        sendButton.setBounds (bar.removeFromRight (70));
-        bar.removeFromRight (6);
-        dragButton.setBounds (bar.removeFromRight (28));
-        bar.removeFromRight (2);
-        saveButton.setBounds (bar.removeFromRight (28));
-
-        if (slotMode()) // the plugin's own switches, under the transport (FL: next to its Record button)
-        {
-            auto row = area.removeFromTop (30).reduced (6, 3);
-            row.removeFromLeft (112); // (they start under the Record button)
-            auto put = [&row] (juce::Component& c, int w, int gap = 4) {
-                c.setBounds (row.removeFromLeft (w));
-                row.removeFromLeft (gap);
-            };
-            put (recModeBox, 104);
-            put (maxTimeBox, 96);
-            put (appendButton, 72, 14);
-            put (slaveButton, 64);
-            put (muteInputButton, 96);
-        }
-
-        // each button gets the width its text needs, plus an equal share of what is left (round 165o: translated
-        // labels such as "Normalisieren" or "Ausschneiden" are never cut). When one row cannot hold them all (German,
-        // Russian, Polish… at the default width) the buttons go on two rows instead; English keeps its single row.
+        capsuleArea = stripArea = {};
+        const auto full = edisonLayout();
         const auto n = quickButtons.size();
-        const auto curveWidth = 18;
-        const juce::Font font (theme::font (theme::type::body));
-        std::vector<float> natural;
-        float total = 0.0f;
-        for (int i = 0; i < n; ++i)
-        {
-            natural.push_back (i == 8 ? (float) curveWidth : juce::GlyphArrangement::getStringWidth (font, quickButtons[i]->getButtonText()) + 18.0f);
-            total += natural.back() + (i == 7 ? 0.0f : 2.0f);
-        }
-        const auto rowWidth = (float) (area.getWidth() - 12);
-        const auto twoRows = total - 14.0f * (float) (n - 1) > rowWidth && n > 9; // not even with 4 px padding
-        auto tools = area.removeFromTop (twoRows ? 56 : 30).reduced (6, 2);
-        // lays out buttons [first, last) in one row: natural widths plus an equal share of the free space; still too
-        // narrow -> the padding goes first (down to 4 px a side), then the text squeezes (drawFittedText)
-        auto layoutRow = [&] (juce::Rectangle<int> row, int first, int last)
-        {
-            float need = 0.0f;
-            int stretchable = 0;
-            for (int i = first; i < last; ++i)
+        const auto editTools = 4; // Cut, Copy, Paste, Delete: the small icon row (FL's scissors / copy place)
+
+        // the small icon row: file, edit, undo, menu, view switches, the playback volume
+        auto smallRow = [&] (juce::Rectangle<int> row, int size) {
+            auto place = [&row, size] (juce::Component& c, int w = 0, int gap = 2) {
+                c.setBounds (row.removeFromLeft (juce::jmin (w > 0 ? w : size, row.getWidth())).withSizeKeepingCentre (w > 0 ? w : size, size));
+                row.removeFromLeft (juce::jmin (gap, row.getWidth()));
+            };
+            place (saveButton);
+            place (dragButton, 0, 8);
+            for (int i = 0; i < editTools && i < n; ++i)
+                place (*quickButtons[i], 0, i == editTools - 1 ? 8 : 2);
+            place (undoButton);
+            place (redoButton);
+            place (historyButton, 14, 8);
+            place (menuButton, 0, 8);
+            place (snapButton);
+            place (fitButton);
+            place (followButton, 0, 8);
+            place (viewButton);
+            place (envButton, 0, 8);
+            place (volumeKnob, size + 2, 8);
+            return row;
+        };
+        auto warpRow = [this] (juce::Rectangle<int> row) {
+            auto place = [&row] (juce::Component& c, int w, int gap = 2) {
+                c.setBounds (row.removeFromLeft (juce::jmin (w, row.getWidth())));
+                row.removeFromLeft (juce::jmin (gap, row.getWidth()));
+            };
+            if (warpButton.isVisible())
+                place (warpButton, 100, 4);
+            if (autoWarpButton.isVisible())
+                place (autoWarpButton, 78, 4);
+            if (warpBpmBox.isVisible())
             {
-                need += natural[(std::size_t) i] + (i == 7 || i == last - 1 ? 0.0f : 2.0f);
-                stretchable += i == 8 ? 0 : 1;
-            }
-            const auto avail = (float) row.getWidth();
-            const auto extra = juce::jmax (0.0f, avail - need) / (float) juce::jmax (1, stretchable);
-            auto shrink = 0.0f, scale = 1.0f;
-            if (need > avail)
-            {
-                const auto padding = 14.0f * (float) stretchable;
-                shrink = 14.0f * juce::jlimit (0.0f, 1.0f, (need - avail) / padding);
-                const auto after = need - shrink * (float) stretchable;
-                scale = after > avail ? avail / after : 1.0f;
-            }
-            float x = (float) row.getX();
-            for (int i = first; i < last; ++i)
-            {
-                const auto w = i == 8 ? (float) curveWidth : (natural[(std::size_t) i] - shrink) * scale + extra;
-                quickButtons[i]->setBounds (juce::roundToInt (x), row.getY(), juce::roundToInt (x + w) - juce::roundToInt (x), row.getHeight());
-                x += w + (i == 7 ? 0.0f : 2.0f);
+                place (warpBpmBox, 58);
+                place (warpHalveButton, 26);
+                place (warpDoubleButton, 26);
             }
         };
-        if (! twoRows)
-            layoutRow (tools, 0, n);
+
+        if (full)
+        {
+            auto panel = area.removeFromTop (panelHeight).reduced (8, 6);
+            // the tool grid at the right: 2 rows x 9, 36 x 28, 4 px apart (the edit tools sit in the small row)
+            const auto gridTools = n - editTools;
+            const auto rows = 2, columns = juce::jmax (toolColumns, (gridTools + rows - 1) / rows);
+            const auto gridW = columns * toolW + (columns - 1) * toolGap, gridH = rows * toolH + toolGap;
+            const auto grid = juce::Rectangle<int> (panel.getRight() - gridW, panel.getY() + (panel.getHeight() - gridH) / 2, gridW, gridH);
+            for (int i = editTools; i < n; ++i)
+            {
+                const auto k = i - editTools;
+                quickButtons[i]->setBounds (grid.getX() + (k % columns) * (toolW + toolGap), grid.getY() + (k / columns) * (toolH + toolGap), toolW, toolH);
+            }
+            panel.setRight (grid.getX() - 10);
+            sendButton.setBounds (juce::Rectangle<int> (panel.getRight() - 70, panel.getY(), 70, 28));
+
+            // row 1: the capsule (loop, play, stop), Record and its controls
+            auto row1 = panel.removeFromTop (28);
+            // (rollup step 6: natives190kj's Scrub sits between Play and Stop, as in its branch's transport row)
+            capsuleArea = row1.removeFromLeft (4 * 30 + 8);
+            auto inCapsule = capsuleArea.reduced (4, 0);
+            for (auto* b : std::initializer_list<juce::Component*> { &loopButton, &playButton, &scrubButton, &stopButton })
+                b->setBounds (inCapsule.removeFromLeft (30));
+            row1.removeFromLeft (8);
+            recordButton.setBounds (row1.removeFromLeft (28));
+            row1.removeFromLeft (4);
+            auto row2 = panel.removeFromTop (22).withTrimmedTop (2);
+            if (slotMode())
+            {
+                recModeBox.setBounds (row1.removeFromLeft (104).reduced (0, 3));
+                row1.removeFromLeft (4);
+                maxTimeBox.setBounds (row1.removeFromLeft (96).reduced (0, 3));
+                // under them, as FL's APPEND under its record controls
+                row2.setX (recordButton.getX());
+                auto put = [&row2] (juce::Component& c, int w, int gap = 4) {
+                    c.setBounds (row2.removeFromLeft (juce::jmin (w, row2.getWidth())));
+                    row2.removeFromLeft (juce::jmin (gap, row2.getWidth()));
+                };
+                put (appendButton, 72);
+                put (slaveButton, 64);
+                put (muteInputButton, 96);
+            }
+            else
+            {
+                recordMenuButton.setBounds (row1.removeFromLeft (18));
+                warpRow (row2);
+            }
+            panel.removeFromTop (4);
+            smallRow (panel.removeFromTop (24), 24);
+            stripArea = area.removeFromTop (stripHeight);
+        }
         else
         {
-            // split near half the total width, never between Fade out (7) and its curve menu (8)
-            int split = 1;
-            float run = 0.0f;
-            while (split < n - 1 && run + natural[(std::size_t) split - 1] < total * 0.5f)
-                run += natural[(std::size_t) split++ - 1] + 2.0f;
-            if (split == 8)
-                ++split;
-            const auto top = tools.removeFromTop (tools.getHeight() / 2);
-            layoutRow (top.withTrimmedBottom (1), 0, split);
-            layoutRow (tools.withTrimmedTop (1), split, n);
+            // compact (a short or narrow editor): one icon row, then the tools wrapping in rows of 30 x 26
+            auto bar = area.removeFromTop (34).reduced (6, 3);
+            sendButton.setBounds (bar.removeFromRight (64));
+            bar.removeFromRight (6);
+            capsuleArea = bar.removeFromLeft (4 * 28 + 8);
+            auto inCapsule = capsuleArea.reduced (4, 0);
+            for (auto* b : std::initializer_list<juce::Component*> { &loopButton, &playButton, &scrubButton, &stopButton })
+                b->setBounds (inCapsule.removeFromLeft (28));
+            bar.removeFromLeft (6);
+            recordButton.setBounds (bar.removeFromLeft (28));
+            if (! slotMode())
+                recordMenuButton.setBounds (bar.removeFromLeft (16));
+            bar.removeFromLeft (8);
+            bar = smallRow (bar, 26);
+            warpRow (bar);
+
+            if (slotMode()) // the plugin's own switches, under the transport (FL: next to its Record button)
+            {
+                auto row = area.removeFromTop (30).reduced (6, 3);
+                auto put = [&row] (juce::Component& c, int w, int gap = 4) {
+                    c.setBounds (row.removeFromLeft (juce::jmin (w, row.getWidth())));
+                    row.removeFromLeft (juce::jmin (gap, row.getWidth()));
+                };
+                put (recModeBox, 104);
+                put (maxTimeBox, 96);
+                put (appendButton, 72, 14);
+                put (slaveButton, 64);
+                put (muteInputButton, 96);
+            }
+
+            const auto avail = juce::jmax (30, getWidth() - 12);
+            const auto perRow = juce::jmax (1, (avail + 2) / 32);
+            const auto gridTools = n - editTools;
+            const auto rows = (gridTools + perRow - 1) / perRow;
+            auto tools = area.removeFromTop (rows * 28 + 2).reduced (6, 1);
+            for (int i = editTools; i < n; ++i)
+            {
+                const auto k = i - editTools;
+                quickButtons[i]->setBounds (tools.getX() + (k % perRow) * 32, tools.getY() + (k / perRow) * 28, 30, 26);
+            }
         }
 
         infoArea = area.removeFromBottom (24);
-        overviewArea = area.removeFromBottom (18).reduced (6, 2);
+        overviewArea = area.removeFromBottom (full ? 32 : 18).reduced (6, 2);
         area.removeFromBottom (2);
         area = area.reduced (6, 0);
         levelArea = area.removeFromLeft (34);
-        rulerArea = area.removeFromTop (24);
+        // round gaps190kf: an unwarped clip's Clip View has its time ruler (seconds) under the waveform, as Live's [LIVE 12.4
+        // gaps190kf/raw/c13-unwarped.png: no beat ruler on top, "0:00 0:00:500 0:01 …" along the bottom]
+        rulerBelow = clipRulerBelow();
+        rulerArea = rulerBelow ? area.removeFromBottom (24) : area.removeFromTop (24);
         rulerArea.setX (area.getX());
+        // round gaps190kf: Live's loop brace and Start / End markers under the ruler (the Clip View of a grid clip)
+        clipLane = gridClipShown() ? area.removeFromTop (braceLaneHeight) : juce::Rectangle<int>();
         warpLane = warpMode ? area.removeFromTop (18) : juce::Rectangle<int>();
         waveArea = area;
         clampView();
@@ -1477,18 +1640,53 @@ public:
         if (syncAxis()) // (the markers changed elsewhere: the Playlist, undo; the whole view follows)
             repaint();
         g.fillAll (colour::bg2);
+        // round 190jo: Edison's panel (92 px; the compact form's icon row) and its transport capsule / round Record
+        auto top = 34;
+        if (! edisonLayout())
+            for (auto* b : quickButtons)
+                top = juce::jmax (top, b->getBottom() + 2);
+        else
+            top = panelHeight;
         g.setColour (colour::bg3);
-        g.fillRect (getLocalBounds().removeFromTop (36));
+        g.fillRect (getLocalBounds().removeFromTop (top));
         g.setColour (colour::border);
-        g.drawHorizontalLine (36, 0.0f, (float) getWidth());
+        g.drawHorizontalLine (top, 0.0f, (float) getWidth());
+        if (! capsuleArea.isEmpty())
+        {
+            const auto pill = capsuleArea.toFloat();
+            g.setColour (colour::bg1);
+            g.fillRoundedRectangle (pill, juce::jmin (14.0f, pill.getHeight() * 0.5f));
+            g.setColour (colour::borderStrong);
+            g.drawRoundedRectangle (pill.reduced (0.5f), juce::jmin (14.0f, pill.getHeight() * 0.5f) - 0.5f, 1.0f);
+            const auto ring = recordButton.getBounds().toFloat().reduced (0.5f);
+            g.setColour (colour::bg1);
+            g.fillEllipse (ring);
+            g.setColour (colour::borderStrong);
+            g.drawEllipse (ring, 1.0f);
+        }
+        paintStrip (g);
 
         paintRuler (g);
+        paintClipLane (g);
         paintLevels (g);
+        // FL's Dual view (round natives190kj, 0x854030): the two views over each other, strengths by the zoom
+        const auto layer = edisonview::layers (spectrumView, dualView, samplesPerPixel());
         if (spectrumView)
-            paintSpectrum (g);
+        {
+            paintSpectrum (g, layer.spectrum);
+            if (layer.wave > 0 && ! doc.audio.empty())
+            {
+                juce::Graphics::ScopedSaveState save (g);
+                g.reduceClipRegion (waveArea);
+                waveOpacity = (float) layer.wave / 256.0f;
+                paintLanes (g, false);
+                waveOpacity = 1.0f;
+            }
+        }
         else
-            paintWave (g);
+            paintWave (g, layer.spectrum);
         paintOverlays (g);
+        paintBraceLines (g);
         if (warpMode)
             paintWarpLane (g);
         paintOverview (g);
@@ -1498,6 +1696,11 @@ public:
     // --- mouse ----------------------------------------------------------------------------------------------
     void mouseDown (const juce::MouseEvent& e) override
     {
+        if (e.eventComponent == &scrubButton)
+        {
+            scrubMouseDown (e);
+            return;
+        }
         grabKeyboardFocus();
         drag = Drag::none;
         syncAxis();
@@ -1510,11 +1713,27 @@ public:
 
         const auto pos = e.getPosition();
 
+        if (e.mods.isMiddleButtonDown() && (waveArea.contains (pos) || rulerArea.contains (pos))) // round 190ld (DP-58)
+        {
+            drag = Drag::middle;
+            middleGrab = { e.x, e.y };
+            middleFpp = fpp;
+            middleView = viewStart;
+            return;
+        }
+
         if (warpMode && warpLane.contains (pos))
         {
             warpMouseDown (e);
             return;
         }
+        if (clipLane.contains (pos))
+        {
+            braceMouseDown (e);
+            return;
+        }
+        if (std::exchange (braceSelected, false))
+            repaint (clipLane);
 
         if (overviewArea.contains (pos))
         {
@@ -1561,6 +1780,17 @@ public:
             return;
         }
 
+        if (waveArea.contains (pos) && (e.mods.isCtrlDown() || e.mods.isCommandDown()) && ! e.mods.isShiftDown())
+        {
+            // round 190ld (DP-57): FL's Ctrl+click places the play-head (the cursor) without making a selection
+            cursor = snapFrame (xToFrame (e.x));
+            selection = {};
+            if (playing)
+                startPlayback();
+            repaint();
+            return;
+        }
+
         if (waveArea.contains (pos) || rulerArea.contains (pos))
         {
             const auto f = snapFrame (xToFrame (e.x));
@@ -1581,6 +1811,11 @@ public:
 
     void mouseDrag (const juce::MouseEvent& e) override
     {
+        if (e.eventComponent == &scrubButton)
+        {
+            scrubMouseDrag (e);
+            return;
+        }
         if (drag == Drag::overview)
         {
             centreViewOnOverview (e.x);
@@ -1594,6 +1829,22 @@ public:
         if (drag == Drag::warp)
         {
             warpMouseDrag (e);
+            return;
+        }
+        if (drag == Drag::brace)
+        {
+            braceMouseDrag (e);
+            return;
+        }
+        if (drag == Drag::middle) // round 190ld (DP-58): up zooms in (around where the drag began), left / right scrolls
+        {
+            const auto anchorX = (float) middleGrab.x;
+            const auto frame = middleView + (anchorX - (float) waveArea.getX()) * middleFpp;
+            fpp = middleFpp * std::pow (1.01, (double) (e.y - middleGrab.y));
+            clampView();
+            viewStart = frame - (anchorX - (float) waveArea.getX()) * fpp - (double) (e.x - middleGrab.x) * fpp;
+            clampView();
+            repaint();
             return;
         }
         if (drag == Drag::none)
@@ -1626,11 +1877,21 @@ public:
         repaint();
     }
 
-    void mouseUp (const juce::MouseEvent&) override
+    void mouseUp (const juce::MouseEvent& e) override
     {
+        if (e.eventComponent == &scrubButton)
+        {
+            endScrub();
+            return;
+        }
         if (drag == Drag::warp)
         {
             warpMouseUp();
+            return;
+        }
+        if (drag == Drag::brace)
+        {
+            braceMouseUp();
             return;
         }
         if (drag == Drag::envPoint || drag == Drag::envBend)
@@ -1659,18 +1920,34 @@ public:
 
     void mouseMove (const juce::MouseEvent& e) override
     {
+        if (e.eventComponent == &scrubButton)
+            return;
         const auto hover = warpMode && ! doc.audio.empty() && warpLane.contains (e.getPosition()) ? warpAttackAtX (e.x) : -1;
         if (std::exchange (warpHover, hover) != hover)
             repaint (warpLane.getUnion (waveArea));
+        // round gaps190kf: the brace's ends and the markers resize, the brace's body moves
+        if (clipLane.contains (e.getPosition()))
+        {
+            const auto part = bracePartAt (e.getPosition());
+            setMouseCursor (part == clipbrace::Part::loopBody ? juce::MouseCursor::DraggingHandCursor
+                            : part != clipbrace::Part::none   ? juce::MouseCursor::LeftRightResizeCursor
+                                                              : juce::MouseCursor::NormalCursor);
+        }
+        else if (getMouseCursor() != juce::MouseCursor::NormalCursor && ! clipLane.isEmpty())
+            setMouseCursor (juce::MouseCursor::NormalCursor);
     }
-    void mouseExit (const juce::MouseEvent&) override
+    void mouseExit (const juce::MouseEvent& e) override
     {
+        if (e.eventComponent == &scrubButton)
+            return;
         if (std::exchange (warpHover, -1) != -1)
             repaint (warpLane.getUnion (waveArea));
     }
 
     void mouseDoubleClick (const juce::MouseEvent& e) override
     {
+        if (e.eventComponent == &scrubButton)
+            return;
         syncAxis();
         if (warpMode && ! doc.audio.empty() && warpLane.contains (e.getPosition()))
         {
@@ -1700,12 +1977,44 @@ public:
         repaint();
     }
 
+    // round 190ld (DP-59): FL's hint bar over the waveform (capture 190ld F30, fl-edison-hint-F30/F30b): the time under the
+    // mouse as "s:ms" ("0:500") and the level at the mouse's height in dB and linear ("-18.34dB 0.12")
+    ui::Hint hintAt (juce::Point<int>) override { return waveHintAt (getMouseXYRelative()); }
+
+    // (--details190ldshot: the hint at a point given as fractions of the waveform area)
+    ui::Hint waveHintForSnapshot (float fx, float fy) const
+    {
+        return waveHintAt ({ waveArea.getX() + juce::roundToInt ((float) waveArea.getWidth() * fx), waveArea.getY() + juce::roundToInt ((float) waveArea.getHeight() * fy) });
+    }
+
+    ui::Hint waveHintAt (juce::Point<int> p) const
+    {
+        if (doc.audio.empty() || ! waveArea.contains (p) || (spectrumView && ! dualView) || doc.audio.sampleRate <= 0.0)
+            return {};
+        const auto lanes = juce::jmax (1, doc.audio.numChannels());
+        const auto lane = laneBounds (juce::jlimit (0, lanes - 1, (int) ((float) (p.y - waveArea.getY()) * (float) lanes / (float) juce::jmax (1, waveArea.getHeight()))));
+        const auto half = juce::jmax (1.0f, lane.getHeight() * 0.5f - 2.0f);
+        const auto level = juce::jlimit (0.0f, 1.0f, std::abs (lane.getCentreY() - (float) p.y) / half);
+        const auto ms = (std::int64_t) std::floor ((double) xToFrame (p.x) * 1000.0 / doc.audio.sampleRate);
+        const auto minutes = ms / 60000, seconds = (ms / 1000) % 60, millis = ms % 1000;
+        ui::Hint h;
+        h.text = (minutes > 0 ? juce::String (minutes) + ":" + juce::String (seconds).paddedLeft ('0', 2) : juce::String (seconds))
+                 + ":" + juce::String (millis).paddedLeft ('0', 3);
+        h.value = (level > 0.0f ? juce::String (20.0f * std::log10 (level), 2) : juce::String ("-inf")) + "dB " + juce::String (level, 2);
+        return h;
+    }
+
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override
     {
-        if (doc.audio.empty())
+        if (doc.audio.empty() || e.eventComponent == &scrubButton)
             return;
         const auto delta = std::abs (w.deltaY) > std::abs (w.deltaX) ? w.deltaY : w.deltaX;
-        if (e.mods.isCtrlDown() || e.mods.isCommandDown())
+        // round 190ld (DP-58, owner decision PL2): FL's mapping by default — the wheel zooms around the mouse,
+        // Shift+wheel (or a sideways swipe) scrolls; View › "Wheel scrolls (LYNX)" brings back LYNX's (wheel scrolls,
+        // Ctrl+wheel zooms)
+        const auto zoomGesture = wheelScrollsLynx() ? (e.mods.isCtrlDown() || e.mods.isCommandDown())
+                                                    : (std::abs (w.deltaY) >= std::abs (w.deltaX) && ! e.mods.isShiftDown());
+        if (zoomGesture)
             zoomAround ((float) e.x, delta > 0 ? 0.8 : 1.25);
         else
         {
@@ -1728,6 +2037,15 @@ public:
             removeWarpMarker (warpSelected);
             return true;
         }
+        // round gaps190kf (Live 8.9): a selected loop brace — Left / Right nudge it a grid step, Up / Down by its length
+        if (braceSelected && ! ctrl && ! shift
+            && (code == juce::KeyPress::leftKey || code == juce::KeyPress::rightKey || code == juce::KeyPress::upKey || code == juce::KeyPress::downKey))
+        {
+            const auto byLength = code == juce::KeyPress::upKey || code == juce::KeyPress::downKey;
+            const auto steps = code == juce::KeyPress::rightKey || code == juce::KeyPress::upKey ? 1 : -1;
+            editGridClip ([grid = braceGridTicks(), byLength, steps] (Clip& c, ClipGridSlot& slot) { return clipbrace::nudge (c, slot, grid, steps, byLength); });
+            return true;
+        }
         // round 190cg: Live's Insert Warp Markers and Quantize on a channel's audio
         // (round 190cm: default keys only in the Clip-launch layout, core/SessionKeys.h; elsewhere the chords are not
         // taken, so Ctrl+I stays "Recording waits for input" and the commands are in the warp menu)
@@ -1741,6 +2059,17 @@ public:
             && sessionkeys::defaultKeyActs (sessionkeys::Command::audioQuantize))
         {
             quantizeWarp();
+            return true;
+        }
+        if (! ctrl && ! shift && ! k.getModifiers().isAltDown() && c == 'c') // FL's Edit › Click-free (smooth) editing (round gaps190kf)
+        {
+            clickFreeEditing() = ! clickFreeEditing();
+            setStatus (clickFreeEditing() ? tr ("Click-free (smooth) editing: on") : tr ("Click-free (smooth) editing: off"), false);
+            return true;
+        }
+        if (code == juce::KeyPress::F2Key && ! ctrl && ! shift) // FL's Format › Edit properties... (round gaps190kf)
+        {
+            showSampleProperties();
             return true;
         }
         if (ctrl && (code == 'Z' || c == 'z'))
@@ -1793,7 +2122,7 @@ public:
             muteInputButton.triggerClick();
         else if (slotMode() && ! ctrl && c == 'a')
             followButton.triggerClick();
-        else if (! ctrl && c >= '1' && c <= '4') // FL's Snap menu keys (round 190ee)
+        else if (! ctrl && c >= '1' && c <= '5') // FL's Snap menu keys (round 190ee; 5 = pitch period, round natives190kj)
             setSnapMode ((int) (c - '1'));
         else if (c == '+' || c == '=')
             zoomAround ((float) waveArea.getCentreX(), 0.5);
@@ -1927,7 +2256,9 @@ private:
         loopEnd,
         overview,
         envPoint,
-        envBend
+        envBend,
+        brace, // round gaps190kf: the Clip View's loop brace / Start / End markers
+        middle // round 190ld (DP-58): FL's middle-drag — up / down zooms, left / right scrolls
     };
     enum class RecState
     {
@@ -1993,16 +2324,18 @@ private:
 
     // FL's Edison snap (round 190ee; Edison_x64.dll snap function 0x855d20, Snap menu Tags 0…4): the toolbar's Snap
     // button switches snapping on and off, the Snap menu picks what it snaps to. LYNX's grid is the one its ruler
-    // draws at the current zoom (FL's own grid-step law is not decoded); "Snap to pitch period" is not built.
+    // draws at the current zoom. Round natives190kj: FL's grid-step law (0x84c890, core/EdisonView.h grid) outside the
+    // beat-time view, and "Snap to pitch period" (key 5, the period of the Sample properties' pitch).
     static juce::String snapCaption (int mode)
     {
-        static const char* const names[] { TR_NOOP ("Snap to grid"), TR_NOOP ("Snap to regions"), TR_NOOP ("Snap to samples"), TR_NOOP ("Snap to zero-crossing") };
-        return tr (names[juce::jlimit (0, 3, mode)]);
+        static const char* const names[] { TR_NOOP ("Snap to grid"), TR_NOOP ("Snap to regions"), TR_NOOP ("Snap to samples"), TR_NOOP ("Snap to zero-crossing"),
+                                           TR_NOOP ("Snap to pitch period") };
+        return tr (names[juce::jlimit (0, 4, mode)]);
     }
 
     void setSnapMode (int mode)
     {
-        snapMode = juce::jlimit (0, 3, mode);
+        snapMode = juce::jlimit (0, 4, mode);
         snapButton.setTooltip (snapCaption (snapMode));
         snapButton.setToggleState (true, juce::sendNotification); // (FL: picking a mode turns snapping on)
     }
@@ -2022,11 +2355,37 @@ private:
             const auto beat = std::round (axis.beatOfUnit (unitOfFrame ((double) f)) / grid) * grid;
             return juce::jlimit<std::int64_t> (0, doc.audio.frames(), (std::int64_t) std::llround (frameOfUnit (axis.unitOfBeat (beat))));
         }
-        const auto rate = doc.audio.sampleRate;
-        const auto step = timeRulerStep() * rate;
-        if (! (step > 0.0))
+        // round natives190kj: FL's grid (0x84c890) in its units — half seconds, or beats of a tempo-synced sample
+        const auto g = flGrid();
+        if (! (g.framesPerUnit > 0.0) || ! (g.grid.step > 0.0))
             return f;
-        return juce::jlimit<std::int64_t> (0, doc.audio.frames(), (std::int64_t) std::llround (std::round ((double) f / step) * step));
+        const auto unit = edisonview::snapToStep ((double) f / g.framesPerUnit, g.grid.step, g.offsetUnits);
+        return juce::jlimit<std::int64_t> (0, doc.audio.frames(), (std::int64_t) std::llround (unit * g.framesPerUnit));
+    }
+
+    // FL's time grid at the current zoom (round natives190kj, core/EdisonView.h): the unit, its base steps and the step
+    struct FlGrid
+    {
+        double framesPerUnit = 0.0, offsetUnits = 0.0;
+        edisonview::GridBase base;
+        edisonview::Grid grid;
+    };
+    FlGrid flGrid() const
+    {
+        FlGrid out;
+        if (doc.audio.empty() || ! (fpp > 0.0))
+            return out;
+        const auto beats = edisonview::beatMode (doc.props);
+        out.framesPerUnit = edisonview::framesPerUnit (beats, doc.audio.sampleRate, doc.props.tempo);
+        if (beats)
+        {
+            const auto beatsPerBar = juce::jmax (1, (int) std::lround ((double) engine.getSong().barTicks() / ppq));
+            out.base = edisonview::beatsBase (beatsPerBar * 4, 4); // (FL's host: 4 steps per beat)
+        }
+        else
+            out.base = edisonview::secondsBase();
+        out.grid = edisonview::grid (out.base, out.framesPerUnit / fpp);
+        return out;
     }
 
     // FL: the nearest region edge within 12 pixels, other than the region being moved
@@ -2051,6 +2410,7 @@ private:
             case 0: return snapToGrid (f);
             case 1: return snapToRegions (f, skipMarker);
             case 2: return f; // (positions are whole samples already)
+            case 4: return juce::jlimit<std::int64_t> (0, doc.audio.frames(), edisonview::snapToPeriod (f, edisonview::pitchPeriodFrames (doc.audio.sampleRate, doc.props.middleNote, doc.props.fineTune)));
             default: return ae::nearestZeroCrossing (doc.audio, f, (std::int64_t) juce::jmax (8.0, fpp * 6.0));
         }
     }
@@ -2117,10 +2477,10 @@ private:
         return { (float) waveArea.getX(), (float) waveArea.getY() + h * (float) lane, (float) waveArea.getWidth(), h };
     }
 
-    void paintWave (juce::Graphics& g)
+    void paintWave (juce::Graphics& g, int spectrumUnder = 0)
     {
         using namespace theme;
-        g.setColour (colour::bg0);
+        g.setColour (canvasColour);
         g.fillRect (waveArea);
 
         if (doc.audio.empty())
@@ -2135,10 +2495,41 @@ private:
 
         juce::Graphics::ScopedSaveState save (g);
         g.reduceClipRegion (waveArea);
-        paintSelectionAndRegions (g);
+        if (spectrumUnder > 0) // Dual view: the spectrogram under the waveform
+            drawSpectrum (g, (float) spectrumUnder / 256.0f);
         if (axis.valid())
             paintBeatGrid (g);
+        else
+            paintFlGrid (g);
+        paintSelectionAndRegions (g);
+        paintLanes (g, true);
+    }
 
+    // FL's time grid lines in the waveform's background (round natives190kj, 0x84d0b0): one line per grid step, the
+    // medium and large ones stronger
+    void paintFlGrid (juce::Graphics& g)
+    {
+        const auto fl = flGrid();
+        if (! (fl.framesPerUnit > 0.0) || ! (fl.grid.step > 0.0))
+            return;
+        const auto stepFrames = fl.grid.step * fl.framesPerUnit;
+        const auto first = (std::int64_t) std::floor ((viewStart - fl.offsetUnits * fl.framesPerUnit) / stepFrames);
+        const auto lastFrame = viewStart + (double) waveArea.getWidth() * fpp;
+        for (auto i = first; i < first + 4096; ++i)
+        {
+            const auto f = fl.offsetUnits * fl.framesPerUnit + (double) i * stepFrames;
+            if (f > lastFrame)
+                break;
+            const auto cls = edisonview::lineClass (i, fl.grid);
+            g.setColour (cls == 2 ? theme::colour::gridBar : cls == 1 ? theme::colour::gridBeat.brighter (0.25f) : theme::colour::gridBeat.withMultipliedAlpha (0.6f));
+            g.drawVerticalLine ((int) std::floor (frameToX (f)), (float) waveArea.getY(), (float) waveArea.getBottom());
+        }
+    }
+
+    // the channels' lanes: level guides (when `guides`) and the waveform
+    void paintLanes (juce::Graphics& g, bool guides)
+    {
+        using namespace theme;
         const auto lanes = doc.audio.numChannels();
         for (int lane = 0; lane < lanes; ++lane)
         {
@@ -2146,11 +2537,13 @@ private:
             const auto centre = r.getCentreY();
             const auto half = r.getHeight() * 0.5f - 2.0f;
 
+            if (guides)
+            {
             // level guides: centre line and -6 dB
-            g.setColour (colour::gridBeat);
+            g.setColour (canvasGrid);
             g.drawHorizontalLine ((int) (centre - half * 0.5f), r.getX(), r.getRight());
             g.drawHorizontalLine ((int) (centre + half * 0.5f), r.getX(), r.getRight());
-            g.setColour (colour::gridBar);
+            g.setColour (canvasGridStrong);
             g.drawHorizontalLine ((int) centre, r.getX(), r.getRight());
             if (const auto mark = shownNoiseThreshold(); viewNoiseMark && mark > 0.0f && mark < 1.0f)
             {
@@ -2163,6 +2556,7 @@ private:
             {
                 g.setColour (colour::border);
                 g.drawHorizontalLine ((int) r.getY(), r.getX(), r.getRight());
+            }
             }
 
             if (axis.valid())
@@ -2183,7 +2577,7 @@ private:
                     const auto p = juce::Point<float> (frameToX ((double) i), centre - juce::jlimit (-1.0f, 1.0f, data[(std::size_t) i]) * half);
                     i == first ? line.startNewSubPath (p) : line.lineTo (p);
                 }
-                g.setColour (waveColour());
+                g.setColour (waveColour().withMultipliedAlpha (waveOpacity));
                 g.strokePath (line, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
                 if (fpp < 1.0 / 6.0)
                     for (auto i = first; i <= last; ++i)
@@ -2236,7 +2630,7 @@ private:
                 wave.lineTo (px (i), bottoms[(std::size_t) i]);
             wave.closeSubPath();
         }
-        g.setColour (waveColour());
+        g.setColour (waveColour().withMultipliedAlpha (waveOpacity));
         g.fillPath (wave);
     }
 
@@ -2258,7 +2652,7 @@ private:
                 const auto p = juce::Point<float> (frameToX ((double) i), centre - juce::jlimit (-1.0f, 1.0f, data[(std::size_t) i]) * half);
                 i == first ? line.startNewSubPath (p) : line.lineTo (p);
             }
-            g.setColour (waveColour());
+            g.setColour (waveColour().withMultipliedAlpha (waveOpacity));
             g.strokePath (line, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
             return;
         }
@@ -2294,7 +2688,7 @@ private:
         {
             const auto x = (float) waveArea.getX() + (float) ((axis.unitOfBeat (b) - viewStart) / fpp);
             const auto onBar = std::abs (b / perBar - std::round (b / perBar)) < 1.0e-6;
-            g.setColour (onBar ? colour::gridBar : colour::gridBeat);
+            g.setColour (onBar ? canvasGridStrong : canvasGrid);
             g.drawVerticalLine ((int) x, (float) waveArea.getY(), (float) waveArea.getBottom());
         }
     }
@@ -2305,7 +2699,7 @@ private:
         for (const auto& m : doc.markers)
             if (viewRegions && m.isRegion())
             {
-                g.setColour (colour::warning.withAlpha (0.07f));
+                g.setColour (colour::warning.withAlpha (edisonLayout() ? 0.025f : 0.07f)); // (Edison: the regions in the ruler, the canvas stays navy)
                 g.fillRect (juce::Rectangle<float>::leftTopRightBottom (frameToX ((double) m.start), (float) waveArea.getY(), frameToX ((double) m.end),
                                                                         (float) waveArea.getBottom()));
             }
@@ -2317,17 +2711,41 @@ private:
         }
     }
 
-    void paintSpectrum (juce::Graphics& g)
+    void paintSpectrum (juce::Graphics& g, int strength = 256)
     {
         using namespace theme;
-        g.setColour (colour::bg0);
+        g.setColour (canvasColour);
         g.fillRect (waveArea);
         if (doc.audio.empty())
         {
             paintWave (g);
             return;
         }
+        if (strength < 256) // (round natives190kj: Dual view — FL draws its grid behind a see-through spectrogram)
+        {
+            juce::Graphics::ScopedSaveState save (g);
+            g.reduceClipRegion (waveArea);
+            if (axis.valid())
+                paintBeatGrid (g);
+            else
+                paintFlGrid (g);
+        }
+        if (strength > 0)
+            drawSpectrum (g, (float) strength / 256.0f);
 
+        juce::Graphics::ScopedSaveState save (g);
+        g.reduceClipRegion (waveArea);
+        if (! selection.empty())
+        {
+            g.setColour (juce::Colours::white.withAlpha (0.10f));
+            g.fillRect (juce::Rectangle<float>::leftTopRightBottom (frameToX ((double) selection.start), (float) waveArea.getY(),
+                                                                    frameToX ((double) selection.end), (float) waveArea.getBottom()));
+        }
+    }
+
+    // the spectrogram of the view at `opacity` (its images are made once per view and kept)
+    void drawSpectrum (juce::Graphics& g, float opacity)
+    {
         const auto columns = juce::jmax (1, waveArea.getWidth() / 2);
         const auto height = juce::jmax (1, waveArea.getHeight());
         // the file range in view (round 190db: in beats, the range the view's beats play; the columns are then
@@ -2379,19 +2797,15 @@ private:
                 }
                 spectrumWarpedKey = warpedKey;
             }
+            g.setOpacity (opacity);
             g.drawImage (spectrumWarped, waveArea.toFloat());
         }
         else
-            g.drawImage (spectrumImage, waveArea.toFloat());
-
-        juce::Graphics::ScopedSaveState save (g);
-        g.reduceClipRegion (waveArea);
-        if (! selection.empty())
         {
-            g.setColour (juce::Colours::white.withAlpha (0.10f));
-            g.fillRect (juce::Rectangle<float>::leftTopRightBottom (frameToX ((double) selection.start), (float) waveArea.getY(),
-                                                                    frameToX ((double) selection.end), (float) waveArea.getBottom()));
+            g.setOpacity (opacity);
+            g.drawImage (spectrumImage, waveArea.toFloat());
         }
+        g.setOpacity (1.0f);
     }
 
     void paintLevels (juce::Graphics& g)
@@ -2519,10 +2933,14 @@ private:
             if (x < (float) rulerArea.getX())
                 continue;
             g.setColour (colour::gridBar);
-            g.drawVerticalLine ((int) x, (float) rulerArea.getBottom() - 7.0f, (float) rulerArea.getBottom());
+            // (round gaps190kf: under the waveform the ticks hang from its top and the labels sit below them, as Live's)
+            if (rulerBelow)
+                g.drawVerticalLine ((int) x, (float) rulerArea.getY(), (float) rulerArea.getY() + 7.0f);
+            else
+                g.drawVerticalLine ((int) x, (float) rulerArea.getBottom() - 7.0f, (float) rulerArea.getBottom());
             g.setColour (colour::textSecondary);
-            g.drawText (formatTime ((std::int64_t) std::llround (t * rate)), juce::Rectangle<float> (x + 3.0f, (float) rulerArea.getY(), 90.0f, 13.0f),
-                        juce::Justification::centredLeft);
+            g.drawText (formatTime ((std::int64_t) std::llround (t * rate)),
+                        juce::Rectangle<float> (x + 3.0f, (float) rulerArea.getY() + (rulerBelow ? 9.0f : 0.0f), 90.0f, 13.0f), juce::Justification::centredLeft);
         }
     }
 
@@ -2539,14 +2957,17 @@ private:
                 g.setColour (colour::warning.withAlpha (0.22f));
                 g.fillRect (juce::Rectangle<float>::leftTopRightBottom (x, (float) rulerArea.getY() + 12.0f, frameToX ((double) m.end), (float) rulerArea.getBottom() - 5.0f));
             }
-            juce::Path flag;
-            flag.addTriangle (x, (float) rulerArea.getY() + 12.0f, x + 7.0f, (float) rulerArea.getY() + 15.5f, x, (float) rulerArea.getY() + 19.0f);
-            g.setColour (colour::warning);
-            g.fillPath (flag);
-            g.drawVerticalLine ((int) x, (float) rulerArea.getY() + 12.0f, (float) rulerArea.getBottom());
+            // round 190jo (FW-24): Edison's marker flag, 6 x 10 in the accent, its name in 11 px beside it
+            g.setColour (colour::accent);
+            g.fillRect (juce::Rectangle<float> (x, (float) rulerArea.getY() + 11.0f, 6.0f, 10.0f));
+            g.drawVerticalLine ((int) x, (float) rulerArea.getY() + 11.0f, (float) rulerArea.getBottom());
             if (! m.name.empty())
-                g.drawText (juce::String::fromUTF8 (m.name.c_str()), juce::Rectangle<float> (x + 8.0f, (float) rulerArea.getY() + 12.0f, 120.0f, 8.0f),
+            {
+                g.setFont (font (type::caption));
+                g.setColour (colour::textPrimary);
+                g.drawText (juce::String::fromUTF8 (m.name.c_str()), juce::Rectangle<float> (x + 8.0f, (float) rulerArea.getY() + 10.0f, 120.0f, 12.0f),
                             juce::Justification::centredLeft);
+            }
         }
         if (doc.hasLoop() && viewLoop)
         {
@@ -2570,11 +2991,11 @@ private:
         {
             if (! viewRegions)
                 break;
-            g.setColour (colour::warning.withAlpha (0.55f));
+            g.setColour (colour::accent.withAlpha (0.6f)); // (round 190jo: Edison's marker lines take the flags' colour)
             g.drawVerticalLine ((int) frameToX ((double) m.start), (float) waveArea.getY(), (float) waveArea.getBottom());
             if (m.isRegion())
             {
-                g.setColour (colour::warning.withAlpha (0.3f));
+                g.setColour (colour::accent.withAlpha (0.3f));
                 g.drawVerticalLine ((int) frameToX ((double) m.end), (float) waveArea.getY(), (float) waveArea.getBottom());
             }
         }
@@ -2605,6 +3026,11 @@ private:
             g.setColour (colour::playhead);
             g.fillRect (juce::Rectangle<float> (frameToX ((double) playhead) - 0.5f, (float) waveArea.getY(), 2.0f, (float) waveArea.getHeight()));
         }
+        else if (launchedHead >= 0) // round 190im (R13): where the clip launched from the grid plays now
+        {
+            g.setColour (colour::playhead);
+            g.fillRect (juce::Rectangle<float> (frameToX ((double) launchedHead) - 0.5f, (float) waveArea.getY(), 2.0f, (float) waveArea.getHeight()));
+        }
         if (recState != RecState::idle)
         {
             auto badge = juce::Rectangle<float> ((float) waveArea.getX() + 8.0f, (float) waveArea.getY() + 8.0f, recState == RecState::recording ? 70.0f : 150.0f, 20.0f);
@@ -2628,7 +3054,7 @@ private:
         const auto perPixel = frames / juce::jmax (1, overviewArea.getWidth());
         const auto centre = (float) overviewArea.getCentreY();
         const auto half = overviewArea.getHeight() * 0.5f - 1.0f;
-        g.setColour (waveColour().withAlpha (0.55f));
+        g.setColour (juce::Colour (0xff8a93a8)); // (round 190jo, FW-24: Edison's overview wave)
         for (int x = 0; x < overviewArea.getWidth(); ++x)
         {
             // (round 190db: in beats, each pixel shows the file its beats play)
@@ -2640,10 +3066,76 @@ private:
         }
         const auto x0 = (float) overviewArea.getX() + (float) (viewStart / frames) * overviewArea.getWidth();
         const auto w = (float) ((double) waveArea.getWidth() * fpp / frames) * overviewArea.getWidth();
-        g.setColour (colour::accent.withAlpha (0.18f));
+        // the view window: a 1 px light frame (red stays for the selection and the playhead)
+        g.setColour (colour::textSecondary.withAlpha (0.12f));
         g.fillRect (juce::Rectangle<float> (x0, (float) overviewArea.getY(), juce::jmax (3.0f, w), (float) overviewArea.getHeight()));
-        g.setColour (colour::accent);
+        g.setColour (colour::textSecondary);
         g.drawRect (juce::Rectangle<float> (x0, (float) overviewArea.getY(), juce::jmax (3.0f, w), (float) overviewArea.getHeight()), 1.0f);
+    }
+
+    // Round 190jo (design190ia FW-23): Edison's info strip under the panel. FL's captions (SAMPLERATE, FORMAT, TEMPO,
+    // TITLE / LENGTH, BAR:BEAT:TICK) in small bold caps over their values; the caption words are FL's labels, kept as FL
+    // writes them. Tempo: the one in the file name (as Auto-warp reads it), else the song's while the channel's warp
+    // markers lock the audio to it ("SYNCED").
+    void paintStrip (juce::Graphics& g)
+    {
+        using namespace theme;
+        if (stripArea.isEmpty())
+            return;
+        g.setColour (colour::bg1);
+        g.fillRect (stripArea);
+        g.setColour (colour::border);
+        g.drawHorizontalLine (stripArea.getBottom() - 1, 0.0f, (float) getWidth());
+        const auto captionFont = font (9.0f, true), valueFont = font (type::body);
+        auto area = stripArea.reduced (10, 2);
+        auto field = [&] (juce::Rectangle<int> r, const juce::String& caption, const juce::String& value, juce::Justification j,
+                          const juce::String& badge = {}) {
+            g.setFont (captionFont);
+            g.setColour (colour::textSecondary);
+            g.drawText (caption, r.withHeight (11), j, false);
+            if (badge.isNotEmpty())
+            {
+                const auto w = juce::GlyphArrangement::getStringWidth (captionFont, caption) + 6.0f;
+                g.setColour (colour::textPrimary);
+                g.drawText (badge, r.withHeight (11).withTrimmedLeft ((int) w), juce::Justification::centredLeft, false);
+            }
+            g.setFont (valueFont);
+            g.setColour (colour::textPrimary);
+            g.drawFittedText (value, r.withTrimmedTop (11), j, 1, 0.8f);
+        };
+        const auto has = ! doc.audio.empty();
+        const auto bitsText = juce::String (fileBits > 0 ? fileBits : bits == ae::WavFormat::int16 ? 16 : bits == ae::WavFormat::int24 ? 24 : 32);
+        field (area.removeFromLeft (84), "SAMPLERATE", has ? juce::String (juce::roundToInt (doc.audio.sampleRate)) + " Hz" : juce::String ("-"),
+               juce::Justification::centredLeft);
+        area.removeFromLeft (8);
+        field (area.removeFromLeft (84), "FORMAT", has ? bitsText + "  " + (doc.audio.numChannels() > 1 ? tr ("Stereo") : tr ("Mono")) : juce::String ("-"),
+               juce::Justification::centredLeft);
+        area.removeFromLeft (8);
+        auto bpm = autowarp::bpmInName (doc.title.empty() ? juce::File (source.path).getFileNameWithoutExtension().toStdString() : doc.title);
+        const auto synced = ! warpMarkers().empty();
+        if (synced)
+            bpm = engine.getSong().bpm;
+        field (area.removeFromLeft (110), "TEMPO", bpm > 0.0 ? juce::String (bpm, std::abs (bpm - std::round (bpm)) < 0.005 ? 0 : 2) + " BPM" : juce::String ("-"),
+               juce::Justification::centredLeft, synced ? juce::String ("SYNCED") : juce::String());
+        area.removeFromLeft (8);
+        auto right = area.removeFromRight (juce::jmin (260, area.getWidth() / 2));
+        const auto at = selection.empty() ? cursor : selection.start;
+        field (right.removeFromRight (110), "BAR:BEAT:TICK", has ? barBeatTick (at) : juce::String ("-"), juce::Justification::centredRight);
+        right.removeFromRight (12);
+        field (right, "LENGTH", has ? formatTime (doc.audio.frames()) : juce::String ("-"), juce::Justification::centredRight);
+        field (area, "TITLE", doc.title.empty() ? juce::String ("-") : juce::String::fromUTF8 (doc.title.c_str()), juce::Justification::centredLeft);
+    }
+
+    // FL's bar:beat:tick ("003:01:000"): bars and beats of the song's tempo and meter, ticks at FL's 96 per quarter note
+    juce::String barBeatTick (std::int64_t frames) const
+    {
+        const auto rate = juce::jmax (1.0, doc.audio.sampleRate);
+        const auto beats = (double) frames / rate * engine.getSong().bpm / 60.0;
+        const auto perBar = juce::jmax (1, (int) std::lround ((double) engine.getSong().barTicks() / ppq));
+        const auto bar = (int) (beats / perBar);
+        const auto beat = (int) beats - bar * perBar;
+        const auto tick = juce::jlimit (0, 95, (int) ((beats - std::floor (beats)) * 96.0));
+        return juce::String (bar + 1).paddedLeft ('0', 3) + ":" + juce::String (beat + 1).paddedLeft ('0', 2) + ":" + juce::String (tick).paddedLeft ('0', 3);
     }
 
     void paintInfo (juce::Graphics& g)
@@ -2665,9 +3157,12 @@ private:
             return;
 
         juce::StringArray parts;
-        parts.add (juce::String (juce::roundToInt (doc.audio.sampleRate)) + " Hz");
-        parts.add (doc.audio.numChannels() > 1 ? tr ("Stereo") : tr ("Mono"));
-        parts.add (tr ("Length") + " " + formatTime (doc.audio.frames()));
+        if (stripArea.isEmpty()) // (round 190jo: with Edison's info strip the rate, channels and length are up there)
+        {
+            parts.add (juce::String (juce::roundToInt (doc.audio.sampleRate)) + " Hz");
+            parts.add (doc.audio.numChannels() > 1 ? tr ("Stereo") : tr ("Mono"));
+            parts.add (tr ("Length") + " " + formatTime (doc.audio.frames()));
+        }
         const auto r = ae::orAll (doc, selection);
         if (! selection.empty())
             parts.add (tr ("Selection") + " " + formatTime (selection.start) + " - " + formatTime (selection.end) + " (" + formatTime (selection.length()) + ")");
@@ -2796,7 +3291,7 @@ private:
             return;
         clipboard() = ae::copy (doc.audio, selection);
         const auto at = selection.start;
-        edit (tr ("Cut"), [] (ae::Document& d, ae::Range r) { ae::erase (d, r); }, true);
+        edit (tr ("Cut"), [] (ae::Document& d, ae::Range r) { clickFreeEditing() ? ae::clickfree::eraseClickFree (d, r) : ae::erase (d, r); }, true);
         selection = {};
         cursor = at;
         repaint();
@@ -2806,7 +3301,7 @@ private:
     {
         if (selection.empty())
             return;
-        edit (tr ("Trim"), [] (ae::Document& d, ae::Range r) { ae::trim (d, r); }, true);
+        edit (tr ("Trim"), [] (ae::Document& d, ae::Range r) { clickFreeEditing() ? ae::clickfree::trimClickFree (d, r) : ae::trim (d, r); }, true);
         selection = {};
         cursor = 0;
         zoomToFit();
@@ -2817,7 +3312,7 @@ private:
         if (selection.empty())
             return;
         const auto at = selection.start;
-        edit (tr ("Delete"), [] (ae::Document& d, ae::Range r) { ae::erase (d, r); }, true);
+        edit (tr ("Delete"), [] (ae::Document& d, ae::Range r) { clickFreeEditing() ? ae::clickfree::eraseClickFree (d, r) : ae::erase (d, r); }, true);
         selection = {};
         cursor = at;
         repaint();
@@ -2836,9 +3331,9 @@ private:
         if (mix)
             ae::pasteMix (doc, at, clip);
         else if (! selection.empty())
-            ae::pasteReplace (doc, selection, clip);
+            clickFreeEditing() ? ae::clickfree::pasteReplaceClickFree (doc, selection, clip) : ae::pasteReplace (doc, selection, clip);
         else
-            ae::insert (doc, at, clip);
+            clickFreeEditing() ? ae::clickfree::insertClickFree (doc, at, clip) : ae::insert (doc, at, clip);
         selection = { at, at + length };
         commit (mix ? tr ("Paste mix") : tr ("Paste"));
         if (wasEmpty)
@@ -2994,7 +3489,9 @@ private:
     }
 
     // --- Tools › Analysis › Convert to MIDI (round a2m189b): the selection (or the whole audio) as a new pattern
-    void convertToMidi (a2m::Mode mode)
+    void convertToMidi (a2m::Mode mode) { convertToMidi (mode, std::nullopt); }
+    void convertToMidi (const a2m::ConvertOptions& options) { convertToMidi (a2m::Mode::harmony, options); }
+    void convertToMidi (a2m::Mode mode, const std::optional<a2m::ConvertOptions>& options)
     {
         if (doc.audio.empty())
             return;
@@ -3007,10 +3504,14 @@ private:
             for (std::size_t i = 0; i < mono.size(); ++i)
                 mono[i] += ch[(std::size_t) from + i] / (float) channels;
         juce::Component::SafePointer<AudioEditor> self (this);
-        convertAudioToMidi (engine, std::move (mono), doc.audio.sampleRate, mode, safeTitle(), [self] (int count) {
+        auto shown = [self] (int count) {
             if (self != nullptr && count > 0)
                 self->setStatus (tr ("{0} notes put in a new pattern", { juce::String (count) }), false);
-        });
+        };
+        if (options)
+            convertAudioToMidi (engine, std::move (mono), doc.audio.sampleRate, *options, safeTitle(), shown);
+        else
+            convertAudioToMidi (engine, std::move (mono), doc.audio.sampleRate, mode, safeTitle(), shown);
     }
 
     // --- scripts (Tools › Scripting: Run script / Edit last script; REA_rodada167c.md §2) -----------------------------
@@ -3316,6 +3817,79 @@ private:
 
     void showAmp() { openEdisonTool (audiotools::Tool::amp); } // Edison's Amp form (round 165l)
 
+    // FL Edison's Sample properties (Format › Edit properties..., F2; round gaps190kf, core/SampleProps.h)
+    void showSampleProperties()
+    {
+        if (doc.audio.empty() || recState != RecState::idle)
+            return;
+        const auto whole = doc.audio.frames();
+        const auto part = ! selection.empty() && selection.length() != whole;
+        SamplePropertiesHost h;
+        h.selectionFrames = (double) (part ? selection.length() : whole);
+        h.partSelected = part;
+        h.projectTempo = engine.getSong().bpm;
+        juce::Component::SafePointer<AudioEditor> self (this);
+        const auto range = part ? selection : ae::Range { 0, whole };
+        h.detectPitch = [self, range]() -> double {
+            if (self == nullptr)
+                return -1.0;
+            const auto mono = self->monoOf (range);
+            // LYNX's own detector (YIN pitch track, its median over the pitched frames): FL's analyser is not ported
+            const auto track = warpengine::pitchTrack (mono.data(), (long) mono.size(), self->doc.audio.sampleRate);
+            std::vector<float> pitched;
+            for (const auto v : track.semitones)
+                if (std::isfinite (v))
+                    pitched.push_back (v);
+            if (pitched.empty())
+                return -1.0;
+            std::nth_element (pitched.begin(), pitched.begin() + (std::ptrdiff_t) (pitched.size() / 2), pitched.end());
+            // round natives190kj: FL's middle note is the detected MIDI pitch − 12 (0x7a9a10 subtracts 12: a 440 Hz
+            // sample gets "A4" = 57 in FL's note names, as FL's own Autodetect shows)
+            return (double) pitched[pitched.size() / 2] - 12.0;
+        };
+        h.detectTempo = [self, range] (int) -> double {
+            if (self == nullptr)
+                return 0.0;
+            const auto& a = self->doc.audio;
+            const auto* l = a.channels[0].data() + range.start;
+            const auto* r = a.numChannels() > 1 ? a.channels[1].data() + range.start : nullptr;
+            // LYNX's tempo detection (core/TempoDetect) for both of FL's song methods
+            return tempodetect::detect (l, r, (std::size_t) range.length(), a.sampleRate).bpm;
+        };
+        h.accept = [self] (const sampleprops::Form& f) {
+            if (self == nullptr)
+                return;
+            self->stopPlayback();
+            const auto rateChanged = sampleprops::accept (self->doc, f);
+            if (! f.fileName.empty())
+                self->doc.title = f.fileName;
+            if (f.int16)
+                self->bits = ae::WavFormat::int16;
+            self->selection = {};
+            self->commit (tr ("Edit properties"));
+            if (rateChanged)
+                self->zoomToFit();
+            self->updateTitle();
+        };
+        auto panel = makeSamplePropertiesPanel (doc, doc.title, std::move (h));
+        openToolWindow (std::move (panel), tr ("Sample properties"), "audioeditor-props");
+    }
+
+    // the range's audio, both channels mixed (for the detectors)
+    std::vector<float> monoOf (ae::Range r) const
+    {
+        const auto& a = doc.audio;
+        std::vector<float> m;
+        if (a.empty())
+            return m;
+        r = ae::clamp (doc, r);
+        m.assign (a.channels[0].begin() + r.start, a.channels[0].begin() + r.end);
+        if (a.numChannels() > 1)
+            for (std::size_t i = 0; i < m.size(); ++i)
+                m[i] = 0.5f * (m[i] + a.channels[1][(std::size_t) r.start + i]);
+        return m;
+    }
+
     void showResample()
     {
         if (doc.audio.empty())
@@ -3355,7 +3929,10 @@ private:
                                                        return;
                                                    const auto frames = (std::int64_t) std::llround (v[0] * 0.001 * self->doc.audio.sampleRate);
                                                    const auto at = self->cursor;
-                                                   ae::insertSilence (self->doc, at, frames);
+                                                   if (clickFreeEditing())
+                                                       ae::clickfree::insertSilenceClickFree (self->doc, at, frames);
+                                                   else
+                                                       ae::insertSilence (self->doc, at, frames);
                                                    self->selection = { at, at + frames };
                                                    self->commit (tr ("Insert silence"));
                                                },
@@ -3408,6 +3985,115 @@ private:
             commit (tr ("Grid slice"));
     }
 
+    // FL's grid-slicing (round natives190kj): the selection (or the whole sample), its plain markers replaced by one at
+    // every small / medium / large base step from its start
+    void flGridSlice (int size)
+    {
+        if (doc.audio.empty())
+            return;
+        const auto g = flGrid();
+        const auto from = selection.empty() ? (std::int64_t) 0 : juce::jlimit<std::int64_t> (0, doc.audio.frames() - 1, selection.start);
+        const auto to = selection.empty() ? doc.audio.frames() - 1 : juce::jlimit<std::int64_t> (from, doc.audio.frames() - 1, selection.end - 1);
+        const auto n = edisonview::gridSlice (doc, from, to, edisonview::sliceStep (g.base, size) * g.framesPerUnit);
+        if (n > 0)
+            commit (tr ("Grid slice"));
+        setStatus (tr ("{0} markers added", { juce::String (n) }), false);
+    }
+
+    // Round 190lo: Tools › Analysis › "Edit notes (polyphonic)..." — LYNX's polyphonic note editor (ui/PolyEditor.h) on
+    // the selection, or the whole audio, as a buffer: the editor keeps its own undo, and its Apply writes the edited notes
+    // back over the same frames as one Edison undo step
+    void editNotesPolyphonic()
+    {
+        if (doc.audio.empty() || recState != RecState::idle)
+            return;
+        const auto range = ae::orAll (doc, selection);
+        auto data = std::make_shared<SampleData>();
+        data->sampleRate = doc.audio.sampleRate;
+        data->left.assign (doc.audio.channels[0].begin() + range.start, doc.audio.channels[0].begin() + range.end);
+        if (doc.audio.numChannels() > 1)
+            data->right.assign (doc.audio.channels[1].begin() + range.start, doc.audio.channels[1].begin() + range.end);
+        juce::Component::SafePointer<AudioEditor> self (this);
+        PolyEditorWindows::openBuffer (engine, data, "Edison", [self, range, frames = doc.audio.frames()] (std::shared_ptr<const SampleData> out) {
+            if (self == nullptr || out == nullptr || self->doc.audio.frames() != frames || (std::int64_t) out->left.size() != range.length())
+                return;
+            self->stopPlayback();
+            auto& ch = self->doc.audio.channels;
+            std::copy (out->left.begin(), out->left.end(), ch[0].begin() + range.start);
+            if (ch.size() > 1)
+                std::copy ((out->right.empty() ? out->left : out->right).begin(), (out->right.empty() ? out->left : out->right).end(), ch[1].begin() + range.start);
+            self->commit (tr ("Edit notes (polyphonic)"));
+        });
+    }
+
+    // FL's Detect pitch regions (round natives190kj, 0x869100): one region per detected note, named after it. FL's
+    // pitch analyser is not ported: the notes are LYNX's Newtone analysis (core/NewtoneFx.h analyseNotes).
+    void detectPitchRegions()
+    {
+        if (doc.audio.empty())
+            return;
+        setStatus (tr ("Detecting pitch regions..."), false);
+        SampleData data;
+        data.sampleRate = doc.audio.sampleRate;
+        data.left = doc.audio.channels[0];
+        if (doc.audio.numChannels() > 1)
+            data.right = doc.audio.channels[1];
+        const auto track = newtonefx::analyseNotes (data);
+        std::vector<edisonview::PitchSegment> segments;
+        for (const auto& note : track.pitches)
+            if (note.voiced()) // (the analysis tiles the file as FL's, round natives190kj: the voiced notes, to their voice's end)
+                segments.push_back ({ note.origStart, note.voicedEnd(), note.origPitch });
+        const auto n = edisonview::pitchRegions (doc, segments);
+        commit (tr ("Detect pitch regions"));
+        setStatus (tr ("{0} regions", { juce::String (n) }), false);
+    }
+
+    // --- FL's Scrub button (round natives190kj, ScrubBtnMouseDown / Move / Up): a shuttle. Pressed: the sample plays from
+    // the playhead (or the cursor) paused; each pixel dragged right adds 0.025 × to the speed (left: backward), within
+    // ±16; released: the playback stops. The mouse moves without bounds while it is held (FL hides and wraps it).
+    void scrubMouseDown (const juce::MouseEvent& e)
+    {
+        if (doc.audio.empty() || recState != RecState::idle || slotMode() || ! e.mods.isLeftButtonDown())
+            return;
+        const auto start = playing && playhead >= 0 ? playhead : cursor;
+        stopPlayback();
+        auto data = std::make_shared<SampleData>();
+        data->sampleRate = doc.audio.sampleRate;
+        data->left = doc.audio.channels[0];
+        if (doc.audio.numChannels() > 1)
+            data->right = doc.audio.channels[1];
+        engine.previewScrub (data, start);
+        scrubbing = true;
+        scrubSpeedNow = 0.0;
+        playing = true;
+        playFrom = 0;
+        playStartedMs = juce::Time::getMillisecondCounterHiRes();
+        playhead = start;
+        scrubLastX = e.getScreenX();
+        e.source.enableUnboundedMouseMovement (true);
+        setStatus (tr ("Paused"), false);
+    }
+
+    void scrubMouseDrag (const juce::MouseEvent& e)
+    {
+        if (! scrubbing)
+            return;
+        const auto x = e.getScreenX();
+        scrubSpeedNow = edisonview::scrubSpeed (scrubSpeedNow, (double) (x - std::exchange (scrubLastX, x)), 1.0);
+        engine.setPreviewScrubSpeed (scrubSpeedNow);
+        setStatus (scrubSpeedNow == 0.0 ? tr ("Paused") : juce::String::fromUTF8 (edisonview::scrubText (scrubSpeedNow).c_str()), false);
+    }
+
+    void endScrub()
+    {
+        if (! scrubbing)
+            return;
+        scrubbing = false;
+        scrubSpeedNow = 0.0;
+        stopPlayback();
+        setStatus ({}, false);
+    }
+
     // --- playback -------------------------------------------------------------------------------------------
     void playAudio (const ae::Audio& audio, std::int64_t from, bool loop)
     {
@@ -3439,6 +4125,7 @@ private:
 
     void startPlayback()
     {
+        EditorGlobals::get().resumeFollow (EditorGlobals::FollowView::audioEditor); // (round 190im: a play lifts the pause)
         if (doc.audio.empty() || recState != RecState::idle)
             return;
         auto r = selection;
@@ -4245,6 +4932,7 @@ private:
         for (auto* b : quickButtons)
             b->setEnabled (has);
         playButton.setEnabled (has);
+        scrubButton.setEnabled (has && ! slotMode()); // (round natives190kj: the editor window's player; a slot plays through its insert)
         saveButton.setEnabled (has);
         dragButton.setEnabled (has);
     }
@@ -4318,6 +5006,8 @@ private:
                 return;
             repaint();
         }
+        watchFollowPause();
+        stepLaunchedHead();
         if (playing)
         {
             const auto slotPlayer = slotMode() ? processor() : nullptr;
@@ -4331,11 +5021,12 @@ private:
             const auto before = playhead;
             playhead = playFrom < 0 ? -1 : playFrom + (std::int64_t) pos; // (a tool preview is not on the timeline)
             // page along with the playhead (Follow on, issue #12)
-            if (playhead >= 0 && EditorGlobals::get().isFollowingView (EditorGlobals::FollowView::audioEditor)
+            if (playhead >= 0 && EditorGlobals::get().followsNow (EditorGlobals::FollowView::audioEditor)
                 && (unitOfFrame ((double) playhead) > viewStart + (double) waveArea.getWidth() * fpp || unitOfFrame ((double) playhead) < viewStart) && fpp < maxFpp())
             {
                 viewStart = unitOfFrame ((double) playhead);
                 clampView();
+                followSeenView = viewStart; // (round 190im: not a scroll by hand)
                 repaint();
             }
             else if (before != playhead)
@@ -4343,8 +5034,313 @@ private:
         }
     }
 
+    // --- round gaps190kf: the Clip View's warp time line (Live's loop brace and Start / End markers, core/ClipBrace.h) ---
+    // Under the beat-time ruler (time in seconds for an unwarped clip) the grid clip's loop brace and its markers are drawn
+    // and dragged in content ticks; they snap to the ruler's grid (Alt: no snap, as Live's Alt / Cmd) and are written to
+    // the clip when the drag ends (one undo step), so the Clip panel's Start / End / Position / Length follow.
+    bool gridClipShown() const noexcept { return source.kind == Source::Kind::channel && source.gridTrack >= 0 && source.gridScene >= 0; }
+    bool clipRulerBelow() const
+    {
+        const auto* c = gridClipShown() ? warpChannel() : nullptr;
+        return c != nullptr && c->sampler.stretchBeats <= 0.0f;
+    }
+    const Clip* gridClip (const ClipGridSlot** slot = nullptr) const
+    {
+        const auto& song = engine.getSong();
+        const auto* c = song.clipGrid ? launcher::clipAt (*song.clipGrid, source.gridTrack, source.gridScene) : nullptr;
+        if (c == nullptr || c->kind != ClipKind::audio || ! juce::isPositiveAndBelow ((int) c->gridSlot, (int) song.clipGrid->slots.size()))
+            return nullptr;
+        if (slot != nullptr)
+            *slot = &song.clipGrid->slots[(std::size_t) c->gridSlot];
+        return c;
+    }
+    template <class Fn>
+    void editGridClip (Fn&& fn)
+    {
+        auto changed = false;
+        engine.editSong ([&] (Song& s) {
+            if (! s.clipGrid)
+                return;
+            if (auto* c = const_cast<Clip*> (launcher::clipAt (*s.clipGrid, source.gridTrack, source.gridScene));
+                c != nullptr && c->kind == ClipKind::audio && juce::isPositiveAndBelow ((int) c->gridSlot, (int) s.clipGrid->slots.size()))
+                changed = fn (*c, s.clipGrid->slots[(std::size_t) c->gridSlot]);
+        });
+        if (changed)
+            repaint();
+    }
+    // content tick <-> file frame / view x: through the warp axis (beats), else the warped length, else the song tempo
+    double braceFrameOfTick (double tick) const
+    {
+        if (axis.valid())
+            return axis.frameOfBeat (tick / (double) ppq);
+        if (const auto* c = warpChannel(); c != nullptr && c->sampler.stretchBeats > 0.0f)
+            return tick / (double) ppq / (double) c->sampler.stretchBeats * (double) doc.audio.frames();
+        return tick / (double) ppq * 60.0 / juce::jmax (1.0, engine.getSong().bpm) * doc.audio.sampleRate;
+    }
+    float braceTickToX (double tick) const
+    {
+        const auto unit = axis.valid() ? axis.unitOfBeat (tick / (double) ppq) : braceFrameOfTick (tick);
+        return (float) waveArea.getX() + (float) ((unit - viewStart) / fpp);
+    }
+    double braceXToTick (int x) const
+    {
+        const auto unit = viewStart + (double) (x - waveArea.getX()) * fpp;
+        if (axis.valid())
+            return axis.beatOfUnit (unit) * (double) ppq;
+        if (const auto* c = warpChannel(); c != nullptr && c->sampler.stretchBeats > 0.0f && doc.audio.frames() > 0)
+            return unit / (double) doc.audio.frames() * (double) c->sampler.stretchBeats * (double) ppq;
+        return unit / juce::jmax (1.0, doc.audio.sampleRate) * juce::jmax (1.0, engine.getSong().bpm) / 60.0 * (double) ppq;
+    }
+    // the ruler's grid in ticks (the step snapToGrid uses): beats in the beat-time view, the time ruler's step otherwise
+    std::int64_t braceGridTicks() const
+    {
+        if (doc.audio.empty())
+            return ppq;
+        if (axis.valid())
+        {
+            const auto perBar = juce::jmax (1, (int) std::lround ((double) engine.getSong().barTicks() / ppq));
+            const auto pixelsPerBeat = axis.unitsPerBeat / fpp;
+            const auto step = warpview::rulerStep (pixelsPerBeat, perBar);
+            const auto tick = step <= 1.0 ? 0.25 : (step <= perBar ? 1.0 : (double) perBar);
+            return juce::jmax<std::int64_t> (1, (std::int64_t) std::llround ((tick * pixelsPerBeat >= 6.0 ? tick : step) * ppq));
+        }
+        return juce::jmax<std::int64_t> (1, (std::int64_t) std::llround (timeRulerStep() * juce::jmax (1.0, engine.getSong().bpm) / 60.0 * ppq));
+    }
+    clipbrace::Marks braceMarks() const
+    {
+        if (braceHeld)
+            return braceShown;
+        const ClipGridSlot* slot = nullptr;
+        const auto* c = gridClip (&slot);
+        return c != nullptr ? clipbrace::of (*c, *slot) : clipbrace::Marks {};
+    }
+    clipbrace::Part bracePartAt (juce::Point<int> p) const
+    {
+        const ClipGridSlot* slot = nullptr;
+        if (clipLane.isEmpty() || doc.audio.empty() || gridClip (&slot) == nullptr)
+            return clipbrace::Part::none;
+        const auto m = braceMarks();
+        const auto xa = braceTickToX ((double) m.loopStart), xb = braceTickToX ((double) m.loopEnd);
+        const auto near = [&p] (float x) { return std::abs ((float) p.x - x) <= 5.0f; };
+        if (p.y >= clipLane.getY() + braceLaneHeight / 2)
+        {
+            // (the Start marker is drawn to the right of its place, the End marker to the left)
+            if (const auto xs = braceTickToX ((double) m.start); (float) p.x >= xs - 2.0f && (float) p.x <= xs + 7.0f)
+                return clipbrace::Part::start;
+            if (! m.loop)
+                if (const auto xe = braceTickToX ((double) m.end); (float) p.x >= xe - 7.0f && (float) p.x <= xe + 2.0f)
+                    return clipbrace::Part::end;
+            return clipbrace::Part::none;
+        }
+        if (near (xa))
+            return clipbrace::Part::loopStart;
+        if (near (xb))
+            return clipbrace::Part::loopEnd;
+        return (float) p.x > xa && (float) p.x < xb ? clipbrace::Part::loopBody : clipbrace::Part::none;
+    }
+    void paintClipLane (juce::Graphics& g)
+    {
+        using namespace theme;
+        if (clipLane.isEmpty())
+            return;
+        g.setColour (colour::bg1);
+        g.fillRect (clipLane);
+        if (doc.audio.empty() || gridClip() == nullptr)
+            return;
+        const juce::Graphics::ScopedSaveState save (g);
+        g.reduceClipRegion (clipLane.withX (waveArea.getX()).withRight (waveArea.getRight()));
+        const auto m = braceMarks();
+        const auto top = (float) clipLane.getY(), mid = top + (float) (braceLaneHeight / 2);
+        const auto xa = braceTickToX ((double) m.loopStart), xb = braceTickToX ((double) m.loopEnd);
+        // the loop brace [LIVE: a 1 px frame over the loop's span, a ">" inside its start and a "<" inside its end; brighter
+        // while Loop is on]; selected (its keys act) in the accent colour
+        // [LIVE 12.4 gaps190kf/raw/c3, c7, c8, c12: Loop on = a teal bar (#00bfaf) between 1 px grey lines (#919191) over the
+        // loop, a grey ">" in its start and "<" in its end; selected (its arrow keys act) light blue (#b0ddeb); Loop off = the
+        // grey frame alone]
+        const auto box = juce::Rectangle<float>::leftTopRightBottom (std::floor (xa), top + 1.0f, std::floor (xb) + 1.0f, mid);
+        if (m.loop || braceSelected)
+        {
+            g.setColour (braceSelected ? livelook::selectionFocused : livelook::clipMarker);
+            g.fillRect (box);
+            g.setColour (livelook::braceOff);
+            g.fillRect (box.withHeight (1.0f));
+            g.fillRect (box.withTop (box.getBottom() - 1.0f));
+        }
+        else
+        {
+            g.setColour (livelook::braceOff);
+            g.drawRect (box, 1.0f);
+        }
+        g.setColour (m.loop || braceSelected ? livelook::braceOn : livelook::braceOff);
+        const auto cy = (box.getY() + box.getBottom()) * 0.5f;
+        juce::Path chevrons;
+        chevrons.startNewSubPath (box.getX() + 1.5f, cy - 4.0f);
+        chevrons.lineTo (box.getX() + 6.0f, cy);
+        chevrons.lineTo (box.getX() + 1.5f, cy + 4.0f);
+        chevrons.startNewSubPath (box.getRight() - 1.5f, cy - 4.0f);
+        chevrons.lineTo (box.getRight() - 6.0f, cy);
+        chevrons.lineTo (box.getRight() - 1.5f, cy + 4.0f);
+        g.strokePath (chevrons, juce::PathStrokeType (1.5f));
+        // the Start marker (right of its place) and, with Loop off, the End marker (left of its place): grey while the loop
+        // brace is on (the brace carries the colour), teal with Loop off
+        g.setColour (m.loop ? livelook::braceOn : livelook::clipMarker);
+        const auto xs = std::floor (braceTickToX ((double) m.start)) + 0.5f;
+        juce::Path marks;
+        marks.addTriangle (xs, mid + 1.5f, xs + 6.0f, mid + 5.5f, xs, mid + 9.5f); // (Live: about 6 × 8 px)
+        if (! m.loop)
+        {
+            const auto xe = std::floor (braceTickToX ((double) m.end)) + 0.5f;
+            marks.addTriangle (xe, mid + 1.5f, xe - 6.0f, mid + 5.5f, xe, mid + 9.5f);
+        }
+        g.fillPath (marks);
+    }
+    // the markers' lines down the waveform, and the played span a shade lighter [LIVE gaps190kf/raw/c3: 1 px grey lines at
+    // the loop's ends and the Start marker; the loop (Loop off: Start…End) lighter, #3e3e3e over #393939]
+    void paintBraceLines (juce::Graphics& g)
+    {
+        using namespace theme;
+        if (clipLane.isEmpty() || doc.audio.empty() || gridClip() == nullptr)
+            return;
+        const juce::Graphics::ScopedSaveState save (g);
+        g.reduceClipRegion (waveArea);
+        const auto m = braceMarks();
+        const auto xa = std::floor (braceTickToX ((double) m.loopStart)), xb = std::floor (braceTickToX ((double) m.loopEnd));
+        g.setColour (juce::Colours::white.withAlpha (0.025f));
+        g.fillRect (juce::Rectangle<float>::leftTopRightBottom (xa, (float) waveArea.getY(), xb, (float) waveArea.getBottom()));
+        g.setColour (livelook::braceOff);
+        for (const auto x : { xa, xb, std::floor (braceTickToX ((double) m.start)) })
+            g.drawVerticalLine ((int) x, (float) waveArea.getY(), (float) waveArea.getBottom());
+    }
+    void braceMouseDown (const juce::MouseEvent& e)
+    {
+        syncAxis();
+        const ClipGridSlot* slot = nullptr;
+        const auto* c = gridClip (&slot);
+        const auto part = bracePartAt (e.getPosition());
+        braceSelected = part == clipbrace::Part::loopStart || part == clipbrace::Part::loopEnd || part == clipbrace::Part::loopBody;
+        repaint (clipLane);
+        if (c == nullptr || part == clipbrace::Part::none)
+            return;
+        bracePart = part;
+        braceShown = clipbrace::of (*c, *slot);
+        braceGrab = braceXToTick (e.x) - (double) braceShown.loopStart;
+        braceHeld = true;
+        drag = Drag::brace;
+    }
+    std::int64_t braceTickFor (const juce::MouseEvent& e) const
+    {
+        const auto raw = braceXToTick (e.x) - (bracePart == clipbrace::Part::loopBody ? braceGrab : 0.0);
+        return e.mods.isAltDown() ? (std::int64_t) std::llround (raw) : clipbrace::snap (raw, braceGridTicks());
+    }
+    void braceMouseDrag (const juce::MouseEvent& e)
+    {
+        const ClipGridSlot* slot = nullptr;
+        const auto* c = gridClip (&slot);
+        if (c == nullptr)
+            return;
+        auto clip = *c;
+        auto s = *slot;
+        braceTick = braceTickFor (e);
+        braceMin = e.mods.isAltDown() ? 1 : braceGridTicks();
+        clipbrace::move (clip, s, bracePart, braceTick, braceMin);
+        braceShown = clipbrace::of (clip, s);
+        braceMoved = true;
+        repaint (clipLane);
+    }
+    void braceMouseUp()
+    {
+        drag = Drag::none;
+        braceHeld = false;
+        if (std::exchange (braceMoved, false))
+            editGridClip ([part = bracePart, tick = braceTick, minLength = braceMin] (Clip& c, ClipGridSlot& slot) {
+                return clipbrace::move (c, slot, part, tick, minLength);
+            });
+        bracePart = clipbrace::Part::none;
+        repaint (clipLane);
+    }
+
+    // Round 190im (R13, DL-73; Live's manual 8.7): opened in the Clip View for a clip of the grid, the editor shows
+    // where that clip plays while it is launched — its content position (launcher clock − the clip's anchor, wrapped
+    // at its length, from its start offset) on the sample: through the warp axis for a warped clip, at the song's
+    // tempo otherwise. On the editor's existing timer, only while that clip plays; the old and new 2 px columns are
+    // repainted. Follow pages along (and pauses on a scroll or an edit, round 190im R15).
+    std::int64_t launchedFrame() const
+    {
+        if (source.gridTrack < 0 || source.gridTrack >= launcher::maxTracks || doc.audio.empty() || playing || recState != RecState::idle)
+            return -1;
+        const auto* state = engine.launcherState();
+        if (state == nullptr || ! state->running.load (std::memory_order_relaxed))
+            return -1;
+        const auto& view = state->tracks[(std::size_t) source.gridTrack];
+        if (view.playing.load (std::memory_order_relaxed) != source.gridScene)
+            return -1;
+        const auto& song = engine.getSong();
+        const auto* clip = song.clipGrid ? launcher::clipAt (*song.clipGrid, source.gridTrack, source.gridScene) : nullptr;
+        if (clip == nullptr || clip->kind != ClipKind::audio || clip->length <= 0)
+            return -1;
+        const auto into = std::fmod (juce::jmax (0.0, state->clockNow.load (std::memory_order_relaxed) + engine.playheadAdvanceTicks()
+                                                          - view.anchor.load (std::memory_order_relaxed)), (double) clip->length);
+        const auto tick = (double) clip->offset + into;
+        const auto frame = axis.valid() ? frameOfUnit (axis.unitOfBeat (tick / (double) ppq))
+                                        : tick / (double) ppq * 60.0 / juce::jmax (1.0, song.bpm) * doc.audio.sampleRate;
+        return juce::jlimit<std::int64_t> (0, doc.audio.frames(), (std::int64_t) frame);
+    }
+    void stepLaunchedHead()
+    {
+        const auto now = isShowing() ? launchedFrame() : (std::int64_t) -1;
+        if (now == launchedHead)
+            return;
+        const auto column = [this] (std::int64_t f) {
+            return f >= 0 ? juce::Rectangle<int> ((int) frameToX ((double) f) - 2, waveArea.getY(), 5, waveArea.getHeight()).getIntersection (waveArea)
+                          : juce::Rectangle<int>();
+        };
+        const auto before = column (launchedHead);
+        launchedHead = now;
+        if (now >= 0 && followLaunched())
+        {
+            viewStart = unitOfFrame ((double) now);
+            clampView();
+            followSeenView = viewStart; // (round 190im: not a scroll by hand)
+            repaint();
+            return;
+        }
+        if (! before.isEmpty())
+            repaint (before);
+        if (const auto after = column (now); ! after.isEmpty())
+            repaint (after);
+    }
+    // Follow on: the view pages along when the launched clip's position leaves it
+    bool followLaunched() const
+    {
+        if (! EditorGlobals::get().followsNow (EditorGlobals::FollowView::audioEditor))
+            return false;
+        const auto unit = unitOfFrame ((double) launchedHead);
+        return (unit > viewStart + (double) waveArea.getWidth() * fpp || unit < viewStart) && fpp < maxFpp();
+    }
+    std::int64_t launchedHead = -1;
+
+    // Round 190im (R15, Live's manual 8.7: "Follow will pause if you make an edit in the Sample Editor"): while the
+    // editor's own playback or a launched clip moves its playhead, a scroll by hand (the view moved at the same zoom, not
+    // by Follow) or an edit (the undo history moved) pauses Follow, until the next play / stop or a Follow click.
+    void watchFollowPause()
+    {
+        auto& globals = EditorGlobals::get();
+        globals.noteTransport (engine.getTransport().playing.load (std::memory_order_relaxed));
+        const auto edits = std::pair (history.size(), history.getPosition());
+        if ((playing || launchedHead >= 0) && followSeenKnown && ((viewStart != followSeenView && fpp == followSeenFpp) || edits != followSeenEdits))
+            globals.pauseFollow (EditorGlobals::FollowView::audioEditor);
+        followSeenView = viewStart;
+        followSeenFpp = fpp;
+        followSeenEdits = edits;
+        followSeenKnown = true;
+    }
+    double followSeenView = 0.0, followSeenFpp = 0.0;
+    std::pair<int, int> followSeenEdits;
+    bool followSeenKnown = false;
+
     // --- Edison's tools (round 165l): the tool windows' host ---------------------------------------------------
 public:
+    void openDeverbTool() { openEdisonTool (audiotools::Tool::deverb); } // (the audio clip menu's Deverb, round 190jv)
     const ae::Document& toolDocument() const override { return doc; }
     ae::Range toolSelection() const override { return selection; }
     void toolApply (const juce::String& label, ae::Document d, ae::Range newSelection) override
@@ -4424,6 +5420,7 @@ private:
     {
         envMode = m;
         envButton.setButtonText (tr (envModeName (m)));
+        envButton.setTooltip (tr (envModeName (m)) + ": " + tr ("What the mouse edits: the waveform, or the volume / panning / stereo separation envelope drawn over it (E)"));
         envButton.setToggleState (m != EnvMode::wave, juce::dontSendNotification);
         if (m != EnvMode::wave)
             setStatus (tr ("Right-click (or click) adds a point, drag moves it, right-click or Alt+click on a point deletes it, the hollow handles bend. Tools > Mixdown amp envelopes applies it."), false);
@@ -4812,19 +5809,28 @@ private:
     bool modified = false;
     juce::File lastFile;
     ae::WavFormat bits = ae::WavFormat::int24;
+    int fileBits = 0; // (round 190jo) the opened file's bit depth, 0 = not from a file (the info strip then shows the save format)
 
     ae::Range selection;
     std::int64_t cursor = 0, anchor = 0;
     double viewStart = 0.0, fpp = 1.0;
     Drag drag = Drag::none;
+    juce::Point<int> middleGrab;                 // round 190ld: the middle-drag's start, and the view then
+    double middleFpp = 1.0, middleView = 0.0;
     int dragMarkerIndex = -1;
 
     bool spectrumView = false, logFrequency = true;
+    bool dualView = false; // FL's View › Dual view (round natives190kj, core/EdisonView.h layers)
+    float waveOpacity = 1.0f; // (the waveform's strength while it is painted: Dual view draws it over the spectrogram)
+    // FL's Scrub button (round natives190kj): the shuttle speed while it is held (× normal; 0 = paused)
+    bool scrubbing = false;
+    double scrubSpeedNow = 0.0;
+    int scrubLastX = 0;
     int fftSize = 2048;
     juce::Image spectrumImage;
     juce::String spectrumKey;
     TimeFormat timeFormat = TimeFormat::automatic;
-    bool snapOn = false; // FL's Snap button (off in its form); snapMode: 0 grid, 1 regions, 2 samples, 3 zero-crossing
+    bool snapOn = false; // FL's Snap button (off in its form); snapMode: 0 grid, 1 regions, 2 samples, 3 zero-crossing, 4 pitch period
     int snapMode = 0;
     // FL's view switches (round 190cd): regions and markers, the loop, the noise threshold mark
     bool viewRegions = true, viewLoop = true, viewNoiseMark = false;
@@ -4862,9 +5868,10 @@ private:
     std::unique_ptr<juce::FileChooser> chooser;
 
     juce::Rectangle<int> rulerArea, waveArea, levelArea, overviewArea, infoArea;
+    juce::Rectangle<int> capsuleArea, stripArea; // (round 190jo: Edison's transport capsule and info strip)
     IconButton menuButton { "menu", Icon::panelMenu }, undoButton { "undo", Icon::undo }, redoButton { "redo", Icon::redo },
         historyButton { "history", Icon::chevronDown }, recordButton { "record", Icon::record }, recordMenuButton { "recordMenu", Icon::chevronDown },
-        playButton { "play", Icon::play }, stopButton { "stop", Icon::stop }, snapButton { "snap", Icon::magnet }, fitButton { "fit", Icon::zoom },
+        playButton { "play", Icon::play }, scrubButton { "scrub", Icon::scrub }, stopButton { "stop", Icon::stop }, snapButton { "snap", Icon::magnet }, fitButton { "fit", Icon::zoom },
         saveButton { "save", Icon::save }, followButton { "follow", Icon::follow };
     // FL's DragBtn (round 190ee, hint "Drag / copy sample / selection", MouseDown 0x88ea00): drag = the sample or the
     // selection as a WAV onto the Playlist / Channel Rack (the Browser's file drag); right-click = copy to the clipboard
@@ -4895,11 +5902,23 @@ private:
         }
     };
     DragSourceButton dragButton { "drag", Icon::audioFile };
-    juce::TextButton loopButton, viewButton, sendButton, envButton;
+    // (round 190jo: Loop, Spectrum and the envelope mode as icon buttons, design190ia FW-22)
+    IconButton loopButton { "loop", Icon::loop }, viewButton { "spectrum", Icon::spectrogram }, envButton { "envelopeMode", Icon::envelope };
+    juce::TextButton sendButton;
     // warp markers (round 175a, M3): a lane above the waveform with the channel's markers, for a channel source
     juce::TextButton warpButton, autoWarpButton;
     bool warpMode = false;
     juce::Rectangle<int> warpLane;
+    // round gaps190kf: Live's loop brace (top half) and Start / End markers (bottom half) of the Clip View's grid clip
+    static constexpr int braceLaneHeight = 20;
+    bool rulerBelow = false; // the Clip View of an unwarped clip: the time ruler under the waveform (Live)
+    juce::Rectangle<int> clipLane;
+    clipbrace::Part bracePart = clipbrace::Part::none; // what the held drag moves
+    clipbrace::Marks braceShown;                       // the marks drawn (the held drag's preview, else the clip's)
+    bool braceHeld = false, braceSelected = false;
+    double braceGrab = 0.0;                            // a body drag: the pointer's tick minus the brace's start
+    std::int64_t braceTick = 0, braceMin = 1;          // where the held drag puts its part, the shortest loop
+    bool braceMoved = false;
     int warpDrag = -1, warpSelected = -1;   // marker index (in the channel's markers)
     double warpDragSeconds = 0.0;           // where the dragged marker goes (applied on release)
     // round 190cy: Shift + drag slides the audio under the marker; a plain drag takes it to `warpDragBeat` (the beat of
@@ -4926,7 +5945,7 @@ private:
     juce::Image spectrumWarped;
     juce::String spectrumWarpedKey;
     juce::Slider volumeKnob { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox };
-    juce::OwnedArray<juce::TextButton> quickButtons;
+    juce::OwnedArray<IconButton> quickButtons; // (round 190jo: Edison's icon tools, Quick table order)
 
     void refreshVolumeKnob()
     {
@@ -4967,13 +5986,18 @@ juce::PopupMenu AudioEditor::editMenu (bool contextual)
     menu.addItem (tr ("Paste replace (drum)"), clip && sel, false, [this] { pasteFitted (true); });
     menu.addSeparator();
     menu.addItem (tr ("Delete") + "\tDel", sel, false, [this] { deleteSelection(); });
-    menu.addItem (tr ("Clear (silence)"), sel, false, [this] { edit (tr ("Silence"), [] (ae::Document& d, ae::Range r) { ae::clear (d, r); }, true); });
+    menu.addItem (tr ("Clear (silence)"), sel, false, [this] { edit (tr ("Silence"), [] (ae::Document& d, ae::Range r) { clickFreeEditing() ? ae::clickfree::clearClickFree (d, r) : ae::clear (d, r); }, true); });
     menu.addItem (tr ("Trim (keep the selection)"), sel, false, [this] { trimSelection(); });
     // (right-click on the selection: issue #12)
     menu.addItem (tr ("Send the selection to a new Sampler channel"), sel, false, [this] { sendRangeToNewSampler (selection); });
     menu.addItem (tr ("Insert silence..."), has, false, [this] { showInsertSilence(); });
     menu.addItem (tr ("Delete the part after the loop"), has && doc.hasLoop(), false,
                   [this] { edit (tr ("Delete after loop"), [] (ae::Document& d, ae::Range) { ae::deleteAfterLoop (d); }); });
+    if (! contextual) // (FL: the last item of Edison's Edit menu, round gaps190kf)
+    {
+        menu.addSeparator();
+        menu.addItem (tr ("Click-free (smooth) editing") + "\tC", true, clickFreeEditing(), [] { clickFreeEditing() = ! clickFreeEditing(); });
+    }
     menu.addSeparator();
     menu.addItem (tr ("Select all") + "\tCtrl+A", has, false, [this] {
         selection = { 0, doc.audio.frames() };
@@ -5014,6 +6038,31 @@ juce::PopupMenu AudioEditor::mainMenu()
     file.addSeparator();
     file.addItem (tr ("Send to the Playlist as an audio clip"), has, false, [this] { sendToPlaylist(); });
     file.addItem (tr ("Send to a new Sampler channel"), has, false, [this] { sendToNewSampler(); });
+
+    // FL's Format menu (round gaps190kf: Edison's WAVOptionsMenu › Format: Edit properties... F2, Precision, Channels)
+    juce::PopupMenu format;
+    format.addItem (tr ("Edit properties...") + "\tF2", has, false, [this] { showSampleProperties(); });
+    format.addSectionHeader (tr ("Precision"));
+    format.addItem (tr ("16Bit int"), has, doc.props.int16, [this] {
+        if (! doc.props.int16)
+            edit (tr ("16Bit int"), [] (ae::Document& d, ae::Range) { sampleprops::toInt16 (d); });
+        bits = ae::WavFormat::int16;
+    });
+    format.addItem (tr ("32Bit float"), has, ! doc.props.int16, [this] {
+        if (doc.props.int16)
+        {
+            doc.props.int16 = false;
+            commit (tr ("32Bit float"));
+        }
+        bits = ae::WavFormat::float32;
+    });
+    format.addSectionHeader (tr ("Channels"));
+    format.addItem (tr ("Mono"), has, doc.audio.numChannels() == 1, [this] {
+        edit (tr ("Convert to mono"), [] (ae::Document& d, ae::Range) { sampleprops::setChannels (d, sampleprops::Channels::monoMerged); });
+    });
+    format.addItem (tr ("Stereo"), has, doc.audio.numChannels() > 1, [this] {
+        edit (tr ("Convert to stereo"), [] (ae::Document& d, ae::Range) { sampleprops::setChannels (d, sampleprops::Channels::stereo); });
+    });
 
     juce::PopupMenu tools;
     using T = audiotools::Tool;
@@ -5157,6 +6206,16 @@ juce::PopupMenu AudioEditor::mainMenu()
         for (const auto& [label, mode] : modes)
             convert.addItem (tr (label), [this, m = mode] { convertToMidi (m); });
         tools.addSubMenu (tr ("Convert to MIDI"), convert, has);
+        // round 190lj: with the options dialog (polyphonic by default), quantized to the Piano roll's step when asked
+        tools.addItem (tr ("Convert to MIDI (polyphonic)..."), has, false, [this] {
+            juce::Component::SafePointer<AudioEditor> self (this);
+            showConvertOptions (engine, this, (std::int64_t) ticksPerStep, [self] (const a2m::ConvertOptions& options) {
+                if (self != nullptr)
+                    self->convertToMidi (options);
+            });
+        });
+        // round 190lo: the polyphonic note editor on the selection (or the whole audio), in buffer mode
+        tools.addItem (tr ("Edit notes (polyphonic)..."), has && recState == RecState::idle, false, [this] { editNotesPolyphonic(); });
     }
 
     juce::PopupMenu regions;
@@ -5195,14 +6254,24 @@ juce::PopupMenu AudioEditor::mainMenu()
     slice.addItem (tr ("Medium auto-slicing"), has, false, [this] { autoSlice (0.5f); });
     slice.addItem (tr ("Sharp auto-slicing"), has, false, [this] { autoSlice (0.85f); });
     slice.addSeparator();
+    // FL's grid-slicing (round natives190kj, 0x8636d0): markers at the editor's small / medium / large grid lines
+    slice.addItem (tr ("Small grid-slicing"), has, false, [this] { flGridSlice (0); });
+    slice.addItem (tr ("Medium grid-slicing"), has, false, [this] { flGridSlice (1); });
+    slice.addItem (tr ("Large grid-slicing"), has, false, [this] { flGridSlice (2); });
+    slice.addSeparator();
     slice.addItem (tr ("Every beat (project tempo)"), has, false, [this] { gridSlice (1.0); });
     slice.addItem (tr ("Every 1/2 beat"), has, false, [this] { gridSlice (0.5); });
     slice.addItem (tr ("Every 1/4 beat"), has, false, [this] { gridSlice (0.25); });
     regions.addSubMenu (tr ("Auto-slice"), slice, has);
+    regions.addItem (tr ("Detect pitch regions"), has, false, [this] { detectPitchRegions(); });
 
     juce::PopupMenu view;
     view.addItem (tr ("Waveform"), true, ! spectrumView, [this] { viewButton.setToggleState (false, juce::sendNotification); });
     view.addItem (tr ("Spectrogram") + "\tS", true, spectrumView, [this] { viewButton.setToggleState (true, juce::sendNotification); });
+    view.addItem (tr ("Dual view"), true, dualView, [this] { // FL's ViewDualMenu (round natives190kj)
+        dualView = ! dualView;
+        repaint();
+    });
     juce::PopupMenu precision;
     for (int size : { 512, 1024, 2048, 4096, 8192 })
         precision.addItem (tr ("{0} bands", { juce::String (size / 2) }), true, fftSize == size, [this, size] {
@@ -5214,6 +6283,7 @@ juce::PopupMenu AudioEditor::mainMenu()
         logFrequency = ! logFrequency;
         repaint();
     });
+    view.addItem (tr ("Wheel scrolls (LYNX)"), true, wheelScrollsLynx(), [] { wheelScrollsLynx() = ! wheelScrollsLynx(); }); // round 190ld
     juce::PopupMenu time;
     const std::pair<TimeFormat, const char*> formats[] = { { TimeFormat::automatic, TR_NOOP ("Auto") },
                                                            { TimeFormat::seconds, TR_NOOP ("Minutes : seconds") },
@@ -5250,7 +6320,7 @@ juce::PopupMenu AudioEditor::mainMenu()
 
     // FL's Snap menu (round 190ee): the mode, keys 1…4 (picking one turns snapping on)
     juce::PopupMenu snap;
-    for (int mode = 0; mode < 4; ++mode)
+    for (int mode = 0; mode < 5; ++mode)
         snap.addItem (snapCaption (mode) + "\t" + juce::String (mode + 1), true, snapMode == mode, [this, mode] { setSnapMode (mode); });
 
     // FL's Select menu (the commands Slicex's wave editor has too)
@@ -5265,6 +6335,7 @@ juce::PopupMenu AudioEditor::mainMenu()
 
     juce::PopupMenu menu;
     menu.addSubMenu (tr ("File"), file);
+    menu.addSubMenu (tr ("Format"), format);
     menu.addSubMenu (tr ("Edit"), editMenu (false));
     menu.addSubMenu (tr ("Select"), select, has);
     menu.addSubMenu (tr ("Tools"), tools, has);
@@ -5346,6 +6417,19 @@ void openAudioEditorForChannel (AudioEngine& engine, int channel, int clip)
         editor->loadFile (juce::File (path));
 }
 
+void openAudioEditorDeverb (AudioEngine& engine, int channel, int clip)
+{
+    const auto& song = engine.getSong();
+    if (! juce::isPositiveAndBelow (channel, (int) song.channels.size()))
+        return;
+    const auto path = juce::String::fromUTF8 (song.channels[(std::size_t) channel].samplePath.c_str());
+    if (path.isEmpty())
+        return;
+    auto* editor = openWindow (engine, { Source::Kind::channel, channel, path, clip });
+    editor->loadFile (juce::File (path));
+    editor->openDeverbTool();
+}
+
 std::unique_ptr<juce::Component> makeAudioEditorPanel (AudioEngine& engine, int channel, int clip, bool showWarp)
 {
     const auto& song = engine.getSong();
@@ -5382,6 +6466,18 @@ void setAudioEditorGridClip (juce::Component& panel, int track, int scene)
 {
     if (auto* editor = dynamic_cast<AudioEditor*> (&panel))
         editor->setGridClip (track, scene);
+}
+
+void selectAudioEditorBraceForSnapshot (juce::Component& panel, bool selected)
+{
+    if (auto* editor = dynamic_cast<AudioEditor*> (&panel))
+        editor->selectBraceForSnapshot (selected);
+}
+
+void holdAudioEditorBraceForSnapshot (juce::Component& panel, int part, std::int64_t tick)
+{
+    if (auto* editor = dynamic_cast<AudioEditor*> (&panel))
+        editor->holdBraceForSnapshot (part, tick);
 }
 
 void openAudioEditorRecording (AudioEngine& engine)
@@ -5489,6 +6585,13 @@ std::unique_ptr<juce::Component> makeAudioEditorForSnapshot (AudioEngine& engine
     return editor;
 }
 
+std::unique_ptr<juce::Component> makeAudioEditorForFileSnapshot (AudioEngine& engine, const juce::File& file)
+{
+    auto editor = std::make_unique<AudioEditor> (engine, Source { Source::Kind::file, -1, file.getFullPathName() });
+    editor->loadFile (file); // (markers, regions and the loop from the WAV; no selection; zoomed to fit)
+    return editor;
+}
+
 std::unique_ptr<juce::Component> makeAudioToolPanelForSnapshot (juce::Component& editor, int tool, int envelopeMode)
 {
     auto* e = dynamic_cast<AudioEditor*> (&editor);
@@ -5545,6 +6648,39 @@ juce::String setAudioEditorSnapForSnapshot (juce::Component& component, int mode
         return {};
     editor->setSnapForSnapshot (mode);
     return editor->snapTooltipForSnapshot() + "; frame " + juce::String (probeFrame) + " snaps to " + juce::String (editor->snapFrameForSnapshot (probeFrame));
+}
+
+void setAudioEditorViewForSnapshot (juce::Component& component, bool spectrum, bool dual, std::int64_t from, std::int64_t to)
+{
+    if (auto* editor = dynamic_cast<AudioEditor*> (&component))
+        editor->setViewForSnapshot (spectrum, dual, { from, to });
+}
+
+juce::String audioEditorCommandForSnapshot (juce::Component& component, const juce::String& what)
+{
+    auto* editor = dynamic_cast<AudioEditor*> (&component);
+    return editor != nullptr ? editor->commandForSnapshot (what) : juce::String();
+}
+
+void setAudioEditorSamplePropsForSnapshot (juce::Component& component, const audioedit::SampleProps& props)
+{
+    if (auto* editor = dynamic_cast<AudioEditor*> (&component))
+        editor->setSamplePropsForSnapshot (props);
+}
+
+juce::String audioEditorHoverHintForSnapshot (juce::Component& component, float fx, float fy)
+{
+    auto* editor = dynamic_cast<AudioEditor*> (&component);
+    if (editor == nullptr)
+        return {};
+    const auto h = editor->waveHintForSnapshot (fx, fy);
+    return h.text + (h.value.isNotEmpty() ? "  " + h.value : juce::String());
+}
+
+juce::PopupMenu audioEditorMainMenuForSnapshot (juce::Component& component)
+{
+    auto* editor = dynamic_cast<AudioEditor*> (&component);
+    return editor != nullptr ? editor->mainMenu() : juce::PopupMenu();
 }
 
 juce::StringArray audioEditorMenuForSnapshot (juce::Component& component)

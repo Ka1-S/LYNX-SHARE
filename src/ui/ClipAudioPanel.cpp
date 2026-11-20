@@ -13,6 +13,7 @@
 #include "ui/AudioEditor.h"
 #include "ui/AutomationUi.h"
 #include "ui/I18n.h"
+#include "ui/LiveClipLook.h"
 #include "ui/NumBox.h"
 #include "ui/Theme.h"
 
@@ -483,8 +484,7 @@ public:
         // the warp mode: Live's names first
         for (const auto& m : liveModes)
             mode.addItem (tr (m.name), m.method + 2);
-        if constexpr (warpmodes::complexProPlays) // (Live's last mode; its chooser then reads "Pro")
-            mode.addItem (tr ("Complex Pro"), complexProId);
+        mode.addItem (tr ("Complex Pro"), complexProId); // (Live's last mode; round 190ik plays it)
         mode.addSeparator();
         for (const auto& m : flModes)
             mode.addItem (tr (m.name), m.method + 2);
@@ -510,14 +510,23 @@ public:
             if (! refreshing)
                 editMode ([v = preserve.getSelectedId() - 1] (Song& s, int c) { warpmodes::setPreserve (s, c, v); });
         };
-        // round 190gx: Beats' law, shown only for a channel of a project saved before the Measured law (Classic), so it
-        // can be moved to Live's measured law (new channels are Measured and show Live's box alone)
+        // round 190gx: Beats' law, shown only for a channel of a project saved before the newest law (Classic, or round
+        // 190ik: Measured), so it can be moved on (new channels use the newest law and show Live's box alone)
         beatsLaw.addItem (tr ("Classic"), 1);
         beatsLaw.addItem (tr ("Measured"), 2);
-        beatsLaw.setTooltip (tr ("Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders"));
+        beatsLaw.addItem (tr ("Pitch-aware"), 3);
+        beatsLaw.setTooltip (tr ("Beats law: Classic plays as LYNX did before 0.1.28, Measured as 0.1.28 and 0.1.29 did (this project was saved then); Pitch-aware also cuts where the pitch of a held note steps"));
         beatsLaw.onChange = [this] {
             if (! refreshing)
                 editMode ([v = beatsLaw.getSelectedId() - 1] (Song& s, int c) { warpmodes::setBeatsLaw (s, c, v); });
+        };
+        // round 190ik: the Texture / Complex Pro law, shown only for a channel of a project saved before 190ik
+        warpLaw.addItem (tr ("Classic"), 1);
+        warpLaw.addItem (tr ("Measured"), 2);
+        warpLaw.setTooltip (tr ("Texture and Complex Pro law: Classic plays as LYNX did before 0.1.30 (this project was saved then); Measured follows Live 12.4's renders (grains and Flux, formants kept)"));
+        warpLaw.onChange = [this] {
+            if (! refreshing)
+                editMode ([v = warpLaw.getSelectedId() - 1] (Song& s, int c) { warpmodes::setWarpLaw (s, c, v); });
         };
         loopMode.onChoose = [this] (int v) {
             if (! refreshing)
@@ -608,9 +617,11 @@ public:
         // Pitch: the knob (semitones) and the semitone and cent boxes under it
         pitchKnob.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
         pitchKnob.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
-        pitchKnob.setRange (-12.0, 12.0, 1.0);
+        // round 190hr (detail-072): Live's Transpose ±48 st and Detune ±50 ct [SCHEMA AudioClip PitchCoarse / PitchFine;
+        // STR "Transposition/Semitones", "Transposition/Cents"; DOC Live's manual: ±48 semitones, ±50 cents]
+        pitchKnob.setRange (-48.0, 48.0, 1.0);
         pitchKnob.setDoubleClickReturnValue (true, 0.0);
-        pitchKnob.setTooltip (tr ("Clip pitch in semitones"));
+        pitchKnob.setTooltip (tr ("Transpose: the clip's pitch in semitones (±48)"));
         pitchKnob.onValueChange = [this] {
             if (refreshing)
                 return;
@@ -622,14 +633,17 @@ public:
             s->setDoubleClickReturnValue (true, 0.0);
             s->setColour (juce::Slider::trackColourId, colour::bg4);
             s->onValueChange = [this] {
-                const auto pitch = (float) juce::jlimit (-12.0, 12.0, semitones.getValue() + cents.getValue() / 100.0);
-                editClip ([pitch] (Clip& c) { c.pitch = pitch; });
+                const auto pitch = (float) juce::jlimit (-48.0, 48.0, semitones.getValue() + cents.getValue() / 100.0);
+                if (warpmodes::proTransposes (sampler())) // (round 190ik: Complex Pro / Texture transpose offline)
+                    editMode ([pitch, t = track, sc = scene] (Song& song, int c) { warpmodes::setClipTranspose (song, c, t, sc, pitch); });
+                else
+                    editClip ([pitch] (Clip& c) { c.pitch = pitch; });
             };
         }
-        semitones.setRange (-12.0, 12.0, 1.0);
-        semitones.setTooltip (tr ("Clip pitch in semitones"));
+        semitones.setRange (-48.0, 48.0, 1.0);
+        semitones.setTooltip (tr ("Transpose: the clip's pitch in semitones (±48)"));
         cents.setRange (-50.0, 50.0, 1.0);
-        cents.setTooltip (tr ("Clip pitch, fine: cents"));
+        cents.setTooltip (tr ("Detune: the clip's fine pitch in cents (±50)"));
 
         reverse.setButtonText (tr ("Reverse"));
         reverse.setClickingTogglesState (true);
@@ -653,7 +667,7 @@ public:
         for (auto* c : std::initializer_list<juce::Component*> { &warp, &mode, bpm.get(), &halve, &twice, &gain, &pitchKnob, &semitones, &cents, &reverse, &edit, &fade })
             addAndMakeVisible (*c);
         for (auto* c : std::initializer_list<juce::Component*> { &preserve, &loopMode, envelope.get(), grainTones.get(), grainTexture.get(), flux.get(),
-                                                                 proFormants.get(), proEnvelope.get(), &beatsLaw })
+                                                                 proFormants.get(), proEnvelope.get(), &beatsLaw, &warpLaw })
             addChildComponent (*c);
 
         editor = makeAudioEditorPanel (engine, channel, -1, true);
@@ -705,6 +719,11 @@ public:
 
     void paint (juce::Graphics& g) override
     {
+        if (liveShown)
+        {
+            paintLive (g);
+            return;
+        }
         using namespace theme;
         const auto column = getLocalBounds().removeFromLeft (columnWidth);
         g.setColour (colour::bg1);
@@ -757,6 +776,12 @@ public:
     // and Fade at the bottom; on the right the Gain fader with its dB read-out, then Pitch: the knob, st and ct boxes
     void resized() override
     {
+        applyLook();
+        if (liveShown)
+        {
+            resizedLive();
+            return;
+        }
         auto area = getLocalBounds();
         auto column = area.removeFromLeft (columnWidth).reduced (8, 0);
         column.removeFromTop (20);
@@ -767,26 +792,9 @@ public:
         warp.setBounds (left.removeFromTop (20).withWidth (left.getWidth() / 2));
         left.removeFromTop (4);
         mode.setBounds (left.removeFromTop (22));
-        // the mode's own settings under it, placed as Live's Audio box [LIVE 190gu warp/live-audio-box-4-modes.png]: a label
-        // row, then its box, full width (Beats: Preserve › its chooser, then the loop-mode icon chooser and the Transient
-        // Envelope box side by side; Tones: Grain Size; Texture: Grain Size, Flux; Complex Pro: Formants, Envelope)
-        {
-            modeLabel1 = left.removeFromTop (16);
-            auto row1 = left.removeFromTop (20);
-            preserve.setBounds (row1);
-            grainTones->setBounds (row1);
-            grainTexture->setBounds (row1);
-            proFormants->setBounds (row1);
-            left.removeFromTop (3);
-            auto row2 = left.removeFromTop (20);
-            loopMode.setBounds (row2.withWidth (row2.getWidth() / 2 - 4));
-            envelope->setBounds (row2.withTrimmedLeft (row2.getWidth() / 2 + 2));
-            modeLabel2 = row2;
-            auto row3 = left.removeFromTop (20);
-            flux->setBounds (row3);
-            proEnvelope->setBounds (row3);
-            beatsLaw.setBounds (row3.withTrimmedTop (3)); // (Beats, Classic projects only)
-        }
+        // round 190ig (round 190ia CL-20a, a bug): the bottom rows first — Fade, Reverse | Edit, then BPM ÷2 ×2 above them —
+        // so they keep their height in a short Clip View; the BPM row was squeezed to ~2 px in a 203 px detail view
+        // because the mode's settings rows above took their room whether the mode showed them or not
         fade.setBounds (left.removeFromBottom (18).withWidth (left.getWidth() / 2 - 2));
         left.removeFromBottom (4);
         {
@@ -804,6 +812,46 @@ public:
             row.removeFromLeft (2);
             twice.setBounds (row);
             bpmLabel = left.removeFromBottom (14);
+        }
+        // the mode's own settings between the mode box and BPM, placed as Live's Audio box [LIVE 190gu
+        // warp/live-audio-box-4-modes.png]: a label row, then its box, full width (Beats: Preserve › its chooser, then the
+        // loop-mode icon chooser and the Transient Envelope box side by side; Tones: Grain Size; Texture: Grain Size, Flux;
+        // Complex Pro: Formants, Envelope). Only the rows the mode shows take room; a row that does not fit in a short
+        // Clip View folds away until the view is taller (its setting is kept).
+        {
+            left.removeFromBottom (2);
+            const auto first = preserve.isVisible() || grainTones->isVisible() || grainTexture->isVisible() || proFormants->isVisible();
+            const auto beatsRow = loopMode.isVisible() || envelope->isVisible();
+            const auto secondBox = flux->isVisible() || proEnvelope->isVisible(); // (its label in the second row, its box in the third)
+            const auto take = [&left] (int h) {
+                return left.getHeight() >= h ? left.removeFromTop (h) : juce::Rectangle<int> (left.getX(), left.getY(), left.getWidth(), 0);
+            };
+            juce::Rectangle<int> row1, row2, row3;
+            modeLabel1 = {};
+            if (first && left.getHeight() >= 36)
+            {
+                modeLabel1 = take (16);
+                row1 = take (20);
+            }
+            if ((beatsRow || secondBox) && left.getHeight() >= (secondBox ? 43 : 23))
+            {
+                left.removeFromTop (3);
+                row2 = take (20);
+            }
+            if ((secondBox && ! row2.isEmpty()) || (beatsLaw.isVisible() && left.getHeight() >= 20))
+                row3 = take (20);
+            preserve.setBounds (row1);
+            grainTones->setBounds (row1);
+            grainTexture->setBounds (row1);
+            proFormants->setBounds (row1);
+            loopMode.setBounds (row2.withWidth (juce::jmax (0, row2.getWidth() / 2 - 4)));
+            envelope->setBounds (row2.withTrimmedLeft (row2.getWidth() / 2 + 2));
+            modeLabel2 = row2;
+            flux->setBounds (row3);
+            proEnvelope->setBounds (row3);
+            beatsLaw.setBounds (row3.isEmpty() ? row3 : row3.withTrimmedTop (3)); // (Beats, projects saved before its newest law only)
+            // (round 190ik: Texture / Complex Pro, projects saved before 190ik: beside the Flux / Envelope label, whose row is free there)
+            warpLaw.setBounds (modeLabel2.withTrimmedLeft (modeLabel2.getWidth() / 2 + 2).withTrimmedBottom (2));
         }
 
         gainLabel = right.removeFromTop (14);
@@ -832,7 +880,214 @@ public:
             envelopes->setBounds (area);
     }
 
+    // --- round 190jn (design190ia CL-20a): Live 12.4's Audio section (live-clipview-audio.png 249..418 × 789..994) ---------
+    // In the Clip-launch layout's Live look: a 170 px column with Live's 17 px "Audio" header (click: fold), Warp 83 × 13
+    // (#FFAD56 on) at 12 px, the mode under it, BPM ÷2 ×2 then Reverse | Edit and Fade from the bottom up (the mode's own
+    // settings between, folding away when they don't fit: round 190ig's rule); at the right (104..162) Gain as Live's rail
+    // with its ▶ handle and the 24 / 0 / 70 marks, its dB under it, Pitch as Live's ring knob and the st / ct fields at the
+    // bottom. The editor's title bar is Live's 17 px #363636 bar with the Sample | Envelopes tabs centred.
+    static inline bool audioOpen = true; // (UI state, not saved)
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        if (liveShown && liveHeader.contains (e.getPosition()))
+        {
+            audioOpen = ! audioOpen;
+            resized();
+            repaint();
+        }
+    }
+
 private:
+    bool liveShown = false;
+    juce::Rectangle<int> liveHeader, liveContent;
+    int liveDivideY = 0, liveFadeSepY = 0;
+    void applyLook()
+    {
+        const auto live = theme::livelook::active();
+        if (live == liveShown)
+            return;
+        liveShown = live;
+        for (auto* c : std::initializer_list<juce::Component*> { &warp, &halve, &twice, &reverse, &edit, &fade, &mode, &preserve, &beatsLaw, &gain, &pitchKnob,
+                                                                 &semitones, &cents })
+            liveclip::style (*c, live);
+        for (auto* b : { &sampleTab, &envelopesTab })
+        {
+            liveclip::swapColour (*b, juce::TextButton::buttonColourId, theme::livelook::surface, live);
+            liveclip::swapColour (*b, juce::TextButton::buttonOnColourId, liveclip::header, live);
+            liveclip::swapColour (*b, juce::TextButton::textColourOffId, theme::livelook::text, live);
+            liveclip::swapColour (*b, juce::TextButton::textColourOnId, theme::livelook::text, live);
+            b->setConnectedEdges (live ? juce::Button::ConnectedOnLeft | juce::Button::ConnectedOnRight : 0);
+        }
+        if (live)
+            gain.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 58, liveclip::row);
+        else
+            gain.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 62, 16);
+    }
+
+    void resizedLive()
+    {
+        const auto row = liveclip::row;
+        auto area = getLocalBounds();
+        auto column = area.removeFromLeft (liveclip::columnWidth);
+        area.removeFromLeft (2);
+        liveHeader = column.removeFromTop (liveclip::headerHeight);
+        column.removeFromTop (1);
+        liveContent = column;
+        const std::initializer_list<juce::Component*> controls { &warp, &mode, bpm.get(), &halve, &twice, &gain, &pitchKnob, &semitones, &cents, &reverse, &edit,
+                                                                 &fade, &preserve, &loopMode, envelope.get(), grainTones.get(), grainTexture.get(), flux.get(),
+                                                                 proFormants.get(), proEnvelope.get(), &beatsLaw };
+        modeLabel1 = modeLabel2 = bpmLabel = gainLabel = pitchLabel = stLabel = ctLabel = {};
+        liveDivideY = liveFadeSepY = 0;
+        if (! audioOpen)
+            for (auto* c : controls)
+                c->setBounds ({});
+        else
+        {
+            auto left = juce::Rectangle<int> (12, column.getY() + 4, 83, std::max (0, column.getHeight() - 8));
+            auto right = juce::Rectangle<int> (104, column.getY() + 4, 58, std::max (0, column.getHeight() - 8));
+            warp.setBounds (left.removeFromTop (row));
+            left.removeFromTop (4);
+            mode.setBounds (left.removeFromTop (row));
+            left.removeFromTop (4);
+            // from the bottom: Fade, then Reverse | Edit, then BPM ÷2 ×2 (round 190ig: these keep their room)
+            fade.setBounds (left.removeFromBottom (row).withWidth (27));
+            liveFadeSepY = left.getBottom() - 3;
+            left.removeFromBottom (6);
+            {
+                auto r = left.removeFromBottom (row);
+                reverse.setBounds (r.removeFromLeft (53));
+                r.removeFromLeft (4);
+                edit.setBounds (r);
+            }
+            liveDivideY = left.getBottom() - 3;
+            left.removeFromBottom (6);
+            {
+                auto r = left.removeFromBottom (row);
+                bpm->setBounds (r.removeFromLeft (40));
+                r.removeFromLeft (3);
+                halve.setBounds (r.removeFromLeft (19));
+                r.removeFromLeft (2);
+                twice.setBounds (r.removeFromLeft (19));
+                bpmLabel = left.removeFromBottom (row);
+            }
+            left.removeFromBottom (3);
+            // the mode's own settings, as LYNX's look lays them out, in 13 px rows; a row that doesn't fit folds away
+            {
+                const auto first = preserve.isVisible() || grainTones->isVisible() || grainTexture->isVisible() || proFormants->isVisible();
+                const auto beatsRow = loopMode.isVisible() || envelope->isVisible();
+                const auto secondBox = flux->isVisible() || proEnvelope->isVisible();
+                const auto take = [&left] (int h) {
+                    return left.getHeight() >= h ? left.removeFromTop (h) : juce::Rectangle<int> (left.getX(), left.getY(), left.getWidth(), 0);
+                };
+                juce::Rectangle<int> row1, row2, row3;
+                if (first && left.getHeight() >= 2 * row + 2)
+                {
+                    modeLabel1 = take (row);
+                    row1 = take (row);
+                }
+                if ((beatsRow || secondBox) && left.getHeight() >= (secondBox ? 2 * row + 6 : row + 3))
+                {
+                    left.removeFromTop (3);
+                    row2 = take (row);
+                }
+                if ((secondBox && ! row2.isEmpty()) || (beatsLaw.isVisible() && left.getHeight() >= row))
+                    row3 = take (row);
+                preserve.setBounds (row1);
+                grainTones->setBounds (row1);
+                grainTexture->setBounds (row1);
+                proFormants->setBounds (row1);
+                loopMode.setBounds (row2.withWidth (juce::jmax (0, row2.getWidth() / 2 - 2)));
+                envelope->setBounds (row2.withTrimmedLeft (row2.getWidth() / 2 + 2));
+                modeLabel2 = row2;
+                flux->setBounds (row3);
+                proEnvelope->setBounds (row3);
+                beatsLaw.setBounds (row3);
+            }
+            // the right part: Gain over its rail and dB, then Pitch, its knob, "st" and the st | ct fields at the bottom
+            gainLabel = right.removeFromTop (row);
+            {
+                auto fields = right.removeFromBottom (row);
+                semitones.setBounds (fields.removeFromLeft (fields.getWidth() / 2));
+                cents.setBounds (fields);
+            }
+            stLabel = right.removeFromBottom (row);
+            pitchKnob.setBounds (right.removeFromBottom (28).withSizeKeepingCentre (28, 28));
+            pitchLabel = right.removeFromBottom (row);
+            right.removeFromBottom (2);
+            gain.setBounds (right.withTrimmedLeft (4));
+        }
+        titleBar = area.removeFromTop (liveclip::headerHeight);
+        area.removeFromTop (1);
+        {
+            auto tabs = titleBar.withSizeKeepingCentre (60 + 1 + 60, liveclip::headerHeight);
+            sampleTab.setBounds (tabs.removeFromLeft (60));
+            tabs.removeFromLeft (1);
+            envelopesTab.setBounds (tabs);
+        }
+        if (editor != nullptr)
+            editor->setBounds (area);
+        if (envelopes != nullptr)
+            envelopes->setBounds (area);
+    }
+
+    void paintLive (juce::Graphics& g)
+    {
+        namespace ll = theme::livelook;
+        const auto w = liveclip::columnWidth;
+        g.fillAll (ll::window);
+        g.setColour (ll::surface);
+        g.fillRect (0, 0, w, getHeight());
+        g.setColour (ll::separator);
+        g.fillRect (w, 0, 2, getHeight());
+        liveclip::paintHeader (g, liveHeader, tr ("Audio"), 2, audioOpen);
+        if (audioOpen)
+        {
+            g.setColour (ll::separator); // (Live: a line between the left and the right part, and over Reverse and Fade)
+            g.fillRect (99, liveContent.getY() + 4, 1, std::max (0, liveContent.getHeight() - 8));
+            if (liveDivideY > 0)
+                g.fillRect (12, liveDivideY, 83, 1);
+            if (liveFadeSepY > 0)
+                g.fillRect (12, liveFadeSepY, 83, 1);
+            g.setColour (ll::text);
+            g.setFont (theme::font (theme::type::small));
+            g.drawText (tr ("BPM"), bpmLabel, juce::Justification::centredLeft);
+            if (preserve.isVisible())
+                g.drawText (tr ("Preserve"), modeLabel1, juce::Justification::centredLeft);
+            if (grainTones->isVisible() || grainTexture->isVisible())
+                g.drawText (tr ("Grain Size"), modeLabel1, juce::Justification::centredLeft);
+            if (proFormants->isVisible())
+                g.drawText (tr ("Formants"), modeLabel1, juce::Justification::centredLeft);
+            g.drawText (tr ("Gain"), gainLabel, juce::Justification::centred);
+            g.drawText (tr ("Pitch"), pitchLabel, juce::Justification::centred);
+            g.drawText ("st", stLabel, juce::Justification::centred);
+            // the rail's marks: 24 at the top, 0, 70 at the bottom (Live's Gain scale, live-clipview-audio.png 352..410)
+            if (! gain.getBounds().isEmpty())
+                for (const auto v : { 24.0, 0.0, -70.0 })
+                {
+                    const auto y = gain.getY() + juce::roundToInt (gain.getPositionOfValue (v));
+                    g.drawText (juce::String (juce::roundToInt (std::abs (v))), juce::Rectangle<int> (gain.getRight() - 16, y - 6, 18, 12),
+                                juce::Justification::centredRight);
+                }
+        }
+        if (! titleBar.isEmpty())
+        {
+            g.setColour (ll::surface);
+            g.fillRect (titleBar);
+            g.setColour (ll::separator);
+            g.fillRect (titleBar.getX(), titleBar.getBottom(), titleBar.getWidth(), 1);
+            const auto icon = titleBar.withWidth (22).toFloat().withSizeKeepingCentre (14.0f, 9.0f);
+            g.setColour (ll::text);
+            g.drawRect (icon, 1.0f);
+            for (int k = 0; k < 4; ++k)
+            {
+                const auto x = icon.getX() + 3.0f + (float) k * 2.6f, h = k % 2 == 0 ? 5.0f : 2.5f;
+                g.fillRect (x, icon.getCentreY() - h * 0.5f, 1.2f, h);
+            }
+            g.setFont (theme::font (theme::type::small));
+            g.drawText (titleText, titleBar.withTrimmedLeft (26).withRight (sampleTab.getX() - 6), juce::Justification::centredLeft, true);
+        }
+    }
+
     void changeListenerCallback (juce::ChangeBroadcaster*) override { refresh(); }
 
     const SamplerSettings& sampler() const
@@ -908,32 +1163,43 @@ private:
             w->setEnabled (warped && fileSeconds > 0.0);
         bpm->repaint();
         gain.setValue (c->gain > 0.0f ? juce::jlimit (-70.0, 24.0, 20.0 * std::log10 ((double) c->gain)) : -70.0, n);
-        const auto whole = std::round ((double) c->pitch);
+        const auto shown = (double) c->pitch + (warpmodes::proTransposes (s) ? (double) s.stretchPitch : 0.0);
+        const auto whole = std::round (shown);
         semitones.setValue (whole, n);
         pitchKnob.setValue (whole, n);
-        cents.setValue (std::round (((double) c->pitch - whole) * 100.0), n);
+        cents.setValue (std::round ((shown - whole) * 100.0), n);
+        // round gaps190kf: Re-Pitch has no transposition of its own [DOC Live 12 manual, Warp modes: "In this mode, the
+        // sample's transposition controls are deactivated because changing the playback speed directly affects the pitch"]
+        const auto repitch = warped && ! s.keepPitch;
+        for (auto* w : std::initializer_list<juce::Component*> { &pitchKnob, &semitones, &cents })
+            w->setEnabled (! repitch);
         reverse.setToggleState (c->reversed, n);
         // the mode's own settings: shown for the mode they belong to, only while the sample is warped and keeps its pitch
         const auto beats = warped && s.keepPitch && s.stretchMethod == StretchMethod::beats;
         const auto tones = warped && s.keepPitch && s.stretchMethod == StretchMethod::tones;
         const auto texture = warped && s.keepPitch && s.stretchMethod == StretchMethod::texture;
-        const auto pro = warpmodes::complexProPlays && warped && s.keepPitch && s.stretchMethod == StretchMethod::complex && s.warpModes.complexPro;
-        if (pro)
+        const auto proMode = warped && s.keepPitch && s.stretchMethod == StretchMethod::complex && s.warpModes.complexPro;
+        const auto pro = proMode && warpmodes::complexProPlays (s.warpModes);
+        if (proMode)
             mode.setSelectedId (complexProId, n);
-        flux->setVisible (texture && warpmodes::textureFluxPlays);
+        flux->setVisible (texture && warpmodes::textureFluxPlays (s.warpModes));
         proFormants->setVisible (pro);
         proEnvelope->setVisible (pro);
+        warpLawShown = warpLawShown || ((texture || proMode) && s.warpModes.warpLaw == WarpModeSettings::warpLawClassic);
+        warpLaw.setVisible ((texture || proMode) && warpLawShown);
+        warpLaw.setSelectedId (s.warpModes.warpLaw == WarpModeSettings::warpLawClassic ? 1 : 2, n);
         flux->repaint();
         proFormants->repaint();
         proEnvelope->repaint();
         preserve.setVisible (beats);
-        lawShown = lawShown || (beats && s.warpModes.beatsLaw == WarpModeSettings::beatsLawClassic);
+        lawShown = lawShown || (beats && s.warpModes.beatsLaw != WarpModeSettings::beatsLawPitchAware);
         beatsLaw.setVisible (beats && lawShown);
-        beatsLaw.setSelectedId (s.warpModes.beatsLaw == WarpModeSettings::beatsLawClassic ? 1 : 2, n);
+        beatsLaw.setSelectedId ((int) std::min<std::uint8_t> (s.warpModes.beatsLaw, WarpModeSettings::beatsLawPitchAware) + 1, n);
         loopMode.setVisible (beats);
         envelope->setVisible (beats);
         grainTones->setVisible (tones);
         grainTexture->setVisible (texture);
+        resized(); // (round 190ig: only the rows of the shown settings take room)
         preserve.setSelectedId ((int) s.warpModes.beatsPreserve + 1, n);
         loopMode.setMode ((int) s.warpModes.beatsLoop);
         envelope->repaint();
@@ -975,8 +1241,9 @@ private:
     AudioEngine& engine;
     int track, scene, channel;
     juce::TextButton warp, halve, twice, reverse, edit, fade;
-    juce::ComboBox mode, preserve, beatsLaw;
-    bool lawShown = false;                         // round 190gx: a Classic channel was shown (the law chooser stays)
+    juce::ComboBox mode, preserve, beatsLaw, warpLaw;
+    bool lawShown = false;                         // round 190gx: a channel on an older Beats law was shown (the chooser stays)
+    bool warpLawShown = false;                     // round 190ik: the same for Texture / Complex Pro
     LoopModeChooser loopMode;                      // round 190gx: Live's icon chooser
     std::unique_ptr<ui::NumBox> bpm, envelope, grainTones, grainTexture, flux, proFormants, proEnvelope;
     static constexpr int complexProId = 100;       // (the mode chooser's Complex Pro item)

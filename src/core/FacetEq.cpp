@@ -1,10 +1,13 @@
 #include "core/FacetEq.h"
+#include "core/Api560.h"
 
 #include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <complex>
 #include <cstdio>
+#include <cstdint>
+#include <cstdlib>
 #include <vector>
 
 namespace lynx::facet
@@ -687,6 +690,143 @@ private:
     std::array<Band, bands> bandsData {};
 };
 
+// ---- round 190mg: the PuigTec law's output stage (FacetEq.h puigLawParam; docs/analise/REA_rodada190mg_dyn.md §1) ----
+// LYNX's own model of what REA showed in the Waves PuigTec EQP1A's DSP (an output stage after the EQ: the mains hum and
+// a noise floor added, then a waveshaper, then the oversampler's resampling filter), every constant fitted on our own
+// demo-mode renders (waves3_190mg/dyn/lab: tubefit.py, humfit2.py, noisefit.py; the flat impulse response's delay).
+namespace puig
+{
+// the resampler's linear phase: the reference is 148.774 samples late at 48 kHz, LYNX's curve (minimum phase) 0 — the
+// integer part is latency the host compensates, the fraction (0.226 samples at 48 kHz = 4.7 us) is what an aligned
+// comparison hears (−30 dB of error at 1 kHz): a 3rd-order Thiran all-pass of delay puigLatency − fraction
+constexpr double leadSeconds = 0.226 / 48000.0;
+// the hum: frequency (Hz), level (dB), even term, low pass (Hz, Q), high pass (Hz, Q) — 60 Hz and 50 Hz settings
+struct Hum { double hz, levelDb, even, lpHz, lpQ, hpHz, hpQ; };
+constexpr Hum hums[2] {
+    { 59.8505, -87.0972, 0.15324, 117.52, 0.5954, 1.0, 8.0 },   // H1 -90.0 / H2 -115.9 / H3 -117.2 dBFS (ref -90.1 / -115.9 / -116.8)
+    { 49.7940, -90.3888, 0.05256, 170.10, 0.2925, 93.84, 8.0 }, // H1 -103.0 / H2 -114.5 / H3 -116.6 (ref -103.3 / -114.3 / -114.3)
+};
+// the noise floor: white (sigma, linear) through a broad low bell and a high shelf (RBJ): 0.34 dB rms over 1/6 octaves
+constexpr double noiseSigma = 7.829e-6, noiseBellHz = 18.98, noiseBellDb = 18.27, noiseBellQ = 0.0500, noiseShelfHz = 12168.0, noiseShelfDb = -3.167;
+// the waveshaper (LYNX's rational form, fitted on the complex H2 … H5 of 1 kHz / 100 Hz / 4.8 kHz stairs and the
+// Output ±12 dB renders: within 0.1 dB and the phases): v = s·y, z = [v + g·c·v / (g|v| + c) · (1 + k·g·v)] / ((1 + g)·s)
+constexpr double shapeS = 3.32662, shapeG = 0.0411740, shapeC = 0.214359, shapeK = 2.44709;
+
+struct Bq
+{
+    double b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0, z1 = 0, z2 = 0;
+    double run (double x) noexcept { const double y = b0 * x + z1; z1 = b1 * x - a1 * y + z2; z2 = b2 * x - a2 * y; return y; }
+    void set (double nb0, double nb1, double nb2, double na0, double na1, double na2) noexcept
+    { b0 = nb0 / na0; b1 = nb1 / na0; b2 = nb2 / na0; a1 = na1 / na0; a2 = na2 / na0; }
+    // bilinear 2nd-order low / high pass (w = tan (pi f / sr))
+    void pass (bool high, double hz, double q, double sr) noexcept
+    {
+        const double w = std::tan (pi * std::min (hz, 0.45 * sr) / sr), n = 1.0 + w / q + w * w;
+        if (high) set (1.0, -2.0, 1.0, n, 2.0 * w * w - 2.0, 1.0 - w / q + w * w);
+        else set (w * w, 2.0 * w * w, w * w, n, 2.0 * w * w - 2.0, 1.0 - w / q + w * w);
+    }
+    void bell (double hz, double db, double q, double sr) noexcept
+    {
+        const double A = std::pow (10.0, db / 40.0), w = 2.0 * pi * hz / sr, al = std::sin (w) / (2.0 * q), c = std::cos (w);
+        set (1.0 + al * A, -2.0 * c, 1.0 - al * A, 1.0 + al / A, -2.0 * c, 1.0 - al / A);
+    }
+    void highShelf (double hz, double db, double sr) noexcept
+    {
+        const double A = std::pow (10.0, db / 40.0), w = 2.0 * pi * std::min (hz, 0.45 * sr) / sr, al = std::sin (w) / (2.0 * 0.70710678118654752);
+        const double c = std::cos (w), s2 = 2.0 * std::sqrt (A) * al;
+        set (A * ((A + 1) + (A - 1) * c + s2), -2.0 * A * ((A - 1) + (A + 1) * c), A * ((A + 1) + (A - 1) * c - s2),
+             (A + 1) - (A - 1) * c + s2, 2.0 * ((A - 1) - (A + 1) * c), (A + 1) - (A - 1) * c - s2);
+    }
+    void clear() noexcept { z1 = z2 = 0.0; }
+};
+
+class Stage
+{
+public:
+    void configure (int law, double sr) noexcept
+    {
+        k = law;
+        rate = sr;
+        // 3rd-order Thiran all-pass, delay D = puigLatency − the lead
+        const double D = (double) puigLatency - leadSeconds * sr;
+        constexpr int N = puigLatency;
+        a[0] = 1.0;
+        for (int j = 1; j <= N; ++j)
+        {
+            double prod = 1.0;
+            for (int n = 0; n <= N; ++n) prod *= (D - N + n) / (D - N + j + n);
+            const double binom = j == 1 ? 3.0 : j == 2 ? 3.0 : 1.0;
+            a[j] = ((j & 1) ? -1.0 : 1.0) * binom * prod;
+        }
+        if (k >= 2)
+        {
+            const auto& h = hums[k == 2 ? 0 : 1];
+            step = h.hz / sr;
+            humGain = std::pow (10.0, h.levelDb / 20.0);
+            even = h.even;
+            humLp.pass (false, h.lpHz, h.lpQ, sr);
+            humHp.pass (true, h.hpHz, h.hpQ, sr);
+            for (int c = 0; c < 2; ++c)
+            {
+                bell[c].bell (noiseBellHz, noiseBellDb, noiseBellQ, sr);
+                shelf[c].highShelf (noiseShelfHz, noiseShelfDb, sr);
+            }
+        }
+        reset();
+    }
+    void reset() noexcept
+    {
+        for (auto& c : xs) for (auto& v : c) v = 0.0;
+        for (auto& c : ys) for (auto& v : c) v = 0.0;
+        phase = 0.0;
+        humLp.clear(); humHp.clear();
+        for (int c = 0; c < 2; ++c) { bell[c].clear(); shelf[c].clear(); }
+        seed[0] = 0x2545F491u; seed[1] = 0x9E3779B9u; // LYNX renders stay deterministic (the reference's are not)
+    }
+    void process (float* l, float* r, int n) noexcept
+    {
+        const bool mains = k >= 2;
+        for (int i = 0; i < n; ++i)
+        {
+            double hum = 0.0;
+            if (mains)
+            {
+                const double tri = 4.0 * std::abs (phase - 0.5) - 1.0;
+                phase += step;
+                if (phase >= 1.0) phase -= 1.0;
+                hum = humGain * humHp.run (humLp.run (tri + even * std::abs (tri)));
+            }
+            float* io[2] { l + i, r + i };
+            for (int c = 0; c < 2; ++c)
+            {
+                double y = *io[c];
+                if (mains)
+                    y += hum + noiseSigma * shelf[c].run (bell[c].run (white (c)));
+                y = puigShape (y);
+                // the all-pass (direct form: numerator = the reversed denominator)
+                double out = a[3] * y + a[2] * xs[c][0] + a[1] * xs[c][1] + xs[c][2] - a[1] * ys[c][0] - a[2] * ys[c][1] - a[3] * ys[c][2];
+                xs[c][2] = xs[c][1]; xs[c][1] = xs[c][0]; xs[c][0] = y;
+                ys[c][2] = ys[c][1]; ys[c][1] = ys[c][0]; ys[c][0] = out;
+                *io[c] = (float) out;
+            }
+        }
+    }
+
+private:
+    // unit-variance triangular noise (two uniforms, xorshift32)
+    double white (int c) noexcept
+    {
+        auto next = [this, c]() noexcept { auto& x = seed[c]; x ^= x << 13; x ^= x >> 17; x ^= x << 5; return (double) x * (1.0 / 4294967296.0) - 0.5; };
+        return (next() + next()) * 2.449489742783178; // var of a sum of two U(-1/2, 1/2) = 1/6
+    }
+    int k = 0;
+    double rate = 48000.0, a[puigLatency + 1] { 1.0, 0.0, 0.0, 0.0 }, xs[2][3] {}, ys[2][3] {};
+    double phase = 0.0, step = 0.0, humGain = 0.0, even = 0.0;
+    Bq humLp, humHp, bell[2], shelf[2];
+    std::uint32_t seed[2] { 1u, 2u };
+};
+} // namespace puig
+
 class FacetEqEffect final : public Effect
 {
 public:
@@ -696,6 +836,8 @@ public:
         {
             mode = phase ((*initial)[(std::size_t) phaseParam]);
             allocRes = resolution ((*initial)[(std::size_t) resolutionParam]);
+            puigNow = puigLaw ((*initial)[(std::size_t) puigLawParam]); // round 190mg: its latency known from the start
+            api560Now = (*initial)[(std::size_t) api560LawParam] >= 0.5f; // round 190mt: likewise
             initialParams = *initial;
             haveInitial = true;
         }
@@ -737,6 +879,8 @@ public:
             const auto& q = seenParams ? current : initialParams;
             spectral.configure (q, attackMs (q[(std::size_t) attackParam]), releaseMs (q[(std::size_t) releaseParam]));
         }
+        if (puigNow > 0) puigStage.configure (puigNow, sr); // round 190mg
+        api560.prepare (sr); // round 190mt (small; ready if the law is switched on later)
         configureMode (mode);
         reset();
     }
@@ -746,7 +890,7 @@ public:
         for (auto& band : state)
             for (auto& st : band)
                 st = {};
-        for (auto& d : det) { d.filter.clear(); d.ms = 0.0; d.gain = 0.0; }
+        for (auto& d : det) { d.filter.clear(); d.ms = 0.0; d.gain = 0.0; d.top = autoLaw().floorDb; }
         solo.clear();
         conv.reset();
         firLoaded = false;
@@ -754,11 +898,14 @@ public:
         delayPos = 0;
         dynUsed.fill (0.0);
         spectral.reset();
+        for (auto& a : apState) a = {};
         for (auto& m : meters) m.store (0.0f, std::memory_order_relaxed);
         for (auto* r : { &srcRing[0], &srcRing[1], &tgtRing[0], &tgtRing[1] }) std::fill (r->begin(), r->end(), 0.0f);
         cmpPos = 0;
         powSrc = powTgt = 0.0;
         tgtGain = 1.0f;
+        if (puigNow > 0) puigStage.reset();
+        api560.reset(); // round 190mt
     }
 
     void setSidechain (const float* left, const float* right) noexcept override
@@ -778,7 +925,7 @@ public:
     void process (float* left, float* right, int n, const EffectParams& params, double) noexcept override
     {
         bool changed = false;
-        for (int i = 0; i < paramCount; ++i)
+        for (int i = 0; i < storedParamCount; ++i)
             if (params[(std::size_t) i] != cached[(std::size_t) i]) { changed = true; break; }
         if (changed)
             update (params);
@@ -821,7 +968,12 @@ public:
             spectral.pushDetector (dl, dr, n);
 
         constexpr int chunk = 32;
-        for (int off = 0; off < n; off += chunk)
+        if (api560Now) // round 190mt: the API-560 law plays the sliders instead of Facet's bands
+        {
+            api560.set (api560Gains); // (re-designs only when a slider or the rate changed)
+            api560.process (left, right, n);
+        }
+        for (int off = 0; off < (api560Now ? 0 : n); off += chunk)
         {
             const int m = std::min (chunk, n - off);
             if (anyDynamic)
@@ -856,6 +1008,23 @@ public:
         if (spectralNow)
             spectral.process (left, right, n);
 
+        if (apCount > 0) // round 190ln: the hidden all-pass cascade (the Disperser role)
+            for (int i = 0; i < n; ++i)
+            {
+                double x[2] { (double) left[i], (double) right[i] };
+                for (int c = 0; c < 2; ++c)
+                    for (int k = 0; k < apCount; ++k)
+                    {
+                        auto& z = apState[(std::size_t) k][(std::size_t) c];
+                        const double y = apB0 * x[c] + z[0];
+                        z[0] = apB1 * x[c] - apB1 * y + z[1]; // b1 = a1 for an all-pass
+                        z[1] = x[c] - apB0 * y;               // b2 = 1, a2 = b0
+                        x[c] = y;
+                    }
+                left[i] = (float) x[0];
+                right[i] = (float) x[1];
+            }
+
         if (outMidSide)
             for (int i = 0; i < n; ++i)
             {
@@ -873,6 +1042,8 @@ public:
                 left[i] = characterSample (characterNow, left[i]);
                 right[i] = characterSample (characterNow, right[i]);
             }
+        if (puigNow > 0) // round 190mg: the PuigTec law's output stage (off = untouched)
+            puigStage.process (left, right, n);
         if (comparing && keep) // round 166f: the source / the target instead of (crossfaded with) the EQ's output
         {
             const auto wantGain = params[(std::size_t) targetLevelParam] >= 0.5f ? (float) targetMatchGain (powSrc, powTgt) : 1.0f;
@@ -902,6 +1073,15 @@ private:
         Biquad filter;
         double ms = 0.0, gain = 0.0, msCoef = 0.0, threshold = -20.0, range = 0.0;
         bool on = false;
+        // round 190jh: the automatic threshold (autoThreshold): its top level, the fall per sample, the gain limits that
+        // keep the band's total within +-30 dB
+        bool autoT = false;
+        double top = autoFloorDb, topFall = 0.0, topRise = 1.0, lo = -60.0, hi = 60.0;
+        // round 190lg: the automatic threshold's revision 1 (Pro-Q 4's structure, AutoLaw1): the peak follower (linear),
+        // its fall, the three followers of the reduction and their coefficients (rise, fall)
+        bool rev1 = false;
+        double env = 0.0, envFall = 0.0, f0 = 0.0, f1 = 0.0, f2 = 0.0;
+        double c0r = 1.0, c1a = 1.0, c1r = 1.0, c2a = 1.0, c2r = 1.0;
     };
 
     void configureMode (Phase p) noexcept
@@ -920,14 +1100,30 @@ private:
     // round 152: the phase mode's latency plus the spectral stage's when a band is spectral
     void storeLatency() noexcept
     {
-        latencyNow.store (latencyFor (mode, sampleRate, allocRes) + (spectral.active() ? spectral.latency() : 0), std::memory_order_relaxed);
+        latencyNow.store (latencyFor (mode, sampleRate, allocRes) + (spectral.active() ? spectral.latency() : 0) + (puigNow > 0 ? puigLatency : 0)
+                          + (api560Now ? api560::latency : 0), // round 190mt
+                          std::memory_order_relaxed);
     }
 
     void update (const EffectParams& params) noexcept
     {
-        for (int i = 0; i < paramCount; ++i) cached[(std::size_t) i] = params[(std::size_t) i];
+        for (int i = 0; i < storedParamCount; ++i) cached[(std::size_t) i] = params[(std::size_t) i];
         current = params;
         seenParams = true;
+        {
+            // round 190ln: the all-pass cascade's sections (cookbook all-pass: b0 = a2 = (1 − α) / (1 + α), b1 = a1 =
+            // −2 cos w0 / (1 + α), b2 = a0 = 1, α = sin w0 / 2Q); a changed count starts the new sections from rest
+            const int count = dispersionSections (params[(std::size_t) dispersionCountParam]);
+            if (count > 0)
+            {
+                const double f = std::min (hz (params[(std::size_t) dispersionFreqParam]), 0.45 * sampleRate);
+                const double w0 = 2.0 * pi * f / sampleRate, alpha = std::sin (w0) / (2.0 * q (params[(std::size_t) dispersionQParam]));
+                apB0 = (1.0 - alpha) / (1.0 + alpha);
+                apB1 = -2.0 * std::cos (w0) / (1.0 + alpha);
+                for (int k = apCount; k < count; ++k) apState[(std::size_t) k] = {};
+            }
+            apCount = count;
+        }
         const auto newMode = phase (params[(std::size_t) phaseParam]);
         if (newMode != mode)
         {
@@ -943,6 +1139,25 @@ private:
             d.on = isDynamic (params, b) && ! isSpectral (params, b); // round 152: a spectral band moves in the STFT stage
             d.threshold = thresholdDb (params[(std::size_t) (thresholdParam0 + b)]);
             d.range = rangeDb (params[(std::size_t) (rangeParam0 + b)]);
+            {
+                const bool wasAuto = d.autoT;
+                d.autoT = autoThreshold (params, b);
+                const auto& A = autoLaw();
+                if (d.autoT && ! wasAuto) d.top = A.floorDb;
+                d.topFall = A.decayDbPerSecond / sampleRate;
+                d.topRise = A.topRiseMs > 0.0 ? 1.0 - std::exp (-1.0 / (A.topRiseMs * 0.001 * sampleRate)) : 1.0;
+                // round 190lg: revision 1 (see AutoLaw1)
+                const bool wasRev1 = d.rev1;
+                d.rev1 = d.autoT && params[(std::size_t) autoRevisionParam] >= 0.5f;
+                if (d.rev1)
+                {
+                    if (! wasRev1 || ! wasAuto) d.env = d.f0 = d.f1 = d.f2 = 0.0;
+                    autoTimes1 (params, b, sampleRate, d);
+                }
+                const double g0 = gainDb (params[(std::size_t) param (b, 2)]);
+                d.lo = -30.0 - g0;
+                d.hi = 30.0 - g0;
+            }
             if (d.on)
             {
                 regionFilter (d.filter, params, b, sampleRate);
@@ -973,6 +1188,13 @@ private:
         }
         attackCoef = 1.0 - std::exp (-1.0 / (attackMs (params[(std::size_t) attackParam]) * 0.001 * sampleRate));
         releaseCoef = 1.0 - std::exp (-1.0 / (releaseMs (params[(std::size_t) releaseParam]) * 0.001 * sampleRate));
+        {
+            const auto& A = autoLaw();
+            autoAttackCoef = A.attackMs > 0.0 ? 1.0 - std::exp (-1.0 / (A.attackMs * 0.001 * sampleRate)) : attackCoef;
+            autoReleaseCoef = A.releaseMs > 0.0 ? 1.0 - std::exp (-1.0 / (A.releaseMs * 0.001 * sampleRate)) : releaseCoef;
+            autoTopOffset = A.topOffsetDb;
+            autoFloor = A.floorDb;
+        }
         outGain = (float) std::pow (10.0, outputDb (params[(std::size_t) outputParam]) / 20.0);
         anyPlaced = anyMidSide = false;
         for (int b = 0; b < bands; ++b)
@@ -990,6 +1212,19 @@ private:
         outR = level * (float) (pan < 0.0 ? 1.0 + pan : 1.0);
         outMidSide = panMidSide (params[(std::size_t) panModeParam]) && outL != outR;
         characterNow = character (params[(std::size_t) characterParam]);
+        if (const int k = puigLaw (params[(std::size_t) puigLawParam]); k != puigNow) // round 190mg
+        {
+            puigNow = k;
+            if (k > 0) puigStage.configure (k, sampleRate);
+            storeLatency();
+        }
+        if (const bool on = params[(std::size_t) api560LawParam] >= 0.5f; on != api560Now) // round 190mt
+        {
+            api560Now = on;
+            api560.reset();
+            storeLatency();
+        }
+        for (int k = 0; k < 10; ++k) api560Gains[k] = api560GainDb (params[(std::size_t) (api560GainParam0 + k)]);
 
         const int sb = soloBand (params[(std::size_t) soloParam]);
         const bool wasSolo = soloOn;
@@ -1009,6 +1244,33 @@ private:
         return n;
     }
 
+    // round 190lg: revision 1's follower times (Pro-Q 4's BandCompander, REA_rodada190lg): from the band's region (its
+    // edges in octaves) and the attack / release knobs (the translator's ms back to the reference's percent)
+    void autoTimes1 (const EffectParams& params, int b, double rate, Detector& d) const noexcept
+    {
+        const auto& L = autoLaw1();
+        // the region the reference reads its times from is the dynamic band's own detection range (state values 17 / 18,
+        // log2 Hz), 10 Hz … 20 kHz by default; Facet has no such range, so the default's
+        (void) b;
+        const double lo = std::log2 (10.0), hi = std::log2 (20000.0);
+        const double attPct = std::clamp (50.0 + 50.0 * std::log10 (attackMs (params[(std::size_t) attackParam]) / 9.22), 0.0, 100.0);
+        const double relPct = std::clamp (50.0 + 50.0 * std::log10 (releaseMs (params[(std::size_t) releaseParam]) / 268.0), 0.0, 100.0);
+        const double u = 1.0 - 0.1 * std::clamp (lo - 4.5, 0.0, 10.0), u2 = u * u;
+        const double p = attPct * attPct * ((u2 * 3.6e-5 + 6e-5) * u2 + u2 * 6e-5 + 1e-4);
+        const double atk = p * p * 0.59975 + 0.00025; // s
+        const double kx = std::clamp (relPct / 100.0, 0.0, 1.0);
+        const double rel = 0.005 + 2.495 * (std::exp (L.relCurve * kx) - 1.0) / (std::exp (L.relCurve) - 1.0); // s
+        const double centre = std::pow (2.0, 0.5 * (lo + hi)), low = 100.0 / std::max (centre, 100.0);
+        const double wide = (std::clamp (hi - lo, 2.0, 8.0) - 2.0) / 6.0;
+        const auto c = [rate] (double sec) { return sec <= 1e-9 ? 1.0 : 1.0 - std::exp (-2.302585092994046 / (sec * rate)); };
+        d.c0r = c ((std::min (1.0, wide + low) * 0.02 + 0.015) * L.t0);
+        d.c1a = c (std::max (0.12, 0.3 - atk * 30.0) * L.t1);
+        d.c1r = c ((rel * 1.29 + 0.25) * L.t1);
+        d.c2a = c ((wide * 0.01 + atk) * L.t2a);
+        d.c2r = c ((low * 0.25 + 0.45) * rel * L.t2r);
+        d.envFall = c (L.envSec);
+    }
+
     // detector levels and the dynamic gains, sample by sample over one chunk
     void detect (const float* dl, const float* dr, const float* inL, const float* inR, int m, bool side) noexcept
     {
@@ -1023,9 +1285,32 @@ private:
                 else x = 0.5 * ((double) inL[i] + (double) inR[i]);
                 if (! std::isfinite (x)) x = 0.0;
                 const double y = d.filter.run (x, 0);
+                if (d.rev1) // round 190lg: Pro-Q 4's structure (AutoLaw1)
+                {
+                    const auto& L = autoLaw1();
+                    const double mag = std::abs (y);
+                    d.env = mag > d.env ? mag : d.env + d.envFall * (mag - d.env);
+                    const double rel = 20.0 * std::log10 (std::max (mag, 1e-12) / std::max (d.env, L.floor));
+                    const double amt = std::abs (std::clamp (autoDynamicGainDb1 (rel, d.range), d.lo, d.hi));
+                    d.f0 = amt > d.f0 ? amt : d.f0 + d.c0r * (amt - d.f0);
+                    d.f1 += (d.f0 > d.f1 ? d.c1a : d.c1r) * (d.f0 - d.f1);
+                    const double m1 = std::max (d.f0, d.f1);
+                    d.f2 += (m1 > d.f2 ? d.c2a : d.c2r) * (m1 - d.f2);
+                    d.gain = d.range < 0.0 ? -d.f2 : d.f2;
+                    continue;
+                }
                 d.ms += d.msCoef * (y * y - d.ms);
                 const double level = 10.0 * std::log10 (2.0 * d.ms + 1e-20);
-                const double target = dynamicGainDb (level, d.threshold, d.range);
+                double target;
+                if (d.autoT) // round 190jh: the automatic threshold (round 190js: its rise and own timing)
+                {
+                    const double t = level + autoTopOffset;
+                    d.top = std::max ({ d.top - d.topFall, d.topRise >= 1.0 ? t : d.top + d.topRise * (t - d.top), autoFloor });
+                    target = std::clamp (autoDynamicGainDb (level, d.top, d.range), d.lo, d.hi);
+                    d.gain += (std::abs (target) > std::abs (d.gain) ? autoAttackCoef : autoReleaseCoef) * (target - d.gain);
+                    continue;
+                }
+                target = dynamicGainDb (level, d.threshold, d.range);
                 d.gain += (std::abs (target) > std::abs (d.gain) ? attackCoef : releaseCoef) * (target - d.gain);
             }
             if (std::abs (d.ms) < 1e-30) d.ms = 0.0;
@@ -1220,7 +1505,10 @@ private:
     double sampleRate = 48000.0;
     Phase mode = Phase::zeroLatency;
     EffectParams current {};
-    std::array<float, paramCount> cached {};
+    std::array<float, storedParamCount> cached {};
+    int apCount = 0; // round 190ln: the hidden all-pass cascade
+    double apB0 = 1.0, apB1 = 0.0;
+    std::array<std::array<std::array<double, 2>, 2>, maxDispersionSections> apState {};
     std::array<std::array<Section, maxSections>, bands> sections {};
     std::array<std::array<State, maxSections>, bands> state {};
     std::array<int, bands> counts {};
@@ -1228,8 +1516,14 @@ private:
     std::array<double, bands> dynUsed {};
     std::array<std::atomic<float>, bands> meters {};
     double attackCoef = 0.1, releaseCoef = 0.001;
+    double autoAttackCoef = 0.1, autoReleaseCoef = 0.001, autoTopOffset = 0.0, autoFloor = autoFloorDb; // round 190js
     float outGain = 1.0f, outL = 1.0f, outR = 1.0f;
     int characterNow = 0;
+    int puigNow = 0; // round 190mg: the PuigTec law (0 = off)
+    puig::Stage puigStage;
+    api560::Engine api560; // round 190mt
+    bool api560Now = false;
+    double api560Gains[10] {};
     std::array<Placement, bands> placed {};
     bool anyPlaced = false, anyMidSide = false, outMidSide = false;
     bool anyDynamic = false, soloOn = false, firLoaded = false, firDirty = true, sideGiven = false;
@@ -1282,6 +1576,18 @@ const std::array<Shape, shapeCount - 1>& menuShapes() noexcept
     return m;
 }
 int character (float v) noexcept { return std::clamp ((int) std::lround (v * 2.0f), 0, 2); }
+int puigLaw (float v) noexcept { return v > 0.0f ? std::clamp ((int) std::lround (v * 16.0f), 0, 3) : 0; }
+float puigLawValue (int k) noexcept { return (float) std::clamp (k, 0, 3) / 16.0f; }
+float api560GainValue (double db) noexcept { return (float) std::clamp ((db + 12.0) / 24.0, 0.0, 1.0); } // round 190mt
+double api560GainDb (float v) noexcept { return 24.0 * std::clamp ((double) v, 0.0, 1.0) - 12.0; }
+int waveCode (float v) noexcept { return v > 0.0f ? std::clamp ((int) std::lround (v * 64.0f), 0, (int) WaveCode::count - 1) : 0; }
+float waveCodeValue (WaveCode c) noexcept { return (float) std::clamp ((int) c, 0, (int) WaveCode::count - 1) / 64.0f; }
+double puigShape (double y) noexcept
+{
+    using namespace puig;
+    const double v = shapeS * y;
+    return (v + shapeG * shapeC * v / (shapeG * std::abs (v) + shapeC) * (1.0 + shapeK * shapeG * v)) / ((1.0 + shapeG) * shapeS);
+}
 float characterSample (int c, float x) noexcept
 {
     // Subtle: a soft knee that bends hot peaks a little (odd harmonics); Warm: an earlier, rounder knee. Both are unity
@@ -1424,8 +1730,232 @@ std::string paramText (int p, float v)
     }
 }
 
+int dispersionSections (float v) noexcept
+{
+    return std::clamp ((int) std::lround ((double) v * maxDispersionSections), 0, maxDispersionSections);
+}
+
+// ---- round 190mm: the Waves design law (FacetEq.h wavesLawParam; docs/analise/REA_rodada190mm.md §2) ----------------
+// Every structure below was identified black-box on our own demo-mode impulse responses of the references (each band
+// alone, a grid of frequencies / gains / Qs, two takes against the demo mutes): a Prony fit of the exact IR gives each
+// section's coefficients, and the analog prototype + digitisation that reproduce them to −100 dB and better were found by
+// fitting (eq/lab in the round folder). The constants are LYNX's own fits; the bell's digitisation is the published
+// prescribed-Nyquist-gain design (Orfanidis, JAES 1997), the others bilinear transforms.
+namespace
+{
+namespace wv
+{
+// analog (n2 s² + n1 s + n0) / (d2 s² + d1 s + d0), s in rad/s, through s = K (1 − z⁻¹) / (1 + z⁻¹)
+Section bilinear (double n2, double n1, double n0, double d2, double d1, double d0, double K) noexcept
+{
+    Section s;
+    if (n2 == 0.0 && d2 == 0.0) // first order: (n1 s + n0) / (d1 s + d0), no (1 + z⁻¹) pair on the unit circle
+    {
+        const double a0 = d1 * K + d0;
+        s.b0 = (n1 * K + n0) / a0;
+        s.b1 = (n0 - n1 * K) / a0;
+        s.a1 = (d0 - d1 * K) / a0;
+        return s;
+    }
+    const double K2 = K * K, a0 = d2 * K2 + d1 * K + d0;
+    s.b0 = (n2 * K2 + n1 * K + n0) / a0;
+    s.b1 = 2.0 * (n0 - n2 * K2) / a0;
+    s.b2 = (n2 * K2 - n1 * K + n0) / a0;
+    s.a1 = 2.0 * (d0 - d2 * K2) / a0;
+    s.a2 = (d2 * K2 - d1 * K + d0) / a0;
+    return s;
+}
+// the bilinear constant prewarped at w rad/s (kept just below Nyquist)
+double prewarp (double w, double fs) noexcept
+{
+    w = std::min (w, 0.999 * pi * fs);
+    return w / std::tan (w / (2.0 * fs));
+}
+// a bell with gain G at w0 (digital rad), DC gain 1, Nyquist gain G1 and bandwidth dw at the level GB (Orfanidis 1997)
+Section prescribedBell (double G, double GB, double G1, double w0, double dw) noexcept
+{
+    Section s;
+    const double G0 = 1.0;
+    const double F = std::abs (G * G - GB * GB), G00 = std::abs (G * G - G0 * G0), F00 = std::abs (GB * GB - G0 * G0);
+    if (F < 1e-15 || G00 < 1e-15)
+        return s;
+    const double G01 = std::abs (G * G - G0 * G1), G11 = std::abs (G * G - G1 * G1);
+    const double F01 = std::abs (GB * GB - G0 * G1), F11 = std::max (std::abs (GB * GB - G1 * G1), 1e-30);
+    const double W2 = std::sqrt (G11 / G00) * std::pow (std::tan (w0 * 0.5), 2.0);
+    const double DW = (1.0 + std::sqrt (F00 / F11) * W2) * std::tan (std::min (dw, 0.999 * pi) * 0.5);
+    const double C = F11 * DW * DW - 2.0 * W2 * (F01 - std::sqrt (F00 * F11));
+    const double D = 2.0 * W2 * (G01 - std::sqrt (G00 * G11));
+    const double A = std::sqrt (std::max (0.0, (C + D) / F)), B = std::sqrt (std::max (0.0, (G * G * C + GB * GB * D) / F));
+    const double n = 1.0 + W2 + A;
+    s.b0 = (G1 + G0 * W2 + B) / n;
+    s.b1 = -2.0 * (G1 - G0 * W2) / n;
+    s.b2 = (G1 - B + G0 * W2) / n;
+    s.a1 = -2.0 * (1.0 - W2) / n;
+    s.a2 = (1.0 + W2 - A) / n;
+    return s;
+}
+// the cookbook bell with its bandwidth prewarped (Q given as the analog Q; bandwidth in octaves kept at w0)
+Section bandwidthBell (double db, double Qc, double w0) noexcept
+{
+    Section s;
+    const double A = std::pow (10.0, db / 40.0), w = std::min (w0, 0.999 * pi);
+    const double bw = 2.0 / std::log (2.0) * std::asinh (1.0 / (2.0 * Qc));
+    const double al = std::sin (w) * std::sinh (std::log (2.0) * 0.5 * bw * w / std::sin (w));
+    const double a0 = 1.0 + al / A;
+    s.b0 = (1.0 + al * A) / a0; s.b1 = -2.0 * std::cos (w) / a0; s.b2 = (1.0 - al * A) / a0;
+    s.a1 = -2.0 * std::cos (w) / a0; s.a2 = (1.0 - al / A) / a0;
+    return s;
+}
+// Renaissance EQ shelf law (fitted, 8 gains × 6 Qs, 1.2e-4 relative): the centre is m × the set frequency (low) or the
+// set frequency / m (high), the shared s-term b = beta × centre; Q clamped to 0.707 … 1.414
+constexpr double shelfM[15] = { 0.420647, -0.0204507, -0.0102655, -0.003422, -0.0007764, -0.6859482, 0.0217492, 0.0117397,
+                                0.004093, 0.3618043, 0.0080709, 0.0034372, 0.0855262, -0.0184951, -0.1371341 };
+constexpr double shelfCb[5] = { -0.001115, -0.0049426, -0.0145809, -0.0289102, 0.9716466 }; // descending powers of g / 18
+void reqShelfLaw (double db, double q, double& m, double& beta) noexcept
+{
+    const double qq = std::clamp (q, 0.70711, 1.41421), x = std::log (qq), y = std::clamp (db, -18.0, 18.0) / 18.0;
+    double lm = 0.0;
+    int k = 0;
+    for (int i = 0; i <= 4; ++i)
+        for (int j = 0; i + j <= 4; ++j)
+            lm += shelfM[k++] * std::pow (x, i) * std::pow (y, j);
+    double cb = 0.0;
+    for (double c : shelfCb) cb = cb * y + c;
+    m = std::exp (lm);
+    beta = cb / qq;
+}
+// Renaissance EQ cut law: the second-order section's Q (ln Q2 = poly (ln q), q clamped 0.707 … 1.414); its zeros at
+// s² = −(1 − 1/Q2) w0² (a notch for Q2 > 1, a shelf-like floor below)
+double reqCutQ (double q) noexcept
+{
+    const double x = std::log (std::clamp (q, 0.70711, 1.41421));
+    return std::exp ((((-0.1107541 * x + 0.15263) * x - 0.1760575) * x + 1.1589371) * x - 2.1e-6);
+}
+// Q10's Q → the bell's analog Q: Bell Qc = q · 0.0908542 (√G + 1/√G); PQ-Bell Qc = q · k(|g|), k measured every 1.5 dB
+constexpr double pqK[13] = { 0.2355, 0.2542, 0.3119, 0.4093, 0.5503, 0.7408, 0.9882, 1.3020, 1.6938, 2.1775, 2.7695, 3.4892, 4.3591 };
+double q10Qc (double db, double q, bool pq) noexcept
+{
+    const double G = std::pow (10.0, db / 20.0);
+    if (! pq)
+        return q * 0.0908542 * (std::sqrt (G) + 1.0 / std::sqrt (G));
+    const double x = std::clamp (std::abs (db) / 1.5, 0.0, 12.0);
+    const int i = std::min ((int) x, 11);
+    const double f = x - i;
+    return q * std::exp (std::log (pqK[i]) * (1.0 - f) + std::log (pqK[i + 1]) * f);
+}
+// round 190mt: the PQ-Bell's bandwidth warp β (alpha = θ (1 + β θ²) / k), fitted every 1.5 dB from 1.5 to 18 dB (ln β
+// interpolated; held below 1.5 dB and above 18 dB)
+constexpr double pqBeta[12] = { 0.20584, 0.13164, 0.07569, 0.04289, 0.02495, 0.01511, 0.00957, 0.00633, 0.00436, 0.00312, 0.00231, 0.00177 };
+double q10PqBeta (double db) noexcept
+{
+    const double x = std::clamp (std::abs (db) / 1.5 - 1.0, 0.0, 11.0);
+    const int i = std::min ((int) x, 10);
+    const double t = x - i;
+    return std::exp (std::log (pqBeta[i]) * (1.0 - t) + std::log (pqBeta[i + 1]) * t);
+}
+} // namespace wv
+} // namespace
+
+// the sections of a band under the Waves law (code > 0); returns the count
+int wavesDesign (const EffectParams& params, int band, double fs, std::array<Section, maxSections>& out) noexcept
+{
+    if (! bandPower (params, band)) return 0;
+    const auto code = (WaveCode) waveCode (params[(std::size_t) (wavesBandParam0 + band)]);
+    const double f = hz (params[(std::size_t) param (band, 1)]);
+    const double db = gainDb (params[(std::size_t) param (band, 2)]) * gainScale (params[(std::size_t) scaleParam]);
+    const double qv = q (params[(std::size_t) param (band, 3)]);
+    const double w = 2.0 * pi * f, w0 = w / fs;
+    const double G = std::pow (10.0, db / 20.0), A = std::pow (10.0, db / 40.0);
+    switch (code)
+    {
+        case WaveCode::reqBell:
+        {
+            if (std::abs (db) < 1e-9) return 0;
+            const std::complex<double> s (0.0, 0.5 * fs / f);
+            const double G1 = std::abs ((s * s + s * (G / qv) + 1.0) / (s * s + s / qv + 1.0));
+            out[0] = wv::prescribedBell (G, std::sqrt ((1.0 + G * G) * 0.5), G1, std::min (w0, 0.999 * pi), w0 / qv);
+            return 1;
+        }
+        case WaveCode::q10Bell:
+        case WaveCode::q10PqBell:
+            if (std::abs (db) < 1e-9) return 0;
+            out[0] = wv::bandwidthBell (db, wv::q10Qc (db, 4.0 * qv, code == WaveCode::q10PqBell), w0);
+            return 1;
+        case WaveCode::q10BellTan: // round 190mt: [EXEC] exact on 336 probes 0.5 … 20 kHz (−160 dB and better)
+        case WaveCode::q10PqBellX: // round 190mt: [EXEC] the PQ-Bell, 192 probes 3 … 12 kHz × ±1.5 … ±18 dB (alpha within 4e-3)
+        {
+            if (std::abs (db) < 1e-9) return 0;
+            const double th = std::min (pi * f / (std::max (4.0 * qv, 1e-3) * fs), 0.25 * pi);
+            const double al = code == WaveCode::q10PqBellX ? th * (1.0 + wv::q10PqBeta (db) * th * th) / wv::q10Qc (db, 1.0, true)
+                                                            : std::tan (th) / (0.090904 * (std::sqrt (G) + 1.0 / std::sqrt (G)));
+            const double wc = std::min (w0, 0.999 * pi), c = std::cos (wc), a0 = 1.0 + al / A;
+            Section& s = out[0];
+            s.b0 = (1.0 + al * A) / a0; s.b1 = -2.0 * c / a0; s.b2 = (1.0 - al * A) / a0;
+            s.a1 = -2.0 * c / a0; s.a2 = (1.0 - al / A) / a0;
+            return 1;
+        }
+        case WaveCode::reqLowShelf:
+        case WaveCode::reqHighShelf:
+        {
+            if (std::abs (db) < 1e-9) return 0;
+            double m = 1.0, beta = 1.0;
+            wv::reqShelfLaw (db, qv, m, beta);
+            const bool high = code == WaveCode::reqHighShelf;
+            const double wc = high ? w / m : w * m, b = beta * wc, K = wv::prewarp (wc, fs);
+            out[0] = high ? wv::bilinear (A, b, wc * wc, 1.0 / A, b, wc * wc, K) : wv::bilinear (1.0, b, A * wc * wc, 1.0, b, wc * wc / A, K);
+            return 1;
+        }
+        case WaveCode::rbjLowShelf:
+        case WaveCode::rbjHighShelf:
+        {
+            if (std::abs (db) < 1e-9) return 0;
+            const double Qs = std::clamp (qv, 0.70711, 1.41421), sa = std::sqrt (A), K = wv::prewarp (w, fs);
+            out[0] = code == WaveCode::rbjLowShelf ? wv::bilinear (A, A * sa / Qs * w, A * A * w * w, A, sa / Qs * w, w * w, K)
+                                                   : wv::bilinear (A * A, A * sa / Qs * w, A * w * w, 1.0, sa / Qs * w, A * w * w, K);
+            return 1;
+        }
+        case WaveCode::reqHighPass:
+        case WaveCode::reqLowPass:
+        {
+            const double Q2 = wv::reqCutQ (qv), z = 1.0 - 1.0 / Q2, K = wv::prewarp (w, fs);
+            if (code == WaveCode::reqHighPass)
+            {
+                out[0] = wv::bilinear (0.0, 1.0, 0.0, 0.0, 1.0, w, K);                       // s / (s + w)
+                out[1] = wv::bilinear (1.0, 0.0, z * w * w, 1.0, w / Q2, w * w, K);          // (s² + z w²) / (s² + s w/Q2 + w²)
+            }
+            else
+            {
+                out[0] = wv::bilinear (0.0, 0.0, w, 0.0, 1.0, w, K);                         // w / (s + w)
+                out[1] = wv::bilinear (z, 0.0, w * w, 1.0, w / Q2, w * w, K);                // (z s² + w²) / (s² + s w/Q2 + w²)
+            }
+            return 2;
+        }
+        case WaveCode::lowShelf1:
+        case WaveCode::highShelf1:
+        {
+            if (std::abs (db) < 1e-9) return 0;
+            const double K = wv::prewarp (w, fs);
+            out[0] = code == WaveCode::lowShelf1 ? wv::bilinear (0.0, 1.0, A * w, 0.0, 1.0, w / A, K)
+                                                 : wv::bilinear (0.0, A, w, 0.0, 1.0 / A, w, K);
+            return 1;
+        }
+        case WaveCode::butterHighPass:
+        case WaveCode::butterLowPass:
+        {
+            const double K = wv::prewarp (w, fs), qb = std::sqrt (0.5);
+            out[0] = code == WaveCode::butterHighPass ? wv::bilinear (1.0, 0.0, 0.0, 1.0, w / qb, w * w, K)
+                                                      : wv::bilinear (0.0, 0.0, w * w, 1.0, w / qb, w * w, K);
+            return 1;
+        }
+        default: return 0;
+    }
+}
+
 int design (const EffectParams& params, int band, double sampleRate, std::array<Section, maxSections>& out, double extraDb) noexcept
 {
+    // round 190mm: a band under the Waves law (only the Waves EQ translators set it; 0 for every other project)
+    if (params[(std::size_t) wavesLawParam] > 0.0f && params[(std::size_t) (wavesBandParam0 + band)] > 0.0f)
+        return wavesDesign (params, band, sampleRate, out);
     Analog a[maxSections];
     const int n = analogSections (params, band, a, extraDb);
     const double f0 = std::min (hz (params[(std::size_t) param (band, 1)]), 0.4999 * sampleRate);
@@ -1669,6 +2199,74 @@ int matchEq (const EffectParams& params, const double* f, const double* cur, con
         for (const int prm : { param (b, 0), param (b, 1), param (b, 2), param (b, 3), param (b, 4), rangeParam0 + b, powerParam0 + b })
             changes.push_back ({ prm, work[(std::size_t) prm] });
     return (int) used.size();
+}
+
+namespace
+{
+#ifdef LYNX_LAB190JS
+AutoLaw autoLaw190js { autoFloorDb, autoDecayDbPerSecond, autoKneeDb, 0.0, 0.0, 0.0, 0.0, 0.0 };
+struct AutoLawLab
+{
+    AutoLawLab()
+    {
+        if (const char* e = std::getenv ("LYNX_LAB_FA"))
+            std::sscanf (e, "%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf", &autoLaw190js.floorDb, &autoLaw190js.decayDbPerSecond, &autoLaw190js.kneeDb,
+                         &autoLaw190js.topOffsetDb, &autoLaw190js.topRiseMs, &autoLaw190js.attackMs, &autoLaw190js.releaseMs,
+                         &autoLaw190js.kneePerRange);
+    }
+} autoLawLab;
+#else
+// round 190js [EXEC] (Nelder-Mead on the C++ renders, 5 ms windows of refcap030 grid2's tc + stairs at ranges -30 / -15 /
+// +15: 1.067 → 0.67 dB rms): the knee is 1.53 x the range (the band starts moving 1.53 x |range| / 2 under the threshold),
+// the top rises at once (the fitted rise and offset came out at 0) and falls 1.70 dB/s as before (the fit's 1.58 cost the
+// -15 dB stairs a parity step); the gain timing at Pro-Q's 50 % is 9.2 / 268 ms (the translator's attack / release)
+constexpr AutoLaw autoLaw190js { autoFloorDb, autoDecayDbPerSecond, autoKneeDb, 0.0, 0.0, 0.0, 0.0, 1.53 };
+#endif
+} // namespace
+
+const AutoLaw& autoLaw() noexcept { return autoLaw190js; }
+
+// round 190lg: revision 1 (AutoLaw1). The threshold and knee buses of the reference's auto mode were not traced: LYNX keeps
+// round 190js's fitted mapping (the band moves from |range| under its peak level, over a knee of 1.53 |range|), now on the
+// reference's own detector: the per-sample level against the peak follower
+namespace
+{
+AutoLaw1 autoLaw1Value;
+#ifdef LYNX_Q4LAB
+struct AutoLaw1Lab
+{
+    AutoLaw1Lab()
+    {
+        if (const char* e = std::getenv ("LYNX_Q4LAB"))
+            std::sscanf (e, "%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf", &autoLaw1Value.thrK, &autoLaw1Value.thrOff, &autoLaw1Value.kneeK,
+                         &autoLaw1Value.envSec, &autoLaw1Value.floor, &autoLaw1Value.t0, &autoLaw1Value.t1, &autoLaw1Value.t2a,
+                         &autoLaw1Value.t2r, &autoLaw1Value.relCurve);
+    }
+} autoLaw1Lab;
+#endif
+} // namespace
+const AutoLaw1& autoLaw1() noexcept { return autoLaw1Value; }
+double autoDynamicGainDb1 (double rel, double range) noexcept
+{
+    const auto& L = autoLaw1();
+    const double x = rel + L.thrK * std::abs (range) - L.thrOff;
+    const double knee = std::max (0.01, L.kneeK * std::abs (range));
+    const double over = x <= -0.5 * knee ? 0.0 : x < 0.5 * knee ? (x + 0.5 * knee) * (x + 0.5 * knee) / (2.0 * knee) : x;
+    return range < 0.0 ? -std::min (-range, over) : std::min (range, over);
+}
+
+bool autoThreshold (const EffectParams& p, int b) noexcept
+{
+    return b >= 0 && b < bands && p[(std::size_t) (autoThresholdParam0 + b)] >= 0.5f;
+}
+
+double autoDynamicGainDb (double level, double top, double range) noexcept
+{
+    const double x = level - (top - std::abs (range));
+    const auto& A = autoLaw();
+    const double knee = std::max (0.01, A.kneePerRange > 0.0 ? A.kneePerRange * std::abs (range) : A.kneeDb);
+    const double over = x <= -0.5 * knee ? 0.0 : x < 0.5 * knee ? (x + 0.5 * knee) * (x + 0.5 * knee) / (2.0 * knee) : x;
+    return range < 0.0 ? -std::min (-range, over) : std::min (range, over);
 }
 
 double dynamicGainDb (double level, double threshold, double range) noexcept

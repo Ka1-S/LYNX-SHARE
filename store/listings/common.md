@@ -47,6 +47,10 @@ Windows 10 version 1809 or newer, 64-bit (x64)
 03-piano-roll.png
 04-mixer.png
 05-instruments-effects.png
+06-audio-editing.png
+07-chord-helper.png
+08-drum-machine.png
+09-helix-plus.png
 
 ## StoreLogo300x300
 

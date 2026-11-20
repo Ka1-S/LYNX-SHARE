@@ -28,6 +28,20 @@ bool save (const Song& song, const juce::File& file, juce::String& error);
 // `file` named as a project: "beat.v2" -> "beat.v2.lynx" (File::withFileExtension would make it "beat.lynx").
 juce::File withProjectExtension (const juce::File& file);
 std::optional<Song> load (const juce::File& file, juce::String& error, juce::String* savedBy = nullptr);
+// Round 190mr (DF-141, owner decision F3): the window layout saved with a project, as FL keeps its windows' places in
+// the .flp. View only, so it stays outside the Song: a save is given it, a load hands it back. `style` =
+// layoutstyle::Style it belongs to; `text` = the workspace's layout text ("" = none: every project before this round).
+struct WindowLayout
+{
+    int style = 0;
+    juce::String text;
+};
+bool save (const Song& song, const juce::File& file, juce::String& error, const WindowLayout& layout);
+std::optional<Song> load (const juce::File& file, juce::String& error, juce::String* savedBy, WindowLayout* layout);
+// the project text with the layout added at the end of its root object (unchanged when the layout is empty)
+juce::String withWindowLayout (const juce::String& json, const WindowLayout& layout);
+// the layout a project text holds (empty text: none)
+WindowLayout windowLayoutOf (const juce::var& root);
 
 // One mixer track as stored in a project (sends, input and effects included).
 juce::var mixerTrackToVar (const MixerTrack& track);
@@ -41,5 +55,12 @@ juce::String mixerTrackStateToJson (const MixerTrack& track);
 std::optional<MixerTrack> mixerTrackStateFromJson (const juce::String& json, juce::String& error);
 // Puts a state on a track (its routing stays); `takeName` = also the state's name and colour ("Insert from state").
 void applyMixerTrackState (MixerTrack& target, const MixerTrack& state, bool takeName);
+
+// Round 190jf (B22): a channel / an effect slot as the project stores it (JSON bytes), for LYNX's own devices inside a
+// DAWproject file; nullopt when the bytes are not such a state
+std::vector<std::uint8_t> channelStateBytes (const ChannelDef& channel);
+std::optional<ChannelDef> channelFromStateBytes (const std::vector<std::uint8_t>& bytes);
+std::vector<std::uint8_t> effectStateBytes (const EffectSlot& slot);
+std::optional<EffectSlot> effectFromStateBytes (const std::vector<std::uint8_t>& bytes);
 } // namespace ProjectFile
 } // namespace lynx

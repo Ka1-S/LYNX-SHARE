@@ -47,6 +47,9 @@ juce::Point<float> handlePosition (juce::Rectangle<float> area, const EffectPara
 int bandAt (juce::Rectangle<float> area, const EffectParams& params, juce::Point<float> p, double rangeDb);
 // right-click menu of a band: type, then FL's orders or the cut slope; `set` applies (param, value) changes
 void showBandMenu (juce::Component& target, const EffectParams& params, int band, std::function<void (std::vector<std::pair<int, float>>)> set);
+// round 190ih: a band back to its default (FL's Alt+click on a token): the band of a new Parametric EQ 2 of the same
+// law, or 0 dB when the laws differ
+std::vector<std::pair<int, float>> bandReset (const EffectParams& params, int band);
 // one line about the band (type, frequency, gain, width / order)
 juce::String bandText (const EffectParams& params, int band);
 
@@ -58,6 +61,8 @@ struct DisplaySettings
 {
     bool spectrum = true, heatmap = false;
     int position = 0; // core/SpectrumHeat.h Position
+    bool soloOnShift = true; // round 190ih: FL's "Solo on Shift" (owner decision PL5: on); off = Shift+drag left / right = width
+    bool monitorInput = false; // round 190ld (DP-14): FL's Monitor — the input (pre-EQ) instead of the output (post-EQ)
 };
 DisplaySettings& displaySettings();
 void saveDisplaySettings();

@@ -61,7 +61,7 @@ struct SharedBlock
 {
     static constexpr std::uint32_t magicValue = 0x4C594E58; // "LYNX"
     // (32 channels: a bridged multi-output instrument keeps 16 stereo outputs for the wrapper's Connections, issue #114)
-    static constexpr int maxChannels = 32, maxFrames = 4096 /* PluginHost::maxBlockSize */, maxMidi = 1024, maxParams = 512;
+    static constexpr int maxChannels = 32, maxFrames = 4096 /* PluginHost::maxBlockSize */, maxMidi = 1024, maxParams = 512, maxTimed = 512;
 
     struct Midi
     {
@@ -92,6 +92,17 @@ struct SharedBlock
     Midi midi[maxMidi];
     Param params[maxParams], paramsOut[maxParams];
     float audio[maxChannels][maxFrames];
+    // round 190jg (sample-accurate automation, engine/TimedParameters.h): this block's parameter changes inside it, each
+    // at its sample offset (after `params`, which apply at its start)
+    std::int32_t timedCount;
+    Param timed[maxTimed];
+    std::int32_t timedOffsets[maxTimed];
+    // rollup 0.1.30: the MIDI the plugin sent out of this block (what its MidiBuffer holds after processBlock), so the
+    // parent's buffer holds the plugin's output as in LYNX's own process: an arpeggiator's notes for the note lights and
+    // the wrapper's Output port, which also reaches hardware MIDI outputs (round 190jl). Before, the parent's buffer
+    // still held what went in.
+    std::int32_t midiOutCount;
+    Midi midiOut[maxMidi];
 };
 // one layout for the 64-bit LYNX and the 32-bit bridge (x86 MinGW aligns doubles to 8 as x64 does; alignas pins it)
 static_assert (offsetof (SharedBlock, transport) == 40 && sizeof (SharedBlock::Transport) == 64, "SharedBlock layout");

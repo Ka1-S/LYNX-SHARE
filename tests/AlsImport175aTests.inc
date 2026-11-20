@@ -251,7 +251,9 @@ TEST (als175a_imports_a_set)
     CHECK (s.mixer[3].muted && ! s.mixer[2].muted);
     // Keys → Reverb at 0 dB; Vocal → Band (group) only, not to the Master
     CHECK (s.mixer[2].sends.size() == 1 && s.mixer[2].sends[0].target == 4 && std::abs (s.mixer[2].sends[0].level - 1.0f) < 1e-6);
-    CHECK (! s.mixer[3].toMaster && s.mixer[3].sends.size() == 1 && s.mixer[3].sends[0].target == 1);
+    // (round 190kc: its send to the return at -inf is kept as a send at 0, after the route into the group)
+    CHECK (! s.mixer[3].toMaster && s.mixer[3].sends.size() == 2 && s.mixer[3].sends[0].target == 1 && s.mixer[3].sends[1].target == 4
+           && s.mixer[3].sends[1].level == 0.0f);
     // the VST2 insert (with its chunk) and the native EQ in the report
     CHECK (s.mixer[3].effects.size() == 1 && s.mixer[3].effects[0].plugin.foreign.format == ForeignPlugin::Format::vst2);
     if (s.mixer[3].effects.size() == 1)
@@ -389,7 +391,7 @@ TEST (als175a_real_sets)
                      "%zu markers, %d plugins, %d samples missing, %zu dropped devices, %zu unsupported\n",
                      entry.path().filename().string().c_str(), ms, song->bpm, song->beatsPerBar, song->mixer.size(), song->channels.size(),
                      song->patterns.size(), notes, song->playlist.size(), song->automations.size(), song->markers().size(), plugins,
-                     report.missingSamples, report.droppedEffects.size(), report.unsupported.size());
+                     report.missingSamples, report.droppedEffects.size(), report.unsupported.size() + report.notReproduced.size());
     }
 }
 
@@ -975,20 +977,30 @@ TEST (als175a_warp_markers_place_the_audio)
     for (auto method : { StretchMethod::general, StretchMethod::transients, StretchMethod::mono, StretchMethod::beats, StretchMethod::tones,
                          StretchMethod::texture, StretchMethod::complex })
     {
-        const auto out = timeStretchMapped (in, map, method);
+      // (round 190ik: Texture's granular engine reads each grain at the source's speed from its anchor, as Live's does, so
+      // a burst lands within a grain period of its place; the Classic Texture keeps the 8 ms check)
+      for (const auto law : { WarpModeSettings::warpLawClassic, WarpModeSettings::warpLawMeasured })
+      {
+        if (law == WarpModeSettings::warpLawMeasured && method != StretchMethod::texture)
+            continue;
+        StretchOptions options;
+        options.modes.warpLaw = law;
+        const auto out = timeStretchMapped (in, map, method, 0.0, options);
         CHECK (out != nullptr && out->frames() == 88200 && out->isStereo());
         if (out == nullptr || out->frames() != 88200)
             continue;
+        const auto tolerance = law == WarpModeSettings::warpLawMeasured ? (long) (0.075 * 44100.0) : 353L; // (65 ms grains + scatter / 8 ms)
         int placed = 0;
         for (std::size_t k = 0; k < at.size(); ++k)
         {
             const auto want = (long) std::llround (stretchMapOutput (map, (double) sourcePeak[k]));
             const auto got = als175a::envelopePeak (*out, want);
-            placed += std::abs (got - want) <= 353; // 8 ms
+            placed += std::abs (got - want) <= tolerance;
         }
         CHECK (placed == 4);
         if (placed != 4)
-            std::printf ("  warp markers: method %d placed %d of 4 bursts\n", (int) method, placed);
+            std::printf ("  warp markers: method %d law %d placed %d of 4 bursts\n", (int) method, (int) law, placed);
+      }
     }
     // fewer than 3 points: the plain stretch at the overall ratio (the same samples as timeStretch)
     const auto plain = timeStretchMapped (in, { { 0.0, 0.0 }, { 88200.0, 110250.0 } }, StretchMethod::complex);

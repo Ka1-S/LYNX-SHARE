@@ -1283,7 +1283,7 @@ private:
                 e = ae::createSequence (s, envelopeBeats());
                 // the sequence is a volume shape around unity: level 1 = the envelope's 0 dB line
                 for (auto& p : e.points)
-                    p.y *= 0.5;
+                    p.y *= host.toolEnvelopeUnity();
                 break;
             }
             default: break;

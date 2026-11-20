@@ -5,7 +5,8 @@
 // view's frame step at the display's refresh instead (juce::VBlankAttachment: one per window, on the display that
 // window is on), and only while the view animates:
 //  - attached: one step per vertical blank (at most `maxHz`, 170 by default: a 240 Hz display gets every other one;
-//    capped tickers all run on the same frames; Settings › General › Animation rate caps them all at 60 or 30);
+//    capped tickers all run on the same frames; Settings › General › Animation rate caps them all at Balanced / 60 /
+//    30, on every n-th frame);
 //  - after ~0.3 s of steps that changed nothing (transport stopped, meters fallen) it detaches; a light idle poll
 //    (20 Hz, the same step; one timer for every ticker since round 190gd) brings it back as soon as something moves,
 //    so an idle view costs no repaint at all;
@@ -18,6 +19,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/FramePacing.h"
+#include "ui/NativeChild.h"
 
 #include <algorithm>
 #include <atomic>
@@ -25,6 +27,8 @@
 #include <cstdlib>
 #include <functional>
 #include <map>
+#include <string>
+#include <typeinfo>
 #include <vector>
 
 namespace lynx::ui
@@ -61,9 +65,24 @@ public:
         static std::atomic<int> n { 0 };
         return n;
     }
+    // FL's FPS readout ("Show FL Studio user interface screen refresh rate", 143 on a 144 Hz display in FL 2026): the rate
+    // LYNX's moving views are drawn at — the display's refresh measured from its vertical blanks, under Settings › General ›
+    // Animation rate (LYNX_FRAME_HZ when set); 0 before the first vertical blank
+    static int uiFrameRate()
+    {
+        if (fixedHz() > 0)
+            return fixedHz();
+        const auto period = framePeriodMs();
+        if (period <= 0.0)
+            return 0;
+        const auto refresh = 1000.0 / period;
+        const auto n = rateLimit() != 0 ? framepace::evenDivisor (refresh, rateLimit() < 0 ? framepace::balancedCap : (double) rateLimit()) : 1;
+        return juce::roundToInt (refresh / (double) juce::jmax (1, n));
+    }
 
     // Settings › General › Animation rate (round 174e2): 0 = the display's refresh, else at most this many frames a
-    // second (60, 30) for every ticker, still on the display's vertical blanks (message thread)
+    // second (60, 30) for every ticker, still on the display's vertical blanks; -1 = Balanced (round 190ip: the refresh
+    // halved until it is at most 100 Hz). Evenly paced: every n-th frame (message thread)
     static int& rateLimit()
     {
         static int hz = 0;
@@ -103,8 +122,30 @@ private:
     bool run (double nowMs)
     {
         stepsRun().fetch_add (1, std::memory_order_relaxed);
-        return step != nullptr && step (nowMs);
+        const auto moved = step != nullptr && step (nowMs);
+        if (perOwnerWanted()) // (round 190kr, --uiperf: which live views step, and how often they move)
+        {
+            auto& counts = perOwner()[typeid (owner).name()];
+            ++counts.first;
+            counts.second += moved ? 1 : 0;
+        }
+        return moved;
     }
+
+public:
+    // diagnostics (round 190kr, LYNX_UIPERF_TICKERS=1): per view type, the steps run and the steps that moved (message thread)
+    static bool perOwnerWanted()
+    {
+        static const bool on = std::getenv ("LYNX_UIPERF_TICKERS") != nullptr || std::getenv ("LYNX_TICKER_LOG") != nullptr;
+        return on;
+    }
+    static std::map<std::string, std::pair<long long, long long>>& perOwner()
+    {
+        static std::map<std::string, std::pair<long long, long long>> m;
+        return m;
+    }
+
+private:
 
     void onVBlank (double seconds)
     {
@@ -121,14 +162,23 @@ private:
         lastFrameMs = frameMs;
         if (period > 0.0)
         {
+            // Settings › General › Animation rate (round 190ip): every n-th frame, evenly (core/FramePacing.h), the same
+            // frames for every ticker; a ticker's own lower cap (maxHz) still holds
+            const auto n = rateLimit() != 0 ? framepace::evenDivisor (1000.0 / period, rateLimit() < 0 ? framepace::balancedCap : (double) rateLimit()) : 1;
+            // (2 % slack: the toolbar's own 72 Hz cap on a 144 Hz display is the same rate as Balanced, and must run on the
+            // same frames, not on the other half: round 190ip measured 141 updates a second for that, 72 with it)
+            if (n > 1 && maxHz >= 0.98 * 1000.0 / period / n)
+            {
+                if (! dividerFor (n).runs (frameMs, period, n))
+                    return;
+            }
             // below the refresh, the frames where this cap's next one is due (core/FramePacing.h): 72 Hz on a 144 Hz
-            // display = every other frame, 60 Hz = every 2nd / 3rd, the same frames for every ticker with that cap
-            const auto cap = rateLimit() > 0 ? juce::jmin (maxHz, (double) rateLimit()) : maxHz;
-            if (! pacerFor (cap).runs (frameMs, period, cap))
+            // display = every other frame, the same frames for every ticker with that cap
+            else if (! pacerFor (maxHz).runs (frameMs, period, maxHz))
                 return;
         }
 
-        if (owner.isShowing() && run (nowMs))
+        if (showing() && run (nowMs))
             quiet = 0;
         else
             ++quiet; // (detached by the timer: not from inside the attachment's own callback)
@@ -139,6 +189,12 @@ private:
     {
         static std::map<int, framepace::Pacer> pacers;
         return pacers[juce::roundToInt (capHz * 10.0)];
+    }
+
+    static framepace::Divider& dividerFor (int n)
+    {
+        static std::map<int, framepace::Divider> dividers;
+        return dividers[n];
     }
 
     static double& framePeriodMs()
@@ -186,6 +242,7 @@ private:
         }
         void timerCallback() override
         {
+            writeLog();
             polling = true;
             const auto list = tickers; // (a step may delete views, and their tickers with them)
             for (auto* t : list)
@@ -195,6 +252,46 @@ private:
             if (orphaned)
                 delete this;
         }
+
+        // round 190kr: LYNX_TICKER_LOG=<file>, every 2 s: each view type's frame steps per second (run / moved), the
+        // steps left out because the view was covered, and for every ticker whose view is showing how the cover check
+        // sees its window (ui/NativeChild.h describeCover)
+        void writeLog()
+        {
+            static const auto path = juce::SystemStats::getEnvironmentVariable ("LYNX_TICKER_LOG", {});
+            if (path.isEmpty())
+                return;
+            const auto now = juce::Time::getMillisecondCounterHiRes();
+            if (logSince <= 0.0)
+            {
+                logSince = now;
+                logStart = perOwner();
+                logCovered = nativechild::coveredSkips().load();
+                return;
+            }
+            if (now - logSince < 2000.0)
+                return;
+            const auto s = (now - logSince) / 1000.0;
+            juce::String text;
+            text << juce::String (now / 1000.0, 1) << " tickers attached " << attachedNow().load() << ":";
+            for (const auto& [name, counts] : perOwner())
+            {
+                const auto before = logStart.count (name) != 0 ? logStart.at (name) : std::pair<long long, long long> {};
+                text << " " << juce::String (name).fromLastOccurrenceOf ("::", false, false).retainCharacters ("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_")
+                     << " " << juce::String ((double) (counts.first - before.first) / s, 0) << "/" << juce::String ((double) (counts.second - before.second) / s, 0);
+            }
+            text << "; covered skips " << juce::String ((double) (nativechild::coveredSkips().load() - logCovered) / s, 0) << "/s\n";
+            for (auto* t : tickers)
+                if (t->owner.isShowing())
+                    text << "    " << juce::String (typeid (t->owner).name()) << ": " << nativechild::describeCover (t->owner) << "\n";
+            juce::File (path).appendText (text);
+            logSince = now;
+            logStart = perOwner();
+            logCovered = nativechild::coveredSkips().load();
+        }
+        double logSince = 0.0;
+        std::map<std::string, std::pair<long long, long long>> logStart;
+        int logCovered = 0;
     };
 
     void poll()
@@ -202,7 +299,7 @@ private:
         const auto nowMs = juce::Time::getMillisecondCounterHiRes();
         if (fixedHz() > 0) // diagnostics: a plain timer
         {
-            if (owner.isShowing())
+            if (showing())
                 run (nowMs);
             return;
         }
@@ -211,8 +308,23 @@ private:
         if (isAttached() && nowMs - lastVBlankMs < 150.0)
             return; // the display drives it
         // idle (or a window without vertical blanks): the same step at the poll's rate; moving → the display's rate
-        if (owner.isShowing() && run (nowMs) && ! isAttached())
+        if (showing() && run (nowMs) && ! isAttached())
             attach();
+    }
+
+    // round 190kr (QA-11): a view whose docked panel lies wholly under other panels' windows (the Playlist behind
+    // Thief's maximised Channel rack) is "showing" for JUCE, but nothing it paints reaches the screen: its steps wait
+    // (the idle poll looks again 20 times a second, and the first step after it shows again catches up)
+    bool showing() const
+    {
+        if (! owner.isShowing())
+            return false;
+        if (nativechild::coveredBySiblingWindows (owner))
+        {
+            nativechild::coveredSkips().fetch_add (1, std::memory_order_relaxed);
+            return false;
+        }
+        return true;
     }
 
     juce::Component& owner;

@@ -359,15 +359,15 @@ TEST (groove190fm_als_import_reads_the_pool_and_clip_grooves)
             CHECK (slot != nullptr && clip != nullptr && slot->groove == pushed.id && clip->groove == 0);
         }
     }
-    CHECK (report.unsupported.count ("Clip groove that is not in the set's Groove Pool (left out)") == 1);
-    CHECK (report.unsupported.count ("Default groove for new clips (LYNX's new clips start without a groove)") == 1);
+    CHECK (report.notReproduced.count ("Clip groove that is not in the set's Groove Pool (left out)") == 1);
+    CHECK (report.notReproduced.count ("Default groove for new clips (LYNX's new clips start without a groove)") == 1);
     CHECK (report.approximated.count ("Grooves (LYNX's groove timing and accents; Live's exact law needs a live check)") == 1);
 
     // no default groove, the global amount above Live's 130 %: kept at 130, reported
     FlpImportReport second;
     const auto t = importAls (bytesOf (grooveSet (-1, 131.25)), options (&second));
     CHECK (t.has_value() && std::abs (t->grooves.amount - 1.3f) < 1.0e-6f);
-    CHECK (second.unsupported.count ("Default groove for new clips (LYNX's new clips start without a groove)") == 0);
+    CHECK (second.notReproduced.count ("Default groove for new clips (LYNX's new clips start without a groove)") == 0);
     CHECK (second.approximated.count ("Global groove amount above 130 % (kept at 130 %)") == 1);
 }
 

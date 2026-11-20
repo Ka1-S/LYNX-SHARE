@@ -7,6 +7,7 @@
 #include "ui/I18n.h"
 #include "ui/Icons.h"
 #include "ui/Theme.h"
+#include "ui/TextCache.h"
 
 namespace lynx::ui
 {
@@ -56,7 +57,7 @@ bool noLineStart (juce::juce_wchar c)
 std::vector<Item> makeItems (const juce::String& text, const juce::Font& font, const juce::Font& keyFont, float glyph)
 {
     std::vector<Item> items;
-    const auto space = juce::GlyphArrangement::getStringWidth (font, " ");
+    const auto space = textcache::stringWidth (font, " ");
 
     // the subject: the words before the first ": " or " - " (when it comes early, before any glyph)
     auto titleEnd = -1;
@@ -85,8 +86,8 @@ std::vector<Item> makeItems (const juce::String& text, const juce::Font& font, c
             item.text = value;
             item.gap = pendingGap;
             item.width = item.kind == Item::Kind::mouse
-                             ? glyph + (value == "2xLMB" ? juce::GlyphArrangement::getStringWidth (keyFont, "x2") + 1.0f : 0.0f)
-                             : juce::GlyphArrangement::getStringWidth (keyFont, value) + 8.0f;
+                             ? glyph + (value == "2xLMB" ? textcache::stringWidth (keyFont, "x2") + 1.0f : 0.0f)
+                             : textcache::stringWidth (keyFont, value) + 8.0f;
             items.push_back (item);
             pendingGap = 0.0f;
             consumed += (int) segment.value.size() + 2;
@@ -123,7 +124,7 @@ std::vector<Item> makeItems (const juce::String& text, const juce::Font& font, c
                 Item item;
                 item.text = value.substring (from, to);
                 item.gap = pendingGap;
-                item.width = juce::GlyphArrangement::getStringWidth (font, item.text);
+                item.width = textcache::stringWidth (font, item.text);
                 item.title = titleEnd > 0 && consumed + from < titleEnd;
                 items.push_back (item);
                 pendingGap = 0.0f;
@@ -181,7 +182,7 @@ bool layOut (const std::vector<Item>& items, float width, int maxLines, std::vec
 }
 
 void drawLine (juce::Graphics& g, const std::vector<Item>& line, juce::Rectangle<float> area, const juce::Font& font,
-               const juce::Font& keyFont, float glyph)
+               const juce::Font& keyFont, float glyph, juce::Colour plain = theme::colour::textSecondary)
 {
     using namespace theme;
     auto x = area.getX();
@@ -200,7 +201,7 @@ void drawLine (juce::Graphics& g, const std::vector<Item>& line, juce::Rectangle
         {
             case Item::Kind::word:
                 g.setFont (font);
-                g.setColour (item.title ? colour::textPrimary : colour::textSecondary);
+                g.setColour (item.title ? colour::textPrimary : plain);
                 g.drawText (item.text, box, juce::Justification::centredLeft, true);
                 break;
 
@@ -302,6 +303,92 @@ void HintBar::setHint (const Hint& hint, bool isLive)
     }
 }
 
+void InfoView::setHint (const Hint& hint)
+{
+    if (hint.text == lastText && hint.value == lastValue) // (the hint timer's every tick: nothing new)
+        return;
+    lastText = hint.text;
+    lastValue = hint.value;
+    auto text = plainHint (withMarkup (hint.text)).trim();
+    juce::String t, b = text;
+    if (const auto colon = text.indexOfChar (':'); colon > 0 && colon <= 48 && ! text.substring (0, colon).containsChar ('\n'))
+    {
+        t = text.substring (0, colon).trim();
+        b = text.substring (colon + 1).trim();
+    }
+    if (hint.value.isNotEmpty())
+        b << (b.isEmpty() ? "" : "\n") << hint.value;
+    if (t == title && b == body)
+        return;
+    title = t;
+    body = b;
+    layoutWidth = -1.0f;
+    repaint();
+}
+
+void InfoView::paint (juce::Graphics& g)
+{
+    namespace ll = theme::livelook;
+    auto r = getLocalBounds();
+    g.setColour (ll::surface);
+    g.fillRect (r);
+    const auto bar = r.removeFromTop (17);
+    g.setColour (ll::raised);
+    g.fillRect (bar);
+    g.setColour (ll::text);
+    g.setFont (theme::font (theme::type::small, true));
+    g.drawText (title, bar.withTrimmedLeft (5).withTrimmedRight (4), juce::Justification::centredLeft, true);
+    g.setFont (theme::font (theme::type::small));
+    // Live: 15 px lines from 6 px in (its text 15..226 in a 231 px view)
+    const auto area = r.withTrimmedTop (4).reduced (6, 0).toFloat();
+    if (area.getWidth() != layoutWidth)
+    {
+        juce::AttributedString text;
+        text.append (body, theme::font (theme::type::small), ll::text);
+        text.setLineSpacing (15.0f - theme::font (theme::type::small).getHeight());
+        text.setWordWrap (juce::AttributedString::byWord);
+        layout.createLayout (text, area.getWidth());
+        layoutWidth = area.getWidth();
+    }
+    juce::Graphics::ScopedSaveState save (g);
+    g.reduceClipRegion (area.toNearestInt());
+    layout.draw (g, area.withHeight (layout.getHeight()));
+}
+
+juce::PopupMenu HintBar::copyMenu() const
+{
+    juce::PopupMenu menu;
+    const auto value = plainHint (current.value).trim();
+    const auto text = plainHint (current.text).trim();
+    menu.addItem (value.isEmpty() ? tr ("Copy value") : tr ("Copy value: {0}", { value }), value.isNotEmpty(), false,
+                  [value] { juce::SystemClipboard::copyTextToClipboard (value); });
+    menu.addItem (tr ("Copy text"), text.isNotEmpty(), false, [text] { juce::SystemClipboard::copyTextToClipboard (text); });
+    return menu;
+}
+
+void HintBar::mouseDown (const juce::MouseEvent& e)
+{
+    if (! e.mods.isPopupMenu())
+        return;
+    auto menu = onMenu != nullptr ? onMenu() : juce::PopupMenu();
+    if (menu.getNumItems() > 0)
+        menu.addSeparator();
+    for (juce::PopupMenu::MenuItemIterator it (copyMenu()); it.next();)
+        menu.addItem (it.getItem());
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+}
+
+// rollup 0.1.30 step 13 (CI paint gate, stream playlist +5 %): the laid-out text kept between paints
+struct HintBar::LaidOut
+{
+    juce::String text;
+    float width = -1.0f;
+    juce::Font big { juce::FontOptions() }, bigKey { juce::FontOptions() }, small { juce::FontOptions() }, smallKey { juce::FontOptions() };
+    bool larger = false;
+    bool oneLine = false, fits = false;
+    std::vector<std::vector<Item>> lines;
+};
+
 void HintBar::paint (juce::Graphics& g)
 {
     using namespace theme;
@@ -322,7 +409,7 @@ void HintBar::paint (juce::Graphics& g)
     if (current.value.isNotEmpty())
     {
         const juce::Font valueFont (font (type::small, true));
-        const auto w = juce::jmin (r.getWidth() / 3.0f, juce::GlyphArrangement::getStringWidth (valueFont, current.value) + 18.0f);
+        const auto w = juce::jmin (r.getWidth() / 3.0f, textcache::stringWidth (valueFont, current.value) + 18.0f);
         const auto valueArea = r.removeFromRight (juce::jmax (44.0f, w)).reduced (0.0f, 3.0f);
         g.setColour (live ? colour::accentMuted : colour::bg3);
         g.fillRoundedRectangle (valueArea, radius::sm);
@@ -339,23 +426,42 @@ void HintBar::paint (juce::Graphics& g)
 
     // the text: one line if it fits, else two smaller lines, else two lines cut at the end
     const auto text = withMarkup (current.text);
-    std::vector<std::vector<Item>> lines;
 
-    const juce::Font big (font (type::small)), bigKey (font (type::caption - 1.0f, true));
-    if (auto items = makeItems (text, big, bigKey, 15.0f); layOut (items, r.getWidth(), 1, lines))
+    // (round 190jo FM-7: the Pattern toolbar's hint one step larger, its words in the primary text colour)
+    const auto plain = larger ? colour::textPrimary.withAlpha (0.88f) : colour::textSecondary;
+    const juce::Font big (font (larger ? type::body + 1.0f : type::small)), bigKey (font (larger ? type::caption : type::caption - 1.0f, true));
+    const auto bigGlyph = larger ? 16.0f : 15.0f;
+    const juce::Font smallFont (font (larger ? type::small : type::caption)), smallKey (font (larger ? type::caption - 1.0f : type::caption - 2.0f, true));
+    const auto smallGlyph = larger ? 13.0f : 12.0f;
+    if (laidOut == nullptr)
+        laidOut = std::make_shared<LaidOut>();
+    auto& laid = *laidOut;
+    if (laid.text != text || laid.width != r.getWidth() || laid.larger != larger || laid.big != big || laid.bigKey != bigKey
+        || laid.small != smallFont || laid.smallKey != smallKey)
     {
-        drawLine (g, lines.front(), r.withSizeKeepingCentre (r.getWidth(), 17.0f), big, bigKey, 15.0f);
+        laid.text = text;
+        laid.width = r.getWidth();
+        laid.larger = larger;
+        laid.big = big;
+        laid.bigKey = bigKey;
+        laid.small = smallFont;
+        laid.smallKey = smallKey;
+        laid.oneLine = layOut (makeItems (text, big, bigKey, bigGlyph), r.getWidth(), 1, laid.lines);
+        laid.fits = laid.oneLine || layOut (makeItems (text, smallFont, smallKey, smallGlyph), r.getWidth(), 2, laid.lines);
+    }
+    const auto& lines = laid.lines;
+    if (laid.oneLine)
+    {
+        drawLine (g, lines.front(), r.withSizeKeepingCentre (r.getWidth(), larger ? 19.0f : 17.0f), big, bigKey, bigGlyph, plain);
         return;
     }
 
-    const juce::Font smallFont (font (type::caption)), smallKey (font (type::caption - 2.0f, true));
-    const auto items = makeItems (text, smallFont, smallKey, 12.0f);
-    const auto fits = layOut (items, r.getWidth(), 2, lines);
-    const auto lineHeight = juce::jmin (13.0f, r.getHeight() / 2.0f);
+    const auto fits = laid.fits;
+    const auto lineHeight = juce::jmin (larger ? 14.0f : 13.0f, r.getHeight() / 2.0f);
     auto area = r.withSizeKeepingCentre (r.getWidth(), lineHeight * 2.0f);
 
     for (std::size_t i = 0; i < lines.size() && i < 2; ++i)
-        drawLine (g, lines[i], area.removeFromTop (lineHeight), smallFont, smallKey, 12.0f);
+        drawLine (g, lines[i], area.removeFromTop (lineHeight), smallFont, smallKey, smallGlyph, plain);
 
     if (! fits) // the rest did not fit: a fade at the end of the second line says so
     {
@@ -373,6 +479,7 @@ const juce::Identifier quickTipProperty ("lynxQuickTip");
 juce::Font tipNameFont() { return juce::Font (theme::font (theme::type::caption)); }
 juce::Font tipKeyFont() { return juce::Font (theme::font (theme::type::caption - 1.0f)); }
 constexpr float tipPadX = 7.0f, tipGap = 8.0f;
+constexpr float tipCapPad = 8.0f; // the shortcut's key cap around its text (round 190je, SG-25: as the hint bar's keys)
 constexpr int tipHeight = 20;
 } // namespace
 
@@ -389,9 +496,9 @@ juce::String quickTipOf (const juce::Component& c)
 juce::Rectangle<int> quickTipSize (const juce::String& tip)
 {
     const auto name = tip.upToFirstOccurrenceOf ("\t", false, false), key = tip.fromFirstOccurrenceOf ("\t", false, false);
-    auto w = juce::GlyphArrangement::getStringWidth (tipNameFont(), name) + 2.0f * tipPadX;
+    auto w = textcache::stringWidth (tipNameFont(), name) + 2.0f * tipPadX;
     if (key.isNotEmpty())
-        w += tipGap + juce::GlyphArrangement::getStringWidth (tipKeyFont(), key);
+        w += tipGap + textcache::stringWidth (tipKeyFont(), key) + tipCapPad;
     return { 0, 0, (int) std::ceil (w) + 2, tipHeight };
 }
 
@@ -405,17 +512,25 @@ void paintQuickTip (juce::Graphics& g, juce::Rectangle<float> bubble, const juce
     g.drawRoundedRectangle (bubble.reduced (0.5f), radius::sm, 1.0f);
 
     auto text = bubble.reduced (tipPadX, 0.0f);
-    g.setColour (colour::textPrimary.withAlpha (0.92f));
+    g.setColour (colour::textPrimary); // (round 190je, SG-25: the full token, was × 0.92)
     g.setFont (tipNameFont());
-    const auto nameWidth = juce::GlyphArrangement::getStringWidth (tipNameFont(), name);
+    const auto nameWidth = textcache::stringWidth (tipNameFont(), name);
     g.drawText (name, text.removeFromLeft (nameWidth + 1.0f), juce::Justification::centredLeft, false);
 
     if (key.isNotEmpty())
     {
+        // the shortcut as a key cap, the way the hint bar shows keys (round 190je, SG-25: the text read 4.6:1 at × 0.85)
         text.removeFromLeft (tipGap);
-        g.setColour (colour::textSecondary.withAlpha (0.85f));
+        const auto keyWidth = textcache::stringWidth (tipKeyFont(), key) + tipCapPad;
+        const auto cap = text.withWidth (juce::jmin (keyWidth, text.getWidth()))
+                             .withSizeKeepingCentre (juce::jmin (keyWidth, text.getWidth()), juce::jmin (text.getHeight() - 4.0f, tipKeyFont().getHeight() + 4.0f));
+        g.setColour (colour::bg4);
+        g.fillRoundedRectangle (cap, radius::sm);
+        g.setColour (colour::borderStrong);
+        g.drawRoundedRectangle (cap.reduced (0.5f), radius::sm, 1.0f);
+        g.setColour (colour::textPrimary);
         g.setFont (tipKeyFont());
-        g.drawText (key, text, juce::Justification::centredLeft, false);
+        g.drawText (key, cap, juce::Justification::centred, false);
     }
 }
 
@@ -518,7 +633,7 @@ void TweakReadout::paint (juce::Graphics& g)
     if (name.isNotEmpty() && value.isNotEmpty())
     {
         const juce::Font valueFont (font (type::small, true));
-        const auto w = juce::jmin (r.getWidth() * 0.4f, juce::GlyphArrangement::getStringWidth (valueFont, value) + 14.0f);
+        const auto w = juce::jmin (r.getWidth() * 0.4f, textcache::stringWidth (valueFont, value) + 14.0f);
         const auto valueArea = r.removeFromRight (juce::jmax (36.0f, w)).reduced (0.0f, 3.0f);
         g.setColour (fresh ? colour::accentMuted : colour::bg3);
         g.fillRoundedRectangle (valueArea, radius::sm);

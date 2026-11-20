@@ -1,5 +1,35 @@
 [
   {
+    "version": "0.1.30-alpha",
+    "tag": "v0.1.30-alpha",
+    "date": "2026-11-20",
+    "url": "https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.30-alpha",
+    "title": "About half of FL Studio's CPU while a song plays; ARA, a polyphonic note editor, DAWproject and much more",
+    "summary": "On one Windows PC, FL's Thief demo plays with 27.5 % of one CPU core in LYNX SHARE (FL Studio 2026: 59.5 %; 0.1.29: 77.8 %), with the same sound. The release adds ARA 2 hosting for Melodyne and other ARA plugins, a polyphonic note editor, polyphonic audio to MIDI, a more natural Newtone, the Helix wavetable synth with Helix+, a Chord helper, a BandLab-style Drum Machine, MPE, hardware MIDI Out, a DirectWave editor, DAWproject, GarageBand and BandLab projects, .gig / .dwp / .ncw instruments, AIFF and M4A export, more than 40 refitted plugin stand-ins and fixes for around 40 GitHub issues.",
+    "new": [
+      "**Lighter than FL Studio while a song plays** (one Windows PC, quiet machine, % of one core): Thief 27.5 % (FL Studio 2026: 59.5 %), Exoplanet 45.9 % (FL Studio: 59.5 %), an empty project 11.1 % (FL Studio: 22.5 %). The engine changes keep the output bit for bit.",
+      "**ARA 2 hosting**: an audio clip's menu › LYNX extras › Edit in ARA plugin opens Melodyne or another ARA 2 plugin on the clip, on LYNX SHARE's timeline. The edits are saved in the project and rendered in exports.",
+      "**Polyphonic editing**: Edit notes (polyphonic) moves and retunes single notes inside chords and mixes, and Convert to MIDI (polyphonic) turns them into notes.",
+      "**Newtone's natural engine**: new Newtone slots keep the voice's vowels, consonants and level, with Pitch modulation and Pitch drift per note.",
+      "**New instruments**: Helix, a wavetable synth with a Helix+ section (more warps, 16-voice unison, macros, drawn LFOs, an effects rack), and Tetra, a 4-operator FM synth that Live's Operator opens on.",
+      "**Chord helper** in the Piano roll, the Simple workflow's editor and the Clip View, and FL's chord strip in the Piano roll.",
+      "**Simple workflow**: a BandLab-style Drum Machine, a tuner, a song fade-out, a Controls tab, a Loop Browser, and loops that fit the song's key and tempo.",
+      "**Clip-launch workflow**: Live's return tracks, Sends, crossfader and scene follow actions, and Live's look for the Session mixer and its views.",
+      "**New formats**: DAWproject (open and export), GarageBand .band, BandLab .blx, DirectWave .dwp / .dwb, .gig instruments and Kontakt .ncw samples; AIFF and M4A export."
+    ],
+    "better": [
+      "**Plugin stand-ins**: more than 40 refitted against the plugins they replace (FabFilter Pro-C 3 6.30 → 8.60, Waves L2 3.44 → 9.52, Timeless 3 2.37 → 6.93, Eiosis AirEQ 5.78 → 8.85 and more). Projects saved earlier keep their sound.",
+      "**FL Studio workflow**: a DirectWave editor, Slicex snapping, FL's Browser tabs and favourites, a docked Browser, fade handles on audio clips, the graph editor's Note pitch / Shift / Repeat lanes, MPE and hardware MIDI Out.",
+      "**Plugin hosting**: plugins can run in groups of processes, more CLAP extensions, and sample-accurate automation for CLAP and VST3."
+    ],
+    "fixed": [
+      "Around 40 GitHub issues, among them #138 (silent start of exports), #185 (Delay under tempo automation), #188 (minimized window on Linux), #189 (small text on Linux, now with a Text size setting), #204 (audio-clip channels) and #209 (plugin picker freeze)."
+    ],
+    "known": [
+      "ARA was tested with Melodyne 5 on Windows only. The BandLab reader was tested on made-up projects only. Reverb stand-ins are still well below the dynamics and EQ ones."
+    ]
+  },
+  {
     "version": "0.1.29-alpha",
     "tag": "v0.1.29-alpha",
     "date": "2026-11-15",

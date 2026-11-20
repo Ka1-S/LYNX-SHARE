@@ -1,16 +1,27 @@
 #pragma once
 
+#include <atomic>
 #include <functional>
 #include <memory>
+#include <optional>
 
 #include <juce_audio_formats/juce_audio_formats.h>
 
 #include "core/ExportOptions.h"
 #include "core/Song.h"
 
+namespace juce
+{
+class AudioPluginInstance;
+}
+
 namespace lynx
 {
 class AudioEngine;
+class Instrument;
+class Effect;
+class PluginInstrument;
+class PluginEffect;
 
 // The short form used by the command line, the self-test and "Render to audio" (the Export window uses
 // exportopts::Options, core/ExportOptions.h).
@@ -36,7 +47,61 @@ struct ExportSettings
 // File extension (with dot) for the format.
 juce::String exportExtension (ExportSettings::Format format);
 
-// Exports a copy of the song with its own engine, without touching what is playing.
+// Round 190jb (owner decision 2026-11-16: FL-exact; docs/analise/REA_rodada190jb.md): FL renders with the plugin
+// instances that play, playback stopped. While a hold is open, an ExportJob made on the message thread (the Export
+// window's mix, its stems and its marker sections; round 190jx: Render to audio and Freeze too) renders with the live engine's hosted plugins and the Patchers that
+// host plugins: the same instances, so a plugin with internal state, a random seed, a licence check or a long boot
+// renders what was heard. LYNX's own units are made new (their render is the same either way). Opening the hold stops
+// playback; when it and the last job that used it are gone (message thread), every plugin it lent gets its sample rate
+// and its state back and is reset as FL resets it, and the live engine plays again. The export makes its own instances,
+// as before, without a hold (the command line, the remote renderer, the self-tests' own engines), when the live engine
+// cannot be held (recording, a real-time export), when another job uses the hold, and for a plugin it cannot lend (a
+// crashed one, one that refuses the export's sample rate, a Patcher at another rate).
+class LiveExportHold
+{
+public:
+    // nullptr when the live engine can't be held (message thread)
+    static std::shared_ptr<LiveExportHold> open (AudioEngine& live);
+    // the hold open now, if any
+    static std::shared_ptr<LiveExportHold> current();
+    ~LiveExportHold();
+    LiveExportHold (const LiveExportHold&) = delete;
+    LiveExportHold& operator= (const LiveExportHold&) = delete;
+
+    AudioEngine& getLive() noexcept { return live; }
+    // the plugins lent so far (hosted plugins, counting the ones inside Patchers)
+    int lentPlugins() const noexcept { return (int) units.size(); }
+    // one job at a time renders with the lent units (false: another one does; this one makes its own)
+    bool claim() noexcept;
+    void unclaim() noexcept;
+    // what the claiming job's engine builds with (AudioEngine::setLiveUnits)
+    std::shared_ptr<Instrument> lendInstrument (const ChannelDef& channel, double sampleRate);
+    std::shared_ptr<Effect> lendEffect (const EffectSlot& slot, double sampleRate);
+
+    // tests: why a unit was not lent (the last refusal)
+    juce::String lastRefusal() const { return refusal; }
+
+private:
+    explicit LiveExportHold (AudioEngine& e) : live (e) {}
+    struct Unit
+    {
+        std::shared_ptr<void> keep; // (the adapter alive until it is restored)
+        juce::AudioPluginInstance* plugin = nullptr;
+        PluginInstrument* instrument = nullptr;
+        PluginEffect* effect = nullptr;
+        std::optional<std::string> state; // as it was before the export
+        double rate = 0.0;
+    };
+    void note (const std::shared_ptr<void>& keep, PluginInstrument* instrument, PluginEffect* effect);
+    bool fitRate (double sampleRate, PluginInstrument* instrument, PluginEffect* effect);
+    AudioEngine& live;
+    std::vector<Unit> units;
+    std::atomic<bool> claimed { false };
+    juce::String refusal;
+};
+
+// Exports a copy of the song with its own engine, without touching what is playing (round 190jb: with a LiveExportHold
+// open, with the live engine's plugin instances).
 // The constructor creates the instruments and plugins (call on the UI thread); run() may
 // run on a background thread.
 class ExportJob
@@ -78,6 +143,9 @@ public:
     void setExactFrames (std::int64_t frames) noexcept { exactFrames = frames; }
     // the frames the last run() wrote (after the PDC trim and the tail)
     std::int64_t getWrittenFrames() const noexcept { return writtenFrames; }
+    // Round 190jb: the live engine's plugins its hold has lent so far, when this job renders with them (0: its own
+    // instances only)
+    int livePlugins() const noexcept;
 
 private:
     friend class StemPass;
@@ -97,6 +165,7 @@ private:
 
     bool runRealtime (const std::function<bool (double)>& progress, juce::String& error);
 
+    std::shared_ptr<LiveExportHold> hold; // (round 190jb: declared before the engine, which holds its units: released after it)
     std::unique_ptr<AudioEngine> engine;
     std::vector<int> thawedForExport; // frozen channels whose audio was out of date: they render live (round 190ay)
     AudioEngine* live = nullptr; // a real-time bounce

@@ -3,10 +3,15 @@
 #include <algorithm>
 #include <cmath>
 
+#include "core/AlsExport.h"
+#include "core/AlsImport.h"
 #include "core/Effects.h"
+#include "core/FlEffects.h"
+#include "core/NativeEngines.h"
 #include "core/NoteNames.h"
 #include "core/Patcher.h"
 #include "core/Rack.h"
+#include "core/Details190mr.h"
 #include "core/Vfx.h"
 #include "engine/PluginHost.h"
 #include "engine/ProjectFile.h"
@@ -16,7 +21,9 @@
 #include "ui/ControllerKnob.h"
 #include "ui/DetailView.h"
 #include "ui/FileChoosers.h"
+#include "ui/HintBar.h"
 #include "ui/I18n.h"
+#include "ui/LiveLook.h"
 #include "ui/MixerComponent.h"
 #include "ui/PatcherEditor.h"
 #include "ui/PluginPicker.h"
@@ -186,6 +193,124 @@ struct RackView::Impl
     PatcherDoc* doc (Song& song) const { return locate ? locate (song) : nullptr; }
     const RackDoc* rack() const { return rack::rackOf (shown); }
     bool drum() const { const auto* r = rack(); return r != nullptr && r->drum; }
+
+    // Round 190lr (DL-94, capture live-drumrack-pad-lit.png): a Drum Rack pad whose note sounds lights its ▶ (Live: orange
+    // #FFAD56) and its cell in the pad overview, for at least 200 ms (Live lights it while the sample sounds; the engine
+    // tells which keys are held or struck). Read on the view's 30 Hz tick; the pads repaint only when a light changes.
+    NoteMask soundingShown {};
+    std::array<double, 128> litUntil {};
+    bool padLit (int key) const noexcept
+    {
+        return key >= 0 && key < 128 && (soundingShown[(std::size_t) (key >> 6)] >> (key & 63) & 1u) != 0;
+    }
+    // Round 190mr (DL-92, Live's chain list "Auto Select"): while it is on, the chains that process now are lit as
+    // selected and the first of them becomes the selected chain (its devices show), read on the view's 30 Hz tick.
+    // View only: the selection changes without an edit (no rebuild, no undo step); nothing runs while it is off.
+    std::vector<int> autoLit;
+    std::optional<std::array<std::uint64_t, 2>> keysForCheck; // (--details190mrshot)
+    int selectedBeforeAuto = -1;
+    // Live's info text (capture 190mr B2): "all chains which are able to process an incoming note will become selected in
+    // the Chain List for the duration of the note" — incoming notes (MIDI inputs, the typing keyboard) on the rack's
+    // channel when it is the selected one; the song playing a clip selects nothing (captured: no change while playing).
+    // An Audio Effect Rack: the chains its chain selector opens.
+    void watchAutoSelect()
+    {
+        const auto* r = rack();
+        if (r == nullptr || ! r->autoSelect || ! r->showChains)
+        {
+            if (! autoLit.empty())
+            {
+                autoLit.clear();
+                owner.repaint();
+            }
+            selectedBeforeAuto = -1;
+            return;
+        }
+        NoteMask keys {};
+        if (keysForCheck)
+            keys = *keysForCheck;
+        else if (const auto channel = channelOfRack(); channel >= 0 && channel == engine.getSelectedChannel())
+            for (int m = 0; m < 16; ++m)
+            {
+                const auto held = engine.heldInputKeyBits (m);
+                keys[0] |= held[0];
+                keys[1] |= held[1];
+            }
+        auto now = details190mr::processingChains (*r, keys);
+        if (now == autoLit)
+            return;
+        const auto wasLit = ! autoLit.empty();
+        autoLit = std::move (now);
+        auto select = -1;
+        if (! autoLit.empty() && std::find (autoLit.begin(), autoLit.end(), r->selectedChain) == autoLit.end() && emptyPadKey < 0)
+        {
+            if (! wasLit)
+                selectedBeforeAuto = r->selectedChain;
+            select = autoLit.front();
+        }
+        else if (autoLit.empty() && wasLit && r->kind != RackDoc::Kind::audioEffect && selectedBeforeAuto >= 0)
+            select = std::exchange (selectedBeforeAuto, -1); // (the note is over: the selection from before)
+        if (select >= 0)
+            if (auto* d = doc (const_cast<Song&> (engine.getSong())))
+                if (auto* live = rack::rackOf (*d))
+                    live->selectedChain = select; // (view only: no edit, no rebuild)
+        refresh();
+        owner.repaint();
+    }
+    bool autoSelected (int slot) const { return std::find (autoLit.begin(), autoLit.end(), slot) != autoLit.end(); }
+    // the switch's place (capture 190mr B2, live-rack-autoselect.png): the foot of the rack's left column, above the save
+    // button — Live: a square "‖▶" switch, lit #FFAD56 with dark ink, else #1E1E1E with grey ink
+    juce::Rectangle<int> autoSelectButton (const RackDoc&) const
+    {
+        const auto save = saveButton();
+        if (save.isEmpty())
+            return {};
+        const auto side = theme::livelook::active() ? 16 : viewColumn - 4;
+        return juce::Rectangle<int> (side, theme::livelook::active() ? 16 : 18).withCentre ({ column.getCentreX(), save.getY() - 4 - (theme::livelook::active() ? 8 : 9) });
+    }
+    void paintAutoSelect (juce::Graphics& g, const RackDoc& r, juce::Rectangle<float> b) const
+    {
+        const auto live = theme::livelook::active();
+        const auto on = r.autoSelect;
+        g.setColour (on ? (live ? juce::Colour (0xffffad56) : col::accent) : (live ? juce::Colour (0xff1e1e1e) : col::bg4));
+        g.fillRoundedRectangle (b, live ? 2.0f : theme::radius::sm);
+        g.setColour (on ? (live ? juce::Colour (0xff1a140d) : col::onAccent) : (live ? juce::Colour (0xffa0a0a0) : col::textSecondary));
+        const auto c = b.getCentre();
+        g.fillRect (juce::Rectangle<float> (c.x - 5.0f, c.y - 3.5f, 1.6f, 7.0f));
+        g.fillRect (juce::Rectangle<float> (c.x - 2.4f, c.y - 3.5f, 1.6f, 7.0f));
+        juce::Path tri;
+        tri.addTriangle (c.x + 0.2f, c.y - 4.0f, c.x + 0.2f, c.y + 4.0f, c.x + 5.2f, c.y);
+        g.fillPath (tri);
+    }
+
+    void watchSounding()
+    {
+        const auto channel = channelOfRack();
+        if (pads.isEmpty() || channel < 0)
+        {
+            if (soundingShown != NoteMask {})
+            {
+                soundingShown = {};
+                owner.repaint();
+            }
+            return;
+        }
+        const auto keys = engine.soundingKeys (channel);
+        const auto now = juce::Time::getMillisecondCounterHiRes();
+        NoteMask lit {};
+        for (int k = 0; k < 128; ++k)
+        {
+            if ((keys[(std::size_t) (k >> 6)] >> (k & 63) & 1u) != 0)
+                litUntil[(std::size_t) k] = juce::jmax (litUntil[(std::size_t) k], now + 200.0);
+            if (litUntil[(std::size_t) k] > now)
+                lit[(std::size_t) (k >> 6)] |= std::uint64_t (1) << (k & 63);
+        }
+        if (lit != soundingShown)
+        {
+            soundingShown = lit;
+            owner.repaint (pads);
+        }
+    }
 
     void refresh()
     {
@@ -458,6 +583,7 @@ struct RackView::Impl
                 cell.removeFromBottom (15); // (the Map button, painted)
             cell.removeFromBottom (13); // (the value, painted)
             k.setBounds (cell.reduced (4, 1));
+            k.liveRing = theme::livelook::active(); // (round 190jn: Live's open-ring knob in the Clip-launch layout's Live look)
         }
         const auto w = width (owner.getHeight());
         if (w != lastWidth)
@@ -477,7 +603,13 @@ struct RackView::Impl
     }
 
     juce::Rectangle<int> powerLed() const { return { header.getX() + 7, header.getCentreY() - 5, 10, 10 }; }
-    juce::Rectangle<int> columnButton (int k) const { return { column.getX() + 2, column.getY() + 4 + k * 20, viewColumn - 4, 18 }; }
+    juce::Rectangle<int> columnButton (int k) const
+    {
+        // Live's look (round 190jn, CL-21): round 13 px toggles on a 17 px pitch (live-session.png rack 1227..1239, y 828 / 845)
+        if (theme::livelook::active())
+            return { column.getX() + 4, column.getY() + 4 + k * 17, 13, 13 };
+        return { column.getX() + 2, column.getY() + 4 + k * 20, viewColumn - 4, 18 };
+    }
     // the view column's buttons, top to bottom. An Instrument / Audio Effect / MIDI Effect Rack: M C D V + −. A Drum
     // Rack in Live's order (round 190el, 190ei B1c: macros, + / − while the macros show, variations, pads, chain list,
     // then I-O / S / R while the chain list shows), then LYNX's devices toggle (D) last
@@ -619,7 +751,8 @@ struct RackView::Impl
     // --- paint ------------------------------------------------------------------------------------------------------
     void paint (juce::Graphics& g)
     {
-        g.fillAll (col::bg2);
+        const auto live = theme::livelook::active();
+        g.fillAll (live ? theme::livelook::surface : col::bg2);
         const auto* r = rack();
         if (r == nullptr)
             return;
@@ -646,10 +779,17 @@ struct RackView::Impl
         }
 
         // view column: macros, chains, devices, variations, + / − (Live's selectors [SHOT]); a Drum Rack's in Live's order
-        g.setColour (col::bg3);
+        g.setColour (live ? theme::livelook::surface : col::bg3);
         g.fillRect (column);
         const auto items = columnItems();
-        for (int k = 0; k < (int) items.size(); ++k)
+        for (int k = 0; live && k < (int) items.size(); ++k) // Live: round toggles, lit #FFAD56 with dark ink, else #1E1E1E
+        {
+            const auto b = columnButton (k).toFloat();
+            g.setColour (theme::livelook::drawWell (g, b, columnLit (*r, items[(std::size_t) k])));
+            g.setFont (theme::font (9.0f, true));
+            g.drawText (columnLabel (items[(std::size_t) k]), b, juce::Justification::centred, false);
+        }
+        for (int k = 0; ! live && k < (int) items.size(); ++k)
         {
             const auto b = columnButton (k).toFloat();
             const auto lit = columnLit (*r, items[(std::size_t) k]);
@@ -664,6 +804,20 @@ struct RackView::Impl
             g.drawFittedText (columnLabel (items[(std::size_t) k]), b.toNearestInt(), juce::Justification::centred, 1, 0.6f);
         }
 
+        if (const auto save = saveButton(); ! save.isEmpty() && save.getY() > (items.empty() ? column.getY() : columnButton ((int) items.size() - 1).getBottom()))
+        {
+            g.setColour (col::bg4);
+            g.fillRoundedRectangle (save.toFloat(), theme::radius::sm);
+            // a floppy disk (Live's Save Preset glyph [190gu shot]), drawn
+            const auto d = save.toFloat().withSizeKeepingCentre (11.0f, 11.0f);
+            g.setColour (col::textSecondary);
+            g.drawRoundedRectangle (d, 1.5f, 1.2f);
+            g.fillRect (d.withTrimmedLeft (3.0f).withTrimmedRight (3.0f).withHeight (3.5f));
+            g.fillRect (d.withTrimmedTop (6.5f).reduced (2.5f, 0.0f).withTrimmedBottom (1.5f));
+        }
+
+        if (const auto ab = autoSelectButton (*r); ! ab.isEmpty() && ab.getY() > (items.empty() ? column.getY() : columnButton ((int) items.size() - 1).getBottom()))
+            paintAutoSelect (g, *r, ab.toFloat()); // round 190mr (DL-92)
         if (! variations.isEmpty())
             paintVariations (g, *r);
         if (! macros.isEmpty())
@@ -678,6 +832,11 @@ struct RackView::Impl
             paintDevices (g, *r);
         if (! mapList.isEmpty())
             paintMapList (g, *r);
+        if (dropMarkerX >= 0 && ! devices.isEmpty()) // (round 190hr: where a dragged device lands)
+        {
+            g.setColour (col::accent);
+            g.fillRect (dropMarkerX - 1, devices.getY() + 4, 3, devices.getHeight() - 8);
+        }
     }
 
     void paintVariations (juce::Graphics& g, const RackDoc& r)
@@ -734,13 +893,21 @@ struct RackView::Impl
             const auto cell = macroCell (m);
             auto plate = cell.withHeight (16).reduced (2, 1).toFloat();
             const auto mapped = ! r.macros[(std::size_t) m].mappings.empty();
-            g.setColour (mapped ? col::info.withAlpha (0.35f) : col::bg3);
-            g.fillRoundedRectangle (plate, theme::radius::sm);
-            g.setColour (mapped ? col::textPrimary : col::textDisabled);
+            // Live's look (round 190jn): a mapped macro's plate #B5B5B5 with #070707 ink (190ei 909 Core Kit "Low Gain"),
+            // its cell framed #242424 on #363636
+            const auto live = theme::livelook::active();
+            if (live)
+            {
+                g.setColour (theme::livelook::separator);
+                g.drawRect (cell.reduced (1, 0), 1);
+            }
+            g.setColour (live ? (mapped ? theme::livelook::padName : theme::livelook::raised) : mapped ? col::info.withAlpha (0.35f) : col::bg3);
+            g.fillRoundedRectangle (plate, live ? 0.0f : theme::radius::sm);
+            g.setColour (live ? (mapped ? theme::livelook::ink : theme::livelook::text) : mapped ? col::textPrimary : col::textDisabled);
             g.drawFittedText (macroName (m), plate.toNearestInt().reduced (2, 0), juce::Justification::centred, 1, 0.8f);
             auto valueRow = cell.withTrimmedBottom (owner.mapping ? 15 : 0);
             valueRow = valueRow.removeFromBottom (13);
-            g.setColour (mapped ? col::textPrimary : col::textSecondary);
+            g.setColour (live ? theme::livelook::text : mapped ? col::textPrimary : col::textSecondary);
             g.drawFittedText (macroText (m, r.macros[(std::size_t) m].value), valueRow, juce::Justification::centred, 1, 0.8f);
             if (owner.mapping)
             {
@@ -827,7 +994,7 @@ struct RackView::Impl
                 g.setColour (col::borderStrong);
                 g.drawHorizontalLine (row.getY() - rowHeight / 2, (float) chains.getX() + 4.0f, (float) chains.getRight() - 4.0f);
             }
-            if (slot == r.selectedChain && emptyPadKey < 0)
+            if ((slot == r.selectedChain && emptyPadKey < 0) || (r.autoSelect && autoSelected (slot)))
             {
                 g.setColour (col::accentMuted);
                 g.fillRect (row);
@@ -963,9 +1130,11 @@ struct RackView::Impl
     }
     int channelOfRack() const { return automation && automation->kind == AutomationTargetKind::channelParam ? automation->index : -1; }
 
+    static juce::Colour padLitColour() { return theme::livelook::active() ? juce::Colour (0xffffad56) : col::accent; }
+
     void paintPads (juce::Graphics& g, const RackDoc& r)
     {
-        g.setColour (col::bg1);
+        g.setColour (theme::livelook::active() ? theme::livelook::surface : col::bg1);
         g.fillRect (pads.reduced (1));
         // the overview: all 128 pads, 32 rows of 4 (C-2 at the bottom), the shown rows framed
         const auto rowH = (float) overview.getHeight() / (float) rack::drumPadRows;
@@ -975,7 +1144,7 @@ struct RackView::Impl
             {
                 const auto key = rack::rowFirstKey (row) + c;
                 const auto chain = rack::padChain (r, key);
-                g.setColour (chain >= 0 ? chainColour (r.chains[(std::size_t) chain], chain) : col::bg3);
+                g.setColour (chain >= 0 && padLit (key) ? padLitColour() : chain >= 0 ? chainColour (r.chains[(std::size_t) chain], chain) : col::bg3);
                 g.fillRect (juce::Rectangle<float> ((float) overview.getX() + (float) c * colW, (float) overview.getY() + (float) row * rowH, colW - 1.0f, std::max (1.0f, rowH - 1.0f)));
             }
         g.setColour (col::accent);
@@ -997,6 +1166,33 @@ struct RackView::Impl
                     g.setColour (col::textDisabled);
                     g.drawText (keyText (key), pad, juce::Justification::centred);
                 }
+                else if (theme::livelook::active())
+                {
+                    // Live 12.4's pad (round 190jn; 190ei mn_drumrack-choke-menu.png 645..860 × 828..990): a #242424 frame,
+                    // the name area #B5B5B5 (selected #637E86) with #070707 ink, the M ▶ S strip in #363636 cells with
+                    // #B5B5B5 letters; lit buttons keep LYNX's colours (Live's lit pad buttons were not captured)
+                    namespace ll = theme::livelook;
+                    const auto& chain = r.chains[(std::size_t) chainIndex];
+                    g.setColour (ll::separator);
+                    g.fillRect (pad);
+                    const auto nameArea = pad.reduced (1).withTrimmedBottom (14);
+                    g.setColour (key == selected ? ll::selectionUnfocused : chain.active ? ll::padName : ll::padName.withMultipliedBrightness (0.7f));
+                    g.fillRect (nameArea);
+                    g.setColour (ll::ink);
+                    g.drawFittedText (str (chain.name), nameArea.reduced (3, 0), juce::Justification::centredTop, 2, 0.75f);
+                    const bool lit[] { ! chain.active, previewKey == key, chain.solo };
+                    const char* labels[] { "M", "\xe2\x96\xb6", "S" };
+                    const juce::Colour on[] { col::warning, col::accent, col::warning };
+                    for (int k = 0; k < 3; ++k)
+                    {
+                        const auto b = padButton (pad, k).toFloat();
+                        g.setColour (lit[k] ? on[k] : ll::surface);
+                        g.fillRect (b);
+                        // (round 190lr: a sounding pad's ▶ glyph turns Live's orange, its cell stays)
+                        g.setColour (lit[k] ? col::bg0 : k == 1 && padLit (key) ? padLitColour() : k == 1 ? ll::raised.brighter (0.3f) : ll::text);
+                        g.drawText (juce::String::fromUTF8 (labels[k]), b, juce::Justification::centred);
+                    }
+                }
                 else
                 {
                     const auto& chain = r.chains[(std::size_t) chainIndex];
@@ -1016,11 +1212,11 @@ struct RackView::Impl
                         const auto b = padButton (pad, k).toFloat();
                         g.setColour (lit[k] ? on[k] : col::bg4);
                         g.fillRoundedRectangle (b, 2.0f);
-                        g.setColour (lit[k] ? col::bg0 : col::textSecondary);
+                        g.setColour (lit[k] ? col::bg0 : k == 1 && padLit (key) ? padLitColour() : col::textSecondary); // (round 190lr)
                         g.drawText (juce::String::fromUTF8 (labels[k]), b, juce::Justification::centred);
                     }
                 }
-                if (key == selected)
+                if (key == selected && ! (chainIndex >= 0 && theme::livelook::active())) // (Live: the selected pad's fill)
                 {
                     g.setColour (col::accent);
                     g.drawRoundedRectangle (pad.toFloat().reduced (0.5f), theme::radius::sm, 2.0f);
@@ -1140,6 +1336,12 @@ struct RackView::Impl
             g.setColour (col::textDisabled);
             g.drawFittedText (tr ("Drop an instrument or sample here"), devices.withTrimmedLeft (deviceWidth + 12).reduced (8), juce::Justification::centredLeft, 3);
         }
+        else if (list.empty()) // (round 190hr: an empty chain is Live's drop area, "Drop Audio Effects Here" [190gu shot])
+        {
+            g.setColour (col::textDisabled);
+            g.drawFittedText (r.kind == RackDoc::Kind::instrument ? tr ("Drop an instrument or effect here") : tr ("Drop effects here"),
+                              devices.withTrimmedLeft (deviceWidth + 12).reduced (8), juce::Justification::centredLeft, 3);
+        }
         g.setColour (col::bg1);
         g.fillRoundedRectangle (plus, theme::radius::md);
         g.setColour (col::textSecondary);
@@ -1209,6 +1411,10 @@ struct RackView::Impl
                 edit ([item] (PatcherDoc& d) { toggleColumn (*rack::rackOf (d), item); });
                 return;
             }
+        if (const auto* now = rack(); now != nullptr && autoSelectButton (*now).contains (p) && ! e.mods.isPopupMenu()) // round 190mr (DL-92)
+            return edit ([on = ! now->autoSelect] (PatcherDoc& d) { rack::rackOf (d)->autoSelect = on; }, false);
+        if (saveButton().contains (p) && ! e.mods.isPopupMenu())
+            return saveLivePreset();
 
         if (variations.contains (p))
             return variationsDown (e, *r);
@@ -1987,6 +2193,133 @@ struct RackView::Impl
         });
     }
 
+    // --- round 190hr: Live's drop area (racks-065) ------------------------------------------------------------------
+    // Where a drop at `p` goes: the chain row under it in the chain list, else the selected chain (a Drum Rack's empty
+    // pad: a new pad on it); before the device card whose middle is right of `p` in the devices pane, else last
+    int dropChainAt (const RackDoc& r, juce::Point<int> p) const
+    {
+        if (chains.contains (p) && p.y >= chains.getY() + headerStrip)
+            for (int c = 0; c < listedSlots (r); ++c)
+                if (slotRow (r, c).contains (p) && rowVisible (slotRow (r, c)))
+                    return c;
+        return emptyPadPane (r) ? -1 : r.selectedChain;
+    }
+    int dropPositionAt (const RackDoc& r, juce::Point<int> p) const
+    {
+        if (! devices.contains (p))
+            return -1;
+        const auto n = (int) shownDevices (r).size();
+        for (int i = 0; i < n; ++i)
+            if (p.x < deviceCard (i).getCentreX())
+                return i;
+        return -1;
+    }
+    // What the rack kind takes [Live MAN 25.2; 190gu shot live-audio-effect-rack-empty-default.png "Drop Audio Effects
+    // Here"]: an Audio Effect Rack (and a Drum Rack's return chain) audio effects; a MIDI Effect Rack MIDI effects; an
+    // Instrument Rack's chain MIDI effects, one instrument and audio effects. "" = taken.
+    juce::String refusal (const RackDoc& r, int chain, const PatchNode& n) const
+    {
+        const auto midiEffect = n.generator && n.channel.instrument == InstrumentKind::vfx;
+        const auto instrument = n.generator && ! midiEffect;
+        if (r.kind == RackDoc::Kind::midiEffect)
+            return midiEffect ? juce::String() : tr ("A MIDI Effect Rack takes MIDI effects only");
+        if (r.kind == RackDoc::Kind::audioEffect || rack::isReturnSlot (r, chain))
+            return n.generator ? tr ("An Audio Effect Rack takes audio effects only") : juce::String();
+        if (instrument && chain >= 0)
+            for (const auto x : rack::devices (r, chain))
+                if (x >= 0 && x < (int) shown.nodes.size() && shown.nodes[(std::size_t) x].generator
+                    && shown.nodes[(std::size_t) x].channel.instrument != InstrumentKind::vfx)
+                    return tr ("This chain has an instrument already");
+        return {};
+    }
+    bool dropNode (PatchNode node, juce::Point<int> p)
+    {
+        const auto* r = rack();
+        if (r == nullptr)
+            return false;
+        const auto chain = dropChainAt (*r, p);
+        if (chain < 0 && r->drum)
+        {
+            // an empty pad: a new pad there holding the instrument (Live's "Drop an Instrument or Sample Here")
+            if (! node.generator || node.channel.instrument == InstrumentKind::vfx)
+                return ui::postHint ({ tr ("Drop an instrument or sample here"), {} }, 3000), false;
+            const auto key = emptyPadKey >= 0 ? emptyPadKey : firstFreeKey (*r);
+            const auto name = node.channel.name.empty() ? std::string (node.channel.plugin.name) : node.channel.name;
+            edit ([key, name, node] (PatcherDoc& d) { rack::addPad (d, key, name, node); });
+            emptyPadKey = -1;
+            return true;
+        }
+        if (const auto why = refusal (*r, chain, node); why.isNotEmpty())
+            return ui::postHint ({ why, {} }, 3000), false;
+        const auto position = dropPositionAt (*r, p);
+        int added = -1;
+        engine.editSong ([l = locate, chain, position, node, &added] (Song& song) {
+            if (auto* d = l ? l (song) : nullptr)
+                added = rack::addDevice (*d, chain, node, position);
+        });
+        refresh();
+        return added >= 0;
+    }
+    // a device built from a preset file: an FL effect preset (.fst), a Live device / rack preset (.adv / .adg: an effect,
+    // else an instrument)
+    std::optional<PatchNode> nodeFromFile (const juce::File& file) const
+    {
+        juce::MemoryBlock data;
+        if (! file.loadFileAsData (data))
+            return std::nullopt;
+        const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
+        const std::vector<std::uint8_t> v (bytes, bytes + data.getSize());
+        PatchNode n;
+        if (file.hasFileExtension ("adv;adg"))
+        {
+            if (auto fx = importLiveDevicePreset (v))
+            {
+                n.effect = std::move (fx->slot);
+                n.label = fx->name;
+                return n;
+            }
+            if (auto inst = importLiveInstrumentPreset (v))
+            {
+                n.generator = true;
+                n.channel = std::move (inst->channel);
+                n.label = inst->name;
+                return n;
+            }
+            return std::nullopt;
+        }
+        if (auto fx = effectFromFlPreset (v, engine.getSong().bpm, natives::flDataReader (flStudioAccess())))
+        {
+            n.effect = std::move (*fx);
+            return n;
+        }
+        return std::nullopt;
+    }
+    bool dropFile (const juce::File& file, juce::Point<int> p)
+    {
+        if (auto n = nodeFromFile (file))
+            return dropNode (std::move (*n), p);
+        ui::postHint ({ tr ("LYNX SHARE can't build a device from this preset."), {} }, 3000);
+        return false;
+    }
+    int dropMarkerX = -1; // a drop over the devices pane: where it lands (paintDevices draws the marker)
+
+    // --- round 190hr: Live's rack Save Preset (racks-068): the disk button at the foot of the view column [190gu shot
+    // live-audio-effect-rack-empty-default.png: hot-swap, save and "…" at the bottom of the rack's left strip] ---------
+    juce::Rectangle<int> saveButton() const
+    {
+        return column.isEmpty() ? juce::Rectangle<int>() : juce::Rectangle<int> (column.getX() + 2, column.getBottom() - 22, viewColumn - 4, 18);
+    }
+    void saveLivePreset()
+    {
+        const auto* r = rack();
+        if (r != nullptr)
+            RackWindows::saveLivePreset (engine, locate, ! r->name.empty() ? str (r->name) : rackKindName (*r));
+    }
+    static juce::String rackKindName (const RackDoc& r)
+    {
+        return r.drum ? tr ("Drum Rack") : r.kind == RackDoc::Kind::instrument ? tr ("Instrument Rack") : r.kind == RackDoc::Kind::midiEffect ? tr ("MIDI Effect Rack") : tr ("Audio Effect Rack");
+    }
+
     // the "+" card: what the rack kind takes (Live [MAN] 25.2): audio effects; MIDI effects; or both and one instrument
     void showAddMenu (int chain)
     {
@@ -2489,6 +2822,42 @@ RackView::~RackView() = default;
 
 bool RackView::keyPressed (const juce::KeyPress& key) { return impl->padKey (key); }
 
+int RackView::autoSelectForSnapshot (const std::array<std::uint64_t, 2>& keys)
+{
+    impl->keysForCheck = keys;
+    impl->refresh();
+    impl->watchAutoSelect();
+    impl->keysForCheck.reset();
+    const auto* r = impl->rack();
+    return r != nullptr ? r->selectedChain : -1;
+}
+
+void RackView::clickForSnapshot (juce::Point<int> at)
+{
+    auto source = juce::Desktop::getInstance().getMainMouseSource();
+    const auto now = juce::Time::getCurrentTime();
+    const juce::MouseEvent e (source, at.toFloat(), juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                              this, this, now, at.toFloat(), now, 1, false);
+    mouseDown (e);
+    mouseUp (e.withNewPosition (at.toFloat()));
+}
+
+juce::Rectangle<int> RackView::autoSelectButtonForSnapshot() const
+{
+    const auto* r = impl->rack();
+    return r != nullptr ? impl->autoSelectButton (*r) : juce::Rectangle<int>();
+}
+
+void RackView::padLitForSnapshot (int key)
+{
+    if (key >= 0 && key < 128)
+    {
+        impl->soundingShown[(std::size_t) (key >> 6)] |= std::uint64_t (1) << (key & 63);
+        impl->litUntil[(std::size_t) key] = juce::Time::getMillisecondCounterHiRes() + 60000.0;
+    }
+    repaint();
+}
+
 juce::PopupMenu RackView::padMenuForSnapshot (int key)
 {
     const auto* r = impl->rack();
@@ -2507,15 +2876,56 @@ void RackView::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheel
 
 std::unique_ptr<juce::Component> RackView::makeTitleAccessory()
 {
-    struct Accessory final : juce::Component
+    struct Accessory final : juce::Component, public juce::TooltipClient
     {
         juce::TextButton rand { "Rand" }, map { "Map" };
+        // Live's look (round 190jn, CL-21): Live's rack title bar has R (randomise, a round well) and M (map, a square
+        // well, lit while mapping) at 13 px on a 16 px pitch (live-session.png "H..." rack 1271..1299)
+        static bool live() { return theme::livelook::active(); }
+        juce::Rectangle<float> wellOf (int k) const { return { (float) getWidth() - 16.0f * (float) (2 - k), (float) (getHeight() - 13) / 2.0f, 13.0f, 13.0f }; }
         void resized() override
         {
+            rand.setVisible (! live());
+            map.setVisible (! live());
             auto a = getLocalBounds();
             map.setBounds (a.removeFromRight (30));
             a.removeFromRight (2);
             rand.setBounds (a.removeFromRight (34));
+        }
+        void paint (juce::Graphics& g) override
+        {
+            if (! live())
+                return;
+            namespace ll = theme::livelook;
+            g.setFont (theme::font (9.0f, true));
+            g.setColour (ll::drawWell (g, wellOf (0), false));
+            g.drawText ("R", wellOf (0), juce::Justification::centred, false);
+            const auto m = wellOf (1);
+            const bool lit = map.getToggleState();
+            g.setColour (ll::wellRim);
+            g.fillRoundedRectangle (m, 2.0f);
+            g.setColour (lit ? ll::on : ll::well);
+            g.fillRoundedRectangle (m.reduced (1.0f), 1.5f);
+            g.setColour (lit ? ll::ink : ll::text);
+            g.drawText ("M", m, juce::Justification::centred, false);
+        }
+        void mouseUp (const juce::MouseEvent& e) override
+        {
+            if (! live() || ! getLocalBounds().contains (e.getPosition()))
+                return;
+            if (wellOf (0).expanded (1.0f).contains (e.position) && rand.onClick != nullptr)
+                rand.onClick();
+            else if (wellOf (1).expanded (1.0f).contains (e.position) && map.onClick != nullptr)
+            {
+                map.setToggleState (! map.getToggleState(), juce::dontSendNotification);
+                map.onClick();
+            }
+            repaint();
+        }
+        juce::String getTooltip() override
+        {
+            const auto p = getMouseXYRelative().toFloat();
+            return live() ? (wellOf (0).contains (p) ? rand.getTooltip() : wellOf (1).contains (p) ? map.getTooltip() : juce::String()) : juce::String();
         }
     };
     auto a = std::make_unique<Accessory>();
@@ -2632,19 +3042,91 @@ int RackView::padKeyAt (juce::Point<int> p) const
 
 bool RackView::isInterestedInFileDrag (const juce::StringArray& files)
 {
-    if (! impl->drum())
-        return false;
     for (const auto& f : files)
-        if (SampleLibrary::isSampleFile (juce::File (f)))
+        if ((impl->drum() && SampleLibrary::isSampleFile (juce::File (f))) || juce::File (f).hasFileExtension ("fst;adv;adg"))
             return true;
     return false;
 }
 
-void RackView::filesDropped (const juce::StringArray& files, int x, int y) { impl->dropSamples (files, { x, y }); }
+void RackView::filesDropped (const juce::StringArray& files, int x, int y)
+{
+    impl->dropMarkerX = -1;
+    if (files.size() == 1 && juce::File (files[0]).hasFileExtension ("fst;adv;adg")) // (round 190hr: a preset into a chain)
+    {
+        impl->dropFile (juce::File (files[0]), { x, y });
+        return;
+    }
+    if (impl->drum())
+        impl->dropSamples (files, { x, y });
+}
+
+bool RackView::isInterestedInDragSource (const SourceDetails& details)
+{
+    if (impl->rack() == nullptr)
+        return false;
+    return BrowserComponent::isEffectDrag (details) || BrowserComponent::isGeneratorDrag (details)
+           || (BrowserComponent::isBrowserDrag (details) && BrowserComponent::draggedFile (details).hasFileExtension ("fst;adv;adg"));
+}
+
+void RackView::itemDragMove (const SourceDetails& details)
+{
+    const auto* r = impl->rack();
+    int x = -1;
+    if (r != nullptr && impl->devices.contains (details.localPosition))
+    {
+        const auto at = impl->dropPositionAt (*r, details.localPosition);
+        const auto n = (int) impl->shownDevices (*r).size();
+        x = (at < 0 ? impl->deviceCard (n) : impl->deviceCard (at)).getX() - 2;
+    }
+    if (x != impl->dropMarkerX)
+    {
+        impl->dropMarkerX = x;
+        repaint();
+    }
+}
+
+void RackView::itemDragExit (const SourceDetails&)
+{
+    impl->dropMarkerX = -1;
+    repaint();
+}
+
+void RackView::itemDropped (const SourceDetails& details)
+{
+    impl->dropMarkerX = -1;
+    repaint();
+    const auto p = details.localPosition;
+    if (BrowserComponent::isEffectDrag (details))
+    {
+        if (auto fx = BrowserComponent::draggedEffect (details))
+        {
+            PatchNode n;
+            n.effect = std::move (*fx);
+            impl->dropNode (std::move (n), p);
+        }
+        return;
+    }
+    if (BrowserComponent::isGeneratorDrag (details))
+    {
+        if (auto c = BrowserComponent::draggedGenerator (details))
+        {
+            PatchNode n;
+            n.generator = true;
+            n.channel = std::move (*c);
+            impl->dropNode (std::move (n), p);
+        }
+        return;
+    }
+    impl->dropFile (BrowserComponent::draggedFile (details), p);
+}
+
+bool RackView::dropNodeForCheck (PatchNode node, juce::Point<int> at) { return impl->dropNode (std::move (node), at); }
 void RackView::timerCallback()
 {
     impl->stepGlide();
     impl->refresh();
+    impl->watchSounding(); // round 190lr (DL-94)
+    impl->watchAutoSelect(); // round 190mr (DL-92)
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -2759,6 +3241,71 @@ void closeChannel (int channel)
     if (auto* w = findToolWindow (channelKey (channel)))
         delete w;
 }
+
+bool isLivePreset (const juce::File& file) { return file.hasFileExtension ("adv;adg"); }
+
+std::optional<ChannelDef> instrumentFromLivePreset (const juce::File& file, juce::String& error)
+{
+    juce::MemoryBlock data;
+    if (! file.loadFileAsData (data))
+    {
+        error = tr ("Could not read {0}", { file.getFullPathName() });
+        return std::nullopt;
+    }
+    const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
+    std::string why;
+    if (auto p = importLiveInstrumentPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), {}, &why))
+    {
+        if (p->channel.name.empty())
+            p->channel.name = file.getFileNameWithoutExtension().toStdString();
+        return std::move (p->channel);
+    }
+    error = tr ("LYNX SHARE can't build an instrument from this preset.");
+    return std::nullopt;
+}
+
+void saveLivePreset (AudioEngine& engine, RackLocator locate, const juce::String& name)
+{
+    static std::unique_ptr<juce::FileChooser> chooser; // (one save dialog at a time)
+    const auto folder = platform::settingsFile ("Presets").getChildFile ("Racks");
+    folder.createDirectory();
+    const auto stem = juce::File::createLegalFileName (name.isNotEmpty() ? name : juce::String ("Rack"));
+    chooser = lynx::ui::makeFileChooser (tr ("Save as Live rack preset (.adg)..."), folder.getChildFile (stem + ".adg"), "*.adg");
+    lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+                             [&engine, locate, name] (const juce::FileChooser& c) {
+        auto file = c.getResult();
+        if (file == juce::File())
+            return;
+        if (! file.hasFileExtension ("adg"))
+            file = file.withFileExtension ("adg");
+        engine.capturePluginStates(); // (the plugins' current settings go into the preset)
+        auto& song = const_cast<Song&> (engine.getSong());
+        const auto* doc = locate ? locate (song) : nullptr;
+        if (doc == nullptr)
+            return;
+        AlsExportOptions options;
+        options.creator = "LYNX SHARE";
+        auto& host = engine.getPluginHost();
+        options.pluginRecord = [&host] (const PluginRef& ref, bool instrument) { return host.flWrapperRecord (ref, instrument); };
+        const auto result = exportLiveRackPreset (*doc, name.toStdString(), options);
+        if (result.bytes.empty() || ! file.replaceWithData (result.bytes.data(), result.bytes.size()))
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Save as Live rack preset (.adg)..."),
+                                                    tr ("The rack preset could not be written"));
+            return;
+        }
+        if (! result.notes.empty())
+        {
+            juce::StringArray lines;
+            for (std::size_t i = 0; i < std::min<std::size_t> (result.notes.size(), 8); ++i)
+                lines.add (juce::String::fromUTF8 (result.notes[i].c_str()));
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Save as Live rack preset (.adg)..."),
+                                                    tr ("Saved. Left out (Live has no such device):") + "\n" + lines.joinIntoString ("\n"));
+        }
+        else
+            ui::postHint ({ tr ("Saved {0}", { file.getFileName() }), {} }, 3000);
+    });
+}
 } // namespace RackWindows
 
 namespace rackcards
@@ -2785,7 +3332,7 @@ public:
         return widthLimit > 0 ? std::max (std::min (wanted, widthLimit), view->minimumWidth (bodyHeight)) : wanted;
     }
     juce::Component* titleAccessory() override { return accessory.get(); }
-    int titleAccessoryWidth() const override { return RackView::titleAccessoryWidth; }
+    int titleAccessoryWidth() const override { return theme::livelook::active() ? 32 : RackView::titleAccessoryWidth; }
     void resized() override { view->setBounds (getLocalBounds()); }
 
 private:

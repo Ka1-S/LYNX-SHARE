@@ -599,7 +599,7 @@ float titleMinWidth (const juce::String& name, float height)
     auto most = 0.0f;
     for (const auto st : { Style::glow, Style::neon, Style::hardware, Style::vivid })
     {
-        if (const auto n = titlePrefixLength (name); n > 0 && height >= 20.0f)
+        if (const auto n = titlePrefixLength (name); n > 0 && height >= 20.0f && st != Style::hardware) // (round 190in: one-line badge)
         {
             const auto low = titleLook (st, height * 0.7f);
             most = juce::jmax (most, titleWidth (low, name.substring (n), titleMinSize));
@@ -621,8 +621,9 @@ float titleText (juce::Graphics& g, juce::Rectangle<float> a, const juce::String
         lastFit.size = size;
         return drawTitleLine (g, a, name, accent, underline, size);
     }
-    // 2. a known prefix ("Fruity") on a small line above, the rest of the name below it
-    if (const auto n = titlePrefixLength (name); n > 0 && a.getHeight() >= 20.0f)
+    // 2. a known prefix ("Fruity") on a small line above, the rest of the name below it (round 190in, design190ia FW-10:
+    // not for the Hardware style, whose badge has one form: one line, the whole FL name)
+    if (const auto n = titlePrefixLength (name); n > 0 && a.getHeight() >= 20.0f && currentStyle != Style::hardware)
     {
         const auto rest = name.substring (n);
         const auto top = a.withHeight (a.getHeight() * 0.36f).translated (0.0f, 1.0f);
@@ -939,6 +940,7 @@ void knob (juce::Graphics& g, juce::Rectangle<float> boundsIn, const KnobLook& k
     key = key * 401u + (std::uint64_t) std::lround (scale * 100.0f);
     key ^= (std::uint64_t) k.accent.getARGB() * 0x9e3779b97f4a7c15ull;
     key ^= (std::uint64_t) k.capTint.getARGB() * 0xc2b2ae3d27d4eb4full;
+    key ^= ((std::uint64_t) k.ring.getARGB() * 0x165667b19e3779f9ull) ^ (k.noArc ? 0x27d4eb2f165667c5ull : 0u); // round 190ld
 
     static std::unordered_map<std::uint64_t, juce::Image> cache;
     static const bool registered = lynx::ui::registerImageCache ([] { cache.clear(); }); (void) registered;

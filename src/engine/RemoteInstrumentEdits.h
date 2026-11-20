@@ -36,6 +36,7 @@ inline Result replace (const Song& source, int index, ChannelDef generator)
     generator.keyLabels = previous.keyLabels;
     generator.ghostHidden = previous.ghostHidden;
     generator.soloLock = previous.soloLock;
+    generator.zipped = previous.zipped; // (round 190mk)
     generator.keyLow = previous.keyLow;
     generator.keyHigh = previous.keyHigh;
     generator.receiveFrom = previous.receiveFrom;

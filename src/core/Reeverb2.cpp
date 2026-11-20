@@ -21,6 +21,30 @@ namespace lynx
 {
 namespace reeverb2
 {
+// (float) std::sin ((double) ph · 2π) for the LFO, faster (round 190kz, owner decision 4f) and exact: an odd polynomial
+// to r^23 on [−π/2, π/2] (error < 1e-15) gives v; when every value within 1e-14 of v rounds to the same float, that float
+// is what std::sin's (≤ 1 ulp) result rounds to, else std::sin itself. Checked on every float phase in [0, 1): all
+// 1,065,353,216 identical to the plain expression (agents/dsp/f/lfosin.txt of round 190kz); 2.5x faster on a phase walk.
+float lfoSine (float ph) noexcept
+{
+    const double x = (double) ph * 6.283185307179586;
+    if (! (x >= 0.0 && x < 6.283185307179586))
+        return (float) std::sin (x);
+    const double pi = 3.141592653589793, halfPi = 1.5707963267948966;
+    double r = x > pi ? x - 6.283185307179586 : x; // (−π, π]
+    r = r > halfPi ? pi - r : r < -halfPi ? -pi - r : r;
+    const double r2 = r * r;
+    static constexpr double c[12] = { 1.0, -1.0 / 6.0, 1.0 / 120.0, -1.0 / 5040.0, 1.0 / 362880.0, -1.0 / 39916800.0, 1.0 / 6227020800.0,
+                                      -1.0 / 1307674368000.0, 1.0 / 355687428096000.0, -1.0 / 121645100408832000.0,
+                                      1.0 / 51090942171709440000.0, -1.0 / 25852016738884976640000.0 };
+    double q = c[11];
+    for (int k = 10; k >= 0; --k)
+        q = q * r2 + c[k];
+    const double v = q * r;
+    const float lo = (float) (v - 1.0e-14), hi = (float) (v + 1.0e-14);
+    return lo == hi ? lo : (float) std::sin (x);
+}
+
 // FL's control ranges (REA_rodada7 §3.2) and the two option bytes
 const std::array<Range, reeverb2ParamCount> ranges { {
     { 19, 3000 }, { 5, 221 }, { 0, 384 }, { 1, 100 }, { 0, 100 }, { 1, 200 }, { 5, 221 }, { 20, 300 }, { 25, 2000 },
@@ -379,7 +403,7 @@ struct Engine::Impl
             amount = std::abs ((double) diff) < 0.01 ? target : diff * smooth + amount + 1.0e-30f;
             // with no modulation depth the product is a zero of the amount's sign for any s in [−1, 1]: the sine is
             // only computed when it can change the delay
-            const float s = amount != 0.0f ? (float) std::sin ((double) ph * 6.283185307179586) : 0.0f;
+            const float s = amount != 0.0f ? lfoSine (ph) : 0.0f;
             const float dly = amount * ((s + 1.0f) * 0.5f);
 
             // input: high cut one-pole, low cut through a first-order all-pass
@@ -987,6 +1011,7 @@ public:
     {
         if (ready)
             engine.flush();
+        directZ[0] = directZ[1] = 0.0;
     }
 
     void process (float* left, float* right, int n, const EffectParams& params, double bpm) noexcept override
@@ -999,13 +1024,40 @@ public:
         }
         else
             engine.set (s, bpm > 0 ? bpm : 120.0);
-        engine.process (left, right, n);
+        const bool direct = params[(std::size_t) reeverb2DirectLaw] >= 0.5f; // round 190lf (hidden)
+        if (! direct)
+        {
+            engine.process (left, right, n);
+            return;
+        }
+        // the measured direct path (TrueVerb's): y = a·x − b·Σ ρ^(k−1) x[n−k], added to the engine's output (its own dry
+        // control is at 0 in that translation); a, b, ρ from the hidden parameters
+        const double a = params[(std::size_t) reeverb2DirectLaw + 1], b = params[(std::size_t) reeverb2DirectLaw + 2];
+        const double rho = std::clamp ((double) params[(std::size_t) reeverb2DirectLaw + 3], 0.0, 0.999);
+        for (int done = 0; done < n;)
+        {
+            const int m = std::min (n - done, (int) dryL.size());
+            std::copy (left + done, left + done + m, dryL.data());
+            std::copy (right + done, right + done + m, dryR.data());
+            engine.process (left + done, right + done, m);
+            for (int i = 0; i < m; ++i)
+            {
+                const double xl = dryL[(std::size_t) i], xr = dryR[(std::size_t) i];
+                left[done + i] += (float) (a * xl - b * directZ[0]);
+                right[done + i] += (float) (a * xr - b * directZ[1]);
+                directZ[0] = xl + rho * directZ[0];
+                directZ[1] = xr + rho * directZ[1];
+            }
+            done += m;
+        }
     }
 
 private:
     reeverb2::Engine engine;
     int rate = 44100;
     bool ready = false;
+    std::array<float, 1024> dryL {}, dryR {}; // round 190lf: the direct path's input, block by block
+    double directZ[2] {};
 };
 
 std::int32_t i32 (const std::vector<std::uint8_t>& d, std::size_t at)

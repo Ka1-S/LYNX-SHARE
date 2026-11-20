@@ -129,7 +129,7 @@ jobs:
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DFETCHCONTENT_SOURCE_DIR_JUCE="$RUNNER_TEMP/juce" \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_OBJC_COMPILER_LAUNCHER=ccache -DCMAKE_OBJCXX_COMPILER_LAUNCHER=ccache \
             -DLYNX_LTO=OFF
-          cmake --build build --target LYNX lynx_remote_project_tests -- -k 0
+          cmake --build build --target LYNX lynx_remote_project_tests perfbench -- -k 0
           ccache --show-stats || true
 
       - name: Remote project document regressions
@@ -152,6 +152,31 @@ jobs:
           "${run[@]}" "$bin" --selftest "$PWD/selftest.txt" "$PWD/selftest-demo.lynx" || true
           cat selftest.txt
           grep -q '^result=OK' selftest.txt
+
+      # Round perfgate190id (community slice B12): the big-project performance gate on the synthetic projects
+      # (core/PerfProjects.h): audio CPU per block size, load / rebuild time, memory, .lynx save / load, open time and
+      # paint per frame of every view, against tests/perf/baseline-ci-ubuntu.json (scripts/perf-gate.sh; times are
+      # divided by a fixed calibration run, failing cells are measured again before the gate fails).
+      - name: Performance gate (big projects)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          python3 -m unittest discover -s tests/perf -p 'test_*.py'
+          sudo sysctl -w kernel.perf_event_paranoid=1 > /dev/null 2>&1 || true # (the CPU's instruction counter, where the VM has one)
+          PROFILE=ci-ubuntu PERFBENCH=build/perfbench LYNX_APP=build/LYNX_artefacts/Release/LYNX \
+            scripts/perf-gate.sh compare "$PWD/perfgate"
+
+      - name: Upload the performance gate results
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: perfgate-results
+          path: |
+            perfgate/*.txt
+            perfgate/*.json
+            perfgate/*.md
+          retention-days: 30
+          if-no-files-found: ignore
 
       # Issue #85: no LV2 child while nothing changed, one when something did; a child that fails changes nothing
       - name: LV2 scan
@@ -214,6 +239,32 @@ jobs:
           LYNX_PROFILE_DIR="$PWD/sc-profile" xvfb-run -a build/LYNX_artefacts/Release/LYNX --plugintest "$PWD/sc-plugin/LYNX Test Sidechain.vst3" "$PWD/sc.txt" || true
           cat sc.txt
           grep -q '^result=OK' sc.txt && grep -q '^plugin_crashes=0' sc.txt
+
+      # Issue #138 (round 190hn): a hosted synth that drops notes while it boots (1.5 s of audio, as a hardware emulator
+      # booting its firmware) must still play a short note at tick 0 of an export (the plugin warm-up)
+      - name: Short export of a booting synth (VST3)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          V="$RUNNER_TEMP/juce/modules/juce_audio_processors/format_types/VST3_SDK"
+          B="boot-plugin/LYNX Test Synth.vst3/Contents/x86_64-linux"
+          mkdir -p "$B"
+          c++ -shared -fPIC -O2 -std=c++17 -I"$V" tools/testplugin/lynx_test_synth_vst3.cpp "$V/pluginterfaces/base/funknown.cpp" -o "$B/LYNX Test Synth.so"
+          LYNX_TEST_SYNTH_BOOT_MS=1500 LYNX_PROFILE_DIR="$PWD/boot-profile" xvfb-run -a build/LYNX_artefacts/Release/LYNX --shortexporttest "$PWD/boot.txt" 1 --quick --plugin "$PWD/boot-plugin/LYNX Test Synth.vst3" || true
+          grep -E 'hosted|^short_export=|^result=' boot.txt
+          grep -q '^result=OK' boot.txt
+
+      # Round 190jb (FL renders with the plugin instances that play): an export made with the Export window's hold renders
+      # with the live engine's instance. The test synth's seeded mode gives every instance its own pitches: the export
+      # must equal playback (a new instance can't), playback after it must equal playback before it, the plugin back at
+      # its rate in real-time mode (the synth built by the step above)
+      - name: Export with the live plugin instances (VST3)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          LYNX_TEST_SYNTH_SEED=1 LYNX_PROFILE_DIR="$PWD/live-profile" xvfb-run -a build/LYNX_artefacts/Release/LYNX --exportlivetest "$PWD/live.txt" --plugin "$PWD/boot-plugin/LYNX Test Synth.vst3" || true
+          cat live.txt
+          grep -q '^result=OK' live.txt
 
       # Round 190dt: a hosted plugin that crashes in its audio processing (a null write, and a memcpy from null as in
       # issue #155) is switched off and LYNX keeps playing, saves and reloads it; a plugin that crashes on its saved state

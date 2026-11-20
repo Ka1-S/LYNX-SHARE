@@ -1,5 +1,7 @@
 #include "core/VideoTrack.h"
 
+#include <cctype>
+
 #include <algorithm>
 #include <cmath>
 
@@ -224,5 +226,22 @@ double videoEnd (const std::vector<VideoTrack>& tracks) noexcept
         for (const auto& c : t.clips)
             e = std::max (e, c.end());
     return e;
+}
+
+bool isVideoPath (const std::string& path) noexcept
+{
+    const auto slash = path.find_last_of ("/\\");
+    const auto dot = path.find_last_of ('.');
+    if (dot == std::string::npos || (slash != std::string::npos && dot < slash))
+        return false;
+    std::string ext;
+    for (auto i = dot + 1; i < path.size() && ext.size() < 8; ++i)
+        ext += (char) std::tolower ((unsigned char) path[i]);
+    static constexpr const char* list[] = { "mp4", "m4v", "mov", "mkv", "webm", "avi", "wmv", "mxf", "mpg", "mpeg", "m2v",
+                                            "ts",  "m2ts", "mts", "3gp", "flv", "dv", "ogv" };
+    for (const auto* e : list)
+        if (ext == e)
+            return true;
+    return false;
 }
 } // namespace lynx::videotrack

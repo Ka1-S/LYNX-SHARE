@@ -83,8 +83,10 @@ TEST (mod190do_new_instances_run_the_measured_laws_and_saved_projects_keep_the_c
             auto again = makeEffectSlot (law.kind);
             again.params[law.index] = v;
             const auto count = savedEffectParamCount (again);
-            // (round 190fy: a Spiral Echo also saves its hidden loop revision, one past the Law)
-            CHECK (count == law.index + 1 + (law.kind == EffectKind::spiralEcho ? 1u : 0u));
+            // (round 190fy: a Spiral Echo also saves its hidden loop revision, one past the Law; round 190it: a Lattice Mod
+            // its hidden tap-network revision)
+            // round 190ly: and a Spiral Echo its hidden rate-independent loop phase, one further
+            CHECK (count == law.index + 1 + (law.kind == EffectKind::spiralEcho ? 2u : law.kind == EffectKind::latticeMod ? 1u : 0u));
             auto loaded = makeEffectSlot (law.kind);
             for (std::size_t i = 0; i < count; ++i)
                 loaded.params[i] = std::clamp ((float) savedEffectParamValue (again.params[i]), 0.0f, 1.0f);

@@ -121,7 +121,7 @@ TEST (flm190fn_factory_samples_from_the_users_resources_first)
         CHECK (s && pathOf (*s, "Kick") == fl + "/Drum Samples/Kick/Kick 1.wav");
         CHECK (s && pathOf (*s, "Clap").empty());
         CHECK (report.missingSamples == 1);
-        CHECK (report.unsupported.count ("FL Studio Mobile factory content not found: add the app's Resources folder in Settings > Files") == 1);
+        CHECK (report.notReproduced.count ("FL Studio Mobile factory content not found: add the app's Resources folder in Settings > Files") == 1);
     }
     {
         // the user's own Resources folder first: both found there, nothing listed
@@ -130,7 +130,7 @@ TEST (flm190fn_factory_samples_from_the_users_resources_first)
         CHECK (s && pathOf (*s, "Kick") == mine + "/Drum Samples/Kick/Kick 1.wav");
         CHECK (s && pathOf (*s, "Clap") == mine + "/Drum Samples/Clap/Clap 2.wav");
         CHECK (report.missingSamples == 0);
-        CHECK (report.unsupported.empty() || report.unsupported.count ("FL Studio Mobile factory content not found: add the app's Resources folder in Settings > Files") == 0);
+        CHECK (report.notReproduced.empty() || report.notReproduced.count ("FL Studio Mobile factory content not found: add the app's Resources folder in Settings > Files") == 0);
     }
     {
         // no FL at all: the user's folder alone does it
@@ -144,7 +144,7 @@ TEST (flm190fn_factory_samples_from_the_users_resources_first)
         FlpImportReport report;
         const auto s = run (true, true, report);
         CHECK (s && pathOf (*s, "Clap").empty());
-        CHECK (report.unsupported.count ("FL Studio Mobile factory content not found in the Resources folders of Settings > Files") == 1);
+        CHECK (report.notReproduced.count ("FL Studio Mobile factory content not found in the Resources folders of Settings > Files") == 1);
     }
 }
 
@@ -272,17 +272,13 @@ TEST (flm190fn_flp_mobile_rack_left_as_stand_in_when_not_rebuilt)
         CHECK (report.unsupported.count (line + "; played with a LYNX SHARE synth preset") == 1);
         CHECK (report.converted.empty());
     };
-    // a drum kit, two instruments, an effect first, an active note effect, a state that is not a rack
+    // a drum kit, an Arpeggiator, a state that is not a rack (round 190jv: two instruments, an effect first and the note
+    // effects that act on each note are rebuilt now: tests/Flm190jvTests.inc)
     check (flm190fn::rackState (flm182c::rack (flm::kindNormal, {}, { flm182c::sample ("Kick", "@R@", "Drum Samples\\Kick\\Kick 1.wav") })), "FL Studio Mobile Rack (drum kit: not reproduced yet)");
-    check (flm190fn::rackState (flm182c::rack (flm::kindNormal, { flm182c::module (23, 2, {}, "Default/Default", 0, 127, pocketsaw::flmParamCount),
-                                                         flm182c::module (23, 3, {}, "Default/Default", 0, 127, pocketsaw::flmParamCount) })),
-           "FL Studio Mobile Rack (several instruments: not reproduced yet)");
-    check (flm190fn::rackState (flm182c::rack (flm::kindNormal, { flm182c::module (9, 3, {}, "Default/Default", 0, 127, 5),
+    // (round 190jv: Transpose, Scale and Randomizer run over FL's notes now; an Arpeggiator or a Note Echo stays)
+    check (flm190fn::rackState (flm182c::rack (flm::kindNormal, { flm182c::module (51, 4, {}, "Default/Default", 0, 127, 20),
                                                          flm182c::module (23, 2, {}, "Default/Default", 0, 127, pocketsaw::flmParamCount) })),
-           "FL Studio Mobile Rack (an effect before the instrument: not reproduced yet)");
-    check (flm190fn::rackState (flm182c::rack (flm::kindNormal, { flm182c::module (48, 4, {}, "Default/Default", 0, 127, 3),
-                                                         flm182c::module (23, 2, {}, "Default/Default", 0, 127, pocketsaw::flmParamCount) })),
-           "FL Studio Mobile Rack (note effects: not reproduced yet)");
+           "FL Studio Mobile Rack (an Arpeggiator or Note Echo: not reproduced yet)");
     check (Bytes { 'n', 'o', 'p', 'e', 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8 }, "FL Studio Mobile Rack (state not readable)");
 }
 
@@ -314,7 +310,7 @@ TEST (flm190fn_newer_app_version_is_named)
         FlpImportReport report;
         const auto s = importFlm (song (version), flm182c::options (&report));
         CHECK (s.has_value());
-        return report.unsupported.count ("FL Studio Mobile " + version + " (newer than this import knows: new settings may be missing)");
+        return report.notReproduced.count ("FL Studio Mobile " + version + " (newer than this import knows: new settings may be missing)");
     };
     CHECK (lines ("5.1.0") == 1);
     CHECK (lines ("6.0") == 1);
@@ -358,7 +354,7 @@ TEST (flm190fn_effect_enable_lane_switches_the_slots)
         }
     CHECK (lanes == 1);
     CHECK (report.converted.count ("FL Studio Mobile: effect automation") == 1);
-    CHECK (report.unsupported.count ("FL Studio Mobile: automation of an effect switch or layout (not imported)") == 0);
+    CHECK (report.notReproduced.count ("FL Studio Mobile: automation of an effect switch or layout (not imported)") == 0);
 }
 
 TEST (flm190fn_flp_mobile_rack_fx_on_the_flm_engines)

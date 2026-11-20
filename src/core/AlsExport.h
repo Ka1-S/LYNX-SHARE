@@ -56,6 +56,15 @@ struct AlsExportResult
 
 AlsExportResult exportAls (const Song& song, const AlsExportOptions& options = {});
 
+// (round 190hr, racks-068) A LYNX rack (an Audio Effect, Instrument, MIDI Effect or Drum Rack) as Live's rack preset
+// (.adg, gzip XML): GroupDevicePreset with the rack device and one branch preset per chain, as Live 12.4 saves them
+// (docs/analise/ALS_FORMAT.md §26). What a set export carries of a rack goes in (chains, zones, chain mixers, macros and
+// their mappings, variations, the selector, nested racks, a Drum Rack's pads, Simplers, choke groups, sends and return
+// chains); LYNX's own built-in devices have no Live device yet, and plugins stay out (Live 12.4 closed on a VST3 in a
+// LYNX-written preset [LIVE]): both are listed in `notes`.
+// Empty `bytes`: `rack` is not a rack.
+AlsExportResult exportLiveRackPreset (const PatcherDoc& rack, const std::string& name, const AlsExportOptions& options = {});
+
 // True when Live can't read a sample file as it is and it has to be written as a plain WAV first (round 182b). Live picks
 // the decoder by the file's extension and reads WAV (PCM / float), AIFF, FLAC, Ogg and MP3 only. FL ships Ogg Vorbis
 // inside RIFF/WAVE (format tags 0x674F…0x6751) and also raw Ogg Vorbis streams ("OggS") named .wav: Live 12.4 reports

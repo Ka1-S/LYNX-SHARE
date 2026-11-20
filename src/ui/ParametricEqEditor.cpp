@@ -4,6 +4,7 @@
 
 
 #include "core/Effects.h"
+#include "core/NoteNames.h"
 #include "core/RackRenderer.h"
 #include "core/SpectrumHeat.h"
 #include "engine/Text.h"
@@ -206,7 +207,36 @@ void showBandMenu (juce::Component& target, const EffectParams& params, int band
                           [set, band, stages] { set ({ { peq::slopeParam + band, peq::slopeValue (stages) } }); });
     }
 
+    // round 190ih (PLAN R9, DP-19), FL's manual: "Key that center the frequency band of the Token to the fundamental
+    // frequency of the selected note" (A4 = 440 Hz); the notes inside the EQ's 20 Hz … 20 kHz, an octave per submenu
+    menu.addSeparator();
+    juce::PopupMenu keys;
+    for (int octave = 0; octave * 12 <= 127; ++octave)
+    {
+        juce::PopupMenu notes;
+        for (int key = octave * 12; key < octave * 12 + 12 && key <= 127; ++key)
+            if (const auto hz = 440.0 * std::pow (2.0, (key - 69) / 12.0); hz >= 20.0 && hz <= 20000.0)
+                notes.addItem (juce::String (notenames::keyName (key)) + "   " + juce::String (hz, hz < 100.0 ? 1 : 0) + " Hz", [set, band, hz] {
+                    set ({ { peq::param (band, 1), peq::hzValue (hz) } });
+                });
+        if (notes.getNumItems() > 0)
+            keys.addSubMenu (juce::String (notenames::keyName (octave * 12)) + " - " + juce::String (notenames::keyName (juce::jmin (127, octave * 12 + 11))), notes);
+    }
+    menu.addSubMenu (tr ("Key"), keys);
+
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&target).withMousePosition());
+}
+
+std::vector<std::pair<int, float>> bandReset (const EffectParams& params, int band)
+{
+    const auto fresh = makeEffectSlot (EffectKind::parametricEq);
+    std::vector<std::pair<int, float>> out;
+    if (peq::flLaw (fresh.params) == peq::flLaw (params))
+        for (int field = 0; field < 4; ++field)
+            out.push_back ({ peq::param (band, field), fresh.params[(std::size_t) peq::param (band, field)] });
+    else
+        out.push_back ({ peq::param (band, 2), 0.5f }); // (0 dB)
+    return out;
 }
 
 juce::String bandText (const EffectParams& p, int band)
@@ -246,6 +276,8 @@ DisplaySettings& displaySettings()
             if (key == "spectrum") d.spectrum = value.getIntValue() != 0;
             else if (key == "heatmap") d.heatmap = value.getIntValue() != 0;
             else if (key == "position") d.position = juce::jlimit (0, 2, value.getIntValue());
+            else if (key == "soloOnShift") d.soloOnShift = value.getIntValue() != 0;
+            else if (key == "monitorInput") d.monitorInput = value.getIntValue() != 0;
         }
         return d;
     }();
@@ -256,7 +288,8 @@ void saveDisplaySettings()
 {
     const auto& d = displaySettings();
     displayFile().replaceWithText ("spectrum=" + juce::String ((int) d.spectrum) + "\nheatmap=" + juce::String ((int) d.heatmap) + "\nposition="
-                                   + juce::String (d.position) + "\n");
+                                   + juce::String (d.position) + "\nsoloOnShift=" + juce::String ((int) d.soloOnShift)
+                                   + "\nmonitorInput=" + juce::String ((int) d.monitorInput) + "\n");
 }
 
 void addDisplayItems (juce::PopupMenu& menu, std::function<void()> changed)
@@ -275,6 +308,13 @@ void addDisplayItems (juce::PopupMenu& menu, std::function<void()> changed)
     for (int p = 0; p < 3; ++p)
         position.addItem (tr (names[p]), true, d.position == p, [apply, p] { apply ([p] (DisplaySettings& s) { s.position = p; s.heatmap = true; }); });
     menu.addSubMenu (tr ("Heatmap position"), position);
+    // round 190ih: FL's Shift on a band token: solo it while held (on), or drag its width left / right (off)
+    menu.addItem (tr ("Solo on Shift"), true, d.soloOnShift, [apply] { apply ([] (DisplaySettings& s) { s.soloOnShift = ! s.soloOnShift; }); });
+    // round 190ld (DP-14), FL's manual (Parametric EQ 2 › Monitor): the display shows the input signal (pre-EQ) or the
+    // output signal (post-EQ, the default)
+    menu.addSectionHeader (tr ("Monitor"));
+    menu.addItem (tr ("Input (pre EQ)"), true, d.monitorInput, [apply] { apply ([] (DisplaySettings& s) { s.monitorInput = true; }); });
+    menu.addItem (tr ("Output (post EQ)"), true, ! d.monitorInput, [apply] { apply ([] (DisplaySettings& s) { s.monitorInput = false; }); });
 }
 
 Analyser::Analyser()
@@ -317,8 +357,9 @@ bool Analyser::update (AudioEngine& engine, int track, int slot, bool claim, juc
     const auto srNow = tap.sampleRate.load (std::memory_order_relaxed);
     const auto sr = srNow > 8000.0 ? srNow : 48000.0;
     std::fill (data.begin(), data.end(), 0.0f);
+    const auto& ring = settings.monitorInput ? tap.pre : tap.post; // round 190ld (DP-14): FL's Monitor input / output
     for (int i = 0; i < fftSize; ++i)
-        data[(std::size_t) i] = tap.post[(std::size_t) ((written - (std::uint32_t) fftSize + (std::uint32_t) i) & (ProcessTimes::AnalyzerTap::size - 1))]
+        data[(std::size_t) i] = ring[(std::size_t) ((written - (std::uint32_t) fftSize + (std::uint32_t) i) & (ProcessTimes::AnalyzerTap::size - 1))]
                                     .load (std::memory_order_relaxed) * window[(std::size_t) i];
     fft.performFrequencyOnlyForwardTransform (data.data(), true);
     const auto norm = 4.0f / (float) fftSize; // Hann (coherent gain ½), one side: a full-scale sine = 0 dB

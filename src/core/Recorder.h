@@ -3,6 +3,7 @@
 // Recording of notes played live (MIDI or PC keyboard) into the current pattern.
 // Runs on the UI thread; events arrive with the absolute transport position.
 
+#include <array>
 #include <cstdint>
 #include <map>
 #include <vector>
@@ -23,6 +24,11 @@ struct RecordedEvent
     // the "on" its fine pitch (cents) and Mod X, the "off" its Mod Y (the note's peak pressure)
     bool expression = false;
     float finePitch = 0.0f, modX = 0.5f, modY = 0.5f;
+    // MPE stage 2 (issue #108, core/NoteCurves.h): −1 = a note's "on" / "off"; 0..2 = a NoteCurveLane — the held note
+    // (channel, key)'s bend (`value` in cents) / timbre (0..1, Mod X law) / pressure (0..1) changed at `tick`. On an
+    // MPE note's "on", `value` = its whole bend in cents (finePitch is clamped to the piano roll's ±120).
+    std::int8_t lane = -1;
+    float value = 0.0f;
 };
 
 // Where an absolute transport position falls within the current pattern: in pattern mode,
@@ -176,6 +182,33 @@ void commitEventPoints (Song& song, int pattern, AutomationWrite& w, std::vector
 // Removes the points between two of the same value (no change of the curve) in [from, to].
 void thinAutomation (std::vector<AutomationPoint>& points, std::int64_t from, std::int64_t to);
 
+// --- round 190mx (GitHub #198: knobs turned in a plugin's own window while recording) ------------------------------
+// FL (live check 190mx, FL 2026.1.7, Surge XT with the wrapper's "Notify about parameter changes" on, its default):
+// with Recording › Automation on, a generator's own parameter moved in its window is written into the current pattern
+// as event data in Song mode as in Pattern mode; no automation clip is made. True for such a target: a channel's
+// parameter (a hosted plugin's or a built-in instrument's), not a controller's CC / pressure / pitch wheel on it.
+bool recordsAsPatternEvents (const AutomationTarget& t) noexcept;
+// Where a take's moves of `t` go (AudioEngine::updateAutomationRecording; Session Record is apart: the recorded clips'
+// envelopes). Pattern mode: the current pattern's events, every layout. Song mode: the Clip-launch layout writes Live's
+// Arrangement automation (the parameter's lane); the Pattern layout puts a generator's own parameter into the current
+// pattern (FL, recordsAsPatternEvents) and the rest into automation clips; the Simple layout makes automation clips.
+enum class AutomationDestination { automationClip, patternEvents, lane };
+AutomationDestination recordedAutomationDestination (bool songMode, int layoutStyle, const AutomationTarget& t) noexcept;
+// A recorded hand move is sampled about 30 times a second; what is written is thinned to the points that draw the same
+// line within this much (0..1 of the parameter's range; Ramer-Douglas-Peucker along the value axis).
+constexpr float recordThinTolerance = 1.0f / 512.0f;
+void thinRecordedCurve (std::vector<AutomationPoint>& points, float tolerance = recordThinTolerance);
+// The points of one batch of a gesture into automation `a` (its own ticks): what lay under the gesture is replaced, the
+// curve before and after it stays; thinned (thinRecordedCurve). commitAutomationPoints and commitLanePoints use it.
+void writeRecordedStretch (Automation& a, std::vector<AutomationPoint> fresh, AutomationWrite& w);
+// Live's Arrangement automation (the Clip-launch layout, Arrangement Record): into the automation lane of the parameter
+// under the track its device belongs to (autolanes::trackFor; a lane is made when there is none), in song time.
+void commitLanePoints (Song& song, AutomationWrite& w, std::vector<RecordedValue> points, std::int64_t grid, bool linear = false);
+// Live's clip envelopes (the Clip-launch layout, Session Record): into the event lane of `pattern` (the clip's pattern);
+// the points' ticks are the clip's own positions (folded into `length`).
+void commitClipEnvelopePoints (Song& song, int pattern, AutomationWrite& w, std::vector<RecordedValue> localPoints, std::int64_t length,
+                               std::int64_t grid);
+
 // --- Song-mode note takes (round 168k, the YouTube review: "it just maxes out at two bars") ----------------------
 // FL (REA_rodada165z-b fh2–fh5, round 168k [EXEC]): a take recorded in Song mode goes into the current pattern at the
 // song position it was played at — nothing folds into the pattern's first bars. Where no clip of the pattern plays, the
@@ -297,9 +330,14 @@ private:
         float velocity;
         bool expression = false; // (issue #108: an MPE note's own fine pitch / Mod X / Mod Y)
         float finePitch = 0.0f, modX = 0.5f, modY = 0.5f;
+        // (MPE stage 2: the take's bend / timbre / pressure, ticks from the note's start; thinned into Note::curves)
+        std::array<std::vector<NoteCurvePoint>, noteCurveLaneCount> curve {};
     };
+    static constexpr std::size_t maxTakePoints = 20000; // per lane of one held note (the rest of a very long note is dropped)
 
     void finish (const Song& song, int channel, int key, const Held& held, double endTick);
+    static NoteCurvesRef takeCurves (const std::array<std::vector<NoteCurvePoint>, noteCurveLaneCount>& take, float finePitch, float modX,
+                                     double length);
     Note makeNote (const Song& song, int channel, int key, const Held& h, double endTick, std::int64_t& takeOrigin, bool& takeFromClip,
                    std::int64_t& takeReach) const;
 

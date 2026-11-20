@@ -47,4 +47,37 @@ inline bool readSetting (std::string_view key, int value, int& bars, int& length
     }
     return false;
 }
+// FL's time display during the count-in reads "REC IN n", n = the beats left, one per beat (live check 190iw Q7: REC IN 4,
+// 3, 2, 1 over one bar of 4/4 at 150 BPM, ~400 ms each). `ticksLeft` = Transport::countIn, `beatUnit` = the meter's note
+// value (a beat = 4 / beatUnit quarter notes of `ppqn` ticks). 0 when not counting in.
+inline int beatsLeft (double ticksLeft, int beatUnit, int ppqn) noexcept
+{
+    if (! (ticksLeft > 0.0) || ppqn <= 0)
+        return 0;
+    const auto beat = (double) ppqn * 4.0 / (double) (beatUnit > 0 ? beatUnit : 4);
+    const auto n = (int) (ticksLeft / beat - 1.0e-6) + 1; // the beat being counted: 4 at the very start, 1 on the last
+    return n < 1 ? 1 : n;
+}
+// Live's count-in in the Arrangement Position field (round 190kn, DL-44; Live 12 manual 19.6: "The count-in runs from
+// negative bars-beats-sixteenths (beginning at -2.1.1., for example, with a Count-In setting of 2 bars) up to 1.1.1., at
+// which point recording commences"): the bar counts up from -bars to -1 while the beat and sixteenth count forward
+// inside it. `ticksLeft` = Transport::countIn, `beatsPerBar` / `beatUnit` = the meter. bar = 0 when not counting in.
+struct LivePosition
+{
+    int bar = 0, beat = 1, sixteenth = 1;
+};
+inline LivePosition livePosition (double ticksLeft, int beatsPerBar, int beatUnit, int ppqn) noexcept
+{
+    if (! (ticksLeft > 0.0) || ppqn <= 0)
+        return {};
+    const auto beat = (double) ppqn * 4.0 / (double) (beatUnit > 0 ? beatUnit : 4);
+    const auto bar = beat * (double) (beatsPerBar > 0 ? beatsPerBar : 4);
+    const auto barsLeft = (int) (ticksLeft / bar - 1.0e-9) + 1;          // the bar being counted: -2, then -1
+    const auto into = ((double) barsLeft * bar - ticksLeft > 0.0 ? (double) barsLeft * bar - ticksLeft : 0.0); // ticks into that bar
+    LivePosition p;
+    p.bar = -barsLeft;
+    p.beat = (int) (into / beat) + 1;
+    p.sixteenth = (int) ((into - (double) (p.beat - 1) * beat) / ((double) ppqn / 4.0)) + 1;
+    return p;
+}
 } // namespace lynx::countin

@@ -210,6 +210,11 @@ void soloTrack (Song& song, int track, int trackCount, flsettings::SoloMemory* m
 // ones with "Lock active/mute state"; on a channel already playing alone (among the unlocked ones) every channel the
 // solo touched plays again (`memory` / `restore`: as soloTrack's).
 void soloChannel (Song& song, int channel, flsettings::SoloMemory* memory = nullptr, bool restore = false);
+// FL's Alt+click on a channel's mute switch (round 190mv, DE-12; capture 190mv A4): the solo within the channel's filter
+// group — the channel plays and the other channels of its group are muted (the channels without a group are one group,
+// FL's "Unsorted"); other groups and the locked channels keep theirs. Again on the channel heard alone in its group:
+// the whole group plays.
+void soloChannelInGroup (Song& song, int channel);
 
 // --- Playlist track groups (FL's "Group with above track", REA round 104) -----------------------------
 // A track with `grouped` set belongs to the group of the nearest ungrouped track above it: the header.
@@ -221,6 +226,35 @@ void groupWithAbove (Song& song, int track);                 // no-op on track 0
 void ungroupTrack (Song& song, int track);                   // a member leaves its group (headers stay)
 void setGroupCollapsed (Song& song, int track, bool collapsed); // the group of `track`
 void colourGroup (Song& song, int track);                    // "Auto color group": members take the header's colour
+
+// --- Round 190jf (slice B17): folders = nested track groups (LYNX; FL's groups are one level) and FL's group mute / solo ----
+// The functions above are nest-aware: a header is any track followed by a deeper one, its members are every track of its
+// folder (sub-folders included), a track is folded away when any folder it is in is collapsed.
+int folderDepth (const Song& song, int track);                     // 0 = not grouped; `grouped ? 1 + nest : 0`
+int folderParent (const Song& song, int track);                    // the header of the folder it is directly in, −1 = none
+int folderEnd (const Song& song, int header);                      // the last track of the folder (`header` itself when none)
+std::vector<int> folderChildren (const Song& song, int header);    // the tracks directly in the folder
+// Every track is at most one level deeper than the track above it (the first track at 0). Returns true when it changed.
+bool normalizeFolders (Song& song);
+// FL's group mute / solo (manual, Playlist › Mute / Solo: "(Alt+Click) the Mute icon for any member of the group",
+// Alt+left = mute, Alt+right = solo): the tracks of the group `track` is in — a header's own folder, else its parent's
+// folder (the header included). Mute: every track takes the clicked track's flipped state. Solo: the group plays and
+// every other track is muted; on a group already playing alone everything plays again (or, with `restore`, what
+// played before). Both return false when the track is in no group.
+std::vector<int> groupMuteSet (const Song& song, int track);
+// `insertOf` (rollup 0.1.30, round 190jf × 190ib): the mixer insert a linked header's M button mutes (≤ 0: none), for
+// the Playlist tracks linked to the mixer. Their LED is lit by the track's mute or by the insert's, so the clicked
+// track's state is that lit state, and a group switched back on also unmutes its linked inserts: every LED of the
+// group goes out, as every LED came on. Empty: FL's groups (the Playlist mutes only).
+bool muteGroup (Song& song, int track, const std::vector<int>& insertOf = {});
+bool soloGroup (Song& song, int track, int trackCount, flsettings::SoloMemory* memory = nullptr, bool restore = false);
+// Moves `track` with its folder so that it starts at the old index `before` (count = to the end), at folder `depth`
+// (clamped to what the place allows: at most one deeper than the track above). The clips follow. Returns the track's
+// new index, −1 when nothing moved. LYNX's Alt+drag of a track header (B17).
+int moveFolder (Song& song, int track, int before, int depth);
+int maxFolderDepthAt (const Song& song, int before, int track); // the deepest `moveFolder` allows there
+bool nestTrack (Song& song, int track);   // one level deeper (with its folder), under the track above
+bool unnestTrack (Song& song, int track); // out of its folder: below the folder, one level up
 
 // --- Piano roll note template and Alt+wheel (round 166e, FL 2026 measured in docs/analise/REA_rodada166e.md) --------
 // FL: clicking a note (or Alt+wheel-editing the nearest one) makes its properties the ones new notes get. Velocity and

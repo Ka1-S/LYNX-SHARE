@@ -8,7 +8,8 @@ Usage:
                                                                residual (LYNX - FL) after alignment
 
 Metrics (after the alignment search, over the overlapping part):
-  lag       samples LYNX is late (+) / early (-) relative to FL (cross-correlation of the mono sums, +-4096)
+  lag       samples LYNX is late (+) / early (-) relative to FL (cross-correlation of the mono sums; search window
+            +-LAG_WINDOW_S seconds, never fewer than 4096 samples: +-4096 at 44.1 / 48 kHz, +-8192 at 96 kHz)
   peak_db   20log10(peak LYNX / peak FL)
   rms_db    20log10(rms LYNX / rms FL)
   esr_db    error-to-signal ratio 20log10(rms(L-F)/rms(F)); <= -40 dB is close, >= 0 dB is unrelated
@@ -29,6 +30,16 @@ import wave
 import numpy as np
 
 SR = 44100
+# Alignment search window in time (round 190lg): 4096 samples at 48 kHz (85.3 ms) at every rate. A fixed 4096-sample
+# window was only 42.7 ms at 96 kHz, so a reference with ~63 ms of latency (Pro-L 2 Dense / Loud / Safe) failed alignment
+# there. Never narrower than the old 4096 samples, so 44.1 / 48 kHz results are bit-identical to the old scorer.
+LAG_WINDOW_S = 4096 / 48000.0
+LAG_MIN = 4096
+
+
+def lag_window(sr=None):
+    sr = SR if sr is None else sr
+    return max(LAG_MIN, int(np.ceil(LAG_WINDOW_S * sr - 1e-9)))
 
 
 def read_fl(path):
@@ -66,8 +77,13 @@ def rms(x):
     return float(np.sqrt(np.mean(x * x))) if len(x) else 0.0
 
 
-def find_lag(f, l, maxlag=4096, span=40 * SR):
-    """Lag (LYNX later = +) maximizing the cross-correlation of the mono sums over the first `span` samples."""
+def find_lag(f, l, maxlag=None, span=None):
+    """Lag (LYNX later = +) maximizing the cross-correlation of the mono sums over the first `span` samples (default
+    1 764 000 = 40 s at 44.1 kHz at every rate, as before) within +-maxlag samples (default lag_window(): +-85 ms at the current SR, at least 4096 samples)."""
+    if maxlag is None:
+        maxlag = lag_window()
+    if span is None:
+        span = 40 * 44100
     fm = f[:span].sum(axis=1)
     lm = l[:span + maxlag].sum(axis=1)
     if rms(fm) < 1e-7 or rms(lm) < 1e-7:
@@ -127,7 +143,23 @@ def spec_distance(fa, la):
     return float(np.mean(np.abs(np.clip(d, -60, 60))))
 
 
-def compare(flpath, lypath):
+def apply_mask(fa, la, lag, spans):
+    """Round 190mm: drop the reference's masked spans (demo-mode mutes; [start, end) in reference samples) from both
+    aligned signals. fa[k] is reference sample k + max(0, -lag). The kept parts are joined; the error, level, spectrum
+    and envelope metrics then see only audio both sides really played."""
+    keep = np.ones(len(fa), bool)
+    off = max(0, -lag)
+    for s0, s1 in spans:
+        a, b = max(0, int(s0) - off), min(len(fa), int(s1) - off)
+        if b > a:
+            keep[a:b] = False
+    return fa[keep], la[keep], int(len(keep) - keep.sum())
+
+
+def compare(flpath, lypath, mask=None):
+    """`mask` (round 190mm): optional [start, end) spans in reference samples left out of every metric (the Waves
+    demo mode's periodic mutes, detected in the capture and stored next to the reference, see fxparity.py). None =
+    the unmasked comparison, bit-identical to before."""
     f = read_fl(flpath)
     l = read_lynx(lypath)
     r = {'fl_s': round(len(f) / SR, 2), 'lynx_s': round(len(l) / SR, 2),
@@ -143,6 +175,8 @@ def compare(flpath, lypath):
     r['lag'] = lag
     r['xcorr'] = round(corr, 4)
     fa, la = align(f, l, lag)
+    if mask:
+        fa, la, r['masked'] = apply_mask(fa, la, lag, mask)
     pf, pl = float(np.max(np.abs(fa))) if len(fa) else 0.0, float(np.max(np.abs(la))) if len(la) else 0.0
     rf, rl = rms(fa), rms(la)
     e = la - fa

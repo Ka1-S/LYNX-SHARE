@@ -1,3 +1,4 @@
+#include "core/MeterScale.h"
 #include "ui/CleanVoiceMenu.h"
 #include "ui/FlMods.h"
 #include "platform/Paths.h"
@@ -5,8 +6,11 @@
 #include "ui/FileChoosers.h"
 #include "ui/ImageReadback.h"
 #include "ui/MixerComponent.h"
+#include "core/SelectionRename.h"
+#include "core/MixSnapshots.h"
 #include "ui/PluginOffTag.h"
 #include "ui/SlotWatch.h"
+#include "ui/RemoteControl.h"
 #include "core/AlsImport.h"
 #include "core/ValueMath.h"
 #include "ui/UiTrace.h"
@@ -22,6 +26,7 @@
 #include "core/LiveInput.h"
 #include "core/HardwareOutput.h"
 #include "core/MixerOps.h"
+#include "core/SecondClick.h"
 #include "ui/PluginHeader.h"
 #include "core/ProjectSafety.h"
 #include "core/Templates.h"
@@ -52,11 +57,18 @@
 #include "ui/Icons.h"
 #include "ui/ValueControl.h"
 #include "ui/Theme.h"
+#include "ui/LabelFont.h"
 #include "ui/AudioEditor.h"
 #include "ui/Dialogs.h"
 #include "ui/QuickPick.h"
+#include "ui/QuickAddPalette.h"
+#include "ui/ToolWindow.h"
 #include "ui/TrackIcons.h"
 #include "core/TrackIcons.h"
+#include "core/DetailChain.h"
+#include "core/MiddleEllipsis.h"
+#include "core/MixerRouteArrow.h"
+#include "core/StripInserts.h"
 
 namespace lynx
 {
@@ -71,6 +83,22 @@ constexpr int wiresHeight = 14;
 constexpr int laneHeight = switchHeight + sendKnobHeight + wiresHeight + 4;
 constexpr int masterScaleWidth = 17; // the dB numbers beside the master meter (round 162, issue #9)
 
+// FL's locked state (Shift+click on a mute switch or a slot LED): an open padlock in the current colour in the LED's
+// place (round 190kn; FL 2026, details190kn raw/f05: a 10 x 5 body under a shackle open on the left, 13 px tall)
+void paintLockedLed (juce::Graphics& g, juce::Rectangle<float> m)
+{
+    const auto u = m.getWidth() / 12.0f;
+    const auto body = juce::Rectangle<float> (m.getX() + 1.0f * u, m.getY() + 6.5f * u, 10.0f * u, 5.0f * u);
+    g.fillRect (body.toNearestInt());
+    juce::Path shackle;
+    shackle.startNewSubPath (body.getX() + 2.0f * u, body.getY() - 1.5f * u);
+    shackle.lineTo (body.getX() + 2.0f * u, body.getY() - 4.0f * u);
+    shackle.quadraticTo (body.getX() + 2.0f * u, m.getY() - 1.0f * u, body.getCentreX() + 0.5f * u, m.getY() - 1.0f * u);
+    shackle.quadraticTo (body.getRight() - 2.0f * u, m.getY() - 1.0f * u, body.getRight() - 2.0f * u, body.getY() - 4.0f * u);
+    shackle.lineTo (body.getRight() - 2.0f * u, body.getY());
+    g.strokePath (shackle, juce::PathStrokeType (juce::jmax (1.0f, 1.2f * u)));
+}
+
 // Fader 0..1 -> dB, with 0.8 = 0 dB (as in FL).
 juce::String faderToDb (float volume)
 {
@@ -81,11 +109,11 @@ juce::String faderToDb (float volume)
     return (db > 0 ? "+" : "") + juce::String (db, 1);
 }
 
-// Meter level 0..1 on a dB scale (-60..+6).
+// Meter level 0..1: FL's normal law in the Pattern layout (round 190mf), a -60..+6 dB axis in the other layouts, FL's
+// "Alternate meter scale" when it is on (round 190lx, DF-61).
 float meterPosition (float gain)
 {
-    const auto db = juce::Decibels::gainToDecibels (gain, -60.0f);
-    return juce::jlimit (0.0f, 1.0f, (db + 60.0f) / 66.0f);
+    return meterscale::position (gain, meterscale::current());
 }
 
 // Stereo separation: -1 = widest, 0 = normal, +1 = mono (MixerTrack::stereo).
@@ -315,10 +343,13 @@ void MixerStrips::layoutStrips()
                 if (const auto bus = mixerops::groupBus (song, mixerops::groupOf (song, t)); bus > 0)
                     foldHead[(std::size_t) bus] = true;
     }
+    if (const auto c = mixerops::currentTrack (song); c > 0) // round 190mv: FL's Current track has its own strip
+        hidden[(std::size_t) c] = true;
     dockGaps.clear();
     separatorLines.clear();
     vcaXs.clear();
     loudnessX = hiddenX;
+    currentX = hiddenX;
 
     int x = 4;
     bool any = false, afterMaster = false;
@@ -351,6 +382,11 @@ void MixerStrips::layoutStrips()
             }
             else if (afterMaster)
                 x += 8;
+            if (t == 0) // FL's Current track: the leftmost strip, left of the Master (round 190mv, DF-82)
+            {
+                currentX = x;
+                x += stripWidthOf (currentStrip) + 4;
+            }
             if (t == 0 && ! song.vcas.empty()) // the VCA strips: their own block left of the Master (round 177a)
             {
                 for (std::size_t i = 0; i < song.vcas.size(); ++i)
@@ -412,6 +448,8 @@ int MixerStrips::pinOffset (MixerDock dock) const noexcept
 
 int MixerStrips::stripX (int track) const noexcept
 {
+    if (track == currentStrip) // (round 190mv: the Current track's strip, in the Master's dock)
+        return currentX == hiddenX ? hiddenX : currentX + pinOffset (dockOf (0));
     if (track <= -2) // a VCA strip (vcaStrip): it follows the Master's dock
     {
         const auto i = (std::size_t) (-2 - track);
@@ -522,6 +560,12 @@ MixerStrips::Rows MixerStrips::rows() const noexcept
     r.readoutHeight = sp.dbReadout ? 16 : 0;
 
     auto y = r.header;
+    if (showStripInserts && stripinserts::shownIn (layout)) // issue #154 part 2 (round 190io): the effects list under the band
+    {
+        r.insertsTop = y + 2;
+        r.insertsHeight = stripinserts::height (stripinserts::rowsFor (getHeight()));
+        y += r.insertsHeight + 2;
+    }
     if (sp.verticalName && ! sp.nameLow)
     {
         r.nameTop = y;
@@ -531,7 +575,13 @@ MixerStrips::Rows MixerStrips::rows() const noexcept
     r.buttonsTop = r.knobsTop + r.knobsHeight;
     r.faderTop = r.buttonsTop + r.buttonsHeight + 6;
 
-    auto bottom = laneTop() - r.readoutHeight - 4;
+    auto bottom = laneTop() - r.readoutHeight - 4 - arrowRowHeight; // (round 190io: FL's route arrow at the strip's foot)
+    if (flInsertList()) // FL's Extra large (round 190jd): the used slots' names under the fader, above the route arrow
+    {
+        r.insertsHeight = stripinserts::height (stripinserts::flExtraLarge, stripinserts::rowsFor (getHeight()));
+        r.insertsTop = laneTop() - arrowRowHeight - 2 - r.insertsHeight;
+        bottom = r.insertsTop - r.readoutHeight - 4;
+    }
     if (compact)
     {
         r.armY = bottom - 14;
@@ -909,6 +959,125 @@ void MixerStrips::paintVcaMeter (juce::Graphics& g, int i) const
     }
 }
 
+// --- FL's Current (C) track (round 190mv, DF-82) ---------------------------------------------------------------------
+// FL (capture 190mr A4, fl-mixer-current.png): the leftmost strip, "Current" in grey at the top, a tall dB meter with its
+// scale inside (3, 0, 3 … down), no fader, pan, slots or send; selected: a green outline round the meter, the name white
+// and a green down arrow at the foot. Its meter shows the selected track's output after the Current track's effects
+// (capture 190mv A1: with Fruity Balance at -inf on C, the selected insert's meter still moved and the Master's was silent).
+
+bool MixerStrips::onCurrentStrip (juce::Point<int> p) const noexcept
+{
+    const auto x = stripX (currentStrip);
+    return currentX != hiddenX && p.x >= x && p.x < x + stripWidthOf (currentStrip) - spec().gap && p.y < laneTop();
+}
+
+juce::Rectangle<int> MixerStrips::currentMeter() const noexcept
+{
+    if (currentX == hiddenX)
+        return {};
+    const auto w = stripWidthOf (currentStrip) - spec().gap;
+    const auto boxWidth = juce::jmin (w - 8, 2 * spec().meterWidth + 2 + 12);
+    const auto top = rows().header + 10;
+    const auto bottom = juce::jmax (top + 40, faderArea (0).getBottom());
+    return { stripX (currentStrip) + (w - boxWidth) / 2, top, boxWidth, bottom - top };
+}
+
+void MixerStrips::paintCurrentMeter (juce::Graphics& g) const
+{
+    const auto& song = engine.getSong();
+    const auto c = mixerops::currentTrack (song);
+    // (before its first click the strip shows what it would take in: the selected track's output)
+    const auto shown = c > 0 ? c : juce::jmax (0, selected);
+    const auto box = currentMeter().reduced (2);
+    const auto half = (box.getWidth() - 2) / 2;
+    for (int ch = 0; ch < 2; ++ch)
+        paintMeterLevel (g, shown, ch, juce::Rectangle<int> (box.getX() + ch * (half + 2), box.getY(), half, box.getHeight()));
+}
+
+void MixerStrips::paintCurrentStrip (juce::Graphics& g)
+{
+    using namespace theme;
+    if (currentX == hiddenX)
+        return;
+    const auto x = stripX (currentStrip);
+    const auto w = stripWidthOf (currentStrip) - spec().gap;
+    if (! g.clipRegionIntersects ({ x, 0, w, laneTop() }))
+        return;
+    const auto& song = engine.getSong();
+    const auto c = mixerops::currentTrack (song);
+    const auto isSelected = c > 0 && selected == c;
+    const auto strip = juce::Rectangle<int> (x, 2, w, laneTop() - 2).toFloat();
+    theme::fillRoundRect (g, strip, radius::md, hoverTrack == currentStrip ? colour::bg3 : colour::bg2);
+    // the header with the name, as an insert's (grey; white while selected)
+    g.setColour (isSelected ? colour::textPrimary : colour::textSecondary);
+    g.setFont (font (mixerlayout::isCompact (layout) ? 9.5f : type::small));
+    textcache::drawFittedText (g, tr ("Current"), juce::Rectangle<int> (x + 3, 6, w - 6, 16), juce::Justification::centredLeft, 1, 0.6f);
+    // the meter: a dark box, its dB scale inside
+    const auto meter = currentMeter();
+    theme::fillRoundRect (g, meter.toFloat(), 2.0f, colour::bg0);
+    g.setFont (font (8.0f));
+    g.setColour (colour::textDisabled);
+    for (int db = 3; db >= -39; db -= 3)
+    {
+        const auto y = (float) meter.getBottom() - meterPosition (juce::Decibels::decibelsToGain ((float) db)) * (float) meter.getHeight();
+        if (y < (float) meter.getY() + 4.0f || y > (float) meter.getBottom() - 4.0f)
+            continue;
+        textcache::drawText (g, juce::String (std::abs (db)), juce::Rectangle<int> (meter.getX(), (int) y - 5, meter.getWidth(), 10), juce::Justification::centred);
+    }
+    if (! cachePainting) // (cached: drawn over the picture, paintMeterLevels)
+        paintCurrentMeter (g);
+    if (isSelected)
+    {
+        g.setColour (colour::ledOn);
+        g.drawRect (meter.expanded (1), 1);
+        // the green arrow at the foot (FL: the selected track's output goes on from here)
+        const auto foot = juce::Rectangle<float> ((float) x, (float) laneTop() - 22.0f, (float) w, 14.0f);
+        juce::Path arrow;
+        const auto cx = foot.getCentreX(), cy = foot.getCentreY();
+        arrow.addTriangle (cx - 5.0f, cy - 1.0f, cx + 5.0f, cy - 1.0f, cx, cy + 5.0f);
+        arrow.addRectangle (cx - 2.0f, cy - 6.0f, 4.0f, 5.0f);
+        g.fillPath (arrow);
+    }
+}
+
+int MixerStrips::selectCurrent()
+{
+    // the first click makes the song's Current track (an edit outside the undo history: nothing is heard differently
+    // until an effect goes on it)
+    auto c = mixerops::currentTrack (engine.getSong());
+    if (c <= 0)
+    {
+        engine.editSong ([] (Song& s) { mixerops::addCurrentTrack (s); }, false);
+        c = mixerops::currentTrack (engine.getSong());
+        updateSize();
+    }
+    if (c > 0)
+        selectTrack (c);
+    return c;
+}
+
+void MixerStrips::currentMouseDown (const juce::MouseEvent& e)
+{
+    if (const auto c = selectCurrent(); c > 0 && flmods::popup (e.mods))
+        showMenu (c); // FL: "Mixer track (Current)"
+}
+
+ui::Hint MixerStrips::currentHint() const
+{
+    ui::Hint h;
+    h.text = tr ("Current - the selected track's output goes through this track's effects and EQ, its meter shows the result  [LMB] select: its effect slots  [RMB] menu");
+    h.hasMenu = true;
+    return h;
+}
+
+void MixerStrips::publishCurrentSource()
+{
+    // FL (REA 190mv R, SelectMixerTrack): the Current track takes the selected track's output — the Master's when the
+    // Master or the Current track itself is selected
+    const auto& song = engine.getSong();
+    engine.setCurrentTrackSource (mixerops::isCurrentTrack (song, selected) ? 0 : juce::jmax (0, selected));
+}
+
 void MixerStrips::paintVcaStrip (juce::Graphics& g, int i)
 {
     using namespace theme;
@@ -1086,6 +1255,27 @@ juce::Rectangle<int> MixerStrips::stereoArea (int t) const
     return { stripX (t) + w / 2, r.knobsTop, w - w / 2, r.knobsHeight };
 }
 
+// Round 190lr (DF-80, capture fl-strip-phase-swap.png): FL draws "Reverse polarity" (an up and a down arrowhead) and
+// "Swap left and right" (a left and a right arrowhead) left of the stereo separation knob, stacked, grey (#B1B7BB) and
+// light blue (#7CCFFE) when on; a click toggles them. Only where the strip leaves room beside the knob.
+juce::Rectangle<int> MixerStrips::invertIcon (int t) const
+{
+    const auto a = stereoArea (t);
+    const auto& sp = spec();
+    const auto knob = sp.stackedKnobs ? sp.knobSize - 6 : 22;
+    const auto room = (a.getWidth() - knob) / 2;
+    if (a.isEmpty() || room < 9 || a.getHeight() < 22)
+        return {};
+    const auto w = juce::jmin (12, room - 1);
+    return { a.getX() + (room - w) / 2, a.getCentreY() - 11, w, 10 };
+}
+
+juce::Rectangle<int> MixerStrips::swapIcon (int t) const
+{
+    const auto i = invertIcon (t);
+    return i.isEmpty() ? i : i.translated (0, 12);
+}
+
 juce::Rectangle<int> MixerStrips::muteArea (int t) const
 {
     const auto r = rows();
@@ -1155,9 +1345,329 @@ juce::Rectangle<int> MixerStrips::routeArea (int t) const
     return { stripX (t) + inset, laneTop() + 2, stripWidthOf (t) - spec().gap - 2 * inset, switchHeight };
 }
 
+juce::Rectangle<int> MixerStrips::arrowArea (int t) const
+{
+    return { stripX (t), laneTop() - arrowRowHeight - 2, stripWidthOf (t) - spec().gap, arrowRowHeight };
+}
+
+juce::Rectangle<int> MixerStrips::insertsArea (int t) const
+{
+    const auto r = rows();
+    if (r.insertsHeight <= 0 || t < 0 || t >= (int) engine.getSong().mixer.size() || isFoldTab (t))
+        return {};
+    return { stripX (t) + 2, r.insertsTop, stripWidthOf (t) - spec().gap - 4, r.insertsHeight - 4 };
+}
+
+// --- issue #154 part 2 (round 190io): the strip's insert effects list (the linked track headers' list, round 190ht) ----
+void MixerStrips::setShowStripInserts (bool on)
+{
+    showStripInserts = on;
+    insertsScroll.clear();
+    hoverInsertItem = -1;
+    updateSize();
+    repaint();
+}
+
+int MixerStrips::insertsFirst (int t) const
+{
+    const auto found = insertsScroll.find (t);
+    const auto effects = (int) engine.getSong().mixer[(std::size_t) t].effects.size();
+    const auto geo = insertsGeometry();
+    return stripinserts::clampFirst (geo, found == insertsScroll.end() ? 0 : found->second, effects, stripinserts::rowsThatFit (geo, insertsArea (t).getHeight()));
+}
+
+int MixerStrips::insertsItemAt (int t, juce::Point<int> p) const
+{
+    const auto box = insertsArea (t);
+    if (! box.contains (p))
+        return -1;
+    const auto effects = (int) engine.getSong().mixer[(std::size_t) t].effects.size();
+    const auto geo = insertsGeometry();
+    return stripinserts::itemAt (geo, effects, insertsFirst (t), stripinserts::rowsThatFit (geo, box.getHeight()), p.y - box.getY());
+}
+
+void MixerStrips::paintStripInserts (juce::Graphics& g, int t)
+{
+    using namespace theme;
+    if (flInsertList())
+        return paintFlInsertList (g, t);
+    const auto box = insertsArea (t);
+    const auto& fx = engine.getSong().mixer[(std::size_t) t].effects;
+    const auto effects = (int) fx.size();
+    const auto rows = trackinserts::rowsThatFit (box.getHeight());
+    const auto first = insertsFirst (t);
+    const auto hoveredHere = hoverTrack == t && hoverPart == Part::inserts;
+    const auto led = juce::jmin (trackinserts::ledWidth, box.getWidth() / 3);
+
+    // a recessed well, as the Mixer's slot list; one row per effect in chain order, then "+" while a slot is free
+    theme::fillRoundRect (g, box.toFloat().expanded (1.0f, 2.0f), radius::sm, colour::bg0.withAlpha (0.7f));
+    g.setFont (font (10.0f));
+    for (int r = 0; r < rows; ++r)
+    {
+        const auto item = first + r;
+        if (item > effects || (item == effects && effects >= maxEffectSlots))
+            break;
+        const auto row = juce::Rectangle<int> (box.getX(), box.getY() + r * trackinserts::rowHeight, box.getWidth(), trackinserts::rowHeight);
+        const auto isAdd = item == effects;
+        const auto under = hoveredHere && hoverInsertItem == (isAdd ? trackinserts::addRow : item);
+        const auto dragged = insertsDragging && insertsPressTrack == t && insertsPressItem == item;
+        if (under || dragged)
+            theme::fillRoundRect (g, row.toFloat().reduced (0.0f, 0.5f), 2.0f, colour::bg5.withAlpha (dragged ? 0.9f : 0.6f));
+        if (isAdd)
+        {
+            g.setColour (under ? colour::textPrimary : colour::textSecondary.withAlpha (0.8f));
+            textcache::drawText (g, "+", row.withWidth (led), juce::Justification::centred, false);
+            textcache::drawText (g, tr ("Add"), row.withTrimmedLeft (led + 1), juce::Justification::centredLeft, true);
+            continue;
+        }
+        const auto& slot = fx[(std::size_t) item];
+        // the on/off dot (the Mixer slot's LED): filled while on, a ring while bypassed
+        const auto dot = row.withWidth (led).toFloat().withSizeKeepingCentre (6.0f, 6.0f);
+        const auto dotHot = under && hoverInsertLed;
+        if (slot.enabled)
+        {
+            g.setColour (dotHot ? colour::accentHover : colour::accent);
+            g.fillEllipse (dot);
+        }
+        else
+        {
+            g.setColour (dotHot ? colour::textPrimary : colour::textSecondary.withAlpha (0.7f));
+            g.drawEllipse (dot.reduced (0.5f), 1.0f);
+        }
+        g.setColour (slot.enabled ? colour::textPrimary : colour::textSecondary.withAlpha (0.6f));
+        textcache::drawText (g, quickpick::slotName (engine, slot), row.withTrimmedLeft (led + 1).withTrimmedRight (2), juce::Justification::centredLeft, true);
+    }
+    // more rows than fit: a thin scroll mark at the right edge
+    if (const auto items = trackinserts::itemCount (effects); items > rows)
+    {
+        const auto h = juce::jmax (4.0f, (float) box.getHeight() * (float) rows / (float) items);
+        const auto y = (float) box.getY() + ((float) box.getHeight() - h) * (float) first / (float) juce::jmax (1, items - rows);
+        theme::fillRoundRect (g, juce::Rectangle<float> ((float) box.getRight() - 2.0f, y, 2.0f, h), 1.0f, colour::textSecondary.withAlpha (0.5f));
+    }
+    // a drag in progress: where the effect lands
+    if (insertsDragging && insertsDropTrack == t && insertsDropAt >= 0)
+    {
+        const auto y = box.getY() + (insertsDropAt - first) * trackinserts::rowHeight;
+        if (y >= box.getY() - 1 && y <= box.getBottom() + 1)
+        {
+            g.setColour (colour::accent);
+            g.fillRect (box.getX() + 1, juce::jlimit (box.getY(), box.getBottom() - 2, y - 1), box.getWidth() - 2, 2);
+        }
+    }
+}
+
+// FL's Extra large list (round 190jd, live check 190iw Q6; q6-fl-mixer-extralarge-fxlist-zoom2.png): one 23 px cell per
+// used slot in slot order, a little darker than the strip, the name cut in the middle in FL's light grey-blue; empty
+// cells below (fainter, 1 px lines between them); no bypass dots, icons or "add" row. Hover / drag as the LYNX view.
+void MixerStrips::paintFlInsertList (juce::Graphics& g, int t)
+{
+    using namespace theme;
+    const auto geo = stripinserts::flExtraLarge;
+    const auto box = insertsArea (t);
+    const auto& fx = engine.getSong().mixer[(std::size_t) t].effects;
+    const auto effects = (int) fx.size();
+    const auto rows = stripinserts::rowsThatFit (geo, box.getHeight());
+    const auto first = insertsFirst (t);
+    const auto hoveredHere = hoverTrack == t && hoverPart == Part::inserts;
+    const auto f = font (11.0f);
+    g.setFont (f);
+    // FL: empty cells (53,37,36) on a (56,40,39) strip with lighter 1 px lines; used cells (47,31,30)
+    for (int r = 0; r < rows; ++r)
+    {
+        const auto item = first + r;
+        const auto row = juce::Rectangle<int> (box.getX() - 1, box.getY() + r * geo.rowHeight, box.getWidth() + 2, geo.rowHeight);
+        const auto used = item < effects;
+        g.setColour (juce::Colours::black.withAlpha (used ? 0.17f : 0.06f));
+        g.fillRect (row.withTrimmedTop (1));
+        g.setColour (juce::Colours::white.withAlpha (0.025f));
+        g.fillRect (row.withHeight (1));
+        if (! used)
+            continue;
+        const auto under = hoveredHere && hoverInsertItem == item;
+        const auto dragged = insertsDragging && insertsPressTrack == t && insertsPressItem == item;
+        if (under || dragged)
+        {
+            g.setColour (colour::bg5.withAlpha (dragged ? 0.9f : 0.6f));
+            g.fillRect (row.withTrimmedTop (1));
+        }
+        const auto& slot = fx[(std::size_t) item];
+        const auto text = row.withTrimmedLeft (4).withTrimmedRight (2);
+        g.setColour (juce::Colour (0xffc6d3d9).withAlpha (slot.enabled ? 1.0f : 0.5f)); // (FL's text; a bypassed one dims, no mark)
+        textcache::drawText (g, theme::fitMiddle (quickpick::slotName (engine, slot), f, (float) text.getWidth()), text, juce::Justification::centredLeft, false);
+    }
+    if (const auto items = stripinserts::itemCount (geo, effects); items > rows)
+    {
+        const auto h = juce::jmax (4.0f, (float) box.getHeight() * (float) rows / (float) items);
+        const auto y = (float) box.getY() + ((float) box.getHeight() - h) * (float) first / (float) juce::jmax (1, items - rows);
+        theme::fillRoundRect (g, juce::Rectangle<float> ((float) box.getRight() - 2.0f, y, 2.0f, h), 1.0f, colour::textSecondary.withAlpha (0.5f));
+    }
+    if (insertsDragging && insertsDropTrack == t && insertsDropAt >= 0)
+    {
+        const auto y = box.getY() + (insertsDropAt - first) * geo.rowHeight;
+        if (y >= box.getY() - 1 && y <= box.getBottom() + 1)
+        {
+            g.setColour (colour::accent);
+            g.fillRect (box.getX() + 1, juce::jlimit (box.getY(), box.getBottom() - 2, y - 1), box.getWidth() - 2, 2);
+        }
+    }
+}
+
+EffectsPanel& MixerStrips::insertActions (int insert)
+{
+    if (insertActionsPanel == nullptr)
+    {
+        insertActionsPanel = std::make_unique<EffectsPanel> (engine); // never shown: the Mixer slot's own code
+        insertActionsPanel->setMenuTarget (this);
+    }
+    insertActionsPanel->setTrack (insert);
+    return *insertActionsPanel;
+}
+
+bool MixerStrips::insertsMouseDown (const juce::MouseEvent& e, int t)
+{
+    if (! insertsArea (t).contains (e.getPosition()))
+        return false;
+    const auto item = insertsItemAt (t, e.getPosition());
+    insertsPressTrack = insertsPressItem = insertsDropTrack = insertsDropAt = -1;
+    insertsDragging = false;
+    const auto& fx = engine.getSong().mixer[(std::size_t) t].effects;
+    if (flmods::popup (e.mods))
+    {
+        // the Mixer slot's own menu; on "+" or below the list, the slot's add menu
+        auto& actions = insertActions (t);
+        if (item >= 0)
+            actions.showSlotMenuFor (item);
+        else if (fx.size() < (std::size_t) maxEffectSlots)
+            actions.showAddMenuFor (trackinserts::nextFreeRow (fx));
+        return true;
+    }
+    if (e.getNumberOfClicks() > 1)
+        return true; // (a double click opens nothing twice)
+    insertsPressTrack = t;
+    insertsPressItem = item;
+    return true;
+}
+
+bool MixerStrips::insertsMouseDrag (const juce::MouseEvent& e)
+{
+    if (insertsPressTrack < 0)
+        return false;
+    if (insertsPressItem >= 0 && (insertsDragging || e.getDistanceFromDragStart() > 4))
+    {
+        // drag an effect: up / down in its list reorders it, onto another strip's list moves it there (Ctrl: a copy)
+        insertsDragging = true;
+        const auto over = trackAt (juce::jlimit (0, getWidth() - 1, e.x));
+        const auto box = over >= 0 ? insertsArea (over) : juce::Rectangle<int>();
+        const auto geo = insertsGeometry();
+        if (! box.isEmpty() && e.y >= box.getY() - geo.rowHeight && e.y < box.getBottom() + geo.rowHeight)
+        {
+            const auto effects = (int) engine.getSong().mixer[(std::size_t) over].effects.size();
+            insertsDropTrack = over;
+            insertsDropAt = over == insertsPressTrack
+                                ? stripinserts::dropPosition (geo, effects, insertsFirst (over), stripinserts::rowsThatFit (geo, box.getHeight()), e.y - box.getY())
+                                : effects;
+        }
+        else
+            insertsDropTrack = insertsDropAt = -1;
+        repaint (0, rows().insertsTop - 3, getWidth(), rows().insertsHeight + 4);
+    }
+    return true;
+}
+
+bool MixerStrips::insertsMouseUp (const juce::MouseEvent& e)
+{
+    if (insertsPressTrack < 0)
+        return false;
+    const auto insert = insertsPressTrack, item = insertsPressItem, dropTrack = insertsDropTrack, dropAt = insertsDropAt;
+    const auto dragged = insertsDragging;
+    insertsPressTrack = insertsPressItem = insertsDropTrack = insertsDropAt = -1;
+    insertsDragging = false;
+    if (insert < 0 || insert >= (int) engine.getSong().mixer.size())
+        return true;
+    const auto copy = flmods::ctrl (e.mods);
+    const auto full = [] { ui::postHint ({ tr ("This insert has no free slot (10 effects)"), {} }, 3000); };
+    if (dragged)
+    {
+        const auto target = item >= 0 ? dropTrack : -1; // (outside a list: nothing changes)
+        if (target >= 0 && target != insert)
+        {
+            auto moved = -1;
+            engine.editSongStructural ([insert, item, target, copy, &moved] (Song& s) { moved = detailchain::moveEffectToInsert (s, insert, item, target, copy); });
+            if (moved < 0)
+                full();
+        }
+        else if (target == insert && copy)
+        {
+            if (engine.getSong().mixer[(std::size_t) insert].effects.size() >= (std::size_t) maxEffectSlots)
+                full();
+            else
+                engine.editSong ([insert, item, dropAt] (Song& s) { detailchain::duplicateEffect (s, insert, item, dropAt); });
+        }
+        else if (target == insert)
+            engine.editSongStructural ([insert, item, dropAt] (Song& s) { detailchain::moveEffectBefore (s, insert, item, dropAt); });
+        repaint();
+        return true;
+    }
+    if (item == trackinserts::addRow)
+    {
+        insertActions (insert).showAddMenuFor (trackinserts::nextFreeRow (engine.getSong().mixer[(std::size_t) insert].effects));
+        return true;
+    }
+    if (item < 0)
+        return true;
+    if (insertsGeometry().dots && e.getMouseDownX() < insertsArea (insert).getX() + juce::jmin (trackinserts::ledWidth, insertsArea (insert).getWidth() / 3) + 1)
+    {
+        // the dot: the effect on / off (the Mixer slot LED's edit)
+        engine.editSong ([insert, item] (Song& s) {
+            auto& fx = s.mixer[(std::size_t) insert].effects;
+            if (item < (int) fx.size())
+                fx[(std::size_t) item].enabled = ! fx[(std::size_t) item].enabled;
+        });
+        return true;
+    }
+    insertActions (insert).toggleSlotEditor (item); // the name: its window (as a click on a Mixer slot)
+    return true;
+}
+
+bool MixerStrips::insertsWheel (const juce::MouseEvent& e, float deltaY)
+{
+    const auto t = trackAt (e.x);
+    if (t < 0 || deltaY == 0.0f)
+        return false;
+    const auto box = insertsArea (t);
+    if (! box.contains (e.getPosition()))
+        return false;
+    const auto effects = (int) engine.getSong().mixer[(std::size_t) t].effects.size();
+    const auto geo = insertsGeometry();
+    const auto rows = stripinserts::rowsThatFit (geo, box.getHeight());
+    if (stripinserts::itemCount (geo, effects) <= rows)
+        return false; // everything shows: the wheel scrolls the Mixer as usual
+    insertsScroll[t] = stripinserts::clampFirst (geo, insertsFirst (t) + (deltaY > 0 ? -1 : 1), effects, rows);
+    repaint (box.expanded (2));
+    return true;
+}
+
 juce::Rectangle<int> MixerStrips::sendArea (int t) const
 {
     return { stripX (t), laneTop() + 2 + switchHeight, stripWidthOf (t) - spec().gap, sendKnobHeight };
+}
+
+juce::Point<int> MixerStrips::wheelScrollPointForPerf (juce::Point<int> preferred, juce::Rectangle<int> within) const
+{
+    const auto tracks = (int) engine.getSong().mixer.size();
+    within = within.getIntersection (getLocalBounds());
+    auto scrolls = [this, tracks, within] (juce::Point<int> p) {
+        const auto t = trackAt (p.x);
+        return t >= 0 && t < tracks && within.contains (p) && partAt (t, p) == Part::body && ! insertsArea (t).contains (p);
+    };
+    // the same row first (outwards from the preferred x), then rows above and below
+    for (int dy = 0; dy < getHeight(); dy += 4)
+        for (const auto y : { preferred.y + dy, preferred.y - dy })
+            for (int dx = 0; dx < 600; dx += 2)
+                for (const auto x : { preferred.x + dx, preferred.x - dx })
+                    if (scrolls ({ x, y }))
+                        return { x, y };
+    return preferred;
 }
 
 MixerStrips::Part MixerStrips::partAt (int t, juce::Point<int> p) const
@@ -1183,10 +1693,19 @@ MixerStrips::Part MixerStrips::partAt (int t, juce::Point<int> p) const
     if (t > 0 && t < (int) engine.getSong().mixer.size() && engine.getSong().mixer[(std::size_t) t].inputChannel >= 0
         && inputArea (t).expanded (0, 2).contains (p))
         return Part::input;
+    if (insertsArea (t).contains (p))
+        return Part::inserts;
     if (headerArea (t).contains (p) || nameArea (t).contains (p))
         return Part::header;
+    // FL's route arrow (round 190io): the Send switch from the selected track, as the "→ n" pill
+    if (sending && arrowArea (t).contains (p) && (song.routes (selected, t) || song.canRoute (selected, t)))
+        return Part::route;
     if (panArea (t).contains (p))
         return Part::pan;
+    if (invertIcon (t).expanded (1).contains (p)) // (round 190lr, DF-80)
+        return Part::invert;
+    if (swapIcon (t).expanded (1).contains (p))
+        return Part::swap;
     if (stereoArea (t).contains (p))
         return Part::stereo;
     if (muteArea (t).contains (p))
@@ -1258,6 +1777,11 @@ void MixerStrips::setHover (Part part, int t)
 
 void MixerStrips::mouseMove (const juce::MouseEvent& e)
 {
+    if (onCurrentStrip (e.getPosition()))
+    {
+        setHover (Part::body, currentStrip);
+        return;
+    }
     if (const auto i = vcaAt (e.x); i >= 0)
     {
         setHover (vcaPartAt (i, e.getPosition()), vcaStrip (i));
@@ -1269,7 +1793,18 @@ void MixerStrips::mouseMove (const juce::MouseEvent& e)
         repaint (loudnessResetArea().expanded (2));
     }
     const auto t = trackAt (e.x);
-    setHover (t >= 0 ? partAt (t, e.getPosition()) : Part::none, t);
+    const auto part = t >= 0 ? partAt (t, e.getPosition()) : Part::none;
+    // issue #154 part 2: the effect row (and its dot) under the mouse
+    const auto item = part == Part::inserts ? insertsItemAt (t, e.getPosition()) : -1;
+    const auto led = item >= 0 && insertsGeometry().dots && e.x < insertsArea (t).getX() + juce::jmin (trackinserts::ledWidth, insertsArea (t).getWidth() / 3) + 1;
+    if (item != hoverInsertItem || led != hoverInsertLed)
+    {
+        hoverInsertItem = item;
+        hoverInsertLed = led;
+        if (part == Part::inserts && hoverPart == part && hoverTrack == t)
+            repaint (insertsArea (t).expanded (2));
+    }
+    setHover (part, t);
 }
 
 void MixerStrips::mouseExit (const juce::MouseEvent&)
@@ -1368,10 +1903,18 @@ void MixerStrips::paint (juce::Graphics& g)
             plate = plate.interpolatedWith (tame (juce::Colour (track.colour)), isSelected ? 0.26f : 0.2f);
         theme::fillRoundRect (g, strip.toFloat(), radius::md, plate);
 
-        if (track.colour != 0) // thin colour band at the top
-        {
-            theme::fillRoundRect (g, strip.toFloat().withHeight (3.0f).reduced (6.0f, 0.0f), 1.5f, tame (juce::Colour (track.colour)));
-        }
+        // FL's header band (round 190io, design190ia FM-30): the top 36 px filled with the insert's colour (FL: #8C1F1C on
+        // insert 1), held at a brightness where its marks read; FL's grey for an insert without a colour. Rounded on top.
+        const auto band = colourFill (track.colour != 0 ? juce::Colour (track.colour) : juce::Colour (0xff485156), 0.45f, 0.6f)
+                              .withMultipliedAlpha (track.muted ? 0.55f : 1.0f);
+        const auto bandArea = juce::Rectangle<float> ((float) x, 2.0f, (float) plateWidth, (float) rows().header - 2.0f);
+        if (needs (bandArea.getSmallestIntegerContainer()))
+            fillPlate (g, bandArea, radius::md, band, band, true);
+        // the band's marks: FL's dark number (the colour × 0.3) where it reads, else white; the icon in a light tint
+        const auto bandInk = [&band] {
+            const auto dark = juce::Colour ((juce::uint8) (band.getRed() * 0.3f), (juce::uint8) (band.getGreen() * 0.3f), (juce::uint8) (band.getBlue() * 0.3f));
+            return contrast (dark, band) >= 3.0f ? dark : juce::Colours::white.withAlpha (0.92f);
+        }();
 
         if (inSelection && ! isSelected)
         {
@@ -1422,9 +1965,9 @@ void MixerStrips::paint (juce::Graphics& g)
         // header's last row (Extra large) or up a column of the strip (round 168h)
         if (needs (juce::Rectangle<int> (x, 0, plateWidth, 18).getUnion (iconArea (t))))
         {
-        g.setColour (isSelected ? colour::accent : colour::textSecondary);
-        g.setFont (font (compactLayout ? 9.5f : type::caption, isSelected));
-        textcache::drawFittedText (g, t == 0 ? juce::String ("M") : juce::String (t), juce::Rectangle<int> (x, 4, plateWidth, 13),
+        g.setColour (bandInk);
+        g.setFont (font (compactLayout ? 10.0f : type::body, true));
+        textcache::drawFittedText (g, t == 0 ? juce::String ("M") : juce::String (t), juce::Rectangle<int> (x, 4, plateWidth, 14),
                                    juce::Justification::centred, 1, 0.6f);
 
         if (t < (int) foldHead.size() && foldHead[(std::size_t) t]) // round 177a: fold / unfold the group
@@ -1439,12 +1982,14 @@ void MixerStrips::paint (juce::Graphics& g)
         }
 
         if (const auto icon = trackicons::iconFor (track.icon); icon != trackicons::Icon::none)
-            ui::drawTrackIcon (g, icon, iconArea (t).toFloat(), track.muted ? colour::textDisabled : colour::textPrimary.withAlpha (0.88f));
+            ui::drawTrackIcon (g, icon, iconArea (t).toFloat(),
+                               track.muted ? bandInk.withAlpha (0.5f)
+                                           : (track.colour != 0 ? juce::Colour (track.colour) : band).withMultipliedSaturation (0.45f).withBrightness (1.0f));
 
         if (! track.effects.empty() && sp.fxBadge)
         {
             const auto on = mixerops::anyEffectEnabled (song, t);
-            g.setColour (on ? colour::info : colour::textDisabled);
+            g.setColour (bandInk.withAlpha (on ? 1.0f : 0.5f)); // (on the band: its ink)
             g.setFont (font (9.0f, true));
             if (plateWidth >= 56)
                 textcache::drawText (g, "FX" + juce::String ((int) track.effects.size()), x + plateWidth - 26, 4, 23, 13, juce::Justification::centredRight);
@@ -1455,8 +2000,13 @@ void MixerStrips::paint (juce::Graphics& g)
 
         if (needs (nameArea (t).withX (x).withWidth (plateWidth)))
         {
-        g.setColour (track.muted ? colour::textDisabled : (hovered (Part::header) ? colour::textPrimary : colour::textPrimary.withAlpha (0.9f)));
-        g.setFont (font (compactLayout ? 10.0f : type::small, isSelected));
+        // FL's name in a light tint of the insert's colour ("KICK" red-pink on the red group; round 190io, FM-31), white
+        // where the tint would read below 4.5:1, one size up (FL's 10 px glyphs)
+        {
+            const auto tint = track.colour != 0 ? lightTint (juce::Colour (track.colour), plate, colour::textPrimary) : colour::textPrimary;
+            g.setColour (track.muted ? colour::textDisabled : hovered (Part::header) ? tint.brighter (0.2f) : tint.withAlpha (0.95f));
+        }
+        g.setFont (labelFont (compactLayout ? 10.0f : type::body, isSelected)); // (round 190je: condensed with FL-style labels on)
         // Online Sessions (round 168a): a plugin of this insert is not installed here, its stand-in render plays (an
         // amber R before the name)
         const auto standIn = engine.insertPlaysStandIn (t);
@@ -1465,7 +2015,8 @@ void MixerStrips::paint (juce::Graphics& g)
         const auto name = juce::String::fromUTF8 (track.name.c_str());
         if (const auto box = nameArea (t); ! sp.verticalName)
         {
-            textcache::drawFittedText (g, name, box.withTrimmedLeft (standIn || pluginOff ? 16 : 0), juce::Justification::centred, 1, 0.7f);
+            const auto room = box.withTrimmedLeft (standIn || pluginOff ? 16 : 0);
+            textcache::drawFittedText (g, fitMiddle (name, g.getCurrentFont(), (float) room.getWidth() / 0.7f), room, juce::Justification::centred, 1, 0.7f);
             if (standIn)
                 drawStandInTag (g, { (float) box.getX() + 1.0f, (float) box.getY() + 0.5f, 13.0f, 13.0f });
             else if (pluginOff)
@@ -1488,7 +2039,9 @@ void MixerStrips::paint (juce::Graphics& g)
             juce::Graphics::ScopedSaveState state (g);
             g.addTransform (juce::AffineTransform::rotation (-juce::MathConstants<float>::halfPi, (float) column.getCentreX(), (float) column.getCentreY()));
             const auto rotated = juce::Rectangle<int> (column.getHeight(), column.getWidth()).withCentre (column.getCentre());
-            textcache::drawFittedText (g, name, rotated, juce::Justification::centredLeft, 1, 0.8f); // (laid out once: round 173f)
+            // FL's middle ellipsis ("CUTLAY..idated)", FM-14) past what squeezing to 80 % fits
+            textcache::drawFittedText (g, fitMiddle (name, g.getCurrentFont(), (float) rotated.getWidth() / 0.8f), rotated, juce::Justification::centredLeft, 1,
+                                       0.8f); // (laid out once: round 173f)
         }
 
         // FL's narrow strips show the level beside the name too: two thin bars (Wide layouts)
@@ -1521,6 +2074,23 @@ void MixerStrips::paint (juce::Graphics& g)
         if (sp.stereoKnob)
             drawKnob (g, stereoArea (t).toFloat().withSizeKeepingCentre (stereoKnob, stereoKnob), (track.stereo + 1.0f) * 0.5f, true,
                       dragging (Part::stereo) ? colour::accent : colour::knobArc, hovered (Part::stereo) || dragging (Part::stereo));
+        // round 190lr (DF-80): FL's polarity and swap icons
+        if (const auto inv = invertIcon (t); ! inv.isEmpty())
+        {
+            const auto ink = [] (bool on, bool over) { return on ? juce::Colour (0xff7ccffe) : juce::Colour (0xffb1b7bb).withAlpha (over ? 1.0f : 0.85f); };
+            const auto a = inv.toFloat();
+            juce::Path p;
+            p.addTriangle (a.getCentreX() - 3.5f, a.getY() + 4.0f, a.getCentreX() + 3.5f, a.getY() + 4.0f, a.getCentreX(), a.getY());
+            p.addTriangle (a.getCentreX() - 3.5f, a.getBottom() - 4.0f, a.getCentreX() + 3.5f, a.getBottom() - 4.0f, a.getCentreX(), a.getBottom());
+            g.setColour (ink (track.invertPhase, hovered (Part::invert)));
+            g.fillPath (p);
+            const auto b = swapIcon (t).toFloat();
+            juce::Path q;
+            q.addTriangle (b.getX() + 1.0f, b.getCentreY(), b.getCentreX() - 1.0f, b.getY() + 1.0f, b.getCentreX() - 1.0f, b.getBottom() - 1.0f);
+            q.addTriangle (b.getRight() - 1.0f, b.getCentreY(), b.getCentreX() + 1.0f, b.getY() + 1.0f, b.getCentreX() + 1.0f, b.getBottom() - 1.0f);
+            g.setColour (ink (track.swapChannels, hovered (Part::swap)));
+            g.fillPath (q);
+        }
         }
 
         // mute and solo
@@ -1529,8 +2099,11 @@ void MixerStrips::paint (juce::Graphics& g)
             const auto led = compactLayout ? 10.0f : 12.0f;
             const auto m = muteArea (t).toFloat().withSizeKeepingCentre (led, led);
             g.setColour (muteLed (track.muted));
-            g.fillEllipse (m);
-            if (! track.muted || hovered (Part::mute))
+            if (track.lockState)
+                paintLockedLed (g, m); // round 190kn: FL's locked state (Shift+click), an open padlock in the LED's colour
+            else
+                g.fillEllipse (m);
+            if (! track.lockState && (! track.muted || hovered (Part::mute)))
             {
                 g.setColour (hovered (Part::mute) ? colour::textSecondary : colour::ledOn.withAlpha (0.25f));
                 g.drawEllipse (m.expanded (2.0f), 1.0f);
@@ -1556,9 +2129,11 @@ void MixerStrips::paint (juce::Graphics& g)
             {
                 const auto bar = juce::Rectangle<int> (meters.getX() + ch * (sp.meterWidth + 2), meters.getY(), sp.meterWidth, meters.getHeight());
                 theme::fillRoundRect (g, bar.toFloat(), 1.5f, colour::bg0);
-                if (! cachePainting) // (cached: the levels are drawn over the picture, paintMeterLevels)
+                if (! cachePainting && ! meterWaveforms) // (cached: the levels are drawn over the picture, paintMeterLevels)
                     paintMeterLevel (g, t, ch, bar);
             }
+            if (! cachePainting && meterWaveforms) // round 190lr (DF-60): FL's Waveforms view instead of the two bars
+                paintMeterWave (g, t, meters.withWidth (2 * sp.meterWidth + 2));
 
             if (hovered (Part::meter))
             {
@@ -1611,7 +2186,13 @@ void MixerStrips::paint (juce::Graphics& g)
             const auto cap = juce::Rectangle<float> (capWidth, 12.0f).withCentre ({ railX, capY });
             theme::fillRoundRect (g, cap.translated (0.0f, 1.5f), radius::sm, juce::Colours::black.withAlpha (0.35f));
             // same cap as the LookAndFeel's linear faders
-            theme::fillRoundRect (g, cap, radius::sm, capActive ? juce::Colour (0xffffffff) : juce::Colour (0xffd4d7dd));
+            // FL's fader colours (manual, Mixer › Level faders: "Grey (Default), Green (Selected), Orange (Armed for
+            // recording)"; details190if fl-fader-selected-green.png): LYNX's green LED colour and its warning orange
+            {
+                const auto armedCap = t > 0 && engine.isInsertArmed (t);
+                auto capColour = armedCap ? colour::warning : isSelected ? colour::ledOn : juce::Colour (0xffd4d7dd);
+                theme::fillRoundRect (g, cap, radius::sm, capActive ? (armedCap || isSelected ? capColour.brighter (0.25f) : juce::Colour (0xffffffff)) : capColour);
+            }
             g.setColour ((dragging (Part::fader) ? colour::accent : colour::bg0).withAlpha (0.8f));
             g.fillRect (cap.withSizeKeepingCentre (capWidth - 8.0f, 1.5f));
 
@@ -1642,6 +2223,48 @@ void MixerStrips::paint (juce::Graphics& g)
                 textcache::drawFittedText (g, text, badge.toNearestInt(), juce::Justification::centred, 1, 0.7f);
             }
         }
+
+        // FL's route arrow at the strip's foot (round 190io, design190ia FM-32; FL manual › Routing Iconography): the
+        // selected track's downward arrow, a hollow up-arrow where it can send, lit where it sends, greyed where it would
+        // loop; the small "Send in use" arrow above it on a track others send into
+        if (const auto foot = arrowArea (t); needs (foot))
+        {
+            const auto state = routearrow::of (song, selected, t);
+            const auto c = foot.toFloat().getCentre();
+            const auto w = compactLayout ? 9.0f : 11.0f, h = compactLayout ? 7.0f : 8.0f;
+            const auto top = (float) foot.getY() + 5.0f;
+            juce::Path arrow;
+            if (state == routearrow::State::out)
+                arrow.addTriangle (c.x - w * 0.5f, top, c.x + w * 0.5f, top, c.x, top + h);
+            else
+                arrow.addTriangle (c.x - w * 0.5f, top + h, c.x + w * 0.5f, top + h, c.x, top);
+            const auto hot = hovered (Part::route);
+            switch (state)
+            {
+                case routearrow::State::out: g.setColour (colour::ledOn); g.fillPath (arrow); break;
+                case routearrow::State::routed: g.setColour (hot ? colour::accentHover : colour::accent); g.fillPath (arrow); break;
+                case routearrow::State::available:
+                    g.setColour (hot ? colour::textPrimary : colour::textSecondary.withAlpha (0.75f));
+                    g.strokePath (arrow, juce::PathStrokeType (1.0f, juce::PathStrokeType::mitered));
+                    break;
+                case routearrow::State::blocked:
+                    g.setColour (colour::textDisabled.withAlpha (0.45f));
+                    g.strokePath (arrow, juce::PathStrokeType (1.0f, juce::PathStrokeType::mitered));
+                    break;
+                case routearrow::State::none: break;
+            }
+            if (state != routearrow::State::none && routearrow::receives (song, t)) // "Send in use"
+            {
+                juce::Path small;
+                small.addTriangle (c.x - 3.0f, top - 1.5f, c.x + 3.0f, top - 1.5f, c.x, top - 4.5f);
+                g.setColour (colour::textSecondary);
+                g.fillPath (small);
+            }
+        }
+
+        // issue #154 part 2 (round 190io): the insert's effects under the band, while the view is on
+        if (const auto list = insertsArea (t); ! list.isEmpty() && needs (list))
+            paintStripInserts (g, t);
 
         // round 186c's option: the selected insert's sends to deleted inserts, as a greyed dashed chip in its own (empty)
         // route-switch place: the deleted insert's name (or how many); the insert menu's "Disconnected links" acts on them
@@ -1713,6 +2336,7 @@ void MixerStrips::paint (juce::Graphics& g)
     }
     if (pass == dockOf (0))
     {
+        paintCurrentStrip (g); // (round 190mv)
         for (int i = 0; i < (int) vcaXs.size(); ++i)
             paintVcaStrip (g, i);
         if (showLoudness && g.clipRegionIntersects (loudnessArea().expanded (3)))
@@ -1772,6 +2396,11 @@ void MixerStrips::paintRouting (juce::Graphics& g)
 
 void MixerStrips::mouseDown (const juce::MouseEvent& e)
 {
+    if (onCurrentStrip (e.getPosition())) // round 190mv: FL's Current track
+    {
+        currentMouseDown (e);
+        return;
+    }
     if (const auto i = vcaAt (e.x); i >= 0)
     {
         vcaMouseDown (e, i);
@@ -1794,6 +2423,17 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
     const auto part = partAt (t, e.getPosition());
     headerDragTrack = -1;
     headerDragged = false;
+
+    // FL's track label: "Can be Middle-clicked ... to rename the track or recolor it" (round 190kn)
+    if (part == Part::header && e.mods.isMiddleButtonDown())
+    {
+        selectTrack (t);
+        runMenuItem (tr ("Rename, color and icon..."));
+        return;
+    }
+
+    if (part == Part::inserts && insertsMouseDown (e, t)) // issue #154 part 2 (round 190io)
+        return;
 
     if (part == Part::add && flmods::popup (e.mods))
     {
@@ -1839,7 +2479,7 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
                 selectTrack (free);
                 return;
             }
-        const auto added = (int) engine.getSong().mixer.size();
+        auto added = (int) engine.getSong().mixer.size();
         engine.editSong ([] (Song& s) {
             if (s.mixer.empty())
                 s.mixer = Song::defaultMixer (0);
@@ -1851,6 +2491,9 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
         });
         if (added < (int) engine.getSong().mixer.size())
         {
+            // (round 190mv: with FL's Current track, the new insert took its place and it moved one on)
+            if (const auto c = mixerops::currentTrack (engine.getSong()); c > 0)
+                added = c - 1;
             revealed.insert (added); // shown even while unused
             updateSize();
             selectTrack (added);
@@ -1933,6 +2576,28 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
+    // FL's mute switch (manual "Mixer › Mute Switch", round 190kn): Ctrl+right-click = Unmute All, Alt+click = solo the
+    // track with every track routed to and from it, Shift+click = Lock/Unlock State
+    if (part == Part::mute && e.mods.isRightButtonDown() && flmods::ctrl (e.mods))
+    {
+        engine.editSong ([] (Song& s) { mixerops::unmuteAll (s); });
+        ui::postHint ({ tr ("Unmute all: every mixer track unmuted and every solo cleared (locked tracks keep their state)"), {}, false, false }, 3000);
+        return;
+    }
+    if (part == Part::mute && e.mods.isAltDown() && ! flmods::popup (e.mods) && t > 0)
+    {
+        engine.editSong ([t] (Song& s) { mixerops::soloSelected (s, { t }, true); });
+        return;
+    }
+    if (part == Part::mute && e.mods.isShiftDown() && ! flmods::popup (e.mods))
+    {
+        engine.editSong ([t] (Song& s) { mixerops::toggleLockState (s, t); });
+        const auto locked = t < (int) engine.getSong().mixer.size() && engine.getSong().mixer[(std::size_t) t].lockState;
+        ui::postHint ({ locked ? tr ("State locked: a solo elsewhere doesn't silence this track (Shift+click again to unlock)")
+                               : tr ("State unlocked"), {}, false, false }, 3000);
+        repaint (muteArea (t).expanded (3));
+        return;
+    }
     if (part == Part::mute && (flmods::popup (e.mods) || flmods::ctrl (e.mods))) // solo on the same LED
     {
         soloExclusive (t);
@@ -2029,6 +2694,14 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
     {
         case Part::mute:
             engine.editSong ([t] (Song& s) { s.mixer[(std::size_t) t].muted = ! s.mixer[(std::size_t) t].muted; });
+            return;
+
+        case Part::invert: // round 190lr (DF-80)
+            engine.editSong ([t] (Song& s) { s.mixer[(std::size_t) t].invertPhase = ! s.mixer[(std::size_t) t].invertPhase; });
+            return;
+
+        case Part::swap:
+            engine.editSong ([t] (Song& s) { s.mixer[(std::size_t) t].swapChannels = ! s.mixer[(std::size_t) t].swapChannels; });
             return;
 
         case Part::solo:
@@ -2171,6 +2844,8 @@ void MixerStrips::stepRailOnce()
 
 void MixerStrips::mouseDrag (const juce::MouseEvent& e)
 {
+    if (insertsMouseDrag (e)) // issue #154 part 2: an effect dragged in / between the strips' lists
+        return;
     if (railStrip != railNone) // the cap goes on towards where the mouse is now
     {
         railMouseY = e.y;
@@ -2321,6 +2996,7 @@ void MixerStrips::setSelection (std::vector<int> tracks, int primary)
     selected = primary;
     keepSelectionShown();
     repaint();
+    publishCurrentSource();
 
     if (changed && onSelectionChanged)
         onSelectionChanged (selected);
@@ -2346,7 +3022,10 @@ bool MixerStrips::moveSelected (int delta)
 void MixerStrips::deleteTracks (std::vector<int> tracks)
 {
     const auto count = (int) engine.getSong().mixer.size();
-    tracks.erase (std::remove_if (tracks.begin(), tracks.end(), [count] (int t) { return t < 1 || t >= count; }), tracks.end());
+    // (round 190my: FL's Current track can't be deleted — its Delete is greyed, Del passes it by)
+    tracks.erase (std::remove_if (tracks.begin(), tracks.end(), [count, &song = engine.getSong()] (int t) {
+                      return t < 1 || t >= count || mixerops::isCurrentTrack (song, t);
+                  }), tracks.end());
     if (tracks.empty())
         return;
 
@@ -2360,9 +3039,15 @@ void MixerStrips::deleteTracks (std::vector<int> tracks)
     auto run = [safe, tracks] (mixerops::LinkedPlaylistTracks linked) {
         if (safe == nullptr)
             return;
-        safe->engine.editSongStructural ([&tracks, linked] (Song& s) { mixerops::deleteTracks (s, tracks, linked, MixerStrips::keepLostLinks); });
-        const auto first = juce::jlimit (0, (int) safe->engine.getSong().mixer.size() - 1, *std::min_element (tracks.begin(), tracks.end()));
+        int deleted = 0;
+        safe->engine.editSongStructural ([&tracks, linked, &deleted] (Song& s) { deleted = mixerops::deleteTracks (s, tracks, linked, MixerStrips::keepLostLinks); });
+        // issue #221 (round 190ng): with only the used inserts shown, the blank insert that takes a deleted one's number
+        // stays hidden (it looked as if Del did nothing) and the selection goes to a shown insert
+        safe->revealed = mixerops::revealedAfterDelete (safe->revealed, tracks);
+        const auto first = mixerops::selectionAfterDelete (safe->engine.getSong(), safe->revealed, *std::min_element (tracks.begin(), tracks.end()),
+                                                          MixerStrips::showUsedOnly);
         safe->setSelection ({ first }, first);
+        ui::postHint ({ tr ("Deleted {0} mixer track(s)", { juce::String (deleted) }), {}, false, false }, 3000);
     };
     auto confirmed = [safe, tracks, run] {
         if (safe == nullptr)
@@ -2399,6 +3084,56 @@ void MixerStrips::deleteTracks (std::vector<int> tracks)
                            messages::setShown ("DeleteMixerTrack", false);
                        confirmed();
                    });
+}
+
+// FL's Mixer menu › "Trim unused tracks" (round 190jv; REA FUN_012a6920 → FUN_012a65c0 / FUN_0127bcc0, removal by
+// FUN_012a5280 with flags 0x11, docs/analise/REA_rodada190jv.md): "Remove unused tracks|Select the mixer track types to be
+// removed." with two exclusive choices ("Unlinked tracks only" ticked) and OK / Cancel; then, when at least one track
+// would go, "Remove unused tracks|This will |delete| %d unused mixer track(s). Are you sure?" (Yes / No and Remember my
+// choice: FL's message 0x33 "TrimUnusedMixerTracks", File/Data). With none FL does nothing (LYNX: a hint). FL refuses the
+// whole trim while a plugin has "side routing"; LYNX renumbers those references, so it never refuses (MixerOps.h).
+void MixerStrips::trimUnusedTracks()
+{
+    juce::Component::SafePointer<MixerStrips> safe (this);
+    FlMessage ask { tr ("Remove unused tracks"), tr ("Select the mixer track types to be removed."), { tr ("OK"), tr ("Cancel") }, false };
+    ask.options = { tr ("Unlinked tracks only"), tr ("Unlinked and non-empty tracks") };
+    ask.icon = juce::MessageBoxIconType::WarningIcon;
+    showFlOptions (ask, [safe] (int button, int option) {
+        if (safe == nullptr || button != 1)
+            return;
+        const auto mode = option == 1 ? mixerops::TrimUnused::unlinkedAndNonEmpty : mixerops::TrimUnused::unlinkedOnly;
+        const auto count = (int) mixerops::unusedTracks (safe->engine.getSong(), mode).size();
+        if (count == 0)
+        {
+            ui::postHint ({ tr ("No unused mixer tracks"), {}, false, false }, 3000);
+            return;
+        }
+        auto run = [safe, mode] {
+            if (safe == nullptr)
+                return;
+            int removed = 0;
+            safe->engine.editSongStructural ([&removed, mode] (Song& s) { removed = mixerops::trimUnusedTracks (s, mode); });
+            safe->revealed.clear(); // (their numbers moved)
+            // FL keeps the selected number, the last track when it is past the end now (FUN_0128fa20)
+            const auto at = juce::jlimit (0, (int) safe->engine.getSong().mixer.size() - 1, safe->selected);
+            safe->setSelection ({ at }, at);
+            ui::postHint ({ tr ("Removed {0} unused insert(s)", { juce::String (removed) }), {}, false, false }, 3000);
+        };
+        if (! messages::shown ("TrimUnusedMixerTracks"))
+        {
+            run();
+            return;
+        }
+        showFlMessage ({ tr ("Remove unused tracks"), tr ("This will |delete| {0} unused mixer track(s). Are you sure?", { juce::String (count) }),
+                         { tr ("Yes"), tr ("No") }, true },
+                       [run] (int button, bool remember) {
+                           if (button != 1)
+                               return;
+                           if (remember)
+                               messages::setShown ("TrimUnusedMixerTracks", false);
+                           run();
+                       });
+    });
 }
 
 void MixerStrips::linkSelectedChannels (bool startingHere)
@@ -2506,6 +3241,9 @@ void MixerStrips::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWh
         return;
     }
 
+    if (! e.mods.isShiftDown() && insertsWheel (e, wheel.deltaY)) // issue #154 part 2: a long effects list scrolls
+        return;
+
     const auto t = trackAt (e.x);
 
     if (t > 0 && t < (int) engine.getSong().mixer.size() && e.mods.isShiftDown())
@@ -2537,6 +3275,8 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
 {
     if (dragVca >= 0)
         return vcaHint (dragVca, p);
+    if (onCurrentStrip (p) && dragPart == Part::none) // (round 190mv)
+        return currentHint();
     if (const auto i = vcaAt (p.x); i >= 0 && dragPart == Part::none)
         return vcaHint (i, p);
     if (showLoudness && dragPart == Part::none && loudnessArea().contains (p))
@@ -2608,13 +3348,32 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
         case Part::stereo:
         case Part::send:
             return ui::valueHint (specFor (part, t), valueOf (part, t), gesture);
-        case Part::mute: h.text = name + " - " + tr ("Click: mute.  Right-click or Ctrl+click: solo"); break;
+        case Part::mute:
+            h.text = name + " - " + tr ("Click: mute.  Right-click or Ctrl+click: solo.  Alt+click: solo with its routes.  Shift+click: lock the state.  Ctrl+right-click: unmute all");
+            if (song.mixer[(std::size_t) t].lockState)
+                h.value = tr ("State locked");
+            break;
         case Part::arm: h.text = name + " - " + mixerinput::armHint (engine, t); h.hasMenu = true; break;
         case Part::input: h.text = name + " - " + tr ("Input level of this insert's audio input  [LMB] choose the input"); h.hasMenu = true; break;
         case Part::solo: h.text = name + " - " + tr ("Solo"); break;
-        case Part::meter: h.text = name + " - " + tr ("Peak meter (left/right) with peak hold  [LMB] selects the track and clears the clip light"); break;
+        case Part::invert: h.text = name + " - " + tr ("Reverse polarity"); h.value = song.mixer[(std::size_t) t].invertPhase ? tr ("On") : tr ("Off"); break;
+        case Part::swap: h.text = name + " - " + tr ("Swap left and right"); h.value = song.mixer[(std::size_t) t].swapChannels ? tr ("On") : tr ("Off"); break;
+        case Part::meter:
+        {
+            h.text = name + " - " + tr ("Peak meter (left/right) with peak hold  [LMB] selects the track and clears the clip light");
+            // FL: "hovering your cursor over most peak meters will show the value at the pointer position" (round 190kn)
+            const auto m = meterArea (t);
+            const auto pos = juce::jlimit (0.0f, 1.0f, (float) (m.getBottom() - p.y) / (float) juce::jmax (1, m.getHeight()));
+            const auto db = meterscale::dbAtPosition (pos, meterscale::current()); // (FL's format, as its output meter: "-7.19dB 0.44")
+            h.value = juce::String (db, 2) + " dB  " + juce::String (juce::Decibels::decibelsToGain (db), 2);
+            break;
+        }
         case Part::route: h.text = name + " - " + tr ("Route the selected inserts to this one (drag after enabling: level). Ctrl+click: this track only, Shift: sidechain, Ctrl+Shift: sidechain only, right-click: menu"); h.hasMenu = true; break;
         case Part::add: h.text = tr ("Add a mixer insert"); break;
+        case Part::inserts: // issue #154 part 2 (round 190io); FL's Extra large list has no dots (round 190jd)
+            h.text = name + " - " + (flInsertList() ? tr ("Insert effects: [LMB] opens one  drag: reorder or onto another strip, [Ctrl] copies  [RMB] slot menu  [Wheel] scrolls") : tr ("Insert effects: [LMB] opens one  [LMB] on its dot: bypass  drag: reorder or onto another strip, [Ctrl] copies  [RMB] slot menu  [Wheel] scrolls"));
+            h.hasMenu = true;
+            break;
         case Part::fold:
             h.text = name + " - " + (mixerops::isFolded (song, t) ? tr ("Unfold this group  [Alt]+[LMB] all groups")
                                                                 : tr ("Fold this group to its bus strip, or to a slim tab  [Alt]+[LMB] all groups"));
@@ -2640,8 +3399,10 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
     return h;
 }
 
-void MixerStrips::mouseUp (const juce::MouseEvent&)
+void MixerStrips::mouseUp (const juce::MouseEvent& e)
 {
+    if (insertsMouseUp (e)) // issue #154 part 2
+        return;
     railRepeat.stopTimer();
     railStrip = railNone;
 
@@ -2718,6 +3479,7 @@ void MixerStrips::selectTrack (int track)
     selection = { selected };
     keepSelectionShown();
     repaint();
+    publishCurrentSource();
 
     if (onSelectionChanged)
         onSelectionChanged (selected);
@@ -3210,45 +3972,54 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
     // the tracks the "selected track(s)" items act on: the selection when the clicked track is in it
     const auto targets = std::find (selection.begin(), selection.end(), t) != selection.end() ? selection : std::vector<int> { t };
     const auto trackName = juce::String::fromUTF8 (song.mixer[(std::size_t) t].name.c_str());
+    // FL's Current track (round 190my, DF-82; capture 190my A1): its menu is an insert's with what can't apply to it
+    // greyed — Assign to new Audio track(s), Track routing, Compensate for master latency, Auto color group, Delete and
+    // the Insert items; its title is "Mixer track (Current)"
+    const auto isCurrent = mixerops::isCurrentTrack (song, t);
 
-    auto rename = [this, t] {
+    // issue #201 (round 190ll, core/SelectionRename.h): FL's "Set the selected Mixer Track name, color & icon" — with
+    // several selected, the colour goes to all of them and the name to the unnamed ones
+    auto rename = [this, t, targets] {
         if (t >= (int) engine.getSong().mixer.size())
             return;
         const auto& track = engine.getSong().mixer[(std::size_t) t];
-        showNameAndColourDialog (tr ("Rename track"), juce::String::fromUTF8 (track.name.c_str()), track.colour,
-                                 [this, t] (const juce::String& name, std::uint32_t colour) {
-                                     if (t < (int) engine.getSong().mixer.size())
-                                         engine.editSong ([t, n = name.trim().toStdString(), colour] (Song& s) {
-                                             if (! n.empty())
-                                                 s.mixer[(std::size_t) t].name = n;
-                                             s.mixer[(std::size_t) t].colour = colour;
-                                         });
-                                 });
+        // issue #220 (round 190ng): FL's "Rename, color and icon": the icon in the same window (FL: every selected track)
+        showNameColourIconDialog (tr ("Rename track"), juce::String::fromUTF8 (track.name.c_str()), track.colour, track.icon,
+                                  [this, t, targets, oldName = track.name, oldColour = track.colour, oldIcon = track.icon] (const juce::String& name, std::uint32_t colour, int icon) {
+                                      if (t < (int) engine.getSong().mixer.size())
+                                          engine.editSong ([t, targets, icon, oldIcon, r = selrename::Result { oldName, name.trim().toStdString(), oldColour, colour }] (Song& s) {
+                                              selrename::applyToMixer (s, t, targets, r);
+                                              if (icon >= 0 && icon != oldIcon)
+                                                  for (const auto x : targets)
+                                                      if (x >= 0 && x < (int) s.mixer.size())
+                                                          s.mixer[(std::size_t) x].icon = icon;
+                                          });
+                                  });
     };
 
     // the title band in the insert's colour (FL tints the whole menu); a double-click on it renames (issue #12)
     // FL: "Mixer tracks (N selected)" when the menu acts on several tracks
     const auto several = targets.size() > 1;
-    ui::addItemHeader (menu, several ? juce::String() : t == 0 ? tr ("Master") : tr ("Mixer track {0}", { juce::String (t) }),
+    ui::addItemHeader (menu, several ? juce::String() : t == 0 ? tr ("Master") : isCurrent ? tr ("Mixer track (Current)") : tr ("Mixer track {0}", { juce::String (t) }),
                        several ? tr ("Mixer tracks ({0} selected)", { juce::String ((int) targets.size()) }) : trackName,
                        song.mixer[(std::size_t) t].colour != 0 ? juce::Colour (song.mixer[(std::size_t) t].colour) : juce::Colour(), rename);
 
     // FL's first section: name and colour (REA_rodada115)
-    menu.addItem (tr ("Rename and color...") + "\tF2", rename);
-    menu.addItem (tr ("Change color..."), [this, t] { // (FL: the colour selector at once)
+    menu.addItem (tr ("Rename, color and icon...") + "\tF2", rename); // (FL's text; round 190ng: the dialog sets the icon too)
+    menu.addItem (tr ("Change color..."), [this, t, targets] { // (FL: the colour selector at once)
         const auto current = engine.getSong().mixer[(std::size_t) t].colour;
         const auto mouse = juce::Desktop::getMousePosition();
-        const auto set = [this, t] (std::uint32_t colour) {
+        const auto set = [this, t, targets] (std::uint32_t colour) { // (issue #201: every selected track)
             if (t < (int) engine.getSong().mixer.size())
-                engine.editSong ([t, colour] (Song& s) { s.mixer[(std::size_t) t].colour = colour; });
+                engine.editSong ([targets, colour] (Song& s) { selrename::colourMixer (s, targets, colour); });
         };
         ui::showColourPickerPopup ({ mouse.x, mouse.y, 1, 1 }, tr ("Change color..."), current != 0 ? juce::Colour (current) : juce::Colour (lynxPalette()[0]), {},
                                    [set] (juce::Colour c) { set (c.getARGB()); }, {}, [set] { set (0); });
     });
-    menu.addItem (tr ("Random color"), [this, t] {
+    menu.addItem (tr ("Random color"), [this, targets] {
         const auto& palette = lynxPalette();
         const auto colour = palette[(std::size_t) juce::Random::getSystemRandom().nextInt ((int) palette.size())];
-        engine.editSong ([t, colour] (Song& s) { s.mixer[(std::size_t) t].colour = colour; });
+        engine.editSong ([targets, colour] (Song& s) { selrename::colourMixer (s, targets, colour); }); // (issue #201)
     });
     // FL's "Gradient color..." (SetGradientColorMenuClick, REA_rodada177a §5): greyed below two selected tracks; the
     // Gradient editor starts from the first and the last selected track's colours
@@ -3286,7 +4057,7 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         };
         const auto anyLinked = std::any_of (targets.begin(), targets.end(), [&] (int x) { return x > 0 && linked (x); });
         const auto anyFree = std::any_of (targets.begin(), targets.end(), [&] (int x) { return x > 0 && ! linked (x); });
-        menu.addItem (tr ("Assign to new Audio track(s)"), anyFree, false,
+        menu.addItem (tr ("Assign to new Audio track(s)"), anyFree && ! isCurrent, false,
                       [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::assignNewAudioTracks (s, targets); }); });
         menu.addItem (tr ("Unassign from Audio track(s)"), anyLinked, false,
                       [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::unassignAudioTracks (s, targets); }); });
@@ -3366,16 +4137,16 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
     menu.addSectionHeader (tr ("Routing"));
     {
         juce::PopupMenu channels;
-        channels.addItem (tr ("Route selected channels to this track") + "\tCtrl+L", [this, t] {
+        channels.addItem (tr ("Route selected channels to this track") + "\tCtrl+L", ! isCurrent, false, [this, t] {
             setSelection (selection, t);
             linkSelectedChannels (false);
         });
-        channels.addItem (tr ("Route selected channels starting from this track") + "\tCtrl+Shift+L", [this, t] {
+        channels.addItem (tr ("Route selected channels starting from this track") + "\tCtrl+Shift+L", ! isCurrent, false, [this, t] {
             setSelection (selection, t);
             linkSelectedChannels (true);
         });
         if (channel < (int) song.channels.size())
-            channels.addItem (tr ("Route channel \"{0}\" here", { juce::String::fromUTF8 (song.channels[(std::size_t) channel].name.c_str()) }),
+            channels.addItem (tr ("Route channel \"{0}\" here", { juce::String::fromUTF8 (song.channels[(std::size_t) channel].name.c_str()) }), ! isCurrent, false,
                               [this, channel, t] { engine.editSong ([channel, t] (Song& s) { s.channels[(std::size_t) channel].mixerTrack = t; }); });
         menu.addSubMenu (tr ("Channel routing"), channels);
     }
@@ -3413,7 +4184,7 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         routing.addItem (tr ("Route this track to selected only"), any && thisIsInsert, false, [thisToSel] { thisToSel (K::routeOnly); });
         routing.addItem (tr ("Sidechain this track to selected"), any && thisIsInsert, false, [thisToSel] { thisToSel (K::sidechain); });
         routing.addItem (tr ("Sidechain this track to selected only"), any && thisIsInsert, false, [thisToSel] { thisToSel (K::sidechainOnly); });
-        menu.addSubMenu (tr ("Track routing"), routing, any);
+        menu.addSubMenu (tr ("Track routing"), routing, any && ! isCurrent);
         // round 186c's option: the sends this insert lost when their insert was deleted (greyed in the routing lane)
         if (t > 0 && ! song.mixer[(std::size_t) t].lostSends.empty())
         {
@@ -3512,7 +4283,7 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                     engine.setInsertArmed (x, false);
         });
     }
-    menu.addItem (tr ("Compensate for master latency"), song.mixer[(std::size_t) t].outputChannel >= 0, song.mixer[(std::size_t) t].compensateMasterLatency, [this, t] {
+    menu.addItem (tr ("Compensate for master latency"), song.mixer[(std::size_t) t].outputChannel >= 0 && ! isCurrent, song.mixer[(std::size_t) t].compensateMasterLatency, [this, t] {
         engine.editSong ([t] (Song& s) { s.mixer[(std::size_t) t].compensateMasterLatency = ! s.mixer[(std::size_t) t].compensateMasterLatency; });
     });
     // FL's track latency (the "Track latency compensation" label's menu, REA round 165f-mixer)
@@ -3556,7 +4327,7 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
             engine.editSong ([targets, on] (Song& s) { mixerops::setSeparator (s, targets, ! on); });
         });
         menu.addItem (tr ("Create group"), [this, targets, t] { engine.editSong ([targets, t] (Song& s) { mixerops::createGroup (s, targets, t); }); });
-        menu.addItem (tr ("Auto color group"), song.mixer[(std::size_t) t].colour != 0, false,
+        menu.addItem (tr ("Auto color group"), song.mixer[(std::size_t) t].colour != 0 && ! isCurrent, false,
                       [this, t] { engine.editSong ([t] (Song& s) { mixerops::autoColorGroup (s, t); }); });
         // LYNX's addition (round 177a): a group folds to its bus strip, or to a slim tab when it has no bus
         const auto canFold = mixerops::canFold (song, t);
@@ -3629,8 +4400,8 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
             moveSelected (1);
         });
         menu.addSeparator();
-        menu.addItem (tr ("Delete") + "\tDel", [this, targets] { deleteTracks (targets); });
-        const auto room = (int) song.mixer.size() < maxMixerTracks;
+        menu.addItem (tr ("Delete") + "\tDel", ! isCurrent, false, [this, targets] { deleteTracks (targets); });
+        const auto room = (int) song.mixer.size() < maxMixerTracks && ! isCurrent;
         menu.addItem (tr ("Insert one"), room, false, [this, t] {
             engine.editSong ([t] (Song& s) { mixerops::insertTrack (s, t); });
             setSelection ({ t }, t);
@@ -3731,9 +4502,26 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                      [this] { engine.editSong ([] (Song& s) { s.autoPdc = ! s.autoPdc; }); });
         pdc.addItem (tr ("Compensate automations (delay a plugin's automation with its audio)"), true, song.compensateAutomations,
                      [this] { engine.editSong ([] (Song& s) { s.compensateAutomations = ! s.compensateAutomations; }); });
+        // round 190hq (LYNX extra, Song::compensateMixerLevels): the faders, pans, route levels and VCA faders too
+        pdc.addItem (tr ("Compensate fader and route automations too (LYNX)"), song.compensateAutomations, song.compensateMixerLevels,
+                     [this] { engine.editSong ([] (Song& s) { s.compensateMixerLevels = ! s.compensateMixerLevels; }); });
         menu.addSubMenu (tr ("Plugin delay compensation"), pdc);
     }
+    {
+        // round 190lr (DF-60): FL's View submenu, with its Waveforms switch (Alt+W)
+        juce::PopupMenu view;
+        view.addItem (tr ("Waveforms") + "\tAlt+W", true, meterWaveforms, [this] {
+            setMeterWaveforms (! meterWaveforms);
+            if (mixeroptions::changed)
+                mixeroptions::changed();
+        });
+        menu.addSubMenu (tr ("View"), view);
+    }
     menu.addSubMenu (tr ("Mixer layout"), MixerLayoutBox::menu (*this)); // as the title bar's drop-down (issue #52)
+    // FL's Options section: after View / Detached and a separator, "Trim unused tracks" (round 190jv, REA FUN_012a6920)
+    menu.addSeparator();
+    menu.addItem (tr ("Trim unused tracks"), [this] { trimUnusedTracks(); });
+    menu.addSeparator();
     mixeroptions::addItems (menu, engine, false);
 
     return menu;
@@ -3799,6 +4587,7 @@ void MixerStrips::changeListenerCallback (juce::ChangeBroadcaster*)
         shownLevels[t] = { mixer[t].volume, mixer[t].pan, mixer[t].stereo };
 
     selected = juce::jlimit (0, juce::jmax (0, (int) engine.getSong().mixer.size() - 1), selected);
+    publishCurrentSource(); // (round 190mv: a new project, an edit that moved the tracks)
     const auto count = (int) engine.getSong().mixer.size();
     selection.erase (std::remove_if (selection.begin(), selection.end(), [count] (int t) { return t >= count; }), selection.end());
     if (! std::binary_search (selection.begin(), selection.end(), selected))
@@ -4069,6 +4858,75 @@ void MixerStrips::showLoudnessMenu()
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
 }
 
+void MixerStrips::setMeterWaveforms (bool on)
+{
+    meterWaveforms = on;
+    waveRing.clear();
+    waveFrameMax.clear();
+    waveQuiet.clear();
+    waveHead = 0;
+    waveAccumMs = 0.0;
+    repaint();
+}
+
+// Round 190lr (DF-60): one row per 1/70 s (FL's scroll, filmed: ~7 px per 100 ms), each the loudest block peak since the
+// row before; only the wells that still show sound repaint
+void MixerStrips::advanceWaves (double elapsedMs, juce::Rectangle<int>& dirty, bool showing)
+{
+    const auto count = levels.size();
+    if (waveRing.size() != (std::size_t) waveRows * count)
+    {
+        waveRing.assign ((std::size_t) waveRows * count, 0.0f);
+        waveFrameMax.assign (count, 0.0f);
+        waveQuiet.assign (count, waveRows);
+        waveHead = 0;
+    }
+    constexpr double rowMs = 1000.0 / 70.0;
+    waveAccumMs = juce::jmin (waveAccumMs + elapsedMs, rowMs * 16.0);
+    auto rows = 0;
+    for (; waveAccumMs >= rowMs; waveAccumMs -= rowMs, ++rows)
+    {
+        waveHead = (waveHead + 1) % waveRows;
+        for (std::size_t i = 0; i < count; ++i)
+        {
+            const auto v = waveFrameMax[i];
+            waveRing[(std::size_t) waveHead * count + i] = v;
+            waveQuiet[i] = v > 1.0e-4f ? 0 : juce::jmin (waveRows, waveQuiet[i] + 1);
+        }
+        std::fill (waveFrameMax.begin(), waveFrameMax.end(), 0.0f);
+    }
+    if (rows == 0 || ! showing)
+        return;
+    for (int t = 0; t < (int) count / 2; ++t)
+        if ((waveQuiet[(std::size_t) t * 2] < waveRows || waveQuiet[(std::size_t) t * 2 + 1] < waveRows) && ! isHidden (t) && ! isFoldTab (t))
+        {
+            const auto area = meterArea (t).expanded (1);
+            dirty = dirty.isEmpty() ? area : dirty.getUnion (area);
+        }
+}
+
+void MixerStrips::paintMeterWave (juce::Graphics& g, int t, juce::Rectangle<int> area) const
+{
+    const auto count = levels.size();
+    if (waveRing.size() != (std::size_t) waveRows * count || t < 0 || (std::size_t) t * 2 + 1 >= count)
+        return;
+    const auto silenced = isSilenced (t);
+    const auto tone = [silenced] (juce::Colour c) { return silenced ? silencedMeterColour (c) : c; };
+    const auto mid = (float) area.getCentreX();
+    const auto half = (float) area.getWidth() * 0.5f;
+    for (int y = 0; y < area.getHeight() && y < waveRows; ++y)
+    {
+        const auto row = (std::size_t) ((waveHead - y + waveRows) % waveRows) * count; // (the newest at the top)
+        const auto l = waveRing[row + (std::size_t) t * 2], r = waveRing[row + (std::size_t) t * 2 + 1];
+        if (l <= 1.0e-4f && r <= 1.0e-4f)
+            continue;
+        const auto loud = juce::jmax (l, r);
+        g.setColour (tone (loud >= 1.0f ? theme::colour::meterClip : loud >= meters::flTickOrange ? theme::colour::meterMid : theme::colour::meterLow));
+        const auto wl = half * meterPosition (l), wr = half * meterPosition (r);
+        g.fillRect (juce::Rectangle<float> (mid - wl, (float) (area.getY() + y), wl + wr, 1.0f));
+    }
+}
+
 // One meter's level, peak hold line and clip latch, inside its well (painted with the strip, or over the cached picture)
 void MixerStrips::paintMeterLevel (juce::Graphics& g, int t, int ch, juce::Rectangle<int> bar) const
 {
@@ -4093,7 +4951,9 @@ void MixerStrips::paintMeterLevel (juce::Graphics& g, int t, int ch, juce::Recta
     if (meter.peak > 0.001f) // peak hold line
     {
         const auto peakY = bar.getBottom() - (int) (meterPosition (meter.peak) * (float) bar.getHeight());
-        g.setColour (tone (meter.peak >= 1.0f ? colour::meterClip : meter.peak >= 0.5f ? colour::meterMid : colour::textPrimary.withAlpha (0.85f)));
+        // FL's peak tick is in the meter's own colour (its lime; details190if fl-mixer-meters-strips-3frames.png; round 190io),
+        // orange above about -3 dB (live check 190iw Q6, round 190jd)
+        g.setColour (tone (meter.peak >= 1.0f ? colour::meterClip : meter.peak >= meters::flTickOrange ? colour::meterMid : colour::meterLow));
         g.fillRect (bar.getX(), juce::jmax (bar.getY(), peakY - 1), bar.getWidth(), 2);
     }
 
@@ -4145,11 +5005,21 @@ void MixerStrips::paintMeterLevels (juce::Graphics& g) const
         if (dockOf (t) == MixerDock::middle)
             for (const auto& r : pinned)
                 g.excludeClipRegion (r);
-        if (meterShown)
+        if (meterShown && meterWaveforms) // round 190lr (DF-60): FL's Waveforms view instead of the two bars
+            paintMeterWave (g, t, meters.withWidth (2 * sp.meterWidth + 2));
+        else if (meterShown)
             for (int ch = 0; ch < 2; ++ch)
                 paintMeterLevel (g, t, ch, juce::Rectangle<int> (meters.getX() + ch * (sp.meterWidth + 2), meters.getY(), sp.meterWidth, meters.getHeight()));
         if (barsShown)
             paintNameBars (g, t);
+    }
+    if (currentMeter().intersects (clip)) // (round 190mv: the Current track's meter)
+    {
+        const juce::Graphics::ScopedSaveState state (g);
+        if (dockOf (0) == MixerDock::middle)
+            for (const auto& r : pinned)
+                g.excludeClipRegion (r);
+        paintCurrentMeter (g);
     }
     for (int i = 0; i < (int) vcaXs.size(); ++i)
         if (meterArea (vcaStrip (i)).intersects (clip))
@@ -4217,12 +5087,19 @@ bool MixerStrips::liveFrame (double nowMs)
     // against one repaint per meter favoured the single rectangle, within the noise of the machine)
     juce::Rectangle<int> dirty;
     int woken = -1;
+    // round 190mv: the Current track's strip shows its own meter, or the selected track's before it exists
+    const auto currentShown = [this] {
+        const auto c = mixerops::currentTrack (engine.getSong());
+        return c > 0 ? c : juce::jmax (0, selected);
+    }();
     for (std::size_t i = 0; i < levels.size(); ++i)
     {
         auto& m = levels[i];
         const auto before = m;
         const auto peak = meters.takePeak ((int) (i / 2), (int) (i % 2));
-        m.advance (peak, elapsed); // ~20 dB/s falloff, 1.5 s peak hold
+        m.advanceFl (peak, elapsed); // ~20 dB/s bar falloff; FL's 2.6 s peak hold, then an accelerating fall (round 190jd)
+        if (meterWaveforms && i < waveFrameMax.size()) // (round 190lr: the frame's peak for the waveform's next row)
+            waveFrameMax[i] = juce::jmax (waveFrameMax[i], peak);
         // "Show only used inserts" (round 190am): an insert that receives audio always shows, whatever feeds it
         if (showUsedOnly && peak > 1.0e-4f && i >= 2 && revealed.count ((int) (i / 2)) == 0 && isHidden ((int) (i / 2)))
             woken = (int) (i / 2);
@@ -4242,6 +5119,8 @@ bool MixerStrips::liveFrame (double nowMs)
             const juce::Rectangle<int> bar (stripX (tab) + foldTabWidth - 10, rail.getY() - 1, 8, rail.getHeight() + 2);
             dirty = dirty.isEmpty() ? bar : dirty.getUnion (bar);
         }
+        if (t == currentShown && currentX != hiddenX && (m.level != before.level || m.peak != before.peak))
+            dirty = dirty.isEmpty() ? currentMeter().expanded (1) : dirty.getUnion (currentMeter().expanded (1));
         if (isHidden (t) || isFoldTab (t))
             continue;
         const auto area = meterArea (t);
@@ -4278,6 +5157,11 @@ bool MixerStrips::liveFrame (double nowMs)
                 }
                 was = level;
             }
+    }
+    if (meterWaveforms) // round 190lr (DF-60)
+    {
+        advanceWaves (elapsed, dirty, showing);
+        moving = moving || std::any_of (waveQuiet.begin(), waveQuiet.end(), [] (int q) { return q < waveRows; });
     }
     // the loudness panel (round 190am; nothing while it is off): repainted when a shown number or the bar changes
     if (showLoudness && showing)
@@ -4320,7 +5204,7 @@ const EffectKind allEffects[] = { EffectKind::eq,     EffectKind::parametricEq, 
                                       EffectKind::delay,  EffectKind::reverb,       EffectKind::chorus,     EffectKind::filter,
                                       EffectKind::distortion, EffectKind::utility, EffectKind::volumeGate,
                                       EffectKind::pitchShift, EffectKind::freqShift, EffectKind::lofi, EffectKind::effector, EffectKind::crossover, EffectKind::frequencySplitter, EffectKind::autoPan, EffectKind::vocoder, EffectKind::pitchCorrect,
-                                      EffectKind::ridgeStrip, EffectKind::glowLeveler, EffectKind::hushDeEsser, EffectKind::aether, EffectKind::ember, EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, EffectKind::strikeShaper, EffectKind::anvilBus, // LYNX's mixing suite
+                                      EffectKind::ridgeStrip, EffectKind::glowLeveler, EffectKind::hushDeEsser, EffectKind::aether, EffectKind::ember, EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, EffectKind::strikeShaper, EffectKind::anvilBus, EffectKind::corrode, EffectKind::soundboard, EffectKind::platter, EffectKind::timeprism, EffectKind::harmonia, // LYNX's mixing suite
                                       EffectKind::lynxTune, // LYNX's own pitch corrector
                                       EffectKind::epochVerb, EffectKind::atrium, EffectKind::foilPlate, EffectKind::nebula, EffectKind::halo, EffectKind::horizon, // LYNX's reverbs
                                       EffectKind::echoform, EffectKind::spiralEcho, EffectKind::orbit, EffectKind::latticeMod, // LYNX's delay / modulation suite
@@ -4418,8 +5302,72 @@ EffectsPanel::EffectsPanel (AudioEngine& e)
     showingTimer = std::make_unique<ui::TimerWhileShowing> (*this, static_cast<juce::Timer&> (*this), 30); // (stopped while hidden; round 174f)
 }
 
+// issue #206 (round 190lw): the second press of a double-click on an empty slot. The first press opened the slot's menu at
+// the mouse, so the second one reaches that menu's window: a desktop-wide listener sees it there, closes the menu (no
+// item is chosen: the menu is dismissed before the button comes up) and opens the effect search. Any later press ends
+// the watch; nothing runs while no slot menu was just opened.
+struct EffectsPanel::SecondClickWatch final : public juce::MouseListener
+{
+    explicit SecondClickWatch (EffectsPanel& p) : panel (p) {}
+    ~SecondClickWatch() override { stop(); }
+
+    void start (secondclick::Press press, int slotRow)
+    {
+        first = press;
+        row = slotRow;
+        if (! listening)
+            juce::Desktop::getInstance().addGlobalMouseListener (this);
+        listening = true;
+    }
+    void stop()
+    {
+        if (listening)
+            juce::Desktop::getInstance().removeGlobalMouseListener (this);
+        listening = false;
+        first = {};
+    }
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        if (e.eventComponent == &panel) // (the panel's own presses arm the watch again)
+            return;
+        const auto at = e.getScreenPosition();
+        const auto second = e.mods.isLeftButtonDown()
+                            && secondclick::isSecond (first, { at.x, at.y, (std::int64_t) juce::Time::getMillisecondCounter() },
+                                                      (std::int64_t) juce::MouseEvent::getDoubleClickTimeout());
+        const auto slot = row;
+        stop();
+        if (! second)
+            return;
+        juce::PopupMenu::dismissAllActiveMenus();
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<EffectsPanel> (&panel), slot] {
+            if (safe != nullptr)
+                safe->showSlotSearch (slot);
+        });
+    }
+
+    EffectsPanel& panel;
+    secondclick::Press first;
+    int row = -1;
+    bool listening = false;
+};
+
+void EffectsPanel::armSecondClick (const juce::MouseEvent& e, int row)
+{
+    if (secondClick == nullptr)
+        secondClick = std::make_unique<SecondClickWatch> (*this);
+    const auto at = e.getScreenPosition();
+    secondClick->start ({ at.x, at.y, (std::int64_t) juce::Time::getMillisecondCounter() }, row);
+}
+
+void EffectsPanel::disarmSecondClick()
+{
+    if (secondClick != nullptr)
+        secondClick->stop();
+}
+
 EffectsPanel::~EffectsPanel()
 {
+    secondClick.reset();
     engine.removeChangeListener (this);
 }
 
@@ -4880,6 +5828,7 @@ namespace mixeroptions
 std::function<void()> changed;
 std::function<void (bool)> setShowUsedOnly;
 std::function<void (bool)> setShowLoudness;
+std::function<void (bool)> setShowStripInserts;
 std::function<void (std::vector<int>, std::function<void (const std::vector<juce::File>&)>)> renderTracks;
 std::function<void (std::vector<int>)> selectPlaylistTracks;
 
@@ -4903,6 +5852,54 @@ void askNumber (const juce::String& title, const juce::String& text, int value, 
     }), true);
 }
 } // namespace
+
+juce::PopupMenu snapshotsMenu (AudioEngine& engine)
+{
+    // Round 190hp (slice B16 of the 0.1.28 pain report; LYNX's own, core/MixSnapshots.h): take, recall and compare whole
+    // mixes. Each change is one undo step.
+    const auto& song = engine.getSong();
+    juce::PopupMenu menu;
+    const auto count = (int) song.mixSnapshots.size();
+    const auto full = count >= maxMixSnapshots;
+    menu.addItem (full ? tr ("Take snapshot (at most {0})", { juce::String (maxMixSnapshots) }) : tr ("Take snapshot"), ! full, false, [&engine] {
+        int made = -1;
+        engine.editSong ([&made] (Song& s) { made = mixsnap::take (s, tr ("Snapshot").toStdString()); });
+        if (made >= 0)
+            ui::postHint ({ tr ("Mix saved as \"{0}\"", { juce::String::fromUTF8 (engine.getSong().mixSnapshots[(std::size_t) made].name.c_str()) }), {}, false, false }, 2500);
+    });
+    const auto ab = mixsnap::canCompare (song);
+    menu.addItem (ab ? tr ("Compare A/B: back to \"{0}\"", { juce::String::fromUTF8 (song.mixSnapshots[(std::size_t) song.mixSnapshotPrevious].name.c_str()) })
+                     : tr ("Compare A/B"),
+                  ab, false, [&engine] { engine.editSong ([] (Song& s) { mixsnap::compareAB (s); }); });
+    if (count == 0)
+        return menu;
+    menu.addSeparator();
+    for (int i = 0; i < count; ++i)
+    {
+        const auto& snap = song.mixSnapshots[(std::size_t) i];
+        const auto name = juce::String::fromUTF8 (snap.name.c_str());
+        // ticked: the mix is this snapshot now
+        const auto now = mixsnap::matches (song, snap);
+        juce::PopupMenu one;
+        one.addItem (tr ("Recall"), true, false, [&engine, i] { engine.editSong ([i] (Song& s) { mixsnap::recall (s, i); }); });
+        one.addItem (tr ("Update to the current mix"), ! now, false, [&engine, i] { engine.editSong ([i] (Song& s) { mixsnap::update (s, i); }); });
+        one.addItem (tr ("Rename..."), [&engine, i, name] {
+            auto* w = new juce::AlertWindow (tr ("Rename snapshot"), {}, juce::MessageBoxIconType::NoIcon);
+            w->addTextEditor ("name", name);
+            w->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+            w->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+            w->enterModalState (true, juce::ModalCallbackFunction::create ([w, &engine, i] (int result) {
+                const auto typed = w->getTextEditorContents ("name").trim().toStdString();
+                if (result == 1 && ! typed.empty())
+                    engine.editSong ([i, typed] (Song& s) { mixsnap::rename (s, i, typed); });
+            }), true);
+        });
+        one.addSeparator();
+        one.addItem (tr ("Delete"), [&engine, i] { engine.editSong ([i] (Song& s) { mixsnap::remove (s, i); }); });
+        menu.addSubMenu (name + (i == song.mixSnapshotCurrent ? "  (A)" : i == song.mixSnapshotPrevious ? "  (B)" : ""), one, true, juce::Image(), now);
+    }
+    return menu;
+}
 
 void addItems (juce::PopupMenu& menu, AudioEngine& engine, bool newProjects)
 {
@@ -4930,6 +5927,15 @@ void addItems (juce::PopupMenu& menu, AudioEngine& engine, bool newProjects)
             MixerStrips::showUsedOnly = on;
         notifyChanged();
     });
+    // LYNX's own (issue #154 part 2, round 190io; off = FL's mixer): each strip lists its insert's effects
+    menu.addItem (tr ("Insert effects on the strips (LYNX)"), true, MixerStrips::showStripInserts, [] {
+        const auto on = ! MixerStrips::showStripInserts;
+        if (setShowStripInserts)
+            setShowStripInserts (on);
+        else
+            MixerStrips::showStripInserts = on;
+        notifyChanged();
+    });
     // LYNX's own (round 190am; off = FL's mixer): the Master's loudness in LUFS and its true peak, beside the Master
     menu.addItem (tr ("Loudness meter beside the Master (LYNX)"), true, MixerStrips::showLoudness, [] {
         const auto on = ! MixerStrips::showLoudness;
@@ -4939,6 +5945,7 @@ void addItems (juce::PopupMenu& menu, AudioEngine& engine, bool newProjects)
             MixerStrips::showLoudness = on;
         notifyChanged();
     });
+    menu.addSubMenu (tr ("Mix snapshots (LYNX)"), snapshotsMenu (engine));
     menu.addItem (tr ("Remove unused inserts at the end"), song.mixer.size() > 1 && ! song.insertInUse ((int) song.mixer.size() - 1), false, [&engine] {
         int removed = 0;
         engine.editSong ([&removed] (Song& s) { removed = mixerops::removeUnusedTrailingInserts (s); });
@@ -5469,8 +6476,12 @@ void EffectsPanel::paint (juce::Graphics& g)
         }
 
         auto box = inputBoxBounds().toFloat();
+        // round 190ir: armed without an input records nothing (FL arms anyway; at FL's default "Post EQ" the take is the
+        // insert's own output, silence when no channel plays into it): the box says so in the record colour
+        const auto armedNoInput = mt.inputChannel < 0 && engine.isInsertArmed (track)
+                                  && std::none_of (song.channels.begin(), song.channels.end(), [t = track] (const ChannelDef& c) { return c.mixerTrack == t; });
         theme::fillRoundRect (g, box, radius::sm, hoverInput == 2 ? colour::bg4 : colour::bg3);
-        g.setColour (hoverInput == 2 ? colour::borderStrong : colour::border);
+        g.setColour (armedNoInput ? colour::record : hoverInput == 2 ? colour::borderStrong : colour::border);
         g.drawRoundedRectangle (box.reduced (0.5f), radius::sm, 1.0f);
 
         // the level, as a thin bar along the bottom of the box (left over right)
@@ -5491,8 +6502,9 @@ void EffectsPanel::paint (juce::Graphics& g)
         icons::draw (g, Icon::mic, box.withWidth (18.0f).reduced (2.0f).translated (3.0f, -1.0f), mt.inputChannel >= 0 ? colour::textPrimary : colour::textDisabled);
         const auto names = engine.getInputChannelNames();
         const auto label = mt.inputChannel >= 0 ? juce::String::fromUTF8 (inputSourceName (mt.inputChannel, mt.inputStereo, names).c_str())
-                                                : tr ("No audio input");
-        g.setColour (mt.inputChannel >= 0 ? colour::textPrimary : colour::textSecondary);
+                           : armedNoInput         ? tr ("Choose an input to record")
+                                                  : tr ("No audio input");
+        g.setColour (mt.inputChannel >= 0 ? colour::textPrimary : armedNoInput ? colour::record : colour::textSecondary);
         g.setFont (font (type::body));
         textcache::drawText (g, label, box.withTrimmedLeft (24.0f).withTrimmedRight (18.0f).translated (0.0f, -1.0f).toNearestInt(), juce::Justification::centredLeft, true);
         icons::draw (g, Icon::chevronDown, box.removeFromRight (18.0f).reduced (4.0f).translated (-2.0f, -1.0f), colour::textSecondary);
@@ -5556,7 +6568,10 @@ void EffectsPanel::paint (juce::Graphics& g)
             else
             {
                 g.setColour (muteLed (! slot.enabled));
-                g.fillEllipse (ledArea);
+                if (slot.lockState) // round 190ld: FL's slot LED "the same as for the Mixer Track mute LEDs": Shift+click locks
+                    paintLockedLed (g, ledArea.expanded (2.0f));
+                else
+                    g.fillEllipse (ledArea);
             }
             if (slotHovered && hoverLed)
             {
@@ -5961,6 +6976,9 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
         const auto i = effectIn (row);
         if (i < 0)
         {
+            // issue #206: a second press soon after, on the menu, is a double-click: the effect search instead
+            if (e.mods.isLeftButtonDown() && ! e.mods.isAnyModifierKeyDown())
+                armSecondClick (e, row);
             showAddMenu (row); // (FL: the plugin lands in this slot)
             return;
         }
@@ -5997,6 +7015,12 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
 
         if (flmods::popup (e.mods) || (e.mods.isShiftDown() && ! ledBounds (row).contains (e.getPosition()))) // (FL: Shift+click = the menu)
             showSlotMenu (i);
+        else if (ledBounds (row).contains (e.getPosition()) && e.mods.isShiftDown())
+            // FL's slot LED: Shift+click = "Lock/Unlock State", as on the track's mute switch (round 190ld)
+            engine.editSong ([t = track, i] (Song& song) { mixerops::toggleSlotLock (song, t, i); });
+        else if (ledBounds (row).contains (e.getPosition()) && (flmods::ctrl (e.mods) || e.mods.isAltDown()))
+            // FL's slot LED: "Solo/Unsolo - (Ctrl+Left-Click), (Alt/Opt+Left-Click)" (round 190kn)
+            engine.editSong ([t = track, i] (Song& song) { mixerops::soloSlot (song, t, i); });
         else if (ledBounds (row).contains (e.getPosition())) // LED: bypass
             engine.editSong ([t = track, i] (Song& song) {
                 auto& slot = song.mixer[(std::size_t) t].effects[(std::size_t) i];
@@ -6367,6 +7391,7 @@ ui::Hint EffectsPanel::hintAt (juce::Point<int> p)
                 return h;
             }
             h.text = used ? (arrowBounds (i).contains (p) ? tr ("Effect slot options: replace, move, delete...")
+                             : ledBounds (i).contains (p) ? tr ("Effect on/off: click bypasses.  Ctrl+click or Alt+click: solo this effect (again: all on).  Shift+click: lock its state")
                                                           : tr ("Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options"))
                           : tr ("Empty slot: click to add an effect");
             h.hasMenu = used;
@@ -6568,6 +7593,16 @@ void EffectsPanel::mouseDoubleClick (const juce::MouseEvent& e)
             setValue (eqControl, -1, specFor (eqControl, -1).defaultValue);
         return;
     }
+
+    // issue #206: a double-click on an empty slot that reached the panel (no menu came between the clicks)
+    if (! e.mods.isAnyModifierKeyDown())
+        for (int row = 0; row < maxEffectSlots; ++row)
+            if (slotBounds (row).contains (e.getPosition()) && effectIn (row) < 0)
+            {
+                juce::PopupMenu::dismissAllActiveMenus();
+                showSlotSearch (row);
+                return;
+            }
 
     for (int i = 0; slots() != nullptr && i < (int) slots()->size(); ++i)
         if (mixBounds (rowOf (i)).contains (e.getPosition()))
@@ -6887,27 +7922,7 @@ void EffectsPanel::showAddMenu (int row)
     juce::PopupMenu menu;
 
     // the effect lands in the clicked empty slot (FL's slot places, round 170b); returns its index, -1 = not added
-    auto place = [this, row] (EffectSlot fx) {
-        int at = -1;
-        engine.editSong ([t = track, row, &fx, &at] (Song& song) {
-            if (t < 0 || t >= (int) song.mixer.size() || (int) song.mixer[(std::size_t) t].effects.size() >= maxEffectSlots)
-                return;
-            at = mixerops::insertEffectAtRow (song, t, fx, row);
-            if (at < 0)
-            {
-                song.mixer[(std::size_t) t].effects.push_back (std::move (fx));
-                at = (int) song.mixer[(std::size_t) t].effects.size() - 1;
-            }
-            mixerops::linkAddedSidechain (song, t, at); // round 170h: the sole sidechain sender feeds a new compressor
-        });
-        if (at < 0)
-            return at;
-        selectedSlot = at;
-        if ((*slots())[(std::size_t) at].kind != EffectKind::plugin) // (plugins: their own window, below)
-            openEditor (at); // FL opens the effect's window when it is loaded (round 170h, fl-09)
-        repaint();
-        return at;
-    };
+    auto place = [this, row] (EffectSlot fx) { return placeEffectAtRow (row, std::move (fx)); };
 
     // FL's renamed plugins first (issue #11): "1_EQ" renamed in the Browser's Plugin database is added by typing 1
     auto addFx = [this, place] (EffectSlot fx) {
@@ -6947,6 +7962,53 @@ void EffectsPanel::showAddMenu (int row)
     quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (menuOwner()).withMousePosition(), std::move (picks));
 }
 
+int EffectsPanel::placeEffectAtRow (int row, EffectSlot fx)
+{
+    int at = -1;
+    engine.editSong ([t = track, row, &fx, &at] (Song& song) {
+        if (t < 0 || t >= (int) song.mixer.size() || (int) song.mixer[(std::size_t) t].effects.size() >= maxEffectSlots)
+            return;
+        at = mixerops::insertEffectAtRow (song, t, fx, row);
+        if (at < 0)
+        {
+            song.mixer[(std::size_t) t].effects.push_back (std::move (fx));
+            at = (int) song.mixer[(std::size_t) t].effects.size() - 1;
+        }
+        mixerops::linkAddedSidechain (song, t, at); // round 170h: the sole sidechain sender feeds a new compressor
+    });
+    if (at < 0)
+        return at;
+    selectedSlot = at;
+    if ((*slots())[(std::size_t) at].kind != EffectKind::plugin) // (plugins: their own window, below)
+        openEditor (at); // FL opens the effect's window when it is loaded (round 170h, fl-09)
+    repaint();
+    return at;
+}
+
+std::unique_ptr<juce::Component> EffectsPanel::makeSlotSearch (int row)
+{
+    QuickAddTargets targets;
+    targets.effectsOnly = true;
+    targets.effectsFirst = true;
+    targets.effectsTitle = tr ("Effects: into slot {0}", { juce::String (row + 1) });
+    targets.addInstrument = [] (ChannelDef) {};
+    targets.addEffect = [safe = juce::Component::SafePointer<EffectsPanel> (this), row, t = track] (EffectSlot fx) {
+        if (safe == nullptr || safe->track != t)
+            return;
+        if (const auto at = safe->placeEffectAtRow (row, std::move (fx)); at >= 0 && (*safe->slots())[(std::size_t) at].kind == EffectKind::plugin)
+            safe->openPluginWindow (at);
+    };
+    return makeQuickAddPalette (engine, std::move (targets));
+}
+
+void EffectsPanel::showSlotSearch (int row)
+{
+    disarmSecondClick();
+    if (row < 0 || row >= maxEffectSlots || effectIn (row) >= 0)
+        return; // (the slot was filled meanwhile)
+    openToolWindow (makeSlotSearch (row), tr ("Find an effect"), "slotsearch");
+}
+
 void EffectsPanel::showSlotMenu (int slot)
 {
     // the same categories as the empty slot's menu (rounds 166f / 170b)
@@ -6961,25 +8023,47 @@ void EffectsPanel::showSlotMenu (int slot)
     }));
     quickpick::addFolderViewItems (replace, engine);
 
+    // FL's FX slot ▸ menu (round 190mp, DF-77; capture 190mp A5, fl-mixer-slot-menu.png; hint "FX slot N options"): FL's
+    // items in FL's order — Replace ▸, Delete... | Patcherize, Patcherize all | Presets | Spare state | Parameters | CPU |
+    // Move up / down | View editor, Rename, color and icon... F2, Change color..., Random color, Change icon... | Scaling ▸,
+    // Help. An item a mixer slot can't do in LYNX is greyed, never left out (as ui/WrapperMenu.h). LYNX's own items follow
+    // under a line.
+    const auto& fx = (*slots())[(std::size_t) slot];
+    const auto isPlugin = fx.kind == EffectKind::plugin;
+    auto* livePlugin = isPlugin ? dynamic_cast<PluginEffect*> (engine.getEffect (track, slot).get()) : nullptr;
     juce::PopupMenu menu;
     if (extendSlotMenu != nullptr) // (round 183a: the Device View's card adds Fold / Unfold first; the Mixer adds nothing)
         extendSlotMenu (menu, slot);
-    menu.addSubMenu (tr ("Replace with"), replace);
-    // round 190ce: hot-swap from the Mixer too (the Device View's card has its own item and button)
-    if (extendSlotMenu == nullptr && onHotSwapSlot != nullptr)
-        menu.addItem (tr ("Hot-swap in the Browser"), [t = track, slot] {
-            if (onHotSwapSlot != nullptr)
-                onHotSwapSlot (t, slot);
-        });
-    menu.addItem (tr ("Audio editor (record this insert)..."), [this] { openAudioEditorForInsert (engine, track); });
+    menu.addSubMenu (tr ("Replace"), replace);
+    menu.addItem (tr ("Delete...") + "\tDel", [this, slot] { deleteSlot (slot); });
 
-    // FL presets (Plugin presets\Effects\<plugin>) that map to this effect
+    // FL's Patcherize / Patcherize all (round 165m): the effect (or the whole chain) into a new Patcher, same sound
+    menu.addSeparator();
+    menu.addItem (tr ("Patcherize"), patcherize::canPatcherizeSlot (engine.getSong(), track, slot), false, [this, slot] {
+        engine.capturePluginStates(); // (the plugins' current settings go with them)
+        int placed = -1;
+        engine.editSong ([t = track, slot, &placed] (Song& song) { placed = patcherize::patcherizeSlots (song, t, slot, false); });
+        if (placed >= 0)
+            selectedSlot = placed;
+        repaint();
+    });
+    menu.addItem (tr ("Patcherize all"), patcherize::slotsForAll (engine.getSong(), track).size() > 1, false, [this, slot] {
+        engine.capturePluginStates();
+        int placed = -1;
+        engine.editSong ([t = track, slot, &placed] (Song& song) { placed = patcherize::patcherizeSlots (song, t, slot, true); });
+        if (placed >= 0)
+            selectedSlot = placed;
+        repaint();
+    });
+
+    // Presets: FL's presets (Plugin presets\Effects\<plugin>) that map to this effect
+    menu.addSectionHeader (tr ("Presets"));
     {
         juce::PopupMenu presets;
         const auto roots = findFlStudioRoots();
         const auto base = juce::File (juce::String::fromUTF8 (roots.data.c_str())).getChildFile ("Patches/Plugin presets/Effects");
 
-        for (const auto& plugin : flPluginsForEffect ((*slots())[(std::size_t) slot].kind))
+        for (const auto& plugin : flPluginsForEffect (fx.kind))
         {
             juce::PopupMenu sub;
             auto files = base.getChildFile (juce::String::fromUTF8 (plugin.c_str())).findChildFiles (juce::File::findFiles, true, "*.fst");
@@ -6991,12 +8075,12 @@ void EffectsPanel::showSlotMenu (int slot)
                     if (! f.loadFileAsData (data))
                         return;
                     const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
-                    if (auto fx = effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), engine.getSong().bpm, natives::flDataReader (flStudioAccess())))
-                        engine.editSong ([t = track, slot, fx = *fx] (Song& song) {
+                    if (auto loaded = effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), engine.getSong().bpm, natives::flDataReader (flStudioAccess())))
+                        engine.editSong ([t = track, slot, loaded = *loaded] (Song& song) {
                             auto& target = song.mixer[(std::size_t) t].effects[(std::size_t) slot];
                             const auto enabled = target.enabled;
                             const auto mix = target.mix;
-                            target = fx;
+                            target = loaded;
                             target.enabled = enabled;
                             target.mix = mix;
                         });
@@ -7005,14 +8089,102 @@ void EffectsPanel::showSlotMenu (int slot)
             if (sub.getNumItems() > 0)
                 presets.addSubMenu (juce::String::fromUTF8 (plugin.c_str()), sub);
         }
-
-        if (presets.getNumItems() > 0)
-            menu.addSubMenu (tr ("FL presets"), presets);
+        menu.addSubMenu (tr ("Presets"), presets, presets.getNumItems() > 0);
     }
+    menu.addItem (tr ("Browse presets"), false, false, [] {});
+    menu.addItem (tr ("Save preset as..."), false, false, [] {});
+    if (isPlugin)
+    {
+        // FL's "Add to plugin database (flag as favorite)": LYNX's favourites (the picker's stars), as the wrapper menu
+        const auto id = fx.plugin.id;
+        auto& host = engine.getPluginHost();
+        menu.addItem (tr ("Add to plugin database (flag as favorite)"), ! id.empty(), host.favourites().count (id) > 0, [this, id] {
+            auto& h = engine.getPluginHost();
+            h.setFavourite (id, h.favourites().count (id) == 0);
+        });
+    }
+    else
+        menu.addItem (tr ("Add to plugin database (flag as favorite)"), false, false, [] {});
+    menu.addItem (tr ("Display preset name in preset selector"), false, true, [] {});
+
+    // Spare state (FL): LYNX's A/B copy of the settings (the same store as the A/B compare items below)
+    const auto spareKey = std::make_pair (track, slot);
+    const auto hasSpare = spare.count (spareKey) > 0 && spare[spareKey].kind == fx.kind;
+    menu.addSectionHeader (tr ("Spare state"));
+    menu.addItem (tr ("Store in spare state"), [this, spareKey, slot] { spare[spareKey] = (*slots())[(std::size_t) slot]; });
+    menu.addItem (tr ("Flip with spare state"), hasSpare, false, [this, spareKey, slot] {
+        const auto stored = spare[spareKey];
+        spare[spareKey] = (*slots())[(std::size_t) slot];
+        engine.editSong ([t = track, slot, stored] (Song& song) {
+            auto& target = song.mixer[(std::size_t) t].effects[(std::size_t) slot];
+            const auto enabled = target.enabled;
+            target = stored;
+            target.enabled = enabled;
+        });
+    });
+
+    menu.addSectionHeader (tr ("Parameters"));
+    {
+        std::vector<AutomationTarget> targets;
+        if (livePlugin != nullptr)
+            targets = allPluginParameterTargets (livePlugin->getInstance(), { AutomationTargetKind::effectParam, track, slot, 0 });
+        menu.addItem (tr ("Link all parameters..."), ! targets.empty(), false, [this, targets] { openRemoteControlSettings (engine, targets, false); });
+    }
+    menu.addItem (tr ("Browse parameters"), false, false, [] {});
+
+    // FL's slot menu "CPU" section (REA round 139): Allow threaded processing (plugins), Smart disable
+    menu.addSectionHeader (tr ("CPU"));
+    menu.addItem (tr ("Allow threaded processing"), isPlugin, isPlugin && fx.plugin.threaded, [this, slot] {
+        engine.editSong ([t = track, slot] (Song& song) {
+            if (t < (int) song.mixer.size() && slot < (int) song.mixer[(std::size_t) t].effects.size())
+                song.mixer[(std::size_t) t].effects[(std::size_t) slot].plugin.threaded = ! song.mixer[(std::size_t) t].effects[(std::size_t) slot].plugin.threaded;
+        });
+    });
+    // FL's per-plugin "Smart disable": skipped while its input and output are silent
+    menu.addItem (tr ("Smart disable"), true, fx.smartDisable, [this, slot] {
+        engine.editSong ([t = track, slot] (Song& song) {
+            if (t < (int) song.mixer.size() && slot < (int) song.mixer[(std::size_t) t].effects.size())
+                song.mixer[(std::size_t) t].effects[(std::size_t) slot].smartDisable = ! song.mixer[(std::size_t) t].effects[(std::size_t) slot].smartDisable;
+        });
+    });
+    menu.addSeparator();
+    // FL's Move up / Move down (REA FUN_01233de0 / FUN_01235190): one slot, into an empty one too, wrapping around
+    auto move = [this, slot] (int delta) {
+        int now = -1;
+        engine.editSongStructural ([t = track, slot, delta, &now] (Song& song) { now = mixerops::moveEffectBy (song, t, slot, delta); });
+        if (now >= 0)
+            selectedSlot = now;
+        repaint();
+    };
+    menu.addItem (tr ("Move up"), [move] { move (-1); });
+    menu.addItem (tr ("Move down"), [move] { move (1); });
+    menu.addSeparator();
+    {
+        // FL's "View editor": ticked while the effect's window shows (the slot name's click, round 170b)
+        const auto shown = livePlugin != nullptr ? PluginWindows::isOpen (livePlugin->getInstance()) : ui::SlotGoneWatcher::isWindowOpen (engine, track, slot);
+        menu.addItem (tr ("View editor"), true, shown, [this, slot] { toggleEditor (slot); });
+    }
+    menu.addItem (tr ("Rename, color and icon...") + "\tF2", false, false, [] {});
+    menu.addItem (tr ("Change color..."), false, false, [] {});
+    menu.addItem (tr ("Random color"), false, false, [] {});
+    menu.addItem (tr ("Change icon..."), false, false, [] {});
+    menu.addSeparator();
+    menu.addSubMenu (tr ("Scaling"), juce::PopupMenu(), false);
+    menu.addItem (tr ("Help"), false, false, [] {});
+
+    // LYNX's own items
+    menu.addSeparator();
+    // round 190ce: hot-swap from the Mixer too (the Device View's card has its own item and button)
+    if (extendSlotMenu == nullptr && onHotSwapSlot != nullptr)
+        menu.addItem (tr ("Hot-swap in the Browser"), [t = track, slot] {
+            if (onHotSwapSlot != nullptr)
+                onHotSwapSlot (t, slot);
+        });
+    menu.addItem (tr ("Audio editor (record this insert)..."), [this] { openAudioEditorForInsert (engine, track); });
 
     // side inputs: another track's output feeds the compressor's detector, or the vocoder's modulator/carrier. Round
     // 177b: every effect with a side input (plugins with a sidechain bus too) gets the picker, which makes the route
-    const auto kind = (*slots())[(std::size_t) slot].kind;
+    const auto kind = fx.kind;
     auto sideMenu = [&] (const juce::String& title, bool second) {
         juce::PopupMenu side;
         pluginheader::addSidechainPicker (side, engine, track, slot, second);
@@ -7028,7 +8200,6 @@ void EffectsPanel::showSlotMenu (int slot)
     if (kind == EffectKind::newtone || kind == EffectKind::newtime)
     {
         // the sample the plugin plays in slave mode (REA_rodada73): FL's edits are kept in the state but not reproduced
-        const auto& fx = (*slots())[(std::size_t) slot];
         const auto current = juce::File (juce::String::fromUTF8 (fx.samplePath.c_str()));
         juce::PopupMenu source;
         source.addItem (fx.samplePath.empty() ? tr ("No sample") : current.getFileName(), false, false, [] {});
@@ -7056,15 +8227,13 @@ void EffectsPanel::showSlotMenu (int slot)
     }
     {
         // A/B compare: keep a copy of the settings, then swap between it and the current ones
-        const auto key = std::make_pair (track, slot);
-        const auto hasSpare = spare.count (key) > 0 && spare[key].kind == (*slots())[(std::size_t) slot].kind;
         juce::PopupMenu ab;
-        ab.addItem (tr ("Store the current settings as B"), [this, key, slot] {
-            spare[key] = (*slots())[(std::size_t) slot];
+        ab.addItem (tr ("Store the current settings as B"), [this, spareKey, slot] {
+            spare[spareKey] = (*slots())[(std::size_t) slot];
         });
-        ab.addItem (tr ("Swap with B"), hasSpare, false, [this, key, slot] {
-            const auto stored = spare[key];
-            spare[key] = (*slots())[(std::size_t) slot];
+        ab.addItem (tr ("Swap with B"), hasSpare, false, [this, spareKey, slot] {
+            const auto stored = spare[spareKey];
+            spare[spareKey] = (*slots())[(std::size_t) slot];
             engine.editSong ([t = track, slot, stored] (Song& song) {
                 auto& target = song.mixer[(std::size_t) t].effects[(std::size_t) slot];
                 const auto enabled = target.enabled;
@@ -7072,88 +8241,40 @@ void EffectsPanel::showSlotMenu (int slot)
                 target.enabled = enabled;
             });
         });
-        ab.addItem (tr ("Forget B"), hasSpare, false, [key] { spare.erase (key); });
+        ab.addItem (tr ("Forget B"), hasSpare, false, [spareKey] { spare.erase (spareKey); });
         menu.addSubMenu (hasSpare ? tr ("A/B compare (B stored)") : tr ("A/B compare"), ab);
     }
-    if ((*slots())[(std::size_t) slot].isSubstitute()) // A/B of every substitute of the project at once (round 113)
+    if (fx.isSubstitute()) // A/B of every substitute of the project at once (round 113)
         menu.addItem (tr ("Bypass all LYNX SHARE substitutes of this project"), true, engine.getSong().substitutesBypassed, [this] {
             engine.editSong ([] (Song& song) { song.substitutesBypassed = ! song.substitutesBypassed; });
             repaint();
         });
-    // FL's slot menu "CPU" section (REA round 139): Allow threaded processing (plugins), Smart disable
-    menu.addSectionHeader (tr ("CPU"));
-    if ((*slots())[(std::size_t) slot].kind == EffectKind::plugin)
-        menu.addItem (tr ("Allow threaded processing"), true, (*slots())[(std::size_t) slot].plugin.threaded, [this, slot] {
-            engine.editSong ([t = track, slot] (Song& song) {
-                if (t < (int) song.mixer.size() && slot < (int) song.mixer[(std::size_t) t].effects.size())
-                    song.mixer[(std::size_t) t].effects[(std::size_t) slot].plugin.threaded = ! song.mixer[(std::size_t) t].effects[(std::size_t) slot].plugin.threaded;
-            });
-        });
-    // FL's per-plugin "Smart disable": skipped while its input and output are silent
-    menu.addItem (tr ("Smart disable"), true, (*slots())[(std::size_t) slot].smartDisable, [this, slot] {
-        engine.editSong ([t = track, slot] (Song& song) {
-            if (t < (int) song.mixer.size() && slot < (int) song.mixer[(std::size_t) t].effects.size())
-                song.mixer[(std::size_t) t].effects[(std::size_t) slot].smartDisable = ! song.mixer[(std::size_t) t].effects[(std::size_t) slot].smartDisable;
-        });
-    });
-    menu.addSeparator();
-    // FL's Move up / Move down (REA FUN_01233de0 / FUN_01235190): one slot, into an empty one too, wrapping around
-    auto move = [this, slot] (int delta) {
-        int now = -1;
-        engine.editSongStructural ([t = track, slot, delta, &now] (Song& song) { now = mixerops::moveEffectBy (song, t, slot, delta); });
-        if (now >= 0)
-            selectedSlot = now;
-        repaint();
-    };
-    menu.addItem (tr ("Move up"), [move] { move (-1); });
-    menu.addItem (tr ("Move down"), [move] { move (1); });
-    if ((*slots())[(std::size_t) slot].kind == EffectKind::plugin)
+    if (isPlugin)
     {
         // round 190ao: only while the plugin is down (it crashed, or its separate process died)
         if (engine.hostedPluginDown ({ -1, track, slot }))
             menu.addItem (tr ("Reload crashed plugin"), [this, t = track, slot] { PluginWindows::reload (engine, { { -1, t, slot } }); });
-        auto* live = dynamic_cast<PluginEffect*> (engine.getEffect (track, slot).get());
-        menu.addSubMenu (tr ("Processing"), pluginProcessingMenu (engine, (*slots())[(std::size_t) slot].plugin, live != nullptr ? &live->getInstance() : nullptr,
+        menu.addSubMenu (tr ("Processing"), pluginProcessingMenu (engine, fx.plugin, livePlugin != nullptr ? &livePlugin->getInstance() : nullptr,
                                                                 [t = track, slot] (Song& song) -> PluginRef* {
                                                                     if (t >= (int) song.mixer.size() || slot >= (int) song.mixer[(std::size_t) t].effects.size())
                                                                         return nullptr;
                                                                     return &song.mixer[(std::size_t) t].effects[(std::size_t) slot].plugin;
                                                                 }));
+        if (livePlugin != nullptr)
+            addPluginParameterItems (menu, engine, livePlugin->getInstance(), { AutomationTargetKind::effectParam, track, slot, 0 });
     }
-    if ((*slots())[(std::size_t) slot].kind == EffectKind::plugin)
-    {
-        if (auto* p = dynamic_cast<PluginEffect*> (engine.getEffect (track, slot).get()))
-            addPluginParameterItems (menu, engine, p->getInstance(), { AutomationTargetKind::effectParam, track, slot, 0 });
-    }
-    if ((*slots())[(std::size_t) slot].kind == EffectKind::patcher) // its published parameters (round 171b)
-        addPatcherParameterItems (menu, engine, (*slots())[(std::size_t) slot].patcher, { AutomationTargetKind::effectParam, track, slot, 0 });
+    if (fx.kind == EffectKind::patcher) // its published parameters (round 171b)
+        addPatcherParameterItems (menu, engine, fx.patcher, { AutomationTargetKind::effectParam, track, slot, 0 });
 
-    // FL's Patcherize / Patcherize all (round 165m): the effect (or the whole chain) into a new Patcher, same sound
-    menu.addSeparator();
-    menu.addItem (tr ("Patcherize"), patcherize::canPatcherizeSlot (engine.getSong(), track, slot), false, [this, slot] {
-        engine.capturePluginStates(); // (the plugins' current settings go with them)
-        int placed = -1;
-        engine.editSong ([t = track, slot, &placed] (Song& song) { placed = patcherize::patcherizeSlots (song, t, slot, false); });
-        if (placed >= 0)
-            selectedSlot = placed;
-        repaint();
-    });
-    menu.addItem (tr ("Patcherize all"), patcherize::slotsForAll (engine.getSong(), track).size() > 1, false, [this, slot] {
-        engine.capturePluginStates();
-        int placed = -1;
-        engine.editSong ([t = track, slot, &placed] (Song& song) { placed = patcherize::patcherizeSlots (song, t, slot, true); });
-        if (placed >= 0)
-            selectedSlot = placed;
-        repaint();
-    });
     // round 183c: Live's Group (Ctrl+G): the effect (or the whole chain) into a new Audio Effect Rack, same sound; the
     // automation of the moved effects' parameters drives the rack's macros
+    menu.addSeparator();
     menu.addItem (tr ("Group into Audio Effect Rack"), patcherize::canPatcherizeSlot (engine.getSong(), track, slot), false, [this, slot] { groupIntoRack (slot, false); });
     menu.addItem (tr ("Group all into Audio Effect Rack"), patcherize::slotsForAll (engine.getSong(), track).size() > 1, false, [this, slot] { groupIntoRack (slot, true); });
     // Live's Ungroup: a one-chain Audio Effect Rack's devices back into the slots
-    if (const auto* list = slots(); list != nullptr && slot < (int) list->size() && rack::isRack ((*list)[(std::size_t) slot]))
+    if (rack::isRack (fx))
     {
-        const auto* r = rack::rackOf ((*list)[(std::size_t) slot].patcher);
+        const auto* r = rack::rackOf (fx.patcher);
         const auto canUngroup = r != nullptr && r->kind == RackDoc::Kind::audioEffect && r->chains.size() == 1;
         menu.addItem (tr ("Ungroup"), canUngroup, false, [this, slot] {
             engine.capturePluginStates();
@@ -7164,8 +8285,6 @@ void EffectsPanel::showSlotMenu (int slot)
             repaint();
         });
     }
-    menu.addSeparator();
-    menu.addItem (tr ("Delete") + "\tDel", [this, slot] { deleteSlot (slot); });
 
     if (slotMenuForSnapshot != nullptr) // (the shot routes: the menu itself, nothing opens)
     {
@@ -7228,6 +8347,11 @@ juce::String issueText (const AudioEngine::RecordingNotice& notice)
         case I::armedWithoutInput:
             return tr ("Please select an audio input first: the armed insert has none. Click the input box above the insert's effect slots in the Mixer.");
         case I::insertWithoutInput: return tr ("Insert {0} is armed but has no audio input, so it records nothing.", { juce::String (notice.track) });
+        case I::silentTake:
+            return tr ("The recording is silent: the audio input sent nothing but silence. Check that the insert's input is the "
+                       "channel your microphone or instrument is plugged into (the input box above its effect slots), that the "
+                       "interface's input is not muted, and that LYNX SHARE may use the microphone (Windows: Settings > Privacy "
+                       "> Microphone; macOS: System Settings > Privacy & Security > Microphone).");
         case I::failed: return tr ("The audio input could not be used: {0}", { notice.detail });
         case I::lowDisk:
             return tr ("The recordings drive is almost full: about {0} minute(s) of recording left. Free some space or choose another project folder.",
@@ -7256,7 +8380,7 @@ void explain (const AudioEngine::RecordingNotice& notice)
         return;
 
     using I = AudioEngine::InputIssue;
-    const auto aboutRecording = notice.issue == I::lowDisk || notice.issue == I::recordSafe || notice.issue == I::framesLost;
+    const auto aboutRecording = notice.issue == I::lowDisk || notice.issue == I::recordSafe || notice.issue == I::framesLost || notice.issue == I::silentTake;
     auto options = juce::MessageBoxOptions()
                        .withIconType (juce::MessageBoxIconType::WarningIcon)
                        .withTitle (aboutRecording ? tr ("Recording") : tr ("Audio input needed"))
@@ -7617,12 +8741,20 @@ bool MixerComponent::runAction (const std::string& id)
         strips.linkSelectedChannels (true);
     else if (id == "mixer.selectLinkedChannels")
         strips.selectLinkedChannels();
+    else if (id == "mixer.waveforms") // round 190lr (DF-60): FL's Alt+W
+    {
+        strips.setMeterWaveforms (! MixerStrips::meterWaveforms);
+        if (mixeroptions::changed)
+            mixeroptions::changed();
+    }
     else if (id == "mixer.audioEditor")
         return strips.runMenuItem (tr ("Open audio editor"));
     else if (id == "mixer.audioEditorRecord")
         return strips.runMenuItem (tr ("Open audio editor and record"));
     else if (id == "mixer.rename") // FL's mixer menu keys (round 167k): the menu's own items
-        return strips.runMenuItem (tr ("Rename and color..."));
+        return strips.runMenuItem (tr ("Rename, color and icon..."));
+    else if (id == "mixer.changeIcon") // issue #220 (round 190ng): F3, the icon picker of the selected track(s)
+        return strips.runMenuItem (tr ("Change icon..."));
     else if (id == "mixer.soloSelected")
         return strips.runMenuItem (tr ("Solo selected track(s)"));
     else if (id == "mixer.altSoloSelected")

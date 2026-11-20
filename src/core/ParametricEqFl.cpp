@@ -1,5 +1,7 @@
 #include "core/ParametricEqFl.h"
 #include "core/ParametricEqLinear.h"
+#include "core/Simd.h"
+#include "core/CpuFeatures.h"
 
 #include <algorithm>
 #include <cmath>
@@ -629,6 +631,7 @@ void designPeq1 (const Settings& s, int b, double rate, Band& band)
     designStage (band.stage[0], t, A, alpha, sn, cs);
 }
 
+// One stage over the block, the plain loop: the reference runStages is checked against (stagesMatchReference)
 void runStage (Stage& st, float* io, int n) noexcept
 {
     double x1l = st.s[0], x1r = st.s[1], x2l = st.s[2], x2r = st.s[3];
@@ -650,6 +653,84 @@ void runStage (Stage& st, float* io, int n) noexcept
         st.s[k] = std::abs (out[k]) < (double) flushBelow ? 0.0 : out[k];
 }
 
+// A cascade of `count` stages over the block (round 190kr): the same as runStage on each one after another (each stage's
+// float output is the next one's input, the end-of-call flush per stage), but sample by sample, so the stages' recursions
+// overlap, with the interleaved left / right pair in the two lanes of an SSE2 double vector: per lane the same IEEE
+// double operations in the same order as runStage.
+// (always inlined: runStagesAvx2 below takes the same body in VEX encoding)
+template <int count>
+__attribute__ ((always_inline)) inline void runStagesN (Stage* const* st, float* io, int n) noexcept
+{
+    __m128d x1[count], x2[count], y1[count], y2[count];
+    for (int k = 0; k < count; ++k)
+    {
+        const auto* s = st[k]->s; // x1l x1r x2l x2r y1l y1r y2l y2r
+        x1[k] = _mm_loadu_pd (s), x2[k] = _mm_loadu_pd (s + 2), y1[k] = _mm_loadu_pd (s + 4), y2[k] = _mm_loadu_pd (s + 6);
+    }
+    for (int i = 0; i < n; ++i)
+    {
+        __m128 f = _mm_castpd_ps (_mm_load_sd ((const double*) (io + 2 * i)));
+        for (int k = 0; k < count; ++k)
+        {
+            const auto& c = *st[k];
+            const __m128d x = _mm_cvtps_pd (f);
+            const __m128d inner = _mm_sub_pd (_mm_add_pd (_mm_sub_pd (_mm_mul_pd (x1[k], _mm_set1_pd (c.b1)), _mm_mul_pd (y2[k], _mm_set1_pd (c.a2))),
+                                                          _mm_mul_pd (x2[k], _mm_set1_pd (c.b2))),
+                                               _mm_mul_pd (y1[k], _mm_set1_pd (c.a1)));
+            const __m128d y = _mm_add_pd (_mm_mul_pd (x, _mm_set1_pd (c.b0)), inner);
+            x2[k] = x1[k], x1[k] = x, y2[k] = y1[k], y1[k] = y;
+            f = _mm_cvtpd_ps (y);
+        }
+        _mm_store_sd ((double*) (io + 2 * i), _mm_castps_pd (f));
+    }
+    for (int k = 0; k < count; ++k)
+    {
+        double out[8];
+        _mm_storeu_pd (out, x1[k]), _mm_storeu_pd (out + 2, x2[k]), _mm_storeu_pd (out + 4, y1[k]), _mm_storeu_pd (out + 6, y2[k]);
+        for (int j = 0; j < 8; ++j) // end of call: state values below 2^-24 in magnitude are cleared (§2.4)
+            st[k]->s[j] = std::abs (out[j]) < (double) flushBelow ? 0.0 : out[j];
+    }
+}
+
+#if LYNX_CPU_DISPATCH
+// round 190kz: the same cascade compiled for AVX2 (picked at run time, src/core/CpuFeatures.h): the same SSE2 operations,
+// VEX-encoded (three-operand forms, fewer register copies), the same bits; no FMA (the target list has none)
+LYNX_TARGET_AVX2 void runStagesAvx2 (Stage* const* st, int count, float* io, int n) noexcept
+{
+    for (; count >= 4; st += 4, count -= 4)
+        runStagesN<4> (st, io, n);
+    switch (count)
+    {
+        case 1: runStagesN<1> (st, io, n); return;
+        case 2: runStagesN<2> (st, io, n); return;
+        case 3: runStagesN<3> (st, io, n); return;
+        default: return;
+    }
+}
+#endif
+
+void runStages (Stage* const* st, int count, float* io, int n) noexcept
+{
+#if LYNX_CPU_DISPATCH
+    if (cpu::hasAvx2())
+    {
+        runStagesAvx2 (st, count, io, n);
+        return;
+    }
+#endif
+    switch (count)
+    {
+        case 0: return;
+        case 1: runStagesN<1> (st, io, n); return;
+        case 2: runStagesN<2> (st, io, n); return;
+        case 3: runStagesN<3> (st, io, n); return;
+        default:
+            runStagesN<4> (st, io, n);
+            runStages (st + 4, count - 4, io, n);
+            return;
+    }
+}
+
 void clearStages (Band& band) noexcept
 {
     for (auto& st : band.stage)
@@ -667,7 +748,8 @@ void flushHalfBand (double* s) noexcept
             s[k] = 0.0;
 }
 
-void upsample (double* s, const float* in, float* out, int n) noexcept
+// the plain per-channel loops: the reference upsample / downsample are checked against (stagesMatchReference)
+void upsampleReference (double* s, const float* in, float* out, int n) noexcept
 {
     for (int i = 0; i < n; ++i)
         for (int c = 0; c < 2; ++c)
@@ -694,7 +776,7 @@ void upsample (double* s, const float* in, float* out, int n) noexcept
     flushHalfBand (s);
 }
 
-void downsample (double* s, const float* in, float* out, int n) noexcept
+void downsampleReference (double* s, const float* in, float* out, int n) noexcept
 {
     for (int i = 0; i < n; ++i)
         for (int c = 0; c < 2; ++c)
@@ -716,6 +798,76 @@ void downsample (double* s, const float* in, float* out, int n) noexcept
             d[10] = b2, o[10] = b3;
             out[2 * i + c] = (float) ((b3 + a3) * 0.5);
         }
+    flushHalfBand (s);
+}
+
+// round 190kr: the two channels in the two lanes of an SSE2 double vector (the states are stored as left / right pairs):
+// per lane the same operations in the same order as the per-channel loops above
+void upsample (double* s, const float* in, float* out, int n) noexcept
+{
+    __m128d o0 = _mm_loadu_pd (s), o2 = _mm_loadu_pd (s + 2), o4 = _mm_loadu_pd (s + 4), o6 = _mm_loadu_pd (s + 6),
+            o8 = _mm_loadu_pd (s + 8), o10 = _mm_loadu_pd (s + 10);
+    __m128d d0 = _mm_loadu_pd (s + 12), d2 = _mm_loadu_pd (s + 14), d4 = _mm_loadu_pd (s + 16), d6 = _mm_loadu_pd (s + 18),
+            d8 = _mm_loadu_pd (s + 20), d10 = _mm_loadu_pd (s + 22);
+    const __m128d A0 = _mm_set1_pd (hbA[0]), A1 = _mm_set1_pd (hbA[1]), A2 = _mm_set1_pd (hbA[2]);
+    const __m128d B0 = _mm_set1_pd (hbB[0]), B1 = _mm_set1_pd (hbB[1]), B2 = _mm_set1_pd (hbB[2]);
+    for (int i = 0; i < n; ++i)
+    {
+        const __m128d v = _mm_cvtps_pd (_mm_castpd_ps (_mm_load_sd ((const double*) (in + 2 * i))));
+        const __m128d a1 = _mm_add_pd (d0, _mm_mul_pd (_mm_sub_pd (v, o0), A0));
+        d0 = v, o0 = a1;
+        const __m128d b1 = _mm_add_pd (d6, _mm_mul_pd (_mm_sub_pd (v, o6), B0));
+        d6 = v, o6 = b1;
+        const __m128d a2 = _mm_add_pd (d2, _mm_mul_pd (_mm_sub_pd (a1, o2), A1));
+        d2 = a1, o2 = a2;
+        const __m128d b2 = _mm_add_pd (d8, _mm_mul_pd (_mm_sub_pd (b1, o8), B1));
+        d8 = b1, o8 = b2;
+        const __m128d a3 = _mm_add_pd (d4, _mm_mul_pd (_mm_sub_pd (a2, o4), A2));
+        o4 = a3;
+        const __m128d b3 = _mm_add_pd (d10, _mm_mul_pd (_mm_sub_pd (b2, o10), B2));
+        o10 = b3;
+        d4 = a2, d10 = b2;
+        _mm_store_sd ((double*) (out + 4 * i), _mm_castps_pd (_mm_cvtpd_ps (b3)));
+        _mm_store_sd ((double*) (out + 4 * i + 2), _mm_castps_pd (_mm_cvtpd_ps (a3)));
+    }
+    _mm_storeu_pd (s, o0), _mm_storeu_pd (s + 2, o2), _mm_storeu_pd (s + 4, o4), _mm_storeu_pd (s + 6, o6);
+    _mm_storeu_pd (s + 8, o8), _mm_storeu_pd (s + 10, o10);
+    _mm_storeu_pd (s + 12, d0), _mm_storeu_pd (s + 14, d2), _mm_storeu_pd (s + 16, d4), _mm_storeu_pd (s + 18, d6);
+    _mm_storeu_pd (s + 20, d8), _mm_storeu_pd (s + 22, d10);
+    flushHalfBand (s);
+}
+
+void downsample (double* s, const float* in, float* out, int n) noexcept
+{
+    __m128d o0 = _mm_loadu_pd (s), o2 = _mm_loadu_pd (s + 2), o4 = _mm_loadu_pd (s + 4), o6 = _mm_loadu_pd (s + 6),
+            o8 = _mm_loadu_pd (s + 8), o10 = _mm_loadu_pd (s + 10);
+    __m128d d0 = _mm_loadu_pd (s + 12), d2 = _mm_loadu_pd (s + 14), d4 = _mm_loadu_pd (s + 16), d6 = _mm_loadu_pd (s + 18),
+            d8 = _mm_loadu_pd (s + 20), d10 = _mm_loadu_pd (s + 22);
+    const __m128d A0 = _mm_set1_pd (hbA[0]), A1 = _mm_set1_pd (hbA[1]), A2 = _mm_set1_pd (hbA[2]);
+    const __m128d B0 = _mm_set1_pd (hbB[0]), B1 = _mm_set1_pd (hbB[1]), B2 = _mm_set1_pd (hbB[2]);
+    const __m128d half = _mm_set1_pd (0.5);
+    for (int i = 0; i < n; ++i)
+    {
+        const __m128d e = _mm_cvtps_pd (_mm_castpd_ps (_mm_load_sd ((const double*) (in + 4 * i))));
+        const __m128d od = _mm_cvtps_pd (_mm_castpd_ps (_mm_load_sd ((const double*) (in + 4 * i + 2))));
+        const __m128d a1 = _mm_add_pd (d0, _mm_mul_pd (_mm_sub_pd (e, o0), A0));
+        d0 = e, o0 = a1;
+        const __m128d b1 = _mm_add_pd (d6, _mm_mul_pd (_mm_sub_pd (od, o6), B0));
+        d6 = od, o6 = b1;
+        const __m128d a2 = _mm_add_pd (d2, _mm_mul_pd (_mm_sub_pd (a1, o2), A1));
+        d2 = a1, o2 = a2;
+        const __m128d b2 = _mm_add_pd (d8, _mm_mul_pd (_mm_sub_pd (b1, o8), B1));
+        d8 = b1, o8 = b2;
+        const __m128d a3 = _mm_add_pd (d4, _mm_mul_pd (_mm_sub_pd (a2, o4), A2));
+        d4 = a2, o4 = a3;
+        const __m128d b3 = _mm_add_pd (d10, _mm_mul_pd (_mm_sub_pd (b2, o10), B2));
+        d10 = b2, o10 = b3;
+        _mm_store_sd ((double*) (out + 2 * i), _mm_castps_pd (_mm_cvtpd_ps (_mm_mul_pd (_mm_add_pd (b3, a3), half))));
+    }
+    _mm_storeu_pd (s, o0), _mm_storeu_pd (s + 2, o2), _mm_storeu_pd (s + 4, o4), _mm_storeu_pd (s + 6, o6);
+    _mm_storeu_pd (s + 8, o8), _mm_storeu_pd (s + 10, o10);
+    _mm_storeu_pd (s + 12, d0), _mm_storeu_pd (s + 14, d2), _mm_storeu_pd (s + 16, d4), _mm_storeu_pd (s + 18, d6);
+    _mm_storeu_pd (s + 20, d8), _mm_storeu_pd (s + 22, d10);
     flushHalfBand (s);
 }
 
@@ -1155,14 +1307,25 @@ void Engine::block (float* io, int n) noexcept
         x = wide.data();
         m = 2 * n;
     }
+    // the bands' stages in order as one cascade (round 190kr: runStages), then each band's 0 dB countdown (it touches only
+    // its own band's states, which the cascade has finished with)
+    Stage* cascade[7 * 4];
+    int count = 0;
+    bool on[7] {};
     for (int b = 0; b < 7; ++b)
     {
         auto& band = bands[(std::size_t) b];
         if (band.active == 0 || (settings.law == Law::peq2 && (settings.mask & (1u << b)) == 0))
             continue;
+        on[b] = true;
         for (int k = 0; k < band.stages; ++k)
-            runStage (band.stage[(std::size_t) k], x, m);
-        if (band.active > 0 && (band.active -= m) < 1)
+            cascade[count++] = &band.stage[(std::size_t) k];
+    }
+    runStages (cascade, count, x, m);
+    for (int b = 0; b < 7; ++b)
+    {
+        auto& band = bands[(std::size_t) b];
+        if (on[b] && band.active > 0 && (band.active -= m) < 1)
         {
             band.active = 0;
             clearStages (band);
@@ -1205,5 +1368,60 @@ void Engine::process (float* left, float* right, int n) noexcept
         }
         done += len;
     }
+}
+// round 190kr: the sample-by-sample SIMD cascade against the plain per-stage loop (tests: perf190kr)
+bool stagesMatchReference (std::uint32_t seed) noexcept
+{
+    auto rnd = [&seed] { seed = seed * 1664525u + 1013904223u; return (double) (seed >> 8) / 16777216.0; };
+    for (int count = 1; count <= 9; ++count)
+    {
+        Stage a[9], b[9];
+        for (int k = 0; k < count; ++k)
+        {
+            // a stable resonant stage (poles at radius r) with random gains, and random states (some below the flush)
+            const auto r = 0.5 + 0.49 * rnd(), w = 3.0 * rnd();
+            a[k].a1 = -2.0 * r * std::cos (w), a[k].a2 = r * r;
+            a[k].b0 = 2.0 * rnd() - 0.5, a[k].b1 = 2.0 * rnd() - 1.0, a[k].b2 = rnd() - 0.5;
+            for (auto& v : a[k].s)
+                v = rnd() < 0.2 ? 1.0e-9 * rnd() : rnd() - 0.5;
+            b[k] = a[k];
+        }
+        float x[2 * 300], y[2 * 300];
+        for (int block : { 1, 37, 128, 300 })
+        {
+            for (int i = 0; i < 2 * block; ++i)
+                x[i] = y[i] = i % 97 == 0 ? 0.0f : (float) (rnd() - 0.5) * (i % 5 == 0 ? 1.0e-7f : 1.0f);
+            for (int k = 0; k < count; ++k)
+                runStage (a[k], x, block);
+            Stage* list[9];
+            for (int k = 0; k < count; ++k)
+                list[k] = &b[k];
+            runStages (list, count, y, block);
+            if (std::memcmp (x, y, sizeof (float) * 2 * (std::size_t) block) != 0)
+                return false;
+            for (int k = 0; k < count; ++k)
+                if (std::memcmp (a[k].s, b[k].s, sizeof (a[k].s)) != 0)
+                    return false;
+        }
+    }
+    // the half-band 1:2 / 2:1 resamplers: per-channel loops vs the two-lane ones
+    for (int block : { 1, 37, 256 })
+    {
+        double sa[24], sb[24];
+        for (int k = 0; k < 24; ++k)
+            sa[k] = sb[k] = rnd() < 0.2 ? 0.0 : rnd() - 0.5;
+        float in[2 * 256], wa[4 * 256], wb[4 * 256], oa[2 * 256], ob[2 * 256];
+        for (int i = 0; i < 2 * block; ++i)
+            in[i] = i % 53 == 0 ? -0.0f : (float) (rnd() - 0.5);
+        upsampleReference (sa, in, wa, block);
+        upsample (sb, in, wb, block);
+        if (std::memcmp (wa, wb, sizeof (float) * 4 * (std::size_t) block) != 0 || std::memcmp (sa, sb, sizeof (sa)) != 0)
+            return false;
+        downsampleReference (sa, wa, oa, block);
+        downsample (sb, wb, ob, block);
+        if (std::memcmp (oa, ob, sizeof (float) * 2 * (std::size_t) block) != 0 || std::memcmp (sa, sb, sizeof (sa)) != 0)
+            return false;
+    }
+    return true;
 }
 } // namespace lynx::peqfl

@@ -116,7 +116,7 @@ TEST (flclip190dz_menu_model_is_fl_order_and_sections)
             CHECK (e.mnemonic == 'f');
     }
 
-    // what LYNX shows: FL's list without what it cannot do (Deverb: FL 2026 only offers a download there), Crossfade
+    // what LYNX shows: FL's list (round 190jv: Deverb too, LYNX's own Deverb in the audio editor), Crossfade
     // selected only when FL shows it (round 190gw: Pitch-correct / Time-warp = LYNX's Newtone / Newtime, Crossfade with
     // works and is greyed only while no other channel's clip overlaps)
     const std::vector<std::string> usual {
@@ -124,7 +124,7 @@ TEST (flclip190dz_menu_model_is_fl_order_and_sections)
         "Select source channel >", "Channel settings", "Make unique", "Select all similar clips", "Delete", "-", "Properties...",
         "[Region]", "Select region >", "Chop >", "||",
         "[Sample]", "Make unique as sample", "Edit sample", "Pitch-correct sample", "Time-warp sample", "Extract stems from sample",
-        "Detect tempo", "Fit to tempo", "[Automation]", "Automate >", "Crossfade with >", "[Fades]", "Reset fades", "Fade in curve >", "Fade out curve >"
+        "Deverb", "Detect tempo", "Fit to tempo", "[Automation]", "Automate >", "Crossfade with >", "[Fades]", "Reset fades", "Fade in curve >", "Fade out curve >"
     };
     CHECK (flclip190dz::texts (flclipmenu::shown (true, false)) == usual);
     auto overlapped = usual;
@@ -135,7 +135,7 @@ TEST (flclip190dz_menu_model_is_fl_order_and_sections)
 
     // LYNX's own items after FL's, in this order, none of them an FL label
     const auto extras = flclipmenu::lynxExtras();
-    CHECK (extras.size() == 17 && extras.front() == "Color palette" && extras.back() == "Paste here");
+    CHECK (extras.size() == 21 && extras[2] == "Split at silence..." && /* (round 190hp; 190lj: + Convert to MIDI (polyphonic)...; 190lk: + Edit notes (polyphonic)...) */ extras.front() == "Color palette" && extras.back() == "Paste here");
     for (const auto& x : extras)
         CHECK (std::none_of (fl.begin(), fl.end(), [&x] (const std::string& f) { return f == x || f == x + " >"; }));
 

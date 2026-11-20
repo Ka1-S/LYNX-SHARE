@@ -5,6 +5,7 @@
 #include <array>
 #include <atomic>
 #include <map>
+#include <set>
 #include <mutex>
 #include <thread>
 #include <unordered_map>
@@ -14,7 +15,10 @@
 #include <clap/clap.h>
 
 #include "core/Mpe.h"
+#include "core/WorkerPool.h"
 #include "engine/PluginHost.h"
+#include "engine/TimedParameters.h"
+#include "platform/PowerThrottling.h"
 #include "platform/CrashGuard.h"
 #include "platform/NativeEmbed.h"
 #include "platform/Paths.h"
@@ -85,6 +89,9 @@ public:
     }
 
     const clap_plugin_factory_t* factory = nullptr;
+
+    // another factory of the module (round 190jg: the preset discovery factory), or nullptr
+    const void* getFactory (const char* id) const { return entry != nullptr ? entry->get_factory (id) : nullptr; }
 
 private:
     ClapModule() = default;
@@ -168,6 +175,22 @@ public:
     }
 
     const clap_input_events_t* get() const noexcept { return &list; }
+
+    // in time order, keeping the order of events at the same time (an insertion sort: no allocation, and the list is
+    // already in order unless timed parameter changes came before the MIDI)
+    void sortByTime() noexcept
+    {
+        const auto timeOf = [this] (uint32_t at) { return reinterpret_cast<const clap_event_header_t*> (pool.data() + at)->time; };
+        for (std::size_t i = 1; i < offsets.size(); ++i)
+        {
+            const auto item = offsets[i];
+            const auto t = timeOf (item);
+            auto j = i;
+            for (; j > 0 && timeOf (offsets[j - 1]) > t; --j)
+                offsets[j] = offsets[j - 1];
+            offsets[j] = item;
+        }
+    }
 
 private:
     std::vector<std::uint8_t> pool;
@@ -419,6 +442,18 @@ public:
         gui = static_cast<const clap_plugin_gui_t*> (plugin->get_extension (plugin, CLAP_EXT_GUI));
         latency = static_cast<const clap_plugin_latency_t*> (plugin->get_extension (plugin, CLAP_EXT_LATENCY));
         audioPorts = static_cast<const clap_plugin_audio_ports_t*> (plugin->get_extension (plugin, CLAP_EXT_AUDIO_PORTS));
+        // round 190jg (BUILD-LIST 18): the further extensions LYNX hosts
+        tailExt = static_cast<const clap_plugin_tail_t*> (plugin->get_extension (plugin, CLAP_EXT_TAIL));
+        renderExt = static_cast<const clap_plugin_render_t*> (plugin->get_extension (plugin, CLAP_EXT_RENDER));
+        voiceInfoExt = static_cast<const clap_plugin_voice_info_t*> (plugin->get_extension (plugin, CLAP_EXT_VOICE_INFO));
+        stateContextExt = static_cast<const clap_plugin_state_context_t*> (plugin->get_extension (plugin, CLAP_EXT_STATE_CONTEXT));
+        threadPoolExt = static_cast<const clap_plugin_thread_pool_t*> (plugin->get_extension (plugin, CLAP_EXT_THREAD_POOL));
+        remoteControlsExt = static_cast<const clap_plugin_remote_controls_t*> (plugin->get_extension (plugin, CLAP_EXT_REMOTE_CONTROLS));
+        if (remoteControlsExt == nullptr)
+            remoteControlsExt = static_cast<const clap_plugin_remote_controls_t*> (plugin->get_extension (plugin, CLAP_EXT_REMOTE_CONTROLS_COMPAT));
+        presetLoadExt = static_cast<const clap_plugin_preset_load_t*> (plugin->get_extension (plugin, CLAP_EXT_PRESET_LOAD));
+        if (presetLoadExt == nullptr)
+            presetLoadExt = static_cast<const clap_plugin_preset_load_t*> (plugin->get_extension (plugin, CLAP_EXT_PRESET_LOAD_COMPAT));
 
         if (const auto* notes = static_cast<const clap_plugin_note_ports_t*> (plugin->get_extension (plugin, CLAP_EXT_NOTE_PORTS)))
         {
@@ -426,6 +461,7 @@ public:
 
             if (notes->count (plugin, true) > 0 && notes->get (plugin, 0, true, &info))
                 midiDialect = (info.supported_dialects & CLAP_NOTE_DIALECT_CLAP) == 0;
+            hasNoteOutput = notes->count (plugin, false) > 0; // (GitHub #198, round 190ks: a plugin that sends notes)
         }
 
         inputChannels = mainPortChannels (true, description.isInstrument ? 0 : 2);
@@ -449,9 +485,12 @@ public:
                 params->get_value (plugin, info.id, &value);
                 auto parameter = std::make_unique<ClapParameter> (*this, info, value);
                 byId[info.id] = parameter.get();
+                byIndex.push_back (parameter.get());
                 addHostedParameter (std::move (parameter));
             }
         }
+        readRemoteControls();
+        readVoiceInfo();
 
         return true;
     }
@@ -532,6 +571,9 @@ public:
 
             if (latency != nullptr)
                 setLatencySamples ((int) latency->get (plugin));
+            if (tailExt != nullptr) // (round 190jg; main or audio thread)
+                tailSamples.store (tailExt->get (plugin));
+            readVoiceInfo();
         }
 
         releaseProcessing();
@@ -566,6 +608,8 @@ public:
         if (gate.exchange (true))
         {
             buffer.clear();
+            if (hasNoteOutput)
+                midi.clear(); // (round 190ks: it sent nothing)
             return;
         }
         audioThread.store (std::this_thread::get_id());
@@ -580,12 +624,16 @@ public:
         if (restartPending.load() || ! active || n > maxBlock)
         {
             buffer.clear();
+            if (hasNoteOutput)
+                midi.clear(); // (round 190ks: it sent nothing)
             gate.store (false);
             return;
         }
 
         if (! processing.load())
             processing.store (plugin->start_processing (plugin));
+        if (tailExt != nullptr && tailChanged.exchange (false)) // (round 190jg: clap_host_tail.changed)
+            tailSamples.store (tailExt->get (plugin));
 
         events.clear();
 
@@ -602,8 +650,32 @@ public:
             events.add (e);
         }
 
+        // round 190jg (sample-accurate automation, engine/TimedParameters.h): the automation's changes inside this block
+        for (int k = 0; k < juce::lynxTimedParamCount; ++k)
+        {
+            const auto index = juce::lynxTimedParamIndices[k];
+            if (index < 0 || index >= (int) byIndex.size())
+                continue;
+            auto* parameter = byIndex[(std::size_t) index];
+            const auto value = juce::jlimit (0.0f, 1.0f, juce::lynxTimedParamValues[k]);
+            auto e = makeEvent<clap_event_param_value_t> (CLAP_EVENT_PARAM_VALUE, (uint32_t) juce::jlimit (0, n - 1, juce::lynxTimedParamOffsets[k]));
+            e.param_id = parameter->id;
+            e.cookie = parameter->cookie;
+            e.note_id = -1;
+            e.port_index = e.channel = e.key = -1;
+            e.value = parameter->toPlain (value);
+            events.add (e);
+            parameter->setFromPlugin (e.value);
+        }
+
         for (const auto m : midi)
             addMidi (m.getMessage(), (uint32_t) juce::jlimit (0, n - 1, m.samplePosition));
+        events.sortByTime(); // (CLAP: a block's input events in time order)
+        // GitHub #198 (round 190ks): with a note output port, the buffer comes back with what the plugin sent (JUCE's
+        // processBlock rule: after the call, the MIDI buffer holds the plugin's output)
+        outMidi = hasNoteOutput ? &midi : nullptr;
+        if (outMidi != nullptr)
+            midi.clear();
 
         std::array<float*, 16> inputs {};
         std::array<float*, 16> outputs {};
@@ -636,6 +708,30 @@ public:
                 if (auto it = self->byId.find (v->param_id); it != self->byId.end())
                     it->second->setFromPlugin (v->value);
             }
+            // GitHub #198 (round 190ks): the notes it sends (its note output port), as MIDI at their sample
+            if (self->outMidi != nullptr && e->space_id == CLAP_CORE_EVENT_SPACE_ID)
+            {
+                const auto at = (int) e->time;
+                if (e->type == CLAP_EVENT_NOTE_ON || e->type == CLAP_EVENT_NOTE_OFF)
+                {
+                    const auto* note = reinterpret_cast<const clap_event_note_t*> (e);
+                    if (note->key >= 0 && note->key < 128)
+                    {
+                        const auto ch = note->channel >= 0 && note->channel < 16 ? note->channel + 1 : 1;
+                        const auto velocity = (float) juce::jlimit (0.0, 1.0, note->velocity);
+                        self->outMidi->addEvent (e->type == CLAP_EVENT_NOTE_ON && velocity > 0.0f
+                                                     ? juce::MidiMessage::noteOn (ch, note->key, velocity)
+                                                     : juce::MidiMessage::noteOff (ch, note->key, velocity),
+                                                 at);
+                    }
+                }
+                else if (e->type == CLAP_EVENT_MIDI)
+                {
+                    const auto* m = reinterpret_cast<const clap_event_midi_t*> (e);
+                    if (m->data[0] >= 0x80 && m->data[0] < 0xF0)
+                        self->outMidi->addEvent (m->data, juce::MidiMessage::getMessageLengthFromFirstByte (m->data[0]), at);
+                }
+            }
 
             return true;
         };
@@ -652,24 +748,80 @@ public:
 
         plugin->process (plugin, &process);
         steadyTime += n;
+        outMidi = nullptr;
 
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
             buffer.copyFrom (ch, 0, scratch, juce::jmin (ch, outputChannels - 1), 0, n);
         gate.store (false);
     }
 
-    double getTailLengthSeconds() const override { return 0.0; }
+    // round 190jg: clap.tail (UINT32_MAX = an infinite tail); 0 without the extension, as before
+    double getTailLengthSeconds() const override
+    {
+        if (tailExt == nullptr)
+            return 0.0;
+        const auto samples = tailSamples.load();
+        if (samples == UINT32_MAX)
+            return std::numeric_limits<double>::infinity();
+        const auto rate = activeRate.load();
+        return rate > 0.0 ? samples / rate : 0.0;
+    }
+
+    // round 190jg: clap.render — an export renders offline (the plugin may use its slower, better algorithms); a plugin
+    // with a hard real-time requirement (it plays hardware) stays real-time
+    void setNonRealtime (bool offline) noexcept override
+    {
+        AudioPluginInstance::setNonRealtime (offline);
+        if (renderExt == nullptr)
+            return;
+        onMessageThreadFor ([this, offline] {
+            if (renderExt->has_hard_realtime_requirement != nullptr && renderExt->has_hard_realtime_requirement (plugin) && offline)
+                return;
+            renderExt->set (plugin, offline ? CLAP_RENDER_OFFLINE : CLAP_RENDER_REALTIME);
+        });
+    }
     bool acceptsMidi() const override { return description.isInstrument; }
-    bool producesMidi() const override { return false; }
+    bool producesMidi() const override { return hasNoteOutput; } // (round 190ks)
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return gui != nullptr; }
 
-    int getNumPrograms() override { return 1; }
-    int getCurrentProgram() override { return 0; }
-    void setCurrentProgram (int) override {}
-    const juce::String getProgramName (int) override { return {}; }
+    // Round 190jg: the plugin's presets (preset-discovery factory + preset-load) as JUCE programs, which LYNX's plugin
+    // window lists in its preset bar (the wrapper's preset menu and arrows). Found on the message thread the first time
+    // they are asked for there; one program (none) until then and without the extensions, as before.
+    int getNumPrograms() override
+    {
+        const auto& list = presets();
+        return list.empty() ? 1 : (int) list.size();
+    }
+    int getCurrentProgram() override { return juce::jmax (0, currentPreset); }
+    void setCurrentProgram (int index) override
+    {
+        const auto& list = presets();
+        if (presetLoadExt == nullptr || index < 0 || index >= (int) list.size() || ! isMessageThread())
+            return;
+        const auto& p = list[(std::size_t) index];
+        if (presetLoadExt->from_location (plugin, p.kind, p.kind == CLAP_PRESET_DISCOVERY_LOCATION_PLUGIN ? nullptr : p.location.toRawUTF8(),
+                                          p.loadKey.isEmpty() ? nullptr : p.loadKey.toRawUTF8()))
+        {
+            currentPreset = index;
+            refreshParameterValues();
+        }
+    }
+    const juce::String getProgramName (int index) override
+    {
+        const auto& list = presets();
+        return index >= 0 && index < (int) list.size() ? list[(std::size_t) index].name : juce::String();
+    }
     void changeProgramName (int, const juce::String&) override {}
+
+    // what discovery found for this plugin (the tests, --clapext)
+    struct Preset
+    {
+        juce::String name, location, loadKey;
+        uint32_t kind = CLAP_PRESET_DISCOVERY_LOCATION_FILE;
+    };
+    const std::vector<Preset>& presets();
 
     void getStateInformation (juce::MemoryBlock& data) override
     {
@@ -682,7 +834,11 @@ public:
         stream.write = [] (const clap_ostream_t* s, const void* buffer, uint64_t size) -> int64_t {
             return static_cast<juce::MemoryOutputStream*> (s->ctx)->write (buffer, (size_t) size) ? (int64_t) size : -1;
         };
-        state->save (plugin, &stream);
+        // round 190jg: clap.state-context — a preset or a duplicate may leave out what belongs to the project
+        if (const auto context = clapStateContext(); stateContextExt != nullptr && context != CLAP_STATE_CONTEXT_FOR_PROJECT)
+            stateContextExt->save (plugin, &stream, context);
+        else
+            state->save (plugin, &stream);
     }
 
     void setStateInformation (const void* data, int size) override
@@ -697,7 +853,16 @@ public:
             return static_cast<juce::MemoryInputStream*> (s->ctx)->read (buffer, (int) juce::jmin<uint64_t> (bytes, 1 << 30));
         };
 
-        if (state->load (plugin, &stream) && params != nullptr)
+        const auto context = clapStateContext();
+        const auto loaded = stateContextExt != nullptr && context != CLAP_STATE_CONTEXT_FOR_PROJECT ? stateContextExt->load (plugin, &stream, context)
+                                                                                                    : state->load (plugin, &stream);
+        if (loaded)
+            refreshParameterValues();
+    }
+
+    void refreshParameterValues()
+    {
+        if (params != nullptr)
             for (auto& [paramId, parameter] : byId)
             {
                 double value = 0.0;
@@ -706,6 +871,73 @@ public:
                     parameter->setFromPlugin (value);
             }
     }
+
+    // --- round 190jg: remote controls, voice info, what the plugin offers --------------------------------------------
+    std::vector<ClapRemotePage> remotePages; // (message thread)
+    void readRemoteControls()
+    {
+        remotePages.clear();
+        if (remoteControlsExt == nullptr)
+            return;
+        std::map<clap_id, int> indexOf;
+        for (std::size_t i = 0; i < byIndex.size(); ++i)
+            indexOf[byIndex[i]->id] = (int) i;
+        const auto count = juce::jmin (64u, remoteControlsExt->count (plugin));
+        for (uint32_t i = 0; i < count; ++i)
+        {
+            clap_remote_controls_page_t page {};
+            if (! remoteControlsExt->get (plugin, i, &page))
+                continue;
+            ClapRemotePage out;
+            out.section = juce::String::fromUTF8 (page.section_name);
+            out.name = juce::String::fromUTF8 (page.page_name);
+            out.forPreset = page.is_for_preset;
+            for (int k = 0; k < CLAP_REMOTE_CONTROLS_COUNT; ++k)
+            {
+                const auto it = indexOf.find (page.param_ids[k]);
+                out.params[(std::size_t) k] = page.param_ids[k] != CLAP_INVALID_ID && it != indexOf.end() ? it->second : -1;
+            }
+            remotePages.push_back (out);
+        }
+    }
+
+    ClapVoiceInfo voiceInfo; // (message thread)
+    void readVoiceInfo()
+    {
+        voiceInfo = {};
+        if (voiceInfoExt == nullptr || ! isMessageThread())
+            return;
+        clap_voice_info_t info {};
+        if (voiceInfoExt->get (plugin, &info))
+            voiceInfo = { true, (int) info.voice_count, (int) info.voice_capacity, (info.flags & CLAP_VOICE_INFO_SUPPORTS_OVERLAPPING_NOTES) != 0 };
+    }
+
+    juce::StringArray extensionsOffered() const
+    {
+        static const char* const ids[] = { CLAP_EXT_PARAMS, CLAP_EXT_STATE, CLAP_EXT_STATE_CONTEXT, CLAP_EXT_GUI, CLAP_EXT_LATENCY, CLAP_EXT_TAIL,
+                                           CLAP_EXT_RENDER, CLAP_EXT_AUDIO_PORTS, CLAP_EXT_AUDIO_PORTS_CONFIG, CLAP_EXT_NOTE_PORTS, CLAP_EXT_NOTE_NAME,
+                                           CLAP_EXT_VOICE_INFO, CLAP_EXT_THREAD_POOL, CLAP_EXT_TIMER_SUPPORT, CLAP_EXT_POSIX_FD_SUPPORT,
+                                           CLAP_EXT_REMOTE_CONTROLS, CLAP_EXT_REMOTE_CONTROLS_COMPAT, CLAP_EXT_PRESET_LOAD, CLAP_EXT_PRESET_LOAD_COMPAT,
+                                           CLAP_EXT_PARAM_INDICATION, CLAP_EXT_CONTEXT_MENU, CLAP_EXT_TRACK_INFO, CLAP_EXT_AMBISONIC, CLAP_EXT_SURROUND,
+                                           CLAP_EXT_CONFIGURABLE_AUDIO_PORTS, CLAP_EXT_AUDIO_PORTS_ACTIVATION };
+        juce::StringArray out;
+        for (const auto* id : ids)
+            if (plugin->get_extension (plugin, id) != nullptr)
+                out.add (id);
+        return out;
+    }
+    std::pair<int, int> threadPoolUse() const { return { threadPoolRequests.load(), threadPoolTasks.load() }; }
+    // the presets are still being found (round 190jg: on their own thread; the first presets() call starts it)
+    bool presetsPending()
+    {
+        if (presetLoadExt == nullptr || presetsFound)
+            return false;
+        presets();
+        return ! presetsFound;
+    }
+    bool declaresTail() const noexcept { return tailExt != nullptr; }
+    const std::shared_ptr<ClapModule>& moduleOf() const { return life->module; }
+    const juce::PluginDescription& describedAs() const { return description; }
 
     // --- used by the parameters and the editor ---------------------------------------------
     void queueParam (clap_id id, void* cookie, double value) { pendingParams.push ({ id, cookie, value }); }
@@ -889,6 +1121,12 @@ private:
             if (std::strcmp (id, CLAP_EXT_LATENCY) == 0) return &hostLatency();
             if (std::strcmp (id, CLAP_EXT_GUI) == 0) return &hostGui();
             if (std::strcmp (id, CLAP_EXT_TIMER_SUPPORT) == 0) return &hostTimers();
+            // round 190jg (BUILD-LIST 18)
+            if (std::strcmp (id, CLAP_EXT_THREAD_POOL) == 0) return &hostThreadPool();
+            if (std::strcmp (id, CLAP_EXT_TAIL) == 0) return &hostTail();
+            if (std::strcmp (id, CLAP_EXT_VOICE_INFO) == 0) return &hostVoiceInfo();
+            if (std::strcmp (id, CLAP_EXT_REMOTE_CONTROLS) == 0 || std::strcmp (id, CLAP_EXT_REMOTE_CONTROLS_COMPAT) == 0) return &hostRemoteControls();
+            if (std::strcmp (id, CLAP_EXT_PRESET_LOAD) == 0 || std::strcmp (id, CLAP_EXT_PRESET_LOAD_COMPAT) == 0) return &hostPresetLoad();
            #if JUCE_LINUX || JUCE_BSD
             if (std::strcmp (id, CLAP_EXT_POSIX_FD_SUPPORT) == 0) return &hostFds();
            #endif
@@ -923,7 +1161,25 @@ private:
     const clap_plugin_state_t* state = nullptr;
     const clap_plugin_latency_t* latency = nullptr;
     const clap_plugin_audio_ports_t* audioPorts = nullptr;
+    // round 190jg
+    const clap_plugin_tail_t* tailExt = nullptr;
+    const clap_plugin_render_t* renderExt = nullptr;
+    const clap_plugin_voice_info_t* voiceInfoExt = nullptr;
+    const clap_plugin_state_context_t* stateContextExt = nullptr;
+    const clap_plugin_thread_pool_t* threadPoolExt = nullptr;
+    const clap_plugin_remote_controls_t* remoteControlsExt = nullptr;
+    const clap_plugin_preset_load_t* presetLoadExt = nullptr;
+    std::atomic<uint32_t> tailSamples { 0 };
+    std::atomic<bool> tailChanged { false };
+    std::vector<ClapParameter*> byIndex; // the parameters in getParameters() order
+    int currentPreset = -1;
+    bool presetsFound = false;
+    std::vector<Preset> presetList;
+    std::atomic<int> threadPoolRequests { 0 }, threadPoolTasks { 0 }; // (diagnostics)
+    friend struct ClapHostThreadPool;
     bool midiDialect = false;
+    bool hasNoteOutput = false;           // (round 190ks) a note output port: its notes come back in processBlock's buffer
+    juce::MidiBuffer* outMidi = nullptr;  // (round 190ks) that buffer while process() runs
     std::atomic<float> expressionRange { 0.0f }; // issue #108: > 0 = member channels' MPE data go out as note expressions
     bool initialised = false;
 
@@ -1049,6 +1305,85 @@ private:
     }
    #endif
 
+    // --- round 190jg (BUILD-LIST 18) ---------------------------------------------------------------------------------
+    // thread-pool: the plugin's tasks of one process call run on LYNX's own worker threads (a pool kept for CLAP plugins:
+    // the rack's pool may be running the very block that called). While another plugin's tasks hold it, or off the
+    // audio thread, they run here one after the other (still complete when request_exec returns, as the spec asks).
+    static const clap_host_thread_pool_t& hostThreadPool()
+    {
+        static const clap_host_thread_pool_t e { [] (const clap_host_t* hh, uint32_t tasks) {
+            auto* life = lifeOf (hh);
+            auto* self = life->owner.load();
+            if (self == nullptr || self->threadPoolExt == nullptr || life->audioThread.load() != std::this_thread::get_id())
+                return false;
+            ++self->threadPoolRequests;
+            self->threadPoolTasks += (int) tasks;
+            runClapTasks (*self->plugin, *self->threadPoolExt, tasks);
+            return true;
+        } };
+        return e;
+    }
+    static void runClapTasks (const clap_plugin_t& p, const clap_plugin_thread_pool_t& ext, uint32_t tasks) noexcept
+    {
+        static std::atomic<bool> busy { false };
+        static WorkerPool* pool = [] {
+            const auto n = juce::jlimit (1, 7, (int) std::thread::hardware_concurrency() - 1);
+            return new WorkerPool (n, [] { power::becomeProAudioThread(); }); // (never destroyed: used until exit)
+        }();
+        auto task = [&p, &ext] (int i) { ext.exec (&p, (uint32_t) i); };
+        if (tasks > 1 && ! busy.exchange (true))
+        {
+            pool->parallelFor ((int) tasks, task);
+            pool->park();
+            busy.store (false);
+            return;
+        }
+        for (uint32_t i = 0; i < tasks; ++i)
+            task ((int) i);
+    }
+    // tail: the plugin's tail changed (audio or main thread): read again at the next block
+    static const clap_host_tail_t& hostTail()
+    {
+        static const clap_host_tail_t e { [] (const clap_host_t* hh) {
+            if (auto* self = from (hh))
+                self->tailChanged.store (true);
+        } };
+        return e;
+    }
+    static const clap_host_voice_info_t& hostVoiceInfo()
+    {
+        static const clap_host_voice_info_t e { [] (const clap_host_t* hh) {
+            if (auto* self = from (hh))
+                self->onMainThread ([self] { self->readVoiceInfo(); });
+        } };
+        return e;
+    }
+    static const clap_host_remote_controls_t& hostRemoteControls()
+    {
+        static const clap_host_remote_controls_t e {
+            [] (const clap_host_t* hh) {
+                if (auto* self = from (hh))
+                    self->onMainThread ([self] { self->readRemoteControls(); });
+            },
+            [] (const clap_host_t*, clap_id) {} // (a suggested page: LYNX's controller pages follow the knob banks)
+        };
+        return e;
+    }
+    static const clap_host_preset_load_t& hostPresetLoad()
+    {
+        static const clap_host_preset_load_t e {
+            [] (const clap_host_t*, uint32_t, const char*, const char*, int32_t, const char* msg) {
+                juce::ignoreUnused (msg);
+                DBG ("CLAP preset load failed: " << msg);
+            },
+            [] (const clap_host_t* hh, uint32_t, const char*, const char*) {
+                if (auto* self = from (hh))
+                    self->onMainThread ([self] { self->refreshParameterValues(); });
+            }
+        };
+        return e;
+    }
+
     static const clap_host_latency_t& hostLatency()
     {
         static const clap_host_latency_t e { [] (const clap_host_t* hh) {
@@ -1086,6 +1421,209 @@ private:
         return e;
     }
 };
+
+// --- round 190jg: preset discovery ---------------------------------------------------------------------------------
+namespace
+{
+// What one discovery run found for one module: every preset with the plugin ids it is for (empty: the provider named
+// none). A module is crawled once per session (the spec: indexing must be fast and not interactive).
+struct FoundPreset
+{
+    ClapInstance::Preset preset;
+    juce::StringArray pluginIds;
+};
+
+struct Crawl
+{
+    std::vector<clap_preset_discovery_location_t> locations;
+    std::vector<juce::String> locationNames, locationPaths; // (owned copies of the strings)
+    juce::StringArray extensions;                          // declared file types ("" = any)
+    std::vector<FoundPreset> found;
+    // the file / location being read now
+    uint32_t kind = CLAP_PRESET_DISCOVERY_LOCATION_FILE;
+    juce::String path;
+};
+
+std::atomic<bool> discoveryStop { false }; // (the application is closing: a crawl stops between files)
+
+std::vector<FoundPreset> discoverPresets (const ClapModule& module)
+{
+    std::vector<FoundPreset> result;
+    auto* factory = static_cast<const clap_preset_discovery_factory_t*> (module.getFactory (CLAP_PRESET_DISCOVERY_FACTORY_ID));
+    if (factory == nullptr)
+        factory = static_cast<const clap_preset_discovery_factory_t*> (module.getFactory (CLAP_PRESET_DISCOVERY_FACTORY_ID_COMPAT));
+    if (factory == nullptr)
+        return result;
+
+    constexpr std::size_t maxPresets = 8192, maxFiles = 20000;
+    for (uint32_t i = 0; i < factory->count (factory); ++i)
+    {
+        const auto* descriptor = factory->get_descriptor (factory, i);
+        if (descriptor == nullptr || descriptor->id == nullptr)
+            continue;
+        Crawl crawl;
+        clap_preset_discovery_indexer_t indexer {};
+        indexer.clap_version = CLAP_VERSION;
+        indexer.name = "LYNX SHARE";
+        indexer.vendor = "LYNX";
+        indexer.url = "";
+        indexer.version = JUCE_APPLICATION_VERSION_STRING;
+        indexer.indexer_data = &crawl;
+        indexer.declare_filetype = [] (const clap_preset_discovery_indexer_t* x, const clap_preset_discovery_filetype_t* t) {
+            if (t != nullptr)
+                static_cast<Crawl*> (x->indexer_data)->extensions.add (juce::String::fromUTF8 (t->file_extension != nullptr ? t->file_extension : ""));
+            return true;
+        };
+        indexer.declare_location = [] (const clap_preset_discovery_indexer_t* x, const clap_preset_discovery_location_t* l) {
+            if (l == nullptr)
+                return false;
+            auto* c = static_cast<Crawl*> (x->indexer_data);
+            c->locations.push_back (*l);
+            c->locationNames.push_back (juce::String::fromUTF8 (l->name != nullptr ? l->name : ""));
+            c->locationPaths.push_back (juce::String::fromUTF8 (l->location != nullptr ? l->location : ""));
+            return true;
+        };
+        indexer.declare_soundpack = [] (const clap_preset_discovery_indexer_t*, const clap_preset_discovery_soundpack_t*) { return true; };
+        indexer.get_extension = [] (const clap_preset_discovery_indexer_t*, const char*) -> const void* { return nullptr; };
+
+        const auto* provider = factory->create (factory, &indexer, descriptor->id);
+        if (provider == nullptr)
+            continue;
+        if (provider->init (provider))
+        {
+            clap_preset_discovery_metadata_receiver_t receiver {};
+            receiver.receiver_data = &crawl;
+            receiver.on_error = [] (const clap_preset_discovery_metadata_receiver_t*, int32_t, const char*) {};
+            receiver.begin_preset = [] (const clap_preset_discovery_metadata_receiver_t* r, const char* name, const char* key) {
+                auto* c = static_cast<Crawl*> (r->receiver_data);
+                if (c->found.size() >= maxPresets)
+                    return false;
+                FoundPreset p;
+                p.preset.name = juce::String::fromUTF8 (name != nullptr ? name : "");
+                p.preset.loadKey = juce::String::fromUTF8 (key != nullptr ? key : "");
+                p.preset.location = c->path;
+                p.preset.kind = c->kind;
+                if (p.preset.name.isEmpty())
+                    p.preset.name = juce::File (c->path).getFileNameWithoutExtension();
+                c->found.push_back (std::move (p));
+                return true;
+            };
+            receiver.add_plugin_id = [] (const clap_preset_discovery_metadata_receiver_t* r, const clap_universal_plugin_id_t* id) {
+                auto* c = static_cast<Crawl*> (r->receiver_data);
+                if (id != nullptr && id->id != nullptr && ! c->found.empty() && (id->abi == nullptr || std::strcmp (id->abi, "clap") == 0))
+                    c->found.back().pluginIds.add (juce::String::fromUTF8 (id->id));
+            };
+            receiver.set_soundpack_id = [] (const clap_preset_discovery_metadata_receiver_t*, const char*) {};
+            receiver.set_flags = [] (const clap_preset_discovery_metadata_receiver_t*, uint32_t) {};
+            receiver.add_creator = [] (const clap_preset_discovery_metadata_receiver_t*, const char*) {};
+            receiver.set_description = [] (const clap_preset_discovery_metadata_receiver_t*, const char*) {};
+            receiver.set_timestamps = [] (const clap_preset_discovery_metadata_receiver_t*, clap_timestamp, clap_timestamp) {};
+            receiver.add_feature = [] (const clap_preset_discovery_metadata_receiver_t*, const char*) {};
+            receiver.add_extra_info = [] (const clap_preset_discovery_metadata_receiver_t*, const char*, const char*) {};
+
+            std::size_t files = 0;
+            for (std::size_t l = 0; l < crawl.locations.size(); ++l)
+            {
+                if (crawl.locations[l].kind == CLAP_PRESET_DISCOVERY_LOCATION_PLUGIN)
+                {
+                    crawl.kind = CLAP_PRESET_DISCOVERY_LOCATION_PLUGIN;
+                    crawl.path = {};
+                    provider->get_metadata (provider, CLAP_PRESET_DISCOVERY_LOCATION_PLUGIN, nullptr, &receiver);
+                    continue;
+                }
+                const juce::File where (crawl.locationPaths[l]);
+                crawl.kind = CLAP_PRESET_DISCOVERY_LOCATION_FILE;
+                juce::Array<juce::File> list;
+                if (where.existsAsFile())
+                    list.add (where);
+                else if (where.isDirectory())
+                    for (const auto& entry : juce::RangedDirectoryIterator (where, true, "*", juce::File::findFiles))
+                    {
+                        const auto f = entry.getFile();
+                        auto wanted = crawl.extensions.isEmpty();
+                        for (const auto& e : crawl.extensions)
+                            wanted = wanted || e.isEmpty() || f.getFileExtension().equalsIgnoreCase ("." + e.trimCharactersAtStart ("."));
+                        if (wanted)
+                            list.add (f);
+                        if (list.size() >= (int) maxFiles)
+                            break;
+                    }
+                for (const auto& f : list)
+                {
+                    if (++files > maxFiles || crawl.found.size() >= maxPresets || discoveryStop.load())
+                        break;
+                    crawl.path = f.getFullPathName();
+                    provider->get_metadata (provider, CLAP_PRESET_DISCOVERY_LOCATION_FILE, crawl.path.toRawUTF8(), &receiver);
+                }
+            }
+        }
+        provider->destroy (provider);
+        for (auto& p : crawl.found)
+            result.push_back (std::move (p));
+    }
+    return result;
+}
+
+// The crawls (round 190jg, measured on Windows: Surge XT's 2970 presets took 6.6 s): on a thread of their own, as the
+// CLAP spec encourages (its factory is thread-safe); until one is done its plugin has no programs. One per module and
+// session; at exit the running ones are told to stop (discoveryStop) and are waited for (they hold their module).
+struct Discoveries
+{
+    std::mutex lock;
+    std::map<juce::String, std::shared_ptr<const std::vector<FoundPreset>>> done;
+    std::set<juce::String> running;
+    std::vector<std::thread> threads;
+    ~Discoveries()
+    {
+        discoveryStop.store (true);
+        for (auto& t : threads)
+            if (t.joinable())
+                t.join();
+    }
+};
+Discoveries& discoveries()
+{
+    static Discoveries d;
+    return d;
+}
+
+thread_local ClapStateContext stateContextNow = ClapStateContext::project;
+} // namespace
+
+const std::vector<ClapInstance::Preset>& ClapInstance::presets()
+{
+    static const std::vector<Preset> none;
+    if (presetLoadExt == nullptr)
+        return none;
+    if (! presetsFound)
+    {
+        std::shared_ptr<const std::vector<FoundPreset>> found;
+        const auto key = description.fileOrIdentifier;
+        {
+            auto& d = discoveries();
+            const std::lock_guard<std::mutex> l (d.lock);
+            if (const auto it = d.done.find (key); it != d.done.end())
+                found = it->second;
+            else if (d.running.insert (key).second && ! discoveryStop.load())
+                d.threads.emplace_back ([key, module = life->module] {
+                    juce::Thread::setCurrentThreadName ("LYNX CLAP presets");
+                    auto list = std::make_shared<const std::vector<FoundPreset>> (discoverPresets (*module));
+                    auto& dd = discoveries();
+                    const std::lock_guard<std::mutex> ll (dd.lock);
+                    dd.done[key] = std::move (list);
+                    dd.running.erase (key);
+                });
+        }
+        if (found == nullptr)
+            return none; // (still being found: the preset bar asks again when its menu opens)
+        presetsFound = true;
+        const auto ownId = juce::String::fromUTF8 (plugin->desc != nullptr && plugin->desc->id != nullptr ? plugin->desc->id : "");
+        for (const auto& p : *found)
+            if (p.pluginIds.isEmpty() || p.pluginIds.contains (ownId))
+                presetList.push_back (p.preset);
+    }
+    return presetList;
+}
 
 void ClapParameter::setValue (float v)
 {
@@ -1187,6 +1725,76 @@ juce::AudioProcessorEditor* ClapInstance::createEditor()
     return gui != nullptr ? new ClapEditor (*this) : nullptr;
 }
 } // namespace
+
+ScopedClapStateContext::ScopedClapStateContext (ClapStateContext context) noexcept : previous (stateContextNow)
+{
+    stateContextNow = context;
+}
+
+ScopedClapStateContext::~ScopedClapStateContext() { stateContextNow = previous; }
+
+std::uint32_t clapStateContext() noexcept { return (std::uint32_t) stateContextNow; }
+
+std::vector<ClapRemotePage> clapRemoteControls (juce::AudioPluginInstance& plugin)
+{
+    if (auto* clap = dynamic_cast<ClapInstance*> (&plugin))
+        return clap->remotePages;
+    return {};
+}
+
+ClapVoiceInfo clapVoiceInfo (juce::AudioPluginInstance& plugin)
+{
+    if (auto* clap = dynamic_cast<ClapInstance*> (&plugin))
+    {
+        clap->readVoiceInfo();
+        return clap->voiceInfo;
+    }
+    return {};
+}
+
+bool clapDeclaresTail (const juce::AudioPluginInstance& plugin)
+{
+    const auto* clap = dynamic_cast<const ClapInstance*> (&plugin);
+    return clap != nullptr && clap->declaresTail();
+}
+
+std::pair<int, int> clapThreadPoolUse (juce::AudioPluginInstance& plugin)
+{
+    if (auto* clap = dynamic_cast<ClapInstance*> (&plugin))
+        return clap->threadPoolUse();
+    return {};
+}
+
+juce::String describeClapPlugin (juce::AudioPluginInstance& plugin)
+{
+    auto* clap = dynamic_cast<ClapInstance*> (&plugin);
+    if (clap == nullptr)
+        return "not a CLAP plugin\n";
+    juce::String out;
+    out << "plugin=" << plugin.getName() << " id=" << juce::String::fromUTF8 (clap->plugin->desc != nullptr ? clap->plugin->desc->id : "?") << "\n";
+    out << "extensions=" << clap->extensionsOffered().joinIntoString (" ") << "\n";
+    out << "parameters=" << plugin.getParameters().size() << "\n";
+    out << "latency=" << plugin.getLatencySamples() << " tail_seconds=" << plugin.getTailLengthSeconds() << "\n";
+    const auto voices = clapVoiceInfo (plugin);
+    out << "voice_info=" << (voices.valid ? juce::String (voices.count) + "/" + juce::String (voices.capacity) + (voices.overlappingNotes ? " overlapping" : "") : juce::String ("none")) << "\n";
+    const auto pages = clapRemoteControls (plugin);
+    out << "remote_pages=" << (int) pages.size();
+    for (std::size_t i = 0; i < pages.size() && i < 4; ++i)
+        out << (i == 0 ? " [" : ", ") << pages[i].section << "/" << pages[i].name;
+    out << (pages.empty() ? "" : "]") << "\n";
+    // (the crawl runs on its own thread: a test waits for it, up to 60 s)
+    const auto crawlStart = juce::Time::getMillisecondCounterHiRes();
+    while (clap->presetsPending() && juce::Time::getMillisecondCounterHiRes() - crawlStart < 60000.0)
+        juce::Thread::sleep (20);
+    out << "preset_crawl_ms=" << juce::String (juce::Time::getMillisecondCounterHiRes() - crawlStart, 0) << " (background thread)\n";
+    const auto& presetList = clap->presets();
+    out << "presets=" << (int) presetList.size();
+    for (std::size_t i = 0; i < presetList.size() && i < 5; ++i)
+        out << (i == 0 ? " [" : ", ") << presetList[i].name;
+    out << (presetList.empty() ? "" : "]") << "\n";
+    return out;
+}
+
 
 // --- format ----------------------------------------------------------------------------
 

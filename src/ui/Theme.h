@@ -4,6 +4,13 @@
 
 #include "core/ThemePalette.h"
 
+#include <cstdint>
+
+namespace lynx
+{
+enum class ClipKind : std::uint8_t; // (core/Song.h)
+}
+
 // LYNX design tokens: the single source of colours, type sizes, spacing and radii for the whole UI,
 // plus the LookAndFeel that draws every stock JUCE widget with them.
 //
@@ -27,10 +34,11 @@ inline juce::Colour bg6 { 0xff434852 };   // controls pressed / neutral "on"
 
 inline juce::Colour border { 0xff2a2d34 };       // hairlines between areas
 inline juce::Colour borderStrong { 0xff3b3f48 }; // control outlines
+inline juce::Colour outline { 0xff747983 };      // outlines that must read at 3:1 on the panels, bg4 included (round 190je: buttons, fields)
 
 inline juce::Colour textPrimary { 0xffeceef2 };
 inline juce::Colour textSecondary { 0xffa1a6b0 };
-inline juce::Colour textDisabled { 0xff60656f };
+inline juce::Colour textDisabled { 0xff767b85 }; // round 190je: 3.6:1 on bg3 (was #60656F, 2.6:1)
 
 // the red accent
 inline juce::Colour accent { 0xffe5383b };
@@ -78,15 +86,56 @@ inline juce::Colour audioClip { 0xff5a87b8 };
 void setPalette (const themes::Palette& palette); // the tokens only (ThemeSettings also refreshes the windows)
 themes::Palette currentPalette();
 
+// --- one state language for every button kind (round 190je, design190ia G1; the rule: core/ThemePalette.h buttonLook) ---
+// idle / hover (0..1, faded by IconButton) / pressed / on / disabled for a secondary button, a flat momentary icon or a
+// flat switch (whose hover previews its "on" look, FL 2024). Text buttons, icon buttons, combo boxes and tick boxes use it.
+struct ButtonColours
+{
+    juce::Colour fill, edge, content; // transparent: not drawn
+};
+ButtonColours buttonColours (themes::ButtonKind kind, bool on, float hover, bool down, bool enabled);
+
 // --- typography ----------------------------------------------------------------------------------
+// Round 190lx (DL-59, capture 190lx B1 live-led-send.png / live-led-device-knob.png): Live's automation LED on a knob,
+// a red (255,77,71) 4 px dot with a dark ring (about 6 px in all) at the knob's top-left, just outside its ring.
+inline void drawLiveKnobAutomationLed (juce::Graphics& g, juce::Rectangle<float> knob)
+{
+    const auto r = juce::jmin (knob.getWidth(), knob.getHeight()) * 0.5f;
+    const juce::Point<float> at { knob.getCentreX() - 0.82f * r, knob.getCentreY() - 0.88f * r };
+    g.setColour (juce::Colour (0xff060606));
+    g.fillEllipse (juce::Rectangle<float> (6.0f, 6.0f).withCentre (at));
+    g.setColour (juce::Colour (0xffff4d47));
+    g.fillEllipse (juce::Rectangle<float> (4.0f, 4.0f).withCentre (at));
+}
+
 namespace type
 {
-inline constexpr float caption = 11.0f;  // grid numbers, small captions
-inline constexpr float small = 12.0f;    // secondary labels, status bar, tooltips
-inline constexpr float body = 13.0f;     // default control text
-inline constexpr float title = 15.0f;    // panel titles
-inline constexpr float display = 20.0f;  // the transport position
+// The text roles at 100 %. Settings › General › Text size (issue #189, round 190ir) scales them per role at start-up
+// (setTextSize): the sizes below are what the code reads, so they are variables, set once before any window exists.
+namespace base
+{
+inline constexpr float caption = 11.0f, small = 12.0f, body = 13.0f, title = 15.0f, display = 20.0f;
+}
+inline float caption = base::caption;  // grid numbers, small captions
+inline float small = base::small;      // secondary labels, status bar, tooltips
+inline float body = base::body;        // default control text
+inline float title = base::title;      // panel titles
+inline float display = base::display;  // the transport position
 } // namespace type
+
+// Settings › General › Text size (issue #189): the roles scaled per role (core/TextSize.h), saved in the profile
+// (ui-text-size.txt) and applied at start-up, as the interface font is (Labels and layouts take their sizes when they
+// are made).
+void setTextSize (int percent); // sets type::caption..display
+int textSize();                 // the percent in use
+int savedTextSize();            // 100 when none was saved
+void saveTextSize (int percent);
+// Settings › General › Bold text (round 190jp): textsize::Bold, set once at start-up (ui-bold-text.txt); theme::font
+// then gives the bold face for the chosen roles.
+void setBoldText (int setting);
+int boldText();
+int savedBoldText(); // 0 (off) when none was saved
+void saveBoldText (int setting);
 
 // The UI font at `size` (plain or bold). Round 190gr (U1): the fonts come from a small cache, so a paint no longer makes a
 // new juce::Font whose typeface JUCE then looks up by name (its typeface cache compares the family and style strings),
@@ -95,6 +144,7 @@ inline constexpr float display = 20.0f;  // the transport position
 // LYNX_PAINT_CACHE=0 (diagnostics) makes a new font on every call, as before.
 juce::Font font (float size, bool bold = false);
 void clearFontCache();
+
 
 // The width a column of labels needs: `minWidth` when every text fits in it (the English layout), else the widest
 // text (+ the label borders), up to `maxWidth` (round 165o: translated labels are often longer).
@@ -126,8 +176,19 @@ namespace menus
 void setCompact (bool compact);
 bool compact();
 int itemHeight();    // a normal row
-int headerHeight();  // a section header (the "DOCUMENTS" titles)
+int headerHeight();  // a section header: FL's full-width band (round 190je: 17 px compact, 22 comfortable)
 int separatorHeight();
+// The menu text, one step larger than the body text (round 190je, design190ia FW-15: FL's cap 8 px, LYNX's was 7): 14 at
+// 100 %, scaled by Settings › General › Text size like the body role. The shortcut column uses type::small, italic as FL's.
+float textSize();
+// Settings › Theme › Menu style (round 190je, FW-16): LYNX's dark menus (the default) or FL's classic light grey ones.
+void setStyle (themes::MenuStyle style);
+themes::MenuStyle style();
+struct Colours
+{
+    juce::Colour background, border, text, shortcut, disabled, band, bandText, hover, hoverText, separator, check;
+};
+Colours colours(); // the palette in use, in the style in use
 } // namespace menus
 
 juce::Font monoFont (float size); // (cached as font() is)
@@ -182,6 +243,106 @@ inline juce::Colour tame (juce::Colour c)
 {
     return c.withMultipliedSaturation (0.8f).withBrightness (juce::jmin (c.getBrightness(), 0.72f));
 }
+
+// --- the Live look of the Clip-launch layout (round 190ig; tokens measured by round 190ia in Ableton Live 12.4's Dark
+// theme at 100 %, /mnt/e/lynx-work/design190ia/findings/cliplaunch.md §0). Used only while the Clip-launch layout shows,
+// so the Pattern layout never changes. Fixed values (the reference look), not user-theme tokens.
+namespace livelook
+{
+inline const juce::Colour window { 0xff2a2a2a };     // control bar, around the views
+inline const juce::Colour surface { 0xff363636 };    // slots, strips, scene cells
+inline const juce::Colour raised { 0xff464646 };     // selected track column / scene row, title bars
+inline const juce::Colour separator { 0xff242424 };  // 2 px between columns, 1 px between rows
+inline const juce::Colour well { 0xff1e1e1e };       // stop squares, record circles, fields
+inline const juce::Colour mainHeader { 0xff3c3c3c }; // the Main column's header
+inline const juce::Colour text { 0xffb5b5b5 };       // text on the greys
+inline const juce::Colour ink { 0xff070707 };        // text on a light selection
+inline const juce::Colour selectionFocused { 0xffb0ddeb }; // a selected scene; a focused slot's edge
+inline const juce::Colour selectionFocusedFill { 0xff95bbc7 }; // a focused selected slot's launch zone
+inline const juce::Colour selectionUnfocused { 0xff637e86 };
+inline const juce::Colour playing { 0xff00d38d };    // a playing clip's launch triangle
+inline const juce::Colour queuedOn { 0xff008a5c };   // a queued launch's blink, lit phase
+inline const juce::Colour queuedOff { 0xff002217 };  // and its dark phase
+inline const juce::Colour stateBox { 0xff181818 };   // the launch zone of a playing / queued / recording clip
+inline const juce::Colour arm { 0xffff5559 };
+inline const juce::Colour on { 0xffffad56 };         // Live's "on" orange: activators, power, Warp, Detail toggles
+inline const juce::Colour meterWell { 0xff181818 };  // the wells of the level meters
+inline const juce::Colour knobRing { 0xff111111 };   // a knob's open ring and its needle (#181818)
+inline const juce::Colour focusOutline { 0xff757575 }; // the focused view's 2 px outline
+// Round 190jn: whether the Clip-launch layout shows Live's look now (the Clip-launch layout without View › "Classic LYNX
+// look", round 190ig's switch). Every Live-look painter (grid, Session mixer, Arrangement, Clip / Device View, Info View,
+// status bar) asks this one switch, so the Pattern and Simple layouts never change.
+bool active() noexcept;
+// round gaps190kf: the Clip View's Sample Editor (Live 12.4 Dark, 100 %: live190gu/warp/live-clipview-beats-defaults-full.png)
+inline const juce::Colour clipMarker { 0xff00bfaf }; // the clip's Start / End markers
+inline const juce::Colour braceOff { 0xff919191 };   // the loop brace while Loop is off
+inline const juce::Colour braceOn { 0xff808080 };    // its ">" / "<" over the teal bar, and the Start marker while Loop is on
+} // namespace livelook
+
+// Live derives every shade of a clip from its colour by multiplying the RGB channels (round 190ia: name ×0.24, idle
+// launch triangle ×0.40, launch-zone divider ×0.66, waveform ×0.15, grid in a clip ×0.88).
+inline juce::Colour liveShade (juce::Colour c, float k)
+{
+    const auto m = [k] (juce::uint8 v) { return (juce::uint8) juce::jlimit (0, 255, juce::roundToInt ((float) v * k)); };
+    return juce::Colour (m (c.getRed()), m (c.getGreen()), m (c.getBlue()), c.getAlpha());
+}
+
+// --- one colour system for clips (round 190ig, design190ia PLAN §2) ---------------------------------------------------
+// A clip's colours from its own colour (FL: its channel's or pattern's; Live: its slot's, else its track's) and the
+// colour of the track it sits on, in the look of one layout: FL Studio's tint (Pattern layout), Live's pastel blocks
+// (Clip-launch) or BandLab's track hue (Simple). Each layout's painter picks its style; the slices that restyle the other
+// layouts only choose theirs here.
+enum class ClipStyle { flTint, livePastel, bandlabHue };
+
+struct ClipLook
+{
+    juce::Colour headerTop, headerBottom; // the header band, a vertical gradient (one colour: no gradient)
+    juce::Colour edge;                    // 1 px rim of the header band
+    juce::Colour body;                    // the body, filled at bodyAlpha over the lane (FL: the grid shows through)
+    float bodyAlpha = 1.0f;
+    juce::Colour content;                 // waveform, automation curve, note marks
+    juce::Colour contentFill;             // under an automation curve (transparent: none)
+    juce::Colour compactContent;          // FL: the waveform when the whole clip is one band (a short track)
+    juce::Colour ink;                     // the name and kind glyph on the header
+};
+
+// FL (measured in FL Studio 2026 on "Ookay - Thief", round 190ig, fl-playlist-zoom-audioclips.png / fl-playlist.png):
+// header = the clip colour, a gradient from colour − 13 to colour − 28 per channel, its rim colour × 0.66; body = the
+// TRACK's colour at 50 % over the lane (the Riser Noise clip: an orange header on the yellow RISER SWEEP track has a
+// yellow body); waveform = colour + 72 per channel, automation curve = colour + 84 with colour + 84 at 13 % under it;
+// name = colour + 124; on a short track the clip is one header-coloured band with its waveform in the clip colour.
+// `trackColour` 0 / `clipColour` 0 = FL's default grey #485156 (a channel or track saved without a colour).
+ClipLook clipBody (juce::Colour clipColour, juce::Colour trackColour, ClipKind kind, ClipStyle style);
+
+// --- FL's colour-filled buttons and tinted names (round 190io, design190ia FM-10 / FM-30 / FM-31) ------------------------
+// WCAG contrast ratio of two colours (1 … 21).
+float contrast (juce::Colour a, juce::Colour b);
+
+// A user colour as FL fills a button or a header band with it: the colour itself (FL keeps its saturation: Synth Bass
+// #0E4498, Grv Kick #8A211A measured in fl-channelrack.png), its brightness held in [lo, hi] so white text on it keeps
+// its contrast (LYNX: FL's lighter fills such as Titey Tom #B65227 read 4.2:1 with white).
+juce::Colour colourFill (juce::Colour c, float lo, float hi);
+
+// FL's light tint of a track colour for its name ("KICK" red-pink on the red group): saturation × 0.45, brightness 0.95;
+// `fallback` when the tint reads below 4.5:1 on `background`.
+juce::Colour lightTint (juce::Colour c, juce::Colour background, juce::Colour fallback);
+
+// FL's raised step keycap (round 190io, FM-11) in `fill`; `lit`: a lit step's light edges and slot line. From a cached tile.
+void drawKeycap (juce::Graphics& g, juce::Rectangle<int> r, juce::Colour fill, bool lit);
+// Eight step keycaps in a row (the Channel rack's idle steps, two groups of four: `a` then `b`) at `pitch` from `firstCell`,
+// one tile per row instead of eight; `ghost`: the faint outlined steps past a pattern's end (round 190io).
+void drawStepStrip (juce::Graphics& g, juce::Rectangle<int> firstCell, int pitch, juce::Colour a, juce::Colour b, bool ghost);
+// Round 190mh (perf): drawStepStrip's strip where the frame shows the opaque `background` under it (a Channel rack row):
+// on JUCE's software renderer the strip's translucent tile is composed over `background` once, into an opaque image
+// that is copied afterwards (the same pixel blends: the same pixels); elsewhere drawStepStrip as before.
+void drawStepStripOver (juce::Graphics& g, juce::Rectangle<int> firstCell, int pitch, juce::Colour a, juce::Colour b, bool ghost, juce::Colour background);
+// A plate filled top-down from `top` to `bottom` (one colour: equal), rounded `corner` (only on top with `squareBottom`):
+// FL's colour-filled channel buttons and Mixer header bands (round 190io). From a cached tile.
+void fillPlate (juce::Graphics& g, juce::Rectangle<float> r, float corner, juce::Colour top, juce::Colour bottom, bool squareBottom = false);
+
+// FL's middle ellipsis (core/MiddleEllipsis.h): `text` as it fits in `width` with `font`, start + ".." + end when it is
+// too long. Cached by text, font height and width, so a paint measures each name once.
+juce::String fitMiddle (const juce::String& text, const juce::Font& font, float width);
 
 // Upper case for small caption headers, including accented Latin letters (ã -> Ã), which the C
 // runtime's towupper leaves alone on Windows.
@@ -242,6 +403,8 @@ juce::StringArray fontFoldersToScan (const juce::StringArray& fontconfigFolders,
 juce::String fontSelfTest();
 // --selftest "paint_caches=" (round 190gr): the font cache and the shape tiles against shapes drawn straight.
 juce::String paintCacheSelfTest();
+// Round 190ms: what JUCE fix 45 rests on (edge tables over a path's own rows; RGB rows into ARGB pixels): "OK" or an error.
+juce::String softwareRendererSelfTest();
 
 // --- LookAndFeel ---------------------------------------------------------------------------------
 class LookAndFeel final : public juce::LookAndFeel_V4
@@ -285,7 +448,9 @@ public:
     void drawPopupMenuSectionHeader (juce::Graphics&, const juce::Rectangle<int>& area, const juce::String& sectionName) override;
     juce::Font getPopupMenuFont() override;
     void getIdealPopupMenuItemSize (const juce::String& text, bool isSeparator, int standardMenuItemHeight, int& idealWidth, int& idealHeight) override;
-    int getPopupMenuBorderSize() override { return 4; }
+    int getPopupMenuBorderSize() override { return 2; } // (round 190je: 4 → 2, FL's rows reach the frame)
+    void drawPopupMenuColumnSeparatorWithOptions (juce::Graphics&, const juce::Rectangle<int>&, const juce::PopupMenu::Options&) override;
+    int getPopupMenuColumnSeparatorWidthWithOptions (const juce::PopupMenu::Options&) override;
     // keeps a submenu from opening over its own multi-column parent menu (round 162d: JUCE then misses the click on
     // the submenu's items — the mixer track menu's "Change color" did nothing, issue #9)
     void preparePopupMenuWindow (juce::Component& newWindow) override;

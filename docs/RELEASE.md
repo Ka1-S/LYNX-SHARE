@@ -31,6 +31,22 @@ Steps:
 2. Locally: `scripts/build-local.sh "/mnt/c/Program Files/Image-Line/FL Studio 2026/Data"` → `0 failures`;
    `flock ~/.cache/lynx-winbuild.lock scripts/build-windows-zig.sh`; from a Windows folder `LYNX.exe --selftest r.txt`
    (`result=OK`) and `LYNX.exe --scantest <folder with a VST3/CLAP> r.txt` (a test CLAP: `tools/testplugin`).
+2b. Performance (every release; LYNX must stay faster and lighter than FL Studio): on a quiet machine (no builds),
+   `FL=1 OPENTIME=1 LOAD_MAX=6 CORES=7-11 scripts/perf-gate.sh compare` with the Linux app and perfbench built
+   (`build-linux/`). It measures the synthetic big projects of `core/PerfProjects.h` (synth100, inserts50, stream,
+   big200: 200 channels / 120 inserts / 2,000 clips / 200 automation clips, automation: 400 dense automation clips)
+   and FL Studio's Thief and Exoplanet plus Live's Patience (from the local installs, never committed): audio CPU at
+   64 / 128 / 256 samples, import / build / rebuild time and peak memory (`tools/perfbench --gate`), `.lynx` save and
+   load (`LYNX --perfgen`), open time, memory and paint per frame of every view (`LYNX --paintbench`) and the start-up
+   with the project (`LYNX --opentime`), against `tests/perf/baseline-local.json`; any regression past its threshold
+   fails (`scripts/perf_gate.py` prints the table). CI runs the synthetic part on every push (*Tests* › App ubuntu ›
+   *Performance gate*, `tests/perf/baseline-ci-ubuntu.json`). Then the Windows comparison with FL Studio and Live:
+   `scripts/perf-vs-fl.sh startup|open|play` (start-up, project open, RAM, playback CPU / fps; `scripts/perf-vs-fl-sum.py`).
+   A baseline changes only for a reviewed, intended change: `PROFILE=<name> scripts/perf-gate.sh update`, committed
+   with the reason. Paint cells: where the CPU counter can be read (Linux), `--paintbench` also counts the instructions
+   per frame, and a cell whose instructions the run and the baseline both have is gated on them (5 %), its time only
+   reported (the time divided by the calibration moves with the runner's memory system); add a CPU model's counts with
+   `PERF_GATE_ONLY_METRICS=paint_instr scripts/perf_gate.py update <results> <baseline>` (every other number stays).
 3. Optional local package check: `scripts/make-installer.sh` (defaults to `build-win/LYNX.exe`) writes the installer,
    the zip and `SHA256SUMS.txt` to `dist/`. NSIS: `makensis` on PATH, `$MAKENSIS`, or the NSIS zip release unpacked
    into `~/opt/nsis-<version>` (its `makensis.exe` runs through WSL interop). Quick installer check:

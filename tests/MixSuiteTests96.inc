@@ -470,7 +470,9 @@ TEST (mixsuite_panels_place_every_parameter)
             {
                 const auto p = plugui::paramIndex (kind, item.param);
                 CHECK (p >= 0);
-                if (p >= 0)
+                if (p >= count) // round 190le: a hidden parameter with a control (Ridge's 32C voicing)
+                    CHECK (hiddenEffectParamName (kind, p) != nullptr);
+                else if (p >= 0)
                 {
                     bool variant = false; // another variant of a control already counted
                     for (const auto* other : byParam[(std::size_t) p])

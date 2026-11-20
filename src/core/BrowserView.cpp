@@ -25,8 +25,9 @@ bool among (const std::string& ext, std::initializer_list<const char*> list)
 }
 
 // (".speech": FL's speech presets, spoken into a sample by core/Speech.h; round 168b)
-bool isAudioExt (const std::string& ext) { return among (ext, { "wav", "flac", "ogg", "mp3", "aif", "aiff", "wv", "speech" }); }
-bool isFontExt (const std::string& ext) { return among (ext, { "sf2", "sf3" }); }
+bool isAudioExt (const std::string& ext) { return among (ext, { "wav", "flac", "ogg", "mp3", "aif", "aiff", "wv", "speech", "ncw" }); }
+// (and other samplers' instruments, opened as DirectWave channels: core/SamplerImport.h, round 190ii)
+bool isFontExt (const std::string& ext) { return among (ext, { "sf2", "sf3", "dwp", "dwb", "gig" }); }
 bool isPresetExt (const std::string& ext) { return among (ext, { "fst" }); }
 bool isProjectExt (const std::string& ext) { return among (ext, { "lynx", "flp", "mid", "midi" }); }
 } // namespace

@@ -473,6 +473,8 @@ public:
         det.reset();
         psola.reset();
         activity = 0.0;
+        passGain = 1.0; // round 190mg
+        passQuiet = 0.0;
         hpX[0] = hpX[1] = hpY[0] = hpY[1] = 0.0;
         std::fill (dry.begin(), dry.end(), 0.0f);
         dryPos = 0;
@@ -501,6 +503,10 @@ public:
         held = channels;
         heldCount = count;
     }
+    // (rollup 0.1.30 step 9: round 190kz's per-block batching must leave a block piece by piece when a MIDI target channel is
+    // set: process() reads that channel's held notes, which change from piece to piece)
+    bool followsHeldNotes() const noexcept override { return true; }
+    bool followsHeldNotesWith (const EffectParams& p) const noexcept override { return midiChannelIndex (p[midiChannel]) >= 0; }
 
     void process (float* l, float* r, int n, const EffectParams& p, double) noexcept override
     {
@@ -612,9 +618,17 @@ public:
         // `latency` samples ago
         const auto voicedDelay = std::clamp (latency - det.windowCentre(), 0, dryRing - 1);
         const auto wet = std::clamp (p[mix], 0.0f, 1.0f);
+        const bool waves = p[wavesLaw] >= 0.5f; // round 190mg (hidden, the Waves translator's)
+        const auto passSmooth = waves ? 1.0 - std::exp (-1.0 / (0.005 * sr)) : 0.0;
         const auto dt = 1.0 / sr;
         const auto stereo = r != nullptr && r != l;
         float peakIn = 0.0f, peakOut = 0.0f; // round 135w: the input / output meters
+        // round 190li (CPU only, the same values to the bit): the per-sample smoothing coefficients, computed once per
+        // block (the high shelf's pole, the activity and created-vibrato followers) or when their time changes (retune)
+        const double shelfPole = std::exp (-2.0 * 3.141592653589793 * 3000.0 / sr);
+        const double activityCoef = 1.0 - std::exp (-1.0 / (0.01 * sr));
+        const double extraCoef = 1.0 - std::exp (-dt / 0.003);
+        double retuneT = -1.0, retuneCoef = 1.0;
 
         for (int i = 0; i < n; ++i)
         {
@@ -755,12 +769,17 @@ public:
                 const auto x = std::clamp ((noteAge - 0.275) / 0.1, 0.0, 1.0);
                 t += human * 0.135 * x * x * (3.0 - 2.0 * x);
             }
-            shift += (t > 0.0 ? 1.0 - std::exp (-dt / t) : 1.0) * (wanted - shift);
+            if (t != retuneT)
+            {
+                retuneT = t;
+                retuneCoef = t > 0.0 ? 1.0 - std::exp (-dt / t) : 1.0;
+            }
+            shift += retuneCoef * (wanted - shift);
 
             auto semis = shift + trans;
             if (natural || extra != 0.0)
             {
-                extra += (1.0 - std::exp (-dt / 0.003)) * (extraWanted - extra);
+                extra += extraCoef * (extraWanted - extra);
                 semis += extra;
             }
             if (amount < 1.0)
@@ -823,10 +842,10 @@ public:
                 // Round 165j ([RUN] REA_rodada165j §4, her 24 live-set takes against Auto-Tune Pro with her states): the
                 // corrected voice was still 0.52 dB darker at 2.5-6.3 kHz relative to 300-1000 Hz (Auto-Tune: 0.07); the
                 // shelf now starts at 3 kHz with +1.5 dB (tilt -0.13 dB; pitch, bursts and formant distance not worse)
-                const double a = std::exp (-2.0 * 3.141592653589793 * 3000.0 / sr);
+                const double a = shelfPole;
                 // (voiced only: unvoiced sounds pass as plain overlap-add, untouched)
                 const double want = unvoicedFor > 0.0 ? 0.0 : std::min (1.0, std::abs (semis - trans) / 0.05);
-                activity += (1.0 - std::exp (-1.0 / (0.01 * sr))) * (want - activity);
+                activity += activityCoef * (want - activity);
                 constexpr double lift = 0.18850222743702228; // 10^(1.5/20) - 1
                 for (int c = 0; c < 2; ++c)
                 {
@@ -846,6 +865,8 @@ public:
                 y[0] += nz;
                 y[1] += nz;
             }
+            if (waves) // round 190mg: the reference is the input itself while nothing is being corrected
+                passThrough (y, d0, d1, unvoicedFor > 0.0 ? -1.0 : std::abs (semis - trans), stereo, dt, passSmooth);
             if (vibLevel != 0.0) // round 166c: the created vibrato's level swing
                 for (auto& v : y)
                     v = (float) (v * (1.0 + vibLevel));
@@ -914,6 +935,35 @@ public:
 private:
     static constexpr int dryRing = 16384;
 
+    // round 190mg (wavesLaw): the fade between the corrected signal and the delayed input (`applied` = the correction
+    // in semitones, < 0 = unvoiced), out of line so the loop without the law stays as it was
+    [[gnu::noinline]] void passThrough (float* y, float d0, float d1, double applied, bool stereo, double dt, double passSmooth) noexcept
+    {
+        auto aim = applied < 0.0 ? 0.0 : std::clamp ((applied - passFloor) / passSpan, 0.0, 1.0);
+        // the dry signal only once the condition has held for passHold; back to the corrected one at once
+        passQuiet = aim < 1.0 ? passQuiet + dt : 0.0;
+        if (passQuiet < passHold)
+            aim = 1.0;
+        passGain += passSmooth * (aim - passGain);
+        if (std::abs (aim - passGain) < 1e-6)
+            passGain = aim; // settled: the plain corrected signal (1) or the input itself (0), no fade maths
+        if (passGain <= 0.0)
+        {
+            y[0] = d0;
+            y[1] = d1;
+        }
+        else if (passGain < 1.0)
+        {
+            // half-way between a linear and an equal-power fade (the two signals are partly coherent: a linear fade lost
+            // 0.1 … 0.6 dB, an equal-power one gained 0.1 … 0.3 dB on refcap182)
+            const auto hp = 0.5 * 3.141592653589793 * passGain;
+            const auto gw = 0.5 * (passGain + std::sin (hp)), gd = 0.5 * (1.0 - passGain + std::cos (hp));
+            y[0] = (float) (gd * d0 + gw * y[0]);
+            if (stereo)
+                y[1] = (float) (gd * d1 + gw * y[1]);
+        }
+    }
+
     void configure (int rg, bool low) noexcept
     {
         curRange = rg;
@@ -946,6 +996,13 @@ private:
     std::atomic<float> meterSung { -1.0f }, meterTarget { -1.0f }, meterShift { 0.0f }, meterHeld { 0.0f };
     std::atomic<float> meterIn { 0.0f }, meterOut { 0.0f };
     double activity = 0.0, hpX[2] {}, hpY[2] {}; // round 148: the high-frequency make-up
+    // round 190mg (wavesLaw): the share of the corrected signal over the dry one (0 = the delayed input itself); it
+    // follows the applied correction: the dry signal below passFloor (semitones) once that has held for passHold (s),
+    // and on unvoiced sounds, all of the corrected one from passFloor + passSpan, back to it at once; a 5 ms one-pole fade
+    // [fit] refcap182 (Waves Tune RT, five settings x five signals: 10 / 30 ms fades and 40 ms hold scored lower)
+    double passGain = 1.0;
+    static constexpr double passFloor = 0.01, passSpan = 0.02, passHold = 0.08;
+    double passQuiet = 0.0; // round 190mg: how long the pass condition has held (s)
     double candidateTime = 0.0; // round 135w: Tolerance time
     int candidate = -1;
     int scaleOffset = 0; // round 166c: transpose in scale — the current target's offset (semitones)

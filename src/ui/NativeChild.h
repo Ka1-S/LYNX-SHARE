@@ -2,6 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include <atomic>
 #include <functional>
 #include <vector>
 
@@ -82,6 +83,24 @@ void removeFloater (juce::Component& c);
 // A floater or an overlay with an attached sibling above it that is neither: raiseOverlays (Windows; a cheap walk of
 // the siblings above each one). Elsewhere: nothing (raiseOverlays already runs on every stacking change).
 void keepFloatersInFront();
+// Round 190kr (QA-11): `c`'s native window is a child window (a docked panel: the Playlist, Piano roll, Mixer...) that
+// lies wholly under visible, opaque sibling windows above it, or under its parent's edges (and the same for each parent
+// child window): nothing it paints or composes reaches the screen. The Playlist behind Thief's maximised Channel rack.
+// Round 190la: also when the top-level window it is in (the main window, a detached panel, a plugin window) lies wholly
+// under one visible, opaque top-level window of any program (a maximised browser over LYNX): layered, click-through,
+// cloaked, minimised and region windows never count (LYNX_OCCLUSION=0: this part off, A/B).
+// A component without a native window of its own and every platform but Windows: false.
+// Cheap (a walk of the windows above it: a few user32 calls; the top-level answer is kept 8 ms). LYNX_COVERCHECK=0:
+// always false (A/B).
+bool coveredBySiblingWindows (const juce::Component& c);
+// `c` shows on screen: isShowing() (or an off-screen picture route, ui/ShotShowing.h) and not covered as above. The live
+// views' frame steps run only then (ui/FrameTicker.h).
+bool showsOnScreen (const juce::Component& c);
+// diagnostics (--uiperf): steps the frame tickers left out because their view was covered
+std::atomic<int>& coveredSkips();
+// diagnostics (LYNX_OVERLAY_STATS, LYNX_TICKER_LOG): how coveredBySiblingWindows decided for `c` — its window, what of
+// it can show, and every visible sibling window above it (and above its parents) with its rectangle and flags
+juce::String describeCover (const juce::Component& c);
 // The attached children of a native window (the main window's handle), from the bottom of their stacking order up.
 std::vector<juce::Component*> attachedChildren (void* parentWindow);
 
@@ -144,4 +163,32 @@ bool pressSpaceForTest (void* fallback);
 // (HTCLIENT) = the window takes the mouse there, -1 (HTTRANSPARENT) = the click goes to the window under it. (Round
 // 190cj: an attached component that is not opaque answers "transparent" wherever its hitTest says no.)
 int hitCodeAt (const juce::Component& c, juce::Point<int> localPoint);
+
+// Round 190jy (queue item 44, core/DockStack.h editorsAbove): docked LYNX editors drawn by the main window itself show
+// through holes in the native siblings below them.
+// `holes`: rectangles in the attached component's own native window, physical pixels (0,0 = its top-left); empty = the
+// whole window shows (no window region). The window is only touched when its holes change. Windows only (elsewhere
+// nothing: the editors stay native child windows there).
+void setHoles (juce::Component& c, const std::vector<juce::Rectangle<int>>& holes);
+std::vector<juce::Rectangle<int>> holesOf (const juce::Component& c);
+// Whether any part of `rectInWindow` (physical pixels of that native window) is in one of its holes (the window has a
+// region and the rectangle is not wholly inside it). Windows only; elsewhere false.
+bool cutsInto (void* window, juce::Rectangle<int> rectInWindow);
+// Runs (message thread) after an attached child window moved, was resized, shown, hidden or put elsewhere in the
+// stacking order, or after the floaters / overlays were raised (nullptr: nothing). The workspace keeps the holes current.
+void setStackingListener (std::function<void()> listener);
+// The main window's client-area rectangle of `boundsInArea` (in `area`'s coordinates), in physical pixels, rounded edge
+// by edge (as its own drawing of a component there is clipped).
+juce::Rectangle<int> physicalInTop (const juce::Component& area, juce::Rectangle<int> boundsInArea);
+// An attached component's native window rectangle in its parent's client area, physical pixels (empty: not attached).
+juce::Rectangle<int> rectInParentWindow (const juce::Component& c);
+// The click raise (raiseOnAnyClick) and the key forwarding (forwardUnusedKeys) of a component that stops being an
+// attached window (it is drawn by the main window now).
+void stopRaiseOnAnyClick (juce::Component& c);
+// Puts the attached `c` right above `below` in the native stacking order (nullptr: at the bottom); Windows only.
+void placeJustAbove (juce::Component& c, juce::Component* below);
+// --selftest (round 190jy): two attached children of a never-shown window: a hole set and read back (the system's region,
+// its hit test there), cleared again, and placeJustAbove's order. "OK", "OK (not available ...)" elsewhere, or "ERROR ...".
+juce::String editorHolesSelfTest();
+void stopForwardingUnusedKeys (juce::Component& c);
 } // namespace lynx::nativechild

@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <type_traits>
 
 #include "core/Biquad.h"
 #include "core/Effects.h"
@@ -34,6 +35,24 @@ constexpr double inApCoef[4] = { 0.75, 0.75, 0.625, 0.625 };
 // in-loop all-pass length as a fraction of its line, early smearing all-passes (ms)
 constexpr double loopApFraction = 0.16;
 constexpr double earlyApMs[2][2] = { { 7.13, 2.31 }, { 6.47, 2.83 } };
+
+// round 190ls: the dense late tank (Settings::dense): 32 lines, lengths as multiples of the geometric mean of the shape's
+// set (× lineScale), spread over 0.55 … 1.6 of it on a near-geometric grid with jitter, alternately in the two halves
+// (LYNX's own set: no common factors, every half spanning the whole range)
+constexpr int denseCount = 32, denseHalf = 16;
+// the outputs read every line through two Walsh rows (22 and 13): sign of line j = (−1)^popcount (j & row)
+constexpr float walshSign (int j, unsigned row) noexcept { return (__builtin_popcount ((unsigned) j & row) & 1) != 0 ? -1.0f : 1.0f; }
+constexpr std::array<float, 32> walshRow (unsigned row) noexcept
+{
+    std::array<float, 32> a {};
+    for (int j = 0; j < 32; ++j)
+        a[(std::size_t) j] = walshSign (j, row);
+    return a;
+}
+constexpr auto denseOutL = walshRow (22u), denseOutR = walshRow (13u);
+constexpr double denseRatio[denseCount] = {
+    0.553, 0.571, 0.588, 0.611, 0.629, 0.652, 0.673, 0.697, 0.719, 0.743, 0.769, 0.793, 0.821, 0.847, 0.877, 0.905,
+    0.937, 0.967, 1.001, 1.033, 1.069, 1.103, 1.142, 1.179, 1.219, 1.259, 1.303, 1.345, 1.391, 1.437, 1.487, 1.597 };
 
 constexpr int earlyTaps = 14;
 constexpr int buildTaps = 40;
@@ -95,6 +114,47 @@ struct Line
     }
 };
 
+// round 190ls: the dense tank's 32 lines in one buffer, frame-major (frame f holds every line's sample at f × 32 … f × 32 + 31):
+// every line has the same capacity and moves on one write position, so a sample's 32 writes are one contiguous store (measured
+// against one buffer per line and line after line in one buffer: the fewest cycles)
+struct DenseBank
+{
+    static constexpr int lines = 32;
+    std::vector<float> buf;
+    int mask = 0, pos = 0;
+
+    void allocate (int samples)
+    {
+        const auto n = nextPow2 (std::max (4, samples + 4));
+        buf.assign ((std::size_t) n * lines, 0.0f);
+        mask = n - 1;
+        pos = 0;
+    }
+    void clear() noexcept
+    {
+        std::fill (buf.begin(), buf.end(), 0.0f);
+        pos = 0;
+    }
+    // line j's sample written d writes ago (d ≥ 1)
+    float read (int j, int d) const noexcept { return buf[(std::size_t) ((((pos - d) & mask) * lines) + j)]; }
+    // fractional delay (≥ 2), 4-point Hermite (as Line::readFrac)
+    float readFrac (int j, double d) const noexcept
+    {
+        const auto i = (int) d;
+        const auto f = (float) (d - i);
+        const auto xm1 = read (j, i - 1), x0 = read (j, i), x1 = read (j, i + 1), x2 = read (j, i + 2);
+        const auto c1 = 0.5f * (x1 - xm1);
+        const auto c2 = xm1 - 2.5f * x0 + 2.0f * x1 - 0.5f * x2;
+        const auto c3 = 0.5f * (x2 - xm1) + 1.5f * (x0 - x1);
+        return ((c3 * f + c2) * f + c1) * f + x0;
+    }
+    void write (const float* x) noexcept
+    {
+        std::copy (x, x + lines, buf.begin() + (std::ptrdiff_t) pos * lines);
+        pos = (pos + 1) & mask;
+    }
+};
+
 struct Allpass
 {
     Line line;
@@ -146,9 +206,40 @@ struct Shifter
         }
         return y;
     }
+    // round 190mj (Horizon's reaLaw granular echoes): four heads a quarter window apart, each sin²-windowed and the sum
+    // scaled by ½ (the windows sum to 2): low tones keep their level, while a click — or a high tone, whose heads add
+    // without coherence — carries half the energy of the two-head pitch shifter's (ValhallaFutureVerb's reverse / octave
+    // modes: the impulse 3 … 4 dB under LYNX's two heads, the 4 … 10 kHz bursts 1 … 2 dB under, the low bursts level)
+    float process4 (float x, double ratio) noexcept
+    {
+        line.write (x);
+        phase += (1.0 - ratio) / window;
+        phase -= std::floor (phase);
+        float y = 0.0f;
+        for (int h = 0; h < 4; ++h)
+        {
+            auto p = phase + 0.25 * h;
+            p -= std::floor (p);
+            const auto w = (float) std::sin (pi * p);
+            y += w * w * line.readFrac (2.0 + p * window);
+        }
+        return 0.5f * y;
+    }
 };
 
 double clampPos (double v, double lo, double hi) noexcept { return std::isfinite (v) ? std::clamp (v, lo, hi) : lo; }
+
+// round 190it: where revision 1's build groups part (Hz; 250 / 400 / 600 / 800 tried on refcap030's room bank: 600 kept
+// the long-decay music renders where they were); the lab build reads LYNX_SPLITHZ
+double splitHz() noexcept
+{
+   #ifdef LYNX_VERB_FIT
+    static const double hz = [] { const char* e = std::getenv ("LYNX_SPLITHZ"); return e != nullptr ? std::atof (e) : 600.0; }();
+    return hz;
+   #else
+    return 600.0;
+   #endif
+}
 
 // ---- engine law 1 (0.1.27, round 190bz) ------------------------------------------------------------------------
 // Per-band decay (Jot & Chaigne 1991: one absorption filter per line whose attenuation in dB is proportional to the
@@ -361,6 +452,7 @@ struct Engine::Impl
     double lfo[lineCount] {};
     Shifter shifters[4]; // inside lines 0, 2, 4, 6 (shimmer)
     float shiftHp[4][2] {}; // round tp172d: the shifted branch's two one-pole high-pass states (energy-keeping shimmer)
+    float splitLp[2][4] {};  // round 190it: the build groups' low band (one-pole states), which still reaches the lines as one sum
     Biquad outLow, outHigh, shelfLow, shelfHigh, toneHigh, toneMid, toneLow, band[maxBandSections];
     bool outLowOn = false, outHighOn = false, shelfLowOn = false, shelfHighOn = false, toneHighOn = false, toneMidOn = false, toneLowOn = false, bandOn = false;
     int bandSections = 0;
@@ -395,7 +487,15 @@ struct Engine::Impl
     bool bellOn[3] {};
     int onsetD[onsetSteps][onsetChans] {};
 
-    Impl (double maxLine, double maxPre) : maxLineSec (maxLine), maxPreSec (maxPre)
+    // ---- the dense late tank (round 190ls; allocated only for an engine made with dense = true) ----
+    bool denseAlloc = false;
+    DenseBank dLine;
+    double dCur[denseCount] {}, dKey[14 + denseCount] {};
+    bool dDesigned = false;
+    float dB0[loopShelves][denseCount] {}, dB1[loopShelves][denseCount] {}, dA1[loopShelves][denseCount] {}, dZ[loopShelves][denseCount] {};
+    float dBw[denseCount] {}, dLc[denseCount] {};
+
+    Impl (double maxLine, double maxPre, bool dense) : maxLineSec (maxLine), maxPreSec (maxPre), denseAlloc (dense)
     {
         Lcg r { 0x2545F491u };
         for (int c = 0; c < 2; ++c)
@@ -439,6 +539,8 @@ struct Engine::Impl
             lines[i].allocate (maxLine + (int) (0.05 * sr));
             loopAp[i].line.allocate ((int) (0.2 * maxLineSec * sr) + 8);
         }
+        if (denseAlloc)
+            dLine.allocate (maxLine + (int) (0.05 * sr));
         for (auto& sh : shifters)
             sh.prepare (sr, 0.06);
         for (int k = 0; k < onsetSteps; ++k)
@@ -470,6 +572,9 @@ struct Engine::Impl
             sh.clear();
         for (auto& h : shiftHp)
             h[0] = h[1] = 0.0f;
+        for (auto& c : splitLp)
+            for (auto& z : c)
+                z = 0.0f;
         outLow.reset();
         outHigh.reset();
         shelfLow.reset();
@@ -502,6 +607,16 @@ struct Engine::Impl
         mmInc = -1.0;
         renorm = 0;
         loopDesigned = toneDesigned = false;
+        if (denseAlloc)
+        {
+            dLine.clear();
+            for (auto& row : dZ)
+                for (auto& z : row)
+                    z = 0.0f;
+            for (int j = 0; j < denseCount; ++j)
+                dBw[j] = dLc[j] = 0.0f;
+            dDesigned = false;
+        }
     }
 
     double targetLen (const Settings& s, int i) const noexcept
@@ -624,9 +739,24 @@ struct Engine::Impl
         if (toneMidOn)
             toneMid.peaking (sr, std::min (s.toneMidHz, 0.45 * sr), std::max (0.1, s.toneMidQ), s.toneMidDb);
         shelfLowOn = std::abs (s.lowShelfDb) > 0.01;
+        shelfHighOn = std::abs (s.highShelfDb) > 0.01;
+        if (s.shelfOrder == 1)
+        {
+            // round 190ln: first-order shelves, (gLow + gHigh·s/ω0) / (1 + s/ω0) through the bilinear transform with
+            // k = 2·fs / ω0 (the corner not pre-warped): b0 = gLow + gHigh·k, b1 = gLow − gHigh·k, a0 = 1 + k, a1 = 1 − k
+            const auto firstOrder = [this] (Biquad& f, double hz, double gLow, double gHigh)
+            {
+                const auto k = sr / (pi * std::max (1.0, hz));
+                f.set (gLow + gHigh * k, gLow - gHigh * k, 0.0, 1.0 + k, 1.0 - k, 0.0);
+            };
+            if (shelfLowOn)
+                firstOrder (shelfLow, s.lowShelfHz, std::pow (10.0, s.lowShelfDb / 20.0), 1.0);
+            if (shelfHighOn)
+                firstOrder (shelfHigh, s.highShelfHz, 1.0, std::pow (10.0, s.highShelfDb / 20.0));
+            return;
+        }
         if (shelfLowOn)
             shelfLow.shelf (sr, s.lowShelfHz, s.lowShelfDb, false, 0.7);
-        shelfHighOn = std::abs (s.highShelfDb) > 0.01;
         if (shelfHighOn)
             shelfHigh.shelf (sr, std::min (s.highShelfHz, 0.45 * sr), s.highShelfDb, true, 0.7);
     }
@@ -675,8 +805,64 @@ struct Engine::Impl
             tb[b] = std::tan (pi * std::min (bandHz[b], 0.45 * sr) / sr);
         for (int i = 0; i < lineCount; ++i)
         {
+            float b0[loopShelves], b1[loopShelves], a1[loopShelves];
+            designLine (s, sr, key[14 + i], tc, tb, b0, b1, a1);
+            for (int k = 0; k < loopShelves; ++k)
+            {
+                shB0[k][i] = b0[k];
+                shB1[k][i] = b1[k];
+                shA1[k][i] = a1[k];
+            }
+        }
+    }
+
+    // round 190ls: the dense tank's line j (samples) for the shape and lineScale, whole samples
+    double denseTarget (const Settings& s, int j) const noexcept
+    {
+        const auto shape = std::clamp (s.shape, 0, 2);
+        double mean = 0.0;
+        for (int i = 0; i < lineCount; ++i)
+            mean += std::log (shapes[shape][i]);
+        const auto ms = std::exp (mean / lineCount) * denseRatio[j] * std::max (0.0, s.lineScale);
+        return std::floor (clampPos (ms * sr / 1000.0, 8.0, maxLineSec * sr));
+    }
+    // the dense tank's loop filters (as designLoop's, per line, redone only when a setting or a length moves)
+    void designDense (const Settings& s) noexcept
+    {
+        double key[14 + denseCount] = { s.rt60, s.lowMult, s.lowXover, s.highMult, s.highXover, s.gateSec };
+        for (int b = 0; b < engineBands; ++b)
+            key[6 + b] = s.bandRtMult[b];
+        for (int j = 0; j < denseCount; ++j)
+            key[14 + j] = dCur[j];
+        if (dDesigned && std::equal (std::begin (key), std::end (key), std::begin (dKey)))
+            return;
+        std::copy (std::begin (key), std::end (key), std::begin (dKey));
+        dDesigned = true;
+        double tc[loopShelves], tb[engineBands];
+        for (int k = 0; k < loopShelves; ++k)
+            tc[k] = std::tan (pi * std::min (loopShelfHz[k], 0.45 * sr) / sr);
+        for (int b = 0; b < engineBands; ++b)
+            tb[b] = std::tan (pi * std::min (bandHz[b], 0.45 * sr) / sr);
+        for (int j = 0; j < denseCount; ++j)
+        {
+            float b0[loopShelves], b1[loopShelves], a1[loopShelves];
+            designLine (s, sr, key[14 + j], tc, tb, b0, b1, a1);
+            for (int k = 0; k < loopShelves; ++k)
+            {
+                dB0[k][j] = b0[k];
+                dB1[k][j] = b1[k];
+                dA1[k][j] = a1[k];
+            }
+        }
+    }
+
+    // one line's loop filter (law 1): a gain folded into six first-order shelves meeting the per-band loss of a line of
+    // len samples (designLoop; round 190ls: also the dense tank's lines)
+    static void designLine (const Settings& s, double sr, double len, const double* tc, const double* tb, float* b0, float* b1, float* a1) noexcept
+    {
+        {
             double target[engineBands], shelf[loopShelves], gainDb = 0.0;
-            bandLossDb (s, sr, key[14 + i], target);
+            bandLossDb (s, sr, len, target);
             fitShelves (tc, loopShelves, tb, target, 1e-3, gainDb, shelf);
             // never above unity at any frequency: the highest point of the response on a grid of 40 frequencies from
             // 0 Hz to the top (the cascade of first-order shelves is smooth: between two grid points it cannot rise by
@@ -700,9 +886,9 @@ struct Engine::Impl
             for (int k = 0; k < loopShelves; ++k)
             {
                 const auto r = std::pow (10.0, shelf[k] / 40.0), den = 1.0 + tc[k] / r, fold = k == 0 ? g : 1.0;
-                shB0[k][i] = (float) (fold * (1.0 + tc[k] * r) / den);
-                shB1[k][i] = (float) (fold * (tc[k] * r - 1.0) / den);
-                shA1[k][i] = (float) ((tc[k] / r - 1.0) / den);
+                b0[k] = (float) (fold * (1.0 + tc[k] * r) / den);
+                b1[k] = (float) (fold * (tc[k] * r - 1.0) / den);
+                a1[k] = (float) ((tc[k] / r - 1.0) / den);
             }
         }
     }
@@ -797,7 +983,32 @@ struct Engine::Impl
                 curLen[i] = target[i];
             loopAp[i].len = std::clamp ((int) (target[i] * loopApFraction), 1, loopAp[i].line.mask - 2);
         }
+        // round 190ls: the dense tank (Atrium's ValhallaRoom role; not with a gate, a shimmer or split sides)
+        const auto dense = denseAlloc && s.dense == 1 && s.gateSec <= 0.0 && s.splitSides == false
+                           && s.shiftFeedback * s.shiftMix <= 0.0;
+        double dTarget[denseCount] {};
+        if (dense)
+        {
+            for (int j = 0; j < denseCount; ++j)
+            {
+                dTarget[j] = denseTarget (s, j);
+                if (first || dCur[j] < 8.0)
+                    dCur[j] = dTarget[j];
+            }
+            designDense (s);
+        }
+        bool dGlide = false; // (a length gliding: every line read through the interpolator, the glide run per sample)
+        int dInt[denseCount] {};
+        if (dense)
+            for (int j = 0; j < denseCount; ++j)
+            {
+                dGlide = dGlide || dCur[j] != dTarget[j];
+                dInt[j] = (int) dTarget[j];
+            }
         first = false;
+        double step[lineCount]; // round 190ie: the glide per sample (fixed, or a tempo change spread over the block)
+        for (int i = 0; i < lineCount; ++i)
+            step[i] = s.lengthSpread > 0 ? std::min (0.25, std::abs (target[i] - curLen[i]) / (double) s.lengthSpread) : 0.25; // (0.25: the fixed glide)
         designLoop (s);
         designTone (s);
         // modulators as rotating pairs (one rotation per sample instead of a sine), the lines' rates as in law 0
@@ -818,10 +1029,11 @@ struct Engine::Impl
                 mmRs = std::sin (inc);
             }
         }
-        const auto glide = 0.25;
         const auto norm = (float) (1.0 / std::sqrt ((double) lineCount));
         const auto early = (float) s.earlyLevel, late = (float) s.lateLevel, send = (float) s.earlySend;
         const auto gated = s.gateSec > 0.0, build = gated || s.buildSec > 0.0005;
+        const auto split = s.buildSplit && ! gated; // round 190it: the build-up taps in four groups (below)
+        const auto splitCoef = (float) (1.0 - std::exp (-2.0 * pi * splitHz() / sr));
         const auto crossAngle = 0.25 * pi * std::clamp (s.crossFeed, 0.0, 1.0);
         const auto crossCos0 = std::cos (crossAngle), crossSin0 = std::sin (crossAngle);
         const auto mixA = 0.25 * pi * std::clamp (s.mixAngle, 0.0, 1.0);
@@ -844,12 +1056,17 @@ struct Engine::Impl
         const auto onsetLevel = (float) s.onsetLevel, onsetFeed = (float) std::clamp (s.onsetFeed, 0.0, 1.0);
         const auto onsetFront = (float) std::clamp (s.onsetFront, 0.0, 1.0);
         const auto onsetOn = onsetLevel != 0.0f || onsetFeed != 0.0f;
+        const auto splitShare = 0.5f * (1.0f - onsetFeed); // (revision 1's build groups, below)
         if (onsetOn)
             for (int k = 0; k < onsetSteps; ++k)
                 for (int j = 0; j < onsetChans; ++j)
                     onsetD[k][j] = std::clamp ((int) (std::clamp (s.onsetSec, 0.001, maxOnsetSec) * onsetSpan[k] * onsetFrac[k][j] * sr), 1,
                                                onsetLine[k][j].mask - 2);
         const auto bwOn = absorb[0].bw.a != 0.0f, lcOn = absorb[0].lc.a != 1.0f;
+        const auto bwA = absorb[0].bw.a, lcA = absorb[0].lc.a;
+        // (the tank's stored energy does not depend on its size, so 32 lines read at 1 / √32 would be 6 dB under the
+        // 8-line tank: read at its 1 / √8, the levels of the front-ends hold)
+        const auto denseNorm = (float) (1.0 / std::sqrt ((double) lineCount));
         constexpr float r2 = 0.70710678f; // (two inputs spread over four channels)
         constexpr float tiny = 1.0e-18f; // keeps the recirculating states out of the denormal range
 
@@ -857,6 +1074,7 @@ struct Engine::Impl
         {
             float x[2] = { L[t], R[t] };
             float e[2], d[2], pin[2];
+            float dg[2][4] {};
             for (int c = 0; c < 2; ++c)
             {
                 pre[c].write (x[c]);
@@ -884,7 +1102,44 @@ struct Engine::Impl
                 for (int k = 0; k < 4; ++k)
                     if (inG[k] != 0.0f)
                         v = inAp[c][k].process (v, inG[k]);
-                if (build)
+                if (build && split)
+                {
+                    // revision 1 (round 190it): four interleaved groups of the build-up taps, each spanning the whole
+                    // build, reach the four lines of the half through a 4-point Hadamard (below) instead of one FIR
+                    // into every line: one fixed random-sign FIR left its ripple (±3 … 4 dB, 50 … 200 Hz wide) on the
+                    // whole tail; four independent ones average it out (a steady sine meets the tail's mean gain)
+                    dif[c].write (v);
+                    // (round 190kg, perf: the four groups' sums in registers, each still added in the taps' order — the
+                    // indexed array went through memory at every tap)
+                    static_assert (buildTaps % 4 == 0);
+                    const auto tap = [&] (int k) noexcept { return bW[c][k] * (bD[c][k] == 0 ? v : dif[c].read (bD[c][k])); };
+                    float g4[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+                    {
+                        float g0 = 0.0f, g1 = 0.0f, g2 = 0.0f, g3 = 0.0f;
+                        for (int k = 0; k < buildTaps; k += 4)
+                        {
+                            g0 += tap (k);
+                            g1 += tap (k + 1);
+                            g2 += tap (k + 2);
+                            g3 += tap (k + 3);
+                        }
+                        g4[0] = g0;
+                        g4[1] = g1;
+                        g4[2] = g2;
+                        g4[3] = g3;
+                    }
+                    // below ~600 Hz the groups go on as one sum (the build's low band as before: there the few modes
+                    // of the tank, not the taps, set the tone, and music read them as before); above, apart
+                    float low = 0.0f;
+                    for (int g = 0; g < 4; ++g)
+                    {
+                        splitLp[c][g] += splitCoef * (g4[g] - splitLp[c][g]);
+                        low += splitLp[c][g];
+                        dg[c][g] = g4[g] - splitLp[c][g];
+                    }
+                    v = low;
+                }
+                else if (build)
                 {
                     dif[c].write (v);
                     float b = 0.0f;
@@ -894,6 +1149,18 @@ struct Engine::Impl
                 }
                 d[c] = v;
             }
+            // revision 1's build groups into the lines of each half: a 4-point Hadamard (signs per line as below), × the
+            // build's share (round 190kg, perf: once per sample here instead of inside the line loop; the same operations)
+            float splitIn[2][4];
+            if (build && split)
+                for (int c = 0; c < 2; ++c)
+                {
+                    const auto* q = dg[c];
+                    splitIn[c][0] = splitShare * (q[0] + q[1] + q[2] + q[3]);
+                    splitIn[c][1] = splitShare * (q[0] + (-q[1]) + q[2] + (-q[3]));
+                    splitIn[c][2] = splitShare * (q[0] + q[1] + (-q[2]) + (-q[3]));
+                    splitIn[c][3] = splitShare * (q[0] + (-q[1]) + (-q[2]) + q[3]);
+                }
             eModPhase += eModInc;
             if (eModPhase > 2.0 * pi)
                 eModPhase -= 2.0 * pi;
@@ -931,111 +1198,235 @@ struct Engine::Impl
             }
 
             // late tank
-            float sOut[lineCount];
-            for (int i = 0; i < lineCount; ++i)
+            float lateL, lateR;
+            if (dense)
             {
-                curLen[i] += std::clamp (target[i] - curLen[i], -glide, glide);
-                const auto c = lfoC[i] * lfoRc[i] - lfoS[i] * lfoRs[i];
-                lfoS[i] = lfoS[i] * lfoRc[i] + lfoC[i] * lfoRs[i];
-                lfoC[i] = c;
-                const auto dl = std::max (2.0, curLen[i] - modDepth * 0.5 * (1.0 + lfoS[i]));
-                auto y = lines[i].readFrac (dl);
-                if (apG[i] != 0.0f)
-                    y = loopAp[i].process (y, apG[i]);
-                sOut[i] = y;
-            }
-            for (int k = 0; k < loopShelves; ++k)
-                for (int i = 0; i < lineCount; ++i)
+                // round 190ls: the dense tank (32 lines, two halves of 16)
+                float y[denseCount];
+                // the reference's layout: in each group of four lines two move — modulator j / 4 of the 8-line tank's
+                // eight, one line each way — and two stay (read at whole samples unless their length glides)
+                if (dGlide)
+                    for (int j = 0; j < denseCount; ++j)
+                        dCur[j] += std::clamp (dTarget[j] - dCur[j], -0.25, 0.25);
+                const auto half = 0.5 * modDepth;
+                for (int g = 0; g < denseCount; g += 4)
                 {
-                    const auto y = shB0[k][i] * sOut[i] + shZ[k][i];
-                    shZ[k][i] = shB1[k][i] * sOut[i] - shA1[k][i] * y;
-                    sOut[i] = y;
-                }
-            if (bwOn)
-                for (int i = 0; i < lineCount; ++i)
-                    sOut[i] = absorb[i].bw.lp (sOut[i]);
-            if (lcOn)
-                for (int i = 0; i < lineCount; ++i)
-                    sOut[i] -= absorb[i].lc.lp (sOut[i]);
-
-            float lateL = (sOut[0] + sOut[1] + sOut[2] - sOut[3] + sOut[4] + sOut[5] - sOut[6] + sOut[7]) * norm;
-            float lateR = (sOut[0] - sOut[1] + sOut[2] + sOut[3] + sOut[4] - sOut[5] + sOut[6] + sOut[7]) * norm;
-            if (s.splitSides)
-            {
-                lateL = (sOut[0] + sOut[1] + sOut[2] - sOut[3]) * norm * 1.41421356f;
-                lateR = (sOut[4] - sOut[5] + sOut[6] + sOut[7]) * norm * 1.41421356f;
-            }
-            const float in[2] = { (1.0f - onsetFeed) * (d[0] + send * e[0]) + onsetFeed * on[0] + tiny,
-                                  (1.0f - onsetFeed) * (d[1] + send * e[1]) + onsetFeed * on[1] + tiny };
-            if (gated)
-            {
-                lateL = 0.3f * lateL + d[0];
-                lateR = 0.3f * lateR + d[1];
-            }
-
-            // mixing: each half through two layers of rotations by mixAngle × 45° (at 45° a normalised 4-point
-            // Hadamard up to signs), then the halves rotated into each other by crossFeed × 45°, swinging by the
-            // matrix modulator (orthogonal for any amount)
-            auto crossCos = (float) crossCos0, crossSin = (float) crossSin0;
-            float hc[2] = { mc, mc }, hs[2] = { msn, msn };
-            if (mmDepth > 0.0)
-            {
-                const auto c = mmC * mmRc - mmS * mmRs;
-                mmS = mmS * mmRc + mmC * mmRs;
-                mmC = c;
-                const auto dlt = mmDepth * mmS, d2 = dlt * dlt;
-                const auto cd = 1.0 - d2 * (0.5 - d2 * (1.0 / 24.0 - d2 * (1.0 / 720.0)));
-                const auto sd = dlt * (1.0 - d2 * (1.0 / 6.0 - d2 * (1.0 / 120.0 - d2 * (1.0 / 5040.0))));
-                crossCos = (float) (crossCos0 * cd - crossSin0 * sd);
-                crossSin = (float) (crossSin0 * cd + crossCos0 * sd);
-                // the rotations inside the halves swing too, the two halves in opposite ways
-                hc[0] = (float) (mc * cd - msn * sd);
-                hs[0] = (float) (msn * cd + mc * sd);
-                hc[1] = (float) (mc * cd + msn * sd);
-                hs[1] = (float) (msn * cd - mc * sd);
-            }
-            float h[lineCount];
-            for (int half = 0; half < lineCount; half += 4)
-            {
-                const auto qc = hc[half / 4], qs = hs[half / 4];
-                const auto a0 = qc * sOut[half] + qs * sOut[half + 1], a1 = qc * sOut[half + 1] - qs * sOut[half];
-                const auto a2 = qc * sOut[half + 2] + qs * sOut[half + 3], a3 = qc * sOut[half + 3] - qs * sOut[half + 2];
-                h[half] = qc * a0 + qs * a2;
-                h[half + 2] = qc * a2 - qs * a0;
-                h[half + 1] = qc * a1 + qs * a3;
-                h[half + 3] = qc * a3 - qs * a1;
-            }
-            for (int i = 0; i < 4; ++i)
-            {
-                const auto a = h[i], b = h[i + 4];
-                auto u = crossCos * a + crossSin * b, w = -crossSin * a + crossCos * b;
-                if (shimmer > 0.0f && (i & 1) == 0)
-                {
-                    const auto second = i == 2 && voice2 > 0.0f;
-                    const auto r = second ? ratio2 : ratio;
-                    const auto amount = second ? shimmer * voice2 : shimmer;
-                    if (s.shimmerEnergy > 0.0)
+                    const auto m = half * lfoS[g >> 2];
+                    y[g] = dLine.readFrac (g, std::max (2.0, dCur[g] - half - m));
+                    y[g + 1] = dLine.readFrac (g + 1, std::max (2.0, dCur[g + 1] - half + m));
+                    if (dGlide)
                     {
-                        const auto bb = shimmerB[second ? 1 : 0], keep = shimmerKeep[second ? 1 : 0];
-                        auto hp = [&] (int k, float v)
-                        {
-                            shiftHp[k][0] += hpC * (v - shiftHp[k][0]);
-                            v -= shiftHp[k][0];
-                            shiftHp[k][1] += hpC * (v - shiftHp[k][1]);
-                            return v - shiftHp[k][1];
-                        };
-                        u = keep * u + bb * hp (i / 2, shifters[i / 2].process (u, r));
-                        w = keep * w + bb * hp (2 + i / 2, shifters[2 + i / 2].process (w, r));
+                        y[g + 2] = dLine.readFrac (g + 2, dCur[g + 2]);
+                        y[g + 3] = dLine.readFrac (g + 3, dCur[g + 3]);
                     }
                     else
                     {
-                        u = (1.0f - amount) * u + amount * shifters[i / 2].process (u, r);
-                        w = (1.0f - amount) * w + amount * shifters[2 + i / 2].process (w, r);
+                        y[g + 2] = dLine.read (g + 2, dInt[g + 2]);
+                        y[g + 3] = dLine.read (g + 3, dInt[g + 3]);
                     }
                 }
-                const auto alt = (i & 1) == 0 ? 0.5f : -0.5f;
-                lines[i].write (u + alt * in[0]);
-                lines[i + 4].write (w + alt * in[1]);
+                for (int i = 0; i < lineCount; ++i)
+                {
+                    const auto c = lfoC[i] * lfoRc[i] - lfoS[i] * lfoRs[i];
+                    lfoS[i] = lfoS[i] * lfoRc[i] + lfoC[i] * lfoRs[i];
+                    lfoC[i] = c;
+                }
+                for (int k = 0; k < loopShelves; ++k)
+                    for (int j = 0; j < denseCount; ++j)
+                    {
+                        const auto v = dB0[k][j] * y[j] + dZ[k][j];
+                        dZ[k][j] = dB1[k][j] * y[j] - dA1[k][j] * v;
+                        y[j] = v;
+                    }
+                if (bwOn)
+                    for (int j = 0; j < denseCount; ++j)
+                        y[j] = dBw[j] = y[j] + bwA * (dBw[j] - y[j]);
+                if (lcOn)
+                    for (int j = 0; j < denseCount; ++j)
+                    {
+                        dLc[j] = y[j] + lcA * (dLc[j] - y[j]);
+                        y[j] -= dLc[j];
+                    }
+                // outputs: two Walsh rows (22 and 13) over all 32 lines
+                float oL = 0.0f, oR = 0.0f;
+                for (int j = 0; j < denseCount; ++j)
+                {
+                    oL += denseOutL[j] * y[j];
+                    oR += denseOutR[j] * y[j];
+                }
+                lateL = oL * denseNorm;
+                lateR = oR * denseNorm;
+                const float in[2] = { (1.0f - onsetFeed) * (d[0] + send * e[0]) + onsetFeed * on[0] + tiny,
+                                      (1.0f - onsetFeed) * (d[1] + send * e[1]) + onsetFeed * on[1] + tiny };
+                // mixing: a 16-point Hadamard inside each half (four butterfly stages, × 1/4), then the halves rotated
+                // into each other by crossFeed × 45° (swinging by the matrix modulator)
+                {
+                    // (stage by stage over both halves at once; a stage of span len pairs k and k + len in every block of
+                    // 2 · len: the inner loops run over contiguous lines, so the wide stages are vector operations)
+                    const auto stage = [&y] (auto span) noexcept
+                    {
+                        constexpr int len = decltype (span)::value;
+                        for (int b = 0; b < denseCount; b += 2 * len)
+                            for (int k = b; k < b + len; ++k)
+                            {
+                                const auto u = y[k], w = y[k + len];
+                                y[k] = u + w;
+                                y[k + len] = u - w;
+                            }
+                    };
+                    stage (std::integral_constant<int, 1> {});
+                    stage (std::integral_constant<int, 2> {});
+                    stage (std::integral_constant<int, 4> {});
+                    stage (std::integral_constant<int, 8> {});
+                }
+                auto crossCos = (float) crossCos0, crossSin = (float) crossSin0;
+                if (mmDepth > 0.0)
+                {
+                    const auto c = mmC * mmRc - mmS * mmRs;
+                    mmS = mmS * mmRc + mmC * mmRs;
+                    mmC = c;
+                    const auto dlt = mmDepth * mmS;
+                    crossCos = (float) std::cos (crossAngle + dlt);
+                    crossSin = (float) std::sin (crossAngle + dlt);
+                }
+                crossCos *= 0.25f;
+                crossSin *= 0.25f;
+                float w[denseCount];
+                for (int j = 0; j < denseHalf; ++j)
+                {
+                    const auto a = y[j], bb = y[j + denseHalf];
+                    // the input: ±1/4 on every line of its half; revision 1's four build groups on lines j & 3, ±1/2
+                    const auto sgIn = (j & 1) == 0 ? 0.25f : -0.25f;
+                    auto inL = sgIn * in[0], inR = sgIn * in[1];
+                    if (build && split)
+                    {
+                        const auto sg = (j & 4) == 0 ? 0.5f : -0.5f;
+                        inL += sg * splitIn[0][j & 3];
+                        inR += sg * splitIn[1][j & 3];
+                    }
+                    w[j] = crossCos * a + crossSin * bb + inL;
+                    w[j + denseHalf] = -crossSin * a + crossCos * bb + inR;
+                }
+                dLine.write (w);
+            }
+            else
+            {
+                float sOut[lineCount];
+                for (int i = 0; i < lineCount; ++i)
+                {
+                    curLen[i] += std::clamp (target[i] - curLen[i], -step[i], step[i]);
+                    if (s.lengthSpread > 0) // (round 190ie: the loop all-pass follows its gliding line)
+                        loopAp[i].len = std::clamp ((int) (curLen[i] * loopApFraction), 1, loopAp[i].line.mask - 2);
+                    const auto c = lfoC[i] * lfoRc[i] - lfoS[i] * lfoRs[i];
+                    lfoS[i] = lfoS[i] * lfoRc[i] + lfoC[i] * lfoRs[i];
+                    lfoC[i] = c;
+                    const auto dl = std::max (2.0, curLen[i] - modDepth * 0.5 * (1.0 + lfoS[i]));
+                    auto y = lines[i].readFrac (dl);
+                    if (apG[i] != 0.0f)
+                        y = loopAp[i].process (y, apG[i]);
+                    sOut[i] = y;
+                }
+                for (int k = 0; k < loopShelves; ++k)
+                    for (int i = 0; i < lineCount; ++i)
+                    {
+                        const auto y = shB0[k][i] * sOut[i] + shZ[k][i];
+                        shZ[k][i] = shB1[k][i] * sOut[i] - shA1[k][i] * y;
+                        sOut[i] = y;
+                    }
+                if (bwOn)
+                    for (int i = 0; i < lineCount; ++i)
+                        sOut[i] = absorb[i].bw.lp (sOut[i]);
+                if (lcOn)
+                    for (int i = 0; i < lineCount; ++i)
+                        sOut[i] -= absorb[i].lc.lp (sOut[i]);
+
+                lateL = (sOut[0] + sOut[1] + sOut[2] - sOut[3] + sOut[4] + sOut[5] - sOut[6] + sOut[7]) * norm;
+                lateR = (sOut[0] - sOut[1] + sOut[2] + sOut[3] + sOut[4] - sOut[5] + sOut[6] + sOut[7]) * norm;
+                if (s.splitSides)
+                {
+                    lateL = (sOut[0] + sOut[1] + sOut[2] - sOut[3]) * norm * 1.41421356f;
+                    lateR = (sOut[4] - sOut[5] + sOut[6] + sOut[7]) * norm * 1.41421356f;
+                }
+                const float in[2] = { (1.0f - onsetFeed) * (d[0] + send * e[0]) + onsetFeed * on[0] + tiny,
+                                      (1.0f - onsetFeed) * (d[1] + send * e[1]) + onsetFeed * on[1] + tiny };
+                if (gated)
+                {
+                    lateL = 0.3f * lateL + d[0];
+                    lateR = 0.3f * lateR + d[1];
+                }
+
+                // mixing: each half through two layers of rotations by mixAngle × 45° (at 45° a normalised 4-point
+                // Hadamard up to signs), then the halves rotated into each other by crossFeed × 45°, swinging by the
+                // matrix modulator (orthogonal for any amount)
+                auto crossCos = (float) crossCos0, crossSin = (float) crossSin0;
+                float hc[2] = { mc, mc }, hs[2] = { msn, msn };
+                if (mmDepth > 0.0)
+                {
+                    const auto c = mmC * mmRc - mmS * mmRs;
+                    mmS = mmS * mmRc + mmC * mmRs;
+                    mmC = c;
+                    const auto dlt = mmDepth * mmS, d2 = dlt * dlt;
+                    const auto cd = 1.0 - d2 * (0.5 - d2 * (1.0 / 24.0 - d2 * (1.0 / 720.0)));
+                    const auto sd = dlt * (1.0 - d2 * (1.0 / 6.0 - d2 * (1.0 / 120.0 - d2 * (1.0 / 5040.0))));
+                    crossCos = (float) (crossCos0 * cd - crossSin0 * sd);
+                    crossSin = (float) (crossSin0 * cd + crossCos0 * sd);
+                    // the rotations inside the halves swing too, the two halves in opposite ways
+                    hc[0] = (float) (mc * cd - msn * sd);
+                    hs[0] = (float) (msn * cd + mc * sd);
+                    hc[1] = (float) (mc * cd + msn * sd);
+                    hs[1] = (float) (msn * cd - mc * sd);
+                }
+                float h[lineCount];
+                for (int half = 0; half < lineCount; half += 4)
+                {
+                    const auto qc = hc[half / 4], qs = hs[half / 4];
+                    const auto a0 = qc * sOut[half] + qs * sOut[half + 1], a1 = qc * sOut[half + 1] - qs * sOut[half];
+                    const auto a2 = qc * sOut[half + 2] + qs * sOut[half + 3], a3 = qc * sOut[half + 3] - qs * sOut[half + 2];
+                    h[half] = qc * a0 + qs * a2;
+                    h[half + 2] = qc * a2 - qs * a0;
+                    h[half + 1] = qc * a1 + qs * a3;
+                    h[half + 3] = qc * a3 - qs * a1;
+                }
+                for (int i = 0; i < 4; ++i)
+                {
+                    const auto a = h[i], b = h[i + 4];
+                    auto u = crossCos * a + crossSin * b, w = -crossSin * a + crossCos * b;
+                    if (shimmer > 0.0f && (i & 1) == 0)
+                    {
+                        const auto second = i == 2 && voice2 > 0.0f;
+                        const auto r = second ? ratio2 : ratio;
+                        const auto amount = second ? shimmer * voice2 : shimmer;
+                        if (s.shimmerEnergy > 0.0)
+                        {
+                            const auto bb = shimmerB[second ? 1 : 0], keep = shimmerKeep[second ? 1 : 0];
+                            auto hp = [&] (int k, float v)
+                            {
+                                shiftHp[k][0] += hpC * (v - shiftHp[k][0]);
+                                v -= shiftHp[k][0];
+                                shiftHp[k][1] += hpC * (v - shiftHp[k][1]);
+                                return v - shiftHp[k][1];
+                            };
+                            u = keep * u + bb * hp (i / 2, shifters[i / 2].process (u, r));
+                            w = keep * w + bb * hp (2 + i / 2, shifters[2 + i / 2].process (w, r));
+                        }
+                        else
+                        {
+                            u = (1.0f - amount) * u + amount * shifters[i / 2].process (u, r);
+                            w = (1.0f - amount) * w + amount * shifters[2 + i / 2].process (w, r);
+                        }
+                    }
+                    const auto alt = (i & 1) == 0 ? 0.5f : -0.5f;
+                    if (build && split)
+                    {
+                        lines[i].write (u + alt * in[0] + splitIn[0][i]);
+                        lines[i + 4].write (w + alt * in[1] + splitIn[1][i]);
+                    }
+                    else
+                    {
+                        lines[i].write (u + alt * in[0]);
+                        lines[i + 4].write (w + alt * in[1]);
+                    }
+                }
             }
             if ((++renorm & 8191u) == 0) // the rotating pairs drift by rounding: back onto the unit circle
             {
@@ -1142,9 +1533,13 @@ struct Engine::Impl
                 shimmerB[v] = (float) (s.shimmerEnergy * a * f);
                 shimmerKeep[v] = 1.0f - shimmerB[v] * (float) (1.0 - f); // (unshifted: plain feedback, the RT law's own)
             }
-        double target[lineCount];
+        double target[lineCount], step[lineCount];
         for (int i = 0; i < lineCount; ++i)
+        {
             target[i] = targetLen (s, i);
+            // round 190ie: the glide per sample (fixed, or a tempo change spread over the block)
+            step[i] = s.lengthSpread > 0 ? std::min (glide, std::abs (target[i] - curLen[i]) / (double) s.lengthSpread) : glide;
+        }
 
         for (int t = 0; t < n; ++t)
         {
@@ -1196,7 +1591,9 @@ struct Engine::Impl
             float sOut[lineCount];
             for (int i = 0; i < lineCount; ++i)
             {
-                curLen[i] += std::clamp (target[i] - curLen[i], -glide, glide);
+                curLen[i] += std::clamp (target[i] - curLen[i], -step[i], step[i]);
+                if (s.lengthSpread > 0) // (round 190ie: the loop all-pass follows its gliding line)
+                    loopAp[i].len = std::clamp ((int) (curLen[i] * loopApFraction), 1, loopAp[i].line.mask - 2);
                 lfo[i] += modInc[i];
                 if (lfo[i] > 2.0 * pi)
                     lfo[i] -= 2.0 * pi;
@@ -1289,6 +1686,14 @@ struct Engine::Impl
             L[t] = (mid + side) * gain;
             R[t] = (mid - side) * gain;
         }
+        if (s.classicTone == 1) // round 190mb: law 1's tone corrector after the classic loop (Nebula's Supermassive role)
+        {
+            designTone (s);
+            if (toneOn)
+                for (int k = 0; k < engineBands; ++k)
+                    if (geqOn[k])
+                        geq[k].processBlock (L, R, n);
+        }
         if (outLowOn)
             outLow.processBlock (L, R, n);
         if (outHighOn)
@@ -1310,7 +1715,7 @@ struct Engine::Impl
     }
 };
 
-Engine::Engine (double maxLineSec, double maxPredelaySec) : impl (std::make_unique<Impl> (maxLineSec, maxPredelaySec)) {}
+Engine::Engine (double maxLineSec, double maxPredelaySec, bool dense) : impl (std::make_unique<Impl> (maxLineSec, maxPredelaySec, dense)) {}
 Engine::~Engine() = default;
 void Engine::prepare (double sampleRate) { impl->prepare (sampleRate); }
 void Engine::reset() noexcept { impl->reset(); }
@@ -1463,6 +1868,23 @@ void fitOverride (Settings& s)
         else if (k == "width") s.width *= v;
         else if (k == "earlyms") s.earlySec = v / 1000.0;
         else if (k == "bl") s.bandLimit *= v;
+        else if (k == "rev") s.revision = (int) v;
+        else if (k == "dense") s.dense = (int) v;
+        else if (k == "mrate") s.modRateHz *= v;
+        else if (k == "split") s.buildSplit = v >= 0.5;
+        else if (k == "lbw") s.loopBandwidth = v;
+        else if (k == "hcut") s.outHighCut = v;
+        else if (k == "lcut") s.outLowCut = v;
+        else if (k == "lsdb") s.lowShelfDb = v;
+        else if (k == "lshz") s.lowShelfHz = v;
+        else if (k == "hsdb") s.highShelfDb = v;
+        else if (k == "hshz") s.highShelfHz = v;
+        else if (k == "tmdb") s.toneMidDb = v;
+        else if (k == "ebuild") s.buildRise = v;
+        else if (k == "shim") s.shimmerEnergy *= v;
+        else if (k == "shfb") s.shiftFeedback *= v;
+        else if (k == "lowmult") s.lowMult *= v;
+        else if (k == "highmult") s.highMult *= v;
         else if (k.size() == 3 && k[0] == 'b' && (k[1] == 'f' || k[1] == 'g' || k[1] == 'q') && k[2] >= '0' && k[2] <= '2')
             (k[1] == 'f' ? s.bellHz : k[1] == 'g' ? s.bellDb : s.bellQ)[k[2] - '0'] = v;
     }
@@ -1472,7 +1894,7 @@ void fitOverride (Settings& s)
 class VerbEffect : public Effect
 {
 public:
-    VerbEffect (EffectKind k, double maxLineSec, double maxPreSec) : kind (k), engine (maxLineSec, maxPreSec) {}
+    VerbEffect (EffectKind k, double maxLineSec, double maxPreSec, bool dense = false) : kind (k), engine (maxLineSec, maxPreSec, dense) {}
 
     void prepare (double sampleRate) noexcept override
     {
@@ -1540,7 +1962,14 @@ protected:
             std::copy (l, l + m, dl.begin());
             std::copy (r, r + m, dr.begin());
             preStage (l, r, m, p, bpm);
-            engine.process (l, r, m, s);
+            if (s.lengthSpread > 0) // (round 190ie: a tempo change spreads over each chunk it covers)
+            {
+                auto spread = s;
+                spread.lengthSpread = m;
+                engine.process (l, r, m, spread);
+            }
+            else
+                engine.process (l, r, m, s);
             postStage (l, r, m, p, bpm);
             for (int i = 0; i < m; ++i)
             {
@@ -1587,6 +2016,362 @@ struct EpochMode
 #else
 #define LYNX_FIT_TABLE const
 #endif
+
+// round 190it: revision 1's trims per type / mode, measured on refcap030's black-box captures (each type / mode at the
+// capture's base setting against the reference's impulse): the wet level (dB) and the tone corrector (dB added per octave
+// band, 63 Hz … 8 kHz). Neutral = the 0.1.27 Measured law
+struct Rev1Trim
+{
+    double gainDb = 0.0;
+    double db[engineBands] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+};
+// Epoch Verb ← ValhallaVintageVerb's ReverbMode sweep (base Decay 0.51 s; two passes of the closed loop; Concert Hall, the
+// mode of every other capture, keeps the 0.1.27 voicing); faded out by Decay 1.41 s (the front-end)
+LYNX_FIT_TABLE Rev1Trim epochTrim[epoch::modeCount] = {
+    {}, // Concert Hall
+    { 9.61, { -4.69, -4.20, -0.99, -0.50, -0.90, 0.78, 5.83, 8.39 } }, // Plate
+    { 2.64, { 1.64, 1.89, -0.39, -1.30, 0.48, 0.52, -1.21, -1.82 } }, // Room
+    { 5.75, { -5.15, -3.53, 0.12, -0.79, -1.89, 0.86, 5.24, 8.18 } }, // Chamber
+    { 0.78, { -0.70, -0.01, -1.31, -2.10, -0.64, 1.80, 2.26, -1.39 } }, // Random Space
+    { 6.89, { -1.34, 0.87, -0.46, -1.63, -0.84, 1.22, 0.85, -4.69 } }, // Chorus Space
+    { 8.59, { -3.62, -4.93, -1.21, -0.82, -2.59, 2.12, 7.44, 9.41 } }, // Ambience
+    { 5.04, { -3.57, -2.60, -2.05, -1.92, -1.13, 0.71, 6.98, 12.96 } }, // Bright Hall
+    { 5.90, { 2.10, -2.48, -3.26, 0.65, 2.22, 3.39, -0.52, -14.57 } }, // Nave
+    { 2.98, { -1.90, -5.90, -1.84, 2.74, 2.75, 5.34, -3.07, -20.56 } }, // Grit Hall
+    { -0.75, { -0.85, -1.41, -1.33, -1.20, -0.41, 3.00, 1.35, -10.24 } }, // Grit Plate
+    { 5.73, { -2.66, -3.85, -0.89, 1.00, 0.17, 2.85, 0.72, -12.61 } }, // Smooth Plate
+    { 9.37, { 7.68, 7.33, 3.15, -4.53, -3.14, 1.07, -3.86, -17.78 } }, // Smooth Room
+    { 6.79, { 8.10, 6.32, 0.66, -3.45, -1.97, 1.36, -2.91, -16.40 } }, // Smooth Space
+    { -0.63, { 0.87, 1.07, 0.89, 0.50, 0.43, 2.94, -5.83, -17.37 } }, // Gated
+    { 6.21, { -3.32, -3.60, -0.98, -1.01, -1.09, 1.08, 5.59, 10.46 } }, // Drift Chamber
+    { 7.74, { -3.33, -6.49, -2.05, 2.00, 1.74, 3.35, 1.45, -11.92 } }, // Drift Hall
+    { -3.48, { 1.08, 1.38, 0.80, -0.64, 0.29, 4.17, -6.00, -14.52 } }, // Drift Space
+    { -4.48, { -0.55, -1.86, 0.11, 0.50, -0.27, 2.86, -1.36, -11.65 } }, // Cathedral
+    { -3.93, { 3.64, -2.34, -0.88, 2.28, 2.00, 4.49, -5.56, -14.07 } }, // Grand Hall
+    { -6.17, { 1.19, -1.22, -1.27, 0.88, 0.86, 2.55, -1.82, -11.16 } }, // Vintage Chamber
+    { -2.85, { 0.07, -5.03, -1.68, 1.48, 1.22, 4.32, -0.31, -12.19 } }, // Vintage Hall
+};
+// round 190ly (epoch::shortTrim): Concert Hall at short decays ← ValhallaVintageVerb's ColorMode sweep and Decay pairs at
+// 0.51 s (Concert Hall, the 1970s / 1980s and Now colours; closed loop on the impulses). Revision 1 left Concert Hall on its
+// 0.1.27 voicing, fitted at 2 … 4 s: at 0.51 s the reference's impulse sat 2 dB over ours. Full at 0.51 s and under, faded
+// out on the decay's logarithm by `epochShortEnd` s (S3 at 2.9 s already sits on the reference)
+// (three passes of lab/vvtrim.py on 11 impulse renders, 500 Hz up; the loop's cuts under 500 Hz — −5.4 dB at 125 Hz — took
+// the other banks' bass and impulse renders of the same setting 2 … 3 dB under their reference (tp172d S1, refcap182 S1_bass),
+// so the lows keep the 0.1.27 voicing. The level stays where the loop put it: +0.7 … +1.9 dB more lifted the 1 kHz staircase
+// files a step but took sr96 S1's impulse one down — Epoch sits 1.3 dB higher at 96 kHz than at 48 kHz there, a finding of its own)
+// Round 190mb (the merge with round 190kw's loopLaw, which lifts Concert Hall's level at 0.51 s by its own law): the trim
+// above stacked on the loop law's level took the impulses 1.9 dB over the reference (refcap030 mode / pairs files 4 → 3).
+// Refitted on top of the loop law (three more passes of lab/vvtrim.py): −2.7 dB with the 500 Hz … 8 kHz bands, the lows
+// cancelled out (they stay where the loop law puts them, as round 190ly kept them), and the 1 kHz band 2.5 dB over the
+// impulse fit — the test signal's 1 kHz staircase sat 2.8 … 4.3 dB under the reference where the impulse sat on it
+// (+1.5 / +2.5 / +3.5 dB tried: 2.5 takes every refcap030 / tp172d / refcap182 / verb183b file up or level)
+LYNX_FIT_TABLE Rev1Trim epochShort = { -2.70, { 2.70, 2.70, 2.70, 4.56, 5.26, 2.58, 3.47, 2.03 } };
+LYNX_FIT_TABLE double epochShortEnd = 2.9;
+// round 190mb (nebula::toneLaw): ValhallaSupermassive's per-mode tone and level on Nebula's classic networks (law 0; the
+// six cloud networks keep theirs), from refcap030's Mode sweep (impulse and test signal: Mix 100 %, Feedback 80 %,
+// Density 0, Delay 50 %). There the classic networks' lows ran 2 … 8 dB over the reference and their top 1 … 3 dB under.
+// At Feedback 50 % (tp172d's mode probes, the same states otherwise) the same kind of fit took 12 files down (the
+// time-window spectra of music and bursts, not the long-term one the fit sees): the trim comes in from Feedback 65 % to
+// its full value at 80 % and holds above. Gain (dB) + the tone corrector's octave bands 63 Hz … 8 kHz (dB)
+// (three closed-loop passes of lab/nbtrim.py, each channel's power; Haze and Plateau 1 dB under the fit: their test-signal
+// renders sat 2 dB louder than their impulse ones against the reference, the fit's full level took them a step down)
+LYNX_FIT_TABLE Rev1Trim nebulaTone[nebula::modeCount] = {
+    {}, // Ripple (a cloud network)
+    { 1.14, { -2.89, -2.20, -1.08, -0.15, 0.76, 0.95, 1.72, 4.26 } }, // Swell
+    {}, // Fold (a cloud network)
+    {}, // Drift (a cloud network)
+    {}, // Abyss (a cloud network)
+    { 1.72, { -2.19, -2.35, -1.18, 0.20, 1.00, 0.94, 1.37, 3.41 } }, // Vortex
+    {}, // Glint (a cloud network)
+    { -2.46, { 2.69, -0.18, -1.46, -0.83, -0.36, 0.80, 2.03, 3.01 } }, // Pulse
+    { 2.19, { -4.92, -4.71, -2.46, 1.62, 2.66, 1.34, 1.54, 2.05 } }, // Expanse
+    { 0.54, { -4.89, -3.53, -0.91, 0.69, 0.68, 1.41, 1.65, 1.80 } }, // Haze
+    { 0.34, { -3.16, -2.50, -1.07, 0.32, 0.58, 0.98, 1.67, 1.62 } }, // Veil
+    { -0.10, { -2.62, -1.76, -0.74, 0.17, 0.89, 0.73, 0.69, 1.66 } }, // Mist
+    { 1.53, { -4.93, -3.55, -0.86, 0.70, 0.65, 1.42, 1.64, 1.80 } }, // Monolith
+    { -1.10, { 0.34, -0.42, -0.71, 0.33, 0.07, -0.26, 0.98, 0.78 } }, // Eternity
+    { -0.25, { -2.52, -1.68, -0.70, 0.12, 0.71, 0.74, 0.82, 1.75 } }, // Tide
+    { -0.37, { -2.05, -1.61, -0.89, 0.05, 0.87, 0.66, 0.94, 2.67 } }, // Shoal
+    { -3.40, { 4.95, 3.28, 0.17, -1.24, -1.19, -0.86, -0.16, 0.80 } }, // Spark
+    { 1.20, { -5.99, -2.90, 0.01, 0.69, 0.26, 1.33, 0.61, -1.10 } }, // Plateau
+    { 3.94, { -6.25, -4.96, -2.22, 1.93, 2.96, 1.63, 0.65, -1.52 } }, // Dusk
+    {}, // Mirage (a cloud network)
+    { -0.87, { -0.80, -1.64, -1.29, -0.19, 0.94, 1.12, 1.05, 1.82 } }, // Cluster
+    { -0.43, { -2.64, -1.81, -0.77, 0.13, 0.88, 0.76, 0.80, 1.89 } }, // Beacon
+};
+constexpr double nebulaToneFrom = 0.65, nebulaToneFull = 0.8; // Feedback
+// round 190mb (horizon::revision): ValhallaFutureVerb's tone and level per reverb mode on Horizon's 0.1.27 law, from this
+// round's probe renders of the reference (every reverb mode at its own value, Mix 100 %, Decay 25 %: impulse + test signal;
+// three closed-loop passes of lab/hztrim.py). Gain (dB) + the tone corrector's octave bands 63 Hz … 8 kHz (dB). The bands
+// under 500 Hz stay 0 (the fit's lows took the music files 1 … 2 dB loud); Room and Chamber keep no trim (Chamber, the
+// default, took verb183b's music captures and Reverse's echo files down at any share tried; Room its music files), Space
+// keeps its tone only (its +5.9 dB at the probe's value took tp172d's Space impulse 2 → 1: the level differs inside the mode)
+LYNX_FIT_TABLE Rev1Trim horizonTrim[horizon::reverbModeCount] = {
+    {}, // Room
+    {}, // Chamber
+    { -0.80, { 0.00, 0.00, 0.00, -0.68, -1.41, -0.67, 0.61, 3.13 } }, // Plate
+    { 0.00, { 0.00, 0.00, 0.00, 1.15, -2.49, -1.76, -1.08, -0.43 } }, // Hall
+    { -3.36, { 0.00, 0.00, 0.00, -2.01, -0.90, -0.10, 0.40, 2.23 } }, // Cathedral
+    { 0.00, { 0.00, 0.00, 0.00, -0.16, 1.21, 0.98, 0.20, -0.17 } }, // Space
+    { 1.95, { 0.00, 0.00, 0.00, -0.18, 0.19, 0.03, 0.64, 3.18 } }, // Freeze
+    { -3.95, { 0.00, 0.00, 0.00, -0.92, 2.42, 0.89, -1.49, -0.54 } }, // Gated
+};
+// round 190mj (horizon::reaLaw) [EXEC]: ValhallaFutureVerb's echo modes against this round's probe renders of the echo alone
+// (Reverb level 0, Echo level 100 %, Feedback 0 / 40 %; impulses at 0.5 / 0.05 / 0.005, tone bursts 100 Hz … 10 kHz at −40 /
+// −20 / −6 dB, pink bursts, a sweep; lab/echoan.py): each mode's voicing (level of the heard echo, low-pass, drive)
+struct HorizonEcho
+{
+    double gainDb = 0.0, cutHz = 0.0; // the echo's level (dB) and its low-pass (Hz; 0 = the mode's own, as before)
+    int poles = 1;                    // the low-pass's order (1 or 2 one-pole sections)
+    double driveMult = 1.0;           // × the Drive control's dB (the plain modes)
+};
+// Fitted on the echo alone (lab/echofit.py: gain, low-pass, order, drive per mode), then kept only where the probe bank's
+// echo-mode renders (echo + Chamber, the reference's S2: Level 50 %, Feedback 40 %) gained without a file down: Analog a
+// darker two-pole 3 kHz low-pass, Reverse Up/Down a two-pole 8 kHz one and +2 dB, Lo-fi a two-pole 4 kHz one. (The level the
+// echo-alone fit asks for, +2 … +5 dB on most modes, took those renders down: the reverb behind the echo was measured with
+// LYNX's echo level; the voicing's gain is the heard echo's only)
+LYNX_FIT_TABLE HorizonEcho horizonEcho[horizon::echoModeCount] = {
+    {}, {}, {},                    // Clean, Tape, Digital (its own coder)
+    { 1.0, 3000.0, 2, 1.0 },       // Analog
+    {}, {}, {}, {},                // Detune, Reverse, Reverse Up, Reverse Down
+    { 2.0, 8000.0, 2, 1.0 },       // Reverse Up/Down
+    {}, {},                        // Sparkle, Swarm
+    { 1.0, 4000.0, 2, 1.0 },       // Lo-fi
+};
+// round 190mj (horizon::reaLaw) [EXEC]: Room and Chamber against this round's probe renders of the reference (each at Size
+// 0 / 25 / 50 / 75 / 100 % × Decay 0.15 / 0.29 / 0.45: an impulse at 0.5 and 0.05, a pink burst, music). Their errors move
+// with Size, not Decay: at Size 0 LYNX's first 100 ms sit 4 dB (Chamber) / 9 … 12 dB (Room) under the reference, at Size 100 %
+// 2 … 3 dB over, and the tail at Size 25 … 50 % (Chamber) 2 … 3 dB over — which is why one trim per mode (round 190mb) took
+// files down at the other sizes. The law, per mode at five Sizes (linear in between): the onset network's level (its span
+// stays the mode's), the late tank's level (×) and the wet gain (dB)
+struct HorizonRoomKnot
+{
+    double onset = -1.0, late = 1.0, gainDb = 0.0; // onset < 0: the mode's own
+    double rt = 1.0, early = 1.0;                  // × the decay, × the early taps' level
+};
+// Fitted per Size on the probe renders (lab/roomfit.py: window levels 0-0.1 / 0.1-0.3 / 0.3-0.8 / 0.8-2 s after the impulse,
+// the quiet impulse, the pink burst, the music), then eased until no file of the gate banks went down (Room: Size 25 % from
+// +1 to +0.5 dB and its onset 0.45 → 0.3, Size 50 … 100 % without the fit's +1 … +2 dB, which the short decays' music did not
+// want; Chamber: Size 50 % from late 0.6 / +3 dB to 0.75 / +1.7 dB, Size 75 % halfway, Size 100 % as it was)
+LYNX_FIT_TABLE HorizonRoomKnot horizonRoomLaw[2][5] = {
+    { { 0.7, 1.0, 3.0 }, { 0.3, 1.0, 0.5 }, {}, {}, { -1.0, 1.0, 0.5, 1.0, 0.5 } },                          // Room (its onset: 0)
+    { { 0.7, 0.8, 2.0 }, { 0.45, 0.7, 2.0 }, { 0.45, 0.75, 1.7 }, { 0.3, 0.8, 1.5 }, {} },                   // Chamber (0.45)
+};
+// round 190mj: which granular echo modes run the four-head shifter (Shifter::process4) under reaLaw
+// (Reverse Up, Reverse Down and Sparkle gained on the probe bank; Detune, Reverse, Reverse Up/Down and Swarm lost: two heads)
+LYNX_FIT_TABLE bool horizonHeads4[horizon::echoModeCount] = { false, false, false, false, false, false, true, true, false, true, false, false };
+// The Digital mode's coder (LYNX's own law of what the probe renders show: a single-sample impulse leaves the reference's
+// Digital echo as the same small ramp-shaped pulse, ~19 dB under the clean echo's, whatever its height, while tones pass
+// within ~1.3 dB up to −6 dB at 1 kHz, 4 kHz loses ~4 dB and 10 kHz ~20 dB — a coder that slews towards its input by a
+// limited step): a two-pole pre low-pass, the slew limiter (Coder: stepMin per sample at 48 kHz, growing towards stepMax over
+// tauMs while it stays at its limit), a post low-pass and a gain; fitted on the probe bank's Digital renders (1 / 2 / 1 → 2 /
+// 3 / 3). Not reproduced: the reference's repeats under Feedback die after the first (its coder drops the smooth small pulse)
+struct HorizonCoder
+{
+    double gainDb, preHz, postHz, stepMin, stepMax, tauMs, leak;
+};
+LYNX_FIT_TABLE HorizonCoder horizonCoder { -3.5, 6000.0, 10000.0, 0.002, 0.1, 1.0, 1.0 };
+// round 190mb (epoch::rateLaw): ValhallaVintageVerb is not rate-independent where Epoch is (Epoch's impulse at 96 kHz is its
+// 48 kHz one to 0.05 dB). Against its own 48 kHz renders the reference's sr96 captures (refcap182's D / S1 / S2 / S3 states)
+// lose 1.4 … 1.7 dB in the first 80 ms and ~0.9 dB to 300 ms in its 1970s colour (ColorMode 0.33: D / S1 / S2), nothing in the
+// tail, while in its 1980s colour (0.8: S3) its tail sits ~0.5 dB higher (colour names read back from the plug-in this round). Per colour: the early field's and the whole wet level's change per octave of rate (dB)
+struct EpochRate
+{
+    double earlyDb, levelDb;
+};
+// Fitted on refcap030's sr96 block (20 files; lab/erate.sh grid): 1970s (D / S1 / S2 / S4) −2 dB a rate octave on the early
+// field, 1980s (S3) +0.5 dB on the level; Now has no capture and stays. Every file keeps its score (the step scorer), the mean |level| error 0.88 → 0.76 dB and spectrum 2.18 → 2.11 dB;
+// more early cut or a level cut on colour 0 took 1 … 3 files a step down
+LYNX_FIT_TABLE EpochRate epochRate[epoch::colourCount] = { { -2.0, 0.0 }, { 0.0, 0.5 }, { 0.0, 0.0 } };
+// round 190kw (revision 1 + loopLaw): Epoch's level over Decay and Size from the reference's loop (static REA of
+// ValhallaVintageVerb, docs/analise/REA_rodada190kw.md §4 / §11). Each of its modes is one loop whose gain is the RT60 law
+// 10^(−3 L / (fs T)) split over N gain stages, the input entering after a stage, with no output gain of its own: its wet
+// energy is E(T, s) = E0 / (1 − 10^(−6 ℓ(s) / T)), ℓ = c · L(s) / N, and the first 80 ms do not move with Decay. Per mode:
+// ℓ at Size 100 % (s), the loop's size law L(s) / L(1) = a + b · s^e, the level at the capture's base Decay (0.513 s) against
+// revision 1 (dB, refcap030's mode sweep, impulse) and Epoch's own wet-energy growth over Decay (dB at the knots below,
+// measured on the impulse with the law's level off). The trim is the reference's growth minus Epoch's own. Fitted on the
+// scores after that (the stand-in's spectrum is not the reference's, so the level that scores best is not always the
+// energy match): Concert Hall +0.3 dB, and its own growth 0.1 / 0.6 / 0.2 / 0.9 dB less at 2 / 4 / 7 / 15 s and 0.3 / 0.3 dB
+// more at 33 / 70 s (refcap030's pairs and sr48 / sr96 captures, refcap182's programme and tp172d at 0.51 / 2.9 / 4 / 7 /
+// 12.8 / 33 s), Room −0.4 dB (its 1.41 s captures), Bright Hall +1.25 dB, Grit Plate −3.25 dB, Gated −2 dB (its impulse).
+// A negative ℓ: the mode keeps revision 1 (early part and level as round 190it left them).
+struct EpochLoop
+{
+    double ell, a, b, e, atDb;
+    double grow[8];
+};
+constexpr double epochLoopKnots[8] = { 0.513, 1.0, 2.0, 4.0, 7.0, 15.0, 33.0, 70.0 }; // Decay (s)
+LYNX_FIT_TABLE EpochLoop epochLoop[epoch::modeCount] = {
+    { 0.39520, 0.200, 0.800, 1.0, 0.85, { 0.00, 0.35, 1.39, 2.79, 4.78, 6.48, 10.11, 12.31 } }, // Concert Hall: 0.5605 s (0.2 + 0.8 s), N 2, c 1.41
+    { 0.18654, 0.16155, 0.83845, 1.0, -2.05, { 0.00, 0.93, 3.42, 6.14, 8.22, 10.84, 13.33, 15.50 } }, // Plate: 5100 (1 + 5.19 s) / 33850, N 5
+    { 0.13013, 0.250, 0.750, 1.0, -1.22, { 0.00, 1.76, 3.86, 5.93, 7.57, 9.72, 11.82, 13.71 } }, // Room: 26770 (0.5 + 1.5 s) / 48000, N 6, c 0.7
+    { 0.15545, 0.16155, 0.83845, 1.0, -1.68, { 0.00, 1.09, 3.60, 6.26, 8.29, 10.85, 13.28, 15.42 } }, // Chamber: as Plate, N 6
+    { 0.26899, 0.19750, 0.80250, 1.0, 1.43, { 0.00, 1.14, 3.53, 6.35, 8.53, 11.28, 13.87, 16.12 } }, // Random Space: 5100 (3 + 12.19 s) / 48000, N 6
+    { 0.26899, 0.19750, 0.80250, 1.0, 0.97, { 0.00, 1.00, 3.10, 5.71, 7.84, 10.58, 13.18, 15.44 } }, // Chorus Space: as Random Space
+    { 0.20566, 0.36630, 0.63370, 1.0, -2.95, { 0.00, 0.18, 2.39, 4.89, 6.81, 9.25, 11.59, 13.67 } }, // Ambience: 5100 (3 + 5.19 s) / 33850, N 6
+    { 0.30797, 0.200, 0.800, 1.0, -3.41, { 0.00, -2.44, -2.10, -0.65, 0.79, 2.92, 5.15, 7.22 } }, // Bright Hall: 11210 (0.2 + 0.8 s) / 18200, N 2
+    { 1.13677, 0.200, 0.800, 1.0, -2.93, { 0.00, -0.33, 0.74, 2.65, 4.39, 6.81, 9.25, 11.46 } }, // Nave ← Sanctuary: 21826 (1 + 4 s) / 48000, N 2
+    { 0.28025, 0.200, 0.800, 1.0, -2.47, { 0.00, -1.33, -1.02, 0.30, 1.65, 3.68, 5.86, 7.89 } }, // Grit Hall ← Dirty Hall: as Concert Hall, c 1
+    { 0.08252, 0.09434, 0.90566, 1.0, -0.33, { 0.00, 1.65, 4.25, 6.99, 9.06, 11.66, 14.12, 16.29 } }, // Grit Plate ← Dirty Plate: 11210 (0.8 s fs / 20000 + 0.2) / fs (48 kHz), N 6
+    { 0.47326, 0.05263, 0.94737, 1.0, -2.39, { 0.00, 0.29, 1.66, 3.60, 5.29, 7.60, 9.90, 11.97 } }, // Smooth Plate: 4250 (1 + 18 s) / 34125, N 5
+    { 0.32854, 0.07582, 0.92418, 1.0, -3.36, { 0.00, 1.43, 3.90, 6.05, 7.84, 10.21, 12.47, 14.33 } }, // Smooth Room: 5100 (1 + 12.19 s) / 34125, N 6
+    { 0.26899, 0.19750, 0.80250, 1.0, -2.55, { 0.00, 1.10, 3.35, 5.62, 7.53, 10.07, 12.52, 14.59 } }, // Smooth Space ← Smooth Random: as Random Space
+    { 0.0, 0.07582, 0.92418, 2.0, 0.43, { 0.00, -0.44, -0.36, -0.36, -2.06, -4.42, -7.61, -7.28 } }, // Gated ← Nonlin: 5100 (1 + 12.19 s²) / 34125; its gate, not the loop, sets the level
+    { -0.39438, 0.15789, 0.84211, 1.0, -3.96, { 0.00, -0.95, 0.21, 2.17, 3.87, 6.15, 8.39, 10.40 } }, // Drift Chamber ← Chaotic Chamber: 4250 (3 + 16 s) / 34125, N 6; keeps revision 1 (its test signal lost a step)
+    { 0.28025, 0.200, 0.800, 1.0, -1.57, { 0.00, -0.73, -0.13, 1.48, 3.03, 5.26, 7.56, 9.66 } }, // Drift Hall ← Chaotic Hall: as Grit Hall
+    { 0.44835, 0.11111, 0.88889, 1.0, -0.02, { 0.00, 0.96, 3.35, 6.09, 8.20, 10.87, 13.39, 15.59 } }, // Drift Space ← Chaotic Neutral: 5100 (2 + 16 s) / 34125, N 6
+    { 0.38147, 0.200, 0.800, 1.0, 1.39, { 0.00, 0.91, 1.36, 2.99, 4.45, 6.83, 9.64, 12.25 } }, // Cathedral: 30000 (0.5 + 2 s) / 32768, N 6
+    { 0.32005, 0.03125, 0.96875, 1.5, 0.43, { 0.00, -0.82, -0.12, 1.73, 3.59, 6.23, 8.84, 11.17 } }, // Grand Hall ← Palace: 61449 (0.125 + 3.875 s^1.5) / 48000, N 16
+    { 0.41550, 0.500, 0.500, 1.0, 2.93, { 0.00, 0.97, 3.13, 5.73, 7.76, 10.34, 12.79, 14.97 } }, // Vintage Chamber ← Chamber1979: 9972 (0.5 + 0.5 s) / 20000 per line, RT 1.2 × Decay
+    { 0.46667, 0.500, 0.500, 1.0, 2.33, { 0.00, -0.79, -0.33, 1.10, 2.54, 4.67, 6.91, 8.97 } }, // Vintage Hall ← Hall1984: 11200 (0.5 + 0.5 s) / 20000 per line, RT 1.2 × Decay
+};
+// the level trim (dB) of revision 1 + loopLaw for mode k at Decay T (s) and Size s (0..1): the base level, plus the
+// reference's growth from (0.513 s, 100 %) to (T, s) through its own size law, minus Epoch's own growth over Decay and Size
+double epochLoopDb (int k, double decay, double size) noexcept
+{
+    const auto& m = epochLoop[k];
+    if (m.ell <= 0.0)
+        return m.atDb;
+    const auto t = std::clamp (decay, epochLoopKnots[0], epochLoopKnots[7]);
+    const auto grow = [t] (double ell) { return -10.0 * std::log10 (std::max (1.0e-9, 1.0 - std::pow (10.0, -6.0 * ell / t))); };
+    const auto lawSize = m.a + m.b * std::pow (std::clamp (size, 0.0, 1.0), m.e);
+    // Epoch's own lines scale by 0.3 + 0.7 s, and its wet energy rises by that factor^−0.64 at any Decay (measured:
+    // +1.2 / +2.0 dB at Size 50 / 25 %, Concert Hall and Room, 0.51 … 12.8 s)
+    const auto ownSizeDb = -6.4 * std::log10 (0.3 + 0.7 * std::clamp (size, 0.0, 1.0));
+    const auto ref = grow (m.ell * lawSize) - ownSizeDb + 10.0 * std::log10 (1.0 - std::pow (10.0, -6.0 * m.ell / epochLoopKnots[0]));
+    int i = 0;
+    while (i < 6 && t > epochLoopKnots[i + 1])
+        ++i;
+    const auto f = std::log (t / epochLoopKnots[i]) / std::log (epochLoopKnots[i + 1] / epochLoopKnots[i]);
+    const auto own = m.grow[i] + (m.grow[i + 1] - m.grow[i]) * std::clamp (f, 0.0, 1.0);
+    return m.atDb + ref - own;
+}
+
+// Atrium ← ValhallaRoom's type sweep (3-point smoothed over the bands, half the 63 Hz band's; Large Room, the type of
+// every other capture, keeps its 0.1.27 voicing; Medium Room's level a compromise between its impulse (+2 dB) and its
+// test signal (−3 dB))
+LYNX_FIT_TABLE Rev1Trim atriumTrim[atrium::typeCount] = {
+    {}, // Large Room
+    { -1.50, { 0.77, -1.36, -0.63, 0.39, 0.02, 0.45, 1.13, 1.24 } }, // Medium Room
+    {}, // Bright Room (its 0.1.27 law was fitted on tp172d's S2, which the sweep's trim cost a step)
+    { -0.75, { 0.04, 0.01, 0.26, 1.05, 0.45, -0.63, -1.14, -1.63 } }, // Large Chamber
+    { 0.40, { 0.01, 1.43, 0.90, 0.45, 0.00, -0.87, -1.90, -3.50 } }, // Dark Room
+    { -0.20, { 0.08, 0.20, 0.11, 0.92, 0.43, -0.85, -0.82, -0.22 } }, // Dark Chamber
+    { 2.30, { -1.15, -0.14, 0.89, 1.18, 0.04, -1.07, -0.91, -0.23 } }, // Dark Space
+    { 3.75, { -1.13, 0.74, 1.19, 0.98, -0.26, -1.38, -1.26, -0.93 } }, // Deep Space
+    { 2.42, { -0.56, 0.82, 0.80, 0.56, 0.07, -0.91, -1.35, -1.30 } }, // Mirror Space
+    { 3.05, { -0.86, 0.03, 1.16, 1.51, 0.16, -1.32, -1.54, -1.17 } }, // Vast Space
+    { 5.16, { -1.21, 1.24, 1.62, 1.05, -0.22, -1.62, -2.06, -2.00 } }, // Distant Space
+    {}, // Dense Room
+};
+// Foil Plate ← ValhallaPlate's type sweep (as Atrium's; Silver and Pewter, the types of the other captures, keep theirs:
+// Pewter's trim at the sweep's decay cost the 0.5 decay of refcap182's S2 a step); the last entry: the measured plate voicing
+LYNX_FIT_TABLE Rev1Trim foilTrim[foil::typeCount + 1] = {
+    {}, // Silver
+    {}, // Pewter
+    { 3.26, { -1.89, -0.54, 0.24, 0.47, 0.04, -0.13, -0.08, -0.79 } }, // Nickel
+    { 1.65, { -0.36, 0.27, 0.31, 0.61, 0.10, -0.82, -0.46, 0.09 } }, // Bronze
+    { 1.87, { -1.12, -0.78, 0.06, 1.34, 0.90, -0.35, -1.18, -2.21 } }, // Bismuth
+    { 0.39, { 1.63, 1.84, 0.02, -0.88, -0.69, -0.38, 0.09, 0.21 } }, // Tin
+    { 0.28, { -0.85, -0.82, -0.67, -0.31, -0.10, 0.50, 1.39, 1.48 } }, // Zinc
+    { 3.88, { 0.55, 1.93, 1.04, -0.30, -0.64, -1.11, -0.92, -0.18 } }, // Platinum
+    { 2.14, { 0.71, 0.58, -1.25, -1.52, -0.19, 1.17, 1.20, -0.70 } }, // Tungsten
+    { 3.74, { -0.55, 0.54, 0.41, 0.29, -0.02, -0.26, -0.96, -3.08 } }, // Iron
+    { 2.39, { -0.35, -0.03, -1.06, -0.94, -0.02, 0.97, 1.08, -0.80 } }, // Gold
+    { 0.68, { 0.93, 0.69, -0.59, -0.32, 0.30, 0.22, -0.31, -1.42 } }, // Lead
+    {}, // the measured plate voicing
+};
+LYNX_FIT_TABLE Rev1Trim haloTrim[7] = {};                   // per reverb mode
+// round 190ls: Atrium's ValhallaRoom role on the dense tank (atrium::reaLaw), per type on top of revision 1's trims: the
+// dense tank's level and tone against the reference's impulses (refcap030's type sweep, two closed-loop passes, 3-point
+// smoothed over the bands; Large Room, the type of every other capture, 0.65 dB under the sweep's level and half its lift at
+// 63 / 125 Hz: at the sweep's trim the music, bass and test signals of the pairs / sr blocks and of tp172d / refcap182 /
+// verb183b sat 0.5 … 2 dB over the reference)
+LYNX_FIT_TABLE Rev1Trim roomTrim[atrium::typeCount] = {
+    { -0.60, { 1.03, 0.50, -0.10, 0.05, -0.27, -0.79, 0.09, 0.54 } }, // Large Room
+    { -2.19, { 4.15, -0.45, -0.07, 0.99, -0.27, -0.42, 0.23, 0.60 } }, // Medium Room
+    { -0.50, { 1.74, -0.45, -0.11, 0.45, -0.00, -0.30, 0.42, 1.86 } }, // Bright Room
+    { -0.90, { 5.12, 1.05, -0.79, -0.20, -0.22, -0.17, 0.33, 0.91 } }, // Large Chamber
+    { -0.22, { 2.35, -0.07, -0.42, 0.41, -0.23, -0.19, 0.50, 0.02 } }, // Dark Room
+    { -0.14, { 3.70, 1.76, 0.92, 0.09, -0.98, -1.17, -0.62, 0.23 } }, // Dark Chamber
+    { -0.90, { 5.38, 0.64, -0.91, 0.26, -0.09, -0.27, 0.36, 0.77 } }, // Dark Space
+    { -0.55, { 4.95, 0.34, -0.59, 0.62, -0.06, -0.37, 0.06, 0.44 } }, // Deep Space
+    { -0.57, { 4.55, 0.62, -0.71, 0.55, 0.20, -0.52, -0.15, 0.46 } }, // Mirror Space
+    { -0.40, { 4.47, 0.77, 0.41, 0.10, -0.67, -0.45, -0.16, 0.43 } }, // Vast Space
+    { -0.38, { 5.46, 0.52, -0.40, 0.80, -0.20, -0.65, -0.08, 0.34 } }, // Distant Space
+    {}, // Dense Room (no capture)
+};
+#ifdef LYNX_VERB_FIT
+// the fitting harness: LYNX_VTRIM=<file>, lines "<epoch|atrium|foil|halo> <index> <gain dB> <8 × dB>"
+bool loadTrims()
+{
+    if (const char* f = std::getenv ("LYNX_VTRIM"))
+        if (auto* in = std::fopen (f, "r"))
+        {
+            char name[32];
+            int i;
+            Rev1Trim t;
+            while (std::fscanf (in, "%31s %d %lf %lf %lf %lf %lf %lf %lf %lf %lf", name, &i, &t.gainDb, &t.db[0], &t.db[1], &t.db[2],
+                                &t.db[3], &t.db[4], &t.db[5], &t.db[6], &t.db[7]) == 11)
+            {
+                const std::string n = name;
+                if (n == "erate") // round 190mb: "erate <colour> <early dB> <level dB> + 7 unused"
+                {
+                    if (i >= 0 && i < epoch::colourCount)
+                        epochRate[i] = { t.gainDb, t.db[0] };
+                    continue;
+                }
+                if (n == "hecho") // round 190mj: "hecho <echo mode> <dB> <cut Hz> <poles> <drive ×> + 5 unused"
+                {
+                    if (i >= 0 && i < horizon::echoModeCount)
+                        horizonEcho[i] = { t.gainDb, t.db[0], (int) t.db[1], t.db[2] };
+                    continue;
+                }
+                if (n == "hroom") // round 190mj: "hroom <mode 0 | 1> <onset> <late ×> <size knot 0 … 4> <gain dB> <rt × (0 = 1)> <1 + early × (0 = 1)> + 3 unused"
+                {
+                    const auto k = (int) t.db[1];
+                    if (i >= 0 && i < 2 && k >= 0 && k < 5)
+                        horizonRoomLaw[i][k] = { t.gainDb, t.db[0], t.db[2], t.db[3] > 0.0 ? t.db[3] : 1.0, t.db[4] > 0.0 ? t.db[4] - 1.0 : 1.0 };
+                    continue;
+                }
+                if (n == "hheads") // round 190mj: "hheads <echo mode> <0 | 1> + 8 unused"
+                {
+                    if (i >= 0 && i < horizon::echoModeCount)
+                        horizonHeads4[i] = t.gainDb >= 0.5;
+                    continue;
+                }
+                if (n == "hcoder") // round 190mj: "hcoder 0 <gain dB> <pre Hz> <post Hz> <step min> <step max> <tau ms> <leak> + 2 unused"
+                {
+                    horizonCoder = { t.gainDb, t.db[0], t.db[1], t.db[2], t.db[3], t.db[4], t.db[5] };
+                    continue;
+                }
+                if (n == "eshort") // round 190ly: "eshort <end s> <gain> <8 × dB>"
+                {
+                    epochShortEnd = i > 0 ? (double) i / 10.0 : epochShortEnd; // (index = the end in tenths of a second)
+                    epochShort = t;
+                    continue;
+                }
+                Rev1Trim* table = n == "epoch" ? epochTrim : n == "atrium" ? atriumTrim : n == "foil" ? foilTrim : n == "halo" ? haloTrim : n == "room" ? roomTrim
+                                : n == "nebula" ? nebulaTone : n == "horizon" ? horizonTrim : nullptr;
+                const int count = n == "epoch" ? epoch::modeCount : n == "nebula" ? nebula::modeCount : n == "horizon" ? horizon::reverbModeCount : n == "atrium" || n == "room" ? atrium::typeCount : n == "foil" ? foil::typeCount + 1 : 7;
+                if (table != nullptr && i >= 0 && i < count)
+                    table[i] = t;
+            }
+            std::fclose (in);
+        }
+    return true;
+}
+#endif
+void applyTrim (Settings& s, const Rev1Trim& t, double weight = 1.0) noexcept
+{
+   #ifdef LYNX_VERB_FIT
+    static const bool loaded = loadTrims();
+    (void) loaded;
+   #endif
+    s.gain *= std::pow (10.0, weight * t.gainDb / 20.0);
+    for (int b = 0; b < engineBands; ++b)
+        s.bandDb[b] += weight * t.db[b];
+}
 LYNX_FIT_TABLE EpochMode epochModes[epoch::modeCount] = {
     { "Concert Hall", 0, 0.9394, 1, 1.2, 1, 0.975, 0.4, 42.94, 0.0, 1, 1.031, 3.2, 0.0 },
     { "Plate", 2, 0.80, 0.90, 0.45, 1.0, 1.0, 0.10, 2.0, 60.0, 1.0, 0.70, 2.0, 0.0 },
@@ -1745,10 +2530,44 @@ protected:
         // first 100 ms still holds), its modes sit denser low down (lines × 0.85: the −20 dB impulses and music both
         // closer), and it is 0.7 dB lower
         s.lineScale *= 0.85;
-        s.earlyLevel *= std::min (1.6, 1.13 * std::sqrt (std::max (1.0, decay / 2.0)));
+        // round 190kw (loopLaw): the reference's first 80 ms do not move with Decay (−10.65 dB at 0.51 / 7 / 33 s): the
+        // early level holds at its long-decay value
+        const auto loopLaw = p[epoch::engineLaw] >= 0.5f && p[epoch::revision] >= 0.5f && p[epoch::loopLaw] >= 0.5f
+                          && epochLoop[modeIndex].ell >= 0.0;
+        s.earlyLevel *= loopLaw ? 1.6 : std::min (1.6, 1.13 * std::sqrt (std::max (1.0, decay / 2.0)));
         s.gain *= 0.92;
         if (p[epoch::engineLaw] >= 0.5f)
             applyLaw (s, epochLaw[modeIndex]);
+        if (p[epoch::engineLaw] >= 0.5f && p[epoch::revision] >= 0.5f)
+        {
+            s.revision = 1; // round 190it
+            // Epoch's trims were measured at the capture's base Decay (0.51 s); its Room mode needs none at 1.41 s
+            // (refcap182 S2): they fade out between the two on the decay's logarithm
+            const auto fade = std::clamp (std::log (1.41 / std::max (0.01, decay)) / std::log (1.41 / 0.51), 0.0, 1.0);
+            if (! loopLaw)
+                applyTrim (s, epochTrim[modeIndex], fade);
+            else
+            {
+                // round 190kw: the tone trims fade as before; the level is the loop law's at every Decay and Size
+                auto tone = epochTrim[modeIndex];
+                const auto levelDb = tone.gainDb;
+                tone.gainDb = 0.0;
+                applyTrim (s, tone, fade);
+                s.gain *= std::pow (10.0, (levelDb + epochLoopDb (modeIndex, decay, size)) / 20.0);
+            }
+            if (p[epoch::shortTrim] >= 0.5f && modeIndex == 0) // round 190ly: Concert Hall's short-decay trim (tone only)
+                if (const auto w = std::clamp (std::log (epochShortEnd / std::max (0.01, decay)) / std::log (epochShortEnd / 0.51), 0.0, 1.0); w > 0.0)
+                    applyTrim (s, epochShort, w);
+            if (p[epoch::rateLaw] >= 0.5f && rate != 48000.0) // round 190mb: the reference's level away from 48 kHz
+            {
+               #ifdef LYNX_VERB_FIT
+                applyTrim (s, Rev1Trim {}, 0.0); // (loads the fit file's erate lines)
+               #endif
+                const auto octaves = std::log2 (rate / 48000.0);
+                s.earlyLevel *= std::pow (10.0, epochRate[colour].earlyDb * octaves / 20.0);
+                s.gain *= std::pow (10.0, epochRate[colour].levelDb * octaves / 20.0);
+            }
+        }
     }
 };
 
@@ -1787,10 +2606,23 @@ LYNX_FIT_TABLE LawVoicing atriumLaw[atrium::typeCount] = {
 
 double atriumDecaySec (float v) { return skewLaw (v, 0.1, 100.0, 5.717); }
 
+// round 190ls (atrium::reaLaw): the ValhallaRoom role on the dense late tank, after revision 1. The reference's late network
+// is 32 lines whose eight modulators move half of them (static REA); its steady 1 kHz tone (refcap030's staircase) then
+// swings by 2.0 dB (sd of 10 ms levels) where the 8-line tank's swung 1.2 dB and sat 2 dB under it on average. The dense tank,
+// its moving lines at four times revision 1's depth, meets it (2.3 dB; Late mod depth 50 %, 0.5 Hz: ±1.1 ms), and the trims
+// per type (roomTrim) take its tone back onto the reference's impulses (docs/analise/REA_rodada190ls.md)
+LYNX_FIT_TABLE double roomModScale = 4.0;
+void applyRoomLaw (const EffectParams& p, Settings& s) noexcept
+{
+    s.dense = 1;
+    s.modDepthMs *= roomModScale;
+    applyTrim (s, roomTrim[choice (p[19], atrium::typeCount)]);
+}
+
 class AtriumFx final : public VerbEffect
 {
 public:
-    AtriumFx() : VerbEffect (EffectKind::atrium, 0.25, 1.05) {}
+    AtriumFx() : VerbEffect (EffectKind::atrium, 0.25, 1.05, true) {} // (round 190ls: with the dense tank)
 
 protected:
     int structure (const EffectParams& p) const noexcept override { return choice (p[19], atrium::typeCount) + (p[atrium::engineLaw] >= 0.5f ? 1000 : 0); }
@@ -1849,6 +2681,14 @@ protected:
             s.outLowCut = 0.0;
         if (p[atrium::engineLaw] >= 0.5f)
             applyLaw (s, atriumLaw[choice (p[19], atrium::typeCount)]);
+        if (p[atrium::engineLaw] >= 0.5f && p[atrium::revision] >= 0.5f)
+        {
+            s.revision = 1; // round 190it
+            applyTrim (s, atriumTrim[choice (p[19], atrium::typeCount)]);
+            s.buildSplit = true;
+            if (p[atrium::reaLaw] >= 0.5f)
+                applyRoomLaw (p, s);
+        }
     }
 };
 
@@ -2040,6 +2880,28 @@ protected:
             }
             else
                 applyLaw (s, foilLaw[choice (p[11], foil::typeCount)]);
+            if (p[foil::revision] >= 0.5f)
+            {
+                s.revision = 1; // round 190it
+                applyTrim (s, foilTrim[p[14] >= 0.5f ? foil::typeCount : choice (p[11], foil::typeCount)]);
+                // round 190ln (reaLaw, the ValhallaPlate role): the reference's own laws, read by static REA
+                // (docs/analise/REA_rodada190ln.md). Its Low / High EQ are first-order shelves with the corner at the
+                // panel's frequency (20 … 2000 / 200 … 20000 Hz) and ±12 dB (the gain linear in dB); ours were second-order
+                // shelves placed by ear (half-gain near 0.47 / 0.5 × the frequency, the cut of the high one −9 dB). Its
+                // bass decay is longer than Decay from ~2.5 s on (foil::reaBassRtMult); the voicings above were fitted at
+                // the default Decay (3 s), so the bass decay moves by the law's ratio to that point (its loop's bass
+                // crossover, a one-pole at 200 Hz, was tried for ours at 250 Hz: one file a step lower, none higher)
+                if (p[foil::reaLaw] >= 0.5f && p[14] < 0.5f)
+                {
+                    s.shelfOrder = 1;
+                    s.lowShelfHz = 20.0 + 1980.0 * p[7];
+                    s.lowShelfDb = -12.0 + 24.0 * p[8];
+                    s.highShelfHz = 200.0 + 19800.0 * p[9];
+                    s.highShelfDb = -12.0 + 24.0 * p[10];
+                    if (! infinite)
+                        s.lowMult *= foil::reaBassRtMult (rt) / foil::reaBassRtMult (3.0);
+                }
+            }
         }
     }
 };
@@ -2121,6 +2983,10 @@ public:
         const auto want = p[nebulaLaw] >= 0.5f ? nebulaTopology (choice (p[12], nebula::modeCount)) : cloud::Topology::none;
         if (! placed)
             placed = true, active = want, before = p;
+        // round 190ie (issue #185): a synced delay whose tempo moved (and nothing else of its time): the lines' change
+        // spreads over the block (cloud::Controls::spread, Settings::lengthSpread) instead of the fixed glide's burst
+        tempoGlide = choice (p[1], 4) > 0 && lastBpm > 0.0 && bpm != lastBpm && p[1] == before[1] && p[2] == before[2] && p[3] == before[3];
+        lastBpm = bpm;
         if (want != active && change == Fade::none)
         {
             change = Fade::out;
@@ -2158,7 +3024,11 @@ public:
                 wet = 1.0f;
             }
             else
-                network.process (inL.data(), inR.data(), l, r, m, controls (q, bpm, active));
+            {
+                auto c = controls (q, bpm, active);
+                c.spread = tempoGlide && change == Fade::none ? m : 0;
+                network.process (inL.data(), inR.data(), l, r, m, c);
+            }
             for (int i = 0; i < m; ++i)
             {
                 auto w = wet;
@@ -2209,6 +3079,8 @@ private:
     }
 
     float lastClear = -1.0f;
+    double lastBpm = 0.0;
+    bool tempoGlide = false; // (this block: the synced delay's tempo moved)
     cloud::Network network;
     cloud::Topology active = cloud::Topology::none;
     Fade change = Fade::none;
@@ -2233,6 +3105,7 @@ protected:
         s.shape = 3;
         s.lineScale = delay * mult;
         s.lineSpread = sw;
+        s.lengthSpread = tempoGlide ? 1 : 0; // (round 190ie: VerbEffect::run spreads it over each chunk)
         // √F per pass of the delay: RT = 6·D / −log10 F, times the shape's measured decay multiple (which already holds
         // its line-length multiple); warp shortens the lines and so the decay
         const auto meanSec = delay * (1.0 - 0.53 * sw) / 1000.0; // (the warp fractions average 0.47)
@@ -2270,6 +3143,12 @@ protected:
         // The level is re-measured with the full width: −0.9 dB at Density 0, −4.2 dB from Density 50 % up (the dense
         // network's sides were nearly mono before)
         s.gain *= (0.9 - 0.28 * std::min (1.0, dens / 0.5)) * std::pow (10.0, 5.0 * std::exp (-(double) p[11] / 0.1) / 20.0);
+        if (p[nebula::toneLaw] >= 0.5f) // round 190mb: the Supermassive role's per-mode tone and level (classic networks)
+        {
+            s.classicTone = 1;
+            const auto k = choice (p[12], nebula::modeCount);
+            applyTrim (s, nebulaTone[k], std::clamp ((fb - nebulaToneFrom) / (nebulaToneFull - nebulaToneFrom), 0.0, 1.0));
+        }
     }
 };
 
@@ -2307,6 +3186,25 @@ double haloShiftSemis (float v) { return -12.0 + 24.0 * v; }
 // round 190bz: law 1
 // fitted with the tail lab (round 190bz; the reference and the scores per row: docs/PARITY.md); a neutral entry is the classic voicing on the new loop
 LYNX_FIT_TABLE LawVoicing haloLaw = { { 1.108, 1.268, 1.316, 1.083, 1.164, 1.001, 1.182, 1.427 }, { 1.63, -1.12, -1.41, -0.40, -0.68, -1.46, -1.95, -0.59 }, 2.13, 0.000, 30, 0.00, 0.00, 1.00, 1.00, 0.00, 0.30, 6.00, 1.00, { 63, 159, 5000 }, { -2.29, -1.54, 0.00 }, { 2.0, 2.0, 1.4 } };
+
+// round 190it (revision 1): the RT per reverb mode against the reference's (refcap030's mode sweep, impulses: ours ran
+// ×1.13 / ×0.75 / ×1.0 / ×2.85 its RT in Mono / Small / Medium / Big stereo)
+LYNX_FIT_TABLE double haloRev1Rt[7] = { 1.0, 0.88, 1.33, 1.0, 1.0, 0.35, 1.0 };
+#ifdef LYNX_VERB_FIT
+const double* haloRtTable()
+{
+    static const bool once = []
+    {
+        if (const char* e = std::getenv ("LYNX_HALORT"))
+            std::sscanf (e, "%lf,%lf,%lf,%lf,%lf,%lf,%lf", &haloRev1Rt[0], &haloRev1Rt[1], &haloRev1Rt[2], &haloRev1Rt[3], &haloRev1Rt[4], &haloRev1Rt[5], &haloRev1Rt[6]);
+        return true;
+    }();
+    (void) once;
+    return haloRev1Rt;
+}
+#else
+const double* haloRtTable() { return haloRev1Rt; }
+#endif
 
 class HaloFx final : public VerbEffect
 {
@@ -2349,7 +3247,11 @@ protected:
             // with less diffusion the reference's tail is shorter (Diffusion 0 / 50 %: ~5.5 / 6 s against 9.8 s at 92 %)
             const auto dn = std::clamp ((double) p[3] / 0.92, 0.0, 1.0);
             s.rt60 = (1.5 + 12.5 * size) * m.rtScale * (mPlain + (mShift - mPlain) * f) * (0.55 + 0.45 * dn * dn * dn);
+            if (p[halo::engineLaw] >= 0.5f && p[halo::revision] >= 0.5f)
+                s.rt60 *= haloRtTable()[haloModeIndex (p[9])];
         }
+        // (the energy of its impulse matched before the RT did: a mode's RT moves with the energy kept, gain × 1 / √RT ratio)
+        const auto rtKeep = p[halo::engineLaw] >= 0.5f && p[halo::revision] >= 0.5f ? 1.0 / std::sqrt (haloRtTable()[haloModeIndex (p[9])]) : 1.0;
         // round tp172d: its first 0.3 s are 5–9 dB under ours at 0.45; with less diffusion they are empty (Diffusion 50 %:
         // −55 dB, 0 %: silent until the first arrival at 1.2 s)
         s.earlyLevel = 0.3 * std::pow (std::clamp ((double) p[3] / 0.92, 0.0, 1.0), 8.0);
@@ -2363,7 +3265,19 @@ protected:
         s.outHighOrder = 1;
         if (shiftMode == 2 || shiftMode == 3 || m.bright > 0.0)
             s.highShelfDb = 4.0, s.highShelfHz = 3000.0;
-        s.loopBandwidth = dark ? 5000.0 : 0.0;
+        // round 190it (revision 1): the reference's Dark colour is a tone on the output, not in the loop: against
+        // Bright its tail keeps the RT at every octave (8.4 / 7.8 s at 4 / 8 kHz against 8.8 / 8.7) and its spectrum
+        // falls −3 / −6.6 / −11.7 dB at 4 / 8 / 16 kHz and −4.7 … −7.9 dB below 50 Hz, the mids −0.5 dB (refcap030's
+        // colour sweep); the loop low-pass took the highs' RT down to 2.2 s and 2 dB of the level
+        const auto rev1 = p[halo::engineLaw] >= 0.5f && p[halo::revision] >= 0.5f;
+        s.loopBandwidth = dark && ! rev1 ? 5000.0 : 0.0;
+        if (dark && rev1)
+        {
+            s.toneHighHz = 6500.0;
+            s.toneHighDb = -13.0;
+            s.toneLowHz = 70.0;
+            s.toneLowDb = -6.0;
+        }
         s.modRateHz = 0.05 + 4.95 * p[7];
         s.modDepthMs = 1.2 * p[8] / std::sqrt (std::max (0.3, s.modRateHz));
         // round tp172d: the wet level measured on music and drums (refs/halo): −3 dB up to Feedback 75 %, rising to +1 dB
@@ -2372,8 +3286,12 @@ protected:
         {
             const auto fb = (double) p[2];
             const auto dn = std::clamp ((double) p[3] / 0.92, 0.0, 1.0); // less diffusion: louder (+4.5 / +5.4 dB measured at 0 / 50 %)
-            const auto trimDb = (fb <= 0.75 ? -3.0 : -3.0 + 16.0 * (fb - 0.75)) + 5.0 * (1.0 - dn * dn * dn);
-            s.gain = (dark ? 0.75 : 0.95) * std::pow (10.0, trimDb / 20.0);
+            // round 190it (revision 1, refcap030: Feedback × Diffusion pairs, music and impulse): half that lift (at 20 /
+            // 50 % diffusion ours ran 2.5 dB over its level at 80 %, where the reference's does not), and 0.5 dB less overall
+            // (its music and test signal sat 2.6 dB under ours at the capture's base setting, the impulse 0.1 dB: −1 dB
+            // scored higher on refcap030 but cost tp172d's impulses, −0.5 dB is the cut no bank loses a block to)
+            const auto trimDb = (fb <= 0.75 ? -3.0 : -3.0 + 16.0 * (fb - 0.75)) + (rev1 ? 2.5 : 5.0) * (1.0 - dn * dn * dn) - (rev1 ? 0.5 : 0.0);
+            s.gain = (dark ? (rev1 ? 0.95 * 0.94 : 0.75) : 0.95) * std::pow (10.0, trimDb / 20.0) * rtKeep;
         }
         s.shimmerEnergy = 0.2; // the shifted voice's share added per pass (× the shimmer amount)
         if (m.stereo == 2)
@@ -2389,6 +3307,12 @@ protected:
         }
         if (p[halo::engineLaw] >= 0.5f)
             applyLaw (s, haloLaw);
+        if (p[halo::engineLaw] >= 0.5f && p[halo::revision] >= 0.5f)
+        {
+            s.revision = 1; // round 190it
+            applyTrim (s, haloTrim[haloModeIndex (p[9])]);
+            s.buildSplit = true;
+        }
     }
 
     // the reference's Mono mode sums the input (mono in, a stereo tail)
@@ -2469,6 +3393,7 @@ public:
         for (auto& sh : shifters)
             sh.clear();
         tone[0].z = tone[1].z = 0.0f;
+        tone2[0].z = tone2[1].z = 0.0f;
         lowCutState[0].z = lowCutState[1].z = 0.0f;
         compEnv = 0.0f;
         compGain = 1.0f;
@@ -2476,6 +3401,8 @@ public:
         wow = 0.0;
         crush[0] = crush[1] = 0.0f;
         crushPhase = 0.0;
+        for (auto& c : codeState)
+            c.clear();
     }
 
 protected:
@@ -2558,6 +3485,27 @@ protected:
         s.gain *= std::min (1.0, 0.56 + 0.88 * size) * std::pow (10.0, 2.2 * std::min (1.0, 2.0 * (1.0 - (double) p[15])) / 20.0);
         if (p[horizon::engineLaw] >= 0.5f)
             applyLaw (s, horizonLaw[mode]);
+        if (p[horizon::engineLaw] >= 0.5f && p[horizon::revision] >= 0.5f) // round 190mb: the reference's tone and level per mode
+            applyTrim (s, horizonTrim[mode]);
+        if (p[horizon::engineLaw] >= 0.5f && p[horizon::revision] >= 0.5f && p[horizon::reaLaw] >= 0.5f && mode <= 1)
+        {
+            // round 190mj: Room / Chamber's law over Size (horizonRoomLaw)
+           #ifdef LYNX_VERB_FIT
+            static const bool loaded = loadTrims();
+            (void) loaded;
+           #endif
+            const auto at = std::clamp (size, 0.0, 1.0) * 4.0;
+            const auto k0 = std::min (3, (int) at);
+            const auto f = at - k0;
+            const auto& a = horizonRoomLaw[mode][k0];
+            const auto& b = horizonRoomLaw[mode][k0 + 1];
+            const auto onsetA = a.onset < 0.0 ? s.onsetLevel : a.onset, onsetB = b.onset < 0.0 ? s.onsetLevel : b.onset;
+            s.onsetLevel = onsetA + (onsetB - onsetA) * f;
+            s.lateLevel *= a.late + (b.late - a.late) * f;
+            s.gain *= std::pow (10.0, (a.gainDb + (b.gainDb - a.gainDb) * f) / 20.0);
+            s.rt60 *= a.rt + (b.rt - a.rt) * f;
+            s.earlyLevel *= a.early + (b.early - a.early) * f;
+        }
     }
 
     // round 183b: the echo section as the reference's manual has it. Echo → Reverb: the echo's output (not the dry
@@ -2576,7 +3524,14 @@ protected:
         const auto spread = (double) p[6];
         const auto mode = choice (p[21], horizon::echoModeCount);
         const auto granular = mode >= 4 && mode <= 10;
-        const auto drive = granular ? 1.0 : std::pow (10.0, 24.0 * p[7] / 20.0);
+        // round 190mj (reaLaw): the reference's voicing per echo mode (level, low-pass, drive) and its Digital mode's coder
+        const auto rea = p[horizon::engineLaw] >= 0.5f && p[horizon::revision] >= 0.5f && p[horizon::reaLaw] >= 0.5f;
+       #ifdef LYNX_VERB_FIT
+        static const bool loaded = loadTrims();
+        (void) loaded;
+       #endif
+        const HorizonEcho voicing = rea ? horizonEcho[mode] : HorizonEcho {};
+        const auto drive = granular ? 1.0 : std::pow (10.0, 24.0 * p[7] * voicing.driveMult / 20.0);
         const auto detune = granular ? (-30.0 + 60.0 * p[8]) / 100.0 : 0.0; // semitones
         double ratio = 1.0, ratio2 = 1.0;
         bool shift = false, dual = false;
@@ -2600,11 +3555,36 @@ protected:
             shift = true;
             ratio = std::pow (2.0, detune / 12.0);
         }
+        if (voicing.cutHz > 0.0)
+            cut = voicing.cutHz;
         tone[0].setLowpass (cut, rate);
         tone[1].a = tone[0].a;
+        const auto twoPole = voicing.poles >= 2;
+        const auto fourHeads = rea && granular && horizonHeads4[mode];
+        tone2[0].a = tone2[1].a = tone[0].a;
         const auto lowCut = skewLaw (p[19], 20.0, 1000.0, 1.807);
         lowCutState[0].setLowpass (lowCut, rate);
         lowCutState[1].a = lowCutState[0].a;
+        // (the voicing's level is the heard echo's — Level's share beside the reverb —, not what the loop or the reverb gets:
+        // the reverb's own level law was measured with the echo as it was)
+        const auto heard = rea ? level * (float) std::pow (10.0, voicing.gainDb / 20.0) : level;
+        const auto coder = rea && mode == 2;
+        if (coder)
+        {
+            const auto& k = horizonCoder;
+            for (int c = 0; c < 2; ++c)
+            {
+                codeState[c].pre.setLowpass (k.preHz, rate);
+                codeState[c].pre2.a = codeState[c].pre.a;
+                codeState[c].post.setLowpass (k.postHz, rate);
+            }
+            codeGain = (float) std::pow (10.0, k.gainDb / 20.0);
+            const auto toRate = 48000.0 / rate; // (the steps are per sample at 48 kHz: the same slew per second at any rate)
+            codeMin = (float) (k.stepMin * toRate);
+            codeMax = (float) (k.stepMax * toRate);
+            codeTau = (float) (1.0 - std::exp (-1.0 / (std::max (0.01, k.tauMs) * 0.001 * rate)));
+            codeLeak = (float) std::pow (k.leak, toRate);
+        }
         const auto spreadL = delay * (1.0 - 0.25 * spread), spreadR = delay * (1.0 + 0.25 * spread);
         const auto wowInc = 2.0 * pi * 0.7 / rate;
         const auto hold = mode == 11 ? std::max (1.0, rate / 11025.0) : 1.0;
@@ -2621,12 +3601,17 @@ protected:
                 auto v = y[c];
                 if (shift)
                 {
-                    auto a = shifters[c].process (v, ratio);
+                    auto a = fourHeads ? shifters[c].process4 (v, ratio) : shifters[c].process (v, ratio);
                     if (dual)
-                        a = 0.5f * (a + shifters[c + 2].process (v, ratio2));
+                        a = 0.5f * (a + (fourHeads ? shifters[c + 2].process4 (v, ratio2) : shifters[c + 2].process (v, ratio2)));
                     v = a;
                 }
-                v = tone[c].lp (v);
+                if (coder)
+                    v = codeState[c].run (v, codeMin, codeMax, codeTau, codeLeak) * codeGain;
+                else
+                    v = tone[c].lp (v);
+                if (twoPole)
+                    v = tone2[c].lp (v);
                 if (drive > 1.0001)
                     v = (float) (std::tanh (drive * v) / drive);
                 if (mode == 11)
@@ -2648,15 +3633,15 @@ protected:
             }
             if (beforeReverb)
             {
-                echoOut[0][(std::size_t) i] = level * y[0];
-                echoOut[1][(std::size_t) i] = level * y[1];
+                echoOut[0][(std::size_t) i] = heard * y[0];
+                echoOut[1][(std::size_t) i] = heard * y[1];
                 l[i] = y[0];
                 r[i] = y[1];
             }
             else
             {
-                l[i] = x[0] + level * y[0];
-                r[i] = x[1] + level * y[1];
+                l[i] = x[0] + heard * y[0];
+                r[i] = x[1] + heard * y[1];
             }
         }
     }
@@ -2693,6 +3678,30 @@ protected:
             }
     }
 
+    // round 190mj: the Digital echo's slope-limited coder (LYNX's own law, see horizonCoder): the output slews towards the
+    // (pre-filtered) input by at most a step per sample; the step grows towards stepMax (syllabic, over tauMs) while the
+    // slew stays at its limit for three samples or more, and falls back to stepMin when it does not
+    struct Coder
+    {
+        OnePole pre, pre2, post;
+        float y = 0.0f, syl = 0.0f;
+        int run1 = 0;
+        float run (float x, float stepMin, float stepMax, float tau, float leak) noexcept
+        {
+            const auto in = pre2.lp (pre.lp (x));
+            const auto step = stepMin + (stepMax - stepMin) * syl;
+            const auto e = in - y;
+            const auto limited = std::abs (e) > step;
+            y = leak * (y + std::clamp (e, -step, step));
+            run1 = limited ? run1 + 1 : 0;
+            syl += tau * ((run1 >= 3 ? 1.0f : 0.0f) - syl);
+            return post.lp (y);
+        }
+        void clear() noexcept { pre.z = pre2.z = post.z = y = syl = 0.0f; run1 = 0; }
+    };
+    Coder codeState[2];
+    OnePole tone2[2]; // round 190mj: the echo low-pass's second section (reaLaw voicings with two poles)
+    float codeGain = 1.0f, codeMin = 0.0f, codeMax = 0.0f, codeTau = 0.0f, codeLeak = 1.0f;
     Line echo[2];
     Shifter shifters[4];
     OnePole tone[2], lowCutState[2];
@@ -2717,6 +3726,10 @@ float atrium::decayValue (double s) noexcept { return (float) skewInverse (s, 0.
 double foil::lowCutHz (float v) noexcept { return v <= 0.0f ? 0.0 : 20.0 * std::pow (50.0, (double) std::min (v, 1.0f)); }
 const char* foil::typeName (int i) noexcept { return foilTypes[std::clamp (i, 0, foil::typeCount - 1)].name; }
 double foil::decaySec (float v) noexcept { return foilDecaySec (v); }
+// round 190ln (static REA of ValhallaPlate, docs/analise/REA_rodada190ln.md): its tank runs two sets of lines, one at Decay
+// and one at a longer bass decay that equals Decay up to ~2.5 s and grows to 1.4 × Decay by ~10 s (and stays there). Our
+// own law of that shape: a linear rise of the multiple between the two points
+double foil::reaBassRtMult (double decay) noexcept { return 1.0 + 0.4 * std::clamp ((decay - 2.5) / 7.5, 0.0, 1.0); }
 const char* nebula::modeName (int i) noexcept { return nebulaModes[std::clamp (i, 0, nebula::modeCount - 1)].name; }
 double nebula::delayMs (float v) noexcept { return nebulaDelayMs (v); }
 bool nebula::cloudMode (int mode) noexcept { return nebulaTopology (mode) != cloud::Topology::none; }

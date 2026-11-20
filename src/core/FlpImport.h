@@ -32,7 +32,11 @@ struct FlpImportReport
 {
     std::map<std::string, int> converted;    // generators truly converted (3x Osc, FPC, DirectWave...)
     std::map<std::string, int> approximated; // approximated by the internal synth (MiniSynth, DX10...)
-    std::map<std::string, int> unsupported;  // no equivalent: play with a synth preset chosen by name
+    std::map<std::string, int> unsupported;  // instruments/generators with no equivalent: play with a synth preset chosen by name
+    // Round qafix190kq: everything else the import does not reproduce exactly (automation, clip and region data, grooves,
+    // scenes, MIDI / note effects, project info, a channel left silent...): left out or played differently. Before this
+    // round these lines were in `unsupported`, under the report's "played with a synth preset" heading.
+    std::map<std::string, int> notReproduced;
     std::map<std::string, int> droppedEffects; // effects with no equivalent (removed from the mixer)
     std::map<std::string, int> partialEffects; // effects kept but approximated or partly reproduced (still in the mixer)
     int missingSamples = 0;

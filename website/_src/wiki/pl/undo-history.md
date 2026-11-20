@@ -1,5 +1,5 @@
 ---
-source: 9f36c60cc7
+source: 2298a70fec
 ---
 ![Okno Historia cofania: sześć kroków od Start do Add notes, z Mute: Kick jako bieżącym](/assets/img/wiki/history.webp)
 
@@ -15,18 +15,17 @@ Każda zmiana w projekcie to krok w historii cofania: dodana nuta, przesunięty 
 
 ## Klawisze cofania
 
-`Ctrl+Z` nie działa tak jak w większości programów. Cofa ostatni krok, a naciśnięty ponownie go ponawia, więc przełącza między dwoma ostatnimi stanami. Żeby cofać dalej, użyj `Ctrl+Alt+Z`.
+`Ctrl+Z` cofa się po historii, o jeden krok na naciśnięcie, jak w FL Studio 2026 i większości programów. `Ctrl+Y` lub `Ctrl+Shift+Z` idzie z powrotem do przodu.
 
 | Polecenie | Klawisz | Co robi |
 |---|---|---|
-| `Cofnij` | `Ctrl+Z` | Cofa ostatni krok. Po cofnięciu ponawia następny krok, a pozycja menu brzmi `Cofnij (ponów)` |
-| `Cofnij wstecz` | `Ctrl+Alt+Z` | Zawsze cofa, o jeden krok na naciśnięcie |
+| `Cofnij` | `Ctrl+Z` | Cofa o jeden krok na naciśnięcie |
 | `Ponów` | `Ctrl+Y` lub `Ctrl+Shift+Z` | Idzie do przodu |
 | `Historia cofania...` | `Ctrl+Alt+H` | Otwiera listę |
 
-Po każdym cofnięciu lub ponowieniu pasek podpowiedzi nazywa krok i pokazuje poziom, na przykład `Level 2/3`.
+Menu `Edycja` nazywa krok, na którym działa każda pozycja, na przykład `Undo Add notes: Pattern 1`. Po każdym cofnięciu lub ponowieniu pasek podpowiedzi nazywa krok i pokazuje poziom, na przykład `Level 2/3`.
 
-Jeśli wolisz zwykłe zachowanie, włącz `Alternatywny tryb cofania (klasyczne cofanie zamiast cofnij/ponów pod tym samym skrótem)` w `Opcje › Ustawienia ogólne...`. `Ctrl+Z` zawsze cofa wtedy o krok.
+Jest też drugi tryb cofania z FL Studio: wyłącz `Alternatywny tryb cofania` w `Opcje › Ustawienia ogólne...`. `Ctrl+Z` cofa wtedy ostatni krok, a naciśnięty ponownie go ponawia, więc przełącza między dwoma ostatnimi stanami. `Ctrl+Alt+Z` (`Cofnij wstecz`) cofa dalej, a `Ctrl+Y` lub `Ctrl+Shift+Z` nadal ponawiają.
 
 ## Co jest krokiem, a co nie
 
@@ -43,7 +42,7 @@ Oba są w `Opcje › Ustawienia ogólne...`.
 | Ustawienie | Co robi |
 |---|---|
 | `Maksymalna liczba kroków cofania` | Ile kroków jest trzymanych: 25, 50, 100, 200, 500 lub 1000. Domyślnie 100 |
-| `Alternatywny tryb cofania` | Robi z `Ctrl+Z` klasyczne cofanie |
+| `Alternatywny tryb cofania` | Domyślnie włączony: `Ctrl+Z` cofa się po historii. Wyłączony: `Ctrl+Z` przełącza między cofnięciem a ponowieniem ostatniego kroku |
 
 ## Kopie zapasowe
 

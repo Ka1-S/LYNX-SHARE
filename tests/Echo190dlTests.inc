@@ -130,6 +130,7 @@ TEST (echo190dl_classic_law_renders_as_the_base_commit_did)
     {
         auto slot = makeEffectSlot (EffectKind::echoform);
         slot.params[e::engineLaw] = 0.0f;
+        slot.params[(std::size_t) e::revision] = 0.0f; // round 190is: a project saved before also keeps the voicings' revision 0
         for (int k = 0; k < 3; ++k)
             if (c.idx[k] >= 0)
                 slot.params[(std::size_t) c.idx[k]] = c.val[k];
@@ -284,9 +285,10 @@ TEST (echo190dl_hdelay_modulation_translates_to_the_clock_law)
         return;
     int n = 0;
     const auto s = makeSubstituteSlot (*entry, &id, &n);
-    CHECK (n > 0 && s.params[e::modClock] == 1.0f && e::modShapeOf (s.params[e::modShape]) == 1);
-    CHECK (std::abs (e::modRateHz (s.params[e::modRate]) - 0.2) < 0.005);
-    CHECK (std::abs (s.params[e::modDepth] - 0.466f) < 1e-3f && s.params[e::lofi] == 1.0f);
+    // round 190lf: the measured H-Delay loop (the hybrid engine's law 1) carries the modulation now, not the clock law
+    CHECK (n > 0 && s.params[e::hybridLaw] == 1.0f && s.params[e::modClock] == 0.0f);
+    CHECK (std::abs (s.params[e::hybridRate] * 20.0f - 0.2f) < 1e-5f);
+    CHECK (std::abs (s.params[e::hybridDepth] - 0.5f) < 1e-6f && s.params[e::lofi] == 1.0f);
     // no modulation in the state: the clock law stays off
     id.state = substtest::wavesComponent ("H-Delay", "* 0 120 375 11 * 100 60 0 0 0 * * * 0 20100 * 19 * 0 0.1 1 * 2");
     const auto t = makeSubstituteSlot (*findPluginSubstitute (id, false), &id, &n);

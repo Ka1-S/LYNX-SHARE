@@ -82,6 +82,7 @@ enum class Target
     leftEdge,    // left edge of a note / clip
     rightEdge,   // right edge of a note / clip
     fadeHandle,  // Playlist: fade handle of an audio clip
+    fadeTension, // Playlist: the tension handle (circle) on an audio clip's fade (FL 2026, round 190jz)
     gainHandle,  // Playlist: an audio clip's gain handle (bottom centre, FL 2026; round 166e)
     autoPoint,   // Playlist: a point of an inline automation curve
     autoCurve,   // Playlist: on an automation curve (a click adds a point)
@@ -119,6 +120,7 @@ enum class Action
     zoomRange,
     listen,
     fade,         // drags an audio fade
+    fadeTension,  // drags an audio fade's tension up / down (round 190jz)
     clipGain,     // drags an audio clip's gain up / down
     movePoint,    // drags an automation point
     addPoint,     // adds an automation point on the curve
@@ -168,6 +170,8 @@ inline Action leftAction (EditTool tool, Target target, Mods mods, bool playlist
             return Action::addPoint;
         if (target == Target::fadeHandle)
             return Action::fade;
+        if (target == Target::fadeTension)
+            return Action::fadeTension;
         if (target == Target::gainHandle)
             return Action::clipGain;
         if (mods.alt && mods.shift && target == Target::item)
@@ -181,6 +185,7 @@ inline Action leftAction (EditTool tool, Target target, Mods mods, bool playlist
         case Target::autoCurve:
         case Target::autoTension:
         case Target::fadeHandle:
+        case Target::fadeTension:
         case Target::gainHandle: return mods.shift ? Action::copyMove : Action::move;
         case Target::rightEdge: return Action::resizeRight;
         case Target::leftEdge: return Action::resizeLeft;
@@ -224,7 +229,8 @@ inline Cursor cursorFor (Action action, EditTool tool)
         case Action::resizeRight:
         case Action::resizeLeft:
         case Action::fade: return Cursor::resizeH;
-        case Action::clipGain: return Cursor::resizeV;
+        case Action::clipGain:
+        case Action::fadeTension: return Cursor::resizeV;
         case Action::slipContent: return Cursor::slip;
         case Action::toggleSelect:
         case Action::boxSelect: return Cursor::select;
@@ -421,6 +427,23 @@ inline float keyClickVelocity (double along, double length)
     if (length <= 0.0)
         return 0.8f;
     return (float) std::clamp ((along + 1.0) / length, 1.0 / 127.0, 1.0);
+}
+
+// Issue #183: whether the Piano roll sounds a note the mouse places, drags, resizes or edits. While the song or pattern
+// plays it doesn't (FL leaves the notes you draw to the playback; the Channel rack's step clicks are silent either way),
+// unless the Piano roll's "Preview notes while playing" is on (LYNX's, off by default). Clicks on the Piano roll's own
+// keyboard always sound: they play the instrument, they don't edit a note.
+constexpr bool previewsEditedNote (bool playing, bool previewWhilePlaying) noexcept
+{
+    return ! playing || previewWhilePlaying;
+}
+
+// Round 190jd (FL 2026, live check 190iw Q1): pressing the mouse on an existing note sounds it only for a grab of a note
+// that was not selected (a move); a press on a note edge (resize, left or right) and a grab of an already-selected note
+// are silent. Placing a new note and the key changes of a drag still sound (previewsEditedNote decides the transport part).
+constexpr bool previewsGrabbedNote (bool resizeEdge, bool wasSelected) noexcept
+{
+    return ! resizeEdge && ! wasSelected;
 }
 
 // Alt+wheel over a note: the property moves by 4/127 per notch (Ctrl+Alt: 1/127), clamped to 0..1.

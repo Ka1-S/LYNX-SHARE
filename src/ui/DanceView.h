@@ -70,6 +70,8 @@ public:
 
     void paint (juce::Graphics& g) override;
     bool hitTest (int x, int y) override;
+    // round 190jx: "lynxOverlayIgnores" on the stage while it draws no dancer itself (ui/MotionOverlay covers nothing then)
+    void markOverlayCover();
     void mouseDown (const juce::MouseEvent& e) override;
     void mouseDrag (const juce::MouseEvent& e) override;
     void mouseUp (const juce::MouseEvent& e) override;

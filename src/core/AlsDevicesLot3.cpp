@@ -247,6 +247,7 @@ bool drumBussToRack (const Element& device, Translated& out)
     {
         comp = makeEffectSlot (EffectKind::crestCompressor);
         auto& k = comp.params;
+        k[cr::revision] = 0.0f; // round 190kw: this map was measured on the fitted laws (revision 0)
         k[cr::style] = cr::styleValue (cr::Style::clean);
         k[cr::voicing] = 0.0f;
         k[cr::threshold] = linValue (drumbuss::compThresholdDb, -60.0, 0.0);
@@ -675,13 +676,7 @@ void autoFilterModulation (const Element& device, const Context& context, Transl
     out.modulator = std::move (mod);
 }
 
-// ================================================================================================ Operator, Drift
-
-double operatorRatioSemitones (int coarse, double fine) noexcept
-{
-    const auto c = coarse <= 0 ? 0.5 : (double) std::min (coarse, 48);
-    return 12.0 * std::log2 (c * (1.0 + std::clamp (fine, 0.0, 1000.0) / 1000.0));
-}
+// ================================================================================================ Drift (Operator: core/AlsDevicesFm.cpp)
 
 void setOscillatorPitch (SynthOscillator& osc, double semitones) noexcept
 {
@@ -701,140 +696,7 @@ void setLevel (ChannelDef& channel, double gain)
     channel.volume = g <= 0.0 ? 0.0f : (float) (std::log (10.0 * g + 1.0) / std::log (11.0));
 }
 
-// Operator's envelope [DATA: ms and linear levels] as ADSR seconds; anything beyond a plain ADSR goes to the notes
-void operatorEnvelope (const Element& env, SynthSettings& s, Notes& notes)
-{
-    s.attack = (float) (manual (env, "AttackTime", 0.1) / 1000.0);
-    s.decay = (float) (manual (env, "DecayTime", 600.0) / 1000.0);
-    s.sustain = (float) std::clamp (manual (env, "SustainLevel", 1.0), 0.0, 1.0);
-    s.release = (float) (manual (env, "ReleaseTime", 50.0) / 1000.0);
-    if (! isFloor (manual (env, "AttackLevel", 0.0)) || manual (env, "DecayLevel", 1.0) < 0.999 || ! isFloor (manual (env, "ReleaseLevel", 0.0)))
-        notes.approximated.push_back ("envelope start / peak / end levels (the synth's envelope runs 0 → 1 → sustain → 0)");
-    if (std::abs (manual (env, "AttackSlope", 0.0)) > 1.0e-3 || std::abs (manual (env, "DecaySlope", 1.0) - 1.0) > 1.0e-3 || std::abs (manual (env, "ReleaseSlope", 1.0) - 1.0) > 1.0e-3)
-        notes.approximated.push_back ("envelope slopes (straight segments)");
-    if ((int) manual (env, "LoopMode", 0) != 0)
-        notes.dropped.push_back ("envelope loop mode");
-}
 } // namespace
-
-bool operatorToSynth (const Element& device, ChannelDef& channel, double bpm, Notes& notes)
-{
-    if (! device.path ("Operator.0/Envelope") || ! device.path ("Globals/Algorithm"))
-        return false;
-    const auto algorithm = (int) manual (device, "Globals/Algorithm", 0);
-    // which operators sound: on, above Live's floor
-    std::array<bool, 4> sounding {};
-    for (int k = 0; k < 4; ++k)
-    {
-        const auto stem = "Operator." + std::to_string (k) + "/";
-        sounding[(std::size_t) k] = manualBool (device, stem + "IsOn", true) && ! isFloor (manual (device, stem + "Volume", 1.0));
-    }
-    // A is a carrier in every algorithm [DOC]; with B … D silent it is a plain oscillator. Algorithm 10 = four carriers,
-    // no modulation [DOC: the last algorithm, all side by side]. Any other case is FM: not translated.
-    std::vector<int> carriers;
-    if (! sounding[1] && ! sounding[2] && ! sounding[3])
-        carriers = { 0 };
-    else if (algorithm == 10)
-        for (int k = 0; k < 4; ++k)
-            if (sounding[(std::size_t) k])
-                carriers.push_back (k);
-    if (carriers.empty() || ! sounding[(std::size_t) carriers.front()])
-        return false;
-    // waveforms: 0 = sine, 21 = white noise, 22 = User (its 64 harmonics) [DATA: 0, 15, 20, 21, 22 seen; 21 is operator A
-    // of the shipped "White Noise" preset, alone; the User wave holds the harmonic table; the others' order is not
-    // settled: not translated]
-    for (const auto k : carriers)
-    {
-        const auto wave = (int) manual (device, "Operator." + std::to_string (k) + "/WaveForm", 0);
-        if (wave != 0 && wave != 21 && wave != 22)
-            return false;
-        if (manual (device, "Operator." + std::to_string (k) + "/Feedback", 0.0) > 0.5 && carriers.size() > 1)
-            return false;
-    }
-
-    channel.instrument = InstrumentKind::synth;
-    auto& s = channel.synth;
-    s = SynthSettings {};
-    for (auto& o : s.osc)
-        o.level = 0.0f;
-    bool userUsed = false, differentEnvelopes = false;
-    for (std::size_t i = 0; i < carriers.size() && i < 3; ++i)
-    {
-        const auto k = carriers[i];
-        const auto stem = "Operator." + std::to_string (k) + "/";
-        auto& o = s.osc[i];
-        const auto wave = (int) manual (device, stem + "WaveForm", 0);
-        if (wave == 22)
-        {
-            if (userUsed)
-                return false; // one harmonic table per synth
-            userUsed = true;
-            o.wave = Waveform::spectral;
-            for (int h = 0; h < 64 && h < SynthSettings::spectrumSize; ++h)
-                s.spectrum[(std::size_t) h] = (float) std::clamp (device.number (stem + "UserHarmonics/Harmonics." + std::to_string (h), h == 0 ? 1.0 : 0.0), 0.0, 1.0);
-        }
-        else
-            o.wave = wave == 21 ? Waveform::noise : Waveform::sine;
-        setOscillatorPitch (o, operatorRatioSemitones ((int) manual (device, stem + "Tune/Coarse", 1), manual (device, stem + "Tune/Fine", 0.0))
-                                   + manual (device, "Globals/Transpose", 0.0));
-        o.level = (float) std::clamp (manual (device, stem + "Volume", 1.0), 0.0, 1.0);
-        if (manualBool (device, stem + "Tune/FixedFrequencyOn", false))
-            notes.dropped.push_back ("fixed-frequency operator (it follows the note here)");
-        if (i == 0)
-            operatorEnvelope (device.path (stem + "Envelope"), s, notes);
-        else
-            differentEnvelopes = differentEnvelopes || std::abs (manual (device, stem + "Envelope/DecayTime", 0.0) - s.decay * 1000.0) > 1.0
-                                 || std::abs (manual (device, stem + "Envelope/AttackTime", 0.0) - s.attack * 1000.0) > 1.0;
-        if (manual (device, stem + "Feedback", 0.0) > 0.5)
-            notes.dropped.push_back ("operator feedback");
-    }
-    if (carriers.size() > 3)
-        notes.dropped.push_back ("the fourth carrier (the synth has three oscillators)");
-    if (differentEnvelopes)
-        notes.approximated.push_back ("one envelope for every oscillator (operator A's)");
-    // the filter [DATA: Filter/OnOff, Type 0 … 4 (low, high, band pass, notch, morph: the Auto Filter's list ASSUMED),
-    // Frequency Hz, Resonance 0 … 1.25, Slope (24 dB/oct: the synth's 4-pole ladder ASSUMED), FrequencyKeyScale %]
-    if (manualBool (device, "Filter/OnOff", false))
-    {
-        static constexpr int types[5] { 0, 2, 1, 3, 0 };
-        s.filterType = types[std::clamp ((int) manual (device, "Filter/Type", 0), 0, 4)];
-        s.cutoff = (float) std::clamp (manual (device, "Filter/Frequency", 20000.0), 20.0, 20000.0);
-        s.resonance = (float) std::clamp (manual (device, "Filter/Resonance", 0.0) / 1.25, 0.0, 1.0);
-        s.ladder = manualBool (device, "Filter/Slope", false) && s.filterType == 0;
-        s.keyTrack = (float) std::clamp (manual (device, "Filter/FrequencyKeyScale", 0.0) / 100.0, 0.0, 2.0);
-        notes.approximated.push_back ("filter on the synth's filter (resonance and key tracking laws assumed)");
-        if (std::abs (manual (device, "Filter/EnvelopeAmount", 0.0)) > 0.5)
-            notes.dropped.push_back ("filter envelope");
-        if (manual (device, "Filter/Drive", 0.0) > 0.01 || (int) manual (device, "Filter/CircuitLpHp", 0) != 0)
-            notes.dropped.push_back ("filter circuit / drive");
-    }
-    else
-        s.cutoff = 20000.0f;
-    // voices: Live's polyphony index; glide [DATA: PortamentoOn, PortamentoTime ms] at the set's tempo
-    s.porta = manualBool (device, "Globals/PortamentoOn", false);
-    if (s.porta)
-        s.portaBeats = (float) (manual (device, "Globals/PortamentoTime", 50.0) / 1000.0 * bpm / 60.0);
-    setLevel (channel, manual (device, "Globals/Volume", 1.0));
-    channel.pan = (float) std::clamp (manual (device, "Globals/Panorama", 0.0), -1.0, 1.0);
-    if (manual (device, "Globals/SpreadAmount", 0.0) > 0.5)
-        notes.dropped.push_back ("spread");
-    if (std::abs (manual (device, "Globals/Tone", 0.7) - 0.7) > 0.01)
-        notes.dropped.push_back ("tone (the anti-alias filter)");
-    // the LFO and the pitch envelope reach an operator only when both its own switch and the section's are on [DATA]
-    bool lfo = false, pitchEnv = false;
-    for (const auto k : carriers)
-    {
-        const auto stem = "Operator." + std::to_string (k) + "/";
-        lfo = lfo || (manualBool (device, "Lfo/LfoOn", false) && manualBool (device, stem + "LfoOn", true));
-        pitchEnv = pitchEnv || (manualBool (device, "PitchEnv/PitchEnvOn", false) && manualBool (device, stem + "PitchEnvOn", true));
-    }
-    if (lfo)
-        notes.dropped.push_back ("LFO");
-    if (pitchEnv)
-        notes.dropped.push_back ("pitch envelope");
-    notes.approximated.push_back (std::string (carriers.size() == 1 ? "operator A alone" : "the carriers of algorithm 11") + " as the built-in synth's oscillators (level not matched to Live's)");
-    return true;
-}
 
 bool driftToSynth (const Element& device, ChannelDef& channel, double bpm, Notes& notes)
 {

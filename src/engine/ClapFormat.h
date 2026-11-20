@@ -1,5 +1,9 @@
 #pragma once
 
+#include <array>
+#include <cstdint>
+#include <vector>
+
 #include <juce_audio_processors/juce_audio_processors.h>
 
 namespace lynx
@@ -57,4 +61,51 @@ void addPluginFormats (juce::AudioPluginFormatManager& manager);
 // the notes on that channel; `bendRange` 0 = as before (raw MIDI events). False = not a CLAP plugin of ours, or one
 // that takes MIDI notes (it gets the MPE messages themselves). Call before the plugin processes.
 bool setClapNoteExpressions (juce::AudioPluginInstance& plugin, float bendRange);
+
+// --- round 190jg (BUILD-LIST 18): more CLAP extensions -----------------------------------------------------------------
+// LYNX hosts clap.thread-pool (the plugin's tasks on LYNX's worker threads), clap.tail (getTailLengthSeconds),
+// clap.render (an export renders offline), clap.voice-info, clap.state-context, clap.remote-controls, clap.preset-load
+// with the preset discovery factory (the plugin's presets are its programs in the plugin window's preset bar), and
+// sample-accurate parameter changes (engine/TimedParameters.h).
+
+// clap.state-context: what a state saved or loaded on this thread is for, while a scope is alive (default: the project)
+enum class ClapStateContext { preset = 1, duplicate = 2, project = 3 };
+class ScopedClapStateContext
+{
+public:
+    explicit ScopedClapStateContext (ClapStateContext context) noexcept;
+    ~ScopedClapStateContext();
+    ScopedClapStateContext (const ScopedClapStateContext&) = delete;
+    ScopedClapStateContext& operator= (const ScopedClapStateContext&) = delete;
+
+private:
+    ClapStateContext previous;
+};
+std::uint32_t clapStateContext() noexcept; // the CLAP context type now (CLAP_STATE_CONTEXT_FOR_...)
+
+// clap.remote-controls: the plugin's pages of 8 knobs, each the index of a parameter in getParameters() (-1: none)
+struct ClapRemotePage
+{
+    juce::String section, name;
+    std::array<int, 8> params {};
+    bool forPreset = false;
+};
+std::vector<ClapRemotePage> clapRemoteControls (juce::AudioPluginInstance& plugin); // message thread; {} for other plugins
+
+// clap.voice-info (message thread)
+struct ClapVoiceInfo
+{
+    bool valid = false;
+    int count = 0, capacity = 0;
+    bool overlappingNotes = false;
+};
+ClapVoiceInfo clapVoiceInfo (juce::AudioPluginInstance& plugin);
+
+// What a CLAP plugin offers and what LYNX made of it (--clapext): its extensions, presets found, remote pages, voice
+// info, tail; message thread
+juce::String describeClapPlugin (juce::AudioPluginInstance& plugin);
+// clap.tail: whether the plugin declares its tail (then getTailLengthSeconds is the plugin's own, used by smart disable)
+bool clapDeclaresTail (const juce::AudioPluginInstance& plugin);
+// thread-pool use since the plugin was made: requests and tasks (tests)
+std::pair<int, int> clapThreadPoolUse (juce::AudioPluginInstance& plugin);
 } // namespace lynx

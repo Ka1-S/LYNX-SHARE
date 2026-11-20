@@ -9,17 +9,22 @@ TEST (beatslaw190gx_defaults_lists_and_cache_keys)
 {
     using namespace lynx;
     const WarpModeSettings fresh;
-    CHECK (fresh.beatsLaw == WarpModeSettings::beatsLawMeasured);
-    // the .lynx list: a 190fm list had nine numbers (Classic), the tenth is the law
+    CHECK (fresh.beatsLaw == WarpModeSettings::beatsLawPitchAware); // (round 190ik's default; Measured before it)
+    // the .lynx list: a 190fm list had nine numbers (Classic), the tenth is the law (round 190ik: the eleventh the
+    // Texture / Complex Pro law)
     const std::array<double, 9> nine { 6, 2, 100, 30, 65, 25, 100, 128, 0 };
     CHECK (warpmodes::fromList (nine, nine.size()).beatsLaw == WarpModeSettings::beatsLawClassic);
-    auto ten = warpmodes::toList (fresh);
-    CHECK (ten.size() == 10 && ten[9] == 1.0 && warpmodes::fromList (ten, ten.size()) == fresh);
-    ten[9] = 0.0;
-    CHECK (warpmodes::fromList (ten, ten.size()).beatsLaw == WarpModeSettings::beatsLawClassic);
-    // the stretch caches tell the laws apart (Beats only), the Measured defaults keep the empty key
+    auto list = warpmodes::toList (fresh);
+    CHECK (list.size() == 11 && list[9] == 2.0 && list[10] == 1.0 && warpmodes::fromList (list, list.size()) == fresh);
+    list[9] = 1.0;
+    CHECK (warpmodes::fromList (list, list.size()).beatsLaw == WarpModeSettings::beatsLawMeasured);
+    list[9] = 0.0;
+    CHECK (warpmodes::fromList (list, list.size()).beatsLaw == WarpModeSettings::beatsLawClassic);
+    // the stretch caches tell the laws apart (Beats only), the Measured law keeps the empty key it had as the default
     StretchOptions measured, classic;
+    measured.modes.beatsLaw = WarpModeSettings::beatsLawMeasured;
     classic.modes.beatsLaw = WarpModeSettings::beatsLawClassic;
+    CHECK (stretchOptionsKey (StretchOptions {}, StretchMethod::beats) == "|pa");
     CHECK (stretchOptionsKey (measured, StretchMethod::beats).empty());
     CHECK (stretchOptionsKey (classic, StretchMethod::beats) == "|classic");
     CHECK (stretchOptionsKey (classic, StretchMethod::complex).empty());
@@ -44,7 +49,7 @@ TEST (beatslaw190gx_other_methods_ignore_the_law)
         CHECK (timeStretch (in, 1.25, m, 0.0, classic)->left == timeStretch (in, 1.25, m)->left);
 }
 
-TEST (beatslaw190gx_als_import_gets_the_measured_law)
+TEST (beatslaw190gx_als_import_gets_the_newest_law)
 {
     using namespace lynx;
     auto song = clipenv190gi::dcSong();
@@ -59,7 +64,7 @@ TEST (beatslaw190gx_als_import_gets_the_measured_law)
             if (c.instrument == InstrumentKind::audioClip)
             {
                 any = true;
-                CHECK (c.sampler.warpModes.beatsLaw == WarpModeSettings::beatsLawMeasured);
+                CHECK (c.sampler.warpModes.beatsLaw == WarpModeSettings::beatsLawPitchAware); // (round 190ik: the pitch-aware law)
             }
     CHECK (any);
 }

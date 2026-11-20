@@ -19,8 +19,12 @@
 // "pluck replaces blur decay" option, phaser and harmonizer masks, timbre blend modes 1–5 (5: pluck blend), the global
 // envelope scales, the harmonic-randomness module and the per-block X/Y/Z smoothing.
 //
-// Fallbacks (harmorFallbacks() lists the ones a state needs): resynthesis-mode images (a sample analysed at load time)
-// and images with a per-column gain table (+0x100) are ignored (the part plays its timbres), unknown filter/resonance/
+// Round natives190kj (REA_rodada190kj-harmor) adds resynthesis: a sample in the IMG section is analysed as FL's DLL does
+// (core/HarmorResynth.h) and played with FL's per-step phase locking; the sample comes through harmor::setSampleLoader
+// (the app finds it as FL does). ChannelDef::engineRev 0 (projects saved before) keeps the former behaviour.
+//
+// Fallbacks (harmorFallbacks() lists the ones a state needs): a resynthesis sample that cannot be found or read, and
+// images with a per-column gain table (+0x100), are ignored (the part plays its timbres), unknown filter/resonance/
 // phaser shapes and clip modes > 4 switch that stage off, blend modes > 5 play as mode 0. FL's IPP vector functions
 // run at 11-bit accuracy at precision "Average" (Exp/Expm1/Div_32f_A11); LYNX computes them exactly.
 //
@@ -52,6 +56,9 @@ std::optional<std::vector<std::uint8_t>> harmorUpgradeState (const std::vector<s
 
 // the round-34 fallbacks this state relies on (empty: everything it uses is modelled), for logs and reports
 std::vector<std::string> harmorFallbacks (const std::vector<std::uint8_t>& state);
+// true when a part of this state has a sample in its IMG section (resynthesis, played as FL's DLL since round
+// natives190kj with ChannelDef::engineRev 1; before, such a part played its timbres)
+bool harmorUsesResynthesis (const std::vector<std::uint8_t>& state);
 
 // Byte offset of a raw integer parameter inside the state (part 0/1: part parameter 0…385; part −1: global 0…52, then
 // 53…58 = the effects rack's unit order),
@@ -92,7 +99,7 @@ struct RefNote
 // empty if the state is unusable.
 std::vector<float> renderReference (const std::vector<std::uint8_t>& state, const std::vector<RefNote>& notes, double sampleRate,
                                     int length, int block = 512, const std::vector<std::uint32_t>& mt = {}, double bpm = 120.0,
-                                    const std::vector<std::uint8_t>& compressorState = {});
+                                    const std::vector<std::uint8_t>& compressorState = {}, int engineRev = 1);
 
 // IPP's 11-bit Exp_32f_A11 / Ln_32f_A11 as FL's DLL computes them on the AVX2 code path (Harmor's precision
 // "Average"; REA_rodada165g-flbeta165h §3), exposed for the tests

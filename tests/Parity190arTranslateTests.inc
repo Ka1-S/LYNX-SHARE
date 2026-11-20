@@ -60,7 +60,8 @@ TEST (p190ar_fitted_maps_leave_unknown_states_alone)
     using namespace lynx;
     // a reference of the same role without a map, and a mapped one whose state carries none of the mapped entries:
     // the substitute stays at its defaults (the entry's preset), nothing is half applied
-    const auto plain = makeEffectSlot (EffectKind::crestCompressor);
+    auto plain = makeEffectSlot (EffectKind::crestCompressor);
+    plain.params[(std::size_t) dyn::crest::revision] = 0.0f; // round 190kw: the substitutes' Crest keeps revision 0
     int n = -1;
     auto s = p190artr::slotFor ("VBC FG-Red", "<package version=\"1.0\"><entry id=\"Threshold\" type=\"float64\" value=\"0.3\"/></package>", &n);
     CHECK (s.kind == EffectKind::crestCompressor && n == 0 && s.params == plain.params);

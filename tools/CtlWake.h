@@ -31,6 +31,9 @@
 #include <sstream>
 
 #include "CtlAudit.h"
+#include "core/FmSynth.h"
+#include "core/WavetableSynth.h"
+#include "core/Braid.h"
 #include "core/Morphine.h"
 #include "core/TransistorBass.h"
 
@@ -362,6 +365,337 @@ inline std::vector<Hint> hintsFor (InstrumentKind kind, const std::vector<Contro
             named ("the delay mixed in", { { "Delay mix", 0.7f } });
             named ("the mod wheel at full on a negative amount", { { "Mod wheel amount", 0.25f } }, "pat:mod");
             break;
+        case InstrumentKind::tetra:
+        {
+            // (round 190ix) Tetra's new channel plays operator A alone (B…D off, at the −70 dB floor), with the LFO, the pitch
+            // envelope and the filter off and every envelope a click attack onto a full sustain (core/FmSynth.cpp defaults):
+            // a section's controls are heard with it on. Operator's laws keep some of them context-bound: an operator's
+            // feedback acts only where nothing modulates it, a fixed frequency only with Fixed on, a loop time / repeat
+            // only in its loop mode, a band-pass circuit only on a band / notch / morph filter.
+            const char* const ops[] { "A", "B", "C", "D" };
+            const char* const envs[] { "A Env", "B Env", "C Env", "D Env", "LFO Env", "Pitch Env", "Filter Env" };
+            std::vector<std::pair<std::string, float>> on;
+            for (const auto* o : ops)
+            {
+                on.push_back ({ std::string (o) + " On", 1.0f });
+                on.push_back ({ std::string (o) + " Level", 0.5f });
+            }
+            auto with = [&on] (std::vector<std::pair<std::string, float>> more) {
+                auto v = on;
+                v.insert (v.end(), more.begin(), more.end());
+                return v;
+            };
+            // every envelope slow and shaped (levels from a start to a sustain and on to an end), in a loop mode
+            auto shaped = [&] (float loopMode) {
+                std::vector<std::pair<std::string, float>> v;
+                for (const auto* e : envs)
+                {
+                    const std::string n = e;
+                    const bool pitch = n == "Pitch Env";
+                    for (const auto& [what, x] : std::vector<std::pair<const char*, float>> {
+                             { " Attack", 150.0f }, { " Initial", pitch ? 12.0f : 0.5f }, { " Decay", 150.0f }, { " Peak", pitch ? -12.0f : 1.0f },
+                             { " Sustain", pitch ? 7.0f : 0.3f }, { " Release", 150.0f }, { " End", pitch ? -7.0f : 0.2f }, { " Loop Mode", loopMode } })
+                        v.push_back ({ n + what, x });
+                }
+                for (const auto* o : ops)
+                {
+                    v.push_back ({ std::string (o) + " Pitch Env On", 1.0f });
+                    v.push_back ({ std::string (o) + " LFO On", 1.0f });
+                }
+                for (const auto& kv : std::vector<std::pair<std::string, float>> { { "Pitch Env On", 1.0f }, { "LFO On", 1.0f }, { "LFO Amount", 0.5f },
+                                                                                   { "Filter On", 1.0f }, { "Filter Freq", 800.0f }, { "Filter Env Amount", 36.0f },
+                                                                                   { "LFO Filter On", 1.0f } })
+                    v.push_back (kv);
+                return with (v);
+            };
+            named ("every operator on at half level, in a chain", on);
+            named ("every operator on at half level and heard (algorithm 11)", with ({ { "Algorithm", 10.0f } }));
+            named ("every operator on at half level, at a fixed frequency", with ({ { "A Fixed", 1.0f }, { "B Fixed", 1.0f }, { "C Fixed", 1.0f }, { "D Fixed", 1.0f } }));
+            named ("every operator on, the chord hit again", with ({ { "A Phase", 25.0f }, { "B Phase", 25.0f }, { "C Phase", 25.0f }, { "D Phase", 25.0f } }), "pat:retrig");
+            named ("every operator on, the LFO at full on each", with ({ { "LFO On", 1.0f }, { "LFO Amount", 1.0f }, { "A LFO On", 1.0f }, { "B LFO On", 1.0f }, { "C LFO On", 1.0f }, { "D LFO On", 1.0f } }));
+            named ("every operator on, the LFO at full on each, tempo-synced", with ({ { "LFO On", 1.0f }, { "LFO Amount", 1.0f }, { "LFO Range", 2.0f } }));
+            named ("every operator on, the LFO at full on each, a note after a gap", with ({ { "LFO On", 1.0f }, { "LFO Amount", 1.0f }, { "LFO Rate", 40.0f } }), "pat:gap");
+            named ("the LFO at full on the filter", { { "LFO On", 1.0f }, { "LFO Amount", 1.0f }, { "LFO Filter On", 1.0f }, { "Filter On", 1.0f }, { "Filter Freq", 1000.0f } });
+            named ("every operator on, the pitch envelope on each from an octave up",
+                   with ({ { "Pitch Env On", 1.0f }, { "Pitch Env Initial", 12.0f }, { "Pitch Env Attack", 150.0f }, { "A Pitch Env On", 1.0f }, { "B Pitch Env On", 1.0f },
+                           { "C Pitch Env On", 1.0f }, { "D Pitch Env On", 1.0f } }));
+            named ("every section on, every envelope slow and shaped", shaped (0.0f));
+            named ("every section on, every envelope slow and shaped, looping", shaped (1.0f), "pat:long");
+            named ("every section on, every envelope slow and shaped, in Beat mode", shaped (2.0f), "pat:long");
+            named ("the filter on as a band pass", { { "Filter On", 1.0f }, { "Filter Type", 2.0f }, { "Filter Freq", 1000.0f }, { "Filter Res", 0.8f } });
+            named ("the filter on as a morph filter", { { "Filter On", 1.0f }, { "Filter Type", 4.0f }, { "Filter Freq", 1000.0f }, { "Filter Res", 0.8f } });
+            named ("the filter on at 1 kHz, its envelope at full", { { "Filter On", 1.0f }, { "Filter Freq", 1000.0f }, { "Filter Env Amount", 72.0f }, { "Filter Env Attack", 150.0f } });
+            named ("the filter on at 1 kHz, its morph at the high pass", { { "Filter On", 1.0f }, { "Filter Freq", 1000.0f }, { "Filter Morph", 0.5f } });
+            named ("the filter on at 1 kHz, a driven circuit", { { "Filter On", 1.0f }, { "Filter Freq", 1000.0f }, { "Filter Circuit", 1.0f }, { "Filter Res", 0.5f } });
+            named ("the filter on at 1 kHz with the shaper", { { "Filter On", 1.0f }, { "Filter Freq", 1000.0f }, { "Shaper", 1.0f }, { "Shaper Drive", 12.0f } });
+            named ("glide on, a legato second note", { { "Glide", 1.0f } }, "pat:mono");
+            {
+                // the user wave (no editor knob: the wave editor's 64 partials) as a saw, heard where an operator picks it
+                named ("every operator on, its user wave a saw", on);
+                out.back().apply = [] (ChannelDef& d) {
+                    if ((int) d.modelParams.size() < fm::stateSize)
+                    {
+                        const auto def = tetraDefaults();
+                        const auto have = d.modelParams.size();
+                        d.modelParams.resize ((std::size_t) fm::stateSize);
+                        std::copy (def.begin() + (std::ptrdiff_t) have, def.end(), d.modelParams.begin() + (std::ptrdiff_t) have);
+                    }
+                    for (int k = 0; k < fm::opCount; ++k)
+                        for (int i = 0; i < fm::harmonics; ++i)
+                            d.modelParams[(std::size_t) (fm::harmonicsBase + k * fm::harmonics + i)] = 1.0f / (float) (i + 1);
+                };
+            }
+            break;
+        }
+        case InstrumentKind::helix:
+        {
+            // (rollup 0.1.30, round 190jk) Helix's new channel is Live's default Wavetable (core/WavetableSynth.cpp
+            // defaults): oscillator 1 alone through filter 1 wide open, the sub and filter 2 off, an empty matrix apart from
+            // the MIDI rows, so envelopes 2 / 3 and the LFOs move nothing until a matrix cell routes them; the effects'
+            // modes are heard with their amounts up, a band-pass circuit on a band pass, Morph on the morph type, Drive on
+            // a driven circuit, Unison's voices / amount with a unison mode, Glide on a Mono voice's legato note
+            const auto routed = [] (std::vector<std::pair<int, float>> cells) {
+                return [cells] (ChannelDef& d) {
+                    if ((int) d.modelParams.size() < wt::stateSize)
+                    {
+                        const auto def = helixDefaults();
+                        const auto have = d.modelParams.size();
+                        d.modelParams.resize ((std::size_t) wt::stateSize);
+                        std::copy (def.begin() + (std::ptrdiff_t) have, def.end(), d.modelParams.begin() + (std::ptrdiff_t) have);
+                    }
+                    for (const auto& [cell, v] : cells)
+                        d.modelParams[(std::size_t) cell] = v;
+                };
+            };
+            using namespace wt;
+            named ("oscillator 2 on, a fifth up", { { "Osc 2 On", 1.0f }, { "Osc 2 Transpose", 7.0f }, { "Osc 2 Gain", 0.7f } });
+            named ("both oscillators' effects at half, oscillator 2 on", { { "Osc 1 Effect 1", 0.5f }, { "Osc 1 Effect 2", 0.5f }, { "Osc 2 On", 1.0f },
+                                                                           { "Osc 2 Effect Mode", 3.0f }, { "Osc 2 Effect 1", 0.5f }, { "Osc 2 Effect 2", 0.5f } });
+            named ("the sub on", { { "Sub On", 1.0f }, { "Sub Gain", 0.8f }, { "Sub Tone", 0.5f } });
+            for (int k = 1; k <= 2; ++k)
+            {
+                const auto f = "Filter " + std::to_string (k);
+                std::vector<std::pair<std::string, float>> at1k { { f + " On", 1.0f }, { f + " Freq", 1000.0f }, { f + " Res", 0.8f } };
+                auto plus = [&at1k] (std::vector<std::pair<std::string, float>> more) {
+                    auto v = at1k;
+                    v.insert (v.end(), more.begin(), more.end());
+                    return v;
+                };
+                named ("filter " + std::to_string (k) + " on at 1 kHz, resonant", at1k);
+                named ("filter " + std::to_string (k) + " on at 1 kHz as a morph filter", plus ({ { f + " Type", 4.0f } }));
+                named ("filter " + std::to_string (k) + " on at 1 kHz as a band pass", plus ({ { f + " Type", 2.0f } }));
+                named ("filter " + std::to_string (k) + " on at 1 kHz, a driven circuit", plus ({ { f + " Circuit", 1.0f }, { f + " Drive", 12.0f } }));
+            }
+            named ("both filters on at 1 kHz, filter 2 a high pass", { { "Filter 1 Freq", 1000.0f }, { "Filter 1 Res", 0.8f }, { "Filter 2 On", 1.0f },
+                                                                       { "Filter 2 Type", 1.0f }, { "Filter 2 Freq", 1000.0f }, { "Filter 2 Res", 0.8f } });
+            // envelopes 2 and 3 slow and shaped, routed to oscillator 1's pitch and filter 1 (at 1 kHz); looping on held notes
+            for (int k = 2; k <= 3; ++k)
+            {
+                const auto e = "Env " + std::to_string (k);
+                const auto source = k == 2 ? src::env2 : src::env3;
+                const std::vector<std::pair<std::string, float>> shaped { { e + " Attack", 0.15f }, { e + " Decay", 0.15f }, { e + " Release", 0.2f },
+                                                                          { e + " Sustain", 0.3f }, { e + " Initial", 0.2f }, { e + " Final", 0.5f },
+                                                                          { "Filter 1 Freq", 1000.0f }, { "Filter 1 Res", 0.5f } };
+                const auto cells = routed ({ { matrixIndex (tgt::oscPitch, source), 0.3f }, { matrixIndex (tgt::filterFreq, source), 0.5f } });
+                named (e + " slow and shaped, on oscillator 1's pitch and filter 1", shaped);
+                out.back().apply = cells;
+                auto looping = shaped;
+                looping.push_back ({ e + " Loop Mode", 2.0f });
+                named (e + " slow and shaped, on oscillator 1's pitch and filter 1, looping", looping, "pat:long");
+                out.back().apply = cells;
+            }
+            // the LFOs on oscillator 1's pitch and filter 1: free at 4 Hz, tempo-synced, after a gap
+            for (int k = 1; k <= 2; ++k)
+            {
+                const auto l = "LFO " + std::to_string (k);
+                const auto source = k == 1 ? src::lfo1 : src::lfo2;
+                const auto cells = routed ({ { matrixIndex (tgt::oscPitch, source), 0.3f }, { matrixIndex (tgt::filterFreq, source), 0.5f } });
+                const std::vector<std::pair<std::string, float>> at4 { { l + " Rate", 4.0f }, { l + " Attack", 0.0f }, { "Filter 1 Freq", 1000.0f } };
+                named (l + " at 4 Hz on oscillator 1's pitch and filter 1", at4);
+                out.back().apply = cells;
+                named (l + " tempo-synced on oscillator 1's pitch and filter 1", { { l + " Sync", 1.0f }, { "Filter 1 Freq", 1000.0f } });
+                out.back().apply = cells;
+                named (l + " at 4 Hz on oscillator 1's pitch, a note after a gap", at4, "pat:gap");
+                out.back().apply = cells;
+                named (l + " at 4 Hz on oscillator 1's pitch, its attack slow", { { l + " Rate", 4.0f }, { l + " Attack", 0.3f } });
+                out.back().apply = cells;
+            }
+            named ("unison on (Classic)", { { "Unison Mode", 1.0f }, { "Unison Amount", 0.5f } });
+            named ("mono, a legato second note", { { "Poly", 0.0f }, { "Glide", 0.3f } }, "pat:mono");
+            named ("the amp envelope shaped, held long", { { "Amp Decay", 0.15f }, { "Amp Sustain", 0.3f }, { "Amp Loop Mode", 2.0f } }, "pat:long");
+            // (round 190mi) Helix+: a second warp needs its amount (and a mode), noise its switch, Unison+ a unison mode,
+            // the macros and drawn LFOs a matrix cell, the effects' knobs their effect on
+            named ("Helix+: both second warps Bend + at half, oscillator 2 on", { { "Osc 1 Warp 2", (float) warp::bendPlus }, { "Osc 1 Warp 2 Amount", 0.5f },
+                                                                              { "Osc 2 On", 1.0f }, { "Osc 2 Gain", 0.7f },
+                                                                              { "Osc 2 Warp 2", (float) warp::bendPlus }, { "Osc 2 Warp 2 Amount", 0.5f } });
+            named ("Helix+: noise on, darker", { { "Noise On", 1.0f }, { "Noise Level", 0.5f }, { "Noise Color", 0.3f } });
+            named ("Helix+: unison Classic, 6 voices", { { "Unison Mode", 1.0f }, { "Unison Amount", 0.5f }, { "Unison Voices", 6.0f } });
+            named ("Helix+: filter 2 on at 1 kHz, resonant", { { "Filter 2 On", 1.0f }, { "Filter 2 Freq", 1000.0f }, { "Filter 2 Res", 0.8f } });
+            named ("Helix+: the four macros on oscillator 1's pitch", { { "Filter 1 Freq", 1000.0f } });
+            out.back().apply = routed ({ { cellIndex (tgt::oscPitch, src::macro1), 0.2f }, { cellIndex (tgt::oscPitch, src::macro1 + 1), 0.3f },
+                                         { cellIndex (tgt::oscPitch, src::macro1 + 2), 0.4f }, { cellIndex (tgt::oscPitch, src::macro1 + 3), 0.5f } });
+            for (int k = 1; k <= 2; ++k)
+            {
+                const auto l = "LFO " + std::to_string (k);
+                named ("Helix+: " + l + " at 4 Hz on oscillator 1's pitch", { { l + " Rate", 4.0f }, { l + " Attack", 0.0f } });
+                out.back().apply = routed ({ { matrixIndex (tgt::oscPitch, k == 1 ? src::lfo1 : src::lfo2), 0.3f } });
+            }
+            named ("Helix+: distortion on", { { "Distortion On", 1.0f }, { "Distortion Drive", 0.5f }, { "Distortion Mix", 0.7f } });
+            named ("Helix+: chorus on", { { "Chorus On", 1.0f } });
+            named ("Helix+: delay on", { { "Delay On", 1.0f }, { "Delay Time", 3.0f }, { "Delay Mix", 0.5f } });
+            named ("Helix+: reverb on", { { "Reverb On", 1.0f } });
+            // (round 190ml) Helix+ 2: oscillator 3 and the sample need switching on (the sample a sample in the channel's
+            // data), their effects / second warps an amount and a mode, macros 5…8 and the chaos sources a matrix cell, the
+            // shifter / EQ / multiband their switch (the EQ its bands away from 0 dB)
+            named ("Helix+ 2: oscillator 3 on, a fifth up", { { "Osc 3 On", 1.0f }, { "Osc 3 Gain", 0.7f }, { "Osc 3 Transpose", 7.0f } });
+            named ("Helix+ 2: oscillator 3's effect at half", { { "Osc 3 On", 1.0f }, { "Osc 3 Gain", 0.7f }, { "Osc 3 Effect Mode", 3.0f },
+                                                               { "Osc 3 Effect 1", 0.5f }, { "Osc 3 Effect 2", 0.5f } });
+            named ("Helix+ 2: oscillator 3's second warp Bend + at half", { { "Osc 3 On", 1.0f }, { "Osc 3 Gain", 0.7f },
+                                                                           { "Osc 3 Warp 2", (float) warp::bendPlus }, { "Osc 3 Warp 2 Amount", 0.5f } });
+            const auto withSample = [] (ChannelDef& d) {
+                if ((int) d.modelParams.size() < wt::stateSize)
+                {
+                    const auto def = helixDefaults();
+                    const auto have = d.modelParams.size();
+                    d.modelParams.resize ((std::size_t) wt::stateSize);
+                    std::copy (def.begin() + (std::ptrdiff_t) have, def.end(), d.modelParams.begin() + (std::ptrdiff_t) have);
+                }
+                wt::HelixUserData data; // (a 0.3 s tone with a falling pitch: Start, Loop and the pitch all heard)
+                data.sample.rate = 44100.0;
+                data.sample.l.resize (13230);
+                double ph = 0.0;
+                for (std::size_t i = 0; i < data.sample.l.size(); ++i)
+                {
+                    ph += (330.0 - 200.0 * (double) i / 13230.0) / 44100.0;
+                    data.sample.l[i] = (float) (0.7 * std::sin (2.0 * 3.14159265358979 * ph));
+                }
+                d.pluginState = wt::encodeUserData (data);
+            };
+            named ("Helix+ 2: the sample on (a falling tone)", { { "Sample On", 1.0f } });
+            out.back().apply = withSample;
+            named ("Helix+ 2: the sample's second warp Sync at half", { { "Sample On", 1.0f }, { "Sample Warp 2", (float) warp::sync },
+                                                                       { "Sample Warp 2 Amount", 0.5f } });
+            out.back().apply = withSample;
+            named ("Helix+ 2: macros 5 to 8 on oscillator 1's pitch", { { "Filter 1 Freq", 1000.0f } });
+            out.back().apply = routed ({ { cellIndex (tgt::oscPitch, src::macro1 + 4), 0.2f }, { cellIndex (tgt::oscPitch, src::macro1 + 5), 0.3f },
+                                         { cellIndex (tgt::oscPitch, src::macro1 + 6), 0.4f }, { cellIndex (tgt::oscPitch, src::macro1 + 7), 0.5f } });
+            for (int k = 1; k <= chaosCount; ++k)
+            {
+                const auto c = "Chaos " + std::to_string (k);
+                named ("Helix+ 2: " + c + " at 4 Hz on oscillator 1's pitch", { { c + " Rate", 4.0f }, { c + " Amount", 1.0f } });
+                out.back().apply = routed ({ { cellIndex (tgt::oscPitch, src::chaos1 + k - 1), 0.3f } });
+            }
+            named ("Helix+ 2: the shifter on", { { "Shift On", 1.0f }, { "Shift", 0.3f }, { "Shift Mix", 1.0f } });
+            named ("Helix+ 2: the EQ on, its bands moved", { { "EQ On", 1.0f }, { "EQ Low", 6.0f }, { "EQ Mid", -6.0f }, { "EQ High", 6.0f } });
+            named ("Helix+ 2: the multiband on", { { "Multiband On", 1.0f } });
+            // (round 190mt) Helix round 3: the granular and spectral oscillators need switching on and a sample in the
+            // channel's data (the spectral one a rich one, its band narrowed and few partials, so Band, Width and Partials
+            // are heard); Clean a rich sample played an octave up
+            const auto withRich = [] (ChannelDef& d) {
+                if ((int) d.modelParams.size() < wt::stateSize)
+                {
+                    const auto def = helixDefaults();
+                    const auto have = d.modelParams.size();
+                    d.modelParams.resize ((std::size_t) wt::stateSize);
+                    std::copy (def.begin() + (std::ptrdiff_t) have, def.end(), d.modelParams.begin() + (std::ptrdiff_t) have);
+                }
+                wt::HelixUserData data; // (0.4 s of a falling tone with 30 harmonics)
+                data.sample.rate = 44100.0;
+                data.sample.l.resize (17640);
+                double ph = 0.0;
+                for (std::size_t i = 0; i < data.sample.l.size(); ++i)
+                {
+                    ph += (330.0 - 150.0 * (double) i / 17640.0) / 44100.0;
+                    double y = 0.0;
+                    for (int h = 1; h <= 30; ++h)
+                        y += std::sin (2.0 * 3.14159265358979 * h * ph) / h;
+                    data.sample.l[i] = (float) (0.4 * y);
+                }
+                d.pluginState = wt::encodeUserData (data);
+            };
+            named ("Helix 3: the grains on (a falling tone)", { { "Grain On", 1.0f } });
+            out.back().apply = withSample;
+            named ("Helix 3: the spectral oscillator on (a rich falling tone), a band of four partials",
+                   { { "Spectral On", 1.0f }, { "Spectral Width", 2.0f }, { "Spectral Partials", 4.0f } });
+            out.back().apply = withRich;
+            named ("Helix 3: the sample on an octave up (a rich falling tone)", { { "Sample On", 1.0f }, { "Sample Transpose", 12.0f } });
+            out.back().apply = withRich;
+            break;
+        }
+        case InstrumentKind::braid:
+        {
+            // (rollup 0.1.30 step 7, round 190lc) Braid's new channel is Live's default Meld (core/BraidParams.cpp): both
+            // engines Basic Shapes as a sine (Shape 0, so Tone has nothing to colour), filters wide open, amp sustain at
+            // full (Decay / its slope / Loop unheard), and a matrix that routes only the bend, MPE pitch, velocity and the
+            // voice spread, so each engine's mod envelope, LFO 1 (with its two FX) and LFO 2 move nothing until a matrix
+            // cell routes them; glide wants a glide time and a mono legato note, Legato a mono patch, Link Envelopes an
+            // engine B whose own amp envelope differs, Osc Reset a chord hit again while it sounds
+            const auto routed = [] (std::vector<std::pair<int, float>> cells) {
+                return [cells] (ChannelDef& d) {
+                    if ((int) d.modelParams.size() < braid::stateSize)
+                    {
+                        const auto def = braidDefaults();
+                        const auto have = d.modelParams.size();
+                        d.modelParams.resize ((std::size_t) braid::stateSize);
+                        std::copy (def.begin() + (std::ptrdiff_t) have, def.end(), d.modelParams.begin() + (std::ptrdiff_t) have);
+                    }
+                    for (const auto& [cell, v] : cells)
+                        d.modelParams[(std::size_t) cell] = v;
+                };
+            };
+            using namespace braid;
+            for (int k = 0; k < 2; ++k)
+            {
+                const std::string e = k == 0 ? "A " : "B ";
+                const auto t = k * tgt::perEngine;
+                const auto modEnv = k == 0 ? src::aModEnv : src::bModEnv, lfo1 = k == 0 ? src::aLfo1 : src::bLfo1,
+                           lfo1Fx = k == 0 ? src::aLfo1Fx : src::bLfo1Fx, lfo2 = k == 0 ? src::aLfo2 : src::bLfo2;
+                // (Basic Shapes' second macro is the pulse width: heard near the square end of Shape)
+                named (e + "shaped near a square, its filter at 1 kHz", { { e + "Osc Macro 1", 0.9f }, { e + "Filter Freq", 1000.0f },
+                                                                          { e + "Filter Macro 1", 0.5f } });
+                // (a mono, non-legato voice restarts on the same voice: its phase reset is heard)
+                named (e + "shaped as a saw, mono, not legato, the chord hit again", { { e + "Osc Macro 1", 0.6f }, { "Poly", 0.0f }, { "Legato", 0.0f } },
+                       "pat:retrig");
+                const std::vector<std::pair<std::string, float>> amp { { e + "Amp Decay", 0.4f }, { e + "Amp Sustain", 0.3f }, { e + "Amp Attack", 0.05f } };
+                named (e + "amp envelope decaying to 0.3", amp);
+                auto ampLoop = amp;
+                ampLoop.push_back ({ e + "Amp Loop", 1.0f });
+                named (e + "amp envelope decaying to 0.3, held long", ampLoop, "pat:long");
+                // the mod envelope slow and shaped, on the engine's filter (at 1 kHz) and pitch
+                const std::vector<std::pair<std::string, float>> mod { { e + "Filter Freq", 1000.0f }, { e + "Mod Attack", 0.15f }, { e + "Mod Decay", 0.3f },
+                                                                       { e + "Mod Release", 0.3f }, { e + "Mod Initial", 0.1f }, { e + "Mod Peak", 1.0f },
+                                                                       { e + "Mod Sustain", 0.3f }, { e + "Mod Final", 0.2f } };
+                const auto modCells = routed ({ { matrixIndex (t + tgt::filterFreq, modEnv), 0.6f }, { matrixIndex (t + tgt::pitch, modEnv), 0.3f } });
+                named (e + "mod envelope slow and shaped, on its filter and pitch", mod);
+                out.back().apply = modCells;
+                auto modLoop = mod;
+                modLoop.push_back ({ e + "Mod Loop", 1.0f });
+                named (e + "mod envelope slow and shaped, on its filter and pitch, looping", modLoop, "pat:long");
+                out.back().apply = modCells;
+                // LFO 1 (and its FX output) and LFO 2 on the engine's filter and pitch: free at 4 Hz, tempo-synced, after a gap
+                const auto lfoCells = routed ({ { matrixIndex (t + tgt::filterFreq, lfo1), 0.5f }, { matrixIndex (t + tgt::pitch, lfo1Fx), 0.3f },
+                                                { matrixIndex (t + tgt::detune, lfo2), 0.8f }, { matrixIndex (t + tgt::filterMacro1, lfo2), 0.5f } });
+                // (LFO 1 near a square, so its pulse width counts; its second FX a ramp up instead of the neutral Bipolar;
+                // LFO 2 retriggered, so its phase counts after a gap; the free rates off the synced ones' 4 Hz at 120 BPM)
+                const std::vector<std::pair<std::string, float>> lfos { { e + "Filter Freq", 1000.0f }, { e + "Filter Macro 1", 0.4f }, { e + "LFO 1 Rate", 3.0f },
+                                                                        { e + "LFO 1 Macro 1", 0.9f }, { e + "LFO 1 FX 1 Macro", 0.5f },
+                                                                        { e + "LFO 1 FX 2", 15.0f }, { e + "LFO 1 FX 2 Macro", 0.5f },
+                                                                        { e + "LFO 2 Rate", 3.0f }, { e + "LFO 2 Retrigger", 1.0f } };
+                named (e + "LFO 1 / its FX / LFO 2 at 4 Hz on its filter and pitch", lfos);
+                out.back().apply = lfoCells;
+                auto synced = lfos;
+                synced.push_back ({ e + "LFO 1 Sync", 1.0f });
+                synced.push_back ({ e + "LFO 2 Sync", 1.0f });
+                named (e + "LFO 1 / its FX / LFO 2 tempo-synced on its filter and pitch", synced);
+                out.back().apply = lfoCells;
+                named (e + "LFO 1 / its FX / LFO 2 at 4 Hz on its filter and pitch, a note after a gap", lfos, "pat:gap");
+                out.back().apply = lfoCells;
+                named (e + "glide over a legato second note", { { "Poly", 0.0f }, { e + "Glide Time", 0.3f } }, "pat:mono");
+            }
+            named ("mono, a second note over the first, a slow attack", { { "Poly", 0.0f }, { "A Amp Attack", 0.2f }, { "B Amp Attack", 0.2f } }, "pat:mono");
+            named ("engine B's own amp envelope slow", { { "B Amp Attack", 0.5f }, { "B Amp Sustain", 0.3f }, { "B Amp Decay", 0.3f } });
+            break;
+        }
         default:
             break;
     }
@@ -465,6 +799,11 @@ inline bool context (const std::string& key, const ChannelDef& c, const std::vec
             for (std::size_t j = 0; j < controls.size(); ++j)
             {
                 const auto& k = controls[j];
+                // (round 190mc) Transistor Bass's program row picks WHICH program / patch / sequence the other controls
+                // edit (FL's PROGRAM, AF, SEQUENCE, TRANSP., PATCH): a random setting keeps them, and draws no number for
+                // them, so the other controls get the values they had before the row existed
+                if (ctx.instrument == InstrumentKind::transistorbass && k.index >= tbprog::program && k.index <= tbprog::patch)
+                    continue;
                 std::string lower = k.name;
                 std::transform (lower.begin(), lower.end(), lower.begin(), [] (unsigned char ch) { return (char) std::tolower (ch); });
                 const auto r = rnd();
@@ -493,8 +832,15 @@ inline std::vector<float> valuesFrom (const Control& k, float v)
     const auto other = out[0] == k.low ? k.high : k.low;
     if (std::abs (other - v) > 1e-6f * std::max (1.0f, std::abs (k.high - k.low)))
         out.push_back (other);
-    // a phase's two ends are the same angle: half a cycle away too (the effects' rule, round 173d)
-    if (k.name.size() >= 5 && k.name.compare (k.name.size() - 5, 5, "phase") == 0)
+    // a phase's two ends are the same angle: half a cycle away too (the effects' rule, round 173d). Round 190ix: "Phase"
+    // too, and Tetra's Filter Morph, whose two ends are both the low pass (Operator's low → band → high → notch → low)
+    const auto endsWith = [&k] (const char* tail) {
+        const auto n = std::strlen (tail);
+        return k.name.size() >= n && k.name.compare (k.name.size() - n, n, tail) == 0;
+    };
+    // (rollup 0.1.30: Helix's "Filter 1 Morph" / "Filter 2 Morph", the same cyclic morph filter as Tetra's)
+    const auto helixMorph = k.name.rfind ("Filter ", 0) == 0 && endsWith (" Morph");
+    if (endsWith ("phase") || endsWith ("Phase") || endsWith ("Filter Morph") || helixMorph)
         out.push_back (0.5f * (k.low + k.high) + (v < 0.5f * (k.low + k.high) ? 0.0f : -0.25f * (k.high - k.low)));
     return out;
 }

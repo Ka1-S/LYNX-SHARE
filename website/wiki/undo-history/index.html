@@ -8,7 +8,7 @@
 <meta property="og:title" content="Undo and history · LYNX SHARE">
 <meta property="og:description" content="Step back through your edits, and find the backups LYNX SHARE keeps.">
 <meta property="og:site_name" content="LYNX SHARE">
-<meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.28">
+<meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.30">
 <meta property="og:url" content="https://lynx-share.com/wiki/undo-history/">
 <meta property="og:locale" content="en_US">
 <meta property="og:locale:alternate" content="zh_CN">
@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="8c6ce8ed";
+window.LYNX_LANG=lang;window.LYNX_V="69805082";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=8c6ce8ed">
+<link rel="stylesheet" href="/assets/site.css?v=69805082">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -94,15 +94,15 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <h2 id="go-back-to-an-earlier-step">Go back to an earlier step</h2>
 <ol><li>Choose <code>Edit › Undo history...</code>, or press <code>Ctrl+Alt+H</code>.</li><li>The list shows the steps with the newest at the bottom. The first row, <code>Start</code>, is the project as it was opened.</li><li>Click a step. The project goes back to the state right after it, and the later steps turn grey.</li><li>Click a grey step to go forward again.</li><li>Make a new edit to continue from the step you chose. The grey steps are then gone.</li></ol>
 <h2 id="the-undo-keys">The undo keys</h2>
-<p><code>Ctrl+Z</code> does not work as in most programs. It undoes the last step, and pressed again it redoes it, so it switches between the last two states. To walk further back, use <code>Ctrl+Alt+Z</code>.</p>
-<div class="tablewrap"><table><thead><tr><th>Command</th><th>Key</th><th>What it does</th></tr></thead><tbody><tr><td><code>Undo</code></td><td><code>Ctrl+Z</code></td><td>Undoes the last step. After an undo it redoes the next step, and the menu item reads <code>Undo (redo)</code></td></tr><tr><td><code>Undo backwards</code></td><td><code>Ctrl+Alt+Z</code></td><td>Always steps back, one step per press</td></tr><tr><td><code>Redo</code></td><td><code>Ctrl+Y</code> or <code>Ctrl+Shift+Z</code></td><td>Steps forward</td></tr><tr><td><code>Undo history...</code></td><td><code>Ctrl+Alt+H</code></td><td>Opens the list</td></tr></tbody></table></div>
-<p>After each undo or redo, the hint bar names the step and shows the level, for example <code>Level 2/3</code>.</p>
-<p>If you prefer the usual behaviour, turn on <code>Alternate undo mode (classic undo, instead of undo/redo on the same shortcut)</code> in <code>Options › General settings...</code>. <code>Ctrl+Z</code> then always steps back.</p>
+<p><code>Ctrl+Z</code> steps back through the history, one step per press, as in FL Studio 2026 and most programs. <code>Ctrl+Y</code> or <code>Ctrl+Shift+Z</code> steps forward again.</p>
+<div class="tablewrap"><table><thead><tr><th>Command</th><th>Key</th><th>What it does</th></tr></thead><tbody><tr><td><code>Undo</code></td><td><code>Ctrl+Z</code></td><td>Steps back one step per press</td></tr><tr><td><code>Redo</code></td><td><code>Ctrl+Y</code> or <code>Ctrl+Shift+Z</code></td><td>Steps forward</td></tr><tr><td><code>Undo history...</code></td><td><code>Ctrl+Alt+H</code></td><td>Opens the list</td></tr></tbody></table></div>
+<p>The <code>Edit</code> menu names the step each item acts on, for example <code>Undo Add notes: Pattern 1</code>. After each undo or redo, the hint bar names the step and shows the level, for example <code>Level 2/3</code>.</p>
+<p>FL Studio's other undo mode is there too: turn off <code>Alternate undo mode</code> in <code>Options › General settings...</code>. <code>Ctrl+Z</code> then undoes the last step and, pressed again, redoes it, so it switches between the last two states. <code>Ctrl+Alt+Z</code> (<code>Undo backwards</code>) walks further back, and <code>Ctrl+Y</code> or <code>Ctrl+Shift+Z</code> still redo.</p>
 <h2 id="what-is-a-step-and-what-is-not">What is a step and what is not</h2>
 <ul><li>Edits to the project are steps: notes, patterns, clips, channels, mixer levels and routing, effects, automation, tempo, mutes.</li><li>A recording is a step. So is merging a part in an <a href="/wiki/online-sessions/">online session</a>, and <code>Comp these takes</code>.</li><li>Things that do not change the project are not steps: zooming, scrolling, moving windows, and the program's own settings.</li><li>Saving and exporting are not undone. The files they wrote stay.</li><li>LYNX SHARE's own plugin windows have a separate undo and redo for that plugin's changes, next to the A and B settings.</li></ul>
 <h2 id="settings">Settings</h2>
 <p>Both are in <code>Options › General settings...</code>.</p>
-<div class="tablewrap"><table><thead><tr><th>Setting</th><th>What it does</th></tr></thead><tbody><tr><td><code>Maximum undo levels</code></td><td>How many steps are kept: 25, 50, 100, 200, 500 or 1000. The default is 100</td></tr><tr><td><code>Alternate undo mode</code></td><td>Makes <code>Ctrl+Z</code> a classic undo</td></tr></tbody></table></div>
+<div class="tablewrap"><table><thead><tr><th>Setting</th><th>What it does</th></tr></thead><tbody><tr><td><code>Maximum undo levels</code></td><td>How many steps are kept: 25, 50, 100, 200, 500 or 1000. The default is 100</td></tr><tr><td><code>Alternate undo mode</code></td><td>On by default: <code>Ctrl+Z</code> steps back through the history. Off: <code>Ctrl+Z</code> switches between undo and redo of the last step</td></tr></tbody></table></div>
 <h2 id="backups">Backups</h2>
 <p>LYNX SHARE saves a backup copy of the open project every 2 minutes by default, and keeps the 10 newest per project. A backup is a normal <code>.lynx</code> file in the <code>autosave</code> folder inside the settings folder, named after the project with <code>(autosaved on ...)</code> and the date and time.</p>
 <p>Each time you save over an existing project file, the version that is replaced is copied to the same folder with <code>(overwritten on ...)</code> in its name.</p>
@@ -123,8 +123,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=8c6ce8ed" defer></script>
-<script src="/assets/wiki.js?v=8c6ce8ed" defer></script>
-<script src="/assets/motion.js?v=8c6ce8ed" defer></script>
+<script src="/assets/site.js?v=69805082" defer></script>
+<script src="/assets/wiki.js?v=69805082" defer></script>
+<script src="/assets/motion.js?v=69805082" defer></script>
 </body>
 </html>

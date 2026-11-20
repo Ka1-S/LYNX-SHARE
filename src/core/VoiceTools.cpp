@@ -141,6 +141,8 @@ struct Bq
         return y;
     }
     void ap (double sr, double fc, double qq) noexcept { const auto w = twoPi * fc / sr, a = std::sin (w) / (2 * qq), c = std::cos (w); set (1 - a, -2 * c, 1 + a, 1 + a, -2 * c, 1 - a); }
+    // round 190mg (ns1): the first-order all-pass (bilinear, corner prewarped)
+    void ap1 (double sr, double fc) noexcept { const auto K = std::tan (0.5 * twoPi * fc / sr); set (K - 1, K + 1, 0, K + 1, K - 1, 0); }
     void lp (double sr, double fc, double qq) noexcept { const auto w = twoPi * fc / sr, a = std::sin (w) / (2 * qq), c = std::cos (w); set ((1 - c) / 2, 1 - c, (1 - c) / 2, 1 + a, -2 * c, 1 - a); }
     void bp (double sr, double fc, double qq) noexcept { const auto w = twoPi * fc / sr, a = std::sin (w) / (2 * qq), c = std::cos (w); set (a, 0, -a, 1 + a, -2 * c, 1 - a); }
     void shelf (double sr, double fc, double g, bool high) noexcept
@@ -197,8 +199,10 @@ public:
     }
     // in place; returns the mean reduction (dB) of the block for the meter. `tr` = the noise-floor tracker (round
     // 190dp), nullptr = round 124's fixed thresholds (bit for bit)
-    double process (float* l, float* r, int n, double amt, bool listenOnly, float out, const Track* tr = nullptr) noexcept
+    double process (float* l, float* r, int n, double amt, bool listenOnly, float out, const Track* tr = nullptr, bool zero = false) noexcept
     {
+        // round 190lf (zeroLaw): the engine's share over the bare all-pass pair (1 = the engine alone, as before)
+        const auto wet = zero && amt < zeroFade ? std::max (0.0, amt) / zeroFade : 1.0;
         if (tr != nullptr && (tr != trackDesigned || amt != trackAmount))
             designTrack (*tr, amt);
         const int nb = fit.bands + 2;
@@ -289,6 +293,8 @@ public:
                 for (int b = 0; b < fit.bands; ++b)
                     o = peaking[(std::size_t) b].run (o, c);
                 o = hsh.run (lsh.run (o, c), c);
+                if (wet < 1.0)
+                    o = a[c] + (o - a[c]) * wet; // round 190lf: 0 % = exactly the all-pass pair
                 // Listen: what is taken away (the open chain minus the processed one)
                 const auto y = listenOnly ? a[c] - o : o;
                 (c == 0 ? l[i] : r[i]) = (float) y * out;
@@ -387,6 +393,246 @@ private:
 };
 } // namespace fitted
 
+// ---- the NS1 law (round 190mg ns1) ------------------------------------------------------------------------------------
+// [REA of the NS1 trial's DSP for the structure only; every number fitted on our own probes and renders of the trial,
+// docs/analise/REA_rodada190mg_ns1.md] Zero latency, per sample:
+// - front end: two complementary all-pass splits in cascade (a first- and a second-order all-pass: low part = their
+//   half sum, high part = their half difference), the low part of the first (at the low corner) and the high part of
+//   the second (at the high corner) multiplied by the cut; at cut 0 dB each split is exactly its second-order all-pass;
+// - six bands (centres from the low to the high corner, geometric), each three cascaded Regalia–Mitra sections
+//   y = (x + A x) / 2 + g (x − A x) / 2 on the same all-pass A, one gain g per band (g = 1: exactly transparent);
+// - per band, from the mid signal: a band-pass detector, rectified; a noise floor that slews up / down by fixed dB per
+//   second (frozen under a gate), a level follower that slews the same way, a threshold between floor and level
+//   (the layout's position), kept within fixed distances above the floor, lifted while a voice-activity flag says
+//   "pause"; a soft weight w = T⁴ / (e⁴ + T⁴), the gain 1 − (1 − g_min) w², opening / closing smoothing.
+namespace ns1
+{
+struct Fit // (the fitted values: lowFit / highFit below, in this field order)
+{
+    double q1;                       // the low split's second-order Q
+    double depthDb, bandQ;           // the cut at a band centre (dB, the three sections together); the RM all-passes' Q
+    double detQ, detScale;           // the detector: two band-passes of this Q in cascade; its input scale
+    double floorUp, floorDown, gateDb, levUp, levDown; // floor / level slews (dB per second), the floor's gate (dBFS)
+    double aboveDb, capDb, ktDb;     // the threshold: at least / at most this far over the floor (dB); its scale (dB)
+    double openMs, closeMs;          // gain smoothing
+    double vadDb, vadBoostDb, vadHoldMs, vadLo, vadHi; // the pause flag: band over its floor (dB), lift (dB), hold, range (Hz)
+    double floorInitDb;              // floor / level start (dBFS)
+    double absAtt, absRel;           // the rectified detector's envelope (ms; release 0 = none)
+};
+// fitted at 20 … 50 % (the three measured settings share one set) and at 100 %; in between, each value linearly
+constexpr Fit lowFit { 1, 8.5, 0.7, 2.7, 0.5, 0.75, 13, -80, 118600, 32, 9, 21, -10, 3.4, 38, 23, 3, 60, 100, 998, -70, 0, 0 };
+constexpr Fit highFit { 1, 9.9, 0.5, 1.2, 0.5, 1.5, 47, -80, 118600, 38, 9, 25, 1, 2.4, 30, 36, 3, 60, 100, 998, -60, 0.1, 0.5 };
+inline Fit fitAt (double amt) noexcept
+{
+    const auto t = std::clamp ((amt - 0.5) / 0.5, 0.0, 1.0);
+    if (t <= 0.0)
+        return lowFit;
+    const auto mix = [t] (double a, double b) { return a + (b - a) * t; };
+    Fit f;
+    f.q1 = mix (lowFit.q1, highFit.q1);
+    f.depthDb = mix (lowFit.depthDb, highFit.depthDb);
+    f.bandQ = mix (lowFit.bandQ, highFit.bandQ);
+    f.detQ = mix (lowFit.detQ, highFit.detQ);
+    f.detScale = mix (lowFit.detScale, highFit.detScale);
+    f.floorUp = mix (lowFit.floorUp, highFit.floorUp);
+    f.floorDown = mix (lowFit.floorDown, highFit.floorDown);
+    f.gateDb = mix (lowFit.gateDb, highFit.gateDb);
+    f.levUp = mix (lowFit.levUp, highFit.levUp);
+    f.levDown = mix (lowFit.levDown, highFit.levDown);
+    f.aboveDb = mix (lowFit.aboveDb, highFit.aboveDb);
+    f.capDb = mix (lowFit.capDb, highFit.capDb);
+    f.ktDb = mix (lowFit.ktDb, highFit.ktDb);
+    f.openMs = mix (lowFit.openMs, highFit.openMs);
+    f.closeMs = mix (lowFit.closeMs, highFit.closeMs);
+    f.vadDb = mix (lowFit.vadDb, highFit.vadDb);
+    f.vadBoostDb = mix (lowFit.vadBoostDb, highFit.vadBoostDb);
+    f.vadHoldMs = mix (lowFit.vadHoldMs, highFit.vadHoldMs);
+    f.vadLo = mix (lowFit.vadLo, highFit.vadLo);
+    f.vadHi = mix (lowFit.vadHi, highFit.vadHi);
+    f.floorInitDb = mix (lowFit.floorInitDb, highFit.floorInitDb);
+    f.absAtt = mix (lowFit.absAtt, highFit.absAtt);
+    f.absRel = mix (lowFit.absRel, highFit.absRel);
+    return f;
+}
+constexpr int nb = 6, sections = 3;
+
+class Engine
+{
+public:
+    void prepare (double rate) noexcept
+    {
+        sr = rate;
+        designedAmount = -1.0;
+        reset();
+    }
+    void reset() noexcept
+    {
+        for (auto* f : { &s1a1, &s1a2, &s2a1, &s2a2 })
+            f->reset();
+        for (auto& row : rm)
+            for (auto& f : row)
+                f.reset();
+        for (auto& f : det)
+            f.reset();
+        for (auto& f : det2)
+            f.reset();
+        const auto init = std::pow (10.0, fitAt (designedAmount < 0.0 ? 0.0 : designedAmount).floorInitDb / 20.0);
+        floorv.fill (init);
+        lev.fill (init);
+        gain.fill (1.0);
+        env.fill (0.0);
+        noiseCount = 0;
+        flag = 1.0;
+    }
+    // in place; returns the mean reduction (dB) of the block for the meter
+    double process (float* l, float* r, int n, double amt, bool listenOnly, float out) noexcept
+    {
+        if (amt != designedAmount)
+            design (amt);
+        double sumRed = 0.0;
+        for (int i = 0; i < n; ++i)
+        {
+            const double xs[2] { l[i], r[i] };
+            double w[2];
+            for (int c = 0; c < 2; ++c)
+            {
+                const auto a1 = s1a1.run (xs[c], c), a2 = s1a2.run (xs[c], c);
+                const auto u = 0.5 * (a2 - a1) + gLow * 0.5 * (a2 + a1);
+                const auto b1 = s2a1.run (u, c), b2 = s2a2.run (u, c);
+                w[c] = 0.5 * (b2 + b1) + gHigh * 0.5 * (b2 - b1);
+            }
+            const auto mid = 0.5 * (w[0] + w[1]) * detScale;
+            double e[nb];
+            for (int b = 0; b < nb; ++b)
+            {
+                const auto ad = std::abs (det2[(std::size_t) b].run (det[(std::size_t) b].run (mid, 0), 0));
+                if (useEnv)
+                {
+                    auto& v = env[(std::size_t) b];
+                    v = ad > v ? ad + (v - ad) * envA : ad + (v - ad) * envR;
+                    e[b] = v + 1e-9;
+                }
+                else
+                    e[b] = ad + 1e-9;
+            }
+            // the voice flag: a band of its range over its floor -> voice; else, after the hold, a pause
+            bool voice = false;
+            for (int b = 0; b < nb; ++b)
+                if (vadBand[(std::size_t) b] && e[b] > floorv[(std::size_t) b] * vadK)
+                    voice = true;
+            if (voice)
+            {
+                noiseCount = 0;
+                flag = 1.0;
+            }
+            else if (++noiseCount >= holdN)
+            {
+                noiseCount = holdN;
+                flag = boost;
+            }
+            double red = 0.0;
+            for (int b = 0; b < nb; ++b)
+            {
+                auto& fl = floorv[(std::size_t) b];
+                auto& lv = lev[(std::size_t) b];
+                const auto level = lv;
+                if (e[b] >= gate)
+                {
+                    fl *= e[b] > fl ? up : down;
+                    lv *= e[b] > level ? lu : ld;
+                }
+                const auto thr = fl + position * (level - fl);
+                const auto T = std::max (aboveK * fl, std::min (kT * thr, capK * fl)) * flag;
+                const auto t2 = T * T, q2 = e[b] * e[b], T4 = t2 * t2;
+                const auto wt = T4 / (q2 * q2 + T4);
+                const auto target = 1.0 - (1.0 - gmin) * wt * wt;
+                auto& g = gain[(std::size_t) b];
+                g = target > g ? target + (g - target) * go : target + (g - target) * gc;
+                red += g;
+            }
+            for (int c = 0; c < 2; ++c)
+            {
+                auto y = w[c];
+                for (int b = 0; b < nb; ++b)
+                    for (int k = 0; k < sections; ++k)
+                    {
+                        const auto A = rm[(std::size_t) b][(std::size_t) k].run (y, c);
+                        y = 0.5 * (y + A) + gain[(std::size_t) b] * 0.5 * (y - A);
+                    }
+                // Listen: what is taken away (the open chain minus the processed one)
+                const auto v = listenOnly ? w[c] - y : y;
+                (c == 0 ? l[i] : r[i]) = (float) v * out;
+            }
+            sumRed += red;
+        }
+        // the meter: the mean band cut at the centres (dB)
+        const auto meanGain = n > 0 ? sumRed / (n * nb) : 1.0;
+        return -20.0 * sections * std::log10 (std::max (1e-6, meanGain));
+    }
+
+private:
+    void design (double amt) noexcept
+    {
+        const bool first = designedAmount < 0.0;
+        designedAmount = amt;
+        const auto lay = ns1Layout (amt);
+        const auto fit = fitAt (amt);
+        s1a1.ap1 (sr, lay.minFc);
+        s1a2.ap (sr, lay.minFc, fit.q1);
+        s2a1.ap1 (sr, std::min (lay.maxFc, 0.49 * sr));
+        s2a2.ap (sr, std::min (lay.maxFc, 0.49 * sr), lay.q2);
+        gLow = gHigh = dbToGain (lay.cutDb);
+        position = lay.position;
+        // the depth fades in up to the first measured setting (20 %)
+        const auto depth = fit.depthDb * std::min (1.0, std::max (0.0, amt) / zeroFade);
+        gmin = std::pow (10.0, -depth / (20.0 * sections));
+        for (int b = 0; b < nb; ++b)
+        {
+            const auto fc = std::min (lay.minFc * std::pow (lay.maxFc / lay.minFc, b / (nb - 1.0)), 0.45 * sr);
+            for (auto& f : rm[(std::size_t) b])
+                f.ap (sr, fc, fit.bandQ);
+            det[(std::size_t) b].bp (sr, fc, fit.detQ);
+            det2[(std::size_t) b].bp (sr, fc, fit.detQ);
+            vadBand[(std::size_t) b] = fc >= fit.vadLo && fc <= fit.vadHi;
+        }
+        const auto ln10_20 = std::log (10.0) / 20.0;
+        up = std::exp (ln10_20 * fit.floorUp / sr);
+        down = std::exp (-ln10_20 * fit.floorDown / sr);
+        lu = std::exp (ln10_20 * fit.levUp / sr);
+        ld = std::exp (-ln10_20 * fit.levDown / sr);
+        go = coef (fit.openMs, sr);
+        gc = coef (fit.closeMs, sr);
+        holdN = std::max (1, (int) std::lround (fit.vadHoldMs * 0.001 * sr));
+        detScale = fit.detScale;
+        useEnv = fit.absRel > 0.0;
+        envA = coef (fit.absAtt, sr);
+        envR = coef (fit.absRel, sr);
+        gate = std::pow (10.0, fit.gateDb / 20.0);
+        aboveK = std::pow (10.0, fit.aboveDb / 20.0);
+        capK = std::pow (10.0, fit.capDb / 20.0);
+        kT = std::pow (10.0, fit.ktDb / 20.0);
+        vadK = std::pow (10.0, fit.vadDb / 20.0);
+        boost = std::pow (10.0, fit.vadBoostDb / 20.0);
+        if (first)
+        {
+            const auto init = std::pow (10.0, fit.floorInitDb / 20.0);
+            floorv.fill (init);
+            lev.fill (init);
+        }
+    }
+    double sr = 48000.0, designedAmount = -1.0;
+    double up = 1.0, down = 1.0, lu = 1.0, ld = 1.0, go = 0.0, gc = 0.0, gLow = 1.0, gHigh = 1.0, position = 0.0, gmin = 1.0;
+    double gate = 0.0, aboveK = 1.0, capK = 1.0, kT = 1.0, vadK = 1.0, boost = 1.0, flag = 1.0, detScale = 0.5, envA = 0.0, envR = 0.0;
+    bool useEnv = false;
+    int holdN = 1, noiseCount = 0;
+    fitted::Bq s1a1, s1a2, s2a1, s2a2;
+    std::array<std::array<fitted::Bq, sections>, nb> rm;
+    std::array<fitted::Bq, nb> det, det2;
+    std::array<double, nb> floorv {}, lev {}, gain {}, env {};
+    std::array<bool, nb> vadBand {};
+};
+} // namespace ns1
+
 class Quell final : public Effect
 {
 public:
@@ -417,6 +663,7 @@ public:
                 a.reset();
         power.fill (0.0);
         gainDb.fill (0.0);
+        ns1On = false; // round 190mg: the NS1 law's engine restarts (prepared again at the current rate)
     }
 
     void process (float* l, float* r, int n, const EffectParams& p, double) noexcept override
@@ -426,12 +673,27 @@ public:
         const auto out = (float) dbToGain (outputDb (p[output]));
         if (on (p[matched]))
         {
+            // round 190mg (ns1): the NS1 law above 0 % (and from then on, so that automation down to 0 stays continuous).
+            // Round 190mm (owner, 11-19): Amount 0 runs the NS1 engine's own open all-pass pair too (refcap182's 0 % mix
+            // −54 → −76 dB ESR); the zero law and the NS1 law are both unreleased, so no saved project changes
+            if (on (p[ns1Law]))
+            {
+                if (! ns1On)
+                {
+                    ns1Engine.prepare (sr);
+                    ns1On = true;
+                }
+                const auto red = ns1Engine.process (l, r, n, amt, listenOnly, out);
+                meter[0].store ((float) std::clamp (red / 30.0, 0.0, 1.0), std::memory_order_relaxed);
+                return;
+            }
+            ns1On = false;
             if (! matchedOn)
             {
                 matchedEngine.prepare (sr);
                 matchedOn = true;
             }
-            const auto red = matchedEngine.process (l, r, n, amt, listenOnly, out, on (p[law]) ? &track : nullptr);
+            const auto red = matchedEngine.process (l, r, n, amt, listenOnly, out, on (p[law]) ? &track : nullptr, on (p[zeroLaw]));
             meter[0].store ((float) std::clamp (red / 30.0, 0.0, 1.0), std::memory_order_relaxed);
             return;
         }
@@ -501,8 +763,34 @@ private:
     std::array<std::atomic<float>, bands + 1> meter {};
     fitted::Engine matchedEngine;
     bool matchedOn = false;
+    ns1::Engine ns1Engine; // round 190mg
+    bool ns1On = false;
 };
 } // namespace
+
+Ns1Layout ns1Layout (double amount) noexcept
+{
+    // the reference's five saved states (RealWorld 85 / 86 = the corners, 206 / 203 = the cuts, 226 = the position) at
+    // 0 / 20 / 35 / 50 / 100 %; the high split's Q measured on our probes / renders (REA_rodada190mg_ns1.md §2)
+    static constexpr double at[] { 0.0, 0.2, 0.35, 0.5, 1.0 };
+    static constexpr double lo[] { 60.0, 60.0, 65.0, 70.0, 110.0 }, hi[] { 16000.0, 14000.0, 13500.0, 13000.0, 8000.0 };
+    static constexpr double cut[] { 0.0, -10.0, -25.0, -40.0, -70.0 }, pos[] { 0.0, 0.02, 0.0325, 0.045, 0.8 };
+    static constexpr double q[] { 0.8992, 0.370, 0.392, 0.432, 0.6992 };
+    const auto a = std::clamp (amount, 0.0, 1.0);
+    int k = 0;
+    while (k < 3 && a > at[k + 1])
+        ++k;
+    const auto t = (a - at[k]) / (at[k + 1] - at[k]);
+    const auto lin = [&] (const double* v) { return v[k] + (v[k + 1] - v[k]) * t; };
+    const auto lg = [&] (const double* v) { return v[k] * std::pow (v[k + 1] / v[k], t); };
+    Ns1Layout l;
+    l.minFc = lg (lo);
+    l.maxFc = lg (hi);
+    l.cutDb = lin (cut);
+    l.position = lin (pos);
+    l.q2 = lin (q);
+    return l;
+}
 
 std::unique_ptr<Effect> make (const Tuning& t) { return std::make_unique<Quell> (t); }
 std::unique_ptr<Effect> makeTracked (const Track& t) { return std::make_unique<Quell> (defaultTuning(), &t); }
@@ -619,6 +907,10 @@ public:
     void prepare (double sampleRate) noexcept override
     {
         sr = sampleRate > 0.0 ? sampleRate : 48000.0;
+        spliceReady = false; // round 190mg: the splice law's coefficients follow the rate
+        for (auto& z : spl)
+            z.hist.assign (2 * spliceHist, 0.0f); // (here, not on the audio thread)
+        spliceUsed = false;
         // longest read: 100 ms of delay + the 53 ms window (+ the octave's doubled sweep) + margin
         const auto n = (int) std::ceil (0.25 * sr) + 8;
         for (auto& v : voice)
@@ -643,6 +935,15 @@ public:
         }
         for (auto& d : direct)
             d.clear();
+        for (auto& z : spl) // round 190mg (the history is cleared only once the law has run)
+        {
+            z.pos = z.other = z.energy = 0.0;
+            z.fade = 1.0;
+            z.corr.fill (0.0f);
+            z.at = 0;
+            if (spliceUsed)
+                std::fill (z.hist.begin(), z.hist.end(), 0.0f);
+        }
         lowShelf.reset();
         highShelf.reset();
         designed = false;
@@ -677,6 +978,13 @@ public:
         const auto voiceExtra = (aligned ? 0.0103 * sr : 0.0) - 0.5 * window;
         const bool lowOnV = on (p[lowOn]), highOnV = on (p[highOn]);
         const bool headLaw = p[gemini::headLaw] >= 0.5f;
+        const bool splice = p[gemini::spliceLaw] >= 0.5f; // round 190mg (hidden, the Waves translator's)
+        if (splice)
+        {
+            if (! spliceReady)
+                prepareSplice();
+            setSpliceRange (on (p[range]));
+        }
         const auto headRange = 252.0 * sr / 48000.0; // round 190do [EXEC]: the measured head's range (samples at 48 kHz)
 
         struct VoiceSetup
@@ -705,127 +1013,141 @@ public:
             s.source = sourceOf (p[(std::size_t) voiceParam (k, vSource)]);
         }
 
-        for (int i = 0; i < n; ++i)
-        {
-            const float inL = l[i], inR = r[i];
-            float wetL = 0.0f, wetR = 0.0f;
-            for (int k = 0; k < voices; ++k)
+        // round 190mg: the sample loop is instantiated twice, so the paths without the splice law compile as before
+        const auto run = [&]<bool kSplice>() {
+            for (int i = 0; i < n; ++i)
             {
-                auto& v = voice[k];
-                const auto& s = vs[k];
-                const auto own = k % 2 == 0 ? inL : inR, other = k % 2 == 0 ? inR : inL; // odd voices: the left side
-                const auto src = s.source == 0 ? own : (s.source == 1 ? 0.5f * (own + other) : 0.5f * (own - other));
-                // feedback from the voice's last output through the low cut
-                v.line.push (src + s.fb * v.fbHp.process (v.last, 0));
-                if (! s.active)
+                const float inL = l[i], inR = r[i];
+                float wetL = 0.0f, wetR = 0.0f;
+                for (int k = 0; k < voices; ++k)
                 {
-                    v.last = 0.0f;
-                    continue;
-                }
-                // triangle LFO on the pitch
-                v.lfo += s.lfoInc;
-                v.lfo -= std::floor (v.lfo);
-                const auto tri = v.lfo < 0.5 ? 4.0 * v.lfo - 1.0 : 3.0 - 4.0 * v.lfo;
-                auto ratio = std::pow (2.0, (s.cents + s.depth * tri) / 1200.0);
-                if (s.octave)
-                    ratio *= 0.5;
-                if (! s.octave && aligned)
-                {
-                    // [EXEC] round 124 (official trial, impulse trains at ±1 … ±100 cents, 44.1 / 48 kHz): ONE read head
-                    // at delay + offset, the offset starting at 495 samples (so 0 cents = delay + 495 exactly) and
-                    // drifting by (1 − ratio) per sample inside a 496-sample range; at the range's end the head fades
-                    // out over 1.3 samples of offset, jumps back by the range and fades in again (pitch down), or a
-                    // second head enters at the top while the first finishes at the bottom (pitch up); linear reads
-                    const auto drift = 1.0 - ratio;
-                    float y = 0.0f;
-                    if (drift >= 0.0)
+                    auto& v = voice[k];
+                    const auto& s = vs[k];
+                    const auto own = k % 2 == 0 ? inL : inR, other = k % 2 == 0 ? inR : inL; // odd voices: the left side
+                    const auto src = s.source == 0 ? own : (s.source == 1 ? 0.5f * (own + other) : 0.5f * (own - other));
+                    // feedback from the voice's last output through the low cut
+                    v.line.push (src + s.fb * v.fbHp.process (v.last, 0));
+                    if (! s.active)
                     {
-                        v.offset += drift;
-                        if (v.offset >= downMax)
-                            v.offset -= downMax - downMin;
-                        const auto g = std::min ({ 1.0, (downMax - v.offset) / fade, (v.offset - downMin) / fade });
-                        y = (float) std::max (0.0, g) * v.line.linear (1.0 + s.delay + v.offset);
-                        v.second = -1.0;
+                        v.last = 0.0f;
+                        continue;
                     }
-                    else
+                    // triangle LFO on the pitch
+                    v.lfo += s.lfoInc;
+                    v.lfo -= std::floor (v.lfo);
+                    const auto tri = v.lfo < 0.5 ? 4.0 * v.lfo - 1.0 : 3.0 - 4.0 * v.lfo;
+                    auto ratio = std::pow (2.0, (s.cents + s.depth * tri) / 1200.0);
+                    if (s.octave)
+                        ratio *= 0.5;
+                    if (! s.octave && aligned)
                     {
-                        v.offset += drift;
-                        if (v.second < 0.0 && v.offset <= upMin + upOverlap)
-                            v.second = v.offset + (upMax - upMin - upOverlap);
-                        if (v.second >= 0.0)
-                            v.second += drift;
-                        if (v.offset <= upMin)
+                        // [EXEC] round 124 (official trial, impulse trains at ±1 … ±100 cents, 44.1 / 48 kHz): ONE read head
+                        // at delay + offset, the offset starting at 495 samples (so 0 cents = delay + 495 exactly) and
+                        // drifting by (1 − ratio) per sample inside a 496-sample range; at the range's end the head fades
+                        // out over 1.3 samples of offset, jumps back by the range and fades in again (pitch down), or a
+                        // second head enters at the top while the first finishes at the bottom (pitch up); linear reads
+                        const auto drift = 1.0 - ratio;
+                        float y = 0.0f;
+                        if (drift >= 0.0)
                         {
-                            v.offset = v.second >= 0.0 ? v.second : v.offset + (upMax - upMin);
+                            v.offset += drift;
+                            if (v.offset >= downMax)
+                                v.offset -= downMax - downMin;
+                            const auto g = std::min ({ 1.0, (downMax - v.offset) / fade, (v.offset - downMin) / fade });
+                            y = (float) std::max (0.0, g) * v.line.linear (1.0 + s.delay + v.offset);
                             v.second = -1.0;
                         }
-                        const auto gIn = std::clamp ((upMax - v.offset) / upFadeIn, 0.0, 1.0);
-                        y = (float) gIn * v.line.linear (1.0 + s.delay + v.offset);
-                        if (v.second >= 0.0)
-                            y += (float) std::clamp ((upMax - v.second) / upFadeIn, 0.0, 1.0) * v.line.linear (1.0 + s.delay + v.second);
+                        else
+                        {
+                            v.offset += drift;
+                            if (v.second < 0.0 && v.offset <= upMin + upOverlap)
+                                v.second = v.offset + (upMax - upMin - upOverlap);
+                            if (v.second >= 0.0)
+                                v.second += drift;
+                            if (v.offset <= upMin)
+                            {
+                                v.offset = v.second >= 0.0 ? v.second : v.offset + (upMax - upMin);
+                                v.second = -1.0;
+                            }
+                            const auto gIn = std::clamp ((upMax - v.offset) / upFadeIn, 0.0, 1.0);
+                            y = (float) gIn * v.line.linear (1.0 + s.delay + v.offset);
+                            if (v.second >= 0.0)
+                                y += (float) std::clamp ((upMax - v.second) / upFadeIn, 0.0, 1.0) * v.line.linear (1.0 + s.delay + v.second);
+                        }
+                        v.last = y;
+                        wetL += s.gl * y;
+                        wetR += s.gr * y;
+                        continue;
+                    }
+                    if (kSplice && ! s.octave)
+                    {
+                        v.last = spliceVoice (v, spl[(std::size_t) k], s.delay, ratio, src);
+                        wetL += s.gl * v.last;
+                        wetR += s.gr * v.last;
+                        continue;
+                    }
+                    if (! s.octave && headLaw)
+                    {
+                        // round 190do [EXEC] (tp172d renders, Align off: the voices' delays tracked over 8 s of music): ONE
+                        // read head at delay + offset; the offset drifts by (1 − ratio) per sample away from the delay (pitch
+                        // down: later, up to +R; pitch up: earlier, down to −R) and jumps back by R towards the delay, a
+                        // second head crossfading in over the last X samples of offset; linear reads
+                        v.head += 1.0 - ratio;
+                        if (v.head >= headRange)
+                            v.head -= headRange;
+                        else if (v.head <= -headRange)
+                            v.head += headRange;
+                        const auto edge = headRange - std::abs (v.head);
+                        const auto g1 = std::clamp (edge / headFade, 0.0, 1.0);
+                        const auto read = [&v, &s] (double o) { return v.line.linear (std::max (1.0, 1.0 + s.delay + o)); };
+                        auto y = (float) g1 * read (v.head);
+                        if (g1 < 1.0)
+                            y += (float) (1.0 - g1) * read (v.head - (v.head > 0.0 ? headRange : -headRange));
+                        v.last = y;
+                        wetL += s.gl * y;
+                        wetR += s.gr * y;
+                        continue;
+                    }
+                    // two read taps half a window apart sweep the window at (1 − ratio) samples per sample
+                    v.phase += (1.0 - ratio) / window;
+                    v.phase -= std::floor (v.phase);
+                    float y = 0.0f;
+                    for (int t = 0; t < 2; ++t)
+                    {
+                        auto ph = v.phase + 0.5 * t;
+                        ph -= std::floor (ph);
+                        const auto w = (float) std::sin (pi * ph); // power-complementary crossfade of the two grains
+                        y += w * v.line.at (1.0 + s.delay + voiceExtra + ph * window);
                     }
                     v.last = y;
                     wetL += s.gl * y;
                     wetR += s.gr * y;
-                    continue;
                 }
-                if (! s.octave && headLaw)
+                if (lowOnV)
                 {
-                    // round 190do [EXEC] (tp172d renders, Align off: the voices' delays tracked over 8 s of music): ONE
-                    // read head at delay + offset; the offset drifts by (1 − ratio) per sample away from the delay (pitch
-                    // down: later, up to +R; pitch up: earlier, down to −R) and jumps back by R towards the delay, a
-                    // second head crossfading in over the last X samples of offset; linear reads
-                    v.head += 1.0 - ratio;
-                    if (v.head >= headRange)
-                        v.head -= headRange;
-                    else if (v.head <= -headRange)
-                        v.head += headRange;
-                    const auto edge = headRange - std::abs (v.head);
-                    const auto g1 = std::clamp (edge / headFade, 0.0, 1.0);
-                    const auto read = [&v, &s] (double o) { return v.line.linear (std::max (1.0, 1.0 + s.delay + o)); };
-                    auto y = (float) g1 * read (v.head);
-                    if (g1 < 1.0)
-                        y += (float) (1.0 - g1) * read (v.head - (v.head > 0.0 ? headRange : -headRange));
-                    v.last = y;
-                    wetL += s.gl * y;
-                    wetR += s.gr * y;
-                    continue;
+                    wetL = lowShelf.process (wetL, 0);
+                    wetR = lowShelf.process (wetR, 1);
                 }
-                // two read taps half a window apart sweep the window at (1 − ratio) samples per sample
-                v.phase += (1.0 - ratio) / window;
-                v.phase -= std::floor (v.phase);
-                float y = 0.0f;
-                for (int t = 0; t < 2; ++t)
+                if (highOnV)
                 {
-                    auto ph = v.phase + 0.5 * t;
-                    ph -= std::floor (ph);
-                    const auto w = (float) std::sin (pi * ph); // power-complementary crossfade of the two grains
-                    y += w * v.line.at (1.0 + s.delay + voiceExtra + ph * window);
+                    wetL = highShelf.process (wetL, 0);
+                    wetR = highShelf.process (wetR, 1);
                 }
-                v.last = y;
-                wetL += s.gl * y;
-                wetR += s.gr * y;
+                // the direct signal: rotated in the stereo field, delayed by half a window when aligned with the voices
+                direct[0].push (inL);
+                direct[1].push (inR);
+                const auto dL = alignSamples > 0.0 ? direct[0].at (1.0 + alignSamples) : inL;
+                const auto dR = alignSamples > 0.0 ? direct[1].at (1.0 + alignSamples) : inR;
+                const auto oL = dirGain * (rc * dL + rs * dR), oR = dirGain * (rc * dR - rs * dL);
+                l[i] = master * (oL + wetL);
+                r[i] = master * (oR + wetR);
+                peakOut = std::max (peakOut, std::max (std::abs (l[i]), std::abs (r[i])));
             }
-            if (lowOnV)
-            {
-                wetL = lowShelf.process (wetL, 0);
-                wetR = lowShelf.process (wetR, 1);
-            }
-            if (highOnV)
-            {
-                wetL = highShelf.process (wetL, 0);
-                wetR = highShelf.process (wetR, 1);
-            }
-            // the direct signal: rotated in the stereo field, delayed by half a window when aligned with the voices
-            direct[0].push (inL);
-            direct[1].push (inR);
-            const auto dL = alignSamples > 0.0 ? direct[0].at (1.0 + alignSamples) : inL;
-            const auto dR = alignSamples > 0.0 ? direct[1].at (1.0 + alignSamples) : inR;
-            const auto oL = dirGain * (rc * dL + rs * dR), oR = dirGain * (rc * dR - rs * dL);
-            l[i] = master * (oL + wetL);
-            r[i] = master * (oR + wetR);
-            peakOut = std::max (peakOut, std::max (std::abs (l[i]), std::abs (r[i])));
-        }
+        };
+        if (splice)
+            run.template operator()<true>();
+        else
+            run.template operator()<false>();
         meterIn.store (std::min (peakIn, 1.0f), std::memory_order_relaxed);
         meterOut.store (std::min (peakOut, 1.0f), std::memory_order_relaxed);
     }
@@ -918,6 +1240,7 @@ private:
     static constexpr double downMin = 79.4, downMax = 575.7, fade = 1.3;
     static constexpr double upMin = 62.0, upMax = 558.4, upOverlap = 4.2, upFadeIn = 0.7;
 
+    static constexpr int spliceLags = 20; // round 190mg: the splice law's candidate lags
     struct Voice
     {
         Line line;
@@ -927,6 +1250,102 @@ private:
         float last = 0.0f;
         Biquad fbHp;
     };
+    // round 190mg: the splice law's state per voice (apart from Voice: the old paths keep their layout) — the head's lag
+    // (samples ago, 0 = unset), the old head's distance from it during a fade, the fade's gain, the running energy and
+    // autocorrelation at the candidate lags, and the source's recent history written twice (reads never wrap)
+    static constexpr int spliceHist = 4096; // > the longest candidate lag (495 · 4 at Range 1), a power of two
+    struct Splice
+    {
+        double pos = 0.0, other = 0.0, fade = 1.0, energy = 0.0;
+        std::array<float, spliceLags> corr {}; // (single precision, as the DSP keeps them)
+        std::vector<float> hist; // 2 · spliceHist, allocated when the law is first used
+        int at = 0;
+    };
+    std::array<Splice, voices> spl;
+
+    // round 190mg [REA, the Waves doubler's DSP] — one read head per voice at `lag` samples ago, drifting by (1 − ratio)
+    // per sample. Its free band is the delay ± W (W = 256 samples, ×4 with Range); past it the head jumps by the
+    // candidate lag with the highest running autocorrelation of the source (20 lags 256·2^(k/20)·W/256, one-pole 20 ms
+    // average) as soon as the source is quiet (mean square < 0.001), or the head sits on a near-zero sample (|x| < 0.01)
+    // while that autocorrelation exceeds 0.1 × the mean square; 32 samples further the jump is forced. The old head fades
+    // out linearly over W samples. Linear reads. Every number is from the DSP (sizes in samples, not time).
+    std::array<int, spliceLags> lagList {};
+    bool spliceReady = false, spliceUsed = false;
+    double spliceW = 256.0, spliceC = 0.0, spliceFadeInc = 1.0;
+    float spliceC4 = 0.0f; // the autocorrelation's weight per update (every 4th sample)
+    void prepareSplice() noexcept
+    {
+        spliceReady = true;
+        spliceUsed = true;
+        spliceC = std::exp (-1.0 / (0.020 * sr));
+        spliceC4 = (float) (1.0 - std::pow (spliceC, 4.0));
+    }
+    void setSpliceRange (bool wide) noexcept
+    {
+        const auto w = wide ? 4.0 : 1.0;
+        if (spliceW == 256.0 * w && lagList[0] != 0)
+            return;
+        spliceW = 256.0 * w;
+        spliceFadeInc = 1.0 / spliceW; // [EXEC] the old head fades out linearly over W samples (fitted on noise probes: 256)
+        for (int k = 0; k < spliceLags; ++k)
+            lagList[(std::size_t) k] = (int) std::floor (std::pow (2.0, 0.05 * k) * w * 256.0 + 0.5);
+    }
+    [[gnu::noinline]] float spliceVoice (Voice& v, Splice& z, double delay, double ratio, float src) noexcept
+    {
+        const auto size = (int) v.line.buf.size();
+        const auto ago = [&v, size] (int d) { auto i = v.line.pos - d; return v.line.buf[(std::size_t) (i < 0 ? i + size : i)]; };
+        // the detector: running energy and autocorrelation of the source (one-pole averages)
+        z.at = (z.at + 1) & (spliceHist - 1);
+        z.hist[(std::size_t) z.at] = z.hist[(std::size_t) (z.at + spliceHist)] = src;
+        const float* h = z.hist.data() + z.at + spliceHist; // h[0] = this sample, h[-d] = d samples before
+        const auto a = 1.0 - spliceC, x = (double) src;
+        z.energy += a * (x * x - z.energy);
+        // the autocorrelation every 4th sample (the same 20 ms average: the DSP updates it every sample; a quarter of the
+        // work, the jump decisions still every sample)
+        if ((z.at & 3) == 0)
+        {
+            const auto af = spliceC4, xf = src;
+            for (int k = 0; k < spliceLags; ++k)
+            {
+                auto& r = z.corr[(std::size_t) k];
+                r += af * (xf * h[-lagList[(std::size_t) k]] - r);
+            }
+        }
+        // the delay is at least W + 64 samples (the DSP's minimum without Align)
+        const auto centre = std::max (delay, spliceW + 64.0);
+        if (z.pos <= 0.0)
+            z.pos = centre;
+        z.pos += 1.0 - ratio;
+        const auto lo = centre - spliceW, hi = centre + spliceW;
+        if (z.pos <= lo || z.pos >= hi)
+        {
+            // the candidate with the highest autocorrelation (the last of equals)
+            float best = 0.0f;
+            int bestLag = lagList[0];
+            for (int k = 0; k < spliceLags; ++k)
+                if (best <= z.corr[(std::size_t) k])
+                    best = z.corr[(std::size_t) k], bestLag = lagList[(std::size_t) k];
+            const bool up = z.pos <= lo;
+            const auto at = std::clamp ((int) std::lround (z.pos), 1, size - 4);
+            const bool forced = up ? z.pos <= lo - 32.0 : z.pos >= hi + 32.0;
+            if (forced || z.energy < 0.001 || (std::abs (ago (at)) < 0.01f && 0.1 * z.energy < (double) best))
+            {
+                const auto step = up ? (double) bestLag : -(double) bestLag;
+                z.pos += step;
+                z.other = -step;
+                z.fade = 0.0;
+            }
+        }
+        const auto read = [&v, size] (double d) { return v.line.linear (std::clamp (1.0 + d, 1.0, (double) size - 5.0)); };
+        auto y = read (z.pos);
+        if (z.fade < 1.0)
+        {
+            z.fade = std::min (1.0, z.fade + spliceFadeInc);
+            const auto old = read (z.pos + z.other);
+            y = (float) (old + (double) (y - old) * z.fade);
+        }
+        return y;
+    }
 
     double sr = 48000.0;
     std::array<Voice, voices> voice;

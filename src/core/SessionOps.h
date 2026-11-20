@@ -81,6 +81,31 @@ bool moveClip (Song& song, int fromTrack, int fromScene, int toTrack, int toScen
 // Duplicate: a copy in the slot below (a new scene is added under the last one). Returns the copy's scene, −1: nothing.
 int duplicate (Song& song, int track, int scene);
 
+// Round 190lx (DL-29, Live manual 7.4 / capture 190lx LB1-LB3): a rectangle of slots on the clipboard. `tracks` x `scenes`
+// is the rectangle's size; `clips` hold the slots that had a clip, at their offset from its top-left corner (the empty
+// ones stay holes: a paste leaves what is under them alone).
+struct SlotBlock
+{
+    struct Item
+    {
+        int track = 0, scene = 0; // offset in the rectangle
+        SlotClip content;
+    };
+    int tracks = 0, scenes = 0;
+    std::vector<Item> clips;
+    bool empty() const noexcept { return clips.empty(); }
+};
+// The clips of tracks t0..t1, scenes s0..s1 (either order).
+SlotBlock copyBlock (const Song& song, int t0, int s0, int t1, int s1);
+// Empties the slots of the rectangle (the cut's second half).
+void clearBlock (Song& song, int t0, int s0, int t1, int s1);
+// Puts the block with its top-left corner on (track, scene): each clip replaces what its slot held; the parts that fall
+// past the last track or scene are dropped. Returns the clips placed.
+int pasteBlock (Song& song, int track, int scene, const SlotBlock& block);
+// Duplicate of a rectangle: a copy right under it (scenes s1+1 ... s1+height), as the one-slot Duplicate goes to the slot
+// below. Returns the copy's first scene, −1: nothing to copy or no room.
+int duplicateBlock (Song& song, int t0, int s0, int t1, int s1);
+
 // A slot's clip on the Playlist: a copy on `playlistTrack` at `tick`, one pass long. False: nothing in the slot.
 bool toPlaylist (Song& song, int track, int scene, int playlistTrack, std::int64_t tick);
 // A copy of a Playlist-style clip (pattern or audio, as copied there) into a slot. False: not a clip a slot can hold.

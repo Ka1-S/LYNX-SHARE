@@ -11,7 +11,8 @@ namespace lynx
 // loader speaks them; round 168b). Every drop target (Channel Rack, Playlist, Newtone...) and the Browser ask this through
 // SampleLibrary::isSampleFile, so they all take what the Browser lists (round 165q: the Channel Rack ignored the .wv
 // pack samples dropped from the Browser).
-inline constexpr std::array<std::string_view, 8> sampleFileExtensions { "wav", "aif", "aiff", "flac", "ogg", "mp3", "wv", "speech" };
+// (".ncw": Kontakt's lossless compressed WAV, engine/NcwFormat.h; round 190ii, issue #149)
+inline constexpr std::array<std::string_view, 9> sampleFileExtensions { "wav", "aif", "aiff", "flac", "ogg", "mp3", "wv", "speech", "ncw" };
 
 // `extension` with or without its leading dot, in any case ("WAV", ".wv").
 inline bool isSampleExtension (std::string_view extension)

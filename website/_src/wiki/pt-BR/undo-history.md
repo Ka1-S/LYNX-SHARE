@@ -1,5 +1,5 @@
 ---
-source: 9f36c60cc7
+source: 2298a70fec
 ---
 ![A janela do histórico de desfazer: seis passos de Start a Add notes, com Mudo: Kick como o atual](/assets/img/wiki/history.webp)
 
@@ -15,18 +15,17 @@ Toda edição no projeto é um passo no histórico de desfazer: uma nota que voc
 
 ## As teclas de desfazer
 
-`Ctrl+Z` não funciona como na maioria dos programas. Ele desfaz o último passo e, apertado de novo, o refaz, alternando entre os dois últimos estados. Para voltar mais, use `Ctrl+Alt+Z`.
+`Ctrl+Z` volta pelo histórico, um passo por toque, como no FL Studio 2026 e na maioria dos programas. `Ctrl+Y` ou `Ctrl+Shift+Z` avança de novo.
 
 | Comando | Tecla | O que faz |
 |---|---|---|
-| `Desfazer` | `Ctrl+Z` | Desfaz o último passo. Depois de um desfazer, refaz o passo seguinte, e o item do menu passa a mostrar `Desfazer (refazer)` |
-| `Desfazer para trás` | `Ctrl+Alt+Z` | Sempre volta, um passo por toque |
+| `Desfazer` | `Ctrl+Z` | Volta um passo por toque |
 | `Refazer` | `Ctrl+Y` ou `Ctrl+Shift+Z` | Avança um passo |
 | `Histórico de desfazer...` | `Ctrl+Alt+H` | Abre a lista |
 
-Depois de cada desfazer ou refazer, a barra de dicas nomeia o passo e mostra o nível, por exemplo `Level 2/3`.
+O menu `Editar` mostra o nome do passo em que cada item vai agir, por exemplo `Undo Add notes: Pattern 1`. Depois de cada desfazer ou refazer, a barra de dicas nomeia o passo e mostra o nível, por exemplo `Level 2/3`.
 
-Se você prefere o comportamento usual, ligue `Modo de desfazer alternativo (desfazer clássico, em vez de desfazer/refazer no mesmo atalho)` em `Opções › Configurações gerais...`. `Ctrl+Z` então sempre volta um passo.
+O outro modo de desfazer do FL Studio também está lá: desligue `Modo de desfazer alternativo` em `Opções › Configurações gerais...`. `Ctrl+Z` então desfaz o último passo e, apertado de novo, o refaz, alternando entre os dois últimos estados. `Ctrl+Alt+Z` (`Desfazer para trás`) volta mais, e `Ctrl+Y` ou `Ctrl+Shift+Z` continuam refazendo.
 
 ## O que é um passo e o que não é
 
@@ -43,7 +42,7 @@ As duas estão em `Opções › Configurações gerais...`.
 | Opção | O que faz |
 |---|---|
 | `Máximo de níveis de desfazer` | Quantos passos são mantidos: 25, 50, 100, 200, 500 ou 1000. O padrão é 100 |
-| `Modo de desfazer alternativo` | Faz de `Ctrl+Z` um desfazer clássico |
+| `Modo de desfazer alternativo` | Ligado por padrão: `Ctrl+Z` volta pelo histórico. Desligado: `Ctrl+Z` alterna entre desfazer e refazer o último passo |
 
 ## Cópias de segurança
 

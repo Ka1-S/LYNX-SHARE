@@ -14,14 +14,17 @@
 #include <sstream>
 #include <utility>
 
+#include "core/AlsDevices.h"
 #include "core/AlsImport.h"
 #include "core/AlsSkeleton.h"
 #include "core/ClipLauncher.h"
 #include "core/Effects.h"
 #include "core/FlWrapper.h"
 #include "core/Groove.h"
+#include "core/WavetableSynth.h"
 #include "core/Gzip.h"
 #include "core/Inflate.h"
+#include "core/LiveFader.h"
 #include "core/LiveScales.h"
 #include "core/OggVorbis.h"
 #include "core/Patcher.h"
@@ -176,9 +179,8 @@ std::string boolean (bool b) { return b ? "true" : "false"; }
 // The project key as Live's scale (round 190o) [LIVE 12.4 save: ScaleInformation { Root, Name = the scale chooser's
 // index } beside the set's InKey and each MIDI clip's IsInKey; Live 11: a clip's ScaleInformation { RootNote, Name as
 // text }]. A project with no key, or with a scale Live has none like, is written with Scale Mode off (C Major).
-void writeLiveScale (Node& owner, const Song& song, std::string_view inKeyMember)
+void writeLiveScale (Node& owner, const std::optional<projectkey::Key>& key, std::string_view inKeyMember)
 {
-    const auto key = projectkey::get (song);
     const auto index = key ? livescales::indexFor (*key) : -1;
     auto* info = owner.child ("ScaleInformation");
     owner.value (inKeyMember, boolean (index >= 0 && info != nullptr)); // (the Live 12 skeleton's set has Scale Mode on)
@@ -193,6 +195,7 @@ void writeLiveScale (Node& owner, const Song& song, std::string_view inKeyMember
         name->set ("Value", numeric ? num (index) : std::string (livescales::scales()[(std::size_t) index].name));
     }
 }
+void writeLiveScale (Node& owner, const Song& song, std::string_view inKeyMember) { writeLiveScale (owner, projectkey::get (song), inKeyMember); }
 
 // ---------------------------------------------------------------------------------------------------------------
 // Skeletons (core/AlsSkeleton.h): one map of element kind → element per version, decoded once
@@ -270,6 +273,154 @@ struct LiveTrack
     bool muted = false, solo = false;
 };
 
+// ---------------------------------------------------------------------------------------------------------------
+// Rack presets (.adg, round 190hr): the set form of a rack (Branches/<Kind>Branch with their devices, as a track holds it)
+// rewritten into Live's preset form [DATA: every .adg of Live 12.4's Core Library; SCHEMA 12402 lines 2-10, 241-252,
+// 1860-1872, 2760-2766, 2915-2927, 4611-4623]: GroupDevicePreset{OverwriteProtectionNumber, Device (the rack with an
+// empty Branches / ReturnBranches), PresetRef, BranchPresets, ReturnBranchPresets}; each chain a <Kind>BranchPreset
+// {Name, IsSoloed, DevicePresets, MixerPreset, BranchSelectorRange, SessionViewBranchWidth, DocumentColorIndex,
+// AutoColored, AutoColorScheme, SourceContext[, ZoneSettings]}; each device an AbletonDevicePreset (a nested rack a
+// GroupDevicePreset). Live's own presets write 3077 as OverwriteProtectionNumber and every pointee / target Id as 0.
+constexpr const char* presetProtection = "3077";
+
+Node scalar (std::string name, std::string value)
+{
+    Node n;
+    n.name = std::move (name);
+    n.set ("Value", std::move (value));
+    return n;
+}
+
+Node named (std::string name)
+{
+    Node n;
+    n.name = std::move (name);
+    return n;
+}
+
+bool isRackTag (const std::string& tag)
+{
+    return tag == "AudioEffectGroupDevice" || tag == "InstrumentGroupDevice" || tag == "MidiEffectGroupDevice" || tag == "DrumGroupDevice";
+}
+
+void zeroIds (Node& e)
+{
+    const auto target = e.name == "Pointee" || (e.name.size() > 6 && e.name.compare (e.name.size() - 6, 6, "Target") == 0)
+                        || e.name.rfind ("ControllerTargets.", 0) == 0;
+    if (target && e.has ("Id"))
+        e.set ("Id", "0");
+    for (auto& k : e.kids)
+        zeroIds (k);
+}
+
+Node devicePreset (Node device, int id);
+
+Node branchPreset (Node& b, int id)
+{
+    const auto drum = b.name == "DrumBranch";
+    // (a Drum Rack's return chain, ReturnBranch in a set, is an AudioEffectBranchPreset in a preset [DATA])
+    Node p = named ((b.name == "ReturnBranch" ? std::string ("AudioEffectBranch") : b.name) + "Preset");
+    p.set ("Id", std::to_string (id));
+    std::string name;
+    if (auto* n = b.at ("Name/UserName"))
+        name = n->get ("Value");
+    if (name.empty())
+        if (auto* n = b.at ("Name/EffectiveName"))
+            name = n->get ("Value");
+    p.add (scalar ("Name", name));
+    p.add (scalar ("IsSoloed", b.child ("IsSoloed") != nullptr ? b.child ("IsSoloed")->get ("Value") : "false"));
+    Node presets = named ("DevicePresets");
+    for (const auto* chain : { "DeviceChain/AudioToAudioDeviceChain/Devices", "DeviceChain/MidiToAudioDeviceChain/Devices",
+                               "DeviceChain/MidiToMidiDeviceChain/Devices" })
+        if (auto* devices = b.at (chain))
+            for (auto& d : devices->kids)
+                presets.add (devicePreset (std::move (d), (int) presets.kids.size()));
+    p.add (std::move (presets));
+    Node mixer = named ("MixerPreset");
+    if (auto* m = b.child ("MixerDevice"))
+    {
+        Node inner = std::move (*m);
+        inner.name = b.name == "MidiEffectBranch" ? "MidiBranchMixerDevice" : "AudioBranchMixerDevice";
+        inner.attrs.clear();
+        inner.set ("Id", "0");
+        Node wrap = named ("AbletonDevicePreset");
+        wrap.set ("Id", "0");
+        wrap.add (scalar ("OverwriteProtectionNumber", presetProtection));
+        Node device = named ("Device");
+        device.add (std::move (inner));
+        wrap.add (std::move (device));
+        wrap.add (named ("PresetRef"));
+        mixer.add (std::move (wrap));
+    }
+    p.add (std::move (mixer));
+    if (auto* range = b.child ("BranchSelectorRange"))
+        p.add (*range);
+    const auto value = [&b] (const char* member, const char* fallback) {
+        const auto* e = b.child (member);
+        return e != nullptr && e->has ("Value") ? e->get ("Value") : std::string (fallback);
+    };
+    p.add (scalar ("SessionViewBranchWidth", value ("SessionViewBranchWidth", "55")));
+    p.add (scalar ("DocumentColorIndex", value ("Color", "0")));
+    p.add (scalar ("AutoColored", value ("AutoColored", "true")));
+    p.add (scalar ("AutoColorScheme", value ("AutoColorScheme", "0")));
+    p.add (named ("SourceContext"));
+    if (drum)
+    {
+        Node zones = named ("ZoneSettings");
+        if (auto* info = b.child ("BranchInfo"))
+            for (const auto* member : { "ReceivingNote", "SendingNote", "ChokeGroup" })
+                if (auto* x = info->child (member))
+                    zones.add (*x);
+        p.add (std::move (zones));
+    }
+    else if (auto* zones = b.child ("ZoneSettings"))
+        p.add (*zones);
+    return p;
+}
+
+Node rackPreset (Node device)
+{
+    Node p = named ("GroupDevicePreset");
+    p.add (scalar ("OverwriteProtectionNumber", presetProtection));
+    Node branches = named ("BranchPresets"), returns = named ("ReturnBranchPresets");
+    if (auto* list = device.child ("Branches"))
+    {
+        for (auto& b : list->kids)
+            branches.add (branchPreset (b, (int) branches.kids.size()));
+        list->kids.clear();
+    }
+    if (auto* list = device.child ("ReturnBranches"))
+    {
+        for (auto& b : list->kids)
+            returns.add (branchPreset (b, (int) returns.kids.size()));
+        list->kids.clear();
+    }
+    device.set ("Id", "0");
+    Node holder = named ("Device");
+    holder.add (std::move (device));
+    p.add (std::move (holder));
+    p.add (named ("PresetRef"));
+    p.add (std::move (branches));
+    p.add (std::move (returns));
+    return p;
+}
+
+Node devicePreset (Node device, int id)
+{
+    Node p = isRackTag (device.name) ? rackPreset (std::move (device)) : named ("AbletonDevicePreset");
+    if (p.name == "AbletonDevicePreset")
+    {
+        device.set ("Id", "0");
+        p.add (scalar ("OverwriteProtectionNumber", presetProtection));
+        Node holder = named ("Device");
+        holder.add (std::move (device));
+        p.add (std::move (holder));
+        p.add (named ("PresetRef"));
+    }
+    p.set ("Id", std::to_string (id));
+    return p;
+}
+
 struct Exporter
 {
     const Song& song;
@@ -279,6 +430,7 @@ struct Exporter
     bool live11 = false;
     std::set<std::string> noted;
     int sceneCount = 1; // the set's scenes: the clip grid's rows (round 181c), else one
+    std::vector<int> exportReturns; // round 190kc: the inserts written as return tracks, in order
 
     void note (const std::string& what)
     {
@@ -355,6 +507,9 @@ struct Exporter
         else
             return false;
         out.value ("On/Manual", boolean (on));
+        // the plugin's MPE Mode (round 190hy): the device's own MpeEnabled, which the import reads (the preset copy stays
+        // the skeleton's 0, as in every save seen)
+        out.value ("MpeEnabled", boolean (ref.mpe));
         return true;
     }
 
@@ -380,6 +535,7 @@ struct Exporter
 
     // ---- Drum Racks (round 190ec, ALS_FORMAT.md §7): a pad's BranchInfo, its sends and Audio To, the return chains, and
     // a LYNX Sampler on a pad as Live's Simpler
+    bool rackPresetMode = false; // (round 190hr: writing an .adg)
     std::string drumTarget {}; // "AudioOut/Track.<track Id>/DeviceIn.<device Id>" of the Drum Rack about to be written (top level)
     static constexpr const char* sendFloor = "0.0003162277571"; // (Live's −70 dB send floor = −inf [DATA])
 
@@ -464,6 +620,56 @@ struct Exporter
                 }
             list->add (std::move (b));
         }
+    }
+
+    // A Helix channel → Live's Wavetable (round 190ja): the import backwards — Helix keeps Wavetable's units, so every value
+    // goes out as it is; the tables go out as the Live table that maps onto each (Live's own content), and their LYNX
+    // names in the device's info text so LYNX reads them back exactly [MODEL]
+    bool helixDevice (const ChannelDef& ch, Node& out)
+    {
+        out = sk["InstrumentVector"];
+        if (out.name.empty())
+            return false;
+        const auto s = helixState (ch);
+        const auto& names = alsdev::helixLiveNames();
+        for (int i = 0; i < wt::paramCount && i < (int) names.size(); ++i)
+            if (auto* e = out.at (names[(std::size_t) i]))
+            {
+                auto* target = e->child ("Manual") != nullptr ? e->child ("Manual") : e;
+                const auto old = target->get ("Value");
+                const auto v = s[(std::size_t) i];
+                target->set ("Value", old == "true" || old == "false" ? std::string (v > 0.5 ? "true" : "false")
+                                                                    : (e->child ("Manual") != nullptr ? num (v) : num ((int) std::lround (v))));
+            }
+        const auto mode1 = (int) std::lround (s[(std::size_t) (wt::oscBase (0) + wt::osc::effectMode)]);
+        const auto mode2 = (int) std::lround (s[(std::size_t) (wt::oscBase (1) + wt::osc::effectMode)]);
+        if (auto* mc = out.at ("ModulationConnections"))
+        {
+            int row = 0;
+            for (auto& r : mc->kids)
+            {
+                if (row >= wt::targetCount)
+                    break;
+                r.value ("TargetName", wt::targetName (row, mode1, mode2));
+                for (int k = 0; k < wt::sourceCount; ++k)
+                    r.value ("ModulationAmounts." + std::to_string (k), num (s[(std::size_t) wt::matrixIndex (row, k)]));
+                ++row;
+            }
+        }
+        // the wheel's range is the channel's (Pitch ← Pitch Bend: 1 = 48 semitones)
+        if (auto* mc = out.at ("ModulationConnections"); mc != nullptr && (int) mc->kids.size() > wt::tgt::pitch)
+            mc->kids[(std::size_t) wt::tgt::pitch].value ("ModulationAmounts." + std::to_string (wt::src::pitchBend),
+                                                         num (std::clamp (ch.misc.pitchRange, 0, 48) / 48.0));
+        std::string tables;
+        for (int k = 0; k < 2; ++k)
+        {
+            const auto t = (int) std::lround (s[(std::size_t) wt::tableBase + (std::size_t) k]);
+            out.value ("SpriteName" + std::to_string (k + 1), wt::liveTableFor (t));
+            tables += (k ? " | " : "") + std::string (wt::tableName (t));
+        }
+        out.value ("Annotation", "LYNX Helix tables: " + tables);
+        out.value ("UserName", "");
+        return true;
     }
 
     // A LYNX Sampler on a pad → Live's Simpler [DATA: Live's default pad Simpler; the import's laws backwards
@@ -616,6 +822,15 @@ struct Exporter
                     const auto& node = doc.nodes[(std::size_t) n];
                     Node d;
                     bool made = false;
+                    if (rackPresetMode && ((node.generator && node.channel.instrument == InstrumentKind::plugin) || (! node.generator && node.effect.kind == EffectKind::plugin)))
+                    {
+                        // [LIVE, round 190hr] Live 12.4.16 closed ("A serious program error") on each LYNX-written .adg
+                        // holding a VST3 plugin device (kHs Gain, no saved state), while the same racks without it, nested
+                        // racks, Instrument / MIDI Effect / Drum Racks loaded: plugins stay out of rack presets until a
+                        // plugin with a state Live saved is checked
+                        note ("Plugin left out of the Live rack preset (Live 12.4 closes on it): " + patcher::nodeName (node));
+                        continue;
+                    }
                     if (node.generator && node.channel.instrument == InstrumentKind::plugin)
                         made = pluginDevice (node.channel.plugin, true, true, d);
                     else if (drum && node.generator && node.channel.instrument == InstrumentKind::sampler) // (round 190ec)
@@ -785,6 +1000,9 @@ struct Exporter
             mixer->value ("Pan/Manual", num ((double) std::clamp (t.pan, -1.0f, 1.0f)));
             mixer->value ("Speaker/Manual", boolean (! t.muted));
             mixer->value ("SoloSink", boolean (t.solo));
+            // round 190kc: Live's Crossfade Assign (0 A, 1 none, 2 B)
+            if (t.insert > 0 && t.insert < (int) song.mixer.size() && t.ownsInsert)
+                mixer->value ("CrossFadeState/Manual", num ((int) song.mixer[(std::size_t) t.insert].crossfade));
             if (auto* sends = mixer->child ("Sends"))
             {
                 sends->kids.clear();
@@ -794,9 +1012,13 @@ struct Exporter
                     h.set ("Id", num (r));
                     h.value ("Send/Manual", num (minGain));
                     // a return track's sends to the returns are off, as Live saves them [LIVE: its default set and
-                    // demo sets; round 182b]
+                    // demo sets; round 182b], unless switched on (round 190kc: MixerTrack::returnSendsOn)
                     if (t.kind == LiveTrack::Kind::ret)
-                        h.value ("EnabledByUser", "false");
+                    {
+                        const auto& on = song.mixer[(std::size_t) t.insert].returnSendsOn;
+                        const auto target = r < (int) exportReturns.size() ? exportReturns[(std::size_t) r] : -1;
+                        h.value ("EnabledByUser", std::find (on.begin(), on.end(), target) != on.end() ? "true" : "false");
+                    }
                     sends->add (std::move (h));
                 }
             }
@@ -1009,6 +1231,7 @@ struct Exporter
             std::vector<int> ids;
         };
         std::map<int, ChanceGroup> chanceGroups;
+        std::vector<std::pair<int, NoteCurvesRef>> expression; // (NoteId, the note's curves as exported)
         if (keyTracks != nullptr)
         {
             keyTracks->kids.clear();
@@ -1045,6 +1268,21 @@ struct Exporter
                         g.chance = n->chance;
                         g.ids.push_back (noteId);
                     }
+                    if (n->curves.has())
+                    {
+                        // (a note cut by the clip's end keeps the part that sounds)
+                        auto curves = n->start + n->length > offset + length ? notecurves::slice (n->curves, 0.0, (double) (offset + length - n->start))
+                                                                            : n->curves;
+                        // Live has no fine pitch per note: a pitch bend carries it (without one it stays unexported, as before)
+                        if (n->finePitch != 0.0f && curves.has() && ! curves->lane (NoteCurveLane::pitch).empty())
+                        {
+                            for (auto& point : curves.edit().lane (NoteCurveLane::pitch))
+                                point.value += n->finePitch;
+                            curves.tidy();
+                        }
+                        if (curves.has())
+                            expression.emplace_back (noteId, std::move (curves));
+                    }
                     e.set ("NoteId", num (noteId++));
                     list->add (std::move (e));
                 }
@@ -1052,6 +1290,7 @@ struct Exporter
             }
         }
         c.value ("Notes/NoteIdGenerator/NextId", num (noteId));
+        writePerNoteExpression (c, expression);
         if (auto* groups = c.at ("Notes/NoteProbabilityGroups"); groups != nullptr && ! chanceGroups.empty())
         {
             int index = 0;
@@ -1091,6 +1330,47 @@ struct Exporter
         return c;
     }
 
+    // The notes' expression (MPE stage 2, round 190hy; the import's perNoteCurvesOf has the format and its evidence): a
+    // PerNoteEventList per lane that has points, linear points only (no CurveControl). Clips without any keep the
+    // skeleton's empty store, as Live writes it.
+    void writePerNoteExpression (Node& clip, const std::vector<std::pair<int, NoteCurvesRef>>& expression)
+    {
+        auto* lists = clip.at ("Notes/PerNoteEventStore/EventLists");
+        if (lists == nullptr || expression.empty())
+            return;
+        lists->kids.clear();
+        int listId = 0;
+        for (const auto& [id, curves] : expression)
+            for (const auto lane : { NoteCurveLane::pitch, NoteCurveLane::timbre, NoteCurveLane::pressure })
+            {
+                const auto& points = curves->lane (lane);
+                if (points.empty())
+                    continue;
+                Node list;
+                list.name = "PerNoteEventList";
+                list.set ("Id", num (listId++));
+                list.set ("NoteId", num (id));
+                list.set ("CC", lane == NoteCurveLane::pitch ? "-2" : lane == NoteCurveLane::timbre ? "74" : "-1");
+                Node events;
+                events.name = "Events";
+                for (const auto& point : points)
+                {
+                    const auto x = (double) point.value;
+                    // pitch: 8191.5 / 48 per semitone; slide: the inverse of core/Mpe.h's timbre law, unrounded
+                    const auto value = lane == NoteCurveLane::pitch ? std::clamp (x * 8191.5 / (double) notecurves::maxPitchCents, -8191.5, 8191.5)
+                                       : lane == NoteCurveLane::timbre ? std::clamp (x >= 0.5 ? 64.0 + (x - 0.5) * 126.0 : x * 128.0, 0.0, 127.0)
+                                                                       : std::clamp (x * 127.0, 0.0, 127.0);
+                    Node event;
+                    event.name = "PerNoteEvent";
+                    event.set ("TimeOffset", num (std::max (0.0, (double) point.tick / (double) ppq)));
+                    event.set ("Value", num (value));
+                    events.add (std::move (event));
+                }
+                list.add (std::move (events));
+                lists->add (std::move (list));
+            }
+    }
+
     Node audioClip (const Clip& clip, int id)
     {
         Node c = sk["AudioClip"];
@@ -1115,8 +1395,11 @@ struct Exporter
             c.value ("ComplexProFormants", num ((double) w.proFormants));
             c.value ("ComplexProEnvelope", num ((double) w.proEnvelope));
         }
-        // a Beats channel's offline transposition (stretchPitch) is the clip's transpose in Live
-        const auto baked = mode == 0 && ch.sampler.keepPitch && ch.sampler.stretchBeats > 0.0f ? (double) ch.sampler.stretchPitch : 0.0;
+        // a Beats (or, round 190ik, Complex Pro / Texture) channel's offline transposition (stretchPitch) is the clip's
+        // transpose in Live
+        const auto baked = (mode == 0 || mode == 2 || mode == 6) && ch.sampler.keepPitch && ch.sampler.bakesPitch() && ch.sampler.stretchBeats > 0.0f
+                               ? (double) ch.sampler.stretchPitch
+                               : 0.0;
         const auto pitch = mode == 3 ? 0.0 : std::clamp ((double) clip.pitch + baked, -48.0, 48.0);
         const auto coarse = std::round (pitch);
         c.value ("PitchCoarse", num (coarse));
@@ -1356,7 +1639,8 @@ struct Exporter
         {
             loop->value ("LoopStart", num (contentStart));
             loop->value ("LoopEnd", num (contentEnd));
-            loop->value ("StartRelative", "0");
+            // round 190hr: the Start marker inside the loop (Live's StartRelative, beats from LoopStart)
+            loop->value ("StartRelative", slot.loop ? num (launcher::startLead (slot, (std::int64_t) std::llround ((contentEnd - contentStart) * ppq)) / ppq) : std::string ("0"));
             loop->value ("LoopOn", boolean (slot.loop));
             loop->value ("OutMarker", num (contentEnd));
         }
@@ -1371,6 +1655,9 @@ struct Exporter
         c.value ("FollowAction/JumpIndexA", num (f.jumpA + 1)); // Live's jump number is 1-based [LIVE, 181c]
         c.value ("FollowAction/JumpIndexB", num (f.jumpB + 1));
         c.value ("FollowAction/FollowActionEnabled", boolean (f.enabled));
+        // round 190hr: a MIDI clip's own scale (Live's Clip Scale: ScaleInformation + IsInKey per clip)
+        if (c.child ("ScaleInformation") != nullptr && (slot.ownScale || ! slot.scaleOn))
+            writeLiveScale (c, projectkey::clipKey (slot, song), "IsInKey");
     }
 
     // The slot node of `scene` in a track's main clip slot list (nullptr past the list)
@@ -1421,6 +1708,38 @@ struct Exporter
                 add (events[i].first, events[i].second);
         }
         list->add (std::move (env));
+    }
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // (round 190hr) one rack as a Live rack preset (.adg)
+    bool runRackPreset (const PatcherDoc& doc, const std::string& name)
+    {
+        live11 = sk.kinds.count ("Root") > 0 && sk["Root"].get ("MinorVersion").rfind ("11.", 0) == 0;
+        const auto* r = rack::rackOf (doc);
+        if (r == nullptr)
+            return false;
+        // a Drum Rack pad playing into a return chain: Live's presets route it relative to the rack [DATA: Drums Gritty.adg
+        // "AudioOut/RELATIVE/DeviceIn.PARENT.R0,ChainIn"]
+        drumTarget = r->drum ? "AudioOut/RELATIVE/DeviceIn.PARENT" : "";
+        rackPresetMode = true;
+        Node device;
+        if (! rackDevice (doc, true, name, device))
+            return false;
+        zeroIds (device);
+        Node root = sk["Root"];
+        root.set ("Creator", options.creator);
+        if (! live11) // (as Live 12.4 writes its presets [DATA]; checked loading in Live 12.4.16 [LIVE])
+        {
+            root.set ("MinorVersion", "12.0_12402");
+            root.set ("SchemaChangeCount", "1");
+        }
+        root.kids.clear();
+        root.add (rackPreset (std::move (device)));
+        result.xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+        write (root, result.xml, 0);
+        const auto* data = reinterpret_cast<const std::uint8_t*> (result.xml.data());
+        result.bytes = gzip::compressStored (data, result.xml.size());
+        return true;
     }
 
     // ---------------------------------------------------------------------------------------------------------------
@@ -1490,7 +1809,8 @@ struct Exporter
                 continue;
             // (a plugin or an Instrument Rack (round 183c) is a device of its own: its track goes out even with no notes)
             const auto plugin = ch.instrument == InstrumentKind::plugin || rack::isRack (ch);
-            if (! plays[i] && ! plugin)
+            const auto native = ch.instrument == InstrumentKind::helix; // (a LYNX engine with a Live twin, round 190ja)
+            if (! plays[i] && ! plugin && ! native)
                 continue;
             LiveTrack t;
             t.kind = LiveTrack::Kind::midi;
@@ -1502,7 +1822,7 @@ struct Exporter
             t.gain = channelGain (ch.volume) * (plugin && song.flPluginLevels ? 1.41421356f : 1.0f) * levelAdjustGain (ch.misc.levels.volume);
             t.pan = adjustedPan (ch.pan, ch.misc.levels.pan); // (with the Misc tab's Levels adjustment, round 190dz)
             tracks.push_back (t);
-            if (! plugin && ch.instrument != InstrumentKind::plugin)
+            if (! plugin && ! native && ch.instrument != InstrumentKind::plugin)
                 note ("Instrument not exported (LYNX built-in, notes kept): " + ch.name);
         }
         std::map<int, std::vector<const Clip*>> rows;
@@ -1539,8 +1859,13 @@ struct Exporter
             if (m <= 0 || m >= (int) song.mixer.size())
                 return -1;
             const auto& mx = song.mixer[(std::size_t) m];
-            if (mx.toMaster || mx.sends.size() != 1)
+            if (mx.toMaster || mx.sends.empty())
                 return -1;
+            // (round 190kc: besides its route, sends to Live return tracks or at -inf, as an imported set's tracks have)
+            for (std::size_t k = 1; k < mx.sends.size(); ++k)
+                if (const auto to = mx.sends[k].target;
+                    mx.sends[k].level > 0.0f && ! (to > 0 && to < (int) song.mixer.size() && song.mixer[(std::size_t) to].liveReturn))
+                    return -1;
             const auto target = mx.sends.front().target;
             return target > 0 && target < (int) song.mixer.size() && target != m && perInsert.count (target) == 0 ? target : -1;
         };
@@ -1551,6 +1876,9 @@ struct Exporter
             for (const auto& s : song.mixer[m].sends)
                 if (s.target != busOf ((int) m))
                     sendTargets.insert (s.target);
+        for (std::size_t m = 1; m < song.mixer.size(); ++m) // (round 190kc: Live's return tracks, sent to or not)
+            if (song.mixer[m].liveReturn)
+                sendTargets.insert ((int) m);
         std::set<int> buses;
         for (std::size_t m = 1; m < song.mixer.size(); ++m)
             if (const auto b = busOf ((int) m); b > 0)
@@ -1659,6 +1987,7 @@ struct Exporter
 
         // nodes
         const auto returns = (int) returnInsert.size();
+        exportReturns = returnInsert;
         std::vector<int> trackIds (ordered.size());
         for (std::size_t i = 0; i < ordered.size(); ++i)
             trackIds[i] = 8 + (int) i;
@@ -1690,6 +2019,27 @@ struct Exporter
                         addDevice (n, std::move (d));
                     else
                         note ("Plugin not exported (not VST2 or VST3, or not found): " + ch.name);
+                }
+                else if (ch.instrument == InstrumentKind::helix) // (round 190ja: Helix → Wavetable)
+                {
+                    Node d;
+                    if (helixDevice (ch, d))
+                    {
+                        addDevice (n, std::move (d));
+                        // (round 190mi) Helix+'s values are LYNX's own: Live's Wavetable has no place for them
+                        const auto st = helixState (ch);
+                        bool plus = st[(std::size_t) wt::extBase] >= 0.5;
+                        bool used = false;
+                        for (int i = wt::extBase + 1; plus && i < wt::stateSize && ! used; ++i)
+                            used = (float) st[(std::size_t) i] != (float) wt::defaults()[(std::size_t) i] // (the channel keeps floats)
+                                   && i != wt::ext3Base + wt::ext3::sampleClean; // (190mt: new channels read their sample band-limited: no feature)
+                        if (used)
+                            note ("Helix+ settings (second warps, noise, unison stack, extra filters, macros, drawn LFOs, effects) are LYNX-only "
+                                  "and not in the Live set: "
+                                  + ch.name);
+                    }
+                    else
+                        note ("Helix not exported (this Live version's set has no Wavetable skeleton): " + ch.name);
                 }
                 else if (rack::isRack (ch)) // (round 183c: an Instrument Rack)
                 {
@@ -1779,6 +2129,9 @@ struct Exporter
         if (main != nullptr)
         {
             main->value ("DeviceChain/Mixer/Tempo/Manual", num (song.bpm));
+            // round 190kc: Live's crossfader position and curve
+            main->value ("DeviceChain/Mixer/CrossFade/Manual", num ((double) std::clamp (song.crossfader, -1.0f, 1.0f)));
+            set.value ("CrossfadeCurve", num (std::clamp (song.crossfadeCurve, 0, 6)));
             // the signature at the song start: a signature marker there, else the project's n/4 (round 190cg)
             int startNum = song.beatsPerBar, startDen = meterUnit (song.beatUnit); // (round 190fg: the song meter's own denominator)
             for (const auto& m : song.markers())
@@ -1827,6 +2180,8 @@ struct Exporter
                     for (const auto& s : song.mixer[m].sends)
                         if (s.target == target && returnOf.count (s.target) != 0 && s.target != busOf ((int) m))
                             (s.pre ? preSends : postSends)++;
+                if (song.mixer[(std::size_t) target].liveReturn) // (round 190kc: a return's own Pre / Post toggle)
+                    preSends = song.mixer[(std::size_t) target].returnPre ? 1 : 0, postSends = preSends == 0 ? 1 : 0;
                 if (preSends > 0 && postSends > 0)
                     note ("Pre-fader sends: Live switches Pre / Post per return track, so the sends to " + song.mixer[(std::size_t) target].name
                           + " are all exported post-fader");
@@ -1856,6 +2211,20 @@ struct Exporter
                         s.value ("TimeSignatureId", num (alsTimeSignatureCode (g.beatsPerBar, g.beatUnit)));
                         s.value ("IsTimeSignatureEnabled", "true");
                     }
+                    if (s.child ("FollowAction") != nullptr) // round 190lr (DL-14): the scene's follow action, as a clip's
+                    {
+                        const auto& f = g.follow;
+                        s.value ("FollowAction/FollowTime", num (beats (f.ticks)));
+                        s.value ("FollowAction/IsLinked", boolean (f.linked));
+                        s.value ("FollowAction/LoopIterations", num (f.iterations));
+                        s.value ("FollowAction/FollowActionA", num ((int) f.a));
+                        s.value ("FollowAction/FollowActionB", num ((int) f.b));
+                        s.value ("FollowAction/FollowChanceA", num (f.chanceA));
+                        s.value ("FollowAction/FollowChanceB", num (f.chanceB));
+                        s.value ("FollowAction/JumpIndexA", num (f.jumpA + 1));
+                        s.value ("FollowAction/JumpIndexB", num (f.jumpB + 1));
+                        s.value ("FollowAction/FollowActionEnabled", boolean (f.enabled));
+                    }
                 }
                 scenes->add (std::move (s));
             }
@@ -1863,6 +2232,15 @@ struct Exporter
         // the set-wide quantisation has no Global entry: Live's number is the clip number − 1 [LIVE: 9 = 1/8]
         if (session && grid->globalQuant != LaunchQuant::global)
             set.value ("GlobalQuantisation", num ((int) grid->globalQuant - 1));
+        // round 190kc: the Session mixer's sections (LiveSet/ViewStates)
+        if (session)
+        {
+            const auto& v = grid->mixerView;
+            for (const auto& [name, on] : { std::pair<const char*, bool> { "MixerInSession", v.shown }, { "SessionIO", v.io }, { "SessionSends", v.sends },
+                                            { "SessionReturns", v.returns }, { "SessionVolume", v.volume }, { "SessionTrackOptions", v.trackOptions },
+                                            { "SessionCrossFade", v.crossfader } })
+                set.value (std::string ("ViewStates/") + name, on ? "1" : "0");
+        }
         if (auto* locs = set.at ("Locators/Locators"))
         {
             locs->kids.clear();
@@ -1923,6 +2301,8 @@ struct Exporter
             const auto& a = song.automations[(std::size_t) c->automation];
             Node* owner = nullptr;
             std::string path;
+            int sendIndex = -1;
+            bool gain = false;
             std::function<double (float)> map;
             switch (a.target.kind)
             {
@@ -1935,10 +2315,27 @@ struct Exporter
                     owner = ownerOf (a.target.index);
                     path = "DeviceChain/Mixer/Volume/AutomationTarget";
                     map = [] (float v) { return std::clamp ((double) faderGain (v), minGain, maxGain); };
+                    gain = true;
                     break;
                 case AutomationTargetKind::mixerPan:
                     owner = ownerOf (a.target.index);
                     path = "DeviceChain/Mixer/Pan/AutomationTarget";
+                    map = [] (float v) { return (double) v * 2.0 - 1.0; };
+                    break;
+                // round als190ka: a send to an insert that became a return track: that return's send knob (Live's
+                // send tops out at 0 dB [DATA: MidiControllerRange Max 1])
+                case AutomationTargetKind::mixerSend:
+                    if (const auto r = returnOf.find (a.target.slot); r != returnOf.end() && a.target.index != a.target.slot)
+                    {
+                        owner = ownerOf (a.target.index);
+                        sendIndex = r->second;
+                        map = [] (float v) { return std::clamp ((double) faderGain (v), minGain, 1.0); };
+                        gain = true;
+                    }
+                    break;
+                case AutomationTargetKind::crossfader: // (round 190kc: Main's CrossFade, -1..1)
+                    owner = main;
+                    path = "DeviceChain/Mixer/CrossFade/AutomationTarget";
                     map = [] (float v) { return (double) v * 2.0 - 1.0; };
                     break;
                 default: break;
@@ -1948,13 +2345,71 @@ struct Exporter
                 note ("Automation not exported: " + a.name);
                 continue;
             }
-            const auto* t = owner->at (path);
+            const Node* t = nullptr;
+            if (sendIndex >= 0)
+            {
+                if (auto* sends = owner->at ("DeviceChain/Mixer/Sends"); sends != nullptr && sendIndex < (int) sends->kids.size())
+                    t = sends->kids[(std::size_t) sendIndex].at ("Send/AutomationTarget");
+            }
+            else
+                t = owner->at (path);
             if (t == nullptr)
                 continue;
             auto& slot = envelopes[t->get ("Id")];
             slot.first = owner;
-            for (const auto& p : a.points)
-                slot.second.push_back ({ beats (c->start + p.tick), map (p.value) });
+            // round als190ka: LYNX's curve (bends, FL's curve modes, its straight fader travel) as Live's straight
+            // pieces: each segment is cut until what Live plays between two events (straight along its fader for the
+            // gains, core/LiveFader.h) stays within 0.1 dB (gains) or 0.3 % of the range of LYNX's curve
+            const auto& pts = a.points;
+            const auto valueAt = [&pts] (double tick) { return (double) automationCurveAt (pts, tick); };
+            double lo = 1.0e300, hi = -1.0e300;
+            for (const auto& p : pts)
+                lo = std::min (lo, map (p.value)), hi = std::max (hi, map (p.value));
+            const auto span = std::max (1.0e-9, hi - lo);
+            const auto off = [gain, span] (double truth, double straight) {
+                if (gain)
+                {
+                    const auto db = [] (double g) { return g > 1.0e-3 ? 20.0 * std::log10 (g) : -60.0; };
+                    return std::abs (db (truth) - db (straight)) / 0.1;
+                }
+                return std::abs (truth - straight) / (0.003 * span);
+            };
+            const auto send = sendIndex >= 0;
+            // what Live plays between two of its events: straight along its fader's travel for the gains
+            // (core/LiveFader.h), straight in the value otherwise
+            const auto liveBetween = [gain, send] (double l0, double l1, double q) {
+                if (! gain)
+                    return l0 + (l1 - l0) * q;
+                const auto p0 = livefader::positionOfGain (l0, send), p1 = livefader::positionOfGain (l1, send);
+                return livefader::gainAt (p0 + (p1 - p0) * q, send);
+            };
+            std::function<void (double, double, int)> piece = [&] (double t0, double t1, int depth) {
+                const auto l0 = map ((float) valueAt (t0)), l1 = map ((float) valueAt (t1));
+                double worst = 0.0;
+                for (const auto q : { 0.25, 0.5, 0.75 })
+                    worst = std::max (worst, off (map ((float) valueAt (t0 + (t1 - t0) * q)), liveBetween (l0, l1, q)));
+                if (depth < 7 && worst > 1.0)
+                {
+                    piece (t0, 0.5 * (t0 + t1), depth + 1);
+                    piece (0.5 * (t0 + t1), t1, depth + 1);
+                    return;
+                }
+                slot.second.push_back ({ beats (c->start) + t1 / (double) ppq, l1 });
+            };
+            for (std::size_t k = 0; k < pts.size(); ++k)
+            {
+                // the point itself (a jump: two points at one tick keep their order)
+                slot.second.push_back ({ beats (c->start + pts[k].tick), map (pts[k].value) });
+                if (k + 1 < pts.size() && pts[k + 1].tick > pts[k].tick)
+                {
+                    const auto t0 = (double) pts[k].tick, t1 = (double) pts[k + 1].tick;
+                    // the inner pieces only: the next point is written as itself
+                    const auto before = slot.second.size();
+                    piece (t0, t1, 0);
+                    if (slot.second.size() > before)
+                        slot.second.pop_back();
+                }
+            }
         }
         for (auto& [pointee, entry] : envelopes)
         {
@@ -2025,6 +2480,26 @@ AlsExportResult exportAls (const Song& song, const AlsExportOptions& options)
     e.run();
     return result;
 }
+AlsExportResult exportLiveRackPreset (const PatcherDoc& rack, const std::string& name, const AlsExportOptions& options)
+{
+    AlsExportResult result;
+    const auto& sk = skeletons (options.version);
+    if (sk.kinds.empty())
+    {
+        result.notes.push_back ("internal error: the set skeletons could not be read");
+        return result;
+    }
+    static const Song empty;
+    Exporter e { empty, options, sk, result, false, {} };
+    if (! e.runRackPreset (rack, name))
+    {
+        result.bytes.clear();
+        if (result.notes.empty())
+            result.notes.push_back ("not a rack");
+    }
+    return result;
+}
+
 bool alsSampleNeedsWav (const std::string& extension, const std::uint8_t* head, std::size_t size)
 {
     std::string ext;

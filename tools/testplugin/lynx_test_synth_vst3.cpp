@@ -13,6 +13,13 @@
 // without one (-1) it ends the oldest voice of its key. With the environment variable LYNX_TEST_SYNTH_LOG = a file path
 // it appends to <path>.<instance> one line per process call ("P<instance> <ppq> <samples> <playing> <rt|off> <voices>") and per
 // event ("E<instance> on|off <key> <sampleOffset> <noteId>"): what the host sent and when.
+// Round 190hn (issue #138): LYNX_TEST_SYNTH_BOOT_MS = n makes each instance behave like a hardware emulator booting its
+// firmware (gearmulator's JE-8086, ...): for its first n ms of processed audio after it was made, note ons are dropped
+// ("E<instance> drop <key> <sampleOffset>" in the log), as a booting firmware drops what arrives meanwhile.
+// Round 190jb (exports with the live instances): LYNX_TEST_SYNTH_SEED = 1 gives each instance a random seed of its own,
+// made when the instance is made and never saved (an analogue-drift emulation's, a plugin's licence-dependent seed...):
+// every key plays detuned by up to ±50 cents and from a phase that depend on that seed. A new instance plays the same
+// notes at other pitches; only the instance that played renders what was heard.
 #define INIT_CLASS_IID
 #include "pluginterfaces/base/funknown.h"
 #include "pluginterfaces/base/ipluginbase.h"
@@ -25,7 +32,9 @@
 #include "pluginterfaces/gui/iplugview.h"
 
 #include <atomic>
+#include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -92,6 +101,17 @@ public:
     // IPluginBase (shared by the component and the controller)
     tresult PLUGIN_API initialize (FUnknown*) override
     {
+        if (const char* boot = std::getenv ("LYNX_TEST_SYNTH_BOOT_MS"); boot != nullptr)
+            bootMs = std::atof (boot);
+        if (const char* seeded = std::getenv ("LYNX_TEST_SYNTH_SEED"); seeded != nullptr && std::atoi (seeded) != 0 && seed == 0)
+        {
+            // (the clock and the instance's address: each instance its own, whatever the C++ library's random_device)
+            auto h = (std::uint64_t) std::chrono::high_resolution_clock::now().time_since_epoch().count() ^ (std::uint64_t) (std::uintptr_t) this;
+            h ^= h >> 33;
+            h *= 0xff51afd7ed558ccdULL;
+            h ^= h >> 33;
+            seed = (std::uint32_t) h | 1u;
+        }
         if (log == nullptr)
             if (const char* path = std::getenv ("LYNX_TEST_SYNTH_LOG"); path != nullptr && *path != 0)
             {
@@ -220,6 +240,7 @@ public:
             }
             if (n == 0)
                 break;
+            ++processed;
             float v = 0.0f;
             for (int i = 0; i < voiceCount; ++i)
             {
@@ -276,6 +297,12 @@ private:
                 noteOff (e.noteOn.pitch, e.sampleOffset, -1);
                 return;
             }
+            if ((double) processed < bootMs * 0.001 * rate) // (still booting: the note is lost)
+            {
+                if (log != nullptr)
+                    std::fprintf (log, "E%d drop %d %d\n", id, (int) e.noteOn.pitch, (int) e.sampleOffset);
+                return;
+            }
             if (log != nullptr)
                 std::fprintf (log, "E%d on %d %d %d\n", id, (int) e.noteOn.pitch, (int) e.sampleOffset, (int) e.noteOn.noteId);
             if (voiceCount < maxVoices)
@@ -285,6 +312,16 @@ private:
                 v.noteId = e.noteOn.noteId;
                 v.phase = 0.0;
                 v.step = 6.283185307179586 * 440.0 * std::pow (2.0, (e.noteOn.pitch - 69) / 12.0) / rate;
+                if (seed != 0) // (round 190jb: this instance's own pitch and phase for the key)
+                {
+                    auto h = seed ^ ((std::uint32_t) e.noteOn.pitch * 2654435761u);
+                    h ^= h >> 15;
+                    h *= 0x2c1b3c6du;
+                    h ^= h >> 12;
+                    const auto cents = ((double) (h % 10001u) / 10000.0 - 0.5) * 100.0;
+                    v.step *= std::pow (2.0, cents / 1200.0);
+                    v.phase = (double) ((h >> 8) % 6283u) / 1000.0;
+                }
             }
         }
         else if (e.type == Event::kNoteOffEvent)
@@ -309,6 +346,9 @@ private:
     Voice voices[maxVoices];
     int voiceCount = 0;
     double rate = 44100.0;
+    double bootMs = 0.0;          // (round 190hn) LYNX_TEST_SYNTH_BOOT_MS
+    std::uint32_t seed = 0;       // (round 190jb) LYNX_TEST_SYNTH_SEED: this instance's own, never saved
+    long long processed = 0;      // samples processed since the instance was made
     bool offline = false;
     std::FILE* log = nullptr;
     std::atomic<uint32> refs { 1 };

@@ -5,6 +5,30 @@
 #include <vector>
 #include <cmath>
 #include <cstring>
+#include <type_traits>
+
+// LYNX (round 190kr): the split-complex FFT passes and the real-FFT twists run four values at a time with SSE2 where
+// available (float only). Each output value is computed by the same IEEE operations in the same order as the scalar
+// code, so the results are bit-identical.
+#if defined(__SSE2__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
+#	include <emmintrin.h>
+#	define SIGNALSMITH_LINEAR_SSE2 1
+#else
+#	define SIGNALSMITH_LINEAR_SSE2 0
+#endif
+// LYNX (round 190kz): the strided radix-4 passes, the 2-point pass and the radix-5 final pass also eight values at a time
+// with AVX2 where the CPU has it (picked at run time: src/core/CpuFeatures.h; LYNX_CPU=sse2 keeps the four-wide loops).
+// The same operations on eight lanes, so every path gives the same bits.
+#if SIGNALSMITH_LINEAR_SSE2 && (defined(__GNUC__) || defined(__clang__)) && (defined(__x86_64__) || defined(__i386__)) && defined(__has_include)
+#	if __has_include("core/CpuFeatures.h")
+#		include "core/CpuFeatures.h"
+#		include <immintrin.h>
+#		define SIGNALSMITH_LINEAR_AVX LYNX_CPU_DISPATCH
+#	endif
+#endif
+#ifndef SIGNALSMITH_LINEAR_AVX
+#	define SIGNALSMITH_LINEAR_AVX 0
+#endif
 
 #if defined(__FAST_MATH__) && (__apple_build_version__ >= 16000000) && (__apple_build_version__ <= 16000099) && !defined(SIGNALSMITH_IGNORE_BROKEN_APPLECLANG)
 #	error Apple Clang 16.0.0 generates incorrect SIMD for ARM. If you HAVE to use this version of Clang, turn off -ffast-math.
@@ -54,7 +78,19 @@ namespace _impl {
 	// Input: aStride elements next to each other -> output with bStride
 	template<size_t aStride, class V>
 	void interleaveCopy(const V *a, V *b, size_t bStride) {
-		for (size_t bi = 0; bi < bStride; ++bi) {
+		size_t start = 0;
+#if SIGNALSMITH_LINEAR_SSE2
+		if constexpr (std::is_same<V, float>::value) {
+			// four rows at a time: a plain copy, stored four values at once
+			for (; start + 4 <= bStride; start += 4) {
+				const V *offsetA = a + start*aStride;
+				for (size_t ai = 0; ai < aStride; ++ai) {
+					_mm_storeu_ps(b + ai*bStride + start, _mm_setr_ps(offsetA[ai], offsetA[aStride + ai], offsetA[2*aStride + ai], offsetA[3*aStride + ai]));
+				}
+			}
+		}
+#endif
+		for (size_t bi = start; bi < bStride; ++bi) {
 			const V *offsetA = a + bi*aStride;
 			V *offsetB = b + bi;
 			for (size_t ai = 0; ai < aStride; ++ai) {
@@ -116,6 +152,17 @@ struct SimpleFFT {
 			twiddles[i] = std::polar(Sample(1), twiddlePhase);
 		}
 		working.resize(size);
+		// the full-size pass's twiddles (i, 2i, 3i), split: the same values, for its four-at-a-time loop
+		size_t quarter = size/4;
+		splitTwiddles.resize(quarter*6);
+		for (size_t i = 0; i < quarter; ++i) {
+			splitTwiddles[i] = twiddles[i].real();
+			splitTwiddles[i + quarter] = twiddles[i].imag();
+			splitTwiddles[i + quarter*2] = twiddles[i*2].real();
+			splitTwiddles[i + quarter*3] = twiddles[i*2].imag();
+			splitTwiddles[i + quarter*4] = twiddles[i*3].real();
+			splitTwiddles[i + quarter*5] = twiddles[i*3].imag();
+		}
 	}
 	
 	void fft(const Complex *time, Complex *freq) {
@@ -159,6 +206,8 @@ struct SimpleFFT {
 private:
 	std::vector<Complex> twiddles;
 	std::vector<Complex> working;
+	std::vector<Sample> splitTwiddles;
+	static constexpr bool simdFloat = SIGNALSMITH_LINEAR_SSE2 && std::is_same<Sample, float>::value;
 	
 	template<bool conjB>
 	static Complex mul(const Complex &a, const Complex &b) {
@@ -235,7 +284,25 @@ private:
 			combine4<inverse>(4, stride, inputR, inputI, outputR, outputI);
 		} else {
 			// 2-point FFT
-			for (size_t s = 0; s < stride; ++s) {
+			size_t s = 0;
+#if SIGNALSMITH_LINEAR_AVX
+			if constexpr (simdFloat) {
+				if (lynx::cpu::hasAvx2()) s = pass2Avx(stride, inputR, inputI, outputR, outputI);
+			}
+#endif
+#if SIGNALSMITH_LINEAR_SSE2
+			if constexpr (simdFloat) {
+				for (; s + 4 <= stride; s += 4) {
+					__m128 ar = _mm_loadu_ps(inputR + s), ai = _mm_loadu_ps(inputI + s);
+					__m128 br = _mm_loadu_ps(inputR + s + stride), bi = _mm_loadu_ps(inputI + s + stride);
+					_mm_storeu_ps(outputR + s, _mm_add_ps(ar, br));
+					_mm_storeu_ps(outputI + s, _mm_add_ps(ai, bi));
+					_mm_storeu_ps(outputR + s + stride, _mm_sub_ps(ar, br));
+					_mm_storeu_ps(outputI + s + stride, _mm_sub_ps(ai, bi));
+				}
+			}
+#endif
+			for (; s < stride; ++s) {
 				Sample ar = inputR[s], ai = inputI[s];
 				Sample br = inputR[s + stride], bi = inputI[s + stride];
 				outputR[s] = ar + br;
@@ -246,10 +313,175 @@ private:
 		}
 	}
 
+#if SIGNALSMITH_LINEAR_AVX
+	// the 2-point pass and the strided radix-4 pass eight values at a time: butterfly4's operations on eight lanes
+	__attribute__((target("avx2"))) static size_t pass2Avx(size_t stride, const Sample *inputR, const Sample *inputI, Sample *outputR, Sample *outputI) {
+		size_t s = 0;
+		for (; s + 8 <= stride; s += 8) {
+			__m256 ar = _mm256_loadu_ps(inputR + s), ai = _mm256_loadu_ps(inputI + s);
+			__m256 br = _mm256_loadu_ps(inputR + s + stride), bi = _mm256_loadu_ps(inputI + s + stride);
+			_mm256_storeu_ps(outputR + s, _mm256_add_ps(ar, br));
+			_mm256_storeu_ps(outputI + s, _mm256_add_ps(ai, bi));
+			_mm256_storeu_ps(outputR + s + stride, _mm256_sub_ps(ar, br));
+			_mm256_storeu_ps(outputI + s + stride, _mm256_sub_ps(ai, bi));
+		}
+		return s;
+	}
+	template<bool inverse>
+	__attribute__((target("avx2"), always_inline)) static inline void butterfly8(__m256 ar, __m256 ai, __m256 br0, __m256 bi0, __m256 cr0, __m256 ci0, __m256 dr0, __m256 di0,
+			__m256 tbr, __m256 tbi, __m256 tcr, __m256 tci, __m256 tdr, __m256 tdi,
+			Sample *oAr, Sample *oAi, Sample *oBr, Sample *oBi, Sample *oCr, Sample *oCi, Sample *oDr, Sample *oDi) {
+		__m256 br, bi, cr, ci, dr, di;
+		if (inverse) {
+			br = _mm256_add_ps(_mm256_mul_ps(br0, tbr), _mm256_mul_ps(bi0, tbi)); bi = _mm256_sub_ps(_mm256_mul_ps(bi0, tbr), _mm256_mul_ps(br0, tbi));
+			cr = _mm256_add_ps(_mm256_mul_ps(cr0, tcr), _mm256_mul_ps(ci0, tci)); ci = _mm256_sub_ps(_mm256_mul_ps(ci0, tcr), _mm256_mul_ps(cr0, tci));
+			dr = _mm256_add_ps(_mm256_mul_ps(dr0, tdr), _mm256_mul_ps(di0, tdi)); di = _mm256_sub_ps(_mm256_mul_ps(di0, tdr), _mm256_mul_ps(dr0, tdi));
+		} else {
+			br = _mm256_sub_ps(_mm256_mul_ps(br0, tbr), _mm256_mul_ps(bi0, tbi)); bi = _mm256_add_ps(_mm256_mul_ps(bi0, tbr), _mm256_mul_ps(br0, tbi));
+			cr = _mm256_sub_ps(_mm256_mul_ps(cr0, tcr), _mm256_mul_ps(ci0, tci)); ci = _mm256_add_ps(_mm256_mul_ps(ci0, tcr), _mm256_mul_ps(cr0, tci));
+			dr = _mm256_sub_ps(_mm256_mul_ps(dr0, tdr), _mm256_mul_ps(di0, tdi)); di = _mm256_add_ps(_mm256_mul_ps(di0, tdr), _mm256_mul_ps(dr0, tdi));
+		}
+		__m256 ac0r = _mm256_add_ps(ar, cr), ac0i = _mm256_add_ps(ai, ci);
+		__m256 ac1r = _mm256_sub_ps(ar, cr), ac1i = _mm256_sub_ps(ai, ci);
+		__m256 bd0r = _mm256_add_ps(br, dr), bd0i = _mm256_add_ps(bi, di);
+		__m256 bd1r = inverse ? _mm256_sub_ps(br, dr) : _mm256_sub_ps(dr, br);
+		__m256 bd1i = inverse ? _mm256_sub_ps(bi, di) : _mm256_sub_ps(di, bi);
+		__m256 rotR = _mm256_xor_ps(bd1i, _mm256_set1_ps(-0.0f)), rotI = bd1r;
+		_mm256_storeu_ps(oAr, _mm256_add_ps(ac0r, bd0r));
+		_mm256_storeu_ps(oAi, _mm256_add_ps(ac0i, bd0i));
+		_mm256_storeu_ps(oBr, _mm256_add_ps(ac1r, rotR));
+		_mm256_storeu_ps(oBi, _mm256_add_ps(ac1i, rotI));
+		_mm256_storeu_ps(oCr, _mm256_sub_ps(ac0r, bd0r));
+		_mm256_storeu_ps(oCi, _mm256_sub_ps(ac0i, bd0i));
+		_mm256_storeu_ps(oDr, _mm256_sub_ps(ac1r, rotR));
+		_mm256_storeu_ps(oDi, _mm256_sub_ps(ac1i, rotI));
+	}
+	template<bool inverse>
+	__attribute__((target("avx2"))) void combine4StridedAvx(size_t size, size_t stride, const Sample *inputR, const Sample *inputI, Sample *outputR, Sample *outputI) const {
+		auto twiddleStep = working.size()/size;
+		size_t quarter = size/4;
+		for (size_t i = 0; i < quarter; ++i) {
+			Complex twiddleB = twiddles[i*twiddleStep];
+			Complex twiddleC = twiddles[i*2*twiddleStep];
+			Complex twiddleD = twiddles[i*3*twiddleStep];
+			__m256 tbr = _mm256_set1_ps(twiddleB.real()), tbi = _mm256_set1_ps(twiddleB.imag());
+			__m256 tcr = _mm256_set1_ps(twiddleC.real()), tci = _mm256_set1_ps(twiddleC.imag());
+			__m256 tdr = _mm256_set1_ps(twiddleD.real()), tdi = _mm256_set1_ps(twiddleD.imag());
+			const Sample *inAr = inputR + 4*i*stride, *inAi = inputI + 4*i*stride;
+			for (size_t s = 0; s < stride; s += 8) {
+				butterfly8<inverse>(_mm256_loadu_ps(inAr + s), _mm256_loadu_ps(inAi + s),
+					_mm256_loadu_ps(inAr + stride + s), _mm256_loadu_ps(inAi + stride + s),
+					_mm256_loadu_ps(inAr + 2*stride + s), _mm256_loadu_ps(inAi + 2*stride + s),
+					_mm256_loadu_ps(inAr + 3*stride + s), _mm256_loadu_ps(inAi + 3*stride + s),
+					tbr, tbi, tcr, tci, tdr, tdi,
+					outputR + i*stride + s, outputI + i*stride + s,
+					outputR + (i + quarter)*stride + s, outputI + (i + quarter)*stride + s,
+					outputR + (i + quarter*2)*stride + s, outputI + (i + quarter*2)*stride + s,
+					outputR + (i + quarter*3)*stride + s, outputI + (i + quarter*3)*stride + s);
+			}
+		}
+	}
+#endif
+
 	// Combine interleaved results into a single spectrum
+#if SIGNALSMITH_LINEAR_SSE2
+	// one radix-4 butterfly on four lanes: a, b, c, d (split) and the twiddles of b, c, d; the scalar code's operations
+	template<bool inverse>
+	static void butterfly4(__m128 ar, __m128 ai, __m128 br0, __m128 bi0, __m128 cr0, __m128 ci0, __m128 dr0, __m128 di0,
+			__m128 tbr, __m128 tbi, __m128 tcr, __m128 tci, __m128 tdr, __m128 tdi,
+			Sample *oAr, Sample *oAi, Sample *oBr, Sample *oBi, Sample *oCr, Sample *oCi, Sample *oDr, Sample *oDi) {
+		// mul<inverse>(x, t): {x.r*t.r -/+ x.i*t.i, x.i*t.r +/- x.r*t.i}
+		auto mulT = [](__m128 xr, __m128 xi, __m128 tr, __m128 ti, __m128 &outR, __m128 &outI) {
+			if (inverse) {
+				outR = _mm_add_ps(_mm_mul_ps(xr, tr), _mm_mul_ps(xi, ti));
+				outI = _mm_sub_ps(_mm_mul_ps(xi, tr), _mm_mul_ps(xr, ti));
+			} else {
+				outR = _mm_sub_ps(_mm_mul_ps(xr, tr), _mm_mul_ps(xi, ti));
+				outI = _mm_add_ps(_mm_mul_ps(xi, tr), _mm_mul_ps(xr, ti));
+			}
+		};
+		__m128 br, bi, cr, ci, dr, di;
+		mulT(br0, bi0, tbr, tbi, br, bi);
+		mulT(cr0, ci0, tcr, tci, cr, ci);
+		mulT(dr0, di0, tdr, tdi, dr, di);
+		__m128 ac0r = _mm_add_ps(ar, cr), ac0i = _mm_add_ps(ai, ci);
+		__m128 ac1r = _mm_sub_ps(ar, cr), ac1i = _mm_sub_ps(ai, ci);
+		__m128 bd0r = _mm_add_ps(br, dr), bd0i = _mm_add_ps(bi, di);
+		__m128 bd1r = inverse ? _mm_sub_ps(br, dr) : _mm_sub_ps(dr, br);
+		__m128 bd1i = inverse ? _mm_sub_ps(bi, di) : _mm_sub_ps(di, bi);
+		// bd1i (times i) = {-bd1.imag, bd1.real}
+		__m128 rotR = _mm_xor_ps(bd1i, _mm_set1_ps(-0.0f)), rotI = bd1r;
+		_mm_storeu_ps(oAr, _mm_add_ps(ac0r, bd0r));
+		_mm_storeu_ps(oAi, _mm_add_ps(ac0i, bd0i));
+		_mm_storeu_ps(oBr, _mm_add_ps(ac1r, rotR));
+		_mm_storeu_ps(oBi, _mm_add_ps(ac1i, rotI));
+		_mm_storeu_ps(oCr, _mm_sub_ps(ac0r, bd0r));
+		_mm_storeu_ps(oCi, _mm_sub_ps(ac0i, bd0i));
+		_mm_storeu_ps(oDr, _mm_sub_ps(ac1r, rotR));
+		_mm_storeu_ps(oDi, _mm_sub_ps(ac1i, rotI));
+	}
+	static void transpose4(__m128 &a, __m128 &b, __m128 &c, __m128 &d) {
+		__m128 t0 = _mm_unpacklo_ps(a, b), t1 = _mm_unpacklo_ps(c, d), t2 = _mm_unpackhi_ps(a, b), t3 = _mm_unpackhi_ps(c, d);
+		a = _mm_movelh_ps(t0, t1);
+		b = _mm_movehl_ps(t1, t0);
+		c = _mm_movelh_ps(t2, t3);
+		d = _mm_movehl_ps(t3, t2);
+	}
+#endif
+
 	template<bool inverse>
 	void combine4(size_t size, size_t stride, const Sample *inputR, const Sample *inputI, Sample *outputR, Sample *outputI) const {
 		auto twiddleStep = working.size()/size;
+#if SIGNALSMITH_LINEAR_SSE2
+		if constexpr (simdFloat) {
+			size_t quarter = size/4;
+#if SIGNALSMITH_LINEAR_AVX
+			if (stride%8 == 0 && lynx::cpu::hasAvx2()) {
+				combine4StridedAvx<inverse>(size, stride, inputR, inputI, outputR, outputI);
+				return;
+			}
+#endif
+			if (stride%4 == 0) { // four of each butterfly's interleaved values at a time, the twiddles broadcast
+				for (size_t i = 0; i < quarter; ++i) {
+					Complex twiddleB = twiddles[i*twiddleStep];
+					Complex twiddleC = twiddles[i*2*twiddleStep];
+					Complex twiddleD = twiddles[i*3*twiddleStep];
+					__m128 tbr = _mm_set1_ps(twiddleB.real()), tbi = _mm_set1_ps(twiddleB.imag());
+					__m128 tcr = _mm_set1_ps(twiddleC.real()), tci = _mm_set1_ps(twiddleC.imag());
+					__m128 tdr = _mm_set1_ps(twiddleD.real()), tdi = _mm_set1_ps(twiddleD.imag());
+					const Sample *inAr = inputR + 4*i*stride, *inAi = inputI + 4*i*stride;
+					for (size_t s = 0; s < stride; s += 4) {
+						butterfly4<inverse>(_mm_loadu_ps(inAr + s), _mm_loadu_ps(inAi + s),
+							_mm_loadu_ps(inAr + stride + s), _mm_loadu_ps(inAi + stride + s),
+							_mm_loadu_ps(inAr + 2*stride + s), _mm_loadu_ps(inAi + 2*stride + s),
+							_mm_loadu_ps(inAr + 3*stride + s), _mm_loadu_ps(inAi + 3*stride + s),
+							tbr, tbi, tcr, tci, tdr, tdi,
+							outputR + i*stride + s, outputI + i*stride + s,
+							outputR + (i + quarter)*stride + s, outputI + (i + quarter)*stride + s,
+							outputR + (i + quarter*2)*stride + s, outputI + (i + quarter*2)*stride + s,
+							outputR + (i + quarter*3)*stride + s, outputI + (i + quarter*3)*stride + s);
+					}
+				}
+				return;
+			}
+			if (stride == 1 && twiddleStep == 1 && quarter%4 == 0 && splitTwiddles.size() == quarter*6) {
+				// the full-size pass: four butterflies at a time (their inputs a, b, c, d are 4 neighbours: transposed)
+				const Sample *tw = splitTwiddles.data();
+				for (size_t i = 0; i < quarter; i += 4) {
+					__m128 r0 = _mm_loadu_ps(inputR + 4*i), r1 = _mm_loadu_ps(inputR + 4*i + 4), r2 = _mm_loadu_ps(inputR + 4*i + 8), r3 = _mm_loadu_ps(inputR + 4*i + 12);
+					__m128 i0 = _mm_loadu_ps(inputI + 4*i), i1 = _mm_loadu_ps(inputI + 4*i + 4), i2 = _mm_loadu_ps(inputI + 4*i + 8), i3 = _mm_loadu_ps(inputI + 4*i + 12);
+					transpose4(r0, r1, r2, r3);
+					transpose4(i0, i1, i2, i3);
+					butterfly4<inverse>(r0, i0, r1, i1, r2, i2, r3, i3,
+						_mm_loadu_ps(tw + i), _mm_loadu_ps(tw + quarter + i), _mm_loadu_ps(tw + quarter*2 + i),
+						_mm_loadu_ps(tw + quarter*3 + i), _mm_loadu_ps(tw + quarter*4 + i), _mm_loadu_ps(tw + quarter*5 + i),
+						outputR + i, outputI + i, outputR + i + quarter, outputI + i + quarter,
+						outputR + i + quarter*2, outputI + i + quarter*2, outputR + i + quarter*3, outputI + i + quarter*3);
+				}
+				return;
+			}
+		}
+#endif
 		for (size_t i = 0; i < size/4; ++i) {
 			Complex twiddleB = twiddles[i*twiddleStep];
 			Complex twiddleC = twiddles[i*2*twiddleStep];
@@ -763,6 +995,38 @@ private:
 			f4[i] = a + bcde01 - bcde11;
 		}
 	}
+#if SIGNALSMITH_LINEAR_AVX
+	// the radix-5 final pass eight values at a time (the SSE2 loop's operations on eight lanes)
+	__attribute__((target("avx2"))) size_t finalPass5Avx(Sample *f0r, Sample *f0i, Sample *f1r, Sample *f1i, Sample *f2r, Sample *f2i, Sample *f3r, Sample *f3i,
+			Sample *f4r, Sample *f4i, Sample tw1r, Sample tw1i, Sample tw2r, Sample tw2i) {
+		size_t i = 0;
+		const __m256 t1r = _mm256_set1_ps(tw1r), t1i = _mm256_set1_ps(tw1i), t2r = _mm256_set1_ps(tw2r), t2i = _mm256_set1_ps(tw2i);
+		for (; i + 8 <= innerSize; i += 8) {
+			__m256 ar = _mm256_loadu_ps(f0r + i), ai = _mm256_loadu_ps(f0i + i), br = _mm256_loadu_ps(f1r + i), bi = _mm256_loadu_ps(f1i + i);
+			__m256 cr = _mm256_loadu_ps(f2r + i), ci = _mm256_loadu_ps(f2i + i), dr = _mm256_loadu_ps(f3r + i), di = _mm256_loadu_ps(f3i + i);
+			__m256 er = _mm256_loadu_ps(f4r + i), ei = _mm256_loadu_ps(f4i + i);
+			__m256 be0r = _mm256_add_ps(br, er), be0i = _mm256_add_ps(bi, ei);
+			__m256 be1r = _mm256_sub_ps(ei, bi), be1i = _mm256_sub_ps(br, er);
+			__m256 cd0r = _mm256_add_ps(cr, dr), cd0i = _mm256_add_ps(ci, di);
+			__m256 cd1r = _mm256_sub_ps(di, ci), cd1i = _mm256_sub_ps(cr, dr);
+			__m256 b01r = _mm256_add_ps(_mm256_mul_ps(be0r, t1r), _mm256_mul_ps(cd0r, t2r)), b01i = _mm256_add_ps(_mm256_mul_ps(be0i, t1r), _mm256_mul_ps(cd0i, t2r));
+			__m256 b02r = _mm256_add_ps(_mm256_mul_ps(be0r, t2r), _mm256_mul_ps(cd0r, t1r)), b02i = _mm256_add_ps(_mm256_mul_ps(be0i, t2r), _mm256_mul_ps(cd0i, t1r));
+			__m256 b11r = _mm256_add_ps(_mm256_mul_ps(be1r, t1i), _mm256_mul_ps(cd1r, t2i)), b11i = _mm256_add_ps(_mm256_mul_ps(be1i, t1i), _mm256_mul_ps(cd1i, t2i));
+			__m256 b12r = _mm256_sub_ps(_mm256_mul_ps(be1r, t2i), _mm256_mul_ps(cd1r, t1i)), b12i = _mm256_sub_ps(_mm256_mul_ps(be1i, t2i), _mm256_mul_ps(cd1i, t1i));
+			_mm256_storeu_ps(f0r + i, _mm256_add_ps(_mm256_add_ps(ar, be0r), cd0r));
+			_mm256_storeu_ps(f0i + i, _mm256_add_ps(_mm256_add_ps(ai, be0i), cd0i));
+			_mm256_storeu_ps(f1r + i, _mm256_add_ps(_mm256_add_ps(ar, b01r), b11r));
+			_mm256_storeu_ps(f1i + i, _mm256_add_ps(_mm256_add_ps(ai, b01i), b11i));
+			_mm256_storeu_ps(f2r + i, _mm256_add_ps(_mm256_add_ps(ar, b02r), b12r));
+			_mm256_storeu_ps(f2i + i, _mm256_add_ps(_mm256_add_ps(ai, b02i), b12i));
+			_mm256_storeu_ps(f3r + i, _mm256_sub_ps(_mm256_add_ps(ar, b02r), b12r));
+			_mm256_storeu_ps(f3i + i, _mm256_sub_ps(_mm256_add_ps(ai, b02i), b12i));
+			_mm256_storeu_ps(f4r + i, _mm256_sub_ps(_mm256_add_ps(ar, b01r), b11r));
+			_mm256_storeu_ps(f4i + i, _mm256_sub_ps(_mm256_add_ps(ai, b01i), b11i));
+		}
+		return i;
+	}
+#endif
 	template<bool inverse>
 	void finalPass5(Sample *f0r, Sample *f0i) {
 		auto *f1r = f0r + innerSize;
@@ -778,7 +1042,41 @@ private:
 		const Sample tw1i = -0.9510565162951535*(inverse ? -1 : 1);
 		const Sample tw2r = -0.8090169943749473;
 		const Sample tw2i = -0.5877852522924732*(inverse ? -1 : 1);
-		for (size_t i = 0; i < innerSize; ++i) {
+		size_t i = 0;
+#if SIGNALSMITH_LINEAR_AVX
+		if constexpr (std::is_same<Sample, float>::value) {
+			if (lynx::cpu::hasAvx2()) i = finalPass5Avx(f0r, f0i, f1r, f1i, f2r, f2i, f3r, f3i, f4r, f4i, tw1r, tw1i, tw2r, tw2i);
+		}
+#endif
+#if SIGNALSMITH_LINEAR_SSE2
+		if constexpr (std::is_same<Sample, float>::value) {
+			const __m128 t1r = _mm_set1_ps(tw1r), t1i = _mm_set1_ps(tw1i), t2r = _mm_set1_ps(tw2r), t2i = _mm_set1_ps(tw2i);
+			for (; i + 4 <= innerSize; i += 4) {
+				__m128 ar = _mm_loadu_ps(f0r + i), ai = _mm_loadu_ps(f0i + i), br = _mm_loadu_ps(f1r + i), bi = _mm_loadu_ps(f1i + i);
+				__m128 cr = _mm_loadu_ps(f2r + i), ci = _mm_loadu_ps(f2i + i), dr = _mm_loadu_ps(f3r + i), di = _mm_loadu_ps(f3i + i);
+				__m128 er = _mm_loadu_ps(f4r + i), ei = _mm_loadu_ps(f4i + i);
+				__m128 be0r = _mm_add_ps(br, er), be0i = _mm_add_ps(bi, ei);
+				__m128 be1r = _mm_sub_ps(ei, bi), be1i = _mm_sub_ps(br, er);
+				__m128 cd0r = _mm_add_ps(cr, dr), cd0i = _mm_add_ps(ci, di);
+				__m128 cd1r = _mm_sub_ps(di, ci), cd1i = _mm_sub_ps(cr, dr);
+				__m128 b01r = _mm_add_ps(_mm_mul_ps(be0r, t1r), _mm_mul_ps(cd0r, t2r)), b01i = _mm_add_ps(_mm_mul_ps(be0i, t1r), _mm_mul_ps(cd0i, t2r));
+				__m128 b02r = _mm_add_ps(_mm_mul_ps(be0r, t2r), _mm_mul_ps(cd0r, t1r)), b02i = _mm_add_ps(_mm_mul_ps(be0i, t2r), _mm_mul_ps(cd0i, t1r));
+				__m128 b11r = _mm_add_ps(_mm_mul_ps(be1r, t1i), _mm_mul_ps(cd1r, t2i)), b11i = _mm_add_ps(_mm_mul_ps(be1i, t1i), _mm_mul_ps(cd1i, t2i));
+				__m128 b12r = _mm_sub_ps(_mm_mul_ps(be1r, t2i), _mm_mul_ps(cd1r, t1i)), b12i = _mm_sub_ps(_mm_mul_ps(be1i, t2i), _mm_mul_ps(cd1i, t1i));
+				_mm_storeu_ps(f0r + i, _mm_add_ps(_mm_add_ps(ar, be0r), cd0r));
+				_mm_storeu_ps(f0i + i, _mm_add_ps(_mm_add_ps(ai, be0i), cd0i));
+				_mm_storeu_ps(f1r + i, _mm_add_ps(_mm_add_ps(ar, b01r), b11r));
+				_mm_storeu_ps(f1i + i, _mm_add_ps(_mm_add_ps(ai, b01i), b11i));
+				_mm_storeu_ps(f2r + i, _mm_add_ps(_mm_add_ps(ar, b02r), b12r));
+				_mm_storeu_ps(f2i + i, _mm_add_ps(_mm_add_ps(ai, b02i), b12i));
+				_mm_storeu_ps(f3r + i, _mm_sub_ps(_mm_add_ps(ar, b02r), b12r));
+				_mm_storeu_ps(f3i + i, _mm_sub_ps(_mm_add_ps(ai, b02i), b12i));
+				_mm_storeu_ps(f4r + i, _mm_sub_ps(_mm_add_ps(ar, b01r), b11r));
+				_mm_storeu_ps(f4i + i, _mm_sub_ps(_mm_add_ps(ai, b01i), b11i));
+			}
+		}
+#endif
+		for (; i < innerSize; ++i) {
 			Sample ar = f0r[i], ai = f0i[i], br = f1r[i], bi = f1i[i], cr = f2r[i], ci = f2i[i], dr = f3r[i], di = f3i[i], er = f4r[i], ei = f4i[i];
 
 			Sample be0r = br + er, be0i = bi + ei;
@@ -1014,7 +1312,21 @@ struct RealFFT {
 			if (step-- == 0) {
 				size_t hSize = complexFft.size();
 				if (halfBinShift) {
-					for (size_t i = 0; i < hSize; ++i) {
+					size_t i = 0;
+#if SIGNALSMITH_LINEAR_SSE2
+					if constexpr (std::is_same<Sample, float>::value) {
+						const float *tw = (const float *)halfBinTwists.data();
+						for (; i + 4 <= hSize; i += 4) {
+							__m128 t0 = _mm_loadu_ps(time + 2*i), t1 = _mm_loadu_ps(time + 2*i + 4);
+							__m128 w0 = _mm_loadu_ps(tw + 2*i), w1 = _mm_loadu_ps(tw + 2*i + 4);
+							__m128 tr = _mm_shuffle_ps(t0, t1, _MM_SHUFFLE(2, 0, 2, 0)), ti = _mm_shuffle_ps(t0, t1, _MM_SHUFFLE(3, 1, 3, 1));
+							__m128 wr = _mm_shuffle_ps(w0, w1, _MM_SHUFFLE(2, 0, 2, 0)), wi = _mm_shuffle_ps(w0, w1, _MM_SHUFFLE(3, 1, 3, 1));
+							_mm_storeu_ps(tmpTimeR + i, _mm_sub_ps(_mm_mul_ps(tr, wr), _mm_mul_ps(ti, wi)));
+							_mm_storeu_ps(tmpTimeI + i, _mm_add_ps(_mm_mul_ps(ti, wr), _mm_mul_ps(tr, wi)));
+						}
+					}
+#endif
+					for (; i < hSize; ++i) {
 						Sample tr = time[2*i], ti = time[2*i + 1];
 						Complex twist = halfBinTwists[i];
 						tmpTimeR[i] = tr*twist.real() - ti*twist.imag();
@@ -1043,7 +1355,41 @@ struct RealFFT {
 						startI = (startI + endI)/2;
 					}
 				}
-				for (size_t i = startI; i < endI; ++i) {
+				size_t i = startI;
+#if SIGNALSMITH_LINEAR_SSE2
+				if constexpr (std::is_same<Sample, float>::value) {
+					if (halfBinShift) {
+						// four bands and their four mirror bands at a time; the last two pairs (which write the middle
+						// bands twice) stay in the scalar loop, in order
+						const float *tw = (const float *)twiddles.data();
+						float *out = (float *)freq;
+						const __m128 half = _mm_set1_ps(0.5f);
+						for (; i + 4 + 1 < endI; i += 4) {
+							size_t c = hSize - 1 - i - 3; // the mirror bands c..c+3, reversed against i..i+3
+							__m128 fr = _mm_loadu_ps(tmpFreqR + i), fi = _mm_loadu_ps(tmpFreqI + i);
+							__m128 cr = _mm_shuffle_ps(_mm_loadu_ps(tmpFreqR + c), _mm_loadu_ps(tmpFreqR + c), _MM_SHUFFLE(0, 1, 2, 3));
+							__m128 ci = _mm_shuffle_ps(_mm_loadu_ps(tmpFreqI + c), _mm_loadu_ps(tmpFreqI + c), _MM_SHUFFLE(0, 1, 2, 3));
+							__m128 w0 = _mm_loadu_ps(tw + 2*i), w1 = _mm_loadu_ps(tw + 2*i + 4);
+							__m128 wr = _mm_shuffle_ps(w0, w1, _MM_SHUFFLE(2, 0, 2, 0)), wi = _mm_shuffle_ps(w0, w1, _MM_SHUFFLE(3, 1, 3, 1));
+							__m128 oddR = _mm_mul_ps(_mm_add_ps(fr, cr), half);
+							__m128 oddI = _mm_mul_ps(_mm_sub_ps(fi, ci), half);
+							__m128 evenIR = _mm_mul_ps(_mm_sub_ps(fr, cr), half);
+							__m128 evenII = _mm_mul_ps(_mm_add_ps(fi, ci), half);
+							__m128 eR = _mm_sub_ps(_mm_mul_ps(evenIR, wr), _mm_mul_ps(evenII, wi));
+							__m128 eI = _mm_add_ps(_mm_mul_ps(evenII, wr), _mm_mul_ps(evenIR, wi));
+							__m128 aR = _mm_add_ps(oddR, eR), aI = _mm_add_ps(oddI, eI);
+							__m128 bR = _mm_sub_ps(oddR, eR), bI = _mm_sub_ps(eI, oddI);
+							_mm_storeu_ps(out + 2*i, _mm_unpacklo_ps(aR, aI));
+							_mm_storeu_ps(out + 2*i + 4, _mm_unpackhi_ps(aR, aI));
+							// mirror: lane j belongs to band c + 3 - j
+							__m128 rR = _mm_shuffle_ps(bR, bR, _MM_SHUFFLE(0, 1, 2, 3)), rI = _mm_shuffle_ps(bI, bI, _MM_SHUFFLE(0, 1, 2, 3));
+							_mm_storeu_ps(out + 2*c, _mm_unpacklo_ps(rR, rI));
+							_mm_storeu_ps(out + 2*c + 4, _mm_unpackhi_ps(rR, rI));
+						}
+					}
+				}
+#endif
+				for (; i < endI; ++i) {
 					size_t conjI = halfBinShift ? (hSize - 1 - i) : (hSize - i);
 					Complex twiddle = twiddles[i];
 
@@ -1200,7 +1546,38 @@ struct RealFFT {
 						startI = (startI + endI)/2;
 					}
 				}
-				for (size_t i = startI; i < endI; ++i) {
+				size_t i = startI;
+#if SIGNALSMITH_LINEAR_SSE2
+				if constexpr (std::is_same<Sample, float>::value) {
+					if (halfBinShift) {
+						// four bands and their four mirror bands at a time (the last two pairs, which write the middle
+						// bands twice, stay in the scalar loop, in order)
+						const float *tw = (const float *)twiddles.data();
+						const float *in = (const float *)freq;
+						for (; i + 4 + 1 < endI; i += 4) {
+							size_t c = hSize - 1 - i - 3;
+							__m128 f0 = _mm_loadu_ps(in + 2*i), f1 = _mm_loadu_ps(in + 2*i + 4);
+							__m128 fr = _mm_shuffle_ps(f0, f1, _MM_SHUFFLE(2, 0, 2, 0)), fi = _mm_shuffle_ps(f0, f1, _MM_SHUFFLE(3, 1, 3, 1));
+							__m128 g0 = _mm_loadu_ps(in + 2*c), g1 = _mm_loadu_ps(in + 2*c + 4);
+							// the mirror bands reversed: lane j = band c + 3 - j
+							__m128 gr = _mm_shuffle_ps(g1, g0, _MM_SHUFFLE(0, 2, 0, 2)), gi = _mm_shuffle_ps(g1, g0, _MM_SHUFFLE(1, 3, 1, 3));
+							__m128 w0 = _mm_loadu_ps(tw + 2*i), w1 = _mm_loadu_ps(tw + 2*i + 4);
+							__m128 wr = _mm_shuffle_ps(w0, w1, _MM_SHUFFLE(2, 0, 2, 0)), wi = _mm_shuffle_ps(w0, w1, _MM_SHUFFLE(3, 1, 3, 1));
+							// odd = f + conj(g), evenRotMinusI = f - conj(g)
+							__m128 oddR = _mm_add_ps(fr, gr), oddI = _mm_add_ps(fi, _mm_xor_ps(gi, _mm_set1_ps(-0.0f)));
+							__m128 eR = _mm_sub_ps(fr, gr), eI = _mm_sub_ps(fi, _mm_xor_ps(gi, _mm_set1_ps(-0.0f)));
+							__m128 evR = _mm_add_ps(_mm_mul_ps(eR, wr), _mm_mul_ps(eI, wi));
+							__m128 evI = _mm_sub_ps(_mm_mul_ps(eI, wr), _mm_mul_ps(eR, wi));
+							_mm_storeu_ps(tmpFreqR + i, _mm_add_ps(oddR, evR));
+							_mm_storeu_ps(tmpFreqI + i, _mm_add_ps(oddI, evI));
+							__m128 mR = _mm_sub_ps(oddR, evR), mI = _mm_sub_ps(evI, oddI);
+							_mm_storeu_ps(tmpFreqR + c, _mm_shuffle_ps(mR, mR, _MM_SHUFFLE(0, 1, 2, 3)));
+							_mm_storeu_ps(tmpFreqI + c, _mm_shuffle_ps(mI, mI, _MM_SHUFFLE(0, 1, 2, 3)));
+						}
+					}
+				}
+#endif
+				for (; i < endI; ++i) {
 					size_t conjI = halfBinShift ? (hSize - 1 - i) : (hSize - i);
 					Complex twiddle = twiddles[i];
 
@@ -1221,7 +1598,22 @@ struct RealFFT {
 			} else {
 				size_t hSize = complexFft.size();
 				if (halfBinShift) {
-					for (size_t i = 0; i < hSize; ++i) {
+					size_t i = 0;
+#if SIGNALSMITH_LINEAR_SSE2
+					if constexpr (std::is_same<Sample, float>::value) {
+						const float *tw = (const float *)halfBinTwists.data();
+						for (; i + 4 <= hSize; i += 4) {
+							__m128 tr = _mm_loadu_ps(tmpTimeR + i), ti = _mm_loadu_ps(tmpTimeI + i);
+							__m128 w0 = _mm_loadu_ps(tw + 2*i), w1 = _mm_loadu_ps(tw + 2*i + 4);
+							__m128 wr = _mm_shuffle_ps(w0, w1, _MM_SHUFFLE(2, 0, 2, 0)), wi = _mm_shuffle_ps(w0, w1, _MM_SHUFFLE(3, 1, 3, 1));
+							__m128 re = _mm_add_ps(_mm_mul_ps(tr, wr), _mm_mul_ps(ti, wi));
+							__m128 im = _mm_sub_ps(_mm_mul_ps(ti, wr), _mm_mul_ps(tr, wi));
+							_mm_storeu_ps(time + 2*i, _mm_unpacklo_ps(re, im));
+							_mm_storeu_ps(time + 2*i + 4, _mm_unpackhi_ps(re, im));
+						}
+					}
+#endif
+					for (; i < hSize; ++i) {
 						Sample tr = tmpTimeR[i], ti = tmpTimeI[i];
 						Complex twist = halfBinTwists[i];
 						time[2*i] = 	tr*twist.real() + ti*twist.imag();

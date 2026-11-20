@@ -325,7 +325,11 @@ const Tables& tables()
     return t;
 }
 
-// nearest-entry read (quality ≤ 1) and linear interpolation (quality 2) of a filter/resonance shape (§1.6)
+// nearest-entry read (quality ≤ 1) and linear interpolation (quality 2) of a filter/resonance shape (§1.6); inlined
+// into the per-partial loops of a control block (round beatfl190kr: the call was most of the filter stage's time)
+#if defined(__GNUC__)
+__attribute__ ((always_inline)) inline
+#endif
 double shapeRead (const std::vector<double>& t, float x, bool interpolate) noexcept
 {
     const auto N = (int) t.size();
@@ -799,7 +803,8 @@ const float unisonTable[3][9] {
 // ---------------------------------------------------------------------------------------------------------------
 // The sine-bank kernel: groups of 8 partials kept in registers over a segment of m samples; each partial runs the
 // two-term recurrence x ← c·x − y and adds (T + (a − T)·kamp^j)·x into its lane sum acc[8·j + lane]. The same IEEE
-// operations in the same order whatever the vector width, so the AVX build gives bit-identical results.
+// operations in the same order whatever the vector width or the number of groups per pass, so the SSE2 and AVX builds
+// give bit-identical results (tests/Harm190krTests.inc pins both against the one-group scalar loop).
 
 #if defined(__GNUC__)
 #define HARMLESS_INLINE inline __attribute__ ((always_inline))
@@ -807,6 +812,78 @@ const float unisonTable[3][9] {
 #define HARMLESS_INLINE inline
 #endif
 
+#if defined(__GNUC__) || defined(__clang__)
+// The lanes as explicit 4-double vectors (GCC/Clang vector extensions: element-wise IEEE operations, nothing
+// reassociated or fused). Written as plain arrays, the compiler had vectorised the lane sums but kept the eight
+// recurrences x ← c·x − y in scalar registers spilled to the stack (round beatfl190kr). G groups of 8 partials run
+// through one pass over the segment: lane l of the sum then takes group g's term and then group g + 1's, the order the
+// one-group passes added them in, and the G independent recurrences hide each other's latency.
+typedef double HarmlessV2 __attribute__ ((vector_size (16))); // SSE2
+typedef double HarmlessV4 __attribute__ ((vector_size (32))); // AVX
+
+// G groups of 8 partials over the segment, in vectors V of W doubles (8 / W vectors per group)
+template <typename V, int W, int G>
+HARMLESS_INLINE void bankKernelGroups (double* osc0, double* osc1, const double* oscC, const double* T, const double* A,
+                                       int g, int m, const double* kp, double* acc) noexcept
+{
+    constexpr int P = 8 / W, H = P * G; // vectors per group, in all
+    constexpr auto bytes = sizeof (V);
+    static_assert (bytes == sizeof (double) * W);
+    V x[H], y[H], c[H], t[H], d[H];
+#pragma GCC unroll 16
+    for (int h = 0; h < H; ++h)
+    {
+        const auto i = (std::size_t) (g + W * h);
+        V a;
+        std::memcpy (&x[h], osc0 + i, bytes), std::memcpy (&y[h], osc1 + i, bytes), std::memcpy (&c[h], oscC + i, bytes);
+        std::memcpy (&t[h], T + i, bytes), std::memcpy (&a, A + i, bytes);
+        d[h] = a - t[h];
+    }
+    for (int j = 0; j < m; ++j)
+    {
+        const auto k = kp[j];
+        auto* a = acc + 8 * j;
+        V s[P];
+#pragma GCC unroll 4
+        for (int p = 0; p < P; ++p)
+            std::memcpy (&s[p], a + W * p, bytes);
+#pragma GCC unroll 4
+        for (int q = 0; q < G; ++q)
+#pragma GCC unroll 4
+            for (int p = 0; p < P; ++p)
+            {
+                const auto h = P * q + p;
+                const auto u = x[h];
+                s[p] = s[p] + (t[h] + d[h] * k) * u;
+                x[h] = c[h] * u - y[h];
+                y[h] = u;
+            }
+#pragma GCC unroll 4
+        for (int p = 0; p < P; ++p)
+            std::memcpy (a + W * p, &s[p], bytes);
+    }
+#pragma GCC unroll 16
+    for (int h = 0; h < H; ++h)
+    {
+        const auto i = (std::size_t) (g + W * h);
+        std::memcpy (osc0 + i, &x[h], bytes), std::memcpy (osc1 + i, &y[h], bytes);
+    }
+}
+
+template <typename V, int W, int G>
+HARMLESS_INLINE void bankKernelBody (double* osc0, double* osc1, const double* oscC, const double* T, const double* A, int top,
+                                     int m, const double* kp, double* acc) noexcept
+{
+    int g = 0;
+    for (; g + 8 * G <= top; g += 8 * G)
+        bankKernelGroups<V, W, G> (osc0, osc1, oscC, T, A, g, m, kp, acc);
+    for (; g < top; g += 8)
+        bankKernelGroups<V, W, 1> (osc0, osc1, oscC, T, A, g, m, kp, acc);
+}
+#else
+struct HarmlessV2;
+struct HarmlessV4;
+template <typename V, int W, int G>
 HARMLESS_INLINE void bankKernelBody (double* osc0, double* osc1, const double* oscC, const double* T, const double* A, int top,
                                      int m, const double* kp, double* acc) noexcept
 {
@@ -839,11 +916,12 @@ HARMLESS_INLINE void bankKernelBody (double* osc0, double* osc1, const double* o
             osc0[(std::size_t) (g + l)] = x[l], osc1[(std::size_t) (g + l)] = y[l];
     }
 }
+#endif
 
 void bankKernelPlain (double* osc0, double* osc1, const double* oscC, const double* T, const double* A, int top, int m,
                       const double* kp, double* acc) noexcept
 {
-    bankKernelBody (osc0, osc1, oscC, T, A, top, m, kp, acc);
+    bankKernelBody<HarmlessV2, 2, 2> (osc0, osc1, oscC, T, A, top, m, kp, acc);
 }
 
 #if (defined(__GNUC__) || defined(__clang__)) && (defined(__x86_64__) || defined(__i386__)) && ! defined(HARMLESS_NO_AVX)
@@ -852,7 +930,7 @@ void bankKernelPlain (double* osc0, double* osc1, const double* oscC, const doub
 __attribute__ ((target ("avx"))) void bankKernelAvx (double* osc0, double* osc1, const double* oscC, const double* T,
                                                      const double* A, int top, int m, const double* kp, double* acc) noexcept
 {
-    bankKernelBody (osc0, osc1, oscC, T, A, top, m, kp, acc);
+    bankKernelBody<HarmlessV4, 4, 2> (osc0, osc1, oscC, T, A, top, m, kp, acc);
 }
 
 bool cpuHasAvx() noexcept
@@ -1206,7 +1284,7 @@ public:
             if (nt.slide.moving()) // a slide note moves Final.Pitch (issue #14)
             {
                 const auto was = nt.slide.cents;
-                const auto d = (double) (nt.slide.advance ((float) n) - was);
+                const auto d = (double) (nt.slide.advanceFirst ((float) n) - was);
                 nt.finalPitch += d;
                 for (int k = 0; k < nt.count; ++k)
                     records[(std::size_t) nt.records[(std::size_t) k]].finalPitch += d;
@@ -2082,14 +2160,24 @@ private:
         // harmonics without grittiness or frequency phaser lie on f_h = (1 + (h − 1)·D)·f₀/fs: their steps e^{2πi·f_h}
         // follow from two sincos by complex rotation (the rounding differs from a direct sincos by ~h·1e-16)
         const auto geometric = P.grit == 0.0 && ! (P.p[71] != 0 && P.phType == 9) && top > 4;
+        // (round beatfl190kr: a held note's frequencies stay put between control blocks — when no position needs a new
+        // step, the loop below would write nothing, its rotation only feeding positions that changed: skipped)
+        bool anyChanged = resync || top > v.oscTop;
+        if (! anyChanged)
+        {
+            int differ = 0;
+            for (int i = 0; i < top; ++i)
+                differ |= (int) (v.freq[(std::size_t) i] != v.oscF[(std::size_t) i]);
+            anyChanged = differ != 0;
+        }
         double gr = 0.0, gi = 0.0, rr = 1.0, ri = 0.0;
-        if (geometric)
+        if (geometric && anyChanged)
         {
             const auto s = v.freq[4]; // ratio 1
             gr = std::cos (twoPi * s), gi = std::sin (twoPi * s);
             rr = std::cos (twoPi * P.D * s), ri = std::sin (twoPi * P.D * s);
         }
-        for (int i = 0; i < top; ++i)
+        for (int i = 0; i < (anyChanged ? top : 0); ++i)
         {
             const auto u = (std::size_t) i;
             const auto f = v.freq[u];
@@ -2290,7 +2378,15 @@ public:
                 std::vector<std::uint8_t> state (count);
                 for (std::size_t k = 0; k < count; ++k)
                     state[k] = (std::uint8_t) std::clamp ((int) mp[(std::size_t) harmlessCompIndex + 1 + k], 0, 255);
-                s.comp = hlfx::makeMaximusPreset (state);
+                // (round perfgate190id: the same state keeps its preset. Built again on every edit of the project it
+                // cost 13 ms per Harmless channel of each snapshot (Exoplanet: 52 of 60 ms), and the new pointer made
+                // the audio thread rebuild the rack compressor, its state reset, at every edit anywhere)
+                if (compPreset == nullptr || state != compState)
+                {
+                    compPreset = hlfx::makeMaximusPreset (state);
+                    compState = std::move (state);
+                }
+                s.comp = compPreset;
             }
         }
         mailbox.write (s);
@@ -2449,6 +2545,8 @@ private:
     Engine engine;
     Settings settings, incoming;
     Mailbox<Settings> mailbox;
+    std::vector<std::uint8_t> compState; // (message thread: configure's last compressor state and its preset)
+    std::shared_ptr<const hlfx::MaximusPreset> compPreset;
     bool dirty = false, rackBuilt = false;
     std::array<float, 11> rackInputs {};
     std::shared_ptr<const hlfx::MaximusPreset> rackComp;
@@ -2497,6 +2595,24 @@ std::optional<std::vector<float>> harmlessParams (const std::vector<std::uint8_t
 }
 
 std::unique_ptr<Instrument> makeHarmlessInstrument() { return std::make_unique<HarmlessInstrument>(); }
+
+bool harmlessBankKernelForTest (int path, double* osc0, double* osc1, const double* oscC, const double* T, const double* A,
+                                int top, int m, const double* kpow, double* acc) noexcept
+{
+    if (path == 0)
+    {
+        bankKernelPlain (osc0, osc1, oscC, T, A, top, m, kpow, acc);
+        return true;
+    }
+#ifdef HARMLESS_AVX
+    if (path == 1 && cpuHasAvx())
+    {
+        bankKernelAvx (osc0, osc1, oscC, T, A, top, m, kpow, acc);
+        return true;
+    }
+#endif
+    return false;
+}
 
 std::vector<float> harmlessDefaultModelParams()
 {

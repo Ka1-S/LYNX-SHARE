@@ -54,6 +54,12 @@ std::vector<Action> makeActions()
         // FL 2026 (checked in FL, round 165s): Shift+Space stops and goes back to the start of the song / pattern, or
         // plays from there when stopped; the position clicked on a ruler is ignored (issue #11)
         { "transport.playFromStart", TR_NOOP ("Play, or stop at the start of the song or pattern"), Context::global, { chord (space, shift) } },
+        // issue #195: FL's Home, "Move playback marker to start" (FL 2026 manual, Keyboard shortcuts › Playlist). Checked in
+        // FL 2026 in round 190jz (shots fl-195-*): the Playlist and the Piano roll take Home, also while playing (the song
+        // goes on from its start); with the Mixer or the Channel rack focused it does nothing. FL's ShortcutsModule has no
+        // action for it: those two windows take the key themselves. The global action has no key of its own (bind one in
+        // the shortcut editor; LYNX's W extra runs it).
+        { "transport.toStart", TR_NOOP ("Move the playback marker to the start of the song or pattern"), Context::global, {} },
         { "transport.toggleMode", TR_NOOP ("Pattern / song mode"), Context::global, { chord ('L') }, true },
         { "transport.nextMarker", TR_NOOP ("Jump to the next song marker (Quantize song jumps while playing)"), Context::global, { chord (numpadMultiply, alt) } },
         { "transport.previousMarker", TR_NOOP ("Jump to the previous song marker"), Context::global, { chord (numpadDivide, alt) } },
@@ -81,12 +87,17 @@ std::vector<Action> makeActions()
         // FL's F8 (ShowPluginPickerAction, ShortCut 119): the Plugin picker view, again = closed (round 169k; the
         // quick-add palette that F8 opened since round 167o stays on the toolbar's plug button)
         { "view.pluginPicker", TR_NOOP ("Plugin picker: every generator and effect, the categories as tabs (press again to close)"), Context::global, { chord (f8) } },
+        // FL's Ctrl+F8 (View › Project picker; round 190my): the patterns and channels in the picker's form, again = closed
+        { "view.projectPicker", TR_NOOP ("Project picker: the patterns and channels (press again to close)"), Context::global, { chord (f8, ctrl) } },
         { "panel.mixer", TR_NOOP ("Show, focus or hide the Mixer"), Context::global, { chord (f9) } },
         // FL 2026's other window keys (its shortcut list, REA round 165a)
         { "view.pluginDatabase", TR_NOOP ("Plugin database (in the Browser)"), Context::global, { chord (f8, shift) } },
         // F10 / F11 toggle like FL's (round 167o, settingsKeyPress): Settings on another page switches to this one
         { "view.midiSettings", TR_NOOP ("MIDI settings (press again to close)"), Context::global, { chord (f10) } },
         { "view.projectInfo", TR_NOOP ("Project info (press again to close)"), Context::global, { chord (f11) } },
+        // Issue #181 (LYNX's own, beside FL's F10 / F11): Ctrl+, (Cmd+, on macOS), the settings key of most apps. It opens
+        // Settings on the page shown last (General at first) and closes it when it is open.
+        { "view.settings", TR_NOOP ("Settings (press again to close)"), Context::global, { chord (',', ctrl) } },
         { "view.closeWindows", TR_NOOP ("Close all windows (plugins, channel settings, tools)"), Context::global, { chord (f12) } },
         // Round 183a: the Clip-launch workflow's detail view, with the reference DAW's keys (its View menu, Live 12.4
         // [SHOT] detail183a/live/d05). They do nothing in Pattern workflow, where the keys keep their old meaning.
@@ -94,6 +105,8 @@ std::vector<Action> makeActions()
         { "view.detailClip", TR_NOOP ("Clip-launch workflow: clip view"), Context::global, { chord ('3', ctrl | alt) } },
         { "view.detailDevices", TR_NOOP ("Clip-launch workflow: device view"), Context::global, { chord ('4', ctrl | alt) } },
         { "view.detailSwitch", TR_NOOP ("Clip-launch workflow: switch between clip view and device view"), Context::global, { chord (tab, shift) } },
+        // Round 190jn (design190ia CL-23, DL-64): Live's ? key (Shift+/) shows or hides its Info View
+        { "view.detailInfo", TR_NOOP ("Clip-launch workflow: show or hide the Info View"), Context::global, { chord ('/', shift) } },
         // Round 190ce: the reference DAW's hot-swap key (its lesson "Hot-Swapping Presets": Q links the Browser to the
         // selected device and Q again ends it; docs/analise/REA_rodada190ce.md §2). The typing keyboard keeps Q while on.
         { "view.hotSwap", TR_NOOP ("Hot-swap: link the Browser to the selected device, instrument or sample (again: end)"), Context::global, { chord ('Q') } },
@@ -137,6 +150,17 @@ std::vector<Action> makeActions()
         { "file.save", TR_NOOP ("Save project"), Context::global, { chord ('S', ctrl) } },
         { "file.saveAs", TR_NOOP ("Save project as"), Context::global, { chord ('S', ctrl | shift) } },
         { "file.saveNewVersion", TR_NOOP ("Save new version (Song_2, Song_3...)"), Context::global, { chord ('S', ctrl | alt) } },
+        // FL's File › Recent projects: Alt+1 … Alt+0 open the ten most recent (FL manual, File menu; round 190ih)
+        { "file.recent1", TR_NOOP ("Open recent project 1"), Context::global, { chord ('1', alt) } },
+        { "file.recent2", TR_NOOP ("Open recent project 2"), Context::global, { chord ('2', alt) } },
+        { "file.recent3", TR_NOOP ("Open recent project 3"), Context::global, { chord ('3', alt) } },
+        { "file.recent4", TR_NOOP ("Open recent project 4"), Context::global, { chord ('4', alt) } },
+        { "file.recent5", TR_NOOP ("Open recent project 5"), Context::global, { chord ('5', alt) } },
+        { "file.recent6", TR_NOOP ("Open recent project 6"), Context::global, { chord ('6', alt) } },
+        { "file.recent7", TR_NOOP ("Open recent project 7"), Context::global, { chord ('7', alt) } },
+        { "file.recent8", TR_NOOP ("Open recent project 8"), Context::global, { chord ('8', alt) } },
+        { "file.recent9", TR_NOOP ("Open recent project 9"), Context::global, { chord ('9', alt) } },
+        { "file.recent10", TR_NOOP ("Open recent project 10"), Context::global, { chord ('0', alt) } },
         { "file.export", TR_NOOP ("Export audio"), Context::global, { chord ('R', ctrl) } },
         { "file.exportMp3", TR_NOOP ("Export an MP3 file"), Context::global, { chord ('R', ctrl | shift) } },
         { "file.exportMidi", TR_NOOP ("Export a MIDI file"), Context::global, { chord ('M', ctrl | shift) } },
@@ -176,10 +200,26 @@ std::vector<Action> makeActions()
         { "rack.pianoRollView", TR_NOOP ("Piano-roll view of all channels on/off"), Context::channelRack, {} },
         { "rack.follow", TR_NOOP ("Follow the playhead (page along with the playing step) on/off"), Context::channelRack, {} },
         { "rack.groupSelected", TR_NOOP ("Put the selected channels in a new filter group"), Context::channelRack, { chord ('G', alt) } },
+        // issue #201 (round 190ll): the channel menu's "Rename and color... F2" with the rack focused (a new colour goes to
+        // every selected channel)
+        { "rack.rename", TR_NOOP ("Rename and color the selected channel"), Context::channelRack, { chord (f2) } },
+        // issue #220 (round 190ng): F3 opens the icon picker (FL has no key for it; in FL's name dialog the icon is F5)
+        { "rack.changeIcon", TR_NOOP ("Change the selected channel's icon"), Context::channelRack, { chord (f3) } },
         { "rack.rotateLeft", TR_NOOP ("Rotate the selected channels' steps left"), Context::channelRack, { chord (left, ctrl | shift) } },
         { "rack.rotateRight", TR_NOOP ("Rotate the selected channels' steps right"), Context::channelRack, { chord (right, ctrl | shift) } },
+        // FL's Channel rack (manual "Channel Rack › Filter"; round 190ld, DE-37): Page Up / Page Down = the previous / next
+        // filter group, in the group menu's order
+        { "rack.filterPrevious", TR_NOOP ("Previous filter group"), Context::channelRack, { chord (pageUp) } },
+        { "rack.filterNext", TR_NOOP ("Next filter group"), Context::channelRack, { chord (pageDown) } },
+        // FL 2026's Channel rack menu › Options › "Show mixer track selectors" (Alt+M) (round 190ld, DE-26)
+        { "rack.mixerSelectors", TR_NOOP ("Show mixer track selectors"), Context::channelRack, { chord ('M', alt) } },
+        // FL's Channel rack menu › Options › "Zip selected" (Alt+Z) / "Unzip all" (Alt+U) (round 190mk, DE-38)
+        { "rack.zipSelected", TR_NOOP ("Zip selected"), Context::channelRack, { chord ('Z', alt) } },
+        { "rack.unzipAll", TR_NOOP ("Unzip all"), Context::channelRack, { chord ('U', alt) } },
+        { "rack.restretchAll", TR_NOOP ("Restretch all"), Context::channelRack, { chord ('R', ctrl | alt) } }, // (round 190mp, DE-38)
 
         // Piano Roll (focused): tool dialogs and zoom
+        { "pianoRoll.toStart", TR_NOOP ("Move the playback marker to start"), Context::pianoRoll, { chord (home) } }, // (issue #195)
         { "pianoRoll.arpeggiate", TR_NOOP ("Arpeggiate..."), Context::pianoRoll, { chord ('A', alt) } },
         { "pianoRoll.strum", TR_NOOP ("Strum..."), Context::pianoRoll, { chord ('S', alt) } },
         { "pianoRoll.flip", TR_NOOP ("Flip..."), Context::pianoRoll, { chord ('Y', alt) } },
@@ -189,12 +229,22 @@ std::vector<Action> makeActions()
         // the other tools with FL's keys (REA round 143: the piano roll Tools menu)
         { "pianoRoll.quantize", TR_NOOP ("Quantize..."), Context::pianoRoll, { chord ('Q', alt) } },
         { "pianoRoll.chop", TR_NOOP ("Chop..."), Context::pianoRoll, { chord ('U', alt) } },
+        // round 190hr: the reference's clip editor keys, acting only in the Clip-launch layout's docked editor (core/LiveGrid.h)
+        { "pianoRoll.liveGridNarrower", TR_NOOP ("Clip-launch editor: narrow the grid"), Context::pianoRoll, { chord ('1', ctrl) } },
+        { "pianoRoll.liveGridWider", TR_NOOP ("Clip-launch editor: widen the grid"), Context::pianoRoll, { chord ('2', ctrl) } },
+        { "pianoRoll.liveGridTriplet", TR_NOOP ("Clip-launch editor: triplet grid"), Context::pianoRoll, { chord ('3', ctrl) } },
+        { "pianoRoll.liveGridSnap", TR_NOOP ("Clip-launch editor: snap to grid"), Context::pianoRoll, { chord ('4', ctrl) } },
+        { "pianoRoll.liveGridFixed", TR_NOOP ("Clip-launch editor: fixed or adaptive grid"), Context::pianoRoll, { chord ('5', ctrl) } },
+        { "pianoRoll.liveQuantize", TR_NOOP ("Clip-launch editor: quantize"), Context::pianoRoll, { chord ('U', ctrl) } },
+        { "pianoRoll.liveQuantizeSettings", TR_NOOP ("Clip-launch editor: quantize settings..."), Context::pianoRoll, { chord ('U', ctrl | shift) } },
         { "pianoRoll.flam", TR_NOOP ("Flam..."), Context::pianoRoll, { chord ('F', alt) } },
         { "pianoRoll.claw", TR_NOOP ("Claw machine..."), Context::pianoRoll, { chord ('W', alt) } },
         { "pianoRoll.lfo", TR_NOOP ("LFO..."), Context::pianoRoll, { chord ('O', alt) } },
         { "pianoRoll.articulate", TR_NOOP ("Articulate..."), Context::pianoRoll, { chord ('L', alt) } },
         { "pianoRoll.riffMachine", TR_NOOP ("Riff machine..."), Context::pianoRoll, { chord ('E', alt) } },
         { "pianoRoll.chordProgression", TR_NOOP ("Generate chord progression..."), Context::pianoRoll, { chord ('P', alt) } },
+        // LYNX's Chord helper (round 190mc, discussion #105): no key of its own (FL has no such tool; the user may give it one)
+        { "pianoRoll.chordHelper", TR_NOOP ("Chord helper..."), Context::pianoRoll, {} },
         // FL's "Run last script again" (Piano roll scripts, round 190as)
         { "pianoRoll.runLastScript", TR_NOOP ("Run last script again"), Context::pianoRoll, { chord ('Y', ctrl | alt) } },
         // note colours and the Select menu (REA round 153: FL's keys from its piano roll manual)
@@ -248,15 +298,15 @@ std::vector<Action> makeActions()
         { "pianoRoll.markerSignature", TR_NOOP ("Pattern time markers: Add time signature change..."), Context::pianoRoll, { chord ('T', shift | alt) } },
         // the tools and the other single letters (FL's keys; issue #12: they were fixed in the editor and won over a
         // global shortcut given the same key)
-        { "pianoRoll.tool.pencil", TR_NOOP ("Tool: Pencil"), Context::pianoRoll, { chord ('P') } },
-        { "pianoRoll.tool.brush", TR_NOOP ("Tool: Brush"), Context::pianoRoll, { chord ('B') } },
-        { "pianoRoll.tool.drumPaint", TR_NOOP ("Tool: Drum brush"), Context::pianoRoll, { chord ('N') } },
-        { "pianoRoll.tool.eraser", TR_NOOP ("Tool: Eraser"), Context::pianoRoll, { chord ('D') } },
+        { "pianoRoll.tool.pencil", TR_NOOP ("Tool: Draw"), Context::pianoRoll, { chord ('P') } },
+        { "pianoRoll.tool.brush", TR_NOOP ("Tool: Paint"), Context::pianoRoll, { chord ('B') } },
+        { "pianoRoll.tool.drumPaint", TR_NOOP ("Tool: Paint drum sequencer"), Context::pianoRoll, { chord ('N') } },
+        { "pianoRoll.tool.eraser", TR_NOOP ("Tool: Delete"), Context::pianoRoll, { chord ('D') } },
         { "pianoRoll.tool.mute", TR_NOOP ("Tool: Mute"), Context::pianoRoll, { chord ('T') } },
-        { "pianoRoll.tool.knife", TR_NOOP ("Tool: Knife"), Context::pianoRoll, { chord ('C') } },
-        { "pianoRoll.tool.lasso", TR_NOOP ("Tool: Lasso (select)"), Context::pianoRoll, { chord ('E') } },
+        { "pianoRoll.tool.knife", TR_NOOP ("Tool: Slice"), Context::pianoRoll, { chord ('C') } },
+        { "pianoRoll.tool.lasso", TR_NOOP ("Tool: Select"), Context::pianoRoll, { chord ('E') } },
         { "pianoRoll.tool.zoom", TR_NOOP ("Tool: Zoom"), Context::pianoRoll, { chord ('Z') } },
-        { "pianoRoll.tool.listen", TR_NOOP ("Tool: Listen"), Context::pianoRoll, { chord ('Y') } },
+        { "pianoRoll.tool.listen", TR_NOOP ("Tool: Playback"), Context::pianoRoll, { chord ('Y') } },
         { "pianoRoll.slide", TR_NOOP ("Slide notes on/off (new notes)"), Context::pianoRoll, { chord ('S') } },
         // round 190an (LYNX's own option; FL has none, so no key by default): the Piano roll's Snap to scale switch
         { "pianoRoll.scaleSnap", TR_NOOP ("Snap notes to the scale on/off"), Context::pianoRoll, {} },
@@ -280,9 +330,21 @@ std::vector<Action> makeActions()
         { "playlist.autoCrossfades", TR_NOOP ("Automatic crossfades (current project) on/off"), Context::playlist, {} },
         // LYNX extra (round 190gz, issue #170): Playlist tracks linked to mixer tracks
         { "playlist.linkTracks", TR_NOOP ("Link Playlist tracks to mixer tracks (current project) on/off"), Context::playlist, {} },
+        // LYNX extra (round 190ht, issue #154): the linked headers list their mixer track's insert effects
+        { "playlist.trackInserts", TR_NOOP ("Show insert effects on linked tracks on/off"), Context::playlist, {} },
         // FL's legacy Pattern Blocks (round 170f, issue #60)
         { "playlist.patternBlocks", TR_NOOP ("Pattern blocks (current project) on/off"), Context::playlist, {} },
         { "playlist.automationLanes", TR_NOOP ("Automation lanes on/off"), Context::playlist, {} },
+        // LYNX extra (round 190iu, issue #186): the wheel scrolls over the track headers and zooms over the arrangement
+        { "playlist.wheelZones", TR_NOOP ("Wheel: scroll over the track headers, zoom over the arrangement on/off"), Context::playlist, {} },
+        { "editing.tempTools", TR_NOOP ("Hold a tool key for a temporary tool on/off"), Context::playlist, {} },
+        // LYNX extras (round 190jq: issues #191, #191.3, #164)
+        { "playlist.pointerClick", TR_NOOP ("Pointer click (a click on an empty spot selects and moves the song position) on/off"), Context::playlist, {} },
+        { "playlist.clipLanes", TR_NOOP ("Automation clips as lanes under their tracks on/off"), Context::playlist, {} },
+        { "playlist.headerWidth", TR_NOOP ("Drag the track header column's right edge to widen it on/off"), Context::playlist, {} },
+        { "playlist.midiDrop", TR_NOOP ("MIDI files dropped on the Playlist become pattern clips on/off"), Context::playlist, {} },
+        { "playlist.clipsToLanes", TR_NOOP ("Move automation clips into their tracks' lanes"), Context::playlist, {} },
+        { "layout.trackOnly", TR_NOOP ("Track-only mode on/off"), Context::playlist, {} },
         // FL's Playlist menu › Picker panel › Enable (EEPatternsShowMenu; FL's shortcut page: Alt+P, issue #175)
         { "playlist.pickerPanel", TR_NOOP ("Picker panel on / off"), Context::playlist, { chord ('P', alt) } },
         { "playlist.blocksToClips", TR_NOOP ("Turn pattern blocks into clips"), Context::playlist, {} },
@@ -305,15 +367,21 @@ std::vector<Action> makeActions()
         { "playlist.quantizeStarts", TR_NOOP ("Quantize the clips' starts"), Context::playlist, { chord ('Q', ctrl) } },
         { "playlist.quantizeHalf", TR_NOOP ("Quantize the clips' starts 50% (halfway to the grid)"), Context::playlist, {} },
         { "playlist.follow", TR_NOOP ("Follow the playhead (auto scrolling) on/off"), Context::playlist, {} },
-        { "playlist.tool.pencil", TR_NOOP ("Tool: Pencil"), Context::playlist, { chord ('P') } },
-        { "playlist.tool.brush", TR_NOOP ("Tool: Brush"), Context::playlist, { chord ('B') } },
-        { "playlist.tool.eraser", TR_NOOP ("Tool: Eraser"), Context::playlist, { chord ('D') } },
+        { "playlist.tool.pencil", TR_NOOP ("Tool: Draw"), Context::playlist, { chord ('P') } },
+        { "playlist.tool.brush", TR_NOOP ("Tool: Paint"), Context::playlist, { chord ('B') } },
+        { "playlist.tool.eraser", TR_NOOP ("Tool: Delete"), Context::playlist, { chord ('D') } },
         { "playlist.tool.mute", TR_NOOP ("Tool: Mute"), Context::playlist, { chord ('T') } },
-        { "playlist.tool.knife", TR_NOOP ("Tool: Knife"), Context::playlist, { chord ('C') } },
-        { "playlist.tool.lasso", TR_NOOP ("Tool: Lasso (select)"), Context::playlist, { chord ('E') } },
+        { "playlist.tool.knife", TR_NOOP ("Tool: Slice"), Context::playlist, { chord ('C') } },
+        { "playlist.tool.lasso", TR_NOOP ("Tool: Select"), Context::playlist, { chord ('E') } },
         { "playlist.tool.zoom", TR_NOOP ("Tool: Zoom"), Context::playlist, { chord ('Z') } },
-        { "playlist.tool.listen", TR_NOOP ("Tool: Listen"), Context::playlist, { chord ('Y') } },
+        { "playlist.tool.listen", TR_NOOP ("Tool: Playback"), Context::playlist, { chord ('Y') } },
         { "playlist.tool.slip", TR_NOOP ("Tool: Slip"), Context::playlist, { chord ('S') } },
+        // issue #219 (round 190ng): FL's snap key (the main snap's hint "BkSp: Main snap", REA r168s f05), now in the key
+        // map; "snap.toggle" is the same from any window, without a key until one is given (e.g. Alt+S)
+        { "playlist.snapToggle", TR_NOOP ("Snap on/off (the main snap)"), Context::playlist, { chord (backspace) } },
+        { "playlist.changeIcon", TR_NOOP ("Change the selected tracks' icon"), Context::playlist, { chord (f3) } },
+        { "pianoRoll.snapToggle", TR_NOOP ("Snap on/off (the main snap)"), Context::pianoRoll, { chord (backspace) } },
+        { "snap.toggle", TR_NOOP ("Snap on/off, from any window (the main snap)"), Context::global, {} },
         // FL's Performance mode (round 165m; Ctrl+P on FL's Playlist menu [DFM])
         { "playlist.performanceMode", TR_NOOP ("Performance mode on/off (launch the clips before the Start marker)"), Context::playlist, { chord ('P', ctrl) } },
         { "playlist.zoomPerformance", TR_NOOP ("Zoom on the performance clips"), Context::playlist, { chord ('6', shift) }, true },
@@ -366,6 +434,7 @@ std::vector<Action> makeActions()
         // ShortCut 49188 = Ctrl+Alt+Home, EEShiftMouseWheelNudgeAction, EECreateNewClipsWithManualFadesAction,
         // EESnapFadeHandlesAction, EESelMagicAction)
         { "playlist.makeUniqueAsSample", TR_NOOP ("Make the selected audio clips unique as samples"), Context::playlist, {} },
+        { "playlist.toStart", TR_NOOP ("Move the playback marker to start"), Context::playlist, { chord (home) } }, // (issue #195)
         { "playlist.leftResizing", TR_NOOP ("Allow resizing clips from the left on/off"), Context::playlist, { chord (home, ctrl | alt) } },
         { "playlist.wheelNudging", TR_NOOP ("Nudge clips with Shift+mouse wheel on/off"), Context::playlist, {} },
         { "playlist.manualFades", TR_NOOP ("Create new clips with manual fades on/off"), Context::playlist, {} },
@@ -378,9 +447,17 @@ std::vector<Action> makeActions()
         { "browser.swapPrevious", TR_NOOP ("Previous file into the selected channel"), Context::browser, { chord (up, shift) } },
         { "browser.swapNext", TR_NOOP ("Next file into the selected channel"), Context::browser, { chord (down, shift) } },
         { "browser.load", TR_NOOP ("Load the file into the selected channel"), Context::browser, { chord (enter) } },
+        // round 190ld (DL-98): Live's Shift+Enter preview; it acts in the Clip-launch layout only
+        { "browser.previewLive", TR_NOOP ("Preview the selected file (Clip-launch layout)"), Context::browser, { chord (enter, shift) } },
         { "browser.closeFolder", TR_NOOP ("Close the folder (or go to the parent folder)"), Context::browser, { chord (left) } },
         { "browser.openFolder", TR_NOOP ("Open the folder"), Context::browser, { chord (right) } },
         { "browser.rename", TR_NOOP ("Rename the selected plugin (Plugin database)"), Context::browser, { chord (f2) } },
+        // round 190lr (DF-97): FL's "Use (F3) to skip to the next matching item" of a search (Shift+F3: the previous one)
+        { "browser.findNext", TR_NOOP ("Next search match"), Context::browser, { chord (f3) } },
+        { "browser.findPrevious", TR_NOOP ("Previous search match"), Context::browser, { chord (f3, shift) } },
+        // round 190lr (DF-96 FL's navigation history; DL-102 Live's Ctrl+[ / Ctrl+])
+        { "browser.historyBack", TR_NOOP ("Previous location"), Context::browser, { chord (backspace), chord ('[', ctrl) } },
+        { "browser.historyForward", TR_NOOP ("Next location"), Context::browser, { chord (backspace, shift), chord (']', ctrl) } },
         // Round 190ce: the Browser's collections with the reference DAW's keys (1-7 put the selected item into a colour
         // collection or take it out, 0 takes it out of all; docs/analise/REA_rodada190ce.md §1). Plain keys: the typing
         // keyboard keeps them while it is on.
@@ -399,8 +476,10 @@ std::vector<Action> makeActions()
         { "mixer.linkChannels", TR_NOOP ("Link the selected channels to the selected insert"), Context::mixer, { chord ('L', ctrl) } },
         { "mixer.linkChannelsFrom", TR_NOOP ("Link the selected channels to inserts starting from the selected one"), Context::mixer, { chord ('L', ctrl | shift) } },
         { "mixer.selectLinkedChannels", TR_NOOP ("Select the channels linked to the selected insert"), Context::mixer, { chord ('L', alt) } },
+        { "mixer.waveforms", TR_NOOP ("Waveforms instead of the peak meters"), Context::mixer, { chord ('W', alt) } }, // round 190lr (DF-60)
         // FL's mixer track menu keys (round 167k, the DFM's ShortCut values: F2, S, Alt+R, Shift+Alt+R)
-        { "mixer.rename", TR_NOOP ("Rename and color the selected mixer track"), Context::mixer, { chord (f2) } },
+        { "mixer.rename", TR_NOOP ("Rename, color and icon of the selected mixer track"), Context::mixer, { chord (f2) } },
+        { "mixer.changeIcon", TR_NOOP ("Change the selected mixer track's icon"), Context::mixer, { chord (f3) } },
         { "mixer.audioEditor", TR_NOOP ("Open the audio editor"), Context::mixer, { chord ('E', ctrl) } },
         { "mixer.audioEditorRecord", TR_NOOP ("Open the audio editor and record"), Context::mixer, { chord ('E', shift) } },
         { "mixer.soloSelected", TR_NOOP ("Solo the selected mixer track(s)"), Context::mixer, { chord ('S') } },

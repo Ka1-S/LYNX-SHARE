@@ -187,8 +187,23 @@ struct GlobalLink
     bool smooth = false;
     int smoothing = 469;
     int mode = 0; // FL's "Mode" (round 190cs; linkformula::LinkMode)
+    // the Mapping Browser's Min / Max (round 190hp: a mapping of the MIDI Map Mode made global keeps its range)
+    float min = 0.0f, max = 1.0f;
     bool hasSettings() const noexcept { return port >= 0 || ! formula.empty() || smooth || smoothing != 469 || mode != 0; }
     bool operator== (const GlobalLink&) const = default;
+};
+
+// A MIDI mapping of the Clip-launch layout's MIDI Map Mode kept in the settings, for every project (round 190hp, slice
+// B9 of the 0.1.28 pain report; LYNX's own: the reference DAW keeps its mappings with each set, which users complain
+// about). Made with the Mapping Browser's "In every project (LYNX)". Only targets that exist in any project: the
+// transport switches, Stop all clips and a scene's launch button (it acts while the project has that scene). A
+// project's own mapping of the same MIDI control wins. Parameter mappings become FL's global links (GlobalLink).
+struct GlobalMapping
+{
+    int channel = -1, number = -1, port = -1; // as RemoteMapping (number: a controller 0..127 or a key 256 + n)
+    int action = 0;                           // RemoteAction (its enum value)
+    int scene = -1;                           // sceneLaunch
+    bool operator== (const GlobalMapping&) const = default;
 };
 
 // An output device (FL's Options › MIDI "Output" panel, REA round 165f): master sync and all-notes-off.
@@ -199,6 +214,10 @@ struct MidiOutputPrefs
     std::string syncType = "clock"; // midisync::syncTypeKey: MIDI clock + SPP, or an MTC rate
     int offsetMs = 0;          // "Master sync offset (milliseconds)", -1000…1000 (later = positive)
     bool allNotesOff = false;  // "Send all notes off" on init and after an export
+    // FL's output "Port" (Options › MIDI › Output, OutPortSel "Output port number", none by default; round 190jl): the
+    // MIDI Out channels (and plugin wrapper output ports) on this port send their notes, controllers, program / bank
+    // changes, pitch bend and aftertouch to this device
+    int port = -1;
 
     bool operator== (const MidiOutputPrefs&) const = default;
 };
@@ -210,6 +229,7 @@ struct MidiPrefs
     std::string clockInput;             // "External clock sync": the input LYNX follows ("" = off)
     int clockOffsetMs = 0;              // "External sync offset (milliseconds)", -1000…1000
     std::vector<GlobalLink> globalLinks;
+    std::vector<GlobalMapping> globalMappings; // (round 190hp)
     VelocityCurve velocity = VelocityCurve::linear;
     bool pickup = false;                // a controller takes over a parameter only once it reaches its value
     // FL's "Foot pedal controls note off" (KbHoldSupportBox, on; round 187a): LYNX holds the notes on CC 64 (sustain)
@@ -235,6 +255,11 @@ struct MidiPrefs
     void setInput (const MidiInputPrefs& input);
     MidiOutputPrefs output (const std::string& name) const;
     void setOutput (const MidiOutputPrefs& output);
+    // The port an output device sends on (round 190jl): its own, else FL's default — the port of the input that is the
+    // same device (the same name, or its paired name: controller::pairedOutput; REA midiout190jl, FLEngine 0x117cdb0 /
+    // 0xfd9430: an output takes the matching input's port, a saved port ≥ 0 wins). −1 = none.
+    int outputPort (const std::string& name) const;
+    int inheritedOutputPort (const std::string& name) const; // (the matching input's port alone)
 
     // Should a message on MIDI channel `channel` (1..16) from `device` be played?
     bool accepts (const std::string& device, int channel) const;

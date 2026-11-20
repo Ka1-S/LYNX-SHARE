@@ -6,6 +6,7 @@
 #include "engine/AudioEngine.h"
 #include "ui/AutomationUi.h"
 #include "ui/I18n.h"
+#include "ui/LiveLook.h"
 #include "ui/Theme.h"
 #include "ui/ValueControl.h"
 
@@ -32,6 +33,12 @@ public:
         const auto size = juce::jmin (area.getWidth(), area.getHeight()) - 4.0f;
         const auto box = juce::Rectangle<float> (size, size).withCentre (area.getCentre());
         constexpr float sweep = juce::MathConstants<float>::pi * 1.5f;
+        if (liveRing && compact) // (round 190jn: a rack macro in Live's look, theme::livelook::drawKnob at up to 27 px)
+        {
+            theme::livelook::drawKnob (g, juce::Rectangle<float> (juce::jmin (size + 4.0f, 27.0f), juce::jmin (size + 4.0f, 27.0f)).withCentre (area.getCentre()),
+                                       (float) v, spec.minimum < 0.0);
+            return;
+        }
 
         g.setColour (theme::colour::bg4);
         g.fillEllipse (box.reduced (4.0f));
@@ -102,6 +109,7 @@ public:
 
     juce::String shortName;
     bool compact = false; // only the dial (no value / name rows): FL's small knobs, e.g. the Video Player's volume
+    bool liveRing = false; // (round 190jn) Live's open ring instead of LYNX's dial (a compact knob in the Clip-launch layout's Live look)
 
 private:
     AudioEngine* engine;

@@ -575,8 +575,25 @@ Layout transistorBassLayout()
     l.width = 700;
     l.height = 600;
     auto& v = l.items;
-    v.push_back (label (14, 6, 300, 34, "Transistor Bass", dim | alignLeft));
-    v.push_back (display (360, 12, 326, 22, "tbprogram"));
+    v.push_back (label (14, 4, 300, 32, "Transistor Bass", dim | alignLeft));
+    // FL's program row under the logo (round 190mc, discussion #202; TSynthEditorForm at y 45: ProgramAutoFollowCheckBox
+    // 10, ProgramDigiWheel 95, PatternDigiWheel 185 + PatternNameEdit 215 + its shared indicator 320,
+    // PatternTransposeDigiWheel 383, ParamPatchDigiWheel 452 + ParamPatchNameEdit 482 + its shared indicator 590, READ 620,
+    // WRITE 653): the same order, LYNX's steppers a little wider for their arrows
+    v.push_back (toggle (10, 43, 36, 14, "Auto follow", "AF"));
+    v.push_back (label (48, 40, 46, 20, TR_NOOP ("Program"), dim | alignLeft));
+    v.push_back (stepper (95, 40, 38, 20, "Program", nullptr));
+    v.push_back (label (137, 40, 50, 20, TR_NOOP ("Sequence"), dim | alignLeft));
+    v.push_back (stepper (188, 40, 38, 20, "Sequence number", nullptr));
+    v.push_back (display (229, 40, 88, 20, "tbrowseqname"));
+    v.push_back (display (319, 40, 10, 20, "tbrowseqshared"));
+    v.push_back (label (333, 40, 44, 20, TR_NOOP ("Transp."), dim | alignLeft));
+    v.push_back (stepper (377, 40, 38, 20, "Sequence transpose", nullptr));
+    v.push_back (label (419, 40, 33, 20, TR_NOOP ("Patch"), dim | alignLeft));
+    v.push_back (stepper (452, 40, 38, 20, "Patch number", nullptr));
+    v.push_back (display (493, 40, 88, 20, "tbrowpatchname"));
+    v.push_back (display (583, 40, 10, 20, "tbrowpatchshared"));
+    v.push_back (display (600, 40, 90, 20, "tbrowreadwrite"));
     v.push_back (section (10, 62, 680, 98, TR_NOOP ("Voice")));
     v.push_back (section (10, 166, 392, 94, TR_NOOP ("Tweaks")));
     v.push_back (section (436, 166, 254, 94, nullptr));
@@ -665,8 +682,10 @@ Layout transistorBassMobileLayout()
     auto l = transistorBassLayout();
     l.height = 266;
     std::erase_if (l.items, [] (const LayoutItem& i) {
-        return i.y >= 262.0f || (i.display != nullptr && std::string (i.display) == "tbprogram")
-               || (i.param != nullptr && std::string (i.param) == "303 pulse");
+        return i.y >= 262.0f || (i.display != nullptr && (std::string (i.display) == "tbprogram" || std::string (i.display).rfind ("tbrow", 0) == 0))
+               || (i.param != nullptr && (std::string (i.param) == "303 pulse" || std::string (i.param) == "Program" || std::string (i.param) == "Auto follow"
+                                          || std::string (i.param).rfind ("Sequence ", 0) == 0 || std::string (i.param) == "Patch number"))
+               || (i.label != nullptr && i.param == nullptr && i.y >= 39.0f && i.y <= 41.0f); // (FL Studio Mobile's build: no programs)
     });
     return l;
 }

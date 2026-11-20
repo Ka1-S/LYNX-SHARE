@@ -102,8 +102,15 @@ jobs:
           echo "$JUCE_SHA256  juce.tar.gz" | sha256sum -c -
           tar xzf juce.tar.gz && mv "JUCE-$JUCE_VERSION" "juce-$JUCE_VERSION" && rm juce.tar.gz
 
+      # Release code generation (round 190kz, owner decision; docs/PLATFORMS.md "Release optimisation"): a real -O3
+      # (zig maps -O3 to -O2, so the -O3 goes to clang itself) and ThinLTO of LYNX's own objects; the instruction set
+      # stays the x86-64 baseline (SSE2), the hottest loops pick AVX2 at run time (src/core/CpuFeatures.h). About
+      # 8 more minutes of link on the runner; Harmless.cpp stays out of LTO (LYNX_WIN_LTO_SKIP, measured)
       - name: Build (Zig cross compile)
         shell: bash
+        env:
+          LYNX_WIN_OPT: -O2 -Xclang -O3
+          LYNX_WIN_LTO: thin
         run: |
           ZIG="$HOME/opt/zig-x86_64-linux-$ZIG_VERSION/zig" JUCE_DIR="$HOME/opt/juce-$JUCE_VERSION" OUT=build-win \
             ./scripts/build-windows-zig.sh 2>&1 | grep -v '^1 warning generated\.$'
@@ -236,6 +243,9 @@ jobs:
           $p = Start-Process bin\LYNX.exe -ArgumentList '--showcase', "$PWD\pkg\$name\Demo.lynx" -Wait -PassThru
           if (-not (Test-Path "pkg\$name\Demo.lynx")) { throw "showcase did not write Demo.lynx (exit $($p.ExitCode))" }
           Copy-Item bin\LYNX.exe, bin\onnxruntime.dll, LICENSE, THIRD_PARTY.md, PRIVACY.md "pkg\$name\"
+          # the third-party licence texts (round 190nk): Git for Windows' bash runs the same script as the other packages
+          & "$env:ProgramFiles\Git\bin\bash.exe" scripts/collect-licenses.sh "pkg/$name/licenses"
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path "pkg\$name\licenses\ara-ARA_API-LICENSE.txt")) { throw "collect-licenses failed" }
           # LYNX ASIO driver and its registration helpers (REA round 97)
           if (Test-Path bin\lynx-asio.dll) { Copy-Item bin\lynx-asio.dll, "asio\Register LYNX ASIO.bat", "asio\Unregister LYNX ASIO.bat" "pkg\$name\" }
           if (Test-Path bin\lynx-asio32.dll) { Copy-Item bin\lynx-asio32.dll "pkg\$name\" }  # 32-bit hosts (round 106)
@@ -274,7 +284,7 @@ jobs:
           $tools = $sdk.DirectoryName; "Windows SDK tools: $tools"
           $demo = "pkg\LYNX-$env:LABEL-windows-x64\Demo.lynx"
           function Pack($layout, $out, [switch]$test) {
-            $a = @('scripts\make-msix-layout.py', '--version', $env:VERSION, '--bin', 'bin', '--out', $layout, '--extra', $demo, 'LICENSE', 'THIRD_PARTY.md', 'PRIVACY.md')
+            $a = @('scripts\make-msix-layout.py', '--version', $env:VERSION, '--bin', 'bin', '--out', $layout, '--extra', $demo, 'LICENSE', 'THIRD_PARTY.md', 'PRIVACY.md', "pkg\LYNX-$env:LABEL-windows-x64\licenses")
             if ($test) { $a += '--test-identity' }
             python @a; if ($LASTEXITCODE -ne 0) { throw "make-msix-layout failed" }
             & "$tools\makepri.exe" createconfig /cf "$layout.priconfig.xml" /dq en-US_pt-BR_es-ES_fr-FR_de-DE_it-IT_nl-NL_pl-PL_ru-RU_tr-TR_id-ID_ja-JP_ko-KR_zh-CN_zh-TW /pv 10.0.0 /o | Out-Null

@@ -20,6 +20,7 @@
 #include <string>
 #include <vector>
 
+#include "core/Preferences.h"
 #include "core/Song.h"
 
 namespace lynx::remotemap
@@ -39,6 +40,7 @@ struct Target
     static Target sceneLaunch (int scene) { return { RemoteAction::sceneLaunch, {}, -1, scene }; }
     static Target trackStop (int track) { return { RemoteAction::trackStop, {}, track, -1 }; }
     static Target of (RemoteAction a) { return { a, {}, -1, -1 }; }
+    static Target selectedClip (int track) { return { RemoteAction::launchSelectedClip, {}, track, -1 }; } // (round 190kc)
 };
 bool valid (const Target& t) noexcept;
 Target targetOf (const RemoteMapping& m);
@@ -98,6 +100,9 @@ struct Row
     Target target;
     float min = 0.0f, max = 1.0f;
     bool hasRange = false; // parameters: Min and Max can be edited
+    // round 190hp: a mapping kept for every project (index into prefs::MidiPrefs::globalLinks when `link`, else
+    // globalMappings); `overridden`: this project maps the same control or target itself, so it does not act here
+    bool global = false, overridden = false;
     bool operator== (const Row&) const = default;
 };
 // The rows of one map mode, in the order they were made (MIDI: the links of the project, then the other MIDI mappings).
@@ -127,4 +132,30 @@ std::vector<Fire> keyFires (const Song& song, int key, bool down);
 // The MIDI numbers the mappings take (bits as AudioEngine::linkedCcs / linkedNotes): their messages go to the mappings
 // instead of the instruments.
 void usedNumbers (const Song& song, std::uint64_t ccs[2], std::uint64_t notes[2]) noexcept;
+
+// --- for every project (round 190hp, slice B9 of the 0.1.28 pain report; LYNX's own) ------------------------------------
+// The reference keeps MIDI mappings with each set; the Mapping Browser's "In every project (LYNX)" moves a MIDI mapping
+// into the settings. A parameter's mapping becomes FL's global link (prefs::GlobalLink, the same list FL's "Override
+// global link..." makes, so both layouts share them); the transport switches, Stop all clips and a scene's launch
+// button become prefs::GlobalMapping. Clip slots and track stop buttons belong to one project's tracks: not offered.
+// A project's own mapping of the same control or target wins (as FL's project links over global ones). A global
+// mapping acts where its target exists: a scene launch only while the project has that scene; a parameter (a channel,
+// an insert, a slot) only while it exists (the engine ignores a link to a missing one).
+bool canBeGlobal (const Target& t) noexcept;
+// The MIDI rows of the global mappings (after the project's in the Browser), `overridden` set from the song.
+std::vector<Row> globalRows (const Song& song, const prefs::MidiPrefs& prefs);
+// The project's MIDI row into the settings (it leaves the project; a global entry of the same target or control is
+// replaced), or a global row back into this project only. False when the row cannot move.
+bool canMove (const Song& song, const prefs::MidiPrefs& prefs, const Row& row, bool toEveryProject);
+bool moveToEveryProject (Song& song, prefs::MidiPrefs& prefs, const Row& row);
+bool moveToThisProject (Song& song, prefs::MidiPrefs& prefs, const Row& row);
+bool removeGlobalRow (prefs::MidiPrefs& prefs, const Row& row);
+bool setGlobalRange (prefs::MidiPrefs& prefs, const Row& row, float min, float max);
+// The global mappings the project does not override (the ones that act in it).
+std::vector<RemoteMapping> activeGlobalMappings (const Song& song, const prefs::MidiPrefs& prefs);
+// What a mapped element shows: its project mapping, else its global one.
+Assigned midiOf (const Song& song, const prefs::MidiPrefs& prefs, const Target& target);
+// midiFires / usedNumbers with the global mappings that act in this project too.
+std::vector<Fire> midiFires (const Song& song, const std::vector<RemoteMapping>& global, int channel, int number, int value, int previous, int port);
+void usedNumbers (const std::vector<RemoteMapping>& global, std::uint64_t ccs[2], std::uint64_t notes[2]) noexcept;
 } // namespace lynx::remotemap

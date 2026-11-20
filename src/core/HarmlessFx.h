@@ -45,7 +45,9 @@ public:
     MaximusProcessor (const MaximusProcessor&) = delete;
     MaximusProcessor& operator= (const MaximusProcessor&) = delete;
 
-    void prepare (std::shared_ptr<const MaximusPreset> preset, double sampleRate, int mixParameter);
+    // engineRev (round 190kz, EffectSlot::engineRev): 0 = the gain smoothers' state on the x87 unit (FL's arithmetic), 1 =
+    // in double precision (faster; the same samples on every demo state measured)
+    void prepare (std::shared_ptr<const MaximusPreset> preset, double sampleRate, int mixParameter, int engineRev = 0);
     void process (float* left, float* right, int n) noexcept;
     void reset() noexcept;
     int latencySamples() const noexcept; // reported to the host (FL compensates it)
@@ -56,6 +58,10 @@ private:
 
 // parameter 5 (band mix) stored in the state
 int maximusMixParameter (const MaximusPreset& preset) noexcept;
+
+// Round 190kr test hook: Maximus's sample-by-sample kernels (biquad and smoother cascades, the two-lane half-band
+// stages) render exactly what the plain loops they replaced render (random filters, states and blocks)
+bool kernelsMatchReference (std::uint32_t seed) noexcept;
 
 // The whole rack of one Harmless instance (state lives here; the presets are shared)
 class Rack

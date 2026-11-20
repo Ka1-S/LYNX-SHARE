@@ -174,6 +174,11 @@ int split (Pattern& pattern, int index, std::int64_t tick)
     tail.length = n.start + n.length - tick;
     tail.slide = false; // the tail continues the note; it does not glide again
     tail.porta = false;
+    if (n.curves.has()) // (issue #108: each part keeps its own stretch of the MPE curves)
+    {
+        tail.curves = notecurves::slice (n.curves, (double) (tick - n.start), (double) n.length);
+        n.curves = notecurves::slice (n.curves, 0.0, (double) (tick - n.start));
+    }
     n.length = tick - n.start;
     pattern.notes.push_back (tail);
     return (int) pattern.notes.size() - 1;
@@ -208,6 +213,38 @@ std::vector<int> chop (Pattern& pattern, const std::vector<int>& indices, std::i
     return pieces;
 }
 
+// Issue #108 (MPE stage 2): a joined note keeps both notes' curves, as Live 12 keeps MPE envelopes when it joins notes
+// (its What's New lesson, "Join"): from the second note's start on, its own curve (or its own values where it has
+// none); before it, the first note's.
+static void joinCurves (Note& k, const Note& n)
+{
+    if (! k.curves.has() && ! n.curves.has())
+        return;
+    const auto off = (double) (n.start - k.start);
+    const auto base = [] (const Note& m, NoteCurveLane l) {
+        return l == NoteCurveLane::pitch ? 0.0f : l == NoteCurveLane::timbre ? m.modX : std::clamp ((m.modY - 0.5f) * 2.0f, 0.0f, 1.0f);
+    };
+    NoteCurves joined = *k.curves;
+    for (int i = 0; i < noteCurveLaneCount; ++i)
+    {
+        const auto l = (NoteCurveLane) i;
+        const auto& from = n.curves->lane (l);
+        auto& to = joined.lane (l);
+        if (from.empty() && to.empty())
+            continue;
+        if (to.empty())
+            to.push_back ({ 0.0f, base (k, l) });
+        const auto held = joined.valueAt (l, off, base (k, l));
+        to.erase (std::remove_if (to.begin(), to.end(), [off] (const NoteCurvePoint& q) { return (double) q.tick >= off; }), to.end());
+        to.push_back ({ (float) std::max (0.0, off - 1.0), held });
+        if (from.empty())
+            to.push_back ({ (float) off, base (n, l) });
+        for (const auto& q : from)
+            to.push_back ({ (float) (off + (double) q.tick), q.value });
+    }
+    k.curves = std::move (joined);
+}
+
 int join (Pattern& pattern, const std::vector<int>& indices)
 {
     std::vector<int> order;
@@ -237,6 +274,7 @@ int join (Pattern& pattern, const std::vector<int>& indices)
 
             if (k.channel == n.channel && k.key == n.key && n.start <= k.start + k.length)
             {
+                joinCurves (k, n);
                 k.length = std::max (k.start + k.length, n.start + n.length) - k.start;
                 doomed.push_back (i);
                 continue;
@@ -831,7 +869,7 @@ void soloTrack (Song& song, int track, int trackCount, flsettings::SoloMemory* m
     soloRows ((int) h.size(), track, memory, restore,
               [&h] (int t) { return h[(std::size_t) t].muted; },
               [&h] (int t, bool on) { h[(std::size_t) t].muted = on; },
-              [] (int) { return true; });
+              [&h] (int t) { return ! h[(std::size_t) t].soloLock; }); // (round 190ld: FL's locked state)
 }
 void soloChannel (Song& song, int channel, flsettings::SoloMemory* memory, bool restore)
 {
@@ -844,7 +882,25 @@ void soloChannel (Song& song, int channel, flsettings::SoloMemory* memory, bool 
               [&c] (int i) { return ! c[(std::size_t) i].soloLock; });
 }
 
+void soloChannelInGroup (Song& song, int channel)
+{
+    auto& c = song.channels;
+    if (channel < 0 || channel >= (int) c.size())
+        return;
+    const auto group = c[(std::size_t) channel].group < 0 ? -1 : c[(std::size_t) channel].group;
+    soloRows ((int) c.size(), channel, nullptr, false,
+              [&c] (int i) { return c[(std::size_t) i].muted; },
+              [&c] (int i, bool on) { c[(std::size_t) i].muted = on; },
+              [&c, group] (int i) {
+                  const auto g = c[(std::size_t) i].group < 0 ? -1 : c[(std::size_t) i].group;
+                  return g == group && ! c[(std::size_t) i].soloLock;
+              });
+}
+
 // --- track groups ------------------------------------------------------------------------------------
+// Round 190jf (B17): nest-aware. A track's folder depth is `grouped ? 1 + nest : 0`; it belongs to the nearest track above
+// it with a smaller depth. With every `nest` 0 (FL's groups, every project before 190jf) each function below does what
+// it did before: a header is an ungrouped track followed by a grouped one, its members are the grouped run under it.
 
 namespace
 {
@@ -854,45 +910,76 @@ bool groupedFlag (const Song& song, int track)
 }
 } // namespace
 
+int folderDepth (const Song& song, int track)
+{
+    if (! groupedFlag (song, track))
+        return 0;
+    return 1 + std::max (0, song.playlistTracks[(std::size_t) track].nest);
+}
+
+int folderParent (const Song& song, int track)
+{
+    const auto d = folderDepth (song, track);
+    if (d == 0)
+        return -1;
+    for (int t = track - 1; t >= 0; --t)
+        if (folderDepth (song, t) < d)
+            return t;
+    return -1;
+}
+
+int folderEnd (const Song& song, int header)
+{
+    if (header < 0)
+        return header;
+    const auto d = folderDepth (song, header);
+    auto last = header;
+    while (last + 1 < (int) song.playlistTracks.size() && folderDepth (song, last + 1) > d)
+        ++last;
+    return last;
+}
+
+std::vector<int> folderChildren (const Song& song, int header)
+{
+    std::vector<int> out;
+    const auto end = folderEnd (song, header);
+    for (int t = header + 1; t <= end; ++t)
+        if (folderParent (song, t) == header)
+            out.push_back (t);
+    return out;
+}
+
 bool isGroupHeader (const Song& song, int track)
 {
-    return track >= 0 && ! groupedFlag (song, track) && groupedFlag (song, track + 1);
+    return track >= 0 && folderDepth (song, track + 1) > folderDepth (song, track);
 }
 
 int groupHeaderOf (const Song& song, int track)
 {
     if (track < 0)
         return -1;
-
-    if (! groupedFlag (song, track))
-        return isGroupHeader (song, track) ? track : -1;
-
-    while (track > 0 && groupedFlag (song, track))
-        --track;
-
-    return track;
+    if (isGroupHeader (song, track))
+        return track;
+    return folderParent (song, track);
 }
 
 std::vector<int> groupMembers (const Song& song, int header)
 {
     std::vector<int> out;
-
-    if (header < 0 || groupedFlag (song, header))
+    if (header < 0 || ! isGroupHeader (song, header))
         return out;
-
-    for (int t = header + 1; groupedFlag (song, t); ++t)
+    const auto end = folderEnd (song, header);
+    for (int t = header + 1; t <= end; ++t)
         out.push_back (t);
-
     return out;
 }
 
 bool isFoldedAway (const Song& song, int track)
 {
-    if (! groupedFlag (song, track))
-        return false;
-
-    const auto header = groupHeaderOf (song, track);
-    return header >= 0 && header < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) header].collapsed;
+    for (auto p = folderParent (song, track); p >= 0; p = folderParent (song, p))
+        if (p < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) p].collapsed)
+            return true;
+    return false;
 }
 
 void groupWithAbove (Song& song, int track)
@@ -900,13 +987,20 @@ void groupWithAbove (Song& song, int track)
     if (track <= 0)
         return;
 
-    headers (song, track + 1)[(std::size_t) track].grouped = true;
+    auto& t = headers (song, track + 1)[(std::size_t) track];
+    t.grouped = true;
+    t.nest = 0;
+    normalizeFolders (song);
 }
 
 void ungroupTrack (Song& song, int track)
 {
     if (groupedFlag (song, track))
+    {
         song.playlistTracks[(std::size_t) track].grouped = false;
+        song.playlistTracks[(std::size_t) track].nest = 0;
+        normalizeFolders (song);
+    }
 }
 
 void setGroupCollapsed (Song& song, int track, bool collapsed)
@@ -930,6 +1024,213 @@ void colourGroup (Song& song, int track)
 
     for (auto t : groupMembers (song, header))
         song.playlistTracks[(std::size_t) t].colour = colour;
+}
+
+// --- round 190jf (B17): folders ------------------------------------------------------------------------------------
+
+namespace
+{
+void setDepth (Song& song, int track, int depth)
+{
+    if (track <= 0 && depth > 0)
+        depth = 0; // (the first track is never grouped)
+    auto& t = headers (song, track + 1)[(std::size_t) track];
+    t.grouped = depth > 0;
+    t.nest = std::max (0, depth - 1);
+}
+} // namespace
+
+bool normalizeFolders (Song& song)
+{
+    auto changed = false;
+    int previous = -1; // the depth of the track above (−1: none yet, so the first track is 0)
+    for (int t = 0; t < (int) song.playlistTracks.size(); ++t)
+    {
+        auto& tr = song.playlistTracks[(std::size_t) t];
+        if (! tr.grouped && tr.nest != 0)
+        {
+            tr.nest = 0;
+            changed = true;
+        }
+        const auto d = folderDepth (song, t);
+        const auto allowed = previous + 1;
+        if (d > allowed)
+        {
+            setDepth (song, t, allowed);
+            changed = true;
+        }
+        previous = folderDepth (song, t);
+    }
+    return changed;
+}
+
+std::vector<int> groupMuteSet (const Song& song, int track)
+{
+    const auto header = groupHeaderOf (song, track);
+    if (header < 0)
+        return {};
+    std::vector<int> out { header };
+    const auto end = folderEnd (song, header);
+    for (int t = header + 1; t <= end; ++t)
+        out.push_back (t);
+    return out;
+}
+
+bool muteGroup (Song& song, int track, const std::vector<int>& insertOf)
+{
+    const auto set = groupMuteSet (song, track);
+    if (set.empty())
+        return false;
+    // (rollup 0.1.30) a linked header's insert: its mute lights the same LED
+    const auto insert = [&] (int t) {
+        const auto i = t >= 0 && t < (int) insertOf.size() ? insertOf[(std::size_t) t] : -1;
+        return i > 0 && i < (int) song.mixer.size() ? i : -1;
+    };
+    const auto lit = (track < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) track].muted)
+                     || (insert (track) > 0 && song.mixer[(std::size_t) insert (track)].muted);
+    const auto muted = ! lit;
+    auto& h = headers (song, set.back() + 1);
+    for (const auto t : set)
+    {
+        h[(std::size_t) t].muted = muted;
+        if (! muted && insert (t) > 0)
+            song.mixer[(std::size_t) insert (t)].muted = false;
+    }
+    return true;
+}
+
+bool soloGroup (Song& song, int track, int trackCount, flsettings::SoloMemory* memory, bool restore)
+{
+    const auto set = groupMuteSet (song, track);
+    if (set.empty())
+        return false;
+    trackCount = std::max (trackCount, set.back() + 1);
+    auto& h = headers (song, trackCount);
+    const auto rows = (int) h.size();
+    auto inSet = [&set] (int t) { return std::find (set.begin(), set.end(), t) != set.end(); };
+    // "alone": every track of the group plays and every other track is muted (then the group solo switches off)
+    auto alone = true;
+    for (int t = 0; t < rows && alone; ++t)
+        alone = h[(std::size_t) t].muted != inSet (t);
+    const auto header = set.front();
+    if (! alone)
+    {
+        if (memory != nullptr && ! memory->valid (header, (std::size_t) rows))
+        {
+            memory->muted.resize ((std::size_t) rows);
+            for (int t = 0; t < rows; ++t)
+                memory->muted[(std::size_t) t] = h[(std::size_t) t].muted;
+            memory->row = header;
+        }
+        for (int t = 0; t < rows; ++t)
+            h[(std::size_t) t].muted = ! inSet (t);
+        return true;
+    }
+    const auto back = restore && memory != nullptr && memory->valid (header, (std::size_t) rows);
+    for (int t = 0; t < rows; ++t)
+        h[(std::size_t) t].muted = back ? (bool) memory->muted[(std::size_t) t] : false;
+    if (memory != nullptr)
+        memory->clear();
+    return true;
+}
+
+namespace
+{
+// Puts the tracks in the order `order` (order[i] = the old index of the new track i; a permutation of 0…n−1); the clips
+// follow their tracks.
+void reorderTracks (Song& song, const std::vector<int>& order)
+{
+    const auto n = (int) order.size();
+    std::vector<int> newIndex ((std::size_t) n, -1);
+    for (int i = 0; i < n; ++i)
+        newIndex[(std::size_t) order[(std::size_t) i]] = i;
+    song.forEachClipList ([&newIndex, n] (std::vector<Clip>& clips) {
+        for (auto& c : clips)
+            if (c.track >= 0 && c.track < n)
+                c.track = newIndex[(std::size_t) c.track];
+    });
+    auto& h = headers (song, n);
+    std::vector<PlaylistTrack> moved;
+    moved.reserve ((std::size_t) n);
+    for (const auto o : order)
+        moved.push_back (h[(std::size_t) o]);
+    std::copy (moved.begin(), moved.end(), h.begin());
+}
+} // namespace
+
+int maxFolderDepthAt (const Song& song, int before, int track)
+{
+    // the rows above the drop place after the folder of `track` is taken out
+    for (int t = before - 1; t >= 0; --t)
+    {
+        if (t >= track && t <= folderEnd (song, track))
+            continue;
+        return folderDepth (song, t) + 1;
+    }
+    return 0;
+}
+
+int moveFolder (Song& song, int track, int before, int depth)
+{
+    const auto count = (int) song.playlistTracks.size();
+    if (track < 0 || track >= count)
+        return -1;
+    const auto end = folderEnd (song, track);
+    before = std::clamp (before, 0, count);
+    const auto n = count;
+    if (before > track && before <= end + 1)
+        before = track; // (dropped inside itself: the place stays, only the depth changes)
+    depth = std::clamp (depth, 0, maxFolderDepthAt (song, before, track));
+
+    std::vector<int> block;
+    for (int t = track; t <= end; ++t)
+        block.push_back (t);
+    std::vector<int> order;
+    order.reserve ((std::size_t) n);
+    for (int t = 0; t < n; ++t)
+    {
+        if (t == before)
+            order.insert (order.end(), block.begin(), block.end());
+        if (t < track || t > end)
+            order.push_back (t);
+    }
+    if (before >= n)
+        order.insert (order.end(), block.begin(), block.end());
+
+    const auto shift = depth - folderDepth (song, track);
+    std::vector<int> depths;
+    for (const auto t : block)
+        depths.push_back (folderDepth (song, t) + shift);
+    reorderTracks (song, order);
+    const auto at = (int) (std::find (order.begin(), order.end(), track) - order.begin());
+    for (std::size_t i = 0; i < depths.size(); ++i)
+        setDepth (song, at + (int) i, std::max (0, depths[i]));
+    normalizeFolders (song);
+    return at;
+}
+
+bool nestTrack (Song& song, int track)
+{
+    if (track <= 0 || track >= (int) song.playlistTracks.size())
+        return false;
+    const auto d = folderDepth (song, track);
+    if (d + 1 > folderDepth (song, track - 1) + 1)
+        return false; // (already one level under the track above)
+    const auto end = folderEnd (song, track);
+    for (int t = track; t <= end; ++t)
+        setDepth (song, t, folderDepth (song, t) + 1);
+    return true;
+}
+
+bool unnestTrack (Song& song, int track)
+{
+    const auto parent = folderParent (song, track);
+    if (parent < 0)
+        return false;
+    // out of its folder: the track (and its own folder) goes below the parent's folder, one level up
+    const auto parentEnd = folderEnd (song, parent);
+    moveFolder (song, track, parentEnd + 1, folderDepth (song, parent));
+    return true;
 }
 
 // --- round 168g: FL's editor Select / Edit items ------------------------------------------------------------------------

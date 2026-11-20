@@ -1,11 +1,14 @@
 #include "engine/SandboxWorker.h"
 
+#include <map>
+
 #include <juce_gui_extra/juce_gui_extra.h>
 
 #include "core/Denormals.h"
 #include "platform/PowerThrottling.h"
 #include "engine/PluginSandbox.h"
 #include "engine/SandboxShared.h"
+#include "engine/TimedParameters.h"
 
 #if JUCE_LINUX
  #include <dlfcn.h>
@@ -15,8 +18,9 @@
  #include <objc/runtime.h>
 #endif
 
-// The child side of the plugin sandbox (split out of PluginSandbox.cpp in round 176a): the process that hosts one
-// plugin for LYNX — LYNX.exe --plugin-host, or the 32-bit bridge LYNX-bridge32.exe for 32-bit plugins.
+// The child side of the plugin sandbox (split out of PluginSandbox.cpp in round 176a): the process that hosts plugins
+// for LYNX — LYNX.exe --plugin-host, or the 32-bit bridge LYNX-bridge32.exe for 32-bit plugins. One plugin per process,
+// or (round 190jg) a group of them: every message names its plugin's slot.
 
 namespace lynx
 {
@@ -167,15 +171,19 @@ void applyFloatMode() noexcept
    #endif
 }
 
-class SandboxWorker final : public juce::ChildProcessWorker,
-                            private juce::Thread,
-                            private juce::AudioProcessorParameter::Listener,
-                            private juce::AudioPlayHead
+class SandboxWorker;
+
+// One plugin of the process (round 190jg: a sandbox process may host several, Bitwig-style groups: per vendor or all
+// plugins together). Each has its own shared block and doorbells and its own audio thread, so plugins of one group
+// run as independently as in separate processes; only a crash takes the whole group.
+class SandboxSlot final : private juce::Thread,
+                          private juce::AudioProcessorParameter::Listener,
+                          private juce::AudioPlayHead
 {
 public:
-    SandboxWorker() : Thread ("LYNX sandbox audio") {}
+    SandboxSlot (SandboxWorker& w, int i) : Thread ("LYNX sandbox audio"), worker (w), slot (i) {}
 
-    ~SandboxWorker() override
+    ~SandboxSlot() override
     {
         stopThread (2000);
         window.reset();
@@ -185,149 +193,10 @@ public:
         plugin.reset();
     }
 
-    void handleMessageFromCoordinator (const juce::MemoryBlock& data) override
-    {
-        auto message = juce::ValueTree::readFromData (data.getData(), data.getSize());
-        trace ("child: message " + message.getType().toString());
-        juce::MessageManager::callAsync ([this, message] { handle (message); });
-    }
-
-    void handleConnectionLost() override
-    {
-        trace ("child: connection lost");
-        juce::MessageManager::callAsync ([] { juce::JUCEApplicationBase::quit(); });
-    }
+    juce::ValueTree open (const juce::ValueTree& message);
+    void handle (const juce::ValueTree& message);
 
 private:
-    void send (const juce::ValueTree& message) { sendMessageToCoordinator (encode (message)); }
-
-    void handle (const juce::ValueTree& message)
-    {
-        applyFloatMode();
-        if (message.hasType ("open"))
-            send (open (message));
-        else if (message.hasType ("getState"))
-        {
-            juce::ValueTree reply ("state");
-            if (plugin != nullptr)
-                reply.setProperty ("state", juce::String (sandboxhost::captureState (*plugin)), nullptr);
-            send (reply);
-        }
-        else if (message.hasType ("setState"))
-        {
-            if (plugin != nullptr)
-            {
-                juce::MemoryBlock state;
-                if (state.fromBase64Encoding (message["state"].toString()))
-                    plugin->setStateInformation (state.getData(), (int) state.getSize());
-            }
-            send (juce::ValueTree ("ok"));
-        }
-        else if (message.hasType ("hang"))
-            hang = true;
-        else if (message.hasType ("crash")) // only in the crash-isolation test
-            std::abort();
-        else if (message.hasType ("showEditor") && plugin != nullptr && plugin->hasEditor())
-        {
-            if (window == nullptr)
-            {
-                window = std::make_unique<SandboxWindow> (plugin->getName());
-                window->onUnusedKey = [this] (const juce::KeyPress& key) {
-                    send (juce::ValueTree ("key").setProperty ("code", key.getKeyCode(), nullptr)
-                                                 .setProperty ("mods", key.getModifiers().getRawFlags(), nullptr)
-                                                 .setProperty ("char", (int) key.getTextCharacter(), nullptr));
-                };
-                if (auto* ed = plugin->createEditorIfNeeded())
-                    window->setContentOwned (ed, true);
-                window->centreWithSize (window->getWidth(), window->getHeight());
-            }
-            if (! window->isOnDesktop())
-                window->addToDesktop(); // (the native window exists before it is shown: its owner is set first)
-            window->setAlwaysOnTop (! window->setOwner ((juce::int64) message["owner"]));
-            window->setVisible (true);
-            window->toFront (true);
-        }
-        else if (message.hasType ("hideEditor") && window != nullptr)
-            window->setVisible (false);
-    }
-
-    juce::ValueTree open (const juce::ValueTree& message)
-    {
-        juce::ValueTree reply ("opened");
-        auto fail = [&] (const juce::String& why) {
-            reply.setProperty ("error", why, nullptr);
-            return reply;
-        };
-
-        const auto base = message["shm"].toString();
-        if (! channel.open (base))
-            return fail ("shared memory unavailable");
-        shared = channel.block();
-
-        juce::PluginDescription description;
-        const auto xml = juce::parseXML (message["description"].toString());
-        if (xml == nullptr || ! description.loadFromXml (*xml))
-            return fail ("invalid plugin description");
-
-        sampleRate = (double) message["sampleRate"];
-        blockSize = juce::jlimit (16, SharedBlock::maxFrames, (int) message["blockSize"]);
-        juce::String error;
-        applyFloatMode();
-        plugin = sandboxhost::open (description, sampleRate, blockSize, error);
-        if (plugin == nullptr)
-            return fail (error.isEmpty() ? juce::String ("the plugin failed to open") : error);
-
-        plugin->setPlayHead (this); // the host's position of each block (SharedBlock::transport)
-        sandboxhost::prepare (*plugin, sampleRate, blockSize);
-        if (const auto state = message["state"].toString(); state.isNotEmpty())
-        {
-            juce::MemoryBlock block;
-            if (block.fromBase64Encoding (state))
-                plugin->setStateInformation (block.getData(), (int) block.getSize());
-        }
-
-        reply.setProperty ("ins", plugin->getTotalNumInputChannels(), nullptr);
-        reply.setProperty ("outs", plugin->getTotalNumOutputChannels(), nullptr);
-        reply.setProperty ("midiIn", plugin->acceptsMidi(), nullptr);
-        reply.setProperty ("midiOut", plugin->producesMidi(), nullptr);
-        reply.setProperty ("editor", plugin->hasEditor(), nullptr);
-        reply.setProperty ("tail", plugin->getTailLengthSeconds(), nullptr);
-        reply.setProperty ("latency", plugin->getLatencySamples(), nullptr);
-       #if LYNX_POSIX_SANDBOX
-        reply.setProperty ("pid", (int) ::getpid(), nullptr);
-       #elif JUCE_WINDOWS
-        reply.setProperty ("pid", (int) GetCurrentProcessId(), nullptr);
-       #endif
-        reply.setProperty ("state", juce::String (sandboxhost::captureState (*plugin)), nullptr);
-
-        juce::ValueTree params ("params");
-        const auto& list = plugin->getParameters();
-        for (int i = 0; i < list.size(); ++i)
-        {
-            auto* p = list[i];
-            juce::ValueTree info ("p");
-            info.setProperty ("name", p->getName (128), nullptr);
-            info.setProperty ("label", p->getLabel(), nullptr);
-            info.setProperty ("default", p->getDefaultValue(), nullptr);
-            info.setProperty ("value", p->getValue(), nullptr);
-            info.setProperty ("steps", p->getNumSteps(), nullptr);
-            info.setProperty ("discrete", p->isDiscrete(), nullptr);
-            if (auto* hosted = dynamic_cast<juce::HostedAudioProcessorParameter*> (p))
-                info.setProperty ("id", hosted->getParameterID(), nullptr);
-            else
-                info.setProperty ("id", juce::String (i), nullptr);
-            params.appendChild (info, nullptr);
-            p->addListener (this);
-        }
-        reply.appendChild (params, nullptr);
-
-        channels = juce::jmin (SharedBlock::maxChannels, juce::jmax (2, plugin->getTotalNumInputChannels(), plugin->getTotalNumOutputChannels()));
-        midiBuffer.ensureSize (8192);
-        startThread (juce::Thread::Priority::highest);
-        reply.setProperty ("ok", true, nullptr);
-        return reply;
-    }
-
     void run() override
     {
         // the sandbox's audio thread gets the same FTZ/DAZ as LYNX's own audio threads (round 160: it had none)
@@ -377,11 +246,36 @@ private:
             if (c >= shared->channels)
                 std::memset (shared->audio[c], 0, sizeof (float) * (std::size_t) frames);
         }
+        // round 190jg: the parent's timed parameter changes, for the plugin's host (engine/TimedParameters.h)
+        const auto timed = juce::jlimit (0, SharedBlock::maxTimed, (int) shared->timedCount);
+        for (int k = 0; k < timed; ++k)
+        {
+            timedIndices[(std::size_t) k] = shared->timed[k].index;
+            timedValues[(std::size_t) k] = shared->timed[k].value;
+            timedOffsets[(std::size_t) k] = shared->timedOffsets[k];
+        }
+        juce::lynxTimedParamCount = timed;
+        juce::lynxTimedParamIndices = timedIndices.data();
+        juce::lynxTimedParamOffsets = timedOffsets.data();
+        juce::lynxTimedParamValues = timedValues.data();
         if (frames > 0)
         {
             juce::AudioBuffer<float> buffer (pointers, channels, frames);
             plugin->processBlock (buffer, midiBuffer);
         }
+        juce::lynxTimedParamCount = 0;
+        // (rollup 0.1.30) what the plugin sent out, for the parent's buffer
+        int outCount = 0;
+        if (frames > 0)
+            for (const auto m : midiBuffer)
+                if (m.numBytes >= 1 && m.numBytes <= 3 && outCount < SharedBlock::maxMidi)
+                {
+                    auto& e = shared->midiOut[outCount++];
+                    e.offset = juce::jlimit (0, frames - 1, m.samplePosition);
+                    e.size = (std::uint8_t) m.numBytes;
+                    std::memcpy (e.bytes, m.data, (std::size_t) m.numBytes);
+                }
+        shared->midiOutCount = outCount;
 
         shared->paramOutCount = changed.drain (shared->paramsOut, SharedBlock::maxParams);
         shared->latency = plugin->getLatencySamples();
@@ -393,6 +287,8 @@ private:
     void parameterValueChanged (int index, float value) override { changed.push (index, value); }
     void parameterGestureChanged (int, bool) override {}
 
+    SandboxWorker& worker;
+    const int slot;
     std::unique_ptr<juce::AudioPluginInstance> plugin;
     std::unique_ptr<SandboxWindow> window;
     SandboxChannel channel;
@@ -402,7 +298,191 @@ private:
     std::atomic<bool> hang { false };
     juce::MidiBuffer midiBuffer;
     ParamQueue changed;
+    std::array<int, SharedBlock::maxTimed> timedIndices {}, timedOffsets {};
+    std::array<float, SharedBlock::maxTimed> timedValues {};
 };
+
+class SandboxWorker final : public juce::ChildProcessWorker
+{
+public:
+    ~SandboxWorker() override { slots.clear(); }
+
+    void handleMessageFromCoordinator (const juce::MemoryBlock& data) override
+    {
+        auto message = juce::ValueTree::readFromData (data.getData(), data.getSize());
+        trace ("child: message " + message.getType().toString() + " slot " + message["slot"].toString());
+        juce::MessageManager::callAsync ([this, message] { handle (message); });
+    }
+
+    void handleConnectionLost() override
+    {
+        trace ("child: connection lost");
+        juce::MessageManager::callAsync ([] { juce::JUCEApplicationBase::quit(); });
+    }
+
+    // a reply to the parent's request (its sequence number goes back with it: a late reply is never taken for another)
+    void reply (const juce::ValueTree& request, juce::ValueTree message)
+    {
+        message.setProperty ("seq", request["seq"], nullptr);
+        send (message);
+    }
+
+    void send (const juce::ValueTree& message) { sendMessageToCoordinator (encode (message)); }
+
+private:
+    void handle (const juce::ValueTree& message)
+    {
+        applyFloatMode();
+        const auto slot = (int) message.getProperty ("slot", 0);
+        if (message.hasType ("open"))
+        {
+            auto created = std::make_unique<SandboxSlot> (*this, slot);
+            auto answer = created->open (message);
+            if ((bool) answer["ok"])
+                slots[slot] = std::move (created);
+            reply (message, answer);
+            return;
+        }
+        if (message.hasType ("close")) // (round 190jg) one plugin of the group goes; the process stays for the others
+        {
+            slots.erase (slot);
+            return;
+        }
+        if (message.hasType ("crash")) // only in the crash-isolation test
+            std::abort();
+        if (const auto it = slots.find (slot); it != slots.end())
+        {
+            it->second->handle (message);
+            return;
+        }
+        if (message.hasType ("getState") || message.hasType ("setState")) // (a slot that never opened: still answered)
+            reply (message, juce::ValueTree (message.hasType ("getState") ? "state" : "ok"));
+    }
+
+    std::map<int, std::unique_ptr<SandboxSlot>> slots;
+};
+
+void SandboxSlot::handle (const juce::ValueTree& message)
+{
+    if (message.hasType ("getState"))
+    {
+        juce::ValueTree answer ("state");
+        if (plugin != nullptr)
+            answer.setProperty ("state", juce::String (sandboxhost::captureState (*plugin)), nullptr);
+        worker.reply (message, answer);
+    }
+    else if (message.hasType ("setState"))
+    {
+        if (plugin != nullptr)
+        {
+            juce::MemoryBlock state;
+            if (state.fromBase64Encoding (message["state"].toString()))
+                plugin->setStateInformation (state.getData(), (int) state.getSize());
+        }
+        worker.reply (message, juce::ValueTree ("ok"));
+    }
+    else if (message.hasType ("hang"))
+        hang = true;
+    else if (message.hasType ("showEditor") && plugin != nullptr && plugin->hasEditor())
+    {
+        if (window == nullptr)
+        {
+            window = std::make_unique<SandboxWindow> (plugin->getName());
+            window->onUnusedKey = [this] (const juce::KeyPress& key) {
+                worker.send (juce::ValueTree ("key").setProperty ("code", key.getKeyCode(), nullptr)
+                                                    .setProperty ("mods", key.getModifiers().getRawFlags(), nullptr)
+                                                    .setProperty ("char", (int) key.getTextCharacter(), nullptr));
+            };
+            if (auto* ed = plugin->createEditorIfNeeded())
+                window->setContentOwned (ed, true);
+            window->centreWithSize (window->getWidth(), window->getHeight());
+        }
+        if (! window->isOnDesktop())
+            window->addToDesktop(); // (the native window exists before it is shown: its owner is set first)
+        window->setAlwaysOnTop (! window->setOwner ((juce::int64) message["owner"]));
+        window->setVisible (true);
+        window->toFront (true);
+    }
+    else if (message.hasType ("hideEditor") && window != nullptr)
+        window->setVisible (false);
+}
+
+juce::ValueTree SandboxSlot::open (const juce::ValueTree& message)
+{
+    juce::ValueTree reply ("opened");
+    auto fail = [&] (const juce::String& why) {
+        reply.setProperty ("error", why, nullptr);
+        return reply;
+    };
+
+    const auto base = message["shm"].toString();
+    if (! channel.open (base))
+        return fail ("shared memory unavailable");
+    shared = channel.block();
+
+    juce::PluginDescription description;
+    const auto xml = juce::parseXML (message["description"].toString());
+    if (xml == nullptr || ! description.loadFromXml (*xml))
+        return fail ("invalid plugin description");
+
+    sampleRate = (double) message["sampleRate"];
+    blockSize = juce::jlimit (16, SharedBlock::maxFrames, (int) message["blockSize"]);
+    juce::String error;
+    applyFloatMode();
+    plugin = sandboxhost::open (description, sampleRate, blockSize, error);
+    if (plugin == nullptr)
+        return fail (error.isEmpty() ? juce::String ("the plugin failed to open") : error);
+
+    plugin->setPlayHead (this); // the host's position of each block (SharedBlock::transport)
+    sandboxhost::prepare (*plugin, sampleRate, blockSize);
+    if (const auto state = message["state"].toString(); state.isNotEmpty())
+    {
+        juce::MemoryBlock block;
+        if (block.fromBase64Encoding (state))
+            plugin->setStateInformation (block.getData(), (int) block.getSize());
+    }
+
+    reply.setProperty ("ins", plugin->getTotalNumInputChannels(), nullptr);
+    reply.setProperty ("outs", plugin->getTotalNumOutputChannels(), nullptr);
+    reply.setProperty ("midiIn", plugin->acceptsMidi(), nullptr);
+    reply.setProperty ("midiOut", plugin->producesMidi(), nullptr);
+    reply.setProperty ("editor", plugin->hasEditor(), nullptr);
+    reply.setProperty ("tail", plugin->getTailLengthSeconds(), nullptr);
+    reply.setProperty ("latency", plugin->getLatencySamples(), nullptr);
+   #if LYNX_POSIX_SANDBOX
+    reply.setProperty ("pid", (int) ::getpid(), nullptr);
+   #elif JUCE_WINDOWS
+    reply.setProperty ("pid", (int) GetCurrentProcessId(), nullptr);
+   #endif
+    reply.setProperty ("state", juce::String (sandboxhost::captureState (*plugin)), nullptr);
+
+    juce::ValueTree params ("params");
+    const auto& list = plugin->getParameters();
+    for (int i = 0; i < list.size(); ++i)
+    {
+        auto* p = list[i];
+        juce::ValueTree info ("p");
+        info.setProperty ("name", p->getName (128), nullptr);
+        info.setProperty ("label", p->getLabel(), nullptr);
+        info.setProperty ("default", p->getDefaultValue(), nullptr);
+        info.setProperty ("value", p->getValue(), nullptr);
+        info.setProperty ("steps", p->getNumSteps(), nullptr);
+        info.setProperty ("discrete", p->isDiscrete(), nullptr);
+        if (auto* hosted = dynamic_cast<juce::HostedAudioProcessorParameter*> (p))
+            info.setProperty ("id", hosted->getParameterID(), nullptr);
+        else
+            info.setProperty ("id", juce::String (i), nullptr);
+        params.appendChild (info, nullptr);
+        p->addListener (this);
+    }
+    reply.appendChild (params, nullptr);
+
+    channels = juce::jmin (SharedBlock::maxChannels, juce::jmax (2, plugin->getTotalNumInputChannels(), plugin->getTotalNumOutputChannels()));
+    midiBuffer.ensureSize (8192);
+    startThread (juce::Thread::Priority::highest);
+    reply.setProperty ("ok", true, nullptr);
+    return reply;
+}
 
 std::unique_ptr<SandboxWorker>& worker()
 {

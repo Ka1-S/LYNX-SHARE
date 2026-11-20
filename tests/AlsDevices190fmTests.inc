@@ -375,8 +375,10 @@ TEST (als190fm_roar_becomes_a_rack)
         CHECK (near (s1.params[em::output], (float) ((-6.0206 + 18.0) / 36.0), 1.0e-4) && s1.params[em::autoGain] == 0.0f);
         CHECK (f1.kind == EffectKind::filter && near (f1.params[1], filterCutoffValue (4000.0), 1.0e-6) && f1.params[0] == filterTypeValue (0));
         CHECK (s2.kind == EffectKind::lofi && near (s2.params[1], lofiBitsValue (16.0 - 15.0 * 0.4), 1.0e-6));
-        CHECK (comp.kind == EffectKind::crestCompressor && near (comp.params[dyn::crest::threshold], (float) ((-9.0 + 60.0) / 60.0), 1.0e-5));
-        CHECK (outGain.kind == EffectKind::utility && near (outGain.params[0], (float) ((-6.0206 + 24.0) / 48.0), 1.0e-4));
+        // (round qafix190kq: Live's measured compression law and the neutral +1.55 dB on the output)
+        CHECK (comp.kind == EffectKind::crestCompressor && near (comp.params[dyn::crest::threshold], (float) ((roarCompThresholdDb (0.25) + 60.0) / 60.0), 1.0e-5));
+        CHECK (near (dyn::crest::ratioOf (comp.params[dyn::crest::ratio]), roarCompRatio (0.25), 0.05));
+        CHECK (outGain.kind == EffectKind::utility && near (outGain.params[0], (float) ((-6.0206 + roarNeutralDb + 24.0) / 48.0), 1.0e-4));
     }
     CHECK (near (r->chains[0].volume, 0.8, 1.0e-6) && near (r->chains[1].volume, 0.2, 1.0e-6));
     CHECK (r->macros[rrDrive1].name == "Drive 1" && r->macros[rrDrive1].mappings.size() == 1 && r->macros[rrDrive2].mappings.empty());
@@ -397,8 +399,8 @@ TEST (als190fm_roar_becomes_a_rack)
                                                                par ("Input_Blend", 0.25) + par ("Output_DryWet", 1.0) + par ("Output_CompressionAmount", 0.0) +
                                                                "<ModulationMatrix_Stage1Amount_Env Value=\"0.5\" />"));
     const auto* pr = p ? als190fm::rackOf (*p) : nullptr;
-    CHECK (pr != nullptr && pr->chains.size() == 1 && pr->chains[0].nodes.size() == 1);
-    if (pr != nullptr && pr->chains[0].nodes.size() == 1)
+    CHECK (pr != nullptr && pr->chains.size() == 1 && pr->chains[0].nodes.size() == 2); // (round qafix190kq: the inner rack, then the output Utility with Live's measured neutral gain)
+    if (pr != nullptr && pr->chains[0].nodes.size() == 2)
     {
         const auto& node = als190fm::nodeOf (p->slot.patcher, *pr, 0, 0);
         const auto* inner = rack::rackOf (node.patcher);
@@ -415,7 +417,7 @@ TEST (als190fm_roar_becomes_a_rack)
     const auto mb = als190fm::translate (als190fm::roar (3, par ("Input_LowMidCrossover", 200.0) + par ("Input_MidHighCrossover", 2000.0) + par ("Output_DryWet", 1.0) +
                                                                 par ("Stage3_Shaper_Type", 10)));
     const auto* mr = mb ? als190fm::rackOf (*mb) : nullptr;
-    if (mr != nullptr && mr->chains[0].nodes.size() == 1)
+    if (mr != nullptr && mr->chains[0].nodes.size() == 2)
     {
         const auto& node = als190fm::nodeOf (mb->slot.patcher, *mr, 0, 0);
         const auto* inner = rack::rackOf (node.patcher);
@@ -435,7 +437,7 @@ TEST (als190fm_roar_becomes_a_rack)
     const auto ms = als190fm::translate (als190fm::roar (4, par ("Stage1_Shaper_Amount", 0.0) + par ("Stage2_Shaper_Amount", 0.0) + flag ("Stage1_Filter_On", false) +
                                                                 flag ("Stage2_Filter_On", false) + par ("Output_DryWet", 1.0)));
     CHECK (ms.has_value() && ms && als190fm::rackOf (*ms) != nullptr);
-    if (const auto* mr2 = ms ? als190fm::rackOf (*ms) : nullptr; mr2 != nullptr && mr2->chains[0].nodes.size() == 1)
+    if (const auto* mr2 = ms ? als190fm::rackOf (*ms) : nullptr; mr2 != nullptr && mr2->chains[0].nodes.size() == 2)
     {
         const auto& node = als190fm::nodeOf (ms->slot.patcher, *mr2, 0, 0);
         const auto* inner = rack::rackOf (node.patcher);

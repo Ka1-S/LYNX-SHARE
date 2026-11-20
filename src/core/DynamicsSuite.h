@@ -63,8 +63,41 @@ enum Param
     // ratio × knee × attack grid. Off = round 108's laws: what a project saved before that round loads with
     // (upgradeLoadedEffectParams), so it sounds as it did. The other styles ignore it.
     law,
-    count
+    count,
+    // round 190kt, hidden (not in the info: no control, no text; saved while non-zero): the Bus style's console law — a
+    // FEEDBACK compressor (the detector hears the compressed output) with a rational soft knee and RC ballistics,
+    // LYNX's own model of the console bus compressor's structure (REA_rodada190kt §2), fitted on our renders. Off (0) for
+    // new instances and every project saved before (the Bus style as it was, bit for bit); the bus-compressor
+    // translators (Waves SSLComp) set it. Threshold / ratio / knee / attack / release keep their ranges and mean, in
+    // this law: the detector's threshold, 1 + the loop gain, the knee's width (dB), and the RC time constants (ms);
+    // Auto release adds a slow second capacitor (consoleAuto* in DynamicsSuite.cpp)
+    busLaw = count,
+    // round 190ky, hidden like busLaw (no control, no text; saved while non-zero): the FET law — a FET feedback limiter
+    // (the detector hears the gained signal, three parallel peak followers sum into a control level, a two-term soft
+    // law turns it into gain), LYNX's own model of the structure REA showed in a FET-limiter emulation's DSP
+    // (REA_rodada190ky §2), fitted on our renders. 0 = off: new instances and every project saved before (each style as
+    // it was, bit for bit). k / 16 (k = 1 … 10) picks one of the fitted voicings (fetVoiceFits in DynamicsSuite.cpp: two
+    // revisions × the four ratio buttons and all buttons); the knobs keep their meaning: threshold = the control
+    // level's knee, ratio = 1 + the first term's slope, knee = its width (dB), attack / release = the followers' time
+    // constants (each follower at fitted multiples of them)
+    fetLaw,
+    // round 190kw, hidden (not in the info: no control, no text; saved while non-zero; after busLaw / fetLaw since the
+    // 0.1.30 rollup, step 8; either of those laws, when on, takes precedence): revision 1 runs the reference's
+    // own law for Clean, Classic and Opto (REA_rodada190kw §1: the reduction smoothed by each style's two-stage follower,
+    // its knee shape, its attack / release scaling). A new Crest and a translated Pro-C 3 state get 1; a project or
+    // preset saved before keeps 0 (the fitted laws, bit for bit)
+    revision,
+    // round 190mg, hidden like fetLaw (after round 190kw's revision since the 0.1.30 rollup, step 11; saved while
+    // non-zero; 0 = off, every project before): the FET law's output
+    // amplifier — LYNX's own static law of the amplifier stage after the FET (level-dependent H2 / H3, a DC part, the
+    // harmonics led by a first-order pre-emphasis), fitted on our Comp Off / Comp On stairs of the reference (REA_rodada190mg_dyn
+    // §3). The value carries the compressed path's level at the amplifier: (dB + 64) / 128 (the translator's Input + voicing gain)
+    fetAmp
 };
+double fetAmpDb (float v) noexcept;   // the wet path's gain to the amplifier's reference level (dB)
+float fetAmpValue (double db) noexcept;
+constexpr int fetVoices = 10;
+float fetLawValue (int voice) noexcept; // voice 0 … 9 → the fetLaw value (voice + 1) / 16
 enum class Trigger { off, hostSync, midi };
 Trigger triggerOf (float v) noexcept;
 double triggerBeats (float v) noexcept;     // whole, 1/2, 1/4, 1/8, 1/16 note (quarter notes: 4 … 0.25)
@@ -120,6 +153,12 @@ double trimDb (float v) noexcept;        // input / output: −36 .. +36 dB
 // Static curve: gain (dB, ≤ 0 for downward styles) the compressor settles to for a steady sine of `inputDb` peak
 // level (side chain flat, no auto gain). Used by the editor's curve and the tests.
 double staticGainDb (const EffectParams& p, double inputDb);
+// round 190kt: the console law's steady gain (dB) for a steady tone of `peakDb` sample peak (threshold dBFS, ratio,
+// knee dB as Crest's knobs read); a fixed point of the feedback loop
+double consoleSteadyDb (double thresholdDb, double ratio, double kneeDb, double peakDb) noexcept;
+// round 190ky: the FET law's steady gain (dB) for a steady 1 kHz tone of `peakDb` sample peak (the fixed point of its
+// feedback loop; Crest's knobs and fetLaw value as in the parameter list)
+double fetSteadyDb (const EffectParams& p, double peakDb) noexcept;
 // The character stage's transfer curve at a drive (no compensation), for the editor.
 float characterCurve (Character c, float x) noexcept;
 } // namespace crest
@@ -173,7 +212,40 @@ enum Global { xover1 = legacyBands * fieldsPerBand, xover2, xover3, slope, looka
               // round tp172b6 [EXEC] (Pro-MB's Audition, Expert panel): the output becomes what the band's detector hears (0 off,
               // k / 6 band k): level, range, threshold and mix don't touch it, the Output does, a switched-off band still sounds
               audition = rev152 + 1,
-              count = audition + 1 };
+              count = audition + 1,
+              // round 190lg, hidden (not in the info: no control, no text; saved while non-zero): revision 1 runs the
+              // reference's own band compander graph (REA_rodada190lg §7: the detector with its soft range, a peak hold
+              // and a low pass timed by the look-ahead, two followers joined by a max) for the bands that compress
+              // downward or expand upward; `lookaheadSwitch` is the reference's look-ahead switch under revision 1
+              // (1 on: each band's detector leads by 500 / its centre frequency + its own look-ahead, the audio waits
+              // 20 ms). Only the Pro-MB translator sets them; a project saved before keeps 0 (bit for bit)
+              revision = count, lookaheadSwitch = count + 1,
+              // round 190mg, hidden (no control, no text; saved while non-zero; only the Waves C4 translator sets them):
+              // the C4 law — LYNX's own model of the Waves C4's structure, fitted black-box (REA_rodada190mg.md §2):
+              // in-phase squared-biquad crossovers (crossoverQ), per band peak detector → rational gain with a cubic
+              // knee → look-ahead minimum → two-stage release → triangular smoothing → gain between 0 dB and the
+              // range. 0 = Prism's own engine (every project saved before); c4LawValue (false) electro, (true) opto
+              c4Law = count + 2, // (rollup 0.1.30 step 11: after round 190lg's revision / lookaheadSwitch)
+              c4Q,
+              // round 190mm (sub-round dyn), hidden (saved while non-zero; only the Waves C6 translator sets them): the
+              // C6's two floating dynamic bands on the C4 law, each c6Float0 + 8 k + field (c6On, c6Freq 16 · 1335^v Hz,
+              // c6Width Q 0.35 · 171^v, c6Thr / c6Range / c6Gain / c6Att / c6Rel as the bands' threshold, range, level,
+              // attack and release values). All 0 = no floating band (every project saved before)
+              c6Float0 };
+enum C6Field { c6On, c6Freq, c6Width, c6Thr, c6Range, c6Gain, c6Att, c6Rel, c6Fields };
+inline int c6Param (int band, int field) noexcept { return c6Float0 + c6Fields * band + field; }
+float c6FreqValue (double hz) noexcept;
+float c6WidthValue (double q) noexcept;
+float c4LawValue (bool opto) noexcept;
+bool c4Active (const EffectParams& p) noexcept;
+bool c4Opto (const EffectParams& p) noexcept;
+float c4QValue (double q) noexcept;        // crossover Q 0.1 … 0.75 (0 = the C4's default 0.6)
+double c4QOf (const EffectParams& p) noexcept;
+// the C4 law reads Prism's controls in the C4's own units: knee = kneeDb / 64 (0 … 0.75), attack 0.5 · 1000^v ms,
+// release 5 · 1000^v ms (v = the control's 0 … 1 value); c4AttackValue / c4ReleaseValue are the inverses
+float c4AttackValue (double ms) noexcept;
+float c4ReleaseValue (double ms) noexcept;
+int c4Lookahead (double sampleRate) noexcept; // 64 samples up to 50 kHz, 128 up to 100 kHz, 256 above (measured)
 inline int param (int band, int field) noexcept
 {
     return band < legacyBands ? band * fieldsPerBand + field : band5 + (band - legacyBands) * fieldsPerBand + field;
@@ -275,7 +347,12 @@ enum Param
     // over Release, whatever the level does meanwhile (the style's level curve, ratio and knee are not used). Measured
     // black-box on a drum-gate reference's probes (docs/PARITY.md "Round 190dm").
     trigger, sensitivity, releaseShape,
-    count
+    count,
+    // round 190lp, hidden (not in the info: no control, no text; saved while non-zero): revision 1 runs the level gate's
+    // algorithms refitted black-box on the reference gate's renders (the gain moves in dB: opening, a wait, a smooth
+    // closing curve per style). A new Sentry and a translated Pro-G state get 1; a project or preset saved before (and
+    // the Live maps / substitutes) keep 0, bit for bit
+    revision = count
 };
 enum class Shape { smooth, mid, sharp };
 bool transientTrigger (const EffectParams& p) noexcept;

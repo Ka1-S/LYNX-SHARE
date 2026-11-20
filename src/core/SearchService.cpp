@@ -1,4 +1,5 @@
 #include "core/SearchService.h"
+#include "platform/CvWait.h"
 
 #include <algorithm>
 #include <atomic>
@@ -108,7 +109,7 @@ IndexStatus Service::status() const
 bool Service::waitIdle (int timeoutMs)
 {
     std::unique_lock<std::mutex> guard (lock);
-    return idleWake.wait_for (guard, std::chrono::milliseconds (timeoutMs), [this] { return ! working && ! pendingSearch && passes.empty() && ! reloadAsked; });
+    return cvwait::waitFor (idleWake, guard, std::chrono::milliseconds (timeoutMs), [this] { return ! working && ! pendingSearch && passes.empty() && ! reloadAsked; }); // (round 190la: platform/CvWait.h)
 }
 
 bool Service::superseded (std::uint64_t id) const

@@ -10,9 +10,13 @@
 // What stands in for what is DATA: a text table (built in, extendable with registerPluginSubstitutes) of entries
 // that name the third-party product (VST2 unique IDs, VST3 class IDs, CLAP ids, plugin / file names, Waves shell
 // sub-plugin names), the LYNX effect, a default preset and, where the saved state is readable, a parameter map.
-// Parameter maps only use layouts that are visible in the saved data itself (VST2 float parameters, the attributes of
-// a JUCE XML state, Waves' "RealWorld" parameter lists) and meanings known from public documentation or our own
-// black-box measurements; never decompiled third-party code. Without a readable state the default preset is used.
+// Parameter maps use layouts that are visible in the saved data itself (VST2 float parameters, the attributes of a
+// JUCE XML state, Waves' "RealWorld" parameter lists) and meanings known from public documentation or our own
+// black-box measurements. Since 2026-11, by the project owner's decision, some stand-ins and translators (e.g. the
+// FabFilter roles of round 190kw onwards) were also informed by clean-room static analysis of the third-party
+// binaries: their laws and structure were described in our own words and LYNX's code was written from that
+// description. No third-party code, tables, presets or other content is copied, and licence protections are never
+// bypassed. The evidence for each case is in docs/analise/REA_*.md. Without a readable state the default preset is used.
 //
 // Does not depend on JUCE so it can be tested in isolation.
 
@@ -70,6 +74,9 @@ struct SubstituteEntry
     // the LYNX effect and its default preset
     EffectKind effect = EffectKind::eq;
     std::vector<std::pair<int, float>> preset; // parameter position -> normalised value, over makeEffectSlot (effect)
+    // round 190ly ("replaced = …", same items as preset): applied over the preset only when the slot replaces an original
+    // device (project / import translation), not for one added by hand from a substitute menu
+    std::vector<std::pair<int, float>> replacedPreset;
     float mix = 1.0f;                          // slot dry/wet of the substitute
     std::vector<SubstituteParamMap> params;
     // a built-in state translator (core/FabFilterStates.h: "pro-c3", "pro-mb", "pro-g", "saturn2") run after the
@@ -182,6 +189,12 @@ std::vector<double> wavesRealWorldParams (const std::vector<std::uint8_t>& state
 // Soundtoys states (read black-box in the official trials) are translated by it.
 std::optional<std::uint64_t> soundtoysStateHash (const std::vector<std::uint8_t>& state);
 int knownSoundtoysStates() noexcept;
+// Round 190kv: the Soundtoys factory presets. The fingerprint of a state's encoded payload without its volatile fields
+// (0 when the state has none); the fingerprints known for a plug-in's widget name ("EchoBoy", "Decapitator", …); a known
+// fingerprint applied to a slot of the matching LYNX effect (the number of parameters set, 0 when not known).
+std::uint64_t soundtoysFactoryFingerprint (const std::vector<std::uint8_t>& state);
+std::vector<std::uint64_t> soundtoysFactoryFingerprints (std::string_view widget);
+int applySoundtoysFactoryPreset (std::string_view widget, std::uint64_t fingerprint, EffectSlot& slot);
 
 // --- lossless text form of an .flp plugin reference (.lynx keeps it for substitutes) ------------------------------
 // Base64 of a versioned binary record of every ForeignPlugin field; foreignFromText(foreignToText(p)) == p, the

@@ -49,12 +49,16 @@ inline int autoWarp (Song& song, int clip, const SampleData& sample, const std::
 inline std::vector<double> attacks (const SampleData& sample)
 {
     std::vector<double> out;
-    if (sample.left.empty() || ! (sample.sampleRate > 0.0))
+    // (round 190kc: a long file is memory-mapped, its samples behind leftData() / rightData(), not in left / right)
+    const auto frames = sample.frames();
+    if (frames == 0 || ! (sample.sampleRate > 0.0))
         return out;
-    std::vector<float> mono (sample.left);
-    if (! sample.right.empty())
-        for (std::size_t i = 0; i < mono.size() && i < sample.right.size(); ++i)
-            mono[i] = 0.5f * (mono[i] + sample.right[i]);
+    const auto* l = sample.leftData();
+    const auto* r = sample.rightData();
+    std::vector<float> mono (l, l + frames);
+    if (sample.isStereo())
+        for (std::size_t i = 0; i < frames; ++i)
+            mono[i] = 0.5f * (mono[i] + r[i]);
     for (const auto a : stretchdetail::detectAttacks (mono.data(), (long) mono.size(), sample.sampleRate, 6.0))
         out.push_back ((double) a / sample.sampleRate);
     return out;

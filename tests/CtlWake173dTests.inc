@@ -61,6 +61,12 @@ const std::vector<Allowed>& allowed()
         // rows only, a filter's input comes from the FM layer (REA_rodada11 §1.5, FUN_0086dd40 [DECOMP + EXEC])
         { "Sytrus", "RM op * to filter *", "fl-inert: FL's voice assembly reads the RM layer for operators only; a filter's input is the FM layer's row (REA_rodada11 §1.5)" },
         { "Harmless", "Threaded", "non-audio: renders the voices on worker threads (same output)" },
+        // (round 190mc) FL's AF switch of Transistor Bass's program row: whether the editor follows the programs the notes
+        // pick (TSynthEditorForm ProgramAutoFollowCheckBox, REA_rodada169g2 §2); the engine plays the same either way
+        { "Transistor Bass", "Auto follow", "non-audio: which program the editor shows and edits (FL's AF), not what plays" },
+        // (rollup 0.1.30) Helix keeps Live's HiQ switch for the .als round trip; its oscillators are always band-limited
+        // (round 190ja: every table's mipmaps), so the switch changes nothing in LYNX
+        { "Helix", "HiQ", "non-audio: Helix is always band-limited (round 190ja); HiQ is kept for Live's round trip" },
     };
     // FL's Drumaxx engine reads pad 1's Noise Retrig and EG Retrig (pad fields 5, 6) for every pad (REA_rodada67 §6.2),
     // so pads 2…16's own switches do nothing in FL either
@@ -97,6 +103,10 @@ const std::vector<Gap>& knownGaps()
         { "Kepler Exo", "Mod * amount", "gap173d2-3" },
         { "Kepler Exo", "X offset", "gap173d2-3" },
         { "Kepler Exo", "Y offset", "gap173d2-3" },
+        // Braid (round 190ko): LYNX's second LFO 1 transformer starts on Bipolar (the default's neutral) and the audit moves
+        // it to its two ends, None and Scrambler, which Braid passes through unchanged too (Scrambler is not modelled
+        // yet); every type between moves the LFO (its macro wakes on Ramp up). Rollup 0.1.30 step 7 (round 190lc)
+        { "Braid", "* LFO 1 FX 2", "rollup030-7-braid-scrambler" },
     };
     return g;
 }
@@ -121,10 +131,11 @@ bool isAllowed (const std::string& engine, const std::string& control)
     return false;
 }
 
-void auditEngines (const std::set<std::string>& names, bool except)
+// (`withoutFl`: engines that need nothing of FL's run without its Data folder too, e.g. Tetra on CI)
+void auditEngines (const std::set<std::string>& names, bool except, bool withoutFl = false)
 {
     using namespace lynx;
-    if (realFlpDir.empty())
+    if (realFlpDir.empty() && ! withoutFl)
         return;
     static const auto fl = natives142::flAccess();
     ctlaudit::flAccess = &fl;
@@ -172,7 +183,7 @@ void auditEngines (const std::set<std::string>& names, bool except)
 // the slow engines in tests of their own (the build runs the chunks in parallel)
 const std::set<std::string>& slow()
 {
-    static const std::set<std::string> s { "GMS", "Sawer", "Toxic Biohazard", "Harmless", "Kepler Exo", "Transistor Bass", "Sytrus", "Drumaxx" };
+    static const std::set<std::string> s { "GMS", "Sawer", "Toxic Biohazard", "Harmless", "Kepler Exo", "Transistor Bass", "Sytrus", "Drumaxx", "Tetra", "Helix", "Braid" };
     return s;
 }
 } // namespace ctlwake173d
@@ -187,6 +198,15 @@ TEST (ctlwake173d_generator_controls_sytrus) { ctlwake173d::auditEngines ({ "Syt
 TEST (ctlwake173d_generator_controls_kepler_exo) { ctlwake173d::auditEngines ({ "Kepler Exo" }, false); }
 TEST (ctlwake173d_generator_controls_transistor_bass) { ctlwake173d::auditEngines ({ "Transistor Bass" }, false); }
 TEST (ctlwake173d_generator_controls_drumaxx) { ctlwake173d::auditEngines ({ "Drumaxx" }, false); }
+// (round 190ix: LYNX's own FM synth needs nothing of FL, so it runs on CI too; its contexts are Tetra hints in tools/CtlWake.h)
+TEST (ctlwake173d_generator_controls_tetra) { ctlwake173d::auditEngines ({ "Tetra" }, false, true); }
+// (rollup 0.1.30: Helix, LYNX's own wavetable synth (round 190ja), needs nothing of FL either; its contexts are Helix hints in
+// tools/CtlWake.h, its keys from a tools/ctlwake survey: 100 controls, 0 dead, HiQ allowed; round 190mi: + 36 Helix+ controls, their keys from
+// the Helix+ hints)
+TEST (ctlwake173d_generator_controls_helix) { ctlwake173d::auditEngines ({ "Helix" }, false, true); }
+// (rollup 0.1.30 step 7: Braid, LYNX's own two-engine macro synth (round 190ko), needs nothing of FL; its contexts are Braid
+// hints in tools/CtlWake.h)
+TEST (ctlwake173d_generator_controls_braid) { ctlwake173d::auditEngines ({ "Braid" }, false, true); }
 
 // every editor control reads and writes on the engine's new channel: a state saved before a parameter existed (Slayer's
 // version 0, Kepler's 34 floats, Kepler Exo's 151) silently dropped its edits

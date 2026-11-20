@@ -84,7 +84,10 @@ def main(argv):
         elif name == "LYNX.exe":
             raise SystemExit(f"missing {src}")
     for extra in a.extra:
-        shutil.copy2(extra, a.out)
+        if os.path.isdir(extra):  # a folder (the third-party licence texts, round 190nk) keeps its name
+            shutil.copytree(extra, os.path.join(a.out, os.path.basename(os.path.normpath(extra))), dirs_exist_ok=True)
+        else:
+            shutil.copy2(extra, a.out)
     assets = os.path.join(a.out, "Assets")
     shutil.copytree(os.path.join(ROOT, "resources", "msix", "Assets"), assets)
     if a.loose:

@@ -16,6 +16,15 @@ namespace lynx::mixerops
 // sends, sidechain inputs, automation and MIDI targets, controller sources).
 void swapTracks (Song& song, int a, int b);
 
+// FL's Current (C) track (round 190mv, DF-82; MixerTrack::current): its index (the last mixer track) or -1; whether `t`
+// is it; adds it when the song has none (returns its index, -1 when the mixer is full); and moves it back to the end
+// after an edit added inserts past it (every reference follows, as insertTracks). An insert added past the end of a
+// mixer with a Current track takes the Current track's place (its number) and the Current track moves one on.
+int currentTrack (const Song& song) noexcept;
+bool isCurrentTrack (const Song& song, int t) noexcept;
+int addCurrentTrack (Song& song);
+bool keepCurrentLast (Song& song);
+
 // Moves the selected inserts left (delta < 0) or right by one place as a block; the Master never moves.
 // `selection` is updated. Returns false when nothing moved.
 bool moveTracks (Song& song, std::vector<int>& selection, int delta);
@@ -63,6 +72,34 @@ std::vector<int> linkChannels (Song& song, const std::vector<int>& channels, int
 // Mixer › "Remove unused inserts at the end"). Returns how many were removed.
 int removeUnusedTrailingInserts (Song& song, int keep = 0);
 
+// --- FL's Mixer menu › Options › "Trim unused tracks" (round 190jv; REA FUN_012a6920 / FUN_012a65c0 / FUN_0127bcc0 /
+// FUN_012a5280 in FLEngine_x64.dll, docs/analise/REA_rodada190jv.md) ---------------------------------------------------
+// FL asks "Select the mixer track types to be removed." with two exclusive choices:
+enum class TrimUnused
+{
+    unlinkedOnly,       // "Unlinked tracks only" (the default): unlinked, no effect and no name of its own
+    unlinkedAndNonEmpty // "Unlinked and non-empty tracks": every unlinked track, also with effects or a name
+};
+// FL's "linked" test of insert `t` (FUN_0127bcc0): a channel plays into it, a Playlist audio track is linked to it, or a
+// route goes from another insert into it or from it to another insert (a level-0 sidechain route too; the route to the
+// Master does not count). FL ignores a fader, pan, mute, colour, audio input or automation (a track in that state is
+// trimmed). LYNX adds the plugins' own references to an insert (a side-chain source, Fruity Send / Patcher / Transmitter /
+// EQUO / Transporter sends, a hosted plugin's routed outputs, Soundfont reverb / chorus, Voltage Controller outputs):
+// FL refuses the whole trim while any plugin has such "side routing" (it cannot renumber them), LYNX renumbers them, so
+// such an insert just counts as linked. The Master is always linked.
+bool insertLinked (const Song& song, int t);
+// FL's "non-empty" insert (FUN_0127c030 / record +0x0C): an effect in a slot, or a name of its own.
+bool insertNonEmpty (const Song& song, int t);
+// The inserts "Trim unused tracks" removes in `mode`, ascending (never the Master).
+std::vector<int> unusedTracks (const Song& song, TrimUnused mode);
+// Removes `tracks` (FL's trim, FUN_012a5280 with flags 0x11: no rerouting of feeders, one undo step "trim unused mixer
+// tracks"): the inserts above move down, every reference follows (channels, Playlist tracks, sends, side-chains, slot
+// sends, automation, links, VCAs, snapshots), default names follow their new number, and the mixer gets shorter by
+// that many — it does not keep its count as Delete does. Returns how many were removed.
+int trimTracks (Song& song, std::vector<int> tracks);
+// unusedTracks + trimTracks in one call (what the menu item does after "Yes").
+int trimUnusedTracks (Song& song, TrimUnused mode);
+
 // Mixer menu › "Show only used inserts" (round 163; the rule made exact in round 190am): which strips take no room.
 // An insert is hidden only when ALL of these hold:
 //  - it is not the Master;
@@ -73,6 +110,16 @@ int removeUnusedTrailingInserts (Song& song, int keep = 0);
 //    at it, its name, fader, pan, separation, mute, solo, colour, EQ and output are the defaults, nothing automates it.
 // Returns one flag per insert plus one for the "+" button (never hidden). Nothing in the song changes.
 std::vector<bool> hiddenUnusedInserts (const Song& song, const std::set<int>& keep);
+
+// Issue #221 (round 190ng): "Show only used inserts" after a delete. FL keeps the count (the inserts after a deleted one
+// move one place left and a blank one comes at the end), so deleting an empty insert that "+" had brought back left a
+// blank insert under the same number, shown (it was still in the kept set and selected): Del looked like it did nothing.
+// `revealedAfterDelete`: the kept set with the deleted numbers gone and the later ones moved left as their inserts did.
+std::set<int> revealedAfterDelete (const std::set<int>& revealed, std::vector<int> deleted);
+// The insert to select after deleting from `firstDeleted` on: FL keeps the number (`usedOnly` off); with only the used
+// inserts shown, that number when its insert shows (in use or kept), else the nearest shown one before it (the Master
+// at worst), so no blank insert comes back into view.
+int selectionAfterDelete (const Song& song, const std::set<int>& revealed, int firstDeleted, bool usedOnly);
 
 // Channels whose output goes to `track`.
 std::vector<int> channelsOn (const Song& song, int track);
@@ -174,6 +221,16 @@ void resetToDefault (Song& song, const std::vector<int>& tracks);
 // REA_rodada167l §4): the targets play with their path to Master; the alt solo also keeps the tracks that feed them.
 // Again on the same solo clears it; one kind on the other kind switches to it.
 void soloSelected (Song& song, const std::vector<int>& targets, bool alt);
+// FL's mute-switch modifiers (manual "Mixer › Mute Switch", round 190kn): Ctrl+right-click = "Unmute All" (every insert
+// unmuted and every solo cleared; a track with its state locked keeps its mute), Shift+click = "Lock/Unlock State".
+void unmuteAll (Song& song);
+void toggleLockState (Song& song, int track);
+// FL's effect-slot LED: Ctrl/Alt+click = "Solo/Unsolo" the slot (manual "Mute/Disable LED - The same as for the Mixer
+// Track mute LEDs"): only this effect of the insert stays on; again on a soloed slot turns every effect of it on.
+void soloSlot (Song& song, int track, int index);
+// FL's Shift+click on the slot LED = "Lock/Unlock State" (round 190ld): a locked slot keeps its on/off state when
+// another slot of the insert is soloed.
+void toggleSlotLock (Song& song, int track, int index);
 // "Reset selected track(s) routing": each insert sends only to the Master again, at full level.
 void resetRouting (Song& song, const std::vector<int>& tracks);
 // "Unroute tracks routed to the selected track(s)": the sends into them are removed (an insert left with no

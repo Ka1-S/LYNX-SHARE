@@ -2090,6 +2090,10 @@ struct State
     std::vector<Sequence> sequences;
     std::size_t engineAt = 0, sequencerModeAt = 0; // (round 168q2)
     std::size_t programAt = 0;                     // the program, then the edit program (round 169g2)
+    // round 190mc (FL's program row): where each program's sequence / patch / transpose fields sit, each patch's stored
+    // copy and the names (string = i32 length + bytes, the length counting a terminating 0)
+    std::array<std::size_t, 128> programFieldsAt {}, storedAt {}, patchNameAt {}, workingNameAt {}, sequenceNameAt {};
+    std::array<std::string, 128> patchNames, sequenceNames;
 };
 
 struct Reader
@@ -2116,6 +2120,20 @@ struct Reader
             ok = false;
         else
             at += (std::size_t) n;
+    }
+    std::string string()
+    {
+        const auto n = get<std::int32_t>();
+        if (n < 0 || at + (std::size_t) n > b.size())
+        {
+            ok = false;
+            return {};
+        }
+        std::string out (reinterpret_cast<const char*> (b.data() + at), (std::size_t) n);
+        at += (std::size_t) n;
+        if (const auto zero = out.find ('\0'); zero != std::string::npos)
+            out.resize (zero);
+        return out;
     }
 };
 
@@ -2152,10 +2170,12 @@ State parseState (const std::vector<std::uint8_t>& s)
     st.program = e.get<std::int32_t>();
     st.editProgram = e.get<std::int32_t>();
     st.follow = e.get<std::uint8_t>() != 0;
-    for (auto& p : st.programs)
+    for (std::size_t k = 0; k < st.programs.size(); ++k)
     {
+        auto& p = st.programs[k];
         e.get<std::int16_t>();
         e.skipString();
+        st.programFieldsAt[k] = e.at;
         p.sequence = e.get<std::int32_t>();
         p.patch = e.get<std::int32_t>();
         p.transpose = e.get<std::int32_t>();
@@ -2164,8 +2184,13 @@ State parseState (const std::vector<std::uint8_t>& s)
     for (int k = 0; k < 128; ++k)
         for (int c = 0; c < 2; ++c)
         {
-            e.skipString();
+            (c == 0 ? st.patchNameAt : st.workingNameAt)[(std::size_t) k] = e.at;
+            auto name = e.string();
+            if (c == 0)
+                st.patchNames[(std::size_t) k] = std::move (name);
             std::array<float, 100> v {};
+            if (c == 0)
+                st.storedAt[(std::size_t) k] = e.at;
             if (c == 1)
                 st.workingAt[(std::size_t) k] = e.at;
             for (auto& x : v)
@@ -2174,10 +2199,12 @@ State parseState (const std::vector<std::uint8_t>& s)
                 st.patches[(std::size_t) k] = v;
         }
     st.sequences.resize (128);
-    for (auto& q : st.sequences)
+    for (std::size_t k = 0; k < st.sequences.size(); ++k)
     {
+        auto& q = st.sequences[k];
         const auto ver = e.get<std::int16_t>();
-        e.skipString();
+        st.sequenceNameAt[k] = e.at;
+        st.sequenceNames[k] = e.string();
         e.get<std::int16_t>();
         q.lengthAt = e.at;
         q.length = e.get<std::int32_t>();
@@ -2511,6 +2538,26 @@ public:
             q.length = std::clamp (v, 1, 16);
         else if (index == tbseq::sequencer)
             st.sequencerMode = seqMode = v != 0 ? 4 : 0;
+        else if (index == tbprog::program) // (FL's program selector: what plays and what the page edits)
+        {
+            const auto oldPatch = st.programs[(std::size_t) program].patch;
+            program = editProgram = std::clamp (v, 0, 127);
+            if (st.programs[(std::size_t) program].patch != oldPatch)
+                reset();
+            applyPatch();
+        }
+        else if (index == tbprog::follow)
+            st.follow = v != 0;
+        else if (index == tbprog::sequence)
+            st.programs[(std::size_t) editProgram].sequence = std::clamp (v, 0, 127);
+        else if (index == tbprog::transpose)
+            st.programs[(std::size_t) editProgram].transpose = std::clamp (v, -48, 48);
+        else if (index == tbprog::patch)
+        {
+            st.programs[(std::size_t) editProgram].patch = std::clamp (v, 0, 127);
+            if (editProgram == program)
+                applyPatch();
+        }
         else if (index >= tbseq::firstStep && index < tbseq::firstStep + 5 * tbseq::steps)
         {
             auto& stp = q.steps[(std::size_t) ((index - tbseq::firstStep) / 5)];
@@ -2784,10 +2831,20 @@ std::optional<float> seqValue (const State& st, int index)
     if (! st.usable)
         return std::nullopt;
     const auto& q = savedSequence (st);
+    const auto& edited = st.programs[(std::size_t) st.editProgram];
     if (index == tbseq::length)
         return (float) std::clamp (q.length, 1, 16);
     if (index == tbseq::sequencer)
         return st.sequencerMode != 0 ? 1.0f : 0.0f;
+    switch (index) // FL's program row (round 190mc)
+    {
+        case tbprog::program: return (float) st.editProgram;
+        case tbprog::follow: return st.follow ? 1.0f : 0.0f;
+        case tbprog::sequence: return (float) edited.sequence;
+        case tbprog::transpose: return (float) std::clamp (edited.transpose, -48, 48);
+        case tbprog::patch: return (float) edited.patch;
+        default: break;
+    }
     if (index < tbseq::firstStep || index >= tbseq::firstStep + 5 * tbseq::steps)
         return std::nullopt;
     const auto& stp = q.steps[(std::size_t) ((index - tbseq::firstStep) / 5)];
@@ -2812,6 +2869,19 @@ bool seqWriteInPlace (std::vector<std::uint8_t>& b, const State& st, int index, 
         return poke<std::int32_t> (b, q.lengthAt, std::clamp (v, 1, 16)), true;
     if (index == tbseq::sequencer)
         return poke<std::int32_t> (b, st.sequencerModeAt, v != 0 ? 1 : 0), true;
+    const auto fields = st.programFieldsAt[(std::size_t) st.editProgram];
+    switch (index) // FL's program row (round 190mc): the program shown (and played), its sequence, transpose and patch
+    {
+        case tbprog::program:
+            poke<std::int32_t> (b, st.programAt, std::clamp (v, 0, 127));
+            poke<std::int32_t> (b, st.programAt + 4, std::clamp (v, 0, 127));
+            return true;
+        case tbprog::follow: return poke<std::uint8_t> (b, st.programAt + 8, (std::uint8_t) (v != 0 ? 1 : 0)), true;
+        case tbprog::sequence: return fields != 0 && (poke<std::int32_t> (b, fields, std::clamp (v, 0, 127)), true);
+        case tbprog::patch: return fields != 0 && (poke<std::int32_t> (b, fields + 4, std::clamp (v, 0, 127)), true);
+        case tbprog::transpose: return fields != 0 && (poke<std::int32_t> (b, fields + 8, std::clamp (v, -48, 48)), true);
+        default: break;
+    }
     if (index < tbseq::firstStep || index >= tbseq::firstStep + 5 * tbseq::steps)
         return false;
     const auto k = (std::size_t) ((index - tbseq::firstStep) / 5);
@@ -2910,6 +2980,9 @@ public:
         flmVariant = variant;
         parsed = parseState (state);
         data = loadDll (dllPath);
+        // round 190mc: the program the new state edits is the instrument's at once — the page's follow timer must not
+        // read the old engine's program (until the audio thread takes the new one) and write it into the new state
+        selected.store (parsed.usable ? parsed.editProgram : -1);
         delete incoming.exchange (build().release());
     }
 
@@ -3113,7 +3186,9 @@ private:
     }
 
 public:
-    int selectedProgram() const noexcept override { return selected.load(); }
+    // (−1 while a new engine waits for the audio thread: its program is not the one `selected` may still hold, so the
+    // page's follow timer waits; round 190mc)
+    int selectedProgram() const noexcept override { return incoming.load() != nullptr ? -1 : selected.load(); }
 
     void setParameter (int index, float value) noexcept override
     {
@@ -3230,6 +3305,89 @@ bool transistorBassSelectProgram (std::vector<std::uint8_t>& state, int program)
     return true;
 }
 
+std::optional<TransistorBassBank> transistorBassBank (const std::vector<std::uint8_t>& state)
+{
+    const auto st = parseState (state);
+    if (! st.usable)
+        return std::nullopt;
+    TransistorBassBank out;
+    out.patches = st.patchNames;
+    out.sequences = st.sequenceNames;
+    for (const auto& p : st.programs)
+    {
+        ++out.patchUsers[(std::size_t) p.patch];
+        ++out.sequenceUsers[(std::size_t) p.sequence];
+    }
+    out.program = st.editProgram;
+    out.patch = st.programs[(std::size_t) st.editProgram].patch;
+    out.sequence = st.programs[(std::size_t) st.editProgram].sequence;
+    const auto stored = st.storedAt[(std::size_t) out.patch], working = st.workingAt[(std::size_t) out.patch];
+    out.edited = stored != 0 && working != 0 && std::memcmp (state.data() + stored, state.data() + working, 100 * sizeof (float)) != 0;
+    return out;
+}
+
+namespace
+{
+bool copyPatch (std::vector<std::uint8_t>& state, bool toWorking)
+{
+    const auto st = parseState (state);
+    if (! st.usable)
+        return false;
+    const auto patch = (std::size_t) st.programs[(std::size_t) st.editProgram].patch;
+    const auto stored = st.storedAt[patch], working = st.workingAt[patch];
+    if (stored == 0 || working == 0 || stored + 400 > state.size() || working + 400 > state.size())
+        return false;
+    std::memmove (state.data() + (toWorking ? working : stored), state.data() + (toWorking ? stored : working), 100 * sizeof (float));
+    return true;
+}
+
+// replaces the string at `at` (i32 length counting the terminating 0, the bytes) and grows / shrinks the two chunk sizes
+// that hold it (the wrapper's chunk 2 and the engine's own, as addAccentByte)
+bool replaceString (std::vector<std::uint8_t>& b, const State& st, std::size_t at, const std::string& text)
+{
+    if (at == 0 || at + 4 > b.size() || st.engineAt < 8)
+        return false;
+    const auto oldLength = (std::size_t) std::max (0, peek<std::int32_t> (b, at));
+    if (at + 4 + oldLength > b.size())
+        return false;
+    std::string clean = text.substr (0, 63);
+    std::vector<std::uint8_t> bytes (clean.begin(), clean.end());
+    bytes.push_back (0);
+    const auto delta = (std::int64_t) bytes.size() - (std::int64_t) oldLength;
+    b.erase (b.begin() + (std::ptrdiff_t) (at + 4), b.begin() + (std::ptrdiff_t) (at + 4 + oldLength));
+    b.insert (b.begin() + (std::ptrdiff_t) (at + 4), bytes.begin(), bytes.end());
+    poke<std::int32_t> (b, at, (std::int32_t) bytes.size());
+    poke<std::uint64_t> (b, st.engineAt - 8, (std::uint64_t) ((std::int64_t) peek<std::uint64_t> (b, st.engineAt - 8) + delta));
+    poke<std::uint64_t> (b, st.engineAt + 4, (std::uint64_t) ((std::int64_t) peek<std::uint64_t> (b, st.engineAt + 4) + delta));
+    return true;
+}
+} // namespace
+
+bool transistorBassReadPatch (std::vector<std::uint8_t>& state) { return copyPatch (state, true); }
+bool transistorBassWritePatch (std::vector<std::uint8_t>& state) { return copyPatch (state, false); }
+
+bool transistorBassRename (std::vector<std::uint8_t>& state, bool patch, int index, const std::string& name)
+{
+    if (index < 0 || index >= 128)
+        return false;
+    auto st = parseState (state);
+    if (! st.usable)
+        return false;
+    auto next = state;
+    if (patch)
+    {
+        // the working copy's name first (it sits after the stored one: its offset stays valid)
+        if (! replaceString (next, st, st.workingNameAt[(std::size_t) index], name) || ! replaceString (next, st, st.patchNameAt[(std::size_t) index], name))
+            return false;
+    }
+    else if (! replaceString (next, st, st.sequenceNameAt[(std::size_t) index], name))
+        return false;
+    if (! parseState (next).usable)
+        return false;
+    state = std::move (next);
+    return true;
+}
+
 std::optional<TransistorBassProgram> transistorBassProgram (const std::vector<std::uint8_t>& state)
 {
     const auto st = parseState (state);
@@ -3277,6 +3435,12 @@ const std::vector<EngineParam>& transistorBassParams()
         // the saved program's sequence (round 168q2)
         add (tbseq::length, "Sequence length", 1.0f, 16.0f);
         add (tbseq::sequencer, "Sequencer", 0.0f, 1.0f);
+        // FL's program row (round 190mc): PROGRAM (0…127, shown as its key), AF, SEQUENCE, TRANSP., PATCH (0…127, shown 1…128)
+        add (tbprog::program, "Program", 0.0f, 127.0f);
+        add (tbprog::follow, "Auto follow", 0.0f, 1.0f);
+        add (tbprog::sequence, "Sequence number", 0.0f, 127.0f);
+        add (tbprog::transpose, "Sequence transpose", -48.0f, 48.0f);
+        add (tbprog::patch, "Patch number", 0.0f, 127.0f);
         for (int i = 0; i < tbseq::steps; ++i)
         {
             const auto step = "Step " + std::to_string (i + 1) + " ";

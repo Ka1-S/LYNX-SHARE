@@ -3,6 +3,9 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/EventPaneSplit.h"
+#include "core/LiveGrid.h"
+#include "core/MagicLasso.h"
+#include "core/MpeTab.h"
 #include "core/NoteTools.h"
 #include "core/PianoKeys.h"
 #include "core/ScaleSnap.h"
@@ -10,6 +13,7 @@
 #include "ui/TimerWhileShowing.h"
 #include "ui/EditorTools.h"
 #include "ui/FrameTicker.h"
+#include "ui/MotionOverlay.h"
 #include "ui/FlMods.h"
 #include "ui/NoteToolDialogs.h"
 #include "ui/ValueControl.h"
@@ -19,6 +23,8 @@
 
 namespace lynx
 {
+class ChordHelperPanel; // (round 190mc, ui/ChordHelper.h)
+
 // Piano Roll for the selected channel in the current pattern.
 //  - a tool strip (Pencil, Brush, Eraser, Mute, Knife, Lasso, Zoom, Listen; the wheel over it switches);
 //    with the Pencil: left click on empty space creates a note (default length, or the last used one)
@@ -69,6 +75,8 @@ public:
     ui::Hint hintAt (juce::Point<int> position) override;
     void mouseDoubleClick (const juce::MouseEvent& e) override;
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
+    void showToolModeMenu(); // FL's middle + right click (round 190mp, DE-62)
+    void feedMagicLasso (juce::Point<int> p, bool buttonDown); // FL's Magic lasso (round 190mp, DE-71)
     // trackpad pinch (macOS; Windows touch screens): time zoom around the pointer, with Alt the vertical zoom (round 170e)
     void mouseMagnify (const juce::MouseEvent& e, float scale) override;
 
@@ -81,8 +89,19 @@ public:
 
     // The key map's pianoRoll.* actions (tool dialogs, zoom presets). Returns false for unknown ids.
     bool runAction (const std::string& id);
+    // round 190mr (DE-63): a left press at `at` held still, its ring as after `elapsedMs`, its action now, the release
+    void pressForSnapshot (juce::Point<int> at, juce::ModifierKeys mods = juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier));
+    void holdRingForSnapshot (int elapsedMs) { holdSince = juce::Time::getMillisecondCounter() - (juce::uint32) elapsedMs; repaint(); }
+    void fireHoldForSnapshot() { holdReadsMouse = false; holdFired (holdSerial); holdReadsMouse = true; }
+    void releaseForSnapshot (juce::Point<int> at);
+    void dragForSnapshot (juce::Point<int> at, juce::ModifierKeys mods = juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier)); // (round 190mv)
+    bool holdPendingForSnapshot() const noexcept { return hold != Hold::none; }
+    std::int64_t gridTicksForSnapshot() const { return gridTicks(); }
+    juce::PopupMenu moreMenuForSnapshot() { return moreMenu(); } // --userfixshot190ib (issue #183's item)
     // The shortcut text of a key map action for menus ("\tCtrl+Q"; empty when unbound), set by the main window.
     static inline std::function<juce::String (const std::string& id)> shortcutText;
+    // The Piano roll's main menu (its window's ▾ items), for FL's middle + right click tool menu (round 190mp, DE-62).
+    std::function<juce::PopupMenu()> mainMenu;
 
     // Note tool dialogs on the selection (or all of the channel's notes).
     void openNoteTool (NoteTool tool);
@@ -102,6 +121,7 @@ public:
     // Centers the view on the channel's notes and, with `fitPattern`, zooms to show the whole pattern
     // (called on open).
     void scrollToNotes (bool fitPattern = true);
+    void centreOnTick (double tick, double at = 0.5); // round 190mk (DE-33): this pattern tick at `at` of the view's width
 
     // FL's parameter menu "Edit events in piano roll" (REA round 146): the bottom lane shows and draws the current
     // pattern's events of `target` (the lane box lists the pattern's event lanes after the note properties).
@@ -118,6 +138,10 @@ public:
     // default): a selection of 2 to 10 different keys shows its chord name over the grid's top-left corner. The main
     // window saves both with the UI options.
     static inline bool gridHighlights = true, showChordName = false;
+    // View › Scale highlighting › "Black notes" / "Default" (FL 2026, round 190mq, issue #212): with no scale chosen, the
+    // rows of the black keys are shaded (FL's Black notes, LYNX's "No scale": on) or none is (FL's Default: off). A
+    // chosen scale (or Automatic) shades by the scale instead, whatever this says. Saved with the UI options.
+    static inline bool blackKeyRows = true;
     // View › Keyboard style (round 190j, discussion #136; LYNX's own): flat = FL's keyboard (the default), piano = a
     // traditional keyboard with a line between every two white keys (core/PianoKeys.h). Saved with the UI options.
     static inline pianokeys::Style keyStyle = pianokeys::Style::flat;
@@ -126,6 +150,9 @@ public:
     // FL's General › "Monophonic painting in piano roll" (round 189o, off): on, the Paint tool paints monophonically
     // without Shift (noteedit::monophonicPaint). Saved with the UI options.
     static inline bool monophonicPainting = false;
+    // Issue #183: "Preview notes while playing" (the Piano roll's menu; LYNX's, off: FL keeps the notes you place silent
+    // while the song or pattern plays). Saved with the UI settings (prPreviewPlaying).
+    static inline bool previewWhilePlaying = false;
     // the keys of the selection, on every change (the toolbar's chord panel)
     static inline std::function<void (const std::vector<int>&)> onSelectedKeys;
     // View › Background waveform (Alt+N): an audio file dropped on the Piano roll is drawn behind the notes from the
@@ -146,6 +173,17 @@ public:
     std::function<void()> onBrowseScores;
     // "Note names on every key" was switched in the menu (the main window saves its settings)
     std::function<void()> onNoteNamesChanged;
+    // round 190im (R13): set by the Clip View while this editor is docked for a clip of the grid: the clip's pattern
+    // position while it is launched (−1: not playing); the playhead shows it
+    std::function<double()> launchedPlayhead;
+
+private:
+    // round 190im (R15): what the frame step saw of the view (a change it did not make = a scroll by hand), and the
+    // song's publish count at the last mouse press (a gesture that changed it = an edit)
+    double followSeenScroll = 0.0, followSeenZoom = 0.0;
+    std::uint64_t followEditStamp = 0;
+
+public:
     // The play button: click plays / pauses the pattern, right-click stops back at the last start (the main window's transport)
     std::function<void()> onPlayPause, onPlayRightClick;
     // The time selection (Ctrl+drag on the ruler; -1 = none) that Insert / Delete space and Trim use.
@@ -157,8 +195,15 @@ public:
     // nothing is selected: `selected` false), and its result becomes the selection.
     std::vector<int> midiToolNotes (bool& selected) const { selected = ! selection.empty(); return selectionOrAll(); }
     void selectMidiToolResult (std::vector<int> indices) { setSelection (std::move (indices)); }
+    // round 190mc: notes another panel of this editor just added (the Chord helper's insert) become the selection; the
+    // note count it made is this editor's own, not an outside change that drops the selection
+    void selectOwnNewNotes (std::vector<int> indices);
     std::int64_t midiToolGrid() const { return gridTicks(); }
     void openMidiTools(); // Tools › MIDI Tools: the panel in its own small window
+    // Tools › Chord helper (round 190mc, discussion #105): modal interchange from the selected chord, in its own small
+    // window in the shown layout's look; it follows this editor's selection while it is open
+    void openChordHelper();
+    ChordHelperPanel* chordHelperForTests() const noexcept;
     std::int64_t markerKeyTickForTests() const { return markerKeyTick(); }
     juce::String chordBubbleTextForTests() const { return chordBubble.isVisible() ? chordBubble.getText() : juce::String(); }
 
@@ -169,7 +214,42 @@ public:
 
     // For snapshots: the tool in use and the Note inspector of the selection.
     void setToolForSnapshot (EditTool tool) { tools.setTool (tool); }
+    const ToolStrip& toolsForSnapshot() const noexcept { return tools; } // (round 190mp)
+    juce::PopupMenu selectMenuForSnapshot() { return selectMenu(); }     // (round 190mp, DE-71)
+    void setSelectionForSnapshot (const std::vector<int>& s) { setSelection (s); }
+    struct NoteOnScreen
+    {
+        int index = -1;
+        juce::Rectangle<int> bounds;
+    };
+    NoteOnScreen firstVisibleNoteForSnapshot (int skip = -1, juce::Point<int> near = {}) const; // (round 190mp: a note of the
+                                                                                                 // channel wholly on the grid; with `skip`, the one nearest `near`)
+    // --details190imshot (round 190im): one display-rate frame step, and where the playhead is (−1: none)
+    void frameStepForSnapshot() { playheadFrame (0.0); }
+    double playheadForSnapshot() const noexcept { return playheadTick; }
+    EditTool currentTool() const noexcept { return tools.getTool(); } // (round 190iu: temporary tools)
     void setScaleForSnapshot (int root, int scale) { setScale (root, scale); }
+    // round 190jv: View › Scale highlighting › Automatic on / off, and the key it guessed (scaledetect; -1 none)
+    void setAutoScale (bool on) { scaleBox.setSelectedId (on ? autoScaleId : 1, juce::sendNotificationSync); }
+    bool isAutoScaleForTests() const { return isAutoScale(); }
+    int autoScaleKeyForTests() { updateAutoKey(); return isAutoScale() ? autoKey : -1; }
+    juce::PopupMenu getViewMenuForSnapshot() { return viewMenu(); }
+    juce::PopupMenu getScaleHighlightMenuForSnapshot() { return scaleHighlightMenu(); }
+    // issue #203 (round 190ll): the toolbar's scale choice as shown — the FL layout's box and the menu its click opens;
+    // docked, the root and scale boxes (their texts and item counts)
+    bool scaleBoxesSplitForTests() const { return splitScaleBoxes(); }
+    juce::String scaleTextForTests() const { return scaleBox.getText(); }
+    juce::String scaleRootTextForTests() const { return scaleRootBox.getText(); }
+    juce::String scaleNameTextForTests() const { return scaleNameBox.getText(); }
+    int scaleNameItemsForTests() const { return scaleNameBox.getNumItems(); }
+    void pickScaleRootForTests (int root) { scaleRootBox.setSelectedId (root + 1, juce::sendNotificationSync); }
+    void pickScaleNameForTests (int itemIndex) { scaleNameBox.setSelectedItemIndex (itemIndex, juce::sendNotificationSync); }
+    int scaleRootForTests() const { return scaleRoot(); }
+    int scaleIndexForTests() const { return scaleIndex(); }
+    juce::Rectangle<int> scaleBoundsForSnapshot() const
+    {
+        return splitScaleBoxes() ? scaleRootBox.getBounds().getUnion (scaleNameBox.getBounds()) : scaleBox.getBounds();
+    }
     // The scale the rows show (LYNX's scale list index, 0 = none) on `root` (round 190ds: the Simple dock's "Only notes
     // in key" sets the project key here before folding)
     void setScale (int root, int scale) { scaleBox.setSelectedId (scale <= 0 ? 1 : scale * 100 + root + 1, juce::sendNotificationSync); }
@@ -184,9 +264,26 @@ public:
     void squeezeToolbarForSnapshot (int pixels); // the toolbar as in a window `pixels` narrower (negative: back)
     // zooms in (taller rows, wider steps) and hovers the right edge of the first note; returns its hint
     ui::Hint hoverForSnapshot();
+    // round 190mf (DL-80): docked in Live's look, the first note's velocity marker hovered (or dragged); its value
+    int liveVelocityHoverForSnapshot (bool dragging);
     // the lane box's note properties (ids; pattern event lanes follow from eventLaneIdBase)
     static constexpr int laneVelocity = 1, lanePan = 2, laneFinePitch = 3, laneRelease = 4, laneModX = 5, laneModY = 6, laneChance = 7,
-                         laneVelocityRange = 8, laneLast = 8;
+                         laneVelocityRange = 8,
+                         // MPE stage 2 (issue #108, core/NoteCurves.h): the notes' own pitch bend / slide / pressure curves
+                         laneMpePitch = 9, laneMpeSlide = 10, laneMpePressure = 11, laneLast = 11;
+    static constexpr bool isMpeLane (int id) noexcept { return id >= laneMpePitch && id <= laneMpePressure; }
+    // The Clip-launch layout's MPE tab (Live 11+'s note expression editor, round 190hy): the bottom lane becomes the three
+    // expression lanes stacked (pitch bend, slide, pressure) and the notes show their pitch curves
+    void setMpeView (bool on);
+    bool isMpeView() const noexcept { return mpeStacked; }
+    // (tests / snapshots: the lane rectangles shown and the edit target at x)
+    std::vector<std::pair<juce::Rectangle<int>, int>> mpeLaneAreasForTests() const { return mpeLaneAreas(); }
+    // round 190jd (Live 12.4's MPE tab): the lanes its "Show Lane:" menu shows (core/MpeTab.h; a session preference)
+    static inline mpetab::LaneSet mpeShownLanes = mpetab::defaultLanes;
+    void setMpeLanesForSnapshot (mpetab::LaneSet lanes);
+    juce::PopupMenu getMpeLaneMenuForSnapshot() { return mpeLaneMenu(); }
+    // hovers the line of lane `laneId` at `tick` as the mouse would (the value ghost point); returns its text ("" = none)
+    juce::String hoverMpeLineForSnapshot (int laneId, double tick);
     // the bottom lane's property (laneVelocity … laneVelocityRange; round 187c)
     void setLaneForSnapshot (int id) { laneBox.setSelectedId (id, juce::sendNotificationSync); }
     // The divider between the note grid and the event editor (round 190fz, FL's TQuickSplitter; core/EventPaneSplit.h):
@@ -199,8 +296,21 @@ public:
     void toggleEventPaneAlternate();
     void resetEventPane();
     int eventPaneBarTopForTests() const noexcept { return eventPaneBarTop; }
+    // --undogesture190jv (round 190jv): the middle of the row of `key` at `tick`, in this component's coordinates
+    // round 190mq (issues #211, #212, #213): the view and the time selection, for --issueshot190mq
+    void setViewForTests (double firstTick, int rowPixels, int centreKey)
+    {
+        scrollTicks = firstTick;
+        setRowHeightAround (rowPixels, centreKey, gridArea().getCentreY());
+        repaint();
+    }
+    std::pair<std::int64_t, std::int64_t> timeSelectionForTests() const { return { timeFrom, timeTo }; }
+    void setTimeSelectionForTests (std::int64_t from, std::int64_t to) { setTimeSelection (from, to); }
+    int rulerYForTests() const { return rulerTop + timelineHeight / 2; }
+    juce::Point<int> pointForTests (std::int64_t tick, int key) const { return { (int) tickToX ((double) tick), (keyToY (key) + keyToY (key - 1)) / 2 }; }
 
     static constexpr int keyboardWidth = 72;
+    static constexpr int blackKeyWidth = keyboardWidth * 16 / 25; // FL's black keys: 64 % of the keyboard (round 190jo FM-17; was 3 / 5)
     static constexpr int toolbarHeight = 32; // the panel title row (Workspace::titleHeight)
     static constexpr int overviewHeight = 16; // the overview strip under the toolbar (round 90)
     static constexpr int timelineHeight = 22;
@@ -216,6 +326,8 @@ public:
         if (fitKeysToNotes == docked)
             return;
         fitKeysToNotes = docked;
+        if (! docked)
+            mpeStacked = false; // (round 190hy: the MPE tab's stacked lanes are the dock's)
         velocityHeight = docked ? compactVelocityHeight : defaultVelocityHeight;
         if (docked)
             undockedRowHeight = rowHeight;
@@ -225,14 +337,33 @@ public:
         repaint();
     }
     bool fitKeysToNotes = false;
-    int undockedRowHeight = 14;
-    int rowHeight = 14; // vertical zoom (Ctrl+middle-drag, Ctrl+Alt+wheel): gesture::minKeyHeight..maxKeyHeight px per key
+    // Round 190jn (design190ia CL-20b): docked in the Clip View in the Clip-launch layout's Live look, the notes take the
+    // clip's colour as Live 12.4 draws them (colour × 0.86, a 1 px black edge) on Live's note-editor grey #464F53
+    // (ableton190o live-01-clipview-notes.png); transparent = LYNX's note colours. Only the dock sets it.
+    juce::Colour liveNoteColour { juce::Colours::transparentBlack };
+    bool liveNotes() const;
+    // Round 190hr (detail-055, miditools-098): docked in the Clip-launch detail view, the editor uses the reference's
+    // grid (core/LiveGrid.h: adaptive / fixed, narrower / wider, triplet, snap; its value at the toolbar's grid place)
+    // and its Quantize (Ctrl+U) / Quantize Settings (Ctrl+Shift+U), which the Clip View's MIDI Tools Quantize tool does
+    // (Live 12: Quantize Settings… opens that tool; the dock sets the two hooks). The FL layout keeps FL's snap box. UI
+    // state, not saved.
+    livegrid::Grid liveGrid;
+    std::function<void()> onLiveQuantize, onLiveQuantizeSettings;
+    bool liveGridOn() const noexcept { return fitKeysToNotes; }
+    juce::PopupMenu liveGridMenu();
+    std::int64_t gridStepForCheck() const { return gridTicks(); }
+    juce::String liveGridTextForCheck() const { return liveGridButton.getButtonText(); }
+    // round 190jo (design190ia FM-15): FL's 18 px rows by default (was 14), notes 17 px with a 1 px row line under them
+    int undockedRowHeight = 18;
+    int rowHeight = 18; // vertical zoom (Ctrl+middle-drag, Ctrl+Alt+wheel): gesture::minKeyHeight..maxKeyHeight px per key
     static constexpr int scrollBarSize = 12;
 
 private:
     enum class Drag { none, move, resize, resizeLeft, erase, keyboard, select, velocity, velocityLine, velocitySet, paint, muting, knife,
                       zoomRange, listen, pan, keyZoom, timeZoom, keySelect, rulerSelect, seek, drumPaint, stretch, eventDraw, eventErase,
-                      eventPaneBar, eventPaneAlternate }; // (round 190fz: dragging the divider; a right-click on it, swapped on release)
+                      eventPaneBar, eventPaneAlternate, // (round 190fz: dragging the divider; a right-click on it, swapped on release)
+                      mpePoint, mpeDraw, mpeErase, // (round 190hy: a curve point moved, drawn, erased in an MPE lane)
+                      mpeBend, mpeValue }; // (round 190jd: a pitch point on a note dragged; a Velocity / Release Velocity lane set)
 
     // Channel selector: the wheel steps through the channels with notes (Ctrl+wheel: all channels).
     class ChannelBox final : public juce::ComboBox
@@ -276,6 +407,13 @@ private:
     std::int64_t snap (double tick, bool enabled) const;
     std::int64_t viewLengthTicks() const;
     std::int64_t newNoteLength() const;
+    // round 190jo (FM-15): a note's box, FL's anatomy: the whole row but the 1 px line under it, from its start to 1 px
+    // before its end (at least 4 px wide)
+    juce::Rectangle<float> noteRect (std::int64_t start, std::int64_t length, int key) const
+    {
+        return { (float) tickToX ((double) start), (float) keyToY (key), juce::jmax (4.0f, (float) (length * pixelsPerTick) - 1.0f),
+                 (float) juce::jmax (2, rowHeight - 1) };
+    }
     int noteAt (int x, int y, bool& onRightEdge) const;
     int noteAt (int x, int y, bool& onRightEdge, bool& onLeftEdge) const;
     int ghostAt (int x, int y) const;      // index of a ghost note (another channel) under the point
@@ -291,8 +429,11 @@ private:
     void paintNoteAt (std::int64_t start, int key, bool monophonic);
     void runOperation (const std::function<std::vector<int> (Pattern&, const std::vector<int>&)>& op);
     void showMoreMenu();
+    juce::PopupMenu moreMenu(); // (the menu showMoreMenu shows)
     void updateScrollBars();
     void previewOn (int key, float velocity);
+    // previewOn for a note the mouse placed, dragged or edited: silent while playing unless previewWhilePlaying (#183)
+    void previewEdit (int key, float velocity);
     float keyVelocityAt (int x, int key) const; // velocity of a click on the keyboard at x
     void previewOff();
     void visibilityChanged() override;
@@ -320,6 +461,7 @@ private:
     std::vector<Note> visibleGhostNotes() const; // round 177d: the ghost notes on show, as notes (song pattern ticks)
     void copyGhostNotes();
     void paste();
+    std::int64_t pasteOffset() const; // issue #211: how far Ctrl+V moves the clipboard (core/PastePlace.h)
     void duplicateSelection();
     void nudge (std::int64_t ticks, int keys);
 
@@ -336,6 +478,7 @@ private:
     int titleInsetLeft = 0, titleInsetRight = 0; // the window's title and buttons share the toolbar row
     ChannelBox channelBox;
     SnapBox snapBox { true };         // "Main" (the toolbar snap) or this editor's own grid
+    juce::TextButton liveGridButton;  // round 190hr: docked, the reference's grid value ("1/16 ▾") and its menu
     IconButton ghostButton { "ghosts", Icon::ghost };
     IconButton scaleSnapButton { "scaleSnap", Icon::scaleSnap }; // snap to the scale (next to the scale box)
     IconButton moreButton { "more", Icon::more }; // note operations, left-edge resize, MIDI import/export
@@ -345,7 +488,29 @@ private:
     juce::ComboBox laneBox; // what the bottom lane edits: velocity, pan or fine pitch
     IconComboBox chordBox { Icon::chord }; // chord created on each click (like FL's "stamp")
     IconButton slideButton { "slide", Icon::slide }; // new notes slide (like FL's slide tool)
-    IconComboBox scaleBox { Icon::keyboard }; // scale highlighted on the keyboard rows
+    // scale highlighted on the keyboard rows. Issue #203 (round 190ll): its list held every scale on each of the 12
+    // roots (C Major, C# Major, ... B Locrian). In the FL layout a click opens FL's View › Scale highlighting menu
+    // instead (its "Root note" and "Scale" sections: one root, one scale); docked in the Clip-launch and Simple layouts
+    // the root and the scale are two boxes side by side, as Live's Clip View "Scale" (root | scale name) and BandLab's
+    // Smart View (key | scale). This box stays the one place the choice lives (its ids, the saved data, the tests).
+    class ScaleBox final : public IconComboBox
+    {
+    public:
+        using IconComboBox::IconComboBox;
+        std::function<void()> onPopup;
+        void showPopup() override
+        {
+            if (onPopup)
+                onPopup();
+            else
+                IconComboBox::showPopup();
+        }
+    };
+    ScaleBox scaleBox { Icon::keyboard };
+    juce::ComboBox scaleRootBox, scaleNameBox; // (issue #203: docked in the Clip-launch / Simple layouts)
+    int splitRoot = 0;                         // the root box's choice while no scale is chosen
+    bool splitScaleBoxes() const noexcept { return fitKeysToNotes; }
+    void refreshScaleBoxes();
     // note colour groups (FL's 16 note colours; REA round 153): new notes get `noteColour`; the swatch opens a menu
     // that picks it, colours the selection and selects by colour
     class ColourSwatch final : public juce::Button
@@ -370,7 +535,18 @@ private:
     bool chordTopDown = false; // the chord stamp puts the clicked key on top (FL 2026's top-down mode)
     bool inScale (int key) const;
     int scaleRoot() const;  // 0..11
-    int scaleIndex() const; // index into notetools::scales(), 0 = none
+    int scaleIndex() const; // index into notetools::scales(), 0 = none (also Automatic)
+    // FL's View › Scale highlighting › Automatic (round 190jv, core/ScaleDetect.h): the scale box's item, the key guessed
+    // from the edited notes (scaledetect: 0..11 major, 12..23 minor, -1 none) and what it was guessed from
+    static constexpr int autoScaleId = 2; // (between "No scale" = 1 and the scales, s * 100 + root + 1)
+    bool isAutoScale() const { return scaleBox.getSelectedId() == autoScaleId; }
+    void updateAutoKey();
+    int autoKey = -1;
+    bool autoKeyValid = false, autoKeyAllChannels = false;
+    std::uint64_t autoKeyStamp = 0;
+    int autoKeyPattern = -1, autoKeyChannel = -1;
+    std::vector<int> autoKeySelection;
+    juce::PopupMenu scaleHighlightMenu(); // View › Scale highlighting
     int snapKey (int key) const; // the key itself, or the nearest in-scale key while scale snap is on
     scalesnap::Scale snapScale() const; // the chosen scale and the Snap to scale switch (core/ScaleSnap.h)
     void publishScale();
@@ -423,6 +599,15 @@ private:
     };
     Hover hover;
     juce::Point<int> lastMouse { -1, -1 };
+    // round 190mf (DL-80): the marker whose value Live's lane header shows (set while the lane paints)
+    struct LiveVelocityReadout
+    {
+        int note = -1;
+        float y = 0.0f;
+        int value = 0;
+    };
+    mutable LiveVelocityReadout liveVelocityReadout;
+    bool liveLaneHover = false;
     Hover hoverAt (juce::Point<int> p) const;
     gesture::Target targetAt (const Hover& h) const;
     void updateHover (juce::Point<int> p, juce::ModifierKeys mods);
@@ -436,6 +621,46 @@ private:
     void postDragHint (const juce::MouseEvent& e); // what the gesture in progress does (hint bar)
     juce::uint32 lastWheelEdit = 0;    // wheel edits within a burst are one undo step
     std::vector<Note> laneOriginals;   // right-drag line / Shift+drag: the pattern's notes when it started
+
+    // MPE lanes (round 190hy, issue #108; core/NoteCurves.h). Lane ids are laneMpePitch … laneMpePressure.
+    bool mpeStacked = false;           // the Clip-launch MPE tab: three lanes stacked
+    int mpeDragLane = 0, mpeDragNote = -1, mpeDragPoint = -1, lastMpeX = 0, lastMpeY = 0;
+    float mpeDragRange = 1200.0f;      // the pitch lane's half range (cents) when the drag started (kept while it lasts)
+    juce::uint32 mpeCreatedAt = 0;     // a click that drew a point: the double click that follows does not delete it
+    std::vector<std::pair<juce::Rectangle<int>, int>> mpeLaneAreas() const; // (area, lane id) shown now; none = not an MPE lane
+    int mpeLaneAt (juce::Point<int> p, juce::Rectangle<int>* area = nullptr) const;
+    float mpePitchRange() const;       // half range of the pitch lane: ±12, ±24 or ±48 semitones, as the curves need
+    float mpeNorm (int lane, float value, float range) const noexcept;  // a curve value -> 0..1 of the lane's height
+    float mpeValue (int lane, float norm, float range) const noexcept;  // and back
+    static float mpeBase (int lane, const Note& n) noexcept;           // the lane's value without a curve
+    int mpeNoteAt (int x) const;       // the note an MPE lane edits at x: a selected one first, else the latest started
+    int mpePointAt (int note, int lane, juce::Rectangle<int> area, juce::Point<int> p, float range) const;
+    void paintMpeLane (juce::Graphics& g, juce::Rectangle<int> area, int lane, float range);
+    void paintMpePitchOnNotes (juce::Graphics& g, juce::Rectangle<int> grid);
+    bool mpeMouseDown (const juce::MouseEvent& e);
+    bool mpeMouseDrag (const juce::MouseEvent& e);
+    bool mpeDoubleClick (const juce::MouseEvent& e);
+    void editNoteCurves (int note, const std::function<void (Note&)>& edit);
+    // round 190jd, the MPE tab as Live 12.4's (core/MpeTab.h): pitch on the notes, Slide / Pressure / Velocity / Release
+    // Velocity lanes from the "Show Lane:" menu, click-on-the-line points, a value ghost point on hover
+    int mpeFocusLane = laneMpePressure; // the footer names the lane edited last (Live: "Pressure", then "Slide")
+    float mpeBendStart = 0.0f;          // the pitch point's cents when its drag started
+    int mpeBendY0 = 0;
+    juce::Point<float> mpeGhost { -1.0f, -1.0f }; // the value ghost point under the mouse (x < 0: none)
+    juce::String mpeGhostText;
+    static int mpeLaneIdOf (mpetab::Lane lane) noexcept;
+    juce::Rectangle<int> mpeFooterArea() const;   // under the stacked lanes: ▾ "Show Lane" + the focused lane's name
+    juce::Rectangle<int> mpeGhostBounds() const;
+    juce::PopupMenu mpeLaneMenu();
+    mpetab::HitResult mpeLaneHit (int note, int lane, juce::Rectangle<int> area, juce::Point<int> p, float range) const;
+    std::pair<int, int> mpePitchPointAt (juce::Point<int> p) const; // (note, point) of a selected note's pitch curve
+    bool mpePitchMouseDown (const juce::MouseEvent& e, int hit, bool onEdge);
+    bool mpePitchDoubleClick (const juce::MouseEvent& e);
+    void updateMpeGhost (juce::Point<int> p);
+    void paintMpeValueLane (juce::Graphics& g, juce::Rectangle<int> area, int lane);
+    void paintMpeTabFrame (juce::Graphics& g);    // the stacked lanes' left column (icon, scale) and the footer
+    static float mpeValueLaneValue (int lane, const Note& n) noexcept;
+    static void setMpeValueLaneValue (int lane, Note& n, float v) noexcept;
     float laneSetValue = 0.0f;
     // pattern event lanes in the lane box (ids eventLaneIdBase + k; REA round 146)
     static constexpr int eventLaneIdBase = 100;
@@ -448,6 +673,7 @@ private:
     void beginKeyZoom (const juce::MouseEvent&);
     // round 190j: the zoom wheel (FL's VZoomSelect) at the right end of the overview strip
     static constexpr int zoomWheelSize = 16;
+    magiclasso::Trail lassoPath; // FL's Magic lasso (round 190mp, DE-71): the mouse trail while the option is on
     bool zoomWheelHover = false; // (round 190he, issue #152 "no vertical zoom found": the box lights up under the mouse)
     juce::Rectangle<int> zoomWheelArea() const;
     int zoomAnchorKey() const; // the key whose centre stays put: the middle of the notes in view, else of the view
@@ -462,6 +688,12 @@ private:
     void glideFrame();
     ui::OnDemandVBlank vblank { *this, [this] { glideFrame(); return gliding; } }; // (attached only while gliding)
     ui::FrameTicker frames { *this, [this] (double ms) { return playheadFrame (ms); } };
+    // round 190ip: while playing, the GPU moves the playhead over the view (ui/MotionOverlay.h) instead of repainting its
+    // column every frame; stopped (or when the overlay cannot) it is painted as before
+    void paintPlayheadAt (juce::Graphics& g, float x);
+    ui::MotionOverlay gpuPlayhead { *this, [this] (juce::Graphics& g, float x) { paintPlayheadAt (g, x); } };
+    ui::MotionOverlay::Mark playheadMark() const;
+    juce::Rectangle<int> playheadColumn (double tick) const;
 
     double pixelsPerTick = 24.0 / ticksPerStep; // 24 px per step
     double scrollTicks = 0.0;
@@ -501,6 +733,23 @@ private:
     int lastDrumKey = -1;
     bool resizeFromLeft = true;       // the left edge of a note resizes it (Ctrl+Alt+Home turns it off)
     bool startedOnEmpty = false, erasedSomething = false, holdExpired = false;
+    // Round 190mr (DE-63; capture 190mr A1.2): FL's click-and-hold functions (F10 › General › Input › "Click-and-hold &
+    // special gesture functions", core/FlSettings.h clickHold, off as in FL). A press that stays still: from 390 ms a
+    // thin ring grows clockwise from 12 o'clock at the mouse, and at 750 ms — on a note: a clone one grid step later is
+    // what the mouse drags; on a note just added: slide, then every 750 ms porta, plain, slide…; at the resize cursor
+    // between two touching notes: they are glued (and selected). A one-shot timer per press; the ring repaints on the
+    // view's own timer only while a hold is pending.
+    enum class Hold { none, copy, cycle, glue };
+    Hold hold = Hold::none;
+    int holdSerial = 0, holdStep = 0, glueA = -1, glueB = -1;
+    juce::Point<int> holdDownAt, holdRingAt;
+    juce::uint32 holdSince = 0;
+    bool holdRing = false; // (the ring shows until the first action)
+    static constexpr int holdMs = 750, holdRingFromMs = 390;
+    void armHold (Hold kind, juce::Point<int> screenAt, bool ring = true);
+    bool holdReadsMouse = true; // (--details190mrshot: the hold fires without a real mouse)
+    void holdFired (int serial);
+    juce::Rectangle<int> holdRingArea() const { return juce::Rectangle<int> (20, 20).withCentre (holdRingAt); }
     juce::uint32 createdAt = 0;       // when the last click created a note (a double click there is not an edit)
     std::int64_t nextPaintTick = 0, paintLength = 0;
     bool muteTarget = false;
@@ -525,10 +774,12 @@ private:
 
     // round 168g
     std::int64_t timeFrom = -1, timeTo = -1;   // the time selection (ticks; -1 = none)
+    std::int64_t rulerMark = -1; // issue #211 (round 190mq): the last single click on the ruler, FL's paste anchor; -1 = none
     juce::Label chordBubble;                   // "Show chord name for selection"
     juce::uint32 chordBubbleUntil = 0;
     std::vector<int> chordBubbleSelection;     // the selection it was shown for
     std::vector<int> chordPanelSelection;      // the selection the toolbar's chord panel last heard of
+    juce::Component::SafePointer<juce::Component> chordHelper; // the open Chord helper (round 190mc)
     void updateChordBubble();
     void paintBackgroundWave (juce::Graphics& g, juce::Rectangle<int> grid);
     void spaceOperation (int kind);            // 0 insert, 1 slice & insert, 2 delete, 3 trim

@@ -22,6 +22,7 @@
 #include "engine/Vst2Format.h"
 #include "engine/Vst3NoteTuning.h"
 #include "engine/PluginSandbox.h"
+#include "engine/TimedParameters.h"
 #include "engine/FlStudio.h"
 #include "platform/CrashGuard.h"
 #include "core/Denormals.h"
@@ -153,6 +154,8 @@ public:
         const auto bpm = t.bpm.load (std::memory_order_relaxed);
         const auto rate = t.sampleRate.load (std::memory_order_relaxed);
         // (the block's own start: a generator's chunk is split at its notes, round 169c)
+        // (round 190ll: a fixed block that began before the song's start says so: a position just below 0, as a
+        // count-in's, so its blocks still follow each other)
         const auto quarters = t.tickAt (hostBlockOffset()) / (double) ppq;
         const auto beatsPerBar = juce::jmax (1, t.beatsPerBar.load (std::memory_order_relaxed));
         const auto beatUnit = meterUnit (t.beatUnit.load (std::memory_order_relaxed));
@@ -562,6 +565,7 @@ PluginInstrument::PluginInstrument (std::unique_ptr<juce::AudioPluginInstance> i
       blockSize (maxBlockSize),
       name (plugin->getName().toStdString())
 {
+    timedOk = TimedParameterQueue::supports (*plugin);
     buffer.setSize (bufferChannels (*plugin), blockSize);
     midi.ensureSize (32768); // 8 KiB normal queue, with room for all 16x128 recovery note-offs without allocation
     if (options.mpe)
@@ -658,6 +662,27 @@ void PluginInstrument::setRenderMode (bool offline)
         setPluginRenderMode (*plugin, offline, plugin->getBlockSize() > 0 ? plugin->getBlockSize() : blockSize);
 }
 
+bool PluginInstrument::changeRate (double rate)
+{
+    if (hasCrashed() || rate <= 0.0)
+        return false;
+    if (plugin->getSampleRate() == rate)
+        return true;
+    // (round 190jb: an export at another rate with the running instance; nothing processes it now)
+    const juce::ScopedLock lock (plugin->getCallbackLock());
+    const auto block = plugin->getBlockSize() > 0 ? plugin->getBlockSize() : blockSize;
+    if (const auto code = crashguard::run ([this, rate, block] {
+            plugin->releaseResources();
+            preparePlugin (*plugin, rate, block, false);
+        });
+        code != 0)
+    {
+        failed (code);
+        return false;
+    }
+    return plugin->getSampleRate() == rate;
+}
+
 void PluginInstrument::resetForExport()
 {
     // FL's "Reset plugin when FL Studio resets" (on by default): an export starts without what the plugin still holds
@@ -677,7 +702,49 @@ void PluginInstrument::collectMidiOutput (const juce::MidiBuffer& buffer) noexce
         const auto m = event.getMessage();
         if ((m.isNoteOn() || m.isNoteOff()) && midiOutCount < (int) midiOut.size())
             midiOut[(std::size_t) midiOutCount++] = { m.getNoteNumber(), m.isNoteOn() ? m.getFloatVelocity() : 0.0f };
+        // GitHub #198 (round 190ks): its own notes for a take; a note on of a key it was sent within 50 ms is the echo of
+        // that note (a "MIDI thru" plugin), and so is the note off of a key whose note on was not its own
+        if (recordOwn && (m.isNoteOn() || m.isNoteOff()))
+        {
+            const auto key = juce::jlimit (0, 127, m.getNoteNumber());
+            const auto window = (std::int64_t) (ownnotes::echoSeconds * juce::jmax (1.0, plugin->getSampleRate()));
+            const auto own = echoGuard.noteOut (key, m.isNoteOn(), samplesSeen, window);
+            if (own && ownNoteCount < (int) ownNotes.size())
+            {
+                auto& o = ownNotes[(std::size_t) ownNoteCount++];
+                o.sample = hardwareBlockAt + (hardwarePositions ? juce::jmax (0, event.samplePosition) : 0);
+                o.key = (std::uint8_t) key;
+                o.midiChannel = (std::uint8_t) juce::jlimit (0, 15, m.getChannel() - 1);
+                o.velocity = m.isNoteOn() ? m.getFloatVelocity() : 0.0f;
+            }
+        }
+        // round 190jl: the channel messages to the hardware outputs on the wrapper's output port
+        if (hardwareOut && event.numBytes >= 2 && event.numBytes <= 3 && event.data[0] >= 0x80 && event.data[0] < 0xF0
+            && hardwareMidiCount < (int) hardwareMidi.size())
+        {
+            auto& h = hardwareMidi[(std::size_t) hardwareMidiCount++];
+            h.sample = hardwareBlockAt + (hardwarePositions ? juce::jmax (0, event.samplePosition) : 0);
+            h.size = (std::uint8_t) event.numBytes;
+            h.source = 0;
+            h.bytes = { event.data[0], event.data[1], event.numBytes > 2 ? event.data[2] : (std::uint8_t) 0 };
+        }
     }
+}
+
+int PluginInstrument::takeHardwareMidi (HardwareMidi* out, int max) noexcept
+{
+    const auto count = juce::jmin (max, hardwareMidiCount);
+    std::copy (hardwareMidi.begin(), hardwareMidi.begin() + count, out);
+    hardwareMidiCount = 0;
+    return count;
+}
+
+int PluginInstrument::takeOwnNotes (OwnNote* out, int max) noexcept
+{
+    const auto count = juce::jmin (max, ownNoteCount);
+    std::copy (ownNotes.begin(), ownNotes.begin() + count, out);
+    ownNoteCount = 0;
+    return count;
 }
 
 int PluginInstrument::takeMidiOutput (MidiOutNote* out, int max) noexcept
@@ -935,6 +1002,8 @@ void PluginInstrument::rememberMidi (const juce::MidiBuffer& messages) noexcept
         const auto status = event.data[0] & 0xf0, channel = event.data[0] & 0x0f;
         if (status == 0x90 || status == 0x80)
             deliveredKeys.set (channel, event.data[1], status == 0x90 && event.data[2] != 0);
+        if (status == 0x90 && event.data[2] != 0) // (round 190ks: the echo guard of takeOwnNotes)
+            echoGuard.noteIn (event.data[1] & 0x7f, samplesSeen);
     }
 }
 
@@ -989,6 +1058,72 @@ void PluginInstrument::setParameter (int index, float value) noexcept
     if (crashed.load (std::memory_order_relaxed) || midiControls.set (index, value))
         return;
     audioParameter (*plugin, parameterChanges, crashed, name, index, value);
+}
+
+int PluginEffect::tailSamples() const noexcept
+{
+    if (! declaresTail || crashed.load (std::memory_order_relaxed))
+        return -1;
+    const auto seconds = plugin->getTailLengthSeconds();
+    if (! std::isfinite (seconds) || seconds < 0.0 || seconds > 3600.0)
+        return -1;
+    return (int) std::ceil (seconds * tailRate) + latencySamples();
+}
+
+// --- round 190jg: sample-accurate automation (engine/TimedParameters.h) ---------------------------------------------
+bool TimedParameterQueue::supports (const juce::AudioPluginInstance& plugin)
+{
+    // (a plugin in a separate process gets them with its block: engine/SandboxShared.h; not the 32-bit bridge, whose
+    // VST2 / VST3 hosts take a block's values at its start)
+    if (isBridged32 (plugin))
+        return false;
+    const auto format = plugin.getPluginDescription().pluginFormatName;
+    return format == "CLAP" || format == "VST3";
+}
+
+void TimedParameterQueue::add (int index, float value, int offset) noexcept
+{
+    const auto now = hostTimeline().chunk.load (std::memory_order_relaxed);
+    if (now != chunk)
+    {
+        chunk = now;
+        count = 0;
+    }
+    if (count < capacity && index >= 0 && offset >= 0)
+    {
+        indices[(std::size_t) count] = index;
+        offsets[(std::size_t) count] = offset;
+        values[(std::size_t) count] = value;
+        ++count;
+    }
+}
+
+TimedParameterQueue::Scope::Scope (TimedParameterQueue& q, int from, int length) noexcept
+    : previousCount (juce::lynxTimedParamCount), previousIndices (juce::lynxTimedParamIndices),
+      previousOffsets (juce::lynxTimedParamOffsets), previousValues (juce::lynxTimedParamValues)
+{
+    auto n = 0;
+    if (q.count > 0 && q.chunk == hostTimeline().chunk.load (std::memory_order_relaxed))
+        for (int i = 0; i < q.count; ++i)
+            if (const auto at = q.offsets[(std::size_t) i] - from; at >= 0 && at < length)
+            {
+                q.blockIndices[(std::size_t) n] = q.indices[(std::size_t) i];
+                q.blockOffsets[(std::size_t) n] = at;
+                q.blockValues[(std::size_t) n] = q.values[(std::size_t) i];
+                ++n;
+            }
+    juce::lynxTimedParamCount = n;
+    juce::lynxTimedParamIndices = q.blockIndices.data();
+    juce::lynxTimedParamOffsets = q.blockOffsets.data();
+    juce::lynxTimedParamValues = q.blockValues.data();
+}
+
+TimedParameterQueue::Scope::~Scope()
+{
+    juce::lynxTimedParamCount = previousCount;
+    juce::lynxTimedParamIndices = previousIndices;
+    juce::lynxTimedParamOffsets = previousOffsets;
+    juce::lynxTimedParamValues = previousValues;
 }
 
 void PluginInstrument::render (float* left, float* right, int n, float gl, float gr) noexcept
@@ -1058,7 +1193,11 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
         midi.clear();
         recoveryMidi = false;
 
-        auto process = [this] (float* const* ch, int count) {
+        // round 190ll (issue #199): each fixed block's play head is where that block began (it may have begun in an
+        // earlier stretch or chunk), not the stretch it completes in: the blocks follow each other by exactly their length
+        int stretchAt = 0;
+        auto process = [this, &stretchAt] (float* const* ch, int count, int end) {
+            setHostBlockOffset (stretchAt + end - count);
             juce::AudioBuffer<float> view (buffer.getArrayOfWritePointers(), buffer.getNumChannels(), count);
             view.clear();
             if (! crashed.load (std::memory_order_relaxed))
@@ -1087,9 +1226,13 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
         {
             const auto count = juce::jmin (blockSize, n - done);
             setHostBlockOffset (chunkOffset + done);
+            stretchAt = chunkOffset + done;
+            hardwareBlockAt = chunkOffset + done; // (round 190jl)
+            hardwarePositions = false;
             fixed->run (io.data(), count, false, process);
             mixOutputs (io.data(), juce::jmin (channels, (int) io.size()), done, count, gl, gr, left, right);
             done += count;
+            samplesSeen += count; // (round 190ks)
         }
         return;
     }
@@ -1101,7 +1244,10 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
         view.clear();
         bendBlock (midi, 0, count);
         setHostBlockOffset (chunkOffset + done);
+        hardwareBlockAt = chunkOffset + done; // (round 190jl)
+        hardwarePositions = true;
         rememberMidi (midi);
+        const TimedParameterQueue::Scope timedChanges (timed, chunkOffset + done, count); // (round 190jg)
         if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }, crashed, name); code != 0)
         {
             midi.clear();
@@ -1114,6 +1260,7 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
 
         mixOutputs (view.getArrayOfReadPointers(), view.getNumChannels(), done, count, gl, gr, left, right);
         done += count;
+        samplesSeen += count; // (round 190ks)
     }
 }
 
@@ -1210,6 +1357,9 @@ PluginEffect::PluginEffect (std::unique_ptr<juce::AudioPluginInstance> instance,
       blockSize (maxBlockSize),
       name (plugin->getName().toStdString())
 {
+    timedOk = TimedParameterQueue::supports (*plugin);
+    declaresTail = clapDeclaresTail (*plugin);
+    tailRate = plugin->getSampleRate() > 0.0 ? plugin->getSampleRate() : 44100.0;
     buffer.setSize (bufferChannels (*plugin), blockSize);
     midi.ensureSize (2048); // MIDI CC "parameters" (core/MidiControls.h)
     sideBus = hasSideBus (*plugin);
@@ -1235,6 +1385,31 @@ void PluginEffect::setRenderMode (bool offline)
 {
     if (! hasCrashed())
         setPluginRenderMode (*plugin, offline, plugin->getBlockSize() > 0 ? plugin->getBlockSize() : blockSize);
+}
+
+bool PluginEffect::changeRate (double rate)
+{
+    if (hasCrashed() || rate <= 0.0)
+        return false;
+    if (plugin->getSampleRate() == rate)
+        return true;
+    // (round 190jb: an export at another rate with the running instance; nothing processes it now)
+    const std::lock_guard<std::mutex> layout (layoutLock);
+    const juce::ScopedLock lock (plugin->getCallbackLock());
+    const auto block = plugin->getBlockSize() > 0 ? plugin->getBlockSize() : blockSize;
+    const auto side = sideChannel >= 0;
+    if (const auto code = crashguard::run ([this, rate, block, side] {
+            plugin->releaseResources();
+            preparePlugin (*plugin, rate, block, side);
+        });
+        code != 0)
+    {
+        failed (code);
+        return false;
+    }
+    buffer.setSize (bufferChannels (*plugin), blockSize);
+    findSideChannel();
+    return plugin->getSampleRate() == rate;
 }
 
 void PluginEffect::resetForExport()
@@ -1891,9 +2066,13 @@ void PluginEffect::process (float* left, float* right, int n, const EffectParams
             }
         }
         // routed: output pair 1 / 2 come back on channels 0-1 / 2-3 (pairs past the second are not carried here)
-        fixed->run (io, n, true, [this, isRouted] (float* const* ch, int count) {
+        // round 190ll (issue #199): each fixed block's play head is where the block began (see PluginInstrument::render)
+        const auto runAt = hostBlockOffset();
+        const juce::ScopeGuard offsetBack { [runAt] { setHostBlockOffset (runAt); } };
+        fixed->run (io, n, true, [this, isRouted, runAt] (float* const* ch, int count, int end) {
             if (crashed.load (std::memory_order_relaxed))
                 return; // (crashed in an earlier block of this call: the input passes through)
+            setHostBlockOffset (runAt + end - count);
             juce::AudioBuffer<float> view (buffer.getArrayOfWritePointers(), buffer.getNumChannels(), count);
             view.clear();
             view.copyFrom (0, 0, ch[0], count);
@@ -1961,6 +2140,7 @@ void PluginEffect::process (float* left, float* right, int n, const EffectParams
             view.copyFrom (1, 0, inR + done, count);
         }
         feedSide (view, done, count);
+        const TimedParameterQueue::Scope timedChanges (timed, done, count); // (round 190jg)
         if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }, crashed, name); code != 0)
         {
             midi.clear();
@@ -3831,8 +4011,12 @@ std::unique_ptr<juce::AudioPluginInstance> PluginHost::createInstance (const Plu
     // a 32-bit plugin always runs in the 32-bit bridge (round 176a; FL bridges them the same way, whatever "Make bridged" says)
     if (bits32 || pluginSandboxEnabled() || ref.separateProcess || pluginAlwaysSeparate (description->name))
     {
-        // separate process (for every plugin, or this one only — FL's "Make bridged"): the child prepares the plugin and applies the state
-        if (auto remote = createSandboxedPlugin (*description, sampleRate, preparedBlock, ref.state, message))
+        // separate process (for every plugin, or this one only — FL's "Make bridged"): the child prepares the plugin and applies the state.
+        // Round 190jg: with the option's per-vendor / all-together modes the plugin joins its group's process; one the user
+        // separated by itself ("Make bridged", "Always run in a separate process") keeps a process of its own.
+        const auto own = ref.separateProcess || pluginAlwaysSeparate (description->name);
+        const auto group = own ? juce::String() : sandboxGroupFor (*description, pluginSandboxMode());
+        if (auto remote = createSandboxedPlugin (*description, sampleRate, preparedBlock, ref.state, message, group))
             return remote;
         if (error != nullptr)
             *error = juce::String::fromUTF8 (ref.name.c_str()) + ": " + message;
@@ -4053,6 +4237,15 @@ std::shared_ptr<Effect> PluginHost::makeEffect (const PluginRef& ref, double sam
     if (error != nullptr)
         *error = why;
     return nullptr;
+}
+
+// Round 190kx (engine/AraHost.cpp): what an ARA playback renderer needs of the hosted plugins' machinery
+juce::AudioPlayHead& songPlayHead() { return timelinePlayHead (false); }
+
+std::uint32_t processGuarded (juce::AudioPluginInstance& plugin, juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi,
+                              std::atomic<bool>& crashed, const std::string& name) noexcept
+{
+    return runBlock (BlockCall { &plugin, &buffer, &midi }, crashed, name);
 }
 
 std::string capturePluginState (juce::AudioPluginInstance& plugin)

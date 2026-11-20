@@ -11,7 +11,11 @@ configuration or design?" Round 114 scored only the layout. This audit checks **
 
 Sources: each original's official trial installed on this PC, hosted black-box in our own host (parameter lists read
 through the public VST3 API — every control, range and option text — plus screenshots of each view as a user sees
-it), the official manuals, and `docs/specs/*.md`. Nothing was decompiled; no graphics, presets or names were copied.
+it), the official manuals, and `docs/specs/*.md`. Round 128 decompiled nothing; no graphics, presets or names were copied.
+Since 2026-11, by the project owner's decision, some sound work (the FabFilter roles from round 190kw on) was also
+informed by clean-room static analysis of the third-party binaries — laws and structure in our own words, evidence in
+`docs/analise/REA_*.md`; no third-party code, tables, presets or content is copied and licence protections are never
+bypassed. Those rounds' sections say so.
 Reference screenshots stay outside git (`D:\lynx-work\parity128\ref`); the side-by-side pages are on the Desktop
 (`LYNX-paridade`).
 
@@ -52,10 +56,10 @@ there.
 | LYNX Tune | Auto-Tune Pro | 8 | 7 | 6 (ref expired) | 8 | 135 | 165j: sound only (highs kept, measured; scores unchanged) |
 | Ridge Strip (Vocal strip) | SSL Native Vocalstrip 2 | 9 | 7 | 8 (ref expired) | 8 | 145 |  |
 | Ridge Strip (Modern) | SSL Native Channel Strip 2 | 9 | 8 | 7 | 8 | tp172c | sound 3 → 7 (fxparity 2.6 → 7.1, 30 renders); look: the console's colour-coded caps on grey metal, three columns |
-| Ridge Strip (4K) | SSL 4K E | 9 | 8 | 6 | 8 | 148 | tp172c4: the 4K compressor blends its measured ratio nodes in log slope (10:1 acted like ~100:1; S4 6 dB too deep): fxparity 5.4 → 6.0 |
+| Ridge Strip (4K) | SSL 4K E | 9 | 8 | 6 | 8 | 148 | tp172c4: the 4K compressor blends its measured ratio nodes in log slope (10:1 acted like ~100:1; S4 6 dB too deep): fxparity 5.4 → 6.0; 190lb: its Black / Orange high-pass is 18 dB/oct (K4E_ir): 24 changed files 4.67 → 6.25, none down |
 | Ridge Strip (4K) | SSL 4K B | 8 | 8 | 5 | 8 | tp172c | tp172c4: its stepped compressor (out / 2 / 4 / 10 : 1 / ds, stepped releases) read as the 4K's near-limiting curve with the measured knee offsets, its threshold-only auto make-up, its gentler mic pre: fxparity 3.5 → 5.2 |
-| Ridge Strip (4K) | SSL 4K G | 8 | 8 | 5 | 8 | tp172c | tp172c4: its ±18 / ±20 / ±22 dB dials scaled onto the 4K's ±15 (same curves), its deeper slow compressor: fxparity 4.4 → 5.1; its Pink EQ type still plays as Black |
-| Ridge Strip | Harrison 32Classic Channel Strip | 7 | 6 | 4 | 8 | tp172c | tp172c5: its state translated (was Ridge's defaults): EQ shelves / bells / filters fitted on the trial's impulse grid (a mid out of Ridge's band range moves to a free neighbour), the compressor's static line (the dial - 2 dB RMS, the Limiter ~1.8 dB lower, under -40 dBFS through the input trim), its auto make-up law, gate / expander: fxparity 3.0 → 4.5 (EQ bank 2.8 → 5.4, dynamics 3.8 → 5.5, make-up 3.6 → 6.6); tp172c6: its saturator on Ridge's new DRIVE section (Saturate model, the dial's -24 .. +24 dB shifting the measured clip curve): 32C 4.5 → 5.2 (saturator bank 5.3); tp172c10: its compressor's 27.5 dB reduction cap as a hidden Ridge parameter set by the translation (the original has no control for it): dynamics bank 5.5 → 6.2; tp172c11: its attack dial as a real time constant (hidden Ridge parameter), release time constants from the stair decay (0.25 / 0.35 / 1.6 s at 50 / 104 / 351.5 ms, half in Limiter mode): dynamics bank 6.2 → 6.7, make-up bank 6.7 → 6.6, 32C 5.2 = 5.2 |
+| Ridge Strip (4K) | SSL 4K G | 8 | 8 | 5 | 8 | 190lb | tp172c4: its ±18 / ±20 / ±22 dB dials scaled onto the 4K's ±15 (same curves), its deeper slow compressor: fxparity 4.4 → 5.1; 190ho: its Pink EQ measured (Pink impulse renders 4.07 → 6.50; replaced by 190lb's in the 0.1.30 rollup, step 8), ÷3 / ×3 do nothing in its Black (kept); 190lb (black-box): its Pink EQ measured on its own (the default colour; proportional-Q bells, resonant shelves, no bell on LF / HF), both colours its 18 dB/oct high-pass, uncramped low-pass and 1.1108 ceiling: all 594 files 5.17 → 6.26 (249 up / 2 down, owner decision in BLACKBOX_rodada190lb §11) |
+| Ridge Strip | Harrison 32Classic Channel Strip | 7 | 6 | 4 | 8 | tp172c | tp172c5: its state translated (was Ridge's defaults): EQ shelves / bells / filters fitted on the trial's impulse grid (a mid out of Ridge's band range moves to a free neighbour), the compressor's static line (the dial - 2 dB RMS, the Limiter ~1.8 dB lower, under -40 dBFS through the input trim), its auto make-up law, gate / expander: fxparity 3.0 → 4.5 (EQ bank 2.8 → 5.4, dynamics 3.8 → 5.5, make-up 3.6 → 6.6); tp172c6: its saturator on Ridge's new DRIVE section (Saturate model, the dial's -24 .. +24 dB shifting the measured clip curve): 32C 4.5 → 5.2 (saturator bank 5.3); tp172c10: its compressor's 27.5 dB reduction cap as a hidden Ridge parameter set by the translation (the original has no control for it): dynamics bank 5.5 → 6.2; tp172c11: its attack dial as a real time constant (hidden Ridge parameter), release time constants from the stair decay (0.25 / 0.35 / 1.6 s at 50 / 104 / 351.5 ms, half in Limiter mode): dynamics bank 6.2 → 6.7, make-up bank 6.7 → 6.6, 32C 5.2 = 5.2; 190le: its EQ in Ridge's new **32C voicing** (the exact law of BLACKBOX_rodada190lb §4: first-order shelves, matched bells at the dial with Q(|gain|), matched 12 dB/oct filters to 3.15 kHz / 160 Hz; its own dials): EQ bank 5.36 → 9.99 (curve error 1.15 → 0.00 dB rms, filters 8.3 / 9.0 → 0.01 / 0.00 dB), all 302 files 5.88 → 8.54 (206 up, 0 down) |
 | Ridge Strip | Harrison MPC Channel Strip | 7 | 6 | 5 | 8 | tp172c | tp172c5: its 8 bands onto Ridge's 4 (shelves on LF / HF, the bells on the free slots), the 12 dB/oct filters on the 32C's laws, its compressor's measured line and knee: fxparity 4.6 → 5.5 (dynamics bank 3.8 → 6.6, EQ bank 1.9 → 3.2: band-pass / notch shapes, Q under 0.5 and ±19 dB gains are outside Ridge's bands; open for this release: no new Ridge bands or plugin) |
 | Kiln Channel (Console E / G / A / N / Y, Tube) | Slate VCC Channel | 7 | 7 | 7 | 8 | tp172c7 | tp172c7: its own plugin (was Ridge's DRIVE section): a compact dark single-channel console like the original (amber VU, console selector with the six models round it, Input / Output, Drive, Group, Noise reduction and Group bypass keys, main In / Out columns with meters), own art and emblem; the same measured drive stages; its noise floor per console (NR off: E / G -113.9, A -110.0, N -109.8, Y -101.6, Tube -101.9 dBFS RMS, uncorrelated L / R) and group bypass shared by the group's channels; state fully translated (console, drive, trims, NR, group, group bypass, main gains): fxparity 6.8 (drive bank 6.8, US A 6.3, group / NR sets 6.7 / 6.9) |
 | Fret Channel (guitar / bass channel strip) | SSL Guitarstrip | 8 | 7 | 6 | 8 | tp172c8 | tp172c8: its own plugin (was Ridge with its DRIVE section): input / output, phase correction (align to side chain / left / right, ±20 ms delay with ±1 / ±10 sample nudges, polarity, 1st / 2nd-order all-pass with its phase screen, correlation), the EQ (LF / MF / HF shelves and bell, high- and low-pass, pre / post), the compressor (five measured modes, threshold, mix, auto gain), the guitar amp (pre-amp, drive, Boost / Punch / Edge) and bass amp (drive, Punch / Shape) with mix, output mix, mono and side-chain listen; the panel in the original's layout, own drawing. State translated 1:1. fxparity 5.7 (bank 5.5 → 5.8 → 6.0, voicings at drive 2.8 → 3.2 → 3.9). tp172c9: part of each amp's tone runs ahead of its curve, as the original's drive sweeps show (guitar: a 4 kHz low-pass, so its highs compress less; bass: a +17 dB 1.27 kHz pre-emphasis shelf, so its highs compress more), nodes refitted on the de-embedded harmonics, bass voicings ahead of the amp, Boost / Punch laws measured at drive. Missing: the EQ's Auto listen key (not in the state) |
@@ -83,13 +87,13 @@ there.
 | Spiral Echo | ValhallaFreqEcho | 9 | 9 | 7 | 8 | 190fy | 190do: measured loop (fxparity 3.38 → 3.88); 190fy: the loop's read and all-pass refitted, revision 1 (fxparity 3.88 → 4.50, 7 up / 9 same / 0 down, tail 6.79 → 6.98; refcap0124 36 captures 3.69 → 3.75) |
 | Lattice Mod | ValhallaUberMod | 9 | 9 | 4 | 8 | 144 |  |
 | Quell Denoiser | NS1 (Waves) | 9 | 9 | 4 (ref expired) | 6 | 137 |  |
-| Hush De-esser | Pro-DS | 10 | 9 | 6 | 6 | tp172b | 8 → 9 → 10 / 8 → 8 → 9 (165w: pans, state levels; 165x: ranges, the 0 … 200 % link knob) |
+| Hush De-esser | Pro-DS | 10 | 9 | 6 | 6 | 190iq | 8 → 9 → 10 / 8 → 8 → 9 (165w: pans, state levels; 165x: ranges, the 0 … 200 % link knob); 190iq: the Allround law's measured timing (refcap030 bank 5.62 → 5.79, tp172b 6.55 → 6.70, programme 8.56 → 8.60, no file down) |
 | Foil Plate | ValhallaPlate | 9 | 10 | 4 | 8 | 135 | 183b: sound 3 → 4 (fxparity 3.13 → 3.73, verb 8.15 → 8.49; bank 3.03 → 3.64 / 8.13 → 8.48): EQ laws, Width keeps the level, the reference's tone |
 | Gemini Doubler | Doubler2 / Doubler4 (Waves) | 10 | 8 | 6 (ref expired) | 8 | 165w | 9 → 10 / 8 → 8 (defaults; 165w: shelf range −88 … +12 and law) |
 | Compressor (stand-in) | Renaissance Compressor (Waves) | 10 | 8 | 6 (ref expired) | 8 | 152 | 190fx: the FET references' maps and translators refitted on the pink stairs — FG-116 4.80 → 5.80, Modern 4.08 → 4.76, Vintage 5.00 → 5.56, all-buttons 4.28 → 4.48 — this pair unchanged |
 | LYNX Tune | Waves Tune Real-Time | 10 | 8 | 6 (ref expired) | 8 | 152b | 165j: sound only (measured; scores unchanged) |
 | Echoform | EchoBoy / PrimalTap | 10 | 8 | 6 | 6 | 150 |  |
-| Voice Shift | Little AlterBoy | 10 | 8 | 4 | 8 | trial187b | trial187b: dual mono like the original, the input itself at no shift, level laws: 2.8 → 3.1 |
+| Voice Shift | Little AlterBoy | 10 | 8 | 4 | 8 | 190ho | trial187b: dual mono like the original, the input itself at no shift, level laws: 2.8 → 3.1; 190ho: Measured law revision 1 (no low thump at sung onsets): trial187b 3.27 → 3.35, tp172d 3.17 → 3.17, prog182 3.80 → 3.80 |
 | Prism Multiband | Pro-MB | 10 | 10 | 8 | 6 | tp172b | tp172b: programme 5.9 → 7.6 (default state level fixed) |
 | LuxeVerb (Space engine) | Pro-R 2 | 7 | 7 | 8 | 8 | tp172b | new: Space engine page, verb score 7.4 → 8.9 (RT60 / EDC / early / stereo / modulation, measured) |
 
@@ -740,6 +744,8 @@ lookahead on, expert mode, display range, analyser options.
 **After round 150** (REA_rodada150): configuration **10**/10, design 9 → **10**/10 — the free layout with gaps (bands placed anywhere, as the reference), slopes 6 … 48 dB/oct with the reference's laws per processing mode, a side-chain input per band, the narrow free side-chain filter, and the **measured detector** (the range's 12 dB soft knee, the release after the curve: a range-limited band recovers at once; release trajectories within 0.1 – 0.7 dB of the trial where the old detector was 1 – 4 dB off; projects saved before keep the old one). Left: the slow attacks' tail (50 – 100 %: 0.5 – 1.3 dB rms), narrow even-order bands in Dynamic phase (0.3 dB at their edges), Linear phase on LYNX's prewarped axis (≤ 0.35 dB at high crossovers).
 
 **After round 152** (REA_rodada152 §1–2): configuration **10**/10, design **10**/10 (sound closer) — the attack in the gain stage (slow attacks 50 – 100 % now within 0.4 dB of the reference over the first 400 ms; round 150 was up to 3 dB off), Dynamic phase's own band shapes for narrow bands and cuts (edges moved out, gain moved — the measured table, ≤ 0.05 dB), the 0.8-octave minimum band width in every mode. Left: Linear phase on LYNX's prewarped axis (≤ 0.35 dB at a 3 kHz edge, 6 dB/oct), mixed 6 / n sides beyond the measured table.
+
+**After round 190lg** (REA_rodada190lg §7, static REA of the reference's `BandCompander`): configuration **10**/10, design **10**/10 (sound closer) — translated Pro-MB states run **revision 1** (hidden): the reference's own detector graph per band (gain computer with its 0.6 × knee + 12 dB soft range → peak hold → low pass timed by the look-ahead → two followers joined by a max), the inverted graph for upward compression / downward expansion, the look-ahead switch's lead (half a period of the band's centre + the band's own) and 20 ms latency. Band gain trajectories on the mix within 0.02 – 0.09 dB of the reference (were 0.5 – 1.8 dB); refcap030 8.17 → 9.32, refcap182 programme 7.64 → 9.16, tp172b 7.60 → 9.05, no file down. Projects saved before keep the measured detector. Left: the knob curve is LYNX's own smooth fit (within 13 % of the reference's release times on 15 … 100 %).
 
 ## Sentry Gate ← Pro-G
 
@@ -2341,7 +2347,13 @@ compressor role (no captured state) still load the stand-in at its defaults.
 | Sidechain from an effect | route arrow › "Sidechain to this track" (/ only), then the plugin's own input selector | the same route menu, plus a "SC: … ▾" picker in every side-input effect's window header, the plugin wrapper header, the mixer's selected-effect panel and the slot menu (makes FL's level-0 link) | LYNX extra |
 | Automation lanes under Playlist tracks | — (automation clips only) | Playlist ruler menu › "Automation lanes", off by default | LYNX extra (Ableton-style, optional) |
 | Modulators (LFO / random moving a knob around its value) | — | Tools › "Modulators…" and every control's "Modulate" submenu; no cost until the first one exists | LYNX extra |
-| Playlist tracks linked to mixer tracks (round 190gz, issue #170) | tracks and inserts apart; Track mode links one track at a time | Playlist › Edit, Track mode and Settings › Project › "Link Playlist tracks to mixer tracks", off by default (Settings also has the new-projects default). Each track with clips becomes FL's audio / instrument track of an insert (Track N with insert N when the sound stays the same; content already routed keeps its insert; mixed tracks stay unassigned), new content follows, insert N's recording lands on Track N; linked headers get M, S, volume and pan (152 px headers). The links are FL track modes, so .flp keeps them | LYNX extra (optional) |
+| Playlist tracks linked to mixer tracks (rounds 190gz, 190ib; issue #170) | tracks and inserts apart; Track mode links one track at a time | Playlist › Edit, Track mode and Settings › Project › "Link Playlist tracks to mixer tracks", off by default (Settings also has the new-projects default, read back at start since 190ib). Round 190ib's rule: Track N = insert N. Each instrument / sample lives on its home track (the first that plays it); everything a track's own instruments play goes through insert N (inserts moved by swaps, an insert with settings of its own sending into N, channels routed), listed in a confirmation before it is done, one undo step; the track is FL's audio / instrument track of insert N and shares its name and colour both ways. Tracks that only repeat another track's patterns stay unassigned and say whose insert they play through. New content follows; insert N's recording lands on Track N; linked headers get the insert's M, S, volume and pan (152 px headers). The links are FL track modes, so .flp keeps them | LYNX extra (optional) |
+| Insert effects on linked track headers (round 190ht, issue #154) | an insert's effects only in the Mixer's right panel (and the Device View in the Clip-launch layout) | Playlist › Edit and Settings › LYNX extras › "Show insert effects on linked tracks", off by default (a view option, not saved in the project): each linked header gets a REAPER-style list of its insert's effects in chain order (dot = bypass, click = window, drag = reorder, Ctrl+drag = copy, drag onto another linked track = move, right-click = the Mixer slot menu, "+ Add" = the slot's add menu, Browser effects drop between rows); headers 152 → 256 px; the edits are the Mixer's / Device View's own | LYNX extra (optional) |
+| Pattern Blocks: the other Playlist tools (round 190ht, issue #127 phase 2) | FL 10 (blocks removed in FL 12; FL 2026 keeps only the conversion strings) | Mute (click / sweep in any row, the first block decides, a muted block plays nothing and stays a muted clip when turned into clips, saved in .lynx), Select (box in any row, Shift adds; Pencil / Brush move the selection together, each block in its row), Slice (destructive: the pattern keeps the part before the cut, a new pattern after it gets the rest, its blocks follow every block of the pattern), Zoom (drag zooms, click goes back), Listen (play while held). Select / Slice / Zoom take either button, the others erase with the right one | FL 10-exact as reported (live FL 10 not available; see REA_rodada190ht.md) |
+| Piano roll: notes placed or dragged while playing (round 190ib, issue #183) | edited notes stay silent while the song / pattern plays (issue; FL's step clicks are silent either way, REA 165a) | the same by default; the Piano roll menu's "Preview notes while playing" sounds them (off, saved with the UI settings). The Piano roll keyboard always plays | FL default + LYNX option (FL's grab of an unselected note while playing: needs a live check, HANDOFF 190ib) |
+| Settings shortcut Ctrl+, / Cmd+, (round 190ib, issue #181) | F10 / F11 open Settings' MIDI / Project info pages | Ctrl+, (Cmd+, on macOS) opens Settings on the page shown last (General at first), again closes it; FL's F10 / F11 stay; remappable | LYNX extra |
+| Type-to-jump in menus and lists (round 190ib, issue #182) | menus: accelerator letters (round 170a) | typing selects the item / row starting with the typed letters (same letter again: the next; a prefix within a second) in every popup menu and dropdown (JUCE fix 37), the Browser (keys bound to an action keep it), the Plugin manager, Settings' folder lists, templates, SoundFont presets, arrangements; FL's accelerator letters still win | LYNX extra |
+| Insert effects on the Mixer strips (round 190io, issue #154 part 2) | Extra large layout: "a special feature showing the FX in use per track" (manual) | Mixer menu and Settings › LYNX extras › "Insert effects on the strips (LYNX)", off by default (ui-options mixerStripInserts): every Wide / Extra large strip lists its insert's effects under the header band with the track headers' list and edits (dot = bypass, click = window, drag = reorder or onto another strip, Ctrl = copy, right-click = slot menu, "+ Add", wheel scrolls) | LYNX extra (optional); FL's Extra large look not captured yet |
 
 ## Host workflow: LYNX extras over FL (round 177d)
 
@@ -2408,6 +2420,8 @@ read for Auto map / Reset. Details: `docs/analise/REA_rodada188d.md`.
 | Where | Edison › Tools › "Convert to score and dump to piano roll" (monophonic, into the selected channel's notes) | audio clip menu › "Convert Melody / Harmony / Drums to New MIDI Track" | Playlist audio clip menu › "Convert to MIDI" › Melody / Harmony / Drums "to new pattern", and the same submenu in the audio editor's Tools › Analysis (the selection, or the whole audio). FL's own item stays as it was |
 | Result | the notes replace the channel's notes in the current pattern | a new MIDI track under the clip with an instrument (Melody / Harmony: "… to MIDI" instrument racks; Drums: a 606 Drum Rack, kick C1, snare D1, hi-hat F#1) | a new pattern on new channels (melody / harmony: one Synth channel; drums: Kick, Snare and Hat channels, one step note per hit), on a new track right under the clip, aligned with it and as long; one undo step; the pattern is selected |
 | Analysis | FL's pitch detector | Live's own (not public) | melody and harmony: Spotify Basic Pitch (Apache-2.0, 230 KB model compiled in, run by the ONNX Runtime LYNX already ships), with settings chosen on round a2m189b's clips; drums: LYNX's own semi-adaptive NMF (kick / snare / hat templates); on a worker thread with a progress window and Cancel, nothing on the audio thread |
+| Convert to MIDI (polyphonic)... (round 190lj) | Edison's Convert to score (one note at a time, into the selected channel) | Convert Harmony / Melody to New MIDI Track (no options) | LYNX extra in the clip menu's LYNX extras column (every layout) and Edison's Tools › Analysis: a dialog with Basic Pitch's knobs (note / split sensitivity, shortest note, key range), one note at a time or chords, pitch bends into each note's pitch curve, quantize to the snap, a new Synth channel or one of the song's instruments; notes identical to Python Basic Pitch on its own posteriorgram; 2.2 s of CPU per minute of audio (was 7.9 s: polyphase resampler) |
+| Edit notes (polyphonic)... (round 190lk) | none (Newtone is monophonic; Melodyne's DNA as a plugin) | none | LYNX extra in the clip menu's LYNX extras column: PitchNet's polyphonic engine (AGPL-3.0, `third_party/pitchnet-poly`) finds the notes of chords (Basic Pitch's posteriorgram as the note filter's evidence); each note's pitch, time and level edited inside the chord, blobs in Newtone's look; unedited audio comes back sample for sample; analysis once on a worker (saved with the project), renders of the edited blocks only (masks on demand: a LYNX change), cached, nothing on the audio thread. Quality lab and Melodyne 5 comparison: `/mnt/e/lynx-work/polyedit190lk/STUDY.md` |
 
 Measured against ground truth (note F1, onset within 50 ms) on round a2m189b's clips (`/mnt/e/lynx-work/a2m189b/report.md`):
 LYNX matches or beats Live 12 on bass, synthetic voice, guitar, piano, drums; Live is better on a real sung vocal
@@ -2514,7 +2528,22 @@ FL Studio 2026 has no MPE switch (docs/analise/REA_rodada190bb-mpe.md §1); LYNX
 | MPE controller input (lower zone, member channels 2 … 16, bend range 48) | — | Settings › MIDI › device › "MPE controller" + member channel count | ✅ played per note; recorded as the note's fine pitch (bend at the note on), Mod X (CC 74), Mod Y (peak pressure) |
 | Per-note response of built-in instruments | — | Sampler (pitch, Mod X / Mod Y filter), built-in synth (pitch) | ✅ those two; ❌ the other generators |
 | MPE to hosted plugins | — (fine pitch as key / VST3 tuning, Mod X as poly aftertouch) | wrapper Settings › MIDI › "MPE": one member channel per note with bend / CC 74 / pressure; CLAP note expressions (tuning, brightness, pressure) for CLAP-note plugins | ✅ ; ❌ VST3 note expression events (MPE MIDI instead) |
-| Per-note expression curves in the piano roll | — | — | ❌ stage 2 |
+| Per-note expression curves in the piano roll | — | — | ✅ stage 2 (round 190hy, below) |
+
+## Round 190hy: MPE, stage 2 — per-note expression curves (issue #108)
+
+FL 2026 still has no per-note curves (docs/analise/REA_rodada190hy-mpe.md §1); they follow Ableton Live 11 / 12.
+
+| Feature | FL 2026 | Live 12 | LYNX | State |
+|---|---|---|---|---|
+| Per-note pitch bend / slide / pressure curves | — (one value per note, slide notes) | `PerNoteEventStore`, MPE view | `Note::curves` (core/NoteCurves.h) | ✅ |
+| Recording from an MPE controller | — | records the curves | the take's bend / CC 74 / pressure per note, thinned | ✅ |
+| Editing | — | MPE tab: Pitch Bend / Slide / Pressure lanes, curve over the note | Piano roll lane list "MPE pitch bend / slide / pressure"; Clip-launch Clip page tab **MPE** (three lanes stacked); pitch curve over the notes | ✅ (Live's tab layout and gestures: needs a live check) |
+| Split / chop / knife / join keep the curves | — | Join keeps MPE envelopes | ✅ | ✅ |
+| Playback to built-in instruments | — | — | Sampler (pitch, filter by Mod X / Y), built-in synth (pitch), FPC | ✅ those; ❌ other generators |
+| Playback to hosted plugins | — | MPE per plugin | wrapper MPE switch: member-channel MPE MIDI; CLAP note expressions | ✅ ; ❌ VST3 note expression events (MPE MIDI instead) |
+| `.lynx` / `.als` / `.flp` | — | `.als` lists by NoteId (CC −2 / 74 / −1) | `.lynx` note element 20; `.als` import (Bézier flattened) and export (linear); `.flp`: start values only | ✅ ; ⚠️ Bézier controls not written |
+| Remote control | — | — | `pattern.notes` field `expression` (editable) | ✅ |
 
 ## Round 190i: the plugin window's Detached flag in `.flp` (issue #116)
 FL saves a plugin window's **Detached** state in the plugin record (`0xD4`, flags bit `0x4`; FL 2026 driven, see
@@ -3589,4 +3618,1933 @@ branch, no new filter). Latency 0, memory unchanged.
 
 Tools: `/mnt/e/lynx-work/parityfx190fy` (`lab/spiral.py`, `lab/refcap_sp.py`, `lab/sp_search.py`, `lab/cands.sh`,
 `lab/echoes.py`, `lab/loopid.py`, `lab/bands.py`, `lab/lf.py`, `gold/`, `cpu/`).
+
+
+## Round 190hp: community complaints B9, B16, B18 (global MIDI mappings, mix snapshots, split at silence)
+Three slices of the 0.1.28 pain report (`/mnt/e/lynx-work/pain190gc/REPORT.md` §4, complaints #10, #30, #32). All
+three are LYNX's own additions, off until used; FL's and the reference DAW's own features stay as they were.
+
+| Item | FL Studio 2026 | Ableton Live 12 | LYNX |
+|---|---|---|---|
+| A parameter's controller link for every project | "Override global link..." (window "Global link settings", `Mapping\Generic`) | none: mappings are kept with the set (the complaint) | ✅ unchanged (REA round 146 / 190bt); the settings file now keeps the links of sends, VCAs and Levels adjustments too (before, they were dropped at the next start) and a link's Min / Max |
+| A MIDI Map Mode mapping for every project | — | — | ✅ Mapping Browser row menu › "In every project (LYNX)" (Clip-launch layout): a parameter becomes FL's global link (the same list), Play / Stop / Record / Session Record / Metronome / Stop all clips / a scene's launch button go to the settings (`prefs::GlobalMapping`). Global rows are listed after the project's, "Every project ›" in their Path, dimmed while the project maps that control or target itself (the project's own wins, as FL's project links over global ones). A scene launch acts while the project has that scene. They act in both layouts and are listed (and removable) in Settings › MIDI. ❌ clip slots and track stop buttons (they belong to one project's tracks), key mappings |
+| Hide unused mixer inserts | — ("Trim unused mixer tracks" deletes them) | — | ✅ already there: Mixer menu › "Show only used inserts" (round 163 / 190am). FL's "Trim unused mixer tracks" (strings in FLEngine_x64.dll: "Remove unused tracks", "Unlinked tracks only", "Unlinked and non-empty tracks") is not built: its menu place and rules need a live check |
+| Mix snapshots | per insert only: Mixer states (.fst, LYNX has them) | none | ✅ Mixer menu › "Mix snapshots (LYNX)" (`core/MixSnapshots.h`): Take snapshot (16 per project), Compare A/B (the snapshot recalled before), and per snapshot Recall / Update to the current mix / Rename... / Delete; ticked while the mix is it. A snapshot holds every insert's fader, pan, separation, mute, route to the Master and sends; a recall is one undo step, follows the inserts' reordering and skips a send that would make a loop. Saved in .lynx (`mixSnapshots`, read-only for the remote API) |
+| Strip silence from a clip | Edison: Trim side noise, Trim all noise & slice up (edit the sample; LYNX has both) | none | ✅ audio clip menu › LYNX extras › "Split at silence..." (`core/StripSilence.h`): threshold (dB, 5 ms peak windows), minimum silence, pre-roll, post-roll; the quiet parts go, the clips left play the same audio at the same time, the file is not touched; one undo step, several selected clips at once. ❌ clips with warp markers (greyed) |
+
+Tests: `tests/Community190hpTests.inc` (7 core tests); `LYNX --communityshot190hp <prefix>` (shots and checks).
+
+## Round 190ho: Voice Shift's onset thump, the SSL 4K G's Pink EQ (0.1.30 parity follow-ups)
+
+Follow-ups left by rounds 190fy and 190fx. Black-box only: every number comes from reference renders already recorded
+(trial187b, tp172d and refcap182 for Little AlterBoy; tp172c for the SSL 4K G, its `K4G_ir` grid of 412 impulse renders);
+nothing was captured again, no third-party binary was opened, no third-party code was used. Tools and logs:
+`/mnt/e/lynx-work/parity190ho/` (`lab/`, `runs/`, `gold/`, `cpu/`, `mini/`).
+
+**Voice Shift: Measured law, revision 1** (owner's call: fix the thump even if a file loses a point). LYNX's detector
+calls a note voiced some 20 ms after it starts, and until then the measured path read the note's own start as unvoiced, at the
+formant factor — at Formant −6 its 170 Hz fundamental came out near 120 Hz, a low thump under 130 Hz at each onset
+(−27.5 dB at the onsets of the trial187b line, the reference −38.7 dB). Normalising the overlap-add by the window sum
+(LYNX Tune's round-165j cure for other bumps) did not touch it (−27.6 dB) and cost ten pitch-down files (the window sum is
+not 1 there); keeping the unvoiced grains of the onset unshifted after the detector has decided came too late (the
+latency leaves ~10 ms). What works is the level, which rises at once: after a 12 dB rise (1 ms follower over a 30 ms one)
+out of near-silence (under −60 dBFS), the unvoiced grains placed for 60 ms keep the source's formants
+(`Psola::setUnvoicedPlain`, unused by LYNX Tune). Onsets of the line now −40.5 dB (V4, Formant −6; V3 / V5 −47.1 / −45.6,
+the reference −46.3 / −41.8).
+
+| Bank | Files | Before → after | Up / same / down | Down |
+|---|---|---|---|---|
+| trial187b Little AlterBoy | 78 | 3.27 → **3.35** | 6 / 71 / 1 | V12_stvocal 4 → 3 |
+| tp172d Little AlterBoy | 12 | 3.17 → 3.17 | 1 / 10 / 1 | S2_sweep 3 → 2 (the sweep starts out of silence) |
+| refcap182 programme (fitted map) | 20 | 3.80 → 3.80 | 1 / 18 / 1 | S2_drums 4 → 3 (drum hits out of silence) |
+
+No row went down; three files did, each by one step (the owner accepted a point for the fix). Variants measured and not
+kept: no quiet condition (rows 3.36 / 3.25 / 3.75: prog182 drums ×2 down), a 15 ms window (3.36 / 3.25 / 3.65), a low-band
+share condition (the drums still fire). The pitch-up thump of V1 (Pitch +12: −38.6 dB, the reference −50.0) is another
+mechanism and stays open.
+
+Old projects: the revision is a hidden parameter (index 8 = `count`, not in the info: no control, no string). A new
+instance starts at 1; a project or preset saved by 0.1.27 … 0.1.29 (Law, no revision) loads at 0 and renders bit for bit
+as before (4 of 4 fingerprints from the base commit's objects, `tests/Parity190hoTests.inc`); older ones keep Classic,
+which ignores the revision.
+
+**Ridge Strip: the SSL 4K G's Pink EQ.** The 4K G translation played its Pink EQ type as Black. Its 206 Pink impulse
+renders (every band at 5 frequencies × 6 gains, the mids at 3 Qs, ÷3 / ×3; tp172c `K4G_ir`) show another EQ: the shelves
+are a 2nd-order shelf with an overshoot on the far side (an −18 dB LF cut comes back +1.5 dB near 3 kHz; the HF shelf
+is wide, its corner a quarter to half of the dial), modelled as the shelf plus a bell of the opposite sign; the mids are
+one magnitude-matched bell each (fits 0.02 … 0.4 dB rms); the Bell switches do nothing in Pink; ÷3 / ×3 move the centre
+×0.24 / ×2.9. Measured on the way: the renders clip at +0.9 dBFS (1.111) at the reference's output — the large HF
+boosts of the 0.5 impulse — which round 190fy read as "a high shelf that tilts the lows down 11 dB"; the fits simulate
+the clip. And in the 4K G's **Black** ÷3 / ×3 do nothing (the renders with and without are identical), so the translation
+no longer divides / multiplies the dial there (6 Black renders up, none down).
+
+Pink is a hidden switch of the 4K voicing (`k4Pink`, `k4PinkDiv3`, `k4PinkMult3` after Ridge's other hidden parameters;
+saved only while on), set by the 4K G translation for EQ Type Pink; the colour selector then reads Black. Every project
+saved before has it off and renders as before (the selector's Brown / Black / Orange: 4 of 4 fingerprints = the base
+commit's). Tables: `src/core/Console4KPinkTables.inc` (generated by `lab/pinkinc.py`).
+
+| Bank | Files | Before → after | Up / same / down | Mean ESR | Down |
+|---|---|---|---|---|---|
+| tp172c SSL 4K G (the scoreboard row) | 20 | 5.10 → **5.20** | 3 / 16 / 1 | −15.2 → −15.1 dB | S1_stair 7 → 5 |
+| tp172c K4G_ir, Pink | 206 | 4.07 → **6.50** | 172 / 31 / 3 | −12.6 → −22.6 dB | three boosts the reference clips (HF +20 @ 1.5 k, HMF +22 Q 0.5 ×2) |
+| tp172c K4G_ir, Black | 206 | 5.94 → 6.10 | 6 / 200 / 0 | −19.5 → −20.2 dB | |
+
+The row's S1 setting (LF +6, LMF −4 @ 0.4 kHz, HMF +5, HF +4 — all under or near the grid's smallest gain, 5.4 … 6.6 dB)
+goes 5.2 → 5.6 per file, but its 1 kHz stairs come out 0.79 dB loud (base 0.24): small dial gains are not on the grid
+and are scaled from the smallest node; S1's sweep says LYNX cuts ~1 dB too little around 500 Hz (the LMF at −4) and boosts
+0.3 … 0.5 dB too much at the extremes. Changing the small-gain law alone (exponents 1.25 … 2) made S1 worse; a capture of
+small Pink gains would settle it. Coordinator's call: the file is down two steps while its setting and the row go up.
+
+**CPU** (thread time, 20 s at 48 kHz, blocks of 512, best of 5; base / revision 0 / revision 1, machine load ~23, the
+quietest of three interleaved runs): Voice Shift Formant −6 6.56 / 6.56 / 6.46 %, Pitch +5 6.83 / 6.58 / 6.81 %,
+−7 / +2 / Drive 3 6.82 / 6.81 / 6.84 % of one core — the same within noise (two followers per channel). Ridge 4K, four
+bands: Black 0.162 / 0.164 %, Pink 0.204 % (two more sections, for the shelves' overshoot; only with Pink). Latency and
+memory unchanged.
+
+**Dynamics rows re-checked (190fx left them), nothing shipped:** the Harrison MPC compressor and the VBC FG-MU on Crest
+have no translator and no captured state sweeps (trial190k recorded audio only; tp172c holds two MPC states, D and S1),
+so a Crest law fitted to them would only move a scoreboard row through its fitted map, never a project that loads the
+plugin missing — not a real gain. X-Limit on Apex (4.94, translated): on tp172c LYNX is louder on transients (bursts
++1.5 … +2.1 dB, drums +1.2 … +1.7 dB) while the stairs match (+0.2 … +0.4 dB): the reference's limiter keeps the reduction
+after a hit where Apex's levelling stage lets go — a release law of its own, not attempted in this round.
+
+## Round 190iq: refcap030 as a parity bank; Hush De-esser ← Pro-DS, the Allround timing (revision 1)
+
+Queue item 17 of 0.1.30 ("parity round 2: the next lowest Sound rows"). All black-box: the references' own renders
+(refcap030, round 190hv: FabFilter 12, Soundtoys 23, Valhalla 9) and their saved states, nothing inside a plug-in.
+
+**The bank.** refcap030 saved no plug-in state per setting, and LYNX loads a missing plug-in through its own translator
+of that state. So every refcap030 setting's state was taken through the same scripts (the render scripts' setup lines,
+`savecomponent` instead of the renders): FabFilter 1 949 (before its trial ended on 11-16), Soundtoys + Valhalla 799 — in
+`refcap030/<vendor>/<plug-in>/st/<block>/`; the 44.1 / 48 / 96 kHz blocks reuse refcap182's states (the same settings).
+Each render is then rendered by LYNX as a project would load it (`--ff` for FabFilter, `--sub` for Valhalla; Soundtoys'
+encoded states through tp172d's value map) at the capture's rate, and scored with `scripts/fxparity.py` (0–10). Mono
+blocks are not scored (fxrender is stereo). Tools: `/mnt/e/lynx-work/parity190iq/lab` (`rc030.py`, `bank.sh`, `agg.py`).
+
+Waveform score (fxparity, 0–10) per reference over every scored block, lowest first ("after" = this round's build;
+only Hush moved). Reverbs, delays and modulation sit at 3 … 4 on this score by nature (their tails do not null).
+EchoBoy Jr, PrimalTap and Little PrimalTap load with LYNX's generic Echoform preset (their states are encoded and not
+among the known ones), so their rows measure exactly that. Little AlterBoy's row is what a project with an unknown Little
+AlterBoy state plays (LYNX Tune, its most used preset); Voice Shift through the value map is being re-scored (HANDOFF).
+Not in the table yet (still scoring when this was written; HANDOFF has the final numbers): Saturn 2 (Ember, 1 004
+renders), Timeless 3 (Fruity Delay 3), ValhallaDelay, ValhallaVintageVerb, ValhallaFreqEcho.
+
+| refcap030 reference | LYNX stand-in | files | score before → after | lowest blocks |
+|---|---|---|---|---|
+| LittleAlterBoy | Voice Shift | 87 | 1.56 → 1.56 | mode 1.40, sr44 1.50 |
+| LittlePrimalTap | Echoform | 108 | 2.59 → 2.59 | pairs 2.50, mode 2.58 |
+| ValhallaShimmer | Halo | 194 | 3.04 → 3.04 | pairs 2.39, mode 3.03 |
+| ValhallaUberMod | Lattice Mod | 172 | 3.20 → 3.20 | mode 2.80, pairs 3.47 |
+| FabFilter_Pro_R_2 | LuxeVerb | 323 | 3.25 → 3.25 | grid2 2.70, pairs 3.38 |
+| ValhallaRoom | Atrium | 116 | 3.28 → 3.28 | mode 2.50, sr96 3.38 |
+| PrimalTap | Echoform | 165 | 3.39 → 3.39 | sr44 3.10, sr96 3.15 |
+| LittlePlate | Foil Plate | 90 | 3.57 → 3.57 | sr44 2.88, pairs 3.58 |
+| ValhallaPlate | Foil Plate | 124 | 3.60 → 3.60 | mode 3.19, sr48 3.55 |
+| EchoBoy | Echoform | 375 | 3.62 → 3.62 | styles 2.94, pairs 3.30 |
+| ValhallaSpaceModulator | Orbit | 106 | 3.69 → 3.69 | mode 2.85, pairs 4.33 |
+| EchoBoyJr | Echoform | 186 | 3.82 → 3.82 | pairs 3.31, mode 3.73 |
+| ValhallaSupermassive | Nebula | 106 | 4.51 → 4.51 | mode 3.23, pairs 5.39 |
+| Decapitator | Ember Saturator | 180 | 4.56 → 4.56 | styles 3.70, sr44 4.17 |
+| PanMan | Auto-pan | 87 | 5.14 → 5.14 | pairs 5.06, mode 5.17 |
+| FabFilter_Pro_DS | Hush De-esser | 106 | 5.62 → 5.79 | grid 4.00, mode 5.39 |
+| FabFilter_Pro_C_3 | Crest Compressor | 508 | 6.30 → 6.30 | prog 5.95, styles 6.01 |
+| FabFilter_Pro_L_2 | Apex Limiter | 359 | 7.30 → 7.30 | sr96 6.21, pairs 6.69 |
+| FabFilter_Pro_Q_4 | Facet EQ | 200 | 7.53 → 7.53 | grid2 2.60, mode 8.74 |
+| FabFilter_Pro_MB | Prism Multiband | 203 | 8.17 → 8.17 | grid 7.50, mode 7.62 |
+| FabFilter_Pro_G | Sentry Gate | 204 | 8.21 → 8.21 | sr48 7.54, sr44 7.58 |
+
+**Hush De-esser ← Pro-DS: the Allround law's timing, revision 1.** On the `ess` probe (trial190k: a 500 Hz body under
+5 … 9 kHz bursts of rising level, then a band sweep), the reference's gain on the body moves later than LYNX's: by ~5 ms
+at the default 10 ms look-ahead (a shift of LYNX's gain trajectory by +5.25 ms takes its error from 0.63 to 0.31 dB rms),
+and it releases over ~10 ms where LYNX's gain was back within ~3 ms. Fitted on the Allround renders' gain trajectories
+(the body demodulated at 0.25 ms steps; Nelder-Mead from tp172b's timing): detector attack / release 0.0084 / 1.46 ms,
+gain attack / release 2.94 / 5.82 ms, the gain looking 1.0945 × the dial − 4.85 ms ahead (≈ 6.1 ms at 10 ms; never
+below 0): 0.73 → 0.30 dB rms. Single Vocal keeps round 148's timing: the same timing cost its vocal / drum programme files
+a step (its reference opens its gate ~10 ms after a burst starts and then takes the full range at once — a different
+model, listed below as open).
+
+| Bank | Files | Score before → after | Up / same / down |
+|---|---|---|---|
+| refcap030 Pro-DS (every block: mode, pairs, grid, 44.1 / 48 / 96 kHz; ess, stim, mix) | 106 | 5.62 → 5.79 | 12 / 94 / 0 |
+| refcap182 programme (D, S1 … S4 × drums, bass, guitar, vocal, mix) | 25 | 8.56 → 8.60 | 1 / 24 / 0 |
+| tp172b (D, S1 … S4 × vocal, music, sweep, drums) | 20 | 6.55 → 6.70 | 2 / 18 / 0 |
+
+The revision is a hidden parameter (`hush::timing`, not in the info: no control, no string): a new Hush and a translated
+Pro-DS state run it, a project or preset saved before keeps tp172b's timing bit for bit (`upgradeLoadedEffectParams`;
+fingerprints from the base commit's objects in `tests/Parity190iqTests.inc`). CPU (thread time, 20 s at 48 kHz in blocks of 512, best of 5): Allround 0.452 % of a core (base) → 0.449 % (revision 1), Single Vocal 0.433 → 0.432 % — the same; latency unchanged (15 ms).
+
+Open (evidence in `/mnt/e/lynx-work/parity190iq`):
+- **Single Vocal's gate** (Pro-DS's default mode): on `ess` the reference leaves bursts at the body's level alone (the 7, 10
+  and 14 kHz sweep bursts, and the −12 dBFS 5 … 9 kHz burst gets −0.3 dB) and takes the whole range once a burst stands
+  ~8 dB over the body (−12 / −19.2 dB at range 12 / 19.2, the same at thresholds −48, −30 and −12), opening ~10 ms after
+  the burst starts; LYNX's gate (band against everything under the high-pass) opens on all of them and follows its level
+  law (−4 … −10 dB). A model of the reference's "stands out" test (a broad high band against the body) is the next step.
+- **Facet EQ ← Pro-Q 4 dynamic bands**: not translated (round 124 had no state with them): refcap030's grid of Dynamic
+  Range × Threshold scores 2.6 (range −30 dB: LYNX stays static, the reference cuts 24 … 30 dB). The state holds them
+  (band b at 23b: 9 range dB, 10 dynamics on, 11 "auto", 12 threshold, 13 / 14 attack / release %), but the reference
+  ignored the threshold in every captured state (thresholds −90 and −15 render bit-identical; its threshold follows the
+  signal: −24 dB at −42 … −3 dBFS on the rising stairs, −14 dB at −18 dBFS on the falling ones), i.e. an automatic
+  threshold Facet does not have. Needs the auto-threshold law measured (a capture with "auto" off would settle it).
+- **Little AlterBoy** loads as LYNX Tune (its states are encoded; an unknown one gets the most used preset, drive 4.6):
+  through `--sub` refcap030 scores 1.6; Voice Shift through the value map is the parity row (above).
+
+**Stand-ins that still have no scored reference** (none of the parity banks, v1 … v3 scoreboards or this one, scores them):
+Strike Shaper (Transient Designer: never on this PC, no capture at all); captured (refcap0124 one-control sweeps, refcap182
+programme) but never scored, the Waves roles whose licence has lapsed: Limiter ← L2, Parametric EQ ← SSL Channel /
+PuigTec EQP-1A (Q10 and Renaissance EQ never captured), Reeverb 2 ← RVerb / H-Reverb / TrueVerb, Stereo Shaper ← S1
+Imager, Fruity Delay 3 ← SuperTap, Compressor ← CLA-76 / SSLComp; LYNX Tune ← Waves Tune Real-Time and Auto-Tune (only the
+tune157 / tune165 pitch measurements, no fxparity bank); and the sonible roles (Crest ← smart:comp 3 / pure:comp /
+learn:comp, Apex ← pure:limit / learn:limit, Facet ← smart:EQ 4 / pure:EQ / learn:EQ, Hush ← smart:deess / pure:deess,
+Foil Plate ← smart:reverb 2 / pure:verb / learn:reverb): their states are not translated (LYNX plays the role's preset)
+and this round's sonible captures (`refcap030/sonible`, started with the trial running; /mnt/e/lynx-work/parity190iq/HANDOFF.md) are
+the first usable ones (refcap0124's pure:verb renders are all bypass).
+
+## Round 190is: Echoform ← the Soundtoys delays (EchoBoy voicings revision 1, Little PrimalTap's own default)
+Black-box on refcap030's captures (round 190hv) and round 190iq's bank (`/mnt/e/lynx-work/parity190iq/lab/rc030.py`:
+each render with a saved state, rendered as LYNX loads it; EchoBoy through tp172d's value map, the other three through
+the substitute's fallback, since their states are encoded). Lab: `/mnt/e/lynx-work/parity190is` (HANDOFF.md).
+
+**The states stay undecoded.** The Soundtoys component state carries `PRESET =` + an encoded payload; on two states that
+differ in one control the payload changes from that control's position to its end (858 of 1859 bytes for one PrimalTap
+Algorithm step), i.e. a chained encoding. Black-box rules out decoding it, so the translators keep the round-136 hash
+table (her real projects' states) and a fallback per plug-in for any other state.
+
+**What differed (EchoBoy styles × Saturation 4.8 / 12 / 19.2 dB, impulses at 0 / −20 / −40 dBFS, noise bursts):**
+- *Saturation in the loop.* The reference's repeats fall by the same dB per pass at every Saturation (−40 dBFS impulse,
+  feedback 0.50: 8.4 / 8.4 / 8.4 dB per pass on Master Tape, 7.6 / 7.6 / 7.5 on Space Echo), while its first echo rises
+  by the curve's small-signal gain. Echoform applied that gain on every pass: at 19.2 dB most voicings ran away (rms
+  +20 … +50 dB, 45 files at score 1).
+- *Diffusion.* A Schroeder allpass of small gain passes its input mostly delayed by its length, so a voicing's loop
+  diffusion (EchoPlex-, TelRay-, Fat-, Ambient-like styles) made every pass ~33 ms (× size) longer than the echo time
+  (EchoPlex: 16 dB "loss" per pass in the reference's windows; its repeats keep the time).
+- *Timing.* The reference's echoes sit 8 / 7.7 / 5 samples behind n · T + the L/R offset at 44.1 / 48 / 96 kHz (against
+  its dry, every style alike); Echoform's were on the grid. (tp172d's map also set 249.95 ms for 250: the closest text.)
+- *Little PrimalTap:* a clean line band-limited by a steep low-pass at 12.3 kHz with a droop (−1.9 dB at 4 kHz, −4.6 at
+  8 kHz), the echo 6 samples late, mix on a **linear** law (50 %: dry and echo −6 dB), the dry slightly dipped above
+  8 kHz; its feedback path adds a stronger droop and ~40 samples per pass. PrimalTap: the same family (13.2 kHz), its
+  mix equal-power, the two taps hard-panned, BEATS 0.5 → 254.65 ms on the trial. EchoBoy Jr: its Studio Tape is darker
+  and ~+3 dB louder at low frequencies than EchoBoy's.
+
+**Built (Echoform, hidden revision 1):** the saturation curve runs at unity small-signal gain inside the loop and its
+make-up is applied once on the echoes; the voicing's loop diffusion reads that much earlier (the period stays T); the
+echoes 8 / 5 samples late (≤ 64 kHz / 96 kHz). Only with an echo voicing. `echoform::revision` = paramCount (no control,
+no string): a new Echoform and every translated / substituted one run it, a project or preset saved before keeps rounds
+147 / 150 bit for bit (8 / 8 renders hash-identical to the base commit with revision 0, `tests/Parity190isTests.inc`).
+**Substitutes:** Little PrimalTap gets its own entry playing its measured default (Clean character, Age 0.221 = the steep
+12.3 kHz low-pass, High cut 0.45, 113.125 ms, Mix 2/3 + Output −4.8 dB = the linear law). EchoBoy Jr gets its own entry
+with EchoBoy's fallback in revision 0 (`#108=0`: the preset grammar now names a hidden parameter by index): revision 1's
+8-sample lag is EchoBoy's, EchoBoy Jr's is ~3, and on its steady tones the lag moved the echo's phase against the dry
+(5 mode / sr96 files a step lower). PrimalTap's and EchoBoy Jr's own defaults were tried as their fallbacks and **not**
+shipped: refcap030's blocks, mostly 95 / 120 ms or mix 25 … 30 %, scored lower with them (PrimalTap mode 3.67 → 3.04,
+pairs 3.37 → 3.00; EchoBoy Jr lower in every block).
+
+| refcap030 row (as LYNX loads it) | files | before | after | per block (before → after) |
+|---|---|---|---|---|
+| Little PrimalTap | 108 | 2.59 | **3.53** | mode 2.58 → 3.58, pairs 2.50 → 2.81, sr44 2.65 → 3.95, sr48 2.70 → 4.00, sr96 2.60 → 3.90 |
+| PrimalTap | 165 | 3.39 | 3.39 | unchanged (its fallback is not a voicing; sr48 re-run identical) |
+| EchoBoy (tp172d's map) | 375 | 3.62 | **4.13** | mode 4.83 → 5.26, pairs 3.30 → 3.37, sr44 4.65 → 5.20, sr48 4.60 → 5.15, sr96 4.80 → 4.90, styles 2.94 → 3.65 |
+| EchoBoy Jr | 186 | 3.82 | 3.82 | unchanged (its fallback runs revision 0) |
+
+Per file: EchoBoy 106 up / 259 same / 10 down (styles: TelRay / FM-radio / Queeked noise bursts 1–2 dB louder now that
+the loop no longer loses the curve's sub-unity gain each pass, and four 19.2 dB impulse files whose first-echo spectrum
+moved), Little PrimalTap 77 up / 18 same / 13 down (pairs: its feedback path's droop and extra delay are not modelled).
+**Value-map lab** (the plug-ins' own parameter values mapped onto Echoform — what a decodable state would give;
+`/mnt/e/lynx-work/parity190is/lab/vmap.py`, not a product path): EchoBoy 4.47 (the exact time, Dual / Note / Rhythm modes,
+Input / Output, Groove / Feel / Prime numbers), PrimalTap 3.76, Little PrimalTap 3.66, EchoBoy Jr 4.26 (its styles block
+lower: Jr's styles are not EchoBoy's).
+**Other banks** (`/mnt/e/lynx-work/echo190dl/lab/bank_echo.py`, the 10 Echoform rows): EchoBoy (tp172d) wave 5.15 → 5.40,
+tail 6.34 → 6.56; the other nine rows (H-Delay, ValhallaDelay, the prog182 Soundtoys rows on their fitted maps, tp172c)
+identical. CPU (48 kHz, 20 s, blocks of 512, best of 5; three voicings at Saturation 12 dB, feedback 50 %): revision 1 2.2 / 3.7 /
+5.2 % of one core, revision 0 2.4 / 4.1 / 4.6 %, base objects 3.4 / 3.8 / 5.0 % — within the run-to-run noise (±10 %): the
+make-up is a block constant, the lag a 32-sample ring.
+Latency unchanged (0). Not done: EchoBoy's LowCut / HighCut law (unmeasured), Jr's own styles, PrimalTap's algorithms /
+VCO / feedback-path droop, the PrimalTap family's dry-path dip above 8 kHz.
+
+## Round 190it: the reverb stand-ins' 0.1.30 revision (refcap030's captures, LYNX's own translators)
+
+Round 190iq turned refcap030 (black-box captures of the third-party references, round 190hv) into a parity bank: every
+render whose setting has a saved state is rendered by LYNX through the same translator a project uses and scored with
+`scripts/fxparity.py` (0–10). This round measured what differs on the reverb rows and changed the DSP and the
+translators one measured step at a time (lab and evidence: `/mnt/e/lynx-work/parity190it/`).
+
+Every change sits behind a **hidden revision** (no control, no string, saved while non-zero, as Hush's timing in
+round 190iq): `verbs::epoch / atrium / foil / halo::revision` (one past the Law), `echosuite::lattice::revision`, and
+LuxeVerb's Space-engine Ducking (`luxeVerbSpaceDucking`, 0 unless the Pro-R 2 translator sets it). A new instance and a
+translated state run revision 1; a project or preset saved before loads 0 and renders bit for bit as the base commit
+(63 / 63 renders at 44.1 / 48 / 96 kHz, `gold/`; fingerprints in `tests/Parity190itTests.inc`). Live's Reverb → Atrium
+map (round 190cz, measured on the 0.1.27 law) keeps revision 0.
+
+| What was measured | What changed (revision 1) |
+|---|---|
+| Atrium / Epoch / Halo's tail is lumpy: the 40 Hz-smoothed spectrum of the tail varies ±3.3 dB (the references ±0.9 … 1.1). The build-up taps — one random-sign 40-tap FIR feeding every line — leave their ripple on the whole tail, so a steady 1 kHz tone (the staircase of the test signal) met a dip 6 … 11 dB deep where the reference meets its mean gain | Above 600 Hz the build-up taps reach the tank as four interleaved groups through a 4-point Hadamard (four independent FIRs: ripple ±1.9 … 2.1 dB); below, one sum as before (there the tank's few modes set the tone, and the long-decay music renders stayed where they were: 250 / 400 / 600 / 800 Hz tried). Atrium and Halo; Epoch measured no gain from it and keeps one FIR |
+| Halo's Dark colour: against Bright the reference keeps its RT at every octave (8.4 / 7.8 s at 4 / 8 kHz) and falls −3 / −6.6 / −11.7 dB at 4 / 8 / 16 kHz and −5 … −8 dB below 50 Hz; ours was a 5 kHz low-pass in the loop (RT 2.2 s at 4 … 8 kHz, −2 dB). Its colour turns Dark between 0.479 and 0.521 (the translator stepped at 0.525) | Dark = an output tone (high shelf −13 dB at 6.5 kHz, low shelf −6 dB at 70 Hz), the loop untouched; the translator's step at 0.5 |
+| Halo's level: music and test signal 2.6 dB over the reference at the capture's base, the impulse on it; at 20 / 50 % diffusion ours 2.5 dB over its own level at 80 % (the reference not); RT per reverb mode ×1.13 / ×0.75 / ×1.0 / ×2.85 the reference's (Mono / Small / Medium / Big stereo) | Half the low-diffusion lift, −0.5 dB overall (−1 dB scored higher here but cost tp172d's impulses a step), the RT per mode matched with the impulse's energy kept (gain × 1/√ratio) |
+| Atrium per type, Foil Plate per type, Epoch per mode at the sweep's base setting: wet level and octave balance against the reference's impulse | Trims (level + the tone corrector's eight bands, 3-point smoothed) for the types / modes only the sweep holds; the types every other capture uses (Atrium's Large and Bright Room, Foil's Silver and Pewter, Epoch's Concert Hall) keep their 0.1.27 voicing, since their sweep trim cost a step on refcap182 / tp172d. Epoch's (measured at Decay 0.51 s; its Room mode needs none at 1.41 s, refcap182 S2) fade out between those two decays |
+| Lattice Mod: from the type's 8th step the reference's low end was 20 … 30 dB under ours (8 / 16 taps summed into the loop: a loop gain of √N × the feedback below 200 Hz); past its tenth step (0.4375 …) the reference plays the dry signal alone, at unity (its impulse: the dry click, no wet) | The loop hears the longest tap at the feedback's own gain (through its own copy of the tap filters; the summed loop / √N was tried: 4.77 against 4.88); the values past the tenth step play the dry signal |
+| Pro-R 2's Ducking (state value 8, dB 0 … 48) was not translated: with it on, ours was 4 … 25 dB over | The Space engine dips its wet part by 0.71 × the setting (dB) while the input plays (detector 1 / 5 ms, keyed from −50 … −40 dBFS; the dip in 10 ms, back with τ = 115 ms in dB), measured on a −6 dB RMS noise burst at 0 / 25 / 50 / 75 / 100 % |
+
+**Scores** (refcap030 bank, files; before → after; files up / down):
+
+| Reference → stand-in | files | before → after | up / down | blocks |
+|---|---|---|---|---|
+| ValhallaUberMod → Lattice Mod | 172 | 3.20 → **4.88** | 42 / 1 | mode 2.80 → 5.62, pairs 3.47 → 3.97, sr48 / sr96 = |
+| ValhallaShimmer → Halo | 194 | 3.04 → **3.61** | 87 / 0 | mode 3.03 → 3.65, pairs 2.39 → 3.17, sr48 3.44 → 3.75, sr96 3.50 → 3.69 |
+| ValhallaRoom → Atrium | 116 | 3.28 → **3.63** | 27 / 0 | mode 2.50 → 3.31, pairs 4.22 =, sr48 3.44 =, sr96 3.38 → 3.44 |
+| ValhallaPlate → Foil Plate | 124 | 3.60 → **3.74** | 16 / 0 | mode 3.19 → 3.54, the rest = |
+| ValhallaVintageVerb → Epoch Verb | 154 | 2.49 → **2.67** | 21 / 3 | mode 1.86 → 2.16, the rest = |
+| FabFilter Pro-R 2 → LuxeVerb | 323 | 3.25 → **3.30** | 11 / 1 | grid2 2.70 → 2.81 (Ducking), the rest = |
+| Little Plate → Foil Plate | 90 | 3.57 → 3.57 | 0 / 0 | (the measured plate voicing: no change) |
+
+The other banks of these stand-ins (`lab/gate2.py`: tp172d matched settings, verb183b's captures, refcap182's programme,
+tp172b): equal or up everywhere except two files — Halo's tp172d S1 drums 3 → 2 (its spectrum was already 3.9 dB off:
+the block 3.50 → 3.42) and one of verb183b's −20 dB impulses (Halo 3.21 → 3.37 on that bank); Atrium's refcap182 S2 bass
+4 → 3 beside S1 guitar 3 → 4 (the block equal). Up: Halo's refcap182 programme 3.35 → 3.55, Atrium's verb183b captures
+3.82 → 3.88.
+
+**CPU** (thread time on one pinned core, 20 s at 48 kHz, blocks of 512, best of 2 × 5; base / revision 0 / revision 1,
+% of real time): Atrium Medium Room 1.72 / 1.83 / 1.94, Atrium default 2.18 / 1.96 / 2.20, Halo default 1.74 / 1.59 /
+1.96, Halo Big stereo Dark 1.80 / 1.63 / 1.98, Epoch Room 2.37 / 2.18 / 2.08, Foil Bismuth 1.33 / 1.17 / 1.31, Lattice
+default 0.73 / 0.66 / 0.71, Lattice 16 taps 6.68 / 6.74 / 6.65, LuxeVerb Space with Ducking 50 % 4.83 / 4.83 / 5.16.
+Revision 0 is the base (within the machine's ±10 %); revision 1 costs Halo ≈ +0.2 point of one core (the build groups'
+eight one-poles and the four-way injection), the Ducking +0.3 point when it is on. Latency unchanged (none).
+
+**Still off**: Epoch Verb's mode sweep (most algorithms 5 … 9 dB under the reference at Decay 0.51 s before the trims:
+one setting per mode, so the trims stay limited to that decay); Pro-R 2 at Space 0 (6 … 11 dB under) and with a
+left-only input (the Stereo Width grid: −2 … −12 dB), Pro-R 2 Brightness at its ends (+4 … +8 dB); Halo's Feedback 80 %
+(highs −3 dB, lows +5 … +9 dB on music); Little Plate at 44.1 kHz (the reference is ~1.5 dB quieter there than at 48 kHz:
+a reference quirk). The waveform score saturates near 4 on reverb rows (ESR cannot null a second reverb): the steps
+above are spectrum (≤ 2.5 dB) and level (≤ 1.5 dB) moving files from 1 … 3 to 4.
+
+## Round 190jh: the Waves roles scored and translated; Facet EQ ← Pro-Q 4's dynamic bands (automatic threshold)
+
+Black-box, on captures already on disk (lab and evidence: `/mnt/e/lynx-work/parity190jh/`, HANDOFF.md). Same score as rounds
+190iq / is / it (`scripts/fxparity.py`, 0–10, higher is better), the references' own renders against LYNX loading the
+plug-in's saved state through its substitute / translator.
+
+**The Waves roles, first scored.** refcap182's programme bank (round 182a, with Waves' licence: D and X1 … X4 × drums, bass,
+guitar, vocal, mix, 35 s each, and each setting's component state) through LYNX's substitute for the state, the slot's dry /
+wet applied as the mixer does (`tools/fxrender --slotmix`, new: substitutes such as Reeverb 2's 25 % mix were rendered at 100 %
+before). refcap0124's one-control sweeps of these plug-ins are not usable (the controls did not take on most renders: every
+SuperTap / PuigTec sweep equals the default). Translations added (RealWorld lists read against the settings set through
+the trials' own parameters, constants fitted on the programme renders):
+- **Limiter ← L2**: threshold → input gain, out ceiling → ceiling, release → release, ARC → the Limiter's shortest (10 ms;
+  ARC at 10 / 50 ms scored 6.90 / 6.65; the manual release at 1 / 2 / 4 × the dial 6.0 / 6.2 / 5.8). L1 / L3 / L4 keep the default.
+- **SuperTap → Echoform** (was Fruity Delay 3 at FL's default, which put echoes on a SuperTap whose taps are off — its
+  default): the taps' times are the stored delay × 240 / BPM (0.064 at 136.4 BPM = 112.6 ms, the echo found at 112.9 ms), the
+  pan constant-power (hard = +3 dB on one side), played by Echoform's clean Single / Dual echo with the dry path at unity
+  (Mix low, the echoes raised by Output, which acts on the echoes only), the feedback on the lines and the tap filter as the
+  high cut. SuperTap's separate feedback delay and its modulation are not modelled. No state: the dry signal.
+- **Compressor ← SSLComp**: threshold + −23 dB (offsets −15 / −20 / −23 / −25 / −30 scored 2.64 / 4.20 / 5.56 / 5.40 / 3.08),
+  ratio 2 / 4 / 10, attack 0.1 … 30 ms, release 0.1 … 1.2 s and Auto as 600 ms, make-up, mix. CLA-3A / C1 / API-2500 keep the preset.
+- **Crest ← CLA-76, single ratio buttons**: the all-buttons fit (round 148) put the 4 / 8 / 12 : 1 settings 7 … 12 dB under the
+  reference; their wet path is now +7.7 / +11 / +10.2 dB (20 : 1 as 12 : 1). The all-buttons fit is unchanged.
+
+| refcap182 reference (25 files) | LYNX stand-in | before → after | up / same / down |
+|---|---|---|---|
+| L2 | Limiter | 3.44 → **7.32** (D 9.0, X1 3.0 → 7.2, X2 1.2 → 6.6, X3 2.0 → 6.0, X4 2.0 → 7.8) | 20 / 5 / 0 |
+| SuperTap 2-Taps | Echoform (was Fruity Delay 3) | 1.88 → **6.44** (D 1.2 → 10.0, X1 → 7.6, X2 → 5.6, X3 → 5.0, X4 → 4.0) | 25 / 0 / 0 |
+| SSLComp | Compressor | 2.92 → **5.68** (D 4.4 → 5.0, X1 4.0 → 5.6, X2 2.2 → 5.8, X3 2.2 → 6.6, X4 1.8 → 5.4) | 20 / 4 / 1 (D mix 6 → 5) |
+| CLA-76 | Crest Compressor | 2.20 → **5.36** (D / X1 / X2 / X4 1.0 → 5.6 / 5.6 / 4.0 / 4.6; X3 all buttons 7.0) | 20 / 5 / 0 |
+| S1 Imager | Stereo Shaper | 10.00 (unchanged) | — |
+| SSL Channel | Ridge Strip | 8.12 (unchanged) | — |
+| RVerb / H-Reverb / TrueVerb | Reeverb 2 (25 % mix) | 2.04 / 1.72 / 3.24 (unchanged; lab below) | — |
+| PuigTec EQP-1A | none (missing plug-in: the dry signal) | 3.72 (unchanged) | — |
+
+Not changed: **Stereo Shaper ← S1 Imager 10.00** and **Ridge Strip ← SSL Channel 8.12** (their translators already hold),
+**PuigTec EQP-1A**: no substitute (a project keeps the missing plug-in; its dry signal scores 3.72 — the reference adds
++1.1 dB and its boosts / cuts); a Pultec curve model needs measured curves, which the capture set does not have.
+**The Waves reverbs** were translated in the lab (decay, pre-delay, size, diffusion, a wet level per decay) and are **not**
+shipped: no setting of the stand-in Reeverb 2 kept every file — RVerb 2.04 → 2.60 (15 up, X1 / X3 drums 2 → 1), H-Reverb
+1.72 → 2.00 (7 up, 5 down), TrueVerb below the current 25 % mix (3.24) in every try (its direct path is attenuated with
+Distance in a way Reeverb's dry control cannot follow); owner decision below.
+
+**Facet EQ ← Pro-Q 4's dynamic bands.** Round 124's translator kept dynamic bands static; refcap030's Dynamic Range ×
+Threshold grid scored 2.60. The state holds them (band b at 23b: 9 range dB, 10 dynamics on, 11 Auto, 12 the manual
+threshold, 13 / 14 attack / release %), and every captured state has **Auto** on (Pro-Q 4's default; the threshold control
+then has no effect: thresholds −90 … 0 render bit-identical). Measured on the grid's stairs and time-constant probes at
+1 kHz (10 ms gain trajectories, ranges −30 / −15 / +15 dB): the band reaches its full range at the loudest recent level and
+moves 1 dB per dB below it; that "top" follows a louder detector level at once, falls by ~1.7 dB/s otherwise and never sits
+below −40 dB (where it starts); the band's total gain stays within ±30 dB (+30 range: the gain stops at +24 over a +6 bell).
+Facet gets this as an **automatic threshold per band** — hidden parameters past the info (no control, no string, 0 i18n
+keys), saved only while on — fitted by Nelder-Mead on the six trajectories: top −39.7 dB, fall 1.70 dB/s, soft knee 30.5 dB,
+gain attack / release 18.1 / 305 ms (Pro-Q's 50 %; other percentages one decade per 50 % [model]): 1.06 dB rms. The
+translator now carries range, Auto (→ the automatic threshold) or the manual threshold (the parameter's own texts: −90 /
+−66 / −45 dB at 0 / 0.125 / 0.25, then linear to 0 dB), and the first dynamic band's attack / release (Facet has one timing).
+
+| refcap030 Pro-Q 4 block | files | before → after | up / same / down |
+|---|---|---|---|
+| grid2 (Dynamic Range × Threshold; stairs, time constants) | 50 | 2.60 → **6.60** | 40 / 10 / 0 |
+| grid, mode, pairs, 44.1 / 48 / 96 kHz | 150 | 9.33 / 8.74 / 9.19 / 9.27 / 9.27 / 9.73, each unchanged | 0 / 150 / 0 |
+| all (row) | 200 | 7.53 → **8.53** | 40 / 160 / 0 |
+
+Other Pro-Q 4 banks: refcap182 programme 9.40 → 9.40 and tp172b (no dynamic band in their states: unchanged by construction,
+programme re-rendered identical). **Old projects**: a project or preset saved before has the automatic threshold off — gold
+(base commit's objects against the round's, Facet with manual dynamic bands at 44.1 / 48 / 96 kHz, every phase mode): 6 / 6
+renders identical (`tests/Parity190jhGold.inc`). The translators only change what a project with the missing plug-in loads.
+
+**CPU** (thread time, 20 s at 48 kHz in blocks of 512, best of 5, three runs, one pinned core; `cpu/bench.log`): Facet with
+one manual dynamic band 0.21 … 0.25 % (base) / 0.22 % (round) — unchanged; with the automatic threshold 0.30 … 0.33 % (its gain
+keeps moving, so the band is redesigned more often); SuperTap's stand-in Echoform (two taps + feedback) 1.19 … 1.38 % against
+Fruity Delay 3's 0.60 … 0.69 %; Limiter 0.11 % either way. No latency change.
+
+**Still off / measured, not built:**
+- Facet's automatic threshold settles ~9 dB under a short loud burst in the reference (after −6 dBFS bursts of 2 … 200 ms the
+  top sits at −15 dB, not −6): the −30 dB range time-constant probe stays at 2.
+- **EchoBoy's LowCut / HighCut** (refcap030 pairs PX2 against S1's own echo, the first echo's spectrum): both are shelves,
+  not cuts — HighCut 0.2 / 0.5 / 0.8: a high shelf down to −3.5 / −8.9 / −14.3 dB (reached by ~8 kHz, half-way at ~2 … 3 kHz);
+  LowCut 0.2 / 0.5 / 0.8: a low shelf, −14.7 / −23.4 / −28.4 dB at 20 Hz and −1.0 / −2.5 / −5.0 dB at 500 Hz (~4 dB/oct
+  between). (LowCut 0.2 with HighCut 0.2 nearly mutes the echo: a reference quirk or a bad render.) Not built: an EchoBoy
+  state reaches LYNX encoded (the hash table carries no filter), so the law only matters for the value-map lab (tp172d's map
+  sets none) — Echoform's 12 dB/oct Low / High cut would need a shelving EchoBoy mode first.
+- **Hush ← Pro-DS Single Vocal**: round 190iq's finding stands (the reference takes the whole range once a 5 … 9 kHz burst stands
+  ~8 dB over the body, ~10 ms late, independent of the threshold); not modelled in this round.
+- PuigTec, the Waves reverbs (above), SuperTap's feedback delay and modulation, Q10 / Renaissance EQ (never captured).
+
+## Round 190iu: issues #186 and #191 (workflow; FL's own way stays the default)
+
+Sources: docs/analise/REA_rodada190iu.md.
+
+| Feature | FL Studio / Live | LYNX | Status |
+|---|---|---|---|
+| Wheel over the track headers scrolls, over the arrangement zooms (#186) | FL and Live: the plain wheel scrolls everywhere, Ctrl+wheel zooms (FL REA 167t; Live manual). REAPER has a "Track control panel" wheel context | Settings › LYNX extras / Playlist menu "Wheel: scroll over the track headers, zoom over the arrangement", off; Ctrl does the other one in each place; Shift / Alt unchanged. Playlist and the Clip-launch arrangement | LYNX extra (optional) |
+| Hold a tool key for a temporary tool (#191.1) | FL 2026: tool keys only select (manual shortcut page, change log to 26.1.7, DLL strings); FL's temporary tools are the right button, double right-click (Mute), Ctrl (select), Shift (paint/draw), right button + wheel, 26.1's "hold A" for audio-clip stretch | Settings › LYNX extras / Playlist menu "Hold a tool key for a temporary tool", off: a key held ≥ 400 ms or used with the mouse goes back to the previous tool on release; a tap still selects. Playlist and Piano roll | LYNX extra (optional) |
+| .mid dropped on the Playlist (#191.2) | FL: MIDI files go to the Channel rack, the Piano roll and the desktop (manual automation_midiimport); a Playlist drop is not documented. Live: drops into Session slots and Arrangement tracks; below / right of the tracks a new track | Pattern layout: Settings › LYNX extras "MIDI files dropped on the Playlist become pattern clips", off (one new pattern named after the file; an instrument track's channel, else a new channel per MIDI track). Clip-launch arrangement and grid slots: always (Live): the track's instrument, else a new instrument track; further MIDI tracks of a file on the tracks below; a slot merges them. Plugins' MIDI drag-out (temp .mid) is the same file drop | LYNX extra (Pattern) / Live-exact (Clip-launch) |
+| Automation clips into their tracks' lanes (#191.3) | FL: automation clips only (24.1 puts "Turn into automation clip" of an instrument track on grouped sub-tracks). Live: lanes under each track (Automation Mode, A; fold triangle) | Lanes since 177b (on in Clip-launch, option in Pattern). New: Playlist menu "Move automation clips into their tracks' lanes (N)" while lanes are on: clips of controls owned by an instrument track or a linked insert, one undo step | LYNX extra (partial: no pure view projection, see REA doc) |
+| Separate patterns per track / Track-only mode (#191.5) | FL: Split by channel, Make unique, Lock to content, Auto name; instrument tracks (20.1) place their own channel pattern; no auto-separation option | View › Layout style / Settings › LYNX extras "Track-only mode (no Channel rack: 1 track = 1 instrument)", off: Pattern layout without the rack; every instrument added gets its own instrument track (FL's pieces, .flp unchanged); switching on offers to give the existing ones a track | LYNX extra (optional) |
+| Delete takes and recorded envelopes (#191.6) | FL: picker lists patterns / audio clips / automation; "Purge unused audio clips"; "Delete unused recorded files"; no delete on Browser › Current project audio / automation rows | Picker panel right-click on an audio clip or automation row: Delete; Picker panel menu: Purge unused audio clips (N), Delete unused automation clips (N); Browser › Current project › Automation and audio-clip rows: Delete. The panel itself hides with FL's Picker panel › Enable (Alt+P) | LYNX extra (menu items) |
+
+## Round 190js: the Waves reverbs on Reeverb 2, Hush's Single Vocal "stands out" revision, Facet's auto threshold refitted
+
+Plugin parity 5 of 0.1.30. Black-box, on captures already on disk (lab and evidence: `/mnt/e/lynx-work/parity190js/`,
+HANDOFF.md). Same score as rounds 190iq … 190jh (`scripts/fxparity.py`, 0–10, higher is better): the references' own renders
+against LYNX loading the plug-in's saved state through its substitute / translator.
+
+**The Waves reverbs (RVerb, H-Reverb, TrueVerb → Reeverb 2).** Why round 190jh's lab translation failed: it took the
+references' own tone values (RVerb's 5.7 kHz roll-off, Reeverb's high-damping default) and a wet level per decay only, but
+the score at this level is set by the long-term third-octave spectrum and the level of each file (a reverb's tail does
+not null: 4 = spectrum within 2.5 dB and level within 1.5 dB). Each reference's band gain (out / in per third octave) was
+measured from the programme renders (pooled over the five signals; the IR deconvolved for decay, pre-delay and the direct
+path) and is not what the states say: RVerb is flat to 1 kHz and −8 / −15 / −19 dB at 2.8 / 5.7 / 11 kHz; H-Reverb has a
++5 … 6 dB hump at 700 Hz and −20 … −27 dB at 11 … 18 kHz; TrueVerb is a filtered direct path (−4.8 … −6.2 dB, falling
+with Distance) under a bright tail. All three keep about the same wet energy whatever the decay (RVerb: −3 … −4 dB in the
+mids at 0.8 … 4 s), so a longer decay needs a lower wet control. Reeverb 2 (the stand-in since round 129; its engine is
+unchanged) can reach every setting's tone (per-setting fits 0.8 … 2.5 dB mean |band error|), so the role stays on it and
+its controls are fitted, all five settings at once, on a model of the score (the input's third-octave spectrum times the
+impulse response's band gain against the reference render: spectrum and level per file). The translator `waves-reverb`
+reads the decay, the pre-delay, TrueVerb's reverb / early-reflection levels, Distance and Direct, H-Reverb's ducking
+(on: 0.25 × its range off the wet level [model], fitted on X4) and sets each reverb's fitted tone (raw Reeverb 2 values in
+`wavesVerbFits`), the wet level by the decay (−8.25 / −7.5 / −5.25 dB per decade) and the slot at 100 %. Atrium,
+LuxeVerb and Epoch were tried for RVerb's role first (Foil Plate not: a plate's role): their best band errors on RVerb's
+default were 2.0 / 2.4 / 8.4 dB (Epoch's top band stops at its high cut), against Reeverb 2's 0.8.
+
+| refcap182 programme (25 files each) | before → after | up / same / down |
+|---|---|---|
+| RVerb → Reeverb 2 | 2.04 → **3.48** (D 2.0 → 4.0, X1 2.0 → 2.6, X2 2.2 → 3.6, X3 2.0 → 3.6, X4 2.0 → 3.6) | 22 / 3 / 0 |
+| H-Reverb → Reeverb 2 | 1.72 → **3.16** (D 1.8 → 3.4, X1 1.8 → 3.6, X2 1.0 → 2.2, X3 2.0 → 3.4, X4 ducking 2.0 → 3.2) | 22 / 3 / 0 |
+| TrueVerb → Reeverb 2 | 3.24 → **3.96** (D 3.4 → 4.0, X1 3.6 → 4.0, X2 4.0 = 4.0, X3 3.0 → 4.0, X4 direct off 2.2 → 3.8) | 15 / 10 / 0 |
+
+**Facet EQ's automatic threshold, refitted (Pro-Q 4's Auto).** Round 190jh fitted it on 10 ms windows, which smeared the
+time-constant probe's bursts. Refitted by Nelder-Mead on the C++ renders themselves (5 ms windows of grid2's `tc` and
+`stairs` at ranges −30 / −15 / +15, lab build with the law's constants from the environment, `facet/fitc.py`): the knee is
+**1.53 × the range** (not a fixed 30.5 dB) — after a −6 dBFS burst the reference keeps ~5 dB of cut at −40 dBFS with a
+−30 dB range and none with −15 dB, which one fixed knee cannot do; this is the "settles ~9 dB lower" of round 190jh — and the
+gain timing at Pro-Q's 50 % is **9.2 / 268 ms** (the translator's attack / release; was 18.1 / 305). A slower rise of the
+top and an offset under the level were also free in the fit and came out at 0; the fit's top fall (1.58 dB/s) cost the
+−15 dB stairs a step on the score, so the fall stays 1.70 dB/s. Trajectory error 1.067 → 0.67 dB rms (tc −30: 1.77 → 1.10,
+mean +1.00 → +0.12 dB). The
+automatic threshold has not been released (round 190jh's branch), so its law changes without a revision; manual bands
+render bit for bit as before.
+
+| refcap030 Pro-Q 4 block | files | before → after | up / same / down |
+|---|---|---|---|
+| grid2 (Dynamic Range × Threshold; stairs, time constants; the threshold is ignored under Auto) | 50 | 6.60 → **6.90** | 10 / 40 / 0 (tc −30: 2 → 3, ESR −3.4 → −10.2 dB; tc +15: 6 → 8) |
+| grid, mode, pairs, 44.1 / 48 / 96 kHz | 150 | each unchanged | 0 / 150 / 0 |
+| all (row) | 200 | 8.53 → **8.60** | 10 / 190 / 0 |
+
+refcap182's programme and tp172b have no dynamic band in their states (unchanged by construction).
+
+**Hush De-esser ← Pro-DS Single Vocal: the "stands out" revision.** Pro-DS's default mode. On refcap030's `ess`
+probe (a 500 Hz body at −14 dBFS under 5 … 9 kHz bursts of rising level, a sweep of band tones, a long burst alone) the
+reference leaves a burst alone until it stands out from the body (+5 dB: −0.2 dB; +11 dB: the whole range at every
+threshold), ignores band tones at the body's level, starts ~20 ms after the burst minus the look-ahead and holds a
+steady reduction; a burst alone follows a level law (92 / 87 / 66 % of the range at thresholds −48 / −30 / −12 dB).
+Round 148's gate compared the band (high-pass … low-pass) with everything under the high-pass, so a 5 … 9 kHz burst's own
+lower half counted as the body: it opened on every burst and its level law moved with the noise (−5 … −10 dB under a
+burst the reference cuts by 12). **Revision 1** (hidden `hush::vocalRevision`, Allround unchanged) compares the signal above
+a split (0.567 × the high-pass, 4th-order) with the body below it from 200 Hz up (a kick drum's low end hid the cymbals of
+tp172b's drums), opens at +8.2 dB and closes at +7.6 dB over 4.9 ms averages, decides 1.6 ms behind the look-ahead, and has
+its own level law (offset 9 dB, span × 1.11) and gain timing (6.2 / 20 ms). Fitted by Nelder-Mead on the 27 Single Vocal ess
+renders (lab build, `hush/fitsv.py`: 3.05 → 0.50 dB rms over 5 ms windows, full band and above 4 kHz), the body's
+high-pass and the law offset then chosen on the parity score of the drums / vocal / mix / stim renders (`hush/svscore.py`).
+A new Hush and a translated Pro-DS state run it; a project or preset saved before keeps round 148's Single Vocal.
+
+| Pro-DS bank (Single Vocal and Allround settings) | files | before → after | up / same / down |
+|---|---|---|---|
+| refcap030 grid / mode / pairs | 10 / 33 / 18 | 4.80 / 5.55 / 5.72 → **6.80 / 7.21 / 7.94** | 32 / 29 / 0 |
+| refcap030 44.1 / 48 / 96 kHz | 15 each | 6.13 / 6.13 / 6.40 → **6.67 / 7.20 / 7.13** | 16 / 27 / 2 (44.1 kHz S4 stim, 96 kHz S1 stim: 6 → 5) |
+| refcap030, all blocks (row) | 106 | 5.79 → **7.21** | 48 / 56 / 2 |
+| refcap182 programme | 25 | 8.60 → 8.68 | 2 / 23 / 0 |
+| tp172b (vocal, music, sweep, drums) | 20 | 6.70 → **7.20** | 8 / 12 / 0 |
+
+The two files a step down are the `stim` signal at 44.1 kHz (S4, look-ahead off) and 96 kHz (S1): the reference cuts
+the band ~1.4 / 0.5 dB on average there, the revision +1.1 dB less / 1.5 dB more (spectrum 0.74 / 0.79 dB against the
+6-point limit of 0.6); at 48 kHz the same two settings went 5 → 7 and 6 → 6. Twelve variants (body high-pass 150 … 500 Hz,
+split 0.52 … 0.62, open threshold, ratio and gain timing) kept them at 5; shipped as an owner decision (HANDOFF).
+
+**Old projects.** Reeverb 2's engine is unchanged (the translator only changes what a project with the missing Waves
+plug-in loads); Facet's manual dynamic bands, Hush's Allround and Hush's Single Vocal with the revision off (every project
+or preset saved before: `upgradeLoadedEffectParams`) render byte for byte as the base commit (`lab/gold.sh`: the base
+binary against the round's, 171 renders at 44.1 / 48 / 96 kHz, 0 differ; fingerprints in `tests/Parity190jsGold.inc`;
+round 190jh's Facet fingerprints pass unchanged).
+
+**CPU** (thread time, 20 s at 48 kHz in blocks of 512, best of 5, three runs pinned to one core; `cpu/bench.log`): Hush
+Single Vocal 0.41 … 0.44 % of a core (revision 0) → 0.46 … 0.54 % (revision 1: four more biquads and the body's high-pass in
+the stand-out test); Facet with one automatic band 0.24 … 0.27 % (manual 0.17 … 0.21 %); Reeverb 2 at the old stand-in
+setting 0.29 … 0.38 % against the translated RVerb / H-Reverb / TrueVerb defaults 0.25 … 0.35 % (the same engine). No
+latency change.
+
+**Still off:**
+- RVerb X1 (Reverb Type 3, diffusion 80) stays at 2 … 3 (its guitar −4.8 dB): one tone for every type; H-Reverb X2 (short,
+  ER-heavy, 0.4 s) 2.2; H-Reverb's ducking is a fixed share of its range, not an envelope; TrueVerb's direct path is flat
+  (the reference's has a short low-pass FIR) — a 4 is the top here, a 5 needs the tail to null.
+- Hush: the two `stim` files above; split band (Band Processing = split) keeps round 148's split [model] (its ess error
+  2.3 dB rms, the rest 0.2 … 0.7).
+- Facet: the −30 dB time-constant probe is at 3 (from 2): the reference's cut after the short bursts (7.5 / 8.7 s) is
+  still deeper than the model's.
+- PuigTec, SuperTap's feedback delay and modulation, EchoBoy's shelving cuts (round 190jh's list) not touched.
+
+## Round 190jq: issue #164 (header width), issue #191 (pointer click, automation clips as lanes)
+
+Evidence: FL 2026 checked for the #164 thread (the header column keeps its width; its right strip selects tracks);
+design190ia shots/ref/fl-playlist.png (fixed 100 px column, names cut as "Pitch A..t (VOX)"); Live 12 lanes
+(live190cw/shots/warp190cg-08a/08b). Side by side: /mnt/e/lynx-work/playlist190jq/shots/pairs/.
+
+| Feature | FL Studio / Live | LYNX | Status |
+| Wider track header column (#164) | FL: fixed width; only the row height is dragged (the header's bottom band). REAPER: the track control panel's width is dragged at its edge | Settings › LYNX extras / Playlist menu "Drag the track header column's right edge to widen it", off: the column's right edge (1 px of the selection strip + 3 px of the arrangement) drags the width, up to half the Playlist; a double click goes back to FL's width; Pattern / Clip-launch / linked headers (Simple keeps its own). A preference (ui-options.txt headerWidthExtra), not saved in the project | LYNX extra (optional) |
+| Single click on empty space without placing (#191, Nuelka) | FL: the Pencil / Brush place the last pattern or clip; the Select tool (E) deselects on a click and draws a box on a drag. Live: a click in the Arrangement moves the position (insert marker) | Settings › LYNX extras "Pointer click switch in the Playlist toolbar" shows a switch beside Stretch (also Playlist menu, key action): while lit, the Pencil / Brush on empty space act as FL's Select tool (click deselects, drag = box) and the click moves the song position (Live); a double click places the clip. Clips keep the Pencil's gestures | LYNX extra (optional) |
+| Automation clips drawn as lanes under their track (#191.3, view option) | FL: automation clips on tracks of their own. Live: automation lanes under each track, folding with the track | Playlist menu / Settings › LYNX extras "Automation clips as lanes under their tracks": a track holding only automation clips of one owner (instrument track of the channel, or the track linked to the insert; core/LaneView.h) is drawn right under the owner, indented with a lane header, folding with the owner's lane arrow. The song is untouched (clips stay on their tracks; .flp unchanged); a lane's clips move in time only and no other clip lands in a lane. On by default in Clip-launch (Live), off in Pattern (FL), never in Simple | LYNX extra (Pattern) / Live-like (Clip-launch) |
+
+## Round 190kl: issue #197 (Peak Controller: window flashing, steady display, extra LFO shapes)
+
+| Feature | FL Studio | LYNX | Status |
+|---|---|---|---|
+| Moving the editor window while its display runs | FL's window moves cleanly | 0.1.29 at a fractional interface or display scale (150 %): every move step also resized the docked window by one pixel, and the new, undrawn Direct2D buffers showed as white flashes with only the live display drawn in them (captured: 100 white frames in a 6 s drag). Round 190hx's fix for issue #178 (position and size rounded on their own) removes it; 0 white frames at 100 % in either build | Fixed (190hx, after 0.1.29) |
+| The display's scrolling speed while a knob is dragged | FL's display runs by time | It moved one column per editor timer call, and JUCE drops timer calls while a dragged knob keeps the message thread busy, so it slowed down. Now one column per 33 ms of real time (`core/LiveHistory.h`); a late call adds the missed columns as a straight line | FL-exact behaviour |
+| More LFO shapes | Sine, Triangle, Square, Saw, Random | FL's five stay first and are the default. The Shape menu adds a "LYNX shapes" section: Ramp down, Exp rise, Exp fall, Triangle skew, Half sine, Pulse 25%, Steps 4 / 8 / 16, Smooth random, Random x4 (`core/PeakShapes.h`, table revision 1). They are stored in a hidden parameter (index 12, id / 64) that is not written while 0, so earlier projects load, render and save byte for byte as before, and FL's parameter list (automation, links, the .flp import) is unchanged. Phase, Tension, Speed and the song lock apply as for FL's shapes. FL export writes FL's Shape (FL has no such shapes) | LYNX extra |
+
+## Round 190kt: REA of third-party binaries — Crest's console law, Waves SSLComp on it
+
+The owner's permission of 2026-11-17 (REA on third-party plug-in binaries, clean-room) opened the plug-ins round 190hv
+could not capture. Evidence and method: `docs/analise/REA_rodada190kt.md`. In short: the SSL, Harrison, LiquidSonics,
+Antares, Sonic Academy, D16 and Overloud binaries are PACE-encrypted (nothing readable; their existing black-box banks
+stay what we have), Slate / Eiosis / Valhalla are readable but large, and the Waves V17 DSP DLLs are small and unwrapped.
+The Waves SSLComp DSP was read (§2): a feedback bus compressor with a log-domain rational soft knee and RC ballistics.
+
+**Crest Compressor — the Bus style's console law** (hidden `busLaw`, past Crest's info: no control, no string; off for new
+instances and for every project saved before). The detector hears the output (feedback), sample peaks clipped at full
+scale over a −60 dBFS floor; the over-threshold amount (nepers) goes through the loop gain (ratio − 1) and the knee
+`y² / (y − k)`; the log gain follows an RC network (attack charges, the release resistor discharges; Auto adds a slow
+second capacitor, 2.53 s, charging 0.17 × as fast). Threshold, ratio, knee, attack and release keep their knobs.
+Every constant is fitted on our own Waves-demo probes (`/mnt/e/lynx-work/rea190kt/cap`, 44 renders, mutes masked):
+steady curve 0.16 / 0.05 / 0.02 dB rms at 2 / 4 / 10 : 1 over four thresholds; time constants within 0.1 … 0.3 dB rms on
+level steps.
+
+**Waves SSLComp → Crest's console law** (was Compressor's classic voicing, round 190jh): threshold (per ratio step, the
+knob plus a fitted cubic), ratio, attack, release (Auto), make-up on the compressed path only (Crest's mix and output carry
+it), IN, mix, trim, side-chain high-pass.
+
+| reference → LYNX | bank | files | before → after | up / same / down |
+|---|---|---|---|---|
+| SSLComp → Crest (console law) | refcap182 programme | 25 | 5.68 → **7.56** | 21 / 4 / 0 |
+| SSL Native Bus Compressor 2 → Crest (console law, **not shipped**) | tp172c / refcap182 | 16 / 20 | 6.06 → 5.06 / 6.20 → 5.30 | kept on round 190ar's map |
+
+Bus Compressor 2's steady curve fits the same law (0.24 dB rms on tp172c's four stairs) but its timing does not match
+SSLComp's time constants and it has no step probes (its trial expired): it stays on its fitted map.
+
+**Old projects.** The console law runs only with `busLaw` = 1, which only the SSLComp translator sets. `lab/gold.sh`: Crest
+at all 11 styles × 2 settings (+ auto release) and the Bus default, 44.1 / 48 / 96 kHz × 3 programme signals, the base
+binary against the round's: 207 renders, 0 differ.
+
+**CPU** (35 s stereo at 48 kHz including file I/O, best of 5 on one core; `cpu/bench.log`): Crest's Bus style 1.12 … 1.27 s,
+the console law through the SSLComp translator 1.35 s, the old stand-in (Compressor) 0.98 s: about +1 % of a core per
+SSLComp instance. No latency. Tests: the mini runner (190js's list + every Crest-related test file + the round's) 543 732
+checks, 0 failures.
+
+**Still off:** the analog extras (noise, ripple, the small second-order term; off by default in the reference), the
+inter-sample peak allowance, the fade stage; Bus Compressor 2 (above); CLA-76 / CLA-2A read for structure only
+(REA_rodada190kt §5).
+
+
+## Round 190lb: black-box study of the licence-protected plug-ins — SSL 4K G Pink EQ, 4K G / 4K E filters
+
+The owner's rule of 2026-11-17: never break the encryption (round 190kt found SSL, Harrison, LiquidSonics, Antares, Sonic
+Academy, D16 and Overloud PACE-encrypted). Each plug-in is a black box: its own API data and audio captured before the
+trials ended, public manuals and hardware descriptions. Evidence, laws, sources and the spec of every plug-in of the group:
+`docs/analise/BLACKBOX_rodada190lb.md`. No plug-in of the group was loaded (trials ended 11-13; PACE's activation window).
+
+**SSL 4K G — Pink** (its default EQ colour; LYNX played it as Black): each band one second-order section fitted per
+render of tp172c's K4G_ir grid — boost / cut mirror each other, proportional-Q bells whose centre rises with the gain,
+resonant shelves whose turnover falls with the gain, no bell on LF / HF, the dials' full ±18 / ±22 / ±20 dB; ÷3 = ×0.242,
+×3 = ×2.88. Both colours: an 18 dB/oct high-pass from 14.8 Hz, a Butterworth low-pass with no bilinear cramping (dial up
+to 23.8 kHz), a hard ceiling at 1.1108. Hidden Ridge parameters `k4Pink` (+ `k4LmfDiv3`, `k4HmfMult3`) and `k4gLaw`, set
+only by the 4K G translation. **SSL 4K E**: Black / Orange high-pass 18 dB/oct (hidden `k4eHpLaw`; Brown keeps its
+12 dB/oct). **D16 Repeater** → Echoform at the delay role's preset (spec-based, unscored).
+
+| reference → LYNX | bank | files | before → after | up / same / down |
+|---|---|---|---|---|
+| SSL 4K G → Ridge Strip 4K (Pink, filters, ceiling) | tp172c K4G_ir / SSL_4K_G / K4G_dyn / K4G_mic + refcap182 | 594 | 5.17 → **6.26** | 249 / 343 / 2 |
+| · Pink impulse grid | tp172c K4G_ir | 206 | 4.07 → **6.73** | |
+| SSL 4K E → Ridge Strip 4K (Black / Orange high-pass) | tp172c K4E_ir / SSL_4K_E + refcap182 (changed settings only) | 24 | 4.67 → **6.25** | 24 / 0 / 0 |
+| Harrison 32C → Ridge Strip (measured only, nothing changed) | tp172c H32_eq | 148 | 5.4 | — |
+
+Down (owner decision): SSL_4K_G S1_stair 7 → 5 (a four-band Pink combination 0.8 dB loud at 1 kHz; its programme files
+rose) and K4G_ir BlHFBf1g5 4 → 3 (an extreme Black boost at the ceiling). Old projects: `lab/gold.sh`, 522 renders,
+0 mismatches. CPU: no measurable difference (law on / off in one build). Harrison 32C's exact EQ law (first-order
+shelves, bells at the dial, Q by |gain|, 12 dB/oct filters to 3.15 kHz / 160 Hz) waits for a "32C" voicing (owner
+decision, BLACKBOX §11).
+
+## Round 190le: Ridge Strip's "32C" voicing (Harrison 32Classic EQ law) and the Lustrous Plates translator
+
+Owner decisions taken (recommended options of BLACKBOX_rodada190lb §11.3 and §5.4). Work folder
+`/mnt/e/lynx-work/harrison190le/` (lab scripts, runs, logs).
+
+**Harrison 32C → Ridge Strip, 32C voicing.** A new voicing of Ridge's own engine (hidden parameter `h32`, saved only while
+on, with its own panel switch "32C console" beside the 4K / Modern ones: `hiddenEffectParamIndex` lets a layout reach a
+hidden parameter by name). Its EQ is the law measured in round 190lb, now reproduced exactly on all 148 renders of tp172c's
+H32_eq grid (lab `shelves*.py`, `bells.py`, `hp.py`): Lo shelf first order, bilinear prewarped at its centre (rms 0.0003 dB);
+Hi shelf first order, its magnitude matched to the analog shelf at DC, at its centre and at Nyquist (max 0.009 dB; plain or
+prewarped bilinear were 0.27 dB off at 10 kHz); bells (mids, and the end bands in Bell mode) magnitude-matched peaking
+sections (Vicanek) at the dial with Q(|g|) = 0.5249 − 0.00357 |g| + 0.00145 g² (≤ 0.004 dB); Butterworth 12 dB/oct high- /
+low-pass at the dial, magnitude-matched (the always-in 20 kHz low-pass is −2.40 dB at 18 kHz, as measured). The dials read
+the original's own host scales (texts at ninths of the travel): Hi shelf centre 400 … 2650 … 10000 Hz and Lo 25 … 145 …
+1500 Hz (straight lines broken at the middle), their bells 689 … 14 500 / 19 … 799 Hz, Hi-Mid 271 Hz … 8 kHz, Low-Mid
+104 Hz … 4.37 kHz, high-pass 25 Hz … 3.15 kHz, low-pass 20 kHz … 160 Hz, shelf plateau ±13.5 dB linear, bell gain ±13.74 dB
+on the original's taper; the Q dials hide (the 32C has none), the Brown / Black tabs dim. The translation now sets the
+voicing and its dials (the saved end-band frequency / gain are the Bell mode's; the shelf follows the dial); dynamics,
+trims and saturator as before. Switching a console voicing (E / 4K / Modern) on switches the 32C off and the reverse.
+
+| reference → LYNX | bank | files | before → after | up / same / down |
+|---|---|---|---|---|
+| Harrison 32C → Ridge Strip 32C | tp172c H32_eq (impulse grid) | 148 | 5.36 → **9.99** | 148 / 0 / 0 |
+| | tp172c H32_dyn | 72 | 6.74 → **7.51** | 27 / 45 / 0 |
+| | tp172c H32_sat | 20 | 5.30 → **6.25** | 11 / 9 / 0 |
+| | tp172c H32_mk | 42 | 6.57 → **7.02** | 10 / 32 / 0 |
+| | refcap182 programme | 20 | 5.70 → **6.90** | 10 / 10 / 0 |
+| | all | 302 | 5.88 → **8.54** | 206 / 96 / 0 |
+
+Curve error on the grid (30 Hz – 16 kHz, rms dB): shelves 1.16 / 0.82 → 0.00, end bells 0.72 / 0.75 → 0.00, mid bells
+0.38 / 0.42 → 0.00, filters 8.33 / 9.02 → 0.01 / 0.00 (`logs/curveerr_*.txt`).
+
+**LiquidSonics Lustrous Plates → Foil Plate.** Round 190bz is in; its Classic law is the old engine bit for bit, and round
+190ca's physical Foil fit of the plate (Iron, full band, Classic law) is the setting used, so no refit was needed. Its
+plain ValueTree state is read (`LP_FullState` › `StateVT` › PARAM id / value): Damper and Plate Model → Foil decay, the two
+700 Hz shelves and the low cut (190ca's knots: Damper 2.5 / 5, model 12 = "Reserved (using Iridium)"); Dry/Wet → Foil's Mix
+at the same wet : dry ratio (equal-power law; the ends are one path); Width scales the fitted width; Master Gain moves both
+shelves (a flat wet gain); a Master EQ low cut above the fitted one replaces it. Not mapped: modulation, dispersion, the
+band EQs, the high cut, dynamics.
+
+| reference → LYNX | bank | files | before → after (wave) | tail score | up / same / down |
+|---|---|---|---|---|---|
+| Lustrous Plates → Foil Plate (role preset → translator) | refcap182 programme | 20 | 1.55 → **2.20** | 4.00 → **6.07** | wave 13 / 7 / 0, tail 20 / 0 / 0 |
+
+Gate: old projects `lab/gold.sh` (base = round 190lb's fxrender): every strip whose translation is unchanged via `--sub`
+(SSL 4K E / G / B, Channel Strip 2, Vocalstrip 2, Harrison MPC), the Harrison 32C Ridge Strips a project saved before holds
+(base `--dump`), Ridge Strips set directly in every voicing — also with the 32C switch on under a console voicing — and
+Foil Plate as the role preset and at defaults; 44.1 / 48 / 96 kHz: **666 renders, 0 mismatches**. CPU (one binary, 280 s
+programme, user seconds best of 5): old translation vs 32C voicing 3.02 / 2.93 (S1), 5.97 / 5.88 (S3), 2.86 / 2.95 (S2):
+no measurable difference (same section count; the coefficients are designed once per block). Latency 0.
+
+## Round 190ky: REA of the Waves DSP, second pass — Crest's FET law, Waves CLA-76 on it
+
+Round 190kt's path (the Waves V17 DSP DLLs are small and unwrapped) applied to the brief's list in order of use. Evidence
+and method: `docs/analise/REA_rodada190ky.md`. CLA-76 was read completely (DSP and the control DLL's coefficient
+setters): a FET **feedback** limiter — the side chain hears the gained output, three parallel peak followers with their
+own attack / release times and weights (set by the attack knob) sum into the FET's control voltage, which reads a
+per-ratio transfer table. CLA-2A (a circuit-level opto model) and L2 (a look-ahead brickwall with a CIC-smoothed gain and
+a table-driven programme release) were read for structure only; RVerb, H-Delay, PuigTec were not reached.
+
+**Crest Compressor — the FET law** (hidden `fetLaw`, past Crest's info and past `busLaw`: no control, no string; 0 for new
+instances and every project saved before). The detector hears the input × the gain applied now; two (of three) peak
+followers sum into a control level; the gain (dB) is `−S1·W1·softplus((L − T1)/W1) − S2·W2·softplus((L − T2)/W2)`, floored
+at −range; a fixed wet-path tone (two first-order shelves). Ten voicings (Blacky / Bluey × 20 / 12 / 8 / 4 / all) carry
+the second term, the followers' multiples and weights; threshold, ratio, knee, attack and release keep their knobs.
+LYNX's analytic law replaces the reference's tables (not read out); every constant is fitted on our demo-mode probes
+(`/mnt/e/lynx-work/waves190ky/cap`, mutes masked, a 1.5 s silent lead against the host's reset ramps).
+
+**Waves CLA-76 → Crest's FET law** (was the Bus style fitted around one factory state, rounds 127 / 148 / 190jh). Input
+and Output through their measured gains (the Output knob is far from its dB scale: −30 → −24 is +9.7 dB, −6 → 0 is
++0.9 dB); Input moves the threshold, both plus the voicing's small-signal gain make up the compressed path; attack /
+release per ratio group (20 / 12 / 8, 4, all); revision, comp off, mix (inside Crest: the dry path is the plain input)
+and trim.
+
+| reference → LYNX | bank | files | before → after | up / same / down |
+|---|---|---|---|---|
+| CLA-76 → Crest (FET law) | refcap182 programme | 25 | 4.16 → **6.92** | 21 / 3 / 1 |
+
+Per setting: D 5.6 → 7.6, X1 5.6 → 7.4, X2 4.0 → 6.6, X3 (all buttons, 40 % mix) 1.0 → 7.8, X4 (Bluey 12:1) 4.6 → 5.2.
+The one file down, X1_mix 8 → 7: its waveform match improved (ESR −23.9 → −28.1 dB) but its third-octave error moved from
+0.14 to 0.19 dB, over the score's 0.15 dB step. Owner decision 1 below. The 4:1 timing was refined on two of the five
+scored settings (D, X1; fit76p.py); 8:1, Bluey 12:1 and all buttons rest on the probes only.
+
+**Old projects.** The FET law runs only with `fetLaw` > 0, which only the CLA-76 translator sets. `lab/gold.sh` (base =
+rea190kt's binary): Crest at all 11 styles × 2 settings (+ auto release), the Bus default, the console law
+(SSLComp state and busLaw by hand), 44.1 / 48 / 96 kHz × 3 programme signals: 225 renders, 0 differ.
+
+**CPU** (`cpu/bench.log`, 35 s stereo at 48 kHz incl. file I/O, best of 5 on one core, under load ~22, so ±30 %):
+CLA-76 X1 / X3 states 0.91 / 0.86 s (old translation, Crest's Bus style) → 1.27 / 1.17 s (the FET law): about +1 % of a
+core per CLA-76 instance. No latency.
+
+**Tests:** `tests/Parity190kyTests.inc` (4) and `Vmatch127Tests.inc`'s CLA-76 expectations (now the FET law); the mini runner (190kt's list
++ the round's) 543 827 checks, 0 failures. No full Linux / Windows build, no --selftest (no UI change).
+
+**Still off:** the amplifier / output saturation stage, the analog noise and hum, auto make-up, the reset ramps (host
+artefacts in refcap182's first second); X4 (Bluey 12:1) stays at 5 (its release scaling is a model, no Bluey 12:1 step
+probe); CLA-2A, L2, RVerb, H-Delay, PuigTec, Valhalla FutureVerb and Slate / Eiosis not refit (REA_rodada190ky §5–§7).
+
+## Round 190kw: static REA of the references — Crest gets Pro-C 3's own style laws
+
+The owner allowed static reverse-engineering of the third-party binaries for parity (clean-room: the laws are understood
+and re-written in LYNX's own code; nothing copied, nothing bypassed). The binaries keep MSVC RTTI, which names every DSP
+class; the Pro-C 3 style laws were read from the decompiled classes and rebuilt (evidence, addresses and constants:
+docs/analise/REA_rodada190kw.md; lab /mnt/e/lynx-work/rea190kw/).
+
+**Built (Crest, hidden `crest::revision` = 1):**
+- Clean / Classic / Opto (the reference's "V1" styles): the instantaneous reduction of the side chain's sample level, smoothed
+  in dB by each style's own two-stage, program-dependent follower (every step 1 − exp(−ln 10 / T), T in samples); the
+  style's Bézier knee shape blended with the quadratic knee by the knob; attack lo + span · a³ and a release that shortens
+  with the attack, per style. Classic is a feedback design (its target reads the reduction already applied).
+- Vocal / Mastering / Bus / Punch / Pumping: the reference wires them from its generic gain computer (quadratic knee, ratio,
+  range; Vocal its own soft curve without ratio) and generic followers (attack / release blended with the step size, the
+  step's exponential lengthening, maxima between stages); Mastering also holds the reduction 10 ms and smooths it at 10 Hz.
+- A new Crest and a translated Pro-C 3 state run revision 1; a project or preset saved before keeps 0 (the fitted laws, bit
+  for bit); Live's device maps and the plug-in substitutes' Crest keep 0 (they were measured on the fitted laws); with Auto
+  release on, Clean / Classic / Opto keep the fitted law. Allround (Versatile), Smooth, Upward, Two-way (TTM), Op-El and
+  Vari-Mu are untouched (generated graph classes in the reference: not rebuilt this round).
+
+**Scores** (refcap030 bank, Pro-C 3 → Crest through the translator; before = the branch point, after = revision 1):
+
+| block | files | before → after | up / same / down |
+|---|---|---|---|
+| grid | 238 | 6.35 → 7.87 | 136 / 102 / 0 |
+| mode | 48 | 6.56 → 8.54 | 47 / 1 / 0 |
+| pairs | 36 | 6.22 → 9.44 | 35 / 1 / 0 |
+| prog | 42 | 5.95 → 7.64 | 24 / 18 / 0 |
+| sr44 / sr48 / sr96 | 20 each | 6.55 / 6.70 / 6.50 → 7.85 / 7.95 / 7.65 | 35 / 25 / 0 |
+| styles | 84 | 6.01 → 7.71 | 48 / 36 / 0 |
+| **all** | **508** | **6.30 → 7.99** | **325 / 183 / 0** |
+
+Per style (all blocks): Clean 6.59 → 8.91, Classic 5.73 → 8.96, Opto 5.76 → 8.21, Vocal 5.73 → 8.77, Mastering 5.46 → 8.00,
+Bus 6.13 → 9.18, Punch 7.05 → 8.95, Pumping 6.73 → 9.31; the six untouched styles are unchanged file for file.
+
+Other banks: refcap182's programme (Pro-C 3, 25 files) 6.04 → 7.52 (15 up, 0 down); tp172b's Pro-C 3 captures (20 files)
+6.2 → 7.5 (S1 / S2 / S4 up to 8–9, D and S3 unchanged, 0 down).
+
+**Old projects.** Revision 0 renders byte for byte as the base commit: `gold/gold.sh` (base fxrender against the round's,
+every Pro-C 3 style's state with the revision forced off + Crest defaults over five styles, 44.1 / 48 / 96 kHz): 57 / 57
+identical; fingerprints of both revisions in tests/Parity190kwGold.inc. The editor's static curve follows the law that runs
+(revision 1: the reference's curves; revision 0 unchanged).
+
+**CPU** (thread time on one pinned core, 20 s at 48 kHz in blocks of 512, best of 5, three runs; % of real time, revision 0 →
+1): Clean 0.54 … 0.64 → 0.46 … 0.58, Classic 0.46 … 0.62 → 0.46 … 0.64, Opto 0.50 … 0.61 → 0.35 … 0.55, Vocal 0.78 … 1.08 →
+1.01 … 1.06, Mastering 0.54 … 0.68 → 0.81 … 0.90, Bus 0.43 … 0.47 → 0.70 … 0.75, Punch 0.49 … 0.53 → 0.28 … 0.37, Pumping
+0.38 … 0.42 → 0.52 … 0.60. Bus / Mastering / Pumping cost up to +0.3 point of one core (three followers whose times move
+with every step: one exp each per sample; the coefficient is cached while the time holds). No latency change.
+
+**Still off:** Two-way (TTM) 7.38 keeps its measured three-band law (the reference's separate multiband object: read, not
+rebuilt); Clean / Classic / Opto's auto release. (Allround / Versatile: built in round 190lg; Smooth 5.08 and Op-El 5.85:
+built in round 190lp; Upward 6.62 and Vari-Mu 6.19: built in round 190mb; all below.)
+**Round 190lg — Allround = Pro-C 3's Versatile (its default style), revision 1.** Rebuilt from the reference's own graph
+(`VersatileCompressor_MainCompressorAlgorithm`, read statically; REA notes docs/analise/REA_rodada190lg.md): two gain
+computers on two readings of the linked side-chain level, working on the reduction share 1 − 10^(−GR / 20) — slow: 0.979 ×
+the level + 0.0203 × its 204 Hz low-pass, then the knob-timed follower (attack 0.8 ms + 249.2 ms · a³, release 10 ms +
+2.49 s · tan (1.2 r²) / tan (1.2), auto release k / (√y + 1)); fast: 0.91 × its 6.39 kHz low-pass, then a slew limiter
+(LYNX's own smooth fits of the reference's knob curves; its fall at half the fit, which reads round 108's measured
+release, 59.5 against 61.6 ms) — and the reduction max (slow, w · fast), w = 0.9 + 0.0398 · fast. The reference's random
+mixer drifts run as their mean; the attack knob's two step-dependent follower terms are not built (every reading scored
+lower on the bank). Revision 1 never shipped (round 190kw is on no released branch), so Versatile joins it: a new Crest
+and a translated Pro-C 3 state run it, a project saved before keeps 0, Live's maps and the substitutes keep 0.
+
+| bank (new time-based scorer, before and after) | files | before → after | up / same / down |
+|---|---|---|---|
+| refcap030 Pro-C 3, all blocks | 508 | 7.99 → **8.08** | 32 / 476 / 0 |
+| · Versatile files | 38 | 6.66 → **7.82** | 32 / 6 / 0 |
+| · grid / sr44 / sr48 / sr96 / styles | 238 / 20 / 20 / 20 / 84 | 7.87 / 7.85 / 7.95 / 7.65 / 7.71 → 7.96 / 8.10 / 8.15 / 7.90 / 7.82 | 32 up |
+| · mode / pairs / prog, every other style | | unchanged file for file | 0 / 126 / 0 |
+| refcap182 programme | 25 | 7.52 → **7.64** | 3 / 22 / 0 (D bass / drums / guitar) |
+| tp172b (its D settings are Versatile) | 20 | 7.55 → **7.95** | 4 / 16 / 0 (D: ESR −21 … −27 → −44 … −52 dB) |
+
+Old projects: `gold/gold.sh` (fxrender with the revision forced off against round 190kw's): 57 / 57 identical; the one
+revision-1 Allround fingerprint in tests/Parity190kwGold.inc moves to the new law. CPU (thread time, one pinned core, 20 s
+at 48 kHz, best of 5, three runs): Allround 0.62 … 0.66 % → 0.97 … 1.00 % of a core (+0.35 point: two gain computers, two
+low-passes and the share's exp / log a sample).
+
+**Round 190lp — Smooth and Op-El = Pro-C 3's own graphs (revision 1).** Read statically (REA notes
+docs/analise/REA_rodada190lp.md, part crest) and rebuilt in LYNX's own code on the reduction share 1 − 10^(−GR / 20), as
+Versatile:
+- **Smooth** — a feed-forward stand-in for a feedback design: a first gain computer (threshold + 0.21 dB, its ratio the
+  knob's up to 10 : 1 then easing towards 16 : 1) drives two followers (the knob times, release × 0.44; attack × 9,
+  release × 2.26) whose max (× 0.761 / 0.769) turns the side chain down before the main gain computer; that one (its
+  threshold × a factor of the ratio, 1 at 1 : 1 → about 1.18 at 20 : 1) drives C0 (the knob's attack, release × 0.43) and
+  C1 (attack × 9, release × 2.25); the reduction max (A · C0, C1), A = 1.0081 − 0.0123 · 0.610 · C0 · F0. Knob laws:
+  attack 0.25 s · a³, release 0.02 s + 2.48 s · tan (1.2 r²) / tan (1.2), auto-release constant from LYNX's fit of the
+  reference's curve.
+- **Op-El** — two gain computers (the knobs'; the knob's ratio with a fixed 30 dB knee and 60 dB range), their squared
+  shares followed by a fast (attack 0.998 × + 0.5 ms, release 0.596 × + 10 ms), a slower (9.99 × + 2 ms / 1.79 × + 30 ms)
+  and a very slow follower (149.9 × + 15 ms / 4.77 × + 80 ms), weighted 0.8 / 0.15 / 0.05 and summed in power; the first
+  reads the side chain through a wide −11 dB high shelf (LYNX's own second-order shelf at 0.4167 × the rate, ≤ 26.7 kHz).
+LYNX's smooth fits replace the reference's piecewise-linear curves (the ratio factor, the ratio easing, the auto-release
+constant). Not built: Upward (its loud-signal cut and expansion detector mode not decoded), TTM (a multiband object) and
+Vari-Mu (a feedback tube model): they keep their fitted laws. Revision 1 still never shipped, so both join it.
+
+| bank (time-window scorer, before = rea2_190lg's final fxr_m4) | files | before → after | up / same / down |
+|---|---|---|---|
+| refcap030 Pro-C 3, all blocks | 508 | 8.08 → **8.35** | 51 / 457 / 0 |
+| · Smooth files | 26 | 5.08 → **7.96** | 26 / 0 / 0 (stairs ESR −9 … −20 → −39 … −54 dB; mix −24 → −31) |
+| · Op-El files | 26 | 5.85 → **8.19** | 25 / 1 / 0 (stairs ESR −14 … −24 → −28 … −38 dB; mix −28 → −57) |
+| · grid / prog / styles blocks | 238 / 42 / 84 | 7.96 / 7.64 / 7.82 → 8.33 / 7.79 / 8.31 | the 51 up |
+| · every other style's file (all blocks: mode, pairs, sr44 / 48 / 96 included) | 456 | unchanged file for file (score, rms, spectrum, ESR) | 0 / 456 / 0 |
+| refcap182 programme / tp172b (no Smooth or Op-El setting) | 25 / 20 | 7.64 / 8.0 = | 0 / 25 / 0, 0 / 20 / 0 (identical metrics) |
+
+Old projects: `gold/gold.sh` (fxrender with the revision forced off against rea2_190lg's): 72 / 72 renders identical (every
+Pro-C 3 style's state, the style values and the Smooth / Op-El voicings at 44.1 / 48 / 96 kHz); revision-0 fingerprints
+(tests/Parity190lpCrestGold.inc) equal the base's. CPU (thread time, 20 s at 48 kHz, best of 5, three runs, machine under
+load ~27): Smooth 0.62 … 0.68 % → 1.27 … 1.39 % of a core (+0.65 point: four followers, two gain computers and their
+exp / log a sample), Op-El 0.61 … 0.73 % → 1.03 … 1.16 % (+0.43 point: three followers, two gain computers, the shelf;
+Allround in the same runs 0.65 … 0.66 → 0.93 … 1.06, as round 190lg measured).
+
+**Round 190mb — Upward and Vari-mu = Pro-C 3's own Upward graph and Vari-Mu tube node (revision 1).** Read statically (REA
+notes docs/analise/REA_rodada190mb.md, part crest) and rebuilt in LYNX's own code:
+- **Upward** — the side chain's level (instant attack, 5 ms release, dB) into an expansion gain computer (the dB under the
+  threshold through a one-sided quadratic knee, × (1 − 1 / ratio), within the upward range = the range knob, at most 36 dB);
+  the lift is L − follower (L − E (level)), L the lift at silence, the follower on the knob times (attack 0.25 s · a³,
+  release 0.2 + 2.3 F (r) s, F LYNX's smooth fit of the reference's curve; auto 9 r² + 1). Measured on the reference's
+  stairs [EXEC] and applied as such: a level-independent cut of (1 − 1 / ratio) · √a · (threshold + the upward range) dB
+  (0 / 2.63 / 5.26 / 10.53 dB at threshold −48 / −30 / −24 / −12, ratio 4, attack 10 ms; the 5 dB round 190lp's build
+  missed). Without any bound the rebuild is near-exact (the 26 Upward files 9.92, ESR −63 … −98 dB); LYNX keeps issue
+  #77's bound (a lift never takes the instantaneous level above the threshold: no boosted first hit after a lifted gap),
+  which costs the programme and level-step files 9.92 → 8.65 (owner decision).
+- **Vari-mu** — a push-pull tube stage: the side chain's sample 6 dB down swings around a bias b on both sides of LYNX's
+  own tube curve (a quintic fitted to the reference's shape) and a tanh; the gain is (tanh T (b + d) − tanh T (b − d)) / 2d.
+  Feedback: the stage's own output over the threshold (linear; the knee in dB) drives one follower (attack 0.249 (a² + a³ −
+  a⁴) + 0.001 s, release 0.005 + 0.97 tan (1.2 r²) s, auto 3.6 r² + 0.1), b = (r' − 1) × that, r' = (1 − 0.5 √(knee / 60)) ×
+  the ratio's own scale (1 / 40 / 80 at 1 / 10 / 100 : 1, LYNX's smooth fit). The stairs land within 0.06 dB.
+- **TTM** (not rebuilt): the reference's multiband object splits at 88 Hz / 2.5 kHz (LR4), the split LYNX's measured
+  two-way law already runs; its band processors (hold, look-ahead smoother) are the next step.
+
+| bank (time-window scorer, before = parity190mb's fxr_m0) | files | before → after | up / same / down |
+|---|---|---|---|
+| refcap030 Pro-C 3, all blocks | 508 | 8.35 → **8.54** | 48 / 460 / 0 |
+| · Upward files | 26 | 6.62 → **8.65** | 22 / 4 / 0 (stairs ESR −28 … −34 → −55 … −97 dB) |
+| · Vari-Mu files | 26 | 6.19 → **7.96** | 26 / 0 / 0 (stairs ESR −21 … −28 → −45 … −48 dB) |
+| · grid / prog / styles blocks | 238 / 42 / 84 | 8.33 / 7.79 / 8.31 → 8.63 / 7.93 / 8.56 | the 48 up |
+| · every other style's file (all blocks) | 456 | unchanged file for file (score, rms, spectrum, ESR) | 0 / 456 / 0 |
+| refcap182 programme / tp172b (no Upward or Vari-Mu setting) | 25 / 20 | 7.64 / 7.95 = | identical metrics |
+
+Old projects: `gold/gold.sh` (fxrender with the revision forced off, index 53, against fxr_m0): 72 / 72 renders identical;
+every other style's translated state renders byte for byte as fxr_m0 (108 / 108, 44.1 / 48 / 96 kHz); revision-0
+fingerprints (tests/Parity190mbCrestGold.inc) equal the base's. A Vari-mu project saved before round 190v (law off) keeps
+its classic law under any revision. CPU (thread time, 20 s at 48 kHz, best of 5, three runs, load ~11): Upward 0.54 … 0.56 %
+→ 0.49 … 0.50 % of a core (two followers and one gain computer a sample), Vari-mu 0.45 … 0.46 % → 0.81 … 0.84 % (+0.37
+point: two tanh, the tube curve twice and a log a sample).
+
+**Round 190mj, Crest TTM — Two-way = Pro-C 3's own TTM band processors (revision 1).** Read statically (REA notes
+docs/analise/REA_rodada190mj.md, part crest: `TTMCompressor`, its three `TTMCompressor_BandProcessor1`s, their knob
+update and run-time wiring) and rebuilt in LYNX's own code. The reference is a true three-band compressor (the plug-in
+level installs each band's gain on that band's audio) on its own split, fourth-order Linkwitz-Riley at 2^6.4622 =
+88.17 Hz and 2^11.2877 = 2.5 kHz (round 190al's measured 88 Hz left a 0.3° error at 100 Hz). Per band:
+- the level: the magnitude, held for the Hold time, held again over the look-ahead, squared, one follower on that power,
+  back to dB (an RMS-like reading); attack 1/2 / 1/4 / 1/8 of the knob's time (low / mid / high), release 1/4 / 1/4 /
+  0.1125 of the knob's, auto release k / (√y + 1), k = 3.6 (T / 2.5 s)² + 0.1;
+- a downward gain computer (the knob's knee, centred) at the threshold + 0 / + 3 / − 2 dB, ratio 2/3 / 2/3 / 1 × the knob's,
+  and an upward one (one-sided knee) at the threshold − 7 dB + half the knee, ratio 1 + 3.17 √((ratio − 1) / 99), within
+  0.6 × the range; the gain = lift − reduction, smoothed over the look-ahead (two moving averages);
+- [EXEC] a level-independent cut, the same in every band: 0.6 · (1 − 1 / ratio) · √a · (threshold + 0.6 × range) dB when
+  positive (trial190k's TTM grid: scale 0.601, 0.04 dB rms over 189 settings — Upward's cut at 0.6);
+- oversampled, the audio is split at the oversampled rate (the reference runs its graph there; the band gains at the
+  base rate are brought up through the audio's own up path).
+LYNX keeps issue #77's fade (no lift of floors under −80 dBFS, none by −100) and its threshold bound on the lift; revision
+0's 30 dB ceiling is not kept (the upward computer's 0.6 × the range bounds the lift). The reference lifts quiet floors:
+without the fade the TTM files score 8.62 instead of 8.54 (owner decision; recommended: keep it). Revision 1 still never
+shipped, so TTM joins it: a new Crest and a translated Pro-C 3 state run it; projects saved before keep 0.
+
+| bank (time-window scorer, before = parity190mj's fxr_b0) | files | before → after | up / same / down |
+|---|---|---|---|
+| refcap030 Pro-C 3, all blocks | 508 | 8.54 → **8.60** | 24 / 484 / 0 |
+| · TTM files (grid / prog / styles) | 26 (17 / 3 / 6) | 7.38 → **8.54** (7.24 / 7.67 / 7.67 → 8.53 / 8.33 / 8.67) | 24 / 2 / 0 (1x stairs ESR −42 … −45 → −53 … −59 dB; 2x … 16x tc −36 → −57 dB; mix −33 → −58) |
+| · every other style's file (all blocks) | 482 | unchanged file for file (score, rms, spectrum, ESR) | 0 / 482 / 0 |
+| refcap182 programme / tp172b (no TTM setting) | 25 / 20 | 7.64 / 8.0 = | identical metrics |
+| trial190k / trial187b TTM grids (evidence; round 190v's bank, traj = 5 ms gain-trajectory rms) | 506 | 7.53 → 8.32 (traj 0.30 / 0.14 / 0.25 → 0.05 / 0.11 / 0.16 dB) | 271 / 229 / 6 (the 6: level-step files at 2 : 1 / 0.25 ms, 0.02 dB louder: ESR −61 → −51 dB, past the scorer's −55 dB line) |
+
+Old projects: `gold/gold.sh` (fxrender with the revision forced off, index 53, against fxr_b0): 72 / 72 renders identical;
+every other style's translated state (Upward and Vari-Mu included) renders byte for byte as fxr_b0 (117 / 117, 44.1 / 48 /
+96 kHz); the revision-0 two-way fingerprints (tests/Parity190mjCrestGold.inc) equal the base's. CPU (thread time, 20 s at 48 kHz in blocks of 512, best of 5, three
+runs, load ~7): Two-way 1.10 … 1.18 % → 1.14 … 1.23 % of a core (+0.04 … 0.09 point: one follower, two gain computers and
+two logs per band and channel a sample). Oversampled, the audio's split runs at the oversampled rate (nine biquads per
+channel and up-sample, plus six gain up-samplers). Not tested on references: look-ahead, Hold, auto release (no capture
+sets them).
+
+## Round 190kw (Timeless 3 translator): FabFilter Timeless 3 → Echoform (the hidden line law)
+
+0.1.30 plugin parity. Black-box on captures already on disk (lab and evidence: `/mnt/e/lynx-work/rea190kw/tl3/`,
+REA_part.md). Same score as rounds 190iq … 190js (`scripts/fxparity.py`, 0–10): the references' own renders against LYNX
+loading the plug-in's saved state through its substitute.
+
+**Before.** `[fabfilter-timeless]` played Fruity Delay 3 at FL's default whatever the state said: 2.37 / 10 on refcap030's
+Timeless 3 bank (279 files), the lowest FabFilter row.
+
+**The state.** FFBS v1, 1007 values, one per parameter of the plug-in's own VST3 list in its order (refcap182's parameter
+dumps name every index; the plug-in's parameter-set order read statically agrees): delay time (the normalised knob), time
+pan, offset, sync, read mode, freeze, ping pong, 15 taps, feedback (0 … 2) / pan / cross mix / inverts, six filters
+(log2 Hz, gain, pan, peak, style, shape, slope, enabled, used), drive, lo-fi, diffuse, dynamics, pitch, width, wet level
+/ pan, mix (−1 … 1). Every capture's Filter 1 is "unused": its 55 frequency × style renders are the same sound.
+
+**What the reference does (measured).** The delay time knob, read off the echoes' sample positions at 44.1 / 48 / 96 kHz
+and the display texts (5 ms … 5 s; no closed form fits, so a monotone cubic in log ms through 11 points); echoes on whole
+samples; the dry at unity up to Mix 50 %, the wet 2 × Mix; the echo flat to 15 kHz through a linear-phase low-pass on
+every read (−2.3 dB at 20 kHz, −6 dB at 24 kHz at 48 kHz) and a 15.5 Hz one-pole low cut in the loop; the feedback per
+pass = the stored fraction; nearly linear (−0.08 dB at a 0 dBFS impulse), the loop settling near ±6 above 100 %; ping
+pong feeds the start side's own input only (programme regression: left echo 0.60 × left input, −0.03 × right).
+
+**Stand-in: Echoform** (the multi-mode echo already playing H-Delay, SuperTap and the Soundtoys delays). Fruity Delay 3 is
+FL-exact and has no line to match the reference's dry / wet law, read filter or whole-sample times; Echoform's Clean mode
+reaches them with one hidden addition: **the line law** (`echoform::lineLaw`, past the info's parameters and its revision:
+no control, no text; saved while non-zero; set only by a translated Timeless 3 state or the entry's preset `#109=1`): the
+reference's dry / wet law, the read through a Kaiser-windowed sinc fitted per rate (44.1 kHz: half length 12, cutoff 0.94
+of Nyquist, β 11; 48 kHz: 8 / 0.9175 / 9.5; 96 kHz: 4 / 0.8625 / 6.5; residual −44 … −49 dB under the echo), whole-sample
+delays, a 5.5 tanh (x / 5.5) limit instead of the Clean shaper and the line's 2 tanh (x / 2), and in ping pong the start
+side's own input. Without it (every project and preset saved before) Echoform renders bit for bit as before (six Echoform
+settings and Fruity Delay 3 compared byte for byte against the base build). The translator `timeless3`
+(`fabfilter::fromTimeless3`) carries delay time / sync (1/2 … 1/16, dotted / triplet offsets) / time pan, feedback (ping
+pong: the square, as Echoform's ping-pong loops √gain per side), feedback pan / cross mix, mix, width, wet level / pan,
+freeze, the filters in use (low pass → high cut, high pass → low cut), drive and diffuse; the last groups are by meaning,
+not measured (no capture uses them). Not carried: the extra taps, lo-fi, dynamics, pitch shift, feedback invert, the M/S
+channel mode, the modulation sources. Without a readable state (Timeless 2): the reference's default (a single 350 ms
+echo, no feedback, Mix 50 %, the line law).
+
+| refcap030 Timeless 3 block | files | before → after | up / same / down |
+|---|---|---|---|
+| grid (Filter 1 style × freq, inert: S1 250 ms / 50 %; ping pong × feedback, left impulse) | 125 | 1.94 → **7.68** | 122 / 3 / 0 |
+| grid2 (delay time × feedback 0 … 200 %, 96 kHz) | 25 | 2.16 → **5.88** | 24 / 1 / 0 |
+| mode (read mode, filter style, channel mode on S1) | 45 | 3.00 → **6.00** | 45 / 0 / 0 |
+| pairs (time × feedback, feedback × filter freq) | 36 | 1.75 → **5.03** | 36 / 0 / 0 |
+| sr44 / sr48 / sr96 (D, S1, S2 ping pong, S3 width 0) | 48 | 3.38 / 3.44 / 3.56 → **7.94 / 7.94 / 7.56** | 47 / 1 / 0 |
+| **all** | 279 | **2.37 → 6.93** | 274 / 5 / 0 |
+| refcap182 programme (D / S1 / S2 / S3 × drums, bass, guitar, vocal, mix) | 20 | 3.45 → **7.25** | 20 / 0 / 0 |
+
+What is still off: feedback at 100 % and above (the reference's loop grows to about ±6 and self-oscillates from nothing
+in ping pong; scores 1 … 5), the mode block's ir renders (the reference put the same state's echo at 12000 samples there and
+at 11999 in grid / sr48: a one-sample spread in its own captures; 4 / 10 on those 15 files), S1's programme with louder
+peaks (5 … 7). CPU (thread time, 20 s at 48 kHz, blocks of 512, best of 5, three runs on a loaded machine): Fruity Delay 3
+at its default 0.68 … 0.84 % → Echoform from the D / S1 / S2 states 1.50 … 2.12 % (the same settings without the line law
+1.32 … 1.68 %): Echoform's engine costs about twice Fruity Delay 3's (+0.8 … 1.2 points of one core).
+## Round 190kw (VintageVerb → Epoch)
+
+Built from the laws recovered by static REA of ValhallaVintageVerb (docs/analise/REA_rodada190kw.md §4; clean-room, LYNX's own
+code and tables). Lab and evidence: `/mnt/e/lynx-work/rea190kw/vvimpl/` (REA_part.md). Same score as rounds 190iq / it
+(`scripts/fxparity.py`, 0–10), the reference's own renders against LYNX loading the saved state through its translator.
+
+The step is a **hidden parameter past 190it's revision**: `verbs::epoch::loopLaw` (index 19, no control, no string, saved
+while non-zero). It is read only with the Measured law and revision 1. New instances and the VintageVerb translator get it.
+A project or preset saved before loads 0, so revisions 0 and 1 render bit for bit as the base commit did. Gold: 72 / 72
+renders (12 settings × revision 0 / 1 × 44.1 / 48 / 96 kHz, `gold/`); fingerprints in `tests/Parity190kwVvTests.inc`.
+
+| What the reference does (static, checked on the captures) | What loopLaw changes |
+|---|---|
+| No per-mode output gain. Each mode is a loop whose gain is the RT60 law over N gain stages, the input entering after a stage, so the wet energy is E(T, s) = E0 / (1 − 10^(−6 ℓ(s)/T)) with ℓ = c·L(s)/N | Epoch's level follows that law per mode: the base level at 0.513 s (the mode sweep's impulse energy), plus the reference's growth over Decay and Size (its own loop-length law per mode), minus Epoch's own growth. Epoch's growth was measured once per mode at 0.513 … 70 s, and over Size it is (0.3 + 0.7 s)^−0.64 at any Decay. Revision 1's per-mode tone trims still fade out by 1.41 s |
+| The first 80 ms hold over Decay (−10.65 dB at 0.51 / 7 / 33 s); Epoch's rose 3 dB from 2 to 4 s | The early taps hold their long-decay level at every Decay |
+| Spectra differ, so the best-scoring level is not always the energy match | Fitted on the scores: Concert Hall +0.3 dB (its own-growth knots fitted to the 2.9 … 33 s captures), Room −0.4 dB, Bright Hall +1.25 dB, Grit Plate −3.25 dB, Gated −2 dB. Drift Chamber keeps revision 1 (its test signal lost a step) |
+
+Concert Hall against revision 1 (`tests/Parity190kwVvTests.inc`): +2.3 dB at Decay 0.51 s, −1.3 dB at 7 s (the analyst's
+law: +2.0 / −1.3).
+
+**Scores** (refcap030 bank, 154 files; before → after; up / same / down):
+
+| Block | files | before → after | up / same / down |
+|---|---|---|---|
+| mode (ReverbMode + ColorMode sweeps, 0.51 s) | 96 | 2.16 → **2.74** | 56 / 40 / 0 |
+| pairs (PreDelay × Decay 0.51 / 7 / 33 s) | 18 | 3.44 → **3.89** | 8 / 10 / 0 |
+| sr48 (D, S1 … S4) | 20 | 3.50 → **3.70** | 4 / 16 / 0 |
+| sr96 | 20 | 3.60 → **3.70** | 3 / 16 / 1 (S1 impulse 4 → 3) |
+| **all** | 154 | **2.67 → 3.12** | 71 / 82 / 1 |
+
+Other Epoch banks (round 190it's `gate2.py`): tp172d's matched settings 3.73 → 3.73 (15 files, 0 / 15 / 0), verb183b's captures 3.56 → 3.89 (18, 6 up, 0 down), refcap182's programme 3.48 → 3.64 (25, 4 up, 0 down).
+
+**CPU** (thread time, 20 s at 48 kHz in blocks of 512, best of 5, two runs; `cpu/bench.log`, a loaded machine ±15 %):
+Concert Hall default 2.00 % (base) / 2.04 % (new instance); Concert Hall 0.51 s 1.98 / 1.99; Room 2.90 / 3.03; Plate 7 s
+2.38 / 2.55. Revision 0 / 1 forced on the round's objects: 1.90 … 2.97 %, the same as the base within the noise. The step
+adds a few `pow` / `log10` per block in `configure`, not per sample. No latency change.
+
+**Still off / not built:**
+- The per-mode Size law in the DSP (only the level follows it; Epoch's lines still scale by 0.3 + 0.7·Size). There are no
+  captures at Size ≠ 100 % except Concert Hall's.
+- RT = Decay with a first lap free of Decay, as a DSP change. 1970s at half the host rate and the ×0.64 mod depth.
+- The early level at long decays is 1.5 … 2 dB under the reference's −10.65 dB at 7 … 33 s, because the law scales the
+  whole wet path.
+- 96 kHz: at Decay 0.51 s the reference is 1.3 dB quieter at 96 kHz than at 48 kHz against Epoch. With the law, sr96 S1's
+  impulse is +1.6 dB over it (4 → 3; the setting's sweep, test signal and music there went up). A 96 kHz trim is not
+  built (owner decision: the rate dependence is Epoch's, not measured further).
+- Score-led stands: Grit Plate −3.25 dB and Gated −2 dB sit under the impulse's energy match (their test-signal / impulse
+  files score higher there). Smooth Room's +2.5 dB (test signal only) and Drift Chamber's +1.5 dB (impulse only) were not
+  taken.
+
+## Round 190kv: the Soundtoys factory presets recognised (fingerprint of the encoded payload → their own settings)
+
+Follows round 190ku (the state container). Lab and evidence: `/mnt/e/lynx-work/stoys190kv/` (HANDOFF.md);
+docs/analise/REA_rodada190kv.md. Public VST3 API only (our hidden host, one process per preset); no Frida, nothing patched.
+
+**What was wrong in 190ku.** Its wrapper looked only for `ARCHIVE =` (most factory files say `PRESET =`) and left the fxb
+chunk size stale, so the plug-in's parser raised a visible "Syntax Error Expected '{'" box: that was the "hang". Fixed
+(`scripts/wrap2.py`), every factory preset loads; none needed the GUI.
+
+**Captured:** all 631 factory presets of the eight Soundtoys plug-ins that run here, each in its own hidden host
+(values + re-saved state), plus a 60-per-host pass of all 2 026 presets of the 23 installed plug-ins (lab record
+`lab/factory_record.tsv`, numbers and hashes only). Two saves of one setting differ only in a few volatile fields (the
+last 24 characters, characters 300 … 369), so LYNX matches a **fingerprint** without them: stable on 160 / 160 presets
+saved twice, shared only by duplicate presets, and it recognised 112 / 112 independent re-saves.
+
+**Built:** `translateSoundtoysFactory` (core/SoundtoysFactory190kv.inc, 639 fingerprints of 314 presets) after the
+round-136 tables: a hit plays the preset's own values (round 190is's value maps; Decapitator → Ember Classic; Little
+AlterBoy → LYNX Tune) on the effect's new-instance values; a miss leaves the substitute's preset bit for bit. A preset
+ships only if, rendered against the official plug-in (all 371 candidate presets on `stim`, 101 of them also on `mix`), its mapped values score at least the fallback on every file. The rows below are the final binary.
+
+| bank (as LYNX loads it) | files | before | after | per file |
+|---|---|---|---|---|
+| refcap030 PrimalTap (190is's bank) | 165 | 3.39 | 3.39 | 165 identical |
+| refcap030 Little PrimalTap | 108 | 3.53 | 3.53 | 108 identical |
+| refcap030 EchoBoy Jr | 186 | 3.82 | 3.82 | 186 identical |
+| factory EchoBoy (named styles), stim | 152 | 3.19 | **3.93** | 90 up / 62 same / 0 down |
+| factory EchoBoy Jr, stim | 71 | 3.56 | **4.06** | 22 up / 49 same / 0 down |
+| factory PrimalTap, stim | 60 | 2.78 | **3.27** | 25 up / 35 same / 0 down |
+| factory Little PrimalTap, stim | 29 | 2.97 | **3.14** | 3 up / 26 same / 0 down |
+| factory Decapitator, stim | 47 | 2.77 | **4.26** | 33 up / 14 same / 0 down |
+| factory Little AlterBoy, stim | 12 | 2.42 | **3.33** | 9 up / 3 same / 0 down |
+| factory sample, stim + mix (6 plug-ins, 20 presets each; EchoBoy incl. Edited Style at the fallback) | 224 | 3.01 | **3.84** | 103 up / 121 same / 0 down |
+
+The refcap030 bank cannot move: its states are parameter sweeps saved through the API, not factory presets (of its 373
+Soundtoys states only Little PrimalTap's and Little AlterBoy's default-instance states are in the table, and their mapped
+values equal the fallback). The value-map ceilings of round 190is (EchoBoy 4.47, PrimalTap 3.76, Little PrimalTap 3.66,
+EchoBoy Jr 4.26) need arbitrary states decoded — not done. EchoBoy's refcap030 row is scored through tp172d's value map, not
+the translator, and is unchanged (4.13). Her own corpus (round 136, 187 states): 0 untouched factory presets, so her
+projects are unchanged. Not shipped: EchoBoy's Edited-Style presets (192: the style is not in the parameter list), PanMan
+(patterns not in the parameter list), Little Plate (no value map yet), presets that scored lower (9 EchoBoy, 10 EchoBoy Jr,
+13 PrimalTap, 15 Little PrimalTap, 9 Decapitator, 1 Little AlterBoy: the value maps miss their feedback-path / multiply / cut laws).
+CPU: no DSP change (the translator runs once per load: a binary search over ≤ 308 fingerprints). Latency unchanged.
+
+## Round 190kw (Saturn 2 → Ember): the styles' own laws (hidden revision)
+
+The reference's style laws were recovered by static analysis (round 190kw's analyst, `rea190kw/rea/sat2`) and written as
+LYNX's own code (`core/EmberSaturnStyles.inc`, `saturnCurve` / `saturnPreDb` / `saturnPostGain` in core/MixSuite):
+each style is a curve (arctan, x / (1 + x), tanh, sine, 2nd / 3rd order, the asymmetric tube curve, rectifier) with a
+power P and a negative-side scale B — `y = sign(x) · f((β|x|)^P)^(1/P) / β`, β = B below zero — a drive range (the
+pre-gain lo … hi dB over the reference's 0 … 100 %), a level compensation `10^(trim/20) · 2C / (F(G·C) − min(F(−G·C), 0))`
+(C = the style's reference level: a sine there keeps its peak-to-peak level), its own EQ before / after the curve and
+the band tone stack (low shelf 120 Hz, bell 600 Hz, high shelves 2.5 / 7 kHz; the amps 170 / 500 / 1500 / 4500 Hz).
+
+- Hidden `ember::revision` (index 163; a new Ember and a translated Saturn 2 state = 1, anything saved before = 0) and
+  `lawRate` (164: the reference's High Quality off — the law's curve at the base rate, the latency unchanged). Ember's
+  Drive keeps its scale; the reference's drive is `referenceDrive (driveDb (v))` = 1.2 v (the translator's 30 / 36 ×).
+- The law runs for the styles that scored up on the lab files and net up on the bank: Subtle / Clean / Warm / Broken
+  Tube, Subtle Tape, Warm / Old Tape, Tweed, Plexi, Brit Pop, Lead / Screaming Amp, Subtle Saturation. The others keep
+  round 150 / 152's measured characters (`lawCharacter`): Power Amp and Breakdown (net level / down on the bank: 3 / 2
+  and 3 / 6 files up / down), the transformers (their dynamic "LL" knee was
+  not recovered: ESR −11 → −15 dB but the IMD spectrum 4 … 8 dB off), Clean Tape / Gentle / Heavy Saturation (a steady
+  −0.7 … −1 dB level offset), Brit Rock / Smooth / Crunchy Amp (a 5.6 kHz segment 16 dB loud: their resonant low-pass Q
+  convention), the rectifier (the reference's saturates), Smudge / Foldback / Destroy (stages not recovered).
+- Lab (refcap030 grid subset, 168 files): base 3.375 → law (all styles) 3.643 (56 up / 27 down); without the style EQ
+  3.190 (18 / 44); with B read as 1 / B 3.625 — the EQ is part of the law, B as recovered.
+- Superb's 32× / Good's 8× keep Ember's 4× (8× scored no better on the lab files and costs twice the CPU).
+
+refcap030 bank (scripts/fxparity.py, Saturn 2 translated by `fromSaturn2`; per file before → after):
+
+| block | files | mean before → after | up / same / down |
+|---|---|---|---|
+| grid | 588 | 3.55 → 3.93 | 158 / 428 / 2 |
+| mode | 33 | 4.67 → 4.88 | 18 / 4 / 11 |
+| pairs | 54 | 3.78 → 4.41 | 28 / 23 / 3 |
+| sr44 | 20 | 5.55 → 6.10 | 9 / 8 / 3 |
+| sr48 | 20 | 5.60 → 6.10 | 8 / 8 / 4 |
+| sr96 | 20 | 5.60 → 6.10 | 8 / 10 / 2 |
+| prog | 84 | 4.31 → 4.38 | 13 / 63 / 8 |
+| **all** | 819 | 3.84 → **4.20** | 242 / 544 / 33 |
+
+All 33 files a step down are 6 → 5 (two 7 → 6, one 3 → 2 / 2 → 1) on broadband signals (25 of them `mix`) of the
+tube / tape styles (Clean / Warm Tube, Warm / Old Tape, Plexi): the waveform match improves (ESR −3 … −11 → −17 … −23 dB)
+but the third-octave balance crosses the 6-point limit (0.37 … 0.45 → 0.75 … 0.83 dB): a steady −0.5 … −0.9 dB level
+offset against the reference (its small-signal gain is ~1 dB higher than the recovered compensation gives — the same
+offset that kept Clean Tape / the saturations out) and up to +3.5 dB at 16 kHz (the cuts' Q convention; a Butterworth-at-
+Q-1 reading scored worse). Shipped as an owner decision (HANDOFF): net +0.36 over the bank, 242 up / 33 down.
+
+**Old projects.** Revision 0 renders byte for byte as the base commit: fxrender of the base (parity190js `fxr4`) and of
+the round over 16 Ember settings (characters, bands, drives, oversampling, PUNISH, effect law) at 44.1 / 48 / 96 kHz,
+48 files, 0 differ (`rea190kw/sat/ident.sh`); fingerprints in `tests/Parity190kwSatGold.inc`.
+
+**CPU** (thread time, 20 s at 48 kHz in blocks of 512, best of 5, three runs on one core under load; `rea190kw/sat/
+bench_g.log`), revision 0 → 1 at Ember's 4×: Round valve (Warm Tube) 0.86 → 1.03 %, Chime combo (Brit Pop: P = 0.8, 16
+EQ sections) 1.02 → 1.29 %, Worn reel (Old Tape) 2.40 → 1.17 %, Solo amp (Lead Amp) 2.64 → 0.97 %, three bands 6.17 →
+3.39 %; a translated Saturn state with High Quality off runs the curve at the base rate: 0.36 … 0.65 %. The P ≠ 1 styles
+read their curve from a per-band table (64 points per octave, < 3e-5 relative; two powf per oversampled sample cost
+2.4 %). No latency change.
+
+**Still off:** the transformers' dynamic knee, the rectifier, the base styles' level offset, the amps' resonant
+low-pass convention (round 150's characters stay for them); Dynamics, feedback, crossovers and the Smudger / Breakdown
+pitch internals keep LYNX's behaviour.
+
+### Round 190lg: the ~1 dB small-signal offset found (Saturn 2 → Ember, revision 1)
+
+- The offset was the reference's **channel output soft clipper** (static: a cubic `T · (1.5u − 0.5u³)`, u = clamp (k·x, ±1),
+  k = (1 / (12T²) + 2/3) / T, threshold T = 0 dB): small-signal gain 9/8 (+1.02 dB), ceiling 0 dBFS. Its absence was the
+  steady +1.02 dB the reference measured over the law on Clean / Warm / Broken Tube, the tapes, the saturations, Tweed and
+  the FX styles (identical at 44.1 / 48 / 96 kHz and every High Quality), and the extra compression near 0 dBFS at low drive.
+  With it the law fits the level sweeps within 0.03 dB at every level and drive. The Subtle styles and the transformers
+  measure without it (`saturnClipStyle`).
+- The cut filters' Q: the reference's Q 1 is Butterworth (LYNX scaled the resonant pair by q / √½: +1.3 dB at 31 Hz,
+  +1 … +5 dB at 12.7 … 16 kHz). The law's DC blocker is the reference's ~1.5 Hz (was 8 Hz: −0.3 dB at 31 Hz).
+- The law now also runs for Clean Tape, Gentle and Heavy Saturation (kept out in 190kw for that offset).
+- Scorer: round 190lg's time-based alignment window for before and after.
+
+refcap030 bank, base = rea190kw (Ember revision 0 law-free, as every project before) → round 190lg:
+
+| block | files | mean before → after | up / same / down |
+|---|---|---|---|
+| grid | 588 | 3.55 → 4.63 | 283 / 305 / 0 |
+| mode | 33 | 4.67 → 7.88 | 33 / 0 / 0 |
+| pairs | 54 | 3.78 → 6.20 | 44 / 10 / 0 |
+| sr44 | 20 | 5.55 → 7.80 | 14 / 6 / 0 |
+| sr48 | 20 | 5.60 → 7.75 | 14 / 6 / 0 |
+| sr96 | 20 | 5.60 → 7.80 | 14 / 6 / 0 |
+| prog | 84 | 4.31 → 5.04 | 37 / 47 / 0 |
+| **all** | 819 | 3.84 → **5.14** | **439 / 380 / 0** (round 190kw: 4.20, 33 down) |
+
+refcap182 programme 25 files 6.16 → 7.88 (19 up / 0 down); tp172b 20 files 5.1 → 7.75 (20 up / 0 down). Nothing down.
+Old projects (revision 0): 48 / 48 renders byte-identical to the base (`rea2_190lg/sat/ident.sh`). CPU (thread time, 20 s
+at 48 kHz, best of 5, `rea2_190lg/sat/bench_190lg.log`), revision 0 → 1 at 4×: Round valve 0.87 → 0.98 / 0.99 %, Chime
+combo 0.93 → 1.17 / 1.22 %, Worn reel 2.07 / 2.16 → 1.02 / 0.99 %, Open reel (Clean Tape, new on the law) 2.03 / 2.06 →
+1.09 / 1.14 %, Mellow clip (Gentle Saturation, new) 1.95 / 2.15 → 0.94 / 0.90 %, three bands 5.21 / 5.43 → 3.26 / 3.21 %;
+the clipper itself costs nothing measurable.
+
+**Still off after 190lg:** the amps' 4 … 8-section EQs above 5 kHz (bell / shelf Q conventions), the transformers' dynamic
+knee, Broken Tube above −15 dBFS (−1.6 dB), why the Subtle / transformer styles skip the clipper (measured, not found
+statically); Power Amp / Breakdown keep round 150's characters (the law still scored them down: lab 2.17).
+
+## Round 190lg (Pro-Q 4 → Facet EQ): the automatic threshold on the reference's own structure (hidden revision)
+
+Static REA of Pro-Q 4's `BandCompander` (REA notes docs/analise/REA_rodada190lg.md): with Auto on, the band's detector
+reads its per-sample magnitude against a peak follower of itself (instant rise, 10 s fall, never under −40 dB), in dB,
+through the usual gain computer, and the reduction runs through three followers whose times come from the band's
+detection region (10 Hz … 20 kHz by default) and the attack / release knobs. Facet runs this as **revision 1** of its
+automatic threshold (hidden `facet::autoRevisionParam` = 125): the follower and its constants are the reference's; the
+threshold / knee mapping stays round 190js's fit (the reference's Auto buses were not traced: the band moves from |range|
+under the peak level over a knee of 1.53 × |range|, which the captures confirm with the new detector); the three followers'
+times are the reference's laws with scales fitted on the captures' gain trajectories (f1 × 0.65, f2 attack × 0.05, f2
+release × 0.6: mean trajectory error 0.33 → 0.16 dB over the −30 / −15 / +15 / +30 dB sweeps, tc + stairs). Only the
+Pro-Q 4 translator sets it; a project saved before keeps round 190js's law; a plain Facet is unchanged (Auto is hidden).
+
+| bank (new time-based scorer, before and after; before = fxrG) | files | before → after | up / same / down |
+|---|---|---|---|
+| refcap030 Pro-Q 4 grid2 (the Auto sweep: Dynamic Range × Threshold) | 50 | 6.90 → **7.50** | 15 / 35 / 0 |
+| · range −30 / −15 / +30 dB, time-constant probe | 5 each | 3 / 5 / 5 → **5 / 7 / 7** | 15 up |
+| grid / mode / pairs / sr44 / sr48 / sr96 | 30 / 39 / 36 / 15 / 15 / 15 | 9.33 / 8.74 / 9.19 / 9.27 / 9.27 / 9.73 = | 0 / 150 / 0 |
+| **refcap030 Pro-Q 4, all blocks** | 200 | 8.61 → **8.76** | 15 / 185 / 0 |
+| refcap182 programme | 25 | 9.40 → 9.40 | 0 / 25 / 0 (no Auto band) |
+| tp172b | 20 | 9.35 → 9.35 | 0 / 20 / 0 (no Auto band) |
+
+Old projects: `gold/gold.sh` (fxrender with the revision forced off against the base binary: the five Auto states, every
+sixth grid / pairs state, refcap182's Pro-Q 4 states; 44.1 / 48 / 96 kHz): 48 / 48 byte-identical. CPU (one Auto band,
+thread time, one pinned core, 20 s at 48 kHz, best of 5, three runs): 0.24 … 0.26 % → 0.27 … 0.32 % of a core. Not built:
+the reference's start-up follower (its count's setter was not traced) and the band's own detection range (Facet has none:
+the reference's default is used for the times).
+
+## Round 190lg (Pro-MB → Prism Multiband): the band compander on the reference's own graph (hidden revision)
+
+Static REA of Pro-MB's `BandCompander` (REA notes docs/analise/REA_rodada190lg.md §7): per band the level in dB goes
+through the gain computer (quadratic knee, ratio, then a soft range 0.6 × knee + 12 dB wide), a peak hold (1.1 × the
+look-ahead + a fast-attack term), a two-pole low pass at 650 Hz / look-ahead ms, a slow follower A, max (A, the reduction),
+and follower B with the knob times; upward compression and downward expansion run the same graph on 36 dB − the
+reduction, scaled by range / 36. With the reference's look-ahead switch on, each band's detector leads the audio by half
+a period of its centre (at most 5 ms) + its own look-ahead, and the latency is 20 ms (as the reference). Prism runs this
+as **revision 1** (hidden `dyn::prism::revision` = 157, `lookaheadSwitch` = 158): only the Pro-MB translator sets it; a
+project saved before (saved count ≤ 157) keeps the measured detector of rounds 150 / 152, bit for bit; a new Prism is
+unchanged. The laws run at their reference scale (no fitted factor); the release knob is LYNX's own smooth curve.
+
+| bank (new time-based scorer, before and after; before = fxrG) | files | before → after | up / same / down |
+|---|---|---|---|
+| refcap030 Pro-MB grid | 18 | 7.50 → **8.83** | 16 / 2 / 0 |
+| grid2 | 50 | 9.10 → **9.78** | 20 / 30 / 0 |
+| mode | 39 | 7.62 → **9.10** | 27 / 12 / 0 |
+| pairs | 36 | 8.28 → **9.25** | 16 / 20 / 0 |
+| sr44 / sr48 / sr96 | 20 each | 7.85 / 7.90 / 7.90 → **9.25** each | 45 / 15 / 0 |
+| **refcap030 Pro-MB, all blocks** | 203 | 8.17 → **9.32** | 124 / 79 / 0 |
+| refcap182 programme | 25 | 7.64 → **9.16** | 20 / 5 / 0 |
+| tp172b | 20 | 7.60 → **9.05** | 15 / 5 / 0 |
+
+The worst files before: PA Threshold 0.8 × Range 0.8 mix (upward compression +18 dB) 3 → 8 (band gain error 3.3 →
+0.02 dB), M Look-ahead off mix 5 → 8, S2 mix 5 → 8. Old projects: `gold/gold.sh` (fxrender with revision 1 forced off
+against the base binary: every mode state, every third pairs state, every grid state, refcap182's five Pro-MB states;
+44.1 / 48 / 96 kHz): 99 / 99 byte-identical. CPU (one bass band, Pro-MB's default-like state, thread time, one pinned core,
+20 s at 48 kHz, best of 5, three runs): 0.85 … 0.92 % → 1.01 … 1.02 % of a core (the 20 ms look-ahead and the two
+followers). Not traced: the band's 0 … 2 output amount property (+0x108, default 1: kept at 1).
+
+## Round 190lf: REA of the Waves DSP, third pass — the Limiter's L2 law, PuigTec on Facet, CLA-2A's cell law, H-Delay's loop, TrueVerb's direct sound
+
+Rounds 190kt / 190ky's path (small, unwrapped Waves V17 DSP DLLs; black-box probes in Waves demo mode with a 1.5 s silent
+lead; clean-room: structure from REA, every LYNX constant fitted on our renders, no vendor table read out). Evidence:
+`docs/analise/REA_rodada190lf.md` (L2, PuigTec, the host finding), `REA_rodada190lf_dyn.md` (CLA-2A, CLA-76),
+`REA_rodada190lf_verb.md` (reverbs, H-Delay). **Host finding:** on refcap030's fxmeasure host `defaults` + `set` loses
+some Waves settings (renders with the previous setting's state); every probe of this round runs from component states
+(refcap182's, or crafted by `lab/mkcomp.py`).
+
+- **Limiter — the L2 law** (hidden [3]; [4] ARC, [5] trim; 0 = the classic limiter, every project saved before). L2's
+  make-up is exactly ceiling − threshold (0.999 / threshold at Ceiling 0 dB): the Gain knob carries it. A 64-sample window
+  (= latency) minimum of the needed gain, two moving averages of 27 and 38 samples (a spike's dip is box(64) ∗ box(27) ∗
+  box(38) to 0.0005), the manual Release as the 90 % recovery time, and ARC as a follower of the window minimum (107 /
+  218 ms) plus a release rate that follows the depth and the follower (fitted on 8 probes, 0.061 dB rms; the scored
+  renders not used). Waves L2 translates onto it.
+- **Waves PuigTec EQP1A → Facet EQ** (a new substitute entry: such projects had no stand-in). Eight zero-latency Facet
+  bands: the reference's flat response (+1.1 dB, its resampler's roll-off), the Low Frequency switch's own lift, the low
+  boost / atten as two shelves whose values are cubic polynomials of both knobs (the boost-and-dip interaction), the high
+  boost bell and the atten shelf interpolated over a 1.375-step knob grid × five bandwidths — fitted on ~1 000 impulse
+  probes. Facet's code is unchanged.
+- **Glow Leveler — the cell law** (hidden `Settings::cellLaw`; Waves CLA-2A only): a compact opto behaviour model —
+  feedback side chain through the Hi Freq weighting, a light with persistence, fast and slow conductances with
+  state-dependent release and an exposure memory, the high band reduced less (the tilt), the gain dial's measured make-up.
+  Fitted on our probes and, as a final refinement (stated), on refcap182's programme renders.
+- **Crest's FET law — CLA-76 Bluey 20 / 12 / 8**: a translator row (`cla76Times`) from Bluey step / release probes, knob 1's
+  release refined on X4; fetLaw values untouched.
+- **Echoform — hybrid law 1** (hidden; Waves H-Delay only): HiPass / LoPass (2nd order) and LoFi inside the loop, the
+  modulation as a smoothed, free-running triangle, as measured.
+- **Reeverb 2 — the direct law** (hidden; TrueVerb only, direct sound on): TrueVerb's exact first-order direct-sound shelf
+  by Distance, and a refit tail (decay, bass, damping, wet) for those settings.
+- **Quell Denoiser — the zero law** (hidden [5]; Waves NS1 only; sub-round after the crash, `REA_rodada190lf_ns1.md`): REA
+  of NS1's DSP (zero-latency split, per-band cuts transparent when open, a slewing noise-floor tracker, a soft thr⁴ weight,
+  a voice-activity flag) and of its saved states (the knob moves the split 60 Hz / 16 kHz → 110 Hz / 8 kHz, the band
+  centres, the low / high cuts 0 → −70 dB). At 0 % NS1 is exactly its all-pass pair (−40 … −71 dB ESR on refcap182's D):
+  Amount 0 is that bare pair and the matched engine fades in up to 20 % (from 20 % the engine alone, bit for bit). NS1's
+  20 … 100 % need its own moving layout and tracker (next round; probes ready in `waves2_190lf/ns1/cap`).
+
+| reference → LYNX | files | before → after | up / same / down |
+|---|---|---|---|
+| Waves L2 → Limiter (L2 law) | 25 | 7.32 → **9.52** | 25 / 0 / 0 |
+| Waves PuigTec EQP1A → Facet EQ (new entry) | 25 | no stand-in (n = 0) → **7.60** | — |
+| Waves CLA-2A → Glow Leveler (cell law) | 30 | 5.57 → **6.47** | 18 / 11 / 1 |
+| Waves CLA-76 → Crest (FET law, Bluey row) | 25 | 6.92 → **7.16** | 5 / 20 / 0 |
+| Waves H-Delay → Echoform (hybrid law 1) | 30 | 6.27 → **7.00** | 6 / 24 / 0 |
+| Waves TrueVerb → Reeverb 2 (direct law) | 25 | 3.96 → **4.20** | 3 / 22 / 0 |
+| Waves NS1 → Quell Denoiser (zero law) | 25 | 4.84 → **5.40** | 5 / 20 / 0 |
+| Waves RVerb / H-Reverb → Reeverb 2 (unchanged) | 25 / 25 | 3.48 / 3.16 | — |
+| Waves SSLComp, SuperTap (unchanged, checked) | 25 / 25 | 7.56 / 6.44 | 0 / 25 / 0 each |
+
+Scorer: `scripts/fxparity.py` as on this branch (round 190ky's; round 190lg's time-based alignment window is not in it).
+Per setting: L2 D 9.0 → 10.0, X1 7.2 → 9.8, X2 6.6 → 8.8, X3 6.0 → 10.0, X4 7.8 → 9.0; PuigTec D 8.0, X1 8.0, X2 6.8,
+X3 8.0, X4 7.2; CLA-2A D 6.4 → 7.4, S1 5.0 → 6.2, S2 5.0 → 6.0, S3 5.0 → 6.0, X1 5.8 → 6.8, X2 6.2 → 6.4; CLA-76 X4 5.2 →
+6.4; H-Delay X2 3.4 → 7.6, S2 3.8 → 4.0; TrueVerb X1 4.0 → 5.2. The one file down: CLA-2A X2_vocal 8 → 7 (its waveform
+match improved: ESR −25.5 → −26.2 dB, gESR −26.2 → −26.8; third-octave error 0.14 → 0.21 dB crosses the 0.15 step) — owner
+rule (one step down with a better waveform) applied, listed below. The reverbs: RVerb is exactly LTI and an independent
+reverb with its time-frequency envelope scores only 3.6 … 3.8 on this table (REA_rodada190lf_verb §1), so its decay law
+was not changed.
+
+**Old projects.** Every new behaviour runs only with its hidden law set by the translators. Gold renders (base = round
+190ky's binary, 44.1 / 48 / 96 kHz × 3 programme signals, byte-identical): the Limiter (default + 10 settings) and Facet,
+117; Glow Leveler's own and classic voicings + Crest, 153; Echoform's engines and styles, Reeverb 2 by hand and the
+unchanged reverb / H-Delay translations, 144; Quell (default, classic / matched engines, tracker, Listen, Output), 135 —
+**549 renders, 0 differ**.
+
+**CPU** (`/mnt/e/lynx-work/waves2_190lf/cpu/bench.log`: 35 s stereo at 48 kHz incl. file I/O, best of 5 on one core, base =
+round 190ky's binary, load ~15, so ±30 %: a plain file copy measured 0.84 / 0.71 s): L2 states 1.04 / 0.73 s → 0.86 / 1.10 s
+(ARC / manual; the law ≈ +1 % of a core at most), its latency 72 → 64 samples; PuigTec 0.92 s (Facet, eight bands: ≈ +0.6 %
+of a core against the copy; before it had no stand-in); CLA-2A 1.03 / 1.07 → 1.00 / 0.92 s, CLA-76 X4 1.11 → 0.94 s,
+H-Delay 2.67 / 2.70 / 1.99 → 2.06 / 2.25 / 1.86 s, TrueVerb 2.18 / 2.78 → 2.02 / 1.94 s, NS1 D / S1 2.10 / 2.05 →
+2.13 / 1.97 s (best of 7): no measurable change.
+
+**Tests:** `tests/Parity190lfTests.inc` (4: the L2 law hidden / off, brickwall and make-up, ARC vs manual release, the L2 and
+PuigTec translations), `Parity190lfDynTests.inc` (3), `Parity190lfVerbTests.inc` (6), `Parity190lfNs1Tests.inc` (4); expectations moved: Parity190jh (L2 → the
+law), VoiceMatchTests123 / Parity165x (CLA-2A on the cell law), Echo190dl / Parity190js (H-Delay / TrueVerb), VoiceToolsTests119 (NS1: 3 values). Mini runner
+(round 190ky's list + the round's four files): **543 929 checks, 0 failures**. No full Linux / Windows build, no
+--selftest (no UI change, no new strings; the train does those).
+
+**Owner decisions (reversible; the recommended option taken):** (1) CLA-2A ships on the cell law although X2_vocal goes 8 → 7
+(waveform better) and the law reduces a steady −6 dBFS tone 1.4 dB less than round 123's trial measured on one user state
+(VoiceMatchTests123 / Parity165x expectations moved to the new law); (2) TrueVerb's refit tail only with the direct sound
+on (with it off it would cost X4 0.2 … 0.6); (3) PuigTec stands in on Facet EQ (no dedicated Pultec engine: a new effect
+would need UI).
+
+**Still off:** Doubler2 (4.48), Waves Tune Real-Time (5.36) and RVerb / H-Reverb's decay (time / the table's ceiling);
+NS1 at 20 … 100 % (a new engine); PuigTec's mains hum, tube harmonics (−50 dB at −4 dBFS) and its resampler's
+fractional delay; L2's IDR dither; CLA-76's auto make-up and output saturation (no scored setting uses them).
+
+## Round 190ln (Valhalla reverbs): Foil Plate on ValhallaPlate's own EQ and bass decay; ValhallaRoom read, not changed
+
+Static analysis of the official ValhallaPlate / ValhallaRoom binaries by the owner's leave (clean-room: the laws understood,
+LYNX's own code written; nothing of the plug-ins copied). Evidence: docs/analise/REA_rodada190ln.md, lab
+`/mnt/e/lynx-work/rea3_190ln/vr/`. Score: `scripts/fxparity.py` with round 190lg's alignment window in time (~85 ms), the
+same scorer before and after.
+
+**Foil Plate ← ValhallaPlate (hidden `verbs::foil::reaLaw`, index 18, one past round 190it's revision).** Read only with
+revision 1 and the plate voicing off (the ValhallaPlate role; Little Plate's role never reads it). A new instance and a
+translated ValhallaPlate state get 1; a project saved before loads 0 and renders bit for bit as before (42 / 42 renders of
+revisions 0 and 1 at 44.1 / 48 / 96 kHz against the base commit's objects, plus 42 / 42 fxrender renders of translated states;
+fingerprints in `tests/Parity190lnVrTests.inc`).
+- Low / High EQ: the reference's first-order shelves — the bilinear transform of (gLow + gHigh·s/ω0) / (1 + s/ω0), the corner
+  at the panel's frequency (not pre-warped), ±12 dB linear in the value — in place of round 183b's second-order shelves placed
+  by ear (`Settings::shelfOrder`, LYNX's engine).
+- Bass decay: the reference's bass lines ring at Decay up to ~2.5 s and at up to 1.4 × Decay from ~10 s; Foil's bass
+  multiplier follows that law's ratio to the default 3 s (its voicings were fitted there).
+
+| Bank (ValhallaPlate captures → Foil Plate) | files | before → after | up / same / down |
+|---|---|---|---|
+| refcap030 mode / pairs / sr48 / sr96 | 124 | 3.73 → **3.76** | 4 / 119 / 1 |
+| verb183b captures | 18 | 3.78 → 3.83 | 1 / 17 / 0 |
+| refcap182 programme | 25 | 3.84 → 3.84 | 0 / 25 / 0 |
+| tp172d | 15 | 3.73 → 3.73 | 0 / 15 / 0 |
+
+Up: the Low EQ +7 dB impulse (spectrum 2.58 → 1.57 dB) and the Decay 1.5 s music files. The one file down (sr48 S3 impulse
+4 → 3) is the scorer's alignment on a diffuse tail: the bands moved < 0.1 dB but the found lag jumped from +16 to −74 ms.
+
+**ValhallaRoom → Atrium: read, not changed.** Its late network has 2 × 16 lines (ours 8), its HiCut is a Butterworth
+low-pass plus a first-order shelf on four inner paths. Atrium's level over Decay and its octaves from 125 Hz up are within
+~1 dB; the files at 1 … 3 are the test signal's 1 kHz staircase, a linear effect of the tank's fine structure (the reference
+flat within ±1 dB over ±4 Hz, ours ±4 … 12 dB). More modulation moved it 1 … 1.5 dB only — a denser late tank is its own
+project. Room scores unchanged (mode 3.31, pairs 4.22, sr48 3.44, sr96 3.38).
+
+## Round 190ly (Valhalla, part 2): the dense tank for ValhallaRoom only; Delay, FreqEcho and VintageVerb laws
+
+Black-box (refcap030 captures; clean-room: LYNX's own code and fits). Evidence: docs/analise/REA_rodada190ly.md, lab
+`/mnt/e/lynx-work/valhalla2_190ly/`. Score: round 190lg's scorer, the same copy before and after. Every change is a hidden value;
+with it off the round renders byte for byte as round 190ls (126 / 126 fxrender renders, `gold/gold.sh`).
+
+**0.1.30 rollup, step 10 (round 190me):** in the rollup, Epoch Verb already runs round 190kw's loop law (level over Decay and
+Size, step 9). With both on, ValhallaVintageVerb's refcap030 bank scored lower than with the loop law alone (mode 2.74 → 2.55,
+pairs 3.89 → 3.61, sr48 3.70 → 3.60, sr96 3.70 → 3.65; 37 files down, 11 up): the trim was fitted without the loop law. So a
+new Epoch keeps the trim **off** (the law stays, hidden index 20 after loopLaw 19, for a refit on top of the loop law); the
+Echoform ValhallaDelay law (index 115 in the rollup) and Spiral's rate law are merged as the round left them.
+
+- **Atrium (owner decision, perf-first):** the dense 32-line tank (`atrium::reaLaw`) is set only by the ValhallaRoom translator
+  (the substitute table's new `replaced = …` items, applied only when a slot replaces a device). A new Atrium is the light
+  8-line tank again (−29 % instructions against round 190ls); translated ValhallaRoom states keep the dense tank (scores as 190ls).
+- **Echoform ← ValhallaDelay (hidden `echoform::valhallaLaw`, set by the ValhallaDelay translator only):** −1.1 dB of loop gain
+  at Feedback 100 % (the reference fades 1.5 dB a pass, the tape loop grew), none at 70 / 160 %; the loop diffusion read back
+  out of the echo time (it made every pass 33 ms late) and 3.5 × as long, so the echo spreads around its time as the reference's.
+- **Spiral Echo ← ValhallaFreqEcho (hidden `spiral::rateLaw`, new instances / translated):** the analytic filter's phase turned
+  onto its 48 kHz phase at every rate (−66.7° and half a sample at 96 kHz); a steady tone through the loop now reads the same at
+  44.1 / 48 / 96 kHz (96 kHz was 2.2 dB off).
+- **Epoch Verb ← ValhallaVintageVerb (hidden `epoch::shortTrim`, new instances / translated):** Concert Hall's short-decay trim
+  (+1.3 … +2.7 dB from 500 Hz up at 0.51 s, faded out by 2.9 s; the lows keep the 0.1.27 voicing — the other banks need them).
+
+| Bank (refcap030 → LYNX) | files | before → after | up / same / down |
+|---|---|---|---|
+| ValhallaDelay → Echoform (mode / pairs / sr48 / sr96) | 164 | 3.96 → 4.04 | 6 / 158 / 0 |
+| … pairs | 36 | 3.94 → 4.22 | 4 / 32 / 0 |
+| ValhallaFreqEcho → Spiral Echo, sr96 | 16 | 3.31 → 4.81 | 13 / 3 / 0 |
+| ValhallaFreqEcho → Spiral Echo, sr48 | 16 | 4.06 → 4.06 | 0 / 16 / 0 |
+| ValhallaVintageVerb → Epoch Verb (all blocks) | 154 | 2.67 → 2.92 | 39 / 115 / 0 |
+| … mode (ColorMode / ReverbMode sweeps at 0.51 s) | 96 | 2.16 → 2.48 | 31 / 65 / 0 |
+| ValhallaRoom → Atrium (translated) | 116 | 3.80 → 3.80 | byte-identical |
+
+| Gate bank (other captures of the same plug-ins) | files | before → after | up / same / down |
+|---|---|---|---|
+| tp172d VintageVerb / Delay / FreqEcho / Room | 15 / 16 / 16 / 12 | 3.73 → 3.87 / 4.56 = / 4.50 = / 3.67 = | 2 / 57 / 0 |
+| verb183b captures VintageVerb / Delay / Room | 18 / 25 / 17 | 3.56 → 3.61 / 2.92 = / 3.88 = | 1 / 59 / 0 |
+| refcap182 programme VintageVerb / Delay / FreqEcho / Room | 25 / 20 / 20 / 20 | 3.48 → 3.64 / 4.20 → 4.25 / 4.25 = / 3.80 = | 5 / 80 / 0 |
+
+CPU (fxrender, 20 s incl. file I/O, instructions): Echoform's ValhallaDelay role +0.9 %, Spiral Echo at 96 kHz +1.8 % (0 at
+48 kHz), Epoch's short trim +0.01 %, a new Atrium −29 % (light tank).
+
+## Round 190mb (Valhalla, part 3): Supermassive's tone, FutureVerb, SpaceModulator levels, Epoch's merge and rate laws
+
+Black-box (refcap030's host for new probe renders; clean-room: LYNX's own code and fits). Evidence:
+docs/analise/REA_rodada190mb.md, lab `/mnt/e/lynx-work/parity190mb/`. Score: round 190lg's time-window scorer, the same copy
+before and after. Before = origin/valhalla2_190ly merged with origin/rea3_190lp (621cd37bd, `bin/fxr_m0`). Every change is a
+hidden value; with it off every render is byte for byte the before binary's (`gold/gold.sh`).
+
+- **Names:** the Valhalla plug-ins' own mode / colour names, read back through the host after each value was processed
+  (their value texts were stale): every translator map already agrees — SpaceModulator's modes run in Orbit's order.
+- **Nebula ← ValhallaSupermassive (hidden `nebula::toneLaw`, the translator only):** law 1's octave-band tone corrector after
+  the classic networks' loop, a per-mode gain + tone fitted on the Mode sweep, from Feedback 65 % to full at 80 %.
+- **Epoch Verb ← ValhallaVintageVerb:** the merge stacked round 190kw's loop-law level and round 190ly's short trim (+1.9 dB at
+  0.51 s); the short trim is refitted on top of the loop law (lows left to it, 1 kHz +2.5 dB for the staircase). Hidden
+  `epoch::rateLaw` (the translator only): the reference's own level change away from 48 kHz (Epoch itself is
+  rate-independent; the reference loses 1.4 … 1.7 dB of its early field at 96 kHz in the 1970s colour).
+- **Orbit ← ValhallaSpaceModulator (hidden `orbit::smLaw`, the translator only):** the wet level per mode (Up/Down −3.5, the
+  through-zero pair +4.8 / +4.0, Octo −6.5, Drift rise +0.8 dB), scaled by |feedback| (none at Feedback 0).
+- **Echoform ← ValhallaDelay (valhallaLaw):** from round 190ly's 80 … 140 % probe renders: −1.1 dB held from 100 to 120 %,
+  −0.5 dB at 140 %, 0 from 160 % (up to 100 % as round 190ly left it).
+- **Horizon ← ValhallaFutureVerb (hidden `horizon::revision`, new instances / translated):** the reference's tone and level per
+  reverb mode (Plate −0.8, Cathedral −3.4, Freeze +2.0, Gated −4.0 dB with their 500 Hz … 8 kHz tone; Hall and Space the tone
+  only; Room and Chamber untouched), from this round's FutureVerb probe renders (one host process per setting: its demo
+  opens holes ~40 s after load).
+
+| Bank (refcap030 → LYNX) | files | before → after | up / same / down |
+|---|---|---|---|
+| ValhallaSupermassive → Nebula, mode sweep | 48 | 3.23 → 3.75 | 19 / 29 / 0 |
+| … pairs / sr48 / sr96 | 58 | 5.39 / 5.60 / 5.70 = | 0 / 58 / 0 |
+| ValhallaVintageVerb → Epoch Verb, mode | 96 | 2.55 → 3.02 | 45 / 51 / 0 |
+| … pairs / sr48 / sr96 | 18 / 20 / 20 | 3.61 / 3.60 / 3.65 → 3.78 / 3.70 / 3.75 | 7 / 51 / 0 |
+| ValhallaSpaceModulator → Orbit, mode | 48 | 2.85 → 3.23 | 16 / 32 / 0 |
+| … pairs / sr48 / sr96 | 58 | 4.33 / 4.40 / 4.40 = | 0 / 58 / 0 |
+| ValhallaDelay → Echoform (mode / pairs / sr48 / sr96) | 164 | 4.04 = | 0 / 164 / 0 |
+| ValhallaFutureVerb → Horizon, this round's probe bank (mode) | 99 | 2.53 → 2.66 | 10 / 89 / 0 |
+| … pairs / sr44 / sr48 / sr96 | 84 | 2.61 / 2.25 / 2.19 / 2.25 = | 0 / 84 / 0 |
+
+| Gate bank (other captures of the same plug-ins, all ten Valhalla tags) | files | before → after | up / same / down |
+|---|---|---|---|
+| verb183b captures (FutureVerb / VintageVerb / Delay; the other 6 tags =) | 62 / 18 / 25 (+105) | 2.68 → 2.82 / 3.83 → 3.89 / 2.92 → 3.00 | 9 / 201 / 0 |
+| tp172d probes (FutureVerb / Supermassive) | 40 / 94 | 3.17 → 3.20 / 4.59 = | 1 / 133 / 0 |
+| refcap182 programme (VintageVerb; 9 other tags =) | 25 (+190) | 3.48 → 3.56 | 2 / 213 / 0 |
+| tp172d matched settings (10 tags) | 137 | = | 0 / 137 / 0 |
+
+Round 190ly's 140 % probe renders of ValhallaDelay (new references, not a gate bank): 105 % 2 → 4, 110 % 1 → 1 / 1 → 2,
+120 % 1 → 2 / 1 → 3, 140 % 3 → 2 / 3 → 2 (−2.3 dB under; verb183b's 140 % capture rose 1 → 3 with the same law) — listed.
+
+## Round 190mj (Valhalla, part 4): Orbit on ValhallaSpaceModulator's own voices, Horizon's echo modes and Room / Chamber
+
+Black-box (refcap030's host for new probe renders; clean-room: LYNX's own code and fits). Evidence:
+docs/analise/REA_rodada190mj.md, lab `/mnt/e/lynx-work/parity190mj/` (Horizon: `hz/`). Score: round 190lg's time-window scorer,
+the same copy before and after. Before = origin/parity190mb (ebbadbe4e, `bin/fxr_b0`). Every change is a hidden value; with it
+off every render is byte for byte the before binary's (`gold/gold.sh` 114 / 114, `hz/gold/gold.sh` 114 / 114).
+
+- **Orbit ← ValhallaSpaceModulator (hidden `orbit::voiceLaw`, #8, the translator only):** the reference's own voices,
+  measured black-box on click-train and still probes (`smcap/`): one sweep phase that runs on from load (a reset does not
+  restart it) at 10 |2 v − 1|^(10/3) Hz; every tap read through a first-order all-pass (Thiran) fractional delay; the
+  through-zero pair on smooth random paths over 0.5 … 2.5 × Depth (both at 1.75 × Depth at load, the − mode inverting one);
+  Octo's four-tap barber pole at 1/√2; Vari Up / Down's hard-wrapping ramps; two random taps for Ensemble / Symphonic; the
+  mode by the reference's own value law floor (11 v) − 1 (verb183b's saved 0.2727 / 0.5454 are Up / Down and TriFlange, which
+  the translator had played as Through-zero + / Octo). Up, Up / Down, Tri, Doubler and Vari Up keep round 190mb's voices
+  under the law (their new voices did not gate; for those files the sweep's start phase decides, which a render cannot
+  share with a capture made after minutes of earlier settings).
+
+| ValhallaSpaceModulator → Orbit (refcap030) | files | before → after | up / same / down |
+|---|---|---|---|
+| mode sweep | 48 | 3.23 → 3.38 | 7 / 41 / 0 |
+| pairs / sr48 / sr96 | 58 | 4.33 / 4.40 / 4.40 = | 0 / 58 / 0 |
+| verb183b captures | 17 | 4.18 = | 1 / 15 / 1 |
+| tp172d matched / refcap182 programme | 12 / 20 | 5.25 / 4.50 = | 0 / 32 / 0 |
+
+The one down is verb183b's single-impulse capture spM3 (3 → 2): its state's Mode 0.2727 is the reference's Up / Down (its
+own impulse shows the barber pole's two taps 5.0 ms apart); before, LYNX played it as Through-zero + (the wrong mode) and
+the impulse's spectrum happened to sit closer. Listed, not hidden: the mode correction is the parity fix.
+
+- **Horizon ← ValhallaFutureVerb (hidden `horizon::reaLaw`, #26):** Hidden `horizon::reaLaw` (#26; new instances and translated ValhallaFutureVerb states; read with the engine law and revision 1;
+a project saved before keeps revision 1 bit for bit). From this round's black-box probe renders of the reference (echo modes
+alone; Room / Chamber at five Sizes × three Decays): the Digital echo's slope-limited coder (impulse +19.2 → +2.2 dB), a
+four-head shifter for Reverse Up / Reverse Down / Sparkle, Analog / Reverse Up/Down / Lo-fi low-passes, and Room / Chamber's
+onset, late level and gain over Size. Time-window scorer, before → after, files up / same / down: probe bank mode 2.66 → 2.86
+(18 / 81 / 0), pairs 2.61 → 2.69 (3 / 33 / 0), sr44 / 48 / 96 2.25 / 2.19 / 2.25 → 2.44 / 2.38 / 2.44 (3 / 13 / 0 each),
+verb183b 2.82 → 2.89 (4 / 58 / 0), tp172d probes 3.20 → 3.25 (2 / 38 / 0), refcap182 programme 3.75 → 3.80 (1 / 19 / 0), tp172d
+matched =. Gold 114 / 114 byte-identical with the law off. CPU (instructions, 20 s): Digital +1.5 %, the four-head modes
++11 %, Analog +0.2 %, Room / Chamber +0.01 %. Still off: Digital's repeats under Feedback (the reference's die after one),
+Chamber's two-slope decay, the reference's level dependence (−20 dB input ~1.5 … 2 dB lower), Clean / Tape / Detune / Reverse /
+Swarm voicings (their fits lost on the bank).
+
+## Round 190ls (Valhalla): Atrium on a dense late tank for the ValhallaRoom role
+
+Static analysis of the official ValhallaRoom binary by the owner's leave (clean-room: the structure understood, LYNX's own
+code written; no code, table or preset copied). Evidence: docs/analise/REA_rodada190ls.md, lab `/mnt/e/lynx-work/valhalla190ls/`.
+Score: `scripts/fxparity.py` with round 190lg's alignment window in time (~85 ms), the same scorer before and after.
+
+**Atrium ← ValhallaRoom (hidden `verbs::atrium::reaLaw`, index 24, one past round 190it's revision).** Read with the engine
+law and revision 1. A new instance and a translated ValhallaRoom state get 1; a project saved before loads 0 and renders bit
+for bit as before (42 / 42 renders of revisions 0 and 1 at 44.1 / 48 / 96 kHz against the base commit's objects, 81 / 81
+fxrender renders of translated states, Atrium's own settings and every other LYNX reverb / delay; fingerprints in
+`tests/Parity190lsTests.inc`).
+- The reference's late network has 32 lines in two halves; in every group of four, two lines move (one modulator, one each
+  way) and two stay. Atrium's engine gets a dense tank of that size (`Settings::dense`): 32 lines of LYNX's own lengths, a
+  16-point Hadamard per half, Late cross between the halves, law 1's per-line loop filters, the reference's modulation layout.
+- Late modulation × 4 on the moving lines: the reference's steady 1 kHz tone swings like that (sd of 10 ms levels 2.03 dB;
+  the 8-line tank's 1.19 dB, the dense tank's 2.26 dB).
+- Trims per type (`roomTrim`) on the type sweep's impulses; Large Room at half the sweep's lift at 63 / 125 Hz (music and bass
+  renders of the other banks).
+
+| Bank (ValhallaRoom captures → Atrium) | files | before → after | up / same / down |
+|---|---|---|---|
+| refcap030 mode (type sweep) | 48 | 3.31 → 3.58 | 14 / 30 / 4 |
+| refcap030 pairs | 36 | 4.22 → 4.25 | 1 / 34 / 1 |
+| refcap030 sr48 | 16 | 3.44 → 3.56 | 2 / 14 / 0 |
+| refcap030 sr96 | 16 | 3.38 → 3.69 | 3 / 13 / 0 |
+| **refcap030 all** | 116 | **3.62 → 3.80** | 20 / 91 / 5 |
+| tp172d | 12 | 3.58 → 3.67 | 1 / 11 / 0 |
+| verb183b captures | 17 | 3.88 → 3.88 | 0 / 17 / 0 |
+| refcap182 programme | 20 | 3.70 → 3.80 | 2 / 18 / 0 |
+
+The five files a step lower: four are the test signal's 1 kHz staircase (a steady tone through a time-varying tank: its level
+is the draw of the modulation at that frequency; the spectrum error fell on three of them, 2.35 / 2.37 / 2.25 → 2.28 / 1.91 /
+1.86 dB), one a music render whose level moved onto the reference (+0.69 → −0.05 dB) while its spectrum error crossed the
+2.5 dB step (2.14 → 2.52 dB).
+CPU (Atrium, 48 kHz, instructions of 20 s × 4 settings × 5 runs, one core): 80.0 G → 80.2 G with the law off (+0.3 %),
+118.7 G with the dense tank (+48 %; cycles +45 … 50 %, ~3.3 → ~4.8 % of a core in thread time) — the 32-line tank itself.
+
+## Round 190ln (Slate / Eiosis): AirEQ and Infinity EQ translated onto Facet EQ in physical units
+
+Static REA of the third-party binaries by the owner's leave (2026-11-17), clean-room (docs/analise/REA_rodada190ln.md §1 … §5;
+lab /mnt/e/lynx-work/rea3_190ln). Until now a project that used **Eiosis AirEQ**, Slate's **VM AirEQ Air / Earth** or
+**Infinity EQ** opened Facet EQ flat (round 190ar left the EQ modules without a translator: their per-setting maps did not
+interpolate). Their states are XML archives of normalised values; they are now read in physical units:
+- **AirEQ** (`translate = eiosis-aireq`): low / high cuts (shallow / steep, slope, Q), the Earth and Air shelves, five
+  bells / shelves, strength (per-band exclusion), mid / side or left / right placement, input / output trims. Value laws
+  through the plug-in's own value texts (its tapers are 11-knot tables interpolated linearly in the unit — structure seen
+  statically, the knots not read). Shapes fitted with Facet's own prototypes on the references' renders: a bell's peak and
+  width follow the dial (peak 5.6 / 9.5 / 11.6 / 18.1 dB for a dial of 3 / 6 / 9 / 18 dB at Q 1, × q^0.35; Facet Q falls from
+  1.0 to 0.50 as the gain grows, × q^0.876), shelves are the cookbook shelf of slope Q, Earth / Air are Facet shelves fitted
+  per dial value, cuts are Butterworth at Q 0.71.
+- **Infinity EQ** (`translate = slate-infinity-eq`): the first eight enabled of its 24 bands — cuts, shelves, bells (Width =
+  the cookbook bandwidth in semitones), notch, tilt, dynamics (target, threshold or automatic), placement, output.
+
+| reference → LYNX | files (sweeps / programme / probes) | before → after | up / same / down |
+|---|---|---|---|
+| Eiosis AirEQ → Facet EQ | 154 / 25 / 10 | 5.78 → **8.85** (sweeps 6.18 → 8.93, programme 4.20 → 8.52, probes 3.70 → 8.40) | 99 / 90 / 0 |
+| VM AirEQ Air → Facet EQ | 31 / 25 / 10 | 4.38 → **8.05** | 51 / 15 / 0 |
+| VM AirEQ Earth → Facet EQ | 31 / 25 / 10 | 4.44 → **7.39** | 50 / 16 / 0 |
+| Infinity EQ → Facet EQ | — / 30 / 12 | 4.71 → **8.00** | 34 / 8 / 0 |
+
+Score: scripts/fxparity.py with round 190lg's time-based alignment window, before and after. No LYNX effect changed (gold:
+24 renders of Facet, the role-entry EQs and Pro-Q 4 translations at 44.1 / 48 / 96 kHz identical to the base binary); the
+translated Facet costs its bands (+0.1 … 0.3 % of one core over flat). Open: AirEQ's per-band Character and "steep" bell
+switch, the shallow 6 dB low cut's resonance (no capture with them on; the licence ended 11-13), Infinity EQ's Q2, the other
+VM EQ modules (FG-73 / FG-N / FG-S / SD-PE1 / CS-EQ / CS-Lift: same route, thin banks).
+
+## Round 190lp (Pro-L 2 → Apex Limiter, Pro-G → Sentry Gate): the styles refitted black-box (hidden revision 1)
+
+Pro-L 2's styles and Pro-G's algorithms are presets of a generic engine (round 190lg §8); by the owner's decision this
+round read nothing from either binary (no static analysis, no preset): every law was measured on the reference renders
+already in the banks and LYNX's own smooth laws were fitted to them (REA notes: docs/analise/REA_rodada190lp.md, part lg).
+Both effects run the refit as **revision 1** (hidden `apex::pRevision` = 24, `dyn::sentry::revision` = 32: no control,
+no text, saved only while non-zero): a new instance and a translated Pro-L 2 / Pro-G state get 1; a project or preset
+saved before (saved count ≤ 24 / 32), the Live maps (Limiter, Gate, Expander), the plug-in substitutes and LYNX's own
+chains (mastering looks, reference match, the demo songs, Clean Voice) keep 0, bit for bit. Latency unchanged.
+
+Apex, revision 1 (gain trajectories of the stairs per half cycle and per sample, the tc bursts and the music in 10 …
+100 ms frames):
+- **Output level is a gain after a limiter that holds 0 dB** (the reference's S3: output level −1 dB plays its quiet
+  carrier at gain − 1 dB, not at gain): with a ceiling under 0 dB the chain limits at 0 dB, then the level, then the
+  dither. Unity gain still monitors at the input's level.
+- **A hold of about one half period** for Loud (Aggressive, 0.875 × the mean time between the detected mid's zero
+  crossings), Bus (0.75), Safe (1.0) and Dense (Modern, 0.5): a steady tone keeps one gain through its cycle (the
+  reference adds no harmonics there: stairs H3 −32 → −150 dB at 1 kHz) while a drum's quick crossings are still taken
+  peak by peak (a fixed 5 ms window took drums 1.5 … 3 dB too deep). Loud's, Bus's and Safe's slow stages refitted.
+- **Programme-dependent release**: Clean (Transparent) 0.15 and Glue (Allround) 0.05 per dB of held reduction
+  faster (the reference recovers faster out of deep limiting: pairs mix at 24 dB of gain −0.89 → −0.25 dB mean error).
+  Punch (Punchy) and Dynamic keep revision 0's table (no fit beat Punchy; every Dynamic fit took a programme or sr96 file down).
+
+Sentry, revision 1 (tc bursts in 1 … 5 ms frames): the gain closes **in dB** — a wait (Classic 0.08 × release, Clean
+0.05 ×, Guitar 20 ms + 2.3 × release), then a fall limited to a slope (Classic 20 dB, Clean 10 dB, Guitar 50 dB per
+release time of 16 + 0.3 × release / 60 + 0.5 × release / 3.75 + 0.4 × release ms) through a second pole, landing on the
+range; Classic and Clean open in the linear domain, Guitar along two poles in dB. Vocal (its fit took refcap182's S3
+drums a step down with every variant) and Upward (its lift already matches: tones 10 / 10) keep revision 0's gate.
+
+| bank (time-window scorer; before = fxr_m4, the end of round 190lg) | files | before → after | up / same / down |
+|---|---|---|---|
+| refcap030 Pro-L 2 grid / mode / pairs | 136 / 33 / 54 | 7.65 / 7.88 / 6.69 → **7.79 / 8.00 / 7.02** | 28 / 195 / 0 |
+| prog | 16 | 7.69 → **7.75** | 1 / 15 / 0 |
+| sr44 / sr48 / sr96 | 24 each | 7.62 / 7.50 / 7.54 → **8.00** each | 13 / 59 / 0 |
+| styles | 48 | 6.73 → **7.06** | 10 / 38 / 0 |
+| **refcap030 Pro-L 2, all blocks** | 359 | 7.39 → **7.64** | 52 / 307 / 0 |
+| refcap182 programme (Pro-L 2) | 30 | 7.60 → **7.90** | 4 / 26 / 0 |
+| tp172b (Pro-L 2) | 24 | 7.08 → **7.25** | 2 / 22 / 0 |
+| refcap030 Pro-G grid / mode / pairs | 15 / 30 / 72 | 8.20 / 9.03 / 8.40 → **8.40 / 9.10 / 8.49** | 11 / 106 / 0 |
+| sr44 / sr48 / sr96 | 24 each | 7.58 / 7.54 / 7.58 → **7.83 / 7.79 / 7.79** | 14 / 58 / 0 |
+| styles | 15 | 8.67 → **8.73** | 1 / 14 / 0 |
+| **refcap030 Pro-G, all blocks** | 204 | 8.21 → **8.35** | 26 / 178 / 0 |
+| refcap182 programme (Pro-G) | 30 | 7.43 → **7.57** | 4 / 26 / 0 |
+| tp172b (Pro-G) | 24 | 7.17 → **7.33** | 3 / 21 / 0 |
+
+By style (refcap030): Aggressive 6.22 → 7.43 (S3 5 → 7 … 8 at every rate: the output level), Transparent 7.24 → 7.45
+(pairs at 15 / 24 dB of gain), Safe 7.62 → 7.89, Modern 7.92 → 8.05, Bus 7.48 → 7.56, Allround 7.52 → 7.56, Punchy and
+Dynamic unchanged; Pro-G Guitar 6.22 → 6.78, Clean 8.44 → 8.78, Classic 8.58 → 8.68, Vocal and Upward unchanged. No file
+down in any bank. Old projects: `gold/gold.sh` (fxrender with the revision forced to 0 against round 190lg's final
+binary: every Pro-L 2 / Pro-G styles-block state, refcap182's six states of each, the defaults with every style value;
+tc / stairs / mix; 44.1 / 48 / 96 kHz): 300 / 300 byte-identical. Tests: `tests/Parity190lpLgTests.inc` (the hidden
+parameters and their load / translator / substitute rules, the output level, the half-period hold (100 Hz H3 −119 dB vs
+−61 dB at revision 0), Transparent's faster recovery, Sentry's wait and fall, Vocal / Upward bit for bit); the round
+108 / 128 / 190ar / 190dm tests that pin those rounds' laws now set revision 0. Mini runner 652 702 checks, 0 failures. CPU (thread time,
+one pinned core, 20 s at 48 kHz, best of 5, three runs, `cpu/bench.cpp`): Apex 1.8 … 2.1 % → 1.8 … 2.2 % of a core (within
+the noise; the zero-crossing hold is a few compares per sample), Sentry Classic 0.89 → 1.33 %, Clean 0.9 → 1.25 … 1.43 %
+(the linear-domain opening converts dB ↔ gain while it moves), Guitar 0.9 → 1.0 %, Vocal / Upward unchanged. Not built: the smooth styles' ~50 ms
+look-ahead (it needs their latency), Aggressive's extra ~1.2 dB on a tone held 15 … 18 dB over, Pro-G Vocal (S3 drums)
+and Upward (a mean-square detector fixed the mix, broke the tones).
+
+## Round 190kw (Pro-R 2 → LuxeVerb Space)
+
+LuxeVerb's Space engine gets a hidden **revision 1** (`luxeVerbSpaceRevision`) written from the Pro-R 2 laws that the round
+recovered by static analysis (docs/analise/REA_rodada190kw.md): true stereo (each channel its own network; the law's 16
+line lengths 5.18 ms × 1.12402^(k + n0 + j) split even / odd between the channels), the input M/S (s_in) and output X / Y
+width matrices with the feedback rotation √(1 − v²/2) / ± v / √2, a 2-line network ((200 + 0.00088 (T − 200)) × rate ms),
+an early network at 1.15 × the displayed time without the rate, Space 0 = 0.2 s, the late-level law
+((250 / T)^0.7 + 1.3) (1 + 0.5 d) f10 and the brightness filters (d = 1 − min (B / 0.7, 1): one-pole low pass, high shelf
+following d, 200 Hz shelf −8e²). Open constants fitted on refcap030 (component spectra, `lab/comp.py` / `lab/fit.py`).
+The Pro-R 2 translator passes Stereo Width raw (0 … 1.2; past 1 in the hidden `luxeVerbSpaceWidthExt`) and sets
+revision 1 for **Modern** states; Vintage / Plate keep revision 0 (their revision-1 fit scored lower on the grid).
+
+| refcap030 Pro-R 2 (fxparity) | files | before → after | up / same / down |
+|---|---|---|---|
+| grid (Style × Character) | 30 | 3.43 → **3.50** | 2 / 28 / 0 |
+| grid2 (Space × Rate, Distance × Character, Brightness × Thickness, Space × Width, Rate × Ducking, 96 kHz) | 140 | 2.81 → **3.30** | 62 / 58 / 20 |
+| · Space × Width (left-only impulse) | 25 | 2.16 → **3.32** | 20 / 5 / 0 |
+| · Brightness × Thickness | 25 | 2.72 → **3.20** | 11 / 11 / 3 |
+| · Space × Rate | 25 | 3.12 → **3.48** | 8 / 13 / 4 |
+| · Rate × Ducking (noise burst) | 25 | 2.00 → **2.60** | 14 / 5 / 6 |
+| mode / pairs / prog | 18 / 72 / 6 | 3.72 / 3.38 / 3.50 → 3.78 / 3.43 / 3.50 | 21 / 57 / 18 |
+| 44.1 / 48 / 96 kHz | 16 each | 4.44 / 4.12 / 4.06 → 4.12 / 3.94 / 4.19 | 4 / 39 / 5 |
+| styles | 9 | 4.00 → 4.00 | 0 / 9 / 0 |
+| **all blocks** | 323 | 3.30 → **3.51** | 89 / 191 / 43 |
+| refcap182 programme (Pro-R 2) | 20 | 3.95 → 3.95 | 0 / 20 / 0 |
+| tp172b (impulse / drums / music) | 12 | 3.83 → 3.75 | 1 / 10 / 1 (D drums 6 → 4) |
+
+**Not landed as "nothing worse"**: 43 files go a step down (owner decision, HANDOFF): the default state D at 44.1 / 48 kHz
+(6 → 4: rms −0.5 → −0.6 dB at 30 % mix, the 6-point limit is 0.5), long rates with Ducking (the fitted late level
+× T^−0.94 leaves the tail after the dip too quiet: −8 … −16 dB at rate 400 %), Distance ≥ 0.75 (+1.6 … +2.7 dB), and
+several pairs `mix` files.
+
+**Old projects.** Revision 0 is the tp172b / 190it engine unchanged: 15 gold renders (5 settings × 44.1 / 48 / 96 kHz) from
+the base objects equal the round's objects with revision 0 (`tests/Parity190kwR2Tests.inc`), and fxrender's Pro-R 2
+renders with revision 0 are byte-identical to the base binary at 44.1 / 48 / 96 kHz. `upgradeLoadedEffectParams` sets 0
+for every LuxeVerb saved before.
+
+**CPU** (Space engine alone, 20 s at 48 kHz in blocks of 512, best of 5; `lab/bench1.cpp`): revision 0 5.2 … 6.0 %,
+revision 1 4.0 … 4.3 % (two 8-line halves; 2 × 16 lines measured 10.1 % and were dropped; one sin / cos a sample for the
+lines' modulation).
+
+**Still off:** the in-loop brightness filters on the even lines and the early network's own tone filters (not built);
+Vintage / Plate under revision 1; CrossInput x fitted at 0.5 (x = 1 scores the width impulses better, 3.40 vs 3.32, but
+lifts a centred input by 1.7 dB against the fitted levels); the Space display text still reads 0.30 s at Space 0.
+
+## Round 190lg (Pro-R 2 → LuxeVerb Space revision 1: the levels refitted on time windows)
+
+Round 190kw's revision 1 fitted its open levels on the captures' total level and spectrum only. Per time window (0 … 5 ms
+… 6.4 s) and band the fit was wrong in time: the early network (1.15 × the displayed time, no rate) carried the whole
+tail and the late network sat 6 / 14 / 25 dB under the reference at Decay Rate × 0.25 / 1 / 4, so long rates died early
+(−22 dB at 1.6 … 3.2 s), short ones rang 2.9 s, and Ducking left no tail at long rates. Round 190lg (branch
+`rea2_190lg-r2`) refits revision 1 on the energy per time window and band of every Modern capture (components rendered
+alone, `lab/comp3.py` / `lab/fit4.py`, then the real fxparity bank, `lab/lab2.py`; REA notes in
+docs/analise/REA_rodada190lg.md):
+
+- the late network carries the tail at every rate (its level a fitted surface over Space, rate, Distance and Character on
+  top of the recovered G law); the early network is a build-up of 0.3 × 1.15 × the displayed time;
+- Distance takes the early energy (the reference: −30 dB at 0 … 5 ms from Distance 0 to 1, the tail within 1.6 dB): the
+  early / 2-line networks and the reflections fall with Distance, plus a fitted whole-wet trim;
+- Thickness is the reference's Thickner (static: saturation + compander): the measured −13.2 dB per unit below 0 (the
+  reflections included) and 6.8 (1 − (1 − t)²) dB above act only on a quiet wet (full below −38 dBFS, none above
+  −28 dBFS): an impulse's tail moves, a music wet does not (the reference: ≤ 1.4 dB).
+
+All scores with round 190lg's time-based alignment window (before and after; 44.1 / 48 kHz identical to the old scorer,
+the base bank re-scored identically at 96 kHz too). Before = d9bfc68ce (revision 0 for every state); the 190kw-r2 column
+is that round's own run (old scorer; its 96 kHz files were not re-scored).
+
+| refcap030 Pro-R 2 (fxparity) | files | before → 190kw-r2 → **190lg** | up / same / down (190lg) |
+|---|---|---|---|
+| grid (Style × Character) | 30 | 3.43 → 3.50 → **3.47** | 1 / 29 / 0 |
+| grid2 | 140 | 2.81 → 3.30 → **3.48** | 71 / 62 / 7 |
+| · Space × Rate | 25 | 3.12 → 3.48 → **3.76** | 10 / 14 / 1 |
+| · Distance × Character | 25 | 3.60 → 3.64 → **3.88** | 8 / 16 / 1 |
+| · Brightness × Thickness | 25 | 2.72 → 3.20 → **3.40** | 14 / 10 / 1 |
+| · Space × Width (left-only impulse) | 25 | 2.16 → 3.32 → **3.32** | 20 / 5 / 0 |
+| · Rate × Ducking (noise burst + 1 kHz tone) | 25 | 2.00 → 2.60 → **2.92** | 18 / 3 / 4 |
+| · Style × Space, 96 kHz | 15 | 3.53 → 3.73 → **3.67** | 1 / 14 / 0 |
+| mode | 18 | 3.72 → 3.78 → **3.72** | 2 / 15 / 1 |
+| pairs | 72 | 3.38 → 3.43 → **3.79** | 25 / 43 / 4 |
+| prog / styles | 6 / 9 | 3.50 / 4.00 → = → **=** | 0 / 15 / 0 |
+| 44.1 / 48 / 96 kHz | 16 each | 4.44 / 4.12 / 4.06 → 4.12 / 3.94 / 4.19 → **4.12 / 4.25 / 4.25** | 5 / 39 / 4 |
+| **all blocks** | 323 | 3.30 → 3.51 → **3.68** | **104 / 203 / 16** (190kw-r2: 89 / 191 / 43) |
+| refcap182 programme | 20 | 3.95 → 3.95 → **4.05** | 1 / 19 / 0 |
+| tp172b (impulse / drums / music) | 12 | 3.83 → 3.75 → **3.75** | 1 / 10 / 1 |
+
+**Still down (17 files, not landed as "nothing worse"; owner decision in the round's HANDOFF):**
+- 7 are dominated by a long steady 1 kHz sine (Rate × Ducking 0.5 / 0 and 1 / 0.5 · 0.75 · 1, the mode stim at Character
+  Tilt 0, the 44.1 kHz S1 / D stims): a static network's response at one frequency is a modal draw (±5 dB; this engine
+  L / R +6.4 / −2.4 dB on that tone, revision 0 −0.5 / −1.5) and the reference varies ±1.5 dB between identical captures.
+- 3 are the default state D (30 % mix) at its 6-point limits: 44.1 / 48 kHz impulse spectrum 0.88 / 0.72 dB (limit 0.6:
+  the 31 … 62 Hz third octaves, a modal pattern again), tp172b D drums rms −0.58 dB (limit 0.5). The D state as a whole:
+  20 files, 4 down / 3 up (prog182 D mix 4 → 6, 48 / 96 kHz D stim 4 → 6 / 3 → 4).
+- 7 one-step drops where fxparity's alignment moved (lag 203 → 3542, 227 → 1238, …): Space 0.75 at Rate 0, Distance 0.25
+  Character 0.75, Brightness 0.75 Thickness 0.25, two Distance 0.2 mixes, Character 0.8 Thickness 0.5, Space 0.5 Width
+  0.8 mix. The reference's reflections are fixed single-sample taps (L 6.69 / 11.33 / 18.35 / 25.42 ms, R 8.31 / 12.50 /
+  21.15 / 32.40 ms at every rate, Space and Distance); LYNX's do not line up, so the cross-correlation often locks onto a
+  late arrival. Matching those taps is the next step (not built).
+
+**Old projects.** Revision 0 untouched: the 15 gold renders equal the base commit's (`tests/Parity190kwR2Tests.inc`), and
+fxrender's Pro-R 2 renders with the revision forced to 0 are byte-identical to the base binary at 44.1 / 48 / 96 kHz
+(D / S1 × impulse / mix). Revision 1 was never released (190kw-r2 was not merged), so it changes freely.
+
+**CPU** (Space engine alone, 20 s at 48 kHz, blocks of 512, best of 5, under load 31 … 34): revision 1 4.1 … 5.3 %
+before, 4.2 … 5.3 % after (Thickness ≠ 0 adds one log10 / exp a sample: 4.3 … 4.7 %); revision 0 5.6 … 6.9 %.
+
+## Round 190lp (Pro-R 2 → LuxeVerb Space revision 1: the reference's fixed early taps)
+
+Round 190lg's open item: the reference's early field is a fixed set of single-sample arrivals, LYNX's (tp172b's twelve
+spread reflections) did not line up, so fxparity's cross-correlation locked onto wrong lags and rms / spectrum moved by
+1 … 3 dB at random. Round 190lp (branch `rea3_190lp-r2` = `rea2_190lg` + `rea2_190lg-r2` + this round) measured the
+arrivals black-box on every Modern impulse capture and built them into revision 1 (REA notes in
+docs/analise/REA_rodada190lp.md):
+
+- until the late network's first line returns, the reference's output is only these arrivals with exact silence between
+  them; their onsets are the same at every Space, Decay Rate, Character ≤ ½ and Distance ≤ ½ and at 44.1 / 48 / 96 kHz:
+  43 left / 36 right within 105 ms (left 6.67 +, 8.96 +, 11.31 −, …; right 8.29 +, 10.96 −, 12.48 +, …), each with a fixed
+  polarity and level;
+- their levels follow fitted laws (on the arrivals' energy, 4 413 readings, robust sd 0.7 dB): −2.8 dB per unit Space,
+  −0.5 dB per octave of rate, −5.9 dB per unit Distance, −3.2 dB × t / T; fifteen of them stand out by 8 … 25 dB at some
+  Spaces and switch with the integer k of the line-length law (Space ⅕ and ¼ differ, ¾ and ⅘ do not), fall faster with
+  Distance and rise ~2 … 3 dB from Character ¼ to ½ (from Distance ¼ on); from Character ~0.6 the later ones lose that
+  lift (the reference's arrivals are modulated there); all fade out from Distance ½ to ¾ (none from ¾ on), where the
+  early and 2-line networks fade in (they are not run while silent);
+- the late / 2-line / early levels refitted with the taps in (components per time window × band, then the real bank).
+
+fxparity now aligns the impulse captures at lag 0 (|lag| ≤ 3 samples: 3 % of the 193 impulse files before, 72 % after;
+median xcorr 0.057 → 0.206, median ESR +2.55 → +1.56 dB).
+
+| Pro-R 2 (fxparity, time-window scorer) | files | before (fxr_m4, revision 0) → 190lg-r2 → **190lp** | up / same / down (190lp) |
+|---|---|---|---|
+| grid | 30 | 3.43 → 3.47 → **3.50** | 2 / 28 / 0 |
+| grid2 | 140 | 2.81 → 3.48 → **3.53** | 67 / 65 / 8 |
+| mode | 18 | 3.72 → 3.72 → **3.67** | 3 / 12 / 3 |
+| pairs | 72 | 3.38 → 3.79 → **3.68** | 23 / 39 / 10 |
+| prog / styles | 6 / 9 | 3.50 / 4.00 → = → **3.33 / 4.00** | 0 / 14 / 1 |
+| 44.1 / 48 / 96 kHz | 16 each | 4.44 / 4.12 / 4.06 → 4.12 / 4.25 / 4.25 → **4.12 / 4.25 / 4.44** | 7 / 37 / 4 |
+| **refcap030 all** | 323 | 3.30 → 3.68 → **3.69** | **102 / 195 / 26** (190lg-r2: 104 / 203 / 16) |
+| refcap182 programme | 20 | 3.95 → 4.05 → **4.05** | 2 / 17 / 1 |
+| tp172b | 12 | 3.83 → 3.75 → **4.00** | 1 / 11 / 0 |
+
+**Not landed: 27 files down** (26 refcap030 + prog182 S1 drums), listed with their numbers in the round's HANDOFF:
+9 are one-step drops with a clearly better waveform match (xcorr +0.15 … +0.48, ESR 1.3 … 3.4 dB lower: Space ½ / ¾ at
+short rates, Distance 0.2 mixes, …); 7 are music / stim files at Space ≤ ¼ one step down with xcorr up but ESR only
+0.3 … 0.6 dB lower (their wet ~1.5 … 2 dB over the reference); 3 are two-step drops on the long 1 kHz tone (the modal
+draw: on the same state the error is +4.7 dB on the 44.1 kHz capture and +1.8 dB on the 48 kHz one, which went up); 3 are the default state D at
+its 6-point limits (44.1 kHz impulse spectrum 0.98, limit 0.6; 48 kHz 0.80; 44.1 kHz stim rms +1.13); the rest are single
+cases (a far-Distance impulse, a mis-locked mix at lag −2316, a Space ½ Width 0.8 mix at −2.6 dB).
+
+**Old projects.** Revision 0 untouched: gold 15 / 15 identical (`tests/Parity190kwR2Tests.inc` fingerprints), fxrender's
+Pro-R 2 renders with the revision forced to 0 byte-identical to the base binary at 44.1 / 48 / 96 kHz (D / S1 × impulse /
+mix). Revision 1 was never released (not in main, no tag), so it changes freely.
+
+**CPU** (Space engine alone, 20 s at 48 kHz, blocks of 512, best of 5, under load 17 … 20, two interleaved runs): revision
+1 4.1 … 5.9 % (190lg-r2's 4.5 … 5.6 %), revision 0 6.1 … 8.0 %: the 79 taps cost what the skipped early / 2-line networks
+save at Distance ≤ ½.
+
+## Round 190lz (Pro-R 2 → LuxeVerb Space revision 1: the taps' tone and the Space-½ level) — NOT merged
+
+Owner decision on 190lp's taps (options b + c): one more refit of the music level at Space ≤ ¼, the three two-step
+1 kHz-tone drops accepted as a modal lottery, then the re-gate. Measured black-box (docs/analise/REA_rodada190lz.md):
+both sides are linear at Space ¼ (music and sweeps within ±0.5 dB of each side's own impulse prediction), and the music
+excess sat in the taps' window (0 … 40 ms: +3 … +4 dB from 125 Hz to 2 kHz, −1 dB at 4 … 8 kHz; none at decay rate
+× 2 … × 4); Space ½ sat 1.2 dB under the reference at every rate; Distance 0.8 1.7 dB. Revision 1 only:
+- the taps' own tone: a −3 dB bell at 700 Hz (Q 0.5) and +1.5 dB above 4 kHz on the tap sum, in full to rate × 1, gone
+  by × 4 (`Fit1::tapEqDb …`, `eqR0 / eqR1`);
+- the body by Space: +1.3 dB at Space ½, linear to 0 at ¼ and ¾ (`Fit1::spaceDb`); the distance table's ¾ point 0.06 →
+  0.36 dB.
+
+| bank (time-window scorer; before = fxr_m4, revision 0) | files | before → 190lp → **190lz** | up / same / down |
+|---|---|---|---|
+| refcap030 Pro-R 2, all blocks | 323 | 3.30 → 3.69 → **3.77** | 109 / 198 / 16 (190lp 102 / 195 / 26) |
+| refcap182 programme | 20 | 3.95 → 4.05 → **4.05** | 2 / 17 / 1 |
+| tp172b | 12 | 3.83 → 4.00 → **4.00** | 1 / 11 / 0 |
+
+17 files down (190lp 27): 5 qualify (one step, waveform clearly better), 3 are the accepted 1 kHz-tone files, **9 do not
+meet the rule** (four more 1 kHz-tone files, two D-state impulses on low single modes, PX3 S0.5 W0.8 mix, the drums stem
+at S1 in refcap030 and refcap182): not merged; the list goes to the owner. Old projects: revision 0 byte-identical
+(gold 15 / 15, fxrender revision 0 = fxr_m4 12 / 12); every other effect byte-identical to 190lp (158 / 158). CPU of
+the Space engine 3.5 … 4.5 % → 3.7 … 4.7 % of a core (two biquads per channel on the taps; within the noise).
+## Round 190mg: REA of the Waves DSP, fourth pass — C4 on Prism's C4 law, the Renaissance Compressor law, NS1 at 20 … 100 %, Doubler's splice law, Waves Tune's pass-through, the 190lf leftovers
+
+Rounds 190kt / 190ky / 190lf's path (clean-room: structure from the unprotected Waves V17 DSP DLLs, every LYNX constant
+fitted on our Waves demo-mode probes with a 1.5 s silent lead and the demo's mutes masked; no vendor code, table or preset
+read out). Scorer: scripts/fxparity.py with round 190lg's time window (refcap182 is 48 kHz: identical results). Evidence:
+`docs/analise/REA_rodada190mg.md` (C4, the new entries, the survey), `_ren.md`, `_ns1.md`, `_voc.md`, `_dyn.md`.
+
+| reference → LYNX | files | before → after | up / same / down |
+|---|---|---|---|
+| C4 → Prism Multiband (C4 law; new entry) | 25 | n = 0 → 9.52 | — |
+| Renaissance Compressor → Compressor (Renaissance law) | 30 | 6.57 → 9.80 | 25 / 5 / 0 |
+| NS1 → Quell (NS1 law, 20 … 100 %) | 25 | 5.40 → 7.04 | 16 / 9 / 0 |
+| Doubler2 → Gemini Doubler (splice law) | 25 | 4.48 → 4.76 | 4 / 21 / 0 |
+| Waves Tune Real-Time → LYNX Tune (pass-through law) | 25 | 5.36 → 5.72 | 6 / 19 / 0 |
+| PuigTec EQP1A → Facet EQ (PuigTec law) | 25 | 7.60 → 7.84 | 6 / 19 / 0 |
+| L2 → Limiter (L2 law + IDR) | 25 | 9.52 → 9.52 | 0 / 25 / 0 |
+| CLA-76 → Crest (amp modelled, not set) | 25 | 7.16 → 7.16 | 0 / 25 / 0 |
+| Abbey Road Plates → Foil Plate (new entry) | 25 | n = 0 → 2.40 | — |
+| Atlas Reverb → Atrium (new entry) | 25 | n = 0 → 2.96 | — |
+| CLA-2A, DeEsser, H-Delay, RVerb, H-Reverb, TrueVerb, S1, SSLChannel, SSLComp, SuperTap (unchanged) | 265 | all same | — |
+
+- **Prism Multiband — the C4 law** (hidden [157], crossover Q [158]; Waves C4 only; a new entry: C4 projects had no
+  stand-in). The C4's own structure in LYNX's engine: in-phase squared-biquad crossovers (−6 dB at the nominal
+  frequency, all four bands summing to the all-pass chain: −90 dB ESR against the probes), per band a linked peak →
+  g = 1 / (1 + k · peak / threshold) with the knee's cubic (k = 0.5 · 2^(−range / 12) at knee 0, measured on nine ranges
+  at knee 0.5; every stair within 0.003 dB), the look-ahead minimum (64 samples at 44.1 / 48 kHz, 128 at 96 kHz), the
+  Renaissance-family release (a slow follower, the release shaped by it and by the smoother's depth, read at 255 steps),
+  the deeper of smoother and follower, two box filters, gain range + (1 − range) · g. 19 burst probes −65 … −84 dB ESR.
+- **Compressor — the Renaissance law** (hidden [20]; RComp only; sub-round ren): linked peak (Smooth: + three all-pass
+  copies), 64-sample look-ahead max, the same rational gain law with the ratio as the gain's floor, the release law
+  above, the 0 dBFS limiter inside the gain path, two box filters. Probes −71 … −107 dB ESR; about half the old CPU.
+- **Quell — the NS1 law** (hidden [6]; NS1 at 20 … 100 %; sub-round ns1): NS1's two moving all-pass splits and cuts (from
+  its saved states), six bands × three Regalia–Mitra cuts, slewing floor and level per band, the soft fourth-power
+  weight, open / close smoothing, the pause flag. Constants fitted with the scorer's score of the refcap182 renders in
+  the objective (probes as a check; stated). 0 % keeps 190lf's zero law bit for bit.
+- **Gemini Doubler — the splice law** (hidden; Doubler only; sub-round voc): one read head per voice in the delay
+  ± 256 samples, jumping by the best of 20 candidate lags (running autocorrelation) at a quiet moment or a good zero
+  crossing, the old head fading out over 256 samples. The waveform stays unmatched by design (the reference's heads
+  free-run through silence and the host's reset).
+- **LYNX Tune — the Waves pass-through law** (hidden; Waves Tune RT only; sub-round voc): what is not being corrected
+  (< 1 cent for 80 ms, or unvoiced) fades to the delayed input itself, as the reference does; back to the corrected
+  signal at once from 3 cents. No conflict with round 190li (applies cleanly to origin/vocal190li-tune; 190li's tunelab
+  12 / 12 renders byte-identical).
+- **Facet EQ — the PuigTec law** (hidden [125]) and **the Limiter's IDR** (hidden [6 … 8]) (sub-round dyn, finished by
+  the coordinator): PuigTec's output-stage waveshaper (H2 … H5 within 0.1 dB), the resampler's 0.226-sample fractional
+  delay (a Thiran all-pass), the Mains hum + noise floor; L2's word length / TPDF / three fitted noise-shaping filters.
+  CLA-76's output amplifier was modelled (Crest's hidden fetAmp) but is not set: it cost two files a step.
+- **New entries:** Abbey Road Reverb Plates → Foil Plate (measured plate voicing; decay, pre-delay, treble, bass cut, a
+  +5 dB high shelf measured on impulse probes), Atlas Reverb → Atrium (decay, pre-delay). Both 100 % wet like the
+  references; their scores sit at the reverb ceiling (the plates are strongly coloured per plate).
+
+**Old projects.** Every new behaviour runs only with its hidden law, set only by the Waves translators. Gold renders
+(base = round 190lf's binary 2c893d3ca, final binary = this branch, 44.1 / 48 / 96 kHz × 3 programme signals,
+byte-identical): Prism Multiband 90; Facet EQ / Limiter / Crest (+ SSLComp's translation) 162; Quell 180; Compressor
+(classic, vintage, SSLComp) 108; Gemini Doubler / LYNX Tune 108 — **648 renders, 0 differ**.
+
+**CPU** (35 s stereo at 48 kHz incl. file I/O, one core): C4 law ≈ 3.9 % of a core (Prism's own default 7.8 %; C4 had no
+stand-in); Renaissance law about half the old vintage voicing (0.44 → 0.19 … 0.25 s user); NS1 law 4.6 → 1.2 % of a core;
+Doubler's splice law +19 % instructions on translated Doubler states (the measured detector, owner decision below); Waves
+Tune law +1 %; PuigTec law and L2 IDR within the wall-clock noise (L2 X4 +0.4 s / 35 s at most).
+
+**Tests:** `tests/Parity190mgC4Tests.inc` (5), `Parity190mgRenTests.inc`, `Parity190mgNs1Tests.inc`, `Parity190mgVocTests.inc`,
+`Parity190mgDynTests.inc` (2); expectations moved: Parity190jh (Facet's stored count + the PuigTec law), VoiceToolsTests119 /
+Parity190lfNs1 (NS1: 4 values). Mini runner (round 190lf's list + the round's files): **544 249 checks, 0 failures**. No full
+Linux / Windows build, no --selftest (no UI change, no new strings).
+
+**Owner decisions (reversible; the recommended option taken):** (1) Doubler's splice law kept despite +19 % instructions on
+translated Doubler states (alternative: drop it, −0.28); (2) C4 ships with the constants fitted on its own probes (9.52; the
+RComp constants gave 9.56 on the programme); (3) Abbey Road Plates / Atlas Reverb get stand-ins although they score 2.40 /
+2.96 (before: the plug-in was lost); (4) CLA-76's amplifier law stays unset (it cost two files a step). **Open:** NS1 at 0 %
+could move onto the new engine's own pair (D mix −54 → −76 dB ESR), which changes 190lf's zero-law renders (not done).
+
+**Still off:** Scheps Omni Channel 2 (no stand-in; five inner modules); the three reverbs on Reeverb 2; Doubler2's waveform
+(the reference's heads free-run through the host's reset); references for the common Waves without any (demo mode mutes).
+
+
+## Round 190mm: Waves, fifth pass — NS1 at 0 %, a masked demo-mode bank, REQ / Q10 / API / SSL G / RChannel / Scheps / the Renaissance dynamics family
+
+Owner's decisions of 11-19: (1) NS1 at 0 % on the NS1 engine's own pair; (2) the common Waves plug-ins without any
+reference captured in demo mode, the scorer taught to mask the demo's periodic mutes, then stand-ins built by how common
+they are; (3) Scheps Omni Channel 2 as a chain of its five inner modules. Clean-room as before (structure read from the
+unprotected Waves V17 DSP where needed, every LYNX constant fitted on our demo-mode probes; no vendor code, table or preset
+read out). Evidence: `docs/analise/REA_rodada190mm.md` (coordinator: NS1, the bank and the masks, REQ / Q10 / API / SSL G /
+RChannel), `_scheps.md`, `_dyn.md`.
+
+**The demo-mode bank and the masks.** 16 plug-ins × D + X1 … X4 × refcap182's five programme files (+ the 7 s stimulus
+for fitting), each rendered twice (1.5 s and 9 s of silence after the reset). The demo mutes (≈ 0.95 s of digital silence
+every 20 s of processed audio, ≈ 10 ms fades) are found as silence runs of take A that take B plays, widened over the
+fades, and stored next to the reference (`<name>.mask.json`); scripts/fxparity.py leaves those spans out of every metric.
+References without a sidecar score exactly as before.
+
+| reference → LYNX | files | before → after | up / same / down |
+|---|---|---|---|
+| NS1 → Quell (NS1 law at 0 % too; refcap182) | 25 | 7.04 → 7.24 | 3 / 22 / 0 |
+| Scheps Omni Channel 2 → Ridge Strip (omni law; new entry; refcap182) | 25 | n = 0 → 6.32 | — |
+| Renaissance EQ 6 → Facet EQ (Waves design law; was a flat Parametric EQ) | 25 | 4.92 → 9.76 | 20 / 5 / 0 |
+| Renaissance EQ 4 → Facet EQ | 25 | 5.16 → 9.92 | 20 / 5 / 0 |
+| Renaissance EQ 2 → Facet EQ | 25 | 5.64 → 9.80 | 20 / 5 / 0 |
+| Q10 → Facet EQ (Waves design law; was a flat Parametric EQ) | 25 | 4.64 → 9.68 | 20 / 5 / 0 |
+| API-550A → Facet EQ (fitted band tables; new entry) | 25 | n = 0 → 7.92 | — |
+| API-550B → Facet EQ | 25 | n = 0 → 8.04 | — |
+| API-560 → Facet EQ | 25 | n = 0 → 8.44 | — |
+| SSL G-Channel → Ridge Strip (E voicing; new entry) | 25 | n = 0 → 6.44 | — |
+| Renaissance Channel → Compressor (Renaissance law + channel EQ; new entry) | 25 | n = 0 → 5.96 | — |
+| Renaissance Vox → Compressor (Vox law; new entry) | 25 | n = 0 → 9.52 | — |
+| RDeEsser → Hush De-esser (Renaissance de-esser law; new entry) | 25 | n = 0 → 9.92 | — |
+| C6 → Prism Multiband (C4 law + floating bands; new entry) | 25 | n = 0 → 8.56 | — |
+| API-2500 → Compressor (bus law; own entry, was the generic Waves compressor preset) | 25 | 2.36 → 5.88 | 25 / 0 / 0 |
+| MaxxBass → Low Lifter (bass law; new entry) | 25 | n = 0 → 9.56 | — |
+| Renaissance Bass → Low Lifter (bass law; new entry) | 25 | n = 0 → 4.92 | — |
+| Vitamin → Aether (Vitamin law; new entry) | 25 | n = 0 → 7.16 | — |
+| the other 19 refcap182 Waves references | 455 | same | 0 down |
+
+- **Facet EQ — the Waves design law** (hidden [126] + a design code per band [127 … 134]; Renaissance EQ / Q10 / the
+  Renaissance Channel only): each band's sections from the reference's own structure, identified on demo-mode impulse
+  responses (Prony on the exact IR, −110 … −176 dB): the Renaissance EQ bell is (s² + s·G/q + 1)/(s² + s/q + 1) digitised
+  with a prescribed Nyquist gain (Orfanidis 1997), its shelves a shared-s-term pair bilinear at their centre (a fitted law of
+  gain and Q, the Q clamped 0.707 … 1.414), the resonant shelves the cookbook shelf, the cuts 18 dB/oct with Q-dependent
+  zeros; Q10's bells the cookbook form with its Q laws (Bell, PQ-Bell), first-order shelves, Butterworth cuts.
+- **API-550A / 550B / 560** on Facet EQ as it is: every control position probed and fitted with one Facet band
+  (core/WavesApiEq.h, generated), the 550s' flat response fitted in magnitude and phase; the 560's continuous gain
+  interpolated between probed gains (it is a 65-sample linear-phase design: X files −32 … −57 dB ESR at ≤ 0.09 dB spectral
+  distance).
+- **SSL G-Channel** on Ridge Strip's measured E console through the SSL E-Channel translation (same RealWorld layout; LMF ÷3
+  / HMF ×3 at 55 / 56). Its own EQ is not the E's (X1 / X2 / X3 at 5): open.
+- **Compressor — the Renaissance Channel EQ** (hidden [48] on, [49] routing, [50 …] four bands; RChannel only) on the
+  Renaissance law; the gate and the RVox compressor type are not carried (X3 / X4 the weak files).
+- **Ridge Strip — the omni law** (hidden [100 … 191]; Scheps Omni Channel only): the five modules, their switches and
+  order read from the state, each module LYNX's own fitted model (REA_rodada190mm_scheps.md).
+- **Compressor — the Vox law** (hidden [21], gate [22], gate release [23], gain [24]; Renaissance Vox only): the Renaissance
+  family's chain read from the reference's DSP — linked peak with three all-pass copies, g = T / (p (1 − T) + T) (one knob,
+  no ratio), the 64-sample look-ahead minimum, a slow follower, the deeper of gain and follower released through two
+  256-step tables, the gate's linear expander, two boxcars, make-up 0.99 · gain / T. Follower / release constants fitted
+  on our bank (−59 → −70 dB on the fit set).
+- **Hush De-esser — the Renaissance de-esser law** (hidden [29] … [34]; RDeEsser only): squared-section crossover with its
+  all-pass complement (high-pass / band-pass), a threshold that rises with the low band (absolute → relative at the
+  hidden −12 dB corner), the sibilance detector on the high bands' mid through 0.6 · Freq high-passes, the same chain
+  (follower 15 / 30 ms), split (low + G · high) or wide-band.
+- **Prism — C6 floating bands** (hidden c6Float0 … +15, after the C4 law's [157 / 158]): the C6's four crossover bands are
+  the C4 law; its two floating bands (our model) are a band-pass (Q × 0.67, fitted) of the crossovers' sum through the
+  same gain law and smoother, added as (G − 1) · band.
+- **Compressor — the bus law** (hidden [25] … [37]; API-2500 only; core/BusComp2500.h): our own simple model of the
+  reference's VCA circuit — mean-square detector, threshold cal + slope · knob, per-knee soft knee, dB ballistics, thrust
+  as a side-chain high-pass share, feedback type with loop gain k (r − 1), auto make-up; 13 constants fitted on the bank.
+- **Low Lifter — the bass law** (hidden [15] … [21]; MaxxBass / Renaissance Bass only; core/BassHarmonics.h): the
+  references' exact crossover (a first- and a second-order all-pass: the third-order Butterworth pair; MaxxBass with
+  harmonics off is linear and nulls: −46 … −95 dB) and a harmonic generator written from the read structure (level-
+  normalised band × (1 + its own clamped high band), a second high band, an output normaliser, a limit), fitted on the
+  RBass bank (spectrum close, waveform not: 4.92).
+- **Aether — the Vitamin law** (hidden [10] … [20]; Vitamin only; core/VitaminLaw.h): five bands on the C4-type crossover
+  (the default state's all-pass fitted to −56 dB on its impulse), direct gain, our own per-band saturated enhancement
+  (fitted on the 20 X renders).
+- Old projects: every law 0 for new instances and projects saved before (upgradeLoadedEffectParams resets them for a
+  slot saved with fewer values); gold 225 renders, 0 differ. Tests: tests/Parity190mmDynTests.inc (6).
+
+**Old projects.** Every new behaviour runs only with its hidden law, set only by the Waves translators. Gold renders (base =
+round 190mg's final binary, final binary = this branch, 44.1 / 48 / 96 kHz × 3 programme signals, byte-identical):
+coordinator 189 (Facet incl. the PuigTec and Pro-Q 4 translations, Quell, Ridge's E-Channel translation, Compressor incl.
+the Renaissance law), dyn 225 (Compressor, Hush, Prism, Low Lifter, Aether incl. RComp / SSLComp / Pro-C / DeEsser / Pro-DS /
+C4 / Pro-MB states), scheps 72 (Ridge: default, E, Vocal, 4K, Modern, DRIVE) — **486 renders, 0 differ**.
+
+**CPU** (35 s mix at 48 kHz incl. file I/O, one core, best of 5; a copy ≈ 0.9 s): the Waves design law costs what Facet's
+own bands cost (REQ 6 X1 1.00 s, Q10 X1 0.78, Facet's own four bands 1.14); API-550A 0.94, API-560 1.10, SSL G 1.21,
+RChannel 1.08, Scheps ≤ +0.62 s (≈ 1.8 % of a core), RVox 0.94, RDeEsser 1.11, C6 2.86, API-2500 0.91, MaxxBass 0.92, RBass
+1.15, Vitamin 1.47.
+
+**Tests:** `tests/Parity190mmTests.inc` (4), `Parity190mmSchepsTests.inc` (5), `Parity190mmDynTests.inc` (6); moved:
+Parity190mgNs1 (0 % is the NS1 engine's pair now), Parity190jh (Facet's stored count). Mini runner (round 190mg's list + the
+round's three files): **544 541 checks, 0 failures**. No full Linux / Windows build, no --selftest (no UI change, no new
+strings).
+
+**Owner decisions (reversible; the recommended option taken):** NS1 0 % moved (decision 1); the masked demo-mode bank and the
+stand-ins (decision 2: every listed plug-in now has one; Renaissance EQ covers REQ 2 / 4 / 6); Scheps on Ridge Strip's hidden
+omni law (decision 3); RChannel on Compressor (its compressor law + channel EQ) rather than a strip; SSL G on the E voicing
+(the Modern voicing's G curve scored 5.20 against 6.44); API-2500 on its own Compressor law (not Crest); the bass family on
+Low Lifter, Vitamin on Aether. **Still off:** SSL G's own EQ curves; RChannel's gate / RVox type; RBass's waveform (4.92);
+API-2500 (5.88); Q10's wide bells above 3 kHz (−45 … −53 dB); the reverbs on Reeverb 2.
+
+## Round 190mt: Waves, part 5 — SSL G-Channel's own EQ, the Q10 bell's exact law, the API-560 network, RChannel's RVox type and gate
+
+Clean-room as before: black-box identification on our demo-mode probes (two takes each) and one 5-minute headless Ghidra
+session on the API-560 / H-Reverb DSP libraries, read for structure only; every LYNX constant is a fit on our probes.
+Evidence: `docs/analise/REA_rodada190mt.md`. Before = round 190mm's final binary (bank wv190mm, masked).
+
+| reference → LYNX | files | before → after | up / same / down |
+|---|---|---|---|
+| SSL G-Channel → Ridge Strip (E voicing + hidden G EQ law) | 25 | 6.44 → 8.20 | 17 / 8 / 0 |
+| Q10 → Facet EQ (exact Bell law, Waves code 14) | 25 | 9.68 → 10.00 | 5 / 20 / 0 |
+| API-560 → Facet EQ (hidden API-560 network law, 65-sample latency) | 25 | 8.44 → 9.72 | 19 / 6 / 0 |
+| Renaissance Channel → Compressor (RVox type + gate) | 25 | 5.96 → 6.80 | 5 / 20 / 0 |
+| every other wv190mm / refcap182 Waves reference | — | same | 0 down |
+
+- **Ridge Strip — the SSL G EQ law** (hidden [87 … 99]; SSL G-Channel only): each band one second-order section whose
+  poles and zeros move with the gain (proportional-Q bells, shelves that overshoot their dial, the G's ±17 / ±20 dB);
+  LYNX keeps each probed section's analog prototype (7 900 probes) and interpolates it (core/SslGTables.inc). Filters and
+  dynamics stay the E voicing's (the G compressor is the remaining gap: X1 / X2 / X4 at 7 … 8).
+- **Facet EQ — Q10 bells** (Waves codes 14 / 15): the cookbook section with alpha = tan (min (π f / (Q fs), π / 4)) /
+  (0.090904 (√G + 1/√G)) for the Bell, θ (1 + β θ²) / k for the PQ-Bell (θ = min (π f / (Q fs), π / 4), β fitted every
+  1.5 dB): −80 … −99 dB through the translator up to 16 kHz (the wide bands above 3 kHz were −19 … −50 dB).
+- **Facet EQ — the API-560 law** (hidden [135] + ten slider gains [136 …]; API-560 only; core/Api560.h): the reference's
+  graphic-EQ structure (two groups of five resonators in a node network, each slider a potentiometer that also loads its
+  resonator, 4× oversampled, a linear-phase decimator), constants fitted on our single-slider probes (−62 … −70 dB);
+  65 samples of latency at every rate, reported to PDC; a plain delay with every slider at 0. Old projects: 0 latency.
+- **Compressor — RChannel's RVox type** (hidden [38]): the vocal compressor's curve on the Renaissance law with the Opto
+  release shape, the ratio ignored (X3 2 → 5 … 7); **its gate** (hidden [39 … 43]): a held detector, a one-pole fall to the
+  floor with the release, gate / 1:2 expander. X1 / X2 / X4 stay on the RComp law's accuracy (5 … 8).
+- **Not changed:** RVerb / H-Reverb (round 190lf's ceiling stands: a sample-accurate network would need the reference's
+  delay tables; REA_rodada190mt §5), the G's filters (probed, REA §1) and compressor.
 

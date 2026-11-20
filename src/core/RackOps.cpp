@@ -877,7 +877,7 @@ int removeChannels (Song& song, std::vector<int> channels)
 
 bool isInsertFree (const Song& song, int track) noexcept
 {
-    if (track <= 0 || track >= (int) song.mixer.size())
+    if (track <= 0 || track >= (int) song.mixer.size() || song.mixer[(std::size_t) track].current) // (round 190mv: FL's Current track)
         return false;
 
     if (std::any_of (song.channels.begin(), song.channels.end(), [track] (const ChannelDef& c) { return c.mixerTrack == track; }))

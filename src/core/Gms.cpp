@@ -2134,7 +2134,7 @@ public:
             if (h.on && h.slide.moving())
             {
                 const auto was = h.slide.cents;
-                h.pitchCents += (double) (h.slide.advance ((float) n) - was);
+                h.pitchCents += (double) (h.slide.advanceFirst ((float) n) - was);
             }
         tables();
         auto tpos = songBeats;

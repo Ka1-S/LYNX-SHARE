@@ -1,4 +1,8 @@
 #include "core/DirectWave.h"
+
+#include <map>
+
+#include <mutex>
 #include "core/HostSlide.h"
 
 #include "core/BassDrum.h"
@@ -65,10 +69,45 @@ float rf (const std::uint8_t* p) { float f; std::memcpy (&f, p, 4); return f; }
 std::int32_t ri (const std::uint8_t* p) { std::int32_t v; std::memcpy (&v, p, 4); return v; }
 std::uint16_t ru16 (const std::uint8_t* p) { std::uint16_t v; std::memcpy (&v, p, 2); return v; }
 
+// The bytes LYNX reads of a zone record (0 = a record it reads whole, or none it knows).
+std::size_t zoneRecordSizeOf (std::uint32_t id) noexcept
+{
+    switch (id)
+    {
+        case 0x1F4: return 25;
+        case 0x1F7: return 40;
+        case 0x1F8: return 8;
+        case 0x1F9: return 14;
+        case 0x1FA: case 0x1FD: case 0x202: return 16;
+        case 0x1FB: case 0x203: return 20;
+        case 0x1FC: return 2;
+        case 0x1FE: case 0x1FF: case 0x200: case 0x201: return 9;
+        case 0x204: return 8;
+        default: return 0;
+    }
+}
+
 void readZone (const Chunk& z, Zone& zone)
 {
     int filters = 0, envs = 0, lfos = 0, mods = 0;
-    forEachChunk (z.data, z.size, [&] (const Chunk& c) {
+    forEachChunk (z.data, z.size, [&] (const Chunk& chunk) {
+        // FL's own reader (DirectWave_x64.dll 0x18003f840; docs/analise/REA_rodada190ii.md §1.2) reads every record with
+        // read (min (chunk size, record size)) over a record that starts as zeros, the sample format record's bit depth
+        // as 32: a short chunk keeps those values for its missing tail. FL's shipped version-36 programs (and the
+        // version-36 states in old .flp projects) store the sample format record in 36 bytes, without the bit depth:
+        // their loops are read, bits = 32 (round 190il; before, the whole record was skipped and with it the loop).
+        std::uint8_t completed[40] {};
+        auto c = chunk;
+        if (const auto want = zoneRecordSizeOf (chunk.id); want != 0 && chunk.size < want)
+        {
+            std::memcpy (completed, chunk.data, chunk.size);
+            if (chunk.id == 0x1F7 && chunk.size <= 36)
+            {
+                const std::int32_t bits = 32;
+                std::memcpy (completed + 36, &bits, 4);
+            }
+            c = Chunk { chunk.id, completed, want };
+        }
         const auto* b = c.data;
         switch (c.id)
         {
@@ -80,7 +119,7 @@ void readZone (const Chunk& z, Zone& zone)
                     zone.gain = rf (b + 9); zone.pan = rf (b + 13); zone.altGroup = ri (b + 17);
                 }
                 break;
-            case 0x1F5: break;
+            case 0x1F5: zone.name.assign ((const char*) b, c.size); break;
             case 0x1F6: zone.path.assign ((const char*) b, c.size); break;
             case 0x1F7:
                 if (c.size >= 40)
@@ -181,6 +220,7 @@ void readProgram (const Chunk& top, Program& p)
                 }
                 break;
             case 0x66: p.name.assign ((const char*) b, c.size); break;
+            case 0x67: p.file.assign ((const char*) b, c.size); break;
             case 0x68:
                 if (c.size >= 10) { p.shape1 = b[0] != 0; p.shape2 = b[1] != 0; p.shape1Amount = rf (b + 2); p.shape2Amount = rf (b + 6); }
                 break;
@@ -225,6 +265,7 @@ void readProgram (const Chunk& top, Program& p)
             {
                 Zone z;
                 readZone (c, z);
+                z.origin = (int) p.zones.size();
                 p.zones.push_back (std::move (z));
                 break;
             }
@@ -246,6 +287,8 @@ std::optional<State> parseState (const std::vector<std::uint8_t>& d)
     forEachChunk (d.data() + 4, d.size() - 4, [&] (const Chunk& c) {
         if (c.id == 6 && c.size >= 4)
             s.flags = (std::uint32_t) ri (c.data);
+        else if (c.id == 5 && c.size >= 521 && ri (c.data) == 0)
+            s.slotProgram = c.data[520];
         else if (c.id == 1)
         {
             Program p;
@@ -2015,8 +2058,30 @@ void Engine::render (float* out, int n)
 
 
 // ================================================================================================= LYNX channel
+Program parseProgram (const std::uint8_t* body, std::size_t size)
+{
+    Program p;
+    readProgram (Chunk { 1, body, size }, p);
+    return p;
+}
+
+std::size_t zoneRecordSize (std::uint32_t id) noexcept
+{
+    return zoneRecordSizeOf (id);
+}
+
+Zone parseZone (const std::uint8_t* body, std::size_t size)
+{
+    Zone z;
+    readZone (Chunk { 3, body, size }, z);
+    return z;
+}
+
 const Program* playedProgram (const State& state)
 {
+    for (const auto& p : state.programs)
+        if (p.index == state.slotProgram && ! p.zones.empty())
+            return &p;
     for (const auto& p : state.programs)
         if (! p.zones.empty())
             return &p;
@@ -2070,8 +2135,45 @@ std::shared_ptr<const ZoneSamples> zoneSamples (const SampleData& sample, bool i
     return z;
 }
 
-namespace
+std::shared_ptr<const ZoneSamples> zoneSamplesShared (const std::string& path, const std::shared_ptr<const SampleData>& sample, bool int16)
 {
+    if (sample == nullptr)
+        return nullptr;
+    // the sample's identity: length, channels and 64 of its values (a file changed on disk makes new zones)
+    const auto frames = sample->frames();
+    const auto stereo = sample->isStereo();
+    std::uint64_t print = 1469598103934665603ull;
+    for (std::size_t k = 0; frames > 0 && k < 64; ++k)
+    {
+        const auto at = k * (frames - 1) / 63;
+        float v[2] { sample->leftData()[at], stereo ? sample->rightData()[at] : 0.0f };
+        std::uint32_t bits[2];
+        std::memcpy (bits, v, sizeof bits);
+        print = (print ^ bits[0]) * 1099511628211ull;
+        print = (print ^ bits[1]) * 1099511628211ull;
+    }
+    struct Entry
+    {
+        std::size_t frames = 0;
+        bool stereo = false;
+        std::uint64_t print = 0;
+        std::weak_ptr<const ZoneSamples> zones;
+    };
+    static std::mutex lock;
+    static std::map<std::pair<std::string, bool>, Entry> cache;
+    const std::lock_guard<std::mutex> hold (lock);
+    const auto key = std::make_pair (path, int16);
+    if (const auto at = cache.find (key); at != cache.end() && at->second.frames == frames && at->second.stereo == stereo && at->second.print == print)
+        if (auto zones = at->second.zones.lock())
+            return zones;
+    for (auto it = cache.begin(); it != cache.end();) // (entries nobody holds any more)
+        it = it->second.zones.expired() ? cache.erase (it) : std::next (it);
+    auto zones = zoneSamples (*sample, int16);
+    if (zones != nullptr)
+        cache[key] = { frames, stereo, print, zones };
+    return zones;
+}
+
 // a WAV whose audio is 16-bit PCM (format 1, or extensible with the PCM sub-format)
 bool isPcm16Wav (const std::vector<std::uint8_t>& w)
 {
@@ -2095,6 +2197,8 @@ bool isPcm16Wav (const std::vector<std::uint8_t>& w)
     return false;
 }
 
+namespace
+{
 std::vector<std::uint8_t> wavOf (const Zone& z)
 {
     const auto bytes = (std::size_t) (z.bits == 16 ? 2 : 4);
@@ -2291,7 +2395,7 @@ public:
             for (auto& nt : notes) // a slide note moves the voices' Final.Pitch (issue #14)
                 if (nt.slide.moving())
                 {
-                    nt.slide.advance ((float) len);
+                    nt.slide.advanceFirst ((float) len); // (round 190jv: moved before it renders; FL's steps, core/HostSlide.h)
                     engine.setLevels (nt.id, channelVol * nt.initVol, std::clamp ((double) nt.pan + channelPan, -1.0, 1.0),
                                       nt.cents + (double) nt.slide.cents);
                 }

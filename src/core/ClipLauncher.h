@@ -15,6 +15,7 @@
 // Threads: the UI posts commands into Runtime::commands; the audio thread applies them at the start of a block, never
 // allocates, and publishes what plays per track (Runtime::tracks).
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <bitset>
@@ -40,6 +41,14 @@ constexpr std::size_t slotKeyBase = 900000;
 ClipGrid& ensureGrid (Song& song);
 // The clip in (track, scene), or nullptr.
 const Clip* clipAt (const ClipGrid& grid, int track, int scene) noexcept;
+// Round 190hr (Live's Start marker inside the loop, detail-016): how far into its loop a launch of a clip `length` ticks
+// long starts — the slot's startMarker with Loop on (kept inside the loop), else 0.
+inline double startLead (const ClipGridSlot& slot, std::int64_t length) noexcept
+{
+    if (! slot.loop || slot.startMarker <= 0 || length <= 1)
+        return 0.0;
+    return (double) std::min<std::int64_t> (slot.startMarker, length - 1);
+}
 // Puts a clip in a slot, replacing what is there; its settings start at their defaults. `clip` keeps what it plays
 // (kind, source, length, offset, gain…); pattern and audio clips only. Returns the slot's id, −1 when it cannot be placed.
 int setClip (Song& song, int track, int scene, Clip clip);
@@ -67,6 +76,11 @@ struct FollowOutcome
     int scene = -1; // the row to launch, −1 = none
 };
 FollowOutcome followTarget (const ClipGrid& grid, int track, int scene, FollowKind kind, int jump, std::uint32_t random) noexcept;
+// Round 190lr (DL-14): what a scene's follow action leads to from scene `scene` among the grid's scenes (Live: the
+// scenes play the part of a column's clips; Next after the last scene is the first, as in a clip group).
+FollowOutcome sceneFollowTarget (const ClipGrid& grid, int scene, FollowKind kind, int jump, std::uint32_t random) noexcept;
+// Whether scene `scene` has a follow action that will act (its own switch and the grid's "Enable Follow Actions")
+bool sceneFollows (const ClipGrid& grid, int scene) noexcept;
 
 // A pass the recorder turns into a Playlist clip: the clip in `slot`, played from song tick `songTick` for `length`
 // ticks, starting `offset` ticks into the clip (its own offset not included).
@@ -95,7 +109,11 @@ struct Command
     // `at` > 0 on record: a fixed length in ticks, the recording ends by itself. `at` >= 0 on launch: the clip's
     // position 0 is at that point of the clock (the end of its recording), whenever the command arrives; the launch
     // waits for the clip to exist, since the song that holds it is published separately.
-    enum class Type : std::uint8_t { launch, release, launchScene, stopTrack, stopAll, backToArrangement, reset, record, recordEnd };
+    // (round 190kc: cancelLaunch = Live's "Cancel Launch" of the Relative Session Mapping Strip: the launches still
+    // waiting for their grid point are dropped, what plays goes on)
+    // (round 190lr, DL-38: trackBackToArrangement = Live's per-track Back to Arrangement: `track` only gives its Playlist
+    // clips back, at once)
+    enum class Type : std::uint8_t { launch, release, launchScene, stopTrack, stopAll, backToArrangement, reset, record, recordEnd, cancelLaunch, trackBackToArrangement };
     Type type = Type::launch;
     int track = 0;
     int scene = 0;
@@ -164,6 +182,9 @@ public:
     int playingOn (int track) const noexcept;
     // test access: the scene a track records into (−1 = none) and its range on the clock
     int recordingOn (int track) const noexcept;
+    // test access (round 190lr): the scene whose follow action waits, and when it acts on the clock (−1 / infinity: none)
+    int sceneFollowScene() const noexcept { return followScene; }
+    double sceneFollowTime() const noexcept { return followSceneAt; }
 
 private:
     static constexpr double never = std::numeric_limits<double>::infinity();
@@ -226,6 +247,13 @@ private:
     void follow (const Song& song, const ClipGrid& grid, const GridIndex& index, TrackState& t, double at) noexcept;
     void recordPartial (const ClipGrid& grid, const GridIndex& index, const Play& p, double at, Runtime* runtime) noexcept;
     std::uint32_t nextRandom() noexcept;
+    // round 190lr (DL-14): the launched scene's follow action, and launching a scene's clips at once (a follow action
+    // waits for each clip's own quantisation, not the global one)
+    void launchScene (const Song& song, const ClipGrid& grid, const GridIndex& index, int scene, double now, bool byFollow) noexcept;
+    void sceneFollow (const Song& song, const ClipGrid& grid, const GridIndex& index, double at) noexcept;
+    int followScene = -1;
+    double followSceneAt = never;
+    bool followLaunch = false;
     std::uint32_t rng = 0x9E3779B9u;
     double lastEnd = 0.0;
 };

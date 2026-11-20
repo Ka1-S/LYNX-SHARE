@@ -118,7 +118,7 @@ TEST (natives142_lists_and_no_fl_installation)
         if (c)
         {
             CHECK (c->instrument == e.kind && c->name == e.name);
-            CHECK (e.kind == InstrumentKind::fpc // (FL's empty kit: no samples, silent as FL)
+            CHECK (e.kind == InstrumentKind::fpc || e.kind == InstrumentKind::directwave // (FL's empty kit / FL's new DirectWave: no samples, silent as FL)
                    || e.kind == InstrumentKind::wavetraveller || e.kind == InstrumentKind::granulizer || e.kind == InstrumentKind::fruityslicer || e.kind == InstrumentKind::slicex // (play the channel's sample:
                    || natives142::renderChannel (*c, none, e.kind == InstrumentKind::drumaxx ? 36 : 60) > 1.0e-3); // none yet, silent as FL; Drumaxx: pad 1's key
         }
@@ -202,7 +202,8 @@ TEST (natives142_engines_from_the_fl_installation)
         ++made;
         CHECK (c->instrument == e.kind && c->name == e.name);
         if (e.kind == InstrumentKind::granulizer || e.kind == InstrumentKind::wavetraveller
-            || e.kind == InstrumentKind::fruityslicer || e.kind == InstrumentKind::slicex) // (play the channel's sample: none yet)
+            || e.kind == InstrumentKind::fruityslicer || e.kind == InstrumentKind::slicex // (play the channel's sample: none yet)
+            || e.kind == InstrumentKind::directwave) // (round 190hz: FL's new DirectWave has no zones, silent as FL's)
             continue;
         auto key = e.kind == InstrumentKind::drumaxx ? 36 : 60; // (FL's Default Kit: the kick on 36, round 169e)
         if (e.kind == InstrumentKind::fpc) // (round 190q: a pad's key; FL's new FPC comes with a kit)
@@ -296,7 +297,7 @@ TEST (natives142_newtone_and_newtime_native_projects)
     const double expected[] = { 57.0, 59.0, 60.0, 64.0 };
     for (std::size_t k = 0; k < std::min<std::size_t> (4, t.pitches.size()); ++k)
     {
-        CHECK (std::abs (t.pitches[k].origPitch - expected[k]) < 0.1);
+        CHECK (std::abs (t.pitches[k].origPitch - expected[k]) < 0.12); // (round 190kj: FL's whole-sample periods: E4 → 64.105)
         CHECK (! t.pitches[k].edited (1.0) && t.pitches[k].curStart == t.pitches[k].origStart);
     }
     CHECK (newtonefx::renderEdits (s, t) == nullptr); // (unedited: the source plays as it is)

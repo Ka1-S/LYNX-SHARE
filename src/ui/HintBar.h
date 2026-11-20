@@ -76,11 +76,51 @@ public:
     void setHint (const Hint& hint, bool live = false);
     const Hint& getHint() const noexcept { return current; }
     void paint (juce::Graphics& g) override;
+    // Round 190kn (DF-47): a right-click on the hint bar opens what FL 2026 opens there, the toolbars menu (captured:
+    // details190kn raw/f09), which the owner gives through `onMenu`; LYNX adds the shown value and text for the clipboard
+    // at its end (FL's own "copy any value" is the controls' Copy value, which LYNX's value menus have too)
+    void mouseDown (const juce::MouseEvent& e) override;
+    juce::PopupMenu copyMenu() const; // (tests / shots)
+    std::function<juce::PopupMenu()> onMenu;
+    // Round 190jo (design190ia FM-7, the Pattern toolbar only): the hint a step larger and brighter, as FL's (cap 8 on one
+    // line, cap 7 on two; FL cap 11 / 9); the other toolbars and windows keep the smaller text
+    void setLarger (bool shouldBeLarger)
+    {
+        if (larger != shouldBeLarger)
+        {
+            larger = shouldBeLarger;
+            repaint();
+        }
+    }
 
 private:
     Hint current;
     bool live = false;
+    bool larger = false;
+    // rollup 0.1.30 step 13: the text's items and lines as last laid out (HintBar.cpp), made again only when the text, the
+    // width or the fonts change — a hint that needs the two-line fallback no longer shapes its words twice per frame
+    struct LaidOut;
+    std::shared_ptr<LaidOut> laidOut;
 };
+// Ableton Live's Info View (round 190jn, design190ia CL-23) for the Clip-launch layout's Live look: the same hint as the
+// hint bar, as Live shows it at the bottom left — a 17 px #464646 title bar with the control's name, then the text in
+// #B5B5B5 on #363636, wrapped on a 15 px line pitch (live-session.png 9..239 × 807..994). The title is the hint's part
+// before its first colon ("Volume: drag ..."), else the hint has no title. Repaints only when the hint changes.
+class InfoView final : public juce::Component
+{
+public:
+    void setHint (const Hint& hint);
+    juce::String getTitleText() const { return title; }
+    juce::String getBodyText() const { return body; }
+    void paint (juce::Graphics& g) override;
+
+private:
+    juce::String title, body;
+    juce::String lastText, lastValue; // (the hint as given: the same again changes nothing, with no text work)
+    juce::TextLayout layout;          // the body laid out (again only when the text or the width changes)
+    float layoutWidth = -1.0f;
+};
+
 // FL's Tools › Last tweaked as a toolbar read-out (round 162d, issue #8): the name and value of the last moved
 // automatable control (a LYNX knob or a hosted plugin's own parameter); a click opens that parameter's menu (create
 // automation clip, link to controller, edit events, init song with this position, value). Handy when a plugin's own

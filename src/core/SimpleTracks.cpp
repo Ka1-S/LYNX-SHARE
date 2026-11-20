@@ -295,6 +295,23 @@ std::uint32_t defaultColour (Kind kind) noexcept
     return 0xFF9A8F7Fu;
 }
 
+trackicons::Icon iconOf (Kind kind) noexcept
+{
+    using I = trackicons::Icon;
+    switch (kind)
+    {
+        case Kind::voice: return I::microphone;
+        case Kind::instrument: return I::piano;
+        case Kind::drums: return I::drumMachine;
+        case Kind::sampler: return I::sample;
+        case Kind::pads: return I::steps;
+        case Kind::guitar: return I::electricGuitar;
+        case Kind::bass: return I::bass;
+        case Kind::audio: break;
+    }
+    return I::audio;
+}
+
 bool isAudioKind (Kind kind) noexcept
 {
     return kind == Kind::voice || kind == Kind::guitar || kind == Kind::bass || kind == Kind::audio;
@@ -318,6 +335,17 @@ int nextEmptyTrack (const Song& song)
         if (! used[(std::size_t) t])
             return t;
     return -1;
+}
+
+int rowsShown (const Song& song, int rows)
+{
+    int last = -1;
+    for (const auto& c : song.playlist)
+        last = std::max (last, c.track);
+    for (int t = (int) song.playlistTracks.size(); --t > last;)
+        if (song.playlistTracks[(std::size_t) t].mode != PlaylistTrackMode::unassigned || ! song.playlistTracks[(std::size_t) t].name.empty())
+            last = t;
+    return std::clamp (std::max (last, nextEmptyTrack (song)) + 1, 1, std::max (1, rows));
 }
 
 double tempoInName (const std::string& name, bool* explicitBpm)
@@ -426,6 +454,11 @@ std::string rename (Song& song, int track, const std::string& name)
             if (clip.track == track && clip.kind == ClipKind::pattern && clip.pattern >= 0 && clip.pattern < (int) song.patterns.size()
                 && song.patterns[(std::size_t) clip.pattern].name == old)
                 song.patterns[(std::size_t) clip.pattern].name = unique;
+        // round 190lr: the Drum Machine's patterns B … H ("<track> B", core/SimpleSteps.h) keep their letter
+        for (auto& p : song.patterns)
+            if (p.name.size() == old.size() + 2 && p.name.compare (0, old.size(), old) == 0 && p.name[old.size()] == ' '
+                && p.name.back() >= 'B' && p.name.back() <= 'H')
+                p.name = unique + p.name.substr (old.size());
     }
     return unique;
 }

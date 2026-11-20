@@ -51,6 +51,24 @@ struct Settings
     // round 165 (model 0): "EQ to Dyn S.C." — [EXEC] the filters (unless split) and the EQ leave the audio and feed only
     // the dynamics' side chain; with the filter split on, the filters stay at the input of the audio path
     bool eqToSidechain = false;
+    // round 190lb (model 1, off = the old sound): the "Pink" EQ colour of the SSL 4K G, measured black-box on its
+    // impulse grid (docs/analise/BLACKBOX_rodada190lb.md §2). With `pink` the four bands take the dials in the
+    // original's own units (LF ±18, mids ±22, HF ±20 dB; LMF 0.2 … 2.5 kHz before ÷3, HMF 0.6 … 7 kHz before ×3) and
+    // the LF / HF Bell switches do nothing (the reference's Pink bands are shelves only)
+    bool pink = false, lmfDiv3 = false, hmfMult3 = false;
+    // the SSL 4K G's own measured details (either colour; off = the 4K E's): its 18 dB/oct high-pass, its low-pass
+    // without bilinear cramping (a matched second-order section; the dial reaches 23.8 kHz), and its output ceiling
+    // (hard clip at 1.1108, both polarities, before the output trim)
+    bool k4g = false;
+    // round 190lb: the 4K E's own high-pass in Black / Orange, third order (18 dB/oct; its trial's K4E_ir renders — Brown
+    // keeps the measured 12 dB/oct one). Off = the old 12 dB/oct high-pass for every colour
+    bool e18HighPass = false;
+    // round 190mt (model 0): the G-Channel EQ law (Ridge Strip's hidden gEqLaw, set only by the Waves SSL G-Channel
+    // translator; 0 = the E bands above). The four bands become the G's own gain-dependent sections (proportional-Q
+    // bells, shelves whose corners and slope move with the gain; tables fitted on our probes, core/SslGTables.inc) on the
+    // G's ranges (LF / HF ±17 dB, LMF / HMF ±20 dB; no LF / HF bell), with its LMF ÷3 / HMF ×3 switches (lmfDiv3 / hmfMult3 above, shared with the
+    // 4K G's Pink colour since the 0.1.30 rollup step 13) and flat gain
+    int gLaw = 0;
 };
 
 // Q of the mid bands as the console's dial shows it, for a 0..1 dial position (3.5 at 0 .. 0.1 at 1)
@@ -150,6 +168,10 @@ struct Settings
     bool proLink = false, linkSide = false;
     double link = 1.0, linkOnly = 0.0;
     bool gate = true; // round tp172b: false = the reference's Allround mode (no single-vocal gate, the same level law)
+    int timing = 0;   // round 190iq: 1 = the Allround law's measured timing revision (detector, gain, look-ahead); Single Vocal ignores it
+    // round 190js: 1 = Single Vocal's "stands out" revision (the band must stand out from the signal below it by the
+    // measured margin, the gate decides a fixed delay late, the measured level law and gain timing); Allround ignores it
+    int vocalRevision = 0;
 };
 
 class DeEsser
@@ -173,6 +195,9 @@ private:
     // round 165x: the second detector lane (the right channel's blend, or the side signal)
     Biquad bhp1, bhp2, blp1, blp2, blow1, blow2;
     double beh = 0.0, bqh = 0.0, bql = 0.0, bsm = 0.0;
+    // round 190js: Single Vocal's revision compares the signal above a split under the band with the signal below it
+    Biquad shi1, shi2, slo1, slo2, bshi1, bshi2, bslo1, bslo2, sbody, bsbody;
+    double designedSplit = -1.0;
     bool bopen = false;
     std::array<float, ring> blevel {}, bratio {};
     std::array<float, ring> dl {}, dr {}, level {}, ratio {};
@@ -207,6 +232,12 @@ struct Settings
     // weighting. 0 = the voicing's own emphasis (every project before); 1 = the even weighting those references measured
     // (much less treble emphasis, a little more bass), its 1 kHz gain the same, so every 1 kHz law fitted before holds
     int scWeighting = 0;
+    // round 190lf [EXEC] (REA_rodada190lf_dyn §1): the cell law. 0 = the laws above (every project before); 1 = LYNX's
+    // compact opto behaviour model fitted on our black-box probes of an opto-leveler emulation (a feedback side chain
+    // through a low and a high peaking filter, a fast and a slow conductance sharing the light, an exposure that slows
+    // the release, a high-frequency band that is reduced less, its own peak reduction / Hi Freq / gain laws). Uses
+    // gain, peakReduction, hiFreq, limit, autoMakeup / makeupRef; the other switches above are ignored
+    int cellLaw = 0;
 };
 double autoMakeupDb (double peakReduction) noexcept; // round 152: AUTO MAKEUP's gain (dB) at a peak reduction dial
 double gainForMakeupDb (double db) noexcept;          // round 165x: the gain dial giving makeupDb (inverse)
@@ -228,6 +259,12 @@ private:
     Biquad scHigh190, scLow190; // round 190fx: the even weighting (Settings::scWeighting)
     double scShift190 = 0.0;    // its level shift (dB) that keeps the chain's 1 kHz gain where the emphasis put it
     double scDesignedRate = 0.0;
+    // round 190lf: the cell law's state (Settings::cellLaw = 1)
+    void processCell (float* l, float* r, int n, const Settings& s) noexcept;
+    struct Peak2 { double b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0, x1[2] {}, x2[2] {}, y1[2] {}, y2[2] {}; };
+    Peak2 cellLow, cellHigh;
+    double cellHiFreq = -1.0, cellRate = 0.0;
+    double ccf = 0.0, ccs = 0.0, cc3 = 0.0, cexp = 0.0, cenv = 0.0, cyp[2] {}, chx[2] {}, chy[2] {};
     float last = 0.0f;
 };
 } // namespace opto
@@ -269,6 +306,63 @@ private:
 };
 // round 152: the measured static correction (dB of gain added) at a ratio ≥ 1 and a level `over` dB above the threshold
 double measuredStaticDelta (double ratio, double over) noexcept;
+
+// ---- round 190mg (REA_rodada190mg_ren): the "Renaissance law" of the vintage voicing — LYNX's model of the reference's
+// structure (clean-room: structure from REA, every constant fitted on our own demo-mode probes). Compressor's hidden law
+// parameter selects it; only the Renaissance Compressor translator sets it.
+struct RenSettings
+{
+    double thresholdDb = 0.0, ratio = 1.0, attackMs = 16.0, releaseMs = 160.0, gainDb = 0.0, mix = 1.0, trimDb = 0.0;
+    bool manual = false, opto = false, smooth = false, limiter = true;
+    // round 190mt: the Renaissance Channel's "RVox" compressor type — the one-knob vocal compressor's curve
+    // (g = 1 / (1 + p (1/t − 0.1)), t = the threshold: no ratio, no floor, no bend) on this law's detector and smoothing
+    // (its attack / release still apply, with the Opto mode's release shape); the ratio is ignored [EXEC]
+    bool voxCurve = false;
+};
+// the static law: the gain's floor (a < 1 compresses, a > 1 expands), the threshold shift (dB) and the curve
+double renFloor (double ratio) noexcept;
+double renShiftDb (double ratio) noexcept;
+// the gain (linear) of a steady peak `x` (linear) at a ratio and threshold, before the make-up
+double renStaticGain (double x, double thresholdDb, double ratio) noexcept;
+
+class Renaissance
+{
+public:
+    void prepare (double sampleRate) noexcept;
+    void reset() noexcept;
+    void process (float* l, float* r, int n, const RenSettings& s) noexcept;
+    int latency() const noexcept { return win; }
+    float reductionDb() const noexcept { return last; }
+    float changeDb() const noexcept { return change; }
+    // the look-ahead window (= the audio delay) at a rate: 64 samples under 64 kHz, 128 under 128 kHz, else 256
+    static int windowFor (double sampleRate) noexcept;
+
+private:
+    static constexpr int cap = 512, tableSize = 256;
+    double sr = 48000.0;
+    int win = 64, boxA = 27, boxB = 38;
+    // detector all-passes (first order) per channel
+    double apc[3] {}, apx[2][3] {}, apy[2][3] {};
+    // sliding maximum (monotonic queue) of the detector over the window
+    std::array<double, cap> qv {};
+    std::array<int, cap> qi {};
+    int qh = 0, qt = 0, n0 = 0;
+    // the gain path: smoothed curve gain s, its slow follower q, the limiter's gain
+    double s = 1.0, q = 1.0, lim = 1.0;
+    // two running boxcars over the gain (fixed point, exact) and the audio delay
+    std::array<std::int64_t, cap> b1 {}, b2 {};
+    std::int64_t sum1 = 0, sum2 = 0;
+    int p1 = 0, p2 = 0;
+    std::array<float, cap> dl {}, dr {};
+    int dp = 0;
+    double wetG = 1.0, dryG = 0.0;
+    bool started = false;
+    // release tables (rebuilt when the release, mode or curve change)
+    std::array<double, tableSize> relT {}, pdrT {};
+    double tRelease = -1.0;
+    int tMode = -1;
+    float last = 0.0f, change = 0.0f;
+};
 } // namespace progcomp
 } // namespace lynx::vmatch
 

@@ -5,6 +5,7 @@
 #include "ui/FileChoosers.h"
 #include "ui/HintBar.h"
 
+#include "engine/ClapFormat.h"
 #include "engine/PluginHost.h"
 #include "engine/Vst2Format.h"
 #include "platform/Paths.h"
@@ -225,6 +226,7 @@ bool loadUnguarded (juce::AudioPluginInstance& plugin, const juce::File& file, j
             error = tr ("This preset belongs to {0}.", { juce::String::fromUTF8 (preset->pluginName.c_str()) });
             return false;
         }
+        const ScopedClapStateContext forPreset (ClapStateContext::preset); // (round 190jg: a CLAP plugin's preset state)
         plugin.setStateInformation (preset->state.data(), (int) preset->state.size());
         return true;
     }
@@ -319,7 +321,10 @@ bool save (juce::AudioPluginInstance& plugin, const juce::File& file, const juce
     else
     {
         juce::MemoryBlock state;
-        plugin.getStateInformation (state);
+        {
+            const ScopedClapStateContext forPreset (ClapStateContext::preset); // (round 190jg: clap.state-context)
+            plugin.getStateInformation (state);
+        }
         pp::Preset p;
         p.name = presetName.toStdString();
         p.pluginName = plugin.getName().toStdString();
@@ -506,9 +511,20 @@ PresetBar::PresetBar (juce::AudioPluginInstance& p, std::function<void()> change
     }
 }
 
+void PresetBar::setTitleLook (bool shouldBe)
+{
+    titleLook = shouldBe;
+    prev.setVisible (! titleLook);
+    next.setVisible (! titleLook);
+    resized();
+    repaint();
+}
+
 void PresetBar::resized()
 {
     auto r = getLocalBounds();
+    if (titleLook)
+        return; // (painted and hit-tested by areas: the name, then ◀ ▶ at the right)
     prev.setBounds (r.removeFromLeft (24));
     r.removeFromLeft (2);
     next.setBounds (r.removeFromLeft (24));
@@ -517,6 +533,26 @@ void PresetBar::resized()
 void PresetBar::paint (juce::Graphics& g)
 {
     using namespace theme;
+    if (titleLook)
+    {
+        auto r = getLocalBounds();
+        const auto nextArea = r.removeFromRight (16), prevArea = r.removeFromRight (16);
+        const auto mouse = getMouseXYRelative();
+        const auto over = isMouseOver();
+        g.setColour (over && r.contains (mouse) ? colour::textPrimary : colour::textSecondary);
+        g.setFont (font (type::small));
+        g.drawText (current.isEmpty() ? tr ("Presets") : current, r.withTrimmedRight (4), juce::Justification::centredRight, true);
+        for (const auto left : { true, false })
+        {
+            const auto a = (left ? prevArea : nextArea).toFloat();
+            juce::Path p;
+            p.addTriangle (left ? 3.0f : -3.0f, -4.5f, left ? 3.0f : -3.0f, 4.5f, left ? -3.0f : 3.0f, 0.0f);
+            p.applyTransform (juce::AffineTransform::translation (a.getCentreX(), a.getCentreY()));
+            g.setColour (over && a.contains (mouse.toFloat()) ? colour::accent : colour::textPrimary);
+            g.fillPath (p);
+        }
+        return;
+    }
     auto r = getLocalBounds().withTrimmedLeft (54).toFloat();
     g.setColour (isMouseOver() ? colour::bg5 : colour::bg4);
     g.fillRoundedRectangle (r, radius::md);
@@ -533,7 +569,19 @@ void PresetBar::paint (juce::Graphics& g)
 
 void PresetBar::mouseUp (const juce::MouseEvent& e)
 {
-    if (e.x >= 54 && ! e.mouseWasDraggedSinceMouseDown())
+    if (e.mouseWasDraggedSinceMouseDown())
+        return;
+    if (titleLook)
+    {
+        if (e.x >= getWidth() - 16)
+            step (1);
+        else if (e.x >= getWidth() - 32)
+            step (-1);
+        else
+            showMenu();
+        return;
+    }
+    if (e.x >= 54)
         showMenu();
 }
 
@@ -570,6 +618,24 @@ void PresetBar::step (int delta)
 
 void PresetBar::apply (const Entry& entry)
 {
+    // round 190in (R8): FL's Hybridize — the parameters as they were, half of them put back after the preset loads
+    std::vector<float> before;
+    if (hybridize())
+        callPluginFromUi (plugin, "reading its parameters", [this, &before] {
+            for (auto* p : plugin.getParameters())
+                before.push_back (p->getValue());
+        });
+    const juce::ScopeGuard mix { [this, &before] {
+        if (before.empty())
+            return;
+        auto& random = juce::Random::getSystemRandom();
+        callPluginFromUi (plugin, "mixing a preset (Hybridize)", [this, &before, &random] {
+            const auto& params = plugin.getParameters();
+            for (int i = 0; i < params.size() && i < (int) before.size(); ++i)
+                if (params[i]->isAutomatable() && random.nextBool())
+                    params[i]->setValueNotifyingHost (before[(std::size_t) i]);
+        });
+    } };
     if (entry.program >= 0)
     {
         if (! callPluginFromUi (plugin, "loading a program", [this, &entry] { plugin.setCurrentProgram (entry.program); }))
@@ -602,7 +668,21 @@ void PresetBar::setName (const juce::String& name)
         onChanged();
 }
 
-void PresetBar::showMenu()
+void PresetBar::randomize()
+{
+    // FL's Presets › Randomize: random values to the published (automatable) parameters (round 190in, R8)
+    auto& random = juce::Random::getSystemRandom();
+    callPluginFromUi (plugin, "randomizing its parameters", [this, &random] {
+        for (auto* p : plugin.getParameters())
+            if (p->isAutomatable())
+                p->setValueNotifyingHost (random.nextFloat());
+    });
+    currentFile = juce::File();
+    currentProgram = -1;
+    setName ({});
+}
+
+juce::PopupMenu PresetBar::presetsMenu()
 {
     juce::PopupMenu menu;
     const auto list = entries();
@@ -655,6 +735,19 @@ void PresetBar::showMenu()
         menu.addSeparator();
         menu.addItem (tr ("Play a note when a preset loads"), true, auditionOnLoad(), [] { setAuditionOnLoad (! auditionOnLoad()); });
     }
+    // FL's Presets › Randomize / Hybridize (round 190in, R8: FL manual, Plugin wrapper › Presets)
+    menu.addSeparator();
+    menu.addItem (tr ("Randomize"), [safe = juce::Component::SafePointer<PresetBar> (this)] {
+        if (safe != nullptr)
+            safe->randomize();
+    });
+    menu.addItem (tr ("Hybridize"), true, hybridize(), [] { hybridize() = ! hybridize(); });
+    return menu;
+}
+
+void PresetBar::showMenu()
+{
+    auto menu = presetsMenu();
     if (extendMenu)
     {
         menu.addSeparator();

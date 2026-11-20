@@ -28,6 +28,11 @@ bool isReachable (const Rect& r, int width, int height)
 }
 } // namespace
 
+const char* dockId (Dock dock) noexcept
+{
+    return dock == Dock::left ? "left" : dock == Dock::right ? "right" : "none";
+}
+
 const char* panelId (Panel panel) noexcept
 {
     return ids[(int) panel];
@@ -92,6 +97,93 @@ Layout Layout::makeDefault (int width, int height)
     l.order = { Panel::playlist, Panel::browser, Panel::mixer, Panel::pianoRoll, Panel::channelRack };
     l.focused = Panel::channelRack;
     return l;
+}
+
+bool Layout::browserDocked() const noexcept
+{
+    const auto& b = (*this)[Panel::browser];
+    return browserDock != Dock::none && b.visible && ! b.detached;
+}
+
+Rect Layout::freeArea() const noexcept
+{
+    Rect r { 0, 0, std::max (1, width), std::max (1, height) };
+    if (! browserDocked())
+        return r;
+    const auto bw = std::clamp ((*this)[Panel::browser].bounds.w, 0, std::max (0, r.w - 1));
+    r.w -= bw;
+    if (browserDock == Dock::left)
+        r.x = bw;
+    return r;
+}
+
+Rect Layout::maximisedArea (Panel p) const noexcept
+{
+    return p == Panel::browser ? Rect { 0, 0, std::max (1, width), std::max (1, height) } : freeArea();
+}
+
+void Layout::placeDockedBrowser()
+{
+    if (browserDock == Dock::none)
+        return;
+    auto& b = (*this)[Panel::browser].bounds;
+    const auto w = std::max (1, width), h = std::max (1, height);
+    b.w = std::clamp (b.w, std::min (minWidth, w), std::max (std::min (minWidth, w), w - minWidth));
+    b.h = h;
+    b.y = 0;
+    b.x = browserDock == Dock::left ? 0 : w - b.w;
+}
+
+int Layout::keepOutOfDockedBrowser()
+{
+    if (! browserDocked())
+        return 0;
+    const auto area = freeArea();
+    int moved = 0;
+    for (int i = 0; i < panelCount; ++i)
+    {
+        const auto p = (Panel) i;
+        auto& state = panels[(std::size_t) i];
+        if (p == Panel::browser || state.detached)
+            continue;
+        auto r = state.bounds;
+        r.w = std::min (r.w, area.w);
+        r.x = std::clamp (r.x, area.x, area.right() - r.w);
+        if (! (r == state.bounds))
+        {
+            state.bounds = r;
+            ++moved;
+        }
+    }
+    return moved;
+}
+
+void Layout::followFreeArea (Rect before)
+{
+    const auto after = freeArea();
+    if (before == after || before.w <= 0)
+        return;
+    const auto dx = after.x - before.x;
+    for (int i = 0; i < panelCount; ++i)
+    {
+        auto& state = panels[(std::size_t) i];
+        if ((Panel) i == Panel::browser || state.detached)
+            continue;
+        auto& r = state.bounds;
+        const auto x = r.x + dx;
+        const auto right = r.right() >= before.right() - 1 ? after.right() : r.right() + dx; // (glued to the right edge)
+        r.x = x;
+        r.w = std::max (std::min (minWidth, after.w), right - x);
+    }
+    keepOutOfDockedBrowser();
+}
+
+void Layout::dockBrowser (Dock side)
+{
+    const auto before = freeArea();
+    browserDock = side;
+    placeDockedBrowser();
+    followFreeArea (before);
 }
 
 void Layout::relayoutDefault (int newWidth, int newHeight)
@@ -178,6 +270,7 @@ void Layout::resize (int newWidth, int newHeight)
     newWidth = std::max (1, newWidth);
     newHeight = std::max (1, newHeight);
     const auto dockedPlaylist = width > 0 && browserDocksPlaylist();
+    const auto dockedWidth = (*this)[Panel::browser].bounds.w; // (issue #192: a docked Browser keeps its width, as FL's dock site)
 
     if (width > 0 && height > 0 && (newWidth != width || newHeight != height))
     {
@@ -199,6 +292,12 @@ void Layout::resize (int newWidth, int newHeight)
 
     for (auto& p : panels)
         p.bounds = clampInto (p.bounds, width, height);
+
+    if (browserDock != Dock::none) // (issue #192: a docked Browser stays at its edge, full height, its width kept)
+    {
+        (*this)[Panel::browser].bounds.w = dockedWidth;
+        placeDockedBrowser();
+    }
 
     if (dockedPlaylist)
         redockPlaylist();
@@ -264,6 +363,7 @@ std::string Layout::serialise() const
     for (auto p : order)
         out << ' ' << ids[(int) p];
     out << "\nfocus " << ids[(int) focused] << "\n";
+    out << "dock " << dockId (browserDock) << "\n"; // (issue #192; LYNX 0.1.29 and earlier skip the line)
     return out.str();
 }
 
@@ -279,6 +379,7 @@ std::optional<Layout> Layout::parse (const std::string& text, int width, int hei
 
     std::string line;
     int panelsRead = 0;
+    std::optional<Dock> dock;
 
     while (std::getline (in, line))
     {
@@ -335,10 +436,27 @@ std::optional<Layout> Layout::parse (const std::string& text, int width, int hei
                 if (const auto p = panelFromId (id))
                     layout.focused = *p;
         }
+        else if (kind == "dock")
+        {
+            std::string id;
+            if (words >> id)
+                dock = id == "right" ? Dock::right : id == "none" ? Dock::none : Dock::left;
+        }
     }
 
     if (panelsRead == 0)
         return std::nullopt;
+
+    // Issue #192: a layout saved before round 190jz has no dock line: a Browser at the full height of the left (or right)
+    // edge was LYNX's docked one; one moved elsewhere stays where it is (none).
+    if (! dock)
+    {
+        const auto& b = layout[Panel::browser].bounds;
+        const auto fullHeight = b.y <= 1 && b.bottom() >= layout.height - 1;
+        dock = fullHeight && b.x <= 1 ? Dock::left : fullHeight && b.right() >= layout.width - 1 ? Dock::right : Dock::none;
+    }
+    layout.browserDock = *dock;
+    layout.placeDockedBrowser();
 
     // A layout saved by 0.1.21 or earlier could have the Browser (at the left edge) wider than where the Playlist
     // starts, covering its pattern picker (a minimum width applied while the window was still small, then scaled):

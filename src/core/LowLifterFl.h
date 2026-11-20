@@ -31,6 +31,14 @@
 namespace lynx::lowlifter
 {
 constexpr int numParams = 15;
+// round 190mm (sub-round dyn), hidden (after the named ones; saved while non-zero; only the Waves Renaissance Bass /
+// MaxxBass translators set them): the psycho-acoustic bass law (core/BassHarmonics.h; 1 = on) and its values — maxx 1 =
+// the MaxxBass role (its input gain), freq log 16 … 1000 Hz, levels as (dB + 72) / 96 (0 = off), orig 0 … 1 linear
+enum BassLawParam { bassLaw = numParams, bassMaxx, bassFreq, bassInput, bassOrig, bassHarm, bassOut, bassEnd };
+float bassLevelValue (double db) noexcept;
+double bassLevelDb (float v) noexcept;
+float bassFreqValue (double hz) noexcept;
+double bassFreqHz (float v) noexcept;
 constexpr std::array<int, numParams> rawMax { 1, 10000, 10000, 10000, 1, 1, 10000, 10000, 10000, 10000, 10000, 10000, 1, 1, 1 };
 
 struct State

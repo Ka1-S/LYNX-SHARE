@@ -13,6 +13,7 @@
 #include "ui/ColourPicker.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
+#include "ui/TrackIcons.h"
 #include "ui/WindowOwner.h"
 
 namespace lynx
@@ -88,7 +89,9 @@ private:
 class NameAndColourWindow final : public juce::AlertWindow
 {
 public:
-    NameAndColourWindow (const juce::String& title, const juce::String& name, std::uint32_t colour)
+    // `icon` (FL's index, 0 = none; -1 = no icon section): issue #220 (round 190ng), FL's "Rename, color and icon" sets the
+    // icon in the same window (FL: its Icon button, F5); LYNX shows its icon picker with the search box under the colours
+    NameAndColourWindow (const juce::String& title, const juce::String& name, std::uint32_t colour, int icon = -1)
         : juce::AlertWindow (title, {}, juce::MessageBoxIconType::NoIcon), swatches (colour)
     {
         addTextEditor ("name", name, tr ("Name"));
@@ -112,6 +115,18 @@ public:
                 picker.setColour (juce::Colour (swatches.colour), false);
         };
         addCustomComponent (&picker);
+        if (icon >= 0)
+        {
+            iconTitle.setText (tr ("Icon") + "  (F5)", juce::dontSendNotification);
+            iconTitle.setFont (theme::font (theme::type::small, true));
+            iconTitle.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+            iconTitle.setSize (swatches.getWidth(), 18);
+            addCustomComponent (&iconTitle);
+            const auto columns = juce::jmax (8, (swatches.getWidth() - 12) / 30);
+            icons = std::make_unique<ui::TrackIconPicker> (icon, columns, nullptr);
+            icons->setSize (juce::jmax (icons->getWidth(), swatches.getWidth()), icons->getHeight());
+            addCustomComponent (icons.get());
+        }
         addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
         addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
 
@@ -126,16 +141,25 @@ public:
             swatches.pickRandom();
             return true;
         }
+        if (key.getKeyCode() == juce::KeyPress::F5Key && icons != nullptr) // FL's "Icon  F5"
+        {
+            icons->focusSearch();
+            return true;
+        }
 
         return juce::AlertWindow::keyPressed (key);
     }
 
     std::uint32_t colour() const { return swatches.colour; }
+    int icon() const { return icons != nullptr ? icons->pickedFlIndex() : -1; }
+    ui::TrackIconPicker* iconPicker() const noexcept { return icons.get(); }
 
 private:
     Swatches swatches;
     juce::Label hint;
     ui::ColourPicker picker { juce::Colours::grey, true };
+    juce::Label iconTitle;
+    std::unique_ptr<ui::TrackIconPicker> icons;
 };
 
 // One big choice of the record dialog: a title line and a note below it. The note is never cut (round 190cj: the
@@ -345,7 +369,7 @@ public:
         channelType.addItem (tr ("LYNX SHARE synth"), 1);
         channelType.addItem (tr ("MIDI Out"), 2);
         channelType.setSelectedId (o.midiOut ? 2 : 1, juce::dontSendNotification);
-        channelType.setTooltip (tr ("MIDI Out channels play the plugins on their MIDI port, on the note's MIDI channel"));
+        channelType.setTooltip (tr ("MIDI Out channels play the plugins and the MIDI output devices on their port (Settings › MIDI › Output devices › Port), on their MIDI channel"));
 
         // Which controller to import? (the ones LYNX applies: 7 / 11 volume, 10 pan, when the file has them)
         controller.addItem (eventLane ? juce::String ("---") : tr ("None"), 1); // (FL's "---" in the Event editor: every controller)
@@ -518,23 +542,52 @@ void showRecordChoiceDialog (std::function<void (int, bool)> onChoice)
     keepAboveMainWindow (*window);
 }
 
-std::unique_ptr<juce::AlertWindow> makeNameAndColourDialog (const juce::String& title, const juce::String& name, std::uint32_t colour)
+std::unique_ptr<juce::AlertWindow> makeNameAndColourDialog (const juce::String& title, const juce::String& name, std::uint32_t colour, int icon)
 {
-    return std::make_unique<NameAndColourWindow> (title, name, colour);
+    return std::make_unique<NameAndColourWindow> (title, name, colour, icon);
+}
+
+ui::TrackIconPicker* iconPickerOfNameDialog (juce::AlertWindow& dialog)
+{
+    auto* w = dynamic_cast<NameAndColourWindow*> (&dialog);
+    return w != nullptr ? w->iconPicker() : nullptr;
 }
 
 void showNameAndColourDialog (const juce::String& title, const juce::String& name, std::uint32_t colour,
                               std::function<void (const juce::String&, std::uint32_t)> onDone)
 {
-    auto* window = new NameAndColourWindow (title, name, colour);
+    showNameColourIconDialog (title, name, colour, -1, [onDone] (const juce::String& n, std::uint32_t c, int) {
+        if (onDone)
+            onDone (n, c);
+    });
+}
+
+void showNameColourIconDialog (const juce::String& title, const juce::String& name, std::uint32_t colour, int icon,
+                               std::function<void (const juce::String&, std::uint32_t, int)> onDone, bool focusIcons)
+{
+    // Issue #179: one rename window at a time, as in FL (F4 pressed again, or held, opened one more on every press and
+    // spamming it crashed LYNX). A second request while one is open brings that one to the front.
+    static juce::Component::SafePointer<NameAndColourWindow> open;
+    if (auto* existing = open.getComponent(); existing != nullptr && existing->isShowing())
+    {
+        existing->toFront (true);
+        return;
+    }
+    auto* window = new NameAndColourWindow (title, name, colour, icon);
+    open = window;
     window->enterModalState (true, juce::ModalCallbackFunction::create ([window, onDone] (int result) {
                                  const auto typed = window->getTextEditorContents ("name").trim();
 
                                  if (result == 1 && typed.isNotEmpty())
-                                     onDone (typed, window->colour());
+                                     onDone (typed, window->colour(), window->icon());
                              }),
                              true);
     keepAboveMainWindow (*window);
+    if (focusIcons) // (F3: the icons first; round 190ng)
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<NameAndColourWindow> (window)] {
+            if (auto* w = safe.getComponent(); w != nullptr && w->iconPicker() != nullptr)
+                w->iconPicker()->focusSearch();
+        });
 }
 
 namespace
@@ -811,9 +864,22 @@ class FlMessageWindow final : public juce::AlertWindow
 {
 public:
     explicit FlMessageWindow (const FlMessage& m)
-        : juce::AlertWindow (m.title, {}, juce::MessageBoxIconType::QuestionIcon), text (m.text)
+        : juce::AlertWindow (m.title, {}, m.icon), text (m.text)
     {
         addCustomComponent (&text);
+        for (int i = 0; i < m.options.size(); ++i) // (round 190jv: FL's exclusive choices; one is always ticked)
+        {
+            auto* b = choices.add (new juce::ToggleButton (m.options[i]));
+            // (round 190kd, FL 2026 shot f09: FL draws each choice once, as a radio dot; an AlertWindow labels a named
+            // custom component above it, so the name goes)
+            b->setName ({});
+            b->getProperties().set ("lynxRadio", true);
+            b->setSize (text.getWidth(), 26);
+            b->setRadioGroupId (190);
+            b->setClickingTogglesState (true);
+            b->setToggleState (i == juce::jlimit (0, m.options.size() - 1, m.option), juce::dontSendNotification);
+            addCustomComponent (b);
+        }
         if (m.buttons.size() > 2) // FL stacks three or more choices, one under the other ("Playlist tracks"); Escape = 0
         {
             for (int i = 0; i < m.buttons.size(); ++i)
@@ -831,6 +897,8 @@ public:
         if (m.rememberBox)
         {
             remember.setButtonText (tr ("Remember my choice"));
+            // issue #221 (round 190ng): only Yes is remembered; this says where to undo it
+            remember.setTooltip (tr ("Only Yes is remembered. Settings › General › Manage messages asks again"));
             remember.setSize (text.getWidth(), 26);
             addCustomComponent (&remember);
         }
@@ -842,9 +910,17 @@ public:
     }
 
     bool remembered() const { return remember.getToggleState(); }
+    int chosenOption() const
+    {
+        for (int i = 0; i < choices.size(); ++i)
+            if (choices[i]->getToggleState())
+                return i;
+        return 0;
+    }
 
 private:
     FlMessageText text;
+    juce::OwnedArray<juce::ToggleButton> choices;
     juce::OwnedArray<juce::TextButton> stacked;
     juce::OwnedArray<juce::Component> rows;
     juce::ToggleButton remember;
@@ -868,6 +944,17 @@ void showFlMessage (const FlMessage& message, std::function<void (int, bool)> on
     keepAboveMainWindow (*window);
 }
 
+void showFlOptions (const FlMessage& message, std::function<void (int, int)> onChoice)
+{
+    auto* window = new FlMessageWindow (message);
+    window->enterModalState (true, juce::ModalCallbackFunction::create ([window, onChoice] (int result) {
+                                 if (onChoice != nullptr)
+                                     onChoice (result, window->chosenOption());
+                             }),
+                             true);
+    keepAboveMainWindow (*window);
+}
+
 std::unique_ptr<juce::AlertWindow> makeFlMessageDialog (const FlMessage& message)
 {
     return std::make_unique<FlMessageWindow> (message);
@@ -880,7 +967,9 @@ const std::vector<Entry>& all()
     // FL's entries LYNX shows (the rest of FL's list belongs to features with their own setting in LYNX)
     // (round 190ey: FL's "RecAutoSwitchExternalInput", the External input question of issue #152; its heading "Audio" is
     // inferred from FL's table order, not decoded)
+    // (round 190jv: FL's next record, 0x33, "TrimUnusedMixerTracks" in File/Data — the Trim unused tracks question)
     static const std::vector<Entry> entries { { "DeleteMixerTrack", TR_NOOP ("Delete mixer track"), TR_NOOP ("File/Data") },
+                                              { "TrimUnusedMixerTracks", TR_NOOP ("Trim unused mixer tracks"), TR_NOOP ("File/Data") },
                                               { "RecAutoSwitchExternalInput", TR_NOOP ("Auto switch to external input only"), TR_NOOP ("Audio") } };
     return entries;
 }

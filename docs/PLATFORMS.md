@@ -14,6 +14,7 @@ JUCE and builds anywhere; the app uses JUCE 8.0.4. Everything that differs per O
 | Plugin sandbox (separate process) | yes (opt-in) | yes (opt-in, since 0.1.25) | yes (opt-in) |
 | Settings | `%APPDATA%\LYNX` | `~/Library/Application Support/LYNX` | `$XDG_CONFIG_HOME/LYNX` (`~/.config/LYNX`) |
 | Waveform cache | `%APPDATA%\LYNX\wavecache` | `~/Library/Caches/LYNX/wavecache` | `$XDG_CACHE_HOME/LYNX/wavecache` (`~/.cache/LYNX`) |
+| Moving playheads while playing (`src/ui/MotionOverlay.h`) | DirectComposition visual (on) | Core Animation layer (**off by default**, `LYNX_OVERLAY_MAC=1`; checked headless on CI only) | drawn by the X server with XRender (on) ([LINUX.md](LINUX.md)) |
 | Crash report + emergency save | `%APPDATA%\LYNX\autosave` | `.../Application Support/LYNX/autosave` | `~/.config/LYNX/autosave` |
 | FL Studio installation (factory samples, plugin database) | registry, else `Program Files\Image-Line\FL Studio*` | `/Applications/FL Studio*.app/Contents/Resources/FL` (layout not confirmed) | a Windows FL Studio under Wine: `$WINEPREFIX` or `~/.wine`, `drive_c/Program Files/Image-Line/FL Studio*` |
 
@@ -91,7 +92,8 @@ Windows `perfbench.exe` linked from a Windows build's own objects (thread cycles
   `-ffunction-sections -fdata-sections -faddrsig`; see the script for why zig needs a hand here). LYNX.exe 53.8 →
   48.2 MB (`.text` −9 %, `.rdata` −13 %), the same output, render cost within the run-to-run noise (±5 %).
   - ThinLTO (`LYNX_WIN_LTO=thin`): streamed audio −14 %, synth100 −4 %, the rest −1…+5 %, and the FL Harmless engine
-    ran 1.5× slower under it (Harmless.cpp is kept out of LTO when it is on); the link takes 15–25 minutes. Off.
+    ran 1.5× slower under it (Harmless.cpp is kept out of LTO when it is on); the link takes 15–25 minutes. Off
+    (round 190kz turned it on for the release with a real `-O3`, below).
   - `-fno-math-errno`: up to 25 % fewer cycles on Linux, none on Windows (0 to 3 % more); on MinGW it also turns `sin` +
     `cos` of one value into the C runtime's `sincos`. Not used.
   - zig gives `-O3` byte-identical objects to `-O2`; a real `-O3` (`-Xclang -O3`) measured no better than ThinLTO.
@@ -102,6 +104,60 @@ Windows `perfbench.exe` linked from a Windows build's own objects (thread cycles
   static library the app's LTO never reached), and `-fno-math-errno`, measured no gain with GCC.
 - **macOS**: unchanged (Apple's clang `-O3`, LTO of the app's own objects; Darwin has no maths `errno`).
 - `scripts/build-local.sh` takes `LYNX_OPT_FLAGS` (default `-O2`) to run the test suite with other optimisation flags.
+
+### Round 190kz: release code generation (owner decision)
+
+The Windows release builds (`.github/workflows/release.yml`) use a real `-O3` (`LYNX_WIN_OPT="-O2 -Xclang -O3"`: zig
+0.14.1 still maps its own `-O3` to clang's `-O2`, checked again: identical code) and ThinLTO of LYNX's own objects
+(`LYNX_WIN_LTO=thin`; JUCE's modules stay out of it). The instruction set stays the x86-64 baseline (SSE2), so every
+64-bit CPU still runs LYNX; the hottest loops pick AVX2 at run time instead (below).
+- Measured on Windows (Ryzen 5 3600; `perfbench.exe` linked from each build's own objects, one thread pinned, block 128
+  unless named, thread cycles per sample; the variants interleaved, their order rotated each rep; Δ = median over reps
+  of each rep's variant/`-O2` ratio; the same output hash in every cell; the machine was not idle, single reps vary by
+  up to ±20 %):
+
+  | scenario | `-O2` cycles/sample | `-O3` | `-O3` + ThinLTO, Harmless outside | `-O3` + ThinLTO, Harmless inside | reps |
+  |---|---:|---:|---:|---:|---:|
+  | Thief, block 480 | 22575 | +3.5 % | −0.9 % | −1.1 % | 9 |
+  | Thief | 22816 | +0.2 % | −2.2 % | −7.2 % | 5 |
+  | Exoplanet | 34120 | −4.6 % | −7.2 % | −8.0 % | 5 |
+  | Patience (Live set) | 66267 | −1.8 % | −3.7 % | −12.7 % | 5 |
+  | Future House (Harmless) | 37568 | +5.7 % | +0.3 % | +5.6 % | 4 |
+  | synth100 | 100014 | −0.2 % | +1.9 % | −1.4 % | 5 |
+  | inserts50 | 43901 | −7.1 % | −4.3 % | −5.0 % | 5 |
+  | stream | 3452 | +0.8 % | −12.9 % | −13.9 % | 5 |
+  | demo | 1372 | +0.1 % | +0.9 % | −0.6 % | 5 |
+  | big200 | 249797 | −0.5 % | −1.6 % | −0.3 % | 5 |
+
+  Chosen: `-O3` + ThinLTO with `Harmless.cpp` outside it (the default `LYNX_WIN_LTO_SKIP`): nothing worse beyond the
+  noise, streamed audio −13 %, the Live set and inserts −4 %, Exoplanet −7 %. `-O3` alone made Thief at block 480
+  (the FL comparison) 3.5 % slower; Harmless inside LTO made the Harmless-heavy song 5.6 % slower and gained elsewhere
+  only within the noise. Raw numbers: round 190kz's notes (`abwin-flags2.txt`, `abwin-flags3.txt`).
+- CI time (GitHub runner, 4 threads, cold app compile, round-build workflow, same commit): the build step takes
+  22.6 min at `-O2` without LTO (link 41 s) and 30.8 min with `-O3` + ThinLTO (link 530 s): +8 minutes, all in the
+  link. The release's Windows job (about 40 minutes before) stays shorter than the macOS jobs it waits for.
+- The plugins' Windows build (`plugins.yml`) stays at `-O2` without LTO: each of its nine links (the CLAP, seven VST3s,
+  plugexporttest) would run its own LTO back end over all of LYNX's objects, and `-O3` alone is not better (above).
+- Round builds (`round-build.yml`) keep the fast default (`-O2`, no LTO); `LYNX_CI_RELEASE_OPT=1 tools/ci-round-build.sh`
+  marks the commit `[release-opt]` and the run builds with the release's flags.
+- `LYNX_WIN_LTO_SKIP`: LYNX sources compiled outside ThinLTO in an LTO build (default `src/core/Harmless.cpp`; empty =
+  every LYNX source in it). `LYNX_WIN_LTO_SCOPE=core` keeps ThinLTO to the engine (`src/core`, `src/flp`) and compiles
+  the UI as plain objects: a shorter link (measured locally only), not used by the release.
+
+## Runtime CPU dispatch
+
+`src/core/CpuFeatures.h` (round 190kz) finds once what the CPU and the operating system support (CPUID; XGETBV for the
+AVX register state): SSE4.1, AVX, AVX2. A dispatched loop is compiled a second time with
+`__attribute__ ((target ("avx2")))` and taken when `cpu::hasAvx2()`; everything else is the baseline build.
+- **Rules**: the same IEEE operations in the same order per element, only wider (8 floats / 4 doubles) or VEX-encoded;
+  never `fma` in the target list (one rounding instead of two), no reassociated sums, no horizontal reductions, no
+  approximations. So every path renders the same bits; a test pins each dispatched loop (tests/Codegen190kzTests.inc).
+- **Override**: `LYNX_CPU=sse2|sse4|avx|avx2` (also `baseline`) caps the level for a process (benchmarks: hash both
+  paths on one machine); `cpu::setLevelForTest` does it from code. It never raises the level above the hardware.
+- **Dispatched now**: Signalsmith Stretch (the real-time pitch shifter, the offline stretch: the spectral band loops
+  and the strided radix-4, 2-point and radix-5 FFT passes, 8 wide), Parametric EQ 2's band cascade and Maximus's
+  band-split cascade (VEX encoding of the same SSE2 code). Older per-engine checks (`cpuHasAvx` in Harmless, Harmor,
+  Ogun, HardcoreFx; FMA checks of the FL-exact engines, which must follow FL's own dispatch) stay as they are.
 
 ## Windows plugins on Linux (yabridge)
 

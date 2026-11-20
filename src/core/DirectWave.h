@@ -76,12 +76,15 @@ struct Zone
     Lfo lfo[2];
     std::array<ModSlot, 16> mods {};
     std::string path;
+    std::string name;                         // 0x1F5 (the zone grid's name column)
     std::vector<std::uint8_t> embedded;       // raw planar audio (0x205), (frames + 512)·bits/8 per channel
+    int origin = -1;                          // editing (DirectWaveState.h): the zone record it was read from, −1 new
 };
 
 struct Program
 {
     std::string name;
+    std::string file;                         // 0x67: the .dwp the program was loaded from (name only)
     int index = 0;
     int voiceMode = 0;                        // 0 poly, 1 mono, 2 legato
     bool glideLegatoOnly = false;
@@ -105,6 +108,7 @@ struct State
 {
     std::uint32_t flags = 0;                  // chunk 6
     std::vector<Program> programs;            // programs with zones (index = Program::index)
+    int slotProgram = 0;                      // the program of MIDI slot 0 (chunk 5, byte 520; round 190hz)
 };
 std::optional<State> parseState (const std::vector<std::uint8_t>& state);
 
@@ -160,16 +164,33 @@ private:
 };
 
 // --------------------------------------------------------------------------------------------- LYNX channel
-// The program LYNX plays: the first one with zones (the one the demos' first MIDI slot selects).
+// The program LYNX plays: MIDI slot 0's program (FL's MIDI channel 1) when it has zones, else the first one with zones
+// (round 190hz; before, always the first with zones — the same program in every demo).
 const Program* playedProgram (const State& state);
+
+// One program record (the body of chunk 1) / zone record (chunk 3), as parseState reads them (round 190hz: the editor)
+Program parseProgram (const std::uint8_t* body, std::size_t size);
+Zone parseZone (const std::uint8_t* body, std::size_t size);
+// The bytes LYNX reads of zone record `id` (0x1F4…0x204; 0 = none it reads by size). A shorter record is read as
+// DirectWave reads it: over zeros, the sample format record's (0x1F7) bit depth 32 (rollup 0.1.30, REA round 190ii).
+std::size_t zoneRecordSize (std::uint32_t id) noexcept;
 
 // modelParams of an imported channel: { 1, zone count, then per zone 1 when DirectWave holds it as 16-bit
 // integers (16-bit PCM file or 16-bit embedded audio), else 0 }
 std::vector<float> encodeFormats (const std::vector<bool>& int16);
 std::vector<bool> decodeFormats (const std::vector<float>& params);
 
+// whether DirectWave holds a sample file as 16-bit integers: an 8- or 16-bit PCM WAV (EXEC, REA_rodada72 §6)
+bool isPcm16Wav (const std::vector<std::uint8_t>& file);
+
 // a decoded sample as the plugin holds it (16-bit sources back to their integers)
 std::shared_ptr<const ZoneSamples> zoneSamples (const SampleData& sample, bool int16);
+// Round qafix190kq (QA-10 of 0.1.30): the same, shared while any instrument holds it — a rebuild of the rack (every
+// published edit; the export's own engine beside the project's) takes the zones already made instead of copying every
+// sample again (Secret Agent Rendezvous: 2 × 422 MB of zones at an --export's peak). Keyed on the zone's file and the
+// format, checked against the sample's length, channels and a sparse fingerprint of its audio (the decoded SampleData
+// itself is not kept by the rack, so a later build decodes a new one).
+std::shared_ptr<const ZoneSamples> zoneSamplesShared (const std::string& path, const std::shared_ptr<const SampleData>& sample, bool int16);
 
 // Fills an imported channel (FlpImport): the state, the zones' files (resolved with `existing`, or the audio
 // the project embeds, stored with `saveEmbedded`) and their formats (read with `readFile`). False: not usable.

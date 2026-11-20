@@ -125,8 +125,11 @@ public:
             addAndMakeVisible (*l);
         }
         instrumentsTitle.setText (tr ("Instruments: new channel"), juce::dontSendNotification);
-        effectsTitle.setText (tr ("Effects: into the selected insert"), juce::dontSendNotification);
-        hint.setText (tr ("Enter adds the highlighted item, Up/Down move, Tab switches lists, Esc closes"), juce::dontSendNotification);
+        effectsTitle.setText (targets.effectsTitle.isNotEmpty() ? targets.effectsTitle : tr ("Effects: into the selected insert"), juce::dontSendNotification);
+        hint.setText (targets.effectsOnly ? tr ("Enter adds the highlighted effect, Up/Down move, Esc closes")
+                                          : tr ("Enter adds the highlighted item, Up/Down move, Tab switches lists, Esc closes"),
+                      juce::dontSendNotification);
+        instrumentsTitle.setVisible (! targets.effectsOnly);
         hint.setFont (theme::font (theme::type::caption));
         hint.setColour (juce::Label::textColourId, theme::colour::textDisabled);
         addAndMakeVisible (hint);
@@ -280,8 +283,9 @@ public:
             list->filter ({});
         }
 
-        active = targets.effectsFirst ? &effects : &instruments;
-        setSize (640, 420);
+        active = targets.effectsFirst || targets.effectsOnly ? &effects : &instruments;
+        instruments.setVisible (! targets.effectsOnly); // (issue #206: the effects alone)
+        setSize (targets.effectsOnly ? 420 : 640, 420);
     }
 
     void paint (juce::Graphics& g) override
@@ -299,6 +303,12 @@ public:
         area.removeFromTop (6);
         hint.setBounds (area.removeFromBottom (18));
         auto titles = area.removeFromTop (20);
+        if (targets.effectsOnly)
+        {
+            effectsTitle.setBounds (titles);
+            effects.setBounds (area);
+            return;
+        }
         instrumentsTitle.setBounds (titles.removeFromLeft (area.getWidth() / 2));
         effectsTitle.setBounds (titles.withTrimmedLeft (6));
         instruments.setBounds (area.removeFromLeft (area.getWidth() / 2).withTrimmedRight (3));
@@ -324,6 +334,8 @@ public:
 
         if (key == juce::KeyPress::tabKey)
         {
+            if (targets.effectsOnly)
+                return true;
             active = active == &instruments ? &effects : &instruments;
             repaint();
             return true;
@@ -351,7 +363,7 @@ private:
         effects.filter (search.getText());
 
         // the list that has matches when the preferred one has none
-        if (active->shown.empty())
+        if (active->shown.empty() && ! targets.effectsOnly)
         {
             auto* other = active == &instruments ? &effects : &instruments;
             if (! other->shown.empty())

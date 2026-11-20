@@ -1041,3 +1041,89 @@ KeyMap keyMap (int deck, const std::vector<WavRegion>& deckA, const std::vector<
     return map;
 }
 } // namespace lynx::slicex
+
+// ---- the articulator editor's grid, zoom and snap (round 190hz)
+namespace lynx::slicex
+{
+namespace
+{
+// Delphi's Round: to the nearest integer, halves to even (the default rounding mode)
+long long flRound (double v) noexcept
+{
+    return (long long) std::nearbyint (v);
+}
+} // namespace
+
+GridStep rulerStep (double base, double step1, double step2, double pixelsPerUnit, double minPixels) noexcept
+{
+    GridStep g;
+    if (! (base > 0.0) || ! std::isfinite (base))
+    {
+        g.step = 65536.0;
+        return g;
+    }
+    const auto c = (int) flRound (step1 / base), b = (int) flRound (step2 / base);
+    const auto c1 = std::max (c, 1), b1 = std::max (b, 1);
+    const auto m = std::max (b, c);
+    auto fits = [&] (int n) {
+        return (c1 % n == 0 || n % c1 == 0) && (b1 % n == 0 || n % b1 == 0) && base * (double) n * pixelsPerUnit >= minPixels;
+    };
+    int n = m;
+    if (m > 0)
+    {
+        if (! fits (m))
+        {
+            do
+                n *= 2;
+            while (! fits (n) && n < (1 << 28));
+        }
+        else
+            for (n = 1; n < m && ! fits (n); ++n) {}
+    }
+    g.step = base * (double) n;
+    if (g.step <= 0.0)
+        g.step = 65536.0;
+    g.perStep1 = (int) std::max (1LL, flRound (step1 / g.step));
+    g.perStep2 = step2 == 0.0 ? 0 : (int) std::max (1LL, flRound (step2 / g.step));
+    return g;
+}
+
+int gridLineClass (long long index, const GridStep& g) noexcept
+{
+    if (g.perStep2 != 0 && index % g.perStep2 == 0)
+        return 2;
+    return g.perStep1 != 0 && index % g.perStep1 == 0 ? 1 : 0;
+}
+
+TimeAxis articulatorTimeAxis (bool tempoBased, int beatsPerBar) noexcept
+{
+    constexpr double subdivision = 10.0; // Slicex's answer to the editor's grid question (0x881cb0)
+    if (tempoBased)
+        return { 1.0 / 4.0 / subdivision, 1.0, (double) std::max (1, beatsPerBar) };
+    return { 2.0 / 10.0 / subdivision, 2.0, 0.0 };
+}
+
+double articulatorView (double lastTime, bool lfo) noexcept
+{
+    auto d = std::max (0.0, lastTime) + (lfo ? 1.0 : 0.0);
+    d = d + 1.0 <= d * 1.25 ? d * 1.25 : d + 1.0;
+    return std::clamp (d, 2.0, 7200.0);
+}
+
+double snapToGrid (double v, double step, double offset) noexcept
+{
+    if (! (step > 0.0))
+        return v;
+    return (double) flRound ((v - offset) / step) * step + offset;
+}
+
+bool snapActive (bool snapButton, bool alt) noexcept
+{
+    return snapButton != alt;
+}
+
+double wheelZoomFactor (double notches, bool fine) noexcept
+{
+    return std::exp (-notches * 3.0 * (fine ? 0.01875 : 0.075) * std::log (2.0));
+}
+} // namespace lynx::slicex

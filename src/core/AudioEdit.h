@@ -6,6 +6,7 @@
 // undo history list. Also: a spectrogram, zero-crossing snap, onset detection (auto-slice) and WAV encoding and
 // decoding with the markers (cue/labl/ltxt) and the loop (smpl). JUCE-free; tests in tests/AudioEditTests.inc.
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -60,9 +61,28 @@ struct Envelope
     static Envelope flat (double y); // two points (0, y) and (1, y)
 };
 
+// FL Edison's sample properties (Format › Edit properties..., F2; round gaps190kf, REA of Edison_x64.dll: the form
+// TMEWAVPropForm and its accept handler 0x878c90, the WAV writer 0x613e00 and readers 0x6191d0 / 0x619290 / 0x619320 /
+// 0x619d30). They travel in the WAV's own chunks as FL writes them: LIST INFO INAM / ICMT (name, comments), smpl (middle
+// note and fine tune), inst (the mapping range), acid (tempo, tempo-sync). The defaults are FL's for a new sample.
+struct SampleProps
+{
+    std::string name, comments;   // FL's Title (INAM) and Comments (ICMT)
+    double tempo = 0.0;           // BPM; 0 = none (FL keeps 0…960)
+    bool tempoSync = false;       // "Tempo-sync": rhythmic content (acid without the one-shot flag)
+    int middleNote = 60, lowNote = 0, highNote = 127;
+    double fineTune = 0.0;        // cents
+    int lowVelocity = 0, highVelocity = 127;
+    bool int16 = false;           // FL's Precision "16Bit int" (else 32Bit float)
+
+    bool hasPitchInfo() const noexcept { return middleNote != 60 || fineTune != 0.0 || lowNote != 0 || highNote != 127 || lowVelocity != 0 || highVelocity != 127; }
+    bool hasTempoInfo() const noexcept { return tempo != 0.0 || tempoSync; }
+};
+
 struct Document
 {
     Audio audio;
+    SampleProps props; // round gaps190kf (default: nothing written, files stay as before)
     std::vector<Marker> markers; // sorted by start
     std::int64_t loopStart = -1, loopEnd = -1; // frames [loopStart, loopEnd), -1 = no loop
     std::string title;
@@ -238,6 +258,53 @@ bool decodeWavMarkers (const std::uint8_t* data, std::size_t size, Document& out
 // than 65 markers, one key up each, at most 124), 3 default / none, 4 C5 for all. (FL's pad layouts are not here.)
 enum class NoteLayout { wholeKeyboard, whiteNotes, blackNotes, none, c5 };
 void assignTriggerNotes (Document& doc, NoteLayout layout);
+
+// --- click-free (smooth) editing (round gaps190kf; FL Edison's Edit › "Click-free (smooth) editing", key C, on by
+// default: the editor's 0x84b300 around its edits, from the edit handler 0x8702c0) ------------------------------------
+// Before an edit the audio around the range [first, last] is taken (24 ms on each side, `capture`); after it each seam
+// is overlapped with the audio that followed it before (`blend`): a raised-cosine fade (FL's fade type 4) out of the old
+// audio over a fade in of the new. Flags as FL's: check the file's ends (0x40: no left seam at frame 0, no right seam at
+// the end), fade at the file's ends (0x80), fade the document's own audio too (0x100), left seam (0x200), right seam
+// (0x400), and at most the range's length (0x800).
+namespace clickfree
+{
+constexpr unsigned checkEnds = 0x40, fadeFileEnds = 0x80, fadeOwn = 0x100, left = 0x200, right = 0x400, withinRange = 0x800;
+constexpr double milliseconds = 24.0;
+struct Take
+{
+    std::vector<std::vector<float>> audio; // 2 × the overlap: the range's first frames, then its last ones
+    std::int64_t half() const noexcept { return audio.empty() ? 0 : (std::int64_t) audio[0].size() / 2; }
+};
+Take capture (Document& doc, std::int64_t first, std::int64_t last, unsigned flags);
+void blend (Document& doc, const Take& take, std::int64_t first, std::int64_t last, unsigned flags);
+// FL's fade type 4 on [first, last] of every channel: gain from → to along (1 − cos (π x)) / 2, x = (i − first + 1) / (n + 1)
+void raisedCosineFade (std::vector<std::vector<float>>& channels, std::int64_t first, std::int64_t last, float from, float to);
+// The edits FL makes click-free, as its edit handler does them
+void eraseClickFree (Document& doc, Range r);                                 // Delete / Cut
+void clearClickFree (Document& doc, Range r);                                 // Clear (silence)
+void insertClickFree (Document& doc, std::int64_t at, const Audio& clip);     // Paste (insert)
+void pasteReplaceClickFree (Document& doc, Range r, const Audio& clip);       // Paste replacing the selection
+void insertSilenceClickFree (Document& doc, std::int64_t at, std::int64_t frames);
+void trimClickFree (Document& doc, Range r);                                  // Trim: the kept part's ends fade
+} // namespace clickfree
+
+// --- sample properties in the WAV (round gaps190kf; FL Edison's writer 0x613e00 and readers, see SampleProps) ----------
+// smpl's unity note and pitch fraction for a middle note and fine tune (cents): the whole semitones of the fine tune
+// (floored) come off the middle note, the rest is the fraction (2^32 = one semitone)
+struct SmplPitch
+{
+    int unityNote = 60;
+    std::uint32_t fraction = 0;
+};
+SmplPitch smplPitchOf (int middleNote, double fineTune) noexcept;
+// inst's 7 bytes: unshifted note, fine tune (−50…50 cents), gain 0, low / high note, low / high velocity
+std::array<std::uint8_t, 7> instOf (const SampleProps& props) noexcept;
+// acid's 24 bytes for `frames` frames at `sampleRate`: flags (1 one-shot = not tempo-sync, 4 = the length is not whole
+// beats), root 60, beats, 4/4, the tempo (0 when the sample has none)
+std::array<std::uint8_t, 24> acidOf (const SampleProps& props, std::int64_t frames, double sampleRate) noexcept;
+// Reads the properties FL reads (smpl, inst, acid, LIST INFO INAM / ICMT) into out.props (`out.audio` gives the frames
+// and the rate). False when the WAV has none of them.
+bool decodeWavProps (const std::uint8_t* data, std::size_t size, Document& out);
 
 // What FL hands a plugin about a WAV besides its audio: the starts of its cue points and regions (ascending, clamped to
 // `frames` − 1) and the ACID chunk's beat count (0 = none). `data` may hold only the RIFF header and the non-audio

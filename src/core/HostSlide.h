@@ -42,6 +42,23 @@ struct HostSlide
         return glide;
     }
 
+    // FL's slide notes step (round 190jv, REA_rodada190hg §1.1, REA_rodada190jv §3): on FL's native generators the host
+    // moves a sounding voice's Final pitch once per tick of the project (PPQ 96), in n + 1 equal steps for a slide note
+    // n ticks long — the first one with the slide's start, the last one at its end — not in a straight glide. The rack
+    // sets this around Instrument::slideTo for a slide note on an FL native generator (n ticks, one tick as a fraction of
+    // the slide's length) and splits its render calls on those ticks; start() then steps instead of gliding. A porta
+    // glide and every other engine keep the straight glide.
+    struct Steps
+    {
+        int ticks = 0;         // n (0: glide)
+        float fraction = 0.0f; // one tick / the slide's length
+    };
+    static Steps& pendingSteps() noexcept
+    {
+        static thread_local Steps steps;
+        return steps;
+    }
+
     // the note on: the channel's pitch the voice was started with (knob + fine tune + main pitch, cents); `rate` =
     // the engine's samples per host sample (an engine that runs at its own rate)
     void anchor (float ref, float rate = 1.0f) noexcept
@@ -74,6 +91,16 @@ struct HostSlide
     {
         target = toCents - jump;
         left = std::max (1.0f, samples);
+        if (const auto& s = pendingSteps(); s.ticks > 0) // (FL's stepped slide note)
+        {
+            stepsLeft = s.ticks + 1;
+            stepSize = (target - cents) / (float) stepsLeft;
+            stepEvery = (double) left * (double) s.fraction;
+            stepDue = 0.0; // (the first step at once: at the next advance, even advance (0))
+            step = 0.0f;
+            return;
+        }
+        stepsLeft = 0;
         step = (target - cents) / left;
     }
     // `n` samples went by: the new offset (cents)
@@ -87,6 +114,26 @@ struct HostSlide
         }
         if (left <= 0.0f)
             return cents;
+        if (stepsLeft > 0) // (FL's steps: each one at its tick; a step due within a hair of the end of `n` counts)
+        {
+            auto remaining = (double) n;
+            const auto tolerance = 1.0e-3 * stepEvery + 1.0e-6;
+            while (stepsLeft > 0 && remaining + tolerance >= stepDue)
+            {
+                remaining -= stepDue;
+                stepDue = stepEvery;
+                cents += stepSize;
+                --stepsLeft;
+            }
+            if (stepsLeft == 0)
+            {
+                cents = target;
+                left = 0.0f;
+            }
+            else
+                stepDue -= remaining;
+            return cents;
+        }
         if (n >= left)
         {
             cents = target;
@@ -99,7 +146,24 @@ struct HostSlide
         }
         return cents;
     }
+    // For an engine that moves the pitch before it renders `n` samples (it reads the offset for them first): a straight
+    // glide as advance (n) always did; a stepped slide gives the offset at the start of those samples (the steps due by
+    // now) and keeps the ones due inside them for the next call, which the rack starts on the tick.
+    float advanceFirst (float n) noexcept
+    {
+        if (stepsLeft <= 0)
+            return advance (n);
+        const auto now = advance (0.0f);
+        if (stepsLeft > 0)
+            stepDue -= (double) n;
+        return now;
+    }
     bool moving() const noexcept { return left > 0.0f || jump != 0.0f; }
+    bool stepping() const noexcept { return stepsLeft > 0; }
+
+    int stepsLeft = 0;     // steps of a stepped slide still to come
+    float stepSize = 0.0f; // cents each
+    double stepEvery = 0.0, stepDue = 0.0; // samples between two steps; until the next one
 };
 
 // What an engine keeps of Instrument::setChannelPitchNow (round 167a): the channel's pitch now, for its voices' anchor()

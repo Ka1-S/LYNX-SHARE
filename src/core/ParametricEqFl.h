@@ -123,4 +123,7 @@ private:
     int ringIndex[2] {};
     std::vector<float> buffer, wide;
 };
+// Round 190kr test hook: the engine's sample-by-sample cascade of stages renders exactly what the plain per-stage
+// loop renders (random stages, states and blocks); true when every output and state is bit-identical
+bool stagesMatchReference (std::uint32_t seed) noexcept;
 } // namespace lynx::peqfl

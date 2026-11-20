@@ -5,7 +5,9 @@
 #include "core/DemoSongs.h"
 #include "engine/AudioEngine.h"
 #include "engine/Exporter.h"
+#include "ui/DialogFrame.h"
 #include "ui/I18n.h"
+#include "ui/Icons.h"
 #include "ui/NewProjectDialog.h"
 #include "ui/Theme.h"
 
@@ -104,6 +106,7 @@ public:
     {
         setWantsKeyboardFocus (false);
         play.setTooltip (tr ("Plays the first bars without opening it"));
+        play.setIconSizing (0.5f, 16.0f);
         play.onClick = [this] { owner.togglePreview (index); };
         addAndMakeVisible (play);
     }
@@ -112,8 +115,13 @@ public:
     {
         const auto& e = owner.list[(std::size_t) index];
         const auto known = e.bpm > 0.0;
-        play.setEnabled (! known || e.playable);
-        play.setButtonText (owner.previewing == index ? tr ("Stop") : owner.rendering == index ? juce::String ("...") : tr ("Play"));
+        // round 190jp (design190ia SG-19, BandLab's square play buttons): a ▶ icon (■ while it plays, … while it renders);
+        // a row with nothing to play shows none
+        play.setVisible (! known || e.playable);
+        // round 190mr (DS-47, capture 190mr C2 bl-kit-preview.png): BandLab's preview button shows ⏸ while it plays (no ring
+        // or bar) and ▶ again when the preview ends by itself
+        play.setIcon (owner.previewing == index ? Icon::pause : owner.rendering == index ? Icon::more : Icon::play);
+        play.setTitle (owner.previewing == index ? tr ("Stop") : tr ("Play"));
         repaint();
     }
 
@@ -127,7 +135,7 @@ public:
         g.setColour (sel ? theme::colour::accent : theme::colour::border);
         g.drawRoundedRectangle (r.reduced (0.5f), theme::radius::md, sel ? 1.5f : 1.0f);
         auto text = getLocalBounds().reduced (12, 6);
-        text.removeFromRight (84);
+        text.removeFromLeft (playSize + 12);
         g.setColour (theme::colour::textPrimary);
         g.setFont (theme::font (theme::type::body, true));
         g.drawFittedText (e.name, text.removeFromTop (text.getHeight() / 2), juce::Justification::centredLeft, 1, 0.8f);
@@ -146,7 +154,8 @@ public:
         g.drawFittedText (line, text, juce::Justification::centredLeft, 1, 0.8f);
     }
 
-    void resized() override { play.setBounds (getLocalBounds().removeFromRight (84).reduced (10, 11)); }
+    static constexpr int playSize = 32;
+    void resized() override { play.setBounds (getLocalBounds().withTrimmedLeft (12).removeFromLeft (playSize).withSizeKeepingCentre (playSize, playSize)); }
     void mouseEnter (const juce::MouseEvent&) override { repaint(); }
     void mouseExit (const juce::MouseEvent&) override { repaint(); }
     void mouseDown (const juce::MouseEvent&) override { owner.select (index); }
@@ -155,7 +164,7 @@ public:
 private:
     StartFromPanel& owner;
     int index;
-    juce::TextButton play;
+    IconButton play { "play", Icon::play };
 };
 
 StartFromPanel::StartFromPanel (AudioEngine& e, Hooks h) : engine (e), hooks (std::move (h)), shared (std::make_shared<Shared>())
@@ -164,8 +173,7 @@ StartFromPanel::StartFromPanel (AudioEngine& e, Hooks h) : engine (e), hooks (st
     getProperties().set ("lynxKeepsKeys", true); // (round 190fc: its list keys while it is up; MainComponent::simpleClickEnded)
     setTitle (tr ("Start from"));
     title.setText (tr ("Start from"), juce::dontSendNotification);
-    title.setFont (theme::font (theme::type::display, true));
-    title.setJustificationType (juce::Justification::centred);
+    ui::dialog::styleTitle (title); // (round 190jp: the one dialog title, design190ia SG-20)
     addAndMakeVisible (title);
     closeButton.setButtonText (juce::String::fromUTF8 ("\xc3\x97"));
     closeButton.setTooltip (tr ("Close"));
@@ -180,6 +188,7 @@ StartFromPanel::StartFromPanel (AudioEngine& e, Hooks h) : engine (e), hooks (st
     hint.setColour (juce::Label::textColourId, theme::colour::textSecondary);
     addAndMakeVisible (hint);
     openButton.setButtonText (tr ("Open"));
+    ui::dialog::styleButton (openButton, true); // (SG-19 / SG-21: the Return default is the dialog's one accent button)
     openButton.onClick = [this] { open (selected); };
     addAndMakeVisible (openButton);
 
@@ -255,6 +264,13 @@ bool StartFromPanel::openForSnapshot (int index)
     return true;
 }
 
+void StartFromPanel::previewLookForSnapshot (int index)
+{
+    previewing = index;
+    for (auto& r : rows)
+        r->update();
+}
+
 void StartFromPanel::stopPreview()
 {
     shared->serial.fetch_add (1); // (a render still running is dropped when it ends)
@@ -328,26 +344,16 @@ void StartFromPanel::timerCallback()
 
 void StartFromPanel::paint (juce::Graphics& g)
 {
-    g.fillAll (theme::colour::bg0.withAlpha (0.72f));
-    const auto c = card().toFloat();
-    g.setColour (juce::Colours::black.withAlpha (0.35f));
-    g.fillRoundedRectangle (c.translated (0.0f, 4.0f).expanded (2.0f), theme::radius::lg + 2.0f);
-    g.setColour (theme::colour::bg2);
-    g.fillRoundedRectangle (c, theme::radius::lg);
-    g.setColour (theme::colour::borderStrong);
-    g.drawRoundedRectangle (c.reduced (0.5f), theme::radius::lg, 1.0f);
-    g.setColour (theme::colour::accent);
-    g.fillRect (c.getX() + 24.0f, c.getY() + 52.0f, c.getWidth() - 48.0f, 1.0f);
+    ui::dialog::paintDim (g, getLocalBounds());
+    ui::dialog::paintFrame (g, card().toFloat(), ui::dialog::Kind::overlay); // (round 190jp: the one dialog frame)
 }
 
 void StartFromPanel::resized()
 {
-    auto c = card().reduced (20, 14);
-    auto top = c.removeFromTop (34);
+    auto top = ui::dialog::titleRow (card()).reduced (10, 0);
     closeButton.setBounds (top.removeFromRight (28).withSizeKeepingCentre (28, 28));
-    top.removeFromLeft (28);
-    title.setBounds (top);
-    c.removeFromTop (16);
+    title.setBounds (top.reduced (28, 0));
+    auto c = ui::dialog::bodyOf (card()).reduced (20, 14);
     auto bottom = c.removeFromBottom (32);
     openButton.setBounds (bottom.removeFromRight (120));
     bottom.removeFromRight (10);

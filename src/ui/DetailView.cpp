@@ -1,3 +1,4 @@
+#include "ui/TextCache.h"
 #include "ui/DetailView.h"
 #include "core/StandIns.h"
 #include "ui/MapMode.h"
@@ -8,11 +9,14 @@
 #include <map>
 #include <set>
 
+#include "core/AlsImport.h"
+#include "core/Braid.h"
 #include "core/ClipLauncher.h"
 #include "core/ClipSample.h"
 #include "core/DetailChain.h"
 #include "core/RackOps.h"
 #include "core/Groove.h"
+#include "core/GrooveAudio.h"
 #include "core/Effects.h"
 #include "core/FlEffects.h"
 #include "core/HotSwap.h"
@@ -37,11 +41,14 @@
 #include "ui/MidiToolsPanel.h"
 #include "ui/MixerComponent.h"
 #include "ui/NumBox.h"
+#include "ui/LiveClipLook.h"
+#include "ui/LiveLook.h"
 #include "ui/PianoRollComponent.h"
 #include "ui/PlaylistComponent.h"
 #include "ui/PluginHeader.h"
 #include "ui/PluginThumbs.h"
 #include "ui/QuickPick.h"
+#include "ui/RackEditor.h"
 #include "ui/Theme.h"
 #include "ui/TimerWhileShowing.h"
 #include "ui/ValueControl.h"
@@ -54,10 +61,36 @@ namespace
 {
 juce::String utf8 (const std::string& s) { return juce::String::fromUTF8 (s.c_str()); }
 
-// card geometry (px at 100 %)
-constexpr int contextWidth = 132, meterWidth = 22, gap = 4, titleHeight = 20, foldedWidth = 22, addWidth = 44;
+// A size in LYNX's look and in Live's (round 190jn, design190ia CL-21: the Clip-launch layout's Live look); reads as an int.
+struct LookMetric
+{
+    int classic, live;
+    operator int() const noexcept { return theme::livelook::active() ? live : classic; }
+};
+
+// card geometry (px at 100 %); Live 12.4's device title bar is 17 px (live-session.png Utility y 807..823)
+constexpr int contextWidth = 132, meterWidth = 22, gap = 4, foldedWidth = 22, addWidth = 44;
+const LookMetric titleHeight { 20, 17 };
 constexpr int knobColumn = 62, knobRow = 70, knobSize = 30, instrumentWidth = 196, pluginWidth = 172;
 constexpr int maxEffectKnobs = 7; // + the slot's Mix
+// Round 190ko: an instrument card can show its engine's main parameters as knobs (Live's generic device look: knob
+// columns, two rows), as an effect card does. Knob id = engineKnobBase + the engine's parameter index.
+constexpr int engineKnobBase = 100;
+const std::vector<int>& engineCardParams (InstrumentKind kind)
+{
+    namespace b = braid;
+    // Braid (Live's Meld): engine A on the top row, B below — oscillator type and macros, filter frequency and macros, volume
+    static const std::vector<int> braidKnobs = [] {
+        std::vector<int> v;
+        for (const int p : { b::eng::oscType, b::eng::oscMacro1, b::eng::oscMacro2, b::eng::filterFreq, b::eng::filterMacro1, b::eng::filterMacro2,
+                             b::eng::volume })
+            for (int k = 0; k < 2; ++k)
+                v.push_back (b::engineBase (k) + p);
+        return v;
+    }();
+    static const std::vector<int> none;
+    return kind == InstrumentKind::braid ? braidKnobs : none;
+}
 
 juce::String insertName (const Song& song, int insert)
 {
@@ -116,6 +149,42 @@ void drawSwapGlyph (juce::Graphics& g, juce::Rectangle<int> r, bool hot, bool li
     g.strokePath (p, juce::PathStrokeType (1.0f));
 }
 
+// Round 190jn (CL-21): Live's title-bar wells (theme::livelook::drawWell) and the LYNX vector glyphs drawn in them.
+void drawLiveWellGlyph (juce::Graphics& g, juce::Rectangle<int> r, int kind, bool hot, bool lit)
+{
+    namespace ll = theme::livelook;
+    const auto box = r.toFloat();
+    auto ink = ll::drawWell (g, box, lit);
+    if (hot && ! lit)
+        ink = colour::textPrimary;
+    g.setColour (ink);
+    const auto cx = box.getCentreX(), cy = box.getCentreY();
+    if (kind == 0) // window: a small frame with its title band
+    {
+        const auto f = juce::Rectangle<float> (7.0f, 6.0f).withCentre ({ cx, cy });
+        g.drawRect (f, 1.0f);
+        g.fillRect (f.withHeight (2.0f));
+    }
+    else if (kind == 1) // hot-swap: two arrows, one each way
+    {
+        juce::Path p;
+        p.startNewSubPath (cx - 3.0f, cy - 1.5f);
+        p.lineTo (cx + 3.0f, cy - 1.5f);
+        p.lineTo (cx + 1.0f, cy - 3.5f);
+        p.startNewSubPath (cx + 3.0f, cy + 1.5f);
+        p.lineTo (cx - 3.0f, cy + 1.5f);
+        p.lineTo (cx - 1.0f, cy + 3.5f);
+        g.strokePath (p, juce::PathStrokeType (1.2f));
+    }
+    else // save: a filled disk with its label slot
+    {
+        const auto d = juce::Rectangle<float> (7.0f, 7.0f).withCentre ({ cx, cy });
+        g.fillRoundedRectangle (d, 1.0f);
+        g.setColour (lit ? ll::on : ll::well);
+        g.fillRect (d.getX() + 2.0f, d.getY() + 1.0f, 3.0f, 2.0f);
+    }
+}
+
 // The save-preset button beside it (the reference's disk).
 void drawSaveGlyph (juce::Graphics& g, juce::Rectangle<int> r, bool hot)
 {
@@ -166,9 +235,17 @@ public:
         scrollBar.setAutoHide (false);
         engine.addChangeListener (this);
         showingTimer = std::make_unique<ui::TimerWhileShowing> (*this, static_cast<juce::Timer&> (*this), 30);
+        showingTimer->onRunningChanged = [this] (bool running) {
+            if (! running)
+                watchDevices (false); // (round 190lr: hidden, the audio thread stops measuring the devices' levels)
+        };
     }
 
-    ~DeviceChain() override { engine.removeChangeListener (this); }
+    ~DeviceChain() override
+    {
+        watchDevices (false);
+        engine.removeChangeListener (this);
+    }
 
     void setTrack (int t)
     {
@@ -181,6 +258,13 @@ public:
     int insertShown() const noexcept { return insert; }
     int channelShown() const noexcept { return channel; }
     int cardCount() const noexcept { return (int) cards.size(); }
+    // (issue #191's check: where the card's window button is, in this component's coordinates; empty: none)
+    juce::Rectangle<int> windowButtonOf (int i) const
+    {
+        if (i < 0 || i >= (int) cards.size() || cards[(std::size_t) i].kind == Card::add || cards[(std::size_t) i].folded)
+            return {};
+        return windowBounds (cards[(std::size_t) i]);
+    }
     bool isCardFolded (int i) const { return i >= 0 && i < (int) cards.size() && cards[(std::size_t) i].folded; }
     void toggleCardFold (int i)
     {
@@ -196,8 +280,21 @@ public:
     void selectCard (int i) { select (i); }
     void showCardMenuForSnapshot (int i)
     {
-        if (i >= 0 && i < (int) cards.size() && cards[(std::size_t) i].kind == Card::effect)
+        if (i >= 0 && i < (int) cards.size() && cards[(std::size_t) i].kind != Card::add)
             showCardMenu (i);
+    }
+    // (round 190hr shots and checks) Ctrl+G / Ctrl+Shift+G on the instrument card
+    bool groupCardForCheck (int i, bool ungroup)
+    {
+        if (i < 0 || i >= (int) cards.size() || cards[(std::size_t) i].kind != Card::instrument)
+            return false;
+        const auto channel = cards[(std::size_t) i].index;
+        if (ungroup)
+            ungroupInstrument (channel);
+        else
+            groupInstrument (channel);
+        const auto& song = engine.getSong();
+        return channel < (int) song.channels.size() && rack::isRack (song.channels[(std::size_t) channel]) != ungroup;
     }
     // the 0 key: the selected device on / off
     bool toggleSelectedOn()
@@ -218,7 +315,7 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        g.fillAll (colour::bg1);
+        g.fillAll (theme::livelook::active() ? theme::livelook::window : colour::bg1); // (Live: the cards lie on #2A2A2A)
         paintContext (g);
 
         const auto area = chainArea();
@@ -247,7 +344,7 @@ public:
             }
             else if (insert >= 0) // the free room after the last card shows the drop hint, as the reference does [SHOT d01]
             {
-                const auto room = area.withLeft (cards.empty() ? area.getX() : cards.back().bounds.getRight() + gap);
+                const auto room = area.withLeft (cards.empty() ? area.getX() : cards.back().bounds.getRight() + cardGap());
                 if (room.getWidth() > 120)
                 {
                     g.setColour (colour::textDisabled);
@@ -260,6 +357,7 @@ public:
                 g.setColour (colour::accent);
                 g.fillRect (juce::Rectangle<int> (dropLineX (dropBefore) - 1, area.getY() + 2, 3, area.getHeight() - 4));
             }
+            paintDeviceMeters (g); // round 190lr (DL-87)
         }
         paintMeter (g);
     }
@@ -291,6 +389,9 @@ public:
             return;
         }
         select (hit.card);
+        // round 190ld (DL-83): the clicked parameter is the selected one, which Delete returns to its default
+        selectedKnobCard = hit.part == Part::knob ? hit.card : -1;
+        selectedKnob = hit.part == Part::knob ? hit.knob : -1;
         if (hit.part != Part::title && hit.part != Part::folded && refuseLocked (card, hit.part == Part::knob ? hit.knob : -2))
             return;
 
@@ -448,6 +549,20 @@ public:
     bool keyPressed (const juce::KeyPress& key) override
     {
         const auto i = selectedCard();
+        // Live (manual 17.1, details DL-83): "Delete returns the selected parameter to its default" — the knob clicked
+        // last; with no parameter selected Delete removes the selected device as before
+        if ((key.isKeyCode (juce::KeyPress::deleteKey) || key.isKeyCode (juce::KeyPress::backspaceKey)) && ! key.getModifiers().isAnyModifierKeyDown()
+            && selectedKnobCard >= 0 && selectedKnobCard == i && selectedKnobCard < (int) cards.size() && selectedKnob >= 0)
+        {
+            const auto& card = cards[(std::size_t) selectedKnobCard];
+            if (! cardLocked (card, selectedKnob))
+            {
+                const auto spec = knobSpec (card, selectedKnob);
+                setKnob (card, selectedKnob, spec.defaultValue);
+                ui::flashValueTip (*this, knobBounds (card, selectedKnob), spec.text (spec.defaultValue));
+            }
+            return true;
+        }
         if ((key.isKeyCode (juce::KeyPress::deleteKey) || key.isKeyCode (juce::KeyPress::backspaceKey)) && i >= 0
             && cards[(std::size_t) i].kind == Card::effect)
         {
@@ -485,6 +600,16 @@ public:
                 refresh();
                 return true;
             }
+        }
+        // round 190hr (racks-061 / -062): Group and Ungroup on the instrument: an Instrument Rack holding it, and back
+        if (key.getModifiers().isCommandDown() && ! key.getModifiers().isAltDown() && i >= 0 && cards[(std::size_t) i].kind == Card::instrument
+            && juce::CharacterFunctions::toUpperCase ((juce::juce_wchar) key.getKeyCode()) == 'G')
+        {
+            if (key.getModifiers().isShiftDown())
+                ungroupInstrument (cards[(std::size_t) i].index);
+            else
+                groupInstrument (cards[(std::size_t) i].index);
+            return true;
         }
         if (key.getModifiers().isCommandDown() && ! key.getModifiers().isAltDown() && ! key.getModifiers().isShiftDown()
             && juce::CharacterFunctions::toUpperCase ((juce::juce_wchar) key.getKeyCode()) == 'V' && insert >= 0 && deviceClipboard().has_value())
@@ -560,7 +685,7 @@ public:
     {
         int from = -1, slot = -1;
         return insert >= 0
-               && ((BrowserComponent::isBrowserDrag (details) && BrowserComponent::draggedFile (details).hasFileExtension ("fst"))
+               && ((BrowserComponent::isBrowserDrag (details) && BrowserComponent::draggedFile (details).hasFileExtension ("fst;adv;adg"))
                    || BrowserComponent::isEffectDrag (details) || BrowserComponent::isGeneratorDrag (details)
                    || (detailDeviceDrag (details.description, from, slot) && from == insert)); // (round 190dr: back into its own chain)
     }
@@ -629,6 +754,34 @@ public:
         std::optional<EffectSlot> fx;
         if (BrowserComponent::isEffectDrag (details))
             fx = BrowserComponent::draggedEffect (details);
+        else if (const auto file = BrowserComponent::draggedFile (details); RackWindows::isLivePreset (file))
+        {
+            // round 190hr: Live's device / rack presets — an effect into the chain; an instrument (an .adv instrument, an
+            // Instrument or Drum Rack) onto the instrument card replaces it, elsewhere it makes a channel, as a dropped plugin
+            juce::MemoryBlock data;
+            if (file.loadFileAsData (data))
+            {
+                const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
+                if (auto live = importLiveDevicePreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize())))
+                    fx = std::move (live->slot);
+            }
+            if (! fx)
+            {
+                juce::String error;
+                auto c = RackWindows::instrumentFromLivePreset (file, error);
+                if (! c)
+                    return ui::postHint ({ error, {} }, 3000);
+                if (const auto hit = hitAt (details.localPosition); juce::isPositiveAndBelow (hit.card, (int) cards.size())
+                                                                     && cards[(std::size_t) hit.card].kind == Card::instrument)
+                {
+                    engine.editSong ([channel = cards[(std::size_t) hit.card].index, gen = std::move (*c)] (Song& song) mutable { replaceGenerator (song, channel, std::move (gen)); });
+                    refresh();
+                }
+                else if (hooks.instrumentDropped != nullptr)
+                    hooks.instrumentDropped (insert, std::move (*c));
+                return;
+            }
+        }
         else
         {
             juce::MemoryBlock data;
@@ -666,6 +819,7 @@ private:
         std::unique_ptr<DetailCard> card;
     };
     enum class Part { none, picker, title, led, window, swap, save, knob, body, folded };
+    int selectedKnobCard = -1, selectedKnob = -1; // round 190ld (DL-83): the parameter Delete resets
     struct Hit
     {
         Part part = Part::none;
@@ -767,6 +921,8 @@ private:
             c.index = channel;
             c.folded = folded.count (keyOf (c)) > 0;
             c.knobs = { 0, 1 };
+            for (const auto p : engineCardParams (engine.getSong().channels[(std::size_t) channel].instrument))
+                c.knobs.push_back (engineKnobBase + p);
             c.custom = customFor (keyOf (c), (int) engine.getSong().channels[(std::size_t) channel].instrument, [&] {
                 return DetailView::instrumentCardFactory != nullptr
                            ? DetailView::instrumentCardFactory (engine, channel, engine.getSong().channels[(std::size_t) channel])
@@ -774,9 +930,12 @@ private:
             });
             if (c.custom != nullptr)
                 c.knobs.clear();
-            const auto w = c.folded ? foldedWidth : c.custom != nullptr ? customWidth (*c.custom, height, x) : instrumentWidth;
+            const auto w = c.folded              ? foldedWidth
+                           : c.custom != nullptr   ? customWidth (*c.custom, height, x)
+                           : c.knobs.size() > 2u ? std::max (instrumentWidth, 16 + (((int) c.knobs.size() + 1) / 2) * knobColumn)
+                                                   : instrumentWidth;
             c.bounds = { x, top, w, height };
-            x += w + gap;
+            x += w + cardGap();
             cards.push_back (std::move (c));
         }
         for (int i = 0; i < effectCount(); ++i)
@@ -803,7 +962,7 @@ private:
                            : fx.kind == EffectKind::plugin ? pluginWidth
                                                            : std::max (136, 16 + columns * knobColumn);
             c.bounds = { x, top, w, height };
-            x += w + gap;
+            x += w + cardGap();
             cards.push_back (std::move (c));
         }
         if (insert >= 0 && effectCount() < maxEffectSlots)
@@ -811,7 +970,7 @@ private:
             Card c;
             c.kind = Card::add;
             c.bounds = { x, top, addWidth, height };
-            x += addWidth + gap;
+            x += addWidth + cardGap();
             cards.push_back (std::move (c));
         }
         placeCustomCards();
@@ -860,7 +1019,7 @@ private:
         // (x: the card's left with the scroll applied; the room is measured with the chain at its start, so the width
         // doesn't change while it scrolls)
         const auto area = chainArea();
-        card.widthLimit = std::max (area.getWidth() / 2, area.getRight() - (x + scroll) - gap);
+        card.widthLimit = std::max (area.getWidth() / 2, area.getRight() - (x + scroll) - cardGap());
         return std::max (foldedWidth * 2, card.preferredWidth (height - titleHeight - 6));
     }
     void placeCustomCards()
@@ -917,8 +1076,8 @@ private:
     int dropLineX (int position) const
     {
         if (position >= 0 && position < (int) cards.size())
-            return cards[(std::size_t) position].bounds.getX() - gap / 2;
-        return cards.empty() ? chainArea().getX() : cards.back().bounds.getRight() + gap / 2;
+            return cards[(std::size_t) position].bounds.getX() - cardGap() / 2;
+        return cards.empty() ? chainArea().getX() : cards.back().bounds.getRight() + cardGap() / 2;
     }
     // a card position as a place in the effect chain (0 = the first effect)
     int effectPositionFor (int position) const
@@ -1024,6 +1183,20 @@ private:
         menu.addItem (folded.count (key) > 0 ? tr ("Unfold") : tr ("Fold"), [this, key] { toggleFold (key); });
         menu.addItem (tr ("Hot-swap in the Browser") + "\tQ", hooks.toggleHotSwap != nullptr, linkedTo (targetOf (c)), [this, c] { toggleSwap (targetOf (c)); });
         menu.addItem (tr ("Show or hide the window"), [this, c] { toggleWindow (c); });
+        if (c.kind == Card::instrument) // round 190hr: Live's Group / Ungroup on the instrument, and a rack's Save Preset
+        {
+            const auto& song = engine.getSong();
+            menu.addSeparator();
+            menu.addItem (tr ("Group") + "\tCtrl+G", rack::canGroupChannel (song, c.index), false, [this, ch = c.index] { groupInstrument (ch); });
+            menu.addItem (tr ("Ungroup") + "\tCtrl+Shift+G", rack::canUngroupChannel (song, c.index), false, [this, ch = c.index] { ungroupInstrument (ch); });
+            if (c.index >= 0 && c.index < (int) song.channels.size() && rack::isRack (song.channels[(std::size_t) c.index]))
+                menu.addItem (tr ("Save as Live rack preset (.adg)..."), [this, ch = c.index] { saveRackPreset (ch, -1); });
+        }
+        if (EffectsPanel::slotMenuForSnapshot != nullptr) // (shots: the menu as built)
+        {
+            *EffectsPanel::slotMenuForSnapshot = menu;
+            return;
+        }
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
     }
 
@@ -1048,12 +1221,16 @@ private:
     bool canSavePreset (int slot) const
     {
         const auto* fx = effectAt (slot);
+        if (fx != nullptr && rack::isRack (*fx)) // (round 190hr: a rack saves as Live's rack preset, .adg)
+            return true;
         return fx != nullptr && fx->kind != EffectKind::plugin && fx->kind != EffectKind::patcher && pluginheader::PresetBar (engine, insert, slot).hasLynxPresets();
     }
     void savePreset (int slot)
     {
         if (! canSavePreset (slot))
             return;
+        if (const auto* fx = effectAt (slot); fx != nullptr && rack::isRack (*fx))
+            return saveRackPreset (-1, slot);
         presetBar = std::make_unique<pluginheader::PresetBar> (engine, insert, slot);
         presetBar->savePreset (*this);
     }
@@ -1110,6 +1287,77 @@ private:
         }
         refresh();
     }
+    // round 190hr: Group (Ctrl+G) on the instrument card: the channel's instrument into an Instrument Rack (Live's
+    // Group on an instrument [STR "Group"; Live 12 manual]); its automated plugin parameters become macros at their values
+    void groupInstrument (int channel)
+    {
+        const auto& song = engine.getSong();
+        if (! rack::canGroupChannel (song, channel))
+            return;
+        if (channel >= 0 && channel < (int) song.channels.size() && song.channels[(std::size_t) channel].freeze.on())
+            return (void) refuseLocked (Card { Card::instrument, channel });
+        engine.capturePluginStates();
+        // the plugin's parameters the song automates or links: their values now (read before the edit)
+        std::map<int, float> values;
+        auto probe = song;
+        probe.forEachTarget ([&] (AutomationTarget& t) {
+            if (t.kind == AutomationTargetKind::channelParam && t.index == channel && values.count (t.param) == 0)
+                values[t.param] = engine.currentTargetValue (t);
+        });
+        auto value = [values] (int, int param) {
+            const auto it = values.find (param);
+            return it != values.end() ? it->second : -1.0f;
+        };
+        auto trial = song;
+        if (! rack::groupChannel (trial, channel, value))
+        {
+            ui::postNotice ({ tr ("This instrument can't go into a rack (more than 16 automated parameters, or their values are unknown)"), {} }, 3000);
+            return;
+        }
+        engine.editSong ([channel, value] (Song& s) { rack::groupChannel (s, channel, value); });
+        refresh();
+    }
+    void ungroupInstrument (int channel)
+    {
+        if (! rack::canUngroupChannel (engine.getSong(), channel))
+            return;
+        engine.capturePluginStates();
+        engine.editSong ([channel] (Song& s) { rack::ungroupChannel (s, channel); });
+        refresh();
+    }
+    // round 190hr: a rack's Save Preset (Live's .adg): channel `channel`'s Instrument Rack, or effect slot `slot`'s rack
+    void saveRackPreset (int channel, int slot)
+    {
+        const auto& song = engine.getSong();
+        juce::String name;
+        RackLocator locate;
+        if (slot >= 0)
+        {
+            const auto* fx = effectAt (slot);
+            if (fx == nullptr || ! rack::isRack (*fx))
+                return;
+            name = utf8 (rack::rackOf (fx->patcher)->name);
+            locate = [t = insert, slot] (Song& s) -> PatcherDoc* {
+                if (t < 0 || t >= (int) s.mixer.size() || slot >= (int) s.mixer[(std::size_t) t].effects.size())
+                    return nullptr;
+                auto& x = s.mixer[(std::size_t) t].effects[(std::size_t) slot];
+                return rack::isRack (x) ? &x.patcher : nullptr;
+            };
+        }
+        else
+        {
+            if (channel < 0 || channel >= (int) song.channels.size() || ! rack::isRack (song.channels[(std::size_t) channel]))
+                return;
+            const auto& ch = song.channels[(std::size_t) channel];
+            name = utf8 (! rack::rackOf (ch.patcher)->name.empty() ? rack::rackOf (ch.patcher)->name : ch.name);
+            locate = [channel] (Song& s) -> PatcherDoc* {
+                if (channel >= (int) s.channels.size() || ! rack::isRack (s.channels[(std::size_t) channel]))
+                    return nullptr;
+                return &s.channels[(std::size_t) channel].patcher;
+            };
+        }
+        RackWindows::saveLivePreset (engine, std::move (locate), name);
+    }
     void ungroupDevice (int slot)
     {
         const auto* fx = effectAt (slot);
@@ -1124,16 +1372,23 @@ private:
     // the title bar's buttons at the right: [hot-swap] [save] [window]
     int titleButtonsWidth (const Card& c) const
     {
-        return 18 + (c.kind == Card::add ? 0 : 18) + (c.kind == Card::effect && canSavePreset (c.index) ? 18 : 0);
+        const auto pitch = theme::livelook::active() ? 16 : 18;
+        return pitch + (c.kind == Card::add ? 0 : pitch) + (c.kind == Card::effect && canSavePreset (c.index) ? pitch : 0);
     }
     juce::Rectangle<int> saveBounds (const Card& c) const
     {
-        return c.kind == Card::effect && canSavePreset (c.index) ? juce::Rectangle<int> (c.bounds.getRight() - 38, c.bounds.getY() + 3, 16, 14) : juce::Rectangle<int>();
+        if (! (c.kind == Card::effect && canSavePreset (c.index)))
+            return {};
+        if (theme::livelook::active())
+            return { c.bounds.getRight() - 32, c.bounds.getY() + 2, 13, 13 };
+        return juce::Rectangle<int> (c.bounds.getRight() - 38, c.bounds.getY() + 3, 16, 14);
     }
     juce::Rectangle<int> swapBounds (const Card& c) const
     {
         if (c.kind == Card::add)
             return {};
+        if (theme::livelook::active())
+            return { c.bounds.getRight() - 32 - (saveBounds (c).isEmpty() ? 0 : 16), c.bounds.getY() + 2, 13, 13 };
         return { c.bounds.getRight() - 38 - (saveBounds (c).isEmpty() ? 0 : 18), c.bounds.getY() + 3, 16, 14 };
     }
     void showInsertMenu()
@@ -1169,10 +1424,77 @@ private:
     }
 
     // --- knobs ---------------------------------------------------------------------------------------------------
+    // --- an engine parameter on the instrument card (round 190ko): the knob moves the parameter's 0..1 (its automation
+    // value), shown in the engine's own units
+    const EngineParam* engineParamOf (const Card& c, int param) const
+    {
+        const auto& song = engine.getSong();
+        if (c.index < 0 || c.index >= (int) song.channels.size() || song.channels[(std::size_t) c.index].instrument != InstrumentKind::braid)
+            return nullptr;
+        const auto& list = braidEngineParams();
+        return param >= 0 && param < (int) list.size() ? &list[(std::size_t) param] : nullptr;
+    }
+    juce::String engineKnobLabel (const Card& c, int param) const
+    {
+        const auto* p = engineParamOf (c, param);
+        return p != nullptr ? utf8 (p->name) : juce::String();
+    }
+    ui::ValueSpec engineKnobSpec (const Card& c, int param) const
+    {
+        ui::ValueSpec spec;
+        const auto* p = engineParamOf (c, param);
+        if (p == nullptr)
+            return spec;
+        spec.name = cardName (c) + " - " + utf8 (p->name);
+        spec.minimum = 0.0, spec.maximum = 1.0;
+        const auto span = (double) (p->high - p->low);
+        spec.defaultValue = span > 0.0 ? (braid::defaults()[(std::size_t) param] - p->low) / span : 0.0;
+        if (p->stepped && span > 0.0)
+            spec.interval = 1.0 / span;
+        spec.toText = [param, lo = (double) p->low, span] (double v) { return utf8 (braid::paramText (param, lo + v * span)); };
+        spec.target = AutomationTarget { AutomationTargetKind::channelParam, c.index, 0, param };
+        return spec;
+    }
+    double engineKnobValue (const Card& c, int param) const
+    {
+        const auto* p = engineParamOf (c, param);
+        if (p == nullptr)
+            return 0.0;
+        const auto& ch = engine.getSong().channels[(std::size_t) c.index];
+        const auto raw = param < (int) ch.modelParams.size() ? (double) ch.modelParams[(std::size_t) param] : braid::defaults()[(std::size_t) param];
+        const auto span = (double) (p->high - p->low);
+        return span > 0.0 ? juce::jlimit (0.0, 1.0, (raw - p->low) / span) : 0.0;
+    }
+    void setEngineKnob (const Card& c, int param, double v)
+    {
+        const auto* p = engineParamOf (c, param);
+        if (p == nullptr)
+            return;
+        auto raw = (double) p->low + juce::jlimit (0.0, 1.0, v) * (double) (p->high - p->low);
+        if (p->stepped)
+            raw = std::round (raw);
+        engine.editSong ([ch = c.index, param, raw] (Song& s) {
+            if (ch < 0 || ch >= (int) s.channels.size() || s.channels[(std::size_t) ch].instrument != InstrumentKind::braid)
+                return;
+            auto& mp = s.channels[(std::size_t) ch].modelParams;
+            if ((int) mp.size() < braid::stateSize)
+            {
+                const auto d = braidDefaults();
+                const auto have = mp.size();
+                mp.resize ((std::size_t) braid::stateSize);
+                std::copy (d.begin() + (std::ptrdiff_t) have, d.end(), mp.begin() + (std::ptrdiff_t) have);
+            }
+            mp[(std::size_t) param] = (float) raw;
+        });
+        repaint();
+    }
+
     ui::ValueSpec knobSpec (const Card& c, int knob) const
     {
         if (c.kind == Card::effect)
             return slotActions.slotParamSpec (c.knobs[(std::size_t) knob], c.index);
+        if (c.knobs[(std::size_t) knob] >= engineKnobBase)
+            return engineKnobSpec (c, c.knobs[(std::size_t) knob] - engineKnobBase);
         const auto name = cardName (c);
         if (c.knobs[(std::size_t) knob] == 1)
         {
@@ -1188,6 +1510,8 @@ private:
     {
         if (c.kind == Card::effect)
             return slotActions.slotParamValue (c.knobs[(std::size_t) knob], c.index);
+        if (c.knobs[(std::size_t) knob] >= engineKnobBase)
+            return engineKnobValue (c, c.knobs[(std::size_t) knob] - engineKnobBase);
         const auto& song = engine.getSong();
         if (c.index < 0 || c.index >= (int) song.channels.size())
             return 0.0;
@@ -1199,6 +1523,11 @@ private:
         if (c.kind == Card::effect)
         {
             slotActions.setSlotParam (c.knobs[(std::size_t) knob], c.index, v);
+            return;
+        }
+        if (c.knobs[(std::size_t) knob] >= engineKnobBase)
+        {
+            setEngineKnob (c, c.knobs[(std::size_t) knob] - engineKnobBase, v);
             return;
         }
         const auto pan = c.knobs[(std::size_t) knob] == 1;
@@ -1217,7 +1546,7 @@ private:
         if (c.folded || knob < 0 || knob >= (int) c.knobs.size())
             return {};
         const auto body = c.bounds.withTrimmedTop (titleHeight + 6);
-        if (c.kind == Card::instrument)
+        if (c.kind == Card::instrument && c.knobs.size() <= 2u)
             return { c.bounds.getX() + 16 + knob * knobColumn, body.getY() + 92, knobColumn - 8, knobRow - 6 };
         if (c.kind == Card::effect)
             if (const auto* fx = effectAt (c.index); fx != nullptr && fx->kind == EffectKind::plugin)
@@ -1229,8 +1558,20 @@ private:
     // --- hit testing ---------------------------------------------------------------------------------------------
     juce::Rectangle<int> pickerBounds() const { return { 8, 40, contextWidth - 16, 20 }; }
     static juce::Rectangle<int> titleBounds (const Card& c) { return c.bounds.withHeight (titleHeight); }
-    static juce::Rectangle<int> ledBounds (const Card& c) { return { c.bounds.getX() + 5, c.bounds.getY() + 5, 11, 11 }; }
-    static juce::Rectangle<int> windowBounds (const Card& c) { return { c.bounds.getRight() - 20, c.bounds.getY() + 3, 16, 14 }; }
+    // Live's look (round 190jn, CL-21): the 13 px power disc 3 px in, 2 px down; the title bar's round 13 px wells on a
+    // 16 px pitch, the last 3 px from the right edge (live-session.png Utility: disc x 1078..1090, wells 1166 / 1182 / 1198)
+    static juce::Rectangle<int> ledBounds (const Card& c)
+    {
+        if (theme::livelook::active())
+            return { c.bounds.getX() + 3, c.bounds.getY() + 2, 13, 13 };
+        return { c.bounds.getX() + 5, c.bounds.getY() + 5, 11, 11 };
+    }
+    static juce::Rectangle<int> windowBounds (const Card& c)
+    {
+        if (theme::livelook::active())
+            return { c.bounds.getRight() - 16, c.bounds.getY() + 2, 13, 13 };
+        return { c.bounds.getRight() - 20, c.bounds.getY() + 3, 16, 14 };
+    }
 
     Hit hitAt (juce::Point<int> p) const
     {
@@ -1282,12 +1623,13 @@ private:
     {
         const auto& song = engine.getSong();
         auto r = juce::Rectangle<int> (0, 0, contextWidth - 6, getHeight());
-        g.setColour (colour::bg2);
+        const auto live = theme::livelook::active(); // (round 190jn: Live's greys; Live has no such panel, LYNX keeps it)
+        g.setColour (live ? theme::livelook::surface : colour::bg2);
         g.fillRect (r);
-        g.setColour (colour::border);
+        g.setColour (live ? theme::livelook::separator : colour::border);
         g.fillRect (r.getRight(), 0, 1, getHeight());
         r = r.reduced (8, 6);
-        g.setColour (colour::textPrimary);
+        g.setColour (live ? theme::livelook::text : colour::textPrimary);
         g.setFont (font (type::body, true));
         g.drawText (track >= 0 ? trackName (song, track) : juce::String(), r.removeFromTop (18), juce::Justification::centredLeft, true);
         g.setColour (colour::textSecondary);
@@ -1297,7 +1639,7 @@ private:
         const bool choice = inserts.size() > 1;
         if (choice)
         {
-            g.setColour (hover.part == Part::picker ? colour::bg5 : colour::bg4);
+            g.setColour (live ? (hover.part == Part::picker ? theme::livelook::raised : theme::livelook::well) : hover.part == Part::picker ? colour::bg5 : colour::bg4);
             g.fillRoundedRectangle (box.toFloat(), 3.0f);
         }
         g.setColour (insert >= 0 ? colour::textPrimary : colour::textDisabled);
@@ -1328,6 +1670,11 @@ private:
         const auto& c = cards[(std::size_t) i];
         if (! c.bounds.intersects (chainArea()))
             return;
+        if (theme::livelook::active())
+        {
+            paintCardLive (g, i);
+            return;
+        }
         if (c.kind == Card::add)
         {
             const bool hot = hover.card == i;
@@ -1387,8 +1734,75 @@ private:
         g.drawRect (c.bounds, selected ? 2 : 1);
     }
 
-    void paintBody (juce::Graphics& g, int i)
+    // Round 190jn (design190ia CL-21): a card in Live 12.4's device chrome (live-session.png Utility 1075..1213 × 807..995):
+    // body #363636 with 3 px corners on the #2A2A2A chain, a 17 px #464646 title bar (selected: #637E86 with #070707 text),
+    // the 13 px power disc (#FFAD56 on, #1E1E1E off), the name in #B5B5B5, round 13 px wells for hot-swap / save / window;
+    // no outline. A folded card is the title bar turned on its side. The body: Live's open-ring knobs (paintBodyLive).
+    void paintCardLive (juce::Graphics& g, int i)
     {
+        namespace ll = theme::livelook;
+        const auto& c = cards[(std::size_t) i];
+        if (c.kind == Card::add)
+        {
+            const bool hot = hover.card == i;
+            g.setColour (hot ? ll::raised : ll::surface);
+            g.fillRoundedRectangle (c.bounds.reduced (0, 1).toFloat(), 3.0f);
+            g.setColour (hot ? colour::textPrimary : ll::text);
+            g.setFont (font (22.0f));
+            g.drawText ("+", c.bounds, juce::Justification::centred, false);
+            return;
+        }
+        const bool selected = i == selectedCard();
+        const bool on = cardOn (c);
+        const auto name = cardName (c);
+        const auto box = c.bounds.toFloat();
+        const auto bar = selected ? ll::selectionUnfocused : ll::raised;
+        g.setColour (c.folded ? bar : ll::surface);
+        g.fillRoundedRectangle (box, 3.0f);
+        if (! c.folded)
+        {
+            juce::Path title;
+            title.addRoundedRectangle (box.getX(), box.getY(), box.getWidth(), (float) (int) titleHeight, 3.0f, 3.0f, true, true, false, false);
+            g.setColour (bar);
+            g.fillPath (title);
+        }
+        ll::drawPower (g, ledBounds (c).toFloat(), on);
+        if (hover.card == i && hover.part == Part::led)
+        {
+            g.setColour (colour::textPrimary.withAlpha (0.6f));
+            g.drawEllipse (ledBounds (c).toFloat().expanded (1.0f), 1.0f);
+        }
+        g.setColour (selected ? ll::ink : ll::text);
+        g.setFont (font (type::small));
+        if (c.folded)
+            drawVerticalText (g, name, c.bounds.withTrimmedTop (titleHeight));
+        else
+        {
+            g.drawText (name, titleBounds (c).withTrimmedLeft (20).withTrimmedRight (4 + titleButtonsWidth (c) + (c.custom != nullptr ? c.custom->titleAccessoryWidth() : 0)),
+                        juce::Justification::centredLeft, true);
+            drawLiveWellGlyph (g, windowBounds (c), 0, hover.card == i && hover.part == Part::window, false);
+            drawLiveWellGlyph (g, swapBounds (c), 1, hover.card == i && hover.part == Part::swap, linkedTo (targetOf (c)));
+            if (const auto save = saveBounds (c); ! save.isEmpty())
+                drawLiveWellGlyph (g, save, 2, hover.card == i && hover.part == Part::save, false);
+            if (c.custom != nullptr)
+            {
+                // (its own component draws the body)
+            }
+            else if (on)
+                paintBodyLive (g, i);
+            else // switched off: its controls dim (Live 12.4: round 183a's d02-utility-off.png)
+            {
+                g.beginTransparencyLayer (0.45f);
+                paintBodyLive (g, i);
+                g.endTransparencyLayer();
+            }
+        }
+    }
+
+    // Live's body: label and value in #B5B5B5 (the UI font at 12 px: Live's cap height 7 px), the 25 px open-ring knob
+    void paintBodyLive (juce::Graphics& g, int i)
+    {
+        namespace ll = theme::livelook;
         const auto& c = cards[(std::size_t) i];
         const auto body = c.bounds.withTrimmedTop (titleHeight + 6).reduced (8, 0);
         const auto* fx = c.kind == Card::effect ? effectAt (c.index) : nullptr;
@@ -1403,6 +1817,46 @@ private:
             const auto value = knobValue (c, k);
             const auto label = c.kind == Card::effect && c.knobs[(std::size_t) k] < 0 ? (fx != nullptr && hasOwnMix (fx->kind) ? tr ("Slot mix") : tr ("Mix"))
                                : c.kind == Card::effect && fx != nullptr                ? utf8 (effectInfo (fx->kind).params[(std::size_t) c.knobs[(std::size_t) k]].name)
+                               : c.knobs[(std::size_t) k] == 1                          ? tr ("Pan")
+                                                                                        : tr ("Volume");
+            auto rr = r;
+            const auto hot = (hover.card == i && hover.knob == k) || (knobCard == i && knobDrag == k);
+            g.setColour (hot ? colour::textPrimary : ll::text);
+            g.setFont (font (type::small));
+            g.drawText (label, rr.removeFromTop (14), juce::Justification::centred, true);
+            const auto knob = rr.removeFromTop (knobSize).toFloat().withSizeKeepingCentre (27.0f, 27.0f);
+            const auto range = spec.maximum - spec.minimum;
+            const auto v01 = range > 0.0 ? (float) ((value - spec.minimum) / range) : 0.0f;
+            const auto home = range > 0.0 ? (float) ((juce::jlimit (spec.minimum, spec.maximum, spec.defaultValue) - spec.minimum) / range) : 0.0f;
+            ll::drawKnob (g, knob, juce::jlimit (0.0f, 1.0f, v01), home);
+            if (spec.target) // round 190lx (DL-59, capture 190lx L04): Live's red LED on an automated device knob
+            {
+                const auto& automated = engine.getAutomationDisplay().automatedTargets();
+                if (std::find (automated.begin(), automated.end(), *spec.target) != automated.end())
+                    theme::drawLiveKnobAutomationLed (g, knob);
+            }
+            g.setColour (hot ? colour::textPrimary : ll::text);
+            g.drawText (spec.text (value), rr.removeFromTop (14), juce::Justification::centred, true);
+        }
+    }
+
+    void paintBody (juce::Graphics& g, int i)
+    {
+        const auto& c = cards[(std::size_t) i];
+        const auto body = c.bounds.withTrimmedTop (titleHeight + 6).reduced (8, 0);
+        const auto* fx = c.kind == Card::effect ? effectAt (c.index) : nullptr;
+        if ((c.kind == Card::instrument && c.knobs.size() <= 2u) || (fx != nullptr && fx->kind == EffectKind::plugin))
+            paintPicture (g, c, body.withHeight (80));
+        for (int k = 0; k < (int) c.knobs.size(); ++k)
+        {
+            const auto r = knobBounds (c, k);
+            if (r.isEmpty())
+                continue;
+            const auto spec = knobSpec (c, k);
+            const auto value = knobValue (c, k);
+            const auto label = c.kind == Card::effect && c.knobs[(std::size_t) k] < 0 ? (fx != nullptr && hasOwnMix (fx->kind) ? tr ("Slot mix") : tr ("Mix"))
+                               : c.kind == Card::effect && fx != nullptr                ? utf8 (effectInfo (fx->kind).params[(std::size_t) c.knobs[(std::size_t) k]].name)
+                               : c.knobs[(std::size_t) k] >= engineKnobBase             ? engineKnobLabel (c, c.knobs[(std::size_t) k] - engineKnobBase)
                                : c.knobs[(std::size_t) k] == 1                          ? tr ("Pan")
                                                                                         : tr ("Volume");
             auto rr = r;
@@ -1458,7 +1912,7 @@ private:
         if (! key.empty())
             if (const auto file = pluginthumbs::fileFor (key, true); file.existsAsFile())
                 picture = juce::ImageCache::getFromFile (file);
-        g.setColour (colour::bg0);
+        g.setColour (theme::livelook::active() ? theme::livelook::well : colour::bg0);
         g.fillRect (area);
         if (picture.isValid())
         {
@@ -1473,7 +1927,7 @@ private:
     void paintMeter (juce::Graphics& g)
     {
         const auto r = meterBounds();
-        g.setColour (colour::bg0);
+        g.setColour (theme::livelook::active() ? theme::livelook::meterWell : colour::bg0);
         g.fillRect (r);
         for (int side = 0; side < 2; ++side)
         {
@@ -1487,8 +1941,142 @@ private:
     }
     juce::Rectangle<int> meterBounds() const { return { getWidth() - meterWidth, 4, meterWidth - 4, std::max (0, getHeight() - 16) }; }
 
+    // Round 190lr (DL-87, Live manual 23.2 "Devices in Live's tracks have input and output level meters"; capture
+    // live-device-meters.png): in Live's look a slim meter stands in the gap after each device, the level that leaves it
+    // (after the instrument: what enters the first effect). The slots' peaks come from the audio thread only while this
+    // view shows (RackRenderer's levelWanted / slotLevels, the editors' own level taps); mono (the louder side).
+    bool deviceMeters() const { return theme::livelook::active(); }
+    int cardGap() const { return deviceMeters() ? deviceMeterGap : gap; }
+    static constexpr int deviceMeterGap = 9; // (Live, L28: 9 px between two devices, the meter in its middle)
+    std::size_t slotKey (int slot) const { return (std::size_t) juce::jmax (0, insert) * (std::size_t) maxEffectSlots + (std::size_t) slot; }
+    void watchDevices (bool on)
+    {
+        std::vector<std::size_t> want;
+        if (on && deviceMeters() && insert >= 0)
+            for (int i = 0; i < effectCount() && i < maxEffectSlots; ++i)
+                want.push_back (slotKey (i));
+        if (want == watched)
+            return;
+        if (auto* times = engine.getProcessTimes())
+        {
+            for (const auto k : watched)
+                if (k < times->levelWanted.size())
+                    times->levelWanted[k].fetch_sub (1, std::memory_order_relaxed);
+            for (const auto k : want)
+                if (k < times->levelWanted.size())
+                    times->levelWanted[k].fetch_add (1, std::memory_order_relaxed);
+            watched = std::move (want);
+        }
+        else
+            watched.clear();
+    }
+    // the meter after card `i` (empty: none): Live's 2 + 1 + 2 px well in the middle of the gap, centred on the device's
+    // height (L28: 108 of 188 px; its top 11 px cut off by a line, as Live's)
+    juce::Rectangle<int> deviceMeterBounds (int i) const
+    {
+        if (! deviceMeters() || i < 0 || i >= (int) cards.size())
+            return {};
+        const auto& c = cards[(std::size_t) i];
+        if (c.kind == Card::add || (c.kind == Card::instrument && effectCount() == 0))
+            return {};
+        const auto inset = juce::roundToInt ((float) c.bounds.getHeight() * 0.21f);
+        return { c.bounds.getRight() + (deviceMeterGap - 5) / 2 + 1, c.bounds.getY() + inset, 5, juce::jmax (0, c.bounds.getHeight() - 2 * inset) };
+    }
+    // its level, one side: an effect's output, the instrument's = the first effect's input
+    float takeDeviceLevel (const Card& c, int side)
+    {
+        auto* times = engine.getProcessTimes();
+        if (times == nullptr)
+            return 0.0f;
+        auto& sides = c.kind == Card::effect ? times->slotOutputSides : times->slotInputSides;
+        const auto k = (c.kind == Card::effect ? slotKey (c.index) : slotKey (0)) * 2 + (std::size_t) side;
+        return k < sides.size() ? sides[k].exchange (0.0f, std::memory_order_relaxed) : 0.0f;
+    }
+    void tickDeviceMeters()
+    {
+        watchDevices (true);
+        if (! deviceMeters())
+            return;
+        if (deviceLevels.size() != cards.size() * 2)
+            deviceLevels.assign (cards.size() * 2, {});
+        for (int i = 0; i < (int) cards.size(); ++i)
+        {
+            const auto r = deviceMeterBounds (i);
+            if (r.isEmpty())
+                continue;
+            for (int side = 0; side < 2; ++side)
+            {
+                auto& m = deviceLevels[(std::size_t) i * 2 + (std::size_t) side];
+                const auto before = m.level;
+                const auto beforePeak = m.peak;
+                m.tick (takeDeviceLevel (cards[(std::size_t) i], side));
+                if (std::abs (m.level - before) > 1e-4f || std::abs (m.peak - beforePeak) > 1e-4f)
+                    repaint (r.expanded (1));
+            }
+        }
+    }
+    void paintDeviceMeters (juce::Graphics& g)
+    {
+        if (! deviceMeters())
+            return;
+        namespace lv = theme::livelook;
+        for (int i = 0; i < (int) cards.size(); ++i)
+        {
+            const auto r = deviceMeterBounds (i);
+            if (r.isEmpty() || ! g.clipRegionIntersects (r))
+                continue;
+            // (Live, capture L28: two 2 px wells #181818 with the window between, a 1 px #363636 line 11 px under the top;
+            // the level #00F758, the peak hold a 1 px line)
+            const auto body = r.withTrimmedTop (12);
+            for (int side = 0; side < 2; ++side)
+            {
+                const auto bar = juce::Rectangle<int> (r.getX() + side * 3, r.getY(), 2, r.getHeight());
+                g.setColour (lv::meterWell);
+                g.fillRect (bar);
+                g.setColour (lv::surface);
+                g.fillRect (bar.getX(), r.getY() + 11, 2, 1);
+                const auto& m = (std::size_t) i * 2 + (std::size_t) side < deviceLevels.size() ? deviceLevels[(std::size_t) i * 2 + (std::size_t) side]
+                                                                                               : meters::PeakHold {};
+                const auto yOf = [&body] (float gain) {
+                    const auto db = juce::Decibels::gainToDecibels (gain, -60.0f);
+                    return body.getBottom() - juce::roundToInt ((float) body.getHeight() * juce::jlimit (0.0f, 1.0f, (db + 60.0f) / 66.0f));
+                };
+                if (m.level > 0.0f)
+                {
+                    g.setColour (juce::Colour (0xff00f758)); // (Live's meter green)
+                    g.fillRect (bar.withTop (yOf (m.level)).withBottom (body.getBottom()));
+                }
+                if (m.peak > 0.001f)
+                {
+                    g.setColour (juce::Colour (0xff00f758));
+                    g.fillRect (bar.getX(), juce::jmin (body.getBottom() - 1, yOf (m.peak)), 2, 1);
+                }
+                if (m.clipped)
+                {
+                    g.setColour (juce::Colour (0xffff3a3a));
+                    g.fillRect (bar.withHeight (11));
+                }
+            }
+        }
+    }
+    std::vector<std::size_t> watched;
+    std::vector<meters::PeakHold> deviceLevels;
+public:
+    void deviceLevelsForSnapshot (float left, float right)
+    {
+        deviceLevels.assign (cards.size() * 2, {});
+        for (std::size_t i = 0; i < deviceLevels.size(); ++i)
+        {
+            deviceLevels[i].level = i % 2 == 0 ? left : right;
+            deviceLevels[i].peak = juce::jmin (1.0f, (i % 2 == 0 ? left : right) * 1.25f);
+        }
+        repaint();
+    }
+private:
+
     void timerCallback() override
     {
+        tickDeviceMeters(); // round 190lr (DL-87)
         if (insert < 0 || hooks.levelOf == nullptr)
             return;
         bool moved = false;
@@ -1534,6 +2122,30 @@ private:
 // (core/ProjectKey.h; round 190o), Groove has no LYNX model (listed as missing in REA_rodada183a.md).
 // The clip's colour and activator in one square, as the reference's clip title bar [LIVE 12.4 Clip View] (round 190s,
 // GAPMAP-0126 D15): filled = the clip plays, hollow = deactivated. Click switches it; right-click picks the colour.
+// Round 190kc: the Clip box's Commit button. Live 12.4 draws it as a 13 px round well with an arrow beside the Groove
+// label (shots/ref/live-clipview-midi-groove.png x 156..168 y 797..809; dim while the clip has no groove); the classic
+// look keeps a text button.
+class GrooveCommitButton final : public juce::TextButton
+{
+public:
+    void paintButton (juce::Graphics& g, bool over, bool down) override
+    {
+        if (! theme::livelook::active())
+        {
+            juce::TextButton::paintButton (g, over, down);
+            return;
+        }
+        namespace lv = theme::livelook;
+        const auto r = getLocalBounds().toFloat().withSizeKeepingCentre (13.0f, 13.0f);
+        const auto ink = lv::drawWell (g, r, down, true);
+        g.setColour (isEnabled() ? ink : ink.withAlpha (0.35f));
+        const auto cx = std::round (r.getCentreX()), cy = std::round (r.getCentreY());
+        g.fillRect (cx - 3.0f, cy, 6.0f, 1.0f); // (→: the shaft and the head)
+        g.fillRect (cx + 1.0f, cy - 2.0f, 1.0f, 5.0f);
+        g.fillRect (cx + 2.0f, cy - 1.0f, 1.0f, 3.0f);
+    }
+};
+
 class ClipChip final : public juce::Component, public juce::SettableTooltipClient
 {
 public:
@@ -1549,6 +2161,15 @@ public:
     }
     void paint (juce::Graphics& g) override
     {
+        if (theme::livelook::active()) // (round 190jn: Live's activator in the clip-coloured title bar: a 9 px square, orange while on)
+        {
+            const auto sq = getLocalBounds().toFloat().withSizeKeepingCentre (9.0f, 9.0f);
+            g.setColour (isMouseOver() ? theme::livelook::ink : liveclip::rim);
+            g.fillRect (sq);
+            g.setColour (active ? theme::livelook::on : theme::livelook::well);
+            g.fillRect (sq.reduced (1.0f));
+            return;
+        }
         const auto r = getLocalBounds().toFloat().reduced (2.0f);
         g.setColour (fill);
         if (active)
@@ -1702,7 +2323,8 @@ public:
         // moved with the end and Length is the clip's length (core/ClipSample.h)
         start.setTooltip (tr ("Start: where the clip starts in its source (bar. beat. sixteenth; seconds for unwarped audio)"));
         end.setTooltip (tr ("End: where the clip ends in its source"));
-        position.setTooltip (tr ("Loop Position: moves the looped part, its length stays (the loop starts where the clip starts)"));
+        // round 190hr (detail-016): with Loop on, Start is a marker of its own inside the loop (Live's StartRelative)
+        position.setTooltip (tr ("Loop Position: where the loop starts; the Start marker stays where it is"));
         length.setTooltip (tr ("Loop Length (bars. beats. sixteenths)"));
         // round 190dr: Live's Set buttons beside the fields: the marker goes to where the playing clip is now; dim while
         // the clip does not play
@@ -1717,6 +2339,7 @@ public:
         setStart.setTooltip (tr ("Set: the clip starts where it plays now"));
         setEnd.setTooltip (tr ("Set: the clip ends where it plays now"));
         setPosition.setTooltip (tr ("Set: the loop moves to start where the clip plays now"));
+        start.setTooltip (tr ("Start: where the clip starts playing in its source (with Loop on, a marker inside the loop; bar. beat. sixteenth; seconds for unwarped audio)"));
         setLength.setTooltip (tr ("Set: the loop ends where the clip plays now"));
         showingTimer = std::make_unique<ui::TimerWhileShowing> (*this, static_cast<juce::Timer&> (*this), 10);
         // the Groove chooser: the project's Groove Pool (round 190bv), for MIDI clips (LYNX's grooves act on MIDI clips)
@@ -1729,6 +2352,13 @@ public:
             engine.editSong ([t = track, sc = scene, id] (Song& s) { groove::setClipGroove (s, t, sc, id); });
         };
         addAndMakeVisible (groove);
+        // round 190kc: Live's Commit (manual 14.1.2): the groove written into the clip — MIDI notes moved, an audio clip's
+        // warp markers at its attacks — and the chooser back to None
+        commitGroove.setButtonText (tr ("Commit"));
+        commitGroove.setConnectedEdges (0);
+        commitGroove.setTooltip (tr ("Commit: writes the groove into the clip (MIDI: the notes move; audio: warp markers at its attacks) and sets the groove to None"));
+        commitGroove.onClick = [this] { commitClipGroove(); };
+        addAndMakeVisible (commitGroove);
         signature.setFont (font (type::small));
         signature.setColour (juce::Label::textColourId, colour::textPrimary);
         signature.setTooltip (tr ("The project's time signature (clips have no signature of their own in LYNX SHARE)"));
@@ -1751,6 +2381,75 @@ public:
         quant.onChange = [this] { editSlot ([q = quant.getSelectedId() - 1] (ClipGridSlot& slot) { slot.quant = (LaunchQuant) juce::jlimit (0, 14, q); }); };
         for (auto* c : { &mode, &quant })
             addAndMakeVisible (*c);
+
+        // round 190hr (detail-028): the Launch panel's Follow Action controls over the slot's follow action (the same model
+        // as the grid slot menu's Follow action submenu). Live 12's controls [STR live-exe-strings-u16.txt 2061-2075:
+        // Follow Action Enabled, A, B, Chance A, Chance B, Time, Linked, Multiplier, Jump Index A / B]
+        followOn.setButtonText (tr ("Follow Action"));
+        followOn.setClickingTogglesState (true);
+        followOn.setConnectedEdges (0);
+        followOn.setTooltip (tr ("Follow Action: after its time the clip launches another, A or B by their chances"));
+        followOn.onClick = [this] { editFollow ([on = followOn.getToggleState()] (ClipFollow& f) { f.enabled = on; }); };
+        linked.setButtonText (tr ("Linked"));
+        linked.setClickingTogglesState (true);
+        linked.setConnectedEdges (0);
+        linked.setTooltip (tr ("Linked: the follow action comes after the clip has played Multiplier times; off: after the Time"));
+        linked.onClick = [this] { editFollow ([on = linked.getToggleState()] (ClipFollow& f) { f.linked = on; }); };
+        for (auto* b : { &followOn, &linked })
+            addAndMakeVisible (*b);
+        const std::pair<FollowKind, const char*> actions[] = {
+            { FollowKind::none, TR_NOOP ("No action") }, { FollowKind::stop, TR_NOOP ("Stop") }, { FollowKind::playAgain, TR_NOOP ("Play again") },
+            { FollowKind::previous, TR_NOOP ("Previous") }, { FollowKind::next, TR_NOOP ("Next") }, { FollowKind::first, TR_NOOP ("First") },
+            { FollowKind::last, TR_NOOP ("Last") }, { FollowKind::any, TR_NOOP ("Any") }, { FollowKind::other, TR_NOOP ("Other") },
+            { FollowKind::jump, TR_NOOP ("Jump") }
+        };
+        for (auto* box : { &followA, &followB })
+        {
+            for (const auto& [k, text] : actions)
+                box->addItem (tr (text), (int) k + 1);
+            box->setTooltip (box == &followA ? tr ("Follow Action A") : tr ("Follow Action B"));
+            box->onChange = [this, box] {
+                if (loading || box->getSelectedId() < 1)
+                    return;
+                const auto k = (FollowKind) (box->getSelectedId() - 1);
+                editFollow ([k, isA = box == &followA] (ClipFollow& f) { (isA ? f.a : f.b) = k; });
+            };
+            addAndMakeVisible (*box);
+        }
+        const auto numberBox = [this] (std::unique_ptr<ui::NumBox>& box, const juce::String& name, double lo, double hi, std::function<juce::String (double)> text,
+                                       std::function<double (const ClipFollow&)> get, std::function<void (ClipFollow&, int)> set) {
+            ui::ValueSpec spec;
+            spec.name = name;
+            spec.minimum = lo;
+            spec.maximum = hi;
+            spec.interval = 1.0;
+            spec.pixelsForRange = std::min (300.0, (hi - lo) * 4.0);
+            spec.toText = std::move (text);
+            box = std::make_unique<ui::NumBox> (spec, [this, get] { const auto* f = follow(); return f != nullptr ? get (*f) : 0.0; },
+                                                [this, set] (double v) { editFollow ([set, v] (ClipFollow& f) { set (f, juce::roundToInt (v)); }); });
+            addAndMakeVisible (*box);
+        };
+        const auto percent = [] (double v) { return juce::String (juce::roundToInt (v)) + " %"; };
+        numberBox (chanceA, tr ("Follow Action Chance A"), 0, 100, percent, [] (const ClipFollow& f) { return (double) f.chanceA; }, [] (ClipFollow& f, int v) { f.chanceA = v; });
+        numberBox (chanceB, tr ("Follow Action Chance B"), 0, 100, percent, [] (const ClipFollow& f) { return (double) f.chanceB; }, [] (ClipFollow& f, int v) { f.chanceB = v; });
+        numberBox (multiplier, tr ("Follow Action Multiplier"), 1, 64, [] (double v) { return juce::String::fromUTF8 ("\xc3\x97") + juce::String (juce::roundToInt (v)); },
+                   [] (const ClipFollow& f) { return (double) f.iterations; }, [] (ClipFollow& f, int v) { f.iterations = std::max (1, v); });
+        const auto scene = [] (double v) { return juce::String (juce::roundToInt (v)); };
+        numberBox (jumpA, tr ("Follow Action Jump Index A"), 1, launcher::maxScenes, scene, [] (const ClipFollow& f) { return (double) f.jumpA + 1; }, [] (ClipFollow& f, int v) { f.jumpA = std::max (0, v - 1); });
+        numberBox (jumpB, tr ("Follow Action Jump Index B"), 1, launcher::maxScenes, scene, [] (const ClipFollow& f) { return (double) f.jumpB + 1; }, [] (ClipFollow& f, int v) { f.jumpB = std::max (0, v - 1); });
+        followTime.setFont (font (type::small));
+        followTime.setTooltip (tr ("Follow Action Time (bars. beats. sixteenths): with Linked off, the follow action comes after this time"));
+        followTime.onReturnKey = [this] { applyFollowTime(); };
+        followTime.onFocusLost = [this] { applyFollowTime(); };
+        followTime.onEscapeKey = [this] { load(); };
+        addAndMakeVisible (followTime);
+        for (auto* l : { &followTitle })
+        {
+            l->setFont (font (type::small, true));
+            l->setColour (juce::Label::textColourId, colour::textSecondary);
+            l->setText (tr ("Follow Action"), juce::dontSendNotification);
+            addAndMakeVisible (*l);
+        }
 
         // the reference's note tools, each the Piano roll's own operation on every note of the clip's pattern
         const std::pair<juce::TextButton*, const char*> tools[] = {
@@ -1789,12 +2488,22 @@ public:
         fitScale.setButtonText (tr ("Fit to scale"));
         timesTwo.setTooltip (tr ("Twice as slow: doubles every note's start and length"));
         divideTwo.setTooltip (tr ("Twice as fast: halves every note's start and length"));
-        fitScale.setTooltip (tr ("Moves every note of the clip onto the project's key"));
+        fitScale.setTooltip (tr ("Moves every note of the clip onto the clip's scale"));
         for (auto* b : { &timesTwo, &divideTwo, &fitScale })
         {
             b->setConnectedEdges (0);
             addAndMakeVisible (*b);
         }
+        // LYNX's Chord helper (round 190mc, discussion #105): the docked editor's selection, in Live's look
+        chordHelper.setButtonText (tr ("Chord helper"));
+        chordHelper.setTooltip (tr ("Select a chord: related keys and borrowed chords to insert after it"));
+        chordHelper.setConnectedEdges (0);
+        chordHelper.onClick = [this] {
+            if (editorOf)
+                if (auto* roll = editorOf())
+                    roll->openChordHelper();
+        };
+        addAndMakeVisible (chordHelper);
         const auto stretch = [this] (bool twice) {
             notes ([twice] (Pattern& p, const std::vector<int>& all, const Song&) {
                 for (auto i : all)
@@ -1810,29 +2519,39 @@ public:
         timesTwo.onClick = [stretch] { stretch (true); };
         divideTwo.onClick = [stretch] { stretch (false); };
         fitScale.onClick = [this] {
-            notes ([] (Pattern& p, const std::vector<int>& all, const Song& song) {
-                if (const auto key = projectkey::get (song); key && projectkey::lynxScale (*key) > 0)
+            notes ([key = clipKeyOf (engine.getSong())] (Pattern& p, const std::vector<int>& all, const Song&) {
+                if (key && projectkey::lynxScale (*key) > 0)
                     notetools::snapNotesToScale (p, all, key->root, projectkey::lynxScale (*key));
             });
         };
 
-        // the Clip panel's Scale row: the project key (Live keeps a scale per clip; LYNX SHARE has one per project)
-        scaleRoot.addItem (tr ("None"), 1);
+        // the Clip panel's Scale row (round 190hr, detail-022): the clip's own scale, as Live's Clip Scale [SHOT
+        // live190gu/warp/live-clipview-beats-defaults-full.png, ableton190o/shots/live-02-clipview-scale-bhairav.png: the
+        // Scale Mode switch, the root and the scale name]. A clip follows the project key until its row is changed.
+        scaleMode.setButtonText (juce::String::fromUTF8 ("\xe2\x99\xad\xe2\x99\xaf")); // (flat sharp, Live's switch)
+        scaleMode.setClickingTogglesState (true);
+        scaleMode.setConnectedEdges (0);
+        scaleMode.setTooltip (tr ("Scale Mode: the clip's notes, editor and tools follow the clip's scale"));
+        scaleMode.onClick = [this] { editClip ([on = scaleMode.getToggleState()] (Clip&, ClipGridSlot& slot) { slot.scaleOn = on; }); };
+        addAndMakeVisible (scaleMode);
         for (int root = 0; root < 12; ++root)
-            scaleRoot.addItem (juce::String (projectkey::rootName (root)), root + 2);
+            scaleRoot.addItem (juce::String (projectkey::rootName (root)), root + 1);
         for (auto index : projectkey::commonFirst())
             scaleName.addItem (tr (notetools::flReferenceScales()[(std::size_t) index].name), index + 1);
         for (auto* c : { &scaleRoot, &scaleName })
         {
-            c->setTooltip (tr ("The project's key: the Piano roll highlights it and Fit to scale uses it (LYNX SHARE has one key per project)"));
+            c->setTooltip (tr ("The clip's scale: its root and name (a new clip follows the project's key)"));
             addAndMakeVisible (*c);
             c->onChange = [this] {
-                std::optional<projectkey::Key> key;
-                if (scaleRoot.getSelectedId() >= 2)
-                    key = projectkey::Key { scaleRoot.getSelectedId() - 2, std::max (0, scaleName.getSelectedId() - 1) };
-                if (key && scaleName.getSelectedId() == 0) // first key of a project: Major
-                    key->flScale = projectkey::commonFirst().front();
-                engine.editSong ([key] (Song& song) { projectkey::set (song, key); });
+                if (loading || scaleRoot.getSelectedId() < 1)
+                    return;
+                const auto root = scaleRoot.getSelectedId() - 1;
+                const auto index = scaleName.getSelectedId() >= 1 ? scaleName.getSelectedId() - 1 : projectkey::commonFirst().front();
+                editClip ([root, index] (Clip&, ClipGridSlot& slot) {
+                    slot.ownScale = true;
+                    slot.scaleRoot = (std::int8_t) root;
+                    slot.scaleIndex = (std::int16_t) index;
+                });
             };
         }
         engine.addChangeListener (this);
@@ -1840,11 +2559,13 @@ public:
     ~ClipColumn() override { engine.removeChangeListener (this); }
 
     // the reference's Clip / Launch / Notes panels side by side under the clip's name [SHOT d08]
-    static constexpr int clipPanel = 164, clipPanel2 = 164, launchPanel = 136, notesPanel = 172, gap = 8;
+    static constexpr int clipPanel = 164, clipPanel2 = 164, launchPanel = 136, followPanel = 144, notesPanel = 172, gap = 8;
     static constexpr int foldedTools = 20;
     int preferredWidth() const
     {
-        return gap + clipPanel + gap + clipPanel2 + gap + launchPanel + gap + (hasNotes ? notesPanel + gap + (toolsFolded ? foldedTools : MidiToolsPanel::panelWidth) + gap : 0);
+        if (theme::livelook::active()) // (round 190jn: Live's 170 px column + its 2 px separator; the MIDI Tools stay at its right)
+            return liveclip::columnWidth + 2 + (hasNotes ? gap + (toolsFolded ? foldedTools : MidiToolsPanel::panelWidth) + gap : 0);
+        return gap + clipPanel + gap + clipPanel2 + gap + launchPanel + gap + followPanel + gap + (hasNotes ? notesPanel + gap + (toolsFolded ? foldedTools : MidiToolsPanel::panelWidth) + gap : 0);
     }
     // the docked Piano roll (nullptr while it is not docked here): the MIDI Tools work on its selection
     std::function<PianoRollComponent*()> editorOf;
@@ -1862,6 +2583,11 @@ public:
 
     void paint (juce::Graphics& g) override
     {
+        if (liveShown)
+        {
+            paintLive (g);
+            return;
+        }
         g.fillAll (colour::bg2);
         g.setColour (colour::border);
         g.fillRect (getWidth() - 1, 0, 1, getHeight());
@@ -1869,6 +2595,12 @@ public:
 
     void resized() override
     {
+        applyLook();
+        if (liveShown)
+        {
+            resizedLive();
+            return;
+        }
         auto r = getLocalBounds().reduced (gap, 4).withTrimmedRight (1);
         const auto take = [] (juce::Rectangle<int>& area, int h) { auto x = area.removeFromTop (h); area.removeFromTop (3); return x; };
         if (hasNotes)
@@ -1925,9 +2657,18 @@ public:
         auto c2 = r.removeFromLeft (clipPanel2);
         r.removeFromLeft (gap);
         halves (take (c2, 14), signatureLabel, grooveLabel);
+        commitGroove.setBounds (grooveLabel.getBounds().removeFromRight (46).withTrimmedTop (1)); // (round 190kc)
         halves (take (c2, 20), signature, groove);
         scaleLabel.setBounds (take (c2, 14));
-        halves (take (c2, 20), scaleRoot, scaleName);
+        {
+            auto row = take (c2, 20);
+            scaleMode.setBounds (row.removeFromLeft (22));
+            row.removeFromLeft (3);
+            const auto w = (row.getWidth() - 4) * 2 / 5;
+            scaleRoot.setBounds (row.removeFromLeft (w));
+            row.removeFromLeft (4);
+            scaleName.setBounds (row);
+        }
 
         // Launch: mode, quantisation, legato
         auto l = r.removeFromLeft (launchPanel);
@@ -1938,6 +2679,26 @@ public:
         quantLabel.setBounds (take (l, 12));
         quant.setBounds (take (l, 20));
         legato.setBounds (take (l, 20));
+
+        // Follow Action (round 190hr): the switch; A | B with their jump targets; the chances; Linked with the
+        // multiplier; the time
+        auto f = r.removeFromLeft (followPanel);
+        r.removeFromLeft (gap);
+        followTitle.setBounds (take (f, 14));
+        followOn.setBounds (take (f, 18));
+        halves (take (f, 20), followA, followB);
+        {
+            auto row = take (f, 18);
+            const auto w = (row.getWidth() - 6) / 2;
+            auto a = row.removeFromLeft (w);
+            row.removeFromLeft (6);
+            jumpA->setBounds (a.removeFromRight (jumpA->isVisible() ? 30 : 0));
+            chanceA->setBounds (a.withTrimmedRight (jumpA->isVisible() ? 3 : 0));
+            jumpB->setBounds (row.removeFromRight (jumpB->isVisible() ? 30 : 0));
+            chanceB->setBounds (row.withTrimmedRight (jumpB->isVisible() ? 3 : 0));
+        }
+        halves (take (f, 18), linked, *multiplier);
+        followTime.setBounds (take (f, 18));
 
         // Notes: the note tools, two columns
         auto n = r.removeFromLeft (notesPanel);
@@ -1960,9 +2721,263 @@ public:
         addInterval.setBounds (cell (4, 1));
         duplicate.setBounds (cell (5, 0).withWidth (60));
         randomize.setBounds (cell (5, 0).withTrimmedLeft (64).withRight (n.getRight()));
+        chordHelper.setBounds (cell (6, 0).withRight (n.getRight()));
+    }
+    void reload() { load(); } // (the page docked an editor: it gets the column's hooks)
+
+    // --- round 190jn (design190ia CL-20a / CL-20b): Live 12.4's Clip View column ----------------------------------------
+    // A 170 px column (live-clipview-audio.png 249..418, live-01-clipview-notes.png 9..178): the 17 px title bar in the
+    // clip's colour (the activator square, the name in colour × 0.24) stays; under it Live's sections, each a 17 px #464646
+    // header (click: fold / unfold) over its rows — Clip; Launch (with LYNX's Follow Action, as Live 12 puts it there;
+    // folded at first, as Live shows it); for MIDI clips Pitch & Time (LYNX's note tools). Rows are 13 px fields and pills.
+    // When the open sections are taller than the view, the wheel scrolls them under the title bar (Live does the same).
+    // The fold states are UI state, not saved. The MIDI Tools (Transform / Generate) stay at the column's right.
+    static inline bool clipOpen = true, launchOpen = false, notesOpen = true;
+    bool isLive() const noexcept { return liveShown; }
+    void setScrollForSnapshot (int y)
+    {
+        scrollY = y;
+        resized();
+        repaint();
+    }
+
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        if (! liveShown || e.x >= liveclip::columnWidth)
+            return;
+        for (int k = 0; k < 3; ++k)
+            if (headerY[(std::size_t) k] >= liveclip::headerHeight && e.y >= headerY[(std::size_t) k] && e.y < headerY[(std::size_t) k] + liveclip::headerHeight)
+            {
+                auto& open = k == 0 ? clipOpen : k == 1 ? launchOpen : notesOpen;
+                open = ! open;
+                resized();
+                repaint();
+                return;
+            }
+    }
+    void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override
+    {
+        if (! liveShown || e.x >= liveclip::columnWidth)
+        {
+            juce::Component::mouseWheelMove (e, wheel);
+            return;
+        }
+        const auto before = scrollY;
+        scrollY = juce::jlimit (0, maxScroll(), scrollY - juce::roundToInt (wheel.deltaY * 120.0f));
+        if (scrollY != before)
+        {
+            resized();
+            repaint();
+        }
     }
 
 private:
+    bool liveShown = false;
+    int scrollY = 0, contentHeight = 0;
+    std::array<int, 3> headerY {}; // the sections' header tops (Clip, Launch, Pitch & Time; < 17: not shown)
+    juce::Colour titleColour { colour::bg5 };
+    int maxScroll() const { return std::max (0, contentHeight - getHeight()); }
+
+    std::vector<juce::Component*> styledChildren()
+    {
+        return { &start, &end, &position, &length, &followTime, &setStart, &setEnd, &setPosition, &setLength, &followOn, &linked, &invert, &reverse,
+                 &makeLegato, &humanize, &duplicate, &quantize, &randomize, &timesTwo, &divideTwo, &fitScale, &chordHelper, &addInterval, &scaleMode, &groove, &mode,
+                 &quant, &followA, &followB, &scaleRoot, &scaleName, &loop, &legato, &nameLabel, &startLabel, &endLabel, &lengthLabel,
+                 &positionLabel, &grooveLabel, &signatureLabel, &modeLabel, &quantLabel, &scaleLabel, &signature, &commitGroove };
+    }
+    // the look follows the layout's switch (checked on every layout and load; nothing changes while it stays the same)
+    void applyLook()
+    {
+        const auto live = theme::livelook::active();
+        if (live == liveShown)
+            return;
+        liveShown = live;
+        for (auto* c : styledChildren())
+            liveclip::style (*c, live);
+        for (auto* l : { &clipTitle, &launchTitle, &notesTitle, &followTitle, &nameLabel })
+            l->setVisible (! live);
+        nameColours();
+        if (! live)
+            scrollY = 0;
+    }
+    // the name sits on the title bar in the clip's ink (Live: colour × 0.24)
+    void nameColours()
+    {
+        const auto ink = liveShade (titleColour, 0.24f).withAlpha (1.0f);
+        liveclip::swapColour (name, juce::TextEditor::backgroundColourId, juce::Colours::transparentBlack, liveShown);
+        liveclip::swapColour (name, juce::TextEditor::outlineColourId, juce::Colours::transparentBlack, liveShown);
+        liveclip::swapColour (name, juce::TextEditor::textColourId, ink, liveShown);
+        if (liveShown)
+            name.setColour (juce::TextEditor::textColourId, ink);
+        name.applyColourToAllText (name.findColour (juce::TextEditor::textColourId), true);
+    }
+
+    void paintLive (juce::Graphics& g)
+    {
+        namespace ll = theme::livelook;
+        const auto w = liveclip::columnWidth;
+        g.fillAll (ll::window);
+        g.setColour (ll::surface);
+        g.fillRect (0, 0, w, getHeight());
+        g.setColour (ll::separator);
+        g.fillRect (w, 0, 2, getHeight());
+        {
+            juce::Graphics::ScopedSaveState save (g);
+            g.reduceClipRegion (0, liveclip::headerHeight + 1, w, getHeight());
+            const char* titles[] { TR_NOOP ("Clip"), TR_NOOP ("Launch"), TR_NOOP ("Pitch & Time") };
+            const bool open[] { clipOpen, launchOpen, notesOpen };
+            for (int k = 0; k < 3; ++k)
+                if (k < 2 || hasNotes)
+                    liveclip::paintHeader (g, { 0, headerY[(std::size_t) k], w, liveclip::headerHeight }, tr (titles[k]), k == 2 ? 3 : k, open[k]);
+        }
+        g.setColour (titleColour);
+        g.fillRect (0, 0, w, liveclip::headerHeight);
+        g.setColour (ll::separator);
+        g.fillRect (0, liveclip::headerHeight, w, 1);
+    }
+
+    void resizedLive()
+    {
+        const auto w = liveclip::columnWidth;
+        const auto top = liveclip::headerHeight + 1;
+        const int row = liveclip::row, x0 = 11, inner = w - 22, half = (inner - 4) / 2;
+        // a child goes where the layout puts it while that is wholly under the title bar and in view; else it hides
+        const auto put = [this, top] (juce::Component& c, juce::Rectangle<int> r) {
+            c.setBounds (r.getY() >= top && r.getBottom() <= getHeight() ? r : juce::Rectangle<int>());
+        };
+        const auto hide = [] (std::initializer_list<juce::Component*> list) {
+            for (auto* c : list)
+                c->setBounds ({});
+        };
+        chip.setBounds (2, 2, 13, 13);
+        name.setBounds (17, 1, w - 21, 15);
+        for (auto* l : { &clipTitle, &launchTitle, &notesTitle, &followTitle, &nameLabel })
+            l->setBounds ({});
+        if (hasNotes)
+        {
+            auto t = getLocalBounds().withTrimmedLeft (w + 2 + gap).withTrimmedRight (gap).reduced (0, 4);
+            foldTools.setBounds (t.getRight() - 18, t.getY(), 18, 16);
+            tools.setBounds (t.withWidth (toolsFolded ? foldedTools : MidiToolsPanel::panelWidth).withRightX (t.getRight()));
+        }
+        int y = top - scrollY;
+        const auto labelRow = [&] (juce::Component& a, juce::Component* set, int x, int width) {
+            put (a, { x, y, width - (set != nullptr ? 24 : 0), row });
+            if (set != nullptr)
+                put (*set, { x + width - 22, y + 1, 22, row - 2 });
+        };
+        // Clip
+        headerY[0] = y;
+        y += liveclip::headerHeight + 1;
+        if (clipOpen)
+        {
+            y += 4;
+            labelRow (startLabel, &setStart, x0, half);
+            labelRow (endLabel, &setEnd, x0 + half + 4, half);
+            y += row + 1;
+            put (start, { x0, y, half, row });
+            put (end, { x0 + half + 4, y, half, row });
+            y += row + 5;
+            put (loop, { x0, y, inner, row });
+            y += row + 5;
+            labelRow (positionLabel, &setPosition, x0, half);
+            labelRow (lengthLabel, &setLength, x0 + half + 4, half);
+            y += row + 1;
+            put (position, { x0, y, half, row });
+            put (length, { x0 + half + 4, y, half, row });
+            y += row + 5;
+            put (signatureLabel, { x0, y, half, row });
+            put (grooveLabel, { x0 + half + 4, y, half - 16, row });
+            put (commitGroove, { x0 + 2 * half + 4 - 14, y, 14, row }); // (round 190kc: Live's round well)
+            y += row + 1;
+            put (signature, { x0, y, half, row });
+            put (groove, { x0 + half + 4, y, half, row });
+            y += row + 5;
+            put (scaleLabel, { x0, y, inner, row });
+            y += row + 1;
+            put (scaleMode, { x0, y, 18, row });
+            put (scaleRoot, { x0 + 21, y, 50, row });
+            put (scaleName, { x0 + 74, y, inner - 74, row });
+            y += row + 6;
+        }
+        else
+            hide ({ &startLabel, &setStart, &endLabel, &setEnd, &start, &end, &loop, &positionLabel, &setPosition, &lengthLabel, &setLength, &position,
+                    &length, &signatureLabel, &grooveLabel, &signature, &groove, &scaleLabel, &scaleMode, &scaleRoot, &scaleName, &commitGroove });
+        // Launch (+ Follow Action)
+        headerY[1] = y;
+        y += liveclip::headerHeight + 1;
+        if (launchOpen)
+        {
+            y += 4;
+            put (modeLabel, { x0, y, inner, row });
+            y += row + 1;
+            put (mode, { x0, y, inner, row });
+            y += row + 5;
+            put (quantLabel, { x0, y, inner, row });
+            y += row + 1;
+            put (quant, { x0, y, inner, row });
+            y += row + 5;
+            put (legato, { x0, y, inner, row });
+            y += row + 5;
+            put (followOn, { x0, y, inner, row });
+            y += row + 4;
+            put (followA, { x0, y, half, row });
+            put (followB, { x0 + half + 4, y, half, row });
+            y += row + 4;
+            {
+                const auto jw = 26;
+                put (*jumpA, { x0 + half - (jumpA->isVisible() ? jw : 0), y, jumpA->isVisible() ? jw : 0, row });
+                put (*chanceA, { x0, y, half - (jumpA->isVisible() ? jw + 3 : 0), row });
+                put (*jumpB, { x0 + inner - (jumpB->isVisible() ? jw : 0), y, jumpB->isVisible() ? jw : 0, row });
+                put (*chanceB, { x0 + half + 4, y, half - (jumpB->isVisible() ? jw + 3 : 0), row });
+            }
+            y += row + 4;
+            put (linked, { x0, y, half, row });
+            put (*multiplier, { x0 + half + 4, y, half, row });
+            y += row + 4;
+            put (followTime, { x0, y, inner, row });
+            y += row + 6;
+        }
+        else
+            hide ({ &modeLabel, &mode, &quantLabel, &quant, &legato, &followOn, &followA, &followB, jumpA.get(), chanceA.get(), jumpB.get(), chanceB.get(),
+                    &linked, multiplier.get(), &followTime });
+        // Pitch & Time (MIDI clips): LYNX's note tools, two columns of 13 px pills
+        headerY[2] = hasNotes ? y : -1;
+        if (hasNotes)
+        {
+            y += liveclip::headerHeight + 1;
+            if (notesOpen)
+            {
+                y += 4;
+                const auto cell = [&] (int r, int c) { return juce::Rectangle<int> (x0 + c * (half + 4), y + r * (row + 4), half, row); };
+                put (*pitchRange, cell (0, 0));
+                put (invert, cell (0, 1));
+                put (reverse, cell (1, 0));
+                put (makeLegato, cell (1, 1));
+                put (humanize, cell (2, 0));
+                put (quantize, cell (2, 1));
+                const auto small = (half - 4) / 2;
+                put (timesTwo, cell (3, 0).withWidth (small));
+                put (divideTwo, cell (3, 0).withTrimmedLeft (small + 4));
+                put (fitScale, cell (3, 1));
+                put (*intervalSize, cell (4, 0));
+                put (addInterval, cell (4, 1));
+                put (duplicate, cell (5, 0));
+                put (randomize, cell (5, 1));
+                put (chordHelper, cell (6, 0).withRight (cell (6, 1).getRight()));
+                y += 7 * (row + 4) + 4;
+            }
+            else
+                hide ({ pitchRange.get(), &invert, &reverse, &makeLegato, &humanize, &quantize, &timesTwo, &divideTwo, &fitScale, intervalSize.get(),
+                        &addInterval, &duplicate, &randomize, &chordHelper });
+        }
+        contentHeight = y + scrollY;
+        if (scrollY > maxScroll()) // (a section folded at the bottom: the column scrolls back)
+        {
+            scrollY = maxScroll();
+            resizedLive();
+        }
+    }
+
     void changeListenerCallback (juce::ChangeBroadcaster*) override { load(); }
 
     // the Set buttons are lit only while this clip plays
@@ -1989,19 +3004,46 @@ private:
                 b->setEnabled (on && loop.getToggleState());
     }
     // 0 Start, 1 End, 2 Position, 3 Length (Length's Set ends the loop there: LYNX's loop ends where the clip does)
+    // round 190kc: Commit (the Clip box's button)
+    void commitClipGroove()
+    {
+        const auto& song = engine.getSong();
+        const auto* c = song.clipGrid ? launcher::clipAt (*song.clipGrid, track, scene) : nullptr;
+        if (c == nullptr)
+            return;
+        if (c->kind == ClipKind::pattern)
+            engine.editSong ([t = track, sc = scene] (Song& s) { groove::commit (s, t, sc); });
+        else if (c->kind == ClipKind::audio && c->channel >= 0 && c->channel < (int) song.channels.size())
+            if (const auto sample = engine.getSampleLibrary().load (juce::String::fromUTF8 (song.channels[(std::size_t) c->channel].samplePath.c_str())))
+                engine.editSong ([t = track, sc = scene, sample] (Song& s) { grooveaudio::commit (s, t, sc, *sample); });
+    }
+
     void setHere (int which)
     {
         float progress = 0.0f;
         if (! clipPlays (&progress))
             return;
-        editClip ([which, progress] (Clip& c, ClipGridSlot&) {
+        editClip ([which, progress] (Clip& c, ClipGridSlot& slot) {
             const auto at = clipsample::playPosition (c, progress);
-            if (which == 0)
+            const auto marker = c.offset + (std::int64_t) launcher::startLead (slot, c.length);
+            if (which == 0 && slot.loop && at >= c.offset && at < c.offset + c.length)
+                slot.startMarker = at - c.offset; // (round 190hr: the Start marker inside the loop)
+            else if (which == 0)
+            {
                 clipsample::setStartAt (c, at);
+                slot.startMarker = 0;
+            }
             else if (which == 2)
+            {
                 clipsample::setPositionAt (c, at);
+                slot.startMarker = marker >= c.offset && marker < c.offset + c.length ? marker - c.offset : 0;
+            }
             else
+            {
                 clipsample::setEndAt (c, at);
+                if (slot.startMarker >= c.length)
+                    slot.startMarker = 0;
+            }
         });
     }
     // The clip's content is in seconds (an unwarped audio clip) rather than in beats
@@ -2043,8 +3085,9 @@ private:
         if (! name.hasKeyboardFocus (false))
             name.setText (slot != nullptr ? utf8 (slot->name) : juce::String(), false);
         const auto secs = inSeconds (*c);
+        const auto marker = slot != nullptr ? (std::int64_t) launcher::startLead (*slot, c->length) : 0;
         if (! start.hasKeyboardFocus (false))
-            start.setText (fieldText (c->offset, false, secs), false);
+            start.setText (fieldText (c->offset + marker, false, secs), false);
         if (! end.hasKeyboardFocus (false))
             end.setText (fieldText (c->offset + c->length, false, secs), false);
         if (! position.hasKeyboardFocus (false))
@@ -2066,9 +3109,11 @@ private:
                     if (pool[(std::size_t) i].id == slot->groove)
                         selected = i + 2;
             groove.setSelectedId (selected, n);
-            groove.setEnabled (c->kind == ClipKind::pattern);
+            // (round 190kc: audio clips take a groove too, for Commit: LYNX plays grooves live on MIDI clips only)
+            groove.setEnabled (c->kind == ClipKind::pattern || c->kind == ClipKind::audio);
             groove.setTooltip (c->kind == ClipKind::pattern ? tr ("The groove this clip plays through (the Groove Pool)")
-                                                            : tr ("Grooves play on MIDI clips only in LYNX SHARE"));
+                                                            : tr ("The groove for this audio clip: Commit writes it as warp markers (LYNX SHARE plays grooves live on MIDI clips only)"));
+            commitGroove.setEnabled (slot != nullptr && slot->groove != 0 && (c->kind == ClipKind::pattern || c->kind == ClipKind::audio));
         }
         if (slot != nullptr)
         {
@@ -2076,6 +3121,25 @@ private:
             for (auto* ed : { &position, &length }) // (Live: the loop's fields are off with Loop off)
                 ed->setEnabled (slot->loop);
             legato.setToggleState (slot->legato, n);
+            {
+                const juce::ScopedValueSetter<bool> guard (loading, true);
+                const auto& fa = slot->follow;
+                followOn.setToggleState (fa.enabled, n);
+                followA.setSelectedId ((int) fa.a + 1, n);
+                followB.setSelectedId ((int) fa.b + 1, n);
+                linked.setToggleState (fa.linked, n);
+                if (! followTime.hasKeyboardFocus (false))
+                    followTime.setText (fieldText (fa.ticks, true, false), false);
+                followTime.setEnabled (! fa.linked);
+                multiplier->setEnabled (fa.linked);
+                const auto jumps = jumpA->isVisible() != (fa.a == FollowKind::jump) || jumpB->isVisible() != (fa.b == FollowKind::jump);
+                jumpA->setVisible (fa.a == FollowKind::jump);
+                jumpB->setVisible (fa.b == FollowKind::jump);
+                for (auto* box : { chanceA.get(), chanceB.get(), multiplier.get(), jumpA.get(), jumpB.get() })
+                    box->repaint();
+                if (jumps)
+                    resized();
+            }
             mode.setSelectedId ((int) slot->mode + 1, n);
             quant.setSelectedId ((int) slot->quant + 1, n);
         }
@@ -2085,7 +3149,7 @@ private:
                 parent->resized();
         for (auto* b : { &notesTitle })
             b->setVisible (pattern);
-        for (auto* b : { &invert, &reverse, &makeLegato, &humanize, &duplicate, &quantize, &randomize, &timesTwo, &divideTwo, &fitScale, &addInterval })
+        for (auto* b : { &invert, &reverse, &makeLegato, &humanize, &duplicate, &quantize, &randomize, &timesTwo, &divideTwo, &fitScale, &addInterval, &chordHelper })
             b->setVisible (pattern);
         pitchRange->setVisible (pattern);
         intervalSize->setVisible (pattern);
@@ -2105,10 +3169,54 @@ private:
         auto fill = slot != nullptr && slot->colour != 0 ? juce::Colour (slot->colour)
                     : c->kind == ClipKind::audio ? colour::audioClip : tame (PlaylistComponent::patternColour (song, c->pattern));
         chip.set (fill, ! c->muted);
-        const auto key = projectkey::get (song);
-        scaleRoot.setSelectedId (key ? key->root + 2 : 1, n);
-        scaleName.setSelectedId (key ? key->flScale + 1 : 0, n);
-        scaleName.setEnabled (key.has_value());
+        applyLook();
+        if (fill != titleColour)
+        {
+            titleColour = fill;
+            if (liveShown)
+            {
+                nameColours();
+                repaint (0, 0, liveclip::columnWidth, liveclip::headerHeight);
+            }
+        }
+        {
+            const juce::ScopedValueSetter<bool> guard (loading, true);
+            const auto shown = slot != nullptr ? projectkey::clipScale (*slot, song) : projectkey::get (song);
+            scaleRoot.setSelectedId (shown ? shown->root + 1 : 0, n);
+            scaleName.setSelectedId (shown ? shown->flScale + 1 : 0, n);
+            scaleMode.setToggleState (slot == nullptr || slot->scaleOn, n);
+            for (auto* box : { &scaleRoot, &scaleName })
+                box->setEnabled (pattern);
+            scaleMode.setEnabled (pattern);
+        }
+        // round 190hr: the docked editor's Quantize keys use the MIDI Tools' Quantize tool (Live 12's Edit › Quantize /
+        // Quantize Settings…)
+        if (auto* roll = editorOf != nullptr ? editorOf() : nullptr)
+        {
+            const juce::Component::SafePointer<ClipColumn> safe (this);
+            roll->onLiveQuantize = [safe] {
+                if (safe != nullptr)
+                    safe->tools.quantizeNow();
+            };
+            roll->onLiveQuantizeSettings = [safe] {
+                if (safe == nullptr)
+                    return;
+                if (std::exchange (toolsFolded, false))
+                {
+                    safe->load();
+                    if (auto* parent = safe->getParentComponent())
+                        parent->resized();
+                }
+                safe->tools.showQuantize();
+            };
+        }
+        const auto key = clipKeyOf (song);
+        // the docked editor shows the clip's scale (Live: the clip's Scale drives its editor), when it changes
+        if (auto* roll = editorOf != nullptr ? editorOf() : nullptr; roll != nullptr && pattern && key != shownKey)
+        {
+            shownKey = key;
+            roll->setScale (key ? key->root : 0, key ? projectkey::lynxScale (*key) : 0);
+        }
         tools.setVisible (pattern && ! toolsFolded);
         foldTools.setVisible (pattern);
         foldTools.setButtonText (toolsFolded ? juce::String ("+") : juce::String::fromUTF8 ("\xe2\x88\x92")); // (+ / minus sign)
@@ -2123,22 +3231,39 @@ private:
         const auto* c = clip();
         if (c == nullptr)
             return;
-        // the field that was typed in decides (Start keeps the end, Position keeps the length)
+        // the field that was typed in decides. Loop off: Start keeps the end, Position keeps the length. Loop on (round
+        // 190hr, Live's model): Start moves only the Start marker inside the loop; Position moves the loop and the Start
+        // marker stays where it is in the source; End / Length change the loop's end.
         const auto secs = inSeconds (*c);
+        const auto& song0 = engine.getSong();
+        const auto* slot0 = c->gridSlot >= 0 && c->gridSlot < (int) song0.clipGrid->slots.size() ? &song0.clipGrid->slots[(std::size_t) c->gridSlot] : nullptr;
+        const auto looping = slot0 != nullptr && slot0->loop;
+        const auto marker0 = slot0 != nullptr ? (std::int64_t) launcher::startLead (*slot0, c->length) : 0;
         const auto end0 = c->offset + c->length;
         auto offset = c->offset, len = c->length;
-        if (start.getText() != fieldText (c->offset, false, secs))
+        auto marker = marker0;
+        if (start.getText() != fieldText (c->offset + marker0, false, secs))
         {
             if (const auto t = fieldTicks (start, false, secs); t >= 0 && t < end0)
             {
-                offset = t;
-                len = end0 - t;
+                if (looping && t >= c->offset)
+                    marker = t - c->offset;
+                else
+                {
+                    offset = t;
+                    len = end0 - t;
+                    marker = 0;
+                }
             }
         }
         else if (position.getText() != fieldText (c->offset, false, secs))
         {
             if (const auto t = fieldTicks (position, false, secs); t >= 0)
+            {
                 offset = t;
+                const auto at = c->offset + marker0 - t; // (the Start marker keeps its place in the source)
+                marker = at >= 0 && at < len ? at : 0;
+            }
         }
         else if (end.getText() != fieldText (end0, false, secs))
         {
@@ -2150,9 +3275,11 @@ private:
             if (const auto t = fieldTicks (length, true, secs); t > 0)
                 len = t;
         }
+        if (marker >= len)
+            marker = 0;
         const auto newName = name.getText().trim().toStdString();
         const int t = track, sc = scene;
-        engine.editSong ([t, sc, offset, len, newName] (Song& song) {
+        engine.editSong ([t, sc, offset, len, marker, newName] (Song& song) {
             if (! song.clipGrid)
                 return;
             for (auto& clip : song.clipGrid->clips)
@@ -2162,9 +3289,33 @@ private:
                     clip.offset = offset;
                     clip.length = len;
                     song.clipGrid->slots[(std::size_t) clip.gridSlot].name = newName;
+                    song.clipGrid->slots[(std::size_t) clip.gridSlot].startMarker = marker;
                 }
         });
         load();
+    }
+
+    // round 190hr: the slot's follow action (one undo step) and its typed time
+    const ClipFollow* follow() const
+    {
+        const auto* c = clip();
+        const auto& song = engine.getSong();
+        return c != nullptr && c->gridSlot >= 0 && c->gridSlot < (int) song.clipGrid->slots.size() ? &song.clipGrid->slots[(std::size_t) c->gridSlot].follow : nullptr;
+    }
+    void editFollow (std::function<void (ClipFollow&)> fn)
+    {
+        editSlot ([fn] (ClipGridSlot& slot) { fn (slot.follow); });
+    }
+    void applyFollowTime()
+    {
+        const auto* f = follow();
+        if (f == nullptr)
+            return;
+        const auto t = fieldTicks (followTime, true, false);
+        if (t > 0 && t != f->ticks)
+            editFollow ([t] (ClipFollow& x) { x.ticks = t; });
+        else
+            load();
     }
 
     // the grid clip of the slot and its settings (one undo step)
@@ -2255,13 +3406,30 @@ private:
     juce::TextButton setStart, setEnd, setPosition, setLength; // round 190dr
     juce::Label positionLabel, grooveLabel;
     juce::ComboBox groove;
+    GrooveCommitButton commitGroove; // round 190kc: Live's Commit button beside the Groove label
     bool loading = false;
     std::unique_ptr<ui::TimerWhileShowing> showingTimer;
     juce::ToggleButton loop, legato;
+    // round 190hr: the Follow Action controls
+    juce::Label followTitle;
+    juce::TextButton followOn, linked;
+    juce::ComboBox followA, followB;
+    std::unique_ptr<ui::NumBox> chanceA, chanceB, multiplier, jumpA, jumpB;
+    juce::TextEditor followTime;
     juce::ComboBox mode, quant;
-    juce::TextButton invert, reverse, makeLegato, humanize, duplicate, quantize, randomize, timesTwo, divideTwo, fitScale;
+    juce::TextButton invert, reverse, makeLegato, humanize, duplicate, quantize, randomize, timesTwo, divideTwo, fitScale, chordHelper;
     juce::Label scaleLabel;
-    juce::ComboBox scaleRoot, scaleName; // the project key (round 190o; Live: the clip's Scale)
+    juce::ComboBox scaleRoot, scaleName; // the clip's scale (round 190hr; before: the project key)
+    juce::TextButton scaleMode;          // Live's Scale Mode switch of the clip (IsInKey)
+    std::optional<projectkey::Key> shownKey; // the scale last handed to the docked editor
+    // the key the clip's tools use: its own scale (or the project's) while its Scale Mode is on
+    std::optional<projectkey::Key> clipKeyOf (const Song& song) const
+    {
+        const auto* c = clip();
+        if (c == nullptr || ! song.clipGrid || c->gridSlot < 0 || c->gridSlot >= (int) song.clipGrid->slots.size())
+            return projectkey::get (song);
+        return projectkey::clipKey (song.clipGrid->slots[(std::size_t) c->gridSlot], song);
+    }
 };
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -2273,7 +3441,7 @@ public:
     {
         addChildComponent (column); // (slice 2b: shown while a grid clip is)
         column.editorOf = [this] { return dynamic_cast<PianoRollComponent*> (editor); };
-        for (auto* b : { &notesTab, &envelopesTab })
+        for (auto* b : { &notesTab, &envelopesTab, &mpeTab })
         {
             addChildComponent (*b);
             b->setConnectedEdges (0);
@@ -2284,8 +3452,11 @@ public:
         notesTab.setButtonText (tr ("Notes"));
         envelopesTab.setButtonText (tr ("Envelopes"));
         envelopesTab.setTooltip (tr ("The pattern's events: the levels and controls it changes while it plays"));
+        mpeTab.setButtonText (tr ("MPE"));
+        mpeTab.setTooltip (tr ("Each note's own pitch bend, slide and pressure curves (MPE)"));
         notesTab.onClick = [this] { showTab (false); };
         envelopesTab.onClick = [this] { showTab (true); };
+        mpeTab.onClick = [this] { showTab (false, true); };
         addChildComponent (open);
         open.onClick = [this] {
             if (dockable())
@@ -2314,6 +3485,13 @@ public:
         update();
     }
     MidiToolsPanel& midiTools() noexcept { return column.midiTools(); }
+    void sectionsForSnapshot (bool clipOpen, bool launchOpen, bool notesOpen, int scroll)
+    {
+        ClipColumn::clipOpen = clipOpen;
+        ClipColumn::launchOpen = launchOpen;
+        ClipColumn::notesOpen = notesOpen;
+        column.setScrollForSnapshot (scroll);
+    }
     void editorTakenBack()
     {
         if (editor != nullptr)
@@ -2324,17 +3502,63 @@ public:
         }
         update();
     }
-    void showTab (bool envelopes)
+    void showTab (bool envelopes, bool mpe = false)
     {
         DetailView::envelopesTab = envelopes;
+        DetailView::mpeTab = mpe && ! envelopes;
         if (! envelopes)
-            takenBack = false; // (Notes: the Piano roll docks again)
+            takenBack = false; // (Notes / MPE: the Piano roll docks again)
         update();
     }
+    // (round 190hy) the docked Piano roll shows the MPE lanes while the MPE tab does
+    void applyMpeView()
+    {
+        if (auto* roll = dynamic_cast<PianoRollComponent*> (editor))
+        {
+            roll->setMpeView (DetailView::mpeTab && ! DetailView::envelopesTab);
+            // round 190jn (CL-20b): in Live's look the docked notes take the clip's colour (PianoRollComponent::liveNotes)
+            const auto* clip = clipShown();
+            const auto colour = theme::livelook::active() && clip != nullptr ? clipColourOf (*clip) : juce::Colours::transparentBlack;
+            if (roll->liveNoteColour != colour)
+            {
+                roll->liveNoteColour = colour;
+                roll->repaint();
+            }
+        }
+    }
+    // the clip's colour as its title bar shows it (ClipColumn::load's rule)
+    juce::Colour clipColourOf (const Clip& c) const
+    {
+        const auto& song = engine.getSong();
+        const ClipGridSlot* slot = song.clipGrid && c.gridSlot >= 0 && c.gridSlot < (int) song.clipGrid->slots.size() ? &song.clipGrid->slots[(std::size_t) c.gridSlot] : nullptr;
+        return slot != nullptr && slot->colour != 0 ? juce::Colour (slot->colour)
+               : c.kind == ClipKind::audio ? colour::audioClip : tame (PlaylistComponent::patternColour (song, c.pattern));
+    }
+
+    // Round 190im (R13, DL-74): the docked clip's position in its pattern while it is launched from the grid (the
+    // launcher clock − its anchor, wrapped at its length, from its start offset); −1 when it does not play
+    double launchedTick() const
+    {
+        const auto* state = engine.launcherState();
+        if (state == nullptr || dockedTrack < 0 || dockedTrack >= launcher::maxTracks || ! state->running.load (std::memory_order_relaxed))
+            return -1.0;
+        const auto& view = state->tracks[(std::size_t) dockedTrack];
+        if (view.playing.load (std::memory_order_relaxed) != dockedScene)
+            return -1.0;
+        const auto& song = engine.getSong();
+        const auto* clip = song.clipGrid ? launcher::clipAt (*song.clipGrid, dockedTrack, dockedScene) : nullptr;
+        if (clip == nullptr || clip->kind != ClipKind::pattern || clip->length <= 0)
+            return -1.0;
+        return (double) clip->offset + std::fmod (juce::jmax (0.0, state->clockNow.load (std::memory_order_relaxed) + engine.playheadAdvanceTicks()
+                                                                       - view.anchor.load (std::memory_order_relaxed)), (double) clip->length);
+    }
+
     void release()
     {
         dropEvents();
         dockedTrack = dockedScene = -1;
+        if (auto* roll = dynamic_cast<PianoRollComponent*> (editor)) // (round 190jn: its own colours again at home)
+            roll->liveNoteColour = juce::Colours::transparentBlack;
         if (editor != nullptr && hooks.undockPianoRoll != nullptr)
         {
             editor = nullptr;
@@ -2345,7 +3569,14 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        g.fillAll (colour::bg1);
+        g.fillAll (liveTabs ? theme::livelook::window : colour::bg1);
+        if (liveTabs && notesTab.isVisible()) // (round 190jn: Live's 17 px tab bar over the editor, #363636)
+        {
+            g.setColour (theme::livelook::surface);
+            g.fillRect (tabBar);
+            g.setColour (theme::livelook::separator);
+            g.fillRect (tabBar.getX(), tabBar.getBottom(), tabBar.getWidth(), 1);
+        }
         if (editor != nullptr || events != nullptr)
             return;
         g.setColour (colour::textSecondary);
@@ -2361,10 +3592,28 @@ public:
         open.setBounds (area.withSizeKeepingCentre (240, 26).translated (0, 16));
         if (audioPanel != nullptr) // round 190cg (ui/ClipAudioPanel)
             audioPanel->setBounds (area);
-        if (notesTab.isVisible())
+        applyLook();
+        tabBar = {};
+        if (notesTab.isVisible() && liveTabs)
         {
-            // the clip's tabs, top right, as the reference's Notes | Envelopes [SHOT d08]
+            // round 190jn (CL-20b): Live's tab bar — 17 px #363636 across the editor, the tabs (60 px, MPE 40 px) centred,
+            // the shown one #464646 (live-01-clipview-notes.png 691..873, live-clipview-audio.png 962..1082)
+            tabBar = area.removeFromTop (liveclip::headerHeight);
+            area.removeFromTop (1);
+            const auto total = 60 + 1 + 60 + 1 + 40;
+            auto bar = tabBar.withSizeKeepingCentre (total, liveclip::headerHeight);
+            notesTab.setBounds (bar.removeFromLeft (60));
+            bar.removeFromLeft (1);
+            envelopesTab.setBounds (bar.removeFromLeft (60));
+            bar.removeFromLeft (1);
+            mpeTab.setBounds (bar);
+        }
+        else if (notesTab.isVisible())
+        {
+            // the clip's tabs, top right, as the reference's Notes | Envelopes [SHOT d08] (| MPE: Live 11+, round 190hy)
             auto bar = area.removeFromTop (tabHeight).reduced (2, 2);
+            mpeTab.setBounds (bar.removeFromRight (72));
+            bar.removeFromRight (2);
             envelopesTab.setBounds (bar.removeFromRight (96));
             bar.removeFromRight (2);
             notesTab.setBounds (bar.removeFromRight (96));
@@ -2382,6 +3631,26 @@ public:
 
 private:
     void changeListenerCallback (juce::ChangeBroadcaster*) override { update(); }
+
+    // round 190jn: the tabs in Live's colours (the shown one #464646, the others #363636, text #B5B5B5) and square, or
+    // LYNX's back; follows the layout's switch
+    bool liveTabs = false;
+    juce::Rectangle<int> tabBar;
+    void applyLook()
+    {
+        const auto live = theme::livelook::active();
+        if (live == liveTabs)
+            return;
+        liveTabs = live;
+        for (auto* b : { &notesTab, &envelopesTab, &mpeTab })
+        {
+            liveclip::swapColour (*b, juce::TextButton::buttonColourId, theme::livelook::surface, live);
+            liveclip::swapColour (*b, juce::TextButton::buttonOnColourId, liveclip::header, live);
+            liveclip::swapColour (*b, juce::TextButton::textColourOffId, theme::livelook::text, live);
+            liveclip::swapColour (*b, juce::TextButton::textColourOnId, theme::livelook::text, live);
+            b->setConnectedEdges (live ? juce::Button::ConnectedOnLeft | juce::Button::ConnectedOnRight : 0);
+        }
+    }
 
     // this page and every parent visible (not isShowing(): an off-screen --detailshot has no window, and a minimised
     // window keeps its dock)
@@ -2441,6 +3710,11 @@ private:
 
     void update()
     {
+        if (theme::livelook::active() != liveTabs)
+        {
+            applyLook();
+            resized();
+        }
         const auto& song = engine.getSong();
         const auto* clip = clipShown();
         if (column.isVisible() != (clip != nullptr))
@@ -2455,14 +3729,18 @@ private:
         {
             notesTab.setVisible (tabs);
             envelopesTab.setVisible (tabs);
+            mpeTab.setVisible (tabs);
             resized();
         }
-        notesTab.setToggleState (! DetailView::envelopesTab, juce::dontSendNotification);
+        notesTab.setToggleState (! DetailView::envelopesTab && ! DetailView::mpeTab, juce::dontSendNotification);
         envelopesTab.setToggleState (DetailView::envelopesTab, juce::dontSendNotification);
+        mpeTab.setToggleState (DetailView::mpeTab && ! DetailView::envelopesTab, juce::dontSendNotification);
         if (tabs && DetailView::envelopesTab)
         {
             if (editor != nullptr && hooks.undockPianoRoll != nullptr) // (the Piano roll goes home while Envelopes shows)
             {
+                if (auto* roll = dynamic_cast<PianoRollComponent*> (editor))
+                    roll->setMpeView (false);
                 editor = nullptr;
                 dockedTrack = dockedScene = -1;
                 hooks.undockPianoRoll();
@@ -2476,16 +3754,25 @@ private:
         if (clip != nullptr && clip->kind == ClipKind::pattern && onScreen() && ! takenBack && hooks.dockPianoRoll != nullptr)
         {
             if (editor != nullptr && dockedTrack == track && dockedScene == scene)
+            {
+                applyMpeView();
                 return; // (already showing this clip: the user may have picked another pattern in it meanwhile)
+            }
             dockedTrack = track;
             dockedScene = scene;
             auto* e = hooks.dockPianoRoll (clip->pattern);
+            if (auto* roll = dynamic_cast<PianoRollComponent*> (e)) // (round 190im, R13: the launched clip's position)
+                roll->launchedPlayhead = [safe = juce::Component::SafePointer<ClipPage> (this), roll] {
+                    return safe != nullptr && safe->editor == roll ? safe->launchedTick() : -1.0;
+                };
             if (e != nullptr && e != editor)
             {
                 editor = e;
                 addAndMakeVisible (*editor);
+                column.reload(); // (round 190hr: the column gives the docked editor its Quantize keys and the clip's scale)
                 resized();
             }
+            applyMpeView();
             open.setVisible (false);
             repaint();
             return;
@@ -2540,7 +3827,7 @@ private:
     juce::TextButton open;
     juce::String text;
     ClipColumn column;
-    juce::TextButton notesTab, envelopesTab;
+    juce::TextButton notesTab, envelopesTab, mpeTab;
     static constexpr int tabHeight = 26;
     std::unique_ptr<juce::Component> events; // the Envelopes tab's Event editor
     int eventsTrack = -1, eventsScene = -1;
@@ -2556,6 +3843,9 @@ private:
 DetailView::DetailView (AudioEngine& e, Hooks h) : engine (e), hooks (std::move (h))
 {
     setTitle (tr ("Detail view"));
+    info = std::make_unique<ui::InfoView>();
+    addChildComponent (*info);
+    info->setInterceptsMouseClicks (false, false);
     chain = std::make_unique<DeviceChain> (engine, hooks);
     clipPage = std::make_unique<ClipPage> (engine, hooks);
     addChildComponent (*chain);
@@ -2607,6 +3897,7 @@ void DetailView::togglePage() { setPage (devicesPage ? Page::clip : Page::device
 void DetailView::editorTakenBack() { clipPage->editorTakenBack(); }
 void DetailView::releaseEditor() { clipPage->release(); }
 void DetailView::setClipTab (bool envelopes) { clipPage->showTab (envelopes); }
+void DetailView::setMpeTab() { clipPage->showTab (false, true); }
 
 void DetailView::showPage()
 {
@@ -2641,6 +3932,11 @@ void DetailView::showOptionsMenu()
 
 void DetailView::paint (juce::Graphics& g)
 {
+    if (theme::livelook::active())
+    {
+        paintLiveStrip (g);
+        return;
+    }
     g.fillAll (colour::bg1);
     // the top edge: drag to resize
     g.setColour (colour::bg3);
@@ -2673,6 +3969,24 @@ void DetailView::resized()
 {
     auto r = getLocalBounds();
     r.removeFromTop (edgeHeight);
+    const auto live = theme::livelook::active();
+    clipTab.setVisible (! live);
+    devicesTab.setVisible (! live);
+    info->setVisible (live && infoViewShown);
+    if (live)
+    {
+        // Live: the status strip under everything; the Info View 9..240 then the views from 249 (live-session.png)
+        r.removeFromBottom (stripHeight);
+        optionsButton.setBounds (getWidth() - 28, getHeight() - stripHeight + 2, 26, stripHeight - 4);
+        if (infoViewShown)
+        {
+            auto left = r.removeFromLeft (249);
+            info->setBounds (left.withTrimmedLeft (9).withTrimmedRight (9).withTrimmedTop (2).withTrimmedBottom (1));
+        }
+        chain->setBounds (r);
+        clipPage->setBounds (r);
+        return;
+    }
     auto strip = r.removeFromBottom (stripHeight).reduced (2, 2);
     optionsButton.setBounds (strip.removeFromRight (26));
     strip.removeFromRight (4);
@@ -2692,6 +4006,130 @@ void DetailView::mouseDown (const juce::MouseEvent& e)
 {
     resizing = e.y < edgeHeight;
     dragStartHeight = getHeight();
+    if (resizing || ! theme::livelook::active() || e.mods.isPopupMenu())
+        return;
+    if (infoButtonArea().expanded (2).contains (e.getPosition()))
+        toggleInfoView();
+    else if (pageGlyphArea (false).expanded (1).contains (e.getPosition()))
+        setPage (Page::clip);
+    else if (pageGlyphArea (true).expanded (1).contains (e.getPosition()))
+        setPage (Page::devices);
+}
+
+// --- round 190jn: Live's Info View and status strip (design190ia CL-23 / CL-24) -----------------------------------------
+void DetailView::setInfoHint (const ui::Hint& hint)
+{
+    if (info->isVisible())
+        info->setHint (hint);
+}
+
+void DetailView::toggleInfoView()
+{
+    infoViewShown = ! infoViewShown;
+    resized();
+    repaint();
+    if (hooks.layoutChanged != nullptr)
+        hooks.layoutChanged();
+}
+
+ui::InfoView& DetailView::infoViewForSnapshot() { return *info; }
+
+// Live 12.4's status bar (live-session.png y 1004..1022): the (i) button 15 px at x 11 (orange: the Info View shows),
+// the status text in a #363636 field from x 42; at the right the selected track's name and the view selector
+// (here: a Clip glyph and a Device glyph, 17 px, the shown one lit #FFAD56); LYNX's "..." options last.
+juce::Rectangle<int> DetailView::infoButtonArea() const
+{
+    return { 11, getHeight() - stripHeight + (stripHeight - 15) / 2, 15, 15 };
+}
+
+juce::Rectangle<int> DetailView::pageGlyphArea (bool devices) const
+{
+    const auto right = getWidth() - 34;
+    return { right - (devices ? 19 : 38), getHeight() - stripHeight + (stripHeight - 17) / 2, 17, 17 };
+}
+
+void DetailView::paintLiveStrip (juce::Graphics& g)
+{
+    namespace ll = theme::livelook;
+    g.fillAll (ll::window);
+    // the top edge: drag to resize (a 1 px #464646 line as Live's split, the grip in the middle)
+    g.setColour (ll::separator);
+    g.fillRect (0, edgeHeight - 1, getWidth(), 1);
+    g.setColour (ll::raised);
+    g.fillRect (getWidth() / 2 - 16, 2, 32, 1);
+    const auto strip = getLocalBounds().removeFromBottom (stripHeight);
+    // (i)
+    const auto ib = infoButtonArea().toFloat();
+    g.setColour (infoViewShown ? ll::on : ll::well);
+    g.fillEllipse (ib);
+    g.setColour (infoViewShown ? ll::ink : ll::text);
+    g.fillEllipse (juce::Rectangle<float> (2.0f, 2.0f).withCentre ({ ib.getCentreX(), ib.getY() + 4.0f }));
+    g.fillRect (juce::Rectangle<float> (ib.getCentreX() - 1.0f, ib.getY() + 6.0f, 2.0f, 6.0f));
+    // the status text field
+    const auto& song = engine.getSong();
+    const auto glyphs = pageGlyphArea (false).getX();
+    const auto name = track >= 0 ? trackName (song, track) : juce::String();
+    g.setFont (font (type::small));
+    static juce::String measuredName; // (the name's width, measured once per name)
+    static int measuredWidth = 0;
+    if (name != measuredName)
+    {
+        measuredName = name;
+        measuredWidth = name.isEmpty() ? 0 : juce::jmin (180, juce::roundToInt (juce::TextLayout::getStringWidth (g.getCurrentFont(), name)) + 12);
+    }
+    const auto nameWidth = measuredWidth;
+    auto field = juce::Rectangle<int> (42, strip.getY() + (stripHeight - 19) / 2, std::max (0, glyphs - nameWidth - 12 - 42), 19);
+    g.setColour (ll::surface);
+    g.fillRoundedRectangle (field.toFloat(), 3.0f);
+    juce::String what;
+    if (devicesPage)
+    {
+        what = track >= 0 ? tr ("Devices") + ": " + trackName (song, track) : tr ("Devices");
+        if (const auto i = chain->insertShown(); i >= 0)
+            what << juce::String::fromUTF8 (" \xc2\xb7 ") << insertName (song, i);
+    }
+    else
+        what = tr ("Clip");
+    what << "   (" << tr ("Shift+Tab: {0}", { devicesPage ? tr ("Clip") : tr ("Devices") }) << ")";
+    g.setColour (ll::text);
+    textcache::drawText (g, what, field.reduced (6, 0), juce::Justification::centredLeft, true);
+    if (nameWidth > 0)
+        textcache::drawText (g, name, juce::Rectangle<int> (glyphs - nameWidth - 6, strip.getY(), nameWidth, stripHeight), juce::Justification::centredLeft, true);
+    // the Clip glyph (a clip block with its waveform) and the Device glyph (Live's three bars)
+    for (const auto devices : { false, true })
+    {
+        const auto r = pageGlyphArea (devices).toFloat();
+        const auto lit = devicesPage == devices;
+        g.setColour (lit ? ll::on : ll::well);
+        g.fillRoundedRectangle (r, 2.0f);
+        g.setColour (lit ? ll::ink : ll::text);
+        if (devices)
+            for (int k = 0; k < 3; ++k)
+            {
+                const auto h = k == 1 ? 9.0f : 6.0f;
+                g.fillRect (juce::Rectangle<float> (r.getX() + 4.0f + (float) k * 3.5f, r.getBottom() - 4.0f - h, 2.0f, h));
+            }
+        else
+        {
+            const auto b = r.reduced (3.5f, 5.0f);
+            g.drawRect (b, 1.0f);
+            g.drawLine (b.getX() + 2.0f, b.getCentreY(), b.getRight() - 2.0f, b.getCentreY(), 1.0f);
+        }
+    }
+}
+
+juce::String DetailView::getTooltip()
+{
+    if (! theme::livelook::active())
+        return {};
+    const auto p = getMouseXYRelative();
+    if (infoButtonArea().expanded (2).contains (p))
+        return tr ("Info View: shows what the control under the mouse does. Click or press Shift+? to show or hide it");
+    if (pageGlyphArea (false).expanded (1).contains (p))
+        return clipTab.getTooltip();
+    if (pageGlyphArea (true).expanded (1).contains (p))
+        return devicesTab.getTooltip();
+    return {};
 }
 
 void DetailView::mouseDrag (const juce::MouseEvent& e)
@@ -2711,10 +4149,12 @@ void DetailView::mouseUp (const juce::MouseEvent&)
 }
 
 MidiToolsPanel& DetailView::midiToolsForSnapshot() { return clipPage->midiTools(); }
+void DetailView::clipSectionsForSnapshot (bool clipOpen, bool launchOpen, bool notesOpen, int scroll) { clipPage->sectionsForSnapshot (clipOpen, launchOpen, notesOpen, scroll); }
 hotswap::Target DetailView::selectedDeviceTarget() const { return devicesPage && isShowing() ? chain->selectedTarget() : hotswap::Target(); }
 void DetailView::hotSwapChanged() { chain->repaint(); }
 void DetailView::selectCardForCheck (int card) { chain->selectCard (card); }
 bool DetailView::duplicateCardForCheck (int card) { return chain->duplicateCard (card); }
+bool DetailView::groupCardForCheck (int card, bool ungroup) { return chain->groupCardForCheck (card, ungroup); }
 juce::PopupMenu DetailView::cardMenuForSnapshot (int card)
 {
     juce::PopupMenu menu;
@@ -2724,10 +4164,16 @@ juce::PopupMenu DetailView::cardMenuForSnapshot (int card)
     return menu;
 }
 int DetailView::cardCountForCheck() const { return chain->cardCount(); }
+juce::Rectangle<int> DetailView::windowButtonForCheck (int card) const
+{
+    const auto r = chain->windowButtonOf (card);
+    return r.isEmpty() ? r : getLocalArea (chain.get(), r);
+}
 int DetailView::chainInsertForCheck() const { return chain->insertShown(); }
 int DetailView::chainChannelForCheck() const { return chain->channelShown(); }
 bool DetailView::isFoldedForCheck (int card) const { return chain->isCardFolded (card); }
 void DetailView::toggleFoldForCheck (int card) { chain->toggleCardFold (card); }
+void DetailView::deviceLevelsForSnapshot (float left, float right) { chain->deviceLevelsForSnapshot (left, right); }
 // ---------------------------------------------------------------------------------------------------------------------
 // Round 190dr: the description of a device card dragged out of the Device View
 namespace

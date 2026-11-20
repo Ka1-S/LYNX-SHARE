@@ -48,9 +48,18 @@ constexpr int rackMaxWidth = 720, rackMinWidth = 420;
 // back (FL 2026, round 168s / issue #32 [SHOT] r168s f02 → f03 → f04; it used to stay behind everything).
 constexpr bool isBackground (Panel p) noexcept { return p == Panel::browser; }
 
+// Issue #192: where the Browser is docked. FL 2026 docks its Browser in the main window's left or right dock site
+// (TFruityLoopsMainForm SBLeftDockSite / SBRightDockSite, the Browser form is dockable): a docked Browser is not part of
+// the desktop the other windows use, so a maximized Playlist, Piano roll, Channel rack or Mixer fills only what it
+// leaves, and the whole desktop once the Browser is closed (Alt+F8) or detached. `none`: a Browser placed freely inside
+// the desktop (layouts saved before round 190jz where it was moved off its side); it docks again at a side.
+enum class Dock : int { left, right, none };
+const char* dockId (Dock dock) noexcept; // "left", "right", "none" (the saved-layout values)
+
 struct Layout
 {
     std::array<PanelState, panelCount> panels {};
+    Dock browserDock = Dock::left;
     std::vector<Panel> order; // stacking order, back to front (always all panels)
     Panel focused = Panel::playlist;
     int width = 0, height = 0; // desktop size the rects refer to
@@ -79,6 +88,27 @@ struct Layout
     void show (Panel p);
     void hide (Panel p);
     void toggleMaximised (Panel p);
+
+    // --- issue #192: the docked Browser ---------------------------------------------------------------------------
+    // The Browser takes its side now: docked, shown and not in its own window.
+    bool browserDocked() const noexcept;
+    // The desktop the other panels use: all of it but a docked Browser's column.
+    Rect freeArea() const noexcept;
+    // Where a maximized panel goes: the free area (the Browser itself: the whole desktop).
+    Rect maximisedArea (Panel p) const noexcept;
+    // Docks the Browser at `side` (none: left where it is), full height at that edge, keeping its width; the floating
+    // panels move out of its column.
+    void dockBrowser (Dock side);
+    // Puts a docked Browser back at its edge, full height, its width kept between minWidth and what leaves the other
+    // panels minWidth (after a resize or a parse).
+    void placeDockedBrowser();
+    // The floating (attached, not maximized) panels other than the Browser kept inside the free area: those that reach
+    // into the docked Browser's column move out of it, narrower only when they don't fit. Returns how many moved.
+    int keepOutOfDockedBrowser();
+    // The free area changed from `before` (the Browser shown, closed, docked elsewhere, detached or made wider): the other
+    // panels move with it, as FL's windows do with its desktop (FL 2026, round 190jz shots fl-192-restored-windows-*: Alt+F8
+    // moved the Mixer left by the Browser's width, and the Playlist touching the right edge kept that edge, getting wider).
+    void followFreeArea (Rect before);
 
     // The desktop changed size: rects scale with it (proportionally), then are clamped back in.
     void resize (int newWidth, int newHeight);

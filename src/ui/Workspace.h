@@ -44,6 +44,25 @@ public:
     void toggleMaximised (Panel panel);
     void setDetached (Panel panel, bool detached);
 
+    // Issue #192: the Browser docked at the left or right side of the main window, as FL's: a maximized panel fills what
+    // it leaves (the whole desktop while it is closed or detached), the other panels keep out of its column, its title
+    // dragged docks it at the side it is let go on (off the main window: detached there), its inner edge sets its width.
+    void dockBrowser (workspace::Dock side);
+    workspace::Dock getBrowserDock() const;
+    bool isBrowserDockedPanel (Panel panel) const; // the Browser, docked and shown now
+    juce::Rectangle<int> dockedBrowserBoundsForWidth (int width) const;
+    juce::Rectangle<int> getMaximisedArea (Panel panel) const; // where a maximized panel goes now
+    void browserTitleDropped (juce::Point<int> screenPosition, bool moved);
+
+    // FL's Browser options › View › "Auto-hide" (round 190mv, DF-107; capture 190mv A2): only a floating Browser hides —
+    // once the mouse has left it, it rolls up to its title strip; the mouse on the strip rolls it out again. Docked (left
+    // or right) or closed, it never hides (FL 2026). Not saved in the layout: the layout keeps the full height.
+    void setBrowserAutoHide (bool on);
+    bool isBrowserAutoHide() const noexcept { return browserAutoHide; }
+    bool isBrowserRolledUp() const noexcept { return browserRolled && browserCanRoll(); }
+    void browserHovered (bool inside); // (the Browser's frame: the mouse came in / went out)
+    void rollBrowserForSnapshot (bool up) { browserRolled = up; placeBrowserRoll(); }
+
     bool isPanelVisible (Panel panel) const;
     bool isMaximised (Panel panel) const;
     bool isDetached (Panel panel) const;
@@ -92,6 +111,7 @@ public:
 
     void paint (juce::Graphics& g) override;
     void resized() override;
+    void childrenChanged() override; // (round 190jy: an editor drawn here put in front by toFront)
 
     // used by the frames
     void activate (Panel panel);
@@ -123,7 +143,30 @@ public:
     // A place for a new docked frame of that size: cascading from the top-left of the desktop's free area.
     juce::Rectangle<int> placeForDockedFrame (int width, int height) const;
 
+    // Round 190jy (queue item 44; core/DockStack.h editorsAbove): a docked LYNX editor window drawn by the main window
+    // itself, a child component of the desktop at `bounds`, kept in the stacking order of the native panels and docked
+    // windows by a hidden native anchor; the native windows below it get a hole where it is. `window` has no parent and
+    // is not on the desktop. Not owned: removeEditorWindow gives it back (no parent), and a deleted window goes by itself.
+    bool addEditorWindow (juce::Component& window, juce::Rectangle<int> bounds);
+    void removeEditorWindow (juce::Component& window);
+    bool hasEditorWindow (const juce::Component& window) const;
+    std::vector<juce::Component*> editorWindows() const;
+    // In front of the native panels and docked windows (a click in it, toFront, opened again)
+    void raiseEditorWindow (juce::Component& window);
+    // The holes again (the stacking order, a window's place or visibility changed); cheap when nothing changed
+    void updateEditorHoles();
+    // (tests) the anchor that stands for the window in the native stacking order
+    juce::Component* editorAnchorForTest (const juce::Component& window) const;
+
 private:
+    struct EditorWindow;
+    struct EditorWatch;
+    std::vector<std::unique_ptr<EditorWindow>> editorWindowList;
+    std::unique_ptr<EditorWatch> editorWatch;
+    bool updatingHoles = false, raisingEditor = false;
+    int childCountSeen = 0;
+    void keepEditorWindowsOnTop(); // (above the plain frames: the Browser)
+
     struct PeerWatch;
     std::unique_ptr<PeerWatch> peerWatch;
     std::vector<juce::Component::SafePointer<juce::Component>> dockedFrames;
@@ -137,6 +180,9 @@ private:
 
     workspace::Layout layout;
     bool layoutReady = false, persistent = false;
+    bool browserAutoHide = false, browserRolled = false; // round 190mv (DF-107)
+    bool browserCanRoll() const;
+    void placeBrowserRoll();
     // The layout is still LYNX's default (no panel moved or resized by hand, nothing detached or loaded):
     // when the window changes size it takes the default rects for the new size instead of scaling them,
     // so a window that opens small and is then maximised gets a sensible desktop.

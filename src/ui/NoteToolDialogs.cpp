@@ -5,9 +5,12 @@
 #include <map>
 #include <optional>
 
+#include "core/FlArpeggiator.h"
 #include "core/NoteTools.h"
 #include "core/PianoRollTools.h"
+#include "core/ScaleDetect.h"
 #include "engine/FlStudio.h"
+#include "ui/ChordStripView.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 #include "ui/ToolWindow.h"
@@ -216,6 +219,8 @@ public:
         bpm = song.bpm;
         meter = song.meter();
         buildControls();
+        if (tool == NoteTool::chordProgression)
+            initChordTool();
 
         title.setText (tr (noteToolTitle (tool)), juce::dontSendNotification);
         title.setFont (theme::font (theme::type::title, true));
@@ -245,8 +250,10 @@ public:
         int height = 92 + 44 + (hasExtraButton() ? rowHeight : 0);
         for (const auto& c : controls)
             height += c.kind == Control::header ? headerHeight : c.joinPrevious ? 0 : rowHeight;
+        if (stripView != nullptr) // (round 190kd: FL's chord viewer above the options, as wide as FL's tool)
+            height += stripView->preferredHeight() + 6;
 
-        setSize (440, height);
+        setSize (stripView != nullptr ? 720 : 440, height);
         preview();
     }
 
@@ -257,6 +264,22 @@ public:
     }
 
     std::function<void()> onFinished;
+
+    // round 190jv (--prshot190jv): picks the item of the choice `name` whose text starts with `item`, as a click would
+    // (the preview follows); false when there is no such control or item
+    bool chooseForSnapshot (const juce::String& name, const juce::String& item)
+    {
+        for (std::size_t c = 0; c < controls.size(); ++c)
+            if (controls[c].kind == Control::choice && controls[c].name == name)
+                if (auto* box = dynamic_cast<juce::ComboBox*> (editors[c].get()))
+                    for (int i = 0; i < box->getNumItems(); ++i)
+                        if (box->getItemText (i).startsWith (item))
+                        {
+                            box->setSelectedItemIndex (i, juce::sendNotificationSync);
+                            return true;
+                        }
+        return false;
+    }
 
     void paint (juce::Graphics& g) override
     {
@@ -275,6 +298,11 @@ public:
         title.setBounds (area.removeFromTop (24));
         info.setBounds (area.removeFromTop (36));
         area.removeFromTop (6);
+        if (stripView != nullptr)
+        {
+            stripView->setBounds (area.removeFromTop (stripView->preferredHeight()));
+            area.removeFromTop (6);
+        }
 
         for (std::size_t c = 0; c < controls.size(); ++c)
         {
@@ -318,7 +346,8 @@ private:
 
     bool hasExtraButton() const noexcept
     {
-        return tool == NoteTool::randomise || tool == NoteTool::humanize || tool == NoteTool::riffMachine || tool == NoteTool::chordProgression;
+        // (round 190kd: the chord tool's Generate is FL's, in its strip's top bar)
+        return tool == NoteTool::randomise || tool == NoteTool::humanize || tool == NoteTool::riffMachine;
     }
 
     // --- controls ------------------------------------------------------------------------------
@@ -450,6 +479,81 @@ private:
         preview();
     }
 
+    // FL's Piano roll arpeggiator tool (round 190jv, coverage prtools-0003; core/FlArpeggiator.h): its pattern from the
+    // user's FL install (Data/Patches/Scores/Arpeggiator, read only) and its options, after LYNX's own arpeggiator's
+    // four. "None" keeps LYNX's arpeggiator; a pattern runs FL's law with FL's controls (DFM TPRArpForm, FL's defaults).
+    static constexpr std::size_t flArpFirst = 4; // (the controls after Step, Gate, Direction, Octaves)
+    void addFlArpeggiator()
+    {
+        header (tr ("FL arpeggiator pattern"));
+        juce::StringArray patterns { tr ("None (the arpeggiator above)") };
+        patterns.addArray (scoreFolder ("Arpeggiator").names);
+        Control picker { Control::choice, tr ("Pattern"), 0, 0, 1, 0, {}, patterns };
+        // FL's preset list (round 190kd, FL 2026 shot f23-arp-presets): the folder's own patterns first (FL: "Default"
+        // at the top), then the patterns under a heading per folder ("1 note", "2 notes" … "Riff machine"), each by its
+        // own name. The item id is the pattern's index + 2 (applyFlArpeggiator reads the id, the list's order is FL's)
+        picker.fill = [] (juce::ComboBox& box) {
+            box.addItem (tr ("None (the arpeggiator above)"), 1);
+            const auto& names = scoreFolder ("Arpeggiator").names;
+            for (int i = 0; i < names.size(); ++i)
+                if (! names[i].containsChar ('/'))
+                    box.addItem (names[i], i + 2);
+            juce::String folder = "-";
+            for (int i = 0; i < names.size(); ++i)
+            {
+                const auto& name = names[i];
+                if (! name.containsChar ('/'))
+                    continue;
+                const auto here = name.upToLastOccurrenceOf ("/", false, false);
+                if (here != folder)
+                    box.addSectionHeading (here);
+                folder = here;
+                box.addItem (name.fromLastOccurrenceOf ("/", false, false), i + 2);
+            }
+        };
+        add (std::move (picker));
+        const juce::StringArray modes { tr ("Normal"), tr ("Flip"), tr ("Alternate") };
+        add ({ Control::choice, tr ("Pattern mode"), 0, 2, 1, 0, {}, modes });
+        add ({ Control::slider, tr ("Range (octaves)"), 1.0, 6.0, 1.0, 1.0, [] (double v) { return juce::String (juce::roundToInt (v)); } });
+        add ({ Control::choice, tr ("Range mode"), 0, 2, 1, 0, {}, modes });
+        add ({ Control::choice, tr ("Sync"), 0, 2, 1, 0, {}, { tr ("Time"), tr ("Block"), tr ("Chord") } });
+        add ({ Control::slider, tr ("Time mul"), 1.0, 7.0, 1.0, 4.0, [] (double v) {
+                  static const char* names[] = { "1/8", "1/4", "1/2", "1", "2", "3", "4" };
+                  return juce::String::charToString ((juce::juce_wchar) 0x00D7) + names[juce::jlimit (1, 7, juce::roundToInt (v)) - 1];
+              } });
+        add ({ Control::slider, tr ("Gate"), 0.0, 48.0, 1.0, 48.0, [] (double v) { return juce::String (juce::roundToInt (v * 100.0 / 48.0)) + "%"; } });
+        add ({ Control::toggle, tr ("Group notes"), 0, 1, 1, 0 });
+        addLevelStrengths();
+    }
+
+    bool applyFlArpeggiator (Pattern& p)
+    {
+        const auto first = flArpFirst + 1; // (after the header)
+        const auto* box = getCombo (first);
+        const auto pattern = (box != nullptr ? box->getSelectedId() : 1) - 2; // (the id: the list is in FL's order)
+        if (pattern < 0)
+            return false;
+        const auto score = scoreFolder ("Arpeggiator").load (pattern);
+        if (! score)
+        {
+            status = tr ("The pattern could not be read.");
+            return true;
+        }
+        flarp::Options f;
+        f.patternMode = (flarp::Mode) juce::jlimit (0, 2, intValue (first + 1));
+        f.range = juce::jlimit (1, 6, intValue (first + 2));
+        f.rangeMode = (flarp::Mode) juce::jlimit (0, 2, intValue (first + 3));
+        f.sync = (flarp::Sync) juce::jlimit (0, 2, intValue (first + 4));
+        f.timeMul = juce::jlimit (1, 7, intValue (first + 5));
+        f.gate = juce::jlimit (0, 48, intValue (first + 6));
+        f.groupNotes = on (first + 7);
+        const auto s = levelStrengths (first + 9); // (after the strengths' header)
+        const auto wheel = [] (float v) { return juce::jlimit (0, 128, juce::roundToInt (v * 128.0f)); };
+        f.strength = { wheel (s.pan), wheel (s.velocity), wheel (s.release), wheel (s.modX), wheel (s.modY), wheel (s.pitch) };
+        flarp::apply (p, indices, flarp::prepare (*score, f), f);
+        return true;
+    }
+
     juce::StringArray levelNames() const
     {
         juce::StringArray levels;
@@ -509,6 +613,7 @@ private:
                 add ({ Control::slider, tr ("Gate"), 0.05, 1.0, 0.01, 0.8, percent });
                 add ({ Control::choice, tr ("Direction"), 0, 3, 1, 0, {}, { tr ("Up"), tr ("Down"), tr ("Up and down"), tr ("Down and up") } });
                 add ({ Control::slider, tr ("Octaves"), 1.0, 4.0, 1.0, 1.0, [] (double v) { return juce::String (juce::roundToInt (v)); } });
+                addFlArpeggiator();
                 break;
             case NoteTool::flip:
             {
@@ -792,11 +897,204 @@ private:
                 add ({ Control::choice, tr ("Rhythm"), 0, 0, 1, 0, {}, rhythms });
                 add ({ Control::toggle, tr ("Bass note"), 0, 1, 1, 1 });
                 add ({ Control::toggle, tr ("Smooth voicing"), 0, 1, 1, 1 });
+                // FL's MidiLearnCheckBox (round 190kd, coverage prtools-0117): the selected chord is replaced by the next
+                // chord played on a MIDI controller (or the typing keyboard)
+                add ({ Control::toggle, tr ("Learn from MIDI input"), 0, 1, 1, 0 });
+                {
+                    // (FL keeps it in the learn button's menu, off by default)
+                    Control next { Control::toggle, tr ("Auto learn next chord"), 0, 1, 1, 0 };
+                    next.indent = 16;
+                    add (std::move (next));
+                }
+                // the strip follows the options (FL: Key tab, Count, Length with Rescale, Octave with Transpose)
+                controls[0].onChange = [this] { applyKeyFromControls(); };
+                controls[1].onChange = [this] { applyKeyFromControls(); };
+                {
+                    auto presetChange = controls[preset].onChange;
+                    controls[preset].onChange = [this, presetChange] {
+                        if (presetChange)
+                            presetChange();
+                        stripFromText();
+                    };
+                }
+                controls[3].onChange = [this] {
+                    setValue (2, 0);
+                    stripFromText();
+                };
+                controls[4].onChange = [this] {
+                    chordstrip::setCount (chordState.strip, intValue (4), chordLength(), chordGenOptions());
+                    syncChordText();
+                };
+                controls[5].onChange = [this] { chordState.adventure = (float) value (5); };
+                controls[6].onChange = [this] {
+                    for (auto& b : chordState.strip.blocks)
+                        b.length = chordLength();
+                };
+                controls[7].onChange = [this] {
+                    chordState.octave = intValue (7);
+                    chordstrip::voiceLead (chordState.strip, chordState.octave, chordState.smooth);
+                };
+                controls[10].onChange = [this] {
+                    chordState.smooth = on (10);
+                    chordstrip::voiceLead (chordState.strip, chordState.octave, chordState.smooth, true);
+                };
+                controls[11].onChange = [this] {
+                    if (stripView != nullptr && stripView->setLearning (on (11)) != on (11))
+                        setValue (11, 0);
+                };
+                controls[12].onChange = [this] { chordState.autoLearnNext = on (12); };
                 break;
             }
         }
     }
 
+    // --- FL's chord tool (round 190kd) -------------------------------------------------------------
+
+    std::int64_t chordLength() const
+    {
+        static const std::int64_t lengths[] = { 1, 2, 4, 8 };
+        const auto l = juce::jlimit (0, 3, intValue (6));
+        return l < 2 ? (std::int64_t) ppq * lengths[l] : meter.bar() * (l == 2 ? 1 : 2);
+    }
+
+    chordstrip::GenerateOptions chordGenOptions() const
+    {
+        chordstrip::GenerateOptions o;
+        o.mode = chordState.mode;
+        o.adventure = chordState.adventure;
+        o.seed = chordState.seed;
+        o.octave = chordState.octave;
+        o.smoothVoicing = chordState.smooth;
+        o.accompany = chordState.nonChord != chordstrip::NonChord::replaceAll;
+        return o;
+    }
+
+    void initChordTool()
+    {
+        chordState.octave = intValue (7);
+        chordState.adventure = (float) value (5);
+        chordState.smooth = on (10);
+
+        // the notes the tool found (the selection, or the channel's notes): Analyze reads them, from the progression's start
+        const auto start = generatorStart();
+        for (auto i : indices)
+            if (i >= 0 && i < (int) originals.size())
+            {
+                auto n = originals[(std::size_t) i];
+                n.start -= start;
+                existingNotes.push_back (n);
+            }
+        chordState.analyzeAvailable = ! existingNotes.empty();
+        chordState.opening = existingNotes;
+
+        // with notes, the key is guessed from them (FL opens on the key it analyses; LYNX: its Automatic guess,
+        // core/ScaleDetect.h, the minor read as the natural minor)
+        if (const auto key = chordstrip::guessKey (existingNotes))
+        {
+            setValue (0, key->tonic);
+            setValue (1, key->minor ? 1 : 0);
+        }
+
+        // FL opens on a progression of its own: the blocks of the first preset's length and count, then Generate
+        // (Rework, following the notes found)
+        stripFromText();
+        chordstrip::generate (chordState.strip, existingNotes, chordGenOptions());
+        setText (3, juce::String::fromUTF8 (chordstrip::toText (chordState.strip).c_str()));
+        setValue (2, 0);
+
+        stripView = std::make_unique<ChordStripView> (engine, chordState, channel);
+        stripView->onChanged = [this] {
+            syncChordText();
+            preview();
+        };
+        stripView->onGenerate = [this] { generateChords(); };
+        stripView->onKeyChanged = [this] {
+            setValue (0, chordState.strip.tonic);
+            setValue (1, chordState.strip.minor ? 1 : 0);
+        };
+        stripView->bassOn = [this] { return on (9); };
+        stripView->setBassOn = [this] (bool yes) { setValue (9, yes ? 1 : 0); };
+        stripView->onLearnToggled = [this] (bool yes) { setValue (11, yes ? 1 : 0); };
+        stripView->onMessage = [this] (const juce::String& text) {
+            status = text;
+            updateInfo();
+            status.clear();
+        };
+        stripView->onSnapExisting = [this] (int block) {
+            chordState.snapBlocks.insert (block);
+            preview();
+        };
+        addAndMakeVisible (*stripView);
+    }
+
+    void applyKeyFromControls()
+    {
+        // the chords move with the key; a major / minor switch keeps them (FL's key tab › Edit)
+        const auto tonic = intValue (0);
+        const auto delta = tonic - chordState.strip.tonic;
+        for (auto& b : chordState.strip.blocks)
+        {
+            b.chord.root = chordstrip::pc (b.chord.root + delta);
+            if (b.chord.bass >= 0)
+                b.chord.bass = chordstrip::pc (b.chord.bass + delta);
+            if (b.fixedBass >= 0)
+                b.fixedBass = chordstrip::pc (b.fixedBass + delta);
+        }
+        chordState.strip.tonic = chordstrip::pc (tonic);
+        chordState.strip.minor = intValue (1) == 1;
+        if (stripView != nullptr)
+            stripView->repaint();
+    }
+
+    // the typed progression (or a preset) becomes the blocks (FL's "Type a progression" + Accept)
+    void stripFromText()
+    {
+        const auto chords = chordstrip::parseText (textValue (3).toStdString(), intValue (0), intValue (1) == 1);
+        if (! chords)
+            return;
+        chordState.strip = chordstrip::fromChords (*chords, intValue (0), intValue (1) == 1, chordLength(), chordState.octave, chordState.smooth);
+        chordState.selected.clear();
+        chordState.snapBlocks.clear();
+        {
+            const juce::ScopedValueSetter<bool> quiet (updating, true);
+            setValue (4, (double) chords->size());
+        }
+        if (stripView != nullptr)
+            stripView->repaint();
+    }
+
+    // the progression field shows the blocks (FL's "Get current progression")
+    void syncChordText()
+    {
+        setText (3, juce::String::fromUTF8 (chordstrip::toText (chordState.strip).c_str()));
+        setValue (2, 0);
+        setValue (4, (double) chordState.strip.blocks.size());
+        if (stripView != nullptr)
+            stripView->repaint();
+    }
+
+    // FL's Generate: the chosen mode on every unlocked block
+    void generateChords()
+    {
+        ++chordState.seed;
+        ++seed;
+        chordState.adventure = (float) value (5);
+        chordstrip::generate (chordState.strip, existingNotes, chordGenOptions());
+        setValue (0, chordState.strip.tonic);
+        setValue (1, chordState.strip.minor ? 1 : 0);
+        chordState.snapBlocks.clear();
+        syncChordText();
+        preview();
+    }
+
+public:
+    // (round 190kd: tests and the --prchord190kd shot)
+    ChordToolState* chordStateForTests() noexcept { return stripView != nullptr ? &chordState : nullptr; }
+    ChordStripView* chordViewForTests() noexcept { return stripView.get(); }
+    void chordGenerateForTests() { generateChords(); }
+    void chordChangedForTests() { syncChordText(); preview(); }
+
+private:
     // --- applying ------------------------------------------------------------------------------
 
     std::optional<prtools::Score> chosenScore (const juce::String& folder, int choice, const prtools::Score& builtIn) const
@@ -851,6 +1149,8 @@ private:
             case NoteTool::arpeggiate:
             {
                 static const std::int64_t stepTicks[] = { ppq, ppq / 2, ppq / 3, ppq / 4, ppq / 6, ppq / 8 };
+                if (applyFlArpeggiator (p)) // (round 190jv: an FL pattern chosen: FL's arpeggiator tool instead)
+                    break;
                 ArpeggiateOptions o;
                 o.step = stepTicks[juce::jlimit (0, 5, intValue (0))];
                 o.gate = (float) value (1);
@@ -1059,37 +1359,30 @@ private:
             }
             case NoteTool::chordProgression:
             {
-                const auto tonic = intValue (0);
-                const auto minor = intValue (1) == 1;
-                const auto chords = prtools::parseProgression (textValue (3).toStdString(), tonic, minor);
-
-                if (! chords)
+                // FL's chord tool (round 190kd): the strip of chord blocks is the progression; the Piano roll's notes
+                // that were there are treated as the spanner's "Non chord notes" says (core/ChordStrip.h)
+                if (chordState.strip.blocks.empty())
                 {
                     status = tr ("Type chords as Roman numerals, e.g. I-V-vi-IV or ii7 V7 Imaj7.");
                     break;
                 }
-
-                // remove the notes it replaces, then write the chords
-                auto valid = indices;
-                std::sort (valid.begin(), valid.end());
-                for (auto it = valid.rbegin(); it != valid.rend(); ++it)
-                    if (*it >= 0 && *it < (int) p.notes.size())
-                        p.notes.erase (p.notes.begin() + *it);
-
-                static const std::int64_t lengths[] = { 1, 2, 4, 8 };
-                prtools::ChordWriteOptions o;
-                o.chordLength = intValue (6) < 2 ? (std::int64_t) ppq * lengths[intValue (6)] : meter.bar() * (intValue (6) == 2 ? 1 : 2);
-                o.octave = intValue (7);
+                chordstrip::WriteOptions w;
+                w.channel = channel;
+                w.start = generatorStart();
+                w.octave = intValue (7);
+                w.main = chordState.main;
+                w.bass = on (9);
+                w.nonChord = chordState.nonChord;
+                w.snapBlocks.assign (chordState.snapBlocks.begin(), chordState.snapBlocks.end());
+                w.seed = chordState.seed;
                 const auto r = intValue (8) - 1;
                 if (r >= 0 && r < (int) rhythmPresets().size())
-                    o.rhythm = rhythmPresets()[(std::size_t) r].cells;
-                o.bassNote = on (9);
-                o.voiceLead = on (10);
-                prtools::writeProgression (p, channel, generatorStart(), *chords, o);
+                    w.rhythm = rhythmPresets()[(std::size_t) r].cells;
+                chordstrip::write (p, indices, chordState.strip, w);
 
                 juce::StringArray names;
-                for (const auto& c : *chords)
-                    names.add (prtools::chordName (c));
+                for (const auto& b : chordState.strip.blocks)
+                    names.add (juce::String::fromUTF8 (chordstrip::blockName (chordState.strip, b, false).c_str()));
                 chordNames = tr ("Chords") + ": " + names.joinIntoString ("  ");
                 break;
             }
@@ -1119,12 +1412,6 @@ private:
             dice.flipTime = r.nextBool();
             dice.articulation = r.nextInt (3);
         }
-        else if (tool == NoteTool::chordProgression)
-        {
-            const auto chords = prtools::generateProgression (intValue (0), intValue (1) == 1, intValue (4), (float) value (5), seed);
-            setText (3, juce::String::fromUTF8 (prtools::toNumerals (chords, intValue (0)).c_str()));
-            setValue (2, 0);
-        }
 
         preview();
     }
@@ -1135,7 +1422,10 @@ private:
     {
         juce::String text;
 
-        if (noteToolGenerates (tool))
+        if (tool == NoteTool::chordProgression && ! indices.empty()) // (round 190kd: FL's Non chord notes decide)
+            text = tr ("{0} notes found in the Piano roll: the spanner's Non chord notes says what happens to them. Accept keeps the result as one undo step.",
+                       { juce::String ((int) indices.size()) });
+        else if (noteToolGenerates (tool))
             text = indices.empty() ? tr ("Writes new notes on the selected channel. Accept keeps them as one undo step.")
                                    : tr ("Replaces {0} notes of the selected channel. Accept keeps the result as one undo step.",
                                          { juce::String ((int) indices.size()) });
@@ -1230,6 +1520,10 @@ private:
     bool accepted = false, updating = false;
     std::size_t levelsAt = 0;
     juce::String status, chordNames;
+    // FL's chord tool (round 190kd): its state and the strip of chord blocks
+    ChordToolState chordState;
+    std::unique_ptr<ChordStripView> stripView;
+    std::vector<Note> existingNotes; // the notes the tool found, from the progression's start
     mutable std::map<juce::String, prtools::Score> scoreCache;
 
     struct Dice // the riff machine's hidden choices, changed by "Throw dice"
@@ -1281,6 +1575,30 @@ bool noteToolGenerates (NoteTool tool) noexcept
 std::unique_ptr<juce::Component> makeNoteToolPanel (AudioEngine& engine, NoteTool tool, std::vector<int> indices, std::int64_t grid)
 {
     return std::make_unique<NoteToolPanel> (engine, tool, std::move (indices), grid);
+}
+
+bool noteToolChooseForSnapshot (juce::Component& panel, const juce::String& control, const juce::String& item)
+{
+    auto* tool = dynamic_cast<NoteToolPanel*> (&panel);
+    return tool != nullptr && tool->chooseForSnapshot (control, item);
+}
+
+ChordToolState* noteToolChordStateForSnapshot (juce::Component& panel)
+{
+    auto* tool = dynamic_cast<NoteToolPanel*> (&panel);
+    return tool != nullptr ? tool->chordStateForTests() : nullptr;
+}
+
+ChordStripView* noteToolChordViewForSnapshot (juce::Component& panel)
+{
+    auto* tool = dynamic_cast<NoteToolPanel*> (&panel);
+    return tool != nullptr ? tool->chordViewForTests() : nullptr;
+}
+
+void noteToolChordGenerateForSnapshot (juce::Component& panel)
+{
+    if (auto* tool = dynamic_cast<NoteToolPanel*> (&panel))
+        tool->chordGenerateForTests();
 }
 
 juce::PopupMenu noteToolPresetMenuForSnapshot (juce::Component& panel)

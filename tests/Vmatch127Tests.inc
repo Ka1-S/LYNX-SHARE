@@ -205,13 +205,12 @@ TEST (waves_cla76_translates_onto_crest_round127)
         return;
     int n = 0;
     const auto s = makeSubstituteSlot (*e, &id, &n);
-    CHECK (n == 11 && c::styleOf (s.params[c::style]) == c::Style::bus);
-    // round 148 refit on the full (unmuted) trial: −55.4 dB, 2.8:1, knee 24.8, range 31.5, attack 1.56 ms, release 2.5 s
-    CHECK (std::abs (c::thresholdDb (s.params[c::threshold]) + 55.4) < 0.05 && std::abs (c::ratioOf (s.params[c::ratio]) - 2.8) < 0.1);
-    CHECK (std::abs (c::rangeDb (s.params[c::range]) - 31.5) < 0.05 && std::abs (c::trimDb (s.params[c::output]) - 31.5) < 0.05);
-    CHECK (std::abs (c::attackMs (s.params[c::attack]) - 1.56) < 0.05 && std::abs (c::releaseMs (s.params[c::release]) - 2500.0) < 30.0);
-    CHECK (std::abs (s.mix - 0.413f) < 1e-5f && s.params[c::mix] == 1.0f && s.params[c::autoGain] == 0.0f);
-    // its static curve (wet path): the range's ceiling at full scale, (almost) nothing far below the soft knee
+    CHECK (n == 13 && c::styleOf (s.params[c::style]) == c::Style::bus);
+    // round 190ky: on Crest's FET law (her list leaves the revision at 0 = Bluey: voice 9, all buttons); the old
+    // fit around her state (rounds 127 / 148) is replaced by the law fitted on the demo-mode probes
+    CHECK (s.params[c::fetLaw] == c::fetLawValue (9) && s.params[c::busLaw] == 0.0f);
+    CHECK (s.mix == 1.0f && s.params[c::mix] > 0.413f && s.params[c::mix] < 1.0f && s.params[c::autoGain] == 0.0f);
+    // its static curve (wet path): (almost) nothing far below the knee, the range's ceiling at most
     CHECK (c::staticGainDb (s.params, -90.0) > -1.0);
-    CHECK (c::staticGainDb (s.params, 0.0) >= -31.6 && c::staticGainDb (s.params, 0.0) <= -31.0);
+    CHECK (c::staticGainDb (s.params, 0.0) >= -40.01 && c::staticGainDb (s.params, 0.0) < -3.0);
 }

@@ -141,8 +141,8 @@ TEST (flm190de_instrument_wrapper_and_parameter_lanes)
     CHECK (report.partialEffects.count ("FL Studio Mobile: instrument Enable automation (the channel's volume on or off)") == 1);
     // (round 190dw: the aftertouch lane reaches no FLM module, so there is nothing to import)
     CHECK (report.converted.count ("FL Studio Mobile: Aftertouch automation (no FL Studio Mobile instrument responds to it)") == 1
-           && report.unsupported.count ("FL Studio Mobile: Pitch Bend/Aftertouch automation (not imported)") == 0);
-    CHECK (report.unsupported.count ("FL Studio Mobile: automation of module parameters (not imported yet)") == 0);
+           && report.notReproduced.count ("FL Studio Mobile: Pitch Bend/Aftertouch automation (not imported)") == 0);
+    CHECK (report.notReproduced.count ("FL Studio Mobile: automation of module parameters (not imported yet)") == 0);
     // rows: the cutoff and enable lanes on the Saw, one row per bent child
     int rows = 0;
     for (const auto& r : s->playlistTracks)
@@ -512,8 +512,8 @@ TEST (flm190de_pitchers_become_lynx_tune)
     CHECK (b[lt::noteC] == 1.0f && b[lt::noteC + 2] == 1.0f && b[lt::noteC + 3] == 1.0f && b[lt::noteC + 4] == 0.0f && b[lt::noteC + 10] == 1.0f
            && b[lt::noteC + 11] == 0.0f);
     CHECK (b[lt::formantPreserve] == 1.0f && std::abs (b[lt::toleranceCents] - 0.55f) < 1e-6f && b[lt::mix] == 1.0f);
-    // Speed 0.25: fc = (200^0.25 − 0.9)·2.29896 = 6.576 Hz → 5.30 / (2π fc) = 128.3 ms
-    CHECK (std::abs (b[lt::retune] - 0.5663f) < 2e-3f);
+    // Speed 0.25: fc = (200^0.25 − 0.9)·2.29896 = 6.576 Hz → (round 190jv, FL's renders: the 90 % time) 2.31 / (2π fc) = 55.9 ms
+    CHECK (std::abs (b[lt::retune] - 0.3738f) < 2e-3f);
     CHECK (report.converted.count ("FL Studio Mobile: Pitcher (LYNX Tune)") == 1 && report.converted.count ("FL Studio Mobile: Pitcher 2 (LYNX Tune)") == 1
            && report.droppedEffects.empty());
 }

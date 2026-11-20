@@ -1,4 +1,5 @@
 #include "core/SampleSimilarity.h"
+#include "platform/CvWait.h"
 
 #include <algorithm>
 #include <chrono>
@@ -675,7 +676,7 @@ bool Service::idleLocked() const
 bool Service::waitIdle (int timeoutMs)
 {
     std::unique_lock<std::mutex> hold (lock);
-    return idleWake.wait_for (hold, std::chrono::milliseconds (timeoutMs), [this] { return idleLocked(); });
+    return cvwait::waitFor (idleWake, hold, std::chrono::milliseconds (timeoutMs), [this] { return idleLocked(); }); // (round 190la: platform/CvWait.h)
 }
 
 void Service::setStatus (const std::function<void (Status&)>& change, bool notify)
@@ -699,7 +700,7 @@ void Service::rest (double workedSeconds)
     if (! callbacks.throttle)
         return;
     std::unique_lock<std::mutex> hold (lock);
-    wake.wait_for (hold, std::chrono::duration<double> (std::clamp (workedSeconds, 0.002, 0.5)), [this] { return stopping; });
+    cvwait::waitFor (wake, hold, std::chrono::duration<double> (std::clamp (workedSeconds, 0.002, 0.5)), [this] { return stopping; }); // (round 190la: platform/CvWait.h)
 }
 
 void Service::loadIndex()
@@ -830,7 +831,7 @@ bool Service::runPass (std::vector<std::string>& folders)
             {
                 setStatus ([] (Status& s) { s.paused = true; }, false);
                 std::unique_lock<std::mutex> hold (lock);
-                if (wake.wait_for (hold, std::chrono::milliseconds (250), [this] { return stopping; }))
+                if (cvwait::waitFor (wake, hold, std::chrono::milliseconds (250), [this] { return stopping; })) // (round 190la: platform/CvWait.h)
                     break;
             }
             // a query is served first: the pass goes on once it is answered (the answer has its own thread)

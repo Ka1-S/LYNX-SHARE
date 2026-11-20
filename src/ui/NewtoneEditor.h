@@ -31,4 +31,11 @@ void openSampleInMasterEditor (AudioEngine& engine, EffectKind kind, const std::
 
 // The editor alone (snapshots, tests)
 std::unique_ptr<juce::Component> makeNewtoneEditor (AudioEngine& engine, int track, int slot);
+// Round 190kj (--newtoneshot): put an editor made above in a state for a picture: "select:k,k...", "advanced", "cut",
+// "timesel:a,b" (output samples), "zoom:z", "lynxlook" (the round-165g layout, for the paint before / after); and the
+// average time of `paints` full paints in ms
+void setNewtoneShotState (juce::Component& editor, const juce::String& state);
+double newtonePaintMs (juce::Component& editor, int paints);
+// Round 190li (--newtoneshot190li): the editor's Edit menu, for a picture
+juce::PopupMenu newtoneEditMenuForSnapshot (juce::Component& editor);
 } // namespace lynx

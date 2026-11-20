@@ -729,7 +729,8 @@ inline void knob (juce::Graphics& g, Rectangle<float> area, const KnobLook& k)
     const auto hover = juce::jlimit (0.0f, 1.0f, k.active ? 1.0f : k.hover);
     const auto from = k.bipolar ? arcStart + arcRange * 0.5f : arcStart;
     const auto to = arcStart + arcRange * value;
-    const auto lit = k.enabled ? (k.active ? p.accent.brighter (0.25f) : p.accent) : theme::colour::textDisabled;
+    const auto litBase = k.ring.getAlpha() > 0 ? k.ring : p.accent; // round 190ld: a knob's own ring colour (Delay 3's warning)
+    const auto lit = k.enabled ? (k.active ? litBase.brighter (0.25f) : litBase) : theme::colour::textDisabled;
     const auto lit2 = k.enabled ? p.accent2 : theme::colour::textDisabled;
     const Point<float> dir { std::sin (to), -std::cos (to) };
 
@@ -905,7 +906,7 @@ inline void knob (juce::Graphics& g, Rectangle<float> area, const KnobLook& k)
     {
         g.setColour (p.track.withAlpha (k.enabled ? 1.0f : 0.6f));
         g.strokePath (arc (c, r, arcStart, arcStart + arcRange), juce::PathStrokeType (t, juce::PathStrokeType::curved, th0.buttTrack ? juce::PathStrokeType::butt : juce::PathStrokeType::rounded));
-        if (std::abs (to - from) > 0.002f)
+        if (std::abs (to - from) > 0.002f && ! k.noArc)
         {
             const auto v = arc (c, r, from, to);
             if (fx && k.enabled && th0.arcGlow > 0.0f)
@@ -1556,10 +1557,25 @@ juce::String artSelfTest()
             const StyleScope scope (st);
             titleText (g, { 66.0f, 0.0f, 400.0f, 26.0f }, "Fruity Blood Overdrive", juce::Colours::red);
             expect (lastTitleFit().lines == 1 && ! lastTitleFit().clipped && lastTitleFit().size >= 12.0f, "a wide box keeps the one-line name");
-            // the narrowest box the name may get (titleMinWidth): too narrow for one line at the smallest size in any style
-            titleText (g, { 66.0f, 0.0f, titleMinWidth ("Fruity Blood Overdrive", 26.0f), 26.0f }, "Fruity Blood Overdrive", juce::Colours::red);
-            const auto f = lastTitleFit();
-            if (f.lines != 2 || f.clipped)
+            // the narrowest box the name may get (titleMinWidth) shows it whole. Round 190in (design190ia FW-10): the
+            // Hardware badge has one form, one line; the other styles put "Fruity" above the name in a box too narrow
+            // for one line
+            const auto widest = titleMinWidth ("Fruity Blood Overdrive", 26.0f);
+            titleText (g, { 66.0f, 0.0f, widest, 26.0f }, "Fruity Blood Overdrive", juce::Colours::red);
+            auto f = lastTitleFit();
+            auto ok = ! f.clipped && (st == Style::hardware ? f.lines == 1 : true);
+            auto split = false;
+            for (auto w = widest; w > 40.0f && st != Style::hardware; w -= 2.0f)
+            {
+                titleText (g, { 66.0f, 0.0f, w, 26.0f }, "Fruity Blood Overdrive", juce::Colours::red);
+                if (lastTitleFit().lines == 2 && ! lastTitleFit().clipped)
+                {
+                    split = true;
+                    break;
+                }
+            }
+            ok = ok && (st == Style::hardware || split);
+            if (! ok)
                 errors.add ("a narrow box puts Fruity above the name (" + juce::String (styleName (st)) + ": lines " + juce::String (f.lines) + ", size "
                             + juce::String (f.size, 1) + ", need " + juce::String (f.need, 1) + ")");
         }

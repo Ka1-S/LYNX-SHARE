@@ -60,6 +60,41 @@ void setEffectMidiInPort (EffectSlot& slot, int port) noexcept; // −1…255
 // How many of a slot's parameters a project / preset saves (issue #67): the named ones plus any hidden ones after them
 // that hold a value (the Parametric EQ's FL law, processing, band mask and FL's own values: ParametricEqFl.h [36…47]).
 std::size_t savedEffectParamCount (const EffectSlot& slot) noexcept;
+// Round 190le: the hidden parameters (after the named ones, saved only while they hold a value) that have a control on
+// the effect's own panel, by the name the layout gives them (Ridge Strip's "32C voicing"); −1 / nullptr = none
+int hiddenEffectParamIndex (EffectKind kind, const char* name) noexcept;
+const char* hiddenEffectParamName (EffectKind kind, int index) noexcept;
+// round 190mg: Compressor's hidden law (after its named parameters; saved only while non-zero): 1 = the vintage voicing's
+// Renaissance law (core/VoiceMatch.h progcomp::Renaissance), set only by the Renaissance Compressor translator
+constexpr int compressorRenLaw = 20;
+// round 190mm (sub-round dyn): the one-knob vocal compressor's law (core/RenDynamics.h rendyn::Vox; 1 = on, set only by
+// the Renaissance Vox translator) and its own values, hidden and saved while non-zero: the gate (0 = off, else −80 … 0 dB),
+// the gate's release (10 … 250 ms) and the output gain (0 … −36 dB); its threshold knob is Threshold [0]
+constexpr int compressorVoxLaw = 21, compressorVoxGate = 22, compressorVoxGateRelease = 23, compressorVoxGain = 24;
+// round 190mm (sub-round dyn): the VCA bus compressor law (core/BusComp2500.h; set only by the Waves API-2500 translator)
+// and its values, hidden and saved while non-zero: on (1), threshold (10 − dB) / 30 (+10 … −20), ratio step / 6 (1.5, 2,
+// 3, 4, 6, 10, ∞), attack step / 6 (0.03 … 30 ms), release step / 6 (0.05 … 2 s, 6 = variable), the variable release
+// (s − 0.05) / 2.95, knee (2 − step) / 2 (Hard 0, Med, Soft), thrust step / 2, type (1 = feedback), manual make-up (1),
+// make-up (dB + 24) / 48, dry share (1 − mix), trim (dB + 18) / 36
+enum CompressorApi { compressorApiLaw = 25, compressorApiThreshold, compressorApiRatio, compressorApiAttack, compressorApiRelease,
+                     compressorApiVar, compressorApiKnee, compressorApiThrust, compressorApiFeedback, compressorApiManual,
+                     compressorApiMakeup, compressorApiDry, compressorApiTrim, compressorApiEnd };
+// round 190mm: the Renaissance Channel's EQ around the Renaissance law (hidden like the above; 0 = off: every other
+// Compressor). [48] on, [49] routing (0 = EQ before the dynamics, 1 = after), [50 + 4 k …] band k = 0 … 3: its Facet
+// Waves design code (facet::WaveCode, k / 64), frequency / gain / Q as Facet's normalized values (facet::hzValue …).
+// The bands are digitised by Facet EQ's Waves design law (core/FacetEq.h), so they null against the Renaissance EQ's.
+// round 190mt: the Renaissance Channel's "RVox" compressor type on the Renaissance law (hidden like the above; 1 = on, set
+// only by the RChannel translator; 0 = every other Compressor): the vocal compressor's curve, ratio ignored
+constexpr int compressorRVoxType = 38;
+// round 190mt: the Renaissance Channel's gate before the Renaissance law (hidden like the above; [39] 1 = on, set only by
+// the RChannel translator): [40] threshold (dB + 90) / 108, [41] floor (dB + 90) / 90, [42] release ln (ms / 10) / ln 500,
+// [43] 1 = gate (0 = a 1:2 expander). [EXEC] its detector holds the last loud level (falling with max (0.14 s, release)),
+// its gain falls to the floor with the release as time constant and opens within a millisecond
+enum CompressorRchGate { compressorRchGate = 39, compressorRchGateThreshold, compressorRchGateFloor, compressorRchGateRelease,
+                         compressorRchGateMode };
+constexpr int compressorChannelLaw = 48;
+constexpr int compressorChannelRouting = 49;
+constexpr int compressorChannelBand0 = 50; // + 4 k: code, hz, gain, Q
 // A parameter value as written to a file: rounded to 4 decimals when that reads back as the same float, else the
 // shortest decimal that does (FL's raw values, e.g. a frequency of raw/65536, survive a save and reload bit for bit)
 double savedEffectParamValue (float v) noexcept;
@@ -69,6 +104,8 @@ double savedEffectParamValue (float v) noexcept;
 // For shelves the "Q" is the cookbook shelf slope S (1 = default).
 // Slots imported from FL's Parametric EQ 2 / Parametric EQ run FL's exact engine instead and give some of these
 // parameters FL's own meaning (core/ParametricEqFl.h: width instead of Q, FL's order instead of the cut slope).
+class Effect; // (peq::setSoloBand, round 190ih)
+
 namespace peq
 {
 constexpr int bands = 7;
@@ -96,6 +133,14 @@ std::string widthText (const EffectParams& params, int band); // Q (LYNX) or ban
 
 // Response of the whole EQ (all bands and the output) in dB, for the editor graph.
 double responseDb (const EffectParams& params, double sampleRate, double hz);
+
+// Round 190ih (PLAN R9, DP-16; FL manual, Parametric EQ 2: "holding (Shift) and clicking the Band Tokens will
+// momentarily solo the Band"): while a band is soloed the running EQ's output passes through a band-pass at that
+// band's frequency and width, so only its region is heard. `band` -1 ends it. Any thread; `effect` must be a running
+// Parametric EQ (anything else is ignored). The band's width as a band-pass Q: LYNX's Q, or FL's bandwidth turned round.
+void setSoloBand (Effect* effect, int band) noexcept;
+int soloBand (const Effect* effect) noexcept; // -1 = none
+double soloQ (const EffectParams& params, int band) noexcept;
 } // namespace peq
 
 // Notes held on a Channel Rack channel: bit k of word k / 64 = MIDI key k
@@ -117,6 +162,9 @@ public:
     virtual void process (float* left, float* right, int n, const EffectParams& params, double bpm) noexcept = 0;
     // Automated plugin parameter (built-in effects receive their parameters in process()). 0..1.
     virtual void setParameter (int /*index*/, float /*value*/) noexcept {}
+    // Round 190jg: a change inside the next process() call (see Instrument::setParameterAt); hosted CLAP / VST3 only.
+    virtual bool takesTimedParameters() const noexcept { return false; }
+    virtual void setParameterAt (int /*index*/, float /*value*/, int /*offset*/) noexcept {}
     // A hosted plugin's parameter value now (0..1; −1 = unknown), for a Patcher parameter output (round 171b). Audio thread.
     virtual float parameterValue (int /*index*/) const noexcept { return -1.0f; }
     // Control output ("controller" effects such as the Peak Controller), 0..1. Read every block.
@@ -148,6 +196,12 @@ public:
     // The notes held on every Channel Rack channel (`count` masks, by channel index) during the next process(); the
     // pointer stays valid until the next call. Effects that follow notes (LYNX Tune's MIDI targets) keep it.
     virtual void setHeldNotes (const NoteMask* /*channels*/, int /*count*/) noexcept {}
+    // Round 190kz: true for an effect that can read those held notes (setHeldNotes) while it processes; it reads every
+    // channel's, so the renderer keeps such a slot's block piece by piece (RackRenderer::processBatched) — when its
+    // parameters are automated, or when followsHeldNotesWith says these settings read them
+    virtual bool followsHeldNotes() const noexcept { return false; }
+    // ... with these parameter values (the slot's own): does it read them? (default: whenever it can)
+    virtual bool followsHeldNotesWith (const EffectParams& /*params*/) const noexcept { return followsHeldNotes(); }
     // Round 190ee: a note reaching the effect through its MIDI input port (FL: a MIDI Out channel on the port the
     // effect listens to), before the process() that follows. `velocity` 1…127, 0 = note off; `midiChannel` 0…15.
     // Audio thread. Effects that take notes: Gross Beat (slot selection), Pitcher (MIDI mode / Harmonize).

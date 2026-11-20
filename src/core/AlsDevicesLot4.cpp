@@ -753,7 +753,14 @@ RoarShaperFit roarShaperFit (int type) noexcept
     }
 }
 
-double roarDriveDb (double amount) noexcept { return 36.0 * std::clamp (amount, 0.0, 1.0); }
+// Round qafix190kq (QA-1 of 0.1.30): the laws below are fitted to Live 12.4's renders of Roar (probe set
+// /mnt/e/lynx-work/qafix190kq/sets/roarprobe-a.als: music at -17 dB RMS and pink noise at -30 / -20 / -12 dB RMS through
+// Roar at single settings). They were assumed before (drive 0 … 36 dB, compression 4 : 1 from −36 dB × amount) and the
+// Main track of Live's Patience demo (Roar at 79 % compression) came out 11.6 dB quieter than Live's.
+double roarDriveDb (double amount) noexcept { return roarDrivePerUnitDb * std::clamp (amount, 0.0, 1.0); }
+
+double roarCompThresholdDb (double amount) noexcept { return roarCompThresholdAt0 + roarCompThresholdPerUnit * std::clamp (amount, 0.0, 1.0); }
+double roarCompRatio (double amount) noexcept { return 1.0 + roarCompRatioPerUnit * std::clamp (amount, 0.0, 1.0); }
 
 namespace
 {
@@ -835,7 +842,7 @@ int roarStage (RackBuilder& b, int chain, const Element& device, int k, double i
                 p[(std::size_t) em::characterParam (0)] = (float) fit.character / (float) em::characters;
             p[em::autoGain] = 0.0f;
             p[(std::size_t) em::law] = 0.0f; // (rollup 0.1.28, 190fm x 190fj: the shaper fits are on the Classic curves, as Saturator's)
-            p[em::drive] = linValue (roarDriveDb (amount), 0.0, 36.0);
+            p[em::drive] = linValue (roarDriveDb (amount), 0.0, 36.0); // (round qafix190kq: Live's measured drive law)
             p[em::inputGain] = linValue (inputDb, -24.0, 24.0);
             p[em::output] = linValue (trimDb, -18.0, 18.0);
             p[em::mix] = 1.0f;
@@ -993,37 +1000,42 @@ bool roarToRack (const Element& device, Translated& out)
             out.links.push_back ({ "Stage" + std::to_string (k + 1) + "_Shaper_Amount", rrDrive1 + k, [] (double v) { return unit (v); } });
         }
 
-    // the output: compression [ASSUMED: Crest Clean, 4 : 1, threshold −36 dB × amount, 10 / 100 ms], then the gain
+    // the output: compression (round qafix190kq: [MEASURED] Live's Roar compresses gently — 79 % takes ~4.4 dB off pink
+    // noise at −12 dB RMS and nothing at −30 dB — fitted as Crest Clean with a 6 dB knee, roarCompAttackMs /
+    // roarCompReleaseMs, threshold and ratio by roarCompThresholdDb / roarCompRatio), then the gain
     const auto comp = std::clamp (manual (device, "Output_CompressionAmount", 0.0), 0.0, 1.0);
     if (comp > 1.0e-3)
     {
         auto c = makeEffectSlot (EffectKind::crestCompressor);
         auto& k = c.params;
+        k[cr::revision] = 0.0f; // round 190kw: this map was measured on the fitted laws (revision 0)
         k[cr::style] = cr::styleValue (cr::Style::clean);
-        k[cr::threshold] = linValue (-36.0 * comp, -60.0, 0.0);
-        k[cr::ratio] = cr::ratioValue (4.0);
+        k[cr::threshold] = linValue (roarCompThresholdDb (comp), -60.0, 0.0);
+        k[cr::ratio] = cr::ratioValue (roarCompRatio (comp));
         k[cr::knee] = linValue (6.0, 0.0, 72.0);
         k[cr::range] = 1.0f;
-        k[cr::attack] = cr::attackValue (10.0);
-        k[cr::release] = cr::releaseValue (100.0);
+        k[cr::attack] = cr::attackValue (roarCompAttackMs);
+        k[cr::release] = cr::releaseValue (roarCompReleaseMs);
         k[cr::autoRelease] = 0.0f;
         k[cr::lookahead] = 0.0f;
         k[cr::output] = linValue (0.0, -36.0, 36.0);
         k[cr::autoGain] = 0.0f;
         k[cr::mix] = 1.0f;
         b.add (0, std::move (c), "Compressor");
-        notes.approximated.push_back (text ("compression %.0f %% as Crest Compressor (4 : 1 from %.0f dB)", 100.0 * comp, -36.0 * comp));
+        notes.approximated.push_back (text ("compression %.0f %% as Crest Compressor (%.1f : 1 from %.0f dB)", 100.0 * comp, roarCompRatio (comp), roarCompThresholdDb (comp)));
         if (manualBool (device, "Output_CompressorHighpassFilterOn", true))
             notes.dropped.push_back ("the compressor's side-chain high pass");
     }
+    // (round qafix190kq: [MEASURED] Roar with every stage at 0 and no compression is +1.55 dB louder than its input,
+    // flat from 63 Hz to 8 kHz — on the output's gain)
     const auto outDb = dbOfGain (manual (device, "Output_OutputGain", 1.0));
+    const auto wetDb = outDb + roarNeutralDb;
     int outNode = -1;
-    if (std::abs (outDb) > 0.05 || macroOn (device, "Output_OutputGain"))
     {
-        outNode = b.add (0, utilitySlot ({}, outDb), "Output");
-        if (outDb < -24.0 || outDb > 24.0)
-            notes.approximated.push_back (text ("output %.1f dB held at ±24 dB", outDb));
-        b.mapParam (rrOutput, outNode, 0, linValue (-48.0, -24.0, 24.0), linValue (12.0, -24.0, 24.0), (outDb + 48.0) / 60.0);
+        outNode = b.add (0, utilitySlot ({}, wetDb), "Output");
+        if (wetDb < -24.0 || wetDb > 24.0)
+            notes.approximated.push_back (text ("output %.1f dB held at ±24 dB", wetDb));
+        b.mapParam (rrOutput, outNode, 0, linValue (-48.0 + roarNeutralDb, -24.0, 24.0), linValue (12.0 + roarNeutralDb, -24.0, 24.0), (outDb + 48.0) / 60.0);
         b.macro (rrOutput, "Output", (outDb + 48.0) / 60.0);
         out.links.push_back ({ "Output_OutputGain", rrOutput, [] (double g) { return unit ((dbOfGain (g) + 48.0) / 60.0); } });
     }

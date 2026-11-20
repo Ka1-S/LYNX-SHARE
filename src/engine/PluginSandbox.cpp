@@ -20,6 +20,7 @@
 #include "core/PeArch.h"
 #include "engine/SandboxShared.h"
 #include "engine/SandboxWorker.h"
+#include "engine/TimedParameters.h"
 
 static_assert (lynx::PluginHost::maxBlockSize == 4096, "SandboxShared.h: SharedBlock::maxFrames");
 
@@ -27,14 +28,53 @@ namespace lynx
 {
 using namespace sandboxipc;
 
+SandboxMode pluginSandboxMode()
+{
+    // sandbox.txt: "1" (round 157: each plugin in its own process), "type", "vendor", "all" (round 190jg); else in LYNX's process
+    const auto text = PluginHost::settingsFolder().getChildFile ("sandbox.txt").loadFileAsString().trim();
+    return text == "1" ? SandboxMode::perPlugin : text == "vendor" ? SandboxMode::perVendor : text == "all" ? SandboxMode::allTogether
+           : text == "type" ? SandboxMode::perPluginType : SandboxMode::inProcess;
+}
+
+void setPluginSandboxMode (SandboxMode mode)
+{
+    PluginHost::settingsFolder().getChildFile ("sandbox.txt").replaceWithText (mode == SandboxMode::perPlugin ? "1"
+                                                                               : mode == SandboxMode::perVendor ? "vendor"
+                                                                               : mode == SandboxMode::allTogether ? "all"
+                                                                               : mode == SandboxMode::perPluginType ? "type"
+                                                                                                                   : "0");
+}
+
 bool pluginSandboxEnabled()
 {
-    return PluginHost::settingsFolder().getChildFile ("sandbox.txt").loadFileAsString().trim() == "1";
+    return pluginSandboxMode() != SandboxMode::inProcess;
 }
 
 void setPluginSandboxEnabled (bool enabled)
 {
-    PluginHost::settingsFolder().getChildFile ("sandbox.txt").replaceWithText (enabled ? "1" : "0");
+    setPluginSandboxMode (enabled ? SandboxMode::perPlugin : SandboxMode::inProcess);
+}
+
+juce::String sandboxGroupFor (const juce::PluginDescription& description, SandboxMode mode)
+{
+    switch (mode)
+    {
+        case SandboxMode::perVendor:
+        {
+            // the vendor as the plugin reports it; one without a vendor name: by its file's folder (a vendor's plugins
+            // usually share one), else on its own
+            auto vendor = description.manufacturerName.trim();
+            if (vendor.isEmpty() && juce::File::isAbsolutePath (description.fileOrIdentifier))
+                vendor = "folder:" + juce::File (description.fileOrIdentifier).getParentDirectory().getFullPathName();
+            return vendor.isEmpty() ? juce::String() : "vendor:" + vendor.toLowerCase();
+        }
+        case SandboxMode::allTogether: return "all";
+        case SandboxMode::perPluginType: // every instance of one plugin (its file and class)
+            return "plugin:" + description.pluginFormatName + "|" + description.fileOrIdentifier + "|" + juce::String (description.uniqueId);
+        case SandboxMode::inProcess:
+        case SandboxMode::perPlugin: break;
+    }
+    return {};
 }
 
 namespace
@@ -78,37 +118,41 @@ std::atomic<bool> showAlerts { true };
 constexpr int deathSlots = 16;
 struct DeathSlot
 {
-    char name[128] {};
-    bool crashed = false, bits32 = false;
+    char name[128] {}, group[64] {};
+    bool crashed = false, bits32 = false, alone = true;
 };
 std::array<DeathSlot, deathSlots> deathSlotsArray;
-std::atomic<int> deathCount { 0 };
+std::atomic<int> deathCount { 0 }, recorded { 0 };
 
-void recordDeath (const char* name, bool crashed, bool bits32) noexcept
+void recordDeath (const char* name, const char* group, bool crashed, bool bits32, bool alone) noexcept
 {
-    const auto n = deathCount.load (std::memory_order_relaxed);
+    const auto n = deathCount.fetch_add (1, std::memory_order_acq_rel); // (a group's plugins die together: one slot each)
     auto& slot = deathSlotsArray[(std::size_t) (n % deathSlots)];
     std::memcpy (slot.name, name, sizeof (slot.name));
     slot.name[sizeof (slot.name) - 1] = 0;
+    std::memcpy (slot.group, group, sizeof (slot.group));
+    slot.group[sizeof (slot.group) - 1] = 0;
     slot.crashed = crashed;
     slot.bits32 = bits32;
-    deathCount.store (n + 1, std::memory_order_release);
+    slot.alone = alone;
+    recorded.fetch_add (1, std::memory_order_acq_rel);
 }
 } // namespace
 
 int pluginSandboxDeathCount() noexcept
 {
-    return deathCount.load (std::memory_order_acquire);
+    // (the slots written completely; a group's plugins are recorded one after the other, by the thread that saw it die)
+    return recorded.load (std::memory_order_acquire);
 }
 
 std::vector<SandboxDeath> pluginSandboxDeaths()
 {
     std::vector<SandboxDeath> out;
-    const auto n = deathCount.load (std::memory_order_acquire);
+    const auto n = pluginSandboxDeathCount();
     for (int i = juce::jmax (0, n - deathSlots); i < n; ++i)
     {
         const auto& slot = deathSlotsArray[(std::size_t) (i % deathSlots)];
-        out.push_back ({ juce::String::fromUTF8 (slot.name), slot.crashed, slot.bits32 });
+        out.push_back ({ juce::String::fromUTF8 (slot.name), slot.crashed, slot.bits32, juce::String::fromUTF8 (slot.group), slot.alone });
     }
     return out;
 }
@@ -184,24 +228,145 @@ pearch::Arch moduleArch (const juce::String& path)
 }
 } // namespace
 
+namespace
+{
+// The answers by module path: the file's date when it was read and whether it is 32-bit. Kept in plugin-bits.txt
+// ("<0|1>\t<date ms>\t<path>" lines, issue #209) so a new run need not open the plugins' files again.
+struct BitsCache
+{
+    std::mutex lock;
+    std::map<juce::String, std::pair<juce::int64, bool>> entries;
+    bool loaded = false, dirty = false;
+    std::atomic<bool> refreshing { false };
+
+    static juce::File file() { return PluginHost::settingsFolder().getChildFile ("plugin-bits.txt"); }
+
+    void loadLocked()
+    {
+        if (loaded)
+            return;
+        loaded = true;
+        juce::StringArray lines;
+        lines.addLines (file().loadFileAsString());
+        for (const auto& line : lines)
+        {
+            const auto bits = line.upToFirstOccurrenceOf ("\t", false, false);
+            const auto rest = line.fromFirstOccurrenceOf ("\t", false, false);
+            const auto path = rest.fromFirstOccurrenceOf ("\t", false, false);
+            if ((bits == "0" || bits == "1") && path.isNotEmpty())
+                entries[path] = { rest.upToFirstOccurrenceOf ("\t", false, false).getLargeIntValue(), bits == "1" };
+        }
+    }
+
+    void saveLocked()
+    {
+        if (! dirty)
+            return;
+        dirty = false;
+        juce::String text;
+        for (const auto& [path, entry] : entries)
+            text << (entry.second ? "1" : "0") << "\t" << juce::String (entry.first) << "\t" << path << "\n";
+        file().replaceWithText (text);
+    }
+};
+
+BitsCache& bitsCache()
+{
+    static auto* cache = new BitsCache(); // (never destroyed: a background refresh may still run at exit)
+    return *cache;
+}
+
+juce::int64 moduleStamp (const juce::String& fileOrIdentifier)
+{
+    const juce::File f (juce::File::isAbsolutePath (fileOrIdentifier) ? fileOrIdentifier : juce::String());
+    return f.getFullPathName().isEmpty() ? 0 : f.getLastModificationTime().toMilliseconds();
+}
+
+bool hasModuleFile (const juce::PluginDescription& d)
+{
+    return d.pluginFormatName == "VST" || d.pluginFormatName == "VST3";
+}
+} // namespace
+
 bool isModule32Bit (const juce::String& fileOrIdentifier)
 {
     if (! bridge32Supported())
         return false;
     // cached by path and date: the plugin menus and the scan ask often, and the answer only changes with the file
-    static std::mutex lock;
-    static std::map<juce::String, std::pair<juce::int64, bool>> cache;
-    const juce::File f (juce::File::isAbsolutePath (fileOrIdentifier) ? fileOrIdentifier : juce::String());
-    const auto stamp = f.getFullPathName().isEmpty() ? 0 : f.getLastModificationTime().toMilliseconds();
+    auto& cache = bitsCache();
+    const auto stamp = moduleStamp (fileOrIdentifier);
     {
-        const std::scoped_lock l (lock);
-        if (const auto it = cache.find (fileOrIdentifier); it != cache.end() && it->second.first == stamp)
+        const std::scoped_lock l (cache.lock);
+        cache.loadLocked();
+        if (const auto it = cache.entries.find (fileOrIdentifier); it != cache.entries.end() && it->second.first == stamp)
             return it->second.second;
     }
     const auto is32 = moduleArch (fileOrIdentifier) == pearch::Arch::x86;
-    const std::scoped_lock l (lock);
-    cache[fileOrIdentifier] = { stamp, is32 };
+    const std::scoped_lock l (cache.lock);
+    cache.entries[fileOrIdentifier] = { stamp, is32 };
+    cache.dirty = true;
     return is32;
+}
+
+std::optional<bool> knownPlugin32Bit (const juce::PluginDescription& description)
+{
+    if (! bridge32Supported() || ! hasModuleFile (description))
+        return false;
+    auto& cache = bitsCache();
+    const std::scoped_lock l (cache.lock);
+    cache.loadLocked();
+    if (const auto it = cache.entries.find (description.fileOrIdentifier); it != cache.entries.end())
+        return it->second.second;
+    return std::nullopt;
+}
+
+void refreshPluginBitness (const juce::Array<juce::PluginDescription>& types, std::function<void()> changed)
+{
+    if (! bridge32Supported())
+        return;
+    auto& cache = bitsCache();
+    if (cache.refreshing.exchange (true))
+        return; // (one at a time: the running one answers the same plugins)
+    juce::StringArray paths;
+    for (const auto& t : types)
+        if (hasModuleFile (t))
+            paths.addIfNotAlreadyThere (t.fileOrIdentifier);
+    const auto launched = juce::Thread::launch (juce::Thread::Priority::low, [paths, changed = std::move (changed), &cache] {
+        bool any = false;
+        for (const auto& path : paths)
+        {
+            const auto stamp = moduleStamp (path); // (the date: no read of the file itself)
+            {
+                const std::scoped_lock l (cache.lock);
+                cache.loadLocked();
+                if (const auto it = cache.entries.find (path); it != cache.entries.end() && it->second.first == stamp)
+                    continue;
+            }
+            const auto is32 = moduleArch (path) == pearch::Arch::x86;
+            const std::scoped_lock l (cache.lock);
+            const auto it = cache.entries.find (path);
+            any = any || it == cache.entries.end() || it->second.second != is32;
+            cache.entries[path] = { stamp, is32 };
+            cache.dirty = true;
+        }
+        {
+            const std::scoped_lock l (cache.lock);
+            cache.saveLocked();
+        }
+        cache.refreshing = false;
+        if (any && changed)
+            juce::MessageManager::callAsync (changed);
+    });
+    if (! launched)
+        cache.refreshing = false;
+}
+
+bool waitForPluginBitness (int ms)
+{
+    const auto until = juce::Time::getMillisecondCounter() + (juce::uint32) juce::jmax (0, ms);
+    while (bitsCache().refreshing && juce::Time::getMillisecondCounter() < until)
+        juce::Thread::sleep (5);
+    return ! bitsCache().refreshing;
 }
 
 bool isPlugin32Bit (const juce::PluginDescription& description)
@@ -214,36 +379,65 @@ bool isPlugin32Bit (const juce::PluginDescription& description)
 namespace
 {
 
-class SandboxSession final : private juce::ChildProcessCoordinator
+class SandboxSession;
+
+// One child process (round 190jg: it may host a group of plugins, each a SandboxSession with its own slot, shared block
+// and doorbells). The connection (JUCE's pipe), the child's pid watch and the requests with replies are the process's;
+// when the process dies (a crash, or its message thread stopped answering) every plugin in it is marked dead.
+class SandboxProcess final : private juce::ChildProcessCoordinator
 {
 public:
-    SandboxSession()
-    {
-        static std::atomic<int> counter { 0 };
-       #if JUCE_WINDOWS
-        const auto pid = (int) GetCurrentProcessId();
-       #else
-        const auto pid = (int) ::getpid();
-       #endif
-        baseName = "LYNX-sandbox-" + juce::String (pid) + "-" + juce::String (++counter);
-        created = channel.create (baseName);
-    }
+    SandboxProcess (juce::String groupKey, bool is32) : group (std::move (groupKey)), bits32 (is32) {}
 
-    ~SandboxSession() override
+    ~SandboxProcess() override
     {
         closing = true;
         stopWatching();
         killWorkerProcess();
     }
 
-    // Linux (round 161) and macOS: the moment the child process ends (a crash, abort, kill), the plugin is marked dead; before,
-    // a crash was noticed only by the audio block's 0.5 s timeout or the connection's own ping
-    void watchChild (int pid)
+    bool start (const juce::File& executable)
     {
+        const auto launched = launchWorkerProcess (executable, pluginSandboxId, 10000);
+        trace ("parent: child launched " + juce::String ((int) launched) + " group " + group);
+        return launched;
+    }
+
+    const juce::String group;
+    const bool bits32;
+    int pid = 0;
+
+    int nextSlot() noexcept { return slots++; }
+    int pluginCount() const
+    {
+        const std::scoped_lock l (sessionsLock);
+        return (int) sessions.size();
+    }
+    bool isDead() const noexcept { return dead.load(); }
+
+    void add (SandboxSession* s)
+    {
+        const std::scoped_lock l (sessionsLock);
+        sessions.push_back (s);
+    }
+    void remove (SandboxSession* s)
+    {
+        const std::scoped_lock l (sessionsLock);
+        sessions.erase (std::remove (sessions.begin(), sessions.end(), s), sessions.end());
+    }
+
+    // the process ended or stopped answering: all its plugins go silent (not on the audio thread: it takes a lock)
+    void markDead (bool crashed);
+
+    // Linux (round 161) and macOS: the moment the child process ends (a crash, abort, kill), its plugins are marked dead;
+    // before, a crash was noticed only by the audio block's 0.5 s timeout or the connection's own ping
+    void watchChild (int childPid)
+    {
+        pid = childPid;
        #if JUCE_LINUX && defined(SYS_pidfd_open)
-        if (pid <= 0 || watcher.joinable())
+        if (childPid <= 0 || watcher.joinable())
             return;
-        const int fd = (int) ::syscall (SYS_pidfd_open, (pid_t) pid, 0);
+        const int fd = (int) ::syscall (SYS_pidfd_open, (pid_t) childPid, 0);
         if (fd < 0)
             return;
         stopFd = ::eventfd (0, EFD_CLOEXEC);
@@ -266,13 +460,13 @@ public:
         });
        #elif JUCE_MAC
         // macOS: the same, through a kqueue watching the pid's exit (EVFILT_USER wakes it to stop)
-        if (pid <= 0 || watcher.joinable())
+        if (childPid <= 0 || watcher.joinable())
             return;
         stopFd = ::kqueue();
         if (stopFd < 0)
             return;
         struct kevent changes[2];
-        EV_SET (&changes[0], (uintptr_t) pid, EVFILT_PROC, EV_ADD | EV_ONESHOT, NOTE_EXIT, 0, nullptr);
+        EV_SET (&changes[0], (uintptr_t) childPid, EVFILT_PROC, EV_ADD | EV_ONESHOT, NOTE_EXIT, 0, nullptr);
         EV_SET (&changes[1], 1, EVFILT_USER, EV_ADD | EV_CLEAR, 0, 0, nullptr);
         if (::kevent (stopFd, changes, 2, nullptr, 0, nullptr) != 0)
         {
@@ -296,73 +490,42 @@ public:
         // only when JUCE's pipe read gave up waiting for the child to connect again (its 10 s timeout) or the ping
         // failed: until then every message to the child (a state save, a parameter, the close) waited those 10 s on
         // the pipe of a process that was gone.
-        if (pid <= 0 || childWait != nullptr)
+        if (childPid <= 0 || childWait != nullptr)
             return;
-        childProcess = OpenProcess (SYNCHRONIZE, FALSE, (DWORD) pid);
+        childProcess = OpenProcess (SYNCHRONIZE, FALSE, (DWORD) childPid);
         if (childProcess == nullptr)
             return;
-        if (! RegisterWaitForSingleObject (&childWait, childProcess, &SandboxSession::childEnded, this, INFINITE, WT_EXECUTEONLYONCE))
+        if (! RegisterWaitForSingleObject (&childWait, childProcess, &SandboxProcess::childEnded, this, INFINITE, WT_EXECUTEONLYONCE))
         {
             childWait = nullptr;
             CloseHandle (childProcess);
             childProcess = nullptr;
         }
        #else
-        juce::ignoreUnused (pid);
+        juce::ignoreUnused (childPid);
        #endif
     }
 
-    bool start (const juce::File& executable)
-    {
-        if (! created)
-            return false;
-        const auto launched = launchWorkerProcess (executable, pluginSandboxId, 10000);
-        trace ("parent: child launched " + juce::String ((int) launched));
-        return launched;
-    }
-
-    const juce::String& name() const noexcept { return baseName; }
-    SharedBlock* block() noexcept { return channel.block(); }
-    void childAttached() { channel.unlinkName(); }
-    bool isDead() const noexcept { return dead.load(); }
-
-    // `crashed`: the process ended or its connection broke; else it stopped answering (a hang). Any thread (the audio
-    // thread on a block's timeout): the death is only recorded (no allocation, no lock); the UI tells the user
-    // (pluginSandboxDeaths, MainComponent).
-    void markDead (bool crashed)
-    {
-        if (dead.exchange (true))
-            return;
-        replyReady.signal();
-        channel.signalResponse(); // an audio thread waiting for a block that will never come returns now (round 161)
-        if (! closing && showAlerts)
-            recordDeath (nameCopy, crashed, bits32);
-    }
-
-    void setPluginName (const juce::String& n, bool is32)
-    {
-        pluginName = n;
-        bits32 = is32;
-        n.copyToUTF8 (nameCopy, sizeof (nameCopy));
-    }
-    void setPluginName (const juce::String& n) { pluginName = n; }
-
-    // request with reply (UI thread)
-    juce::ValueTree ask (const juce::ValueTree& message, int timeoutMs)
+    // request with reply (UI thread; one at a time per process): matched by sequence number, so a reply that comes too
+    // late for one request is never taken for the next
+    juce::ValueTree ask (juce::ValueTree message, int timeoutMs)
     {
         const std::scoped_lock lock (askMutex);
         if (dead)
             return {};
+        const auto seq = ++sequence;
+        message.setProperty ("seq", seq, nullptr);
         {
             const std::scoped_lock l (replyMutex);
             reply = {};
+            awaited = seq;
         }
         replyReady.reset();
         if (! sendMessageToWorker (encode (message)))
             return {};
         if (! replyReady.wait (timeoutMs))
         {
-            markDead (false);
+            markDead (false); // (its message thread is stuck: the whole process, as before for one plugin)
             return {};
         }
         const std::scoped_lock l (replyMutex);
@@ -373,20 +536,6 @@ public:
     {
         if (! dead)
             sendMessageToWorker (encode (message));
-    }
-
-    // one audio block (audio thread): false = the child didn't respond
-    bool runBlock (int timeoutMs) noexcept
-    {
-        if (dead)
-            return false;
-        channel.signalRequest();
-        if (! channel.waitResponse (timeoutMs))
-        {
-            markDead (false);
-            return false;
-        }
-        return ! dead; // woken by markDead (the child crashed or the connection was lost)
     }
 
 private:
@@ -401,6 +550,8 @@ private:
         }
         {
             const std::scoped_lock l (replyMutex);
+            if ((int) message["seq"] != awaited)
+                return; // (the reply to a request that already timed out)
             reply = std::move (message);
         }
         trace ("parent: reply received " + reply.getType().toString());
@@ -417,7 +568,7 @@ private:
     static void CALLBACK childEnded (PVOID context, BOOLEAN /*timedOut*/)
     {
         trace ("parent: child process ended");
-        static_cast<SandboxSession*> (context)->markDead (true);
+        static_cast<SandboxProcess*> (context)->markDead (true);
     }
    #endif
 
@@ -455,11 +606,6 @@ private:
        #endif
     }
 
-    juce::String baseName, pluginName;
-    char nameCopy[128] {};
-    bool bits32 = false;
-    SandboxChannel channel;
-    bool created = false;
    #if JUCE_LINUX || JUCE_MAC
     std::thread watcher;
     int stopFd = -1;
@@ -467,10 +613,124 @@ private:
     HANDLE childProcess = nullptr, childWait = nullptr;
    #endif
     std::atomic<bool> dead { false }, closing { false };
+    std::atomic<int> slots { 0 };
+    mutable std::mutex sessionsLock;
+    std::vector<SandboxSession*> sessions;
     std::mutex askMutex, replyMutex;
+    int sequence = 0, awaited = 0;
     juce::ValueTree reply;
     juce::WaitableEvent replyReady;
 };
+
+// One plugin in a sandbox process: its slot there, its shared block and doorbells (each plugin keeps its own, so one
+// plugin's block never waits for another's, and a hung plugin times out alone).
+class SandboxSession final
+{
+public:
+    explicit SandboxSession (std::shared_ptr<SandboxProcess> p) : process (std::move (p)), slot (process->nextSlot())
+    {
+        static std::atomic<int> counter { 0 };
+       #if JUCE_WINDOWS
+        const auto pid = (int) GetCurrentProcessId();
+       #else
+        const auto pid = (int) ::getpid();
+       #endif
+        baseName = "LYNX-sandbox-" + juce::String (pid) + "-" + juce::String (++counter);
+        created = channel.create (baseName);
+        process->add (this);
+    }
+
+    ~SandboxSession()
+    {
+        process->remove (this);
+        if (! process->isDead())
+            process->tell (juce::ValueTree ("close").setProperty ("slot", slot, nullptr));
+        process = nullptr; // (the last one ends the child: JUCE's kill message, then the pipe)
+    }
+
+    bool ready() const noexcept { return created; }
+    const juce::String& name() const noexcept { return baseName; }
+    SharedBlock* block() noexcept { return channel.block(); }
+    void childAttached() { channel.unlinkName(); }
+    bool isDead() const noexcept { return dead.load(); }
+    SandboxProcess& owner() noexcept { return *process; }
+    int pid() const noexcept { return process->pid; }
+
+    // `crashed`: the process ended or its connection broke; else it stopped answering (a hang). Any thread (the audio
+    // thread on a block's timeout): the death is only recorded (no allocation, no lock); the UI tells the user
+    // (pluginSandboxDeaths, MainComponent).
+    void markDead (bool crashed, bool alone = true)
+    {
+        if (dead.exchange (true))
+            return;
+        channel.signalResponse(); // an audio thread waiting for a block that will never come returns now (round 161)
+        if (showAlerts)
+            recordDeath (nameCopy, groupCopy, crashed, process->bits32, alone);
+    }
+
+    void setPluginName (const juce::String& n)
+    {
+        pluginName = n;
+        n.copyToUTF8 (nameCopy, sizeof (nameCopy));
+        process->group.copyToUTF8 (groupCopy, sizeof (groupCopy));
+    }
+
+    juce::ValueTree ask (juce::ValueTree message, int timeoutMs)
+    {
+        if (dead)
+            return {};
+        return process->ask (message.setProperty ("slot", slot, nullptr), timeoutMs);
+    }
+
+    void tell (juce::ValueTree message)
+    {
+        if (! dead)
+            process->tell (message.setProperty ("slot", slot, nullptr));
+    }
+
+    // one audio block (audio thread): false = the child didn't respond
+    bool runBlock (int timeoutMs) noexcept
+    {
+        if (dead)
+            return false;
+        channel.signalRequest();
+        if (! channel.waitResponse (timeoutMs))
+        {
+            markDead (false);
+            return false;
+        }
+        return ! dead; // woken by markDead (the child crashed or the connection was lost)
+    }
+
+private:
+    std::shared_ptr<SandboxProcess> process;
+    const int slot;
+    juce::String baseName, pluginName;
+    char nameCopy[128] {}, groupCopy[64] {};
+    SandboxChannel channel;
+    bool created = false;
+    std::atomic<bool> dead { false };
+};
+
+void SandboxProcess::markDead (bool crashed)
+{
+    if (dead.exchange (true))
+        return;
+    replyReady.signal();
+    if (closing)
+        return;
+    const std::scoped_lock l (sessionsLock);
+    for (auto* s : sessions)
+        s->markDead (crashed, sessions.size() == 1);
+}
+
+// The running group processes by group key (round 190jg): a plugin of a group joins its process while it lives.
+std::mutex groupsLock;
+std::map<juce::String, std::weak_ptr<SandboxProcess>>& groups()
+{
+    static auto* g = new std::map<juce::String, std::weak_ptr<SandboxProcess>>(); // (never destroyed: see retirements)
+    return *g;
+}
 
 // Issue #159 (a user's hang report: the window froze for 10 s and more while a project was opened again): ending a
 // session sends the child JUCE's "kill" message, and JUCE's pipe waits up to the connection timeout (10 s) for a child
@@ -551,6 +811,7 @@ public:
         value = v;
         sendValueChangedMessageToListeners (v);
     }
+    void setLocally (float v) noexcept { value = v; } // (round 190jg: a timed change sent with the block)
 
 private:
     RemotePlugin& owner;
@@ -642,11 +903,11 @@ class RemotePlugin final : public juce::AudioPluginInstance
 public:
     RemotePlugin (std::unique_ptr<SandboxSession> s, const juce::PluginDescription& d, const juce::ValueTree& info, bool is32)
         : AudioPluginInstance (busesFor ((int) info["ins"], (int) info["outs"])), bits32 (is32), pid ((int) info["pid"]),
-          session (std::move (s)), description (d),
+          group (s->owner().group), session (std::move (s)), description (d),
           midiIn ((bool) info["midiIn"]), midiOut ((bool) info["midiOut"]), editor ((bool) info["editor"]),
           tail ((double) info["tail"]), lastState (info["state"].toString())
     {
-        session->setPluginName (description.name, is32);
+        session->setPluginName (description.name);
         setLatencySamples ((int) info["latency"]);
         const auto params = info.getChildWithName ("params");
         for (int i = 0; i < params.getNumChildren(); ++i)
@@ -662,6 +923,7 @@ public:
     bool dead() const noexcept { return session->isDead(); }
     const bool bits32;
     const int pid;
+    const juce::String group;
     void hangForTest() { session->tell (juce::ValueTree ("hang")); }
     void crashForTest() { session->tell (juce::ValueTree ("crash")); }
 
@@ -717,6 +979,7 @@ public:
         if (session->isDead() || shared == nullptr || frames <= 0)
         {
             buffer.clear();
+            midi.clear(); // (rollup 0.1.30: nothing came out)
             return;
         }
 
@@ -737,6 +1000,17 @@ public:
         shared->midiCount = count;
         shared->paramCount = pending.drain (shared->params, SharedBlock::maxParams);
         shared->paramOutCount = 0;
+        // round 190jg: the automation's changes inside this block, at their offsets (the child's plugin takes them so)
+        auto timedCount = 0;
+        for (int k = 0; k < juce::lynxTimedParamCount && timedCount < SharedBlock::maxTimed; ++k)
+            if (const auto at = juce::lynxTimedParamOffsets[k]; at >= 0 && at < frames)
+            {
+                shared->timed[timedCount] = { juce::lynxTimedParamIndices[k], juce::lynxTimedParamValues[k] };
+                shared->timedOffsets[timedCount++] = at;
+                if (const auto i = juce::lynxTimedParamIndices[k]; i >= 0 && i < (int) remoteParams.size())
+                    remoteParams[(std::size_t) i]->setLocally (juce::lynxTimedParamValues[k]);
+            }
+        shared->timedCount = timedCount;
         if (auto* head = getPlayHead())
             writeTransport (shared->transport, head->getPosition());
         else
@@ -749,6 +1023,7 @@ public:
         if (! session->runBlock (isNonRealtime() ? 30000 : 500))
         {
             buffer.clear();
+            midi.clear(); // (rollup 0.1.30: nothing came out)
             return;
         }
 
@@ -756,6 +1031,12 @@ public:
             std::memcpy (buffer.getWritePointer (c), shared->audio[c], sizeof (float) * (std::size_t) frames);
         for (int c = channels; c < buffer.getNumChannels(); ++c)
             buffer.clear (c, 0, frames);
+
+        // rollup 0.1.30: the buffer holds the plugin's own output afterwards, as in LYNX's process (SharedBlock::midiOut)
+        midi.clear();
+        for (int i = 0; i < std::min ((int) shared->midiOutCount, SharedBlock::maxMidi); ++i)
+            if (const auto& e = shared->midiOut[i]; e.size >= 1 && e.size <= 3)
+                midi.addEvent (e.bytes, e.size, juce::jlimit (0, frames - 1, (int) e.offset));
 
         for (int i = 0; i < std::min (shared->paramOutCount, SharedBlock::maxParams); ++i)
             if (const auto k = shared->paramsOut[i].index; k >= 0 && k < (int) remoteParams.size())
@@ -796,7 +1077,8 @@ void RemoteParameter::setValue (float v)
 } // namespace
 
 std::unique_ptr<juce::AudioPluginInstance> createSandboxedPlugin (const juce::PluginDescription& description, double sampleRate,
-                                                                  int blockSize, const std::string& stateBase64, juce::String& error)
+                                                                  int blockSize, const std::string& stateBase64, juce::String& error,
+                                                                  const juce::String& group)
 {
     trace ("parent: session");
     // a 32-bit plugin: the 32-bit bridge (round 176a); every other plugin: LYNX.exe itself in child mode
@@ -807,12 +1089,38 @@ std::unique_ptr<juce::AudioPluginInstance> createSandboxedPlugin (const juce::Pl
         error = juce::String::fromUTF8 ("a 32-bit plugin, and the 32-bit bridge (LYNX-bridge32.exe) is missing");
         return nullptr;
     }
-    auto session = std::make_unique<SandboxSession>();
-    session->setPluginName (description.name, bridged32);
-    trace ("parent: starting child " + executable.getFileName());
-    if (! session->start (executable))
+
+    // round 190jg: a plugin of a group joins its group's running process (the 32-bit bridge is a group of its own)
+    std::shared_ptr<SandboxProcess> process;
+    bool fresh = false;
     {
-        error = juce::String::fromUTF8 (bridged32 ? "could not start the 32-bit bridge (LYNX-bridge32.exe)" : "could not start the plugin process");
+        const auto key = group.isEmpty() ? juce::String() : (bridged32 ? "32|" : "") + group;
+        const std::scoped_lock l (groupsLock);
+        if (key.isNotEmpty())
+            if (auto alive = groups()[key].lock(); alive != nullptr && ! alive->isDead())
+                process = std::move (alive);
+        if (process == nullptr)
+        {
+            process = std::make_shared<SandboxProcess> (key, bridged32);
+            trace ("parent: starting child " + executable.getFileName());
+            if (! process->start (executable))
+            {
+                error = juce::String::fromUTF8 (bridged32 ? "could not start the 32-bit bridge (LYNX-bridge32.exe)" : "could not start the plugin process");
+                return nullptr;
+            }
+            fresh = true;
+            if (key.isNotEmpty())
+                groups()[key] = process;
+            for (auto it = groups().begin(); it != groups().end();) // (the ended ones)
+                it = it->second.expired() ? groups().erase (it) : std::next (it);
+        }
+    }
+
+    auto session = std::make_unique<SandboxSession> (process);
+    session->setPluginName (description.name);
+    if (! session->ready())
+    {
+        error = juce::String::fromUTF8 ("shared memory unavailable");
         return nullptr;
     }
 
@@ -826,8 +1134,8 @@ std::unique_ptr<juce::AudioPluginInstance> createSandboxedPlugin (const juce::Pl
     trace ("parent: open");
     const auto info = session->ask (open, 30000);
     session->childAttached();
-    if (info.isValid())
-        session->watchChild ((int) info["pid"]);
+    if (info.isValid() && (fresh || process->pid == 0))
+        process->watchChild ((int) info["pid"]);
     trace ("parent: reply " + juce::String ((int) info.isValid()));
     if (! info.isValid() || ! (bool) info["ok"])
     {
@@ -837,6 +1145,22 @@ std::unique_ptr<juce::AudioPluginInstance> createSandboxedPlugin (const juce::Pl
     auto remote = std::make_unique<RemotePlugin> (std::move (session), description, info, bridged32);
     trace ("parent: proxy ready");
     return remote;
+}
+
+int sandboxProcessCount()
+{
+    const std::scoped_lock l (groupsLock);
+    int n = 0;
+    for (const auto& [key, process] : groups())
+        if (const auto alive = process.lock(); alive != nullptr && ! alive->isDead())
+            ++n;
+    return n;
+}
+
+juce::String sandboxGroupOf (const juce::AudioPluginInstance& plugin)
+{
+    const auto* remote = dynamic_cast<const RemotePlugin*> (&plugin);
+    return remote != nullptr ? remote->group : juce::String();
 }
 
 bool finishSandboxTeardowns (int timeoutMs)
@@ -890,7 +1214,8 @@ int sandboxedPluginProcessId (const juce::AudioPluginInstance& plugin)
 
 #else // other platforms: not yet
 
-std::unique_ptr<juce::AudioPluginInstance> createSandboxedPlugin (const juce::PluginDescription&, double, int, const std::string&, juce::String& error)
+std::unique_ptr<juce::AudioPluginInstance> createSandboxedPlugin (const juce::PluginDescription&, double, int, const std::string&, juce::String& error,
+                                                                  const juce::String&)
 {
     error = juce::String::fromUTF8 ("out-of-process plugins: Windows, macOS and Linux only");
     return nullptr;
@@ -902,6 +1227,8 @@ int sandboxTeardownsRunning() { return 0; }
 bool isBridged32 (const juce::AudioPluginInstance&) { return false; }
 int sandboxedPluginProcessId (const juce::AudioPluginInstance&) { return 0; }
 bool isSandboxedPlugin (const juce::AudioPluginInstance&) { return false; }
+int sandboxProcessCount() { return 0; }
+juce::String sandboxGroupOf (const juce::AudioPluginInstance&) { return {}; }
 void hangSandboxedPluginForTest (juce::AudioPluginInstance&) {}
 void crashSandboxedPluginForTest (juce::AudioPluginInstance&) {}
 

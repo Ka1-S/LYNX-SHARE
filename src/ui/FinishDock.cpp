@@ -5,6 +5,7 @@
 
 #include "core/MasterLooks.h"
 #include "core/Mastering.h"
+#include "core/SongFade.h"
 #include "engine/AudioEngine.h"
 #include "engine/Exporter.h"
 #include "ui/I18n.h"
@@ -105,7 +106,7 @@ public:
         g.fillRoundedRectangle (r, theme::radius::lg);
         g.setColour (selected || hasKeyboardFocus (false) ? theme::colour::accent : hover ? theme::colour::borderStrong : theme::colour::border);
         g.drawRoundedRectangle (r.reduced (0.5f), theme::radius::lg, selected ? 1.5f : 1.0f);
-        const auto side = juce::jmin (28.0f, r.getHeight() - 26.0f);
+        const auto side = juce::jmin (32.0f, r.getHeight() - 30.0f); // (round 190jc, SG-16: a larger glyph on taller tiles)
         const juce::Rectangle<float> box (r.getCentreX() - side / 2.0f, r.getY() + 8.0f, side, side);
         auto glyph = lookGlyph (id);
         glyph.applyTransform (juce::AffineTransform::scale (side).translated (box.getX(), box.getY()));
@@ -208,12 +209,13 @@ private:
 
 FinishDock::FinishDock (AudioEngine& e, std::function<void()> close, Saving s)
     : engine (e), onClose (std::move (close)), saving (std::move (s)), measuring (std::make_shared<std::atomic<int>> (0)),
-      measuredLufs (std::make_shared<std::atomic<float>> (0.0f))
+      measuredLufs (std::make_shared<std::atomic<float>> (0.0f)), matching (std::make_shared<std::atomic<int>> (0)),
+      matchDb (std::make_shared<std::atomic<float>> (0.0f))
 {
     setComponentID ("simple.finishDock"); // (round 190dv: the first-song tour keeps its card off it)
     setTitle (tr ("Master looks"));
     title.setText (tr ("Master looks"), juce::dontSendNotification);
-    title.setFont (theme::font (theme::type::title, true));
+    title.setFont (theme::font (theme::type::display, true)); // (round 190jc, SG-16: BandLab's "Mastering" title size)
     addAndMakeVisible (title);
     status.setFont (theme::font (theme::type::small));
     status.setColour (juce::Label::textColourId, theme::colour::textSecondary);
@@ -228,14 +230,16 @@ FinishDock::FinishDock (AudioEngine& e, std::function<void()> close, Saving s)
     addAndMakeVisible (closeButton);
 
     hearWithout.setButtonText (tr ("Hear without"));
-    hearWithout.setTooltip (tr ("Switches the look off and on, to compare (A/B)"));
+    hearWithout.setTooltip (tr ("Switches the look off and on, to compare (A/B), at the same loudness. Right-click: hear the raw level instead"));
     hearWithout.setClickingTogglesState (true);
     hearWithout.onClick = [this] {
         if (updating)
             return;
         const auto off = hearWithout.getToggleState();
         engine.editSong ([off] (Song& s) { looks::setBypassed (s, off); });
+        updateListenGain();
     };
+    hearWithout.addMouseListener (this, false);
     addAndMakeVisible (hearWithout);
 
     for (int i = 0; i < looks::count; ++i)
@@ -325,6 +329,30 @@ FinishDock::FinishDock (AudioEngine& e, std::function<void()> close, Saving s)
         addAndMakeVisible (matchButton);
     }
 
+    // round 190ke (GarageBand's Mix › Fade Out, its iPad switch "Fade Out"): the Master's volume falls to silence over the
+    // song's last seconds; an ordinary automation clip on the Master, so it can be edited and every export renders it
+    fadeButton.setButtonText (tr ("Fade out the end"));
+    fadeButton.setTooltip (tr ("Adds a fade-out of the Master's volume over the song's last seconds (an automation clip you can edit)"));
+    fadeButton.setComponentID ("simple.finish.fade");
+    fadeButton.onClick = [this] {
+        if (! updating)
+            setFade (fadeButton.getToggleState(), fadeLength.getSelectedId() > 0 ? (double) fadeLength.getSelectedId() : songfade::defaultSeconds);
+    };
+    addAndMakeVisible (fadeButton);
+    for (const int seconds : { 5, 10, 15, 20, 30 })
+        fadeLength.addItem (tr ("{0} s", { juce::String (seconds) }), seconds);
+    fadeLength.setSelectedId ((int) songfade::defaultSeconds, juce::dontSendNotification);
+    fadeLength.setTooltip (tr ("How long the fade-out lasts"));
+    fadeLength.onChange = [this] {
+        if (! updating && fadeButton.getToggleState())
+            setFade (true, (double) fadeLength.getSelectedId());
+    };
+    addAndMakeVisible (fadeLength);
+    fadeInfo.setFont (theme::font (theme::type::caption));
+    fadeInfo.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+    fadeInfo.setMinimumHorizontalScale (0.8f);
+    addAndMakeVisible (fadeInfo);
+
     // the last step in plain words: the song as one file, with the look on (round 190t)
     if (saving.exportAudio)
     {
@@ -366,6 +394,92 @@ void FinishDock::save (int format)
 FinishDock::~FinishDock()
 {
     stopTimer();
+    engine.setListenGain (1.0f);
+}
+
+void FinishDock::mouseDown (const juce::MouseEvent& e)
+{
+    if (e.eventComponent != &hearWithout || ! e.mods.isPopupMenu())
+        return;
+    juce::PopupMenu menu;
+    menu.addItem (tr ("Same loudness as with the look"), true, matchLoudness, [this] {
+        matchLoudness = ! matchLoudness;
+        updateListenGain();
+    });
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&hearWithout));
+}
+
+// round 190ld (DS-44): while "Hear without" is on, the device plays the song at the look's loudness: the gain is the
+// difference of the two offline loudnesses (the song with and without the look), measured once per look setting
+void FinishDock::updateListenGain()
+{
+    const auto& song = engine.getSong();
+    if (! matchLoudness || ! looks::present (song) || ! looks::bypassed (song))
+    {
+        engine.setListenGain (1.0f);
+        return;
+    }
+    if (matchValid && matchedFor == song.masterLook)
+    {
+        engine.setListenGain (juce::Decibels::decibelsToGain (matchDb->load()));
+        return;
+    }
+    engine.setListenGain (1.0f); // (the raw level until the match is measured)
+    measureMatch();
+}
+
+namespace
+{
+// the song's integrated loudness (LUFS) from an offline 44.1 kHz render of its first 10 minutes; -100 when silent
+float renderedLufs (const Song& song)
+{
+    exportopts::Options o;
+    o.format = exportopts::Format::wav;
+    o.wavBits = 32;
+    o.sampleRate = 44100.0;
+    const auto file = juce::File::createTempFile (".wav");
+    ExportJob job (song, o, file);
+    job.setExtraData (false);
+    juce::String error;
+    float lufs = -100.0f;
+    if (job.run ([] (double) { return true; }, error))
+    {
+        juce::WavAudioFormat wav;
+        if (std::unique_ptr<juce::AudioFormatReader> reader (wav.createReaderFor (file.createInputStream().release(), true)); reader != nullptr)
+        {
+            const auto n = (int) juce::jmin<juce::int64> (reader->lengthInSamples, (juce::int64) (44100.0 * 600.0));
+            juce::AudioBuffer<float> buf ((int) juce::jmax (2u, reader->numChannels), n);
+            reader->read (&buf, 0, n, 0, true, true);
+            std::vector<float> l (buf.getReadPointer (0), buf.getReadPointer (0) + n), r (buf.getReadPointer (1), buf.getReadPointer (1) + n);
+            double value = 0.0, peak = 0.0;
+            mastering::measure (l, r, 44100.0, value, peak);
+            lufs = (float) value;
+        }
+    }
+    file.deleteFile();
+    return lufs;
+}
+} // namespace
+
+void FinishDock::measureMatch()
+{
+    if (matching->load() != 0)
+        return;
+    auto with = engine.getSong();
+    looks::setBypassed (with, false);
+    auto without = with;
+    looks::setBypassed (without, true);
+    matchedFor = with.masterLook;
+    matchValid = false;
+    matching->store (1);
+    auto flag = matching;
+    auto result = matchDb;
+    std::thread ([with = std::move (with), without = std::move (without), flag, result] {
+        const auto a = renderedLufs (with), b = renderedLufs (without);
+        result->store (a < -70.0f || b < -70.0f ? 0.0f : juce::jlimit (-24.0f, 24.0f, a - b));
+        flag->store (2);
+    }).detach();
+    startTimer (100);
 }
 
 void FinishDock::refresh()
@@ -390,6 +504,8 @@ void FinishDock::refresh()
     for (int i = 0; i < 3; ++i)
         tone[i].setValue (has ? shown.tone[(std::size_t) i] : 0.0, juce::dontSendNotification);
     hearWithout.setToggleState (looks::bypassed (song), juce::dontSendNotification);
+    updateListenGain(); // (round 190ld: the A/B's loudness follows an undo or another project)
+    refreshFade();
     for (auto* c : std::initializer_list<juce::Component*> { &hearWithout, &intensity, &tone[0], &tone[1], &tone[2], &autoButton, &removeButton })
         c->setEnabled (has);
     if (measuring->load() == 0)
@@ -403,6 +519,39 @@ void FinishDock::refresh()
             const auto seconds = exportMusicSeconds (song, o);
             saveRows[i]->setSize (seconds > 0.0 ? juce::File::descriptionOfSizeInBytes (exportopts::estimatedBytes (o, seconds)) : juce::String());
         }
+}
+
+void FinishDock::setFade (bool on, double seconds)
+{
+    if (on)
+    {
+        auto placed = false;
+        engine.editSong ([seconds, &placed] (Song& s) { placed = songfade::apply (s, seconds).ok; });
+        juce::ignoreUnused (placed); // (nothing placed yet: refreshFade says so)
+    }
+    else if (songfade::present (engine.getSong()))
+        engine.editSong ([] (Song& s) { songfade::remove (s); });
+    refreshFade();
+}
+
+void FinishDock::refreshFade()
+{
+    const juce::ScopedValueSetter<bool> guard (updating, true);
+    const auto& song = engine.getSong();
+    const auto on = songfade::present (song);
+    fadeButton.setToggleState (on, juce::dontSendNotification);
+    if (on)
+    {
+        const auto seconds = (int) std::lround (songfade::seconds (song));
+        if (fadeLength.indexOfItemId (seconds) >= 0)
+            fadeLength.setSelectedId (seconds, juce::dontSendNotification);
+        else
+            fadeLength.setText (tr ("{0} s", { juce::String (seconds) }), juce::dontSendNotification);
+        fadeInfo.setText (tr ("On the Master track's volume: edit its points on the timeline"), juce::dontSendNotification);
+    }
+    else
+        fadeInfo.setText (songfade::musicEnd (song) > 0 ? juce::String() : tr ("Nothing to fade yet: put something on the timeline first."),
+                          juce::dontSendNotification);
 }
 
 void FinishDock::choose (int id)
@@ -476,9 +625,20 @@ void FinishDock::autoLevel()
 
 void FinishDock::timerCallback()
 {
+    if (matching->load() == 2) // round 190ld: the loudness match is measured
+    {
+        matching->store (0);
+        matchValid = true;
+        updateListenGain();
+    }
     if (measuring->load() != 2)
+    {
+        if (measuring->load() == 0 && matching->load() == 0)
+            stopTimer();
         return;
-    stopTimer();
+    }
+    if (matching->load() == 0)
+        stopTimer();
     measuring->store (0);
     autoButton.setEnabled (shown.id != 0);
     const auto lufs = measuredLufs->load();
@@ -502,16 +662,19 @@ void FinishDock::paint (juce::Graphics& g)
 
 void FinishDock::resized()
 {
+    constexpr int fadeRowHeight = 10 + 28 + 18;
     auto r = getLocalBounds().reduced (12, 10);
-    auto head = r.removeFromTop (28);
+    r.removeFromTop (4);
+    auto head = r.removeFromTop (32);
     closeButton.setBounds (head.removeFromRight (28));
     title.setBounds (head);
     status.setBounds (r.removeFromTop (34));
     r.removeFromTop (4);
     // (a short window: the look tiles give way so that the Save rows stay in view)
-    const auto saveH = (saveRows[0] != nullptr ? 22 + 2 * 36 + (otherApps.isVisible() ? 34 : 0) + 10 : 0) + (matchButton.isVisible() ? 34 : 0);
+    const auto saveH = (saveRows[0] != nullptr ? 22 + 2 * 36 + (otherApps.isVisible() ? 34 : 0) + 10 : 0) + (matchButton.isVisible() ? 34 : 0)
+                       + fadeRowHeight; // (round 190ke: the fade-out row)
     const auto gap = 6;
-    const auto tileH = juce::jlimit (46, 64, (r.getHeight() - 306 - saveH) / 4 - gap);
+    const auto tileH = juce::jlimit (46, 76, (r.getHeight() - 306 - saveH) / 4 - gap); // (round 190jc, SG-16: up to 76 px)
     const auto colW = (r.getWidth() - gap) / 2;
     for (int i = 0; i < looks::count; ++i)
     {
@@ -553,6 +716,15 @@ void FinishDock::resized()
         r.removeFromTop (6);
     }
     peakHint.setBounds (r.removeFromTop (32));
+    // round 190ke: Fade out the end [10 s ▾], and what it made
+    r.removeFromTop (10);
+    {
+        auto row = r.removeFromTop (28);
+        fadeLength.setBounds (row.removeFromRight (84));
+        row.removeFromRight (8);
+        fadeButton.setBounds (row);
+        fadeInfo.setBounds (r.removeFromTop (18));
+    }
     if (saveRows[0] != nullptr)
     {
         r.removeFromTop (10);

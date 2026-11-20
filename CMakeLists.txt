@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.22)
 # macOS: Big Sur or newer (universal builds pass -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"); set before project()
 set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum macOS version")
 
-project(LYNX VERSION 0.1.29 LANGUAGES C CXX)
+project(LYNX VERSION 0.1.30 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -42,6 +42,7 @@ add_library(lynx_core STATIC
     src/core/SessionOps.cpp
     src/core/RemoteMap.cpp
     src/core/DrawMode.cpp
+    src/core/AutoPointEdit.cpp
     src/core/Groove.cpp
     src/core/Patcherize.cpp
     src/core/Instruments.cpp
@@ -60,13 +61,21 @@ add_library(lynx_core STATIC
     src/core/AlsDevicesLot2.cpp
     src/core/AlsDevicesLot3.cpp
     src/core/AlsDevicesLot4.cpp
+    src/core/AlsDevicesLot5.cpp
     src/core/FlmFormat.cpp
     src/core/FlmImport.cpp
+    src/core/BandFormat.cpp
+    src/core/BandImport.cpp
+    src/core/BlxImport.cpp
+    src/core/RegionLoop.cpp
+    src/core/SmartControls.cpp
+    src/core/FactoryContent.cpp
     src/core/FlmEffects.cpp
     src/core/FlmNoteFx.cpp
     src/core/FlmDwSampler.cpp
     src/core/FlmSlicer.cpp
     src/core/AlsExport.cpp
+    src/core/DawProject.cpp src/core/ZipLite.cpp
     src/flp/FlpWrite.cpp
     src/core/Effects.cpp
     src/core/NoteEdit.cpp
@@ -76,10 +85,20 @@ add_library(lynx_core STATIC
     src/core/Pdc.cpp
     src/core/WorkerPool.cpp
     src/core/TimeStretch.cpp
+    src/core/WarpEngines.cpp
     src/core/Arpeggiator.cpp
     src/core/SynthPresets.cpp
     src/core/Slicer.cpp
     src/core/AudioToMidi.cpp
+    src/core/PolyEdit.cpp
+    # PitchNet's polyphonic engine (round 190lk; AGPL-3.0, third_party/pitchnet-poly/README-LYNX.md)
+    third_party/pitchnet-poly/PolyEngine.cpp
+    third_party/pitchnet-poly/PolyExtraction.cpp
+    third_party/pitchnet-poly/PolyPurifier.cpp
+    third_party/pitchnet-poly/PolyRenderer.cpp
+    third_party/pitchnet-poly/PolySoundModel.cpp
+    third_party/pitchnet-poly/PolySpectral.cpp
+    third_party/pitchnet-poly/PolyLazy.cpp
     src/core/Templates.cpp
     src/core/FlWrapper.cpp
     src/core/FlPluginDb.cpp
@@ -101,7 +120,10 @@ add_library(lynx_core STATIC
     src/core/LoopStarter.cpp
     src/core/SimpleTracks.cpp
     src/core/SimplePads.cpp
+    src/core/SimpleSteps.cpp
     src/core/KeyFollow.cpp
+    src/core/LoopAnalysis.cpp
+    src/core/LoopKeywords.cpp
     src/core/GoalKnobs.cpp
     src/core/ChainPresets.cpp
     src/core/SoundLibrary.cpp
@@ -124,9 +146,19 @@ add_library(lynx_core STATIC
     src/core/DrumSynthLive.cpp
     src/core/Harmless.cpp
     src/core/Harmor.cpp
+    src/core/HarmorResynth.cpp
     src/core/Gms.cpp
     src/core/GmsMobile.cpp
     src/core/PocketSuperSaw.cpp
+    src/core/FmSynth.cpp
+    src/core/AlsDevicesFm.cpp
+    src/core/WavetableSynth.cpp
+    src/core/WavetableTables.cpp
+    src/core/WavetableUser.cpp
+    src/core/AlsDevicesWt.cpp
+    src/core/Braid.cpp
+    src/core/BraidParams.cpp
+    src/core/AlsDevicesLot6.cpp
     src/core/Morphine.cpp
     src/core/FruitKick.cpp
     src/core/BassDrum.cpp
@@ -236,6 +268,7 @@ add_library(lynx_core STATIC
     src/core/VoiceShift.cpp
     src/core/NativeEngines.cpp
     src/core/LynxBanks.cpp
+    src/core/HelixBank.cpp
     src/core/ModelParams.cpp
     src/core/ToxicBank.cpp
     src/core/BeepMapBank.cpp
@@ -256,10 +289,15 @@ add_library(lynx_core STATIC
     src/core/FlResampler.cpp
     src/core/FlKeys.cpp
     src/core/DirectWave.cpp
+    src/core/DirectWaveState.cpp
     src/core/OggVorbis.cpp
     src/core/BeepMap.cpp
     src/core/Sawer.cpp
     src/core/Inflate.cpp
+    src/core/SamplerImport.cpp
+    src/core/GigFile.cpp
+    src/core/Ncw.cpp
+    src/core/KontaktFile.cpp
     src/core/WavPack.cpp)
 target_include_directories(lynx_core PUBLIC src third_party/sse2neon)
 
@@ -289,6 +327,8 @@ target_sources(lynx_core PRIVATE
     src/core/EventEdit.cpp
     src/core/AudioEdit.cpp
     src/core/AudioEditTools.cpp
+    src/core/SampleProps.cpp
+    src/core/EdisonView.cpp
     src/core/FlAutoSlicer.cpp
     src/core/MixerOps.cpp
     src/core/History.cpp
@@ -469,8 +509,10 @@ if(LYNX_BUILD_APP)
         src/engine/Metronome.cpp
         src/engine/SampleLibrary.cpp
     src/engine/WavPackFormat.cpp
+    src/engine/NcwFormat.cpp
     src/engine/Mp3Format.cpp
         src/engine/ProjectFile.cpp
+        src/engine/ProjectDowngrade.cpp
         src/engine/ProjectPackage.cpp
         src/engine/SessionPack.cpp
         src/ui/SessionDialogs.cpp
@@ -482,17 +524,28 @@ if(LYNX_BUILD_APP)
         src/engine/ShortExportTest.cpp
         src/engine/ExportParityTest.cpp
         src/engine/MidiHotplugTest.cpp
+        src/engine/MidiOutPortTest.cpp
+        src/engine/PadRecordTest.cpp
+        src/engine/ShareMemoryTest.cpp
         src/ui/LiveSessionUi.cpp
         src/ui/LiveChat.cpp
         src/engine/LiveRemotePlugins.cpp
         src/ui/LiveRemoteUi.cpp
         src/engine/PluginHost.cpp
+        src/engine/AraHost.cpp
+        src/engine/AraTest.cpp
         src/engine/FlStudio.cpp
         src/engine/PluginSandbox.cpp
         src/engine/SandboxWorker.cpp
         src/engine/Bridge32Test.cpp
         src/engine/ClapTeardownTest.cpp
+        src/engine/HostingTests.cpp
         src/engine/Exporter.cpp
+        # M4A export through the system's AAC encoder (owner decision D5): each file compiles on its own platform only
+        # (Windows: Media Foundation, linked below; macOS: AudioToolbox; elsewhere: not available)
+        src/engine/AacEncoder.cpp
+        src/engine/AacEncoderWindows.cpp
+        src/engine/AacEncoderMac.cpp
         src/engine/FlStudioExport.cpp
         src/engine/StreamPrefetcher.cpp
         src/engine/DllAsioDevice.cpp
@@ -510,6 +563,7 @@ if(LYNX_BUILD_APP)
         src/ui/ChannelRackComponent.cpp
         src/ui/PianoRollComponent.cpp
         src/ui/PlaylistComponent.cpp
+        src/ui/AraMenu.cpp
         src/ui/PatternBlocksView.cpp
         src/ui/MixerComponent.cpp
         src/ui/QuickPick.cpp
@@ -519,6 +573,7 @@ if(LYNX_BUILD_APP)
         src/ui/ProjectLoading.cpp
         src/ui/WindowOwner.cpp
         src/ui/PluginKeysTest.cpp
+        src/ui/ZOrder191Test.cpp
         src/ui/ParametricEqEditor.cpp
         src/ui/FacetEqEditor.cpp
         src/ui/ProEditors.cpp
@@ -532,6 +587,7 @@ if(LYNX_BUILD_APP)
         src/ui/ExportDialog.cpp
         src/ui/FlStudioExportDialog.cpp
         src/ui/AlsExportDialog.cpp
+        src/ui/DawProjectExport.cpp
         src/ui/GamepadInput.cpp
         src/ui/ControllerBridge.cpp
         src/ui/OtherAppsExport.cpp
@@ -551,6 +607,9 @@ if(LYNX_BUILD_APP)
         src/ui/AdrWindow.cpp
         src/ui/WaveTravellerEditor.cpp
         src/ui/FpcEditor.cpp
+        src/ui/TetraEditor.cpp
+        src/ui/DirectWaveEditor.cpp
+        src/ui/HelixEditor.cpp
         src/ui/FruitySlicerEditor.cpp
         src/ui/FlVoicePanel.cpp
         src/ui/SlicexEditor.cpp
@@ -560,6 +619,7 @@ if(LYNX_BUILD_APP)
         src/ui/Controllers164.cpp
         src/ui/VoltageEditor.cpp
         src/ui/SoundFontEditor.cpp
+        src/ui/SamplerImportUi.cpp
         src/ui/VfxEditors.cpp
         src/ui/BrowserComponent.cpp
         src/ui/Theme.cpp
@@ -574,6 +634,8 @@ if(LYNX_BUILD_APP)
     list(APPEND LYNX_APP_SOURCES
         src/ui/Workspace.cpp
         src/ui/NativeChild.cpp
+        src/ui/DockPaintCheck.cpp
+        src/ui/MotionOverlay.cpp
         src/ui/ExternalDrag.cpp
         src/ui/ExternalDragX11.cpp
         src/ui/ValueControl.cpp
@@ -599,14 +661,18 @@ if(LYNX_BUILD_APP)
         src/ui/EventEditor.cpp
         src/ui/AudioEditor.cpp
         src/ui/AudioEditorTools.cpp
+        src/ui/ArticulatorTools.cpp
+        src/ui/SampleProperties.cpp
         src/ui/ToolWindow.cpp
         src/ui/SpeechDialog.cpp
         src/ui/TempoTapper.cpp
         src/ui/TempoDetectionDialog.cpp
         src/ui/LoopStarterWindow.cpp
         src/ui/SimpleWorkflow.cpp
+        src/ui/LoopInfo.cpp
         src/ui/FinishDock.cpp
         src/ui/SimpleDock.cpp
+        src/ui/SimpleTuner.cpp
         src/ui/HistoryPanel.cpp
         src/ui/VersionsPanel.cpp
         src/ui/LyricsPanel.cpp
@@ -618,6 +684,8 @@ if(LYNX_BUILD_APP)
         src/ui/MissingFilesDialog.cpp
         src/ui/SettingsDialog.cpp
         src/ui/SettingsPages.cpp
+        src/ui/WorkflowExtras.cpp
+        src/ui/KeyFocus.cpp
         src/ui/PluginManager.cpp
         src/ui/ShortcutManager.cpp
         src/ui/NewProjectDialog.cpp
@@ -630,16 +698,20 @@ if(LYNX_BUILD_APP)
         src/ui/SessionMixer.cpp
         src/ui/MapMode.cpp
         src/ui/MidiToolsPanel.cpp
+        src/ui/ChordHelper.cpp
         src/ui/TouchKeyboard.cpp
         src/ui/QuickAddPalette.cpp
         src/ui/PluginPickerView.cpp
+        src/ui/PickerLook.cpp
+        src/ui/ProjectPickerView.cpp
         src/ui/PluginThumbs.cpp
         src/ui/PluginPicker.cpp
         src/ui/CrashReporter.cpp
         src/ui/Updater.cpp
         src/ui/AudioCheck.cpp
         src/ui/StemExtract.cpp
-        src/ui/AudioToMidi.cpp)
+        src/ui/AudioToMidi.cpp
+        src/ui/PolyEditor.cpp)
     target_sources(LYNX PRIVATE src/Main.cpp ${LYNX_APP_SOURCES})
     # Ableton Link 4.1.1 (GPL-2.0-or-later, used under the GPLv3; third_party/link, round 190gl) with its bundled Asio
     # (Boost licence): header-only, used by src/engine/AbletonLink.cpp alone (it sets Link's and Asio's macros itself)
@@ -648,6 +720,7 @@ if(LYNX_BUILD_APP)
     target_include_directories(LYNX PRIVATE third_party/onnxruntime) # loaded at run time, never linked
 
     target_include_directories(LYNX PRIVATE third_party/clap/include)
+    target_include_directories(LYNX PRIVATE third_party/ara) # (ARA_API / ARA_Library, round 190kx)
     # the commit the build comes from (crash reports name it, round 159)
     execute_process(COMMAND git rev-parse --short=10 HEAD WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
                     OUTPUT_VARIABLE LYNX_GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
@@ -658,6 +731,8 @@ if(LYNX_BUILD_APP)
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
         JUCE_PLUGINHOST_VST3=1
+        # ARA 2 hosting (round 190kx): Celemony's ARA SDK 2.1 headers and library sources in third_party/ara (Apache-2.0)
+        JUCE_PLUGINHOST_ARA=1
         # MP3 is read by LYNX (src/engine/Mp3Format, minimp3; round 157b), not by JUCE's MP3AudioFormat
         JUCE_USE_MP3AUDIOFORMAT=0
         JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:LYNX,JUCE_PRODUCT_NAME>"
@@ -669,13 +744,19 @@ if(LYNX_BUILD_APP)
         target_compile_definitions(LYNX PRIVATE JUCE_ASIO=1) # ASIO SDK headers in third_party/asiosdk (GPLv3 option)
         target_link_libraries(LYNX PRIVATE winhttp bcrypt advapi32) # live sessions' WebSocket (engine/LiveLink.cpp)
         target_link_libraries(LYNX PRIVATE ws2_32 iphlpapi) # Ableton Link's sockets and network interfaces (round 190gl)
-        target_link_libraries(LYNX PRIVATE mfplat mfreadwrite mfuuid propsys) # the system's video decoder (round 174d)
+        # the system's video decoder (round 174d) and AAC encoder (M4A export, engine/AacEncoderWindows.cpp)
+        target_link_libraries(LYNX PRIVATE mfplat mfreadwrite mfuuid propsys)
     elseif(APPLE)
         target_compile_definitions(LYNX PRIVATE JUCE_PLUGINHOST_AU=1)
         # the system's video decoder (round 174d, ui/VideoMediaMac.mm; manual retain / release)
         target_sources(LYNX PRIVATE src/ui/VideoMediaMac.mm)
         set_source_files_properties(src/ui/VideoMediaMac.mm PROPERTIES COMPILE_OPTIONS "-fno-objc-arc")
+        # the moving marks as Core Animation layers (round 190jx, ui/MotionOverlayMac.h; off by default: LYNX_OVERLAY_MAC=1)
+        target_sources(LYNX PRIVATE src/ui/MotionOverlayMac.mm)
+        set_source_files_properties(src/ui/MotionOverlayMac.mm PROPERTIES COMPILE_OPTIONS "-fno-objc-arc")
+        target_link_libraries(LYNX PRIVATE "-framework QuartzCore")
         target_link_libraries(LYNX PRIVATE "-framework AVFoundation" "-framework CoreMedia" "-framework CoreVideo")
+        target_link_libraries(LYNX PRIVATE "-framework AudioToolbox" "-framework CoreFoundation") # M4A export (engine/AacEncoderMac.cpp)
         target_link_libraries(LYNX PRIVATE ${CMAKE_DL_LIBS}) # (libcurl loaded at run time: engine/LiveLink.cpp)
     else()
         # ALSA (linked) + JACK (loaded at run time; PipeWire serves JACK clients through pipewire-jack)
@@ -683,6 +764,9 @@ if(LYNX_BUILD_APP)
         # LYNX's own PipeWire driver (round 161): vendored MIT headers, libpipewire-0.3.so.0 loaded at run time
         target_include_directories(LYNX SYSTEM PRIVATE third_party/pipewire/include/pipewire-0.3 third_party/pipewire/include/spa-0.2)
         target_link_libraries(LYNX PRIVATE ${CMAKE_DL_LIBS})
+        # the X server draws the moving marks (round 190jx, ui/MotionOverlayX11.h; libX11 / libXrender loaded at run time
+        # as JUCE loads them: only their headers are needed)
+        target_sources(LYNX PRIVATE src/ui/MotionOverlayX11.cpp)
     endif()
 
     # the UI font on Linux and the BSDs (src/ui/Theme.cpp); Windows and macOS use their own and don't carry the files

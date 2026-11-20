@@ -1,5 +1,6 @@
 #include "ui/NativeChild.h"
 #include "ui/WindowOwner.h"
+#include "ui/ShotShowing.h"
 #include "core/DockStack.h"
 #include "core/DockingPolicy.h"
 
@@ -49,13 +50,31 @@ struct PeerScaleListeners : juce::ComponentPeer
 };
 
 // `bounds` (the component's bounds: in the main window's client area, LYNX's zoomed units) in the parent's physical
-// pixels (times the UI zoom = the peer's logical pixels, times the display's scale = physical)
+// pixels (times the UI zoom = the peer's logical pixels, times the display's scale = physical).
+// Issue #178 (round 190hx): the position and the size are rounded each on its own, as JUCE does for its own windows
+// (Rectangle::toNearestInt). Rounding the right and bottom EDGES made the size depend on the position at a scale that is
+// not a whole number (150 %: a 101-unit-wide window was 152 pixels at x = 0 and 151 at x = 1), so every step of a drag
+// also resized the native window: Windows then showed its Direct2D swap chain's new, undrawn buffers (other programs'
+// old pictures, white stripes) until the next frame, a rapid flicker while a panel or a docked window moved.
 #if JUCE_WINDOWS
 RECT physicalRect (const juce::Component& c, const juce::ComponentPeer& peer, juce::Rectangle<int> bounds)
 {
     const auto scale = peer.getPlatformScaleFactor() * (double) c.getDesktopScaleFactor();
-    const auto b = bounds.toDouble() * scale;
-    return { juce::roundToInt (b.getX()), juce::roundToInt (b.getY()), juce::roundToInt (b.getRight()), juce::roundToInt (b.getBottom()) };
+    const auto r = dockstack::physicalPlace (bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), scale);
+    return { r.x, r.y, r.x + r.w, r.y + r.h };
+}
+
+// Issue #197 (round 190kl): `want` keeps the native window's present size when that is within a pixel of the exact
+// size (core/DockStack.h keepsSize): placing a window again only moves it
+void keepNativeSize (const juce::Component& c, const juce::ComponentPeer& peer, juce::Rectangle<int> bounds, RECT now, RECT& want)
+{
+    const auto scale = peer.getPlatformScaleFactor() * (double) c.getDesktopScaleFactor();
+    const auto w = (int) (now.right - now.left), h = (int) (now.bottom - now.top);
+    if (dockstack::keepsSize (w, h, bounds.getWidth(), bounds.getHeight(), scale))
+    {
+        want.right = want.left + w;
+        want.bottom = want.top + h;
+    }
 }
 
 // LYNX's own exact placement is under way (placePhysically): the window procedure leaves its position alone
@@ -83,8 +102,9 @@ void placePhysically (juce::Component& c, juce::Rectangle<int> bounds)
     auto* parent = hwnd != nullptr ? GetParent (hwnd) : nullptr;
     if (parent == nullptr)
         return;
-    const auto want = physicalRect (c, *peer, bounds);
+    auto want = physicalRect (c, *peer, bounds);
     const auto now = rectInParent (hwnd, parent);
+    keepNativeSize (c, *peer, bounds, now, want); // (issue #197: a move is never also a resize)
     if (now.left == want.left && now.top == want.top && now.right == want.right && now.bottom == want.bottom)
         return;
     const juce::ScopedValueSetter<bool> exact (placingExactly, true); // (this place stands: placeAtOnce leaves it)
@@ -249,6 +269,21 @@ private:
 };
 
 #if JUCE_WINDOWS
+// Round 190jy: told after a native child moved, was resized, shown, hidden or restacked (ui/NativeChild.h)
+std::function<void()>& stackingListener()
+{
+    static std::function<void()> listener;
+    return listener;
+}
+
+void stackingChanged()
+{
+    if (auto& l = stackingListener(); l != nullptr)
+        l();
+}
+#endif
+
+#if JUCE_WINDOWS
 // Every attached child window goes through one window procedure in front of JUCE's (one per window, so the original is
 // put back in the right order when the window goes):
 // - Round 190cj: a transparent child window (a dancer) takes the mouse wherever its picture is not fully transparent:
@@ -270,6 +305,13 @@ std::map<HWND, Subclassed>& subclassedWindows()
 {
     static std::map<HWND, Subclassed> windows;
     return windows;
+}
+
+// Round 190jy: the holes each attached child window has now (its window region), physical pixels in that window
+std::map<HWND, std::vector<juce::Rectangle<int>>>& holesNow()
+{
+    static std::map<HWND, std::vector<juce::Rectangle<int>>> holes;
+    return holes;
 }
 
 bool pretendInactive = false; // (tests: the window answers as when LYNX is in the background)
@@ -303,7 +345,9 @@ void placeAtOnce (juce::Component& c, WINDOWPOS& pos)
     auto* peer = c.getPeer();
     if (peer == nullptr || ! isAttached (c) || GetParent (pos.hwnd) == nullptr || (GetWindowLongPtr (pos.hwnd, GWL_STYLE) & WS_CHILD) == 0)
         return;
-    const auto want = physicalRect (c, *peer, c.getBounds());
+    auto want = physicalRect (c, *peer, c.getBounds());
+    if (auto* parent = GetParent (pos.hwnd))
+        keepNativeSize (c, *peer, c.getBounds(), rectInParent (pos.hwnd, parent), want); // (issue #197)
     if ((pos.flags & SWP_NOMOVE) == 0)
     {
         pos.x = want.left;
@@ -358,10 +402,21 @@ LRESULT CALLBACK childProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
         placeAtOnce (*c, *reinterpret_cast<WINDOWPOS*> (lParam));
     else if (message == WM_PARENTNOTIFY && c != nullptr && isButtonDownNotice (LOWORD (wParam)))
         raiseForForeignClick (hwnd, lParam);
+    else if (message == WM_WINDOWPOSCHANGED && lParam != 0)
+    {
+        // Round 190jy: the holes of the windows below a docked editor drawn by the main window follow every move,
+        // resize, show, hide and restacking of the main window's native children (not the region changes themselves)
+        const auto flags = reinterpret_cast<const WINDOWPOS*> (lParam)->flags;
+        const auto result = CallWindowProc (original, hwnd, message, wParam, lParam);
+        if ((flags & SWP_NOZORDER) == 0 || (flags & SWP_NOMOVE) == 0 || (flags & SWP_NOSIZE) == 0 || (flags & (SWP_SHOWWINDOW | SWP_HIDEWINDOW)) != 0)
+            stackingChanged();
+        return result;
+    }
     else if (message == WM_NCDESTROY)
     {
         SetWindowLongPtr (hwnd, GWLP_WNDPROC, (LONG_PTR) original);
         windows.erase (it);
+        holesNow().erase (hwnd);
     }
     return CallWindowProc (original, hwnd, message, wParam, lParam);
 }
@@ -456,12 +511,13 @@ LRESULT CALLBACK clickHookProc (int code, WPARAM wParam, LPARAM lParam)
                 for (auto h = msg->hwnd; h != nullptr && ancestry.size() < 24; h = GetAncestor (h, GA_PARENT))
                     ancestry.push_back (h);
                 const auto at = dockstack::clickedWindow (ancestry, [&list] (HWND h) {
-                    return std::any_of (list.begin(), list.end(), [h] (const ClickRaise& r) { return r.component->getWindowHandle() == (void*) h; });
+                    // (round 190jy: a component drawn by the main window has the main window's handle: it is no attached window)
+                    return std::any_of (list.begin(), list.end(), [h] (const ClickRaise& r) { return isAttached (*r.component) && r.component->getWindowHandle() == (void*) h; });
                 });
                 if (at <= 0) // (none, or the component's own window: JUCE's mouse listeners take it)
                     break;
                 for (const auto& r : list)
-                    if (r.component->getWindowHandle() == (void*) ancestry[(std::size_t) at])
+                    if (isAttached (*r.component) && r.component->getWindowHandle() == (void*) ancestry[(std::size_t) at])
                     {
                         juce::MessageManager::callAsync ([safe = r.component] { raiseClicked (safe); });
                         break;
@@ -615,8 +671,9 @@ bool isPlacedAt (const juce::Component& c, const juce::Component& area, juce::Re
     auto* parent = hwnd != nullptr ? GetParent (hwnd) : nullptr;
     if (parent == nullptr || ! isAttached (c))
         return true; // (no native window to move)
-    const auto want = physicalRect (c, *peer, boundsInArea + originOf (area));
+    auto want = physicalRect (c, *peer, boundsInArea + originOf (area));
     const auto now = rectInParent (hwnd, parent);
+    keepNativeSize (c, *peer, boundsInArea + originOf (area), now, want); // (issue #197)
     return now.left == want.left && now.top == want.top && now.right == want.right && now.bottom == want.bottom;
    #else
     juce::ignoreUnused (c, area, boundsInArea);
@@ -726,12 +783,235 @@ bool placedPhysically (const juce::Component& c)
     RECT now {};
     GetWindowRect (hwnd, &now);
     MapWindowPoints (nullptr, parent, reinterpret_cast<POINT*> (&now), 2);
-    return std::abs (now.left - b.getX()) <= 1.0 && std::abs (now.top - b.getY()) <= 1.0 && std::abs (now.right - b.getRight()) <= 1.0
-           && std::abs (now.bottom - b.getBottom()) <= 1.0;
+    // (the right and bottom edges: the position's rounding plus a kept size within a pixel, round 190kl)
+    return std::abs (now.left - b.getX()) <= 1.0 && std::abs (now.top - b.getY()) <= 1.0 && std::abs (now.right - b.getRight()) < 1.5
+           && std::abs (now.bottom - b.getBottom()) < 1.5;
    #else
     juce::ignoreUnused (c);
     return true;
    #endif
+}
+
+namespace
+{
+bool coverCheckWanted()
+{
+    static const bool on = juce::SystemStats::getEnvironmentVariable ("LYNX_COVERCHECK", {}).trim() != "0";
+    return on;
+}
+
+#if JUCE_WINDOWS
+bool occlusionCheckWanted()
+{
+    static const bool on = juce::SystemStats::getEnvironmentVariable ("LYNX_OCCLUSION", {}).trim() != "0";
+    return on;
+}
+
+// a window's rectangle as it shows (DWM's frame bounds: without Windows 10/11's invisible resize borders)
+RECT shownRect (HWND w)
+{
+    using GetAttribute = HRESULT (WINAPI*) (HWND, DWORD, PVOID, DWORD);
+    static const auto getAttribute = [] {
+        auto* dwm = LoadLibraryW (L"dwmapi.dll");
+        return dwm != nullptr ? (GetAttribute) (void*) GetProcAddress (dwm, "DwmGetWindowAttribute") : nullptr;
+    }();
+    RECT r {};
+    if (getAttribute == nullptr || FAILED (getAttribute (w, 9 /* DWMWA_EXTENDED_FRAME_BOUNDS */, &r, sizeof (r))))
+        GetWindowRect (w, &r);
+    return r;
+}
+
+bool cloaked (HWND w)
+{
+    using GetAttribute = HRESULT (WINAPI*) (HWND, DWORD, PVOID, DWORD);
+    static const auto getAttribute = [] {
+        auto* dwm = LoadLibraryW (L"dwmapi.dll");
+        return dwm != nullptr ? (GetAttribute) (void*) GetProcAddress (dwm, "DwmGetWindowAttribute") : nullptr;
+    }();
+    DWORD value = 0;
+    return getAttribute != nullptr && SUCCEEDED (getAttribute (w, 14 /* DWMWA_CLOAKED */, &value, sizeof (value))) && value != 0;
+}
+
+// Round 190la: a top-level window (the main window, a detached panel, a plugin window) whose visible part (on its
+// monitor) lies wholly under ONE visible, opaque top-level window of any program above it in the stacking order (a
+// maximised browser over LYNX while a song plays): nothing it paints reaches the screen, so its live views need not step
+// and its GPU playhead need not be committed (the frame steps resume within the idle poll's 50 ms when it shows again).
+// Windows that may let it show through never count: layered or click-through windows (overlays, translucent terminals),
+// windows without a redirection surface (DirectComposition content may be translucent), cloaked windows (other virtual
+// desktops, hidden store apps), minimised ones, and windows with a region (a hole). Message thread; the answer is kept
+// for 8 ms (every ticker of a frame asks about the same window). LYNX_OCCLUSION=0: never (A/B).
+bool occludedByOtherWindows (HWND top)
+{
+    if (top == nullptr || ! occlusionCheckWanted() || IsIconic (top))
+        return false;
+    static HWND lastTop = nullptr;
+    static double lastMs = -1.0e9;
+    static bool lastAnswer = false;
+    const auto now = juce::Time::getMillisecondCounterHiRes();
+    if (top == lastTop && now - lastMs < 8.0)
+        return lastAnswer;
+
+    auto answer = false;
+    auto own = shownRect (top);
+    MONITORINFO mi {};
+    mi.cbSize = sizeof (mi);
+    if (auto* monitor = MonitorFromWindow (top, MONITOR_DEFAULTTONULL); monitor != nullptr && GetMonitorInfoW (monitor, &mi))
+    {
+        // (a window across two monitors: only the monitor it is mostly on is looked at if it lies wholly there)
+        RECT onMonitor {};
+        if (IntersectRect (&onMonitor, &own, &mi.rcMonitor) && EqualRect (&onMonitor, &own))
+            own = onMonitor;
+    }
+    if (own.right > own.left && own.bottom > own.top)
+    {
+        auto steps = 0;
+        for (auto above = GetWindow (top, GW_HWNDPREV); above != nullptr && ++steps < 400; above = GetWindow (above, GW_HWNDPREV))
+        {
+            if (! IsWindowVisible (above) || IsIconic (above))
+                continue;
+            const auto ex = GetWindowLongPtr (above, GWL_EXSTYLE);
+            if ((ex & (WS_EX_LAYERED | WS_EX_TRANSPARENT | 0x00200000L /* WS_EX_NOREDIRECTIONBITMAP */)) != 0)
+                continue;
+            const auto r = shownRect (above);
+            if (r.left > own.left || r.top > own.top || r.right < own.right || r.bottom < own.bottom)
+                continue;
+            if (cloaked (above))
+                continue;
+            if (auto* region = CreateRectRgn (0, 0, 0, 0))
+            {
+                const auto type = GetWindowRgn (above, region);
+                DeleteObject (region);
+                if (type != ERROR)
+                    continue;
+            }
+            answer = true;
+            break;
+        }
+    }
+    lastTop = top;
+    lastMs = now;
+    lastAnswer = answer;
+    return answer;
+}
+#endif
+} // namespace
+
+std::atomic<int>& coveredSkips()
+{
+    static std::atomic<int> n { 0 };
+    return n;
+}
+
+bool coveredBySiblingWindows (const juce::Component& c)
+{
+   #if JUCE_WINDOWS
+    if (! coverCheckWanted())
+        return false;
+    auto* peer = c.getPeer();
+    auto* hwnd = peer != nullptr ? static_cast<HWND> (peer->getNativeHandle()) : nullptr;
+    if (hwnd == nullptr)
+        return false;
+    // round 190la: the top-level window it is in, wholly under another program's window (or another LYNX window)
+    if ((GetWindowLongPtr (hwnd, GWL_STYLE) & WS_CHILD) == 0)
+        return occludedByOtherWindows (hwnd);
+    // what of the window can show: its rectangle, clipped by each parent's client area on the way up (screen pixels)
+    RECT visible {};
+    if (! GetWindowRect (hwnd, &visible))
+        return false;
+    for (auto w = hwnd; (GetWindowLongPtr (w, GWL_STYLE) & WS_CHILD) != 0;)
+    {
+        const auto parent = GetParent (w);
+        if (parent == nullptr)
+            return false;
+        RECT client {};
+        GetClientRect (parent, &client);
+        MapWindowPoints (parent, nullptr, reinterpret_cast<POINT*> (&client), 2);
+        if (! IntersectRect (&visible, &visible, &client))
+            return true; // (scrolled or moved out of its parent: nothing shows)
+        // a visible sibling above `w` that holds all of it: an opaque window (not layered: the floaters and the tour's
+        // dimmed layer let what is under them show) with no region of its own (a region can leave a hole: round 190jy's
+        // docked editors drawn by the main window)
+        for (auto above = GetWindow (w, GW_HWNDPREV); above != nullptr; above = GetWindow (above, GW_HWNDPREV))
+        {
+            if (! IsWindowVisible (above) || (GetWindowLongPtr (above, GWL_EXSTYLE) & (WS_EX_LAYERED | WS_EX_TRANSPARENT)) != 0)
+                continue;
+            RECT r {};
+            if (! GetWindowRect (above, &r) || r.left > visible.left || r.top > visible.top || r.right < visible.right || r.bottom < visible.bottom)
+                continue;
+            if (auto* region = CreateRectRgn (0, 0, 0, 0))
+            {
+                const auto type = GetWindowRgn (above, region);
+                DeleteObject (region);
+                if (type != ERROR)
+                    continue; // (it has a region: perhaps a hole over us)
+            }
+            return true;
+        }
+        w = parent;
+        if ((GetWindowLongPtr (w, GWL_STYLE) & WS_CHILD) == 0)
+            return occludedByOtherWindows (w); // (round 190la)
+    }
+    return false;
+   #else
+    juce::ignoreUnused (c);
+    return false;
+   #endif
+}
+
+juce::String describeCover (const juce::Component& c)
+{
+   #if JUCE_WINDOWS
+    auto* peer = c.getPeer();
+    auto* hwnd = peer != nullptr ? static_cast<HWND> (peer->getNativeHandle()) : nullptr;
+    if (hwnd == nullptr)
+        return "no window";
+    const auto rectText = [] (const RECT& r) { return juce::String (r.left) + "," + juce::String (r.top) + " " + juce::String (r.right - r.left) + "x" + juce::String (r.bottom - r.top); };
+    RECT visible {};
+    GetWindowRect (hwnd, &visible);
+    juce::String out;
+    out << "window " << juce::String::toHexString ((juce::pointer_sized_int) hwnd) << " " << rectText (visible)
+        << ((GetWindowLongPtr (hwnd, GWL_STYLE) & WS_CHILD) != 0 ? " child" : " top-level") << (IsWindowVisible (hwnd) ? "" : " INVISIBLE")
+        << " showing " << (c.isShowing() ? 1 : 0) << " covered " << (coveredBySiblingWindows (c) ? 1 : 0);
+    for (auto w = hwnd; (GetWindowLongPtr (w, GWL_STYLE) & WS_CHILD) != 0;)
+    {
+        const auto parent = GetParent (w);
+        if (parent == nullptr)
+            break;
+        RECT client {};
+        GetClientRect (parent, &client);
+        MapWindowPoints (parent, nullptr, reinterpret_cast<POINT*> (&client), 2);
+        IntersectRect (&visible, &visible, &client);
+        out << " | in parent " << juce::String::toHexString ((juce::pointer_sized_int) parent) << " visible " << rectText (visible) << ", above:";
+        for (auto above = GetWindow (w, GW_HWNDPREV); above != nullptr; above = GetWindow (above, GW_HWNDPREV))
+        {
+            if (! IsWindowVisible (above))
+                continue;
+            RECT r {};
+            GetWindowRect (above, &r);
+            const auto ex = GetWindowLongPtr (above, GWL_EXSTYLE);
+            auto type = ERROR;
+            if (auto* region = CreateRectRgn (0, 0, 0, 0))
+            {
+                type = GetWindowRgn (above, region);
+                DeleteObject (region);
+            }
+            wchar_t cls[64] {};
+            GetClassNameW (above, cls, 63);
+            out << " [" << juce::String (cls).substring (0, 24) << " " << rectText (r) << ((ex & WS_EX_LAYERED) != 0 ? " layered" : "")
+                << ((ex & WS_EX_TRANSPARENT) != 0 ? " transparent" : "") << (type != ERROR ? " region " + juce::String ((int) type) : juce::String())
+                << (r.left <= visible.left && r.top <= visible.top && r.right >= visible.right && r.bottom >= visible.bottom ? " HOLDS" : "") << "]";
+        }
+        w = parent;
+    }
+    return out;
+   #else
+    return c.isShowing() ? "showing" : "not showing";
+   #endif
+}
+
+bool showsOnScreen (const juce::Component& c)
+{
+    return (c.isShowing() || ui::showingForShots()) && ! coveredBySiblingWindows (c);
 }
 
 std::vector<juce::Component*> attachedChildren (void* parentWindow)
@@ -745,6 +1025,9 @@ void raiseOverlays()
         for (auto& o : *list)
             if (o != nullptr && o->isVisible() && isAttached (*o))
                 o->toFront (false);
+   #if JUCE_WINDOWS
+    stackingChanged(); // (round 190jy: after every stacking change the callers make)
+   #endif
 }
 
 bool supportsFloaters()
@@ -885,6 +1168,207 @@ void raiseOnAnyClick (juce::Component& c, std::function<void()> onClick)
 void forwardUnusedKeys (juce::Component& c)
 {
     c.addKeyListener (&keyForwarder()); // (JUCE adds a listener once)
+}
+
+void stopForwardingUnusedKeys (juce::Component& c)
+{
+    c.removeKeyListener (&keyForwarder());
+}
+
+void stopRaiseOnAnyClick (juce::Component& c)
+{
+   #if JUCE_WINDOWS
+    std::erase_if (clickRaises(), [&c] (const ClickRaise& r) { return r.component == nullptr || r.component.getComponent() == &c; });
+   #else
+    juce::ignoreUnused (c);
+   #endif
+}
+
+void placeJustAbove (juce::Component& c, juce::Component* below)
+{
+   #if JUCE_WINDOWS
+    auto* self = isAttached (c) ? static_cast<HWND> (c.getWindowHandle()) : nullptr;
+    if (self == nullptr)
+        return;
+    constexpr UINT flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER;
+    auto* under = below != nullptr && isAttached (*below) ? static_cast<HWND> (below->getWindowHandle()) : nullptr;
+    if (under == nullptr)
+    {
+        SetWindowPos (self, HWND_BOTTOM, 0, 0, 0, 0, flags);
+        return;
+    }
+    if (under == self)
+        return;
+    auto* above = GetWindow (under, GW_HWNDPREV);
+    if (above == self)
+        return; // (already there)
+    SetWindowPos (self, above != nullptr ? above : HWND_TOP, 0, 0, 0, 0, flags); // (just below `above` = just above `under`)
+   #else
+    juce::ignoreUnused (c, below);
+   #endif
+}
+
+juce::String editorHolesSelfTest()
+{
+   #if JUCE_WINDOWS
+    if (! dockingEnabled())
+        return "OK (not available: docking is off)";
+    juce::Component host, lower, upper;
+    host.setOpaque (true);
+    host.setBounds (100, 40, 640, 480);
+    host.addToDesktop (juce::ComponentPeer::windowHasTitleBar);
+    for (auto* c : { &lower, &upper })
+    {
+        c->setOpaque (true);
+        c->setBounds (10, 10, 300, 200);
+        if (! attach (*c, host))
+            return "ERROR no native child window";
+        c->setVisible (true);
+    }
+    juce::String error;
+    auto* hl = static_cast<HWND> (lower.getWindowHandle());
+    placeJustAbove (upper, &lower);
+    if (! isAbove (upper.getWindowHandle(), hl))
+        error << "placeJustAbove: upper not above lower; ";
+    placeJustAbove (upper, nullptr);
+    if (isAbove (upper.getWindowHandle(), hl))
+        error << "placeJustAbove (bottom): upper still above; ";
+    const juce::Rectangle<int> hole (20, 30, 50, 40);
+    setHoles (lower, { hole });
+    if (holesOf (lower).size() != 1 || ! cutsInto (hl, hole) || ! cutsInto (hl, hole.withSize (5, 5)) || cutsInto (hl, { 100, 100, 10, 10 }))
+        error << "the hole is not the window's region; ";
+    {
+        auto* region = CreateRectRgn (0, 0, 0, 0);
+        const auto type = GetWindowRgn (hl, region);
+        const auto inHole = PtInRegion (region, 30, 40) != FALSE, outside = PtInRegion (region, 5, 5) != FALSE;
+        DeleteObject (region);
+        if (type == ERROR || inHole || ! outside)
+            error << "region type " << (int) type << " hole " << (int) inHole << " rest " << (int) outside << "; ";
+    }
+    setHoles (lower, { hole }); // (the same: nothing happens)
+    setHoles (lower, {});
+    if (! holesOf (lower).empty() || cutsInto (hl, hole))
+        error << "the hole stayed; ";
+    for (auto* c : { &upper, &lower })
+        detach (*c);
+    return error.isEmpty() ? juce::String ("OK") : "ERROR " + error.trim();
+   #else
+    return "OK (not available: Windows only)";
+   #endif
+}
+
+void setStackingListener (std::function<void()> listener)
+{
+   #if JUCE_WINDOWS
+    stackingListener() = std::move (listener);
+   #else
+    juce::ignoreUnused (listener);
+   #endif
+}
+
+void setHoles (juce::Component& c, const std::vector<juce::Rectangle<int>>& holes)
+{
+   #if JUCE_WINDOWS
+    auto* hwnd = isAttached (c) ? static_cast<HWND> (c.getWindowHandle()) : nullptr;
+    if (hwnd == nullptr)
+        return;
+    auto& now = holesNow();
+    const auto it = now.find (hwnd);
+    if (it == now.end() ? holes.empty() : it->second == holes)
+        return;
+    if (holes.empty())
+    {
+        now.erase (hwnd);
+        SetWindowRgn (hwnd, nullptr, TRUE);
+        return;
+    }
+    RECT r {};
+    GetWindowRect (hwnd, &r);
+    auto* region = CreateRectRgn (0, 0, (int) (r.right - r.left), (int) (r.bottom - r.top));
+    for (const auto& h : holes)
+    {
+        auto* hole = CreateRectRgn (h.getX(), h.getY(), h.getRight(), h.getBottom());
+        CombineRgn (region, region, hole, RGN_DIFF);
+        DeleteObject (hole);
+    }
+    now[hwnd] = holes;
+    if (SetWindowRgn (hwnd, region, TRUE) == 0) // (the system owns the region once it is set)
+    {
+        DeleteObject (region);
+        now.erase (hwnd);
+    }
+   #else
+    juce::ignoreUnused (c, holes);
+   #endif
+}
+
+std::vector<juce::Rectangle<int>> holesOf (const juce::Component& c)
+{
+   #if JUCE_WINDOWS
+    auto* hwnd = isAttached (c) ? static_cast<HWND> (c.getWindowHandle()) : nullptr;
+    const auto it = hwnd != nullptr ? holesNow().find (hwnd) : holesNow().end();
+    return it != holesNow().end() ? it->second : std::vector<juce::Rectangle<int>> {};
+   #else
+    juce::ignoreUnused (c);
+    return {};
+   #endif
+}
+
+bool cutsInto (void* window, juce::Rectangle<int> rectInWindow)
+{
+   #if JUCE_WINDOWS
+    auto* hwnd = static_cast<HWND> (window);
+    if (hwnd == nullptr || rectInWindow.isEmpty())
+        return false;
+    auto* region = CreateRectRgn (0, 0, 0, 0);
+    bool cut = false;
+    if (const auto type = GetWindowRgn (hwnd, region); type != ERROR && type != NULLREGION)
+    {
+        RECT r {};
+        GetWindowRect (hwnd, &r);
+        const auto inside = rectInWindow.getIntersection ({ 0, 0, (int) (r.right - r.left), (int) (r.bottom - r.top) });
+        if (! inside.isEmpty())
+        {
+            auto* wanted = CreateRectRgn (inside.getX(), inside.getY(), inside.getRight(), inside.getBottom());
+            auto* outside = CreateRectRgn (0, 0, 0, 0);
+            cut = CombineRgn (outside, wanted, region, RGN_DIFF) != NULLREGION;
+            DeleteObject (outside);
+            DeleteObject (wanted);
+        }
+    }
+    DeleteObject (region);
+    return cut;
+   #else
+    juce::ignoreUnused (window, rectInWindow);
+    return false;
+   #endif
+}
+
+juce::Rectangle<int> physicalInTop (const juce::Component& area, juce::Rectangle<int> boundsInArea)
+{
+    const auto* top = area.getTopLevelComponent();
+    const auto* peer = top != nullptr ? top->getPeer() : nullptr;
+    if (peer == nullptr)
+        return {};
+    const auto scale = peer->getPlatformScaleFactor() * (double) top->getDesktopScaleFactor();
+    const auto inTop = top->getLocalArea (&area, boundsInArea);
+    const auto r = dockstack::editorRect (inTop.getX(), inTop.getY(), inTop.getWidth(), inTop.getHeight(), scale);
+    return { r.x, r.y, r.w, r.h };
+}
+
+juce::Rectangle<int> rectInParentWindow (const juce::Component& c)
+{
+   #if JUCE_WINDOWS
+    auto* hwnd = isAttached (c) ? static_cast<HWND> (c.getWindowHandle()) : nullptr;
+    auto* parent = hwnd != nullptr ? GetParent (hwnd) : nullptr;
+    if (parent == nullptr)
+        return {};
+    const auto r = rectInParent (hwnd, parent);
+    return juce::Rectangle<int>::leftTopRightBottom ((int) r.left, (int) r.top, (int) r.right, (int) r.bottom);
+   #else
+    juce::ignoreUnused (c);
+    return {};
+   #endif
 }
 
 bool isAbove (void* a, void* b)

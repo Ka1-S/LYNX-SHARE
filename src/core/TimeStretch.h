@@ -10,6 +10,7 @@
 
 #include <array>
 #include <atomic>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -36,9 +37,15 @@ StretchOptions stretchOptionsOf (const SamplerSettings& sampler);
 // defaults do (so every key made before 190fm stays the same).
 std::string stretchOptionsKey (const StretchOptions& options, StretchMethod method);
 
+// Whether `method` with `modes` renders a transposition (`semitones`) offline: Beats (round 175a), and under warpLaw Measured
+// (round 190ik) Complex Pro (its formants kept) and Texture (each grain resampled, as Live's). Every other mode ignores
+// `semitones` (the voice shifts in real time).
+bool stretchBakesPitch (StretchMethod method, const WarpModeSettings& modes) noexcept;
+
 // `ratio` = output duration / input duration (2 = twice as long, same pitch).
-// `semitones` (Beats only, else ignored): each piece is also resampled by that much, offline (Live's clip transpose in
-// Beats mode); the pieces keep their places on the grid.
+// `semitones` (Beats and Complex Pro, see stretchBakesPitch; else ignored): Beats resamples each piece by that much,
+// offline (Live's clip transpose in Beats mode), the pieces keeping their places on the grid; Complex Pro transposes the
+// whole stretch and keeps its formants (round 190ik).
 std::shared_ptr<SampleData> timeStretch (const SampleData& input, double ratio, StretchMethod method = StretchMethod::general,
                                          double semitones = 0.0, const StretchOptions& options = {});
 
@@ -81,6 +88,10 @@ class VoicePitchShifter
 {
 public:
     static constexpr double minFactor = 0.25, maxFactor = 4.0; // ±2 octaves
+    // round gaps190kf: an audio clip's own transposition reaches Live's ±48 st Transpose (detail-072: Complex, Tones and
+    // Beats in the Clip View): ±4 octaves. Only a clip transposed beyond ±24 st uses it, so every other note keeps the
+    // ±2 octave clamp it always had (old projects play bit-identical).
+    static constexpr double minClipFactor = 1.0 / 16.0, maxClipFactor = 16.0;
 
     VoicePitchShifter();
     ~VoicePitchShifter();
@@ -91,9 +102,13 @@ public:
     bool ready() const noexcept;
     int primeLength (double factor) const noexcept;
     int maxPrimeLength() const noexcept { return primeLength (minFactor); } // the longest: the lowest transposition
+    int maxClipPrimeLength() const noexcept { return primeLength (minClipFactor); } // (round gaps190kf: a clip's −48 st)
     // `l`/`r` (r may equal l): primeLength (factor) frames of the transposed source from the note's start
     void start (const float* l, const float* r, int frames) noexcept;
     void process (const float* inL, const float* inR, int inFrames, float* outL, float* outR, int outFrames) noexcept;
+    // the stretcher's output latency (frames): how far its output lags, in output frames (issue #187: a voice whose input
+    // rate changes keeps its content aligned by this much times the change)
+    int outputLatency() const noexcept;
 
 private:
     struct Impl;
@@ -131,6 +146,7 @@ public:
     std::unique_ptr<VoicePitchShifter> make (int kind) const;
     // the longest priming a shifter of that kind takes (VoicePitchShifter::maxPrimeLength)
     int maxPrimeLength (int kind) const;
+    int maxClipPrimeLength (int kind) const; // (round gaps190kf: VoicePitchShifter::maxClipPrimeLength)
 
     // keep `count` fresh shifters of that kind ready (RackState::build sets it for each rack it builds); topUp() makes
     // what is missing. liveReserve: a chord a keyboard plays beyond the song (refilled 30 times a second)
@@ -175,6 +191,11 @@ std::vector<long> detectAttacks (const float* mono, long frames, double sampleRa
 // Where LYNX's Beats warp mode cuts the audio (round 175a, N4): the attacks, each moved to where it rises fastest.
 // `measured` false: the Classic law's cut, the start of the 10 ms window before the steepest rise (round 190gx)
 std::vector<long> beatsCuts (const float* mono, long frames, double sampleRate, bool measured = true);
+// The cuts of a Beats law (round 190ik): Classic and Measured as beatsCuts; PitchAware = Measured's cuts made pitch aware
+// (core/WarpEngines' pitchAwareCuts: legato pitch steps added, glide / vibrato cuts dropped)
+std::vector<long> beatsCutsOfLaw (const float* mono, long frames, double sampleRate, int beatsLaw);
+// Texture's grain scatter seed for a source of `frames` frames (round 190ik: a fixed sequence, the same render each time)
+std::uint32_t textureSeed (long frames) noexcept;
 // The ratio band that is resampled instead of stretched.
 constexpr double resampleTolerance = 0.001;
 

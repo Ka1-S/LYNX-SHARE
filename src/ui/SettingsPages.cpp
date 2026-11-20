@@ -1,6 +1,9 @@
 #include "ui/RemoteControl.h"
+#include "core/EscClose.h"
 #include "ui/NumBox.h"
 #include "ui/SettingsPages.h"
+#include "ui/LabelFont.h"
+#include "core/TextSize.h"
 #include "ui/RemoteControlSettings.h"
 #include "platform/Paths.h"
 #include "platform/FileTypes.h"
@@ -10,6 +13,8 @@
 #include "core/FlSettings.h"
 #include "core/LayoutStyle.h"
 #include "core/LynxExtras.h"
+#include "ui/PolyEditor.h"
+#include "ui/WorkflowExtras.h" // round 190iu
 #include "core/PlaylistOps.h"
 #include "core/ToolbarLayout.h"
 #include "engine/AudioEngine.h"
@@ -18,10 +23,12 @@
 #include "ui/AutomationUi.h"
 #include "ui/DetailView.h"
 #include "ui/Dialogs.h"
+#include "ui/MapMode.h"
 #include "ui/I18n.h"
 #include "ui/MixerComponent.h"
 #include "ui/NewProjectDialog.h"
 #include "ui/PianoRollComponent.h"
+#include "ui/PlaylistComponent.h"
 #include "ui/PluginSkin.h"
 #include "ui/Updater.h"
 
@@ -62,22 +69,27 @@ struct Rows
 
     explicit Rows (int width) : area (20, 14, width - 40, 100000), y (14) {}
 
+    // Settings › General › Text size (issue #189): above 100 % the rows and notes grow with the text, so a two-line note
+    // or a control's text is not cut (the page scrolls)
+    static int h (int height) { return juce::roundToInt ((float) height * juce::jmax (1.0f, (float) theme::textSize() / 100.0f)); }
+
     void section (juce::Component& title, bool first = false)
     {
         if (! first)
             y += 10;
-        title.setBounds (area.getX(), y, area.getWidth(), sectionHeight);
-        y += sectionHeight + rowGap;
+        title.setBounds (area.getX(), y, area.getWidth(), h (sectionHeight));
+        y += h (sectionHeight) + rowGap;
     }
 
     // label + control (control width 0 = to the right edge)
     // round 165o: a caption wider than the label column (a long translation) gets its own line above the control
     juce::Rectangle<int> row (juce::Label& label, int controlWidth = 260, int height = rowHeight)
     {
+        height = h (height);
         if (theme::labelColumnWidth ({ &label }, 0, 2000) > labelWidth + labelWidth / 10) // a slight squeeze is fine
         {
-            label.setBounds (area.getX(), y, area.getWidth(), 18);
-            y += 18;
+            label.setBounds (area.getX(), y, area.getWidth(), h (18));
+            y += h (18);
         }
         else
             label.setBounds (area.getX(), y, labelWidth, height);
@@ -88,6 +100,7 @@ struct Rows
 
     juce::Rectangle<int> full (int height = rowHeight)
     {
+        height = h (height);
         auto r = juce::Rectangle<int> (area.getX(), y, area.getWidth(), height);
         y += height + rowGap;
         return r;
@@ -95,8 +108,26 @@ struct Rows
 
     juce::Rectangle<int> indented (int height = rowHeight)
     {
+        height = h (height);
         auto r = juce::Rectangle<int> (area.getX() + labelWidth, y, area.getWidth() - labelWidth, height);
         y += height + rowGap;
+        return r;
+    }
+
+    // a note under a control: as tall as its text needs at the width it gets (wrapped), at least `minHeight` (issue #189:
+    // a larger Text size wraps a note into more lines than the fixed heights had room for)
+    juce::Rectangle<int> indentedNote (juce::Label& label, int minHeight)
+    {
+        if (theme::textSize() <= 100)
+            return indented (minHeight); // (the standard size keeps its layout to the pixel)
+        const auto width = area.getWidth() - labelWidth;
+        const auto border = label.getBorderSize();
+        juce::GlyphArrangement text;
+        text.addJustifiedText (label.getFont(), label.getText(), 0.0f, 0.0f, (float) juce::jmax (40, width - border.getLeftAndRight()),
+                               juce::Justification::topLeft);
+        const auto needed = (int) std::ceil (text.getBoundingBox (0, -1, true).getHeight()) + border.getTopAndBottom() + 2;
+        auto r = juce::Rectangle<int> (area.getX() + labelWidth, y, width, juce::jmax (h (minHeight), needed));
+        y += r.getHeight() + rowGap;
         return r;
     }
 
@@ -104,7 +135,8 @@ struct Rows
 
     // round 190bj (QA: Settings › MIDI's game-controller line was drawn squeezed sideways): a note label as tall as its
     // text needs at the page's width (never less than `minHeight`), wrapped, never squeezed
-    juce::Rectangle<int> note (juce::Label& label, int minHeight, int lift = 3)
+    // (`indent`: under the controls, past the label column, as indented() places it)
+    juce::Rectangle<int> note (juce::Label& label, int minHeight, int lift = 3, bool indent = false)
     {
         label.setMinimumHorizontalScale (1.0f);
         const auto border = label.getBorderSize();
@@ -112,9 +144,12 @@ struct Rows
         text.append (label.getText(), label.getFont());
         text.setWordWrap (juce::AttributedString::byWord);
         juce::TextLayout layout;
-        layout.createLayout (text, (float) juce::jmax (1, area.getWidth() - border.getLeftAndRight()));
-        const auto height = juce::jmax (minHeight, (int) std::ceil (layout.getHeight()) + border.getTopAndBottom() + 1);
-        return full (height).translated (0, -lift);
+        layout.createLayout (text, (float) juce::jmax (1, area.getWidth() - (indent ? labelWidth : 0) - border.getLeftAndRight()));
+        const auto height = juce::jmax (h (minHeight), (int) std::ceil (layout.getHeight()) + border.getTopAndBottom() + 1);
+        const auto left = indent ? labelWidth : 0;
+        auto r = juce::Rectangle<int> (area.getX() + left, y, area.getWidth() - left, height); // (measured: not scaled again)
+        y += height + rowGap;
+        return r.translated (0, -lift);
     }
 };
 
@@ -133,12 +168,12 @@ public:
 
         for (auto* c : std::initializer_list<juce::Component*> { &workflowTitle, &layoutStyleLabel, &layoutStyleBox, &layoutStyleNote, &alsSessionLabel, &alsSessionBox, &languageTitle, &displayTitle, &startupTitle, &editingTitle, &backupTitle,
                                                                  &pluginsTitle, &languageLabel, &languageBox, &languageNote, &scaleLabel, &scaleBox, &menuLabel, &menuBox,
-                                                                 &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &rackStepColour, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &uiAnimations, &animationLabel, &animationBox, &animationNote, &gpuRendering, &templateLabel, &templateBox, &templateNote, &startupProjectLabel, &startupProjectBox, &splash, &startupSound, &scanAtStart, &supportNoteBox, &menuEntry,
-                                                                 &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &monoPaint, &autoSelectLinked, &noTypingPriority, &hoverValues, &editInLabel, &editInBox, &undoLabel,
+                                                                 &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &rackStepColour, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &uiAnimations, &animationLabel, &animationBox, &animationNote, &gpuRendering, &editorsInMain, &templateLabel, &templateBox, &templateNote, &startupProjectLabel, &startupProjectBox, &splash, &startupSound, &scanAtStart, &supportNoteBox, &menuEntry,
+                                                                 &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &monoPaint, &altMeterScale, &autoSelectLinked, &noTypingPriority, &hoverValues, &escCloses, &editInLabel, &editInBox, &undoLabel,
                                                                  &undoBox, &alternateUndo, &hintsTitle, &manageMessages, &messagesNote, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &backupQuiet, &longestWaitLabel, &longestWaitBox, &unusedTakes, &detachNew,
-                                                                 &sandbox, &sandboxNote, &substitutes, &substitutesNote, &limitEditors, &managePlugins, &manageShortcuts, &shortcutsNote,
+                                                                 &sandboxLabel, &sandboxBox, &sandboxNote, &substitutes, &substitutesNote, &sampleAccurate, &limitEditors, &managePlugins, &manageShortcuts, &shortcutsNote,
                                                                  &reportsTitle, &crashLabel, &crashBox, &crashNote, &updatesTitle, &checkUpdates, &checkNow, &updatesNote,
-                                                                 &previousLabel, &goBack, &autoNameChannels, &restoreAfterSolo, &readSampleTempo, &historyNewestFirst })
+                                                                 &previousLabel, &goBack, &autoNameChannels, &restoreAfterSolo, &readSampleTempo, &historyNewestFirst, &projectLayout, &historyOnUndo, &undoKnobTweaks, &dataSizeLabel, &dataSizeBox, &clickHold, &bothButtons })
             add (*c);
 
         setupFontRow();
@@ -153,18 +188,15 @@ public:
             if (hooks.setGeneral)
                 hooks.setGeneral (options);
         };
-        styleNote (layoutStyleNote, tr ("Pattern workflow: channel rack, patterns and a Playlist.") + "\n"
-                                        + tr ("Clip-launch workflow: a clip grid with scenes beside the Playlist; patterns and the channel rack stay one click away.") + "\n"
-                                        + tr ("Simple workflow: one window with the tracks and the timeline; the other windows stay one click away."));
+        styleNote (layoutStyleNote, tr ("Three workflows in one program. Switch any time in View › Layout style: the project stays the same, only the windows change.") + "\n"
+                                        + tr ("Pattern workflow: works the way FL Studio does, with the Channel Rack, Piano Roll, Playlist and Mixer.") + "\n"
+                                        + tr ("Clip-launch workflow: clips and scenes launched from a grid, in the style of Ableton Live, with a Session mixer and the clip and device views; patterns and the Channel Rack stay one click away.") + "\n"
+                                        + tr ("Simple workflow: BandLab's approachable one-window style mixed with FL Studio Mobile's way of working, with tracks and a timeline, loops, pads and quick recording; FL Studio Mobile projects (.flm) open too."));
         styleLabel (alsSessionLabel, tr ("Session clips of Live sets"));
         alsSessionBox.addItem (tr ("Clip grid (default)"), 1);
         alsSessionBox.addItem (tr ("Playlist, after the arrangement"), 2);
         alsSessionBox.setSelectedId (options.alsSessionOnPlaylist ? 2 : 1, juce::dontSendNotification);
-        alsSessionBox.onChange = [this] {
-            options.alsSessionOnPlaylist = alsSessionBox.getSelectedId() == 2;
-            if (hooks.setGeneral)
-                hooks.setGeneral (options);
-        };
+        alsSessionBox.onChange = [this] { change ([&] { options.alsSessionOnPlaylist = alsSessionBox.getSelectedId() == 2; }); };
         add (remoteTitle);
         add (remoteControl);
         add (remoteStatus);
@@ -246,19 +278,35 @@ public:
                 [this] (bool on) { options.uiAnimations = on; });
         // round 174e2: how often the playhead, meters and scopes move (the display's refresh by default, as FL)
         styleLabel (animationLabel, tr ("Animation rate"));
+        // round 190ip: Balanced (Live's rule: the refresh halved until it is at most 100 Hz); the capped rates are evenly paced
         animationBox.addItem (tr ("Display (default)"), 1);
+        animationBox.addItem (tr ("Balanced"), 4); // (the note says what it is: a narrow box)
         animationBox.addItem (tr ("60 Hz"), 2);
         animationBox.addItem (tr ("30 Hz"), 3);
-        animationBox.setSelectedId (options.animationRate == 30 ? 3 : options.animationRate == 60 ? 2 : 1, juce::dontSendNotification);
+        animationBox.setSelectedId (options.animationRate == 30 ? 3 : options.animationRate == 60 ? 2 : options.animationRate < 0 ? 4 : 1,
+                                    juce::dontSendNotification);
         animationBox.onChange = [this] {
-            change ([&] { options.animationRate = animationBox.getSelectedId() == 3 ? 30 : animationBox.getSelectedId() == 2 ? 60 : 0; });
+            change ([&] {
+                const auto id = animationBox.getSelectedId();
+                options.animationRate = id == 3 ? 30 : id == 2 ? 60 : id == 4 ? -1 : 0;
+            });
         };
         styleNote (animationNote, tr ("How often the playhead, meters and scopes move. Display follows your screen's refresh rate "
-                                      "(smoothest); 60 Hz or 30 Hz use less CPU on slower computers."));
+                                      "(smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz "
+                                      "use the least CPU (laptops, slower computers)."));
         toggle (gpuRendering, tr ("Draw with the GPU (Direct2D). Turn off if LYNX SHARE crashes in the graphics driver or the screen flickers"),
                 options.gpuRendering, [this] (bool on) { options.gpuRendering = on; });
        #if ! JUCE_WINDOWS
         gpuRendering.setVisible (false);
+       #endif
+        // round 190jy (queue item 44, LYNX's own): a docked LYNX editor drawn by the main window, so its live display
+        // costs only its paint; hosted plugins and detached windows keep windows of their own
+        toggle (editorsInMain, tr ("Draw docked LYNX editors in the main window (lighter live displays)"), options.editorsInMainWindow,
+                [this] (bool on) { options.editorsInMainWindow = on; });
+        editorsInMain.setTooltip (tr ("On: a docked LYNX editor (Gross Beat, Fruity Limiter, Maximus...) is drawn by the main window: "
+                                      "its moving displays use less CPU. Hosted plugins and detached windows keep windows of their own"));
+       #if ! JUCE_WINDOWS
+        editorsInMain.setVisible (false);
        #endif
 
         // FL's Options › General › Miscellaneous › "Default template" (REA_rodada186a; issue #123)
@@ -318,6 +366,9 @@ public:
         toggle (monoPaint, tr ("Monophonic painting in piano roll"), options.monophonicPainting,
                 [this] (bool on) { options.monophonicPainting = on; });
         monoPaint.setTooltip (tr ("On: the Paint tool replaces the notes under each new note, and Shift paints over them. Off: the other way round"));
+        // FL's General › Miscellaneous "Alternate meter scale" (round 190lx, DF-61; FL's hint "Alternate scale for all peak meters")
+        toggle (altMeterScale, tr ("Alternate meter scale"), options.alternateMeterScale, [this] (bool on) { options.alternateMeterScale = on; });
+        altMeterScale.setTooltip (tr ("Alternate scale for all peak meters"));
         // FL's next Miscellaneous box, DisablePlugFocusDefaultBox (off; round 187a, issue #96)
         toggle (noTypingPriority, tr ("Disable typing keyboard priority by default"), options.disableTypingPriority,
                 [this] (bool on) { options.disableTypingPriority = on; });
@@ -329,6 +380,8 @@ public:
                 [this] (bool on) { options.rememberSeek = on; });
         toggle (hoverValues, tr ("Show a control's value next to the mouse when hovering over it (LYNX)"), options.hoverValues,
                 [this] (bool on) { options.hoverValues = on; });
+        // issue #217 (round 190ng): FL 2026 closes the focused window on Esc (core/EscClose.h); the LYNX extras page has it too
+        toggle (escCloses, tr ("Esc closes the focused window"), escclose::enabled(), [] (bool on) { workflowextras::setExtra ("general.escCloses", on); });
         // LYNX extra (issue #25): FL plays a stretched pattern clip once; off = FL's behaviour
         toggle (clipsLoop, tr ("Stretched pattern clips loop their pattern (LYNX)"), options.stretchedClipsLoop,
                 [this] (bool on) { options.stretchedClipsLoop = on; });
@@ -377,11 +430,21 @@ public:
             flag (readSampleTempo, tr ("Read sample tempo information"),
                   tr ("Read tempo information stored in samples. Off: it is ignored for the samples loaded from then on"), fl.readSampleTempo);
             flag (historyNewestFirst, tr ("Show recent changes at the top"), tr ("Sort the undo history from new to old"), fl.historyNewestFirst);
+            // round 190mv (DF-134; FL's label, on as in FL — capture 190mr A1.1)
+            flag (undoKnobTweaks, tr ("Undo knob tweaks"),
+                  tr ("Knob, fader and slider moves are undo steps. Off: they are left out of the undo history"), fl.undoKnobTweaks);
+            // round 190mr (DF-135; FL's label, off as in FL)
+            flag (historyOnUndo, tr ("Show undo history in the browser when undoing changes"),
+                  tr ("An undo opens the Browser at Current project › History"), fl.historyOnUndo);
+            // round 190mr (DF-141, owner F3; LYNX's switch: FL always does it): a project opens with the windows where they were
+            flag (projectLayout, tr ("Load the window layout saved with a project"),
+                  tr ("On: a project opens with its windows where they were when it was saved, as in FL Studio. Off: the layout on screen stays"),
+                  fl.projectWindowLayout);
         }
 
         styleLabel (autosaveLabel, tr ("Save a backup copy"));
         for (auto minutes : prefs::autosaveIntervals())
-            autosaveBox.addItem (minutes == 0 ? tr ("Never")
+            autosaveBox.addItem (minutes == 0 ? tr ("Never (just remind every 10 min)") // (FL's wording; round 190ih)
                                  : minutes == 1 ? tr ("Every minute")
                                                 : tr ("Every {0} minutes", { juce::String (minutes) }),
                                  minutes + 1);
@@ -416,12 +479,23 @@ public:
         toggle (unusedTakes, tr ("When a project closes, offer to delete the recordings it no longer uses"), options.askUnusedRecordings,
                 [this] (bool on) { options.askUnusedRecordings = on; });
 
-        toggle (sandbox, tr ("Run plugins in a separate process (protects LYNX SHARE from crashes)"), options.pluginSandbox,
-                [this] (bool on) { options.pluginSandbox = on; });
-        styleNote (sandboxNote, tr ("Applies to plugins opened from now on; reopen the project to move the others."));
+        // round 190jg: Bitwig's plugin hosting modes (was the toggle "Run plugins in a separate process")
+        styleLabel (sandboxLabel, tr ("Plugin processes"));
+        // (ordered from the most isolated; the id is the mode + 1, engine/PluginSandbox.h SandboxMode)
+        sandboxBox.addItem (tr ("In LYNX SHARE's process (fastest)"), 1);
+        sandboxBox.addItem (tr ("Each plugin instance in its own process"), 2);
+        sandboxBox.addItem (tr ("One process per plugin (all its instances)"), 5);
+        sandboxBox.addItem (tr ("One process per plugin vendor"), 3);
+        sandboxBox.addItem (tr ("All plugins in one process"), 4);
+        sandboxBox.setSelectedId (juce::jlimit (0, 4, options.pluginSandbox) + 1, juce::dontSendNotification);
+        sandboxBox.onChange = [this] { change ([&] { options.pluginSandbox = sandboxBox.getSelectedId() - 1; }); };
+        styleNote (sandboxNote, tr ("A plugin that crashes takes down only its own process, never LYNX SHARE.") + " "
+                                    + tr ("Applies to plugins opened from now on; reopen the project to move the others."));
         toggle (substitutes, tr ("Substitute missing plugins with LYNX SHARE equivalents"), options.pluginSubstitutes,
                 [this] (bool on) { options.pluginSubstitutes = on; });
         styleNote (substitutesNote, tr ("A project keeps the original plugin and uses it again once it is installed."));
+        toggle (sampleAccurate, tr ("Sample-accurate automation for CLAP and VST3 plugins"), options.sampleAccurateAutomation,
+                [this] (bool on) { options.sampleAccurateAutomation = on; });
         // FL's General › Miscellaneous (round 189o): at most 25 plugin editors open, the oldest closes; FL warns before
         // turning it off (FUN_013559c0) and keeps it on with No
         toggle (limitEditors, tr ("Limit the number of open plugin editors"), options.limitEditors, [this] (bool on) {
@@ -441,7 +515,44 @@ public:
         manageMessages.onClick = [this] {
             messages::manageMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&manageMessages));
         };
-        styleNote (messagesNote, tr ("Ticked messages are shown; untick one to skip its question."));
+        // issue #221 (round 190ng): where a remembered "Remember my choice" answer is undone
+        styleNote (messagesNote, tr ("Ticked messages are shown; untick one to skip its question. A question answered with \"Remember my choice\" is unticked here: tick it, or Show all, to be asked again."));
+        // FL's Hints and warnings › "Project data size warning" (round 190mr, DF-147): the size a saved project may reach
+        // before LYNX warns, or "Don't warn me"
+        styleLabel (dataSizeLabel, tr ("Project data size warning"));
+        for (const auto mb : flsettings::projectSizeChoices) // (FL's texts: "50MB", "100MB (default)", "1GB", "1.5GB")
+            dataSizeBox.addItem (mb == 0 ? tr ("Don't warn me")
+                                 : (mb >= 1024 ? juce::String ((double) mb / 1024.0, mb % 1024 == 0 ? 0 : 1) + "GB" : juce::String (mb) + "MB")
+                                       + (mb == flsettings::projectSizeDefault ? " " + tr ("(default)") : juce::String()),
+                                 mb + 1);
+        dataSizeBox.setSelectedId (flsettings::options().projectSizeWarnMb.load() + 1, juce::dontSendNotification);
+        dataSizeBox.setTooltip (tr ("Warn when a saved project is larger than this"));
+        dataSizeBox.onChange = [this] {
+            flsettings::options().projectSizeWarnMb = flsettings::clampProjectSizeWarning (dataSizeBox.getSelectedId() - 1);
+            if (mixeroptions::changed)
+                mixeroptions::changed(); // (ui-options.txt)
+        };
+        // FL's General › Input (round 190mr, capture 190mr A1.1: both off in FL)
+        {
+            auto& fl = flsettings::options();
+            const auto flagged = [] (juce::ToggleButton& t, const juce::String& text, const juce::String& hint, std::atomic<bool>& value) {
+                styleToggle (t, text);
+                t.setTooltip (hint);
+                t.setToggleState (value.load(), juce::dontSendNotification);
+                t.onClick = [&t, &value] {
+                    value.store (t.getToggleState());
+                    if (mixeroptions::changed)
+                        mixeroptions::changed();
+                };
+            };
+            flagged (clickHold, tr ("Click-and-hold & special gesture functions"),
+                     tr ("Extra functions when holding clicks in piano roll: hold a note to copy it, hold while adding a note to cycle "
+                         "slide / porta, hold between two touching notes to glue them"),
+                     fl.clickHold);
+            flagged (bothButtons, tr ("Use both mouse buttons in step sequencer"),
+                     tr ("On: a left click only switches steps on and a right click switches them off. Off: a left click toggles a step"),
+                     fl.bothButtonsSteps);
+        }
         managePlugins.onClick = [this] {
             if (hooks.managePlugins)
                 hooks.managePlugins();
@@ -478,7 +589,7 @@ public:
         for (auto* c : std::initializer_list<juce::Component*> { &updatesTitle, &checkUpdates, &checkNow, &updatesNote, &previousLabel, &goBack })
             c->setVisible (updater::offered());
 
-        for (auto* b : { &templateBox, &startupProjectBox, &longestWaitBox, &languageBox, &fontBox, &scaleBox, &menuBox, &wavesBox, &noteNamesBox, &blackNotesBox, &pluginStyleBox, &animationBox, &editInBox, &undoBox, &longestWaitBox, &autosaveBox, &keepBox, &crashBox })
+        for (auto* b : { &templateBox, &startupProjectBox, &longestWaitBox, &languageBox, &fontBox, &textSizeBox, &scaleBox, &menuBox, &wavesBox, &noteNamesBox, &blackNotesBox, &pluginStyleBox, &animationBox, &editInBox, &undoBox, &longestWaitBox, &autosaveBox, &keepBox, &crashBox, &sandboxBox, &dataSizeBox })
             styleCombo (*b);
         juce::ignoreUnused (engine, persistent);
     }
@@ -489,23 +600,32 @@ private:
         Rows r (width);
         r.section (workflowTitle, true);
         layoutStyleBox.setBounds (r.row (layoutStyleLabel, 260));
-        layoutStyleNote.setBounds (r.indented (66).translated (0, -3));
+        layoutStyleNote.setBounds (r.note (layoutStyleNote, 66, 3, true)); // (round 190hw: longer, so measured)
         alsSessionBox.setBounds (r.row (alsSessionLabel, 260));
         r.section (languageTitle);
         languageBox.setBounds (r.row (languageLabel, 220));
-        languageNote.setBounds (r.indented (languageNote.getText().length() > 60 ? 32 : 16).translated (0, -3));
+        languageNote.setBounds (r.indentedNote (languageNote, languageNote.getText().length() > 60 ? 32 : 16).translated (0, -3));
         if (translationLink.isVisible())
             translationLink.setBounds (r.indented (18).translated (0, -4).withWidth (juce::jmin (420, width - 40)));
         {
             // (the reset button as wide as its text: "Auf Standard zurücksetzen" wrapped at a fixed width)
-            const auto resetWidth = juce::jlimit (110, 240, juce::roundToInt (juce::GlyphArrangement::getStringWidth (
-                getLookAndFeel().getTextButtonFont (fontReset, 24), fontReset.getButtonText())) + 24);
+            const auto resetWidth = juce::jlimit (110, Rows::h (240), juce::roundToInt (juce::GlyphArrangement::getStringWidth (
+                getLookAndFeel().getTextButtonFont (fontReset, Rows::h (24)), fontReset.getButtonText())) + 24);
             auto row = r.row (fontLabel, 228 + resetWidth);
             fontBox.setBounds (row.removeFromLeft (220));
             fontReset.setBounds (row.withTrimmedLeft (8));
         }
         fontPreview.setBounds (r.indented (22).translated (0, -3));
-        fontNote.setBounds (r.indented (16).translated (0, -5));
+        fontNote.setBounds (r.indentedNote (fontNote, 16).translated (0, -5));
+        {
+            // the size, then Bold text on the same row (round 190jp)
+            auto row = r.row (textSizeLabel, 0);
+            textSizeBox.setBounds (row.removeFromLeft (120));
+            row.removeFromLeft (8);
+            boldLabel.setBounds (row.removeFromLeft (juce::jmin (row.getWidth() / 3, theme::labelColumnWidth ({ &boldLabel }, Rows::h (80), Rows::h (160)))));
+            boldBox.setBounds (row.withTrimmedLeft (6).withWidth (juce::jmin (row.getWidth() - 6, Rows::h (220))));
+        }
+        condensedLabels.setBounds (r.indented (24));
         scaleBox.setBounds (r.row (scaleLabel, 120));
         menuBox.setBounds (r.row (menuLabel, 160));
         wavesBox.setBounds (r.row (wavesLabel, 0));
@@ -523,33 +643,35 @@ private:
         animationNote.setBounds (r.indented (32).translated (0, -3));
        #if JUCE_WINDOWS
         gpuRendering.setBounds (r.full (24));
+        editorsInMain.setBounds (r.full (24));
        #endif
 
         r.section (startupTitle);
         templateBox.setBounds (r.row (templateLabel, 260));
         startupProjectBox.setBounds (r.row (startupProjectLabel, 260));
         templateNote.setBounds (r.indented (32).translated (0, -3));
-        for (auto* t : { &splash, &startupSound, &scanAtStart, &supportNoteBox })
+        for (auto* t : { &projectLayout, &splash, &startupSound, &scanAtStart, &supportNoteBox })
             t->setBounds (r.full (24));
         if (menuEntry.isVisible())
             menuEntry.setBounds (r.full (24));
 
         r.section (editingTitle);
-        for (auto* t : { &typingPiano, &keepEditors, &autoNameChannels, &detachNew, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &monoPaint, &autoSelectLinked, &noTypingPriority,
-                         &restoreAfterSolo, &readSampleTempo, &hoverValues })
+        for (auto* t : { &clickHold, &bothButtons }) // (round 190mr: FL's General › Input)
+            t->setBounds (r.full (24));
+        for (auto* t : { &typingPiano, &keepEditors, &autoNameChannels, &detachNew, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &monoPaint, &altMeterScale, &autoSelectLinked, &noTypingPriority,
+                         &restoreAfterSolo, &readSampleTempo, &hoverValues, &escCloses })
             t->setBounds (r.full (24));
         editInBox.setBounds (r.row (editInLabel, 0));
         undoBox.setBounds (r.row (undoLabel, 120));
+        undoKnobTweaks.setBounds (r.full (24)); // (round 190mv: FL's Undo history panel, after Maximum undo levels)
         alternateUndo.setBounds (r.full (24));
+        historyOnUndo.setBounds (r.full (24)); // (round 190mr: FL's Undo history panel, before its last box)
         historyNewestFirst.setBounds (r.full (24)); // (FL's Undo history panel: its last box)
 
         r.section (hintsTitle); // FL's General › Hints and warnings (round 186c)
-        {
-            auto row = r.full();
-            manageMessages.setBounds (row.removeFromLeft (180));
-            row.removeFromLeft (12);
-            messagesNote.setBounds (row.withTrimmedTop (6));
-        }
+        manageMessages.setBounds (r.full().removeFromLeft (180));
+        messagesNote.setBounds (r.note (messagesNote, 18)); // (round 190ng: its own wrapped line under the button)
+        dataSizeBox.setBounds (r.row (dataSizeLabel, 160)); // (round 190mr, DF-147)
 
         r.section (backupTitle);
         {
@@ -564,10 +686,11 @@ private:
         unusedTakes.setBounds (r.full (24));
 
         r.section (pluginsTitle);
-        sandbox.setBounds (r.full (24));
-        sandboxNote.setBounds (r.full (16).translated (0, -3));
+        sandboxBox.setBounds (r.row (sandboxLabel, 300));
+        sandboxNote.setBounds (r.full (32).translated (0, -3));
         substitutes.setBounds (r.full (24));
         substitutesNote.setBounds (r.full (16).translated (0, -3));
+        sampleAccurate.setBounds (r.full (24));
         limitEditors.setBounds (r.full (24));
         {
             auto row = r.full();
@@ -601,6 +724,7 @@ private:
 
     void timerCallback() override
     {
+        followLayoutStyle();
         remoteControl.setToggleState (remoteui::enabled(), juce::dontSendNotification);
         const auto historyError = engine.getRemoteHistoryError();
         remoteStatus.setText (historyError.isNotEmpty() ? historyError : tr (remoteui::status()), juce::dontSendNotification);
@@ -617,6 +741,7 @@ private:
     // the LYNX extras page switches this one too (round 190am): the copy kept here follows when the page comes back
     void visibilityChanged() override
     {
+        followLayoutStyle();
         if (isVisible() && hooks.getGeneral)
         {
             options.hoverValues = hooks.getGeneral().hoverValues;
@@ -635,19 +760,56 @@ private:
 
     void change (const std::function<void()>& fn)
     {
+        followLayoutStyle(); // (round 190jp: never hand back a layout style the user has left since)
         fn();
         if (hooks.setGeneral)
             hooks.setGeneral (options);
+    }
+
+    // Round 190jp (Discord, 0.1.29: "switching Layout style doesn't work"): the page kept the layout style it was opened
+    // with. Switched meanwhile from View › Layout style, the Welcome screen or the Setup wizard, the box still showed the
+    // old style, so picking the style the window really had changed nothing, and any other option changed on this page
+    // put the old style back. The box and the page's copy now follow the window's style (the page's 2 Hz timer, which
+    // runs only while Settings › General is open, and before every change it hands back).
+    void followLayoutStyle()
+    {
+        if (hooks.getGeneral == nullptr) // (--snapshot: no window behind the page)
+            return;
+        const auto now = layoutstyle::current();
+        options.layoutStyle = (int) now;
+        if (layoutStyleBox.getSelectedId() != layoutstyle::comboId (now))
+            layoutStyleBox.setSelectedId (layoutstyle::comboId (now), juce::dontSendNotification);
     }
 
     // The interface font: the platform's default or any installed family, saved at once, applied by the next start
     // (Labels and caches hold the old font's shapes). The sample line shows the choice right away.
     void setupFontRow()
     {
-        for (auto* c : std::initializer_list<juce::Component*> { &fontLabel, &fontBox, &fontReset, &fontPreview, &fontNote })
+        for (auto* c : std::initializer_list<juce::Component*> { &fontLabel, &fontBox, &fontReset, &fontPreview, &fontNote, &textSizeLabel, &textSizeBox,
+                                                                 &boldLabel, &boldBox, &condensedLabels })
             add (*c);
+        // round 190je (design190ia FM-5): FL's condensed face for the FL-landmark labels, off by default; at the next start
+        toggle (condensedLabels, tr ("Condensed labels (FL style)"), options.condensedLabels, [this] (bool on) { options.condensedLabels = on; });
+        condensedLabels.setTooltip (tr ("Menus, the menu bar, the Browser, Playlist track names and Mixer strip names in a condensed face, "
+                                        "a step larger, as FL Studio draws them (Open Sans Condensed). Applied when LYNX SHARE restarts."));
         styleLabel (fontLabel, tr ("Interface font"));
-        styleNote (fontNote, tr ("A new interface font is applied when LYNX SHARE restarts."));
+        styleNote (fontNote, tr ("A new interface font, text size or bold text is applied when LYNX SHARE restarts."));
+        // issue #189: the text roles' size next to the font (core/TextSize.h), applied at the next start as the font is
+        styleLabel (textSizeLabel, tr ("Text size"));
+        for (const auto percent : textsize::choices)
+            textSizeBox.addItem (juce::String (percent) + " %", percent);
+        selectNearest (textSizeBox, options.textSize);
+        textSizeBox.setTooltip (tr ("The size of the interface's text, role by role (labels, menus, buttons, titles). The UI size scales everything."));
+        textSizeBox.onChange = [this] { change ([&] { options.textSize = textSizeBox.getSelectedId(); }); };
+        // round 190jp (a Discord request): bold text next to the size, per role, applied at the next start as they are
+        styleLabel (boldLabel, tr ("Bold text"));
+        boldLabel.setJustificationType (juce::Justification::centredRight);
+        boldBox.addItem (tr ("Off"), 1);
+        boldBox.addItem (tr ("Labels, buttons and menus"), 2);
+        boldBox.addItem (tr ("All text"), 3);
+        boldBox.setSelectedId (juce::jlimit (0, 2, options.boldText) + 1, juce::dontSendNotification);
+        boldBox.setTooltip (tr ("Draws the interface's text in the bold face: the labels, buttons and menus, or every text. Applied when LYNX SHARE restarts."));
+        boldBox.onChange = [this] { change ([&] { options.boldText = boldBox.getSelectedId() - 1; }); };
         const auto fallback = theme::defaultUiFont();
         fontBox.addItem (fallback.isNotEmpty() ? tr ("Default ({0})", { fallback }) : tr ("Default"), 1);
         fontBox.addSeparator();
@@ -707,9 +869,10 @@ private:
     juce::ComboBox alsSessionBox;
     SectionTitle languageTitle { tr ("Language and display") }, displayTitle, startupTitle { tr ("Startup") }, editingTitle { tr ("Editing") },
         backupTitle { tr ("Backup") }, hintsTitle { tr ("Hints and warnings") }, pluginsTitle { tr ("Plugins and shortcuts") }, reportsTitle { tr ("Crash reports") }, updatesTitle { tr ("Updates") }, remoteTitle { tr ("Remote control") };
-    juce::Label longestWaitLabel, animationLabel, animationNote, languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote, previousLabel;
-    juce::Label fontLabel, fontPreview, fontNote;
-    juce::ComboBox fontBox;
+    juce::Label longestWaitLabel, animationLabel, animationNote, languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote, previousLabel;
+    juce::Label fontLabel, fontPreview, fontNote, textSizeLabel, boldLabel;
+    juce::ComboBox fontBox, textSizeBox, boldBox;
+    juce::ToggleButton condensedLabels;
     juce::Label templateLabel, templateNote, startupProjectLabel;
     juce::ComboBox templateBox, startupProjectBox;
     std::vector<TemplateChoice> templateChoices; // templateBox's item id - 1
@@ -718,9 +881,15 @@ private:
     juce::ToggleButton remoteControl;
     juce::Label remoteStatus;
     juce::HyperlinkButton translationLink;
-    juce::ComboBox animationBox, crashBox, languageBox, scaleBox, menuBox, wavesBox, noteNamesBox, blackNotesBox, pluginStyleBox, editInBox, undoBox, autosaveBox, keepBox, longestWaitBox;
-    juce::ToggleButton detachNew, stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, uiAnimations, gpuRendering, splash, startupSound, scanAtStart, supportNoteBox, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, autoClipsAtPlayback, firstChannel, monoPaint, hoverValues, alternateUndo, sandbox, substitutes, limitEditors, backupQuiet, unusedTakes, checkUpdates, noTypingPriority, autoSelectLinked;
+    juce::ComboBox animationBox, crashBox, languageBox, scaleBox, menuBox, wavesBox, noteNamesBox, blackNotesBox, pluginStyleBox, editInBox, undoBox, autosaveBox, keepBox, longestWaitBox, sandboxBox;
+    juce::ToggleButton detachNew, editorsInMain, stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, uiAnimations, gpuRendering, splash, startupSound, scanAtStart, supportNoteBox, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, autoClipsAtPlayback, firstChannel, monoPaint, altMeterScale, hoverValues, alternateUndo, substitutes, sampleAccurate, limitEditors, backupQuiet, unusedTakes, checkUpdates, noTypingPriority, autoSelectLinked;
     juce::ToggleButton autoNameChannels, restoreAfterSolo, readSampleTempo, historyNewestFirst; // FL's options of round 190bx (core/FlSettings.h)
+    juce::ToggleButton projectLayout, historyOnUndo; // round 190mr (DF-141, DF-135)
+    juce::ToggleButton undoKnobTweaks; // round 190mv (DF-134)
+    juce::Label dataSizeLabel;                        // round 190mr (DF-147)
+    juce::ComboBox dataSizeBox;
+    juce::ToggleButton clickHold, bothButtons; // round 190mr (DE-63, DE-16)
+    juce::ToggleButton escCloses; // round 190ng (issue #217)
     juce::TextButton openBackups { tr ("Open backup folder") }, managePlugins { tr ("Plugin manager...") }, manageShortcuts { tr ("Manage shortcuts...") },
         checkNow { tr ("Check now") }, manageMessages { tr ("Manage messages") }, goBack;
     juce::Label messagesNote;
@@ -1587,12 +1756,14 @@ public:
 };
 
 // One output device (FL's Options › MIDI "Output" panel, round 165f): master sync (MIDI clock or MTC) with its
-// offset, and all notes off on init and after an export.
+// offset, all notes off on init and after an export, and (round 190jl) its port: the MIDI Out channels on that port
+// play the device.
 class MidiOutputRow final : public juce::Component
 {
 public:
-    MidiOutputRow (const juce::String& deviceName, const prefs::MidiOutputPrefs& p, std::function<void (const prefs::MidiOutputPrefs&)> changed)
-        : prefsNow (p), onChange (std::move (changed))
+    // `inheritedPort`: the port of the input that is the same device (FL: the output takes it while it has none of its own)
+    MidiOutputRow (const juce::String& deviceName, const prefs::MidiOutputPrefs& p, int inheritedPort, std::function<void (const prefs::MidiOutputPrefs&)> changed)
+        : prefsNow (p), inherited (inheritedPort), onChange (std::move (changed))
     {
         name.setText (deviceName, juce::dontSendNotification);
         name.setFont (theme::font (theme::type::body));
@@ -1636,7 +1807,30 @@ public:
             prefsNow.allNotesOff = notesOff.getToggleState();
             update();
         };
-        for (auto* c : std::initializer_list<juce::Component*> { &sync, &type, &offsetLabel, &offset, &notesOff })
+        // FL's output "Port" (OutPortSel "Output port number", a number wheel, none by default; round 190jl), as the
+        // input rows show theirs
+        portLabel.setText (tr ("Port"), juce::dontSendNotification);
+        portLabel.setFont (theme::font (theme::type::small));
+        portLabel.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        portLabel.setJustificationType (juce::Justification::centredRight);
+        {
+            ui::ValueSpec spec;
+            spec.name = tr ("Output port number: the MIDI Out channels on this port send their notes and controllers to this device");
+            spec.minimum = -1.0;
+            spec.maximum = 255.0;
+            spec.defaultValue = -1.0;
+            spec.interval = 1.0;
+            spec.toText = [] (double v) { return v < 0.0 ? juce::String::fromUTF8 ("\xe2\x8b\xaf") : juce::String (juce::roundToInt (v)); };
+            port = std::make_unique<ui::NumBox> (ui::digitWheel (spec), [this] { return (double) (prefsNow.port >= 0 ? prefsNow.port : inherited); },
+                                                 [this] (double v) {
+                                                     const auto now = juce::jlimit (-1, 255, juce::roundToInt (v));
+                                                     if (now == prefsNow.port)
+                                                         return;
+                                                     prefsNow.port = now;
+                                                     update();
+                                                 });
+        }
+        for (auto* c : std::initializer_list<juce::Component*> { &sync, &type, &offsetLabel, &offset, &notesOff, &portLabel, port.get() })
             addAndMakeVisible (c);
         update (false);
     }
@@ -1655,6 +1849,9 @@ public:
         bottom.removeFromLeft (12);
         offsetLabel.setBounds (bottom.removeFromLeft (76));
         offset.setBounds (bottom.removeFromLeft (110));
+        bottom.removeFromLeft (10);
+        port->setBounds (bottom.removeFromRight (48).reduced (0, 2)); // (where the input rows have theirs)
+        portLabel.setBounds (bottom.removeFromRight (44));
     }
 
     void paint (juce::Graphics& g) override
@@ -1673,11 +1870,13 @@ private:
     }
 
     prefs::MidiOutputPrefs prefsNow;
+    int inherited = -1;
     std::function<void (const prefs::MidiOutputPrefs&)> onChange;
-    juce::Label name, offsetLabel;
+    juce::Label name, offsetLabel, portLabel;
     juce::ToggleButton sync, notesOff;
     juce::ComboBox type;
     juce::Slider offset;
+    std::unique_ptr<ui::NumBox> port;
 };
 
 class MidiPage final : public ScrollingPage,
@@ -1695,8 +1894,9 @@ public:
                                                                  &clockOffset, &clockStatusLabel, &clockStatus, &clockNote, &jumpLabel, &jumpBox,
                                                                  &jumpNote, &gamepadToggle, &gamepadNote })
             add (*c);
-        styleNote (outputsNote, tr ("Send master sync drives drum machines, synths and other software from LYNX SHARE's transport: MIDI clock "
-                                    "with Song Position Pointer, or MIDI Time Code."));
+        styleNote (outputsNote, tr ("Give a device a port number and the MIDI Out channels on that port play it: their notes, controllers, "
+                                    "program and bank changes and pitch bend. Send master sync drives drum machines, synths and other "
+                                    "software from LYNX SHARE's transport: MIDI clock with Song Position Pointer, or MIDI Time Code."));
         styleLabel (noOutputs, tr ("No MIDI output devices found."));
         styleLabel (clockLabel, tr ("External clock sync"));
         clockBox.setTooltip (tr ("LYNX SHARE follows the MIDI clock of this input: its tempo, Start / Continue / Stop and Song Position Pointer"));
@@ -1840,6 +2040,15 @@ public:
                 engine.editSong ([row] (Song& s) { s.midiLinks.erase (s.midiLinks.begin() + row); });
             else if (const auto global = engine.getGlobalLinks(); juce::isPositiveAndBelow (row - projectLinks, (int) global.size()))
                 engine.removeGlobalLink (global[(std::size_t) (row - projectLinks)].target);
+            else if (const auto mapping = row - projectLinks - (int) global.size(); juce::isPositiveAndBelow (mapping, (int) engine.getMidiPrefs().globalMappings.size()))
+            {
+                remotemap::Row r; // (round 190hp: a MIDI Map Mode mapping kept for every project)
+                r.global = true;
+                r.index = mapping;
+                engine.editGlobalMappingRow (r, [&r] (prefs::MidiPrefs& p) { return remotemap::removeGlobalRow (p, r); });
+                links.updateContent();
+                links.repaint();
+            }
         };
         removeAll.onClick = [this] { engine.editSong ([] (Song& s) { s.midiLinks.clear(); }); };
 
@@ -1854,6 +2063,10 @@ public:
             drums.masterSync = true;
             drums.allNotesOff = true;
             p.setOutput (drums);
+            prefs::MidiOutputPrefs volca; // (round 190jl: a synth the MIDI Out channels on port 1 play)
+            volca.name = "Korg volca sample";
+            volca.port = 1;
+            p.setOutput (volca);
             p.clockInput = "Akai MPD218";
             engine.setMidiPrefs (p, false);
             engine.editSong ([] (Song& s) {
@@ -1985,7 +2198,10 @@ private:
     static std::string sampleFeedback (const juce::String& input) { return input.toStdString(); }
 
     // the project's links, then the global ones (settings; FL's "Override global link...", REA round 146)
-    int linkRows() const { return (int) (engine.getSong().midiLinks.size() + engine.getGlobalLinks().size()); }
+    int linkRows() const
+    {
+        return (int) (engine.getSong().midiLinks.size() + engine.getGlobalLinks().size() + engine.getMidiPrefs().globalMappings.size());
+    }
 
     void rebuildInputs()
     {
@@ -2058,7 +2274,8 @@ private:
             outputs = sampleOutputs;
         for (const auto& name : outputs)
         {
-            auto row = std::make_unique<MidiOutputRow> (name, engine.getMidiPrefs().output (name.toStdString()), [this] (const prefs::MidiOutputPrefs& out) {
+            auto row = std::make_unique<MidiOutputRow> (name, engine.getMidiPrefs().output (name.toStdString()),
+                                                         engine.getMidiPrefs().inheritedOutputPort (name.toStdString()), [this] (const prefs::MidiOutputPrefs& out) {
                 auto p = engine.getMidiPrefs();
                 p.setOutput (out);
                 set (p);
@@ -2116,6 +2333,26 @@ private:
         const auto projectLinks = (int) list.size();
         for (const auto& l : engine.getGlobalLinks())
             list.push_back (l);
+        // round 190hp: then the MIDI Map Mode's mappings kept for every project (transport, Stop all clips, scenes)
+        if (const auto& mappings = engine.getMidiPrefs().globalMappings; row >= (int) list.size() && row - (int) list.size() < (int) mappings.size())
+        {
+            const auto& m = mappings[(std::size_t) (row - (int) list.size())];
+            if (selected)
+            {
+                g.setColour (theme::colour::accentMuted);
+                g.fillRect (0, 0, width, height);
+            }
+            g.setFont (theme::font (theme::type::body));
+            g.setColour (theme::colour::info);
+            const auto source = (isNoteLink (m.number) ? tr ("Note") + " " + juce::MidiMessage::getMidiNoteName (m.number - linkNoteBase, true, true, 5)
+                                                       : "CC " + juce::String (m.number))
+                                + (m.channel >= 0 ? juce::String::fromUTF8 (" \xc2\xb7 ") + tr ("ch. {0}", { juce::String (m.channel + 1) }) : juce::String());
+            g.drawText (source, 10, 0, 110, height, juce::Justification::centredLeft);
+            g.setColour (theme::colour::textPrimary);
+            const auto [path, name] = mapmode::describe (engine, { (RemoteAction) m.action, {}, -1, m.scene });
+            g.drawText (path + juce::String::fromUTF8 (" \xe2\x80\xba ") + name + "  (" + tr ("global") + ")", 124, 0, width - 134, height, juce::Justification::centredLeft, true);
+            return;
+        }
         if (list.empty() || row >= (int) list.size())
         {
             g.setFont (theme::font (theme::type::small));
@@ -2228,6 +2465,7 @@ public:
                 refresh(); // (what the app really did, e.g. an action that was refused)
             };
             styleNote (row.note, tr (std::string (item.note).c_str()));
+            row.note.setMinimumHorizontalScale (1.0f); // (round 190iu: a long note wraps instead of being squeezed onto one line)
             add (row.toggle);
             add (row.note);
         }
@@ -2404,12 +2642,16 @@ std::unique_ptr<juce::Component> makeLinkPage (AudioEngine& engine, const Settin
 
 bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_view id)
 {
+    if (const auto own = workflowextras::extraOn (id)) return *own; // round 190iu (ui/WorkflowExtras.h)
     if (id == "mixer.loudness") return MixerStrips::showLoudness;
+    if (id == "mixer.stripInserts") return MixerStrips::showStripInserts;
     if (id == "mixer.usedOnly") return MixerStrips::showUsedOnly;
     if (id == "mixer.keepLostLinks") return MixerStrips::keepLostLinks;
     if (id == "mixer.followPlaylist") return MixerStrips::followPlaylist;
     if (id == "playlist.automationLanes") return autolanes::shown();
+    if (id == "playlist.trackInserts") return PlaylistComponent::showTrackInserts;
     if (id == "pianoRoll.songBarsRuler") return PianoRollComponent::songBarsRuler;
+    if (id == "polyEdit.prepareOnOpen") return PolyEditorWindows::prepareOnOpen; // (round 190lo)
     if (id == "general.hoverValues") return hooks.getGeneral && hooks.getGeneral().hoverValues;
     if (id == "project.linkTracks") return hooks.getGeneral && hooks.getGeneral().linkTracksInNewProjects;
     if (id == "record.lastLoopPassPlays") return engine.getRecordOptions().lastLoopPassPlays;
@@ -2430,12 +2672,23 @@ void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_
     // a view option with an action: the action is what its menu item runs (it also refreshes the editor and saves)
     const auto toggledBy = [&hooks] (const char* action) { return hooks.runAction && hooks.runAction (action); };
 
+    if (workflowextras::setExtra (id, on)) // round 190iu (ui/WorkflowExtras.h): saves through its own hook
+        return;
+
     if (id == "mixer.loudness")
     {
         if (mixeroptions::setShowLoudness)
             mixeroptions::setShowLoudness (on);
         else
             MixerStrips::showLoudness = on;
+        saved();
+    }
+    else if (id == "mixer.stripInserts") // round 190io (issue #154 part 2)
+    {
+        if (mixeroptions::setShowStripInserts)
+            mixeroptions::setShowStripInserts (on);
+        else
+            MixerStrips::showStripInserts = on;
         saved();
     }
     else if (id == "mixer.usedOnly")
@@ -2466,6 +2719,14 @@ void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_
             saved();
         }
     }
+    else if (id == "playlist.trackInserts")
+    {
+        if (! toggledBy ("playlist.trackInserts"))
+        {
+            PlaylistComponent::showTrackInserts = on;
+            saved();
+        }
+    }
     else if (id == "pianoRoll.songBarsRuler")
     {
         if (! toggledBy ("pianoRoll.songBarsRuler"))
@@ -2473,6 +2734,11 @@ void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_
             PianoRollComponent::songBarsRuler = on;
             saved();
         }
+    }
+    else if (id == "polyEdit.prepareOnOpen") // round 190lo (ui/PolyEditor.h)
+    {
+        PolyEditorWindows::prepareOnOpen = on;
+        saved();
     }
     else if (id == "general.hoverValues")
     {

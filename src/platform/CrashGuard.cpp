@@ -1,4 +1,5 @@
 #include "platform/CrashGuard.h"
+#include "platform/CvWait.h"
 #include "core/CrashReport.h"
 
 #include <algorithm>
@@ -24,6 +25,7 @@
  #include <mmsystem.h>
 #else
  #include <signal.h>
+ #include <fcntl.h>
  #include <setjmp.h>
  #include <unistd.h>
  #include <pthread.h>
@@ -1413,7 +1415,7 @@ void watchLoop()
     {
         {
             std::unique_lock<std::mutex> l (w.lock);
-            w.wake.wait_for (l, std::chrono::milliseconds (250), [&w] { return w.quit; });
+            cvwait::waitFor (w.wake, l, std::chrono::milliseconds (250), [&w] { return w.quit; }); // (round 190la: platform/CvWait.h)
             if (w.quit)
                 return;
         }
@@ -1649,9 +1651,32 @@ MainProfiler& mainProfiler()
 }
 
 #if defined(LYNX_UNWIND)
+// LYNX_PROFILE_SYMBOLS=1: LYNX.exe's own frames named in the process (its PDB). Off by default (round 190kz): dbghelp
+// loads the whole ~750 MB LYNX.pdb on the first such frame, which took longer than a measurement run, so no window was
+// ever written (rounds 190gr-190kr). The frames are written as "LYNX.exe+0x<rva>" and in a raw section per window that
+// scripts/profile_symbolize.py names afterwards (llvm-symbolizer with the build's PDB). Other modules keep their exports.
+bool symbolizeOwnFrames()
+{
+    static const bool on = [] {
+        const auto* v = std::getenv ("LYNX_PROFILE_SYMBOLS");
+        return v != nullptr && v[0] == '1';
+    }();
+    return on;
+}
+
+bool inOwnModule (std::uintptr_t address)
+{
+    HMODULE module = nullptr;
+    return GetModuleHandleExW (GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                               reinterpret_cast<LPCWSTR> (address), &module)
+           && module == GetModuleHandleW (nullptr);
+}
+
 // "function" of a frame: its symbol without the offset, else the module
 std::string functionOf (std::uintptr_t address)
 {
+    if (! symbolizeOwnFrames() && inOwnModule (address))
+        return describeAddress (reinterpret_cast<const void*> (address));
     auto name = symbolOf ((DWORD64) address);
     if (const auto plus = name.rfind (" + 0x"); plus != std::string::npos)
         name.resize (plus);
@@ -1704,6 +1729,17 @@ void writeProfileWindow (const std::string& file, double fromS, double toS, long
     std::fprintf (out, "-- total (self + callees)\n");
     for (const auto& [n, k] : top (totalByName, 70))
         std::fprintf (out, "%6.1f %%  %s\n", 100.0 * (double) n / (double) std::max (1L, samples), k.c_str());
+    if (! symbolizeOwnFrames())
+    {
+        // (round 190kz) every own-module address with its weight, for scripts/profile_symbolize.py: "S|T <rva> <weight>"
+        const auto base = (std::uintptr_t) GetModuleHandleW (nullptr);
+        std::fprintf (out, "-- raw (LYNX.exe rva, weight; S = self, T = total; of %ld)\n", samples);
+        for (const auto* m : { &self, &total })
+            for (const auto& [a, n] : *m)
+                if (inOwnModule (a))
+                    std::fprintf (out, "%c %llx %ld\n", m == &self ? 'S' : 'T', (unsigned long long) (a - base), n);
+    }
+    std::fprintf (out, "-- end\n");
     std::fclose (out);
 }
 
@@ -2083,6 +2119,256 @@ void dispatchGuarded (const void* msg) noexcept
  #endif
 }
 #endif
+
+// ---- crash handler watchdog (rollup 0.1.30 step 12; CrashGuard.h) ------------------------------------------------------
+namespace
+{
+std::atomic<int> watchdogSeconds { 60 };
+std::atomic<bool> hangForTest { false };
+// the crash folder, prepared at start-up: the heap-corruption crash file is written without allocating
+#if defined(_WIN32)
+wchar_t crashFolderWide[1024] {};
+HANDLE watchdogWake = nullptr;
+std::atomic<std::uint32_t> watchdogCode { 0xC0000374u };
+DWORD WINAPI watchdogLate (LPVOID) noexcept
+{
+    Sleep ((DWORD) watchdogSeconds.load() * 1000u);
+    TerminateProcess (GetCurrentProcess(), (UINT) watchdogCode.load());
+    return 0;
+}
+DWORD WINAPI watchdogThread (LPVOID) noexcept
+{
+    WaitForSingleObject (watchdogWake, INFINITE);
+    return watchdogLate (nullptr);
+}
+#else
+char crashFolderUtf8[2048] {};
+#endif
+
+void storeFolder (const std::string& folder) noexcept
+{
+#if defined(_WIN32)
+    const auto n = MultiByteToWideChar (CP_UTF8, 0, folder.c_str(), -1, crashFolderWide, (int) (sizeof (crashFolderWide) / sizeof (wchar_t)));
+    if (n <= 0)
+        crashFolderWide[0] = 0;
+#else
+    if (folder.size() < sizeof (crashFolderUtf8))
+        std::memcpy (crashFolderUtf8, folder.c_str(), folder.size() + 1);
+    else
+        crashFolderUtf8[0] = 0;
+#endif
+}
+
+#if ! defined(_WIN32)
+// The C library aborted on its own (its heap checks: "free(): invalid next size", "corrupted double-linked list"...; its
+// fortify checks): the function that called abort() is the C library's. glibc's allocator entry points jump to static
+// functions, so their names are not among the frames (seen with glibc 2.42: free -> ?? -> ?? -> abort); only the module
+// tells. macOS: any frame in libsystem_malloc. A C++ terminate (libstdc++), LYNX's or a plugin's abort() do not count.
+bool inModule (const void* pc, const char* part, const char** symbol = nullptr) noexcept
+{
+    Dl_info info {};
+    if (pc == nullptr || dladdr (pc, &info) == 0 || info.dli_fname == nullptr)
+        return false;
+    if (symbol != nullptr)
+        *symbol = info.dli_sname;
+    const char* base = std::strrchr (info.dli_fname, '/');
+    base = base != nullptr ? base + 1 : info.dli_fname;
+    return std::strncmp (base, part, std::strlen (part)) == 0;
+}
+
+bool libraryAbort (void* const* frames, int n) noexcept
+{
+    for (int i = 0; i < n; ++i)
+    {
+ #if defined(__APPLE__)
+        if (inModule (frames[i], "libsystem_malloc"))
+            return true;
+ #else
+        const char* name = nullptr;
+        if (inModule (frames[i], "libc.so", &name) && name != nullptr && std::strcmp (name, "abort") == 0)
+            return i + 1 < n && inModule (frames[i + 1], "libc.so"); // (abort's caller)
+ #endif
+    }
+    return false;
+}
+
+// unsigned decimal into `out` (no allocation); returns the end
+char* putNumber (char* out, unsigned long long v) noexcept
+{
+    char digits[24];
+    int n = 0;
+    do
+    {
+        digits[n++] = (char) ('0' + (int) (v % 10));
+        v /= 10;
+    } while (v != 0 && n < 24);
+    while (n > 0)
+        *out++ = digits[--n];
+    return out;
+}
+
+void writeAll (int fd, const char* text) noexcept
+{
+    auto left = std::strlen (text);
+    while (left > 0)
+    {
+        const auto n = ::write (fd, text, left);
+        if (n <= 0)
+            return;
+        text += n;
+        left -= (std::size_t) n;
+    }
+}
+#endif
+} // namespace
+
+void prepareCrashWatchdog (const std::string& crashFolder) noexcept
+{
+    if (const char* v = std::getenv ("LYNX_CRASH_WATCHDOG_S"))
+        if (const auto s = std::atoi (v); s >= 1 && s <= 600)
+            watchdogSeconds = s;
+    storeFolder (crashFolder);
+#if defined(_WIN32)
+    if (watchdogWake == nullptr)
+    {
+        watchdogWake = CreateEventW (nullptr, TRUE, FALSE, nullptr);
+        if (watchdogWake != nullptr)
+            if (auto* t = CreateThread (nullptr, 64 * 1024, watchdogThread, nullptr, STACK_SIZE_PARAM_IS_A_RESERVATION, nullptr))
+                CloseHandle (t);
+    }
+#elif defined(LYNX_EXECINFO)
+    void* warm[4];
+    (void) backtrace (warm, 4); // (its first call loads the unwinder: an allocation, here and not in the handler)
+#endif
+}
+
+void setCrashFolder (const std::string& crashFolder) noexcept { storeFolder (crashFolder); }
+int crashWatchdogSeconds() noexcept { return watchdogSeconds.load(); }
+
+void armCrashWatchdog (void* exceptionPointers) noexcept
+{
+#if defined(_WIN32)
+    if (auto* ep = static_cast<EXCEPTION_POINTERS*> (exceptionPointers); ep != nullptr && ep->ExceptionRecord != nullptr)
+        watchdogCode = (std::uint32_t) ep->ExceptionRecord->ExceptionCode;
+    if (watchdogWake != nullptr)
+        SetEvent (watchdogWake);
+    else if (auto* t = CreateThread (nullptr, 64 * 1024, watchdogLate, nullptr, STACK_SIZE_PARAM_IS_A_RESERVATION, nullptr))
+        CloseHandle (t); // (not prepared: a thread of its own now)
+#else
+    (void) exceptionPointers;
+    struct sigaction action {};
+    action.sa_handler = SIG_DFL;
+    sigemptyset (&action.sa_mask);
+    sigaction (SIGALRM, &action, nullptr);
+    sigset_t alarmOnly;
+    sigemptyset (&alarmOnly);
+    sigaddset (&alarmOnly, SIGALRM);
+    pthread_sigmask (SIG_UNBLOCK, &alarmOnly, nullptr);
+    alarm ((unsigned) watchdogSeconds.load());
+#endif
+}
+
+bool heapCorruptionCrash (void* exceptionPointers) noexcept
+{
+#if defined(_WIN32)
+    const auto* ep = static_cast<const EXCEPTION_POINTERS*> (exceptionPointers);
+    return ep != nullptr && ep->ExceptionRecord != nullptr && (std::uint32_t) ep->ExceptionRecord->ExceptionCode == 0xC0000374u;
+#elif defined(LYNX_EXECINFO)
+    if ((int) reinterpret_cast<std::intptr_t> (exceptionPointers) != SIGABRT)
+        return false;
+    void* frames[64];
+    const auto n = backtrace (frames, 64);
+    return libraryAbort (frames, n);
+#else
+    (void) exceptionPointers;
+    return false;
+#endif
+}
+
+void writeHeapCrashFile (void* exceptionPointers) noexcept
+{
+#if defined(_WIN32)
+    if (crashFolderWide[0] == 0)
+        return;
+    wchar_t path[1200];
+    const auto len = lstrlenW (crashFolderWide);
+    if (len + 64 >= (int) (sizeof (path) / sizeof (wchar_t)))
+        return;
+    lstrcpyW (path, crashFolderWide);
+    lstrcatW (path, L"\\crash heap-corruption.txt");
+    const auto file = CreateFileW (path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE)
+        return;
+    char text[256];
+    const auto* ep = static_cast<const EXCEPTION_POINTERS*> (exceptionPointers);
+    const auto code = ep != nullptr && ep->ExceptionRecord != nullptr ? (unsigned long) ep->ExceptionRecord->ExceptionCode : 0ul;
+    const auto n = wsprintfA (text, "LYNX crashed: heap corruption (exception 0x%08lx). The emergency save was skipped: the heap is broken.\r\n", code);
+    DWORD written = 0;
+    WriteFile (file, text, (DWORD) n, &written, nullptr);
+    CloseHandle (file);
+#else
+    if (crashFolderUtf8[0] == 0)
+        return;
+    char path[sizeof (crashFolderUtf8) + 64];
+    const auto len = std::strlen (crashFolderUtf8);
+    std::memcpy (path, crashFolderUtf8, len);
+    char* end = path + len;
+    const char* name = "/crash heap-corruption ";
+    std::memcpy (end, name, std::strlen (name));
+    end += std::strlen (name);
+    end = putNumber (end, (unsigned long long) std::time (nullptr));
+    std::memcpy (end, ".txt", 5);
+    const int fd = ::open (path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd < 0)
+        return;
+    char head[96];
+    char* h = head;
+    const char* what = "LYNX crashed: the C library's heap-corruption abort (signal ";
+    writeAll (fd, what);
+    h = putNumber (h, (unsigned long long) reinterpret_cast<std::uintptr_t> (exceptionPointers));
+    *h = 0;
+    writeAll (fd, head);
+    writeAll (fd, ", abort). The emergency save was skipped: the heap is broken.\n--- frames\n");
+ #if defined(LYNX_EXECINFO)
+    void* frames[64];
+    const auto n = backtrace (frames, 64);
+    backtrace_symbols_fd (frames, n, fd);
+ #endif
+    ::close (fd);
+#endif
+}
+
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__ ((noinline))
+#endif
+void heapCorruptionForTest() noexcept
+{
+#if defined(__linux__)
+    // two chunks past the per-thread cache's sizes; the first one's neighbour gets a size of 0, so free() of the first
+    // finds "invalid next size" while it holds the arena's lock (what round 190mo's self-test write ended in)
+    using Alloc = void* (*) (std::size_t);
+    using Free = void (*) (void*);
+    volatile Alloc alloc = &std::malloc;
+    volatile Free release = &std::free;
+    auto* first = static_cast<unsigned char*> (alloc (4000));
+    auto* second = static_cast<unsigned char*> (alloc (4000));
+    std::memset (first, 1, 4000);
+    reinterpret_cast<volatile std::size_t*> (second)[-1] = 0; // (the size word of `second`'s chunk header)
+    release (first);
+    release (second);
+#elif ! defined(_WIN32)
+    using Free = void (*) (void*);
+    volatile Free release = &std::free;
+    alignas (16) static unsigned char notFromMalloc[256];
+    release (notFromMalloc + 16); // (libsystem_malloc: "pointer being freed was not allocated" -> abort)
+#else
+    RaiseException (0xC0000374u, EXCEPTION_NONCONTINUABLE, 0, nullptr); // (Windows: the code its heap raises)
+#endif
+    std::abort(); // (not reached when the C library noticed)
+}
+
+void setHangInCrashHandlerForTest() noexcept { hangForTest = true; }
+bool hangInCrashHandlerForTest() noexcept { return hangForTest.load(); }
 
 std::string lastHangFile()
 {

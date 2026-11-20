@@ -1,4 +1,6 @@
 #include "ui/Theme.h"
+#include "ui/LiveLook.h"
+#include "ui/TextCache.h"
 
 #include "core/MenuMnemonic.h"
 
@@ -17,17 +19,30 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <tuple>
 #include <unordered_map>
 #include <vector>
 
+#include "core/FontMetrics.h"
 #include "core/MenuPlacement.h"
+#include "core/Song.h"
+#include "core/MiddleEllipsis.h"
+#include "core/TextSize.h"
 #include "core/UiFontChoice.h"
 #include "platform/Paths.h"
+#include "ui/CondensedFontData.h"
+#include "ui/LabelFont.h"
 #include "ui/Icons.h"
 #include "ui/ImageCaches.h"
 #include "ui/PaintAB.h"
 #include "ui/PluginSkin.h"
 #include "ui/WindowOwner.h"
+
+// cmake/LynxPatchJuce.cmake fix 40 (round 190je): where a tall menu breaks into a second column (set by the LookAndFeel)
+namespace juce
+{
+extern int (*lynxTallMenuBreakHook) (const int* heights, const int* kinds, int count, int screenHeight);
+}
 
 namespace lynx::theme
 {
@@ -56,21 +71,26 @@ FontCache& fontCache()
     return *cache;
 }
 
+juce::Typeface::Ptr condensedFace (bool bold); // (below)
+
 juce::FontOptions fontOptions (float size, int kind)
 {
     if (kind == 2)
         return juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), size, juce::Font::plain);
-    return juce::FontOptions (size, kind == 1 ? juce::Font::bold : juce::Font::plain);
+    if (kind >= 3)
+        if (auto face = condensedFace (kind == 4))
+            return juce::FontOptions (face).withHeight (size);
+    return juce::FontOptions (size, kind == 1 || kind == 4 ? juce::Font::bold : juce::Font::plain);
 }
 
-// kind 0 plain, 1 bold, 2 monospaced
+// kind 0 plain, 1 bold, 2 monospaced, 3 condensed, 4 condensed bold
 juce::Font cachedFont (float size, int kind)
 {
     if (! lynx::ui::paintCache())
         return juce::Font (fontOptions (size, kind));
     std::uint32_t bits = 0;
     std::memcpy (&bits, &size, sizeof (bits));
-    const auto key = ((std::uint64_t) bits << 2) | (std::uint64_t) kind;
+    const auto key = ((std::uint64_t) bits << 3) | (std::uint64_t) kind;
     auto& cache = fontCache();
     const juce::SpinLock::ScopedLockType lock (cache.lock);
     if (const auto it = cache.fonts.find (key); it != cache.fonts.end())
@@ -81,14 +101,57 @@ juce::Font cachedFont (float size, int kind)
 }
 } // namespace
 
+namespace
+{
+int boldTextInUse = 0; // textsize::Bold (round 190jp)
+} // namespace
+
 juce::Font font (float size, bool bold)
 {
+    // Bold text (round 190jp): the roles the user chose take the bold face (the role from the size, as the roles are now)
+    if (! bold && boldTextInUse != 0)
+        bold = textsize::boldFor (boldTextInUse, textsize::roleOf (size, { type::caption, type::small, type::body, type::title, type::display }));
     return cachedFont (size, bold ? 1 : 0);
 }
 
 juce::Font monoFont (float size)
 {
     return cachedFont (size, 2);
+}
+
+// --- Settings › General › "Condensed labels (FL style)" (round 190je, FM-5 / FM-S8) -----------------------------------
+namespace
+{
+bool condensedOn = false;
+constexpr float condensedScale = 1.15f; // a step larger: Open Sans Condensed is about 80 % as wide, so the text keeps its width
+juce::File condensedFile() { return platform::settingsFile ("ui-condensed-labels.txt"); }
+} // namespace
+
+juce::Font labelFont (float size, bool bold)
+{
+    if (! condensedOn)
+        return font (size, bold);
+    return cachedFont (size * condensedScale, bold ? 4 : 3);
+}
+
+void setCondensedLabels (bool on)
+{
+    if (on != condensedOn)
+    {
+        condensedOn = on;
+        clearFontCache();
+    }
+}
+
+bool condensedLabels() { return condensedOn; }
+bool savedCondensedLabels() { return condensedFile().loadFileAsString().trim() == "1"; }
+
+void saveCondensedLabels (bool on)
+{
+    if (on)
+        condensedFile().replaceWithText ("1");
+    else
+        condensedFile().deleteFile();
 }
 
 void clearFontCache()
@@ -312,9 +375,124 @@ constexpr bool nativeTiles =
     false;
    #endif
 std::uint64_t paletteStamp = 0; // (setPalette: +1; part of the knob tiles' keys)
+
+// the palette of the tokens in use (setPalette), for the state rules that read several tokens at once (round 190je)
+themes::Palette& paletteInUse()
+{
+    static themes::Palette palette = themes::defaultPalette();
+    return palette;
+}
 // (the largest channel difference a tile may show against its shape drawn straight, --selftest; see paintCacheSelfTest)
 constexpr int nativeTolerance = 1, nativeKnobTolerance = 3;
 } // namespace
+
+ClipLook clipBody (juce::Colour clipColour, juce::Colour trackColour, ClipKind kind, ClipStyle style)
+{
+    const juce::Colour flGrey { 0xff485156 }; // FL's default channel / track colour
+    if (clipColour.getAlpha() == 0)
+        clipColour = flGrey;
+    if (trackColour.getAlpha() == 0)
+        trackColour = style == ClipStyle::flTint ? flGrey : clipColour;
+    const auto add = [] (juce::Colour c, int d) {
+        const auto f = [d] (juce::uint8 v) { return (juce::uint8) juce::jlimit (0, 255, (int) v + d); };
+        return juce::Colour (f (c.getRed()), f (c.getGreen()), f (c.getBlue()));
+    };
+    ClipLook look;
+    switch (style)
+    {
+        case ClipStyle::flTint:
+        {
+            look.headerTop = add (clipColour, -13);
+            look.headerBottom = add (clipColour, -28);
+            look.edge = liveShade (clipColour, 0.66f).withAlpha (1.0f);
+            look.body = trackColour.withAlpha (1.0f);
+            look.bodyAlpha = 0.5f;
+            look.content = add (clipColour, kind == ClipKind::automation ? 84 : 72);
+            look.contentFill = kind == ClipKind::automation ? look.content.withAlpha (0.13f) : juce::Colours::transparentBlack;
+            look.compactContent = clipColour.withAlpha (1.0f);
+            look.ink = add (clipColour, 124);
+            // a light theme (issue #95: the lanes near white): the body then is pale, so the content takes a dark shade
+            if (colour::bg2.getPerceivedBrightness() > 0.6f)
+            {
+                look.content = liveShade (clipColour, 0.45f).withAlpha (1.0f);
+                look.contentFill = kind == ClipKind::automation ? look.content.withAlpha (0.13f) : juce::Colours::transparentBlack;
+            }
+            break;
+        }
+        case ClipStyle::livePastel: // Live 12.4 (round 190ia CL-5, CL-17, CL-18): one block in the colour, dark marks
+            look.headerTop = look.headerBottom = look.body = clipColour.withAlpha (1.0f);
+            look.edge = liveShade (clipColour, 0.66f).withAlpha (1.0f);
+            look.content = look.compactContent = liveShade (clipColour, 0.15f).withAlpha (1.0f);
+            look.contentFill = juce::Colours::transparentBlack;
+            look.ink = liveShade (clipColour, 0.24f).withAlpha (1.0f);
+            break;
+        case ClipStyle::bandlabHue: // BandLab web Studio (round 190ia SG-5: header ×0.45, body ×0.57, waveform the hue)
+            look.headerTop = look.headerBottom = liveShade (trackColour, 0.45f).withAlpha (1.0f);
+            look.body = liveShade (trackColour, 0.57f).withAlpha (1.0f);
+            look.edge = liveShade (trackColour, 0.35f).withAlpha (1.0f);
+            look.content = look.compactContent = trackColour.withAlpha (1.0f);
+            look.contentFill = juce::Colours::transparentBlack;
+            look.ink = juce::Colours::white.withAlpha (0.92f);
+            break;
+    }
+    return look;
+}
+
+float contrast (juce::Colour a, juce::Colour b)
+{
+    const auto lum = [] (juce::Colour c) {
+        const auto lin = [] (float v) { return v <= 0.03928f ? v / 12.92f : std::pow ((v + 0.055f) / 1.055f, 2.4f); };
+        return 0.2126f * lin (c.getFloatRed()) + 0.7152f * lin (c.getFloatGreen()) + 0.0722f * lin (c.getFloatBlue());
+    };
+    const auto la = lum (a), lb = lum (b);
+    return (juce::jmax (la, lb) + 0.05f) / (juce::jmin (la, lb) + 0.05f);
+}
+
+juce::Colour colourFill (juce::Colour c, float lo, float hi)
+{
+    return c.withBrightness (juce::jlimit (lo, hi, c.getBrightness()));
+}
+
+juce::Colour lightTint (juce::Colour c, juce::Colour background, juce::Colour fallback)
+{
+    const auto tint = c.withMultipliedSaturation (0.45f).withBrightness (0.95f);
+    return contrast (tint, background) >= 4.5f ? tint : fallback;
+}
+
+juce::String fitMiddle (const juce::String& text, const juce::Font& font, float width)
+{
+    // (message thread only, as every paint; a project switch or a long session starts the cache again)
+    // Round 190mh (perf): found by a hash of the call instead of a key string built at every call (a float formatted and
+    // five strings joined per clip / channel name and frame); the same fields as the key string held (the font's height
+    // to 2 decimals, its names, the width in quarter pixels), so the same calls share an entry and give the same text.
+    struct Entry
+    {
+        juce::String text, name, style;
+        std::int64_t height;
+        int quarters;
+        juce::String fitted;
+    };
+    static std::unordered_multimap<std::uint64_t, Entry> cache;
+    const auto height = std::llround ((double) font.getHeight() * 100.0);
+    const auto quarters = juce::roundToInt (width * 4.0f);
+    const auto name = font.getTypefaceName(), style = font.getTypefaceStyle();
+    const auto h = mix (mix (mix (mix (mix (0x9b05688c2b3e6c1full, (std::uint64_t) text.hashCode64()), (std::uint64_t) height), (std::uint64_t) (std::uint32_t) quarters),
+                             (std::uint64_t) name.hashCode64()),
+                        (std::uint64_t) style.hashCode64());
+    for (auto [it, end] = cache.equal_range (h); it != end; ++it)
+        if (it->second.quarters == quarters && it->second.height == height && it->second.text == text && it->second.name == name && it->second.style == style)
+            return it->second.fitted;
+    if (cache.size() > 4000)
+        cache.clear();
+    const auto n = text.length();
+    const auto widthOf = [&] (int first, int count) { return juce::GlyphArrangement::getStringWidth (font, text.substring (first, first + count)); };
+    const auto [head, tail] = middleellipsis::split (n, width, juce::GlyphArrangement::getStringWidth (font, ".."), widthOf);
+    auto fitted = tail == 0 && head == n ? text
+                  : head == 0               ? text.substring (0, 1) // (nothing fits: the drawText that follows clips it)
+                                            : text.substring (0, head).trimEnd() + ".." + text.substring (n - tail).trimStart();
+    cache.emplace (h, Entry { text, name, style, height, quarters, fitted });
+    return fitted;
+}
 
 void fillLaunchTriangle (juce::Graphics& g, juce::Rectangle<float> a, juce::Colour colour)
 {
@@ -331,6 +509,146 @@ void fillLaunchTriangle (juce::Graphics& g, juce::Rectangle<float> a, juce::Colo
     };
     if (! (tilesForPaths() && lynx::ui::paintTiles()) || ! drawTile (g, cache, a, 0.0f, mix (0x3c6ef372fe94f82bull, (std::uint64_t) colour.getARGB()), nativeTiles, colour, direct))
         direct (g, a);
+}
+
+// Round 190io: FL's raised step keycap and the colour-filled plates (rack buttons, Mixer header bands), drawn from cached
+// tiles where the context's scale is whole (as the rounded rectangles): one blit per keycap instead of five fills
+// (paintbench: the rack's whole frame went from 16 to 35 ms with the fills).
+// Rollup 0.1.30 (round 190iy): tilesForPaths(), not tilesForPrimitives(): on Windows the latter is off (Direct2D draws a
+// rounded rectangle as one GPU primitive), so these drew five fills per keycap and a new path geometry per plate there
+// — the rack's whole frame on Thief 10 → 22 ms (--paintbench, Windows); as the knobs and triangles, they are Direct2D
+// bitmaps there now (Linux unchanged: both switches are the same there).
+void drawKeycap (juce::Graphics& g, juce::Rectangle<int> r, juce::Colour fill, bool lit)
+{
+    if (r.isEmpty() || ! g.clipRegionIntersects (r))
+        return;
+    const auto direct = [fill, lit] (juce::Graphics& k, juce::Rectangle<float> b) {
+        using namespace colour;
+        const auto x = b.getX(), y = b.getY(), w = b.getWidth(), h = b.getHeight();
+        const auto slotY = y + std::round (h * 0.25f);
+        k.setColour (fill);
+        k.fillRoundedRectangle (b, 2.0f);
+        // the bevel: the cap's upper part a step lighter down to the slot (FL: #767C80 over a #63696D body)
+        k.setColour (fill.brighter (lit ? 0.12f : 0.18f));
+        k.fillRect (juce::Rectangle<float> (x + 1.0f, y + 1.0f, w - 2.0f, slotY - y - 1.0f));
+        k.setColour (lit ? fill.brighter (0.4f) : borderStrong.brighter (0.25f));
+        k.fillRect (juce::Rectangle<float> (x + 1.0f, y, w - 2.0f, 1.0f));
+        k.setColour (lit ? fill.darker (0.45f) : bg0);
+        k.fillRect (juce::Rectangle<float> (x + 1.0f, y + h - 1.0f, w - 2.0f, 1.0f));
+        k.setColour (lit ? onAccent.withAlpha (0.6f) : bg0.withAlpha (0.85f));
+        k.fillRect (juce::Rectangle<float> (x + 3.0f, slotY, w - 6.0f, 1.0f));
+    };
+    static SpriteCache cache;
+    static const bool registered = lynx::ui::registerImageCache ([] { cache.images.clear(); }); (void) registered;
+    const auto key = mix (mix (mix (0x6a09e667f3bcc908ull, (std::uint64_t) fill.getARGB()), lit ? 1u : 0u), paletteStamp);
+    if (! tilesForPaths() || ! drawTile (g, cache, r.toFloat(), 0.0f, key, nativeTiles, fill, direct))
+        direct (g, r.toFloat());
+}
+
+void drawStepStrip (juce::Graphics& g, juce::Rectangle<int> firstCell, int pitch, juce::Colour a, juce::Colour b, bool ghost)
+{
+    const auto bounds = firstCell.withWidth (7 * pitch + firstCell.getWidth());
+    if (! g.clipRegionIntersects (bounds))
+        return;
+    const auto w = (float) firstCell.getWidth();
+    const auto cell = [ghost, w] (juce::Graphics& k, juce::Rectangle<float> c, juce::Colour fill) {
+        if (! ghost)
+        {
+            using namespace colour; // (drawKeycap's keycap, unlit)
+            const auto slotY = c.getY() + std::round (c.getHeight() * 0.25f);
+            k.setColour (fill);
+            k.fillRoundedRectangle (c, 2.0f);
+            k.setColour (fill.brighter (0.18f));
+            k.fillRect (juce::Rectangle<float> (c.getX() + 1.0f, c.getY() + 1.0f, w - 2.0f, slotY - c.getY() - 1.0f));
+            k.setColour (borderStrong.brighter (0.25f));
+            k.fillRect (juce::Rectangle<float> (c.getX() + 1.0f, c.getY(), w - 2.0f, 1.0f));
+            k.setColour (bg0);
+            k.fillRect (juce::Rectangle<float> (c.getX() + 1.0f, c.getBottom() - 1.0f, w - 2.0f, 1.0f));
+            k.setColour (bg0.withAlpha (0.85f));
+            k.fillRect (juce::Rectangle<float> (c.getX() + 3.0f, slotY, w - 6.0f, 1.0f));
+            return;
+        }
+        // a step past the pattern's end: faint, outlined
+        k.setColour (fill.withMultipliedAlpha (0.35f));
+        k.fillRoundedRectangle (c, 2.0f);
+        k.setColour (fill.brighter (0.25f).withMultipliedAlpha (0.55f));
+        k.drawRoundedRectangle (c.reduced (0.5f), 2.0f, 1.0f);
+    };
+    const auto direct = [&cell, pitch, w, a, b] (juce::Graphics& k, juce::Rectangle<float> r) {
+        for (int i = 0; i < 8; ++i)
+            cell (k, juce::Rectangle<float> (r.getX() + (float) (i * pitch), r.getY(), w, r.getHeight()), i < 4 ? a : b);
+    };
+    static SpriteCache cache;
+    static const bool registered = lynx::ui::registerImageCache ([] { cache.images.clear(); }); (void) registered;
+    const auto key = mix (mix (mix (mix (mix (0x3c6ef372fe94f82bull, (std::uint64_t) a.getARGB()), (std::uint64_t) b.getARGB()), (std::uint64_t) pitch),
+                               ghost ? 1u : 0u), paletteStamp);
+    if (! tilesForPaths() || ! drawTile (g, cache, bounds.toFloat(), 0.0f, key, nativeTiles, a, direct))
+        direct (g, bounds.toFloat());
+}
+
+void drawStepStripOver (juce::Graphics& g, juce::Rectangle<int> firstCell, int pitch, juce::Colour a, juce::Colour b, bool ghost, juce::Colour background)
+{
+    const auto bounds = firstCell.withWidth (7 * pitch + firstCell.getWidth());
+    if (! g.clipRegionIntersects (bounds))
+        return;
+    // only where drawStepStrip blits its tile (tilesForPaths, a whole scale, a tile of at most 256 px) with JUCE's software
+    // renderer into the frame: the tile's pixels blended over `background` here are the frame's (PixelARGB and PixelRGB
+    // blend an opaque pixel alike), and an opaque RGB image is then copied (PixelARGB::blend (PixelRGB) = set)
+    const auto scale = spriteScale (g);
+    if (! tilesForPaths() || scale == 0 || ! background.isOpaque() || bounds.getWidth() * scale > 256 || bounds.getHeight() * scale > 256
+        || dynamic_cast<juce::LowLevelGraphicsSoftwareRenderer*> (&g.getInternalContext()) == nullptr)
+    {
+        drawStepStrip (g, firstCell, pitch, a, b, ghost);
+        return;
+    }
+    static std::unordered_map<std::uint64_t, juce::Image> cache;
+    static const bool registered = lynx::ui::registerImageCache ([] { cache.clear(); }); (void) registered;
+    auto key = mix (mix (mix (mix (mix (0x510e527fade682d1ull, (std::uint64_t) a.getARGB()), (std::uint64_t) b.getARGB()), (std::uint64_t) pitch),
+                         ghost ? 1u : 0u), paletteStamp);
+    key = mix (mix (mix (mix (key, (std::uint64_t) background.getARGB()), (std::uint64_t) firstCell.getWidth()), (std::uint64_t) firstCell.getHeight()),
+               (std::uint64_t) scale);
+    auto it = cache.find (key);
+    if (it == cache.end())
+    {
+        if (cache.size() > 200)
+            cache.clear();
+        juce::Image image (juce::Image::RGB, bounds.getWidth() * scale, bounds.getHeight() * scale, false, juce::SoftwareImageType());
+        {
+            juce::Graphics ig (image);
+            ig.addTransform (juce::AffineTransform::scale ((float) scale));
+            ig.setColour (background);
+            ig.fillRect (juce::Rectangle<int> (bounds.getWidth(), bounds.getHeight()));
+            drawStepStrip (ig, firstCell.withPosition (0, 0), pitch, a, b, ghost);
+        }
+        it = cache.emplace (key, std::move (image)).first;
+    }
+    g.setColour (juce::Colours::black); // (an image is drawn with the current colour's alpha as its opacity)
+    if (scale == 1)
+        g.drawImageAt (it->second, bounds.getX(), bounds.getY());
+    else
+        g.drawImage (it->second, bounds.toFloat(), juce::RectanglePlacement::stretchToFit);
+    g.setColour (a); // (the colour drawStepStrip leaves set)
+}
+
+void fillPlate (juce::Graphics& g, juce::Rectangle<float> r, float corner, juce::Colour top, juce::Colour bottom, bool squareBottom)
+{
+    if (r.isEmpty() || ! g.clipRegionIntersects (r.getSmallestIntegerContainer()))
+        return;
+    const auto direct = [corner, top, bottom, squareBottom] (juce::Graphics& k, juce::Rectangle<float> b) {
+        if (top == bottom)
+            k.setColour (top);
+        else
+            k.setGradientFill (juce::ColourGradient::vertical (top, b.getY(), bottom, b.getBottom()));
+        juce::Path p;
+        p.addRoundedRectangle (b.getX(), b.getY(), b.getWidth(), b.getHeight(), corner, corner, true, true, ! squareBottom, ! squareBottom);
+        k.fillPath (p);
+    };
+    static SpriteCache cache;
+    static const bool registered = lynx::ui::registerImageCache ([] { cache.images.clear(); }); (void) registered;
+    const auto key = mix (mix (mix (mix (0xbb67ae8584caa73bull, (std::uint64_t) top.getARGB()), (std::uint64_t) bottom.getARGB()),
+                               (std::uint64_t) eighth (corner)), squareBottom ? 1u : 0u);
+    if (! tilesForPaths() || ! drawTile (g, cache, r, 0.0f, key, nativeTiles, bottom, direct))
+        direct (g, r);
 }
 
 void fillRoundRect (juce::Graphics& g, juce::Rectangle<float> r, float corner, juce::Colour colour)
@@ -528,6 +846,24 @@ void drawKnob (juce::Graphics& g, juce::Rectangle<float> bounds, float value01, 
     blit (g, *sprite, at, scale, false, textPrimary); // (the colour drawKnobDirect leaves set: its pointer's)
 }
 
+// Round 190jn: Live's knobs (ui/LiveLook.h) from tiles, as drawKnob above. Values and defaults in sixteenths of a degree.
+void drawLiveKnobTile (juce::Graphics& g, juce::Rectangle<float> bounds, float value01, float default01, int style,
+                       void (*direct) (juce::Graphics&, juce::Rectangle<float>, float, float))
+{
+    if (! g.clipRegionIntersects (bounds.getSmallestIntegerContainer().expanded (5)))
+        return;
+    const auto value = juce::roundToInt (juce::jlimit (0.0f, 1.0f, value01) * 1440.0f), home = juce::roundToInt (juce::jlimit (0.0f, 1.0f, default01) * 1440.0f);
+    static SpriteCache cache;
+    static const bool registered = lynx::ui::registerImageCache ([] { cache.images.clear(); });
+    (void) registered;
+    const auto key = mix (mix (mix (0x9e3779b97f4a7c15ull, (std::uint64_t) value), (std::uint64_t) home), (std::uint64_t) style);
+    const auto drawn = tilesForPaths() && drawTile (g, cache, bounds, 5.0f, key, nativeTiles, juce::Colour (0xff181818), [&] (juce::Graphics& ig, juce::Rectangle<float> r) {
+        direct (ig, r, (float) value / 1440.0f, (float) home / 1440.0f);
+    });
+    if (! drawn)
+        direct (g, bounds, value01, default01);
+}
+
 namespace
 {
 void drawKnobDirect (juce::Graphics& g, juce::Rectangle<float> bounds, float value01, bool bipolar, juce::Colour arcColour, bool hover)
@@ -712,12 +1048,126 @@ juce::String paintCacheSelfTest()
         // plate's; reported, not a failure. The alpha must be applied once: the plates' middles are the same.)
         detail << ", translucent plates " << worst << " at a corner";
     }
+    // round 190ms (JUCE fix 45): the software renderer builds a path's edge table over the clip cut to the path's
+    // bounds + 1 px (not the whole clip), and copies an RGB image's rows into ARGB pixels four bytes at a time
+    if (const auto renderer = softwareRendererSelfTest(); renderer != "OK")
+        return renderer;
+    detail << ", edge tables over the path's rows and RGB rows exact";
     return "OK (" + detail + ")";
+}
+
+// Round 190ms: the two claims JUCE fix 45 rests on (cmake/LynxPatchJuce.cmake), checked with JUCE's own classes:
+// (a) an edge table built over the clip's rows from one above the path's bounds to one below (every column of the clip)
+//     covers every pixel as the one built over the whole clip does (shapes at sub-pixel places, strokes, ellipses, curves
+//     of many nearly flat segments, scaled; clips that cut through them or not). Not its columns: EdgeTable extrapolates
+//     a nearly flat segment from its rounded start row, so an edge point can land pixels beyond the path's bounds, and
+//     it is clamped to the table's columns (round 190ms: a 2-D cut changed 3 pixels of Helix+ 2's filter curve by 1 level).
+// (b) an opaque RGB image drawn into an ARGB one gives every pixel 0xff000000 | its RGB (rows of any width and offset).
+juce::String softwareRendererSelfTest()
+{
+    struct Coverage // EdgeTable::iterate's callback: the coverage of each pixel in a W x H map
+    {
+        std::vector<int>& map;
+        int width, height, y = 0;
+        void setEdgeTableYPos (int row) noexcept { y = row; }
+        void put (int x, int alpha) noexcept
+        {
+            if (x >= 0 && x < width && y >= 0 && y < height)
+                map[(std::size_t) (y * width + x)] += alpha + 1; // (+1: a pixel set at alpha 0 still counts as visited)
+        }
+        void handleEdgeTablePixel (int x, int alpha) noexcept { put (x, alpha); }
+        void handleEdgeTablePixelFull (int x) noexcept { put (x, 255); }
+        void handleEdgeTableLine (int x, int w, int alpha) noexcept { for (int i = 0; i < w; ++i) put (x + i, alpha); }
+        void handleEdgeTableLineFull (int x, int w) noexcept { for (int i = 0; i < w; ++i) put (x + i, 255); }
+        void handleEdgeTableRectangle (int x, int y0, int w, int h, int alpha) noexcept
+        {
+            for (int row = y0; row < y0 + h; ++row) { y = row; handleEdgeTableLine (x, w, alpha); }
+        }
+        void handleEdgeTableRectangleFull (int x, int y0, int w, int h) noexcept { handleEdgeTableRectangle (x, y0, w, h, 255); }
+    };
+    constexpr int W = 160, H = 120;
+    juce::Random random (190);
+    int cases = 0;
+    for (int i = 0; i < 1200; ++i)
+    {
+        const auto x = random.nextFloat() * 150.0f - 10.0f, y = random.nextFloat() * 110.0f - 10.0f;
+        const auto w = 1.0f + random.nextFloat() * 60.0f, h = 1.0f + random.nextFloat() * 40.0f;
+        juce::Path path;
+        // a curve as many short, nearly flat segments (a response or envelope curve): its edge points can land well
+        // outside its own bounds (EdgeTable extrapolates a flat segment's slope from a rounded start row)
+        const auto curve = [&] {
+            juce::Path c;
+            for (int k = 0; k <= 120; ++k)
+            {
+                const auto px = x + w * (float) k / 120.0f, py = y + h * 0.5f * (1.0f + std::sin ((float) k * 0.05f + w)) * (k < 60 ? 0.02f : 1.0f);
+                k == 0 ? c.startNewSubPath (px, py) : c.lineTo (px, py);
+            }
+            return c;
+        };
+        switch (i % 6)
+        {
+            case 0: path.addRoundedRectangle (x, y, w, h, random.nextFloat() * 6.0f); break;
+            case 1: juce::PathStrokeType (0.5f + random.nextFloat() * 2.0f).createStrokedPath (path, [&] { juce::Path p; p.addRoundedRectangle (x, y, w, h, 2.0f); return p; }()); break;
+            case 2: path.addEllipse (x, y, w, h); break;
+            case 3: juce::PathStrokeType (0.75f + random.nextFloat() * 1.5f).createStrokedPath (path, curve()); break;
+            case 4: path = curve(); path.lineTo (x + w, y + h); path.lineTo (x, y + h); path.closeSubPath(); break;
+            default: path.addTriangle (x, y, x + w, y + h * 0.5f, x, y + h); break;
+        }
+        const auto transform = i % 5 == 4 ? juce::AffineTransform::scale (1.5f) : i % 7 == 6 ? juce::AffineTransform::scale (2.0f).translated (-3.0f, 1.0f)
+                                                                                           : juce::AffineTransform();
+        // the clip: the whole picture, or a part that cuts through the shape
+        const auto clip = i % 3 == 0 ? juce::Rectangle<int> (W, H)
+                                     : juce::Rectangle<int> (random.nextInt (W / 2), random.nextInt (H / 2), 10 + random.nextInt (W / 2), 10 + random.nextInt (H / 2));
+        const auto pathArea = path.getBoundsTransformed (transform).getSmallestIntegerContainer();
+        if (! pathArea.intersects (clip))
+            continue;
+        // (fix 45: the clip's rows from one above the path's to one below; every column of the clip)
+        const auto rows = juce::Rectangle<int>::leftTopRightBottom (clip.getX(), juce::jmax (clip.getY(), pathArea.getY() - 1), clip.getRight(),
+                                                                   juce::jmin (clip.getBottom(), pathArea.getBottom() + 1));
+        std::vector<int> whole ((std::size_t) (W * H), 0), cut ((std::size_t) (W * H), 0);
+        Coverage a { whole, W, H }, b { cut, W, H };
+        juce::EdgeTable (clip, path, transform).iterate (a);
+        juce::EdgeTable (rows, path, transform).iterate (b);
+        if (whole != cut)
+            return "ERROR a path's edge table over its own rows covers other pixels than over the whole clip (case " + juce::String (i) + ")";
+        ++cases;
+    }
+    // (b) RGB rows into ARGB pixels, the image placed at odd offsets and clipped
+    juce::Image rgb (juce::Image::RGB, 37, 9, false, juce::SoftwareImageType());
+    {
+        juce::Image::BitmapData data (rgb, juce::Image::BitmapData::writeOnly);
+        for (int y = 0; y < data.height; ++y)
+            for (int x = 0; x < data.width; ++x)
+                data.setPixelColour (x, y, juce::Colour ((juce::uint8) random.nextInt (256), (juce::uint8) random.nextInt (256), (juce::uint8) random.nextInt (256)));
+    }
+    const std::tuple<int, int, int> placesAndClips[] { { 0, 0, 64 }, { 3, 2, 64 }, { -5, 1, 64 }, { 7, -2, 20 }, { 30, 4, 64 } };
+    for (const auto& [dx, dy, clipWidth] : placesAndClips)
+    {
+        juce::Image argb (juce::Image::ARGB, 64, 16, true, juce::SoftwareImageType());
+        {
+            juce::Graphics g (argb);
+            g.reduceClipRegion (0, 0, clipWidth, 16);
+            g.setColour (juce::Colours::black);
+            g.drawImageAt (rgb, dx, dy);
+        }
+        const juce::Image::BitmapData from (rgb, juce::Image::BitmapData::readOnly), to (argb, juce::Image::BitmapData::readOnly);
+        for (int y = 0; y < 16; ++y)
+            for (int x = 0; x < 64; ++x)
+            {
+                const auto sx = x - dx, sy = y - dy;
+                const auto inside = x < clipWidth && sx >= 0 && sy >= 0 && sx < rgb.getWidth() && sy < rgb.getHeight();
+                const auto want = inside ? from.getPixelColour (sx, sy).withAlpha ((juce::uint8) 255) : juce::Colour();
+                if (to.getPixelColour (x, y) != want)
+                    return "ERROR an RGB image drawn into an ARGB one: pixel " + juce::String (x) + ", " + juce::String (y);
+            }
+    }
+    return cases > 300 ? "OK" : "ERROR too few edge table cases (" + juce::String (cases) + ")";
 }
 
 void setPalette (const themes::Palette& p)
 {
     ++paletteStamp;
+    paletteInUse() = p;
     auto c = [] (std::uint32_t argb) { return juce::Colour (argb); };
     bg0 = c (p.bg0); bg1 = c (p.bg1); bg2 = c (p.bg2); bg3 = c (p.bg3); bg4 = c (p.bg4); bg5 = c (p.bg5); bg6 = c (p.bg6);
     border = c (p.border); borderStrong = c (p.borderStrong);
@@ -729,11 +1179,40 @@ void setPalette (const themes::Palette& p)
     gridBar = c (p.gridBar); gridBeat = c (p.gridBeat); gridStep = c (p.gridStep); keyBlack = c (p.keyBlack);
     rowWhite = c (p.rowWhite); rowBlack = c (p.rowBlack);
     noteSoft = c (p.noteSoft); noteHard = c (p.noteHard); noteMuted = c (p.noteMuted); ledOff = c (p.ledOff);
+    colour::outline = c (p.outline);
 
     // the legacy names
     theme::window = bg1; theme::panel = bg2; theme::toolbar = bg3; theme::channelButton = bg4; theme::channelButtonSelected = bg6;
     theme::knobBackground = bg0; theme::stepOn = accent; theme::stepOnOffGrid = stepNote; theme::accentOrange = accent;
     theme::playhead = accent; theme::text = textPrimary;
+}
+
+ButtonColours buttonColours (themes::ButtonKind kind, bool on, float hover, bool down, bool enabled)
+{
+    // (round 190mh, perf: the state rule mixes colours and checks contrast at every button paint; its answer is kept per
+    // palette and state, per thread: some self-tests and renders paint off the message thread)
+    std::uint32_t hoverBits = 0;
+    static_assert (sizeof (hoverBits) == sizeof (hover));
+    std::memcpy (&hoverBits, &hover, sizeof (hover));
+    const auto key = mix (mix (mix (0x2545f4914f6cdd1dull, paletteStamp), (std::uint64_t) hoverBits),
+                          (std::uint64_t) ((int) kind * 8 + (on ? 4 : 0) + (down ? 2 : 0) + (enabled ? 1 : 0)));
+    struct Entry
+    {
+        std::uint64_t stamp;
+        std::uint32_t hover;
+        int state;
+        ButtonColours colours;
+    };
+    static thread_local std::unordered_map<std::uint64_t, Entry> cache;
+    const auto state = (int) kind * 8 + (on ? 4 : 0) + (down ? 2 : 0) + (enabled ? 1 : 0);
+    if (const auto it = cache.find (key); it != cache.end() && it->second.stamp == paletteStamp && it->second.hover == hoverBits && it->second.state == state)
+        return it->second.colours;
+    const auto look = themes::buttonLook (paletteInUse(), kind, on, (double) hover, down, enabled);
+    const ButtonColours colours { juce::Colour (look.fill), juce::Colour (look.edge), juce::Colour (look.content) };
+    if (cache.size() > 1024) // (fades step through hover levels)
+        cache.clear();
+    cache[key] = { paletteStamp, hoverBits, state, colours };
+    return colours;
 }
 
 juce::String mnemonic (const juce::String& text, char key)
@@ -767,7 +1246,7 @@ themes::Palette currentPalette()
     return { c (bg0), c (bg1), c (bg2), c (bg3), c (bg4), c (bg5), c (bg6), c (border), c (borderStrong), c (textPrimary), c (textSecondary),
              c (textDisabled), c (accent), c (accentHover), c (accentPressed), c (accentMuted), c (onAccent), c (selectionFill), c (knobArc),
              c (knobTrack), c (colour::stepOff), c (stepOffAlt), c (stepNote), c (gridBar), c (gridBeat), c (gridStep), c (keyBlack), c (rowWhite),
-             c (rowBlack), c (noteSoft), c (noteHard), c (noteMuted), c (ledOff) };
+             c (rowBlack), c (noteSoft), c (noteHard), c (noteMuted), c (ledOff), c (colour::outline) };
 }
 
 namespace
@@ -802,17 +1281,67 @@ namespace
 
 #if LYNX_BUNDLED_FONT
 // Open Sans, regular and bold (resources/fonts, SIL OFL). (The name finds a memory face only while it lives.)
+// Issue #189 (round 190ir): with its own vertical metrics (ascent + descent 1.362 em) Open Sans drew its letters 15 %
+// smaller than DejaVu Sans did at the same JUCE height, the font Linux showed up to 0.1.23, and narrower: every text
+// looked much smaller after 0.1.25 at the same UI size. Its ascent + descent are set to DejaVu Sans's in memory
+// (core/FontMetrics.h), so the letters are as large as 0.1.23's again; Open Sans's own widths (8 % narrower than
+// DejaVu's at that size) leave the layouts more room than 0.1.23 had. The font file itself is unchanged (OFL: the
+// glyphs and names are the same; only the line metrics JUCE sizes by are read differently).
+juce::Typeface::Ptr bundledFace (const unsigned char* data, int size)
+{
+    // LYNX_FONT_METRICS=0 (diagnostics, A/B): Open Sans with its own metrics, as 0.1.25-0.1.29 drew it
+    if (juce::SystemStats::getEnvironmentVariable ("LYNX_FONT_METRICS", {}) == "0")
+        return juce::Typeface::createSystemTypefaceFor (data, (size_t) size);
+    const auto scaled = fontmetrics::withVerticalExtent (data, (std::size_t) size, fontmetrics::dejaVuSansExtent);
+    if (! scaled.empty())
+        if (auto face = juce::Typeface::createSystemTypefaceFor (scaled.data(), scaled.size()))
+            return face; // (JUCE keeps its own copy of the data)
+    return juce::Typeface::createSystemTypefaceFor (data, (size_t) size);
+}
+
 const std::array<juce::Typeface::Ptr, 2>& bundledFaces()
 {
     static const std::array<juce::Typeface::Ptr, 2> faces {
-        juce::Typeface::createSystemTypefaceFor (lynxfontdata::OpenSansRegular_ttf, (size_t) lynxfontdata::OpenSansRegular_ttfSize),
-        juce::Typeface::createSystemTypefaceFor (lynxfontdata::OpenSansBold_ttf, (size_t) lynxfontdata::OpenSansBold_ttfSize)
+        bundledFace ((const unsigned char*) lynxfontdata::OpenSansRegular_ttf, lynxfontdata::OpenSansRegular_ttfSize),
+        bundledFace ((const unsigned char*) lynxfontdata::OpenSansBold_ttf, lynxfontdata::OpenSansBold_ttfSize)
     };
     return faces;
 }
 #endif
 
 bool typefaceFallbackOff = false; // (fontSelfTest only)
+} // namespace
+
+namespace
+{
+// Open Sans Condensed (round 190je), decoded from ui/CondensedFontData.h on first use: only when the option is on, so the
+// default look never meets these faces. On Linux they get Open Sans's adjusted line metrics (issue #189), as the
+// regular face does, so both draw their letters at the same scale.
+juce::Typeface::Ptr condensedFace (bool bold)
+{
+    static const std::array<juce::Typeface::Ptr, 2> faces = [] {
+        const auto decode = [] (const char* const* pieces, int count) {
+            juce::String text;
+            for (int i = 0; i < count; ++i)
+                text += pieces[i];
+            juce::MemoryOutputStream out;
+            juce::Base64::convertFromBase64 (out, text);
+            return out.getMemoryBlock();
+        };
+        const auto make = [] (const juce::MemoryBlock& data) -> juce::Typeface::Ptr {
+            if (data.getSize() == 0)
+                return {};
+           #if LYNX_BUNDLED_FONT
+            return bundledFace ((const unsigned char*) data.getData(), (int) data.getSize());
+           #else
+            return juce::Typeface::createSystemTypefaceFor (data.getData(), data.getSize());
+           #endif
+        };
+        return std::array<juce::Typeface::Ptr, 2> { make (decode (condensedfont::semiBold, condensedfont::semiBoldPieces)),
+                                                    make (decode (condensedfont::bold, condensedfont::boldPieces)) };
+    }();
+    return faces[bold ? 1 : 0] != nullptr ? faces[bold ? 1 : 0] : faces[0];
+}
 } // namespace
 
 juce::StringArray fontFoldersToScan (const juce::StringArray& fontconfigFolders, const std::function<bool (const juce::String&)>& exists)
@@ -861,6 +1390,14 @@ LookAndFeel::LookAndFeel()
    #endif
     clearFontCache(); // (the cached fonts may hold the typeface of the family before)
     refreshColours();
+
+    // FL's columns for long menus (round 190je, FW-13): a menu taller than 70 % of the screen breaks once at a group
+    juce::lynxTallMenuBreakHook = [] (const int* heights, const int* kinds, int count, int screenHeight) {
+        std::vector<themes::MenuRow> rows ((std::size_t) juce::jmax (0, count));
+        for (int i = 0; i < count; ++i)
+            rows[(std::size_t) i] = { heights[i], kinds[i] == 1, kinds[i] == 2 };
+        return themes::tallMenuBreak (rows, screenHeight * 7 / 10);
+    };
 }
 
 // JUCE expects a typeface for every font ("the look and feel must return a typeface!") but, on Linux, has none for a
@@ -1013,6 +1550,61 @@ juce::StringArray installedUiFonts()
 
 static juce::File uiFontFile() { return platform::settingsFile ("ui-font.txt"); }
 
+// --- Settings › General › Text size (issue #189) --------------------------------------------------------
+namespace
+{
+int textSizeInUse = textsize::standard;
+juce::File textSizeFile() { return platform::settingsFile ("ui-text-size.txt"); }
+} // namespace
+
+void setTextSize (int percent)
+{
+    using textsize::Role;
+    textSizeInUse = textsize::clamp (percent);
+    type::caption = textsize::scaled (type::base::caption, textSizeInUse, Role::caption);
+    type::small = textsize::scaled (type::base::small, textSizeInUse, Role::small);
+    type::body = textsize::scaled (type::base::body, textSizeInUse, Role::body);
+    type::title = textsize::scaled (type::base::title, textSizeInUse, Role::title);
+    type::display = textsize::scaled (type::base::display, textSizeInUse, Role::display);
+    clearFontCache();
+}
+
+int textSize() { return textSizeInUse; }
+
+int savedTextSize() { return textsize::parse (textSizeFile().loadFileAsString().toStdString()); }
+
+void saveTextSize (int percent)
+{
+    if (textsize::clamp (percent) == textsize::standard)
+        textSizeFile().deleteFile();
+    else
+        textSizeFile().replaceWithText (juce::String (textsize::clamp (percent)));
+}
+
+// --- Settings › General › Bold text (round 190jp) ------------------------------------------------------------
+namespace
+{
+juce::File boldTextFile() { return platform::settingsFile ("ui-bold-text.txt"); }
+} // namespace
+
+void setBoldText (int setting)
+{
+    boldTextInUse = juce::jlimit (0, 2, setting);
+    clearFontCache();
+}
+
+int boldText() { return boldTextInUse; }
+
+int savedBoldText() { return textsize::parseBold (boldTextFile().loadFileAsString().toStdString()); }
+
+void saveBoldText (int setting)
+{
+    if (juce::jlimit (0, 2, setting) == 0)
+        boldTextFile().deleteFile();
+    else
+        boldTextFile().replaceWithText (juce::String (juce::jlimit (0, 2, setting)));
+}
+
 juce::String savedUiFont() { return uiFontFile().loadFileAsString().trim(); }
 
 void saveUiFont (const juce::String& family)
@@ -1064,11 +1656,13 @@ void LookAndFeel::refreshColours()
     setColour (juce::ComboBox::buttonColourId, bg4);
     setColour (juce::ComboBox::focusedOutlineColourId, accent);
 
-    setColour (juce::PopupMenu::backgroundColourId, bg3);
-    setColour (juce::PopupMenu::textColourId, textPrimary);
-    setColour (juce::PopupMenu::headerTextColourId, textSecondary);
-    setColour (juce::PopupMenu::highlightedBackgroundColourId, bg5);
-    setColour (juce::PopupMenu::highlightedTextColourId, textPrimary);
+    // (round 190je: the menu style's colours, LYNX dark or FL classic)
+    const auto menuLook = menus::colours();
+    setColour (juce::PopupMenu::backgroundColourId, menuLook.background);
+    setColour (juce::PopupMenu::textColourId, menuLook.text);
+    setColour (juce::PopupMenu::headerTextColourId, menuLook.bandText);
+    setColour (juce::PopupMenu::highlightedBackgroundColourId, menuLook.hover);
+    setColour (juce::PopupMenu::highlightedTextColourId, menuLook.hoverText);
 
     setColour (juce::Label::textColourId, textPrimary);
     setColour (juce::Label::backgroundColourId, juce::Colours::transparentBlack);
@@ -1081,7 +1675,7 @@ void LookAndFeel::refreshColours()
     setColour (juce::TextEditor::textColourId, textPrimary);
     setColour (juce::TextEditor::highlightColourId, accent.withAlpha (0.35f));
     setColour (juce::TextEditor::highlightedTextColourId, textPrimary);
-    setColour (juce::TextEditor::outlineColourId, border);
+    setColour (juce::TextEditor::outlineColourId, colour::outline); // (round 190je: 3:1, was border 1.1:1)
     setColour (juce::TextEditor::focusedOutlineColourId, accent);
     setColour (juce::TextEditor::shadowColourId, juce::Colours::transparentBlack);
     setColour (juce::CaretComponent::caretColourId, accent);
@@ -1144,14 +1738,27 @@ void LookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& button,
     auto bounds = button.getLocalBounds().toFloat().reduced (0.5f);
     const auto on = button.getToggleState();
     auto base = backgroundColour; // already buttonOnColour when toggled
+    juce::Colour edge;
 
-    if (down)
-        base = on ? accentPressed : (base == bg4 ? bg6 : base.brighter (0.18f));
-    else if (highlighted)
-        base = on ? accentHover : (base == bg4 ? bg5 : base.brighter (0.1f));
+    // LYNX's own colours (a secondary button: bg4; on / primary: the accent) follow the one state rule (round 190je);
+    // a button given colours of its own keeps its shading
+    const auto standard = base == bg4 || base == accent;
+    if (standard)
+    {
+        const auto look = buttonColours (themes::ButtonKind::secondary, on || base == accent, highlighted ? 1.0f : 0.0f, down, button.isEnabled());
+        base = look.fill;
+        edge = look.edge;
+    }
+    else
+    {
+        if (down)
+            base = on ? accentPressed : base.brighter (0.18f);
+        else if (highlighted)
+            base = on ? accentHover : base.brighter (0.1f);
 
-    if (! button.isEnabled())
-        base = base.withMultipliedAlpha (0.5f);
+        if (! button.isEnabled())
+            base = base.withMultipliedAlpha (0.5f);
+    }
 
     const auto flatLeft = button.isConnectedOnLeft(), flatRight = button.isConnectedOnRight();
     juce::Path p;
@@ -1159,6 +1766,16 @@ void LookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& button,
                            ! flatRight, ! flatLeft, ! flatRight);
     g.setColour (base);
     g.fillPath (p);
+    if (! edge.isTransparent())
+    {
+        // 1 px outline (round 190je, FW idea 6): the fill alone reads 1.1:1 on the panels
+        // (on the pixel centres: `bounds` is the button inset by half a pixel, so the line covers exactly its edge pixels)
+        juce::Path rim;
+        rim.addRoundedRectangle (bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), radius::md, radius::md, ! flatLeft, ! flatRight,
+                                 ! flatLeft, ! flatRight);
+        g.setColour (edge);
+        g.strokePath (rim, juce::PathStrokeType (1.0f));
+    }
 
     if ((button.hasKeyboardFocus (false) || button.getProperties().contains ("lynxSnapshotFocus")) // (--snapshot: see saveWindow)
         && button.getWantsKeyboardFocus())
@@ -1177,8 +1794,9 @@ void LookAndFeel::drawButtonText (juce::Graphics& g, juce::TextButton& button, b
 {
     const auto font = getTextButtonFont (button, button.getHeight());
     g.setFont (font);
-    const auto fg = button.findColour (button.getToggleState() ? juce::TextButton::textColourOnId : juce::TextButton::textColourOffId)
-                        .withMultipliedAlpha (button.isEnabled() ? 1.0f : 0.45f);
+    const auto own = button.findColour (button.getToggleState() ? juce::TextButton::textColourOnId : juce::TextButton::textColourOffId);
+    // disabled: the disabled text token (3.6:1, round 190je) for LYNX's own text colours, else the colour dimmed as before
+    const auto fg = button.isEnabled() ? own : (own == textPrimary || own == onAccent) ? textDisabled : own.withMultipliedAlpha (0.45f);
     g.setColour (fg);
 
     auto area = button.getLocalBounds().reduced (juce::jmin (8, button.getWidth() / 6), 0);
@@ -1212,7 +1830,8 @@ void LookAndFeel::drawTickBox (juce::Graphics& g, juce::Component& component, fl
         const auto circle = box.withSizeKeepingCentre (juce::jmin (box.getWidth(), box.getHeight()), juce::jmin (box.getWidth(), box.getHeight()));
         g.setColour (bg0);
         g.fillEllipse (circle);
-        g.setColour (ticked ? (enabled ? (highlighted ? accentHover : accent) : accentMuted) : (highlighted ? textSecondary : borderStrong));
+        g.setColour (ticked ? (enabled ? (highlighted ? accentHover : accent) : accentMuted)
+                            : (highlighted ? textSecondary : enabled ? colour::outline : colour::outline.withMultipliedAlpha (0.5f)));
         g.drawEllipse (circle.reduced (0.5f), 1.2f);
         if (ticked)
             g.fillEllipse (circle.reduced (circle.getWidth() * 0.28f));
@@ -1224,7 +1843,8 @@ void LookAndFeel::drawTickBox (juce::Graphics& g, juce::Component& component, fl
     else
     {
         fillRounded (g, box, radius::sm, bg0);
-        outlineRounded (g, box, radius::sm, highlighted ? textSecondary : borderStrong);
+        // (round 190je: the outline at 3:1, was borderStrong 1.4:1)
+        outlineRounded (g, box.expanded (0.5f), radius::sm, highlighted ? textSecondary : enabled ? colour::outline : colour::outline.withMultipliedAlpha (0.5f));
     }
 
     if (ticked)
@@ -1239,7 +1859,8 @@ void LookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& butto
     drawTickBox (g, button, 2.0f, ((float) button.getHeight() - tickSize) * 0.5f, tickSize, tickSize, button.getToggleState(),
                  button.isEnabled(), highlighted, down);
 
-    g.setColour (button.findColour (juce::ToggleButton::textColourId).withMultipliedAlpha (button.isEnabled() ? 1.0f : 0.5f));
+    const auto own = button.findColour (juce::ToggleButton::textColourId);
+    g.setColour (button.isEnabled() ? own : own == textPrimary ? textDisabled : own.withMultipliedAlpha (0.5f));
     g.setFont (uiFont (fontSize));
     const auto textArea = button.getLocalBounds().withTrimmedLeft (juce::roundToInt (tickSize) + 8).withTrimmedRight (2);
     g.drawFittedText (button.getButtonText(), textArea, juce::Justification::centredLeft, 2, 0.85f);
@@ -1252,12 +1873,17 @@ void LookAndFeel::drawComboBox (juce::Graphics& g, int width, int height, bool, 
 {
     const auto bounds = juce::Rectangle<float> (0.0f, 0.0f, (float) width, (float) height).reduced (0.5f);
     const auto hover = box.isMouseOver (true) && box.isEnabled();
-    fillRounded (g, bounds, radius::md, hover ? bg5 : box.findColour (juce::ComboBox::backgroundColourId));
+    const auto own = box.findColour (juce::ComboBox::backgroundColourId);
+    // LYNX's own box (bg4) follows the button rule (round 190je): bg5 under the mouse, a 1 px outline at 3:1
+    const auto look = buttonColours (themes::ButtonKind::secondary, false, hover ? 1.0f : 0.0f, false, box.isEnabled());
+    fillRounded (g, bounds, radius::md, own == bg4 ? look.fill : hover ? bg5 : own);
 
     if ((box.hasKeyboardFocus (true) || box.getProperties().contains ("lynxSnapshotFocus")) && box.getWantsKeyboardFocus())
         outlineRounded (g, bounds, radius::md, accent.withAlpha (0.7f));
-    else if (! box.findColour (juce::ComboBox::outlineColourId).isTransparent())
-        outlineRounded (g, bounds, radius::md, box.findColour (juce::ComboBox::outlineColourId));
+    else if (const auto rim = box.findColour (juce::ComboBox::outlineColourId); ! rim.isTransparent() && rim != borderStrong)
+        outlineRounded (g, bounds, radius::md, rim);
+    else if (own == bg4 || rim == borderStrong) // (Settings' boxes asked for borderStrong, 1.4:1: the 3:1 outline)
+        outlineRounded (g, bounds.expanded (0.5f), radius::md, look.edge); // (expanded: the helper insets half a pixel, crisp)
 
     const auto arrowSize = juce::jmin (14.0f, (float) height * 0.6f);
     const auto arrowArea = juce::Rectangle<float> ((float) width - arrowSize - 7.0f, ((float) height - arrowSize) * 0.5f, arrowSize, arrowSize);
@@ -1274,7 +1900,8 @@ void LookAndFeel::positionComboBoxText (juce::ComboBox& box, juce::Label& label)
     const auto arrowSize = juce::jmin (14, juce::roundToInt ((float) box.getHeight() * 0.6f));
     label.setBounds (2, 1, box.getWidth() - arrowSize - 12, box.getHeight() - 2);
     label.setFont (getComboBoxFont (box));
-    label.setColour (juce::Label::textColourId, box.findColour (juce::ComboBox::textColourId).withMultipliedAlpha (box.isEnabled() ? 1.0f : 0.5f));
+    const auto own = box.findColour (juce::ComboBox::textColourId);
+    label.setColour (juce::Label::textColourId, box.isEnabled() ? own : own == textPrimary ? textDisabled : own.withMultipliedAlpha (0.5f));
 }
 
 void LookAndFeel::preparePopupMenuWindow (juce::Component& window)
@@ -1365,9 +1992,22 @@ void LookAndFeel::preparePopupMenuWindow (juce::Component& window)
 void LookAndFeel::drawPopupMenuBackground (juce::Graphics& g, int width, int height)
 {
     const auto bounds = juce::Rectangle<float> (0.0f, 0.0f, (float) width, (float) height);
-    g.fillAll (bg3);
-    g.setColour (borderStrong);
+    const auto look = menus::colours();
+    g.fillAll (look.background);
+    g.setColour (look.border);
     g.drawRect (bounds, 1.0f);
+}
+
+// FL's 1 px line between the columns of a long menu (round 190je, FW-13)
+void LookAndFeel::drawPopupMenuColumnSeparatorWithOptions (juce::Graphics& g, const juce::Rectangle<int>& bounds, const juce::PopupMenu::Options&)
+{
+    g.setColour (menus::colours().separator);
+    g.fillRect (bounds.withSizeKeepingCentre (1, bounds.getHeight()));
+}
+
+int LookAndFeel::getPopupMenuColumnSeparatorWidthWithOptions (const juce::PopupMenu::Options&)
+{
+    return 1;
 }
 
 namespace menus
@@ -1375,17 +2015,29 @@ namespace menus
 namespace
 {
 bool compactMenus = true;
+themes::MenuStyle menuStyle = themes::MenuStyle::lynxDark;
 }
 void setCompact (bool c) { compactMenus = c; }
 bool compact() { return compactMenus; }
 int itemHeight() { return compactMenus ? 21 : 26; }
-int headerHeight() { return compactMenus ? 19 : 39; }
+int headerHeight() { return compactMenus ? 17 : 22; }
 int separatorHeight() { return compactMenus ? 5 : 9; }
+float textSize() { return textsize::scaled (14.0f, theme::textSize(), textsize::Role::body); }
+void setStyle (themes::MenuStyle s) { menuStyle = s; }
+themes::MenuStyle style() { return menuStyle; }
+
+Colours colours()
+{
+    const auto m = themes::menuColours (paletteInUse(), menuStyle);
+    const auto c = [] (std::uint32_t argb) { return juce::Colour (argb); };
+    return { c (m.background), c (m.border), c (m.text), c (m.shortcut), c (m.disabled), c (m.band), c (m.bandText), c (m.hover), c (m.hoverText),
+             c (m.separator), c (m.check) };
+}
 } // namespace menus
 
 juce::Font LookAndFeel::getPopupMenuFont()
 {
-    return uiFont (type::body);
+    return labelFont (menus::textSize());
 }
 
 void LookAndFeel::getIdealPopupMenuItemSize (const juce::String& text, bool isSeparator, int standardMenuItemHeight, int& idealWidth,
@@ -1403,7 +2055,7 @@ void LookAndFeel::getIdealPopupMenuItemSize (const juce::String& text, bool isSe
     {
         // JUCE asks with -1 for a section header and then adds half of the answer: hand back 2/3 of the wanted height
         idealHeight = (menus::headerHeight() * 2 + 2) / 3;
-        idealWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (uiFont (type::small, true), caps (text)) * 0.8f) + 24;
+        idealWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (labelFont (type::small), text)) + 24;
         return;
     }
     idealHeight = standardMenuItemHeight > 0 ? standardMenuItemHeight : menus::itemHeight();
@@ -1416,40 +2068,44 @@ void LookAndFeel::drawPopupMenuItem (juce::Graphics& g, const juce::Rectangle<in
                                      bool isTicked, bool hasSubMenu, const juce::String& text, const juce::String& shortcutKeyText,
                                      const juce::Drawable* icon, const juce::Colour* textColourToUse)
 {
+    const auto look = menus::colours();
     if (isSeparator)
     {
-        g.setColour (border.brighter (0.1f));
+        g.setColour (look.separator);
         g.fillRect (area.reduced (8, 0).withHeight (1).withY (area.getCentreY()));
         return;
     }
 
-    auto r = area.reduced (4, 1);
+    auto r = area.reduced (0, 0);
+    const auto hot = isHighlighted && isActive;
 
-    if (isHighlighted && isActive)
+    // FL's hover: the whole row, square, no accent bar (round 190je, FW-14: the accent stays for selected states)
+    if (hot)
     {
-        fillRounded (g, r.toFloat(), radius::sm, bg5);
-        g.setColour (accent);
-        g.fillRoundedRectangle (r.toFloat().withWidth (3.0f).reduced (0.0f, 4.0f), 1.5f);
+        g.setColour (look.hover);
+        g.fillRect (r);
     }
 
-    auto textColour = textColourToUse != nullptr ? *textColourToUse : textPrimary;
+    auto textColour = textColourToUse != nullptr ? *textColourToUse : look.text;
     if (! isActive)
-        textColour = textDisabled;
+        textColour = look.disabled;
+    else if (hot && textColourToUse == nullptr)
+        textColour = look.hoverText;
 
-    auto content = r.reduced (8, 0);
+    auto content = r.reduced (12, 0);
     auto iconArea = content.removeFromLeft (juce::roundToInt ((float) r.getHeight() * 0.8f)).toFloat();
 
     if (icon != nullptr)
         icon->drawWithin (g, iconArea.withSizeKeepingCentre (14.0f, 14.0f), juce::RectanglePlacement::centred, isActive ? 1.0f : 0.4f);
     else if (isTicked)
-        icons::draw (g, Icon::check, iconArea.withSizeKeepingCentre (16.0f, 16.0f), isActive ? accent : textDisabled);
+        icons::draw (g, Icon::check, iconArea.withSizeKeepingCentre (16.0f, 16.0f), ! isActive ? look.disabled : hot ? look.hoverText : look.check);
 
     if (hasSubMenu)
     {
         const auto arrow = content.removeFromRight (14).toFloat().withSizeKeepingCentre (12.0f, 12.0f);
         juce::Graphics::ScopedSaveState state (g);
         g.addTransform (juce::AffineTransform::rotation (-pi * 0.5f, arrow.getCentreX(), arrow.getCentreY()));
-        icons::draw (g, Icon::chevronDown, arrow, isHighlighted ? textPrimary : textSecondary);
+        icons::draw (g, Icon::chevronDown, arrow, ! isActive ? look.disabled : hot ? look.hoverText : look.shortcut);
     }
 
     content.removeFromLeft (4);
@@ -1458,9 +2114,11 @@ void LookAndFeel::drawPopupMenuItem (juce::Graphics& g, const juce::Rectangle<in
 
     if (shortcutKeyText.isNotEmpty())
     {
-        g.setColour (textSecondary.withMultipliedAlpha (isActive ? 1.0f : 0.6f));
-        g.setFont (uiFont (type::small));
-        g.drawText (shortcutKeyText, content.removeFromRight (juce::roundToInt (juce::GlyphArrangement::getStringWidth (uiFont (type::small), shortcutKeyText)) + 4),
+        // FL's shortcut column: right-aligned, italic, a step smaller; white under the mouse as FL's
+        const auto keyFont = labelFont (type::small).italicised();
+        g.setColour (! isActive ? look.disabled : hot ? look.hoverText : look.shortcut);
+        g.setFont (keyFont);
+        g.drawText (shortcutKeyText, content.removeFromRight (juce::roundToInt (juce::GlyphArrangement::getStringWidth (keyFont, shortcutKeyText)) + 4),
                     juce::Justification::centredRight, false);
         g.setFont (font);
     }
@@ -1484,9 +2142,14 @@ void LookAndFeel::drawPopupMenuItem (juce::Graphics& g, const juce::Rectangle<in
 
 void LookAndFeel::drawPopupMenuSectionHeader (juce::Graphics& g, const juce::Rectangle<int>& area, const juce::String& sectionName)
 {
-    g.setFont (uiFont (type::small, true));
-    g.setColour (textSecondary);
-    g.drawFittedText (caps (sectionName), area.reduced (14, 0).withTrimmedTop (menus::compact() ? 2 : 4), juce::Justification::centredLeft, 1);
+    // FL's section band (round 190je, FW-12): the full row filled, the title in sentence case ("Recent projects")
+    const auto look = menus::colours();
+    const auto band = area.withTrimmedTop (juce::jmax (0, area.getHeight() - menus::headerHeight()));
+    g.setColour (look.band);
+    g.fillRect (band);
+    g.setFont (labelFont (type::small));
+    g.setColour (look.bandText);
+    g.drawFittedText (sectionName, band.reduced (8, 0), juce::Justification::centredLeft, 1);
 }
 
 void LookAndFeel::drawMenuBarBackground (juce::Graphics&, int, int, bool, juce::MenuBarComponent&)
@@ -1494,15 +2157,24 @@ void LookAndFeel::drawMenuBarBackground (juce::Graphics&, int, int, bool, juce::
     // transparent: the menu sits inside the main toolbar, which paints the band behind it
 }
 
-juce::Font LookAndFeel::getMenuBarFont (juce::MenuBarComponent&, int, const juce::String&)
+juce::Font LookAndFeel::getMenuBarFont (juce::MenuBarComponent& bar, int, const juce::String&)
 {
-    return uiFont (type::body);
+    // round 190jo (design190ia FM-4): the Pattern toolbar's menu one step larger, FL's landmark (FL cap 12, LYNX's 13 gave
+    // cap 7; 15 gives cap 8 in about 335 px at 1920); the Simple and Live menu rows keep theirs. (Rollup: both through
+    // round 190je's labelFont, so Condensed labels still applies to the menu bar.)
+    if ((bool) bar.getProperties().getWithDefault ("lynxFlMenuBar", false))
+        return labelFont (type::title);
+    return labelFont (type::body);
 }
 
 int LookAndFeel::getMenuBarItemWidth (juce::MenuBarComponent& bar, int itemIndex, const juce::String& itemText)
 {
     // a long (translated) menu bar takes tighter item padding so the toolbar keeps its panels (round 165o)
-    const auto padding = (bool) bar.getProperties().getWithDefault ("lynxTightMenuBar", false) ? 8 : 16;
+    // (round 190jo: the Pattern toolbar's larger menu text with FL's closer items, 12 px: the bar keeps its ~292 px, as FL's
+    // eight menus take, so no toolbar panel drops out)
+    const auto padding = (bool) bar.getProperties().getWithDefault ("lynxTightMenuBar", false)  ? 8
+                         : (bool) bar.getProperties().getWithDefault ("lynxFlMenuBar", false) ? 12
+                                                                                               : 16;
     return juce::roundToInt (juce::GlyphArrangement::getStringWidth (getMenuBarFont (bar, itemIndex, itemText), itemText)) + padding;
 }
 
@@ -1516,9 +2188,12 @@ void LookAndFeel::drawMenuBarItem (juce::Graphics& g, int width, int height, int
         fillRounded (g, juce::Rectangle<float> (0.0f, 2.0f, (float) width, (float) height - 4.0f).reduced (1.0f, 0.0f), radius::sm,
                      isMenuOpen ? bg4 : bg3);
 
-    g.setColour (active ? textPrimary : textSecondary.brighter (0.2f));
+    // (round 190jo FM-4: the Pattern toolbar's menu titles in textPrimary at rest, as FL's bright caps)
+    g.setColour (active || (bool) bar.getProperties().getWithDefault ("lynxFlMenuBar", false) ? textPrimary : textSecondary.brighter (0.2f));
     g.setFont (getMenuBarFont (bar, itemIndex, itemText));
-    g.drawFittedText (itemText, 0, 0, width, height, juce::Justification::centred, 1);
+    // (round 190mh, perf: the laid-out title from the text cache, the same glyphs at the item's origin; round 190jo's larger
+    // Pattern-toolbar titles were shaped again on every paint)
+    textcache::drawFittedText (g, itemText, 0, 0, width, height, juce::Justification::centred, 1);
 }
 
 // --- sliders ---------------------------------------------------------------------------------------
@@ -1790,7 +2465,7 @@ juce::Font LookAndFeel::getAlertWindowFont() { return uiFont (type::body); }
 void LookAndFeel::drawAlertBox (juce::Graphics& g, juce::AlertWindow& alert, const juce::Rectangle<int>& textArea, juce::TextLayout& textLayout)
 {
     auto bounds = alert.getLocalBounds().toFloat();
-    g.fillAll (bg3);
+    g.fillAll (bg2); // (round 190jp, design190ia SG-20: the one dialog body colour, as ui/DialogFrame.h)
     g.setColour (borderStrong);
     g.drawRect (bounds, 1.0f);
     g.setColour (accent);
@@ -1828,6 +2503,12 @@ void LookAndFeel::drawDocumentWindowTitleBar (juce::DocumentWindow& window, juce
 
     const auto font = uiFont (type::body);
     g.setFont (font);
+    // round 190in (design190ia FW-5): a plugin / channel window's title bar holds FL's ▸ at the left and the presets at
+    // the right (the window says how much room they take), and its "Name (target)" in FL's two tones
+    const auto& props = window.getProperties();
+    const auto insetLeft = (int) props.getWithDefault ("lynxTitleLeft", 0), insetRight = (int) props.getWithDefault ("lynxTitleRight", 0);
+    titleSpaceX += insetLeft;
+    titleSpaceW = juce::jmax (0, titleSpaceW - insetLeft - insetRight);
     auto textW = juce::GlyphArrangement::getStringWidthInt (font, window.getName());
     auto iconW = 0;
 
@@ -1849,7 +2530,20 @@ void LookAndFeel::drawDocumentWindowTitleBar (juce::DocumentWindow& window, juce
     }
 
     g.setColour (window.isActiveWindow() ? textPrimary : textSecondary);
-    g.drawText (window.getName(), textX, 0, textW, h, juce::Justification::centredLeft, true);
+    const auto name = window.getName();
+    if (const auto open = name.lastIndexOf (" ("); (bool) props.getWithDefault ("lynxTitleTwoTone", false) && open > 0 && name.endsWithChar (')'))
+    {
+        const auto head = name.substring (0, open);
+        const auto room = juce::jmax (0, titleSpaceX + titleSpaceW - textX); // (the bold name is wider than textW measured)
+        g.setFont (uiFont (type::body, true));
+        const auto headW = juce::jmin (room, juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), head) + 1);
+        g.drawText (head, textX, 0, headW, h, juce::Justification::centredLeft, true);
+        g.setFont (font);
+        g.setColour (textSecondary);
+        g.drawText (name.substring (open), textX + headW, 0, juce::jmax (0, room - headW), h, juce::Justification::centredLeft, true);
+        return;
+    }
+    g.drawText (name, textX, 0, textW, h, juce::Justification::centredLeft, true);
 }
 
 juce::Button* LookAndFeel::createDocumentWindowButton (int buttonType)
@@ -1929,7 +2623,7 @@ void LookAndFeel::drawFileBrowserRow (juce::Graphics& g, int width, int height, 
         iconKind = Icon::folder;
     else if (file.hasFileExtension ("wav;aif;aiff;flac;ogg;mp3;wv"))
         iconKind = Icon::audioFile;
-    else if (file.hasFileExtension ("lynx;flp;als;flm;dawproj"))
+    else if (file.hasFileExtension ("lynx;flp;als;flm;dawproj;dawproject;blx"))
         iconKind = Icon::project;
     else if (file.hasFileExtension ("mid;midi"))
         iconKind = Icon::pianoRoll;

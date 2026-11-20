@@ -346,6 +346,36 @@ inline float fadeTensionCurve (float y, float tension) noexcept
                    : (float) ((std::exp ((double) y * range) - 1.0) / a);
 }
 
+// FL 2026's fade tension handle (round 190jz, issue #194; FL GUI and FL's saved files): the circle on a fade's curve holds
+// a value v of -1..1 (FL's hint "Tension: 15%", its Type in value "Tension ±0-1 or %"), kept in the file as the raw value
+// above: raw = ±0.1·(e^(17.10105·|v|) − 1). Measured: v 0.25 → 7.0899, 0.5 → 516.8467, 1 → 2672339.25 (Thief's −812.933 is
+// v −0.527). A drag of 1 px moves v by 1/174 (FL: 156 px up took the hint from 0 % to 90 %); up raises the curve's middle.
+constexpr double fadeTensionSlope = 17.10105, fadeTensionPerPixel = 1.0 / 174.0;
+inline float fadeTensionFromHandle (double v) noexcept
+{
+    v = std::clamp (v, -1.0, 1.0);
+    const auto a = 0.1 * (std::exp (fadeTensionSlope * std::abs (v)) - 1.0);
+    return (float) (v < 0.0 ? -a : a);
+}
+inline double fadeTensionHandle (float raw) noexcept
+{
+    if (! std::isfinite (raw) || raw == 0.0f)
+        return 0.0;
+    const auto v = std::min (1.0, std::log (10.0 * std::abs ((double) raw) + 1.0) / fadeTensionSlope);
+    return raw < 0.0f ? -v : v;
+}
+
+// The gain of a fade at `x` (0..1 along it from its start; `rising` = a fade in) as the voices play it (Instruments
+// clipFadeGainOf): FL's S curve, or straight (`linear`), then bent by the raw tension. The Playlist draws its fade curves
+// and places the tension handle (at x = 0.5) with it, so the picture is the sound.
+inline float fadeLevel (float x, bool rising, bool linear, float tension) noexcept
+{
+    x = std::clamp (x, 0.0f, 1.0f);
+    const auto y0 = rising ? x : 1.0f - x;
+    const auto y = linear ? y0 : crossfadeCurve (y0);
+    return tension != 0.0f ? fadeTensionCurve (y, tension) : y;
+}
+
 // A comp crossfade (round 177c): sin(x·π/2) — the fade-in and the fade-out (the same curve, mirrored) keep constant
 // power (sin² + cos² = 1), the right sum for two different takes (uncorrelated) where an S curve would dip ~3 dB.
 inline float equalPowerCurve (float x) noexcept

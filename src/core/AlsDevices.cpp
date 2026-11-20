@@ -285,6 +285,7 @@ bool compressorToCrest (const Element& device, EffectSlot& slot, Notes& notes, S
         return false;
     slot = makeEffectSlot (EffectKind::crestCompressor);
     auto& p = slot.params;
+    p[revision] = 0.0f; // round 190kw: this map was measured on the fitted laws (revision 0)
     p[style] = styleValue (Style::clean);
     p[voicing] = 0.0f;
     if (model == 1)
@@ -333,6 +334,7 @@ bool glueToCrest (const Element& device, EffectSlot& slot, Notes& notes, SideInp
         return false;
     slot = makeEffectSlot (EffectKind::crestCompressor);
     auto& p = slot.params;
+    p[revision] = 0.0f; // round 190kw: this map was measured on the fitted laws (revision 0)
     p[style] = styleValue (Style::bus);
     p[voicing] = 0.0f;
     p[threshold] = linValue (manual (device, "Threshold", 0.0), -60.0, 0.0); // [DATA: −40 … 0 dB]
@@ -531,6 +533,7 @@ bool reverbToAtrium (const Element& device, EffectSlot& slot, Notes& notes)
         return false;
     slot = makeEffectSlot (EffectKind::atrium);
     auto& p = slot.params;
+    p[(std::size_t) verbs::atrium::revision] = 0.0f; // round 190it: this map was measured on the 0.1.27 law (round 190cz)
     p[0] = unit (manual (device, "MixDirect", 0.55));                      // Dry/Wet
     p[1] = linValue (manual (device, "PreDelay", 2.5), 0.0, 500.0);        // ms [DATA: 0.5 … 250]
     // Decay [DATA: 200 … 60000 ms; MEASURED 190cz r00–r04: Live's 1 kHz T30 ≈ 0.91 × the setting] → Atrium's decay
@@ -831,6 +834,49 @@ std::optional<Translated> effectFromLiveDevice (const Element& device, const Con
         t.to = "Echoform (Pitch mode)";
         t.approximate = true;
         ok = grainDelayToEchoform (device, context, t);
+    }
+    // ---- lot 5 (round 190kk) ----
+    else if (tag == "Erosion" || tag == "Erosion2")
+    {
+        t.from = "Erosion";
+        t.to = "Corrode";
+        t.approximate = true;
+        ok = erosionToCorrode (device, t);
+    }
+    else if (tag == "Vinyl")
+    {
+        t.from = "Vinyl Distortion";
+        t.to = "Platter";
+        t.approximate = true;
+        ok = vinylToPlatter (device, t);
+    }
+    else if (tag == "Corpus")
+    {
+        t.from = "Corpus";
+        t.to = "Soundboard";
+        t.approximate = true;
+        ok = corpusToSoundboard (device, t);
+    }
+    else if (tag == "Looper")
+    {
+        t.from = "Looper";
+        t.to = "Edison";
+        ok = looperToSlot (device, t);
+    }
+    // ---- lot 6 (round 190ko) ----
+    else if (tag == "Spectral")
+    {
+        t.from = "Spectral Time";
+        t.to = "Timeprism";
+        t.approximate = true;
+        ok = spectralTimeToTimeprism (device, t);
+    }
+    else if (tag == "Transmute")
+    {
+        t.from = "Spectral Resonator";
+        t.to = "Harmonia";
+        t.approximate = true;
+        ok = spectralResonatorToHarmonia (device, t);
     }
     if (! ok)
         return std::nullopt;

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/LiveKeys.h" // (round 190ih)
+
 #include "core/ProjectKey.h"
 #include "core/Preferences.h"
 #include "core/ChordReadout.h"
@@ -19,6 +21,7 @@
 #include "core/ValueMath.h"
 #include "engine/AudioEngine.h"
 #include "engine/MidiFileIo.h"
+#include "engine/ProjectFile.h"
 #include "ui/BrowserComponent.h"
 #include "ui/MapMode.h"
 #include "ui/Icons.h"
@@ -57,12 +60,16 @@ class LyricsPanel;
 
 class MainComponent final : public juce::Component,
                             public juce::DragAndDropContainer,
+                            public juce::FileDragAndDropTarget, // (round 190ih: a project file dropped on the window opens)
                             public ui::HintSource,
                             private juce::MenuBarModel,
                             private juce::Timer,
                             private juce::ChangeListener
 {
 public:
+    // round 190hq (B20): the "Save a copy for an older LYNX" window for project text `json` (its list goes into `list`,
+    // which must outlive the window); --tempomarkershot paints it
+    static juce::AlertWindow* buildSaveCopyWindow (const juce::String& json, std::shared_ptr<juce::TextEditor> list);
     void backupNowForTest() { autosave(); } // --rtstress --backuptest (round 177d)
     // `restoreUserSettings`: load/save the workspace layout, key map and UI options from the user
     // settings (off for --snapshot, which must look the same on every machine).
@@ -109,12 +116,31 @@ public:
     // --uiperf / tests: F8's Plugin picker (round 171c), and whether it is open
     void togglePluginPickerForSnapshot() { togglePluginPicker(); }
     juce::Component* pluginPickerForSnapshot() const noexcept { return pluginPickerView.get(); }
+    void toggleProjectPickerForSnapshot() { toggleProjectPicker(); }
+    juce::Component* projectPickerForSnapshot() const noexcept { return projectPickerView.get(); }
     void showDesktopForSnapshot (bool extraPanels);
     // The Clip-launch workflow's layout (round 181a): the clip grid beside the Playlist, or flipped. Nothing exists until
     // it is first turned on. Moves panels only; the project does not change, except that it gets an (empty) grid.
     void setClipLaunchWorkflow (bool on, bool swapLayout = true) { setLayoutStyle (on ? layoutstyle::Style::clipLaunch : layoutstyle::Style::pattern, swapLayout); }
     void setClipGridView (PlaylistArea::GridView view);
     bool isClipLaunchWorkflow() const noexcept { return layoutStyle == layoutstyle::Style::clipLaunch; }
+    // Round 190iv (--toolbarshot190iv): the toolbar's look, its "⋯" menu, the Simple status in a state, a control-bar
+    // button by name (hover / pressed / lit shots), the Session button row
+    toolbarlayout::Look getToolbarLook() const noexcept { return toolbarLook; }
+    juce::PopupMenu makeToolbarMoreMenuForSnapshot() { return makeToolbarMoreMenu(); }
+    void setSaveStatusForSnapshot (toolbarlayout::SaveState state);
+    juce::Component* toolbarPartForSnapshot (const juce::String& name);
+    // round 190ld (--details190ldshot): FL's Count-in / Wait for input right-click menus, the Simple Cycle switch
+    juce::PopupMenu countInMenuForSnapshot() { return makeCountInMenu(); }
+    juce::PopupMenu waitInputMenuForSnapshot() { return makeWaitInputMenu(); }
+    void toggleCycleForSnapshot() { toggleCycle(); }
+    void updateUndoRedoEnabled(); // round 190kn: the Simple top bar greys Undo / Redo with nothing to undo / redo
+    // round 190jj: one timer tick of the transport's shown states (Play / Pause, Stop, Record, the time, the Simple
+    // capsule's lock, the master meter), for shots and tests with an offline engine
+    void transportTickForSnapshot();
+    double simpleRecordStartForCheck() const noexcept { return simpleRecordStart; }
+    void stopForCheck() { stopAndRewind(); }
+    void setSessionButtonRowShown (bool shown);
     // Round 190ef: the reference's MIDI Map Mode / Key Map Mode (ui/MapMode.h; Ctrl+M / Ctrl+K and the MIDI / Key
     // switches), in the Clip-launch layout only (elsewhere it stays off).
     void setMapMode (remotemap::Mode mode);
@@ -125,6 +151,7 @@ public:
     // View › Layout style (round 184a: Pattern, Clip-launch or Simple workflow; core/LayoutStyle.h). Moves panels only;
     // each style keeps its own workspace layout. The Simple workflow's parts are made when it is first chosen.
     void setLayoutStyle (layoutstyle::Style style, bool swapLayout = true);
+    void setSimpleLargeControls (bool on); // round 190jc: View › Large controls (touch size), Simple layout
     layoutstyle::Style getLayoutStyle() const noexcept { return layoutStyle; }
     SimpleWorkflow* getSimpleWorkflowForSnapshot() noexcept { return simpleWorkflow.get(); } // --simpleshot
     // round 190fc (B1): how many Simple workflow objects were still alive when the last MainComponent's destructor body
@@ -132,6 +159,11 @@ public:
     static inline int simpleWorkflowAliveAfterTeardown = -1;
     // The Clip-launch workflow's detail view (round 183a), made with the grid; nullptr until then.
     DetailView* getDetailViewForSnapshot() const noexcept { return detailView.get(); }
+    bool runActionForSnapshot (const std::string& id) { return runAction (id); }
+    // round 190mz (--undoshot190mz): Settings › General › "Alternate undo mode"
+    bool getAlternateUndo() const noexcept { return alternateUndo; }
+    void setAlternateUndoForSnapshot (bool on) noexcept { alternateUndo = on; }
+    void updateLookFieldsForSnapshot() { updateLookFields(); } // (round 190lx) // (round 190jn: Q, the hot-swap key; round 190jz: --issueshot190jz)
     juce::Component* getClipGridForSnapshot() const noexcept { return clipGridView.get(); } // --gridshot (round 190bv)
     // round 190ch (LYNX's own): the project's Lyrics / Notes panel — docked on the right of the Playlist in every layout,
     // or in its own window — and the Reference match window
@@ -142,11 +174,29 @@ public:
     void showReferenceMatch();
     LyricsPanel* getLyricsPanelForSnapshot(); // (docked, made if needed)
     void commitSongNotes(); // what is being typed in the Lyrics / Notes panel reaches the project now (before a save)
+    // Round 190mr (DF-141, owner F3): the window layout goes into the project file with every save (view only: not part
+    // of the Song), and a project that has one opens with it (Settings › General › "Load the window layout saved with a
+    // project")
+    ProjectFile::WindowLayout currentWindowLayout() const;
+    void applyProjectWindowLayout (const ProjectFile::WindowLayout& layout);
+    bool layoutInSaves = false; // (--details190mrshot: the off-screen window keeps its layout in saves too)
+    void warnIfProjectTooBig (const juce::File& file); // round 190mr (DF-147)
+    // round 190mr (DF-34): something dragged inside LYNX over a window button shows that window in front (FL's toolbar)
+    void revealPanelUnderDrag();
+    int dragRevealPanel = -1;
+    // round 190mr (DF-49): FL's Extended Hint Panel (View › Toolbars › Hint bar; ui/ExtendedHintPanel.h), off by default;
+    // its place is kept as an offset from the desktop's lower left (−1: FL's corner)
+    std::unique_ptr<juce::Component> extendedHint;
+    juce::Point<int> extendedHintOffset { -1, -1 };
+    bool showExtendedHintAfterLoad = false;
+    void showExtendedHint (bool on);
+    void placeExtendedHint();
     juce::PopupMenu getKeyMenuForSnapshot() { return makeKeyMenu(); } // --simpleshot (round 184a S11)
     // --uiperf (round 173f): the default layout with these panels shown too (the reporter's Channel Rack + Mixer)
     void showPanelsForSnapshot (std::initializer_list<workspace::Panel> panels);
     void openQuickAddForTest() { showQuickAdd(); } // --windowtest
     Workspace& workspaceForTest() { return workspace; } // --plugwintest dock mode (issue #116)
+    const keys::KeyMap& getKeyMapForSnapshot() const { return keyMap; }
     juce::Component* setupOverlayForTest() const { return setupOverlay.get(); }
     juce::Component* danceStageForTest() const { return danceStage.get(); } // (a DanceStage, ui/DanceView.h)
     void waitForBrowserForSnapshot() { browser.waitForListing (5000); }
@@ -166,6 +216,30 @@ public:
         juce::PopupMenu menu;
         addRecordOptions (menu);
         return menu;
+    }
+    // round 190ih (--details190ihshot): the transport's live states with Record's blink phase fixed, the "Note on" hint
+    // of the last live note, the save reminder as it shows after ten minutes
+    void transportForSnapshot (bool playing, bool recordLit)
+    {
+        recordLitForSnapshot = recordLit;
+        playButton.setToggleState (playing, juce::dontSendNotification); // (the main timer's part)
+        refreshModeButton();
+        updateTransportStates (playing);
+    }
+    juce::String liveNoteHintForSnapshot()
+    {
+        updateLiveNoteHint();
+        const auto posted = ui::postedHint();
+        return posted ? posted->text : juce::String();
+    }
+    juce::String saveReminderForSnapshot()
+    {
+        autosaveMinutes = 0;
+        saveReminderTicks = 30 * 60 * 10 - 1;
+        updateSaveReminder();
+        saveButton.setToggleState (true, juce::dontSendNotification); // (the blink's lit phase)
+        const auto posted = ui::postedHint();
+        return posted ? posted->text : juce::String();
     }
     void setHintForSnapshot (const ui::Hint& hint, bool live = false)
     {
@@ -192,6 +266,13 @@ public:
     int getToolbarAndTrayHeightForSnapshot() const { return toolbarHeight + (toolbarEditor != nullptr ? toolbar::EditOverlay::trayHeight : 0); }
     juce::Rectangle<int> getToolStripAreaForSnapshot (bool playlistStrip);
     void setMetersForSnapshot (double cpu, std::int64_t memory, int polyphony) { perfMeter.setValues (cpu, memory, polyphony); }
+    // round 190kn (--details190knshot): the toolbar's output display, CPU panel and hint bar
+    toolbar::OutputMonitor& getOutputForSnapshot() noexcept { return output; }
+    juce::Component& getAudioEditorButtonForSnapshot() noexcept { return audioEditorButton; } // (round 190mv, DF-35)
+    juce::Component& getMasterPitchForSnapshot() noexcept { return masterPitch; }             // (round 190mv, DF-22)
+    void openMasterAudioEditorForSnapshot (bool newOne) { openMasterAudioEditor (newOne); }
+    toolbar::PerformanceMeter& getPerfMeterForSnapshot() noexcept { return perfMeter; }
+    ui::HintBar& getHintBarForSnapshot() noexcept { return hintBar; }
     static std::unique_ptr<juce::Component> makeHelpContent (const keys::KeyMap* keyMap = nullptr); // nullptr: the defaults
     static std::unique_ptr<juce::AlertWindow> makeAboutWindow(); // result 1 = OK, 2 = "Support LYNX SHARE"
     // round 190fq: the start-up support note (ui/SupportLynx.h), once per normal start; `quietRun` = test mode / CI
@@ -200,13 +281,24 @@ public:
     supportnote::Moment supportNoteMoment(); // a dialog / overlay in front, playing, recording
     std::unique_ptr<juce::AlertWindow> makeConfirmDiscardWindow();
     PianoRollComponent& getPianoRollForSnapshot() { return pianoRoll; }
+    juce::ComboBox& patternBoxForTest() { return patternBox; } // (round 190ng, issue #218)
+    juce::ComboBox& gridBoxForTest() { return gridBox; }
     ChannelRackComponent& getRackForSnapshot() { return rack; }
+    juce::PopupMenu rackMenuForSnapshot() { juce::PopupMenu m; addPanelMenuItems (Panel::channelRack, m); return m; } // (round 190mk)
     void scrollRackForSnapshot (int x) { rackViewport.setViewPosition (x, rackViewport.getViewPositionY()); }
     BrowserComponent& getBrowserForSnapshot() { return browser; }
     MixerComponent& getMixerForSnapshot() { return mixer; }
     // the Multilink button's right-click menu (round 190ey: shown by it, and the shot route's)
     juce::PopupMenu getMultilinkMenuForSnapshot();
     PlaylistComponent& getPlaylistForSnapshot() { return playlist; }
+    juce::PopupMenu tempoMenuForSnapshot() { return tempoDisplay.buildMenu(); } // (round 190mp, DF-16)
+    // round 190mr (--details190mrshot): the Extended Hint Panel, saves that keep the layout, the undo key, the drag reveal
+    void showExtendedHintForSnapshot (bool on) { showExtendedHint (on); }
+    juce::Component* extendedHintForSnapshot() const noexcept { return extendedHint.get(); }
+    void keepLayoutInSavesForSnapshot() { layoutInSaves = true; }
+    juce::String layoutTextForSnapshot() const { return workspace.getLayoutText(); }
+    void undoForSnapshot() { undoRedo (false); }
+    juce::Component& panelButtonForSnapshot (workspace::Panel p) { return panelButtons[(std::size_t) p]; }
     juce::Component& getRackViewportForSnapshot() { return rackViewport; }
     std::unique_ptr<juce::Component> makeQuickAddForSnapshot();
     PatternPicker& getPickerForSnapshot() { return picker; }
@@ -235,6 +327,7 @@ private:
     // project (only when something is missing; the FL import report follows it), else from the menu (always).
     void showMissingFiles (bool afterOpening);
     void openSettings (int page); // ui/SettingsDialog.h SettingsPage: 0 Project, 1 Info, 2 Files, 3 General, 4 Audio, 5 MIDI
+    int lastSettingsPage = 3; // the page openSettings showed last (SettingsPage::general at first): Ctrl+, opens it (issue #181)
     void showPluginManager();
     void showShortcutManager();
     int scansSeen = 0; // background plugin scans already announced in the hint bar
@@ -242,7 +335,7 @@ private:
     int editorCrashesSeen = 0; // faults in plugin editor windows (ui/PluginWindow.h, issue #32) already announced
     int sandboxDeathsSeen = 0; // separate-process plugins that died (engine/PluginSandbox.h, round 176a) already announced
     void announceEditorCrash (const juce::String& plugin);
-    void announceSeparateProcessCrash (const juce::String& plugin, bool crashed, bool bits32);
+    void announceSeparateProcessCrash (const juce::String& plugin, bool crashed, bool bits32, const juce::StringArray& withIt = {});
     void reloadCrashedPlugins (const juce::String& plugin); // round 190ao: a crash prompt's "Reload"
     void showHelp();
     void closeUnfocusedWindows();
@@ -253,6 +346,7 @@ private:
     void playStop();     // Space: play, or stop and go back to where playback started
     void playPause();    // Ctrl+Space: pause / resume where it is
     void playFromStart(); // Shift+Space (FL): play; while playing, stop at the start of the time selection / song / pattern
+    void moveToStart();  // Home (FL, issue #195): the playback marker to the start of the song or pattern
     void stopAndRewind (bool toStart = false); // toStart: the very start, ignoring "Remember seek time"
     void showStopMenu(); // right-click on Stop: "remember seek time", panic // the Stop button
     double playStartTicks = 0.0;
@@ -308,6 +402,7 @@ private:
     void insertPatternHere();
     void deleteCurrentPattern();
     void splitPatternByChannelNow();
+    void hidePanelForTrackOnly(); // round 190iu: Track-only mode (core/TrackOnly.h)
     void clonePatternNow();
     void movePatternNow (int delta);
 
@@ -362,6 +457,7 @@ private:
     int toolbarHeight = 2 * rowHeight + 12;
     toolbarlayout::IconSize appliedIconSize = toolbarlayout::IconSize::medium;
     bool compactRecord = false;
+    bool fileWide = true; // round 190nk: the File panel shows its fourth column (the audio-editor button)
     bool narrowSnap = false; // round 170e5, 1280 px: the "+" new-pattern button takes the pattern icon's place
     juce::Rectangle<int> modeArea; // the Pattern / Song switch (painted as one control) // a narrow window: four recording switches per row (round 170e3)
     void applyIconSizing (toolbarlayout::IconSize size);
@@ -382,12 +478,13 @@ private:
     // it undoes, or redoes when something is undone (round 190b, issue #140; core/UndoKeys.h)
     void flUndoBackwards();
     void runUndoStep (undokeys::Step step);
-    bool alternateUndo = false; // Settings › General › "Alternate undo mode" (FL's default: off)
+    bool alternateUndo = undokeys::alternateModeDefault; // Settings › General › "Alternate undo mode" (FL 2026's default: on; round 190mz)
     // FL's Playlist menu › Picker panel › Enable (issue #175; on by default, kept with the UI settings)
     bool pickerPanelOn = true;
     void setPickerPanelOn (bool on);
     std::unique_ptr<toolbar::EditOverlay> toolbarEditor;
     std::unique_ptr<juce::Component> pluginPickerView; // FL's Plugin picker (F8), its own window over the screen (rounds 169k, 175b)
+    std::unique_ptr<juce::Component> projectPickerView; // FL's Project picker (Ctrl+F8; round 190my)
     // round 184a, S16: the game controller, made only while Settings › MIDI › "Use a game controller" is on (no timer
     // otherwise); the hints overlay while Back is held
     std::unique_ptr<GamepadInput> gamepadInput;
@@ -396,6 +493,7 @@ private:
     void gamepadChanges (const gamepad::Changes& changes, const gamepad::State& state, double seconds);
     int gamepadInsert() const; // the selected track's insert (its track mode's link, else the selected channel's)
     void togglePluginPicker();
+    void toggleProjectPicker(); // (round 190my, DF-143)
     std::unique_ptr<juce::Component> setupOverlay; // the first-start / Options > Setup wizard, over everything
     std::unique_ptr<support::StartupNote> supportNote; // round 190fq (made on first use)
     void hostSetupOverlayNatively(); // issue #116: in front of the native panels (ui/NativeChild.h)
@@ -404,6 +502,7 @@ private:
     void newProject (bool askAlways = false); // File › New: the New project window unless turned off
     void startNewProject (Song song, const juce::File& file);
     void saveAsTemplate();
+    void saveCopyForOlder(); // round 190hq (B20): File › "Save a copy for an older LYNX..."
     void chooseFileToOpen();
     void chooseFileToOpenNow();
     // `afterSaved`: runs once the project is on disk, also when a "Save as" dialog had to ask first (never after a
@@ -464,12 +563,50 @@ private:
     bool backupWaitsForQuiet = true;              // (round 177d) also while playing / right after MIDI input
     int backupLongestWaitMinutes = prefs::defaultBackupLongestWaitMinutes; // ...but a backup is written after this long
     bool hoverValues = false;                     // (round 177d) the hovered control's value next to the mouse
+    // round 190lr (DL-49): Live's Tap box in the Clip-launch layout taps the tempo itself (FL's tapper window stays in its
+    // right-click menu); "Start Playback with Tap Tempo" (a UI setting, Live's preference: off) starts the song on the 4th tap
+    controls::TapTempo liveTaps;
+    bool tapStartsPlayback = false;
+    void liveTap();
+    void showLiveTapMenu();
+    juce::PopupMenu makeLiveTapMenu();
+    juce::PopupMenu makeMetronomeMenu();
+
+public:
+    // round 190lr (--details190lrshot)
+    juce::PopupMenu metronomeMenuForSnapshot() { return makeMetronomeMenu(); }
+    juce::PopupMenu liveTapMenuForSnapshot() { return makeLiveTapMenu(); }
+
+private:
     bool hoverTipShown = false;                   // ...and it is showing now
     juce::String hoverTipText;
     juce::Point<int> hoverTipAt;
     std::uint32_t backupMidiSeen = 0;
     double backupMidiMs = -1.0e9;
     bool lastModified = false;
+    void updateTransportStates (bool playing); // round 190ih: Play → Pause, Record blink (Pattern layout)
+    void updateSimpleTransport (bool playing, bool recording, bool countingIn); // round 190jj: BandLab's capsule states
+    bool shownPause = false, recordBlinkDark = false;
+    // round 190jj (Simple, BandLab's capsule): the second button shows Stop while the song runs, the tempo capsule greys
+    // out while it records or counts in, and Stop goes back to where the recording started (-1: no recording since the
+    // last Stop)
+    bool shownStopGlyph = true, shownRecordLock = false, shownRecordingRuns = false;
+    double simpleRecordStart = -1.0;
+    std::optional<bool> recordLitForSnapshot;
+    void updateLiveNoteHint(); // round 190ih: "Note on: C4 / velocity: 100"
+    void openRecent (int index); // round 190ih: Alt+1 … Alt+0
+    bool runLiveKey (livekeys::Command command); // round 190ih: Live's keys in the Clip-launch layout
+    PlaylistArea::GridView shownGridView = PlaylistArea::GridView::beside;
+    void updateSaveReminder();   // round 190ih: backups off = a reminder every 10 min, Save blinks
+    int saveReminderTicks = 0;
+public:
+    // round 190ih (DF-139): a project file dropped anywhere on the window that no panel takes (the Playlist and the rack
+    // take samples) opens, as File › Open would (FL: ".flp ... drag-n-drop on the FL Studio desktop")
+    static bool isProjectFile (const juce::File& file);
+    bool isInterestedInFileDrag (const juce::StringArray& files) override;
+    void filesDropped (const juce::StringArray& files, int x, int y) override;
+private:
+    std::uint32_t shownLiveNote = 0;
     void openPianoRoll();
     void toggleMode();
     void refreshModeButton();
@@ -480,6 +617,10 @@ private:
 
     IconButton newButton { "new", Icon::newFile }, openButton { "open", Icon::open }, saveButton { "save", Icon::save },
         exportButton { "export", Icon::exportAudio }, undoButton { "undo", Icon::undo }, redoButton { "redo", Icon::redo };
+    // FL's toolbar "Open audio editor / New audio editor" (round 190mv, DF-35; capture 190mv A9): left = the Master's audio
+    // editor (Edison into the Master's first empty slot, or the one there), right = a new one
+    IconButton audioEditorButton { "audioEditor", Icon::scissors };
+    void openMasterAudioEditor (bool newOne);
     IconButton playButton { "play", Icon::play };
     IconButton stopButton { "stop", Icon::stop };
     IconButton recordButton { "record", Icon::record };
@@ -511,6 +652,7 @@ private:
     void dumpScoreLog (int minutes); // Tools › Score logger (REA round 165f)
     // View > Audio editor: the selected channel's sample when it is a Sampler with one, else an empty editor
     void openAudioEditorForSelection();
+    void addFactoryItem (const std::string& pluginKey); // round 190ke: a "LYNX content" item of the Browser (core/FactoryContent.h)
     void connectBrowser (BrowserComponent& b); // the main Browser and the Sample browser window (round 163)
     void toggleSampleBrowser();
     void openSampleBrowser();
@@ -528,6 +670,8 @@ private:
     {
     public:
         explicit TempoDisplay (AudioEngine& e) : engine (e) {}
+        // round 190iv: BandLab's tempo segment ("120 bpm") in Simple, Live's 17 px box ("167.00") in Clip-launch
+        toolbarlayout::Look look = toolbarlayout::Look::fl;
         void paint (juce::Graphics& g) override;
         void mouseDown (const juce::MouseEvent& e) override;
         void mouseDrag (const juce::MouseEvent& e) override;
@@ -536,6 +680,7 @@ private:
         void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
         ui::Hint hintAt (juce::Point<int> position) override;
         void showMenu();
+        juce::PopupMenu buildMenu(); // (round 190mp: the shots read it)
         void showTap();
 
     private:
@@ -684,6 +829,65 @@ private:
     // DAW's "Show Link Toggle"), until the user shows or hides it
     toolbar::LinkToggle linkToggle { engine };
     bool linkToggleFollowsStyle = true;
+
+    // --- round 190iv: the toolbar per layout style (core/ToolbarLayout.h Look; design190ia slices SG-A and CL-G) ---
+    // Pattern: FL's toolbar, untouched. Simple: BandLab's capsules in FL's frame, "Last saved" and Finish at the right.
+    // Clip-launch: the menus on a 23 px row over Live's one-row control bar; LYNX's own panels in its "⋯" menu.
+    // The same widgets are reused in each look (their setLook / IconButton::setLook); the parts only one look has are
+    // below. Nothing here runs a timer: the main window's timer updates them and each repaints only on a change.
+    toolbarlayout::Look toolbarLook = toolbarlayout::Look::fl;
+    void applyFlTiles();          // round 190jo: FL's tiles on the Pattern toolbar (design190ia FM-1)
+    float flTileIconBox() const;  // their glyph box for the row height
+    std::uint64_t toolbarBackdropStamp (juce::Rectangle<int> buttonBounds) const; // round 190ki: the tiles' cached backdrop
+    juce::Rectangle<int> lastPaintClip; // round 190mh: paint()'s clip bounds in a frame (the tiles' atlas on the software renderer)
+    void applyToolbarLook();                                // the widgets' looks for the layout style now shown
+    void layoutSimpleToolbar (juce::Rectangle<int> bar, int menuWidth);
+    void layoutLiveControlBar (juce::Rectangle<int> bar, int menuWidth);
+    void layoutUnderToolbar();                              // the edit tray, the update bar and the workspace
+    void paintLookToolbar (juce::Graphics& g);              // the Simple / Live band and capsules
+    juce::PopupMenu makeToolbarMoreMenu();                  // "⋯": what the look leaves off its bar
+    void updateLookFields();                                // the main window's timer: signature, quantisation, states
+    void refreshSaveStatus();
+    std::vector<juce::Component*> lookOnlyParts();          // the parts the FL look never shows
+    toolbar::SignatureBox signatureBox { engine };
+    toolbar::QuantBox quantBox { engine };
+    toolbar::SaveStatus saveStatus;
+    IconButton moreButton { "toolbarMore", Icon::more };
+    IconButton browserToggleButton { "liveBrowser", Icon::browserPanel };
+    IconButton backToArrangementButton { "backToArrangement", Icon::backToArrangement };
+    IconButton cycleButton { "cycle", Icon::cycle }; // round 190ld (DS-2): BandLab's Cycle switch in the Simple transport capsule
+    // round 190lx (DL-61): Live's Loop and Punch-Out switches beside the Punch-In one (punchButton) in the Clip-launch bar
+    IconButton liveLoopButton { "liveLoop", Icon::liveLoop };
+    IconButton punchOutButton { "punchOut", Icon::punchOut };
+    toolbar::PhaseNudge nudgeDownButton { engine, false }, nudgeUpButton { engine, true }; // round 190mv (DL-51): Live's phase nudge
+    void toggleLiveLoop();
+    bool punchHintLive = false; // (the punch button's hint is Live's Punch-In one)
+    IconButton metronomeMenuButton { "metronomeMenu", Icon::chevronDown }; // round 190ld (DS-1): BandLab's metronome popover
+    void showMetronomePopover();
+public:
+    std::unique_ptr<juce::Component> makeMetronomePopoverForSnapshot();
+private:
+    void toggleCycle();
+    double stoppedAtTicks = -1.0; // round 190ld (DL-66): where Space last stopped the song
+    juce::PopupMenu makeCountInMenu();   // round 190ld: FL's right-click on Count-in / Wait for input
+    juce::PopupMenu makeWaitInputMenu();
+    IconButton captureButton { "captureMidi", Icon::capture };
+    IconButton sessionRecordButton { "sessionRecord", Icon::sessionRecord };
+    IconButton drawModeButton { "drawMode", Icon::draw };
+    IconButton keyMapButton { "keyMap", Icon::none };
+    IconButton midiMapButton { "midiMap", Icon::none };
+    IconButton sessionViewButton { "sessionView", Icon::sessionView };
+    IconButton arrangementViewButton { "arrangementView", Icon::arrangementView };
+    std::array<bool, toolbarlayout::livebar::itemCount> liveShown {}; // the control-bar items that fit (the rest: "⋯")
+    std::vector<juce::Rectangle<int>> lookCapsules;         // Simple: the capsules' outlines
+    std::vector<juce::Rectangle<int>> lookDividers;         // Simple: the 1 px lines between capsule segments
+    juce::Rectangle<int> lookMenuRow, lookBand;             // Clip-launch: the menu row and the control-bar band
+    int saveStatusTicks = 0;
+    bool saveStatusFrozen = false;                          // (snapshots)
+    bool sessionButtonRowShown = false;                     // Clip-launch: the clip grid's old footer row (an option)
+    bool lookPartsReady = false;                            // the parts above are made children on the first look change
+    void setUpLookParts();
+    void hideToolbarParts();                                // every toolbar widget hidden (a look then shows its own)
     void showKeyMenu();
     juce::PopupMenu makeKeyMenu();
     void refreshKeyPanel();
@@ -698,11 +902,25 @@ private:
     int midiInputTicks = 0;
     bool realtimeHintChecked = false; // Linux: the real-time priority hint was considered (round 161)
     toolbar::OutputMonitor output { engine };
-    // the toolbar's live displays (output monitor, song position, time), at the display's refresh up to 72 Hz (round
-    // 174e: the oscilloscope is a 1024-point path; at 72 Hz it already moves fluidly and costs half of 144)
+    // the toolbar's live displays (output monitor, song position, time), at the display's refresh (round 174e capped
+    // them at 72 Hz: the oscilloscope's stroke costs twice as much at 144). Round 190kr (QA-11): with the Channel rack
+    // maximised over the Playlist (Thief's default view) the toolbar's scope is the only thing that moves at the
+    // display's rate; FL draws it at 143 frames a second, LYNX at 72 (86 screen updates a second; 0.1.29's 143 were the
+    // covered Playlist's own playhead frames, painted for nobody). Windows, Thief playing, 2 runs each under load: 72 Hz
+    // 85 updates/s, 76.6 % of a core for the process; the display's rate 134/s, 75-93 % (message thread +7, GPU driver
+    // +2 points). LYNX_TOOLBAR_HZ=<n>: another cap (72 = before round 190kr), for A/B measurements.
     bool toolbarFrame (double nowMs);
-    ui::FrameTicker toolbarFrames { *this, [this] (double ms) { return toolbarFrame (ms); }, 72.0 };
+    static double toolbarHz()
+    {
+        static const double hz = [] {
+            const auto v = juce::SystemStats::getEnvironmentVariable ("LYNX_TOOLBAR_HZ", {}).getDoubleValue();
+            return v >= 10.0 ? juce::jmin (v, 1000.0) : 170.0; // (170: FrameTicker's own cap, the display's rate up to 170 Hz)
+        }();
+        return hz;
+    }
+    ui::FrameTicker toolbarFrames { *this, [this] (double ms) { return toolbarFrame (ms); }, toolbarHz() };
     int meterTicks = 0;
+    std::int64_t syncLightBeat = std::numeric_limits<std::int64_t>::min(); // round 190ld: FL's MIDI Sync light
     juce::String driverTipType; // the device type the ASIO suggestion was worked out for
 
     // hint bar: what the control under the mouse does, its live value, and markers for
@@ -735,6 +953,14 @@ private:
     layoutstyle::SettingsReader startStyle; // the style saved in the UI settings (applied when the window is ready)
     // round 190ch: the docked Lyrics / Notes panel (made when first shown) and the ones living in tool windows
     std::unique_ptr<juce::Component> lyricsDock;
+    // round 190lx (DS-42): the Simple layout's Loops dock on the right (BandLab's Sounds panel)
+    std::unique_ptr<juce::Component> loopsDock;
+    void showLoopsDock();
+    void hideLoopsDock();
+public:
+    bool isLoopsDockShowing() const { return loopsDock != nullptr && loopsDock->getParentComponent() != nullptr; }
+    juce::Component* showLoopsDockForSnapshot() { showLoopsDock(); return loopsDock.get(); }
+private:
     juce::Component::SafePointer<juce::Component> lyricsWindowPanel, referenceMatchPanel;
     void refreshSongNotes(); // the song changed: the panels above follow
     bool lanesBeforeClipLaunch = false; // the Automation lanes setting to go back to
@@ -745,6 +971,7 @@ private:
     std::unique_ptr<mapmode::Overlay> mapOverlay;
     std::unique_ptr<mapmode::MappingBrowser> mappingBrowser;
     std::vector<int> heldMappedKeys;
+    std::vector<RemoteAction> heldCrossfaderSpots; // round 190kc: the crossfader positions whose mapped key / note is down
     bool mapKeyPressed (const juce::KeyPress& key);
     void layoutMapMode();
     void syncClipLaunchSwitches();

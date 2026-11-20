@@ -7,6 +7,7 @@
 
 #include "core/AlsDevices.h"
 #include "core/AlsImport.h"
+#include "core/FmSynth.h" // round 190hs
 #include "core/DynamicsSuite.h"
 #include "core/Effects.h"
 #include "core/FacetEq.h"
@@ -186,21 +187,13 @@ TEST (als190ek_drift_voice_modes_and_the_synths_measured_laws)
             CHECK (c.synth.osc[1].wave == one[twoAsOne[t]]);
         CHECK (als190ek::near (c.synth.attack, 0.01, 1.0e-6) && als190ek::near (c.synth.sustain, 0.6, 1.0e-6) && als190ek::near (c.synth.release, 0.4, 1.0e-6));
     }
-    // Operator [MEASURED, the wave menu: 0 Sine … 21 Noise White, 22 User; algorithm 10 = four carriers]: wave 21 alone is the
-    // synth's noise; the fourth carrier of algorithm 10 is listed (three oscillators)
+    // Operator [MEASURED, the wave menu: 0 Sine … 21 Noise White, 22 User] (round 190hs: Tetra keeps the wave number)
     {
         xml::Document doc;
         CHECK (doc.parse (als190ed::operatorDevice (0, { 1.0, 0.000316227757, 0.000316227757, 0.000316227757 }, 21)));
         ChannelDef c;
         Notes n;
-        CHECK (operatorToSynth (doc.root(), c, 120.0, n) && c.synth.osc[0].wave == Waveform::noise);
-    }
-    {
-        xml::Document doc;
-        CHECK (doc.parse (als190ed::operatorDevice (10, { 1.0, 1.0, 1.0, 1.0 })));
-        ChannelDef c;
-        Notes n;
-        CHECK (operatorToSynth (doc.root(), c, 120.0, n) && c.synth.osc[2].level > 0.0f && als190ek::hasNote (n.dropped, "the fourth carrier"));
+        CHECK (operatorToTetra (doc.root(), c, n) && c.instrument == InstrumentKind::tetra && c.modelParams[(std::size_t) fm::op::wave] == 21.0f);
     }
 }
 
@@ -246,7 +239,7 @@ TEST (als190ek_vst3_automation_follows_the_plugin_s_own_ids)
     CHECK (flVst3SlotPositions (flVst3ParamSlots (foreign.state), { 414u, 1u, 7u }) == (std::vector<int> { 1, 0, 2 })); // (7: the next free slot)
     std::vector<std::uint8_t> component, controller;
     CHECK (splitFlVst3State (foreign.state, component, controller) && component.size() == 1);
-    CHECK (report.unsupported.count ("Automation of a VST3 plugin's parameter (kHs Gain: Live keeps the plugin's own id, not its index)") == 0);
+    CHECK (report.notReproduced.count ("Automation of a VST3 plugin's parameter (kHs Gain: Live keeps the plugin's own id, not its index)") == 0);
     CHECK (report.approximated.count ("Automation of a VST3 parameter with its own range (kHs Gain Gain: Live's plain values mapped linearly between the range's ends)") == 1);
     CHECK (report.approximated.count ("Automation of a VST3 parameter with its own range (kHs Gain mode: Live's plain values mapped linearly between the range's ends)") == 0);
 }

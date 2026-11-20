@@ -19,6 +19,11 @@
 namespace lynx
 {
 constexpr int reeverb2ParamCount = 17; // 15 controls + tempo-synced predelay + Mid/Side input
+// round 190lf, hidden (not in the info: no control, no string; saved while non-zero; 0 in a new instance, an FL import and
+// every project saved before, which then plays as it did): 1 = a measured direct path is added to the output, a·x −
+// b·Σ ρ^(k−1)·x[n−k] (the next three values a, b, ρ), set only by the Waves reverb translator (TrueVerb's direct sound,
+// a first-order low shelf whose depth grows with its Distance, docs/analise/REA_rodada190lf_verb.md §2)
+constexpr int reeverb2DirectLaw = reeverb2ParamCount;
 
 std::unique_ptr<Effect> makeReeverb2();
 
@@ -97,5 +102,8 @@ private:
     struct Impl;
     std::unique_ptr<Impl> d;
 };
+
+// the LFO's sine, (float) std::sin ((double) ph · 2π) bit for bit, faster (round 190kz; exposed for the tests)
+float lfoSine (float ph) noexcept;
 } // namespace reeverb2
 } // namespace lynx

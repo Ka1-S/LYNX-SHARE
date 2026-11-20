@@ -74,6 +74,9 @@ constexpr std::pair<InstrumentKind, const char*> ids[] = {
     { InstrumentKind::slicex, "slicex" },
     { InstrumentKind::fpc, "fpc" },
     { InstrumentKind::pocketSuperSaw, "pocketsupersaw" },
+    { InstrumentKind::tetra, "tetra" },
+    { InstrumentKind::helix, "helix" },
+    { InstrumentKind::braid, "braid" },
 };
 
 constexpr const char* b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";

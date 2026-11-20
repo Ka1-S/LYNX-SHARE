@@ -121,7 +121,10 @@ TEST (opto_and_program_compressor_voicings_round123)
     CHECK (std::abs (s.params[g::peakReduction] - 0.626f) < 1e-5f && std::abs (s.params[g::gain] - 0.4896f) < 1e-5f);
     // 1 kHz steady gain vs the official plug-in's stairs: +16.0 dB below the threshold, -1.2 dB at -6 dBFS (her state)
     CHECK (std::abs (vm123::sineGainDb (s, 1000.0, -50.0) - 15.98) < 0.1);
-    CHECK (std::abs (vm123::sineGainDb (s, 1000.0, -6.0) - (-1.2)) < 0.6);
+    // round 190lf: CLA-2A now plays Glow Leveler's cell law (fitted on 190lf's probes, refined on refcap182's programme:
+    // 5.57 -> 6.47); on this steady -6 dBFS tone it reduces 1.4 dB less than the trial measured (+0.23 dB, owner decision
+    // listed in docs/PARITY.md "Round 190lf")
+    CHECK (std::abs (vm123::sineGainDb (s, 1000.0, -6.0) - 0.23) < 0.3);
     // the gain dial's measured law (level below the threshold) and the peak reduction / Hi Freq sensitivity shifts
     CHECK (std::abs (vmatch::opto::makeupDb (80.0) - 33.68) < 1e-9 && std::abs (vmatch::opto::sensitivityDb (62.6, 50.0)) < 1e-9);
     CHECK (std::abs (vmatch::opto::sensitivityDb (80.0, 0.0) - (-34.05 + 24.78 + 6.15)) < 1e-9);

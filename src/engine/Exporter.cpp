@@ -1,11 +1,16 @@
 #include "engine/Exporter.h"
+#include "engine/AraHost.h"
+#include "core/MixerOps.h" // (round 190my: the Current track)
 
 #include "core/Mastering.h"
 
 #include "core/Dither.h"
 #include "core/MessageThreadOwned.h"
 #include "core/Mp3Encoder.h"
+#include "engine/AacEncoder.h"
 #include "engine/AudioEngine.h"
+#include "core/Patcher.h"
+#include "engine/PluginHost.h"
 #include "engine/PowerHints.h"
 #include "engine/SessionPack.h"
 #include "engine/Text.h"
@@ -46,6 +51,18 @@ Options ExportSettings::toOptions() const
 
 namespace
 {
+// M4A without a system AAC encoder (Linux; a Windows N edition without the Media Feature Pack): said before the render
+bool formatsWritable (const Options& o, juce::String& error)
+{
+    for (const auto f : formatsOf (o))
+        if (f == exportopts::Format::aac && ! aac::available())
+        {
+            error = juce::String::fromUTF8 (aac::unavailableReason().c_str());
+            return false;
+        }
+    return true;
+}
+
 // tail length in ticks for `seconds` at the tempo where the music ends
 std::int64_t tailTicksFor (const Song& song, const Options& o, std::int64_t& musicTicks, std::int64_t& loopTicks)
 {
@@ -96,6 +113,244 @@ int oggQualityIndex (juce::AudioFormat& format, int kbps)
 }
 } // namespace
 
+// --- Round 190jb: exports with the live plugin instances (LiveExportHold) ----------------------------------------------
+
+namespace
+{
+std::weak_ptr<LiveExportHold>& openHold()
+{
+    static std::weak_ptr<LiveExportHold> hold; // (message thread)
+    return hold;
+}
+
+bool songHostsPlugins (const Song& song)
+{
+    for (const auto& c : song.channels)
+        if (c.instrument == InstrumentKind::plugin || c.instrument == InstrumentKind::patcher)
+            return true;
+    for (const auto& m : song.mixer)
+        for (const auto& fx : m.effects)
+            if (fx.kind == EffectKind::plugin || fx.kind == EffectKind::patcher)
+                return true;
+    return false;
+}
+
+// the hosted plugins inside a Patcher's graph (and its Patchers'), with their adapters' owners
+void hostedInGraph (patcher::Graph* graph, std::vector<std::pair<std::shared_ptr<void>, std::pair<PluginInstrument*, PluginEffect*>>>& out)
+{
+    if (graph == nullptr)
+        return;
+    for (int n = 0; n < graph->nodeCount(); ++n)
+    {
+        auto effect = graph->effectAt (n);
+        auto instrument = graph->instrumentAt (n);
+        if (auto* p = dynamic_cast<PluginEffect*> (effect.get()))
+            out.push_back ({ effect, { nullptr, p } });
+        if (auto* p = dynamic_cast<PluginInstrument*> (instrument.get()))
+            out.push_back ({ instrument, { p, nullptr } });
+        hostedInGraph (patcher::graphOf (effect.get()), out);
+        hostedInGraph (patcher::graphOf (instrument.get()), out);
+    }
+}
+} // namespace
+
+std::shared_ptr<LiveExportHold> LiveExportHold::current()
+{
+    return openHold().lock();
+}
+
+std::shared_ptr<LiveExportHold> LiveExportHold::open (AudioEngine& live)
+{
+    if (auto h = current(); h != nullptr)
+        return &h->live == &live ? h : nullptr;
+    // (nothing to lend: the export goes as before, the live engine's own silence during renders included)
+    if (! songHostsPlugins (live.getSong()) || ! live.holdForExport())
+        return nullptr;
+    std::shared_ptr<LiveExportHold> h (new LiveExportHold (live));
+    openHold() = h;
+    return h;
+}
+
+bool LiveExportHold::claim() noexcept
+{
+    auto expected = false;
+    return claimed.compare_exchange_strong (expected, true);
+}
+
+void LiveExportHold::unclaim() noexcept
+{
+    claimed.store (false);
+}
+
+void LiveExportHold::note (const std::shared_ptr<void>& keep, PluginInstrument* instrument, PluginEffect* effect)
+{
+    auto* plugin = instrument != nullptr ? &instrument->getInstance() : &effect->getInstance();
+    for (const auto& u : units)
+        if (u.plugin == plugin)
+            return; // (lent before: its state before the first export is the one to restore)
+    Unit u;
+    u.keep = keep;
+    u.plugin = plugin;
+    u.instrument = instrument;
+    u.effect = effect;
+    u.rate = plugin->getSampleRate();
+    u.state = instrument != nullptr ? instrument->captureState() : effect->captureState();
+    units.push_back (std::move (u));
+}
+
+bool LiveExportHold::fitRate (double sampleRate, PluginInstrument* instrument, PluginEffect* effect)
+{
+    auto& plugin = instrument != nullptr ? instrument->getInstance() : effect->getInstance();
+    if (plugin.getSampleRate() == sampleRate)
+        return true;
+    // (LYNX's own extra: an export at another rate than the device's; FL renders at the device's. The running instance
+    // is prepared at the export's rate and back afterwards; one that does not take it is not lent)
+    const auto before = plugin.getSampleRate();
+    if (instrument != nullptr ? instrument->changeRate (sampleRate) : effect->changeRate (sampleRate))
+        return true;
+    if (instrument != nullptr)
+        instrument->changeRate (before);
+    else
+        effect->changeRate (before);
+    return false;
+}
+
+std::shared_ptr<Instrument> LiveExportHold::lendInstrument (const ChannelDef& channel, double sampleRate)
+{
+    const auto& song = live.getSong();
+    auto at = song.channels.size();
+    for (std::size_t i = 0; i < song.channels.size() && at == song.channels.size(); ++i)
+        if (song.channels[i].instance.id == channel.instance.id)
+            at = i;
+    if (at == song.channels.size() || song.channels[at].instrument != channel.instrument)
+    {
+        refusal = "channel " + juce::String::fromUTF8 (channel.name.c_str()) + ": not in the live project";
+        return nullptr;
+    }
+    const auto& mine = song.channels[at];
+    auto unit = live.getChannelInstrument ((int) at);
+    // round 190kx: an audio clip channel edited in an ARA plugin renders with the live instance (its edits as they are now)
+    if (channel.instrument == InstrumentKind::audioClip && channel.ara.active())
+    {
+        if (! AraHost::isAraInstrument (unit.get()) || mine.ara != channel.ara || live.getTransport().sampleRate.load() != sampleRate)
+        {
+            refusal = "channel " + juce::String::fromUTF8 (channel.name.c_str()) + ": ARA plugin not lent";
+            return nullptr;
+        }
+        return unit;
+    }
+    if (channel.instrument == InstrumentKind::plugin)
+    {
+        auto* p = dynamic_cast<PluginInstrument*> (unit.get());
+        if (p == nullptr || p->hasCrashed() || mine.plugin.id != channel.plugin.id)
+        {
+            refusal = "channel " + juce::String::fromUTF8 (channel.name.c_str()) + ": no running plugin";
+            return nullptr;
+        }
+        note (unit, p, nullptr); // (its state and rate before the export, before fitRate changes the rate)
+        if (! fitRate (sampleRate, p, nullptr))
+        {
+            refusal = "channel " + juce::String::fromUTF8 (channel.name.c_str()) + ": the plugin does not take " + juce::String (sampleRate) + " Hz";
+            return nullptr;
+        }
+        return unit;
+    }
+    // a Patcher: lent whole when it hosts plugins, has the same structure and runs at the export's rate
+    std::vector<std::pair<std::shared_ptr<void>, std::pair<PluginInstrument*, PluginEffect*>>> inside;
+    hostedInGraph (patcher::graphOf (unit.get()), inside);
+    if (inside.empty() || ! patcher::sameStructure (mine.patcher, channel.patcher) || live.getTransport().sampleRate.load() != sampleRate)
+    {
+        refusal = "channel " + juce::String::fromUTF8 (channel.name.c_str()) + ": Patcher not lent";
+        return nullptr;
+    }
+    for (const auto& [keep, adapter] : inside)
+        note (keep, adapter.first, adapter.second);
+    return unit;
+}
+
+std::shared_ptr<Effect> LiveExportHold::lendEffect (const EffectSlot& slot, double sampleRate)
+{
+    const auto& song = live.getSong();
+    int track = -1, index = -1;
+    for (std::size_t t = 0; t < song.mixer.size() && track < 0; ++t)
+        for (std::size_t i = 0; i < song.mixer[t].effects.size(); ++i)
+            if (song.mixer[t].effects[i].instance.id == slot.instance.id)
+            {
+                track = (int) t;
+                index = (int) i;
+                break;
+            }
+    if (track < 0 || song.mixer[(std::size_t) track].effects[(std::size_t) index].kind != slot.kind)
+    {
+        refusal = "effect " + juce::String::fromUTF8 (slot.plugin.name.c_str()) + ": not in the live project";
+        return nullptr;
+    }
+    const auto& mine = song.mixer[(std::size_t) track].effects[(std::size_t) index];
+    auto unit = live.getEffect (track, index);
+    if (slot.kind == EffectKind::plugin)
+    {
+        auto* p = dynamic_cast<PluginEffect*> (unit.get());
+        if (p == nullptr || p->hasCrashed() || mine.plugin.id != slot.plugin.id)
+        {
+            refusal = "effect " + juce::String::fromUTF8 (slot.plugin.name.c_str()) + ": no running plugin";
+            return nullptr;
+        }
+        note (unit, nullptr, p);
+        if (! fitRate (sampleRate, nullptr, p))
+        {
+            refusal = "effect " + juce::String::fromUTF8 (slot.plugin.name.c_str()) + ": the plugin does not take " + juce::String (sampleRate) + " Hz";
+            return nullptr;
+        }
+        return unit;
+    }
+    std::vector<std::pair<std::shared_ptr<void>, std::pair<PluginInstrument*, PluginEffect*>>> inside;
+    hostedInGraph (patcher::graphOf (unit.get()), inside);
+    if (inside.empty() || ! patcher::sameStructure (mine.patcher, slot.patcher) || live.getTransport().sampleRate.load() != sampleRate)
+    {
+        refusal = "effect slot: Patcher not lent";
+        return nullptr;
+    }
+    for (const auto& [keep, adapter] : inside)
+        note (keep, adapter.first, adapter.second);
+    return unit;
+}
+
+LiveExportHold::~LiveExportHold()
+{
+    // every plugin lent goes back as it was: its rate, its real-time mode, its state (the export's automation and its
+    // start values moved its parameters), reset as FL resets a plugin ("Reset plugin when FL Studio resets"), and the
+    // live engine plays again. Message thread (the jobs and their holders are deleted there).
+    auto restore = [units = std::move (units), engine = &live]() mutable {
+        for (auto& u : units)
+        {
+            auto* in = u.instrument;
+            auto* fx = u.effect;
+            if (in != nullptr ? in->hasCrashed() : fx->hasCrashed())
+                continue;
+            if (u.plugin->getSampleRate() != u.rate)
+                in != nullptr ? (void) in->changeRate (u.rate) : (void) fx->changeRate (u.rate);
+            if (u.plugin->isNonRealtime())
+                in != nullptr ? in->setRenderMode (false) : fx->setRenderMode (false);
+            if (u.state.has_value())
+                if (const auto now = in != nullptr ? in->captureState() : fx->captureState(); now.has_value() && *now != *u.state)
+                    in != nullptr ? (void) in->restoreState (*u.state) : (void) fx->restoreState (*u.state);
+            in != nullptr ? in->resetForExport() : fx->resetForExport();
+        }
+        units.clear();
+        engine->releaseAfterExport();
+    };
+    auto* mm = juce::MessageManager::getInstanceWithoutCreating();
+    if (mm == nullptr || mm->isThisTheMessageThread())
+        restore();
+    else
+        juce::MessageManager::callAsync (std::move (restore));
+}
+
+int ExportJob::livePlugins() const noexcept
+{
+    return hold != nullptr && engine != nullptr ? hold->lentPlugins() : 0;
+}
+
 double exportMusicSeconds (const Song& song, const Options& options)
 {
     std::int64_t musicTicks = 0, loopTicks = 0;
@@ -129,6 +384,22 @@ ExportJob::ExportJob (const Song& project, const Options& o, const juce::File& f
 
     // rate before setSong: instruments and plugins are created already prepared for it
     engine->getTransport().sampleRate.store (options.sampleRate);
+    // round 190jb: with the Export window's hold open, the render plays the live engine's running plugins (FL)
+    if (juce::MessageManager::existsAndIsCurrentThread())
+        if (auto h = LiveExportHold::current(); h != nullptr && h->claim())
+        {
+            hold = std::move (h);
+            auto* lender = hold.get();
+            engine->setLiveUnits ([lender] (const ChannelDef& c, double rate) { return lender->lendInstrument (c, rate); },
+                                  [lender] (const EffectSlot& e, double rate) { return lender->lendEffect (e, rate); });
+        }
+    engine->setParallelSampleDecode (false); // (round 190la, QA-10: the song's samples are decoded already)
+    // round 190my (DF-82; REA 190my R1, live check 190my A2): FL's render runs the same per-track process as playback,
+    // with the Current track on the Mixer's selection — and its render window selects the Master when it opens (FormShow
+    // FUN_00c51750 → FUN_00c4d0b0; the Mixer title turned "Mixer - Master", Fruity Balance at -inf on C silenced every
+    // export whatever was selected before). So a render plays C on the Master's output.
+    if (mixerops::currentTrack (copy) > 0)
+        engine->setCurrentTrackSource (0);
     engine->setSong (std::move (copy));
 }
 
@@ -184,6 +455,8 @@ Options ExportJob::realtimeOptions (Options o, double deviceRate)
 
 bool ExportJob::runRealtime (const std::function<bool (double)>& progress, juce::String& error)
 {
+    if (! formatsWritable (options, error))
+        return false;
     for (const auto f : formatsOf (options))
         if (const auto file = f == options.format ? output : output.withFileExtension (extension (f)); ! canReplace (file))
         {
@@ -271,7 +544,13 @@ bool ExportJob::runRealtime (const std::function<bool (double)>& progress, juce:
     return writeBuffered (left, right, error);
 }
 
-ExportJob::~ExportJob() = default;
+ExportJob::~ExportJob()
+{
+    // (round 190jb: the engine, which holds the lent units, goes first; then the hold may give them back)
+    engine.reset();
+    if (hold != nullptr)
+        hold->unclaim();
+}
 
 struct ExportJob::Sink
 {
@@ -311,6 +590,8 @@ bool ExportJob::openSink (Sink& sink, juce::String& error)
     render.exactSamples = exactFrames; // (round 190gh: every stem as long as the mix)
     writtenFrames = 0;
 
+    if (! formatsWritable (options, error))
+        return false;
     for (const auto f : formatsOf (options))
         if (const auto file = f == options.format ? output : output.withFileExtension (extension (f)); ! canReplace (file))
         {
@@ -319,7 +600,8 @@ bool ExportJob::openSink (Sink& sink, juce::String& error)
         }
 
     // streaming straight into the file when nothing needs the whole render first (the classic WAV/FLAC/OGG export)
-    sink.streaming = options.format != exportopts::Format::mp3 && options.channels == Channels::stereo && ! options.normalize && ! options.master
+    // (MP3 and M4A encode the whole render at the end: their encoders' rates may differ from the render's)
+    sink.streaming = options.format != exportopts::Format::mp3 && options.format != exportopts::Format::aac && options.channels == Channels::stereo && ! options.normalize && ! options.master
                      && options.tail == TailMode::leave && formatsOf (options).size() == 1;
 
     if (! sink.streaming)
@@ -349,6 +631,8 @@ bool ExportJob::openSink (Sink& sink, juce::String& error)
         format = std::make_unique<juce::OggVorbisAudioFormat>();
         quality = oggQualityIndex (*format, options.oggKbps);
     }
+    else if (options.format == exportopts::Format::aiff)
+        format = std::make_unique<juce::AiffAudioFormat>();
     else
         format = std::make_unique<juce::WavAudioFormat>();
 
@@ -507,6 +791,43 @@ bool ExportJob::writeFile (const Options& o, const juce::File& file, float* left
         return replaceTarget (temp, file, error);
     }
 
+    if (o.format == exportopts::Format::aac)
+    {
+        // M4A (owner decision D5): the system's AAC encoder (engine/AacEncoder.h) at 44.1 / 48 kHz — a render at
+        // 88.2 / 96 / 176.4 / 192 kHz is brought down by halving (exportopts::decimate)
+        if (! aac::available())
+        {
+            error = utf8 (aac::unavailableReason().c_str());
+            return false;
+        }
+        const auto factor = aacDecimation (o.sampleRate);
+        if (factor <= 0)
+        {
+            error = tr ("M4A files take 44100 or 48000 Hz (or a multiple of it); this export is at {0} Hz", { juce::String ((int) o.sampleRate) });
+            return false;
+        }
+        std::vector<float> dl, dr;
+        const float* l = left;
+        const float* r = channels == 2 ? right : left;
+        auto n = (long long) frames;
+        if (factor > 1)
+        {
+            dl = decimate (std::vector<float> (left, left + frames), o.sampleRate, factor);
+            if (channels == 2)
+                dr = decimate (std::vector<float> (right, right + frames), o.sampleRate, factor);
+            l = dl.data();
+            r = channels == 2 ? dr.data() : l;
+            n = (long long) dl.size();
+        }
+        std::string message;
+        if (! aac::encode (temp.getFile().getFullPathName().toStdString(), l, r, n, channels, (int) aacSampleRate (o.sampleRate), o.aacKbps, message))
+        {
+            error = utf8 (message.c_str());
+            return false;
+        }
+        return replaceTarget (temp, file, error);
+    }
+
     std::unique_ptr<juce::AudioFormat> format;
     int quality = 0;
     if (o.format == exportopts::Format::flac)
@@ -519,6 +840,8 @@ bool ExportJob::writeFile (const Options& o, const juce::File& file, float* left
         format = std::make_unique<juce::OggVorbisAudioFormat>();
         quality = oggQualityIndex (*format, o.oggKbps);
     }
+    else if (o.format == exportopts::Format::aiff)
+        format = std::make_unique<juce::AiffAudioFormat>();
     else
         format = std::make_unique<juce::WavAudioFormat>();
 
@@ -1012,7 +1335,7 @@ int runStemExport (const StemPlan& plan, std::function<void (std::function<void(
         // are made together only as far as about 2 GB of it goes; streamed files have no such limit
         const auto& set = plan.sets[s];
         const auto o = clamped (set.options);
-        const auto streamed = o.format != exportopts::Format::mp3 && o.channels == Channels::stereo && ! o.normalize && ! o.master
+        const auto streamed = o.format != exportopts::Format::mp3 && o.format != exportopts::Format::aac && o.channels == Channels::stereo && ! o.normalize && ! o.master
                               && o.tail == TailMode::leave && formatsOf (o).size() == 1;
         const auto seconds = exportMusicSeconds (set.song, o) + tailSecondsFor (o);
         const auto bytesEach = std::max (1.0, seconds * o.sampleRate * 2.0 * sizeof (float));

@@ -1691,10 +1691,56 @@ void rampOut (float prev, float target, int n, float maxstep, float& start, floa
     }
 }
 
+// the state-variable stages (type 0) of filterRun sample by sample (round beatfl190kr): stage i + 1 still reads stage
+// i's output of the same sample, each stage's float arithmetic is unchanged, but the stages' recurrences now overlap
+// instead of running one whole sub-block after the other
+template <int Stages, bool Ramped>
+void svfStages (const FiltDef& D, FiltState& S, const Coefs& C, float* y, int nn, float gL, float gB, float gH, const float* const* GA)
+{
+    float f[Stages], q[Stages], lo[Stages], bd[Stages];
+    const auto q0 = (float) C.q0;
+    for (int i = 0; i < Stages; ++i)
+    {
+        f[i] = (float) C.f[i];
+        auto qq = i == 0 ? q0 : 1.0f;
+        if (D.flat)
+            qq = i == 0 ? (qq * (float) D.k184) / f[i] : (float) D.k184 / f[i];
+        q[i] = qq;
+        lo[i] = S.svf[i][0], bd[i] = S.svf[i][1];
+    }
+    for (int k = 0; k < nn; ++k)
+    {
+        auto v = y[k];
+        for (int i = 0; i < Stages; ++i)
+        {
+            lo[i] = bd[i] * f[i] + lo[i];
+            const auto hi = v - (bd[i] * q[i] + lo[i]);
+            bd[i] = hi * f[i] + bd[i];
+            if (! Ramped)
+                v = (lo[i] * gL + bd[i] * gB) + hi * gH;
+            else
+                v = (lo[i] * GA[0][k] + bd[i] * GA[1][k]) + hi * GA[2][k];
+        }
+        y[k] = v;
+    }
+    for (int i = 0; i < Stages; ++i)
+        S.svf[i][0] = lo[i], S.svf[i][1] = bd[i];
+}
+
 // one stage set over y[0..nn) in place, plain coefficients (FUN_00626230, biquad, Mango, Cherry kernels)
 void filterRun (const FiltDef& D, FiltState& S, const Coefs& C, float* y, int nn, float gL, float gB, float gH, const float* const* GA)
 {
     const auto t = D.type, n = D.n;
+    if (t == 0 && n >= 0 && n <= 2)
+    {
+        if (GA == nullptr)
+            n == 0 ? svfStages<1, false> (D, S, C, y, nn, gL, gB, gH, GA)
+            : n == 1 ? svfStages<2, false> (D, S, C, y, nn, gL, gB, gH, GA) : svfStages<3, false> (D, S, C, y, nn, gL, gB, gH, GA);
+        else
+            n == 0 ? svfStages<1, true> (D, S, C, y, nn, gL, gB, gH, GA)
+            : n == 1 ? svfStages<2, true> (D, S, C, y, nn, gL, gB, gH, GA) : svfStages<3, true> (D, S, C, y, nn, gL, gB, gH, GA);
+        return;
+    }
     if (t == 0)
     {
         const auto q0 = (float) C.q0;
@@ -4545,7 +4591,7 @@ struct Engine::Impl
     {
         if (! v.slide.moving())
             return;
-        v.pitch = v.notePitch + v.slide.advance ((float) n);
+        v.pitch = v.notePitch + v.slide.advanceFirst ((float) n);
         for (auto& o : v.ops)
             if (o.active)
                 o.freq = opFreq (v, o);

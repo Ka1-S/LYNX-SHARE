@@ -1542,6 +1542,17 @@ static spaceverb::Settings settingsOf (const EffectParams& p) noexcept
     s.lowHz = lowHz (at (lowFreq));
     s.highMult = multOf (at (highMult));
     s.highHz = highHz (at (highFreq));
+    s.ducking = p[(std::size_t) luxeVerbSpaceDucking]; // round 190it (hidden: the Pro-R 2 translator sets it)
+    if (p[(std::size_t) luxeVerbSpaceRevision] >= 0.5f) // round 190kw: revision 1 (hidden)
+    {
+        s.revision = 1;
+        // the reference's shortest Space is 0.2 s (the other knots stay)
+        const double x = std::clamp ((double) at (space), 0.0, 1.0);
+        if (x < spaceKnots[1].first)
+            s.decaySec = 0.2 + (spaceKnots[1].second - 0.2) * x / spaceKnots[1].first;
+        s.spaceKnob = x;
+        s.widthRaw = std::clamp ((double) at (width), 0.0, 1.0) + 0.2 * std::clamp ((double) p[(std::size_t) luxeVerbSpaceWidthExt], 0.0, 1.0);
+    }
     return s;
 }
 } // namespace luxeverb::sp
@@ -1637,6 +1648,7 @@ std::optional<EffectSlot> luxeVerbFromFl (const std::vector<std::uint8_t>& state
     luxeverb::toParams (*s, slot.params);
     for (int i = 0; i < luxeVerbSpaceCount; ++i) // the Space engine stays off, at its defaults
         slot.params[(std::size_t) (luxeVerbSpaceFirst + i)] = luxeverb::sp::defaults[(std::size_t) i];
+    slot.params[(std::size_t) luxeVerbSpaceRevision] = 1.0f; // round 190kw: a new instance (its Space engine's revision 1)
     return slot;
 }
 

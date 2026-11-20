@@ -113,6 +113,57 @@ void autoName (Song& song, int track)
     t.colour = colour;
 }
 
+int autoNameClips (Song& song, int track)
+{
+    if (track < 0 || track >= (int) song.playlistTracks.size())
+        return 0;
+    const auto info = song.playlistTracks[(std::size_t) track];
+    auto name = info.name;
+    if (! name.empty() && name.front() == '-') // (FL strips a leading '-')
+        name.erase (0, 1);
+    if (name.empty())
+        return 0;
+
+    // the clips of the track in the order they start (FL's item list), each source once
+    std::vector<const Clip*> clips;
+    for (const auto& c : song.playlist)
+        if (c.track == track)
+            clips.push_back (&c);
+    std::stable_sort (clips.begin(), clips.end(), [] (const Clip* a, const Clip* b) { return a->start < b->start; });
+    std::vector<std::pair<int, int>> seen;
+    int named = 0;
+    for (const auto* c : clips)
+    {
+        const std::pair<int, int> key { (int) c->kind, sourceOf (*c) };
+        if (key.second < 0 || std::find (seen.begin(), seen.end(), key) != seen.end())
+            continue;
+        seen.push_back (key);
+        const auto label = named == 0 ? name : name + " #" + std::to_string (named + 1);
+        if (c->kind == ClipKind::pattern && key.second < (int) song.patterns.size())
+        {
+            auto& p = song.patterns[(std::size_t) key.second];
+            p.name = label;
+            if (info.colour != 0)
+                p.colour = info.colour;
+        }
+        else if (c->kind == ClipKind::audio && key.second < (int) song.channels.size())
+        {
+            auto& ch = song.channels[(std::size_t) key.second];
+            ch.name = label;
+            if (info.colour != 0)
+                ch.colour = info.colour;
+            if (info.icon > 0)
+                ch.icon = info.icon;
+        }
+        else if (c->kind == ClipKind::automation && key.second < (int) song.automations.size())
+            song.automations[(std::size_t) key.second].name = label;
+        else
+            continue;
+        ++named;
+    }
+    return named;
+}
+
 // FL (FUN_012e7a90): locking gives an icon-less track FL's lock icon (index 93), unlocking takes that icon away again
 static void setLockIcon (PlaylistTrack& track, bool on)
 {
@@ -758,6 +809,7 @@ int cloneTracks (Song& song, const std::vector<int>& tracks, const CloneOptions&
         // grouping (+0x3e copied): a member's clone stays grouped (under the group it lands in); a header and its
         // members cloned together make a new group
         clone.grouped = info.grouped && at > 0;
+        clone.nest = clone.grouped ? info.nest : 0; // (round 190jf: a nested folder's clones keep their level)
         trackAt (song, at) = clone;
         if (! info.name.empty())
             song.playlistTracks[(std::size_t) at].name = uniqueTrackName (song, info.name, at);
@@ -828,6 +880,7 @@ int cloneTracks (Song& song, const std::vector<int>& tracks, const CloneOptions&
         }
         ++at;
     }
+    noteedit::normalizeFolders (song); // (round 190jf: a clone may land under a shallower track)
     return firstClone;
 }
 

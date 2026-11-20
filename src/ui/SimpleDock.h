@@ -13,6 +13,8 @@
 //               "Only notes in key" folds the rows to the project key.
 //   Pads        (round 190fo) a Sampler track's 16 pads (core/SimplePads.h): play, drop sounds on them, their region,
 //               mode, envelope, tone, pitch, pan, volume, group and colour; kits of the user's own.
+//   Controls    (round 190ke) eight big knobs on the track's key settings (GarageBand's Smart Controls, core/SmartControls.h):
+//               the instrument's parameters, the chain's effects, Reverb / Pan / Volume; Edit mapping re-points a knob.
 //   Effects     the track's insert as cards: one-knob effects (core/GoalKnobs.h) show one big knob, any other effect
 //               its Mix; on / off, move, remove, "Editor" opens the effect's own window. On the left the chain's
 //               preset (core/ChainPresets.h, the user's own in Documents/LYNX/Chain presets) and Blend, the dry/wet
@@ -53,7 +55,7 @@ public:
         std::function<void()> openPianoRollPanel;
     };
 
-    enum class Tab { instrument, keyboard, editor, effects, pads };
+    enum class Tab { instrument, keyboard, editor, effects, pads, controls, steps };
 
     SimpleDock (AudioEngine& engine, Hooks hooks);
     ~SimpleDock() override;
@@ -74,13 +76,21 @@ public:
     void releaseEditor();
     bool isEditorDocked() const noexcept;
 
+    // Round 190ih: the input level of an armed track's input in the header ("Input Level", BandLab); the main window's
+    // 30 Hz timer calls it (nothing happens while the dock is hidden)
+    void tickInputMeter();
+    void inputLevelForSnapshot (float level) { inputMeterForced = true; inputLevel = level; repaint(); } // (--details190ihshot)
+
     // The height the owner gives it out of `available` px (the timeline keeps at least 40 %)
     int heightFor (int available) const noexcept;
 
     // User settings (ui-options.txt; not the project)
     static inline int preferredHeight = 248;
     static inline bool shownSetting = true; // Ctrl+Alt+L
-    static constexpr int minHeight = 150, edgeHeight = 5, stripHeight = 30;
+    static constexpr int minHeight = 150, edgeHeight = 5;
+    // the header strip (round 190jc, design190ia SG-7: 30 -> 36 px, BandLab's Track View header; Large controls 48)
+    static int stripHeight();
+    void lookChanged(); // round 190jc: View › Large controls changed
 
     // The folder of the user's own chain presets (.lynxtrack files)
     static juce::File userPresetFolder();
@@ -109,6 +119,10 @@ public:
     juce::String soundNameForCheck() const;
     void clickSoundForCheck (int row);   // picks row `row` of the list as a click on its name does
     void stepSoundForCheck (int delta);  // the ‹ › arrows
+    // round 190kn (BandLab's effects side panel): the preset's ‹ › and the chain bypass, as their buttons do
+    void stepPresetForCheck (int delta);
+    void bypassChainForCheck();
+    bool bypassLitForCheck() const;
     void turnKnobForCheck (int card, float value);
     void moveCardForCheck (int card, int delta);
     void removeCardForCheck (int card);
@@ -134,8 +148,17 @@ public:
     void padsRegionForCheck (float start, float end);
     void padsNormalizeForCheck();
     void padsHitForCheck (int pad);
+    void padsPressForSnapshot (int pad, float amount); // round 190jj: a pad drawn pressed (0 = at rest, 1 = darkest)
+    void padsWatchForCheck();                           // round 190jj: one look at the song's notes (the 30 Hz tick)
+    float padsPressForCheck (int pad) const;            // ... and the press a pad shows now
+    juce::Component* keyboardForSnapshot() { return keyboardPage.get(); }
     void padsDragForCheck (int from, int to, bool copy);
     void padsUpdateForCheck();
+    // round 190mr (DS-36): the empty pad's calls to action (0 Record, 1 Import, 2 Browse), recording into the pad
+    juce::Component* padsCtaForCheck (int k);
+    bool padsRecordingForCheck() const;
+    void padsRecordForCheck();
+    void padsRecordingLookForSnapshot (bool on);
     juce::PopupMenu padMenuForSnapshot (int pad);
     juce::PopupMenu kitMenuForSnapshot();
     bool saveKitForCheck (const juce::String& name);
@@ -155,6 +178,39 @@ public:
     class EffectsPage;
     class InstrumentPage;
     class EditorPage;
+    class ControlsPage; // round 190ke: the Controls tab (GarageBand's Smart Controls, ui/SimpleControlsPage.inc)
+    class StepsPage;    // round 190lr: the Drum Machine tab (BandLab's drum machine, ui/SimpleStepsPage.inc)
+
+    // round 190lr (DS-39, tests and --details190lrshot): a Drums track's Drum Machine tab
+    bool hasStepsTabForCheck() const noexcept { return stepsTab; }
+    StepsPage* stepsPageForCheck() { return stepsPage.get(); }
+    juce::Component* stepsComponentForSnapshot();
+    int stepsRowsForCheck() const;
+    int stepsCountForCheck() const;
+    void stepsClickForCheck (int row, int step);
+    void stepsLetterForCheck (int letter);
+    void stepsAddClipForCheck();
+    void stepsLengthForCheck (int bars);
+    void stepsSwingForCheck (float v);
+    void stepsPreviewForCheck();
+    bool stepsPreviewingForCheck() const;
+    int stepsPatternForCheck() const;
+    int stepsPlayingStepForCheck() const;
+    void stepsPlayingStepForSnapshot (int step);
+    juce::PopupMenu stepsLengthMenuForSnapshot();
+    void stepsWatchForCheck();
+    void stepsVelocityForCheck (int row, int step, float v); // BandLab's V tool on a step
+    void stepsVelocityToolForSnapshot (bool on);
+    // a typing key while the Drum Machine tab shows: the row's channel (lit), −1 when the key plays no row
+    int stepsChannelForKey (int keyCode);
+
+    // round 190ke (tests, --simplegb190keshot): the Controls tab's knobs
+    bool hasControlsTabForCheck() const noexcept { return controlsTab; }
+    void controlsTurnForCheck (int knob, float value);
+    juce::String controlsNameForCheck (int knob) const;
+    float controlsValueForCheck (int knob) const;
+    void controlsEditingForSnapshot (bool on);
+    juce::PopupMenu controlsMenuForSnapshot (int knob);
 
 private:
     void showPage();
@@ -167,8 +223,19 @@ private:
     std::unique_ptr<InstrumentPage> instrumentPage;
     std::unique_ptr<EditorPage> editorPage;
     std::unique_ptr<PadsPage> padsPage;
+    std::unique_ptr<ControlsPage> controlsPage; // round 190ke
+    std::unique_ptr<StepsPage> stepsPage;       // round 190lr
     std::unique_ptr<juce::Component> keyboardPage; // (made the first time the Keyboard tab shows)
-    juce::TextButton instrumentButton, keyboardButton, editorButton, effectsButton, padsButton, hideButton;
+    // round 190jc (design190ia SG-7, SG-8): the strip's buttons draw themselves: the tabs with a vector icon before the
+    // label (a lone tab as a section title), the hide button as BandLab's round close X at the strip's left
+    class StripButton final : public juce::TextButton
+    {
+    public:
+        int glyph = -1;    // ui::simplelook::Glyph of a tab; -1: the round close X
+        bool lone = false; // the only tab: drawn as a section title
+        void paintButton (juce::Graphics& g, bool over, bool down) override;
+    };
+    StripButton instrumentButton, keyboardButton, editorButton, effectsButton, padsButton, controlsButton, stepsButton, hideButton;
     juce::ToggleButton followButton;
     juce::String followText;
     Tab tab = Tab::effects;
@@ -176,7 +243,17 @@ private:
     bool instrumentTab = false; // the track has an instrument whose sound can be picked
     bool playTabs = false;      // the track plays notes (Instrument / Sampler): Keyboard and Editor
     bool padsTab = false;       // round 190fo: a Sampler track's pads
+    bool controlsTab = false;   // round 190ke: a track with an insert: its eight knobs
+    bool stepsTab = false;      // round 190lr: a Drums track's step grid
     int track = -1, insert = -1, channel = -1;
+    juce::Colour trackColourNow() const; // round 190jj: the shown track's colour (its own, else its kind's), for held keys
+    // round 190ih (DS-9): the record dock's input level
+    bool inputMeterShown() const;
+    juce::Rectangle<int> inputMeterArea() const, inputMeterBar() const;
+    juce::Rectangle<int> monitorButton() const; // round 190ld (DS-9): BandLab's headphones switch
+    bool monitoring() const;
+    float inputLevel = 0.0f;
+    bool inputMeterWasShown = false, inputMeterForced = false;
     int dragStartHeight = 0;
     bool resizing = false;
 

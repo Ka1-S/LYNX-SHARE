@@ -5,7 +5,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <mutex>
 #include <numeric>
+#include <utility>
 
 namespace lynx::tempodetect
 {
@@ -218,10 +220,33 @@ float fitBeatsOf (const SampleData* sample, double bpm)
     double found = 0.0;
     if (sample->acidBeats <= 0.0f && seconds <= 120.0)
     {
-        Options options;
-        options.minBpm = 75.0; // FL's middle range; fitBeats takes the octave nearest the project tempo
-        options.maxBpm = 150.0;
-        found = detect (sample->leftData(), sample->isStereo() ? sample->rightData() : nullptr, sample->frames(), sample->sampleRate, options).bpm;
+        // round 190kx: the last few samples' tempos are kept (the clip menu asks twice: FL's Fit to tempo submenu and
+        // the LYNX extras' one-click fit), keyed by the sample's data and length
+        static std::mutex memoLock;
+        // (with a fingerprint of 64 of its values: other data at the same address after a reload is not taken for it)
+        static std::vector<std::pair<std::pair<const float*, std::pair<std::size_t, double>>, double>> memo;
+        double print = sample->sampleRate;
+        for (std::size_t i = 0; i < 64; ++i)
+            print += (double) sample->leftData()[i * (sample->frames() - 1) / 63] * (double) (i + 1);
+        const auto key = std::make_pair (sample->leftData(), std::make_pair (sample->frames(), print));
+        bool known = false;
+        {
+            const std::lock_guard<std::mutex> hold (memoLock);
+            for (const auto& [k, v] : memo)
+                if (k == key)
+                    found = v, known = true;
+        }
+        if (! known)
+        {
+            Options options;
+            options.minBpm = 75.0; // FL's middle range; fitBeats takes the octave nearest the project tempo
+            options.maxBpm = 150.0;
+            found = detect (sample->leftData(), sample->isStereo() ? sample->rightData() : nullptr, sample->frames(), sample->sampleRate, options).bpm;
+            const std::lock_guard<std::mutex> hold (memoLock);
+            memo.insert (memo.begin(), { key, found });
+            if (memo.size() > 8)
+                memo.pop_back();
+        }
     }
     return clipops::fitBeats (seconds, bpm, sample->acidBeats, found);
 }

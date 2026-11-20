@@ -1,5 +1,7 @@
 #include "core/HarmlessFx.h"
 #include "core/PlateReverb.h"
+#include "core/Simd.h"
+#include "core/CpuFeatures.h"
 
 #include <algorithm>
 #include <cmath>
@@ -761,6 +763,102 @@ struct Biquad
     }
 };
 
+// A cascade of `count` biquads, in → out (in place allowed), the same as running Biquad::process one stage after another
+// (each stage's float output is the next one's input; the end-of-block flush per stage) but sample by sample, so the
+// stages' recursions overlap, with the left and right channels in the two lanes of an SSE2 double vector: per lane the
+// same IEEE double operations in the same order as the scalar code (round 190kr).
+// (always inlined: biquadChainAvx2 below takes the same body in VEX encoding)
+template <int count>
+__attribute__ ((always_inline)) inline void biquadChainN (Biquad* q, const float* inL, const float* inR, float* outL, float* outR, int n) noexcept
+{
+    __m128d x1[count], x2[count], y1[count], y2[count];
+    for (int k = 0; k < count; ++k)
+    {
+        const auto& s = q[k].s;
+        x1[k] = _mm_set_pd (s[4], s[0]), x2[k] = _mm_set_pd (s[5], s[1]);
+        y1[k] = _mm_set_pd (s[6], s[2]), y2[k] = _mm_set_pd (s[7], s[3]);
+    }
+    for (int i = 0; i < n; ++i)
+    {
+        __m128 f = _mm_unpacklo_ps (_mm_load_ss (inL + i), _mm_load_ss (inR + i));
+        for (int k = 0; k < count; ++k)
+        {
+            const auto& c = q[k];
+            const __m128d x = _mm_cvtps_pd (f);
+            const __m128d inner = _mm_sub_pd (_mm_add_pd (_mm_sub_pd (_mm_mul_pd (x1[k], _mm_set1_pd (c.b1)), _mm_mul_pd (y2[k], _mm_set1_pd (c.a2))),
+                                                          _mm_mul_pd (x2[k], _mm_set1_pd (c.b2))),
+                                               _mm_mul_pd (y1[k], _mm_set1_pd (c.a1)));
+            const __m128d y = _mm_add_pd (_mm_mul_pd (x, _mm_set1_pd (c.b0)), inner);
+            x2[k] = x1[k], x1[k] = x, y2[k] = y1[k], y1[k] = y;
+            f = _mm_cvtpd_ps (y);
+        }
+        _mm_store_ss (outL + i, f);
+        _mm_store_ss (outR + i, _mm_shuffle_ps (f, f, 1));
+    }
+    for (int k = 0; k < count; ++k)
+    {
+        double v[8];
+        _mm_storel_pd (v + 0, x1[k]), _mm_storeh_pd (v + 4, x1[k]);
+        _mm_storel_pd (v + 1, x2[k]), _mm_storeh_pd (v + 5, x2[k]);
+        _mm_storel_pd (v + 2, y1[k]), _mm_storeh_pd (v + 6, y1[k]);
+        _mm_storel_pd (v + 3, y2[k]), _mm_storeh_pd (v + 7, y2[k]);
+        for (int j = 0; j < 8; ++j)
+            q[k].s[(std::size_t) j] = flushState (v[j]);
+    }
+}
+
+#if LYNX_CPU_DISPATCH
+// round 190kz: the same cascade compiled for AVX2 (picked at run time, src/core/CpuFeatures.h): the same SSE2 operations,
+// VEX-encoded, the same bits; no FMA (the target list has none)
+LYNX_TARGET_AVX2 void biquadChainAvx2 (Biquad* q, int count, const float* inL, const float* inR, float* outL, float* outR, int n) noexcept
+{
+    if (count >= 4)
+    {
+        biquadChainN<4> (q, inL, inR, outL, outR, n);
+        for (q += 4, count -= 4; count >= 4; q += 4, count -= 4)
+            biquadChainN<4> (q, outL, outR, outL, outR, n);
+        inL = outL, inR = outR;
+        if (count == 0)
+            return;
+    }
+    switch (count)
+    {
+        case 0:
+            if (outL != inL)
+                std::copy (inL, inL + n, outL), std::copy (inR, inR + n, outR);
+            return;
+        case 1: biquadChainN<1> (q, inL, inR, outL, outR, n); return;
+        case 2: biquadChainN<2> (q, inL, inR, outL, outR, n); return;
+        default: biquadChainN<3> (q, inL, inR, outL, outR, n); return;
+    }
+}
+#endif
+
+void biquadChain (Biquad* q, int count, const float* inL, const float* inR, float* outL, float* outR, int n) noexcept
+{
+#if LYNX_CPU_DISPATCH
+    if (cpu::hasAvx2())
+    {
+        biquadChainAvx2 (q, count, inL, inR, outL, outR, n);
+        return;
+    }
+#endif
+    switch (count)
+    {
+        case 0:
+            if (outL != inL)
+                std::copy (inL, inL + n, outL), std::copy (inR, inR + n, outR);
+            return;
+        case 1: biquadChainN<1> (q, inL, inR, outL, outR, n); return;
+        case 2: biquadChainN<2> (q, inL, inR, outL, outR, n); return;
+        case 3: biquadChainN<3> (q, inL, inR, outL, outR, n); return;
+        default:
+            biquadChainN<4> (q, inL, inR, outL, outR, n);
+            biquadChain (q + 4, count - 4, outL, outR, outL, outR, n);
+            return;
+    }
+}
+
 // alpha = sin·k: order 0 (12 dB stage) k = 1, order 1 (24 dB, two stages) k = 1/√2
 double crossoverAlpha (int order) noexcept { return order == 1 ? 0.70710678118654746 : 1.0; }
 
@@ -792,39 +890,74 @@ struct Halfband
                 s[(std::size_t) (12 * c + k)] = flushState (s[(std::size_t) (12 * c + k)]);
     }
 
+    // the two channels in the two lanes of an SSE2 double vector (round 190kr): per lane the same operations in the same
+    // order as chain() on that channel's states
+    struct Lanes
+    {
+        __m128d o[3], i[3]; // the chain's outputs (st[0…2]) and inputs (st[3…5]), lane 0 left, lane 1 right
+    };
+
+    Lanes load (int at) const noexcept
+    {
+        Lanes c;
+        for (int k = 0; k < 3; ++k)
+        {
+            c.o[k] = _mm_set_pd (s[(std::size_t) (12 + at + k)], s[(std::size_t) (at + k)]);
+            c.i[k] = _mm_set_pd (s[(std::size_t) (12 + at + 3 + k)], s[(std::size_t) (at + 3 + k)]);
+        }
+        return c;
+    }
+
+    void store (const Lanes& c, int at) noexcept
+    {
+        for (int k = 0; k < 3; ++k)
+        {
+            _mm_storel_pd (&s[(std::size_t) (at + k)], c.o[k]), _mm_storeh_pd (&s[(std::size_t) (12 + at + k)], c.o[k]);
+            _mm_storel_pd (&s[(std::size_t) (at + 3 + k)], c.i[k]), _mm_storeh_pd (&s[(std::size_t) (12 + at + 3 + k)], c.i[k]);
+        }
+    }
+
+    static __m128d chain (Lanes& c, __m128d x, const double* k) noexcept
+    {
+        const auto y1 = _mm_add_pd (c.i[0], _mm_mul_pd (_mm_sub_pd (x, c.o[0]), _mm_set1_pd (k[0])));
+        c.i[0] = x;
+        const auto y2 = _mm_add_pd (c.i[1], _mm_mul_pd (_mm_sub_pd (y1, c.o[1]), _mm_set1_pd (k[1])));
+        c.i[1] = y1;
+        const auto y3 = _mm_add_pd (c.i[2], _mm_mul_pd (_mm_sub_pd (y2, c.o[2]), _mm_set1_pd (k[2])));
+        c.i[2] = y2;
+        c.o[0] = y1, c.o[1] = y2, c.o[2] = y3;
+        return y3;
+    }
+
+    static __m128d pair (const float* l, const float* r) noexcept { return _mm_cvtps_pd (_mm_unpacklo_ps (_mm_load_ss (l), _mm_load_ss (r))); }
+
     void up (const float* inL, const float* inR, float* outL, float* outR, int n) noexcept
     {
-        const float* in[2] { inL, inR };
-        float* out[2] { outL, outR };
-        for (int c = 0; c < 2; ++c)
+        auto A = load (0), B = load (6);
+        for (int i = 0; i < n; ++i)
         {
-            auto* st = s.data() + 12 * c;
-            for (int i = 0; i < n; ++i)
-            {
-                const auto v = (double) in[c][i];
-                const auto a = chain (st, v, ka);
-                const auto b = chain (st + 6, v, kb);
-                out[c][2 * i] = (float) b;
-                out[c][2 * i + 1] = (float) a;
-            }
+            const auto v = pair (inL + i, inR + i);
+            const auto a = _mm_cvtpd_ps (chain (A, v, ka));
+            const auto b = _mm_cvtpd_ps (chain (B, v, kb));
+            _mm_store_ss (outL + 2 * i, b), _mm_store_ss (outL + 2 * i + 1, a);
+            _mm_store_ss (outR + 2 * i, _mm_shuffle_ps (b, b, 1)), _mm_store_ss (outR + 2 * i + 1, _mm_shuffle_ps (a, a, 1));
         }
+        store (A, 0), store (B, 6);
         endBlock();
     }
 
     void down (const float* inL, const float* inR, float* outL, float* outR, int n) noexcept // n output frames
     {
-        const float* in[2] { inL, inR };
-        float* out[2] { outL, outR };
-        for (int c = 0; c < 2; ++c)
+        auto A = load (0), B = load (6);
+        const auto half = _mm_set1_pd (0.5);
+        for (int i = 0; i < n; ++i)
         {
-            auto* st = s.data() + 12 * c;
-            for (int i = 0; i < n; ++i)
-            {
-                const auto a = chain (st, (double) in[c][2 * i], ka);
-                const auto b = chain (st + 6, (double) in[c][2 * i + 1], kb);
-                out[c][i] = (float) ((b + a) * 0.5);
-            }
+            const auto a = chain (A, pair (inL + 2 * i, inR + 2 * i), ka);
+            const auto b = chain (B, pair (inL + 2 * i + 1, inR + 2 * i + 1), kb);
+            const auto y = _mm_cvtpd_ps (_mm_mul_pd (_mm_add_pd (b, a), half));
+            _mm_store_ss (outL + i, y), _mm_store_ss (outR + i, _mm_shuffle_ps (y, y, 1));
         }
+        store (A, 0), store (B, 6);
         endBlock();
     }
 };
@@ -865,6 +998,77 @@ struct Smoother
     }
 };
 
+// A chain of `count` smoothers over the block (round 190kr): the same as running them one after another (each one's float
+// output is the next one's input, the x87 state per stage, the same coefficient choice and end-of-block flush), but
+// sample by sample, so the stages' recurrences overlap instead of running back to back. With two coefficients both
+// products (y − x)·c0 and (y − x)·c1 are formed and the one Smoother::run would form is kept (c0 when the input is ≥ the
+// state): the comparison runs beside the multiplication instead of in front of it. (The chains of one band share their
+// coefficients: one-coefficient chains take the plain step.)
+// (round 190kz: R = the state's type — long double, the x87 unit as FL's FUN_00605410 runs it, or double for Maximus slots
+// of EffectSlot::engineRev 1: on every Maximus state of the demo projects the two give the same samples)
+template <int count, bool single, typename R = long double>
+void smootherChainN (Smoother* sm, float* x, int n) noexcept
+{
+    R y[count];
+    double c0[count], c1[count];
+    for (int k = 0; k < count; ++k)
+        y[k] = sm[k].s, c0[k] = sm[k].c0, c1[k] = sm[k].c1;
+    for (int i = 0; i < n; ++i)
+    {
+        float v = x[i];
+        for (int k = 0; k < count; ++k)
+        {
+            const R u = v;
+            const R d = y[k] - u;
+            if constexpr (single)
+                y[k] = d * (R) c0[k] + u;
+            else
+            {
+                const R p0 = d * (R) c0[k], p1 = d * (R) c1[k];
+                y[k] = (u >= y[k] ? p0 : p1) + u;
+            }
+            v = (float) y[k];
+        }
+        x[i] = v;
+    }
+    for (int k = 0; k < count; ++k)
+        sm[k].s = std::fabs ((double) y[k]) > (double) flushLevel ? (double) y[k] : 0.0;
+}
+
+template <bool single, typename R = long double>
+void smootherChainOf (Smoother* sm, int count, float* x, int n) noexcept
+{
+    switch (count)
+    {
+        case 0: return;
+        case 1: smootherChainN<1, single, R> (sm, x, n); return;
+        case 2: smootherChainN<2, single, R> (sm, x, n); return;
+        case 3: smootherChainN<3, single, R> (sm, x, n); return;
+        default:
+            smootherChainN<4, single, R> (sm, x, n);
+            smootherChainOf<single, R> (sm + 4, count - 4, x, n);
+            return;
+    }
+}
+
+void smootherChain (Smoother* sm, int count, float* x, int n, bool doubleState = false) noexcept
+{
+    bool single = true;
+    for (int k = 0; k < count; ++k)
+        single = single && sm[k].c0 == sm[k].c1;
+    if (doubleState)
+    {
+        if (single)
+            smootherChainOf<true, double> (sm, count, x, n);
+        else
+            smootherChainOf<false, double> (sm, count, x, n);
+    }
+    else if (single)
+        smootherChainOf<true> (sm, count, x, n);
+    else
+        smootherChainOf<false> (sm, count, x, n);
+}
+
 // FUN_00629710 + FUN_007806b0: max(|L|, |R|), then the running maximum over the last W samples
 struct PeakWindow
 {
@@ -879,60 +1083,67 @@ struct PeakWindow
         pos = 0, head = W > 1 ? 1 : 0, tail = 0, count = 0;
     }
 
+    // (round 190kr: the positions and counters as locals, written back after the block: the int members could otherwise
+    // alias the int ring / queue being written and be stored / re-read at every sample. The same steps.)
     void run (const float* L, const float* R, float* out, int n) noexcept
     {
         for (int i = 0; i < n; ++i)
             out[i] = std::max (std::fabs (L[i]), std::fabs (R[i]));
         if (W <= 1)
             return;
+        std::int32_t* const rg = ring.data();
+        std::int32_t* const q = dq.data();
+        const int w = W;
+        int ps = pos, hd = head, tl = tail, ct = count;
         for (int i = 0; i < n; ++i)
         {
             std::int32_t x = 0;
             std::memcpy (&x, out + i, 4);
-            auto next = pos + 1;
-            if (next >= W)
+            auto next = ps + 1;
+            if (next >= w)
                 next = 0;
-            const auto old = count < 1 ? ring[(std::size_t) pos] : ring[(std::size_t) dq[(std::size_t) head]];
-            if (ring[(std::size_t) pos] < x)
+            const auto old = ct < 1 ? rg[ps] : rg[q[hd]];
+            if (rg[ps] < x)
             {
-                while (count > 0)
+                while (ct > 0)
                 {
-                    if (x <= ring[(std::size_t) dq[(std::size_t) tail]])
+                    if (x <= rg[q[tl]])
                     {
-                        const auto j = dq[(std::size_t) head] - 1;
-                        if (next == j || next == j + W)
+                        const auto j = q[hd] - 1;
+                        if (next == j || next == j + w)
                         {
-                            --count;
-                            if (++head >= W)
-                                head = 0;
+                            --ct;
+                            if (++hd >= w)
+                                hd = 0;
                         }
                         break;
                     }
-                    --count;
-                    if (--tail < 0)
-                        tail = W - 1;
+                    --ct;
+                    if (--tl < 0)
+                        tl = w - 1;
                 }
             }
             else
             {
-                if (++tail >= W)
-                    tail = 0;
-                dq[(std::size_t) tail] = pos;
-                const auto j = dq[(std::size_t) head] - 1;
-                if (next == j || next == j + W)
+                if (++tl >= w)
+                    tl = 0;
+                q[tl] = ps;
+                const auto j = q[hd] - 1;
+                if (next == j || next == j + w)
                 {
-                    if (++head >= W)
-                        head = 0;
+                    if (++hd >= w)
+                        hd = 0;
                 }
                 else
-                    ++count;
+                    ++ct;
             }
-            ring[(std::size_t) next] = x;
+            rg[next] = x;
             if (x < old)
                 x = old;
             std::memcpy (out + i, &x, 4);
-            pos = next;
+            ps = next;
         }
+        pos = ps, head = hd, tail = tl, count = ct;
     }
 };
 
@@ -1018,13 +1229,19 @@ struct FrameDelay
     {
         if (L == 0)
             return;
+        // (round 190kr: the position as a local, written back after the block)
+        float* const bl = l.data();
+        float* const br = r.data();
+        const int len = L;
+        int q = p;
         for (int i = 0; i < n; ++i)
         {
-            std::swap (xl[i], l[(std::size_t) p]);
-            std::swap (xr[i], r[(std::size_t) p]);
-            if (++p >= L)
-                p = 0;
+            std::swap (xl[i], bl[q]);
+            std::swap (xr[i], br[q]);
+            if (++q >= len)
+                q = 0;
         }
+        p = q;
     }
 };
 } // namespace
@@ -1159,8 +1376,9 @@ class Maximus
 public:
     static constexpr int maxFrames = Rack::maxBlock * 8;
 
-    void prepare (std::shared_ptr<const MaximusPreset> preset, double rate, int mixParam)
+    void prepare (std::shared_ptr<const MaximusPreset> preset, double rate, int mixParam, int engineRev = 0)
     {
+        doubleSmoothers = engineRev >= 1;
         pr = std::move (preset);
         fs = rate;
         const auto& P = *pr;
@@ -1350,8 +1568,7 @@ public:
             counter = -1073741823;
             return;
         }
-        for (auto& q : lowCut)
-            q.process (L, R, L, R, n);
+        biquadChain (lowCut.data(), (int) lowCut.size(), L, R, L, R, n);
         // X: the signal being split (at the band rate)
         const auto nb = n * K;
         float* XL = L;
@@ -1373,27 +1590,15 @@ public:
                 fir[(std::size_t) b].process (XL, XR, yl, yr, nb);
             else if (b == 1 && b != first)
             {
-                const float* sl = XL;
-                const float* sr = XR;
-                for (int k = 0; k < (int) st.size(); ++k)
-                {
-                    float* dl = k < inPlaceStages ? XL : yl;
-                    float* dr = k < inPlaceStages ? XR : yr;
-                    st[(std::size_t) k].process (sl, sr, dl, dr, nb);
-                    sl = dl, sr = dr;
-                }
-                if (st.size() <= (std::size_t) inPlaceStages) // (not reached with the presets: kept literal)
-                    std::copy (sl, sl + nb, yl), std::copy (sr, sr + nb, yr);
+                // the first inPlaceStages stages write the split signal in place (the high band reads it after), the
+                // others the band's buffer; each part as one sample-by-sample cascade (round 190kr)
+                const auto inPlace = std::clamp (inPlaceStages, 0, (int) st.size());
+                biquadChain (st.data(), inPlace, XL, XR, XL, XR, nb);
+                biquadChain (st.data() + inPlace, (int) st.size() - inPlace, XL, XR, yl, yr, nb);
             }
             else
             {
-                const float* sl = XL;
-                const float* sr = XR;
-                for (auto& q : st)
-                {
-                    q.process (sl, sr, yl, yr, nb);
-                    sl = yl, sr = yr;
-                }
+                biquadChain (st.data(), (int) st.size(), XL, XR, yl, yr, nb);
             }
             auto& B = band[(std::size_t) b];
             processBand (b, yl, yr, nb);
@@ -1465,8 +1670,7 @@ private:
                 B.rmsDet.run (xl, xr, g, n);
             else
                 B.det.run (xl, xr, g, n);
-            for (auto& s : B.rel)
-                s.run (g, n);
+            smootherChain (B.rel.data(), (int) B.rel.size(), g, n, doubleSmoothers);
             const auto k = f32 ((double) S.pre * 8192.25);
             const auto pp = S.pre * S.post;
             const auto hiGain = f32 (S.end * (double) S.post);
@@ -1486,8 +1690,7 @@ private:
                     g[i] = (t[idx] + (t[idx + 1] - t[idx]) * fr) * pp;
                 }
             }
-            for (auto& s : B.att)
-                s.run (g, n);
+            smootherChain (B.att.data(), (int) B.att.size(), g, n, doubleSmoothers);
         }
         B.delay.run (xl, xr, n);
         const auto keepDry = mixOn && b < 3;
@@ -1549,6 +1752,7 @@ public:
 
 private:
     std::shared_ptr<const MaximusPreset> pr;
+    bool doubleSmoothers = false; // round 190kz: MaximusProcessor::prepare's engineRev >= 1
     double fs = 44100.0;
     int K = 1, first = 0, inPlaceStages = 0, tailLength = 0, counter = 0, reportedLatency = 0, firLatency = 0;
     bool firOn = false;
@@ -2330,8 +2534,7 @@ struct HarmorRack::Impl
         shape (xl, xr, yl, yr, m);
         wet.mulAdd (yl, yr, dl, drr, m);
         if (post)
-            for (auto& q : postLp)
-                q.process (dl, drr, dl, drr, m);
+            biquadChain (postLp.data(), (int) postLp.size(), dl, drr, dl, drr, m);
         // down-sampling cascade (FUN_00864070): in place, the last stage into the output
         for (int st = stages - 1; st >= 0; --st)
         {
@@ -2615,7 +2818,7 @@ namespace lynx::hlfx
 MaximusProcessor::MaximusProcessor() = default;
 MaximusProcessor::~MaximusProcessor() = default;
 
-void MaximusProcessor::prepare (std::shared_ptr<const MaximusPreset> preset, double sampleRate, int mixParameter)
+void MaximusProcessor::prepare (std::shared_ptr<const MaximusPreset> preset, double sampleRate, int mixParameter, int engineRev)
 {
     if (preset == nullptr)
     {
@@ -2623,7 +2826,7 @@ void MaximusProcessor::prepare (std::shared_ptr<const MaximusPreset> preset, dou
         return;
     }
     engine = std::make_unique<Maximus>();
-    engine->prepare (std::move (preset), sampleRate, mixParameter);
+    engine->prepare (std::move (preset), sampleRate, mixParameter, engineRev);
 }
 
 void MaximusProcessor::process (float* left, float* right, int n) noexcept
@@ -2646,4 +2849,119 @@ void MaximusProcessor::reset() noexcept
 int MaximusProcessor::latencySamples() const noexcept { return engine != nullptr ? engine->latency() : 0; }
 
 int maximusMixParameter (const MaximusPreset& preset) noexcept { return preset.p[5]; }
+
+// round 190kr: the engine's sample-by-sample / SIMD kernels against the plain loops they replace (tests: perf190kr)
+bool kernelsMatchReference (std::uint32_t seed) noexcept
+{
+    auto rnd = [&seed] { seed = seed * 1664525u + 1013904223u; return (double) (seed >> 8) / 16777216.0; };
+    constexpr int maxN = 300;
+    float xl[maxN], xr[maxN], yl[maxN], yr[maxN], al[2 * maxN], ar[2 * maxN], bl[2 * maxN], br[2 * maxN];
+    auto fill = [&] (float* l, float* r, int n) {
+        for (int i = 0; i < n; ++i)
+        {
+            l[i] = i % 89 == 0 ? 0.0f : (float) (rnd() - 0.5) * (i % 7 == 0 ? 1.0e-7f : 1.0f);
+            r[i] = i % 61 == 0 ? -0.0f : (float) (rnd() - 0.5);
+        }
+    };
+    auto same = [] (const void* a, const void* b, std::size_t bytes) { return std::memcmp (a, b, bytes) == 0; };
+    for (int count = 0; count <= 9; ++count)
+        for (const int n : { 1, 37, 128, maxN })
+            for (const bool inPlace : { false, true })
+            {
+                // biquad cascade: Biquad::process stage after stage vs biquadChain
+                Biquad a[9], b[9];
+                for (int k = 0; k < count; ++k)
+                {
+                    a[k].design (k % 3 == 0 ? 1 : k % 3 == 1 ? 4 : 5, 0.05 + 2.5 * rnd(), 0.5 + rnd());
+                    for (auto& v : a[k].s)
+                        v = rnd() < 0.2 ? 1.0e-9 * rnd() : rnd() - 0.5;
+                    b[k] = a[k];
+                }
+                fill (xl, xr, n);
+                std::copy (xl, xl + n, yl), std::copy (xr, xr + n, yr);
+                float ol[maxN], orr[maxN], pl[maxN], pr[maxN];
+                const float* sl = xl;
+                const float* sr = xr;
+                float* dl = inPlace ? xl : ol;
+                float* dr = inPlace ? xr : orr;
+                if (count == 0 && ! inPlace)
+                    std::copy (xl, xl + n, ol), std::copy (xr, xr + n, orr);
+                for (int k = 0; k < count; ++k)
+                {
+                    a[k].process (sl, sr, dl, dr, n);
+                    sl = dl, sr = dr;
+                }
+                biquadChain (b, count, yl, yr, inPlace ? yl : pl, inPlace ? yr : pr, n);
+                if (! same (dl, inPlace ? yl : pl, sizeof (float) * (std::size_t) n) || ! same (dr, inPlace ? yr : pr, sizeof (float) * (std::size_t) n))
+                    return false;
+                for (int k = 0; k < count; ++k)
+                    if (! same (a[k].s.data(), b[k].s.data(), sizeof (a[k].s)))
+                        return false;
+
+                // smoother cascade: Smoother::run one after another vs smootherChain (one or two coefficients, the
+                // release smoothers' zero rising coefficient)
+                std::vector<Smoother> u ((std::size_t) count), w;
+                for (int k = 0; k < count; ++k)
+                {
+                    const auto c1 = 0.9 + 0.0999 * rnd();
+                    const auto c0 = inPlace ? c1 : (k % 2 == 0 ? 0.0 : 0.5 + 0.4 * rnd());
+                    u[(std::size_t) k] = Smoother { c0, c1, rnd() < 0.2 ? 0.0 : rnd() };
+                }
+                w = u;
+                for (int i = 0; i < n; ++i)
+                    xl[i] = std::fabs (xl[i]) * (i % 50 < 25 ? 1.0f : 0.25f), yl[i] = xl[i];
+                for (auto& m : u)
+                    m.run (xl, n);
+                smootherChain (w.data(), count, yl, n);
+                if (! same (xl, yl, sizeof (float) * (std::size_t) n))
+                    return false;
+                for (int k = 0; k < count; ++k)
+                    if (u[(std::size_t) k].s != w[(std::size_t) k].s && ! (std::isnan (u[(std::size_t) k].s) && std::isnan (w[(std::size_t) k].s)))
+                        return false;
+            }
+    // half-band up / down: the per-channel scalar loops (Halfband::chain on each channel's states) vs the two-lane ones
+    for (const int n : { 1, 37, 150 })
+    {
+        Halfband h, g;
+        for (auto& v : h.s)
+            v = rnd() < 0.2 ? 0.0 : rnd() - 0.5;
+        g = h;
+        fill (xl, xr, n);
+        const float* in[2] { xl, xr };
+        float* ref[2] { al, ar };
+        for (int c = 0; c < 2; ++c)
+        {
+            auto* st = h.s.data() + 12 * c;
+            for (int i = 0; i < n; ++i)
+            {
+                const auto v = (double) in[c][i];
+                const auto a = Halfband::chain (st, v, Halfband::ka);
+                const auto b = Halfband::chain (st + 6, v, Halfband::kb);
+                ref[c][2 * i] = (float) b, ref[c][2 * i + 1] = (float) a;
+            }
+        }
+        h.endBlock();
+        g.up (xl, xr, bl, br, n);
+        if (! same (al, bl, sizeof (float) * 2 * (std::size_t) n) || ! same (ar, br, sizeof (float) * 2 * (std::size_t) n)
+            || ! same (h.s.data(), g.s.data(), sizeof (h.s)))
+            return false;
+        float* back[2] { yl, yr };
+        for (int c = 0; c < 2; ++c)
+        {
+            auto* st = h.s.data() + 12 * c;
+            for (int i = 0; i < n; ++i)
+            {
+                const auto a = Halfband::chain (st, (double) ref[c][2 * i], Halfband::ka);
+                const auto b = Halfband::chain (st + 6, (double) ref[c][2 * i + 1], Halfband::kb);
+                back[c][i] = (float) ((b + a) * 0.5);
+            }
+        }
+        h.endBlock();
+        g.down (bl, br, xl, xr, n);
+        if (! same (yl, xl, sizeof (float) * (std::size_t) n) || ! same (yr, xr, sizeof (float) * (std::size_t) n)
+            || ! same (h.s.data(), g.s.data(), sizeof (h.s)))
+            return false;
+    }
+    return true;
+}
 } // namespace lynx::hlfx

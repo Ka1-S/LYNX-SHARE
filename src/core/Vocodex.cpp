@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <atomic>
 #include <climits>
+#include <limits>
 #include <cmath>
 #include <cstring>
 
@@ -633,6 +634,95 @@ struct Biquad
     }
 };
 
+// Band filter cascades, several at once (round beatfl190kr). Each stage computes exactly what Biquad::run64 computes —
+// y = x·b0 + ((x2·b2 − y2·a2) − y1·a1) per channel, L and R as the two lanes of one vector (GCC/Clang vector
+// extensions: element-wise IEEE operations) — but the stages of a cascade run sample by sample instead of block by
+// block, and J independent cascades share the loop: run64 was bound by the 3-operation latency of each stage's
+// recurrence, now J·order recurrences overlap. The states read and written back are the Biquad's own.
+struct CascadeJob
+{
+    Biquad* filters = nullptr;
+    const double* in = nullptr;
+    double* out = nullptr;
+};
+
+#if defined(__GNUC__) || defined(__clang__)
+typedef double VocodexV2 __attribute__ ((vector_size (16)));
+
+template <int O, int J>
+void runCascadeGroup (const CascadeJob* jobs, int n) noexcept
+{
+    VocodexV2 b0[J][O], b2[J][O], a1[J][O], a2[J][O], x1[J][O], x2[J][O], y1[J][O], y2[J][O];
+    for (int j = 0; j < J; ++j)
+        for (int i = 0; i < O; ++i)
+        {
+            const auto& f = jobs[j].filters[i];
+            b0[j][i] = VocodexV2 { f.b0, f.b0 }, b2[j][i] = VocodexV2 { f.b2, f.b2 };
+            a1[j][i] = VocodexV2 { f.a1, f.a1 }, a2[j][i] = VocodexV2 { f.a2, f.a2 };
+            x1[j][i] = VocodexV2 { f.s[0], f.s[1] }, x2[j][i] = VocodexV2 { f.s[2], f.s[3] };
+            y1[j][i] = VocodexV2 { f.s[4], f.s[5] }, y2[j][i] = VocodexV2 { f.s[6], f.s[7] };
+        }
+    const double* in[J];
+    double* out[J];
+    for (int j = 0; j < J; ++j)
+        in[j] = jobs[j].in, out[j] = jobs[j].out;
+    for (int k = 0; k < n; ++k)
+    {
+#pragma GCC unroll 4
+        for (int j = 0; j < J; ++j)
+        {
+            VocodexV2 x;
+            std::memcpy (&x, in[j] + 2 * k, sizeof x);
+#pragma GCC unroll 4
+            for (int i = 0; i < O; ++i)
+            {
+                const VocodexV2 y = x * b0[j][i] + ((x2[j][i] * b2[j][i] - y2[j][i] * a2[j][i]) - y1[j][i] * a1[j][i]);
+                x2[j][i] = x1[j][i], x1[j][i] = x, y2[j][i] = y1[j][i], y1[j][i] = y;
+                x = y;
+            }
+            std::memcpy (out[j] + 2 * k, &x, sizeof x);
+        }
+    }
+    for (int j = 0; j < J; ++j)
+        for (int i = 0; i < O; ++i)
+            jobs[j].filters[i].s = { x1[j][i][0], x1[j][i][1], x2[j][i][0], x2[j][i][1], y1[j][i][0], y1[j][i][1], y2[j][i][0], y2[j][i][1] };
+}
+
+template <int O>
+void runCascadesOf (const CascadeJob* jobs, int count, int n) noexcept
+{
+    int j = 0;
+    for (; j + 2 <= count; j += 2)
+        runCascadeGroup<O, 2> (jobs + j, n);
+    if (j < count)
+        runCascadeGroup<O, 1> (jobs + j, n);
+}
+
+void runCascades (const CascadeJob* jobs, int count, int order, int n) noexcept
+{
+    switch (order)
+    {
+        case 1: runCascadesOf<1> (jobs, count, n); return;
+        case 2: runCascadesOf<2> (jobs, count, n); return;
+        case 3: runCascadesOf<3> (jobs, count, n); return;
+        default: runCascadesOf<4> (jobs, count, n); return;
+    }
+}
+#else
+void runCascades (const CascadeJob* jobs, int count, int order, int n) noexcept
+{
+    for (int j = 0; j < count; ++j)
+    {
+        const double* in = jobs[j].in;
+        for (int i = 0; i < order; ++i)
+        {
+            jobs[j].filters[i].run64 (in, jobs[j].out, n);
+            in = jobs[j].out;
+        }
+    }
+}
+#endif
+
 // --- polyphase all-pass half-band pair (two 3-section all-pass chains) ---------------------------------------------
 constexpr double halfA[3] { 0.14737711360104661, 0.48246854276970014, 0.88300502576937312 };
 constexpr double halfB[3] { 0.039151597734460045, 0.30264684832849342, 0.6746159185469639 };
@@ -702,53 +792,110 @@ struct HalfBand
 };
 
 // --- followers -------------------------------------------------------------------------------------------------------
-// maximum over the current sample and the W − 1 previous ones (monotonic queue; the inputs are ≥ 0, so the zero
-// history at the start never wins)
+// maximum over the current sample and the W − 1 previous ones (the inputs are ≥ 0, so the zero history at the start
+// never wins). Round beatfl190kr: van Herk / Gil-Werman instead of a monotonic queue — the queue's pops were one
+// mispredicted branch after another. The stream is cut into chunks of W samples; the window ending at chunk position j
+// is the tail of the previous chunk from j + 1 (its suffix maxima, kept when that chunk completes) and the current
+// chunk up to j (its running maximum). A maximum of the same values is the same value, so the outputs are the queue's
+// bit for bit; a NaN (which the queue let through on its own sample and which emptied it) switches the samples whose
+// window holds it to a direct scan with exactly the queue's semantics: the NaN itself, then the maximum of what came
+// after it.
 struct SlidingMax
 {
     int window = 1;
-    std::vector<float> value;
-    std::vector<std::uint32_t> when;
-    int head = 0, count = 0;
-    std::uint32_t clock = 0;
+    std::vector<float> ring;   // the current chunk's inputs at [0, pos), the previous chunk's at [pos, W)
+    std::vector<float> suffix; // [q] = max of the previous chunk's inputs q…W − 1; [W] = −∞
+    int pos = 0, nanLeft = 0;  // nanLeft: samples still to come whose window holds a NaN
+    float run = 0.0f;          // max of the current chunk's inputs so far
 
     void setup (int w)
     {
         window = std::max (1, w);
-        value.assign ((std::size_t) window, 0.0f);
-        when.assign ((std::size_t) window, 0);
+        ring.assign ((std::size_t) window, 0.0f);
+        suffix.assign ((std::size_t) window + 1, 0.0f);
         clear();
     }
-    void clear() noexcept { head = count = 0, clock = 0; }
-
-    void run (float* e, int n) noexcept
+    void clear() noexcept
     {
-        if (window <= 1)
+        std::fill (ring.begin(), ring.end(), 0.0f);
+        std::fill (suffix.begin(), suffix.end(), 0.0f);
+        if (! suffix.empty())
+            suffix.back() = -std::numeric_limits<float>::infinity();
+        pos = 0, nanLeft = 0, run = 0.0f;
+    }
+    bool takeOver (const SlidingMax& o) noexcept
+    {
+        if (o.window != window || o.ring.size() != ring.size() || o.suffix.size() != suffix.size())
+            return false;
+        ring = o.ring, suffix = o.suffix;
+        pos = o.pos, nanLeft = o.nanLeft, run = o.run;
+        return true;
+    }
+
+    void process (float* e, int n) noexcept
+    {
+        const int w = window;
+        if (w <= 1)
             return;
-        for (int k = 0; k < n; ++k, ++clock)
+        float* const r = ring.data();
+        float* const sfx = suffix.data();
+        for (int k = 0; k < n;)
         {
-            while (count > 0 && clock - when[(std::size_t) head] >= (std::uint32_t) window)
+            const int seg = std::min (n - k, w - pos);
+            float* const x = e + k;
+            int nan = nanLeft > 0;
+            for (int i = 0; i < seg; ++i)
+                nan |= (int) (x[i] != x[i]);
+            float g = pos == 0 ? x[0] : run;
+            if (nan == 0)
+                for (int i = 0; i < seg; ++i)
+                {
+                    const int j = pos + i;
+                    const float v = x[i];
+                    r[j] = v;
+                    g = g < v ? v : g;
+                    const float t = sfx[j + 1];
+                    x[i] = g < t ? t : g;
+                }
+            else
+                for (int i = 0; i < seg; ++i) // the queue's semantics, sample by sample
+                {
+                    const int j = pos + i;
+                    const float v = x[i];
+                    r[j] = v;
+                    g = g < v ? v : g;
+                    if (v != v)
+                        nanLeft = w; // (x[i] stays the NaN)
+                    else
+                    {
+                        float m = v;
+                        for (int d = 1; d < w; ++d)
+                        {
+                            const float u = r[j - d >= 0 ? j - d : j - d + w];
+                            if (u != u)
+                                break;
+                            m = m < u ? u : m;
+                        }
+                        x[i] = m;
+                    }
+                    if (nanLeft > 0)
+                        --nanLeft;
+                }
+            run = g;
+            pos += seg;
+            k += seg;
+            if (pos == w)
             {
-                head = head + 1 == window ? 0 : head + 1;
-                --count;
+                float m = r[w - 1];
+                sfx[w - 1] = m;
+                for (int q = w - 2; q >= 0; --q)
+                {
+                    const float u = r[q];
+                    m = m < u ? u : m;
+                    sfx[q] = m;
+                }
+                pos = 0;
             }
-            const float x = e[k];
-            while (count > 0)
-            {
-                auto back = head + count - 1;
-                if (back >= window)
-                    back -= window;
-                if (value[(std::size_t) back] > x)
-                    break;
-                --count;
-            }
-            auto pos = head + count;
-            if (pos >= window)
-                pos -= window;
-            value[(std::size_t) pos] = x;
-            when[(std::size_t) pos] = clock;
-            ++count;
-            e[k] = value[(std::size_t) head];
         }
     }
 };
@@ -821,6 +968,56 @@ struct Smoother
         y = v;
     }
 };
+
+// count stages of a smoother over e[0…n) in one pass (round beatfl190kr): sample by sample through the stages instead of
+// stage by stage through the block, so the stages' recurrences overlap. Per stage and sample it is Smoother::run's
+// arithmetic: the coefficient picked by x ≥ v (a single-coefficient stage has ca = cr, so the pick gives the same
+// value), v = (v − x)·c + x (the same rounded product and sum as x + c·(v − x)), the next stage reading v rounded to
+// float, and each stage's state flushed below 2⁻²⁴ at the end of the block.
+template <int S>
+void runSmoothersOf (Smoother* st, float* e, int n) noexcept
+{
+    double v[S], ca[S], cr[S];
+    for (int i = 0; i < S; ++i)
+        v[i] = st[i].y, ca[i] = st[i].ca, cr[i] = st[i].cr;
+    for (int k = 0; k < n; ++k)
+    {
+        float f = e[k];
+#pragma GCC unroll 8
+        for (int i = 0; i < S; ++i)
+        {
+            const double x = f;
+            const double c = x >= v[i] ? ca[i] : cr[i];
+            v[i] = (v[i] - x) * c + x;
+            f = (float) v[i];
+        }
+        e[k] = f;
+    }
+    for (int i = 0; i < S; ++i)
+    {
+        auto y = v[i];
+        if (! ((double) tiny < std::fabs (y)))
+            y = 0.0;
+        st[i].y = y;
+    }
+}
+
+void runSmoothers (std::array<Smoother, smootherStages>& st, int count, float* e, int n) noexcept
+{
+    static_assert (smootherStages == 8);
+    switch (count)
+    {
+        case 0: return;
+        case 1: runSmoothersOf<1> (st.data(), e, n); return;
+        case 2: runSmoothersOf<2> (st.data(), e, n); return;
+        case 3: runSmoothersOf<3> (st.data(), e, n); return;
+        case 4: runSmoothersOf<4> (st.data(), e, n); return;
+        case 5: runSmoothersOf<5> (st.data(), e, n); return;
+        case 6: runSmoothersOf<6> (st.data(), e, n); return;
+        case 7: runSmoothersOf<7> (st.data(), e, n); return;
+        default: runSmoothersOf<8> (st.data(), e, n); return;
+    }
+}
 
 // stage count round(order + 0.5), each stage t/√order, the last one scaled by its fractional part
 int setupSmoother (std::array<Smoother, smootherStages>& stages, double att, double attOrder, double rel, double relOrder) noexcept
@@ -1287,7 +1484,8 @@ struct Engine::Impl
     std::array<std::array<std::vector<double>, levelCount>, 2> level;
     std::array<std::vector<double>, levelCount> acc;
     std::array<bool, levelCount> touched {};
-    std::vector<double> tmp64a, tmp64b;
+    std::vector<double> tmp64b;
+    std::vector<double> voiceOut, osOut; // filterVoices: maxVoices slices of 4·(maxBlock + 64) each
     std::vector<float> tmp32, env, envSum, x32a, x32b, voc, outBuf, modPassBuf, carPassBuf, noise, contourBuf, mono, carBuf, modBuf, gains;
 
     std::array<MapReader, 13> maps;
@@ -1298,7 +1496,8 @@ struct Engine::Impl
     void setupSaturation();
     void clear() noexcept;
     bool takeOver (const Impl& o) noexcept;
-    void filterBand (Voice& u, int sig, int lvl, int n, double* out) noexcept;
+    void filterVoices (Band& B, int fat, int lvl, int n) noexcept;
+    double* voiceBuf (int slot) noexcept { return voiceOut.data() + (std::size_t) slot * (voiceOut.size() / maxVoices); }
     void accumulate (int lv, const double* a, const double* b, double scale, int n2) noexcept;
     void saturate (float* e, int n, float dry, float wetGain, float sc) const noexcept;
     void process (const float* own, const float* mod, const float* car, float* dst, int n) noexcept;
@@ -1684,8 +1883,7 @@ bool Engine::Impl::takeOver (const Impl& o) noexcept
             if (u.oversample == ou.oversample)
                 for (int i = 0; i < order; ++i)
                     u.filters[(std::size_t) i].s = ou.filters[(std::size_t) i].s;
-            if (u.peak.window == ou.peak.window && copyRing (u.peak.value, ou.peak.value) && copyRing (u.peak.when, ou.peak.when))
-                u.peak.head = ou.peak.head, u.peak.count = ou.peak.count, u.peak.clock = ou.peak.clock;
+            u.peak.takeOver (ou.peak);
             if (u.rms.window == ou.rms.window && copyRing (u.rms.ring, ou.rms.ring))
                 u.rms.pos = ou.rms.pos, u.rms.sum = ou.rms.sum;
             for (std::size_t k = 0; k < u.smoother.size(); ++k)
@@ -1701,10 +1899,8 @@ bool Engine::Impl::takeOver (const Impl& o) noexcept
     }
     analysis = o.analysis;
     synthesis = o.synthesis;
-    if (contour && o.contour && contourPeak.window == o.contourPeak.window && copyRing (contourPeak.value, o.contourPeak.value)
-        && copyRing (contourPeak.when, o.contourPeak.when) && copyRing (zcRing, o.zcRing))
+    if (contour && o.contour && contourPeak.window == o.contourPeak.window && copyRing (zcRing, o.zcRing) && contourPeak.takeOver (o.contourPeak))
     {
-        contourPeak.head = o.contourPeak.head, contourPeak.count = o.contourPeak.count, contourPeak.clock = o.contourPeak.clock;
         contourSmoother = o.contourSmoother;
         consonantHp.s = o.consonantHp.s;
         zcPos = o.zcPos, zcCount = o.zcCount, zcPrev = o.zcPrev;
@@ -1718,32 +1914,41 @@ bool Engine::Impl::takeOver (const Impl& o) noexcept
     return true;
 }
 
-void Engine::Impl::filterBand (Voice& u, int sig, int lvl, int n, double* out) noexcept
+// the band filters of voices −fat…0 (the modulator, signal 1) and 1 (the carrier, signal 0) of one band, each into
+// voiceBuf (slot): what filterBand gives voice by voice, with the independent cascades interleaved (runCascades)
+void Engine::Impl::filterVoices (Band& B, int fat, int lvl, int n) noexcept
 {
-    if (u.oversample < 2)
+    CascadeJob native[maxVoices], twice[maxVoices];
+    int nn = 0, nt = 0;
+    const auto osSize = osOut.size() / maxVoices;
+    for (int slot = 4 - fat; slot < maxVoices; ++slot)
     {
-        const double* in = level[(std::size_t) sig][(std::size_t) lvl + 1].data();
-        for (int i = 0; i < order; ++i)
+        auto& u = B.voices[(std::size_t) slot];
+        const int sig = slot == maxVoices - 1 ? 0 : 1;
+        if (u.oversample < 2)
+            native[nn++] = { u.filters.data(), level[(std::size_t) sig][(std::size_t) lvl + 1].data(), voiceBuf (slot) };
+        else
         {
-            u.filters[(std::size_t) i].run64 (in, out, n);
-            in = out;
+            twice[nt] = { u.filters.data(), level[(std::size_t) sig][0].data(), osOut.data() + (std::size_t) nt * osSize };
+            ++nt;
         }
     }
-    else // 2× copy, brought back by averaging pairs
-    {
-        const double* in = level[(std::size_t) sig][0].data();
-        double* t = tmp64b.data();
-        for (int i = 0; i < order; ++i)
+    runCascades (native, nn, order, n);
+    if (nt == 0)
+        return;
+    runCascades (twice, nt, order, 2 * n); // 2× copies, brought back by averaging pairs
+    nt = 0;
+    for (int slot = 4 - fat; slot < maxVoices; ++slot)
+        if (B.voices[(std::size_t) slot].oversample >= 2)
         {
-            u.filters[(std::size_t) i].run64 (in, t, 2 * n);
-            in = t;
+            const double* t = osOut.data() + (std::size_t) nt++ * osSize;
+            double* out = voiceBuf (slot);
+            for (int k = 0; k < n; ++k)
+            {
+                out[2 * k] = (t[4 * k] + t[4 * k + 2]) * 0.5;
+                out[2 * k + 1] = (t[4 * k + 1] + t[4 * k + 3]) * 0.5;
+            }
         }
-        for (int k = 0; k < n; ++k)
-        {
-            out[2 * k] = (t[4 * k] + t[4 * k + 2]) * 0.5;
-            out[2 * k + 1] = (t[4 * k + 1] + t[4 * k + 3]) * 0.5;
-        }
-    }
 }
 
 // acc[lv] (+)= a·b, or a·scale without b
@@ -1871,9 +2076,8 @@ void Engine::Impl::process (const float* own, const float* mod, const float* car
                 const float a = std::fabs (src[2 * k]), b = std::fabs (src[2 * k + 1]);
                 mono_[k] = a <= b ? b : a;
             }
-            contourPeak.run (mono_, m);
-            for (int i = 0; i < contourStages; ++i)
-                contourSmoother[(std::size_t) i].run (mono_, m);
+            contourPeak.process (mono_, m);
+            runSmoothers (contourSmoother, contourStages, mono_, m);
             for (int k = 0; k < m; ++k)
                 cb[2 * k] = cb[2 * k + 1] = mono_[k];
             cont = cb;
@@ -1923,20 +2127,20 @@ void Engine::Impl::process (const float* own, const float* mod, const float* car
         float* e = env.data();
         float* es = envSum.data();
         float* t32 = tmp32.data();
-        double* ta = tmp64a.data();
         double* tb = tmp64b.data();
         for (int b = 0; b < bandCount; ++b)
         {
             auto& B = bands[(std::size_t) b];
             const int lv = B.level, nb = m >> lv;
+            filterVoices (B, fat, lv, nb);
             for (int v = -fat; v < 1; ++v)
             {
                 auto& u = B.voices[(std::size_t) (v + 4)];
-                filterBand (u, 1, lv, nb, ta);
+                const double* fo = voiceBuf (v + 4);
                 if (B.modPass != 0.0)
-                    accumulate (lv + 1, ta, nullptr, B.modPass, 2 * nb);
+                    accumulate (lv + 1, fo, nullptr, B.modPass, 2 * nb);
                 for (int k = 0; k < 2 * nb; ++k)
-                    t32[k] = (float) ta[k];
+                    t32[k] = (float) fo[k];
                 if (s.holdMode == 0)
                 {
                     for (int k = 0; k < nb; ++k)
@@ -1944,7 +2148,7 @@ void Engine::Impl::process (const float* own, const float* mod, const float* car
                         const float a = std::fabs (t32[2 * k]), c = std::fabs (t32[2 * k + 1]);
                         e[k] = a <= c ? c : a;
                     }
-                    u.peak.run (e, nb);
+                    u.peak.process (e, nb);
                 }
                 else
                 {
@@ -1980,8 +2184,7 @@ void Engine::Impl::process (const float* own, const float* mod, const float* car
                         const double g4 = (double) u.gain * 0.25;
                         saturate (e, nb, (float) (g4 * 4.0 * (1.0 - B.satMix)), (float) (4.0 * B.satMix), (float) g4);
                     }
-                    for (int i = 0; i < u.stages; ++i)
-                        u.smoother[(std::size_t) i].run (e, nb);
+                    runSmoothers (u.smoother, u.stages, e, nb);
                     if (nb > 0)
                         u.last = e[nb - 1];
                 }
@@ -2010,10 +2213,9 @@ void Engine::Impl::process (const float* own, const float* mod, const float* car
                         if (es[k] < 0.0f)
                             es[k] = 0.0f;
             }
-            filterBand (B.voices[5], 0, lv, nb, ta);
             for (int k = 0; k < 2 * nb; ++k)
                 tb[k] = (double) es[k];
-            accumulate (lv + 1, tb, ta, 0.0, 2 * nb);
+            accumulate (lv + 1, tb, voiceBuf (5), 0.0, 2 * nb);
         }
 
         // pass-through (written to the output base)
@@ -2192,8 +2394,9 @@ void Engine::prepare (const State& state, double sampleRate, int maxBlockFrames,
             v.assign (4 * n, 0.0);
     for (auto& v : p.acc)
         v.assign (4 * n, 0.0);
-    p.tmp64a.assign (4 * n, 0.0);
     p.tmp64b.assign (4 * n, 0.0);
+    p.voiceOut.assign (maxVoices * 4 * n, 0.0);
+    p.osOut.assign (maxVoices * 4 * n, 0.0);
     for (auto* v : { &p.tmp32, &p.x32a, &p.x32b })
         v->assign (4 * n, 0.0f);
     for (auto* v : { &p.env, &p.envSum, &p.voc, &p.outBuf, &p.modPassBuf, &p.carPassBuf, &p.noise, &p.contourBuf, &p.mono,
@@ -2343,6 +2546,17 @@ private:
     std::vector<float> left, right;
 };
 } // namespace
+
+std::vector<float> slidingMaxForTest (int window, const std::vector<float>& input, int block)
+{
+    SlidingMax sm;
+    sm.setup (window);
+    auto x = input;
+    block = std::max (1, block);
+    for (std::size_t at = 0; at < x.size(); at += (std::size_t) block)
+        sm.process (x.data() + at, (int) std::min<std::size_t> ((std::size_t) block, x.size() - at));
+    return x;
+}
 
 std::unique_ptr<Carrier> makeInternalCarrier (const State&)
 {

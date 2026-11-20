@@ -180,18 +180,23 @@ TEST (rea146a_wrapper_settings_page_options)
     // sub-options need fixed buffers
     const auto& o = lynx::wrapperOptions();
     // round 151 added the MIDI ones and two Compatibility ones; round 188d "Process inactive inputs and outputs" (index 4);
-    // round 190bb (issue #108) "MPE" (index 8, a LYNX addition after the other per-note MIDI options)
-    CHECK (o.size() == 15);
-    if (o.size() == 15)
+    // round 190bb (issue #108) "MPE" (index 8, a LYNX addition after the other per-note MIDI options); round 190ks
+    // (GitHub #198) "Record notes from the plugin window" (index 10, a LYNX addition, on by default)
+    CHECK (o.size() == 16);
+    if (o.size() == 16)
     {
         CHECK (std::string (o[0].label) == "Notify about rendering mode" && o[0].member == &lynx::PluginRef::notifyRender && ! o[0].recreates);
         CHECK (std::string (o[4].label) == "Process inactive inputs and outputs" && o[4].member == &lynx::PluginRef::processInactive && ! o[4].recreates);
-        CHECK (std::string (o[12].label) == "Use fixed size buffers" && o[12].member == &lynx::PluginRef::fixedBuffers && o[12].recreates);
-        CHECK (o[13].needsFixed && o[14].needsFixed && ! o[12].needsFixed && ! o[1].needsFixed);
+        CHECK (std::string (o[13].label) == "Use fixed size buffers" && o[13].member == &lynx::PluginRef::fixedBuffers && o[13].recreates);
+        CHECK (o[14].needsFixed && o[15].needsFixed && ! o[13].needsFixed && ! o[1].needsFixed);
         CHECK (std::string (o[8].label) == "MPE" && o[8].member == &lynx::PluginRef::mpe && o[8].recreates && std::string (o[8].section) == "MIDI");
+        CHECK (std::string (o[10].label) == "Record notes from the plugin window" && o[10].member == &lynx::PluginRef::recordOwnNotes
+               && ! o[10].recreates && std::string (o[10].section) == "MIDI");
         CHECK (! o[1].recreates && ! o[3].recreates && o[2].recreates && std::string (o[2].section) == "Processing"
-               && std::string (o[4].section) == "Processing" && std::string (o[12].section) == "Compatibility" && std::string (o[5].section) == "MIDI");
+               && std::string (o[4].section) == "Processing" && std::string (o[13].section) == "Compatibility" && std::string (o[5].section) == "MIDI");
         lynx::PluginRef ref;
-        CHECK (ref.*(o[0].member) && ref.*(o[1].member) && ref.*(o[3].member) && ! (ref.*(o[12].member)) && ! (ref.*(o[8].member))); // FL's defaults (MPE off)
+        // FL's defaults (MPE off); LYNX's recording of the window's notes on
+        CHECK (ref.*(o[0].member) && ref.*(o[1].member) && ref.*(o[3].member) && ! (ref.*(o[13].member)) && ! (ref.*(o[8].member))
+               && ref.*(o[10].member));
     }
 }

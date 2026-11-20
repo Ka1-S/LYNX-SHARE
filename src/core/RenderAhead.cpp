@@ -129,6 +129,9 @@ struct RenderAhead::Entry
     int samples = 0;
     bool playing = false;
     std::array<float, 2 * maxMixerTracks> peaks {}; // [i * 2 + side]: the i-th insert of the part rendered ahead
+    // round 190lr (DL-108): the blocks' sums of squares and their frames, kept only while the Session mixer's RMS bars show
+    std::array<float, 2 * maxMixerTracks> power {};
+    std::array<int, maxMixerTracks> powerFrames {};
 };
 
 struct RenderAhead::Partition
@@ -742,6 +745,7 @@ void RenderAhead::wakeThread() noexcept
 void RenderAhead::threadLoop (std::function<void()> onStart)
 {
     const ScopedFlushDenormals noDenormals;
+    WorkerPool::nameCurrentThread ("LYNX render-ahead"); // (round 190kb)
     if (onStart)
         onStart();
     while (! quit.load (std::memory_order_acquire))
@@ -838,6 +842,12 @@ void RenderAhead::harvestMeters (Entry& entry) noexcept
             const auto a = m.takePeak (t, side), v = m.takeViewPeak (t, side), s = m.takeSessionPeak (t, side);
             entry.peaks[(std::size_t) (i * 2 + side)] = std::max ({ a, v, s });
         }
+        float pl = 0.0f, pr = 0.0f;
+        int frames = 0;
+        m.takePowerSums (t, pl, pr, frames); // (round 190lr: zeros while nobody wants them)
+        entry.power[(std::size_t) (i * 2)] = pl;
+        entry.power[(std::size_t) (i * 2 + 1)] = pr;
+        entry.powerFrames[(std::size_t) i] = frames;
     }
 }
 
@@ -845,11 +855,16 @@ void RenderAhead::replayMeters (const Entry& entry, MeterBank* meters) noexcept
 {
     if (meters == nullptr)
         return;
+    const auto power = meters->powerWanted.load (std::memory_order_relaxed);
+    aheadMeters->powerWanted.store (power, std::memory_order_relaxed); // (round 190lr: the part rendered ahead sums them too)
     for (int i = 0; i < current->aheadTrackCount; ++i)
     {
         const auto l = entry.peaks[(std::size_t) (i * 2)], r = entry.peaks[(std::size_t) (i * 2 + 1)];
         if (l > 0.0f || r > 0.0f)
             meters->accumulate (current->aheadTrackList[(std::size_t) i], l, r);
+        if (power && entry.powerFrames[(std::size_t) i] > 0)
+            meters->accumulatePower (current->aheadTrackList[(std::size_t) i], entry.power[(std::size_t) (i * 2)], entry.power[(std::size_t) (i * 2 + 1)],
+                                     entry.powerFrames[(std::size_t) i]);
     }
 }
 
@@ -941,6 +956,25 @@ bool RenderAhead::renderAheadAllowed() const noexcept
     return alwaysEngage || probe == Probe::on || probe == Probe::decidedOn;
 }
 
+RenderAhead::ProbeVerdict RenderAhead::probeVerdict (double cpuShareOff, double cpuShareOn, double overRateOff, double overRateOn) noexcept
+{
+    ProbeVerdict v;
+    const auto fewerOverruns = overRateOn <= overRateOff * probeOverrunGain && overRateOff > 0.0;
+    const auto muchFewer = overRateOn <= overRateOff * probeMuchFewer && overRateOff > 0.0;
+    const auto lessCpu = cpuShareOn <= cpuShareOff * probeCpuGain;
+    // kept for a CPU win beyond the probe's measuring error (about ten points in render-ahead's favour against whole
+    // runs) with no more overruns. Since the owner's 0.1.28 decision (`favourFewerOverruns`) also for clearly fewer
+    // overruns at no more than probeCpuMargin more CPU (synth100, Exoplanet: 5-20x fewer), and since 0.1.30 for at
+    // least 4x fewer at no more than probeCpuMarginMuchFewer.
+    const auto cpuWin = lessCpu && overRateOn <= overRateOff;
+    const auto forOverruns = favourFewerOverruns
+                             && ((fewerOverruns && cpuShareOn <= cpuShareOff * probeCpuMargin)
+                                 || (muchFewer && cpuShareOn <= cpuShareOff * probeCpuMarginMuchFewer));
+    v.keep = cpuWin || forOverruns;
+    v.forOverruns = v.keep && ! cpuWin;
+    return v;
+}
+
 void RenderAhead::account (double wallNs, double cpuNs, int samples, bool playing, const RackState* state) noexcept
 {
     if (alwaysEngage || samples <= 0 || sampleRate <= 0.0)
@@ -1019,19 +1053,16 @@ void RenderAhead::account (double wallNs, double cpuNs, int samples, bool playin
                 counters.probeCpuOn.store ((float) (100.0 * cpuShareOn), std::memory_order_relaxed);
                 counters.probeOverOff.store ((float) (60.0 * overRateOff), std::memory_order_relaxed);
                 counters.probeOverOn.store ((float) (60.0 * overRateOn), std::memory_order_relaxed);
-                const auto fewerOverruns = overRateOn <= overRateOff * probeOverrunGain && overRateOff > 0.0;
-                const auto lessCpu = cpuShareOn <= cpuShareOff * probeCpuGain;
-                // (kept for a CPU win beyond the probe's measuring error — about ten points in render-ahead's favour
-                // against whole runs — with no more overruns; and, since the owner's 0.1.28 decision
-                // (`favourFewerOverruns`), for clearly fewer overruns at no more than probeCpuMargin more CPU: synth100,
-                // Exoplanet: 5-20x fewer.)
-                const auto keep = (lessCpu && overRateOn <= overRateOff) || (favourFewerOverruns && fewerOverruns && cpuShareOn <= cpuShareOff * probeCpuMargin);
+                const auto verdict = probeVerdict (cpuShareOff, cpuShareOn, overRateOff, overRateOn);
+                const auto keep = verdict.keep;
                 probe = keep ? Probe::decidedOn : Probe::decidedOff;
                 // (a project that keeps losing is probed less and less often: the probe's own "on" windows cost)
                 decidedLeft = keep ? decidedSeconds : offHold;
                 offHold = keep ? decidedSeconds : std::min (600.0, offHold * 2.0);
                 decidedState = state != nullptr ? state->serial : 0;
                 (keep ? counters.keptOn : counters.keptOff).fetch_add (1, std::memory_order_relaxed);
+                if (verdict.forOverruns)
+                    counters.keptForOverruns.fetch_add (1, std::memory_order_relaxed);
                 if (! keep)
                     drain.store (true, std::memory_order_release);
             }

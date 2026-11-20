@@ -1361,7 +1361,7 @@ public:
         for (int k = 0; k < 128; ++k) // slides (round 167a): the key's Final.Pitch offset this block
             if (auto& sl = keySlide[(std::size_t) k]; sl.moving())
             {
-                sl.advance ((float) n);
+                sl.advanceFirst ((float) n); // (round 190jv: moved before it renders; FL's steps, core/HostSlide.h)
                 engine->keyPitch[(std::size_t) k] = (float) ((keyCents[(std::size_t) k] + (double) sl.cents) / 100.0);
             }
         for (int done = 0; done < n;)

@@ -1,8 +1,12 @@
+#include "ui/Motion.h"
 #include "ui/FlMods.h"
 #include "ui/EditorTools.h"
 
+#include <algorithm>
+
 #include "core/NoteEdit.h"
 #include "core/NoteTools.h"
+#include "core/NoteRepeat.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
@@ -14,16 +18,18 @@ namespace lynx
 const std::vector<EditToolInfo>& editTools()
 {
     static const std::vector<EditToolInfo> list {
-        { EditTool::pencil, Icon::draw, TR_NOOP ("Pencil"), TR_NOOP ("Click adds, drag moves, drag an edge resizes"), 'P' },
-        { EditTool::brush, Icon::brush, TR_NOOP ("Brush"), TR_NOOP ("Drag to paint a run of notes or clips"), 'B' },
-        { EditTool::drumPaint, Icon::drumBrush, TR_NOOP ("Drum brush"),
+        // FL's tool names (owner decision E1, details DE-58, round 190ld; were Pencil / Brush / Drum brush / Eraser / Knife /
+        // Lasso / Listen)
+        { EditTool::pencil, Icon::draw, TR_NOOP ("Draw"), TR_NOOP ("Click adds, drag moves, drag an edge resizes"), 'P' },
+        { EditTool::brush, Icon::brush, TR_NOOP ("Paint"), TR_NOOP ("Drag to paint a run of notes or clips"), 'B' },
+        { EditTool::drumPaint, Icon::drumBrush, TR_NOOP ("Paint drum sequencer"),
           TR_NOOP ("Drag to paint one short hit per grid cell, on whatever key is under the mouse"), 'N' },
-        { EditTool::eraser, Icon::erase, TR_NOOP ("Eraser"), TR_NOOP ("Click or drag to delete"), 'D' },
+        { EditTool::eraser, Icon::erase, TR_NOOP ("Delete"), TR_NOOP ("Click or drag to delete"), 'D' },
         { EditTool::mute, Icon::mute, TR_NOOP ("Mute"), TR_NOOP ("Click or drag to mute or unmute"), 'T' },
-        { EditTool::knife, Icon::knife, TR_NOOP ("Knife"), TR_NOOP ("Drag a line to cut; a click cuts at the cursor"), 'C' },
-        { EditTool::lasso, Icon::select, TR_NOOP ("Lasso"), TR_NOOP ("Click or drag to select (Shift adds)"), 'E' },
+        { EditTool::knife, Icon::knife, TR_NOOP ("Slice"), TR_NOOP ("Drag a line to cut; a click cuts at the cursor"), 'C' },
+        { EditTool::lasso, Icon::select, TR_NOOP ("Select"), TR_NOOP ("Click or drag to select (Shift adds)"), 'E' },
         { EditTool::zoom, Icon::zoom, TR_NOOP ("Zoom"), TR_NOOP ("Click zooms in, drag a range to zoom to it; right-click zooms out"), 'Z' },
-        { EditTool::listen, Icon::listen, TR_NOOP ("Listen"), TR_NOOP ("Click or drag to hear what is under the cursor"), 'Y' },
+        { EditTool::listen, Icon::listen, TR_NOOP ("Playback"), TR_NOOP ("Click or drag to hear what is under the cursor"), 'Y' },
         { EditTool::slip, Icon::slip, TR_NOOP ("Slip"), TR_NOOP ("Drag inside a clip to move its content under it"), 'S' },
     };
     return list;
@@ -122,10 +128,34 @@ ToolStrip::ToolStrip (bool includeSlip)
                     onChange (t);
             }
         };
+        if (info.tool == EditTool::zoom) // FL: right-clicking the Zoom icon gives quick-zoom options (round 190mp, DE-74)
+            button->onRightClick = [this, b = button.get()] {
+                if (onZoomMenu != nullptr)
+                    onZoomMenu (*b);
+            };
         addAndMakeVisible (*button);
         buttons.push_back (std::move (button));
         tools.push_back (info.tool);
     }
+}
+
+void ToolStrip::setFlPlaylistLook (bool on)
+{
+    if (on == flPlaylistLook)
+        return;
+    flPlaylistLook = on;
+    const auto at = [this] (EditTool t) { return (std::size_t) (std::find (tools.begin(), tools.end(), t) - tools.begin()); };
+    if (const auto knife = at (EditTool::knife), slip = at (EditTool::slip); knife < tools.size() && slip < tools.size())
+    {
+        std::swap (tools[knife], tools[slip]);
+        std::swap (buttons[knife], buttons[slip]);
+    }
+    if (const auto eraser = at (EditTool::eraser); eraser < tools.size())
+        buttons[eraser]->setIcon (on ? Icon::deleteTool : Icon::erase);
+    if (const auto slip = at (EditTool::slip); slip < tools.size())
+        buttons[slip]->setIcon (on ? Icon::slipArrows : Icon::slip);
+    resized();
+    repaint();
 }
 
 void ToolStrip::setTool (EditTool newTool)
@@ -196,12 +226,77 @@ void ToolStrip::paint (juce::Graphics& g)
 
 void ToolStrip::mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& wheel)
 {
-    if (wheel.deltaY == 0.0f || tools.empty())
-        return;
+    if (wheel.deltaY != 0.0f)
+        step (wheel.deltaY < 0.0f ? 1 : -1);
+}
 
+void ToolStrip::step (int direction)
+{
+    if (tools.empty() || direction == 0)
+        return;
     const auto at = (int) (std::find (tools.begin(), tools.end(), tool) - tools.begin());
-    const auto next = juce::jlimit (0, (int) tools.size() - 1, at + (wheel.deltaY < 0.0f ? 1 : -1));
-    setTool (tools[(std::size_t) next]);
+    const auto next = juce::jlimit (0, (int) tools.size() - 1, at + (direction > 0 ? 1 : -1));
+    if (tools[(std::size_t) next] != tool)
+        setTool (tools[(std::size_t) next]);
+}
+
+juce::PopupMenu quickZoomMenu (const std::string& prefix, const std::function<bool (const std::string&)>& run,
+                               const std::function<juce::String (const std::string&)>& keyText, bool performanceClips)
+{
+    juce::PopupMenu menu;
+    const auto add = [&] (const char* id, const juce::String& text, bool enabled = true) {
+        const auto full = prefix + id;
+        menu.addItem (text + (keyText != nullptr ? keyText (full) : juce::String()), enabled, false, [run, full] {
+            if (run != nullptr)
+                run (full);
+        });
+    };
+    add ("zoomIn", tr ("Zoom in"));
+    add ("zoomOut", tr ("Zoom out"));
+    menu.addSeparator();
+    add ("zoom1", tr ("Quick zoom 1"));
+    add ("zoom2", tr ("Quick zoom 2"));
+    add ("zoom3", tr ("Quick zoom 3"));
+    menu.addSeparator();
+    add ("zoomAll", tr ("Zoom out far"));
+    add ("zoomSelection", tr ("Zoom on selection"));
+    menu.addSeparator();
+    if (prefix == "playlist.")
+        add ("zoomPerformance", tr ("Zoom on performance clips"), performanceClips);
+    else
+        menu.addItem (tr ("Step sequencer mode zoom"), false, false, [] {}); // (FL's Shift+6 in the Piano roll; not in LYNX)
+    return menu;
+}
+
+juce::PopupMenu toolModeMenu (const ToolStrip& strip, const std::function<void (EditTool)>& choose, const juce::PopupMenu& mainMenu)
+{
+    juce::PopupMenu menu;
+    menu.addSectionHeader (tr ("Mode"));
+    for (const auto t : strip.toolList())
+    {
+        const auto& info = editToolInfo (t);
+        juce::PopupMenu::Item item (tr (info.name));
+        item.isTicked = t == strip.getTool();
+        // FL's column shows each tool's icon (capture 190mp A3.2); the one in use in the accent colour (a picture at twice
+        // the size, so it stays sharp)
+        constexpr int px = 32;
+        juce::Image picture (juce::Image::ARGB, px, px, true);
+        {
+            juce::Graphics g (picture);
+            icons::draw (g, info.icon, juce::Rectangle<float> (2.0f, 2.0f, px - 4.0f, px - 4.0f),
+                         item.isTicked ? theme::colour::accent : theme::colour::textSecondary);
+        }
+        item.setImage (std::make_unique<juce::DrawableImage> (picture));
+        item.action = [choose, t] {
+            if (choose != nullptr)
+                choose (t);
+        };
+        menu.addItem (std::move (item));
+    }
+    menu.addColumnBreak();
+    for (juce::PopupMenu::MenuItemIterator it (mainMenu); it.next();)
+        menu.addItem (it.getItem());
+    return menu;
 }
 
 // --- cursors ---------------------------------------------------------------------------
@@ -298,6 +393,7 @@ juce::String actionHint (gesture::Action action, bool playlist)
         case A::zoomRange: return tr ("[LMB] click zooms in, drag a range to zoom to it  [RMB] zooms out");
         case A::listen: return playlist ? tr ("[LMB] click or drag plays from here") : tr ("[LMB] click or drag plays the notes under the cursor");
         case A::fade: return tr ("Fade: [LMB] drag sets its length");
+        case A::fadeTension: return tr ("Fade tension: [LMB] drag up / down bends the curve  [Alt][LMB] resets  [RMB] menu");
         case A::clipGain: return tr ("Clip gain: [LMB] drag up / down (the selected clips together)  [RMB] menu");
         case A::movePoint: return tr ("Point: [LMB] drag moves, then [Shift] keeps time, [Ctrl] keeps value  [Alt] no snap  [RMB] menu");
         case A::addPoint: return tr ("Curve: [LMB] or [RMB] adds a point (hold and drag to place it)");
@@ -519,6 +615,16 @@ void EditorGlobals::setDefaultNoteLength (std::int64_t ticks)
 void EditorGlobals::setFollowing (bool pianoRoll, bool on, bool save)
 {
     auto& flag = pianoRoll ? followPianoRoll : followPlaylist;
+    // (round 190im, R15: a Follow click while it is paused resumes it, as Live's; it stays on)
+    if (const auto view = pianoRoll ? FollowView::pianoRoll : FollowView::playlist; isFollowPaused (view))
+    {
+        resumeFollow (view);
+        if (! on && flag)
+        {
+            sendChangeMessage();
+            return;
+        }
+    }
 
     if (flag != on)
     {
@@ -534,6 +640,15 @@ void EditorGlobals::setFollowingView (FollowView v, bool on, bool save)
     if (v == FollowView::playlist || v == FollowView::pianoRoll)
         return setFollowing (v == FollowView::pianoRoll, on, save);
     auto& flag = v == FollowView::channelRack ? followRack : followAudioEditor;
+    if (isFollowPaused (v))
+    {
+        resumeFollow (v);
+        if (! on && flag)
+        {
+            sendChangeMessage();
+            return;
+        }
+    }
     if (flag != on)
     {
         flag = on;
@@ -619,8 +734,29 @@ void OverviewBar::setRange (double newTotal, double newStart, double newLength)
         total = newTotal;
         start = newStart;
         length = newLength;
+        positionX = positionXFor (position); // (round 190im: the line moves with the scale)
         repaint();
     }
+}
+
+int OverviewBar::positionXFor (double units) const
+{
+    return units < 0.0 || total <= 0.0 ? -1 : (int) std::floor (units / total * (double) getWidth());
+}
+
+void OverviewBar::setPosition (double units)
+{
+    position = units;
+    const auto x = positionXFor (units);
+    if (x == positionX)
+        return;
+    // the line and the trail left of it (a few pixels), old and new
+    const auto strip = [this] (int at) { return juce::Rectangle<int> (at - 6, 0, 8, getHeight()); };
+    if (positionX >= 0)
+        repaint (strip (positionX));
+    if (x >= 0)
+        repaint (strip (x));
+    positionX = x;
 }
 
 juce::Rectangle<float> OverviewBar::windowArea() const
@@ -681,6 +817,21 @@ void OverviewBar::paint (juce::Graphics& g)
 
     g.setColour (border);
     g.fillRect (area.withTop (area.getBottom() - 1.0f));
+
+    // round 190im (R5, DC-6): the song position while playing — FL draws a 1 px line with a short glow behind it
+    // (shots/fl-overview-stopped-vs-playing.png: ≈4 px fading in); LYNX's playhead colour (decision PL1), the glow only
+    // with Animations on
+    if (const auto px = positionXFor (position); px >= 0)
+    {
+        const auto x = (float) px;
+        if (ui::motion::enabled())
+        {
+            g.setGradientFill (juce::ColourGradient (playhead.withAlpha (0.0f), x - 4.0f, 0.0f, playhead.withAlpha (0.45f), x, 0.0f, false));
+            g.fillRect (juce::Rectangle<float> (x - 4.0f, 0.0f, 4.0f, area.getHeight() - 1.0f));
+        }
+        g.setColour (playhead);
+        g.fillRect (juce::Rectangle<float> (x, 0.0f, 1.0f, area.getHeight() - 1.0f));
+    }
 }
 
 void OverviewBar::mouseMove (const juce::MouseEvent& e)
@@ -775,6 +926,15 @@ public:
         addRow (finePitch, TR_NOOP ("Fine pitch"), -120.0, 120.0, " ct");
         addRow (modX, TR_NOOP ("Mod X"), 0.0, 100.0, "%");
         addRow (modY, TR_NOOP ("Mod Y"), 0.0, 100.0, "%");
+        // FL's Note properties' REPEAT (issue #208, core/NoteRepeat.h): the note struck again at one of FL's rates
+        addRow (repeat, TR_NOOP ("Repeat"), 0.0, (double) noterepeat::rateCount, "");
+        repeat.slider.textFromValueFunction = [] (double v) {
+            auto text = tr (juce::String (noterepeat::rateName (juce::roundToInt (v))));
+            for (const char* word : { TR_NOOP ("dotted"), TR_NOOP ("triplet"), TR_NOOP ("Beat"), TR_NOOP ("Half step"), TR_NOOP ("Quarter step") })
+                text = text.replace (word, tr (word));
+            return text.replace ("(Step)", "(" + tr ("Step") + ")");
+        };
+        repeat.slider.setTextBoxStyle (juce::Slider::TextBoxRight, true, 110, 20);
         // FL's Note properties also have the colour group (its "Color group / MIDI channel" button, 1..16; round 168g)
         addRow (colour, TR_NOOP ("Colour group"), 1.0, (double) noteColourCount, "");
         // Live 12's note Chance and Velocity Range (round 187c, LYNX additions)
@@ -825,7 +985,7 @@ public:
         addAndMakeVisible (resetButton);
 
         load();
-        setSize (320, 34 + 9 * rowHeight + rowHeight + (single ? 2 * rowHeight : 0) + 44);
+        setSize (320, 34 + 10 * rowHeight + rowHeight + (single ? 2 * rowHeight : 0) + 44);
     }
 
     void paint (juce::Graphics& g) override
@@ -838,7 +998,7 @@ public:
         auto area = getLocalBounds().reduced (12, 8);
         title.setBounds (area.removeFromTop (26));
 
-        for (auto* row : { &velocity, &pan, &release, &finePitch, &modX, &modY, &colour, &chance, &velocityRange })
+        for (auto* row : { &velocity, &pan, &release, &finePitch, &modX, &modY, &repeat, &colour, &chance, &velocityRange })
         {
             auto r = area.removeFromTop (rowHeight);
             row->label.setBounds (r.removeFromLeft (80));
@@ -879,6 +1039,7 @@ public:
         set (modY, std::round (defaults.modY * 100.0f));
         set (chance, 100.0);
         set (velocityRange, 0.0);
+        set (repeat, 0.0);
     }
 
 private:
@@ -924,6 +1085,7 @@ private:
         set (finePitch, std::round (shown.finePitch));
         set (modX, std::round (shown.modX * 100.0f));
         set (modY, std::round (shown.modY * 100.0f));
+        set (repeat, (double) shown.repeat);
         set (colour, (double) (shown.colour + 1));
         set (chance, std::round (shown.chance * 100.0f));
         set (velocityRange, std::round (shown.velocityRange * 100.0f));
@@ -983,6 +1145,7 @@ private:
                 if (finePitch.touched) n.finePitch = (float) finePitch.slider.getValue();
                 if (modX.touched) n.modX = (float) modX.slider.getValue() / 100.0f;
                 if (modY.touched) n.modY = (float) modY.slider.getValue() / 100.0f;
+                if (repeat.touched) n.repeat = juce::jlimit (0, noterepeat::rateCount, (int) repeat.slider.getValue());
                 if (colour.touched) n.colour = juce::jlimit (0, noteColourCount - 1, (int) colour.slider.getValue() - 1);
                 if (chance.touched) n.chance = (float) chance.slider.getValue() / 100.0f;
                 if (velocityRange.touched) n.velocityRange = (float) velocityRange.slider.getValue() / 100.0f;
@@ -1012,7 +1175,7 @@ private:
     Note shown;
     bool single = false, slideTouched = false, portaTouched = false;
     juce::Label title;
-    SliderRow velocity, pan, release, finePitch, modX, modY, colour, chance, velocityRange;
+    SliderRow velocity, pan, release, finePitch, modX, modY, repeat, colour, chance, velocityRange;
     juce::ToggleButton slide, porta;
     TextRow time, length;
     juce::TextButton applyButton, revertButton, resetButton;

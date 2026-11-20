@@ -1,6 +1,7 @@
 #include "core/FruityDance.h"
 #include "core/FruitySlicer.h"
 #include "core/Instruments.h"
+#include "core/HostSlide.h"
 #include "core/HostTimelineScope.h"
 #include "core/SynthParams.h"
 #include "core/FpcInstrument.h"
@@ -29,6 +30,9 @@
 #include "core/Harmor.h"
 #include "core/MiniSynth.h"
 #include "core/PocketSuperSaw.h"
+#include "core/FmSynth.h"
+#include "core/WavetableSynth.h"
+#include "core/Braid.h"
 #include "core/SimSynth.h"
 #include "core/Wasp.h"
 #include "core/Plucked.h"
@@ -329,6 +333,9 @@ private:
             case InstrumentKind::slicex:
             case InstrumentKind::fpc:
             case InstrumentKind::pocketSuperSaw:
+            case InstrumentKind::tetra:
+            case InstrumentKind::helix:
+            case InstrumentKind::braid:
             case InstrumentKind::drumaxx:
             case InstrumentKind::slayer:
             case InstrumentKind::fruitydance:
@@ -2003,6 +2010,7 @@ struct SamplerVoice
     bool active = false;
     double position = 0.0; // read position in region order (reversed voices read the region backwards)
     double rate = 1.0;     // frames per output sample (> 0)
+    double rateBpm = 0.0;  // round 190hq: the tempo `rate` was set for (a tempo-synced Resample voice follows the tempo)
     bool reversed = false;
     int loops = 0;         // times the zone loop has wrapped (FL lets taps before the loop start wrap only then)
     flrs::Kernel kernel;
@@ -2048,6 +2056,10 @@ struct SamplerVoice
     float panL = 1.0f, panR = 1.0f;
     double glideRatio = 1.0;
     int glideLeft = 0;
+    // FL's stepped slide note (round 190jv, core/HostSlide.h Steps): the speed (or a shifted voice's transposition) times
+    // stepRatio at the start of the render call where stepDue reaches 0; the rack starts those calls on the ticks
+    double stepRatio = 1.0, stepDue = 0.0, stepEvery = 0.0;
+    int stepsLeft = 0;
     float lowL = 0.0f, bandL = 0.0f, lowR = 0.0f, bandR = 0.0f; // channel filter
     std::array<ModState, 2> mod {}; // cutoff and pitch envelopes
     std::array<LfoState, lfoTargets> lfo {};
@@ -2214,10 +2226,12 @@ public:
         cutSelf.store (s.cut);
         useLoops.store (s.useLoopPoints);
         flVelocityLaw.store (s.flVelocityLaw);
+        clipNoteLegacy.store (s.clipNoteLegacy);
         declickMode.store (std::clamp (s.declickMode, 0, 5));
         // with "keep pitch" the sample arrives already stretched (RackState): play at normal speed; the keys then
         // transpose it through each voice's pitch shifter (round 162), so its length stays
         stretchBeats.store (s.keepPitch ? 0.0f : std::max (0.0f, s.stretchBeats));
+        warpedTempo.store (s.stretchBeats > 0.0f); // (issue #187: a warped sample follows the playing tempo)
         // keep length (round 163): with "keep pitch" a transposition never changes the length — the keys of a sampler, the
         // pitch knob and the fine tune of a sampler or an audio clip go through each voice's pitch shifter, stretched to
         // the tempo or not
@@ -2294,12 +2308,20 @@ public:
         const auto clipFades = std::exchange (nextClip, {});
         const auto clipShape = std::exchange (nextClipShape, (std::uint16_t) 0);
         const auto clipEnvelope = std::exchange (nextClipEnvelope, -1);
-        const auto clipPitch = clipMode ? (double) std::clamp (std::exchange (nextClipPitch, 0.0f), -12.0f, 12.0f) : 0.0;
+        const auto clipPitch = clipMode ? (double) std::clamp (std::exchange (nextClipPitch, 0.0f), -48.0f, 48.0f) : 0.0; // (round 190hr: Live's ±48 st Transpose; round gaps190kf: the shifter reaches it)
         // FL 2026's clip stretch (round 167l, FL render of a 2 s 440 Hz ramp: ×2 lasts 4 s at 220 Hz in Resample, at
         // 440 Hz in the stretch modes; ×0.5 lasts 1 s): the clip reads its file `stretch` times slower
         const auto clipStretch = clipMode ? (double) std::clamp (std::exchange (nextClipStretch, 1.0f), 0.01f, 100.0f) : 1.0;
-        const auto* zone = clipMode ? nullptr : zoneFor (key, velocity);
+        const auto* zone = clipMode && key >= audioClipKeyBase ? nullptr : zoneFor (key, velocity);
         const auto* data = zone != nullptr ? zone->sample.get() : sample.get();
+        // Round 190lq (issue #204): a NOTE of an audio clip channel (a step, a Piano roll note, a key played on it; keys below
+        // audioClipKeyBase) plays as a Sampler note of the channel: FL 2026's /R renders of the same notes on an audio clip
+        // channel and on a Sampler of the same file are bit-identical (round 190lq: the whole sample whatever the note's
+        // length, overlapping notes layer, the key transposes it from the root note — A5 740 Hz for 0.6 s, C4 220 Hz for
+        // 2 s — and FL's velocity and channel laws: velocity 50 / 100 / 128 = 0.023 / 0.097 / 0.200 for a 0.25 sine).
+        // Playlist / session clips (their own keys) and the notes of older LYNX projects (SamplerSettings::
+        // clipNoteLegacy: the clip's own pitch, cut at the note's end) keep the clip voice.
+        const auto asClip = clipMode && (key >= audioClipKeyBase || clipNoteLegacy.load (std::memory_order_relaxed));
 
         if (envelopeMailbox.read (modulation))
             updateModulation();
@@ -2309,7 +2331,7 @@ public:
 
         sliceMailbox.read (slices);
         // audio clips too (the clip menu's Reverse); a reversed clip (FL 2026's clip reverse, key 9) flips it again
-        const auto backwards = reverse.load() != (clipMode && (clipShape & 4) != 0);
+        const auto backwards = reverse.load() != (asClip && (clipShape & 4) != 0);
         const auto total = (double) (data->frames() - 1);
         // sample region (the start acts as "start offset"); audio clips use the whole file. `last` is the region's
         // last frame: FL plays until the read position passes it, interpolating with that frame repeated.
@@ -2322,17 +2344,17 @@ public:
             if (knobEnd >= 1.0 - 1.0e-6)
                 knobEnd = 1.0;
         }
-        auto first = clipMode ? 0.0 : std::floor (total * knobStart);
-        auto last = clipMode ? total : std::max (first + 1.0, std::floor (total * knobEnd));
+        auto first = asClip ? 0.0 : std::floor (total * knobStart);
+        auto last = asClip ? total : std::max (first + 1.0, std::floor (total * knobEnd));
         // (the locator counts over the whole region, from before the start offset and across slices; round 190w)
         const auto regionFirst = first, regionLast = last;
-        if (const auto offset = (double) startOffset.load (std::memory_order_relaxed); ! clipMode && offset > 0.0)
+        if (const auto offset = (double) startOffset.load (std::memory_order_relaxed); ! asClip && offset > 0.0)
             first += offset * (last - first + 1.0); // FL: a fraction of the region's frames (not floored, FL render §4)
         auto sliced = false;
 
         // sliced sample: each key from C5 up plays one slice, at the original pitch; Fruity Slicer: the slice FL's key
         // table gives the key (issue #160)
-        if (! clipMode && slices.count > 0)
+        if (! asClip && slices.count > 0)
         {
             const auto index = ! slices.keyed                                 ? key - slices.firstKey
                                : key >= 0 && key < (int) slices.keys.size() ? (int) slices.keys[(std::size_t) key]
@@ -2355,16 +2377,16 @@ public:
         auto startFrame = first + std::max (0.0, startSeconds * sampleRate * base);
         // a resampled (pitched) clip reads its file faster or slower: a start inside it moves with that speed (the
         // Playlist shows the file at that speed too, clipops::framesPerTick)
-        if (clipMode && ! keyShift.load (std::memory_order_relaxed))
+        if (asClip && ! keyShift.load (std::memory_order_relaxed))
             if (const auto cents = (double) pitch.load() * 100.0 + nextCents; cents != 0.0)
                 startFrame = first + std::max (0.0, startSeconds * sampleRate * flrs::speedFor ((float) cents, base));
-        if (clipMode) // FL starts an audio clip on a whole source frame (round 110 §1: ceil or round fit, floor is 1 late)
+        if (asClip) // FL starts an audio clip on a whole source frame (round 110 §1: ceil or round fit, floor is 1 late)
             startFrame = std::round (startFrame);
 
         if (startFrame >= last + 1.0)
             return;
 
-        if (! clipMode && cutSelf.load())
+        if (! asClip && cutSelf.load())
             for (auto& v : voices)
                 if (v.active)
                     startCut (v, true); // "cut itself": the previous note fades out quickly
@@ -2394,9 +2416,9 @@ public:
         const auto tune = zone != nullptr ? (double) zone->zone.tune : 0.0;
         // an audio clip has no key: its channel's pitch and fine tune transpose it (round 163 — the Clip properties' and
         // Channel settings' pitch did nothing to clips); Resample changes its speed, "keep pitch" its pitch only
-        const auto semitones = clipMode ? (double) pitch.load() + nextCents / 100.0
-                                        : (sliced ? 0 : key - root) + tune + (double) pitch.load() + nextCents / 100.0;
-        const auto attackSeconds = clipMode ? 0.0f : attack.load();
+        const auto semitones = asClip ? (double) pitch.load() + nextCents / 100.0
+                                      : (sliced ? 0 : key - root) + tune + (double) pitch.load() + nextCents / 100.0;
+        const auto attackSeconds = asClip ? 0.0f : attack.load();
 
         *target = {};
         target->active = true;
@@ -2404,7 +2426,7 @@ public:
         target->noteId = startingNoteId();
         // FL plays a Playlist audio clip at unity gain at the channel's default volume (78%): the channel volume
         // curve is relative to that point for clips (REA_rodada89 §4.2 [EXEC]: +5.2 dB at every volume and pan)
-        target->velocity = clipMode                                         ? velocity * audioClipUnity()
+        target->velocity = asClip                                           ? velocity * audioClipUnity()
                            : flVelocityLaw.load (std::memory_order_relaxed) ? flInitVolume (velocity)
                                                                             : velocity;
         target->data = data;
@@ -2430,10 +2452,11 @@ public:
         target->fadeIn = clipFades[2];
         target->fadeOut = clipFades[3];
         target->fadeShape = (std::uint8_t) (clipShape & (3 | 8 | 16)); // (bits 3 / 4: a comp crossfade, round 177c)
-        startClipEdges (*target, clipShape, clipFades);
+        if (asClip) // (a note of the channel starts as a Sampler note: no clip edges, round 190lq)
+            startClipEdges (*target, clipShape, clipFades);
         target->fadeInTension = std::exchange (nextClipTension[0], 0.0f);
         target->fadeOutTension = std::exchange (nextClipTension[1], 0.0f);
-        target->envIndex = clipMode ? clipEnvelope : -1;
+        target->envIndex = asClip ? clipEnvelope : -1;
         target->envTick = nextClipEnvTick;
         target->envLeft = 0;
         target->envStarted = false;
@@ -2441,7 +2464,7 @@ public:
         // FL's read speed: the rate ratio at the original pitch, else exp(cents·ln2/1200)·ratio
         target->rate = flrs::speedFor ((float) (semitones * 100.0), base);
         target->reversed = backwards;
-        if (clipMode && data != nullptr && data->frames() > 0) // the DC a clip holds after its sample (a clip resumed past it)
+        if (asClip && data != nullptr && data->frames() > 0) // the DC a clip holds after its sample (a clip resumed past it)
         {
             const auto end = (std::int64_t) std::min ((double) (data->frames() - 1), last);
             const auto q = (std::size_t) std::clamp<std::int64_t> (backwards ? (std::int64_t) first : end, 0, (std::int64_t) data->frames() - 1);
@@ -2459,7 +2482,7 @@ public:
 
         // portamento (channel porta, inverted by the note): starts from the previous note's pitch
         // (FL's glide: porta ticks + 1 ticks at 96 PPQ, none under 1 tick; round 168l, core/ChannelPoly.h)
-        if (! clipMode && (porta.load() != nextPorta) && lastRate != 0.0 && channelpoly::portaTicks (portaBeats.load()) >= 1)
+        if (! asClip && (porta.load() != nextPorta) && lastRate != 0.0 && channelpoly::portaTicks (portaBeats.load()) >= 1)
         {
             const auto steps = (int) (channelpoly::glideBeats (portaBeats.load()) * 60.0 / bpm.load() * sampleRate);
             const auto from = std::abs (lastRate);
@@ -2472,7 +2495,7 @@ public:
             }
         }
 
-        if (! clipMode)
+        if (! asClip)
             lastRate = target->glideLeft > 0 ? target->rate * std::pow (target->glideRatio, target->glideLeft) : target->rate;
         target->env = attackSeconds > 0.0f ? 0.0f : 1.0f;
         target->envStep = attackSeconds > 0.0f ? (float) (1.0 / (attackSeconds * sampleRate)) : 0.0f;
@@ -2503,7 +2526,7 @@ public:
 
         // FL's volume articulator: starts at its initial level and is stepped on the voice's first block (FLEngine
         // FUN_00d24ae0 steps a new voice at once, then once per sequencer tick)
-        target->flEnvelope = ! clipMode && modulation.flVolume && modulation.ticksPerSecond > 0.0;
+        target->flEnvelope = ! asClip && modulation.flVolume && modulation.ticksPerSecond > 0.0;
         if (target->flEnvelope)
         {
             target->env = 1.0f;
@@ -2516,7 +2539,7 @@ public:
         }
         // FL's native sampler voice (REA_rodada76): the articulators start, the first render block steps them at once,
         // the following steps fall on the song's tick grid (the tick this note starts on, then round(k · spt))
-        target->flVoice = ! clipMode && modulation.flNative && modulation.ticksPerSecond > 0.0;
+        target->flVoice = ! asClip && modulation.flNative && modulation.ticksPerSecond > 0.0;
         if (target->flVoice)
         {
             target->flEnvelope = false;
@@ -2542,28 +2565,36 @@ public:
                 target->loopWhileHeld = false;
             }
         }
-        if (! clipMode && ! target->flVoice) // issue #63 (FL's voice above takes them as its noteCut / noteRes)
+        if (! asClip && ! target->flVoice) // issue #63 (FL's voice above takes them as its noteCut / noteRes)
         {
             target->noteCut = nextModX * 2.0f - 1.0f;
             target->noteRes = nextModY * 2.0f - 1.0f;
         }
-        voicePan (clipMode ? 0.0f : nextPan, target->panL, target->panR);
-        target->basePan = clipMode ? 0.0f : nextPan;
-        target->cents = clipMode ? 0.0f : nextCents;
-        target->liveRef = clipMode ? std::numeric_limits<float>::quiet_NaN() : pitch.load() * 100.0f + liveRest;
+        voicePan (asClip ? 0.0f : nextPan, target->panL, target->panR);
+        target->basePan = asClip ? 0.0f : nextPan;
+        target->cents = asClip ? 0.0f : nextCents;
+        target->liveRef = asClip ? std::numeric_limits<float>::quiet_NaN() : pitch.load() * 100.0f + liveRest;
         if (shaper != nullptr)
             shaper->voiceStarted ((int) (target - voices.data()));
 
         for (std::size_t i = 0; i < lfoTargets; ++i)
-            if (lfos[i].active && ! clipMode)
+            if (lfos[i].active && ! asClip)
                 lfos[i].start (target->lfo[i], songTicks);
         // FL 2026's clip pitch (round 167k, FL render: +3 → 522.5 Hz from 440 Hz, the 2 s clip still 2 s on a channel
         // that resamples): a shift on top of the channel's own pitch, whatever the channel's mode, the length stays
         // (a stretched clip on a channel that keeps the pitch: read slower, shifted back up by the stretch)
-        if (clipMode && ! keyShift.load (std::memory_order_relaxed))
+        // (round gaps190kf: only a clip whose own Transpose is beyond ±24 st — Live's range, never FL's ±12 — widens the
+        // shifter's range; a channel pitch plus a clip pitch that add up beyond ±24 keeps the old clamp)
+        wideClipShift = std::abs (clipPitch) > 24.0;
+        if (asClip && ! keyShift.load (std::memory_order_relaxed))
             startKeyShift (*target, clipPitch, base, true);
         else
             startKeyShift (*target, semitones + clipPitch + (clipStretch != 1.0 ? 12.0 * std::log2 (clipStretch) : 0.0), base);
+        wideClipShift = false;
+        // issue #187: a warped voice that plays without a shifter reads at the playing tempo (its pitch follows, as a
+        // resampled stretch does); a shifted one keeps its rate and its shifter takes the tempo
+        if (tempoC != 1.0 && ! shifts[(std::size_t) (target - voices.data())].on)
+            target->rate *= tempoC;
         nextPan = nextCents = 0.0f;
         nextModX = nextModY = 0.5f;
         nextPorta = false;
@@ -2579,10 +2610,14 @@ public:
         bool primed = false;                        // primed in render (a few per block: it costs ~1 ms each)
         SamplerVoice ahead;                         // reads the source primeLength() frames ahead of the voice
         double factor = 1.0, glideRatio = 1.0;      // the note's transposition and its portamento / slide
+        // the factor's range: ±2 octaves, or (round gaps190kf) ±4 for a clip transposed beyond ±24 st, Live's ±48 Transpose
+        double lowest = VoicePitchShifter::minFactor, highest = VoicePitchShifter::maxFactor;
+        float gain = 1.0f; // round gaps190kf: the level law of a clip transposed above +24 st (1 = none)
         int glideLeft = 0;
         std::array<float, keyShiftBlock * 4 + 2> inL {}, inR {}; // the source read `factor` times faster
         std::array<float, keyShiftBlock> outL {}, outR {};
         double owed = 0.0; // input frames owed to the shifter (n / factor per block, the fraction carried)
+        double tempoAt = 1.0; // issue #187: the tempo ratio the shifter's alignment is set for (its priming assumes 1)
         int pos = 0, count = 0;
     };
     // Stretch keeping pitch (round 162, issue #9): a transposed note reads the stretched sample at its own speed, so it
@@ -2595,7 +2630,10 @@ public:
         auto& ks = shifts[index];
         ks.on = false;
         ks.shifter = nullptr;
-        if ((! keyShift.load (std::memory_order_relaxed) && ! (keepRate && clipShift)) || std::abs (semitones) < 1.0e-6)
+        // (issue #187: while the tempo can move, a warped voice that keeps its pitch takes a shifter even untransposed, so a
+        // tempo change never changes its pitch)
+        const auto followsTempo = tempoMoves && keyShift.load (std::memory_order_relaxed) && warpedTempo.load (std::memory_order_relaxed);
+        if ((! keyShift.load (std::memory_order_relaxed) && ! (keepRate && clipShift)) || (std::abs (semitones) < 1.0e-6 && ! followsTempo))
         {
             if (keyShift.load (std::memory_order_relaxed))
                 lastFactor = 1.0;
@@ -2623,6 +2661,11 @@ public:
 
         ks.on = true;
         ks.factor = std::exp2 (semitones / 12.0);
+        // (round gaps190kf: an audio clip's own Transpose beyond ±24 st takes the shifter's ±48 range; its prime buffer is
+        // sized for it, prepareKeyShift)
+        const auto wide = clipMode && wideClipShift && primeL.size() >= (std::size_t) ks.shifter->maxClipPrimeLength();
+        ks.lowest = wide ? VoicePitchShifter::minClipFactor : VoicePitchShifter::minFactor;
+        ks.highest = wide ? VoicePitchShifter::maxClipFactor : VoicePitchShifter::maxFactor;
         ks.glideLeft = 0;
         // portamento: the transposition glides from the previous note's (its length stays)
         if (v.glideLeft > 0 && lastFactor > 0.0)
@@ -2640,16 +2683,29 @@ public:
         }
 
         ks.ahead = v;
+        // (round gaps190kf: above +24 st the source is read 8–16 times as fast; the voice's 24-point sinc then spans one
+        // or two lobes of its lowered cutoff and dulls the sound — W3 vs Live: −4 dB at +36, −9 dB at +48. Such a clip
+        // reads through FL's 512-point sinc instead: few input frames a block, so it costs little)
+        // The stretch back by 8–16 times still loses level against Live: W3 (tone, voice, chords; Complex and Tones) +36 st
+        // −2.4 dB, +48 st −4.1 dB beyond the ±24 path's own difference: 0.3 dB + 2.1 dB per octave above +24, made up here
+        // (fitted on those renders: mean |level| vs Live 0.75 dB as ±24 played them, 0.92 with 2.1 dB / octave alone).
+        ks.gain = 1.0f;
+        if (wide && std::exp2 (semitones / 12.0) > VoicePitchShifter::maxFactor)
+        {
+            ks.ahead.kernel.setQuality (9);
+            ks.gain = (float) std::pow (10.0, (0.3 + 2.1 * std::log2 (std::exp2 (semitones / 12.0) / VoicePitchShifter::maxFactor)) / 20.0);
+        }
         ks.ahead.pitchMul = 1.0;
         ks.primed = false;
         ks.pos = ks.count = 0;
         ks.owed = 0.0;
+        ks.tempoAt = 1.0;
     }
 
     // the transposition the shifter applies now: the note's (gliding), the pitch envelope / LFO and the pitch wheel
     double shiftFactor (const SamplerVoice& v, const KeyShift& ks) const noexcept
     {
-        return std::clamp (ks.factor * v.pitchMul * bendMul, VoicePitchShifter::minFactor, VoicePitchShifter::maxFactor);
+        return std::clamp (ks.factor * v.pitchMul * bendMul, ks.lowest, ks.highest);
     }
 
     // Primes a new shifted voice's shifter with the start of its source (so its output has no latency). A render
@@ -2702,21 +2758,63 @@ public:
                 ks.glideLeft -= k;
             }
             const auto factor = shiftFactor (v, ks);
-            ks.owed += keyShiftBlock / factor;
-            const auto frames = std::min ((int) ks.inL.size(), (int) ks.owed);
+            ks.owed += keyShiftBlock * tempoC / factor; // (issue #187: the source read tempoC times faster, the pitch kept)
+            if (tempoC != ks.tempoAt)
+            {
+                // issue #187: the shifter's output lags its input by its output latency, in output frames; at another
+                // input rate that lag covers another stretch of the source, so the input moves by the difference and the
+                // content stays on the beat (measured: without it a 120 → 90 ramp drifted 12 ms early over 8 beats)
+                ks.owed += (double) ks.shifter->outputLatency() * (tempoC - ks.tempoAt) / factor;
+                ks.tempoAt = tempoC;
+            }
+            // round gaps190kf: a clip transposed below −24 st owes more input than one buffer holds (−48 st: 16 frames an
+            // output frame); the block then goes through the shifter in 2, 4, 8 or 16 equal parts, each with its share of
+            // the input (the same ratio). Within ±24 st it is one part, as before.
+            const auto owedNow = std::max (0, (int) ks.owed);
+            const auto room = (int) ks.inL.size();
+            int parts = 1;
+            while (parts < 16 && owedNow > parts * room)
+                parts *= 2;
+            const auto frames = std::clamp (owedNow, 0, parts * room);
             ks.owed -= frames;
-            for (int i = 0; i < frames; ++i)
-                readAhead (v, ks, factor, ks.inL[(std::size_t) i], ks.inR[(std::size_t) i]);
-            ks.shifter->process (ks.inL.data(), ks.inR.data(), frames, ks.outL.data(), ks.outR.data(), keyShiftBlock);
+            const auto outPart = keyShiftBlock / parts;
+            for (int part = 0, done = 0; part < parts; ++part)
+            {
+                const auto upTo = (int) ((std::int64_t) frames * (part + 1) / parts), n = upTo - done;
+                done = upTo;
+                for (int i = 0; i < n; ++i)
+                    readAhead (v, ks, factor, ks.inL[(std::size_t) i], ks.inR[(std::size_t) i]);
+                ks.shifter->process (ks.inL.data(), ks.inR.data(), n, ks.outL.data() + part * outPart, ks.outR.data() + part * outPart, outPart);
+            }
             ks.pos = 0;
             ks.count = keyShiftBlock;
         }
         outL = ks.outL[(std::size_t) ks.pos];
         outR = ks.outR[(std::size_t) ks.pos];
+        if (ks.gain != 1.0f) // (round gaps190kf: a clip transposed above +24 st, see startKeyShift)
+        {
+            outL *= ks.gain;
+            outR *= ks.gain;
+        }
         ++ks.pos;
     }
 
     void setClipShift (bool on) override { clipShift = on; }
+
+    void setTempoRatio (double ratio, bool moves) noexcept override
+    {
+        tempoHooked = true; // (rollup 0.1.30: round 190hq's per-voice rate step below stands down, see render)
+        tempoMoves = moves;
+        const auto c = warpedTempo.load (std::memory_order_relaxed) && std::isfinite (ratio) && ratio > 0.0 ? std::clamp (ratio, 0.05, 20.0) : 1.0;
+        if (c == tempoC)
+            return;
+        // the voices already sounding: an unshifted one changes its speed by the step (its shifted ones take tempoC at
+        // their next shifter block); the step is a block's, never a jump in the read position
+        for (auto& v : voices)
+            if (v.active && ! shifts[(std::size_t) (&v - voices.data())].on)
+                v.rate *= c / tempoC;
+        tempoC = c;
+    }
 
     void setNextClipPitch (float semitones) noexcept override { nextClipPitch = std::isfinite (semitones) ? semitones : 0.0f; }
     void setNextClipStretch (float stretch) noexcept override { nextClipStretch = std::isfinite (stretch) && stretch > 0.0f ? stretch : 1.0f; }
@@ -2750,7 +2848,9 @@ public:
         }
         heldShifters.store (now, std::memory_order_relaxed);
         shifterUser.fill (-1);
-        const auto prime = (std::size_t) (shifterPool[0] != nullptr ? shifterPool[0]->maxPrimeLength() : shifterStock->maxPrimeLength (shifterKind));
+        // (round gaps190kf: an audio clip's channel primes for its Transpose's −48 st as well)
+        const auto prime = (std::size_t) (clipMode ? (shifterPool[0] != nullptr ? shifterPool[0]->maxClipPrimeLength() : shifterStock->maxClipPrimeLength (shifterKind))
+                                                   : (shifterPool[0] != nullptr ? shifterPool[0]->maxPrimeLength() : shifterStock->maxPrimeLength (shifterKind)));
         primeL.assign (prime, 0.0f);
         primeR.assign (prime, 0.0f);
     }
@@ -2906,6 +3006,42 @@ public:
         return true;
     }
 
+    // FL's stepped slide (round 190jv): n + 1 equal steps of the whole move `ratio`, the first at once
+    void startSteps (SamplerVoice& v, double ratio, const HostSlide::Steps& stepped, float samples) noexcept
+    {
+        v.stepsLeft = stepped.ticks + 1;
+        v.stepRatio = std::pow (ratio, 1.0 / (double) v.stepsLeft);
+        v.stepEvery = (double) std::max (1.0f, samples) * (double) stepped.fraction;
+        v.stepDue = 0.0;
+        anyStepping = true;
+    }
+    // at the start of a render call: the steps that are due (a shifted voice steps its transposition)
+    void applySteps (int n) noexcept
+    {
+        for (auto& v : voices)
+            if (v.stepsLeft > 0)
+            {
+                if (! v.active || v.stolen)
+                {
+                    v.stepsLeft = 0;
+                    continue;
+                }
+                const auto tolerance = 1.0e-3 * v.stepEvery + 1.0e-6;
+                auto& ks = shifts[(std::size_t) (&v - voices.data())];
+                while (v.stepsLeft > 0 && v.stepDue <= tolerance)
+                {
+                    if (ks.on)
+                        ks.factor *= v.stepRatio;
+                    else
+                        v.rate *= v.stepRatio;
+                    --v.stepsLeft;
+                    v.stepDue += v.stepEvery;
+                }
+                v.stepDue -= (double) n;
+            }
+    }
+    bool anyStepping = false;
+
     bool followsSlides() const noexcept override { return true; } // (round 168l: a Mono channel's notes)
     void slideTo (int key, float cents, float samples) noexcept override
     {
@@ -2914,6 +3050,7 @@ public:
 
         const auto semitones = (key - 60) + (double) pitch.load() + cents / 100.0;
         const auto steps = std::max (1, (int) samples);
+        const auto stepped = HostSlide::pendingSteps(); // (round 190jv: FL's steps on its ticks)
 
         for (auto& v : voices)
             if (v.active && ! v.stolen && v.rate != 0.0 && v.data != nullptr)
@@ -2921,12 +3058,26 @@ public:
                 // a shifted voice (stretch keeping pitch) glides its transposition, not its speed (round 162)
                 if (auto& ks = shifts[(std::size_t) (&v - voices.data())]; ks.on)
                 {
+                    if (stepped.ticks > 0)
+                    {
+                        ks.glideLeft = 0;
+                        startSteps (v, std::exp2 (semitones / 12.0) / ks.factor, stepped, samples);
+                        continue;
+                    }
+                    v.stepsLeft = 0;
                     ks.glideRatio = std::pow (std::exp2 (semitones / 12.0) / ks.factor, 1.0 / steps);
                     ks.glideLeft = steps;
                     continue;
                 }
                 // (with stretch in Resample mode the speed is relative to the stretched one)
                 const auto target = flrs::speedFor ((float) (semitones * 100.0), baseRate (*v.data));
+                if (stepped.ticks > 0)
+                {
+                    v.glideLeft = 0;
+                    startSteps (v, target / v.rate, stepped, samples);
+                    continue;
+                }
+                v.stepsLeft = 0;
                 v.glideRatio = std::pow (target / v.rate, 1.0 / steps);
                 v.glideLeft = steps;
             }
@@ -2937,11 +3088,27 @@ public:
         if (clipMode)
         {
             // the clip ended: its voice fades out quickly. A clip carries its own key (audioClipKey), so the next clip
-            // of the same channel that already started (a crossfade) keeps playing; other callers stop everything.
+            // of the same channel that already started (a crossfade) keeps playing.
             // FL's per-clip edge declicker (round 189i, FUN_00d253d0 / FUN_00d24400): the channel's declicking release,
             // or a sharp cut where the clip's end has no declick (Disabled, manual, a seamless join, a fade out)
+            // Round 190jd (live check 190iw Q6): the end of a NOTE of the channel (a step, a Piano roll note, a key played
+            // on it; keys below audioClipKeyBase) leaves the clip playing to its end, as FL does — FL's renders of one
+            // step on a 1 / 2 / 5 s clip channel play 1.010 / 2.010 / 5.010 s, the same as a Sampler without its volume
+            // envelope; LYNX stopped every voice at the step's end (0.13 s). Stop, cut groups and choke still end it.
+            // Round 190lq (issue #204): a note's end goes to the Sampler's note-off below (FL plays the notes of an audio
+            // clip channel as a Sampler's: without a volume envelope the sample plays on). The legacy law of a project
+            // saved before 0.1.30 (SamplerSettings::clipNoteLegacy) ends the note's own voice at its end, as that project
+            // sounded; 0.1.29 stopped EVERY voice of the channel there (allNotesOff), so of two overlapping notes the
+            // second one ended where the first one did.
             if (key < audioClipKeyBase)
-                allNotesOff();
+            {
+                if (! clipNoteLegacy.load (std::memory_order_relaxed))
+                    return noteOffAsSampler (key);
+                for (auto& v : voices)
+                    if (v.active && endsVoice (v.key, v.noteId, key))
+                        v.stolen = true; // (the fade allNotesOff gave it)
+                return;
+            }
             else
                 for (auto& v : voices)
                     if (v.active && v.key == key && ! v.stolen)
@@ -2956,7 +3123,11 @@ public:
                     }
             return;
         }
+        noteOffAsSampler (key);
+    }
 
+    void noteOffAsSampler (int key) noexcept
+    {
         // (round 190ej: of two overlapping notes of one key, FL's sampler ends only the note's own voice [EXEC: issue #158's
         // 25 renders and round 190ej's]; endsVoice() takes every voice of the key for an off without a note id)
         if (shaper != nullptr)
@@ -3163,12 +3334,36 @@ public:
             int n;
             ~Advance() { at += n; }
         } advance { songSample, n };
+        if (anyStepping) // (round 190jv: FL's stepped slide note)
+        {
+            applySteps (n);
+            anyStepping = std::any_of (voices.begin(), voices.end(), [] (const SamplerVoice& v) { return v.stepsLeft > 0; });
+        }
         // round 190w: the newest voice's place in its region, for the channel settings' locator, after every block
         const struct Publish
         {
             SamplerInstrument& s;
             ~Publish() { s.publishPosition(); }
         } publish { *this };
+
+        // round 190hq (B11, complaint #22): a channel stretched to a number of beats in Resample mode lasts those beats at
+        // the tempo that plays now, as FL's does under its tempo automation: its sounding voices speed up or slow down with a
+        // moving tempo (tempo markers, a tempo clip) instead of keeping the project tempo they started with
+        // (rollup 0.1.30: issue #187's tempo hook (round 190ik, setTempoRatio) moves the same voices by the same ratio, for
+        // Resample and pitch-kept channels alike; with both, a stretched sample sped up twice under a moving tempo. This
+        // step stays only for a renderer that does not call the hook: tempofollow off, tests' A/B)
+        if (const auto now = liveBpm; now > 0.0 && ! tempoHooked && stretchBeats.load (std::memory_order_relaxed) > 0.0f)
+            for (auto& v : voices)
+                if (v.active)
+                {
+                    if (! (v.rateBpm > 0.0))
+                        v.rateBpm = bpm.load (std::memory_order_relaxed);
+                    if (v.rateBpm > 0.0 && now != v.rateBpm)
+                    {
+                        v.rate *= now / v.rateBpm;
+                        v.rateBpm = now;
+                    }
+                }
 
         if (sample == nullptr && zones.empty())
             return;
@@ -3262,8 +3457,12 @@ public:
 
                 const auto pastEnd = (double) flrs::wholeFrames (v.position) > lastFrame || v.position < v.first;
                 // FL holds an audio clip's last value as DC to the clip's end (its note-off): the clip does not end with
-                // the sample (FL renders, REA_rodada167l §1 / round 168j); other voices end with their region
-                if ((pastEnd && ! clipMode) || (v.stolen && v.fade <= 0.0f) || (v.env <= 0.0f && v.stage >= 1))
+                // the sample (FL renders, REA_rodada167l §1 / round 168j); other voices end with their region.
+                // Round qafix190kq (QA-6 of 0.1.30): a NOTE of an audio clip channel (a step, a Piano roll note; keys below
+                // audioClipKeyBase) has no clip end since round 190jd lets it play the whole clip — it ends with the
+                // sample, as FL's 1 / 2 / 5 s renders do. It held the sample's last value for ever: every hi-hat step of
+                // "Never Out" left its DC voice, -73 dBFS summed, and the export's tail never fell silent.
+                if ((pastEnd && (! clipMode || v.key < audioClipKeyBase)) || (v.stolen && v.fade <= 0.0f) || (v.env <= 0.0f && v.stage >= 1))
                 {
                     v.active = false;
                     break;
@@ -3387,7 +3586,7 @@ public:
                     right[i] += sr * gain * gr * v.panR;
                 }
 
-                v.position += ks.on ? v.rate : v.rate * v.pitchMul * bendMul;
+                v.position += ks.on ? v.rate * tempoC : v.rate * v.pitchMul * bendMul;
                 ++v.age;
 
                 if (v.glideLeft > 0)
@@ -3647,7 +3846,7 @@ public:
                     endGain *= table[(std::size_t) v.offFade++];
                 }
                 flG[(std::size_t) m] = gain * endGain;
-                v.position += shifts[(std::size_t) (&v - voices.data())].on ? v.rate : v.rate * v.pitchMul * bendMul;
+                v.position += shifts[(std::size_t) (&v - voices.data())].on ? v.rate * tempoC : v.rate * v.pitchMul * bendMul;
                 ++v.age;
                 if (v.glideLeft > 0)
                 {
@@ -3784,9 +3983,15 @@ private:
     int shiftersNow = keyShiftVoices;            // made by prepareKeyShift (useShifterStock)
     std::atomic<int> heldShifters { 0 };         // shifterPool's filled slots (any thread may read it)
     std::vector<float> primeL, primeR;
+    bool wideClipShift = false; // round gaps190kf: the note starting now is a clip transposed beyond ±24 st
     std::atomic<bool> keyShift { false };
     std::atomic<int> keyShiftMethod { 0 };
     double lastFactor = 1.0; // the last shifted note's transposition (where its portamento starts)
+    // issue #187 (round 190ik): the playing tempo over the song's (1 unless the sample is warped), whether it can move
+    double tempoC = 1.0;
+    bool tempoHooked = false; // (rollup 0.1.30: the renderer calls setTempoRatio, issue #187's tempo following)
+    bool tempoMoves = false;
+    std::atomic<bool> warpedTempo { false };
     double bendMul = 1.0;    // the pitch wheel (pitchBend), audio thread
     int quality = flrs::liveQuality;        // FL's interpolation index (prepare)
     bool preparedOffline = false;           // prepare() ran for an export: `quality` stays the export's
@@ -3839,8 +4044,11 @@ private:
     std::atomic<float> portaBeats { 0.125f };
     std::vector<LoadedZone> zones; // multi-sample (fixed after creation)
     double songTicks = 0.0;         // song position in the block (global LFO)
+    double liveBpm = 0.0;           // round 190hq: the tempo now (setSongTempo; audio thread)
 
 public:
+    // round 190hq: the tempo of the block about to render (the renderer, while the tempo can move); 0 = the project's
+    void setSongTempo (double songBpm) noexcept override { liveBpm = songBpm; }
     void setSongPosition (double ticks) noexcept override
     {
         songTicks = ticks;
@@ -3920,6 +4128,7 @@ private:
     std::atomic<bool> padOn { false }, padHold { false };
     std::atomic<float> padAttack { 0.0f }, padDecay { 1.0f }, padSustain { 1.0f }, padRelease { 1.0f }, padLength { 0.0f }, padStart { 0.5f };
     std::atomic<bool> flVelocityLaw { false }; // SamplerSettings::flVelocityLaw
+    std::atomic<bool> clipNoteLegacy { false }; // SamplerSettings::clipNoteLegacy (round 190lq)
     std::atomic<int> declickMode { 0 };
 };
 } // namespace
@@ -3995,6 +4204,8 @@ public:
     void noteOn (int key, float velocity) noexcept override
     {
         mailbox.read (data);
+        lastKey.store ((float) key, std::memory_order_relaxed);
+        lastVelocity.store (velocity, std::memory_order_relaxed);
         if (data.keyboard) // Keyboard Controller: output 0 is the key's value
         {
             heldKey = key;
@@ -4089,12 +4300,20 @@ public:
         }
     }
 
+    // outputs 0 … 7 drive the links; 8 and 9 are the last key (0 … 127) and velocity (0 … 1) received, -1 before the
+    // first note, for the editor's Keyboard / Velocity mapping line (round 190ih, FL's manual)
     float controlOutput (int output) const noexcept override
     {
+        if (output == lastKeyOutput)
+            return lastKey.load (std::memory_order_relaxed);
+        if (output == lastVelocityOutput)
+            return lastVelocity.load (std::memory_order_relaxed);
         return output >= 0 && output < (int) values.size() ? values[(std::size_t) output] : 0.0f;
     }
+    static constexpr int lastKeyOutput = 8, lastVelocityOutput = 9;
 
 private:
+    std::atomic<float> lastKey { -1.0f }, lastVelocity { -1.0f };
     struct Data
     {
         EnvelopeControllerData articulators {};
@@ -4156,6 +4375,13 @@ std::atomic<bool> hqAllFlag { false };
 }
 void setHqForAllPlugins (bool on) noexcept { hqAllFlag.store (on); }
 bool hqForAllPlugins() noexcept { return hqAllFlag.load (std::memory_order_relaxed); }
+
+namespace
+{
+std::atomic<bool> sampleAccurateFlag { true };
+}
+void setSampleAccurateAutomation (bool on) noexcept { sampleAccurateFlag.store (on); }
+bool sampleAccurateAutomation() noexcept { return sampleAccurateFlag.load (std::memory_order_relaxed); }
 
 namespace
 {
@@ -4360,6 +4586,12 @@ std::unique_ptr<Instrument> makeInstrument (InstrumentKind kind, std::shared_ptr
         return makeFpcInstrument ({}, {});
     if (kind == InstrumentKind::pocketSuperSaw)
         return makePocketSuperSawInstrument();
+    if (kind == InstrumentKind::tetra) // round 190hs
+        return makeTetraInstrument();
+    if (kind == InstrumentKind::helix) // round 190ja
+        return makeHelixInstrument();
+    if (kind == InstrumentKind::braid) // round 190ko
+        return makeBraidInstrument();
     if (kind == InstrumentKind::drumaxx)
         return makeDrumaxxInstrument();
     if (kind == InstrumentKind::slayer)

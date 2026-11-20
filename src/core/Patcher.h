@@ -92,6 +92,7 @@ public:
     void setSongPosition (double ticks) noexcept;
     void setPlaying (bool playing) noexcept;
     void setHeldNotes (const NoteMask* channels, int count) noexcept;
+    bool followsHeldNotes() const noexcept; // (round 190kz: a node's effect reads them)
 
     // One block: the host's input (and side-chain, may be null) in, the main output out (may alias the input);
     // the extra outputs land in auxOutput(). Any n (split into pieces).
@@ -165,6 +166,16 @@ public:
     // Takes the values of a document with the same structure (sameStructure): applied at the next block.
     // UI thread; the graph keeps the document copy.
     void takeValues (const PatcherDoc& doc, double bpm = 140.0);
+
+    // Round 190ld (FL's Patcher › View › Activity / Performance): while an editor keeps calling watch() (each frame;
+    // it lapses ~2 s after the last call), the graph measures each node's main-output peak and process time and its
+    // own whole time; nothing is measured otherwise. The readers run on the UI thread.
+    void watch() noexcept { watchLeft.store (96000, std::memory_order_relaxed); }
+    float takeNodePeak (int node) noexcept;                  // the node's highest |sample| since the last call
+    std::uint64_t nodeNanoseconds (int node) const noexcept; // its process time while watched, accumulated
+    std::uint64_t watchedNanoseconds() const noexcept { return graphNs.load (std::memory_order_relaxed); } // the whole graph's
+    std::uint64_t watchedFrames() const noexcept { return framesWatched.load (std::memory_order_relaxed); }
+    float takeInputPeak() noexcept { return inputPeak.exchange (0.0f, std::memory_order_relaxed); } // "From LYNX SHARE"
 
 private:
     struct Node;
@@ -270,6 +281,9 @@ private:
     HardwareOutput* hwOut = nullptr;
     int hwOffset = 0, pieceOffset = 0; // (pieceOffset: the current piece's first sample in the callback piece)
     bool hardwareNodes = false;
+    std::atomic<std::int64_t> watchLeft { 0 };          // round 190ld: frames still measured (watch())
+    std::atomic<std::uint64_t> graphNs { 0 }, framesWatched { 0 };
+    std::atomic<float> inputPeak { 0.0f };
 };
 
 // A Layer node's children (round 165c): the generator nodes its Children pin reaches (through MIDI Out nodes), Layers

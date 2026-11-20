@@ -21,7 +21,9 @@ class FinishDock final : public juce::Component,
                          private juce::Timer
 {
 public:
-    static constexpr int width = 300;
+    // tests and --simplegb190keshot: the fade switch as a click sets it
+    void setFadeForCheck (bool on, double seconds) { setFade (on, seconds); }
+    static constexpr int width = 360; // (round 190jc, SG-16: 300 -> 360, look tiles near BandLab Mastering's 182 x 76)
 
     // What "Save the song as a file" opens (round 190t): the Export window on one format (0 WAV, 1 MP3) and
     // File › Export › For other apps. Without them the block is not shown.
@@ -49,6 +51,13 @@ private:
     void choose (int id);
     void changed (bool structural); // the intensity / tone moved: the chain follows (one undo step per drag)
     void autoLevel();
+    // round 190ld (DS-44, owner decision S7): "Hear without" plays the song without the look at the look's loudness
+    // (both measured offline, once per look setting); the raw level is one right-click away
+    void updateListenGain();
+    void measureMatch();
+    void mouseDown (const juce::MouseEvent& e) override;
+    void setFade (bool on, double seconds); // round 190ke: the song's fade-out (core/SongFade.h)
+    void refreshFade();
     void timerCallback() override;
 
     AudioEngine& engine;
@@ -61,8 +70,20 @@ private:
     juce::TextButton closeButton, hearWithout, autoButton, removeButton, otherApps, matchButton;
     juce::Slider intensity, tone[3];
     juce::Label toneNames[3], marks[3];
+    // round 190ke (owner decision D5, GarageBand's Mix › Fade Out): "Fade out the end" and its length
+    juce::ToggleButton fadeButton;
+    juce::ComboBox fadeLength;
+    juce::Label fadeInfo;
     std::shared_ptr<std::atomic<int>> measuring; // Auto level's render: 0 idle, 1 running (shared with its thread)
     std::shared_ptr<std::atomic<float>> measuredLufs;
+    // round 190ld: the loudness match's render (0 idle, 1 running, 2 done) and its result (dB to add to the A side)
+    std::shared_ptr<std::atomic<int>> matching;
+    std::shared_ptr<std::atomic<float>> matchDb;
+    MasterLookSettings matchedFor { -1 }; // the look setting matchDb belongs to (id -1: none yet)
+    bool matchValid = false;
+public:
+    static inline bool matchLoudness = true; // right-click on "Hear without": off = hear the raw level
+private:
     bool updating = false;
 };
 } // namespace lynx

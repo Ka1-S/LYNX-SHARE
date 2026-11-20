@@ -7,6 +7,7 @@
 #include "core/LoadTrace.h"
 #include "flp/Flp.h"
 #include "core/AlsImport.h"
+#include "core/DawProject.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 #include "ui/Toolbar.h"
@@ -121,12 +122,14 @@ private:
                 try
                 {
                     const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
-                    if (file.hasFileExtension ("flm;songtmpl"))
+                    if (file.hasFileExtension ("flm;songtmpl;blx"))
                     {
-                        // an FL Studio Mobile project (round 182c): no third-party plugins
+                        // an FL Studio Mobile project (round 182c), a BandLab project (round 190jr): no third-party plugins
                     }
                     else if (file.hasFileExtension ("als")) // a Live set (round 175a)
                         uses = alsForeignPlugins (std::vector<std::uint8_t> (bytes, bytes + data.getSize()));
+                    else if (file.hasFileExtension ("dawproject")) // a DAWproject (round 190jf, B22)
+                        uses = dawProjectForeignPlugins (std::vector<std::uint8_t> (bytes, bytes + data.getSize()));
                     else
                         uses = flpForeignPlugins (flp::parseProject ({ bytes, data.getSize() }));
                 }

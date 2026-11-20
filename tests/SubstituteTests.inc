@@ -1,3 +1,4 @@
+#include "core/LynxVerbs.h" // (round 190mb: Epoch's rate law index in the VintageVerb substitute test)
 // --- LYNX substitutes for missing third-party plugins (core/PluginSubstitutes.h) - round 98 -------------------------
 
 namespace substtest
@@ -142,7 +143,11 @@ TEST (substitute_valhalla_vst3_translates_mix_and_keeps_original)
     const auto plain = lynx::makeSubstituteSlot (*entry, nullptr, &translated);
     const auto id2 = lynx::pluginIdentity (vv);
     const auto fromJunk = lynx::makeSubstituteSlot (*entry, &id2, &translated);
-    CHECK (translated == 0 && fromJunk.mix == plain.mix && plain.mix == 1.0f && fromJunk.params == plain.params);
+    // (round 190mb: a state that came from an original device also gets the entry's `replaced` items — Epoch's rate law)
+    auto junkBase = fromJunk;
+    CHECK (junkBase.params[(std::size_t) lynx::verbs::epoch::rateLaw] == 1.0f && plain.params[(std::size_t) lynx::verbs::epoch::rateLaw] == 0.0f);
+    junkBase.params[(std::size_t) lynx::verbs::epoch::rateLaw] = 0.0f;
+    CHECK (translated == 0 && fromJunk.mix == plain.mix && plain.mix == 1.0f && junkBase.params == plain.params);
 }
 
 TEST (substitute_waves_shell_by_plugin_name)

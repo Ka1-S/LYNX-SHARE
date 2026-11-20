@@ -1,7 +1,9 @@
 #include "core/NoteTools.h"
+#include "core/NoteRepeat.h"
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <iterator>
 #include <map>
 #include <tuple>
@@ -54,8 +56,84 @@ const char* levelName (Level level)
         case Level::finePitch: return TR_NOOP ("Fine pitch");
         case Level::modX: return TR_NOOP ("Mod X");
         case Level::modY: return TR_NOOP ("Mod Y");
+        case Level::notePitch: return TR_NOOP ("Note pitch");
+        case Level::shift: return TR_NOOP ("Shift");
+        case Level::repeat: return TR_NOOP ("Repeat");
     }
     return "";
+}
+
+Level stepLevel (int tab) noexcept
+{
+    static constexpr Level order[stepLevelCount] { Level::notePitch, Level::velocity, Level::release, Level::finePitch, Level::pan,
+                                                   Level::modX, Level::modY, Level::shift, Level::repeat };
+    return order[std::clamp (tab, 0, stepLevelCount - 1)];
+}
+
+const char* stepLevelName (int tab, int size)
+{
+    // FL's three label sets (FLEngine FUN_0130ff30: the full names, the short ones, and the middle set it builds from them)
+    static const char* const full[stepLevelCount] { TR_NOOP ("Note pitch"), TR_NOOP ("Velocity"), TR_NOOP ("Release velocity"), TR_NOOP ("Fine pitch"),
+                                                    TR_NOOP ("Panning"), TR_NOOP ("Mod X"), TR_NOOP ("Mod Y"), TR_NOOP ("Shift"), TR_NOOP ("Repeat") };
+    static const char* const medium[stepLevelCount] { TR_NOOP ("Note pitch"), TR_NOOP ("Velocity"), TR_NOOP ("Release"), TR_NOOP ("Fine pitch"),
+                                                      TR_NOOP ("Pan"), TR_NOOP ("Mod X"), TR_NOOP ("Mod Y"), TR_NOOP ("Shift"), TR_NOOP ("Repeats") };
+    static const char* const brief[stepLevelCount] { TR_NOOP ("Note"), TR_NOOP ("Vel"), TR_NOOP ("Rel"), TR_NOOP ("Fine"), TR_NOOP ("Pan"),
+                                                     "X", "Y", TR_NOOP ("Shift"), TR_NOOP ("Rep") };
+    tab = std::clamp (tab, 0, stepLevelCount - 1);
+    return (size >= 2 ? full : size == 1 ? medium : brief)[tab];
+}
+
+const char* graphLaneName (int lane)
+{
+    for (int tab = 0; tab < stepLevelCount; ++tab)
+        if ((int) stepLevel (tab) == lane)
+            return stepLevelName (tab);
+    return "";
+}
+
+float graphValue (const Note& n, int lane, std::int64_t stepTicks) noexcept
+{
+    if (lane == graphShift && stepTicks != ticksPerStep && stepTicks > 0)
+        return std::clamp ((float) ((double) (((n.start % stepTicks) + stepTicks) % stepTicks) / (0.99 * (double) stepTicks)), 0.0f, 1.0f);
+    return levelValue (n, (Level) std::clamp (lane, 0, graphRepeat));
+}
+
+void setGraphValue (Note& n, int lane, float v, std::int64_t stepTicks) noexcept
+{
+    if (lane == graphShift && stepTicks != ticksPerStep && stepTicks > 0)
+    {
+        const auto base = n.start - (((n.start % stepTicks) + stepTicks) % stepTicks);
+        n.start = base + (std::int64_t) std::llround ((double) std::clamp (v, 0.0f, 1.0f) * 0.99 * (double) stepTicks);
+        return;
+    }
+    setLevelValue (n, (Level) std::clamp (lane, 0, graphRepeat), v);
+}
+
+float graphDefault (int lane) noexcept { return levelDefault ((Level) std::clamp (lane, 0, graphRepeat)); }
+
+bool graphIsBipolar (int lane) noexcept { return levelIsBipolar ((Level) std::clamp (lane, 0, graphRepeat)); }
+
+std::string levelText (Level level, float v)
+{
+    v = std::clamp (v, 0.0f, 1.0f);
+    switch (level)
+    {
+        case Level::notePitch:
+        {
+            // FL's names: C5 = key 60
+            static const char* const names[12] { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+            const auto key = (int) std::lround (v * 127.0f);
+            return std::string (names[key % 12]) + std::to_string (key / 12);
+        }
+        case Level::shift: // FL's "0.00": the part of the step
+        {
+            char text[16];
+            std::snprintf (text, sizeof (text), "%.2f", (double) v);
+            return text;
+        }
+        case Level::repeat: return noterepeat::rateName ((int) std::lround (v * noterepeat::rateCount));
+        default: return {}; // (the other lanes: the caller's percent)
+    }
 }
 
 float levelValue (const Note& n, Level level) noexcept
@@ -68,6 +146,10 @@ float levelValue (const Note& n, Level level) noexcept
         case Level::finePitch: return (n.finePitch + 120.0f) / 240.0f;
         case Level::modX: return n.modX;
         case Level::modY: return n.modY;
+        case Level::notePitch: return (float) std::clamp (n.key, 0, 127) / 127.0f;
+        case Level::shift: // (FL's manual: "100% shift equals 99% of the note position equal to one 16th note")
+            return std::clamp ((float) ((double) (((n.start % ticksPerStep) + ticksPerStep) % ticksPerStep) / (0.99 * ticksPerStep)), 0.0f, 1.0f);
+        case Level::repeat: return (float) std::clamp (n.repeat, 0, noterepeat::rateCount) / (float) noterepeat::rateCount;
     }
     return 0.0f;
 }
@@ -84,6 +166,15 @@ void setLevelValue (Note& n, Level level, float v) noexcept
         case Level::finePitch: n.finePitch = v * 240.0f - 120.0f; break;
         case Level::modX: n.modX = v; break;
         case Level::modY: n.modY = v; break;
+        case Level::notePitch: n.key = (int) std::lround (v * 127.0f); break;
+        case Level::shift:
+        {
+            // the note stays in its step: FL's 100 % is the step's last tick (it never reaches the next step)
+            const auto step = n.start - (((n.start % ticksPerStep) + ticksPerStep) % ticksPerStep);
+            n.start = step + std::min<std::int64_t> (ticksPerStep - 1, std::llround ((double) v * 0.99 * ticksPerStep));
+            break;
+        }
+        case Level::repeat: n.repeat = (int) std::lround (v * noterepeat::rateCount); break;
     }
 }
 

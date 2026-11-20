@@ -11,6 +11,7 @@
 // its outLat still counts at the destination. "When recording or not playing" is planned like "Never"; the renderer
 // skips those delays while the transport is stopped or recording.
 
+#include <array>
 #include <memory>
 #include <vector>
 
@@ -27,7 +28,17 @@ struct PdcPlan
     // [track][slot]: how late a slot's input is (the track's inAlign plus the active slots before it), in samples —
     // FL's per-slot delay that "Compensate automations" shifts the slot's automation by (REA round 168j)
     std::vector<std::vector<int>> slotInput;
+    // [track][slot]: the delay (samples) each side input of a slot needs to line up with the slot's own input (round
+    // 190hq, B13): k = 0 its side-chain source, 1 its second side-chain source, 2 / 3 a hosted effect's routed
+    // Connections main / side source (sideSources). A side input is late by its insert's outLat; the slot's input by
+    // slotInput. The plan raises the listening insert's inAlign when a source would arrive later than the slot's input,
+    // so these are never negative. 0 = no delay (no source, a source bypassed "Always", or already in line).
+    std::vector<std::vector<std::array<int, 4>>> sideDelay;
+    // [track]: how late an insert's audio is when its fader, pan and routes act on it (its inAlign plus its active
+    // slots' latencies; the manual latency delays nothing inside the insert) — Song::compensateMixerLevels (round 190hq)
+    std::vector<int> levelLag;
     int total = 0;                              // latency at the Master output
+    int currentLatency = 0;                     // (round 190my) FL's Current track's active slots' latency, whatever its source
 
     bool any() const noexcept;
 };
@@ -35,8 +46,15 @@ struct PdcPlan
 // `channelLatency[c]` = latency of the channel's instrument; `slotLatency[t][s]` = of the slot's
 // effect (0 if disabled). Vectors smaller than the Song count as 0.
 // `sampleRate` converts the tracks' manual latencies (ms) to samples.
+// `currentSource` (round 190my, DF-82): the mixer track FL's Current (C) track runs on (the selected one, 0 = the
+// Master; −1 = none, as in a render that leaves C out). C's active slots' latency is added to that track's output latency
+// (REA 190mv: FUN_010ff3b0 / FUN_010ffca0 add C's latency to its target's), after its fader: levelLag leaves it out.
 PdcPlan computePdc (const Song& song, const std::vector<int>& channelLatency, const std::vector<std::vector<int>>& slotLatency,
-                    double sampleRate = 44100.0);
+                    double sampleRate = 44100.0, int currentSource = -1);
+
+// The inserts a slot of insert `track` listens to besides its own input (round 190hq): {side-chain, second side-chain,
+// routed Connections main source, routed Connections side source}; −1 = none (an insert ≥ 1 otherwise, never `track`).
+std::array<int, 4> sideSources (const Song& song, int track, const EffectSlot& slot);
 
 // A track's manual latency in samples (FL rounds ms × rate / 1000).
 int manualLatencySamples (const MixerTrack& track, double sampleRate) noexcept;
@@ -62,6 +80,8 @@ public:
     // Empties the line (no allocation; nothing to do when it already holds only silence): used when a bypassed edge
     // goes back to being compensated, so it starts from silence instead of replaying what it held.
     void clear() noexcept;
+    // Only silence inside (what comes out next is silence until something non-silent goes in).
+    bool silent() const noexcept { return quiet >= delay; }
 
 private:
     int delay;

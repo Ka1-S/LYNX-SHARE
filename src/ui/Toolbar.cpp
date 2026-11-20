@@ -2,20 +2,94 @@
 
 #include <juce_dsp/juce_dsp.h>
 
+#include "core/ClipLauncher.h"
+#include "core/CountIn.h"
+#include "core/Details190mv.h" // (round 190mv: Master pitch in Hz)
+#include "core/LayoutStyle.h"
 #include "core/MarkerPlan.h"
 #include "core/Timecode.h"
 #include "core/TempoMap.h"
+#include "core/ValueMath.h" // (round 190mv: the phase nudge)
 #include "ui/FrameTicker.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
 #include "ui/Icons.h"
 #include "ui/PaintAB.h"
 #include "ui/Theme.h"
+#include "ui/TextCache.h"
 
 namespace lynx::toolbar
 {
 namespace
 {
+// --- round 190iv: Live's control-bar boxes and BandLab's capsule text (shared by the fields below) ---
+namespace live
+{
+const juce::Colour band { 0xff2a2a2a }, box { 0xff363636 }, boxHover { 0xff464646 }, text { 0xffb5b5b5 }, lit { 0xffffad56 }, onLit { 0xff070707 };
+// the count-in in the position field (Live 12 manual 19.6 "in blue"): filmed in Live 12.4 (round 190ld, details2_190ld
+// shots/ref/live-countin-*.png) the whole field turns #03c3d5 with the count in Live's #070707 ink (190kn guessed blue text)
+const juce::Colour countIn { 0xff03c3d5 };
+}
+void paintLiveBox (juce::Graphics& g, juce::Rectangle<int> r, bool hover, bool lit = false)
+{
+    g.setColour (lit ? live::lit : hover ? live::boxHover : live::box);
+    g.fillRect (r);
+}
+void paintLiveText (juce::Graphics& g, const juce::String& t, juce::Rectangle<int> r, bool lit = false,
+                    juce::Justification j = juce::Justification::centred)
+{
+    g.setColour (lit ? live::onLit : live::text);
+    g.setFont (theme::font (theme::type::caption));
+    g.drawFittedText (t, r.reduced (3, 0), j, 1, 0.75f);
+}
+// a small "▾" at the right of a box
+void paintLiveArrow (juce::Graphics& g, juce::Rectangle<int> r, juce::Colour c)
+{
+    const auto a = r.toFloat().removeFromRight (10.0f).withSizeKeepingCentre (6.0f, 3.5f);
+    juce::Path tri;
+    tri.addTriangle (a.getX(), a.getY(), a.getRight(), a.getY(), a.getCentreX(), a.getBottom());
+    g.setColour (c);
+    g.fillPath (tri);
+}
+// the hover wash of a capsule segment (the capsule's fill is drawn behind by the main window)
+void paintCapsuleHover (juce::Graphics& g, juce::Rectangle<int> r, bool hover, bool roundRight = false)
+{
+    if (hover)
+    {
+        const auto f = r.toFloat();
+        const auto radius = f.getHeight() / 2.0f;
+        juce::Path p;
+        p.addRoundedRectangle (f.getX(), f.getY(), f.getWidth(), f.getHeight(), radius, radius, false, roundRight, false, roundRight);
+        g.setColour (theme::colour::bg5);
+        g.fillPath (p);
+    }
+}
+// Round 190jo (design190ia FM-6, details190if DF-18): FL's time panel in B:S:T, "1:01:00" = bar 1, step 01, tick 00. The
+// steps are the sixteenths of the bar (01-16 in 4/4, with the Playlist's time signatures in Song mode) and the ticks are
+// FL's at its default 96 PPQ: 24 per step (00-23).
+juce::String barStepTick (const Song& song, double ticks, Meter meter)
+{
+    int bar = 0;
+    double intoBar = 0.0;
+    if (song.mode == PlayMode::song)
+    {
+        const auto current = song.barAt ((std::int64_t) ticks);
+        bar = current.number;
+        intoBar = ticks - (double) current.tick;
+    }
+    else
+    {
+        const auto perBar = (double) meter.bar();
+        bar = (int) (ticks / perBar) + 1;
+        intoBar = std::fmod (ticks, perBar);
+    }
+    intoBar = juce::jmax (0.0, intoBar);
+    const auto step = (int) (intoBar / ticksPerStep) + 1;
+    constexpr int flTicksPerStep = 24; // (FL: 96 PPQ / 4 steps a beat)
+    const auto tick = juce::jlimit (0, flTicksPerStep - 1, (int) (std::fmod (intoBar, (double) ticksPerStep) * flTicksPerStep / ticksPerStep));
+    return juce::String::formatted ("%d:%02d:%02d", bar, step, tick);
+}
+
 juce::String barBeatStep (const Song& song, double ticks, Meter meter)
 {
     // (round 190fg: beats of the meter in force, eighths in 6/8; the steps are sixteenths into the beat)
@@ -218,23 +292,59 @@ double secondsForTicksCached (const Song& song, std::uint64_t stamp, std::int64_
 juce::String TimeDisplay::text() const
 {
     const auto& song = engine.getSong();
+    // FL's count-in (round 190jd, live check 190iw Q7): "REC IN 4" ... "REC IN 1", one per beat, before the position
+    // (the Pattern layout's FL look; the Clip-launch and Simple layouts keep showing the position)
+    if (layoutstyle::current() == layoutstyle::Style::pattern)
+        if (const auto left = countin::beatsLeft (engine.getTransport().countIn.load(), song.beatUnit, ppq); left > 0)
+            return tr ("REC IN {0}", { juce::String (left) });
+
+    // round 190kn (DL-44, Live 12 manual 19.6): Live's Arrangement Position field shows the count-in "in blue as
+    // bars-beats-sixteenths", from -bars.1.1 up to 1.1.1 (the Clip-launch control bar)
+    if (look == toolbarlayout::Look::live && engine.isCountingIn())
+        if (const auto p = countin::livePosition (engine.getTransport().countIn.load(), song.meter().beats, song.meter().unit, ppq); p.bar < 0)
+            return juce::String (p.bar) + " : " + juce::String (p.beat) + " : " + juce::String (p.sixteenth);
+
     const auto ticks = playheadTicks (engine);
 
-    if (mode == Mode::bars)
+    // round 190jj (Simple, capture190ji §1d): BandLab shows its count-in only as negative time counting up to zero
+    // ("-00:01.7" … "-00:00.2"), in minutes : seconds : hundredths whatever the display's mode
+    if (look == toolbarlayout::Look::simple && engine.isCountingIn())
+    {
+        const auto left = juce::jmax (0.0, engine.getTransport().countIn.load()) * 60.0 / (juce::jmax (1.0, song.bpm) * ppq);
+        const auto whole = (int) left;
+        return juce::String::formatted ("-%d : %02d : %02d", whole / 60, whole % 60, juce::jmin (99, (int) ((left - whole) * 100.0)));
+    }
+
+    const auto fl = look == toolbarlayout::Look::fl;
+    if (mode == Mode::bars && fl)
+        return barStepTick (song, ticks, song.meter());
+    if (mode == Mode::bars || mode == Mode::beats)
         return barBeatStep (song, ticks, song.meter());
 
     const auto seconds = secondsForTicksCached (song, engine.getSongStamp(), (std::int64_t) ticks);
     if (mode == Mode::smpte)
         return juce::String (timecode::format (seconds, smpteRate));
     const auto whole = (int) seconds;
-    return juce::String::formatted ("%d : %02d : %02d", whole / 60, whole % 60, (int) ((seconds - whole) * 100.0));
+    // (round 190jo FM-6: FL's "M:S:CS" without the spaces in the Pattern toolbar)
+    return juce::String::formatted (fl ? "%d:%02d:%02d" : "%d : %02d : %02d", whole / 60, whole % 60, (int) ((seconds - whole) * 100.0));
 }
 
 void TimeDisplay::update()
 {
-    if (const auto t = text(); t != shown)
+    // (round 190jj: the Simple capsule's time is red while a take records or counts in)
+    const auto nowRed = look == toolbarlayout::Look::simple && engine.isRecording()
+                        && (engine.getTransport().playing.load() || engine.isCountingIn());
+    // (round 190jo, perf: FL's B:S:T ticks run 24 to a step, at the timer's rate; a change of the ticks alone repaints at
+    // most every 100 ms, as often as bar : beat : step changed at 150 BPM; a new step or bar shows at once)
+    const auto t = text();
+    const auto now = juce::Time::getMillisecondCounter();
+    const auto ticksOnly = look == toolbarlayout::Look::fl && mode == Mode::bars && t.length() == shown.length() && t.length() > 3
+                           && t.dropLastCharacters (2) == shown.dropLastCharacters (2);
+    if ((t != shown && ! (ticksOnly && now - shownAt < 100u)) || nowRed != red)
     {
         shown = t;
+        shownAt = now;
+        red = nowRed;
         repaint();
     }
     // (round 190gl) the reference DAW's position display with Link: a progress bar of the session through the quantum
@@ -248,9 +358,67 @@ void TimeDisplay::update()
     }
 }
 
+void TimeDisplay::setLook (toolbarlayout::Look l)
+{
+    if (l != look)
+    {
+        look = l;
+        shown = {}; // (round 190jo: the Pattern toolbar's B:S:T reads differently from the other looks' bar : beat : step)
+        repaint();
+    }
+}
+
+// round 190iv: BandLab's time segment (the last segment of the transport capsule, 15 px digits) and Live's position box
+// ("1. 1. 1": bar, beat, sixteenth with Live's dotted separators)
+void TimeDisplay::paintLook (juce::Graphics& g)
+{
+    using namespace theme;
+    const auto area = getLocalBounds();
+    const auto readout = shown.isEmpty() ? text() : shown;
+    if (look == toolbarlayout::Look::live)
+    {
+        paintLiveBox (g, area, false);
+        if (linkProgress >= 0.0)
+        {
+            g.setColour (live::lit.withAlpha (0.45f));
+            g.fillRect (area.withWidth (juce::roundToInt (area.getWidth() * juce::jlimit (0.0, 1.0, linkProgress))));
+        }
+        const auto countingIn = engine.isCountingIn() && readout.startsWith ("-");
+        if (countingIn) // (round 190kn: Live's count-in, always as bars. beats. sixteenths; round 190ld: Live 12.4's colours)
+        {
+            g.setColour (live::countIn);
+            g.fillRect (area);
+            g.setColour (live::onLit);
+            g.setFont (theme::font (theme::type::caption));
+            g.drawFittedText (readout.replace (" : ", ". "), area.withTrimmedRight (4).reduced (3, 0), juce::Justification::centredRight, 1, 0.75f);
+            return;
+        }
+        paintLiveText (g, mode == Mode::bars ? readout.replace (" : ", ". ") : readout.replace (" ", ""), area.withTrimmedRight (4), false,
+                       juce::Justification::centredRight);
+        return;
+    }
+    paintCapsuleHover (g, area, isMouseOver(), true); // (the transport capsule's last segment)
+    if (linkProgress >= 0.0)
+    {
+        g.setColour (colour::accent.withAlpha (0.42f));
+        g.fillRect (area.withWidth (juce::roundToInt (area.getWidth() * juce::jlimit (0.0, 1.0, linkProgress))));
+    }
+    auto f = monoFont (15.0f);
+    for (int i = 0; i < 8 && textcache::stringWidth (f, readout) > (float) area.getWidth() - 10.0f; ++i)
+        f = f.withHeight (f.getHeight() * 0.92f);
+    g.setFont (f);
+    g.setColour (red ? colour::record : colour::textPrimary);
+    g.drawText (readout, area, juce::Justification::centred, false);
+}
+
 void TimeDisplay::paint (juce::Graphics& g)
 {
     using namespace theme;
+    if (look != toolbarlayout::Look::fl)
+    {
+        paintLook (g);
+        return;
+    }
     const auto area = getLocalBounds();
     g.setColour (colour::bg1);
     g.fillRoundedRectangle (area.toFloat(), radius::md);
@@ -272,18 +440,47 @@ void TimeDisplay::paint (juce::Graphics& g)
     g.setColour (colour::textPrimary);
     // round 170e3: the song position is the toolbar's centre (FL users look there first): a larger readout
     const auto readout = shown.isEmpty() ? text() : shown;
+    // round 190jo (design190ia FM-6): FL's digits are 26 px tall (cap) in its 33 px panel; LYNX's cap 12 becomes cap 20
+    // (font 40 in the 46 px box) with FL's mode caption at the top right ("B:S:T", "M:S:CS") instead of the line under it
+    if (mode != Mode::beats)
+    {
+        auto big = monoFont (juce::jmin (40.0f, (float) area.getHeight() * 0.87f));
+        const auto caption = mode == Mode::clock ? juce::String ("M:S:CS") : mode == Mode::smpte ? "SMPTE " + juce::String (timecode::rates[smpteRate].name)
+                                                                                                 : juce::String ("B:S:T");
+        const auto captionFont = font (9.0f, true);
+        const auto key = Fit { readout.length(), area.getWidth(), area.getHeight(), (int) mode * 64 + smpteRate, (float) theme::textSize() };
+        if (key.length != fit.length || key.width != fit.width || key.height != fit.height || key.mode != fit.mode || key.scale != fit.scale)
+        {
+            fit = key;
+            fit.caption = textcache::stringWidth (captionFont, caption);
+            const auto room = (float) area.getWidth() - 8.0f;
+            for (int i = 0; i < 16 && textcache::stringWidth (big, readout) > room; ++i)
+                big = big.withHeight (big.getHeight() * 0.94f);
+            fit.digits = big.getHeight();
+        }
+        big = big.withHeight (fit.digits);
+        const auto captionWidth = fit.caption;
+        g.setFont (big);
+        g.drawText (readout, area.withTrimmedTop (2), juce::Justification::centred, false);
+        g.setColour (colour::textSecondary);
+        g.setFont (captionFont);
+        g.drawText (caption, area.withTrimmedRight (4).withTrimmedTop (2).withHeight (10).withLeft (area.getRight() - 4 - (int) std::ceil (captionWidth) - 1),
+                    juce::Justification::topRight, false);
+        return;
+    }
     auto readoutFont = monoFont (juce::jmin (26.0f, (float) area.getHeight() * 0.52f));
     // a narrow display (the compact toolbar) shrinks the digits instead of cutting them off
-    for (int i = 0; i < 12 && juce::GlyphArrangement::getStringWidth (readoutFont, readout) > (float) area.getWidth() - 8.0f; ++i)
+    for (int i = 0; i < 12 && textcache::stringWidth (readoutFont, readout) > (float) area.getWidth() - 8.0f; ++i)
         readoutFont = readoutFont.withHeight (readoutFont.getHeight() * 0.92f);
     g.setFont (readoutFont);
     g.drawText (readout, area.withTrimmedBottom (11), juce::Justification::centred, false);
     g.setColour (colour::textDisabled);
     g.setFont (font (type::caption - 1.0f));
-    g.drawText (mode == Mode::clock   ? tr ("MIN : SEC : CS")
-                : mode == Mode::smpte ? "SMPTE " + juce::String (timecode::rates[smpteRate].name)
-                                      : tr ("BAR : BEAT : STEP"), area.withTrimmedTop (area.getHeight() - 14).withTrimmedBottom (2),
-                juce::Justification::centred, false);
+    // (fitted: a translation or a larger Text size (issue #189) narrows the letters instead of cutting the label off)
+    g.drawFittedText (mode == Mode::clock   ? tr ("MIN : SEC : CS")
+                      : mode == Mode::smpte ? "SMPTE " + juce::String (timecode::rates[smpteRate].name)
+                                            : tr ("BAR : BEAT : STEP"), area.withTrimmedTop (area.getHeight() - 14).withTrimmedBottom (2).reduced (2, 0),
+                      juce::Justification::centred, 1, 0.6f);
 }
 
 void TimeDisplay::mouseUp (const juce::MouseEvent& e)
@@ -296,7 +493,7 @@ void TimeDisplay::mouseUp (const juce::MouseEvent& e)
         return;
     }
 
-    mode = mode == Mode::bars ? Mode::clock : mode == Mode::clock ? Mode::smpte : Mode::bars;
+    mode = mode == Mode::bars || mode == Mode::beats ? Mode::clock : mode == Mode::clock ? Mode::smpte : Mode::bars;
     shown = {};
     update();
     repaint();
@@ -314,7 +511,13 @@ void TimeDisplay::showMenu()
         update();
         repaint();
     };
-    menu.addItem (tr ("Bar : Beat : Step"), true, mode == Mode::bars, [set] { set (Mode::bars, -1); });
+    if (look == toolbarlayout::Look::fl) // (round 190jo: FL's B:S:T first, LYNX's bar : beat : step kept)
+    {
+        menu.addItem (tr ("Bar : Step : Tick"), true, mode == Mode::bars, [set] { set (Mode::bars, -1); });
+        menu.addItem (tr ("Bar : Beat : Step"), true, mode == Mode::beats, [set] { set (Mode::beats, -1); });
+    }
+    else
+        menu.addItem (tr ("Bar : Beat : Step"), true, mode == Mode::bars || mode == Mode::beats, [set] { set (Mode::bars, -1); });
     menu.addItem (tr ("Minute : Second : Centisecond"), true, mode == Mode::clock, [set] { set (Mode::clock, -1); });
     for (int i = 0; i < timecode::rateCount; ++i)
         menu.addItem ("SMPTE " + juce::String (timecode::rates[i].name) + " fps", true, mode == Mode::smpte && smpteRate == i, [set, i] { set (Mode::smpte, i); });
@@ -326,6 +529,7 @@ ui::Hint TimeDisplay::hintAt (juce::Point<int>)
     ui::Hint h;
     h.text = (mode == Mode::clock   ? tr ("Time: minutes : seconds : hundredths")
               : mode == Mode::smpte ? tr ("Time: SMPTE time code (hours : minutes : seconds : frames)")
+              : mode == Mode::bars && look == toolbarlayout::Look::fl ? tr ("Time: bar : step : tick")
                                     : tr ("Time: bar : beat : step"))
              + "  " + tr ("[LMB] next mode (bars, minutes, SMPTE)  [RMB] mode and frame rate");
     h.value = text();
@@ -395,6 +599,23 @@ ui::ValueSpec MasterKnob::spec() const
             return std::nullopt;
         return number.getDoubleValue();
     };
+    // FL's Master pitch › "Type in value..." (round 190mv, DF-22; capture 190mv A6: a box "Master pitch (Hz)" showing 440):
+    // the tuning of A in Hz, 440 = no shift; LYNX's range ±1200 cents = 220…880 Hz
+    auto hz = std::make_shared<ui::ValueSpec>();
+    hz->name = tr ("Master pitch (Hz)");
+    hz->minimum = 220.0;
+    hz->maximum = 880.0;
+    hz->defaultValue = 440.0;
+    hz->toText = [] (double v) { return std::abs (v - std::round (v)) < 0.005 ? juce::String ((int) std::round (v)) : juce::String (v, 2); };
+    hz->fromText = [] (const juce::String& t) -> std::optional<double> {
+        const auto number = t.retainCharacters ("0123456789.");
+        if (number.isEmpty() || number.getDoubleValue() <= 0.0)
+            return std::nullopt;
+        return juce::jlimit (220.0, 880.0, number.getDoubleValue());
+    };
+    s.typeInSpec = hz;
+    s.toTypeIn = [] (double cents) { return masterpitch::hzOfCents (cents); };
+    s.fromTypeIn = [] (double hzValue) { return masterpitch::centsOfHz (hzValue); };
     return s;
 }
 
@@ -407,9 +628,130 @@ void MasterKnob::update()
     }
 }
 
+void MasterKnob::setLook (toolbarlayout::Look l)
+{
+    if (l == look)
+        return;
+    look = l;
+    meter = {};
+    meterPixels = { -1, -1 };
+    meterMs = -1.0;
+    repaint();
+}
+
+juce::Rectangle<float> MasterKnob::sliderRail() const
+{
+    auto area = getLocalBounds().toFloat();
+    area.removeFromLeft (26.0f);  // the speaker
+    area.removeFromRight (66.0f); // the value
+    return area.withSizeKeepingCentre (area.getWidth(), 11.0f);
+}
+
+void MasterKnob::tickMeter (double nowMs)
+{
+    if (! isSlider() || ! isShowing())
+    {
+        meterMs = -1.0;
+        return;
+    }
+    // (BandLab: ~0.6 s from full to the rest stub, no peak hold; a peak rises at once)
+    const auto dt = meterMs < 0.0 ? 1.0 / 30.0 : juce::jlimit (0.0, 0.25, (nowMs - meterMs) / 1000.0);
+    meterMs = nowMs;
+    const auto rail = sliderRail();
+    auto& meters = engine.getMeters();
+    auto moved = false;
+    for (int ch = 0; ch < 2; ++ch)
+    {
+        const auto target = juce::jlimit (0.0f, 1.0f, faderPosition (meters.takeMasterBarPeak (ch)));
+        auto& m = meter[(std::size_t) ch];
+        m = target >= m ? target : juce::jmax (target, m - (float) (dt / 0.6));
+        const auto px = juce::roundToInt (m * rail.getWidth());
+        moved = moved || px != meterPixels[(std::size_t) ch];
+        meterPixels[(std::size_t) ch] = px;
+    }
+    if (moved)
+        repaint (rail.toNearestInt().expanded (1, 3)); // (the rail only; the thumb sits on it and is painted with it)
+}
+
+void MasterKnob::paintSlider (juce::Graphics& g)
+{
+    using namespace theme;
+    const auto area = getLocalBounds().toFloat();
+    const auto rail = sliderRail();
+    const auto ink = available() ? (isMouseOver() || drag.isActive() || sliderDrag ? colour::textPrimary : colour::textSecondary) : colour::textDisabled;
+
+    // the speaker (a LYNX vector: a box, a cone and two waves)
+    {
+        const auto s = juce::Rectangle<float> (area.getX() + 3.0f, area.getCentreY() - 8.0f, 16.0f, 16.0f);
+        juce::Path body;
+        body.startNewSubPath (s.getX() + 1.0f, s.getY() + 6.0f);
+        body.lineTo (s.getX() + 4.0f, s.getY() + 6.0f);
+        body.lineTo (s.getX() + 8.0f, s.getY() + 2.5f);
+        body.lineTo (s.getX() + 8.0f, s.getBottom() - 2.5f);
+        body.lineTo (s.getX() + 4.0f, s.getBottom() - 6.0f);
+        body.lineTo (s.getX() + 1.0f, s.getBottom() - 6.0f);
+        body.closeSubPath();
+        juce::Path waves;
+        waves.addCentredArc (s.getX() + 8.5f, s.getCentreY(), 3.5f, 3.5f, 0.0f, 0.75f, 2.39f, true);
+        waves.addCentredArc (s.getX() + 8.5f, s.getCentreY(), 6.5f, 6.5f, 0.0f, 0.75f, 2.39f, true);
+        g.setColour (ink);
+        g.strokePath (body, juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.strokePath (waves, juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+
+    // the rail: two 4 px bars with a 3 px gap (BandLab's stereo master meter), the meter filled green to yellow along
+    // the rail (#4baa69 at the left, #a9c423 at the slider's thumb), a short green stub at rest
+    const auto value01 = (float) juce::jlimit (0.0, 1.0, value());
+    const auto cx = rail.getX() + value01 * rail.getWidth();
+    const juce::Colour railColour { 0xff2e3138 }, low { 0xff4baa69 }, high { 0xffa9c423 };
+    for (int ch = 0; ch < 2; ++ch)
+    {
+        const auto bar = juce::Rectangle<float> (rail.getX(), rail.getY() + (float) ch * 7.0f, rail.getWidth(), 4.0f);
+        g.setColour (railColour);
+        g.fillRoundedRectangle (bar, 2.0f);
+        const auto w = juce::jmax (5.0f, meter[(std::size_t) ch] * rail.getWidth());
+        juce::ColourGradient fill (low, rail.getX(), 0.0f, high, juce::jmax (rail.getX() + 8.0f, cx), 0.0f, false);
+        g.setGradientFill (fill);
+        g.fillRoundedRectangle (bar.withWidth (w), 2.0f);
+    }
+    // the thumb: a dark disc in a white ring on the value
+    const auto thumb = juce::Rectangle<float> (16.0f, 16.0f).withCentre ({ cx, rail.getCentreY() });
+    g.setColour (colour::bg2);
+    g.fillEllipse (thumb);
+    g.setColour (available() ? juce::Colours::white : colour::textDisabled);
+    g.drawEllipse (thumb.reduced (1.0f), 2.0f);
+
+    // the value ("+0.0 dB"), right of the rail
+    g.setColour (ink == colour::textDisabled ? ink : colour::textPrimary);
+    g.setFont (font (type::small, true));
+    const auto db = juce::Decibels::gainToDecibels (faderGain (value01), -100.0f);
+    juce::String text;
+    if (! available())
+        text = tr ("no mixer");
+    else if (db <= -99.0f)
+        text = "-inf dB";
+    else
+    {
+        const auto r = std::round (db * 10.0f) / 10.0f;
+        text = (r >= 0.0f ? "+" : "") + juce::String (r == 0.0f ? 0.0f : r, 1) + " dB";
+    }
+    g.drawText (text, area.withLeft (rail.getRight() + 10.0f), juce::Justification::centredLeft, false);
+}
+
+void MasterKnob::setFromRail (float x)
+{
+    const auto rail = sliderRail();
+    setValue ((double) juce::jlimit (0.0f, 1.0f, (x - rail.getX()) / juce::jmax (1.0f, rail.getWidth())));
+}
+
 void MasterKnob::paint (juce::Graphics& g)
 {
     using namespace theme;
+    if (isSlider())
+    {
+        paintSlider (g);
+        return;
+    }
     auto area = getLocalBounds().toFloat();
     const auto s = spec();
     const auto v = value();
@@ -460,12 +802,25 @@ void MasterKnob::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
+    if (isSlider() && sliderRail().expanded (8.0f, 6.0f).contains (e.position)) // (round 190jj: BandLab's slider follows the mouse)
+    {
+        sliderDrag = true;
+        setFromRail (e.position.x);
+        repaint();
+        return;
+    }
+
     drag.begin (e, value());
     repaint();
 }
 
 void MasterKnob::mouseDrag (const juce::MouseEvent& e)
 {
+    if (sliderDrag)
+    {
+        setFromRail (e.position.x);
+        return;
+    }
     if (! drag.isActive())
         return;
 
@@ -479,6 +834,7 @@ void MasterKnob::mouseDrag (const juce::MouseEvent& e)
 
 void MasterKnob::mouseUp (const juce::MouseEvent&)
 {
+    sliderDrag = false;
     drag.end();
     repaint();
 }
@@ -517,6 +873,54 @@ ui::Hint MasterKnob::hintAt (juce::Point<int>)
     return ui::valueHint (spec(), value(), gesture);
 }
 
+// --- Live's phase nudge (round 190mv, DL-51) ----------------------------------------------------------------------
+
+void PhaseNudge::paint (juce::Graphics& g)
+{
+    const auto box = getLocalBounds();
+    if (held)
+        g.fillAll (juce::Colour (0xffffc281)); // (capture 190mv B2: 255,194,129)
+    else if (isMouseOver())
+        g.fillAll (juce::Colour (0xff464646));
+    g.setColour (held ? juce::Colours::black : juce::Colour (0xffb5b5b5));
+    // four bars, the pair on the side it nudges to drawn heavier (Live's "||||" glyphs mirror each other)
+    const auto h = (float) box.getHeight() * 0.62f, y = (float) box.getCentreY() - h * 0.5f;
+    const float xs[] = { -5.0f, -2.0f, 1.0f, 4.0f };
+    for (int i = 0; i < 4; ++i)
+    {
+        const auto heavy = faster ? i >= 2 : i < 2;
+        g.fillRect (juce::Rectangle<float> ((float) box.getCentreX() + xs[i] - (heavy ? 0.5f : 0.0f), y, heavy ? 2.0f : 1.0f, h));
+    }
+}
+
+void PhaseNudge::mouseDown (const juce::MouseEvent& e)
+{
+    if (! e.mods.isLeftButtonDown() || held)
+        return;
+    held = true;
+    base = engine.getSong().bpm;
+    const auto bpm = controls::nudgedTempo (base, faster);
+    engine.editSong ([bpm] (Song& song) { song.bpm = bpm; }, false); // (outside the history: the tempo comes back)
+    repaint();
+}
+
+void PhaseNudge::release()
+{
+    if (! held)
+        return;
+    held = false;
+    const auto bpm = base;
+    engine.editSong ([bpm] (Song& song) { song.bpm = bpm; }, false);
+    repaint();
+}
+
+ui::Hint PhaseNudge::hintAt (juce::Point<int>)
+{
+    return { faster ? tr ("Phase Nudge Up: Temporarily increase song tempo to synchronize to external music.")
+                    : tr ("Phase Nudge Down: Temporarily decrease song tempo to synchronize to external music."),
+             {}, false, false };
+}
+
 // --- CPU, memory, polyphony ----------------------------------------------------------------------
 
 void PerformanceMeter::setValues (double cpu01, std::int64_t memoryBytes, int polyphony)
@@ -526,7 +930,97 @@ void PerformanceMeter::setValues (double cpu01, std::int64_t memoryBytes, int po
     memory = memoryBytes;
     voices = polyphony;
     peakVoices = juce::jmax (peakVoices, polyphony);
-    repaint();
+    // FL's CPU graph (round 190kn): one point per update, the newest on the right
+    std::rotate (cpuHistory.begin(), cpuHistory.begin() + 1, cpuHistory.end());
+    cpuHistory.back() = (float) juce::jlimit (0.0, 1.0, cpu01);
+    cpuHistoryCount = juce::jmin (historySize, cpuHistoryCount + 1);
+    // repaint only when a pixel would change: the texts, the bar, or the graph's rows (an idle project's 1-3 % load
+    // draws the same flat graph update after update)
+    const auto graph = graphArea();
+    const auto rows = juce::jmax (1.0f, graph.getHeight() - 1.0f);
+    juce::int64 sig = juce::roundToInt (cpuSmoothed * 100.0);
+    sig = sig * 31 + juce::roundToInt (cpuSmoothed * (double) barBox().getWidth());
+    sig = sig * 31 + (juce::int64) (memory / (1024 * 1024));
+    sig = sig * 31 + (secondView == framesPerSecond ? 100000 + fps : voices);
+    sig = sig * 31 + juce::jmin (cpuHistoryCount, 2);
+    for (std::size_t i = 0; i < cpuHistory.size(); ++i)
+        sig = sig * 1000003 + (juce::int64) std::round (cpuHistory[i] * rows) * 7 + (juce::int64) i;
+    if (sig != paintedSignature)
+    {
+        paintedSignature = sig;
+        repaint();
+    }
+}
+
+juce::Rectangle<float> PerformanceMeter::barBox() const
+{
+    auto area = getLocalBounds();
+    auto row1 = area.removeFromTop (area.getHeight() / 2).reduced (0, 4);
+    row1.removeFromLeft (30);
+    row1.removeFromRight (34);
+    if (underruns > 0)
+        row1.removeFromRight (26);
+    return row1.reduced (2, 3).toFloat();
+}
+
+juce::Rectangle<float> PerformanceMeter::graphArea() const
+{
+    if (look == toolbarlayout::Look::live)
+        return {};
+    // FL: the load bar on top, the running graph below it in the same box; here the box's lower part, under a 5 px bar
+    const auto box = barBox();
+    return box.getHeight() >= 11.0f ? box.withTrimmedTop (6.0f).reduced (1.0f, 0.0f) : juce::Rectangle<float>();
+}
+
+void PerformanceMeter::setFramesPerSecond (int framesPerSecondIn)
+{
+    fps = juce::jmax (0, framesPerSecondIn); // (painted with the next setValues, which compares what would change)
+}
+
+void PerformanceMeter::mouseDown (const juce::MouseEvent& e)
+{
+    if (e.mods.isPopupMenu())
+        makeMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
+}
+
+juce::PopupMenu PerformanceMeter::makeMenu()
+{
+    juce::PopupMenu menu;
+    menu.addSectionHeader (tr ("Refresh"));
+    const std::pair<int, juce::String> rates[] { { slow, tr ("Slow") }, { medium, tr ("Medium") }, { fast, tr ("Fast") } };
+    for (const auto& [id, name] : rates)
+        menu.addItem (name, true, refresh == id, [this, id = id] {
+            refresh = id;
+            if (onRefreshChanged)
+                onRefreshChanged();
+        });
+    // FL's "Misc" section (FL 2026 capture details190kn raw/f08): the voice count / FPS radio pair, then greyed info lines
+    menu.addSectionHeader (tr ("Misc"));
+    const std::pair<int, juce::String> views[] { { voiceCount, tr ("View voice count") }, { framesPerSecond, tr ("View FPS") } };
+    for (const auto& [id, name] : views)
+        menu.addItem (name, true, secondView == id, [this, id = id] {
+            secondView = id;
+            paintedSignature = -1;
+            repaint();
+            if (onRefreshChanged)
+                onRefreshChanged();
+        });
+    if (const auto [gdi, user] = guiHandles(); gdi >= 0)
+        menu.addItem (tr ("Handles: {0} (GDI) / {1} (USER)", { juce::String (gdi), juce::String (user) }), false, false, [] {});
+    if (const auto threads = threadCount(); threads > 0)
+        menu.addItem (tr ("Threads: {0}", { juce::String (threads) }), false, false, [] {});
+    menu.addSeparator();
+    menu.addItem (tr ("Plugin performance monitor..."), onOpenMonitor != nullptr, false, [this] {
+        if (onOpenMonitor)
+            onOpenMonitor();
+    });
+    return menu;
+}
+
+void PerformanceMeter::mouseDoubleClick (const juce::MouseEvent& e)
+{
+    if (e.mods.isLeftButtonDown() && onOpenMonitor) // FL: "Double-Click the CPU panel to open the Plugin Performance Monitor"
+        onOpenMonitor();
 }
 
 void PerformanceMeter::setRealtime (std::uint64_t over, std::uint64_t late, double peak, const juce::StringArray& units, int device)
@@ -534,18 +1028,53 @@ void PerformanceMeter::setRealtime (std::uint64_t over, std::uint64_t late, doub
     const auto count = RtStats::underrunCount (over, late, device);
     if (over > overDeadline || late > lateCalls || count > underruns)
         lastGlitchAt = juce::jmax<juce::uint32> (1, juce::Time::getMillisecondCounter());
+    // (round 190kn: repaint only when the panel would look different: a new count, the peak mark's pixel, the red
+    // glitch edge coming or going; the hint reads the rest when asked)
+    const auto box = barBox();
+    auto markX = [&box] (double p) { return p > 0.0 ? juce::roundToInt (box.getWidth() * (float) juce::jlimit (0.0, 1.0, p)) * 2 + (p < 0.85 ? 0 : 1) : -1; };
+    const bool glitchLit = lastGlitchAt != 0 && juce::Time::getMillisecondCounter() - lastGlitchAt < 5000;
+    const bool changed = count != underruns || markX (peak) != markX (peakLoad) || glitchLit != glitchShown;
     overDeadline = over;
     lateCalls = late;
     deviceUnderruns = device;
     underruns = count;
     peakLoad = peak;
     heaviest = units;
-    repaint();
+    glitchShown = glitchLit;
+    if (changed)
+        repaint();
+}
+
+void PerformanceMeter::setLook (toolbarlayout::Look l)
+{
+    if (l != look)
+    {
+        look = l;
+        repaint();
+    }
 }
 
 void PerformanceMeter::paint (juce::Graphics& g)
 {
     using namespace theme;
+    if (look == toolbarlayout::Look::live) // round 190iv: Live's CPU box (CL-2: "26 %" over its orange load bar)
+    {
+        const auto area = getLocalBounds();
+        paintLiveBox (g, area, false);
+        const auto load = (float) juce::jlimit (0.0, 1.0, cpuSmoothed);
+        if (load > 0.0f)
+        {
+            g.setColour (live::lit);
+            g.fillRect (area.withWidth (juce::jmax (1, juce::roundToInt ((float) area.getWidth() * load))));
+        }
+        if (lastGlitchAt != 0 && juce::Time::getMillisecondCounter() - lastGlitchAt < 5000)
+        {
+            g.setColour (colour::meterClip);
+            g.drawRect (area, 1);
+        }
+        paintLiveText (g, juce::String (juce::roundToInt (cpuSmoothed * 100.0)) + " %", area);
+        return;
+    }
     auto area = getLocalBounds();
     auto row1 = area.removeFromTop (area.getHeight() / 2).reduced (0, 4);
     auto row2 = area.reduced (0, 4);
@@ -564,9 +1093,29 @@ void PerformanceMeter::paint (juce::Graphics& g)
         g.drawText (underruns > 999 ? juce::String ("999+") : juce::String ((juce::int64) underruns), row1.removeFromRight (26),
                     juce::Justification::centredRight, false);
     }
-    const auto bar = row1.reduced (2, 3).toFloat();
+    const auto box = row1.reduced (2, 3).toFloat();
     g.setColour (colour::bg0);
-    g.fillRoundedRectangle (bar, 2.0f);
+    g.fillRoundedRectangle (box, 2.0f);
+    // round 190kn: FL's running CPU graph in the box's lower part (the load bar shrinks to the top 5 px)
+    const auto graph = graphArea();
+    const auto bar = graph.isEmpty() ? box : box.withHeight (5.0f);
+    if (! graph.isEmpty() && cpuHistoryCount > 1)
+    {
+        const auto n = juce::jmin (cpuHistoryCount, juce::jmax (2, (int) graph.getWidth()));
+        const auto step = graph.getWidth() / (float) (n - 1);
+        g.setColour (colour::textSecondary.withAlpha (0.8f));
+        auto yOf = [&] (float v) { return std::round (graph.getBottom() - 1.0f - v * (graph.getHeight() - 1.0f)); };
+        // newest on the right: 1 px columns joined, so a spike shows as FL's thin vertical line
+        float lastY = yOf (cpuHistory[(std::size_t) (historySize - n)]);
+        for (int i = 1; i < n; ++i)
+        {
+            const auto y = yOf (cpuHistory[(std::size_t) (historySize - n + i)]);
+            const auto x0 = std::round (graph.getRight() - (float) (n - i) * step), x1 = std::round (graph.getRight() - (float) (n - 1 - i) * step);
+            g.fillRect (juce::Rectangle<float> (x0, juce::jmin (lastY, y), 1.0f, std::abs (y - lastY) + 1.0f));
+            g.fillRect (juce::Rectangle<float> (x0, y, juce::jmax (1.0f, x1 - x0), 1.0f));
+            lastY = y;
+        }
+    }
     const auto load = (float) juce::jlimit (0.0, 1.0, cpuSmoothed);
     g.setColour (load < 0.6f ? colour::meterLow : load < 0.85f ? colour::meterMid : colour::meterClip);
     if (load > 0.0f)
@@ -596,6 +1145,20 @@ void PerformanceMeter::paint (juce::Graphics& g)
                 juce::Justification::centredLeft, false);
     g.setFont (caption);
     g.setColour (colour::textDisabled);
+    if (secondView == framesPerSecond) // round 190ld: FL's "View FPS" (FL 2026: "143" and a 14 x 11 grey "FPS" badge after it)
+    {
+        const auto badge = row2.removeFromRight (16).withSizeKeepingCentre (16, 11).toFloat();
+        g.setColour (juce::Colour (0xff596267));
+        g.fillRoundedRectangle (badge, 1.5f);
+        g.setColour (colour::bg0);
+        g.setFont (font (type::caption - 3.0f, true));
+        g.drawText ("FPS", badge, juce::Justification::centred, false);
+        row2.removeFromRight (3);
+        g.setFont (number);
+        g.setColour (fps > 0 ? colour::textPrimary : colour::textSecondary);
+        g.drawText (juce::String (fps), row2, juce::Justification::centredRight, false);
+        return;
+    }
     g.drawText (tr ("POLY"), row2.removeFromLeft (32), juce::Justification::centredLeft, false);
     g.setFont (number);
     g.setColour (voices > 0 ? colour::textPrimary : colour::textSecondary);
@@ -604,15 +1167,24 @@ void PerformanceMeter::paint (juce::Graphics& g)
 
 // --- MIDI activity light ---------------------------------------------------------------------------
 
-void MidiActivityLight::update (std::uint32_t count, const juce::StringArray& activeInputs)
+void MidiActivityLight::update (std::uint32_t count, const juce::StringArray& activeInputs, std::uint32_t projectLinked, std::uint32_t globalLinked)
 {
     const auto wasLit = litFrames > 0;
-    if (seenCount && count != lastCount)
+    const auto shownKind = paintedKind;
+    if (seenCount && (count != lastCount || projectLinked != lastProject || globalLinked != lastGlobal))
+    {
         litFrames = 6; // ~0.2 s after the last message
+        // (a link takes its message on the message thread a frame after the count: the link's colour wins)
+        kind = projectLinked != lastProject ? Kind::project : globalLinked != lastGlobal ? Kind::global
+             : (kind == Kind::project || kind == Kind::global) && wasLit ? kind : Kind::unhandled;
+    }
     else if (litFrames > 0)
         --litFrames;
     seenCount = true;
     lastCount = count;
+    lastProject = projectLinked;
+    lastGlobal = globalLinked;
+    paintedKind = kind;
 
     if (activeInputs != inputs)
     {
@@ -620,8 +1192,17 @@ void MidiActivityLight::update (std::uint32_t count, const juce::StringArray& ac
         setTooltip (hintAt ({}).text);
     }
 
-    if (wasLit != (litFrames > 0))
+    if (wasLit != (litFrames > 0) || (litFrames > 0 && shownKind != kind))
         repaint();
+}
+
+void MidiActivityLight::beat (bool barStart)
+{
+    if (litFrames > 0 && (kind == Kind::project || kind == Kind::global || kind == Kind::unhandled) && litFrames > 3)
+        return; // (incoming MIDI just lit it: that stays readable)
+    kind = paintedKind = barStart ? Kind::bar : Kind::beat;
+    litFrames = 3; // a short blink (~0.1 s)
+    repaint();
 }
 
 void ChordPanel::setText (const juce::String& newText)
@@ -643,7 +1224,7 @@ void ChordPanel::paint (juce::Graphics& g)
     // past eight characters the name gets smaller, down to what fits (FL: its size minus 1.15 per character)
     const auto base = juce::jmin (20.0f, (float) area.getHeight() * 0.55f);
     auto readoutFont = monoFont (juce::jmax (9.0f, base - 1.15f * (float) juce::jmax (0, text.length() - 8)));
-    for (int i = 0; i < 10 && juce::GlyphArrangement::getStringWidth (readoutFont, text) > (float) area.getWidth() - 6.0f; ++i)
+    for (int i = 0; i < 10 && textcache::stringWidth (readoutFont, text) > (float) area.getWidth() - 6.0f; ++i)
         readoutFont = readoutFont.withHeight (readoutFont.getHeight() * 0.92f);
     g.setFont (readoutFont);
     g.drawText (text, area, juce::Justification::centred, false);
@@ -676,7 +1257,7 @@ int LinkToggle::idealWidth (int)
     const auto f = theme::font (theme::type::small, true);
     auto widest = 0.0f;
     for (const auto* t : { "@Ableton Link: Link", "@Ableton Link: {0} Links" })
-        widest = juce::jmax (widest, juce::GlyphArrangement::getStringWidth (f, trc (t).replace ("{0}", "88")));
+        widest = juce::jmax (widest, textcache::stringWidth (f, trc (t).replace ("{0}", "88")));
     return juce::roundToInt (widest) + 12 + arrowWidth + 2;
 }
 
@@ -693,9 +1274,29 @@ void LinkToggle::update()
     }
 }
 
+void LinkToggle::setLook (toolbarlayout::Look l)
+{
+    if (l != look)
+    {
+        look = l;
+        repaint();
+    }
+}
+
 void LinkToggle::paint (juce::Graphics& g)
 {
     using namespace theme;
+    if (look == toolbarlayout::Look::live) // round 190iv: Live's toggle box, lit orange while on
+    {
+        const auto arrowBox = arrowArea();
+        const auto main = boxArea().withTrimmedRight (arrowBox.getWidth() + 2);
+        const auto over = isMouseOver (true);
+        paintLiveBox (g, main, over, on);
+        paintLiveText (g, text(), main, on);
+        paintLiveBox (g, arrowBox, over);
+        paintLiveArrow (g, arrowBox, live::text);
+        return;
+    }
     const auto arrow = arrowArea();
     const auto main = boxArea().withTrimmedRight (arrow.getWidth() + 2);
     const auto over = isMouseOver (true);
@@ -711,7 +1312,7 @@ void LinkToggle::paint (juce::Graphics& g)
     g.setColour (on ? colour::accent : (over ? colour::textPrimary : colour::textSecondary));
     auto f = font (type::small, true);
     const auto label = text();
-    for (int i = 0; i < 8 && juce::GlyphArrangement::getStringWidth (f, label) > (float) main.getWidth() - 6.0f; ++i)
+    for (int i = 0; i < 8 && textcache::stringWidth (f, label) > (float) main.getWidth() - 6.0f; ++i)
         f = f.withHeight (f.getHeight() * 0.92f);
     g.setFont (f);
     g.drawText (label, main, juce::Justification::centred, false);
@@ -784,9 +1385,41 @@ void KeyPanel::setText (const juce::String& keyName)
     }
 }
 
+void KeyPanel::setLook (toolbarlayout::Look l)
+{
+    if (l != look)
+    {
+        look = l;
+        repaint();
+    }
+}
+
 void KeyPanel::paint (juce::Graphics& g)
 {
     using namespace theme;
+    if (look == toolbarlayout::Look::live) // round 190iv: Live's key / scale box ("C# minor ▾")
+    {
+        const auto area = getLocalBounds();
+        paintLiveBox (g, area, isMouseOver (true));
+        paintLiveText (g, text.isEmpty() ? tr ("none") : text, area.withTrimmedRight (10), false, juce::Justification::centredLeft);
+        paintLiveArrow (g, area, live::text);
+        return;
+    }
+    if (look == toolbarlayout::Look::simple) // round 190iv: BandLab's Key capsule ("D min"; "Key" while there is none)
+    {
+        const auto area = getLocalBounds().toFloat();
+        g.setColour (isMouseOver (true) ? colour::bg5 : colour::bg4);
+        g.fillRoundedRectangle (area, area.getHeight() / 2.0f);
+        const auto none = text.isEmpty();
+        auto f = font (15.0f, ! none);
+        const auto shown = none ? tr ("Key") : text;
+        for (int i = 0; i < 8 && textcache::stringWidth (f, shown) > area.getWidth() - 20.0f; ++i)
+            f = f.withHeight (f.getHeight() * 0.92f);
+        g.setFont (f);
+        g.setColour (none ? colour::textSecondary : colour::textPrimary);
+        g.drawText (shown, area, juce::Justification::centred, false);
+        return;
+    }
     auto area = getLocalBounds();
     g.setColour (isMouseOver (true) ? colour::bg2 : colour::bg1);
     g.fillRoundedRectangle (area.toFloat(), radius::md);
@@ -806,7 +1439,7 @@ void KeyPanel::paint (juce::Graphics& g)
     g.setColour (none ? colour::textSecondary : colour::textPrimary);
     auto nameFont = font (type::body, ! none).withHeight (juce::jmin (17.0f, (float) area.getHeight() * 0.8f));
     const auto shown = none ? tr ("none") : text;
-    for (int i = 0; i < 8 && juce::GlyphArrangement::getStringWidth (nameFont, shown) > (float) area.getWidth(); ++i)
+    for (int i = 0; i < 8 && textcache::stringWidth (nameFont, shown) > (float) area.getWidth(); ++i)
         nameFont = nameFont.withHeight (nameFont.getHeight() * 0.92f);
     g.setFont (nameFont);
     g.drawText (shown, area, juce::Justification::centredLeft, true);
@@ -850,13 +1483,17 @@ void MidiActivityLight::paint (juce::Graphics& g)
     const auto size = juce::jmin ((float) getWidth(), (float) getHeight()) * 0.36f;
     const auto led = getLocalBounds().toFloat().withSizeKeepingCentre (size, size);
     const auto lit = litFrames > 0;
+    // FL's colours (round 190ld): orange = a project link took it, blue = a global link (and the bar's first beat of
+    // the MIDI Sync light), green = no link used it (and the other beats)
+    const auto litColour = kind == Kind::project ? theme::colour::warning
+                         : kind == Kind::global || kind == Kind::bar ? theme::colour::info : theme::colour::ledOn;
 
     if (lit) // a soft glow around the lit light
     {
-        g.setColour (theme::colour::ledOn.withAlpha (0.25f));
+        g.setColour (litColour.withAlpha (0.25f));
         g.fillEllipse (led.expanded (size * 0.35f));
     }
-    g.setColour (lit ? theme::colour::ledOn : (inputs.isEmpty() ? theme::colour::bg4 : theme::colour::ledOff));
+    g.setColour (lit ? litColour : (inputs.isEmpty() ? theme::colour::bg4 : theme::colour::ledOff));
     g.fillEllipse (led);
     g.setColour (theme::colour::borderStrong);
     g.drawEllipse (led, 1.0f);
@@ -871,7 +1508,7 @@ void MidiActivityLight::mouseUp (const juce::MouseEvent& e)
 ui::Hint MidiActivityLight::hintAt (juce::Point<int>)
 {
     ui::Hint h;
-    h.text = tr ("MIDI input: blinks when a connected device sends MIDI. Click to reconnect the MIDI inputs.");
+    h.text = tr ("MIDI input: blinks when a connected device sends MIDI: orange = a project link used it, blue = a global link, green = nothing linked. With master sync sent it blinks on each beat, blue on each bar. Click to reconnect the MIDI inputs.");
     h.text << "  " << (inputs.isEmpty() ? tr ("No MIDI input is open.") : tr ("Open: {0}", { inputs.joinIntoString (", ") }));
     return h;
 }
@@ -896,6 +1533,10 @@ ui::Hint PerformanceMeter::hintAt (juce::Point<int> p)
             h.text << "  " << tr ("Tip: Windows Audio (shared) drops out more easily; choose the ASIO driver \"{0}\" in Options > Audio settings.",
                                   { driverTip });
         h.value = juce::String (cpu * 100.0, 1) + "%" + (peakLoad > 0.0 ? "  (" + tr ("peak {0}%", { juce::String (juce::roundToInt (peakLoad * 100.0)) }) + ")" : juce::String());
+        if (look != toolbarlayout::Look::live)
+            h.text << "  " << tr ("The graph under the bar is the load over the last seconds.");
+        h.text << "  " << tr ("[Double-click] plugin performance monitor  [RMB] refresh rate");
+        h.hasMenu = true;
     }
     else if (p.x < getWidth() * 58 / 100)
     {
@@ -916,7 +1557,10 @@ ui::Hint PerformanceMeter::hintAt (juce::Point<int> p)
 bool OutputMonitor::update (double nowMs)
 {
     if (! isShowing() || getWidth() <= 0)
+    {
+        stopOverlay();
         return false;
+    }
 
     // the time since the last frame (the falloffs below are per 1/30 s, as when this ran on a 30 Hz timer)
     const auto elapsed = lastMs > 0.0 ? juce::jlimit (0.0, 250.0, nowMs - lastMs) : 1000.0 / 30.0;
@@ -924,6 +1568,8 @@ bool OutputMonitor::update (double nowMs)
     constexpr auto columnPeriod = 1000.0 / 30.0;
 
     engine.copyScope (samples.data(), (int) samples.size());
+    if (stereoScope) // (round 190mv: FL's Stereo, the sides from mid and side)
+        engine.copyScopeSide (sideSamples.data(), (int) sideSamples.size());
     float now = 0.0f;
     for (auto s : samples)
         now = juce::jmax (now, std::abs (s));
@@ -942,6 +1588,24 @@ bool OutputMonitor::update (double nowMs)
     else
         clipMs = juce::jmax (0.0, clipMs - elapsed);
 
+    // round 190kn: the stereo bars (FL's output panel), the same laws per side as the mono meter above
+    float sideNow[2] {};
+    for (int ch = 0; ch < 2; ++ch)
+    {
+        const auto v = engine.takeOutputPeak (ch);
+        sideNow[ch] = v;
+        const auto c = (std::size_t) ch;
+        sidePeak[c] = juce::jmax (v, sidePeak[c] * ui::fallFor (0.82f, elapsed));
+        sideHoldMs[c] -= elapsed;
+        if (v >= sideHeld[c] || sideHoldMs[c] <= 0.0)
+        {
+            sideHeld[c] = v;
+            sideHoldMs[c] = 1000.0;
+        }
+        sideClipMs[c] = v >= 0.999f ? 2000.0 : juce::jmax (0.0, sideClipMs[c] - elapsed);
+    }
+    now = juce::jmax (now, juce::jmax (sideNow[0], sideNow[1]));
+
     // silence after everything has fallen to zero (meter, hold, clip, the long view's history, the spectrum bands)
     // looks the same frame after frame: stop repainting while nothing plays (REA round 116, idle CPU). Below -80 dB
     // (a plugin's noise floor, a reverb's last tail) nothing shows: a 0.003 px wiggle on the scope, under the
@@ -951,8 +1615,11 @@ bool OutputMonitor::update (double nowMs)
     if (silentMs > ((double) history.size() + 90.0) * columnPeriod)
     {
         peak = held = column = 0.0f;
+        sidePeak.fill (0.0f);
+        sideHeld.fill (0.0f);
         bands.fill (0.0f);
         columnMs = 0.0;
+        stopOverlay();
         return false;
     }
 
@@ -967,7 +1634,7 @@ bool OutputMonitor::update (double nowMs)
         std::fill (history.end() - columns, history.end(), column);
         column = 0.0f;
         if (mode == longView)
-            repaint();
+            frameChanged();
     }
 
     if (mode == spectrum)
@@ -999,8 +1666,54 @@ bool OutputMonitor::update (double nowMs)
 
     // (the long view only moves with its columns, above; the scope and the spectrum every frame)
     if (mode != longView)
-        repaint();
+        frameChanged();
+    else if (gpuDisplay.isShowing())
+        frameChanged(); // (the stereo bars move every frame: on the overlay that is the whole picture)
+    else
+        repaint (barsArea().getSmallestIntegerContainer()); // (the stereo bars move every frame)
     return true;
+}
+
+std::atomic<int>& OutputMonitor::overlayFrames()
+{
+    static std::atomic<int> n { 0 };
+    return n;
+}
+
+void OutputMonitor::frameChanged()
+{
+    static const bool wanted = [] {
+#if JUCE_WINDOWS
+        const auto* v = std::getenv ("LYNX_SCOPE_OVERLAY");
+        return v == nullptr || juce::String (v) != "0";
+#else
+        return false; // (the X11 / macOS overlays send a whole picture per frame: no gain over the repaint there)
+#endif
+    }();
+    if (wanted)
+    {
+        const auto was = gpuDisplay.isShowing();
+        const auto area = getLocalBounds();
+        if (gpuDisplay.show ({ 0.0f, area, area, ++overlayKey }))
+        {
+            ++overlayFrames();
+            if (! was)
+                repaint(); // (once: the window shows what is behind the display, the overlay's picture over it)
+            return;
+        }
+        if (was)
+            gpuDisplay.hide();
+    }
+    repaint();
+}
+
+void OutputMonitor::stopOverlay()
+{
+    if (gpuDisplay.isShowing())
+    {
+        gpuDisplay.hide (true); // (it stays a few frames: the repaint below is on screen first)
+        repaint();
+    }
 }
 
 juce::String OutputMonitor::modeName (int m)
@@ -1030,10 +1743,21 @@ void OutputMonitor::mouseDown (const juce::MouseEvent& e)
         menu.addSectionHeader (tr ("Output display"));
         for (int m = 0; m < modeCount; ++m)
             menu.addItem (modeName (m), true, mode == m, [this, m] { setMode (m); });
+        // FL's output panel menu › Oscilloscope › "Stereo" (round 190mv, DF-24; capture 190mv A8)
+        menu.addSectionHeader (tr ("Oscilloscope"));
+        menu.addItem (tr ("Stereo"), true, stereoScope, [this] {
+            stereoScope = ! stereoScope;
+            repaint();
+            if (onModeChanged)
+                onModeChanged(); // (saved with the mode)
+        });
         menu.addSeparator();
         menu.addItem (tr ("Reset the peak hold and clip light"), [this] {
             held = 0.0f;
             clipMs = holdMs = 0.0;
+            sideHeld.fill (0.0f);
+            sideClipMs.fill (0.0);
+            sideHoldMs.fill (0.0);
             repaint();
         });
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
@@ -1046,29 +1770,39 @@ void OutputMonitor::mouseDown (const juce::MouseEvent& e)
 
 void OutputMonitor::paint (juce::Graphics& g)
 {
+    if (gpuDisplay.isShowing())
+        return; // (round 190kz: the overlay shows it)
+    paintDisplay (g, false);
+}
+
+void OutputMonitor::paintDisplay (juce::Graphics& g, bool software)
+{
     using namespace theme;
     auto area = getLocalBounds().toFloat();
     g.setColour (colour::bg0);
     g.fillRoundedRectangle (area, radius::md);
 
-    // peak meter on the right: -60..0 dB, the top segment red while it clipped recently
-    auto meter = area.removeFromRight (8.0f).reduced (1.5f, 4.0f);
+    // round 190kn (FL's output panel, DF-23): the left and right peak bars beside the display, -60..0 dB from the left;
+    // a side's bar turns red while it clipped recently (FL: "If the bars turn red your project is clipping")
     auto level = [] (float gain) { return juce::jlimit (0.0f, 1.0f, (juce::Decibels::gainToDecibels (gain, -60.0f) + 60.0f) / 60.0f); };
-    g.setColour (colour::bg3);
-    g.fillRoundedRectangle (meter, 1.5f);
-    const auto filled = meter.withTop (meter.getBottom() - meter.getHeight() * level (peak));
-    g.setGradientFill (juce::ColourGradient::vertical (colour::meterMid, meter.getY() + meter.getHeight() * 0.1f, colour::meterLow,
-                                                       meter.getY() + meter.getHeight() * 0.4f));
-    g.fillRect (filled);
-    if (held > 0.0f)
+    area.removeFromRight (getLocalBounds().toFloat().getRight() - barsArea().getX() + 2.0f);
+    for (int side = 0; side < 2; ++side)
     {
-        g.setColour (colour::textSecondary);
-        g.fillRect (meter.withHeight (1.0f).withY (meter.getBottom() - meter.getHeight() * level (held)));
-    }
-    if (clipMs > 0.0)
-    {
-        g.setColour (colour::meterClip);
-        g.fillRoundedRectangle (meter.withHeight (4.0f), 1.0f);
+        const auto bar = barArea (side);
+        const auto c = (std::size_t) side;
+        g.setColour (colour::bg3);
+        g.fillRect (bar);
+        const auto filled = bar.withWidth (bar.getWidth() * level (sidePeak[c]));
+        if (sideClipMs[c] > 0.0)
+            g.setColour (colour::meterClip);
+        else
+            g.setGradientFill (juce::ColourGradient::horizontal (colour::meterLow, bar.getX() + bar.getWidth() * 0.6f, colour::meterMid, bar.getRight()));
+        g.fillRect (filled);
+        if (sideHeld[c] > 0.0f)
+        {
+            g.setColour (sideClipMs[c] > 0.0 ? colour::meterClip : colour::textSecondary);
+            g.fillRect (juce::Rectangle<float> (bar.getX() + bar.getWidth() * level (sideHeld[c]) - 1.0f, bar.getY(), 1.0f, bar.getHeight()));
+        }
     }
 
     auto scope = area.reduced (4.0f, 3.0f);
@@ -1104,21 +1838,29 @@ void OutputMonitor::paint (juce::Graphics& g)
     // oscilloscope
     g.setColour (colour::border);
     g.drawHorizontalLine ((int) scope.getCentreY(), scope.getX(), scope.getRight());
-    juce::Path wave;
-    const auto mid = scope.getCentreY();
-    const auto half = scope.getHeight() * 0.47f;
+    wave.clear(); // (round 190kz: the member keeps its storage, no allocation per frame)
     const auto width = juce::jmax (1, (int) scope.getWidth());
-
-    for (int x = 0; x < width; ++x)
+    // FL's Stereo (round 190mv, DF-24; capture 190mv A8): the left side's line in the upper half, the right's in the
+    // lower half of the same box; off = one line of both
+    const auto addLine = [&] (float mid, float half, int side) {
+        for (int x = 0; x < width; ++x)
+        {
+            const auto index = (std::size_t) (x * (int) samples.size() / width);
+            const auto v = side == 0 ? samples[index] : side == 1 ? samples[index] + sideSamples[index] : samples[index] - sideSamples[index];
+            const auto y = mid - juce::jlimit (-1.0f, 1.0f, v) * half;
+            if (x == 0)
+                wave.startNewSubPath (scope.getX(), y);
+            else
+                wave.lineTo (scope.getX() + (float) x, y);
+        }
+    };
+    if (stereoScope)
     {
-        const auto index = (std::size_t) (x * (int) samples.size() / width);
-        const auto y = mid - juce::jlimit (-1.0f, 1.0f, samples[index]) * half;
-
-        if (x == 0)
-            wave.startNewSubPath (scope.getX(), y);
-        else
-            wave.lineTo (scope.getX() + (float) x, y);
+        addLine (scope.getY() + scope.getHeight() * 0.25f, scope.getHeight() * 0.23f, 1);
+        addLine (scope.getY() + scope.getHeight() * 0.75f, scope.getHeight() * 0.23f, 2);
     }
+    else
+        addLine (scope.getCentreY(), scope.getHeight() * 0.47f, 0);
 
     const auto stroke = juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
     // round 174e2: the same stroke drawn by the software renderer into a small image, then the image to the window.
@@ -1128,7 +1870,7 @@ void OutputMonitor::paint (juce::Graphics& g)
         const auto* v = std::getenv ("LYNX_SCOPE_IMAGE");
         return v == nullptr || juce::String (v) != "0";
     }();
-    if (! viaImage)
+    if (! viaImage || software) // (software: the overlay's picture, already drawn by the CPU)
     {
         g.setColour (lineColour);
         g.strokePath (wave, stroke);
@@ -1161,14 +1903,66 @@ void OutputMonitor::paint (juce::Graphics& g)
     g.drawImage (scopeNative, box.toFloat());
 }
 
-ui::Hint OutputMonitor::hintAt (juce::Point<int>)
+ui::Hint OutputMonitor::hintAt (juce::Point<int> p)
 {
     ui::Hint h;
+    h.hasMenu = true;
+    const auto bars = barsArea();
+    if (bars.expanded (1.0f, 2.0f).contains (p.toFloat())) // FL: the level at the pointer's position on the peak meter
+    {
+        const auto x01 = juce::jlimit (0.0f, 1.0f, ((float) p.x + 0.5f - bars.getX()) / juce::jmax (1.0f, bars.getWidth()));
+        h.text = tr ("Output peak meter, left and right (a bar turns red when that side clipped). The value is the level at the pointer");
+        // (FL 2026 hovering its output meter: "Peak meter (master)  -7.19dB 0.44", details190kn raw/f07)
+        const auto db = levelAt (x01);
+        h.value = juce::String (db, 2) + " dB  " + juce::String (juce::Decibels::decibelsToGain (db), 2);
+        return h;
+    }
     h.text = tr ("Output: {0} and the peak level of what you hear (the meter's top turns red when it clipped)  [LMB] next display  [RMB] display menu",
                  { modeName (mode).toLowerCase() });
-    h.hasMenu = true;
     h.value = held <= 1.0e-5f ? juce::String ("-inf dB") : juce::String (juce::Decibels::gainToDecibels (held), 1) + " dB";
     return h;
+}
+
+juce::Rectangle<float> OutputMonitor::barsArea() const
+{
+    // FL keeps its bars beside the scope (about as wide as the scope); here the right 40 % of the panel, 2 bars with a
+    // 1 px gap, centred on the panel's height
+    auto area = getLocalBounds().toFloat().reduced (3.0f, 4.0f);
+    const auto w = juce::jlimit (24.0f, 90.0f, std::round (area.getWidth() * 0.4f));
+    const auto h = juce::jmin (area.getHeight(), 21.0f);
+    return area.removeFromRight (w).withSizeKeepingCentre (w, h);
+}
+
+juce::Rectangle<float> OutputMonitor::barArea (int side) const
+{
+    const auto bars = barsArea();
+    const auto each = std::floor ((bars.getHeight() - 1.0f) / 2.0f);
+    return side == 0 ? bars.withHeight (each) : bars.withTrimmedTop (bars.getHeight() - each);
+}
+
+float OutputMonitor::levelAt (float x01) noexcept
+{
+    return -60.0f + 60.0f * juce::jlimit (0.0f, 1.0f, x01);
+}
+
+void OutputMonitor::setScopeSidesForShot (float leftPhase, float rightPhase)
+{
+    for (std::size_t i = 0; i < samples.size(); ++i)
+    {
+        const auto t = (float) i / (float) samples.size() * juce::MathConstants<float>::twoPi * 6.0f;
+        const auto l = 0.45f * std::sin (t + leftPhase), r = 0.3f * std::sin (1.5f * t + rightPhase);
+        samples[i] = 0.5f * (l + r);
+        sideSamples[i] = 0.5f * (l - r);
+    }
+    repaint();
+}
+
+void OutputMonitor::setSidesForShot (float left, float right, bool clipLeft, bool clipRight)
+{
+    sidePeak = { left, right };
+    sideHeld = { juce::jmin (1.0f, left * 1.12f), juce::jmin (1.0f, right * 1.12f) };
+    sideClipMs = { clipLeft ? 2000.0 : 0.0, clipRight ? 2000.0 : 0.0 };
+    repaint();
 }
 
 // --- customize -------------------------------------------------------------------------------------
@@ -1799,6 +2593,192 @@ ui::Hint EditOverlay::hintAt (juce::Point<int> p)
     h.hasMenu = false;
     return h;
 }
+
+// --- round 190iv: SignatureBox, QuantBox, SaveStatus ------------------------------------------------------------------
+
+void SignatureBox::setLook (toolbarlayout::Look l)
+{
+    if (l != look)
+    {
+        look = l;
+        repaint();
+    }
+}
+
+juce::String SignatureBox::text() const
+{
+    const auto& song = engine.getSong();
+    return juce::String (song.beatsPerBar) + " / " + juce::String (song.beatUnit);
+}
+
+void SignatureBox::update()
+{
+    // (the timer's check compares two numbers; the text is made only when they changed)
+    const auto& song = engine.getSong();
+    if (const auto now = song.beatsPerBar * 1000 + song.beatUnit; now != shownSignature)
+    {
+        shownSignature = now;
+        shown = text();
+        repaint();
+    }
+}
+
+void SignatureBox::paint (juce::Graphics& g)
+{
+    const auto t = shown.isEmpty() ? text() : shown;
+    if (look == toolbarlayout::Look::live)
+    {
+        paintLiveBox (g, getLocalBounds(), isMouseOver());
+        paintLiveText (g, t, getLocalBounds());
+        return;
+    }
+    paintCapsuleHover (g, getLocalBounds(), isMouseOver() && isEnabled(), true); // (the tempo capsule's last segment)
+    g.setFont (theme::font (15.0f, true));
+    g.setColour (isEnabled() ? theme::colour::textPrimary : theme::colour::textDisabled); // (round 190jj: greyed while recording)
+    g.drawText (t, getLocalBounds(), juce::Justification::centred, false);
+}
+
+juce::PopupMenu SignatureBox::makeMenu()
+{
+    // (the Pattern menu's "Song time signature" list)
+    juce::PopupMenu menu;
+    const auto& song = engine.getSong();
+    for (int beats : { 2, 3, 4, 5, 6, 7, 8, 9, 12 })
+        menu.addItem (juce::String (beats) + "/4", true, song.beatsPerBar == beats && song.beatUnit == 4, [this, beats] {
+            engine.editSong ([beats] (Song& s) {
+                s.beatsPerBar = beats;
+                s.beatUnit = 4;
+            });
+            update();
+        });
+    return menu;
+}
+
+void SignatureBox::mouseDown (const juce::MouseEvent& e)
+{
+    if (e.mods.isLeftButtonDown() || e.mods.isPopupMenu())
+        makeMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
+}
+
+ui::Hint SignatureBox::hintAt (juce::Point<int>)
+{
+    return { tr ("Song time signature"), {}, false, true };
+}
+
+namespace
+{
+// the launch quantisations, as the clip grid's footer box lists them (ClipGridComponent.cpp quantNames, Global left out)
+const std::pair<LaunchQuant, const char*> globalQuantNames[] = {
+    { LaunchQuant::none, TR_NOOP ("None") }, { LaunchQuant::bars8, TR_NOOP ("8 bars") }, { LaunchQuant::bars4, TR_NOOP ("4 bars") },
+    { LaunchQuant::bars2, TR_NOOP ("2 bars") }, { LaunchQuant::bar, TR_NOOP ("1 bar") }, { LaunchQuant::half, "1/2" },
+    { LaunchQuant::halfTriplet, "1/2T" }, { LaunchQuant::quarter, "1/4" }, { LaunchQuant::quarterTriplet, "1/4T" },
+    { LaunchQuant::eighth, "1/8" }, { LaunchQuant::eighthTriplet, "1/8T" }, { LaunchQuant::sixteenth, "1/16" },
+    { LaunchQuant::sixteenthTriplet, "1/16T" }, { LaunchQuant::thirtySecond, "1/32" }
+};
+juce::String quantName (LaunchQuant q)
+{
+    for (const auto& [value, name] : globalQuantNames)
+        if (value == q)
+            return value == LaunchQuant::none || value <= LaunchQuant::bar ? tr (name) : juce::String (name);
+    return {};
+}
+LaunchQuant globalQuantOf (const Song& song)
+{
+    return song.clipGrid ? song.clipGrid->globalQuant : ClipGrid {}.globalQuant;
+}
+} // namespace
+
+juce::String QuantBox::text() const { return quantName (globalQuantOf (engine.getSong())); }
+
+void QuantBox::update()
+{
+    if (const auto now = (int) globalQuantOf (engine.getSong()); now != shownQuant)
+    {
+        shownQuant = now;
+        shown = text();
+        repaint();
+    }
+}
+
+void QuantBox::paint (juce::Graphics& g)
+{
+    const auto area = getLocalBounds();
+    paintLiveBox (g, area, isMouseOver());
+    paintLiveText (g, shown.isEmpty() ? text() : shown, area.withTrimmedRight (9), false, juce::Justification::centredLeft);
+    paintLiveArrow (g, area, live::text);
+}
+
+juce::PopupMenu QuantBox::makeMenu()
+{
+    juce::PopupMenu menu;
+    const auto now = globalQuantOf (engine.getSong());
+    for (const auto& [q, name] : globalQuantNames)
+        menu.addItem (quantName (q), true, q == now, [this, q = q] {
+            engine.editSong ([q] (Song& s) { launcher::ensureGrid (s).globalQuant = q; }, false);
+            update();
+        });
+    return menu;
+}
+
+void QuantBox::mouseDown (const juce::MouseEvent& e)
+{
+    if (e.mods.isLeftButtonDown() || e.mods.isPopupMenu())
+        makeMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
+}
+
+ui::Hint QuantBox::hintAt (juce::Point<int>)
+{
+    return { tr ("Launch quantisation: when a launched clip starts"), {}, false, true };
+}
+
+void SaveStatus::set (toolbarlayout::SaveState newState, const juce::String& newText)
+{
+    if (known && newState == state && newText == text)
+        return;
+    known = true;
+    state = newState;
+    text = newText;
+    repaint();
+}
+
+void SaveStatus::paint (juce::Graphics& g)
+{
+    using namespace theme;
+    using toolbarlayout::SaveState;
+    const auto pill = getLocalBounds().toFloat().withSizeKeepingCentre ((float) getWidth(), (float) toolbarlayout::simplebar::statusHeight);
+    if (isMouseOver())
+    {
+        g.setColour (colour::bg4);
+        g.fillRoundedRectangle (pill, pill.getHeight() / 2.0f);
+    }
+    auto content = pill.reduced (10.0f, 0.0f);
+    const auto iconBox = content.removeFromLeft (14.0f).withSizeKeepingCentre (14.0f, 14.0f);
+    switch (state)
+    {
+        case SaveState::saved: icons::draw (g, Icon::cloudCheck, iconBox.withSizeKeepingCentre (18.0f, 18.0f), colour::ledOn); break;
+        case SaveState::backedUp: icons::draw (g, Icon::cloud, iconBox.withSizeKeepingCentre (18.0f, 18.0f), colour::textSecondary); break;
+        case SaveState::unsaved:
+            g.setColour (colour::warning);
+            g.fillEllipse (iconBox.withSizeKeepingCentre (8.0f, 8.0f));
+            break;
+        case SaveState::fresh: icons::draw (g, Icon::cloud, iconBox.withSizeKeepingCentre (18.0f, 18.0f), colour::textDisabled); break;
+    }
+    content.removeFromLeft (6.0f);
+    g.setFont (font (type::small));
+    g.setColour (state == SaveState::fresh ? colour::textSecondary : colour::textPrimary);
+    g.drawFittedText (text, content.toNearestInt(), juce::Justification::centredLeft, 1, 0.8f);
+}
+
+void SaveStatus::mouseUp (const juce::MouseEvent& e)
+{
+    if (getLocalBounds().contains (e.getPosition()) && ! e.mods.isPopupMenu() && onSave)
+        onSave();
+}
+
+ui::Hint SaveStatus::hintAt (juce::Point<int>)
+{
+    return { tr ("LYNX backs your work up by itself. Click to save the project (Ctrl+S)"), {}, false, false };
+}
 } // namespace lynx::toolbar
 
 // The process memory comes from the OS; its headers go last (windows.h defines macros such as `small`).
@@ -1809,6 +2789,7 @@ ui::Hint EditOverlay::hintAt (juce::Point<int> p)
  #define PSAPI_VERSION 2 // GetProcessMemoryInfo from kernel32 (K32GetProcessMemoryInfo): no extra library
  #include <windows.h>
  #include <psapi.h>
+ #include <tlhelp32.h>
 #endif
 
 std::int64_t lynx::toolbar::PerformanceMeter::processPrivateBytes()
@@ -1820,6 +2801,40 @@ std::int64_t lynx::toolbar::PerformanceMeter::processPrivateBytes()
     return 0;
 #else
     return processMemoryBytes();
+#endif
+}
+
+int lynx::toolbar::PerformanceMeter::threadCount()
+{
+#if JUCE_WINDOWS
+    const auto snap = CreateToolhelp32Snapshot (TH32CS_SNAPTHREAD, 0);
+    if (snap == INVALID_HANDLE_VALUE)
+        return 0;
+    THREADENTRY32 entry {};
+    entry.dwSize = sizeof (entry);
+    int n = 0;
+    const auto self = GetCurrentProcessId();
+    for (auto ok = Thread32First (snap, &entry); ok; ok = Thread32Next (snap, &entry))
+        if (entry.th32OwnerProcessID == self)
+            ++n;
+    CloseHandle (snap);
+    return n;
+#elif JUCE_LINUX
+    for (const auto& line : juce::StringArray::fromLines (juce::File ("/proc/self/status").loadFileAsString()))
+        if (line.startsWith ("Threads:"))
+            return line.fromFirstOccurrenceOf (":", false, false).trim().getIntValue();
+    return 0;
+#else
+    return 0;
+#endif
+}
+
+std::pair<int, int> lynx::toolbar::PerformanceMeter::guiHandles()
+{
+#if JUCE_WINDOWS
+    return { (int) GetGuiResources (GetCurrentProcess(), 0 /* GR_GDIOBJECTS */), (int) GetGuiResources (GetCurrentProcess(), 1 /* GR_USEROBJECTS */) };
+#else
+    return { -1, -1 };
 #endif
 }
 

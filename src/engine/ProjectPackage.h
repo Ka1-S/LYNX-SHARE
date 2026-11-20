@@ -29,9 +29,14 @@ bool collectSamples (const Song& song, const juce::File& folder, std::map<std::s
                      juce::String& error);
 
 // Extracts a package into a new folder under `destinationRoot` (named after the zip, made unique) and returns the
-// project file inside (the first .lynx, else the first .flp); an invalid file on failure.
+// project file inside (the first .lynx, else the first .flp; round 190ic: else the first GarageBand .band folder, as
+// GarageBand for iOS shares a song); an invalid file on failure.
 juce::File extractZip (const juce::File& zip, const juce::File& destinationRoot, juce::String& error);
 
 // Where opened packages are extracted: Documents/LYNX/Projects/Unpacked.
 juce::File defaultExtractRoot();
+
+// Round 190ic (issue #184): the GarageBand package (.band folder) `file` is or lies in ("CC Jingle.band", or its
+// "projectData" picked in a file dialog that can't choose folders); an invalid file when there is none.
+juce::File garageBandPackage (const juce::File& file);
 } // namespace lynx::ProjectPackage

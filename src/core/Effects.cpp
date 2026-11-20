@@ -5,11 +5,16 @@
 #include "core/RhythmPan.h"
 #include "core/MixSuite.h"
 #include "core/VoiceMatch.h"
+#include "core/RenDynamics.h"
+#include "core/BusComp2500.h"
 #include "core/EchoSuite.h"
 #include "core/LynxTune.h"
+#include "core/PeakShapes.h"
 #include "core/LynxVerbs.h"
+#include "core/LimiterLaw.h"
 
 #include "core/Effector.h"
+#include "core/KiloheartsDsp.h"
 #include "core/PitcherDsp.h"
 #include "core/Reeverb2.h"
 #include "core/LuxeVerb.h"
@@ -69,6 +74,9 @@
 #include <cmath>
 #include <complex>
 #include <cstdio>
+#include <cstdint>
+#include <type_traits>
+#include <cstring>
 
 namespace lynx
 {
@@ -219,15 +227,22 @@ class Compressor final : public Effect
 public:
     // `initial` (may be null): the slot's parameters, so the voicing's latency is known after prepare(), before the
     // first block (issue #113: a Patcher plans its delay compensation right after building its nodes)
-    explicit Compressor (const EffectParams* initial = nullptr) : vintageAtStart (initial != nullptr && (*initial)[8] >= 0.5f) {}
+    explicit Compressor (const EffectParams* initial = nullptr)
+        : vintageAtStart (initial != nullptr && (*initial)[8] >= 0.5f),
+          renAtStart (initial != nullptr && (*initial)[8] >= 0.5f && (*initial)[(std::size_t) compressorRenLaw] >= 0.5f),
+          voxAtStart (initial != nullptr && (*initial)[8] >= 0.5f && (*initial)[(std::size_t) compressorVoxLaw] >= 0.5f),
+          apiAtStart (initial != nullptr && (*initial)[(std::size_t) compressorApiLaw] >= 0.5f) {}
 
     void prepare (double sr) noexcept override
     {
         sampleRate = sr;
         vintage.prepare (sr);
+        ren.prepare (sr);
+        vox.prepare (sr);
+        apiOn = false;
         reset();
-        if (vintageAtStart)
-            latency.store (vintage.latency(), std::memory_order_relaxed);
+        if (vintageAtStart && ! apiAtStart) // (rollup step 12: the API-2500 bus law, first in process(), has no latency)
+            latency.store (voxAtStart ? vox.latency() : renAtStart ? ren.latency() : vintage.latency(), std::memory_order_relaxed);
     }
     void reset() noexcept override
     {
@@ -235,6 +250,10 @@ public:
         inPower = outPower = 0.0f;
         autoGain = 1.0f;
         vintage.reset();
+        ren.reset();
+        for (auto& z : channelState) z = {}; // round 190mm
+        rchGate.reset(); // round 190mt
+        vox.reset();
     }
 
     // round 123: voicing 1 = the measured program-dependent compressor (core/VoiceMatch.h); it delays the audio
@@ -270,6 +289,115 @@ public:
 
     void process (float* l, float* r, int n, const EffectParams& params, double) noexcept override
     {
+        if (params[(std::size_t) compressorApiLaw] >= 0.5f)
+        {
+            // round 190mm (dyn): the VCA bus compressor law (core/BusComp2500.h; set only by the API-2500 translator)
+            static constexpr double ratios[7] { 1.5, 2.0, 3.0, 4.0, 6.0, 10.0, 1.0e6 }, attacks[7] { 0.03, 0.1, 0.3, 1.0, 3.0, 10.0, 30.0 };
+            static constexpr double releases[6] { 0.05, 0.1, 0.2, 0.5, 1.0, 2.0 };
+            const auto step = [&] (int k, int top) { return std::clamp ((int) std::lround (params[(std::size_t) k] * (float) top), 0, top); };
+            tail = -1;
+            latency.store (0, std::memory_order_relaxed);
+            float peakIn = 0.0f, peakOut = 0.0f;
+            for (int i = 0; i < n; ++i)
+                peakIn = std::max (peakIn, std::max (std::abs (l[i]), std::abs (r[i])));
+            buscomp::Settings v;
+            v.thresholdDb = 10.0 - 30.0 * std::clamp ((double) params[(std::size_t) compressorApiThreshold], 0.0, 1.0);
+            v.ratio = ratios[step (compressorApiRatio, 6)];
+            v.attackMs = attacks[step (compressorApiAttack, 6)];
+            const int rel = step (compressorApiRelease, 6);
+            v.releaseS = rel < 6 ? releases[rel] : 0.05 + 2.95 * std::clamp ((double) params[(std::size_t) compressorApiVar], 0.0, 1.0);
+            v.knee = 2 - step (compressorApiKnee, 2);
+            v.thrust = step (compressorApiThrust, 2);
+            v.feedback = params[(std::size_t) compressorApiFeedback] >= 0.5f;
+            v.autoMakeup = params[(std::size_t) compressorApiManual] < 0.5f;
+            v.makeupDb = params[(std::size_t) compressorApiMakeup] > 0.0f ? 48.0 * (double) params[(std::size_t) compressorApiMakeup] - 24.0 : 0.0;
+            v.mix = 1.0 - std::clamp ((double) params[(std::size_t) compressorApiDry], 0.0, 1.0);
+            v.trimDb = params[(std::size_t) compressorApiTrim] > 0.0f ? 36.0 * (double) params[(std::size_t) compressorApiTrim] - 18.0 : 0.0;
+            if (! apiOn)
+            {
+                api.prepare (sampleRate);
+                apiOn = true;
+            }
+            api.process (l, r, n, v);
+            for (int i = 0; i < n; ++i)
+                peakOut = std::max (peakOut, std::max (std::abs (l[i]), std::abs (r[i])));
+            useSidechain = false;
+            meterLimit.store (0.0f, std::memory_order_relaxed);
+            meterGr.store (std::clamp (api.reductionDb() / 30.0f, 0.0f, 1.0f), std::memory_order_relaxed);
+            meterChange.store (-api.reductionDb(), std::memory_order_relaxed);
+            meterIn.store (std::min (peakIn, 1.0f), std::memory_order_relaxed);
+            meterOut.store (std::min (peakOut, 1.0f), std::memory_order_relaxed);
+            return;
+        }
+        apiOn = false;
+        if (params[8] >= 0.5f && params[(std::size_t) compressorVoxLaw] >= 0.5f)
+        {
+            // round 190mm: the one-knob vocal compressor (core/RenDynamics.h rendyn::Vox; set only by the
+            // Renaissance Vox translator): the threshold knob, the gate and the output gain in hidden parameters
+            tail = -1;
+            latency.store (vox.latency(), std::memory_order_relaxed);
+            float peakIn = 0.0f, peakOut = 0.0f;
+            for (int i = 0; i < n; ++i)
+                peakIn = std::max (peakIn, std::max (std::abs (l[i]), std::abs (r[i])));
+            rendyn::VoxSettings v;
+            v.compressionDb = std::min (0.0, (double) compThresholdDb (params[0]));
+            const float gate = params[(std::size_t) compressorVoxGate];
+            v.gateDb = gate > 0.0f ? -80.0 + 80.0 * std::clamp ((double) gate, 0.0, 1.0) : -80.0;
+            v.gateReleaseMs = 10.0 + 240.0 * std::clamp ((double) params[(std::size_t) compressorVoxGateRelease], 0.0, 1.0);
+            v.gainDb = -36.0 * std::clamp ((double) params[(std::size_t) compressorVoxGain], 0.0, 1.0);
+            vox.process (l, r, n, v);
+            meterLimit.store (0.0f, std::memory_order_relaxed);
+            for (int i = 0; i < n; ++i)
+                peakOut = std::max (peakOut, std::max (std::abs (l[i]), std::abs (r[i])));
+            useSidechain = false;
+            meterGr.store (std::clamp (vox.reductionDb() / 30.0f, 0.0f, 1.0f), std::memory_order_relaxed);
+            meterChange.store (-vox.reductionDb(), std::memory_order_relaxed);
+            meterIn.store (std::min (peakIn, 1.0f), std::memory_order_relaxed);
+            meterOut.store (std::min (peakOut, 1.0f), std::memory_order_relaxed);
+            return;
+        }
+        if (params[8] >= 0.5f && params[(std::size_t) compressorRenLaw] >= 0.5f)
+        {
+            // round 190mg: the vintage voicing's Renaissance law (core/VoiceMatch.h progcomp::Renaissance; set only by the
+            // Renaissance Compressor translator)
+            tail = -1;
+            latency.store (ren.latency(), std::memory_order_relaxed);
+            float peakIn = 0.0f, peakOut = 0.0f;
+            for (int i = 0; i < n; ++i)
+                peakIn = std::max (peakIn, std::max (std::abs (l[i]), std::abs (r[i])));
+            vmatch::progcomp::RenSettings v;
+            const bool rc = params[13] >= 0.5f;
+            v.thresholdDb = compThresholdDb (params[0]);
+            v.ratio = rc ? rcRatio (params[14]) : compRatio (params[1]);
+            v.attackMs = rc ? rcAttackMs (params[16]) : compAttackMs (params[2]);
+            v.releaseMs = rc ? rcReleaseMs (params[17]) : compReleaseMs (params[3]);
+            v.gainDb = rc ? rcGainDb (params[15]) : compMakeupDb (params[4]);
+            v.mix = std::clamp ((double) params[6], 0.0, 1.0);
+            v.trimDb = -18.0 + 36.0 * std::clamp ((double) params[7], 0.0, 1.0);
+            v.manual = params[9] >= 0.5f;
+            v.opto = params[10] >= 0.5f;
+            v.smooth = params[11] >= 0.5f;
+            v.limiter = params[12] >= 0.5f; // the reference's limiter sits inside its gain path
+            v.voxCurve = params[(std::size_t) compressorRVoxType] >= 0.5f; // round 190mt: RChannel's RVox type
+            // round 190mm: the Renaissance Channel's EQ (hidden; set only by the RChannel translator)
+            const bool channel = params[(std::size_t) compressorChannelLaw] >= 0.5f;
+            const bool eqAfter = params[(std::size_t) compressorChannelRouting] >= 0.5f;
+            if (channel) channelDesign (params);
+            if (channel && ! eqAfter) channelEq (l, r, n);
+            if (params[(std::size_t) compressorRchGate] >= 0.5f) // round 190mt: the RChannel's gate (hidden)
+                rchGate.process (l, r, n, params, sampleRate);
+            ren.process (l, r, n, v);
+            if (channel && eqAfter) channelEq (l, r, n);
+            meterLimit.store (0.0f, std::memory_order_relaxed);
+            for (int i = 0; i < n; ++i)
+                peakOut = std::max (peakOut, std::max (std::abs (l[i]), std::abs (r[i])));
+            useSidechain = false;
+            meterGr.store (std::clamp (ren.reductionDb() / 30.0f, 0.0f, 1.0f), std::memory_order_relaxed);
+            meterChange.store (ren.changeDb(), std::memory_order_relaxed);
+            meterIn.store (std::min (peakIn, 1.0f), std::memory_order_relaxed);
+            meterOut.store (std::min (peakOut, 1.0f), std::memory_order_relaxed);
+            return;
+        }
         if (params[8] >= 0.5f)
         {
             tail = -1; // (round 190gp: the measured voicing keeps the fixed hold)
@@ -421,12 +549,100 @@ public:
     int tailSamples() const noexcept override { return tail; }
 
 private:
+    // round 190mm: the Renaissance Channel's EQ — up to four bands of sections from Facet's Waves design law, redesigned
+    // when their parameters change; transposed direct form II per channel
+    void channelDesign (const EffectParams& params) noexcept
+    {
+        bool same = channelDesigned && channelRate == sampleRate;
+        for (int i = 0; i < 16 && same; ++i)
+            same = channelKey[(std::size_t) i] == params[(std::size_t) (compressorChannelBand0 + i)];
+        if (same) return;
+        EffectParams fp {};
+        fp[(std::size_t) facet::wavesLawParam] = 1.0f;
+        fp[(std::size_t) facet::scaleParam] = 0.5f; // 100 %
+        channelCount = 0;
+        for (int k = 0; k < 4; ++k)
+        {
+            const auto at = [&] (int f) { return params[(std::size_t) (compressorChannelBand0 + 4 * k + f)]; };
+            if (at (0) <= 0.0f) continue;
+            fp[(std::size_t) (facet::wavesBandParam0 + k)] = at (0);
+            fp[(std::size_t) facet::param (k, 0)] = facet::shapeValue (facet::Shape::bell);
+            fp[(std::size_t) facet::param (k, 1)] = at (1);
+            fp[(std::size_t) facet::param (k, 2)] = at (2);
+            fp[(std::size_t) facet::param (k, 3)] = at (3);
+            std::array<facet::Section, facet::maxSections> sec {};
+            const int c = facet::design (fp, k, sampleRate, sec, 0.0);
+            for (int j = 0; j < c && channelCount < (int) channelSec.size(); ++j)
+                channelSec[(std::size_t) channelCount++] = sec[(std::size_t) j];
+        }
+        for (int i = 0; i < 16; ++i)
+            channelKey[(std::size_t) i] = params[(std::size_t) (compressorChannelBand0 + i)];
+        if (! channelDesigned || channelRate != sampleRate)
+            for (auto& z : channelState) z = {};
+        channelDesigned = true;
+        channelRate = sampleRate;
+    }
+    void channelEq (float* l, float* r, int n) noexcept
+    {
+        for (int k = 0; k < channelCount; ++k)
+        {
+            const auto& c = channelSec[(std::size_t) k];
+            for (int ch = 0; ch < 2; ++ch)
+            {
+                float* x = ch == 0 ? l : r;
+                auto& z = channelState[(std::size_t) (2 * k + ch)];
+                for (int i = 0; i < n; ++i)
+                {
+                    const double in = x[i], out = c.b0 * in + z[0];
+                    z[0] = c.b1 * in - c.a1 * out + z[1];
+                    z[1] = c.b2 * in - c.a2 * out;
+                    x[i] = (float) out;
+                }
+            }
+        }
+    }
+    std::array<facet::Section, 8> channelSec {};
+    std::array<std::array<double, 2>, 16> channelState {};
+    std::array<float, 16> channelKey {};
+    int channelCount = 0;
+    bool channelDesigned = false;
+    double channelRate = 0.0;
+
     int tail = -1;
     std::atomic<float> meterGr { 0.0f }, meterIn { 0.0f }, meterOut { 0.0f }, meterLimit { 0.0f }, meterChange { 0.0f };
     float limitGain = 1.0f;
     std::atomic<int> latency { 0 };
     vmatch::progcomp::Compressor vintage;
-    bool vintageAtStart = false;
+    vmatch::progcomp::Renaissance ren; // round 190mg
+    rendyn::Vox vox; // round 190mm (dyn)
+    // round 190mt: the Renaissance Channel's gate (Effects.h CompressorRchGate)
+    struct RchGate
+    {
+        double env = 0.0, g = 1.0;
+        void reset() noexcept { env = 0.0; g = 1.0; }
+        void process (float* l, float* r, int n, const EffectParams& p, double sr) noexcept
+        {
+            const double thrDb = 108.0 * std::clamp ((double) p[(std::size_t) compressorRchGateThreshold], 0.0, 1.0) - 90.0;
+            const double floorDb = 90.0 * std::clamp ((double) p[(std::size_t) compressorRchGateFloor], 0.0, 1.0) - 90.0;
+            const double relMs = 10.0 * std::pow (500.0, std::clamp ((double) p[(std::size_t) compressorRchGateRelease], 0.0, 1.0));
+            const bool gate = p[(std::size_t) compressorRchGateMode] >= 0.5f;
+            const double thr = std::pow (10.0, thrDb / 20.0), fl = std::pow (10.0, floorDb / 20.0);
+            const double dC = std::exp (-1.0 / (std::max (0.14, relMs * 0.001) * sr)), rC = std::exp (-1.0 / (relMs * 0.001 * sr));
+            const double aC = std::exp (-1.0 / (0.001 * sr));
+            for (int i = 0; i < n; ++i)
+            {
+                const double x = std::max (std::abs ((double) l[i]), std::abs ((double) r[i]));
+                env = x > env ? x : env * dC;
+                const double target = env >= thr ? 1.0 : (gate ? fl : std::max (fl, env / thr));
+                g = target + (g - target) * (target > g ? aC : rC);
+                l[i] = (float) (l[i] * g);
+                r[i] = (float) (r[i] * g);
+            }
+        }
+    } rchGate;
+    buscomp::Engine api; // round 190mm (dyn)
+    bool apiOn = false;
+    bool vintageAtStart = false, renAtStart = false, voxAtStart = false, apiAtStart = false;
     double sampleRate = 44100.0;
     float envelopeDb = 0.0f;
     float inPower = 0.0f, outPower = 0.0f, autoGain = 1.0f;
@@ -437,10 +653,72 @@ private:
 
 // ---------------------------------------------------------------------------
 
+// Round 190kg (perf): the basic Delay's glide over one chunk whose reads all lie before its writes — the same
+// operations per sample as Delay::process's own glide (the length steps toward the target and snaps within 0.001
+// sample; the line read between samples; the feedback low-pass), the two sides in one loop. Returns the samples it
+// glided (fewer than m when the glide lands). GCC's straight-line vectoriser paired the two sides into half-filled
+// vectors with more shuffles than work here, so it is off for this function (no effect on the results: the same
+// IEEE operations either way)
+#if defined(__GNUC__) && ! defined(__clang__)
+__attribute__ ((optimize ("no-tree-slp-vectorize")))
+#endif
+int delayGlideChunk (double& cur, double target, double glideK, const float* bufL, const float* bufR, std::size_t size,
+                     std::size_t at, int m, float dampCoeff, float& dampL, float& dampR, float* eL, float* eR) noexcept
+{
+    auto c = cur;
+    auto lpL = dampL, lpR = dampR;
+    int k = 0;
+    // flat: no position of the chunk wraps — its writes end before the line's end, and every read (≥ 1 sample after
+    // the line's start: the lengths are ≤ the larger of `c` and `target`) lies after the start; the read positions are
+    // then plain differences, the same ones the wrapping arithmetic gives
+    const auto longest = (std::size_t) (std::int64_t) std::max (c, target);
+    if (at + (std::size_t) m <= size && at >= longest + 1)
+    {
+        for (; k < m && c != target; ++k, ++at)
+        {
+            const auto diff = target - c;
+            c = std::abs (diff) < 0.001 ? target : c + diff * glideK;
+            const auto wholeSigned = (std::int64_t) c;
+            const auto frac = (float) (c - (double) wholeSigned);
+            const auto from = at - (std::size_t) wholeSigned;
+            const auto xL = bufL[from], xR = bufR[from];
+            lpL += dampCoeff * ((xL + (bufL[from - 1] - xL) * frac) - lpL);
+            lpR += dampCoeff * ((xR + (bufR[from - 1] - xR) * frac) - lpR);
+            eL[k] = lpL;
+            eR[k] = lpR;
+        }
+    }
+    else
+        for (; k < m && c != target; ++k)
+        {
+            const auto diff = target - c;
+            c = std::abs (diff) < 0.001 ? target : c + diff * glideK;
+            const auto wholeSigned = (std::int64_t) c; // (≥ 1 and < size)
+            const auto whole = (std::size_t) wholeSigned;
+            const auto frac = (float) (c - (double) wholeSigned);
+            const auto from = at >= whole ? at - whole : at + size - whole, before = from == 0 ? size - 1 : from - 1;
+            const auto xL = bufL[from], xR = bufR[from];
+            lpL += dampCoeff * ((xL + (bufL[before] - xL) * frac) - lpL);
+            lpR += dampCoeff * ((xR + (bufR[before] - xR) * frac) - lpR);
+            eL[k] = lpL;
+            eR[k] = lpR;
+            if (++at == size)
+                at = 0;
+        }
+    cur = c;
+    dampL = lpL;
+    dampR = lpR;
+    return k;
+}
+
 class Delay final : public Effect
 {
 public:
     static constexpr double maxSeconds = 3.0;
+    // Round 190ie (issue #185): a tempo change glides the delay to its new length in this time, as FL's Fruity Delay 3
+    // does at its default Time smoothing (REA_rodada52 §3.2, REA_rodada190ie): d ← d + (target − d)·k per sample with
+    // k = 1 − 0.01^(1 / (T·rate)), snapped onto the target within 0.001 sample, read between samples (linear)
+    static constexpr double glideSeconds = 0.5;
 
     Delay()
     {
@@ -449,7 +727,12 @@ public:
         buffer[1].assign (size, 0.0f);
     }
 
-    void prepare (double sr) noexcept override { sampleRate = sr; reset(); }
+    void prepare (double sr) noexcept override
+    {
+        sampleRate = sr;
+        glideK = 1.0 - std::pow (0.01, 1.0 / (glideSeconds * sr));
+        reset();
+    }
 
     void reset() noexcept override
     {
@@ -457,11 +740,13 @@ public:
         std::fill (buffer[1].begin(), buffer[1].end(), 0.0f);
         damp[0] = damp[1] = 0.0f;
         write = 0;
+        settled = false;
     }
 
     void process (float* l, float* r, int n, const EffectParams& params, double bpm) noexcept override
     {
-        const auto beats = delayDivisions[(std::size_t) delayIndex (params[0])];
+        const auto index = delayIndex (params[0]);
+        const auto beats = delayDivisions[(std::size_t) index];
         const auto seconds = std::min (maxSeconds - 0.01, beats * 60.0 / std::max (bpm, 20.0));
         const auto delaySamples = std::max<std::size_t> (1, (std::size_t) (seconds * sampleRate));
         const auto feedback = params[1] * 0.95f;
@@ -470,39 +755,163 @@ public:
         const auto dampCoeff = 1.0f - params[4] * 0.9f; // 1 = no filter in the feedback path
         const auto size = buffer[0].size();
 
-        for (int i = 0; i < n; ++i)
-        {
-            const auto readPos = (write + size - delaySamples) % size;
-            auto echoL = buffer[0][readPos];
-            auto echoR = buffer[1][readPos];
+        // the first block and a move of the Time knob take the new length at once (as before round 190ie); only a
+        // tempo change glides (the renderer steps the tempo at every block of a tempo clip: each step was a jump of
+        // the read position, a click at the block rate that the feedback kept)
+        const auto target = (double) delaySamples;
+        if (! settled || index != lastIndex)
+            current = target;
+        settled = true;
+        lastIndex = index;
 
-            // 1-pole low-pass in the feedback path: repeats get darker
-            damp[0] += dampCoeff * (echoL - damp[0]);
-            damp[1] += dampCoeff * (echoR - damp[1]);
-            echoL = damp[0];
-            echoR = damp[1];
+        // round 190kg (perf, bit for bit): the same arithmetic in the same order per sample, arranged for fewer
+        // instructions. The state lives in locals (the buffers' floats could alias the float members: every sample
+        // stored and reloaded them); positions wrap by a compare instead of a division; the glide's conversions are
+        // signed (the length is ≥ 1 and < 2^53: the same values, without the unsigned conversions' slow paths). And
+        // when the line is longer than a chunk, no sample of the chunk can read what the chunk writes, so the chunk
+        // runs in two passes: the echoes as the line holds them through the feedback low-pass (serial), then the line's
+        // writes and the outputs (independent per sample: vectorisable, still one IEEE operation each, in the same order)
+        float* const bufL = buffer[0].data();
+        float* const bufR = buffer[1].data();
+        auto w = write;
+        auto dampL = damp[0], dampR = damp[1];
+        auto cur = current;
+        const auto steadyPos = [&] (std::size_t at) noexcept { return (at + size - delaySamples) % size; };
+        // one glide step, then the echo read between samples at write position `at`
+        const auto glideRead = [&] (std::size_t at0, float& echoL, float& echoR) noexcept {
+            const auto diff = target - cur;
+            cur = std::abs (diff) < 0.001 ? target : cur + diff * glideK;
+            const auto wholeSigned = (std::int64_t) cur; // (≥ 1 and < size)
+            const auto whole = (std::size_t) wholeSigned;
+            const auto frac = (float) (cur - (double) wholeSigned);
+            const auto at = at0 >= whole ? at0 - whole : at0 + size - whole, before = at == 0 ? size - 1 : at - 1;
+            echoL = bufL[at] + (bufL[before] - bufL[at]) * frac;
+            echoR = bufR[at] + (bufR[before] - bufR[at]) * frac;
+        };
+        const auto run = [&] (auto pingPongOn) noexcept {
+            constexpr bool pp = decltype (pingPongOn)::value;
+            // one sample as before round 190kg's passes (the chunks a short line could read back)
+            const auto sample = [&] (int i, float echoL, float echoR) noexcept {
+                // 1-pole low-pass in the feedback path: repeats get darker
+                dampL += dampCoeff * (echoL - dampL);
+                dampR += dampCoeff * (echoR - dampR);
+                echoL = dampL;
+                echoR = dampR;
 
-            const auto inL = l[i], inR = r[i];
+                const auto inL = l[i], inR = r[i];
 
-            if (pingPong) // mono input on the left side, repeats alternate
+                if constexpr (pp) // mono input on the left side, repeats alternate
+                {
+                    bufL[w] = 0.5f * (inL + inR) + echoR * feedback;
+                    bufR[w] = echoL * feedback;
+                }
+                else
+                {
+                    bufL[w] = inL + echoL * feedback;
+                    bufR[w] = inR + echoR * feedback;
+                }
+
+                l[i] = inL + mix * echoL;
+                r[i] = inR + mix * echoR;
+                if (++w == size)
+                    w = 0;
+            };
+            constexpr int chunk = 64;
+            float eL[chunk], eR[chunk];
+            for (int i = 0; i < n;)
             {
-                buffer[0][write] = 0.5f * (inL + inR) + echoR * feedback;
-                buffer[1][write] = echoL * feedback;
+                const int m = std::min (chunk, n - i);
+                // (the glide moves monotonically between `cur` and `target`: every length read in the chunk is ≥ the
+                // smaller one's whole part)
+                if (std::min (cur, target) <= (double) (m + 1))
+                {
+                    for (const int end = i + m; i < end; ++i)
+                    {
+                        float echoL, echoR;
+                        if (cur != target) // gliding toward the new tempo's length
+                            glideRead (w, echoL, echoR);
+                        else // the steady length: whole samples, bit for bit as before
+                        {
+                            const auto readPos = steadyPos (w);
+                            echoL = bufL[readPos];
+                            echoR = bufR[readPos];
+                        }
+                        sample (i, echoL, echoR);
+                    }
+                    continue;
+                }
+                // 1. the echoes through the feedback path's low-pass: read between samples while the glide moves
+                // (nothing the chunk writes is read: every length is > m), then whole samples at the steady length
+                const int g = cur != target ? delayGlideChunk (cur, target, glideK, bufL, bufR, size, w, m, dampCoeff, dampL, dampR, eL, eR) : 0;
+                if (g < m) // (one loop per side: no shuffles between them)
+                {
+                    auto at = w + (std::size_t) g;
+                    if (at >= size)
+                        at -= size;
+                    const auto from = steadyPos (at);
+                    const auto steady = [&] (const float* line, float& lp, float* e) noexcept {
+                        auto readPos = from;
+                        for (int k = g; k < m; ++k)
+                        {
+                            lp += dampCoeff * (line[readPos] - lp);
+                            e[k] = lp;
+                            if (++readPos == size)
+                                readPos = 0;
+                        }
+                    };
+                    steady (bufL, dampL, eL);
+                    steady (bufR, dampR, eR);
+                }
+                // 2. the line's writes and the outputs, in runs up to the line's end
+                for (int done = 0; done < m;)
+                {
+                    const int seg = (int) std::min<std::size_t> ((std::size_t) (m - done), size - w);
+                    float* const outL = l + i + done;
+                    float* const outR = r + i + done;
+                    float* const lineL = bufL + w;
+                    float* const lineR = bufR + w;
+                    const float* const echoL = eL + done;
+                    const float* const echoR = eR + done;
+                    for (int k = 0; k < seg; ++k)
+                    {
+                        const auto inL = outL[k], inR = outR[k];
+                        if constexpr (pp)
+                        {
+                            lineL[k] = 0.5f * (inL + inR) + echoR[k] * feedback;
+                            lineR[k] = echoL[k] * feedback;
+                        }
+                        else
+                        {
+                            lineL[k] = inL + echoL[k] * feedback;
+                            lineR[k] = inR + echoR[k] * feedback;
+                        }
+                        outL[k] = inL + mix * echoL[k];
+                        outR[k] = inR + mix * echoR[k];
+                    }
+                    done += seg;
+                    w += (std::size_t) seg;
+                    if (w == size)
+                        w = 0;
+                }
+                i += m;
             }
-            else
-            {
-                buffer[0][write] = inL + echoL * feedback;
-                buffer[1][write] = inR + echoR * feedback;
-            }
-
-            l[i] = inL + mix * echoL;
-            r[i] = inR + mix * echoR;
-            write = (write + 1) % size;
-        }
+        };
+        if (pingPong)
+            run (std::true_type {});
+        else
+            run (std::false_type {});
+        current = cur;
+        write = w;
+        damp[0] = dampL;
+        damp[1] = dampR;
     }
 
 private:
     double sampleRate = 44100.0;
+    double glideK = 1.0;
+    double current = 0.0; // the length read now (samples), gliding toward the tempo's
+    int lastIndex = -1;
+    bool settled = false;
     std::array<std::vector<float>, 2> buffer;
     std::size_t write = 0;
     float damp[2] {};
@@ -747,13 +1156,23 @@ class Limiter final : public Effect
 public:
     static constexpr double lookaheadSeconds = 0.0015;
 
-    Limiter()
+    // (rollup step 9: `l2` = the slot's settings run round 190lf's L2 law, so the latency PDC reads before the first block
+    // is the law's window, as after it: issue #113's rule, tests/Pdc188eTests.inc)
+    explicit Limiter (bool l2 = false) : l2Active (l2)
     {
         const auto size = (std::size_t) (lookaheadSeconds * maxSampleRate) + 4;
         delay[0].assign (size, 0.0f);
         delay[1].assign (size, 0.0f);
         maxValues.assign (size, 0.0f);
         maxTimes.assign (size, 0);
+        // round 190lf: the L2 law's buffers, sized for 192 kHz (no allocation in prepare / process)
+        const auto l2Size = (std::size_t) std::ceil (limiterlaw::windowAt48k * maxSampleRate / 48000.0) + 2;
+        l2Delay[0].assign (l2Size, 0.0);
+        l2Delay[1].assign (l2Size, 0.0);
+        l2MinValues.assign (l2Size + 1, 1.0);
+        l2MinTimes.assign (l2Size + 1, 0);
+        l2BoxA.assign (l2Size, 1.0);
+        l2BoxB.assign (l2Size, 1.0);
     }
 
     void prepare (double sr) noexcept override
@@ -763,6 +1182,13 @@ public:
         // issue #134: the default project has this limiter on its Master)
         lookahead = std::clamp ((int) std::lround (lookaheadSeconds * sr), 1, (int) delay[0].size());
         attack = (float) (1.0 - std::exp (-1.0 / (lookahead * 0.3)));
+        // round 190lf: the L2 law's window and smoothing, scaled from 48 kHz (window = boxA + boxB - 1)
+        const auto scale = sr / 48000.0;
+        l2BoxALength = std::clamp ((int) std::lround (limiterlaw::boxAAt48k * scale), 1, (int) l2BoxA.size());
+        l2BoxBLength = std::clamp ((int) std::lround (limiterlaw::boxBAt48k * scale), 1, (int) l2BoxB.size());
+        l2Window = std::clamp (l2BoxALength + l2BoxBLength - 1, 1, (int) l2Delay[0].size());
+        l2Attack = 1.0 - std::exp (-1.0 / (limiterlaw::arcFollowAttackS * sr));
+        l2Release = 1.0 - std::exp (-1.0 / (limiterlaw::arcFollowReleaseS * sr));
         reset();
     }
 
@@ -778,13 +1204,23 @@ public:
         count = 1;
         maxValues[0] = 0.0f;
         maxTimes[0] = -1;
+        resetL2();
     }
 
-    int latencySamples() const noexcept override { return lookahead; }
+    int latencySamples() const noexcept override { return l2Active.load (std::memory_order_relaxed) ? l2Window : lookahead; }
     int tailSamples() const noexcept override { return tail; }
 
     void process (float* l, float* r, int n, const EffectParams& params, double) noexcept override
     {
+        if (limiterlaw::isL2 (params[(std::size_t) limiterlaw::lawParam]))
+        {
+            processL2 (l, r, n, params);
+            return;
+        }
+
+        if (l2Active.load (std::memory_order_relaxed))
+            l2Active.store (false, std::memory_order_relaxed);
+
         const auto ceiling = dbToGain (limiterCeilingDb (params[0]));
         const auto input = dbToGain (limiterGainDb (params[1]));
         const auto release = (float) (1.0 - std::exp (-1.0 / (limiterReleaseMs (params[2]) * 0.001 * sampleRate)));
@@ -835,6 +1271,167 @@ public:
     }
 
 private:
+    // round 190lf: the L2 law (core/LimiterLaw.h, docs/analise/REA_rodada190lf.md §2). The Gain knob is the make-up
+    // (an L2 threshold t and ceiling c: gain = c − t), the input limited at ceiling / gain: the gain each sample needs, its
+    // minimum over the window, ARC's follower of that minimum and its release (or the Release knob's), two moving
+    // averages; the audio delayed by the window. Every constant is LYNX's own fit on our Waves-demo probes.
+    void processL2 (float* l, float* r, int n, const EffectParams& params) noexcept
+    {
+        namespace ll = limiterlaw;
+        if (! l2Active.load (std::memory_order_relaxed))
+        {
+            resetL2();
+            l2Active.store (true, std::memory_order_relaxed);
+        }
+
+        const double ceiling = std::pow (10.0, limiterCeilingDb (params[0]) / 20.0);
+        const double gainDb = (double) limiterGainDb (params[1]) - 24.0 * (double) params[(std::size_t) ll::trimParam];
+        const double threshold = ceiling / std::pow (10.0, gainDb / 20.0);
+        const double makeup = std::min (ceiling, ll::ceilingMax) / threshold;
+        const bool arc = params[(std::size_t) ll::arcParam] >= 0.5f;
+        const double releaseS = limiterReleaseMs (params[2]) * 0.001 * ll::manualTimeScale;
+        const double manual = std::exp (-1.0 / (releaseS * sampleRate));
+        tail = tailOf (l2Window + 16.0 * (arc ? ll::arcFollowReleaseS : releaseS) * sampleRate + 64.0);
+        const int capacity = (int) l2MinValues.size();
+        // round 190mg: the requantizer's settings (0 bits = off: the law's output as before)
+        ditherBits = params[(std::size_t) ll::ditherBitsParam] > 0.0f ? std::clamp ((int) std::lround (params[(std::size_t) ll::ditherBitsParam] * 32.0f), 8, 24) : 0;
+        ditherTpdf = std::lround (params[(std::size_t) ll::ditherTypeParam] * 4.0f) == 2;
+        ditherShape = std::clamp ((int) std::lround (params[(std::size_t) ll::ditherShapeParam] * 8.0f) - 1, 0, 3);
+
+        for (int i = 0; i < n; ++i)
+        {
+            const double a = l[i], b = r[i];
+            const double peak = std::max (std::abs (a), std::abs (b));
+            const double need = peak > threshold ? threshold / peak : 1.0;
+
+            // the smallest need over the last l2Window samples (sliding minimum with a monotonic queue)
+            while (l2Count > 0 && l2MinValues[(std::size_t) ((l2Head + l2Count - 1) % capacity)] >= need)
+                --l2Count;
+            const auto slot = (std::size_t) ((l2Head + l2Count) % capacity);
+            l2MinValues[slot] = need;
+            l2MinTimes[slot] = l2Clock;
+            ++l2Count;
+            if (l2MinTimes[(std::size_t) l2Head] <= l2Clock - l2Window)
+            {
+                l2Head = (l2Head + 1) % capacity;
+                --l2Count;
+            }
+            ++l2Clock;
+            const double least = l2MinValues[(std::size_t) l2Head];
+
+            double g = least;
+            if (arc)
+            {
+                l2Follow += (least - l2Follow) * (least < l2Follow ? l2Attack : l2Release);
+                g = std::min (least, l2Follow);
+            }
+
+            if (g <= l2Gain)
+                l2Gain = g;
+            else
+            {
+                auto keep = manual;
+                if (arc)
+                {
+                    const double u = std::max (std::log (std::max (l2Gain, 1.0e-12)), ll::arcDepthFloor);
+                    const double v = std::clamp ((l2Follow - l2Gain) / std::max (l2Follow, 1.0e-9), 0.0, 1.0);
+                    const auto& q = ll::arcLaw;
+                    const double rate = std::exp (std::min (q[0] + q[1] * u + q[2] * v + q[3] * u * v + q[4] * u * u + q[5] * v * v, 12.0));
+                    keep = std::exp (-rate / sampleRate);
+                }
+                l2Gain = g + (l2Gain - g) * keep;
+            }
+
+            // two moving averages (their running sums recomputed at every wrap: no drift)
+            l2SumA += l2Gain - l2BoxA[(std::size_t) l2IndexA];
+            l2BoxA[(std::size_t) l2IndexA] = l2Gain;
+            if (++l2IndexA == l2BoxALength)
+            {
+                l2IndexA = 0;
+                l2SumA = 0.0;
+                for (int k = 0; k < l2BoxALength; ++k)
+                    l2SumA += l2BoxA[(std::size_t) k];
+            }
+            const double first = l2SumA / l2BoxALength;
+            l2SumB += first - l2BoxB[(std::size_t) l2IndexB];
+            l2BoxB[(std::size_t) l2IndexB] = first;
+            if (++l2IndexB == l2BoxBLength)
+            {
+                l2IndexB = 0;
+                l2SumB = 0.0;
+                for (int k = 0; k < l2BoxBLength; ++k)
+                    l2SumB += l2BoxB[(std::size_t) k];
+            }
+            const double smooth = l2SumB / l2BoxBLength * makeup;
+
+            const auto p = (std::size_t) l2Position;
+            const double outL = l2Delay[0][p] * smooth, outR = l2Delay[1][p] * smooth;
+            l2Delay[0][p] = a;
+            l2Delay[1][p] = b;
+            if (++l2Position >= l2Window)
+                l2Position = 0;
+            if (ditherBits > 0) // round 190mg: IDR (LimiterLaw.h)
+            {
+                l[i] = (float) requantize (outL, 0);
+                r[i] = (float) requantize (outR, 1);
+                continue;
+            }
+            l[i] = (float) outL;
+            r[i] = (float) outR;
+        }
+    }
+
+    // round 190mg: IDR — rounding to ditherBits through the error-feedback shaper, TPDF dither at Type 1
+    double requantize (double x, int c) noexcept
+    {
+        namespace ll = limiterlaw;
+        const double scale = std::ldexp (1.0, ditherBits - 1);
+        if (ditherShape == 0 && x == 0.0) // no shaping: digital silence stays silent (measured)
+            return 0.0;
+        double v = std::clamp (x, -1.0, 1.0) * scale;
+        auto& hist = ditherHist[c];
+        if (ditherShape > 0)
+        {
+            const auto& h = ll::ditherShaping[ditherShape - 1];
+            for (int k = 0; k < ll::ditherTaps; ++k)
+                v += h[k] * hist[(std::size_t) ((ditherPos[c] + k) % ll::ditherTaps)];
+        }
+        double d = 0.0;
+        if (ditherTpdf)
+        {
+            auto next = [this, c]() noexcept { auto& s = ditherSeed[c]; s ^= s << 13; s ^= s >> 17; s ^= s << 5; return (double) s * (1.0 / 4294967296.0); };
+            d = next() - next(); // TPDF, ±1 LSB
+        }
+        const double y = std::clamp (std::floor (v + d + 0.5), -scale, scale - 1.0);
+        if (ditherShape > 0) // the newest error first (index ditherPos), clamped so an overload cannot run away
+        {
+            ditherPos[c] = (ditherPos[c] + ll::ditherTaps - 1) % ll::ditherTaps;
+            hist[(std::size_t) ditherPos[c]] = std::clamp (y - v, -8.0, 8.0);
+        }
+        return y / scale;
+    }
+
+    void resetL2() noexcept
+    {
+        std::fill (l2Delay[0].begin(), l2Delay[0].end(), 0.0);
+        std::fill (l2Delay[1].begin(), l2Delay[1].end(), 0.0);
+        std::fill (l2BoxA.begin(), l2BoxA.end(), 1.0);
+        std::fill (l2BoxB.begin(), l2BoxB.end(), 1.0);
+        l2SumA = (double) l2BoxALength;
+        l2SumB = (double) l2BoxBLength;
+        l2IndexA = l2IndexB = l2Position = 0;
+        l2Follow = l2Gain = 1.0;
+        l2Clock = 0;
+        l2Head = 0;
+        l2Count = 1;
+        l2MinValues[0] = 1.0;
+        l2MinTimes[0] = -1;
+        for (auto& h : ditherHist) h.fill (0.0); // round 190mg: the requantizer (LYNX's renders stay deterministic)
+        ditherPos[0] = ditherPos[1] = 0;
+        ditherSeed[0] = 0x6C078965u;
+        ditherSeed[1] = 0x5DEECE66u;
+    }
+
     double sampleRate = 44100.0;
     int lookahead = 64, position = 0;
     float attack = 0.1f, gain = 1.0f;
@@ -844,6 +1441,19 @@ private:
     int head = 0, count = 0;
     std::int64_t clock = 0;
     int tail = -1;
+
+    int ditherBits = 0, ditherShape = 0, ditherPos[2] {};
+    bool ditherTpdf = false;
+    std::array<std::array<double, 48>, 2> ditherHist {};
+    std::uint32_t ditherSeed[2] { 0x6C078965u, 0x5DEECE66u };
+    std::atomic<bool> l2Active { false };
+    int l2Window = 64, l2BoxALength = 27, l2BoxBLength = 38, l2Position = 0, l2IndexA = 0, l2IndexB = 0;
+    double l2Attack = 0.0, l2Release = 0.0, l2Follow = 1.0, l2Gain = 1.0, l2SumA = 27.0, l2SumB = 38.0;
+    std::array<std::vector<double>, 2> l2Delay;
+    std::vector<double> l2MinValues, l2BoxA, l2BoxB;   // monotonic (increasing) queue for the sliding minimum; the averages
+    std::vector<std::int64_t> l2MinTimes;
+    int l2Head = 0, l2Count = 0;
+    std::int64_t l2Clock = 0;
 };
 
 // ---------------------------------------------------------------------------
@@ -1138,6 +1748,7 @@ public:
             }
             fl.process (l, r, n);
             tail = -1;
+            listen (l, r, n, params);
             return;
         }
         flMode = false;
@@ -1183,9 +1794,48 @@ public:
                 l[i] *= output;
                 r[i] *= output;
             }
+        listen (l, r, n, params);
     }
 
+    // round 190ih: the momentary band solo (peq::setSoloBand)
+    std::atomic<int> solo { -1 };
+
 private:
+    // after the EQ (its latency and sound kept), only the soloed band's region passes
+    void listen (float* l, float* r, int n, const EffectParams& params) noexcept
+    {
+        const auto band = solo.load (std::memory_order_relaxed);
+        if (band < 0 || band >= peq::bands)
+        {
+            soloShown = -1;
+            return;
+        }
+        const auto hz = params[(std::size_t) peq::param (band, 1)];
+        const auto width = params[(std::size_t) peq::param (band, 3)];
+        if (band != soloShown || hz != soloHz || width != soloWidth)
+        {
+            if (band != soloShown)
+                soloFilter.reset();
+            soloShown = band;
+            soloHz = hz;
+            soloWidth = width;
+            EffectParams bp {};
+            bp[(std::size_t) peq::param (0, 0)] = peq::typeValue (peq::BandType::bandPass);
+            bp[(std::size_t) peq::param (0, 1)] = hz;
+            bp[(std::size_t) peq::param (0, 3)] = peq::qValue (peq::soloQ (params, band));
+            std::array<Biquad, 4> fresh;
+            if (bandStages (bp, 0, sampleRate, fresh) > 0)
+            {
+                soloFilter.b0 = fresh[0].b0; soloFilter.b1 = fresh[0].b1; soloFilter.b2 = fresh[0].b2;
+                soloFilter.a1 = fresh[0].a1; soloFilter.a2 = fresh[0].a2;
+            }
+        }
+        soloFilter.processBlock (l, r, n);
+    }
+
+    Biquad soloFilter;
+    int soloShown = -1;
+    float soloHz = -1.0f, soloWidth = -1.0f;
     double sampleRate = 44100.0;
     std::array<std::array<Biquad, 4>, peq::bands> stages;
     std::array<Biquad*, peq::bands * 4> order {};
@@ -1552,6 +2202,27 @@ private:
 // Parameters: 0 period/64 beats, 1 depth ((a + 1)/2, a = maximum pan excursion), 2 phase
 // offset (cycles), 3 fixed pan ((p + 1)/2). Pan law: the utility's balance (FL's has not been decoded).
 } // namespace
+
+namespace peq
+{
+void setSoloBand (Effect* effect, int band) noexcept
+{
+    if (auto* eq = dynamic_cast<ParametricEq*> (effect))
+        eq->solo.store (band >= 0 && band < bands ? band : -1, std::memory_order_relaxed);
+}
+
+int soloBand (const Effect* effect) noexcept
+{
+    const auto* eq = dynamic_cast<const ParametricEq*> (effect);
+    return eq != nullptr ? eq->solo.load (std::memory_order_relaxed) : -1;
+}
+
+double soloQ (const EffectParams& params, int band) noexcept
+{
+    const auto v = params[(std::size_t) param (std::clamp (band, 0, bands - 1), 3)];
+    return std::clamp (q (flLaw (params) ? 1.0f - v : v), 0.5, 18.0); // (FL's bandwidth grows with the value; LYNX's Q shrinks)
+}
+} // namespace peq
 
 // FL's mode-0 pan law (REA_rodada27 §3.1): G_L = √2·cos((1 + pan)π/4), G_R = √2·sin((1 + pan)π/4) (unit volume),
 // the near side keeps 1 − f/2 of its input and gets f/2 of the other, f = 1 − (far gain); no clamp of pan
@@ -2053,7 +2724,34 @@ public:
         useSide[1] = true;
     }
 
+    // round 190ld (DP-32): the band display's live levels — FL's bands display animates each analysis band's level.
+    // Up to 32 columns (more bands: the loudest of each group), 6 bits each (−60…0 dB in 63 steps), four columns per
+    // output 0…7 packed as an exact integer in the float (vocoder::bandColumn decodes). Nothing while no editor shows them.
+    float controlOutput (int output) const noexcept override
+    {
+        if (! metersShown || output < 0 || output >= 8)
+            return 0.0f;
+        const auto bands = engine.state().bands;
+        const auto columns = std::min (bands, 32), per = std::max (1, bands / std::max (1, columns));
+        std::uint32_t packed = 0;
+        for (int c = 0; c < 4; ++c)
+        {
+            const auto column = output * 4 + c;
+            if (column >= columns)
+                break;
+            float peak = 0.0f;
+            for (int b = column * per; b < (column + 1) * per; ++b)
+                peak = std::max (peak, engine.bandMeter (b));
+            const auto q = peak > 0.001f ? std::clamp ((int) std::lround ((20.0f * std::log10 (peak) + 60.0f) * (63.0f / 60.0f)), 0, 63) : 0;
+            packed |= (std::uint32_t) q << (6 * c);
+        }
+        return (float) packed;
+    }
+
+    void setMetersShown (bool shown) noexcept override { metersShown = shown; }
+
 private:
+    bool metersShown = false; // (an editor counts itself in ProcessTimes::metersWanted)
     fvocoder::Engine engine;
     fvocoder::State saved;
     std::array<float, 16> last {};
@@ -2104,6 +2802,11 @@ public:
     {
         held = channels;
         heldCount = count;
+    }
+    bool followsHeldNotes() const noexcept override { return true; } // (round 190kz)
+    bool followsHeldNotesWith (const EffectParams& p) const noexcept override // (process(): unless the MIDI port routes its notes)
+    {
+        return ! (p[(std::size_t) pcorr::portRoutingParam] > 0.5f);
     }
 
     // round 190ee: a note from the MIDI Out channels on the Pitcher's port (FL: note in 0x180007a40, velocity / 127)
@@ -2358,6 +3061,14 @@ public:
             for (auto& c : b.chain)
                 c.effect->setHeldNotes (channels, count);
     }
+    bool followsHeldNotes() const noexcept override // (round 190kz)
+    {
+        for (const auto& b : branches)
+            for (const auto& c : b.chain)
+                if (c.effect != nullptr && c.effect->followsHeldNotes())
+                    return true;
+        return false;
+    }
 
     void process (float* l, float* r, int n, const EffectParams&, double bpm) noexcept override
     {
@@ -2549,7 +3260,11 @@ public:
             songBeats += beats;
         const auto whole = std::floor (cycles);
         const auto lfoAmount = (lfoAmountRaw < 0.0 ? -1.0 : 1.0) * (std::pow (6.0, std::abs (lfoAmountRaw) / 256.0) - 1.0) * 0.2;
-        const auto lfo = std::clamp (p[4] + lfoAmount * tension (wave (shape, cycles - whole, (std::uint32_t) (std::int64_t) whole), lfoTension), 0.0, 1.0);
+        // round 190kl (issue #197): LYNX's extra shapes (core/PeakShapes.h) when one is picked; none = FL's shape, as before
+        const auto extra = peakshapes::idOf (p[peakshapes::extraShapeParam]);
+        const auto shaped = extra != 0 ? peakshapes::wave (extra, cycles - whole, (std::uint32_t) (std::int64_t) whole)
+                                       : wave (shape, cycles - whole, (std::uint32_t) (std::int64_t) whole);
+        const auto lfo = std::clamp (p[4] + lfoAmount * tension (shaped, lfoTension), 0.0, 1.0);
 
         // outputs 0 = peak + LFO, 1 = peak, 2 = LFO; Ramp: at most 1/8 of the range per host tick (96 per quarter note)
         const double targets[3] { std::min (1.0, peak + lfo), peak, lfo };
@@ -3207,6 +3922,11 @@ const EffectInfo& effectInfoOf (EffectKind kind)
         }
         case EffectKind::strikeShaper: return mixsuite::strikeInfo();
         case EffectKind::anvilBus: return mixsuite::anvilInfo();
+        case EffectKind::corrode: return mixsuite::corrodeInfo();
+        case EffectKind::soundboard: return mixsuite::soundboardInfo();
+        case EffectKind::platter: return mixsuite::platterInfo();
+        case EffectKind::timeprism: return mixsuite::timeprismInfo();
+        case EffectKind::harmonia: return mixsuite::harmoniaInfo();
         case EffectKind::pocketAutoduck:
         {
             static const EffectInfo info { "Pocket Autoduck", { { "Ducking", 0.501f }, { "Attack", 0.1f }, { "Curve", 0.501f }, { "Time", 1.0f },
@@ -3649,6 +4369,8 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm, 
         return mixsuite::ridge::k4ParamText (param, v);
     if (kind == EffectKind::ridgeStrip && mixsuite::ridge::eVoicing (context)) // round 123: the console's own scales
         return mixsuite::ridge::eParamText (param, v);
+    if (kind == EffectKind::ridgeStrip && mixsuite::ridge::h32Voicing (context)) // round 190le: the 32C's own dials
+        return mixsuite::ridge::h32ParamText (param, v, context);
     if (kind == EffectKind::ridgeStrip && (param == mixsuite::ridge::lfGain || param == mixsuite::ridge::lmfGain
                                            || param == mixsuite::ridge::hmfGain || param == mixsuite::ridge::hfGain))
     {
@@ -4140,6 +4862,11 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
         case EffectKind::shellChannel:
         case EffectKind::strikeShaper:
         case EffectKind::anvilBus:
+        case EffectKind::corrode:
+        case EffectKind::soundboard:
+        case EffectKind::platter:
+        case EffectKind::timeprism:
+        case EffectKind::harmonia:
             return mixsuite::paramText (kind, param, v);
         case EffectKind::lynxTune:
             return lynxtune::paramText (param, v);
@@ -4349,6 +5076,49 @@ EffectSlot makeEffectSlot (EffectKind kind)
         slot.state = grossbeat::factoryContainer();
     if (kind == EffectKind::spiralEcho) // round 190fy: a new Spiral Echo runs the measured loop's revision 1 (hidden parameter)
         slot.params[(std::size_t) echosuite::spiral::revision] = 1.0f;
+    if (kind == EffectKind::spiralEcho) // round 190ly: … and its shifted loop's phase independent of the sample rate (hidden)
+        slot.params[(std::size_t) echosuite::spiral::rateLaw] = 1.0f;
+    if (kind == EffectKind::voiceShift) // round 190ho: a new Voice Shift runs the Measured law's revision 1 (hidden parameter)
+        slot.params[(std::size_t) voiceshift::revision] = 1.0f;
+    if (kind == EffectKind::hushDeEsser) // round 190iq: a new Hush runs the measured Allround timing (hidden)
+        slot.params[(std::size_t) mixsuite::hush::timing] = 1.0f;
+    if (kind == EffectKind::hushDeEsser) // round 190js: … and Single Vocal's "stands out" revision (hidden)
+        slot.params[(std::size_t) mixsuite::hush::vocalRevision] = 1.0f;
+    if (kind == EffectKind::echoform) // round 190is: a new Echoform runs the echo voicings' revision 1 (hidden parameter)
+        slot.params[(std::size_t) echosuite::echoform::revision] = 1.0f;
+    if (kind == EffectKind::crestCompressor) // round 190kw: a new Crest runs the V1 styles' revision 1 (hidden parameter)
+        slot.params[(std::size_t) dyn::crest::revision] = 1.0f;
+    if (kind == EffectKind::apexLimiter) // round 190lp: a new Apex runs the styles' refit, revision 1 (hidden parameter)
+        slot.params[(std::size_t) apex::pRevision] = 1.0f;
+    if (kind == EffectKind::sentryGate) // round 190lp: … and a new Sentry the level gate's refit (hidden parameter)
+        slot.params[(std::size_t) dyn::sentry::revision] = 1.0f;
+    if (kind == EffectKind::ember) // round 190kw: a new Ember runs the Saturn styles' own laws (hidden parameter)
+        slot.params[(std::size_t) mixsuite::ember::revision] = 1.0f;
+    // round 190it: a new Epoch Verb / Atrium / Foil Plate / Halo runs the 0.1.30 revision of the Measured law (hidden)
+    if (kind == EffectKind::epochVerb) slot.params[(std::size_t) verbs::epoch::revision] = 1.0f;
+    // round 190ly: … and Epoch Verb Concert Hall's short-decay trim (hidden). Off in new Epochs at the 0.1.30 rollup step 10 (it
+    // was fitted without round 190kw's loop law); round 190mb refitted it on top of the loop law, so it is on again since step
+    // 11 — ValhallaVintageVerb's refcap030 bank against step 10: mode 2.74 → 3.02 (27 up / 0 down), pairs 3.89 → 3.78 and
+    // sr48 = (3 files one step down), sr96 3.70 → 3.75
+    if (kind == EffectKind::epochVerb)
+        slot.params[(std::size_t) verbs::epoch::shortTrim] = 1.0f;
+    if (kind == EffectKind::epochVerb) // round 190kw: … and Epoch's level the reference's loop law (hidden)
+        slot.params[(std::size_t) verbs::epoch::loopLaw] = 1.0f;
+    if (kind == EffectKind::atrium) slot.params[(std::size_t) verbs::atrium::revision] = 1.0f;
+    if (kind == EffectKind::foilPlate) slot.params[(std::size_t) verbs::foil::revision] = 1.0f;
+    if (kind == EffectKind::foilPlate) // round 190ln: … and Foil Plate the reference's EQ / bass-decay laws (hidden)
+        slot.params[(std::size_t) verbs::foil::reaLaw] = 1.0f;
+    // (round 190ly: Atrium's dense late tank, verbs::atrium::reaLaw, is set only by the ValhallaRoom translator — the owner's
+    // perf rule; a new Atrium keeps the light 8-line tank)
+    if (kind == EffectKind::halo) slot.params[(std::size_t) verbs::halo::revision] = 1.0f;
+    if (kind == EffectKind::horizon) // round 190mb: a new Horizon runs the 0.1.30 revision (ValhallaFutureVerb's per-mode tone)
+        slot.params[(std::size_t) verbs::horizon::revision] = 1.0f;
+    if (kind == EffectKind::horizon) // round 190mj: … and its echo modes' and Room / Chamber's laws (hidden)
+        slot.params[(std::size_t) verbs::horizon::reaLaw] = 1.0f;
+    if (kind == EffectKind::latticeMod) // round 190it: … and a new Lattice Mod its tap network's revision 1 (hidden)
+        slot.params[(std::size_t) echosuite::lattice::revision] = 1.0f;
+    if (kind == EffectKind::luxeVerb) // round 190kw: a new LuxeVerb's Space engine runs the Pro-R 2 laws' revision 1 (hidden)
+        slot.params[(std::size_t) luxeVerbSpaceRevision] = 1.0f;
 
     return slot;
 }
@@ -4362,6 +5132,36 @@ std::size_t savedEffectParamCount (const EffectSlot& slot) noexcept
         if (slot.params[i - 1] != 0.0f)
             return i;
     return count;
+}
+
+namespace
+{
+struct HiddenParam
+{
+    EffectKind kind;
+    int index;
+    const char* name;
+};
+const HiddenParam kHiddenWithControl[] {
+    { EffectKind::ridgeStrip, (int) mixsuite::ridge::h32, "32C voicing" }, // round 190le
+};
+} // namespace
+
+int hiddenEffectParamIndex (EffectKind kind, const char* name) noexcept
+{
+    if (name != nullptr)
+        for (const auto& h : kHiddenWithControl)
+            if (h.kind == kind && std::strcmp (h.name, name) == 0)
+                return h.index;
+    return -1;
+}
+
+const char* hiddenEffectParamName (EffectKind kind, int index) noexcept
+{
+    for (const auto& h : kHiddenWithControl)
+        if (h.kind == kind && h.index == index)
+            return h.name;
+    return nullptr;
 }
 
 double savedEffectParamValue (float v) noexcept
@@ -4420,10 +5220,25 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 152: … and before the gain-stage attack keeps round 150's level-follower attack
     if (slot.kind == EffectKind::prismMultiband && savedCount <= (std::size_t) dyn::prism::rev152)
         slot.params[(std::size_t) dyn::prism::rev152] = 0.0f;
+    // round 190lg: … and before revision 1 (Pro-MB's own band compander graph) keeps the measured detector (bit for bit)
+    if (slot.kind == EffectKind::prismMultiband && savedCount <= (std::size_t) dyn::prism::revision)
+        slot.params[(std::size_t) dyn::prism::revision] = slot.params[(std::size_t) dyn::prism::lookaheadSwitch] = 0.0f;
     // round 190v: Crest saved before its two-way / vari-mu refit keeps round 108's laws, Sentry saved before its Vocal
     // noise reduction has none
     if (slot.kind == EffectKind::crestCompressor && savedCount <= (std::size_t) dyn::crest::law)
         slot.params[(std::size_t) dyn::crest::law] = 0.0f;
+    // round 190kw: … and one saved before the V1 styles' revision keeps the fitted Clean / Classic / Opto (bit for bit)
+    if (slot.kind == EffectKind::crestCompressor && savedCount <= (std::size_t) dyn::crest::revision)
+        slot.params[(std::size_t) dyn::crest::revision] = 0.0f;
+    // round 190lp: an Apex saved before the styles' refit keeps the fitted laws of rounds tp172b … 190co (bit for bit)
+    if (slot.kind == EffectKind::apexLimiter && savedCount <= (std::size_t) apex::pRevision)
+        slot.params[(std::size_t) apex::pRevision] = 0.0f;
+    // round 190lp: … and a Sentry saved before the level gate's refit keeps the measured gate of rounds tp172b … 190dm
+    if (slot.kind == EffectKind::sentryGate && savedCount <= (std::size_t) dyn::sentry::revision)
+        slot.params[(std::size_t) dyn::sentry::revision] = 0.0f;
+    // round 190lg: a Facet saved before keeps round 190jh / 190js's automatic-threshold law (bit for bit)
+    if (slot.kind == EffectKind::facetEq && savedCount <= (std::size_t) facet::autoRevisionParam)
+        slot.params[(std::size_t) facet::autoRevisionParam] = 0.0f;
     if (slot.kind == EffectKind::sentryGate && savedCount <= (std::size_t) dyn::sentry::law)
         slot.params[(std::size_t) dyn::sentry::law] = 0.0f;
     // round 150: Auto-pan saved before the Tweak block keeps the Rhythm voicing's clipped angle
@@ -4458,6 +5273,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190dp: a Voice Shift saved before the measured unvoiced path keeps the classic one (unvoiced passes through)
     if (slot.kind == EffectKind::voiceShift && savedCount <= (std::size_t) voiceshift::law)
         slot.params[(std::size_t) voiceshift::law] = 0.0f;
+    // round 190ho: … and one saved before the law's revision (0.1.27 … 0.1.29: Law, no hidden revision) keeps round 190dp's grains
+    if (slot.kind == EffectKind::voiceShift && savedCount <= (std::size_t) voiceshift::revision)
+        slot.params[(std::size_t) voiceshift::revision] = 0.0f;
     // round 165w: a Gemini Doubler saved before the measured shelves keeps round 124's (−30 … +12 dB, first order)
     if (slot.kind == EffectKind::geminiDoubler && savedCount <= (std::size_t) voicetools::gemini::eqLaw)
         slot.params[(std::size_t) voicetools::gemini::eqLaw] = 0.0f;
@@ -4486,28 +5304,121 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
         }
         if (law >= 0 && savedCount <= (std::size_t) law)
             slot.params[(std::size_t) law] = 0.0f;
+        // round 190it: one saved before the 0.1.30 revision keeps the 0.1.27 Measured law, bit for bit
+        int rev = -1;
+        switch (slot.kind)
+        {
+            case EffectKind::epochVerb: rev = verbs::epoch::revision; break;
+            case EffectKind::atrium: rev = verbs::atrium::revision; break;
+            case EffectKind::foilPlate: rev = verbs::foil::revision; break;
+            case EffectKind::halo: rev = verbs::halo::revision; break;
+            case EffectKind::horizon: rev = verbs::horizon::revision; break; // round 190mb
+            default: break;
+        }
+        if (rev >= 0 && savedCount <= (std::size_t) rev)
+            slot.params[(std::size_t) rev] = 0.0f;
+        // round 190kw: an Epoch Verb saved before the loop law keeps revision 1 as it was (or revision 0), bit for bit
+        if (slot.kind == EffectKind::epochVerb && savedCount <= (std::size_t) verbs::epoch::loopLaw)
+            slot.params[(std::size_t) verbs::epoch::loopLaw] = 0.0f;
+        // round 190ln: a Foil Plate saved before the reference's EQ / bass-decay laws keeps revision 1 as it was, bit for bit
+        if (slot.kind == EffectKind::foilPlate && savedCount <= (std::size_t) verbs::foil::reaLaw)
+            slot.params[(std::size_t) verbs::foil::reaLaw] = 0.0f;
+        // round 190mj: a Horizon saved before its echo-mode / Room / Chamber laws keeps revision 1 as it was, bit for bit
+        if (slot.kind == EffectKind::horizon && savedCount <= (std::size_t) verbs::horizon::reaLaw)
+            slot.params[(std::size_t) verbs::horizon::reaLaw] = 0.0f;
+        // round 190ly: an Epoch Verb saved before Concert Hall's short-decay trim keeps revision 1 as it was, bit for bit
+        if (slot.kind == EffectKind::epochVerb && savedCount <= (std::size_t) verbs::epoch::shortTrim)
+            slot.params[(std::size_t) verbs::epoch::shortTrim] = 0.0f;
+        // round 190mb: Epoch's rate law is only ever saved with a translated ValhallaVintageVerb
+        if (slot.kind == EffectKind::epochVerb && savedCount <= (std::size_t) verbs::epoch::rateLaw)
+            slot.params[(std::size_t) verbs::epoch::rateLaw] = 0.0f;
+        // round 190ls: an Atrium saved before the dense tank keeps revision 1 as it was, bit for bit
+        if (slot.kind == EffectKind::atrium && savedCount <= (std::size_t) verbs::atrium::reaLaw)
+            slot.params[(std::size_t) verbs::atrium::reaLaw] = 0.0f;
     }
     // round 152: a Compressor saved before the measured vintage curve keeps the round-150 curve
     if (slot.kind == EffectKind::compressor && savedCount <= 18 && slot.params.size() > 18)
         slot.params[18] = 0.0f;
+    // round 190mg: … and one saved before the Renaissance law keeps the vintage voicing's round-123 / 152 engine
+    if (slot.kind == EffectKind::compressor && savedCount <= (std::size_t) compressorRenLaw && slot.params.size() > (std::size_t) compressorRenLaw)
+        slot.params[(std::size_t) compressorRenLaw] = 0.0f;
+    // round 190mm: … and the Vox law's own hidden values (only a law-2 slot reads them)
+    if (slot.kind == EffectKind::compressor)
+        for (const int k : { compressorVoxLaw, compressorVoxGate, compressorVoxGateRelease, compressorVoxGain })
+            if (savedCount <= (std::size_t) k && slot.params.size() > (std::size_t) k)
+                slot.params[(std::size_t) k] = 0.0f;
+    if (slot.kind == EffectKind::compressor)
+        for (int k = compressorApiLaw; k < compressorApiEnd; ++k)
+            if (savedCount <= (std::size_t) k && slot.params.size() > (std::size_t) k)
+                slot.params[(std::size_t) k] = 0.0f;
+    // … a Low Lifter / Aether saved before keeps its own engine (the round's hidden laws off)
+    if (slot.kind == EffectKind::flLowLifter)
+        for (int k = lowlifter::bassLaw; k < lowlifter::bassEnd; ++k)
+            if (savedCount <= (std::size_t) k && slot.params.size() > (std::size_t) k)
+                slot.params[(std::size_t) k] = 0.0f;
+    if (slot.kind == EffectKind::aether)
+        for (int k = mixsuite::aether::vitLaw; k < mixsuite::aether::vitEnd; ++k)
+            if (savedCount <= (std::size_t) k && slot.params.size() > (std::size_t) k)
+                slot.params[(std::size_t) k] = 0.0f;
     // round 190do: a Gemini Doubler saved before the measured read head keeps the two crossfaded taps
     if (slot.kind == EffectKind::geminiDoubler && savedCount <= (std::size_t) voicetools::gemini::headLaw)
         slot.params[(std::size_t) voicetools::gemini::headLaw] = 0.0f;
+    // round 190mj: the SpaceModulator role's voices likewise (a translated SpaceModulator only)
+    if (slot.kind == EffectKind::orbit && savedCount <= (std::size_t) echosuite::orbit::voiceLaw)
+        slot.params[(std::size_t) echosuite::orbit::voiceLaw] = 0.0f;
+    // round 190mb: the SpaceModulator role's level law is only ever saved with it (a translated SpaceModulator)
+    if (slot.kind == EffectKind::orbit && savedCount <= (std::size_t) echosuite::orbit::smLaw)
+        slot.params[(std::size_t) echosuite::orbit::smLaw] = 0.0f;
     // round 190do: an Orbit saved before the measured sweep keeps the classic voices
     if (slot.kind == EffectKind::orbit && savedCount <= (std::size_t) echosuite::orbit::law)
         slot.params[(std::size_t) echosuite::orbit::law] = 0.0f;
     // round 190do: a Lattice Mod saved before the measured detune depth keeps the classic one
     if (slot.kind == EffectKind::latticeMod && savedCount <= (std::size_t) echosuite::lattice::law)
         slot.params[(std::size_t) echosuite::lattice::law] = 0.0f;
+    // round 190it: … and one saved before the tap network's revision keeps the summed loop
+    if (slot.kind == EffectKind::latticeMod && savedCount <= (std::size_t) echosuite::lattice::revision)
+        slot.params[(std::size_t) echosuite::lattice::revision] = 0.0f;
     // round 190do: a Spiral Echo saved before the measured loop keeps the classic one
     if (slot.kind == EffectKind::spiralEcho && savedCount <= (std::size_t) echosuite::spiral::law)
         slot.params[(std::size_t) echosuite::spiral::law] = 0.0f;
     // round 190fy: … and one saved before the loop timing's revision (0.1.27: Law, no hidden revision) keeps round 190do's loop
     if (slot.kind == EffectKind::spiralEcho && savedCount <= (std::size_t) echosuite::spiral::revision)
         slot.params[(std::size_t) echosuite::spiral::revision] = 0.0f;
+    // round 190ly: a Spiral Echo saved before the rate-independent loop phase keeps its loop as it was, bit for bit
+    if (slot.kind == EffectKind::spiralEcho && savedCount <= (std::size_t) echosuite::spiral::rateLaw)
+        slot.params[(std::size_t) echosuite::spiral::rateLaw] = 0.0f;
+    // round 190iq: a Hush saved before the measured Allround timing keeps tp172b's (bit for bit)
+    if (slot.kind == EffectKind::hushDeEsser && savedCount <= (std::size_t) mixsuite::hush::timing)
+        slot.params[(std::size_t) mixsuite::hush::timing] = 0.0f;
+    // round 190js: … and one saved before Single Vocal's revision keeps round 148's Single Vocal (bit for bit)
+    if (slot.kind == EffectKind::hushDeEsser && savedCount <= (std::size_t) mixsuite::hush::vocalRevision)
+        slot.params[(std::size_t) mixsuite::hush::vocalRevision] = 0.0f;
+    // round 190kw: an Ember saved before the Saturn styles' laws keeps round 150's measured characters (bit for bit)
+    if (slot.kind == EffectKind::ember && savedCount <= (std::size_t) mixsuite::ember::revision)
+        slot.params[(std::size_t) mixsuite::ember::revision] = 0.0f;
+    // round 190mm (dyn): a Hush saved before the Renaissance de-esser law keeps Hush's engines (and its law values 0)
+    if (slot.kind == EffectKind::hushDeEsser)
+        for (int k = mixsuite::hush::essLaw; k <= mixsuite::hush::essWideBand; ++k)
+            if (savedCount <= (std::size_t) k && slot.params.size() > (std::size_t) k)
+                slot.params[(std::size_t) k] = 0.0f;
+    // round 190is: an Echoform saved before the voicings' revision keeps rounds 147 / 150's voicings
+    if (slot.kind == EffectKind::echoform && savedCount <= (std::size_t) echosuite::echoform::revision)
+        slot.params[(std::size_t) echosuite::echoform::revision] = 0.0f;
+    // round 190kw: … and one saved before the line law (hidden, set only by a translated Timeless 3 state) keeps the engine
+    if (slot.kind == EffectKind::echoform && savedCount <= (std::size_t) echosuite::echoform::lineLaw)
+        slot.params[(std::size_t) echosuite::echoform::lineLaw] = 0.0f;
+    // round 190kw: a LuxeVerb saved before the Space engine's revision keeps tp172b / 190it's Space engine (bit for bit)
+    if (slot.kind == EffectKind::luxeVerb && savedCount <= (std::size_t) luxeVerbSpaceRevision)
+        slot.params[(std::size_t) luxeVerbSpaceRevision] = 0.0f;
+    // round 190ly: the ValhallaDelay role's loop laws are only ever saved with it (a translated ValhallaDelay)
+    if (slot.kind == EffectKind::echoform && savedCount <= (std::size_t) echosuite::echoform::valhallaLaw)
+        slot.params[(std::size_t) echosuite::echoform::valhallaLaw] = 0.0f;
     // round 190ca: a Nebula saved before the cloud law keeps the classic engine in every mode
     if (slot.kind == EffectKind::nebula && savedCount <= (std::size_t) verbs::nebula::law)
         slot.params[(std::size_t) verbs::nebula::law] = 0.0f;
+    // round 190mb: the Supermassive role's tone law is only ever saved with it (a translated ValhallaSupermassive)
+    if (slot.kind == EffectKind::nebula && savedCount <= (std::size_t) verbs::nebula::toneLaw)
+        slot.params[(std::size_t) verbs::nebula::toneLaw] = 0.0f;
 }
 
 std::unique_ptr<Effect> makeParallelEffect (const EffectSlot& slot)
@@ -4528,7 +5439,7 @@ std::unique_ptr<Effect> makeEffect (const EffectSlot& slot)
     if (slot.kind == EffectKind::vocodex)
         return vocodex::make (slot.state);
     if (slot.kind == EffectKind::maximus)
-        return maximusfx::make (slot.state);
+        return maximusfx::make (slot.state, slot.engineRev);
     if (slot.kind == EffectKind::multibandDelay)
         return mbdelay::make (slot.state, &slot.params); // (#113: the mode's latency known at once)
     if (slot.kind == EffectKind::vocoder)
@@ -4539,12 +5450,16 @@ std::unique_ptr<Effect> makeEffect (const EffectSlot& slot)
         return hardcore::make (slot);
     if (slot.kind == EffectKind::distructor)
         return distructor::make (slot.state);
+    if (slot.kind == EffectKind::effector && khsdsp::lawOf (slot.params[(std::size_t) khsdsp::lawParam]) != khsdsp::Law::none)
+        return effector::make (true); // round 190nb: a Kilohearts snapin law (core/KiloheartsDsp.h)
     if (slot.kind == EffectKind::fruityWaveShaper)
         return flshape::makeWaveShaper (slot.state);
     if (slot.kind == EffectKind::parametricEq && peq::flLaw (slot.params))
         return std::make_unique<ParametricEq> (slot.params);
     if (slot.kind == EffectKind::frequencySplitter)
         return fsplit::make (slot.params);
+    if (slot.kind == EffectKind::limiter) // (rollup step 9: the L2 law's latency known at once)
+        return std::make_unique<Limiter> (limiterlaw::isL2 (slot.params[(std::size_t) limiterlaw::lawParam]));
     if (slot.kind == EffectKind::hardwareInsert) // its round trip (latency) known before the first block (round 164d)
         return std::make_unique<hwinsert::HardwareInsertFx> (&slot.params);
     if (slot.kind == EffectKind::flEmphasis) // its look-ahead / oversampling latency known before the first block (round 167f)
@@ -4677,7 +5592,12 @@ std::unique_ptr<Effect> makeEffect (EffectKind kind)
         case EffectKind::fretChannel:
         case EffectKind::shellChannel:
         case EffectKind::strikeShaper:
-        case EffectKind::anvilBus: return mixsuite::make (kind); // LYNX's own mixing suite (REA_rodada96)
+        case EffectKind::anvilBus:
+        case EffectKind::corrode:
+        case EffectKind::soundboard:
+        case EffectKind::platter:
+        case EffectKind::timeprism:
+        case EffectKind::harmonia: return mixsuite::make (kind); // LYNX's own mixing suite (REA_rodada96)
         case EffectKind::rackMixer: return rack::makeChainMixer(); // a rack chain's mixer (round 183c)
         case EffectKind::edison: return std::make_unique<edisonfx::Processor>(); // without its slot: nothing to play (round 190cd)
         case EffectKind::lynxTune: return lynxtune::make(); // LYNX's own pitch corrector (REA_rodada95)

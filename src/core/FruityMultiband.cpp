@@ -458,35 +458,36 @@ struct Iir
         return false;
     }
 
+    // (round 190kr: both sections sample by sample, on local copies of the states and coefficients — the float members
+    // could otherwise alias the output samples and be stored / re-read on the recursion at every sample. The same
+    // operations per section in the same order; section 2 takes section 1's float output, as from the buffer before.)
     void run (const float* in, float* out, int n, int chan) noexcept
     {
-        auto& s = ch[(std::size_t) chan];
+        auto s = ch[(std::size_t) chan];
+        const auto k = c1, q = c2;
         for (int i = 0; i < n; ++i)
         {
             const auto x = flushed (in[i]);
-            auto y = s.x1 * c1[1] + x * c1[0];
-            y = y + s.x2 * c1[2];
-            y = y - s.y1 * c1[3];
-            y = flushed (y - s.y2 * c1[4]);
+            auto y = s.x1 * k[1] + x * k[0];
+            y = y + s.x2 * k[2];
+            y = y - s.y1 * k[3];
+            y = flushed (y - s.y2 * k[4]);
             s.x2 = s.x1;
             s.y2 = s.y1;
             s.x1 = x;
             s.y1 = y;
-            out[i] = y;
-        }
-        for (int i = 0; i < n; ++i)
-        {
-            const auto x = flushed (out[i]);
-            auto y = s.u1 * c2[1] + x * c2[0];
-            y = y + s.u2 * c2[2];
-            y = y - c2[3] * s.v1;
-            y = flushed (y - s.v2 * c2[4]);
+            const auto u = flushed (y);
+            auto v = s.u1 * q[1] + u * q[0];
+            v = v + s.u2 * q[2];
+            v = v - q[3] * s.v1;
+            v = flushed (v - s.v2 * q[4]);
             s.u2 = s.u1;
             s.v2 = s.v1;
-            s.u1 = x;
-            s.v1 = y;
-            out[i] = y;
+            s.u1 = u;
+            s.v1 = v;
+            out[i] = v;
         }
+        ch[(std::size_t) chan] = s;
     }
 };
 
@@ -623,6 +624,10 @@ struct Band
     float upper = 0.0f, lower = 0.0f; // mid band FIR edges (Hz)
     Detector det;
     std::vector<float> l, r;
+    // round 190mf (DP-29, FL's per-band IN and C meters): measured only while an editor shows them; the signal is not
+    // touched (peaks after the crossover, the compressor's lowest gain over the block)
+    bool metering = false;
+    float peakL = 0.0f, peakR = 0.0f, minGain = 1.0f;
 
     void redesignFir (float rate) noexcept
     {
@@ -669,14 +674,36 @@ struct Band
                 highPass.run (out[c], out[c], n, c);
             }
         }
-        if (compress)
+        if (metering)
+        {
+            peakL = peakR = 0.0f;
+            minGain = 1.0f;
             for (int i = 0; i < n; ++i)
             {
-                const auto al = std::fabs (l[(std::size_t) i]), ar = std::fabs (r[(std::size_t) i]);
-                const auto g = det.gainFor (det.smooth (det.peak (al > ar ? al : ar)));
-                l[(std::size_t) i] = g * l[(std::size_t) i];
-                r[(std::size_t) i] = g * r[(std::size_t) i];
+                peakL = std::max (peakL, std::fabs (l[(std::size_t) i]));
+                peakR = std::max (peakR, std::fabs (r[(std::size_t) i]));
             }
+        }
+        if (compress)
+        {
+            // (round 190kr: on a local copy of the detector, written back after: its float state could otherwise alias
+            // the band samples and be re-read at every sample; the same operations)
+            auto d = det;
+            float* const bl = l.data();
+            float* const br = r.data();
+            auto mg = minGain;
+            for (int i = 0; i < n; ++i)
+            {
+                const auto al = std::fabs (bl[i]), ar = std::fabs (br[i]);
+                const auto g = d.gainFor (d.smooth (d.peak (al > ar ? al : ar)));
+                bl[i] = g * bl[i];
+                br[i] = g * br[i];
+                if (metering && g < mg) // (round 190mf's band meter; rollup step 11: on a local, as the detector)
+                    mg = g;
+            }
+            det = d;
+            minGain = mg;
+        }
         else
             det.reset();
         for (int i = 0; i < n; ++i)
@@ -760,6 +787,22 @@ public:
     bool linearPhase() const noexcept { return ! bands[0].iirMode; }
 
     // one FL block (≤ maxBlock), separate channels, in place
+    // round 190mf (DP-29): the bands' meters; band 0 low, 1 mid, 2 high (the editor's order)
+    void setMetering (bool on) noexcept
+    {
+        for (auto& b : bands)
+        {
+            b.metering = on;
+            b.peakL = b.peakR = 0.0f;
+            b.minGain = 1.0f;
+        }
+    }
+    float bandMeter (int band, int what) const noexcept
+    {
+        const auto& b = bands[(std::size_t) (2 - std::clamp (band, 0, 2))];
+        return what == 0 ? b.peakL : what == 1 ? b.peakR : b.minGain;
+    }
+
     void process (float* left, float* right, int n) noexcept
     {
         bool signal = false;
@@ -771,6 +814,8 @@ public:
         if (! signal)
         {
             reset(); // the plugin clears its states and passes the block through untouched
+            for (auto& b : bands)
+                b.peakL = b.peakR = 0.0f, b.minGain = 1.0f;
             return;
         }
         for (auto& b : bands)
@@ -785,15 +830,23 @@ public:
             right[i] = (lb.r[s] * enable[2] + mb.r[s] * enable[1] + hb.r[s] * enable[0]) * master;
         }
         if (limiterOn)
+        {
+            // (round 190kr: the detectors and the release factor as local copies, written back after; the same operations)
+            auto dL = limiter[0], dR = limiter[1];
+            auto factor = limiterFactor;
+            auto gainOf = [&factor] (Detector& d, float x) { return d.gainFor (d.smooth (d.limiterPeak (std::fabs (x), factor))); };
             for (int i = 0; i < n; ++i)
             {
-                const auto gl = limiterGain (limiter[0], left[i]);
+                const auto gl = gainOf (dL, left[i]);
                 const auto yl = gl * left[i];
-                const auto gr = limiterGain (limiter[1], right[i]);
+                const auto gr = gainOf (dR, right[i]);
                 const auto yr = gr * right[i];
                 left[i] = softClip (yl) * 0.9999899864196777f;
                 right[i] = softClip (yr) * 0.9999899864196777f;
             }
+            limiter[0] = dL, limiter[1] = dR;
+            limiterFactor = factor;
+        }
     }
 
 private:
@@ -801,11 +854,6 @@ private:
     {
         const auto mn = controlMin[(std::size_t) i], mx = controlMax[(std::size_t) i];
         return (float) ((double) (raw[(std::size_t) i] - mn) / (double) (mx - mn));
-    }
-
-    float limiterGain (Detector& d, float x) noexcept
-    {
-        return d.gainFor (d.smooth (d.limiterPeak (std::fabs (x), limiterFactor)));
     }
 
     static float softClip (float y) noexcept
@@ -953,6 +1001,20 @@ public:
 
     int latencySamples() const noexcept override { return configured && engine.linearPhase() ? linearPhaseLatency : 0; }
 
+    // round 190mf (DP-29): FL's per-band meters, only while an editor shows them (ProcessTimes::metersWanted):
+    // output band * 3 + 0 / 1 = the band's left / right peak after its crossover, + 2 = its compressor's lowest gain
+    void setMetersShown (bool shown) noexcept override
+    {
+        engine.setMetering (shown); // (every block: a setup in between makes the bands again)
+        metersShown = shown;
+    }
+    float controlOutput (int output) const noexcept override
+    {
+        if (! metersShown || output < 0 || output >= 9)
+            return output >= 0 && output < 9 && output % 3 == 2 ? 1.0f : 0.0f;
+        return engine.bandMeter (output / 3, output % 3);
+    }
+
 private:
     // a parameter still at its imported value (within the project file's 4-decimal rounding) keeps FL's exact control
     int control (int i, float v) const noexcept
@@ -971,7 +1033,7 @@ private:
     std::optional<State> imported;
     EffectParams params0 {};
     int sampleRate = 44100;
-    bool hasParams0 = false, prepared = false, configured = false;
+    bool hasParams0 = false, prepared = false, configured = false, metersShown = false;
 };
 
 std::int32_t i32 (const std::vector<std::uint8_t>& d, std::size_t at) noexcept

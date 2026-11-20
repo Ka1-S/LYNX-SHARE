@@ -1,10 +1,14 @@
 #include "core/MixSuite.h"
+#include "core/RenDynamics.h"
+#include "core/VitaminLaw.h"
 
 #include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <cstdio>
+#include <cstdlib>
 
 #include "core/Biquad.h"
 #include "core/Simd.h"
@@ -16,6 +20,11 @@
 #include "core/ParametricEqLinear.h"
 #include "core/StrikeShaper.h"
 #include "core/AnvilBus.h"
+#include "core/Corrode.h"
+#include "core/Soundboard.h"
+#include "core/Platter.h"
+#include "core/Timeprism.h"
+#include "core/Harmonia.h"
 #include "core/VoiceMatch.h"
 #include "core/VoxStrip.h"
 
@@ -71,6 +80,7 @@ struct OnePoleHp
         b1 = -b0;
         a1 = (k - 1.0) / (k + 1.0);
     }
+    void bypass() noexcept { b0 = 1.0; b1 = a1 = 0.0; } // round 190le: a pass-through (the 32C's high-pass is second order)
     void reset() noexcept { x1[0] = x1[1] = y1[0] = y1[1] = 0.0; }
     float process (float x, int ch) noexcept
     {
@@ -394,6 +404,39 @@ double mLfGainDb (float v) noexcept { return lin (v, -16.5, 16.5); }
 double mGainDb (float v) noexcept { return lin (v, -20.0, 20.0); }
 double mQ (float v) noexcept { return lin (v, 0.5, 2.5); }
 double mHoldSeconds (float v) noexcept { return lin (v, 0.0, 4.0); }
+// round 190mm (scheps): the hidden omni law's value scales (MixSuite.h OmniParam)
+namespace omni
+{
+float dbValue (double db) noexcept { return (float) std::clamp ((db + 72.0) / 96.0, 0.0, 1.0); }
+double db (float v) noexcept { return lin (v, -72.0, 24.0); }
+float hzValue (double hz) noexcept { return (float) std::clamp (std::log (std::max (hz, 20.0) / 20.0) / std::log (1000.0), 0.0, 1.0); }
+double hz (float v) noexcept { return logMap (v, 20.0, 20000.0); }
+float qValue (double q) noexcept { return (float) std::clamp (std::log (std::max (q, 0.1) / 0.1) / std::log (100.0), 0.0, 1.0); }
+double q (float v) noexcept { return logMap (v, 0.1, 10.0); }
+float msValue (double ms) noexcept { return (float) std::clamp (std::log10 (std::max (ms, 0.01) / 0.01) / 6.0, 0.0, 1.0); }
+double ms (float v) noexcept { return logMap (v, 0.01, 10000.0); }
+float ratioValue (double r) noexcept { return (float) std::clamp ((1.0 - 1.0 / std::clamp (r, 1.0, 20.0)) / 0.95, 0.0, 1.0); }
+double ratio (float v) noexcept { return 1.0 / std::max (0.05, 1.0 - 0.95 * (double) std::clamp (v, 0.0f, 1.0f)); }
+float indexValue (int k) noexcept { return (float) std::clamp (k, 0, 8) / 8.0f; }
+int index (float v) noexcept { return (int) std::lround (std::clamp (v, 0.0f, 1.0f) * 8.0f); }
+float orderValue (const int (&order)[5]) noexcept
+{
+    long code = 0;
+    for (int m : order) code = code * 10 + std::clamp (m, 0, 9);
+    return (float) ((double) code / 100000.0);
+}
+void orderOf (float v, int (&order)[5]) noexcept
+{
+    static constexpr int byDefault[5] = { pre, comp, ds2, eq, gate };   // the reference's default chain (REA §1)
+    auto code = (long) std::lround ((double) v * 100000.0);
+    int seen = 0;
+    for (int i = 4; i >= 0; --i) { order[i] = (int) (code % 10); code /= 10; }
+    for (int m : order) if (m >= pre && m <= comp) seen |= 1 << m;
+    if (seen != 0x3e)
+        for (int i = 0; i < 5; ++i) order[i] = byDefault[i];
+}
+bool omniLawOn (const EffectParams& p) noexcept { return p[(std::size_t) omniLaw] > 0.5f; }
+} // namespace omni
 namespace
 {
 // the reference's ratio dial (its read-outs at eighths of the travel); 63 .. infinity on the last eighth
@@ -427,6 +470,126 @@ double autoMakeupDb (const EffectParams& p) noexcept
     e.compRatio = ratio (p[compRatio]);
     e.compThreshold = std::clamp (compThresholdDb (p[compThreshold]) + 18.0, -20.0, 10.0);
     return vmatch::echannel::compMakeupDb (e);
+}
+
+// ---- round 190le: the 32C voicing's scales. The dial positions are the original's host parameters (refcap0124's
+// table: its own texts at ninths of the travel); the band laws were measured on tp172c's H32_eq impulse grid
+// (BLACKBOX_rodada190lb.md §4, lab fits in /mnt/e/lynx-work/harrison190le/lab)
+bool h32Voicing (const EffectParams& p) noexcept
+{
+    return on (p[h32]) && ! modernVoicing (p) && ! k4Voicing (p) && ! eVoicing (p) && ! vocalVoicing (p);
+}
+namespace
+{
+// a law through knots at equal steps of the dial, interpolated on the logarithm (exactly invertible)
+template <std::size_t N>
+double logKnots (float v, const double (&hz)[N]) noexcept
+{
+    const auto x = (double) std::clamp (v, 0.0f, 1.0f) * (double) (N - 1);
+    const auto i = std::min ((std::size_t) x, N - 2);
+    return hz[i] * std::pow (hz[i + 1] / hz[i], x - (double) i);
+}
+template <std::size_t N>
+float logKnotsValue (double f, const double (&hz)[N]) noexcept
+{
+    if (! (f > hz[0])) return 0.0f;
+    if (f >= hz[N - 1]) return 1.0f;
+    std::size_t i = 0;
+    while (i + 2 < N && f > hz[i + 1]) ++i;
+    return (float) (((double) i + std::log (f / hz[i]) / std::log (hz[i + 1] / hz[i])) / (double) (N - 1));
+}
+// the original's texts at ninths of the travel (host parameter table)
+constexpr double kH32Hpf[9] { 25.0, 33.0, 85.0, 215.0, 456.0, 841.0, 1400.0, 2160.0, 3150.0 };
+constexpr double kH32Lpf[9] { 160.0, 212.0, 538.0, 1360.0, 2900.0, 5340.0, 8880.0, 13710.0, 20000.0 };
+constexpr double kH32Lmf[9] { 103.586, 210.0, 311.709, 414.0, 608.74, 950.0, 1778.5, 2980.0, 4366.39 };
+constexpr double kH32Hmf[9] { 270.697, 427.0, 711.314, 996.0, 1421.74, 2050.0, 3544.21, 5780.0, 8000.0 };
+// the end bands in Bell mode: the saved dial at quarters of the travel (tp172c states; the bell sits there exactly)
+constexpr double kH32LoBell[5] { 18.9487, 58.8066, 111.355, 369.313, 798.73 };
+constexpr double kH32HiBell[5] { 689.048, 1389.53, 3618.97, 9021.65, 14497.6 };
+// the bells' gain taper: |gain| at |2 (v - 0.5)| (the measured dials 0.3 / 0.7 / 1 and the table's 0.5 / 0.75)
+constexpr double kH32TaperX[6] { 0.0, 0.3, 0.5, 0.7, 0.75, 1.0 };
+constexpr double kH32TaperDb[6] { 0.0, 2.490617, 4.5, 6.936618, 7.8, 13.737392 };
+// monotone cubic through the taper's knots (Fritsch–Butland weighted harmonic slopes, as PCHIP)
+double taperDb (double x) noexcept
+{
+    constexpr int n = 6;
+    x = std::clamp (x, 0.0, 1.0);
+    double d[n - 1], m[n];
+    for (int k = 0; k < n - 1; ++k)
+        d[k] = (kH32TaperDb[k + 1] - kH32TaperDb[k]) / (kH32TaperX[k + 1] - kH32TaperX[k]);
+    m[0] = d[0];
+    m[n - 1] = d[n - 2];
+    for (int k = 1; k < n - 1; ++k)
+    {
+        const double h0 = kH32TaperX[k] - kH32TaperX[k - 1], h1 = kH32TaperX[k + 1] - kH32TaperX[k];
+        const double w1 = 2.0 * h1 + h0, w2 = h1 + 2.0 * h0;
+        m[k] = d[k - 1] * d[k] <= 0.0 ? 0.0 : (w1 + w2) / (w1 / d[k - 1] + w2 / d[k]);
+    }
+    int k = 0;
+    while (k < n - 2 && x > kH32TaperX[k + 1]) ++k;
+    const double h = kH32TaperX[k + 1] - kH32TaperX[k], t = (x - kH32TaperX[k]) / h, t2 = t * t, t3 = t2 * t;
+    return (2 * t3 - 3 * t2 + 1) * kH32TaperDb[k] + (t3 - 2 * t2 + t) * h * m[k] + (-2 * t3 + 3 * t2) * kH32TaperDb[k + 1]
+           + (t3 - t2) * h * m[k + 1];
+}
+} // namespace
+double h32HpfHz (float v) noexcept { return v <= 0.0f ? 0.0 : logKnots (v, kH32Hpf); }
+double h32LpfHz (float v) noexcept { return v <= 0.0f ? 0.0 : logKnots (1.0f - v, kH32Lpf); }
+double h32LmfHz (float v) noexcept { return logKnots (v, kH32Lmf); }
+double h32HmfHz (float v) noexcept { return logKnots (v, kH32Hmf); }
+// the shelves' centres: straight lines in the dial, broken at its middle (the table: 25 / 145 / 1500 Hz, 400 / 2650 / 10000 Hz)
+double h32LfHz (float v, bool bell) noexcept
+{
+    const auto x = (double) std::clamp (v, 0.0f, 1.0f);
+    return bell ? logKnots (v, kH32LoBell) : x <= 0.5 ? 25.0 + 240.0 * x : 145.0 + 2710.0 * (x - 0.5);
+}
+double h32HfHz (float v, bool bell) noexcept
+{
+    const auto x = (double) std::clamp (v, 0.0f, 1.0f);
+    return bell ? logKnots (v, kH32HiBell) : x <= 0.5 ? 400.0 + 4500.0 * x : 2650.0 + 14700.0 * (x - 0.5);
+}
+double h32ShelfDb (float v) noexcept { return 27.0 * ((double) std::clamp (v, 0.0f, 1.0f) - 0.5); }
+double h32BellDb (float v) noexcept
+{
+    const auto x = 2.0 * ((double) std::clamp (v, 0.0f, 1.0f) - 0.5);
+    return std::copysign (taperDb (std::abs (x)), x);
+}
+// fitted on the bells of the grid (0.525 / 0.57 / 0.75 at 2.49 / 6.94 / 13.74 dB, the same for every band)
+double h32Q (double gainDb) noexcept
+{
+    const auto g = std::min (std::abs (gainDb), 13.74);
+    return 0.5248794 - 0.00356832 * g + 0.00145216 * g * g;
+}
+float h32HpfValue (double hz) noexcept { return std::max (1e-4f, logKnotsValue (hz, kH32Hpf)); }
+float h32LpfValue (double hz) noexcept { return std::max (1e-4f, 1.0f - logKnotsValue (hz, kH32Lpf)); }
+float h32LmfValue (double hz) noexcept { return logKnotsValue (hz, kH32Lmf); }
+float h32HmfValue (double hz) noexcept { return logKnotsValue (hz, kH32Hmf); }
+float h32LfValue (double bellHz) noexcept { return logKnotsValue (bellHz, kH32LoBell); }
+float h32HfValue (double bellHz) noexcept { return logKnotsValue (bellHz, kH32HiBell); }
+float h32GainValue (double dialDb) noexcept
+{
+    const auto a = std::min (std::abs (dialDb), kH32TaperDb[5]);
+    double lo = 0.0, hi = 1.0; // the taper rises: bisection
+    for (int i = 0; i < 40; ++i)
+    {
+        const auto mid = 0.5 * (lo + hi);
+        (taperDb (mid) < a ? lo : hi) = mid;
+    }
+    return (float) (0.5 + std::copysign (0.25 * (lo + hi), dialDb));
+}
+std::vector<std::pair<int, float>> linkedEdit (const EffectParams& p, int param, float value)
+{
+    std::vector<std::pair<int, float>> edits { { param, value } };
+    if (! on (value))
+        return edits;
+    if (param == h32)
+    {
+        for (const int other : { (int) modern, (int) console4k, (int) voicing })
+            if (on (p[(std::size_t) other]))
+                edits.push_back ({ other, 0.0f });
+    }
+    else if ((param == modern || param == console4k || param == voicing) && on (p[h32]))
+        edits.push_back ({ (int) h32, 0.0f });
+    return edits;
 }
 
 // round 145: the Vocal strip voicing's settings (the reference's own laws, core/VoxStrip.h)
@@ -476,6 +639,11 @@ struct EqDesign
 
     void design (const EffectParams& p, double sr)
     {
+        if (h32Voicing (p)) // round 190le: the 32C voicing's own EQ
+        {
+            design32 (p, sr);
+            return;
+        }
         const bool black = on (p[curve]);
         hpOn = p[hpf] > 0.0f;
         lpOn = p[lpf] > 0.0f;
@@ -509,6 +677,106 @@ struct EqDesign
 
     // "black" bells: proportional Q — wide for small boosts / cuts, narrower as the gain grows
     static double propQ (double q, double gainDb) { return std::max (0.2, q * (0.5 + std::abs (gainDb) / 12.0)); }
+
+    // ---- round 190le: the 32C voicing (Harrison 32Classic, measured on tp172c's H32_eq impulse grid at 48 kHz; every
+    // law below reproduced the 148 renders within 0.05 dB rms, lab /mnt/e/lynx-work/harrison190le/lab):
+    //  - filters: second-order Butterworth high- / low-pass at the dial, magnitude-matched (no bilinear cramping: the
+    //    20 kHz low-pass is -2.4 dB at 18 kHz, as the original's always-in default);
+    //  - Lo: a first-order shelf (analog (s + wc sqrtG) / (s + wc / sqrtG)), bilinear, prewarped at its centre;
+    //  - Hi: a first-order shelf whose magnitude equals the analog one at DC, at its centre and at Nyquist;
+    //  - bells (the mids, and the end bands in Bell mode): magnitude-matched peaking filters at the dial, Q(|gain|).
+    // M. Vicanek, "Matched Second Order Digital Filters" (2016) for the matched sections; the first-order match is the
+    // same idea with one pole (three magnitude conditions, a closed-form quadratic for the pole)
+    void design32 (const EffectParams& p, double sr)
+    {
+        hpOn = p[hpf] > 0.0f;
+        lpOn = p[lpf] > 0.0f;
+        hp1.bypass();
+        if (hpOn)
+            matchedPass (hp2, sr, h32HpfHz (p[hpf]), true);
+        if (lpOn)
+            matchedPass (lp, sr, h32LpfHz (p[lpf]), false);
+        const bool loBell = on (p[lfBell]), hiBell = on (p[hfBell]);
+        if (loBell)
+            bell32 (lf, sr, h32LfHz (p[lfFreq], true), h32BellDb (p[lfGain]));
+        else
+            lowShelf32 (lf, sr, h32LfHz (p[lfFreq], false), h32ShelfDb (p[lfGain]));
+        if (hiBell)
+            bell32 (hf, sr, h32HfHz (p[hfFreq], true), h32BellDb (p[hfGain]));
+        else
+            highShelf32 (hf, sr, h32HfHz (p[hfFreq], false), h32ShelfDb (p[hfGain]));
+        bell32 (lmf, sr, h32LmfHz (p[lmfFreq]), h32BellDb (p[lmfGain]));
+        bell32 (hmf, sr, h32HmfHz (p[hmfFreq]), h32BellDb (p[hmfGain]));
+    }
+
+    // the poles of an analog second-order section (s^2 + 2 zeta s + 1 at w0) by z = e^(sT)
+    static void matchedPoles (double w0, double zeta, double& a1, double& a2) noexcept
+    {
+        a1 = zeta <= 1.0 ? -2.0 * std::exp (-zeta * w0) * std::cos (std::sqrt (1.0 - zeta * zeta) * w0)
+                         : -2.0 * std::exp (-zeta * w0) * std::cosh (std::sqrt (zeta * zeta - 1.0) * w0);
+        a2 = std::exp (-2.0 * zeta * w0);
+    }
+
+    // Butterworth (Q 1/sqrt 2) high- / low-pass, magnitude-matched at DC, the corner and Nyquist (Vicanek's HP / LP)
+    static void matchedPass (Biquad& b, double sr, double hz, bool high) noexcept
+    {
+        constexpr double q = 0.70710678118654752;
+        const double w0 = 2.0 * pi * std::clamp (hz, 1.0, sr * 0.49) / sr;
+        double a1, a2;
+        matchedPoles (w0, 0.5 / q, a1, a2);
+        const double A0 = (1.0 + a1 + a2) * (1.0 + a1 + a2), A1 = (1.0 - a1 + a2) * (1.0 - a1 + a2), A2 = -4.0 * a2;
+        const double p1 = std::sin (w0 / 2.0) * std::sin (w0 / 2.0), p0 = 1.0 - p1, p2 = 4.0 * p0 * p1;
+        if (high)
+        {
+            const double b0 = q * std::sqrt (std::max (A0 * p0 + A1 * p1 + A2 * p2, 0.0)) / (4.0 * p1);
+            b.set (b0, -2.0 * b0, b0, 1.0, a1, a2);
+            return;
+        }
+        const double R1 = (A0 * p0 + A1 * p1 + A2 * p2) * q * q;
+        const double B0 = A0, B1 = (R1 - B0 * p0) / p1;
+        const double b0 = 0.5 * (std::sqrt (B0) + std::sqrt (std::max (B1, 0.0)));
+        b.set (b0, std::sqrt (B0) - b0, 0.0, 1.0, a1, a2);
+    }
+
+    static void bell32 (Biquad& b, double sr, double hz, double db) noexcept
+    {
+        if (std::abs (db) < 1e-4)
+            b.set (1.0, 0.0, 0.0, 1.0, 0.0, 0.0);
+        else
+            voxstrip::matchedPeak (b, sr, hz, h32Q (db), db);
+    }
+
+    static void lowShelf32 (Biquad& b, double sr, double centreHz, double db) noexcept
+    {
+        const double g = std::sqrt (dbToGain (db)), wc = 2.0 * pi * std::min (centreHz, sr * 0.45);
+        const double wz = wc * g, wp = wc / g, k = wc / std::tan (wc / (2.0 * sr));
+        b.set (k + wz, wz - k, 0.0, k + wp, wp - k, 0.0);
+    }
+
+    static void highShelf32 (Biquad& b, double sr, double centreHz, double db) noexcept
+    {
+        if (std::abs (db) < 1e-4)
+        {
+            b.set (1.0, 0.0, 0.0, 1.0, 0.0, 0.0);
+            return;
+        }
+        // analog |H|^2 = G^2 (w^2 + wz^2) / (w^2 + wp^2), wz = wc / sqrtG, wp = wc sqrtG: 1 at DC, G at the centre
+        const double G = dbToGain (db), sg = std::sqrt (G), wc = 2.0 * pi * std::min (centreHz, sr * 0.45);
+        const double wz = wc / sg, wp = wc * sg, wn = pi * sr;
+        const double hn = G * G * (wn * wn + wz * wz) / (wn * wn + wp * wp), hm = G;
+        const double phi = std::sin (wc / (2.0 * sr)) * std::sin (wc / (2.0 * sr));
+        // |1 + a1 z^-1|^2 = (1 + a1)^2 - 4 a1 phi (phi = sin^2 (w / 2)); the three conditions give a1^2 + B a1 + 1 = 0
+        const double P = (1.0 - phi) - hm, Q = hn * phi;
+        const double B = (2.0 * P - 2.0 * Q + 4.0 * hm * phi) / (P + Q);
+        if (! std::isfinite (B) || B * B <= 4.0)
+        {
+            lowShelf32 (b, sr, centreHz, 0.0); // (never with the original's ranges) flat rather than unstable
+            return;
+        }
+        const double big = 0.5 * (-B - std::copysign (std::sqrt (B * B - 4.0), B)), a1 = 1.0 / big;
+        const double s = 1.0 + a1, d = std::sqrt (hn) * (1.0 - a1);
+        b.set (0.5 * (s + d), 0.5 * (s - d), 0.0, 1.0, a1, 0.0);
+    }
 };
 } // namespace
 
@@ -547,13 +815,32 @@ vmatch::echannel::Settings consoleSettingsOf (const EffectParams& p) noexcept
     e.dynamicsAfterEq = ! on (p[order]);
     e.filtersBeforeDynamics = on (p[filterSplit]);
     e.eqToSidechain = on (p[eqToSidechain]); // round 165
+    if (gch::lawOn (p) && ! k4Voicing (p)) // round 190mt: the G-Channel EQ law (its own band values and ranges)
+    {
+        e.gLaw = 1;
+        e.lfGain = gch::gainDb (p[gLfGain]);
+        e.lfHz = gch::lfHz (p[gLfHz]);
+        e.lmfGain = gch::gainDb (p[gLmfGain]);
+        e.lmfKHz = gch::lmfKHz (p[gLmfKHz]);
+        e.lmfQ = gch::q (p[gLmfQ]);
+        e.hmfGain = gch::gainDb (p[gHmfGain]);
+        e.hmfKHz = gch::hmfKHz (p[gHmfKHz]);
+        e.hmfQ = gch::q (p[gHmfQ]);
+        e.hfGain = gch::gainDb (p[gHfGain]);
+        e.hfKHz = gch::hfKHz (p[gHfKHz]);
+        e.lfBell = e.hfBell = false;
+        e.lmfDiv3 = on (p[gLmfDiv3]);
+        e.hmfMult3 = on (p[gHmfX3]); // (rollup step 13: the field shared with the Pink colour)
+    }
     if (k4Voicing (p)) // round 148: the 4K console (its own Q scale, colour, mic pre, VCA, make-up, mix)
     {
         e.model = 1;
         e.colour = k4ColourIndex (p[k4Colour]);
         e.lmfQ = k4Q (p[lmfQ]);
         e.hmfQ = k4Q (p[hmfQ]);
-        e.lpKHz = e.lpKHz >= 15.9 ? 0.0 : e.lpKHz;
+        e.k4g = on (p[k4gLaw]); // round 190lb: the SSL 4K G's own filters and ceiling
+        e.e18HighPass = on (p[k4eHpLaw]); // round 190lb: the SSL 4K E's Black / Orange high-pass
+        e.lpKHz = e.lpKHz >= 15.9 && ! e.k4g ? 0.0 : e.lpKHz;
         e.filtersBeforeDynamics = true;
         e.pre = on (p[k4Pre]);
         e.micDb = k4MicDb (p[k4Mic]);
@@ -561,6 +848,16 @@ vmatch::echannel::Settings consoleSettingsOf (const EffectParams& p) noexcept
         e.autoMakeup = on (p[autoMakeup]);
         e.makeupOffsetDb = k4OffsetDb (p[k4MakeupOffset]);
         e.compMix = std::clamp ((double) p[compMix], 0.0, 1.0);
+        if (on (p[k4Pink])) // round 190lb: the SSL 4K G's Pink colour, its dials in their own ranges
+        {
+            e.pink = true;
+            e.lfGain *= 18.0 / 15.0;
+            e.lmfGain *= 22.0 / 15.0;
+            e.hmfGain *= 22.0 / 15.0;
+            e.hfGain *= 20.0 / 15.0;
+            e.lmfDiv3 = on (p[k4LmfDiv3]);
+            e.hmfMult3 = on (p[k4HmfMult3]);
+        }
     }
     return e;
 }
@@ -629,6 +926,29 @@ double responseDb (const EffectParams& p, double sampleRate, double hz)
 
 double compGrCapDb (float v) noexcept { return v > 1e-6f ? 60.0 * std::min (1.0f, v) : 1e9; }
 double compAttackFineSeconds (float v) noexcept { return 0.25 * std::clamp (v, 0.0f, 1.0f); }
+
+// round 190mt: the G-Channel EQ law's stored values (MixSuite.h gch)
+namespace gch
+{
+namespace
+{
+float logValue (double x, double lo, double hi) noexcept { return (float) std::clamp (std::log (x / lo) / std::log (hi / lo), 0.0, 1.0); }
+double logOf (float v, double lo, double hi) noexcept { return lo * std::pow (hi / lo, std::clamp ((double) v, 0.0, 1.0)); }
+}
+float gainValue (double db) noexcept { return (float) std::clamp ((db + 20.0) / 40.0, 0.0, 1.0); }
+double gainDb (float v) noexcept { return 40.0 * std::clamp ((double) v, 0.0, 1.0) - 20.0; }
+float lfValue (double hz) noexcept { return logValue (hz, 30.0, 450.0); }
+double lfHz (float v) noexcept { return logOf (v, 30.0, 450.0); }
+float hfValue (double khz) noexcept { return logValue (khz, 1.5, 16.0); }
+double hfKHz (float v) noexcept { return logOf (v, 1.5, 16.0); }
+float lmfValue (double khz) noexcept { return logValue (khz, 0.2, 2.5); }
+double lmfKHz (float v) noexcept { return logOf (v, 0.2, 2.5); }
+float hmfValue (double khz) noexcept { return logValue (khz, 0.6, 7.0); }
+double hmfKHz (float v) noexcept { return logOf (v, 0.6, 7.0); }
+float qValue (double q) noexcept { return (float) std::clamp ((q - 0.1) / 3.4, 0.0, 1.0); }
+double q (float v) noexcept { return 0.1 + 3.4 * std::clamp ((double) v, 0.0, 1.0); }
+bool lawOn (const EffectParams& p) noexcept { return p[(std::size_t) gEqLaw] > 0.5f; }
+} // namespace gch
 
 double compressorCurveDb (const EffectParams& p, double inputDb)
 {
@@ -1041,6 +1361,8 @@ std::unique_ptr<Effect> makeKiln() { return std::make_unique<KilnChannel>(); }
 
 namespace
 {
+#include "core/OmniStrip.inc" // round 190mm (scheps): the hidden omni law
+
 class Strip final : public Effect
 {
 public:
@@ -1060,6 +1382,7 @@ public:
         modernEngine.prepare (rate);
         vocalEngine.prepare (rate);
         drive.prepare (rate);
+        omniEngine.prepare (rate);
         reset();
         if (hasParams0)
         {
@@ -1070,6 +1393,8 @@ public:
                 vocalLatency = vocalEngine.latencySamples();
             }
             driveLatency = on (params0[driveOn]) ? DriveStage::latency() : 0;
+            if (omni::omniLawOn (params0)) // (rollup step 12: the omni law plays without latency, as process() says)
+                vocalLatency = driveLatency = 0;
         }
     }
 
@@ -1083,6 +1408,7 @@ public:
         modernEngine.reset();
         vocalEngine.reset();
         drive.reset();
+        omniEngine.reset();
         for (auto* d : { &audio, &side })
         {
             d->hp1.reset(); d->hp2.reset(); d->lp.reset(); d->lf.reset(); d->lmf.reset(); d->hmf.reset(); d->hf.reset();
@@ -1097,6 +1423,15 @@ public:
 
     void process (float* l, float* r, int n, const EffectParams& p, double) noexcept override
     {
+        if (omni::omniLawOn (p)) // round 190mm (scheps): the hidden omni law (off = everything below, unchanged)
+        {
+            const auto inPeak = Meters::peak (l, r, n);
+            vocalLatency = 0;
+            driveLatency = 0; // (rollup step 12: the omni law has no latency; the DRIVE section is not used)
+            omniEngine.process (l, r, n, p);
+            meters.set (omniEngine.compGrDb(), omniEngine.gateGrDb(), inPeak, Meters::peak (l, r, n));
+            return;
+        }
         if (vocalVoicing (p))
         {
             const auto inPeak = Meters::peak (l, r, n);
@@ -1291,6 +1626,7 @@ private:
     int vocalLatency = 0;
     DriveStage drive; // round tp172c6
     int driveLatency = 0;
+    omnistrip::Engine omniEngine; // round 190mm (scheps): the hidden omni law
     bool driveWasIn = false;
     EffectParams params0 {};
     bool hasParams0 = false;
@@ -1396,6 +1732,7 @@ public:
             c.makeupRef = 100.0 * std::clamp ((double) p[makeupRef], 0.0, 1.0);
             c.memory = on (p[optoMemory]);
             c.scWeighting = on (p[scWeighting]) ? 1 : 0;
+            c.cellLaw = on (p[cellLaw]) ? 1 : 0; // round 190lf (hidden)
             const auto mx = std::clamp (p[mix], 0.0f, 1.0f);
             const int hz = analogHz (p[analog]);
             const auto trimGain = (float) dbToGain (trimDb (p[trim]));
@@ -1638,7 +1975,8 @@ public:
     explicit DeEsser (const EffectParams* p = nullptr)
         : primedMs (p != nullptr ? lookaheadTimeMs ((*p)[lookaheadTime]) : lookaheadMs()),
           vocalOn (p != nullptr && (vocal (*p) || (extended (*p) && on ((*p)[allround]) && ! classic (*p)))),
-          classicOn (p != nullptr && classic (*p))
+          classicOn (p != nullptr && classic (*p)),
+          essOn (p != nullptr && (*p)[essLaw] >= 0.5f)
     {
         // (the same as processCore does when the factor moves)
         if (const auto factor = p != nullptr && ! classic (*p) ? oversamplingOf ((*p)[oversampling]) : 1; factor != osFactor)
@@ -1655,6 +1993,7 @@ public:
         setDelay (primedMs);
         classicEngine.prepare (rate);
         vocalEngine.prepare (rate);
+        essEngine.prepare (rate);
         reset();
     }
 
@@ -1664,6 +2003,7 @@ public:
         scDelay.reset();
         classicEngine.reset();
         vocalEngine.reset();
+        essEngine.reset();
         detect.reset();
         detectLp.reset();
         listenF.reset();
@@ -1687,6 +2027,8 @@ public:
 
     int latencySamples() const noexcept override
     {
+        if (essOn)
+            return essEngine.latency();
         if (vocalOn)
             return vocalEngine.latencySamples();
         if (classicOn) // round 165 [EXEC]: the reference reports 0 samples, so the classic voicing has no latency
@@ -1698,6 +2040,22 @@ public:
 
     void process (float* l, float* r, int n, const EffectParams& p, double bpm) noexcept override
     {
+        if (p[essLaw] >= 0.5f)
+        {
+            // round 190mm (dyn): the Renaissance de-esser law (set only by the RDeEsser translator); its own controls
+            essOn = true;
+            rendyn::EssSettings st;
+            st.thresholdDb = -80.0 * std::clamp ((double) p[essThreshold], 0.0, 1.0);
+            st.rangeDb = -48.0 * std::clamp ((double) p[essRange], 0.0, 1.0);
+            st.freqHz = 2000.0 + 14000.0 * std::clamp ((double) p[essFreq], 0.0, 1.0);
+            st.bandPass = p[essBandPass] >= 0.5f;
+            st.wideBand = p[essWideBand] >= 0.5f;
+            const auto inPeak = Meters::peak (l, r, n);
+            essEngine.process (l, r, n, st);
+            meters.set (essEngine.reductionDb(), 0.0f, inPeak, Meters::peak (l, r, n));
+            return;
+        }
+        essOn = false;
         if (n > maxBlock) // the oversampled path works on blocks of at most maxBlock samples
         {
             const auto* sl = scL;
@@ -1812,6 +2170,12 @@ private:
             v.lookaheadMs = lookaheadTimeMs (p[lookaheadTime]);
             v.wideband = on (p[mode]);
             v.listen = on (p[listen]);
+            v.timing = on (p[timing]) ? 1 : 0; // round 190iq
+            v.vocalRevision = on (p[vocalRevision]) ? 1 : 0; // round 190js
+#ifdef LYNX_LAB190JS
+            if (const char* e = std::getenv ("LYNX_LAB_SVON"))
+                v.vocalRevision = std::atoi (e);
+#endif
             vocalEngine.process (l, r, n, v);
             const auto out = (float) dbToGain (levelDb (p[output], extLaw));
             for (int i = 0; i < n; ++i) { l[i] *= out; r[i] *= out; }
@@ -2111,6 +2475,8 @@ private:
     vmatch::vocalds::DeEsser vocalEngine;
     bool vocalOn = false;
     bool classicOn = false; // round 165: the classic voicing has no latency
+    bool essOn = false;     // round 190mm (dyn): the Renaissance de-esser law
+    rendyn::DeEsser essEngine;
     Biquad detect, detectLp, listenF, listenLp, split, bandLp, bandLp2, topHp, topHp2;
     // round 190dm: Air and Mix — the shelf, the block's dry input and the dry line (latency ≤ 8191 samples)
     static constexpr int dryLen = 8192;
@@ -2154,6 +2520,21 @@ std::vector<std::pair<int, float>> linkedEdit (const EffectParams& p, int param,
 
 namespace aether
 {
+double vitDirectDb (float v) noexcept
+{
+    if (v <= 0.0f)
+        return 0.0;
+    return v >= 0.999f ? -200.0 : (double) v * 96.0 - 72.0;
+}
+float vitDirectValue (double db) noexcept
+{
+    if (db <= -71.9)
+        return 1.0f;
+    return db == 0.0 ? 0.0f : (float) std::clamp ((db + 72.0) / 96.0, 1.0e-4, 0.998);
+}
+double vitCrossHz (float v) noexcept { return 16.0 * std::pow (21357.0 / 16.0, (double) std::clamp (v, 0.0f, 1.0f)); }
+float vitCrossValue (double hz) noexcept { return (float) std::clamp (std::log (std::max (hz, 16.0) / 16.0) / std::log (21357.0 / 16.0), 1.0e-4, 1.0); }
+
 double airDb (float v) noexcept { return lin (v, 0.0, 15.0); }
 double airHz (float v) noexcept { return logMap (v, 5000.0, 20000.0); }
 double exciterHz (float v) noexcept { return logMap (v, 1000.0, 12000.0); }
@@ -2326,6 +2707,27 @@ public:
 
     void process (float* l, float* r, int n, const EffectParams& p, double) noexcept override
     {
+        if (p[vitLaw] >= 0.5f)
+        {
+            // round 190mm (dyn): the five-band harmonic enhancer law (set only by the Waves Vitamin translator)
+            static constexpr double defaults[4] { 90.0, 500.0, 2594.0, 9310.0 };
+            vitamin::Settings st;
+            for (int k = 0; k < 4; ++k)
+                st.crossHz[k] = p[vitCross0 + k] > 0.0f ? vitCrossHz (p[vitCross0 + k]) : defaults[k];
+            for (int b = 0; b < 5; ++b)
+                st.bandGainDb[b] = p[vitGain0 + b] > 0.0f ? 48.0 * std::clamp ((double) p[vitGain0 + b], 0.0, 1.0) : -200.0;
+            st.directDb = vitDirectDb (p[vitDirect]);
+            if (! vitOn)
+            {
+                vitEngine.prepare (sr);
+                vitOn = true;
+            }
+            const auto inPeak = Meters::peak (l, r, n);
+            vitEngine.process (l, r, n, st);
+            meters.set (0.0f, 0.0f, inPeak, Meters::peak (l, r, n));
+            return;
+        }
+        vitOn = false;
         const bool dynamicNow = p[dynamic] >= 0.5f;
         if (dynamicNow != dynamicMode)
         {
@@ -2418,6 +2820,8 @@ private:
     bool dynamicMode = true; // issue #77: the default model (its latency is known before the first block)
     std::array<float, maxBlock> hl {}, hr {};
     Meters meters;
+    vitamin::Engine vitEngine; // round 190mm (dyn)
+    bool vitOn = false;
 };
 } // namespace
 } // namespace aether
@@ -2747,6 +3151,169 @@ float characterShape (int k, double drive, float x) noexcept
     return a * (softKnee (u + c.bias, c.p) - f0) / slope;
 }
 
+// ---- round 190kw: the Saturn styles' own laws (docs/PARITY.md "Round 190kw"; recovered by static analysis) ----
+namespace
+{
+struct SaturnFilter
+{
+    int type;            // 0 low pass, 2 low shelf, 3 high pass, 5 high shelf, 7 bell
+    float hz, db, q;
+    int slope;           // cuts: 0 … 6 = 6, 12, 18, 24, 30, 36, 48 dB/oct
+};
+struct SaturnStyle
+{
+    int curve;           // 0 arctan, 2 x / (1 + x), 4 tanh, 6 sine, 7 2nd-order, 8 3rd-order, 11 tube, 13 rectifier
+    float power, negScale, driveLoDb, driveHiDb, refDb, trimDb;
+    int dynamicKnee, amp, pres, posts;
+    SaturnFilter pre[4], post[4];
+};
+constexpr SaturnStyle saturnStyles[characters] {
+#include "core/EmberSaturnStyles.inc"
+};
+// the curve on t ≥ 0 (the tube curve takes the signed input)
+inline float saturnBase (int curve, float t) noexcept
+{
+    constexpr float halfPi = 1.57079632679489662f;
+    switch (curve)
+    {
+        case 0: return std::atan (halfPi * t) / halfPi;
+        case 2: return t / (1.0f + t);
+        case 4: return std::tanh (t);
+        case 6: return t < 1.0f ? std::sin (halfPi * t) : 1.0f;
+        case 7: return t < 1.0f ? t * (2.0f - t) : 1.0f;
+        case 8: return t < 1.0f ? t * (1.5f - 0.5f * t * t) : 1.0f;
+        case 11: // asymmetric: a hard positive ceiling, a softer negative side
+        {
+            if (t >= 0.32002f) return 0.62993f;
+            if (t >= -0.08905f) return t * (3.9375f - 6.153f * t);
+            if (t >= -1.75482f)
+            {
+                const auto v = -t - 0.032847f;
+                const auto w = 1.0f - v, w2 = w * w, w4 = w2 * w2;
+                return -(0.75f * (1.0f - w4 * w4 * w4) + 0.25f * v + 0.01f);
+            }
+            return -1.17545f;
+        }
+        default: return t; // 13: the rectifier's |x| (its sign dropped below)
+    }
+}
+} // namespace
+
+float saturnCurve (int s, float x) noexcept
+{
+    const auto& st = saturnStyles[std::clamp (s, 0, characters - 1)];
+    if (st.curve == 13) return std::abs (x);
+    const bool neg = x < 0.0f;
+    const auto beta = neg ? st.negScale : 1.0f;
+    if (st.curve == 11 && st.power == 1.0f && beta == 1.0f) return saturnBase (11, x);
+    auto t = beta * std::abs (x);
+    if (st.power != 1.0f) t = std::pow (t, st.power);
+    auto y = st.curve == 11 ? std::abs (saturnBase (11, neg ? -t : t)) : saturnBase (st.curve, t);
+    if (st.power != 1.0f) y = std::pow (y, 1.0f / st.power);
+    y /= beta;
+    return neg ? -y : y;
+}
+double saturnPreDb (int s, double d) noexcept
+{
+    const auto& st = saturnStyles[std::clamp (s, 0, characters - 1)];
+    return st.driveLoDb + (st.driveHiDb - st.driveLoDb) * std::clamp (d, 0.0, 1.0);
+}
+double saturnPostGain (int s, double d) noexcept
+{
+    const auto& st = saturnStyles[std::clamp (s, 0, characters - 1)];
+    const auto c = dbToGain (st.refDb), gc = dbToGain (saturnPreDb (s, d)) * c;
+    const auto span = (double) saturnCurve (s, (float) gc) - std::min ((double) saturnCurve (s, (float) -gc), 0.0);
+    return span > 1e-30 ? dbToGain (st.trimDb) * 2.0 * c / span : 1.0;
+}
+static_assert (lawRate < maxEffectParams, "Ember's hidden parameters must fit the slot");
+bool saturnLaw (const EffectParams& p) noexcept { return on (p[revision]); }
+bool saturnRaw (const EffectParams& p) noexcept { return on (p[lawRate]); }
+bool lawCharacter (int k) noexcept
+{
+    // the styles whose law scored up on the refcap030 lab files and net up on the whole bank (docs/PARITY.md "Round
+    // 190kw"; round 190lg: + Clean Tape, Gentle and Heavy Saturation, whose steady ~1 dB offset was the reference's
+    // channel soft clipper). The others keep round 150 / 152's measured characters: Power Amp and Breakdown (net level /
+    // down on the bank), the effect styles (their smudger, foldback and destroy stages were not recovered), the
+    // transformers (their dynamic knee was not recovered), Brit Rock, Smooth / Crunchy Amp and the rectifier (their EQ /
+    // curve conventions do not reproduce the reference yet)
+    static constexpr bool on[characters] { true, true, true, true, true, true, true, true, true, true, false, true,
+                                           false, false, true, true, false, true, true, true, false, false, false, false,
+                                           false, false, false, false };
+    return k >= 1 && k <= characters && on[k - 1];
+}
+// round 190lg: the reference's channel output soft clipper (found statically: a cubic 1.5u − 0.5u³ on u = clamp (k·x, ±1),
+// k = (1 / (12T²) + 2/3) / T, times T, threshold T = 0 dB): small-signal gain 1 + 1 / (8T²) = 9/8 (+1.02 dB), ceiling 0 dBFS
+// from |x| ≥ 4/3. It is the ~1 dB the law missed and the extra compression near 0 dBFS at low drive (the refcap030 level
+// sweeps of Clean / Warm Tube, Clean Tape, Gentle Saturation fit within 0.03 dB at every level and drive with it). The
+// Subtle styles and the transformers measure without it (small-signal gain exactly the compensation's, no compression).
+bool saturnClipStyle (int s) noexcept
+{
+    return ! (s == 0 || s == 4 || s == 17 || s == 20 || s == 21 || s == 22);
+}
+float saturnClip (float x) noexcept
+{
+    const auto u = std::clamp (0.75f * x, -1.0f, 1.0f);
+    return u * (1.5f - 0.5f * u * u);
+}
+
+namespace
+{
+// RBJ cookbook sections at the reference's Q (shelves with the Q form), a cut of slope index n as Butterworth sections
+// (an odd order's first-order section first) with the last pair's Q scaled by q (round 190lg: q = 1 is Butterworth, as the reference)
+int saturnSections (lynx::Biquad* out, int room, const SaturnFilter& f, double sr) noexcept
+{
+    constexpr double pi = 3.141592653589793;
+    const auto hz = std::min ((double) f.hz, 0.48 * sr);
+    const auto w = 2.0 * pi * hz / sr, cw = std::cos (w), sw = std::sin (w);
+    int n = 0;
+    auto add = [&] () -> lynx::Biquad* { return n < room ? &out[n++] : nullptr; };
+    if (f.type == 7 || f.type == 2 || f.type == 5)
+    {
+        auto* b = add();
+        if (b == nullptr) return n;
+        const auto a = std::pow (10.0, f.db / 40.0);
+        const auto alpha = sw / (2.0 * std::max ((double) f.q, 0.01));
+        if (f.type == 7)
+            b->set (1 + alpha * a, -2 * cw, 1 - alpha * a, 1 + alpha / a, -2 * cw, 1 - alpha / a);
+        else
+        {
+            const auto sq = 2.0 * std::sqrt (a) * alpha;
+            if (f.type == 5)
+                b->set (a * ((a + 1) + (a - 1) * cw + sq), -2 * a * ((a - 1) + (a + 1) * cw), a * ((a + 1) + (a - 1) * cw - sq),
+                        (a + 1) - (a - 1) * cw + sq, 2 * ((a - 1) - (a + 1) * cw), (a + 1) - (a - 1) * cw - sq);
+            else
+                b->set (a * ((a + 1) - (a - 1) * cw + sq), 2 * a * ((a - 1) - (a + 1) * cw), a * ((a + 1) - (a - 1) * cw - sq),
+                        (a + 1) + (a - 1) * cw + sq, -2 * ((a - 1) + (a + 1) * cw), (a + 1) + (a - 1) * cw - sq);
+        }
+        return n;
+    }
+    const bool high = f.type == 3;
+    static constexpr int orders[7] { 1, 2, 3, 4, 5, 6, 8 };
+    const int order = orders[std::clamp (f.slope, 0, 6)];
+    if (order % 2 == 1)
+    {
+        auto* b = add();
+        if (b == nullptr) return n;
+        const auto k = std::tan (w / 2.0);
+        if (high) b->set (1.0, -1.0, 0.0, 1.0 + k, k - 1.0, 0.0);
+        else b->set (k, k, 0.0, 1.0 + k, k - 1.0, 0.0);
+    }
+    const int pairs = order / 2;
+    for (int j = 0; j < pairs; ++j)
+    {
+        auto* b = add();
+        if (b == nullptr) return n;
+        // Butterworth pole pair j (the last one is the most resonant)
+        double q = 1.0 / (2.0 * std::cos (pi * (2.0 * (pairs - 1 - j) + 1.0 + (order % 2)) / (2.0 * order)));
+        if (j == pairs - 1) q *= (double) f.q; // round 190lg: the reference's Q 1 is the Butterworth response (was × q / √½)
+        const auto alpha = sw / (2.0 * q);
+        if (high) b->set ((1 + cw) / 2, -(1 + cw), (1 + cw) / 2, 1 + alpha, -2 * cw, 1 - alpha);
+        else b->set ((1 - cw) / 2, 1 - cw, (1 - cw) / 2, 1 + alpha, -2 * cw, 1 - alpha);
+    }
+    return n;
+}
+} // namespace
+
 namespace
 {
 // a band's character: the curve (run oversampled by the caller), its input / output gain from the drive and the EQ after
@@ -2758,13 +3325,90 @@ struct CharacterStage
     int family = 0;
     float p = 2.0f, bias = 0.0f, f0 = 0.0f, slope = 1.0f, eqGain = 1.0f;
     std::array<Biquad, 9> eq;
+    // round 190kw: the Saturn law (`sat`, set by the engine before configure): the style's EQ before and after its curve
+    bool sat = false, lastSat = false;
+    int satStyle = 0, preN = 0, postN = 0;
+    std::array<Biquad, 12> satPre, satPost;
+    // a style with a power (P ≠ 1) runs its curve from a table built at configure (two pow calls per oversampled sample
+    // cost twice the old character): |F (±a)| at 64 points per octave of a over 2^−24 … 2^16, linear between them
+    // (relative error < 3e-5), the small-signal slope below, the last value above
+    static constexpr int tableLo = -24, tableOctaves = 40, tableSteps = 64;
+    bool satTable = false;
+    std::array<std::array<float, tableOctaves * tableSteps + 1>, 2> satT {};
+    float smallPos = 1.0f, smallNeg = 1.0f;
 
-    void reset() noexcept { for (auto& q : eq) q.reset(); }
+    static float tablePoint (int idx) noexcept
+    {
+        const std::uint32_t u = ((std::uint32_t) (idx / tableSteps + tableLo + 127) << 23) | ((std::uint32_t) (idx % tableSteps) << 17);
+        float a;
+        std::memcpy (&a, &u, 4);
+        return a;
+    }
+    void buildTable() noexcept
+    {
+        for (int i = 0; i <= tableOctaves * tableSteps; ++i)
+        {
+            const auto a = tablePoint (i);
+            satT[0][(std::size_t) i] = std::abs (saturnCurve (satStyle, a));
+            satT[1][(std::size_t) i] = std::abs (saturnCurve (satStyle, -a));
+        }
+        const auto a0 = tablePoint (0);
+        smallPos = satT[0][0] / a0;
+        smallNeg = satT[1][0] / a0;
+    }
+    float tableCurve (float x) const noexcept
+    {
+        const int side = x < 0.0f ? 1 : 0;
+        const auto a = std::abs (x);
+        std::uint32_t u;
+        std::memcpy (&u, &a, 4);
+        const int e = (int) (u >> 23) - 127;
+        float h;
+        if (e < tableLo) h = a * (side ? smallNeg : smallPos);
+        else if (e >= tableLo + tableOctaves) h = satT[(std::size_t) side][(std::size_t) (tableOctaves * tableSteps)];
+        else
+        {
+            const int idx = (e - tableLo) * tableSteps + (int) ((u >> 17) & (tableSteps - 1));
+            const std::uint32_t u0 = u & ~0x1ffffu, us = (std::uint32_t) (127 - e + 6) << 23; // segment start, 64 / 2^e
+            float a0, inv;
+            std::memcpy (&a0, &u0, 4);
+            std::memcpy (&inv, &us, 4);
+            const auto& t = satT[(std::size_t) side];
+            h = t[(std::size_t) idx] + (a - a0) * inv * (t[(std::size_t) idx + 1] - t[(std::size_t) idx]);
+        }
+        return side ? -h : h;
+    }
+
+    void reset() noexcept
+    {
+        for (auto& q : eq) q.reset();
+        for (auto& q : satPre) q.reset();
+        for (auto& q : satPost) q.reset();
+    }
 
     void configure (int kk, double sr) noexcept
     {
         k = std::clamp (kk, 0, characters);
-        if (k == 0 || (k == lastK && sr == lastSr)) return;
+        sat = sat && lawCharacter (k);
+        if (k == 0 || (k == lastK && sr == lastSr && sat == lastSat)) return;
+        if (sat)
+        {
+            satStyle = k - 1;
+            const auto& st = saturnStyles[satStyle];
+            preN = postN = 0;
+            for (int i = 0; i < st.pres; ++i)
+                preN += saturnSections (satPre.data() + preN, (int) satPre.size() - preN, st.pre[i], sr);
+            for (int i = 0; i < st.posts; ++i)
+                postN += saturnSections (satPost.data() + postN, (int) satPost.size() - postN, st.post[i], sr);
+            satTable = st.power != 1.0f;
+            if (satTable && (k != lastK || sat != lastSat)) buildTable();
+            if (k != lastK || sat != lastSat) reset();
+            lastK = k;
+            lastSr = sr;
+            lastSat = sat;
+            return;
+        }
+        lastSat = false;
         const auto& c = characterTable[k - 1];
         family = c.family;
         p = c.p;
@@ -2788,6 +3432,8 @@ struct CharacterStage
     {
         const auto& c = characterTable[std::max (k, 1) - 1];
         const auto d = referenceDrive (driveDb);
+        if (sat) // round 190kw: the reference's drive range and level compensation
+            return { (float) dbToGain (saturnPreDb (satStyle, d) + extraDb), (float) saturnPostGain (satStyle, d) };
         // round 152: Collapse with the measured law — the pitch drop's own level curve (the output's rms at seven input
         // levels per drive step, fitted with the same knee: 0.02 … 0.37 dB rms) [EXEC]
         static constexpr float collapseD[6] { -1.5f, 1.5f, 11.0f, 22.0f, 35.25f, 47.0f };
@@ -2800,13 +3446,33 @@ struct CharacterStage
 
     float curve (float u) const noexcept
     {
+        if (sat) return satTable ? tableCurve (u) : saturnCurve (satStyle, u);
         if (family == 1) return std::sin (u);
         if (family == 2) return std::abs (u);
         return (softKnee (u + bias, p) - f0) / slope;
     }
 
+    // round 190kw: the law's EQ before the drive (base rate)
+    void pre (float& a, float& b) noexcept
+    {
+        for (int i = 0; i < preN; ++i)
+        {
+            a = satPre[(std::size_t) i].process (a, 0);
+            b = satPre[(std::size_t) i].process (b, 1);
+        }
+    }
+
     void post (float& a, float& b) noexcept
     {
+        if (sat)
+        {
+            for (int i = 0; i < postN; ++i)
+            {
+                a = satPost[(std::size_t) i].process (a, 0);
+                b = satPost[(std::size_t) i].process (b, 1);
+            }
+            return;
+        }
         for (int i = 0; i < sections; ++i)
         {
             a = eq[(std::size_t) i].process (a, 0);
@@ -2831,6 +3497,7 @@ struct BandExtras
     float fbLast[2] {};
     double dyn = 0.0, env = 0.0, envAtk = 0.0, envRel = 0.0;
     std::array<float, 4> lastTone { -1.0f, -1.0f, -1.0f, -1.0f };
+    int lastToneMode = 0;
     float lastFbHz = -1.0f;
     int lastFactor = 0;
 
@@ -2842,17 +3509,32 @@ struct BandExtras
         env = 0.0;
     }
 
-    void configure (const EffectParams& p, int band, double sr, int factor) noexcept
+    // toneMode (round 190kw): 0 = Ember's tone stages, 1 = the reference's band tone stack (low shelf 120 Hz, bell 600 Hz,
+    // high shelves 2.5 and 7 kHz), 2 = its amps' (170 Hz, 500 Hz, 1.5 kHz, 4.5 kHz)
+    void configure (const EffectParams& p, int band, double sr, int factor, int toneMode = 0) noexcept
     {
         std::array<float, 4> tv;
         for (int k = 0; k < 4; ++k) tv[(std::size_t) k] = p[(std::size_t) bandExtra (band, 2 + k)];
-        if (tv != lastTone)
+        if (tv != lastTone || toneMode != lastToneMode)
         {
-            tone[0].shelf (sr, 120.0, toneDb (tv[0]), false, 0.7);
-            tone[1].peaking (sr, 800.0, 0.8, toneDb (tv[1]));
-            tone[2].shelf (sr, 3500.0, toneDb (tv[2]), true, 0.7);
-            tone[3].peaking (sr, 6000.0, 1.0, toneDb (tv[3]));
+            if (toneMode == 0)
+            {
+                tone[0].shelf (sr, 120.0, toneDb (tv[0]), false, 0.7);
+                tone[1].peaking (sr, 800.0, 0.8, toneDb (tv[1]));
+                tone[2].shelf (sr, 3500.0, toneDb (tv[2]), true, 0.7);
+                tone[3].peaking (sr, 6000.0, 1.0, toneDb (tv[3]));
+            }
+            else
+            {
+                static constexpr float hz[2][4] { { 120.0f, 600.0f, 2500.0f, 7000.0f }, { 170.0f, 500.0f, 1500.0f, 4500.0f } };
+                static constexpr int types[4] { 2, 7, 5, 5 };
+                static constexpr float qs[4] { 0.415854f, 0.471405f, 0.603418f, 1.0f };
+                for (int k = 0; k < 4; ++k)
+                    saturnSections (&tone[(std::size_t) k], 1,
+                                    SaturnFilter { types[k], hz[toneMode - 1][k], (float) toneDb (tv[(std::size_t) k]), qs[k], 1 }, sr);
+            }
             lastTone = tv;
+            lastToneMode = toneMode;
         }
         toneOn = false;
         for (const auto v : tv) toneOn = toneOn || std::abs (toneDb (v)) > 1e-6;
@@ -3033,8 +3715,15 @@ public:
         classicOn = false;
         for (auto& d : bandDry)
             d.setLength (Oversampler::latency());
+        for (auto& d : rawDelay) // round 190kw
+            d.setLength (Oversampler::latency());
         for (auto& d : bandDc)
             d.set (sr, 8.0);
+        // round 190lg: the law's DC blocker at the reference's ~1.5 Hz (its DC after a loud asymmetric tube passage decays
+        // with τ ≈ 0.11 s on the refcap030 level sweeps; Ember's own 8 Hz one cut the law's lows by 0.3 dB at 31 Hz)
+        satDc.set (sr, 1.5);
+        for (auto& d : satBandDc)
+            d.set (sr, 1.5);
         splitBands = 0; // redesign the crossovers at the new rate
         lastVoice = -1;
         tapeNow = -1; // round 190fj: the tape filters at the new rate
@@ -3076,7 +3765,12 @@ public:
                 o.reset();
         for (auto& d : bandDry)
             d.reset();
+        for (auto& d : rawDelay)
+            d.reset();
         for (auto& d : bandDc)
+            d.reset();
+        satDc.reset();
+        for (auto& d : satBandDc)
             d.reset();
         for (auto& x : split) x.reset();
         for (auto& row : ap)
@@ -3214,6 +3908,7 @@ private:
         // round 135: a voicing replaces the Style menu's curve and adds its own EQ; PUNISH adds 20 dB before the drive
         // round 150: band 1's character (when set) replaces the Style menu and the voicing
         auto& chr = chars[0];
+        chr.sat = saturnLaw (p); // round 190kw
         chr.configure (characterIndex (p[characterParam (0)]), sr);
         chr.law = measuredEffects (p); // round 152
         const auto vk = chr.k > 0 ? 0 : voiceIndex (p[voice]);
@@ -3296,6 +3991,7 @@ private:
                 a = voicePre.process (a, 0);
                 b = voicePre.process (b, 1);
             }
+            if (chr.sat) chr.pre (a, b); // round 190kw: the style's EQ before its curve
             if (mtape)
             {
                 if (tapeFresh && i == 0)
@@ -3317,10 +4013,12 @@ private:
 
         // round 128: band 1's power, mute, feedback, dynamics and tone (single-band mode)
         auto& ex = extras[0];
-        ex.configure (p, 0, sr, factor);
+        ex.configure (p, 0, sr, factor, chr.sat ? 1 + saturnStyles[chr.satStyle].amp : 0);
         const bool powered = on (p[bandExtra (0, 0)]);
         const bool muted = bandState (p[bandExtra (0, 1)]) == BandState::mute;
-        if (chr.k > 0)
+        if (chr.sat && saturnRaw (p)) // round 190kw: the reference's High Quality off — the curve at the base rate
+            shapeRaw (ex, chr, rawDelay[0], wl.data(), wr.data(), n);
+        else if (chr.k > 0)
         {
             if (ex.fbGain > 0.0)
             {
@@ -3375,6 +4073,7 @@ private:
         // round 152 (with the measured law): the single band applies band 1's mix and level like the reference (before,
         // they only acted in the multiband mode)
         const bool bandLaw = measuredEffects (p);
+        const bool satClip = chr.sat && powered && saturnClipStyle (chr.satStyle); // round 190lg
         const auto bandMix = std::clamp (p[band1Mix], 0.0f, 1.0f);
         const auto bandGain = (float) dbToGain (bandLevelDb (p[band1Level]));
 
@@ -3395,8 +4094,9 @@ private:
             }
             else
             {
-                a = dc.process (wl[(std::size_t) i], 0) * compA2;
-                b = dc.process (wr[(std::size_t) i], 1) * compB;
+                auto& dcs = chr.sat ? satDc : dc; // round 190lg
+                a = dcs.process (wl[(std::size_t) i], 0) * compA2;
+                b = dcs.process (wr[(std::size_t) i], 1) * compB;
             }
             if (chr.k > 0) chr.post (a, b);
             if (collapse) pitch[0].run (a, b, cRatio); // round 152
@@ -3429,6 +4129,11 @@ private:
             if (muted) { a = 0.0f; b = 0.0f; }
             a *= panA; // round 147: the band's pan
             b *= panB;
+            if (satClip) // round 190lg: the reference's channel soft clipper
+            {
+                a = saturnClip (a);
+                b = saturnClip (b);
+            }
             l[i] = (da + (a - da) * mx) * out;
             r[i] = (db + (b - db) * mx) * out;
         }
@@ -3511,6 +4216,7 @@ private:
                 compB[(std::size_t) b] = autoOn ? autoMakeup (st[(std::size_t) b], drvB[(std::size_t) b]) : 1.0f;
             }
             // round 150: a character replaces the style's curve, its drive law and the level (no auto gain on top)
+            chars[(std::size_t) b].sat = saturnLaw (p); // round 190kw
             chars[(std::size_t) b].configure (characterIndex (p[(std::size_t) characterParam (b)]), sr);
             chars[(std::size_t) b].law = measuredEffects (p); // round 152
             if (chars[(std::size_t) b].k > 0)
@@ -3583,23 +4289,26 @@ private:
         {
             auto* bl = bandBuf[(std::size_t) b][0].data();
             auto* br = bandBuf[(std::size_t) b][1].data();
+            auto& chr = chars[(std::size_t) b];
             for (int i = 0; i < n; ++i)
             {
                 float da = bl[i], db = br[i];
                 bandDry[(std::size_t) b].process (da, db);
                 dryBand[0][(std::size_t) i] = da;
                 dryBand[1][(std::size_t) i] = db;
+                if (chr.sat) chr.pre (bl[i], br[i]); // round 190kw: the style's EQ before its curve
                 bl[i] *= drv[(std::size_t) b];
                 br[i] *= drvB[(std::size_t) b];
             }
             const auto s = st[(std::size_t) b];
             // round 128: the band's feedback, dynamics, tone, power and solo / mute
             auto& ex = extras[(std::size_t) b];
-            ex.configure (p, b, sr, factor);
-            auto& chr = chars[(std::size_t) b];
+            ex.configure (p, b, sr, factor, chr.sat ? 1 + saturnStyles[chr.satStyle].amp : 0);
             const bool collapse = chr.k == collapseCharacter && measuredEffects (p);
             const auto ratio = collapse ? collapseRatio (referenceDrive (driveDb (p[(std::size_t) bandParam (b, 1)]))) : 1.0;
-            if (chr.k > 0)
+            if (chr.sat && saturnRaw (p)) // round 190kw: the reference's High Quality off — the curve at the base rate
+                shapeRaw (ex, chr, rawDelay[(std::size_t) b], bl, br, n);
+            else if (chr.k > 0)
             {
                 if (ex.fbGain > 0.0)
                 {
@@ -3636,7 +4345,8 @@ private:
             const bool silent = state == BandState::mute || (anySolo && state != BandState::solo);
             for (int i = 0; i < n; ++i)
             {
-                auto wa = bandDc[(std::size_t) b].process (bl[i], 0) * k, wb = bandDc[(std::size_t) b].process (br[i], 1) * kB;
+                auto& dcb = chr.sat ? satBandDc[(std::size_t) b] : bandDc[(std::size_t) b]; // round 190lg
+                auto wa = dcb.process (bl[i], 0) * k, wb = dcb.process (br[i], 1) * kB;
                 if (chr.k > 0) chr.post (wa, wb);
                 if (collapse) pitch[(std::size_t) b].run (wa, wb, ratio); // round 152
                 if (post) ex.post (wa, wb, dryBand[0][(std::size_t) i], dryBand[1][(std::size_t) i]);
@@ -3657,6 +4367,7 @@ private:
             }
         }
 
+        const bool satClip = chars[0].sat && on (p[bandExtra (0, 0)]) && saturnClipStyle (chars[0].satStyle); // round 190lg
         for (int i = 0; i < n; ++i)
         {
             auto a = tiltHi.process (tiltLo.process (wl[(std::size_t) i], 0), 0);
@@ -3668,6 +4379,11 @@ private:
             }
             float da = l[i], db = r[i];
             dry.process (da, db);
+            if (satClip) // round 190lg: the reference's channel soft clipper on the bands' sum (band 1's style decides)
+            {
+                a = saturnClip (a);
+                b = saturnClip (b);
+            }
             l[i] = (da + (a - da) * mx) * out;
             r[i] = (db + (b - db) * mx) * out;
         }
@@ -3724,6 +4440,26 @@ private:
             case 4: voicePre.shelf (sr, 60.0, -3.0, false, 0.7); voicePost.shelf (sr, 10000.0, 0.5, true, 0.7); break; // triode: thinner bass
             default: voicePre.peaking (sr, 100.0, 0.8, 2.5); voicePost.shelf (sr, 1000.0, 0.0, true, 0.7); break;     // pentode: bass bump
         }
+    }
+
+    // round 190kw: a law band's curve at the base rate (the reference's High Quality off), delayed like the oversampled
+    // path so the dry / wet alignment and the latency stay the same
+    void shapeRaw (BandExtras& ex, const CharacterStage& chr, Delay2<256>& d, float* a, float* b, int n) noexcept
+    {
+        if (ex.fbGain > 0.0)
+            for (int i = 0; i < n; ++i)
+            {
+                a[i] = ex.feedbackShape ([&chr] (float u) noexcept { return chr.curve (u); }, a[i], 0);
+                b[i] = ex.feedbackShape ([&chr] (float u) noexcept { return chr.curve (u); }, b[i], 1);
+                d.process (a[i], b[i]);
+            }
+        else
+            for (int i = 0; i < n; ++i)
+            {
+                a[i] = chr.curve (a[i]);
+                b[i] = chr.curve (b[i]);
+                d.process (a[i], b[i]);
+            }
     }
 
     static constexpr int maxBlock = 2048;
@@ -3829,10 +4565,13 @@ private:
     std::array<std::array<Oversampler, 2>, maxBands> bandOs;
     std::array<Delay2<256>, maxBands> bandDry;
     std::array<OnePoleHp, maxBands> bandDc;
+    OnePoleHp satDc;                                // round 190lg: the law bands' DC blocker (1.5 Hz)
+    std::array<OnePoleHp, maxBands> satBandDc;
     std::array<std::array<std::array<float, maxBlock>, 2>, maxBands> bandBuf {};
     std::array<std::array<float, maxBlock>, 2> dryBand {};
     std::array<BandExtras, maxBands> extras;
     std::array<CharacterStage, maxBands> chars; // round 150
+    std::array<Delay2<256>, maxBands> rawDelay;  // round 190kw: the law's base-rate path (lawRate)
     // round 152: linear phase, the modulation, the pitch drop
     std::array<lynx::peqfl::FftConvolver, maxBands - 1> linConv;
     std::vector<float> linTable;
@@ -4049,12 +4788,18 @@ std::unique_ptr<Effect> makeFret();  // round tp172c8 (core/StripSuite.inc)
 std::unique_ptr<Effect> makeShell();
 std::unique_ptr<Effect> makeStrike(); // round trans189d (core/StrikeSuite.inc)
 std::unique_ptr<Effect> makeAnvil(); // round 190fk (core/AnvilSuite.inc)
+std::unique_ptr<Effect> makeCorrode(); // round 190kk (core/LiveFxSuite.inc)
+std::unique_ptr<Effect> makeSoundboard();
+std::unique_ptr<Effect> makePlatter();
+std::unique_ptr<Effect> makeTimeprism(); // round 190ko (core/LiveFxSuite.inc)
+std::unique_ptr<Effect> makeHarmonia();
 bool isSuiteKind (EffectKind kind) noexcept
 {
     return kind == EffectKind::ridgeStrip || kind == EffectKind::glowLeveler || kind == EffectKind::hushDeEsser
            || kind == EffectKind::aether || kind == EffectKind::ember || kind == EffectKind::kilnChannel
            || kind == EffectKind::fretChannel || kind == EffectKind::shellChannel || kind == EffectKind::strikeShaper
-           || kind == EffectKind::anvilBus;
+           || kind == EffectKind::anvilBus || kind == EffectKind::corrode || kind == EffectKind::soundboard
+           || kind == EffectKind::platter || kind == EffectKind::timeprism || kind == EffectKind::harmonia;
 }
 
 std::unique_ptr<Effect> make (EffectKind kind)
@@ -4071,6 +4816,11 @@ std::unique_ptr<Effect> make (EffectKind kind)
         case EffectKind::shellChannel: return makeShell();
         case EffectKind::strikeShaper: return makeStrike();
         case EffectKind::anvilBus: return makeAnvil();
+        case EffectKind::corrode: return makeCorrode();
+        case EffectKind::soundboard: return makeSoundboard();
+        case EffectKind::platter: return makePlatter();
+        case EffectKind::timeprism: return makeTimeprism();
+        case EffectKind::harmonia: return makeHarmonia();
         default: return nullptr;
     }
 }
@@ -4104,6 +4854,7 @@ std::string onOff (float v) { return on (v) ? "on" : "off"; }
 #include "core/StripSuite.inc" // round tp172c8: Fret Channel, Shell Channel
 #include "core/StrikeSuite.inc" // round trans189d: Strike Shaper
 #include "core/AnvilSuite.inc" // round 190fk: Anvil Bus
+#include "core/LiveFxSuite.inc" // round 190kk: Corrode, Soundboard, Platter
 
 namespace glow
 {
@@ -4198,6 +4949,27 @@ std::string modernParamText (int param, float v)
     }
 }
 
+// round 190le: the 32C voicing's read-outs (the original's own dials; the end bands read the shelf's centre and plateau,
+// or in Bell mode the bell's frequency and peak, as its panel does)
+std::string h32ParamText (int param, float v, const EffectParams& p)
+{
+    switch (param)
+    {
+        case hpf: return v <= 0.0f ? "off" : hzText (h32HpfHz (v));
+        case lpf: return v <= 0.0f ? "off" : hzText (h32LpfHz (v));
+        case lfGain: return fmt ("%+.1f dB", on (p[lfBell]) ? h32BellDb (v) : h32ShelfDb (v));
+        case hfGain: return fmt ("%+.1f dB", on (p[hfBell]) ? h32BellDb (v) : h32ShelfDb (v));
+        case lmfGain: case hmfGain: return fmt ("%+.1f dB", h32BellDb (v));
+        case lfFreq: return hzText (h32LfHz (v, on (p[lfBell])));
+        case hfFreq: return hzText (h32HfHz (v, on (p[hfBell])));
+        case lmfFreq: return hzText (h32LmfHz (v));
+        case hmfFreq: return hzText (h32HmfHz (v));
+        case lmfQ: case hmfQ: case curve: return "-";
+        case h32: return on (v) ? "32C console" : "off";
+        default: return paramText (EffectKind::ridgeStrip, param, v);
+    }
+}
+
 std::string vocalParamText (int param, float v)
 {
     namespace vs = voxstrip;
@@ -4236,6 +5008,16 @@ std::string paramText (EffectKind kind, int param, float v)
         return strikeParamText (param, v);
     if (kind == EffectKind::anvilBus)
         return anvilParamText (param, v);
+    if (kind == EffectKind::corrode)
+        return corrodeParamText (param, v);
+    if (kind == EffectKind::soundboard)
+        return soundboardParamText (param, v);
+    if (kind == EffectKind::platter)
+        return platterParamText (param, v);
+    if (kind == EffectKind::timeprism)
+        return timeprismParamText (param, v);
+    if (kind == EffectKind::harmonia)
+        return harmoniaParamText (param, v);
     if (kind == EffectKind::kilnChannel)
     {
         namespace k = kiln;
@@ -4274,6 +5056,7 @@ std::string paramText (EffectKind kind, int param, float v)
             case order: return on (v) ? "dyn > EQ" : "EQ > dyn";
             case voicing: return on (v) ? "E console" : "classic";
             case console4k: return on (v) ? "4K console" : "off";
+            case h32: return on (v) ? "32C console" : "off"; // round 190le
             case modern: case compPeak: case gateHold: return modernParamText (param, v); // round tp172c
             case k4Colour: case k4Mic: case k4MakeupOffset: return k4ParamText (param, v);
             case filterSplit: return on (v) ? "split" : "with EQ";

@@ -1,15 +1,15 @@
 ---
-source: a79e43f031
+source: 98a5eb9945
 ---
-LYNX SHARE 將專案儲存為 `.lynx` 檔案。它也能開啟其他程式的專案、載入常見的音訊檔案，並匯出音訊、MIDI 和給其他程式使用的專案。下表列出 0.1.26 alpha 的所有格式。
+LYNX SHARE 將專案儲存為 `.lynx` 檔案。它也能開啟其他程式的專案、載入常見的音訊檔案，並匯出音訊、MIDI 和給其他程式使用的專案。下表列出 0.1.30 alpha 的所有格式。
 
 從其他程式的格式開啟的專案屬於匯入。此時 `檔案 › 儲存` 會詢問要把 `.lynx` 檔案寫到哪裡，原始檔案絕不會被更改。
 
 ## 開啟其他程式的專案
 
 1. 選擇 `檔案 › 開啟...`（`Ctrl+O`）。
-2. 選取 `.flp`、`.als`、`.flm`、`.mid` 或 `.zip` 檔案。
-3. 如果是 `.flp`，請選擇 `說明 › Last FL Studio import report`，查看哪些內容被近似處理或略過。
+2. 選取 `.flp`、`.als`、`.flm`、`.dawproject`、`.band`、`.blx`、`.mid` 或 `.zip` 檔案。
+3. 請選擇 `說明 › 上次專案匯入報告`，查看哪些內容被近似處理或略過。
 4. 選擇 `檔案 › 儲存`，並選擇 `.lynx` 檔案要寫到哪裡。
 
 ## 格式
@@ -22,14 +22,21 @@ LYNX SHARE 將專案儲存為 `.lynx` 檔案。它也能開啟其他程式的專
 | `.flp` | `檔案 › 開啟...` | `檔案 › 匯出 › FL Studio 專案...`，一個 FL Studio 2026 專案或壓縮循環包 | 原生外掛在重新製作的引擎上播放，精確度各不相同。FLEX 套件絕不會被開啟。匯出時，僅限 LYNX 的樂器和效果器會被算繪為音訊，或換成最接近的 FL 外掛，調變器則會被略過。見[從 FL Studio 轉換](/wiki/coming-from-fl-studio/) |
 | `.flm` | `檔案 › 開啟...` | 否 | FL Studio Mobile 專案。部分支援：MiniSynth、Transistor Bass、3x Osc、GMSynth、SuperSaw、DW Sampler、Slicer 和 DirectWave 以外的樂器會改用內建合成器播放 |
 | `.als` | `檔案 › 開啟...`，Live 11 和 12 的套裝 | `檔案 › 匯出 › Ableton Live 套裝 (.als)...`，適用於 Live 12 或 Live 11 | 匯入時，Live 中沒有 LYNX SHARE 對應項目的裝置會被捨棄。匯出時，LYNX SHARE 自己的樂器和效果器不會被轉換，效果器參數的自動化和插入軌之間的路由會被捨棄。見[從 Ableton Live 轉換](/wiki/coming-from-ableton/) |
+| `.dawproject` | `檔案 › 開啟...` | `檔案 › 匯出 › DAWproject (.dawproject)...` | Bitwig、Studio One、Cubase 等程式使用的開放交換格式：軌道、資料夾、片段、音符、帶 warp 標記的音訊、自動化、速度、標記、帶傳送的混音器，以及帶狀態的 VST3、VST2 和 CLAP 外掛。匯入時，音符效果器和 MIDI 表情會被略過；匯出時，片段網格、其他編排和部分逐音符的細節會被略過。兩個方向都會列出被略過的內容 |
+| `.band` | `檔案 › 開啟...`（專案套件、其中的 `projectData` 檔案或它的 zip） | 否 | GarageBand 10 或 GarageBand for iOS 專案，作為簡易工作流程的音軌。部分匯入：樂器音軌用內建合成器和鼓來播放，GarageBand for iOS 中製作的 Sampler 樂器除外。GarageBand 11 及更早版本的專案無法讀取 |
+| `.blx` | `檔案 › 開啟...`，或用簡易工作流程的 `資料夾...` 匯入其資料夾 | 否 | 由 Cakewalk 或 Sonar 下載的 BandLab 專案，作為簡易工作流程的音軌，帶區域、速度、調性、混音、音量和聲像自動化以及常用效果器。部分匯入：BandLab 的樂器音色和其他踏板效果會列在匯入報告中 |
 | `.mid`、`.midi` | `檔案 › 開啟...` 會建立新專案。`檔案 › 匯入 › MIDI檔案...` 和鋼琴捲軸則匯入到目前的專案 | `檔案 › 匯出 › MIDI檔案...`（`Ctrl+Shift+M`） | |
 | `.wav` | 作為取樣或音訊片段 | `檔案 › 匯出 › Wave檔案...`，16 位元、24 位元或 32 位元浮點數 | 可選的抖動、速度資訊、循環標記和播放清單標記 |
 | `.mp3` | 作為取樣或音訊片段 | `檔案 › 匯出 › MP3檔案...` | 固定位元率 |
 | `.ogg` | 作為取樣或音訊片段 | `檔案 › 匯出 › OGG檔案...` | |
 | `.flac` | 作為取樣或音訊片段 | `檔案 › 匯出 › FLAC檔案...`，壓縮 0 到 8 | 每個等級都是無損 |
-| `.aif`、`.aiff` | 作為取樣或音訊片段 | 否 | |
+| `.aif`、`.aiff` | 作為取樣或音訊片段 | `檔案 › 匯出 › AIFF檔案...`，16 位元或 24 位元 | |
+| `.m4a` | – | `檔案 › 匯出 › M4A檔案...` | 僅匯出。AAC，在 Windows 和 macOS 上使用系統的編碼器；Linux 上不提供 |
 | `.wv` | 作為取樣 | 否 | WavPack 取樣，與 FL Studio 的套件中附帶的相同 |
 | `.sf2`、`.sf3` | 由 LYNX Soundfont 播放 | 否 | SoundFont |
+| `.dwp`、`.dwb` | 在瀏覽器中按兩下、拖放到通道機架，或使用 DirectWave 的 `開啟程式 / 音色庫...` | DirectWave 的程式和音色庫儲存 | DirectWave 程式和音色庫。取樣會在 DirectWave 尋找它們的位置尋找 |
+| `.gig` | 作為 DirectWave 通道 | 否 | GigaStudio 樂器：力度層、輪流取樣、循環、調音和放大包絡。釋放觸發取樣、鍵位切換和壓縮取樣暫不讀取 |
+| `.ncw` | 作為取樣或音訊片段 | 否 | Kontakt 的壓縮取樣。Kontakt 的 `.nki` 樂器需要把 Kontakt 本身作為外掛；受保護的音色庫永遠不會被解密 |
 | `.fst` | 從瀏覽器開啟 | 否 | FL Studio 原生外掛的預設集。僅限 LYNX SHARE 有對應引擎的外掛 |
 | `.fsc` | 鋼琴捲軸和事件編輯器 | 鋼琴捲軸和事件編輯器 | FL Studio 的樂譜和自動化檔案 |
 | `.lynxpreset`、`.fxp`、`.fxb`、`.vstpreset` | 被代管外掛的預設集選單中的 `載入預設集檔案...` | `儲存預設集...` 和 `匯出預設集檔案...` | 第三方外掛的預設集。`.fxp` 和 `.fxb` 用於 VST2 外掛，`.vstpreset` 用於 VST3 外掛，而且只在外掛於 LYNX SHARE 內部執行時才可用 |
@@ -63,7 +70,7 @@ LYNX.exe --export-flp project.lynx out.flp  write an FL Studio project
 ## 須知
 
 - 長度超過 30 秒的音訊檔案會從磁碟快取串流播放。
-- 儲存時絕不會寫入 `.flp`、`.als` 或 `.flm`。要用匯出指令來寫入新檔案。
+- 儲存時絕不會寫入 `.flp`、`.als`、`.flm`、`.dawproject`、`.band` 或 `.blx`。要用匯出指令來寫入新檔案。
 - `.wv` 檔案是唯讀的。
 - `.zip` 會先解壓縮到資料夾，再開啟裡面的專案。
 

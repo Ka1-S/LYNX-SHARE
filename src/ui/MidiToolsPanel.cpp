@@ -1774,6 +1774,34 @@ miditools::Notes MidiToolsPanel::apply (const miditools::Notes& notes, std::int6
     }
 }
 
+void MidiToolsPanel::quantizeNow()
+{
+    if (target == nullptr)
+        return;
+    auto t = target();
+    if (t.pattern < 0 || t.pattern >= (int) engine.getSong().patterns.size())
+        return;
+    if (t.indices.empty()) // (round 190hr: Live's Quantize with no notes selected takes every note of the clip)
+    {
+        t.indices.resize (engine.getSong().patterns[(std::size_t) t.pattern].notes.size());
+        for (int i = 0; i < (int) t.indices.size(); ++i)
+            t.indices[(std::size_t) i] = i;
+        t.selected = false;
+    }
+    if (t.indices.empty())
+        return;
+    if (t.grid <= 1)
+        t.grid = ppq / 4; // (no editor showing the clip: Live's default grid, 1/16)
+    session.valid = false; // (a Transform run in progress keeps what it did)
+    std::vector<int> out;
+    engine.editSong ([&] (Song& s) {
+        auto& p = s.patterns[(std::size_t) t.pattern];
+        out = miditools::replaceNotes (p, t.indices, miditools::quantize (miditools::notesAt (p, t.indices), quantizeOptions, std::max<std::int64_t> (1, t.grid)));
+    });
+    if (t.selected && select != nullptr)
+        select (out);
+}
+
 void MidiToolsPanel::run()
 {
     if (target == nullptr)

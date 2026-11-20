@@ -239,7 +239,7 @@ TEST (stability190gg_thread_guard_is_app_only_and_adds_no_static_tls)
     CHECK (guard.find ("else if (currentFrame() == nullptr && synchronousFault (info))\n        parkPluginThread (sig, context);") != std::string::npos);
     // the self test checks LYNX's own threads still crash (LYNX's executable watched as if it were a plugin's module)
     const auto main = readFile ("src/Main.cpp");
-    CHECK (main.find ("{ \"plain\", \"guarded\", \"guarded-libc\", \"thread\", \"thread-libc\" }") != std::string::npos);
+    CHECK (main.find ("{ \"plain\", \"guarded\", \"guarded-libc\", \"thread\", \"thread-libc\", \"hang\", \"heap\" }") != std::string::npos); // (rollup step 12: + the crash watchdog's kinds)
 }
 
 TEST (stability190gg_always_separate_offered_after_a_crash)

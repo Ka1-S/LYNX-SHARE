@@ -8,7 +8,7 @@
 Free and open source, for Windows, macOS and Linux. Opens your FL Studio, Ableton Live and FL Studio Mobile projects.</p>
 
 <p align="center">
-  <a href="https://github.com/Ka1-S/LYNX-SHARE/releases"><img src="https://img.shields.io/badge/Download-0.1.29%20alpha-d9534f?style=for-the-badge" alt="Download LYNX SHARE"></a>
+  <a href="https://github.com/Ka1-S/LYNX-SHARE/releases"><img src="https://img.shields.io/badge/Download-0.1.30%20alpha-d9534f?style=for-the-badge" alt="Download LYNX SHARE"></a>
   <a href="https://apps.microsoft.com/detail/9NQRFBFDCX6N"><img src="https://get.microsoft.com/images/en-us%20dark.svg" height="28" alt="Get it from Microsoft"></a>
   <a href="https://discord.gg/XHKkbtbkY"><img src="https://img.shields.io/badge/Discord-join%20the%20community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join the LYNX SHARE Discord"></a>
   <br>
@@ -58,8 +58,8 @@ between them at any time in *View › Layout style*; the project stays the same,
    tracks and a timeline in one window, loops and pads, and quick recording. FL Studio Mobile projects (`.flm`) open
    in it.
 
-It opens FL Studio (`.flp`), Ableton Live (`.als`) and FL Studio Mobile (`.flm`) projects, and exports `.flp` and
-`.als` back, so your work is not locked in. It is written from scratch in C++20 with JUCE 8, licensed under the
+It opens FL Studio (`.flp`), Ableton Live (`.als`), FL Studio Mobile (`.flm`), DAWproject (`.dawproject`), GarageBand
+(`.band`) and BandLab (`.blx`) projects, and exports `.flp`, `.als` and `.dawproject` back, so your work is not locked in. It is written from scratch in C++20 with JUCE 8, licensed under the
 AGPL-3.0, and still an **alpha**.
 
 **It's for you if you…**
@@ -75,7 +75,7 @@ AGPL-3.0, and still an **alpha**.
 | | |
 |---|---|
 | 🎹 **The FL Studio workflow** | Channel Rack, Piano Roll, Playlist with several arrangements, and a Mixer with inserts, sends and sidechain. The default layout, never watered down. |
-| 📂 **Your projects come with you** | Opens `.flp`, `.als` (Live 11 and 12) and `.flm`; exports `.flp` and `.als`. FL Studio's native plugins play on LYNX SHARE's own engines, so a project that uses them plays without FL Studio installed. |
+| 📂 **Your projects come with you** | Opens `.flp`, `.als` (Live 11 and 12), `.flm`, `.dawproject`, GarageBand `.band` and BandLab `.blx`; exports `.flp`, `.als` and `.dawproject`. FL Studio's native plugins play on LYNX SHARE's own engines, so a project that uses them plays without FL Studio installed. |
 | 🎛️ **Three workflows, one program** | The FL Studio workflow by default, a Clip-launch workflow in the style of Ableton Live, and a Simple workflow that mixes BandLab's one-window style with FL Studio Mobile's. Switch any time in *View › Layout style*; the project stays the same. |
 | 🤝 **Make music together** | Send a project to a friend as one file, or work on it live with up to three other people, end-to-end encrypted. |
 | ⚡ **Lightweight** | A lock-free engine that spreads channels and mixer tracks across CPU cores, skips idle channels, renders ahead what you are not playing live and streams long audio from disk. Measured on one Windows PC, LYNX SHARE 0.1.28 opened FL's *Thief* demo in 5.2 s with 345 MB of memory (FL Studio 2026: 12.2 s, 874 MB), its window was ready in about 1 s (FL Studio: 1.7 s), and a playing song is drawn at 143 frames a second (FL Studio: 143.8) ([0.1.28 notes](https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.28-alpha)). |
@@ -113,7 +113,7 @@ menu (split, chop, reverse, fit to tempo and more).
 <td width="50%" valign="top">
 <img src="docs/img/mixer.png" alt="Mixer">
 
-**Mixer.** Up to 127 inserts with 10 effect slots each, sends, sidechain, delay compensation and smart disable, plus
+**Mixer.** Up to 500 inserts with 10 effect slots each, sends, sidechain, delay compensation and smart disable, plus
 any insert to any hardware output.
 
 </td>
@@ -130,7 +130,8 @@ any insert to any hardware output.
 columns, scenes are rows. Clips have launch modes, quantisation and follow actions, and a selected clip opens in a Clip
 View. Under the grid there is a Session mixer; there are also instrument, audio-effect and MIDI-effect racks, a Drum
 Rack, Draw Mode and MIDI / Key Map Modes, Live's Freeze Track and Bounce, clip envelopes, and **Ableton Link** to play
-in sync with Live and other Link apps. Live sets bring their Session clips and scenes straight into the grid. The
+in sync with Live and other Link apps; return tracks, Sends and a crossfader as in Live's Session mixer. Live sets bring
+their Session clips and scenes straight into the grid. The
 FL Studio workflow stays the default, and nothing is taken away from it.
 
 ### The Simple workflow, in the style of BandLab and FL Studio Mobile (optional)
@@ -138,8 +139,13 @@ FL Studio workflow stays the default, and nothing is taken away from it.
 *View › Layout style › Simple workflow* mixes BandLab's approachable one-window style with the way FL Studio Mobile
 works: the tracks and the timeline in one window, loops and pads, and quick recording. FL Studio Mobile projects
 (`.flm`) open in it too. Add a voice, an instrument, a 16-pad sampler or a starter beat in one click, bring in a folder of
-stems and MIDI from another app, shape the sound with eight one-knob effects, play chords on a Chord pad and save the song as a file from the Finish dock. *Make my first song*
+stems and MIDI from another app, program a beat in the Drum Machine, tune up with the tuner, shape the sound with eight one-knob effects, play chords on a Chord pad and save the song as a file from the Finish dock. *Make my first song*
 walks you through it step by step. The setup wizard offers all three workflows at the first start.
+
+<p align="center">
+  <img src="docs/img/drum-machine.png" alt="The Simple workflow with the Drum Machine open under a drum track" width="100%">
+  <br><sub>The Simple workflow: a drum track and its BandLab-style Drum Machine.</sub>
+</p>
 
 ### Instruments and effects
 
@@ -165,11 +171,50 @@ Edison (the audio editor) on any mixer slot, and Patcher for building your own c
 Every one of them is listed, with a picture of its editor, in the
 [catalogue of instruments and effects](https://lynx-share.com/instruments-and-effects/).
 
+### Audio editing, chords and sound design
+
+<table>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/img/poly-note-editor.png" alt="The polyphonic note editor: a chord inside a piano recording moved up a semitone">
+
+**Polyphonic note editor.** *Edit notes (polyphonic)* in an audio clip's menu finds the single notes inside chords
+and mixes: move, retune, stretch or mute one of them, shape its modulation and drift, and hear it while you drag.
+
+</td>
+<td width="50%" valign="top">
+<img src="docs/img/ara-edit.png" alt="An audio clip's menu with Edit in ARA plugin and Melodyne">
+
+**ARA 2 plugins.** *Edit in ARA plugin* (clip menu › LYNX extras) opens an audio clip in Melodyne or another ARA 2
+plugin, which edits it in place, in time with the project.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/img/chord-helper.png" alt="The Chord helper next to the Piano Roll: related keys and borrowed chords">
+
+**Chord helper.** *Tools › Chord helper* in the Piano Roll reads the selected chord and suggests related keys and
+borrowed chords, with how each one moves and feels; hear one on hover, click it to insert it.
+
+</td>
+<td width="50%" valign="top">
+<img src="docs/img/helix-plus.png" alt="Helix with the Helix+ strip">
+
+**Helix and Helix+.** Helix, the wavetable synth, gets a Helix+ strip in its channel window: a third oscillator,
+sample, granular and spectral layers, your own wavetables, more warp modes, unison and filter types, eight macros,
+drawn LFOs, chaos sources and a rack of effects.
+
+</td>
+</tr>
+</table>
+
 ### Everything else
 
 - **Automation:** any knob or fader becomes an automation clip with points and curves (all 13 of FL's curve modes); MIDI controllers link to any parameter.
-- **Recording:** notes from the computer keyboard or a MIDI keyboard, and audio with punch in/out, loop takes and comping.
-- **Export:** WAV (16/24/32-bit float), MP3, FLAC and OGG; the song, one pattern, one file per marker section or stems (all mixer stems from one render); MIDI.
+- **Recording:** notes from the computer keyboard or a MIDI keyboard (MPE too), and audio with punch in/out, loop takes and comping. MIDI Out channels play hardware synths.
+- **Audio editing:** ARA 2 plugins such as Melodyne edit audio clips in place; LYNX SHARE's own polyphonic note editor moves and retunes single notes inside chords and mixes; audio clips convert to MIDI (also polyphonic); stems can be extracted from a sample; Newtone corrects vocals.
+- **Export:** WAV (16/24/32-bit float), MP3, FLAC, OGG, AIFF (16/24-bit) and M4A (AAC, with the system's encoder on Windows and macOS); the song, one pattern, one file per marker section or stems (all mixer stems from one render); MIDI.
 - **Third-party plugins:** VST3 and CLAP on every system, plus the formats in the table below. Plugins can run in a separate process, so one that crashes goes silent instead of taking your project down.
 - **Online sessions:** *File › Online session* sends a project as one `.lynxpack` file, or starts a live session for up to four people.
 - **And more:** themes, undo on every edit, autosave and project versions, freezing a channel or a whole track to audio, Ableton Link, MIDI controller profiles, and the interface in 15 languages.
@@ -187,7 +232,7 @@ Every one of them is listed, with a picture of its editor, in the
 
 ## Opens your projects
 
-*File › Open* (or a double-click in the Browser) takes `.lynx`, `.flp`, `.als`, `.flm` and MIDI files. Missing samples
+*File › Open* (or a double-click in the Browser) takes `.lynx`, `.flp`, `.als`, `.flm`, `.dawproject`, GarageBand `.band`, BandLab `.blx` and MIDI files. Missing samples
 are listed in the Missing files window, and *Help › Last project import report* tells you what was converted,
 approximated or left out. The original file is never changed: saving writes a `.lynx` project.
 
@@ -195,9 +240,16 @@ approximated or left out. The original file is never changed: saving writes a `.
 |---|:---:|:---:|---|
 | **FL Studio** `.flp` | ✅ | ✅ | Channels, samples, patterns, every arrangement, automation, the mixer and native plugins with their settings. |
 | **Ableton Live** `.als` (Live 11 and 12) | ✅ | ✅ | Tracks, clips, warp markers, groups, returns, automation, racks and many of Live's devices. Session clips land in the clip grid. |
+| **DAWproject** `.dawproject` (Bitwig, Studio One, Cubase and other apps) | ✅ | ✅ | Tracks, folders, clips, notes, audio with its warp markers, automation, tempo and markers, the mixer with sends, and VST3 / VST2 / CLAP plugins with their state. The clip grid, other arrangements and some per-note details stay behind (listed in the report). |
 | **FL Studio Mobile** `.flm` | ✅ partial | — | Arrangement, samples, drum kits, several instruments and effects, automation and chord sets. |
+| **GarageBand** `.band` (GarageBand 10, GarageBand for iOS) | ✅ partial | — | Tracks, MIDI and audio regions, tempo, key, levels, pan and mute, as Simple-workflow tracks. |
+| **BandLab** `.blx` (BandLab project downloaded by Cakewalk / Sonar) | ✅ partial | — | Tracks, MIDI and audio regions with their loops, tempo, key, levels, pan, mute, volume and pan automation and the common effects, as Simple-workflow tracks. |
 | **MIDI** `.mid` | ✅ | ✅ | Notes, into or out of the Piano Roll or the whole song. |
-| **LYNX SHARE** `.lynx` | ✅ | ✅ | The native format (JSON), with autosave. |
+| **LYNX SHARE** `.lynx` | ✅ | ✅ | The native format (JSON), with autosave. *File › Save a copy for an older LYNX...* writes a copy that 0.1.27 or 0.1.28 can open. |
+
+Instruments and samples of other samplers open too: DirectWave programs and banks (`.dwp`, `.dwb`), GigaStudio `.gig`
+instruments (as DirectWave channels) and Kontakt's `.ncw` samples. Kontakt `.nki` instruments need Kontakt itself as a
+plugin; protected libraries are never decrypted.
 
 <details>
 <summary><strong>FL Studio (<code>.flp</code>): what comes in and what goes back</strong></summary>
@@ -237,6 +289,37 @@ report. More in the [format notes](docs/analise/FLM_FORMAT.md).
 
 </details>
 
+<details>
+<summary><strong>GarageBand (<code>.band</code>): import only, partial</strong></summary>
+
+Projects saved by GarageBand 10 for Mac or GarageBand for iOS open as Simple-workflow tracks: tempo, time signature,
+key, song sections (as markers), each track's level, pan and mute, MIDI regions with their notes, and audio regions
+from the project's Media folder (with their trim). Open the `.band` package itself, the `projectData` file inside it,
+or a zip of it. GarageBand's instruments and effects are not stored in a readable form: instrument tracks play
+LYNX SHARE's built-in synth (a preset chosen by the patch name) and drum kits its built-in drums, except Sampler
+instruments you made in GarageBand for iOS: their recordings are inside the project and play on a Sampler track. Smart Drums, Drummer
+and pattern regions, take folders, tempo changes and Apple Loops that are not inside the project are listed in the
+import report. Projects from GarageBand 6–11 (2013 and older) are not readable: save them again in GarageBand 10, or
+export the tracks as audio (or MIDI) and bring the folder in with the Simple workflow's *Folder...* import.
+
+</details>
+
+<details>
+<summary><strong>BandLab (<code>.blx</code>): import only, partial</strong></summary>
+
+A BandLab project downloaded by Cakewalk or Sonar (*Documents\BandLab\Downloads\<project>*, the `.blx` with its audio
+and MIDI files beside it) opens as Simple-workflow tracks: tempo, time signature, key, each track's volume, pan, mute,
+volume and pan automation (as automation lanes) and its send to BandLab's shared reverb, MIDI regions with their notes
+and audio regions with their offset, gain, fades, pitch and speed; looped regions repeat. BandLab's compressor, 3-band
+and graphic EQs, reverbs, delays, chorus, distortions and limiters come over on LYNX SHARE's effects; other pedals,
+the Mastering preset, BandLab's instrument sounds and sampler kits are listed in the import report (instrument tracks
+play LYNX SHARE's built-in synth and drums). Open the `.blx`, or pick its folder with the Simple workflow's *Folder...*
+import. Without Cakewalk, BandLab's *Download › Tracks* stems and MIDI come in with the same *Folder...* import. The
+reader follows BandLab's project data as BandLab's own apps write it and was tested on made-up projects only: if a `.blx`
+of yours doesn't open as it should, please open an issue.
+
+</details>
+
 ## Built-in instruments and effects
 
 LYNX SHARE's engines for FL Studio's native plugins are clean-room re-implementations, each compared against the
@@ -272,19 +355,22 @@ separate `LYNX-Plugins` download on the releases page (Windows, macOS and, again
 <!-- inspired:begin (generated by scripts/gen-inspired.py) -->
 ## Inspired by the classics
 
-LYNX SHARE ships **native** plugins inspired by the third-party plugins producers use most, next to its clean-room FL Studio natives. 28 dedicated LYNX SHARE engines are in, more are being built, and a project that uses one of the 63 originals below **opens with the LYNX SHARE equivalent** when the original is not installed (its settings are kept and come back once it is; see [PLUGIN_FALLBACK.md](docs/PLUGIN_FALLBACK.md)).
+LYNX SHARE ships **native** plugins inspired by the third-party plugins producers use most, next to its clean-room FL Studio natives. 28 dedicated LYNX SHARE engines are in, more are being built, and a project that uses one of the 124 originals below **opens with the LYNX SHARE equivalent** when the original is not installed (its settings are kept and come back once it is; see [PLUGIN_FALLBACK.md](docs/PLUGIN_FALLBACK.md)).
 
 | Vendor | Inspired by → LYNX SHARE plugin |
 |---|---|
-| **FabFilter** | Pro-L 2 → **Apex Limiter** · Pro-C 2 / 3 → **Crest Compressor** · Pro-MB → **Prism Multiband** · Pro-G → **Sentry Gate** · Pro-Q 2 / 3 / 4 → **Facet EQ** · Pro-DS → **Hush De-esser** · Saturn → **Ember Saturator** · Pro-R 2 → LuxeVerb (stand-in) · Timeless 3 → Fruity Delay 3 (stand-in) |
+| **FabFilter** | Timeless 3 → **Echoform** · Pro-L 2 → **Apex Limiter** · Pro-C 2 / 3 → **Crest Compressor** · Pro-MB → **Prism Multiband** · Pro-G → **Sentry Gate** · Pro-Q 2 / 3 / 4 → **Facet EQ** · Pro-DS → **Hush De-esser** · Saturn → **Ember Saturator** · Pro-R 2 → LuxeVerb (stand-in) |
 | **Valhalla DSP** | VintageVerb → **Epoch Verb** · Room → **Atrium** · Plate → **Foil Plate** · Supermassive → **Nebula** · Shimmer → **Halo** · FutureVerb → **Horizon** · Delay → **Echoform** · FreqEcho → **Spiral Echo** · SpaceModulator → **Orbit** · UberMod → **Lattice Mod** |
 | **Antares** | Auto-Tune → **LYNX Tune** |
-| **Waves** | H-Delay → **Echoform** · CLA-2A → **Glow Leveler** · CLA-76 → **Crest Compressor** · SSL E-Channel → **Ridge Strip** · S1 Imager → **Stereo Shaper** · DeEsser → **Hush De-esser** · NS1 → **Quell Denoiser** · Doubler → **Gemini Doubler** · Tune Real-Time → **LYNX Tune** · RVerb, H-Reverb, TrueVerb → Reeverb 2 (stand-in) · SuperTap → Fruity Delay 3 (stand-in) · L1, L2, L3, L4 → Limiter (stand-in) · Renaissance Compressor → Compressor (stand-in) · CLA-76, CLA-3A, C1, SSLComp, API-2500 → Compressor (stand-in) · Q10, Renaissance EQ, SSL EQ → Parametric EQ (stand-in) |
+| **Waves** | H-Delay → **Echoform** · SuperTap → **Echoform** · CLA-2A → **Glow Leveler** · CLA-76 → **Crest Compressor** · SSLComp → **Crest Compressor** · SSL E-Channel → **Ridge Strip** · SSL G-Channel → **Ridge Strip** · S1 Imager → **Stereo Shaper** · C4 Multiband Parametric Processor → **Prism Multiband** · Scheps Omni Channel → **Ridge Strip** · Renaissance DeEsser → **Hush De-esser** · C6 Multiband Compressor → **Prism Multiband** · Vitamin → **Aether** · Abbey Road Reverb Plates → **Foil Plate** · Atlas Reverb → **Atrium** · PuigTec EQP1A → **Facet EQ** · Renaissance Equalizer (REQ) → **Facet EQ** · API 550A / 550B → **Facet EQ** · API 560 → **Facet EQ** · Q10 Equalizer → **Facet EQ** · DeEsser → **Hush De-esser** · NS1 → **Quell Denoiser** · Doubler → **Gemini Doubler** · Tune Real-Time → **LYNX Tune** · RVerb, H-Reverb, TrueVerb → Reeverb 2 (stand-in) · L1, L2, L3, L4 → Limiter (stand-in) · Renaissance Compressor → Compressor (stand-in) · CLA-76, CLA-3A, C1, SSLComp, API-2500 → Compressor (stand-in) · Renaissance Vox → Compressor (stand-in) · API-2500 → Compressor (stand-in) · Renaissance Bass → Low Lifter (stand-in) · MaxxBass → Low Lifter (stand-in) · Q10, Renaissance EQ, SSL EQ → Parametric EQ (stand-in) · Renaissance Channel (RChannel) → Compressor (stand-in) |
 | **Solid State Logic** | Native Channel Strip, 4K E → **Ridge Strip** |
-| **Soundtoys** | Little Plate → **Foil Plate** · EchoBoy → **Echoform** · PrimalTap → **Echoform** · Decapitator → **Ember Saturator** · Little AlterBoy → **LYNX Tune** · PanMan → Auto-pan (stand-in) |
-| **Slate Digital** | Fresh Air → **Aether** |
+| **Soundtoys** | Little Plate → **Foil Plate** · EchoBoy → **Echoform** · EchoBoy Jr → **Echoform** · PrimalTap → **Echoform** · Little PrimalTap → **Echoform** · Decapitator → **Ember Saturator** · Little AlterBoy → **LYNX Tune** · PanMan → Auto-pan (stand-in) |
+| **Slate Digital** | Infinity EQ → **Facet EQ** · Fresh Air → **Aether** |
 | **Harrison** | 32Classic / MPC channel strips → **Ridge Strip** · De-Esser → **Hush De-esser** |
-| **Complete Access (role)** | channel strips (Slate Virtual Mix Rack) → **Ridge Strip** · bus / smart compressors (SSL Bus Compressor 2, G3, VBC, sonible smart:comp, pure:comp) → **Crest Compressor** · optical levelers (Slate FG-2A, SD-3A, Custom Opto) → **Glow Leveler** · limiters (Slate FG-X 2, SSL X-Limit, sonible smart:limit, pure:limit) → **Apex Limiter** · EQs (Slate Infinity EQ, FG-73 / FG-N / FG-S / SD-PE1 / CS-EQ, Eiosis AirEQ, SSL X-EQ 2, sonible smart:EQ) → **Facet EQ** · de-essers (SSL DeEss, Slate FG-DS 902, Eiosis E2Deesser, sonible smart:deess) → **Hush De-esser** · gates (SSL X-Gate, Slate Gate Classic / Drums, Harrison Spectral Gate) → **Sentry Gate** · three-band bus compressor (SSL G3 MultiBusComp) → **Prism Multiband** · drum gate (Slate Gate Drums) → **Sentry Gate** · reverbs (LiquidSonics Lustrous Plates / Seventh Heaven / Cinematic Rooms, Slate VerbSuite Classics, SSL FlexVerb / PlateVerb / SpringVerb, sonible smart:reverb) → **Foil Plate** · delays (SSL X-Echo / X-Delay, Slate Stellar Echo SD-201, Harrison 3D Delay) → **Echoform** · saturators (Slate Heatwave / Revival, SSL Fusion Vintage Drive / X-Saturator, Harrison Tape Saturator) → **Ember Saturator** · pitch correction (Slate MetaTune) → **LYNX Tune** · vintage compressor models (Slate FG-116 / FG-76 / FG-401 / FG-A / FG-Dynamics, SSL X-ValveComp) → Compressor (stand-in) |
+| **Complete Access (role)** | channel strips (Slate Virtual Mix Rack) → **Ridge Strip** · bus / smart compressors (SSL Bus Compressor 2, G3, VBC, sonible smart:comp, pure:comp) → **Crest Compressor** · optical levelers (Slate FG-2A, SD-3A, Custom Opto) → **Glow Leveler** · limiters (Slate FG-X 2, SSL X-Limit, sonible smart:limit, pure:limit) → **Apex Limiter** · EQs (Slate FG-73 / FG-N / FG-S / SD-PE1 / CS-EQ, SSL X-EQ 2, sonible smart:EQ) → **Facet EQ** · de-essers (SSL DeEss, Slate FG-DS 902, Eiosis E2Deesser, sonible smart:deess) → **Hush De-esser** · gates (SSL X-Gate, Slate Gate Classic / Drums, Harrison Spectral Gate) → **Sentry Gate** · three-band bus compressor (SSL G3 MultiBusComp) → **Prism Multiband** · drum gate (Slate Gate Drums) → **Sentry Gate** · reverbs (LiquidSonics Lustrous Plates / Seventh Heaven / Cinematic Rooms, Slate VerbSuite Classics, SSL FlexVerb / PlateVerb / SpringVerb, sonible smart:reverb) → **Foil Plate** · delays (SSL X-Echo / X-Delay, Slate Stellar Echo SD-201, Harrison 3D Delay) → **Echoform** · saturators (Slate Heatwave / Revival, SSL Fusion Vintage Drive / X-Saturator, Harrison Tape Saturator) → **Ember Saturator** · pitch correction (Slate MetaTune) → **LYNX Tune** · vintage compressor models (Slate FG-116 / FG-76 / FG-401 / FG-A / FG-Dynamics, SSL X-ValveComp) → Compressor (stand-in) |
+| **D16 Group** | Repeater → **Echoform** |
+| **Eiosis (Slate Digital)** | AirEQ (Eiosis AirEQ, Slate VM AirEQ Air / Earth) → **Facet EQ** |
+| **Kilohearts** | Disperser → **Facet EQ** · kHs Haas → **Stereo Shaper** · kHs Filter → **Facet EQ** · kHs 3-Band EQ → **Facet EQ** · kHs Formant Filter → **Facet EQ** · kHs Gate → **Sentry Gate** · kHs Transient Shaper → **Strike Shaper** · kHs Delay → **Echoform** · kHs Dual Delay → **Echoform** · kHs Gain → Utility (stand-in) · kHs Channel Mixer → Utility (stand-in) · kHs Stereo → Utility (stand-in) · kHs Ladder Filter → Filter (stand-in) · kHs Nonlinear Filter → Filter (stand-in) · kHs Compressor → Compressor (stand-in) · kHs Compactor → Compressor (stand-in) · kHs Dynamics → Compressor (stand-in) · kHs Limiter → Limiter (stand-in) · kHs Clipper → Fruity Soft Clipper (stand-in) · kHs Distortion → Distortion (stand-in) · Faturator → Distortion (stand-in) · kHs Bitcrush → Lo-fi (stand-in) · kHs Frequency Shifter → Frequency shifter (stand-in) · kHs Pitch Shifter → Pitch shift (stand-in) · kHs Chorus → Chorus (stand-in) · kHs Ensemble → Chorus (stand-in) · kHs Phaser → Fruity Phaser (stand-in) · kHs Flanger → Fruity Flanger (stand-in) · kHs Reverb → Reeverb 2 (stand-in) · kHs Tape Stop → Pocket Tape Stop (stand-in) · kHs Comb Filter → Pocket Comb Filter (stand-in) · kHs Trance Gate → Volume gate (stand-in) · kHs Ring Mod → Effector (stand-in) · kHs Reverser → Effector (stand-in) · kHs Resonator → Effector (stand-in) · kHs Phase Distortion → Effector (stand-in) · kHs Shaper → Effector (stand-in) |
 | **SPL** | Transient Designer → **Strike Shaper** |
 | **Slate Digital (Complete Access)** | VCC Channel (console emulation) → **Kiln Channel** |
 | **Solid State Logic (Complete Access)** | Drumstrip (drum channel strip) → **Shell Channel** · Guitarstrip (guitar / bass channel strip) → **Fret Channel** |
@@ -363,7 +449,7 @@ LYNX SHARE also runs without a window, to render and convert projects. On macOS 
 
 ```
 LYNX.exe project.lynx                          open a project (.lynx, .flp, .als, .flm or .mid)
-LYNX.exe --export project.flp out.flac         render the song (wav/flac/ogg)
+LYNX.exe --export project.flp out.flac         render the song (wav/flac/ogg/mp3/aif; m4a on Windows and macOS)
 LYNX.exe --render project.flp out.wav 20       render 20 s of the current pattern (24-bit WAV)
 LYNX.exe --export-flp project.lynx out.flp     export an FL Studio project (.zip: with the samples)
 LYNX.exe --export-als project.flp folder [--live11]  export an Ableton Live set (<name> Project/<name>.als)
@@ -401,7 +487,8 @@ replacement for the DAW you rely on every day: expect bugs, save often and keep 
 rough today:
 
 - Not every FL Studio plugin sounds exactly like the original; [`docs/PLUGINS.md`](docs/PLUGINS.md) gives each one a status, from exact to approximate.
-- Only some of Live's own devices are converted from `.als` sets, and LYNX SHARE's own instruments and effects are not written into exported sets yet.
+- Many but not all of Live's own devices are converted from `.als` sets, and LYNX SHARE's own instruments and effects are not written into exported sets yet.
+- GarageBand `.band` and BandLab `.blx` import is partial (instrument sounds are replaced by LYNX SHARE's), and the `.blx` reader was tested on made-up projects only.
 - `.flm` import is partial, and FL Studio Mobile projects cannot be exported.
 - The Windows build is not code-signed and the macOS build is not notarized yet, so both systems warn the first time. The macOS build has had little testing on real Macs.
 

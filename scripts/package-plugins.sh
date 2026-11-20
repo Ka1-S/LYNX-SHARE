@@ -62,6 +62,7 @@ done < <(sed -nE 's/^LYNX_PLUGIN \("([^"]+)", ([01]), [^,]+, [^,]+, "[^"]+", 0x[
 
 sed -e "s/@LABEL@/$label/g" -e "s/@OS@/$osname/g" resources/plugin/README.txt > "$pkg/README.txt"
 cp LICENSE THIRD_PARTY.md "$pkg/"
+./scripts/collect-licenses.sh "$pkg/licenses" > /dev/null   # third-party licence texts (round 190nk)
 if [[ "$os" == windows ]]; then
     for f in README.txt PLUGINS.txt; do sed -i 's/$/\r/' "$pkg/$f"; done # (Notepad)
     sed 's/$/\r/' resources/plugin/install.cmd > "$pkg/install.cmd"

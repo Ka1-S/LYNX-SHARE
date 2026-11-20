@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "engine/AudioEngine.h"
@@ -38,6 +40,29 @@ void setNativeEditorDemo (bool on);
 // Round 166f (--eq166fshot): one display tick of a native editor without its timer (Parametric EQ 2's spectrum and
 // heatmap read the slot's analyser tap, which this claims); false when `editor` is not a native effect editor.
 bool tickNativeEffectEditor (juce::Component& editor);
+// round 190ih (--details190ihshot): Gross Beat's editor on its time (0) or volume (1) envelope
+bool showGrossBeatEnvelopeForSnapshot (juce::Component& editor, int envelopeKind);
+// round 190mf (DP-6 / DP-7): Gross Beat's Step / Slide / Freeze switches set, and its mapping options menu
+// round 190mf (DP-26): Fruity Limiter's KNEE knob held (its transfer curve on the display)
+// round 190mf (DP-29): Fruity Multiband Compressor's band meters with fixed levels
+bool multibandMetersForSnapshot (juce::Component& editor);
+bool multibandHistoryForSnapshot (juce::Component& editor, float speed); // round 190mk (DP-30): a fixed peak history, SPEED at `speed`
+bool limiterKneeHeldForSnapshot (juce::Component& editor, bool held);
+// round 190mk: 1 = Prepare for smooth editing, 2 = points 2-3 copied and pasted (insert), 3 = View gradient on / grid inverted, 0 = views back
+bool grossBeatEditForSnapshot (juce::Component& editor, int what);
+bool grossBeatToolsForSnapshot (juce::Component& editor, bool step, bool slide, bool frozen, juce::PopupMenu* optionsMenu);
+// round 190ld (--details190ldshot): Fruity Delay 3's Time-knob menu while TEMPO SYNC is on (empty otherwise); the
+// Vocoder's band columns as Vocoder::controlOutput 0…7 packs them; Fruity Limiter's graph fed `steps` synthetic frames
+// and paused (false: not a Limiter / Maximus monitor)
+juce::PopupMenu delay3TimeMenuForSnapshot (juce::Component& editor);
+bool setVocoderBandsForSnapshot (juce::Component& editor, const std::array<std::uint32_t, 8>& packed);
+bool pauseLimiterForSnapshot (juce::Component& editor, int steps);
+// round 190lx (--details190lxshot): Transient Processor's lower trace fed synthetic hits, the hover panel shown or not
+bool transientTraceForSnapshot (juce::Component& editor, bool hovered);
+// round 190ih (--uiperf): Gross Beat editors' paints since the last reset ("" when none): count, area, time
+juce::String grossBeatPaintStats (bool reset);
+// round 190ih (--uiperf A/B): Gross Beat's diagnostic switches at run time (the LYNX_GB_DIAG bits)
+void setGrossBeatDiagnostics (int mask);
 // round 170k2: the smallest size its window allows (the header still shows the whole name); {} for another component
 juce::Point<int> nativeEditorMinimumSize (juce::Component& editor);
 } // namespace lynx

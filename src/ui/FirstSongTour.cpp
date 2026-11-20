@@ -2,7 +2,9 @@
 
 #include "engine/AudioEngine.h"
 #include "platform/Paths.h"
+#include "ui/DialogFrame.h"
 #include "ui/I18n.h"
+#include "ui/Motion.h"
 #include "ui/NativeChild.h"
 #include "ui/Theme.h"
 
@@ -71,7 +73,8 @@ void styleButton (juce::TextButton& b, bool primary)
 } // namespace
 
 // --- the dimmed window with a ring around the control to use -------------------------------------------------------------
-class FirstSongTour::Layer final : public juce::Component
+class FirstSongTour::Layer final : public juce::Component,
+                                   private juce::Timer
 {
 public:
     Layer()
@@ -91,6 +94,39 @@ public:
     }
     juce::Rectangle<int> getRing() const noexcept { return ring; }
 
+    // round 190jc (design190ia SG-18): the card beside the ring, and the notch from the card's edge towards the ring
+    void setCard (juce::Rectangle<int> c, tour::Side s)
+    {
+        if (c == cardBox && s == side)
+            return;
+        cardBox = c;
+        side = s;
+        repaint();
+    }
+
+    // BandLab's beacon: after a step change the ring and a 12 px beacon at its corner pulse three times (1.2 s each), then
+    // stay still. Only while the tour shows and Settings › General › Animations is on: no timer otherwise, none when idle.
+    void pulse()
+    {
+        stopTimer();
+        phase = 0.0f;
+        if (! ui::motion::enabled() || ring.isEmpty() || ! isVisible())
+            return;
+        started = juce::Time::getMillisecondCounterHiRes();
+        startTimerHz (30);
+    }
+    bool pulsing() const noexcept { return isTimerRunning(); }
+    void setPhaseForSnapshot (float p)
+    {
+        phase = p;
+        repaint();
+    }
+    void stopPulse()
+    {
+        stopTimer();
+        phase = 0.0f;
+    }
+
     void paint (juce::Graphics& g) override
     {
         juce::Path dim;
@@ -105,18 +141,74 @@ public:
         g.fillPath (dim);
         if (ring.isEmpty())
             return;
+        // the pulse: the ring's alpha 1 -> 0.45 -> 1 (phase 0..1 of a 1.2 s cycle; 0 = still)
+        const auto level = 1.0f - 0.55f * std::sin (phase * juce::MathConstants<float>::pi);
         const auto r = ring.toFloat().expanded (6.0f);
         for (int i = 3; i >= 1; --i) // a soft glow, then the ring
         {
-            g.setColour (theme::colour::accent.withAlpha (0.10f * (float) (4 - i)));
+            g.setColour (theme::colour::accent.withAlpha (0.10f * (float) (4 - i) * level));
             g.drawRoundedRectangle (r.expanded (2.0f * (float) i), theme::radius::lg + 2.0f + 2.0f * (float) i, 2.0f);
         }
-        g.setColour (theme::colour::accent);
+        g.setColour (theme::colour::accent.withAlpha (level));
         g.drawRoundedRectangle (r, theme::radius::lg + 2.0f, 2.5f);
+        // the beacon at the ring's top-right corner: a 12 px dot, its halo growing with the pulse
+        const auto beacon = juce::Point<float> (r.getRight() - 2.0f, r.getY() + 2.0f);
+        if (phase > 0.0f)
+        {
+            const auto halo = 12.0f + 14.0f * phase;
+            g.setColour (theme::colour::accent.withAlpha (0.45f * (1.0f - phase)));
+            g.fillEllipse (juce::Rectangle<float> (halo, halo).withCentre (beacon));
+        }
+        g.setColour (theme::colour::accent);
+        g.fillEllipse (juce::Rectangle<float> (12.0f, 12.0f).withCentre (beacon));
+        g.setColour (theme::colour::onAccent);
+        g.fillEllipse (juce::Rectangle<float> (4.0f, 4.0f).withCentre (beacon));
+
+        // the coachmark's notch: an 8 px triangle from the card's edge towards the ring
+        if (side != tour::Side::none && ! cardBox.isEmpty())
+        {
+            const auto c = cardBox.toFloat().reduced (2.0f);
+            const auto ringC = ring.toFloat().getCentre();
+            juce::Path notch;
+            const auto n = 8.0f;
+            if (side == tour::Side::below || side == tour::Side::above)
+            {
+                const auto x = juce::jlimit (c.getX() + 18.0f, c.getRight() - 18.0f, ringC.x);
+                const auto y = side == tour::Side::below ? c.getY() : c.getBottom();
+                const auto d = side == tour::Side::below ? -n : n;
+                notch.addTriangle (x - n, y, x + n, y, x, y + d);
+            }
+            else
+            {
+                const auto y = juce::jlimit (c.getY() + 18.0f, c.getBottom() - 18.0f, ringC.y);
+                const auto x = side == tour::Side::right ? c.getX() : c.getRight();
+                const auto d = side == tour::Side::right ? -n : n;
+                notch.addTriangle (x, y - n, x, y + n, x + d, y);
+            }
+            g.setColour (theme::colour::bg2);
+            g.fillPath (notch);
+            g.setColour (theme::colour::accent.withAlpha (0.7f));
+            g.strokePath (notch, juce::PathStrokeType (1.2f));
+        }
     }
 
 private:
-    juce::Rectangle<int> ring;
+    void timerCallback() override
+    {
+        const auto elapsed = (juce::Time::getMillisecondCounterHiRes() - started) / 1200.0; // cycles
+        if (elapsed >= 3.0 || ! isShowing() || ! ui::motion::enabled())
+        {
+            stopPulse();
+        }
+        else
+            phase = (float) (elapsed - std::floor (elapsed));
+        repaint (ring.expanded (34)); // (only the ring and its beacon)
+    }
+
+    juce::Rectangle<int> ring, cardBox;
+    tour::Side side = tour::Side::none;
+    float phase = 0.0f;
+    double started = 0.0;
 };
 
 // --- the step card ---------------------------------------------------------------------------------------------------------
@@ -214,7 +306,8 @@ public:
         const auto end = step >= tour::stepCount;
         g.setFont (theme::font (theme::type::small, true));
         g.setColour (theme::colour::accent);
-        g.drawText (end ? tr ("First song") : tr ("Step {0} of {1}", { juce::String (step + 1), juce::String (tour::stepCount) }), top,
+        // (round 190jc: BandLab's coachmark counter, "2 of 7")
+        g.drawText (end ? tr ("First song") : tr ("{0} of {1}", { juce::String (step + 1), juce::String (tour::stepCount) }), top,
                     juce::Justification::centredLeft, true);
         // progress: one segment per step
         auto bar = area.removeFromTop (10).withTrimmedTop (5).toFloat();
@@ -340,9 +433,10 @@ public:
         setWantsKeyboardFocus (true);
         getProperties().set ("lynxKeepsKeys", true); // (round 190fc: Esc and its options' keys while it is up)
         title.setText (tr ("Welcome to LYNX"), juce::dontSendNotification);
-        title.setFont (theme::font (theme::type::display, true));
-        title.setJustificationType (juce::Justification::centred);
-        subtitle.setText (tr ("What would you like to do?"), juce::dontSendNotification);
+        ui::dialog::styleTitle (title); // (round 190jp: the one dialog title, design190ia SG-20)
+        // round 190hw: what this workflow is, then the question (two lines: wrapped, never squeezed)
+        subtitle.setText (tr ("The Simple workflow: tracks and a timeline, loops, pads and quick recording, all in one window. What would you like to do?"), juce::dontSendNotification);
+        subtitle.setMinimumHorizontalScale (1.0f);
         subtitle.setFont (theme::font (theme::type::body));
         subtitle.setColour (juce::Label::textColourId, theme::colour::textSecondary);
         subtitle.setJustificationType (juce::Justification::centred);
@@ -372,27 +466,17 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        g.fillAll (theme::colour::bg0.withAlpha (0.72f));
-        const auto c = card().toFloat();
-        g.setColour (juce::Colours::black.withAlpha (0.35f));
-        g.fillRoundedRectangle (c.translated (0.0f, 4.0f).expanded (2.0f), theme::radius::lg + 2.0f);
-        g.setColour (theme::colour::bg2);
-        g.fillRoundedRectangle (c, theme::radius::lg);
-        g.setColour (theme::colour::borderStrong);
-        g.drawRoundedRectangle (c.reduced (0.5f), theme::radius::lg, 1.0f);
-        g.setColour (theme::colour::accent);
-        g.fillRect (c.getX() + 24.0f, c.getY() + 52.0f, c.getWidth() - 48.0f, 1.0f);
+        ui::dialog::paintDim (g, getLocalBounds());
+        ui::dialog::paintFrame (g, card().toFloat(), ui::dialog::Kind::overlay); // (round 190jp: the one dialog frame)
     }
 
     void resized() override
     {
-        auto c = card().reduced (24, 14);
-        auto top = c.removeFromTop (34);
+        auto top = ui::dialog::titleRow (card()).reduced (10, 0);
         close.setBounds (top.removeFromRight (28).withSizeKeepingCentre (28, 28));
-        top.removeFromLeft (28);
-        title.setBounds (top);
-        c.removeFromTop (12);
-        subtitle.setBounds (c.removeFromTop (22));
+        title.setBounds (top.reduced (28, 0));
+        auto c = ui::dialog::bodyOf (card()).reduced (24, 14);
+        subtitle.setBounds (c.removeFromTop (44));
         c.removeFromTop (10);
         footer.setBounds (c.removeFromBottom (20));
         c.removeFromBottom (8);
@@ -613,6 +697,9 @@ bool FirstSongTour::cardShowing() const noexcept
 
 void FirstSongTour::hideCard()
 {
+    shownStep = -1;
+    if (layer != nullptr)
+        layer->stopPulse();
     if (card != nullptr)
     {
         card->stopFollowing();
@@ -652,7 +739,13 @@ void FirstSongTour::update()
         }
     if (nativechild::boundsIn (*layer, *window) != window->getLocalBounds())
         nativechild::place (*layer, *window, window->getLocalBounds());
+    const auto stepChanged = step != shownStep || ring.isEmpty() != layer->getRing().isEmpty();
     layer->setRing (ring);
+    if (stepChanged)
+    {
+        shownStep = step;
+        layer->pulse(); // (three pulses after each step change, then still)
+    }
 
     // the card: in a corner the ring is not in (top right first, under the toolbar)
     const auto area = window->getLocalBounds().reduced (16);
@@ -673,6 +766,18 @@ void FirstSongTour::update()
             place = s;
             break;
         }
+    // round 190jc (design190ia SG-18): beside the ring first (BandLab's coachmark, 12 px from its target with a notch); a
+    // corner only when there is no room beside it
+    const auto box = [] (juce::Rectangle<int> r) { return tour::Box { r.getX(), r.getY(), r.getWidth(), r.getHeight() }; };
+    // (round 190jp: a ring inside the Simple dock keeps the card off the dock, so the keys it points at stay in view)
+    juce::Rectangle<int> dockArea;
+    if (auto* dock = findShowing (*window, "simple.dock"))
+        if (const auto area = areaIn (*window, *dock); area.contains (ring))
+            dockArea = area;
+    const auto beside = tour::placeCard (box (ring.expanded (6)), box (window->getLocalBounds().reduced (12)), w, h, 14, box (keepClear), box (dockArea));
+    if (beside.side != tour::Side::none)
+        place = { beside.card.x, beside.card.y, beside.card.w, beside.card.h };
+    layer->setCard (place, beside.side);
     if (nativechild::boundsIn (*card, *window) != place)
         nativechild::place (*card, *window, place);
 }
@@ -752,6 +857,19 @@ juce::Rectangle<int> FirstSongTour::ringForSnapshot()
 {
     update();
     return layer != nullptr ? layer->getRing() : juce::Rectangle<int>();
+}
+
+void FirstSongTour::setPulseForSnapshot (float phase)
+{
+    if (layer != nullptr)
+        layer->setPhaseForSnapshot (phase);
+}
+
+bool FirstSongTour::pulsingForCheck() const { return layer != nullptr && layer->pulsing(); }
+
+juce::Rectangle<int> FirstSongTour::cardBoundsForSnapshot() const
+{
+    return card != nullptr && shownIn != nullptr ? nativechild::boundsIn (*card, *shownIn.getComponent()) : juce::Rectangle<int>();
 }
 
 juce::String FirstSongTour::targetIdForSnapshot() const

@@ -14,6 +14,7 @@
 #include "core/EchoSuite.h"
 #include "core/Effects.h"
 #include "core/MixSuite.h"
+#include "core/Rack.h"
 #include "core/XmlLite.h"
 
 namespace lynx::alsdev
@@ -656,6 +657,7 @@ bool limiterToApex (const Element& device, Translated& out)
         return false;
     out.slot = makeEffectSlot (EffectKind::apexLimiter);
     auto& p = out.slot.params;
+    p[(std::size_t) pRevision] = 0.0f; // round 190lp: the map was measured on the laws before the styles' refit
     const Put put { device, out };
     const auto gain = manual (device, "Gain", 0.0);
     put ("Gain", pGain, [] (double db) { return linValue (db, 0.0, 30.0); }, 0.0);           // [DATA −24 … 24 dB]
@@ -693,6 +695,7 @@ bool gateToSentry (const Element& device, Translated& out)
         return false;
     out.slot = makeEffectSlot (EffectKind::sentryGate);
     auto& p = out.slot.params;
+    p[(std::size_t) revision] = 0.0f; // round 190lp: the map was measured on the gate before the level gate's refit
     const Put put { device, out };
     p[style] = styleValue (Style::classic);
     // Threshold: a linear gain [DATA 0.000316 … 1.995] → −60 … 0 dB
@@ -727,6 +730,7 @@ bool expanderToSentry (const Element& device, Translated& out)
         return false;
     out.slot = makeEffectSlot (EffectKind::sentryGate);
     auto& p = out.slot.params;
+    p[(std::size_t) revision] = 0.0f; // round 190lp: (as above)
     const Put put { device, out };
     // Expand [DOC]: what is over the threshold comes out (ratio) dB louder per dB — Sentry's Upward style lifts by
     // (ratio − 1) dB per dB over its upward threshold, the same curve
@@ -995,6 +999,43 @@ std::vector<NoteEdit> applyNoteEffect (const NoteEffect& effect, const NoteEdit&
             out.push_back (n);
             break;
         }
+        case NoteEffect::Kind::rack: // (round 190kk)
+        {
+            for (const auto& chain : effect.chains)
+            {
+                if (! chain.active)
+                    continue;
+                PatchZone zone;
+                zone.key = chain.key;
+                zone.velocity = chain.velocity;
+                zone.select = chain.select;
+                zone.selector = 0; // a MIDI Effect Rack's chain-select zone always applies and fades the velocity
+                zone.selectorScalesVelocity = true;
+                const auto v = rack::zoneVelocity (zone, note.key, note.velocity, effect.selector);
+                if (v <= 0.0f)
+                    continue;
+                auto in = note;
+                in.velocity = v;
+                std::vector<NoteEdit> edits { in };
+                for (const auto& e : chain.effects)
+                {
+                    std::vector<NoteEdit> next;
+                    for (const auto& x : edits)
+                        for (const auto& o : applyNoteEffect (e, x))
+                            next.push_back (o);
+                    edits = std::move (next);
+                }
+                for (const auto& x : edits)
+                {
+                    const auto same = std::find_if (out.begin(), out.end(), [&x] (const NoteEdit& o) { return o.key == x.key; });
+                    if (same == out.end())
+                        out.push_back (x);
+                    else if (x.velocity > same->velocity)
+                        *same = x;
+                }
+            }
+            break;
+        }
     }
     return out;
 }
@@ -1003,14 +1044,16 @@ std::optional<NoteEffect> noteEffectFromLiveDevice (const Element& device, const
 {
     const auto tag = device.name();
     NoteEffect e;
+    // (round 190kk) inside a MIDI Effect Rack a parameter mapped onto a macro takes the macro's value
+    const auto mv = [&] (const std::string& name, double fallback) { return liveValue (device, name, fallback, context); };
     if (tag == "MidiPitcher")
     {
         if (! has (device, "Pitch"))
             return std::nullopt;
         e.kind = NoteEffect::Kind::transpose;
         e.name = "Pitch";
-        e.semitones = (int) std::lround (manual (device, "Pitch", 0.0)); // semitones [DATA −128 … 128]
-        if (device.boolean ("UseCurrentScale", false) || (int) manual (device, "Lowest", 0) != 0 || (int) manual (device, "Range", 127) != 127)
+        e.semitones = (int) std::lround (mv ("Pitch", 0.0)); // semitones [DATA −128 … 128]
+        if (device.boolean ("UseCurrentScale", false) || (int) mv ("Lowest", 0) != 0 || (int) mv ("Range", 127) != 127)
             notes.dropped.push_back ("scale degrees / key range");
         return e;
     }
@@ -1019,18 +1062,18 @@ std::optional<NoteEffect> noteEffectFromLiveDevice (const Element& device, const
         if (! has (device, "MaxOut") && ! has (device, "MinOut"))
             return std::nullopt;
         // Operation [DATA 0 … 2; DOC: Velocity, Release Velocity, Both; order ASSUMED]: release velocities are not touched
-        if ((int) manual (device, "Operation", 0) == 1)
+        if ((int) mv ("Operation", 0) == 1)
             return std::nullopt;
         e.kind = NoteEffect::Kind::velocity;
         e.name = "Velocity";
-        e.mode = std::clamp ((int) manual (device, "Mode", 0), 0, 2); // [DOC: Clip, Gate, Fixed]
-        e.lowest = std::clamp ((int) manual (device, "Lowest", 1), 0, 127);
-        e.range = std::clamp ((int) manual (device, "Range", 127), 0, 127);
-        e.outLow = std::clamp ((int) manual (device, "MinOut", 1), 0, 127);
-        e.outHigh = std::clamp ((int) manual (device, "MaxOut", 127), 0, 127);
-        if (std::abs (manual (device, "Drive", 0.0)) > 0.005 || std::abs (manual (device, "Compand", 0.0)) > 0.005)
+        e.mode = std::clamp ((int) mv ("Mode", 0), 0, 2); // [DOC: Clip, Gate, Fixed]
+        e.lowest = std::clamp ((int) mv ("Lowest", 1), 0, 127);
+        e.range = std::clamp ((int) mv ("Range", 127), 0, 127);
+        e.outLow = std::clamp ((int) mv ("MinOut", 1), 0, 127);
+        e.outHigh = std::clamp ((int) mv ("MaxOut", 127), 0, 127);
+        if (std::abs (mv ("Drive", 0.0)) > 0.005 || std::abs (mv ("Compand", 0.0)) > 0.005)
             notes.dropped.push_back ("Drive / Compand curve (the velocities map in a straight line)");
-        if (manual (device, "Random", 0.0) > 0.5)
+        if (mv ("Random", 0.0) > 0.5)
             notes.dropped.push_back ("Random");
         return e;
     }
@@ -1044,15 +1087,15 @@ std::optional<NoteEffect> noteEffectFromLiveDevice (const Element& device, const
         for (int k = 1; k <= 6; ++k)
         {
             const auto n = std::to_string (k);
-            const auto shift = (int) std::lround (manual (device, "Shift" + n, 0.0));
+            const auto shift = (int) std::lround (mv ("Shift" + n, 0.0));
             if (shift == 0)
                 continue;
-            e.chord.push_back ({ shift, (float) std::clamp (manual (device, "Velocity" + n, 1.0), 0.01, 2.0) });
-            chance = chance || manual (device, "Chance" + n, 1.0) < 0.999;
+            e.chord.push_back ({ shift, (float) std::clamp (mv ("Velocity" + n, 1.0), 0.01, 2.0) });
+            chance = chance || mv ("Chance" + n, 1.0) < 0.999;
         }
         if (chance)
             notes.dropped.push_back ("Chance (every chord note always plays)");
-        if (std::abs (manual (device, "Strum", 0.0)) > 0.5)
+        if (std::abs (mv ("Strum", 0.0)) > 0.5)
             notes.dropped.push_back ("Strum");
         if (device.boolean ("UseCurrentScale", false))
             notes.dropped.push_back ("scale degrees");
@@ -1066,7 +1109,7 @@ std::optional<NoteEffect> noteEffectFromLiveDevice (const Element& device, const
             return std::nullopt;
         e.kind = NoteEffect::Kind::length;
         e.name = "Note Length";
-        const auto ms = manual (device, "TimeLength", 100.0) * manual (device, "Gate", 100.0) / 100.0; // ms × Gate %
+        const auto ms = mv ("TimeLength", 100.0) * mv ("Gate", 100.0) / 100.0; // ms × Gate %
         e.lengthBeats = ms * std::max (context.bpm, 1.0) / 60000.0;
         notes.approximated.push_back (text ("length %.0f ms held in beats at %.4g BPM", ms, context.bpm));
         return e;

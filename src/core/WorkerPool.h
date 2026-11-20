@@ -21,6 +21,7 @@
 #include <functional>
 #include <memory>
 #include <thread>
+#include <type_traits>
 #include <vector>
 
 namespace lynx
@@ -62,6 +63,9 @@ public:
     void setThreadRefresh (std::function<void()> fn);
     void requestThreadRefresh() noexcept { refreshGeneration.fetch_add (1, std::memory_order_acq_rel); }
 
+    // round 190kb: names the calling thread (Windows 10+: its description; Linux: 15 characters) for per-thread CPU
+    // lists and profilers. The workers are "LYNX worker 1…n".
+    static void nameCurrentThread (const char* name) noexcept;
     // a spin-wait pause (x86 PAUSE / ARM YIELD), for callers waiting on each other inside a parallelFor
     static void relax() noexcept;
     // the calling thread's CPU time (nanoseconds; Windows: the scheduler's per-thread times, coarse but fine over seconds)
@@ -86,6 +90,85 @@ public:
     // calls are usually far shorter than 60 µs; a longer one costs a semaphore wake-up)
     static constexpr int spinMicros = 60;
 
+    // Round 190kb: the waiting policy, switchable while running (A/B steps inside one process: --uiperf
+    // LYNX_UIPERF_SPINAB; perfbench / the app at start: LYNX_POOL="spin=60,dry=4,adaptive=1,wait=1,waitspin=30").
+    // Read once per spin or wait, shared by every pool of the process.
+    struct Tuning
+    {
+        std::atomic<int> workerSpinMicros { spinMicros };
+        // a worker whose last `dryEpisodes` spins all ran dry (the block's last parallelFor was over: the task graph
+        // makes one per block) polls only `drySpinMicros`; a wake-up that came within the full spin brings it back
+        std::atomic<bool> adaptiveSpin { true };
+        std::atomic<int> drySpinMicros { 4 };
+        // the waits inside a round for another index's result (await(): the task graph's next task): 0 = spin with a
+        // yield every 1024 pauses (before 190kb), 1 = spin `waitSpinMicros`, then sleep until notify() (no yield),
+        // 2 = (the task graph) spin `waitSpinMicros`, then hand the position over to the thread that will push its task
+        std::atomic<int> waitMode { 1 };
+        std::atomic<int> waitSpinMicros { 30 };
+        // Round 190kr: how many workers a round wakes, from the work it has (RackRenderer: the chunk's units' measured
+        // work last time). `helpPercent` = the work one thread should get, in % of the chunk's real time: a chunk whose
+        // work is W wakes ceil(W / (help% x chunk)) - 1 sleeping workers (0: every one that is needed, as before).
+        // Thief at 480 samples had all 5 workers woken for ~1 ms of work per 2.9 ms chunk: ~1,900 sleeps and wake-ups a
+        // second and their spins. Who computes what changes no sample (the task graph is exact on any thread count).
+        // Measured on Windows (Thief at 480 samples, --uiperf exact cycles, 2 runs x 3 cycles, ~1,150 callbacks per
+        // cell): 0 = 89-90 % of a core for the process, 25 = 76-81 %, 35 = 78-80 %, 50 = 76-79 %; callbacks over the
+        // deadline 0 / 0 / 5 / 15. Default 25; LYNX_POOL="help=0" = every needed sleeper woken (before round 190kr).
+        std::atomic<int> helpPercent { 25 };
+        // Round 190kz (sched): the rounds of a device block cut in pieces (RackRenderer: the automation's 128-sample grid,
+        // pattern events). 1 = one task-graph round for the whole block where that renders the same samples (each unit
+        // runs its pieces one after another inside it); 0 = one round per piece (before round 190kz). LYNX_POOL accepts
+        // "rounds=block" / "rounds=chunk" too.
+        std::atomic<int> blockRounds { 1 };
+        // Round 190lv (sched2): with blockRounds on, the blocks of a project with live controllers (Peak / Formula /
+        // envelope controllers) batched too, in two rounds where that renders the same samples. 0 = those blocks piece
+        // by piece (before round 190lv). LYNX_POOL "live=0" / "live=1".
+        std::atomic<int> liveRounds { 1 };
+        void apply (const char* spec) noexcept; // "spin=60,dry=4,adaptive=1,wait=1,waitspin=30,help=0,rounds=block,live=1" (missing keys: unchanged)
+    };
+    static Tuning& tuning() noexcept;
+
+    // Round 190kb: where the pool's threads spend their time (relaxed sums since the pool started; --uiperf takes the
+    // difference over a step). Nanoseconds of the steady clock; counts of episodes.
+    struct Stats
+    {
+        std::uint64_t rounds = 0;                          // parallelFor calls that used the workers
+        std::uint64_t workNs = 0;                          // workers inside work() (the indices they ran + their waits)
+        std::uint64_t spinNs = 0, spins = 0;               // workers polling for the next round after finishing
+        std::uint64_t spinFound = 0, spinParked = 0, spinTimedOut = 0, sleeps = 0, earlyWakes = 0;
+        std::uint64_t waitNs = 0, waits = 0, waitYields = 0, waitSleeps = 0, waitSleepNs = 0; // await(): every thread (waitNs includes the sleeps)
+        std::uint64_t callerWaitNs = 0, callerSleeps = 0;  // the caller waiting for the round's last index
+    };
+    Stats stats() const noexcept;
+
+    // Round 190kb: inside a parallelFor, wait until ready() holds — a result another index of the same round
+    // publishes and then announces with notify(key) (the task graph: a position waits for the task pushed into it).
+    // Spins first; with Tuning::waitMode 1 it then sleeps until notify (the old way spun with a yield every 1024
+    // pauses: the core went to whatever else was ready, the UI's threads included, and the wait burned the rest).
+    // The waiting index must be one that a later notify(key) is certain to release (every position gets its task).
+    template <typename Ready>
+    void await (int key, Ready&& ready) noexcept
+    {
+        if (ready())
+            return;
+        using R = std::remove_reference_t<Ready>;
+        awaitSlow (key, const_cast<void*> (static_cast<const void*> (&ready)), [] (void* r) { return (bool) (*static_cast<R*> (r))(); });
+    }
+    // after publishing what await(key, …) waits for: wakes the thread sleeping on that key, if any (a fence and one
+    // load when nobody sleeps)
+    // round 190kb: a wait the caller timed itself (the task graph's hand-off): counted as await()'s are, a hand-off as
+    // a sleep
+    void noteWait (std::uint64_t ns, bool handedOff) noexcept;
+    void notify (int key) noexcept
+    {
+        std::atomic_thread_fence (std::memory_order_seq_cst);
+        if (waitSleepers.load (std::memory_order_relaxed) > 0)
+            notifySlow (key);
+    }
+
+    // Round 190kr: at most this many sleeping workers are woken by the next rounds (< 0: no limit). Workers that are
+    // spinning still join. Set by the caller before a parallelFor (the audio thread); any value is safe.
+    void setWakeLimit (int limit) noexcept { wakeLimit.store (limit, std::memory_order_relaxed); }
+
     // Diagnostics: how many indices the workers (not the calling thread) ran, and how many times a worker
     // was woken from sleep. Relaxed counters.
     std::uint64_t indicesRunByWorkers() const noexcept { return byWorkers.load (std::memory_order_relaxed); }
@@ -93,12 +176,26 @@ public:
 
 private:
     using Call = void (*) (void*, int);
+    using ReadyFn = bool (*) (void*);
+
+    // round 190kb: per thread (each worker, then the caller), on a cache line of its own; written by that thread only
+    struct alignas (64) Lane
+    {
+        std::atomic<std::uint64_t> workNs { 0 }, spinNs { 0 }, spins { 0 }, spinFound { 0 }, spinParked { 0 }, spinTimedOut { 0 },
+            sleeps { 0 }, earlyWakes { 0 }, waitNs { 0 }, waits { 0 }, waitYields { 0 }, waitSleeps { 0 }, waitSleepNs { 0 }, callerWaitNs { 0 }, callerSleeps { 0 };
+        std::atomic<int> sleepKey { -1 }; // the await() key this thread sleeps on (-1: none, or a notify took it)
+        OsSemaphore sleep;
+    };
+    static void bump (std::atomic<std::uint64_t>& a, std::uint64_t v) noexcept { a.store (a.load (std::memory_order_relaxed) + v, std::memory_order_relaxed); }
+    Lane* currentLane() const noexcept;
+    void awaitSlow (int key, void* ready, ReadyFn fn) noexcept;
+    void notifySlow (int key) noexcept;
 
     void run (int count, void* context, Call call) noexcept;
     bool work (bool isWorker) noexcept;
     bool hasWork() const noexcept;
     bool isParked() const noexcept;
-    void workerLoop (std::function<void()> onStart);
+    void workerLoop (int index, std::function<void()> onStart);
     void refreshIfAsked (std::uint32_t& seen) const;
 
     // Round 190gq (190gs Q5): what the hot path shares sits on cache lines of its own — the read-mostly work, the
@@ -108,6 +205,7 @@ private:
     std::vector<std::thread> threads;
     std::atomic<bool> quit { false };
     alignas (64) std::atomic<int> sleeping { 0 }; // workers blocked (or about to block) on `wake`
+    std::atomic<int> wakeLimit { -1 };            // round 190kr: setWakeLimit
     // the generation (see `ticket`) of the last parallelFor before park(); while the ticket still carries it,
     // the pool is parked and a worker without work sleeps instead of spinning
     std::atomic<std::uint64_t> parkedGeneration { ~std::uint64_t (0) };
@@ -133,5 +231,10 @@ private:
     alignas (64) std::atomic<std::uint32_t> refreshGeneration { 0 };
     std::function<void()> threadRefresh; // (published by refreshGeneration)
     alignas (64) std::atomic<std::uint64_t> workersCpu { 0 };
+    // round 190kb: the lanes (workers 0…n-1, the caller n) and the count of await() sleepers, which notify() reads
+    std::unique_ptr<Lane[]> lanes;
+    int laneCount = 0;
+    alignas (64) std::atomic<int> waitSleepers { 0 };
+    std::atomic<std::uint64_t> roundsRun { 0 };
 };
 } // namespace lynx

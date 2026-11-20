@@ -1,5 +1,5 @@
 ---
-source: 9f36c60cc7
+source: 2298a70fec
 ---
 ![La ventana del historial de deshacer: seis pasos de Start a Add notes, con Mute: Kick como el actual](/assets/img/wiki/history.webp)
 
@@ -15,18 +15,17 @@ Cada edición del proyecto es un paso del historial de deshacer: una nota que a�
 
 ## Las teclas de deshacer
 
-`Ctrl+Z` no funciona como en la mayoría de los programas. Deshace el último paso y, si lo pulsas otra vez, lo rehace, así que alterna entre los dos últimos estados. Para retroceder más, usa `Ctrl+Alt+Z`.
+`Ctrl+Z` retrocede por el historial, un paso por pulsación, como en FL Studio 2026 y la mayoría de los programas. `Ctrl+Y` o `Ctrl+Shift+Z` avanza de nuevo.
 
 | Comando | Tecla | Qué hace |
 |---|---|---|
-| `Deshacer` | `Ctrl+Z` | Deshace el último paso. Tras un deshacer, rehace el siguiente paso, y el elemento del menú dice `Deshacer (rehacer)` |
-| `Deshacer hacia atrás` | `Ctrl+Alt+Z` | Siempre retrocede, un paso por pulsación |
+| `Deshacer` | `Ctrl+Z` | Retrocede un paso por pulsación |
 | `Rehacer` | `Ctrl+Y` o `Ctrl+Shift+Z` | Avanza |
 | `Historial de deshacer...` | `Ctrl+Alt+H` | Abre la lista |
 
-Después de cada deshacer o rehacer, la barra de ayuda nombra el paso y muestra el nivel, por ejemplo `Level 2/3`.
+El menú `Editar` nombra el paso sobre el que actúa cada elemento, por ejemplo `Undo Add notes: Pattern 1`. Después de cada deshacer o rehacer, la barra de ayuda nombra el paso y muestra el nivel, por ejemplo `Level 2/3`.
 
-Si prefieres el comportamiento habitual, activa `Modo de deshacer alternativo (deshacer clásico, en lugar de deshacer/rehacer con el mismo atajo)` en `Opciones › Configuración general...`. Entonces `Ctrl+Z` siempre retrocede.
+El otro modo de deshacer de FL Studio también está: desactiva `Modo de deshacer alternativo` en `Opciones › Configuración general...`. Entonces `Ctrl+Z` deshace el último paso y, si lo pulsas otra vez, lo rehace, así que alterna entre los dos últimos estados. `Ctrl+Alt+Z` (`Deshacer hacia atrás`) retrocede más, y `Ctrl+Y` o `Ctrl+Shift+Z` siguen rehaciendo.
 
 ## Qué es un paso y qué no
 
@@ -43,7 +42,7 @@ Los dos están en `Opciones › Configuración general...`.
 | Ajuste | Qué hace |
 |---|---|
 | `Niveles máximos de deshacer` | Cuántos pasos se conservan: 25, 50, 100, 200, 500 o 1000. Por defecto, 100 |
-| `Modo de deshacer alternativo` | Hace de `Ctrl+Z` un deshacer clásico |
+| `Modo de deshacer alternativo` | Activado por defecto: `Ctrl+Z` retrocede por el historial. Desactivado: `Ctrl+Z` alterna entre deshacer y rehacer el último paso |
 
 ## Copias de seguridad
 

@@ -3,15 +3,15 @@
 <h2 id="go-back-to-an-earlier-step">回到较早的一步</h2>
 <ol><li>选择 <code>编辑 › 撤销历史...</code>，或按 <code>Ctrl+Alt+H</code>。</li><li>列表按最新在底部的顺序显示各步骤。第一行 <code>起点</code> 是工程刚打开时的状态。</li><li>点击某一步。工程会回到紧接在该步之后的状态，之后的步骤变灰。</li><li>点击一个灰色的步骤可再次前进。</li><li>做一次新的编辑，就会从你选择的那一步继续。此时灰色的步骤会消失。</li></ol>
 <h2 id="the-undo-keys">撤销快捷键</h2>
-<p><code>Ctrl+Z</code> 的行为和大多数程序不同。它撤销最后一步，再按一次则重做这一步，所以它在最近的两个状态之间切换。要继续往回走，请用 <code>Ctrl+Alt+Z</code>。</p>
-<div class="tablewrap"><table><thead><tr><th>命令</th><th>按键</th><th>作用</th></tr></thead><tbody><tr><td><code>撤销</code></td><td><code>Ctrl+Z</code></td><td>撤销最后一步。撤销之后再按则重做下一步，此时菜单项显示为 <code>撤销 (重做)</code></td></tr><tr><td><code>向后撤销</code></td><td><code>Ctrl+Alt+Z</code></td><td>始终往回走，每按一次退一步</td></tr><tr><td><code>重做</code></td><td><code>Ctrl+Y</code> 或 <code>Ctrl+Shift+Z</code></td><td>向前一步</td></tr><tr><td><code>撤销历史...</code></td><td><code>Ctrl+Alt+H</code></td><td>打开列表</td></tr></tbody></table></div>
-<p>每次撤销或重做之后，提示栏会显示这一步的名称和级别，例如 <code>Level 2/3</code>。</p>
-<p>如果你更喜欢通常的行为，请在 <code>选项 › 常规设置...</code> 中打开 <code>备用撤销模式 (经典撤销，而不是在同一快捷键上撤销/重做)</code>。这样 <code>Ctrl+Z</code> 就始终往回撤销。</p>
+<p><code>Ctrl+Z</code> 每按一次沿历史记录退回一步，和 FL Studio 2026 以及大多数程序一样。<code>Ctrl+Y</code> 或 <code>Ctrl+Shift+Z</code> 再向前一步。</p>
+<div class="tablewrap"><table><thead><tr><th>命令</th><th>按键</th><th>作用</th></tr></thead><tbody><tr><td><code>撤销</code></td><td><code>Ctrl+Z</code></td><td>每按一次退回一步</td></tr><tr><td><code>重做</code></td><td><code>Ctrl+Y</code> 或 <code>Ctrl+Shift+Z</code></td><td>向前一步</td></tr><tr><td><code>撤销历史...</code></td><td><code>Ctrl+Alt+H</code></td><td>打开列表</td></tr></tbody></table></div>
+<p><code>编辑</code> 菜单会显示每一项将作用的步骤名称，例如 <code>Undo Add notes: Pattern 1</code>。每次撤销或重做之后，提示栏会显示这一步的名称和级别，例如 <code>Level 2/3</code>。</p>
+<p>FL Studio 的另一种撤销模式也在：在 <code>选项 › 常规设置...</code> 中关闭 <code>备用撤销模式</code>。这时 <code>Ctrl+Z</code> 撤销最后一步，再按一次则重做这一步，所以它在最近的两个状态之间切换。<code>Ctrl+Alt+Z</code> (<code>向后撤销</code>) 继续往回走，<code>Ctrl+Y</code> 或 <code>Ctrl+Shift+Z</code> 仍然重做。</p>
 <h2 id="what-is-a-step-and-what-is-not">什么算一步，什么不算</h2>
 <ul><li>对工程的编辑都是步骤：音符、样式、片段、通道、混音台电平和路由、效果器、自动化、速度、静音。</li><li>一次录制是一步。在<a href="/wiki/online-sessions/">在线会话</a>中合并一部分，以及 <code>用这些录音合成</code>，也都是一步。</li><li>不改变工程的操作不算步骤：缩放、滚动、移动窗口，以及程序自己的设置。</li><li>保存和导出不会被撤销。它们写出的文件会保留。</li><li>LYNX SHARE 自己的插件窗口有单独的撤销和重做，用于该插件的更改，位于 A 和 B 设置旁边。</li></ul>
 <h2 id="settings">设置</h2>
 <p>两项都在 <code>选项 › 常规设置...</code> 中。</p>
-<div class="tablewrap"><table><thead><tr><th>设置</th><th>作用</th></tr></thead><tbody><tr><td><code>最大撤销次数</code></td><td>保留多少步：25、50、100、200、500 或 1000。默认值为 100</td></tr><tr><td><code>备用撤销模式</code></td><td>让 <code>Ctrl+Z</code> 变成经典撤销</td></tr></tbody></table></div>
+<div class="tablewrap"><table><thead><tr><th>设置</th><th>作用</th></tr></thead><tbody><tr><td><code>最大撤销次数</code></td><td>保留多少步：25、50、100、200、500 或 1000。默认值为 100</td></tr><tr><td><code>备用撤销模式</code></td><td>默认打开：<code>Ctrl+Z</code> 沿历史记录往回走。关闭：<code>Ctrl+Z</code> 在撤销和重做最后一步之间切换</td></tr></tbody></table></div>
 <h2 id="backups">备份</h2>
 <p>LYNX SHARE 默认每 2 分钟保存一次已打开工程的备份副本，每个工程保留最新的 10 个。备份是设置文件夹内 <code>autosave</code> 文件夹中的一个普通 <code>.lynx</code> 文件，以工程名命名，后面带有 <code>(autosaved on ...)</code> 以及日期和时间。</p>
 <p>每次覆盖保存现有的工程文件时，被替换的那个版本会复制到同一个文件夹，文件名中带有 <code>(overwritten on ...)</code>。</p>

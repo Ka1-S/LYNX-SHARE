@@ -121,8 +121,42 @@ enum Param
                    // the tape characters' measured tape stage (output and loop tone apart, hiss, the wow's mean lag)
     modClock,      // Clock: the LFO swings the echo time by a fraction of itself (0 … 50 % at Depth 100 %, linear), both
                    // sides in step — a clocked line's modulation (H-Delay's, measured); off (default) = the ms law
-    paramCount
+    paramCount,
+    // round 190is, hidden (not in the info: no control, no string; saved while non-zero): the echo voicings' revision.
+    // 1 = the loop measured on refcap030's EchoBoy captures (new instances, makeEffectSlot): the saturation's make-up
+    // heard once on the echoes instead of on every pass, the voicing's diffusion inside the echo time, the echoes'
+    // measured 1/6 ms behind the dry. 0 = rounds 147 / 150 (a project or preset saved before loads without it, so it
+    // keeps that sound bit for bit). Read only with an echo voicing
+    revision = paramCount,
+    // round 190kw, hidden (not in the info: no control, no string; saved while non-zero): the line law. 1 = the clean
+    // digital line measured on refcap030's Timeless 3 captures (only a translated Timeless 3 state sets it): the dry / wet
+    // law dry = min (1, 2 (1 − mix)), wet = min (1, 2 mix); the delay read at whole samples through a short linear-phase
+    // low-pass (a Kaiser-windowed sinc fitted per rate, see lineLawKernel) and the line bounded by a wide soft limit
+    // (lineLawLimit · tanh (x / lineLawLimit)) instead of the Clean character's shaper and the 2 tanh (x / 2). Without a
+    // voicing only. 0 (the default: every project and preset saved before) = the engine as it was, bit for bit
+    lineLaw,
+    // round 190lf, hidden (not in the info: no control, no string; saved while non-zero; 0 in a new instance and in every
+    // project saved before, which then plays the round-124 hybrid echo bit for bit): the hybrid echo's law. 1 = the
+    // H-Delay loop measured on refcap030's host (docs/analise/REA_rodada190lf_verb.md §3): its high / low passes and
+    // LoFi inside the loop, its delay modulation. Set only by the H-Delay translator; read only with the hybrid engine on
+    hybridLaw, // (rollup 0.1.30 step 9: after round 190kw's lineLaw, both hidden past revision)
+    hybridHp,    // law 1: the loop's high pass, 0 = off, else 10 · 2400^v Hz (H-Delay's HiPass knob)
+    hybridLp,    // law 1: the loop's low pass, 0 = off, else 10 · 2400^v Hz (H-Delay's LoPass knob)
+    hybridDepth, // law 1: the delay modulation's depth, 0 … 1 = H-Delay's 0 … 100 %
+    hybridRate,  // law 1: the modulation's LFO frequency, v · 20 Hz (the translator folds in the sync mode's factor)
+    // round 190ly, hidden (no control, no string; saved while non-zero): the ValhallaDelay role's loop laws, set only by the
+    // ValhallaDelay translator (the substitute table's `replaced` items): the loop diffusion inside the echo time (the
+    // reference keeps the time and smears around it) with its measured spread, and the loop gain over Feedback measured on
+    // refcap030's captures (40 / 70 / 100 / 160 %). Without a voicing; 0 = as before (every other Echoform)
+    valhallaLaw // (rollup 0.1.30 step 10: after round 190lf's hybrid law, all hidden past revision)
 };
+// round 190kw: the line law's read filter at `rate` — the taps of a linear-phase low-pass (2 · half + 1 of them, half ≤ 16)
+// fitted on the reference's echoes at 44.1 / 48 / 96 kHz (the nearest of those rates is used)
+int lineLawKernel (double rate, std::array<float, 33>& taps) noexcept;
+constexpr double lineLawLimit = 5.5;
+// round 190lf: the hybrid law's frequency mapping (hybridHp / hybridLp)
+double hybridFilterHz (float v) noexcept;
+float hybridFilterValue (double hz) noexcept;
 enum class Style { single, ratio, quad, dual, pingPong }; // the two-time styles last (the panel shows the right time for both)
 // in the panel's order: the modulation section shows wow / flutter (tape), rate / depth (lo-fi … phaser), shift / detune
 // (shifter) or pitch / detune (pitch, reverse, detune) — contiguous ranges of the Mode value
@@ -138,6 +172,7 @@ double noteBeats (int index, int kind) noexcept; // quarter notes
 // the delay of one side (ms) from its sync / note / time parameters
 double sideMs (const EffectParams& p, bool right, double bpm) noexcept;
 double feedbackGain (float v) noexcept;  // loop gain 0 .. 2 (0.5 = unity)
+double valhallaLoopDb (float v) noexcept; // round 190ly: the ValhallaDelay role's loop gain correction (dB) over Feedback
 double modRateHz (float v) noexcept;     // 0.01 .. 10 Hz (centre 2 Hz)
 double shiftHz (float v) noexcept;       // ±1000 Hz, |x|^5
 double shiftDetuneHz (float v) noexcept; // ±10 Hz, |x|^2.5
@@ -243,7 +278,12 @@ enum Param { mix, shift, delay, sync, feedback, lowCut, highCut, stereo,
              // round 190fy, hidden (not in the info; saved while non-zero): the measured loop's revision. 1 = the loop
              // timing measured in round 190fy (new instances, makeEffectSlot), 0 = round 190do's measured loop (a project or
              // preset saved by 0.1.27 loads without it, so it keeps that loop bit for bit). Only read with Law = Measured
-             revision = paramCount };
+             revision = paramCount,
+             // round 190ly, hidden (saved while non-zero; read with Law = Measured): 1 = the shifted loop's phase does not
+             // depend on the sample rate (the analytic filter's phase at the running rate turned onto its phase at 48 kHz,
+             // the rate the loop was measured at: a constant rotation of the analytic signal and a sub-sample read
+             // offset). New instances, translated states; 0 = as before (identical at 48 kHz either way)
+             rateLaw };
 double shiftHz (float v) noexcept;   // ±1000 Hz, |x|^5
 double delayMs (float v) noexcept;   // 0.01 .. 1000 ms (centre 100 ms)
 float delayValue (double ms) noexcept;
@@ -252,13 +292,23 @@ double syncBeats (int index) noexcept; // quarter notes (0 for "off")
 double loopGain (float v) noexcept;  // 1.5 × feedback
 double lowCutHz (float v) noexcept;  // 20 .. 3000
 double highCutHz (float v) noexcept; // 50 .. 15000
+// round 190ly: the rotation (radians) and read advance (samples) that turn the analytic filter's phase at `sampleRate`
+// onto its phase at 48 kHz (least squares over 60 Hz … 12 kHz); both 0 at 48 kHz
+void rateTurn (double sampleRate, double& theta, double& advanceSamples) noexcept;
 } // namespace spiral
 
 namespace orbit
 {
 enum Param { mix, rate, depth, feedback, manual, mode,
              law, // round 190do (appended): 0 = the classic voices (projects saved before), 1 = the measured sweep
-             paramCount };
+             paramCount,
+             // round 190mb, hidden (no control, no string; saved while non-zero): 1 = ValhallaSpaceModulator's wet level per
+             // mode (set only by its translator, the substitute table's `replaced` items); 0 = as before
+             smLaw = paramCount,
+             // round 190mj, hidden (no control, no string; saved while non-zero): 1 = ValhallaSpaceModulator's own voices per
+             // mode (measured on click-train and still probes of the reference: tap count, delay laws, crossfade windows,
+             // all-pass interpolation, per-mode filters, the feedback loop; set only by its translator); 0 = as before
+             voiceLaw };
 enum class Mode { rise, riseFall, throughZeroPlus, throughZeroMinus, tri, octo, doubler, driftRise, driftRiseFall, ensemble, symphonic };
 constexpr int modeCount = 11;
 double rateHz (float v) noexcept;    // ±10 Hz, |x|^3.333
@@ -268,6 +318,7 @@ double feedbackGain (float v) noexcept; // ±0.7·|x|^1.5 (sign kept)
 Mode modeOf (float v) noexcept;
 float modeValue (Mode m) noexcept;
 const char* modeName (Mode m) noexcept;
+double smModeDb (Mode m) noexcept; // round 190mb: the SpaceModulator role's wet level per mode (dB, smLaw)
 } // namespace orbit
 
 namespace lattice
@@ -284,7 +335,12 @@ enum Param
                // floor (17 v): 0–1 free, 2–7 1/16 … 2/1, 8–12 1/16. … 1/1., 13–17 1/16T … 1/1T; the synced delay is capped
                // at 2750 ms. Free (0, the default) leaves the older `sync` law in charge
     law, // round 190do (appended): 0 = the classic detune depth (projects saved before), 1 = the measured one
-    paramCount
+    paramCount,
+    // round 190it, hidden (not in the info: no control, no text; saved while non-zero): revision 1 of the tap network,
+    // measured on refcap030's type sweep of the reference: the loop is fed by the longest tap at the feedback's own gain
+    // (the sum of 8 / 16 taps fed back piled up 20 … 30 dB below 200 Hz), and the type values past the tenth step play
+    // the dry signal alone, at unity. A new Lattice Mod and a translated state get 1; projects saved before keep 0
+    revision = paramCount
 };
 int inputPanOf (float v) noexcept;  // 0 … 8
 int delaySyncIndex (float v) noexcept;      // 0 … 17 (round 144)

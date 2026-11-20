@@ -119,6 +119,11 @@ public:
     virtual void render (float* left, float* right, int n, float gainLeft, float gainRight) noexcept = 0;
     // Automated parameter (plugins). 0..1. Audio thread.
     virtual void setParameter (int /*index*/, float /*value*/) noexcept {}
+    // Round 190jg (sample-accurate automation): whether the instrument takes parameter changes inside a chunk (a hosted
+    // CLAP or VST3 plugin), and one such change, `offset` samples into the chunk the renderer is about to render (after
+    // the chunk's setParameter values; offsets ascending per parameter). Audio thread.
+    virtual bool takesTimedParameters() const noexcept { return false; }
+    virtual void setParameterAt (int /*index*/, float /*value*/, int /*offset*/) noexcept {}
     // A hosted plugin's parameter value now (0..1; −1 = unknown), for a Patcher parameter output (round 171b). Audio thread.
     virtual float parameterValue (int /*index*/) const noexcept { return -1.0f; }
     // Latency the instrument introduces (plugins), in samples. For PDC.
@@ -187,6 +192,14 @@ public:
     virtual int selectedProgram() const noexcept { return -1; }
     // Song position (ticks) at the start of the block, for the global LFOs. Audio thread.
     virtual void setSongPosition (double /*ticks*/) noexcept {}
+    // The tempo (BPM) of the block about to render while the tempo can move (tempo automation, tempo markers; round
+    // 190hq), 0 when it is the project's own. Audio thread, before setSongPosition.
+    virtual void setSongTempo (double /*bpm*/) noexcept {}
+    // Issue #187 (round 190ik): the block's tempo over the song's own (tempo automation, pattern Tempo events, a dragged
+    // tempo) and whether the tempo can move while the song plays. A warped sample (stretched to its beats at the song's
+    // tempo) follows it: its voices read it that much faster or slower, keeping their pitch through their shifters when
+    // the channel keeps the pitch. Called at the start of every block, before its notes. Audio thread.
+    virtual void setTempoRatio (double /*ratio*/, bool /*moves*/) noexcept {}
     // No voice sounding: render would only produce silence (the mixer skips the channel until a note arrives).
     virtual bool idle() const noexcept { return false; }
     // The notes it sent out in its renders since the last call (a hosted plugin's MIDI output, FL's wrapper "Output
@@ -201,6 +214,36 @@ public:
     // each one packed as status | data1 << 8 | data2 << 16 (a 0xC0 / 0xD0 status has no data 2). Fills `out` with up
     // to `max` and returns how many; the rest wait for the next call.
     virtual int takeMidiMessages (std::uint32_t* /*out*/, int /*max*/) noexcept { return 0; }
+    // Hardware MIDI outputs (round 190jl, FL's Options › MIDI › Output "Port"): a MIDI Out channel (and a plugin's MIDI
+    // output) whose port an output device has sends what it plays to that device. The rack switches the capture on for
+    // the chunk (audio thread, before the chunk's render), the instrument keeps each short message with its sample in the
+    // chunk (the samples it rendered before it) and the rack takes them after the chunk. `source` = the live MIDI input
+    // the message came from (0 = none: the song, the UI), so a device's own input is not sent back to it.
+    struct HardwareMidi
+    {
+        std::int32_t sample = 0;
+        std::uint8_t size = 0, source = 0;
+        std::array<std::uint8_t, 3> bytes {};
+    };
+    virtual void setHardwareMidi (bool /*on*/) noexcept {}
+    virtual int takeHardwareMidi (HardwareMidi* /*out*/, int /*max*/) noexcept { return 0; }
+    // GitHub #198 (round 190ks): the notes a hosted plugin plays from its own window (pads or keys clicked in it) and sends
+    // on its MIDI output, so a take records them on its channel. The rack switches the capture on for the chunk (audio
+    // thread, before the chunk's render) while a take records; the instrument keeps each note on / off it sent itself —
+    // not the echo of a note it was sent (a "MIDI thru" plugin): a note on of a key it was sent within the last 50 ms is
+    // an echo, and so is the note off of a key whose note on was one — with its sample in the chunk; the rack takes them
+    // after the chunk.
+    struct OwnNote
+    {
+        std::int32_t sample = 0;
+        std::uint8_t key = 60, midiChannel = 0;
+        float velocity = 0.0f; // 0 = note off
+    };
+    virtual void setRecordOwnNotes (bool /*on*/) noexcept {}
+    virtual int takeOwnNotes (OwnNote* /*out*/, int /*max*/) noexcept { return 0; }
+    // the live MIDI input of the noteOn / noteOff / midiMessage calls that follow, until it is set again (NoteEvent::source,
+    // 0 = none; the rack sets it around a live event and puts it back to 0)
+    virtual void setNoteSource (int /*source*/) noexcept {}
     // Extra outputs to other mixer inserts (a generator Patcher's extra "To LYNX" outputs, REA_rodada141): the rack
     // calls beginChunk (n) before a chunk's render() calls, which then also add each extra output's audio (gains
     // applied) into auxOutputData (k, side) from the chunk's start; auxOutputTrack (k) = the insert it feeds.
@@ -339,6 +382,10 @@ bool renderInProgress() noexcept;
 // FL's "HQ for all plugins" during an export (REA round 134): effects with an HQ switch use HQ whatever it is set to.
 void setHqForAllPlugins (bool on) noexcept;
 bool hqForAllPlugins() noexcept;
+// Round 190jg: automation reaches hosted CLAP / VST3 plugins at its own sample inside a chunk (Settings › Plugins; on by
+// default). Off: once per chunk (up to 128 samples while automation plays), as before.
+void setSampleAccurateAutomation (bool on) noexcept;
+bool sampleAccurateAutomation() noexcept;
 // The built-in synth renders up to four voices side by side (round 190gp; the same samples as one voice at a time,
 // which `false` restores: for tests and A/B runs).
 void setSynthVoiceLanes (bool on) noexcept;

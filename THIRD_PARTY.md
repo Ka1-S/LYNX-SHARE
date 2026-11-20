@@ -2,6 +2,9 @@
 
 LYNX is distributed under the [GNU AGPL-3.0](LICENSE). It uses the components below, each under its own license:
 
+The full licence texts and NOTICE files travel with every package in the `licenses` folder next to the program (made by
+`scripts/collect-licenses.sh` from the files named below).
+
 | Component | Used for | License |
 |---|---|---|
 | [JUCE 8](https://juce.com) | UI, audio, VST3 plugin hosting | AGPLv3 (or a commercial JUCE license) |
@@ -10,6 +13,7 @@ LYNX is distributed under the [GNU AGPL-3.0](LICENSE). It uses the components be
 | [libogg 1.3.5 and libvorbis 1.3.7](https://xiph.org/vorbis/) (decoder in `third_party/vorbis`; `src/mdct.c` modified, see the "LYNX modification" comment) | decoding Ogg Vorbis samples the way FL Studio does | 3-clause BSD (`third_party/vorbis/COPYING.libogg`, `third_party/vorbis/COPYING.libvorbis`) |
 | [LAME 3.100](https://lame.sourceforge.io) (`libmp3lame` encoder sources in `third_party/lame`, unmodified; `src/config.h` written for LYNX's build) | MP3 export | LGPL-2.0-or-later (`third_party/lame/COPYING`) |
 | [TinySoundFont 0.9](https://github.com/schellingb/TinySoundFont) (`third_party/tinysoundfont/tsf.h`; LYNX modification: reverb / chorus send generators kept, see the header comment) | parsing SoundFont 2 / 3 files for the LYNX Soundfont instrument (LYNX plays the voices itself) | MIT (`third_party/tinysoundfont/LICENSE`) |
+| File-format references for other samplers' instruments (round 190ii; **no code from these projects is compiled in or shipped**; LYNX's readers in `src/core/GigFile.cpp`, `src/core/Ncw.cpp`, `src/core/KontaktFile.cpp` are its own): [libgig 4.4.1](https://www.linuxsampler.org/libgig/) by Christian Schoenebeck (the GigaStudio `.gig` layout on top of the MMA's DLS Level 2 specification), [ncw](https://github.com/monomadic/ncw) `FORMAT.md` (Native Instruments' NCW sample compression), [ConvertWithMoss](https://github.com/git-moss/ConvertWithMoss) by Jürgen Moßgraber (telling Kontakt instrument versions and protected libraries apart) | importing `.gig` instruments, decoding `.ncw` samples, recognising `.nki` files (protected Kontakt libraries are never decrypted) | libgig: GPL-2.0-or-later (its source headers), compatible with the AGPL-3.0 through the GPLv3 terms its "or any later version" allows; ncw: MIT OR Apache-2.0; ConvertWithMoss: LGPL-3.0 |
 | [stb_vorbis 1.22](https://github.com/nothings/stb) (`third_party/stb_vorbis/stb_vorbis.c`, unmodified) | decoding the Ogg Vorbis samples of SoundFont 3 files | MIT (option of its MIT / public domain licence, `third_party/stb_vorbis/LICENSE`) |
 | [minimp3](https://github.com/lieff/minimp3) (`minimp3.h`, `minimp3_ex.h` in `third_party/minimp3`; one marked "LYNX" change in `minimp3.h`: damaged granules are silenced, see its README) | decoding `.mp3` samples and audio clips (gapless) | CC0 1.0 public domain dedication (`third_party/minimp3/LICENSE`) |
 | [Signalsmith Stretch 1.4](https://github.com/Signalsmith-Audio/signalsmith-stretch) and [Signalsmith Linear 0.6.6](https://github.com/Signalsmith-Audio/linear) (`third_party/signalsmith`, unmodified) | pitch-preserving time-stretch (tempo-following samples, FL Studio stretch modes, Newtone, the audio editor) | MIT (`third_party/signalsmith/LICENSE-stretch.txt`, `LICENSE-linear.txt`) |
@@ -19,16 +23,23 @@ LYNX is distributed under the [GNU AGPL-3.0](LICENSE). It uses the components be
 | [PipeWire 1.6.2](https://gitlab.freedesktop.org/pipewire/pipewire) headers (the `pipewire-0.3` / `spa-0.2` headers LYNX includes, in `third_party/pipewire/include`, unmodified) | LYNX's native PipeWire audio driver on Linux; `libpipewire-0.3.so.0` itself is loaded from the system at run time, never shipped | MIT (`third_party/pipewire/LICENSE`) |
 | [Ableton Link 4.1.1](https://github.com/Ableton/link) by Ableton AG (headers in `third_party/link/include`, unmodified) with the standalone [Asio 1.38.2](https://think-async.com/Asio/) it bundles (`third_party/link/asio/include`, unmodified) | Ableton Link: tempo, beat and phase shared with other apps and devices on the network (`src/engine/AbletonLink.cpp`) | Link: GPL-2.0-or-later (`third_party/link/LICENSE.md`, `GNU-GPL-v2.0.md`), used under the GPLv3 terms its "or any later version" allows, which are compatible with the AGPL-3.0; Asio: Boost Software License 1.0 (`third_party/link/asio/LICENSE_1_0.txt`) |
 | [VST 3 SDK](https://github.com/steinbergmedia/vst3sdk) (the copy bundled with JUCE 8.0.4) | VST3 plugin hosting | GPLv3 option of Steinberg's dual licence (`VST3_SDK/LICENSE.txt` in JUCE) |
+| [ARA SDK 2.1.0](https://github.com/Celemony/ARA_SDK) by Celemony Software GmbH (`ARA_API` headers and the `ARA_Library` Debug / Dispatch / Utilities sources in `third_party/ara`, unmodified; tag `releases/2.1.0`, ARA_API f0af6d7, ARA_Library c3c580d) | hosting ARA 2 plugins (Melodyne, RipX, VocAlign, SpectraLayers…) on audio clips (`src/engine/AraHost.cpp`, through JUCE's ARA hosting classes) | Apache-2.0 (`third_party/ara/ARA_API/LICENSE.txt`, `third_party/ara/ARA_Library/LICENSE.txt`, `third_party/ara/NOTICE.txt`) |
 | [ASIO SDK 2.3.4](https://www.steinberg.net/developers/) (interface headers in `third_party/asiosdk`) | ASIO audio drivers on Windows | GPLv3 option of Steinberg's dual licence (`third_party/asiosdk/LICENSE.txt`) |
-| [ONNX Runtime 1.23.2](https://github.com/microsoft/onnxruntime) (C API headers in `third_party/onnxruntime`, unmodified; Microsoft's release library ships next to LYNX and is loaded at run time) | running the stem separation model of "Extract stems from sample" and the Basic Pitch model of "Convert to MIDI" | MIT (`third_party/onnxruntime/LICENSE`) |
-| [Basic Pitch](https://github.com/spotify/basic-pitch) by Spotify (the ICASSP 2022 model `nmp.onnx` from commit fa5997a, unmodified, compiled in as `third_party/basic-pitch/nmp.onnx.inc`; its note-creation rules ported to C++ in `src/core/AudioToMidi.cpp`) | "Convert to MIDI": melody and harmony of audio clips | Apache-2.0, code and model weights (`third_party/basic-pitch/LICENSE`, `NOTICE`; text below) |
+| [ONNX Runtime 1.23.2](https://github.com/microsoft/onnxruntime) (C API headers in `third_party/onnxruntime`, unmodified; Microsoft's release library ships next to LYNX and is loaded at run time) | running the stem separation model of "Extract stems from sample" and the Basic Pitch model of "Convert to MIDI" | MIT (`third_party/onnxruntime/LICENSE`; Microsoft's notices for the code inside the library: `third_party/onnxruntime/ThirdPartyNotices.txt`, from the 1.23.2 release) |
+| [Basic Pitch](https://github.com/spotify/basic-pitch) by Spotify (the ICASSP 2022 model `nmp.onnx` from commit fa5997a, unmodified, compiled in as `third_party/basic-pitch/nmp.onnx.inc`; its note-creation rules and pitch-bend reading (`note_creation.py` output_to_notes_polyphonic, get_pitch_bends) ported to C++ in `src/core/AudioToMidi.cpp`) | "Convert to MIDI": melody and harmony of audio clips, and "Convert to MIDI (polyphonic)..." (round 190lj) | Apache-2.0, code and model weights (`third_party/basic-pitch/LICENSE`, `NOTICE`; text below) |
+| [PitchNet](https://github.com/SessionLoops/PitchNet)'s polyphonic engine by Session Loops and contributors (a derivative of [HachiTune](https://github.com/KCKT0112/HachiTune) by the HachiTune contributors): `Source/Audio/Polyphonic` of commit 121b330 (2026-11-17) in `third_party/pitchnet-poly`, without its ONNX Runtime wrapper (`BasicPitchEvidence`); LYNX modifications marked "LYNX modification (round 190lk / 190lo)" and listed in `third_party/pitchnet-poly/README-LYNX.md` (masks built on demand, `PolyLazy.cpp` added; slow re-attacks; overlap-aware moves). Its note-filter trees (`PolyPurifierModel.h`, `PolyGuidedPurifierModel.h`) were trained by PitchNet on features of recordings from [Salamander Grand Piano V3](https://github.com/sfzinstruments/SalamanderGrandPiano) by Alexander Holm (CC BY 3.0) and [VSCO 2 Community Edition](https://github.com/sgossner/VSCO-2-CE) by Versilian Studios and Ivy Audio (CC0 1.0); no audio of those libraries is included | "Edit notes (polyphonic)..." (round 190lk): finding the notes of chords and polyphonic audio clips and rendering per-note edits (`src/core/PolyEdit.cpp`, `src/ui/PolyEditor.cpp`) | AGPL-3.0 (`third_party/pitchnet-poly/LICENSE`); the trees' source recordings: CC BY 3.0 (Salamander, attribution above) and CC0 1.0 (VSCO 2 CE) |
 | Libraries bundled inside JUCE's modules | text shaping, image and audio codecs, zip | HarfBuzz (MIT), SheenBidi (Apache-2.0), FLAC (BSD-3-Clause), Ogg/Vorbis (BSD-3-Clause), libpng (libpng/zlib licence), IJG libjpeg (IJG licence), zlib (zlib licence) |
 | [Open Sans](https://github.com/googlefonts/opensans) (`resources/fonts`, unmodified; Linux builds only) | the interface font on Linux | SIL Open Font License 1.1 (`resources/fonts/OFL.txt`, full text below) |
+| [Open Sans Condensed](https://github.com/googlefonts/opensans) SemiBold and Bold (the same Open Sans project's static `OpenSans-CondensedSemiBold.ttf` / `OpenSans-CondensedBold.ttf`, `resources/fonts`, unmodified; embedded in every build as base64 in `src/ui/CondensedFontData.h` by `tools/make_font_data.py`) | Settings › General › "Condensed labels (FL style)" (off by default) | SIL Open Font License 1.1 (`resources/fonts/OFL.txt`, the same licence and copyright line as Open Sans, full text below) |
 
 The HT-Demucs model is not part of LYNX: on first use of "Extract stems from sample" LYNX shows its source and licence
 and downloads it only if you agree. The Demucs code is MIT; its authors state that the licence of the trained weights
 is not clear. On Windows, ONNX Runtime uses the Microsoft Visual C++ Redistributable already on the computer; LYNX does
 not ship it.
+
+M4A (AAC) export uses the AAC encoder of the operating system: Media Foundation's on Windows, AudioToolbox's on macOS.
+LYNX ships no AAC encoder (no FDK-AAC, no FFmpeg): the codec and its patent licensing come with the system that provides
+it. Where there is no system encoder (Linux, Windows "N" editions without the Media Feature Pack), M4A is not offered.
 
 Every component is available under an OSI-approved open-source licence, and LYNX uses each of them under that
 licence; no proprietary or closed-source code is compiled into or shipped with LYNX. Where Steinberg offers a
@@ -58,6 +69,36 @@ Spotify AB (http://www.spotify.com/).
 
 (The rest of Basic Pitch's NOTICE names Python libraries its own package uses — librosa, mir_eval, numpy, pretty-midi,
 resampy, scipy, tensorflow — and test audio from the Vocadito dataset; none of them is part of LYNX.)
+
+## ARA SDK (Apache-2.0)
+
+LYNX includes the `ARA_API` headers and the `ARA_Library` Debug / Dispatch / Utilities sources of Celemony's ARA Audio
+Random Access SDK 2.1.0, unmodified, under the Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0; full
+text in `third_party/ara/ARA_API/LICENSE.txt` and `third_party/ara/ARA_Library/LICENSE.txt`). The parts of the SDK's
+NOTICE file that apply to what LYNX includes (`third_party/ara/NOTICE.txt` has all of it; the SDK's examples, its
+bundled cpp-base64, pugixml, ICST AudioFile, VST3 SDK subset, CoreAudio Utility Classes and JUCE_ARA fork are not part of
+LYNX):
+
+```
+This module bundles the ARA API, ARA Library and ARA Examples
+by Celemony Software GmbH as ARA Audio Random Access SDK,
+available under the Apache License 2.0.
+
+THIS SOFTWARE IS PROVIDED BY CELEMONY SOFTWARE GMBH AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL CELEMONY SOFTWARE GMBH AND/OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+ARA is a trademark of Celemony Software GmbH; LYNX is not affiliated with Celemony. Melodyne is a trademark of
+Celemony Software GmbH.
 
 ## Faust Libraries `re.valhallaSupermassive` (MIT)
 

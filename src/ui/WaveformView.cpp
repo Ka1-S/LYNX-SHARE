@@ -288,9 +288,14 @@ void appendCleanWaveform (juce::Path& wave, float scale, juce::Rectangle<float> 
             smooth[(std::size_t) x] = std::max (c, (l + 2.0f * c + r) * 0.25f);
         }
 
-        const auto centre = body.getY() + laneHeight * ((float) lane + 0.5f);
+        auto centre = body.getY() + laneHeight * ((float) lane + 0.5f);
         const auto half = laneHeight * 0.5f - 1.0f;
-        const auto minHalf = 0.5f; // silence still shows as a hairline
+        auto minHalf = 0.5f; // silence still shows as a hairline
+        if (! style.silenceLine.isTransparent()) // (round 190ig: FL's 1 px silence line carries silence; the centre on a pixel)
+        {
+            centre = (std::floor (centre * scale) + 0.5f) / scale;
+            minHalf = 0.0f;
+        }
 
         // one closed path per run of valid columns: the top edge left to right, the bottom edge back
         int x = 0;
@@ -324,6 +329,16 @@ void paintCleanWaveform (juce::Graphics& g, juce::Rectangle<float> body, juce::R
     const auto scale = juce::jlimit (1.0f, 4.0f, g.getInternalContext().getPhysicalPixelScaleFactor());
     juce::Path wave;
     appendCleanWaveform (wave, scale, body, visible, summary, startFrame, framesPerPixel, style);
+    if (! style.silenceLine.isTransparent()) // FL's silence line: one physical pixel row per lane, under the waveform
+    {
+        const auto lanes = style.stereo && summary.channels > 1 ? 2 : 1;
+        g.setColour (style.silenceLine);
+        for (int lane = 0; lane < lanes; ++lane)
+        {
+            const auto centre = std::floor ((body.getY() + body.getHeight() / (float) lanes * ((float) lane + 0.5f)) * scale) / scale;
+            g.fillRect (juce::Rectangle<float> (visible.getX(), centre, visible.getWidth(), 1.0f / scale));
+        }
+    }
     g.setColour (style.classic);
     g.fillPath (wave);
 }
@@ -536,6 +551,73 @@ float WaveformDisplay::regionX (float fraction) const
     const auto x0 = displayX (juce::jlimit (0.0f, 1.0f, reversed ? 1.0f - regionEnd : regionStart));
     const auto x1 = displayX (juce::jlimit (0.0f, 1.0f, reversed ? 1.0f - regionStart : regionEnd));
     return x0 + (x1 - x0) * juce::jlimit (0.0f, 1.0f, fraction);
+}
+
+double WaveformDisplay::fileFractionAt (float x) const
+{
+    const auto inner = getLocalBounds().toFloat().reduced (1.0f);
+    const auto shown = viewStart + (double) ((x - inner.getX()) / juce::jmax (1.0f, inner.getWidth())) * (viewEnd - viewStart);
+    return juce::jlimit (0.0, 1.0, reversed ? 1.0 - shown : shown);
+}
+
+WaveformDisplay::Handle WaveformDisplay::handleAt (juce::Point<float> p) const
+{
+    if (! handlesEditable || path.isEmpty())
+        return Handle::none;
+    constexpr float reach = 4.0f;
+    // (the loop's lines first: drawn over the start marker; the nearer one when both are in reach)
+    if (loopStart >= 0.0f && loopEnd >= loopStart)
+    {
+        const auto xa = displayX (reversed ? 1.0 - (double) loopEnd : (double) loopStart);
+        const auto xb = displayX (reversed ? 1.0 - (double) loopStart : (double) loopEnd);
+        const auto da = std::abs (p.x - xa), db = std::abs (p.x - xb);
+        if (juce::jmin (da, db) <= reach)
+        {
+            const auto onA = da < db || (da == db && p.y > (float) getHeight() * 0.5f); // (start = end: the lower half takes the start)
+            return (onA != reversed) ? Handle::loopStart : Handle::loopEnd;
+        }
+    }
+    if (std::abs (p.x - regionX (startOffset)) <= reach)
+        return Handle::start;
+    return Handle::none;
+}
+
+float WaveformDisplay::handleXForSnapshot (Handle h) const
+{
+    if (h == Handle::start)
+        return regionX (startOffset);
+    if (loopStart < 0.0f || loopEnd < loopStart)
+        return -1.0f;
+    const auto atStart = (h == Handle::loopStart) != reversed;
+    return displayX (reversed ? 1.0 - (double) (atStart ? loopEnd : loopStart) : (double) (atStart ? loopStart : loopEnd));
+}
+
+void WaveformDisplay::mouseMove (const juce::MouseEvent& e)
+{
+    setMouseCursor (handleAt (e.position) != Handle::none ? juce::MouseCursor::LeftRightResizeCursor : juce::MouseCursor::NormalCursor);
+}
+
+void WaveformDisplay::mouseDrag (const juce::MouseEvent& e)
+{
+    if (dragged == Handle::none || onHandleDrag == nullptr)
+        return;
+    if (dragged == Handle::start)
+    {
+        const auto x0 = regionX (0.0f), x1 = regionX (1.0f);
+        onHandleDrag (Handle::start, juce::jlimit (0.0, 1.0, (double) ((e.position.x - x0) / (std::abs (x1 - x0) < 1.0f ? 1.0f : x1 - x0))), e.mods.isShiftDown());
+        return;
+    }
+    onHandleDrag (dragged, fileFractionAt (e.position.x), e.mods.isShiftDown());
+}
+
+void WaveformDisplay::mouseUp (const juce::MouseEvent&)
+{
+    if (dragged == Handle::none)
+        return;
+    const auto was = dragged;
+    dragged = Handle::none;
+    if (onHandleDragEnd != nullptr)
+        onHandleDragEnd (was);
 }
 
 void WaveformDisplay::setWatermark (const juce::String& text)

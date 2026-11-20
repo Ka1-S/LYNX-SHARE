@@ -5,6 +5,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <vector>
 
 #include "core/Effects.h"
@@ -96,6 +97,32 @@ std::string paramText (int param, float v)
 
 namespace
 {
+// round 190ho [black-box, the trial187b sung line at Formant −6 against the reference]: the detector calls a sung note
+// voiced some 20 ms after it starts; until then round 190dp's measured path read its start as unvoiced, at the formant
+// factor — the note's own fundamental moved down by the Formant shift (170 Hz at −6 st: about 120 Hz), a low thump at
+// every onset (under 130 Hz −27.5 dB at the onsets of the line, the reference −38.7 dB). Revision 1 watches the level
+// instead, which rises at once: after a rise of `riseDb` (a 1 ms against a 30 ms follower) out of near-silence (the
+// slow follower under `quietDb`), for `plainMs` the unvoiced grains placed keep the source's formants
+// (Psola::setUnvoicedPlain); by then the detector has decided and the voiced grains take over. Measured on the line:
+// the onsets come out at −40.5 dB (15 ms was enough there, 8 ms was not)
+struct OnsetLaw
+{
+    double riseDb = 12.0, plainMs = 60.0, fastMs = 1.0, slowMs = 30.0, floorDb = -60.0, quietDb = -60.0;
+};
+
+OnsetLaw onsetLaw() noexcept
+{
+    OnsetLaw o;
+   #ifdef LYNX_LAB190HO
+    if (const char* e = std::getenv ("VS_RISE")) o.riseDb = std::atof (e);
+    if (const char* e = std::getenv ("VS_WIN")) o.plainMs = std::atof (e);
+    if (const char* e = std::getenv ("VS_FAST")) o.fastMs = std::atof (e);
+    if (const char* e = std::getenv ("VS_SLOW")) o.slowMs = std::atof (e);
+    if (const char* e = std::getenv ("VS_QUIET")) o.quietDb = std::atof (e);
+   #endif
+    return o;
+}
+
 // round trial187b [black-box, the trial's renders of a vocal on the left only / a vocal left and music right / a vocal
 // and its 23 ms echo]: the reference shifts each channel on its own (a voice on the left leaves the right silent; the
 // left comes out the same whatever plays on the right), so each channel has its own detector and shifter here (they
@@ -135,6 +162,7 @@ public:
             v.sung = -1.0;
             v.wanted = v.shift = 0.0;
             v.unvoicedFor = 1e9;
+            v.fast = v.slow = v.plainLeft = 0.0;
             v.target = -1;
         }
         std::fill (dry.begin(), dry.end(), 0.0f);
@@ -150,6 +178,8 @@ public:
         held = channels;
         heldCount = count;
     }
+    bool followsHeldNotes() const noexcept override { return true; } // (round 190kz)
+    bool followsHeldNotesWith (const EffectParams& p) const noexcept override { return midiChannelIndex (p[midi]) >= 0; } // (process())
 
     void process (float* l, float* r, int n, const EffectParams& p, double) noexcept override
     {
@@ -169,6 +199,12 @@ public:
         const auto amount = driveAmount (p[drive]);
         const auto wet = std::clamp (p[mix], 0.0f, 1.0f);
         const bool measured = p[law] >= 0.5f; // round 190dp
+        // round 190ho: the Measured law's revision 1 (the onset gate below)
+        const bool rev1 = measured && p[revision] >= 0.5f;
+        const auto ol = onsetLaw();
+        const auto aFast = 1.0 - std::exp (-1.0 / (ol.fastMs * 0.001 * sr)), aSlow = 1.0 - std::exp (-1.0 / (ol.slowMs * 0.001 * sr));
+        const auto rise = dbToGain (ol.riseDb), floorGain = dbToGain (ol.floorDb), quiet = dbToGain (ol.quietDb);
+        const auto plainFor = ol.plainMs * 0.001 * sr;
         const auto stereo = r != nullptr && r != l;
         const int channels = stereo ? 2 : 1;
         // Quantize: "as quickly as possible" — a 2 ms glide between notes, only to avoid clicks
@@ -190,6 +226,16 @@ public:
             {
                 auto& v = voices[(std::size_t) c];
                 v.psola.setUnvoicedShift (measured);
+                if (rev1)
+                {
+                    const auto mag = std::abs ((double) xin[c]);
+                    v.fast += aFast * (mag - v.fast);
+                    v.slow += aSlow * (mag - v.slow);
+                    if (v.fast > floorGain && v.fast > rise * v.slow && v.slow < quiet && v.unvoicedFor > 0.0)
+                        v.plainLeft = plainFor;
+                    v.plainLeft = std::max (0.0, v.plainLeft - 1.0);
+                }
+                v.psola.setUnvoicedPlain (rev1 && v.plainLeft > 0.0);
                 if (v.det.push (xin[c]))
                 {
                     const auto& e = v.det.estimate();
@@ -298,6 +344,7 @@ private:
         vocal::PitchDetector det;
         vocal::Psola psola;
         double sung = -1.0, wanted = 0.0, shift = 0.0, unvoicedFor = 1e9;
+        double fast = 0.0, slow = 0.0, plainLeft = 0.0; // round 190ho: the level rise at a sung onset
         int target = -1;
     };
     static constexpr int dryRing = 16384, lagRing = 1024;

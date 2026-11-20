@@ -182,7 +182,7 @@ PluginDevice{ IsExpanded, BreakoutIsExpanded, On{Manual, AutomationTarget, MidiC
 | Session clips / Scenes | the clip grid (round 181c, section 13; the default by the user's choice of 2026-11-08); Settings › General › Workflow can put them on the Playlist after the arrangement instead, one section per scene (a marker per scene) |
 | Volume/Pan/Send/plugin-param automation | automation clips on the matching target (round 190ed, §18: rack macros, devices inside racks through a free macro, VST2 plugin parameters, a Simpler's filter; VST3 parameters listed) |
 | PluginDevice | `PluginRef.foreign` (vst2 id / vst3 class id + state), resolved like an .flp's plugins |
-| Native devices | the LYNX engine in the same role with its settings translated (slice N3, section 14: Simpler, Sampler zones, Drum Rack pads, racks, EQ Eight, Compressor, Glue Compressor, Utility, Reverb; lot 2 §15; lot 3 §18: EQ Three, Drum Buss, Auto Filter's modulation, Operator without FM, Drift); every other device is dropped and listed in the import report |
+| Native devices | the LYNX engine in the same role with its settings translated (slice N3, section 14: Simpler, Sampler zones, Drum Rack pads, racks, EQ Eight, Compressor, Glue Compressor, Utility, Reverb; lot 2 §15; lot 3 §18: EQ Three, Drum Buss, Auto Filter's modulation, Drift; round 190hs: Operator → Tetra; round 190ja: Wavetable → Helix); every other device is dropped and listed in the import report |
 
 ## 9. What Live's loader requires (found by experiment, 2026-11-06) [LIVE]
 Live crashes on a set that is merely well-formed. It either exits or shows "A serious program error". A set written by another program must follow these rules:
@@ -395,7 +395,8 @@ exists yet: every law that is not plain unit maths is [ASSUMED] and listed in th
 | EQ Three (`FilterEQ3`) | Prism Multiband, 3 bands, minimum-phase (the crossover sum), no dynamics | FreqLo / FreqHi → crossovers, Slope → 24 / 48 dB/oct, GainLo / Mid / Hi (linear) → band levels (dB), kill switches and −inf gains → the bands that still sound are soloed | the pair (fitted), gains under −30 dB, all bands off (Prism's lowest output) |
 | Drum Buss (`DrumBuss`) | **Anvil Bus**, LYNX's own drum-bus engine (round 190fk, §24; until then a rack "Drum Buss": Ember Saturator → Facet EQ → Crest Compressor → Shell Channel, which projects that already hold it keep) | every control one to one: Drive / Drive type / Crunch / Damping / Transients / Boom amount, frequency, decay / Comp / Input Trim / Output / Dry/Wet → the engine's own; Live's envelopes and macros on them reach the engine through `links` | Boom audition (listed); drive amounts between 0 / 25 / 50 / 100 %, the type EQ below 100 %, Boom and Crunch away from 0.5 are interpolated / scaled (reported) |
 | Auto Filter's LFO / envelope follower / side chain | a Peak Controller (FL's internal-controller link) in front of the Filter — or at the end of the side-chain source track's insert — whose output 0 (peak + LFO) drives the Filter's cutoff through a 33-point curve | LFO rate (Hz at the set's tempo, or synced), shape, phase offset, amount; the follower's amount and release (a straight fall); the cutoff's base | amounts (law assumed), the follower's attack, stereo LFO offset, falling saw, inside a rack (no link possible) |
-| Operator (`Operator`) | the built-in synth, only when no FM is in use: operator A alone (B … D off or at −inf), or algorithm 11's carriers (≤ 3) | waveforms Sine (0), White noise (21), User (22 → the synth's harmonic table), coarse / fine ratio → pitch, volume, A's envelope (ms → s), filter, glide, global volume / pan | the pair (fitted), envelope levels / slopes / loop, LFO, pitch envelope, spread, tone; with FM the device stays unsupported ("FM synthesis: no LYNX engine for it yet") |
+| Operator (`Operator`) | Tetra, LYNX's own 4-operator FM synth (round 190hs, `core/FmSynth.h`, `core/AlsDevicesFm.cpp`) | every Operator value Tetra has, as Live stores it: the 4 operators (on, level, wave 0 … 22, coarse / fine, fixed frequency and its range, feedback, phase, retrigger, level < velocity / key, LFO / pitch envelope switches, the envelope with its levels, slopes, loop mode, loop time, repeat, time < velocity, the user wave's 64 partials), algorithm 0 … 10, volume, pan, transpose, tone, spread, voices, retrigger, glide, time, the LFO (wave, range, rate, sync rate, retrigger, amount, amount A, filter switch, its envelope), the pitch envelope, the filter (type, slope, circuit, frequency, resonance, morph, drive, velocity / key, envelope amount, its envelope), the shaper; the wheel range → the channel's pitch range | listed in the report: pan by key / random pan, envelope time by key, LFO rate by key, LFO amount by velocity, LFO and pitch envelope destination B, the MIDI modulation routings, Osc < Vel, legacy filter mode; laws and their evidence: `docs/analise/REA_rodada190hs.md` |
+| Wavetable (`InstrumentVector`) | Helix, LYNX's own wavetable synth (round 190ja, `core/WavetableSynth.h`, `core/AlsDevicesWt.cpp`) | every Wavetable value as Live stores it (`Voice_…` parameters: both oscillators with position, effect mode and its two values, transpose, detune, pan, gain; the sub; both filters with type, circuit, slope, frequency, resonance, drive, morph; routing; the amp envelope and envelopes 2 / 3 with times, slopes, values, loop mode; both LFOs; time, global mod amount, unison mode / voices / amount, transpose, glide, volume, mono / poly, voices, HiQ) and the 52 × 13 modulation matrix (`ModulationConnections`, rows by position, their `TargetName` follows the effect modes); `SpriteName1/2` → the closest LYNX table (Live's tables are Live's content: never read; the pairs come from black-box renders, `core/WavetableMatch.inc`); Pitch ← Pitch Bend → the channel's pitch range. Export: the same values back into a Wavetable device (skeleton from Live 12.4's default Wavetable preset, `tools/als_skeleton_add.py`), the LYNX table names in the device's info text | listed in the report: each oscillator's table pair (Live's name → LYNX's, "its frames differ"), user wave tables (`UserSprite`), HiQ, a non-integer bend range; laws and their evidence: `docs/analise/REA_rodada190ja.md` |
 | Drift (`Drift`) | the built-in synth | oscillator 1 / 2 types → nearest waves, transposes, detune, levels, noise; filter I / II (12 dB / 24 dB ladder), frequency, resonance, key tracking; envelope 1 (amp ADSR); voice mode mono; glide; volume | the pair (fitted), shape, high pass, envelope 2 / LFO / cycling envelope / matrix, drift, stereo / unison voices |
 
 **Envelopes (arrangement automation).** Before lot 3 only envelopes on mixer, tempo, sends and the parameters of converted
@@ -433,7 +434,7 @@ labels read as plain strings from Live's engine binary were used.
 - **Drift.** `Global_VoiceMode` 3 = Unison (menu: Poly, Mono, Stereo, Unison); 2 and 3 listed.
 - **Drum Buss.** As in the §18 table; the laws and their fits are in `AlsDevices.h` (`namespace drumbuss`).
 - **Unchanged and pinned by tests:** EQ Three (flat within 0.31 dB, Slope 0 / 1 = 24 / 48 dB/oct, kills, gains,
-  FlatResponse has no effect), Operator's waves 0 / 21 / 22 and algorithm 10, Drift's oscillator maps, filter slopes and
+  FlatResponse has no effect), Drift's oscillator maps (Operator: round 190hs, Tetra), filter slopes and
   envelope 1.
 
 ## 20. Drum Racks in and out (round 190ec, 2026-11-12) [DATA]
@@ -630,3 +631,141 @@ Before → after per case (the rack against the engine, same stimuli, same metri
   ramps are straight in different units a volume ramp is cut into pieces both ways until the gain agrees within 0.05 dB
   (above −60 dB). **Track Panning law:** constant power with +3 dB at the sides, L = √2·cos((p+1)·π/4),
   R = √2·sin((p+1)·π/4) — the same as LYNX's voice pan, so the pan lane maps one to one.
+
+## 26. Rack presets (.adg) in and out, and Group / Ungroup of an instrument (round 190hr) [DATA, SCHEMA]
+- **A rack preset keeps its chains apart from the rack device.** Every one of the 1,071 `.adg` files of Live 12.4's Core
+  Library (Instrument 814, Audio Effect 148, Drum 90, MIDI Effect 19; `MinorVersion 12.0_12402`) holds
+  `GroupDevicePreset{OverwriteProtectionNumber (3077), Device (the rack element: its Branches and ReturnBranches lists
+  EMPTY), PresetRef, BranchPresets, ReturnBranchPresets}` [SCHEMA lines 2760-2766]. Each chain is a `<Kind>BranchPreset`
+  {`Name` (a plain string), `IsSoloed`, `DevicePresets` (one `AbletonDevicePreset{OverwriteProtectionNumber, Device,
+  PresetRef}` per device; a nested rack is a `GroupDevicePreset` in turn), `MixerPreset` (an AbletonDevicePreset whose
+  Device is `AudioBranchMixerDevice` — `MidiBranchMixerDevice` in a MIDI Effect Rack — with the same members as a set's
+  branch `MixerDevice`), `BranchSelectorRange`, `SessionViewBranchWidth`, `DocumentColorIndex` (the set's `Color`),
+  `AutoColored`, `AutoColorScheme`, `SourceContext`, and `ZoneSettings`} [SCHEMA 241-252, 1860-1872, 2915-2927,
+  4611-4623]. Instrument and MIDI Effect chains: `ZoneSettings{KeyRange, VelocityRange}`; a Drum Rack pad:
+  `ZoneSettings{ReceivingNote, SendingNote, ChokeGroup}` (a set's `BranchInfo`). A Drum Rack's return chains are
+  `AudioEffectBranchPreset`s in `ReturnBranchPresets`; a pad playing into one routes to
+  `AudioOut/RELATIVE/DeviceIn.PARENT.R<k>,ChainIn` (a set: `AudioOut/Track.<id>/DeviceIn.<n>.R<k>,ChainIn`).
+- Ids: every `Pointee`, `AutomationTarget`, `ModulationTarget` Id in a preset is 0 (Live numbers them when it loads the
+  preset). `PresetRef` is a slot (`Slot<PresetRef>`): Live writes a `FilePresetRef` / `AbletonDefaultPresetRef` to the
+  file it came from; LYNX writes it empty, as `SourceContext` is written empty in Live's own branch presets.
+- **Import (fix):** the round-190fm reader took the chains from `Device/…/Branches`, which is always empty in a preset,
+  so every Live `.adg` opened as a rack without chains. LYNX now rewrites the preset into a set's form (Branches filled
+  from BranchPresets, ZoneSettings → BranchInfo on a pad, MixerPreset → MixerDevice, nested GroupDevicePresets in turn)
+  and reads it with the set reader. Test: every Core Library Audio Effect Rack and a sample of 120 Instrument / Drum Racks
+  open with as many chains as they have BranchPresets.
+- **Instrument presets** (`importLiveInstrumentPreset`): an instrument `.adv` (Simpler, Sampler, Operator, Drift, a VST
+  instrument) or an Instrument / Drum Rack `.adg` becomes a channel's instrument through the set's translators. Dropped on
+  the Device View's instrument it replaces it (as a plugin dropped there); elsewhere it makes a channel; into an
+  Instrument Rack's chain it is the chain's instrument. MIDI Effect Rack presets and Live's MIDI effects are refused:
+  LYNX plays them only by writing them into a set's notes, with no live device (left out, listed in the handoff).
+- **Export** (`exportLiveRackPreset`, the rack's Save Preset button, the Device View's Save preset): the rack as a set
+  export writes it (§14, §18, §20), then rewritten into the preset form above, ids 0, root `MinorVersion 12.0_12402`,
+  gzip. LYNX's own built-in devices have no Live device yet and are listed after saving (as in a set export).
+- **[LIVE] Live 12.4.16 check (2026-11-15, round 190hr, files opened through Live's own `.adg` open command):** Live's
+  Smokey Water.adg (control) loads; LYNX-written Audio Effect Racks (two chains, zones, a chain-volume macro shown as
+  "Chain Volume", nested racks), an Instrument Rack (two key-split chains, a "Chain Selector" macro), a MIDI Effect Rack
+  and a Drum Rack (a "Kick" pad on C1, a return chain) load. **Every LYNX-written `.adg` holding a VST3 plugin device
+  (kHs Gain, no saved state) made Live close** ("A serious program error", EXCEPTION_ACCESS_VIOLATION in Log.txt), at the
+  top level as in a nested rack. Plugins are therefore left out of rack presets and listed; whether a plugin with a
+  state Live saved itself loads is an open live check.
+- **Group / Ungroup of an instrument** (racks-061 / -062; Live's Group on an instrument makes an Instrument Rack
+  [STR u16 2524-2531 "Group", "Ungroup"; manual]): Ctrl+G on the Device View's instrument (or its menu) moves the
+  channel's instrument into an Instrument Rack's single chain (Patcherize, then the rack): the channel keeps its volume,
+  pan, insert, arpeggiator and Misc settings; its automated plugin parameters become macros 1-16 at their current values,
+  so the sound and the automation stay (null test). Ctrl+Shift+G ungroups a one-chain Instrument Rack whose chain starts
+  with its instrument: the instrument returns to the channel and the audio effects after it go to the front of the
+  channel's mixer insert (refused when the channel plays into Master or the insert has no room).
+
+## 27. Envelopes as Live plays them, video clips and take lanes (round als190ka, issue #193, 2026-11-17) [LIVE]
+Probe sets built from Live's default template (`/mnt/e/lynx-work/als190ka/s/tools/a1.py`, `a2.py`), opened and saved by
+Live 12.4.16 Trial, every track exported on its own (1 kHz sine, 48 kHz, 32-bit float). Renders and Live's own save:
+`/mnt/e/lynx-work/als190ka/renders/`, `sets/a1-live Project/a1-live.als`.
+- **Interpolation.** Live moves a parameter in a straight line along its *normalised* travel, not in the stored value.
+  For the mixer that is the fader: track volume dB = 40·p − 34 for p ≥ 0.4 (0 dB at 0.85, +6 at 1), a measured curve
+  below (−18 dB at 0.4 … −65.5 dB at 0.0125, silence at 0); a send is the same fader 6 dB lower (0 dB at the top); a
+  return's volume is a track volume. Table and inverse: `core/LiveFader.h`. Utility's Gain and EQ Eight's band gain move
+  straight in dB, EQ Eight's frequency in log frequency (a 100 Hz → 10 kHz ramp passes 1 kHz at the middle).
+- **Curves.** `CurveControl1X/1Y/2X/2Y` on an event bend the segment that **starts** there: a cubic Bézier from (0, 0) to
+  (1, 1) in the segment's normalised time and travel (for the fader: its position). Live writes only the controls that
+  are not 0.5 (a missing one is 0.5): (0.5, 0, 1, 0.5) was saved as `CurveControl1Y="0" CurveControl2X="1"`. The model
+  matches the renders within 0.09 dB.
+- **Jumps** are two events at one time, the value before first (Ids are not in time order).
+- **One-event envelopes win over Manual.** Live's default set holds Tempo/Manual 100 under a tempo envelope whose only event is
+  120. Live plays 120.
+- **Track Volume clip envelope** (Mixer/Volume/ModulationTarget, warped clip): with the fader at 0 dB, m plays
+  −17·(1 − m) dB (m = 1 … 0: 0, −1.7, −4.2, −8.5, −12.7, −15.3, −17.0 dB), i.e. the fader at (1 + m)/2 of its position.
+- **Video clips** are ordinary arrangement `AudioClip`s whose `SampleRef` is the video file. Unwarped: `Loop/LoopStart`
+  and `LoopEnd` are seconds of the file; Live wrote the warp marker `SecTime="5" BeatTime="0"` for a clip starting 5 s into
+  the file. The render plays file seconds 5…9 from 2.0 s (beat 4 at 120 BPM).
+- **Take lanes**: `TakeLanes/TakeLanes/TakeLane{Name, ClipAutomation/Events/(AudioClip|MidiClip)}`; the track's own
+  arrangement clips are the main lane (what plays).
+
+LYNX (`AlsImport.cpp`): gains are cut into straight pieces within 0.1 dB of Live's fader curve. A bent segment
+of any other parameter follows the Bézier in the target's 0…1, within 0.3 %. Bool and enum envelopes are steps: a device's
+On becomes its slot's mix, 0 when off (Live's bypass passes the dry signal). The track's Speaker is listed, since LYNX's
+mute is not automated. A send at −inf with an envelope gets its route. Main track devices go to the Master. A one-event
+envelope sets the tempo or the mixer control. Video clips go to a video track with Live's trim (start, file offset,
+length in song seconds), and the sound stays an audio clip that the sample library decodes from the video. Take lanes
+become muted lanes folded under the track, which becomes the comp track (core/Comping.h). The export writes send
+envelopes and cuts LYNX's curves into pieces that Live's fader reproduces within 0.1 dB.
+
+## 28. Live's still-dropped devices, lot 5 (round 190kk, 2026-11-17) [LIVE renders, DATA]
+Probe sets rendered in Live 12.4.16 Trial (k1: 151 tracks, k3: 34 tracks; the round's folder `/mnt/e/lynx-work/livedev190kk`,
+`RESULTS.md` holds every law). Clean-room: renders and saved sets only. Code: `core/AlsDevicesLot5.cpp`, engines
+`core/Corrode.h`, `core/Platter.h`, `core/Soundboard.h` (wrappers `core/LiveFxSuite.inc`).
+
+| Live device (tag) | LYNX | Quality gate on Live's renders (rms dB of the metric differences: before = device dropped → after) |
+|---|---|---|
+| Erosion2 (Live 12), Erosion (legacy: Mode 0 noise, 1 wide noise, 2 sine) | Corrode (new engine) | 32 cases 23.98 → 0.42, none worse |
+| Vinyl (Vinyl Distortion) | Platter (new engine) | 60 cases 21.49 → 2.42, none worse (Drive 0 = bit-exact pass) |
+| Corpus | Soundboard (new engine) | 62 cases 17.89 → 8.95, none worse; a pipe / tube with Opening < 95 % stays dropped (it scored worse) |
+| Looper | an empty Edison (Monitor 0 / 3) or a muted Utility (Monitor 1 / 2) | 5 cases bit-exact (no set saves a loop) |
+| MidiEffectGroupDevice | one plain chain: its devices as on the track (Arpeggiator → the channel's); else chains, zones, selector, macros written into the notes | not rendered (Live crashed on every generated MIDI rack); core/Rack.h's measured zone laws |
+
+Members read: Erosion2 Amount / Frequency / FilterWidth / NoiseBlend / StereoWidth; Erosion Mode / Freq / Amplitude / BandQ;
+Vinyl Band1On / Gain1 / BandFreq1 / BandQ1 (Tracing), Band2On / Gain2 / BandFreq2 / BandQ2 (Pinch), Drive, SoftHard,
+NormalMono (Tracing's sign on the right channel), CracleDensity / CracleVolume; Corpus ResonanceType (0 beam … 6 tube),
+ResonatorQuality, Frequency (0…1), Decay, FreqDamping (Material), AmpFreq (Brightness), Inharmonics, Radius, TubeOpening,
+Ratio, ExcitationX, ListeningXL / XR, Detune (Spread), Drive (Gain), Bleed, DryWet, StereoWidth, FilterOn / FilterMidFreq /
+FilterBandWidth (LFO, MIDI frequency / gate listed); Looper Monitor / State (the rest listed). Every mapped member is a
+ParamLink (automation, rack macros).
+MIDI Effect Racks: Branches/MidiEffectBranch {DeviceChain/MidiToMidiDeviceChain/Devices, BranchSelectorRange,
+ZoneSettings/KeyRange + VelocityRange (Min, Max, CrossfadeMin, CrossfadeMax), MixerDevice/Speaker}, ChainSelector,
+MacroControls.k; a parameter mapped to a macro carries KeyMidi (Channel 16, NoteOrController = k) and its range in
+MidiControllerRange (linear).
+
+## 29. Live's still-dropped devices, lot 6: Meld, Spectral Time, Spectral Resonator (round 190ko, 2026-11-17) [LIVE renders, DATA]
+Probe sets rendered in Live 12.4 Trial (the round's folder `/mnt/e/lynx-work/meld190ko`: m1 laws, m2 the 84 Core Library
+Meld presets, s1 the spectral laws; 190kk's k1 holds the 14 shipped spectral presets on a drum loop). Clean-room: renders,
+saved sets and Live's own menus as shown in its GUI. Code: `core/AlsDevicesLot6.cpp`; engines `core/Braid.h` (+ .cpp,
+`BraidParams.cpp`), `core/Timeprism.h`, `core/Harmonia.h` on `core/SpectralCore.h` (wrappers `core/LiveFxSuite.inc`).
+Laws and scores: `docs/analise/REA_rodada190ko.md`.
+
+| Live device (tag) | LYNX | how |
+|---|---|---|
+| InstrumentMeld (Meld) | Braid (new instrument) | every member copied in Meld's units (Braid keeps them); ModulationConnections → the 50 × 19 matrix |
+| Spectral (Spectral Time) | Timeprism (new effect) | every member a ParamLink |
+| Transmute (Spectral Resonator) | Harmonia (new effect) | every member a ParamLink; Freq read as Hz or as a note by FrequencyDialMode |
+
+Meld [DATA: Defaults/Instruments/Meld.adv and 142 Meld devices in the Core Library]: per engine
+`MeldVoice_Engine{A,B}_` + On; Oscillator_{OscillatorType 0…24, Macro1, Macro2, UseScale, Reset, ResetToVoiceOffset};
+Oscillator_Pitch_{Keytracking, Transpose ±12, TransposeScaleDegrees ±48, TransposeOctaves ±3, Detune ±0.5}; Filter_{On,
+FilterType 0…16, Frequency 20…20480 Hz, Macro1, Macro2, UseScale}; Lfo1_{GeneratorType 0…5, Sync, Retrigger, Rate
+0.01…200 Hz, SyncedRate 0…21, PhaseOffset 0…360, GeneratorMacro1/2, Transformer1Type / Transformer2Type 0…18 +
+Macro}; Lfo2_{Waveform 0…5, Sync, Rate, SyncedRate, Retrigger, PhaseOffset}; AmpEnvelope_{Times_Attack 0…40 s / Decay /
+Release, Slopes_*, Sustain, LoopMode 0…3}; FilterEnvelope_ (the modulation envelope: also Values_Initial / Peak /
+Sustain / Final); ToneFilter ±1, Pan, Volume −50…24 dB, GlideMode, GlideTime 0…20 s. Global: MeldVoice_{EngineBDelay,
+Drive, LimiterOn, LinkAmpEnvelopes, UseScale, VoiceSpreadAmount, LegacyEnvLoopBehaviour}, Volume (linear, 0…2), MonoPoly,
+MonoLegato, PolyVoices, UnisonVoices (stacked voices). ModulationConnections holds 50 ModulationConnectionsForMeld rows
+(TargetName "A Detune" … "B Volume", the same order in every set) with ModulationAmounts.0…18 (−1…1).
+Spectral Time: Freezer_{On, FreezeOn, AvoidFreezingOnsets, SyncIntervalUnits, SyncIntervalBeats 0…21,
+SyncIntervalSeconds 0.02…10, MainMode (0 manual, 1 retrigger), RetriggerMode (0 onsets, 1 sync), FadeType,
+FadeIn 0.002…10 s, CrossfadePercent, FadeOut 0.02…10 s, Sensitivity}, Delay_{On, TimeSeconds 0.01…3, TimeUnit 0…4,
+TimeSixteenths 1…16, TimeDivisions 0…21, Feedback, Tilt ±2, Spray 0…0.4 s, Mask ±1, StereoSpread, FrequencyShift
+±400 Hz, DryWet}, InputSendGain, Resolution, DryWet, ZeroLatencyDry, ProcessingOrder.
+Spectral Resonator: MidiPitch_{MidiGate, MonoPolyMode, Polyphony, Transpose, TransposeScaleDegrees, PitchBendRange, Glide},
+PartialFrequencies_{FrequencyDialMode, FrequencyHz 8.2…2000, FrequencyNote 0…96, Shift ±48 st, PartialStretch ±1,
+QuantizeToScaleOrTuning}, DecayDamping_{DecayTime 0.001…20 s, HighFreqDamp, LowFreqDamp}, Modulation_{ModMode 0…3,
+ModRate, PitchModAmount 0…4 st}, Global_{PitchMode, NumHarmonics 1…256, Unison 0…3, UnisonAmount, InputSend ±24 dB,
+DryWet, UseScale}, MidiSideChain (the MIDI pitch source; listed, not applied).

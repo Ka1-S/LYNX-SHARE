@@ -1,4 +1,5 @@
 #include "core/FolderWatcher.h"
+#include "platform/CvWait.h"
 
 #include <algorithm>
 #include <chrono>
@@ -257,7 +258,7 @@ struct Watcher::Impl
         // the poll: sleep (woken early by stop), then compare the folders' times
         {
             std::unique_lock<std::mutex> l (lock);
-            wake.wait_for (l, std::chrono::milliseconds (std::max (1, std::min (ms, options.pollMs))), [this] { return stopping.load(); });
+            cvwait::waitFor (wake, l, std::chrono::milliseconds (std::max (1, std::min (ms, options.pollMs))), [this] { return stopping.load(); }); // (round 190la: platform/CvWait.h)
         }
         if (stopping)
             return false;

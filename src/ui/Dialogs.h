@@ -32,6 +32,11 @@ std::unique_ptr<juce::AlertWindow> makeMidiImportDialog();
 // `onDone(name, colour)` runs when the user confirms (colour 0 = automatic / theme default).
 void showNameAndColourDialog (const juce::String& title, const juce::String& name, std::uint32_t colour,
                               std::function<void (const juce::String&, std::uint32_t)> onDone);
+// FL's "Rename, color and icon" (issue #220, round 190ng; FL's name dialog has an Icon button, F5): the same window with
+// LYNX's icon picker and its search box under the colours. `icon` is FL's index (0 = none); `onDone(name, colour, icon)`.
+// `focusIcons`: the icon search box takes the keys first (the F3 key of the Playlist, Mixer and Channel rack).
+void showNameColourIconDialog (const juce::String& title, const juce::String& name, std::uint32_t colour, int icon,
+                               std::function<void (const juce::String&, std::uint32_t, int)> onDone, bool focusIcons = false);
 
 // FL's "Gradient editor" (mixer "Gradient color...", REA_rodada177a §5): First and Last swatches with the blend over
 // `count` tracks, copy / swap buttons and LYNX's colour picker for the swatch being edited. Accept gives the two colours;
@@ -61,8 +66,16 @@ struct FlMessage
     juce::String title, text;
     juce::StringArray buttons;
     bool rememberBox = false;
+    // round 190jv (REA FUN_009654f0, FL's flags 0x2000000 | 0x4000000): exclusive choices ticked like FL's checkboxes
+    // under the text, `option` ticked first ("Remove unused tracks": "Unlinked tracks only" | "Unlinked and non-empty
+    // tracks"); FL's MB_ICONEXCLAMATION boxes show the warning icon
+    juce::StringArray options;
+    int option = 0;
+    juce::MessageBoxIconType icon = juce::MessageBoxIconType::QuestionIcon;
 };
 void showFlMessage (const FlMessage& message, std::function<void (int, bool)> onChoice);
+// The same window with `options`: `onChoice(button, option)` gets the ticked choice (0, 1, ...).
+void showFlOptions (const FlMessage& message, std::function<void (int, int)> onChoice);
 std::unique_ptr<juce::AlertWindow> makeFlMessageDialog (const FlMessage& message);
 
 // FL's remembered message choices (Settings › General › Hints and warnings › "Manage messages", REA round 186c: the
@@ -86,5 +99,7 @@ juce::PopupMenu manageMenu();                     // FL's "Manage messages" menu
 } // namespace messages
 
 // The dialog itself, for --snapshot mode.
-std::unique_ptr<juce::AlertWindow> makeNameAndColourDialog (const juce::String& title, const juce::String& name, std::uint32_t colour);
+std::unique_ptr<juce::AlertWindow> makeNameAndColourDialog (const juce::String& title, const juce::String& name, std::uint32_t colour, int icon = -1);
+namespace ui { class TrackIconPicker; }
+ui::TrackIconPicker* iconPickerOfNameDialog (juce::AlertWindow& dialog); // (the --snapshot / test routes)
 } // namespace lynx

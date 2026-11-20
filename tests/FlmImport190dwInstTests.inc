@@ -233,9 +233,9 @@ TEST (flm190dw_cc_and_aftertouch_lanes)
            && report.converted.count ("FL Studio Mobile: mod-wheel automation on instruments that ignore the wheel (nothing to play)") == 1);
     CHECK (report.converted.count ("FL Studio Mobile: Aftertouch automation (no FL Studio Mobile instrument responds to it)") == 1);
     CHECK (report.converted.count ("FL Studio Mobile: MIDI CC automation without a linked parameter (no effect in FL Studio Mobile)") == 1);
-    CHECK (report.unsupported.count ("FL Studio Mobile: sustain pedal automation (not imported)") == 1);
-    CHECK (report.unsupported.count ("FL Studio Mobile: MIDI CC automation (not imported)") == 0
-           && report.unsupported.count ("FL Studio Mobile: Pitch Bend/Aftertouch automation (not imported)") == 0);
+    CHECK (report.notReproduced.count ("FL Studio Mobile: sustain pedal automation (not imported)") == 1);
+    CHECK (report.notReproduced.count ("FL Studio Mobile: MIDI CC automation (not imported)") == 0
+           && report.notReproduced.count ("FL Studio Mobile: Pitch Bend/Aftertouch automation (not imported)") == 0);
     CHECK (report.converted.count ("FL Studio Mobile: Level automation") == 1 && report.converted.count ("FL Studio Mobile: Pan automation") == 1);
 }
 

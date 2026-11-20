@@ -26,6 +26,15 @@ constexpr int luxeVerbParamCount = luxeVerbControlCount + 4; // + sync of predel
 constexpr int luxeVerbSpaceFirst = luxeVerbParamCount;
 constexpr int luxeVerbSpaceCount = 15;
 constexpr int luxeVerbAllParamCount = luxeVerbSpaceFirst + luxeVerbSpaceCount;
+// round 190it, hidden (not in the info: no control, no text; saved while non-zero; 0 by default, so every project saved
+// before plays as it did): the Space engine's ducking, 0 … 1 = the reference's 0 … 48 dB, set by the Pro-R 2 translator
+constexpr int luxeVerbSpaceDucking = luxeVerbAllParamCount;
+// round 190kw, hidden (saved while non-zero): the Space engine's revision. 1 = the Pro-R 2 laws recovered by static
+// analysis (true stereo, the width matrix / rotation, line lengths, level and brightness laws: core/SpaceVerb.h); a new
+// LuxeVerb and a translated Pro-R 2 state get 1, a project or preset saved before keeps 0 (bit for bit as before)
+constexpr int luxeVerbSpaceRevision = luxeVerbSpaceDucking + 1;
+// round 190kw, hidden: Stereo Width past 100 % (the reference's knob runs to 120 %): 0 … 1 = +0 … +20 %, revision 1 only
+constexpr int luxeVerbSpaceWidthExt = luxeVerbSpaceDucking + 2;
 
 std::unique_ptr<Effect> makeLuxeVerb();
 

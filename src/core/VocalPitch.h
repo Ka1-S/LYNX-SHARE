@@ -116,6 +116,8 @@ private:
     int sinceVoiced = 1 << 20, guardMemory = 16; // estimates since then; the guard remembers it this long
     std::array<Biquad, 2> lp {};
     std::vector<float> full, deci, diff;
+    std::vector<float> lin;     // round 190li: a linear copy of the analysed span (maxFull)
+    std::vector<double> sums;   // round 190li: the difference function's sums per lag
     PitchEstimate est;
 };
 
@@ -163,6 +165,10 @@ public:
     // Round 190dp: unvoiced grains follow the formant factor (the noise / breath / out-of-range path of a voice
     // shifter: they move with the formants instead of passing through). Off by default (LYNX Tune keeps its path).
     void setUnvoicedShift (bool on) noexcept { unvoicedShift = on; }
+    // Round 190ho: while on, the unvoiced marks placed are read unshifted even with setUnvoicedShift (a voice shifter
+    // turns it on from a sung onset's first rise in level until its detector has decided: the start of the note itself
+    // is then not read at the formant factor). Off by default; LYNX Tune never uses it.
+    void setUnvoicedPlain (bool on) noexcept { unvoicedPlain = on; }
     // Marks are placed this many samples behind the newest input (the centre of the pitch detector's window, so the
     // period and shift given with setPitch / setShift describe the signal where the mark lies). Clamped so that the
     // grains stay within the latency.
@@ -187,7 +193,7 @@ private:
     double nextSynth = 0.0;      // next synthesis mark (absolute, output timeline = input timeline)
     double lastMark = 0.0;       // the last voiced mark placed (absolute; 0 = none): the next one correlates with it
     double period = 0.0, ratio = 1.0, formant = 1.0;
-    bool voiced = false, peakAlign = true, lastVoiced = false, unvoicedShift = false;
+    bool voiced = false, peakAlign = true, lastVoiced = false, unvoicedShift = false, unvoicedPlain = false;
     static constexpr double unvoicedTaper = 0.6;       // round 190dp: the share of the hop a shifted unvoiced grain crossfades over
     static constexpr double unvoicedShiftHopMs = 9.5;  // round 190dp: the shifted unvoiced grains' hop (ms)
     float normalise = 0.0f;
@@ -195,7 +201,10 @@ private:
     int markHead = 0, markCount = 0;
     std::vector<float> in[2], acc[2], env; // input history, output accumulators, a low-passed copy for peak search
     std::vector<float> wsum;               // round 165j: the summed grain windows per output sample
+    std::vector<float> markLin;            // round 190li: a linear copy of the low-passed input around a mark's candidates
+    std::vector<double> markScore;         // round 190li: the candidates' correlations
     float envZ = 0.0f;
+    float envCoef = 0.0f; // round 190li: the 900 Hz low-pass's coefficient (prepare())
 };
 // ---------------------------------------------------------------------------------------------------------------------
 // Breath noise (round 190bb, LYNX Tune's Breathiness; issue #103). Aspiration noise for a voice, written from textbook

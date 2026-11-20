@@ -17,6 +17,7 @@
 #include "ui/AutomationUi.h"
 #include "ui/Dialogs.h"
 #include "ui/MidiClipboard.h"
+#include "ui/MotionOverlay.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 #include "ui/ToolWindow.h"
@@ -154,6 +155,7 @@ public:
         setSize (980, 400);
         targetChanged();
         setWantsKeyboardFocus (true);
+        gpuPlayhead.onHidden = [this] { repaint(); }; // (round 190ip: the overlay hid itself: the line is painted again)
         startTimerHz (30);
     }
 
@@ -280,11 +282,8 @@ public:
         g.restoreState();
 
         // playback position
-        if (playhead >= 0.0)
-        {
-            g.setColour (colour::playhead);
-            g.drawVerticalLine ((int) tickToX (playhead), (float) area.getY() - rulerHeight, (float) area.getBottom());
-        }
+        if (playhead >= 0.0 && ! gpuPlayhead.isShowing()) // (round 190ip: the GPU moves it while playing)
+            paintPlayheadAt (g, (float) tickToX (playhead));
 
         // value read-out under the mouse
         if (hoverValue >= 0.0f)
@@ -1026,9 +1025,34 @@ private:
         if (tick != playhead)
         {
             playhead = tick;
-            repaint();
+            // round 190ip: while playing the GPU moves the line (the editor is not painted again 30 times a second);
+            // the frame that starts or ends, and whenever the overlay cannot, the editor is painted as before
+            const auto gpu = ui::stepMark (gpuPlayhead, tick >= 0.0 && isShowing(), playheadMark(), false);
+            if (! gpu.onOverlay || gpu.flipped)
+                repaint();
         }
     }
+
+    void paintPlayheadAt (juce::Graphics& g, float x)
+    {
+        const auto area = plotArea();
+        g.setColour (theme::colour::playhead);
+        g.drawVerticalLine ((int) x, (float) area.getY() - rulerHeight, (float) area.getBottom());
+    }
+
+    ui::MotionOverlay::Mark playheadMark() const
+    {
+        const auto area = plotArea();
+        ui::MotionOverlay::Mark m;
+        m.x = (float) tickToX (playhead);
+        m.extent = juce::Rectangle<int>::leftTopRightBottom (-2, area.getY() - rulerHeight, 2, area.getBottom());
+        m.clip = getLocalBounds();
+        m.look = ((std::uint64_t) (std::uint32_t) theme::colour::playhead.getARGB() << 32) ^ ((std::uint64_t) (std::uint32_t) area.getY() << 16)
+                 ^ (std::uint64_t) (std::uint32_t) area.getBottom();
+        return m;
+    }
+
+    ui::MotionOverlay gpuPlayhead { *this, [this] (juce::Graphics& g, float x) { paintPlayheadAt (g, x); } };
 
     AudioEngine& engine;
     AutomationTarget target;

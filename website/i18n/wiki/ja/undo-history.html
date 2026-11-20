@@ -3,15 +3,15 @@
 <h2 id="go-back-to-an-earlier-step">前のステップに戻る</h2>
 <ol><li><code>編集 › 元に戻す履歴...</code> を選ぶか、<code>Ctrl+Alt+H</code> を押します。</li><li>一覧には、新しいステップが下になるように並びます。最初の行 <code>開始</code> は、プロジェクトを開いたときの状態です。</li><li>ステップをクリックします。プロジェクトはそのステップの直後の状態に戻り、それより後のステップはグレーになります。</li><li>グレーのステップをクリックすると、また先へ進みます。</li><li>新しい編集をすると、選んだステップから続けられます。このとき、グレーのステップは消えます。</li></ol>
 <h2 id="the-undo-keys">元に戻すキー</h2>
-<p><code>Ctrl+Z</code> は、多くのプログラムとは動作が異なります。最後のステップを元に戻し、もう一度押すとやり直すので、直近の2つの状態を行き来します。さらにさかのぼるには、<code>Ctrl+Alt+Z</code> を使います。</p>
-<div class="tablewrap"><table><thead><tr><th>コマンド</th><th>キー</th><th>働き</th></tr></thead><tbody><tr><td><code>元に戻す</code></td><td><code>Ctrl+Z</code></td><td>最後のステップを元に戻します。元に戻した後は、次のステップをやり直し、メニュー項目は <code>元に戻す (やり直し)</code> になります</td></tr><tr><td><code>さかのぼって元に戻す</code></td><td><code>Ctrl+Alt+Z</code></td><td>常に戻ります。1回押すごとに1ステップです</td></tr><tr><td><code>やり直し</code></td><td><code>Ctrl+Y</code> または <code>Ctrl+Shift+Z</code></td><td>先へ進みます</td></tr><tr><td><code>元に戻す履歴...</code></td><td><code>Ctrl+Alt+H</code></td><td>一覧を開きます</td></tr></tbody></table></div>
-<p>元に戻す、またはやり直すたびに、ヒントバーにステップの名前とレベルが表示されます。たとえば <code>Level 2/3</code> です。</p>
-<p>従来の動作がよければ、<code>オプション › 全般設定...</code> で <code>代替の元に戻すモード (同じショートカットで元に戻す/やり直しではなく、従来の元に戻す)</code> をオンにします。すると <code>Ctrl+Z</code> は、常に1つ戻ります。</p>
+<p><code>Ctrl+Z</code> は、FL Studio 2026 や多くのプログラムと同じく、押すたびに履歴を1ステップずつさかのぼります。<code>Ctrl+Y</code> または <code>Ctrl+Shift+Z</code> で先へ進みます。</p>
+<div class="tablewrap"><table><thead><tr><th>コマンド</th><th>キー</th><th>働き</th></tr></thead><tbody><tr><td><code>元に戻す</code></td><td><code>Ctrl+Z</code></td><td>1回押すごとに1ステップ戻ります</td></tr><tr><td><code>やり直し</code></td><td><code>Ctrl+Y</code> または <code>Ctrl+Shift+Z</code></td><td>先へ進みます</td></tr><tr><td><code>元に戻す履歴...</code></td><td><code>Ctrl+Alt+H</code></td><td>一覧を開きます</td></tr></tbody></table></div>
+<p><code>編集</code> メニューには、各項目が対象とするステップの名前が表示されます。たとえば <code>Undo Add notes: Pattern 1</code> です。元に戻す、またはやり直すたびに、ヒントバーにステップの名前とレベルが表示されます。たとえば <code>Level 2/3</code> です。</p>
+<p>FL Studio のもう1つの元に戻すモードも使えます。<code>オプション › 全般設定...</code> で <code>代替の元に戻すモード</code> をオフにします。すると <code>Ctrl+Z</code> は最後のステップを元に戻し、もう一度押すとやり直すので、直近の2つの状態を行き来します。<code>Ctrl+Alt+Z</code> (<code>さかのぼって元に戻す</code>) でさらにさかのぼり、<code>Ctrl+Y</code> または <code>Ctrl+Shift+Z</code> で引き続きやり直せます。</p>
 <h2 id="what-is-a-step-and-what-is-not">ステップになるものとならないもの</h2>
 <ul><li>プロジェクトへの編集はステップになります。ノート、パターン、クリップ、チャンネル、ミキサーのレベルとルーティング、エフェクト、オートメーション、テンポ、ミュートです。</li><li>録音は1ステップです。<a href="/wiki/online-sessions/">オンラインセッション</a>でのパートの統合や、<code>これらのテイクでコンプを作成</code> も同じです。</li><li>プロジェクトを変えないものはステップになりません。ズーム、スクロール、ウィンドウの移動、プログラム自体の設定です。</li><li>保存とエクスポートは元に戻りません。書き出されたファイルはそのまま残ります。</li><li>LYNX SHARE独自のプラグインウィンドウには、AとBの設定の隣に、そのプラグインの変更用の、別の元に戻す/やり直しがあります。</li></ul>
 <h2 id="settings">設定</h2>
 <p>どちらも <code>オプション › 全般設定...</code> にあります。</p>
-<div class="tablewrap"><table><thead><tr><th>設定</th><th>働き</th></tr></thead><tbody><tr><td><code>元に戻すの最大回数</code></td><td>保持するステップ数: 25、50、100、200、500、1000。既定は100です</td></tr><tr><td><code>代替の元に戻すモード</code></td><td><code>Ctrl+Z</code> を従来の元に戻すにします</td></tr></tbody></table></div>
+<div class="tablewrap"><table><thead><tr><th>設定</th><th>働き</th></tr></thead><tbody><tr><td><code>元に戻すの最大回数</code></td><td>保持するステップ数: 25、50、100、200、500、1000。既定は100です</td></tr><tr><td><code>代替の元に戻すモード</code></td><td>既定でオン: <code>Ctrl+Z</code> で履歴をさかのぼります。オフ: <code>Ctrl+Z</code> が最後のステップの元に戻すとやり直しを切り替えます</td></tr></tbody></table></div>
 <h2 id="backups">バックアップ</h2>
 <p>LYNX SHAREは、既定では2分ごとに、開いているプロジェクトのバックアップコピーを保存し、プロジェクトごとに最新の10個を保持します。バックアップは通常の <code>.lynx</code> ファイルで、設定フォルダー内の <code>autosave</code> フォルダーにあり、プロジェクト名に <code>(autosaved on ...)</code> と日時が付いた名前になります。</p>
 <p>既存のプロジェクトファイルに上書き保存するたびに、置き換えられるバージョンが、名前に <code>(overwritten on ...)</code> が付いた状態で同じフォルダーにコピーされます。</p>

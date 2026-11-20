@@ -1,4 +1,5 @@
 #include "core/FlControlMenus.h"
+#include "core/MixerOps.h"
 #include "core/PlaylistOps.h"
 #include "core/QuickRender.h"
 
@@ -1105,6 +1106,7 @@ int trackFor (const Song& song, const AutomationTarget& target)
             break;
         case AutomationTargetKind::none:
         case AutomationTargetKind::tempo:
+        case AutomationTargetKind::crossfader: // (round 190kc)
             break;
     }
     if (channel >= 0)
@@ -1241,37 +1243,15 @@ namespace lynx::autolink
 {
 namespace
 {
+constexpr int maxTracks = 500;
+
 bool linkedToAnotherTrack (const Song& song, int mixer, int track)
 {
     for (int i = 0; i < (int) song.playlistTracks.size(); ++i)
-        if (i != track && song.playlistTracks[(std::size_t) i].mode != PlaylistTrackMode::unassigned
-            && song.playlistTracks[(std::size_t) i].mixerTrack == mixer)
+        if (i != track && linkedInsertOf (song, i) == mixer)
             return true;
     return false;
 }
-
-bool unassigned (const Song& song, int track)
-{
-    return track >= (int) song.playlistTracks.size() || song.playlistTracks[(std::size_t) track].mode == PlaylistTrackMode::unassigned;
-}
-
-// What a track's clips hold (automation clips don't count)
-struct Content
-{
-    bool audio = false, patterns = false, invalid = false;
-    std::vector<int> audioChannels; // each once
-    std::vector<int> noteChannels;  // the channels the patterns' notes play, each once
-    Plan::Kind kind() const
-    {
-        if (invalid || (audio && patterns))
-            return Plan::Kind::none;
-        if (audio && ! audioChannels.empty())
-            return Plan::Kind::audio;
-        if (patterns && noteChannels.size() == 1)
-            return Plan::Kind::instrument;
-        return Plan::Kind::none;
-    }
-};
 
 void addOnce (std::vector<int>& v, int x)
 {
@@ -1279,35 +1259,29 @@ void addOnce (std::vector<int>& v, int x)
         v.push_back (x);
 }
 
-// every track's content, in one pass (patterns' channels are gathered once per pattern)
-std::vector<Content> contents (const Song& song)
+bool contains (const std::vector<int>& v, int x) { return std::find (v.begin(), v.end(), x) != v.end(); }
+
+// The channels each track plays (audio clips' channels, the notes' channels of its pattern clips; automation clips don't
+// count), tracks 0..499, every clip list in one pass (a pattern's channels are gathered once)
+std::vector<std::vector<int>> channelsByTrack (const Song& song)
 {
-    std::vector<Content> out (500);
+    std::vector<std::vector<int>> out (maxTracks);
     std::vector<std::vector<int>> patternChannels (song.patterns.size());
     std::vector<bool> gathered (song.patterns.size(), false);
     const auto channels = (int) song.channels.size();
     song.forEachClipList ([&] (const std::vector<Clip>& clips) {
         for (const auto& c : clips)
         {
-            if (c.track < 0 || c.track >= 500)
+            if (c.track < 0 || c.track >= maxTracks)
                 continue;
             auto& t = out[(std::size_t) c.track];
             if (c.kind == ClipKind::audio)
             {
-                t.audio = true;
                 if (c.channel >= 0 && c.channel < channels)
-                    addOnce (t.audioChannels, c.channel);
-                else
-                    t.invalid = true;
+                    addOnce (t, c.channel);
             }
-            else if (c.kind == ClipKind::pattern)
+            else if (c.kind == ClipKind::pattern && c.pattern >= 0 && c.pattern < (int) song.patterns.size())
             {
-                t.patterns = true;
-                if (c.pattern < 0 || c.pattern >= (int) song.patterns.size())
-                {
-                    t.invalid = true;
-                    continue;
-                }
                 const auto p = (std::size_t) c.pattern;
                 if (! gathered[p])
                 {
@@ -1317,110 +1291,230 @@ std::vector<Content> contents (const Song& song)
                             addOnce (patternChannels[p], n.channel);
                 }
                 for (const auto ch : patternChannels[p])
-                    addOnce (t.noteChannels, ch);
+                    addOnce (t, ch);
             }
         }
     });
     return out;
 }
 
-Plan planOf (const Song& song, int track, const Content& content)
+std::vector<int> homesFrom (const Song& song, const std::vector<std::vector<int>>& byTrack)
 {
-    Plan plan;
-    if (track < 0 || track >= 500 || ! unassigned (song, track))
-        return plan;
-    const auto inserts = (int) song.mixer.size();
-    const auto usable = [&] (int mixer) {
-        return mixer == 0 || (mixer > 0 && mixer < inserts && ! linkedToAnotherTrack (song, mixer, track) && ! song.session.reservedForOther (true, mixer));
-    };
-    switch (content.kind())
-    {
-        case Plan::Kind::none: return plan;
-        case Plan::Kind::audio:
-        {
-            // every channel through one insert
-            const auto route = song.channels[(std::size_t) content.audioChannels.front()].mixerTrack;
-            for (const auto ch : content.audioChannels)
-                if (song.channels[(std::size_t) ch].mixerTrack != route)
-                    return plan;
-            if (inserts < 2 || ! usable (route))
-                return plan;
-            plan.kind = Plan::Kind::audio;
-            plan.mixer = route;
-            return plan;
-        }
-        case Plan::Kind::instrument:
-        {
-            const auto ch = content.noteChannels.front();
-            if (! trackmodes::canBeInstrumentTrack (song, ch) || ! trackmodes::instrumentTracksOf (song, ch).empty())
-                return plan;
-            const auto route = song.channels[(std::size_t) ch].mixerTrack;
-            if (inserts < 2 || ! usable (route))
-                return plan;
-            plan.kind = Plan::Kind::instrument;
-            plan.mixer = route;
-            plan.channel = ch;
-            return plan;
-        }
-    }
-    return plan;
+    std::vector<int> homes (song.channels.size(), -1);
+    for (int t = 0; t < maxTracks; ++t)
+        for (const auto c : byTrack[(std::size_t) t])
+            if (homes[(std::size_t) c] < 0)
+                homes[(std::size_t) c] = t;
+    return homes;
 }
 
-bool link (Song& song, int track, const Content& content)
+bool validInsert (const Song& song, int m) { return m > 0 && m < (int) song.mixer.size(); }
+
+int routeOf (const Song& song, int channel)
 {
-    const auto plan = planOf (song, track, content);
-    if (plan.kind == Plan::Kind::none)
-        return false;
-    const auto fromMaster = plan.mixer == 0;
-    const auto mixerBefore = song.mixer.size();
-    const auto mixer = fromMaster ? insertForTrack (song, track) : plan.mixer;
-    if (mixer <= 0 || ! trackmodes::canLinkToMixerTrack (song, track, mixer))
-    {
-        if (song.mixer.size() > mixerBefore) // (inserts added for nothing go again)
-            song.mixer.resize (mixerBefore);
-        return false;
-    }
-    if ((int) song.playlistTracks.size() <= track)
-        song.playlistTracks.resize ((std::size_t) track + 1);
-
-    if (plan.kind == Plan::Kind::audio)
-    {
-        // a track of one sample is named after it (before the link gives the track and the insert one name)
-        auto& t = song.playlistTracks[(std::size_t) track];
-        if (t.name.empty() && content.audioChannels.size() == 1)
-            t.name = song.channels[(std::size_t) content.audioChannels.front()].name;
-        if (fromMaster)
-            for (const auto ch : content.audioChannels)
-                song.channels[(std::size_t) ch].mixerTrack = mixer;
-        return trackmodes::linkToMixerTrack (song, track, mixer);
-    }
-
-    auto& channel = song.channels[(std::size_t) plan.channel];
-    if (fromMaster)
-    {
-        channel.mixerTrack = mixer;
-        if (! trackmodes::hasOwnName (song, mixer)) // a new insert carries the instrument's name and colour
-        {
-            song.mixer[(std::size_t) mixer].name = channel.name;
-            song.mixer[(std::size_t) mixer].colour = channel.colour;
-        }
-    }
-    return trackmodes::makeInstrumentTrack (song, track, plan.channel);
+    const auto m = song.channels[(std::size_t) channel].mixerTrack;
+    return validInsert (song, m) ? m : 0;
 }
-} // namespace
 
-bool isNeutralFree (const Song& song, int mixer)
+bool receivesSends (const Song& song, int mixer)
 {
-    if (mixer <= 0 || mixer >= (int) song.mixer.size() || song.session.reservedForOther (true, mixer) || linkedToAnotherTrack (song, mixer, -1))
-        return false;
-    for (const auto& c : song.channels)
-        if (c.mixerTrack == mixer)
-            return false;
-    for (int from = 0; from < (int) song.mixer.size(); ++from)
+    for (int from = 1; from < (int) song.mixer.size(); ++from)
         if (from != mixer)
             for (const auto& s : song.mixer[(std::size_t) from].sends)
                 if (s.target == mixer)
-                    return false;
+                    return true;
+    return false;
+}
+
+// Only track `track`'s own channels (or channels no track plays) go through `mixer`, nothing sends into it and no other
+// track is linked to it: it belongs to that track's content alone.
+bool exclusiveTo (const Song& song, int mixer, int track, const std::vector<int>& homes)
+{
+    if (! validInsert (song, mixer) || receivesSends (song, mixer) || linkedToAnotherTrack (song, mixer, track)
+        || song.session.reservedForOther (true, mixer))
+        return false;
+    for (int c = 0; c < (int) song.channels.size(); ++c)
+        if (song.channels[(std::size_t) c].mixerTrack == mixer && homes[(std::size_t) c] >= 0 && homes[(std::size_t) c] != track)
+            return false;
+    return true;
+}
+
+// `track` can take insert `mixer` as it is: neutral, and no other track's channels, sends or links use it
+bool freeFor (const Song& song, int mixer, int track, const std::vector<int>& homes)
+{
+    return isNeutral (song, mixer) && exclusiveTo (song, mixer, track, homes);
+}
+
+// a free neutral insert to move what sits at `mixer` to (after it first, then before), a new one when there is none
+int freeInsertBesides (Song& song, int mixer)
+{
+    for (int m = mixer + 1; m < (int) song.mixer.size(); ++m)
+        if (isNeutralFree (song, m))
+            return m;
+    for (int m = 1; m < mixer; ++m)
+        if (isNeutralFree (song, m))
+            return m;
+    return trackmodes::addMixerTrack (song);
+}
+
+std::string insertName (const Song& song, int m)
+{
+    return trackmodes::hasOwnName (song, m) ? song.mixer[(std::size_t) m].name : std::string(); // ("": its default name)
+}
+
+void note (Report* report, Change change)
+{
+    if (report != nullptr)
+        report->changes.push_back (std::move (change));
+}
+
+// One track: its own channels (`only`: these alone; empty: all of them) go through insert track + 1, and the track is
+// linked to it. `follow`: an edit's new content (nothing that changes the sound). True when the track got linked.
+bool pairTrack (Song& song, int track, const std::vector<int>& homes, const std::vector<int>& content, const std::vector<int>& only,
+                bool follow, Report* report)
+{
+    const auto n = track + 1;
+    if (n >= maxMixerTracks || song.session.reservedForOther (true, n))
+        return false;
+    std::vector<int> own;
+    for (int c = 0; c < (int) homes.size(); ++c)
+        if (homes[(std::size_t) c] == track && (only.empty() || contains (only, c)))
+            own.push_back (c);
+    if (own.empty())
+        return false;
+
+    // 1. inserts up to N (empty inserts change nothing)
+    const auto mixerBefore = song.mixer.size();
+    while ((int) song.mixer.size() <= n)
+        if (trackmodes::addMixerTrack (song) < 0)
+        {
+            song.mixer.resize (mixerBefore);
+            return false;
+        }
+
+    const auto routes = [&] {
+        std::vector<int> s;
+        for (const auto c : own)
+            addOnce (s, routeOf (song, c));
+        return s;
+    };
+    auto from = routes();
+    const auto linked = linkedInsertOf (song, track);
+
+    // 2. what lives at insert N and is not this track's goes to a free insert (a swap: everything that refers to it
+    //    follows, the sound stays)
+    if (! contains (from, n) && linked != n && ! freeFor (song, n, track, homes))
+    {
+        const auto away = freeInsertBesides (song, n);
+        if (away <= 0 || away == n)
+            return false;
+        note (report, { Change::Kind::moveInsert, -1, -1, n, away, insertName (song, n), false });
+        mixerops::swapTracks (song, n, away);
+        from = routes();
+    }
+
+    // 3. the track's content all goes through one insert with settings or a name of its own (an effect chain, a bus the
+    //    user named) or that the track is linked to: that insert becomes insert N
+    if (from.size() == 1 && from[0] != n && from[0] > 0 && exclusiveTo (song, from[0], track, homes)
+        && (! isNeutral (song, from[0]) || from[0] == linked || trackmodes::hasOwnName (song, from[0])))
+    {
+        note (report, { Change::Kind::moveInsert, track, -1, from[0], n, insertName (song, from[0]), false });
+        mixerops::swapTracks (song, from[0], n);
+        from = routes();
+    }
+
+    // 4. the rest goes into insert N: an insert with settings of its own that only this track uses sends into it (its
+    //    sound stays); a channel on the Master, on a neutral insert or on an insert others share moves to it
+    const auto intoN = isNeutral (song, n);
+    std::vector<int> bussed;
+    for (const auto c : own)
+    {
+        const auto m = routeOf (song, c);
+        if (m == n || contains (bussed, m))
+            continue;
+        if (m > 0 && ! isNeutral (song, m) && exclusiveTo (song, m, track, homes) && song.canRoute (m, n))
+        {
+            note (report, { Change::Kind::routeInsert, track, -1, m, n, insertName (song, m), ! intoN });
+            if (follow && ! intoN)
+                continue;
+            auto& source = song.mixer[(std::size_t) m];
+            const auto level = source.masterLevel;
+            source.toMaster = false;
+            song.setRoute (m, n, true, level);
+            bussed.push_back (m);
+            continue;
+        }
+        const auto changesSound = ! intoN || (m > 0 && ! isNeutral (song, m));
+        if (follow && changesSound)
+            continue;
+        note (report, { Change::Kind::routeChannel, track, c, m, n, song.channels[(std::size_t) c].name, changesSound });
+        song.channels[(std::size_t) c].mixerTrack = n;
+    }
+
+    // (an edit's new content that could not go through insert N without changing its sound: the track stays as it is)
+    if (follow && linked != n
+        && std::none_of (own.begin(), own.end(), [&] (int c) { return routeOf (song, c) == n || contains (bussed, routeOf (song, c)); }))
+        return false;
+
+    // 5. the link: FL's instrument track when the track plays one generator, else FL's audio track on insert N
+    if ((int) song.playlistTracks.size() <= track)
+        song.playlistTracks.resize ((std::size_t) track + 1);
+    for (int i = 0; i < (int) song.playlistTracks.size(); ++i) // (one track per insert)
+        if (i != track && linkedInsertOf (song, i) == n)
+            trackmodes::unassign (song, i);
+    auto& t = song.playlistTracks[(std::size_t) track];
+    const auto wasLinked = t.mode != PlaylistTrackMode::unassigned && linked == n;
+    const auto single = content.size() == 1 && own.size() == 1 && content[0] == own[0] && routeOf (song, own[0]) == n
+                        && trackmodes::canBeInstrumentTrack (song, own[0]);
+    if (single)
+    {
+        for (const auto other : trackmodes::instrumentTracksOf (song, own[0])) // (a channel belongs to one instrument track)
+            if (other != track)
+                trackmodes::unassign (song, other);
+        t.mode = PlaylistTrackMode::instrument;
+        t.channel = own[0];
+    }
+    else
+    {
+        t.mode = PlaylistTrackMode::audio;
+        t.channel = -1;
+    }
+    t.mixerTrack = n;
+
+    // 6. one name and colour: the track's own name, else the insert's, else the one instrument's or sample's
+    auto& m = song.mixer[(std::size_t) n];
+    if (t.name.empty() && trackmodes::hasOwnName (song, n))
+        t.name = m.name;
+    else if (t.name.empty() && own.size() == 1 && content.size() == 1)
+        t.name = song.channels[(std::size_t) own[0]].name;
+    if (! t.name.empty())
+        m.name = t.name;
+    if (t.colour == 0)
+        t.colour = m.colour;
+    else
+        m.colour = t.colour;
+    if (! wasLinked)
+        note (report, { Change::Kind::linkTrack, track, single ? own[0] : -1, -1, n, t.name, false });
+    return ! wasLinked;
+}
+} // namespace
+
+int linkedInsertOf (const Song& song, int track)
+{
+    if (track < 0 || track >= (int) song.playlistTracks.size())
+        return -1;
+    const auto& t = song.playlistTracks[(std::size_t) track];
+    if (t.mode == PlaylistTrackMode::audio)
+        return t.mixerTrack;
+    if (t.mode == PlaylistTrackMode::instrument)
+        return t.channel >= 0 && t.channel < (int) song.channels.size() ? song.channels[(std::size_t) t.channel].mixerTrack : t.mixerTrack;
+    return -1;
+}
+
+bool isNeutral (const Song& song, int mixer)
+{
+    if (! validInsert (song, mixer))
+        return false;
     const auto& m = song.mixer[(std::size_t) mixer];
     const MixerTrack plain;
     return m.effects.empty() && m.volume == plain.volume && m.pan == plain.pan && ! m.muted && ! m.solo && m.toMaster
@@ -1428,73 +1522,143 @@ bool isNeutralFree (const Song& song, int mixer)
            && m.eq == plain.eq && m.latencyMs == plain.latencyMs && m.outputChannel == plain.outputChannel && m.inputChannel < 0;
 }
 
-int insertForTrack (Song& song, int track)
+bool isNeutralFree (const Song& song, int mixer)
 {
-    const auto paired = track + 1;
-    if (paired > 0 && paired < maxMixerTracks)
-    {
-        // the track's own number: inserts up to it are added when the mixer is shorter (empty inserts change nothing)
-        const auto before = song.mixer.size();
-        while ((int) song.mixer.size() <= paired && trackmodes::canAddMixerTrack (song))
-            if (trackmodes::addMixerTrack (song) < 0)
-                break;
-        if (isNeutralFree (song, paired))
-            return paired;
-        if (song.mixer.size() > before) // (added for nothing: they go again)
-            song.mixer.resize (before);
-    }
-    for (int m = 1; m < (int) song.mixer.size(); ++m)
-        if (isNeutralFree (song, m))
-            return m;
-    return trackmodes::addMixerTrack (song);
-}
-
-Plan planFor (const Song& song, int track)
-{
-    if (track < 0 || track >= 500)
-        return {};
-    return planOf (song, track, contents (song)[(std::size_t) track]);
-}
-
-bool linkTrack (Song& song, int track)
-{
-    if (track < 0 || track >= 500)
+    if (! isNeutral (song, mixer) || song.session.reservedForOther (true, mixer) || linkedToAnotherTrack (song, mixer, -1)
+        || receivesSends (song, mixer))
         return false;
-    return link (song, track, contents (song)[(std::size_t) track]);
+    for (const auto& c : song.channels)
+        if (c.mixerTrack == mixer)
+            return false;
+    return true;
 }
 
-std::vector<Plan::Kind> contentKinds (const Song& song)
+std::vector<int> homeTracks (const Song& song)
 {
-    const auto all = contents (song);
-    std::vector<Plan::Kind> kinds (all.size());
-    for (std::size_t t = 0; t < all.size(); ++t)
-        kinds[t] = all[t].kind();
-    return kinds;
+    return homesFrom (song, channelsByTrack (song));
 }
 
-int setOn (Song& song, bool on)
+std::vector<int> repeatedTracks (const Song& song)
+{
+    const auto byTrack = channelsByTrack (song);
+    const auto homes = homesFrom (song, byTrack);
+    std::vector<int> out (maxTracks, -1);
+    for (int t = 0; t < maxTracks; ++t)
+    {
+        const auto& played = byTrack[(std::size_t) t];
+        if (played.empty() || std::any_of (played.begin(), played.end(), [&] (int c) { return homes[(std::size_t) c] == t; }))
+            continue;
+        out[(std::size_t) t] = homes[(std::size_t) played.front()];
+    }
+    return out;
+}
+
+bool Report::changesRouting() const
+{
+    return std::any_of (changes.begin(), changes.end(), [] (const Change& c) { return c.kind != Change::Kind::linkTrack; });
+}
+
+bool Report::changesSound() const
+{
+    return std::any_of (changes.begin(), changes.end(), [] (const Change& c) { return c.changesSound; });
+}
+
+int setOn (Song& song, bool on, Report* report)
 {
     song.linkTracksToMixer = on;
     if (! on)
         return 0;
-    const auto all = contents (song);
+    const auto byTrack = channelsByTrack (song);
+    const auto homes = homesFrom (song, byTrack);
     int linked = 0;
-    for (int t = 0; t < (int) all.size(); ++t)
-        if (all[(std::size_t) t].kind() != Plan::Kind::none && link (song, t, all[(std::size_t) t]))
+    for (int t = 0; t < maxTracks; ++t)
+        if (pairTrack (song, t, homes, byTrack[(std::size_t) t], {}, false, report))
             ++linked;
+    if (report != nullptr)
+    {
+        const auto repeats = repeatedTracks (song);
+        for (int t = 0; t < maxTracks; ++t)
+            if (repeats[(std::size_t) t] >= 0)
+                report->repeats.push_back ({ t, repeats[(std::size_t) t] });
+    }
     return linked;
 }
 
-int followNewContent (Song& song, const std::vector<Plan::Kind>& before)
+Report planOn (const Song& song)
 {
-    if (! song.linkTracksToMixer)
+    auto copy = song;
+    Report report;
+    setOn (copy, true, &report);
+    return report;
+}
+
+Snapshot snapshot (const Song& song)
+{
+    Snapshot s;
+    s.on = song.linkTracksToMixer;
+    if (! s.on)
+        return s;
+    s.homes = homeTracks (song);
+    for (int t = 0; t < (int) song.playlistTracks.size(); ++t)
+        if (const auto m = linkedInsertOf (song, t); validInsert (song, m))
+        {
+            const auto& pt = song.playlistTracks[(std::size_t) t];
+            const auto& mt = song.mixer[(std::size_t) m];
+            s.pairs.push_back ({ t, m, pt.name, pt.colour, mt.name, mt.colour });
+        }
+    return s;
+}
+
+int followNewContent (Song& song, const Snapshot& before)
+{
+    if (! song.linkTracksToMixer || ! before.on)
         return 0;
-    const auto all = contents (song);
-    int linked = 0;
-    for (int t = 0; t < (int) all.size(); ++t)
+
+    // names and colours: a linked track and its insert keep one name and colour, whichever was renamed
+    for (const auto& p : before.pairs)
     {
-        const auto was = t < (int) before.size() ? before[(std::size_t) t] : Plan::Kind::none;
-        if (was == Plan::Kind::none && all[(std::size_t) t].kind() != Plan::Kind::none && link (song, t, all[(std::size_t) t]))
+        if (linkedInsertOf (song, p.track) != p.mixer || ! validInsert (song, p.mixer))
+            continue;
+        auto& t = song.playlistTracks[(std::size_t) p.track];
+        auto& m = song.mixer[(std::size_t) p.mixer];
+        const auto trackChanged = t.name != p.trackName || t.colour != p.trackColour;
+        const auto insertChanged = m.name != p.insertName || m.colour != p.insertColour;
+        if (trackChanged && ! insertChanged)
+        {
+            m.name = t.name.empty() ? "Insert " + std::to_string (p.mixer) : t.name;
+            m.colour = t.colour;
+        }
+        else if (insertChanged && ! trackChanged)
+        {
+            t.name = trackmodes::hasOwnName (song, p.mixer) ? m.name : std::string();
+            t.colour = m.colour;
+        }
+    }
+
+    // new content: an instrument or sample no track played before goes through its track's insert
+    const auto byTrack = channelsByTrack (song);
+    const auto homes = homesFrom (song, byTrack);
+    // (also one whose clips all moved from a linked track to another: it follows them, from the old track's insert)
+    std::vector<std::vector<int>> fresh (maxTracks);
+    for (int c = 0; c < (int) homes.size(); ++c)
+    {
+        const auto t = homes[(std::size_t) c];
+        const auto was = c < (int) before.homes.size() ? before.homes[(std::size_t) c] : -1;
+        if (t >= 0 && (was < 0 || (was != t && routeOf (song, c) == was + 1 && linkedInsertOf (song, was) == was + 1)))
+            fresh[(std::size_t) t].push_back (c);
+    }
+    int linked = 0;
+    for (int t = 0; t < maxTracks; ++t)
+    {
+        if (fresh[(std::size_t) t].empty())
+            continue;
+        const auto had = std::any_of (before.homes.begin(), before.homes.end(), [t] (int h) { return h == t; });
+        const auto link = linkedInsertOf (song, t);
+        if (link < 0 && had)
+            continue; // Track mode › Unassigned on a track that already had content: it stays so
+        if (link >= 0 && link != t + 1)
+            continue; // linked by hand to another insert: left as it is
+        if (pairTrack (song, t, homes, byTrack[(std::size_t) t], fresh[(std::size_t) t], true, nullptr))
             ++linked;
     }
     return linked;
@@ -1503,7 +1667,7 @@ int followNewContent (Song& song, const std::vector<Plan::Kind>& before)
 int pairedTakeTrack (const Song& song, int insert)
 {
     const auto track = insert - 1;
-    if (! song.linkTracksToMixer || insert <= 0 || insert >= (int) song.mixer.size() || track >= 500)
+    if (! song.linkTracksToMixer || insert <= 0 || insert >= (int) song.mixer.size() || track >= maxTracks)
         return -1;
     if (track < (int) song.playlistTracks.size())
     {

@@ -258,6 +258,8 @@ public:
         held = channels;
         heldCount = count;
     }
+    bool followsHeldNotes() const noexcept override { return true; } // (round 190kz)
+    bool followsHeldNotesWith (const EffectParams& p) const noexcept override { return combMode (p[0]) == 1; } // (process(): mode 1)
     void process (float* left, float* right, int n, const EffectParams& p, double) noexcept override
     {
         if (tapes[0].w.points.empty())

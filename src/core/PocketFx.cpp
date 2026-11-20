@@ -428,16 +428,25 @@ private:
 // up to 2 s). The loop holds fb·(input + echo), so the first echo is already × feedback; Mix² scales the echoes, the
 // dry stays at unity; a one-pole in the loop is a low-pass below Filter 0.5 and a gentle high-pass above. Stereo: two
 // lines; Mirror: lines of 2D and the left input delayed by D; Ping-Pong: the lines cross, with an input balance.
+// Round 190ie (issue #185): FLM's lines are rings as long as the delay (a ring of D samples read, then written, at one
+// position). Here they are rings of the largest length, read D samples behind the write position: the same samples at
+// a steady tempo, bit for bit. A tempo change (the REA of FLM covers Time / Mode changes only; LYNX's tempo clips step
+// the tempo at every block, which re-cut FLM-style rings: a click per block, peaks near 0 dBFS) glides the lengths to
+// the new tempo's as LYNX's Delay does (FL's Fruity Delay 3 law, REA_rodada190ie): no click, the echoes bend like a tape.
 class TranceDelay final : public Effect
 {
 public:
+    static constexpr double glideSeconds = 0.5;
+
     void prepare (double sampleRate) noexcept override
     {
         fs = sampleRate > 0.0 ? sampleRate : 44100.0;
         capacity = std::max (1, (int) (2.0 * fs));
-        lineL.assign ((std::size_t) capacity, 0.0f);
-        lineR.assign ((std::size_t) capacity, 0.0f);
-        lineP.assign ((std::size_t) capacity, 0.0f);
+        size = (std::size_t) capacity + 2; // (room for a length of `capacity` and the sample before it)
+        lineL.assign (size, 0.0f);
+        lineR.assign (size, 0.0f);
+        lineP.assign (size, 0.0f);
+        glideK = 1.0 - std::pow (0.01, 1.0 / (glideSeconds * fs));
         reset();
     }
     void reset() noexcept override
@@ -445,9 +454,10 @@ public:
         std::fill (lineL.begin(), lineL.end(), 0.0f);
         std::fill (lineR.begin(), lineR.end(), 0.0f);
         std::fill (lineP.begin(), lineP.end(), 0.0f);
-        pl = pr = pp = 0;
+        w = wp = 0;
         zl = zr = 0.0f;
         pan = -1.0f;
+        settled = false;
     }
     void process (float* left, float* right, int n, const EffectParams& p, double bpm) noexcept override
     {
@@ -474,15 +484,36 @@ public:
         auto lenP = mode == 2 ? (int) d : 0;
         lenLR = std::min (lenLR, capacity);
         lenP = std::min (lenP, capacity);
+        // FLM's ring of lenP reads the left input lenP − 1 samples late (written, then the next slot read; none at 0);
+        // the loop's ring of lenLR, lenLR samples late (a ring of 0 is read as one of 1)
+        const auto targetLR = (double) std::max (lenLR, 1), targetP = (double) std::max (lenP - 1, 0);
+        if (! settled)
+            curLR = targetLR, curP = targetP, settled = true; // (a new line, or after a Time / Mode change: at once)
         const auto filter = [&] (float x, float& z) {
             const auto e = x + 1e-30f;
             z = z + (e - z) * kf;
             return lowPass ? z : e - z;
         };
+        const auto glide = [this] (double& cur, double target) noexcept {
+            if (cur != target)
+            {
+                const auto diff = target - cur;
+                cur = std::abs (diff) < 0.001 ? target : cur + diff * glideK;
+            }
+        };
+        // what the line `line` holds `delay` samples behind `at` (whole samples at a steady tempo, as FLM's rings)
+        const auto read = [this] (const std::vector<float>& line, std::size_t at, double delay) noexcept {
+            const auto whole = (std::size_t) delay; // (< size)
+            const auto i = at >= whole ? at - whole : at + size - whole;
+            if ((double) whole == delay)
+                return line[i];
+            const auto frac = (float) (delay - (double) whole);
+            return line[i] + (line[i == 0 ? size - 1 : i - 1] - line[i]) * frac;
+        };
         const auto target = p[5];
         const auto dryPan = p[6] >= 0.5f;
-        for (int i = 0; i < n; ++i)
-        {
+        // one sample; readLR / readP give what a line holds its delay behind a write position
+        const auto sample = [&] (int i, auto&& readLR, auto&& readP) noexcept {
             const auto inL = left[i], inR = right != nullptr ? right[i] : left[i];
             float outL, outR;
             if (mode == 1)
@@ -497,47 +528,61 @@ public:
                 }
                 const auto gR = std::clamp (2.0f * pan, 0.0f, 1.0f), gL = std::clamp (2.0f * (1.0f - pan), 0.0f, 1.0f);
                 const auto aL = gL * inL, aR = gR * inR;
-                if (pl >= lenLR)
-                    pl = 0;
-                const auto fl = filter (lineL[(std::size_t) pl], zl);
+                const auto fl = filter (readLR (lineL, w), zl);
                 outL = wet * fl + (dryPan ? aL : inL);
-                if (pr >= lenLR)
-                    pr = 0;
-                const auto fr = filter (lineR[(std::size_t) pr], zr);
+                const auto fr = filter (readLR (lineR, w), zr);
                 outR = wet * fr + (dryPan ? aR : inR);
-                lineR[(std::size_t) pr] = (fl + aL) * fb;
-                lineL[(std::size_t) pl] = (fr + aR) * fb;
-                ++pl;
-                ++pr;
+                lineR[w] = (fl + aL) * fb;
+                lineL[w] = (fr + aR) * fb;
             }
             else
             {
-                lineP[(std::size_t) pp] = inL;
-                if (++pp >= lenP)
-                    pp = 0;
-                const auto xl = lineP[(std::size_t) pp], xr = inR;
-                if (pl >= lenLR)
-                    pl = 0;
-                const auto fl = filter (lineL[(std::size_t) pl], zl);
+                lineP[wp] = inL;
+                const auto xl = readP (lineP, wp), xr = inR;
+                wp = wp + 1 == size ? 0 : wp + 1;
+                const auto fl = filter (readLR (lineL, w), zl);
                 outL = fl * wet + xl;
-                lineL[(std::size_t) pl] = (xl + fl) * fb;
-                ++pl;
-                if (pr >= lenLR)
-                    pr = 0;
-                const auto fr = filter (lineR[(std::size_t) pr], zr);
+                lineL[w] = (xl + fl) * fb;
+                const auto fr = filter (readLR (lineR, w), zr);
                 outR = fr * wet + xr;
-                lineR[(std::size_t) pr] = (xr + fr) * fb;
-                ++pr;
+                lineR[w] = (xr + fr) * fb;
             }
+            w = w + 1 == size ? 0 : w + 1;
             left[i] = outL;
             if (right != nullptr)
                 right[i] = outR;
+        };
+        int i = 0;
+        for (; i < n && (curLR != targetLR || curP != targetP); ++i) // gliding toward the new tempo's lengths
+        {
+            glide (curLR, targetLR);
+            glide (curP, targetP);
+            sample (
+                i, [&] (const std::vector<float>& line, std::size_t at) { return read (line, at, curLR); },
+                [&] (const std::vector<float>& line, std::size_t at) { return read (line, at, curP); });
+        }
+        if (i < n) // the steady lengths: whole samples, read positions that follow the write positions
+        {
+            const auto dLR = (std::size_t) targetLR, dP = (std::size_t) targetP;
+            auto rLR = w >= dLR ? w - dLR : w + size - dLR, rP = wp >= dP ? wp - dP : wp + size - dP;
+            const auto pre = mode != 1;
+            for (; i < n; ++i)
+            {
+                sample (
+                    i, [&] (const std::vector<float>& line, std::size_t) { return line[rLR]; },
+                    [&] (const std::vector<float>& line, std::size_t) { return line[rP]; });
+                rLR = rLR + 1 == size ? 0 : rLR + 1;
+                if (pre)
+                    rP = rP + 1 == size ? 0 : rP + 1;
+            }
         }
     }
 
 private:
-    double fs = 44100.0, lastBeats = -1.0;
-    int capacity = 0, pl = 0, pr = 0, pp = 0, lastMode = -1;
+    double fs = 44100.0, lastBeats = -1.0, glideK = 1.0, curLR = 1.0, curP = 0.0;
+    int capacity = 0, lastMode = -1;
+    std::size_t size = 0, w = 0, wp = 0;
+    bool settled = false;
     std::vector<float> lineL, lineR, lineP;
     float zl = 0.0f, zr = 0.0f, pan = -1.0f;
 };

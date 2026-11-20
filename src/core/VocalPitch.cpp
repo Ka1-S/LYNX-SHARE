@@ -173,7 +173,8 @@ double noteToHz (double note, double a4) noexcept { return a4 * std::exp2 ((note
 // Pitch detector
 
 PitchDetector::PitchDetector()
-    : full ((std::size_t) maxFull, 0.0f), deci ((std::size_t) maxDecimated, 0.0f), diff ((std::size_t) maxDecimated, 0.0f)
+    : full ((std::size_t) maxFull, 0.0f), deci ((std::size_t) maxDecimated, 0.0f), diff ((std::size_t) maxDecimated, 0.0f),
+      lin ((std::size_t) maxFull, 0.0f), sums ((std::size_t) maxDecimated, 0.0)
 {
 }
 
@@ -258,16 +259,32 @@ void PitchDetector::analyse() noexcept
         energy += (double) at (j) * at (j);
     est.level = (float) std::sqrt (energy / window);
 
+    // Round 190li (CPU only, the same result to the bit): the window is copied out of the ring first and the lags are
+    // summed side by side (j outer, lag inner) — every lag's sum still adds its terms in the same order, but the lags
+    // no longer wait on one another's additions and the inner loop runs over contiguous memory
+    const auto span = window + tauMax + 1;
+    for (int j = 0; j < span; ++j)
+        lin[(std::size_t) j] = at (j);
+    std::fill (sums.begin(), sums.begin() + tauMax + 1, 0.0);
+    {
+        const float* x = lin.data();
+        double* sd = sums.data();
+        for (int j = 0; j < window; ++j)
+        {
+            const auto xj = (double) x[j];
+            const float* xt = x + j;
+            for (int tau = 1; tau <= tauMax; ++tau)
+            {
+                const auto e = xj - xt[tau];
+                sd[tau] += e * e;
+            }
+        }
+    }
     diff[0] = 1.0f;
     double running = 0.0;
     for (int tau = 1; tau <= tauMax; ++tau)
     {
-        double d = 0.0;
-        for (int j = 0; j < window; ++j)
-        {
-            const auto e = (double) at (j) - at (j + tau);
-            d += e * e;
-        }
+        const auto d = sums[(std::size_t) tau];
         running += d;
         diff[(std::size_t) tau] = running > 0.0 ? (float) (d * tau / running) : 1.0f;
     }
@@ -354,19 +371,27 @@ void PitchDetector::analyse() noexcept
             auto y = [&] (std::int64_t j) { return full[(std::size_t) ((start + j) & fm)]; };
             std::array<double, 64> d {};
             const auto count = std::min (hi - lo + 1, 64);
-            int bestK = 0;
-            for (int k = 0; k < count; ++k)
+            // (round 190li: the same sums, the lags side by side over a linear copy — see the YIN step above)
+            const auto need = wf + lo + count;
+            for (int j = 0; j < need; ++j)
+                lin[(std::size_t) j] = y (j);
             {
-                double s = 0.0;
+                const float* x = lin.data();
                 for (int j = 0; j < wf; ++j)
                 {
-                    const auto e = (double) y (j) - y (j + lo + k);
-                    s += e * e;
+                    const auto xj = (double) x[j];
+                    const float* xt = x + j + lo;
+                    for (int k = 0; k < count; ++k)
+                    {
+                        const auto e = xj - xt[k];
+                        d[(std::size_t) k] += e * e;
+                    }
                 }
-                d[(std::size_t) k] = s;
-                if (s < d[(std::size_t) bestK])
-                    bestK = k;
             }
+            int bestK = 0;
+            for (int k = 0; k < count; ++k)
+                if (d[(std::size_t) k] < d[(std::size_t) bestK])
+                    bestK = k;
             if (bestK > 0 && bestK < count - 1)
                 period = lo + bestK + refine (d[(std::size_t) bestK - 1], d[(std::size_t) bestK], d[(std::size_t) bestK + 1]);
         }
@@ -419,18 +444,21 @@ std::vector<PitchFrame> analysePitch (const float* x, int n, double sampleRate, 
 // ---------------------------------------------------------------------------------------------------------------------
 // TD-PSOLA
 
-Psola::Psola() : env ((std::size_t) ringSize, 0.0f), wsum ((std::size_t) ringSize, 0.0f)
+Psola::Psola() : env ((std::size_t) ringSize, 0.0f), wsum ((std::size_t) ringSize, 0.0f), markLin ((std::size_t) ringSize / 2, 0.0f),
+                 markScore ((std::size_t) ringSize / 8, 0.0)
 {
     for (int c = 0; c < 2; ++c)
     {
         in[c].assign ((std::size_t) ringSize, 0.0f);
         acc[c].assign ((std::size_t) ringSize, 0.0f);
     }
+    envCoef = (float) (1.0 - std::exp (-2.0 * pi * 900.0 / sr)); // (the default rate until prepare())
 }
 
 void Psola::prepare (double sampleRate, double maxPeriod, int latency) noexcept
 {
     sr = sampleRate > 0.0 ? sampleRate : 44100.0;
+    envCoef = (float) (1.0 - std::exp (-2.0 * pi * 900.0 / sr)); // (round 190li: once here, no longer per sample)
     maxP = std::clamp (maxPeriod, 16.0, ringSize / 8.0);
     delay = std::clamp (latency, 8, ringSize / 2);
     lag = 0;
@@ -510,7 +538,8 @@ void Psola::placeMarks() noexcept
             markHead = (markHead + 1) % maxMarks;
             --markCount;
         }
-        marks[(std::size_t) ((markHead + markCount) % maxMarks)] = { pos, p, v, (float) ratio, (float) formant };
+        // round 190ho (setUnvoicedPlain): an unvoiced mark placed then keeps the source's own formants
+        marks[(std::size_t) ((markHead + markCount) % maxMarks)] = { pos, p, v, (float) ratio, ! v && unvoicedPlain ? 1.0f : (float) formant };
         ++markCount;
     };
 
@@ -544,13 +573,29 @@ void Psola::placeMarks() noexcept
             const auto pm = (std::int64_t) std::lround (prev);
             // long periods: every other sample (or fewer) of the window — the low-passed signal is smooth there
             const auto stride = std::max (1, span / 256);
+            // Round 190li (CPU only, the same result to the bit): with the correlation, every candidate's sum is formed at
+            // once (the window's offsets outer, the candidates inner, over linear copies): each sum still adds its terms
+            // in the same order, but the candidates no longer wait on one another's additions
+            const auto cands = (int) (to - from + 1);
+            if (corr && cands > 0)
+            {
+                const auto len = cands + span;
+                for (int k = 0; k <= len; ++k)
+                    markLin[(std::size_t) k] = env[(std::size_t) ((from - span + k) & m)];
+                std::fill (markScore.begin(), markScore.begin() + cands, 0.0);
+                double* sc = markScore.data();
+                for (int j = -span; j <= 0; j += stride)
+                {
+                    const auto ref = (double) env[(std::size_t) ((pm + j) & m)];
+                    const float* xs = markLin.data() + (j + span);
+                    for (int c = 0; c < cands; ++c)
+                        sc[c] += (double) xs[c] * ref;
+                }
+            }
             auto score = [&] (std::int64_t i) {
                 if (! corr)
                     return (double) env[(std::size_t) (i & m)];
-                double sxy = 0.0;
-                for (int j = -span; j <= 0; j += stride)
-                    sxy += (double) env[(std::size_t) ((i + j) & m)] * (double) env[(std::size_t) ((pm + j) & m)];
-                return sxy;
+                return markScore[(std::size_t) (i - from)];
             };
             // prefer the predicted position a little: ties and flat tops do not make the marks wander
             const auto pen = corr ? 0.0 : 1e-4;
@@ -601,9 +646,8 @@ void Psola::process (const float* x, float* y, int channels) noexcept
     for (int c = 0; c < channels; ++c)
         in[c][(std::size_t) (now & m)] = std::isfinite (x[c]) ? x[c] : 0.0f;
     const auto mono = channels == 2 ? 0.5f * (in[0][(std::size_t) (now & m)] + in[1][(std::size_t) (now & m)]) : in[0][(std::size_t) (now & m)];
-    // a gentle low-pass (one pole near 900 Hz) of the input: the marks lock to its peaks
-    const auto a = (float) (1.0 - std::exp (-2.0 * pi * 900.0 / sr));
-    envZ += a * (mono - envZ);
+    // a gentle low-pass (one pole near 900 Hz) of the input: the marks lock to its peaks (envCoef: prepare())
+    envZ += envCoef * (mono - envZ);
     if (! std::isfinite (envZ))
         envZ = 0.0f;
     env[(std::size_t) (now & m)] = envZ;

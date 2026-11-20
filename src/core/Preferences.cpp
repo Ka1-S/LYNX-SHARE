@@ -1,5 +1,7 @@
 #include "core/Preferences.h"
 
+#include "core/ControllerProfile.h"
+
 #include <algorithm>
 #include <cstdlib>
 #include <cctype>
@@ -406,6 +408,20 @@ void MidiPrefs::setOutput (const MidiOutputPrefs& out)
         outputs.push_back (out);
 }
 
+int MidiPrefs::inheritedOutputPort (const std::string& name) const
+{
+    for (const auto& i : inputs)
+        if (i.port >= 0 && controller::pairedOutput (i.name, { name }) == name)
+            return std::min (i.port, 255);
+    return -1;
+}
+
+int MidiPrefs::outputPort (const std::string& name) const
+{
+    const auto own = output (name).port;
+    return own >= 0 ? std::min (own, 255) : inheritedOutputPort (name);
+}
+
 bool MidiPrefs::accepts (const std::string& device, int channel) const
 {
     const auto i = input (device);
@@ -477,6 +493,10 @@ std::string MidiPrefs::toText() const
     for (const auto& o : outputs)
         out += "output=" + std::string (o.masterSync ? "1" : "0") + "|" + o.syncType + "|" + std::to_string (o.offsetMs) + "|"
                + (o.allNotesOff ? "1" : "0") + "|" + o.name + "\n";
+    // outputport=<port>|<device name> (round 190jl; its own line: older versions skip it)
+    for (const auto& o : outputs)
+        if (o.port >= 0)
+            out += "outputport=" + std::to_string (o.port) + "|" + o.name + "\n";
     // clockin=<offset ms>|<device name>
     if (! clockInput.empty() || clockOffsetMs != 0)
         out += "clockin=" + std::to_string (clockOffsetMs) + "|" + clockInput + "\n";
@@ -501,7 +521,18 @@ std::string MidiPrefs::toText() const
         // older versions skip it)
         if (l.mode != 0)
             out += "linkmode=" + std::to_string (l.mode) + "\n";
+        // linkrange=<min>|<max> (round 190hp: the Mapping Browser's range; only when not 0..1, its own line)
+        if (l.min != 0.0f || l.max != 1.0f)
+        {
+            char range[64];
+            std::snprintf (range, sizeof (range), "linkrange=%.6g|%.6g\n", (double) l.min, (double) l.max);
+            out += range;
+        }
     }
+    // globalmap=<action>|<channel>|<number>|<port>|<scene> (round 190hp: MIDI Map Mode mappings for every project)
+    for (const auto& m : globalMappings)
+        out += "globalmap=" + std::to_string (m.action) + "|" + std::to_string (m.channel) + "|" + std::to_string (m.number) + "|"
+               + std::to_string (m.port) + "|" + std::to_string (m.scene) + "\n";
     return out;
 }
 
@@ -601,6 +632,19 @@ MidiPrefs MidiPrefs::fromText (const std::string& text)
             if (lastLinkKept)
                 p.globalLinks.back().mode = std::clamp (toInt (trim (value), 0), 0, 4);
         }
+        else if (key == "linkrange") // (the range of the link read just before; round 190hp)
+        {
+            const auto parts = split (value, '|', 2);
+            if (parts.size() != 2 || ! lastLinkKept)
+                continue;
+            const auto number = [] (const std::string& t, float fallback) {
+                char* end = nullptr;
+                const auto v = std::strtod (t.c_str(), &end);
+                return end != t.c_str() && std::isfinite (v) ? std::clamp ((float) v, 0.0f, 1.0f) : fallback;
+            };
+            p.globalLinks.back().min = number (trim (parts[0]), 0.0f);
+            p.globalLinks.back().max = number (trim (parts[1]), 1.0f);
+        }
         else if (key == "output")
         {
             const auto parts = split (value, '|', 5);
@@ -612,6 +656,16 @@ MidiPrefs MidiPrefs::fromText (const std::string& text)
             o.offsetMs = std::clamp (toInt (trim (parts[2]), 0), -1000, 1000);
             o.allNotesOff = trim (parts[3]) == "1";
             o.name = parts[4];
+            o.port = p.output (o.name).port; // (an "outputport" line may come first in a hand-edited file)
+            p.setOutput (o);
+        }
+        else if (key == "outputport") // (round 190jl)
+        {
+            const auto parts = split (value, '|', 2);
+            if (parts.size() != 2 || parts[1].empty())
+                continue;
+            auto o = p.output (parts[1]);
+            o.port = std::clamp (toInt (trim (parts[0]), -1), -1, 255);
             p.setOutput (o);
         }
         else if (key == "clockin")
@@ -637,9 +691,30 @@ MidiPrefs MidiPrefs::fromText (const std::string& text)
             l.index = toInt (trim (parts[3]), 0);
             l.slot = toInt (trim (parts[4]), 0);
             l.param = toInt (trim (parts[5]), 0);
-            lastLinkKept = l.kind > 0 && l.kind <= 8; // AutomationTargetKind::channelVolume ... effectMix
+            // AutomationTargetKind::channelVolume ... channelAdjust (round 190hp: sends, VCAs and the Levels adjustments
+            // were dropped here before, so their global links went at the next start)
+            lastLinkKept = l.kind > 0 && l.kind <= 11;
             if (lastLinkKept)
                 p.globalLinks.push_back (l);
+        }
+        else if (key == "globalmap") // (round 190hp)
+        {
+            const auto parts = split (value, '|', 5);
+            if (parts.size() != 5)
+                continue;
+            GlobalMapping m;
+            m.action = toInt (trim (parts[0]), 0);
+            m.channel = std::clamp (toInt (trim (parts[1]), -1), -1, 15);
+            m.number = toInt (trim (parts[2]), -1);
+            m.port = std::clamp (toInt (trim (parts[3]), -1), -1, 255);
+            m.scene = std::max (-1, toInt (trim (parts[4]), -1));
+            // the actions a mapping for every project may have (RemoteAction: sceneLaunch 2, stopAllClips 4, play 5 ...
+            // metronome 9), a controller 0..127 or a key 256..383
+            const auto action = m.action == 2 || (m.action >= 4 && m.action <= 9);
+            const auto number = (m.number >= 0 && m.number < 128) || (m.number >= 256 && m.number < 384);
+            if (action && number && (m.action != 2 || m.scene >= 0)
+                && std::find (p.globalMappings.begin(), p.globalMappings.end(), m) == p.globalMappings.end())
+                p.globalMappings.push_back (m);
         }
     }
 

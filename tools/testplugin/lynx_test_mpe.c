@@ -8,7 +8,11 @@
  *   LYNX.exe --mpetest "LYNX Test MPE.clap" report.txt
  *
  * Lines: "on <channel> <key> <velocity*1000>", "off <channel> <key>", "expr <expression id> <channel> <key>
- * <value*1000>", "midi <status> <data1> <data2>" (channels 0-based, as CLAP's). */
+ * <value*1000>", "midi <status> <data1> <data2>" (channels 0-based, as CLAP's).
+ * Round 190ks (GitHub #198): with LYNX_TEST_PADS_AUTO = "call:key:velocity:length,..." it also has a note OUTPUT port and
+ * sends those hits (CLAP notes) at its Nth process() call with frames, as if pads were clicked in its window; with
+ * LYNX_TEST_PADS_ECHO = 1 every note on / off it is sent goes back out (the same variables as lynx_test_pads_vst3.cpp:
+ * LYNX --padrectest "LYNX Test MPE.clap" report.txt). Without them nothing changes. */
 #include <clap/clap.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,10 +29,25 @@ enum { logSize = 1 << 16 };
 
 typedef struct
 {
+    int call, key, velocity, length;
+} AutoHit;
+
+typedef struct
+{
     clap_plugin_t plugin;
     char* log;
     int used;
+    AutoHit hits[32];
+    int hitCount, echo;
+    long long calls;
 } Logger;
+
+static int sends (void)
+{
+    const char* a = getenv ("LYNX_TEST_PADS_AUTO");
+    const char* e = getenv ("LYNX_TEST_PADS_ECHO");
+    return (a != NULL && *a != 0) || (e != NULL && atoi (e) != 0);
+}
 
 static Logger* self (const clap_plugin_t* p) { return (Logger*) p->plugin_data; }
 
@@ -58,13 +77,13 @@ static bool audio_get (const clap_plugin_t* p, uint32_t index, bool in, clap_aud
 }
 static const clap_plugin_audio_ports_t audio_ports = { audio_count, audio_get };
 
-static uint32_t note_count (const clap_plugin_t* p, bool in) { (void) p; return in ? 1 : 0; }
+static uint32_t note_count (const clap_plugin_t* p, bool in) { (void) p; return in ? 1 : (sends() ? 1 : 0); }
 static bool note_get (const clap_plugin_t* p, uint32_t index, bool in, clap_note_port_info_t* info)
 {
     (void) p;
-    if (! in || index != 0) return false;
+    if (index != 0 || (! in && ! sends())) return false;
     memset (info, 0, sizeof (*info));
-    info->id = 2;
+    info->id = in ? 2 : 3;
     info->supported_dialects = CLAP_NOTE_DIALECT_CLAP | CLAP_NOTE_DIALECT_MIDI;
     info->preferred_dialect = CLAP_NOTE_DIALECT_CLAP;
     strcpy (info->name, "Notes");
@@ -77,6 +96,22 @@ static bool p_init (const clap_plugin_t* p)
     Logger* l = self (p);
     l->log = (char*) malloc (logSize); /* (before any processing: the audio thread only copies into it) */
     l->used = 0;
+    {
+        const char* a = getenv ("LYNX_TEST_PADS_AUTO");
+        const char* e = getenv ("LYNX_TEST_PADS_ECHO");
+        l->echo = e != NULL && atoi (e) != 0;
+        while (a != NULL && *a != 0 && l->hitCount < 32)
+        {
+            AutoHit h;
+            int used = 0;
+            if (sscanf (a, "%d:%d:%d:%d%n", &h.call, &h.key, &h.velocity, &h.length, &used) != 4)
+                break;
+            if (h.length < 1) h.length = 1;
+            l->hits[l->hitCount++] = h;
+            a += used;
+            while (*a == ',' || *a == ' ') ++a;
+        }
+    }
     return l->log != NULL;
 }
 static void p_destroy (const clap_plugin_t* p)
@@ -104,6 +139,23 @@ static void p_deactivate (const clap_plugin_t* p) { (void) p; }
 static bool p_start (const clap_plugin_t* p) { (void) p; return true; }
 static void p_stop (const clap_plugin_t* p) { (void) p; }
 static void p_reset (const clap_plugin_t* p) { (void) p; }
+static void sendNote (const clap_process_t* proc, bool on, int channel, int key, double velocity)
+{
+    clap_event_note_t e;
+    memset (&e, 0, sizeof (e));
+    e.header.size = sizeof (e);
+    e.header.time = 0;
+    e.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+    e.header.type = on ? CLAP_EVENT_NOTE_ON : CLAP_EVENT_NOTE_OFF;
+    e.note_id = -1;
+    e.port_index = 0;
+    e.channel = (int16_t) channel;
+    e.key = (int16_t) key;
+    e.velocity = velocity;
+    if (proc->out_events != NULL)
+        proc->out_events->try_push (proc->out_events, &e.header);
+}
+
 static clap_process_status p_process (const clap_plugin_t* p, const clap_process_t* proc)
 {
     Logger* l = self (p);
@@ -122,6 +174,8 @@ static clap_process_status p_process (const clap_plugin_t* p, const clap_process
             else
                 snprintf (line, sizeof line, "off %d %d\n", (int) e->channel, (int) e->key);
             put (l, line);
+            if (l->echo)
+                sendNote (proc, h->type == CLAP_EVENT_NOTE_ON, e->channel < 0 ? 0 : e->channel, e->key, e->velocity);
         }
         else if (h->type == CLAP_EVENT_NOTE_EXPRESSION)
         {
@@ -136,6 +190,17 @@ static clap_process_status p_process (const clap_plugin_t* p, const clap_process
             const clap_event_midi_t* e = (const clap_event_midi_t*) h;
             snprintf (line, sizeof line, "midi %d %d %d\n", (int) e->data[0], (int) e->data[1], (int) e->data[2]);
             put (l, line);
+        }
+    }
+    if (l->hitCount > 0 && proc->frames_count > 0) /* (round 190ks: the "clicked" pads) */
+    {
+        ++l->calls;
+        for (int i = 0; i < l->hitCount; ++i)
+        {
+            if (l->hits[i].call == l->calls)
+                sendNote (proc, true, 9, l->hits[i].key, l->hits[i].velocity / 127.0);
+            if (l->hits[i].call + l->hits[i].length == l->calls)
+                sendNote (proc, false, 9, l->hits[i].key, 0.0);
         }
     }
     if (proc->audio_outputs_count >= 1)

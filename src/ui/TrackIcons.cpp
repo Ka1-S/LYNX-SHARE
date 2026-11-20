@@ -544,27 +544,55 @@ const Shape& get (Icon icon)
     return all[(std::size_t) i];
 }
 
+} // namespace
+
 // The grid of the icon picker: LYNX's icons in rows, the current one highlighted, the name of the hovered one below.
+// Issue #220 (round 190ng): only the icons the search box's words match are laid out (in the picker's order); the grid
+// keeps the room of all of them, so the window doesn't jump while typing.
 class IconGrid final : public juce::Component
 {
 public:
-    IconGrid (int currentFlIndex, std::function<void (int)> pick)
-        : current (trackicons::iconFor (currentFlIndex)), onPick (std::move (pick))
+    IconGrid (int currentFlIndex, int columnCount, std::function<void (int)> pick)
+        : current (trackicons::iconFor (currentFlIndex)), onPick (std::move (pick)), columns (juce::jmax (4, columnCount))
     {
+        for (int i = 0; i < (int) trackicons::entries.size(); ++i)
+            shown.push_back (i);
         const auto rowCount = ((int) trackicons::entries.size() + columns - 1) / columns;
         setSize (columns * cell + 2 * margin, rowCount * cell + 2 * margin + footer);
+    }
+
+    void setShown (std::vector<int> indices)
+    {
+        shown = std::move (indices);
+        hovered = -1;
+        repaint();
+    }
+    const std::vector<int>& getShown() const noexcept { return shown; }
+    void setCurrent (Icon icon)
+    {
+        current = icon;
+        repaint();
+    }
+    Icon getCurrent() const noexcept { return current; }
+    void pickEntry (int entry)
+    {
+        if (entry < 0 || entry >= (int) trackicons::entries.size())
+            return;
+        setCurrent (trackicons::entries[(std::size_t) entry].icon);
+        if (onPick)
+            onPick (trackicons::entries[(std::size_t) entry].flIndex);
     }
 
     void paint (juce::Graphics& g) override
     {
         using namespace theme;
         g.fillAll (colour::bg2);
-        for (int i = 0; i < (int) trackicons::entries.size(); ++i)
+        for (int k = 0; k < (int) shown.size(); ++k)
         {
-            const auto& e = trackicons::entries[(std::size_t) i];
-            const auto r = cellBounds (i).toFloat().reduced (2.0f);
+            const auto& e = trackicons::entries[(std::size_t) shown[(std::size_t) k]];
+            const auto r = cellBounds (k).toFloat().reduced (2.0f);
             const auto isCurrent = e.icon == current;
-            if (isCurrent || i == hovered)
+            if (isCurrent || k == hovered)
                 theme::fillRoundRect (g, r, radius::sm, isCurrent ? colour::accent.withAlpha (0.35f) : colour::bg4);
             if (e.icon == Icon::none)
             {
@@ -576,9 +604,15 @@ public:
         }
         g.setColour (colour::textSecondary);
         g.setFont (font (type::small));
-        const auto shown = hovered >= 0 ? trackicons::entries[(std::size_t) hovered].icon : current;
-        g.drawText (tr (juce::String (std::string (trackicons::nameOf (shown)))), getLocalBounds().removeFromBottom (footer).reduced (margin, 0),
-                    juce::Justification::centredLeft, true);
+        juce::String text;
+        if (shown.empty())
+            text = tr ("No icon matches");
+        else
+        {
+            const auto shownIcon = hovered >= 0 ? trackicons::entries[(std::size_t) shown[(std::size_t) hovered]].icon : current;
+            text = tr (juce::String (std::string (trackicons::nameOf (shownIcon))));
+        }
+        g.drawText (text, getLocalBounds().removeFromBottom (footer).reduced (margin, 0), juce::Justification::centredLeft, true);
     }
 
     void mouseMove (const juce::MouseEvent& e) override
@@ -596,30 +630,31 @@ public:
     }
     void mouseUp (const juce::MouseEvent& e) override
     {
-        if (const auto i = indexAt (e.getPosition()); i >= 0 && onPick)
-            onPick (trackicons::entries[(std::size_t) i].flIndex);
+        if (const auto i = indexAt (e.getPosition()); i >= 0)
+            pickEntry (shown[(std::size_t) i]);
     }
 
-private:
-    static constexpr int columns = 10, cell = 30, margin = 6, footer = 22;
+    static constexpr int cell = 30, margin = 6, footer = 22;
 
-    juce::Rectangle<int> cellBounds (int i) const
+private:
+    juce::Rectangle<int> cellBounds (int k) const
     {
-        return { margin + (i % columns) * cell, margin + (i / columns) * cell, cell, cell };
+        return { margin + (k % columns) * cell, margin + (k / columns) * cell, cell, cell };
     }
     int indexAt (juce::Point<int> p) const
     {
-        for (int i = 0; i < (int) trackicons::entries.size(); ++i)
-            if (cellBounds (i).contains (p))
-                return i;
+        for (int k = 0; k < (int) shown.size(); ++k)
+            if (cellBounds (k).contains (p))
+                return k;
         return -1;
     }
 
     Icon current;
     std::function<void (int)> onPick;
-    int hovered = -1;
+    int columns = 10;
+    std::vector<int> shown; // indices into trackicons::entries, in the picker's order
+    int hovered = -1;       // index into `shown`
 };
-} // namespace
 
 void drawTrackIcon (juce::Graphics& g, trackicons::Icon icon, juce::Rectangle<float> area, juce::Colour colour)
 {
@@ -641,21 +676,118 @@ void drawTrackIcon (juce::Graphics& g, trackicons::Icon icon, juce::Rectangle<fl
     }
 }
 
+// --- the picker: the search box over the grid (issue #220, round 190ng) ----------------------------------------------
+TrackIconPicker::TrackIconPicker (int currentFlIndex, int columns, std::function<void (int)> onPick)
+    : picked (currentFlIndex), grid (std::make_unique<IconGrid> (currentFlIndex, columns, [this, onPick = std::move (onPick)] (int flIndex) {
+          picked = flIndex;
+          if (onPick)
+              onPick (flIndex);
+      }))
+{
+    search.setTextToShowWhenEmpty (tr ("Search icons"), theme::colour::textSecondary);
+    search.setFont (theme::font (theme::type::body));
+    search.setJustification (juce::Justification::centredLeft);
+    search.setIndents (8, 0);
+    search.setColour (juce::TextEditor::backgroundColourId, theme::colour::bg1);
+    search.setColour (juce::TextEditor::outlineColourId, theme::colour::border);
+    search.setColour (juce::TextEditor::focusedOutlineColourId, theme::colour::accent);
+    search.setColour (juce::TextEditor::textColourId, theme::colour::textPrimary);
+    search.setEscapeAndReturnKeysConsumed (false);
+    search.onTextChange = [this] { setQuery (search.getText()); };
+    search.addKeyListener (this);
+    search.setTitle (tr ("Search icons"));
+    addAndMakeVisible (search);
+    addAndMakeVisible (*grid);
+    setSize (grid->getWidth(), searchHeight + gap + grid->getHeight());
+}
+
+TrackIconPicker::~TrackIconPicker()
+{
+    search.removeKeyListener (this);
+}
+
+bool TrackIconPicker::keyPressed (const juce::KeyPress& key, juce::Component*)
+{
+    if (key.isKeyCode (juce::KeyPress::returnKey) && search.getText().trim().isNotEmpty())
+        pickFirstShown();
+    return false; // (the dialog's OK still takes it)
+}
+
+void TrackIconPicker::resized()
+{
+    auto r = getLocalBounds();
+    search.setBounds (r.removeFromTop (searchHeight).reduced (IconGrid::margin, 0));
+    r.removeFromTop (gap);
+    grid->setBounds (r);
+}
+
+void TrackIconPicker::paint (juce::Graphics& g)
+{
+    g.fillAll (theme::colour::bg2);
+}
+
+void TrackIconPicker::setQuery (const juce::String& query)
+{
+    if (search.getText() != query)
+        search.setText (query, juce::dontSendNotification);
+    grid->setShown (trackicons::search (query.toStdString(), [] (std::string_view english) {
+        return tr (juce::String (std::string (english))).toStdString();
+    }));
+}
+
+int TrackIconPicker::shownCount() const
+{
+    return (int) grid->getShown().size();
+}
+
+int TrackIconPicker::shownFlIndex (int k) const
+{
+    const auto& shown = grid->getShown();
+    return k >= 0 && k < (int) shown.size() ? trackicons::entries[(std::size_t) shown[(std::size_t) k]].flIndex : -1;
+}
+
+bool TrackIconPicker::pickFirstShown()
+{
+    if (grid->getShown().empty())
+        return false;
+    grid->pickEntry (grid->getShown().front());
+    return true;
+}
+
+void TrackIconPicker::pick (int flIndex)
+{
+    for (int i = 0; i < (int) trackicons::entries.size(); ++i)
+        if (trackicons::entries[(std::size_t) i].flIndex == flIndex)
+            grid->pickEntry (i);
+}
+
+void TrackIconPicker::focusSearch()
+{
+    if (search.isShowing())
+        search.grabKeyboardFocus();
+}
+
 std::unique_ptr<juce::Component> makeTrackIconGrid (int currentFlIndex, std::function<void (int)> onPick)
 {
-    return std::make_unique<IconGrid> (currentFlIndex, std::move (onPick));
+    return std::make_unique<TrackIconPicker> (currentFlIndex, 10, std::move (onPick));
 }
 
 void showTrackIconPicker (juce::Rectangle<int> screenArea, int currentFlIndex, std::function<void (int)> onPick)
 {
     // the grid's pick closes its box (known only once the box exists)
     auto box = std::make_shared<juce::Component::SafePointer<juce::CallOutBox>>();
-    auto grid = makeTrackIconGrid (currentFlIndex, [box, onPick = std::move (onPick)] (int flIndex) {
+    auto picker = std::make_unique<TrackIconPicker> (currentFlIndex, 10, [box, onPick = std::move (onPick)] (int flIndex) {
         if (onPick)
             onPick (flIndex);
         if (*box != nullptr)
             (*box)->dismiss();
     });
-    *box = &juce::CallOutBox::launchAsynchronously (std::move (grid), screenArea, nullptr);
+    auto* raw = picker.get();
+    *box = &juce::CallOutBox::launchAsynchronously (std::move (picker), screenArea, nullptr);
+    // issue #220: typing goes straight into the search box
+    juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<juce::Component> (raw)] {
+        if (auto* p = dynamic_cast<TrackIconPicker*> (safe.getComponent()))
+            p->focusSearch();
+    });
 }
 } // namespace lynx::ui

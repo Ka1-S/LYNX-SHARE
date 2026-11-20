@@ -107,6 +107,16 @@ std::pair<juce::String, juce::String> describe (AudioEngine& engine, const remot
         case RemoteAction::record: return { tr ("Transport"), tr ("Record") };
         case RemoteAction::sessionRecord: return { tr ("Clip grid"), tr ("Session Record") };
         case RemoteAction::metronome: return { tr ("Transport"), tr ("Metronome") };
+        // round 190kc: the crossfader's positions and Live's Relative Session Mapping Strip, as Live 12.4's Key Mappings list
+        // names them (shots/ref/live-keymap-browser.png)
+        case RemoteAction::crossfaderLeft: return { tr ("Main") + " | " + tr ("Mixer"), tr ("Crossfader Left") };
+        case RemoteAction::crossfaderCentre: return { tr ("Main") + " | " + tr ("Mixer"), tr ("Crossfader Center") };
+        case RemoteAction::crossfaderRight: return { tr ("Main") + " | " + tr ("Mixer"), tr ("Crossfader Right") };
+        case RemoteAction::sceneUp: return { tr ("Main"), tr ("Scene Up") };
+        case RemoteAction::sceneDown: return { tr ("Main"), tr ("Scene Down") };
+        case RemoteAction::launchSelectedScene: return { tr ("Main"), tr ("Scene Launch") };
+        case RemoteAction::cancelLaunch: return { tr ("Main"), tr ("Cancel Scene Launch") };
+        case RemoteAction::launchSelectedClip: return { trackName (song, t.track), tr ("Track Launch") };
     }
     return {};
 }
@@ -400,7 +410,8 @@ void Overlay::paint (juce::Graphics& g)
         g.fillRect (r);
         g.setColour (colour.withAlpha (0.85f));
         g.drawRect (r, 1.0f);
-        const auto a = mode == remotemap::Mode::key ? remotemap::keyOf (song, s.target) : remotemap::midiOf (song, s.target);
+        // (round 190hp: an element mapped for every project shows that mapping too)
+        const auto a = mode == remotemap::Mode::key ? remotemap::keyOf (song, s.target) : remotemap::midiOf (song, engine.getMidiPrefs(), s.target);
         if (a.found)
         {
             const auto text = assignedText (a, mode);
@@ -446,6 +457,9 @@ void MappingBrowser::selectRow (int row)
 void MappingBrowser::reload()
 {
     auto now = remotemap::rows (engine.getSong(), mode);
+    if (mode == remotemap::Mode::midi) // round 190hp: then the mappings kept for every project
+        for (auto& r : remotemap::globalRows (engine.getSong(), engine.getMidiPrefs()))
+            now.push_back (std::move (r));
     if (now != list)
     {
         list = std::move (now);
@@ -547,7 +561,12 @@ void MappingBrowser::paint (juce::Graphics& g)
         const auto chosen = std::find (selectedRows.begin(), selectedRows.end(), r) != selectedRows.end();
         g.setColour (chosen ? c::accentMuted : (r % 2 == 0 ? c::bg2 : c::bg1));
         g.fillRect (line);
-        const auto [path, name] = describe (engine, row.target);
+        auto [path, name] = describe (engine, row.target);
+        // round 190hp: a mapping for every project says so in its Path ("Every project › Transport"), dimmed while
+        // this project maps that control or target itself
+        if (row.global)
+            path = tr ("Every project") + juce::String::fromUTF8 (" \xe2\x80\xba ") + path;
+        const auto textColour = row.overridden ? c::textSecondary.withAlpha (0.6f) : c::textPrimary;
         juce::StringArray cells;
         if (mode == remotemap::Mode::key)
             cells = { listKeyText (row.key), path, name };
@@ -566,13 +585,13 @@ void MappingBrowser::paint (juce::Graphics& g)
                     const auto box = cell.reduced (3, 2);
                     g.setColour (isMax ? modeColour (mode).withAlpha (0.55f) : c::bg5);
                     g.fillRect (box);
-                    g.setColour (c::textPrimary);
+                    g.setColour (textColour);
                     g.drawText (rangeText (engine, row.target, isMax ? row.max : row.min), box, juce::Justification::centred, true);
                 }
             }
             else
             {
-                g.setColour (c::textPrimary);
+                g.setColour (textColour);
                 g.drawText (cells[i], cell.reduced (5, 0), juce::Justification::centredLeft, true);
             }
             x += w;
@@ -650,7 +669,10 @@ void MappingBrowser::editRange (int r, bool isMax, float value)
 {
     auto row = list[(std::size_t) r];
     const auto min = isMax ? row.min : value, max = isMax ? value : row.max;
-    engine.editSong ([row, min, max] (Song& s) { remotemap::setRange (s, row, min, max); });
+    if (row.global) // (round 190hp: in the settings)
+        engine.editGlobalMappingRow (row, [&] (prefs::MidiPrefs& p) { return remotemap::setGlobalRange (p, row, min, max); });
+    else
+        engine.editSong ([row, min, max] (Song& s) { remotemap::setRange (s, row, min, max); });
     list[(std::size_t) r].min = min;
     list[(std::size_t) r].max = max;
     repaint();
@@ -682,10 +704,28 @@ juce::PopupMenu MappingBrowser::rowMenu (int r)
         if (r >= (int) list.size())
             return;
         const auto row = list[(std::size_t) r];
-        engine.editSong ([row] (Song& s) { remotemap::invertRange (s, row); });
+        if (row.global)
+            engine.editGlobalMappingRow (row, [&] (prefs::MidiPrefs& p) { return remotemap::setGlobalRange (p, row, row.max, row.min); });
+        else
+            engine.editSong ([row] (Song& s) { remotemap::invertRange (s, row); });
         reload();
     });
     menu.addItem (tr ("Delete") + "\t" + tr ("Del"), has, false, [this] { removeSelected(); });
+    // round 190hp (slice B9; LYNX's own, the reference keeps mappings with the set): the mapping for every project, in the
+    // settings, or back into this project only
+    if (mode == remotemap::Mode::midi)
+    {
+        const auto global = has && list[(std::size_t) r].global;
+        const auto movable = has && remotemap::canMove (engine.getSong(), engine.getMidiPrefs(), list[(std::size_t) r], ! global);
+        menu.addSeparator();
+        menu.addItem (tr ("In every project (LYNX)"), movable, global, [this, r, global] {
+            if (r >= (int) list.size())
+                return;
+            engine.moveMappingScope (list[(std::size_t) r], ! global);
+            selectedRows.clear();
+            reload();
+        });
+    }
     return menu;
 }
 
@@ -700,14 +740,21 @@ void MappingBrowser::removeSelected()
         const auto& y = list[(std::size_t) b];
         return x.link != y.link ? x.link < y.link : x.index > y.index;
     });
-    std::vector<remotemap::Row> gone;
+    std::vector<remotemap::Row> gone, goneGlobal;
     for (const auto r : rows)
         if (r >= 0 && r < (int) list.size())
-            gone.push_back (list[(std::size_t) r]);
-    engine.editSong ([gone] (Song& s) {
-        for (const auto& row : gone)
-            remotemap::removeRow (s, row);
+            (list[(std::size_t) r].global ? goneGlobal : gone).push_back (list[(std::size_t) r]);
+    if (! gone.empty())
+        engine.editSong ([gone] (Song& s) {
+            for (const auto& row : gone)
+                remotemap::removeRow (s, row);
+        });
+    // round 190hp: the mappings for every project, from the settings (from the last index up, as above)
+    std::sort (goneGlobal.begin(), goneGlobal.end(), [] (const remotemap::Row& x, const remotemap::Row& y) {
+        return x.link != y.link ? x.link < y.link : x.index > y.index;
     });
+    for (const auto& row : goneGlobal)
+        engine.editGlobalMappingRow (row, [&] (prefs::MidiPrefs& p) { return remotemap::removeGlobalRow (p, row); });
     selectedRows.clear();
     reload();
 }

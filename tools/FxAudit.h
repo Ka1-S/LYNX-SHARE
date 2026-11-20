@@ -1057,6 +1057,18 @@ inline std::vector<Hint> hintsFor (EffectKind kind)
             out.push_back (stop), out.push_back (start), out.push_back (startSynced);
             break;
         }
+        case EffectKind::timeprism: // (round 190ko) the freezer's retrigger modes need three switches together
+            out.push_back (named ("the freezer re-freezing every interval in beats", { { "Freezer", 1.0f }, { "Freeze", 1.0f }, { "Freeze mode", 1.0f },
+                                                                                       { "Retrigger", 1.0f }, { "Sync units", 1.0f }, { "Delay", 0.0f } }));
+            out.push_back (named ("the freezer re-freezing every interval in ms", { { "Freezer", 1.0f }, { "Freeze", 1.0f }, { "Freeze mode", 1.0f },
+                                                                                    { "Retrigger", 1.0f }, { "Sync units", 0.0f }, { "Delay", 0.0f } }));
+            out.push_back (named ("the freezer re-freezing every interval in ms, enveloped", { { "Freezer", 1.0f }, { "Freeze", 1.0f },
+                                                                                              { "Freeze mode", 1.0f }, { "Retrigger", 1.0f },
+                                                                                              { "Sync units", 0.0f }, { "Fade type", 1.0f },
+                                                                                              { "Delay", 0.0f } }));
+            out.push_back (named ("the freezer at onsets, enveloped", { { "Freezer", 1.0f }, { "Freeze", 1.0f }, { "Freeze mode", 1.0f },
+                                                                        { "Retrigger", 0.0f }, { "Fade type", 1.0f }, { "Delay", 0.0f } }));
+            break;
         default:
             break;
     }

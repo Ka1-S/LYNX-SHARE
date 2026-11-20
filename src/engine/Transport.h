@@ -17,6 +17,9 @@ struct Transport
 {
     std::atomic<bool> playing { false };
     std::atomic<bool> metronome { false };
+    // round 190lr (DL-47): Live's metronome option "Enable Only While Recording" (a UI setting): the click sounds only while
+    // recording (the count-in still counts)
+    std::atomic<bool> metronomeOnlyRecording { false };
     // the metronome's sound in FL's Metronome sound menu order (core/MetronomeVoice.h, REA round 165z-a2): 0 Hi-hat,
     // 1 Tick (FL's default), 2 Beep, 3 Cowbell, 4 Pulse
     std::atomic<int> metronomeSound { 1 };
@@ -145,12 +148,18 @@ struct Transport
     // UI landing between the callback's check and the rack's cannot play a block the callback does not move on from
     std::atomic<bool> callbackPlaying { false };
 
+    // FL's tempo menu "Half speed" (round 190mp, DF-16): 0.5 = the song plays at half its tempo, the tempo shown stays
+    // (a temporary state: not saved, not in an export — renderOffline plays at 1). Render-ahead stays off meanwhile.
+    std::atomic<double> playSpeed { 1.0 };
+
     double ticksPerSample() const noexcept
     {
         // (rollup 0.1.28: an external clock or Link first, then 190gq's pinned tempo, then the song's)
+        // (round 190mp: Half speed scales the override and the song's tempo; a pinned tempo is the renderer's, already scaled)
         const auto over = overrideBpm();
         const auto pinned = pinnedBpm.load (std::memory_order_relaxed);
-        return (over > 0.0 ? over : pinned > 0.0 ? pinned : bpm.load (std::memory_order_relaxed)) * ppq / (60.0 * sampleRate.load (std::memory_order_relaxed));
+        const auto speed = playSpeed.load (std::memory_order_relaxed);
+        return (over > 0.0 ? over * speed : pinned > 0.0 ? pinned : bpm.load (std::memory_order_relaxed) * speed) * ppq / (60.0 * sampleRate.load (std::memory_order_relaxed));
     }
 
     double positionInBeats() const noexcept

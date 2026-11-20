@@ -80,7 +80,8 @@ inline std::vector<std::string> targets (int step)
         case key: return { "toolbar.key", "keyboard.key" };
         case instrument: return { "simple.tile.instrument", "simple.addTrack" };
         case chords: return { "keyboard.chordPad", "simple.dock.keyboard", "simple.dock.editor" };
-        case loop: return { "simple.tile.voice", "simple.addTrack" };
+        // (round 190jc, design190ia SG-18: the drop lane, where a loop goes; it rang "+ Add track" before)
+        case loop: return { "simple.tile.voice", "simple.dropLane", "simple.addTrack" };
         case effect: return { "simple.dock.addEffect", "simple.dock.effects" };
         case finish: return { "simple.finish.looks", "simple.finish" };
         default: return {};
@@ -90,6 +91,46 @@ inline std::vector<std::string> targets (int step)
 // Whether the card offers "Do it for me" (ui/FirstSongTour.cpp does it with the same code the user's action runs).
 // A voice or a loop can't be made up: that step offers the loops instead.
 inline bool canDoForUser (int step) noexcept { return step >= 0 && step < stepCount && step != loop; }
+
+// --- where the card goes (round 190jc, design190ia SG-18: BandLab's coachmark sits beside its target; LYNX's card sat in
+// a corner, up to 1 330 px away from its ring) -------------------------------------------------------------------------
+struct Box
+{
+    int x = 0, y = 0, w = 0, h = 0;
+    int right() const noexcept { return x + w; }
+    int bottom() const noexcept { return y + h; }
+    bool empty() const noexcept { return w <= 0 || h <= 0; }
+    bool intersects (const Box& o) const noexcept { return ! empty() && ! o.empty() && x < o.right() && o.x < right() && y < o.bottom() && o.y < bottom(); }
+    bool inside (const Box& o) const noexcept { return x >= o.x && y >= o.y && right() <= o.right() && bottom() <= o.bottom(); }
+};
+enum class Side : int { below, right, above, left, none };
+struct Placement
+{
+    Box card;
+    Side side = Side::none; // where the card is, seen from the ring (none: no place beside it; the caller uses a corner)
+};
+
+// The card (w x h) beside `ring`, `gap` px from it: below it and left-aligned with it first, then right of it, above it,
+// left of it; slid along that side to stay inside `area`; never over the ring, `keepClear` (the Finish dock) or `avoid`
+// (round 190jp: the bottom dock when the ring is in it — step 4's card went below the Chord pad button, over the keys).
+inline Placement placeCard (Box ring, Box area, int w, int h, int gap, Box keepClear = {}, Box avoid = {})
+{
+    if (ring.empty() || w > area.w || h > area.h)
+        return {};
+    const auto clampX = [&] (int x) { return std::clamp (x, area.x, area.right() - w); };
+    const auto clampY = [&] (int y) { return std::clamp (y, area.y, area.bottom() - h); };
+    const Placement tries[] {
+        { { clampX (ring.x), ring.bottom() + gap, w, h }, Side::below },
+        { { ring.right() + gap, clampY (ring.y), w, h }, Side::right },
+        { { clampX (ring.x), (ring.intersects (avoid) ? std::min (ring.y, avoid.y) : ring.y) - gap - h, w, h }, Side::above }, // (above the dock)
+        { { ring.x - gap - w, clampY (ring.y), w, h }, Side::left },
+    };
+    const Box halo { ring.x - gap / 2, ring.y - gap / 2, ring.w + gap, ring.h + gap };
+    for (const auto& t : tries)
+        if (t.card.inside (area) && ! t.card.intersects (halo) && ! t.card.intersects (keepClear) && ! t.card.intersects (avoid))
+            return t;
+    return {};
+}
 
 // --- what the song shows ------------------------------------------------------------------------------------------------
 // A Simple Drums track whose pattern has notes (a starter beat, or steps set by hand)

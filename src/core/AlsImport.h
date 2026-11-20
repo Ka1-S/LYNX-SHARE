@@ -12,7 +12,7 @@
 //    `sessionOnPlaylist`, the Playlist after the arrangement, one section per scene (a marker per scene);
 //  - third-party VST2 / VST3 plugins → PluginRef::foreign (resolved like an .flp's, state carried over);
 //  - Live's own devices → the closest LYNX instrument (Simpler / Sampler / Drum rack / Instrument rack); the rest is
-//    listed in the report (unsupported / droppedEffects), as for an .flp.
+//    listed in the report (unsupported / notReproduced / droppedEffects), as for an .flp.
 
 #include <array>
 #include <cstdint>
@@ -68,6 +68,19 @@ struct LiveDevicePreset
 std::optional<LiveDevicePreset> importLiveDevicePreset (const std::vector<std::uint8_t>& fileBytes, const AlsImportOptions& options = {},
                                                         std::string* error = nullptr);
 
+// (round 190hr, racks-069) A Live instrument preset — an instrument .adv (Simpler, Sampler, Operator, Drift, a VST
+// instrument) or an Instrument / Drum Rack .adg — as a channel's instrument, through the set import's translators.
+// nullopt + `error`: not an instrument preset, a MIDI effect preset (no live counterpart in LYNX: refused), or an
+// instrument with no LYNX counterpart. `channel` holds only the instrument (and its name): the caller places it.
+struct LiveInstrumentPreset
+{
+    ChannelDef channel;
+    std::string name;
+    bool rack = false;
+};
+std::optional<LiveInstrumentPreset> importLiveInstrumentPreset (const std::vector<std::uint8_t>& fileBytes, const AlsImportOptions& options = {},
+                                                                std::string* error = nullptr);
+
 // The set's third-party plugins (no import): for the targeted scan before an open, as flpForeignPlugins for an .flp.
 std::vector<FlpPluginUse> alsForeignPlugins (const std::vector<std::uint8_t>& fileBytes);
 
@@ -86,5 +99,9 @@ std::string alsHexEncode (const std::vector<std::uint8_t>& bytes, std::size_t li
 
 // Live's 70-colour clip/track palette index → 0xFFRRGGBB (LYNX's own approximation of each hue; 0 for unknown).
 std::uint32_t alsColour (int index) noexcept;
-int alsColourIndex (std::uint32_t argb) noexcept; // the nearest palette index (for the export)
+// Round 190ig: Live 12.4's own colour of each index (0 for unknown), and the colour an .als import gives an index: Live's
+// while the Clip-launch layout shows (layoutstyle::current), alsColour's otherwise.
+std::uint32_t alsLiveColour (int index) noexcept;
+std::uint32_t alsImportColour (int index) noexcept;
+int alsColourIndex (std::uint32_t argb) noexcept; // Live's own index of one of its colours, else the nearest palette index (for the export)
 } // namespace lynx

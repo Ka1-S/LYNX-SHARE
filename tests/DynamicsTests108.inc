@@ -589,6 +589,7 @@ TEST (dyn108_sentry_gate_curves_and_timing)
     };
     p = defaults (EffectKind::sentryGate);
     p[s::hold] = 0.0f;
+    p[s::revision] = 0.0f; // round 190lp: revision 0's measured closing (Parity190lpLgTests covers revision 1)
     const auto c6 = closeAfter (p, -6.0), c20 = closeAfter (p, -20.0);
     std::printf ("  Classic closing: -6 dB after %.0f ms (39), -20 dB after %.0f ms (147)\n", c6, c20);
     CHECK (c6 > 25.0 && c6 < 60.0 && c20 > 95.0 && c20 < 220.0);
@@ -719,7 +720,9 @@ TEST (dyn108_fabfilter_states_translate_to_the_suite)
         old.state = ffbs (90, { { 1, -40.0f } });
         int none = -1;
         const auto slot3 = makeSubstituteSlot (*entry, &old, &none);
-        CHECK (none == 0 && slot3.params == makeEffectSlot (EffectKind::crestCompressor).params);
+        auto plainCrest = makeEffectSlot (EffectKind::crestCompressor);
+        plainCrest.params[(std::size_t) dyn::crest::revision] = 0.0f; // round 190kw: a substitute's untranslated Crest keeps revision 0
+        CHECK (none == 0 && slot3.params == plainCrest.params);
 
         // the substitute keeps the original plugin, state byte for byte
         EffectSlot fl;

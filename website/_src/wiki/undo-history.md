@@ -17,18 +17,17 @@ Every edit to the project is a step in the undo history: a note you add, a clip 
 
 ## The undo keys
 
-`Ctrl+Z` does not work as in most programs. It undoes the last step, and pressed again it redoes it, so it switches between the last two states. To walk further back, use `Ctrl+Alt+Z`.
+`Ctrl+Z` steps back through the history, one step per press, as in FL Studio 2026 and most programs. `Ctrl+Y` or `Ctrl+Shift+Z` steps forward again.
 
 | Command | Key | What it does |
 |---|---|---|
-| `Undo` | `Ctrl+Z` | Undoes the last step. After an undo it redoes the next step, and the menu item reads `Undo (redo)` |
-| `Undo backwards` | `Ctrl+Alt+Z` | Always steps back, one step per press |
+| `Undo` | `Ctrl+Z` | Steps back one step per press |
 | `Redo` | `Ctrl+Y` or `Ctrl+Shift+Z` | Steps forward |
 | `Undo history...` | `Ctrl+Alt+H` | Opens the list |
 
-After each undo or redo, the hint bar names the step and shows the level, for example `Level 2/3`.
+The `Edit` menu names the step each item acts on, for example `Undo Add notes: Pattern 1`. After each undo or redo, the hint bar names the step and shows the level, for example `Level 2/3`.
 
-If you prefer the usual behaviour, turn on `Alternate undo mode (classic undo, instead of undo/redo on the same shortcut)` in `Options › General settings...`. `Ctrl+Z` then always steps back.
+FL Studio's other undo mode is there too: turn off `Alternate undo mode` in `Options › General settings...`. `Ctrl+Z` then undoes the last step and, pressed again, redoes it, so it switches between the last two states. `Ctrl+Alt+Z` (`Undo backwards`) walks further back, and `Ctrl+Y` or `Ctrl+Shift+Z` still redo.
 
 ## What is a step and what is not
 
@@ -45,7 +44,7 @@ Both are in `Options › General settings...`.
 | Setting | What it does |
 |---|---|
 | `Maximum undo levels` | How many steps are kept: 25, 50, 100, 200, 500 or 1000. The default is 100 |
-| `Alternate undo mode` | Makes `Ctrl+Z` a classic undo |
+| `Alternate undo mode` | On by default: `Ctrl+Z` steps back through the history. Off: `Ctrl+Z` switches between undo and redo of the last step |
 
 ## Backups
 

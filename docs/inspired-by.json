@@ -102,7 +102,22 @@
     "Limiter": {"own": false},
     "Compressor": {"own": false},
     "Parametric EQ": {"own": false},
-    "Auto-pan": {"own": false}
+    "Auto-pan": {"own": false},
+    "Utility": {"own": false},
+    "Filter": {"own": false},
+    "Fruity Soft Clipper": {"own": false},
+    "Distortion": {"own": false},
+    "Lo-fi": {"own": false},
+    "Frequency shifter": {"own": false},
+    "Pitch shift": {"own": false},
+    "Chorus": {"own": false},
+    "Fruity Phaser": {"own": false},
+    "Fruity Flanger": {"own": false},
+    "Pocket Tape Stop": {"own": false},
+    "Pocket Comb Filter": {"own": false},
+    "Volume gate": {"own": false},
+    "Effector": {"own": false},
+    "Low Lifter": {"own": false}
   },
   "products": {
     "valhalla-vintageverb": {"short": "VintageVerb"},

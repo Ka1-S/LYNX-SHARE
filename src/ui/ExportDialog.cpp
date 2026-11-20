@@ -1,6 +1,8 @@
 #include "ui/ExportDialog.h"
 
 #include "core/PatternBlocks.h"
+#include "core/ExportNaming.h"
+#include "core/ProjectKey.h"
 #include "core/MessageThreadOwned.h"
 #include "core/PlaylistOps.h"
 #include "core/PickerSelection.h"
@@ -22,6 +24,7 @@
 #include "ui/FileChoosers.h"
 #include "ui/WindowOwner.h"
 
+#include "engine/AacEncoder.h"
 #include "engine/Exporter.h"
 #include "engine/Text.h"
 #include "ui/HintBar.h"
@@ -132,6 +135,20 @@ private:
 public:
     bool reveal = false;
     std::function<void()> then; // after a successful export (round 174d: the video with the mix)
+    // round 190jb: the live engine's plugins render this export (FL); given back when the thread is deleted
+    std::shared_ptr<LiveExportHold> liveHold;
+    // round 190jx: runs (message thread) once the job and the hold are gone, the plugins given back and the live engine
+    // playing again: an edit of the song that uses the render (Render to audio's new insert)
+    std::function<void()> afterRelease;
+
+    ~ExportThread() override
+    {
+        job.reset();
+        liveHold.reset();
+        if (afterRelease)
+            afterRelease();
+    }
+
 private:
     juce::String error;
     bool ok = false;
@@ -194,6 +211,10 @@ public:
         juce::MessageManager::callAsync ([this] { delete this; });
     }
 
+public:
+    // round 190jb: the live engine's plugins render these files (FL); given back when the thread is deleted
+    std::shared_ptr<LiveExportHold> liveHold;
+
 private:
     std::function<void (const std::vector<juce::File>&)> afterRender;
     exportopts::Options options;
@@ -212,6 +233,30 @@ juce::File exportSettingsFile()
 // round 190ap: the named export presets, and what the last export was made with and where it went
 juce::File exportPresetsFile() { return lynx::platform::settingsFile ("export-presets.txt"); }
 juce::File exportLastFile() { return lynx::platform::settingsFile ("export-last.txt"); }
+
+// The formats this window offers, in exportopts::Format order: M4A (the last) only where the system has an AAC encoder
+// (engine/AacEncoder.h; not on Linux)
+int offeredFormats()
+{
+    return aac::available() ? exportopts::formatCount : (int) exportopts::Format::aac;
+}
+
+juce::StringArray offeredFormatNames()
+{
+    juce::StringArray names;
+    for (int i = 0; i < offeredFormats(); ++i)
+        names.add (exportopts::formatName ((exportopts::Format) i));
+    return names;
+}
+
+// `o` without the formats this system cannot write (M4A without an AAC encoder: WAV instead, and no M4A "also")
+exportopts::Options withOfferedFormats (exportopts::Options o)
+{
+    if ((int) o.format >= offeredFormats())
+        o.format = exportopts::Format::wav;
+    o.moreFormats &= (1u << offeredFormats()) - 1u;
+    return exportopts::clamped (o);
+}
 
 // A row of buttons where exactly one is on (the output format).
 class Segmented final : public juce::Component
@@ -314,7 +359,7 @@ public:
     {
         using namespace exportopts;
         if (persistent)
-            options = fromText (exportSettingsFile().loadFileAsString().toStdString());
+            options = withOfferedFormats (fromText (exportSettingsFile().loadFileAsString().toStdString()));
         if (clip != nullptr)
         {
             persistent = false; // (the Export window's own choices stay as they are)
@@ -338,7 +383,7 @@ public:
             options.stems = Stems::mixerTracks;
             options.stemsIncludeMaster = std::find (onlyTracks.begin(), onlyTracks.end(), 0) != onlyTracks.end();
         }
-        if (initialFormat >= 0 && initialFormat <= 3)
+        if (initialFormat >= 0 && initialFormat < offeredFormats())
             options = withSingleFormat (options, (Format) initialFormat);
         const auto& song = engine.getSong();
         // the range follows what is playing unless a selection was the last choice and still exists
@@ -418,24 +463,32 @@ public:
         // FL ticks several format boxes at once (REA round 139): the other formats written from the same render
         settingsui::styleLabel (alsoLabel, tr ("Also save"));
         addAndMakeVisible (alsoLabel);
-        for (int i = 0; i < 4; ++i)
+        for (int i = 0; i < exportopts::formatCount; ++i)
         {
-            static const char* names[] = { "WAV", "MP3", "OGG", "FLAC" };
-            alsoToggles[(std::size_t) i].setButtonText (names[i]);
-            alsoToggles[(std::size_t) i].setTooltip (tr ("Also write the {0} file from the same render (same name, its own extension)", { juce::String (names[i]) }));
+            const auto name = juce::String (formatName ((Format) i));
+            alsoToggles[(std::size_t) i].setButtonText (name);
+            alsoToggles[(std::size_t) i].setTooltip (tr ("Also write the {0} file from the same render (same name, its own extension)", { name }));
             alsoToggles[(std::size_t) i].onClick = [this] { readControls(); };
-            addAndMakeVisible (alsoToggles[(std::size_t) i]);
+            addChildComponent (alsoToggles[(std::size_t) i]);
+            alsoToggles[(std::size_t) i].setVisible (i < offeredFormats()); // (M4A: where the system can encode it)
         }
         combo (depthLabel, tr ("Bit depth"), depthBox, { tr ("16 bits (integer)"), tr ("24 bits (integer)"), tr ("32 bits (float)") });
-        juce::StringArray mp3Items, oggItems;
+        juce::StringArray mp3Items, oggItems, aacItems;
         for (auto k : mp3Bitrates())
             mp3Items.add (juce::String (k) + " kbps");
         for (auto k : oggBitrates())
             oggItems.add (juce::String (k) + " kbps");
+        for (auto k : aacBitrates())
+            aacItems.add (juce::String (k) + " kbps");
         combo (bitrateLabel, tr ("Bitrate"), mp3Box, mp3Items, tr ("Constant bitrate (higher: better sound, bigger file)"));
         addAndMakeVisible (oggBox);
         oggBox.addItemList (oggItems, 1);
         oggBox.onChange = [this] { readControls(); };
+        // M4A (owner decision D5): AAC through the system's encoder, which takes these four bitrates
+        addAndMakeVisible (aacBox);
+        aacBox.addItemList (aacItems, 1);
+        aacBox.setTooltip (tr ("AAC bitrate (the system's encoder; higher: better sound, bigger file)"));
+        aacBox.onChange = [this] { readControls(); };
         combo (compressionLabel, tr ("Compression"), flacLevelBox,
                { tr ("0 (fastest)"), "1", "2", "3", "4", tr ("5 (default)"), "6", "7", tr ("8 (smallest)") },
                tr ("FLAC is lossless at every level; higher levels make smaller files and take longer"));
@@ -504,6 +557,29 @@ public:
         warningLabel.setMinimumHorizontalScale (0.7f);
         addAndMakeVisible (warningLabel);
 
+        // issue #215 (round 190ng): the file name with wildcards (core/ExportNaming.h), the list to click, the name it gives
+        naming = clip == nullptr;
+        settingsui::styleLabel (nameLabel, tr ("File name"));
+        nameEditor.setFont (theme::font (theme::type::body));
+        nameEditor.setIndents (6, 0);
+        nameEditor.setJustification (juce::Justification::centredLeft);
+        nameEditor.setTextToShowWhenEmpty (exportnaming::defaultTemplate, theme::colour::textSecondary);
+        nameEditor.setTooltip (tr ("The exported file's name. Wildcards such as $project, $date or $bpm are filled in when you export"));
+        nameEditor.onTextChange = [this] {
+            options.nameTemplate = nameEditor.getText().toStdString();
+            refreshName();
+        };
+        wildcardButton.setButtonText (tr ("Wildcards"));
+        wildcardButton.setTooltip (tr ("Insert a wildcard at the cursor"));
+        wildcardButton.onClick = [this] { showWildcards(); };
+        namePreview.setFont (theme::font (theme::type::small));
+        namePreview.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        namePreview.setMinimumHorizontalScale (0.7f);
+        for (auto* c : std::initializer_list<juce::Component*> { &nameLabel, &nameEditor, &wildcardButton, &namePreview })
+            addChildComponent (c);
+        for (auto* c : std::initializer_list<juce::Component*> { &nameLabel, &nameEditor, &wildcardButton, &namePreview })
+            c->setVisible (naming);
+
         exportButton.setColour (juce::TextButton::buttonColourId, theme::colour::accent);
         exportButton.setColour (juce::TextButton::textColourOffId, theme::colour::onAccent);
         addAndMakeVisible (exportButton);
@@ -554,7 +630,7 @@ public:
     // --snapshot: the window with this format chosen (0 WAV, 1 MP3, 2 OGG, 3 FLAC) and a few options set
     void setFormatForSnapshot (int format)
     {
-        options.format = (exportopts::Format) juce::jlimit (0, 3, format);
+        options.format = (exportopts::Format) juce::jlimit (0, offeredFormats() - 1, format);
         if (format == 3)
         {
             options.tail = exportopts::TailMode::wrap;
@@ -563,6 +639,13 @@ public:
             options.stemsIncludeMaster = true;
             options.normalize = true;
         }
+        writeControls();
+    }
+
+    // --issues190ngshot (issue #215): the stems choice (0 one file, 1 per insert)
+    void setStemsForSnapshot (int stems)
+    {
+        options.stems = (exportopts::Stems) juce::jlimit (0, 3, stems);
         writeControls();
     }
 
@@ -657,6 +740,18 @@ public:
             realtimeToggle.setBounds (mix.removeFromTop (24));
         }
         area.removeFromBottom (6);
+        if (naming) // issue #215 (round 190ng): the file name row and the name it gives, above the Mix switches
+        {
+            auto block = area.removeFromBottom (namingHeight);
+            block.removeFromTop (6);
+            auto row = block.removeFromTop (26);
+            nameLabel.setBounds (row.removeFromLeft (theme::labelColumnWidth ({ &nameLabel }, 92, 150)));
+            wildcardButton.setBounds (row.removeFromRight (juce::jlimit (96, 160, wildcardButton.getBestWidthForHeight (26))));
+            row.removeFromRight (8);
+            nameEditor.setBounds (row);
+            block.removeFromTop (2);
+            namePreview.setBounds (block.removeFromTop (18).withTrimmedLeft (nameLabel.getWidth()));
+        }
         columnsBottom = area.getBottom();
 
         auto left = area.removeFromLeft ((area.getWidth() - 24) / 2);
@@ -701,31 +796,42 @@ public:
         formatButtons.setBounds (right.removeFromTop (28));
         right.removeFromTop (4);
         {
-            // the four format ticks keep the room their names need; a caption too long to sit beside them
-            // ("Также сохранить", "Auch speichern") gets its own line above them instead of being cut
-            const auto ticks = 4 * 54;
-            const auto labelNeeds = theme::labelColumnWidth ({ &alsoLabel }, 0, 400);
-            const auto ownLine = labelNeeds > (right.getWidth() - ticks) * 11 / 10; // a slight squeeze is fine
-            if (ownLine)
+            // the format ticks keep the room their names need; a caption too long to sit beside them ("Также
+            // сохранить", "Auch speichern") gets its own line above them instead of being cut. Five or six formats
+            // (AIFF, M4A: owner decision D5) do not fit beside the caption: the caption has its own line, and the ticks
+            // take two rows when one is too narrow for them
+            const auto layout = alsoLayout (right.getWidth());
+            if (layout.ownLine)
                 alsoLabel.setBounds (right.removeFromTop (18));
             auto also = right.removeFromTop (22);
-            if (! ownLine) // as before round 165o
-                alsoLabel.setBounds (also.removeFromLeft (juce::jmax (juce::jmin (70, also.getWidth() - ticks),
-                                                                      juce::jmin (theme::labelColumnWidth ({ &alsoLabel }, 70, 130), also.getWidth() - ticks))));
-            const auto w = also.getWidth() / 4;
-            for (auto& t : alsoToggles)
-                t.setBounds (also.removeFromLeft (w));
+            if (! layout.ownLine) // as before round 165o
+                alsoLabel.setBounds (also.removeFromLeft (juce::jmax (juce::jmin (70, also.getWidth() - layout.ticks),
+                                                                      juce::jmin (theme::labelColumnWidth ({ &alsoLabel }, 70, 130), also.getWidth() - layout.ticks))));
+            const auto count = offeredFormats();
+            const auto perRow = (count + layout.rows - 1) / layout.rows;
+            const auto w = also.getWidth() / perRow;
+            for (int i = 0; i < count; ++i)
+            {
+                if (i > 0 && i % perRow == 0)
+                {
+                    right.removeFromTop (2);
+                    also = right.removeFromTop (22);
+                }
+                alsoToggles[(std::size_t) i].setBounds (also.removeFromLeft (w));
+            }
         }
         right.removeFromTop (gap);
         // the format's own settings: two rows, the others hidden
         using exportopts::Format;
         const auto f = options.format;
-        if (f == Format::wav || f == Format::flac)
+        if (f == Format::wav || f == Format::flac || f == Format::aiff)
             row (right, depthLabel, depthBox);
         if (f == Format::mp3)
             row (right, bitrateLabel, mp3Box);
         if (f == Format::ogg)
             row (right, bitrateLabel, oggBox);
+        if (f == Format::aac)
+            row (right, bitrateLabel, aacBox);
         if (f == Format::flac)
             row (right, compressionLabel, flacLevelBox);
         row (right, rateLabel, rateBox);
@@ -754,15 +860,43 @@ private:
         constexpr int rowHeight = 26, gap = 7;
         const auto leftHeight = 26 + 8 + 5 * (rowHeight + gap) + 22 + (sectionsToggle.isVisible() ? 24 : 0) + (onlyTracks.empty() ? 0 : gap + rowHeight + gap);
         const auto columnWidth = (620 - 32 - 24) / 2;
-        const auto labelNeeds = theme::labelColumnWidth ({ &alsoLabel }, 0, 400);
-        const auto ownLine = labelNeeds > (columnWidth - 4 * 54) * 11 / 10;
+        const auto layout = alsoLayout (columnWidth);
         // the most rows a format has: FLAC (bit depth, compression) + rate, channels, dither
-        const auto rightHeight = 26 + 8 + 28 + 4 + (ownLine ? 18 : 0) + 22 + gap + 5 * (rowHeight + gap);
+        const auto rightHeight = 26 + 8 + 28 + 4 + (layout.ownLine ? 18 : 0) + layout.rows * 22 + (layout.rows - 1) * 2 + gap + 5 * (rowHeight + gap);
         return juce::jmax (leftHeight, rightHeight);
+    }
+
+    // "Also save" and its format ticks in a column `width` wide: the caption beside the ticks or on its own line, the
+    // ticks in one row or two (each tick needs its box and its name)
+    struct AlsoLayout
+    {
+        bool ownLine = false;
+        int rows = 1;
+        int ticks = 0; // the width the ticks take in a row beside the caption
+    };
+    AlsoLayout alsoLayout (int width) const
+    {
+        AlsoLayout l;
+        const auto count = offeredFormats();
+        if (count <= 4) // (as before: four ticks of 54 px)
+        {
+            l.ticks = count * 54;
+            l.ownLine = theme::labelColumnWidth ({ &alsoLabel }, 0, 400) > (width - l.ticks) * 11 / 10; // a slight squeeze is fine
+            return l;
+        }
+        l.ownLine = true;
+        int widest = 0;
+        for (int i = 0; i < count; ++i)
+            widest = juce::jmax (widest, juce::GlyphArrangement::getStringWidthInt (theme::font (theme::type::body), formatName ((exportopts::Format) i)));
+        const auto each = widest + 24; // the tick box and its gap (the 54 px a tick always had for "FLAC")
+        l.rows = each * count <= width ? 1 : 2;
+        l.ticks = width;
+        return l;
     }
     int columnsBottom = 0;
     static constexpr int presetRowHeight = 26 + 14;
-    int wantedHeight() { return 12 + (additions ? presetRowHeight : 0) + columnsHeight() + 6 + mixHeight() + 8 + 32 + 12; }
+    static constexpr int namingHeight = 6 + 26 + 2 + 18 + 4; // (round 190ng: the file name row)
+    int wantedHeight() { return 12 + (additions ? presetRowHeight : 0) + columnsHeight() + 6 + (naming ? namingHeight : 0) + mixHeight() + 8 + 32 + 12; }
 
     // ---- round 190ap: presets and "same as last time" ------------------------------------------------------------
     void fillPresets (const juce::String& select)
@@ -793,7 +927,7 @@ private:
         o.master = false;
         if (o.range == exportopts::Range::selection && ! exportopts::hasSelection (engine.getSong()))
             o.range = exportopts::Range::song;
-        return exportopts::clamped (o);
+        return withOfferedFormats (o); // (a preset made where M4A exists, opened where it does not: WAV)
     }
 
     void applyPreset()
@@ -933,9 +1067,13 @@ private:
         stemsMaster.setToggleState (options.stemsIncludeMaster, n);
         sectionsToggle.setToggleState (options.sections, n);
         formatButtons.setSelected ((int) options.format);
-        depthBox.setSelectedItemIndex (options.format == Format::flac ? (options.flacBits == 16 ? 0 : 1) : (options.wavBits == 16 ? 0 : options.wavBits == 24 ? 1 : 2), n);
+        depthBox.setSelectedItemIndex (options.format == Format::flac   ? (options.flacBits == 16 ? 0 : 1)
+                                       : options.format == Format::aiff ? (options.aiffBits == 16 ? 0 : 1)
+                                                                        : (options.wavBits == 16 ? 0 : options.wavBits == 24 ? 1 : 2),
+                                       n);
         mp3Box.setSelectedItemIndex (indexOf (mp3Bitrates(), options.mp3Kbps), n);
         oggBox.setSelectedItemIndex (indexOf (oggBitrates(), options.oggKbps), n);
+        aacBox.setSelectedItemIndex (indexOf (aacBitrates(), options.aacKbps), n);
         flacLevelBox.setSelectedItemIndex (options.flacLevel, n);
         int rate = 0;
         for (int i = 0; i < (int) sampleRates().size(); ++i)
@@ -956,10 +1094,120 @@ private:
         tempoToggle.setToggleState (options.saveTempo, n);
         loopMarkersToggle.setToggleState (options.loopMarkers, n);
         playlistMarkersToggle.setToggleState (options.playlistMarkers, n);
-        for (int i = 0; i < 4; ++i)
+        for (int i = 0; i < exportopts::formatCount; ++i)
             alsoToggles[(std::size_t) i].setToggleState (i == (int) options.format || (options.moreFormats & (1u << i)) != 0, n);
+        nameEditor.setText (juce::String::fromUTF8 (options.nameTemplate.c_str()), n);
         refresh();
+        refreshName();
     }
+
+    // ---- issue #215 (round 190ng): the file name's wildcards ----------------------------------------------------------
+    // the folder the file dialog opens in (and where $take looks)
+    juce::File exportFolder() const
+    {
+        return lastFolder.isDirectory() ? lastFolder
+               : suggestedFolder.isDirectory() ? suggestedFolder
+                                               : juce::File::getSpecialLocation (juce::File::userMusicDirectory);
+    }
+
+    exportnaming::Context namingContext() const
+    {
+        using namespace exportopts;
+        const auto& song = engine.getSong();
+        exportnaming::Context c;
+        c.project = suggestedName.toStdString();
+        const auto now = nowForNaming != juce::Time() ? nowForNaming : juce::Time::getCurrentTime();
+        c.year = now.getYear();
+        c.month = now.getMonth() + 1;
+        c.day = now.getDayOfMonth();
+        c.hour = now.getHours();
+        c.minute = now.getMinutes();
+        c.second = now.getSeconds();
+        c.bpm = song.bpm;
+        if (const auto key = projectkey::get (song))
+        {
+            const auto scale = projectkey::shortScaleName (key->flScale);
+            c.key = projectkey::rootName (key->root) + (scale.empty() ? std::string() : " " + scale);
+        }
+        c.sampleRate = (int) options.sampleRate;
+        switch (options.format)
+        {
+            case Format::wav: c.bitDepth = std::to_string (options.wavBits) + "bit"; break;
+            case Format::flac: c.bitDepth = std::to_string (options.flacBits) + "bit"; break;
+            case Format::aiff: c.bitDepth = std::to_string (options.aiffBits) + "bit"; break;
+            case Format::mp3: c.bitDepth = std::to_string (options.mp3Kbps) + "kbps"; break;
+            case Format::ogg: c.bitDepth = std::to_string (options.oggKbps) + "kbps"; break;
+            case Format::aac: c.bitDepth = std::to_string (options.aacKbps) + "kbps"; break;
+            default: break;
+        }
+        c.format = formatName (options.format);
+        if (song.currentPattern >= 0 && song.currentPattern < (int) song.patterns.size())
+            c.pattern = song.patterns[(std::size_t) song.currentPattern].name;
+        const auto folder = exportFolder();
+        const auto ext = juce::String (extension (options.format));
+        c.exists = [folder, ext] (const std::string& name) { return folder.getChildFile (juce::String::fromUTF8 (name.c_str()) + ext).exists(); };
+        return c;
+    }
+
+    // the name the template gives (without extension); with stems, "$track" stays for each stem's file
+    juce::String resolvedName() const
+    {
+        const auto stems = options.stems != exportopts::Stems::none;
+        return juce::String::fromUTF8 (exportnaming::resolve (options.nameTemplate, namingContext(), stems).c_str());
+    }
+
+    void refreshName()
+    {
+        if (! naming)
+            return;
+        const auto ext = juce::String (exportopts::extension (options.format));
+        auto text = tr ("File:") + " " + resolvedName() + ext;
+        if (options.stems != exportopts::Stems::none)
+        {
+            const auto base = resolvedName().toStdString();
+            const auto example = juce::String::fromUTF8 (exportopts::stemFileName (base, 1, "Kick", exportopts::extension (options.format)).c_str());
+            text = tr ("Stems:") + " " + example + ", ...";
+        }
+        namePreview.setText (text, juce::dontSendNotification);
+        namePreview.setTooltip (text);
+    }
+
+    void showWildcards()
+    {
+        juce::PopupMenu menu;
+        menu.addSectionHeader (tr ("Wildcards"));
+        int id = 1;
+        for (const auto& w : exportnaming::wildcards)
+        {
+            const auto token = juce::String (std::string (w.token));
+            menu.addItem (id++, token + "   " + tr (juce::String (std::string (w.meaning))));
+        }
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&wildcardButton), [safe = juce::Component::SafePointer<ExportPanel> (this)] (int chosen) {
+            if (safe != nullptr && chosen > 0 && chosen <= (int) std::size (exportnaming::wildcards))
+                safe->insertWildcard (juce::String (std::string (exportnaming::wildcards[(std::size_t) chosen - 1].token)));
+        });
+    }
+
+public:
+    void insertWildcard (const juce::String& token)
+    {
+        nameEditor.insertTextAtCaret (token);
+        options.nameTemplate = nameEditor.getText().toStdString();
+        refreshName();
+    }
+    // --issues190ngshot: the template typed, a fixed time, the name shown
+    void setNameTemplateForSnapshot (const juce::String& templ, juce::Time now)
+    {
+        nowForNaming = now;
+        nameEditor.setText (templ, juce::sendNotification);
+        options.nameTemplate = templ.toStdString();
+        refreshName();
+    }
+    juce::String namePreviewForSnapshot() const { return namePreview.getText(); }
+    juce::String resolvedNameForSnapshot() const { return resolvedName(); }
+    juce::Component& wildcardButtonForSnapshot() { return wildcardButton; }
+
+private:
 
     void readControls()
     {
@@ -973,17 +1221,22 @@ private:
         options.stems = (Stems) juce::jmax (0, stemsBox.getSelectedItemIndex());
         options.stemsIncludeMaster = stemsMaster.getToggleState();
         options.sections = additions && sectionsToggle.getToggleState();
+        if (naming) // (round 190ng)
+            options.nameTemplate = nameEditor.getText().toStdString();
         options.format = (Format) formatButtons.getSelected();
         if (options.format == previousFormat)
         {
             const auto depth = depthBox.getSelectedItemIndex();
             if (options.format == Format::flac)
                 options.flacBits = depth == 0 ? 16 : 24;
-            else
+            else if (options.format == Format::aiff)
+                options.aiffBits = depth == 0 ? 16 : 24;
+            else if (options.format == Format::wav)
                 options.wavBits = depth == 0 ? 16 : depth == 1 ? 24 : 32;
         }
         options.mp3Kbps = mp3Bitrates()[(std::size_t) juce::jlimit (0, (int) mp3Bitrates().size() - 1, mp3Box.getSelectedItemIndex())];
         options.oggKbps = oggBitrates()[(std::size_t) juce::jlimit (0, (int) oggBitrates().size() - 1, oggBox.getSelectedItemIndex())];
+        options.aacKbps = aacBitrates()[(std::size_t) juce::jlimit (0, (int) aacBitrates().size() - 1, aacBox.getSelectedItemIndex())];
         options.flacLevel = juce::jlimit (0, 8, flacLevelBox.getSelectedItemIndex());
         if (! realtime) // (real time shows the device's rate)
             options.sampleRate = sampleRates()[(std::size_t) juce::jlimit (0, (int) sampleRates().size() - 1, rateBox.getSelectedItemIndex())];
@@ -1010,7 +1263,7 @@ private:
         }
         realtime = realtimeToggle.isVisible() && realtimeToggle.getToggleState();
         options.moreFormats = 0;
-        for (int i = 0; i < 4; ++i) // (the previous main format's box was only shown ticked)
+        for (int i = 0; i < offeredFormats(); ++i) // (the previous main format's box was only shown ticked)
             if (i != (int) previousFormat && alsoToggles[(std::size_t) i].getToggleState())
                 options.moreFormats |= 1u << i;
         options = clamped (options); // (the main format is not "more")
@@ -1027,7 +1280,8 @@ private:
     void refresh()
     {
         using namespace exportopts;
-        // the depth list: FLAC has no float
+        refreshName(); // (round 190ng: the name follows the format, rate, stems...)
+        // the depth list: FLAC and AIFF have no float
         depthBox.setItemEnabled (3, options.format == Format::wav);
         tailLengthBox.setEnabled (options.tail != TailMode::cut);
         stemsMaster.setEnabled (options.stems != Stems::none);
@@ -1066,21 +1320,22 @@ private:
         }
         stemsMaster.setEnabled (! realtime && options.stems != Stems::none && clip == nullptr);
         normalizeToggle.setEnabled (! masterMode); // (the mastering sets the level)
-        const auto ditherable = (options.format == Format::wav && options.wavBits != 32) || options.format == Format::flac;
+        const auto ditherable = (options.format == Format::wav && options.wavBits != 32) || options.format == Format::flac || options.format == Format::aiff;
         ditherBox.setEnabled (ditherable);
         ditherLabel.setEnabled (ditherable);
         const auto f = options.format;
-        for (int i = 0; i < 4; ++i)
+        for (int i = 0; i < offeredFormats(); ++i)
             alsoToggles[(std::size_t) i].setEnabled (i != (int) f && clip == nullptr);
         // (WAV only: FL writes them into WAV files)
         const auto wav = f == Format::wav || (options.moreFormats & (1u << (int) Format::wav)) != 0;
         for (auto* t : { &tempoToggle, &loopMarkersToggle, &playlistMarkersToggle })
             t->setEnabled (wav);
-        depthLabel.setVisible (f == Format::wav || f == Format::flac);
-        depthBox.setVisible (f == Format::wav || f == Format::flac);
-        bitrateLabel.setVisible (f == Format::mp3 || f == Format::ogg);
+        depthLabel.setVisible (f == Format::wav || f == Format::flac || f == Format::aiff);
+        depthBox.setVisible (f == Format::wav || f == Format::flac || f == Format::aiff);
+        bitrateLabel.setVisible (f == Format::mp3 || f == Format::ogg || f == Format::aac);
         mp3Box.setVisible (f == Format::mp3);
         oggBox.setVisible (f == Format::ogg);
+        aacBox.setVisible (f == Format::aac);
         compressionLabel.setVisible (f == Format::flac);
         flacLevelBox.setVisible (f == Format::flac);
 
@@ -1095,6 +1350,8 @@ private:
             info << " " << tr ("(+ tail up to {0} s)", { juce::String ((int) options.maxTailSeconds) });
         if (options.format == Format::mp3 && mp3SampleRate (options.sampleRate) != options.sampleRate)
             info << "  ·  " << tr ("MP3 at {0} Hz", { juce::String ((int) mp3SampleRate (options.sampleRate)) });
+        if (options.format == Format::aac && aacSampleRate (options.sampleRate) != options.sampleRate && aacSampleRate (options.sampleRate) > 0.0)
+            info << "  ·  " << tr ("M4A at {0} Hz", { juce::String ((int) aacSampleRate (options.sampleRate)) });
         if (sectioned)
             info << "  ·  " << tr ("{0} section(s)", { juce::String ((int) sectionList.size()) }) << "  ·  "
                  << tr ("{0} file(s)", { juce::String (fileCount (song, options, onlyTracks)) });
@@ -1184,16 +1441,17 @@ private:
                 const auto tracks = onlyTracks;
                 const auto after = afterRender;
                 close(); // deletes this panel: no `this` after this point
-                (new StemsThread (engineRef, o, base, tracks, after))->launchThread();
+                auto* stems = new StemsThread (engineRef, o, base, tracks, after);
+                stems->liveHold = LiveExportHold::open (engineRef); // (round 190jb: FL renders with the plugins that play)
+                stems->launchThread();
                 return;
             }
         }
 
-        auto folder = lastFolder.isDirectory() ? lastFolder
-                      : suggestedFolder.isDirectory() ? suggestedFolder
-                                                      : juce::File::getSpecialLocation (juce::File::userMusicDirectory);
-
-        chooser = lynx::ui::makeFileChooser (tr ("Export audio"), folder.getChildFile (suggestedName + extension), "*" + extension);
+        auto folder = exportFolder();
+        // issue #215 (round 190ng): the name the template gives ("$project" = the project's name, as before)
+        const auto name = naming ? resolvedName() : suggestedName;
+        chooser = lynx::ui::makeFileChooser (tr ("Export audio"), folder.getChildFile (name + extension), "*" + extension);
         lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
                               [this, extension] (const juce::FileChooser& fc) {
                                   auto file = fc.getResult();
@@ -1235,15 +1493,20 @@ private:
         if (o.stems != exportopts::Stems::none || exportopts::exportsSections (engineRef.getSong(), o))
         {
             close();
-            (new StemsThread (engineRef, o, file, tracks, after))->launchThread();
+            auto* stems = new StemsThread (engineRef, o, file, tracks, after);
+            stems->liveHold = LiveExportHold::open (engineRef); // (round 190jb: FL renders with the plugins that play)
+            stems->launchThread();
             return;
         }
 
+        // round 190jb: FL renders with the plugin instances that play, playback stopped (the hold, before the job)
+        auto liveHold = LiveExportHold::open (engineRef);
         auto job = std::make_unique<ExportJob> (engineRef.getSong(), o, file);
         job->setExtraData (true);
         const auto withVideo = videoToggle.isVisible() && videoToggle.getToggleState() && o.range != exportopts::Range::pattern;
         close(); // deletes this panel: no `this` after this point
         auto* thread = new ExportThread (std::move (job), file);
+        thread->liveHold = std::move (liveHold);
         thread->reveal = o.showWhenDone;
         if (withVideo)
             thread->then = [song = engineRef.getSong(), o, file] { writeVideoWithMix (song, o, file); };
@@ -1282,54 +1545,97 @@ private:
     std::vector<exportopts::Preset> presets;
     exportopts::LastExport lastExport;
     bool snapshotLast = false; // --versionsshot: the last export's folder need not exist
-    Segmented formatButtons { { "WAV", "MP3", "OGG", "FLAC" } };
+    Segmented formatButtons { offeredFormatNames() };
     juce::Label depthLabel, bitrateLabel, compressionLabel, rateLabel, channelsLabel, ditherLabel;
-    juce::ComboBox depthBox, mp3Box, oggBox, flacLevelBox, rateBox, channelsBox, ditherBox;
+    juce::ComboBox depthBox, mp3Box, oggBox, aacBox, flacLevelBox, rateBox, channelsBox, ditherBox;
     juce::ToggleButton normalizeToggle, masterFxToggle, insertFxToggle, trimToggle, hqToggle, showToggle, polyToggle, warmUpToggle, realtimeToggle;
     juce::ToggleButton tempoToggle, loopMarkersToggle, playlistMarkersToggle;
     juce::ToggleButton videoToggle; // round 174d: also a video with the mix (shown when the project has a video clip)
     bool realtime = false; // "Render through the hardware in real time" (round 165c; not remembered: it takes the song's length)
     juce::Label alsoLabel;
-    std::array<juce::ToggleButton, 4> alsoToggles;
+    std::array<juce::ToggleButton, exportopts::formatCount> alsoToggles;
     juce::Label infoLabel, warningLabel;
     juce::TextButton exportButton { tr ("Export...") }, cancelButton { tr ("Cancel") };
     std::unique_ptr<juce::FileChooser> chooser;
+    // issue #215 (round 190ng): the file name with wildcards
+    bool naming = false;
+    juce::Label nameLabel, namePreview;
+    juce::TextEditor nameEditor;
+    juce::TextButton wildcardButton;
+    juce::Time nowForNaming; // (--issues190ngshot: a fixed time; else now)
 
     static inline juce::File lastFolder;
 };
 } // namespace
 
-void bounceInsertToAudio (AudioEngine& engine, int track)
+namespace
+{
+// Render to audio's job: the insert's sound into `file` (Music/LYNX/Renders), and the clip's length (the song + the
+// tail, at the ending tempo). Round 190jx: with `hold` open (FL renders with the plugin instances that play, as its
+// export does) the job takes the live engine's plugins.
+struct InsertRender
+{
+    std::unique_ptr<ExportJob> job;
+    juce::File file;
+    std::int64_t length = 0;
+};
+
+InsertRender makeInsertRender (AudioEngine& engine, int track, const juce::File& folder)
 {
     const auto& song = engine.getSong();
-
-    if (track <= 0 || track >= (int) song.mixer.size())
-        return;
-
     engine.capturePluginStates();
     const auto name = juce::String::fromUTF8 (song.mixer[(std::size_t) track].name.c_str());
-    const auto folder = juce::File::getSpecialLocation (juce::File::userMusicDirectory).getChildFile ("LYNX/Renders");
     folder.createDirectory();
-    const auto file = folder.getNonexistentChildFile (juce::File::createLegalFileName (name), ".wav");
+    InsertRender r;
+    r.file = folder.getNonexistentChildFile (juce::File::createLegalFileName (name), ".wav");
 
     ExportSettings settings;
     settings.format = ExportSettings::Format::wav32Float;
     settings.sampleRate = engine.getTransport().sampleRate.load();
     settings.tailSeconds = 4.0;
 
-    // clip length: the song + the tail, at the ending tempo
     std::int64_t musicTicks = 0;
     makeExportSong (song, true, 0, musicTicks);
-    const auto length = musicTicks + (std::int64_t) (settings.tailSeconds * song.tempoAt ((double) musicTicks) * ppq / 60.0);
+    r.length = musicTicks + (std::int64_t) (settings.tailSeconds * song.tempoAt ((double) musicTicks) * ppq / 60.0);
+    r.job = std::make_unique<ExportJob> (makeBounceSong (song, track), settings, r.file);
+    return r;
+}
+} // namespace
 
-    auto job = std::make_unique<ExportJob> (makeBounceSong (song, track), settings, file);
+void bounceInsertToAudio (AudioEngine& engine, int track)
+{
+    if (track <= 0 || track >= (int) engine.getSong().mixer.size())
+        return;
+
+    // round 190jx: FL renders with the plugin instances that play, playback stopped (the hold, before the job)
+    auto liveHold = LiveExportHold::open (engine);
+    auto render = makeInsertRender (engine, track, juce::File::getSpecialLocation (juce::File::userMusicDirectory).getChildFile ("LYNX/Renders"));
     auto* engineRef = &engine;
-    (new ExportThread (std::move (job), file, [engineRef, track, file, length] (bool ok) {
-        if (! ok)
-            return;
+    auto rendered = std::make_shared<bool> (false);
+    auto* thread = new ExportThread (std::move (render.job), render.file, [rendered] (bool ok) { *rendered = ok; }, tr ("Rendering insert to audio..."));
+    thread->liveHold = std::move (liveHold);
+    // the new insert once the plugins are given back and the engine plays again (its song edit then builds on them)
+    thread->afterRelease = [engineRef, track, file = render.file, length = render.length, rendered] {
+        if (*rendered)
+            engineRef->editSong ([&] (Song& s) { applyBounce (s, track, file.getFullPathName().toStdString(), length); });
+    };
+    thread->launchThread();
+}
 
-        engineRef->editSong ([&] (Song& s) { applyBounce (s, track, file.getFullPathName().toStdString(), length); });
-    }, tr ("Rendering insert to audio...")))->launchThread();
+juce::String bounceInsertToAudioNow (AudioEngine& engine, int track, bool liveInstances, const juce::File& folder)
+{
+    if (track <= 0 || track >= (int) engine.getSong().mixer.size())
+        return "no such insert";
+    auto liveHold = liveInstances ? LiveExportHold::open (engine) : nullptr;
+    auto render = makeInsertRender (engine, track, folder);
+    juce::String error;
+    const auto ok = render.job->run ({}, error);
+    render.job.reset();
+    liveHold.reset(); // (the plugins given back, the engine plays again)
+    if (! ok)
+        return error.isEmpty() ? juce::String ("cancelled") : error;
+    engine.editSong ([&] (Song& s) { applyBounce (s, track, render.file.getFullPathName().toStdString(), render.length); });
+    return {};
 }
 
 // --- Freeze (round 190ay) ---------------------------------------------------------------------------------------------
@@ -1445,6 +1751,7 @@ public:
 
     void threadComplete (bool userPressedCancel) override
     {
+        liveHold.reset(); // (round 190jx: the plugins given back first; the freeze's edit then unloads the frozen one)
         if (ok)
         {
             finishFreeze (engine, plan, std::move (stems));
@@ -1462,6 +1769,10 @@ public:
         juce::MessageManager::callAsync ([this] { delete this; });
     }
 
+public:
+    // round 190jx: the live engine's plugins render the freeze (FL renders with the instances that play)
+    std::shared_ptr<LiveExportHold> liveHold;
+
 private:
     AudioEngine& engine;
     FreezePlan plan;
@@ -1476,7 +1787,9 @@ namespace
 {
 void startFreeze (AudioEngine& engine, FreezePlan plan, std::function<void (bool)> done)
 {
+    auto liveHold = LiveExportHold::open (engine); // (round 190jx: the render takes the plugins that play; playback stops)
     auto* thread = new FreezeThread (engine, std::move (plan), std::move (done));
+    thread->liveHold = std::move (liveHold);
     // round 190bj (QA: the progress window's first frame was a blank white box): the window is shown and painted once,
     // here on the message thread, before the render starts (launchThread starts the thread first and shows it after)
     if (auto* window = thread->getAlertWindow())
@@ -1520,7 +1833,7 @@ void freezeTrack (AudioEngine& engine, int channel, std::function<void (bool)> d
     startFreeze (engine, planFreeze (engine, channel, true), std::move (done));
 }
 
-juce::String freezeTrackNow (AudioEngine& engine, int channel, bool flattenAfter, const std::function<bool (double)>& progress)
+juce::String freezeTrackNow (AudioEngine& engine, int channel, bool flattenAfter, const std::function<bool (double)>& progress, bool liveInstances)
 {
     if (const auto refusal = whyNoFreeze (engine, channel, true); refusal.isNotEmpty())
         return refusal;
@@ -1528,7 +1841,10 @@ juce::String freezeTrackNow (AudioEngine& engine, int channel, bool flattenAfter
     plan.flattenAfter = flattenAfter;
     std::vector<StandIn> stems;
     juce::String error;
-    if (! sessionpack::renderFreeze (plan.song, plan.channel, plan.rate, plan.folder, stems, progress, error, plan.insert, plan.flattenAfter))
+    auto liveHold = liveInstances ? LiveExportHold::open (engine) : nullptr;
+    const auto ok = sessionpack::renderFreeze (plan.song, plan.channel, plan.rate, plan.folder, stems, progress, error, plan.insert, plan.flattenAfter);
+    liveHold.reset();
+    if (! ok)
         return error.isEmpty() ? juce::String ("cancelled") : error;
     finishFreeze (engine, plan, std::move (stems));
     return {};
@@ -1722,14 +2038,17 @@ juce::String freezeRefusal (AudioEngine& engine, int channel)
     return whyNoFreeze (engine, channel);
 }
 
-juce::String freezeChannelNow (AudioEngine& engine, int channel, const std::function<bool (double)>& progress)
+juce::String freezeChannelNow (AudioEngine& engine, int channel, const std::function<bool (double)>& progress, bool liveInstances)
 {
     if (const auto refusal = whyNoFreeze (engine, channel); refusal.isNotEmpty())
         return refusal;
     const auto plan = planFreeze (engine, channel);
     std::vector<StandIn> stems;
     juce::String error;
-    if (! sessionpack::renderFreeze (plan.song, plan.channel, plan.rate, plan.folder, stems, progress, error))
+    auto liveHold = liveInstances ? LiveExportHold::open (engine) : nullptr;
+    const auto ok = sessionpack::renderFreeze (plan.song, plan.channel, plan.rate, plan.folder, stems, progress, error);
+    liveHold.reset(); // (the plugins given back before the freeze unloads the frozen one)
+    if (! ok)
         return error.isEmpty() ? juce::String ("cancelled") : error;
     finishFreeze (engine, plan, std::move (stems));
     return {};
@@ -2197,6 +2516,18 @@ std::unique_ptr<juce::Component> makeExportPanel (AudioEngine& engine, int forma
 {
     auto panel = std::make_unique<ExportPanel> (engine, juce::File(), "LYNX SHARE", false);
     panel->setFormatForSnapshot (format);
+    return panel;
+}
+
+std::unique_ptr<juce::Component> makeExportPanelWithName (AudioEngine& engine, const juce::String& projectName, const juce::String& templ, juce::Time now,
+                                                          juce::String& preview, juce::String& resolved, int stems)
+{
+    auto panel = std::make_unique<ExportPanel> (engine, juce::File(), projectName, false);
+    panel->setFormatForSnapshot (0);
+    panel->setStemsForSnapshot (stems);
+    panel->setNameTemplateForSnapshot (templ, now);
+    preview = panel->namePreviewForSnapshot();
+    resolved = panel->resolvedNameForSnapshot();
     return panel;
 }
 

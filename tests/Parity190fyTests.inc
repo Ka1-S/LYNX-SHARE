@@ -40,7 +40,7 @@ TEST (parity190fy_spiral_revision_is_hidden_new_instances_run_it_old_projects_do
     auto slot = makeEffectSlot (EffectKind::spiralEcho);
     CHECK (slot.params[(std::size_t) sp::law] == 1.0f);
     CHECK (slot.params[(std::size_t) sp::revision] == 1.0f);
-    CHECK (savedEffectParamCount (slot) == (std::size_t) sp::revision + 1); // saved, since it is not zero
+    CHECK (savedEffectParamCount (slot) == (std::size_t) sp::revision + 2); // saved, since it is not zero (round 190ly: + rateLaw)
     // saved by this version: all ten values -> stays
     auto now = slot;
     upgradeLoadedEffectParams (now, (std::size_t) sp::revision + 1);
@@ -85,6 +85,7 @@ TEST (parity190fy_spiral_revision0_renders_as_the_base_commit_did)
         auto slot = makeEffectSlot (EffectKind::spiralEcho);
         slot.params[(std::size_t) sp::law] = 1.0f;
         slot.params[(std::size_t) sp::revision] = 0.0f;
+        slot.params[(std::size_t) sp::rateLaw] = 0.0f; // (round 190ly: the rate-independent loop phase off, as then)
         if (c.idx >= 0)
             slot.params[(std::size_t) c.idx] = c.val;
         if (c.idx2 >= 0)

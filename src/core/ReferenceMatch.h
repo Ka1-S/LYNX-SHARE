@@ -429,6 +429,7 @@ inline std::vector<EffectSlot> chain (const Suggestion& s)
     eq.params = s.eq;
     eq.presetName = slotName;
     auto limiter = makeEffectSlot (EffectKind::apexLimiter);
+    limiter.params[(std::size_t) apex::pRevision] = 0.0f; // round 190lp: the stage keeps the laws it was tuned on
     limiter.params[apex::pGain] = 0.0f;
     limiter.params[apex::pCeiling] = detail::valueFor ([] (float v) { return apex::ceilingDb (v); }, s.ceilingDb);
     limiter.params[apex::pTruePeak] = 1.0f;

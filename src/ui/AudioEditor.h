@@ -8,6 +8,7 @@
 // loop kept) and sending the result to the Playlist as an audio clip, to a new Sampler channel or back to the
 // channel it came from.
 
+#include <cstdint>
 #include <memory>
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -24,11 +25,17 @@ void openAudioEditor (AudioEngine& engine, const juce::File& file);
 // The sample of a channel (a Sampler channel or the channel of a Playlist audio clip); the edit can go back to it.
 // `clip`: the Playlist audio clip it was opened from (its warp markers are then edited for that clip alone).
 void openAudioEditorForChannel (AudioEngine& engine, int channel, int clip = -1);
+// The audio clip menu's "Deverb" (round 190jv): the channel's sample in the editor with its Deverb tool open
+void openAudioEditorDeverb (AudioEngine& engine, int channel, int clip);
 // The same editor as a panel, without a window (round 175a, for 183a's Clip View): the sample of `channel`, opened from
 // Playlist audio clip `clip` (-1: none). `showWarp`: the warp markers lane starts open.
 std::unique_ptr<juce::Component> makeAudioEditorPanel (AudioEngine& engine, int channel, int clip, bool showWarp = true);
 // Round 190cy: the panel shows the sample of the grid's clip in (track, scene): ÷2 / ×2 scale that clip with the markers.
 void setAudioEditorGridClip (juce::Component& panel, int track, int scene);
+// Round gaps190kf (--gapsshot190kf): the Clip View's loop brace selected; a brace drag held at content tick `tick` (part:
+// 1 loop start, 2 loop end, 3 the brace, 4 Start, 5 End; 0 releases it without writing). No-op for other components.
+void selectAudioEditorBraceForSnapshot (juce::Component& panel, bool selected);
+void holdAudioEditorBraceForSnapshot (juce::Component& panel, int part, std::int64_t tick);
 // --warpshot (round 190cy): ÷2 (0.5) / ×2 (2) as the panel's buttons do it; a warp marker held in the middle of a drag
 // (plain: to `beatOrSeconds` as a beat; `slides` (Shift): to `beatOrSeconds` as a point of the audio).
 void scaleAudioEditorTempoForSnapshot (juce::Component& panel, double factor);
@@ -62,12 +69,25 @@ void askRemoveAllEdisonInstances (AudioEngine& engine);
 
 // --snapshot: the editor showing `doc` (selection = the second quarter), in the waveform or spectrogram view.
 std::unique_ptr<juce::Component> makeAudioEditorForSnapshot (AudioEngine& engine, audioedit::Document doc, bool spectrum);
+// round 190jo (design190ia FW-S4): the editor with `file` opened as the Browser opens it (its WAV markers, regions and
+// loop kept), nothing selected, zoomed to fit; set its size before painting (Edison's layout from 900 x 420).
+std::unique_ptr<juce::Component> makeAudioEditorForFileSnapshot (AudioEngine& engine, const juce::File& file);
 // --snapshot: the items of the editor's main menu, one per line ("Section > Item"), for the menu check.
 juce::StringArray audioEditorMenuForSnapshot (juce::Component& editor);
+// round 190ld (--details190ldshot): the hint bar's text over the waveform at (fx, fy) of its area: "s:ms  level dB linear"
+juce::String audioEditorHoverHintForSnapshot (juce::Component& editor, float fx, float fy);
+// The editor's main menu itself (round 190lj: its Tools submenu pictured by --polyshot190lj).
+juce::PopupMenu audioEditorMainMenuForSnapshot (juce::Component& editor);
 // round 190ee: a marker's menu as lines ("Trigger note > C5  [x]"), and FL's snap mode set (snapping on) with where
 // `probeFrame` snaps to (the tooltip first)
 juce::StringArray audioEditorMarkerMenuForSnapshot (juce::Component& editor, int marker);
 juce::String setAudioEditorSnapForSnapshot (juce::Component& editor, int mode, std::int64_t probeFrame);
+// round natives190kj: FL's Dual view / spectrogram and a zoom (from < to), FL's Edison commands ("grid-small" /
+// "grid-medium" / "grid-large" grid-slicing, "pitch-regions"; "grid" = the time grid at this zoom; returns the markers),
+// and the sample's properties (tempo-sync puts the grid in beats; the middle note sets the pitch period)
+void setAudioEditorViewForSnapshot (juce::Component& editor, bool spectrum, bool dual, std::int64_t from, std::int64_t to);
+juce::String audioEditorCommandForSnapshot (juce::Component& editor, const juce::String& what);
+void setAudioEditorSamplePropsForSnapshot (juce::Component& editor, const audioedit::SampleProps& props);
 // --edisonshot (round 165l): a tool window of `editor` (tool = audiotools::Tool as int; envelopeMode 0 wave,
 // 1 volume, 2 panning, 3 stereo separation: what the envelope tools work on), its English title, and the editor's mode.
 std::unique_ptr<juce::Component> makeAudioToolPanelForSnapshot (juce::Component& editor, int tool, int envelopeMode = 0);

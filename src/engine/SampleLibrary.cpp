@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <cstdlib>
 #include <condition_variable>
@@ -14,10 +15,12 @@
 #include <set>
 
 #include "core/AudioEdit.h"
+#include "core/ContentShare.h"
 #include "core/SampleFiles.h"
 #include "core/OggVorbis.h"
 #include "core/Mp3Decoder.h"
 #include "core/TimeStretch.h"
+#include "core/VideoTrack.h"
 #include "core/LoadTrace.h"
 #include "engine/Mp3Format.h"
 #include "engine/WavPackFormat.h"
@@ -46,6 +49,9 @@ struct SharedCache
     std::condition_variable done;
     std::map<juce::String, std::weak_ptr<const SampleData>> entries;
     std::set<juce::String> loading;
+    // round 190ks: the decoded samples in RAM by their content's fingerprint, so a second file with the same audio (a copy
+    // in another folder) shares the first one's data instead of holding it twice
+    std::multimap<std::uint64_t, std::weak_ptr<const SampleData>> byContent;
     // stretched copies (pitch-preserving tempo follow): the latest length per file, kept (shared like the decoded ones)
     std::mutex stretchLock;
     std::map<juce::String, std::shared_ptr<const SampleData>> stretched;
@@ -55,6 +61,51 @@ SharedCache& sharedCache()
 {
     static SharedCache c;
     return c;
+}
+} // namespace
+
+namespace
+{
+// round 190ks: what makes two decoded samples interchangeable — the audio and everything a channel reads beside it
+std::uint64_t contentPrint (const SampleData& d) noexcept
+{
+    auto h = contentshare::hashBytes (d.left.data(), d.left.size() * sizeof (float));
+    h = contentshare::hashBytes (d.right.data(), d.right.size() * sizeof (float), h);
+    const double fields[] = { d.sampleRate, (double) d.loopStart, (double) d.loopEnd, (double) d.acidBeats, (double) d.sliceMarkers,
+                              (double) d.bitsPerSample, d.floatData ? 1.0 : 0.0, d.cropped ? 1.0 : 0.0, d.cropFrom, d.cropTo };
+    h = contentshare::hashBytes (fields, sizeof (fields), h);
+    return contentshare::hashBytes (d.markerStarts.data(), d.markerStarts.size() * sizeof (std::int64_t), h);
+}
+
+bool sameContent (const SampleData& a, const SampleData& b) noexcept
+{
+    return a.sampleRate == b.sampleRate && a.loopStart == b.loopStart && a.loopEnd == b.loopEnd && a.markerStarts == b.markerStarts
+           && a.acidBeats == b.acidBeats && a.sliceMarkers == b.sliceMarkers && a.bitsPerSample == b.bitsPerSample && a.floatData == b.floatData
+           && a.cropped == b.cropped && a.cropFrom == b.cropFrom && a.cropTo == b.cropTo && a.left.size() == b.left.size()
+           && a.right.size() == b.right.size() && ! a.isMapped() && ! b.isMapped()
+           // (an empty channel's data() may be null: memcmp only on samples, round 190mo's UBSan run)
+           && (a.left.empty() || std::memcmp (a.left.data(), b.left.data(), a.left.size() * sizeof (float)) == 0)
+           && (a.right.empty() || std::memcmp (a.right.data(), b.right.data(), a.right.size() * sizeof (float)) == 0);
+}
+
+// the data already in RAM with the same content, else `data` itself (then remembered); under the cache's lock
+std::shared_ptr<const SampleData> shareContent (SharedCache& shared, std::shared_ptr<const SampleData> data, std::uint64_t print)
+{
+    const auto [from, to] = shared.byContent.equal_range (print);
+    for (auto it = from; it != to;)
+    {
+        auto other = it->second.lock();
+        if (other == nullptr)
+        {
+            it = shared.byContent.erase (it); // (its last user let it go)
+            continue;
+        }
+        if (other == data || sameContent (*other, *data))
+            return other;
+        ++it;
+    }
+    shared.byContent.emplace (print, data);
+    return data;
 }
 } // namespace
 
@@ -209,8 +260,24 @@ juce::String SampleLibrary::wildcard() const
     return formats.getWildcardForAllFormats() + ";*.speech"; // FL's speech files are samples too (round 168b)
 }
 
+namespace
+{
+std::atomic<SampleLibrary::VideoSoundDecoder> videoSoundDecoder { nullptr };
+}
+
+void SampleLibrary::setVideoSoundDecoder (VideoSoundDecoder decoder) noexcept { videoSoundDecoder.store (decoder); }
+
 std::unique_ptr<juce::AudioFormatReader> SampleLibrary::createReader (const juce::File& file)
 {
+    // a video file: its sound track, decoded by the system into a cached WAV (round als190ka, issue #193)
+    if (videotrack::isVideoPath (file.getFullPathName().toStdString()))
+    {
+        if (const auto decoder = videoSoundDecoder.load(); decoder != nullptr)
+            if (const auto wav = decoder (file); wav.existsAsFile())
+                return std::unique_ptr<juce::AudioFormatReader> (formats.createReaderFor (wav));
+        return nullptr;
+    }
+
     // before JUCE's own Ogg reader (vorbisfile), which drops blocks in many of FL's files (REA_rodada77 §3)
     if (auto reader = createFlOggReader (file))
         return reader;
@@ -283,6 +350,28 @@ std::uint64_t stretchFingerprint (StretchMethod method)
     return prints[m];
 }
 
+// Round 190ik: Complex Pro's own engine print (its transposition with the formants kept), keyed only into Complex Pro's
+// copies so the plain Complex ones stay valid
+juce::String proFingerprintKey (StretchMethod method, const StretchOptions& options)
+{
+    if (method != StretchMethod::complex || ! stretchBakesPitch (method, options.modes))
+        return {};
+    static const auto print = [] {
+        SampleData test;
+        test.sampleRate = 44100.0;
+        for (int i = 0; i < 6000; ++i)
+        {
+            const auto t = (double) i / test.sampleRate;
+            test.left.push_back ((float) (0.3 * std::sin (2.0 * 3.14159265358979 * 220.0 * t) + 0.2 * std::sin (2.0 * 3.14159265358979 * 660.0 * t)));
+        }
+        StretchOptions pro;
+        pro.modes.complexPro = true;
+        const auto out = timeStretch (test, 2.6, StretchMethod::complex, 5.0, pro);
+        return fnv (out->left.data(), out->left.size() * sizeof (float));
+    }();
+    return "|pf" + juce::String::toHexString ((juce::int64) print);
+}
+
 // A warp map's part of a cache key ("" for none). "wm1": the mapped renderer's version — raise it when its output changes
 juce::String stretchMapKey (const StretchMap& map)
 {
@@ -303,7 +392,7 @@ juce::File stretchCacheFile (const juce::String& path, double ratio, StretchMeth
     const auto key = source.getFullPathName() + "|" + juce::String (source.getSize()) + "|" + juce::String (source.getLastModificationTime().toMilliseconds())
                    + "|" + juce::String (ratio, 10) + "|" + juce::String ((int) method) + "|" + juce::String::toHexString ((juce::int64) stretchFingerprint (method))
                    + (semitones != 0.0 ? "|st" + juce::String (semitones, 6) : juce::String()) + stretchMapKey (map)
-                   + juce::String (stretchOptionsKey (options, method));
+                   + juce::String (stretchOptionsKey (options, method)) + proFingerprintKey (method, options);
     return SampleLibrary::cacheFolder().getChildFile (juce::String::toHexString (key.hashCode64()) + ".str");
 }
 
@@ -319,7 +408,8 @@ juce::File spanCacheFile (const SampleData& span, double ratio, StretchMethod me
     const auto key = "span|" + juce::String::toHexString ((juce::int64) h) + "|" + juce::String (span.sampleRate, 3) + "|" + juce::String ((juce::int64) span.frames())
                      + "|" + juce::String (ratio, 10) + "|" + juce::String ((int) method) + "|" + juce::String::toHexString ((juce::int64) stretchFingerprint (method))
                      + (semitones != 0.0 ? "|st" + juce::String (semitones, 6) : juce::String())
-                     + juce::String (stretchOptionsKey (options, method)); // (rollup 0.1.28: round 190fm's warp settings)
+                     + juce::String (stretchOptionsKey (options, method)) // (rollup 0.1.28: round 190fm's warp settings)
+                     + proFingerprintKey (method, options);
     return SampleLibrary::cacheFolder().getChildFile (juce::String::toHexString (key.hashCode64()) + ".str");
 }
 
@@ -604,8 +694,8 @@ void writeStretchedLater (const juce::File& file, std::shared_ptr<const SampleDa
 std::shared_ptr<const SampleData> SampleLibrary::loadStretched (const juce::String& path, double ratio, StretchMethod method, double semitones,
                                                                const StretchMap& map, const StretchOptions& options)
 {
-    if (method != StretchMethod::beats)
-        semitones = 0.0; // (only Beats renders a transposition offline)
+    if (! stretchBakesPitch (method, options.modes))
+        semitones = 0.0; // (only Beats and, round 190ik, Complex Pro render a transposition offline)
     // 10 significant digits: ratios within 0.1 % of 1 are resampled to the exact length, so 4 decimals were too coarse
     const auto key = path + "|" + juce::String (ratio, 10) + "|" + juce::String ((int) method)
                      + (semitones != 0.0 ? "|st" + juce::String (semitones, 6) : juce::String()) + stretchMapKey (map)
@@ -661,7 +751,7 @@ std::shared_ptr<const SampleData> SampleLibrary::loadStretchedSpan (const juce::
 {
     if (span == nullptr || span->frames() == 0)
         return nullptr;
-    if (method != StretchMethod::beats)
+    if (! stretchBakesPitch (method, options.modes))
         semitones = 0.0;
     const auto key = path + "|span|" + juce::String::fromUTF8 (variantKey.c_str()) + "|" + juce::String (ratio, 10) + "|"
                      + juce::String ((int) method) + (semitones != 0.0 ? "|st" + juce::String (semitones, 6) : juce::String())
@@ -915,9 +1005,14 @@ std::shared_ptr<const SampleData> SampleLibrary::load (const juce::String& path)
         shared.loading.insert (path);
     }
     auto data = decode (path);
+    // round 190ks: a sample decoded into RAM whose audio another file already holds shares that one's (mapped ones are
+    // the OS's page cache already). The print is made outside the lock.
+    const auto print = data != nullptr && ! data->isMapped() && data->frames() > 0 && contentshare::enabled() ? contentPrint (*data) : 0;
     {
         const std::scoped_lock l (shared.lock);
         shared.loading.erase (path);
+        if (data != nullptr && print != 0)
+            data = shareContent (shared, std::move (data), print);
         if (data != nullptr)
             shared.entries[path] = data;
     }
@@ -1016,8 +1111,9 @@ SampleLibrary::MemoryUse SampleLibrary::memoryUse()
     auto& shared = sharedCache();
     {
         const std::scoped_lock l (shared.lock);
+        std::set<const SampleData*> counted; // (round 190ks: two files sharing one copy count once)
         for (const auto& [path, weak] : shared.entries)
-            if (const auto data = weak.lock())
+            if (const auto data = weak.lock(); data != nullptr && counted.insert (data.get()).second)
             {
                 if (data->isMapped())
                     ++use.mappedSamples, use.mappedBytes += mappedBytesOf (*data);
@@ -1038,10 +1134,21 @@ SampleLibrary::MemoryUse SampleLibrary::memoryUse()
 
 std::shared_ptr<const SampleData> SampleLibrary::decode (const juce::String& path)
 {
-    const auto file = platform::localFile (path); // FL's Windows spelling on macOS/Linux (platform/Paths.h)
+    auto file = platform::localFile (path); // FL's Windows spelling on macOS/Linux (platform/Paths.h)
 
     if (! file.existsAsFile())
         return nullptr;
+
+    // a video's sound track (round als190ka): read from its decoded WAV, which also keys the disk cache (a cache keyed on
+    // the video would outlive a better decode of the same file)
+    if (videotrack::isVideoPath (file.getFullPathName().toStdString()))
+    {
+        const auto decoder = videoSoundDecoder.load();
+        const auto wav = decoder != nullptr ? decoder (file) : juce::File();
+        if (! wav.existsAsFile())
+            return nullptr;
+        file = wav;
+    }
 
     // FL's .speech files: spoken by LYNX's speech synthesizer, one slice (marker) per word (round 168b; FL's sample
     // loader speaks them too and hands the words over as a Zero-X grid)
@@ -1097,5 +1204,31 @@ std::shared_ptr<const SampleData> SampleLibrary::decode (const juce::String& pat
     readWavExtras (file, *data);
 
     return data;
+}
+
+// Round 190kx: what the loop analysis reads (see the header)
+bool SampleLibrary::readForAnalysis (const juce::File& file, double seconds, SampleData& out, double& totalSeconds)
+{
+    out = SampleData {};
+    totalSeconds = 0.0;
+    const auto reader = createReader (file);
+    if (reader == nullptr || reader->sampleRate <= 0.0 || reader->numChannels == 0 || reader->lengthInSamples <= 0)
+        return false;
+    totalSeconds = (double) reader->lengthInSamples / reader->sampleRate;
+    out.sampleRate = reader->sampleRate;
+    const auto frames = (int) juce::jmin (reader->lengthInSamples, (juce::int64) (seconds * reader->sampleRate), (juce::int64) 1 << 26);
+    const auto channels = (int) juce::jmin (reader->numChannels, 8u);
+    juce::AudioBuffer<float> buffer (channels, frames);
+    if (! reader->read (&buffer, 0, frames, 0, true, true))
+        return false;
+    out.left.assign ((std::size_t) frames, 0.0f);
+    for (int c = 0; c < channels; ++c)
+    {
+        const auto* data = buffer.getReadPointer (c);
+        for (int i = 0; i < frames; ++i)
+            out.left[(std::size_t) i] += data[i] / (float) channels;
+    }
+    readWavExtras (file, out);
+    return true;
 }
 } // namespace lynx

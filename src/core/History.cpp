@@ -10,8 +10,9 @@ bool sameNote (const Note& a, const Note& b) noexcept
 {
     return a.start == b.start && a.length == b.length && a.channel == b.channel && a.key == b.key && a.velocity == b.velocity
            && a.pan == b.pan && a.finePitch == b.finePitch && a.muted == b.muted && a.slide == b.slide && a.porta == b.porta
-           && a.release == b.release && a.modX == b.modX && a.modY == b.modY && a.colour == b.colour && a.group == b.group
-           && a.chance == b.chance && a.velocityRange == b.velocityRange && a.chanceGroup == b.chanceGroup && a.chanceOne == b.chanceOne;
+           && a.release == b.release && a.modX == b.modX && a.modY == b.modY && a.colour == b.colour && a.group == b.group && a.repeat == b.repeat
+           && a.chance == b.chance && a.velocityRange == b.velocityRange && a.chanceGroup == b.chanceGroup && a.chanceOne == b.chanceOne
+           && a.curves == b.curves;
 }
 
 bool sameNotes (const std::vector<Note>& a, const std::vector<Note>& b) noexcept
@@ -36,7 +37,7 @@ bool sameSlot (const EffectSlot& a, const EffectSlot& b) noexcept
 {
     return a.kind == b.kind && a.enabled == b.enabled && a.params == b.params && a.mix == b.mix && a.plugin == b.plugin
            && a.sidechain == b.sidechain && a.sidechain2 == b.sidechain2 && a.sendTracks == b.sendTracks && a.branches.size() == b.branches.size() && a.state == b.state
-           && a.presetName == b.presetName && a.abOther == b.abOther && a.abShowingB == b.abShowingB;
+           && a.presetName == b.presetName && a.abOther == b.abOther && a.abShowingB == b.abShowingB && a.lockState == b.lockState;
 }
 
 bool sameEffects (const MixerTrack& a, const MixerTrack& b) noexcept
@@ -56,7 +57,7 @@ bool sameLatency (const MixerTrack& a, const MixerTrack& b) noexcept
 
 bool sameTrack (const MixerTrack& a, const MixerTrack& b) noexcept
 {
-    return a.name == b.name && a.volume == b.volume && a.pan == b.pan && a.muted == b.muted && a.solo == b.solo && a.soloSources == b.soloSources && sameEffects (a, b)
+    return a.name == b.name && a.volume == b.volume && a.pan == b.pan && a.muted == b.muted && a.solo == b.solo && a.soloSources == b.soloSources && a.lockState == b.lockState && sameEffects (a, b)
            && sameRouting (a, b) && a.stereo == b.stereo && a.colour == b.colour && a.invertPhase == b.invertPhase
            && a.swapChannels == b.swapChannels && a.eq == b.eq
            && a.inputChannel == b.inputChannel && a.inputStereo == b.inputStereo && a.monitor == b.monitor && a.recordSafe == b.recordSafe && a.recordTo == b.recordTo
@@ -99,6 +100,8 @@ ChangeLabel label (const char* text, std::string arg = {})
 ChangeLabel describeChange (const Song& before, const Song& after)
 {
     // patterns and notes
+    if (after.patterns.size() == before.patterns.size() + 1 && after.blocks.size() > before.blocks.size()) // (issue #127: the Slice tool on a block)
+        return label (TR_NOOP ("Slice pattern"));
     if (before.patterns.size() != after.patterns.size())
         return label (after.patterns.size() > before.patterns.size() ? TR_NOOP ("Add pattern") : TR_NOOP ("Delete pattern"));
 
@@ -196,6 +199,10 @@ ChangeLabel describeChange (const Song& before, const Song& after)
     {
         if (after.blocks.empty() && after.playlist.size() > before.playlist.size())
             return label (TR_NOOP ("Turn pattern blocks into clips"));
+        if (after.blocks.size() == before.blocks.size()
+            && std::equal (before.blocks.begin(), before.blocks.end(), after.blocks.begin(),
+                           [] (const PatternBlock& a, const PatternBlock& b) { return a.pattern == b.pattern && a.start == b.start; }))
+            return label (TR_NOOP ("Mute pattern blocks"));
         if (after.blocks.size() > before.blocks.size())
             return label (TR_NOOP ("Paint pattern blocks"));
         if (after.blocks.size() < before.blocks.size())
@@ -260,9 +267,11 @@ ChangeLabel describeChange (const Song& before, const Song& after)
     for (std::size_t i = 0; i < after.playlistTracks.size(); ++i)
         if (before.playlistTracks[i].name != after.playlistTracks[i].name || before.playlistTracks[i].muted != after.playlistTracks[i].muted
             || before.playlistTracks[i].colour != after.playlistTracks[i].colour || before.playlistTracks[i].grouped != after.playlistTracks[i].grouped
-            || before.playlistTracks[i].collapsed != after.playlistTracks[i].collapsed
+            || before.playlistTracks[i].collapsed != after.playlistTracks[i].collapsed || before.playlistTracks[i].nest != after.playlistTracks[i].nest
             || before.playlistTracks[i].compTrack != after.playlistTracks[i].compTrack
-            || before.playlistTracks[i].lockedToContent != after.playlistTracks[i].lockedToContent)
+            || before.playlistTracks[i].takeLane != after.playlistTracks[i].takeLane
+            || before.playlistTracks[i].lockedToContent != after.playlistTracks[i].lockedToContent
+            || before.playlistTracks[i].soloLock != after.playlistTracks[i].soloLock)
             return label (TR_NOOP ("Playlist tracks"));
 
     for (std::size_t i = 0; i < after.playlistTracks.size(); ++i)

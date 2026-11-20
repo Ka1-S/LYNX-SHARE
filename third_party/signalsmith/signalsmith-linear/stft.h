@@ -3,6 +3,8 @@
 
 #include "./fft.h"
 
+#include <algorithm>
+
 namespace signalsmith { namespace linear {
 
 enum {
@@ -246,6 +248,17 @@ struct DynamicSTFT {
 		output.pos = (output.pos + samples)%_blockSamples;
 		_samplesSinceSynthesis += samples;
 	}
+	// LYNX (round 190kr): `samples` times moveOutput(1) (which zeroes each passed position and its window product and
+	// leaves samplesSinceSynthesis() alone), in one pass
+	void clearOutput(size_t samples) {
+		for (size_t i = 0; i < samples; ++i) {
+			for (size_t c = 0; c < _synthesisChannels; ++c) {
+				output.buffer[output.pos + c*_blockSamples] = 0;
+			}
+			output.windowProducts[output.pos] = almostZero;
+			if (++output.pos >= _blockSamples) output.pos = 0;
+		}
+	}
 	size_t samplesSinceSynthesis() const {
 		return _samplesSinceSynthesis;
 	}
@@ -319,6 +332,19 @@ struct DynamicSTFT {
 		norm = mode;
 	}
 	
+	// LYNX (round 190kr): whether two analysis channels hold the same input, bit for bit (then their analyses are equal)
+	bool inputChannelsEqual(size_t channelA, size_t channelB) const {
+		const Sample *a = input.buffer.data() + channelA*_inputLengthSamples;
+		const Sample *b = input.buffer.data() + channelB*_inputLengthSamples;
+		return std::memcmp(a, b, sizeof(Sample)*_inputLengthSamples) == 0;
+	}
+	// LYNX (round 190kr): a channel's analysis taken from another one's (for the same input: the same spectrum, and the
+	// same analysis state as analyseStep leaves)
+	void copyAnalysis(size_t fromChannel, size_t toChannel, size_t samplesInPast=0) {
+		_samplesSinceAnalysis = samplesInPast;
+		std::copy(spectrum(fromChannel), spectrum(fromChannel) + _fftBins, spectrum(toChannel));
+	}
+
 	void analyse(size_t samplesInPast=0) {
 		for (size_t s = 0; s < analyseSteps(); ++s) {
 			analyseStep(s, samplesInPast);

@@ -22,6 +22,12 @@ int dominantClip (const Song& song, int track);
 // FL's auto name (FUN_012ef490 ← FUN_012233c0): the track takes the name and colour of the source most of its clips
 // play (pattern, audio clip channel or automation); an empty track gets an empty name and the default colour.
 void autoName (Song& song, int track);
+// FL's "Auto name clips" (EEPLTrackAutoNameChildMenuClick → FUN_012ef5f0, round 190mp; capture 190mp A1): every source
+// the track's clips play (pattern, audio clip channel, automation), in the order the clips start, takes the track's name
+// — the first one plain, the next "Name #2", "Name #3"… — and the track's colour (patterns, channels; FL's icon too when
+// the track has one). A leading "-" of the track name is dropped. A track without a name changes nothing (the menu asks
+// for a name first). Returns how many sources were named.
+int autoNameClips (Song& song, int track);
 // "Lock to content" on / off for `tracks` (the menu's track first: the others follow its new state, FL's mask 4 of
 // FUN_012eafa0). Turning it on names a track that has no name yet (auto name).
 void toggleLockToContent (Song& song, const std::vector<int>& tracks);

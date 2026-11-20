@@ -1,8 +1,10 @@
+#include "core/EscClose.h"
 #include "ui/WindowOwner.h"
 #include "core/HostKeyGate.h"
 #include "ui/NativeChild.h"
 #include "ui/Workspace.h"
 #include "core/DockStack.h"
+#include "core/LayoutStyle.h"
 
 #include "core/WindowFit.h"
 
@@ -25,6 +27,8 @@
 
 #if JUCE_WINDOWS
  #include <windows.h>
+ #include <tlhelp32.h>
+ #include <intrin.h>
 #endif
 #if JUCE_LINUX || JUCE_BSD || JUCE_MAC
  #include <dlfcn.h>
@@ -43,6 +47,11 @@ juce::Component::SafePointer<juce::Component>& mainWindow()
     return window;
 }
 } // namespace
+
+juce::Component* mainWindowComponent()
+{
+    return mainWindow().getComponent();
+}
 
 void* mainWindowHandle()
 {
@@ -107,6 +116,80 @@ double threadCpuSeconds()
    #elif defined (CLOCK_THREAD_CPUTIME_ID)
     timespec t {};
     return clock_gettime (CLOCK_THREAD_CPUTIME_ID, &t) == 0 ? (double) t.tv_sec + (double) t.tv_nsec * 1e-9 : 0.0;
+   #else
+    return 0.0;
+   #endif
+}
+
+std::vector<ThreadCpu> threadCpuList()
+{
+    std::vector<ThreadCpu> out;
+   #if JUCE_WINDOWS
+    using GetDescription = HRESULT (WINAPI*) (HANDLE, PWSTR*);
+    static const auto getDescription = (GetDescription) (void*) GetProcAddress (GetModuleHandleW (L"kernel32.dll"), "GetThreadDescription");
+    const auto snapshot = CreateToolhelp32Snapshot (TH32CS_SNAPTHREAD, 0);
+    if (snapshot == INVALID_HANDLE_VALUE)
+        return out;
+    THREADENTRY32 entry {};
+    entry.dwSize = sizeof (entry);
+    const auto self = GetCurrentProcessId();
+    for (auto ok = Thread32First (snapshot, &entry); ok; ok = Thread32Next (snapshot, &entry))
+    {
+        if (entry.th32OwnerProcessID != self)
+            continue;
+        const auto thread = OpenThread (THREAD_QUERY_LIMITED_INFORMATION, FALSE, entry.th32ThreadID);
+        if (thread == nullptr)
+            continue;
+        ThreadCpu t;
+        t.id = entry.th32ThreadID;
+        FILETIME created {}, exited {}, kernel {}, user {};
+        if (GetThreadTimes (thread, &created, &exited, &kernel, &user))
+            t.seconds = (double) ((((std::uint64_t) kernel.dwHighDateTime << 32) | kernel.dwLowDateTime) + (((std::uint64_t) user.dwHighDateTime << 32) | user.dwLowDateTime)) * 1e-7;
+        if (ULONG64 cycles = 0; QueryThreadCycleTime (thread, &cycles))
+            t.cycles = (std::uint64_t) cycles;
+        if (getDescription != nullptr)
+        {
+            PWSTR text = nullptr;
+            if (SUCCEEDED (getDescription (thread, &text)) && text != nullptr)
+            {
+                t.name = juce::String (text).toStdString();
+                LocalFree (text);
+            }
+        }
+        CloseHandle (thread);
+        out.push_back (std::move (t));
+    }
+    CloseHandle (snapshot);
+   #endif
+    return out;
+}
+
+std::uint64_t processCpuCycles()
+{
+   #if JUCE_WINDOWS
+    ULONG64 cycles = 0;
+    return QueryProcessCycleTime (GetCurrentProcess(), &cycles) ? (std::uint64_t) cycles : 0;
+   #else
+    return 0;
+   #endif
+}
+
+double cpuCyclesPerSecond()
+{
+   #if JUCE_WINDOWS
+    // the cycle counts above run at the time-stamp counter's rate: measured against the performance counter over 50 ms
+    static const double rate = [] {
+        LARGE_INTEGER f {}, a {}, b {};
+        QueryPerformanceFrequency (&f);
+        QueryPerformanceCounter (&a);
+        const auto t0 = __rdtsc();
+        Sleep (50);
+        const auto t1 = __rdtsc();
+        QueryPerformanceCounter (&b);
+        const auto seconds = (double) (b.QuadPart - a.QuadPart) / (double) f.QuadPart;
+        return seconds > 0.0 ? (double) (t1 - t0) / seconds : 0.0;
+    }();
+    return rate;
    #else
     return 0.0;
    #endif
@@ -679,6 +762,8 @@ struct SecondaryKeyForwarder final : juce::KeyListener
 // only an Esc nothing in the window used closes it. Async: the window may delete itself in closeButtonPressed.
 bool closeOnEscape (juce::Component* window)
 {
+    if (! escclose::enabled()) // (issue #217, round 190ng: the switch that keeps windows open on Esc)
+        return false;
     auto* doc = dynamic_cast<juce::DocumentWindow*> (window);
     if (doc == nullptr || ! doc->isVisible())
         return false;
@@ -881,6 +966,11 @@ LRESULT CALLBACK pluginKeyProc (int code, WPARAM removal, LPARAM data)
 } // namespace
 #endif
 
+bool modalDialogOpen()
+{
+    return juce::ModalComponentManager::getInstance()->getNumModalComponents() > 0;
+}
+
 void setSecondaryWindowKeyHandler (std::function<bool (const juce::KeyPress&)> handler)
 {
     keyForwarder().handler = std::move (handler);
@@ -925,7 +1015,7 @@ struct LinkedFocusListener final : juce::FocusChangeListener
     juce::Component::SafePointer<juce::Component> last;
     void globalFocusChanged (juce::Component* focused) override
     {
-        if (auto* top = focused != nullptr ? focused->getTopLevelComponent() : nullptr)
+        if (auto* top = editorWindowOf (focused)) // (round 190jy: an editor drawn by the main window is a window too)
             linkedWindowFocused (*top);
     }
 };
@@ -1143,11 +1233,14 @@ void matchWindowOrderToScreen()
     if (owner == nullptr)
         return;
 
-    // the windows above the main window, from the lowest up (raising them in that order keeps their order)
+    // the windows above the main window, from the lowest up (raising them in that order keeps their order). Issue #188
+    // (round 190ir): a minimised window is not on the screen, so it is not put back above the main window in JUCE's list
+    // (isShowing: visible and not minimised). Up there it counted as covering the main window where it had been: on
+    // X11 JUCE asks the windows above in its list, and those clicks were lost (cmake/LynxPatchJuce.cmake, fix 38).
     std::vector<juce::Component*> above;
     auto& desktop = juce::Desktop::getInstance();
     for (int i = 0; i < desktop.getNumComponents(); ++i)
-        if (auto* c = desktop.getComponent (i); c != owner && c->isVisible() && ! c->isAlwaysOnTop() && ! nativechild::isAttached (*c)
+        if (auto* c = desktop.getComponent (i); c != owner && c->isShowing() && ! c->isAlwaysOnTop() && ! nativechild::isAttached (*c)
                                                  && isAboveMainWindow (*c))
             above.push_back (c);
 
@@ -1203,14 +1296,68 @@ namespace
 Workspace* editorDock = nullptr;
 bool editorsDetached = false;
 
+// Round 190jy: Settings › General › "Draw docked LYNX editors in the main window" (off by default); the environment's
+// LYNX_EDITORS_IN_MAIN=1 / 0 wins (measurements, tests)
+bool& editorsInMainSetting()
+{
+    static bool on = false;
+    return on;
+}
+
+bool editorsInMainNow()
+{
+   #if JUCE_WINDOWS
+    static const auto forced = juce::SystemStats::getEnvironmentVariable ("LYNX_EDITORS_IN_MAIN", {}).trim();
+    return forced == "1" || (forced != "0" && editorsInMainSetting());
+   #else
+    return false; // (no holes elsewhere: the docked editors stay native child windows there)
+   #endif
+}
+
+// The docked LYNX editor windows (native children or drawn by the main window), oldest first
+std::vector<juce::Component::SafePointer<juce::DocumentWindow>>& dockedEditors()
+{
+    static std::vector<juce::Component::SafePointer<juce::DocumentWindow>> list;
+    std::erase_if (list, [] (const auto& w) { return w == nullptr; });
+    return list;
+}
+
+// A window the main window can draw: none of a hosted plugin's editors, no native view of its own inside (a hosted
+// plugin's view, an OpenGL preview: they would be windows of the main window drawn over everything)
+bool mainWindowCanDraw (juce::DocumentWindow& window)
+{
+    if ((bool) window.getProperties().getWithDefault ("lynxKeepOwnWindow", false) || window.isAlwaysOnTop())
+        return false;
+    std::function<bool (juce::Component&)> plain = [&plain] (juce::Component& c) {
+        if (dynamic_cast<juce::AudioProcessorEditor*> (&c) != nullptr)
+            return false;
+       #if JUCE_WINDOWS
+        if (dynamic_cast<juce::HWNDComponent*> (&c) != nullptr)
+            return false;
+       #endif
+        for (auto* child : c.getChildren())
+            if (! plain (*child))
+                return false;
+        return true;
+    };
+    return plain (window);
+}
+
 // A click anywhere in a docked editor window brings it in front of the panels and docked windows (JUCE's own
 // "brought to front on click" asks the system to activate a child window, which is not the same thing).
 struct DockClickRaise final : juce::MouseListener
 {
     void mouseDown (const juce::MouseEvent& e) override
     {
-        auto* top = e.eventComponent != nullptr ? e.eventComponent->getTopLevelComponent() : nullptr;
-        if (top == nullptr || ! nativechild::isAttached (*top))
+        auto* top = editorWindowOf (e.eventComponent);
+        if (top == nullptr)
+            return;
+        if (editorDock != nullptr && editorDock->hasEditorWindow (*top)) // (round 190jy: drawn by the main window)
+        {
+            editorDock->raiseEditorWindow (*top);
+            return;
+        }
+        if (! nativechild::isAttached (*top))
             return;
         top->toFront (false);
         nativechild::raiseOverlays();
@@ -1225,18 +1372,28 @@ DockClickRaise& dockClickRaise()
 
 // A docked window moved or resized by its title bar or border (JUCE's dragger): its title bar stays inside the
 // workspace, and its native window goes exactly where JUCE meant it (in the parent's own scale, ui/NativeChild.h).
+// Round 190jy: an editor drawn by the main window is kept inside the workspace the same way.
 struct DockPlaceKeeper final : juce::ComponentListener
 {
     bool busy = false;
     void componentMovedOrResized (juce::Component& c, bool, bool) override
     {
-        if (busy || editorDock == nullptr || ! nativechild::isAttached (c))
+        if (busy || editorDock == nullptr)
+            return;
+        const auto inMain = editorDock->hasEditorWindow (c);
+        if (! inMain && ! nativechild::isAttached (c))
             return;
         const juce::ScopedValueSetter<bool> guard (busy, true);
         auto r = nativechild::boundsIn (c, *editorDock);
         const auto area = editorDock->getLocalBounds();
         r.setX (juce::jlimit (-r.getWidth() + 80, juce::jmax (0, area.getWidth() - 80), r.getX()));
         r.setY (juce::jlimit (0, juce::jmax (0, area.getHeight() - 24), r.getY()));
+        if (inMain)
+        {
+            if (r != c.getBounds())
+                c.setBounds (r);
+            return;
+        }
         if (r != nativechild::boundsIn (c, *editorDock) || ! nativechild::isPlacedAt (c, *editorDock, r))
             nativechild::place (c, *editorDock, r);
     }
@@ -1246,6 +1403,88 @@ DockPlaceKeeper& dockPlaceKeeper()
 {
     static DockPlaceKeeper keeper;
     return keeper;
+}
+
+// Round 190jy: keys nothing in an editor drawn by the main window used go to the main window's shortcuts as from any
+// docked editor (runSecondaryWindowKey), and stop there: they don't go on up to the main window's own keyPressed (the
+// typing piano, the panels' keys), exactly as when the editor was a window of its own. Tab still moves the focus.
+struct EditorKeys final : juce::KeyListener
+{
+    bool keyPressed (const juce::KeyPress& key, juce::Component*) override
+    {
+        if (key.isKeyCode (juce::KeyPress::tabKey))
+            return false;
+        runSecondaryWindowKey (key);
+        return true;
+    }
+};
+
+EditorKeys& editorKeys()
+{
+    static EditorKeys keys;
+    return keys;
+}
+
+// LYNX's title bar for a docked window (a child window has no native one): the close button alone, no shadow
+void useDockedLook (juce::DocumentWindow& window)
+{
+    auto* content = window.getContentComponent();
+    const auto contentW = content != nullptr ? content->getWidth() : window.getWidth();
+    const auto contentH = content != nullptr ? content->getHeight() : window.getHeight();
+    window.setDropShadowEnabled (false);
+    window.setUsingNativeTitleBar (false);
+    window.setTitleBarButtonsRequired (juce::DocumentWindow::closeButton, false);
+    window.setTitleBarHeight (26);
+    if (content != nullptr)
+        window.setContentComponentSize (contentW, contentH);
+}
+
+// Docks the window (off the desktop, no parent) as a native child window of the main window at `r` (the workspace's
+// coordinates). False: no native window to dock in (left as it was).
+bool dockAsChildWindow (juce::DocumentWindow& window, Workspace& area, juce::Rectangle<int> r, bool visible, bool raise = true)
+{
+    // a TopLevelWindow keeps its own style flags (JUCE makes it a top-level window again when it sees others)
+    if (! nativechild::attach (window, area, window.getDesktopWindowStyleFlags()))
+        return false;
+    nativechild::place (window, area, r);
+    area.addDockedFrame (window); // (placed again with the panels when the main window's native window is made again)
+    nativechild::forwardUnusedKeys (window);
+    nativechild::raiseOnAnyClick (window);
+    window.setVisible (visible);
+    if (visible && raise)
+    {
+        window.toFront (false);
+        noteEditorRaised (window); // (issue #191: opened by a press in a panel, it stays in front of that panel)
+    }
+    nativechild::raiseOverlays();
+    return true;
+}
+
+// Round 190jy: the window drawn by the main window at `r` (the workspace's coordinates). False: it can't be (left as it was).
+bool dockInMainWindow (juce::DocumentWindow& window, Workspace& area, juce::Rectangle<int> r, bool visible, bool raise = true)
+{
+    if (! mainWindowCanDraw (window) || ! area.addEditorWindow (window, r))
+        return false;
+    window.addKeyListener (&editorKeys());
+    window.setVisible (visible);
+    if (raise)
+    {
+        area.raiseEditorWindow (window);
+        noteEditorRaised (window); // (issue #191)
+    }
+    else
+        area.updateEditorHoles();
+    return true;
+}
+
+void listenAsDocked (juce::DocumentWindow& window)
+{
+    window.getProperties().set ("lynxDockedWindow", true);
+    window.addMouseListener (&dockClickRaise(), true);
+    window.addComponentListener (&dockPlaceKeeper());
+    auto& list = dockedEditors();
+    if (std::none_of (list.begin(), list.end(), [&window] (const auto& w) { return w.getComponent() == &window; }))
+        list.emplace_back (&window);
 }
 } // namespace
 
@@ -1259,12 +1498,108 @@ void setEditorsDetached (bool detached)
     editorsDetached = detached;
 }
 
+bool editorsInMainWindow()
+{
+    return editorsInMainNow();
+}
+
+bool editorsInMainWindowSetting()
+{
+    return editorsInMainSetting();
+}
+
+void setEditorsInMainWindow (bool on)
+{
+    if (editorsInMainSetting() == on)
+        return;
+    editorsInMainSetting() = on;
+    moveDockedEditors (editorsInMainNow());
+}
+
+bool isEditorInMainWindow (const juce::Component& window)
+{
+    return editorDock != nullptr && editorDock->hasEditorWindow (window);
+}
+
+std::vector<juce::DocumentWindow*> dockedEditorWindows()
+{
+    std::vector<juce::DocumentWindow*> out;
+    for (const auto& w : dockedEditors())
+        out.push_back (w.getComponent());
+    return out;
+}
+
+juce::Component* editorWindowOf (juce::Component* c)
+{
+    for (auto* p = c; p != nullptr; p = p->getParentComponent())
+        if ((bool) p->getProperties().getWithDefault ("lynxEditorInMainWindow", false))
+            return p;
+    return c != nullptr ? c->getTopLevelComponent() : nullptr;
+}
+
+int moveDockedEditors (bool intoMainWindow)
+{
+    auto* area = editorDock;
+    if (area == nullptr || area->getWindowHandle() == nullptr)
+        return 0;
+    // each one keeps its place in the stacking order of the main window's native children: the moved window (or its
+    // anchor) goes right above the sibling that was right below it
+    int moved = 0;
+    for (auto* w : dockedEditorWindows())
+    {
+        const auto inMain = area->hasEditorWindow (*w);
+        if (inMain == intoMainWindow || (intoMainWindow && ! mainWindowCanDraw (*w)))
+            continue;
+        auto* stand = inMain ? area->editorAnchorForTest (*w) : static_cast<juce::Component*> (w); // (its native place now)
+        if (stand == nullptr)
+            continue;
+        const auto siblings = nativechild::attachedChildren (area->getWindowHandle()); // (bottom up)
+        juce::Component* below = nullptr;
+        for (std::size_t i = 0; i < siblings.size(); ++i)
+            if (siblings[i] == stand)
+                below = i > 0 ? siblings[i - 1] : nullptr;
+        const auto visible = w->isVisible();
+        const auto r = nativechild::boundsIn (*w, *area);
+        w->setVisible (false);
+        if (intoMainWindow)
+        {
+            area->removeDockedFrame (*w);
+            nativechild::stopForwardingUnusedKeys (*w);
+            nativechild::stopRaiseOnAnyClick (*w);
+            nativechild::detach (*w);
+            if (! dockInMainWindow (*w, *area, r, visible, false))
+            {
+                dockAsChildWindow (*w, *area, r, visible, false); // (back as it was)
+                nativechild::placeJustAbove (*w, below);
+                continue;
+            }
+            if (auto* anchor = area->editorAnchorForTest (*w))
+                nativechild::placeJustAbove (*anchor, below);
+        }
+        else
+        {
+            w->removeKeyListener (&editorKeys());
+            area->removeEditorWindow (*w);
+            if (! dockAsChildWindow (*w, *area, r, visible, false))
+                continue;
+            nativechild::placeJustAbove (*w, below);
+        }
+        ++moved;
+    }
+    nativechild::raiseOverlays(); // (the holes follow)
+    area->updateEditorHoles();
+    return moved;
+}
+
 bool dockOrKeepAbove (juce::DocumentWindow& window)
 {
-    if (nativechild::isAttached (window))
+    if (nativechild::isAttached (window) || isEditorInMainWindow (window))
         return true;
     auto* area = editorDock;
-    if (area == nullptr || editorsDetached || ! nativechild::dockingEnabled() || ! area->isShowing() || ! window.isOnDesktop())
+    // issue #191: opened from a floating panel window in the Clip-launch or Simple layout, it would dock behind that
+    // window: it opens as a window of its own (above the main window, as the panel) instead
+    const auto fromFloating = layoutstyle::current() != layoutstyle::Style::pattern && openedFromFloatingPanel();
+    if (area == nullptr || editorsDetached || fromFloating || ! nativechild::dockingEnabled() || ! area->isShowing() || ! window.isOnDesktop())
     {
         keepAboveMainWindow (window);
         return false;
@@ -1272,9 +1607,6 @@ bool dockOrKeepAbove (juce::DocumentWindow& window)
 
     // where its code put it (centred, aligned, remembered) and the size of what it shows
     const auto screen = window.getScreenBounds();
-    auto* content = window.getContentComponent();
-    const auto contentW = content != nullptr ? content->getWidth() : window.getWidth();
-    const auto contentH = content != nullptr ? content->getHeight() : window.getHeight();
     const auto visible = window.isVisible();
 
     // off the desktop first, so no top-level window is made again on the way: LYNX's title bar (a child window has no
@@ -1282,15 +1614,16 @@ bool dockOrKeepAbove (juce::DocumentWindow& window)
     // drop shadow (JUCE's shadow is a set of top-level windows)
     window.setVisible (false);
     window.removeFromDesktop();
-    window.setDropShadowEnabled (false);
-    window.setUsingNativeTitleBar (false);
-    window.setTitleBarButtonsRequired (juce::DocumentWindow::closeButton, false);
-    window.setTitleBarHeight (26);
-    if (content != nullptr)
-        window.setContentComponentSize (contentW, contentH);
+    useDockedLook (window);
 
-    // a TopLevelWindow keeps its own style flags (JUCE makes it a top-level window again when it sees others)
-    if (! nativechild::attach (window, *area, window.getDesktopWindowStyleFlags()))
+    auto r = area->getLocalArea (nullptr, screen).withSize (window.getWidth(), window.getHeight());
+    const auto bounds = area->getLocalBounds();
+    r.setX (juce::jlimit (0, juce::jmax (0, bounds.getWidth() - r.getWidth()), r.getX()));
+    r.setY (juce::jlimit (0, juce::jmax (0, bounds.getHeight() - r.getHeight()), r.getY()));
+
+    // round 190jy: drawn by the main window when the setting is on (and it can be), else a native child window
+    const auto docked = (editorsInMainNow() && dockInMainWindow (window, *area, r, visible)) || dockAsChildWindow (window, *area, r, visible);
+    if (! docked)
     {
         window.setUsingNativeTitleBar (true);
         window.addToDesktop (window.getDesktopWindowStyleFlags());
@@ -1298,23 +1631,94 @@ bool dockOrKeepAbove (juce::DocumentWindow& window)
         keepAboveMainWindow (window);
         return false;
     }
-    auto r = area->getLocalArea (nullptr, screen).withSize (window.getWidth(), window.getHeight());
-    const auto bounds = area->getLocalBounds();
-    r.setX (juce::jlimit (0, juce::jmax (0, bounds.getWidth() - r.getWidth()), r.getX()));
-    r.setY (juce::jlimit (0, juce::jmax (0, bounds.getHeight() - r.getHeight()), r.getY()));
-    nativechild::place (window, *area, r);
-
-    window.getProperties().set ("lynxDockedWindow", true);
-    area->addDockedFrame (window); // (placed again with the panels when the main window's native window is made again)
-    nativechild::forwardUnusedKeys (window);
-    nativechild::raiseOnAnyClick (window);
-    window.addMouseListener (&dockClickRaise(), true);
-    window.addComponentListener (&dockPlaceKeeper());
-    window.setVisible (visible);
-    if (visible)
-        window.toFront (false);
-    nativechild::raiseOverlays();
+    listenAsDocked (window);
     return true;
+}
+
+// --- issue #191 (round 190mx): editors opened by a press in a panel stay in front of it ------------------------
+
+namespace
+{
+bool fix191On()
+{
+    static const bool on = juce::SystemStats::getEnvironmentVariable ("LYNX_FIX191", {}).trim() != "0";
+    return on;
+}
+
+struct PressRaised
+{
+    juce::Component::SafePointer<juce::Component> window;
+    juce::Time press; // the mouse-down time of the press that raised it
+};
+
+std::vector<PressRaised>& pressRaised()
+{
+    static std::vector<PressRaised> list;
+    return list;
+}
+
+// The mouse-down time of the press going on now (a button is held), if any
+std::optional<juce::Time> pressNow()
+{
+    for (const auto& source : juce::Desktop::getInstance().getMouseSources())
+        if (source.isDragging()) // (a button is down: JUCE sets its state before it sends the press)
+            return source.getLastMouseDownTime();
+    return std::nullopt;
+}
+
+bool isFloatingPanelWindow (const juce::Component* c)
+{
+    const auto* top = c != nullptr ? c->getTopLevelComponent() : nullptr;
+    return top != nullptr && top != mainWindow().getComponent() && (bool) top->getProperties().getWithDefault ("lynxPanel", false);
+}
+} // namespace
+
+void noteEditorRaised (juce::Component& window)
+{
+    if (! fix191On())
+        return;
+    const auto press = pressNow();
+    if (! press)
+        return;
+    auto& list = pressRaised();
+    // (only the current press matters: what an older press raised is forgotten)
+    std::erase_if (list, [&] (const PressRaised& r) { return r.window == nullptr || r.press != *press || r.window.getComponent() == &window; });
+    list.push_back ({ &window, *press });
+}
+
+void keepPressRaisedEditorsInFront (const juce::MouseEvent& press)
+{
+    auto& list = pressRaised();
+    if (list.empty())
+        return;
+    const auto raised = std::exchange (list, {});
+    auto any = false;
+    for (const auto& r : raised)
+    {
+        auto* w = r.window.getComponent();
+        if (w == nullptr || r.press != press.mouseDownTime || ! w->isVisible())
+            continue;
+        if (editorDock != nullptr && editorDock->hasEditorWindow (*w)) // (round 190jy: drawn by the main window)
+            editorDock->raiseEditorWindow (*w);
+        else if (nativechild::isAttached (*w))
+            w->toFront (false);
+        else
+            continue; // (a window of its own is above the panels anyway)
+        any = true;
+    }
+    if (any)
+        nativechild::raiseOverlays();
+}
+
+bool openedFromFloatingPanel()
+{
+    if (! fix191On())
+        return false;
+    const auto mouse = juce::Desktop::getInstance().getMainMouseSource();
+    const auto recentPress = mouse.isDragging() || juce::Time::getCurrentTime() - mouse.getLastMouseDownTime() < juce::RelativeTime::seconds (1.0);
+    if (recentPress)
+        return isFloatingPanelWindow (mouse.getComponentUnderMouse());
+    return isFloatingPanelWindow (juce::Component::getCurrentlyFocusedComponent());
 }
 
 void setWindowScreenPosition (juce::Component& window, juce::Point<int> screenTopLeft)
@@ -1323,6 +1727,11 @@ void setWindowScreenPosition (juce::Component& window, juce::Point<int> screenTo
     {
         const auto r = nativechild::boundsIn (window, *editorDock);
         nativechild::place (window, *editorDock, r.withPosition (editorDock->getLocalPoint (nullptr, screenTopLeft)));
+        return;
+    }
+    if (editorDock != nullptr && editorDock->hasEditorWindow (window)) // (round 190jy: a child component of the desktop)
+    {
+        window.setTopLeftPosition (editorDock->getLocalPoint (nullptr, screenTopLeft));
         return;
     }
     window.setTopLeftPosition (screenTopLeft);

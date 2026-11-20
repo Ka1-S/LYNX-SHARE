@@ -7,10 +7,14 @@
 
 #include "engine/ShortExportTest.h"
 
+#include <cstring>
 #include <thread>
 
+#include "engine/AacEncoder.h"
 #include "engine/AudioEngine.h"
 #include "engine/Exporter.h"
+#include "engine/Mp3Format.h"
+#include "engine/StandInAudioDevice.h"
 
 namespace lynx::shortexport
 {
@@ -362,4 +366,598 @@ void run (bool everyUnit, int repeats, const juce::StringArray& pluginFiles, std
     }
     runner->next();
 }
+
+// --- round 190hn: the stress matrix ----------------------------------------------------------------------------------
+// Every export setting the Export window has, drawn at random (a seed makes a run repeatable), over short sounds at the
+// very start of the song: each case is exported with the sound at tick 0 and again with it one bar later, and the two
+// files must hold the same sound. A file that comes out silent, or quieter than its shifted twin, is reported with
+// everything needed to make it again.
+namespace
+{
+struct StressCase
+{
+    int index = 0;
+    juce::String what; // the settings, for the report
+    Song early, late;  // the sound at tick 0, and a bar later
+    exportopts::Options options;
+    bool realtime = false;
+    bool levelOnly = false;   // lossy formats: the levels are compared with more room
+    // normalising, the wrapped tail and loops change the level by design (what else is in the file: the peak the gain
+    // follows, the tail laid over the start, the notes of one pass ringing into the next): only silence is checked
+    bool silenceOnly = false;
+};
+
+struct Decoded
+{
+    std::vector<float> l, r;
+    double rate = 0.0;
+    juce::String error;
+};
+
+Decoded decodeFile (juce::AudioFormatManager& formats, const juce::File& file)
+{
+    Decoded d;
+    std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (file));
+    if (reader == nullptr)
+    {
+        d.error = "can't read " + file.getFileName() + (file.existsAsFile() ? " (" + juce::String (file.getSize()) + " bytes)" : " (no file)");
+        return d;
+    }
+    juce::AudioBuffer<float> b ((int) reader->numChannels, (int) reader->lengthInSamples);
+    reader->read (&b, 0, b.getNumSamples(), 0, true, true);
+    const auto* l = b.getReadPointer (0);
+    const auto* r = b.getReadPointer (b.getNumChannels() > 1 ? 1 : 0);
+    d.l.assign (l, l + b.getNumSamples());
+    d.r.assign (r, r + b.getNumSamples());
+    d.rate = reader->sampleRate;
+    return d;
+}
+
+struct Level
+{
+    double energy = 0.0; // sum of squares over both sides
+    float peak = 0.0f;
+    std::int64_t frames = 0;
+};
+
+Level levelOf (const std::vector<Decoded>& files)
+{
+    Level v;
+    for (const auto& d : files)
+    {
+        v.frames += (std::int64_t) d.l.size();
+        for (std::size_t i = 0; i < d.l.size(); ++i)
+        {
+            v.energy += (double) d.l[i] * d.l[i] + (double) d.r[i] * d.r[i];
+            v.peak = juce::jmax (v.peak, std::abs (d.l[i]), std::abs (d.r[i]));
+        }
+    }
+    return v;
+}
+
+juce::String dbText (double gain) { return juce::String (juce::Decibels::gainToDecibels (gain, -200.0), 1) + " dB"; }
+
+// a short sound written for the cases: a tone that starts at full level on its first frame and decays, `frames` long
+juce::File writeTone (const juce::File& folder, int frames, double rate, bool loopable)
+{
+    const auto file = folder.getChildFile ("tone-" + juce::String (frames) + "-" + juce::String ((int) rate) + (loopable ? "-loop" : "") + ".wav");
+    if (file.existsAsFile())
+        return file;
+    juce::AudioBuffer<float> b (1, frames);
+    for (int i = 0; i < frames; ++i)
+    {
+        const auto t = i / rate;
+        const auto env = loopable ? 1.0 : std::exp (-3.0 * t / juce::jmax (0.005, frames / rate));
+        b.setSample (0, i, (float) (0.7 * std::sin (2.0 * juce::MathConstants<double>::pi * 330.0 * t + 0.5 * juce::MathConstants<double>::pi) * env));
+    }
+    juce::WavAudioFormat wav;
+    std::unique_ptr<juce::AudioFormatWriter> w (wav.createWriterFor (file.createOutputStream().release(), rate, 1, 24, {}, 0));
+    if (w == nullptr || ! w->writeFromAudioSampleBuffer (b, 0, frames))
+        return {};
+    return file;
+}
+
+struct StressMaker
+{
+    juce::Random random;
+    juce::File folder;
+
+    explicit StressMaker (std::int64_t seed, juce::File f) : random (seed), folder (std::move (f)) {}
+    ChannelDef hosted; // a hosted instrument (--plugin), when one was given
+
+    template <typename T>
+    T pick (std::initializer_list<T> list)
+    {
+        return *(list.begin() + random.nextInt ((int) list.size()));
+    }
+    bool chance (float p) { return random.nextFloat() < p; }
+
+    StressCase make (int index, bool allowRealtime)
+    {
+        StressCase c;
+        c.index = index;
+        juce::StringArray what;
+        auto& o = c.options;
+        o.sampleRate = pick ({ 22050.0, 44100.0, 44100.0, 48000.0, 48000.0, 88200.0, 96000.0, 192000.0 });
+        const auto format = random.nextInt (9);
+        switch (format)
+        {
+            case 0: o.format = exportopts::Format::wav; o.wavBits = 16; break;
+            case 1: o.format = exportopts::Format::wav; o.wavBits = 24; break;
+            case 2: o.format = exportopts::Format::wav; o.wavBits = 32; break;
+            case 3: o.format = exportopts::Format::flac; o.flacBits = 16; break;
+            case 4: o.format = exportopts::Format::flac; o.flacBits = 24; o.flacLevel = random.nextInt (9); break;
+            case 5: o.format = exportopts::Format::mp3; o.mp3Kbps = pick ({ 64, 128, 192, 320 }); break;
+            case 6: o.format = exportopts::Format::ogg; o.oggKbps = pick ({ 64, 128, 192, 256, 320 }); break;
+            case 7: o.format = exportopts::Format::wav; o.wavBits = 24; o.moreFormats = (1u << (int) exportopts::Format::mp3) | (1u << (int) exportopts::Format::ogg) | (1u << (int) exportopts::Format::flac); break;
+            default: o.format = exportopts::Format::ogg; o.oggKbps = 128; o.moreFormats = 1u << (int) exportopts::Format::wav; break;
+        }
+        if (o.format == exportopts::Format::mp3 && o.sampleRate > 48000.0)
+            o.sampleRate = 44100.0; // (the window offers MP3 up to 48 kHz)
+        o.dither = pick ({ exportopts::DitherMode::none, exportopts::DitherMode::tpdf, exportopts::DitherMode::shaped });
+        o.normalize = chance (0.3f);
+        o.tail = pick ({ exportopts::TailMode::leave, exportopts::TailMode::leave, exportopts::TailMode::cut, exportopts::TailMode::wrap });
+        o.maxTailSeconds = pick ({ 0.5, 2.0, 12.0 });
+        o.loops = pick ({ 1, 1, 1, 2, 3 });
+        o.hqAllPlugins = chance (0.5f);
+        o.pluginWarmUp = chance (0.5f);
+        o.disableMaxPolyphony = chance (0.7f);
+        o.masterEffects = chance (0.8f);
+        o.insertEffects = chance (0.8f);
+        o.trimPdc = chance (0.8f);
+        o.channels = pick ({ exportopts::Channels::stereo, exportopts::Channels::stereo, exportopts::Channels::monoMerged, exportopts::Channels::monoLeft });
+        o.stems = pick ({ exportopts::Stems::none, exportopts::Stems::none, exportopts::Stems::none, exportopts::Stems::mixerTracks, exportopts::Stems::channels,
+                          exportopts::Stems::channelsDry });
+        o.stemsIncludeMaster = o.stems != exportopts::Stems::none && chance (0.5f);
+        o.saveTempo = chance (0.3f);
+        c.realtime = allowRealtime && chance (0.15f);
+
+        // the sound: what is short and sits at the very start
+        const auto source = random.nextInt (hosted.instrument == InstrumentKind::plugin ? 7 : 6);
+        const auto bpm = pick ({ 90.0, 120.0, 128.0, 140.0, 174.0 });
+        const auto noteTicks = (std::int64_t) pick ({ ppq / 4, ppq / 2, ppq, 2 * ppq, 4 * ppq, 6 * ppq }); // a step … 1.5 bars
+        const auto frames = pick ({ 256, 2205, 13230, 44100, 88200, 132300 }); // 6 ms … 3 s
+        const auto sampleRate = pick ({ 44100.0, 48000.0 });
+        ChannelDef ch;
+        ch.mixerTrack = 1;
+        juce::String sourceText;
+        switch (source)
+        {
+            case 0: // a one-shot
+            case 1: // a one-shot from a start offset
+                ch.instrument = InstrumentKind::sampler;
+                ch.samplePath = writeTone (folder, frames, sampleRate, false).getFullPathName().toStdString();
+                if (source == 1)
+                    ch.sampler.startOffset = pick ({ 0.1f, 0.25f, 0.5f });
+                sourceText = "one-shot " + juce::String (frames) + " frames" + (source == 1 ? " from " + juce::String (ch.sampler.startOffset, 2) : juce::String());
+                break;
+            case 2: // a looped sample, held for the note
+            {
+                ch.instrument = InstrumentKind::sampler;
+                const auto loopFrames = juce::jmax (2205, frames / 4);
+                SampleZone z;
+                z.path = writeTone (folder, loopFrames, sampleRate, true).getFullPathName().toStdString();
+                z.loopMode = 2;
+                z.loopStart = loopFrames / 4;
+                z.loopEnd = loopFrames - 1;
+                ch.zones = { z };
+                ch.sampler.release = 0.05f;
+                sourceText = "looped " + juce::String (loopFrames) + " frames";
+                break;
+            }
+            case 3: // an audio clip (Song only)
+                ch.instrument = InstrumentKind::audioClip;
+                ch.samplePath = writeTone (folder, frames, sampleRate, false).getFullPathName().toStdString();
+                sourceText = "audio clip " + juce::String (frames) + " frames";
+                break;
+            case 4:
+                ch.instrument = InstrumentKind::synth;
+                sourceText = "synth";
+                break;
+            case 6:
+                ch = hosted;
+                ch.mixerTrack = 1;
+                sourceText = "hosted " + juce::String (hosted.plugin.name);
+                break;
+            default:
+                ch.instrument = pick ({ InstrumentKind::kick, InstrumentKind::clap, InstrumentKind::hat });
+                sourceText = ch.instrument == InstrumentKind::kick ? "kick" : ch.instrument == InstrumentKind::clap ? "clap" : "hat";
+                break;
+        }
+        const auto audioClip = ch.instrument == InstrumentKind::audioClip;
+        o.range = c.realtime || audioClip ? pick ({ exportopts::Range::song, exportopts::Range::selection })
+                                          : pick ({ exportopts::Range::song, exportopts::Range::song, exportopts::Range::pattern, exportopts::Range::selection });
+        // (a start offset inside the sound: 1/8 or 1/4 beat is at most 83 ms at 90 BPM)
+        const auto clipOffset = audioClip && frames >= 13230 && chance (0.4f) ? (std::int64_t) pick ({ ppq / 8, ppq / 4 }) : 0;
+        if (clipOffset > 0)
+            sourceText << " from tick " << juce::String ((int) clipOffset);
+
+        auto base = Song::makeDefault(); // (with its Master limiter, as a new project)
+        base.bpm = bpm;
+        base.channels = { ch };
+        base.patterns.clear();
+        base.patterns.emplace_back().name = "Short";
+        base.mode = o.range == exportopts::Range::pattern ? PlayMode::pattern : PlayMode::song;
+        const auto latencyFx = chance (0.3f);
+        if (latencyFx)
+            base.mixer[1].effects.push_back (makeEffectSlot (pick ({ EffectKind::limiter, EffectKind::apexLimiter, EffectKind::maximus })));
+        if (chance (0.3f))
+            base.mixer[1].effects.push_back (makeEffectSlot (pick ({ EffectKind::reverb, EffectKind::delay, EffectKind::eq, EffectKind::compressor })));
+        const auto twoNotes = ! audioClip && chance (0.25f);
+
+        auto place = [&] (std::int64_t at) {
+            auto s = base;
+            const auto length = audioClip ? (std::int64_t) std::ceil ((double) frames / sampleRate * bpm / 60.0 * ppq) - clipOffset : noteTicks;
+            const auto end = at + juce::jmax<std::int64_t> (1, length) + (twoNotes ? ppq : 0);
+            if (audioClip)
+            {
+                Clip clip;
+                clip.kind = ClipKind::audio;
+                clip.channel = 0;
+                clip.track = 0;
+                clip.start = at;
+                clip.length = juce::jmax<std::int64_t> (1, length);
+                clip.offset = clipOffset;
+                s.playlist.push_back (clip);
+            }
+            else
+            {
+                auto& p = s.patterns[0];
+                for (int k = 0; k < (twoNotes ? 2 : 1); ++k)
+                {
+                    Note n;
+                    n.channel = 0;
+                    n.key = 60 + 4 * k;
+                    n.start = at + k * ppq;
+                    n.length = noteTicks;
+                    n.velocity = 0.8f;
+                    p.notes.push_back (n);
+                }
+                p.sortNotes();
+                Clip clip;
+                clip.pattern = 0;
+                clip.track = 0;
+                clip.start = 0;
+                clip.length = end;
+                s.playlist.push_back (clip);
+            }
+            s.currentPattern = 0;
+            if (o.range == exportopts::Range::selection)
+            {
+                s.loopStart = 0;
+                s.loopEnd = end;
+            }
+            return s;
+        };
+        c.early = place (0);
+        c.late = place (4 * ppq);
+
+        what.add ("#" + juce::String (index));
+        what.add (sourceText + (twoNotes ? " x2" : "") + ", note " + juce::String ((int) noteTicks) + " ticks at " + juce::String (bpm, 0) + " BPM");
+        what.add (o.range == exportopts::Range::song ? "song" : o.range == exportopts::Range::pattern ? "pattern" : "selection");
+        what.add (juce::String (exportopts::extension (o.format)).substring (1) + (o.format == exportopts::Format::wav ? juce::String (o.wavBits) : o.format == exportopts::Format::flac ? juce::String (o.flacBits) : o.format == exportopts::Format::mp3 ? juce::String (o.mp3Kbps) : juce::String (o.oggKbps))
+                  + (o.moreFormats != 0 ? "+more" : ""));
+        what.add (juce::String (o.sampleRate / 1000.0, 2) + " kHz");
+        what.add (o.tail == exportopts::TailMode::leave ? "tail " + juce::String (o.maxTailSeconds, 1) + " s" : o.tail == exportopts::TailMode::cut ? "tail cut" : "tail wrapped");
+        if (o.normalize) what.add ("normalised");
+        if (o.loops > 1) what.add (juce::String (o.loops) + " loops");
+        if (o.stems != exportopts::Stems::none)
+            what.add (juce::String (o.stems == exportopts::Stems::mixerTracks ? "insert stems" : o.stems == exportopts::Stems::channels ? "channel stems" : "dry channel stems")
+                      + (o.stemsIncludeMaster ? " + mix" : ""));
+        if (o.channels != exportopts::Channels::stereo) what.add (o.channels == exportopts::Channels::monoMerged ? "mono" : "mono left");
+        what.add (juce::String ("dither ") + (o.dither == exportopts::DitherMode::none ? "off" : o.dither == exportopts::DitherMode::tpdf ? "tpdf" : "shaped"));
+        what.add (juce::String ("HQ ") + (o.hqAllPlugins ? "on" : "off") + ", warm-up " + (o.pluginWarmUp ? "on" : "off"));
+        if (! o.masterEffects) what.add ("no Master fx");
+        if (! o.insertEffects) what.add ("no insert fx");
+        if (! o.trimPdc) what.add ("PDC not trimmed");
+        if (latencyFx) what.add ("latency fx");
+        if (base.mixer[1].effects.size() > (latencyFx ? 1u : 0u)) what.add (juce::String ("+") + effectInfo (base.mixer[1].effects.back().kind).name);
+        if (c.realtime) what.add ("REAL TIME");
+        c.levelOnly = o.format == exportopts::Format::mp3 || o.format == exportopts::Format::ogg;
+        c.silenceOnly = o.normalize || o.tail == exportopts::TailMode::wrap || o.loops > 1;
+        c.what = what.joinIntoString (", ");
+        return c;
+    }
+};
+
+struct StressRunner
+{
+    int count = 0;
+    std::int64_t seed = 0;
+    bool allowRealtime = true;
+    ChannelDef hosted;
+    std::function<void (const juce::String&)> log;
+    juce::File folder;
+    juce::AudioFormatManager formats;
+    std::unique_ptr<AudioEngine> live; // the real-time cases' engine on a stand-in device (made on the message thread)
+    int silent = 0, quiet = 0, failed = 0, done = 0, realtimeCases = 0;
+    juce::StringArray failures;
+
+    static void onMessageThread (std::function<void()> f)
+    {
+        juce::MessageManager::getInstance()->callFunctionOnMessageThread ([] (void* p) -> void* { (*static_cast<std::function<void()>*> (p))(); return nullptr; }, &f);
+    }
+
+    // the files one export wrote (the stems', or the mix in every format asked), decoded
+    std::vector<Decoded> exportOnce (const StressCase& c, const Song& song, const juce::String& name, juce::String& error)
+    {
+        std::vector<Decoded> out;
+        const auto dir = folder.getChildFile (name);
+        dir.deleteRecursively();
+        dir.createDirectory();
+        const auto file = dir.getChildFile ("export" + juce::String (exportopts::extension (c.options.format)));
+        std::vector<juce::File> files;
+        if (c.realtime)
+        {
+            std::unique_ptr<ExportJob> job;
+            onMessageThread ([&] {
+                live->setSong (song);
+            });
+            juce::Thread::sleep (120); // (the engine's timer publishes the rack)
+            onMessageThread ([&] { job = std::make_unique<ExportJob> (*live, c.options, file); });
+            if (! job->run ([] (double) { return true; }, error))
+                error = "real-time export: " + error;
+            onMessageThread ([&] { job.reset(); });
+            for (const auto f : exportopts::formatsOf (job == nullptr ? c.options : c.options))
+                files.push_back (f == c.options.format ? file : file.withFileExtension (exportopts::extension (f)));
+        }
+        else if (c.options.stems != exportopts::Stems::none)
+        {
+            const auto plan = planStemExport (song, c.options, file);
+            const auto written = runStemExport (
+                plan, [] (std::function<void()> f) { juce::MessageManager::callAsync (std::move (f)); }, [] { return false; }, {}, {}, {});
+            if (written <= 0)
+                error = "the stems export wrote no file (" + juce::String ((int) plan.items.size()) + " planned)";
+            for (const auto& item : plan.items)
+                for (const auto f : exportopts::formatsOf (item.options))
+                    files.push_back (f == item.options.format ? item.file : item.file.withFileExtension (exportopts::extension (f)));
+        }
+        else
+        {
+            std::unique_ptr<ExportJob> job;
+            onMessageThread ([&] { job = std::make_unique<ExportJob> (song, c.options, file); });
+            if (! job->run ([] (double) { return true; }, error))
+                error = error.isEmpty() ? juce::String ("the export failed") : error;
+            onMessageThread ([&] { job.reset(); });
+            for (const auto f : exportopts::formatsOf (c.options))
+                files.push_back (f == c.options.format ? file : file.withFileExtension (exportopts::extension (f)));
+        }
+        if (error.isNotEmpty())
+            return out;
+        for (const auto& f : files)
+        {
+            auto d = decodeFile (formats, f);
+            if (d.error.isNotEmpty())
+            {
+                error = d.error;
+                return {};
+            }
+            out.push_back (std::move (d));
+        }
+        dir.deleteRecursively();
+        return out;
+    }
+
+    void runCase (const StressCase& c)
+    {
+        juce::String errorA, errorB;
+        const auto a = exportOnce (c, c.early, "a", errorA);
+        const auto b = exportOnce (c, c.late, "b", errorB);
+        ++done;
+        if (errorA.isNotEmpty() || errorB.isNotEmpty())
+        {
+            ++failed;
+            failures.add (c.what + ": " + (errorA.isNotEmpty() ? errorA : errorB));
+            say ("FAILED " + c.what + ": " + (errorA.isNotEmpty() ? errorA : errorB));
+            return;
+        }
+        // per format: the files of each format written (the first format's files hold the comparison; every format must
+        // hold sound)
+        const auto la = levelOf (a), lb = levelOf (b);
+        const auto ratio = lb.energy > 0.0 ? std::sqrt (la.energy / lb.energy) : 0.0;
+        juce::String line = c.what + " | tick 0: peak " + dbText (la.peak) + ", " + juce::String ((int) la.frames) + " frames in " + juce::String ((int) a.size())
+                            + " file(s) | a bar later: peak " + dbText (lb.peak) + " | level " + dbText (ratio);
+        juce::String problem;
+        for (std::size_t k = 0; k < a.size(); ++k)
+        {
+            const auto one = levelOf ({ a[k] });
+            const auto twin = k < b.size() ? levelOf ({ b[k] }) : Level {};
+            if (one.peak < 1.0e-4f && twin.peak >= 1.0e-3f)
+                problem = "SILENT (file " + juce::String ((int) k + 1) + " of " + juce::String ((int) a.size()) + ": peak " + dbText (one.peak) + ", its twin " + dbText (twin.peak) + ")";
+        }
+        if (problem.isEmpty() && lb.peak < 1.0e-3f)
+            problem = "BOTH SILENT (the sound a bar later is silent too)";
+        if (problem.isEmpty() && ! c.silenceOnly && juce::Decibels::gainToDecibels (ratio, -200.0) < (c.levelOnly ? -1.5 : -0.25))
+            problem = "QUIET (" + dbText (ratio) + " against the sound a bar later)";
+        if (problem.isNotEmpty())
+        {
+            ++(problem.startsWith ("QUIET") ? quiet : silent);
+            failures.add (c.what + ": " + problem);
+            say ("FAILED " + line + " -> " + problem);
+        }
+        else
+            say (line);
+    }
+
+    void say (const juce::String& line)
+    {
+        if (log)
+            log (line);
+    }
+
+    juce::String run()
+    {
+        registerAudioFormats (formats);
+        StressMaker maker (seed, folder);
+        maker.hosted = hosted;
+        if (allowRealtime)
+            onMessageThread ([this] {
+                live = std::make_unique<AudioEngine> (false);
+                if (live->openStandInDevice (48000.0, 256).isNotEmpty())
+                    live.reset();
+            });
+        for (int i = 0; i < count; ++i)
+        {
+            const auto c = maker.make (i, live != nullptr);
+            realtimeCases += c.realtime ? 1 : 0;
+            runCase (c);
+        }
+        onMessageThread ([this] {
+            if (live != nullptr)
+                live->closeStandInDevice();
+            live.reset();
+        });
+        const auto summary = juce::String (done) + " cases (" + juce::String (realtimeCases) + " in real time, seed " + juce::String (seed) + "): " + juce::String (silent)
+                             + " silent, " + juce::String (quiet) + " quiet, " + juce::String (failed) + " failed";
+        return failures.isEmpty() ? "OK (" + summary + ")" : "ERROR " + summary + "; " + failures.joinIntoString ("; ");
+    }
+};
+} // namespace
+
+void stress (int count, std::int64_t seed, bool realtime, const juce::String& pluginFile, std::function<void (const juce::String&)> log,
+             std::function<void (juce::String)> done)
+{
+    auto runner = std::make_shared<StressRunner>();
+    if (pluginFile.isNotEmpty()) // (its first instrument, as --shortexporttest --plugin)
+    {
+        AudioEngine scanner (false);
+        scanner.getPluginHost().addPluginFile (juce::File (pluginFile));
+        for (const auto& t : scanner.getPluginHost().getKnownPlugins().getTypes())
+            if (t.isInstrument && juce::File (t.fileOrIdentifier).getFileName() == juce::File (pluginFile).getFileName())
+            {
+                runner->hosted.instrument = InstrumentKind::plugin;
+                runner->hosted.plugin.id = t.createIdentifierString().toStdString();
+                runner->hosted.plugin.name = t.name.toStdString();
+                break;
+            }
+    }
+    runner->count = juce::jmax (1, count);
+    runner->seed = seed;
+    runner->allowRealtime = realtime;
+    // (the log is called from the stress thread: lines go to the message thread in order)
+    runner->log = [log] (const juce::String& line) { juce::MessageManager::callAsync ([log, line] { if (log) log (line); }); };
+    runner->folder = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-exportstress-" + juce::String (juce::Random::getSystemRandom().nextInt (1000000)));
+    runner->folder.createDirectory();
+    std::thread ([runner, done] {
+        auto result = runner->run();
+        runner->folder.deleteRecursively();
+        juce::MessageManager::callAsync ([done, result] { done (result); });
+    }).detach();
+}
+
+juce::String formatsCheck()
+{
+    // a sampler playing a decaying tone (the same samples on every render) for one bar, the Master without effects
+    const auto folder = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-selftest-formats-" + juce::String (juce::Random::getSystemRandom().nextInt (1000000)));
+    folder.createDirectory();
+    struct Cleanup
+    {
+        juce::File f;
+        ~Cleanup() { f.deleteRecursively(); }
+    } cleanup { folder };
+    auto song = Song::makeDefault();
+    song.bpm = 120.0;
+    ChannelDef ch;
+    ch.instrument = InstrumentKind::sampler;
+    ch.mixerTrack = 1;
+    ch.samplePath = writeTone (folder, 22050, 44100.0, false).getFullPathName().toStdString();
+    song.channels = { ch };
+    for (auto& track : song.mixer)
+        track.effects.clear();
+    song.patterns.clear();
+    song.patterns.emplace_back().name = "Formats";
+    song = withNote (song, 0);
+    song.mode = PlayMode::song;
+
+    juce::AudioFormatManager formats;
+    formats.registerBasicFormats();
+    auto exportWith = [&] (exportopts::Options o, const juce::String& name, juce::String& error) {
+        o.maxTailSeconds = 0.5;
+        o.dither = exportopts::DitherMode::none;
+        const auto file = folder.getChildFile (name + exportopts::extension (o.format));
+        ExportJob job (song, o, file);
+        if (! job.run ([] (double) { return true; }, error) && error.isEmpty())
+            error = "the export failed";
+        return file;
+    };
+    auto same = [] (const Decoded& a, const Decoded& b) {
+        return a.error.isEmpty() && b.error.isEmpty() && ! a.l.empty() && a.l == b.l && a.r == b.r && a.rate == b.rate;
+    };
+    auto bitsOf = [&formats] (const juce::File& f) {
+        std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (f));
+        return reader == nullptr ? 0 : (int) reader->bitsPerSample;
+    };
+
+    juce::StringArray done;
+    juce::String error;
+    // 24-bit AIFF from the same render as the 24-bit WAV ("Also save"): the same samples
+    exportopts::Options both;
+    both.sampleRate = 44100.0;
+    both.wavBits = 24;
+    both.aiffBits = 24;
+    both.moreFormats = 1u << (int) exportopts::Format::aiff;
+    const auto wav24 = exportWith (both, "both", error);
+    const auto aif24 = wav24.withFileExtension (exportopts::extension (exportopts::Format::aiff));
+    if (error.isNotEmpty())
+        return "ERROR wav + aiff export: " + error;
+    const auto a = decodeFile (formats, wav24), b = decodeFile (formats, aif24);
+    if (! same (a, b) || bitsOf (aif24) != 24)
+        return "ERROR the 24-bit AIFF differs from the WAV of the same render (" + juce::String ((int) a.l.size()) + " / " + juce::String ((int) b.l.size())
+               + " frames, " + juce::String (bitsOf (aif24)) + " bits)";
+    done.add ("aiff24 = wav24 (" + juce::String ((int) a.l.size()) + " frames)");
+
+    // a 16-bit AIFF on its own (streamed into the file while it renders) against a 16-bit WAV render
+    exportopts::Options wav16, aif16;
+    wav16.sampleRate = aif16.sampleRate = 48000.0;
+    wav16.wavBits = 16;
+    aif16.format = exportopts::Format::aiff;
+    aif16.aiffBits = 16;
+    const auto c = decodeFile (formats, exportWith (wav16, "w16", error));
+    const auto d = decodeFile (formats, exportWith (aif16, "a16", error));
+    if (error.isNotEmpty())
+        return "ERROR 16-bit export: " + error;
+    if (! same (c, d) || bitsOf (folder.getChildFile ("a16.aif")) != 16)
+        return "ERROR the streamed 16-bit AIFF differs from the 16-bit WAV render";
+    done.add ("aiff16 streamed = wav16");
+
+    // M4A: the system's AAC encoder (a 96 kHz render halved to 48 kHz first), or a clear refusal where there is none
+    exportopts::Options m4a;
+    m4a.format = exportopts::Format::aac;
+    m4a.sampleRate = 96000.0;
+    const auto m4aFile = exportWith (m4a, "m", error);
+    if (aac::available())
+    {
+        juce::MemoryBlock bytes;
+        m4aFile.loadFileAsData (bytes);
+        if (error.isNotEmpty() || bytes.getSize() < 2000 || std::memcmp (static_cast<const char*> (bytes.getData()) + 4, "ftyp", 4) != 0)
+            return "ERROR M4A: " + (error.isNotEmpty() ? error : "no MPEG-4 file (" + juce::String ((int) bytes.getSize()) + " bytes)");
+        done.add ("m4a " + juce::String ((int) bytes.getSize()) + " bytes");
+    }
+    else
+    {
+        if (error.isEmpty() || m4aFile.existsAsFile())
+            return "ERROR M4A without an AAC encoder did not refuse";
+        done.add ("m4a not available here (refused)");
+    }
+    return "OK (" + done.joinIntoString ("; ") + ")";
+}
 } // namespace lynx::shortexport
+
+namespace lynx
+{
+juce::String AudioEngine::openStandInDevice (double sampleRate, int blockSize)
+{
+    player.setProcessor (&graph);
+    deviceManager.addAudioDeviceType (std::make_unique<standin::Type> (sampleRate, blockSize));
+    if (const auto e = deviceManager.initialise (0, 2, nullptr, true); e.isNotEmpty())
+        return e;
+    deviceManager.addAudioCallback (this);
+    return {};
+}
+
+void AudioEngine::closeStandInDevice()
+{
+    deviceManager.removeAudioCallback (this);
+    deviceManager.closeAudioDevice();
+}
+} // namespace lynx

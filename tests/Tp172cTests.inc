@@ -45,10 +45,15 @@ TEST (ridge_channel_strip_2_state_translated_tp172c)
     for (const double ratio : { 1.1, 1.8, 4.3, 10.0, 21.0, 38.0, 63.0 })
         CHECK (std::abs (r::mRatio (r::mRatioValue (ratio)) - ratio) < 1e-3 * ratio);
 
-    p = tp172c::sslSlot ("SSL 4K G", "<PARAM id=\"LowMidEqFreq\" value=\"1.5\"/><PARAM id=\"LowMidEqDiv3\" value=\"1.0\"/>"
+    // (EqType 1 = Black; since round 190lb a state without it reads as the 4K G's default, Pink: Parity190lbTests.inc)
+    p = tp172c::sslSlot ("SSL 4K G", "<PARAM id=\"EqType\" value=\"1.0\"/>"
+                                     "<PARAM id=\"LowMidEqFreq\" value=\"1.5\"/><PARAM id=\"LowMidEqDiv3\" value=\"1.0\"/>"
                                      "<PARAM id=\"HighMidEqFreq\" value=\"2.0\"/><PARAM id=\"HighMidEqMult3\" value=\"1.0\"/>").params;
     CHECK (r::k4Voicing (p) && r::k4ColourIndex (p[r::k4Colour]) == 1);
-    CHECK (std::abs (r::lmfHz (p[r::lmfFreq]) - 500.0) < 0.1 && std::abs (r::hmfHz (p[r::hmfFreq]) - 6000.0) < 1.0);
+    // round 190ho: in the 4K G's Black (EqType 1) ÷3 / ×3 do nothing (K4G_ir: the renders with them
+    // equal the ones without), so the dials stay; the Pink EQ takes them (Parity190hoTests.inc)
+    CHECK (std::abs (r::lmfHz (p[r::lmfFreq]) - 1500.0) < 0.5 && std::abs (r::hmfHz (p[r::hmfFreq]) - 2000.0) < 1.0);
+    CHECK (p[r::k4Pink] == 0.0f && p[r::k4LmfDiv3] == 0.0f && p[r::k4HmfMult3] == 0.0f);
     p = tp172c::sslSlot ("SSL 4K B", "<PARAM id=\"LowEqGain\" value=\"6.0\"/><PARAM id=\"CompRatio\" value=\"3.0\"/>").params;
     CHECK (r::k4Voicing (p) && r::k4ColourIndex (p[r::k4Colour]) == 0);
     CHECK (std::abs (r::bandGainDb (p[r::lfGain], false) - 6.0) < 1e-4);
@@ -201,10 +206,11 @@ TEST (ridge_harrison_strips_translated_tp172c5)
                   + p32 ("compressor_threshold", -20.0) + p32 ("CompAutoMakeUp", 1.0));
     auto& p = s.params;
     CHECK (s.kind == EffectKind::ridgeStrip && ! r::k4Voicing (p) && ! r::modernVoicing (p) && p[r::curve] < 0.5f);
-    CHECK (std::abs (r::hmfHz (p[r::hmfFreq]) - 1421.74) < 0.5 && std::abs (r::bandGainDb (p[r::hmfGain], false) + 4.0) < 1e-3);
+    // round 190le: the EQ plays in Ridge's 32C voicing, its dials the original's own
+    CHECK (r::h32Voicing (p) && std::abs (r::h32HmfHz (p[r::hmfFreq]) - 1421.74) < 0.01 && std::abs (r::h32BellDb (p[r::hmfGain]) + 4.0) < 1e-3);
     CHECK (std::abs (r::ratio (p[r::compRatio]) - 4.0) < 0.01 && std::abs (r::compThresholdDb (p[r::compThreshold]) + 19.0) < 1e-3);
     CHECK (std::abs (r::trimDb (p[r::output]) - 7.5) < 0.01);      // its auto make-up: half of 20 dB x (1 - 1/4)
-    CHECK (std::abs (r::hpfHz (p[r::hpf]) - 23.25) < 0.1 && p[r::lpf] > 0.0f); // 12 dB/oct 25 Hz -> Ridge's 18 dB/oct lower
+    CHECK (std::abs (r::h32HpfHz (p[r::hpf]) - 25.0) < 0.1 && std::abs (r::h32LpfHz (p[r::lpf]) - 20000.0) < 20.0); // its always-in defaults
     s = c32 (p32 ("compressor_mode", 0) + p32 ("compressor_ratio", 10.0) + p32 ("gate_depth", 20) + p32 ("gate_threshold", -30)
              + p32 ("gate_mode", 1) + p32 ("equalizer_band_freq_4", 111.35) + p32 ("equalizer_band_gain_4", 13.74));
     CHECK (s.params[r::compRatio] == 0.0f);                                         // the Leveler: no static reduction
@@ -235,7 +241,8 @@ TEST (ridge_harrison_strips_translated_tp172c5)
         CHECK (outDb - inDb > -27.5 - 1.0 && outDb - inDb < -27.5 + 1.0); // +4 dB in, -4 dB out: the cap alone
     }
     CHECK (std::abs (r::gateRangeDb (s.params[r::gateRange]) - 20.0) < 1e-3 && s.params[r::expander] > 0.5f);
-    CHECK (std::abs (r::lfHz (s.params[r::lfFreq]) - 174.2) < 0.5 && std::abs (r::bandGainDb (s.params[r::lfGain], false) - 11.67) < 0.01);
+    // round 190le: the Lo shelf at the dial's middle: centre 145 Hz, plateau the full 13.5 dB
+    CHECK (std::abs (r::h32LfHz (s.params[r::lfFreq], false) - 145.0) < 0.5 && std::abs (r::h32ShelfDb (s.params[r::lfGain]) - 13.5) < 0.01);
 
     const std::string mpc = "<HarrisonMPCChannelStrip plugin_size=\"1.0\" version=\"327936\">" + p32 ("bypass", 0) + p32 ("mpc_compressorin", 1)
                             + p32 ("mpccomp_ratio", 1.5) + p32 ("mpccomp_threshold", -10) + p32 ("mpccomp_release", 100) + p32 ("mpccomp_attack", 5)

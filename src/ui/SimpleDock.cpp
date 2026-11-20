@@ -11,6 +11,8 @@
 #include "core/KeyFollow.h"
 #include "core/MixerOps.h"
 #include "core/SimplePads.h"
+#include "core/SimpleSteps.h"
+#include "core/SmartControls.h"
 #include "core/SimpleTracks.h"
 #include "core/SoundLibrary.h"
 #include "engine/AudioEngine.h"
@@ -21,8 +23,15 @@
 #include "ui/BrowserComponent.h"
 #include "ui/I18n.h"
 #include "ui/MixerComponent.h"
+#include "ui/PianoRollComponent.h"
 #include "ui/QuickPick.h"
+#include "ui/SimpleLook.h"
 #include "ui/SoundFontEditor.h"
+#include "ui/TrackIcons.h"
+#include "ui/Icons.h"
+#include "ui/HintBar.h"
+#include "core/AudioCapture.h"
+#include "ui/Motion.h"
 #include "ui/Theme.h"
 #include "ui/TouchKeyboard.h"
 
@@ -37,7 +46,7 @@ juce::String glyph (const char* bytes) { return juce::String::fromUTF8 (bytes); 
 
 // geometry (px at 100 %)
 constexpr int sideWidth = 212, cardWidth = 148, cardGap = 8, addWidth = 52, titleHeight = 26, pad = 8;
-constexpr int rowHeight = 24, categoryWidth = 168;
+constexpr int rowHeight = 28, categoryWidth = 168; // (round 190jc, SG-9: sound rows 24 -> 28 px)
 
 // Words that mean something else elsewhere in the UI get their own translation here ("Keys" the instruments, not
 // the computer's keys; "Punch" the effect, not punch-in recording)
@@ -177,19 +186,35 @@ private:
     bool dragging = false, dimmed = false;
 };
 
-// A small flat button of a card's title bar (‹ › ×)
+// A small flat button of a card's title bar and of the sound picker (‹ › ×). Round 190jc (design190ia SG-9, SG-10): vector
+// glyphs (`size` px: chevrons 5 x 9 / 6 x 10, the X 8 x 8, stroke 1.5) instead of 2-5 px text glyphs; a round hover fill.
 class GlyphButton final : public juce::Button
 {
 public:
-    explicit GlyphButton (const juce::String& text) : juce::Button (text) {}
+    GlyphButton (const juce::String& name, ui::simplelook::Glyph g, juce::Point<float> glyphSize, bool roundHover = true)
+        : juce::Button (name), glyph (g), size (glyphSize), round (roundHover)
+    {
+    }
     void paintButton (juce::Graphics& g, bool over, bool down) override
     {
-        if (over || down)
-            fillRoundRect (g, getLocalBounds().toFloat().reduced (1.0f), radius::sm, down ? colour::bg6 : colour::bg5);
-        g.setColour (! isEnabled() ? colour::textDisabled : over ? colour::textPrimary : colour::textSecondary);
-        g.setFont (font (type::title));
-        g.drawText (getName(), getLocalBounds(), juce::Justification::centred, false);
+        const auto r = getLocalBounds().toFloat();
+        if (isEnabled() && (over || down))
+        {
+            g.setColour (down ? colour::bg6 : colour::bg5);
+            if (round)
+                g.fillEllipse (r.withSizeKeepingCentre (juce::jmin (r.getWidth(), r.getHeight()), juce::jmin (r.getWidth(), r.getHeight())).reduced (0.5f));
+            else
+                g.fillRoundedRectangle (r.reduced (1.0f), radius::lg);
+        }
+        const auto scale = ui::simplelook::px (1.0f, 1.4f);
+        ui::simplelook::drawGlyph (g, glyph, r.withSizeKeepingCentre (size.x * scale, size.y * scale),
+                                   ! isEnabled() ? colour::textDisabled : over ? colour::textPrimary : colour::textSecondary, 1.5f);
     }
+
+private:
+    ui::simplelook::Glyph glyph;
+    juce::Point<float> size;
+    bool round;
 };
 
 // The last "card" of the chain: a big + in a dashed frame
@@ -212,6 +237,74 @@ public:
         g.setColour (! isEnabled() ? colour::textDisabled : over ? colour::textPrimary : colour::textSecondary);
         g.fillRect (juce::Rectangle<float> (18.0f, 2.0f).withCentre (c));
         g.fillRect (juce::Rectangle<float> (2.0f, 18.0f).withCentre (c));
+    }
+};
+
+// BandLab's preset stepper chevrons and its chain bypass button (round 190kn, DS-26 / DS-28: bandlab190p
+// 11-sounds-free-loops.png "‹ Bass Boost ›" and the struck "Fx" disc beside Save). LYNX vectors.
+class ChevronButton final : public juce::Button
+{
+public:
+    explicit ChevronButton (bool pointsRight) : juce::Button (pointsRight ? "next" : "previous"), right (pointsRight)
+    {
+        setMouseCursor (juce::MouseCursor::PointingHandCursor);
+    }
+    void paintButton (juce::Graphics& g, bool over, bool down) override
+    {
+        auto r = getLocalBounds().toFloat();
+        if (over || down)
+        {
+            g.setColour (down ? colour::bg5 : colour::bg4);
+            g.fillRoundedRectangle (r.reduced (1.0f), radius::sm);
+        }
+        const auto c = r.getCentre();
+        const auto s = 3.5f, d = right ? 1.0f : -1.0f;
+        juce::Path p;
+        p.startNewSubPath (c.x - d * s * 0.5f, c.y - s);
+        p.lineTo (c.x + d * s * 0.5f, c.y);
+        p.lineTo (c.x - d * s * 0.5f, c.y + s);
+        g.setColour (! isEnabled() ? colour::textDisabled : over ? colour::textPrimary : colour::textSecondary);
+        g.strokePath (p, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+
+private:
+    bool right;
+};
+
+// BandLab's ⓘ on an effect card (round 190kn, DS-25: bandlab190p 11-sounds-free-loops.png, the card's title bar)
+class InfoButton final : public juce::Button
+{
+public:
+    InfoButton() : juce::Button ("about") { setMouseCursor (juce::MouseCursor::PointingHandCursor); }
+    void paintButton (juce::Graphics& g, bool over, bool down) override
+    {
+        const auto r = getLocalBounds().toFloat().reduced (1.0f);
+        const auto ink = down ? colour::textPrimary : over ? colour::textPrimary : colour::textSecondary;
+        g.setColour (ink);
+        g.drawEllipse (r.reduced (0.5f), 1.2f);
+        const auto c = r.getCentre();
+        const auto u = r.getWidth() / 12.0f;
+        g.fillEllipse (c.x - 0.9f * u, c.y - 3.6f * u, 1.8f * u, 1.8f * u);
+        g.fillRoundedRectangle (c.x - 0.8f * u, c.y - 1.0f * u, 1.6f * u, 4.6f * u, 0.6f * u);
+    }
+};
+
+class ChainBypassButton final : public juce::Button
+{
+public:
+    ChainBypassButton() : juce::Button ("bypass") { setMouseCursor (juce::MouseCursor::PointingHandCursor); }
+    bool bypassed = false; // every effect of the chain off
+    void paintButton (juce::Graphics& g, bool over, bool down) override
+    {
+        const auto r = getLocalBounds().toFloat().withSizeKeepingCentre (26.0f, 26.0f).reduced (0.5f);
+        g.setColour (bypassed ? colour::accent : down ? colour::bg5 : over ? colour::bg4 : colour::bg3);
+        g.fillEllipse (r);
+        const auto ink = ! isEnabled() ? colour::textDisabled : bypassed ? colour::onAccent : over ? colour::textPrimary : colour::textSecondary;
+        g.setColour (ink);
+        g.setFont (font (type::caption, true).withStyle (juce::Font::bold | juce::Font::italic));
+        g.drawText ("Fx", r.toNearestInt(), juce::Justification::centred, false);
+        // the stroke through it (BandLab's bypass glyph)
+        g.drawLine (r.getX() + 7.0f, r.getBottom() - 7.0f, r.getRight() - 7.0f, r.getY() + 7.0f, 1.4f);
     }
 };
 
@@ -244,6 +337,22 @@ public:
         saveButton.setTooltip (tr ("Keeps this chain as one of your presets"));
         saveButton.onClick = [this] { askSaveName(); };
         addAndMakeVisible (saveButton);
+        // round 190kn: BandLab's ‹ › on the preset and its chain bypass
+        previousPreset.setTooltip (tr ("Previous preset"));
+        nextPreset.setTooltip (tr ("Next preset"));
+        previousPreset.onClick = [this] { stepPreset (-1); };
+        nextPreset.onClick = [this] { stepPreset (1); };
+        addAndMakeVisible (previousPreset);
+        addAndMakeVisible (nextPreset);
+        bypassButton.setTooltip (tr ("Bypass all effects of this track (again: back on)"));
+        bypassButton.onClick = [this] {
+            const auto t = insert;
+            if (t < 0 || ! hasEffects())
+                return;
+            const auto on = ! mixerops::anyEffectEnabled (engine.getSong(), t);
+            engine.editSong ([t, on] (Song& s) { mixerops::setAllEffectsEnabled (s, t, on); });
+        };
+        addAndMakeVisible (bypassButton);
 
         styleCaption (blendCaption, tr ("Blend"));
         addAndMakeVisible (blendCaption);
@@ -305,6 +414,8 @@ public:
         const auto& song = engine.getSong();
         const bool has = insert >= 0 && insert < (int) song.mixer.size();
         presetButton.setEnabled (has);
+        previousPreset.setEnabled (has);
+        nextPreset.setEnabled (has);
         blend.setEnabled (has);
         reverb.setEnabled (has && insert > 0 && insert != simpletracks::sharedReverb (song));
         reverb.setValue (has ? simpletracks::reverbSend (song, insert) : 0.0f);
@@ -314,6 +425,9 @@ public:
             cards.clear();
             presetButton.setButtonText (tr ("None"));
             saveButton.setEnabled (false);
+            bypassButton.setEnabled (false);
+            bypassButton.bypassed = false;
+            bypassButton.repaint();
             blend.setValue (1.0f);
             emptyHint.setText (tr ("Select a track to see its effects."), juce::dontSendNotification);
             layoutStrip();
@@ -342,6 +456,12 @@ public:
             name << " " << tr ("(edited)");
         presetButton.setButtonText (name + glyph (" \xe2\x96\xbe"));
         saveButton.setEnabled (! fx.empty());
+        bypassButton.setEnabled (! fx.empty());
+        if (const auto off = ! fx.empty() && ! mixerops::anyEffectEnabled (song, insert); off != bypassButton.bypassed)
+        {
+            bypassButton.bypassed = off;
+            bypassButton.repaint();
+        }
         blend.setValue (mixer.chainBlend);
         blend.setDimmed (fx.empty());
         addCard.setEnabled ((int) fx.size() < maxEffectSlots);
@@ -355,10 +475,15 @@ public:
         auto side = r.removeFromLeft (sideWidth - pad);
         presetCaption.setBounds (side.removeFromTop (16));
         auto row = side.removeFromTop (26);
-        saveButton.setBounds (row.removeFromRight (58));
-        row.removeFromRight (6);
-        presetButton.setBounds (row);
-        side.removeFromTop (10);
+        presetButton.setBounds (row); // (BandLab: "‹ Bass Boost ›", the arrows inside the preset's capsule)
+        previousPreset.setBounds (row.removeFromLeft (22).reduced (0, 2));
+        nextPreset.setBounds (row.removeFromRight (22).reduced (0, 2));
+        side.removeFromTop (6);
+        auto second = side.removeFromTop (26); // BandLab: Save and the chain bypass under the preset
+        saveButton.setBounds (second.removeFromLeft (58));
+        second.removeFromLeft (8);
+        bypassButton.setBounds (second.removeFromLeft (26));
+        side.removeFromTop (8);
         auto captions = side.removeFromTop (16);
         auto knobs = side.removeFromTop (juce::jmin (84, side.getHeight()));
         blendCaption.setBounds (captions.removeFromLeft (90));
@@ -512,6 +637,15 @@ public:
     void remove (int index) { slotActions.deleteSlot (index); }
     void openEditor (int index) { slotActions.toggleSlotEditor (index); }
 
+    void stepPreset (int direction)
+    {
+        const auto& song = engine.getSong();
+        if (insert < 0 || insert >= (int) song.mixer.size())
+            return;
+        if (const auto* p = chains::stepped (song.mixer[(std::size_t) insert].chainPreset, direction))
+            applyFactory (p->name);
+    }
+
     void applyFactory (const std::string& name)
     {
         const auto t = insert;
@@ -577,6 +711,8 @@ public:
     }
     void blendForCheck (float v) { blend.turnTo (v); }
     void reverbForCheck (float v) { reverb.turnTo (v); }
+    void bypassForCheck() { bypassButton.onClick(); }                     // round 190kn
+    bool bypassLitForCheck() const noexcept { return bypassButton.bypassed; }
     const juce::Component* cardForSnapshot (int card) const
     {
         return card >= 0 && card < (int) cards.size() ? cards[(std::size_t) card].get() : nullptr;
@@ -607,6 +743,29 @@ private:
             close.onClick = [this] { owner.remove (index); };
             for (auto* b : { &left, &right, &close })
                 addAndMakeVisible (*b);
+            // round 190kn (DS-25, BandLab's card: toggle, ⓘ, name, ×): what the effect does, in a bubble
+            info.setTooltip (tr ("About this effect"));
+            info.onClick = [this] { showAbout(); };
+            addAndMakeVisible (info);
+        }
+
+        juce::String aboutText() const
+        {
+            if (goal != 0)
+                return goalText (goal) + ": " + tr (goals::description (goal));
+            return tr ("{0}: its knob sets how much of the effect is mixed in; Editor opens all of its controls.", { title });
+        }
+
+        void showAbout()
+        {
+            auto label = std::make_unique<juce::Label> (juce::String(), aboutText());
+            label->setFont (font (type::body));
+            label->setColour (juce::Label::textColourId, colour::textPrimary);
+            label->setJustificationType (juce::Justification::topLeft);
+            const auto width = 240;
+            const auto lines = juce::jmax (1, (int) std::ceil (juce::GlyphArrangement::getStringWidth (label->getFont(), label->getText()) / (float) (width - 12)));
+            label->setSize (width, 12 + lines * (int) std::ceil (label->getFont().getHeight() + 3.0f));
+            juce::CallOutBox::launchAsynchronously (std::move (label), info.getScreenBounds(), nullptr);
         }
 
         void update (const EffectSlot& slot, int newIndex, int count)
@@ -628,15 +787,19 @@ private:
             repaint();
         }
 
-        juce::Rectangle<int> ledBounds() const { return { 8, 7, 12, 12 }; }
+        juce::Rectangle<int> ledBounds() const { return { 7, 6, 14, 14 }; } // (round 190jc, SG-10: 14 px, ringed when off)
+        juce::String aboutForCheck() const { return aboutText(); }
 
         void resized() override
         {
             auto r = getLocalBounds();
             auto bar = r.removeFromTop (titleHeight);
-            close.setBounds (bar.removeFromRight (22).reduced (0, 2));
-            right.setBounds (bar.removeFromRight (20).reduced (0, 2));
-            left.setBounds (bar.removeFromRight (20).reduced (0, 2));
+            // round 190jc (SG-10): 20 x 20 hit boxes
+            bar.removeFromRight (3);
+            close.setBounds (bar.removeFromRight (20).withSizeKeepingCentre (20, 20));
+            right.setBounds (bar.removeFromRight (20).withSizeKeepingCentre (20, 20));
+            left.setBounds (bar.removeFromRight (20).withSizeKeepingCentre (20, 20));
+            info.setBounds (ledBounds().getRight() + 3, ledBounds().getY(), 14, 14);
             r.reduce (pad, 6);
             editor.setBounds (r.removeFromBottom (24));
             r.removeFromBottom (4);
@@ -657,6 +820,11 @@ private:
             g.drawRoundedRectangle (r.reduced (0.5f), radius::lg, 1.0f);
             g.setColour (on ? colour::accent : colour::ledOff);
             g.fillEllipse (ledBounds().toFloat());
+            if (! on)
+            {
+                g.setColour (colour::textDisabled);
+                g.drawEllipse (ledBounds().toFloat().reduced (0.5f), 1.0f);
+            }
             if (ledHover)
             {
                 g.setColour (colour::textPrimary.withAlpha (0.6f));
@@ -664,7 +832,7 @@ private:
             }
             g.setColour (on ? colour::textPrimary : colour::textSecondary);
             g.setFont (font (type::body, true));
-            g.drawText (title, juce::Rectangle<int> (26, 0, left.getX() - 28, titleHeight), juce::Justification::centredLeft, true);
+            g.drawText (title, juce::Rectangle<int> (info.getRight() + 5, 0, left.getX() - info.getRight() - 7, titleHeight), juce::Justification::centredLeft, true);
             g.setColour (colour::textSecondary);
             g.setFont (font (type::caption));
             g.drawText (sub, juce::Rectangle<int> (pad, editor.getY() - 20, getWidth() - 2 * pad, 16), juce::Justification::centred, true);
@@ -716,7 +884,10 @@ private:
         juce::String title, sub;
         DockKnob knob;
         juce::TextButton editor;
-        GlyphButton left { glyph ("\xe2\x80\xb9") }, right { glyph ("\xe2\x80\xba") }, close { glyph ("\xc3\x97") };
+        InfoButton info; // (round 190kn: BandLab's ⓘ)
+        GlyphButton left { glyph ("\xe2\x80\xb9"), ui::simplelook::Glyph::chevronLeft, { 5.0f, 9.0f } },
+            right { glyph ("\xe2\x80\xba"), ui::simplelook::Glyph::chevronRight, { 5.0f, 9.0f } },
+            close { glyph ("\xc3\x97"), ui::simplelook::Glyph::cross, { 8.0f, 8.0f } };
     };
 
     // The row of cards (inside the viewport): it paints the drop mark while a card is dragged
@@ -777,6 +948,8 @@ private:
     EffectsPanel slotActions;
     juce::Label presetCaption, blendCaption, reverbCaption, emptyHint;
     juce::TextButton presetButton, saveButton;
+    ChevronButton previousPreset { false }, nextPreset { true };
+    ChainBypassButton bypassButton;
     AddCardButton addCard;
     DockKnob blend, reverb;
     juce::Viewport view;
@@ -945,9 +1118,11 @@ public:
         auto r = getLocalBounds().reduced (pad);
         auto side = r.removeFromLeft (sideWidth - pad);
         soundCaption.setBounds (side.removeFromTop (16));
-        auto row = side.removeFromTop (30);
-        prev.setBounds (row.removeFromLeft (26));
-        next.setBounds (row.removeFromRight (26));
+        // round 190jc (SG-9, BandLab's "‹ Studio Grand ›" field): a 32 px field with the chevrons in 28 px ends
+        auto row = side.removeFromTop (32);
+        pickerField = row;
+        prev.setBounds (row.removeFromLeft (28));
+        next.setBounds (row.removeFromRight (28));
         name.setBounds (row);
         detail.setBounds (side.removeFromTop (18));
         side.removeFromTop (8);
@@ -977,7 +1152,10 @@ public:
     {
         g.setColour (colour::border);
         g.fillRect (sideWidth, pad, 1, getHeight() - 2 * pad);
+        g.setColour (colour::bg4);
+        g.fillRoundedRectangle (pickerField.toFloat(), radius::lg);
     }
+    juce::Rectangle<int> pickerField;
 
     void visibilityChanged() override
     {
@@ -1273,7 +1451,8 @@ private:
     }
 
     juce::Label soundCaption, name, detail, listHint;
-    GlyphButton prev { glyph ("\xe2\x80\xb9") }, next { glyph ("\xe2\x80\xba") };
+    GlyphButton prev { glyph ("\xe2\x80\xb9"), ui::simplelook::Glyph::chevronLeft, { 6.0f, 10.0f }, false },
+        next { glyph ("\xe2\x80\xba"), ui::simplelook::Glyph::chevronRight, { 6.0f, 10.0f }, false };
     juce::TextButton editorButton, keysButton, ownButton, fontsButton, pluginsButton, folderButton;
     juce::TextEditor search;
     CategoryModel categoryModel;
@@ -1318,6 +1497,14 @@ public:
         makePattern.setButtonText (tr ("New pattern"));
         makePattern.setTooltip (tr ("An empty 4-bar pattern on this track, to write notes into"));
         makePattern.onClick = [this] { make(); };
+        // round 190mc (discussion #105): the Chord helper of the docked editor, in the Simple look
+        chordHelper.setButtonText (tr ("Chord helper"));
+        chordHelper.setTooltip (tr ("Select a chord: related keys and borrowed chords to insert after it"));
+        chordHelper.onClick = [this] {
+            if (auto* roll = dynamic_cast<PianoRollComponent*> (editor))
+                roll->openChordHelper();
+        };
+        addAndMakeVisible (chordHelper);
         addAndMakeVisible (fold);
         addAndMakeVisible (open);
         addChildComponent (again);
@@ -1434,6 +1621,8 @@ public:
         open.setBounds (bar.removeFromRight (170));
         bar.removeFromRight (8);
         fold.setBounds (bar.removeFromRight (160));
+        bar.removeFromRight (8);
+        chordHelper.setBounds (bar.removeFromRight (120));
         const auto body = getLocalBounds().withTrimmedTop (barHeight);
         again.setBounds (body.withSizeKeepingCentre (220, 30));
         makePattern.setBounds (body.withSizeKeepingCentre (160, 30));
@@ -1480,6 +1669,7 @@ private:
     {
         const auto& song = engine.getSong();
         fold.setEnabled (projectkey::get (song).has_value() && editor != nullptr);
+        chordHelper.setEnabled (editor != nullptr);
         fold.setToggleState (hooks.foldedToKey && hooks.foldedToKey(), juce::dontSendNotification);
         again.setVisible (takenBack && editor == nullptr);
         makePattern.setVisible (! takenBack && editor == nullptr && pattern < 0 && track >= 0 && ! pendingMake);
@@ -1489,7 +1679,7 @@ private:
     AudioEngine& engine;
     Hooks& hooks;
     juce::ToggleButton fold;
-    juce::TextButton open, again, makePattern;
+    juce::TextButton open, again, makePattern, chordHelper;
     juce::Component* editor = nullptr; // the main window's Piano roll while docked here (not owned)
     int track = -1, channel = -1, dockedPattern = -1;
     bool takenBack = false, pendingMake = false;
@@ -1592,6 +1782,19 @@ public:
             if (onBrowse)
                 onBrowse();
         };
+        // round 190mr (DS-36, BandLab's empty sampler, bandlab190p 21-sampler-empty.png + capture 190mr C1): an empty pad's
+        // three calls to action — Record via an audio input, import a file, Browse Sounds — each a pill under its icon
+        ctaRecord.setButtonText (tr ("Record"));
+        ctaRecord.onClick = [this] { recording ? stopPadRecording() : startPadRecording(); };
+        ctaImport.setButtonText (tr ("Import"));
+        ctaImport.onClick = [this] { chooseFile (selected); };
+        ctaBrowse.setButtonText (tr ("Browse"));
+        ctaBrowse.onClick = [this] {
+            if (onBrowse)
+                onBrowse();
+        };
+        for (auto* b : { &ctaRecord, &ctaImport, &ctaBrowse })
+            addChildComponent (*b);
         kit.setButtonText (tr ("Kit"));
         kit.setTooltip (tr ("Save the pads as a kit, open one of your kits, or fill the pads from a folder"));
         kit.onClick = [this] { showKitMenu(); };
@@ -1674,6 +1877,9 @@ public:
             comp->setEnabled (has);
         for (auto& k : knobs)
             k.setEnabled (has);
+        for (auto* b : { &ctaRecord, &ctaImport, &ctaBrowse }) // round 190mr (DS-36): an empty pad's calls to action
+            b->setVisible (! has || recording);
+        styleRecordCta();
         waveFor = {};
         resized();
         repaint();
@@ -1729,12 +1935,18 @@ public:
             const auto* c = channelOf (p);
             const bool has = c != nullptr && ! c->samplePath.empty();
             const auto tint = padColour (c != nullptr ? c->simplePad.colour : 0, trackColour);
-            const bool lit = flash[(std::size_t) p] > 0;
+            // round 190jc (design190ia SG-11): the label is black or white, whichever reads better on the pad (>= 4.58:1 on any
+            // fill; white "Hat" on orange was 2.71:1). Round 190jj: a press darkens the plate (BandLab); the label keeps the
+            // ink of the pad at rest, as BandLab's glyph keeps its colour
+            const auto rest = has ? tint.withMultipliedBrightness (0.55f).withMultipliedSaturation (0.8f) : colour::bg2;
+            const auto press = pressShown[(std::size_t) p];
+            const auto fill = has && press > 0.0f ? rest.withMultipliedBrightness (1.0f - pressDepth * press) : rest;
+            const auto ink = ui::simplelook::inkOn (rest);
             if (has)
             {
-                fillRoundRect (g, r, radius::md, tint.withMultipliedBrightness (lit ? 1.0f : 0.55f).withMultipliedSaturation (lit ? 1.0f : 0.8f));
-                g.setColour (lit ? colour::onAccent : colour::textPrimary);
-                g.setFont (font (type::small, true));
+                fillRoundRect (g, r, radius::md, fill);
+                g.setColour (ink);
+                g.setFont (font (ui::simplelook::largeControls() ? type::body : type::small, true));
                 g.drawFittedText (utf8 (c->name), r.reduced (6.0f, 4.0f).withTrimmedTop (12.0f).toNearestInt(), juce::Justification::centredLeft, 2, 0.8f);
             }
             else
@@ -1751,7 +1963,7 @@ public:
                 g.fillRect (juce::Rectangle<float> (1.5f, 10.0f).withCentre (r.getCentre()));
             }
             // the typing key that plays it, top left
-            g.setColour (has ? colour::onAccent.withAlpha (0.75f) : colour::textSecondary);
+            g.setColour (has ? ink : colour::textSecondary);
             g.setFont (font (type::caption, true));
             g.drawText (juce::String::charToString ((juce::juce_wchar) simplepads::typingKey (p)), r.reduced (6.0f, 3.0f).toNearestInt(),
                         juce::Justification::topLeft, false);
@@ -1760,6 +1972,12 @@ public:
                 g.setColour (colour::accent);
                 g.drawRoundedRectangle (r.reduced (1.0f), radius::md, 2.0f);
             }
+            if (p == selected && recording) // round 190mr (DS-36, capture 190mr C1): the pad being recorded is red with a dot
+            {
+                fillRoundRect (g, r.reduced (2.0f), radius::md, colour::accent.withAlpha (0.55f));
+                g.setColour (colour::accent);
+                g.fillEllipse (juce::Rectangle<float> (9.0f, 9.0f).withCentre (r.getCentre()));
+            }
             if (p == dropTarget)
             {
                 g.setColour (colour::textPrimary);
@@ -1767,7 +1985,9 @@ public:
             }
         }
 
-        // the selected pad: its title and its waveform with the played region
+        // the selected pad: its title and its waveform with the played region (not when only a pad repaints)
+        if (! g.clipRegionIntersects (titleArea.getUnion (waveArea)))
+            return;
         const auto* c = channelOf (selected);
         const bool has = c != nullptr && ! c->samplePath.empty();
         g.setColour (colour::textPrimary);
@@ -1778,21 +1998,32 @@ public:
         g.drawFittedText (title, titleArea, juce::Justification::centredLeft, 1, 0.8f);
         const auto w = waveArea.toFloat();
         fillRoundRect (g, w, radius::md, colour::bg0);
-        if (! has)
+        if (! has || recording)
         {
-            g.setColour (colour::textSecondary);
-            g.setFont (font (type::small));
-            g.drawFittedText (tr ("Drop a sound on a pad, import a file or browse the sounds. Click a pad or press its key to play it."),
-                              waveArea.reduced (10, 4), juce::Justification::centred, 2, 0.9f);
+            // round 190mr (DS-36): BandLab's three columns — icon, caption, the pill under them (the pills are buttons)
+            static const char* const captions[] { TR_NOOP ("Record via an audio input"), TR_NOOP ("Drag and drop or import an audio file"),
+                                                  TR_NOOP ("Browse Sounds") };
+            const Icon glyphs[] { Icon::mic, Icon::audioFile, Icon::listen };
+            for (int k = 0; k < 3; ++k)
+            {
+                const auto column = ctaColumn (k);
+                const auto icon = juce::Rectangle<float> (22.0f, 22.0f).withCentre ({ (float) column.getCentreX(), (float) column.getY() + 14.0f });
+                icons::draw (g, glyphs[k], icon, k == 0 && recording ? colour::accent : colour::textPrimary);
+                g.setColour (k == 0 && recording ? colour::accent : colour::textSecondary);
+                g.setFont (font (type::small));
+                g.drawFittedText (k == 0 && recording ? tr ("Recording...") : tr (captions[k]),
+                                  column.withTrimmedTop (32).withHeight (18), juce::Justification::centred, 1, 0.8f);
+            }
             return;
         }
-        drawWave (g, *c, w);
+        drawWave (g, *c, w, padColour (c->simplePad.colour, trackColour));
     }
 
     void resized() override
     {
         auto r = getLocalBounds().reduced (pad, 6);
-        const auto side = juce::jlimit (34, 64, (r.getHeight() - 3 * 4) / 4);
+        // round 190jc (SG-11): touch size at least (44 px; Large controls 48), up to 72
+        const auto side = juce::jlimit (ui::simplelook::px (44, 48), 72, (r.getHeight() - 3 * 4) / 4);
         gridArea = r.removeFromLeft (side * 4 + 3 * 4).withHeight (side * 4 + 3 * 4);
         r.removeFromLeft (14);
         auto top = r.removeFromTop (26);
@@ -1805,6 +2036,12 @@ public:
         r.removeFromTop (4);
         auto controls = r.removeFromBottom (juce::jmin (84, r.getHeight() / 2 + 8));
         waveArea = r.reduced (0, 2);
+        for (int k = 0; k < 3; ++k) // round 190mr (DS-36): each pill under its column's caption
+        {
+            auto* b = k == 0 ? &ctaRecord : k == 1 ? &ctaImport : &ctaBrowse;
+            const auto column = ctaColumn (k);
+            b->setBounds (juce::Rectangle<int> (juce::jmin (84, column.getWidth() - 8), 26).withCentre ({ column.getCentreX(), column.getY() + 70 }));
+        }
         auto row = controls.removeFromTop (24);
         for (auto& b : modes)
             b.setBounds (row.removeFromLeft (84)), row.removeFromLeft (2);
@@ -1923,14 +2160,44 @@ public:
         loadFile (at >= 0 ? at : selected, BrowserComponent::draggedFile (d));
     }
 
-    // a short light on a pad played by a key or a click (a timer runs only while a pad is lit)
+    // Round 190jj (capture190ji §1a, shots/bl-a-pads-flash-z2.png, films/play-sampler-pads): BandLab's pad "press" — a
+    // pad that sounds darkens from its colour to ~55 % brightness in ~50 ms and back in ~90 ms (eased both ways), for a
+    // click, a key, and the notes the song plays. The timer runs only while a press runs (60 Hz with Animations on; with
+    // Animations off the pad darkens at once and comes back after the same 140 ms: two repaints). Only the pressed pad
+    // repaints. (Round 190ih, DS-34: the page is never repainted whole for a press.)
+    static constexpr double pressInMs = 50.0, pressOutMs = 90.0;
+    static constexpr float pressDepth = 0.45f; // (to 55 % of the colour)
+    float pressAmount (int p, double nowMs) const
+    {
+        const auto start = pressStart[(std::size_t) p];
+        if (start < 0.0)
+            return 0.0f;
+        const auto t = nowMs - start;
+        if (t >= pressInMs + pressOutMs || t < 0.0)
+            return 0.0f;
+        if (! ui::motion::enabled())
+            return 1.0f;
+        auto ease = [] (double x) { return (float) (x * x * (3.0 - 2.0 * x)); }; // (smoothstep: eased both ways)
+        return t < pressInMs ? ease (t / pressInMs) : 1.0f - ease ((t - pressInMs) / pressOutMs);
+    }
     void timerCallback() override
     {
+        const auto now = juce::Time::getMillisecondCounterHiRes();
         bool any = false;
-        for (auto& f : flash)
-            if (f > 0)
-                --f, any = true;
-        repaint();
+        for (int p = 0; p < simplepads::padCount; ++p)
+        {
+            if (pressStart[(std::size_t) p] < 0.0)
+                continue;
+            const auto amount = pressAmount (p, now);
+            if (amount <= 0.0f && now - pressStart[(std::size_t) p] >= pressInMs + pressOutMs)
+                pressStart[(std::size_t) p] = -1.0;
+            if (amount != pressShown[(std::size_t) p])
+            {
+                pressShown[(std::size_t) p] = amount;
+                repaint (padBounds (p).expanded (2));
+            }
+            any = any || pressStart[(std::size_t) p] >= 0.0;
+        }
         if (! any)
             stopTimer();
     }
@@ -1938,11 +2205,36 @@ public:
     {
         if (pad >= 0 && pad < simplepads::padCount)
         {
-            flash[(std::size_t) pad] = 5;
-            repaint();
+            pressStart[(std::size_t) pad] = juce::Time::getMillisecondCounterHiRes();
             if (! isTimerRunning())
-                startTimerHz (30);
+                startTimerHz (ui::motion::enabled() ? 60 : 30);
+            timerCallback(); // (the first frame now)
         }
+    }
+    // Round 190jj: the notes the song plays press their pads (BandLab). Called on the main window's 30 Hz timer; it reads
+    // the pads' channels' note-strike counters (the engine's activity counters: a new note-on, even one shorter than a
+    // frame) only while the song runs and the page shows; stopped it does nothing.
+    void watchPlayback()
+    {
+        const auto runs = engine.getTransport().playing.load (std::memory_order_relaxed) && isShowing() && track >= 0;
+        for (int p = 0; p < simplepads::padCount; ++p)
+        {
+            const auto ch = channelIndex (p);
+            const auto strikes = runs && ch >= 0 ? engine.noteStrikes (ch) : 0u;
+            if (runs && watching && ch == seenChannel[(std::size_t) p] && strikes != seenStrikes[(std::size_t) p] && hasSound (p))
+                lightPad (p);
+            seenStrikes[(std::size_t) p] = strikes;
+            seenChannel[(std::size_t) p] = ch;
+        }
+        watching = runs;
+    }
+    float pressShownForCheck (int pad) const { return pad >= 0 && pad < simplepads::padCount && pressStart[(std::size_t) pad] >= 0.0 ? 1.0f : pressShown[(std::size_t) pad]; }
+    float pressForSnapshot (int pad, float amount)
+    {
+        pressStart[(std::size_t) pad] = -1.0;
+        pressShown[(std::size_t) pad] = amount;
+        repaint();
+        return amount;
     }
 
 private:
@@ -2354,9 +2646,11 @@ private:
                            });
     }
 
-    void drawWave (juce::Graphics& g, const ChannelDef& c, juce::Rectangle<float> w)
+    // round 190jc (SG-11): the waveform in the pad's colour, one column per PHYSICAL pixel (at @2x it stepped every 2 px)
+    void drawWave (juce::Graphics& g, const ChannelDef& c, juce::Rectangle<float> w, juce::Colour hue)
     {
-        const auto width = juce::jmax (1, (int) w.getWidth());
+        const auto scale = juce::jlimit (1.0f, 4.0f, g.getInternalContext().getPhysicalPixelScaleFactor());
+        const auto width = juce::jmax (1, (int) std::round (w.getWidth() * scale));
         if (waveFor != c.samplePath || (int) wave.size() != width)
         {
             wave.assign ((std::size_t) width, 0.0f);
@@ -2376,15 +2670,19 @@ private:
         }
         const auto mid = w.getCentreY(), half = w.getHeight() * 0.45f;
         const auto s = w.getX() + c.sampler.regionStart * w.getWidth(), e = w.getX() + c.sampler.regionEnd * w.getWidth();
+        const auto played = ui::simplelook::readableOn (hue, colour::bg0, 3.0f);
+        juce::RectangleList<float> inRegion, outside; // (two fills, not one per column)
         for (int x = 0; x < width; ++x)
         {
-            const auto px = w.getX() + (float) x;
-            const auto inside = px >= s && px <= e;
+            const auto px = w.getX() + (float) x / scale;
             const auto idx = c.sampler.reverse ? width - 1 - x : x;
-            const auto h = juce::jmax (0.5f, wave[(std::size_t) idx] * half);
-            g.setColour (inside ? colour::accent.withAlpha (0.9f) : colour::textDisabled.withAlpha (0.6f));
-            g.fillRect (px, mid - h, 1.0f, h * 2.0f);
+            const auto h = juce::jmax (0.5f / scale, wave[(std::size_t) idx] * half);
+            (px >= s && px <= e ? inRegion : outside).addWithoutMerging ({ px, mid - h, 1.0f / scale, h * 2.0f });
         }
+        g.setColour (played.withAlpha (0.95f));
+        g.fillRectList (inRegion);
+        g.setColour (colour::textDisabled.withAlpha (0.6f));
+        g.fillRectList (outside);
         // the region's handles
         g.setColour (colour::textPrimary);
         for (auto x : { s, e })
@@ -2400,10 +2698,150 @@ private:
         }
     }
 
+public:
+    ~PadsPage() override
+    {
+        if (recording) // (closed while recording: the tap and the input are let go, nothing is kept)
+        {
+            recorder.stopTimer();
+            engine.getMeters().capture.setSource (AudioCapture::off);
+            releaseInput();
+        }
+    }
+    bool recordingForCheck() const noexcept { return recording; }
+    void startRecordingForCheck() { startPadRecording(); }
+    void recordingLookForSnapshot (bool on) // (the look only: no input is opened)
+    {
+        recording = on;
+        recordingPad = on ? selected : -1;
+        update();
+    }
+    void stopRecordingForCheck() { stopPadRecording(); }
+    juce::Component* ctaForCheck (int k) { return k == 0 ? &ctaRecord : k == 1 ? (juce::Component*) &ctaImport : &ctaBrowse; }
+
+private:
+    // --- round 190mr (DS-36): recording into the selected pad (BandLab: Record starts at once, no count-in; the dock says
+    // "Recording...", the button turns into a red Stop and the pad turns red; Stop puts the take on the pad) ---------
+    juce::Rectangle<int> ctaColumn (int k) const
+    {
+        const auto area = waveArea.reduced (8, 0);
+        const auto w = area.getWidth() / 3;
+        const auto top = area.getY() + juce::jmax (4, (area.getHeight() - 100) / 2);
+        return { area.getX() + k * w, top, w, 100 };
+    }
+    void styleRecordCta()
+    {
+        ctaRecord.setButtonText (recording ? tr ("Stop") : tr ("Record"));
+        ctaRecord.setColour (juce::TextButton::buttonColourId, recording ? colour::accent : colour::bg4);
+        ctaRecord.setColour (juce::TextButton::textColourOffId, colour::textPrimary);
+    }
+    struct PadRecorder final : juce::Timer
+    {
+        std::function<void()> tick;
+        void timerCallback() override { tick(); }
+    };
+    void startPadRecording()
+    {
+        if (recording || track < 0)
+            return;
+        if (! engine.hasAudioInput())
+        {
+            if (const auto result = engine.openAudioInput(); result.issue != AudioEngine::InputIssue::none)
+            {
+                ui::postNotice ({ result.detail.isNotEmpty() ? result.detail : tr ("No active audio input (Settings > Audio)"), {}, false, false });
+                return;
+            }
+            openedInput = true;
+        }
+        auto* device = engine.getDeviceManager().getCurrentAudioDevice();
+        if (device == nullptr || device->getActiveInputChannels().countNumberOfSetBits() == 0)
+        {
+            ui::postNotice ({ tr ("No active audio input (Settings > Audio)"), {}, false, false });
+            releaseInput();
+            return;
+        }
+        recRate = device->getCurrentSampleRate();
+        recStereo = device->getActiveInputChannels().countNumberOfSetBits() > 1;
+        recL.clear();
+        recR.clear();
+        recordingPad = selected;
+        engine.getMeters().capture.setSource (AudioCapture::input);
+        recording = true;
+        recorder.tick = [this] { pullRecording(); };
+        recorder.startTimerHz (20);
+        update();
+    }
+    void pullRecording()
+    {
+        std::vector<float> l, r;
+        engine.getMeters().capture.pull (l, r);
+        recL.insert (recL.end(), l.begin(), l.end());
+        recR.insert (recR.end(), r.begin(), r.end());
+        if ((double) recL.size() >= recRate * maxPadSeconds) // (a pad holds a sound, not a song: it stops by itself)
+            stopPadRecording();
+    }
+    void releaseInput()
+    {
+        if (std::exchange (openedInput, false))
+            engine.releaseAudioInputIfUnused();
+    }
+    void stopPadRecording()
+    {
+        if (! recording)
+            return;
+        pullRecording();
+        recorder.stopTimer();
+        engine.getMeters().capture.setSource (AudioCapture::off);
+        releaseInput();
+        recording = false;
+        const auto pad = std::exchange (recordingPad, -1);
+        if (recL.empty() || recRate <= 0.0)
+        {
+            ui::postHint ({ tr ("Nothing was recorded"), {}, false, false }, 3000);
+            update();
+            return;
+        }
+        const auto folder = engine.getRecordingFolder();
+        folder.createDirectory();
+        const auto file = folder.getNonexistentChildFile (tr ("Pad {0}", { juce::String (pad + 1) }) + " " + juce::Time::getCurrentTime().formatted ("%Y-%m-%d %H%M%S"), ".wav", false);
+        juce::AudioBuffer<float> buffer (recStereo ? 2 : 1, (int) recL.size());
+        buffer.copyFrom (0, 0, recL.data(), (int) recL.size());
+        if (recStereo)
+            buffer.copyFrom (1, 0, recR.data(), (int) juce::jmin (recR.size(), recL.size()));
+        bool written = false;
+        if (auto out = std::unique_ptr<juce::FileOutputStream> (file.createOutputStream()))
+        {
+            juce::WavAudioFormat wav;
+            if (auto writer = std::unique_ptr<juce::AudioFormatWriter> (wav.createWriterFor (out.get(), recRate, (unsigned) buffer.getNumChannels(), 24, {}, 0)))
+            {
+                out.release();
+                written = writer->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples());
+            }
+        }
+        recL.clear();
+        recR.clear();
+        if (written)
+            loadFile (pad, file);
+        else
+            ui::postNotice ({ tr ("Could not write {0}", { file.getFullPathName() }), {}, false, false });
+        update();
+    }
+    static constexpr double maxPadSeconds = 60.0;
+    PadRecorder recorder;
+    bool recording = false, recStereo = false, openedInput = false;
+    int recordingPad = -1;
+    double recRate = 0.0;
+    std::vector<float> recL, recR;
+    juce::TextButton ctaRecord, ctaImport, ctaBrowse;
+
     AudioEngine& engine;
     int track = -1, selected = 0, dragFrom = -1, dropTarget = -1, regionDrag = 0, clipboard = -1, heldChannel = -1;
     std::vector<int> channels;
-    std::array<int, simplepads::padCount> flash {};
+    std::array<double, simplepads::padCount> pressStart = [] { std::array<double, simplepads::padCount> a; a.fill (-1.0); return a; }();
+    std::array<float, simplepads::padCount> pressShown {};
+    std::array<std::uint32_t, simplepads::padCount> seenStrikes {};
+    std::array<int, simplepads::padCount> seenChannel {};
+    bool watching = false;
     juce::Rectangle<int> gridArea, titleArea, waveArea;
     juce::TextButton load, browse, kit, normalize, group;
     juce::ToggleButton reverse;
@@ -2416,8 +2854,15 @@ private:
     std::unique_ptr<juce::FileChooser> chooser;
 };
 
+#include "ui/SimpleControlsPage.inc" // round 190ke: the Controls tab
+#include "ui/SimpleStepsPage.inc"    // round 190lr: the Drum Machine tab
+
 SimpleDock::SimpleDock (AudioEngine& e, Hooks h) : engine (e), hooks (std::move (h))
 {
+    controlsPage = std::make_unique<ControlsPage> (e);
+    addChildComponent (*controlsPage);
+    stepsPage = std::make_unique<StepsPage> (e);
+    addChildComponent (*stepsPage);
     // the Instrument tab's "Keyboard" button shows the dock's own Keyboard tab (round 190ds)
     hooks.showKeys = [this] { showKeyboard(); };
     effectsPage = std::make_unique<EffectsPage> (engine);
@@ -2442,12 +2887,20 @@ SimpleDock::SimpleDock (AudioEngine& e, Hooks h) : engine (e), hooks (std::move 
     padsButton.setButtonText (tr ("Pads"));
     padsButton.setTooltip (tr ("The Sampler track's 16 pads: their sounds and how they play"));
     padsButton.setComponentID ("simple.dock.pads");
+    controlsButton.setButtonText (tr ("Controls"));
+    controlsButton.setTooltip (tr ("Eight big knobs for the track's main settings (its sound, its effects and its level)"));
+    controlsButton.setComponentID ("simple.dock.controls");
+    stepsButton.setButtonText (tr ("Drum Machine"));
+    stepsButton.setTooltip (tr ("The drum track's step grid: patterns A to H, length and swing"));
+    stepsButton.setComponentID ("simple.dock.steps");
     // round 190dv: what the first-song tour's ring finds
+    setComponentID ("simple.dock"); // (round 190jp: the tour keeps its card off the dock)
     keyboardButton.setComponentID ("simple.dock.keyboard");
     editorButton.setComponentID ("simple.dock.editor");
     effectsButton.setComponentID ("simple.dock.effects");
     const std::pair<juce::TextButton*, Tab> tabs[] { { &instrumentButton, Tab::instrument }, { &keyboardButton, Tab::keyboard },
-                                                     { &editorButton, Tab::editor }, { &padsButton, Tab::pads }, { &effectsButton, Tab::effects } };
+                                                     { &editorButton, Tab::editor }, { &padsButton, Tab::pads }, { &stepsButton, Tab::steps }, { &controlsButton, Tab::controls },
+                                                     { &effectsButton, Tab::effects } };
     for (auto [b, t] : tabs)
     {
         b->setClickingTogglesState (true);
@@ -2465,7 +2918,15 @@ SimpleDock::SimpleDock (AudioEngine& e, Hooks h) : engine (e), hooks (std::move 
     followButton.setTooltip (tr ("The loop is moved to the project key (its length stays); off: it plays in its own key"));
     followButton.onClick = [this] { clickFollowForCheck(); };
     addChildComponent (followButton);
-    hideButton.setButtonText (glyph ("\xe2\x96\xbe"));
+    // round 190jc (SG-8): each tab's icon; (SG-7) the hide button is the round close X at the strip's left
+    instrumentButton.glyph = (int) ui::simplelook::Glyph::piano;
+    keyboardButton.glyph = (int) ui::simplelook::Glyph::keyboard;
+    editorButton.glyph = (int) ui::simplelook::Glyph::notes;
+    effectsButton.glyph = (int) ui::simplelook::Glyph::fx;
+    padsButton.glyph = (int) ui::simplelook::Glyph::pads;
+    controlsButton.glyph = (int) ui::simplelook::Glyph::dials;
+    stepsButton.glyph = (int) ui::simplelook::Glyph::drumMachine;
+    hideButton.setButtonText (tr ("Hide the track dock"));
     hideButton.setTooltip (tr ("Hide the track dock"));
     hideButton.onClick = [this] {
         shownSetting = false;
@@ -2493,6 +2954,7 @@ void SimpleDock::refresh()
     instrumentTab = false;
     playTabs = false;
     padsTab = track >= 0 && simpletracks::kindOf (song, track) == simpletracks::Kind::pads;
+    stepsTab = track >= 0 && simpletracks::kindOf (song, track) == simpletracks::Kind::drums; // round 190lr (DS-39)
     if (track >= 0)
     {
         const auto chain = detailchain::forTrack (song, track);
@@ -2513,12 +2975,18 @@ void SimpleDock::refresh()
     keyboardButton.setVisible (playTabs);
     editorButton.setVisible (playTabs);
     padsButton.setVisible (padsTab);
-    if ((tab == Tab::instrument && ! instrumentTab) || ((tab == Tab::keyboard || tab == Tab::editor) && ! playTabs) || (tab == Tab::pads && ! padsTab))
+    stepsButton.setVisible (stepsTab);
+    controlsTab = track >= 0 && insert > 0 && insert < (int) song.mixer.size();
+    controlsButton.setVisible (controlsTab);
+    if ((tab == Tab::instrument && ! instrumentTab) || ((tab == Tab::keyboard || tab == Tab::editor) && ! playTabs) || (tab == Tab::pads && ! padsTab)
+        || (tab == Tab::controls && ! controlsTab) || (tab == Tab::steps && ! stepsTab))
         tab = Tab::effects;
     if (! tabChosen && (instrumentTab || playTabs))
         tab = instrumentTab ? Tab::instrument : Tab::keyboard; // (an instrument track opens on its sound; an audio track on its effects)
     else if (! tabChosen && padsTab)
         tab = Tab::pads; // (round 190fo: a Sampler track opens on its pads)
+    else if (! tabChosen && stepsTab)
+        tab = Tab::steps; // (round 190lr: a Drums track opens on its step grid, as BandLab's drum machine)
     else if (! tabChosen)
         tab = Tab::effects;
     effectsPage->show (insert);
@@ -2526,6 +2994,8 @@ void SimpleDock::refresh()
     showPage();
     editorPage->show (playTabs ? track : -1, channel);
     padsPage->show (padsTab ? track : -1);
+    stepsPage->show (stepsTab ? track : -1);
+    controlsPage->show (controlsTab ? track : -1, channel, controlsTab ? insert : -1);
     updateFollow();
     resized();
     repaint();
@@ -2534,10 +3004,15 @@ void SimpleDock::refresh()
 void SimpleDock::setTab (Tab t)
 {
     tabChosen = true; // (a refresh keeps a tab that was asked for)
-    if ((t == Tab::instrument && ! instrumentTab) || ((t == Tab::keyboard || t == Tab::editor) && ! playTabs) || (t == Tab::pads && ! padsTab))
+    if ((t == Tab::instrument && ! instrumentTab) || ((t == Tab::keyboard || t == Tab::editor) && ! playTabs) || (t == Tab::pads && ! padsTab)
+        || (t == Tab::controls && ! controlsTab) || (t == Tab::steps && ! stepsTab))
         t = Tab::effects;
+    const auto padsBefore = tab == Tab::pads;
     tab = t;
     showPage();
+    if (padsBefore != (tab == Tab::pads)) // (round 190jc: the Pads tab's least height: the holder lays the dock out again)
+        if (auto* holder = getParentComponent())
+            holder->resized();
 }
 
 void SimpleDock::cycleTab()
@@ -2550,6 +3025,10 @@ void SimpleDock::cycleTab()
         shown.push_back (Tab::keyboard), shown.push_back (Tab::editor);
     if (padsTab)
         shown.push_back (Tab::pads);
+    if (stepsTab)
+        shown.push_back (Tab::steps);
+    if (controlsTab)
+        shown.push_back (Tab::controls);
     shown.push_back (Tab::effects);
     const auto at = std::find (shown.begin(), shown.end(), tab);
     setTab (at == shown.end() || at + 1 == shown.end() ? shown.front() : *(at + 1));
@@ -2559,11 +3038,13 @@ void SimpleDock::showPage()
 {
     auto& button = tab == Tab::instrument ? instrumentButton : tab == Tab::keyboard ? keyboardButton : tab == Tab::editor ? editorButton
                  : tab == Tab::pads                                         ? padsButton
+                 : tab == Tab::steps                                        ? stepsButton
+                 : tab == Tab::controls                                     ? controlsButton
                                                                             : effectsButton;
     button.setToggleState (true, juce::dontSendNotification);
     if (tab == Tab::keyboard && keyboardPage == nullptr)
     {
-        keyboardPage = makeKeyboardPanel (engine, [this] { return channel; });
+        keyboardPage = makeKeyboardPanel (engine, [this] { return channel; }, [this] { return trackColourNow(); });
         addChildComponent (*keyboardPage);
         resized();
     }
@@ -2573,6 +3054,8 @@ void SimpleDock::showPage()
     effectsPage->setVisible (tab == Tab::effects);
     editorPage->setVisible (tab == Tab::editor);
     padsPage->setVisible (tab == Tab::pads);
+    stepsPage->setVisible (tab == Tab::steps);
+    controlsPage->setVisible (tab == Tab::controls);
     if (keyboardPage != nullptr)
         keyboardPage->setVisible (tab == Tab::keyboard);
 }
@@ -2591,6 +3074,18 @@ void SimpleDock::padsKnobForCheck (int knob, float v) { padsPage->turnForCheck (
 void SimpleDock::padsRegionForCheck (float start, float end) { padsPage->setRegionForCheck (start, end); }
 void SimpleDock::padsNormalizeForCheck() { padsPage->normalizeForCheck(); }
 void SimpleDock::padsHitForCheck (int pad) { padsPage->hit (pad); }
+juce::Component* SimpleDock::padsCtaForCheck (int k) { return padsPage->ctaForCheck (k); }
+bool SimpleDock::padsRecordingForCheck() const { return padsPage->recordingForCheck(); }
+void SimpleDock::padsRecordForCheck() { padsPage->startRecordingForCheck(); }
+void SimpleDock::padsRecordingLookForSnapshot (bool on) { padsPage->recordingLookForSnapshot (on); }
+void SimpleDock::controlsTurnForCheck (int knob, float value) { controlsPage->turnForCheck (knob, value); }
+juce::String SimpleDock::controlsNameForCheck (int knob) const { return controlsPage->nameForCheck (knob); }
+float SimpleDock::controlsValueForCheck (int knob) const { return controlsPage->valueForCheck (knob); }
+void SimpleDock::controlsEditingForSnapshot (bool on) { controlsPage->setEditingForSnapshot (on); }
+juce::PopupMenu SimpleDock::controlsMenuForSnapshot (int knob) { return controlsPage->remapMenu (knob); }
+void SimpleDock::padsPressForSnapshot (int pad, float amount) { padsPage->pressForSnapshot (pad, amount); }
+void SimpleDock::padsWatchForCheck() { padsPage->watchPlayback(); }
+float SimpleDock::padsPressForCheck (int pad) const { return padsPage->pressShownForCheck (pad); }
 void SimpleDock::padsDragForCheck (int from, int to, bool copy) { padsPage->dragPadForCheck (from, to, copy); }
 void SimpleDock::padsUpdateForCheck() { padsPage->update(); }
 juce::PopupMenu SimpleDock::padMenuForSnapshot (int pad) { return padsPage->padMenuForSnapshot (pad); }
@@ -2598,6 +3093,89 @@ juce::PopupMenu SimpleDock::kitMenuForSnapshot() { return padsPage->kitMenuForSn
 bool SimpleDock::saveKitForCheck (const juce::String& name) { return padsPage->saveKit (name); }
 bool SimpleDock::openKitForCheck (const juce::File& file) { return padsPage->openKit (file); }
 bool SimpleDock::renameKitForCheck (const juce::File& file, const juce::String& name) { return PadsPage::renameKit (file, name); }
+// Round 190ih (PLAN R14, DS-9): BandLab's dock shows "Input Level" with a slim bar on the right of its header
+// (bandlab190p shots/22-sampler-kits.png). Here it shows while the track's insert is armed to record from an input
+// (no input = no level), fed by the main window's 30 Hz timer only while the dock shows; only the bar repaints, and
+// only when its drawn width changes.
+bool SimpleDock::inputMeterShown() const
+{
+    if (inputMeterForced)
+        return true;
+    const auto& song = engine.getSong();
+    if (track < 0 || insert <= 0 || insert >= (int) song.mixer.size() || ! engine.isInsertArmed (insert) || song.mixer[(std::size_t) insert].inputChannel < 0)
+        return false;
+    const auto kind = simpletracks::kindOf (song, track);
+    return kind && simpletracks::isAudioKind (*kind);
+}
+
+juce::Rectangle<int> SimpleDock::inputMeterArea() const
+{
+    const auto right = followButton.isVisible() ? followButton.getX() - 10 : getWidth() - 10; // (round 190jj merge: 190jc moved the hide button to the left)
+    return { right - 232, 0, 232, stripHeight() };
+}
+
+juce::Rectangle<int> SimpleDock::inputMeterBar() const
+{
+    const auto a = inputMeterArea();
+    return { a.getRight() - 42 - 110, a.getCentreY() - 2, 110, 4 };
+}
+
+// round 190ld (DS-9, BandLab B22: a round headphones switch right of the input bar): hear the input while recording
+juce::Rectangle<int> SimpleDock::monitorButton() const
+{
+    const auto a = inputMeterArea();
+    const auto d = juce::jmin (32, a.getHeight() - 4);
+    return { a.getRight() - d, a.getCentreY() - d / 2, d, d };
+}
+
+bool SimpleDock::monitoring() const
+{
+    const auto& song = engine.getSong();
+    if (insert <= 0 || insert >= (int) song.mixer.size())
+        return false;
+    const auto mode = song.mixer[(std::size_t) insert].monitor;
+    return mode == InputMonitor::on || (mode != InputMonitor::off && engine.isInsertArmed (insert));
+}
+
+juce::Colour SimpleDock::trackColourNow() const
+{
+    const auto& song = engine.getSong();
+    if (track < 0)
+        return theme::colour::accent;
+    const auto own = track < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) track].colour : 0u;
+    const auto kind = simpletracks::kindOf (song, track);
+    return own != 0 ? juce::Colour (own).withAlpha (1.0f) : kind ? juce::Colour (simpletracks::defaultColour (*kind)).withAlpha (1.0f) : theme::colour::accent;
+}
+
+void SimpleDock::tickInputMeter()
+{
+    if (! isShowing())
+        return;
+    if (padsPage != nullptr && padsPage->isVisible()) // round 190jj: the song's notes press the pads (BandLab)
+        padsPage->watchPlayback();
+    if (stepsPage != nullptr && stepsPage->isVisible()) // round 190lr: the step the song plays (only its two columns repaint)
+        stepsPage->watchPlayback();
+    const auto shown = inputMeterShown();
+    auto level = 0.0f;
+    if (shown && insert > 0)
+    {
+        const auto peak = juce::jmax (engine.takeInputPeak (insert, 0), engine.takeInputPeak (insert, 1));
+        const auto db = juce::Decibels::gainToDecibels (peak, -60.0f);
+        level = juce::jmax ((db + 60.0f) / 60.0f, inputLevel * 0.86f); // (a quick fall, as the Mixer's)
+        if (level < 0.01f)
+            level = 0.0f;
+    }
+    const auto width = juce::roundToInt (level * (float) inputMeterBar().getWidth());
+    if (shown != inputMeterWasShown)
+    {
+        inputMeterWasShown = shown;
+        repaint (getLocalBounds().withHeight (stripHeight())); // (the record hint moves left of it)
+    }
+    else if (width != juce::roundToInt (inputLevel * (float) inputMeterBar().getWidth()))
+        repaint (inputMeterBar().expanded (1));
+    inputLevel = level;
+}
+
 bool SimpleDock::recordHintShown() const
 {
     const auto& song = engine.getSong();
@@ -2605,6 +3183,33 @@ bool SimpleDock::recordHintShown() const
         return false;
     const auto kind = simpletracks::kindOf (song, track);
     return kind && simpletracks::isAudioKind (*kind) && *kind != simpletracks::Kind::audio;
+}
+
+juce::Component* SimpleDock::stepsComponentForSnapshot() { return stepsPage.get(); }
+int SimpleDock::stepsRowsForCheck() const { return stepsPage->rowCountForCheck(); }
+int SimpleDock::stepsCountForCheck() const { return stepsPage->stepCountForCheck(); }
+void SimpleDock::stepsClickForCheck (int row, int step) { stepsPage->clickStepForCheck (row, step); }
+void SimpleDock::stepsLetterForCheck (int letter) { stepsPage->pickLetterForCheck (letter); }
+void SimpleDock::stepsAddClipForCheck() { stepsPage->addClipForCheck(); }
+void SimpleDock::stepsLengthForCheck (int bars) { stepsPage->setLengthForCheck (bars); }
+void SimpleDock::stepsSwingForCheck (float v) { stepsPage->setSwingForCheck (v); }
+void SimpleDock::stepsPreviewForCheck() { stepsPage->previewForCheck(); }
+bool SimpleDock::stepsPreviewingForCheck() const { return stepsPage->previewingForCheck(); }
+int SimpleDock::stepsPatternForCheck() const { return stepsPage->patternForCheck(); }
+int SimpleDock::stepsPlayingStepForCheck() const { return stepsPage->playingStepForCheck(); }
+void SimpleDock::stepsPlayingStepForSnapshot (int step) { stepsPage->playingStepForSnapshot (step); }
+juce::PopupMenu SimpleDock::stepsLengthMenuForSnapshot() { return stepsPage->lengthMenuForSnapshot(); }
+void SimpleDock::stepsWatchForCheck() { stepsPage->watchPlayback(); }
+void SimpleDock::stepsVelocityForCheck (int row, int step, float v) { stepsPage->velocityForCheck (row, step, v); }
+void SimpleDock::stepsVelocityToolForSnapshot (bool on) { stepsPage->velocityToolForSnapshot (on); }
+int SimpleDock::stepsChannelForKey (int keyCode)
+{
+    if (! stepsTab || tab != Tab::steps)
+        return -1;
+    const auto channel = stepsPage->channelForKey (keyCode);
+    if (channel >= 0)
+        stepsPage->lightRow (simplesteps::rowForKey (keyCode));
+    return channel;
 }
 
 void SimpleDock::lightPad (int pad)
@@ -2678,25 +3283,47 @@ juce::Component* SimpleDock::keyboardPanelForSnapshot()
 
 int SimpleDock::heightFor (int available) const noexcept
 {
-    return juce::jlimit (std::min (minHeight, available / 2), std::max (minHeight, available * 6 / 10), preferredHeight);
+    // round 190jc (SG-11): the Pads tab needs its 4 x 44 px pads (Large controls: 48) under the strip
+    const auto least = tab == Tab::pads && padsTab ? stripHeight() + 4 * ui::simplelook::px (44, 48) + 12 + 12 + 8 : minHeight;
+    return juce::jlimit (std::min (least, available / 2), std::max (least, available * 6 / 10), juce::jmax (least, preferredHeight));
 }
 
 void SimpleDock::paint (juce::Graphics& g)
 {
     g.fillAll (colour::bg1);
-    auto strip = getLocalBounds().withHeight (stripHeight);
+    auto strip = getLocalBounds().withHeight (stripHeight());
     g.setColour (colour::bg3);
     g.fillRect (strip);
     g.setColour (colour::border);
     g.fillRect (0, 0, getWidth(), 1);
-    g.fillRect (0, stripHeight - 1, getWidth(), 1);
+    g.fillRect (0, stripHeight() - 1, getWidth(), 1);
     // the resize grip in the middle of the top edge
     g.setColour (colour::borderStrong);
     g.fillRoundedRectangle ((float) getWidth() * 0.5f - 16.0f, 2.0f, 32.0f, 2.0f, 1.0f);
 
     const auto& song = engine.getSong();
     // round 190dg: the track's chain preset, right of the tabs (the header's FX button is too small to name it)
-    const auto rightEdge = followButton.isVisible() ? followButton.getX() - 10 : hideButton.getX() - 10;
+    auto rightEdge = followButton.isVisible() ? followButton.getX() - 10 : getWidth() - 10;
+    if (inputMeterShown()) // round 190ih: "Input Level" and its bar (BandLab's dock header)
+    {
+        const auto area = inputMeterArea(), bar = inputMeterBar();
+        g.setColour (colour::textPrimary);
+        g.setFont (font (type::small, true));
+        g.drawText (tr ("Input Level"), area.withRight (bar.getX() - 10), juce::Justification::centredRight, true);
+        fillRoundRect (g, bar.toFloat(), 2.0f, colour::bg1);
+        if (const auto w = juce::roundToInt (inputLevel * (float) bar.getWidth()); w > 0)
+        {
+            const auto db = inputLevel * 60.0f - 60.0f;
+            fillRoundRect (g, bar.withWidth (w).toFloat(), 2.0f, db >= -0.5f ? colour::meterClip : db >= -9.0f ? colour::meterMid : colour::meterLow);
+        }
+        // the monitor switch (round 190ld): lit while the input is heard
+        const auto button = monitorButton().toFloat();
+        const auto on = monitoring();
+        g.setColour (on ? colour::accent : colour::bg4);
+        g.fillEllipse (button);
+        ui::simplelook::drawGlyph (g, ui::simplelook::Glyph::headphones, button.reduced (button.getWidth() * 0.28f), on ? colour::onAccent : colour::textPrimary);
+        rightEdge = area.getX() - 10;
+    }
     if (followButton.isVisible()) // round 190ds: the loop's key and what following does
     {
         g.setColour (colour::textSecondary);
@@ -2722,9 +3349,10 @@ void SimpleDock::paint (juce::Graphics& g)
         g.setFont (font (type::small));
         g.drawText (tr ("Preset") + glyph (": ") + name, area, juce::Justification::centredRight, true);
     }
-    auto text = strip.withTrimmedLeft (12).withRight (instrumentButton.isVisible() ? instrumentButton.getX() - 12
+    auto text = strip.withLeft (hideButton.getRight() + 10).withRight (instrumentButton.isVisible() ? instrumentButton.getX() - 12
                                                       : keyboardButton.isVisible() ? keyboardButton.getX() - 12
                                                       : padsButton.isVisible()     ? padsButton.getX() - 12
+                                                      : controlsButton.isVisible() ? controlsButton.getX() - 12
                                                                                    : effectsButton.getX() - 12);
     if (track < 0)
     {
@@ -2735,11 +3363,25 @@ void SimpleDock::paint (juce::Graphics& g)
     }
     const auto own = track < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) track].colour : 0u;
     const auto kind = simpletracks::kindOf (song, track);
-    g.setColour (own != 0 ? juce::Colour (own) : kind ? juce::Colour (simpletracks::defaultColour (*kind)) : colour::textSecondary);
-    g.fillRoundedRectangle ((float) text.getX(), (float) strip.getCentreY() - 7.0f, 4.0f, 14.0f, 2.0f);
-    text.removeFromLeft (12);
+    const auto hue = own != 0 ? juce::Colour (own) : kind ? juce::Colour (simpletracks::defaultColour (*kind)) : colour::textSecondary;
+    // round 190jc (SG-7): the track's type icon in its colour (BandLab's Track View header), else the colour bar
+    const auto ownIcon = track < (int) song.playlistTracks.size() ? trackicons::iconFor (song.playlistTracks[(std::size_t) track].icon) : trackicons::Icon::none;
+    const auto icon = ownIcon != trackicons::Icon::none ? ownIcon : kind ? simpletracks::iconOf (*kind) : trackicons::Icon::none;
+    if (icon != trackicons::Icon::none)
+    {
+        const auto size = (float) ui::simplelook::px (16, 20);
+        ui::drawTrackIcon (g, icon, juce::Rectangle<float> ((float) text.getX(), (float) strip.getCentreY() - size * 0.5f, size, size),
+                           ui::simplelook::readableOn (hue, colour::bg3, 3.0f));
+        text.removeFromLeft ((int) size + 8);
+    }
+    else
+    {
+        g.setColour (hue);
+        g.fillRoundedRectangle ((float) text.getX(), (float) strip.getCentreY() - 7.0f, 4.0f, 14.0f, 2.0f);
+        text.removeFromLeft (12);
+    }
     g.setColour (colour::textPrimary);
-    g.setFont (font (type::body, true));
+    g.setFont (font (ui::simplelook::largeControls() ? type::title : type::body, true));
     const auto title = trackTitle (song, track);
     const auto titleWidth = juce::jmin (text.getWidth(), juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), title) + 4);
     g.drawText (title, text.removeFromLeft (titleWidth), juce::Justification::centredLeft, true);
@@ -2751,14 +3393,73 @@ void SimpleDock::paint (juce::Graphics& g)
     }
 }
 
+int SimpleDock::stripHeight() { return ui::simplelook::px (36, 48); }
+
+void SimpleDock::lookChanged()
+{
+    refresh(); // (lays the strip and the pages out again)
+    padsPage->resized(); // (the pads' size floor; its bounds may stay the same)
+    if (keyboardPage != nullptr)
+        keyboardPage->resized();
+    if (auto* holder = getParentComponent())
+        holder->resized();
+}
+
+void SimpleDock::StripButton::paintButton (juce::Graphics& g, bool over, bool down)
+{
+    using namespace theme;
+    const auto r = getLocalBounds().toFloat();
+    if (glyph < 0) // BandLab's round close X (the same action as the old caret: hides the dock)
+    {
+        const auto d = juce::jmin (r.getWidth(), r.getHeight());
+        const auto circle = juce::Rectangle<float> (d, d).withCentre (r.getCentre());
+        g.setColour (down ? colour::bg6 : over ? colour::bg5 : colour::bg4);
+        g.fillEllipse (circle);
+        ui::simplelook::drawGlyph (g, ui::simplelook::Glyph::cross, circle.withSizeKeepingCentre (d * 0.34f, d * 0.34f), colour::textPrimary, 1.5f);
+        return;
+    }
+    const auto on = getToggleState() && ! lone;
+    if (! lone)
+    {
+        // one pill per tab, joined into a segmented control: rounded only at the group's ends
+        const auto left = ! isConnectedOnLeft(), right = ! isConnectedOnRight();
+        const auto fill = on ? (down ? colour::accentPressed : over ? colour::accentHover : colour::accent) : down ? colour::bg6 : over ? colour::bg5 : colour::bg4;
+        juce::Path p;
+        p.addRoundedRectangle (r.getX(), r.getY(), r.getWidth() - (right ? 0.0f : 1.0f), r.getHeight(), radius::lg, radius::lg, left, right, left, right);
+        g.setColour (fill);
+        g.fillPath (p);
+    }
+    const auto f = font (ui::simplelook::largeControls() ? type::title : type::body, on || lone);
+    const auto text = getButtonText();
+    const auto iconSize = (float) ui::simplelook::px (14, 18), gap = 6.0f;
+    const auto textWidth = juce::GlyphArrangement::getStringWidth (f, text);
+    const auto total = juce::jmin (r.getWidth() - 12.0f, iconSize + gap + textWidth);
+    auto content = lone ? r.withTrimmedLeft (4.0f).withWidth (total) : r.withSizeKeepingCentre (total, r.getHeight());
+    const auto ink = on ? colour::onAccent : lone ? colour::textPrimary : over ? colour::textPrimary : colour::textSecondary;
+    ui::simplelook::drawGlyph (g, (ui::simplelook::Glyph) glyph, content.removeFromLeft (iconSize).withSizeKeepingCentre (iconSize, iconSize), ink, 1.4f);
+    content.removeFromLeft (gap);
+    g.setColour (ink);
+    g.setFont (f);
+    g.drawFittedText (text, content.toNearestInt(), juce::Justification::centredLeft, 1, 0.8f);
+    if (lone) // a section title: a short accent line under it
+    {
+        g.setColour (colour::accent);
+        g.fillRoundedRectangle (r.getX() + 4.0f, r.getBottom() - 2.0f, 24.0f, 2.0f, 1.0f);
+    }
+}
+
 void SimpleDock::resized()
 {
-    auto strip = getLocalBounds().withHeight (stripHeight).reduced (0, 4);
-    hideButton.setBounds (strip.removeFromRight (34).withTrimmedRight (8));
-    followButton.setBounds (strip.removeFromRight (190).withTrimmedRight (10));
+    // round 190jc (SG-7, SG-8): the round close X at the left (28 px; Large controls 40), tabs 28 px tall (40) with icons
+    const auto stripAll = getLocalBounds().withHeight (stripHeight());
+    const auto closeSize = ui::simplelook::px (28, 40);
+    hideButton.setBounds (juce::Rectangle<int> (8, (stripAll.getHeight() - closeSize) / 2, closeSize, closeSize));
+    const auto tabHeight = ui::simplelook::px (28, 40), tabWidth = ui::simplelook::px (112, 136);
+    auto strip = stripAll.withSizeKeepingCentre (stripAll.getWidth(), tabHeight);
+    followButton.setBounds (strip.removeFromRight (190).withTrimmedRight (10).withSizeKeepingCentre (180, juce::jmin (24, tabHeight)));
     // the tabs sit after the track's name, left of the middle
-    const auto count = 1 + (instrumentTab ? 1 : 0) + (playTabs ? 2 : 0) + (padsTab ? 1 : 0);
-    auto tabs = strip.withLeft (juce::jmin (300, getWidth() / 3)).withWidth (100 * count);
+    const auto count = 1 + (instrumentTab ? 1 : 0) + (playTabs ? 2 : 0) + (padsTab ? 1 : 0) + (stepsTab ? 1 : 0) + (controlsTab ? 1 : 0);
+    auto tabs = strip.withLeft (juce::jmin (300, getWidth() / 3)).withWidth (tabWidth * count);
     std::vector<juce::TextButton*> shown;
     if (instrumentTab)
         shown.push_back (&instrumentButton);
@@ -2766,17 +3467,24 @@ void SimpleDock::resized()
         shown.push_back (&keyboardButton), shown.push_back (&editorButton);
     if (padsTab)
         shown.push_back (&padsButton);
+    if (stepsTab)
+        shown.push_back (&stepsButton);
+    if (controlsTab)
+        shown.push_back (&controlsButton);
     shown.push_back (&effectsButton);
     for (std::size_t i = 0; i < shown.size(); ++i)
     {
         shown[i]->setConnectedEdges ((i > 0 ? juce::Button::ConnectedOnLeft : 0) | (i + 1 < shown.size() ? juce::Button::ConnectedOnRight : 0));
-        shown[i]->setBounds (tabs.removeFromLeft (100));
+        static_cast<StripButton*> (shown[i])->lone = shown.size() == 1; // (round 190jc: an audio track's only tab is a title)
+        shown[i]->setBounds (tabs.removeFromLeft (tabWidth));
     }
-    const auto body = getLocalBounds().withTrimmedTop (stripHeight);
+    const auto body = getLocalBounds().withTrimmedTop (stripHeight());
     effectsPage->setBounds (body);
     instrumentPage->setBounds (body);
     editorPage->setBounds (body);
     padsPage->setBounds (body);
+    stepsPage->setBounds (body);
+    controlsPage->setBounds (body);
     if (keyboardPage != nullptr)
         keyboardPage->setBounds (body);
 }
@@ -2788,6 +3496,16 @@ void SimpleDock::mouseMove (const juce::MouseEvent& e)
 
 void SimpleDock::mouseDown (const juce::MouseEvent& e)
 {
+    if (inputMeterShown() && insert > 0 && monitorButton().contains (e.getPosition()) && ! e.mods.isPopupMenu())
+    {
+        // hear the input (Monitor On) / don't (Off); the Mixer's input menu has the other modes
+        engine.editSong ([i = insert, on = ! monitoring()] (Song& s) {
+            if (i < (int) s.mixer.size())
+                s.mixer[(std::size_t) i].monitor = on ? InputMonitor::on : InputMonitor::off;
+        });
+        repaint (monitorButton().expanded (2));
+        return;
+    }
     resizing = e.y < edgeHeight;
     dragStartHeight = getHeight();
 }
@@ -2871,6 +3589,9 @@ bool SimpleDock::loadUserPreset (AudioEngine& engine, int insert, const juce::Fi
 int SimpleDock::cardCountForCheck() const { return effectsPage->cardCount(); }
 int SimpleDock::oneKnobCardsForCheck() const { return effectsPage->oneKnobCards(); }
 juce::PopupMenu SimpleDock::presetMenuForSnapshot() { return effectsPage->presetMenu(); }
+void SimpleDock::stepPresetForCheck (int delta) { effectsPage->stepPreset (delta); }
+void SimpleDock::bypassChainForCheck() { effectsPage->bypassForCheck(); }
+bool SimpleDock::bypassLitForCheck() const { return effectsPage->bypassLitForCheck(); }
 juce::PopupMenu SimpleDock::addMenuForSnapshot() { return effectsPage->addMenu(); }
 void SimpleDock::setFontsForSnapshot (std::vector<sf::IndexedFont> fonts)
 {

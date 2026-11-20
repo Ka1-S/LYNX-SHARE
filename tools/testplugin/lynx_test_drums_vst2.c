@@ -7,8 +7,13 @@
  * C# output 2… in every octave).
  * No parameters, no editor, no state. Build options: -DPLUGIN_NAME="..." -DPLUGIN_ID=0x... (a second copy beside the
  * first), -DLAST_PAIR_INACTIVE (the Crash pins without kVstPinIsActive: which outputs a host starts active).
+ * MIDI output (round 190ks, GitHub #198; the same variables as lynx_test_pads_vst3.cpp): with LYNX_TEST_PADS_AUTO =
+ * "call:key:velocity:length,..." it says canDo "sendVstMidiEvent" and sends those hits (audioMasterProcessEvents) at its
+ * Nth processReplacing call, as if its pads were clicked; with LYNX_TEST_PADS_ECHO = 1 it also sends back every note it
+ * is sent. Without them it sends nothing, as before.
  */
 #include <math.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -75,11 +80,38 @@ static const char* const names[outputPairs] = { "Kick", "Snare", "Clap", "Hat", 
 
 typedef struct
 {
+    int call, key, velocity, length;
+} AutoHit;
+
+typedef struct
+{
     Effect effect;
     float rate;
     float amplitude[outputPairs];
     double phase[outputPairs];
+    HostCallback host;
+    AutoHit hits[32];
+    int hitCount, sends, echo;
+    long long calls;
+    unsigned char echoed[64][3];
+    int echoCount;
 } Drums;
+
+static void sendNote (Drums* s, unsigned char status, int key, int velocity)
+{
+    MidiEvent m;
+    Events ev;
+    memset (&m, 0, sizeof (m));
+    m.type = 1;
+    m.byteSize = sizeof (MidiEvent);
+    m.data[0] = status;
+    m.data[1] = (unsigned char) key;
+    m.data[2] = (unsigned char) velocity;
+    memset (&ev, 0, sizeof (ev));
+    ev.numEvents = 1;
+    ev.events[0] = &m;
+    s->host (&s->effect, 8, 0, 0, &ev, 0.0f);                    /* audioMasterProcessEvents */
+}
 
 static intptr_t dispatch (Effect* e, int32_t op, int32_t index, intptr_t value, void* ptr, float opt)
 {
@@ -100,6 +132,13 @@ static intptr_t dispatch (Effect* e, int32_t op, int32_t index, intptr_t value, 
                     const int k = ((d[1] - 36) % outputPairs + outputPairs) % outputPairs;
                     s->amplitude[k] = d[2] / 127.0f;
                     s->phase[k] = 0.0;
+                }
+                if (s->echo && ((d[0] & 0xF0) == 0x90 || (d[0] & 0xF0) == 0x80) && s->echoCount < 64)
+                {
+                    s->echoed[s->echoCount][0] = d[0];
+                    s->echoed[s->echoCount][1] = d[1];
+                    s->echoed[s->echoCount][2] = d[2];
+                    ++s->echoCount;
                 }
             }
             return 1;
@@ -127,6 +166,8 @@ static intptr_t dispatch (Effect* e, int32_t op, int32_t index, intptr_t value, 
         case 47: strcpy ((char*) ptr, "LYNX"); return 1;             /* getVendorString */
         case 48: strcpy ((char*) ptr, PLUGIN_NAME); return 1;      /* getProductString */
         case 51:                                                     /* canDo */
+            if (ptr != 0 && s->sends && (strcmp ((const char*) ptr, "sendVstEvents") == 0 || strcmp ((const char*) ptr, "sendVstMidiEvent") == 0))
+                return 1;
             return ptr != 0 && (strcmp ((const char*) ptr, "receiveVstEvents") == 0 || strcmp ((const char*) ptr, "receiveVstMidiEvent") == 0) ? 1 : 0;
         case 58: return 2400;                                        /* getVstVersion */
         default: return 0;
@@ -142,6 +183,26 @@ static void processReplacing (Effect* e, float** in, float** out, int32_t n)
     const float rate = s->rate > 0 ? s->rate : 44100.0f;
     const float decay = expf (-1.0f / (0.25f * rate));              /* ~250 ms */
     (void) in;
+    if (s->sends && n > 0)
+    {
+        ++s->calls;
+        for (int i = 0; i < s->echoCount; ++i)
+            sendNote (s, s->echoed[i][0], s->echoed[i][1], s->echoed[i][2]);
+        s->echoCount = 0;
+        for (int i = 0; i < s->hitCount; ++i)
+        {
+            const AutoHit* h = &s->hits[i];
+            const int k = ((h->key - 36) % outputPairs + outputPairs) % outputPairs;
+            if (h->call == s->calls)
+            {
+                s->amplitude[k] = h->velocity / 127.0f;
+                s->phase[k] = 0.0;
+                sendNote (s, 0x99, h->key, h->velocity);
+            }
+            if (h->call + h->length == s->calls)
+                sendNote (s, 0x89, h->key, 0);
+        }
+    }
     for (int k = 0; k < outputPairs; ++k)
     {
         const double step = 110.0 * (k + 1) / rate;
@@ -163,6 +224,24 @@ EXPORT Effect* VSTPluginMain (HostCallback host)
     if (s == 0 || host (0, 1, 0, 0, 0, 0.0f) == 0)                 /* audioMasterVersion */
         return 0;
     s->rate = 44100.0f;
+    s->host = host;
+    {
+        const char* a = getenv ("LYNX_TEST_PADS_AUTO");
+        const char* echo = getenv ("LYNX_TEST_PADS_ECHO");
+        s->echo = echo != 0 && atoi (echo) != 0;
+        while (a != 0 && *a != 0 && s->hitCount < 32)
+        {
+            AutoHit h;
+            int used = 0;
+            if (sscanf (a, "%d:%d:%d:%d%n", &h.call, &h.key, &h.velocity, &h.length, &used) != 4)
+                break;
+            if (h.length < 1) h.length = 1;
+            s->hits[s->hitCount++] = h;
+            a += used;
+            while (*a == ',' || *a == ' ') ++a;
+        }
+        s->sends = s->hitCount > 0 || s->echo;
+    }
     s->effect.magic = 0x56737450;
     s->effect.dispatcher = dispatch;
     s->effect.setParameter = setParam;

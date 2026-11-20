@@ -1,5 +1,6 @@
 #include "core/ClipEnvelope.h"
 #include "core/FlCurve.h"
+#include "core/NoteRepeat.h"
 #include "core/PlaylistOps.h"
 #include "core/FlpExport.h"
 #include "core/Fpc.h"
@@ -1328,6 +1329,7 @@ struct Converter
                 f.flags = (std::uint16_t) (0x4000 | (n.slide ? 8 : 0));
                 f.extra = (std::uint8_t) ((n.colour & 0x0F) | (n.porta ? 0x10 : 0) | (n.muted ? 0x20 : 0));
                 f.group = (std::uint16_t) std::max (0, n.group);
+                f.repeats = (std::uint8_t) std::clamp (n.repeat, 0, noterepeat::rateCount); // (issue #208)
                 p.notes.push_back (f);
             }
             std::stable_sort (p.notes.begin(), p.notes.end(), [] (const flp::Note& a, const flp::Note& b) { return a.position < b.position; });
@@ -1388,6 +1390,7 @@ struct Converter
             c.index = (int) out.channels.size();
             c.type = flp::ChannelType::automationClip;
             c.name = src.name;
+            c.colour = src.colour != 0 ? rgb (src.colour) : 0; // (round 190ig: the clip's colour; none = FL's default)
             // an automation clip's channel levels are its range: pan = minimum, volume = maximum (of 12800, in the
             // target's whole range) [DATA: FL's tempo clips keep 1250…4250 = 60…180 BPM; FL 2026 played a clip written
             // with a channel's default levels over 6400…10000: round 171e, FL render]. Always the whole range here.
@@ -1528,7 +1531,7 @@ struct Converter
                                      | (shape (0, (clip.flFadeFlags >> 8) & 3) << 8) | (shape (1, (clip.flFadeFlags >> 12) & 3) << 12);
                 }
                 item.gain = clip.gain;
-                item.pitch = clip.pitch;
+                item.pitch = std::clamp (clip.pitch, -12.0f, 12.0f); // (FL's clip pitch range; a Live transpose may reach ±48)
                 item.reversed = clip.reversed;
                 return item;
             }

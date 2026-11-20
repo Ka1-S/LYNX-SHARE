@@ -5,6 +5,10 @@
 #include <complex>
 #include <cmath>
 #include <cstring>
+#ifdef LYNX_LAB190IQ
+ #include <cstdio>
+ #include <cstdlib>
+#endif
 #include <iterator>
 
 namespace lynx::vmatch
@@ -232,8 +236,77 @@ void shelf (bool low, double f0, double db, double q, double sr, Biquad& b) noex
 
 constexpr float qNode[5] = { 0.5f, 1.0f, 1.5f, 2.0f, 3.0f };
 
+// ---- round 190lb: the SSL 4K G's Pink colour ([EXEC] black-box, its trial's impulse grid; BLACKBOX_rodada190lb §2).
+// Every band is one second-order section whose frequency, gain and Q move with the dial's gain (proportional Q: wide
+// at small gains, narrower at full gain; the frequency rises with the gain); boost and cut mirror each other.
+#include "core/Console4KPinkTables.inc"
+
+double tableAt (const float* xs, const float* ys, int n, double x) noexcept;
+
+// one { f0 or ratio, |gain|, Q } from a row of three |gain| nodes: under the first node its frequency and Q with the
+// gain scaled toward 0; between nodes the frequency (log), gain and Q interpolate
+void pinkGainRow (const float (*row)[3], const float* gainNodes, double a, double out[3]) noexcept
+{
+    if (a <= gainNodes[0])
+    {
+        out[0] = row[0][0];
+        out[1] = row[0][1] * a / gainNodes[0];
+        out[2] = row[0][2];
+        return;
+    }
+    const auto ax = nodeAt (gainNodes, 3, a, false);
+    out[0] = std::exp (lerp (std::log ((double) row[ax.i][0]), std::log ((double) row[ax.i + 1][0]), ax.t));
+    out[1] = lerp (row[ax.i][1], row[ax.i + 1][1], ax.t);
+    out[2] = lerp (row[ax.i][2], row[ax.i + 1][2], ax.t);
+}
+
+bool pinkBand (int which, const Settings& s, double sr, Biquad& out) noexcept
+{
+    double g = 0.0, f = 0.0, q = 1.5, maxDb = 18.0;
+    switch (which)
+    {
+        case 0: g = s.lfGain; f = std::clamp (s.lfHz, 30.0, 450.0); break;
+        case 1: g = s.lmfGain; f = std::clamp (s.lmfKHz, 0.2, 2.5) * 1000.0; q = s.lmfQ; maxDb = 22.0; break;
+        case 2: g = s.hmfGain; f = std::clamp (s.hmfKHz, 0.6, 7.0) * 1000.0; q = s.hmfQ; maxDb = 22.0; break;
+        default: g = s.hfGain; f = std::clamp (s.hfKHz, 1.5, 16.0) * 1000.0; maxDb = 20.0; break;
+    }
+    const double a = std::min (std::abs (g), maxDb), sign = g < 0.0 ? -1.0 : 1.0;
+    if (a < 0.05)
+        return false;
+    double v[3], lo[3], hi[3];
+    if (which == 1 || which == 2)
+    {
+        const bool lmf = which == 1;
+        const auto& tab = lmf ? pinkLmf : pinkHmf;
+        const auto aq = nodeAt (pinkQNode, 3, std::clamp (q, 0.5, 3.0), true);
+        pinkGainRow (tab[aq.i], pinkMidGain, a, lo);
+        pinkGainRow (tab[aq.i + 1], pinkMidGain, a, hi);
+        v[0] = std::exp (lerp (std::log (lo[0]), std::log (hi[0]), aq.t));
+        v[1] = lerp (lo[1], hi[1], aq.t);
+        v[2] = std::exp (lerp (std::log (lo[2]), std::log (hi[2]), aq.t));
+        double hz = lmf ? tableAt (pinkLmfDial, pinkLmfHz, 5, f) : tableAt (pinkHmfDial, pinkHmfHz, 5, f);
+        if (lmf && s.lmfDiv3) hz *= pinkDiv3;
+        if (! lmf && s.hmfMult3) hz *= pinkMult3;
+        voxstrip::matchedPeak (out, sr, hz * v[0], v[2], sign * v[1]);
+        return true;
+    }
+    const bool low = which == 0;
+    const auto& tab = low ? pinkLf : pinkHf;
+    const auto* gn = low ? pinkLfGain : pinkHfGain;
+    const auto af = nodeAt (low ? pinkLfDial : pinkHfDial, 5, f, true);
+    pinkGainRow (tab[af.i], gn, a, lo);
+    pinkGainRow (tab[af.i + 1], gn, a, hi);
+    v[0] = std::exp (lerp (std::log (lo[0]), std::log (hi[0]), af.t));
+    v[1] = lerp (lo[1], hi[1], af.t);
+    v[2] = lerp (lo[2], hi[2], af.t);
+    shelf (low, v[0], sign * v[1], v[2], sr, out);
+    return true;
+}
+
 bool band (int which, const Settings& s, double sr, Biquad& out) noexcept
 {
+    if (s.pink)
+        return pinkBand (which, s, sr, out);
     const int c = std::clamp (s.colour, 0, 2);
     double g = 0.0, f = 0.0, q = 1.5;
     bool bell = false;
@@ -296,8 +369,61 @@ double tableAt (const float* xs, const float* ys, int n, double x) noexcept
     return std::exp (lerp (std::log ((double) ys[a.i]), std::log ((double) ys[a.i + 1]), a.t));
 }
 
+// round 190lb: the SSL 4K G's filters ([EXEC] K4G_ir: HPF / LPF renders, both colours alike; lab fithp.py / fitlp.py):
+// the high-pass is third order (a first-order section and a second-order one, Q ~1: 18 dB/oct), the low-pass a
+// second-order section with no bilinear cramping (magnitude-matched); per dial node { f first-order, f second, Q } /
+// { f0, Q }
+constexpr float g4HpDial[7] = { 14.8f, 36.7f, 86.7f, 146.7f, 233.3f, 312.5f, 350.0f };
+constexpr float g4Hp[7][3] = { { 19.3f, 18.4f, 1.004f }, { 42.0f, 41.3f, 0.991f }, { 77.0f, 77.0f, 0.986f }, { 130.1f, 131.7f, 0.984f },
+                               { 181.0f, 195.0f, 0.968f }, { 214.0f, 274.7f, 0.937f }, { 278.1f, 433.9f, 0.922f } };
+// the 4K E's Black and Orange high-pass (K4E_ir, fitted above its hiss floor: rms 0.02 … 0.28 dB)
+constexpr float e4BlHp[7][3] = { { 20.4f, 18.3f, 1.045f }, { 40.3f, 41.1f, 0.972f }, { 64.6f, 79.0f, 0.924f }, { 97.8f, 139.1f, 0.904f },
+                                 { 140.8f, 204.1f, 0.904f }, { 186.2f, 278.7f, 0.903f }, { 279.3f, 422.6f, 0.906f } };
+constexpr float e4OrHp[7][3] = { { 22.6f, 15.7f, 1.197f }, { 46.0f, 33.6f, 1.119f }, { 78.9f, 63.0f, 1.058f }, { 119.5f, 110.1f, 0.994f },
+                                 { 172.1f, 161.7f, 0.992f }, { 232.0f, 219.7f, 0.994f }, { 340.7f, 335.2f, 0.990f } };
+constexpr float g4LpDial[7] = { 3.0f, 3.38f, 3.83f, 4.67f, 7.0f, 10.67f, 23.84f };
+constexpr float g4Lp[7][2] = { { 3179.7f, 0.708f }, { 3587.8f, 0.707f }, { 4316.5f, 0.706f }, { 5529.3f, 0.704f }, { 7492.4f, 0.702f },
+                               { 12298.1f, 0.699f }, { 23686.1f, 0.651f } };
+
+// a digital frequency (Hz at the 48 kHz calibration) re-warped for `sr`: the w0 of a bilinear section
+double warped (double f0, double sr) noexcept
+{
+    const double fd = std::min (refRate / pi * std::atan (pi * f0 / refRate), 0.495 * sr);
+    return 2.0 * sr * std::tan (pi * fd / sr);
+}
+
+bool g4HighPass (const Settings& s, double sr, Biquad& first, Biquad& second) noexcept
+{
+    const auto& tab = s.k4g ? g4Hp : s.colour == 2 ? e4OrHp : e4BlHp;
+    const auto ax = nodeAt (g4HpDial, 7, std::clamp (s.hpHz, 14.8, 350.0), true);
+    const auto at = [&] (int k) { return std::exp (lerp (std::log ((double) tab[ax.i][k]), std::log ((double) tab[ax.i + 1][k]), ax.t)); };
+    const double w = warped (at (0), sr), c = 2.0 * sr;
+    first.set (c / (c + w), -c / (c + w), 0.0, 1.0, (w - c) / (c + w), 0.0);
+    const double n[3] { 1.0, 0.0, 0.0 }, d[3] { 1.0, 1.0 / at (2), 1.0 };
+    bilinearAt (n, d, at (1), sr, second);
+    return true;
+}
+
+// a magnitude-matched second-order low-pass (impulse-invariant poles, numerator fitted to the analog magnitude at DC
+// and at the pole frequency)
+void matchedLowPass (Biquad& b, double sr, double hz, double q) noexcept
+{
+    const double w0 = 2.0 * pi * std::min (hz, 0.49 * sr) / sr, zeta = 1.0 / (2.0 * q);
+    const double a1 = zeta <= 1.0 ? -2.0 * std::exp (-zeta * w0) * std::cos (std::sqrt (1.0 - zeta * zeta) * w0)
+                                  : -2.0 * std::exp (-zeta * w0) * std::cosh (std::sqrt (zeta * zeta - 1.0) * w0);
+    const double a2 = std::exp (-2.0 * zeta * w0);
+    const double A0 = (1.0 + a1 + a2) * (1.0 + a1 + a2), A1 = (1.0 - a1 + a2) * (1.0 - a1 + a2), A2 = -4.0 * a2;
+    const double p1 = std::sin (w0 / 2.0) * std::sin (w0 / 2.0), p0 = 1.0 - p1, p2 = 4.0 * p0 * p1;
+    const double R1 = (A0 * p0 + A1 * p1 + A2 * p2) * q * q;
+    const double B0 = A0, B1 = std::max ((R1 - B0 * p0) / p1, 0.0);
+    const double b0 = 0.5 * (std::sqrt (B0) + std::sqrt (B1)), b1 = std::sqrt (B0) - b0;
+    b.set (b0, b1, 0.0, 1.0, a1, a2);
+}
+
 bool highPass (const Settings& s, double sr, Biquad& first, Biquad& second) noexcept
 {
+    if (s.k4g || (s.e18HighPass && s.colour >= 1))
+        return s.hpHz > 0.0 && g4HighPass (s, sr, first, second);
     if (s.hpHz < 16.5)
         return false;
     const double f = std::clamp (s.hpHz, 20.0, 350.0);
@@ -310,6 +436,13 @@ bool highPass (const Settings& s, double sr, Biquad& first, Biquad& second) noex
 
 bool lowPass (const Settings& s, double sr, Biquad& out) noexcept
 {
+    if (s.k4g && s.lpKHz > 0.0) // round 190lb
+    {
+        const auto ax = nodeAt (g4LpDial, 7, std::clamp (s.lpKHz, 3.0, 23.84), true);
+        const double f0 = std::exp (lerp (std::log ((double) g4Lp[ax.i][0]), std::log ((double) g4Lp[ax.i + 1][0]), ax.t));
+        matchedLowPass (out, sr, f0, lerp (g4Lp[ax.i][1], g4Lp[ax.i + 1][1], ax.t));
+        return true;
+    }
     if (s.lpKHz <= 0.0 || s.lpKHz >= 15.9)
         return false;
     const double f = std::clamp (s.lpKHz, 3.0, 15.95);
@@ -337,10 +470,86 @@ double dialFromQ (double q) noexcept
     return 1.0;
 }
 
+// ---- round 190mt: the G-Channel EQ law (Settings::gLaw; REA_rodada190mt §1) ----
+// [EXEC] Identified black-box on our own demo-mode impulse responses of the reference (every band alone, two takes per
+// probe: shelves at 15 / 14 frequencies × every dB, bells at 11 / 12 frequencies × 20 gains × 10 Qs, the ÷3 / ×3 switches
+// on a coarser grid): each band is ONE second-order section (residual −100 … −150 dB) whose poles and zeros move with
+// the gain — the bells are peaking sections whose pole / zero Qs follow the gain (proportional Q) and whose centre
+// moves with the gain and Q; the LF shelf is (s² + βs + Wz²) / (s² + βs + Wp²) with a shared β of a few kHz (a first-
+// order slope below it), the HF shelf its mirror. LYNX keeps each probe's analog prototype (fitted, inverse bilinear at
+// 48 kHz) and interpolates ln of its coefficients over frequency (log), gain and Q; other rates keep the band's own
+// frequency (rateScale). The numbers are our fits, not vendor data.
+namespace gch
+{
+#include "core/SslGTables.inc"
+struct Ax { int i; double t; };
+Ax axisOf (const double* xs, int n, double x, bool logx) noexcept
+{
+    x = std::clamp (x, xs[0], xs[n - 1]);
+    int i = 0;
+    while (i < n - 2 && x > xs[i + 1])
+        ++i;
+    const double t = logx ? std::log (x / xs[i]) / std::log (xs[i + 1] / xs[i]) : (x - xs[i]) / (xs[i + 1] - xs[i]);
+    return { i, std::clamp (t, 0.0, 1.0) };
+}
+// a table [frequency][gain][Q][5] (nq = 1: shelves) at (af, ag, aq): multilinear in ln of the coefficients
+void lookup (const float* tab, int ng, int nq, Ax af, Ax ag, Ax aq, double u[5]) noexcept
+{
+    for (int k = 0; k < 5; ++k)
+        u[k] = 0.0;
+    for (int df = 0; df < 2; ++df)
+        for (int dg = 0; dg < 2; ++dg)
+            for (int dq = 0; dq < (nq > 1 ? 2 : 1); ++dq)
+            {
+                const double w = (df ? af.t : 1.0 - af.t) * (dg ? ag.t : 1.0 - ag.t) * (nq > 1 ? (dq ? aq.t : 1.0 - aq.t) : 1.0);
+                const float* c = tab + (((af.i + df) * ng + ag.i + dg) * nq + (nq > 1 ? aq.i + dq : 0)) * 5;
+                for (int k = 0; k < 5; ++k)
+                    u[k] += w * c[k];
+            }
+    for (int k = 0; k < 5; ++k)
+        u[k] = std::exp (u[k]);
+}
+bool band (int b, const Settings& s, double sampleRate, Biquad& out) noexcept
+{
+    constexpr int nShelfDb = (int) std::size (gShelfDb), nBellDb = (int) std::size (gBellDb), nBellQ = (int) std::size (gBellQ);
+    constexpr int nSubDb = (int) std::size (gSubDb), nSubQ = (int) std::size (gSubQ);
+    double u[5];
+    const Ax none { 0, 0.0 };
+    if (b == 0 || b == 3)
+    {
+        const double g = std::clamp (b == 0 ? s.lfGain : s.hfGain, -17.0, 17.0);
+        if (std::abs (g) < 1e-6)
+            return false;
+        const auto af = b == 0 ? axisOf (gLfHz, (int) std::size (gLfHz), s.lfHz, true) : axisOf (gHfKHz, (int) std::size (gHfKHz), s.hfKHz, true);
+        lookup (b == 0 ? gLf : gHf, nShelfDb, 1, af, axisOf (gShelfDb, nShelfDb, g, false), none, u);
+    }
+    else
+    {
+        const bool lo = b == 1, sub = lo ? s.lmfDiv3 : s.hmfMult3;
+        const double g = std::clamp (lo ? s.lmfGain : s.hmfGain, -20.0, 20.0), q = lo ? s.lmfQ : s.hmfQ;
+        if (std::abs (g) < 1e-6)
+            return false;
+        const auto af = lo ? axisOf (gLmfKHz, (int) std::size (gLmfKHz), s.lmfKHz, true) : axisOf (gHmfKHz, (int) std::size (gHmfKHz), s.hmfKHz, true);
+        if (sub)
+            lookup (lo ? gLmfDiv3 : gHmfX3, nSubDb, nSubQ, af, axisOf (gSubDb, nSubDb, g, false), axisOf (gSubQ, nSubQ, q, false), u);
+        else
+            lookup (lo ? gLmf : gHmf, nBellDb, nBellQ, af, axisOf (gBellDb, nBellDb, g, false), axisOf (gBellQ, nBellQ, q, false), u);
+    }
+    constexpr double U = 2.0 * pi * 1000.0;
+    double n[3] = { u[0], u[1] * U, u[2] * U * U }, d[2] = { u[3] * U, u[4] * U * U };
+    const double a = rateScale (std::sqrt (d[1]), sampleRate);
+    n[1] *= a; n[2] *= a * a; d[0] *= a; d[1] *= a * a;
+    bilinear (n, d, 2.0 * sampleRate, out);
+    return true;
+}
+} // namespace gch
+
 bool bandBiquad (int band, const Settings& s, double sampleRate, Biquad& out)
 {
     if (s.model == 1)
         return k4::band (band, s, sampleRate, out);
+    if (s.gLaw == 1) // round 190mt: the G-Channel EQ law
+        return gch::band (band, s, sampleRate, out);
     double n[3], d[2], wref = 0.0;
     if (! bandAnalog (band, s, n, d, wref))
         return false;
@@ -569,7 +778,9 @@ void Channel::design (const Settings& s) noexcept
         return a.hpHz == b.hpHz && a.lpKHz == b.lpKHz && a.lfGain == b.lfGain && a.lfHz == b.lfHz && a.lfBell == b.lfBell
             && a.lmfGain == b.lmfGain && a.lmfKHz == b.lmfKHz && a.lmfQ == b.lmfQ && a.hmfGain == b.hmfGain && a.hmfKHz == b.hmfKHz
             && a.hmfQ == b.hmfQ && a.hfGain == b.hfGain && a.hfKHz == b.hfKHz && a.hfBell == b.hfBell
-            && a.model == b.model && a.colour == b.colour;
+            && a.model == b.model && a.colour == b.colour
+            && a.pink == b.pink && a.lmfDiv3 == b.lmfDiv3 && a.hmfMult3 == b.hmfMult3 && a.k4g == b.k4g && a.e18HighPass == b.e18HighPass // round 190lb
+            && a.gLaw == b.gLaw; // round 190mt
     };
     if (designedOnce && eq (s, designed))
         return;
@@ -747,6 +958,11 @@ void Channel::process (float* l, float* r, int n, const Settings& s) noexcept
             a += hiss * gauss (noise[0]);
             b += hiss * gauss (noise[1]);
         }
+        if (s.k4g) // round 190lb: the SSL 4K G's output ceiling (its renders clip at 1.1108, both polarities)
+        {
+            a = std::clamp (a, -k4::pinkCeiling, k4::pinkCeiling);
+            b = std::clamp (b, -k4::pinkCeiling, k4::pinkCeiling);
+        }
         l[i] = (float) (a * outG);
         r[i] = (float) (b * outG);
     }
@@ -894,19 +1110,72 @@ constexpr double lawOffsetDb = 4.1, spanDb = 0.0, spanScale = 1.0;
 // 10 log10 (7 kHz / the band's width), with its law's offset allroundOffsetDb (round 148's span, 0.1 − threshold)
 constexpr double allroundOffsetDb = 5.3, allroundBw = 0.72; // (bank fit 6.34; 5.3 keeps the measured 7 kHz sine point, -4.5 dB at -18 dBFS, within 0.6 dB)
 double pole (double ms, double sr) noexcept { return ms <= 0.0 ? 0.0 : std::exp (-1.0 / (ms * 0.001 * sr)); }
+// round 190iq [EXEC] (refcap030: the Pro-DS trial's `ess` probe — a 500 Hz body under 5 … 9 kHz bursts of rising level
+// and a band sweep — at 35 settings, both modes): timing revision 1 of the Allround law. The reference's gain on the
+// body moves later and releases slower than tp172b's timing, whose gain led it by ~5 ms at the default 10 ms look-ahead;
+// fitted on the Allround renders' gain trajectories (0.25 ms steps; Nelder-Mead from tp172b's timing,
+// /mnt/e/lynx-work/parity190iq/hush/fit.py): 0.73 → 0.30 dB rms. The gain looks 1.0945 × the dial − 4.85 ms ahead (≈ 6.1 ms
+// at 10 ms; never below 0) and releases 3.3 times slower. Single Vocal keeps round 148's timing in both revisions (the same
+// timing cost its vocal / drum programme files a step: its own gate opens ~10 ms after the burst, a different model)
+struct Timing190iq
+{
+    double detAttackMs, detReleaseMs, gainAttackMs, gainReleaseMs, aheadScale, aheadOffsetMs;
+};
+#ifdef LYNX_LAB190IQ
+ #define TIMING_190IQ_CONSTEXPR static
+#else
+ #define TIMING_190IQ_CONSTEXPR constexpr
+#endif
+TIMING_190IQ_CONSTEXPR Timing190iq timingAll190iq { 0.0084, 1.4611, 2.9413, 5.8197, 1.0945, -4.8461 };
+// round 190js [EXEC] (refcap030's `ess` probe, Single Vocal: a 500 Hz body at -14 dBFS under 5 … 9 kHz bursts of rising
+// level, a sweep of band tones and a long burst alone): Single Vocal's revision 1. The reference leaves a burst alone until
+// it stands out from the body by a margin (+5 dB: nothing; +11 dB: the whole range at every threshold), ignores band
+// tones at the body's level, decides late (the reduction starts ~20 ms after the burst minus the look-ahead) and then
+// holds a steady reduction; alone, a burst follows a level law steeper than round 148's. The stand-out test compares the
+// signal above a split (0.567 x the band's high-pass, 4th-order) with the body below it from 200 Hz up — round 148's test
+// (the band against everything under the high-pass) counted a burst's own lower half as the body, and a kick drum's low
+// end hid the cymbals (tp172b's drums). Fitted by Nelder-Mead on the 27 Single Vocal ess renders (5 ms windows, full
+// band and above 4 kHz; /mnt/e/lynx-work/parity190js/hush/fitsv.py): 3.05 → 0.50 dB rms; the body's 200 Hz high-pass and
+// the law offset (9.65 → 9.0) then chosen on the parity score of tp172b's drums / vocal and refcap030's mix / stim
+// renders (hush/svscore.py). Fields: ratio ms, open / close dB, gate delay ms, gain attack / release ms, law offset dB,
+// span scale, detector release ms, split, body high-pass Hz.
+struct Vocal190js
+{
+    double ratioMs, openRatioDb, closeRatioDb, gateDelayMs, gainAttackMs, gainReleaseMs, lawOffsetDb, spanScale, detReleaseMs;
+    double splitRatio; // the stand-out test's split: the band's high-pass x this (the signal above it against the signal below)
+    double bodyLowHz;  // the body (the signal below the split) starts here (2nd-order high-pass; 0 = from DC)
+};
+#ifdef LYNX_LAB190JS
+ #define VOCAL_190JS_CONSTEXPR static
+#else
+ #define VOCAL_190JS_CONSTEXPR constexpr
+#endif
+VOCAL_190JS_CONSTEXPR Vocal190js vocal190js { 4.85, 8.19, 7.57, 1.57, 6.21, 20.4, 9.0, 1.11, 0.50, 0.567, 200.0 };
 } // namespace
 
 void DeEsser::prepare (double sampleRate) noexcept
 {
+#ifdef LYNX_LAB190IQ
+    if (const char* e = std::getenv ("LYNX_LAB_IQA"))
+        std::sscanf (e, "%lf,%lf,%lf,%lf,%lf,%lf", &timingAll190iq.detAttackMs, &timingAll190iq.detReleaseMs, &timingAll190iq.gainAttackMs,
+                     &timingAll190iq.gainReleaseMs, &timingAll190iq.aheadScale, &timingAll190iq.aheadOffsetMs);
+#endif
+#ifdef LYNX_LAB190JS
+    if (const char* e = std::getenv ("LYNX_LAB_SV"))
+        std::sscanf (e, "%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf", &vocal190js.ratioMs, &vocal190js.openRatioDb, &vocal190js.closeRatioDb,
+                     &vocal190js.gateDelayMs, &vocal190js.gainAttackMs, &vocal190js.gainReleaseMs, &vocal190js.lawOffsetDb,
+                     &vocal190js.spanScale, &vocal190js.detReleaseMs, &vocal190js.splitRatio, &vocal190js.bodyLowHz);
+#endif
     sr = sampleRate > 0.0 ? sampleRate : 48000.0;
     latency = std::clamp ((int) std::lround (0.015 * sr), 1, ring / 2);
-    designedHp = designedLp = -1.0;
+    designedHp = designedLp = designedSplit = -1.0;
     reset();
 }
 
 void DeEsser::reset() noexcept
 {
-    for (auto* b : { &hp1, &hp2, &lp1, &lp2, &low1, &low2, &split1, &split2, &bhp1, &bhp2, &blp1, &blp2, &blow1, &blow2 })
+    for (auto* b : { &hp1, &hp2, &lp1, &lp2, &low1, &low2, &split1, &split2, &bhp1, &bhp2, &blp1, &blp2, &blow1, &blow2,
+                     &shi1, &shi2, &slo1, &slo2, &bshi1, &bshi2, &bslo1, &bslo2 })
         b->reset();
     eh = qh = ql = sm = 0.0;
     beh = bqh = bql = bsm = 0.0;
@@ -941,13 +1210,40 @@ void DeEsser::design (const Settings& s) noexcept
 void DeEsser::process (float* l, float* r, int n, const Settings& s) noexcept
 {
     design (s);
-    const double ca = pole (detAttackMs, sr), cr = pole (s.gate ? sDetReleaseMs : detReleaseMs, sr);
-    const double ga = pole (s.gate ? sGainAttackMs : gainAttackMs, sr), gr = pole (s.gate ? sGainReleaseMs : gainReleaseMs, sr);
-    const double cq = pole (ratioMs, sr);
+    if (s.vocalRevision >= 1 && s.gate) // round 190js: the stand-out test's split (4th-order Butterworth both ways)
+    {
+        const double f = std::clamp (designedHp * vocal190js.splitRatio, 200.0, sr * 0.45);
+        if (f != designedSplit)
+        {
+            designedSplit = f;
+            shi1.filter (sr, 1, f, 0.54119610); shi2.filter (sr, 1, f, 1.30656296);
+            slo1.filter (sr, 0, f, 0.54119610); slo2.filter (sr, 0, f, 1.30656296);
+            sbody.filter (sr, 1, std::clamp (vocal190js.bodyLowHz, 10.0, f), 0.70710678);
+            bshi1 = shi1; bshi2 = shi2; bslo1 = slo1; bslo2 = slo2; bsbody = sbody;
+            for (auto* b : { &shi1, &shi2, &slo1, &slo2, &bshi1, &bshi2, &bslo1, &bslo2, &sbody, &bsbody })
+                b->reset();
+        }
+    }
+    const bool t1 = s.timing >= 1 && ! s.gate; // round 190iq: timing revision 1 (the Allround law only)
+    const bool v1 = s.vocalRevision >= 1 && s.gate; // round 190js: Single Vocal's revision 1
+    const auto& T = timingAll190iq;
+    const auto& V = vocal190js;
+    const double ca = pole (t1 ? T.detAttackMs : detAttackMs, sr);
+    const double cr = pole (t1 ? T.detReleaseMs : v1 ? V.detReleaseMs : s.gate ? sDetReleaseMs : detReleaseMs, sr);
+    const double ga = pole (t1 ? T.gainAttackMs : v1 ? V.gainAttackMs : s.gate ? sGainAttackMs : gainAttackMs, sr);
+    const double gr = pole (t1 ? T.gainReleaseMs : v1 ? V.gainReleaseMs : s.gate ? sGainReleaseMs : gainReleaseMs, sr);
+    const double cq = pole (v1 ? V.ratioMs : ratioMs, sr);
+    const double openR = v1 ? V.openRatioDb : openRatioDb, closeR = v1 ? V.closeRatioDb : closeRatioDb;
     const double thr = std::clamp (s.thresholdDb, -60.0, 0.0), range = std::clamp (s.rangeDb, 0.0, 24.0);
-    const double span = s.gate ? std::max (1.0, spanDb + spanScale * (0.1 - thr)) : 0.1 - thr;
-    const double laAdj = s.gate ? lawOffsetDb : allroundOffsetDb + allroundBw * 10.0 * std::log10 (7000.0 / std::max (100.0, designedLp - designedHp));
-    const int ahead = std::clamp ((int) std::lround ((s.lookahead ? std::clamp (s.lookaheadMs, 0.0, 15.0) + extraAheadMs : 0.0) * 0.001 * sr), 0, latency);
+    const double span = s.gate ? std::max (1.0, spanDb + (v1 ? V.spanScale : spanScale) * (0.1 - thr)) : 0.1 - thr;
+    const double laAdj = s.gate ? (v1 ? V.lawOffsetDb : lawOffsetDb)
+                                : allroundOffsetDb + allroundBw * 10.0 * std::log10 (7000.0 / std::max (100.0, designedLp - designedHp));
+    const double aheadMs = t1 ? T.aheadScale * (s.lookahead ? std::clamp (s.lookaheadMs, 0.0, 15.0) : 0.0) + T.aheadOffsetMs
+                              : (s.lookahead ? std::clamp (s.lookaheadMs, 0.0, 15.0) + extraAheadMs : 0.0);
+    const int ahead = std::clamp ((int) std::lround (aheadMs * 0.001 * sr), 0, latency);
+    // round 190js: Single Vocal's revision decides on the stand-out test this many samples after the sample played now
+    // (its ratio is read at now + ahead − gateDelay, never older than the ring holds)
+    const int gateShift = v1 ? std::clamp (ahead - (int) std::lround (V.gateDelayMs * 0.001 * sr), -(ring - latency - 64), latency) : 0;
     constexpr std::int64_t m = ring - 1;
     float maxGr = 0.0f, maxDet = -300.0f;
     // round 165x: the reference's link (two lanes when the channels hear different signals)
@@ -974,8 +1270,19 @@ void DeEsser::process (float* l, float* r, int n, const Settings& s) noexcept
         const double lw = low2.process (low1.process ((float) x, 0), 0);
         const double ph = h * h, pl = lw * lw;
         eh = ph > eh ? ca * eh + (1.0 - ca) * ph : cr * eh + (1.0 - cr) * ph;
-        qh = cq * qh + (1.0 - cq) * ph;
-        ql = cq * ql + (1.0 - cq) * pl;
+        if (v1) // round 190js: above the split against below it
+        {
+            const double a1 = shi2.process (shi1.process ((float) x, 0), 0);
+            double b1 = slo2.process (slo1.process ((float) x, 0), 0);
+            if (vocal190js.bodyLowHz > 0.0) b1 = sbody.process ((float) b1, 0);
+            qh = cq * qh + (1.0 - cq) * a1 * a1;
+            ql = cq * ql + (1.0 - cq) * b1 * b1;
+        }
+        else
+        {
+            qh = cq * qh + (1.0 - cq) * ph;
+            ql = cq * ql + (1.0 - cq) * pl;
+        }
         const auto w = (std::size_t) (pos & m);
         level[w] = (float) (10.0 * std::log10 (2.0 * eh + 1e-30));
         ratio[w] = (float) (10.0 * std::log10 ((qh + 1e-30) / (ql + 1e-30)));
@@ -985,8 +1292,19 @@ void DeEsser::process (float* l, float* r, int n, const Settings& s) noexcept
             const double lb = blow2.process (blow1.process ((float) xb, 0), 0);
             const double pbh = hb * hb, pbl = lb * lb;
             beh = pbh > beh ? ca * beh + (1.0 - ca) * pbh : cr * beh + (1.0 - cr) * pbh;
-            bqh = cq * bqh + (1.0 - cq) * pbh;
-            bql = cq * bql + (1.0 - cq) * pbl;
+            if (v1)
+            {
+                const double a1 = bshi2.process (bshi1.process ((float) xb, 0), 0);
+                double b1 = bslo2.process (bslo1.process ((float) xb, 0), 0);
+                if (vocal190js.bodyLowHz > 0.0) b1 = bsbody.process ((float) b1, 0);
+                bqh = cq * bqh + (1.0 - cq) * a1 * a1;
+                bql = cq * bql + (1.0 - cq) * b1 * b1;
+            }
+            else
+            {
+                bqh = cq * bqh + (1.0 - cq) * pbh;
+                bql = cq * bql + (1.0 - cq) * pbl;
+            }
             blevel[w] = (float) (10.0 * std::log10 (2.0 * beh + 1e-30));
             bratio[w] = (float) (10.0 * std::log10 ((bqh + 1e-30) / (bql + 1e-30)));
         }
@@ -997,12 +1315,12 @@ void DeEsser::process (float* l, float* r, int n, const Settings& s) noexcept
         double gainDb = 0.0;
         if (now >= 0)
         {
-            const double la = level[(std::size_t) ((now + ahead) & m)], rr = ratio[(std::size_t) (now & m)];
+            const double la = level[(std::size_t) ((now + ahead) & m)], rr = ratio[(std::size_t) ((now + gateShift) & m)];
             if (! s.gate)
                 open = true;
-            else if (! open && la >= thr + openDb && rr >= openRatioDb)
+            else if (! open && la >= thr + openDb && rr >= openR)
                 open = true;
-            else if (open && (la < thr + closeDb || rr < closeRatioDb))
+            else if (open && (la < thr + closeDb || rr < closeR))
                 open = false;
             const double t = open ? std::clamp (range * (la + laAdj - thr) / span, 0.0, range) : 0.0;
             sm = t > sm ? ga * sm + (1.0 - ga) * t : gr * sm + (1.0 - gr) * t;
@@ -1010,12 +1328,12 @@ void DeEsser::process (float* l, float* r, int n, const Settings& s) noexcept
             maxDet = std::max (maxDet, (float) la);
             if (two)
             {
-                const double lb = blevel[(std::size_t) ((now + ahead) & m)], rb = bratio[(std::size_t) (now & m)];
+                const double lb = blevel[(std::size_t) ((now + ahead) & m)], rb = bratio[(std::size_t) ((now + gateShift) & m)];
                 if (! s.gate)
                     bopen = true;
-                else if (! bopen && lb >= thr + openDb && rb >= openRatioDb)
+                else if (! bopen && lb >= thr + openDb && rb >= openR)
                     bopen = true;
-                else if (bopen && (lb < thr + closeDb || rb < closeRatioDb))
+                else if (bopen && (lb < thr + closeDb || rb < closeR))
                     bopen = false;
                 const double tb = bopen ? std::clamp (range * (lb + laAdj - thr) / span, 0.0, range) : 0.0;
                 bsm = tb > bsm ? ga * bsm + (1.0 - ga) * tb : gr * bsm + (1.0 - gr) * tb;
@@ -1174,10 +1492,23 @@ void Leveler::reset() noexcept
     scLow172.reset();
     scHigh190.reset();
     scLow190.reset();
+    // round 190lf: the cell law's state
+    ccf = ccs = cc3 = cexp = cenv = 0.0;
+    for (int c = 0; c < 2; ++c)
+    {
+        cyp[c] = chx[c] = chy[c] = 0.0;
+        for (auto* f : { &cellLow, &cellHigh })
+            f->x1[c] = f->x2[c] = f->y1[c] = f->y2[c] = 0.0;
+    }
 }
 
 void Leveler::process (float* l, float* r, int n, const Settings& s) noexcept
 {
+    if (s.cellLaw == 1)
+    {
+        processCell (l, r, n, s);
+        return;
+    }
     const double dt = 1.0 / sr;
     if (scDesignedRate != sr)
     {
@@ -1303,6 +1634,123 @@ void Leveler::process (float* l, float* r, int n, const Settings& s) noexcept
             const double t = tb[0] * tx[c][0] + tb[1] * tx[c][1] + tb[2] * tx[c][2] + tb[3] * tx[c][3] - ta[1] * ty[c][1] - ta[2] * ty[c][2] - ta[3] * ty[c][3];
             ty[c][0] = t;
             *ch[c] = (float) t;
+        }
+        maxGr = std::max (maxGr, -gainToDb (g));
+    }
+    last = (float) maxGr;
+}
+namespace
+{
+// round 190lf [EXEC] (docs/analise/REA_rodada190lf_dyn.md §1): the cell law (Settings::cellLaw = 1), LYNX's compact opto
+// behaviour model. Per sample: the side chain hears the cell's output (feedback; in Limit plus a share of the input)
+// through a low and a high peaking filter, the louder channel's level |sc| · 10^(shift / 20) (shift: the peak
+// reduction dial's and the Hi Freq dial's laws, below) held by the light's persistence (a peak hold releasing with
+// envMs) is u, and lights the cell above u = 1: C* = (u − 1)^gamma. A fast and a slow
+// conductance share C* (1 − share, share; a third, very fast one share3 of it): each charges towards its part (the fast one in the log1p domain at
+// (1 + C)^beta / tau), and releases as dC/dt = −(a Cⁿ + b C) / (1 + mg · E), E an exposure (0 … 1) that charges while the
+// cell is lit and fades slowly — the longer and harder it was lit, the slower it recovers. The audio sees
+// g = 1 / (1 + Cf + Cs) (Limit: floored), its band above tiltHz (first order) reduced less (× min (hmax, g^−kappa)), then
+// the gain dial's make-up, the small 2nd / 3rd harmonic and the unit's idle response of the Opto classic voicing.
+// Every constant is fitted on our own probes (waves2_190lf/dyn/lab/fit2a.py; tables written by lab/gen2a.py).
+struct CellLaw
+{
+    double gamma, gammaLimit, feedForward, floorDb, tauA, beta, a, n, b, share, tauAs, a2, n2, b2, mg, mchMs, mdcMs;
+    double lowHz, lowQ, lowDb, highHz, highQ, highDb, highDbSlope, tiltHz, kappa, hmaxDb, limitShift, envMs;
+    double share3, att3Ms, rel3Ms; // a third, very fast conductance (one-pole attack / release) taking share3 of C*
+    double lowDbSlope;             // the low filter's gain per 50 of the Hi Freq dial away from 50 (as highDbSlope)
+};
+// fit2a:begin (CELL190LF: lab/gen2a.py)
+constexpr CellLaw cell190lf { 2.99579, 3.41216, 0.0590878, 29.5474, 62.4002, 0.364894, 0.978602, 2.90891, 6.9967, 0.240615, 1578.64, 55.4413, 4.83264, 0.258853, 1.82323, 343.78, 86.7507,
+                              86.091, 0.482178, 4.08894, 8007.81, 0.936114, 8.06835, -0.400425, 20000, 1.66958, 17.2213, 2.18174, 1.81797, 0, 0.5, 10, -1.71018 };
+constexpr double cellPrKnob[] { 0, 30, 46, 60, 70, 80, 90, 100 };
+constexpr double cellPrShift[] { -60, -5, 17.9491, 29.3419, 37.824, 42.789, 45.602, 48.4861 };
+constexpr double cellHfKnob[] { 0, 20, 50, 100 };
+constexpr double cellHfShift[] { -3.2, -4.05829, 0, 5.41484 };
+constexpr double cellGainKnob[] { 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 };
+constexpr double cellGainDb[] { -56.219, -34.954, -18.053, -2.544, 8.477, 16.908, 24.746, 29.768, 33.784, 35.289, 38.799 };
+// fit2a:end
+void cellPeak (double sr, double hz, double q, double db, double& b0, double& b1, double& b2, double& a1, double& a2) noexcept
+{
+    const double A = std::pow (10.0, db / 40.0), w = 2.0 * pi * std::min (hz, 0.45 * sr) / sr, al = std::sin (w) / (2.0 * q), cw = std::cos (w), a0 = 1.0 + al / A;
+    b0 = (1.0 + al * A) / a0; b1 = -2.0 * cw / a0; b2 = (1.0 - al * A) / a0; a1 = -2.0 * cw / a0; a2 = (1.0 - al / A) / a0;
+}
+} // namespace
+
+void Leveler::processCell (float* l, float* r, int n, const Settings& s) noexcept
+{
+    const auto& c = cell190lf;
+    const double dt = 1.0 / sr;
+    const double hf = std::clamp (s.hiFreq, 0.0, 100.0);
+    const double highDb = c.highDb + c.highDbSlope * (hf - 50.0) / 50.0, lowDb = c.lowDb + c.lowDbSlope * (hf - 50.0) / 50.0;
+    if (cellRate != sr || cellHiFreq != hf) // the filters follow the Hi Freq dial
+    {
+        cellRate = sr;
+        cellHiFreq = hf;
+        cellPeak (sr, c.lowHz, c.lowQ, lowDb, cellLow.b0, cellLow.b1, cellLow.b2, cellLow.a1, cellLow.a2);
+        cellPeak (sr, c.highHz, c.highQ, highDb, cellHigh.b0, cellHigh.b1, cellHigh.b2, cellHigh.a1, cellHigh.a2);
+    }
+    const double shift = table (cellPrKnob, cellPrShift, (int) std::size (cellPrKnob), std::clamp (s.peakReduction, 0.0, 100.0))
+                       + table (cellHfKnob, cellHfShift, (int) std::size (cellHfKnob), hf) + (s.limit ? c.limitShift : 0.0);
+    const double K = dbToGain (shift), gam = s.limit ? c.gammaLimit : c.gamma, ff = s.limit ? c.feedForward : 0.0;
+    const double gFloor = s.limit ? dbToGain (-c.floorDb) : 0.0;
+    const double eUp = 1.0 - std::exp (-dt * 1000.0 / c.mchMs), eDn = 1.0 - std::exp (-dt * 1000.0 / c.mdcMs);
+    const double envR = std::exp (-dt * 1000.0 / c.envMs);
+    const double a3 = 1.0 - std::exp (-dt * 1000.0 / c.att3Ms), r3 = 1.0 - std::exp (-dt * 1000.0 / c.rel3Ms);
+    const double cAs = 1.0 - std::exp (-dt * 1000.0 / c.tauAs), hpc = std::exp (-2.0 * pi * c.tiltHz / sr), hmax = dbToGain (c.hmaxDb);
+    // the measured level at 1 kHz (the idle response's mid-band loss given back, as the Opto classic voicing does)
+    const double mk = dbToGain (table (cellGainKnob, cellGainDb, (int) std::size (cellGainKnob), std::clamp (s.gain, 0.0, 100.0)) + idleMakeupDb
+                                + (s.autoMakeup ? autoMakeupDb (s.peakReduction) - autoMakeupDb (s.makeupRef) : 0.0));
+    const auto bq = [] (Peak2& f, double x, int ch) noexcept
+    {
+        const double y = f.b0 * x + f.b1 * f.x1[ch] + f.b2 * f.x2[ch] - f.a1 * f.y1[ch] - f.a2 * f.y2[ch];
+        f.x2[ch] = f.x1[ch]; f.x1[ch] = x; f.y2[ch] = f.y1[ch]; f.y1[ch] = y;
+        return y;
+    };
+    const double* tb = idleB;
+    const double* ta = idleA;
+    double maxGr = 0.0;
+    for (int i = 0; i < n; ++i)
+    {
+        float* ch[2] = { &l[i], &r[i] };
+        double u = 0.0;
+        for (int k = 0; k < 2; ++k)
+            u = std::max (u, std::abs (bq (cellHigh, bq (cellLow, cyp[k] + ff * *ch[k], k), k)));
+        cenv = std::max (u * K, cenv * envR);
+        u = cenv;
+        const double ct = u > 1.0 ? std::pow (u - 1.0, gam) : 0.0;
+        const double t3 = c.share3 * ct, tf = (1.0 - c.share) * (1.0 - c.share3) * ct, ts = c.share * (1.0 - c.share3) * ct;
+        cc3 += (t3 > cc3 ? a3 : r3) * (t3 - cc3);
+        const double lit = ct / (1.0 + ct);
+        cexp += (lit > cexp ? eUp : eDn) * (lit - cexp);
+        const double slow = 1.0 + c.mg * cexp;
+        if (tf > ccf)
+        {
+            double cd = std::log1p (ccf);
+            cd += (std::log1p (tf) - cd) * (1.0 - std::exp (-dt * 1000.0 * std::pow (1.0 + ccf, c.beta) / c.tauA));
+            ccf = std::expm1 (cd);
+        }
+        else
+            ccf = std::max (tf, ccf - dt * (c.a * std::pow (ccf, c.n) + c.b * ccf) / slow);
+        if (ts > ccs)
+            ccs += (ts - ccs) * cAs;
+        else
+            ccs = std::max (ts, ccs - dt * (c.a2 * std::pow (ccs, c.n2) + c.b2 * ccs) / slow);
+        const double g = std::max (gFloor, 1.0 / (1.0 + ccf + ccs + cc3));
+        const double h = std::min (hmax, std::pow (g, -c.kappa));
+        for (int k = 0; k < 2; ++k)
+        {
+            const double y = g * *ch[k];
+            cyp[k] = y;
+            const double hp = hpc * (chy[k] + y - chx[k]);
+            chx[k] = y;
+            chy[k] = hp;
+            double o = (y + (h - 1.0) * hp) * mk;
+            o = o + h2 * o * o + h3 * o * o * o;
+            for (int j = 3; j > 0; --j) { tx[k][j] = tx[k][j - 1]; ty[k][j] = ty[k][j - 1]; }
+            tx[k][0] = o;
+            const double t = tb[0] * tx[k][0] + tb[1] * tx[k][1] + tb[2] * tx[k][2] + tb[3] * tx[k][3] - ta[1] * ty[k][1] - ta[2] * ty[k][2] - ta[3] * ty[k][3];
+            ty[k][0] = t;
+            *ch[k] = (float) t;
         }
         maxGr = std::max (maxGr, -gainToDb (g));
     }
@@ -1438,6 +1886,206 @@ void Compressor::process (float* l, float* r, int n, const Settings& s) noexcept
     }
     last = (float) maxGr;
     change = (float) -extreme;
+}
+
+// ================================================================== round 190mg: the Renaissance law
+// [REA] structure of the reference's DSP and control code (docs/analise/REA_rodada190mg_ren.md §1), [EXEC] every constant
+// below fitted on LYNX's own demo-mode probes (1 kHz stairs at 11 ratios / 3 thresholds, tone bursts at Manual / ARC ×
+// Electro / Opto and 5 release / 3 attack settings, 50 / 100 Hz tones at Warm / Smooth; ren/fit): the probes' sample
+// ESR is −50 … −85 dB. Per sample: a linked peak detector (Smooth: also three first-order all-passes of the input, the
+// largest magnitude), its maximum over a look-ahead window, a gain computer in linear gain g = 1 / (1 + x / T) bent by
+// c g² (1 − g), a one-pole smoother on it (attack; release time shaped by the slow follower's depth, faster while the
+// gain sits under its slow follower), the gain's floor a (ratio law), the 0 dBFS limiter, two boxcars over the gain,
+// the audio and the dry path delayed by the window.
+namespace
+{
+// static law (fitstatic2.py): ln (a + f3) = f0 + f1 u + f2 u², u = ln ratio (ratio > 1); below 1 : 1 a = e^(e0 (1 − ratio))
+constexpr double renF0 = 0.00615309, renF1 = -2.99994666, renF2 = 0.43417198, renF3 = 0.00620109, renE0 = 5.5452;
+// threshold shift at low ratios: max (0, s0 − s1 ratio) dB; curve bend c (compressing / expanding)
+constexpr double renS0 = 25.0, renS1 = 20.0, renBendComp = 1.5, renBendExp = 1.25;
+// dynamics (fitdyn.py on 16 burst / tone probes, sample ESR −78 … −94 dB; fitlim.py on the limiter probes, −76 … −97 dB):
+// attack / release knob scales, the program-dependent exponent (ARC / Manual) and offset, the slow follower's fall / rise,
+// the release shape (1 − v⁴)⁴ with its floor, the limiter's recovery (× 5 in Manual), its +24 dB cap, the all-passes
+constexpr double renAttackK = 1.0, renReleaseK = 0.9998, renPdrArc = 0.003911, renPdrManual = 0.0003532, renPdrOffset = 0.003941;
+constexpr double renSlowFallMs = 149.58, renSlowRiseMs = 56.24, renReleaseFloorMs = 0.002, renShapePow = 4.0, renShapeExp = 4.0;
+constexpr double renLimitMs = 1.5, renLimitManual = 5.0, renLimitMax = 16.0, renMixMs = 10.0;
+constexpr double renAllPassHz[3] { 49.50, 130.74, 280.18 };
+constexpr double renBoxShare = 0.42; // the first boxcar's share of the window (the second: the rest + 1)
+constexpr double renFix = 1073741824.0; // 2^30: the boxcars' fixed point
+inline double renCoef (double ms, double sr) noexcept { return ms <= 0.0 ? 0.0 : std::exp (-1000.0 / (ms * sr)); }
+} // namespace
+
+double renFloor (double ratio) noexcept
+{
+    if (ratio < 1.0)
+        return std::exp (renE0 * (1.0 - std::max (0.5, ratio)));
+    const double u = std::log (ratio);
+    return std::max (0.0, std::exp (renF0 + renF1 * u + renF2 * u * u) - renF3);
+}
+
+double renShiftDb (double ratio) noexcept { return std::max (0.0, renS0 - renS1 * ratio); }
+
+double renStaticGain (double x, double thresholdDb, double ratio) noexcept
+{
+    const double a = renFloor (ratio), c = a < 1.0 ? renBendComp : renBendExp;
+    double g = 1.0 / (1.0 + x / dbToGain (thresholdDb + renShiftDb (ratio)));
+    g = std::min (1.0, g + c * g * g * (1.0 - g));
+    return (1.0 - a) * g + a;
+}
+
+int Renaissance::windowFor (double sampleRate) noexcept { return sampleRate < 64000.0 ? 64 : sampleRate < 128000.0 ? 128 : 256; }
+
+void Renaissance::prepare (double sampleRate) noexcept
+{
+    sr = sampleRate;
+    win = windowFor (sr);
+    boxA = (int) std::lround (renBoxShare * win);
+    boxB = win + 1 - boxA;
+    for (int k = 0; k < 3; ++k)
+    {
+        const double t = std::tan (3.14159265358979323846 * std::min (renAllPassHz[k], 0.45 * sr) / sr);
+        apc[k] = (t - 1.0) / (t + 1.0);
+    }
+    tRelease = -1.0;
+    reset();
+}
+
+void Renaissance::reset() noexcept
+{
+    std::memset (apx, 0, sizeof (apx));
+    std::memset (apy, 0, sizeof (apy));
+    qh = qt = n0 = 0;
+    s = q = 1.0;
+    lim = renLimitMax;
+    b1.fill ((std::int64_t) renFix);
+    b2.fill ((std::int64_t) renFix);
+    sum1 = (std::int64_t) renFix * boxA;
+    sum2 = (std::int64_t) renFix * boxB;
+    p1 = p2 = 0;
+    dl.fill (0.0f);
+    dr.fill (0.0f);
+    dp = 0;
+    started = false;
+    last = change = 0.0f;
+}
+
+void Renaissance::process (float* l, float* r, int n, const RenSettings& st) noexcept
+{
+    // round 190mt: the RVox type releases like the Opto mode ([EXEC] fast out of deep reduction, slow near none)
+    const bool opto = st.opto || st.voxCurve;
+    const int mode = (st.manual ? 1 : 0) | (opto ? 2 : 0);
+    if (st.releaseMs != tRelease || mode != tMode)
+    {
+        // the release coefficient = relT[q] · pdrT[min (s, q)]: the time constant set by the slow follower's position
+        // (Electro: faster towards no reduction, Opto: the reverse), times the program-dependent factor
+        tRelease = st.releaseMs;
+        tMode = mode;
+        const double d = st.manual ? renPdrManual : renPdrArc;
+        for (int k = 0; k < tableSize; ++k)
+        {
+            // read at 256 steps, truncated (the reference's tables; the probes' ESR is 15 … 20 dB better than with a
+            // continuous law)
+            const double v = opto ? 1.0 - k / 256.0 : k / 256.0;
+            const double tau = std::max (renReleaseFloorMs, std::max (1.0, st.releaseMs) * renReleaseK * std::pow (1.0 - std::pow (v, renShapePow), renShapeExp));
+            pdrT[(std::size_t) k] = std::exp2 (-d / ((double) k / (tableSize - 1) + renPdrOffset));
+            relT[(std::size_t) k] = renCoef (tau, sr) / pdrT[(std::size_t) k];
+        }
+    }
+    const auto at = [] (double u) noexcept { return (std::size_t) std::clamp ((int) (u * (tableSize - 1)), 0, tableSize - 1); };
+    const double ratio = std::clamp (st.ratio, 0.5, 50.0);
+    const double a = st.voxCurve ? 0.0 : renFloor (ratio), bend = st.voxCurve ? 0.0 : (a < 1.0 ? renBendComp : renBendExp);
+    // round 190mt: the RVox type's curve 1 / (1 + p (1/t − 0.1)) (no threshold shift; 0.1 fitted on our stair probes at
+    // thresholds −24 / −12 dB: the curve is the vocal compressor's t / (p (1 − t) + t) family, a little deeper)
+    const double invT = st.voxCurve ? 1.0 / dbToGain (st.thresholdDb) - 0.1 : 1.0 / dbToGain (st.thresholdDb + renShiftDb (ratio));
+    const double aC = renCoef (std::max (0.01, st.attackMs) * renAttackK, sr), qF = renCoef (renSlowFallMs, sr), qR = renCoef (renSlowRiseMs, sr);
+    const double makeup = dbToGain (st.gainDb), ceiling = 1.0 / makeup;
+    const double lR = renCoef (renLimitMs * (st.manual ? renLimitManual : 1.0), sr), mC = renCoef (renMixMs, sr);
+    const double trim = dbToGain (st.trimDb), wetT = trim * std::clamp (st.mix, 0.0, 1.0), dryT = trim * (1.0 - std::clamp (st.mix, 0.0, 1.0));
+    if (! started)
+    {
+        wetG = wetT;
+        dryG = dryT;
+        started = true;
+    }
+    const int nap = st.smooth ? 3 : 0;
+    const double invB = 1.0 / boxB;
+    double minG = 1e9, maxG = 0.0;
+    for (int i = 0; i < n; ++i)
+    {
+        // linked peak detector (Smooth: with the all-passed copies)
+        double x = 0.0;
+        const float in[2] { l[i], r[i] };
+        for (int ch = 0; ch < 2; ++ch)
+        {
+            const double v = in[ch];
+            double m = std::abs (v);
+            for (int k = 0; k < nap; ++k)
+            {
+                const double y = apc[k] * (v - apy[ch][k]) + apx[ch][k];
+                apx[ch][k] = v;
+                apy[ch][k] = y;
+                m = std::max (m, std::abs (y));
+            }
+            x = std::max (x, m);
+        }
+        // its maximum over the window
+        while (qt != qh && qv[(std::size_t) ((qt - 1) & (cap - 1))] <= x)
+            --qt;
+        qv[(std::size_t) (qt & (cap - 1))] = x;
+        qi[(std::size_t) (qt & (cap - 1))] = n0;
+        ++qt;
+        if (qi[(std::size_t) (qh & (cap - 1))] <= n0 - win)
+            ++qh;
+        if (qh >= cap) // the same slots (cap is a power of two): the positions stay small
+        {
+            qh -= cap;
+            qt -= cap;
+        }
+        ++n0;
+        if (n0 >= (1 << 30)) // keep the counters small (the queue's indices move with it)
+        {
+            for (int k = qh; k != qt; ++k)
+                qi[(std::size_t) (k & (cap - 1))] -= (1 << 29);
+            n0 -= (1 << 29);
+        }
+        const double peak = qv[(std::size_t) (qh & (cap - 1))];
+        // the limiter on the same peak: instant down, one pole up
+        // (its target at most 16 = +24 dB: the expansion's boost passes under the ceiling)
+        const double lt = peak * renLimitMax > ceiling ? ceiling / peak : renLimitMax;
+        lim = std::min (lt, (lim - lt) * lR + lt);
+        // the curve gain and its smoother
+        double g = 1.0 / (1.0 + peak * invT);
+        g = std::min (1.0, g + bend * g * g * (1.0 - g));
+        const double co = g < s ? aC : relT[at (q)] * pdrT[at (std::min (s, q))];
+        s = (s - g) * co + g;
+        q = (q - s) * (s < q ? qF : qR) + s;
+        const double G = std::min ((1.0 - a) * s + a, st.limiter ? lim : 1e9);
+        // two boxcars (exact running sums in fixed point)
+        const auto gi = (std::int64_t) std::llround (std::min (G, 64.0) * renFix);
+        sum1 += gi - b1[(std::size_t) p1];
+        b1[(std::size_t) p1] = gi;
+        if (++p1 == boxA) p1 = 0;
+        const auto m1 = (std::int64_t) std::llround ((double) sum1 / boxA);
+        sum2 += m1 - b2[(std::size_t) p2];
+        b2[(std::size_t) p2] = m1;
+        if (++p2 == boxB) p2 = 0;
+        const double Gs = (double) sum2 * invB / renFix;
+        minG = std::min (minG, Gs);
+        maxG = std::max (maxG, Gs);
+        // the audio (wet and dry) delayed by the window
+        const float xl = dl[(std::size_t) dp], xr = dr[(std::size_t) dp];
+        dl[(std::size_t) dp] = l[i];
+        dr[(std::size_t) dp] = r[i];
+        if (++dp == win) dp = 0;
+        wetG = (wetG - wetT) * mC + wetT;
+        dryG = (dryG - dryT) * mC + dryT;
+        const double w = makeup * Gs * wetG + dryG;
+        l[i] = (float) (xl * w);
+        r[i] = (float) (xr * w);
+    }
+    const double redDb = minG < 1.0 ? -gainToDb (minG) : 0.0, boostDb = maxG > 1.0 ? gainToDb (maxG) : 0.0;
+    last = (float) redDb;
+    change = (float) (boostDb > redDb ? boostDb : -redDb);
 }
 } // namespace progcomp
 } // namespace lynx::vmatch

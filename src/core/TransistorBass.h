@@ -81,6 +81,31 @@ namespace tbseq
 {
 constexpr int length = 100, sequencer = 101, firstStep = 110, steps = 16;
 }
+// FL's program row (round 190mc, GitHub discussion #202; the plugin's form TSynthEditorForm: ProgramAutoFollowCheckBox,
+// ProgramDigiWheel, PatternDigiWheel + PatternNameEdit, PatternTransposeDigiWheel, ParamPatchDigiWheel + ParamPatchNameEdit,
+// the two "shared" indicators, ReadPatternBtn / WritePatternBtn): parameters after the sequence's — the program shown and
+// played (0…127, FL shows its key: 60 = C5), AF (the page follows the notes' programs), and the shown program's
+// sequence number, sequence transpose (−48…48) and patch number (0…127, FL shows 1…128).
+namespace tbprog
+{
+constexpr int program = 102, follow = 103, sequence = 104, transpose = 105, patch = 106;
+}
+// The names of the 128 patches and sequences and how many programs use each (FL's right-click lists and its "shared"
+// indicators), and whether the shown program's working patch differs from its stored copy (FL lights WRITE)
+struct TransistorBassBank
+{
+    std::array<std::string, 128> patches, sequences;
+    std::array<int, 128> patchUsers {}, sequenceUsers {};
+    int program = 0, patch = 0, sequence = 0;
+    bool edited = false;
+};
+std::optional<TransistorBassBank> transistorBassBank (const std::vector<std::uint8_t>& state);
+// FL's READ (the stored patch back into the working copy) and WRITE (the working copy stored) for the shown program's
+// patch; false when the state can't be read
+bool transistorBassReadPatch (std::vector<std::uint8_t>& state);
+bool transistorBassWritePatch (std::vector<std::uint8_t>& state);
+// FL's name fields: renames patch / sequence `index` (both copies of a patch), in place (the state grows or shrinks)
+bool transistorBassRename (std::vector<std::uint8_t>& state, bool patch, int index, const std::string& name);
 // Clear (gates, slides and accents off, notes C5) or move every step an octave (±1) — FL's CLEAR and octave buttons;
 // false when the state can't be read
 bool transistorBassClearSequence (std::vector<std::uint8_t>& state);
