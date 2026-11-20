@@ -125,7 +125,8 @@ TEST (donate190fq_test_and_ci_runs_never_count_or_show)
     CHECK (donate190fq::count (main, "startSupportNote();") == 1);
     const auto after = main.find ("void startAfterWindow (bool offerSetupWizard)");
     CHECK (after != std::string::npos && main.find ("startSupportNote();", after) < main.find ("void startSupportNote()", after));
-    CHECK (donate190fq::count (main, "startAfterWindow (false);") == 1); // no splash
+    // no splash (round 190np: that path offers the first-run welcome card only under --demo, which has no splash)
+    CHECK (donate190fq::count (main, "startAfterWindow (false);") + donate190fq::count (main, "startAfterWindow (lynx::demo::active());") == 1);
     CHECK (donate190fq::count (main, "startAfterWindow (true);") >= 1);  // the splash's landing
     CHECK (main.find ("lynx::supportnote::quietEnvironment (lynx::platform::testMode(), env (\"CI\"), env (\"GITHUB_ACTIONS\"), env (\"LYNX_NO_SUPPORT_NOTE\"))")
            != std::string::npos);
