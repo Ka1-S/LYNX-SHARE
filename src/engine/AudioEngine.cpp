@@ -6978,6 +6978,13 @@ void AudioEngine::markCreatedNow()
         song.info.created = (double) juce::Time::currentTimeMillis() / 1000.0;
 }
 
+void AudioEngine::markCreatedFrom (const juce::File& file)
+{
+    if (song.info.created <= 0.0)
+        if (const auto born = platform::fileBirthSeconds (file); born > 0.0)
+            song.info.created = born;
+}
+
 void AudioEngine::pumpGrossBeatPicks()
 {
     std::vector<std::pair<AutomationTarget, float>> changes;

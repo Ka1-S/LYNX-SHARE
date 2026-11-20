@@ -60,4 +60,9 @@ juce::File useOwnTempFolder (const juce::String& prefix);
 // limit; the kernel checks it whenever the stack grows). The --selftest builds many AudioEngines (1.5 MB each) on the
 // main thread and came within 0.6 MB of the usual 8 MB. Does nothing elsewhere or when the limit is already higher.
 void allowMainThreadStack (std::size_t bytes);
+// When `file` was created (its birth time), in seconds since 1970 UTC; 0 when the file system does not keep one or the
+// file is missing (issue #231, round 190ns: Project info › Created of a project saved without a date). Windows: the
+// creation time; macOS: st_birthtime; Linux: statx's STATX_BTIME (ext4, Btrfs, XFS, tmpfs keep it; JUCE's
+// getCreationTime gives st_ctime there, the last change of the file's inode).
+double fileBirthSeconds (const juce::File& file);
 } // namespace lynx::platform

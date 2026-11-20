@@ -240,6 +240,9 @@ public:
     double workSecondsNow() const;
     void resetWorkTime();  // Project info › "Reset working time": created = now, working time 0, the clock restarts
     void markCreatedNow(); // a new project: Project info › created = now (when it has no date yet)
+    // issue #231 (round 190ns): a project without a date takes `file`'s creation date (platform::fileBirthSeconds), when the
+    // file system keeps one; nothing changes otherwise
+    void markCreatedFrom (const juce::File& file);
     // Offline render mode for the hosted plugins (setNonRealtime), around renderOffline.
     void setPluginsRenderMode (bool offline);
     // Round 190jb (owner decision: FL-exact; REA_rodada190jb): an export renders with the hosted plugin instances that

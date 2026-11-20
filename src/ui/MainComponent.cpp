@@ -7994,6 +7994,7 @@ void MainComponent::saveNewVersion()
     const auto file = folder.getChildFile (juce::String::fromUTF8 (name.c_str()) + ProjectFile::extension);
     juce::String error;
     engine.capturePluginStates();
+    engine.markCreatedNow(); // (issue #231)
     if (! ProjectFile::save (engine.getSong(), file, error, currentWindowLayout()))
     {
         juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not save"), error);
@@ -8366,6 +8367,7 @@ void MainComponent::saveToNewProjectFolder()
         const auto file = folder.getChildFile (name + ProjectFile::extension);
         juce::String error;
         self.engine.capturePluginStates();
+        self.engine.markCreatedNow(); // (issue #231)
         if (! ProjectFile::save (self.engine.getSong(), file, error, self.currentWindowLayout()))
         {
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not save"), error);
@@ -8532,7 +8534,10 @@ void MainComponent::openStartupProject()
             break;
     }
     if (defaultTemplate().isLynxDefault())
+    {
+        engine.markCreatedNow(); // issue #231: the start-up song is a new project, started now (FL dates every new one)
         return; // (the start-up song is LYNX's default already)
+    }
     bool missing = false;
     auto song = makeDefaultTemplateProject (&missing);
     if (missing)
@@ -8953,6 +8958,9 @@ void MainComponent::openLynxProject (const juce::File& file, bool withoutPlugins
         engine.setSong (std::move (*song));
     }
     currentFile = file;
+    // issue #231 (round 190ns): a project saved without a date (the start-up song before 0.1.31) shows the file's
+    // creation date as Project info › Created, kept by the next save
+    engine.markCreatedFrom (file);
     importedFlpFile = juce::File();
     projectName = file.getFileNameWithoutExtension();
     // round 190lo (LYNX extra, off by default): clips with polyphonic note edits get their analysis ready in the background
@@ -9554,6 +9562,7 @@ void MainComponent::save (bool askForFile, std::function<void()> afterSaved)
         juce::String error;
         engine.capturePluginStates(); // plugin state lives in the plugins; copy it before saving
         keepOverwrittenCopy (file);   // the version this save replaces goes to the backup folder (like FL)
+        engine.markCreatedNow();      // issue #231: every saved project carries Project info › Created (FL's "started on")
 
         if (ProjectFile::save (engine.getSong(), file, error, currentWindowLayout()))
         {
