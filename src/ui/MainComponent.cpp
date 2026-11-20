@@ -1,4 +1,7 @@
 #include "ui/ControllerBridge.h"
+#include "ui/KeyFocus.h"
+#include "ui/TrackIcons.h"
+#include "core/EscClose.h"
 #include "core/DetailChain.h"
 #include "core/MeterScale.h"
 #include "core/FactoryContent.h"
@@ -942,6 +945,18 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     hintBar.setHint ({ idleHint(), {}, false, false });
     setWantsKeyboardFocus (true);
     installDialogTextFocus(); // dialogs open with their text field focused (round 165q)
+    // issue #218 (round 190ng): the toolbar's drop-downs (Pattern, snap) never keep the PC keyboard; any drop-down or button
+    // of this window or a panel window that gets it hands it back (ui/KeyFocus.h)
+    // (LYNX_FIX218=0: as before, for the before / after check of --focus218shot190ng)
+    if (juce::SystemStats::getEnvironmentVariable ("LYNX_FIX218", "1") != "0")
+    {
+        for (auto* box : std::initializer_list<juce::Component*> { &patternBox, &gridBox })
+        {
+            box->setWantsKeyboardFocus (false);
+            box->setMouseClickGrabsKeyboardFocus (false);
+        }
+        ui::keyfocus::install (*this);
+    }
     if (startupMark != nullptr) startupMark ("main window: toolbar, menus, controllers");
     setSize (1180, 642);
     startTimerHz (30);
@@ -1072,6 +1087,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
 MainComponent::~MainComponent()
 {
+    ui::keyfocus::uninstall (*this); // (round 190ng)
     EffectsPanel::onHotSwapSlot = nullptr; // (round 190ce: it calls this window)
     if (pluginDatabaseWatcher != nullptr) // (round 190mf: nobody watches the folder any more)
         quickpick::setPluginDatabaseWatched (false);
@@ -2032,6 +2048,10 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     }
     const auto pianoKeys = typingPiano && ! isPlainKey (chord); // (a FREE plain key is a shortcut as with the piano off)
 
+    // issue #218 (round 190ng): Esc gives the keys back when a drop-down or button holds them (ui/KeyFocus.h)
+    if (key.isKeyCode (juce::KeyPress::escapeKey) && ! key.getModifiers().isAnyModifierKeyDown() && ui::keyfocus::releaseOnEscape (*this))
+        return true;
+
     // round 190ce: Esc ends hot-swap (the reference's key for it) before it means anything else
     if (key.isKeyCode (juce::KeyPress::escapeKey) && ! key.getModifiers().isAnyModifierKeyDown() && browser.isHotSwapping())
     {
@@ -2082,6 +2102,15 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     // 4. the key map
     if (const auto action = keyMap.find (chord, focusContext(), pianoKeys); ! action.empty() && runAction (action))
         return true;
+
+    // issue #217 (round 190ng): Esc that nothing above used closes the focused panel, as FL 2026 (core/EscClose.h)
+    if (key.isKeyCode (juce::KeyPress::escapeKey) && ! key.getModifiers().isAnyModifierKeyDown() && focused != Panel::browser
+        && escclose::closesPanel (escclose::enabled(), layoutStyle == layoutstyle::Style::pattern, panelShown))
+    {
+        workspace.hide (focused);
+        refreshPanelButtons();
+        return true;
+    }
 
     // 5. issue #182: in the Browser, a typed character no key above took jumps to the row that starts with it (the
     // typing piano, FL's L / R and the hot-swap Q keep their keys)
@@ -2215,6 +2244,14 @@ bool MainComponent::runAction (const std::string& id)
         if (! target.active())
             return false;
         toggleHotSwap (target);
+        return true;
+    }
+    // issue #219 (round 190ng): the main snap on / off (FL's Backspace in the Playlist and the Piano roll; any key the user
+    // gives "snap.toggle" from any window)
+    if (id == "playlist.snapToggle" || id == "pianoRoll.snapToggle" || id == "snap.toggle")
+    {
+        EditorGlobals::get().toggleGrid();
+        snapToggleButton.setToggleState (EditorGlobals::get().getGridOption() != grid::noneOption, juce::dontSendNotification);
         return true;
     }
     if (id == "rack.follow")
@@ -2473,6 +2510,20 @@ bool MainComponent::runAction (const std::string& id)
     {
         if (const auto c = engine.getSelectedChannel(); c >= 0 && c < (int) engine.getSong().channels.size())
             rack.rename (c);
+    }
+    else if (is ("rack.changeIcon")) // issue #220 (round 190ng): F3, the icon picker of the selected channel
+    {
+        if (const auto c = engine.getSelectedChannel(); c >= 0 && c < (int) engine.getSong().channels.size())
+        {
+            const auto mouse = juce::Desktop::getMousePosition();
+            ui::showTrackIconPicker ({ mouse.x, mouse.y, 1, 1 }, engine.getSong().channels[(std::size_t) c].icon, [this, targets = engine.getSelectedChannels(), c] (int icon) {
+                engine.editSong ([targets, c, icon] (Song& s) {
+                    for (const auto t : targets.empty() ? std::vector<int> { c } : targets)
+                        if (t >= 0 && t < (int) s.channels.size())
+                            s.channels[(std::size_t) t].icon = icon;
+                });
+            });
+        }
     }
     else if (is ("rack.rotateLeft")) rack.rotateSelected (-1);
     else if (is ("rack.rotateRight")) rack.rotateSelected (1);
@@ -6838,8 +6889,9 @@ void MainComponent::setControlHints()
     ui::setHint (tapTempoButton, with (tr ("Tempo tapper: tap the beat to set the tempo"), "view.tempoTapper"));
     ui::setHint (typingPianoButton, with (tr ("Typing keyboard to piano: Z..M and Q..P play the selected channels; letter shortcuts pause"),
                                           "view.typingPiano"));
-    ui::setHint (snapToggleButton, tr ("Snap (magnet): [LMB] turns the snap off and back on (as [Backspace]); lit while it snaps. "
-                                       "The Playlist and Piano Roll snap boxes show the same magnet"));
+    ui::setHint (snapToggleButton, with (tr ("Snap (magnet): [LMB] turns the snap off and back on; lit while it snaps. "
+                                             "The Playlist and Piano Roll snap boxes show the same magnet"),
+                                         "playlist.snapToggle")); // (round 190ng, issue #219: the key from the key map)
     ui::setHint (gridBox, tr ("Global snap: the grid of the Piano Roll and Playlist (when they follow it) and the quantise of recorded notes  "
                               "[LMB] choose  [Wheel] step  [RMB] length of new notes  [Backspace] snap on/off  [Alt] while dragging: no snap"),
                  true);

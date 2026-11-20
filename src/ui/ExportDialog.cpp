@@ -1,6 +1,8 @@
 #include "ui/ExportDialog.h"
 
 #include "core/PatternBlocks.h"
+#include "core/ExportNaming.h"
+#include "core/ProjectKey.h"
 #include "core/MessageThreadOwned.h"
 #include "core/PlaylistOps.h"
 #include "core/PickerSelection.h"
@@ -555,6 +557,29 @@ public:
         warningLabel.setMinimumHorizontalScale (0.7f);
         addAndMakeVisible (warningLabel);
 
+        // issue #215 (round 190ng): the file name with wildcards (core/ExportNaming.h), the list to click, the name it gives
+        naming = clip == nullptr;
+        settingsui::styleLabel (nameLabel, tr ("File name"));
+        nameEditor.setFont (theme::font (theme::type::body));
+        nameEditor.setIndents (6, 0);
+        nameEditor.setJustification (juce::Justification::centredLeft);
+        nameEditor.setTextToShowWhenEmpty (exportnaming::defaultTemplate, theme::colour::textSecondary);
+        nameEditor.setTooltip (tr ("The exported file's name. Wildcards such as $project, $date or $bpm are filled in when you export"));
+        nameEditor.onTextChange = [this] {
+            options.nameTemplate = nameEditor.getText().toStdString();
+            refreshName();
+        };
+        wildcardButton.setButtonText (tr ("Wildcards"));
+        wildcardButton.setTooltip (tr ("Insert a wildcard at the cursor"));
+        wildcardButton.onClick = [this] { showWildcards(); };
+        namePreview.setFont (theme::font (theme::type::small));
+        namePreview.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        namePreview.setMinimumHorizontalScale (0.7f);
+        for (auto* c : std::initializer_list<juce::Component*> { &nameLabel, &nameEditor, &wildcardButton, &namePreview })
+            addChildComponent (c);
+        for (auto* c : std::initializer_list<juce::Component*> { &nameLabel, &nameEditor, &wildcardButton, &namePreview })
+            c->setVisible (naming);
+
         exportButton.setColour (juce::TextButton::buttonColourId, theme::colour::accent);
         exportButton.setColour (juce::TextButton::textColourOffId, theme::colour::onAccent);
         addAndMakeVisible (exportButton);
@@ -614,6 +639,13 @@ public:
             options.stemsIncludeMaster = true;
             options.normalize = true;
         }
+        writeControls();
+    }
+
+    // --issues190ngshot (issue #215): the stems choice (0 one file, 1 per insert)
+    void setStemsForSnapshot (int stems)
+    {
+        options.stems = (exportopts::Stems) juce::jlimit (0, 3, stems);
         writeControls();
     }
 
@@ -708,6 +740,18 @@ public:
             realtimeToggle.setBounds (mix.removeFromTop (24));
         }
         area.removeFromBottom (6);
+        if (naming) // issue #215 (round 190ng): the file name row and the name it gives, above the Mix switches
+        {
+            auto block = area.removeFromBottom (namingHeight);
+            block.removeFromTop (6);
+            auto row = block.removeFromTop (26);
+            nameLabel.setBounds (row.removeFromLeft (theme::labelColumnWidth ({ &nameLabel }, 92, 150)));
+            wildcardButton.setBounds (row.removeFromRight (juce::jlimit (96, 160, wildcardButton.getBestWidthForHeight (26))));
+            row.removeFromRight (8);
+            nameEditor.setBounds (row);
+            block.removeFromTop (2);
+            namePreview.setBounds (block.removeFromTop (18).withTrimmedLeft (nameLabel.getWidth()));
+        }
         columnsBottom = area.getBottom();
 
         auto left = area.removeFromLeft ((area.getWidth() - 24) / 2);
@@ -851,7 +895,8 @@ private:
     }
     int columnsBottom = 0;
     static constexpr int presetRowHeight = 26 + 14;
-    int wantedHeight() { return 12 + (additions ? presetRowHeight : 0) + columnsHeight() + 6 + mixHeight() + 8 + 32 + 12; }
+    static constexpr int namingHeight = 6 + 26 + 2 + 18 + 4; // (round 190ng: the file name row)
+    int wantedHeight() { return 12 + (additions ? presetRowHeight : 0) + columnsHeight() + 6 + (naming ? namingHeight : 0) + mixHeight() + 8 + 32 + 12; }
 
     // ---- round 190ap: presets and "same as last time" ------------------------------------------------------------
     void fillPresets (const juce::String& select)
@@ -1051,8 +1096,118 @@ private:
         playlistMarkersToggle.setToggleState (options.playlistMarkers, n);
         for (int i = 0; i < exportopts::formatCount; ++i)
             alsoToggles[(std::size_t) i].setToggleState (i == (int) options.format || (options.moreFormats & (1u << i)) != 0, n);
+        nameEditor.setText (juce::String::fromUTF8 (options.nameTemplate.c_str()), n);
         refresh();
+        refreshName();
     }
+
+    // ---- issue #215 (round 190ng): the file name's wildcards ----------------------------------------------------------
+    // the folder the file dialog opens in (and where $take looks)
+    juce::File exportFolder() const
+    {
+        return lastFolder.isDirectory() ? lastFolder
+               : suggestedFolder.isDirectory() ? suggestedFolder
+                                               : juce::File::getSpecialLocation (juce::File::userMusicDirectory);
+    }
+
+    exportnaming::Context namingContext() const
+    {
+        using namespace exportopts;
+        const auto& song = engine.getSong();
+        exportnaming::Context c;
+        c.project = suggestedName.toStdString();
+        const auto now = nowForNaming != juce::Time() ? nowForNaming : juce::Time::getCurrentTime();
+        c.year = now.getYear();
+        c.month = now.getMonth() + 1;
+        c.day = now.getDayOfMonth();
+        c.hour = now.getHours();
+        c.minute = now.getMinutes();
+        c.second = now.getSeconds();
+        c.bpm = song.bpm;
+        if (const auto key = projectkey::get (song))
+        {
+            const auto scale = projectkey::shortScaleName (key->flScale);
+            c.key = projectkey::rootName (key->root) + (scale.empty() ? std::string() : " " + scale);
+        }
+        c.sampleRate = (int) options.sampleRate;
+        switch (options.format)
+        {
+            case Format::wav: c.bitDepth = std::to_string (options.wavBits) + "bit"; break;
+            case Format::flac: c.bitDepth = std::to_string (options.flacBits) + "bit"; break;
+            case Format::aiff: c.bitDepth = std::to_string (options.aiffBits) + "bit"; break;
+            case Format::mp3: c.bitDepth = std::to_string (options.mp3Kbps) + "kbps"; break;
+            case Format::ogg: c.bitDepth = std::to_string (options.oggKbps) + "kbps"; break;
+            case Format::aac: c.bitDepth = std::to_string (options.aacKbps) + "kbps"; break;
+            default: break;
+        }
+        c.format = formatName (options.format);
+        if (song.currentPattern >= 0 && song.currentPattern < (int) song.patterns.size())
+            c.pattern = song.patterns[(std::size_t) song.currentPattern].name;
+        const auto folder = exportFolder();
+        const auto ext = juce::String (extension (options.format));
+        c.exists = [folder, ext] (const std::string& name) { return folder.getChildFile (juce::String::fromUTF8 (name.c_str()) + ext).exists(); };
+        return c;
+    }
+
+    // the name the template gives (without extension); with stems, "$track" stays for each stem's file
+    juce::String resolvedName() const
+    {
+        const auto stems = options.stems != exportopts::Stems::none;
+        return juce::String::fromUTF8 (exportnaming::resolve (options.nameTemplate, namingContext(), stems).c_str());
+    }
+
+    void refreshName()
+    {
+        if (! naming)
+            return;
+        const auto ext = juce::String (exportopts::extension (options.format));
+        auto text = tr ("File:") + " " + resolvedName() + ext;
+        if (options.stems != exportopts::Stems::none)
+        {
+            const auto base = resolvedName().toStdString();
+            const auto example = juce::String::fromUTF8 (exportopts::stemFileName (base, 1, "Kick", exportopts::extension (options.format)).c_str());
+            text = tr ("Stems:") + " " + example + ", ...";
+        }
+        namePreview.setText (text, juce::dontSendNotification);
+        namePreview.setTooltip (text);
+    }
+
+    void showWildcards()
+    {
+        juce::PopupMenu menu;
+        menu.addSectionHeader (tr ("Wildcards"));
+        int id = 1;
+        for (const auto& w : exportnaming::wildcards)
+        {
+            const auto token = juce::String (std::string (w.token));
+            menu.addItem (id++, token + "   " + tr (juce::String (std::string (w.meaning))));
+        }
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&wildcardButton), [safe = juce::Component::SafePointer<ExportPanel> (this)] (int chosen) {
+            if (safe != nullptr && chosen > 0 && chosen <= (int) std::size (exportnaming::wildcards))
+                safe->insertWildcard (juce::String (std::string (exportnaming::wildcards[(std::size_t) chosen - 1].token)));
+        });
+    }
+
+public:
+    void insertWildcard (const juce::String& token)
+    {
+        nameEditor.insertTextAtCaret (token);
+        options.nameTemplate = nameEditor.getText().toStdString();
+        refreshName();
+    }
+    // --issues190ngshot: the template typed, a fixed time, the name shown
+    void setNameTemplateForSnapshot (const juce::String& templ, juce::Time now)
+    {
+        nowForNaming = now;
+        nameEditor.setText (templ, juce::sendNotification);
+        options.nameTemplate = templ.toStdString();
+        refreshName();
+    }
+    juce::String namePreviewForSnapshot() const { return namePreview.getText(); }
+    juce::String resolvedNameForSnapshot() const { return resolvedName(); }
+    juce::Component& wildcardButtonForSnapshot() { return wildcardButton; }
+
+private:
 
     void readControls()
     {
@@ -1066,6 +1221,8 @@ private:
         options.stems = (Stems) juce::jmax (0, stemsBox.getSelectedItemIndex());
         options.stemsIncludeMaster = stemsMaster.getToggleState();
         options.sections = additions && sectionsToggle.getToggleState();
+        if (naming) // (round 190ng)
+            options.nameTemplate = nameEditor.getText().toStdString();
         options.format = (Format) formatButtons.getSelected();
         if (options.format == previousFormat)
         {
@@ -1123,6 +1280,7 @@ private:
     void refresh()
     {
         using namespace exportopts;
+        refreshName(); // (round 190ng: the name follows the format, rate, stems...)
         // the depth list: FLAC and AIFF have no float
         depthBox.setItemEnabled (3, options.format == Format::wav);
         tailLengthBox.setEnabled (options.tail != TailMode::cut);
@@ -1290,11 +1448,10 @@ private:
             }
         }
 
-        auto folder = lastFolder.isDirectory() ? lastFolder
-                      : suggestedFolder.isDirectory() ? suggestedFolder
-                                                      : juce::File::getSpecialLocation (juce::File::userMusicDirectory);
-
-        chooser = lynx::ui::makeFileChooser (tr ("Export audio"), folder.getChildFile (suggestedName + extension), "*" + extension);
+        auto folder = exportFolder();
+        // issue #215 (round 190ng): the name the template gives ("$project" = the project's name, as before)
+        const auto name = naming ? resolvedName() : suggestedName;
+        chooser = lynx::ui::makeFileChooser (tr ("Export audio"), folder.getChildFile (name + extension), "*" + extension);
         lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
                               [this, extension] (const juce::FileChooser& fc) {
                                   auto file = fc.getResult();
@@ -1400,6 +1557,12 @@ private:
     juce::Label infoLabel, warningLabel;
     juce::TextButton exportButton { tr ("Export...") }, cancelButton { tr ("Cancel") };
     std::unique_ptr<juce::FileChooser> chooser;
+    // issue #215 (round 190ng): the file name with wildcards
+    bool naming = false;
+    juce::Label nameLabel, namePreview;
+    juce::TextEditor nameEditor;
+    juce::TextButton wildcardButton;
+    juce::Time nowForNaming; // (--issues190ngshot: a fixed time; else now)
 
     static inline juce::File lastFolder;
 };
@@ -2353,6 +2516,18 @@ std::unique_ptr<juce::Component> makeExportPanel (AudioEngine& engine, int forma
 {
     auto panel = std::make_unique<ExportPanel> (engine, juce::File(), "LYNX SHARE", false);
     panel->setFormatForSnapshot (format);
+    return panel;
+}
+
+std::unique_ptr<juce::Component> makeExportPanelWithName (AudioEngine& engine, const juce::String& projectName, const juce::String& templ, juce::Time now,
+                                                          juce::String& preview, juce::String& resolved, int stems)
+{
+    auto panel = std::make_unique<ExportPanel> (engine, juce::File(), projectName, false);
+    panel->setFormatForSnapshot (0);
+    panel->setStemsForSnapshot (stems);
+    panel->setNameTemplateForSnapshot (templ, now);
+    preview = panel->namePreviewForSnapshot();
+    resolved = panel->resolvedNameForSnapshot();
     return panel;
 }
 

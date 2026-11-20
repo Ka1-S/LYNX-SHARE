@@ -107,6 +107,10 @@ inline constexpr Item items[] = {
     { "detail.selectInMixer", TR_NOOP ("Device view"), TR_NOOP ("Selecting a device selects its insert in the Mixer"),
       TR_NOOP ("The Mixer follows the device picked in the Device view. Also in the Device view's options menu."),
       "ui-options.txt:detailExtraSelectInMixer" },
+    // round 190ng (issue #217): FL 2026 closes the focused window on Esc; the one LYNX extra that is on by default as FL is
+    { "general.escCloses", TR_NOOP ("Windows"), TR_NOOP ("Esc closes the focused window"),
+      TR_NOOP ("As in FL Studio, on by default: Esc closes the focused Playlist, Channel rack, Piano roll or Mixer (Pattern layout) and plugin and tool windows. While the Playlist or the Piano roll has a selection, the first Esc clears it. Off: Esc leaves the windows open. Also on the General page."),
+      "ui-options.txt:escClosesWindows" },
     { "midi.gamepad", TR_NOOP ("Controllers"), TR_NOOP ("Use a game controller"),
       TR_NOOP ("A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page."),
       "midi-settings.txt:gamepad" },

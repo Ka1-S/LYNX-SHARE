@@ -1,3 +1,4 @@
+#include "core/EscClose.h"
 #include "ui/WindowOwner.h"
 #include "core/HostKeyGate.h"
 #include "ui/NativeChild.h"
@@ -761,6 +762,8 @@ struct SecondaryKeyForwarder final : juce::KeyListener
 // only an Esc nothing in the window used closes it. Async: the window may delete itself in closeButtonPressed.
 bool closeOnEscape (juce::Component* window)
 {
+    if (! escclose::enabled()) // (issue #217, round 190ng: the switch that keeps windows open on Esc)
+        return false;
     auto* doc = dynamic_cast<juce::DocumentWindow*> (window);
     if (doc == nullptr || ! doc->isVisible())
         return false;

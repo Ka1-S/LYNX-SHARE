@@ -3127,7 +3127,7 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
     });
     menu.addItem (tr ("Graph editor") + "\tCtrl+K", true, graphLanes, [this] { toggleGraphLanes(); });
     menu.addSeparator();
-    menu.addItem (theme::mnemonic (tr ("Rename and color..."), 'R') + "\tF2", [this, channel] { rename (channel); });
+    menu.addItem (theme::mnemonic (tr ("Rename, color and icon..."), 'R') + "\tF2", [this, channel] { rename (channel); }); // (FL's text, round 190ng)
     menu.addSubMenu (tr ("Change color"), ui::colourMenu (c.colour, [this, channel] (std::uint32_t colour) {
                          if (channel < (int) engine.getSong().channels.size())
                              engine.editSong ([channel, colour] (Song& s) { s.channels[(std::size_t) channel].colour = colour; });
@@ -3694,13 +3694,16 @@ void ChannelRackComponent::rename (int channel)
     const auto& c = engine.getSong().channels[(std::size_t) channel];
     // issue #201 (round 190ll, core/SelectionRename.h): a new colour goes to every selected channel (the name to this one)
     const auto targets = selrename::targets (channel, engine.getSelectedChannels());
-    showNameAndColourDialog (tr ("Rename channel"), juce::String::fromUTF8 (c.name.c_str()), c.colour,
-                             [this, channel, targets, oldName = c.name, oldColour = c.colour] (const juce::String& name, std::uint32_t colour) {
-                                 if (channel < (int) engine.getSong().channels.size())
-                                     engine.editSong ([channel, targets, r = selrename::Result { oldName, name.toStdString(), oldColour, colour }] (Song& s) {
-                                         selrename::applyToChannels (s, channel, targets, r);
-                                     });
-                             });
+    // issue #220 (round 190ng): FL's "Rename, color and icon" sets the channel's icon in the same window
+    showNameColourIconDialog (tr ("Rename channel"), juce::String::fromUTF8 (c.name.c_str()), c.colour, c.icon,
+                              [this, channel, targets, oldName = c.name, oldColour = c.colour, oldIcon = c.icon] (const juce::String& name, std::uint32_t colour, int icon) {
+                                  if (channel < (int) engine.getSong().channels.size())
+                                      engine.editSong ([channel, targets, icon, oldIcon, r = selrename::Result { oldName, name.toStdString(), oldColour, colour }] (Song& s) {
+                                          selrename::applyToChannels (s, channel, targets, r);
+                                          if (icon >= 0 && icon != oldIcon && channel < (int) s.channels.size())
+                                              s.channels[(std::size_t) channel].icon = icon;
+                                      });
+                              });
 }
 
 namespace

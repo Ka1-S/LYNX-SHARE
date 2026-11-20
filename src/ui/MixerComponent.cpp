@@ -2428,7 +2428,7 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
     if (part == Part::header && e.mods.isMiddleButtonDown())
     {
         selectTrack (t);
-        runMenuItem (tr ("Rename and color..."));
+        runMenuItem (tr ("Rename, color and icon..."));
         return;
     }
 
@@ -3039,9 +3039,15 @@ void MixerStrips::deleteTracks (std::vector<int> tracks)
     auto run = [safe, tracks] (mixerops::LinkedPlaylistTracks linked) {
         if (safe == nullptr)
             return;
-        safe->engine.editSongStructural ([&tracks, linked] (Song& s) { mixerops::deleteTracks (s, tracks, linked, MixerStrips::keepLostLinks); });
-        const auto first = juce::jlimit (0, (int) safe->engine.getSong().mixer.size() - 1, *std::min_element (tracks.begin(), tracks.end()));
+        int deleted = 0;
+        safe->engine.editSongStructural ([&tracks, linked, &deleted] (Song& s) { deleted = mixerops::deleteTracks (s, tracks, linked, MixerStrips::keepLostLinks); });
+        // issue #221 (round 190ng): with only the used inserts shown, the blank insert that takes a deleted one's number
+        // stays hidden (it looked as if Del did nothing) and the selection goes to a shown insert
+        safe->revealed = mixerops::revealedAfterDelete (safe->revealed, tracks);
+        const auto first = mixerops::selectionAfterDelete (safe->engine.getSong(), safe->revealed, *std::min_element (tracks.begin(), tracks.end()),
+                                                          MixerStrips::showUsedOnly);
         safe->setSelection ({ first }, first);
+        ui::postHint ({ tr ("Deleted {0} mixer track(s)", { juce::String (deleted) }), {}, false, false }, 3000);
     };
     auto confirmed = [safe, tracks, run] {
         if (safe == nullptr)
@@ -3977,13 +3983,18 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         if (t >= (int) engine.getSong().mixer.size())
             return;
         const auto& track = engine.getSong().mixer[(std::size_t) t];
-        showNameAndColourDialog (tr ("Rename track"), juce::String::fromUTF8 (track.name.c_str()), track.colour,
-                                 [this, t, targets, oldName = track.name, oldColour = track.colour] (const juce::String& name, std::uint32_t colour) {
-                                     if (t < (int) engine.getSong().mixer.size())
-                                         engine.editSong ([t, targets, r = selrename::Result { oldName, name.trim().toStdString(), oldColour, colour }] (Song& s) {
-                                             selrename::applyToMixer (s, t, targets, r);
-                                         });
-                                 });
+        // issue #220 (round 190ng): FL's "Rename, color and icon": the icon in the same window (FL: every selected track)
+        showNameColourIconDialog (tr ("Rename track"), juce::String::fromUTF8 (track.name.c_str()), track.colour, track.icon,
+                                  [this, t, targets, oldName = track.name, oldColour = track.colour, oldIcon = track.icon] (const juce::String& name, std::uint32_t colour, int icon) {
+                                      if (t < (int) engine.getSong().mixer.size())
+                                          engine.editSong ([t, targets, icon, oldIcon, r = selrename::Result { oldName, name.trim().toStdString(), oldColour, colour }] (Song& s) {
+                                              selrename::applyToMixer (s, t, targets, r);
+                                              if (icon >= 0 && icon != oldIcon)
+                                                  for (const auto x : targets)
+                                                      if (x >= 0 && x < (int) s.mixer.size())
+                                                          s.mixer[(std::size_t) x].icon = icon;
+                                          });
+                                  });
     };
 
     // the title band in the insert's colour (FL tints the whole menu); a double-click on it renames (issue #12)
@@ -3994,7 +4005,7 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                        song.mixer[(std::size_t) t].colour != 0 ? juce::Colour (song.mixer[(std::size_t) t].colour) : juce::Colour(), rename);
 
     // FL's first section: name and colour (REA_rodada115)
-    menu.addItem (tr ("Rename and color...") + "\tF2", rename);
+    menu.addItem (tr ("Rename, color and icon...") + "\tF2", rename); // (FL's text; round 190ng: the dialog sets the icon too)
     menu.addItem (tr ("Change color..."), [this, t, targets] { // (FL: the colour selector at once)
         const auto current = engine.getSong().mixer[(std::size_t) t].colour;
         const auto mouse = juce::Desktop::getMousePosition();
@@ -8741,7 +8752,9 @@ bool MixerComponent::runAction (const std::string& id)
     else if (id == "mixer.audioEditorRecord")
         return strips.runMenuItem (tr ("Open audio editor and record"));
     else if (id == "mixer.rename") // FL's mixer menu keys (round 167k): the menu's own items
-        return strips.runMenuItem (tr ("Rename and color..."));
+        return strips.runMenuItem (tr ("Rename, color and icon..."));
+    else if (id == "mixer.changeIcon") // issue #220 (round 190ng): F3, the icon picker of the selected track(s)
+        return strips.runMenuItem (tr ("Change icon..."));
     else if (id == "mixer.soloSelected")
         return strips.runMenuItem (tr ("Solo selected track(s)"));
     else if (id == "mixer.altSoloSelected")

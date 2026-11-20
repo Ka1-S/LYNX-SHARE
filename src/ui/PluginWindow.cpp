@@ -1,3 +1,4 @@
+#include "core/EscClose.h"
 #include "ui/WindowOwner.h"
 #include "ui/PluginWindow.h"
 #include "ui/PluginPicker.h"
@@ -1960,7 +1961,7 @@ public:
 
     bool keyPressed (const juce::KeyPress& press) override
     {
-        if (press == juce::KeyPress::escapeKey) // FL closes the focused plugin window with Esc (round 170h)
+        if (press == juce::KeyPress::escapeKey && escclose::enabled()) // FL closes the focused plugin window with Esc (round 170h; #217's switch)
         {
             juce::MessageManager::callAsync ([k = key()] { closeHostOf (k); });
             return true;

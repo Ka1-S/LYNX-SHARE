@@ -5333,11 +5333,8 @@ bool PianoRollComponent::handleKey (const juce::KeyPress& key)
             return true;
     }
 
-    if (code == juce::KeyPress::backspaceKey)
-    {
-        EditorGlobals::get().toggleGrid();
-        return true;
-    }
+    // (issue #219, round 190ng: Backspace's snap on / off is the key map's playlist.snapToggle / pianoRoll.snapToggle now, so it
+    // can be given another key)
 
     if (code == juce::KeyPress::deleteKey && ! cmd) // (Ctrl+Shift+Del: pattern.delete; Ctrl+Del: pianoRoll.deleteSpace)
     {
@@ -5347,6 +5344,9 @@ bool PianoRollComponent::handleKey (const juce::KeyPress& key)
 
     if (code == juce::KeyPress::escapeKey)
     {
+        // (issue #217, round 190ng: an Esc with nothing selected is left to the main window, which closes the Piano roll as FL)
+        if (selection.empty() && timeFrom < 0)
+            return false;
         setSelection ({});
         setTimeSelection (-1, -1);
         return true;

@@ -463,6 +463,35 @@ std::vector<bool> hiddenUnusedInserts (const Song& song, const std::set<int>& ke
     return hidden;
 }
 
+std::set<int> revealedAfterDelete (const std::set<int>& revealed, std::vector<int> deleted)
+{
+    std::sort (deleted.begin(), deleted.end());
+    deleted.erase (std::unique (deleted.begin(), deleted.end()), deleted.end());
+    std::set<int> result;
+    for (const auto t : revealed)
+    {
+        if (std::binary_search (deleted.begin(), deleted.end(), t))
+            continue;
+        const auto before = (int) (std::lower_bound (deleted.begin(), deleted.end(), t) - deleted.begin());
+        result.insert (t - before);
+    }
+    return result;
+}
+
+int selectionAfterDelete (const Song& song, const std::set<int>& revealed, int firstDeleted, bool usedOnly)
+{
+    const auto count = (int) song.mixer.size();
+    if (count <= 0)
+        return 0;
+    auto t = std::clamp (firstDeleted, 0, count - 1);
+    if (! usedOnly)
+        return t;
+    for (; t > 0; --t)
+        if (revealed.count (t) > 0 || song.insertInUse (t))
+            return t;
+    return 0;
+}
+
 int removeUnusedTrailingInserts (Song& song, int keep)
 {
     int removed = 0;

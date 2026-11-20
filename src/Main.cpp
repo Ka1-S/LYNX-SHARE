@@ -209,6 +209,9 @@
 #include "ui/ExportDialog.h"
 #include "ui/QuickAddPalette.h"
 #include "ui/I18n.h"
+#include "ui/KeyFocus.h"
+#include "core/TrackIconScale.h"
+#include "core/EscClose.h"
 #include "ui/MainComponent.h"
 #include "ui/SimpleDock.h"
 #include "core/ScaleKeys.h"
@@ -3147,6 +3150,27 @@ public:
             return;
         }
 
+        // --focus218shot190ng <prefix> (round 190ng, issue #218): src/Focus218Shot190ng.inc
+        if (args.contains ("--focus218shot190ng"))
+        {
+            setApplicationReturnValue (runFocus218Shot190ng (args[args.indexOf ("--focus218shot190ng") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+        // --mixer221shot190ng <prefix> (round 190ng, issue #221): src/Mixer221Shot190ng.inc
+        if (args.contains ("--mixer221shot190ng"))
+        {
+            setApplicationReturnValue (runMixer221Shot190ng (args[args.indexOf ("--mixer221shot190ng") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+        // --issuesshot190ng <prefix> (round 190ng, issues #215, #217, #219, #220, #222): src/IssuesShot190ng.inc
+        if (args.contains ("--issuesshot190ng"))
+        {
+            setApplicationReturnValue (runIssuesShot190ng (args[args.indexOf ("--issuesshot190ng") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
         // --issueshot190mq <prefix> (round 190mq, issues #211, #212, #213): src/IssuesShot190mq.inc
         if (args.contains ("--issueshot190mq"))
         {
@@ -17465,6 +17489,9 @@ private:
 #include "IssuesShot190jz.inc" // round 190jz
 #include "IssuesShot190lw.inc" // round 190lw
 #include "IssuesShot190mq.inc" // round 190mq
+#include "Focus218Shot190ng.inc" // round 190ng (issue #218)
+#include "Mixer221Shot190ng.inc" // round 190ng (issue #221)
+#include "IssuesShot190ng.inc" // round 190ng (issues #215, #217, #219, #220, #222)
 #include "DetailsShot190kn.inc" // round 190kn
 #include "DetailsShot190ld.inc" // round 190ld
 #include "DetailsShot190lr.inc" // round 190lr

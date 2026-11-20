@@ -1,4 +1,5 @@
 #include "ui/RemoteControl.h"
+#include "core/EscClose.h"
 #include "ui/NumBox.h"
 #include "ui/SettingsPages.h"
 #include "ui/LabelFont.h"
@@ -168,7 +169,7 @@ public:
         for (auto* c : std::initializer_list<juce::Component*> { &workflowTitle, &layoutStyleLabel, &layoutStyleBox, &layoutStyleNote, &alsSessionLabel, &alsSessionBox, &languageTitle, &displayTitle, &startupTitle, &editingTitle, &backupTitle,
                                                                  &pluginsTitle, &languageLabel, &languageBox, &languageNote, &scaleLabel, &scaleBox, &menuLabel, &menuBox,
                                                                  &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &rackStepColour, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &uiAnimations, &animationLabel, &animationBox, &animationNote, &gpuRendering, &editorsInMain, &templateLabel, &templateBox, &templateNote, &startupProjectLabel, &startupProjectBox, &splash, &startupSound, &scanAtStart, &supportNoteBox, &menuEntry,
-                                                                 &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &monoPaint, &altMeterScale, &autoSelectLinked, &noTypingPriority, &hoverValues, &editInLabel, &editInBox, &undoLabel,
+                                                                 &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &monoPaint, &altMeterScale, &autoSelectLinked, &noTypingPriority, &hoverValues, &escCloses, &editInLabel, &editInBox, &undoLabel,
                                                                  &undoBox, &alternateUndo, &hintsTitle, &manageMessages, &messagesNote, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &backupQuiet, &longestWaitLabel, &longestWaitBox, &unusedTakes, &detachNew,
                                                                  &sandboxLabel, &sandboxBox, &sandboxNote, &substitutes, &substitutesNote, &sampleAccurate, &limitEditors, &managePlugins, &manageShortcuts, &shortcutsNote,
                                                                  &reportsTitle, &crashLabel, &crashBox, &crashNote, &updatesTitle, &checkUpdates, &checkNow, &updatesNote,
@@ -379,6 +380,8 @@ public:
                 [this] (bool on) { options.rememberSeek = on; });
         toggle (hoverValues, tr ("Show a control's value next to the mouse when hovering over it (LYNX)"), options.hoverValues,
                 [this] (bool on) { options.hoverValues = on; });
+        // issue #217 (round 190ng): FL 2026 closes the focused window on Esc (core/EscClose.h); the LYNX extras page has it too
+        toggle (escCloses, tr ("Esc closes the focused window"), escclose::enabled(), [] (bool on) { workflowextras::setExtra ("general.escCloses", on); });
         // LYNX extra (issue #25): FL plays a stretched pattern clip once; off = FL's behaviour
         toggle (clipsLoop, tr ("Stretched pattern clips loop their pattern (LYNX)"), options.stretchedClipsLoop,
                 [this] (bool on) { options.stretchedClipsLoop = on; });
@@ -512,7 +515,8 @@ public:
         manageMessages.onClick = [this] {
             messages::manageMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&manageMessages));
         };
-        styleNote (messagesNote, tr ("Ticked messages are shown; untick one to skip its question."));
+        // issue #221 (round 190ng): where a remembered "Remember my choice" answer is undone
+        styleNote (messagesNote, tr ("Ticked messages are shown; untick one to skip its question. A question answered with \"Remember my choice\" is unticked here: tick it, or Show all, to be asked again."));
         // FL's Hints and warnings › "Project data size warning" (round 190mr, DF-147): the size a saved project may reach
         // before LYNX warns, or "Don't warn me"
         styleLabel (dataSizeLabel, tr ("Project data size warning"));
@@ -655,7 +659,7 @@ private:
         for (auto* t : { &clickHold, &bothButtons }) // (round 190mr: FL's General › Input)
             t->setBounds (r.full (24));
         for (auto* t : { &typingPiano, &keepEditors, &autoNameChannels, &detachNew, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &monoPaint, &altMeterScale, &autoSelectLinked, &noTypingPriority,
-                         &restoreAfterSolo, &readSampleTempo, &hoverValues })
+                         &restoreAfterSolo, &readSampleTempo, &hoverValues, &escCloses })
             t->setBounds (r.full (24));
         editInBox.setBounds (r.row (editInLabel, 0));
         undoBox.setBounds (r.row (undoLabel, 120));
@@ -665,12 +669,8 @@ private:
         historyNewestFirst.setBounds (r.full (24)); // (FL's Undo history panel: its last box)
 
         r.section (hintsTitle); // FL's General › Hints and warnings (round 186c)
-        {
-            auto row = r.full();
-            manageMessages.setBounds (row.removeFromLeft (180));
-            row.removeFromLeft (12);
-            messagesNote.setBounds (row.withTrimmedTop (6));
-        }
+        manageMessages.setBounds (r.full().removeFromLeft (180));
+        messagesNote.setBounds (r.note (messagesNote, 18)); // (round 190ng: its own wrapped line under the button)
         dataSizeBox.setBounds (r.row (dataSizeLabel, 160)); // (round 190mr, DF-147)
 
         r.section (backupTitle);
@@ -889,6 +889,7 @@ private:
     juce::Label dataSizeLabel;                        // round 190mr (DF-147)
     juce::ComboBox dataSizeBox;
     juce::ToggleButton clickHold, bothButtons; // round 190mr (DE-63, DE-16)
+    juce::ToggleButton escCloses; // round 190ng (issue #217)
     juce::TextButton openBackups { tr ("Open backup folder") }, managePlugins { tr ("Plugin manager...") }, manageShortcuts { tr ("Manage shortcuts...") },
         checkNow { tr ("Check now") }, manageMessages { tr ("Manage messages") }, goBack;
     juce::Label messagesNote;

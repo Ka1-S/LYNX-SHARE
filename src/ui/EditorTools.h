@@ -153,7 +153,13 @@ juce::String describe (const Option& option);
 class IconComboBox : public juce::ComboBox
 {
 public:
-    explicit IconComboBox (Icon icon = Icon::none) : icon (icon) {}
+    explicit IconComboBox (Icon icon = Icon::none) : icon (icon)
+    {
+        // issue #218 (round 190ng): the editors' and toolbars' drop-downs are mouse-only, the PC keyboard stays with the
+        // view (Enter opened a clicked box again; ui/KeyFocus.h)
+        setWantsKeyboardFocus (false);
+        setMouseClickGrabsKeyboardFocus (false);
+    }
     void setIcon (Icon newIcon);
     Icon getIcon() const noexcept { return icon; }
     std::function<bool()> iconLit;

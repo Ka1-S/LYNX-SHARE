@@ -95,6 +95,10 @@ std::unique_ptr<juce::Component> makeExportPanel (AudioEngine& engine, int forma
 // The panel of showExportDialogForTracks (for --snapshot).
 // The panel with round 190ap's additions in use (--versionsshot): two presets, one chosen, "One file per marker section" on.
 std::unique_ptr<juce::Component> makeExportPanelWithAdditions (AudioEngine& engine);
+// --issues190ngshot (issue #215): the Export window of project `projectName` with the file name template `templ` typed at
+// time `now`, `stems` (0 one file, 1 one per insert); `preview` gets the name line it shows, `resolved` the name.
+std::unique_ptr<juce::Component> makeExportPanelWithName (AudioEngine& engine, const juce::String& projectName, const juce::String& templ, juce::Time now,
+                                                          juce::String& preview, juce::String& resolved, int stems = 0);
 std::unique_ptr<juce::Component> makeExportPanelForTracks (AudioEngine& engine, const std::vector<int>& tracks);
 // The render window of "Render as audio clip" (a pattern render: WAV, no file dialog; round 190gk's shot of FL's
 // Start button). Nothing renders.

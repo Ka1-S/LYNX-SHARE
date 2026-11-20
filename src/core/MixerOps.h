@@ -111,6 +111,16 @@ int trimUnusedTracks (Song& song, TrimUnused mode);
 // Returns one flag per insert plus one for the "+" button (never hidden). Nothing in the song changes.
 std::vector<bool> hiddenUnusedInserts (const Song& song, const std::set<int>& keep);
 
+// Issue #221 (round 190ng): "Show only used inserts" after a delete. FL keeps the count (the inserts after a deleted one
+// move one place left and a blank one comes at the end), so deleting an empty insert that "+" had brought back left a
+// blank insert under the same number, shown (it was still in the kept set and selected): Del looked like it did nothing.
+// `revealedAfterDelete`: the kept set with the deleted numbers gone and the later ones moved left as their inserts did.
+std::set<int> revealedAfterDelete (const std::set<int>& revealed, std::vector<int> deleted);
+// The insert to select after deleting from `firstDeleted` on: FL keeps the number (`usedOnly` off); with only the used
+// inserts shown, that number when its insert shows (in use or kept), else the nearest shown one before it (the Master
+// at worst), so no blank insert comes back into view.
+int selectionAfterDelete (const Song& song, const std::set<int>& revealed, int firstDeleted, bool usedOnly);
+
 // Channels whose output goes to `track`.
 std::vector<int> channelsOn (const Song& song, int track);
 

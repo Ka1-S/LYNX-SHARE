@@ -203,6 +203,8 @@ std::vector<Action> makeActions()
         // issue #201 (round 190ll): the channel menu's "Rename and color... F2" with the rack focused (a new colour goes to
         // every selected channel)
         { "rack.rename", TR_NOOP ("Rename and color the selected channel"), Context::channelRack, { chord (f2) } },
+        // issue #220 (round 190ng): F3 opens the icon picker (FL has no key for it; in FL's name dialog the icon is F5)
+        { "rack.changeIcon", TR_NOOP ("Change the selected channel's icon"), Context::channelRack, { chord (f3) } },
         { "rack.rotateLeft", TR_NOOP ("Rotate the selected channels' steps left"), Context::channelRack, { chord (left, ctrl | shift) } },
         { "rack.rotateRight", TR_NOOP ("Rotate the selected channels' steps right"), Context::channelRack, { chord (right, ctrl | shift) } },
         // FL's Channel rack (manual "Channel Rack › Filter"; round 190ld, DE-37): Page Up / Page Down = the previous / next
@@ -374,6 +376,12 @@ std::vector<Action> makeActions()
         { "playlist.tool.zoom", TR_NOOP ("Tool: Zoom"), Context::playlist, { chord ('Z') } },
         { "playlist.tool.listen", TR_NOOP ("Tool: Playback"), Context::playlist, { chord ('Y') } },
         { "playlist.tool.slip", TR_NOOP ("Tool: Slip"), Context::playlist, { chord ('S') } },
+        // issue #219 (round 190ng): FL's snap key (the main snap's hint "BkSp: Main snap", REA r168s f05), now in the key
+        // map; "snap.toggle" is the same from any window, without a key until one is given (e.g. Alt+S)
+        { "playlist.snapToggle", TR_NOOP ("Snap on/off (the main snap)"), Context::playlist, { chord (backspace) } },
+        { "playlist.changeIcon", TR_NOOP ("Change the selected tracks' icon"), Context::playlist, { chord (f3) } },
+        { "pianoRoll.snapToggle", TR_NOOP ("Snap on/off (the main snap)"), Context::pianoRoll, { chord (backspace) } },
+        { "snap.toggle", TR_NOOP ("Snap on/off, from any window (the main snap)"), Context::global, {} },
         // FL's Performance mode (round 165m; Ctrl+P on FL's Playlist menu [DFM])
         { "playlist.performanceMode", TR_NOOP ("Performance mode on/off (launch the clips before the Start marker)"), Context::playlist, { chord ('P', ctrl) } },
         { "playlist.zoomPerformance", TR_NOOP ("Zoom on the performance clips"), Context::playlist, { chord ('6', shift) }, true },
@@ -470,7 +478,8 @@ std::vector<Action> makeActions()
         { "mixer.selectLinkedChannels", TR_NOOP ("Select the channels linked to the selected insert"), Context::mixer, { chord ('L', alt) } },
         { "mixer.waveforms", TR_NOOP ("Waveforms instead of the peak meters"), Context::mixer, { chord ('W', alt) } }, // round 190lr (DF-60)
         // FL's mixer track menu keys (round 167k, the DFM's ShortCut values: F2, S, Alt+R, Shift+Alt+R)
-        { "mixer.rename", TR_NOOP ("Rename and color the selected mixer track"), Context::mixer, { chord (f2) } },
+        { "mixer.rename", TR_NOOP ("Rename, color and icon of the selected mixer track"), Context::mixer, { chord (f2) } },
+        { "mixer.changeIcon", TR_NOOP ("Change the selected mixer track's icon"), Context::mixer, { chord (f3) } },
         { "mixer.audioEditor", TR_NOOP ("Open the audio editor"), Context::mixer, { chord ('E', ctrl) } },
         { "mixer.audioEditorRecord", TR_NOOP ("Open the audio editor and record"), Context::mixer, { chord ('E', shift) } },
         { "mixer.soloSelected", TR_NOOP ("Solo the selected mixer track(s)"), Context::mixer, { chord ('S') } },

@@ -1,4 +1,5 @@
 #include <cstring>
+#include "core/TrackIconScale.h"
 #include "core/SelectionRename.h"
 #include "core/FlCurve.h"
 #include "core/DrawMode.h"
@@ -2961,6 +2962,18 @@ void PlaylistComponent::paint (juce::Graphics& g)
                     textcache::drawText (g, "+A", plus, juce::Justification::centred);
                     textRight = juce::jmin (textRight, (float) plus.getX());
                 }
+                // issue #222 (round 190ng): FL 2026 also draws a track's icon big in the middle of a tall header (captured
+                // 2026-11-19 with Alt+wheel zoom: rows 56 / 68 / 80 px none, 92 / 104 / 116 px a centred icon of half the
+                // row's height in the plate's colour x 0.85); the small icon stays where it is (core/TrackIconScale.h)
+                if (! live && ! simpleHeaders)
+                    if (const auto big = trackiconscale::bigIconSize (trackHeight, (int) plateArea.getWidth()); big > 0)
+                        if (const auto icon = trackicons::iconFor (t < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) t].icon : 0);
+                            icon != trackicons::Icon::none)
+                        {
+                            const auto box = juce::Rectangle<float> ((float) big, (float) big)
+                                                 .withCentre ({ plateArea.getCentreX(), (float) y + (float) trackHeight * 0.5f });
+                            ui::drawTrackIcon (g, icon, box, trackiconscale::shade (plate));
+                        }
                 const auto flTall = fl && trackHeight >= flTallHeader;
                 if (fl)
                 {
@@ -9679,7 +9692,7 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
     juce::PopupMenu menu;
     ui::addItemHeader (menu, tr ("Playlist track"), ! info.name.empty() ? juce::String::fromUTF8 (info.name.c_str()) : tr ("Track {0}", { juce::String (track + 1) }),
                        info.colour != 0 ? juce::Colour (info.colour) : juce::Colour());
-    menu.addItem (theme::mnemonic (tr ("Rename and color..."), 'R'), [this, track] { renameTrack (track); });
+    menu.addItem (theme::mnemonic (tr ("Rename, color and icon..."), 'R'), [this, track] { renameTrack (track); }); // (FL's text, round 190ng)
     // (issue #201, round 190ll: a colour picked here goes to every selected track when this one is among them)
     menu.addSubMenu (tr ("Change color"), ui::colourMenu (info.colour, [this, tracks = tracksForMenu (track)] (std::uint32_t colour) {
                          colourTracks (tracks, colour);
@@ -10067,12 +10080,21 @@ void PlaylistComponent::renameTrack (int track, std::function<void (Song&)> also
     const auto& tracks = engine.getSong().playlistTracks;
     const auto current = track < (int) tracks.size() ? juce::String::fromUTF8 (tracks[(std::size_t) track].name.c_str()) : juce::String();
     const auto colour = track < (int) tracks.size() ? tracks[(std::size_t) track].colour : 0u;
+    const auto oldIcon = track < (int) tracks.size() ? tracks[(std::size_t) track].icon : 0;
     // issue #201 (round 190ll, core/SelectionRename.h): a new colour goes to every selected track (the name to this one)
-    showNameAndColourDialog (tr ("Rename track"), current.isNotEmpty() ? current : tr ("Track {0}", { juce::String (track + 1) }), colour,
-                             [this, track, colour, targets = tracksForMenu (track), alsoEdit] (const juce::String& newName, std::uint32_t newColour) {
+    // issue #220 (round 190ng): FL's "Rename, color and icon": the icon in the same window, for every selected track too
+    showNameColourIconDialog (tr ("Rename track"), current.isNotEmpty() ? current : tr ("Track {0}", { juce::String (track + 1) }), colour, oldIcon,
+                             [this, track, colour, oldIcon, targets = tracksForMenu (track), alsoEdit] (const juce::String& newName, std::uint32_t newColour, int icon) {
                                  const auto name = newName.trim().toStdString();
                                  const auto together = simpleHeaders && simpletracks::kindOf (engine.getSong(), track).has_value();
-                                 engine.editSong ([track, name, newColour, together, colour, targets, alsoEdit] (Song& s) {
+                                 engine.editSong ([track, name, newColour, together, colour, targets, alsoEdit, icon, oldIcon] (Song& s) {
+                                     if (icon >= 0 && icon != oldIcon)
+                                         for (const auto t : targets)
+                                         {
+                                             if ((int) s.playlistTracks.size() <= t)
+                                                 s.playlistTracks.resize ((std::size_t) t + 1);
+                                             s.playlistTracks[(std::size_t) t].icon = icon;
+                                         }
                                      if ((int) s.playlistTracks.size() <= track)
                                          s.playlistTracks.resize ((std::size_t) track + 1);
                                      if (together) // (the Simple workflow: the track, its insert and its channel, round 184a)
@@ -12173,7 +12195,37 @@ bool PlaylistComponent::runAction (const std::string& id)
 {
     auto is = [&id] (const char* name) { return id == name; };
 
-    if (is ("playlist.zoomIn")) zoomAroundCentre (1.25);
+    if (is ("playlist.changeIcon")) // issue #220 (round 190ng): F3, the icon picker (search box first) of the selected tracks
+    {
+        auto targets = sortedTrackSelection();
+        if (targets.empty()) // (else the tracks of the selected clips)
+        {
+            for (const auto i : selection)
+                if (i >= 0 && i < (int) engine.getSong().playlist.size())
+                    targets.push_back (engine.getSong().playlist[(std::size_t) i].track);
+            std::sort (targets.begin(), targets.end());
+            targets.erase (std::unique (targets.begin(), targets.end()), targets.end());
+        }
+        if (targets.empty())
+        {
+            ui::postHint ({ tr ("Select a track first (click its header), then F3 picks its icon"), {}, false, false }, 3000);
+            return true;
+        }
+        const auto& tracks = engine.getSong().playlistTracks;
+        const auto current = targets.front() < (int) tracks.size() ? tracks[(std::size_t) targets.front()].icon : 0;
+        const auto mouse = juce::Desktop::getMousePosition();
+        ui::showTrackIconPicker ({ mouse.x, mouse.y, 1, 1 }, current, [this, targets] (int icon) {
+            engine.editSong ([targets, icon] (Song& s) {
+                for (const auto t : targets)
+                {
+                    if ((int) s.playlistTracks.size() <= t)
+                        s.playlistTracks.resize ((std::size_t) t + 1);
+                    s.playlistTracks[(std::size_t) t].icon = icon;
+                }
+            });
+        });
+    }
+    else if (is ("playlist.zoomIn")) zoomAroundCentre (1.25);
     else if (is ("playlist.zoomOut")) zoomAroundCentre (1.0 / 1.25);
     else if (is ("playlist.zoom1")) zoomToBars (1);
     else if (is ("playlist.zoom2")) zoomToBars (4);
@@ -13023,11 +13075,8 @@ bool PlaylistComponent::handleKey (const juce::KeyPress& key)
     if (pointKeyPressed (key)) // issue #207 (round 190lw): Delete / Esc / Ctrl+C / X / V on selected points
         return true;
 
-    if (code == juce::KeyPress::backspaceKey)
-    {
-        EditorGlobals::get().toggleGrid();
-        return true;
-    }
+    // (issue #219, round 190ng: Backspace's snap on / off is the key map's playlist.snapToggle / pianoRoll.snapToggle now, so it
+    // can be given another key)
 
     // round 190im (R12): Live's Split (Ctrl+E), only in the Clip-launch layout (core/SessionKeys.h; elsewhere Ctrl+E
     // stays FL's Step edit): the selected clips are cut at the time selection's edges, or at the playhead without one
@@ -13077,6 +13126,9 @@ bool PlaylistComponent::handleKey (const juce::KeyPress& key)
 
     if (code == juce::KeyPress::escapeKey)
     {
+        // (issue #217, round 190ng: an Esc with nothing selected is left to the main window, which closes the Playlist as FL)
+        if (selection.empty())
+            return false;
         setSelection ({});
         return true;
     }
