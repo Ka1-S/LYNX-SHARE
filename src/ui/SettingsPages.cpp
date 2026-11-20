@@ -512,7 +512,8 @@ public:
         manageMessages.onClick = [this] {
             messages::manageMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&manageMessages));
         };
-        styleNote (messagesNote, tr ("Ticked messages are shown; untick one to skip its question."));
+        // issue #221 (round 190ng): where a remembered "Remember my choice" answer is undone
+        styleNote (messagesNote, tr ("Ticked messages are shown; untick one to skip its question. A question answered with \"Remember my choice\" is unticked here: tick it, or Show all, to be asked again."));
         // FL's Hints and warnings › "Project data size warning" (round 190mr, DF-147): the size a saved project may reach
         // before LYNX warns, or "Don't warn me"
         styleLabel (dataSizeLabel, tr ("Project data size warning"));
@@ -665,12 +666,8 @@ private:
         historyNewestFirst.setBounds (r.full (24)); // (FL's Undo history panel: its last box)
 
         r.section (hintsTitle); // FL's General › Hints and warnings (round 186c)
-        {
-            auto row = r.full();
-            manageMessages.setBounds (row.removeFromLeft (180));
-            row.removeFromLeft (12);
-            messagesNote.setBounds (row.withTrimmedTop (6));
-        }
+        manageMessages.setBounds (r.full().removeFromLeft (180));
+        messagesNote.setBounds (r.note (messagesNote, 18)); // (round 190ng: its own wrapped line under the button)
         dataSizeBox.setBounds (r.row (dataSizeLabel, 160)); // (round 190mr, DF-147)
 
         r.section (backupTitle);

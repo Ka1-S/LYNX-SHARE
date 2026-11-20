@@ -11859,3 +11859,6 @@ countries: kr
 "Compressor's gate (the Waves RChannel stand-in) is left out: {0}" = "Compressor의 게이트(Waves RChannel 대체)는 빠집니다: {0}"
 "The Current mixer track shows as an ordinary insert: its effects no longer process the selected track: {0}" = "믹서의 현재 트랙은 일반 인서트로 표시되며, 그 이펙트는 더 이상 선택한 트랙을 처리하지 않습니다: {0}"
 "The window layout saved with the project is not restored" = "프로젝트와 함께 저장된 창 배치는 복원되지 않습니다"
+"Only Yes is remembered. Settings › General › Manage messages asks again" = "'예'만 기억됩니다. 설정 › 일반 › 메시지 관리에서 다시 묻습니다"
+"Deleted {0} mixer track(s)" = "믹서 인서트 {0}개 삭제됨"
+"Ticked messages are shown; untick one to skip its question. A question answered with \"Remember my choice\" is unticked here: tick it, or Show all, to be asked again." = "체크된 메시지는 표시됩니다. 질문을 건너뛰려면 체크를 해제하세요. \"선택 기억하기\"로 답한 질문은 여기서 체크가 해제되어 있습니다. 다시 묻게 하려면 체크하거나 모두 표시를 사용하세요."

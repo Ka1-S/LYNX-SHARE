@@ -3018,9 +3018,15 @@ void MixerStrips::deleteTracks (std::vector<int> tracks)
     auto run = [safe, tracks] (mixerops::LinkedPlaylistTracks linked) {
         if (safe == nullptr)
             return;
-        safe->engine.editSongStructural ([&tracks, linked] (Song& s) { mixerops::deleteTracks (s, tracks, linked, MixerStrips::keepLostLinks); });
-        const auto first = juce::jlimit (0, (int) safe->engine.getSong().mixer.size() - 1, *std::min_element (tracks.begin(), tracks.end()));
+        int deleted = 0;
+        safe->engine.editSongStructural ([&tracks, linked, &deleted] (Song& s) { deleted = mixerops::deleteTracks (s, tracks, linked, MixerStrips::keepLostLinks); });
+        // issue #221 (round 190ng): with only the used inserts shown, the blank insert that takes a deleted one's number
+        // stays hidden (it looked as if Del did nothing) and the selection goes to a shown insert
+        safe->revealed = mixerops::revealedAfterDelete (safe->revealed, tracks);
+        const auto first = mixerops::selectionAfterDelete (safe->engine.getSong(), safe->revealed, *std::min_element (tracks.begin(), tracks.end()),
+                                                          MixerStrips::showUsedOnly);
         safe->setSelection ({ first }, first);
+        ui::postHint ({ tr ("Deleted {0} mixer track(s)", { juce::String (deleted) }), {}, false, false }, 3000);
     };
     auto confirmed = [safe, tracks, run] {
         if (safe == nullptr)

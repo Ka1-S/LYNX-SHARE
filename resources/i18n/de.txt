@@ -11859,3 +11859,6 @@ countries: de at ch li lu
 "Compressor's gate (the Waves RChannel stand-in) is left out: {0}" = "Das Gate des Compressors (der Ersatz für Waves RChannel) entfällt: {0}"
 "The Current mixer track shows as an ordinary insert: its effects no longer process the selected track: {0}" = "Die Mixer-Spur Aktuell erscheint als gewöhnlicher Insert: ihre Effekte bearbeiten die ausgewählte Spur nicht mehr: {0}"
 "The window layout saved with the project is not restored" = "Das mit dem Projekt gespeicherte Fensterlayout wird nicht wiederhergestellt"
+"Only Yes is remembered. Settings › General › Manage messages asks again" = "Nur Ja wird gemerkt. Einstellungen › Allgemein › Meldungen verwalten fragt erneut"
+"Deleted {0} mixer track(s)" = "{0} Mixer-Insert(s) gelöscht"
+"Ticked messages are shown; untick one to skip its question. A question answered with \"Remember my choice\" is unticked here: tick it, or Show all, to be asked again." = "Angehakte Meldungen werden angezeigt; Haken entfernen, um die Rückfrage zu überspringen. Eine mit \"Meine Auswahl merken\" beantwortete Rückfrage ist hier nicht angehakt: Haken setzen oder Alle anzeigen, um wieder gefragt zu werden."

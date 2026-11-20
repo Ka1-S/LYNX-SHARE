@@ -222,6 +222,9 @@ public:
     // "mixerFollowPlaylist"; off by default): mixerops::followPlaylistGroups runs after every edit that changes them.
     static inline bool followPlaylist = false;
     bool isHidden (int track) const noexcept { return track > 0 && track < (int) hidden.size() && hidden[(std::size_t) track]; }
+    // --mixer221shot190ng (issue #221): "+" bringing back an unused insert, and the strips laid out again
+    void revealForTest (int track) { revealed.insert (track); updateSize(); selectTrack (track); }
+    void layoutForTest() { updateSize(); }
 
     // FL's "Mixer layout" (issue #52, REA round 168h; ui-options.txt "mixerLayout", per user like FL's FXViewMode):
     // the strip widths and arrangement of every mixer view (core/MixerLayout.h).

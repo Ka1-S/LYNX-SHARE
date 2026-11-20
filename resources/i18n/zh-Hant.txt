@@ -11859,3 +11859,6 @@ countries: tw hk mo
 "Compressor's gate (the Waves RChannel stand-in) is left out: {0}" = "Compressor 的門限（Waves RChannel 的替代）被省略：{0}"
 "The Current mixer track shows as an ordinary insert: its effects no longer process the selected track: {0}" = "混音器的目前軌道顯示為一般插入軌：其效果不再處理所選軌道：{0}"
 "The window layout saved with the project is not restored" = "隨專案儲存的視窗配置不會還原"
+"Only Yes is remembered. Settings › General › Manage messages asks again" = "只記住「是」。設定 › 一般 › 管理訊息 會再次詢問"
+"Deleted {0} mixer track(s)" = "已刪除 {0} 個混音插入軌"
+"Ticked messages are shown; untick one to skip its question. A question answered with \"Remember my choice\" is unticked here: tick it, or Show all, to be asked again." = "勾選的訊息會顯示；取消勾選可略過其提問。用「記住我的選擇」回答過的提問在此處為未勾選：勾選它，或使用「全部顯示」，即可再次詢問。"

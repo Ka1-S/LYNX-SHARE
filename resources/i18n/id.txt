@@ -11859,3 +11859,6 @@ countries: id
 "Compressor's gate (the Waves RChannel stand-in) is left out: {0}" = "Gate milik Compressor (pengganti Waves RChannel) dihilangkan: {0}"
 "The Current mixer track shows as an ordinary insert: its effects no longer process the selected track: {0}" = "Trek mixer Saat ini tampil sebagai insert biasa: efeknya tidak lagi memproses trek yang dipilih: {0}"
 "The window layout saved with the project is not restored" = "Tata letak jendela yang disimpan bersama proyek tidak dipulihkan"
+"Only Yes is remembered. Settings › General › Manage messages asks again" = "Hanya Ya yang diingat. Pengaturan › Umum › Kelola pesan akan bertanya lagi"
+"Deleted {0} mixer track(s)" = "{0} insert mixer dihapus"
+"Ticked messages are shown; untick one to skip its question. A question answered with \"Remember my choice\" is unticked here: tick it, or Show all, to be asked again." = "Pesan yang dicentang ditampilkan; hilangkan centang untuk melewati pertanyaannya. Pertanyaan yang dijawab dengan \"Ingat pilihan saya\" tidak dicentang di sini: centang, atau gunakan Tampilkan semua, agar ditanya lagi."

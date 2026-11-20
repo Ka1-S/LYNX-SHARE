@@ -853,6 +853,8 @@ public:
         if (m.rememberBox)
         {
             remember.setButtonText (tr ("Remember my choice"));
+            // issue #221 (round 190ng): only Yes is remembered; this says where to undo it
+            remember.setTooltip (tr ("Only Yes is remembered. Settings › General › Manage messages asks again"));
             remember.setSize (text.getWidth(), 26);
             addCustomComponent (&remember);
         }
