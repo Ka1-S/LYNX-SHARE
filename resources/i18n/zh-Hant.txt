@@ -11919,3 +11919,7 @@ countries: tw hk mo
 
 # --- round 190nq: Discord 11-18 (Missing files text for projects not from FL)
 "{0} plugin(s) will not sound as they did when the project was saved (not installed, not loaded, or without their settings): see what LYNX SHARE did with each." = "{0} 個外掛的聲音將與儲存專案時不同（未安裝、未載入或缺少設定）：請查看 LYNX SHARE 對每個外掛的處理。"
+
+# --- round 190nq: issue #225 (Mixer: Left / Right select)
+"Select the previous mixer track" = "選擇上一個混音器軌道"
+"Select the next mixer track" = "選擇下一個混音器軌道"

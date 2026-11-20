@@ -11919,3 +11919,7 @@ countries: tr
 
 # --- round 190nq: Discord 11-18 (Missing files text for projects not from FL)
 "{0} plugin(s) will not sound as they did when the project was saved (not installed, not loaded, or without their settings): see what LYNX SHARE did with each." = "{0} eklenti, proje kaydedildiğindeki gibi çalmayacak (yüklü değil, yüklenemedi veya ayarları yok): LYNX SHARE'in her biriyle ne yaptığına bakın."
+
+# --- round 190nq: issue #225 (Mixer: Left / Right select)
+"Select the previous mixer track" = "Önceki mikser kanalını seç"
+"Select the next mixer track" = "Sonraki mikser kanalını seç"

@@ -3473,6 +3473,13 @@ void MixerStrips::keepSelectionShown()
         updateSize();
 }
 
+// #225 (round 190nq): the previous / next shown mixer track (FL's Left / Right), for MixerComponent::selectTrack
+int MixerStrips::neighbourOf (int delta) const
+{
+    const auto count = (int) engine.getSong().mixer.size();
+    return mixerops::neighbourTrack (count, selected, delta, [this] (int t) { return showUsedOnly && revealed.count (t) == 0 && isHidden (t); });
+}
+
 void MixerStrips::selectTrack (int track)
 {
     selected = juce::jlimit (0, juce::jmax (0, (int) engine.getSong().mixer.size() - 1), track);
@@ -8735,6 +8742,8 @@ bool MixerComponent::runAction (const std::string& id)
         strips.moveSelected (-1);
     else if (id == "mixer.moveRight")
         strips.moveSelected (1);
+    else if (id == "mixer.selectPrevious" || id == "mixer.selectNext") // #225 (round 190nq): FL's Left / Right
+        selectTrack (strips.neighbourOf (id == "mixer.selectNext" ? 1 : -1));
     else if (id == "mixer.linkChannels")
         strips.linkSelectedChannels (false);
     else if (id == "mixer.linkChannelsFrom")

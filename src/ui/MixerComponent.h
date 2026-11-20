@@ -154,6 +154,7 @@ public:
         return track >= 0 && (side == 0 || side == 1) && i < levels.size() ? levels[i].level : 0.0f;
     }
     void selectTrack (int track);
+    int neighbourOf (int delta) const; // #225 (round 190nq): FL's Left / Right
     std::function<void (int)> onSelectionChanged;
 
     // An effect dragged from the Browser's Plugin database onto a strip (round 162): it goes into that insert.

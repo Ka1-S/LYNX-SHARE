@@ -473,6 +473,10 @@ std::vector<Action> makeActions()
         // Mixer (focused)
         { "mixer.moveLeft", TR_NOOP ("Move the selected inserts left"), Context::mixer, { chord (left, alt) } },
         { "mixer.moveRight", TR_NOOP ("Move the selected inserts right"), Context::mixer, { chord (right, alt) } },
+        // #225 (round 190nq): FL 2026 selects the previous / next mixer track with Left / Right, and with Ctrl or Shift held
+        // too (checked in FL, [SHOT] 190nq mixkeys); Alt moves the tracks (above)
+        { "mixer.selectPrevious", TR_NOOP ("Select the previous mixer track"), Context::mixer, { chord (left), chord (left, ctrl), chord (left, shift) } },
+        { "mixer.selectNext", TR_NOOP ("Select the next mixer track"), Context::mixer, { chord (right), chord (right, ctrl), chord (right, shift) } },
         { "mixer.linkChannels", TR_NOOP ("Link the selected channels to the selected insert"), Context::mixer, { chord ('L', ctrl) } },
         { "mixer.linkChannelsFrom", TR_NOOP ("Link the selected channels to inserts starting from the selected one"), Context::mixer, { chord ('L', ctrl | shift) } },
         { "mixer.selectLinkedChannels", TR_NOOP ("Select the channels linked to the selected insert"), Context::mixer, { chord ('L', alt) } },

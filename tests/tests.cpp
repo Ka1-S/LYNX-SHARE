@@ -17996,3 +17996,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Mixer221_190ngTests.inc" // round 190ng: issue #221 (Del with only the used inserts shown)
 #include "Issues190ngTests.inc" // round 190ng: issues #215, #217, #219, #220, #222
 #include "Bugs190nqTests.inc" // round 190nq: issues #229, #193, #223, #226 (bugs)
+#include "Issues190nqTests.inc" // round 190nq: issues #225, #227, #228, #230
