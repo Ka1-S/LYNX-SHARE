@@ -1496,8 +1496,25 @@ private:
         bool thenPlay = false, placed = false;
         std::size_t placedEvents = 0;
         std::vector<RecordedEvent> events;
+        // round 190mx (GitHub #198): the parameters of the track's devices moved while it records (launcher-clock ticks),
+        // written into the new clip's envelopes once it exists
+        std::vector<std::pair<AutomationWrite, std::vector<RecordedValue>>> automation;
     };
     std::vector<SlotTake> slotTakes;
+    // round 190mx: overdub's moved parameters, per track: into the clip the track plays (its envelopes)
+    struct OverdubAutomation
+    {
+        int track = -1;
+        int pattern = -1; // (the clip's pattern the write follows; a new clip starts a new write)
+        AutomationWrite write;
+        std::vector<RecordedValue> points; // launcher-clock ticks
+    };
+    std::vector<OverdubAutomation> overdubAutomation;
+    bool sessionAutomationPass = false, sessionAutomationHasUndoStep = false;
+    // the Session Record take of the track whose devices hold `target` gets the points (none: they are dropped, as Live
+    // records automation only into the clips being recorded or overdubbed)
+    void routeSessionAutomation (const AutomationTarget& target, std::vector<RecordedValue> points);
+    void commitSessionAutomation();
     std::vector<int> gridArmed;
     bool sessionOverdub = false, overdubHasUndoStep = false;
     std::vector<std::pair<int, RecordedEvent>> overdubEvents; // (track, event) not yet written

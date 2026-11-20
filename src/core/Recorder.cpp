@@ -1,4 +1,7 @@
 #include "core/Recorder.h"
+#include "core/LayoutStyle.h"
+#include "core/MidiControls.h"
+#include "core/PlaylistOps.h"
 
 #include <algorithm>
 #include <cmath>
@@ -538,29 +541,135 @@ void commitAutomationPoints (Song& song, AutomationWrite& w, std::vector<Recorde
         for (const auto& p : run)
             if (p.tick >= clip.start && p.tick < clip.end()) // an existing clip is not stretched
                 fresh.push_back ({ p.tick - clip.start + clip.offset, p.value, 0.0f });
-        if (fresh.empty())
-            continue;
-
-        const auto l0 = fresh.front().tick, l1 = fresh.back().tick;
-        const auto continuing = w.lastLocal >= 0 && w.lastLocal < l0;
-        const auto from = continuing ? w.lastLocal + 1 : l0;
-        const auto hasBefore = std::any_of (a.points.begin(), a.points.end(), [&] (const AutomationPoint& p) { return p.tick < from; });
-        const auto hasAfter = std::any_of (a.points.begin(), a.points.end(), [&] (const AutomationPoint& p) { return p.tick > l1 + 1; });
-        const auto oldAtFrom = a.valueAt ((double) from - 1.0);
-        const auto oldAfter = a.valueAt ((double) l1 + 1.0);
-
-        // what lay under the gesture is replaced; the curve before and after it stays
-        a.points.erase (std::remove_if (a.points.begin(), a.points.end(), [&] (const AutomationPoint& p) { return p.tick >= from && p.tick <= l1 + 1; }),
-                        a.points.end());
-        if (! continuing && hasBefore && from > 0)
-            a.points.push_back ({ from - 1, oldAtFrom, 0.0f });
-        a.points.insert (a.points.end(), fresh.begin(), fresh.end());
-        if (hasAfter)
-            a.points.push_back ({ l1 + 1, oldAfter, 0.0f });
-        std::stable_sort (a.points.begin(), a.points.end(), [] (const AutomationPoint& x, const AutomationPoint& y) { return x.tick < y.tick; });
-        thinAutomation (a.points, from, l1);
-        w.lastLocal = l1;
+        writeRecordedStretch (a, std::move (fresh), w);
     }
+}
+
+void writeRecordedStretch (Automation& a, std::vector<AutomationPoint> fresh, AutomationWrite& w)
+{
+    if (fresh.empty())
+        return;
+    // round 190mx (GitHub #198): a hand move sampled about 30 times a second is kept as the few points that draw the same
+    // curve within recordThinTolerance (the first and last of each batch stay, so batches join exactly)
+    thinRecordedCurve (fresh, recordThinTolerance);
+
+    const auto l0 = fresh.front().tick, l1 = fresh.back().tick;
+    const auto continuing = w.lastLocal >= 0 && w.lastLocal < l0;
+    const auto from = continuing ? w.lastLocal + 1 : l0;
+    const auto hasBefore = std::any_of (a.points.begin(), a.points.end(), [&] (const AutomationPoint& p) { return p.tick < from; });
+    const auto hasAfter = std::any_of (a.points.begin(), a.points.end(), [&] (const AutomationPoint& p) { return p.tick > l1 + 1; });
+    const auto oldAtFrom = a.valueAt ((double) from - 1.0);
+    const auto oldAfter = a.valueAt ((double) l1 + 1.0);
+
+    // what lay under the gesture is replaced; the curve before and after it stays
+    a.points.erase (std::remove_if (a.points.begin(), a.points.end(), [&] (const AutomationPoint& p) { return p.tick >= from && p.tick <= l1 + 1; }),
+                    a.points.end());
+    if (! continuing && hasBefore && from > 0)
+        a.points.push_back ({ from - 1, oldAtFrom, 0.0f });
+    a.points.insert (a.points.end(), fresh.begin(), fresh.end());
+    if (hasAfter)
+        a.points.push_back ({ l1 + 1, oldAfter, 0.0f });
+    std::stable_sort (a.points.begin(), a.points.end(), [] (const AutomationPoint& x, const AutomationPoint& y) { return x.tick < y.tick; });
+    thinAutomation (a.points, from, l1);
+    w.lastLocal = l1;
+}
+
+void thinRecordedCurve (std::vector<AutomationPoint>& points, float tolerance)
+{
+    if (points.size() < 3 || tolerance <= 0.0f)
+        return;
+    // Ramer-Douglas-Peucker on (tick, value) with the distance measured along the value axis (what is heard): a point
+    // stays when the straight line between the points kept around it misses it by more than `tolerance`
+    std::vector<char> keep (points.size(), 0);
+    keep.front() = keep.back() = 1;
+    std::vector<std::pair<std::size_t, std::size_t>> spans { { 0, points.size() - 1 } };
+    while (! spans.empty())
+    {
+        const auto [a, b] = spans.back();
+        spans.pop_back();
+        if (b <= a + 1)
+            continue;
+        const auto& pa = points[a];
+        const auto& pb = points[b];
+        const auto span = (double) (pb.tick - pa.tick);
+        auto worst = 0.0;
+        auto at = a;
+        for (auto i = a + 1; i < b; ++i)
+        {
+            const auto f = span > 0.0 ? (double) (points[i].tick - pa.tick) / span : 0.0;
+            const auto line = (double) pa.value + f * (double) (pb.value - pa.value);
+            if (const auto d = std::abs ((double) points[i].value - line); d > worst)
+            {
+                worst = d;
+                at = i;
+            }
+        }
+        if (worst > (double) tolerance)
+        {
+            keep[at] = 1;
+            spans.push_back ({ a, at });
+            spans.push_back ({ at, b });
+        }
+    }
+    std::size_t out = 0;
+    for (std::size_t i = 0; i < points.size(); ++i)
+        if (keep[i] != 0)
+            points[out++] = points[i];
+    points.resize (out);
+}
+
+bool recordsAsPatternEvents (const AutomationTarget& t) noexcept
+{
+    // (a controller's pitch wheel, pressure and CCs on a channel are not the generator's own parameters)
+    return t.kind == AutomationTargetKind::channelParam && ! midictl::isMidiParam (t.param);
+}
+
+AutomationDestination recordedAutomationDestination (bool songMode, int layoutStyle, const AutomationTarget& t) noexcept
+{
+    if (! songMode)
+        return AutomationDestination::patternEvents;
+    const auto style = (layoutstyle::Style) layoutStyle;
+    if (style == layoutstyle::Style::clipLaunch)
+        return AutomationDestination::lane;
+    if (style == layoutstyle::Style::pattern && recordsAsPatternEvents (t))
+        return AutomationDestination::patternEvents;
+    return AutomationDestination::automationClip;
+}
+
+void commitLanePoints (Song& song, AutomationWrite& w, std::vector<RecordedValue> points, std::int64_t grid, bool linear)
+{
+    std::vector<LocalPoint> ticks;
+    for (const auto& p : points)
+        ticks.push_back ({ nearestOnGrid (songTickForRecorded (song, p.tick, linear), grid), std::clamp (p.value, 0.0f, 1.0f) });
+    for (const auto& run : forwardRuns (ticks))
+    {
+        // the lane of the parameter: the one this take writes, else the track's lane for it, else a new one (empty: before
+        // its first point it holds the first value, after its last the last, as a parameter never automated before)
+        auto automation = w.automation;
+        if (automation < 0 || automation >= (int) song.automations.size() || autolanes::ownerTrack (song, automation) < 0)
+        {
+            const auto track = autolanes::trackFor (song, w.target);
+            const auto before = song.automations.size();
+            automation = autolanes::addLane (song, track, w.target, w.name, run.front().value);
+            if (automation < 0)
+                continue;
+            if (song.automations.size() > before) // (made now: no flat line of its own)
+                song.automations[(std::size_t) automation].points.clear();
+            if (automation != w.automation)
+                w.lastLocal = -1;
+            w.automation = automation;
+            w.createdByTake = false; // (a lane covers the whole song: nothing grows)
+        }
+        std::vector<AutomationPoint> fresh;
+        for (const auto& p : run)
+            fresh.push_back ({ p.tick, p.value, 0.0f });
+        writeRecordedStretch (song.automations[(std::size_t) automation], std::move (fresh), w);
+    }
+}
+
+namespace
+{
+void writeEventRuns (Song& song, int patternIndex, AutomationWrite& w, const std::vector<LocalPoint>& ticks, std::int64_t loopLength);
 }
 
 void commitEventPoints (Song& song, int patternIndex, AutomationWrite& w, std::vector<RecordedValue> points, std::int64_t loopLength,
@@ -573,7 +682,28 @@ void commitEventPoints (Song& song, int patternIndex, AutomationWrite& w, std::v
     std::vector<LocalPoint> ticks;
     for (const auto& p : points)
         ticks.push_back ({ nearestOnGrid (patternPositionForTick (song, p.tick, loopLength), grid) % loopLength, std::clamp (p.value, 0.0f, 1.0f) });
+    writeEventRuns (song, patternIndex, w, ticks, loopLength);
+}
 
+void commitClipEnvelopePoints (Song& song, int patternIndex, AutomationWrite& w, std::vector<RecordedValue> localPoints, std::int64_t length,
+                               std::int64_t grid)
+{
+    if (patternIndex < 0 || patternIndex >= (int) song.patterns.size() || localPoints.empty())
+        return;
+    length = std::max<std::int64_t> (1, length);
+    std::vector<LocalPoint> ticks;
+    for (const auto& p : localPoints)
+    {
+        const auto t = (std::int64_t) std::floor (std::max (0.0, p.tick));
+        ticks.push_back ({ nearestOnGrid (t % length, grid) % length, std::clamp (p.value, 0.0f, 1.0f) });
+    }
+    writeEventRuns (song, patternIndex, w, ticks, length);
+}
+
+namespace
+{
+void writeEventRuns (Song& song, int patternIndex, AutomationWrite& w, const std::vector<LocalPoint>& ticks, std::int64_t loopLength)
+{
     auto& pattern = song.patterns[(std::size_t) patternIndex];
     auto lane = std::find_if (pattern.events.begin(), pattern.events.end(), [&] (const PatternEvents& e) { return e.target == w.target; });
     if (lane == pattern.events.end())
@@ -611,6 +741,7 @@ void commitEventPoints (Song& song, int patternIndex, AutomationWrite& w, std::v
         w.lastLocal = l1;
     }
 }
+} // namespace
 
 void NoteRecorder::begin (std::int64_t loopLength)
 {

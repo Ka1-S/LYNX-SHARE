@@ -3,6 +3,7 @@
 #include "ui/NativeChild.h"
 #include "ui/Workspace.h"
 #include "core/DockStack.h"
+#include "core/LayoutStyle.h"
 
 #include "core/WindowFit.h"
 
@@ -1448,7 +1449,10 @@ bool dockAsChildWindow (juce::DocumentWindow& window, Workspace& area, juce::Rec
     nativechild::raiseOnAnyClick (window);
     window.setVisible (visible);
     if (visible && raise)
+    {
         window.toFront (false);
+        noteEditorRaised (window); // (issue #191: opened by a press in a panel, it stays in front of that panel)
+    }
     nativechild::raiseOverlays();
     return true;
 }
@@ -1461,7 +1465,10 @@ bool dockInMainWindow (juce::DocumentWindow& window, Workspace& area, juce::Rect
     window.addKeyListener (&editorKeys());
     window.setVisible (visible);
     if (raise)
+    {
         area.raiseEditorWindow (window);
+        noteEditorRaised (window); // (issue #191)
+    }
     else
         area.updateEditorHoles();
     return true;
@@ -1586,7 +1593,10 @@ bool dockOrKeepAbove (juce::DocumentWindow& window)
     if (nativechild::isAttached (window) || isEditorInMainWindow (window))
         return true;
     auto* area = editorDock;
-    if (area == nullptr || editorsDetached || ! nativechild::dockingEnabled() || ! area->isShowing() || ! window.isOnDesktop())
+    // issue #191: opened from a floating panel window in the Clip-launch or Simple layout, it would dock behind that
+    // window: it opens as a window of its own (above the main window, as the panel) instead
+    const auto fromFloating = layoutstyle::current() != layoutstyle::Style::pattern && openedFromFloatingPanel();
+    if (area == nullptr || editorsDetached || fromFloating || ! nativechild::dockingEnabled() || ! area->isShowing() || ! window.isOnDesktop())
     {
         keepAboveMainWindow (window);
         return false;
@@ -1620,6 +1630,92 @@ bool dockOrKeepAbove (juce::DocumentWindow& window)
     }
     listenAsDocked (window);
     return true;
+}
+
+// --- issue #191 (round 190mx): editors opened by a press in a panel stay in front of it ------------------------
+
+namespace
+{
+bool fix191On()
+{
+    static const bool on = juce::SystemStats::getEnvironmentVariable ("LYNX_FIX191", {}).trim() != "0";
+    return on;
+}
+
+struct PressRaised
+{
+    juce::Component::SafePointer<juce::Component> window;
+    juce::Time press; // the mouse-down time of the press that raised it
+};
+
+std::vector<PressRaised>& pressRaised()
+{
+    static std::vector<PressRaised> list;
+    return list;
+}
+
+// The mouse-down time of the press going on now (a button is held), if any
+std::optional<juce::Time> pressNow()
+{
+    for (const auto& source : juce::Desktop::getInstance().getMouseSources())
+        if (source.isDragging()) // (a button is down: JUCE sets its state before it sends the press)
+            return source.getLastMouseDownTime();
+    return std::nullopt;
+}
+
+bool isFloatingPanelWindow (const juce::Component* c)
+{
+    const auto* top = c != nullptr ? c->getTopLevelComponent() : nullptr;
+    return top != nullptr && top != mainWindow().getComponent() && (bool) top->getProperties().getWithDefault ("lynxPanel", false);
+}
+} // namespace
+
+void noteEditorRaised (juce::Component& window)
+{
+    if (! fix191On())
+        return;
+    const auto press = pressNow();
+    if (! press)
+        return;
+    auto& list = pressRaised();
+    // (only the current press matters: what an older press raised is forgotten)
+    std::erase_if (list, [&] (const PressRaised& r) { return r.window == nullptr || r.press != *press || r.window.getComponent() == &window; });
+    list.push_back ({ &window, *press });
+}
+
+void keepPressRaisedEditorsInFront (const juce::MouseEvent& press)
+{
+    auto& list = pressRaised();
+    if (list.empty())
+        return;
+    const auto raised = std::exchange (list, {});
+    auto any = false;
+    for (const auto& r : raised)
+    {
+        auto* w = r.window.getComponent();
+        if (w == nullptr || r.press != press.mouseDownTime || ! w->isVisible())
+            continue;
+        if (editorDock != nullptr && editorDock->hasEditorWindow (*w)) // (round 190jy: drawn by the main window)
+            editorDock->raiseEditorWindow (*w);
+        else if (nativechild::isAttached (*w))
+            w->toFront (false);
+        else
+            continue; // (a window of its own is above the panels anyway)
+        any = true;
+    }
+    if (any)
+        nativechild::raiseOverlays();
+}
+
+bool openedFromFloatingPanel()
+{
+    if (! fix191On())
+        return false;
+    const auto mouse = juce::Desktop::getInstance().getMainMouseSource();
+    const auto recentPress = mouse.isDragging() || juce::Time::getCurrentTime() - mouse.getLastMouseDownTime() < juce::RelativeTime::seconds (1.0);
+    if (recentPress)
+        return isFloatingPanelWindow (mouse.getComponentUnderMouse());
+    return isFloatingPanelWindow (juce::Component::getCurrentlyFocusedComponent());
 }
 
 void setWindowScreenPosition (juce::Component& window, juce::Point<int> screenTopLeft)

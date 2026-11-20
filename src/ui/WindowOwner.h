@@ -59,6 +59,20 @@ juce::Component* editorWindowOf (juce::Component* c);
 // window's client area).
 void setWindowScreenPosition (juce::Component& window, juce::Point<int> screenTopLeft);
 
+// Issue #191 (round 190mx): a docked editor that a mouse press in a panel opens or brings in front (the Clip-launch
+// Device View's window button acts on the press, as Live's does) stays in front of that panel. The panel raises itself
+// for the same press after the press's own handler has run (its frame hears the press after its contents), so the new
+// window ended up behind the Playlist. Docked editors call noteEditorRaised whenever they come in front; a panel's press
+// handler calls keepPressRaisedEditorsInFront right after it raised the panel: the windows raised during that same press
+// go back in front. A raise outside a press (keys, menus, a mouse-up) is not noted. LYNX_FIX191=0 turns it off (A/B).
+void noteEditorRaised (juce::Component& window);
+void keepPressRaisedEditorsInFront (const juce::MouseEvent& press);
+// Issue #191: true when the action that is opening an editor now comes from a floating (detached) panel window: the
+// mouse was pressed in one less than a second ago, or, without a recent press, the keyboard focus is in one. A docked
+// editor would open inside the main window, behind that window; the Clip-launch and Simple layouts open it as a window
+// of its own then (kept above the main window like the panel). Detached panel windows carry the property "lynxPanel".
+bool openedFromFloatingPanel();
+
 // Keys a secondary window does not use (no component in it took them) go to the main window's global shortcuts, as in
 // FL (round 165q / issue #12: Space, F12 or a user's key did nothing while the Undo history, Settings, a plugin window...
 // had the focus). keepAboveMainWindow installs the forwarding on the window; the main window sets the handler. A window

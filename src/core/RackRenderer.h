@@ -533,6 +533,8 @@ public:
     static constexpr int stopSoundChannel = -2;
 
     ProcessTimes& processTimes() noexcept { return *times; }
+    // tests (round 190mx): the value automation slot `slot` had in the last block (NaN: none; the first piece's)
+    float automationValueForCheck (int slot) const noexcept;
 
     // Extra threads for channels and mixer layers (nullptr = everything on the audio thread).
     void setWorkerPool (WorkerPool* pool) noexcept { workers = pool; }

@@ -2955,6 +2955,11 @@ double linearSongTick (const LiveInput* liveInput, double startTick, double leng
 }
 } // namespace
 
+float RackRenderer::automationValueForCheck (int slot) const noexcept
+{
+    return slot >= 0 && slot < RackState::maxAutomations ? automationValues.v[0][(std::size_t) slot] : std::numeric_limits<float>::quiet_NaN();
+}
+
 void RackRenderer::updateAutomation (const RackState& state, double startTick) noexcept
 {
     const auto& song = state.song;
@@ -3024,6 +3029,32 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
                 }
 
                 automationValues[(std::size_t) lane.slot] = value;
+            }
+
+            // round 190mx (GitHub #198, Live's clip envelopes): a pattern clip the clip grid plays drives its pattern's
+            // events at its own position (position 0 at anchor + k·length on the launcher's clock), as Session Record
+            // writes them; the grid's clip takes the track over, so it wins over the Playlist's value
+            if (state.clipLauncher != nullptr && song.clipGrid && state.clipLauncher->anyPlaying.load (std::memory_order_relaxed))
+            {
+                const auto& rt = *state.clipLauncher;
+                const auto& grid = *song.clipGrid;
+                for (const auto& c : grid.clips)
+                {
+                    if (c.kind != ClipKind::pattern || c.length <= 0 || c.pattern < 0 || c.pattern >= (int) song.patterns.size()
+                        || song.patterns[(std::size_t) c.pattern].events.empty() || c.track < 0 || c.track >= launcher::maxTracks
+                        || c.gridSlot < 0 || c.gridSlot >= (int) grid.slots.size())
+                        continue;
+                    const auto& view = rt.tracks[(std::size_t) c.track];
+                    if (view.playing.load (std::memory_order_relaxed) != grid.slots[(std::size_t) c.gridSlot].scene)
+                        continue;
+                    auto at = std::fmod (rt.clock - view.anchor.load (std::memory_order_relaxed), (double) c.length);
+                    if (at < 0.0)
+                        at += (double) c.length;
+                    const auto local = (double) c.offset + at;
+                    for (const auto& lane : state.eventLanes)
+                        if (lane.pattern == c.pattern)
+                            automationValues[(std::size_t) lane.slot] = song.patterns[(std::size_t) c.pattern].events[(std::size_t) lane.lane].valueAt (local);
+                }
             }
         }
     }

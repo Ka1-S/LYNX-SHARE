@@ -269,6 +269,7 @@
 #include "ui/WaveformView.h"
 #include "ui/WindowOwner.h"
 #include "ui/PluginKeysTest.h"
+#include "ui/ZOrder191Test.h"
 #include "ui/Toolbar.h"
 #include "ui/ToolWindow.h"
 #include "core/Details190mv.h" // (round 190mv)
@@ -1890,6 +1891,18 @@ public:
                 if (args[k].containsOnly ("0123456789"))
                     seconds = args[k].getIntValue();
             runPlugWinTest (args[i + 1].unquoted(), args[i + 2].unquoted(), only, seconds);
+            return;
+        }
+
+        if (args.contains ("--zorder191test"))
+        {
+            // LYNX --zorder191test report.txt [plugin.vst3]: issue #191 (round 190mx), ui/ZOrder191Test.h
+            const auto i = args.indexOf ("--zorder191test");
+            const auto plugin = i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String();
+            lynx::runZOrder191Test (args[i + 1].unquoted(), plugin, &lookAndFeel, [this] (bool ok) {
+                setApplicationReturnValue (ok ? 0 : 1);
+                quit();
+            });
             return;
         }
 
