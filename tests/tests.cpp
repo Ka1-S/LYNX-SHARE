@@ -17719,6 +17719,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Layer190bTests.inc"
 #include "PlugLevel190adTests.inc"
 #include "Undo190bTests.inc"
+#include "Undo190mzTests.inc"
 #include "TrackMeters190wTests.inc"
 #include "Locator190wTests.inc"
 #include "Bugs190cTests.inc"

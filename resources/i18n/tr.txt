@@ -11859,3 +11859,7 @@ countries: tr
 "Compressor's gate (the Waves RChannel stand-in) is left out: {0}" = "Compressor'ın kapısı (Waves RChannel yerine geçen) dışarıda kalır: {0}"
 "The Current mixer track shows as an ordinary insert: its effects no longer process the selected track: {0}" = "Geçerli mikser parçası sıradan bir insert olarak görünür: efektleri artık seçili parçayı işlemez: {0}"
 "The window layout saved with the project is not restored" = "Projeyle kaydedilen pencere düzeni geri yüklenmez"
+"Undo {0}" = "Geri al: {0}"
+"Redo {0}" = "Yinele: {0}"
+"Nothing to undo" = "Geri alınacak bir şey yok"
+"Nothing to redo" = "Yinelenecek bir şey yok"

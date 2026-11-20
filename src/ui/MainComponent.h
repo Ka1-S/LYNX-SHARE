@@ -158,6 +158,9 @@ public:
     // The Clip-launch workflow's detail view (round 183a), made with the grid; nullptr until then.
     DetailView* getDetailViewForSnapshot() const noexcept { return detailView.get(); }
     bool runActionForSnapshot (const std::string& id) { return runAction (id); }
+    // round 190mz (--undoshot190mz): Settings › General › "Alternate undo mode"
+    bool getAlternateUndo() const noexcept { return alternateUndo; }
+    void setAlternateUndoForSnapshot (bool on) noexcept { alternateUndo = on; }
     void updateLookFieldsForSnapshot() { updateLookFields(); } // (round 190lx) // (round 190jn: Q, the hot-swap key; round 190jz: --issueshot190jz)
     juce::Component* getClipGridForSnapshot() const noexcept { return clipGridView.get(); } // --gridshot (round 190bv)
     // round 190ch (LYNX's own): the project's Lyrics / Notes panel — docked on the right of the Playlist in every layout,
@@ -470,7 +473,7 @@ private:
     // it undoes, or redoes when something is undone (round 190b, issue #140; core/UndoKeys.h)
     void flUndoBackwards();
     void runUndoStep (undokeys::Step step);
-    bool alternateUndo = false; // Settings › General › "Alternate undo mode" (FL's default: off)
+    bool alternateUndo = undokeys::alternateModeDefault; // Settings › General › "Alternate undo mode" (FL 2026's default: on; round 190mz)
     // FL's Playlist menu › Picker panel › Enable (issue #175; on by default, kept with the UI settings)
     bool pickerPanelOn = true;
     void setPickerPanelOn (bool on);

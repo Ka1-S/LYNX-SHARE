@@ -11859,3 +11859,7 @@ countries: ru by kz
 "Compressor's gate (the Waves RChannel stand-in) is left out: {0}" = "Гейт Compressor (замена Waves RChannel) не переносится: {0}"
 "The Current mixer track shows as an ordinary insert: its effects no longer process the selected track: {0}" = "Текущая дорожка микшера показывается как обычный инсерт: её эффекты больше не обрабатывают выбранную дорожку: {0}"
 "The window layout saved with the project is not restored" = "Раскладка окон, сохранённая с проектом, не восстанавливается"
+"Undo {0}" = "Отменить: {0}"
+"Redo {0}" = "Повторить: {0}"
+"Nothing to undo" = "Нечего отменять"
+"Nothing to redo" = "Нечего повторять"

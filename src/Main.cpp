@@ -3524,6 +3524,16 @@ public:
             return;
         }
 
+        if (args.contains ("--undoshot190mz"))
+        {
+            // LYNX.exe --undoshot190mz prefix [--shot-scale 1.5 --shot-suffix @150] (round 190mz, issue #214): the main
+            // window's undo keys with three edits, in both "Alternate undo mode" settings, and the Edit menu after each
+            // step in the Pattern, Clip-launch and Simple layouts (prefix-menu-*.png); checks in prefix-checks.txt
+            runUndoShot190mz (args[args.indexOf ("--undoshot190mz") + 1].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--design190igs4shot"))
         {
             // LYNX.exe --design190igs4shot prefix [set.als]: round 190ig slice 4 off-screen, in the Clip-launch layout with the
@@ -19416,6 +19426,135 @@ private:
             auto additions = lynx::makeExportPanelWithAdditions (offline);
             shoot (*additions, "export");
         }
+    }
+
+    void runUndoShot190mz (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        juce::String report;
+        int failures = 0;
+        const auto check = [&] (const juce::String& name, bool ok) {
+            report << (ok ? "OK   " : "FAIL ") << name << "\n";
+            failures += ok ? 0 : 1;
+        };
+        {
+            lynx::AudioEngine engine (false);
+            lynx::MainComponent ui (engine, false);
+            ui.setSize (1600, 900);
+            engine.dispatchPendingMessages();
+            // FL 2026's default: Ctrl+Z steps back
+            check ("alternate undo mode is on by default (FL 2026)", ui.getAlternateUndo());
+
+            const auto editMenuText = [&ui] {
+                const auto names = ui.getMenuNamesForSnapshot();
+                juce::StringArray rows;
+                const auto menu = ui.getMenuForSnapshot (juce::jmax (0, names.indexOf (lynx::tr ("Edit"))));
+                for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                {
+                    if (it.getItem().isSeparator)
+                        break;
+                    rows.add ((it.getItem().isEnabled ? "" : "(off) ") + it.getItem().text.replace ("\t", "  |  "));
+                }
+                return rows;
+            };
+            const auto saveEditMenu = [&ui, &prefix] (const juce::String& name) {
+                const auto names = ui.getMenuNamesForSnapshot();
+                const auto index = juce::jmax (0, names.indexOf (lynx::tr ("Edit")));
+                saveMenus (juce::StringArray { names[index] }, std::vector<juce::PopupMenu> { ui.getMenuForSnapshot (index) }, prefix + "-menu-" + name + ".png");
+            };
+            const auto key = [&ui, &engine] (const char* action) {
+                ui.runActionForSnapshot (action);
+                engine.dispatchPendingMessages();
+            };
+            const auto bpm = [&engine] { return engine.getSong().bpm; };
+            const auto start = bpm();
+            const auto swing0 = engine.getSong().swing;
+            const auto log = [&] (const juce::String& state) {
+                report << "     " << state << ": bpm " << bpm() << ", level " << engine.getHistoryPosition() + 1 << "/" << engine.getHistorySize()
+                       << ", Edit menu: " << editMenuText().joinIntoString ("  //  ") << "\n";
+            };
+
+            log ("fresh");
+            saveEditMenu ("pattern-0-fresh");
+            engine.editSong ([] (lynx::Song& s) { s.bpm = 101.0; });
+            engine.editSong ([] (lynx::Song& s) { s.swing = s.swing == 0.25f ? 0.5f : 0.25f; });
+            engine.editSong ([] (lynx::Song& s) { s.bpm = 103.0; });
+            engine.dispatchPendingMessages();
+            log ("three edits");
+            saveEditMenu ("pattern-1-three-edits");
+            check ("menu names the step: Undo Tempo | Ctrl+Z, no Redo item (FL)",
+                   editMenuText()[0].startsWith (lynx::tr ("Undo {0}", { lynx::tr ("Tempo") })) && editMenuText()[0].contains ("Ctrl+Z")
+                       && ! editMenuText()[1].startsWith (lynx::tr ("Redo {0}", { lynx::tr ("Tempo") })));
+
+            // the reporter's case (issue #214): Ctrl+Z pressed again keeps going back
+            key ("edit.undo");
+            log ("Ctrl+Z");
+            saveEditMenu ("pattern-2-alt-ctrl-z");
+            check ("alternate: menu shows Undo Swing | Ctrl+Z and Redo Tempo | Ctrl+Alt+Z (FL)",
+                   editMenuText()[0].startsWith (lynx::tr ("Undo {0}", { lynx::tr ("Swing") })) && editMenuText()[0].endsWith ("Ctrl+Z")
+                       && editMenuText()[1].startsWith (lynx::tr ("Redo {0}", { lynx::tr ("Tempo") })) && editMenuText()[1].endsWith ("Ctrl+Alt+Z"));
+            key ("edit.undo");
+            log ("Ctrl+Z x2");
+            check ("alternate: Ctrl+Z twice goes two steps back (swing undone, bpm 101)", bpm() == 101.0 && engine.getSong().swing == swing0);
+            key ("edit.undo");
+            key ("edit.undo"); // (nothing left: nothing happens, no redo)
+            log ("Ctrl+Z x4");
+            check ("alternate: Ctrl+Z walks to the start and stops there", bpm() == start && ! engine.canUndo() && engine.canRedo());
+            saveEditMenu ("pattern-3-alt-at-start");
+            key ("edit.redo");
+            check ("alternate: Ctrl+Y / Ctrl+Shift+Z redo one step", bpm() == 101.0);
+            key ("edit.redo");
+            key ("edit.redo");
+            check ("alternate: redo back to the newest state", bpm() == 103.0 && ! engine.canRedo());
+            key ("edit.undo");
+            key ("edit.undoBackwards");
+            check ("alternate: Ctrl+Alt+Z redoes what was undone (FL swaps the two keys)", bpm() == 103.0 && ! engine.canRedo());
+
+            // FL's other mode: Ctrl+Z undoes, then redoes (the toggle the issue describes); Ctrl+Alt+Z walks back
+            ui.setAlternateUndoForSnapshot (false);
+            key ("edit.undo");
+            log ("default mode, Ctrl+Z");
+            saveEditMenu ("pattern-4-toggle-ctrl-z");
+            check ("toggle mode: menu shows Undo Swing | Ctrl+Alt+Z and Redo Tempo | Ctrl+Z (FL)",
+                   editMenuText()[0].startsWith (lynx::tr ("Undo {0}", { lynx::tr ("Swing") })) && editMenuText()[0].endsWith ("Ctrl+Alt+Z")
+                       && editMenuText()[1].startsWith (lynx::tr ("Redo {0}", { lynx::tr ("Tempo") })) && editMenuText()[1].endsWith ("Ctrl+Z"));
+            key ("edit.undo");
+            log ("default mode, Ctrl+Z x2");
+            check ("toggle mode: Ctrl+Z again redoes the step", bpm() == 103.0 && ! engine.canRedo());
+            key ("edit.undoBackwards");
+            key ("edit.undoBackwards");
+            check ("toggle mode: Ctrl+Alt+Z walks back", bpm() == 101.0 && engine.getSong().swing == swing0);
+            key ("edit.undo");
+            check ("toggle mode: Ctrl+Z after walking back redoes one step (FL: position - 1)", engine.getSong().swing != swing0 && bpm() == 101.0);
+            key ("edit.redo");
+            check ("toggle mode: Ctrl+Y / Ctrl+Shift+Z redo", bpm() == 103.0 && ! engine.canRedo());
+
+            // Clip-launch and Simple: Live's form (both items, "Nothing to redo", redo on Ctrl+Y)
+            ui.setAlternateUndoForSnapshot (true);
+            for (const auto style : { lynx::layoutstyle::Style::clipLaunch, lynx::layoutstyle::Style::simple })
+            {
+                const juce::String name = style == lynx::layoutstyle::Style::simple ? "simple" : "cliplaunch";
+                ui.setLayoutStyle (style);
+                engine.dispatchPendingMessages();
+                log (name);
+                saveEditMenu (name + "-1-newest");
+                check (name + ": Undo Tempo | Ctrl+Z, Nothing to redo | Ctrl+Y",
+                       editMenuText()[0].startsWith (lynx::tr ("Undo {0}", { lynx::tr ("Tempo") })) && editMenuText()[0].endsWith ("Ctrl+Z")
+                           && editMenuText()[1].startsWith ("(off) " + lynx::tr ("Nothing to redo")) && editMenuText()[1].endsWith ("Ctrl+Y"));
+                key ("edit.undo");
+                key ("edit.undo");
+                log (name + ", Ctrl+Z x2");
+                saveEditMenu (name + "-2-ctrl-z-x2");
+                check (name + ": Ctrl+Z twice goes two steps back", bpm() == 101.0 && engine.getSong().swing == swing0);
+                key ("edit.redo");
+                key ("edit.redo");
+                check (name + ": Ctrl+Y redoes both", bpm() == 103.0 && ! engine.canRedo());
+            }
+            ui.setLayoutStyle (lynx::layoutstyle::Style::pattern);
+            engine.dispatchPendingMessages();
+        }
+        report << (failures == 0 ? "ALL OK\n" : juce::String (failures) + " FAILED\n");
+        juce::File (prefix + "-checks.txt").replaceWithText (report);
     }
 
     void runGamepadShot (const juce::String& prefix)

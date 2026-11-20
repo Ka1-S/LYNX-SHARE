@@ -54,8 +54,9 @@ struct GeneralOptions
     bool hoverValues = false;
     int editPatternsIn = 0;     // 0 = Piano Roll when it has notes, 1 = Channel Rack, 2 = Piano Roll
     int undoLevels = prefs::defaultUndoLevels;
-    // FL's General › "Alternate undo mode" (off by default: Ctrl+Z undoes, then redoes; on: classic undo; round 167k)
-    bool alternateUndo = false;
+    // FL's General › "Alternate undo mode" (round 167k; on: classic undo, Ctrl+Z steps back; off: Ctrl+Z undoes, then
+    // redoes). On by default, as in FL 2026 (round 190mz, issue #214; core/UndoKeys.h)
+    bool alternateUndo = true;
     int autosaveMinutes = prefs::defaultAutosaveMinutes; // 0 = never
     int autosaveKeep = prefs::defaultAutosaveKeep;
     bool askUnusedRecordings = true; // offer to delete takes a project no longer uses when it closes

@@ -11859,3 +11859,7 @@ countries: kr
 "Compressor's gate (the Waves RChannel stand-in) is left out: {0}" = "Compressor의 게이트(Waves RChannel 대체)는 빠집니다: {0}"
 "The Current mixer track shows as an ordinary insert: its effects no longer process the selected track: {0}" = "믹서의 현재 트랙은 일반 인서트로 표시되며, 그 이펙트는 더 이상 선택한 트랙을 처리하지 않습니다: {0}"
 "The window layout saved with the project is not restored" = "프로젝트와 함께 저장된 창 배치는 복원되지 않습니다"
+"Undo {0}" = "실행 취소: {0}"
+"Redo {0}" = "다시 실행: {0}"
+"Nothing to undo" = "실행 취소할 항목 없음"
+"Nothing to redo" = "다시 실행할 항목 없음"

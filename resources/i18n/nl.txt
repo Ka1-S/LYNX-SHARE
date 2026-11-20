@@ -11859,3 +11859,7 @@ countries: nl be
 "Compressor's gate (the Waves RChannel stand-in) is left out: {0}" = "De gate van Compressor (de vervanger van Waves RChannel) vervalt: {0}"
 "The Current mixer track shows as an ordinary insert: its effects no longer process the selected track: {0}" = "De mixertrack Huidig verschijnt als een gewone insert: de effecten ervan bewerken de geselecteerde track niet meer: {0}"
 "The window layout saved with the project is not restored" = "De met het project opgeslagen vensterindeling wordt niet hersteld"
+"Undo {0}" = "Ongedaan maken: {0}"
+"Redo {0}" = "Opnieuw: {0}"
+"Nothing to undo" = "Niets om ongedaan te maken"
+"Nothing to redo" = "Niets om opnieuw te doen"

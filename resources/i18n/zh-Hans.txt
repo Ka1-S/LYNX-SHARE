@@ -11859,3 +11859,7 @@ countries: cn sg
 "Compressor's gate (the Waves RChannel stand-in) is left out: {0}" = "Compressor 的门限（Waves RChannel 的替代）被省略：{0}"
 "The Current mixer track shows as an ordinary insert: its effects no longer process the selected track: {0}" = "混音器的当前轨道显示为普通插入轨：其效果不再处理所选轨道：{0}"
 "The window layout saved with the project is not restored" = "随项目保存的窗口布局不会恢复"
+"Undo {0}" = "撤销 {0}"
+"Redo {0}" = "重做 {0}"
+"Nothing to undo" = "没有可撤销的操作"
+"Nothing to redo" = "没有可重做的操作"

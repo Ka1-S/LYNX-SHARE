@@ -11859,3 +11859,7 @@ countries: id
 "Compressor's gate (the Waves RChannel stand-in) is left out: {0}" = "Gate milik Compressor (pengganti Waves RChannel) dihilangkan: {0}"
 "The Current mixer track shows as an ordinary insert: its effects no longer process the selected track: {0}" = "Trek mixer Saat ini tampil sebagai insert biasa: efeknya tidak lagi memproses trek yang dipilih: {0}"
 "The window layout saved with the project is not restored" = "Tata letak jendela yang disimpan bersama proyek tidak dipulihkan"
+"Undo {0}" = "Urungkan {0}"
+"Redo {0}" = "Ulangi {0}"
+"Nothing to undo" = "Tidak ada yang bisa diurungkan"
+"Nothing to redo" = "Tidak ada yang bisa diulangi"

@@ -11988,3 +11988,7 @@ countries: br
 "Compressor's gate (the Waves RChannel stand-in) is left out: {0}" = "O gate do Compressor (o substituto do Waves RChannel) fica de fora: {0}"
 "The Current mixer track shows as an ordinary insert: its effects no longer process the selected track: {0}" = "A trilha Atual do mixer aparece como um insert comum: seus efeitos não processam mais a trilha selecionada: {0}"
 "The window layout saved with the project is not restored" = "O layout de janelas salvo com o projeto não é restaurado"
+"Undo {0}" = "Desfazer {0}"
+"Redo {0}" = "Refazer {0}"
+"Nothing to undo" = "Nada para desfazer"
+"Nothing to redo" = "Nada para refazer"
