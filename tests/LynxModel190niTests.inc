@@ -92,7 +92,7 @@ TEST (lynxmodel190ni_tables)
         for (std::size_t i = 0; i < t.anchors.size(); ++i)
         {
             const auto& a = t.anchors[i];
-            CHECK (a.count >= 3 && a.count <= 40 && a.contact > 0.0f && a.contact < 0.01f);
+            CHECK (a.count >= 3 && a.count <= 44 && a.contact > 0.0f && a.contact < 0.01f); // (44: calibrate.py MAX_LANES, 190nl)
             CHECK (i == 0 || a.key >= t.anchors[i - 1].key);
             bool main = false;
             for (int k = 0; k < a.count; ++k)

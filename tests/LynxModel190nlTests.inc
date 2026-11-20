@@ -166,8 +166,9 @@ TEST (lynxmodel190nl_tables)
     // on held-out and in-sample notes; HANDOFF 190nl): strike refined through the engine with the two-section noise
     // (marimba, xylophone, glockenspiel, kalimba), mode families (xylophone, glockenspiel, kalimba: refitted in 190nl;
     // the kalimba's other tines as absolute lines); the vibraphone's and the tubular bells' tables are 190ni's
-    const int order[lm::modelCount] = { 2, 1, 2, 2, 1, 2 };
-    const bool tagged[lm::modelCount] = { false, false, true, true, false, true };
+    // (round 190nm refitted the tubular bells with this pipeline: two-section noise and families since)
+    const int order[lm::modelCount] = { 2, 1, 2, 2, 2, 2 };
+    const bool tagged[lm::modelCount] = { false, false, true, true, true, true };
     for (int m = 0; m < lm::modelCount; ++m)
     {
         const auto& t = lm::builtInTable (m);

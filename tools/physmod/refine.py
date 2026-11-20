@@ -11,7 +11,9 @@ absolute grids, with a smoothness term that pulls each anchor towards its layer'
 interpolable between recorded keys).
 
   refine.py <physmodrender> <notes-root> <fit.json> <table.lpm> <out.lpm> [--noise-order 1|2] [--sweeps N]
-            [--smooth L] [--report OUT.json] [--work DIR] [--inc-dir DIR]
+            [--smooth L] [--report OUT.json] [--work DIR] [--inc-dir DIR] [--level]
+        --level (round 190nm): then each anchor's level matched through the engine (its first 2 s against its recording,
+        as the timbre score's level part measures them)
         --inc-dir: also write <instrument>.inc there (src/core/physmod/tables/, the table LYNX compiles in)
 
 Only parameters change; modes stay as fitted. The output table keeps the input's header (position mapping, level
@@ -57,7 +59,7 @@ def render(exe, work, jobs, sr):
     for i, (a, head, cents) in enumerate(jobs):
         tp = os.path.join(work, 'c%05d.lpm' % i)
         lpm.write(tp, head['model'], head['beam'], head['posRef'], head['posU0'], head['posU1'], head['gainOffsetDb'], [a], b'',
-                  head['noiseOrder'])
+                  head['noiseOrder'], head.get('onset', 0), head.get('fade', 0))
         lines.append('%s %s %d %.4f %.3f cents=%.2f' % (os.path.join(work, 'c%05d.wav' % i), tp, int(round(a['key'])), a['velocity'],
                                                           SECONDS, cents))
     open(lst, 'w').write('\n'.join(lines) + '\n')
@@ -112,6 +114,9 @@ def main():
         y = y[ma.onset(y, rate):][:int(min(cfg['seconds'], 8.0) * rate)]
         refs.append((ts.StrikeLoss(y, rate), n.get('tuning_offset_cents', 0.0)))
     GRIDS['noiseHz'] = (list(np.geomspace(150.0, 0.4 * sr, 11)), 'log', 1.0)
+    if head.get('onset', 0) == 1:
+        # (round 190nm: riseMs is the whole note's onset there - a 10-90 % rise of about 2.2 x rise - finer steps)
+        GRIDS['riseMs'] = ([0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0], 'lin', 1.0)
 
     def losses(cands):
         """cands: list of (anchor index, anchor dict) -> losses"""
@@ -144,9 +149,24 @@ def main():
                 x[name] = float(best[1])
             hist.append({'sweep': sweep, 'param': name})
         print('  %s sweep %d done' % (inst, sweep + 1), flush=True)
+    if '--level' in a:
+        # (round 190nm) each anchor's level matched through the engine: the first 2 s of its render against its recording
+        # raised by the table's level offset, as the timbre score's level part measures them (a fitted main mode's
+        # level misses a two-stage decay's loud start, or a fast mode's)
+        global SECONDS
+        keep, SECONDS = SECONDS, 2.5
+        ys = render(exe, work, [(x, head, refs[i][1]) for i, x in enumerate(anchors)], sr)
+        SECONDS = keep
+        g = 10 ** (head['gainOffsetDb'] / 20.0)
+        for i, (x, y) in enumerate(zip(anchors, ys)):
+            r = refs[i][0].r * g
+            c = ts.align(r, ts.prepare(np.asarray(y, np.float64), sr, len(r) / sr), sr)
+            n = min(len(r), len(c), int(2 * sr))
+            lev = 10 * np.log10((np.mean(c[:n] ** 2) + 1e-30) / (np.mean(r[:n] ** 2) + 1e-30))
+            x['gainDb'] = float(x['gainDb'] - np.clip(lev, -24.0, 24.0))
     end = losses(list(enumerate(anchors)))
     lpm.write(tout, head['model'], head['beam'], head['posRef'], head['posU0'], head['posU1'], head['gainOffsetDb'], anchors,
-              b'', order)
+              b'', order, head.get('onset', 0), head.get('fade', 0))
     # (the provenance hash: lpm.write hashed b''; keep the input's)
     data = bytearray(open(tout, 'rb').read())
     data[32:40] = bytes.fromhex(head['provenance_sha256_8'])

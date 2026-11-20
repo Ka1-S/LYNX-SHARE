@@ -95,6 +95,7 @@ struct ModeSet
     int n = 0;
     float ratio[setCap] {}, ampDb[setCap] {}, t60[setCap] {};
     std::uint8_t shape[setCap] {}, fam[setCap] {};
+    bool invert[setCap] {};
     float gainDb = 0.0f, contact = 0.0005f, noiseDb = -60.0f, noiseHz = 2000.0f, noiseQ = 1.0f, noiseMs = 10.0f, riseMs = 0.0f;
 };
 
@@ -114,6 +115,7 @@ ModeSet fromAnchor (const Table& t, const TableAnchor& a, float key)
         s.ampDb[s.n] = m.ampDb;
         s.t60[s.n] = m.t60;
         s.shape[s.n] = m.shape;
+        s.invert[s.n] = m.invert;
         s.fam[s.n] = m.family;
         ++s.n;
     }
@@ -136,8 +138,10 @@ float energyOf (const ModeSet& s, int k) noexcept
 // a weighted blend of two sets (t = the weight of b): the same mode on both sides (the same family id, round 190nl, when
 // `families` - two keys of one layer; for modes without one, and across layers: within 4 % of each other) is one mode
 // (frequency, level, T60 blended); the others fade with their side's weight
-ModeSet blend (const ModeSet& a, const ModeSet& b, float t, bool families = true)
+ModeSet blend (const ModeSet& a, const ModeSet& b, float t, bool families = true, int fade = 0)
 {
+    // (an unpaired mode's fade, dB per unit of 20 log10 (weight): 1 = amplitude, 0.5 = power; round 190nm)
+    const float fadeDb = fade == 1 ? 10.0f : 20.0f;
     if (t <= 0.0f)
         return a;
     if (t >= 1.0f)
@@ -184,14 +188,16 @@ ModeSet blend (const ModeSet& a, const ModeSet& b, float t, bool families = true
             o.ampDb[o.n] = lerp (a.ampDb[i], b.ampDb[best]);
             o.t60[o.n] = glerp (a.t60[i], b.t60[best]);
             o.shape[o.n] = a.shape[i] != 0 ? a.shape[i] : b.shape[best];
+            o.invert[o.n] = a.invert[i];
             o.fam[o.n] = a.fam[i];
         }
         else
         {
             o.ratio[o.n] = a.ratio[i];
-            o.ampDb[o.n] = a.ampDb[i] + 20.0f * std::log10 (1.0f - t);
+            o.ampDb[o.n] = a.ampDb[i] + fadeDb * std::log10 (1.0f - t);
             o.t60[o.n] = a.t60[i];
             o.shape[o.n] = a.shape[i];
+            o.invert[o.n] = a.invert[i];
             o.fam[o.n] = a.fam[i];
         }
         ++o.n;
@@ -200,9 +206,10 @@ ModeSet blend (const ModeSet& a, const ModeSet& b, float t, bool families = true
         if (! used[j])
         {
             o.ratio[o.n] = b.ratio[j];
-            o.ampDb[o.n] = b.ampDb[j] + 20.0f * std::log10 (t);
+            o.ampDb[o.n] = b.ampDb[j] + fadeDb * std::log10 (t);
             o.t60[o.n] = b.t60[j];
             o.shape[o.n] = b.shape[j];
+            o.invert[o.n] = b.invert[j];
             o.fam[o.n] = b.fam[j];
             ++o.n;
         }
@@ -266,6 +273,8 @@ std::optional<Table> parseTable (const std::uint8_t* d, std::size_t size, std::s
     const int anchors = u16 (d + 8), modes = u16 (d + 10);
     t.beam = d[12];
     t.noiseOrder = d[13] == 2 ? 2 : 1; // (round 190nl; 0 in older tables)
+    t.onset = d[14] == 1 ? 1 : 0;      // (round 190nm; 0 in older tables)
+    t.fade = d[15] == 1 ? 1 : 0;       // (round 190nm; 0 in older tables)
     t.posRef = f32 (d + 16);
     t.posU0 = f32 (d + 20);
     t.posU1 = f32 (d + 24);
@@ -303,7 +312,8 @@ std::optional<Table> parseTable (const std::uint8_t* d, std::size_t size, std::s
         x.ratio = f32 (m);
         x.ampDb = f16 (m + 4);
         x.t60 = f16 (m + 6);
-        x.shape = m[8];
+        x.shape = (std::uint8_t) (m[8] & 0x7f);
+        x.invert = (m[8] & 0x80) != 0; // (round 190nm; never set before)
         x.family = m[9];
         if (! (x.ratio > 0.0f) || ! std::isfinite (x.ratio) || ! (x.t60 > 0.0f) || ! std::isfinite (x.ampDb))
             return fail ("bad LPM mode");
@@ -379,7 +389,7 @@ NoteModes interpolate (const Table& t, float key, float velocity)
     {
         const auto k0 = t.anchors[lo].key, k1 = t.anchors[hi].key;
         const auto w = (key - k0) / std::max (k1 - k0, 1e-6f);
-        s = blend (atVelocity (t, lo, endOf (lo), v, key), atVelocity (t, hi, endOf (hi), v, key), w);
+        s = blend (atVelocity (t, lo, endOf (lo), v, key), atVelocity (t, hi, endOf (hi), v, key), w, true, t.fade);
     }
     // beyond the recorded keys: the nearest key's modes transposed, the T60s shorter by 2^-0.5 per octave up (higher
     // bars ring shorter) and longer by 2^0.25 per octave down
@@ -390,7 +400,9 @@ NoteModes interpolate (const Table& t, float key, float velocity)
     for (int k = 0; k < s.n; ++k)
         order[k] = k;
     std::sort (order, order + s.n, [&s] (int a, int b) { return energyOf (s, a) > energyOf (s, b); });
-    const int n = std::min (s.n, maxModes);
+    // (round 190nm: the strongest that the voice can play - the build-up twins take 4 lanes; before, a note with more
+    // than 44 modes and twins lost its highest-frequency modes in Engine::Impl::start, not its weakest)
+    const int n = std::min (s.n, maxModes - (t.onset == 0 && s.riseMs > 0.05f ? 4 : 0));
     std::sort (order, order + n, [&s] (int a, int b) { return s.ratio[a] < s.ratio[b]; });
     const auto base = keyHz (key);
     const auto main = std::pow (10.0f, (s.gainDb + t.gainOffsetDb) / 20.0f);
@@ -402,6 +414,7 @@ NoteModes interpolate (const Table& t, float key, float velocity)
         out.amp[(std::size_t) i] = main * std::pow (10.0f, s.ampDb[k] / 20.0f);
         out.t60[(std::size_t) i] = std::max (s.t60[k] * t60Scale, 0.005f);
         out.shape[(std::size_t) i] = s.shape[k];
+        out.invert[(std::size_t) i] = s.invert[k];
         if (const auto d = std::abs (std::log (s.ratio[k])); d < bestMain)
         {
             bestMain = d;
@@ -545,6 +558,7 @@ struct Engine::Impl
         int nPos = 0, nPeakAt = 0;
         float nPeak = 1.0f;
         std::uint32_t rng = 1;
+        float onLeft = 0.0f, onMul = 0.0f; // (round 190nm) the onset: the output is scaled by 1 - onLeft, onLeft *= onMul
         float amGain = 1.0f;     // the motor's gain applied to the resonated modes now
         float pitchUsed = 0.0f;  // the pitch offset (semitones) the poles were set with
         float peakEnergy = 0.0f;
@@ -609,7 +623,8 @@ struct Engine::Impl
         const auto resT60 = std::pow (2.0, -1.5 * (res - 0.5));
         const auto tone = std::clamp (values[p::tone], -1.0, 1.0);
         int m = 0;
-        const int room = maxModes - (nm.riseMs > 0.05f ? 4 : 0); // (lanes left for the build-up twins)
+        const bool twins = t.onset == 0 && nm.riseMs > 0.05f;
+        const int room = maxModes - (twins ? 4 : 0); // (lanes left for the build-up twins)
         for (int k = 0; k < nm.count && m < room; ++k)
         {
             const auto hz = (double) nm.hz[(std::size_t) k];
@@ -626,12 +641,12 @@ struct Engine::Impl
             target *= std::pow (hz / nm.mainHz, 0.75 * tone);
             if (resonated)
                 target *= resGain;
-            double sign = 1.0;
+            double sign = nm.invert[(std::size_t) k] ? -1.0 : 1.0;
             if (const int sh = nm.shape[(std::size_t) k]; sh > 0)
             {
                 const auto a = (double) modeShape (t.beam, sh, u), r = (double) modeShape (t.beam, sh, uRef);
                 target *= std::clamp (std::abs (a) / std::max (std::abs (r), 1e-6), 0.03, 4.0);
-                sign = a < 0.0 ? -1.0 : 1.0;
+                sign *= a < 0.0 ? -1.0 : 1.0;
             }
             v.rabs[m] = (float) std::pow (10.0, -3.0 / (t60 * rate));
             v.omega[m] = (float) w;
@@ -646,7 +661,7 @@ struct Engine::Impl
         }
         // the tube's build-up: each resonated mode gets a twin of opposite sign that dies with the rise time constant,
         // so the pair grows as e^(-t/T) - e^(-t/rise)
-        if (nm.riseMs > 0.05f)
+        if (twins)
         {
             const auto twinR = (float) std::exp (-1.0 / (nm.riseMs * 0.001 * rate));
             for (int k = 0, end = m; k < end && m < maxModes; ++k)
@@ -659,6 +674,12 @@ struct Engine::Impl
                     v.kick[m] = -v.kick[k];
                     ++m;
                 }
+        }
+        // (round 190nm) the whole note's onset: the voice's output rises as 1 - e^(-t / rise)
+        if (t.onset == 1 && nm.riseMs > 0.05f)
+        {
+            v.onMul = (float) std::exp (-1.0 / (nm.riseMs * 0.001 * rate));
+            v.onLeft = 1.0f;
         }
         v.modes = m;
         v.bank.groups = (m + laneGroup - 1) / laneGroup;
@@ -726,6 +747,26 @@ struct Engine::Impl
     }
 
     void renderVoice (Voice& v, float* out, int n) noexcept
+    {
+        if (v.onLeft <= 1.0e-4f)
+        {
+            renderVoiceInto (v, out, n);
+            return;
+        }
+        // (the onset: the voice into its own buffer, scaled while 1 - e^(-t / rise) rises; a few ms per note)
+        alignas (32) float own[maxBlock];
+        std::fill (own, own + n, 0.0f);
+        renderVoiceInto (v, own, n);
+        auto left = v.onLeft;
+        for (int i = 0; i < n; ++i)
+        {
+            out[i] += own[i] * (1.0f - left);
+            left *= v.onMul;
+        }
+        v.onLeft = left;
+    }
+
+    void renderVoiceInto (Voice& v, float* out, int n) noexcept
     {
         alignas (32) float force[maxBlock];
         int done = 0;

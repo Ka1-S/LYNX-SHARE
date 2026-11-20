@@ -17644,6 +17644,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Tetra190hsTests.inc" // round 190hs
 #include "LynxModel190niTests.inc" // round 190ni
 #include "LynxModel190nlTests.inc" // round 190nl
+#include "LynxModel190nmTests.inc" // round 190nm
 #include "Tetra190ixTests.inc" // round 190ix
 #include "Helix190jaTests.inc" // round 190ja
 #include "Helix190miTests.inc" // round 190mi

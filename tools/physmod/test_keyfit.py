@@ -32,6 +32,22 @@ class KeyfitTests(unittest.TestCase):
         self.assertEqual(len(set(second)), 1, second)  # (the strong mode, not the weak line that sits closer)
         self.assertNotEqual(second[0], an[0]['modes'][0]['fam'])
 
+    def test_many_families_never_become_absolute(self):
+        # (round 190nm) more than 254 families across a table: no regular mode may end up with the absolute id 255
+        an = [anchor(40 + k, [(1.0, 0, 5)] + [(1.5 * 1.2 ** i * (1.1 if k % 2 else 1.0), -20, 1.0) for i in range(30)]) for k in range(12)]
+        an[3]['modes'].append({'ratio': 2.222, 'ampDb': -30.0, 't60': 1.0, 'shape': 0, 'fam': lpm.ABSOLUTE})
+        keyfit.families(an)
+        absolute = [m for a in an for m in a['modes'] if m['fam'] == lpm.ABSOLUTE]
+        self.assertEqual(len(absolute), 1)
+        self.assertAlmostEqual(absolute[0]['ratio'], 2.222)
+
+    def test_main_modes_pair(self):
+        # (round 190nm) the main mode (ratio 1) continues as the main mode even when the next key's main is much louder
+        # and a weaker line sits near it (a kalimba tine split in two components)
+        an = [anchor(53, [(1.0, 0, 3), (1.0216, -28, 2)]), anchor(55, [(1.0, 15.8, 5), (1.011, -1.5, 2), (1.02, -2.9, 1)])]
+        keyfit.families(an)
+        self.assertEqual(an[0]['modes'][0]['fam'], an[1]['modes'][0]['fam'])
+
     def test_layers_are_separate(self):
         an = [anchor(60, [(1.0, 0, 1)], vel=0.5), anchor(72, [(1.0, 0, 1)], vel=0.5), anchor(60, [(1.0, 0, 1)], vel=1.0)]
         keyfit.families(an)

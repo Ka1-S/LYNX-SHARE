@@ -1,6 +1,6 @@
 # LYNX Model: provenance of the parameter tables
 
-LYNX Model (`src/core/physmod/LynxModel.h`, rounds 190ni and 190nl) ships **fitted parameters only**: one table per instrument
+LYNX Model (`src/core/physmod/LynxModel.h`, rounds 190ni, 190nl and 190nm) ships **fitted parameters only**: one table per instrument
 (`<name>.lpm`, format in `tools/physmod/lpm.py`), compiled in as `src/core/physmod/tables/<name>.inc`. No audio from
 any recording is shipped or played. The strike is synthesised: a contact force `t e^(-t / tau)` and band-pass noise,
 whose parameters are fitted. No recorded transient or attack table is used, by owner decision (design study 190nd §3
@@ -46,7 +46,10 @@ python3 -I tools/physmod/calibrate.py fit all <notes> <notes>/manifest.json <fit
 cp <fit>/*.provenance.json resources/physmod/
 # 2. the strike refined through the engine (round 190nl): the shipped table and its include, per instrument
 python3 -I tools/physmod/refine.py build/physmodrender <notes> <fit>/<name>.fit.json <fit>/<name>.lpm resources/physmod/<name>.lpm \
-        --inc-dir src/core/physmod/tables --report <fit>/<name>.refine.json
+        --inc-dir src/core/physmod/tables --report <fit>/<name>.refine.json [--level]
+# (round 190nm: the tubular bells and the kalimba add --level, each anchor's level matched through the engine; their
+# fitting settings - the bells' lower analysis floor, the kalimba's window-exact levels, two-component modes, onset and
+# fade - are in calibrate.py's INSTRUMENTS)
 # held-out tables (three folds: every inner recorded key held out once), refined the same way, then the report
 python3 -I tools/physmod/calibrate.py fit all <notes> <notes>/manifest.json <fit> --holdout 3 [--fold 1|2]
 python3 -I tools/physmod/refine.py build/physmodrender <notes> <fit>/<name>-holdout3[f1|f2].fit.json <fit>/<name>-holdout3[f1|f2].lpm <eval-fit>/...

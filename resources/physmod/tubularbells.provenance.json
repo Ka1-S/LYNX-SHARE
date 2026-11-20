@@ -226,6 +226,7 @@
  "held_out_keys": [],
  "instrument": "tubularbells",
  "not_used_extra_takes": [],
+ "pipeline": "calibrate.py fit (modes, tuning, strike first guess), then refine.py (the strike refined through the engine against the timbre score's attack and spectro-temporal parts; round 190nm: then each anchor's level matched through the engine, --level); rounds 190nl, 190nm",
  "source": {
   "commit": "c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e",
   "library": "Versilian Community Sample Library (VCSL)",
@@ -235,5 +236,5 @@
   "url": "https://github.com/sgossner/VCSL"
  },
  "table": "tubularbells.lpm",
- "tool": "tools/physmod/calibrate.py 190ni-1"
+ "tool": "tools/physmod/calibrate.py 190nm-1"
 }

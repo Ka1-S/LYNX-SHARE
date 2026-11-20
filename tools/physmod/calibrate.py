@@ -11,6 +11,7 @@ attack is synthesised by the engine (a Gaussian contact pulse + band-pass noise)
         --fold F (round 190nl): start with the (2 + F)-th key instead, F < N; the table is <instrument>-holdoutNfF
         (fold 0 keeps the name <instrument>-holdoutN). N folds together hold every inner key out once.
         --inc-dir: also write <instrument>.inc there (tools/make_model_inc.py's format) for src/core/physmod/tables/.
+        --set name=value[,...] (round 190nm): override an instrument's settings (INSTRUMENTS) for a variant
         --report-dir: the fit reports (<instrument>.fit.json, per note: modes, tuning, contact, noise, fit losses) go
         there instead of <out-dir> (the shipped run: tables and provenance in resources/physmod/, reports elsewhere).
 
@@ -30,6 +31,21 @@ Per recorded note (one velocity layer):
      attack measures are the loss (automated refinement against the recording)
   6. (round 190nl) mode families across each layer's keys (keyfit.families, the LPM mode's family byte); the strike is
      then refined through the engine itself by tools/physmod/refine.py, which writes the shipped tables and includes
+     (round 190nm: refine.py --level then matches each anchor's level through the engine)
+
+Round 190nm settings (per instrument in INSTRUMENTS, or --set for a variant):
+  window_exact   a mode's level corrected for its tracking window (a fast partial read through a long window - chosen to
+                 resolve a weak neighbour - read up to 37 dB too loud), and a partial dying within its window tracked
+                 again with a window of half its T60 (modal_analysis.analyse_modes)
+  split          the SPLIT_TOP strongest modes each fitted as two components where two follow the track clearly better
+                 (modal_analysis.fit_two): a two-stage decay (a tine's fast start and slow tail through its coupling to
+                 the body) or a beating pair (a tube's near-degenerate doublet); the second component may start in
+                 antiphase (LPM shape byte bit 7)
+  cover, peaks   the `long` extra modes chosen by what they add to their third-octave band (select_modes); peaks: how
+                 many spectral peaks are analysed (56)
+  onset          the strike's slow start as the whole note's onset 1 - e^(-t / rise) (LPM header byte 14) instead of the
+                 resonated modes' build-up twins
+  fade='power'   between two recorded keys a mode only one of them has fades by its power (LPM header byte 15)
 """
 import datetime
 import hashlib
@@ -46,7 +62,7 @@ import keyfit  # noqa: E402
 import lpm  # noqa: E402
 import modal_analysis as ma  # noqa: E402
 
-TOOL_VERSION = '190nl-1'
+TOOL_VERSION = '190nm-1'
 NOTE = {'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11}
 
 # the instruments: VCSL folder (as fetch_vcsl.py names it), velocity layers in order, modes kept, mode series (ratios to
@@ -62,17 +78,25 @@ INSTRUMENTS = {
                       pos=(0.25, 0.5, 0.95), fmin=0.85, seconds=4.0),
     'glockenspiel': dict(set='glockenspiel', layers=['soft', 'medium', 'loud'], modes=20, series=None, beam=0,
                          pos=(0.25, 0.5, 0.95), fmin=0.85, seconds=8.0),
+    # (round 190nm: fmin 0.28 - the tubes' hum near 0.31 x the strike note rings 3-8 s and was cut at 0.4 -, two-component
+    # modes - the doublets of a tube - and the whole note's onset: a bell's strike rises in about 1.8 ms)
     'tubularbells': dict(set='tubularbells', layers=['v2', 'v4'], modes=32, series=None, beam=0, pos=(0.0, 0.02, 0.35),
-                         fmin=0.4, seconds=14.0),
+                         fmin=0.28, seconds=14.0, split=True, onset=True),
     # (the kalimba's other tines ring along in every take: sympathetic='flag' (round 190nl) keeps their lines and marks
     # them absolute - LPM family 255, played at their own pitch whatever key is struck, so a key between two recorded
     # ones hears the same tines ring; sympathetic=True would drop them)
     # (fmin 0.3: the lower tines ring along too, below the plucked one; round 190nl)
+    # (round 190nm: the window-exact levels, two-component modes, band-covering long modes from 80 peaks, the whole
+    # note's onset - a pluck starts in 2-10 ms - and the equal-power fade of the lines only one neighbour has)
     'kalimba': dict(set='kalimba', layers=[None], modes=28, series=[1.0, 6.27, 17.55, 34.39], beam=1,
-                    pos=(0.2, 0.95, 0.55), fmin=0.3, seconds=6.0, sympathetic='flag'),
+                    pos=(0.2, 0.95, 0.55), fmin=0.3, seconds=6.0, sympathetic='flag', window_exact=True, split=True,
+                    cover=True, long=16, peaks=80, onset=True, fade='power'),
 }
 
 
+PIPELINE = ('calibrate.py fit (modes, tuning, strike first guess), then refine.py (the strike refined through the engine '
+            'against the timbre score\'s attack and spectro-temporal parts; round 190nm: then each anchor\'s level matched '
+            'through the engine, --level); rounds 190nl, 190nm')
 LONG_MODES = 12     # (the default `long`)
 NOISE_ORDER = 2     # the engine's strike noise: two band-pass sections (LPM header byte 13)
 MAX_LANES = 44      # modes per anchor at most: the engine's 48 lanes less the build-up twins
@@ -84,14 +108,34 @@ def audible_seconds(m, top_a0):
     return max(lvl + 50.0, 0.0) / 60.0 * min(m['t60'], 60.0)
 
 
-def select_modes(modes, main, n_energy, n_long):
+def select_modes(modes, main, n_energy, n_long, cover=False):
     """the `n_energy` strongest modes by energy (a0^2 min(T60, 3 s)), then up to `n_long` more by audible duration
-    (round 190nl), the main mode always"""
+    (round 190nl), the main mode always. cover (round 190nm): the `n_long` by what they add to their third-octave band -
+    their audible duration beyond the longest kept mode's in that band (the timbre score's spectro-temporal cells are
+    third-octave bands: a quiet high partial alone in its band is heard there for its whole duration, a quiet partial
+    next to a louder, longer one adds nothing)"""
     top = max(m['a0'] for m in modes)
     by_e = sorted(modes, key=lambda m: -m['a0'] ** 2 * min(m['t60'], 3.0))
     kept = by_e[:n_energy]
-    rest = sorted(by_e[n_energy:], key=lambda m: -audible_seconds(m, top))
-    kept += [m for m in rest[:n_long] if audible_seconds(m, top) > 0.05]
+    if cover:
+        band = lambda m: int(np.floor(3.0 * np.log2(m['f'] / 1000.0) + 0.5))
+        have = {}
+        for m in kept:
+            have[band(m)] = max(have.get(band(m), 0.0), audible_seconds(m, top))
+        rest = list(by_e[n_energy:])
+        for _ in range(n_long):
+            gains = [(audible_seconds(m, top) - have.get(band(m), 0.0), i) for i, m in enumerate(rest)]
+            if not gains:
+                break
+            g, i = max(gains)
+            if g <= 0.05:
+                break
+            m = rest.pop(i)
+            kept.append(m)
+            have[band(m)] = max(have.get(band(m), 0.0), audible_seconds(m, top))
+    else:
+        rest = sorted(by_e[n_energy:], key=lambda m: -audible_seconds(m, top))
+        kept += [m for m in rest[:n_long] if audible_seconds(m, top) > 0.05]
     kept = kept[:MAX_LANES]
     if main not in kept:
         kept = [main] + kept[:-1]
@@ -301,7 +345,17 @@ def noise_carrier(sr, n, fc, q, seed=7, order=None):
     return np.fft.irfft(X * H ** (order or NOISE_ORDER), N)[:n]
 
 
-def fit_attack_noise(x, sr, modes, main_a0, fc0, q0, floor=None, main_f=None):
+ONSETS = np.array([0.0, 0.00025, 0.0005, 0.001, 0.002, 0.004])
+
+
+def onset_env(sr, n, rise):
+    """the engine's whole-note onset (LPM onset tables, round 190nm): 1 - e^(-t / rise)"""
+    if rise <= 0:
+        return np.ones(n)
+    return 1.0 - np.exp(-np.arange(n) / (rise * sr))
+
+
+def fit_attack_noise(x, sr, modes, main_a0, fc0, q0, floor=None, main_f=None, onset=False):
     """contact time constant and strike noise (level re the main mode, centre, Q, decay) that make the emulated first
     150 ms closest to the recording: the timbre score's spectro-temporal grid (third-octaves x 0-3-6-12-25-50-100-150 ms,
     absolute levels) and its attack (10-90 % rise, the 1 ms envelope on a log time grid), grid search"""
@@ -326,8 +380,11 @@ def fit_attack_noise(x, sr, modes, main_a0, fc0, q0, floor=None, main_f=None):
 
     m = curve_ref > -40
     noise_cache = {}
-    for tau, rise in [(t, r) for t in TAUS for r in (RISES if main_f else [0.0])]:
-        ym = emulate_modes(with_build_up(modes, main_f, rise), sr, n, tau)
+    for tau, rise in [(t, r) for t in TAUS for r in (ONSETS if onset else RISES if main_f else [0.0])]:
+        env = onset_env(sr, n, rise) if onset else None
+        ym = emulate_modes(modes if onset else with_build_up(modes, main_f, rise), sr, n, tau)
+        if onset:
+            ym = ym * env
         lag = ts.envelope_lag(ref, ym, sr)  # (the timbre score lines the notes up so; the noise moves with the modes)
         ym = shifted(ym, lag)
         Em = 10 ** (ma.band_energy_grid(ym, sr, EMU_EDGES) / 10)
@@ -335,9 +392,9 @@ def fit_attack_noise(x, sr, modes, main_a0, fc0, q0, floor=None, main_f=None):
         em2c = ma.smooth_env(ym, sr, 1.0) ** 2
         for fc in fcs:
             for T in NOISE_T:
-                key = (tau, fc, T, lag)
+                key = (tau, fc, T, lag, rise if onset else 0.0)
                 if key not in noise_cache:
-                    yn = shifted(carriers[fc] * noise_env(sr, n, tau, T) * chain, lag)
+                    yn = shifted(carriers[fc] * noise_env(sr, n, tau, T) * chain * (env if onset else 1.0), lag)
                     noise_cache[key] = (10 ** (ma.band_energy_grid(yn, sr, EMU_EDGES) / 10), ma.smooth_env(yn, sr, 0.5) ** 2,
                                         ma.smooth_env(yn, sr, 1.0) ** 2)
                 En, en2, en2c = noise_cache[key]
@@ -362,6 +419,50 @@ def fit_attack_noise(x, sr, modes, main_a0, fc0, q0, floor=None, main_f=None):
             'rise_ref_ms': round(rise_ref * 1000.0, 3)}
 
 
+SPLIT_TOP = 16       # (round 190nm) the strongest modes by energy tried as two components
+
+
+def split_modes(x, sr, kept, main, cfg):
+    """round 190nm: the strongest SPLIT_TOP kept modes, each fitted as two components on its complex track
+    (modal_analysis.fit_two: a two-stage decay or a beating pair); a mode whose track two components follow clearly
+    better becomes two modes (part 1 the stronger at the strike, part 2 the other, its sign as fitted). The lanes stay
+    within MAX_LANES: each split takes the place of the weakest unsplit mode (never the main mode)."""
+    hop = max(1, int(sr * 0.005))
+    order = sorted(kept, key=lambda m: -m['a0'] ** 2 * min(m['t60'], 3.0))
+    out = list(kept)
+    tried = 0
+    for m in order:
+        if tried >= cfg.get('split_top', SPLIT_TOP):
+            break
+        if m.get('absolute') or not any(q is m for q in out):
+            continue  # (an absolute line, or a weak mode an earlier split took the place of)
+        tried += 1
+        t, z = ma.track_complex(x, sr, m['f'], m['win'], hop)
+        single = ma.fit_decay(t, np.abs(z))
+        two = ma.fit_two(t, z, single, max_split_hz=cfg.get('split_hz', 3.0), min_gain_db=cfg.get('split_gain_db', 0.6))
+        if two is None:
+            continue
+        if len(out) + 1 > MAX_LANES:
+            spare = [q for q in sorted(out, key=lambda q: q['a0'] ** 2 * min(q['t60'], 3.0)) if q is not main and not q.get('part')
+                     and q is not m]
+            if not spare:
+                break
+            out.remove(spare[0])
+        if cfg.get('window_exact'):
+            for p in two['parts']:
+                p['a0'] /= ma.window_gain(p['t60'], m['win'], sr)
+        p1, p2 = sorted(two['parts'], key=lambda p: -p['a0'])
+        # (the main mode's stronger part stays at the main mode's frequency: the note's tuning and the key's ratio 1)
+        shift = p1['df'] if m is main else 0.0
+        a = dict(m, f=m['f'] + p1['df'] - shift, a0=p1['a0'], t60=p1['t60'], part=1, split=two)
+        b = dict(m, f=m['f'] + p2['df'] - shift, a0=p2['a0'], t60=p2['t60'], part=2, invert=p2['sign'] * p1['sign'] < 0, sibling=a)
+        for q in (a, b):
+            q['energy'] = q['a0'] ** 2 * q['t60']
+        i = next(j for j, q in enumerate(out) if q is m)
+        out[i:i + 1] = [a, b]
+    return out
+
+
 def fit_note(path, cfg, sympathetic_lines=None):
     x, sr = ma.read_wav(path)
     on = ma.onset(x, sr)
@@ -369,7 +470,7 @@ def fit_note(path, cfg, sympathetic_lines=None):
     name = os.path.basename(path)
     key = label_key(name)
     f_nom = hz(key)
-    modes = ma.analyse_modes(x, sr, fmin=cfg['fmin'] * f_nom, k=56, prom_db=10.0)
+    modes = ma.analyse_modes(x, sr, fmin=cfg['fmin'] * f_nom, k=cfg.get('peaks', 56), prom_db=10.0, window_exact=cfg.get('window_exact', False))
     if not modes:
         raise ValueError('no modes: %s' % name)
     top = max(m['a0'] for m in modes)
@@ -396,31 +497,38 @@ def fit_note(path, cfg, sympathetic_lines=None):
             else:
                 keep.append(m)
         modes = keep
-    kept = select_modes(modes, main, cfg['modes'], cfg.get('long', LONG_MODES))
+    kept = select_modes(modes, main, cfg['modes'], cfg.get('long', LONG_MODES), cfg.get('cover', False))
+    if cfg.get('split'):
+        kept = split_modes(x, sr, kept, main, cfg)
+    # (round 190nm: the two parts of a split mode share their mode's shape - one physical mode)
+    whole = [m for m in kept if m.get('part', 0) != 2]
     if cfg['series'] is None:
-        shapes, kmain = uniform_shapes(sorted(kept, key=lambda m: -m['energy']), main['f'])
-        order = sorted(kept, key=lambda m: -m['energy'])
+        shapes, kmain = uniform_shapes(sorted(whole, key=lambda m: -m['energy']), main['f'])
+        order = sorted(whole, key=lambda m: -m['energy'])
         shape = {id(m): s for m, s in zip(order, shapes)}
     else:
-        shape = {id(m): shape_of(m['f'] / main['f'], cfg['series'], cfg['beam']) for m in kept}
+        shape = {id(m): shape_of(m['f'] / main['f'], cfg['series'], cfg['beam']) for m in whole}
         kmain = 1
     # one mode per bending order (the strongest); the rest keep no position law
     seen = {}
-    for m in sorted(kept, key=lambda m: -m['energy']):
+    for m in sorted(whole, key=lambda m: -m['energy']):
         s = shape[id(m)]
         if s and s in seen:
             shape[id(m)] = 0
         elif s:
             seen[s] = m
+    for m in kept:
+        if m.get('part', 0) == 2:
+            shape[id(m)] = shape[id(m['sibling'])]
     # strike: a first guess of the noise's band from the notched residual, then the contact and the noise fitted through
     # the engine's emulated first 150 ms (the modes kept, with their strike-point signs at the default position)
     guess = noise_fit(x, sr, modes, main['a0'])
     u_ref = cfg['pos'][1] + (cfg['pos'][2] - cfg['pos'][1]) * cfg['pos'][0]
-    emu = [(m['f'], m['a0'], min(m['t60'], 60.0), -1.0 if shape[id(m)] and mode_shape(cfg['beam'], shape[id(m)], u_ref) < 0 else 1.0)
-           for m in kept]
+    emu = [(m['f'], m['a0'], min(m['t60'], 60.0), (-1.0 if m.get('invert') else 1.0) *
+            (-1.0 if shape[id(m)] and mode_shape(cfg['beam'], shape[id(m)], u_ref) < 0 else 1.0)) for m in kept]
     import timbre_score as ts
     floor = ts.band_floor(ma.band_energy_grid(x, sr, ts.time_edges(len(x) / sr)))
-    nz = fit_attack_noise(x, sr, emu, main['a0'], guess['noiseHz'], guess['noiseQ'], floor, main['f'])
+    nz = fit_attack_noise(x, sr, emu, main['a0'], guess['noiseHz'], guess['noiseQ'], floor, main['f'], cfg.get('onset', False))
     contact = nz.pop('contact')
     rise = nz['rise_ref_ms'] / 1000.0
     # (ratio = f / (the key's equal-tempered frequency x the tuning offset): the main mode lands on ratio 1, in tune)
@@ -429,7 +537,7 @@ def fit_note(path, cfg, sympathetic_lines=None):
     out_modes = [{'ratio': float(m['f'] / (f_nom if m.get('absolute') else f_tuned)),
                   'ampDb': float(20 * np.log10(m['a0'] / main['a0'])), 't60': float(min(m['t60'], 60.0)),
                   'shape': 0 if m.get('absolute') else int(shape[id(m)]), 'absolute': bool(m.get('absolute')),
-                  'f_hz': m['f'], 'fit_rms_db': m['rms_db']}
+                  'f_hz': m['f'], 'fit_rms_db': m['rms_db'], **({'part': m['part'], 'invert': bool(m.get('invert'))} if m.get('part') else {})}
                  for m in sorted(kept, key=lambda m: m['f'])]
     return {'file': name, 'key': key, 'tuning_offset_cents': round(float(offset), 2), 'label_octave_check': octave_check,
             'main_hz': main['f'], 'gainDb': float(20 * np.log10(main['a0'])), 'contact': contact, 'rise_ms': rise * 1000.0,
@@ -491,15 +599,15 @@ def calibrate(instrument, root, manifest, outdir, holdout=0, inc_dir=None, repor
     pos_ref, u0, u1 = cfg['pos']
     anchors = [{'key': float(f['key']), 'velocity': float(f['velocity']), 'gainDb': float(f['gainDb']), 'contact': f['contact'], 'riseMs': f['riseMs'],
                 'noiseDb': f['noiseDb'], 'noiseHz': f['noiseHz'], 'noiseQ': f['noiseQ'], 'noiseMs': f['noiseMs'],
-                'modes': [dict({k: m[k] for k in ('ratio', 'ampDb', 't60', 'shape')}, **({'fam': lpm.ABSOLUTE} if m.get('absolute') else {}))
+                'modes': [dict({k: m[k] for k in ('ratio', 'ampDb', 't60', 'shape')}, **({'fam': lpm.ABSOLUTE} if m.get('absolute') else {}),
+                               **({'part': m['part'], 'invert': m['invert']} if m.get('part') else {}))
                           for m in f['modes']]} for f in fits]
     keyfit.families(anchors)  # (round 190nl: the engine pairs the same mode across keys by its family)
     tag = instrument + ('-holdout%d' % holdout if holdout else '') + ('f%d' % fold if holdout and fold else '')
     provenance = {
         'instrument': instrument, 'table': tag + '.lpm', 'tool': 'tools/physmod/calibrate.py ' + TOOL_VERSION,
         'date': datetime.date.today().isoformat(),
-        'pipeline': 'calibrate.py fit (modes, tuning, strike first guess), then refine.py (the strike refined through the engine '
-                    'against the timbre score\'s attack and spectro-temporal parts); round 190nl',
+        'pipeline': PIPELINE,
         'data_policy': 'CC0 only; fitted parameters ship, no audio; synthesised attack (no recorded transient)',
         'source': {'library': 'Versilian Community Sample Library (VCSL)', 'url': manifest['source'], 'commit': manifest['commit'],
                    'licence': manifest['licence'], 'licence_sha256': manifest.get('licence_sha256'),
@@ -512,7 +620,7 @@ def calibrate(instrument, root, manifest, outdir, holdout=0, inc_dir=None, repor
     pbytes = json.dumps(provenance, indent=1, sort_keys=True).encode()
     os.makedirs(outdir, exist_ok=True)
     data = lpm.write(os.path.join(outdir, tag + '.lpm'), instrument, cfg['beam'], pos_ref, u0, u1, gain_offset, anchors, pbytes,
-                     NOISE_ORDER)
+                     NOISE_ORDER, 1 if cfg.get('onset') else 0, 1 if cfg.get('fade') == 'power' else 0)
     open(os.path.join(outdir, tag + '.provenance.json'), 'wb').write(pbytes)
     report = {'instrument': instrument, 'bytes': len(data), 'anchors': len(anchors), 'modes': sum(len(a['modes']) for a in anchors),
               'gain_offset_db': gain_offset, 'held_out_keys': sorted(held),
@@ -538,6 +646,12 @@ def main():
     fold = int(a[a.index('--fold') + 1]) if '--fold' in a else 0
     inc = a[a.index('--inc-dir') + 1] if '--inc-dir' in a else None
     rep = a[a.index('--report-dir') + 1] if '--report-dir' in a else None
+    # (round 190nm) --set name=value[,name=value]: override the instruments' settings (variants; numbers parse as such)
+    if '--set' in a:
+        for kv in a[a.index('--set') + 1].split(','):
+            k, v = kv.split('=')
+            for i in (INSTRUMENTS if inst == 'all' else inst.split(',')):
+                INSTRUMENTS[i][k] = json.loads(v)
     for i in (INSTRUMENTS if inst == 'all' else inst.split(',')):
         calibrate(i, root, man, out, holdout, inc, rep, fold)
     return 0

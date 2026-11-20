@@ -46,26 +46,38 @@ def _layers(anchors):
 def families(anchors, tol=0.03, per_semitone=0.003, tol_cap=0.08, level_db=24.0):
     """sets m['fam'] (1-255) on every mode; modes of one layer's neighbouring anchors that are the same mode share it.
     A pair's cost is its log-ratio distance re the tolerance plus its level difference re `level_db` (a strong mode
-    continues as a strong mode, not as a weak line that happens to sit closer), lowest cost first, one to one."""
-    next_id = 1
+    continues as a strong mode, not as a weak line that happens to sit closer), lowest cost first, one to one.
+    (round 190nm: the main modes - ratio 1, the key's tuned mode - always pair with each other; and the working ids
+    start at 1000, so a family can no longer take the id 255 of the absolute lines before the final ids are given: with
+    more than 254 families a table had regular modes marked absolute)"""
+    absolute = {id(m) for a in anchors for m in a['modes'] if m.get('fam') == ABSOLUTE}
+    is_main = lambda m: abs(np.log(m['ratio'])) < 1e-3
+    next_id = 1000
     for layer in _layers(anchors).values():
         prev = None
         for a in layer:
             for m in a['modes']:
-                if m.get('fam') != ABSOLUTE:
-                    m['fam'] = 0
+                m['fam'] = 0
             if prev is not None:
                 lim = min(tol + per_semitone * abs(a['key'] - prev['key']), tol_cap)
                 pairs = []
                 for i, p in enumerate(prev['modes']):
-                    if p['fam'] == ABSOLUTE:
+                    if id(p) in absolute:
                         continue
                     for j, q in enumerate(a['modes']):
-                        if q['fam'] == ABSOLUTE:
+                        if id(q) in absolute:
+                            continue
+                        if is_main(p) and is_main(q):
+                            pairs.append((-1.0, i, j))
                             continue
                         d = abs(np.log(q['ratio'] / p['ratio']))
                         if d < lim:
-                            pairs.append((d / lim + abs(q['ampDb'] - p['ampDb']) / level_db, i, j))
+                            cost = d / lim + abs(q['ampDb'] - p['ampDb']) / level_db
+                            if p.get('part') or q.get('part'):
+                                # (round 190nm: the parts of a split mode - a two-stage decay, a beating pair - continue
+                                # as the same part: like decay, like role)
+                                cost += abs(np.log2(q['t60'] / p['t60'])) / 3.0 + (0.5 if p.get('part', 0) != q.get('part', 0) else 0.0)
+                            pairs.append((cost, i, j))
                 pairs.sort()
                 ui, uj = set(), set()
                 for d, i, j in pairs:
@@ -75,25 +87,25 @@ def families(anchors, tol=0.03, per_semitone=0.003, tol_cap=0.08, level_db=24.0)
                     uj.add(j)
                     a['modes'][j]['fam'] = prev['modes'][i]['fam']
             for m in a['modes']:
-                if m['fam'] == 0:
+                if m['fam'] == 0 and id(m) not in absolute:
                     m['fam'] = next_id
                     next_id += 1
             prev = a
-    # (absolute lines, family 255, keep their mark)
     # ids are u8: families seen in a single anchor only need none (the engine then uses the 4 % rule); the others get
     # ids 1..254, each the smallest id no other family uses at its keys or the neighbouring recorded keys, in ANY layer
     # (the engine compares neighbouring keys, and a note between two layers carries modes of both: two families that can
-    # meet never share an id; further away an id may repeat)
+    # meet never share an id; further away an id may repeat); absolute lines get 255
     count = {}
     for a in anchors:
         for m in a['modes']:
-            count[m['fam']] = count.get(m['fam'], 0) + 1
+            if id(m) not in absolute:
+                count[m['fam']] = count.get(m['fam'], 0) + 1
     keys = sorted(set(a['key'] for a in anchors))
     kidx = {k: i for i, k in enumerate(keys)}
     where = {}
     for a in anchors:
         for m in a['modes']:
-            if m['fam'] != ABSOLUTE and count[m['fam']] >= 2:
+            if id(m) not in absolute and count[m['fam']] >= 2:
                 where.setdefault(m['fam'], set()).add(kidx[a['key']])
     taken = [dict() for _ in keys]  # per recorded key: id -> family
     remap = {}
@@ -111,8 +123,7 @@ def families(anchors, tol=0.03, per_semitone=0.003, tol_cap=0.08, level_db=24.0)
             taken[j][new_id] = f
     for a in anchors:
         for m in a['modes']:
-            if m['fam'] != ABSOLUTE:
-                m['fam'] = remap.get(m['fam'], 0)
+            m['fam'] = ABSOLUTE if id(m) in absolute else remap.get(m['fam'], 0)
     return anchors
 
 

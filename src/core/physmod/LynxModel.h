@@ -16,6 +16,12 @@
 // Round 190nl: up to 48 modes per voice (the bells' and the kalimba's long, quiet upper partials), and the strike noise
 // through two band-pass sections where the table asks for it (-12 dB / octave skirts; the recordings' strikes are not
 // as broad as one section's -6 dB).
+// Round 190nm (tubular bells and kalimba): a partial may be two modes - a two-stage decay (a tine's fast start and slow
+// tail) or a beating pair (a tube's near-degenerate doublet), the second one possibly struck in antiphase (the mode's
+// invert flag); a table may ask for the whole note's onset 1 - e^(-t / rise) (a bell's, a tine's slow start) instead of
+// the resonated modes' build-up twins, and for an equal-power fade of the modes only one of two neighbouring keys has
+// (the other tines' and the body's lines). A note keeps the strongest modes its voice can play (with build-up twins,
+// 44; before, it lost its highest-frequency ones).
 //
 // The knobs act on that physics: Hardness scales the contact width (a harder mallet excites the high modes more and
 // clicks more), Position moves the strike point along the bar (each mode weighted by its shape there: the free-free
@@ -68,7 +74,9 @@ constexpr int stateSize = paramCount;
 struct TableMode
 {
     float ratio = 1.0f, ampDb = 0.0f, t60 = 1.0f;
-    std::uint8_t shape = 0;
+    std::uint8_t shape = 0;  // (the LPM byte's low 7 bits)
+    bool invert = false;     // (round 190nm: the LPM shape byte's bit 7) the mode starts in antiphase: the second component
+                             // of a doublet (a tube's or a tine's near-degenerate pair) struck so
     std::uint8_t family = 0; // (round 190nl) the same mode in a layer's neighbouring anchors; 0 = none (pair by ratio);
                              // absoluteFamily: a line at its own pitch (another tine ringing along), kept in Hz
 };
@@ -77,13 +85,20 @@ struct TableAnchor
 {
     float key = 60.0f, velocity = 1.0f, gainDb = 0.0f, contact = 0.0005f; // contact: the force pulse's time constant (s)
     float noiseDb = -60.0f, noiseHz = 2000.0f, noiseQ = 1.0f, noiseMs = 10.0f;
-    float riseMs = 0.0f; // the resonated modes' build-up (a tube re-radiating the fundamental); 0 = none
+    float riseMs = 0.0f; // the resonated modes' build-up (a tube re-radiating the fundamental), or with Table::onset the
+                         // whole note's onset time constant (ms); 0 = none
     std::uint16_t first = 0, count = 0;
 };
 struct Table
 {
     int model = 0, beam = 0; // beam 0: free-free bar / tube, 1: clamped-free tine
     int noiseOrder = 1;      // (round 190nl) strike-noise band-pass sections: 1 = -6 dB / octave skirts, 2 = -12 dB / octave
+    int fade = 0;            // (round 190nm, LPM header byte 15) between two recorded keys, a mode only one of them has
+                             // fades with 0: its amplitude (1 - t, t), 1: its power (equal power: the other tines' and the
+                             // body's lines of two neighbours keep their summed energy in the middle of a gap)
+    int onset = 0;           // (round 190nm, LPM header byte 14) 1: an anchor's riseMs is the whole note's onset - the voice's
+                             // output rises as 1 - e^(-t / rise) (a bell's, a tine's slow start) - instead of the resonated
+                             // modes' build-up twins; 0: the twins (tables before 190nm)
     float posRef = 0.25f, posU0 = 0.5f, posU1 = 0.95f, gainOffsetDb = 0.0f;
     std::array<std::uint8_t, 8> provenance {}; // the first bytes of the provenance record's SHA-256
     std::vector<TableAnchor> anchors;
@@ -102,6 +117,7 @@ struct NoteModes
     int count = 0;
     std::array<float, maxModes> hz {}, amp {}, t60 {};
     std::array<std::uint8_t, maxModes> shape {};
+    std::array<bool, maxModes> invert {}; // (round 190nm) the mode starts in antiphase
     float mainHz = 440.0f, gain = 1.0f, contact = 0.0005f, noiseAmp = 0.0f, noiseHz = 2000.0f, noiseQ = 1.0f, noiseMs = 10.0f;
     float riseMs = 0.0f;
 };

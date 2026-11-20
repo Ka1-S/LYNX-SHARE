@@ -259,7 +259,7 @@
   "MBira3_pluck_Main_D#4_k4_50_100_rr2.wav",
   "MBira3_pluck_Main_F4_k3_50_100_rr2.wav"
  ],
- "pipeline": "calibrate.py fit (modes, tuning, strike first guess), then refine.py (the strike refined through the engine against the timbre score's attack and spectro-temporal parts); round 190nl",
+ "pipeline": "calibrate.py fit (modes, tuning, strike first guess), then refine.py (the strike refined through the engine against the timbre score's attack and spectro-temporal parts; round 190nm: then each anchor's level matched through the engine, --level); rounds 190nl, 190nm",
  "source": {
   "commit": "c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e",
   "library": "Versilian Community Sample Library (VCSL)",
@@ -269,5 +269,5 @@
   "url": "https://github.com/sgossner/VCSL"
  },
  "table": "kalimba.lpm",
- "tool": "tools/physmod/calibrate.py 190nl-1"
+ "tool": "tools/physmod/calibrate.py 190nm-1"
 }

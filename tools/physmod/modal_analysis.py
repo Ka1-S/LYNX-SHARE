@@ -255,9 +255,20 @@ def track_window(f, neighbours, sr):
     return int(np.clip(max(3.0 * 2.0 * sr / max(sp, 1.0), 6.0 * sr / f), 256, 16384))
 
 
-def fit_decay(t, a, range_db=45.0, floor_margin_db=8.0, min_points=5):
+def window_gain(t60, win, sr):
+    """what a Hann window of `win` samples reads of a decaying partial re its value at the window's centre (> 1: the
+    window's earlier half weighs the louder past); 1 for a slow decay"""
+    w = np.hanning(int(win))
+    n = (np.arange(len(w)) - (len(w) - 1) / 2.0) / sr
+    return float((w * np.exp(-6.9078 / max(t60, 1e-3) * n)).sum() / w.sum())
+
+
+def fit_decay(t, a, range_db=45.0, floor_margin_db=8.0, min_points=5, win=None, sr=None):
     """exponential decay fitted in dB from the track's peak: {'a0' level at t=0, 't60' s, 'rms_db', 't_peak'} or None.
-    Uses the points between the peak and the first fall to (noise floor + margin) or (peak - range_db)."""
+    Uses the points between the peak and the first fall to (noise floor + margin) or (peak - range_db).
+    (round 190nm) With the track's window `win` (samples) and rate `sr`: a0 is corrected for what the window reads of a
+    fast decay (window_gain; a 0.15 s partial tracked with a 0.27 s window read 37 dB too loud). The timbre score
+    calls it without, as before."""
     if len(a) < min_points:
         return None
     adb = 20.0 * np.log10(a + 1e-12)
@@ -283,6 +294,8 @@ def fit_decay(t, a, range_db=45.0, floor_margin_db=8.0, min_points=5):
     # the level at t = 0: the fit at the peak, carried back over the first frame's offset only (a track that peaks
     # late - noise, a neighbour's leakage - must not be extrapolated over its whole rise)
     a0db = b0 + slope * t[pk] - slope * t[0]
+    if win is not None and sr:
+        a0db -= 20.0 * np.log10(window_gain(t60, win, sr))
     return {'a0': float(10 ** (min(a0db, b0) / 20.0)), 't60': float(t60), 'rms_db': rms_db, 't_peak': float(t[pk]),
             'peak_db': float(adb[pk]), 'floor_db': float(floor), 'points': int(len(idx))}
 
@@ -290,8 +303,9 @@ def fit_decay(t, a, range_db=45.0, floor_margin_db=8.0, min_points=5):
 WINDOWS = ((0.004, 0.08), (0.03, 1.0))
 
 
-def analyse_modes(x, sr, fmin=40.0, fmax=None, k=40, prom_db=12.0, hop_ms=5.0, peaks=None):
-    """the note's modes, strongest (energy a0^2 * t60) first: [{'f', 'a0', 't60', 'rms_db', 'energy', 'mag'}]"""
+def analyse_modes(x, sr, fmin=40.0, fmax=None, k=40, prom_db=12.0, hop_ms=5.0, peaks=None, window_exact=False):
+    """the note's modes, strongest (energy a0^2 * t60) first: [{'f', 'a0', 't60', 'rms_db', 'energy', 'mag'}]
+    (window_exact, round 190nm: a0 corrected for the tracking window, fit_decay)"""
     peaks = peaks if peaks is not None else pick_peaks(x, sr, fmin, fmax, k, prom_db)
     freqs = [p[0] for p in peaks]
     hop = max(1, int(sr * hop_ms / 1000.0))
@@ -299,9 +313,19 @@ def analyse_modes(x, sr, fmin=40.0, fmax=None, k=40, prom_db=12.0, hop_ms=5.0, p
     for f, mag, wi in peaks:
         win = track_window(f, freqs, sr)
         t, a = track(x, sr, f, win, hop)
-        p = fit_decay(t, a)
+        p = fit_decay(t, a, win=win if window_exact else None, sr=sr)
         if p is None:
             continue
+        if window_exact and p['t60'] < 2.0 * win / sr:
+            # (round 190nm: a partial that dies within its tracking window - a long window chosen to resolve a weak
+            # neighbour - is tracked again with a window of half its T60: a plucked tine's fast fundamental read
+            # through a 0.3 s window lost its first 20 dB and seemed to die four times too fast)
+            win2 = int(np.clip(0.5 * p['t60'] * sr, 256, win))
+            if win2 < win:
+                t2, a2 = track(x, sr, f, win2, hop)
+                p2 = fit_decay(t2, a2, win=win2, sr=sr)
+                if p2 is not None:
+                    p, win = p2, win2
         p['f'] = float(f)
         p['mag'] = float(mag)
         p['win'] = win
@@ -333,3 +357,90 @@ def band_energy_grid(x, sr, edges_s, centres=None):
             m = (fr >= c * 2 ** (-1 / 6)) & (fr < c * 2 ** (1 / 6))
             out[i, j] = 10.0 * np.log10(S[m].sum() / len(seg) + 1e-30) if m.any() else -200.0
     return out
+
+
+# --- round 190nm: two components per partial (a two-stage decay, a beating pair) ---------------------------------------
+
+def track_complex(x, sr, f, win, hop):
+    """(times, complex baseband track): the partial at f Hz as track() measures it, heterodyned to 0 Hz (a component
+    at f + d Hz turns at d Hz; the amplitude of a unit sine = 1)"""
+    win = int(min(win, len(x)))
+    if win < 16:
+        return np.zeros(0), np.zeros(0, complex)
+    w = np.hanning(win)
+    g = 2.0 / w.sum()
+    c = np.exp(-2j * np.pi * f * np.arange(win) / sr) * w * g
+    starts = np.arange(0, len(x) - win + 1, hop)
+    fr = np.lib.stride_tricks.sliding_window_view(x, win)[starts]
+    z = (fr @ c) * np.exp(-2j * np.pi * f * starts / sr)
+    return (starts + win / 2.0) / sr, z
+
+
+def _pencil(z, order):
+    """the poles of `order` damped complex exponentials in z (matrix pencil, pencil parameter len / 3)"""
+    n = len(z)
+    L = max(order, n // 3)
+    Y = np.lib.stride_tricks.sliding_window_view(z, L + 1)
+    U, s, Vh = np.linalg.svd(Y, full_matrices=False)
+    V = Vh[:order].T  # (the row space of Y: spanned by [1, p, p^2, ...] per pole)
+    V1, V2 = V[:-1], V[1:]
+    return np.linalg.eigvals(np.linalg.pinv(V1) @ V2)
+
+
+def fit_two(t, z, single, max_split_hz=3.0, min_gain_db=0.6, min_level_db=-30.0):
+    """a partial's track as TWO components (round 190nm): c (e^(l1 t) + rho e^(l2 t)), rho real (the strike drives both
+    components of a doublet - a near-degenerate pair of a tube or a tine - from rest, so they start in phase or in
+    antiphase); l = -alpha + i 2 pi d. Same d: a two-stage decay (a fast and a slow part); different d: a beating pair.
+    Fitted on the same span as fit_decay's single exponential (`single`, its result), by the matrix pencil on the complex
+    track, then rho by a search; kept only when the track's dB error falls by `min_gain_db` and both components matter.
+    Returns None or {'parts': [{'df' Hz re the tracked frequency, 'a0', 't60'}, ...], 'rms_db', 'rms_db_single'}"""
+    if single is None or len(t) < 12:
+        return None
+    adb = 20 * np.log10(np.abs(z) + 1e-12)
+    pk = int(np.argmax(adb))
+    stop = max(single['floor_db'] + 8.0, adb[pk] - 45.0)
+    below = np.nonzero(adb[pk:] < stop)[0]
+    end = pk + (int(below[0]) if len(below) else len(adb) - pk)
+    if end - pk < 12:
+        return None
+    tt, zz = t[pk:end], z[pk:end]
+    dt = tt[1] - tt[0]
+    # the single exponential's error on this span (a straight line in dB)
+    A1 = np.vstack([np.ones(len(tt)), tt]).T
+    sol, *_ = np.linalg.lstsq(A1, adb[pk:end], rcond=None)
+    rms1 = float(np.sqrt(np.mean((A1 @ sol - adb[pk:end]) ** 2)))
+    try:
+        poles = _pencil(zz, 2)
+    except np.linalg.LinAlgError:
+        return None
+    lam = np.log(poles.astype(complex) + 1e-30) / dt
+    alpha = -lam.real
+    df = lam.imag / (2 * np.pi)
+    if np.any(alpha <= 0.0) or np.any(np.abs(df) > max_split_hz) or not np.all(np.isfinite(lam)):
+        return None
+    E = np.exp(np.outer(tt - tt[0], lam))
+
+    def trial(rho):
+        b = E[:, 0] + rho * E[:, 1]
+        c = (b.conj() @ zz) / max((b.conj() @ b).real, 1e-30)
+        m = 20 * np.log10(np.abs(c * b) + 1e-12)
+        return float(np.sqrt(np.mean(np.minimum(np.abs(m - adb[pk:end]), 30.0) ** 2))), rho, c
+
+    # (rho: the free complex amplitudes' ratio projected onto the real axis, and a search over signed ratios)
+    cc, *_ = np.linalg.lstsq(E, zz, rcond=None)
+    q = cc[1] / cc[0] if abs(cc[0]) > 0 else 1.0
+    proj = abs(q) * (1.0 if q.real >= 0 else -1.0)
+    grid = np.concatenate([-np.geomspace(30.0, 0.03, 40), np.geomspace(0.03, 30.0, 40), [proj] if np.isfinite(proj) and proj != 0 else []])
+    best = min((trial(r) for r in grid), key=lambda q: q[0])
+    best = min([best] + [trial(best[1] * k) for k in np.geomspace(0.84, 1.19, 15)], key=lambda q: q[0])
+    err, rho, c = best
+    if err > rms1 - min_gain_db:
+        return None
+    # the components' levels at the span's start, carried back over the first frame's offset only (as fit_decay does)
+    a = np.abs(c) * np.array([1.0, abs(rho)]) * np.exp(alpha * t[0])
+    lv = 20 * np.log10(a / a.max())
+    if lv.min() < min_level_db:
+        return None
+    sign = [1.0, 1.0 if rho > 0 else -1.0]
+    parts = [{'df': float(df[k]), 'a0': float(a[k]), 't60': float(min(6.9078 / alpha[k], 120.0)), 'sign': sign[k]} for k in range(2)]
+    return {'parts': parts, 'rms_db': round(err, 3), 'rms_db_single': round(rms1, 3)}
