@@ -678,24 +678,31 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     rackTitleTools.addAndMakeVisible (rackLengthBox);
     rackTitleTools.addAndMakeVisible (rackGraphButton);
     rackTitleTools.layout = [this] {
+        // #229 (round 190nq): left to right at their full widths; a narrow Channel rack hides the tools that no longer fit
+        // (from the right end) instead of letting them run under its buttons
         auto r = rackTitleTools.getLocalBounds();
-        rackPatternSelector.setBounds (r.removeFromLeft (rackPatternSelectorWidth).reduced (0, 3));
-        r.removeFromLeft (6);
-        rackFilterBox.setBounds (r.removeFromLeft (rackFilterBoxWidth).reduced (0, 3));
-        r.removeFromLeft (4);
-        swingSlider.setBounds (r.removeFromLeft (26));
-        r.removeFromLeft (4);
-        rackLengthBox.setBounds (r.removeFromLeft (rackLengthBoxWidth).reduced (0, 3));
-        r.removeFromLeft (4);
-        rackGraphButton.setBounds (r.removeFromLeft (24).reduced (0, 1));
-        r.removeFromLeft (4);
-        rackPianoRollButton.setBounds (r.removeFromLeft (24).reduced (0, 1));
-        r.removeFromLeft (4);
-        rackFollowButton.setBounds (r.removeFromLeft (24).reduced (0, 1));
-        r.removeFromLeft (4);
-        rackLoopButton.setBounds (r.removeFromLeft (24).reduced (0, 1));
-        r.removeFromLeft (4);
-        rackLoopStarterButton.setBounds (r.removeFromLeft (24).reduced (0, 1));
+        auto place = [&r] (juce::Component& c, int width, int gapBefore, int dy, bool fixedHeight = false) {
+            const auto gap = r.getX() > 0 ? gapBefore : 0;
+            const auto fits = r.getWidth() >= gap + width;
+            c.setVisible (fits);
+            if (! fits)
+            {
+                r.setWidth (0);
+                return;
+            }
+            r.removeFromLeft (gap);
+            auto box = r.removeFromLeft (width);
+            c.setBounds (fixedHeight ? box : box.reduced (0, dy));
+        };
+        place (rackPatternSelector, rackPatternSelectorWidth, 0, 3);
+        place (rackFilterBox, rackFilterBoxWidth, 6, 3);
+        place (swingSlider, 26, 4, 0, true);
+        place (rackLengthBox, rackLengthBoxWidth, 4, 3);
+        place (rackGraphButton, 24, 4, 1);
+        place (rackPianoRollButton, 24, 4, 1);
+        place (rackFollowButton, 24, 4, 1);
+        place (rackLoopButton, 24, 4, 1);
+        place (rackLoopStarterButton, 24, 4, 1);
     };
     workspace.setTitleAccessory (Panel::channelRack, &rackTitleTools, rackTitleToolsWidth);
     workspace.setTitleAccessory (Panel::mixer, &mixer.getLayoutBox(), MixerLayoutBox::width); // FL's "Mixer layout" (issue #52)

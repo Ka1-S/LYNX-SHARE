@@ -46,6 +46,20 @@ constexpr int rackMaxWidth = 720, rackMinWidth = 420;
 // The panels that stay behind the others whatever is clicked: only the Browser, docked at the side as in FL. The
 // Playlist is a window like the others: clicking it brings it to front over the Channel Rack, and F6 brings the rack
 // back (FL 2026, round 168s / issue #32 [SHOT] r168s f02 → f03 → f04; it used to stay behind everything).
+// #229 (round 190nq): a panel's title bar when the panel is narrow. FL's Channel rack drops its "Channel rack" caption
+// first and keeps every tool (FL 2026 [SHOT] 190nq f20c -> f21c). `captionEnd` = where the menu button + caption end,
+// `tools` = the title tools' full width, `buttonsLeft` = the left edge of the close / maximise / dock buttons.
+constexpr bool titleCaptionFits (int captionEnd, int tools, int buttonsLeft) noexcept
+{
+    return tools <= 0 || captionEnd + tools <= buttonsLeft;
+}
+// The width the title tools get from `left`: all of it, or what is left before the buttons (the tools hide what
+// doesn't fit; they never run under the buttons).
+constexpr int titleToolsRoom (int left, int tools, int buttonsLeft) noexcept
+{
+    return tools < buttonsLeft - left ? tools : (buttonsLeft - left > 0 ? buttonsLeft - left : 0);
+}
+
 constexpr bool isBackground (Panel p) noexcept { return p == Panel::browser; }
 
 // Issue #192: where the Browser is docked. FL 2026 docks its Browser in the main window's left or right dock site
