@@ -176,7 +176,10 @@ void MainComponent::applyWelcomeChoice (Choice choice)
         default:
             break;
     }
-    if (onboarding::showsMixer (choice))
+    // the Mixer of the timeline group comes up with the first track (coordinator 190np: shown at once, it covered the
+    // New-track card); F9 shows it any time before that
+    mixerAfterFirstTrack = onboarding::showsMixer (choice) && simpletracks::isEmptySong (engine.getSong());
+    if (onboarding::showsMixer (choice) && ! mixerAfterFirstTrack)
         showPanel (Panel::mixer);
     if (! onboarding::next3 (choice).empty())
         showGettingStarted();
@@ -306,6 +309,18 @@ void MainComponent::updateOnboarding()
 {
     if (! onboardingOn)
         return;
+    if (mixerAfterFirstTrack && ! simpletracks::isEmptySong (engine.getSong()))
+    {
+        mixerAfterFirstTrack = false;
+        if (! workspace.isPanelVisible (Panel::mixer))
+            juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<MainComponent> (this)] {
+                if (safe != nullptr)
+                {
+                    safe->showPanel (Panel::mixer);
+                    safe->placeOnboardingCards();
+                }
+            });
+    }
     if (next3Card != nullptr)
     {
         const auto before = onboard.ticked;
@@ -494,7 +509,7 @@ void MainComponent::placeOnboardingCards()
                           .constrainedWithin (getLocalBounds().withTrimmedTop (toolbarHeight));
         // never over the Mixer (shown with the timeline choice, or by F9): above it, else at the Playlist's top
         if (mixer.isShowing() || (! persistent && mixer.isVisible()))
-            if (const auto m = onboardui::areaIn (*this, mixer); m.intersects (bounds))
+            if (const auto m = onboardui::areaIn (*this, mixer).withTrimmedTop (-30); m.intersects (bounds)) // (with its panel's title row)
             {
                 const auto top = area.getY() + PlaylistComponent::toolbarHeight + 16;
                 bounds.setY (m.getY() - h - 16 >= top ? m.getY() - h - 16 : top);

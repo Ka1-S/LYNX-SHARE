@@ -219,6 +219,7 @@ public:
     onboardui::EmptyHintCard* emptyHintForSnapshot() const noexcept { return emptyHint.get(); }
     const onboarding::State& onboardingStateForCheck() const noexcept { return onboard; }
     onboarding::Context& onboardingContextForCheck() noexcept { return onboardCtx; }
+    bool mixerShownForCheck() const { return workspace.isPanelVisible (workspace::Panel::mixer); }
     void updateOnboarding(); // the song or the view changed: the Next-3 ticks and the empty-state hint
     // --demo (ui/DemoMode.cpp): the Remote Control API's ui.* / session.* operations, run on the message thread
     juce::var handleDemoOp (const juce::String& op, const juce::var& args);
@@ -1062,6 +1063,7 @@ private:
     onboarding::TipGate tipGate;
     bool onboardingOn = false; // the real window (or a shot that asked for it)
     int onboardingTicks = 0;
+    bool mixerAfterFirstTrack = false; // the timeline group's Mixer: shown with the first track
     std::unique_ptr<onboardui::Next3Card> next3Card;
     std::unique_ptr<onboardui::TipCard> tipCard;
     juce::Component::SafePointer<juce::Component> tipAnchor;

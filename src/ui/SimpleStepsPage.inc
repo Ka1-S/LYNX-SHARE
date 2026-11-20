@@ -227,12 +227,22 @@ public:
                 const auto lit = row == litRow;
                 const auto ink = lit ? colourOfTrack : colour::textSecondary;
                 ui::drawTrackIcon (g, iconFor (song.channels[(std::size_t) ch]), juce::Rectangle<float> (14.0f, 14.0f).withCentre ({ (float) head.getX() + 12.0f, (float) head.getCentreY() }), ink);
+                // round 190np (coordinator review): the sound's name (elided when long; the tooltip has it whole), and
+                // BandLab's typing key as a small badge at the right of the column (it was the key alone: "J E I F O A")
+                auto label = head.withTrimmedLeft (26).withTrimmedRight (4);
                 if (const auto key = simplesteps::rowKey (row); key != 0)
                 {
-                    g.setColour (lit ? colourOfTrack : colour::textSecondary);
-                    g.setFont (font (type::small, true));
-                    g.drawText (juce::String::charToString ((juce::juce_wchar) key), head.withTrimmedLeft (26).withWidth (16), juce::Justification::centredLeft, false);
+                    const auto badge = label.removeFromRight (keyBadgeWidth).withSizeKeepingCentre (keyBadgeWidth, juce::jmin (16, rowHeight));
+                    g.setColour (colour::bg4);
+                    g.fillRoundedRectangle (badge.toFloat(), radius::sm);
+                    g.setColour (lit ? colourOfTrack : colour::textDisabled);
+                    g.setFont (font (type::caption, true));
+                    g.drawText (juce::String::charToString ((juce::juce_wchar) key), badge, juce::Justification::centred, false);
+                    label.removeFromRight (4);
                 }
+                g.setColour (lit ? colourOfTrack : colour::textSecondary);
+                g.setFont (font (type::small, true));
+                g.drawText (rowName (ch), label, juce::Justification::centredLeft, true);
             }
             for (int s = 0; s < steps; ++s)
             {
@@ -300,6 +310,14 @@ public:
         top.removeFromRight (8);
         playButton = top.removeFromRight (28).withSizeKeepingCentre (28, 28);
         r.removeFromTop (8);
+        // round 190np: the row-name column fits the longest sound name (icon, name, key badge), up to a sixth of the width
+        {
+            const auto nameFont = font (type::small, true);
+            int widest = 0;
+            for (const auto ch : rows)
+                widest = juce::jmax (widest, juce::roundToInt (juce::GlyphArrangement::getStringWidth (nameFont, rowName (ch))));
+            headWidth = juce::jlimit (minHeadWidth, juce::jmax (minHeadWidth, r.getWidth() / 6), 26 + widest + 6 + keyBadgeWidth + 8);
+        }
         rulerArea = r.removeFromTop (16).withTrimmedLeft (headWidth);
         r.removeFromTop (2);
         gridArea = r;
@@ -308,7 +326,17 @@ public:
         rulerArea = rulerArea.withRight (gridArea.getRight());
     }
 
-    void mouseMove (const juce::MouseEvent& e) override { setHover (e.getPosition()); }
+    void mouseMove (const juce::MouseEvent& e) override
+    {
+        setHover (e.getPosition());
+        // round 190np: the row-name column's tooltip: the whole name and its typing key
+        const auto p = e.getPosition();
+        if (const auto row = rowAt (p.y); row >= 0 && p.x >= gridArea.getX() && p.x < gridArea.getX() + headWidth)
+        {
+            const auto key = simplesteps::rowKey (row);
+            setTooltip (rowName (rows[(std::size_t) row]) + (key != 0 ? " (" + tr ("key {0}", { juce::String::charToString ((juce::juce_wchar) key) }) + ")" : juce::String()));
+        }
+    }
     void mouseExit (const juce::MouseEvent&) override { setHover ({ -1, -1 }); }
 
     void mouseDown (const juce::MouseEvent& e) override
@@ -403,7 +431,13 @@ public:
 
 private:
     enum class Part { none, length, swing, play, letter, add, cell };
-    static constexpr int headWidth = 56, gap = 2, maxSteps = 1024;
+    static constexpr int minHeadWidth = 96, keyBadgeWidth = 16, gap = 2, maxSteps = 1024;
+    int headWidth = minHeadWidth; // (round 190np: follows the names, resized())
+    juce::String rowName (int channel) const
+    {
+        const auto& song = engine.getSong();
+        return channel >= 0 && channel < (int) song.channels.size() ? juce::String::fromUTF8 (song.channels[(std::size_t) channel].name.c_str()) : juce::String();
+    }
 
     AudioEngine& engine;
     int track = -1, letter = 0, pattern = -1, steps = 16, rowHeight = 20;

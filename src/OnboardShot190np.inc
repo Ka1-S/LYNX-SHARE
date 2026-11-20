@@ -169,10 +169,15 @@
                     for (int t = 0; t < (int) song.playlistTracks.size(); ++t)
                         drums = drums || simpletracks::kindOf (song, t) == simpletracks::Kind::drums;
                     check ("mobile: the starter beat (a Drums track with notes)", drums && onboarding::anyPatternHasNotes (song));
+                    settle();
+                    if (auto* dm = ui.findChildWithID ("simple.dock.drumMachine") != nullptr ? ui.findChildWithID ("simple.dock.drumMachine")
+                                                                                              : onboardui::findShowing (ui, "simple.dock.drumMachine"))
+                        write (*dm, dm->getLocalBounds(), "drum-machine");
                     break;
                 }
                 case Choice::timeline:
                     check ("timeline: the New-track card", simple != nullptr && simple->isChooserShowing());
+                    check ("timeline: no Mixer over the New-track card yet", ! ui.mixerShownForCheck());
                     break;
                 case Choice::newcomer:
                     check ("new: the first-song tour runs", simple != nullptr && simple->tourRunning());
@@ -193,6 +198,18 @@
                 write (*n, n->getLocalBounds(), juce::String ("next3-") + e.name);
             if (e.choice == Choice::live)
                 check ("live: the empty clip grid shows its hint", hintKind() == onboarding::EmptyHint::clipGrid);
+            if (e.choice == Choice::timeline && simple != nullptr)
+            {
+                // the first track (the chooser's Instrument tile does the same): the Mixer comes up, the card closes
+                simple->doTourStep (tour::instrument);
+                settle();
+                check ("timeline: the first track brings up the Mixer", ui.mixerShownForCheck() && ! simple->isChooserShowing());
+                check ("timeline: the Next-3 card ticks the instrument track and the Mixer",
+                       onboarding::ticked (ui.onboardingStateForCheck(), onboarding::Item::instrumentTrack));
+                whole ("choice-timeline-first-track");
+                if (auto* n = ui.next3ForSnapshot())
+                    write (*n, n->getLocalBounds(), "next3-timeline-first-track");
+            }
             if (e.choice == Choice::mobile)
             {
                 // the items tick from what the song and the view show
