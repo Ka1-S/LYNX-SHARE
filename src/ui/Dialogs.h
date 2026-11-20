@@ -32,6 +32,11 @@ std::unique_ptr<juce::AlertWindow> makeMidiImportDialog();
 // `onDone(name, colour)` runs when the user confirms (colour 0 = automatic / theme default).
 void showNameAndColourDialog (const juce::String& title, const juce::String& name, std::uint32_t colour,
                               std::function<void (const juce::String&, std::uint32_t)> onDone);
+// FL's "Rename, color and icon" (issue #220, round 190ng; FL's name dialog has an Icon button, F5): the same window with
+// LYNX's icon picker and its search box under the colours. `icon` is FL's index (0 = none); `onDone(name, colour, icon)`.
+// `focusIcons`: the icon search box takes the keys first (the F3 key of the Playlist, Mixer and Channel rack).
+void showNameColourIconDialog (const juce::String& title, const juce::String& name, std::uint32_t colour, int icon,
+                               std::function<void (const juce::String&, std::uint32_t, int)> onDone, bool focusIcons = false);
 
 // FL's "Gradient editor" (mixer "Gradient color...", REA_rodada177a §5): First and Last swatches with the blend over
 // `count` tracks, copy / swap buttons and LYNX's colour picker for the swatch being edited. Accept gives the two colours;
@@ -94,5 +99,7 @@ juce::PopupMenu manageMenu();                     // FL's "Manage messages" menu
 } // namespace messages
 
 // The dialog itself, for --snapshot mode.
-std::unique_ptr<juce::AlertWindow> makeNameAndColourDialog (const juce::String& title, const juce::String& name, std::uint32_t colour);
+std::unique_ptr<juce::AlertWindow> makeNameAndColourDialog (const juce::String& title, const juce::String& name, std::uint32_t colour, int icon = -1);
+namespace ui { class TrackIconPicker; }
+ui::TrackIconPicker* iconPickerOfNameDialog (juce::AlertWindow& dialog); // (the --snapshot / test routes)
 } // namespace lynx

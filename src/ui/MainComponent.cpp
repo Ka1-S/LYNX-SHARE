@@ -1,5 +1,6 @@
 #include "ui/ControllerBridge.h"
 #include "ui/KeyFocus.h"
+#include "ui/TrackIcons.h"
 #include "core/EscClose.h"
 #include "core/DetailChain.h"
 #include "core/MeterScale.h"
@@ -2505,6 +2506,20 @@ bool MainComponent::runAction (const std::string& id)
     {
         if (const auto c = engine.getSelectedChannel(); c >= 0 && c < (int) engine.getSong().channels.size())
             rack.rename (c);
+    }
+    else if (is ("rack.changeIcon")) // issue #220 (round 190ng): F3, the icon picker of the selected channel
+    {
+        if (const auto c = engine.getSelectedChannel(); c >= 0 && c < (int) engine.getSong().channels.size())
+        {
+            const auto mouse = juce::Desktop::getMousePosition();
+            ui::showTrackIconPicker ({ mouse.x, mouse.y, 1, 1 }, engine.getSong().channels[(std::size_t) c].icon, [this, targets = engine.getSelectedChannels(), c] (int icon) {
+                engine.editSong ([targets, c, icon] (Song& s) {
+                    for (const auto t : targets.empty() ? std::vector<int> { c } : targets)
+                        if (t >= 0 && t < (int) s.channels.size())
+                            s.channels[(std::size_t) t].icon = icon;
+                });
+            });
+        }
     }
     else if (is ("rack.rotateLeft")) rack.rotateSelected (-1);
     else if (is ("rack.rotateRight")) rack.rotateSelected (1);

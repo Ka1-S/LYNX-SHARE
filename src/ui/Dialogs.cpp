@@ -13,6 +13,7 @@
 #include "ui/ColourPicker.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
+#include "ui/TrackIcons.h"
 #include "ui/WindowOwner.h"
 
 namespace lynx
@@ -88,7 +89,9 @@ private:
 class NameAndColourWindow final : public juce::AlertWindow
 {
 public:
-    NameAndColourWindow (const juce::String& title, const juce::String& name, std::uint32_t colour)
+    // `icon` (FL's index, 0 = none; -1 = no icon section): issue #220 (round 190ng), FL's "Rename, color and icon" sets the
+    // icon in the same window (FL: its Icon button, F5); LYNX shows its icon picker with the search box under the colours
+    NameAndColourWindow (const juce::String& title, const juce::String& name, std::uint32_t colour, int icon = -1)
         : juce::AlertWindow (title, {}, juce::MessageBoxIconType::NoIcon), swatches (colour)
     {
         addTextEditor ("name", name, tr ("Name"));
@@ -112,6 +115,18 @@ public:
                 picker.setColour (juce::Colour (swatches.colour), false);
         };
         addCustomComponent (&picker);
+        if (icon >= 0)
+        {
+            iconTitle.setText (tr ("Icon") + "  (F5)", juce::dontSendNotification);
+            iconTitle.setFont (theme::font (theme::type::small, true));
+            iconTitle.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+            iconTitle.setSize (swatches.getWidth(), 18);
+            addCustomComponent (&iconTitle);
+            const auto columns = juce::jmax (8, (swatches.getWidth() - 12) / 30);
+            icons = std::make_unique<ui::TrackIconPicker> (icon, columns, nullptr);
+            icons->setSize (juce::jmax (icons->getWidth(), swatches.getWidth()), icons->getHeight());
+            addCustomComponent (icons.get());
+        }
         addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
         addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
 
@@ -126,16 +141,25 @@ public:
             swatches.pickRandom();
             return true;
         }
+        if (key.getKeyCode() == juce::KeyPress::F5Key && icons != nullptr) // FL's "Icon  F5"
+        {
+            icons->focusSearch();
+            return true;
+        }
 
         return juce::AlertWindow::keyPressed (key);
     }
 
     std::uint32_t colour() const { return swatches.colour; }
+    int icon() const { return icons != nullptr ? icons->pickedFlIndex() : -1; }
+    ui::TrackIconPicker* iconPicker() const noexcept { return icons.get(); }
 
 private:
     Swatches swatches;
     juce::Label hint;
     ui::ColourPicker picker { juce::Colours::grey, true };
+    juce::Label iconTitle;
+    std::unique_ptr<ui::TrackIconPicker> icons;
 };
 
 // One big choice of the record dialog: a title line and a note below it. The note is never cut (round 190cj: the
@@ -518,13 +542,28 @@ void showRecordChoiceDialog (std::function<void (int, bool)> onChoice)
     keepAboveMainWindow (*window);
 }
 
-std::unique_ptr<juce::AlertWindow> makeNameAndColourDialog (const juce::String& title, const juce::String& name, std::uint32_t colour)
+std::unique_ptr<juce::AlertWindow> makeNameAndColourDialog (const juce::String& title, const juce::String& name, std::uint32_t colour, int icon)
 {
-    return std::make_unique<NameAndColourWindow> (title, name, colour);
+    return std::make_unique<NameAndColourWindow> (title, name, colour, icon);
+}
+
+ui::TrackIconPicker* iconPickerOfNameDialog (juce::AlertWindow& dialog)
+{
+    auto* w = dynamic_cast<NameAndColourWindow*> (&dialog);
+    return w != nullptr ? w->iconPicker() : nullptr;
 }
 
 void showNameAndColourDialog (const juce::String& title, const juce::String& name, std::uint32_t colour,
                               std::function<void (const juce::String&, std::uint32_t)> onDone)
+{
+    showNameColourIconDialog (title, name, colour, -1, [onDone] (const juce::String& n, std::uint32_t c, int) {
+        if (onDone)
+            onDone (n, c);
+    });
+}
+
+void showNameColourIconDialog (const juce::String& title, const juce::String& name, std::uint32_t colour, int icon,
+                               std::function<void (const juce::String&, std::uint32_t, int)> onDone, bool focusIcons)
 {
     // Issue #179: one rename window at a time, as in FL (F4 pressed again, or held, opened one more on every press and
     // spamming it crashed LYNX). A second request while one is open brings that one to the front.
@@ -534,16 +573,21 @@ void showNameAndColourDialog (const juce::String& title, const juce::String& nam
         existing->toFront (true);
         return;
     }
-    auto* window = new NameAndColourWindow (title, name, colour);
+    auto* window = new NameAndColourWindow (title, name, colour, icon);
     open = window;
     window->enterModalState (true, juce::ModalCallbackFunction::create ([window, onDone] (int result) {
                                  const auto typed = window->getTextEditorContents ("name").trim();
 
                                  if (result == 1 && typed.isNotEmpty())
-                                     onDone (typed, window->colour());
+                                     onDone (typed, window->colour(), window->icon());
                              }),
                              true);
     keepAboveMainWindow (*window);
+    if (focusIcons) // (F3: the icons first; round 190ng)
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<NameAndColourWindow> (window)] {
+            if (auto* w = safe.getComponent(); w != nullptr && w->iconPicker() != nullptr)
+                w->iconPicker()->focusSearch();
+        });
 }
 
 namespace

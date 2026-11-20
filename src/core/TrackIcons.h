@@ -11,8 +11,11 @@
 // No JUCE: tested in isolation.
 
 #include <array>
+#include <cctype>
 #include <cstdint>
+#include <string>
 #include <string_view>
+#include <vector>
 
 #ifndef TR_NOOP
  #define TR_NOOP(text) text // marks a literal for translation (tools/i18n_keys.py scans core too)
@@ -191,5 +194,61 @@ constexpr Icon iconFor (int flIndex) noexcept
         case 240: return Icon::clock;          // small clock
         default: return Icon::tag;
     }
+}
+// Issue #220 (round 190ng): the picker's search box. `query` matches an icon when every word of it starts a word of the
+// icon's English name or of `translated` (the name in the user's language; empty: English only), ASCII case ignored:
+// "hat" finds Hi-hat, "el gu" Electric guitar. An empty query matches every icon. Returns indices into `entries`.
+inline bool startsWords (std::string_view text, std::string_view word)
+{
+    const auto lower = [] (char c) { return (char) std::tolower ((unsigned char) c); };
+    for (std::size_t i = 0; i + word.size() <= text.size(); ++i)
+    {
+        const auto atStart = i == 0 || text[i - 1] == ' ' || text[i - 1] == '-' || text[i - 1] == '(' || text[i - 1] == '/';
+        if (! atStart)
+            continue;
+        std::size_t k = 0;
+        while (k < word.size() && lower (text[i + k]) == lower (word[k]))
+            ++k;
+        if (k == word.size())
+            return true;
+    }
+    return false;
+}
+
+inline bool matches (std::string_view query, std::string_view english, std::string_view translated = {})
+{
+    std::size_t at = 0;
+    bool any = false;
+    while (at < query.size())
+    {
+        while (at < query.size() && query[at] == ' ')
+            ++at;
+        auto end = at;
+        while (end < query.size() && query[end] != ' ')
+            ++end;
+        if (end > at)
+        {
+            any = true;
+            const auto word = query.substr (at, end - at);
+            if (! startsWords (english, word) && (translated.empty() || ! startsWords (translated, word)))
+                return false;
+        }
+        at = end;
+    }
+    return any || query.find_first_not_of (' ') == std::string_view::npos;
+}
+
+template <typename Translate>
+std::vector<int> search (std::string_view query, Translate&& translate)
+{
+    std::vector<int> found;
+    for (int i = 0; i < (int) entries.size(); ++i)
+    {
+        const auto& e = entries[(std::size_t) i];
+        const std::string local = translate (e.name);
+        if (matches (query, e.name, local))
+            found.push_back (i);
+    }
+    return found;
 }
 } // namespace lynx::trackicons
