@@ -1332,16 +1332,18 @@ void MainComponent::resized()
     auto minHint = juce::jmax (menuWidth + 8, 320);
     const auto maxHint = room >= 3000 ? 1000 : 620;
     auto visible = toolbarlayout::fit (toolbarLayout, widths, gap, room, minHint);
-    // round 190nk (0.1.30 release QA): round 190mv's audio-editor button made the File panel one column wider, and at
-    // 1920 px the default toolbar then dropped the output scope (and on Windows clipped the meters), which 0.1.29 and FL
-    // show there. The button is the first thing to go: the File panel keeps its three columns whenever the fourth would
-    // cost a whole panel (an audio editor still opens from the Master's effect slots).
+    // round 190nk (0.1.30 release QA): the 0.1.30 toolbar grew (FL's hint and Last tweaked column, bigger transport
+    // tiles, round 190mv's audio-editor button as a fourth File column), so at 1920 px the default toolbar dropped the
+    // output scope and the Chord panel that 0.1.29 and FL show there (on Windows the meters were clipped too). Before
+    // a whole panel goes, the audio-editor column goes (an audio editor still opens from the Master's effect slots), then
+    // round 181b's tighter displays and gaps are used; whichever keeps the most panels wins, the wider form on a tie.
     fileWide = true;
+    const auto shownCount = [] (const std::array<bool, toolbarlayout::groupCount>& v) { return (int) std::count (v.begin(), v.end(), true); };
     {
         auto narrowFile = widths;
         narrowFile[(std::size_t) Group::file] = 3 * h + 4;
         const auto threeColumns = toolbarlayout::fit (toolbarLayout, narrowFile, gap, room, minHint);
-        if (std::count (threeColumns.begin(), threeColumns.end(), true) > std::count (visible.begin(), visible.end(), true))
+        if (shownCount (threeColumns) > shownCount (visible))
         {
             widths = narrowFile;
             visible = threeColumns;
@@ -1349,20 +1351,37 @@ void MainComponent::resized()
         }
     }
     // round 181b: the Chord detection panel is on the default toolbar, as in FL. At 1920 px it misses by about 90 px:
-    // tighter displays and gaps make the room (they get wider again when there is more); all the panels stay
-    if (toolbarLayout.visible && toolbarLayout.isShown (Group::chord) && ! visible[(std::size_t) Group::chord] && visible[(std::size_t) Group::record])
+    // tighter displays and gaps make the room (they get wider again when there is more); all the panels stay.
+    // (Round 190nk: also for the output scope and the meters, and with a three-column File panel if that keeps more.)
+    const auto dropped = [&] (Group g) { return toolbarLayout.isShown (g) && ! visible[(std::size_t) g]; };
+    if (toolbarLayout.visible && visible[(std::size_t) Group::record]
+        && (dropped (Group::chord) || dropped (Group::output) || dropped (Group::meters)))
     {
         auto tighter = widths;
         tighter[(std::size_t) Group::transport] -= 12 + 36; // the tempo and the song position, as narrow as the compact ones
         tighter[(std::size_t) Group::snap] -= 16;
         tighter[(std::size_t) Group::chord] = 88;
-        if (const auto fits = toolbarlayout::fit (toolbarLayout, tighter, 13, room, minHint); fits[(std::size_t) Group::chord])
+        auto fits = toolbarlayout::fit (toolbarLayout, tighter, 13, room, minHint);
+        auto tighterFileWide = fileWide;
+        if (fileWide)
+        {
+            auto tighter3 = tighter;
+            tighter3[(std::size_t) Group::file] = 3 * h + 4;
+            if (const auto fits3 = toolbarlayout::fit (toolbarLayout, tighter3, 13, room, minHint); shownCount (fits3) > shownCount (fits))
+            {
+                tighter = tighter3;
+                fits = fits3;
+                tighterFileWide = false;
+            }
+        }
+        if (shownCount (fits) > shownCount (visible))
         {
             widths = tighter;
             tempoWidth -= 12;
             timeWidth -= 36;
             gap = 13;
             visible = fits;
+            fileWide = tighterFileWide;
         }
     }
     // round 170e3: rather than dropping the recording switches on a narrow window (1280-1440 px), the panels get
