@@ -1353,35 +1353,76 @@ void MainComponent::resized()
     // round 181b: the Chord detection panel is on the default toolbar, as in FL. At 1920 px it misses by about 90 px:
     // tighter displays and gaps make the room (they get wider again when there is more); all the panels stay.
     // (Round 190nk: also for the output scope and the meters, and with a three-column File panel if that keeps more.)
+    // Round 190nr: 0.1.30's FL-look menu text and captions are wider than 0.1.29's (measured at 1920 px against 0.1.29:
+    // the menu bar +33 px on Linux, the Pattern / Song switch and the snap captions +6 px each, the File panel's fourth
+    // column +33 px), so even the tight form dropped the Chord panel that 0.1.29 and FL show at 1920 px. Two more forms
+    // are tried, each only when it keeps more panels: gaps 1 px tighter and the output scope 12 px narrower (it gets the
+    // spare room back first), then, where the menu bar sets the hint column's width (above the 320 px floor), the menu's
+    // tight item padding (round 165o's, as for long translated menus). The hint column never gets narrower than that floor.
     const auto dropped = [&] (Group g) { return toolbarLayout.isShown (g) && ! visible[(std::size_t) g]; };
     if (toolbarLayout.visible && visible[(std::size_t) Group::record]
         && (dropped (Group::chord) || dropped (Group::output) || dropped (Group::meters)))
     {
+        struct Form
+        {
+            std::array<int, toolbarlayout::groupCount> widths;
+            int gap, minHint;
+            bool fileWide, tightMenu;
+            std::array<bool, toolbarlayout::groupCount> fits;
+        };
         auto tighter = widths;
         tighter[(std::size_t) Group::transport] -= 12 + 36; // the tempo and the song position, as narrow as the compact ones
         tighter[(std::size_t) Group::snap] -= 16;
         tighter[(std::size_t) Group::chord] = 88;
-        auto fits = toolbarlayout::fit (toolbarLayout, tighter, 13, room, minHint);
-        auto tighterFileWide = fileWide;
-        if (fileWide)
+        const auto tightMenuWidth = [&] {
+            menuBar.getProperties().set ("lynxTightMenuBar", true);
+            const auto w = measureMenu();
+            menuBar.getProperties().set ("lynxTightMenuBar", false);
+            return w;
+        };
+        const auto alreadyTight = (bool) menuBar.getProperties().getWithDefault ("lynxTightMenuBar", false);
+        std::vector<Form> forms;
+        for (int level = 0; level < 3; ++level)
         {
-            auto tighter3 = tighter;
-            tighter3[(std::size_t) Group::file] = 3 * h + 4;
-            if (const auto fits3 = toolbarlayout::fit (toolbarLayout, tighter3, 13, room, minHint); shownCount (fits3) > shownCount (fits))
+            if (level == 2 && (alreadyTight || menuWidth + 8 <= 320))
+                break; // (the menu doesn't set the hint column's width: its padding gives nothing)
+            auto base = tighter;
+            auto formGap = 13, formHint = minHint;
+            if (level >= 1)
             {
-                tighter = tighter3;
-                fits = fits3;
-                tighterFileWide = false;
+                formGap = 12;
+                base[(std::size_t) Group::output] -= 12;
+            }
+            if (level >= 2)
+                formHint = juce::jmax (tightMenuWidth() + 8, 320);
+            for (const auto wideFile : { fileWide, false })
+            {
+                auto w = base;
+                if (! wideFile)
+                    w[(std::size_t) Group::file] = 3 * h + 4;
+                forms.push_back ({ w, formGap, formHint, wideFile, level >= 2, toolbarlayout::fit (toolbarLayout, w, formGap, room, formHint) });
+                if (! fileWide)
+                    break;
             }
         }
-        if (shownCount (fits) > shownCount (visible))
+        const Form* best = nullptr;
+        for (const auto& f : forms)
+            if (shownCount (f.fits) > (best != nullptr ? shownCount (best->fits) : shownCount (visible)))
+                best = &f;
+        if (best != nullptr)
         {
-            widths = tighter;
+            widths = best->widths;
             tempoWidth -= 12;
             timeWidth -= 36;
-            gap = 13;
-            visible = fits;
-            fileWide = tighterFileWide;
+            gap = best->gap;
+            visible = best->fits;
+            fileWide = best->fileWide;
+            minHint = best->minHint;
+            if (best->tightMenu)
+            {
+                menuBar.getProperties().set ("lynxTightMenuBar", true);
+                menuWidth = measureMenu();
+            }
         }
     }
     // round 170e3: rather than dropping the recording switches on a narrow window (1280-1440 px), the panels get
@@ -1434,6 +1475,24 @@ void MainComponent::resized()
                     e.shown = false;
             visible = toolbarlayout::fit (narrow, widths, gap, room, minHint);
         }
+    }
+    // round 190nr: a panel that 0.1.29 kept still dropped (1280 px: the window buttons) while the menu bar sets the hint
+    // column's width (0.1.30's FL-look menu text is wider): the menu's tight item padding, if that keeps more panels
+    if (toolbarLayout.visible && ! (bool) menuBar.getProperties().getWithDefault ("lynxTightMenuBar", false) && minHint >= menuWidth + 8
+        && minHint > 320 && std::any_of (toolbarLayout.entries.begin(), toolbarLayout.entries.end(),
+                                         [&] (const auto& e) { return e.shown && ! visible[(std::size_t) e.group]; }))
+    {
+        menuBar.getProperties().set ("lynxTightMenuBar", true);
+        const auto tightWidth = measureMenu();
+        const auto tightHint = juce::jmax (tightWidth + 8, minHint == menuWidth + 8 ? tightWidth + 8 : 320);
+        if (const auto fits = toolbarlayout::fit (toolbarLayout, widths, gap, room, tightHint); shownCount (fits) > shownCount (visible))
+        {
+            visible = fits;
+            menuWidth = tightWidth;
+            minHint = tightHint;
+        }
+        else
+            menuBar.getProperties().set ("lynxTightMenuBar", false);
     }
     if (! toolbarLayout.visible) // Ctrl+F11: only the menu and the hint bar, on one row
         visible.fill (false);
