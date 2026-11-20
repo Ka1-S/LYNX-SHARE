@@ -154,7 +154,16 @@ struct ZOrderTest final : juce::Timer
         ui = new MainComponent (*engine, false);
         window->setUsingNativeTitleBar (true);
         window->setContentOwned (ui, false);
-        window->setBounds (20, 20, 1500, 900);
+        // round 190nr: on the screen at every scale (1500 x 900 logical was 2250 x 1350 px at 1.5, larger than a 1920 x 1080
+        // screen, and the clicks the test sends off the screen were dropped: 0.1.30 release QA). 1500 / scale x 900 / scale
+        // was too small at 1.5 (the docked editor then covered the Playlist's title bar and the window button), so the
+        // window takes what the primary display's work area has room for (logical px), up to 1500 x 900
+        const auto scale = juce::Desktop::getInstance().getGlobalScaleFactor();
+        auto room = juce::Rectangle<int> (0, 0, 1500, 900);
+        if (const auto* display = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay())
+            room = display->userArea;
+        window->setBounds (room.getX() + 20, room.getY() + 20, juce::jmin (1500, room.getWidth() - 40), juce::jmin (900, room.getHeight() - 40));
+        line ("window=" + window->getBounds().toString() + " scale=" + juce::String (scale, 2) + " work_area=" + room.toString());
         window->setVisible (true);
         setMainWindowForOwnership (window.get());
         line ("docking=" + juce::String ((int) nativechild::dockingEnabled()));
