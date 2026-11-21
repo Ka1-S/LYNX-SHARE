@@ -10,7 +10,9 @@
 //   Vol   velocity 00..7F           Pan  00 (left) .. 40 (centre) .. 80 (right)
 //   Dly   the ticks into the row the note starts (or, on an OFF, ends) at
 //   Fx    LYNX's own note fields, one letter each: Gxx slide, Pxx porta, Yxx chance, Rxx release velocity, Txx fine pitch
-//         (cents + 80), Mxx mute; Cxx = a note that ends inside the row it starts in (its length in ticks)
+//         (cents + 80), Mxx mute; Cxx = a note that ends inside the row it starts in (its length in ticks); round 190om:
+//         Bxx the note's pitch curve (the pitch it ends at, semitones + 80: an imported pitch slide, vibrato, arpeggio)
+//         and, on any row, Vxx the channel's volume multiplier pattern event in that row (00..FF = 0..200 %, 80 = 100 %)
 //
 // Lossless: a note occupies whole rows from its start to its end; two notes that would share a cell of a column go to two
 // columns, and the start, the end (OFF + Dly) and every field are exact. An edit rewrites only the field it touches, so
@@ -28,9 +30,10 @@
 namespace lynx::tracker
 {
 // ---------------------------------------------------------------------------------------------------------------- layout
-enum class Fx : std::uint8_t { slide, porta, chance, release, finePitch, mute, cut };
-constexpr int fxKinds = 7;
-char fxLetter (Fx fx) noexcept;                       // 'G', 'P', 'Y', 'R', 'T', 'M', 'C'
+// (round 190om: bend = the note's pitch curve; volume = the track's channel's volume multiplier events, not a note field)
+enum class Fx : std::uint8_t { slide, porta, chance, release, finePitch, mute, cut, bend, volume };
+constexpr int fxKinds = 9;
+char fxLetter (Fx fx) noexcept;                       // 'G', 'P', 'Y', 'R', 'T', 'M', 'C', 'B', 'V'
 std::optional<Fx> fxFromLetter (char letter) noexcept; // upper or lower case; 'C' is not typed (it is the note's length)
 const char* fxDescription (Fx fx) noexcept;           // English, TR_NOOP-marked ("glide into this note (slide)")
 
@@ -41,6 +44,10 @@ struct Track
     bool group = false;
     int noteColumns = 1;
     int fxColumns = 1; // per note column
+    // round 190om: the fx slot of note column 0 that shows the channel's Volume multiplier pattern events (Vxx, on the
+    // rows they fall in), −1 = the track's channel has none in this pattern (a group track never shows them)
+    int volumeSlot = -1;
+    std::vector<int> volumeRows; // per row: the value shown (0..255), −1 = no event in the row
 };
 
 // A note placed in the grid.
@@ -137,6 +144,13 @@ int fieldValue (const Song& song, const Layout& layout, const Placed& p, Field f
 // The fx the note shows, in its slot order (the non-default fields, and Cut for a short note).
 std::vector<Fx> shownFx (const Layout& layout, const Placed& p, const Note& n);
 int fxValueOf (const Note& n, Fx fx, std::int64_t length); // the 2-digit value (Cut: the length in ticks)
+// Round 190om: Vxx — the volume multiplier pattern events (FL's channel parameter 0x11, AutomationTargetKind::channelAdjust)
+// of `channel` in a pattern; the value shown for an event (0..255, 128 = 100 %) and back
+const PatternEvents* volumeLane (const Pattern& pattern, int channel) noexcept;
+int volumeValueOf (float eventValue) noexcept;
+float volumeEventValue (int shown) noexcept;
+// the volume slot of the cursor's cell (column 0, the track's volumeSlot)
+bool isVolumeSlot (const Layout& layout, const Cursor& at) noexcept;
 bool fxActive (const Note& n, Fx fx) noexcept;
 int maxValue (const Layout& layout, Field field, std::optional<Fx> fx = std::nullopt);
 

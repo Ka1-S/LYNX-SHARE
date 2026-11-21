@@ -5,12 +5,14 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <map>
 #include <memory>
 #include <set>
 
 #include "core/MarkerPlan.h"
+#include "core/NoteCurves.h"
 #include "core/SamplerImport.h"
 #include "core/TempoMarkers.h"
 
@@ -113,18 +115,21 @@ bool tonePorta (const xmp_event& e) noexcept { return hasFx (e, fxTonePorta) || 
 
 // What the report says about an effect: 0 = imported exactly (or the song's flow, libxmp's own), 1 = imported at the
 // note's start only (approximated), 2 = not imported, 3 = imported as the channel's volume automation (round 190ob: what
-// changes the volume of a sounding note). `name` = how the report names it.
+// changes the volume of a sounding note), 4 = imported as the note's pitch curve (round 190om: what changes the pitch of a
+// sounding note — libxmp's pitch on every frame), 5 = as the channel's pan offset events (round 190om: what moves the pan of a
+// sounding note; where they would not be exact, the report counts the notes left at their start's pan). `name` = how the
+// report names it.
 int effectClass (int type, int param, std::string& name)
 {
     switch (type)
     {
-        case fxArpeggio: name = "arpeggio (0xy)"; return param != 0 ? 2 : 0;
-        case fxPortaUp: name = "pitch slide up (1xx)"; return 2;
-        case fxPortaDown: name = "pitch slide down (2xx)"; return 2;
-        case fxTonePorta: name = "tone portamento (3xx), played as the note's porta"; return 1;
-        case fxVibrato: name = "vibrato (4xy)"; return 2;
-        case fxTonePortaVolSlide: name = "tone portamento + volume slide (5xy): the slide as volume automation, the portamento as the note's porta"; return 1;
-        case fxVibratoVolSlide: name = "vibrato of 6xy (its volume slide is imported)"; return 2;
+        case fxArpeggio: name = "arpeggio (0xy)"; return param != 0 ? 4 : 0;
+        case fxPortaUp: name = "pitch slide up (1xx)"; return 4;
+        case fxPortaDown: name = "pitch slide down (2xx)"; return 4;
+        case fxTonePorta: name = "tone portamento (3xx): the sounding note slides on"; return 4;
+        case fxVibrato: name = "vibrato (4xy)"; return 4;
+        case fxTonePortaVolSlide: name = "tone portamento of 5xy (its volume slide as volume automation)"; return 4;
+        case fxVibratoVolSlide: name = "vibrato of 6xy (its volume slide as volume automation)"; return 4;
         case fxTremolo: name = "tremolo (7xy)"; return 3;
         case fxSetPan: return 0;
         case fxOffset: name = "sample offset (9xx)"; return 2;
@@ -137,29 +142,29 @@ int effectClass (int type, int param, std::string& name)
         case fxChannelVolume: name = "channel volume"; return 3;
         case fxChannelVolSlide: case fxChannelFineVolSlide: name = "channel volume slide"; return 3;
         case fxEnvelopePos: name = "envelope position (Lxx)"; return 2;
-        case fxPanSlide: case fxItPanSlide: case fxPanSlideNoMemory: name = "panning slide"; return 2;
+        case fxPanSlide: case fxItPanSlide: case fxPanSlideNoMemory: name = "panning slide"; return 5;
         case fxMultiRetrig: name = "retrigger (Rxy)"; return 2;
         case fxTremor: name = "tremor (Txy)"; return 3;
-        case fxExtraFinePorta: name = "extra fine portamento"; return 2;
+        case fxExtraFinePorta: name = "extra fine portamento"; return 4;
         case fxItInstrumentFunction: name = "IT instrument functions (S7x: new note actions, envelopes)"; return 2;
         case fxFilterCutoff: case fxFilterResonance: case fxMacroSet: case fxMacro: case fxMacroSmooth:
             name = "IT filter / MIDI macros (Zxx, SFx)"; return 2;
-        case fxPanbrello: case fxPanbrelloWave: name = "panbrello"; return 2;
+        case fxPanbrello: case fxPanbrelloWave: name = "panbrello"; return 5;
         case fxHighOffset: name = "sample offset (9xx)"; return 2;
         case fxSurround: name = "surround (S91)"; return 2;
         case fxReverse: name = "play backwards (S9F)"; return 2;
-        case fxFinetune: name = "set finetune"; return 2;
-        case fxFineVibrato: name = "vibrato (4xy)"; return 2;
-        case fxS3mArpeggio: name = "arpeggio (0xy)"; return 2;
+        case fxFinetune: name = "set finetune"; return 4;
+        case fxFineVibrato: name = "vibrato (4xy)"; return 4;
+        case fxS3mArpeggio: name = "arpeggio (0xy)"; return 4;
         case fxVolColSlideUp: case fxVolColSlideDown: case fxVolColFineUp: case fxVolColFineDown: name = "volume slide (Axy)"; return 3;
         case fxExtended:
             switch (param >> 4)
             {
                 case exFilter: name = "Amiga filter (E0x)"; return 2;
-                case exFinePortaUp: case exFinePortaDown: name = "fine pitch slide (E1x / E2x)"; return (param & 15) != 0 ? 2 : 0;
-                case exGlissando: name = "glissando (E3x)"; return 2;
+                case exFinePortaUp: case exFinePortaDown: name = "fine pitch slide (E1x / E2x)"; return (param & 15) != 0 ? 4 : 0;
+                case exGlissando: name = "glissando (E3x)"; return 4;
                 case exVibratoWave: case exTremoloWave: name = "vibrato / tremolo waveform (E4x / E7x)"; return 0;
-                case exFinetune: name = "set finetune (E5x)"; return 2;
+                case exFinetune: name = "set finetune (E5x)"; return 4;
                 case exPatternLoop: case exCut: case exDelay: case exPatternDelay: case exSetPan: return 0;
                 case exRetrig: name = "retrigger (E9x)"; return (param & 15) != 0 ? 2 : 0;
                 case exFineVolUp: case exFineVolDown: name = "fine volume slide (EAx / EBx)"; return (param & 15) != 0 ? 3 : 0;
@@ -186,6 +191,7 @@ struct ChannelRow
     int instrument = -1;     // libxmp's instrument playing it
     int volume = 0, pan = 128; // libxmp's final volume (0..64) and pan (0..255) at the start
     int maxVolume = 0;
+    int cutFrame = -1;       // round 190om: an ECx cut / Kxx off in the row (what ends a note a tone portamento continues)
 };
 
 struct PlayedRow
@@ -195,8 +201,42 @@ struct PlayedRow
     double ms = 0.0;
     std::vector<ChannelRow> ch;
     std::vector<std::uint8_t> volumes; // round 190ob: libxmp's final volume (0..64) of every channel on every frame
+    // round 190om: the pitch every channel's voice plays on every frame (libxmp's note scale, 60 = the sample's c5spd
+    // rate; NaN = no voice) and its final pan (0..255)
+    std::vector<float> pitches;
+    std::vector<std::uint8_t> pans;
+    // the sample each channel's voice plays (−1 none) and its position after the frame (frames of the sample): a tone
+    // portamento whose voice goes on (same sample, no jump back to the start) slides the sounding note on
+    std::vector<std::int16_t> samples;
+    std::vector<float> positions;
 };
 constexpr std::uint8_t ended = 255; // (PlayedRow::volumes: the channel's sample has ended, nothing sounds)
+
+// round 190om: whether module channel c's voice plays on through frame f of played row k (a tone portamento libxmp did not
+// start a note for): the same sample as on the frame before, its position not back at the start
+bool voiceGoesOn (const std::vector<PlayedRow>& rows, int chn, std::int64_t k, int f, int c)
+{
+    const auto at = [&] (std::int64_t, int frame) { return (std::size_t) frame * (std::size_t) chn + (std::size_t) c; };
+    if (k < 0 || k >= (std::int64_t) rows.size() || f < 0 || f >= rows[(std::size_t) k].frames)
+        return false;
+    auto pk = k;
+    auto pf = f - 1;
+    if (pf < 0)
+    {
+        if (--pk < 0 || rows[(std::size_t) pk].frames <= 0)
+            return false;
+        pf = rows[(std::size_t) pk].frames - 1;
+    }
+    const auto& now = rows[(std::size_t) k];
+    const auto& before = rows[(std::size_t) pk];
+    const auto i = at (k, f), j = at (pk, pf);
+    if (i >= now.samples.size() || j >= before.samples.size() || now.samples[i] < 0 || now.samples[i] != before.samples[j])
+        return false;
+    if (j < before.volumes.size() && before.volumes[j] == ended)
+        return false;
+    // (a looping sample may wrap back past its loop start: a jump back to near the start is a new note)
+    return ! (now.positions[i] < before.positions[j] && now.positions[i] < 0.5f * std::max (1.0f, before.positions[j]) && now.positions[i] < 4096.0f);
+}
 
 int startingFrame (const xmp_event& e)
 {
@@ -261,6 +301,9 @@ Flow walk (Context& ctx, const xmp_module& mod, double maxSeconds)
                             end = f;
                     // (a cut on the note's own row ends that note, not the one before: kept apart below)
                     r.endFrame = end;
+                    for (auto f : { extendedFrame (*e, exCut), keyOffFrame (*e) })
+                        if (f >= 0 && (r.cutFrame < 0 || f < r.cutFrame))
+                            r.cutFrame = f;
                 }
         }
         const auto frame = current->frames;
@@ -272,6 +315,13 @@ Flow walk (Context& ctx, const xmp_module& mod, double maxSeconds)
             const auto& info = fi.channel_info[c];
             // (a channel whose sample has played to its end: silent whatever its volume, marked as no volume at all)
             current->volumes.push_back (lynx_xmp_sample_ended (ctx.c, c) != 0 ? ended : (std::uint8_t) std::clamp ((int) info.volume, 0, 64));
+            double pitch = 0.0, position = 0.0;
+            int sample = -1;
+            const auto voiced = lynx_xmp_channel_pitch (ctx.c, c, &pitch, &sample, &position) != 0;
+            current->pitches.push_back (voiced ? (float) pitch : std::nanf (""));
+            current->samples.push_back ((std::int16_t) (voiced ? std::clamp (sample, -1, 32767) : -1));
+            current->positions.push_back (voiced ? (float) position : -1.0f);
+            current->pans.push_back ((std::uint8_t) std::clamp ((int) info.pan, 0, 255));
             if (r.triggerFrame >= 0 && frame == r.triggerFrame)
             {
                 r.instrument = info.instrument;
@@ -293,6 +343,8 @@ Flow walk (Context& ctx, const xmp_module& mod, double maxSeconds)
                 c.triggerFrame = -1;
             if (c.endFrame >= r.frames)
                 c.endFrame = -1;
+            if (c.cutFrame >= r.frames)
+                c.cutFrame = -1;
         }
     return flow;
 }
@@ -423,6 +475,30 @@ int multiplierRaw (int volume, int noteVolume) noexcept
     return std::clamp ((int) std::lround (x * unityRaw), 0, maxRaw);
 }
 
+// The multiplier (same steps) for a gain (round 190om: a volume ratio times libxmp's pan level)
+int multiplierRawOfGain (double gain) noexcept
+{
+    if (! (gain > 0.0))
+        return 0;
+    const auto x = std::log (10.0 * gain + 1.0) / std::log (11.0);
+    return std::clamp ((int) std::lround (x * unityRaw), 0, maxRaw);
+}
+
+// Round 190om: libxmp's pan law is linear (a side gets 128 ∓ pan of 128: twice the centre's level panned hard), LYNX's
+// channel pan constant power (√2·cos / √2·sin of (1 + pan)·π/4, unity at the centre). A note played at LYNX's centre
+// with the channel's pan offset at atan2 (128 + pan, 128 − pan) / (π/4) − 1 and its level times √((128 − pan)² +
+// (128 + pan)²) / (√2·128) gives libxmp's left and right exactly. `pan` = libxmp's final pan − 128 (−128…127).
+double panLevel (int pan) noexcept
+{
+    const auto left = (128.0 - pan) / 128.0, right = (128.0 + pan) / 128.0;
+    return std::sqrt (left * left + right * right) / std::sqrt (2.0);
+}
+int panOffsetRaw (int pan) noexcept // the Levels pan offset −1…1 as the event value 0…1, in 1/10000 steps
+{
+    const auto offset = std::atan2 (128.0 + pan, 128.0 - pan) / (0.25 * 3.14159265358979) - 1.0;
+    return std::clamp ((int) std::lround ((offset + 1.0) * 0.5 * maxRaw), 0, maxRaw);
+}
+
 struct VolumeAutomationResult
 {
     int changedNotes = 0;   // played notes whose volume changes while they sound
@@ -430,11 +506,16 @@ struct VolumeAutomationResult
     int splitChannels = 0;  // channels added: an instrument in several module channels at once
     int raisedNotes = 0;    // notes that start silent (or far below their loudest) and get their loudest volume
     int leftOut = 0;        // changes not imported (too many channels to split into)
+    int eventChannels = 0, eventLanes = 0, events = 0; // round 190om: channels whose changes are pattern events
+    int panChannels = 0, panNotes = 0;                   // round 190om: channels whose pans move (as pan offset events)
+    int panLeftOut = 0;                                  // notes whose pan moves where the events would not be exact
+    int overBudget = 0;                                  // channels left to a clip: too many lanes in all
 };
 
 template <typename TickOf>
 VolumeAutomationResult volumeAutomation (Song& song, const Flow& flow, int chn, std::int64_t songEnd, std::vector<std::vector<Note>>& notesOf,
-                                         const std::vector<std::vector<std::int64_t>>& lengthOf, std::vector<Instance> instances, TickOf tickOf)
+                                         const std::vector<std::vector<std::int64_t>>& lengthOf, std::vector<Instance> instances, TickOf tickOf,
+                                         std::int64_t rowTicks, bool asPatternEvents)
 {
     VolumeAutomationResult result;
     const auto n = (std::int64_t) flow.rows.size();
@@ -465,6 +546,57 @@ VolumeAutomationResult volumeAutomation (Song& song, const Flow& flow, int chn, 
         }
     };
 
+    // round 190om: the same with libxmp's final pan (−128…127) of each frame
+    auto panFrames = [&] (const Instance& i, std::int64_t until, auto&& fn) {
+        auto k = i.row;
+        auto f = i.frame;
+        while (k < n)
+        {
+            const auto& r = flow.rows[(std::size_t) k];
+            if (f >= r.frames)
+            {
+                ++k;
+                f = 0;
+                continue;
+            }
+            const auto tick = tickOf (k, f);
+            if (tick >= until)
+                return;
+            const auto at = (std::size_t) f * (std::size_t) chn + (std::size_t) i.moduleChannel;
+            const auto v = at < r.volumes.size() ? r.volumes[at] : ended;
+            if (v != ended)
+                fn (tick, (int) v, (at < r.pans.size() ? (int) r.pans[at] : 128) - 128, tick == i.start, k);
+            ++f;
+        }
+    };
+    // round 190om: the notes whose pan moves while they sound (pan sets and slides on a sounding note, pan envelopes,
+    // panbrello): their channel plays every note at the centre and moves the Levels pan offset and the multiplier as
+    // libxmp's linear pan law gives — exact as pattern events (else left as before: the note keeps its start's pan)
+    std::vector<char> pm (instances.size(), 0);
+    if (asPatternEvents)
+    {
+        std::set<int> moving;
+        for (std::size_t k = 0; k < instances.size(); ++k)
+        {
+            int first = 1000;
+            panFrames (instances[k], endOf (instances[k]), [&] (std::int64_t, int, int pan, bool, std::int64_t) {
+                if (first == 1000)
+                    first = pan;
+                else if (pan != first)
+                    pm[k] = 1;
+            });
+            if (pm[k] != 0)
+                moving.insert (noteOfInstance (instances[k]).channel);
+        }
+        for (std::size_t k = 0; k < instances.size(); ++k)
+            pm[k] = moving.count (noteOfInstance (instances[k]).channel) > 0 ? 1 : 0;
+    }
+    // the multiplier and pan offset (raw steps) instance k wants on a frame of this volume and pan
+    auto rawOf = [&] (std::size_t k, int volume, int pan, int noteVolume) {
+        return pm[k] != 0 ? multiplierRawOfGain (noteVolume > 0 ? (double) volume / (double) noteVolume * panLevel (pan) : 0.0) : multiplierRaw (volume, noteVolume);
+    };
+    auto panRawOf = [&] (std::size_t k, int pan) { return pm[k] != 0 ? panOffsetRaw (pan) : unityRaw; };
+
     // 1. a note that starts silent, or so soft that the multiplier's +21.6 dB cannot reach its loudest, gets its loudest
     // volume as its velocity (the automation brings it down where it is softer)
     std::map<std::pair<int, int>, int> loudest;
@@ -484,13 +616,13 @@ VolumeAutomationResult volumeAutomation (Song& song, const Flow& flow, int chn, 
         }
     }
 
-    // 2. which played notes change their volume
+    // 2. which played notes change their volume (round 190om: or play on a channel whose pans move)
     std::vector<char> changes (instances.size(), 0);
     for (std::size_t k = 0; k < instances.size(); ++k)
     {
         const auto v = noteVolume (instances[k]);
-        frames (instances[k], endOf (instances[k]), [&] (std::int64_t, int volume, std::int64_t, bool) {
-            if (multiplierRaw (volume, v) != unityRaw)
+        panFrames (instances[k], endOf (instances[k]), [&] (std::int64_t, int volume, int pan, bool, std::int64_t) {
+            if (rawOf (k, volume, pan, v) != unityRaw || panRawOf (k, pan) != unityRaw)
                 changes[k] = 1;
         });
         result.changedNotes += changes[k];
@@ -505,7 +637,9 @@ VolumeAutomationResult volumeAutomation (Song& song, const Flow& flow, int chn, 
         {
             std::vector<std::pair<std::int64_t, int>> list;
             const auto v = noteVolume (instances[k]);
-            frames (instances[k], endOf (instances[k]), [&] (std::int64_t tick, int volume, std::int64_t, bool) { list.emplace_back (tick, multiplierRaw (volume, v)); });
+            panFrames (instances[k], endOf (instances[k]), [&] (std::int64_t tick, int volume, int pan, bool, std::int64_t) {
+                list.emplace_back (tick, rawOf (k, volume, pan, v) * (maxRaw + 1) + panRawOf (k, pan));
+            });
             it = series.emplace (k, std::move (list)).first;
         }
         return it->second;
@@ -579,14 +713,139 @@ VolumeAutomationResult volumeAutomation (Song& song, const Flow& flow, int chn, 
                 noteOfInstance (instances[k]).channel = it->second;
     }
 
-    // 4. the automation of each channel with a change. A change on a row's first frame (a set: Cxx, the volume column) is a
+    // 4. round 190om (owner decision): the changes as pattern events of the channel's Volume multiplier in each pattern it
+    // plays in — a jump on the frame where libxmp's volume changes, at its exact sample (the renderer ends a chunk at a
+    // pattern event), and one at each note's start. A pattern is one for all its plays, so this is exact only where
+    // every play of a pattern changes the volume alike: checked frame by frame; a channel where a play differs keeps the
+    // automation clip below (round 190ob's).
+    constexpr bool rampOn = false; // (libxmp's anticlick ramp as a staircase of events: measured no better, left off)
+    auto patternTick = [&] (std::int64_t tick, std::int64_t k) { return (std::int64_t) flow.rows[(std::size_t) k].row * rowTicks + (tick - k * rowTicks); };
+    std::set<int> asEvents;
+    // the renderer drives at most RackState::maxAutomations (1024) targets and lanes at once: the lanes stay within a
+    // budget, given first to the channels with the most changing notes (the others keep the automation clip)
+    constexpr int laneBudget = 800;
+    int lanesUsed = 0;
+    auto channels = byChannel();
+    std::vector<std::pair<int, int>> order; // (changing notes, channel)
+    for (const auto& [channel, list] : channels)
+        order.emplace_back ((int) std::count_if (list.begin(), list.end(), [&] (std::size_t k) { return changes[k] != 0; }), channel);
+    std::stable_sort (order.begin(), order.end(), [] (const auto& a, const auto& b) { return a.first > b.first; });
+    for (const auto& [changing, channel] : order)
+    {
+        const auto& list = channels[channel];
+        if (changing == 0)
+            continue;
+        std::map<int, PatternEvents> lanes, panLanes; // LYNX pattern → its lane (round 190om: and its pan offset's)
+        bool exact = rowTicks > 0 && asPatternEvents;
+        const auto pans = pm[list.front()] != 0;
+        // each instance's frames up to the next one's start: (pattern tick, multiplier, pan offset, the note's start)
+        auto walkFrames = [&] (std::size_t j, auto&& fn) {
+            const auto& i = instances[list[j]];
+            const auto v = noteVolume (i);
+            const auto until = std::min (endOf (i), j + 1 < list.size() ? std::max (i.start, instances[list[j + 1]].start) : endOf (i));
+            panFrames (i, until, [&] (std::int64_t tick, int volume, int pan, bool start, std::int64_t row) {
+                const auto& r = flow.rows[(std::size_t) row];
+                const auto ramp = rampOn && r.frames > 0 ? std::max (1, (int) std::lround ((double) rowTicks / r.frames / 8.0)) : 0;
+                fn (patternTick (tick, row), rawOf (list[j], volume, pan, v), panRawOf (list[j], pan), start, ramp);
+            });
+        };
+        auto put = [&] (PatternEvents& lane, std::int64_t at, int raw) {
+            const auto value = (float) raw / (float) maxRaw;
+            auto it = std::lower_bound (lane.events.begin(), lane.events.end(), at, [] (const PatternEvent& e, std::int64_t t) { return e.tick < t; });
+            if (it != lane.events.end() && it->tick == at)
+                exact = exact && it->value == value;
+            else
+                lane.events.insert (it, { at, value });
+        };
+        for (std::size_t j = 0; j < list.size() && exact; ++j)
+        {
+            const auto& i = instances[list[j]];
+            auto& lane = lanes[i.pattern];
+            auto& panLane = panLanes[i.pattern];
+            int last = -1, lastPan = -1;
+            walkFrames (j, [&] (std::int64_t at, int raw, int panRaw, bool start, int ramp) {
+                const auto gainOf = [] (int x) { return (double) levelAdjustGain ((float) x / (float) unityRaw); };
+                if (start || raw != last)
+                {
+                    if (! start && ramp > 1 && last >= 0) // (libxmp's anticlick: a straight ramp over an eighth of the frame)
+                        for (int k = 0; k < ramp; ++k)
+                            put (lane, at + k, multiplierRawOfGain (gainOf (last) + (gainOf (raw) - gainOf (last)) * (k + 0.5) / ramp));
+                    put (lane, at + (start ? 0 : std::max (0, ramp > 1 ? ramp : 0)), raw);
+                }
+                if (pans && (start || panRaw != lastPan))
+                {
+                    if (! start && ramp > 1 && lastPan >= 0)
+                        for (int k = 0; k < ramp; ++k)
+                            put (panLane, at + k, (int) std::lround (lastPan + (panRaw - lastPan) * (k + 0.5) / ramp));
+                    put (panLane, at + (start ? 0 : std::max (0, ramp > 1 ? ramp : 0)), panRaw);
+                }
+                last = raw;
+                lastPan = panRaw;
+            });
+        }
+        // every frame of every play hears its own multiplier (and pan)
+        for (std::size_t j = 0; j < list.size() && exact; ++j)
+        {
+            const auto& i = instances[list[j]];
+            const auto& lane = lanes[i.pattern];
+            const auto& panLane = panLanes[i.pattern];
+            walkFrames (j, [&] (std::int64_t at, int raw, int panRaw, bool start, int ramp) {
+                const auto t = (double) (at + (start || ramp <= 1 ? 0 : ramp));
+                if (exact && (lane.valueAt (t) != (float) raw / (float) maxRaw || (pans && panLane.valueAt (t) != (float) panRaw / (float) maxRaw)))
+                    exact = false;
+            });
+        }
+        const auto needed = (int) lanes.size() + (pans ? (int) panLanes.size() : 0);
+        if (exact && lanesUsed + needed > laneBudget)
+        {
+            exact = false;
+            ++result.overBudget;
+        }
+        if (! exact)
+        {
+            if (pans)
+                for (auto k : list)
+                    result.panLeftOut += changes[k];
+            continue;
+        }
+        lanesUsed += needed;
+        asEvents.insert (channel);
+        ++result.eventChannels;
+        for (auto& [pattern, lane] : lanes)
+        {
+            lane.target = { AutomationTargetKind::channelAdjust, channel, 0, leveladjust::volume };
+            result.events += (int) lane.events.size();
+            ++result.eventLanes;
+            song.patterns[(std::size_t) pattern].events.push_back (std::move (lane));
+        }
+        if (pans)
+        {
+            for (auto& [pattern, lane] : panLanes)
+            {
+                lane.target = { AutomationTargetKind::channelAdjust, channel, 0, leveladjust::pan };
+                result.events += (int) lane.events.size();
+                ++result.eventLanes;
+                song.patterns[(std::size_t) pattern].events.push_back (std::move (lane));
+            }
+            // the notes play at the centre: the pan offset places them
+            for (auto k : list)
+            {
+                auto& note = noteOfInstance (instances[k]);
+                result.panNotes += note.pan != 0.0f ? 1 : 0;
+                note.pan = 0.0f;
+            }
+            ++result.panChannels;
+        }
+    }
+
+    // 5. round 190ob's automation clip of each other channel with a change. A change on a row's first frame (a set: Cxx, the volume column) is a
     // jump (Hold) there, where libxmp makes it; a change on a later frame (a slide's tick, tremolo, an envelope) goes from
     // the old multiplier to the new one in a straight line over its frame, centred on the frame's start: the renderer
     // takes a channel's level once per chunk, so a jump on every tick would click where libxmp ramps (its anticlick), and
     // a slide becomes a smooth line. A note's own start is a jump, halfway through the silence before it when there is one.
     for (const auto& [channel, list] : byChannel())
     {
-        if (std::none_of (list.begin(), list.end(), [&] (std::size_t k) { return changes[k] != 0; }))
+        if (asEvents.count (channel) > 0 || std::none_of (list.begin(), list.end(), [&] (std::size_t k) { return changes[k] != 0; }))
             continue;
         std::vector<AutomationPoint> points;
         const auto valueOf = [] (int raw) { return (float) raw / (float) maxRaw; };
@@ -651,6 +910,130 @@ VolumeAutomationResult volumeAutomation (Song& song, const Flow& flow, int chn, 
         clip.length = std::max<std::int64_t> (1, songEnd);
         song.playlist.push_back (clip);
         ++result.automations;
+    }
+    return result;
+}
+
+// ------------------------------------------------------------------------------------------------ pitch curves (190om)
+// What changes the pitch of a sounding note (pitch slides 1xx / 2xx / fine / extra fine, tone portamento, vibrato,
+// arpeggio, glissando, finetune sets, pitch envelopes, auto-vibrato, the period limits — libxmp's pitch on every frame,
+// as its mixer plays it) becomes the note's own pitch curve (Note::curves, core/NoteCurves.h): a step on each frame where
+// the pitch moves, as libxmp's mixer steps it. A note whose pitch only sits off its key by a constant within ±120 cents
+// gets that as its fine pitch instead. The note's first play gives its curve (the pattern's notes are one for every play).
+struct PitchCurveResult
+{
+    int notes = 0, points = 0, fineTuned = 0, differentPlays = 0;
+};
+
+template <typename TickOf>
+PitchCurveResult pitchCurves (const Song& song, const Flow& flow, int chn, std::vector<std::vector<Note>>& notesOf,
+                              const std::vector<std::vector<std::int64_t>>& lengthOf, const std::vector<Instance>& instances, TickOf tickOf,
+                              std::int64_t rt)
+{
+    PitchCurveResult result;
+    const auto n = (std::int64_t) flow.rows.size();
+    // the pitch (libxmp's note scale) LYNX plays the note at without a curve: its zone's root and tune
+    auto plainPitch = [&] (const Note& note) -> double {
+        if (note.channel < 0 || note.channel >= (int) song.channels.size())
+            return std::nan ("");
+        for (const auto& z : song.channels[(std::size_t) note.channel].zones)
+            if (note.key >= z.lowKey && note.key <= z.highKey)
+                return 60.0 + (double) (note.key - z.rootKey) + (double) z.tune;
+        return std::nan ("");
+    };
+    // (tick from the note's start, cents off its plain pitch) on every frame it sounds with a voice
+    auto series = [&] (const Instance& i, double plain) {
+        std::vector<std::pair<double, float>> out;
+        const auto end = i.start + std::max<std::int64_t> (1, lengthOf[(std::size_t) i.pattern][(std::size_t) i.note]);
+        auto k = i.row;
+        auto f = i.frame;
+        while (k < n)
+        {
+            const auto& r = flow.rows[(std::size_t) k];
+            if (f >= r.frames)
+            {
+                ++k;
+                f = 0;
+                continue;
+            }
+            const auto tick = tickOf (k, f);
+            if (tick >= end)
+                break;
+            const auto at = (std::size_t) f * (std::size_t) chn + (std::size_t) i.moduleChannel;
+            const auto pitch = at < r.pitches.size() ? r.pitches[at] : std::nanf ("");
+            if (std::isfinite (pitch) && (at >= r.volumes.size() || r.volumes[at] != ended))
+            {
+                // the step goes 32 samples (at 44.1 kHz) early: the scheduler sends a curve's value on a 64-sample grid,
+                // so a step lands 0…63 samples late — centred, it lands within ±32 of libxmp's frame
+                const auto early = r.ms > 0.0 ? (32.0 / 44.1) * (double) rt / r.ms : 0.0;
+                const auto rel = (double) (tick - i.start) - (f == i.frame && k == i.row ? 0.0 : early);
+                // (on the steps a .lynx project keeps a curve point in: 1/100 tick, 1/100 cent — the save keeps it exactly)
+                out.emplace_back ((double) std::llround (std::max (0.0, rel) * 100.0) / 100.0,
+                                  (float) std::llround (10000.0 * ((double) pitch - plain)) / 100.0f);
+            }
+            ++f;
+        }
+        return out;
+    };
+    std::set<std::pair<int, int>> done;
+    std::map<std::pair<int, int>, std::vector<std::pair<double, float>>> firstSeries;
+    for (const auto& i : instances)
+    {
+        auto& note = notesOf[(std::size_t) i.pattern][(std::size_t) i.note];
+        const auto plain = plainPitch (note);
+        if (! std::isfinite (plain))
+            continue;
+        auto list = series (i, plain);
+        const auto id = std::make_pair (i.pattern, i.note);
+        if (! done.insert (id).second)
+        {
+            // a later play: does its pitch move as the first play's did?
+            const auto& first = firstSeries[id];
+            bool same = first.size() == list.size();
+            for (std::size_t j = 0; same && j < list.size(); ++j)
+                same = std::abs (first[j].second - list[j].second) < 1.0f && std::abs (first[j].first - list[j].first) < 1.0;
+            result.differentPlays += same ? 0 : 1;
+            continue;
+        }
+        firstSeries[id] = list;
+        note.porta = false; // (the curve plays what libxmp's tone portamento does; FL's porta would glide on top)
+        if (list.empty())
+            continue;
+        const auto lo = std::min_element (list.begin(), list.end(), [] (const auto& a, const auto& b) { return a.second < b.second; })->second;
+        const auto hi = std::max_element (list.begin(), list.end(), [] (const auto& a, const auto& b) { return a.second < b.second; })->second;
+        if (hi - lo < 0.05f)
+        {
+            // a constant: nothing, or the note's fine pitch (FL's −120…120 cents), else a one-point curve
+            const auto cents = 0.5f * (lo + hi);
+            if (std::abs (cents) < 0.05f)
+                continue;
+            if (std::abs (cents) <= 120.0f)
+            {
+                note.finePitch = (float) std::lround (cents * 10.0f) / 10.0f; // (the 1/10 cent a .lynx keeps)
+                ++result.fineTuned;
+                continue;
+            }
+        }
+        NoteCurves c;
+        auto& lane = c.lane (NoteCurveLane::pitch);
+        float current = list.front().second;
+        lane.push_back ({ 0.0f, current });
+        for (std::size_t j = 1; j < list.size(); ++j)
+        {
+            const auto v = list[j].second;
+            if (std::abs (v - current) < 0.01f)
+                continue;
+            // a step: the value held up to just before the frame, the new one from it
+            const auto t = (float) std::llround (list[j].first * 100.0) / 100.0f;
+            const auto before = (float) std::llround (list[j].first * 100.0 - 5.0) / 100.0f; // (0.05 tick before)
+            if (before > lane.back().tick)
+                lane.push_back ({ before, current });
+            lane.push_back ({ std::max (t, (float) std::llround ((double) lane.back().tick * 100.0 + 1.0) / 100.0f), v });
+            current = v;
+        }
+        result.points += (int) lane.size();
+        note.curves = std::move (c);
+        ++result.notes;
     }
     return result;
 }
@@ -897,21 +1280,64 @@ std::optional<Song> importModule (const std::vector<std::uint8_t>& bytes, const 
     std::vector<std::vector<Note>> notesOf (song.patterns.size());
     std::vector<std::vector<std::int64_t>> lengthOf (song.patterns.size());
     std::set<std::tuple<int, int, int>> heldOver;
-    std::map<std::string, std::array<int, 3>> effects; // name → (approximated, not imported, as volume automation) counts
+    std::map<std::string, std::array<int, 5>> effects; // name → (approximated, not imported, as volume automation, as pitch curves, as pan events) counts
     std::set<std::tuple<int, int, int>> counted;
     std::set<std::tuple<int, int, int>> silentNotes;
-    int silent = 0;
+    int silent = 0, continuedPortas = 0;
+    std::set<std::tuple<int, int, int>> slidOn; // round 190om: (pattern, row, channel) of the tone portamentos a note slides on through
     std::vector<Instance> instances; // round 190ob: every played note (for the volume automation)
+    const auto itRules = lynx_xmp_player_mode (ctx.c) == 3; // (libxmp's READ_EVENT_IT)
+    // (an S3M or IT module: its volume changes stay round 190ob's automation clips — measured against libxmp's renders,
+    // kj_jose.s3m and alonely.it play closer with the clips' ramps than with the pattern events' steps)
+    const auto st3OrIt = itRules || lynx_xmp_player_mode (ctx.c) == 2;
     for (int c = 0; c < chn; ++c)
     {
         if ((mod.xxc[c].flg & XMP_CHANNEL_MUTE) != 0)
             continue;
+        // round 190om: a tone portamento on a sounding note of the same instrument (in the same clip) starts no note in
+        // libxmp: its sample plays on and slides to the new key. LYNX does the same: the sounding note goes on (its pitch
+        // curve slides), only a cut / off in that row ends it.
+        std::vector<char> continued ((std::size_t) n, 0);
+        // (not for an Impulse Tracker module: its tone portamento meets IT's new note actions, envelopes and fadeouts,
+        // which LYNX does not play — measured against libxmp's render, alonely.it plays closer as new notes, 190om)
+        if (! itRules)
+        {
+            bool sounding = false;
+            int instrument = -1;
+            std::int64_t clipStop = -1;
+            for (std::int64_t k = 0; k < n; ++k)
+            {
+                const auto& r = flow.rows[(std::size_t) k].ch[(std::size_t) c];
+                if (r.triggerFrame >= 0 && r.key >= 0)
+                {
+                    if (r.porta && sounding && r.instrument == instrument && clipEnd[(std::size_t) k] == clipStop
+                        && voiceGoesOn (flow.rows, chn, k, r.triggerFrame, c))
+                    {
+                        continued[(std::size_t) k] = 1;
+                        ++continuedPortas;
+                        const auto& played = flow.rows[(std::size_t) k];
+                        slidOn.insert ({ played.pattern, played.row, c }); // (not a note of the pattern: the rows pass below skips it)
+                        if (r.cutFrame >= 0)
+                            sounding = false;
+                        continue;
+                    }
+                    sounding = r.instrument >= 0 && r.instrument < mod.ins && channelOfInstrument[(std::size_t) r.instrument] >= 0;
+                    instrument = r.instrument;
+                    clipStop = clipEnd[(std::size_t) k];
+                    if (r.cutFrame > r.triggerFrame)
+                        sounding = false;
+                }
+                else if (r.endFrame >= 0)
+                    sounding = false;
+            }
+        }
         // the next end in this channel at or after row k (a tick), computed backwards
         std::vector<std::int64_t> nextEnd ((std::size_t) n + 1, n * rt);
         for (auto k = n - 1; k >= 0; --k)
         {
             const auto& r = flow.rows[(std::size_t) k].ch[(std::size_t) c];
-            nextEnd[(std::size_t) k] = r.endFrame >= 0 ? tickOf (k, r.endFrame) : nextEnd[(std::size_t) k + 1];
+            const auto endFrame = continued[(std::size_t) k] != 0 ? r.cutFrame : r.endFrame;
+            nextEnd[(std::size_t) k] = endFrame >= 0 ? tickOf (k, endFrame) : nextEnd[(std::size_t) k + 1];
         }
         for (std::int64_t k = 0; k < n; ++k)
         {
@@ -932,7 +1358,7 @@ std::optional<Song> importModule (const std::vector<std::uint8_t>& bytes, const 
                     if (! isKey (e->note) && (type == fxSetVolume || type == fxSetPan || (type == fxExtended && (param >> 4) == exSetPan)))
                     {
                         name = type == fxSetVolume ? "volume set on a sounding note (Cxx without a note)" : "pan set on a sounding note (8xx without a note)";
-                        cls = type == fxSetVolume ? 3 : 2;
+                        cls = type == fxSetVolume ? 3 : 5;
                     }
                     if (cls == 1)
                         ++effects[name][0];
@@ -940,9 +1366,13 @@ std::optional<Song> importModule (const std::vector<std::uint8_t>& bytes, const 
                         ++effects[name][1];
                     else if (cls == 3)
                         ++effects[name][2];
+                    else if (cls == 4)
+                        ++effects[name][3];
+                    else if (cls == 5)
+                        ++effects[name][4];
                 }
             }
-            if (r.triggerFrame < 0 || r.key < 0)
+            if (r.triggerFrame < 0 || r.key < 0 || continued[(std::size_t) k] != 0)
                 continue;
             const auto lp = lynxPattern[(std::size_t) row.pattern];
             const auto ins = r.instrument;
@@ -1013,7 +1443,7 @@ std::optional<Song> importModule (const std::vector<std::uint8_t>& bytes, const 
                     continue;
                 if (e->ins > 0)
                     lastInstrument = e->ins - 1;
-                if (! isKey (e->note) || noteOf.count ({ p, row, c }) > 0 || (mod.xxc[c].flg & XMP_CHANNEL_MUTE) != 0)
+                if (! isKey (e->note) || noteOf.count ({ p, row, c }) > 0 || slidOn.count ({ p, row, c }) > 0 || (mod.xxc[c].flg & XMP_CHANNEL_MUTE) != 0)
                     continue;
                 if (lastInstrument < 0 || lastInstrument >= mod.ins || channelOfInstrument[(std::size_t) lastInstrument] < 0)
                     continue;
@@ -1048,7 +1478,21 @@ std::optional<Song> importModule (const std::vector<std::uint8_t>& bytes, const 
     }
     // ---- round 190ob: the volume changes of sounding notes as the channels' Volume multiplier automation
     const auto channelsBefore = song.channels.size();
-    const auto volume = volumeAutomation (song, flow, chn, n * rt, notesOf, lengthOf, std::move (instances), tickOf);
+    // ---- round 190om: the pitch changes of sounding notes as their pitch curves (before the volume: it moves notes to
+    // the channels it splits off, which play the same zones)
+    const auto pitch = pitchCurves (song, flow, chn, notesOf, lengthOf, instances, tickOf, rt);
+    summary.pitchCurveNotes = pitch.notes;
+    summary.pitchCurvePoints = pitch.points;
+    summary.fineTunedNotes = pitch.fineTuned;
+    summary.pitchDifferentPlays = pitch.differentPlays;
+    summary.continuedPortas = (int) slidOn.size(); (void) continuedPortas;
+    count (report, &FlpImportReport::converted, "Module notes whose pitch moves while they sound (pitch slides, tone portamento, vibrato, arpeggio, "
+                                                "glissando, pitch envelopes, auto-vibrato): as the note's pitch curve", pitch.notes);
+    count (report, &FlpImportReport::converted, "Module notes played off their key by a constant (finetune sets): as the note's fine pitch", pitch.fineTuned);
+    count (report, &FlpImportReport::converted, "Module tone portamentos on a sounding note: the note plays on and slides (no new note)", (int) slidOn.size());
+    count (report, &FlpImportReport::notReproduced, "Module notes whose pitch moves otherwise on a later play of their pattern (the first play's curve is kept)",
+           pitch.differentPlays);
+    const auto volume = volumeAutomation (song, flow, chn, n * rt, notesOf, lengthOf, std::move (instances), tickOf, rt, options.volumeAsPatternEvents && ! st3OrIt);
     for (auto c = channelsBefore; c < song.channels.size(); ++c) // (a channel copied for a module channel: its instrument's)
     {
         const auto source = std::find_if (song.channels.begin(), song.channels.begin() + (std::ptrdiff_t) channelsBefore, [&] (const ChannelDef& d) {
@@ -1060,9 +1504,19 @@ std::optional<Song> importModule (const std::vector<std::uint8_t>& bytes, const 
     summary.volumeAutomations = volume.automations;
     summary.volumePoints = volume.points;
     summary.splitChannels = volume.splitChannels;
+    summary.volumeEventChannels = volume.eventChannels;
+    summary.volumeEventLanes = volume.eventLanes;
+    summary.volumeEvents = volume.events;
     count (report, &FlpImportReport::converted, "Module notes whose volume changes while they sound (volume slides and sets, volume column, tremolo, "
                                                 "global / channel volume, the volume envelope while held): as the channel's Volume multiplier automation",
            volume.changedNotes - volume.leftOut);
+    count (report, &FlpImportReport::converted, "Module channels whose volume changes are pattern events (exact timing; the others an automation clip)",
+           volume.eventChannels);
+    count (report, &FlpImportReport::converted, "Module channels whose notes' pans move: the notes at the centre, the channel's pan offset and volume as libxmp pans (pattern events)",
+           volume.panChannels);
+    count (report, &FlpImportReport::notReproduced, "Module notes whose pan moves while they sound, where a pattern's plays differ (each keeps its start's pan)",
+           volume.panLeftOut);
+    summary.panEventChannels = volume.panChannels;
     count (report, &FlpImportReport::converted, "Module instruments sounding in several module channels at once, each with its own volume: one channel per module channel",
            volume.splitChannels);
     count (report, &FlpImportReport::notReproduced, "Module notes whose volume changes while they sound (too many channels to give each its own)", volume.leftOut);
@@ -1130,6 +1584,8 @@ std::optional<Song> importModule (const std::vector<std::uint8_t>& bytes, const 
         count (report, &FlpImportReport::notReproduced, "Module effect played differently: " + name, n2[0]);
         count (report, &FlpImportReport::notReproduced, "Module effect not imported: " + name, n2[1]);
         count (report, &FlpImportReport::converted, "Module effect as volume automation: " + name, n2[2]);
+        count (report, &FlpImportReport::converted, "Module effect as the note's pitch curve: " + name, n2[3]);
+        count (report, &FlpImportReport::converted, "Module effect as the channel's pan events: " + name, n2[4]);
     }
     (void) unplayed;
 

@@ -14943,6 +14943,7 @@ TEST (simsynth_engine)
     lynx::ChannelDef c;
     c.instrument = lynx::InstrumentKind::simsynth;
     c.pluginState = blobA;
+    c.engineRev = 1; // (round 190om: the revision before the velocity law, every note at Final.Vol 1)
     auto inst = lynx::makeInstrument (lynx::InstrumentKind::simsynth);
     inst->prepare (44100.0);
     inst->configure (c, 120.0);
@@ -18009,3 +18010,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issues190nsTests.inc" // round 190ns: issues #231, #233, #234, #235
 #include "Tracker190nwTests.inc" // round 190nw (0.1.31): the built-in tracker, stage 1 (core/TrackerGrid.h, core/ModuleImport.h)
 #include "Tracker190obTests.inc" // round 190ob (0.1.31): tracker follow-ups (module volume automation, the default key)
+#include "Tracker190omTests.inc" // round 190om (0.1.31): tracker stage 2 (pattern events, pitch curves, Bxx / Vxx), SimSynth velocity

@@ -8,6 +8,7 @@
   and `LIBXMP_STATIC`.
 - LYNX's addition (no libxmp file is modified): `src/lynx_xmp_extra.c` / `.h`, read-only accessors of the module
   data libxmp keeps in its internal context (a sample's c5spd, the exact frame time, the sustain loop; round 190ob:
-  whether a channel's sample has played to its end), used by `src/core/ModuleImport.cpp`.
+  whether a channel's sample has played to its end; round 190om: the pitch, sample and position a channel's mixer voice plays, and the player's mode),
+  used by `src/core/ModuleImport.cpp`.
 - Licence: MIT (`LICENSE`), the whole library since libxmp 4.6.1; `src/loaders/itsex.c` (the IT sample decompressor) is
   public domain by Olivier Lapicque; `src/md5.c` is public domain. Compatible with LYNX's AGPL-3.0.

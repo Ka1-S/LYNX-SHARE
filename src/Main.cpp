@@ -5,6 +5,7 @@
 #include "core/GrooveAudio.h"
 #include "core/EditorScale.h"
 #include "core/SimplePads.h"
+#include "core/SimSynth.h" // (round 190om: the selftest's SimSynth channel)
 
 #include "core/ClipEnvelope.h"
 #include "core/ClipWarp.h"
@@ -8146,7 +8147,7 @@ private:
         // round 190nw (0.1.31): the tracker. Its settings are saved only when changed (an older project's file stays the
         // same bytes) and come back; the copies for 0.1.30 / 0.1.28 drop them with one loss line; a module imports in a
         // real engine (one note, one Sampler channel, its sample written) and its notes render.
-        juce::String tracker190nwResult = "OK", tracker190obResult = "OK";
+        juce::String tracker190nwResult = "OK", tracker190obResult = "OK", tracker190omResult = "OK";
         {
             auto song = lynx::Song::makeDefault();
             juce::String why;
@@ -8219,13 +8220,64 @@ private:
                     const auto automation = std::find_if (vs.automations.begin(), vs.automations.end(), [] (const lynx::Automation& a) {
                         return a.target.kind == lynx::AutomationTargetKind::channelAdjust && a.target.param == lynx::leveladjust::volume && a.target.index == 0;
                     });
-                    if (automation == vs.automations.end() || automation->points.size() < 2)
+                    // (round 190om: a pattern played once changes its volume as pattern events of the multiplier)
+                    const auto events = std::any_of (vs.patterns.begin(), vs.patterns.end(), [] (const lynx::Pattern& p) {
+                        return std::any_of (p.events.begin(), p.events.end(), [] (const lynx::PatternEvents& l) {
+                            return l.target.kind == lynx::AutomationTargetKind::channelAdjust && l.target.param == lynx::leveladjust::volume && l.target.index == 0
+                                   && l.events.size() >= 2;
+                        });
+                    });
+                    if ((automation == vs.automations.end() || automation->points.size() < 2) && ! events)
                         tracker190obResult = "ERROR no volume automation";
-                    else if (const auto reread = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (vs), why); ! reread || reread->automations != vs.automations)
+                    else if (const auto reread = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (vs), why); ! reread || reread->automations != vs.automations
+                                                                                                                   || reread->patterns != vs.patterns)
                         tracker190obResult = "ERROR the automation changed on the .lynx round trip " + why;
                     else if (ve.renderOffline (1.0, 44100.0, nullptr) < 0.001f)
                         tracker190obResult = "ERROR the note is silent";
                 }
+            }
+            // round 190om: a pitch slide (102 on row 1) on that note: its pitch curve and the volume set's pattern events
+            // come in, are saved and read back the same, and it sounds; SimSynth's velocity law and its copy for 0.1.30
+            {
+                mod[1084 + 16 + 2] = 0x01, mod[1084 + 16 + 3] = 0x02;
+                mod[1084 + 32 + 2] = 0x0C, mod[1084 + 32 + 3] = 0x10;
+                const auto slideFile = folder.getChildFile ("one note slide.mod");
+                slideFile.replaceWithData (mod.data(), mod.size());
+                lynx::AudioEngine se (false);
+                if (! se.importFlpFile (slideFile, error))
+                    tracker190omResult = "ERROR module import: " + error;
+                else
+                {
+                    const auto& ss = se.getSong();
+                    const auto curved = std::any_of (ss.patterns.begin(), ss.patterns.end(), [] (const lynx::Pattern& p) {
+                        return std::any_of (p.notes.begin(), p.notes.end(), [] (const lynx::Note& n) { return n.curves.has() && n.curves->moves (lynx::NoteCurveLane::pitch); });
+                    });
+                    const auto events = std::any_of (ss.patterns.begin(), ss.patterns.end(), [] (const lynx::Pattern& p) { return ! p.events.empty(); });
+                    if (! curved || ! events)
+                        tracker190omResult = juce::String ("ERROR import: ") + (curved ? "" : "no pitch curve ") + (events ? "" : "no pattern events");
+                    else if (const auto reread = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (ss), why); ! reread || reread->patterns != ss.patterns)
+                        tracker190omResult = "ERROR the curves or events changed on the .lynx round trip " + why;
+                    else if (se.renderOffline (1.0, 44100.0, nullptr) < 0.001f)
+                        tracker190omResult = "ERROR the note is silent";
+                }
+            }
+            if (tracker190omResult == "OK")
+            {
+                auto song = lynx::Song::makeDefault();
+                auto& sim = song.channels.emplace_back();
+                sim.name = "Sim";
+                sim.instrument = lynx::InstrumentKind::simsynth;
+                sim.pluginState = lynx::simsynth::defaultState();
+                const auto copy = lynx::olderlynx::forRelease (song, "0.1.30");
+                const auto said = std::any_of (copy.lost.begin(), copy.lost.end(), [] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).contains ("SimSynth plays every note at full level"); });
+                auto older = song;
+                older.channels.back().engineRev = 1;
+                const auto olderCopy = lynx::olderlynx::forRelease (older, "0.1.30");
+                const auto olderSaid = std::any_of (olderCopy.lost.begin(), olderCopy.lost.end(), [] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).contains ("SimSynth plays every note"); });
+                juce::String why2;
+                const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), why2);
+                if (sim.engineRev != 2 || ! copy.ok || ! said || olderSaid || ! back || back->channels.back().engineRev != 2)
+                    tracker190omResult = "ERROR SimSynth revision: copy " + juce::String (said ? "said" : "silent") + (olderSaid ? ", old one said" : "");
             }
             folder.deleteRecursively();
         }
@@ -8269,7 +8321,7 @@ private:
                         && mixerBasics == "OK" && fontsResult == "OK" && paintCachesResult.startsWith ("OK") && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && takeoverOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && exportParity.startsWith ("OK") && exportLive.startsWith ("OK") && midiHotplug.startsWith ("OK") && midiOutPorts.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
-                        && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
+                        && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && tracker190omResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK")
@@ -8345,6 +8397,7 @@ private:
                << "trackclips190ne=" << trackclips190neResult << "\n"
                << "tracker190nw=" << tracker190nwResult << "\n"
                << "tracker190ob=" << tracker190obResult << "\n"
+               << "tracker190om=" << tracker190omResult << "\n"
                << "midigen190fm_saved=" << midigen190fmResult << "\n"
                << "trackauto190gz_saved=" << trackauto190gzResult << "\n"
                << "clipenv190gi_saved=" << clipenv190giResult << "\n"

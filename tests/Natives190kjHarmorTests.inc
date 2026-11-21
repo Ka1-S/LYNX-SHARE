@@ -170,7 +170,7 @@ TEST (natives190kj_engine_revision_keeps_old_projects)
     CHECK (lynx::harmor::renderReference (image, notes, 44100.0, 8000, 512, {}, 120.0, {}, 0)
            == lynx::harmor::renderReference (image, notes, 44100.0, 8000, 512, {}, 120.0, {}, 1));
     lynx::ChannelDef fresh;
-    CHECK (fresh.engineRev == 1);
+    CHECK (fresh.engineRev >= 1); // (round 190om: 2, SimSynth's velocity law; Harmor's resynthesis since 1)
     std::filesystem::remove (path);
 }
 
