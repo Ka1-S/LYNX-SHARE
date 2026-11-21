@@ -868,6 +868,7 @@ private:
                 else if (const auto in = g->instrumentAt (n); in != nullptr)
                     own[(std::size_t) n] = std::max (0, in->latencySamples());
             }
+        nodeLatencySelf = own; // (round 190oa, DP-63: FL's "self:" line)
         nodeLatencyTotal.assign ((std::size_t) count, 0);
         for (int pass = 0; pass <= count; ++pass) // (longest path; the graph has no audio loops)
         {
@@ -932,6 +933,10 @@ private:
         for (int n = 0; n < (int) d.nodes.size(); ++n)
         {
             juce::StringArray lines;
+            // round 190oa (DP-63, capture 190oa C8): FL's two lines, "self: N samples" (the plugin's own latency) over
+            // "total: N samples" (the path up to and with it)
+            if (v.latency && n < (int) nodeLatencySelf.size() && nodeLatencySelf[(std::size_t) n] > 0)
+                lines.add (tr ("self: {0} samples", { juce::String (nodeLatencySelf[(std::size_t) n]) }));
             if (v.latency && n < (int) nodeLatencyTotal.size() && nodeLatencyTotal[(std::size_t) n] > 0)
                 lines.add (tr ("total: {0} samples", { juce::String (nodeLatencyTotal[(std::size_t) n]) }));
             if (v.performance)
