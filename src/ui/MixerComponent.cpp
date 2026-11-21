@@ -7322,7 +7322,7 @@ void EffectsPanel::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseW
     {
         // round 190oa (DF-86, capture 190oa A5: FL's wheel over a band changes its level, ≈ 0.8 dB a notch); Ctrl+wheel
         // keeps LYNX's width
-        if (isEqPoint (eqControl) && ! e.mods.isCtrlDown() && wheel.deltaY != 0.0f)
+        if (isEqPoint (eqControl) && ! flmods::ctrl (e.mods) && wheel.deltaY != 0.0f)
         {
             const auto band = (std::size_t) (eqPointBase - eqControl);
             const auto now = engine.getSong().mixer[(std::size_t) track].eq.gainDb[band];
