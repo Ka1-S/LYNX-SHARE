@@ -78,6 +78,7 @@
 #include "core/MasterLooks.h"
 #include "core/Harmor.h"
 #include "core/KiloheartsDsp.h" // (rollup step 14: the copy for 0.1.28 self-test)
+#include "core/WavetableSynth.h" // (round 190oc: the copy for 0.1.30 self-test)
 #include "flp/Flp.h"
 #include "core/DemoSongs.h"
 #include "core/FirstSongTour.h"
@@ -7824,6 +7825,60 @@ private:
             }
         }
 
+        // round 190oc: the copy for 0.1.30 cuts Helix round 4's block (revision 4 back to 3; a loss line only when a unison
+        // or reverse grains play) and the Kilohearts Nonlinear Filter law (code 49, its own loss line); the copy for 0.1.28
+        // still turns Helix into an empty Sampler after it; a Helix channel of revision 4 at the block's defaults loses nothing
+        juce::String helix4khs190ocResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            if (song.mixer.size() < 3)
+                song.mixer.resize (3);
+            lynx::ChannelDef plain, swarm;
+            plain.name = "Plain", swarm.name = "Swarm";
+            plain.instrument = swarm.instrument = lynx::InstrumentKind::helix;
+            const auto d = lynx::helixDefaults();
+            plain.modelParams = swarm.modelParams = d;
+            swarm.modelParams[(std::size_t) (lynx::wt::ext4Base + lynx::wt::ext4::grainUnison)] = 5.0f;
+            swarm.modelParams[(std::size_t) (lynx::wt::ext4Base + lynx::wt::ext4::grainReverse)] = 0.4f;
+            song.channels.push_back (plain);
+            song.channels.push_back (swarm);
+            auto nlf = lynx::makeEffectSlot (lynx::EffectKind::effector);
+            nlf.params[(std::size_t) lynx::khsdsp::lawParam] = lynx::khsdsp::lawValue (lynx::khsdsp::Law::nonlinearFilter);
+            nlf.params[(std::size_t) lynx::khsdsp::valueParam + 2] = 0.5f;
+            song.mixer[2].effects.push_back (nlf);
+            const auto copy = lynx::olderlynx::forRelease (song, "0.1.30");
+            const auto older = lynx::olderlynx::forRelease (song, "0.1.28");
+            const auto count = [] (const lynx::olderlynx::Copy& c, const char* start) {
+                return (int) std::count_if (c.lost.begin(), c.lost.end(), [start] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).startsWith (start); });
+            };
+            const auto parsed = juce::JSON::parse (copy.json);
+            int helixCut = 0, revisions3 = 0;
+            juce::String lossDetail;
+            for (const auto& l : copy.lost)
+                if (juce::String (l.text).startsWith ("Helix's unison"))
+                    lossDetail = l.detail;
+            if (const auto* channels = parsed["channels"].getArray())
+                for (const auto& c : *channels)
+                    if (c["instrument"].toString() == "helix")
+                    {
+                        auto values = juce::StringArray::fromTokens (c["modelParams"].toString(), " ", "");
+                        values.removeEmptyStrings();
+                        helixCut += values.size() == lynx::wt::ext4Base ? 1 : 0;
+                        revisions3 += values.size() > lynx::wt::extBase && values[lynx::wt::extBase].getFloatValue() == 3.0f ? 1 : 0;
+                    }
+            if (! copy.ok || ! older.ok)
+                helix4khs190ocResult = "ERROR copy " + copy.error + older.error;
+            else if (helixCut != 2 || revisions3 != 2)
+                helix4khs190ocResult = "ERROR Helix block in the copy (cut " + juce::String (helixCut) + ", revision 3 " + juce::String (revisions3) + ")";
+            else if (count (copy, "Helix's unison") != 1 || ! lossDetail.contains ("Swarm") || lossDetail.contains ("Plain"))
+                helix4khs190ocResult = "ERROR Helix loss line: " + lossDetail;
+            else if (parsed["mixer"][2]["effects"][0]["params"].size() > lynx::khsdsp::lawParam || count (copy, "Effector's Kilohearts Nonlinear Filter") != 1
+                     || count (copy, "Effector's newer Kilohearts laws") != 0)
+                helix4khs190ocResult = "ERROR Nonlinear Filter law in the copy";
+            else if (older.json.contains ("\"helix\"") || count (older, "Helix is not in this release") != 1)
+                helix4khs190ocResult = "ERROR copy for 0.1.28 after the 0.1.30 step";
+        }
+
         // round 190dr: the Session mixer's sections come back from a project (a project without them: Live's defaults);
         // a device dragged to another track and a Warp switch are one undo step each in a real engine
         juce::String livescr190drResult = "OK";
@@ -8193,6 +8248,7 @@ private:
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && exportParity.startsWith ("OK") && exportLive.startsWith ("OK") && midiHotplug.startsWith ("OK") && midiOutPorts.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
+                        && helix4khs190ocResult == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK")
                         && danceWindowResult == "OK" && clickActivationResult == "OK" && motionOverlayResult.startsWith ("OK")
@@ -8276,6 +8332,7 @@ private:
                << "rollup030_copy_for_0128=" << rollup030Result << "\n"
                << "rollup031_copy_for_0130=" << rollup031Result << "\n"
                << "rollup031s2_copy_for_0130=" << rollup031s2Result << "\n"
+               << "helix4_khs190oc_copy_for_0130=" << helix4khs190ocResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 
