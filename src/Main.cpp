@@ -125,6 +125,7 @@
 #include "engine/Bridge32Test.h"
 #include "engine/ClapFormat.h"
 #include "engine/ClapTeardownTest.h"
+#include "engine/RenderAgainTest.h"
 #include "engine/HostingTests.h"
 #include "core/EdisonFx.h"
 #include "engine/ProjectFile.h"
@@ -1908,6 +1909,18 @@ public:
             // LYNX.exe --claprestarttest "LYNX Test Restart.clap" report.txt (tools/testplugin/lynx_test_restart.c)
             const auto i = args.indexOf ("--claprestarttest");
             runClapRestartTest (args[i + 1].unquoted(), args[i + 2].unquoted());
+            return;
+        }
+
+        if (args.contains ("--renderagaintest"))
+        {
+            // LYNX --renderagaintest report.txt (round 190ou, engine/RenderAgainTest.cpp): offline renders made again
+            const auto i = args.indexOf ("--renderagaintest");
+            juce::String lines;
+            const auto result = lynx::renderagain::check ([&lines] (const juce::String& line) { lines << line << "\n"; });
+            juce::File (args[i + 1].unquoted()).replaceWithText (lines + "renderagain190ou=" + result + "\n");
+            setApplicationReturnValue (result.startsWith ("OK") ? 0 : 1);
+            quit();
             return;
         }
 
@@ -9043,6 +9056,7 @@ private:
         const auto faultResult = faultReportSelfTest();
         const auto stemsResult = stemsSinglePassSelfTest(); // round 190gj
         const auto exportFormatsResult = lynx::shortexport::formatsCheck(); // AIFF and M4A (owner decision D5)
+        const auto renderAgainResult = lynx::renderagain::check(); // round 190ou: offline renders made again
         juce::LookAndFeel::setDefaultLookAndFeel (&lookBefore);
         const auto ok = editorsResult.startsWith ("OK") && ! faultResult.startsWith ("ERROR") && stemsResult == "OK" && exportFormatsResult.startsWith ("OK")
                         && mixerBasics == "OK" && fontsResult == "OK" && paintCachesResult.startsWith ("OK") && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && takeoverOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
@@ -9052,6 +9066,7 @@ private:
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
                         && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK"
+                        && renderAgainResult.startsWith ("OK")
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK")
                         && generatorSmartResult.startsWith ("OK")
@@ -9145,6 +9160,7 @@ private:
                << "rollup031s4_copy_for_0130=" << rollup031s4Result << "\n"
                << "rollup031s5_copy_for_0130=" << rollup031s5Result << "\n"
                << "sections190ol=" << sections190olResult << "\n"
+               << "renderagain190ou=" << renderAgainResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 
