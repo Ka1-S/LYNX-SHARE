@@ -4362,7 +4362,7 @@ std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error,
                 continue;
             RemoteMapping m;
             const auto action = (int) o.getProperty ("action", -1);
-            if (action < 0 || action > (int) RemoteAction::launchSelectedClip) // (round 190kc: + the crossfader and relative strip)
+            if (action < 0 || action > (int) RemoteAction::punchOut) // (round 190kc: + the crossfader and relative strip; gap190og: + overdub, loop, punch)
                 continue; // (an action a newer version added)
             m.action = (RemoteAction) action;
             if (o.hasProperty ("key"))

@@ -709,8 +709,10 @@ MidiPrefs MidiPrefs::fromText (const std::string& text)
             m.port = std::clamp (toInt (trim (parts[3]), -1), -1, 255);
             m.scene = std::max (-1, toInt (trim (parts[4]), -1));
             // the actions a mapping for every project may have (RemoteAction: sceneLaunch 2, stopAllClips 4, play 5 ...
-            // metronome 9), a controller 0..127 or a key 256..383
-            const auto action = m.action == 2 || (m.action >= 4 && m.action <= 9);
+            // metronome 9; round gap190og: also those remotemap::canBeGlobal took since — round 190kc's crossfader
+            // positions and relative strip 10 ... 16, and overdub, loop, punch-in, punch-out 18 ... 21), a controller
+            // 0..127 or a key 256..383
+            const auto action = m.action == 2 || (m.action >= 4 && m.action <= 16) || (m.action >= 18 && m.action <= 21);
             const auto number = (m.number >= 0 && m.number < 128) || (m.number >= 256 && m.number < 384);
             if (action && number && (m.action != 2 || m.scene >= 0)
                 && std::find (p.globalMappings.begin(), p.globalMappings.end(), m) == p.globalMappings.end())

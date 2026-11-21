@@ -933,6 +933,11 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     mapmode::tag (stopButton, remotemap::Target::of (RemoteAction::stop));
     mapmode::tag (recordButton, remotemap::Target::of (RemoteAction::record));
     mapmode::tag (metronomeButton, remotemap::Target::of (RemoteAction::metronome));
+    // round gap190og (mapping-0028): Live's overdub "+", Punch-In, Loop and Punch-Out switches (the Clip-launch bar's)
+    mapmode::tag (blendButton, remotemap::Target::of (RemoteAction::overdub));
+    mapmode::tag (punchButton, remotemap::Target::of (RemoteAction::punchIn));
+    mapmode::tag (liveLoopButton, remotemap::Target::of (RemoteAction::loopSwitch));
+    mapmode::tag (punchOutButton, remotemap::Target::of (RemoteAction::punchOut));
     mapmode::tag (tempoDisplay, remotemap::Target::parameter ({ AutomationTargetKind::tempo, 0, 0, 0 }));
     setTypingPiano (typingPiano);
     setKeyboardSettingsListener ([this] { saveUiSettings(); }); // round 190ds: the keyboards' modes are UI settings
@@ -2985,6 +2990,20 @@ void MainComponent::fireRemote (const remotemap::Fire& f)
         case RemoteAction::cancelLaunch:
             if (press)
                 engine.launcherCommand ({ launcher::Command::Type::cancelLaunch });
+            break;
+        // round gap190og (mapping-0028): a press switches it, as a click on the Control Bar's button does
+        case RemoteAction::overdub:
+            if (press)
+                runAction ("record.blend");
+            break;
+        case RemoteAction::loopSwitch:
+            if (press)
+                toggleLiveLoop();
+            break;
+        case RemoteAction::punchIn:
+        case RemoteAction::punchOut:
+            if (press)
+                runAction (t.action == RemoteAction::punchIn ? "record.punchIn" : "record.punchOut");
             break;
     }
 }
