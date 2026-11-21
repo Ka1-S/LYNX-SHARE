@@ -12067,3 +12067,9 @@ countries: cn sg
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 打开/关闭编辑器  [Alt]+[LMB] 保持其他编辑器打开  [Ctrl]+[LMB] 试听  [2xLMB] 钢琴卷帘  [LMB] 上下拖动重新排序  [RMB] 通道菜单"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值电平表（左/右）带峰值保持  [LMB] 清除削波指示灯"
+# round 190of: the Plugin performance monitor's Longest / Spikes, the split CPU meter (P24)
+"Longest" = "最长"
+"Spikes" = "尖峰"
+"The longest single call since the reset, in milliseconds (red: half of the audio buffer or more)" = "自重置以来最长的单次调用，单位毫秒（红色：音频缓冲区的一半或更多）"
+"Calls that took more than half of the time their own audio lasts: one plugin alone near the deadline, what makes the sound stutter" = "耗时超过其自身音频时长一半的调用：单个插件就接近极限，这会让声音卡顿"
+"Live part {0}%, rendered ahead {1}% (together {2}% of one core)." = "实时部分 {0}%，提前渲染 {1}%（合计一个核心的 {2}%）。"

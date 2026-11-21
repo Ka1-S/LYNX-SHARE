@@ -50,12 +50,15 @@ void Monitor::reset()
     {
         s.totalBusy = 0;
         s.peak = 0.0;
+        s.longestNs = 0;
+        s.spikes = 0;
     }
     totalAudio = 0;
     rackMax = 0.0;
 }
 
-void Monitor::update (const std::vector<Source>& list, const std::vector<std::uint64_t>& busy, std::uint64_t audioNs, std::uint64_t wallNs)
+void Monitor::update (const std::vector<Source>& list, const std::vector<std::uint64_t>& busy, std::uint64_t audioNs, std::uint64_t wallNs,
+                      const CallStats* calls)
 {
     const auto dAudio = started && audioNs >= lastAudio ? audioNs - lastAudio : 0;
     const auto dWall = started && wallNs >= lastWall ? wallNs - lastWall : 0;
@@ -72,12 +75,24 @@ void Monitor::update (const std::vector<Source>& list, const std::vector<std::ui
         s.source = source;
 
         const auto now = source.key >= 0 && (std::size_t) source.key < busy.size() ? busy[(std::size_t) source.key] : 0;
+        // round 190of: the longest call since the last update, and the spikes counted up since the start
+        const auto at = (std::size_t) std::max (0, source.key);
+        const auto longest = calls != nullptr && at < calls->longestNs.size() ? (std::uint64_t) calls->longestNs[at] : 0;
+        const auto spikesNow = calls != nullptr && at < calls->spikes.size() ? calls->spikes[at] : 0;
         if (s.fresh || ! started || now < s.lastBusy)
         {
             s.fresh = false;
             s.lastBusy = now;
+            s.lastSpikes = spikesNow;
             next[source.key] = s;
             continue;
+        }
+        if (calls != nullptr)
+        {
+            s.longestNs = std::max (s.longestNs, longest);
+            if (spikesNow >= s.lastSpikes)
+                s.spikes += spikesNow - s.lastSpikes;
+            s.lastSpikes = spikesNow;
         }
 
         const auto dBusy = now - s.lastBusy;
@@ -123,6 +138,8 @@ std::vector<Row> Monitor::rows (const std::string& find, SortBy sort) const
         row.current = s.current;
         row.peak = s.peak;
         row.average = totalAudio > 0 ? 100.0 * (double) s.totalBusy / (double) totalAudio : 0.0;
+        row.longestMs = (double) s.longestNs * 1.0e-6;
+        row.spikes = s.spikes;
         out.push_back (row);
     }
 
@@ -132,6 +149,8 @@ std::vector<Row> Monitor::rows (const std::string& find, SortBy sort) const
             case SortBy::average: return a.average > b.average;
             case SortBy::peak: return a.peak > b.peak;
             case SortBy::name: return lower (a.source.name) < lower (b.source.name);
+            case SortBy::longest: return a.longestMs > b.longestMs;
+            case SortBy::spikes: return a.spikes > b.spikes || (a.spikes == b.spikes && a.longestMs > b.longestMs);
             case SortBy::current: break;
         }
         return a.current > b.current;

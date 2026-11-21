@@ -3,6 +3,7 @@
 // Ties Song + instruments + scheduler together: given the transport state, renders
 // a block of stereo audio with notes triggered at the exact sample.
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -477,6 +478,29 @@ struct ProcessTimes
     std::array<std::atomic<std::uint64_t>, maxMixerTracks * maxEffectSlots> effectNs {}; // [track * maxEffectSlots + slot]
     std::atomic<std::uint64_t> audioNs { 0 };  // duration of the audio rendered while enabled
     std::atomic<std::uint64_t> wallNs { 0 };   // time the whole rack took for it
+    // Round 190of (the monitor's Longest and Spikes columns): per instrument / slot, the longest single call since the
+    // monitor last took it (exchange (0)), and the calls that took more than half of the time their own audio lasts
+    // (one plugin alone using half of the real-time budget: what makes the sound stutter), counted up
+    std::array<std::atomic<std::uint32_t>, channels> channelLongestNs {};
+    std::array<std::atomic<std::uint32_t>, maxMixerTracks * maxEffectSlots> effectLongestNs {};
+    std::array<std::atomic<std::uint32_t>, channels> channelSpikes {};
+    std::array<std::atomic<std::uint32_t>, maxMixerTracks * maxEffectSlots> effectSpikes {};
+    // one timed call of an instrument (channel = true, key = its channel) or effect slot (key = track * slots + slot):
+    // `spent` ns for `audio` ns of sound
+    void addCall (bool channel, std::size_t key, std::uint64_t spent, std::uint64_t audio) noexcept
+    {
+        if (channel ? key >= channelNs.size() : key >= effectNs.size())
+            return;
+        (channel ? channelNs[key] : effectNs[key]).fetch_add (spent, std::memory_order_relaxed);
+        auto& longest = channel ? channelLongestNs[key] : effectLongestNs[key];
+        const auto value = (std::uint32_t) std::min<std::uint64_t> (spent, 0xffffffffu);
+        auto seen = longest.load (std::memory_order_relaxed);
+        while (value > seen && ! longest.compare_exchange_weak (seen, value, std::memory_order_relaxed))
+        {
+        }
+        if (audio > 0 && spent * 2 > audio)
+            (channel ? channelSpikes[key] : effectSpikes[key]).fetch_add (1, std::memory_order_relaxed);
+    }
     // Live meters of the effects that have them (the mixing suite's gain reduction, REA round 96; LYNX Tune's pitch and
     // Facet EQ's dynamic gains, round 103; the dynamics suite's band gains and levels, round 108), always published:
     // [(track * maxEffectSlots + slot) * meterOutputs + output] = Effect::controlOutput (output) after the last block.
@@ -1063,6 +1087,11 @@ private:
     PieceValue<int> trackSamples { 0 }; // the chunk's samples (what trackBuffer zeroes)
 
     double sampleRate = 44100.0;
+    // round 190of: how long `samples` of audio last, in ns (the Plugin performance monitor's spikes)
+    std::uint64_t audioNsOf (int samples) const noexcept
+    {
+        return samples > 0 && sampleRate > 0.0 ? (std::uint64_t) ((double) samples / sampleRate * 1.0e9) : 0;
+    }
     double bpm = 120.0;
     double ownBpm = 120.0;
     double tempoOverride = 0.0;

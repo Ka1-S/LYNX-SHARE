@@ -19,6 +19,12 @@ juce::String percent (double v)
     return v < 0.05 ? juce::String ("-") : v < 10.0 ? juce::String (v, 1) + "%" : juce::String (juce::roundToInt (v)) + "%";
 }
 
+// round 190of: a call's length, "-" for none
+juce::String milliseconds (double ms)
+{
+    return ms < 0.005 ? juce::String ("-") : ms < 10.0 ? juce::String (ms, 2) + " ms" : juce::String (ms, 1) + " ms";
+}
+
 juce::Colour loadColour (double v)
 {
     return v < 25.0 ? theme::colour::meterLow : v < 60.0 ? theme::colour::meterMid : theme::colour::meterClip;
@@ -40,7 +46,8 @@ juce::String describeDropoutInfo (const AudioEngine::DropoutInfo& d)
     return text;
 }
 
-class MonitorTable final : public juce::Component
+class MonitorTable final : public juce::Component,
+                           public juce::TooltipClient
 {
 public:
     std::vector<perfmon::Row> rows;
@@ -57,9 +64,10 @@ public:
         g.setColour (theme::colour::bg3);
         g.fillRect (0, 0, getWidth(), headerHeight);
         g.setFont (theme::font (theme::type::small, true));
-        const juce::String names[] = { tr ("Plugin"), tr ("Where"), tr ("Now"), tr ("Average"), tr ("Peak") };
-        const perfmon::SortBy keys[] = { perfmon::SortBy::name, perfmon::SortBy::name, perfmon::SortBy::current, perfmon::SortBy::average, perfmon::SortBy::peak };
-        for (int c = 0; c < 5; ++c)
+        // (round 190of: + Longest and Spikes, the calls that make the sound stutter)
+        const juce::String names[] = { tr ("Plugin"), tr ("Where"), tr ("Now"), tr ("Average"), tr ("Peak"), tr ("Longest"), tr ("Spikes") };
+        const auto keys = sortKeys();
+        for (int c = 0; c < columnCount; ++c)
         {
             const auto on = keys[c] == sort && c != 1;
             g.setColour (on ? theme::colour::textPrimary : theme::colour::textSecondary);
@@ -109,7 +117,27 @@ public:
             g.drawText (percent (r.average), cols[3].withY (y).withHeight (rowHeight).reduced (8, 0), juce::Justification::centredRight);
             g.setColour (r.peak >= 60.0 ? theme::colour::meterClip : theme::colour::textSecondary);
             g.drawText (percent (r.peak), cols[4].withY (y).withHeight (rowHeight).reduced (8, 0), juce::Justification::centredRight);
+            // round 190of: the longest single call (red past the device's buffer) and the spikes
+            g.setColour (bufferMs > 0.0 && r.longestMs >= 0.5 * bufferMs ? theme::colour::meterClip : theme::colour::textSecondary);
+            g.drawText (milliseconds (r.longestMs), cols[5].withY (y).withHeight (rowHeight).reduced (8, 0), juce::Justification::centredRight);
+            g.setColour (r.spikes > 0 ? theme::colour::meterClip : theme::colour::textSecondary);
+            g.drawText (r.spikes > 0 ? juce::String ((juce::int64) r.spikes) : juce::String ("-"), cols[6].withY (y).withHeight (rowHeight).reduced (8, 0),
+                        juce::Justification::centredRight);
         }
+    }
+
+    // the header's hints (round 190of: what Longest and Spikes count)
+    juce::String getTooltip() override
+    {
+        const auto mouse = getMouseXYRelative();
+        if (mouse.y >= headerHeight)
+            return {};
+        const auto cols = columns();
+        if (cols[5].contains (mouse.x, cols[5].getY()))
+            return tr ("The longest single call since the reset, in milliseconds (red: half of the audio buffer or more)");
+        if (cols[6].contains (mouse.x, cols[6].getY()))
+            return tr ("Calls that took more than half of the time their own audio lasts: one plugin alone near the deadline, what makes the sound stutter");
+        return {};
     }
 
     void mouseUp (const juce::MouseEvent& e) override
@@ -117,8 +145,8 @@ public:
         if (e.y >= headerHeight)
             return;
         const auto cols = columns();
-        const perfmon::SortBy keys[] = { perfmon::SortBy::name, perfmon::SortBy::name, perfmon::SortBy::current, perfmon::SortBy::average, perfmon::SortBy::peak };
-        for (int c = 0; c < 5; ++c)
+        const auto keys = sortKeys();
+        for (int c = 0; c < columnCount; ++c)
             if (cols[c].contains (e.x, cols[c].getY()))
             {
                 sort = keys[c];
@@ -128,19 +156,28 @@ public:
     }
 
     int idealHeight() const { return headerHeight + juce::jmax (1, (int) rows.size()) * rowHeight; }
+    double bufferMs = 0.0; // the device's buffer (round 190of: Longest turns red from half of it)
 
 private:
-    std::array<juce::Rectangle<int>, 5> columns() const
+    static constexpr int columnCount = 7;
+    static std::array<perfmon::SortBy, columnCount> sortKeys()
+    {
+        return { perfmon::SortBy::name, perfmon::SortBy::name, perfmon::SortBy::current, perfmon::SortBy::average, perfmon::SortBy::peak,
+                 perfmon::SortBy::longest, perfmon::SortBy::spikes };
+    }
+    std::array<juce::Rectangle<int>, columnCount> columns() const
     {
         const auto w = getWidth();
-        const auto num = 92;
-        const auto name = juce::jmax (120, (w - 3 * num) * 45 / 100);
-        std::array<juce::Rectangle<int>, 5> c;
+        const auto num = 84;
+        const auto name = juce::jmax (120, (w - 5 * num) * 45 / 100);
+        std::array<juce::Rectangle<int>, columnCount> c;
         c[0] = { 0, 0, name, getHeight() };
-        c[1] = { name, 0, w - name - 3 * num, getHeight() };
-        c[2] = { w - 3 * num, 0, num + 20, getHeight() };
-        c[3] = { w - 2 * num + 20, 0, num - 20, getHeight() };
-        c[4] = { w - num, 0, num, getHeight() };
+        c[1] = { name, 0, w - name - 5 * num, getHeight() };
+        c[2] = { w - 5 * num, 0, num + 20, getHeight() };
+        c[3] = { w - 4 * num + 20, 0, num - 20, getHeight() };
+        c[4] = { w - 3 * num, 0, num, getHeight() };
+        c[5] = { w - 2 * num, 0, num, getHeight() };
+        c[6] = { w - num, 0, num, getHeight() };
         return c;
     }
 };
@@ -200,7 +237,7 @@ public:
             startTimerHz (4);
         }
         timerCallback();
-        setSize (720, 380);
+        setSize (840, 380); // (round 190of: 720 before Longest / Spikes)
     }
 
     ~PluginMonitorPanel() override
@@ -217,6 +254,10 @@ public:
         std::vector<std::uint64_t> busy (perfmon::keyCount, 0);
         monitor.update (list, busy, 0, 0);
         std::uint64_t audio = 0, wall = 0;
+        perfmon::CallStats calls; // (round 190of: longest calls and spikes, a few on the heaviest)
+        calls.longestNs.assign (perfmon::keyCount, 0);
+        calls.spikes.assign (perfmon::keyCount, 0);
+        table.bufferMs = 256.0 * 1000.0 / 48000.0;
         for (int step = 1; step <= 6; ++step)
         {
             audio += 250'000'000;
@@ -228,9 +269,21 @@ public:
                 const auto ns = (std::uint64_t) (load * 250'000'000.0);
                 busy[(std::size_t) s.key] += ns;
                 sum += ns;
+                const auto block = load * table.bufferMs * 1.0e6; // one call of an average block, ns
+                calls.longestNs[(std::size_t) s.key] = (std::uint32_t) (block * (1.4 + 2.5 * weight * weight));
+            }
+            // the two heaviest show a few spikes (a plugin near the deadline now and then)
+            if (step % 2 == 0)
+            {
+                std::vector<std::pair<std::uint64_t, int>> heaviest;
+                for (const auto& s : list)
+                    heaviest.push_back ({ busy[(std::size_t) s.key], s.key });
+                std::sort (heaviest.rbegin(), heaviest.rend());
+                for (std::size_t k = 0; k < heaviest.size() && k < 2; ++k)
+                    calls.spikes[(std::size_t) heaviest[k].second] += 2 - k;
             }
             wall += sum + 4'000'000;
-            monitor.update (list, busy, audio, wall);
+            monitor.update (list, busy, audio, wall, &calls);
         }
         // (a sample dropout of the second kind: the driver late while the load was low)
         AudioEngine::DropoutInfo sample;
@@ -301,11 +354,24 @@ private:
         if (times == nullptr)
             return;
         std::vector<std::uint64_t> busy (perfmon::keyCount, 0);
+        perfmon::CallStats calls; // (round 190of)
+        calls.longestNs.assign (perfmon::keyCount, 0);
+        calls.spikes.assign (perfmon::keyCount, 0);
         for (int c = 0; c < perfmon::channelKeys && c < ProcessTimes::channels; ++c)
+        {
             busy[(std::size_t) c] = times->channelNs[(std::size_t) c].load (std::memory_order_relaxed);
+            calls.longestNs[(std::size_t) c] = times->channelLongestNs[(std::size_t) c].exchange (0, std::memory_order_relaxed);
+            calls.spikes[(std::size_t) c] = times->channelSpikes[(std::size_t) c].load (std::memory_order_relaxed);
+        }
         for (std::size_t k = 0; k < times->effectNs.size(); ++k)
+        {
             busy[(std::size_t) perfmon::channelKeys + k] = times->effectNs[k].load (std::memory_order_relaxed);
-        monitor.update (perfmon::sources (engine.getSong()), busy, times->audioNs.load(), times->wallNs.load());
+            calls.longestNs[(std::size_t) perfmon::channelKeys + k] = times->effectLongestNs[k].exchange (0, std::memory_order_relaxed);
+            calls.spikes[(std::size_t) perfmon::channelKeys + k] = times->effectSpikes[k].load (std::memory_order_relaxed);
+        }
+        monitor.update (perfmon::sources (engine.getSong()), busy, times->audioNs.load(), times->wallNs.load(), &calls);
+        if (auto* device = engine.getDeviceManager().getCurrentAudioDevice(); device != nullptr && device->getCurrentSampleRate() > 0.0)
+            table.bufferMs = device->getCurrentBufferSizeSamples() * 1000.0 / device->getCurrentSampleRate();
         setDropoutText (describeDropouts (engine));
         refreshRows();
     }

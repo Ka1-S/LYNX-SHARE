@@ -3714,6 +3714,33 @@ public:
             return;
         }
 
+        if (args.contains ("--monitorshot190of"))
+        {
+            // LYNX --monitorshot190of <folder> (round 190of): the Plugin performance monitor with its sample numbers
+            // (Longest, Spikes) at 100 % and 150 %, off screen
+            const juce::File dir (args[args.indexOf ("--monitorshot190of") + 1].unquoted());
+            dir.createDirectory();
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            {
+                lynx::AudioEngine offline (false);
+                lynx::MainComponent ui (offline, false);
+                offline.dispatchPendingMessages();
+                for (const auto scale : { 1.0f, 1.5f })
+                {
+                    auto panel = lynx::makePluginMonitorPanel (offline);
+                    juce::Component frame;
+                    frame.setSize (panel->getWidth(), panel->getHeight());
+                    frame.setOpaque (true);
+                    frame.addAndMakeVisible (*panel);
+                    savePng (frame.createComponentSnapshot (frame.getLocalBounds(), true, scale),
+                             dir.getChildFile (scale > 1.0f ? "plugin-monitor@150.png" : "plugin-monitor.png").getFullPathName());
+                }
+            }
+            setApplicationReturnValue (0);
+            quit();
+            return;
+        }
+
         if (args.contains ("--snapshot"))
         {
             const auto i = args.indexOf ("--snapshot");

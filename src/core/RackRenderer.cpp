@@ -4083,7 +4083,7 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         std::memcpy (blend->dry.data() + RackState::ChainBlendStage::capacity, r, sizeof (float) * (std::size_t) n);
     }
     const auto timing = times->enabled.load (std::memory_order_relaxed);
-    auto timed = [this, timing] (std::size_t key, auto&& run) {
+    auto timed = [this, timing, n] (std::size_t key, auto&& run) {
         if (! timing || key >= times->effectNs.size())
         {
             run();
@@ -4091,7 +4091,7 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         }
         const auto before = ProcessTimes::now();
         run();
-        times->effectNs[key].fetch_add (ProcessTimes::now() - before, std::memory_order_relaxed);
+        times->addCall (false, key, ProcessTimes::now() - before, audioNsOf (n)); // (round 190of: + longest call, spikes)
     };
 
     // round 190gp: the slots' plan (RackState::SlotPlan), made with the snapshot; worked out here only for a state that
@@ -5730,7 +5730,7 @@ void RackRenderer::chunkUnits (const RackState& state, bool playing, int numSamp
         renderChannel (state, c, numSamples);
         const auto spent = ProcessTimes::now() - before;
         if (timed)
-            times->channelNs[(std::size_t) c].fetch_add (spent, std::memory_order_relaxed);
+            times->addCall (true, (std::size_t) c, spent, audioNsOf (numSamples));
         if (measureUnits)
             channelCostNs[(std::size_t) c] = (std::uint32_t) std::min<std::uint64_t> (spent, 0xffffffffu);
     };
@@ -6207,7 +6207,7 @@ bool RackRenderer::runTaskGraph (const RackState& state, bool playing, int chann
             renderChannel (state, at, n);
             const auto spent = ProcessTimes::now() - before;
             if (timing && at < ProcessTimes::channels)
-                times->channelNs[(std::size_t) at].fetch_add (spent, std::memory_order_relaxed);
+                times->addCall (true, (std::size_t) at, spent, audioNsOf (n));
             if (measureUnits)
                 channelCostNs[(std::size_t) at] = (std::uint32_t) std::min<std::uint64_t> (spent, 0xffffffffu);
         }
@@ -6920,6 +6920,9 @@ bool RackRenderer::runGraphRound (const RackState& state, bool playing, int chan
     const auto waitMode = WorkerPool::tuning().waitMode.load (std::memory_order_relaxed);
     const auto handOffSpin = std::chrono::microseconds (WorkerPool::tuning().waitSpinMicros.load (std::memory_order_relaxed));
     const auto count = (std::uint64_t) pieceCount;
+    auto roundSamples = 0; // (round 190of: the audio all the pieces of a unit cover, for the monitor's spikes)
+    for (int k = 0; k < pieceCount; ++k)
+        roundSamples += pieces[(std::size_t) k].samples;
     auto task = [&] (int position) {
         int id = 0;
         auto& slot = graphSlots[(std::size_t) position];
@@ -6993,7 +6996,7 @@ bool RackRenderer::runGraphRound (const RackState& state, bool playing, int chan
                 if (at < channels)
                 {
                     if (timing && at < ProcessTimes::channels)
-                        times->channelNs[(std::size_t) at].fetch_add (spent, std::memory_order_relaxed);
+                        times->addCall (true, (std::size_t) at, spent, audioNsOf (roundSamples));
                     if (measureUnits)
                         channelCostNs[(std::size_t) at] = (std::uint32_t) std::min<std::uint64_t> (spent / count, 0xffffffffu);
                 }
