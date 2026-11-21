@@ -236,6 +236,7 @@ public:
     void setScaleForSnapshot (int root, int scale) { setScale (root, scale); }
     // issue #242 (round 190od): the toolbar scale box as a click opens it (JUCE's ComboBox marks the popup active first)
     juce::ComboBox& scaleBoxForTests() noexcept { return scaleBox; }
+    juce::ComboBox& chordBoxForTests() noexcept { return chordBox; } // (rollup 0.1.31 step 4: #242 with 190nu's stamp box)
     // round 190jv: View › Scale highlighting › Automatic on / off, and the key it guessed (scaledetect; -1 none)
     void setAutoScale (bool on) { scaleBox.setSelectedId (on ? autoScaleId : 1, juce::sendNotificationSync); }
     bool isAutoScaleForTests() const { return isAutoScale(); }

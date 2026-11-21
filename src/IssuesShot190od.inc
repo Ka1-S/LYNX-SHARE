@@ -67,6 +67,29 @@
             check ("#242 and closes again", close());
             check ("#242 and a third time", open());
             close();
+            // rollup 0.1.31 step 4: chord2_190nu's stamp box is a ScaleBox too (its click opens the Stamp menu); the same fix
+            // lets it open again
+            {
+                auto& stamp = roll.chordBoxForTests();
+                const auto openStamp = [&stamp, &pump] {
+                    stamp.keyPressed (juce::KeyPress (juce::KeyPress::returnKey));
+                    pump();
+                    return stamp.isPopupActive() && juce::ModalComponentManager::getInstance()->getNumModalComponents() > 0;
+                };
+                const auto closeStamp = [&stamp, &pump] {
+                    juce::PopupMenu::dismissAllActiveMenus();
+                    pump();
+                    return ! stamp.isPopupActive() && juce::ModalComponentManager::getInstance()->getNumModalComponents() == 0;
+                };
+                check ("#242 the chord stamp menu opens (190nu's stamp box)", openStamp());
+                check ("#242 the stamp box is no longer 'active' after it closed", closeStamp());
+                check ("#242 the stamp menu opens a second time", openStamp());
+                check ("#242 and closes again", closeStamp());
+                check ("#242 and a third time", openStamp());
+                closeStamp();
+                check ("#242 the scale menu still opens after the stamp menu", open());
+                close();
+            }
             // FL-exact (FL manual: "You must first select a Scale ... before Root notes are available"; REA FUN_00eadb90:
             // the root items are enabled only when a reference scale is chosen)
             roll.setScaleForSnapshot (0, 0);
