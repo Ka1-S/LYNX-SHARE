@@ -6,6 +6,8 @@
 #include <cstring>
 
 #include "core/MissingFiles.h"
+#include "core/Offline.h"
+#include "core/Offline.h"
 #include "core/ProjectSafety.h"
 #include "core/SessionParts.h"
 #include "core/Sha256.h"
@@ -131,6 +133,8 @@ struct RelayAnswer
 RelayAnswer relayRequest (const juce::String& method, const juce::String& url, const juce::String& bearer, const juce::String& json, int timeoutMs)
 {
     RelayAnswer answer;
+    if (offline::enabled()) // (every caller is already behind a gate: this is the last line, status 0 = no connection)
+        return answer;
     if (livelink::httpAvailable())
     {
         std::vector<std::string> headers;
@@ -412,6 +416,8 @@ void LiveSessionManager::start (const Options& o)
     io = std::make_unique<Worker> (false, false);
     renderer = std::make_unique<Worker> (options.inlineWork, true);
     std::string why;
+    if (offline::enabled())
+        return setState (State::ended, tr ("Live sessions are off: LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline) and opens no network connection."));
     if (! livelink::Connection::available (&why))
         return setState (State::ended, tr ("Live sessions need a newer libcurl on this computer ({0})", { str (why) }));
 
@@ -524,6 +530,8 @@ void LiveSessionManager::join (const juce::String& code, const Options& o)
     io = std::make_unique<Worker> (false, false);
     renderer = std::make_unique<Worker> (options.inlineWork, true);
     std::string why;
+    if (offline::enabled())
+        return setState (State::ended, tr ("Live sessions are off: LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline) and opens no network connection."));
     if (! livelink::Connection::available (&why))
         return setState (State::ended, tr ("Live sessions need a newer libcurl on this computer ({0})", { str (why) }));
     const auto parsed = livecrypto::parseCode (utf8 (code));
@@ -2626,7 +2634,7 @@ bool LiveSessionManager::resumeHost (const juce::File& file, const Options& o)
     if (! parsed || ! livecrypto::fromHex (utf8 (j["seed"].toString()), seed) || ! song || j["hostToken"].toString().isEmpty())
         return false;
     std::string why;
-    if (! livelink::Connection::available (&why))
+    if (offline::enabled() || ! livelink::Connection::available (&why))
         return false;
     options = o;
     if (options.relay.isEmpty() || j["relay"].toString().isNotEmpty())

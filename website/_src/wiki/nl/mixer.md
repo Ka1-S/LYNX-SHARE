@@ -117,7 +117,7 @@ Wanneer je een externe ingang kiest voor een insert die ook andere audio opneemt
 - De routeschakelaars verschijnen op de andere strips, niet op de geselecteerde.
 - De limiet is 500 inserts per project en tien effectslots per insert.
 - De opname van Edison wordt bewaard als WAV-bestand in de map van het project, niet in het projectbestand zelf.
-- De Sessiemixer onder het clipraster hoort alleen bij de Clip-launch-werkwijze. Hij toont dezelfde inserts als deze Mixer. Zie [Lay-outs](/wiki/layouts/).
+- De Sessiemixer onder het clipraster hoort alleen bij de Clipstart-lay-out. Hij toont dezelfde inserts als deze Mixer. Zie [Lay-outs](/wiki/layouts/).
 
 ## Gerelateerd
 

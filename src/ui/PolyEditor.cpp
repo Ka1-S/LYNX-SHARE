@@ -1773,6 +1773,14 @@ void open (AudioEngine& engine, int channel)
     open[channel] = std::make_unique<PolyEditorWindow> (engine, channel, tr ("Edit notes (polyphonic)") + (name.isNotEmpty() ? " - " + name : juce::String()));
 }
 
+juce::Rectangle<int> boundsOf (int channel)
+{
+    auto& open = windows();
+    if (auto it = open.find (channel); it != open.end())
+        return it->second->getScreenBounds();
+    return {};
+}
+
 void openBuffer (AudioEngine& engine, std::shared_ptr<const SampleData> buffer, const juce::String& title,
                  std::function<void (std::shared_ptr<const SampleData>)> apply)
 {

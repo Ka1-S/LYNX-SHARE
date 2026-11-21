@@ -10628,6 +10628,22 @@ void PlaylistComponent::showClipMenu (int index)
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
 }
 
+juce::Rectangle<int> PlaylistComponent::openClipMenuForDemo (int index)
+{
+    if (index < 0 || index >= (int) engine.getSong().playlist.size())
+        return {};
+    const auto bounds = clipBounds (index).getIntersection (getLocalBounds());
+    if (bounds.isEmpty())
+        return {};
+    if (! isSelected (index))
+        setSelection ({ index }); // (a right-click on a clip selects it first)
+    const auto at = bounds.getCentre();
+    auto menu = withRegionLoopItems (buildClipMenu (index, at.x), index);
+    if (menu.getNumItems() > 0)
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (juce::Rectangle<int> (at.x, at.y, 1, 1))));
+    return localAreaToGlobal (bounds);
+}
+
 // round 190jr (BUILD-LIST 13, BandLab's region loop): the Simple layout's loop items, added at the end of the clip's own
 // menu (its layout and header stay as they are)
 juce::PopupMenu PlaylistComponent::withRegionLoopItems (juce::PopupMenu menu, int index)

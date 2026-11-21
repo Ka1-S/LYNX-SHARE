@@ -10,6 +10,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/AudioEdit.h"
+#include "core/Offline.h"
 #include "core/StemSplit.h"
 #include "core/UpdateCheck.h"
 #include "platform/Paths.h"
@@ -460,6 +461,11 @@ private:
 
     bool download (const juce::File& dest, const stemsplit::ModelFile& model)
     {
+        if (offline::enabled()) // (the dialog says so before any job starts: this is the last line)
+        {
+            error = tr ("LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline), so the stem model is not downloaded.");
+            return false;
+        }
         const auto modelBytes = model.bytes;
         const auto* modelUrl = model.url;
        #if JUCE_LINUX || JUCE_BSD
@@ -777,6 +783,12 @@ void extractStemsFromClip (AudioEngine& engine, int clipIndex, std::function<voi
         if (missing <= 0)
         {
             start (o);
+            return;
+        }
+        if (offline::enabled()) // LYNX_OFFLINE=1 / --offline: a model that is not installed is not downloaded
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Extract stems from sample"),
+                                                    tr ("LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline), so the stem model is not downloaded. Extracting stems needs it once: start LYNX SHARE without offline mode, or copy the model file into {0}.", { modelFolder().getFullPathName() }));
             return;
         }
         // a model not downloaded yet: the source and the licence, before anything is downloaded

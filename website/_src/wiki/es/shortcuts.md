@@ -79,7 +79,7 @@ Algunas de estas teclas hacen otra cosa dentro de un editor que tiene el foco. E
 
 ## Clip View y Device View
 
-Estas teclas funcionan solo en el flujo por lanzamiento de clips.
+Estas teclas funcionan solo en el diseño de lanzamiento de clips.
 
 | Tecla | Qué hace |
 |---|---|

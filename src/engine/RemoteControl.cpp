@@ -199,7 +199,7 @@ struct RemoteControl::Impl final : juce::Thread
             for (std::size_t i = 0; i < s.playlist.size(); ++i)
             {
                 const auto& c = s.playlist[i];
-                playlist.add (object ({ { "index", (int) i }, { "kind", (int) c.kind }, { "pattern", c.pattern },
+                playlist.add (object ({ { "index", (int) i }, { "clipId", text (uids::toHex (c.uid)) }, { "kind", (int) c.kind }, { "pattern", c.pattern },
                                        { "track", c.track }, { "channel", c.channel }, { "automation", c.automation },
                                        { "start", (juce::int64) c.start }, { "length", (juce::int64) c.length },
                                        { "offset", (juce::int64) c.offset }, { "muted", c.muted } }));

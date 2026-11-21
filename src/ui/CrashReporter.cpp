@@ -1,3 +1,4 @@
+#include "core/Offline.h"
 #include "engine/FileSort.h"
 #include "ui/CrashReporter.h"
 
@@ -367,6 +368,11 @@ enum class Outcome
 
 Outcome post (const juce::MemoryBlock& body, juce::String& message)
 {
+    if (offline::enabled()) // (the uploader never gets here in offline mode: the last line)
+    {
+        message = "offline mode";
+        return Outcome::retry;
+    }
    #if JUCE_LINUX || JUCE_BSD
     // (LYNX is built without libcurl, JUCE_USE_CURL=0: the curl program sends it)
     const auto file = juce::File::createTempFile (".json.gz");
@@ -451,6 +457,13 @@ private:
                 if (handled.contains (id))
                     continue; // tried in this run already: the next start retries it
                 handled.add (id);
+                if (offline::enabled())
+                {
+                    // LYNX_OFFLINE=1 / --offline: nothing leaves this computer. The report stays in the pending folder
+                    // (no "tries" mark: it is sent once the mode is off and the person agrees)
+                    callBack (id, false, "offline mode (LYNX_OFFLINE or --offline): the report stays on this computer");
+                    continue;
+                }
                 juce::MemoryBlock body;
                 file.loadFileAsData (body);
                 juce::String message;

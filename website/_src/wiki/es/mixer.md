@@ -117,7 +117,7 @@ Cuando eliges una entrada externa para un insert que también graba otro audio, 
 - Los interruptores de ruta aparecen en las demás franjas, no en la seleccionada.
 - El límite es de 500 inserts por proyecto y diez ranuras de efecto por insert.
 - La grabación de Edison se guarda como archivo WAV en la carpeta del proyecto, no dentro del archivo del proyecto.
-- El mixer de Session bajo la cuadrícula de clips pertenece solo al flujo Clip-launch. Muestra los mismos inserts que este Mixer. Mira [Diseños](/wiki/layouts/).
+- El mixer de Session bajo la cuadrícula de clips pertenece solo al diseño Clip-launch. Muestra los mismos inserts que este Mixer. Mira [Diseños](/wiki/layouts/).
 
 ## Relacionado
 

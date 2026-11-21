@@ -3,22 +3,22 @@ source: cee352e3d5
 ---
 ![La disposition Clip-launch : une grille de clips avec des scènes à côté de la Playlist](/assets/img/cliplaunch.webp)
 
-LYNX SHARE démarre dans le flux par patterns : un Channel Rack, des patterns et une Playlist. Le flux par lancement de clips est facultatif et ajoute une grille de clips avec des scènes à côté de la Playlist. LYNX SHARE lit et écrit les sets `.als`. Il n'est pas affilié à Ableton.
+LYNX SHARE démarre dans la disposition Pattern : un Channel Rack, des patterns et une Playlist. La disposition par lancement de clips est facultative et ajoute une grille de clips avec des scènes à côté de la Playlist. LYNX SHARE lit et écrit les sets `.als`. Il n'est pas affilié à Ableton.
 
 ## Ouvrir un set Live
 
 1. Choisissez `Fichier › Ouvrir...` (`Ctrl+O`) et sélectionnez le `.als`. Les sets enregistrés par Live 11 et Live 12 sont lus.
-2. Choisissez `Vue › Style de disposition › Flux par lancement de clips` pour travailler avec la grille de clips, où vont les clips Session et les scènes du set.
+2. Choisissez `Vue › Style de disposition › Disposition par lancement de clips` pour travailler avec la grille de clips, où vont les clips Session et les scènes du set.
 3. Utilisez le sélecteur `Grid / Both / Song` dans la barre de titre de la Playlist pour afficher la grille, la Playlist, ou les deux.
 4. Choisissez `Fichier › Enregistrer`. Il demande où écrire un fichier `.lynx`. Le `.als` n'est pas modifié.
 
-`Vue › Style de disposition › Flux par patterns (par défaut)` revient en arrière. Le même choix se trouve dans `Options › Réglages généraux...`. Les patterns et le Channel Rack restent disponibles dans les deux dispositions.
+`Vue › Style de disposition › Disposition Pattern (par défaut)` revient en arrière. Le même choix se trouve dans `Options › Réglages généraux...`. Les patterns et le Channel Rack restent disponibles dans les deux dispositions.
 
 ## Correspondances
 
 | Dans Live | Dans LYNX SHARE |
 |---|---|
-| Vue Session | La grille de clips du flux par lancement de clips |
+| Vue Session | La grille de clips de la disposition par lancement de clips |
 | Vue Arrangement | La Playlist |
 | Pistes | Pistes de la Playlist, qui sont les colonnes de la grille de clips |
 | Scènes | Scènes, les lignes de la grille de clips. Une scène peut régler le tempo quand elle est lancée |
@@ -82,4 +82,4 @@ Un rapport après l'export liste ce qui a été laissé de côté.
 - [Dispositions](/wiki/layouts/)
 - [Importer des projets](/wiki/importing-projects/)
 - [Formats de fichiers](/wiki/file-formats/)
-- [Deux flux de travail dans un seul programme](/why/#workflows)
+- [Deux dispositions dans un seul programme](/why/#workflows)

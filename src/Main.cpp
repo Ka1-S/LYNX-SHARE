@@ -2,6 +2,7 @@
 #include "engine/AraHost.h"
 #include "engine/FileSort.h"
 #include "platform/Paths.h"
+#include "core/Offline.h"
 #include "core/GrooveAudio.h"
 #include "core/EditorScale.h"
 #include "core/SimplePads.h"
@@ -124,6 +125,7 @@
 #include "core/PlaylistOps.h"
 #include "core/Sha256.h"
 #include "engine/SessionPack.h"
+#include "engine/LiveSessions.h"
 #include "engine/LiveTest.h"
 #include "engine/ShortExportTest.h"
 #include "core/SessionIds.h"
@@ -705,6 +707,9 @@ public:
 
     void initialise (const juce::String& commandLine) override
     {
+        // round 190nx: --offline (or LYNX_OFFLINE=1) = no network connection of LYNX's own, before anything can start one
+        if (juce::StringArray::fromTokens (commandLine, true).contains ("--offline"))
+            lynx::offline::set (true);
         // round 166b: the copy of LYNX.exe that installs an update (ui/Updater.h) waits, installs, starts LYNX again
         if (commandLine.contains ("--apply-update") && lynx::updater::runApplyHelper (juce::StringArray::fromTokens (commandLine, true)))
         {
@@ -1268,6 +1273,52 @@ public:
             // LYNX --livepeer host|guest|rejoin <folder> [--relay URL] [--code CODE|@file]: one computer's side of a live
             // session between two real computers, no window (round 190ah)
             setApplicationReturnValue (lynx::livetest::runPeer (args));
+            quit();
+            return;
+        }
+
+        if (args.contains ("--offlinetest"))
+        {
+            // LYNX --offlinetest report.txt [--offline] (round 190nx): with LYNX_OFFLINE=1 or --offline every place that
+            // would use the network refuses and says so. The test script runs it under `unshare -rn` with strace and counts
+            // the connect() calls of internet sockets: zero (tests/offline-network-test.sh)
+            const auto report = juce::File::getCurrentWorkingDirectory().getChildFile (args[args.indexOf ("--offlinetest") + 1].unquoted());
+            juce::String log;
+            bool ok = true;
+            auto check = [&] (bool good, const juce::String& what) {
+                ok = ok && good;
+                log << (good ? "ok   " : "FAIL ") << what << "\n";
+            };
+            check (lynx::offline::enabled(), "offline mode is on");
+            {
+                std::string why;
+                check (! lynx::livelink::Connection::available (&why) && why.find ("offline") != std::string::npos, "live link unavailable: " + juce::String (why));
+                check (lynx::livelink::http ("GET", "https://relay.lynx-share.com/v1/health", {}, {}, "LYNX-test", 2).status == 0, "relay HTTP gives no answer, no connection tried");
+            }
+            {
+                lynx::AudioEngine offlineEngine (false);
+                lynx::LiveSessionManager live (offlineEngine);
+                lynx::LiveSessionManager::Options o;
+                o.relay = "https://relay.lynx-share.com";
+                o.name = "Offline test";
+                o.inlineWork = true;
+                live.start (o);
+                check (live.getState() == lynx::LiveSessionManager::State::ended && ! live.isActive(), "Start live session refused: " + live.getStatus());
+                lynx::LiveSessionManager joiner (offlineEngine);
+                joiner.join ("LYNX-AAAA-AAAA-AAAA-AAAA-AAAA", o);
+                check (joiner.getState() == lynx::LiveSessionManager::State::ended && ! joiner.isActive(), "Join live session refused: " + joiner.getStatus());
+            }
+            {
+                const auto err = lynx::crashreporter::sendNow ("{\"offline\":\"test\"}");
+                check (err.containsIgnoreCase ("offline"), "crash report upload refused: " + err);
+            }
+            lynx::updater::startAutomaticCheck();
+            lynx::updater::checkNow();
+            lynx::updater::goBack();
+            check (true, "update check, update dialog and go-back opened no connection (see strace)");
+            log << (ok ? "RESULT OK\n" : "RESULT FAIL\n");
+            report.replaceWithText (log);
+            setApplicationReturnValue (ok ? 0 : 1);
             quit();
             return;
         }

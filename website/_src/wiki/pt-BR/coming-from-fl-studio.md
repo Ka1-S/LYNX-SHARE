@@ -1,7 +1,7 @@
 ---
 source: 3bf7e0c0ab
 ---
-O LYNX SHARE mantém o fluxo de trabalho que você conhece: um Channel Rack, patterns, uma Playlist e um Mixer, com as mesmas teclas. Ele abre projetos `.flp` diretamente e pode gravar um de volta.
+O LYNX SHARE mantém o layout que você conhece: um Channel Rack, patterns, uma Playlist e um Mixer, com as mesmas teclas. Ele abre projetos `.flp` diretamente e pode gravar um de volta.
 
 O LYNX SHARE é um programa independente. Ele não é afiliado, endossado nem patrocinado pela Image-Line e não contém código da Image-Line. FL Studio é marca registrada da Image-Line Software.
 

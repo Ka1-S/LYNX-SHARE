@@ -5,6 +5,7 @@
 #include <mutex>
 #include <optional>
 
+#include "core/Offline.h"
 #include "platform/Package.h"
 #include "platform/Paths.h"
 #include "ui/I18n.h"
@@ -39,6 +40,9 @@ juce::File updateFolder()
     const auto base = profile != juce::File() ? profile.getChildFile ("Temp") : juce::File::getSpecialLocation (juce::File::tempDirectory);
     return base.getChildFile ("LYNX-update");
 }
+
+// round 190nx: LYNX_OFFLINE=1 / --offline: no update check, download or going back (PRIVACY.md)
+juce::String offlineText() { return tr ("LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline), so it does not connect to the internet: no update check and no update download."); }
 
 juce::File downloadsFolder()
 {
@@ -184,6 +188,11 @@ public:
     // release list). False with `error` on failure or Cancel.
     bool download (const juce::String& url, const juce::File& dest, std::int64_t expected, bool quick, juce::String& failure)
     {
+        if (offline::enabled())
+        {
+            failure = offlineText();
+            return false;
+        }
         dest.getParentDirectory().createDirectory();
         dest.deleteFile();
        #if JUCE_LINUX || JUCE_BSD
@@ -701,6 +710,11 @@ void appImageUpdate()
 
 void startUpdate()
 {
+    if (offline::enabled())
+    {
+        message (juce::MessageBoxIconType::InfoIcon, tr ("Update"), offlineText());
+        return;
+    }
     auto& c = controller();
     switch (update::methodFor (flavour()))
     {
@@ -792,6 +806,8 @@ static bool justUpdated = false;
 
 void startAutomaticCheck()
 {
+    if (offline::enabled()) // no network at all, not even the quiet check
+        return;
     // round 190gh (B2), tests: LYNX_TEST_MODE + LYNX_UPDATE_URL + LYNX_UPDATE_GO_BACK=1 go back at start, without asking
     if (offered() && platform::testMode() && overrideUrl().isNotEmpty() && env ("LYNX_UPDATE_GO_BACK") == "1")
     {
@@ -814,6 +830,11 @@ void checkNow()
 {
     if (! offered())
         return;
+    if (offline::enabled())
+    {
+        message (juce::MessageBoxIconType::InfoIcon, tr ("Check for updates"), offlineText());
+        return;
+    }
     if (platform::testMode() && overrideUrl().isEmpty())
     {
         message (juce::MessageBoxIconType::InfoIcon, tr ("Check for updates"), "LYNX_TEST_MODE: no network (set LYNX_UPDATE_URL)");
@@ -857,6 +878,11 @@ void goBack()
     if (! offered())
         return;
     const auto title = tr ("Go back to an earlier version");
+    if (offline::enabled())
+    {
+        message (juce::MessageBoxIconType::InfoIcon, title, offlineText());
+        return;
+    }
     if (platform::testMode() && overrideUrl().isEmpty())
     {
         message (juce::MessageBoxIconType::InfoIcon, title, "LYNX_TEST_MODE: no network (set LYNX_UPDATE_URL)");

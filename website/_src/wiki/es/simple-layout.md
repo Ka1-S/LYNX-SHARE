@@ -1,7 +1,7 @@
 ---
 source: 2ccec7b23f
 ---
-`Ver › Estilo de diseño › Flujo simple` muestra una ventana con las pistas y la línea de tiempo. Mezcla el estilo accesible de una sola ventana de BandLab con la forma de trabajar de FL Studio Mobile (pistas, loops, pads y grabación rápida), y va bien para una primera canción. Los proyectos de FL Studio Mobile (`.flm`) se abren en él, igual que en los otros flujos. El asistente de configuración lo ofrece en el primer inicio, junto al Flujo por patrones (el predeterminado) y el Flujo por lanzamiento de clips.
+`Ver › Estilo de diseño › Diseño simple` muestra una ventana con las pistas y la línea de tiempo. Mezcla el estilo accesible de una sola ventana de BandLab con la forma de trabajar de FL Studio Mobile (pistas, loops, pads y grabación rápida), y va bien para una primera canción. Los proyectos de FL Studio Mobile (`.flm`) se abren en él, igual que en los otros diseños. El asistente de configuración lo ofrece en el primer inicio, junto al Diseño Patrón (el predeterminado) y el Diseño de lanzamiento de clips.
 
 ## Qué incluye
 
@@ -15,6 +15,6 @@ source: 2ccec7b23f
 ## Conviene saber
 
 - No se quita nada: el Channel Rack, el Piano Roll, la Playlist y el Mixer quedan a un clic.
-- El mismo menú vuelve al Flujo por patrones en cualquier momento.
+- El mismo menú vuelve al Diseño Patrón en cualquier momento.
 
 Mira [Disposiciones](/wiki/layouts/) para los otros dos.

@@ -117,7 +117,7 @@ Quand vous choisissez une entrée externe pour un insert qui enregistre aussi d'
 - Les interrupteurs de routage apparaissent sur les autres bandes, pas sur celle qui est sélectionnée.
 - La limite est de 500 inserts par projet et de dix emplacements d'effets par insert.
 - L'enregistrement d'Edison est conservé sous forme de fichier WAV dans le dossier du projet, et non dans le fichier du projet.
-- La table de mixage de session sous la grille de clips n'appartient qu'au flux par lancement de clips. Elle affiche les mêmes inserts que ce Mixer. Voir [Dispositions](/wiki/layouts/).
+- La table de mixage de session sous la grille de clips n'appartient qu'à la disposition par lancement de clips. Elle affiche les mêmes inserts que ce Mixer. Voir [Dispositions](/wiki/layouts/).
 
 ## Voir aussi
 

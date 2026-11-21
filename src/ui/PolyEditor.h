@@ -35,6 +35,8 @@ namespace PolyEditorWindows
 {
 // The editor of an audio clip channel (one window per channel)
 void open (AudioEngine& engine, int channel);
+// round 190nx (--demo, ui.polyeditor): the open editor's rectangle on screen (empty when the channel has none)
+juce::Rectangle<int> boundsOf (int channel);
 // Round 190lo: the editor on a buffer (Edison's Tools › Analysis › "Edit notes (polyphonic)..."): its own undo, and Apply
 // hands the edited render (same length) to `apply`, then the window closes
 void openBuffer (AudioEngine& engine, std::shared_ptr<const SampleData> buffer, const juce::String& title,
