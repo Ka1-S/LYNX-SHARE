@@ -8133,7 +8133,6 @@ private:
             // merge 4 (190oa): the toolbar's main (monitor) volume off 0 dB and Gross Beat's scratch offset set (DF-21, DP-8)
             song.mainVolume = 0.5f;
             auto gross = lynx::makeEffectSlot (lynx::EffectKind::grossBeat);
-            gross.params.resize (9, 0.0f);
             gross.params[8] = 0.25f;
             song.mixer[2].effects.push_back (gross);
             lynx::autolook::Rules rules;
