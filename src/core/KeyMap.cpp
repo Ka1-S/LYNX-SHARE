@@ -288,6 +288,7 @@ std::vector<Action> makeActions()
         { "pianoRoll.backgroundWave", TR_NOOP ("Background waveform on/off"), Context::pianoRoll, { chord ('N', alt) } },
         { "pianoRoll.showChordName", TR_NOOP ("Show chord name for selection on/off"), Context::pianoRoll, {} },
         { "pianoRoll.songBarsRuler", TR_NOOP ("Piano roll ruler: song bars on/off"), Context::pianoRoll, {} },
+        { "pianoRoll.stackedLanes", TR_NOOP ("Piano roll: stacked controller lanes on/off (LYNX)"), Context::pianoRoll, {} }, // round 190on (P10)
         { "pianoRoll.selectRandomOne", TR_NOOP ("Select one at random"), Context::pianoRoll, { chord ('R', shift) }, true },
         { "pianoRoll.selectRandomMore", TR_NOOP ("Select more at random"), Context::pianoRoll, { chord ('M', shift) }, true },
         { "pianoRoll.selectOddSteps", TR_NOOP ("Select odd (swung) notes"), Context::pianoRoll, { chord ('O', shift) }, true },

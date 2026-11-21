@@ -242,3 +242,50 @@ TEST (research190on_p8_tab_to_transient_visits_a_drum_loops_hits)
     }
 }
 
+// ==== 190on P10: stacked controller lanes
+#include "core/LynxExtras.h"
+#include "core/StackedLanes.h"
+
+TEST (research190on_p10_stacked_lanes)
+{
+    using namespace lynx;
+    using namespace lynx::stackedlanes;
+    CHECK (! enabled (false, false)); // Pattern layout: a LYNX extra, off
+    CHECK (enabled (false, true) && enabled (true, false)); // on, or the Clip-launch layout
+    // heights: in proportion, at least minHeight, adding up
+    auto h = heights ({ 1.0f, 1.0f, 1.0f, 1.0f }, 200, 0);
+    CHECK (h == (std::vector<int> { 50, 50, 50, 50 }));
+    h = heights ({ 2.0f, 1.0f, 1.0f }, 160, 0);
+    CHECK (h[0] + h[1] + h[2] == 160 && h[0] > h[1] && h[1] >= minHeight);
+    h = heights ({ 5.0f, 0.2f }, 100, 0);
+    CHECK (h[1] >= minHeight && h[0] + h[1] == 100);
+    h = heights ({ 1.0f, 1.0f, 1.0f }, 30, 0); // too little room: shared, never negative
+    CHECK (h[0] >= 0 && h[0] + h[1] + h[2] == 30);
+    // dragging the line between lanes 0 and 1 by 20 px
+    std::vector<float> w { 1.0f, 1.0f, 1.0f };
+    const auto before = heights (w, 300, 0);
+    dragBoundary (w, 300, 0, 20);
+    const auto after = heights (w, 300, 0);
+    CHECK (std::abs (after[0] - (before[0] + 20)) <= 1 && std::abs (after[1] - (before[1] - 20)) <= 1 && after[2] == before[2]);
+    dragBoundary (w, 300, 0, -1000); // never under minHeight
+    CHECK (heights (w, 300, 0)[0] >= minHeight);
+    // ui-options.txt round trip
+    std::vector<Lane> lanes (3);
+    lanes[0].property = 2;
+    lanes[0].weight = 1.5f;
+    lanes[1].target = AutomationTarget { AutomationTargetKind::mixerSend, 1, 2, 3 };
+    lanes[2].property = 5;
+    const auto text = toText (lanes, 0.75f);
+    float bottom = 0.0f;
+    const auto back = fromText (text, &bottom);
+    CHECK (back == lanes && std::abs (bottom - 0.75f) < 1e-6f);
+    CHECK (fromText ("p99:1 x:2 junk p3:1").size() == 1);
+    CHECK (fromText ("p1:1 p2:1 p3:1 p4:1 p5:1 p6:1").size() == (std::size_t) maxAdded);
+    // listed as a LYNX extra
+    bool listed = false;
+    for (const auto& item : extras::items)
+        listed = listed || (item.id == "pianoRoll.stackedLanes" && item.settingsKey == "ui-options.txt:prStackedLanesExtra");
+    CHECK (listed);
+    CHECK (keys::findAction ("pianoRoll.stackedLanes") != nullptr && keys::findAction ("pianoRoll.stackedLanes")->defaults.empty());
+}
+

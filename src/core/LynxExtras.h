@@ -79,6 +79,10 @@ inline constexpr Item items[] = {
     { "pianoRoll.songBarsRuler", TR_NOOP ("Piano Roll"), TR_NOOP ("Ruler: song bars (LYNX)"),
       TR_NOOP ("The Piano roll's ruler shows the bar numbers of the place in the song where the pattern plays. Also in the Piano roll's View menu."),
       "ui-options.txt:prSongBars" },
+    // round 190on (research190oe P10): FL's event editor shows one lane; Live 12's clip editor several
+    { "pianoRoll.stackedLanes", TR_NOOP ("Piano Roll"), TR_NOOP ("Stacked controller lanes (LYNX)"),
+      TR_NOOP ("A \"+\" beside the event lane's chooser adds lanes above it (up to five in all: velocity, pan, mod X, any pattern event lane...), each with its own chooser and \"×\"; drag the line between two lanes to share their height. Always offered in the Clip-launch layout. Also in the Piano roll's View menu."),
+      "ui-options.txt:prStackedLanesExtra" },
     // round 190iu (issue #191.1): FL's tool keys only select a tool
     { "editing.tempTools", TR_NOOP ("Editing"), TR_NOOP ("Hold a tool key for a temporary tool"),
       TR_NOOP ("In the Playlist and the Piano roll, holding a tool's key (C for the Knife, D for the Eraser...) uses that tool until the key is let go; a quick tap still picks the tool. Also in the Playlist menu."),

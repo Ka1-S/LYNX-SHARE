@@ -281,6 +281,99 @@
             }
         }
 
+        // ================= P10: stacked controller lanes =================
+        {
+            ui.showPanelsForSnapshot ({ Panel::pianoRoll });
+            engine.setSelectedChannel (0);
+            engine.dispatchPendingMessages();
+            auto& pr = ui.getPianoRollForSnapshot();
+            pr.setSize (1200, 640);
+            pr.resized();
+            pr.scrollToNotes();
+            engine.dispatchPendingMessages();
+            check ("Pattern layout: no \"+\" while the extra is off (FL's single lane)", ! PianoRollComponent::stackedLanesExtra && pr.stackedLaneCount() == 0);
+            write (pr, pr.getLocalBounds(), "p10-pianoroll-off");
+            const auto paintMs = [&pr] {
+                juce::Image image (juce::Image::ARGB, pr.getWidth(), pr.getHeight(), true);
+                std::vector<double> t;
+                for (int i = 0; i < 15; ++i)
+                {
+                    juce::Graphics g (image);
+                    const auto start = juce::Time::getMillisecondCounterHiRes();
+                    pr.paintEntireComponent (g, false);
+                    t.push_back (juce::Time::getMillisecondCounterHiRes() - start);
+                }
+                std::sort (t.begin(), t.end());
+                return t[t.size() / 2];
+            };
+            const auto oneLane = paintMs();
+            PianoRollComponent::stackedLanesExtra = true;
+            pr.stackedLanesChanged();
+            pr.addStackedLaneForSnapshot (PianoRollComponent::lanePan);
+            pr.addStackedLaneForSnapshot (PianoRollComponent::laneFinePitch);
+            pr.addStackedLaneForSnapshot (PianoRollComponent::laneModX);
+            pr.moveEventPaneBar (pr.getHeight() / 2); // (room for four lanes)
+            engine.dispatchPendingMessages();
+            const auto lanes = pr.laneAreasForTests();
+            juce::String ids;
+            for (const auto& [area, id] : lanes)
+                ids << id << "@" << area.getY() << "+" << area.getHeight() << " ";
+            line ("lanes (id@y+h): " + ids);
+            check ("four lanes on screen (three added + the bottom one)", lanes.size() == 4 && std::all_of (lanes.begin(), lanes.end(), [] (const auto& l) { return l.first.getHeight() >= 24; }));
+            write (pr, pr.getLocalBounds(), "p10-pianoroll-4lanes");
+            const auto fourLanes = paintMs();
+            line ("paint (whole Piano roll, median of 15): one lane " + juce::String (oneLane, 2) + " ms, four lanes " + juce::String (fourLanes, 2) + " ms");
+            check ("paint time with four lanes within +1 ms of one lane", fourLanes - oneLane <= 1.0);
+            // an edit in lane 3 (index 2: Pan) changes only pan
+            if (lanes.size() == 4)
+            {
+                const auto before = engine.getSong().patterns[0].notes;
+                const auto area = lanes[2].first;
+                pr.dragInLaneForSnapshot (2, area.getX() + 2, area.getRight() - 2, 0.9f, 0.9f);
+                engine.dispatchPendingMessages();
+                const auto after = engine.getSong().patterns[0].notes;
+                bool panChanged = false, othersSame = before.size() == after.size();
+                for (std::size_t i = 0; i < before.size() && i < after.size(); ++i)
+                {
+                    panChanged = panChanged || std::abs (after[i].pan - before[i].pan) > 0.1f;
+                    othersSame = othersSame && after[i].velocity == before[i].velocity && after[i].modX == before[i].modX && after[i].finePitch == before[i].finePitch
+                                 && after[i].modY == before[i].modY && after[i].release == before[i].release;
+                }
+                line ("lane 3 is id " + juce::String (lanes[2].second) + " (Pan = " + juce::String (PianoRollComponent::lanePan) + ")");
+                check ("an edit in lane 3 changes only its target (Pan)", lanes[2].second == PianoRollComponent::lanePan && panChanged && othersSame);
+                write (pr, pr.getLocalBounds(), "p10-pianoroll-4lanes-edited");
+            }
+            // the set is kept, and goes away with the switch
+            const auto saved = PianoRollComponent::stackedLanesSaved;
+            line ("saved: " + juce::String (saved));
+            PianoRollComponent::stackedLanesExtra = false;
+            pr.stackedLanesChanged();
+            check ("switch off: FL's single lane again", pr.stackedLaneCount() == 0);
+            PianoRollComponent::stackedLanesExtra = true;
+            pr.stackedLanesChanged();
+            check ("switch on: the saved lanes come back", pr.stackedLaneCount() == 3);
+            PianoRollComponent::stackedLanesExtra = false;
+            pr.stackedLanesChanged();
+            PianoRollComponent::stackedLanesSaved.clear();
+            pr.stackedLanesChanged();
+            // the Clip-launch layout offers them with the extra off (Live 12's Velocity and Chance lanes, stacked)
+            ui.setLayoutStyle (layoutstyle::Style::clipLaunch);
+            ui.showPanelsForSnapshot ({ Panel::pianoRoll });
+            engine.dispatchPendingMessages();
+            pr.setSize (1200, 640);
+            pr.stackedLanesChanged();
+            check ("Clip-launch layout: stacked lanes offered with the extra off", pr.stackingEnabled());
+            pr.addStackedLaneForSnapshot (PianoRollComponent::laneChance);
+            pr.moveEventPaneBar (pr.getHeight() / 2);
+            engine.dispatchPendingMessages();
+            check ("Clip-launch layout: Velocity with Chance stacked", pr.stackedLaneCount() == 1 && pr.laneAreasForTests().size() == 2);
+            write (pr, pr.getLocalBounds(), "p10-pianoroll-cliplaunch-chance");
+            pr.removeStackedLaneForSnapshot (0);
+            PianoRollComponent::stackedLanesSaved.clear();
+            ui.setLayoutStyle (layoutstyle::Style::pattern);
+            engine.dispatchPendingMessages();
+        }
+
         juce::File (prefix + "-checks.txt").replaceWithText (checks + (allOk ? "result=OK\n" : "result=FAIL\n"));
         wav.deleteFile();
         return allOk;

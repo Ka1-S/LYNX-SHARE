@@ -2663,6 +2663,7 @@ bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_v
     if (id == "playlist.automationLanes") return autolanes::shown();
     if (id == "playlist.trackInserts") return PlaylistComponent::showTrackInserts;
     if (id == "pianoRoll.songBarsRuler") return PianoRollComponent::songBarsRuler;
+    if (id == "pianoRoll.stackedLanes") return PianoRollComponent::stackedLanesExtra; // (round 190on, P10)
     if (id == "polyEdit.prepareOnOpen") return PolyEditorWindows::prepareOnOpen; // (round 190lo)
     if (id == "general.hoverValues") return hooks.getGeneral && hooks.getGeneral().hoverValues;
     if (id == "project.linkTracks") return hooks.getGeneral && hooks.getGeneral().linkTracksInNewProjects;
@@ -2736,6 +2737,14 @@ void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_
         if (! toggledBy ("playlist.trackInserts"))
         {
             PlaylistComponent::showTrackInserts = on;
+            saved();
+        }
+    }
+    else if (id == "pianoRoll.stackedLanes") // round 190on (P10): the Piano roll's action switches it and refreshes the editors
+    {
+        if (! toggledBy ("pianoRoll.stackedLanes"))
+        {
+            PianoRollComponent::stackedLanesExtra = on;
             saved();
         }
     }

@@ -3546,6 +3546,10 @@ void MainComponent::loadUiSettings()
             ChordHelperPanel::pinnedFirst = on;
         else if (key == "prSongBars")
             PianoRollComponent::songBarsRuler = on;
+        else if (key == "prStackedLanesExtra") // (round 190on, P10)
+            PianoRollComponent::stackedLanesExtra = on;
+        else if (key == "prStackedLanes")
+            PianoRollComponent::stackedLanesSaved = line.fromFirstOccurrenceOf ("=", false, false).trim().toStdString();
         else if (key == "polyPrepareOnOpen") // (round 190lo: a LYNX extra, ui/PolyEditor.h)
             PolyEditorWindows::prepareOnOpen = on;
         else if (key == "prKeyStyle") // (round 190j: 0 = flat, FL's; 1 = piano keys)
@@ -3902,6 +3906,8 @@ void MainComponent::saveUiSettings()
                                       + "\nchordFavourites=" + juce::String (modalhelp::favouritesText (ChordHelperPanel::favourites))
                                       + "\nchordPinnedFirst=" + juce::String (ChordHelperPanel::pinnedFirst ? 1 : 0)
                                       + "\nprSongBars=" + juce::String (PianoRollComponent::songBarsRuler ? 1 : 0)
+                                      + "\nprStackedLanesExtra=" + juce::String (PianoRollComponent::stackedLanesExtra ? 1 : 0)
+                                      + "\nprStackedLanes=" + juce::String (PianoRollComponent::stackedLanesSaved)
                                       + "\npolyPrepareOnOpen=" + juce::String (PolyEditorWindows::prepareOnOpen ? 1 : 0)
                                       + "\nprKeyStyle=" + juce::String ((int) PianoRollComponent::keyStyle)
                                       + "\naudioLogEnabled=" + juce::String (engine.getRollingLog().isEnabled() ? 1 : 0)

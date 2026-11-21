@@ -10,6 +10,7 @@
 #include "core/NoteTools.h"
 #include "core/PianoKeys.h"
 #include "core/ScaleSnap.h"
+#include "core/StackedLanes.h"
 #include "engine/AudioEngine.h"
 #include "ui/TimerWhileShowing.h"
 #include "ui/EditorTools.h"
@@ -148,6 +149,20 @@ public:
     static inline pianokeys::Style keyStyle = pianokeys::Style::flat;
     void setKeyStyle (pianokeys::Style style);
     static inline bool songBarsRuler = false; // round 177d: the ruler numbers song bars (off = FL: pattern bars)
+    // Round 190on (research190oe P10, core/StackedLanes.h): stacked controller lanes. The LYNX extra's switch (Pattern and
+    // Simple layouts; the Clip-launch layout always offers them) and the lane set, both kept in ui-options.txt
+    // (prStackedLanesExtra, prStackedLanes). The "+" beside the bottom lane's chooser adds a lane above it.
+    static inline bool stackedLanesExtra = false;
+    static inline std::string stackedLanesSaved;
+    bool stackingEnabled() const;
+    void stackedLanesChanged();            // the switch or the layout changed: the lanes shown follow
+    // tests / --snapshot: add a lane (a note property, or a pattern event lane), the lanes' areas (added ones top to
+    // bottom, then the bottom lane) and their ids, and a drag inside lane `lane` from value `from` to `to` (0..1) at x
+    void addStackedLaneForSnapshot (int property, std::optional<AutomationTarget> target = std::nullopt);
+    void removeStackedLaneForSnapshot (int index) { removeStackedLane (index); }
+    int stackedLaneCount() const noexcept { return (int) stacked.size(); }
+    std::vector<std::pair<juce::Rectangle<int>, int>> laneAreasForTests() const;
+    void dragInLaneForSnapshot (int lane, int fromX, int toX, float from, float to);
     // FL's General › "Monophonic painting in piano roll" (round 189o, off): on, the Paint tool paints monophonically
     // without Shift (noteedit::monophonicPaint). Saved with the UI options.
     static inline bool monophonicPainting = false;
@@ -392,7 +407,8 @@ private:
     void scrollBarMoved (juce::ScrollBar*, double) override;
 
     juce::Rectangle<int> gridArea() const;
-    juce::Rectangle<int> velocityArea() const;
+    juce::Rectangle<int> velocityArea() const; // the lane the code works on now (round 190on: the bottom one, or a stacked one in scope)
+    juce::Rectangle<int> eventPaneArea() const; // every lane of the event editor
     double tickToX (double tick) const;
     double xToTick (int x) const;
     int keyToY (int key) const;
@@ -494,6 +510,40 @@ private:
     IconButton followButton { "follow", Icon::follow }; // Follow (auto scrolling) on/off, EditorGlobals (round 162)
     void quantizeOperation (int kind); // 0 = starts, 1 = starts and lengths (quick quantize), 2 = starts 50% toward the grid
     juce::ComboBox laneBox; // what the bottom lane edits: velocity, pan or fine pitch
+    // --- round 190on (P10): the stacked lanes above the bottom one (core/StackedLanes.h) ---------------------------------
+    struct StackedLane
+    {
+        stackedlanes::Lane spec;
+        juce::ComboBox box;
+        juce::TextButton close { juce::String::fromUTF8 ("\xc3\x97") };
+    };
+    std::vector<std::unique_ptr<StackedLane>> stacked;
+    float bottomWeight = 1.0f;
+    bool stackingWas = false;
+    juce::TextButton addLaneButton { "+" };
+    // what the lane handlers and the lane painting act on: a stacked lane while a gesture or a paint pass is in it
+    int laneOverride = 0, paintingLane = -1, heldLane = -1, boundaryDrag = -1, boundaryLastY = 0;
+    juce::Rectangle<int> laneAreaOverride;
+    struct LaneScope
+    {
+        LaneScope (PianoRollComponent& o, int index);
+        ~LaneScope();
+        PianoRollComponent& owner;
+        int savedId, savedPainting;
+        juce::Rectangle<int> savedArea;
+    };
+    std::vector<juce::Rectangle<int>> laneAreas() const; // stacked lanes top to bottom, then the bottom lane
+    int laneId() const noexcept { return laneOverride != 0 ? laneOverride : laneBox.getSelectedId(); }
+    juce::String laneName() const;
+    int stackedLaneId (const StackedLane& lane) const;
+    int stackedLaneAt (juce::Point<int> p) const;  // -1: none
+    int laneBoundaryAt (juce::Point<int> p) const; // k: the line under lane k (k + 1 below it); -1: none
+    void enterLane (int index);                     // the override for stacked lane `index` (-1: none)
+    void addStackedLane();
+    void removeStackedLane (int index);
+    void saveStackedLanes();
+    void loadStackedLanes();
+    void rebuildStackedBoxes();
     class ScaleBox final : public IconComboBox
     {
     public:
