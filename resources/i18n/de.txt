@@ -11916,3 +11916,4 @@ countries: de at ch li lu
 "Insert a wildcard at the cursor" = "Platzhalter an der Cursorposition einfügen"
 "File:" = "Datei:"
 "Stems:" = "Stems:"
+"Show / hide the header" = "Kopfzeile ein-/ausblenden"

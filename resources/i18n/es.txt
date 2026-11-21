@@ -11916,3 +11916,4 @@ countries: es mx ar co cl pe ve
 "Insert a wildcard at the cursor" = "Insertar un comodín en el cursor"
 "File:" = "Archivo:"
 "Stems:" = "Stems:"
+"Show / hide the header" = "Mostrar / ocultar el encabezado"

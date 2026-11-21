@@ -11916,3 +11916,4 @@ countries: cn sg
 "Insert a wildcard at the cursor" = "在光标处插入通配符"
 "File:" = "文件："
 "Stems:" = "分轨："
+"Show / hide the header" = "显示 / 隐藏标题栏"

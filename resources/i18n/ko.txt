@@ -11916,3 +11916,4 @@ countries: kr
 "Insert a wildcard at the cursor" = "커서 위치에 와일드카드 삽입"
 "File:" = "파일:"
 "Stems:" = "스템:"
+"Show / hide the header" = "헤더 표시 / 숨기기"

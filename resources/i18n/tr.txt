@@ -11916,3 +11916,4 @@ countries: tr
 "Insert a wildcard at the cursor" = "İmleç konumuna bir joker karakter ekle"
 "File:" = "Dosya:"
 "Stems:" = "Stem'ler:"
+"Show / hide the header" = "Üst bilgiyi göster / gizle"

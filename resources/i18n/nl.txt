@@ -11916,3 +11916,4 @@ countries: nl be
 "Insert a wildcard at the cursor" = "Voeg een jokerteken in bij de cursor"
 "File:" = "Bestand:"
 "Stems:" = "Stems:"
+"Show / hide the header" = "Koptekst tonen / verbergen"

@@ -11916,3 +11916,4 @@ countries: pl
 "Insert a wildcard at the cursor" = "Wstaw symbol zastępczy w miejscu kursora"
 "File:" = "Plik:"
 "Stems:" = "Stemy:"
+"Show / hide the header" = "Pokaż / ukryj nagłówek"

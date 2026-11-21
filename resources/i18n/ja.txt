@@ -11916,3 +11916,4 @@ countries: jp
 "Insert a wildcard at the cursor" = "カーソル位置にワイルドカードを挿入"
 "File:" = "ファイル:"
 "Stems:" = "ステム:"
+"Show / hide the header" = "ヘッダーの表示 / 非表示"
