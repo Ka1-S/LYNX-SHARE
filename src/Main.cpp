@@ -3432,6 +3432,15 @@ public:
             quit();
             return;
         }
+        if (args.contains ("--helixshot190oc"))
+        {
+            // LYNX --helixshot190oc prefix: round 190oc off-screen: the Pattern layout's Helix channel window with round 4's
+            // row (Grain Swarm, Spectral Ensemble; Frozen Choir and Triple Stack for the side by side with 190mt), the strip's
+            // row alone; paint costs in prefix-checks.txt
+            runHelixShot190oc (args[args.indexOf ("--helixshot190oc") + 1].unquoted());
+            quit();
+            return;
+        }
         if (args.contains ("--helixshot190mt"))
         {
             // LYNX --helixshot190mt prefix: round 190mt off-screen: the Pattern layout's Helix channel window with round 3's
@@ -28777,6 +28786,105 @@ private:
             juce::FileOutputStream out (file);
             juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (*page), out);
             check ("channel window page", page->getWidth() > 0);
+        }
+        juce::File (prefix + "-checks.txt").replaceWithText (checks);
+    }
+
+    void runHelixShot190oc (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        juce::String checks;
+        const auto check = [&checks] (const juce::String& what, bool ok) { checks << (ok ? "ok   " : "FAIL ") << what << "\n"; };
+        const auto& bank = lynx::banks::bankOf (lynx::InstrumentKind::helix);
+        const auto load = [&] (const juce::String& name) {
+            int index = -1;
+            for (int b = 0; b < (int) bank.size(); ++b)
+                if (juce::String (bank[(std::size_t) b].name) == name)
+                    index = b;
+            check ("preset " + name, index >= 0);
+            offline.editSong ([index] (lynx::Song& s) {
+                if (s.channels.empty())
+                    s.channels.resize (1);
+                lynx::ChannelDef c;
+                c.instrument = lynx::InstrumentKind::helix;
+                c.name = "Helix";
+                c.mixerTrack = s.channels[0].mixerTrack;
+                if (auto loaded = lynx::banks::withPreset (c, std::max (index, 0)))
+                    c = *loaded;
+                s.channels[0] = c;
+            }, false);
+            offline.dispatchPendingMessages();
+        };
+        const auto locate = [] (lynx::Song& s) -> lynx::ChannelDef* { return s.channels.empty() ? nullptr : &s.channels[0]; };
+        const auto save = [&prefix, &offline] (juce::Component& c, const char* name) {
+            offline.dispatchPendingMessages();
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (c), out);
+        };
+        const auto paintCost = [&checks] (juce::Component& c, const char* what) {
+            double best = 1.0e9;
+            for (int run = 0; run < 3; ++run)
+            {
+                juce::Image image (juce::Image::ARGB, c.getWidth(), c.getHeight(), true);
+                const auto t0 = juce::Time::getMillisecondCounterHiRes();
+                for (int f = 0; f < 30; ++f)
+                {
+                    juce::Graphics g (image);
+                    c.paintEntireComponent (g, false);
+                }
+                best = std::min (best, (juce::Time::getMillisecondCounterHiRes() - t0) / 30.0);
+            }
+            checks << "paint " << what << " " << juce::String (best, 3) << " ms per frame (" << c.getWidth() << " x " << c.getHeight() << ")\n";
+        };
+        // each part of a window alone (the strip, the device), its paint cost
+        const auto parts = [&checks] (juce::Component& page) {
+            for (int i = 0; i < page.getNumChildComponents(); ++i)
+            {
+                auto* child = page.getChildComponent (i);
+                juce::Image image (juce::Image::ARGB, std::max (1, child->getWidth()), std::max (1, child->getHeight()), true);
+                double best = 1.0e9;
+                for (int run = 0; run < 3; ++run)
+                {
+                    const auto t0 = juce::Time::getMillisecondCounterHiRes();
+                    for (int f = 0; f < 10; ++f)
+                    {
+                        juce::Graphics g (image);
+                        child->paintEntireComponent (g, false);
+                    }
+                    best = std::min (best, (juce::Time::getMillisecondCounterHiRes() - t0) / 10.0);
+                }
+                checks << "  part " << juce::String (best, 3) << " ms " << typeid (*child).name() << " " << child->getBounds().toString() << "\n";
+            }
+        };
+        // the channel window (Pattern layout, LYNX's look): Helix+'s strip with round 4's row
+        load ("Grain Swarm");
+        {
+            auto page = lynx::makeHelixEditor (offline, locate, 0);
+            check ("window page holds the six strip rows", page->getHeight() >= lynx::helixDeviceHeight + 16 + 446);
+            save (*page, "01-window-grain-swarm");
+            paintCost (*page, "window (Grain Swarm)");
+        }
+        load ("Spectral Ensemble");
+        {
+            auto page = lynx::makeHelixEditor (offline, locate, 0);
+            save (*page, "02-window-spectral-ensemble");
+            paintCost (*page, "window (Spectral Ensemble)");
+            parts (*page);
+        }
+        load ("Frozen Choir");
+        {
+            auto page = lynx::makeHelixEditor (offline, locate, 0);
+            save (*page, "03-window-frozen-choir");
+        }
+        load ("Triple Stack");
+        {
+            auto page = lynx::makeHelixEditor (offline, locate, 0);
+            save (*page, "04-window-triple");
+            paintCost (*page, "window (Triple Stack)");
+            parts (*page);
         }
         juce::File (prefix + "-checks.txt").replaceWithText (checks);
     }

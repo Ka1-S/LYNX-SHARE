@@ -12202,3 +12202,7 @@ countries: br
 
 # rollup 0.1.31 step 2 (issue #233 on the welcome card)
 "Only the newest version number is asked for; nothing about you is sent." = "Só o número da versão mais nova é consultado; nada sobre você é enviado."
+"Grain Unison" = "Uníssono dos grãos"
+"Spectral Unison" = "Uníssono espectral"
+"Effector's Kilohearts Nonlinear Filter law (the kHs Nonlinear Filter stand-in) plays Effector's own Filter: {0}" = "A lei Kilohearts Nonlinear Filter do Effector (o substituto do kHs Nonlinear Filter) toca o próprio Filter do Effector: {0}"
+"Helix's unison on the granular and spectral oscillators and its reverse grains play one voice, forwards (their automation does nothing): {0}" = "O uníssono dos osciladores granular e espectral do Helix e seus grãos invertidos tocam uma voz, para a frente (a automação deles não faz nada): {0}"

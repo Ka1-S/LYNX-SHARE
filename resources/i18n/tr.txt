@@ -12067,3 +12067,7 @@ countries: tr
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak hold'lu tepe ölçer (sol/sağ)  [LMB] clip ışığını temizler"
+"Grain Unison" = "Tane unison"
+"Spectral Unison" = "Spektral unison"
+"Effector's Kilohearts Nonlinear Filter law (the kHs Nonlinear Filter stand-in) plays Effector's own Filter: {0}" = "Effector'ün Kilohearts Nonlinear Filter yasası (kHs Nonlinear Filter yerine geçen) Effector'ün kendi Filter'ını çalar: {0}"
+"Helix's unison on the granular and spectral oscillators and its reverse grains play one voice, forwards (their automation does nothing): {0}" = "Helix'in granüler ve spektral osilatörlerindeki unison ve ters taneleri tek ses, ileri doğru çalar (otomasyonları hiçbir şey yapmaz): {0}"

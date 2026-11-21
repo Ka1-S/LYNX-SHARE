@@ -12067,3 +12067,7 @@ countries: kr
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 에디터 열기/닫기  [Alt]+[LMB] 다른 에디터 유지  [Ctrl]+[LMB] 미리 듣기  [2xLMB] 피아노 롤  [LMB] 위/아래 드래그로 순서 변경  [RMB] 채널 메뉴"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "피크 홀드 기능이 있는 피크 미터(좌/우)  [LMB] 클립 표시등 지우기"
+"Grain Unison" = "그레인 유니즌"
+"Spectral Unison" = "스펙트럴 유니즌"
+"Effector's Kilohearts Nonlinear Filter law (the kHs Nonlinear Filter stand-in) plays Effector's own Filter: {0}" = "Effector의 Kilohearts Nonlinear Filter 법칙(kHs Nonlinear Filter 대체)은 Effector 자체의 Filter를 재생합니다: {0}"
+"Helix's unison on the granular and spectral oscillators and its reverse grains play one voice, forwards (their automation does nothing): {0}" = "Helix의 그래뉼러·스펙트럴 오실레이터 유니즌과 역재생 그레인은 한 보이스, 정방향으로 재생됩니다(해당 오토메이션은 동작하지 않음): {0}"

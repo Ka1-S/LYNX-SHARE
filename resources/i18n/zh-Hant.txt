@@ -12067,3 +12067,7 @@ countries: tw hk mo
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 開啟/關閉編輯器  [Alt]+[LMB] 保持其他編輯器開啟  [Ctrl]+[LMB] 試聽  [2xLMB] 鋼琴捲軸  [LMB] 上下拖曳重新排序  [RMB] 通道選單"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值電平表（左/右）帶峰值保持  [LMB] 清除削波指示燈"
+"Grain Unison" = "顆粒齊奏"
+"Spectral Unison" = "頻譜齊奏"
+"Effector's Kilohearts Nonlinear Filter law (the kHs Nonlinear Filter stand-in) plays Effector's own Filter: {0}" = "Effector 的 Kilohearts Nonlinear Filter 規律（kHs Nonlinear Filter 的替代）改為播放 Effector 自身的 Filter：{0}"
+"Helix's unison on the granular and spectral oscillators and its reverse grains play one voice, forwards (their automation does nothing): {0}" = "Helix 顆粒與頻譜振盪器的齊奏及其反向顆粒以單聲部、正向播放（其自動化不起作用）：{0}"

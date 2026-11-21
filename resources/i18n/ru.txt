@@ -12067,3 +12067,7 @@ countries: ru by kz
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] открыть/закрыть редактор  [Alt]+[LMB] не закрывать другие  [Ctrl]+[LMB] прослушать  [2xLMB] Piano Roll  [LMB] перетаскивание вверх/вниз меняет порядок  [RMB] меню канала"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Пиковый индикатор (левый/правый) с удержанием пика  [LMB] сбрасывает индикатор клиппинга"
+"Grain Unison" = "Унисон гранул"
+"Spectral Unison" = "Спектральный унисон"
+"Effector's Kilohearts Nonlinear Filter law (the kHs Nonlinear Filter stand-in) plays Effector's own Filter: {0}" = "Закон Kilohearts Nonlinear Filter в Effector (замена kHs Nonlinear Filter) играет собственный Filter Effector: {0}"
+"Helix's unison on the granular and spectral oscillators and its reverse grains play one voice, forwards (their automation does nothing): {0}" = "Унисон гранулярного и спектрального осцилляторов Helix и его обратные гранулы звучат одним голосом, вперёд (их автоматизация ничего не делает): {0}"

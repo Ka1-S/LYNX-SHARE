@@ -12067,3 +12067,7 @@ countries: id
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] buka/tutup editor  [Alt]+[LMB] biarkan yang lain terbuka  [Ctrl]+[LMB] dengarkan  [2xLMB] Piano Roll  [LMB] seret naik/turun mengubah urutan  [RMB] menu channel"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak meter (kiri/kanan) dengan peak hold  [LMB] mematikan lampu clip"
+"Grain Unison" = "Unison butir"
+"Spectral Unison" = "Unison spektral"
+"Effector's Kilohearts Nonlinear Filter law (the kHs Nonlinear Filter stand-in) plays Effector's own Filter: {0}" = "Hukum Kilohearts Nonlinear Filter pada Effector (pengganti kHs Nonlinear Filter) memainkan Filter milik Effector: {0}"
+"Helix's unison on the granular and spectral oscillators and its reverse grains play one voice, forwards (their automation does nothing): {0}" = "Unison osilator granular dan spektral Helix serta butir terbaliknya memainkan satu suara, maju (otomasinya tidak berpengaruh): {0}"
