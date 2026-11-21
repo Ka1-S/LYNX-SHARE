@@ -7757,7 +7757,7 @@ private:
             song.info.created = 1763600000.0;
             if (song.mixer.size() < 3)
                 song.mixer.resize (3);
-            song.playlistTracks.resize (juce::jmax ((std::size_t) 2, song.playlistTracks.size()));
+            song.playlistTracks.resize (std::max<std::size_t> (2, song.playlistTracks.size()));
             auto& vox = song.playlistTracks[1];
             vox.mode = lynx::PlaylistTrackMode::audio;
             vox.mixerTrack = 2;

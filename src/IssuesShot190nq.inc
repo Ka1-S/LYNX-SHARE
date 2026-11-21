@@ -51,7 +51,7 @@
         {
             auto song = Song::makeDefault();
             song.playlist.clear();
-            song.mixer.resize (juce::jmax<std::size_t> (song.mixer.size(), 12));
+            song.mixer.resize (std::max<std::size_t> (song.mixer.size(), 12)); // (std::max: juce::jmax<std::size_t> instantiates juce::dsp::SIMDRegister on macOS arm64)
             song.mixer[1].name = "BEAT BUS";
             song.mixer[2].name = "VERB";
             song.mixer[1].sends.push_back ({ 2, 0.5f });
