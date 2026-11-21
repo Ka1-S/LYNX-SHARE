@@ -292,6 +292,15 @@ void writeMarkers (Out& out, const std::vector<TimeMarker>& markers)
             out.u8 (evMarkerNumerator, (std::uint32_t) std::clamp (m.numerator, 1, 32));
             out.u8 (evMarkerDenominator, (std::uint32_t) std::clamp (m.denominator, 1, 32));
         }
+        if (m.type == 12) // round 190nu: a Key/Scale marker's key, as FL 2026 writes it (4/4, root, 0, scale, mask)
+        {
+            out.u8 (evMarkerNumerator, 4);
+            out.u8 (evMarkerDenominator, 4);
+            out.u8 (0x2E, (std::uint32_t) std::clamp (m.keyRoot, 0, 11));
+            out.u8 (0x2D, 0);
+            out.u32 (0xA8, (std::uint32_t) m.keyScale);
+            out.u16 (0x65, (std::uint32_t) (m.keyMask & 0xFFF));
+        }
         out.text (evMarkerName, m.name);
     }
 }

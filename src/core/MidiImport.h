@@ -29,6 +29,14 @@ struct ParsedMidi
     // every Set Tempo, in time order (issue #86): LYNX ticks, FL's BPM (round half even of 60 000 000 / µs per quarter,
     // 10..522, FUN_009864f0); File › Import writes them as the new pattern's Tempo events, as FL does
     std::vector<PatternEvent> tempos;    // value = valueFromTempo (bpm)
+    // round 190nu (core/KeyRegions.h): the key signatures, in time order (LYNX ticks); a "Key: <name>" marker meta event at
+    // the same tick (what LYNX writes) gives the exact scale, else the major / natural minor key the signature names
+    struct KeyChange
+    {
+        std::int64_t tick = 0;
+        int root = 0, flScale = 0;
+    };
+    std::vector<KeyChange> keys;
 };
 
 // FL's MIDI tempo (REA_rodada178a §5): a whole BPM, rounded half to even, 10..522.

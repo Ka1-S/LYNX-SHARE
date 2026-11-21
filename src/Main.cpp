@@ -257,6 +257,7 @@ namespace juce::detail { bool dispatchNextMessageOnSystemQueue (bool returnIfNoP
 #include "ui/NoteToolDialogs.h"
 #include "ui/ChordStripView.h" // round 190kd (--prchord190kd)
 #include "ui/ChordHelper.h" // round 190mc (--modal190mc)
+#include "core/KeyRegions.h" // round chord2_190nu (--selftest, --keys190nu)
 #include "core/TransistorBass.h" // round 190mc (--modal190mc)
 #include "core/ModelParams.h" // round 190mc (--modal190mc)
 #include "ui/EventEditor.h"
@@ -2284,6 +2285,13 @@ public:
         if (args.contains ("--prchord190kd"))
         {
             setApplicationReturnValue (runPrChordShot190kd (juce::File (args[args.indexOf ("--prchord190kd") + 1].unquoted())) ? 0 : 1);
+            quit();
+            return;
+        }
+        // --keys190nu <folder> (round chord2_190nu: key regions, the Scale degree chord, pinned Chord helper relationships)
+        if (args.contains ("--keys190nu"))
+        {
+            setApplicationReturnValue (runKeysShot190nu (juce::File (args[args.indexOf ("--keys190nu") + 1].unquoted())) ? 0 : 1);
             quit();
             return;
         }
@@ -7864,6 +7872,60 @@ private:
                 if (rollup031s2Result != "OK")
                     break;
             }
+        // round chord2_190nu (discussion #105): the Piano roll's key markers come back from a project (their keys beside the
+        // marker list, so older releases keep the markers), the copy for 0.1.30 / 0.1.28 drops the keys with a line, and
+        // a MIDI file carries them as key signatures (with the exact scale in a "Key: ..." marker meta event)
+        juce::String keys190nuResult = "OK";
+        {
+            using namespace lynx::keyregions;
+            auto song = lynx::Song::makeDefault();
+            auto& p = song.patterns[(std::size_t) song.currentPattern];
+            const auto bar = 4 * lynx::ppq;
+            const lynx::projectkey::Key dorian { 2, flScaleNamed ("Other Dorian") }, harmonic { 0, flScaleNamed ("Minor Harmonic") };
+            p.markers.push_back ({ bar / 2, "Verse", 0, 4 });
+            addKeyMarker (p, 0, { State::key, dorian });
+            addKeyMarker (p, bar, { State::key, harmonic });
+            addKeyMarker (p, 2 * bar, { State::none, {} });
+            lynx::Note n;
+            n.key = 62;
+            n.length = lynx::ppq;
+            p.notes.push_back (n);
+            p.lengthTicks = 3 * bar; // (a MIDI file gets the key changes within the pattern's length)
+            juce::String why;
+            const auto json = lynx::ProjectFile::toJson (song);
+            const auto back = lynx::ProjectFile::fromJson (json, why);
+            bool oldShape = true; // (every marker array as 0.1.30 reads it: 4 or 5 items)
+            const auto parsedJson = juce::JSON::parse (json); // (kept: operator[] refers into it)
+            if (auto* patterns = parsedJson["patterns"].getArray())
+                for (const auto& pv : *patterns)
+                    if (auto* ms = pv["markers"].getArray())
+                        for (const auto& m : *ms)
+                            oldShape = oldShape && m.isArray() && (m.size() == 4 || m.size() == 5);
+            const auto for130 = lynx::olderlynx::forRelease (song, "0.1.30");
+            const auto for128 = lynx::olderlynx::forRelease (song, "0.1.28");
+            const auto copy130 = for130.ok ? lynx::ProjectFile::fromJson (for130.json, why) : std::optional<lynx::Song> {};
+            const auto said = std::any_of (for130.lost.begin(), for130.lost.end(), [] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).contains ("key marker(s)"); });
+            const auto file = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-keys190nu.mid");
+            juce::String midiError;
+            const auto saved = lynx::MidiFileIo::savePattern (song, song.currentPattern, file, midiError);
+            const auto parsed = saved ? lynx::MidiFileIo::parseFile (file, midiError) : std::nullopt;
+            const auto loaded = saved ? lynx::MidiFileIo::loadSong (file, midiError) : std::nullopt;
+            file.deleteFile();
+            const auto& bp = back ? back->patterns[(std::size_t) back->currentPattern] : p;
+            if (! back || bp.markers != p.markers)
+                keys190nuResult = "ERROR project round trip " + why;
+            else if (! oldShape)
+                keys190nuResult = "ERROR marker arrays an older release skips";
+            else if (! copy130 || for130.json.contains ("markerKeys") || ! said || ! for128.ok || for128.json.contains ("markerKeys"))
+                keys190nuResult = "ERROR copy for 0.1.30 / 0.1.28";
+            else if (const auto& cp = copy130->patterns[(std::size_t) copy130->currentPattern];
+                     cp.markers.size() != 4 || cp.markers[0].name != "D Other Dorian" || cp.markers[0].action != lynx::Marker::keyScale || keyOf (cp.markers[0]))
+                keys190nuResult = "ERROR the copy's markers";
+            else if (! parsed || parsed->keys.size() != 2 || parsed->keys[0].tick != 0 || parsed->keys[0].flScale != dorian.flScale || parsed->keys[0].root != 2
+                     || parsed->keys[1].tick != bar || parsed->keys[1].flScale != harmonic.flScale)
+                keys190nuResult = "ERROR MIDI key signatures " + midiError;
+            else if (! loaded || ! (lynx::projectkey::get (*loaded) == dorian) || ! (stateAt (loaded->patterns[0], bar).value == harmonic))
+                keys190nuResult = "ERROR MIDI file opened as a project " + midiError;
         }
 
         // round 190dr: the Session mixer's sections come back from a project (a project without them: Live's defaults);
@@ -8235,6 +8297,7 @@ private:
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && exportParity.startsWith ("OK") && exportLive.startsWith ("OK") && midiHotplug.startsWith ("OK") && midiOutPorts.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
+                        && keys190nuResult == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK")
                         && danceWindowResult == "OK" && clickActivationResult == "OK" && motionOverlayResult.startsWith ("OK")
@@ -8318,6 +8381,7 @@ private:
                << "rollup030_copy_for_0128=" << rollup030Result << "\n"
                << "rollup031_copy_for_0130=" << rollup031Result << "\n"
                << "rollup031s2_copy_for_0130=" << rollup031s2Result << "\n"
+               << "keys190nu_key_markers=" << keys190nuResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 
@@ -36486,6 +36550,7 @@ private:
 #include "TrimShot190jv.inc" // round 190jv
 #include "PrChordShot190kd.inc" // round 190kd
 #include "ModalShot190mc.inc" // round 190mc
+#include "KeysShot190nu.inc" // round chord2_190nu
 #include "PrShot190jv.inc" // round 190jv
 #include "HostPlay190ll.inc" // round 190ll (issue #199)
 #include "IssuesShot190ll.inc" // round 190ll (issues #200, #201, #203)

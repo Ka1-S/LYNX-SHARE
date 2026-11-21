@@ -312,6 +312,9 @@ struct TimeMarker
     int type = 0;
     int numerator = 4, denominator = 4;
     std::string name;
+    // round 190nu: a Key/Scale marker's (type 12) key, in FL 2026's events after the 0x94: 0x2E root (0 = C), 0xA8 FL's
+    // reference-scale index, 0x65 the out-of-scale keys (bit 11 − pitch class; 0 = none written)
+    int keyRoot = 0, keyScale = -1, keyMask = 0;
 };
 
 struct Pattern

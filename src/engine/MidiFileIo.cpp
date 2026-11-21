@@ -9,6 +9,7 @@
 #include <map>
 
 #include "core/ExportOptions.h"
+#include "core/KeyRegions.h"
 #include "core/MidiControls.h"
 #include "engine/Text.h"
 
@@ -24,7 +25,50 @@ struct Parsed
     double bpm = 120.0;
     int numerator = 0, denominator = 4; // the first time signature (0 = none)
     std::vector<PatternEvent> tempos; // every Set Tempo (issue #86)
+    std::vector<midiimport::ParsedMidi::KeyChange> keys; // round 190nu
 };
+
+// Round 190nu (core/KeyRegions.h): the file's key signatures in time order; LYNX's "Key: <name>" marker meta event at the
+// same tick gives the exact scale (a signature holds only major / minor and the accidentals)
+template <typename Out>
+void collectKeys (const juce::MidiFile& midi, Out& out, const std::function<std::int64_t (double)>& toTicks)
+{
+    std::vector<std::pair<std::int64_t, projectkey::Key>> signatures, texts;
+    for (int t = 0; t < midi.getNumTracks(); ++t)
+    {
+        const auto& track = *midi.getTrack (t);
+        for (int i = 0; i < track.getNumEvents(); ++i)
+        {
+            const auto& m = track.getEventPointer (i)->message;
+            if (m.isKeySignatureMetaEvent())
+                signatures.emplace_back (toTicks (m.getTimeStamp()),
+                                         keyregions::keyFromMidiSignature (m.getKeySignatureNumberOfSharpsOrFlats(), m.isKeySignatureMajorKey() ? 0 : 1));
+            else if (m.isMetaEvent() && m.getMetaEventType() == 6)
+                if (const auto key = keyregions::keyFromMidiText (m.getTextFromTextMetaEvent().toStdString()))
+                    texts.emplace_back (toTicks (m.getTimeStamp()), *key);
+        }
+    }
+    for (const auto& [tick, key] : texts) // (the exact scale wins over the signature at its tick)
+    {
+        signatures.erase (std::remove_if (signatures.begin(), signatures.end(), [tick] (const auto& s) { return s.first == tick; }), signatures.end());
+        signatures.emplace_back (tick, key);
+    }
+    std::stable_sort (signatures.begin(), signatures.end(), [] (const auto& a, const auto& b) { return a.first < b.first; });
+    for (const auto& [tick, key] : signatures)
+        out.keys.push_back ({ tick, key.root, key.flScale });
+}
+
+// The key signatures (and LYNX's exact-scale markers) of `pattern`'s key regions on the tempo track; `base` = the project
+// key (what applies before the first key marker)
+void addKeySignatures (juce::MidiMessageSequence& tempo, const Pattern& pattern, std::optional<projectkey::Key> base, std::int64_t end)
+{
+    for (const auto& [tick, key] : keyregions::keyChanges (pattern, base, end))
+    {
+        const auto [sharps, minor] = keyregions::midiSignature (key);
+        tempo.addEvent (juce::MidiMessage::keySignatureMetaEvent (sharps, minor != 0), (double) tick);
+        tempo.addEvent (juce::MidiMessage::textMetaEvent (6, juce::String::fromUTF8 (keyregions::midiKeyText (key).c_str())), (double) tick);
+    }
+}
 
 // The file's Set Tempo events in time order (FL's whole BPM) and the first one as the song's tempo (issue #86: it was
 // the first one found while the tempo was still 120, so a file starting at exactly 120 took its second tempo)
@@ -116,6 +160,7 @@ std::optional<Parsed> parse (const juce::File& file, juce::String& error)
     }
 
     collectTempos (midi, out, toTicks);
+    collectKeys (midi, out, toTicks);
     if (! out.tempos.empty())
         out.bpm = std::nearbyint (tempoFromValue (out.tempos.front().value)); // (FL's whole BPM, exact)
 
@@ -159,6 +204,15 @@ std::optional<Song> loadSong (const juce::File& file, juce::String& error)
     }
 
     midiimport::setTempoEvents (pattern, parsed->tempos, 0); // every Set Tempo as the pattern's Tempo events (issue #86)
+    // round 190nu: the key at the start is the project key, the later ones the pattern's key markers
+    for (const auto& k : parsed->keys)
+        if (projectkey::validFlScale (k.flScale))
+        {
+            if (k.tick <= 0)
+                projectkey::set (song, projectkey::Key { k.root, k.flScale });
+            else
+                keyregions::addKeyMarker (pattern, k.tick, { keyregions::State::key, { k.root, k.flScale } });
+        }
     pattern.sortNotes();
     return song;
 }
@@ -210,6 +264,7 @@ static std::optional<midiimport::ParsedMidi> parseStream (juce::InputStream& in,
         out.trackNames.push_back (name);
     }
     collectTempos (midi, out, toTicks);
+    collectKeys (midi, out, toTicks);
     if (! out.tempos.empty())
         out.bpm = std::nearbyint (tempoFromValue (out.tempos.front().value)); // (FL's whole BPM, exact)
     return out;
@@ -315,6 +370,7 @@ bool savePattern (const Song& song, int patternIndex, const juce::File& file, ju
     juce::MidiMessageSequence tempo;
     tempo.addEvent (juce::MidiMessage::tempoMetaEvent (juce::roundToInt (60'000'000.0 / song.bpm)), 0.0);
     tempo.addEvent (juce::MidiMessage::timeSignatureMetaEvent (song.beatsPerBar, meterUnit (song.beatUnit)), 0.0);
+    addKeySignatures (tempo, pattern, projectkey::get (song), pattern.effectiveLength (song.meter())); // (round 190nu)
     midi.addTrack (tempo);
 
     for (auto& [channel, seq] : byChannel)
@@ -348,6 +404,8 @@ bool saveSong (const Song& song, const juce::File& file, juce::String& error)
     flat.channels = song.channels;
     flat.patterns.resize (1);
     flat.patterns[0].notes = exportopts::midiExportNotes (song);
+    flat.scaleHighlight = song.scaleHighlight; // round 190nu: the project key, and the key markers where they play
+    flat.patterns[0].markers = keyregions::songKeyMarkers (song);
     return savePattern (flat, 0, file, error);
 }
 } // namespace lynx::MidiFileIo

@@ -1907,6 +1907,10 @@ struct Marker
                          patternLength = 6, barOverride = 7, timeSignature = 8, punchIn = 9, punchOut = 10,
                          loopLength = 11, keyScale = 12;
     static constexpr int songStart = start; // (round 165m's name) Performance mode's zone ends here
+    // A Key/Scale marker's key (round 190nu, core/KeyRegions.h; FL .flp 0x2E root, 0xA8 scale): an index into
+    // notetools::flReferenceScales() (`keyFlScale`), −1 FL's Default (the Piano roll's own scale from here), −2 Black notes (no scale)
+    int keyRoot = 0;
+    int keyFlScale = -2;
 
     bool isSignature() const noexcept { return numerator > 0; }
     bool operator== (const Marker&) const = default;

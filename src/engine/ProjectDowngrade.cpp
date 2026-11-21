@@ -1382,6 +1382,25 @@ void toRelease0127 (juce::var& root, Losses& lost)
 }
 
 // --- 0.1.31 → 0.1.30 ------------------------------------------------------------------------------------------------------
+// Round 190nu (core/KeyRegions.h): the Piano roll's key markers keep their keys in "markerKeys" beside each pattern's
+// marker list. 0.1.30 keeps such markers as named Key/Scale markers with no effect: their keys go, the names stay.
+// Rollup 0.1.31 step 3 calls it from toRelease0130 below.
+void keyMarkersFor0130 (juce::var& root, Losses& lost)
+{
+    int keyMarkers = 0;
+    if (auto* patterns = arrayOf (root["patterns"]))
+        for (auto& p : *patterns)
+            if (auto* po = objectOf (p))
+            {
+                if (auto* keys = arrayOf (po->getProperty ("markerKeys")))
+                    keyMarkers += keys->size();
+                drop (*po, "markerKeys");
+            }
+    if (keyMarkers > 0)
+        lost.push_back ({ TR_NOOP ("{0} key marker(s) in the Piano roll keep their names but not their keys (the rows show the Piano roll's own scale)"),
+                          juce::String (keyMarkers), false });
+}
+
 // Rollup 0.1.31 (round 190no): what the 0.1.31 rounds save that 0.1.30 cannot hold, each loss reported only when the
 // project has it. A copy for an older release runs this step first, so the later steps never see these. Round 190nc's
 // Macro Map writes ordinary macro mappings (targets 0.1.30 has): nothing to change for it.
@@ -1453,6 +1472,9 @@ void toRelease0130 (juce::var& root, Losses& lost)
         if (cue)
             lost.push_back ({ TR_NOOP ("Live's Solo/Cue settings (Cue mode, Cue Out, Cue Volume and the tracks' Cue switches); the Main mix plays the same"), {}, false });
     }
+
+    // round 190nu (chord2_190nu): the Piano roll's key markers
+    keyMarkersFor0130 (root, lost);
 }
 
 struct Step

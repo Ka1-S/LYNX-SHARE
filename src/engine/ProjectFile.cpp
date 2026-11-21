@@ -30,6 +30,7 @@
 #include "core/Rack.h"
 #include "core/FruityBasicFx.h"
 #include "core/PluginSubstitutes.h"
+#include "core/ProjectKey.h"
 #include "core/ProjectSafety.h"
 #include "core/RemotePlugins.h"
 #include "core/SessionOps.h"
@@ -3126,6 +3127,14 @@ juce::String toJson (const Song& song, bool stampVersion)
                 markers.add (one);
             }
             o->setProperty ("markers", markers);
+            // round 190nu (core/KeyRegions.h): the Key/Scale markers' keys, [marker index, root, scale], beside the list
+            // (a marker array longer than 5 is skipped whole by older releases; this way they keep the named marker)
+            juce::Array<juce::var> keys;
+            for (int i = 0; i < (int) p.markers.size(); ++i)
+                if (const auto& m = p.markers[(std::size_t) i]; m.action == Marker::keyScale)
+                    keys.add (juce::Array<juce::var> { i, m.keyRoot, m.keyFlScale });
+            if (! keys.isEmpty())
+                o->setProperty ("markerKeys", keys);
         }
 
         juce::Array<juce::var> notes;
@@ -3995,6 +4004,17 @@ std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error,
                         pattern.markers.push_back ({ juce::jmax<juce::int64> (0, (juce::int64) m[0]), m[1].toString().toStdString(),
                                                      juce::jlimit (0, 32, (int) m[2]), juce::jlimit (1, 32, (int) m[3]),
                                                      m.size() == 5 ? juce::jlimit (0, 255, (int) m[4]) : 0 });
+            if (auto* keys = p["markerKeys"].getArray()) // (round 190nu)
+                for (const auto& k : *keys)
+                    if (k.isArray() && k.size() >= 3 && (int) k[0] >= 0 && (int) k[0] < (int) pattern.markers.size())
+                    {
+                        auto& m = pattern.markers[(std::size_t) (int) k[0]];
+                        if (m.action != Marker::keyScale)
+                            continue;
+                        m.keyRoot = juce::jlimit (0, 11, (int) k[1]);
+                        const auto scale = (int) k[2];
+                        m.keyFlScale = projectkey::validFlScale (scale) || scale == -1 ? scale : -2;
+                    }
             std::stable_sort (pattern.markers.begin(), pattern.markers.end(), [] (const Marker& x, const Marker& y) { return x.tick < y.tick; });
 
             if (auto* notes = p["notes"].getArray())

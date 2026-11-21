@@ -550,9 +550,23 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
     auto arrangement = [&]() -> Arrangement& { return findOrAdd (project.arrangements, currentArrangement); };
 
     Event e;
+    // round 190nu: a marker's own events follow its 0x94 (0x21 0x22 0x2E 0x2D 0xA8 0x65 0xCD in FL 2026's files); the key
+    // fields are read only there
+    bool inMarkerTail = false;
 
     while (reader.next (e))
     {
+        if (inMarkerTail && e.id != evTimeMarkerNumerator && e.id != evTimeMarkerDenominator && e.id != evTimeMarkerName && e.id != 0x2E
+            && e.id != 0x2D && e.id != 0xA8 && e.id != 0x65)
+            inMarkerTail = false;
+        if (inMarkerTail && lastMarkers != nullptr && ! lastMarkers->empty() && (e.id == 0x2E || e.id == 0xA8 || e.id == 0x65))
+        {
+            auto& m = lastMarkers->back();
+            (e.id == 0x2E ? m.keyRoot : e.id == 0xA8 ? m.keyScale : m.keyMask) = (int) e.value;
+            continue;
+        }
+        if (inMarkerTail && e.id == 0x2D)
+            continue;
         switch (e.id)
         {
             case evVersion:
@@ -1152,6 +1166,7 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
                     lastMarkers = &arrangement().markers;
                 }
                 lastMarkers->push_back ({ e.value & 0xFFFFFFu, (int) (e.value >> 24), 4, 4, {} });
+                inMarkerTail = true;
                 break;
 
             case evTimeMarkerNumerator:

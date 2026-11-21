@@ -8,6 +8,7 @@
 #include <tuple>
 
 #include "core/MidiControls.h"
+#include "core/KeyRegions.h"
 #include "core/MidiOut.h"
 
 namespace lynx::midiimport
@@ -280,6 +281,30 @@ void setTempoEvents (Pattern& pattern, const std::vector<PatternEvent>& tempos, 
     pattern.events.push_back (std::move (lane));
 }
 
+// Round 190nu (core/KeyRegions.h; LYNX extra): the file's key signatures as the new pattern's key markers. A key at the
+// start becomes the project key when the import starts a new project (else a key marker there, unless it is the project
+// key already); the later ones key markers. (FL's MIDI import keeps no key.)
+static void setKeyMarkers (Song& song, Pattern& pattern, const std::vector<ParsedMidi::KeyChange>& keys, std::int64_t shift, bool newProject)
+{
+    std::optional<projectkey::Key> atStart; // (the last of the keys at or before the start)
+    for (const auto& k : keys)
+    {
+        const projectkey::Key key { k.root, k.flScale };
+        if (! projectkey::validFlScale (key.flScale))
+            continue;
+        if (k.tick - shift <= 0)
+            atStart = key;
+        else
+            keyregions::addKeyMarker (pattern, k.tick - shift, { keyregions::State::key, key });
+    }
+    if (! atStart)
+        return;
+    if (newProject)
+        projectkey::set (song, *atStart);
+    else if (const auto project = projectkey::get (song); ! project || ! (*project == *atStart))
+        keyregions::addKeyMarker (pattern, 0, { keyregions::State::key, *atStart });
+}
+
 bool importInto (Song& song, const ParsedMidi& midi, const Options& o, const std::string& patternName, std::string& error)
 {
     const auto gs = groups (midi, o);
@@ -342,6 +367,7 @@ bool importInto (Song& song, const ParsedMidi& midi, const Options& o, const std
     }
     // every Set Tempo of the file as the pattern's Tempo events (issue #86; FL's whole-file import, REA_rodada178a §5)
     setTempoEvents (pattern, midi.tempos, shift);
+    setKeyMarkers (song, pattern, midi.keys, shift, o.newProject);
     pattern.sortNotes();
     song.patterns.push_back (std::move (pattern));
     song.currentPattern = (int) song.patterns.size() - 1;

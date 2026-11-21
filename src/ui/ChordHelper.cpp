@@ -5,12 +5,31 @@
 #include "core/LayoutStyle.h"
 #include "core/ProjectKey.h"
 #include "ui/I18n.h"
+#include "ui/MixerComponent.h"
 #include "ui/SimpleLook.h"
 #include "ui/Theme.h"
 
 namespace lynx
 {
 using namespace modalhelp;
+
+// --- favourites (round 190nu) ------------------------------------------------------------------------------------
+namespace
+{
+bool isFavourite (const std::string& id)
+{
+    const auto& f = ChordHelperPanel::favourites;
+    return std::find (f.begin(), f.end(), id) != f.end();
+}
+void toggleFavourite (const std::string& id)
+{
+    auto& f = ChordHelperPanel::favourites;
+    if (const auto it = std::find (f.begin(), f.end(), id); it != f.end())
+        f.erase (it);
+    else
+        f.push_back (id);
+}
+} // namespace
 
 // --- the three looks ------------------------------------------------------------------------------------------------
 struct ChordHelperPanel::Palette
@@ -197,12 +216,18 @@ void ChordHelperPanel::compute (bool force)
     const auto previousSource = keyRow >= 0 && keyRow < (int) keys.size() ? std::optional<Scale> (keys[(std::size_t) keyRow].scale) : std::nullopt;
     result = analyse (now, context, projectScale, forcedTonic, forcedMode);
     keys = modalhelp::relatedKeys (result);
-    keyRow = 0;
+    if (pinnedFirst) // (round 190nu: the pinned keys first; the first row is then a pinned one)
+        modalhelp::pinnedFirst (keys, [this] (const RelatedKey& k) { return isFavourite (favouriteId (result.key, k)); });
+    keyRow = 0; // (the most common source, rank 1, even when pinned keys stand above it)
+    for (int i = 0; i < (int) keys.size(); ++i)
+        if (keys[(std::size_t) i].rank == 1)
+            keyRow = i;
     if (previousSource) // (the same related key stays chosen while it is still listed)
         for (int i = 0; i < (int) keys.size(); ++i)
             if (keys[(std::size_t) i].scale == *previousSource)
                 keyRow = i;
     chords = keys.empty() ? std::vector<Borrowed> {} : modalhelp::borrowedChords (result, keys[(std::size_t) keyRow], extension);
+    order();
     hoveredChord = -1;
     chordScroll = 0;
     stopPreview();
@@ -215,6 +240,7 @@ void ChordHelperPanel::selectKeyRow (int row)
         return;
     keyRow = row;
     chords = modalhelp::borrowedChords (result, keys[(std::size_t) keyRow], extension);
+    order();
     chordScroll = 0;
     hoveredChord = -1;
     stopPreview();
@@ -226,7 +252,60 @@ void ChordHelperPanel::setExtension (Extension e)
     extension = e;
     if (keyRow >= 0 && keyRow < (int) keys.size())
         chords = modalhelp::borrowedChords (result, keys[(std::size_t) keyRow], extension);
+    order();
     repaint();
+}
+
+
+bool ChordHelperPanel::isPinnedKey (int row) const
+{
+    return result.valid && row >= 0 && row < (int) keys.size() && isFavourite (favouriteId (result.key, keys[(std::size_t) row]));
+}
+
+bool ChordHelperPanel::isPinnedChord (int row) const
+{
+    return result.valid && row >= 0 && row < (int) chords.size() && isFavourite (favouriteId (result.key, chords[(std::size_t) row]));
+}
+
+// the pinned chords first (the related keys are put in order by compute(), where the chosen row is decided)
+void ChordHelperPanel::order()
+{
+    if (pinnedFirst && result.valid)
+        modalhelp::pinnedFirst (chords, [this] (const Borrowed& b) { return isFavourite (favouriteId (result.key, b)); });
+}
+
+void ChordHelperPanel::favouritesChanged()
+{
+    if (mixeroptions::changed) // (the main window writes ui-options.txt)
+        mixeroptions::changed();
+}
+
+void ChordHelperPanel::togglePinKey (int row)
+{
+    if (row < 0 || row >= (int) keys.size() || ! result.valid)
+        return;
+    toggleFavourite (favouriteId (result.key, keys[(std::size_t) row]));
+    favouritesChanged();
+    compute (true); // (the order changes; the chosen key stays chosen)
+}
+
+void ChordHelperPanel::togglePinChord (int row)
+{
+    if (row < 0 || row >= (int) chords.size() || ! result.valid)
+        return;
+    toggleFavourite (favouriteId (result.key, chords[(std::size_t) row]));
+    favouritesChanged();
+    if (pinnedFirst)
+        compute (true);
+    else
+        repaint();
+}
+
+void ChordHelperPanel::setPinnedFirst (bool on)
+{
+    pinnedFirst = on;
+    favouritesChanged();
+    compute (true);
 }
 
 void ChordHelperPanel::setInversion (Inversion i)
@@ -425,6 +504,17 @@ juce::Rectangle<int> ChordHelperPanel::auditionBox() const
     return juce::Rectangle<int> (h.getRight() - 150, k.getY(), 150, k.getHeight());
 }
 
+// round 190nu: a row's pin, at its right end (the row of list `area` scrolled by `scroll`)
+juce::Rectangle<int> ChordHelperPanel::starOf (juce::Rectangle<int> area, int row, int scroll) const
+{
+    const auto y = area.getY() + headHeight() + (row - scroll) * rowHeight();
+    const auto size = look == Look::simple ? 22 : 18;
+    return { area.getRight() - size - (look == Look::simple ? 10 : 6), y + (rowHeight() - size) / 2, size, size };
+}
+
+// round 190nu: "Pinned first", on the hint line's right end
+static juce::Rectangle<int> pinnedBoxOf (juce::Rectangle<int> hint) { return hint.removeFromRight (130); }
+
 int ChordHelperPanel::keyRowAt (juce::Point<int> p) const
 {
     const auto a = keysArea();
@@ -558,6 +648,24 @@ void ChordHelperPanel::paint (juce::Graphics& g)
         }
     };
 
+    // round 190nu: a pin (a five-point star), filled in the accent when pinned, an outline on the hovered row
+    const auto star = [&g, &p] (juce::Rectangle<int> r, bool pinned, bool hot, juce::Colour ink) {
+        if (! pinned && ! hot)
+            return;
+        juce::Path path;
+        path.addStar (r.toFloat().getCentre(), 5, (float) r.getWidth() * 0.22f, (float) r.getWidth() * 0.48f);
+        if (pinned)
+        {
+            g.setColour (p.accent);
+            g.fillPath (path);
+        }
+        else
+        {
+            g.setColour (ink.withAlpha (0.75f));
+            g.strokePath (path, juce::PathStrokeType (1.2f, juce::PathStrokeType::curved));
+        }
+    };
+
     // header: Key [C] Mode [Ionian] Chord C (I) — the context — Audition
     {
         const auto h = headerArea();
@@ -655,7 +763,10 @@ void ChordHelperPanel::paint (juce::Graphics& g)
                 break;
             auto r = juce::Rectangle<int> (a.getX() + 1, y, a.getWidth() - 2, rowHeight()).reduced (look == Look::simple ? 4 : 0, look == Look::simple ? 2 : 0);
             const auto selected = i == keyRow;
-            const auto fill = selected ? p.selected : i == hoveredKey ? p.hover : (i % 2 == 0 ? p.rowFill : p.rowAlt);
+            const auto pinned = isPinnedKey (i);
+            auto fill = selected ? p.selected : i == hoveredKey ? p.hover : (i % 2 == 0 ? p.rowFill : p.rowAlt);
+            if (pinned && ! selected) // (round 190nu: a pinned row is tinted)
+                fill = fill.interpolatedWith (p.accent, look == Look::live ? 0.10f : 0.12f);
             box (r, fill, selected && look != Look::live ? p.selectedEdge : juce::Colour());
             const auto ink = selected && look == Look::live ? p.onAccent : p.text;
             const auto dim = selected && look == Look::live ? p.onAccent.withAlpha (0.7f) : p.dim;
@@ -676,7 +787,9 @@ void ChordHelperPanel::paint (juce::Graphics& g)
             x += 128;
             g.setColour (ink);
             g.setFont (font (p.small));
-            g.drawFittedText (signatureText (k.scale), juce::Rectangle<int> (x, r.getY(), r.getRight() - x - 6, r.getHeight()), juce::Justification::centredLeft, 2, 0.85f);
+            const auto pin = starOf (a, i, keyScroll);
+            g.drawFittedText (signatureText (k.scale), juce::Rectangle<int> (x, r.getY(), pin.getX() - x - 4, r.getHeight()), juce::Justification::centredLeft, 2, 0.85f);
+            star (pin, pinned, i == hoveredKey, ink);
         }
         if (keys.empty() && result.valid)
         {
@@ -701,7 +814,10 @@ void ChordHelperPanel::paint (juce::Graphics& g)
                 break;
             auto r = juce::Rectangle<int> (a.getX() + 1, y, a.getWidth() - 2, rowHeight()).reduced (look == Look::simple ? 4 : 0, look == Look::simple ? 2 : 0);
             const auto hot = i == hoveredChord;
-            const auto fill = hot ? (look == Look::live ? p.selected : p.selected) : (i % 2 == 0 ? p.rowFill : p.rowAlt);
+            const auto pinned = isPinnedChord (i);
+            auto fill = hot ? (look == Look::live ? p.selected : p.selected) : (i % 2 == 0 ? p.rowFill : p.rowAlt);
+            if (pinned && ! hot) // (round 190nu)
+                fill = fill.interpolatedWith (p.accent, look == Look::live ? 0.10f : 0.12f);
             box (r, fill, hot && look != Look::live ? p.selectedEdge : juce::Colour());
             const auto ink = hot && look == Look::live ? p.onAccent : p.text;
             const auto dim = hot && look == Look::live ? p.onAccent.withAlpha (0.7f) : p.dim;
@@ -728,7 +844,9 @@ void ChordHelperPanel::paint (juce::Graphics& g)
             x += moveW;
             g.setColour (ink);
             g.setFont (font (p.small));
-            g.drawFittedText (moodText (b), juce::Rectangle<int> (x, r.getY(), r.getRight() - x - 6, r.getHeight()), juce::Justification::centredLeft, 2, 0.85f);
+            const auto pin = starOf (a, i, chordScroll);
+            g.drawFittedText (moodText (b), juce::Rectangle<int> (x, r.getY(), pin.getX() - x - 4, r.getHeight()), juce::Justification::centredLeft, 2, 0.85f);
+            star (pin, pinned, hot, ink);
         }
         if (chords.empty() && result.valid)
         {
@@ -777,11 +895,29 @@ void ChordHelperPanel::paint (juce::Graphics& g)
             item (10 + i, tr (extensionName ((Extension) i)), extension == (Extension) i);
     }
 
-    // the hint line
+    // the hint line, and "Pinned first" at its right end (round 190nu)
+    const auto pinBox = pinnedBoxOf (hintArea());
     g.setColour (p.dim);
     g.setFont (font (p.caption));
-    g.drawFittedText (tr ("Click a chord to insert it after the selection. Click a key to see what it lends. Music theory only: the same chords give the same list."),
-                      hintArea(), juce::Justification::centredLeft, 1, 0.8f);
+    g.drawFittedText (tr ("Click a chord to insert it after the selection. Click a key to see what it lends. The star pins a relationship in every key."),
+                      hintArea().withTrimmedRight (pinBox.getWidth() + 8), juce::Justification::centredLeft, 1, 0.8f);
+    {
+        const auto tick = pinBox.withWidth (pinBox.getHeight()).reduced (look == Look::simple ? 5 : 4);
+        box (tick, pinnedFirst ? p.accent : (look == Look::live ? theme::livelook::well : p.hover));
+        if (pinnedFirst)
+        {
+            juce::Path mark;
+            const auto t = tick.toFloat().reduced (tick.getWidth() * 0.22f);
+            mark.startNewSubPath (t.getX(), t.getCentreY());
+            mark.lineTo (t.getX() + t.getWidth() * 0.4f, t.getBottom());
+            mark.lineTo (t.getRight(), t.getY());
+            g.setColour (p.onAccent);
+            g.strokePath (mark, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        }
+        g.setColour (p.text);
+        g.setFont (font (p.small));
+        g.drawText (tr ("Pinned first"), pinBox.withTrimmedLeft (pinBox.getHeight() + 2), juce::Justification::centredLeft, true);
+    }
 }
 
 juce::String ChordHelperPanel::getTooltip()
@@ -791,6 +927,12 @@ juce::String ChordHelperPanel::getTooltip()
         return tr ("The tonic: the selected chord's root (click to choose another)");
     if (modeChip().contains (m))
         return tr ("The mode the chord and the chords before it imply (click to choose another)");
+    if (const auto row = chordRowAt (m); row >= 0 && starOf (chordsArea(), row, chordScroll).contains (m))
+        return isPinnedChord (row) ? tr ("Unpin this relationship") : tr ("Pin this relationship: highlighted in every key, first with \"Pinned first\"");
+    if (const auto row = keyRowAt (m); row >= 0 && starOf (keysArea(), row, keyScroll).contains (m))
+        return isPinnedKey (row) ? tr ("Unpin this relationship") : tr ("Pin this relationship: highlighted in every key, first with \"Pinned first\"");
+    if (pinnedBoxOf (hintArea()).contains (m))
+        return tr ("Pinned relationships first in their lists (off: only highlighted)");
     if (const auto row = chordRowAt (m); row >= 0)
         return tr ("[LMB] insert {0} after the selection", { chordText (chords[(std::size_t) row]) });
     if (const auto row = keyRowAt (m); row >= 0)
@@ -841,6 +983,12 @@ void ChordHelperPanel::mouseDown (const juce::MouseEvent& e)
         repaint();
         return;
     }
+    if (pinnedBoxOf (hintArea()).contains (at)) // (round 190nu)
+        return setPinnedFirst (! pinnedFirst);
+    if (const auto k = keyRowAt (at); k >= 0 && starOf (keysArea(), k, keyScroll).contains (at))
+        return togglePinKey (k);
+    if (const auto c = chordRowAt (at); c >= 0 && starOf (chordsArea(), c, chordScroll).contains (at))
+        return togglePinChord (c);
     if (const auto s = sideItemAt (at); s >= 0)
     {
         if (s < 10)
