@@ -97,6 +97,9 @@ public:
         return insert >= 0 && insert < (int) loudest.size() ? loudest[(std::size_t) insert] : 0.0f;
     }
 
+    // round 190ou (--trackstates190opshot): where a column's strip is
+    int stripXForSnapshot (int column) const noexcept { return stripX (column); }
+    int stripWidthForSnapshot (int column) const noexcept { return stripWidth (column); }
 private:
     bool isAutomated (const AutomationTarget& t) const; // (round 190lx, DL-59)
     void refreshCache() const;
@@ -119,6 +122,7 @@ private:
     // round 190jn (design190ia CL-16): Live 12.4's Session mixer strip, in Live's look only (theme::livelook::active)
     juce::Rectangle<int> livePartBounds (int column, Part part, int row) const;
     void paintStripLive (juce::Graphics& g, int column, int selected);
+    void paintDeactivatedVeil (juce::Graphics& g, int column) const; // (round 190ou)
     void paintMeterLive (juce::Graphics& g, int insert, juce::Rectangle<int> area) const;
     void showInputMenu (int insert, bool channels);
     void showSendMenu (const Hit& hit);   // round 190kc: a return's send knob (Enable Send / Enable All Sends)

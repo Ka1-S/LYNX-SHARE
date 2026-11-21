@@ -41,6 +41,7 @@ void clipGridSelectTracksForSnapshot (juce::Component& grid, std::vector<int> tr
 // Round 190dr: the Session mixer under the slots (ui/SessionMixer.h), and the column a dragged device would land in
 // (-1: none), for --liveshot190dr.
 SessionMixerComponent* clipGridMixer (juce::Component& grid);
+void syncClipGridMixerForSnapshot (juce::Component& grid); // (round 190ou: the Session mixer's columns, as the grid's timer sets them)
 void setClipGridDeviceDropForSnapshot (juce::Component& grid, int track);
 
 // Round 190ef (docs/analise/REA_rodada190ef.md): the reference's View › "Scene Tempo And Time Signature" (a preference,
