@@ -122,3 +122,37 @@ TEST (issues190ll_199_fixed_blocks_tell_where_they_began)
     fixed.run (io, 192, false, [&] (float* const*, int) { ++calls; });
     CHECK (calls == 2);
 }
+
+// round 190od (issue #199): a chunk that runs over the pattern's end is one chunk; the plugin block that starts after
+// the wrap (the pattern's first note) reports the pattern's start, not its end + a few samples
+TEST (issues190od_199_blocks_after_the_pattern_wrap_report_its_start)
+{
+    auto s = lynx::Song::makeDefault();
+    s.mode = lynx::PlayMode::pattern;
+    const auto length = (double) s.patterns[0].effectiveLength (s.meter());
+    const auto wrap = lynx::hostPositionWrap (s, s.songLength());
+    CHECK (wrap.at == length && wrap.to == 0.0);
+
+    lynx::HostTimeline t;
+    const auto tps = 960.0 * 130.0 / 60.0 / 48000.0; // 130 BPM at 48 kHz
+    t.ticksPerSample.store (tps);
+    t.tick.store (length - 79.0 * tps);
+    t.wrapAt.store (wrap.at);
+    t.wrapTo.store (wrap.to);
+    CHECK (std::abs (t.tickAt (78) - (length - tps)) < 1e-6);         // before the wrap: as before
+    CHECK (std::abs (t.tickAt (79)) < 1e-6);                          // the first note's block: the start
+    CHECK (std::abs (t.tickAt (512) - 433.0 * tps) < 1e-6);           // and on from there
+    t.wrapAt.store (0.0);
+    CHECK (std::abs (t.tickAt (79) - length) < 1e-6);                 // no wrap known: unchanged
+
+    // Song mode: the loop region's end goes back to its start; without a region, the song's end to 0
+    s.mode = lynx::PlayMode::song;
+    const auto bar = (std::int64_t) lynx::ppq * s.beatsPerBar;
+    s.playlist = { lynx::Clip { 0, 0, 0, 4 * bar, 0 } };
+    auto w = lynx::hostPositionWrap (s, s.songLength());
+    CHECK (w.at == (double) s.songLength() && w.to == 0.0);
+    s.loopStart = bar;
+    s.loopEnd = 3 * bar;
+    w = lynx::hostPositionWrap (s, s.songLength());
+    CHECK (! s.loopPlays() || (w.at == (double) (3 * bar) && w.to == (double) bar));
+}

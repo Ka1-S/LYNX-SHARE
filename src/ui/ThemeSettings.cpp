@@ -5,6 +5,7 @@
 
 #include <juce_audio_formats/juce_audio_formats.h>
 
+#include "core/NewClipColours.h"
 #include "platform/Paths.h"
 #include "ui/ColourPicker.h"
 #include "ui/FileChoosers.h"
@@ -119,6 +120,12 @@ void applyDrawingDots (const themes::Spec& spec)
     colour::audioClip = dot (themes::Dot::waves, audioClip);
     colour::stepOn = theme::stepOn = dot (themes::Dot::steps, colour::accent);
     colour::selection = dot (themes::Dot::selection, colour::accent);
+    colour::defaultTrack = dot (themes::Dot::tracks, juce::Colour (0xff485156)); // (issue #238: FL's grey unless set)
+    // FL's "Audio and automation clips use note colors" (round 190od): the engine's new clips pick from the note colours
+    std::array<std::uint32_t, newclipcolours::count> notes {};
+    for (int i = 0; i < newclipcolours::count; ++i)
+        notes[(std::size_t) i] = theme::noteGroupColour (i, 1.0f).getARGB();
+    newclipcolours::set (spec.clipsUseNoteColours, notes);
 }
 
 void apply (const themes::Spec& spec, bool save)
@@ -185,6 +192,8 @@ juce::String toJson (const themes::Spec& spec)
         o->setProperty ("gridIntensity", spec.gridIntensity);
     if (spec.menuStyle != themes::MenuStyle::lynxDark)
         o->setProperty ("menuStyle", juce::String (themes::menuStyleId (spec.menuStyle)));
+    if (spec.clipsUseNoteColours) // (round 190od: FL's OverrideClips)
+        o->setProperty ("clipsUseNoteColors", true);
     return juce::JSON::toString (juce::var (o));
 }
 
@@ -223,6 +232,7 @@ std::optional<themes::Spec> fromJson (const juce::String& json)
     if (! v["gridIntensity"].isVoid())
         spec.gridIntensity = (float) juce::jlimit (themes::gridIntensityMin, themes::gridIntensityMax, (double) v["gridIntensity"]);
     spec.menuStyle = themes::menuStyleFromId (v["menuStyle"].toString().toStdString());
+    spec.clipsUseNoteColours = (bool) v.getProperty ("clipsUseNoteColors", false);
     return spec;
 }
 
@@ -483,7 +493,9 @@ public:
     };
 
     std::function<void (int)> onPick;
-    static constexpr int columns = 3, gap = 12, nameHeight = 20;
+    // issue #237 (round 190od): `frame` = room for the chosen thumbnail's frame (2 px, drawn outside the picture), so
+    // the first column's left edge and the last column's right edge are not cut off
+    static constexpr int columns = 3, gap = 12, nameHeight = 20, frame = 2;
 
     // (the thumbnails are made only for items that are new to the grid: an edit that rebuilds the list reuses them)
     void setItems (std::vector<Item> items)
@@ -544,12 +556,12 @@ public:
     const std::vector<Item>& items() const { return list; }
 
 private:
-    static int thumbWidth (int width) { return (width - (columns - 1) * gap) / columns; }
+    static int thumbWidth (int width) { return (width - 2 * frame - (columns - 1) * gap) / columns; }
     static int thumbHeight (int width) { return thumbWidth (width) * 104 / 184; } // (FL's 184 x 104)
     juce::Rectangle<int> cellOf (int i) const
     {
         const auto w = thumbWidth (getWidth()), h = thumbHeight (getWidth()) + nameHeight;
-        return { (i % columns) * (w + gap), (i / columns) * (h + gap) + 2, w, h };
+        return { frame + (i % columns) * (w + gap), (i / columns) * (h + gap) + frame, w, h };
     }
     int indexAt (juce::Point<int> p) const
     {
@@ -583,8 +595,10 @@ public:
     void paintButton (juce::Graphics& g, bool over, bool) override
     {
         using namespace theme;
+        // issue #237 (round 190od): the ring of the chosen dot (2.5 px out, 2 px wide) reaches 3.5 px above the dot; the
+        // dot sat 2 px from the top, so the ring's top was cut off. 4.5 px keeps the whole ring inside.
         const auto d = 31.0f;
-        const auto circle = juce::Rectangle<float> ((float) getWidth() / 2.0f - d / 2.0f, 2.0f, d, d);
+        const auto circle = juce::Rectangle<float> ((float) getWidth() / 2.0f - d / 2.0f, 4.5f, d, d);
         g.setColour (this->colour);
         g.fillEllipse (circle);
         g.setColour (juce::Colours::black);
@@ -611,8 +625,14 @@ public:
                                                                  &removeImage, &imageName, &fitLabel, &fitBox, &opacityLabel, &opacitySlider, &dimLabel,
                                                                  &dimSlider, &imageListLabel, &imageList, &openBackgrounds, &imageNote, &soundTitle,
                                                                  &soundName, &soundButton, &soundPlay, &soundDefault, &soundNote, &slotA, &slotB, &abNote, &lookTitle,
-                                                                 &menuStyleLabel, &menuStyleBox, &gridLabel, &gridSlider, &lookNote })
+                                                                 &menuStyleLabel, &menuStyleBox, &gridLabel, &gridSlider, &lookNote,
+                                                                 &optionsTitle, &clipsNoteColours })
             add (*c);
+        // FL's Theme › Options (round 190od): "Audio and automation clips use note colors"
+        clipsNoteColours.setButtonText (tr ("Audio and automation clips use note colors"));
+        clipsNoteColours.setTooltip (tr ("Use the note color list to find random colors for new clips"));
+        clipsNoteColours.setComponentID ("theme.clipsNoteColours");
+        clipsNoteColours.onClick = [this] { edit ([on = clipsNoteColours.getToggleState()] (themes::Spec& s) { s.clipsUseNoteColours = on; }); };
 
         // round 190je: the menus' palette (FL's classic light grey as an option, design190ia FW-16) and how strongly the
         // editors' grid lines show (Live's "Grid Line Intensity", FM-18); presets leave both alone
@@ -653,6 +673,7 @@ public:
 
         // round 190jp (design190ia FW-20): FL's preset thumbnails instead of a list
         presetGrid.onPick = [this] (int index) { choosePreset (index); };
+        presetGrid.setComponentID ("theme.presets"); // (round 190od: --issuesshot190od finds it)
         importButton.onClick = [this] { importTheme(); };
         exportButton.onClick = [this] { exportTheme (false); };
         savePreset.onClick = [this] { exportTheme (true); };
@@ -698,12 +719,15 @@ public:
             add (l);
         }
         // FL's colour dots: a click lets the picker below edit that colour, a double-click gives it back to the theme
-        const juce::String dotNames[] = { tr ("Selection"), tr ("Highlight"), tr ("Mute"), tr ("Option"), tr ("Steps"), tr ("Meters"), tr ("Waves"), tr ("Text") };
+        const juce::String dotNames[] = { tr ("Selection"), tr ("Highlight"), tr ("Mute"), tr ("Option"), tr ("Steps"), tr ("Meters"), tr ("Waves"), tr ("Text"), tr ("Tracks") };
         for (int i = 0; i < themes::dotCount; ++i)
         {
             auto& d = dots[(std::size_t) i];
             d.setButtonText (dotNames[i]);
-            d.setTooltip (tr ("Click: edit this color with the picker. Double-click: the theme's own color."));
+            d.setComponentID ("theme.dot." + juce::String (themes::dotId ((themes::Dot) i))); // (round 190od: tests find a dot)
+            d.setTooltip (i == (int) themes::Dot::tracks // (issue #238)
+                              ? tr ("Tracks, mixer tracks and channels without a color of their own. Click: edit this color with the picker. Double-click: the theme's own color.")
+                              : tr ("Click: edit this color with the picker. Double-click: the theme's own color."));
             d.onClick = [this, i] { selectDot (i); };
             d.addMouseListener (this, false);
             add (d);
@@ -838,6 +862,8 @@ private:
                 d.setBounds (r.removeFromLeft (pitch));
         }
         adjustNote.setBounds (row (18));
+        optionsTitle.setBounds (row (24)); // (FL's Options, round 190od)
+        clipsNoteColours.setBounds (row (24));
 
         coloursTitle.setBounds (row (24));
         {
@@ -985,6 +1011,7 @@ private:
             case D::meters: return theme::colour::meterLow;
             case D::waves: return theme::colour::audioClip;
             case D::text: return juce::Colour (palette.textPrimary);
+            case D::tracks: return juce::Colour (0xff485156); // (FL's grey)
         }
         return juce::Colour (palette.textPrimary);
     }
@@ -996,6 +1023,7 @@ private:
         workspaceWell.colour = juce::Colour (themes::workspaceColour (spec));
         workspaceWell.note = spec.workspace == 0 ? tr ("Automatic") : juce::String();
         autoWorkspace.setToggleState (spec.workspace == 0, juce::dontSendNotification);
+        clipsNoteColours.setToggleState (spec.clipsUseNoteColours, juce::dontSendNotification);
         const auto palette = themes::adjustedPalette (spec);
         for (int i = 0; i < themes::dotCount; ++i)
         {
@@ -1227,7 +1255,7 @@ private:
     juce::Label presetNote, adjustNote, contrastNote, imageName, fitLabel, opacityLabel, dimLabel, imageListLabel, imageNote, soundName, soundNote, abNote;
     std::array<juce::Slider, knobCount> knobs;
     std::array<juce::Label, knobCount> knobLabels;
-    std::array<DotButton, themes::dotCount> dots { DotButton ({}), DotButton ({}), DotButton ({}), DotButton ({}),
+    std::array<DotButton, themes::dotCount> dots { DotButton ({}), DotButton ({}), DotButton ({}), DotButton ({}), DotButton ({}),
                                                    DotButton ({}), DotButton ({}), DotButton ({}), DotButton ({}) };
     int selectedDot = -1;
     juce::TextButton slotA, slotB;
@@ -1247,7 +1275,8 @@ private:
     juce::Array<juce::File> backgroundFiles;
     juce::TextButton openBackgrounds { tr ("Open folder") }, soundButton { tr ("Choose sound...") }, soundPlay { tr ("Play") },
         soundDefault { tr ("Default") };
-    SectionTitle soundTitle { tr ("Startup sound") }, lookTitle { tr ("Menus and grid") };
+    SectionTitle soundTitle { tr ("Startup sound") }, lookTitle { tr ("Menus and grid") }, optionsTitle { tr ("Options") };
+    juce::ToggleButton clipsNoteColours;
     juce::Label menuStyleLabel, gridLabel, lookNote;
     juce::ComboBox menuStyleBox;
     juce::Slider gridSlider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };

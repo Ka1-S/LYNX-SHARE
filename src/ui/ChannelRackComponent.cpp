@@ -1254,7 +1254,7 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                 // #11479C, Grv Kick #892019), its brightness held where white text reads (0.42-0.58), a slight top-down
                 // gradient (+6 % / -6 %); FL's grey #485156 for a channel without a colour; muted = greyed and darker
                 {
-                    auto fill = theme::colourFill (channel.colour != 0 ? juce::Colour (channel.colour) : juce::Colour (0xff485156), 0.42f, 0.58f);
+                    auto fill = theme::colourFill (channel.colour != 0 ? juce::Colour (channel.colour) : theme::colour::defaultTrack, 0.42f, 0.58f);
                     if (channel.muted)
                         fill = fill.withMultipliedSaturation (0.45f).withMultipliedBrightness (0.7f);
                     if (hovered (Area::name))

@@ -289,6 +289,7 @@ namespace juce::detail { bool dispatchNextMessageOnSystemQueue (bool returnIfNoP
 #include "ui/Splash.h"
 #include "ui/Theme.h"
 #include "ui/ThemeSettings.h"
+#include "ui/AutoLookEditor.h" // (round 190od, issue #239)
 #include "ui/WaveformView.h"
 #include "ui/WindowOwner.h"
 #include "ui/PluginKeysTest.h"
@@ -3323,6 +3324,13 @@ public:
         {
             const auto i = args.indexOf ("--tabs2test190nz");
             setApplicationReturnValue (runTabs2Test190nz (args[i + 1].unquoted(), juce::File (args[i + 2].unquoted())) ? 0 : 1);
+            quit();
+            return;
+        }
+        // --issuesshot190od <prefix> (round 190od, issues #236-#242): src/IssuesShot190od.inc
+        if (args.contains ("--issuesshot190od"))
+        {
+            setApplicationReturnValue (runIssuesShot190od (args[args.indexOf ("--issuesshot190od") + 1].unquoted()) ? 0 : 1);
             quit();
             return;
         }
@@ -18174,6 +18182,7 @@ private:
 #include "IssuesShot190ns.inc" // round 190ns (issues #231-#235)
 #include "Rollup031S3Shot.inc" // rollup 0.1.31 step 3 (round 190ny)
 #include "Tabs2Test190nz.inc" // round 190nz (issue #232 stage 2)
+#include "IssuesShot190od.inc" // round 190od (issues #236-#242)
 #include "DetailsShot190kn.inc" // round 190kn
 #include "DetailsShot190ld.inc" // round 190ld
 #include "DetailsShot190lr.inc" // round 190lr

@@ -2773,6 +2773,8 @@ void RackRenderer::prepare (double sr, int maxBlockSize)
     heldScratch.assign ((std::size_t) maxChannels, {});
     polyLayers.assign ((std::size_t) maxChannels, {});
     polyScratch.assign ((std::size_t) maxChannels, {});
+    noteProps.assign ((std::size_t) maxChannels * 128, {}); // (issue #236)
+    propSlides.assign ((std::size_t) maxChannels, {});
 
     if (lastState != nullptr)
     {
@@ -3489,6 +3491,78 @@ bool RackRenderer::stepsSlides (InstrumentKind k) noexcept
     }
 }
 
+// Issue #236 (round 190od, Song::slideNoteProps): FL's slide note moves every sounding note of its channel toward its own
+// velocity, pan and Mod X / Y (FL manual: "During slides all note properties move toward those set in the slide note";
+// FL 2026's renders, docs/analise/REA_rodada190od.md): from where each note is now to the slide note's values in n + 1
+// equal steps, one per FL tick, the first a sample after the slide's start and the last at its end — the law round
+// 190hg measured for the pitch. The voices take the steps as voice properties (Instrument::voiceProperty); an engine
+// without them keeps its level, as before.
+void RackRenderer::startPropSlide (int channel, const NoteEvent& slide, int flTicks, bool flLaw) noexcept
+{
+    if ((std::size_t) channel >= propSlides.size() || (std::size_t) channel * 128 + 128 > noteProps.size())
+        return;
+    auto& p = propSlides[(std::size_t) channel];
+    p.count = 0;
+    p.steps = std::max (0, flTicks);
+    p.flLaw = flLaw;
+    p.to = { std::clamp (slide.velocity, 0.0f, 1.0f), std::clamp (slide.pan, -1.0f, 1.0f), std::clamp (slide.modX, 0.0f, 1.0f),
+             std::clamp (slide.modY, 0.0f, 1.0f) };
+    const auto& held = heldNotes[(std::size_t) channel];
+    const auto* props = noteProps.data() + (std::size_t) channel * 128;
+    bool moves = false;
+    for (int key = 0; key < 128 && p.count < PropSlide::maxKeys; ++key)
+        if ((held[(std::size_t) (key >> 6)] >> (key & 63)) & 1u)
+        {
+            const auto& now = props[key];
+            p.keys[(std::size_t) p.count] = (std::uint8_t) key;
+            p.from[(std::size_t) p.count] = now;
+            ++p.count;
+            moves = moves || now.velocity != p.to.velocity || now.pan != p.to.pan || now.modX != p.to.modX || now.modY != p.to.modY;
+        }
+    if (! moves) // (nothing differs: the slide moves the pitch only, as before)
+        p.count = 0;
+}
+
+void RackRenderer::stepPropSlide (Instrument& instrument, int channel, int step) noexcept
+{
+    if ((std::size_t) channel >= propSlides.size())
+        return;
+    auto& p = propSlides[(std::size_t) channel];
+    if (p.count <= 0 || step < 0)
+        return;
+    const auto last = step >= p.steps;
+    const auto f = last ? 1.0f : (float) (step + 1) / (float) (p.steps + 1);
+    auto* props = noteProps.data() + (std::size_t) channel * 128;
+    for (int k = 0; k < p.count; ++k)
+    {
+        const auto key = (int) p.keys[(std::size_t) k];
+        const auto& a = p.from[(std::size_t) k];
+        const auto& b = p.to;
+        const auto at = [f] (float x, float y) { return x + (y - x) * f; };
+        NoteProps now { at (a.velocity, b.velocity), at (a.pan, b.pan), at (a.modX, b.modX), at (a.modY, b.modY) };
+        if (p.flLaw && a.velocity != b.velocity)
+        {
+            // FL's host moves Final.Vol in a straight line (FL 2026's renders: half way through a fade the level is
+            // the mean of the two levels), i.e. linear in FL's volume law (11^(1.28·v) − 1) / 10, not in velocity
+            const auto vol = [] (float v) { return (std::pow (11.0f, 1.28f * std::clamp (v, 0.0f, 1.0f)) - 1.0f) * 0.1f; };
+            const auto g = at (vol (a.velocity), vol (b.velocity));
+            now.velocity = last ? b.velocity : std::clamp (std::log (10.0f * g + 1.0f) / (1.28f * std::log (11.0f)), 0.0f, 1.0f);
+        }
+        auto& was = props[key];
+        if (now.velocity != was.velocity)
+            instrument.voiceProperty (key, (int) vfx::Prop::velocity, now.velocity);
+        if (now.pan != was.pan)
+            instrument.voiceProperty (key, (int) vfx::Prop::pan, now.pan);
+        if (now.modX != was.modX)
+            instrument.voiceProperty (key, (int) vfx::Prop::modX, now.modX);
+        if (now.modY != was.modY)
+            instrument.voiceProperty (key, (int) vfx::Prop::modY, now.modY);
+        was = now;
+    }
+    if (last)
+        p.count = 0;
+}
+
 void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
 {
     if (foreignChannel (i)) // (render-ahead: the other renderer renders it; the boundary brings it here)
@@ -3576,13 +3650,14 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
                                          : (ticks.start + ticks.k * flTickTicks - chunkStartTick) / chunkTps;
             if (! std::isfinite (at) || at >= (double) end)
                 break;
-            ++ticks.k;
+            const auto step = ticks.k++;
             const auto split = (int) std::lround (at);
             if (split > position && split < end)
             {
                 instrument.render (l + position, r + position, split - position, gl, gr);
                 position = split;
             }
+            stepPropSlide (instrument, i, step); // (issue #236: the note properties step on the same ticks)
         }
         if (end > position)
         {
@@ -3780,6 +3855,12 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
                     velocity *= gain;
                 instrument.setNextNoteFinePitch (e.cents); // (issue #63: a hosted plugin's key and VST3 tuning)
                 instrument.setNextNoteId (e.noteId);     // (round 190ej: the voice is this note's)
+                if (e.key >= 0 && e.key < 128 && (std::size_t) i * 128 + 128 <= noteProps.size()) // (issue #236: what a slide moves from)
+                {
+                    const auto [modX, modY] = modTracking ? channelmisc::trackedModulation (c.misc, e.key, e.velocity, e.modX, e.modY)
+                                                          : std::pair<float, float> { e.modX, e.modY };
+                    noteProps[(std::size_t) i * 128 + (std::size_t) e.key] = { velocity, pan, modX, modY };
+                }
                 instrument.noteOnAt (e.key, velocity, e.startSeconds);
                 instrument.setNextNoteId (0);
                 HostSlide::pendingGlide() = {};
@@ -3796,10 +3877,25 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
             }
             instrument.slideTo (e.key, e.cents + c.misc.fineTune + (c.misc.mainPitch ? state.song.masterPitch : 0.0f), e.slideSamples);
             HostSlide::pendingSteps() = {};
+            // issue #236 (round 190od): FL's slide note moves the sounding notes' velocity, pan and Mod X / Y to its own
+            // as well, in the same n + 1 steps on FL's ticks (every engine: the property steps are the host's)
+            if (state.song.slideNoteProps && ! c.muted)
+            {
+                const auto n = std::max (0, (int) std::lround ((double) e.slideSamples * chunkTps / flTickTicks));
+                startPropSlide (i, e, n, stepsSlides (c.instrument));
+                if (propSlides[(std::size_t) i].count > 0)
+                {
+                    if (n > 0 && flTicks == 0) // (an engine that glides its pitch: the render calls split for the steps only)
+                        ticks = { chunkStartTick + (double) e.sampleOffset * chunkTps, 0, n };
+                    else if (n == 0) // (shorter than a tick: at once)
+                        stepPropSlide (instrument, i, 0);
+                }
+            }
         }
         else if (e.type == NoteEvent::Type::choke)
         {
             instrument.cut(); // short fade, like FL's "cut"
+            propSlides[(std::size_t) i].count = 0; // (issue #236)
             held = {};
             voiceOrders[(std::size_t) i].clear();
             polyLayers[(std::size_t) i].clear();
@@ -4465,6 +4561,8 @@ void RackRenderer::process (const RackState* state,
                 polyLayers[c] = from >= 0 && (std::size_t) from < polyScratch.size() ? polyScratch[(std::size_t) from] : channelpoly::Layer {};
         }
         scheduledNotes->moveChannels (state->channelFrom); // (round 169d)
+        for (auto& slide : propSlides) // (issue #236: a slide in progress stops where channels moved)
+            slide.count = 0;
     }
     lastState = state; // so prepare() knows which instruments to reconfigure
     lastSerial = state->serial;
@@ -4737,6 +4835,8 @@ void RackRenderer::process (const RackState* state,
                     instrument.setNextNoteModulation (e.modX, e.modY);
                     instrument.setNextNoteFinePitch (e.cents);
                 }
+                if (const auto ch = (std::size_t) e.channel; e.key >= 0 && e.key < 128 && ch * 128 + 128 <= noteProps.size()) // (issue #236)
+                    noteProps[ch * 128 + (std::size_t) e.key] = { e.velocity, 0.0f, e.expression ? e.modX : 0.5f, e.expression ? e.modY : 0.5f };
                 instrument.noteOn (e.key, e.velocity);
                 HostSlide::pendingGlide() = {};
             }
@@ -5405,6 +5505,9 @@ void RackRenderer::chunkPrelude (const RackState& state, bool playing, double st
     {
         auto& timeline = hostTimeline();
         timeline.tick.store (hostPositionTick (song, startTick, state.schedule.songLength), std::memory_order_relaxed);
+        const auto wrap = playing ? hostPositionWrap (song, state.schedule.songLength) : HostPositionWrap {}; // (issue #199)
+        timeline.wrapAt.store (wrap.at, std::memory_order_relaxed);
+        timeline.wrapTo.store (wrap.to, std::memory_order_relaxed);
         timeline.bpm.store (bpm, std::memory_order_relaxed);
         timeline.sampleRate.store (sampleRate, std::memory_order_relaxed);
         timeline.beatsPerBar.store (std::max (1, song.beatsPerBar), std::memory_order_relaxed);
@@ -6298,6 +6401,8 @@ void copyTimeline (const HostTimeline& from, HostTimeline& to) noexcept
     to.beatsPerBar.store (from.beatsPerBar.load (r), r);
     to.beatUnit.store (from.beatUnit.load (r), r);
     to.ticksPerSample.store (from.ticksPerSample.load (r), r);
+    to.wrapAt.store (from.wrapAt.load (r), r);
+    to.wrapTo.store (from.wrapTo.load (r), r);
     to.chunk.store (from.chunk.load (r), r);
 }
 } // namespace
@@ -7633,6 +7738,12 @@ void RackRenderer::adoptUnits (const RackRenderer& from, const char* channels, c
             layerTurn[c] = from.layerTurn[c];
             if (c < polyLayers.size() && c < from.polyLayers.size())
                 polyLayers[c] = from.polyLayers[c];
+            slideTicks[c] = from.slideTicks[c]; // (issue #236: a slide in progress goes on where the channel renders now)
+            if (c < propSlides.size() && c < from.propSlides.size())
+                propSlides[c] = from.propSlides[c];
+            if ((c + 1) * 128 <= noteProps.size() && (c + 1) * 128 <= from.noteProps.size())
+                std::copy (from.noteProps.begin() + (std::ptrdiff_t) (c * 128), from.noteProps.begin() + (std::ptrdiff_t) ((c + 1) * 128),
+                           noteProps.begin() + (std::ptrdiff_t) (c * 128));
             if ((c + 1) * 128 <= layerPick.size() && (c + 1) * 128 <= from.layerPick.size())
                 std::copy (from.layerPick.begin() + (std::ptrdiff_t) (c * 128), from.layerPick.begin() + (std::ptrdiff_t) ((c + 1) * 128),
                            layerPick.begin() + (std::ptrdiff_t) (c * 128));
@@ -7676,6 +7787,8 @@ void RackRenderer::silenceChannels (const RackState& state, const char* channels
         voiceOrders[c].clear();
         if (c < polyLayers.size())
             polyLayers[c].clear();
+        if (c < propSlides.size())
+            propSlides[c].count = 0; // (issue #236)
         if ((c + 1) * 128 <= layerPick.size())
             std::fill (layerPick.begin() + (std::ptrdiff_t) (c * 128), layerPick.begin() + (std::ptrdiff_t) ((c + 1) * 128), (std::int16_t) -1);
         if (c < state.arpeggiators.size() && state.arpeggiators[c] != nullptr)

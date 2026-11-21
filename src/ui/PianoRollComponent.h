@@ -234,6 +234,8 @@ public:
     double playheadForSnapshot() const noexcept { return playheadTick; }
     EditTool currentTool() const noexcept { return tools.getTool(); } // (round 190iu: temporary tools)
     void setScaleForSnapshot (int root, int scale) { setScale (root, scale); }
+    // issue #242 (round 190od): the toolbar scale box as a click opens it (JUCE's ComboBox marks the popup active first)
+    juce::ComboBox& scaleBoxForTests() noexcept { return scaleBox; }
     // round 190jv: View › Scale highlighting › Automatic on / off, and the key it guessed (scaledetect; -1 none)
     void setAutoScale (bool on) { scaleBox.setSelectedId (on ? autoScaleId : 1, juce::sendNotificationSync); }
     bool isAutoScaleForTests() const { return isAutoScale(); }
@@ -498,10 +500,28 @@ private:
         std::function<void()> onPopup;
         void showPopup() override
         {
-            if (onPopup)
-                onPopup();
-            else
+            if (! onPopup)
+            {
                 IconComboBox::showPopup();
+                return;
+            }
+            onPopup();
+            // issue #242 (round 190od): juce::ComboBox marks its popup active before showPopup() and clears the mark only
+            // in its own menu's callback, so a box whose click opens another menu stayed "active" after that menu
+            // closed and never opened again. The menu onPopup() showed is the modal component now: its end clears it.
+            if (auto* menu = juce::Component::getCurrentlyModalComponent())
+                juce::ModalComponentManager::getInstance()->attachCallback (
+                    menu, juce::ModalCallbackFunction::create ([box = juce::Component::SafePointer<ScaleBox> (this)] (int) {
+                        if (box != nullptr)
+                            box->popupClosed();
+                    }));
+            else
+                popupClosed();
+        }
+        void popupClosed()
+        {
+            if (isPopupActive())
+                hidePopup();
         }
     };
     // chord created on each click (like FL's "stamp"); round 190nu: a click opens the Stamp menu (FL's stamp button opens

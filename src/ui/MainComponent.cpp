@@ -1,3 +1,4 @@
+#include "ui/AutoLookEditor.h"
 #include "ui/ControllerBridge.h"
 #include "ui/KeyFocus.h"
 #include "ui/TrackIcons.h"
@@ -315,6 +316,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     {
         engine.getRollingLog().setEnabled (true); // on by default, as in FL (Tools › Audio logger)
         loadUiSettings();
+        autolookui::load(); // issue #239 (round 190od): the user's automatic colour / icon rules
         loadOnboarding(); // round 190np: the welcome card's answer, the Next-3 ticks, the tips seen
         onboardingOn = true;
         if (std::exchange (showExtendedHintAfterLoad, false)) // round 190mr (DF-49)

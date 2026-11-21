@@ -961,6 +961,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     song.swing = std::clamp (project.swing / 128.0f, 0.0f, 1.0f);
     song.playTruncatedNotes = project.playTruncatedNotes; // 0x1E (REA round 167g)
     song.muteRunsEffects = true;                          // FL's muted insert (round 190y)
+    song.slideNoteProps = true;                           // FL's slide notes move the note properties (issue #236)
     song.patternClipTakeover = true;                      // FL's pattern clip takeover (issue #158)
     song.fastDeclick = project.fastDeclick;               // 0x28 (REA round 167h)
     song.panTriangular = (project.panLaw >> 1) == 1;       // 0x17: FL saves 2 × its pan-law mode (REA round 167j §1)

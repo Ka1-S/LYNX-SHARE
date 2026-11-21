@@ -79,6 +79,9 @@ inline juce::Colour noteSoft { 0xffb3545a };     // note colour at velocity 0
 inline juce::Colour noteHard { 0xffff6b6e };     // note colour at velocity 1
 inline juce::Colour noteMuted { 0xff4a4e57 };
 inline juce::Colour audioClip { 0xff5a87b8 };
+// issue #238 (round 190od): Playlist tracks, mixer tracks and channels without a colour of their own (FL's grey; Settings ›
+// Theme › Tracks)
+inline juce::Colour defaultTrack { 0xff485156 };
 } // namespace colour
 
 // User themes (round 162d): the tokens above hold LYNX's built-in look until a theme replaces them (ui/ThemeSettings.h

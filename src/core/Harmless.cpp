@@ -1222,6 +1222,27 @@ public:
         return -1;
     }
 
+    // FL's slide notes move a sounding note's FinalLevels (issue #236, round 190od): its volume factor (< 0: kept) and
+    // its pan (NaN: kept), for the note and its records; the render applies them (Final.Vol / Final.Pan)
+    void setNoteLevels (int key, double volFactor, double notePan) noexcept
+    {
+        for (auto i : order)
+        {
+            auto& nt = notes[(std::size_t) i];
+            if (nt.key != key || nt.released)
+                continue;
+            if (volFactor >= 0.0)
+                nt.volFactor = volFactor;
+            if (! std::isnan (notePan))
+                nt.notePan = notePan;
+            for (int k = 0; k < nt.count; ++k)
+            {
+                auto& v = records[(std::size_t) nt.records[(std::size_t) k]];
+                v.volFactor = nt.volFactor, v.notePan = nt.notePan;
+            }
+        }
+    }
+
     // the LYNX note id a note was started with (round 190ej)
     void setLynxNote (int index, std::uint32_t note) noexcept
     {
@@ -2410,6 +2431,22 @@ public:
     {
         take();
         engine.slideTo (100.0 * std::clamp (key, 0, 127) - 6000.0 + (double) settings.pitchCents + (double) cents, samples);
+    }
+
+    // FL's slide notes (issue #236, round 190od; FL 2026's renders): the host moves Final.Vol (VEL → volume on) and
+    // Final.Pan of the sounding notes
+    void voiceProperty (int key, int prop, float value) noexcept override
+    {
+        if (! std::isfinite (value) || (prop != 0 /* velocity */ && prop != 2 /* pan */))
+            return;
+        take();
+        if (prop == 0)
+        {
+            const auto vel = std::clamp ((double) value, 0.0, 1.0);
+            engine.setNoteLevels (key, engine.P.p[37] > 0 ? (std::pow (11.0, 1.28 * vel) - 1.0) / 10.0 : 1.0, std::nan (""));
+        }
+        else
+            engine.setNoteLevels (key, -1.0, std::clamp ((double) value, -1.0, 1.0));
     }
 
     void noteOn (int key, float velocity) noexcept override

@@ -357,7 +357,7 @@ std::uint32_t fromHsv (Hsv x, std::uint32_t alphaOf)
 
 const char* dotId (Dot dot)
 {
-    static const char* ids[] { "selection", "highlight", "mute", "option", "steps", "meters", "waves", "text" };
+    static const char* ids[] { "selection", "highlight", "mute", "option", "steps", "meters", "waves", "text", "tracks" };
     const auto i = (int) dot;
     return i >= 0 && i < dotCount ? ids[i] : "selection";
 }

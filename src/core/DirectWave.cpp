@@ -2306,6 +2306,26 @@ public:
         }
     }
 
+    // FL's slide notes move a sounding note's Final.Vol and Final.Pan (issue #236, round 190od; FL 2026's renders)
+    void voiceProperty (int key, int prop, float value) noexcept override
+    {
+        if (! std::isfinite (value) || (prop != 0 /* velocity */ && prop != 2 /* pan */))
+            return;
+        for (auto& nt : notes)
+        {
+            if (nt.key != key)
+                continue;
+            if (prop == 0)
+            {
+                const auto vel = std::clamp ((double) value, 0.0, 1.0);
+                nt.initVol = (std::pow (11.0, 1.28 * vel) - 1.0) / 10.0;
+            }
+            else
+                nt.pan = std::clamp ((double) value, -1.0, 1.0);
+            engine.setLevels (nt.id, channelVol * nt.initVol, std::clamp (nt.pan + channelPan, -1.0, 1.0), nt.cents + (double) nt.slide.cents);
+        }
+    }
+
     void setNextNoteExpression (float pan, float cents, bool) noexcept override
     {
         nextPan = pan;

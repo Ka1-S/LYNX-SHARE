@@ -62,6 +62,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         // (editable), 190gx's Beats-law mark (what the file was saved by) and 190gw's automation target links (read-only:
         // formulas and targets, as remoteMappings)
         add (S::root, "playlistRowHeight linkTracksToMixer");
+        add (S::root, "slideNoteProps"); // (issue #236, round 190od: slide notes move the note properties)
         add (S::root, "beatsLaw190gx", S::readOnly);
         add (S::root, "warpLaw190ik", S::readOnly); // (round 190ik: the Beats detector / Texture / Complex Pro laws' mark)
         add (S::root, "clipNotes190lq", S::readOnly); // (round 190lq: FL's law for the notes of audio clip channels' mark)

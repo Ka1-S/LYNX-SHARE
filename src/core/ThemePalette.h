@@ -145,9 +145,13 @@ const char* imageFitId (ImageFit fit); // "fill", "fit", "stretch", "tile", "cen
 ImageFit imageFitFromId (const std::string& id);
 
 // FL's colour dots on its Theme page (round 190jp, design190ia FW-20): the colours of the selection, the highlight, muted
-// things, options, lit steps, meters, waveforms and the text, each the theme's own unless set (0).
-enum class Dot : int { selection = 0, highlight, mute, option, steps, meters, waves, text };
-constexpr int dotCount = 8;
+// things, options, lit steps, meters, waveforms and the text, each the theme's own unless set (0). Issue #238 (round 190od,
+// LYNX's own dot; FL's theme files carry the same role as their channel / pattern / Playlist track default colours,
+// "channels.colors." / "pattern.defaultcolor" / "forms.eventeditform.playlist.track.background"): Tracks = the colour
+// drawn for Playlist tracks, mixer tracks and channels that have no colour of their own (FL's grey #485156 unless set).
+// The project keeps "no colour" (0): a theme changes the look, never the project's data.
+enum class Dot : int { selection = 0, highlight, mute, option, steps, meters, waves, text, tracks };
+constexpr int dotCount = 9;
 const char* dotId (Dot dot); // "selection", "highlight", ... (the .lynxtheme keys)
 
 // A theme: what a .lynxtheme file holds and what Options › Theme edits.
@@ -169,12 +173,17 @@ struct Spec
     std::string startupSound;        // audio file played at start instead of LYNX's own sound (empty = LYNX's; issue #12)
     float gridIntensity = 1.0f;      // Grid line intensity (round 190je): gridIntensityMin..Max, 1 = the theme's lines
     MenuStyle menuStyle = MenuStyle::lynxDark; // Menu style (round 190je)
+    // FL's Theme › Options › "Audio and automation clips use note colors" (round 190od, issue #239; FL's ClipsOverrideBox,
+    // .flstheme OverrideClips, hint "Use the note color list to find random colors for new clips"): a new audio clip
+    // channel or automation clip takes a random colour of the 16 note colours instead of the default grey
+    bool clipsUseNoteColours = false;
 
     bool hasAdjustments() const noexcept { return hue != 0.0f || saturation != 0.0f || brightness != 0.0f || contrast != 0.0f || text != 0.0f; }
     bool hasDots() const noexcept { return std::any_of (dots.begin(), dots.end(), [] (std::uint32_t c) { return c != 0; }); }
     bool isDefaultLook() const noexcept
     {
-        return accent == defaultAccent && background == defaultBackground && workspace == 0 && image.empty() && ! hasAdjustments() && ! hasDots();
+        return accent == defaultAccent && background == defaultBackground && workspace == 0 && image.empty() && ! hasAdjustments() && ! hasDots()
+               && ! clipsUseNoteColours;
     }
     bool operator== (const Spec&) const = default;
 };

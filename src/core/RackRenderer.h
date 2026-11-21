@@ -1140,6 +1140,27 @@ private:
         int k = 0, n = 0;   // the next step, the slide's length (FL ticks)
     };
     std::array<SlideTicks, maxChannels> slideTicks {};
+    // FL's slide notes move the note properties too (issue #236, round 190od; Song::slideNoteProps): each sounding key's
+    // velocity, pan and Mod X / Y as the channel's voices have them now (set at note on, moved by slides), and a slide in
+    // progress — the keys it moves, where they started and where they go — stepped on the slide's FL ticks
+    struct NoteProps
+    {
+        float velocity = 0.78125f, pan = 0.0f, modX = 0.5f, modY = 0.5f;
+    };
+    struct PropSlide
+    {
+        static constexpr int maxKeys = 16;
+        int count = 0; // keys it moves (0: none in progress)
+        std::array<std::uint8_t, maxKeys> keys {};
+        std::array<NoteProps, maxKeys> from {};
+        NoteProps to;
+        int steps = 0; // FL ticks (n): steps 0…n, the last one at the slide's end
+        bool flLaw = false; // an FL native generator: the level moves linearly in FL's volume (InitLevels.Vol), not in velocity
+    };
+    std::vector<NoteProps> noteProps;  // maxChannels × 128 (prepare)
+    std::vector<PropSlide> propSlides; // maxChannels (prepare)
+    void startPropSlide (int channel, const NoteEvent& slide, int flTicks, bool flLaw) noexcept;
+    void stepPropSlide (Instrument& instrument, int channel, int step) noexcept;
     std::array<NoteMask, maxChannels> publishedNotes {};     // what soundingKeys holds (stored only on a change)
     int publishedTop = 0;                                   // channels past it have nothing published
     void publishSoundingKeys (int channels) noexcept;

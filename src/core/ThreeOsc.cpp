@@ -1030,13 +1030,47 @@ public:
             engine.voices[(std::size_t) engine.order[(std::size_t) i]].slide.follow (live.now());
     }
 
+    // the voice's InitLevels.Vol for a velocity (FL's host law; an FLM channel: the velocity times its gain)
+    float initVolume (double vel) const noexcept
+    {
+        const auto mobile = flmLevel.load();
+        const auto gain = std::isfinite (autoGain) ? autoGain : mobile; // (round 190fe: a lane on Volume / its envelope amount)
+        return mobile >= 0.0f ? (float) (vel * (double) gain) : (float) ((std::pow (11.0, 1.28 * vel) - 1.0) / 10.0);
+    }
+
+    // FL's slide notes move a sounding note's velocity (its level) and pan (issue #236, round 190od): the host's
+    // FinalLevels, which 3x Osc reads at every render
+    void voiceProperty (int key, int prop, float value) noexcept override
+    {
+        if (! std::isfinite (value) || (prop != 0 /* vfx::Prop::velocity */ && prop != 2 /* vfx::Prop::pan */))
+            return;
+        take();
+        for (int i = 0; i < engine.count; ++i)
+        {
+            const auto slot = (std::size_t) engine.order[(std::size_t) i];
+            auto& v = engine.voices[slot];
+            if (v.key != key || v.proc.released)
+                continue;
+            if (prop == 0)
+            {
+                const auto vel = std::clamp ((double) value, 0.0, 1.0);
+                slotVel[slot] = (float) vel;
+                volFactor[slot] = initVolume (vel);
+                v.fvol = (float) (channelVol * (double) volFactor[slot]);
+            }
+            else
+            {
+                notePan[slot] = std::clamp (value, -1.0f, 1.0f);
+                v.fpan = (float) std::clamp ((double) notePan[slot] + channelPan, -1.0, 1.0);
+            }
+        }
+    }
+
     void noteOn (int key, float velocity) noexcept override
     {
         take();
         const auto vel = std::clamp ((double) velocity, 0.0, 1.0);
-        const auto mobile = flmLevel.load();
-        const auto gain = std::isfinite (autoGain) ? autoGain : mobile; // (round 190fe: a lane on Volume / its envelope amount)
-        const auto initVol = mobile >= 0.0f ? (float) (vel * (double) gain) : (float) ((std::pow (11.0, 1.28 * vel) - 1.0) / 10.0);
+        const auto initVol = initVolume (vel);
         const auto k = std::clamp (key, 0, 127);
         const auto knob = pitchCents.load();
         const auto finalPitch = (float) (100.0 * (k - 60) + (double) knob + (double) nextCents);

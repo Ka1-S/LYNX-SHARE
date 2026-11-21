@@ -388,7 +388,7 @@ constexpr int nativeTolerance = 1, nativeKnobTolerance = 3;
 
 ClipLook clipBody (juce::Colour clipColour, juce::Colour trackColour, ClipKind kind, ClipStyle style)
 {
-    const juce::Colour flGrey { 0xff485156 }; // FL's default channel / track colour
+    const auto flGrey = colour::defaultTrack; // FL's default channel / track colour (issue #238: Settings › Theme › Tracks)
     if (clipColour.getAlpha() == 0)
         clipColour = flGrey;
     if (trackColour.getAlpha() == 0)
