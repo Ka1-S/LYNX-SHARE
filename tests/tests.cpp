@@ -17997,8 +17997,10 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "core/Details190mr.h"
 #include "Details190mrTests.inc" // round details8_190mr: click-and-hold, rack Auto Select, undo / warning / layout options, details pass 8
 #include "core/Details190mv.h"
+#include "core/PluginHelp.h" // (round 190oa)
 #include "Details190mvTests.inc" // round details9_190mv: undo knob tweaks and the rest of details pass 9
 #include "Details190myTests.inc" // round details10_190my: the Current track follow-ups and details pass 10
+#include "Details190oaTests.inc" // round details11_190oa: details pass 11 (the audit's last open rows)
 #include "Mixer221_190ngTests.inc" // round 190ng: issue #221 (Del with only the used inserts shown)
 #include "Issues190ngTests.inc" // round 190ng: issues #215, #217, #219, #220, #222
 #include "Rack190ncTests.inc" // round 190nc (0.1.31): Live's Solo / Cue (DL-110) and the Macro Map pick (DL-95)
