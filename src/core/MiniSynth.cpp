@@ -1247,6 +1247,16 @@ public:
         delete incoming.exchange (s.release());
     }
 
+    // FL's slide notes move a sounding note's Final.Pan (issue #236, round 190od). Its level stays: FL's MiniSynth takes
+    // the velocity at the note's start only (FL 2026's renders of a slide note at another velocity keep the level)
+    void voiceProperty (int key, int prop, float value) noexcept override
+    {
+        if (prop != 2 /* pan */ || ! std::isfinite (value) || key < 0 || key >= 128)
+            return;
+        notePan[key] = std::clamp (value, -1.0f, 1.0f);
+        plugin.setLevels (key, channelVol, std::clamp ((double) notePan[key] + channelPan, -1.0, 1.0));
+    }
+
     void setNextNoteExpression (float pan, float cents, bool) noexcept override
     {
         nextPan = pan;

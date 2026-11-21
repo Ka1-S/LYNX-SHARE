@@ -2894,6 +2894,12 @@ struct Song
     // behaviour before (the insert skipped its effects); projects saved before keep it off, .flp imports and new
     // projects turn it on. Saved with the project.
     bool muteRunsEffects = false;
+    // FL's slide notes and the note properties (issue #236, round 190od; FL manual, Piano roll › Slide notes: "During
+    // slides all note properties move toward those set in the slide note"; FL 2026's renders, REA_rodada190od): a slide
+    // note moves the sounding notes' velocity (their volume), pan and Mod X / Y to its own, in FL's per-tick steps, as
+    // it moves their pitch. Off = LYNX's behaviour before (a slide moved the pitch only); projects saved before keep it
+    // off, .flp imports and new projects turn it on. Saved with the project.
+    bool slideNoteProps = false;
     // FL 2026 (round 190eh renders, issue #158): a pattern plays from one Playlist clip at a time. A clip of the same
     // pattern that starts later (on any track) takes over at its start: the earlier clip starts no more notes from there
     // (also after the later clip has ended), the notes it already started play to their ends (scheduleSong). Clips of

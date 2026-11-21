@@ -1718,6 +1718,18 @@ public:
         delete incoming.exchange (build (current, rate.load()).release());
     }
 
+    // FL's slide notes move a sounding note's Final.Pan (issue #236, round 190od; FL's old voice record: integer pan)
+    void voiceProperty (int key, int prop, float value) noexcept override
+    {
+        if (prop != 2 /* pan */ || ! std::isfinite (value) || key < 0 || key >= 128 || eng == nullptr)
+            return;
+        take();
+        notePan[key] = std::clamp (value, -1.0f, 1.0f);
+        for (auto& s : eng->slots)
+            if (s.used && s.id == key)
+                s.pan = (int) std::lround (std::clamp (notePan[key] + (float) channelPan, -1.0f, 1.0f) * 64.0f);
+    }
+
     void setNextNoteExpression (float pan, float cents, bool) noexcept override
     {
         nextPan = pan;

@@ -2921,7 +2921,11 @@ public:
                     voicePan (v.basePan, v.panL, v.panR);
                 }
                 else if (prop == (int) vfx::Prop::velocity)
+                {
                     v.velocity = flVelocityLaw.load (std::memory_order_relaxed) ? flInitVolume (value) : std::clamp (value, 0.0f, 1.0f);
+                    if (v.flVoice) // (issue #236: FL's native voice plays InitLevels.Vol · channel volume, the host's Final.Vol)
+                        v.initVol = flInitVolume (std::clamp (value, 0.0f, 1.0f));
+                }
                 else if (prop == (int) vfx::Prop::modX || prop == (int) vfx::Prop::modY) // issue #63: the note's filter
                 {
                     const auto offset = std::clamp (value, 0.0f, 1.0f) * 2.0f - 1.0f;
