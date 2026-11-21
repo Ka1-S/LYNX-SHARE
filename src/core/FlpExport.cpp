@@ -804,7 +804,7 @@ struct Converter
         out.autoCrossfades = song.autoCrossfades;
         out.dataFolder = song.dataFolder;
         out.hasScaleHighlight = true;
-        out.scaleHighlight = song.scaleHighlight.scale;
+        out.scaleHighlight = notetools::flMenuScaleIndex (song.scaleHighlight.scale); // (LYNX's index -> FL's)
         out.scaleRoot = song.scaleHighlight.root;
         out.title = song.info.title;
         out.artist = song.info.author;
@@ -1369,7 +1369,7 @@ struct Converter
         if (m.action == Marker::keyScale) // round 190nu: the key, as FL 2026 writes it
         {
             t.keyRoot = m.keyRoot;
-            t.keyScale = m.keyFlScale;
+            t.keyScale = notetools::flMenuScaleIndex (m.keyFlScale); // (LYNX's index -> FL's; −1 / −2 unchanged)
             if (const auto key = keyregions::keyOf (m))
                 t.keyMask = keyregions::flOutOfScaleMask (*key);
         }

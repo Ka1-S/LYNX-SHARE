@@ -6593,8 +6593,11 @@ juce::PopupMenu PianoRollComponent::keyChoiceMenu (const keyregions::State& curr
     menu.addItem (tr ("Black notes"), true, current.kind == keyregions::State::none, [pick] { pick ({ keyregions::State::none, {} }); });
     menu.addSeparator();
     const auto& list = notetools::flReferenceScales();
-    for (int i = 0; i < (int) list.size(); ++i)
+    for (int k = 0; k < (int) list.size(); ++k) // (in FL's menu order: rollup 0.1.31 step 3)
+    {
+        const auto i = notetools::flMenuScaleIndex (k);
         menu.addItem (tr (list[(std::size_t) i].name), true, isKey && scale == i, [pick, root, i] { pick ({ keyregions::State::key, { root, i } }); });
+    }
     return menu;
 }
 

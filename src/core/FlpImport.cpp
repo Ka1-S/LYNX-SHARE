@@ -972,7 +972,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     song.compensateMixerLevels = false; // (round 190hq: FL's own scope, mixer effect parameters only)
     song.timeSignatureMode = project.timeSignatureMode;
     if (project.hasScaleHighlight)
-        song.scaleHighlight = { project.scaleHighlight >= -3 && project.scaleHighlight < 256 ? project.scaleHighlight : -2,
+        song.scaleHighlight = { project.scaleHighlight >= -3 && project.scaleHighlight < 256 ? notetools::flMenuScaleIndex (project.scaleHighlight) : -2, // (FL's index -> LYNX's)
                                 std::clamp (project.scaleRoot, 0, 11) };
     song.dataFolder = project.dataFolder;
     song.masterPitch = (float) std::clamp (project.mainPitch, -1200, 1200); // FL's render follows it (REA round 167g §1)
@@ -3547,7 +3547,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         }
         if (m.type == Marker::keyScale) // round 190nu: FL's key marker (core/KeyRegions.h)
         {
-            if (const auto key = keyregions::keyFromFl (m.keyRoot, m.keyScale, m.keyMask))
+            if (const auto key = keyregions::keyFromFl (m.keyRoot, notetools::flMenuScaleIndex (m.keyScale), m.keyMask)) // (FL's index -> LYNX's)
                 marker.keyRoot = key->root, marker.keyFlScale = key->flScale;
             else
                 marker.keyFlScale = m.keyScale == -1 ? keyregions::defaultScale : keyregions::noScale;

@@ -295,3 +295,64 @@ TEST (keys190nu_chord_helper_favourites)
     CHECK (favouritesFrom ("C:maj:5:1;K:maj:0:5;;C:maj:5:1") == ids);
     CHECK (favouritesFrom ("").empty());
 }
+
+TEST (rollup031s3_fl_scale_index_order)
+{
+    // rollup 0.1.31 step 3 (round 190ny): FL 2026's saves with "Other Blues", "Other Blues Nonatonic", "Other Locrian",
+    // "Other Locrian Super", "Other Phrygian", "Other Phrygian Dominant" key markers: FL's 0xA8 index follows its menu (Blues
+    // 17, Blues Nonatonic 18, Locrian 27, Locrian Super 28, Phrygian 32, Phrygian Dominant 33); LYNX's list has those pairs
+    // the other way, so the .flp import / export convert (notetools::flMenuScaleIndex), .lynx keeps LYNX's index
+    using namespace keys190nu;
+    const auto& list = lynx::notetools::flReferenceScales();
+    const std::pair<int, const char*> fl[] = { { 17, "Other Blues" }, { 18, "Other Blues Nonatonic" }, { 27, "Other Locrian" },
+                                               { 28, "Other Locrian Super" }, { 32, "Other Phrygian" }, { 33, "Other Phrygian Dominant" },
+                                               { 7, "Minor Harmonic" }, { 4, "Major Pentatonic" }, { 20, "Other Dorian" } };
+    for (const auto& [index, name] : fl)
+        CHECK (std::string (list[(std::size_t) lynx::notetools::flMenuScaleIndex (index)].name) == name);
+    for (int i = -3; i < (int) list.size(); ++i)
+        CHECK (lynx::notetools::flMenuScaleIndex (lynx::notetools::flMenuScaleIndex (i)) == i);
+
+    // export: each marker and the project's scale with FL's index, and back to the same key
+    auto song = lynx::Song::makeDefault();
+    auto& p = song.patterns[(std::size_t) song.currentPattern];
+    for (std::size_t k = 0; k < 6; ++k)
+        addKeyMarker (p, (std::int64_t) k * 4 * lynx::ppq, key (0, fl[k].second));
+    p.notes.push_back ([] { lynx::Note n; n.key = 60; n.length = 96; return n; }());
+    song.scaleHighlight = { flScaleNamed ("Other Blues"), 0 };
+    lynx::flpexport::Report report;
+    const auto project = flp::parseProject (lynx::flpexport::exportFlp (song, {}, report));
+    CHECK (project.scaleHighlight == 17);
+    std::vector<int> written;
+    for (const auto& fp : project.patterns)
+        for (const auto& m : fp.markers)
+            if (m.type == lynx::Marker::keyScale)
+                written.push_back (m.keyScale);
+    CHECK (written == (std::vector<int> { 17, 18, 27, 28, 32, 33 }));
+    const auto back = lynx::importFlp (project);
+    CHECK (back.scaleHighlight.scale == flScaleNamed ("Other Blues"));
+    std::vector<std::string> names;
+    for (const auto& bp : back.patterns)
+        for (const auto& m : bp.markers)
+            if (isKeyMarker (m) && keyOf (m))
+                names.push_back (list[(std::size_t) keyOf (m)->flScale].name);
+    CHECK (names == (std::vector<std::string> { "Other Blues", "Other Blues Nonatonic", "Other Locrian", "Other Locrian Super", "Other Phrygian", "Other Phrygian Dominant" }));
+
+    // FL's own saves (this machine): the index alone (converted) names the key its mask shows
+    for (const auto* path : { "/mnt/e/lynx-work/rollup031/s3/fl/fl-save1-blues-locrian-phrygian-nonatonic.flp",
+                              "/mnt/e/lynx-work/rollup031/s3/fl/fl-save2-locriansuper-phrygiandominant.flp" })
+        if (std::ifstream in (path, std::ios::binary); in)
+        {
+            const std::vector<std::uint8_t> data ((std::istreambuf_iterator<char> (in)), std::istreambuf_iterator<char>());
+            const auto parsed = flp::parseProject (data);
+            int keys = 0;
+            for (const auto& fp : parsed.patterns)
+                for (const auto& m : fp.markers)
+                    if (m.type == lynx::Marker::keyScale && m.keyScale >= 0)
+                    {
+                        ++keys;
+                        const lynx::projectkey::Key byIndex { m.keyRoot, lynx::notetools::flMenuScaleIndex (m.keyScale) };
+                        CHECK (flOutOfScaleMask (byIndex) == m.keyMask);
+                    }
+            CHECK (keys == 4);
+        }
+}
