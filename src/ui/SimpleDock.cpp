@@ -431,6 +431,9 @@ public:
             bypassButton.bypassed = false;
             bypassButton.repaint();
             blend.setValue (1.0f);
+            // (round 190oj CS-26: with no track the knobs looked live next to a greyed Save and preset)
+            blend.setDimmed (true);
+            reverb.setDimmed (true);
             emptyHint.setText (tr ("Select a track to see its effects."), juce::dontSendNotification);
             layoutStrip();
             return;
@@ -466,6 +469,7 @@ public:
         }
         blend.setValue (mixer.chainBlend);
         blend.setDimmed (fx.empty());
+        reverb.setDimmed (! reverb.isEnabled());
         addCard.setEnabled ((int) fx.size() < maxEffectSlots);
         emptyHint.setText (fx.empty() ? tr ("No effects yet. Press + to add one, or pick a preset.") : juce::String(), juce::dontSendNotification);
         layoutStrip();
@@ -482,7 +486,7 @@ public:
         nextPreset.setBounds (row.removeFromRight (22).reduced (0, 2));
         side.removeFromTop (6);
         auto second = side.removeFromTop (26); // BandLab: Save and the chain bypass under the preset
-        saveButton.setBounds (second.removeFromLeft (58));
+        saveButton.setBounds (second.removeFromLeft (theme::buttonWidth (saveButton, 58, 110))); // (round 190oj WG-12: de "Speiche...")
         second.removeFromLeft (8);
         bypassButton.setBounds (second.removeFromLeft (26));
         side.removeFromTop (8);

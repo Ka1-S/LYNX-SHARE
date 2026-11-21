@@ -262,8 +262,24 @@ trackicons::Icon simpleTrackIcon (const Song& song, int track)
         return trackicons::Icon::none;
     if (const auto own = trackicons::iconFor (song.playlistTracks[(std::size_t) track].icon); own != trackicons::Icon::none)
         return own;
-    const auto kind = simpletracks::kindOf (song, track);
-    return kind ? simpletracks::iconOf (*kind) : trackicons::Icon::none;
+    if (const auto kind = simpletracks::kindOf (song, track))
+        return simpletracks::iconOf (*kind);
+    // round 190oj (CS-25): a track of an FL project has no Simple kind: the icon of what its clips are (notes, audio,
+    // automation; mixed: layers of steps), so every header keeps its icon and the names stay in one line
+    bool pattern = false, audio = false, automation = false;
+    for (const auto& c : song.playlist)
+        if (c.track == track)
+        {
+            pattern = pattern || c.kind == ClipKind::pattern;
+            audio = audio || c.kind == ClipKind::audio;
+            automation = automation || c.kind == ClipKind::automation;
+        }
+    const auto kinds = (int) pattern + (int) audio + (int) automation;
+    if (kinds == 0)
+        return trackicons::Icon::none;
+    if (kinds > 1)
+        return trackicons::Icon::steps;
+    return pattern ? trackicons::Icon::notes : audio ? trackicons::Icon::audio : trackicons::Icon::automation;
 }
 
 // A Playlist track's colour (transparent: none set)
