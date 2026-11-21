@@ -1,3 +1,4 @@
+#include "ui/AutoLookEditor.h"
 #include "ui/RemoteControl.h"
 #include "core/EscClose.h"
 #include "ui/NumBox.h"
@@ -2471,6 +2472,11 @@ public:
             add (row.toggle);
             add (row.note);
         }
+        // issue #239 (round 190od): the user's automatic colour / icon rules
+        add (autoLookTitle);
+        autoLook = std::make_unique<AutoLookEditor> (engine, persistent);
+        autoLook->onHeightChange = [this] { resized(); };
+        add (*autoLook);
         refresh();
     }
 
@@ -2506,6 +2512,8 @@ public:
             const auto noteHeight = 4 + 15 * linesOf (row->note, noteWidth);
             row->note.setBounds (r.full (noteHeight).withTrimmedLeft (noteIndent).translated (0, -5));
         }
+        r.section (autoLookTitle, false);
+        autoLook->setBounds (r.full (autoLook->heightFor (r.area.getWidth())));
         return r.bottom();
     }
 
@@ -2531,6 +2539,8 @@ private:
     juce::Label intro;
     std::vector<std::unique_ptr<SectionTitle>> titles;
     std::vector<std::unique_ptr<Row>> rows;
+    SectionTitle autoLookTitle { tr ("Automatic colors and icons") };
+    std::unique_ptr<AutoLookEditor> autoLook;
 };
 // ================================================================================================================
 // Link (round 190gl): the reference DAW's Settings › Link, its Link section (manual: "The Link Tab in Live's Settings")

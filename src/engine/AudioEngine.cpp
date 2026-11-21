@@ -1,4 +1,6 @@
 #include "engine/AudioEngine.h"
+#include "core/AutoLook.h"
+#include "core/NewClipColours.h"
 #include "core/SessionMixer.h"
 
 #include "core/TransistorBass.h"
@@ -4081,8 +4083,11 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
     const auto linkBefore = autolink::snapshot (song);
     const auto namesBefore = trackmodes::linkedNames (song); // (round 190ns, issue #235: FL's audio track ⇄ mixer track)
     const auto channelsBefore = song.channels.size(); // (round 190iu: Track-only mode, core/TrackOnly.h)
+    const auto looksBefore = autolook::names (song); // (issue #239: the user's colour / icon rules; nothing when off)
+    const auto automationsBefore = song.automations.size(); // (round 190od: FL's "clips use note colors")
     edit (song);
     song.keepOnePattern(); // (round 190ea: what follows, and every listener, may read the current pattern)
+    newclipcolours::colourNew (song, channelsBefore, automationsBefore); // FL's theme option: new clips take note colours
     mixerops::keepCurrentLast (song); // (round 190mv: FL's Current track stays the last mixer track)
     // round 190ne (core/TrackClips.h): a track clip goes with its last clip, in this undo step (ordinary patterns stay, as
     // in FL; Song::removePattern keeps one pattern and the current one in range)
@@ -4095,6 +4100,7 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
     trackmodes::followLinkedNames (song, namesBefore); // FL: an audio track and its mixer track keep one name and colour
     if (song.linkTracksToMixer && linkBefore.on) // new content goes through its track's insert; renames follow the link
         autolink::followNewContent (song, linkBefore);
+    autolook::follow (song, looksBefore); // issue #239: an item named by this edit takes its rule's colour and icon
     if (detachNewPluginsOn)
         detachNewPlugins (pluginsBefore, song);
     comp::checkAudition (song, auditioned);

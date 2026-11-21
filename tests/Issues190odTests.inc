@@ -1,6 +1,8 @@
 // Round 190od: GitHub issues #236 (slide notes move velocity and pan), #238 (the colour of tracks without one), #239
 // (automatic track colours and icons; FL's "clips use note colors"), #240 (a new project from a template starts its own clock).
+#include "core/AutoLook.h"
 #include "core/HostSlide.h"
+#include "core/NewClipColours.h"
 #include "core/RackRenderer.h"
 #include <cmath>
 
@@ -153,4 +155,82 @@ TEST (issues190od_template_clock_is_cleared)
     info.workSeconds = 1693.0;
     clearProjectClock (info);
     CHECK (info.created == 0.0 && info.workSeconds == 0.0 && info.title == "My template");
+}
+
+// #239 (LYNX extra, core/AutoLook.h): name rules colour and give an icon to what gets a matching name
+TEST (issues190od_auto_look_rules_follow_names)
+{
+    using namespace lynx;
+    autolook::Rules rules;
+    rules.on = true;
+    rules.list.push_back ({ "kick", autolook::Match::contains, 0xff3a6fd8, 7, autolook::everything });
+    rules.list.push_back ({ "REC", autolook::Match::startsWith, 0, 33, autolook::everything });
+    rules.list.push_back ({ "Bass", autolook::Match::is, 0xffc04040, -1, autolook::channels });
+    CHECK (autolook::matches (rules.list[0], "  Big KICK 2 ") && ! autolook::matches (rules.list[0], "Kic"));
+    CHECK (autolook::matches (rules.list[1], "rec vox") && ! autolook::matches (rules.list[1], "Vox REC"));
+    CHECK (autolook::matches (rules.list[2], "bass") && ! autolook::matches (rules.list[2], "Bass 2"));
+
+    auto song = Song::makeDefault();
+    song.playlistTracks.resize (6);
+    auto before = autolook::names (song, rules);
+    song.playlistTracks[2].name = "Kick";
+    song.mixer[4].name = "REC 1";
+    CHECK (autolook::follow (song, before, rules) == 2);
+    CHECK (song.playlistTracks[2].colour == 0xff3a6fd8 && song.playlistTracks[2].icon == 7);
+    CHECK (song.mixer[4].icon == 33 && song.mixer[4].colour == 0u);
+
+    // the user's own colour afterwards stays; a track inserted above shifts the names without renaming anything
+    song.playlistTracks[2].colour = 0xff20a050;
+    before = autolook::names (song, rules);
+    song.playlistTracks.insert (song.playlistTracks.begin(), PlaylistTrack {});
+    CHECK (autolook::follow (song, before, rules) == 0 && song.playlistTracks[3].colour == 0xff20a050);
+
+    // a channel rule; not for a track of that name; rules off: nothing
+    if (song.channels.size() > 1)
+    {
+        before = autolook::names (song, rules);
+        song.channels[1].name = "Bass";
+        song.playlistTracks[4].name = "Bass";
+        autolook::follow (song, before, rules);
+        CHECK (song.channels[1].colour == 0xffc04040 && song.playlistTracks[4].colour == 0u);
+    }
+    rules.on = false;
+    before = autolook::names (song, rules);
+    song.playlistTracks[5].name = "Kick 2";
+    CHECK (autolook::follow (song, before, rules) == 0 && song.playlistTracks[5].colour == 0u);
+    // Apply to this project: every match at once
+    CHECK (autolook::applyAll (song, rules) >= 1 && song.playlistTracks[5].colour == 0xff3a6fd8);
+    // the settings file
+    rules.on = true;
+    CHECK (autolook::fromText (autolook::toText (rules)) == rules);
+    CHECK (autolook::fromText ("not a rules file").list.empty());
+}
+
+// FL's Theme › Options › "Audio and automation clips use note colors" (round 190od, core/NewClipColours.h): with the
+// option on, what an edit adds without a colour (audio clip channels, automation clips) takes a note colour; off: nothing
+TEST (issues190od_new_clips_use_note_colours)
+{
+    using namespace lynx;
+    std::array<std::uint32_t, newclipcolours::count> notes {};
+    for (int i = 0; i < newclipcolours::count; ++i)
+        notes[(std::size_t) i] = 0xff100000u + (std::uint32_t) i;
+    auto song = Song::makeDefault();
+    const auto channels = song.channels.size(), automations = song.automations.size();
+    ChannelDef clip;
+    clip.instrument = InstrumentKind::audioClip;
+    song.channels.push_back (clip);
+    ChannelDef synth;
+    synth.instrument = InstrumentKind::synth;
+    song.channels.push_back (synth);
+    song.automations.push_back ({});
+    newclipcolours::set (false, notes);
+    CHECK (newclipcolours::colourNew (song, channels, automations) == 0 && song.channels[channels].colour == 0u);
+    newclipcolours::set (true, notes);
+    CHECK (newclipcolours::colourNew (song, channels, automations) == 2);
+    const auto isNote = [&notes] (std::uint32_t c) { return std::find (notes.begin(), notes.end(), c) != notes.end(); };
+    CHECK (isNote (song.channels[channels].colour) && song.channels[channels + 1].colour == 0u && isNote (song.automations[automations].colour));
+    // a colour already there stays; what was there before the edit stays
+    song.channels[channels].colour = 0xff123456;
+    CHECK (newclipcolours::colourNew (song, channels, automations + 1) == 0 && song.channels[channels].colour == 0xff123456u);
+    newclipcolours::set (false, notes);
 }

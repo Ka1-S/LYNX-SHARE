@@ -173,12 +173,17 @@ struct Spec
     std::string startupSound;        // audio file played at start instead of LYNX's own sound (empty = LYNX's; issue #12)
     float gridIntensity = 1.0f;      // Grid line intensity (round 190je): gridIntensityMin..Max, 1 = the theme's lines
     MenuStyle menuStyle = MenuStyle::lynxDark; // Menu style (round 190je)
+    // FL's Theme › Options › "Audio and automation clips use note colors" (round 190od, issue #239; FL's ClipsOverrideBox,
+    // .flstheme OverrideClips, hint "Use the note color list to find random colors for new clips"): a new audio clip
+    // channel or automation clip takes a random colour of the 16 note colours instead of the default grey
+    bool clipsUseNoteColours = false;
 
     bool hasAdjustments() const noexcept { return hue != 0.0f || saturation != 0.0f || brightness != 0.0f || contrast != 0.0f || text != 0.0f; }
     bool hasDots() const noexcept { return std::any_of (dots.begin(), dots.end(), [] (std::uint32_t c) { return c != 0; }); }
     bool isDefaultLook() const noexcept
     {
-        return accent == defaultAccent && background == defaultBackground && workspace == 0 && image.empty() && ! hasAdjustments() && ! hasDots();
+        return accent == defaultAccent && background == defaultBackground && workspace == 0 && image.empty() && ! hasAdjustments() && ! hasDots()
+               && ! clipsUseNoteColours;
     }
     bool operator== (const Spec&) const = default;
 };

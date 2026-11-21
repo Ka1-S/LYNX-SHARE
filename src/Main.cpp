@@ -282,6 +282,7 @@ namespace juce::detail { bool dispatchNextMessageOnSystemQueue (bool returnIfNoP
 #include "ui/Splash.h"
 #include "ui/Theme.h"
 #include "ui/ThemeSettings.h"
+#include "ui/AutoLookEditor.h" // (round 190od, issue #239)
 #include "ui/WaveformView.h"
 #include "ui/WindowOwner.h"
 #include "ui/PluginKeysTest.h"
@@ -3244,6 +3245,13 @@ public:
         if (args.contains ("--issuesshot190nq"))
         {
             setApplicationReturnValue (runIssuesShot190nq (args[args.indexOf ("--issuesshot190nq") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+        // --issuesshot190od <prefix> (round 190od, issues #236-#242): src/IssuesShot190od.inc
+        if (args.contains ("--issuesshot190od"))
+        {
+            setApplicationReturnValue (runIssuesShot190od (args[args.indexOf ("--issuesshot190od") + 1].unquoted()) ? 0 : 1);
             quit();
             return;
         }
@@ -17831,6 +17839,7 @@ private:
 #include "TrackClipsShot190ne.inc" // round 190ne
 #include "IssuesShot190nq.inc" // round 190nq (issues #193, #225-#230)
 #include "IssuesShot190ns.inc" // round 190ns (issues #231-#235)
+#include "IssuesShot190od.inc" // round 190od (issues #236-#242)
 #include "DetailsShot190kn.inc" // round 190kn
 #include "DetailsShot190ld.inc" // round 190ld
 #include "DetailsShot190lr.inc" // round 190lr
