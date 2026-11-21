@@ -410,9 +410,22 @@ struct HostTimeline
     // out of time or restarted its step).
     std::atomic<double> ticksPerSample { 0.0 };
     std::atomic<std::uint64_t> chunk { 0 };
+    // Issue #199 (round 190od): where the position wraps while it plays (the pattern's end in Pattern mode, the loop's
+    // or the song's end in Song mode) and where it goes on from; wrapAt = 0: none. A chunk that runs over that point
+    // is one chunk, so a block that starts after the wrap (the pattern's first note: the generator's block is split
+    // there) said "the pattern's end + a few samples" and the next chunk jumped back to the start: Vital re-anchored
+    // its synced chorus / LFOs a block into the note instead of at it. It now says where the song went on.
+    std::atomic<double> wrapAt { 0.0 }, wrapTo { 0.0 };
     double tickAt (int sampleOffset) const noexcept
     {
-        return tick.load (std::memory_order_relaxed) + (double) sampleOffset * ticksPerSample.load (std::memory_order_relaxed);
+        const auto start = tick.load (std::memory_order_relaxed);
+        const auto tps = ticksPerSample.load (std::memory_order_relaxed);
+        const auto at = start + (double) sampleOffset * tps;
+        const auto wrap = wrapAt.load (std::memory_order_relaxed);
+        // (half a sample's leeway: the scheduler puts the wrap's events on the nearest sample)
+        if (wrap > 0.0 && tps > 0.0 && start < wrap && at >= wrap - 0.5 * tps)
+            return wrapTo.load (std::memory_order_relaxed) + std::max (0.0, at - wrap);
+        return at;
     }
 };
 HostTimeline& hostTimeline() noexcept;

@@ -570,6 +570,20 @@ double hostPositionTick (const Song& song, double tick, std::int64_t songLength)
     return std::fmod (tick, (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.meter())));
 }
 
+HostPositionWrap hostPositionWrap (const Song& song, std::int64_t songLength) noexcept
+{
+    if (song.mode == PlayMode::song)
+    {
+        if (song.loopPlays())
+            return { (double) song.loopEnd, (double) song.loopStart };
+        return song.hasLoop() ? HostPositionWrap {} : HostPositionWrap { (double) std::max<std::int64_t> (1, songLength), 0.0 };
+    }
+    if (song.patterns.empty())
+        return {};
+    const auto& pattern = song.patterns[(std::size_t) std::clamp (song.currentPattern, 0, (int) song.patterns.size() - 1)];
+    return { (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.meter())), 0.0 };
+}
+
 // An audio clip's note (round 190ey: out of scheduleClip, so a Playlist preview plays the clip through its channel the
 // same way, AudioEngine::previewClipThroughChannel): the "on" at the clip's start.
 NoteEvent audioClipNote (const Song& song, const Clip& clip, std::size_t clipIndex, double tps) noexcept

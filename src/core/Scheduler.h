@@ -211,6 +211,13 @@ PlaybackLoop playbackLoop (bool songMode, double loopStart, double loopEnd, doub
 // The position hosted plugins see (their play head): within the pattern in Pattern mode, within the song in Song
 // mode, so plugins synced to the host follow the loop like in FL instead of counting on forever.
 double hostPositionTick (const Song& song, double tick, std::int64_t songLength) noexcept; // songLength = song.songLength()
+// Issue #199 (round 190od): where that position wraps while it plays (the pattern's end in Pattern mode; the loop's
+// end, or the song's end without a loop region, in Song mode) and where it goes on from, in the same terms. at = 0: none.
+struct HostPositionWrap
+{
+    double at = 0.0, to = 0.0;
+};
+HostPositionWrap hostPositionWrap (const Song& song, std::int64_t songLength) noexcept;
 
 // Index built once per snapshot so scheduleSong doesn't scan every note on every block:
 // song length and the longest note of each pattern. Requires notes sorted by start.

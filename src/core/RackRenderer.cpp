@@ -5405,6 +5405,9 @@ void RackRenderer::chunkPrelude (const RackState& state, bool playing, double st
     {
         auto& timeline = hostTimeline();
         timeline.tick.store (hostPositionTick (song, startTick, state.schedule.songLength), std::memory_order_relaxed);
+        const auto wrap = playing ? hostPositionWrap (song, state.schedule.songLength) : HostPositionWrap {}; // (issue #199)
+        timeline.wrapAt.store (wrap.at, std::memory_order_relaxed);
+        timeline.wrapTo.store (wrap.to, std::memory_order_relaxed);
         timeline.bpm.store (bpm, std::memory_order_relaxed);
         timeline.sampleRate.store (sampleRate, std::memory_order_relaxed);
         timeline.beatsPerBar.store (std::max (1, song.beatsPerBar), std::memory_order_relaxed);
@@ -6298,6 +6301,8 @@ void copyTimeline (const HostTimeline& from, HostTimeline& to) noexcept
     to.beatsPerBar.store (from.beatsPerBar.load (r), r);
     to.beatUnit.store (from.beatUnit.load (r), r);
     to.ticksPerSample.store (from.ticksPerSample.load (r), r);
+    to.wrapAt.store (from.wrapAt.load (r), r);
+    to.wrapTo.store (from.wrapTo.load (r), r);
     to.chunk.store (from.chunk.load (r), r);
 }
 } // namespace
