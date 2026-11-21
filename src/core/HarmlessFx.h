@@ -51,9 +51,15 @@ public:
     void process (float* left, float* right, int n) noexcept;
     void reset() noexcept;
     int latencySamples() const noexcept; // reported to the host (FL compensates it)
+    // Round 190oa (DP-27, capture 190oa C2: FL's MONITOR shows the selected band's level history): while `on`, the peaks
+    // of each band (0 low, 1 mid, 2 high, 3 master) going into and out of its compressor, the loudest since the last
+    // takeMeters; nothing is measured while off (the sound is never touched). Audio thread.
+    void setMetering (bool on) noexcept { metering = on; }
+    float bandPeak (int band, bool out) const noexcept;
 
 private:
     std::unique_ptr<Maximus> engine;
+    bool metering = false;
 };
 
 // parameter 5 (band mix) stored in the state

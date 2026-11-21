@@ -3285,6 +3285,31 @@ public: // (the class stays public from here, as before)
             paintMonitor (g, inner, true, fx.enabled);
             g.setColour (juce::Colour (0xff5b98c9).withMultipliedAlpha (fx.enabled ? 1.0f : 0.4f));
             g.fillRect (inner.getX(), std::round (inner.getBottom() - inner.getHeight() * dynhistory::axis (1.0f)) - 1.0f, inner.getWidth(), juce::jmax (2.0f, 2.0f * s));
+            if (monitorPaused) // (round 190oa, DP-27: FL's click on the Monitor pauses it)
+                paintPauseCaption (g, inner);
+        }
+        else if (id == "pitchin" || id == "pitchout") // round 190oa (DP-81, capture 190oa C11): Pitcher's pitch strips
+        {
+            const auto cls = (node.locate ? 0.0f : liveMeter (id == "pitchin" ? 0 : 1)) - 1.0f; // (published + 1: 0 = none)
+            const auto noteW = 33.0f * s, buttonW = 30.0f * s; // (the note buttons: 30 px every 33)
+            g.setColour (colour::bg0);
+            g.fillRect (r);
+            g.setColour (colour::textDisabled);
+            for (int n = 0; n <= 12; ++n)
+                g.fillRect (r.getX() + noteW * (float) n + (n < 12 ? buttonW * 0.5f : -1.5f * s), r.getY(), juce::jmax (1.0f, s), r.getHeight());
+            const auto x = cls >= 0.0f ? r.getX() + buttonW * 0.5f + noteW * juce::jlimit (0.0f, 11.99f, cls) : r.getX();
+            g.setColour (juce::Colour (0xffe0352f).withMultipliedAlpha (fx.enabled ? 1.0f : 0.5f));
+            g.fillRect (juce::Rectangle<float> (3.0f * s, r.getHeight() + 2.0f * s).withCentre ({ x + 1.5f * s, r.getCentreY() }));
+        }
+        else if (id == "maxspeed") // round 190oa (DP-27): FL's "Monitor scrolling speed" slider (left slow, right fast)
+        {
+            const auto t = r.reduced (2.0f * s, 0.0f);
+            g.setColour (juce::Colour (0xff1c2124));
+            g.fillRoundedRectangle (t, 2.0f * s);
+            g.setColour (juce::Colour (0xff4a5258));
+            g.fillRect (juce::Rectangle<float> (t.getWidth() - 6.0f * s, 1.0f * s).withCentre (t.getCentre()));
+            g.setColour (juce::Colour (0xffb5bcc0));
+            g.fillRect (juce::Rectangle<float> (5.0f * s, t.getHeight()).withCentre ({ t.getX() + 3.0f * s + maxSpeed * (t.getWidth() - 6.0f * s), t.getCentreY() }));
         }
         else if (id == "eq")
         {
@@ -6365,10 +6390,17 @@ private:
             moved = moved || std::abs (shown - before) > 0.01f || std::abs (hold - holdBefore) > 0.01f;
         }
         if (monitorShown) // round 190jd: the scrolling display takes the peaks; it moves only while playing and shown
-            monitorStep (peaks[0], peaks[1], kind == EffectKind::transientProcessor ? elapsed * tpSpeedFactor()
-                                             : kind == EffectKind::fruityMultiband    ? elapsed * mbSpeedFactor() // (round 190mk, DP-30)
-                                                                                      : elapsed,
+        {
+            // round 190oa (DP-27, capture 190oa C2): Maximus' Monitor shows the selected band (LOW / MID / HIGH / MASTER)
+            const auto band = juce::jlimit (0, 3, page);
+            const auto in = kind == EffectKind::maximus ? liveMeter (2 * band) : peaks[0], out = kind == EffectKind::maximus ? liveMeter (2 * band + 1) : peaks[1];
+            monitorStep (in, out, kind == EffectKind::transientProcessor ? elapsed * tpSpeedFactor()
+                                  : kind == EffectKind::fruityMultiband    ? elapsed * mbSpeedFactor() // (round 190mk, DP-30)
+                                  : kind == EffectKind::fruityLimiter      ? elapsed * speedFactor (limSpeed) // (round 190oa, DP-25)
+                                  : kind == EffectKind::maximus            ? elapsed * speedFactor (maxSpeed) // (round 190oa, DP-27)
+                                                                           : elapsed,
                          engine.getTransport().playing.load (std::memory_order_relaxed) && isShowing());
+        }
         if (moved)
             for (const auto& item : activeLayout().items)
                 if (item.type == Item::display && item.display != nullptr && levelDisplay (item.display) && ! monitorDisplay (item.display) && visible (item))

@@ -40,7 +40,8 @@ TEST (mx168_the_in_out_graph_takes_the_mouse)
     // the root cause: the plugin window hit-tested only the displays it listed, and "maxcurve" was not one of them
     CHECK (lynx::plugui::displayTakesMouse ("maxcurve"));
     CHECK (lynx::plugui::displayTakesMouse ("waveshaper") && lynx::plugui::displayTakesMouse ("eq"));
-    CHECK (! lynx::plugui::displayTakesMouse ("maxbands") && ! lynx::plugui::displayTakesMouse (nullptr));
+    // (round 190oa, DP-27: the bands view takes clicks now — FL's click on the Monitor pauses it)
+    CHECK (lynx::plugui::displayTakesMouse ("maxbands") && ! lynx::plugui::displayTakesMouse (nullptr));
     bool placed = false;
     for (const auto& item : lynx::plugui::layoutFor (lynx::EffectKind::maximus).items)
         placed = placed || (item.display != nullptr && std::strcmp (item.display, "maxcurve") == 0);
