@@ -344,7 +344,7 @@ public:
             }
             if (insert < 0 && channel < 0)
             {
-                g.setColour (colour::textDisabled);
+                g.setColour (colour::textSecondary); // (round 190oj CS-15: the hints read 3.0-3.2:1)
                 g.setFont (font (type::small));
                 g.drawText (track < 0 ? tr ("Select a track in the clip grid to see its devices")
                                       : tr ("This track has no clips yet: put a clip on it to see its devices"),
@@ -355,7 +355,7 @@ public:
                 const auto room = area.withLeft (cards.empty() ? area.getX() : cards.back().bounds.getRight() + cardGap());
                 if (room.getWidth() > 120)
                 {
-                    g.setColour (colour::textDisabled);
+                    g.setColour (colour::textSecondary);
                     g.setFont (font (type::small));
                     g.drawText (tr ("Drop effects here"), room, juce::Justification::centred, true);
                 }
@@ -1675,10 +1675,10 @@ private:
         }
         else if (inserts.size() > 1)
         {
-            g.setColour (colour::textDisabled);
+            g.setColour (colour::textSecondary); // (round 190oj CS-14: 2.4:1, and squeezed into two lines)
             g.setFont (font (type::caption));
-            g.drawFittedText (tr ("This track plays through {0} inserts", { juce::String ((int) inserts.size()) }), r.removeFromTop (30),
-                              juce::Justification::topLeft, 2);
+            g.drawFittedText (tr ("This track plays through {0} inserts", { juce::String ((int) inserts.size()) }), r.removeFromTop (42),
+                              juce::Justification::topLeft, 3, 1.0f);
         }
     }
 
@@ -2820,13 +2820,14 @@ private:
     // the name sits on the title bar in the clip's ink (Live: colour × 0.24)
     void nameColours()
     {
-        const auto ink = liveShade (titleColour, 0.24f).withAlpha (1.0f);
+        const auto ink = liveMarkOn (titleColour, 0.24f, 4.5f, colour::textPrimary); // (round 190oj: readable on dark clip colours too)
         liveclip::swapColour (name, juce::TextEditor::backgroundColourId, juce::Colours::transparentBlack, liveShown);
         liveclip::swapColour (name, juce::TextEditor::outlineColourId, juce::Colours::transparentBlack, liveShown);
         liveclip::swapColour (name, juce::TextEditor::textColourId, ink, liveShown);
         if (liveShown)
             name.setColour (juce::TextEditor::textColourId, ink);
         name.applyColourToAllText (name.findColour (juce::TextEditor::textColourId), true);
+        name.setTextToShowWhenEmpty (nameFallback, name.findColour (juce::TextEditor::textColourId)); // (round 190oj CS-33)
     }
 
     void paintLive (juce::Graphics& g)
@@ -3101,6 +3102,23 @@ private:
         const auto n = juce::dontSendNotification;
         if (! name.hasKeyboardFocus (false))
             name.setText (slot != nullptr ? utf8 (slot->name) : juce::String(), false);
+        // round 190oj (CS-33): a clip without its own name shows the name the grid shows (its pattern's or its sample
+        // channel's) on the title band, as Live does, in the band's ink; typing gives the clip its own name
+        {
+            juce::String shownName;
+            if (slot == nullptr || ! slot->blankName)
+            {
+                if (c->kind == ClipKind::pattern && c->pattern >= 0 && c->pattern < (int) song.patterns.size())
+                    shownName = utf8 (song.patterns[(std::size_t) c->pattern].name);
+                else if (c->kind == ClipKind::audio && c->channel >= 0 && c->channel < (int) song.channels.size())
+                    shownName = utf8 (song.channels[(std::size_t) c->channel].name);
+            }
+            if (shownName != nameFallback)
+            {
+                nameFallback = shownName;
+                name.setTextToShowWhenEmpty (nameFallback, name.findColour (juce::TextEditor::textColourId));
+            }
+        }
         const auto secs = inSeconds (*c);
         const auto marker = slot != nullptr ? (std::int64_t) launcher::startLead (*slot, c->length) : 0;
         if (! start.hasKeyboardFocus (false))
@@ -3199,9 +3217,11 @@ private:
         {
             const juce::ScopedValueSetter<bool> guard (loading, true);
             const auto shown = slot != nullptr ? projectkey::clipScale (*slot, song) : projectkey::get (song);
-            scaleRoot.setSelectedId (shown ? shown->root + 1 : 0, n);
-            scaleName.setSelectedId (shown ? shown->flScale + 1 : 0, n);
-            scaleMode.setToggleState (slot == nullptr || slot->scaleOn, n);
+            // (round 190oj CS-34: with no key, Live's defaults "C" / "Major" with the switch off — before, the switch was lit
+            // over two empty choosers)
+            scaleRoot.setSelectedId (shown ? shown->root + 1 : 1, n);
+            scaleName.setSelectedId (shown ? shown->flScale + 1 : projectkey::commonFirst().front() + 1, n);
+            scaleMode.setToggleState (shown.has_value() && (slot == nullptr || slot->scaleOn), n);
             for (auto* box : { &scaleRoot, &scaleName })
                 box->setEnabled (pattern);
             scaleMode.setEnabled (pattern);
@@ -3420,6 +3440,7 @@ private:
     int transposed = 0, interval = 0;
     juce::Label clipTitle, launchTitle, notesTitle, nameLabel, startLabel, endLabel, lengthLabel, signatureLabel, modeLabel, quantLabel, signature;
     juce::TextEditor name, start, end, position, length;
+    juce::String nameFallback; // (round 190oj CS-33: the name shown while the clip has none of its own)
     juce::TextButton setStart, setEnd, setPosition, setLength; // round 190dr
     juce::Label positionLabel, grooveLabel;
     juce::ComboBox groove;

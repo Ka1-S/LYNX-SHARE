@@ -605,7 +605,11 @@ struct RackView::Impl
             w += padsWidth;
         if (r.showChains)
             w += chainsWidth (r) + (r.zoneEditor >= 0 ? zoneWidth : 0);
-        return w;
+        // round 190oj (CS-16): the rack's own part carries its title bar — the power disc (21 px), a few letters of the
+        // name, the R / M wells (Live look; Rand / Map otherwise) and the card's three title buttons. With every panel
+        // hidden it was ~93 px and the R well covered half of the power disc; Live's narrowest rack title is ~134 px
+        const auto live = theme::livelook::active();
+        return std::max (w, 21 + 18 + (live ? 32 : RackView::titleAccessoryWidth) + 4 + 3 * (live ? 16 : 18) + 4);
     }
     void layoutInline (const RackDoc& r)
     {

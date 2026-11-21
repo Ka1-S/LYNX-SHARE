@@ -455,7 +455,7 @@ public:
             row.removeFromLeft (5);
             g.setColour (! e.available ? colour::textDisabled : selected ? juce::Colours::white : colour::textPrimary);
             g.setFont (font (type::small));
-            g.drawText (labelOf (e), row.withTrimmedRight (4), juce::Justification::centredLeft, true);
+            g.drawFittedText (labelOf (e), row.withTrimmedRight (4), juce::Justification::centredLeft, 1, 0.8f);
         }
     }
 

@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <array>
+#include <unordered_map>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -422,9 +423,10 @@ ClipLook clipBody (juce::Colour clipColour, juce::Colour trackColour, ClipKind k
         case ClipStyle::livePastel: // Live 12.4 (round 190ia CL-5, CL-17, CL-18): one block in the colour, dark marks
             look.headerTop = look.headerBottom = look.body = clipColour.withAlpha (1.0f);
             look.edge = liveShade (clipColour, 0.66f).withAlpha (1.0f);
-            look.content = look.compactContent = liveShade (clipColour, 0.15f).withAlpha (1.0f);
+            // (round 190oj: Live's dark marks only where they read on the colour; on a dark colour the light ones)
+            look.content = look.compactContent = liveMarkOn (clipColour, 0.15f, 3.0f, clipColour.withAlpha (1.0f).brighter (0.9f));
             look.contentFill = juce::Colours::transparentBlack;
-            look.ink = liveShade (clipColour, 0.24f).withAlpha (1.0f);
+            look.ink = liveMarkOn (clipColour, 0.24f, 4.5f, colour::textPrimary);
             break;
         case ClipStyle::bandlabHue: // BandLab web Studio (round 190ia SG-5: header ×0.45, body ×0.57, waveform the hue)
             look.headerTop = look.headerBottom = liveShade (trackColour, 0.45f).withAlpha (1.0f);
@@ -436,6 +438,34 @@ ClipLook clipBody (juce::Colour clipColour, juce::Colour trackColour, ClipKind k
             break;
     }
     return look;
+}
+
+juce::Colour liveMarkOn (juce::Colour fill, float k, float ratio, juce::Colour light)
+{
+    struct Key
+    {
+        juce::uint32 fill, light;
+        int k, ratio;
+        bool operator== (const Key&) const = default;
+    };
+    struct Hash
+    {
+        std::size_t operator() (const Key& key) const noexcept
+        {
+            return std::hash<juce::uint64>() (((juce::uint64) key.fill << 32) ^ key.light ^ ((juce::uint64) key.k << 20) ^ (juce::uint64) key.ratio);
+        }
+    };
+    static std::unordered_map<Key, juce::uint32, Hash> cache;
+    const Key key { fill.getARGB(), light.getARGB(), juce::roundToInt (k * 1000.0f), juce::roundToInt (ratio * 100.0f) };
+    if (const auto it = cache.find (key); it != cache.end())
+        return juce::Colour (it->second);
+    const auto opaque = fill.withAlpha (1.0f);
+    const auto dark = liveShade (opaque, k);
+    const auto chosen = contrast (dark, opaque) >= ratio ? dark : light;
+    if (cache.size() > 4096)
+        cache.clear();
+    cache.emplace (key, chosen.getARGB());
+    return chosen;
 }
 
 float contrast (juce::Colour a, juce::Colour b)

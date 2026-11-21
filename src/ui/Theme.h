@@ -318,6 +318,11 @@ ClipLook clipBody (juce::Colour clipColour, juce::Colour trackColour, ClipKind k
 // WCAG contrast ratio of two colours (1 … 21).
 float contrast (juce::Colour a, juce::Colour b);
 
+// Live's marks on a clip or track colour (round 190oj, design190oj CS-4/5/6): the colour × k (Live: name ×0.24, waveform
+// ×0.15; 7–10:1 on Live's pastels) when that reaches `ratio` on the fill, else `light` — on LYNX's and FL's darker colours
+// Live's dark ink read 1.5–3:1. Cached per colour (message thread; paint calls it per clip).
+juce::Colour liveMarkOn (juce::Colour fill, float k, float ratio, juce::Colour light);
+
 // A user colour as FL fills a button or a header band with it: the colour itself (FL keeps its saturation: Synth Bass
 // #0E4498, Grv Kick #8A211A measured in fl-channelrack.png), its brightness held in [lo, hi] so white text on it keeps
 // its contrast (LYNX: FL's lighter fills such as Titey Tom #B65227 read 4.2:1 with white).

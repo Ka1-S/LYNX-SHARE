@@ -1401,7 +1401,7 @@ void KeyPanel::paint (juce::Graphics& g)
     {
         const auto area = getLocalBounds();
         paintLiveBox (g, area, isMouseOver (true));
-        paintLiveText (g, text.isEmpty() ? tr ("none") : text, area.withTrimmedRight (10), false, juce::Justification::centredLeft);
+        paintLiveText (g, text.isEmpty() ? tr ("No scale") : text, area.withTrimmedRight (10), false, juce::Justification::centredLeft);
         paintLiveArrow (g, area, live::text);
         return;
     }

@@ -5435,7 +5435,10 @@ void BrowserComponent::resized()
     sidebarView->setVisible (liveLayout);
     if (liveLayout)
     {
-        const auto sideWidth = juce::jlimit (84, 120, area.getWidth() / 3);
+        // (round 190oj: at the default 258 px browser a third was 84 px and the English names were cut — "Instrume...",
+        // "Audio Eff...", "User Libr..."; Live's sidebar is ~100 px with a smaller face: 40 %, at least 100 px, and the
+        // names shrink a little before they are cut, in LiveSidebar::paint)
+        const auto sideWidth = juce::jlimit (juce::jmin (100, area.getWidth() / 2), 132, area.getWidth() * 2 / 5);
         sidebarView->setBounds (area.removeFromLeft (sideWidth));
         sidebar->setSize (sideWidth - (sidebar->getHeight() > sidebarView->getHeight() ? 8 : 0), sidebar->getHeight());
         area.removeFromLeft (1);

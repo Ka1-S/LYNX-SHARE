@@ -3056,7 +3056,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 {
                     // Live: the name in the track colour x 0.24 (live-arrangement.png "Drums" #252f22 on #9bc48d), in the first
                     // 17 px of the box (an expanded lane keeps its controls at the top)
-                    g.setColour (theme::liveShade (plate, 0.24f));
+                    g.setColour (theme::liveMarkOn (plate, 0.24f, 4.5f, colour::textPrimary)); // (round 190oj CS-4: KICK read 1.8:1)
                     g.setFont (font (type::small, groupHead));
                     const auto nameRight = (int) juce::jmin (textRight, plateArea.getRight() - 3.0f);
                     const auto nameBox = juce::Rectangle<int> (textLeft - 1, y, juce::jmax (8, nameRight - textLeft + 1), juce::jmin (trackHeight - 2, liveStripHeight));
@@ -3770,8 +3770,10 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
     {
         const auto inX = r.getX() + (float) (fadeIn * pixelsPerTick);
         const auto outX = r.getRight() - (float) (fadeOut * pixelsPerTick);
-        const auto shade = theme::colour::bg0.withAlpha (0.45f);
-        const auto line = liveLook ? liveLook->content.withAlpha (0.9f)
+        // (round 190oj CS-30, issue #230's reference img4: Live blends the faded part ~50 % toward a mid grey and draws the
+        // curve as a thin crimson line; LYNX's other looks keep the darker shade and the content colour)
+        const auto shade = liveLook ? juce::Colour (0x80555555) : theme::colour::bg0.withAlpha (0.45f);
+        const auto line = liveLook ? juce::Colour (0xff8e425f)
                         : fl ? (band ? look.compactContent : look.content) : simpleLook ? simpleLook->content : clipContentColour (colour).withAlpha (0.9f);
         // the gain curve from x0 to x1 (rising: a fade in), as a line along the body
         auto curve = [&body] (float x0, float x1, bool rising, bool cross, bool equalPower, bool linear, float tension) {
@@ -15733,8 +15735,9 @@ void PatternPicker::paint (juce::Graphics& g)
                 textcache::drawText (g, tr ("shown"), toggle, juce::Justification::centred, true);
                 g.setColour (colour::textPrimary);
                 g.setFont (font (type::small, true));
-                textcache::drawText (g, row.name, juce::Rectangle<int> ((int) a.getRight() + 5, y + 2, toggle.getX() - (int) a.getRight() - 8, rowHeight - 4),
-                                     juce::Justification::centredLeft, true);
+                // (round 190oj CS-21: narrows to 80 % before an ellipsis — "Track clips (…" lost its count in a 142 px picker)
+                textcache::drawFittedText (g, row.name, juce::Rectangle<int> ((int) a.getRight() + 5, y + 2, toggle.getX() - (int) a.getRight() - 8, rowHeight - 4),
+                                           juce::Justification::centredLeft, 1, 0.8f);
                 continue;
             }
             const auto r = juce::Rectangle<int> (row.trackClip ? 12 : 4, y + 2, getWidth() - (row.trackClip ? 16 : 8), rowHeight - 4);
