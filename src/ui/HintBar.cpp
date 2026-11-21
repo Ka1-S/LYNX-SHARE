@@ -295,7 +295,7 @@ juce::String withMarkup (const juce::String& text)
 void HintBar::setHint (const Hint& hint, bool isLive)
 {
     if (hint.text != current.text || hint.value != current.value || hint.automatable != current.automatable || hint.hasMenu != current.hasMenu
-        || isLive != live)
+        || hint.mark != current.mark || isLive != live)
     {
         current = hint;
         live = isLive;
@@ -394,6 +394,24 @@ void HintBar::paint (juce::Graphics& g)
 {
     using namespace theme;
     auto r = getLocalBounds().toFloat().reduced (6.0f, 1.0f);
+
+    // round 190oa (DF-45, capture 190oa A3): FL's status icons — a red (239,65,64) circle with a white "!" on a hint
+    // that asks for attention, a piano keyboard on a played note's
+    if (current.mark == Hint::Mark::warning)
+    {
+        const auto box = r.removeFromLeft (16.0f).withSizeKeepingCentre (13.0f, 13.0f);
+        g.setColour (juce::Colour (0xffef4140));
+        g.fillEllipse (box);
+        g.setColour (juce::Colours::white);
+        g.fillRect (juce::Rectangle<float> (1.6f, 5.0f).withCentre ({ box.getCentreX(), box.getY() + 5.2f }));
+        g.fillRect (juce::Rectangle<float> (1.6f, 1.6f).withCentre ({ box.getCentreX(), box.getBottom() - 3.0f }));
+        r.removeFromLeft (6.0f);
+    }
+    else if (current.mark == Hint::Mark::note)
+    {
+        icons::draw (g, Icon::keyboard, r.removeFromLeft (16.0f).withSizeKeepingCentre (14.0f, 14.0f), colour::textSecondary);
+        r.removeFromLeft (6.0f);
+    }
 
     // capability markers (dim when not applicable, so the text does not jump)
     if (current.automatable || current.hasMenu)

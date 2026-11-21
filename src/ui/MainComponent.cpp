@@ -6672,9 +6672,10 @@ void MainComponent::updateLiveNoteHint()
         return;
     const auto key = juce::String (notenames::keyName (livenote::key (note)));
     const auto velocity = juce::String (livenote::velocity (note));
-    ui::postHint ({ livenote::on (note) ? tr ("Note on: {0} / velocity: {1}", { key, velocity })
-                                                   : tr ("Note off: {0} / velocity: {1}", { key, velocity }), {}, false, false },
-                  2500);
+    ui::Hint hint { livenote::on (note) ? tr ("Note on: {0} / velocity: {1}", { key, velocity }) : tr ("Note off: {0} / velocity: {1}", { key, velocity }),
+                    {}, false, false };
+    hint.mark = ui::Hint::Mark::note; // (round 190oa, DF-45: FL's piano keyboard icon, capture 190oa A3 (g))
+    ui::postHint (hint, 2500);
 }
 
 void MainComponent::refreshModeButton()
@@ -7750,7 +7751,11 @@ void MainComponent::timerCallback()
         if (engine.isLearningMidi())
             hint.text = tr ("Move a knob/fader on the MIDI controller to link it to the parameter...");
         else if (engine.isWaitingForInput() || engine.isCountingIn() || engine.isLinkWaiting())
+        {
             hint.text = idleHint();
+            if (engine.isWaitingForInput()) // (round 190oa, DF-45: FL's red "!" beside "Waiting for input...")
+                hint.mark = ui::Hint::Mark::warning;
+        }
         else if (auto posted = ui::postedHint())
         {
             hint = *posted;
