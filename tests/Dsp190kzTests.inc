@@ -44,9 +44,10 @@ TEST (dsp190kz_maximus_double_smoothers_are_a_revision_with_the_same_samples)
         }
         CHECK (l0 == l1 && r0 == r1);
     }
-    // the slot's revision reaches the engine: a new slot is revision 1, a loaded old one 0, and both play
+    // the slot's revision reaches the engine: a new slot is the current revision (2 since round 190ok), a loaded old one
+    // 0, and both play
     auto slot = lynx::makeEffectSlot (lynx::EffectKind::maximus);
-    CHECK (slot.engineRev == 1);
+    CHECK (slot.engineRev == 2);
     lynx::maximusfx::Blob blob;
     blob.state = st;
     slot.state = lynx::maximusfx::pack (blob);
@@ -72,7 +73,7 @@ TEST (dsp190kz_new_channels_and_slots_take_the_current_revisions)
     lynx::ChannelDef c;
     c.instrument = lynx::InstrumentKind::audioClip;
     CHECK (c.engineRev == 1);
-    CHECK (lynx::makeEffectSlot (lynx::EffectKind::maximus).engineRev == 1);
+    CHECK (lynx::makeEffectSlot (lynx::EffectKind::maximus).engineRev == 2); // (round 190ok: revision 2, FastMath)
     lynx::EffectSlot a = lynx::makeEffectSlot (lynx::EffectKind::maximus), b = a;
     b.engineRev = 0;
     CHECK (! (a == b)); // (undo and the rebuild see a revision change)

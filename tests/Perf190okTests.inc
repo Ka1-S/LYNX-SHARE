@@ -194,3 +194,90 @@ TEST (perf190ok_smart_disable_tip_only_for_heavy_projects_with_most_slots_off)
     CHECK (! smarttip::due ({ 8, 17 }, 0.5)); // under half
     CHECK (smarttip::due ({ 116, 118 }, 0.161));
 }
+
+// ---- D3: fast maths for LYNX's own devices (core/FastMath.h), from EffectSlot::engineRev 2
+#include "core/FastMath.h"
+
+TEST (perf190ok_fastmath_is_as_accurate_as_the_c_library)
+{
+    using namespace lynx;
+    double worst = 0.0;
+    for (int i = -1200000; i <= 1200000; ++i)
+    {
+        const auto x = (float) i * 1.0e-5f;
+        const auto exact = std::tanh ((double) x);
+        const auto got = (double) fastmath::tanh (x);
+        const auto ulp = (double) std::nextafter (std::fabs ((float) exact), 2.0f) - std::fabs ((float) exact);
+        worst = std::max (worst, std::abs (got - exact) / std::max (ulp, 1.0e-45));
+        CHECK (std::abs (got) <= 1.0);
+    }
+    CHECK (worst < 3.0); // (2.52 ulp at the most; glibc's tanhf 1.4)
+    CHECK (fastmath::tanh (0.0f) == 0.0f && fastmath::tanh (100.0f) == 1.0f && fastmath::tanh (-100.0f) == -1.0f);
+    CHECK (fastmath::tanh (-0.3f) == -fastmath::tanh (0.3f));
+    double we = 0.0, wl = 0.0, wp = 0.0;
+    for (int i = 1; i < 200000; ++i)
+    {
+        const auto x = -300.0 + i * 0.003;
+        we = std::max (we, std::abs (fastmath::exp (x) / std::exp (x) - 1.0));
+        const auto y = std::pow (10.0, -12.0 + i * 1.3e-4);
+        wl = std::max (wl, std::abs (fastmath::log10 (y) - std::log10 (y)));
+        wp = std::max (wp, std::abs (fastmath::pow (y, 0.37) / std::pow (y, 0.37) - 1.0));
+    }
+    CHECK (we < 1.0e-12 && wl < 1.0e-12 && wp < 1.0e-12);
+    CHECK (fastmath::pow (0.0, 2.0) == 0.0 && std::isnan (fastmath::log2 (-1.0)) && fastmath::exp (-2000.0) < 1.0e-300);
+}
+
+TEST (perf190ok_ember_fast_curve_stays_within_float_rounding_of_the_old_one)
+{
+    using namespace lynx::mixsuite::ember;
+    for (const auto s : { Style::tube, Style::tubeBiased, Style::fuzz, Style::tape, Style::console })
+    {
+        double worst = 0.0;
+        for (int i = -40000; i <= 40000; ++i)
+        {
+            const auto x = (float) i * 2.5e-4f;
+            worst = std::max (worst, (double) std::abs (shapeFast (s, x) - shape (s, x)));
+        }
+        CHECK (worst < 1.0e-6); // under -120 dB of full scale
+    }
+}
+
+TEST (perf190ok_new_slots_take_revision_2_old_ones_render_as_before)
+{
+    using namespace lynx;
+    // revision 2 reaches LYNX's own devices through makeEffect (slot); 0 and 1 (projects saved before) are the C library's
+    // maths, the same samples; 2 is within float rounding of them
+    for (const auto kind : { EffectKind::ember, EffectKind::prismMultiband, EffectKind::crestCompressor })
+    {
+        auto slot = makeEffectSlot (kind);
+        CHECK (slot.engineRev == 2);
+        if (kind == EffectKind::ember)
+            slot.params[(std::size_t) mixsuite::ember::drive] = 0.6f;
+        std::vector<std::vector<float>> outL, outR;
+        for (const int rev : { 0, 1, 2 })
+        {
+            slot.engineRev = rev;
+            auto fx = makeEffect (slot);
+            fx->prepare (44100.0);
+            std::vector<float> l (44100), r (44100);
+            for (int i = 0; i < 44100; ++i)
+            {
+                l[(std::size_t) i] = 0.7f * (float) std::sin (i * 0.031) * (float) (i % 11025 < 6000 ? 1.0 : 0.05);
+                r[(std::size_t) i] = 0.6f * (float) std::sin (i * 0.047 + 1.0);
+            }
+            for (int at = 0; at < 44100; at += 512)
+                fx->process (l.data() + at, r.data() + at, std::min (512, 44100 - at), slot.params, 120.0);
+            outL.push_back (l);
+            outR.push_back (r);
+        }
+        CHECK (outL[0] == outL[1] && outR[0] == outR[1]);
+        double diff = 0.0, peak = 0.0;
+        for (std::size_t i = 0; i < outL[0].size(); ++i)
+        {
+            diff = std::max (diff, (double) std::abs (outL[2][i] - outL[0][i]));
+            peak = std::max (peak, (double) std::abs (outL[0][i]));
+        }
+        CHECK (peak > 0.01);
+        CHECK (diff < 1.0e-5 * std::max (1.0, peak)); // (under -100 dB)
+    }
+}

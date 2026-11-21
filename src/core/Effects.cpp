@@ -5426,7 +5426,22 @@ std::unique_ptr<Effect> makeParallelEffect (const EffectSlot& slot)
     return std::make_unique<ParallelEffect> (slot);
 }
 
+namespace
+{
+std::unique_ptr<Effect> makeEffectOfSlot (const EffectSlot& slot);
+}
+
 std::unique_ptr<Effect> makeEffect (const EffectSlot& slot)
+{
+    auto effect = makeEffectOfSlot (slot);
+    if (effect != nullptr)
+        effect->setEngineRev (slot.engineRev); // (round 190ok, D3)
+    return effect;
+}
+
+namespace
+{
+std::unique_ptr<Effect> makeEffectOfSlot (const EffectSlot& slot)
 {
     if (slot.kind == EffectKind::parallel)
         return makeParallelEffect (slot);
@@ -5512,6 +5527,7 @@ std::unique_ptr<Effect> makeEffect (const EffectSlot& slot)
         return slot.state.empty() ? flmb::make (&slot.params) : flmb::make (slot.state, &slot.params); // (#113: latency known at once)
     return makeEffect (slot.kind);
 }
+} // namespace
 
 std::unique_ptr<Effect> makeEffect (EffectKind kind)
 {

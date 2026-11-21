@@ -162,6 +162,10 @@ public:
     virtual void process (float* left, float* right, int n, const EffectParams& params, double bpm) noexcept = 0;
     // Automated plugin parameter (built-in effects receive their parameters in process()). 0..1.
     virtual void setParameter (int /*index*/, float /*value*/) noexcept {}
+    // Round 190ok (owner decision D3): the slot's engine revision (EffectSlot::engineRev), given once by makeEffect (slot)
+    // right after the effect is made. From revision 2 LYNX's own devices run their per-sample maths (tanh, exp, log, pow,
+    // sin) through core/FastMath.h; below it (a project saved before) they call the C library as they did, bit for bit.
+    virtual void setEngineRev (int /*rev*/) noexcept {}
     // Round 190jg: a change inside the next process() call (see Instrument::setParameterAt); hosted CLAP / VST3 only.
     virtual bool takesTimedParameters() const noexcept { return false; }
     virtual void setParameterAt (int /*index*/, float /*value*/, int /*offset*/) noexcept {}

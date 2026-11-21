@@ -43,6 +43,7 @@
 #include <ctime>
 #include <cmath>
 #include <cstdio>
+#include <functional>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -387,6 +388,32 @@ int main (int argc, char** argv)
             }
         if (std::getenv ("LYNX_PB_SLOTS") != nullptr)
             std::printf ("slots: %d, smart disable on in %d%s\n", all, on, std::getenv ("LYNX_PB_SMARTALL") != nullptr ? " (now all on)" : "");
+    }
+    // round 190ok: LYNX_PB_REV=n gives every effect slot (inside Patchers and parallel branches too) engine revision n:
+    // LYNX_PB_REV=1 renders as a project saved before round 190ok (the gold renders' check that those are bit for bit)
+    if (const char* rev = std::getenv ("LYNX_PB_REV"))
+    {
+        const auto n = std::atoi (rev);
+        std::function<void (EffectSlot&)> slotRev;
+        std::function<void (PatcherDoc&)> docRev = [&] (PatcherDoc& doc) {
+            for (auto& node : doc.nodes)
+            {
+                slotRev (node.effect);
+                docRev (node.channel.patcher);
+            }
+        };
+        slotRev = [&] (EffectSlot& slot) {
+            slot.engineRev = n;
+            for (auto& b : slot.branches)
+                for (auto& inner : b.chain)
+                    slotRev (inner);
+            docRev (slot.patcher);
+        };
+        for (auto& track : song.mixer)
+            for (auto& slot : track.effects)
+                slotRev (slot);
+        for (auto& c : song.channels)
+            docRev (c.patcher);
     }
     std::int64_t songTicks = 0;
     song = makeExportSong (song, true, (std::int64_t) std::ceil (ticksPerSample (song.bpm, sampleRate) * sampleRate), songTicks);
