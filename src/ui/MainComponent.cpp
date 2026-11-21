@@ -6928,12 +6928,32 @@ void MainComponent::TempoDisplay::mouseDown (const juce::MouseEvent& e)
     startBpm = engine.shownTempo();
     dragOnDecimals = isOnDecimals (e.x);
     dragging = true;
+    typed.clear();
+    // (round 190oa, DF-15: the keys come here while the button is held)
+    focusBefore = juce::Component::getCurrentlyFocusedComponent();
+    setWantsKeyboardFocus (true);
+    grabKeyboardFocus();
     repaint();
+}
+
+bool MainComponent::TempoDisplay::keyPressed (const juce::KeyPress& key)
+{
+    const auto c = key.getTextCharacter();
+    if (! dragging || ! ((c >= '0' && c <= '9') || (c == '.' && ! typed.containsChar ('.'))))
+        return false;
+    typed << juce::String::charToString (c);
+    // the number so far, once it is a tempo FL takes (10 BPM and up): "1" waits, "12" = 12, "123" = 123
+    if (const auto bpm = typed.getDoubleValue(); bpm >= 10.0 && bpm <= controls::clampTempo (1.0e9))
+    {
+        engine.noteTweaked ({ AutomationTargetKind::tempo, 0 });
+        setBpm (bpm);
+    }
+    return true;
 }
 
 void MainComponent::TempoDisplay::mouseDrag (const juce::MouseEvent& e)
 {
-    if (dragging)
+    if (dragging && typed.isEmpty()) // (round 190oa: a typed value is not dragged away)
     {
         engine.noteTweaked ({ AutomationTargetKind::tempo, 0 });
         setBpm (controls::tempoDrag (startBpm, -e.getDistanceFromDragStartY(), dragOnDecimals, e.mods.isCtrlDown()));
@@ -6943,6 +6963,12 @@ void MainComponent::TempoDisplay::mouseDrag (const juce::MouseEvent& e)
 void MainComponent::TempoDisplay::mouseUp (const juce::MouseEvent&)
 {
     dragging = false;
+    typed.clear();
+    setWantsKeyboardFocus (false); // (round 190oa: the keys go back where they were)
+    if (focusBefore != nullptr && focusBefore->isShowing())
+        focusBefore->grabKeyboardFocus();
+    else if (auto* top = getTopLevelComponent())
+        top->grabKeyboardFocus();
     repaint();
 }
 
