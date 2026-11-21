@@ -234,7 +234,7 @@ covered:**
 
 | Row | Value | What was built | Proof |
 |---|---:|---|---|
-| `live4:deviceview-0012` | 4 | the Edit menu's Cut / Copy / Paste / Duplicate / Delete on a selected device in the Device View (Ctrl+X / C / V / D, Del); paste lands after the selected device | Live 12 manual + existing Live captures (`gap/HANDOFF.md`) |
+| `live4:deviceview-0012` | 4 | the Edit menu's Cut / Copy / Paste / Duplicate / Delete on a selected device in the Device View (Ctrl+X / C / V / D, Del); a pasted device goes in front of the selected one, as Live's manual says | Live 12 manual + existing Live captures (`gap/HANDOFF.md`) |
 | `live4:mapping-0028` | 4 | Arrangement Overdub, Loop, Punch-In and Punch-Out are MIDI / key mappable in the map modes | Live 12 manual |
 | `live1:detail-019` | 3 | Clip View: Duplicate Loop for MIDI clips | Live 12 manual + captures |
 | `live1:detail-020` | 3 | Crop Clip in the clip menu and on Ctrl+Shift+J | Live 12 manual |
