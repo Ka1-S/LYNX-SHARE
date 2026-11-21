@@ -12224,3 +12224,5 @@ countries: pl
 "Show level markers" = "Pokaż znaczniki poziomu"
 "[2xLMB] create an automation clip  [RMB] menu" = "[2xLMB] utwórz klip automatyzacji  [RMB] menu"
 "self: {0} samples" = "własna: {0} próbek"
+"The main (monitor) volume of the toolbar; exports and the mix are the same" = "Główna głośność (odsłuchu) paska narzędzi; eksporty i miks są takie same"
+"Gross Beat's scratch offset (Time offset (scratching)) plays without the offset: {0}" = "Przesunięcie scratchu w Gross Beat (Time offset (scratching)) gra bez przesunięcia: {0}"

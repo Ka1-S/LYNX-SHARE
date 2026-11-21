@@ -12224,3 +12224,5 @@ countries: ru by kz
 "Show level markers" = "Показать метки уровней"
 "[2xLMB] create an automation clip  [RMB] menu" = "[2xLMB] создать клип автоматизации  [RMB] меню"
 "self: {0} samples" = "своя: {0} сэмплов"
+"The main (monitor) volume of the toolbar; exports and the mix are the same" = "Основная громкость (прослушивания) на панели инструментов; экспорт и микс не меняются"
+"Gross Beat's scratch offset (Time offset (scratching)) plays without the offset: {0}" = "Смещение скретча Gross Beat (Time offset (scratching)) звучит без смещения: {0}"

@@ -12224,3 +12224,5 @@ countries: tw hk mo
 "Show level markers" = "顯示電平標記"
 "[2xLMB] create an automation clip  [RMB] menu" = "[2xLMB] 建立自動化片段  [RMB] 選單"
 "self: {0} samples" = "自身：{0} 取樣"
+"The main (monitor) volume of the toolbar; exports and the mix are the same" = "工具列的主（監聽）音量；匯出和混音不變"
+"Gross Beat's scratch offset (Time offset (scratching)) plays without the offset: {0}" = "Gross Beat 的刷碟偏移（Time offset (scratching)）將不帶偏移播放：{0}"

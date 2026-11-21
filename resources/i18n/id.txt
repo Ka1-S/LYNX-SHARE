@@ -12224,3 +12224,5 @@ countries: id
 "Show level markers" = "Tampilkan penanda level"
 "[2xLMB] create an automation clip  [RMB] menu" = "[2xLMB] buat klip otomasi  [RMB] menu"
 "self: {0} samples" = "sendiri: {0} sampel"
+"The main (monitor) volume of the toolbar; exports and the mix are the same" = "Volume utama (monitor) di bilah alat; ekspor dan mix tetap sama"
+"Gross Beat's scratch offset (Time offset (scratching)) plays without the offset: {0}" = "Offset scratch Gross Beat (Time offset (scratching)) diputar tanpa offset: {0}"

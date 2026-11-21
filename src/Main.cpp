@@ -8109,9 +8109,10 @@ private:
         // rollup 0.1.31 step 4 (round 190oi): the copies for 0.1.30 / 0.1.28 of a project with everything step 4 brought:
         // 190oc's Helix round-4 block and Effector law 49 (each one line), 190od's slide of the note properties (#236: the
         // key goes; one line counting only slide notes that move something), 190od's #239 colours and icons by name and a
-        // #238 "no colour" channel (ordinary project data: kept as they are), 190nz's clipboard (no project data). The 0.1.30
-        // copy keeps every key but "slideNoteProps"; a project whose slide notes move nothing, or saved before #236, gets no
-        // slide line
+        // #238 "no colour" channel (ordinary project data: kept as they are), 190nz's clipboard (no project data), 190oa's
+        // main (monitor) volume and Gross Beat's scratch offset (merge 4; its window places are not in a copy: the copy is
+        // the song's JSON without the window layout). The 0.1.30 copy keeps every key but "slideNoteProps" and "mainVolume";
+        // a project whose slide notes move nothing, or saved before #236, gets no slide line
         juce::String rollup031s4Result = "OK";
         {
             auto song = lynx::Song::makeDefault();
@@ -8129,6 +8130,12 @@ private:
             auto nlf = lynx::makeEffectSlot (lynx::EffectKind::effector);
             nlf.params[(std::size_t) lynx::khsdsp::lawParam] = lynx::khsdsp::lawValue (lynx::khsdsp::Law::nonlinearFilter);
             song.mixer[2].effects.push_back (nlf);
+            // merge 4 (190oa): the toolbar's main (monitor) volume off 0 dB and Gross Beat's scratch offset set (DF-21, DP-8)
+            song.mainVolume = 0.5f;
+            auto gross = lynx::makeEffectSlot (lynx::EffectKind::grossBeat);
+            gross.params.resize (9, 0.0f);
+            gross.params[8] = 0.25f;
+            song.mixer[2].effects.push_back (gross);
             lynx::autolook::Rules rules;
             rules.on = true;
             rules.list.push_back ({ "bass", lynx::autolook::Match::contains, 0xFF2266AAu, 7, lynx::autolook::everything });
@@ -8164,7 +8171,7 @@ private:
                 return keys;
             };
             auto expected = keysOf (juce::JSON::parse (lynx::ProjectFile::toJson (song)));
-            const auto hadKey = expected.erase ("/slideNoteProps") == 1;
+            const auto hadKey = expected.erase ("/slideNoteProps") == 1 && expected.erase ("/mainVolume") == 1;
             const auto countOf = [] (const lynx::olderlynx::Copy& c, const char* start) {
                 return (int) std::count_if (c.lost.begin(), c.lost.end(), [start] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).startsWith (start); });
             };
@@ -8192,13 +8199,16 @@ private:
                 else if (countOf (copy, "Effector's Kilohearts Nonlinear Filter") != 1 || (is130 && countOf (copy, "Helix's unison") != 1)
                          || (! is130 && countOf (copy, "Helix is not in this release") != 1))
                     rollup031s4Result = juce::String ("ERROR 190oc's lines in the copy for ") + release;
+                else if (countOf (copy, "The main (monitor) volume") != 1 || countOf (copy, "Gross Beat's scratch offset") != 1
+                         || copy.json.contains ("mainVolume") || juce::JSON::parse (copy.json)["mixer"][2]["effects"][1]["params"].size() != 8)
+                    rollup031s4Result = juce::String ("ERROR 190oa's main volume / Gross Beat offset in the copy for ") + release;
                 else if (back->patterns[(std::size_t) back->currentPattern].notes != p.notes)
                     rollup031s4Result = juce::String ("ERROR the notes in the copy for ") + release;
                 else if (back->channels[(std::size_t) bassIndex].colour != 0xFF2266AAu || back->channels[(std::size_t) bassIndex].icon != 7
                          || back->channels[(std::size_t) bassIndex + 3].colour != 0 || back->channels[(std::size_t) leadIndex].colour != song.channels[(std::size_t) leadIndex].colour)
                     rollup031s4Result = juce::String ("ERROR #239 / #238 colours in the copy for ") + release;
-                else if (is130 && (copy.lost.size() != 3 || keysOf (juce::JSON::parse (copy.json)) != expected))
-                    rollup031s4Result = "ERROR the copy for 0.1.30 drops more than step 4's three (" + juce::String ((int) copy.lost.size()) + " lines)";
+                else if (is130 && (copy.lost.size() != 5 || keysOf (juce::JSON::parse (copy.json)) != expected))
+                    rollup031s4Result = "ERROR the copy for 0.1.30 drops more than step 4's five (" + juce::String ((int) copy.lost.size()) + " lines)";
             }
             // slide notes that move nothing, and a project saved before #236 (key off): no slide line
             if (rollup031s4Result == "OK")

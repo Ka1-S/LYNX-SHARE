@@ -12224,3 +12224,5 @@ countries: nl be
 "Show level markers" = "Niveaumarkeringen tonen"
 "[2xLMB] create an automation clip  [RMB] menu" = "[2xLMB] maak een automatiseringsclip  [RMB] menu"
 "self: {0} samples" = "eigen: {0} samples"
+"The main (monitor) volume of the toolbar; exports and the mix are the same" = "Het hoofdvolume (meeluistervolume) van de werkbalk; exports en de mix blijven gelijk"
+"Gross Beat's scratch offset (Time offset (scratching)) plays without the offset: {0}" = "De scratch-verschuiving van Gross Beat (Time offset (scratching)) speelt zonder de verschuiving: {0}"

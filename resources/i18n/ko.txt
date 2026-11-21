@@ -12224,3 +12224,5 @@ countries: kr
 "Show level markers" = "레벨 마커 표시"
 "[2xLMB] create an automation clip  [RMB] menu" = "[2xLMB] 오토메이션 클립 만들기  [RMB] 메뉴"
 "self: {0} samples" = "자체: {0} 샘플"
+"The main (monitor) volume of the toolbar; exports and the mix are the same" = "툴바의 메인(모니터) 볼륨. 내보내기와 믹스는 그대로입니다"
+"Gross Beat's scratch offset (Time offset (scratching)) plays without the offset: {0}" = "Gross Beat의 스크래치 오프셋(Time offset (scratching))은 오프셋 없이 재생됩니다: {0}"

@@ -12224,3 +12224,5 @@ countries: tr
 "Show level markers" = "Seviye işaretlerini göster"
 "[2xLMB] create an automation clip  [RMB] menu" = "[2xLMB] otomasyon klibi oluştur  [RMB] menü"
 "self: {0} samples" = "kendi: {0} örnek"
+"The main (monitor) volume of the toolbar; exports and the mix are the same" = "Araç çubuğunun ana (izleme) ses düzeyi; dışa aktarımlar ve miks aynı kalır"
+"Gross Beat's scratch offset (Time offset (scratching)) plays without the offset: {0}" = "Gross Beat'in scratch kaydırması (Time offset (scratching)) kaydırma olmadan çalar: {0}"

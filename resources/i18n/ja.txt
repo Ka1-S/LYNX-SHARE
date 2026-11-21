@@ -12224,3 +12224,5 @@ countries: jp
 "Show level markers" = "レベルマーカーを表示"
 "[2xLMB] create an automation clip  [RMB] menu" = "[2xLMB] オートメーションクリップを作成  [RMB] メニュー"
 "self: {0} samples" = "自身: {0} サンプル"
+"The main (monitor) volume of the toolbar; exports and the mix are the same" = "ツールバーのメイン(モニター)音量。書き出しとミックスは変わりません"
+"Gross Beat's scratch offset (Time offset (scratching)) plays without the offset: {0}" = "Gross Beat のスクラッチ・オフセット(Time offset (scratching))はオフセットなしで鳴ります: {0}"

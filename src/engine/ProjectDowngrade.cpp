@@ -1516,6 +1516,29 @@ void toRelease0130 (juce::var& root, Losses& lost)
                               juce::String (moving), true });
     }
 
+    // round 190oa (DF-21): the toolbar's main volume is FL's monitor volume, on what the audio device plays only (never in
+    // an export). 0.1.30 has no such value: the key goes; the mix and every export are the same, so a view line, only when
+    // it isn't 0 dB. Rollup 0.1.31 step 4
+    if (const auto main = o.getProperty ("mainVolume"); drop (o, "mainVolume") && std::abs ((double) main - (double) unityFader) > 1.0e-6)
+        lost.push_back ({ TR_NOOP ("The main (monitor) volume of the toolbar; exports and the mix are the same"), {}, false });
+
+    // round 190oa (DP-8): Gross Beat's ninth parameter, the scratch dial's "Time offset (scratching)" (0 = no offset). 0.1.30
+    // knows eight: [8 …] are cut; a loss only for slots where it is set (it springs back to 0 when the dial is let go, so
+    // that is a saved or automated offset). Rollup 0.1.31 step 4
+    {
+        juce::StringArray scratched;
+        forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
+            auto* params = arrayOf (e.getProperty ("params"));
+            if (params == nullptr || e.getProperty ("kind").toString() != "grossBeat" || params->size() <= 8)
+                return;
+            if ((double) (*params)[8] != 0.0)
+                addOnce (scratched, where);
+            params->removeRange (8, params->size() - 8);
+        });
+        if (! scratched.isEmpty())
+            lost.push_back ({ TR_NOOP ("Gross Beat's scratch offset (Time offset (scratching)) plays without the offset: {0}"), listOf (scratched), true });
+    }
+
     // round 190nw: the tracker editor's view settings (rows per beat, columns, track groups). A view: the notes are the
     // patterns' own, so 0.1.30 plays and shows them in its Piano roll as they are
     if (drop (o, "tracker"))
