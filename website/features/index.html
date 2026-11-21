@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="0b6ebf23";
+window.LYNX_LANG=lang;window.LYNX_V="f8304275";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=0b6ebf23">
+<link rel="stylesheet" href="/assets/site.css?v=f8304275">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -136,6 +136,13 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
       <div><h3 data-i18n="fe.auT">Automation and controllers</h3>
         <p data-i18n="fe.auP">Any knob or fader of a channel, the mixer, an effect or a plugin can become a clip with points and curves. MIDI controllers can be linked to any parameter, and modulators (an LFO or a random source) move a knob around its own value.</p>
         <p data-i18n="fe.auP2">Common MIDI controllers work from profiles (Mackie Control, Launchkey MK3, APC Key 25 mk2, KeyLab Essential mk3 and nanoKONTROL2). An MPE controller plays each note with its own bend, timbre and pressure; this is a first stage. Right-click a control › Link to controller... opens Remote control settings, as in FL Studio, for knobs, notes and buttons.</p>
+      </div>
+    </div>
+
+    <div class="frow flip">
+      <figure class="loopfig"><video class="lp" muted loop playsinline preload="none" width="1280" height="720" poster="/assets/media/loops/polyeditor.webp?v=0.1.31" aria-label="The polyphonic note editor: the top note of a recorded string chord moved up three semitones, then reset" data-i18n-aria="fe.peA"><source src="/assets/media/loops/polyeditor.mp4?v=0.1.31" type="video/mp4"></video></figure>
+      <div><h3 data-i18n="fe.peT">Polyphonic note editor</h3>
+        <p data-i18n="fe.peP">Right-click an audio clip in the Playlist and choose Edit notes (polyphonic)... under LYNX extras: LYNX analyses the recording and shows each note of its chords on its own row. Drag a single note up or down to retune it (hold Alt for cents) or sideways to move it in time, while the rest of the chord stays as it was. This is a feature of LYNX's own, with no FL Studio counterpart.</p>
       </div>
     </div>
   </div>
@@ -290,8 +297,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=0b6ebf23" defer></script>
-<script src="/assets/features.js?v=0b6ebf23" defer></script>
-<script src="/assets/motion.js?v=0b6ebf23" defer></script>
+<script src="/assets/site.js?v=f8304275" defer></script>
+<script src="/assets/features.js?v=f8304275" defer></script>
+<script src="/assets/motion.js?v=f8304275" defer></script>
 </body>
 </html>
