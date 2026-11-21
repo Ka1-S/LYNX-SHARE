@@ -3670,7 +3670,21 @@ public:
     void followPreview()
     {
         if (previewKey < 0)
+        {
+            // round 190oa (DC-15; FL 2026 What's New 21138, "a playback locator in the channel settings' sample
+            // display"): the newest voice's place while the song or the keyboard plays the channel, not only its preview
+            if (ref.index >= 0 && wave.isShowing())
+            {
+                const auto instrument = engine.getChannelInstrument (ref.index);
+                const auto at = instrument != nullptr ? instrument->playPosition() : -1.0f;
+                if (at != shownLocator)
+                {
+                    shownLocator = at;
+                    wave.setLocator (at);
+                }
+            }
             return;
+        }
         const auto instrument = engine.getChannelInstrument (ref.index);
         const auto at = instrument != nullptr ? instrument->playPosition() : -1.0f;
         ++previewFrames;
@@ -3683,6 +3697,8 @@ public:
         }
         wave.setLocator (at);
     }
+
+    float shownLocator = -1.0f; // (round 190oa: the song's playback locator last shown)
 
     void paint (juce::Graphics& g) override
     {
