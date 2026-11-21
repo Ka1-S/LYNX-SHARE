@@ -34,6 +34,7 @@
 #include "ui/RemoteControl.h"
 #include "ui/Workspace.h"
 #include "ui/WrapperMenu.h"
+#include "ui/WindowPlaces.h"
 #include "ui/ChannelSettings.h"
 #include "platform/Paths.h"
 #include "ui/Theme.h"
@@ -2433,7 +2434,22 @@ void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const
     crashguard::note (("making the editor of " + plugin.getName()).toStdString());
     if (! callPluginFromUi (plugin, "making its editor", [&plugin] { plugin.createEditorIfNeeded(); }))
         return;
+    // round 190oa (DF-130): the window keeps its place with the project (FL's wrapper record): a mixer slot's by its
+    // place, a channel's by the channel
+    juce::String placeKey;
+    if (context.track >= 0 && context.slot >= 0)
+        placeKey = windowplaces::slotKey (context.track, context.slot);
+    else if (context.channel && context.engine != nullptr && context.find)
+    {
+        auto& song = const_cast<Song&> (context.engine->getSong());
+        if (const auto* ref = context.find (song))
+            for (int c = 0; c < (int) song.channels.size(); ++c)
+                if (&song.channels[(std::size_t) c].plugin == ref)
+                    placeKey = windowplaces::channelKey (song.channels[(std::size_t) c].uid, c);
+    }
     open[&plugin] = makeHost (std::move (owner), plugin, title, std::move (context));
+    if (auto* window = dynamic_cast<juce::Component*> (open[&plugin].get()); window != nullptr && placeKey.isNotEmpty())
+        windowplaces::tag (*window, placeKey);
     // FL's "Limit the number of open plugin editors" (round 189o, core/EditorLimit.h): past 25, the oldest closes
     editorlimit::opened (&plugin, [k = &plugin] {
         editorlimit::forget (k);

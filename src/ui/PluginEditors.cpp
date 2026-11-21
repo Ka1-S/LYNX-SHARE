@@ -1,4 +1,5 @@
 #include "ui/SlotWatch.h"
+#include "ui/WindowPlaces.h"
 #include "ui/FrameTicker.h"
 #include "ui/PatcherEditor.h"
 #include "ui/ControllerEditors.h"
@@ -7208,6 +7209,7 @@ void open (AudioEngine& engine, int track, int slot)
     open[key] = std::make_unique<NativeEffectWindow> (engine, track, slot, title);
     // FL's "Limit the number of open plugin editors" (round 189o, core/EditorLimit.h): LYNX's own effect windows count too
     auto* window = open[key].get();
+    windowplaces::tag (*window, windowplaces::slotKey (track, slot)); // (round 190oa, DF-130: its place kept with the project)
     editorlimit::opened (window, [window] {
         editorlimit::forget (window);
         juce::MessageManager::callAsync ([window] {

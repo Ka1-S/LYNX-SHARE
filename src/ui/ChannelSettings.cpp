@@ -7556,6 +7556,9 @@ void openWindow (AudioEngine& engine, int channel, bool modulation)
         }
 
     windows().push_back (std::make_unique<SettingsWindow> (engine, channel, modulation));
+    // round 190oa (DF-130): the channel window keeps its place with the project (FL's wrapper record)
+    if (const auto& channels = engine.getSong().channels; ! modulation && channel >= 0 && channel < (int) channels.size())
+        windowplaces::tag (*windows().back(), windowplaces::channelKey (channels[(std::size_t) channel].uid, channel));
 }
 } // namespace
 

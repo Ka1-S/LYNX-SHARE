@@ -185,6 +185,7 @@ public:
     // of the Song), and a project that has one opens with it (Settings › General › "Load the window layout saved with a
     // project")
     ProjectFile::WindowLayout currentWindowLayout() const;
+    void reopenProjectWindows (const std::vector<juce::String>& keys); // (round 190oa, DF-130)
     void applyProjectWindowLayout (const ProjectFile::WindowLayout& layout);
     bool layoutInSaves = false; // (--details190mrshot: the off-screen window keeps its layout in saves too)
     void warnIfProjectTooBig (const juce::File& file); // round 190mr (DF-147)

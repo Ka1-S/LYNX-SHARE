@@ -1,4 +1,5 @@
 #include "ui/Controllers164.h"
+#include "ui/WindowPlaces.h"
 
 #include <algorithm>
 #include <cmath>
@@ -1094,6 +1095,7 @@ void open (AudioEngine& engine, int track, int slot)
                                           },
                                           target);
     open[key] = std::make_unique<ControllerWindow> (engine, track, slot, utf8 (effectInfo (kind).name) + " - " + where, std::move (content));
+    windowplaces::tag (*open[key], windowplaces::slotKey (track, slot)); // (round 190oa, DF-130: its place kept with the project)
 }
 
 void closeAll()

@@ -1647,6 +1647,7 @@ void open (AudioEngine& engine, int track, int slot)
     open[key] = std::make_unique<FormulaWindow> (engine, track, slot,
                                                  tr ("Formula Controller") + " - " + (name.isNotEmpty() ? name : tr ("Insert {0}", { juce::String (track) }))
                                                      + " (" + tr ("slot {0}", { juce::String (slot + 1) }) + ")");
+    windowplaces::tag (*open[key], windowplaces::slotKey (track, slot)); // (round 190oa, DF-130: its place kept with the project)
 }
 
 void closeAll()

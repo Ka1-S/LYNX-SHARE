@@ -1,4 +1,5 @@
 #include "ui/SlotWatch.h"
+#include "ui/WindowPlaces.h"
 #include "ui/FileChoosers.h"
 #include "ui/NewtoneEditor.h"
 
@@ -3282,6 +3283,7 @@ void open (AudioEngine& engine, int track, int slot)
     open[key] = std::make_unique<NewtoneWindow> (engine, track, slot,
                                                  utf8 (effectInfo (kind).name) + " - " + (name.isNotEmpty() ? name : tr ("Insert {0}", { juce::String (track) }))
                                                      + " (" + tr ("slot {0}", { juce::String (slot + 1) }) + ")");
+    windowplaces::tag (*open[key], windowplaces::slotKey (track, slot)); // (round 190oa, DF-130: its place kept with the project)
 }
 
 void closeAll()

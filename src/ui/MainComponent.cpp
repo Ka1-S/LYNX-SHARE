@@ -1,6 +1,7 @@
 #include "ui/ControllerBridge.h"
 #include "ui/KeyFocus.h"
 #include "ui/TrackIcons.h"
+#include "ui/WindowPlaces.h" // (round 190oa, DF-130)
 #include "core/EscClose.h"
 #include "core/DetailChain.h"
 #include "core/MeterScale.h"
@@ -5534,18 +5535,68 @@ ProjectFile::WindowLayout MainComponent::currentWindowLayout() const
 {
     if (! persistent && ! layoutInSaves) // (the command-line modes: no layout of their own to keep)
         return {};
-    return { (int) layoutStyle, workspace.getLayoutText() };
+    return { (int) layoutStyle, workspace.getLayoutText(), windowplaces::toVar() }; // (round 190oa: the windows' places)
 }
 
 void MainComponent::applyProjectWindowLayout (const ProjectFile::WindowLayout& layout)
 {
     // FL opens a project with the windows where they were saved; LYNX does so for the layout style the project was saved
     // in (each style keeps a layout of its own), and only when the option is on (on, as FL)
-    if ((! persistent && ! layoutInSaves) || layout.text.isEmpty() || layout.style != (int) layoutStyle
-        || ! flsettings::options().projectWindowLayout.load())
+    if ((! persistent && ! layoutInSaves) || ! flsettings::options().projectWindowLayout.load())
+        return;
+    // round 190oa (DF-130; REA 190oa R3: FL's wrapper records keep each window's place and open state): the project's
+    // channel and plugin windows open where they were, the ones that were open opened again
+    windowplaces::fromVar (layout.places);
+    std::vector<juce::String> reopen;
+    for (const auto& [key, place] : windowplaces::all())
+        if (place.open)
+            reopen.push_back (key);
+    if (! reopen.empty())
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<MainComponent> (this), reopen] {
+            if (safe != nullptr)
+                safe->reopenProjectWindows (reopen);
+        });
+    if (layout.text.isEmpty() || layout.style != (int) layoutStyle)
         return;
     if (workspace.applyLayoutText (layout.text))
         platform::testModeLog ("project window layout applied");
+}
+
+void MainComponent::reopenProjectWindows (const std::vector<juce::String>& keys)
+{
+    const auto& song = engine.getSong();
+    const auto selectedTrack = mixer.getSelectedTrack();
+    int opened = 0;
+    for (const auto& key : keys)
+    {
+        const auto parts = juce::StringArray::fromTokens (key, ":", "");
+        if (parts.size() == 2 && (parts[0] == "ch" || parts[0] == "chi"))
+        {
+            int channel = -1;
+            for (int c = 0; c < (int) song.channels.size() && channel < 0; ++c)
+                if (parts[0] == "ch" ? juce::String ((juce::int64) song.channels[(std::size_t) c].uid) == parts[1] : c == parts[1].getIntValue())
+                    channel = c;
+            if (channel < 0)
+                continue;
+            if (song.channels[(std::size_t) channel].instrument == InstrumentKind::plugin)
+                rack.openChannelPluginWindow (channel);
+            else
+                openChannelSettings (engine, channel);
+            ++opened;
+        }
+        else if (parts.size() == 3 && parts[0] == "fx")
+        {
+            const auto track = parts[1].getIntValue(), slot = parts[2].getIntValue();
+            if (track >= 0 && track < (int) song.mixer.size() && slot >= 0 && slot < (int) song.mixer[(std::size_t) track].effects.size())
+            {
+                mixer.openSlotEditor (track, slot);
+                ++opened;
+            }
+        }
+    }
+    if (selectedTrack >= 0 && selectedTrack != mixer.getSelectedTrack())
+        mixer.selectTrack (selectedTrack);
+    platform::testModeLog ("project windows reopened: " + juce::String (opened));
 }
 
 void MainComponent::refreshSongNotes()
