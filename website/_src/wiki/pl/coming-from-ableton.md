@@ -1,9 +1,24 @@
 ---
-source: cee352e3d5
+source: 113a3155f8
 ---
 ![Układ Clip-launch: siatka klipów ze scenami obok Playlisty](/assets/img/cliplaunch.webp)
 
 LYNX SHARE startuje w układzie Pattern: Channel Rack, patterny i Playlist. Układ z uruchamianiem klipów jest opcjonalny i dodaje obok Playlisty siatkę klipów ze scenami. LYNX SHARE odczytuje i zapisuje sety `.als`. Nie jest powiązany z firmą Ableton.
+
+Ta strona jest też dla użytkowników Bitwig Studio: siatka klipów działa tak samo, a pliki DAWproject Bitwiga (`.dawproject`) otwierasz przez `Plik › Otwórz...` i zapisujesz przez `Plik › Eksportuj › DAWproject (.dawproject)...`.
+
+## Pierwsze kroki
+
+1. **Wybierz układ.** Przy pierwszym uruchomieniu LYNX SHARE karta powitalna pyta, skąd przychodzisz (0.1.31). Kliknij `Ableton Live lub Bitwig`: otwiera się układ Clip-launch. W 0.1.30 wybierz `Widok › Styl układu › Układ z uruchamianiem klipów`.
+2. **Wypełnij slot.** Przeciągnij sample lub pattern z Browsera do slotu albo kliknij pusty slot prawym przyciskiem i wybierz `Umieść tu wzorzec`.
+3. **Uruchom.** Kliknij trójkąt po lewej stronie klipu albo trójkąt sceny w kolumnie `Sceny`, żeby uruchomić cały wiersz. Możesz też otworzyć jeden ze swoich setów `.als` (niżej).
+
+Czym różni się od Live:
+
+- Playlist to aranżacja, a jej ścieżki to kolumny siatki. Ścieżka, która uruchomiła klip, zostaje w siatce, dopóki nie naciśniesz `Powrót do Playlisty`.
+- Poza siatką klawisze są jak w FL Studio. `Ctrl+Z` cofa jeden krok, a naciśnięty ponownie ponawia go.
+- Tylko część własnych urządzeń Live jest konwertowana (zobacz Warto wiedzieć). Pluginy zewnętrzne przechodzą ze swoim stanem.
+- Układ Pattern, czyli praca jak w FL Studio z Channel Rack i patternami, działa na tym samym projekcie.
 
 ## Otwórz set Live
 
@@ -83,3 +98,4 @@ Raport po eksporcie wymienia, co pominięto.
 - [Import projektów](/wiki/importing-projects/)
 - [Formaty plików](/wiki/file-formats/)
 - [Dwa tryby pracy w jednym programie](/why/#workflows)
+- [Nauka: samouczki](/learn/)

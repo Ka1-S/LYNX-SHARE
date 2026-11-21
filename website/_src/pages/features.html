@@ -9,7 +9,7 @@
     <p class="lead" data-i18n="fe.winL">The default workflow follows FL Studio: Browser, Channel rack, Piano roll, Playlist and Mixer, each opened and closed with the same keys as there. The other two workflows, Clip-launch and Simple, are <a class="tlink" href="#clips">further down</a>.</p>
 
     <div class="frow">
-      <figure><a class="shot" href="/assets/img/playlist.webp?v=0.1.30"><img src="/assets/img/playlist.webp?v=0.1.30" alt="Playlist" width="1600" height="900"></a></figure>
+      <figure class="loopfig"><video class="lp" muted loop playsinline preload="none" width="1024" height="576" poster="/assets/media/loops/playlist.webp?v=0.1.31" aria-label="The Playlist while the demo song plays" data-i18n-aria="fe.plA2"><source src="/assets/media/loops/playlist.mp4?v=0.1.31" type="video/mp4"></video></figure>
       <div><h3>Playlist</h3>
         <p data-i18n="fe.plP">Pattern, audio and automation clips on tracks. Right-click a clip for split, chop, merge, reverse, normalize and fit to tempo.</p>
         <ul><li data-i18n="fe.plA">Several arrangements in one project, markers and time selection</li><li data-i18n="fe.plB">Automation clips with curves for any knob or fader, and optional automation lanes under tracks</li><li data-i18n="fe.plC">Audio recording with loop takes and comping</li><li data-i18n="fe.plD">Video tracks with a timecode ruler (export with video needs FFmpeg)</li><li data-i18n="fe.plE">Warp markers and Auto-warp, to lock audio clips to the beat</li><li data-i18n="fe.plF">FL Studio's 13 automation curve modes on every point</li></ul>
@@ -33,7 +33,7 @@
     </div>
 
     <div class="frow flip">
-      <figure><a class="shot" href="/assets/img/mixer.webp?v=0.1.30"><img src="/assets/img/mixer.webp?v=0.1.30" alt="Mixer" loading="lazy" width="1920" height="1080"></a></figure>
+      <figure class="loopfig"><video class="lp" muted loop playsinline preload="none" width="960" height="540" poster="/assets/media/loops/mixer.webp?v=0.1.31" aria-label="The Mixer while the demo song plays" data-i18n-aria="fe.mxA2"><source src="/assets/media/loops/mixer.mp4?v=0.1.31" type="video/mp4"></video></figure>
       <div><h3>Mixer</h3>
         <p data-i18n="fe.mxP">Up to 500 insert tracks. Each has 10 effect slots with dry/wet, sends with levels, a built-in EQ and delay compensation.</p>
         <ul><li data-i18n="fe.mxA">Sidechain from one menu on any effect with a side input</li><li data-i18n="fe.mxB">VCA faders and groups that fold</li><li data-i18n="fe.mxC">Moving a track keeps its sends, sidechains and automation</li><li data-i18n="fe.mxD">An optional loudness meter (LUFS and true peak) beside the Master</li><li data-i18n="fe.mxE">Edison on any mixer slot, recording even with its window closed</li></ul>
@@ -54,13 +54,20 @@
   <div class="wrap">
     <h2 data-i18n="fe.clT">Clip-launch and Simple workflows</h2>
     <div class="frow">
-      <figure><a class="shot" href="/assets/img/cliplaunch.webp?v=0.1.30"><img src="/assets/img/cliplaunch.webp?v=0.1.30" alt="Clip-launch workflow" loading="lazy"></a></figure>
+      <figure class="loopfig"><video class="lp" muted loop playsinline preload="none" width="1280" height="720" poster="/assets/media/loops/cliplaunch.webp?v=0.1.31" aria-label="The Clip-launch workflow: scenes launched one after another" data-i18n-aria="fe.clA2"><source src="/assets/media/loops/cliplaunch.mp4?v=0.1.31" type="video/mp4"></video></figure>
       <div>
         <p data-i18n="fe.clP">The Clip-launch workflow (View › Layout style) works in the style of Ableton Live: a grid of clips and scenes next to the Playlist, like Live's Session view. Clips have launch modes, quantisation, legato, loop and follow actions.</p>
         <p data-i18n="fe.clP2">Live sets bring their Session clips into this grid, and exporting an .als writes the grid back. The FL Studio workflow stays the default and nothing changes in it.</p>
         <p data-i18n="fe.clP3">A selected clip opens in a Clip View with Clip, Launch and Notes panels and Live 12's MIDI tools. The selected track's effects show as a chain of cards, and racks with chains, zones and macros open from Live sets and are written back. A Session mixer sits under the grid, a Drum Rack plays pads with choke groups and return chains, and MIDI and Key Map Modes link controllers and computer keys to clips, scenes and knobs. Freeze Track and Bounce turn a track into audio, and Ableton Link keeps the tempo in sync with Live and other Link apps.</p>
         <p data-i18n="fe.simP">The same menu has the third workflow, Simple, which mixes BandLab's approachable one-window style with FL Studio Mobile's way of working: one window with the tracks and the timeline, a New track chooser, starter beats, loops that follow the song's key, a 16-pad Sampler, quick recording on a voice track, a track dock with one-knob effects and a Chord pad, a first-song tour and a Finish dock that saves the song as a file. FL Studio Mobile projects (.flm) open in it, and a folder of stems and MIDI from another app comes in with one drop.</p>
         <p><a class="tlink" href="/wiki/coming-from-ableton/" data-i18n="fe.clL">Coming from Ableton Live</a></p>
+      </div>
+    </div>
+    <div class="frow flip">
+      <figure class="loopfig"><video class="lp" muted loop playsinline preload="none" width="1280" height="720" poster="/assets/media/loops/drum-machine.webp?v=0.1.31" aria-label="The Simple workflow: a beat played while steps are added in the Drum Machine" data-i18n-aria="fe.dmA"><source src="/assets/media/loops/drum-machine.mp4?v=0.1.31" type="video/mp4"></video></figure>
+      <div><h3 data-i18n="fe.dmT">The Simple workflow's Drum Machine</h3>
+        <p data-i18n="fe.dmP">A Drums track opens on a step grid under the timeline: one row per sound, patterns A to H, length and swing. Click a square to add or remove a hit while the beat plays, or press the row's letter key to play its sound.</p>
+        <p><a class="tlink" href="/learn/simple-beat/" data-i18n="fe.dmL">Tutorial: make a beat in the Simple layout</a> · <a class="tlink" href="/wiki/coming-from-bandlab/" data-i18n="fe.dmL2">Coming from BandLab, FL Studio Mobile or GarageBand</a></p>
       </div>
     </div>
   </div>

@@ -1,9 +1,24 @@
 ---
-source: cee352e3d5
+source: 113a3155f8
 ---
 ![O layout de disparo de clipes: uma grade de clipes com cenas ao lado da Playlist](/assets/img/cliplaunch.webp)
 
 O LYNX SHARE começa no layout Pattern: um Channel Rack, patterns e uma Playlist. O layout de lançamento de clipes é opcional e acrescenta uma grade de clipes com cenas ao lado da Playlist. O LYNX SHARE lê e grava sets `.als`. Não tem nenhuma ligação com a Ableton.
+
+Esta página serve também para quem usa o Bitwig Studio: a grade de clipes funciona do mesmo jeito, e os arquivos DAWproject do Bitwig (`.dawproject`) abrem com `Arquivo › Abrir...` e são gravados por `Arquivo › Exportar › DAWproject (.dawproject)...`.
+
+## Seus primeiros passos
+
+1. **Escolha o layout.** Na primeira vez que o LYNX SHARE abre, um cartão de boas-vindas pergunta de onde você vem (0.1.31). Clique em `Ableton Live ou Bitwig`: o Layout de lançamento de clipes abre. Na 0.1.30, escolha `Exibir › Estilo de layout › Layout de lançamento de clipes`.
+2. **Preencha um slot.** Arraste um sample ou um pattern do Browser para um slot, ou clique com o botão direito num slot vazio e escolha `Colocar um padrão aqui`.
+3. **Dispare.** Clique no triângulo à esquerda de um clipe, ou no triângulo de uma cena na coluna `Cenas` para disparar a linha toda. Ou abra um dos seus sets `.als` (abaixo).
+
+O que é diferente do Live:
+
+- A Playlist é o arranjo, e as faixas dela são as colunas da grade. Uma faixa que disparou um clipe fica na grade até você apertar `Voltar à Playlist`.
+- Fora da grade, as teclas seguem o FL Studio. `Ctrl+Z` desfaz um passo e, pressionado de novo, refaz.
+- Só alguns dos devices próprios do Live são convertidos (veja Bom saber). Plugins de terceiros vêm com o estado deles.
+- O Layout Pattern, o jeito de trabalhar do FL Studio com Channel Rack e patterns, funciona no mesmo projeto.
 
 ## Abrir um set do Live
 
@@ -83,3 +98,4 @@ Um relatório depois da exportação lista o que ficou de fora.
 - [Importar projetos](/wiki/importing-projects/)
 - [Formatos de arquivo](/wiki/file-formats/)
 - [Dois layouts em um só programa](/why/#workflows)
+- [Aprenda: tutoriais](/learn/)

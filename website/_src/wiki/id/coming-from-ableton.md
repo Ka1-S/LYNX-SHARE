@@ -1,9 +1,24 @@
 ---
-source: cee352e3d5
+source: 113a3155f8
 ---
 ![Layout Clip-launch: kisi klip dengan scene di samping Playlist](/assets/img/cliplaunch.webp)
 
 LYNX SHARE dimulai dalam alur kerja pattern: Channel Rack, pattern, dan Playlist. Alur kerja peluncuran klip bersifat opsional dan menambahkan kisi klip dengan scene di samping Playlist. LYNX SHARE membaca dan menulis set `.als`. Program ini tidak berafiliasi dengan Ableton.
+
+Halaman ini juga untuk pengguna Bitwig Studio: kisi klip bekerja dengan cara yang sama, dan file DAWproject (`.dawproject`) dari Bitwig dibuka dengan `File › Buka...` serta ditulis oleh `File › Ekspor › DAWproject (.dawproject)...`.
+
+## Langkah pertamamu
+
+1. **Pilih tata letak.** Saat LYNX SHARE pertama kali dijalankan, sebuah kartu sambutan menanyakan dari mana kamu datang (0.1.31). Klik `Ableton Live atau Bitwig`: tata letak peluncuran klip terbuka. Di 0.1.30, pilih `Tampilan › Gaya tata letak › Alur kerja peluncuran klip`.
+2. **Isi sebuah slot.** Seret sample atau pattern dari Browser ke sebuah slot, atau klik kanan slot kosong dan pilih `Taruh pattern di sini`.
+3. **Luncurkan.** Klik segitiga di kiri sebuah klip, atau segitiga sebuah scene di kolom `Scene` untuk meluncurkan seluruh barisnya. Atau buka salah satu set `.als`-mu (di bawah).
+
+Yang berbeda dari Live:
+
+- Playlist adalah arransemennya, dan track-nya adalah kolom-kolom kisi. Track yang sudah meluncurkan klip tetap di kisi sampai kamu menekan `Kembali ke Playlist`.
+- Di luar kisi, tombolnya mengikuti FL Studio. `Ctrl+Z` membatalkan satu langkah, dan jika ditekan lagi akan mengulanginya.
+- Hanya sebagian perangkat bawaan Live yang dikonversi (lihat Perlu diketahui). Plugin pihak ketiga ikut dengan statusnya.
+- Tata letak Pattern, cara kerja FL Studio dengan Channel Rack dan pattern, bekerja di proyek yang sama.
 
 ## Membuka set Live
 
@@ -83,3 +98,4 @@ Laporan setelah ekspor mencantumkan apa yang tidak ikut ditulis.
 - [Mengimpor proyek](/wiki/importing-projects/)
 - [Format file](/wiki/file-formats/)
 - [Dua alur kerja dalam satu program](/why/#workflows)
+- [Belajar: tutorial](/learn/)

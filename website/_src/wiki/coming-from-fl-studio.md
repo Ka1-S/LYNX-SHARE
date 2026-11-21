@@ -1,11 +1,24 @@
 ---
 title: Coming from FL Studio
-summary: What maps to what, opening .flp and .flm projects, and exporting back.
+summary: First steps, what maps to what, opening .flp and .flm projects, and exporting back.
 status: full
 ---
 LYNX SHARE keeps the workflow you know: a Channel rack, patterns, a Playlist and a Mixer, on the same keys. It opens `.flp` projects directly and can write one back.
 
 LYNX SHARE is an independent program. It is not affiliated with, endorsed or sponsored by Image-Line, and it contains no Image-Line code. FL Studio is a registered trademark of Image-Line Software.
+
+## Your first steps
+
+1. **Pick the layout.** The first time LYNX SHARE starts, a welcome card asks where you are coming from (0.1.31). Click `FL Studio`: you get the Pattern layout, the default, with the Channel Rack, Piano roll, Playlist and Mixer. Skip on the card does the same.
+2. **Open a project.** Open one of your `.flp` projects (below), or click steps in the Channel Rack to make a beat.
+3. **Find your plugins.** LYNX SHARE scans the usual plugin folders in the background. For a folder of your own, open `Options › Plugin manager...`, click `Plugin folders...`, add it and click `Find new plugins`.
+
+What is different from FL Studio:
+
+- FL Studio's own plugins play on engines LYNX SHARE recreated, each with a quality level (below). FL Studio itself is not needed to open a `.flp`.
+- LYNX SHARE's own additions are off until you switch them on in `Options › LYNX extras...`.
+- Two more layouts work on the same project: Clip-launch (a clip grid with scenes) and Simple (one window with tracks, loops and quick recording).
+- An [online session](/learn/online-session/) puts up to 4 people in one project, live.
 
 ## Open a .flp project
 
@@ -92,3 +105,4 @@ The file is an FL Studio 2026 project. Samplers, audio clips, FL's own generator
 - [File formats](/wiki/file-formats/)
 - [Shortcuts](/wiki/shortcuts/)
 - [What only LYNX SHARE does with FL settings](/why/#fl-settings)
+- [Learn: tutorials](/learn/)

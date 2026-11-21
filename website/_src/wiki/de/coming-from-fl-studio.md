@@ -1,9 +1,22 @@
 ---
-source: 3bf7e0c0ab
+source: 68d518394b
 ---
 LYNX SHARE behält die Arbeitsweise, die du kennst: ein Channel Rack, Patterns, eine Playlist und einen Mixer, auf denselben Tasten. Es öffnet `.flp`-Projekte direkt und kann auch eines zurückschreiben.
 
 LYNX SHARE ist ein eigenständiges Programm. Es ist weder mit Image-Line verbunden noch von Image-Line unterstützt oder gesponsert, und es enthält keinen Code von Image-Line. FL Studio ist eine eingetragene Marke von Image-Line Software.
+
+## Deine ersten Schritte
+
+1. **Wähle das Layout.** Beim ersten Start von LYNX SHARE fragt eine Willkommenskarte, woher du kommst (0.1.31). Klicke auf `FL Studio`: Du bekommst das Pattern-Layout, den Standard, mit Channel Rack, Piano Roll, Playlist und Mixer. „Überspringen“ auf der Karte macht dasselbe.
+2. **Öffne ein Projekt.** Öffne eines deiner `.flp`-Projekte (unten), oder klicke Steps im Channel Rack, um einen Beat zu bauen.
+3. **Finde deine Plugins.** LYNX SHARE durchsucht die üblichen Plugin-Ordner im Hintergrund. Für einen eigenen Ordner öffne `Optionen › Plugin-Manager...`, klicke auf `Plugin-Ordner...`, füge ihn hinzu und klicke auf `Neue Plugins finden`.
+
+Was anders ist als in FL Studio:
+
+- Die eigenen Plugins von FL Studio laufen auf Engines, die LYNX SHARE nachgebaut hat, jede mit einer Qualitätsstufe (unten). FL Studio selbst wird zum Öffnen einer `.flp` nicht gebraucht.
+- Die eigenen Extras von LYNX SHARE sind aus, bis du sie in `Optionen › LYNX-Extras...` einschaltest.
+- Zwei weitere Layouts arbeiten am selben Projekt: Clip-Start (ein Clip-Raster mit Szenen) und Einfach (ein Fenster mit Spuren, Loops und schneller Aufnahme).
+- Eine [Online-Sitzung](/learn/online-session/) bringt bis zu 4 Personen live in ein Projekt.
 
 ## Ein .flp-Projekt öffnen
 
@@ -90,3 +103,4 @@ Die Datei ist ein FL-Studio-2026-Projekt. Sampler, Audioclips, die eigenen Gener
 - [Dateiformate](/wiki/file-formats/)
 - [Tastenkürzel](/wiki/shortcuts/)
 - [Was nur LYNX SHARE mit FL-Einstellungen kann](/why/#fl-settings)
+- [Lernen: Anleitungen](/learn/)

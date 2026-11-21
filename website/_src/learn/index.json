@@ -1,0 +1,13 @@
+{
+  "tutorials": [
+    {"slug": "simple-beat", "video": "simple-beat", "voices": ["en", "pt-BR"], "layout": "simple", "topic": "beats", "level": "beginner", "length": 64,
+     "chapters": [[0, "Choose how you work"], [17.5, "Play and edit the beat"], [45, "Next steps"]],
+     "youtube": {"en": "", "pt-BR": ""}},
+    {"slug": "record-voice", "video": "record-voice", "voices": ["en", "pt-BR"], "layout": "simple", "topic": "recording", "level": "beginner", "length": 67,
+     "chapters": [[0, "Add a Voice track"], [24.4, "Record a take"], [46.2, "Add an effect and listen"]],
+     "youtube": {"en": "", "pt-BR": ""}},
+    {"slug": "online-session", "video": "online-session", "voices": ["en", "pt-BR"], "layout": "any", "topic": "sessions", "level": "beginner", "length": 74,
+     "chapters": [[0, "Start the session"], [19.2, "Invite a friend"], [41.8, "Work together"]],
+     "youtube": {"en": "", "pt-BR": ""}}
+  ]
+}

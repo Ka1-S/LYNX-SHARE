@@ -1,0 +1,50 @@
+{
+ "assets/media/learn/online-session-en-1080.mp4": {
+  "size": 3150386,
+  "sha256": "d30d193aa76a914d8d8af05fbfc587e4c56afed0992285aa221ca2acd37216bb"
+ },
+ "assets/media/learn/online-session-en-720.mp4": {
+  "size": 2139346,
+  "sha256": "f2db007b9ce5f14bf143c401756ec674e4bdbd43f0a788a140f88e028e230fe5"
+ },
+ "assets/media/learn/online-session-pt-BR-1080.mp4": {
+  "size": 3316768,
+  "sha256": "f8c715dec8f9a2e9eeb8b4510a1d68e141186e4b73d0ce11e22b13643e7d4628"
+ },
+ "assets/media/learn/online-session-pt-BR-720.mp4": {
+  "size": 2245836,
+  "sha256": "8b289697a1a2869b4038ea6b21e04731331fbb0fb9c5f0b8207960ee6b26cc25"
+ },
+ "assets/media/learn/record-voice-en-1080.mp4": {
+  "size": 3831762,
+  "sha256": "b46c8f564c0694e9d3f7303caeef437854a595a7c0143548ec04a24c74990a9d"
+ },
+ "assets/media/learn/record-voice-en-720.mp4": {
+  "size": 2406112,
+  "sha256": "7bda9a19d2db5a66b2751e6488c73a920f663a83ad9574a3931027eab924e9d1"
+ },
+ "assets/media/learn/record-voice-pt-BR-1080.mp4": {
+  "size": 3880037,
+  "sha256": "b2e88d875e89ba0377c5ae58d43d9b34cc3abd2454483228b9796a0687f11bac"
+ },
+ "assets/media/learn/record-voice-pt-BR-720.mp4": {
+  "size": 2466436,
+  "sha256": "a21c30463b5260f3c36ea92c9ef4a9c9db409bdcaa9a71c259b21675fe1e6366"
+ },
+ "assets/media/learn/simple-beat-en-1080.mp4": {
+  "size": 4328164,
+  "sha256": "6180797c5ddd333bce804dbdcd7c98bf92cb92443798dab2bd46e03225743a54"
+ },
+ "assets/media/learn/simple-beat-en-720.mp4": {
+  "size": 2559025,
+  "sha256": "778be82f82b1b3c6f9ded5fff2cff6c6950fe372a964c798f74e92d8a1a3ff5b"
+ },
+ "assets/media/learn/simple-beat-pt-BR-1080.mp4": {
+  "size": 4481198,
+  "sha256": "1e5e302878bdec446d1c931b5e8baed3a7679daa1d3f65b93fc55b8ab2554e65"
+ },
+ "assets/media/learn/simple-beat-pt-BR-720.mp4": {
+  "size": 2679738,
+  "sha256": "18c024fb55cb4ef6f124d9214c11099ba15c301b1ac6ce0f2e3faa9339c18491"
+ }
+}

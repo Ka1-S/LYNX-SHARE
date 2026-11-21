@@ -1,9 +1,22 @@
 ---
-source: 3bf7e0c0ab
+source: 68d518394b
 ---
 O LYNX SHARE mantém o layout que você conhece: um Channel Rack, patterns, uma Playlist e um Mixer, com as mesmas teclas. Ele abre projetos `.flp` diretamente e pode gravar um de volta.
 
 O LYNX SHARE é um programa independente. Ele não é afiliado, endossado nem patrocinado pela Image-Line e não contém código da Image-Line. FL Studio é marca registrada da Image-Line Software.
+
+## Seus primeiros passos
+
+1. **Escolha o layout.** Na primeira vez que o LYNX SHARE abre, um cartão de boas-vindas pergunta de onde você vem (0.1.31). Clique em `FL Studio`: você recebe o Layout Pattern, o padrão, com o Channel Rack, o Piano Roll, a Playlist e o Mixer. Skip no cartão faz o mesmo.
+2. **Abra um projeto.** Abra um dos seus projetos `.flp` (abaixo) ou clique nos passos do Channel Rack para fazer uma batida.
+3. **Encontre os seus plugins.** O LYNX SHARE varre as pastas de plugins mais comuns em segundo plano. Para uma pasta sua, abra `Opções › Gerenciador de plugins...`, clique em `Pastas de plugins...`, adicione-a e clique em `Buscar plugins novos`.
+
+O que é diferente do FL Studio:
+
+- Os plugins próprios do FL Studio tocam em motores que o LYNX SHARE recriou, cada um com um nível de qualidade (abaixo). O FL Studio em si não é necessário para abrir um `.flp`.
+- As adições próprias do LYNX SHARE ficam desligadas até você ligá-las em `Opções › Extras do LYNX...`.
+- Mais dois layouts funcionam no mesmo projeto: o de disparo de clipes (uma grade de clipes com cenas) e o Simples (uma janela com faixas, loops e gravação rápida).
+- Uma [sessão online](/learn/online-session/) põe até 4 pessoas em um só projeto, ao vivo.
 
 ## Abrir um projeto .flp
 
@@ -90,3 +103,4 @@ O arquivo é um projeto do FL Studio 2026. Samplers, clipes de áudio, geradores
 - [Formatos de arquivo](/wiki/file-formats/)
 - [Atalhos](/wiki/shortcuts/)
 - [O que só o LYNX SHARE faz com as configurações do FL](/why/#fl-settings)
+- [Aprenda: tutoriais](/learn/)

@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="fe0c7691";
+window.LYNX_LANG=lang;window.LYNX_V="103b886a";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,12 +77,12 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=fe0c7691">
+<link rel="stylesheet" href="/assets/site.css?v=103b886a">
 </head>
 <body>
 <header class="top"><div class="wrap">
   <a href="/" class="brand"><img src="/assets/img/logo.png?v=0.1.26-logo2" srcset="/assets/img/favicon-32.png?v=0.1.26-logo2 1x, /assets/img/favicon.png?v=0.1.26-logo2 2x, /assets/img/logo.png?v=0.1.26-logo2 4x" alt="" width="32" height="32">LYNX SHARE</a>
-  <nav class="links" aria-label="Site"><a href="/features/" data-i18n="nav.features">Features</a><a href="/why/" data-i18n="nav.why">Why LYNX</a><a href="/instruments-and-effects/" data-i18n="nav.cat">Plugins</a><a href="/updates/" data-i18n="nav.updates">Updates</a><a href="/wiki/" data-i18n="nav.wiki">Wiki</a><a href="/faq/" data-i18n="nav.faq">FAQ</a></nav>
+  <nav class="links" aria-label="Site"><a href="/features/" data-i18n="nav.features">Features</a><a href="/learn/" data-i18n="nav.learn">Learn</a><a href="/why/" data-i18n="nav.why">Why LYNX</a><a href="/instruments-and-effects/" data-i18n="nav.cat">Plugins</a><a href="/updates/" data-i18n="nav.updates">Updates</a><a href="/wiki/" data-i18n="nav.wiki">Wiki</a><a href="/faq/" data-i18n="nav.faq">FAQ</a></nav>
   <div class="navbtns">
     <label class="lang"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg><span id="langCode" aria-hidden="true">EN</span><select id="lang" aria-label="Language" data-i18n-aria="aria.lang"></select></label>
     <a class="btn btn-red btn-sm" href="/download/" data-i18n="nav.download">Download</a>
@@ -99,6 +99,19 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
     <div class="stage">
       <div class="screen"><img src="/assets/img/hero.webp?v=0.1.30" srcset="/assets/img/hero.webp?v=0.1.30 1x, /assets/img/hero@2x.webp?v=0.1.30 2x" alt="LYNX SHARE with the Channel Rack, Piano Roll, Playlist and Mixer open" data-i18n-alt="alt.hero" width="1920" height="1080"></div>
     </div>
+  </div>
+</section>
+
+<section class="sec" id="pick">
+  <div class="wrap">
+    <h2 data-i18n="pick.t">Pick how you like to work</h2>
+    <p class="lead" data-i18n="pick.l">One program, three layouts. Switch any time in View › Layout style: the project stays the same.</p>
+    <div class="pick3">
+      <article class="pcard"><video class="lp" muted loop playsinline preload="none" width="1280" height="720" poster="/assets/media/loops/drum-machine.webp?v=0.1.31" aria-label="The Simple layout: a beat played while steps are added in the Drum Machine" data-i18n-aria="pick.simA"><source src="/assets/media/loops/drum-machine.mp4?v=0.1.31" type="video/mp4"></video><div class="pb"><h3>Simple</h3><p data-i18n="pick.simP">Tracks, loops, a drum machine and quick recording, in one window.</p><a class="tlink" href="/wiki/coming-from-bandlab/" data-i18n="pick.simL">Coming from BandLab, FL Studio Mobile or GarageBand</a></div></article>
+      <article class="pcard"><video class="lp" muted loop playsinline preload="none" width="1280" height="720" poster="/assets/media/loops/pattern.webp?v=0.1.31" aria-label="The Pattern layout: the Channel rack, Playlist and Mixer while the demo song plays" data-i18n-aria="pick.patA"><source src="/assets/media/loops/pattern.mp4?v=0.1.31" type="video/mp4"></video><div class="pb"><h3>Pattern</h3><p data-i18n="pick.patP">The Channel rack, Piano roll, Playlist and Mixer, with FL Studio's shortcuts. The default.</p><a class="tlink" href="/wiki/coming-from-fl-studio/" data-i18n="pick.patL">Coming from FL Studio</a></div></article>
+      <article class="pcard"><video class="lp" muted loop playsinline preload="none" width="1280" height="720" poster="/assets/media/loops/cliplaunch.webp?v=0.1.31" aria-label="The Clip-launch layout: scenes launched one after another" data-i18n-aria="pick.clA"><source src="/assets/media/loops/cliplaunch.mp4?v=0.1.31" type="video/mp4"></video><div class="pb"><h3>Clip-launch</h3><p data-i18n="pick.clP">A grid of clips and scenes beside the arrangement.</p><a class="tlink" href="/wiki/coming-from-ableton/" data-i18n="pick.clL">Coming from Ableton Live or Bitwig</a></div></article>
+    </div>
+    <p class="pickmore" data-i18n="pick.more">New to music software? <a class="tlink" href="/learn/simple-beat/">Make a beat in a minute</a> in the Simple layout. Coming from Logic, Cubase or Reaper? <a class="tlink" href="/wiki/coming-from-other-daws/">Start here</a>. All tutorials: <a class="tlink" href="/learn/">Learn</a>.</p>
   </div>
 </section>
 
@@ -223,7 +236,7 @@ LYNX --showcase Demo.lynx     # writes the demo project</code></pre>
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=fe0c7691" defer></script>
-<script src="/assets/motion.js?v=fe0c7691" defer></script>
+<script src="/assets/site.js?v=103b886a" defer></script>
+<script src="/assets/motion.js?v=103b886a" defer></script>
 </body>
 </html>

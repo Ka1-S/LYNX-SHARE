@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en" class="nojs" data-title="lr.h1" data-desc="m.learn.d">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Learn LYNX SHARE · LYNX SHARE</title>
+<meta name="description" content="Learn LYNX SHARE: short tutorial videos with the steps written out, and pages for people coming from BandLab, FL Studio Mobile, GarageBand, FL Studio, Ableton Live, Logic, Cubase or Reaper.">
+<meta property="og:title" content="Learn LYNX SHARE · LYNX SHARE">
+<meta property="og:description" content="Learn LYNX SHARE: short tutorial videos with the steps written out, and pages for people coming from BandLab, FL Studio Mobile, GarageBand, FL Studio, Ableton Live, Logic, Cubase or Reaper.">
+<meta property="og:site_name" content="LYNX SHARE">
+<meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.30">
+<meta property="og:url" content="https://lynx-share.com/learn/">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:locale:alternate" content="zh_TW">
+<meta property="og:locale:alternate" content="nl_NL">
+<meta property="og:locale:alternate" content="fr_FR">
+<meta property="og:locale:alternate" content="de_DE">
+<meta property="og:locale:alternate" content="id_ID">
+<meta property="og:locale:alternate" content="it_IT">
+<meta property="og:locale:alternate" content="ja_JP">
+<meta property="og:locale:alternate" content="ko_KR">
+<meta property="og:locale:alternate" content="pl_PL">
+<meta property="og:locale:alternate" content="pt_BR">
+<meta property="og:locale:alternate" content="ru_RU">
+<meta property="og:locale:alternate" content="es_ES">
+<meta property="og:locale:alternate" content="tr_TR">
+<link rel="canonical" href="https://lynx-share.com/learn/">
+<link rel="alternate" hreflang="en" href="https://lynx-share.com/learn/">
+<link rel="alternate" hreflang="zh-Hans" href="https://lynx-share.com/learn/?lang=zh-Hans">
+<link rel="alternate" hreflang="zh-Hant" href="https://lynx-share.com/learn/?lang=zh-Hant">
+<link rel="alternate" hreflang="nl" href="https://lynx-share.com/learn/?lang=nl">
+<link rel="alternate" hreflang="fr" href="https://lynx-share.com/learn/?lang=fr">
+<link rel="alternate" hreflang="de" href="https://lynx-share.com/learn/?lang=de">
+<link rel="alternate" hreflang="id" href="https://lynx-share.com/learn/?lang=id">
+<link rel="alternate" hreflang="it" href="https://lynx-share.com/learn/?lang=it">
+<link rel="alternate" hreflang="ja" href="https://lynx-share.com/learn/?lang=ja">
+<link rel="alternate" hreflang="ko" href="https://lynx-share.com/learn/?lang=ko">
+<link rel="alternate" hreflang="pl" href="https://lynx-share.com/learn/?lang=pl">
+<link rel="alternate" hreflang="pt-BR" href="https://lynx-share.com/learn/?lang=pt">
+<link rel="alternate" hreflang="ru" href="https://lynx-share.com/learn/?lang=ru">
+<link rel="alternate" hreflang="es" href="https://lynx-share.com/learn/?lang=es">
+<link rel="alternate" hreflang="tr" href="https://lynx-share.com/learn/?lang=tr">
+<link rel="alternate" hreflang="x-default" href="https://lynx-share.com/learn/">
+<script>
+(function(){
+var L=window.LYNX_LANGS=[["en","English"],["zh-Hans","简体中文"],["zh-Hant","繁體中文"],["nl","Nederlands"],["fr","Français"],["de","Deutsch"],["id","Bahasa Indonesia"],["it","Italiano"],["ja","日本語"],["ko","한국어"],["pl","Polski"],["pt-BR","Português (Brasil)"],["ru","Русский"],["es","Español"],["tr","Türkçe"]];
+var pick=function(s){
+  var p=String(s||"").toLowerCase().replace(/_/g,"-").split("-"),l=p[0],i;
+  if(l==="zh"){for(i=1;i<p.length;i++){if(/^(hant|tw|hk|mo)$/.test(p[i]))return"zh-Hant";if(/^(hans|cn|sg)$/.test(p[i]))return"zh-Hans";}return"zh-Hans";}
+  if(l==="pt")return"pt-BR";if(l==="in")return"id";
+  for(i=0;i<L.length;i++)if(L[i][0].toLowerCase()===l)return L[i][0];
+  return"";
+};
+var q=null,lang="",saved="",h=document.documentElement;
+try{q=new URLSearchParams(location.search).get("lang");}catch(e){}
+try{saved=localStorage.getItem("lynx-lang")||"";}catch(e){}
+lang=pick(q)||pick(saved);
+if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
+lang=lang||"en";
+if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
+window.LYNX_LANG=lang;window.LYNX_V="103b886a";
+var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
+(window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
+  k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
+h.lang=lang;h.classList.remove("nojs");if(location.search.indexOf("shot")>=0)h.classList.add("shot");
+else if(window.IntersectionObserver&&window.matchMedia&&!matchMedia("(prefers-reduced-motion: reduce)").matches)h.classList.add("mo");
+if((" "+(h.getAttribute("data-wt")||"")+" ").indexOf(" "+lang+" ")>=0)h.classList.add("wt");
+if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.remove("i18n-wait");},2500);}
+})();
+</script>
+<meta name="theme-color" content="#0d0e12">
+<link rel="icon" type="image/png" sizes="64x64" href="/assets/img/favicon.png?v=0.1.26-logo2">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png?v=0.1.26-logo2">
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/img/favicon-16.png?v=0.1.26-logo2">
+<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png?v=0.1.26-logo2">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css?v=103b886a">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a href="/" class="brand"><img src="/assets/img/logo.png?v=0.1.26-logo2" srcset="/assets/img/favicon-32.png?v=0.1.26-logo2 1x, /assets/img/favicon.png?v=0.1.26-logo2 2x, /assets/img/logo.png?v=0.1.26-logo2 4x" alt="" width="32" height="32">LYNX SHARE</a>
+  <nav class="links" aria-label="Site"><a href="/features/" data-i18n="nav.features">Features</a><a href="/learn/" aria-current="page" data-i18n="nav.learn">Learn</a><a href="/why/" data-i18n="nav.why">Why LYNX</a><a href="/instruments-and-effects/" data-i18n="nav.cat">Plugins</a><a href="/updates/" data-i18n="nav.updates">Updates</a><a href="/wiki/" data-i18n="nav.wiki">Wiki</a><a href="/faq/" data-i18n="nav.faq">FAQ</a></nav>
+  <div class="navbtns">
+    <label class="lang"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg><span id="langCode" aria-hidden="true">EN</span><select id="lang" aria-label="Language" data-i18n-aria="aria.lang"></select></label>
+    <a class="btn btn-red btn-sm" href="/download/" data-i18n="nav.download">Download</a>
+  </div>
+</div></header>
+<main>
+<div class="phead"><div class="wrap"><h1 data-i18n="lr.h1">Learn LYNX SHARE</h1><p data-i18n="lr.sub">Short videos with the same steps written out, and a page for each program you may be coming from.</p></div></div><div class="wrap learnhub"><ol class="start3"><li><b data-i18n="lr.s1">Download</b><span data-i18n="lr.s1d">Free for Windows, macOS and Linux. <a href="/download/">Download page</a></span></li><li><b data-i18n="lr.s2">Pick how you like to work</b><span data-i18n="lr.s2d">From 0.1.31 the first start asks where you are coming from and opens the layout that fits. In 0.1.30: View › Layout style.</span></li><li><b data-i18n="lr.s3">Watch a first video</b><span data-i18n="lr.s3d">One minute: <a href="/learn/simple-beat/">make a beat in the Simple layout</a>.</span></li></ol><h2 data-i18n="lr.tutT">Tutorials</h2><div class="tcards"><article class="tcard"><a class="tthumb" href="/learn/simple-beat/" tabindex="-1" aria-hidden="true"><img src="/assets/img/learn/simple-beat-en.webp" alt="" loading="lazy" width="640" height="360"><span class="tlen">1:04</span></a><div class="tb"><h3><a href="/learn/simple-beat/" data-i18n="lt.simple-beat.t">Make a beat in the Simple layout</a></h3><p data-i18n="lt.simple-beat.s">From the first start to a beat of your own in about a minute: the starter beat, the Drum Machine and the tempo.</p><p class="tmeta"><span data-i18n="lr.l.simple">Simple layout</span> · <span>1:04</span> · <span data-i18n="lr.lv.beginner">Beginner</span></p></div></article><article class="tcard"><a class="tthumb" href="/learn/record-voice/" tabindex="-1" aria-hidden="true"><img src="/assets/img/learn/record-voice-en.webp" alt="" loading="lazy" width="640" height="360"><span class="tlen">1:07</span></a><div class="tb"><h3><a href="/learn/record-voice/" data-i18n="lt.record-voice.t">Record your voice</a></h3><p data-i18n="lt.record-voice.s">Add a Voice track in the Simple layout, record a take over the beat, put an effect on it and listen.</p><p class="tmeta"><span data-i18n="lr.l.simple">Simple layout</span> · <span>1:07</span> · <span data-i18n="lr.lv.beginner">Beginner</span></p></div></article><article class="tcard"><a class="tthumb" href="/learn/online-session/" tabindex="-1" aria-hidden="true"><img src="/assets/img/learn/online-session-en.webp" alt="" loading="lazy" width="640" height="360"><span class="tlen">1:14</span></a><div class="tb"><h3><a href="/learn/online-session/" data-i18n="lt.online-session.t">Start an online session</a></h3><p data-i18n="lt.online-session.s">Make music with friends over the internet: start a live session, send the invite code, let them in and work on one project together.</p><p class="tmeta"><span data-i18n="lr.l.any">Any layout</span> · <span>1:14</span> · <span data-i18n="lr.lv.beginner">Beginner</span></p></div></article></div><h2 id="coming-from" data-i18n="lr.fromT">Coming from another program?</h2><p class="lead" data-i18n="lr.fromL">What is the same, what is different, which layout to pick and where things are.</p><div class="fcards"><a class="fcard" href="/wiki/coming-from-bandlab/"><small data-i18n="lr.from">Coming from</small><b data-i18n="lr.from.mobile">BandLab, FL Studio Mobile or GarageBand</b></a><a class="fcard" href="/wiki/coming-from-fl-studio/"><small data-i18n="lr.from">Coming from</small><b data-i18n="lr.from.fl">FL Studio</b></a><a class="fcard" href="/wiki/coming-from-ableton/"><small data-i18n="lr.from">Coming from</small><b data-i18n="lr.from.live">Ableton Live or Bitwig</b></a><a class="fcard" href="/wiki/coming-from-other-daws/"><small data-i18n="lr.from">Coming from</small><b data-i18n="lr.from.other">Logic, Cubase or Reaper</b></a><a class="fcard" href="/learn/simple-beat/"><small data-i18n="lr.newS">New to music software?</small><b data-i18n="lr.newB">Start with the Simple layout</b></a></div><p class="note" data-i18n="lr.tm">Program names on this page are trademarks of their owners. LYNX SHARE is an independent program, not affiliated with or endorsed by them.</p><p class="note" data-i18n="lr.more">More in the <a href="/wiki/">wiki</a>: <a href="/wiki/first-song/">your first song</a>, <a href="/wiki/layouts/">the three layouts</a> and <a href="/wiki/shortcuts/">every shortcut</a>.</p></div>
+</main>
+<footer><div class="wrap">
+  <a href="/" class="brand" style="font-size:16px"><img src="/assets/img/logo.png?v=0.1.26-logo2" srcset="/assets/img/favicon-32.png?v=0.1.26-logo2 1x, /assets/img/favicon.png?v=0.1.26-logo2 2x, /assets/img/logo.png?v=0.1.26-logo2 4x" alt="" width="26" height="26" style="width:26px;height:26px">LYNX SHARE</a>
+  <span>© 2026 · AGPL-3.0</span>
+  <span data-i18n="f.logo">Logo by w3teal</span>
+  <div class="links2"><a href="https://github.com/Ka1-S/LYNX-SHARE">GitHub</a><a href="https://github.com/Ka1-S/LYNX-SHARE/releases">Releases</a><a href="https://github.com/Ka1-S/LYNX-SHARE/issues">Issues</a><a href="https://discord.gg/XHKkbtbkY">Discord</a><a href="/#support" data-i18n="f.support">Support</a><a href="/#signing" data-i18n="f.sign">Code signing &amp; privacy</a></div>
+  <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
+</div></footer>
+<script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
+<script src="/assets/site.js?v=103b886a" defer></script>
+<script src="/assets/motion.js?v=103b886a" defer></script>
+</body>
+</html>

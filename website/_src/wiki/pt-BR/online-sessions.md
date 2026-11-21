@@ -65,7 +65,7 @@ O menu `Arquivo › Sessão online` tem estes comandos enquanto uma sessão est�
 | `Seguir o transporte de quem criou a sessão` | Para convidados: tocar, parar e a posição seguem os de quem criou a sessão |
 | `Pessoas e permissões...` | Para quem criou a sessão: o que cada pessoa pode alterar e com o que cada uma fica no fim |
 | `Compartilhar plugins com quem entrar...` | Para o host: quais dos seus plugins os convidados podem usar. O item do menu mostra quantos estão compartilhados |
-| `Mostrar código de convite...` | Para quem criou a sessão: mostra o código de novo, com um botão `Copia` |
+| `Mostrar código de convite...` | Para quem criou a sessão: mostra o código de novo, com um botão `Copiar` |
 | `Encerrar sessão ao vivo` | Para quem criou a sessão. Todos saem e o código deixa de funcionar |
 | `Sair da sessão ao vivo` | Para um convidado. Sua parte do projeto fica com você |
 

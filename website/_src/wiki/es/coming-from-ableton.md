@@ -1,9 +1,24 @@
 ---
-source: cee352e3d5
+source: 113a3155f8
 ---
 ![El diseño de lanzamiento de clips: una cuadrícula de clips con escenas junto a la Playlist](/assets/img/cliplaunch.webp)
 
 LYNX SHARE arranca en el diseño Patrón: un Channel Rack, patrones y una Playlist. El diseño de lanzamiento de clips es opcional y añade una cuadrícula de clips con escenas junto a la Playlist. LYNX SHARE lee y escribe sets `.als`. No está afiliado a Ableton.
+
+Esta página también es para quienes usan Bitwig Studio: la cuadrícula de clips funciona igual, y los archivos DAWproject de Bitwig (`.dawproject`) se abren con `Archivo › Abrir...` y se escriben con `Archivo › Exportar › DAWproject (.dawproject)...`.
+
+## Tus primeros pasos
+
+1. **Elige el diseño.** La primera vez que arranca LYNX SHARE, una tarjeta de bienvenida pregunta de dónde vienes (0.1.31). Haz clic en `Ableton Live o Bitwig`: se abre el Diseño de lanzamiento de clips. En la 0.1.30, elige `Ver › Estilo de diseño › Diseño de lanzamiento de clips`.
+2. **Llena una ranura.** Arrastra un sample o un patrón del Browser a una ranura, o haz clic derecho en una ranura vacía y elige `Poner un patrón aquí`.
+3. **Lanza.** Haz clic en el triángulo a la izquierda de un clip, o en el triángulo de una escena en la columna `Escenas` para lanzar toda la fila. O abre uno de tus sets `.als` (abajo).
+
+Qué es distinto de Live:
+
+- La Playlist es el arreglo, y sus pistas son las columnas de la cuadrícula. Una pista que lanzó un clip se queda en la cuadrícula hasta que pulsas `Volver a la Playlist`.
+- Fuera de la cuadrícula, las teclas siguen a FL Studio. `Ctrl+Z` deshace un paso y, pulsado otra vez, lo rehace.
+- Solo se convierten algunos de los dispositivos propios de Live (consulta Conviene saber). Los plugins de terceros pasan con su estado.
+- El Diseño Patrón, la forma de trabajar de FL Studio con Channel Rack y patrones, funciona sobre el mismo proyecto.
 
 ## Abrir un set de Live
 
@@ -83,3 +98,4 @@ Un informe tras la exportación lista lo que quedó fuera.
 - [Importar proyectos](/wiki/importing-projects/)
 - [Formatos de archivo](/wiki/file-formats/)
 - [Dos diseños en un solo programa](/why/#workflows)
+- [Aprende: tutoriales](/learn/)

@@ -1,9 +1,22 @@
 ---
-source: 3bf7e0c0ab
+source: 68d518394b
 ---
 LYNX SHARE mempertahankan alur kerja yang sudah kamu kenal: Channel Rack, pattern, Playlist, dan Mixer, dengan tombol yang sama. Program ini membuka proyek `.flp` secara langsung dan bisa menulisnya kembali.
 
 LYNX SHARE adalah program independen. Program ini tidak berafiliasi dengan, didukung, atau disponsori oleh Image-Line, dan tidak berisi kode Image-Line. FL Studio adalah merek dagang terdaftar milik Image-Line Software.
+
+## Langkah pertamamu
+
+1. **Pilih tata letak.** Saat LYNX SHARE pertama kali dijalankan, sebuah kartu sambutan menanyakan dari mana kamu datang (0.1.31). Klik `FL Studio`: kamu mendapat tata letak Pattern, yang bawaan, dengan Channel Rack, Piano roll, Playlist, dan Mixer. Tombol Lewati di kartu itu melakukan hal yang sama.
+2. **Buka proyek.** Buka salah satu proyek `.flp`-mu (di bawah), atau klik step di Channel Rack untuk membuat beat.
+3. **Temukan plugin-mu.** LYNX SHARE memindai folder plugin yang umum di latar belakang. Untuk folder milikmu sendiri, buka `Opsi › Pengelola plugin...`, klik `Folder plugin...`, tambahkan folder itu, lalu klik `Cari plugin baru`.
+
+Yang berbeda dari FL Studio:
+
+- Plugin bawaan FL Studio dimainkan di engine yang dibuat ulang LYNX SHARE, masing-masing dengan tingkat kualitas (di bawah). FL Studio sendiri tidak diperlukan untuk membuka `.flp`.
+- Tambahan khas LYNX SHARE mati sampai kamu menyalakannya di `Opsi › Ekstra LYNX...`.
+- Dua tata letak lain bekerja di proyek yang sama: Clip-launch (kisi klip dengan scene) dan Sederhana (satu jendela dengan track, loop, dan perekaman cepat).
+- [Sesi online](/learn/online-session/) menempatkan sampai 4 orang dalam satu proyek, secara langsung.
 
 ## Membuka proyek .flp
 
@@ -90,3 +103,4 @@ File itu adalah proyek FL Studio 2026. Sampler, clip audio, generator dan efek b
 - [Format file](/wiki/file-formats/)
 - [Pintasan](/wiki/shortcuts/)
 - [Yang hanya dilakukan LYNX SHARE dengan pengaturan FL](/why/#fl-settings)
+- [Belajar: tutorial](/learn/)

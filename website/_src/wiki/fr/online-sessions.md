@@ -65,7 +65,7 @@ Le menu `Fichier › Session en ligne` contient ces commandes tant qu'une sessio
 | `Suivre le transport de l'hôte` | Pour les invités : la lecture, l'arrêt et la position suivent l'hôte |
 | `Personnes et autorisations...` | Pour l'hôte : ce que chaque personne peut modifier, et ce que chacune garde à la fin |
 | `Partager des plugins avec les personnes invitées...` | Pour l'hôte : lesquels de vos plugins les invités peuvent utiliser. L'élément de menu indique combien sont partagés |
-| `Afficher le code d'invitation...` | Pour l'hôte : affiche de nouveau le code, avec un bouton `Copie` |
+| `Afficher le code d'invitation...` | Pour l'hôte : affiche de nouveau le code, avec un bouton `Copier` |
 | `Mettre fin à la session en direct` | Pour l'hôte. Tout le monde part, et le code cesse de fonctionner |
 | `Quitter la session en direct` | Pour un invité. Votre partie du projet reste chez vous |
 

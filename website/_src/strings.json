@@ -84,6 +84,15 @@
     "wkg.start.d": "What LYNX SHARE is, installing it, setting up sound, a tour of the window and a first song from an empty project to an exported file.",
     "wkg.work.d": "One page per window, then the things you do in them: automation, recording, exporting, MIDI controllers, undo, online sessions and opening projects from other DAWs.",
     "wkg.plug.d": "How the built-in plugins work, and a page for each one: what it is for, its controls in a table and a few tips.",
-    "wkg.ref.d": "Every settings page, the shortcuts, file formats, the command line, building from source and what to do when something goes wrong."
+    "wkg.ref.d": "Every settings page, the shortcuts, file formats, the command line, building from source and what to do when something goes wrong.",
+    "m.learn.d": "Learn LYNX SHARE: short tutorial videos with the steps written out, and pages for people coming from BandLab, FL Studio Mobile, GarageBand, FL Studio, Ableton Live, Logic, Cubase or Reaper.",
+    "lr.l.simple": "Simple layout",
+    "lr.l.pattern": "Pattern layout",
+    "lr.l.clip": "Clip-launch layout",
+    "lr.l.any": "Any layout",
+    "lr.lv.beginner": "Beginner",
+    "wkg.from.d": "Where things are when you know another program: BandLab, FL Studio Mobile, GarageBand, FL Studio, Ableton Live, Bitwig, Logic, Cubase or Reaper, and the Simple layout.",
+    "lr.yt": "Watch on YouTube",
+    "lr.ytN": "The YouTube player loads only after this click."
   }
 }
