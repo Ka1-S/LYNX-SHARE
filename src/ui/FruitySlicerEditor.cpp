@@ -15,6 +15,10 @@
 #include "engine/AudioEngine.h"
 #include "engine/SampleLibrary.h"
 #include "ui/FrameTicker.h"
+#include "core/AudioEdit.h"
+#include "ui/AudioClipboard.h"
+#include "ui/BrowserComponent.h"
+#include "ui/HintBar.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 #include "ui/ValueControl.h"
@@ -57,6 +61,8 @@ public:
     std::function<void (int)> select;
     std::function<void (int, std::int32_t)> moveSlice;   // slice, new start
     std::function<void (int, std::int32_t)> menu;        // slice under the mouse, frame under the mouse
+    std::function<void (int)> audition;                  // (round 190oa, DP-54: FL's right-click selects and plays)
+    std::function<juce::String (int)> describe;          // (round 190oa: the slice's hint, its trigger key)
 
     void paint (juce::Graphics& g) override
     {
@@ -131,15 +137,38 @@ public:
             if (std::abs (xOf (at[i], frames) - (float) e.x) < 4.0f)
                 dragging = (int) i;
         const auto hit = sliceAt (at, frame);
+        // round 190oa (DP-54), FL manual (Fruity Slicer › Slicer Preview): "Left-click a slice to select a new slice in
+        // the Properties View" and "Right-click to select and audition a slice"; the slice menu is the Properties
+        // view's (SliceView)
         if (e.mods.isPopupMenu())
         {
-            if (menu)
+            if (audition)
+                audition (hit);
+            else if (menu)
                 menu (hit, frame);
             return;
         }
         if (dragging < 0 && select)
             select (hit);
     }
+
+    // FL: "If you hold your mouse over a slice in this area" the hint bar names the key that triggers it
+    void mouseMove (const juce::MouseEvent& e) override
+    {
+        const auto* s = state ? state() : nullptr;
+        const auto data = sample ? sample() : nullptr;
+        if (s == nullptr || data == nullptr || data->frames() == 0 || ! describe)
+            return;
+        const auto frames = (double) data->frames();
+        const auto hit = sliceAt (starts(), (std::int32_t) std::clamp (frames * e.x / std::max (1, getWidth()), 0.0, frames - 1.0));
+        if (hit != hovered)
+        {
+            hovered = hit;
+            ui::postHint ({ describe (hit), {}, false, true }, 1500);
+        }
+    }
+    void mouseExit (const juce::MouseEvent&) override { hovered = -1; }
+    int hovered = -1;
 
     void mouseDrag (const juce::MouseEvent& e) override
     {
@@ -189,6 +218,39 @@ class SliceView final : public juce::Component
 public:
     std::function<std::shared_ptr<const SampleData>()> sample;
     std::function<std::pair<std::int64_t, std::int64_t>()> range; // first frame, frame count
+    // round 190oa (DP-54), FL manual (Fruity Slicer › Slice Properties view): "Right-click to split, remove or copy
+    // slice", "Left-click to audition and Left-click and drag to take slice out of Fruity Slicer" (to a channel)
+    std::function<void()> audition;
+    std::function<void (std::int64_t)> menu; // the frame under the mouse
+    std::function<void()> dragOut;
+
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        draggedOut = false;
+        if (e.mods.isPopupMenu())
+        {
+            if (menu && range)
+            {
+                const auto [from, count] = range();
+                menu (from + (std::int64_t) ((double) count * juce::jlimit (0.0, 1.0, (double) e.x / std::max (1, getWidth()))));
+            }
+            return;
+        }
+    }
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        if (! draggedOut && e.mods.isLeftButtonDown() && e.getDistanceFromDragStart() > 6 && dragOut)
+        {
+            draggedOut = true;
+            dragOut();
+        }
+    }
+    void mouseUp (const juce::MouseEvent& e) override
+    {
+        if (! draggedOut && ! e.mods.isPopupMenu() && e.mouseWasClicked() && audition)
+            audition();
+    }
+    bool draggedOut = false;
 
     void paint (juce::Graphics& g) override
     {
@@ -325,10 +387,21 @@ public:
         scope.starts = [this] { return original != nullptr ? fslicer::playedStarts (state, (std::int64_t) original->frames()) : std::vector<std::int32_t>(); };
         scope.selected = [this] { return selected; };
         scope.playing = [this] { return playingSlice; };
-        scope.select = [this] (int i) {
+        scope.select = [this] (int i) { // (round 190oa, DP-54: FL's left-click selects; the right-click plays it too)
+            selected = i;
+            refresh();
+        };
+        scope.audition = [this] (int i) {
+            if (i < 0)
+                return;
             selected = i;
             refresh();
             preview (i);
+        };
+        scope.describe = [this] (int i) -> juce::String {
+            if (i < 0 || i >= (int) state.slices.size())
+                return {};
+            return tr ("Slice {0}: triggered by {1}", { juce::String (i + 1), keyName (fslicer::sliceKey (state, i)) });
         };
         scope.moveSlice = [this] (int i, std::int32_t at) {
             if (i <= 0 || i >= (int) state.slices.size())
@@ -341,7 +414,7 @@ public:
             commit();
         };
         scope.menu = [this] (int slice, std::int32_t frame) { scopeMenu (slice, frame); };
-        ui::setHint (scope, tr ("Click a slice to select and play it; drag a slice start to move it; right click: remove or split"), true);
+        ui::setHint (scope, tr ("Slice preview: [LMB] select a slice  [RMB] select and play it  drag a slice start to move it"), false);
         addAndMakeVisible (scope);
 
         // BPM / BEATS: the sample's original tempo and length (FL's TempoSelect 10…999, LengthSelect 1…999)
@@ -375,6 +448,12 @@ public:
             const auto end = i + 1 < at.size() ? std::clamp<std::int64_t> (at[i + 1], from, total) : total;
             return { from, end - from };
         };
+        // round 190oa (DP-54): FL's Slice Properties view — left-click plays the slice, a left drag takes it out (onto a
+        // channel, the Playlist...), right-click: split / remove / copy
+        sliceView.audition = [this] { preview (selected); };
+        sliceView.menu = [this] (std::int64_t frame) { scopeMenu (selected, (std::int32_t) frame); };
+        sliceView.dragOut = [this] { dragSliceOut(); };
+        ui::setHint (sliceView, tr ("Slice properties: [LMB] play the slice  drag it out onto a channel or the Playlist  [RMB] split, remove or copy"), true);
         addAndMakeVisible (sliceView);
 
         engine.addChangeListener (this);
@@ -557,6 +636,63 @@ private:
         const auto* d = def();
         if (d != nullptr && (d->pluginState != lastState || d->samplePath != samplePath))
             reload();
+    }
+
+    // round 190oa (DP-54): the slice's frames in the processed sample (what it plays)
+    std::pair<std::int64_t, std::int64_t> sliceFrames (int slice) const
+    {
+        if (processed == nullptr || slice < 0 || slice >= (int) state.slices.size())
+            return { 0, 0 };
+        const auto at = fslicer::playedStarts (state, original != nullptr ? (std::int64_t) original->frames() : 0);
+        if (slice >= (int) at.size())
+            return { 0, 0 };
+        const auto total = (std::int64_t) processed->frames();
+        const auto from = std::clamp<std::int64_t> (at[(std::size_t) slice], 0, total);
+        const auto end = state.playToEnd != 0 || slice + 1 >= (int) at.size() ? total : std::clamp<std::int64_t> (at[(std::size_t) slice + 1], from, total);
+        return { from, end };
+    }
+    audioedit::Audio sliceAudio (int slice) const
+    {
+        audioedit::Audio a;
+        const auto [from, end] = sliceFrames (slice);
+        if (end <= from)
+            return a;
+        a.sampleRate = processed->sampleRate;
+        a.channels.emplace_back (processed->leftData() + from, processed->leftData() + end);
+        if (processed->isStereo())
+            a.channels.emplace_back (processed->rightData() + from, processed->rightData() + end);
+        return a;
+    }
+    void copySlice (int slice)
+    {
+        if (auto a = sliceAudio (slice); ! a.empty())
+            audioclipboard::editor() = std::move (a);
+    }
+    // FL: "Left-click and drag to take slice out of Fruity Slicer" — written to LYNX/Edits and dragged as the Browser
+    // drags a sample (the Channel rack, the Playlist and the sample channels take it, as Edison's Drag)
+    void dragSliceOut()
+    {
+        audioedit::Document part;
+        part.audio = sliceAudio (selected);
+        if (part.audio.empty())
+            return;
+        auto* container = juce::DragAndDropContainer::findParentDragContainerFor (this);
+        for (int i = 0; container == nullptr && i < juce::Desktop::getInstance().getNumComponents(); ++i) // (a window of its own)
+            if (auto* top = juce::Desktop::getInstance().getComponent (i))
+                for (auto* c : top->getChildren())
+                    if (container == nullptr)
+                        container = dynamic_cast<juce::DragAndDropContainer*> (c);
+        if (container == nullptr)
+            return;
+        const auto folder = juce::File::getSpecialLocation (juce::File::userMusicDirectory).getChildFile ("LYNX/Edits");
+        folder.createDirectory();
+        const auto base = samplePath.empty() ? juce::String ("Slice") : fileName (samplePath).upToLastOccurrenceOf (".", false, false);
+        const auto file = folder.getNonexistentChildFile (base + " (slice " + juce::String (selected + 1) + ")", ".wav");
+        const auto bytes = audioedit::encodeWav (part, audioedit::WavFormat::float32);
+        if (! file.replaceWithData (bytes.data(), bytes.size()))
+            return;
+        engine.getSampleLibrary().forget (file.getFullPathName());
+        container->startDragging (juce::String (BrowserComponent::dragDescription) + "|" + file.getFullPathName(), &sliceView, juce::ScaledImage(), true);
     }
 
     void preview (int slice)
@@ -828,12 +964,18 @@ private:
     void scopeMenu (int slice, std::int32_t frame)
     {
         juce::PopupMenu m;
-        m.addItem (1, tr ("Remove slice"), slice > 0 || state.slices.size() > 1);
         m.addItem (2, tr ("Split slice"));
+        m.addItem (1, tr ("Remove slice"), slice > 0 || state.slices.size() > 1);
+        m.addItem (3, tr ("Copy slice"), processed != nullptr); // (round 190oa: its audio to the audio clipboard)
         juce::Component::SafePointer<FruitySlicerEditor> self (this);
         m.showMenuAsync (juce::PopupMenu::Options(), [self, slice, frame] (int r) {
             if (self == nullptr || r == 0)
                 return;
+            if (r == 3)
+            {
+                self->copySlice (slice);
+                return;
+            }
             self->edit ([slice, frame, r] (State& s) {
                 if (r == 1 && slice >= 0 && slice < (int) s.slices.size() && s.slices.size() > 1)
                 {
