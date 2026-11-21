@@ -15,7 +15,6 @@
 
 #include <algorithm>
 #include <array>
-#include <unordered_map>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -442,29 +441,22 @@ ClipLook clipBody (juce::Colour clipColour, juce::Colour trackColour, ClipKind k
 
 juce::Colour liveMarkOn (juce::Colour fill, float k, float ratio, juce::Colour light)
 {
-    struct Key
+    // a direct-mapped cache (256 entries, message thread): paint asks once per clip / slot, from a handful of colours
+    struct Entry
     {
-        juce::uint32 fill, light;
-        int k, ratio;
-        bool operator== (const Key&) const = default;
+        juce::uint32 fill = 0, light = 0, chosen = 0;
+        std::int32_t k = -1, ratio = -1;
     };
-    struct Hash
-    {
-        std::size_t operator() (const Key& key) const noexcept
-        {
-            return std::hash<juce::uint64>() (((juce::uint64) key.fill << 32) ^ key.light ^ ((juce::uint64) key.k << 20) ^ (juce::uint64) key.ratio);
-        }
-    };
-    static std::unordered_map<Key, juce::uint32, Hash> cache;
-    const Key key { fill.getARGB(), light.getARGB(), juce::roundToInt (k * 1000.0f), juce::roundToInt (ratio * 100.0f) };
-    if (const auto it = cache.find (key); it != cache.end())
-        return juce::Colour (it->second);
+    static std::array<Entry, 256> cache;
+    const auto kKey = (std::int32_t) (k * 1000.0f + 0.5f), ratioKey = (std::int32_t) (ratio * 100.0f + 0.5f);
+    const auto argb = fill.getARGB(), lightArgb = light.getARGB();
+    auto& e = cache[(argb ^ (argb >> 11) ^ (lightArgb >> 3) ^ (juce::uint32) kKey ^ ((juce::uint32) ratioKey << 4)) & 255u];
+    if (e.fill == argb && e.light == lightArgb && e.k == kKey && e.ratio == ratioKey)
+        return juce::Colour (e.chosen);
     const auto opaque = fill.withAlpha (1.0f);
     const auto dark = liveShade (opaque, k);
     const auto chosen = contrast (dark, opaque) >= ratio ? dark : light;
-    if (cache.size() > 4096)
-        cache.clear();
-    cache.emplace (key, chosen.getARGB());
+    e = { argb, lightArgb, chosen.getARGB(), kKey, ratioKey };
     return chosen;
 }
 

@@ -192,6 +192,9 @@
                 ui.selectTabForSnapshot (2);
                 settle();
                 auto& pl = ui.getPlaylistForSnapshot();
+                // (Live's collapsed 19 px lanes draw no fades: the Clip-launch picture with View › Tall Arrangement lanes)
+                const juce::ScopedValueSetter<bool> tall (playlistTallLiveLanes(), style == layoutstyle::Style::clipLaunch);
+                pl.liveLanesChanged();
                 pl.setViewForSnapshot (220.0, 0, 0);
                 ui::WaveformCache::getInstance()->find (wav.getFullPathName(), [&offline, &wav] { return offline.getSampleLibrary().load (wav.getFullPathName()); });
                 ui::WaveformCache::getInstance()->waitUntilIdle (20000);
@@ -200,6 +203,8 @@
                 const auto row = pl.trackRowForSnapshot (0);
                 const auto x1 = (int) std::lround (pl.xOfTickForSnapshot ((double) (2 * bar)));
                 both (pl, juce::Rectangle<int> (0, 0, juce::jmin (pl.getWidth(), x1 + 60), row.getBottom() + 4), juce::String (tag) + "-fades");
+                playlistTallLiveLanes() = false;
+                pl.liveLanesChanged();
             }
             ui.setLayoutStyle (layoutstyle::Style::pattern);
             settle();
