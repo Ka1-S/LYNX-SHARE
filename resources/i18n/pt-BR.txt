@@ -12208,3 +12208,10 @@ countries: br
 "The longest single call since the reset, in milliseconds (red: half of the audio buffer or more)" = "A chamada mais longa desde o reset, em milissegundos (vermelho: metade do buffer de áudio ou mais)"
 "Calls that took more than half of the time their own audio lasts: one plugin alone near the deadline, what makes the sound stutter" = "Chamadas que levaram mais da metade do tempo que o próprio áudio dura: um plugin sozinho perto do limite, o que faz o som engasgar"
 "Live part {0}%, rendered ahead {1}% (together {2}% of one core)." = "Parte ao vivo {0}%, renderizado adiantado {1}% (juntos {2}% de um núcleo)."
+
+# round 190ok: safe overloads (P24), generator smart disable (D2), the smart-disable tip (D1)
+"Safe overloads" = "Sobrecargas seguras"
+"No risk of GUI freezing when overloads occur" = "Sem risco de a interface travar quando houver sobrecarga"
+"Smart disable for new instrument plugins" = "Desativação inteligente para novos plugins de instrumento"
+"New channels with an instrument plugin get Smart disable on: the plugin is not called while it gets no notes and its sound has been silent for 4 seconds. FL Studio starts a new generator with it off." = "Novos canais com um plugin de instrumento ficam com a desativação inteligente ligada: o plugin não é chamado enquanto não recebe notas e seu som está em silêncio há 4 segundos. O FL Studio cria um gerador novo com ela desligada."
+"Tip: Smart disable is off on {0} of {1} effects. Try Tools > Macros > Switch smart disable for all plugins" = "Dica: a desativação inteligente está desligada em {0} de {1} efeitos. Experimente Ferramentas > Macros > Ativar a desativação inteligente em todos os plugins"

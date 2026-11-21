@@ -913,7 +913,7 @@ public:
                                                                  &formatLabel, &formatBox, &takeNames, &latencyTitle, &latencyText, &pingOutLabel, &pingOutBox,
                                                                  &pingInLabel, &pingInBox, &measureButton, &pingNote, &useMeasured, &offsetLabel, &offsetSlider, &offsetNote,
                                                                  &mixerTitle, &metronomeTrackLabel, &metronomeTrackBox, &metronomeTrackNote, &playTruncated, &resetPlugins,
-                                                                 &autoClose, &cpuTitle, &threadGenerators, &threadMixer, &smartDisableAll, &renderAhead, &resamplingLabel, &resamplingBox, &resamplingNote })
+                                                                 &autoClose, &safeOverloads, &cpuTitle, &threadGenerators, &threadMixer, &smartDisableAll, &renderAhead, &resamplingLabel, &resamplingBox, &resamplingNote })
             add (*c);
         setupRecordingControls();
         setupMixerControls();
@@ -1013,6 +1013,7 @@ private:
             testButton.setBounds (row.removeFromLeft (150));
         }
         autoClose.setBounds (r.indented (24)); // (FL: "Auto close", under the device in the Input / output panel)
+        safeOverloads.setBounds (r.indented (24)); // (round 190ok: FL's "Safe overloads", the same panel)
         r.section (statusTitle);
         status.setBounds (r.full (22));
         load.setBounds (r.full (22));
@@ -1107,6 +1108,8 @@ private:
         };
         flag (autoClose, tr ("Auto close"),
               tr ("Free the audio device for other applications while LYNX SHARE is in the background and nothing plays or records"), o.autoCloseDevice);
+        // FL's "Safe overloads" (round 190ok, FL's hint; core/OverloadGuard.h): on by default, as in FL
+        flag (safeOverloads, tr ("Safe overloads"), tr ("No risk of GUI freezing when overloads occur"), o.safeOverloads);
         flag (threadGenerators, tr ("Multithreaded generator processing"), tr ("May increase CPU performance"), o.multithreadGenerators);
         flag (threadMixer, tr ("Multithreaded mixer processing"), tr ("May increase CPU performance"), o.multithreadMixer);
         flag (smartDisableAll, tr ("Smart disable"),
@@ -1540,7 +1543,7 @@ private:
     juce::String pingResult;
     SectionTitle mixerTitle { tr ("Mixer") };
     // FL's Settings › Audio options of round 190bx (core/FlSettings.h)
-    juce::ToggleButton autoClose;
+    juce::ToggleButton autoClose, safeOverloads;
     SectionTitle cpuTitle { tr ("CPU") };
     juce::ToggleButton threadGenerators, threadMixer, smartDisableAll, renderAhead;
     juce::Label resamplingLabel, resamplingNote;

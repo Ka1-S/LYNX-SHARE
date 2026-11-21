@@ -12,6 +12,8 @@
 //                                            not the program in front
 //   General › Misc   restoreStateAfterSolo   "Restore previous state after solo"
 //                    autoNameChannels        "Auto name channels"
+//                    safeOverloads           "Safe overloads" (round 190ok, core/OverloadGuard.h): in a real overload
+//                                            with the UI starving, the audio gives up a slice of the CPU (FL: checked)
 //   General › Adv.   readSampleTempo         "Read sample tempo information"
 //   General › Undo   historyNewestFirst      "Show recent changes at the top"
 //                    undoKnobTweaks          "Undo knob tweaks" (round 190mv; AudioEngine::controlTweakedForUndo)
@@ -70,6 +72,7 @@ struct Options
     std::atomic<bool> restoreStateAfterSolo { false };
     std::atomic<bool> autoNameChannels { true };
     std::atomic<bool> readSampleTempo { true };
+    std::atomic<bool> safeOverloads { true }; // round 190ok (FL's SafeOverloadBox: Checked)
     std::atomic<bool> historyNewestFirst { false };
     std::atomic<bool> historyOnUndo { false };
     std::atomic<bool> undoKnobTweaks { true }; // round 190mv (DF-134): FL's General › Undo history › "Undo knob tweaks"
@@ -97,6 +100,7 @@ inline void reset() noexcept
     o.autoNameChannels = true;
     o.readSampleTempo = true;
     o.historyNewestFirst = false;
+    o.safeOverloads = true;
     o.historyOnUndo = false;
     o.undoKnobTweaks = true;
     o.projectSizeWarnMb = projectSizeDefault;
@@ -140,6 +144,7 @@ inline bool parse (std::string_view key, std::string_view value) noexcept
     if (key == "flReadSampleTempo") return flag (o.readSampleTempo, true);
     if (key == "flHistoryNewestFirst") return flag (o.historyNewestFirst, false);
     if (key == "flHistoryOnUndo") return flag (o.historyOnUndo, false);
+    if (key == "flSafeOverloads") return flag (o.safeOverloads, true);
     if (key == "flUndoKnobTweaks") return flag (o.undoKnobTweaks, true);
     if (key == "flClickHold") return flag (o.clickHold, false);
     if (key == "flBothButtonsSteps") return flag (o.bothButtonsSteps, false);
@@ -175,6 +180,7 @@ inline std::string serialise()
            + flag ("flHistoryNewestFirst", o.historyNewestFirst.load())
            + flag ("flHistoryOnUndo", o.historyOnUndo.load())
            + flag ("flUndoKnobTweaks", o.undoKnobTweaks.load())
+           + flag ("flSafeOverloads", o.safeOverloads.load())
            + "\nflProjectSizeWarnMb=" + std::to_string (o.projectSizeWarnMb.load())
            + flag ("flClickHold", o.clickHold.load())
            + flag ("flBothButtonsSteps", o.bothButtonsSteps.load())

@@ -13627,6 +13627,10 @@ private:
                                 before = b.seconds, cyclesBefore = b.cycles;
                         const auto used = t.seconds - before;
                         const auto exact = cycleRate > 0.0 ? 100.0 * (double) (t.cycles - cyclesBefore) / cycleRate / (wall / 1000.0) : -1.0;
+                    // round 190ok (P24): Settings › Audio › "Safe overloads" (core/OverloadGuard.h), since the start
+                    const auto& guard = app.engine->getOverloadGuard();
+                    text << "    safe overloads " << (guard.isEnabled() ? "on" : "off") << ": engaged " << (juce::int64) guard.timesEngaged()
+                         << " times" << (guard.engaged() ? " (now)" : "") << ", yielded " << juce::String (guard.yieldedMs(), 0) << " ms\n";
                         if (used > 0.0005 || exact > 0.05)
                             rows.push_back ({ exact >= 0.0 ? exact : 100.0 * 1000.0 * used / wall,
                                               juce::String (t.id) + " " + (t.name.empty() ? juce::String ("(unnamed)") : juce::String (t.name)) + " "
@@ -13890,6 +13894,10 @@ private:
             int automation = -1;
             for (const auto& c : engine->getSong().playlist)
                 if (c.kind == lynx::ClipKind::automation && c.automation >= 0 && automation < 0)
+            // round 190ok (P24): LYNX_UIPERF_RECOVERY=1 — the song stopped after it, 3 s: the safe-overload guard lets go
+            // and the callbacks keep their deadline again (the report's "safe overloads" line: no "(now)")
+            if (juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_RECOVERY", "0") == "1")
+                run->steps.push_back ({ "overlay A/B: playlist maximised, stopped after the song (recovery)", [this] { engine->stop(); }, {}, 3000 });
                     automation = c.automation;
             if (automation >= 0)
             {
