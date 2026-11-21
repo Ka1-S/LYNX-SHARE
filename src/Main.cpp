@@ -3319,6 +3319,16 @@ public:
             return;
         }
 
+        // --rackauto190owshot <prefix> [project.flp] [probe.flp] (round 190ow, PAT-7 rest / DE-123): src/RackAuto190owShot.inc
+        if (args.contains ("--rackauto190owshot"))
+        {
+            const auto i = args.indexOf ("--rackauto190owshot");
+            const auto arg = [&args] (int k) { return k < args.size() && ! args[k].startsWith ("--") ? args[k].unquoted() : juce::String(); };
+            setApplicationReturnValue (runRackAuto190owShot (args[i + 1].unquoted(), arg (i + 2), arg (i + 3)) ? 0 : 1);
+            quit();
+            return;
+        }
+
         // --design190ooshot <prefix> [project] (round 190oo, design review 2): src/Design190ooShot.inc
         if (args.contains ("--design190ooshot"))
         {
@@ -8460,6 +8470,60 @@ private:
                 rackauto190ooResult = "ERROR copy for 0.1.30";
         }
 
+        // round 190ow (PAT-7 rest, details DE-123; core/RackAutomation.h): what the automation clip rows play. A .lynx round
+        // trip keeps the steps / notes on the rows (Pattern::autoNotes), the clips' MIN / MAX and their mute light; a
+        // project without them writes none of the keys; the copy for 0.1.30 drops the steps (a loss line: 0.1.30 starts
+        // no clip from a pattern), writes the MIN / MAX into the points (the same values play there) and leaves a muted
+        // clip without a target (it stays silent), with a loss line each.
+        juce::String rackauto190owResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            lynx::Automation duck;
+            duck.name = "duck";
+            duck.points = { { 0, 0.0f, 0.0f }, { lynx::ppq, 1.0f, 0.0f } };
+            duck.target = { lynx::AutomationTargetKind::mixerVolume, 0, 0, 0 };
+            duck.rangeMin = 0.25f;
+            duck.rangeMax = 0.75f;
+            auto quiet = duck;
+            quiet.name = "quiet";
+            quiet.rangeMin = 0.0f;
+            quiet.rangeMax = 1.0f;
+            quiet.muted = true;
+            song.automations = { duck, quiet };
+            song.patterns[0].toggleAutoStep (0, 0);
+            song.patterns[0].toggleAutoStep (0, 4);
+            lynx::Note held;
+            held.start = 8 * lynx::ticksPerStep;
+            held.length = 0; // (FL's step of no length)
+            held.channel = 1;
+            held.key = 64;
+            song.patterns[0].autoNotes.push_back (held);
+            song.patterns[0].sortNotes();
+            juce::String why;
+            const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), why);
+            if (! back || back->patterns.empty() || back->patterns[0].autoNotes != song.patterns[0].autoNotes || back->automations.size() != 2
+                || back->automations[0].rangeMin != 0.25f || back->automations[0].rangeMax != 0.75f || back->automations[1].muted != true
+                || back->automations[0].muted || ! back->patterns[0].hasAutoStep (0, 4))
+                rackauto190owResult = "ERROR round trip " + why;
+            const auto plainJson = lynx::ProjectFile::toJson (lynx::Song::makeDefault());
+            if (rackauto190owResult == "OK" && (plainJson.contains ("autoNotes") || plainJson.contains ("\"range\"")))
+                rackauto190owResult = "ERROR keys written for a project without them";
+            const auto copy = lynx::olderlynx::forRelease (song, "0.1.30");
+            int lossLines = 0;
+            for (const auto& l : copy.lost)
+                lossLines += juce::String (l.text).contains ("automation clip") || juce::String (l.text).contains ("Muted automation") ? 1 : 0;
+            if (rackauto190owResult == "OK" && (! copy.ok || copy.json.contains ("autoNotes") || copy.json.contains ("\"range\"") || lossLines < 2))
+                rackauto190owResult = "ERROR copy for 0.1.30 (" + juce::String (lossLines) + " loss lines)";
+            if (rackauto190owResult == "OK")
+                if (const auto old = lynx::ProjectFile::fromJson (copy.json, why); ! old || old->automations.size() != 2
+                    || std::abs (old->automations[0].points[0].value - 0.25f) > 1.0e-3f || std::abs (old->automations[0].points[1].value - 0.75f) > 1.0e-3f
+                    || old->automations[1].target.kind != lynx::AutomationTargetKind::none)
+                    rackauto190owResult = "ERROR the copy's values";
+            const auto copy28 = lynx::olderlynx::forRelease (song, "0.1.28");
+            if (rackauto190owResult == "OK" && (! copy28.ok || copy28.json.contains ("autoNotes")))
+                rackauto190owResult = "ERROR copy for 0.1.28";
+        }
+
         const auto motionOverlayResult = lynx::ui::MotionOverlay::selfTest(); // (round 190ip)
         // round 190bm (0.1.25 showed the Mixer and the Playlist black): their cached pictures shown on native and
         // software targets against straight paints (ui/PictureCheck.h; --picturetest runs more sizes and scales)
@@ -8499,7 +8563,7 @@ private:
                         && mixerBasics == "OK" && fontsResult == "OK" && paintCachesResult.startsWith ("OK") && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && takeoverOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && exportParity.startsWith ("OK") && exportLive.startsWith ("OK") && midiHotplug.startsWith ("OK") && midiOutPorts.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
-                        && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && rackauto190ooResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
+                        && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && rackauto190ooResult == "OK" && rackauto190owResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
@@ -8576,6 +8640,7 @@ private:
                << "trackclips190ne=" << trackclips190neResult << "\n"
                << "tracker190nw=" << tracker190nwResult << "\n"
                << "rackauto190oo=" << rackauto190ooResult << "\n"
+               << "rackauto190ow=" << rackauto190owResult << "\n"
                << "midigen190fm_saved=" << midigen190fmResult << "\n"
                << "trackauto190gz_saved=" << trackauto190gzResult << "\n"
                << "clipenv190gi_saved=" << clipenv190giResult << "\n"
@@ -18157,6 +18222,7 @@ private:
 #include "Rollup031S3Shot.inc" // rollup 0.1.31 step 3 (round 190ny)
 #include "Design190ojShot.inc" // round 190oj (design review of every view)
 #include "Design190ooShot.inc" // round 190oo (design review 2: the owner's options and the round's fixes)
+#include "RackAuto190owShot.inc" // round 190ow (PAT-7 rest, DE-123: the automation clip rows at work)
 #include "DetailsShot190kn.inc" // round 190kn
 #include "DetailsShot190ld.inc" // round 190ld
 #include "DetailsShot190lr.inc" // round 190lr
