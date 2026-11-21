@@ -104,7 +104,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         add (S::plugin, "id name state foreign fixedBuffers separateProcess threaded maxSizeBuffers allowSmartDisable hostMaxBuffer "
              "midiInPort midiOutPort notifyRender latencyMs releaseVelocity sendBendRange bendRange modXAftertouch "
              "allNotesOffOnStop resetOnFlush sendLoopPosition allowHostKeys hostKeysFirst bitSize detached outputs "
-             "mpe processInactive inputs pinnedOnTop velocityMode fixedVelocity recordOwnNotes");
+             "mpe processInactive inputs pinnedOnTop velocityMode fixedVelocity recordOwnNotes dpiAware scaleEditorDimensions");
         // Online Sessions: the participant whose LYNX plays the plugin, and the values it shares
         add (S::plugin, "playedBy values", S::readOnly);
         add (S::origin, "plugin state print");

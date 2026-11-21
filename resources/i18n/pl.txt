@@ -12147,3 +12147,8 @@ countries: pl
 "Pinned relationships first in their lists (off: only highlighted)" = "Przypięte relacje na początku list (wył.: tylko wyróżnione)"
 "Click a chord to insert it after the selection. Click a key to see what it lends. The star pins a relationship in every key." = "Kliknij akord, aby wstawić go po zaznaczeniu. Kliknij tonację, aby zobaczyć, co pożycza. Gwiazdka przypina relację w każdej tonacji."
 "{0} key marker(s) in the Piano roll keep their names but not their keys (the rows show the Piano roll's own scale)" = "{0} znacznik(ów) tonacji w Piano roll zachowuje nazwy, ale nie tonacje (wiersze pokazują własną skalę Piano roll)"
+"GUI" = "Interfejs"
+"DPI aware (requires reloading the plugin)" = "Obsługa DPI (wymaga ponownego wczytania wtyczki)"
+"For plugins that appear too big or small" = "Dla wtyczek, które wyglądają na zbyt duże lub zbyt małe"
+"Scale editor dimensions" = "Skaluj wymiary edytora"
+"Scale dimensions of plugins that appear cut-off on a high resolution screen" = "Skaluje wymiary wtyczek, które na ekranie o wysokiej rozdzielczości wyglądają na ucięte"

@@ -12147,3 +12147,8 @@ countries: tr
 "Pinned relationships first in their lists (off: only highlighted)" = "Sabitlenen ilişkiler listelerinin başında (kapalı: yalnızca vurgulanır)"
 "Click a chord to insert it after the selection. Click a key to see what it lends. The star pins a relationship in every key." = "Seçimden sonra eklemek için bir akora tıklayın. Neyi ödünç verdiğini görmek için bir tona tıklayın. Yıldız bir ilişkiyi her tonda sabitler."
 "{0} key marker(s) in the Piano roll keep their names but not their keys (the rows show the Piano roll's own scale)" = "Piano roll'daki {0} ton işaretçisi adlarını korur ama tonlarını kaybeder (satırlar Piano roll'un kendi gamını gösterir)"
+"GUI" = "Arayüz"
+"DPI aware (requires reloading the plugin)" = "DPI uyumlu (eklentinin yeniden yüklenmesi gerekir)"
+"For plugins that appear too big or small" = "Çok büyük veya çok küçük görünen eklentiler için"
+"Scale editor dimensions" = "Düzenleyici boyutlarını ölçekle"
+"Scale dimensions of plugins that appear cut-off on a high resolution screen" = "Yüksek çözünürlüklü ekranda kesik görünen eklentilerin boyutlarını ölçekler"

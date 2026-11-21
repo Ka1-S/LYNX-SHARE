@@ -410,6 +410,10 @@ juce::var pluginToVar (const PluginRef& p)
         o->setProperty ("allowHostKeys", true);
     if (p.hostKeysFirst)
         o->setProperty ("hostKeysFirst", true);
+    if (! p.dpiAware) // FL's wrapper Settings › GUI (round 190oh)
+        o->setProperty ("dpiAware", false);
+    if (p.scaleEditorDimensions)
+        o->setProperty ("scaleEditorDimensions", true);
     if (p.bitSize != 0)
         o->setProperty ("bitSize", p.bitSize);
     if (! p.processInactive)
@@ -486,6 +490,8 @@ PluginRef pluginFromVar (const juce::var& v)
     p.sendLoopPosition = (bool) v.getProperty ("sendLoopPosition", true);
     p.allowHostKeys = (bool) v.getProperty ("allowHostKeys", false);
     p.hostKeysFirst = (bool) v.getProperty ("hostKeysFirst", false);
+    p.dpiAware = (bool) v.getProperty ("dpiAware", true);
+    p.scaleEditorDimensions = (bool) v.getProperty ("scaleEditorDimensions", false);
     p.bitSize = (int) v.getProperty ("bitSize", 0);
     if (p.bitSize != 32 && p.bitSize != 64)
         p.bitSize = 0;

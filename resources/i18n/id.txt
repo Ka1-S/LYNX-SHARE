@@ -12147,3 +12147,8 @@ countries: id
 "Pinned relationships first in their lists (off: only highlighted)" = "Hubungan yang disematkan di awal daftar (mati: hanya disorot)"
 "Click a chord to insert it after the selection. Click a key to see what it lends. The star pins a relationship in every key." = "Klik akord untuk menyisipkannya setelah pilihan. Klik kunci untuk melihat apa yang dipinjamkannya. Bintang menyematkan hubungan di setiap kunci."
 "{0} key marker(s) in the Piano roll keep their names but not their keys (the rows show the Piano roll's own scale)" = "{0} penanda kunci di Piano roll mempertahankan nama tetapi tidak kuncinya (baris menampilkan tangga nada Piano roll sendiri)"
+"GUI" = "Antarmuka"
+"DPI aware (requires reloading the plugin)" = "Sadar DPI (perlu memuat ulang plugin)"
+"For plugins that appear too big or small" = "Untuk plugin yang tampak terlalu besar atau kecil"
+"Scale editor dimensions" = "Skalakan dimensi editor"
+"Scale dimensions of plugins that appear cut-off on a high resolution screen" = "Menskalakan dimensi plugin yang tampak terpotong di layar beresolusi tinggi"

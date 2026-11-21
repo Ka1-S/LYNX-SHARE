@@ -12147,3 +12147,8 @@ countries: nl be
 "Pinned relationships first in their lists (off: only highlighted)" = "Vastgezette relaties bovenaan hun lijsten (uit: alleen gemarkeerd)"
 "Click a chord to insert it after the selection. Click a key to see what it lends. The star pins a relationship in every key." = "Klik op een akkoord om het na de selectie in te voegen. Klik op een toonsoort om te zien wat die leent. De ster zet een relatie vast in elke toonsoort."
 "{0} key marker(s) in the Piano roll keep their names but not their keys (the rows show the Piano roll's own scale)" = "{0} toonsoortmarker(s) in de Piano roll behouden hun naam maar niet hun toonsoort (de rijen tonen de eigen toonladder van de Piano roll)"
+"GUI" = "Interface"
+"DPI aware (requires reloading the plugin)" = "DPI-bewust (plugin moet opnieuw worden geladen)"
+"For plugins that appear too big or small" = "Voor plugins die te groot of te klein lijken"
+"Scale editor dimensions" = "Editorafmetingen schalen"
+"Scale dimensions of plugins that appear cut-off on a high resolution screen" = "Schaalt de afmetingen van plugins die op een scherm met hoge resolutie afgesneden lijken"

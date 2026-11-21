@@ -12147,3 +12147,8 @@ countries: jp
 "Pinned relationships first in their lists (off: only highlighted)" = "ピン留めした関係をリストの先頭に（オフ: 強調表示のみ）"
 "Click a chord to insert it after the selection. Click a key to see what it lends. The star pins a relationship in every key." = "コードをクリックすると選択の後に挿入します。キーをクリックすると借用できるコードを表示します。星はすべてのキーで関係をピン留めします。"
 "{0} key marker(s) in the Piano roll keep their names but not their keys (the rows show the Piano roll's own scale)" = "Piano roll の {0} 個のキーマーカーは名前を保持しますがキーは失われます（行は Piano roll 自身のスケールを表示します）"
+"GUI" = "GUI"
+"DPI aware (requires reloading the plugin)" = "DPI 対応（プラグインの再読み込みが必要）"
+"For plugins that appear too big or small" = "大きすぎる・小さすぎる表示のプラグイン向け"
+"Scale editor dimensions" = "エディターのサイズをスケール"
+"Scale dimensions of plugins that appear cut-off on a high resolution screen" = "高解像度の画面で切れて表示されるプラグインのサイズをスケールします"

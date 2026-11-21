@@ -12147,3 +12147,8 @@ countries: tw hk mo
 "Pinned relationships first in their lists (off: only highlighted)" = "固定的關係排在清單最前（關閉：僅醒目顯示）"
 "Click a chord to insert it after the selection. Click a key to see what it lends. The star pins a relationship in every key." = "點擊和弦可插入到選取範圍之後。點擊調可查看它借出的和弦。星號會在所有調中固定一個關係。"
 "{0} key marker(s) in the Piano roll keep their names but not their keys (the rows show the Piano roll's own scale)" = "鋼琴卷簾中的 {0} 個調標記保留名稱但不保留調（列顯示鋼琴卷簾自己的音階）"
+"GUI" = "介面"
+"DPI aware (requires reloading the plugin)" = "DPI 感知（需要重新載入外掛程式）"
+"For plugins that appear too big or small" = "適用於顯示過大或過小的外掛程式"
+"Scale editor dimensions" = "縮放編輯器尺寸"
+"Scale dimensions of plugins that appear cut-off on a high resolution screen" = "縮放在高解析度螢幕上顯示不全的外掛程式的尺寸"

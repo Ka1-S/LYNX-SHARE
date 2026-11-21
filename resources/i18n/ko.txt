@@ -12147,3 +12147,8 @@ countries: kr
 "Pinned relationships first in their lists (off: only highlighted)" = "고정한 관계를 목록 맨 위에 (끄기: 강조 표시만)"
 "Click a chord to insert it after the selection. Click a key to see what it lends. The star pins a relationship in every key." = "코드를 클릭하면 선택 뒤에 삽입합니다. 키를 클릭하면 빌려주는 코드를 봅니다. 별표는 모든 키에서 관계를 고정합니다."
 "{0} key marker(s) in the Piano roll keep their names but not their keys (the rows show the Piano roll's own scale)" = "Piano roll의 키 마커 {0}개는 이름은 유지하지만 키는 잃습니다 (행은 Piano roll 자체 스케일을 표시합니다)"
+"GUI" = "GUI"
+"DPI aware (requires reloading the plugin)" = "DPI 인식(플러그인을 다시 불러와야 함)"
+"For plugins that appear too big or small" = "너무 크거나 작게 보이는 플러그인용"
+"Scale editor dimensions" = "에디터 크기 배율 적용"
+"Scale dimensions of plugins that appear cut-off on a high resolution screen" = "고해상도 화면에서 잘려 보이는 플러그인의 크기에 배율을 적용합니다"

@@ -203,6 +203,10 @@ void applyFlWrapperOptions (const ForeignPlugin& w, PluginRef& ref)
         ref.resetOnFlush = (w.wrapperFlags & 0x02000000u) == 0;
         // the window's Typing keyboard priority button off [DATA round 187a: kb-on.flp / kb-off2.flp, 0xB4007D8C -> 0xB5007D8C]
         ref.hostKeysFirst = (w.wrapperFlags & 0x01000000u) != 0;
+        // Settings › GUI (round 190oh [DATA: FL 2026 saves with each box toggled, 0xB4007D8C -> 0xB0007D8C / 0xF4007D8C]):
+        // 0x04000000 "DPI aware", 0x40000000 "Scale editor dimensions"
+        ref.dpiAware = (w.wrapperFlags & 0x04000000u) != 0;
+        ref.scaleEditorDimensions = (w.wrapperFlags & 0x40000000u) != 0;
         if (w.hasWrapperFlags2)
         {
             ref.allNotesOffOnStop = (w.wrapperFlags2 & 0x1000u) == 0;
@@ -414,6 +418,10 @@ const std::vector<WrapperOption>& wrapperOptions()
         { "Compatibility", "Use fixed size buffers", "Constant 2 ms blocks, for plugins that need equal buffers (adds latency)", &PluginRef::fixedBuffers, true, false },
         { "Compatibility", "Process maximum size buffers", "With fixed size buffers: the whole device buffer instead of 2 ms blocks", &PluginRef::maxSizeBuffers, true, true },
         { "Compatibility", "Use maximum buffer size from host", "With fixed size buffers: prepare the plugin for the host's largest block", &PluginRef::hostMaxBuffer, true, true },
+        // round 190oh (P3): Settings › GUI, FL's two scaling boxes (Fruity Wrapper's DFM: captions and hints [DATA]);
+        // a change reloads the plugin / closes its editor, as FL's "(requires reloading the plugin)" says
+        { "GUI", "DPI aware (requires reloading the plugin)", "For plugins that appear too big or small", &PluginRef::dpiAware, true, false },
+        { "GUI", "Scale editor dimensions", "Scale dimensions of plugins that appear cut-off on a high resolution screen", &PluginRef::scaleEditorDimensions, true, false },
     };
     return options;
 }

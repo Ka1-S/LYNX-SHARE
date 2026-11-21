@@ -12281,3 +12281,8 @@ countries: br
 "Keys: Z-M / Q-P notes (the typing keyboard), 1 OFF, 0-9 A-F values, Del clear, Insert / Backspace rows, Tab next track, Ctrl+Up/Down transpose, Space play" = "Teclas: Z-M / Q-P notas (o teclado de digitação), 1 OFF, 0-9 A-F valores, Del limpar, Insert / Backspace linhas, Tab próxima faixa, Ctrl+Up/Down transpor, Space tocar"
 "Group with the next track (one track, an Ins column)" = "Agrupar com a próxima faixa (uma faixa, uma coluna Ins)"
 "Add a note column (Alt+Right)" = "Adicionar uma coluna de nota (Alt+Right)"
+"GUI" = "Interface"
+"DPI aware (requires reloading the plugin)" = "Compatível com DPI (exige recarregar o plugin)"
+"For plugins that appear too big or small" = "Para plugins que aparecem grandes ou pequenos demais"
+"Scale editor dimensions" = "Escalar as dimensões do editor"
+"Scale dimensions of plugins that appear cut-off on a high resolution screen" = "Escala as dimensões de plugins que aparecem cortados em uma tela de alta resolução"

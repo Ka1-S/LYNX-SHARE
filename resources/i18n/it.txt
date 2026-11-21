@@ -12147,3 +12147,8 @@ countries: it ch sm
 "Pinned relationships first in their lists (off: only highlighted)" = "Relazioni fissate in cima alle liste (disattivato: solo evidenziate)"
 "Click a chord to insert it after the selection. Click a key to see what it lends. The star pins a relationship in every key." = "Clicca un accordo per inserirlo dopo la selezione. Clicca una tonalità per vedere cosa presta. La stella fissa una relazione in ogni tonalità."
 "{0} key marker(s) in the Piano roll keep their names but not their keys (the rows show the Piano roll's own scale)" = "{0} marker di tonalità nel Piano roll mantengono il nome ma non la tonalità (le righe mostrano la scala del Piano roll)"
+"GUI" = "Interfaccia"
+"DPI aware (requires reloading the plugin)" = "Compatibile DPI (richiede di ricaricare il plugin)"
+"For plugins that appear too big or small" = "Per i plugin che appaiono troppo grandi o troppo piccoli"
+"Scale editor dimensions" = "Scala le dimensioni dell'editor"
+"Scale dimensions of plugins that appear cut-off on a high resolution screen" = "Scala le dimensioni dei plugin che appaiono tagliati su uno schermo ad alta risoluzione"

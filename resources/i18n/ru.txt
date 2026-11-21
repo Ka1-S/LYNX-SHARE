@@ -12147,3 +12147,8 @@ countries: ru by kz
 "Pinned relationships first in their lists (off: only highlighted)" = "Закреплённые отношения в начале списков (выкл.: только выделяются)"
 "Click a chord to insert it after the selection. Click a key to see what it lends. The star pins a relationship in every key." = "Щёлкните аккорд, чтобы вставить его после выделения. Щёлкните тональность, чтобы увидеть, что она заимствует. Звезда закрепляет отношение во всех тональностях."
 "{0} key marker(s) in the Piano roll keep their names but not their keys (the rows show the Piano roll's own scale)" = "{0} маркер(ов) тональности в Piano roll сохраняют названия, но не тональности (строки показывают лад самого Piano roll)"
+"GUI" = "Интерфейс"
+"DPI aware (requires reloading the plugin)" = "Поддержка DPI (нужно перезагрузить плагин)"
+"For plugins that appear too big or small" = "Для плагинов, которые выглядят слишком большими или маленькими"
+"Scale editor dimensions" = "Масштабировать размеры редактора"
+"Scale dimensions of plugins that appear cut-off on a high resolution screen" = "Масштабирует размеры плагинов, которые на экране высокого разрешения выглядят обрезанными"

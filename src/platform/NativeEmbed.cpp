@@ -1,5 +1,7 @@
 #include "platform/NativeEmbed.h"
 
+#include <juce_audio_processors/juce_audio_processors.h>
+
 #if JUCE_WINDOWS
  #include <windows.h>
 #elif JUCE_MAC
@@ -137,4 +139,68 @@ const char* NativeEmbed::clapWindowApi() noexcept
     return "x11";
    #endif
 }
+
+namespace
+{
+double primaryScale()
+{
+    const auto* display = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay();
+    return display != nullptr ? display->scale : 1.0; // (as the editors read it before round 190oh)
+}
+} // namespace
+
+void setEditorScaling (juce::Component& editor, bool dpiUnaware, bool scaleDims)
+{
+    editor.getProperties().set ("lynxDpiUnaware", dpiUnaware);
+    editor.getProperties().set ("lynxScaleEditorDimensions", dpiUnaware || scaleDims);
+    if (auto* processorEditor = dynamic_cast<juce::AudioProcessorEditor*> (&editor))
+        processorEditor->setScaleFactor (1.0f); // (each editor sizes itself again with the marks)
+}
+
+double editorSizeScale (const juce::Component& editor)
+{
+    return (bool) editor.getProperties()["lynxScaleEditorDimensions"] ? 1.0 : primaryScale();
+}
+
+double editorContentScale (const juce::Component& editor)
+{
+    return (bool) editor.getProperties()["lynxDpiUnaware"] ? 1.0 : primaryScale();
+}
+
+int dpiUnawareWindowCount (void* nativeWindow, int& windows)
+{
+    windows = 0;
+#if JUCE_WINDOWS
+    if (nativeWindow == nullptr)
+        return -1;
+    using GetCtx = void* (WINAPI*) (HWND);  // GetWindowDpiAwarenessContext
+    using GetAw = int (WINAPI*) (void*);    // GetAwarenessFromDpiAwarenessContext (0 = DPI_AWARENESS_UNAWARE)
+    auto* user32 = GetModuleHandleW (L"user32.dll");
+    struct Walk
+    {
+        GetCtx getCtx;
+        GetAw getAw;
+        int windows = 0, unaware = 0;
+    };
+    Walk walk { reinterpret_cast<GetCtx> (reinterpret_cast<void*> (GetProcAddress (user32, "GetWindowDpiAwarenessContext"))),
+                reinterpret_cast<GetAw> (reinterpret_cast<void*> (GetProcAddress (user32, "GetAwarenessFromDpiAwarenessContext"))) };
+    if (walk.getCtx == nullptr || walk.getAw == nullptr)
+        return -1;
+    const auto count = [] (HWND h, LPARAM l) -> BOOL {
+        auto& w = *reinterpret_cast<Walk*> (l);
+        ++w.windows;
+        if (w.getAw (w.getCtx (h)) == 0)
+            ++w.unaware;
+        return TRUE;
+    };
+    count (static_cast<HWND> (nativeWindow), (LPARAM) &walk);
+    EnumChildWindows (static_cast<HWND> (nativeWindow), count, (LPARAM) &walk);
+    windows = walk.windows;
+    return walk.unaware;
+#else
+    (void) nativeWindow;
+    return -1;
+#endif
+}
 } // namespace lynx::platform
+

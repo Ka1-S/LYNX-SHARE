@@ -4017,7 +4017,10 @@ std::unique_ptr<juce::AudioPluginInstance> PluginHost::createInstance (const Plu
         const auto own = ref.separateProcess || pluginAlwaysSeparate (description->name);
         const auto group = own ? juce::String() : sandboxGroupFor (*description, pluginSandboxMode());
         if (auto remote = createSandboxedPlugin (*description, sampleRate, preparedBlock, ref.state, message, group))
+        {
+            setSandboxedEditorScaling (*remote, ref.dpiAware, ref.scaleEditorDimensions); // (round 190oh, P3)
             return remote;
+        }
         if (error != nullptr)
             *error = juce::String::fromUTF8 (ref.name.c_str()) + ": " + message;
         return nullptr;
@@ -4025,7 +4028,13 @@ std::unique_ptr<juce::AudioPluginInstance> PluginHost::createInstance (const Plu
 
     crashguard::note (("loading plugin " + description->name + " (" + description->pluginFormatName + ", "
                        + juce::File (description->fileOrIdentifier).getFileName() + ")").toStdString());
+    // FL's wrapper "DPI aware" off (round 190oh, P3; Windows): the plugin is made in a DPI-unaware context (some query
+    // the scale or make hidden windows while loading), as its editor later is (ui/PluginWindow.cpp)
+    std::optional<juce::ScopedDPIAwarenessDisabler> dpiUnaware;
+    if (! ref.dpiAware)
+        dpiUnaware.emplace();
     auto instance = createRightInstance (formats, *description, sampleRate, maxBlockSize, message);
+    dpiUnaware.reset();
     crashguard::note (("loaded plugin " + description->name + (instance == nullptr ? juce::String (" (failed)") : juce::String())).toStdString());
 
     if (instance == nullptr)
