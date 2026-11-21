@@ -1403,6 +1403,12 @@ juce::Colour PlaylistComponent::patternColour (const Song& song, int pattern)
     if (pattern >= 0 && pattern < (int) song.patterns.size() && song.patterns[(std::size_t) pattern].colour != 0)
         return juce::Colour (song.patterns[(std::size_t) pattern].colour);
 
+    // round 190oj: in the Pattern layout a pattern without a colour is FL's grey (FL 2026: a new project's "Pattern 1" and
+    // Thief's "Pattern 7" / "Pattern 8" in the picker, #485157, the colour of a colourless track); the auto hues gave
+    // white names at 2.6-3.0:1
+    if (flClipLook())
+        return juce::Colour (0xff485156);
+
     // hues spread by the golden ratio: neighboring patterns get clearly different colors
     const auto hue = std::fmod (0.08f + (float) pattern * 0.618034f, 1.0f);
     return juce::Colour::fromHSV (hue, 0.45f, 0.75f, 1.0f);
@@ -15763,7 +15769,7 @@ void PatternPicker::paint (juce::Graphics& g)
                     const auto body = box.reduced (3.0f, 3.0f);
                     const auto span = (float) juce::jmax (6, high - low + 2);
                     const auto length = (double) juce::jmax<std::int64_t> (1, pattern.effectiveLength (song.meter()));
-                    g.setColour (clipContentColour (rowColour).withAlpha (0.35f));
+                    g.setColour (clipContentColour (rowColour).withAlpha (0.15f)); // (round 190oj: 0.35 read as a strike-through of the name; FL's level)
                     for (const auto& n : pattern.notes)
                     {
                         const auto nx = body.getX() + (float) (n.start / length) * body.getWidth();

@@ -1700,7 +1700,17 @@ void PianoRollComponent::paint (juce::Graphics& g)
                     }
             g.setColour (hovered ? colour.brighter (0.3f) : colour.withAlpha (0.8f));
             g.fillRect (juce::Rectangle<float> (x, juce::jmin (top, base), hovered ? 3.0f : 2.0f, std::abs (base - top)));
+            // round 190oj: FL's event mark in the Pattern layout — a line along the note's length at its value and a ring
+            // head (two fills: cheaper than a stroked ellipse); Live's look keeps its filled dot
+            if (! liveVelocity)
+                g.fillRect (juce::Rectangle<float> (x, std::round (top), juce::jmax (0.0f, (float) (n.length * pixelsPerTick) - 1.0f), 1.0f));
             g.fillEllipse (x - 3.0f, top - 3.0f, 7.0f, 7.0f);
+            if (! liveVelocity)
+            {
+                g.setColour (colour.withMultipliedBrightness (0.45f));
+                g.fillEllipse (x - 1.5f, top - 1.5f, 4.0f, 4.0f);
+                g.setColour (colour.brighter (0.3f)); // (the hover ring below)
+            }
             if (hovered)
                 g.drawEllipse (x - 5.0f, top - 5.0f, 11.0f, 11.0f, 1.0f);
         }
@@ -1744,8 +1754,8 @@ void PianoRollComponent::paint (juce::Graphics& g)
             g.setColour (textSecondary);
             g.drawVerticalLine (x, (float) rulerTop + 10.0f, (float) headerHeight);
             const std::int64_t number = songOrigin.has_value() ? polish::songBarNumber (*songOrigin, b, bar) : (std::int64_t) b + 1;
-            if (number > 0)
-                textcache::drawText (g, juce::String (number), x + 3, rulerTop + 2, 40, timelineHeight - 4, juce::Justification::centredLeft);
+            if (number > 0) // (round 190oj: in the ruler's top row, as FL draws them: centred in the whole ruler, "1" sat under the 4/4 flag)
+                textcache::drawText (g, juce::String (number), x + 3, rulerTop, 40, 11, juce::Justification::centredLeft);
         }
 
         // the pattern's time markers (round 168g): a flag and the name in the ruler's lower half, like the Playlist's
