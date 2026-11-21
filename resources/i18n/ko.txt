@@ -12147,3 +12147,14 @@ countries: kr
 "Pinned relationships first in their lists (off: only highlighted)" = "고정한 관계를 목록 맨 위에 (끄기: 강조 표시만)"
 "Click a chord to insert it after the selection. Click a key to see what it lends. The star pins a relationship in every key." = "코드를 클릭하면 선택 뒤에 삽입합니다. 키를 클릭하면 빌려주는 코드를 봅니다. 별표는 모든 키에서 관계를 고정합니다."
 "{0} key marker(s) in the Piano roll keep their names but not their keys (the rows show the Piano roll's own scale)" = "Piano roll의 키 마커 {0}개는 이름은 유지하지만 키는 잃습니다 (행은 Piano roll 자체 스케일을 표시합니다)"
+
+# --- round gap190og: Live's Crop Clip, Duplicate Loop, Velocity Randomize, mappable transport switches
+"Crop Clip" = "클립 자르기"
+"Duplicate Loop: the loop and its notes twice as long; notes after the loop move on with its end" = "루프 복제: 루프와 그 노트가 두 배 길이가 되고, 루프 뒤의 노트는 루프 끝과 함께 이동합니다"
+"Arrangement Overdub" = "어레인지먼트 오버더브"
+"Arrangement Loop switch" = "어레인지먼트 루프 스위치"
+"Punch-in switch" = "펀치인 스위치"
+"Punch-out switch" = "펀치아웃 스위치"
+"Randomize: the selected notes' velocities (all the notes with none selected) move at random by up to the amount beside it" = "랜덤화: 선택한 노트(선택이 없으면 모든 노트)의 벨로시티를 옆의 값까지 무작위로 바꿉니다"
+"Randomization Amount" = "랜덤화 양"
+"Randomization Amount: velocities move up or down by up to this much (drag, or type a number and press Enter)" = "랜덤화 양: 벨로시티가 최대 이 값만큼 오르내립니다 (드래그하거나 숫자를 입력하고 Enter)"

@@ -12147,3 +12147,14 @@ countries: jp
 "Pinned relationships first in their lists (off: only highlighted)" = "ピン留めした関係をリストの先頭に（オフ: 強調表示のみ）"
 "Click a chord to insert it after the selection. Click a key to see what it lends. The star pins a relationship in every key." = "コードをクリックすると選択の後に挿入します。キーをクリックすると借用できるコードを表示します。星はすべてのキーで関係をピン留めします。"
 "{0} key marker(s) in the Piano roll keep their names but not their keys (the rows show the Piano roll's own scale)" = "Piano roll の {0} 個のキーマーカーは名前を保持しますがキーは失われます（行は Piano roll 自身のスケールを表示します）"
+
+# --- round gap190og: Live's Crop Clip, Duplicate Loop, Velocity Randomize, mappable transport switches
+"Crop Clip" = "クリップをクロップ"
+"Duplicate Loop: the loop and its notes twice as long; notes after the loop move on with its end" = "ループを複製: ループとそのノートが2倍の長さになり、ループより後のノートはループの終わりと一緒に移動します"
+"Arrangement Overdub" = "アレンジメントオーバーダブ"
+"Arrangement Loop switch" = "アレンジメントループスイッチ"
+"Punch-in switch" = "パンチインスイッチ"
+"Punch-out switch" = "パンチアウトスイッチ"
+"Randomize: the selected notes' velocities (all the notes with none selected) move at random by up to the amount beside it" = "ランダム化: 選択したノート（選択がなければすべてのノート）のベロシティを、隣の値まででランダムに変えます"
+"Randomization Amount" = "ランダム化量"
+"Randomization Amount: velocities move up or down by up to this much (drag, or type a number and press Enter)" = "ランダム化量: ベロシティはこの値まで上下します（ドラッグ、または数値を入力して Enter）"

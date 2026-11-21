@@ -18060,3 +18060,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issues190nqTests.inc" // round 190nq: issues #225, #227, #228, #230
 #include "Issues190nsTests.inc" // round 190ns: issues #231, #233, #234, #235
 #include "Tracker190nwTests.inc" // round 190nw (0.1.31): the built-in tracker, stage 1 (core/TrackerGrid.h, core/ModuleImport.h)
+#include "Gap190ogTests.inc" // round gap190og (0.1.31): Live Duplicate Loop, Crop Clip, velocity Randomize, mappable transport, Edit menu on devices

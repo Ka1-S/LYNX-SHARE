@@ -12147,3 +12147,14 @@ countries: nl be
 "Pinned relationships first in their lists (off: only highlighted)" = "Vastgezette relaties bovenaan hun lijsten (uit: alleen gemarkeerd)"
 "Click a chord to insert it after the selection. Click a key to see what it lends. The star pins a relationship in every key." = "Klik op een akkoord om het na de selectie in te voegen. Klik op een toonsoort om te zien wat die leent. De ster zet een relatie vast in elke toonsoort."
 "{0} key marker(s) in the Piano roll keep their names but not their keys (the rows show the Piano roll's own scale)" = "{0} toonsoortmarker(s) in de Piano roll behouden hun naam maar niet hun toonsoort (de rijen tonen de eigen toonladder van de Piano roll)"
+
+# --- round gap190og: Live's Crop Clip, Duplicate Loop, Velocity Randomize, mappable transport switches
+"Crop Clip" = "Clip bijsnijden"
+"Duplicate Loop: the loop and its notes twice as long; notes after the loop move on with its end" = "Loop dupliceren: de loop en zijn noten worden twee keer zo lang; noten na de loop schuiven mee met het einde"
+"Arrangement Overdub" = "Arrangement-overdub"
+"Arrangement Loop switch" = "Arrangement-loopschakelaar"
+"Punch-in switch" = "Punch-in-schakelaar"
+"Punch-out switch" = "Punch-out-schakelaar"
+"Randomize: the selected notes' velocities (all the notes with none selected) move at random by up to the amount beside it" = "Willekeurig: de velocities van de geselecteerde noten (alle noten als er geen is geselecteerd) veranderen willekeurig tot de waarde ernaast"
+"Randomization Amount" = "Willekeurigheid"
+"Randomization Amount: velocities move up or down by up to this much (drag, or type a number and press Enter)" = "Willekeurigheid: velocities gaan hoogstens zoveel omhoog of omlaag (sleep, of typ een getal en druk op Enter)"

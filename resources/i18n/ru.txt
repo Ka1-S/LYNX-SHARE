@@ -12147,3 +12147,14 @@ countries: ru by kz
 "Pinned relationships first in their lists (off: only highlighted)" = "Закреплённые отношения в начале списков (выкл.: только выделяются)"
 "Click a chord to insert it after the selection. Click a key to see what it lends. The star pins a relationship in every key." = "Щёлкните аккорд, чтобы вставить его после выделения. Щёлкните тональность, чтобы увидеть, что она заимствует. Звезда закрепляет отношение во всех тональностях."
 "{0} key marker(s) in the Piano roll keep their names but not their keys (the rows show the Piano roll's own scale)" = "{0} маркер(ов) тональности в Piano roll сохраняют названия, но не тональности (строки показывают лад самого Piano roll)"
+
+# --- round gap190og: Live's Crop Clip, Duplicate Loop, Velocity Randomize, mappable transport switches
+"Crop Clip" = "Обрезать клип"
+"Duplicate Loop: the loop and its notes twice as long; notes after the loop move on with its end" = "Дублировать луп: луп и его ноты становятся вдвое длиннее; ноты после лупа сдвигаются вместе с его концом"
+"Arrangement Overdub" = "Овердаб аранжировки"
+"Arrangement Loop switch" = "Переключатель лупа аранжировки"
+"Punch-in switch" = "Переключатель punch-in"
+"Punch-out switch" = "Переключатель punch-out"
+"Randomize: the selected notes' velocities (all the notes with none selected) move at random by up to the amount beside it" = "Случайно: велосити выделенных нот (всех нот, если ничего не выделено) меняется случайно не больше чем на значение рядом"
+"Randomization Amount" = "Величина случайности"
+"Randomization Amount: velocities move up or down by up to this much (drag, or type a number and press Enter)" = "Величина случайности: велосити поднимается или опускается не больше чем на это значение (перетащите или введите число и нажмите Enter)"

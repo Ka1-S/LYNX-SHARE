@@ -12147,3 +12147,14 @@ countries: id
 "Pinned relationships first in their lists (off: only highlighted)" = "Hubungan yang disematkan di awal daftar (mati: hanya disorot)"
 "Click a chord to insert it after the selection. Click a key to see what it lends. The star pins a relationship in every key." = "Klik akord untuk menyisipkannya setelah pilihan. Klik kunci untuk melihat apa yang dipinjamkannya. Bintang menyematkan hubungan di setiap kunci."
 "{0} key marker(s) in the Piano roll keep their names but not their keys (the rows show the Piano roll's own scale)" = "{0} penanda kunci di Piano roll mempertahankan nama tetapi tidak kuncinya (baris menampilkan tangga nada Piano roll sendiri)"
+
+# --- round gap190og: Live's Crop Clip, Duplicate Loop, Velocity Randomize, mappable transport switches
+"Crop Clip" = "Pangkas klip"
+"Duplicate Loop: the loop and its notes twice as long; notes after the loop move on with its end" = "Gandakan loop: loop dan notnya jadi dua kali lebih panjang; not setelah loop ikut bergeser bersama ujungnya"
+"Arrangement Overdub" = "Overdub aransemen"
+"Arrangement Loop switch" = "Sakelar loop aransemen"
+"Punch-in switch" = "Sakelar punch-in"
+"Punch-out switch" = "Sakelar punch-out"
+"Randomize: the selected notes' velocities (all the notes with none selected) move at random by up to the amount beside it" = "Acak: velocity not yang dipilih (semua not jika tidak ada yang dipilih) berubah acak hingga nilai di sebelahnya"
+"Randomization Amount" = "Jumlah pengacakan"
+"Randomization Amount: velocities move up or down by up to this much (drag, or type a number and press Enter)" = "Jumlah pengacakan: velocity naik atau turun paling banyak sebesar ini (seret, atau ketik angka lalu tekan Enter)"

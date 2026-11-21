@@ -12147,3 +12147,14 @@ countries: de at ch li lu
 "Pinned relationships first in their lists (off: only highlighted)" = "Angeheftete Beziehungen oben in ihren Listen (aus: nur hervorgehoben)"
 "Click a chord to insert it after the selection. Click a key to see what it lends. The star pins a relationship in every key." = "Klicken Sie auf einen Akkord, um ihn nach der Auswahl einzufügen. Klicken Sie auf eine Tonart, um zu sehen, was sie leiht. Der Stern heftet eine Beziehung in jeder Tonart an."
 "{0} key marker(s) in the Piano roll keep their names but not their keys (the rows show the Piano roll's own scale)" = "{0} Tonart-Marker im Piano roll behalten ihre Namen, aber nicht ihre Tonart (die Zeilen zeigen die eigene Tonleiter des Piano roll)"
+
+# --- round gap190og: Live's Crop Clip, Duplicate Loop, Velocity Randomize, mappable transport switches
+"Crop Clip" = "Clip zuschneiden"
+"Duplicate Loop: the loop and its notes twice as long; notes after the loop move on with its end" = "Loop duplizieren: Loop und seine Noten werden doppelt so lang; Noten nach dem Loop wandern mit seinem Ende"
+"Arrangement Overdub" = "Arrangement-Overdub"
+"Arrangement Loop switch" = "Arrangement-Loop-Schalter"
+"Punch-in switch" = "Punch-In-Schalter"
+"Punch-out switch" = "Punch-Out-Schalter"
+"Randomize: the selected notes' velocities (all the notes with none selected) move at random by up to the amount beside it" = "Zufällig: Die Velocities der gewählten Noten (aller Noten, wenn keine gewählt ist) ändern sich zufällig um bis zum Wert daneben"
+"Randomization Amount" = "Zufallsmenge"
+"Randomization Amount: velocities move up or down by up to this much (drag, or type a number and press Enter)" = "Zufallsmenge: Velocities steigen oder fallen um höchstens diesen Wert (ziehen oder Zahl eingeben und Enter drücken)"
