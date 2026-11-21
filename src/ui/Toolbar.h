@@ -449,6 +449,7 @@ public:
     void update();
     juce::String text() const;
     juce::PopupMenu makeMenu();
+    juce::PopupMenu simpleMenu (bool numerator); // round 190ol (P6): the Simple look's two BandLab lists
     void paint (juce::Graphics& g) override;
     void mouseDown (const juce::MouseEvent& e) override;
     void mouseEnter (const juce::MouseEvent&) override { repaint(); }

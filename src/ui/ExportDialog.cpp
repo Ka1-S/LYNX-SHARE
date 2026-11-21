@@ -371,6 +371,10 @@ public:
         additions = clip == nullptr && onlyTracks.empty();
         if (! additions)
             options.sections = false;
+        // round 190ol: "One file per section" only when the song has sections in its Sections lane
+        songSectionsShown = additions && ! engine.getSong().sections().empty();
+        if (! songSectionsShown)
+            options.songSections = false;
         if (persistent && additions)
         {
             presets = exportopts::presetsFromText (exportPresetsFile().loadFileAsString().toStdString());
@@ -425,6 +429,11 @@ public:
         sectionsToggle.onClick = [this] { readControls(); };
         addChildComponent (sectionsToggle);
         sectionsToggle.setVisible (additions);
+        // round 190ol: the same, cut at the Sections lane's sections (named after them)
+        songSectionsToggle.setButtonText (tr ("One file per section"));
+        songSectionsToggle.onClick = [this] { readControls(); };
+        addChildComponent (songSectionsToggle);
+        songSectionsToggle.setVisible (songSectionsShown);
         // round 190ap: named presets of these choices, and the last export again without the file dialog
         settingsui::styleLabel (presetLabel, tr ("Preset"));
         presetBox.setTextWhenNothingSelected (tr ("Choose a preset..."));
@@ -673,7 +682,8 @@ public:
         // (the Master export keeps its own window: no presets row, no sections; round 190ap)
         additions = false;
         options.sections = false;
-        for (auto* c : std::initializer_list<juce::Component*> { &sectionsToggle, &presetLabel, &presetBox, &savePresetButton, &deletePresetButton, &sameAsLastButton })
+        options.songSections = false;
+        for (auto* c : std::initializer_list<juce::Component*> { &sectionsToggle, &songSectionsToggle, &presetLabel, &presetBox, &savePresetButton, &deletePresetButton, &sameAsLastButton })
             c->setVisible (false);
         writeControls();
         setSize (620, wantedHeight());
@@ -785,6 +795,11 @@ public:
             left.removeFromTop (2);
             sectionsToggle.setBounds (left.removeFromTop (22).withTrimmedLeft (labelWidth));
         }
+        if (songSectionsToggle.isVisible())
+        {
+            left.removeFromTop (2);
+            songSectionsToggle.setBounds (left.removeFromTop (22).withTrimmedLeft (labelWidth));
+        }
         if (! onlyTracks.empty())
         {
             left.removeFromTop (gap);
@@ -858,7 +873,7 @@ private:
     int columnsHeight()
     {
         constexpr int rowHeight = 26, gap = 7;
-        const auto leftHeight = 26 + 8 + 5 * (rowHeight + gap) + 22 + (sectionsToggle.isVisible() ? 24 : 0) + (onlyTracks.empty() ? 0 : gap + rowHeight + gap);
+        const auto leftHeight = 26 + 8 + 5 * (rowHeight + gap) + 22 + (sectionsToggle.isVisible() ? 24 : 0) + (songSectionsToggle.isVisible() ? 24 : 0) + (onlyTracks.empty() ? 0 : gap + rowHeight + gap);
         const auto columnWidth = (620 - 32 - 24) / 2;
         const auto layout = alsoLayout (columnWidth);
         // the most rows a format has: FLAC (bit depth, compression) + rate, channels, dither
@@ -1066,6 +1081,7 @@ private:
         }
         stemsMaster.setToggleState (options.stemsIncludeMaster, n);
         sectionsToggle.setToggleState (options.sections, n);
+        songSectionsToggle.setToggleState (options.songSections, n);
         formatButtons.setSelected ((int) options.format);
         depthBox.setSelectedItemIndex (options.format == Format::flac   ? (options.flacBits == 16 ? 0 : 1)
                                        : options.format == Format::aiff ? (options.aiffBits == 16 ? 0 : 1)
@@ -1221,6 +1237,7 @@ private:
         options.stems = (Stems) juce::jmax (0, stemsBox.getSelectedItemIndex());
         options.stemsIncludeMaster = stemsMaster.getToggleState();
         options.sections = additions && sectionsToggle.getToggleState();
+        options.songSections = songSectionsShown && songSectionsToggle.getToggleState(); // (round 190ol)
         if (naming) // (round 190ng)
             options.nameTemplate = nameEditor.getText().toStdString();
         options.format = (Format) formatButtons.getSelected();
@@ -1297,6 +1314,16 @@ private:
             sectionsToggle.setTooltip (sectionList.empty() ? tr ("The song is cut at its Playlist markers and each section becomes a file named after its marker. This song has no markers yet")
                                                            : tr ("The song is cut at its Playlist markers and each section becomes a file named after its marker; with stems, each section gets its stems. Sections: {0}",
                                                                  { names.joinIntoString (", ") }));
+        }
+        if (songSectionsShown) // (round 190ol)
+        {
+            const auto lane = laneSections (songNow);
+            songSectionsToggle.setEnabled (! realtime && options.range == Range::song && ! lane.empty());
+            juce::StringArray names;
+            for (const auto& section : lane)
+                names.add (juce::String::fromUTF8 (section.name.c_str()));
+            songSectionsToggle.setTooltip (tr ("The song is cut at the sections of its Sections lane and each section becomes a file named after it; with stems, each section gets its stems. Sections: {0}",
+                                               { names.joinIntoString (", ") }));
         }
         updatePresetButtons();
         loopsBox.setEnabled (! realtime && clip == nullptr && ! sectioned);
@@ -1539,6 +1566,8 @@ private:
     // round 190ap: "One file per marker section", the presets row and "Same as last time"
     bool additions = false;
     juce::ToggleButton sectionsToggle;
+    juce::ToggleButton songSectionsToggle; // round 190ol: "One file per section" (the Sections lane)
+    bool songSectionsShown = false;
     juce::Label presetLabel;
     juce::ComboBox presetBox;
     juce::TextButton savePresetButton { tr ("Save...") }, deletePresetButton { tr ("Delete") }, sameAsLastButton { tr ("Same as last time") };
