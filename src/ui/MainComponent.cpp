@@ -305,7 +305,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         if (std::exchange (showExtendedHintAfterLoad, false)) // round 190mr (DF-49)
             showExtendedHint (true);
         // the start-up song follows Options › Mixer too (round 163) and the automatic crossfades of new projects (166e)
-        engine.setSong (makeNewProject());
+        engine.setSong (withClipLaunchStrips (makeNewProject()));
         skin::onStyleSettingsChanged = [safe = juce::Component::SafePointer<MainComponent> (this)] { // an editor's own style was picked
             if (safe != nullptr) safe->saveUiSettings();
         };
@@ -3312,6 +3312,8 @@ void MainComponent::loadUiSettings()
             PlaylistComponent::hideCollapsedGroups = on;
         else if (key == "fadePreviews") // #230 (round 190nq): Playlist › View › Show fade previews
             PlaylistComponent::showFadePreviews = on;
+        else if (key == "shadeFadedAudio") // round 190oo (O-1): Playlist › View › Shade faded audio (LYNX)
+            PlaylistComponent::shadeFadedAudio = on;
         else if (key == "automationLanes") // round 177b: Playlist › Automation lanes
             autolanes::setShown (on);
         else if (key == "trackInserts") // round 190ht (issue #154): Playlist › Edit › Show insert effects on linked tracks
@@ -3418,9 +3420,15 @@ void MainComponent::loadUiSettings()
             PianoRollComponent::songBarsRuler = on;
         else if (key == "polyPrepareOnOpen") // (round 190lo: a LYNX extra, ui/PolyEditor.h)
             PolyEditorWindows::prepareOnOpen = on;
-        else if (key == "prKeyStyle") // (round 190j: 0 = flat, FL's; 1 = piano keys)
-            PianoRollComponent::keyStyle = line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue() == 1 ? pianokeys::Style::piano
-                                                                                                                  : pianokeys::Style::flat;
+        else if (key == "prKeyStyle") // (round 190j: 0 = flat, the default then; 1 = piano keys)
+        {
+            // round 190oo (O-2): FL's keys are the default now, so a 0 written while flat was the default is no choice
+            // and is skipped; "prKeyStyle2" (written after it) holds the style since
+            if (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue() == 1)
+                PianoRollComponent::keyStyle = pianokeys::Style::piano;
+        }
+        else if (key == "prKeyStyle2") // (round 190oo: 0 = flat, 1 = lined piano keys, 2 = FL's keys)
+            PianoRollComponent::keyStyle = pianokeys::styleFromInt (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "audioLogEnabled")
             engine.getRollingLog().setEnabled (on);
         else if (key == "audioLogSeconds")
@@ -3719,6 +3727,7 @@ void MainComponent::saveUiSettings()
                                       + "\ninstrumentTrackLevels=" + juce::String (PlaylistComponent::showInstrumentTrackLevels ? 1 : 0)
                                       + "\nhideCollapsedGroups=" + juce::String (PlaylistComponent::hideCollapsedGroups ? 1 : 0)
                                       + "\nfadePreviews=" + juce::String (PlaylistComponent::showFadePreviews ? 1 : 0)
+                                      + "\nshadeFadedAudio=" + juce::String (PlaylistComponent::shadeFadedAudio ? 1 : 0)
                                       + "\nautomationLanes=" + juce::String (autolanes::shown() ? 1 : 0)
                                       + "\ntrackInserts=" + juce::String (PlaylistComponent::showTrackInserts ? 1 : 0)
                                       + workflowextras::uiOptionsText() // round 190iu
@@ -3773,7 +3782,8 @@ void MainComponent::saveUiSettings()
                                       + "\nchordPinnedFirst=" + juce::String (ChordHelperPanel::pinnedFirst ? 1 : 0)
                                       + "\nprSongBars=" + juce::String (PianoRollComponent::songBarsRuler ? 1 : 0)
                                       + "\npolyPrepareOnOpen=" + juce::String (PolyEditorWindows::prepareOnOpen ? 1 : 0)
-                                      + "\nprKeyStyle=" + juce::String ((int) PianoRollComponent::keyStyle)
+                                      + "\nprKeyStyle=" + juce::String (PianoRollComponent::keyStyle == pianokeys::Style::piano ? 1 : 0) // (older builds)
+                                      + "\nprKeyStyle2=" + juce::String ((int) PianoRollComponent::keyStyle)
                                       + "\naudioLogEnabled=" + juce::String (engine.getRollingLog().isEnabled() ? 1 : 0)
                                       + "\naudioLogSeconds=" + juce::String (engine.getRollingLog().lengthSeconds())
                                       + "\naudioLogPreEffects=" + juce::String (engine.getRollingLog().getPosition() == RollingAudioLog::Position::preEffects ? 1 : 0)
@@ -5178,6 +5188,12 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
                 // FL's View › "Show fade previews" (#230, round 190nq; EEEnablePreviewFadesAction, on by default)
                 view.addItem (tr ("Show fade previews"), true, PlaylistComponent::showFadePreviews, [this] {
                     PlaylistComponent::showFadePreviews = ! PlaylistComponent::showFadePreviews;
+                    playlist.headerOptionsChanged();
+                    saveUiSettings();
+                });
+                // round 190oo (design review O-1, a LYNX extra): shade the faded part as the Clip-launch layout does
+                view.addItem (tr ("Shade faded audio (LYNX)"), true, PlaylistComponent::shadeFadedAudio, [this] {
+                    PlaylistComponent::shadeFadedAudio = ! PlaylistComponent::shadeFadedAudio;
                     playlist.headerOptionsChanged();
                     saveUiSettings();
                 });
@@ -8785,12 +8801,22 @@ void MainComponent::openStartupProject()
     startNewProject (std::move (song), {});
 }
 
+// Round 190oo (design review CS O-2, a LYNX extra, off by default): a new, empty project made while the Clip-launch
+// layout shows links Track N to insert N (core/Templates.h linkClipLaunchStrips), so the Session mixer shows a strip on
+// every column as a new Live set does. Demos and starter songs (they have clips) and the other layouts are unchanged.
+Song MainComponent::withClipLaunchStrips (Song song)
+{
+    if (newProjectDefaults().clipLaunchStrips && layoutstyle::current() == layoutstyle::Style::clipLaunch && song.playlist.empty())
+        linkClipLaunchStrips (song, newProjectDefaults().playlistTracks);
+    return song;
+}
+
 void MainComponent::startNewProject (Song song, const juce::File& file)
 {
     forgetSeekMark();
     engine.stop();
     engine.rewind();
-    engine.setSong (std::move (song));
+    engine.setSong (withClipLaunchStrips (std::move (song)));
     engine.markCreatedNow(); // Project info › created (a template's own date is kept, as FL does)
     currentFile = juce::File();
     projectName = {};

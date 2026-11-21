@@ -31951,10 +31951,11 @@ private:
         auto& roll = ui.getPianoRollForSnapshot();
         line ("piano roll rows: " + juce::String (roll.rowHeight) + " px");
         check ("FL's 18 px rows by default", roll.rowHeight == 18);
+        const auto keysBefore = lynx::PianoRollComponent::keyStyle; // (round 190oo: FL's keys are the default)
         lynx::PianoRollComponent::keyStyle = lynx::pianokeys::Style::piano;
         roll.repaint();
         saveSnapshot (ui, prefix + "-pr-pianokeys.png");
-        lynx::PianoRollComponent::keyStyle = lynx::pianokeys::Style::flat;
+        lynx::PianoRollComponent::keyStyle = keysBefore;
         lynx::notenames::everyKey.store (true);
         roll.repaint();
         saveSnapshot (ui, prefix + "-pr-allnames.png");
@@ -35212,10 +35213,14 @@ private:
             {
                 // View › Keyboard style › Piano keys (round 190j, discussion #136), also with tall keys
                 auto& roll = ui.getPianoRollForSnapshot();
+                const auto keysBefore = lynx::PianoRollComponent::keyStyle; // (round 190oo: FL's keys are the default)
                 lynx::PianoRollComponent::keyStyle = lynx::pianokeys::Style::piano;
                 roll.repaint();
                 saveSnapshot (ui, prefix + "-pianoroll-pianokeys.png");
                 lynx::PianoRollComponent::keyStyle = lynx::pianokeys::Style::flat;
+                roll.repaint();
+                saveSnapshot (ui, prefix + "-pianoroll-flatkeys.png");
+                lynx::PianoRollComponent::keyStyle = keysBefore;
                 roll.repaint();
                 // round 190j (discussion #10): the toolbar in a narrow window: the chord stamp as an icon button, and
                 // the menu button still there

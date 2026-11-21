@@ -13,6 +13,7 @@
 #include "core/FlSettings.h"
 #include "core/LayoutStyle.h"
 #include "core/LynxExtras.h"
+#include "core/Templates.h" // round 190oo (CS O-2: newProjectDefaults)
 #include "ui/PolyEditor.h"
 #include "ui/WorkflowExtras.h" // round 190iu
 #include "core/PlaylistOps.h"
@@ -2654,10 +2655,12 @@ bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_v
     if (id == "mixer.followPlaylist") return MixerStrips::followPlaylist;
     if (id == "playlist.automationLanes") return autolanes::shown();
     if (id == "playlist.trackInserts") return PlaylistComponent::showTrackInserts;
+    if (id == "playlist.shadeFadedAudio") return PlaylistComponent::shadeFadedAudio; // (round 190oo O-1)
     if (id == "pianoRoll.songBarsRuler") return PianoRollComponent::songBarsRuler;
     if (id == "polyEdit.prepareOnOpen") return PolyEditorWindows::prepareOnOpen; // (round 190lo)
     if (id == "general.hoverValues") return hooks.getGeneral && hooks.getGeneral().hoverValues;
     if (id == "project.linkTracks") return hooks.getGeneral && hooks.getGeneral().linkTracksInNewProjects;
+    if (id == "project.clipLaunchStrips") return newProjectDefaults().clipLaunchStrips; // (round 190oo CS O-2)
     if (id == "record.lastLoopPassPlays") return engine.getRecordOptions().lastLoopPassPlays;
     if (id == "detail.windowKey") return DetailView::extraWindowKey;
     if (id == "detail.selectInMixer") return DetailView::extraSelectInMixer;
@@ -2731,6 +2734,11 @@ void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_
             saved();
         }
     }
+    else if (id == "playlist.shadeFadedAudio") // round 190oo (O-1): Playlist › View › Shade faded audio
+    {
+        PlaylistComponent::shadeFadedAudio = on;
+        saved(); // (saves and repaints the Playlist)
+    }
     else if (id == "pianoRoll.songBarsRuler")
     {
         if (! toggledBy ("pianoRoll.songBarsRuler"))
@@ -2761,6 +2769,11 @@ void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_
             options.linkTracksInNewProjects = on;
             hooks.setGeneral (options);
         }
+    }
+    else if (id == "project.clipLaunchStrips") // round 190oo (CS O-2): kept with the new projects' defaults
+    {
+        newProjectDefaults().clipLaunchStrips = on;
+        saved();
     }
     else if (id == "record.lastLoopPassPlays")
     {

@@ -145,7 +145,7 @@ public:
     static inline bool blackKeyRows = true;
     // View › Keyboard style (round 190j, discussion #136; LYNX's own): flat = FL's keyboard (the default), piano = a
     // traditional keyboard with a line between every two white keys (core/PianoKeys.h). Saved with the UI options.
-    static inline pianokeys::Style keyStyle = pianokeys::Style::flat;
+    static inline pianokeys::Style keyStyle = pianokeys::defaultStyle; // (round 190oo O-2: FL's keys)
     void setKeyStyle (pianokeys::Style style);
     static inline bool songBarsRuler = false; // round 177d: the ruler numbers song bars (off = FL: pattern bars)
     // FL's General › "Monophonic painting in piano roll" (round 189o, off): on, the Paint tool paints monophonically

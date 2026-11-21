@@ -620,9 +620,9 @@ void PianoRollComponent::setKeyStyle (pianokeys::Style style)
 int PianoRollComponent::keyboardKeyAt (int x, int y) const
 {
     const auto key = yToKey (y);
-    if (keyStyle != pianokeys::Style::piano || folded())
+    if (! pianokeys::whiteKeysMeet (keyStyle) || folded())
         return key;
-    // "Piano keys": right of a black key the white keys above and below it meet in the middle of its row
+    // "Piano keys" / FL's keys: right of a black key the white keys above and below it meet in the middle of its row
     const auto next = pianokeys::keyAt (keyStyle, key, y - keyToY (key), rowHeight, x, blackKeyWidth);
     return juce::isPositiveAndBelow (next, 128) && rows.shown (next) ? next : key;
 }
@@ -1831,7 +1831,8 @@ void PianoRollComponent::paint (juce::Graphics& g)
 
         // folded to the scale (round 166d) the keys no longer alternate like a piano: one full-width named row each
         const auto list = folded();
-        const auto piano = keyStyle == pianokeys::Style::piano && ! list;
+        const auto piano = pianokeys::whiteKeysMeet (keyStyle) && ! list;
+        const auto flKeys = keyStyle == pianokeys::Style::fl && ! list; // (round 190oo O-2: FL 2026's keyboard, the default)
         // round 190jo (design190ia FM-17): FL's white keys shade from a light grey at the left to near-white at the right
         // (the column's gradient above); its C keys are a step darker (FL: #B0B4BB against #D0D4DB-#E9EDF4)
         const auto fillKey = [&] (int key, juce::Colour colour, juce::Rectangle<int> r) {
@@ -1859,6 +1860,23 @@ void PianoRollComponent::paint (juce::Graphics& g)
             return pressed ? accent : colour;
         };
         const auto labelClass = scaleIndex() > 0 ? scaleRoot() : 0; // (once per paint)
+        // FL's black keys at rest (round 190oo O-2): one horizontal gradient for all of them, dark at the left to lighter
+        // at the tip (FL 2026: #2a2b2d -> #4e4f51), filled before the loop as one rectangle list; a lit (hovered,
+        // pressed) black key is filled in the loop in its own colour
+        if (flKeys)
+        {
+            juce::RectangleList<int> blacks;
+            const auto inset = rowHeight >= 12 ? 1 : 0;
+            for (int key = 0; key < 128; ++key)
+                if (isBlackKey (key) && rows.shown (key) && keyColour (key) == keyBlack)
+                    if (const auto y = keyToY (key); y <= keys.getBottom() && y + rowHeight >= keys.getY())
+                        blacks.addWithoutMerging ({ 0, y + inset, blackWidth, rowHeight - 2 * inset });
+            if (! blacks.isEmpty())
+            {
+                g.setGradientFill (juce::ColourGradient (keyBlack, 0.0f, 0.0f, keyBlack.interpolatedWith (keyWhite, 0.18f), (float) blackWidth, 0.0f, false));
+                g.fillRectList (blacks);
+            }
+        }
         for (int key = 0; key < 128; ++key)
         {
             const auto y = keyToY (key);
@@ -1876,23 +1894,35 @@ void PianoRollComponent::paint (juce::Graphics& g)
             {
                 // "Piano keys" (round 190j, discussion #136): the white keys meet behind the black key, each in its own
                 // colour (hover, pressed, scale), with a dark line between every two white keys
-                const auto line = bg0.withAlpha (0.85f);
+                // (FL's keys, round 190oo O-2: no line through the black keys' rows, and a faint one, FL's #c6cad0 on
+                // #e3e7ee, between B / C and E / F)
+                const auto line = flKeys ? juce::Colours::black.withAlpha (0.13f) : bg0.withAlpha (0.85f);
                 if (black)
                 {
                     const auto upper = pianokeys::upperPart (rowHeight);
-                    fillKey (juce::jmin (127, key + 1), keyColour (juce::jmin (127, key + 1)), { 0, y, keyboardWidth - 1, upper });
-                    fillKey (juce::jmax (0, key - 1), keyColour (juce::jmax (0, key - 1)), { 0, y + upper, keyboardWidth - 1, rowHeight - upper });
-                    g.setColour (line);
-                    g.drawHorizontalLine (y + upper, (float) blackWidth, (float) (keyboardWidth - 1));
+                    // (FL's keys: the white keys only right of the black key, which the gradient above already filled)
+                    const auto whiteX = flKeys ? blackWidth : 0;
+                    fillKey (juce::jmin (127, key + 1), keyColour (juce::jmin (127, key + 1)), { whiteX, y, keyboardWidth - 1 - whiteX, upper });
+                    fillKey (juce::jmax (0, key - 1), keyColour (juce::jmax (0, key - 1)), { whiteX, y + upper, keyboardWidth - 1 - whiteX, rowHeight - upper });
                     // the black key: a little shorter than its row when there is room, so the white shows around it
                     const auto inset = rowHeight >= 12 ? 1 : 0;
-                    g.setColour (bg0);
-                    g.fillRect (0, y + inset, blackWidth + 1, rowHeight - 2 * inset);
-                    fillBlack (colour, { 0, y + inset, blackWidth, rowHeight - 2 * inset });
-                    if (! pressed && rowHeight >= 12) // a light edge along the top, as on a real black key
+                    if (flKeys)
                     {
-                        g.setColour (keyWhite.withAlpha (0.14f));
-                        g.drawHorizontalLine (y + inset, 0.0f, (float) blackWidth);
+                        if (colour != keyBlack) // (at rest it is in the gradient already)
+                            fillBlack (colour, { 0, y + inset, blackWidth, rowHeight - 2 * inset });
+                    }
+                    else
+                    {
+                        g.setColour (line);
+                        g.drawHorizontalLine (y + upper, (float) blackWidth, (float) (keyboardWidth - 1));
+                        g.setColour (bg0);
+                        g.fillRect (0, y + inset, blackWidth + 1, rowHeight - 2 * inset);
+                        fillBlack (colour, { 0, y + inset, blackWidth, rowHeight - 2 * inset });
+                        if (! pressed && rowHeight >= 12) // a light edge along the top, as on a real black key
+                        {
+                            g.setColour (keyWhite.withAlpha (0.14f));
+                            g.drawHorizontalLine (y + inset, 0.0f, (float) blackWidth);
+                        }
                     }
                 }
                 else
@@ -6411,13 +6441,15 @@ juce::PopupMenu PianoRollComponent::viewMenu()
                   [this] { runAction ("pianoRoll.backgroundWave"); });
     menu.addItem (tr ("Ruler: song bars (LYNX)") + keyText ("pianoRoll.songBarsRuler"), true, songBarsRuler, [this] { runAction ("pianoRoll.songBarsRuler"); });
     {
-        // round 190j (discussion #136): flat = LYNX's keyboard so far, the default. (FL 2026's own keyboard has the white
-        // keys meeting behind the black ones, with lines only between B / C and E / F: flshots/fl-pr-keys-x3.png.)
+        // round 190j (discussion #136): flat = LYNX's keyboard until round 190oo; "Piano keys" = FL 2026's own keyboard
+        // (the white keys meet behind the black ones, with lines only between B / C and E / F: flshots/fl-pr-keys-x3.png),
+        // the default since round 190oo (O-2); the lined piano keys stay as they were
         juce::PopupMenu style;
         const auto add = [this, &style] (const juce::String& name, pianokeys::Style value) {
             style.addItem (name, true, keyStyle == value, [this, value] { setKeyStyle (value); });
         };
         add (tr ("Flat keys"), pianokeys::Style::flat);
+        add (tr ("Piano keys"), pianokeys::Style::fl);
         add (tr ("Piano keys (lines between the white keys)"), pianokeys::Style::piano);
         menu.addSubMenu (tr ("Keyboard style"), style);
     }

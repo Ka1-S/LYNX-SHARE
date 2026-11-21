@@ -546,6 +546,7 @@ private:
     juce::Rectangle<int> fixedToolbarArea;       // the menu and the hint bar
     void newProject (bool askAlways = false); // File › New: the New project window unless turned off
     void startNewProject (Song song, const juce::File& file);
+    static Song withClipLaunchStrips (Song song); // round 190oo (CS O-2)
     void saveAsTemplate();
     void saveCopyForOlder(); // round 190hq (B20): File › "Save a copy for an older LYNX..."
     void chooseFileToOpen();

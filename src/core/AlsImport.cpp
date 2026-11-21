@@ -2825,6 +2825,10 @@ std::uint32_t alsColour (int index) noexcept
 // 13 colours round 190ia measured on screen in the "Patience" demo set — indices 2, 3, 25, 32..36, 41, 42, 50, 52, 55 —
 // match). Used for .als imports while the Clip-launch layout shows; the Pattern and Simple layouts keep alsColour's
 // approximation, so their imports are unchanged. Colour values are data, not artwork (round 190ia's note).
+// Round 190oo (design review CS O-1, owner decision "Live's measured colour table for .als imports"): every .als import
+// takes Live's own colours, in every layout — a set keeps the colours Live showed. Re-checked 11-21 against the
+// "Ableton Live 12 Trial.exe" 12.4 on this PC (the same 70 values at the same offsets, s/livecolours.py) and against
+// Live's screen (round 190ia's 13 swatches). alsColour stays for old exports' nearest-index lookup.
 std::uint32_t alsLiveColour (int index) noexcept
 {
     static constexpr std::uint32_t live[70] = {
@@ -2839,7 +2843,7 @@ std::uint32_t alsLiveColour (int index) noexcept
 
 std::uint32_t alsImportColour (int index) noexcept
 {
-    return layoutstyle::current() == layoutstyle::Style::clipLaunch ? alsLiveColour (index) : alsColour (index);
+    return alsLiveColour (index); // (round 190oo CS O-1: Live's table in every layout)
 }
 
 int alsColourIndex (std::uint32_t argb) noexcept

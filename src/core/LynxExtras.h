@@ -72,6 +72,10 @@ inline constexpr Item items[] = {
     { "playlist.clipLanes", TR_NOOP ("Playlist"), TR_NOOP ("Automation clips as lanes under their tracks"),
       TR_NOOP ("A track that holds only automation clips of one instrument (or of a linked mixer track) is drawn right under that instrument's track, as a lane that folds with the track's arrow; the clips stay clips on their own tracks. On by default in the Clip-launch layout, as Live's lanes. Also in the Playlist menu."),
       "ui-options.txt:clipLanesPattern" },
+    // round 190oo (design review CS O-2): Live's new set has a full mixer strip on every track
+    { "project.clipLaunchStrips", TR_NOOP ("Playlist"), TR_NOOP ("New Clip-launch projects: a mixer track for every track"),
+      TR_NOOP ("A new project made in the Clip-launch layout links Track N to mixer track N, so every column of the Session mixer shows its strip, as a new Live set does. Only empty new projects; nothing is routed differently. Also in the Mixer menu › New projects."),
+      "ui-options.txt:newClipLaunchStrips" },
     // round 190iu (issue #191.5): FL's instrument tracks, every instrument on one, the Channel rack hidden
     { "layout.trackOnly", TR_NOOP ("Playlist"), TR_NOOP ("Track-only mode (no Channel rack: 1 track = 1 instrument)"),
       TR_NOOP ("In the Pattern layout the Channel rack stays hidden and every instrument you add gets its own instrument track, whose pencil places that instrument's own pattern. Also in View › Layout style."),
@@ -115,6 +119,10 @@ inline constexpr Item items[] = {
     { "playlist.rulerSeeksAnyTool", TR_NOOP ("Playlist"), TR_NOOP ("A click on the ruler moves the song position with every tool"),
       TR_NOOP ("In FL Studio a click on the Playlist's or Piano roll's ruler with the Select or Zoom tool selects or zooms a time range and leaves the song position. On: those tools move the song position too, like the others; Ctrl+drag, a double-click drag or a right drag still select a range. Off by default. Also in the Playlist ruler's right-click menu."),
       "ui-options.txt:rulerSeeksAnyTool" },
+    // round 190oo (design review O-1, issue #230): FL 2026 draws only the fade curve; Live (and #230's picture) shade
+    { "playlist.shadeFadedAudio", TR_NOOP ("Playlist"), TR_NOOP ("Shade faded audio (LYNX)"),
+      TR_NOOP ("The Pattern layout also darkens the part of an audio clip that a fade takes away, as the Clip-launch layout and Live do; FL Studio draws only the fade curve. Also in Playlist › View."),
+      "ui-options.txt:shadeFadedAudio" },
     { "midi.gamepad", TR_NOOP ("Controllers"), TR_NOOP ("Use a game controller"),
       TR_NOOP ("A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page."),
       "midi-settings.txt:gamepad" },

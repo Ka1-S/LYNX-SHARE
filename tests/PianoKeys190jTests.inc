@@ -78,3 +78,19 @@ TEST (zoom190j_wheel_levels_and_anchor)
     d.move (84, true);
     CHECK (d.height (14) == 16);
 }
+
+// Round 190oo (design review O-2): FL 2026's keyboard is the default style; it plays and borders as the lined piano keys
+// do except that FL draws no line through the black keys' rows (the paint's business), and the saved number maps back
+TEST (pianokeys190oo_fl_style_default)
+{
+    using namespace lynx::pianokeys;
+    CHECK (defaultStyle == Style::fl);
+    CHECK (whiteKeysMeet (Style::fl) && whiteKeysMeet (Style::piano) && ! whiteKeysMeet (Style::flat));
+    for (int key = 0; key < 128; ++key)
+        for (int y = 0; y < 14; ++y)
+            for (int x : { 0, 35, 36, 50 })
+                CHECK (keyAt (Style::fl, key, y, 14, x, 36) == keyAt (Style::piano, key, y, 14, x, 36));
+    CHECK (styleFromInt (0) == Style::flat && styleFromInt (1) == Style::piano && styleFromInt (2) == Style::fl);
+    CHECK (styleFromInt (-1) == defaultStyle && styleFromInt (7) == defaultStyle);
+    CHECK (styleFromInt ((int) Style::fl) == Style::fl);
+}

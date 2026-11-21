@@ -3814,7 +3814,7 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
         };
         auto paintFade = [&] (float x0, float x1, bool rising, bool cross, bool equalPower, bool linear, float tension) {
             auto edge = curve (x0, x1, rising, cross, equalPower, linear, tension);
-            if (! fl)
+            if (! fl || shadeFadedAudio) // (round 190oo O-1: the Pattern layout shades too with View › Shade faded audio)
             {
                 auto area = edge;
                 area.lineTo (x1, body.getY());

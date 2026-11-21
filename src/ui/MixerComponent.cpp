@@ -6027,6 +6027,11 @@ void addItems (juce::PopupMenu& menu, AudioEngine& engine, bool newProjects)
             });
         menu.addSubMenu (tr ("Playlist tracks shown ({0})", { juce::String (d.playlistTracks) }), tracks);
     }
+    // round 190oo (design review CS O-2, a LYNX extra): Live's new set — a strip on every Clip-launch column
+    menu.addItem (tr ("New Clip-launch projects: a mixer track for every track"), true, d.clipLaunchStrips, [] {
+        newProjectDefaults().clipLaunchStrips = ! newProjectDefaults().clipLaunchStrips;
+        notifyChanged();
+    });
 }
 } // namespace mixeroptions
 

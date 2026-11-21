@@ -232,13 +232,13 @@ std::string NewProjectDefaults::toText() const
     const char* chain = master == MasterChain::empty ? "empty" : master == MasterChain::clipper ? "clipper" : "default";
     return "newInserts=" + std::to_string (inserts) + "\nnewMasterChain=" + chain + "\nnewCleanMixer=" + (cleanMixer ? "1" : "0")
            + "\nplaylistTracks=" + std::to_string (playlistTracks) + "\nnewAutoCrossfades=" + (autoCrossfades ? "1" : "0")
-           + "\nnewLinkTracks=" + (linkTracks ? "1" : "0") + "\n";
+           + "\nnewLinkTracks=" + (linkTracks ? "1" : "0") + "\nnewClipLaunchStrips=" + (clipLaunchStrips ? "1" : "0") + "\n";
 }
 
 bool NewProjectDefaults::ownsKey (const std::string& key)
 {
     return key == "newInserts" || key == "newMasterChain" || key == "newCleanMixer" || key == "playlistTracks" || key == "newAutoCrossfades"
-           || key == "newLinkTracks";
+           || key == "newLinkTracks" || key == "newClipLaunchStrips";
 }
 
 void NewProjectDefaults::readKey (const std::string& key, const std::string& value)
@@ -266,6 +266,8 @@ void NewProjectDefaults::readKey (const std::string& key, const std::string& val
         autoCrossfades = value != "0";
     else if (key == "newLinkTracks")
         linkTracks = value == "1";
+    else if (key == "newClipLaunchStrips") // (round 190oo CS O-2)
+        clipLaunchStrips = value == "1";
 }
 
 void applyNewProjectDefaults (Song& song, const NewProjectDefaults& defaults)
@@ -312,6 +314,28 @@ void applyNewProjectDefaults (Song& song, const NewProjectDefaults& defaults)
     song.playTruncatedNotes = true; // (on in FL's Empty template and new projects)
     song.muteRunsEffects = true;    // (FL's muted insert, round 190y)
     song.patternClipTakeover = true; // (FL's pattern clip takeover, issue #158)
+}
+
+int linkClipLaunchStrips (Song& song, int tracks)
+{
+    autolink::setOn (song, true);
+    int linked = 0;
+    const auto last = std::min (tracks, (int) song.mixer.size() - 1);
+    for (int t = 0; t < last; ++t)
+    {
+        const auto mixer = t + 1;
+        if (t < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) t].mode != PlaylistTrackMode::unassigned)
+            continue;
+        if (t < (int) song.channels.size() && song.channels[(std::size_t) t].mixerTrack == mixer
+            && trackmodes::makeInstrumentTrack (song, t, t))
+        {
+            ++linked;
+            continue;
+        }
+        if (trackmodes::canLinkToMixerTrack (song, t, mixer) && trackmodes::linkToMixerTrack (song, t, mixer))
+            ++linked;
+    }
+    return linked;
 }
 
 NewProjectDefaults& newProjectDefaults()

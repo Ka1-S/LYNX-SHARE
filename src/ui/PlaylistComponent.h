@@ -123,6 +123,10 @@ public:
     // #230 (round 190nq): FL 2026's Playlist menu › View › "Show fade previews" (EEEnablePreviewFadesAction, on by default,
     // [SHOT] 190nq f08c / f12c / f13c): an audio clip's waveform is drawn with its fades applied
     static inline bool showFadePreviews = true;
+    // round 190oo (design review O-1, a LYNX extra, off by default): Playlist › View › "Shade faded audio (LYNX)" — the
+    // Pattern layout also shades what a fade takes away, as the Clip-launch layout and issue #230's reference (Live) do;
+    // FL 2026 draws only the curve (and the fade preview). Kept with the UI settings ("shadeFadedAudio").
+    static inline bool shadeFadedAudio = false;
     void headerOptionsChanged(); // repaints and saves
     std::function<void()> onViewOptionChanged; // an app-wide view option changed (round 177b: Automation lanes): save it
 
