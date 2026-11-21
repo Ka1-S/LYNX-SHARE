@@ -85,6 +85,23 @@ struct RackState
     // Indices into song.automations, or -1 = no automation.
     static constexpr int maxAutomations = 1024;
     std::vector<std::vector<int>> automationClips; // per automation: clips in the Playlist
+    // round 190ow (details DE-123): FL's triggered automation clips. Per automation, the clips its steps / notes on its
+    // Channel rack row start in Song mode (Pattern::autoNotes inside the Playlist's pattern clips), as clips of its own in
+    // song time: start = the note's song position, length = how long the note holds the clip, offset 0. Empty = none
+    // (every song without such steps: no work anywhere). `triggerSlot[a]` = the slot that carries automation a's value
+    // (its own, or the group's when it shares its target, issue #97); `patternTriggers` = some pattern has such steps
+    // (Pattern mode plays the current pattern's).
+    std::vector<std::vector<Clip>> triggerClips;
+    std::vector<int> triggerSlot;
+    std::vector<char> triggered; // per automation: steps / notes in some pattern (bound for Pattern mode too)
+    bool patternTriggers = false;
+    // the automation's value follows the song position: clips in the Playlist or triggered ones
+    bool positional (int a) const noexcept
+    {
+        return a >= 0 && (std::size_t) a < automationClips.size()
+               && (! automationClips[(std::size_t) a].empty() || ((std::size_t) a < triggerClips.size() && ! triggerClips[(std::size_t) a].empty()));
+    }
+    bool driven (int a) const noexcept { return positional (a) || (a >= 0 && (std::size_t) a < triggered.size() && triggered[(std::size_t) a] != 0); }
     std::vector<char> zoneAutomations;             // per automation: it has clips in the performance zone
     // round 177b: automation lanes (PlaylistTrack::lanes): the lane automations that play, and per lane the automations
     // of the same target that have clips (where one of their clips plays, it wins over the lane)
@@ -304,6 +321,7 @@ struct RackState
     void buildTaskGraph (const std::vector<int>& depth);
 
     void buildAutomationTables();
+    void buildTriggerClips (int count); // (round 190ow, DE-123)
     // The automation slots that drive `target` in a snapshot of `song` (its automations, then its pattern event
     // lanes, numbered as buildAutomationTables numbers them). REA round 146: a touched control overrides them.
     static void slotsOfTarget (const Song& song, const AutomationTarget& target, std::vector<int>& out);
@@ -1039,6 +1057,7 @@ private:
     void applyPluginParams (const RackState& state, int firstSlot, bool andLive = false) noexcept;
     void applyPluginParam (const RackState& state, std::size_t index, int firstSlot, bool andLive) noexcept; // (one binding)
     void applyOrDeferParams (const RackState& state, int firstSlot, bool andLive) noexcept;               // (round 190kz)
+    bool updatePatternTriggers (const RackState& state, double startTick) noexcept; // (round 190ow, DE-123)
     // Round 190jg (sample-accurate automation): the automation's changes inside this chunk for hosted CLAP / VST3
     // plugins (Instrument / Effect::setParameterAt), after the chunk's values. Clip automation and lanes (not pattern
     // events: a chunk already ends at each of those). Checked every timedStep samples of the export grid (a ramp moves

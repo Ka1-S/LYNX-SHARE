@@ -1938,8 +1938,13 @@ struct Pattern
     // round 168g): plain markers, time signature changes, Loop length (11), Pattern length (6)... sorted by tick
     std::vector<Marker> markers;
     std::string loopStarterGenre; // FL's Loop Starter genre of this pattern (round 168b); "" = no Loop Starter
+    // FL's steps and notes of the automation clip channels (round 190ow, details DE-123; core/RackAutomation.h): each one
+    // starts its automation clip from the clip's start and plays it while the note is held (FL's manual, "Triggering").
+    // Note::channel is the index into Song::automations, never a channel; sorted by start. Kept apart from `notes`, so
+    // no channel code (steps, Piano roll, scheduler, exports) meets an automation index. Empty = every pattern as before.
+    std::vector<Note> autoNotes;
 
-    void sortNotes();
+    void sortNotes(); // (autoNotes too)
     std::int64_t effectiveLength (Meter meter) const noexcept; // (no length: whole bars of the song's meter)
 
     bool hasStep (int channel, int step) const noexcept;
@@ -1947,6 +1952,10 @@ struct Pattern
     // Channel Rack option "Mute removed steps") mutes them; turning it on with `muteRemoved` unmutes them, data and all,
     // without it adds a new note (as FL's SetStep, REA round 169f: a muted note there is left alone).
     void toggleStep (int channel, int step, bool muteRemoved = false);
+    // the same for automation `automation`'s step on its automation clip row (round 190ow; autoNotes, no mute option:
+    // FL's automation clip channels have no "Mute removed steps" state worth keeping)
+    bool hasAutoStep (int automation, int step) const noexcept;
+    void toggleAutoStep (int automation, int step);
     bool operator== (const Pattern&) const = default;
 };
 
@@ -2078,13 +2087,29 @@ struct Automation
     // clip's row sits above channel row `rackSlot` (FL's channel order of an imported .flp); −1 = after the last channel
     // (a clip made in LYNX, and every clip of a project saved before round 190oo). Saved as "rackSlot" when set.
     int rackSlot = -1;
+    // FL's automation clip MIN / MAX (round 190ow, PAT-7: its channel's pan knob = minimum, volume knob = maximum, the
+    // rack row's two knobs; the .flp levels of 12800, REA_rodada171e): "a scaling factor that re-ranges the output" while
+    // the points stay as drawn. `pointsMin` / `pointsMax` = the range the point values were written in (an imported FL
+    // clip's levels, LYNX's whole 0..1 otherwise); while the knobs equal them nothing is re-ranged (playAt as before, the
+    // same bits), else the played value is moved from that range into rangeMin..rangeMax. Saved when not 0 / 1.
+    float rangeMin = 0.0f, rangeMax = 1.0f;
+    float pointsMin = 0.0f, pointsMax = 1.0f;
+    // FL's mute light of the automation clip channel (round 190ow; .flp channel event 0x00): a muted clip drives
+    // nothing, neither from the Playlist nor from its steps. Saved as "muted" when set.
+    bool muted = false;
+    bool reranged() const noexcept { return rangeMin != pointsMin || rangeMax != pointsMax; }
+    float rerange (float v) const noexcept; // a played value from pointsMin..pointsMax into rangeMin..rangeMax
     float mapLive (float v) const noexcept; // applies the curve
 
     // Value at `tick` (before the first point = first value; after the last = last).
     float valueAt (double tick) const noexcept;
     // What plays at `tick` of the automation (clip time, offset included) at song position `songTick`: valueAt plus
     // the LFO when it is on.
-    float playAt (double tick, double songTick) const noexcept { return lfo.on ? lfo.apply (valueAt (tick), tick, songTick) : valueAt (tick); }
+    float playAt (double tick, double songTick) const noexcept
+    {
+        const auto v = lfo.on ? lfo.apply (valueAt (tick), tick, songTick) : valueAt (tick);
+        return reranged() ? rerange (v) : v; // (round 190ow: the MIN / MAX knobs)
+    }
     std::int64_t length() const noexcept; // tick of the last point (minimum 1)
     bool operator== (const Automation&) const = default;
 };

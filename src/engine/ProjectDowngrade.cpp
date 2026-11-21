@@ -1487,6 +1487,60 @@ void toRelease0130 (juce::var& root, Losses& lost)
         for (auto& a : *automations)
             if (auto* ao = objectOf (a))
                 drop (*ao, "rackSlot");
+
+    // round 190ow (DE-123, core/RackAutomation.h): what the automation clip rows play
+    {
+        // the steps / notes on the rows: 0.1.30 starts no clip from a pattern
+        int triggers = 0;
+        if (auto* patterns = arrayOf (root["patterns"]))
+            for (auto& p : *patterns)
+                if (auto* po = objectOf (p))
+                {
+                    if (auto* notes = arrayOf (po->getProperty ("autoNotes")))
+                        triggers += notes->size();
+                    drop (*po, "autoNotes");
+                }
+        if (triggers > 0)
+            lost.push_back ({ TR_NOOP ("{0} step(s) or note(s) on automation clip rows start no clip (the clips in the Playlist play as before)"),
+                              juce::String (triggers), true });
+
+        // the MIN / MAX knobs: written into the points, so the clips play the same values (an LFO keeps its own range)
+        // and a muted clip: no target, so it drives nothing, as here
+        juce::StringArray muted;
+        bool lfoRange = false;
+        if (auto* automations = arrayOf (root["automations"]))
+            for (auto& a : *automations)
+                if (auto* ao = objectOf (a))
+                {
+                    if (const auto range = ao->getProperty ("range"); range.isArray() && range.size() >= 4)
+                    {
+                        const auto rMin = (double) range[0], rMax = (double) range[1], pMin = (double) range[2], pMax = (double) range[3];
+                        if (rMin != pMin || rMax != pMax)
+                        {
+                            if (auto* points = arrayOf (ao->getProperty ("points")))
+                                for (auto& pt : *points)
+                                    if (auto* fields = arrayOf (pt); fields != nullptr && fields->size() >= 2)
+                                    {
+                                        const auto span = pMax - pMin;
+                                        const auto x = std::abs (span) > 1.0e-9 ? ((double) (*fields)[1] - pMin) / span : 0.0;
+                                        fields->set (1, juce::roundToInt (juce::jlimit (0.0, 1.0, rMin + (rMax - rMin) * x) * 10000.0) / 10000.0);
+                                    }
+                            if (auto* lfo = arrayOf (ao->getProperty ("lfo")); lfo != nullptr && ! lfo->isEmpty() && (bool) (*lfo)[0])
+                                lfoRange = true;
+                        }
+                        drop (*ao, "range");
+                    }
+                    if (drop (*ao, "muted"))
+                    {
+                        muted.add (ao->getProperty ("name").toString());
+                        ao->setProperty ("target", juce::Array<juce::var> { "none", 0, 0, 0 });
+                    }
+                }
+        if (lfoRange)
+            lost.push_back ({ TR_NOOP ("An automation clip's LFO keeps the clip's first range (its MIN / MAX knobs are written into the points)"), {}, true });
+        if (! muted.isEmpty())
+            lost.push_back ({ TR_NOOP ("Muted automation clips lose their target, so they stay silent: {0}"), listOf (muted), false });
+    }
 }
 
 struct Step

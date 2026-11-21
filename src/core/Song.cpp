@@ -24,6 +24,37 @@ namespace lynx
 void Pattern::sortNotes()
 {
     std::stable_sort (notes.begin(), notes.end(), [] (const Note& a, const Note& b) { return a.start < b.start; });
+    if (! autoNotes.empty()) // (round 190ow)
+        std::stable_sort (autoNotes.begin(), autoNotes.end(), [] (const Note& a, const Note& b) { return a.start < b.start; });
+}
+
+// round 190ow (DE-123): FL's steps on an automation clip row, the way toggleStep does them for a channel
+bool Pattern::hasAutoStep (int automation, int step) const noexcept
+{
+    const auto from = (std::int64_t) step * ticksPerStep, to = from + ticksPerStep;
+    for (const auto& n : autoNotes)
+        if (n.channel == automation && n.start >= from && n.start < to && ! n.muted)
+            return true;
+    return false;
+}
+
+void Pattern::toggleAutoStep (int automation, int step)
+{
+    if (step < 0 || automation < 0)
+        return;
+    const auto from = (std::int64_t) step * ticksPerStep, to = from + ticksPerStep;
+    const auto on = hasAutoStep (automation, step);
+    autoNotes.erase (std::remove_if (autoNotes.begin(), autoNotes.end(),
+                                     [&] (const Note& n) { return n.channel == automation && n.start >= from && n.start < to; }),
+                     autoNotes.end());
+    if (on)
+        return;
+    Note n;
+    n.start = from;
+    n.length = 0; // (FL's step of no length, as FL writes a step it sets on an automation clip channel: the clip plays once)
+    n.channel = automation;
+    autoNotes.push_back (n);
+    sortNotes();
 }
 
 std::int64_t Pattern::effectiveLength (Meter meter) const noexcept
@@ -35,6 +66,8 @@ std::int64_t Pattern::effectiveLength (Meter meter) const noexcept
     std::int64_t end = 0;
 
     for (auto& n : notes)
+        end = std::max (end, n.start + std::max<std::int64_t> (n.length, 1));
+    for (auto& n : autoNotes) // (round 190ow: FL's pattern length counts the automation clip channels' notes too)
         end = std::max (end, n.start + std::max<std::int64_t> (n.length, 1));
 
     return std::max<std::int64_t> (bar, (end + bar - 1) / bar * bar);
@@ -1022,6 +1055,16 @@ void Song::removeAutomation (int index)
 
     automations.erase (automations.begin() + index);
 
+    for (auto& p : patterns) // round 190ow (DE-123): its steps / notes go, the later automations' follow
+        if (! p.autoNotes.empty())
+        {
+            p.autoNotes.erase (std::remove_if (p.autoNotes.begin(), p.autoNotes.end(), [index] (const Note& n) { return n.channel == index; }),
+                               p.autoNotes.end());
+            for (auto& n : p.autoNotes)
+                if (n.channel > index)
+                    --n.channel;
+        }
+
     for (auto& track : playlistTracks) // round 177b: lanes follow the renumbering; the removed one's lane goes
     {
         track.lanes.erase (std::remove_if (track.lanes.begin(), track.lanes.end(), [index] (const AutomationLane& l) { return l.automation == index; }),
@@ -1541,6 +1584,13 @@ float PatternEvents::valueAt (double tick) const noexcept
     // the last event at or before `tick`
     auto it = std::upper_bound (events.begin(), events.end(), tick, [] (double t, const PatternEvent& e) { return t < (double) e.tick; });
     return it == events.begin() ? events.front().value : std::prev (it)->value;
+}
+
+float Automation::rerange (float v) const noexcept
+{
+    const auto span = pointsMax - pointsMin;
+    const auto x = std::abs (span) > 1.0e-9f ? (v - pointsMin) / span : 0.0f;
+    return std::clamp (rangeMin + (rangeMax - rangeMin) * x, 0.0f, 1.0f);
 }
 
 float Automation::valueAt (double tick) const noexcept

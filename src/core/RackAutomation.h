@@ -16,6 +16,8 @@
 // the rows follow the automations' order. No JUCE: tests/RackAutomation190ooTests.inc.
 
 #include <algorithm>
+#include <cmath>
+#include <limits>
 #include <utility>
 #include <vector>
 
@@ -179,6 +181,102 @@ inline std::pair<int, int> passFor (const Song& song, std::vector<int> selection
                 return { r.automation, first };
     }
     return { -1, 0 };
+}
+
+// --- FL's triggered automation clips (round 190ow, details DE-123) -------------------------------------------------
+// A step / note on an automation clip row starts the clip from its beginning and plays it while the note is held (FL's
+// manual, "Triggering"; a step of no length plays the clip once). The engine plays them (RackState::buildTriggerClips,
+// RackRenderer::updatePatternTriggers); this is the same rule for the UI: where the clip plays at `tick`.
+
+inline std::int64_t heldFor (const Automation& a, const Note& n) noexcept
+{
+    return n.length > 0 ? n.length : a.length();
+}
+
+inline bool hasTriggers (const Song& song, int automation) noexcept
+{
+    for (const auto& p : song.patterns)
+        for (const auto& n : p.autoNotes)
+            if (n.channel == automation)
+                return true;
+    return false;
+}
+
+// The step / note of automation `automation` that started last at or before transport position `tick` (Song mode: the
+// Playlist's pattern clips; Pattern mode: the current pattern in its loop): its start, how long it has played and how
+// long it holds the clip. start < 0: none yet.
+struct Trigger
+{
+    double start = -1.0, since = 0.0, held = 0.0;
+    bool playing() const noexcept { return start >= 0.0 && since < held; }
+};
+
+inline Trigger lastTrigger (const Song& song, int automation, double tick)
+{
+    Trigger best;
+    if (automation < 0 || automation >= (int) song.automations.size() || song.automations[(std::size_t) automation].muted)
+        return best;
+    const auto& a = song.automations[(std::size_t) automation];
+    const auto meter = song.meter();
+    const auto consider = [&] (double start, const Note& n, double limit) {
+        const auto since = tick - start;
+        if (since < 0.0 || start < best.start)
+            return;
+        best = { start, since, std::max (1.0, std::min ((double) heldFor (a, n), limit - start)) };
+    };
+    if (song.mode != PlayMode::song)
+    {
+        if (song.currentPattern < 0 || song.currentPattern >= (int) song.patterns.size())
+            return best;
+        const auto& p = song.patterns[(std::size_t) song.currentPattern];
+        const auto length = (double) std::max<std::int64_t> (1, p.effectiveLength (meter));
+        const auto base = std::floor (std::max (0.0, tick) / length) * length;
+        for (const auto& n : p.autoNotes)
+            if (n.channel == automation && ! n.muted)
+            {
+                if (base > 0.0)
+                    consider (base - length + (double) n.start, n, 1.0e300);
+                consider (base + (double) n.start, n, 1.0e300);
+            }
+        return best;
+    }
+    for (const auto& c : song.playlist)
+    {
+        if (c.kind != ClipKind::pattern || c.pattern < 0 || c.pattern >= (int) song.patterns.size() || c.muted || c.length <= 0
+            || tick < (double) c.start || song.isTrackMuted (c.track) || c.start < song.performanceZoneEnd())
+            continue;
+        const auto& p = song.patterns[(std::size_t) c.pattern];
+        if (p.autoNotes.empty())
+            continue;
+        const auto passes = clipPasses (c, p.effectiveLength (meter));
+        for (auto k = passes.first; k <= passes.last; ++k)
+            for (const auto& n : p.autoNotes)
+            {
+                if (n.channel != automation || n.muted || (passes.loops && n.start >= passes.length))
+                    continue;
+                const auto at = c.start - c.offset + (passes.loops ? k * passes.length : 0) + n.start;
+                if (at >= c.start && at < c.end()) // (it plays on past the clip's end, as FL's note does)
+                    consider ((double) at, n, 1.0e300);
+            }
+    }
+    return best;
+}
+
+// The clip time the automation plays at `tick` because of a step / note (−1: none playing now; the editor's playhead)
+inline double triggeredAt (const Song& song, int automation, double tick)
+{
+    const auto t = lastTrigger (song, automation, tick);
+    return t.playing() ? t.since : -1.0;
+}
+
+// The value the step / note started last gives the automation's target at `tick` (it holds the value it reached once
+// the note ends), and its start; NaN / −1 when none has started yet (the knobs on screen, AutomationDisplay)
+inline std::pair<float, double> triggeredValue (const Song& song, int automation, double tick)
+{
+    const auto t = lastTrigger (song, automation, tick);
+    if (t.start < 0.0)
+        return { std::numeric_limits<float>::quiet_NaN(), -1.0 };
+    return { song.automations[(std::size_t) automation].playAt (std::min (t.since, t.held), tick), t.start };
 }
 
 inline bool passRow (Song& song, const std::vector<int>& selection, int delta)

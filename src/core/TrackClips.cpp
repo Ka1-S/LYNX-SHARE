@@ -333,7 +333,8 @@ void setOwnClips (Song& song, int track, bool on)
 bool sameContent (const Pattern& a, const Pattern& b) noexcept
 {
     return a.notes == b.notes && a.lengthTicks == b.lengthTicks && a.events == b.events && a.loopOn == b.loopOn && a.loopMode == b.loopMode
-           && a.channelLoops == b.channelLoops && a.markers == b.markers && a.loopStarterGenre == b.loopStarterGenre;
+           && a.channelLoops == b.channelLoops && a.markers == b.markers && a.loopStarterGenre == b.loopStarterGenre
+           && a.autoNotes == b.autoNotes; // (round 190ow)
 }
 
 int mergeIdentical (Song& song)
