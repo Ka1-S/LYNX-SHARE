@@ -1202,6 +1202,11 @@ void PianoRollComponent::paint (juce::Graphics& g)
     const auto lift = [] (juce::Colour c, float amount) { return c.interpolatedWith (textPrimary, amount); };
     const auto prBar = lift (gridBar, 0.06f), prBeat = lift (gridBeat, 0.05f), prStep = lift (gridStep, 0.035f);
     const auto prRowBlack = rowBlack.interpolatedWith (juce::Colours::black, 0.1f);
+    // rollup 0.1.31 step 3 (owner: key regions looked much fainter than FL's, pair-01 of round 190nu): a row in the scale
+    // (key regions, a chosen scale, Automatic) is the white-key row lifted above the 1 px row line, as FL's in-scale rows
+    // are (FL 2026: row 1.18 x its line in luma, out-of-scale rows below the in-scale ones); here 0.07 to textPrimary takes
+    // rowWhite from 1.27:1 under the line to 1.18:1 over it, and the out-of-scale rows keep the black-key shade
+    const auto prRowIn = rowWhite.interpolatedWith (textPrimary, 0.07f);
     // issue #205 (round 190lw): a selected note's row band (FL 2026 capture: BANDNOTE)
     const auto rowBand = [] (juce::Colour row, bool live) { return row.interpolatedWith (textPrimary, live ? 0.10f : 0.10f); };
 
@@ -1277,12 +1282,12 @@ void PianoRollComponent::paint (juce::Graphics& g)
             // Note grid highlights (Alt+B, round 168g): off, every row looks the same (FL's "BlackKeys" option)
             auto row = gridHighlights && blackKeyRows && isBlackKey (key) ? prRowBlack : rowWhite; // (FL's Default: none, #212)
             if (gridHighlights && autoRows) // FL's Automatic (round 190jv): the rows out of the guessed key dark; no guess, none
-                row = autoKey >= 0 && ! scaledetect::inScale (autoKey, key) ? prRowBlack : rowWhite;
+                row = autoKey < 0 ? rowWhite : scaledetect::inScale (autoKey, key) ? prRowIn : prRowBlack;
             else if (gridHighlights && chosenScale)
                 // a chosen scale as FL shades it (round 190kd, owner's decision; FL 2026 shot: the rows out of the scale
                 // take the black-key shade, the rows in it the white-key one, black keys or not; rollup step 6: 190jo's
                 // black-key shade `prRowBlack`, as step 5 did for Automatic)
-                row = inScale (key) ? rowWhite : prRowBlack;
+                row = inScale (key) ? prRowIn : prRowBlack;
             if (liveLookNotes) // (round 190jn: Live's note editor, one grey with a darker line under each row)
                 row = juce::Colour (0xff464f53);
             if (bandRows.test ((std::size_t) key))
@@ -1300,7 +1305,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
                     auto shade = row; // (the editor's own scale)
                     if (r.state.kind != keyregions::State::editor)
                     {
-                        shade = r.state.kind == keyregions::State::key ? (r.degrees.contains (key) ? rowWhite : prRowBlack)
+                        shade = r.state.kind == keyregions::State::key ? (r.degrees.contains (key) ? prRowIn : prRowBlack)
                                                                        : (blackKeyRows && isBlackKey (key) ? prRowBlack : rowWhite);
                         if (bandRows.test ((std::size_t) key))
                             shade = rowBand (shade, false);
