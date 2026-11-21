@@ -293,6 +293,12 @@ namespace juce::detail { bool dispatchNextMessageOnSystemQueue (bool returnIfNoP
 #include "ui/Theme.h"
 #include "ui/ThemeSettings.h"
 #include "ui/AutoLookEditor.h" // (round 190od, issue #239)
+#include "core/StartPage.h" // (round 190oq, issue #252)
+#include "core/MuteKeys.h"
+#include "core/AraRegions.h"
+#include "ui/StartPage.h"
+#include "ui/DeleteFade.h"
+#include "ui/AraMenu.h"
 #include "ui/WaveformView.h"
 #include "ui/WindowOwner.h"
 #include "ui/PluginKeysTest.h"
@@ -4377,6 +4383,14 @@ public:
         {
             mainWindow->showSetupWizard();
             startupTrace.mark ("after the window: setup wizard shown");
+        }
+        // issue #252 (round 190oq, LYNX extra, off by default): the start page over the start-up project, never over the
+        // first run's card, never when a file was given to open
+        if (lynx::startpage::showAtStart (lynx::startpage::enabled(), fileToOpen != juce::File(), action != StartAction::none,
+                                          openTimeReport != juce::File() || lynx::platform::testMode()))
+        {
+            mainWindow->getContent().showStartPage();
+            startupTrace.mark ("after the window: start page shown");
         }
     }
 

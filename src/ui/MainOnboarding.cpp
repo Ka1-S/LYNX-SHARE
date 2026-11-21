@@ -10,6 +10,8 @@
 #include "ui/AudioCheck.h"
 #include "ui/FirstSongTour.h"
 #include "ui/I18n.h"
+#include "ui/StartFromPanel.h"
+#include "ui/StartPage.h"
 #include "ui/SetupWizard.h"
 #include "ui/Updater.h"
 #include "platform/Paths.h"
@@ -145,6 +147,90 @@ void MainComponent::showWelcomeCard (bool firstRun)
             updater::setAutomatic (on);
     };
     setupOverlay = onboardui::makeWelcomeOverlay (std::move (host));
+    addAndMakeVisible (*setupOverlay);
+    setupOverlay->setBounds (getLocalBounds());
+    setupOverlay->toFront (true);
+    hostSetupOverlayNatively();
+}
+
+void MainComponent::showStartPage()
+{
+    // issue #252 (round 190oq): never over the welcome card / setup wizard or another overlay
+    if (setupOverlay != nullptr)
+        return;
+    auto safe = juce::Component::SafePointer<MainComponent> (this);
+    startpageui::Host host;
+    for (int i = 0; i < recent.getNumFiles(); ++i)
+    {
+        const auto f = recent.getFile (i);
+        startpage::Recent r;
+        r.path = f.getFullPathName().toStdString();
+        r.name = f.getFileNameWithoutExtension().toStdString();
+        r.folder = f.getParentDirectory().getFullPathName().toStdString();
+        r.exists = f.existsAsFile();
+        r.modifiedMs = r.exists ? f.getLastModificationTime().toMilliseconds() : 0;
+        r.bytes = r.exists ? f.getSize() : 0;
+        host.recent.push_back (std::move (r));
+    }
+    const auto entries = startfrom::entries();
+    for (const auto& e : entries)
+    {
+        host.templates.push_back (e.name);
+        using Kind = startfrom::Entry::Kind;
+        host.templateDetails.push_back (e.kind == Kind::demo ? tr ("Demo song") : e.kind == Kind::lynxDefault ? tr ("LYNX SHARE's default project")
+                                        : e.kind == Kind::builtIn ? tr ("Template") : tr ("Your template"));
+    }
+    const auto closeThen = [safe] (std::function<void (MainComponent&)> then) {
+        juce::MessageManager::callAsync ([safe, then = std::move (then)] { // (the page's own button is still running)
+            if (safe == nullptr)
+                return;
+            safe->setupOverlay.reset();
+            if (safe->isShowing())
+                safe->grabKeyboardFocus();
+            if (then)
+                then (*safe);
+        });
+    };
+    host.close = [closeThen] { closeThen ({}); };
+    host.open = [closeThen] (const juce::String& path) {
+        closeThen ([path] (MainComponent& m) {
+            const juce::File file (path);
+            if (! file.existsAsFile())
+            {
+                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Open"),
+                                                        tr ("{0} is no longer there.", { file.getFullPathName() }));
+                return;
+            }
+            m.confirmDiscard ([safe = juce::Component::SafePointer<MainComponent> (&m), file] {
+                if (safe != nullptr)
+                    safe->openFile (file);
+            });
+        });
+    };
+    host.newProject = [closeThen] { closeThen ([] (MainComponent& m) { m.newProject (true); }); };
+    host.openDialog = [closeThen] { closeThen ([] (MainComponent& m) { m.chooseFileToOpen(); }); };
+    host.newFromTemplate = [closeThen, entries] (int index) {
+        if (index < 0 || index >= (int) entries.size())
+            return;
+        closeThen ([entry = entries[(std::size_t) index]] (MainComponent& m) {
+            m.confirmDiscard ([safe = juce::Component::SafePointer<MainComponent> (&m), entry] {
+                if (safe == nullptr)
+                    return;
+                if (auto song = startfrom::songOf (entry))
+                    safe->startNewProject (std::move (*song), {});
+                else
+                    juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("New from template"),
+                                                            tr ("{0} could not be opened.", { entry.name }));
+            });
+        });
+    };
+    host.showAtStart = startpage::enabled();
+    host.setShowAtStart = [safe] (bool on) {
+        startpage::setEnabled (on);
+        if (safe != nullptr)
+            safe->saveUiSettings();
+    };
+    setupOverlay = startpageui::makeOverlay (std::move (host));
     addAndMakeVisible (*setupOverlay);
     setupOverlay->setBounds (getLocalBounds());
     setupOverlay->toFront (true);

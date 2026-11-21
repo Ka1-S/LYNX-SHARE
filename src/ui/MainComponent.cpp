@@ -10482,6 +10482,8 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             }
             menu.addSubMenu (tr ("Open in new window"), newWindow);
         }
+        // issue #252 (round 190oq, LYNX extra): the recent projects and templates on one page
+        menu.addItem (tr ("Start page..."), [this] { showStartPage(); });
         if (engine.pluginsOff())
             menu.addItem (tr ("Switch plugins back on..."), [this] { showPluginsOff(); });
         menu.addSeparator();

@@ -211,6 +211,9 @@ public:
     // The welcome card ("Where are you coming from?"): at the first start of a fresh profile, and from Help › Welcome...
     // in every layout. `firstRun`: the background plugin scan starts and the answer is what setup-done.txt records.
     void showWelcomeCard (bool firstRun);
+    // Issue #252 (round 190oq, LYNX extra; core/StartPage.h): the start page over the window — recent projects and
+    // templates; at start-up when switched on (never over the welcome card), and File › Start page... at any time.
+    void showStartPage();
     // A choice (Choice::none = Skip / × / Esc): its layout through the runtime switch (as View › Layout style), its starter,
     // then the "Next: 3 things" card. Skip changes nothing (the Pattern layout).
     void applyWelcomeChoice (onboarding::Choice choice);

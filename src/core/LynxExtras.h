@@ -117,6 +117,14 @@ inline constexpr Item items[] = {
     { "playlist.rulerSeeksAnyTool", TR_NOOP ("Playlist"), TR_NOOP ("A click on the ruler moves the song position with every tool"),
       TR_NOOP ("In FL Studio a click on the Playlist's or Piano roll's ruler with the Select or Zoom tool selects or zooms a time range and leaves the song position. On: those tools move the song position too, like the others; Ctrl+drag, a double-click drag or a right drag still select a range. Off by default. Also in the Playlist ruler's right-click menu."),
       "ui-options.txt:rulerSeeksAnyTool" },
+    // round 190oq (issue #249): FL's Alt+M only mutes; this makes it switch both ways
+    { "editing.muteKeyToggles", TR_NOOP ("Editing"), TR_NOOP ("Alt+M toggles: pressed again, it unmutes (LYNX)"),
+      TR_NOOP ("In FL Studio Alt+M only mutes the selected clips or notes and Shift+Alt+M unmutes them. On: Alt+M on clips or notes that are all muted already unmutes them, in the Playlist and the Piano roll; Shift+Alt+M still unmutes. Also in the Playlist's Edit menu."),
+      "ui-options.txt:muteKeyToggles" },
+    // round 190oq (issue #252): a start page with the recent projects and templates (Bitwig's Dashboard, Studio One's Start page)
+    { "general.startPage", TR_NOOP ("Windows"), TR_NOOP ("Show the start page when LYNX starts (recent projects and templates)"),
+      TR_NOOP ("At start-up a page lists the recent projects (with a search box) and the templates over the start-up project, which stays open behind it (Esc keeps it). Not on the first start, which shows the welcome card, nor when a project is opened from a file. Also in File › Start page..."),
+      "ui-options.txt:startPage" },
     { "midi.gamepad", TR_NOOP ("Controllers"), TR_NOOP ("Use a game controller"),
       TR_NOOP ("A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page."),
       "midi-settings.txt:gamepad" },

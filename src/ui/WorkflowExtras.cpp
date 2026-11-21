@@ -14,6 +14,8 @@
 #include "core/PlaylistTrackOps.h"
 #include "core/TakeCleanup.h"
 #include "core/TransportEdit.h"
+#include "core/MuteKeys.h"
+#include "core/StartPage.h"
 #include "core/TrackOnly.h"
 #include "core/WheelZones.h"
 #include "engine/AudioEngine.h"
@@ -104,6 +106,10 @@ bool readUiOption (const juce::String& key, bool on)
         trackclips::setShownInSelector (on);
     else if (key == "rulerSeeksAnyTool") // issue #227 (round 190nq, LYNX extra)
         ruler::seekWithAnyTool() = on;
+    else if (key == "muteKeyToggles") // issue #249 (round 190oq, LYNX extra)
+        mutekeys::setToggles (on);
+    else if (key == "startPage") // issue #252 (round 190oq, LYNX extra)
+        startpage::setEnabled (on);
     else
         return false;
     return true;
@@ -129,7 +135,9 @@ juce::String uiOptionsText()
            + "\nsimpleLoopDetect=" + juce::String (loopanalysis::dropDetects().load() ? 1 : 0) // (round 190kx)
            + "\nescClosesWindows=" + juce::String (escclose::enabled() ? 1 : 0) // (round 190ng, issue #217)
            + "\ntrackClipsShown=" + juce::String (trackclips::shownInSelector() ? 1 : 0) // (round 190ne)
-           + "\nrulerSeeksAnyTool=" + juce::String (ruler::seekWithAnyTool() ? 1 : 0); // (round 190nq, issue #227)
+           + "\nrulerSeeksAnyTool=" + juce::String (ruler::seekWithAnyTool() ? 1 : 0) // (round 190nq, issue #227)
+           + "\nmuteKeyToggles=" + juce::String (mutekeys::toggles() ? 1 : 0) // (round 190oq, issue #249)
+           + "\nstartPage=" + juce::String (startpage::enabled() ? 1 : 0); // (round 190oq, issue #252)
 }
 
 std::optional<bool> extraOn (std::string_view id)
@@ -156,6 +164,10 @@ std::optional<bool> extraOn (std::string_view id)
         return escclose::enabled();
     if (id == "playlist.rulerSeeksAnyTool") // round 190nq (issue #227)
         return ruler::seekWithAnyTool();
+    if (id == "editing.muteKeyToggles") // round 190oq (issue #249)
+        return mutekeys::toggles();
+    if (id == "general.startPage") // round 190oq (issue #252)
+        return startpage::enabled();
     return std::nullopt;
 }
 
@@ -187,6 +199,10 @@ bool setExtra (std::string_view id, bool on)
         escclose::enabled() = on;
     else if (id == "playlist.rulerSeeksAnyTool") // round 190nq (issue #227)
         ruler::seekWithAnyTool() = on;
+    else if (id == "editing.muteKeyToggles") // round 190oq (issue #249)
+        mutekeys::setToggles (on);
+    else if (id == "general.startPage") // round 190oq (issue #252)
+        startpage::setEnabled (on);
     else
         return false;
     if (onChanged)
