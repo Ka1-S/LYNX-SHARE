@@ -7801,6 +7801,9 @@ void MainComponent::timerCallback()
         if (toolbar::PerformanceMeter::secondView == toolbar::PerformanceMeter::framesPerSecond) // round 190ld: View FPS
             perfMeter.setFramesPerSecond (ui::FrameTicker::uiFrameRate());
         perfMeter.setValues (engine.getDeviceManager().getCpuUsage(), toolbar::PerformanceMeter::processMemoryBytes(), notes + held);
+        if (const auto* split = engine.renderAheadStats()) // (round 190of, P24: the live part / rendered ahead)
+            perfMeter.setSplit (split->liveNs.load (std::memory_order_relaxed), split->aheadNs.load (std::memory_order_relaxed),
+                                split->audioNs.load (std::memory_order_relaxed));
         const auto rt = engine.getRtStats().snapshot();
         juce::StringArray heaviest;
         for (const auto& u : engine.getHeaviestUnits())

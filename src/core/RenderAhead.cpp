@@ -795,6 +795,7 @@ void RenderAhead::threadLoop (std::function<void()> onStart)
         const auto jobNs = ProcessTimes::now() - jobStart;
         aheadCpuNs.fetch_add (WorkerPool::threadCpuNs() - jobCpu, std::memory_order_relaxed);
         aheadBusyNs.fetch_add (jobNs, std::memory_order_relaxed);
+        counters.aheadNs.fetch_add (jobNs, std::memory_order_relaxed); // (round 190of: the split CPU meter)
         if (useWorkers)
             ++jobsSinceSerial;
         else if (sb.samples > 0 && model.sampleRate > 0.0)
@@ -949,6 +950,12 @@ void RenderAhead::process (SnapshotExchange<RackState>& exchange, const Block& b
     processBlock (exchange, b, left, right, liveQueue, meters, moreLive);
     const auto cpu = (double) (WorkerPool::threadCpuNs() - cpu0);
     account ((double) (ProcessTimes::now() - wall0), cpu, b.samples, b.playing, liveState);
+    // round 190of (P24): the live part's share (the callback's own time here) for the split CPU meter
+    if (b.model != nullptr && b.samples > 0 && sampleRate > 0.0)
+    {
+        counters.liveNs.fetch_add (ProcessTimes::now() - wall0, std::memory_order_relaxed);
+        counters.audioNs.fetch_add ((std::uint64_t) ((double) b.samples / sampleRate * 1.0e9), std::memory_order_relaxed);
+    }
 }
 
 bool RenderAhead::renderAheadAllowed() const noexcept

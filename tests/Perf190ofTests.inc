@@ -99,3 +99,34 @@ TEST (perf190of_renderer_feeds_the_monitor_while_it_is_open)
         effects += times.effectLongestNs[k].load();
     CHECK (effects > 0); // (the song's inserts have effects)
 }
+
+TEST (perf190of_split_meter_counts_the_live_part_and_the_part_rendered_ahead)
+{
+    using namespace lynx;
+    const auto song = ra190gq::makeSong (8);
+    const int blocks = 600;
+    ra190gq::AheadRig rig (song, 0, {});
+    ra190gq::Callback cb (song, 64, 0.0);
+    std::vector<float> l, r;
+    double callbackNs = 0.0;
+    cb.run (blocks, l, r, [&] (double start, int n, double tps, float* a, float* b, int) {
+        std::this_thread::sleep_for (std::chrono::microseconds (150)); // (the device's pace, roughly: the thread gets ahead)
+        const auto t0 = std::chrono::steady_clock::now();
+        rig.block (cb, start, n, tps, a, b);
+        callbackNs += (double) std::chrono::duration_cast<std::chrono::nanoseconds> (std::chrono::steady_clock::now() - t0).count();
+    });
+    const auto& st = rig.ahead.stats();
+    const auto audio = st.audioNs.load(), live = st.liveNs.load(), ahead = st.aheadNs.load();
+    // the audio: every sample the callback rendered
+    CHECK (std::abs ((double) audio - (double) blocks * 64.0 / 44100.0 * 1.0e9) < (double) blocks); // (1 ns of rounding per block)
+    // the live part: the callback's own time in the renderers (within 5 % of what the caller measured around them)
+    CHECK (live > 0 && (double) live <= callbackNs * 1.0001 && (double) live >= callbackNs * 0.95);
+    if (! ((double) live >= callbackNs * 0.95))
+        std::printf ("  split meter: live %.0f ns, measured around the callbacks %.0f ns\n", (double) live, callbackNs);
+    // the part rendered ahead: the render-ahead thread's work (most blocks came from its ring)
+    CHECK (st.fromRing.load() > (std::uint64_t) blocks / 2 && ahead > 0);
+    renderahead::SplitLoadReader reader;
+    const auto first = reader.take (st);
+    CHECK (first.valid && std::abs (first.live - (double) live / (double) audio) < 1e-9 && std::abs (first.ahead - (double) ahead / (double) audio) < 1e-9);
+    CHECK (! reader.take (st).valid); // nothing new since
+}

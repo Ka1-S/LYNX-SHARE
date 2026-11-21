@@ -952,6 +952,19 @@ void PerformanceMeter::setValues (double cpu01, std::int64_t memoryBytes, int po
     }
 }
 
+void PerformanceMeter::setSplit (std::uint64_t liveNs, std::uint64_t aheadNs, std::uint64_t audioNs)
+{
+    if (audioNs > lastAudioNs && liveNs >= lastLiveNs && aheadNs >= lastAheadNs)
+    {
+        const auto span = (double) (audioNs - lastAudioNs);
+        splitLive = (double) (liveNs - lastLiveNs) / span;
+        splitAhead = (double) (aheadNs - lastAheadNs) / span;
+    }
+    else if (audioNs == lastAudioNs)
+        splitLive = splitAhead = 0.0; // (nothing rendered since: no device running)
+    lastLiveNs = liveNs, lastAheadNs = aheadNs, lastAudioNs = audioNs;
+}
+
 juce::Rectangle<float> PerformanceMeter::barBox() const
 {
     auto area = getLocalBounds();
@@ -1533,6 +1546,10 @@ ui::Hint PerformanceMeter::hintAt (juce::Point<int> p)
             h.text << "  " << tr ("Tip: Windows Audio (shared) drops out more easily; choose the ASIO driver \"{0}\" in Options > Audio settings.",
                                   { driverTip });
         h.value = juce::String (cpu * 100.0, 1) + "%" + (peakLoad > 0.0 ? "  (" + tr ("peak {0}%", { juce::String (juce::roundToInt (peakLoad * 100.0)) }) + ")" : juce::String());
+        // round 190of (P24): with render-ahead at work, its two parts (the bar shows the live part: the deadline)
+        if (splitAhead >= 0.0005)
+            h.text << "  " << tr ("Live part {0}%, rendered ahead {1}% (together {2}% of one core).",
+                                  { juce::String (splitLive * 100.0, 1), juce::String (splitAhead * 100.0, 1), juce::String ((splitLive + splitAhead) * 100.0, 1) });
         if (look != toolbarlayout::Look::live)
             h.text << "  " << tr ("The graph under the bar is the load over the last seconds.");
         h.text << "  " << tr ("[Double-click] plugin performance monitor  [RMB] refresh rate");
