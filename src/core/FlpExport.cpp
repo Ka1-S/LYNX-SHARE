@@ -3,6 +3,7 @@
 #include "core/NoteRepeat.h"
 #include "core/PlaylistOps.h"
 #include "core/FlpExport.h"
+#include "core/RackAutomation.h" // round 190ow (PAT-7: FL's channel order)
 #include "core/TrackClips.h"
 #include "core/Fpc.h"
 #include "core/SamplerPage.h"
@@ -1403,22 +1404,34 @@ struct Converter
             // an automation clip's channel levels are its range: pan = minimum, volume = maximum (of 12800, in the
             // target's whole range) [DATA: FL's tempo clips keep 1250…4250 = 60…180 BPM; FL 2026 played a clip written
             // with a channel's default levels over 6400…10000: round 171e, FL render]. Always the whole range here.
+            // Round 190ow (PAT-7): the clip's own MIN / MAX (the rack row's knobs), the points written in FL's 0..1 of the
+            // range they were made in (pointsMin / pointsMax: an FL clip's own levels; a LYNX clip's whole range, which
+            // writes what the earlier export did). FL re-ranges them into MIN..MAX as LYNX does.
             c.hasLevels = true;
-            c.pan = 0;
-            c.volume = 12800;
+            c.pan = iround (std::clamp (src.rangeMin, 0.0f, 1.0f) * 12800.0);
+            c.volume = iround (std::clamp (src.rangeMax, 0.0f, 1.0f) * 12800.0);
+            c.enabled = ! src.muted; // (round 190ow: the mute light)
+            const auto pointsSpan = (double) src.pointsMax - (double) src.pointsMin;
+            const auto unranged = src.pointsMin == 0.0f && src.pointsMax == 1.0f;
+            const auto flValue = [&] (float v) {
+                const auto raw = (double) (map ? map (v) : v);
+                if (unranged)
+                    return std::clamp (raw, 0.0, 1.0);
+                return std::abs (pointsSpan) > 1.0e-9 ? std::clamp ((raw - src.pointsMin) / pointsSpan, 0.0, 1.0) : 0.0;
+            };
             for (std::size_t i = 0; i < src.points.size(); ++i)
             {
                 const auto& pt = src.points[i];
                 flp::AutomationPoint fp;
                 fp.position = (double) pt.tick / ppq;
-                fp.value = std::clamp ((double) (map ? map (pt.value) : pt.value), 0.0, 1.0);
+                fp.value = flValue (pt.value);
                 // FL's curve sits on the segment ending at the point (FlpImport: previous.tension = −p.tension)
                 fp.tension = i > 0 ? 0.0f - src.points[i - 1].tension : 0.0f; // (0 − t: a straight segment writes +0)
                 fp.curve = i > 0 ? flCurveOf (src.points[i - 1]) : (std::uint8_t) 0;
                 c.automation.push_back (fp);
             }
             if (c.automation.empty())
-                c.automation.push_back ({ 0.0, (double) (map ? map (song.targetValue (src.target)) : song.targetValue (src.target)), 0.0f });
+                c.automation.push_back ({ 0.0, flValue (song.targetValue (src.target)), 0.0f });
             // FL's clip LFO (round 177b): the fields back as they were read; the level carries the clip's range (FL scales
             // the LFO by its channel range, written whole here)
             if (const auto& lfo = src.lfo; ! lfo.isDefault())
@@ -1426,7 +1439,10 @@ struct Converter
                 auto& f = c.automationLfo;
                 f.present = true;
                 f.enabled = lfo.on ? -1 : 0;
-                f.level = std::abs (lfo.range - 1.0f) < 1.0e-6f ? lfo.level : (int) std::lround (lfo.level * lfo.range);
+                // (round 190ow: FL scales the level by the channel range written above, MIN..MAX; LYNX's LFO by its
+                // `range` in the points' range, re-ranged with them)
+                const auto lfoScale = unranged || std::abs (pointsSpan) < 1.0e-9 ? (double) lfo.range : (double) lfo.range / pointsSpan;
+                f.level = std::abs (lfoScale - 1.0) < 1.0e-6 ? lfo.level : (int) std::lround (lfo.level * lfoScale);
                 f.mode = lfo.add ? 1 : 0;
                 f.flags = lfo.flags;
                 f.speed = lfo.speed;
@@ -1461,6 +1477,121 @@ struct Converter
                 out.initControls.push_back ({ 0, *id, rawValue (v.target, v.value) });
         if (! song.midiLinks.empty())
             report.notes.push_back ("MIDI controller links stay in LYNX (FL keeps them per machine)");
+    }
+
+    // ---- round 190ow (DE-123): the automation clip channels' steps / notes ----
+    void automationNotes()
+    {
+        int written = 0;
+        for (int i = 0; i < (int) song.patterns.size() && i < (int) out.patterns.size(); ++i)
+        {
+            const auto& src = song.patterns[(std::size_t) i];
+            if (src.autoNotes.empty())
+                continue;
+            auto& p = out.patterns[(std::size_t) i];
+            for (const auto& n : src.autoNotes)
+            {
+                const auto it = automationChannel.find (n.channel);
+                if (it == automationChannel.end())
+                    continue;
+                flp::Note f;
+                f.position = ticks (n.start);
+                f.length = n.length > 0 ? std::max<std::uint32_t> (1, ticks (n.length)) : 0; // (0: FL's step)
+                f.channel = (std::uint16_t) it->second;
+                f.key = (std::uint16_t) std::clamp (n.key, 0, 131);
+                f.velocity = (std::uint8_t) std::clamp (iround (n.velocity * 128.0), 0, 128);
+                f.flags = 0x4000;
+                f.extra = (std::uint8_t) (n.muted ? 0x20 : 0);
+                p.notes.push_back (f);
+                ++written;
+            }
+            std::stable_sort (p.notes.begin(), p.notes.end(), [] (const flp::Note& a, const flp::Note& b) { return a.position < b.position; });
+        }
+        if (written > 0)
+            report.exact.push_back (std::to_string (written) + " steps / notes that start automation clips");
+    }
+
+    // ---- round 190ow (PAT-7): FL's channel order = the Channel rack's, the automation clip channels between the others
+    // where their rows are (core/RackAutomation.h). Until here the channels are numbered as LYNX's (automation clips after
+    // them); this renumbers every channel reference of the project. A song whose rows all sit after its channels keeps
+    // the numbers (the file as before).
+    void rackOrder()
+    {
+        const auto count = (int) out.channels.size();
+        std::vector<int> order; // new FL index → old
+        std::vector<char> placed ((std::size_t) count, 0);
+        const auto take = [&] (int old) {
+            if (old >= 0 && old < count && placed[(std::size_t) old] == 0)
+            {
+                placed[(std::size_t) old] = 1;
+                order.push_back (old);
+            }
+        };
+        for (const auto& e : rackauto::order (song))
+        {
+            if (! e.automation)
+                take (e.index);
+            else if (const auto it = automationChannel.find (e.index); it != automationChannel.end())
+                take (it->second);
+        }
+        for (int old = 0; old < count; ++old)
+            take (old);
+        std::vector<int> to ((std::size_t) count, 0); // old → new
+        bool same = true;
+        for (int i = 0; i < count; ++i)
+        {
+            to[(std::size_t) order[(std::size_t) i]] = i;
+            same = same && order[(std::size_t) i] == i;
+        }
+        if (same)
+            return;
+
+        const auto map = [&] (int old) { return old >= 0 && old < count ? to[(std::size_t) old] : old; };
+        const auto mapId = [&] (flp::ControlId& id) {
+            if (id.isChannel() && id.channel() < count)
+                id.raw = ((std::uint32_t) map (id.channel()) << 16) | (id.raw & 0xFFFFu);
+        };
+        for (auto& c : out.channels)
+        {
+            c.index = map (c.index);
+            for (auto& child : c.layerChildren)
+                child = map (child);
+        }
+        std::stable_sort (out.channels.begin(), out.channels.end(), [] (const flp::Channel& a, const flp::Channel& b) { return a.index < b.index; });
+        for (auto& p : out.patterns)
+        {
+            for (auto& n : p.notes)
+                n.channel = (std::uint16_t) map (n.channel);
+            for (auto& l : p.channelLoops)
+                l.first = map (l.first);
+            for (auto& e : p.controlEvents)
+                mapId (e.id);
+        }
+        for (auto& a : out.arrangements)
+        {
+            for (auto& item : a.items)
+                if (item.kind == flp::PlaylistItem::Kind::channelClip)
+                    item.index = map (item.index);
+            for (auto& t : a.tracks)
+                if (t.channel >= 0)
+                    t.channel = map (t.channel);
+        }
+        for (auto& v : out.controls)
+            mapId (v.id);
+        for (auto& v : out.initControls)
+            mapId (v.id);
+        for (auto& l : out.automationLinks)
+        {
+            l.channel = map (l.channel);
+            mapId (l.target);
+        }
+        for (auto& l : out.controllerLinks)
+        {
+            mapId (l.source);
+            mapId (l.target);
+        }
+        for (auto& [a, c] : automationChannel)
+            c = map (c);
     }
 
     // ---- the Playlist ----
@@ -1842,7 +1973,9 @@ struct Converter
         mixer();    // (before the automations: their effect targets need the slots)
         patterns();
         automations();
+        automationNotes();
         arrangements();
+        rackOrder();
         out.mixerTrackCount = 0;
         out.header.channelCount = (std::uint16_t) out.channels.size();
     }
