@@ -10,10 +10,12 @@
 #include <optional>
 #include <stdexcept>
 
+#include "core/SessionIds.h"
 #include "engine/LiveSessions.h"
 #include "ui/I18n.h"
 #include "ui/LiveSessionUi.h"
 #include "ui/MainComponent.h"
+#include "ui/PolyEditor.h"
 
 namespace lynx
 {
@@ -29,7 +31,7 @@ void setActive (bool value) noexcept { on.store (value); }
 
 juce::StringArray operations()
 {
-    return { "ui.window", "ui.find", "ui.click", "ui.list", "ui.layout", "ui.select_track", "ui.show", "ui.welcome", "session.start", "session.status" };
+    return { "ui.window", "ui.find", "ui.click", "ui.list", "ui.layout", "ui.select_track", "ui.show", "ui.welcome", "ui.clipmenu", "ui.polyeditor", "session.start", "session.status" };
 }
 
 bool isLocalRelay (const juce::String& url)
@@ -290,6 +292,53 @@ juce::var MainComponent::handleDemoOp (const juce::String& op, const juce::var& 
         setupOverlay.reset();
         applyWelcomeChoice (choice);
         return object ({ { "choice", id }, { "layout", layoutstyle::id (layoutStyle) } });
+    }
+    // round 190nx: an audio clip's context menu and the polyphonic note editor, by ID. A clip is `clip` (its index in the project
+    // snapshot's playlist) or `clipId` (the clip's stable id as 16 hex digits, uids::toHex); a channel is `channel` (index) or
+    // `channelId` (the snapshot's hex id), or the channel of the clip
+    if (op == "ui.clipmenu" || op == "ui.polyeditor")
+    {
+        const auto& song = engine.getSong();
+        auto uidOf = [] (const juce::var& v) { return uids::fromHex (v.toString().trim().toStdString()); };
+        int clip = -1, channel = -1;
+        if (args["clip"].isInt() || args["clip"].isInt64())
+            clip = (int) args["clip"];
+        else if (args["clipId"].isString())
+        {
+            for (std::size_t i = 0; i < song.playlist.size() && clip < 0; ++i)
+                if (song.playlist[i].uid != 0 && song.playlist[i].uid == uidOf (args["clipId"]))
+                    clip = (int) i;
+        }
+        if ((args["clip"].isInt() || args["clip"].isInt64() || args["clipId"].isString()) && (clip < 0 || clip >= (int) song.playlist.size()))
+            fail ("No Playlist clip with that clip index or clipId");
+        if (op == "ui.clipmenu")
+        {
+            if (clip < 0)
+                fail ("ui.clipmenu needs clip (index) or clipId");
+            if (! playlist.isShowing())
+                fail ("The Playlist is not showing (ui.show panel playlist)");
+            const auto screen = playlist.openClipMenuForDemo (clip);
+            if (screen.isEmpty())
+                fail ("The clip is not in view in the Playlist (scroll to it first)");
+            return object ({ { "clip", clip }, { "screen", rect (screen) }, { "menu", true } });
+        }
+        if (args["channel"].isInt() || args["channel"].isInt64())
+            channel = (int) args["channel"];
+        else if (args["channelId"].isString())
+        {
+            for (std::size_t i = 0; i < song.channels.size() && channel < 0; ++i)
+                if (song.channels[i].uid != 0 && song.channels[i].uid == uidOf (args["channelId"]))
+                    channel = (int) i;
+        }
+        else if (clip >= 0)
+            channel = song.playlist[(std::size_t) clip].channel;
+        if (channel < 0 || channel >= (int) song.channels.size())
+            fail ("ui.polyeditor needs channel (index), channelId or a clip that plays audio");
+        const auto& ch = song.channels[(std::size_t) channel];
+        if (ch.instrument != InstrumentKind::audioClip || ch.ara.active() || engine.getSampleLibrary().load (juce::String::fromUTF8 (ch.samplePath.c_str())) == nullptr)
+            fail ("That channel is not an audio clip with a loaded sample, so it has no polyphonic editor");
+        PolyEditorWindows::open (engine, channel);
+        return object ({ { "channel", channel }, { "screen", rect (PolyEditorWindows::boundsOf (channel)) } });
     }
     if (op == "session.start" || op == "session.status")
     {

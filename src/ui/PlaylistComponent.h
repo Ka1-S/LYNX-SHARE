@@ -291,6 +291,9 @@ public:
     juce::Rectangle<int> trackLaneArrowForSnapshot (int track) const { return trackLaneArrow (track); }
     double xOfTickForSnapshot (double tick) const { return tickToX (tick); }
     juce::Rectangle<int> clipBoundsForSnapshot (int clip) const { return clipBounds (clip); } // (round 190gi)
+    // round 190nx (--demo, ui.clipmenu): selects the clip and opens its context menu at the clip, as a right-click on it does,
+    // with no mouse needed. Returns the clip's rectangle on screen, or an empty one when the clip is not in view
+    juce::Rectangle<int> openClipMenuForDemo (int clip);
     juce::Rectangle<float> curveBodyForSnapshot (int clip) const; // (round 190gi: where an envelope / automation curve is drawn)
     double warpStripSecondsForSnapshot (int clip, juce::Point<int> p) const { return warpStripSeconds (clip, p); }
     std::size_t warpMarkerCountForSnapshot (int clip) const { return clipWarpMarkers (clip).size(); }
