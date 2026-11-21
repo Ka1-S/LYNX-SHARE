@@ -24,6 +24,7 @@ LYNX SHARE是一款免费开源的数字音频工作站，用来制作节拍和�
 • 齐全：100 多款内置乐器和效果器——合成器、鼓机、采样器、均衡器、压缩器、限幅器、混响、延迟、音高校正、可视化工具等等。
 • 你的插件：支持 VST3、CLAP 和 VST2 乐器与效果器，每个插件都可选择在独立的沙箱进程中运行，插件崩溃也不会拖垮整个工程。
 • 你的工程：打开FL Studio工程（.flp），包括模式、音符、混音器、自动化和采样；打开并保存Ableton Live 11/12套装（.als），包括Session片段；打开并保存DAWproject文件（.dawproject），可用于Bitwig、Studio One、Cubase等应用；可导出.flp回到FL Studio；可导入FL Studio Mobile工程（.flm，部分支持）、GarageBand工程（.band，部分支持）、BandLab工程（.blx，部分支持）和MIDI文件。
+• Tracker 模块：.mod、.xm、.s3m 和 .it 文件连同采样、模式和速度一起打开，内置的跟踪器可以编辑音符。
 • 音频编辑：Melodyne等ARA 2插件可直接在音频片段上工作，复音音符编辑器可移动和重新调音和弦中的单个音符，音频还可转换为MIDI。
 • 低延迟：支持 ASIO（包括适用于任何设备的 LYNX SHARE 自带 ASIO 驱动）以及 WASAPI 共享和独占模式。
 • 录制音频和 MIDI（也支持 MPE）、编辑音频、自动化任意参数，导出为 WAV、FLAC、MP3、OGG、AIFF、M4A 或分轨（stems）。
@@ -52,6 +53,7 @@ LYNX SHARE 0.1.30：前所未有地轻量，在我们的测试电脑上播放FL�
 9. 支持简体中文等 15 种界面语言
 10. 免费开源（AGPL-3.0）：无需账号，无广告，无遥测
 11. 支持托管ARA 2插件、复音音符编辑器和音频转MIDI
+12. 打开 Tracker 模块（.mod、.xm、.s3m、.it），并在内置跟踪器中编辑音符
 
 ## Search terms
 

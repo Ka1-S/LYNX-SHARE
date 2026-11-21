@@ -1,5 +1,5 @@
 ---
-source: 222ec28779
+source: c3a082f5e3
 ---
 LYNX SHARE salva i progetti come file `.lynx`. Apre anche i progetti di altri programmi, carica i comuni file audio ed esporta audio, MIDI e progetti per altri programmi. La tabella elenca ogni formato della 0.1.30 alpha.
 
@@ -26,6 +26,7 @@ Un progetto aperto dal formato di un altro programma è un'importazione. `File �
 | `.band` | `File › Apri...` (il pacchetto, il suo file `projectData` o uno zip di esso) | No | Progetto GarageBand 10 o GarageBand per iOS, come tracce del flusso semplice. Parziale: le tracce di strumento suonano con il synth e la batteria integrati, tranne gli strumenti Sampler creati in GarageBand per iOS. I progetti di GarageBand 11 e precedenti non sono leggibili |
 | `.blx` | `File › Apri...`, o la sua cartella con l'importazione `Cartella...` del flusso semplice | No | Progetto BandLab scaricato da Cakewalk o Sonar, come tracce del flusso semplice con regioni, tempo, tonalità, il mix, l'automazione di volume e pan e gli effetti comuni. Parziale: i suoni di strumento di BandLab e gli altri pedali sono elencati nel report di importazione |
 | `.mid`, `.midi` | `File › Apri...` crea un nuovo progetto. `File › Importa › File MIDI...` e il Piano Roll importano in quello corrente | `File › Esporta › File MIDI...` (`Ctrl+Shift+M`) | |
+| `.mod`, `.xm`, `.s3m`, `.it` | `File › Apri...` | No | Moduli tracker (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker). Gli strumenti diventano canali Sampler con i loro campioni, il brano diventa clip di pattern con i suoi cambi di tempo, e `Vista › Tracker` modifica le note. Parziale: effetti come slide, vibrato e arpeggi, inviluppi e cambi di volume su una nota che suona sono elencati nel rapporto di importazione |
 | `.wav` | Come sample o come clip audio | `File › Esporta › File Wave...`, 16 bit, 24 bit o 32 bit float | Dither, informazioni di tempo, marcatori di loop e marcatori della Playlist opzionali |
 | `.mp3` | Come sample o come clip audio | `File › Esporta › File MP3...` | Bitrate costante |
 | `.ogg` | Come sample o come clip audio | `File › Esporta › File OGG...` | |

@@ -27,6 +27,8 @@ Sie ist darauf gebaut, auf jedem PC schlank und schnell zu bleiben.
 • Komplett: über 100 integrierte Instrumente und Effekte – Synthesizer, Drum Machines, Sampler, EQs, Kompressoren, Limiter, Reverbs, Delays, Tonhöhenkorrektur, Visualizer und mehr.
 • Deine Plugins: lädt VST3-, CLAP- und VST2-Instrumente und -Effekte, auf Wunsch jeweils in einem eigenen Sandbox-Prozess, damit ein abstürzendes Plugin nicht deine ganze Session mitreißt.
 • Deine Projekte: öffnet FL-Studio-Projekte (.flp) mit Patterns, Noten, Mixer, Automation und Samples; öffnet und speichert Sets aus Ableton Live 11/12 (.als), samt Session-Clips; öffnet und speichert DAWproject-Dateien (.dawproject) für Bitwig, Studio One, Cubase und andere Programme; exportiert .flp zurück nach FL Studio; importiert Projekte aus FL Studio Mobile (.flm, teilweise), GarageBand (.band, teilweise), BandLab (.blx, teilweise) und MIDI-Dateien.
+• Tracker-Module: .mod-, .xm-, .s3m- und .it-Dateien öffnen sich mit ihren Samples, Patterns und ihrem Tempo, und ein
+eingebauter Tracker bearbeitet die Noten.
 • Audiobearbeitung: ARA-2-Plugins wie Melodyne arbeiten direkt an Audio-Clips, ein polyphoner Noteneditor verschiebt und stimmt einzelne Noten innerhalb von Akkorden um, und Audio lässt sich in MIDI umwandeln.
 • Niedrige Latenz: ASIO (einschließlich des eigenen ASIO-Treibers von LYNX SHARE für jedes Gerät), WASAPI im Shared- und Exclusive-Modus.
 • Audio und MIDI aufnehmen (auch MPE), Audio bearbeiten, alles automatisieren, als WAV, FLAC, MP3, OGG, AIFF, M4A oder Stems rendern.
@@ -57,6 +59,7 @@ LYNX SHARE 0.1.30: leichter denn je, mit etwa der halben CPU-Last von FL Studio 
 9. Oberfläche in 15 Sprachen, darunter Deutsch
 10. Kostenlos und Open Source (AGPL-3.0): kein Konto, keine Werbung, keine Telemetrie
 11. ARA-2-Plugin-Hosting, ein polyphoner Noteneditor und Audio-zu-MIDI-Umwandlung
+12. Öffnet Tracker-Module (.mod, .xm, .s3m, .it) und bearbeitet Noten in einem eingebauten Tracker
 
 ## Search terms
 

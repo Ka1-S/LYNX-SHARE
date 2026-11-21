@@ -27,6 +27,8 @@ Dibuat agar tetap ringan dan cepat di PC mana pun.
 • Lengkap: lebih dari 100 instrumen dan efek bawaan — synth, drum machine, sampler, EQ, compressor, limiter, reverb, delay, koreksi pitch, visualizer, dan banyak lagi.
 • Plugin Anda: mendukung instrumen dan efek VST3, CLAP, dan VST2, masing-masing opsional berjalan di proses sandbox tersendiri sehingga plugin yang crash tidak bisa merusak sesi Anda.
 • Proyekmu: membuka proyek FL Studio (.flp) beserta pattern, not, mixer, otomasi, dan sample; membuka dan menyimpan set Ableton Live 11/12 (.als), termasuk klip Session; membuka dan menyimpan file DAWproject (.dawproject) untuk Bitwig, Studio One, Cubase, dan aplikasi lain; mengekspor .flp kembali ke FL Studio; mengimpor proyek FL Studio Mobile (.flm, sebagian), GarageBand (.band, sebagian), BandLab (.blx, sebagian), dan file MIDI.
+• Modul tracker: file .mod, .xm, .s3m, dan .it terbuka dengan sample, pattern, dan tempo-nya, dan tracker bawaan
+mengedit not-notnya.
 • Pengeditan audio: plugin ARA 2 seperti Melodyne bekerja langsung pada klip audio, editor not polifonik menggeser dan menyetel ulang not tunggal di dalam akor, dan audio bisa diubah menjadi MIDI.
 • Latensi rendah: ASIO (termasuk driver ASIO milik LYNX SHARE sendiri untuk perangkat apa pun), WASAPI mode shared dan exclusive.
 • Rekam audio dan MIDI (MPE juga), edit audio, otomatisasi apa saja, render ke WAV, FLAC, MP3, OGG, AIFF, M4A, atau stem.
@@ -57,6 +59,7 @@ LYNX SHARE 0.1.30: lebih ringan dari sebelumnya, memakai sekitar separuh CPU FL 
 9. Antarmuka dalam 15 bahasa, termasuk bahasa Indonesia
 10. Gratis dan open source (AGPL-3.0): tanpa akun, tanpa iklan, tanpa telemetri
 11. Hosting plugin ARA 2, editor not polifonik, dan konversi audio ke MIDI
+12. Membuka modul tracker (.mod, .xm, .s3m, .it) dan mengedit not di tracker bawaan
 
 ## Search terms
 

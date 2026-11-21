@@ -24,6 +24,7 @@ LYNX SHARE是一款免費開源的數位音訊工作站，用來製作節拍和�
 • 完整：超過 100 款內建樂器與效果器——合成器、鼓機、取樣器、EQ、壓縮器、限幅器、殘響、延遲、音準修正、視覺化工具等等。
 • 你的外掛：支援 VST3、CLAP 與 VST2 樂器和效果器，每個外掛都可選擇在獨立的沙箱程序中執行，外掛當掉也不會拖垮整個工作階段。
 • 你的專案：開啟FL Studio專案（.flp），包括模式、音符、混音器、自動化和取樣；開啟並儲存Ableton Live 11/12組合（.als），包括Session片段；開啟並儲存DAWproject檔案（.dawproject），可用於Bitwig、Studio One、Cubase等應用程式；可匯出.flp回到FL Studio；可匯入FL Studio Mobile專案（.flm，部分支援）、GarageBand專案（.band，部分支援）、BandLab專案（.blx，部分支援）和MIDI檔案。
+• Tracker 模組：.mod、.xm、.s3m 和 .it 檔案連同取樣、模式和速度一起開啟，內建的追蹤器可以編輯音符。
 • 音訊編輯：Melodyne等ARA 2外掛可直接在音訊片段上運作，複音音符編輯器可移動並重新調音和弦中的單一音符，音訊也可轉換為MIDI。
 • 低延遲：支援 ASIO（包括適用於任何裝置的 LYNX SHARE 自家 ASIO 驅動程式）以及 WASAPI 共用與獨占模式。
 • 錄製音訊與 MIDI（也支援 MPE）、編輯音訊、自動化任何參數，輸出為 WAV、FLAC、MP3、OGG、AIFF、M4A 或分軌（stems）。
@@ -52,6 +53,7 @@ LYNX SHARE 0.1.30：前所未有地輕量，在我們的測試電腦上播放FL�
 9. 支援繁體中文等 15 種介面語言
 10. 免費開源（AGPL-3.0）：不需帳號、無廣告、無遙測
 11. 支援託管ARA 2外掛、複音音符編輯器和音訊轉MIDI
+12. 開啟 Tracker 模組（.mod、.xm、.s3m、.it），並在內建追蹤器中編輯音符
 
 ## Search terms
 

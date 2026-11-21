@@ -27,6 +27,8 @@ Hij is gebouwd om licht en snel te blijven op elke pc.
 • Compleet: meer dan 100 ingebouwde instrumenten en effecten — synths, drumcomputers, samplers, EQ's, compressors, limiters, reverbs, delays, toonhoogtecorrectie, visualizers en meer.
 • Je eigen plugins: host VST3-, CLAP- en VST2-instrumenten en -effecten, elk optioneel in een eigen sandboxproces, zodat een crashende plugin je sessie niet onderuit haalt.
 • Je projecten: opent FL Studio-projecten (.flp) met patterns, noten, mixer, automatisering en samples; opent en bewaart Ableton Live 11/12-sets (.als), inclusief Session-clips; opent en bewaart DAWproject-bestanden (.dawproject) voor Bitwig, Studio One, Cubase en andere apps; exporteert .flp terug naar FL Studio; importeert FL Studio Mobile-projecten (.flm, gedeeltelijk), GarageBand-projecten (.band, gedeeltelijk), BandLab-projecten (.blx, gedeeltelijk) en MIDI-bestanden.
+• Trackermodules: .mod-, .xm-, .s3m- en .it-bestanden gaan open met hun samples, patterns en tempo, en een ingebouwde
+tracker bewerkt de noten.
 • Audiobewerking: ARA 2-plugins zoals Melodyne werken direct op audioclips, een polyfone noteneditor verplaatst en stemt losse noten binnen akkoorden opnieuw af, en audio wordt omgezet naar MIDI.
 • Lage latency: ASIO (inclusief de eigen ASIO-driver van LYNX SHARE voor elk apparaat), WASAPI in gedeelde en exclusieve modus.
 • Neem audio en MIDI op (ook MPE), bewerk audio, automatiseer alles en exporteer naar WAV, FLAC, MP3, OGG, AIFF, M4A of stems.
@@ -57,6 +59,7 @@ LYNX SHARE 0.1.30: lichter dan ooit, met ongeveer de helft van de CPU van FL Stu
 9. Interface in 15 talen, waaronder het Nederlands
 10. Gratis en open source (AGPL-3.0): geen account, geen advertenties, geen telemetrie
 11. ARA 2-pluginhosting, een polyfone noteneditor en audio-naar-MIDI-conversie
+12. Opent trackermodules (.mod, .xm, .s3m, .it) en bewerkt noten in een ingebouwde tracker
 
 ## Search terms
 

@@ -27,6 +27,8 @@ Her PC'de hafif ve hızlı kalacak şekilde yapıldı.
 • Eksiksiz: 100'den fazla dahili enstrüman ve efekt — synth'ler, davul makineleri, sampler'lar, EQ'lar, kompresörler, limiter'lar, reverb'ler, delay'ler, perde düzeltme, görselleştiriciler ve daha fazlası.
 • Kendi eklentileriniz: VST3, CLAP ve VST2 enstrüman ve efektlerini çalıştırır; isterseniz her biri kendi sandbox işleminde çalışır, böylece çöken bir eklenti oturumunuzu çökertemez.
 • Projelerin: FL Studio projelerini (.flp) pattern'leri, notaları, mixer'ı, otomasyonu ve sample'larıyla açar; Ableton Live 11/12 setlerini (.als) Session klipleriyle birlikte açar ve kaydeder; Bitwig, Studio One, Cubase ve diğer uygulamalar için DAWproject dosyalarını (.dawproject) açar ve kaydeder; .flp'yi FL Studio'ya geri aktarır; FL Studio Mobile (.flm, kısmen), GarageBand (.band, kısmen) ve BandLab (.blx, kısmen) projelerini ve MIDI dosyalarını içe aktarır.
+• Tracker modülleri: .mod, .xm, .s3m ve .it dosyaları sample'ları, pattern'leri ve temposuyla açılır, yerleşik bir
+tracker notaları düzenler.
 • Ses düzenleme: Melodyne gibi ARA 2 plugin'leri ses kliplerinde yerinde çalışır, polifonik bir nota editörü akorların içindeki tek tek notaları taşır ve yeniden akort eder, ses de MIDI'ye dönüştürülür.
 • Düşük gecikme: ASIO (her cihaz için LYNX SHARE'in kendi ASIO sürücüsü dahil), paylaşımlı ve özel modda WASAPI.
 • Ses ve MIDI kaydedin (MPE dahil), ses düzenleyin, her şeyi otomatikleştirin; WAV, FLAC, MP3, OGG, AIFF, M4A veya stem olarak dışa aktarın.
@@ -57,6 +59,7 @@ LYNX SHARE 0.1.30: hiç olmadığı kadar hafif; test PC'mizde FL'nin Thief demo
 9. Türkçe dahil 15 dilde arayüz
 10. Ücretsiz ve açık kaynak (AGPL-3.0): hesap yok, reklam yok, telemetri yok
 11. ARA 2 plugin desteği, polifonik nota editörü ve sesten MIDI'ye dönüştürme
+12. Tracker modüllerini (.mod, .xm, .s3m, .it) açar ve notaları yerleşik bir tracker'da düzenler
 
 ## Search terms
 

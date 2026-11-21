@@ -1,5 +1,5 @@
 ---
-source: 222ec28779
+source: c3a082f5e3
 ---
 LYNX SHARE guarda los proyectos como archivos `.lynx`. También abre proyectos de otros programas, carga los archivos de audio habituales y exporta audio, MIDI y proyectos para otros programas. La tabla lista todos los formatos de la 0.1.30 alpha.
 
@@ -26,6 +26,7 @@ Un proyecto abierto desde el formato de otro programa es una importación. Enton
 | `.band` | `Archivo › Abrir...` (el paquete, su archivo `projectData` o un zip de él) | No | Proyecto de GarageBand 10 o GarageBand para iOS, como pistas del diseño simple. Parcial: las pistas de instrumento suenan con el sintetizador integrado y la batería, salvo los instrumentos Sampler hechos en GarageBand para iOS. Los proyectos de GarageBand 11 y anteriores no se pueden leer |
 | `.blx` | `Archivo › Abrir...`, o su carpeta con la importación `Carpeta...` del diseño simple | No | Proyecto de BandLab descargado por Cakewalk o Sonar, como pistas del diseño simple con regiones, tempo, tonalidad, la mezcla, automatización de volumen y pan y los efectos comunes. Parcial: los sonidos de instrumento de BandLab y otros pedales se listan en el informe de importación |
 | `.mid`, `.midi` | `Archivo › Abrir...` crea un proyecto nuevo. `Archivo › Importar › Archivo MIDI...` y el Piano Roll importan al actual | `Archivo › Exportar › Archivo MIDI...` (`Ctrl+Shift+M`) | |
+| `.mod`, `.xm`, `.s3m`, `.it` | `Archivo › Abrir...` | No | Módulos de tracker (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker). Los instrumentos pasan a ser canales Sampler con sus samples, la canción pasa a ser clips de patrón con sus cambios de tempo, y `Ver › Tracker` edita las notas. Parcial: efectos como slides, vibrato y arpegios, envolventes y cambios de volumen sobre una nota que suena aparecen en el informe de importación |
 | `.wav` | Como sample o clip de audio | `Archivo › Exportar › Archivo WAV...`, 16 bits, 24 bits o 32 bits flotante | Dither, información de tempo, marcadores de bucle y marcadores de la Playlist opcionales |
 | `.mp3` | Como sample o clip de audio | `Archivo › Exportar › Archivo MP3...` | Bitrate constante |
 | `.ogg` | Como sample o clip de audio | `Archivo › Exportar › Archivo OGG...` | |

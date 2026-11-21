@@ -1,5 +1,5 @@
 ---
-source: 222ec28779
+source: c3a082f5e3
 ---
 O LYNX SHARE salva projetos como arquivos `.lynx`. Ele também abre projetos de outros programas, carrega os arquivos de áudio comuns e exporta áudio, MIDI e projetos para outros programas. A tabela lista todos os formatos da 0.1.30 alpha.
 
@@ -26,6 +26,7 @@ Um projeto aberto a partir do formato de outro programa é uma importação. `Ar
 | `.band` | `Arquivo › Abrir...` (o pacote, o arquivo `projectData` dele ou um zip dele) | Não | Projeto do GarageBand 10 ou do GarageBand para iOS, como faixas do layout Simple. Parcial: as faixas de instrumento tocam no sintetizador e na bateria embutidos, exceto instrumentos Sampler feitos no GarageBand para iOS. Projetos do GarageBand 11 e mais antigos não são legíveis |
 | `.blx` | `Arquivo › Abrir...`, ou a pasta dele com a importação `Pasta...` do layout Simple | Não | Projeto do BandLab baixado pelo Cakewalk ou Sonar, como faixas do layout Simple com regiões, andamento, tom, o mix, automação de volume e pan e os efeitos comuns. Parcial: os sons de instrumento do BandLab e outros pedais são listados no relatório de importação |
 | `.mid`, `.midi` | `Arquivo › Abrir...` cria um projeto novo. `Arquivo › Importar › Arquivo MIDI...` e o Piano Roll importam para o projeto atual | `Arquivo › Exportar › Arquivo MIDI...` (`Ctrl+Shift+M`) | |
+| `.mod`, `.xm`, `.s3m`, `.it` | `Arquivo › Abrir...` | Não | Módulos de tracker (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker). Os instrumentos viram canais Sampler com seus samples, a música vira clipes de pattern com suas mudanças de andamento, e `Exibir › Tracker` edita as notas. Parcial: efeitos como slides, vibrato e arpejos, envelopes e mudanças de volume numa nota que está soando aparecem no relatório de importação |
 | `.wav` | Como sample ou clipe de áudio | `Arquivo › Exportar › Arquivo Wave...`, 16 bits, 24 bits ou 32 bits float | Dither, informação de tempo, marcadores de loop e marcadores da Playlist opcionais |
 | `.mp3` | Como sample ou clipe de áudio | `Arquivo › Exportar › Arquivo MP3...` | Taxa de bits constante |
 | `.ogg` | Como sample ou clipe de áudio | `Arquivo › Exportar › Arquivo OGG...` | |

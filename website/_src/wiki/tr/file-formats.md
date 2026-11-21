@@ -1,5 +1,5 @@
 ---
-source: 222ec28779
+source: c3a082f5e3
 ---
 LYNX SHARE projeleri `.lynx` dosyası olarak kaydeder. Ayrıca başka programların projelerini açar, yaygın ses dosyalarını yükler ve ses, MIDI ve diğer programlar için projeleri dışa aktarır. Tablo, 0.1.30 alpha sürümünün bütün formatlarını listeler.
 
@@ -26,6 +26,7 @@ Başka bir programın formatından açılan proje bir içe aktarmadır. `Dosya �
 | `.band` | `Dosya › Aç...` (paket, içindeki `projectData` dosyası veya onun zip'i) | Hayır | GarageBand 10 veya iOS için GarageBand projesi, Basit iş akışı track'leri olarak. Kısmi: enstrüman track'leri, iOS için GarageBand'de yapılan Sampler enstrümanları dışında dahili synth'i ve davulları çalar. GarageBand 11 ve öncesinin projeleri okunamaz |
 | `.blx` | `Dosya › Aç...` veya klasörü, Basit iş akışının `Klasör...` içe aktarmasıyla | Hayır | Cakewalk veya Sonar'ın indirdiği BandLab projesi, region'lar, tempo, tonalite, mix, ses seviyesi ve pan otomasyonu ile yaygın efektlerle Basit iş akışı track'leri olarak. Kısmi: BandLab'in enstrüman sesleri ve diğer pedalları içe aktarma raporunda listelenir |
 | `.mid`, `.midi` | `Dosya › Aç...` yeni bir proje oluşturur. `Dosya › İçe aktar › MIDI dosyası...` ve Piano Roll mevcut projeye içe aktarır | `Dosya › Dışa aktar › MIDI dosyası...` (`Ctrl+Shift+M`) | |
+| `.mod`, `.xm`, `.s3m`, `.it` | `Dosya › Aç...` | Hayır | Tracker modülleri (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker). Enstrümanlar sample'larıyla birlikte Sampler kanallarına, şarkı tempo değişiklikleriyle birlikte pattern kliplerine dönüşür ve `Görünüm › Tracker` notaları düzenler. Kısmen: slide, vibrato ve arpej gibi efektler, zarflar ve çalan bir notadaki ses değişiklikleri içe aktarma raporunda listelenir |
 | `.wav` | Sample veya ses klibi olarak | `Dosya › Dışa aktar › Wave dosyası...`, 16 bit, 24 bit veya 32 bit float | İsteğe bağlı dither, tempo bilgisi, döngü işaretçileri ve Playlist işaretçileri |
 | `.mp3` | Sample veya ses klibi olarak | `Dosya › Dışa aktar › MP3 dosyası...` | Sabit bit hızı |
 | `.ogg` | Sample veya ses klibi olarak | `Dosya › Dışa aktar › OGG dosyası...` | |

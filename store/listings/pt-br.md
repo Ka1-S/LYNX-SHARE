@@ -31,6 +31,8 @@ compressores, limitadores, reverbs, delays, afinação de voz, visualizadores e 
 • Seus plugins: carrega instrumentos e efeitos VST3, CLAP e VST2, cada um opcionalmente em um processo separado
 (sandbox), para que um plugin que trave não derrube sua sessão.
 • Seus projetos: abre projetos do FL Studio (.flp) com patterns, notas, mixer, automação e samples; abre e salva sets do Ableton Live 11/12 (.als), com os clipes da Session; abre e salva arquivos DAWproject (.dawproject) para Bitwig, Studio One, Cubase e outros apps; exporta .flp de volta para o FL Studio; importa projetos do FL Studio Mobile (.flm, parcial), do GarageBand (.band, parcial), do BandLab (.blx, parcial) e arquivos MIDI.
+• Módulos de tracker: arquivos .mod, .xm, .s3m e .it abrem com seus samples, patterns e andamento, e um tracker
+embutido edita as notas.
 • Edição de áudio: plugins ARA 2, como o Melodyne, trabalham direto nos clipes de áudio, um editor de notas polifônico move e reafina notas isoladas dentro de acordes, e o áudio é convertido em MIDI.
 • Baixa latência: ASIO (inclusive o driver ASIO do próprio LYNX SHARE, para qualquer dispositivo), WASAPI compartilhado e
 exclusivo.
@@ -63,6 +65,7 @@ LYNX SHARE 0.1.30: mais leve do que nunca, usando cerca de metade da CPU do FL S
 9. Interface em 15 idiomas, incluindo português do Brasil
 10. Gratuito e de código aberto (AGPL-3.0): sem conta, sem anúncios, sem telemetria
 11. Hospedagem de plugins ARA 2, editor de notas polifônico e conversão de áudio em MIDI
+12. Abre módulos de tracker (.mod, .xm, .s3m, .it) e edita as notas num tracker embutido
 
 ## Search terms
 

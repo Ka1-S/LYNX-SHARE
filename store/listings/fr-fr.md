@@ -29,6 +29,8 @@ Elle est conçue pour rester légère et rapide sur n'importe quel PC.
 • Complète : plus de 100 instruments et effets intégrés — synthés, boîtes à rythmes, samplers, égaliseurs, compresseurs, limiteurs, reverbs, delays, correction de hauteur, visualiseurs et bien plus.
 • Vos plugins : charge des instruments et effets VST3, CLAP et VST2, chacun pouvant tourner dans son propre processus isolé (sandbox), pour qu'un plugin qui plante ne fasse pas tomber votre session.
 • Vos projets : ouvre les projets FL Studio (.flp) avec leurs patterns, notes, mixer, automation et samples ; ouvre et enregistre les sets Ableton Live 11/12 (.als), clips de la Session compris ; ouvre et enregistre les fichiers DAWproject (.dawproject) pour Bitwig, Studio One, Cubase et d'autres applications ; exporte des .flp vers FL Studio ; importe les projets FL Studio Mobile (.flm, en partie), GarageBand (.band, en partie), BandLab (.blx, en partie) et les fichiers MIDI.
+• Modules de tracker : les fichiers .mod, .xm, .s3m et .it s'ouvrent avec leurs samples, leurs patterns et leur tempo,
+et un tracker intégré édite les notes.
 • Édition audio : les plugins ARA 2 comme Melodyne travaillent directement sur les clips audio, un éditeur de notes polyphonique déplace et réaccorde des notes isolées au sein des accords, et l'audio se convertit en MIDI.
 • Faible latence : ASIO (y compris le pilote ASIO de LYNX SHARE, compatible avec n'importe quel périphérique), WASAPI en modes partagé et exclusif.
 • Enregistrez de l'audio et du MIDI (MPE aussi), éditez l'audio, automatisez tout et exportez en WAV, FLAC, MP3, OGG, AIFF, M4A ou en stems.
@@ -59,6 +61,7 @@ LYNX SHARE 0.1.30 : plus léger que jamais, avec environ la moitié du CPU de FL
 9. Interface en 15 langues, dont le français
 10. Gratuit et open source (AGPL-3.0) : sans compte, sans publicité, sans télémétrie
 11. Hébergement de plugins ARA 2, éditeur de notes polyphonique et conversion audio vers MIDI
+12. Ouvre les modules de tracker (.mod, .xm, .s3m, .it) et édite les notes dans un tracker intégré
 
 ## Search terms
 

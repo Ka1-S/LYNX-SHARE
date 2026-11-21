@@ -1,5 +1,5 @@
 ---
-source: 222ec28779
+source: c3a082f5e3
 ---
 LYNX SHARE zapisuje projekty jako pliki `.lynx`. Otwiera też projekty innych programów, wczytuje typowe pliki audio oraz eksportuje audio, MIDI i projekty dla innych programów. Tabela wylicza każdy format wersji 0.1.30 alpha.
 
@@ -26,6 +26,7 @@ Projekt otwarty z formatu innego programu to import. `Plik › Zapisz` pyta wted
 | `.band` | `Plik › Otwórz...` (pakiet, jego plik `projectData` lub jego zip) | Nie | Projekt GarageBand 10 lub GarageBand na iOS, jako ścieżki Prostego układu. Częściowo: ścieżki instrumentów grają wbudowanym syntezatorem i perkusją, z wyjątkiem instrumentów Sampler z GarageBand na iOS. Projekty z GarageBand 11 i starszych nie są czytelne |
 | `.blx` | `Plik › Otwórz...` lub jego folder przez import `Folder...` Prostego układu | Nie | Projekt BandLab pobrany przez Cakewalk lub Sonar, jako ścieżki Prostego układu z regionami, tempem, tonacją, miksem, automatyką głośności i panoramy oraz typowymi efektami. Częściowo: brzmienia instrumentów BandLab i inne pedały są wymienione w raporcie importu |
 | `.mid`, `.midi` | `Plik › Otwórz...` tworzy nowy projekt. `Plik › Importuj › Plik MIDI...` i Piano Roll importują do bieżącego | `Plik › Eksportuj › Plik MIDI...` (`Ctrl+Shift+M`) | |
+| `.mod`, `.xm`, `.s3m`, `.it` | `Plik › Otwórz...` | Nie | Moduły trackerowe (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker). Instrumenty stają się kanałami Sampler z ich samplami, utwór staje się klipami patternów ze zmianami tempa, a `Widok › Tracker` edytuje nuty. Częściowo: efekty takie jak slide, vibrato i arpeggio, obwiednie i zmiany głośności brzmiącej nuty są wymienione w raporcie importu |
 | `.wav` | Jako sampel albo klip audio | `Plik › Eksportuj › Plik WAV...`, 16-bit, 24-bit lub 32-bit float | Opcjonalnie dither, informacje o tempie, znaczniki pętli i znaczniki Playlisty |
 | `.mp3` | Jako sampel albo klip audio | `Plik › Eksportuj › Plik MP3...` | Stały bitrate |
 | `.ogg` | Jako sampel albo klip audio | `Plik › Eksportuj › Plik OGG...` | |

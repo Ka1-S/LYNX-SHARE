@@ -27,6 +27,8 @@ Został zbudowany tak, by pozostać lekki i szybki na każdym PC.
 • Kompletny: ponad 100 wbudowanych instrumentów i efektów – syntezatory, automaty perkusyjne, samplery, korektory EQ, kompresory, limitery, pogłosy, delaye, korekcja wysokości dźwięku, wizualizery i wiele więcej.
 • Twoje wtyczki: obsługuje instrumenty i efekty VST3, CLAP i VST2, opcjonalnie każdy we własnym procesie (sandbox), więc crash wtyczki nie położy całej sesji.
 • Twoje projekty: otwiera projekty FL Studio (.flp) z patternami, nutami, mikserem, automatyką i samplami; otwiera i zapisuje sety Ableton Live 11/12 (.als) razem z klipami z Session; otwiera i zapisuje pliki DAWproject (.dawproject) dla Bitwiga, Studio One, Cubase i innych aplikacji; eksportuje .flp z powrotem do FL Studio; importuje projekty FL Studio Mobile (.flm, częściowo), GarageBand (.band, częściowo), BandLab (.blx, częściowo) i pliki MIDI.
+• Moduły trackerowe: pliki .mod, .xm, .s3m i .it otwierają się z samplami, patternami i tempem, a wbudowany tracker
+edytuje nuty.
 • Edycja audio: pluginy ARA 2, takie jak Melodyne, pracują bezpośrednio na klipach audio, polifoniczny edytor nut przesuwa i na nowo stroi pojedyncze nuty wewnątrz akordów, a audio można zamienić na MIDI.
 • Niskie opóźnienia: ASIO (w tym własny sterownik ASIO LYNX SHARE dla dowolnego urządzenia), WASAPI w trybie współdzielonym i wyłącznym.
 • Nagrywaj audio i MIDI (także MPE), edytuj audio, automatyzuj wszystko, renderuj do WAV, FLAC, MP3, OGG, AIFF, M4A lub stemów.
@@ -57,6 +59,7 @@ LYNX SHARE 0.1.30: lżejszy niż kiedykolwiek, z około połową obciążenia CP
 9. Interfejs w 15 językach, w tym po polsku
 10. Darmowy i open source (AGPL-3.0): bez konta, bez reklam, bez telemetrii
 11. Hosting pluginów ARA 2, polifoniczny edytor nut i zamiana audio na MIDI
+12. Otwiera moduły trackerowe (.mod, .xm, .s3m, .it) i edytuje nuty we wbudowanym trackerze
 
 ## Search terms
 
