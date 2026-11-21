@@ -68,6 +68,7 @@ add_library(lynx_core STATIC
     src/core/AlsDevicesLot5.cpp
     src/core/FlmFormat.cpp
     src/core/FlmImport.cpp
+    src/core/FlmExport.cpp
     src/core/BandFormat.cpp
     src/core/BandImport.cpp
     src/core/BlxImport.cpp
@@ -613,6 +614,7 @@ if(LYNX_BUILD_APP)
         src/ui/FlStudioExportDialog.cpp
         src/ui/AlsExportDialog.cpp
         src/ui/DawProjectExport.cpp
+        src/ui/FlmExportDialog.cpp
         src/ui/GamepadInput.cpp
         src/ui/ControllerBridge.cpp
         src/ui/OtherAppsExport.cpp

@@ -1,4 +1,5 @@
 #include "core/FlmImport.h"
+#include "core/FlmExport.h"
 
 #include <algorithm>
 #include <cctype>
@@ -2092,7 +2093,18 @@ std::optional<Song> importFlm (const std::vector<std::uint8_t>& fileBytes, const
     auto project = flm::parse ({ fileBytes.data(), fileBytes.size() }, error);
     if (! project)
         return std::nullopt;
-    return importFlmProject (*project, options);
+    // round 190og: a file LYNX exported carries its patterns' grouping and names in a chunk FLM skips (FlmExport.h); it
+    // counts only while the rest of the file is the one LYNX wrote (FLM drops the chunk when it saves the song again)
+    const auto extras = flmexport::readExtras (fileBytes);
+    if (! extras)
+        return importFlmProject (*project, options);
+    auto o = options;
+    std::map<std::pair<int, std::uint32_t>, int> contents;
+    o.contentPatterns = &contents;
+    auto song = importFlmProject (*project, o);
+    if (song)
+        flmexport::regroupPatterns (*song, *extras, contents);
+    return song;
 }
 
 namespace
@@ -2357,6 +2369,14 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
     if (flmVersionNewer (project.appVersion, "5.0.4"))
         ctx.note (&FlpImportReport::notReproduced, "FL Studio Mobile " + project.appVersion + " (newer than this import knows: new settings may be missing)");
     song.bpm = std::clamp (project.tempo > 0.0 ? project.tempo : 120.0, minTempo, maxTempo);
+    // round 190og (format-0012): HEAD's play loop (+272 / +280, beats). FLM keeps whether it loops at run time only and
+    // starts with it off (FLM-FACTS §1), so the range comes in as LYNX's stored range with looping off (Song::loopOff)
+    if (std::isfinite (project.loopStart) && std::isfinite (project.loopEnd) && project.loopEnd > project.loopStart + 1e-9 && project.loopStart >= 0.0)
+    {
+        song.loopStart = ticksOf (project.loopStart);
+        song.loopEnd = ticksOf (project.loopEnd);
+        song.loopOff = true;
+    }
     // KEYB: the keyboard's chord set becomes the project's chord set for LYNX's Chord pad (round 190ds, core/ScaleKeys.h)
     if (! project.chordSetJson.empty())
     {
@@ -2797,7 +2817,12 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
             kitShifts.push_back (s.timeShift);
         if (ch.kind == flm::kindNormal)
         {
-            if (! rack.kit.empty())
+            // round 190og: an audio track's rack keeps one empty slot ("<empty>", no file: FLM's Audio Recording template)
+            // that plays nothing; it makes no sampler channel unless a drum lane plays the kit
+            const auto realKit = std::any_of (rack.kit.begin(), rack.kit.end(), [] (const flm::SampleRef& s) {
+                return ! s.path.empty() || ! s.savedPath.empty() || ! s.relName.empty();
+            }) || std::any_of (ch.lanes.begin(), ch.lanes.end(), [] (const flm::Lane& l) { return l.kind() == flm::LaneKind::drums; });
+            if (! rack.kit.empty() && realKit)
                 kitIndex();
             if (! generators.empty()
                 || std::any_of (ch.lanes.begin(), ch.lanes.end(), [] (const flm::Lane& l) { return l.kind() == flm::LaneKind::notes && ! l.clips.empty(); }))
@@ -2998,6 +3023,8 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                         }, &noteFx);
                     }
                     it = patternOf.emplace (clip.contentId, pattern).first;
+                    if (ctx.options.contentPatterns != nullptr) // round 190og
+                        ctx.options.contentPatterns->emplace (std::make_pair ((int) i, clip.contentId), pattern);
                 }
                 addPatternClips (ctx, clip, it->second, rowIndex);
             }
@@ -3052,6 +3079,18 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
             if (w.empty())
                 continue;
             const auto target = (int) w[0];
+            // round 190og (PROVEN-REA, the channel writer 0x180757d80 / FLM 5.0.3's CSeqChannel send record): [1] is the
+            // send's Enable value ([3] its initial value, [4] the level's): a switched-off route carries nothing
+            if (w.size() >= 2)
+            {
+                float enable = 1.0f;
+                std::memcpy (&enable, &w[1], 4);
+                if (std::isfinite (enable) && enable < 0.5f)
+                {
+                    ctx.note (&FlpImportReport::converted, "FL Studio Mobile: switched-off send (left off)");
+                    continue;
+                }
+            }
             float level = 0.853f;
             if (w.size() >= 6)
                 std::memcpy (&level, &w[5], 4);

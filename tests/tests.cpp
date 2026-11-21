@@ -18006,6 +18006,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Pr190jvTests.inc" // round 190jv: Piano roll Scale highlighting › Automatic (FL's key guess)
 #include "PrArp190jvTests.inc" // round 190jv: FL's Piano roll arpeggiator patterns (TPRArpForm law)
 #include "Flm190jvTests.inc" // round 190jv: FL Studio Mobile racks with several instruments / an effect first (BUILD-LIST 19)
+#include "FlmExport190ogTests.inc" // round 190og: Save a copy as FL Studio Mobile project (.flm), the writer, the LYNX chunk
 #include "Spin190kbTests.inc" // round 190kb: the worker pool's waiting (statistics, tuning, bounded task-graph waits, adaptive spin)
 #include "Beat190krTests.inc" // round 190kr: the worker pool wakes only the workers a chunk's work needs; the same samples
 #include "Lighter190laTests.inc" // round 190la: timed waits without the sub-millisecond spin (platform/CvWait.h)

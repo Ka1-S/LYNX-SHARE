@@ -138,6 +138,7 @@
 #include "ui/AlsExportDialog.h"
 #include "ui/ActionSearch.h" // round 190nq (#228)
 #include "ui/DawProjectExport.h" // round 190jf (B22)
+#include "ui/FlmExportDialog.h" // round 190og (app-0003)
 #include "ui/OtherAppsExport.h"
 #include "ui/FlStudioExportDialog.h"
 #include "ui/FruitySlicerEditor.h"
@@ -10420,6 +10421,14 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Save to new project folder..."), [this] { saveToNewProjectFolder(); });
         menu.addItem (tr ("Save as template..."), [this] { saveAsTemplate(); });
         menu.addItem (tr ("Save a copy for an older LYNX..."), [this] { saveCopyForOlder(); }); // (round 190hq, LYNX extra)
+        // round 190og (FLM coverage app-0003, LYNX extra: FL Studio writes no .flm): the song for FL Studio Mobile, with
+        // what the copy loses listed first (ui/FlmExportDialog.h)
+        menu.addItem (tr ("Save a copy as FL Studio Mobile project (.flm)..."), [this] {
+            showFlmExportDialog (engine, this,
+                                 currentFile != juce::File() ? currentFile.getParentDirectory()
+                                                             : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+                                 projectStem (projectName));
+        });
         menu.addItem (tr ("Delete unused recordings and save..."), [this] { deleteUnusedRecordingsAndSave(); });
         menu.addSeparator();
         {

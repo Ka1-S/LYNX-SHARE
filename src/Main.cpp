@@ -72,6 +72,7 @@
 #include "core/NoteEdit.h"
 #include "core/PlaylistTrackOps.h" // round 190jf (FoldersShot190jf.inc)
 #include "ui/DawProjectExport.h" // round 190jf (--dawprojcheck190jf)
+#include "ui/FlmExportDialog.h" // round 190og (--export-flm, --flmexportshot)
 #include "core/NoteNames.h"
 #include "core/MaximusFx.h"
 #include "core/ChainPresets.h"
@@ -3996,6 +3997,54 @@ public:
         {
             const auto i = args.indexOf ("--export-als");
             runAlsExport (args[i + 1].unquoted(), args[i + 2].unquoted(), args.contains ("--live11"), args.contains ("--reference"));
+            return;
+        }
+
+        // --export-flm <in.lynx|.flp|.als|.flm|...> <out.flm> (round 190og, FLM coverage app-0003): File › "Save a copy as FL
+        // Studio Mobile project" without the window; the samples go beside it, the losses and the result to "<out>.txt".
+        // --flmexportshot <prefix> <project> [--shot-scale 1.5 --shot-suffix @150]: the window with that project's losses
+        if (args.contains ("--export-flm") || args.contains ("--flmexportshot"))
+        {
+            const auto shot = args.contains ("--flmexportshot");
+            const auto i = args.indexOf (shot ? "--flmexportshot" : "--export-flm");
+            const juce::File input (args[i + (shot ? 2 : 1)].unquoted());
+            juce::String error, report;
+            auto ok = false;
+            {
+                lynx::AudioEngine loader (false);
+                if (input.hasFileExtension ("flp;als;flm;songtmpl;band;blx;mod;xm;s3m;it;dawproject"))
+                    ok = loader.importFlpFile (input, error);
+                else if (auto song = lynx::ProjectFile::load (input, error))
+                {
+                    loader.setSong (std::move (*song));
+                    ok = true;
+                }
+                if (ok && shot)
+                {
+                    juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+                    lynx::FlmExportOptions o;
+                    o.title = input.getFileNameWithoutExtension().toStdString();
+                    const auto dry = lynx::exportFlm (loader.getSong(), o);
+                    auto list = std::make_shared<juce::TextEditor>();
+                    std::unique_ptr<juce::AlertWindow> w (lynx::buildFlmExportWindow (dry, list));
+                    saveSnapshot (*w, args[i + 1].unquoted() + "-flmexport.png");
+                    report << lynx::flmExportLossText (dry) << "\n";
+                }
+                else if (ok)
+                {
+                    loader.capturePluginStates();
+                    lynx::FlmExportResult result;
+                    const juce::File out (args[i + 2].unquoted());
+                    ok = lynx::writeFlmCopy (loader.getSong(), out, result, error);
+                    report << "bytes=" << (int) result.bytes.size() << "\nsamples=" << (int) result.samples.size() << "\n";
+                    for (const auto& l : result.lost)
+                        report << (l.sound ? "sound: " : "other: ") << juce::String::fromUTF8 (l.text.c_str()).replace ("{0}", juce::String::fromUTF8 (l.detail.c_str())) << "\n";
+                }
+            }
+            report << "result=" << (ok ? "OK" : "ERROR " + error) << "\n";
+            juce::File (args[i + (shot ? 1 : 2)].unquoted() + (shot ? "-flmexport.txt" : ".txt")).replaceWithText (report);
+            setApplicationReturnValue (ok ? 0 : 1);
+            quit();
             return;
         }
 

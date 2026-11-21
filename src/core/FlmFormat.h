@@ -128,6 +128,7 @@ struct Channel
     float hue = -1.0f;
     int channelId = -1;
     std::vector<std::vector<std::uint32_t>> sends; // SEND chunks, raw 32-bit words (F2)
+    std::uint32_t headerFlags[2] = { 0, 0 }; // CHHD +1056: two booleans (INFERRED mute / solo; round 190og: kept by the writer)
     std::vector<Lane> lanes;
 };
 
@@ -173,10 +174,26 @@ struct Project
     std::string notes;        // META: the song's notes / description (round 190fn)
     double editSeconds = 0.0; // META: the time spent on the song, seconds (round 190fn)
     std::string chordSetJson; // KEYB
+    // --- round 190og (the .flm writer): HEAD's play loop (+272, beats; FLM keeps the switch at run time) and the key
+    // locker's sharp / flat byte (+352); top-level chunks a writer adds after TDIV (FLM's loader skips a tag it does
+    // not know: FLM_FORMAT §1)
+    double loopStart = 0.0, loopEnd = 0.0;
+    bool keySharps = true;
+    std::vector<std::pair<std::string, std::vector<std::uint8_t>>> extraChunks;
+    // --- end of round 190og
     std::vector<Rack> racks;
     std::vector<Channel> channels; // channels[i] belongs to racks[i]
     int unknownChunks = 0;         // top-level chunks this reader skipped
 };
+
+// --- round 190og: the writer. The whole project as FLM 5.0.x writes it (FLM_FORMAT §1–6: HEAD, KEYB, META, TDIV, the
+// racks, then the channels; the containers with their version magic; every fixed field at its size). Racks and channels
+// pair by index, as the reader takes them. Deterministic: the same project gives the same bytes (the GUIDs are made from
+// the names and the order).
+std::vector<std::uint8_t> write (const Project& project);
+// The inverse of channelColour's hue for an 0xFFRRGGBB colour: the hue h (0…1) whose channelColour is nearest; −1 for 0
+float hueOfColour (std::uint32_t colour) noexcept;
+// --- end of round 190og
 
 // A channel hue (Channel::hue) as FLM draws it: 0xFFRRGGBB (round 190fn)
 std::uint32_t channelColour (float hue) noexcept;

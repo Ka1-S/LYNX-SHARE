@@ -4684,6 +4684,18 @@ std::vector<std::string> liveLibraryRoots()
 }
 } // namespace
 
+// round 190og (the .flm export, ui/FlmExportDialog.h): FL Studio Mobile's factory content on this computer, the user's own
+// "Resources" folders first, then FL Studio's copy, as the .flm import looks for it
+std::vector<std::string> flmFactoryRoots()
+{
+    auto out = flmResourceFolders();
+    const auto roots = findFlStudioRoots();
+    if (! roots.factoryData.empty())
+        if (const auto root = flmResourceRootIn (roots.factoryData); ! root.empty() && platform::localFile (root).isDirectory())
+            out.push_back (root);
+    return out;
+}
+
 void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::string, std::string>& relocations, SampleLibrary& library,
                                     PreparedFlp& out)
 {
