@@ -135,6 +135,7 @@ jobs:
           path: |
             selftest.txt
             opentest.txt
+            opentest-hang/*
           retention-days: 14
           if-no-files-found: ignore
 
