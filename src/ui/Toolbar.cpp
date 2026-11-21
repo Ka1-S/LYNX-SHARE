@@ -764,7 +764,7 @@ void MasterKnob::paint (juce::Graphics& g)
         const auto side = juce::jmin (area.getHeight(), area.getWidth());
         drawKnob (g, area.withSizeKeepingCentre (side, side), value01, kind == Kind::pitch,
                   available() ? colour::knobArc : colour::textDisabled, hover && available());
-        g.setColour (colour::textDisabled);
+        g.setColour (colour::textSecondary); // (round 190oj: the caption was 3.98:1)
         g.setFont (font (type::caption - 1.0f, true));
         g.drawText (kind == Kind::volume ? tr ("MASTER") : tr ("PITCH"), text.withHeight (10.0f).translated (0.0f, 1.0f), juce::Justification::centred, true);
         g.setColour (drag.isActive() ? colour::textPrimary : colour::textSecondary);
@@ -777,7 +777,7 @@ void MasterKnob::paint (juce::Graphics& g)
 
     area.removeFromLeft (5.0f);
     auto caption = area.removeFromTop (area.getHeight() / 2.0f);
-    g.setColour (colour::textDisabled);
+    g.setColour (colour::textSecondary); // (round 190oj: the caption was 3.98:1)
     g.setFont (font (type::caption - 1.0f, true));
     g.drawText (kind == Kind::volume ? tr ("MASTER") : tr ("PITCH"), caption.withTrimmedTop (1.0f), juce::Justification::bottomLeft, true);
     g.setColour (drag.isActive() ? colour::textPrimary : colour::textSecondary);
@@ -1082,7 +1082,7 @@ void PerformanceMeter::paint (juce::Graphics& g)
 
     // CPU: caption, bar, percent
     g.setFont (caption);
-    g.setColour (colour::textDisabled);
+    g.setColour (colour::textSecondary); // (round 190oj: the caption was 3.98:1)
     g.drawText (tr ("CPU"), row1.removeFromLeft (30), juce::Justification::centredLeft, false);
     g.setFont (number);
     g.setColour (colour::textSecondary);
@@ -1137,7 +1137,7 @@ void PerformanceMeter::paint (juce::Graphics& g)
     // memory and polyphony
     auto left = row2.removeFromLeft (row2.getWidth() * 58 / 100);
     g.setFont (caption);
-    g.setColour (colour::textDisabled);
+    g.setColour (colour::textSecondary); // (round 190oj: the caption was 3.98:1)
     g.drawText (tr ("RAM"), left.removeFromLeft (30), juce::Justification::centredLeft, false);
     g.setFont (number);
     g.setColour (colour::textSecondary);

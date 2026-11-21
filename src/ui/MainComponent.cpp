@@ -1282,14 +1282,15 @@ void MainComponent::paint (juce::Graphics& g)
 
     // captions that name the snap and pattern selectors, after their icons (the magnet is a button)
     g.setFont (font (type::caption - 1.0f, true));
-    g.setColour (colour::textDisabled);
+    g.setColour (colour::textSecondary); // (round 190oj: textDisabled was 3.98:1 on the toolbar)
     if (! snapLabelArea.isEmpty())
         if (snapLabelArea.getWidth() > rowHeight + 20) // (the narrowest toolbar keeps only the magnet)
-            g.drawText (tr ("SNAP"), snapLabelArea.withTrimmedLeft (rowHeight + 1), juce::Justification::centredLeft, true);
+            g.drawText (tr ("SNAP"), snapLabelArea.withTrimmedLeft (rowHeight + 4), juce::Justification::centredLeft, true); // (+3: it touched the magnet)
     if (! patternLabelArea.isEmpty())
     {
         const auto iconBox = patternLabelArea.withWidth (rowHeight).toFloat();
         icons::draw (g, Icon::pattern, iconBox.withSizeKeepingCentre (14.0f, 14.0f), colour::textDisabled);
+        g.setColour (colour::textSecondary);
         if (patternLabelArea.getWidth() > rowHeight + 20)
             g.drawText (tr ("PATTERN"), patternLabelArea.withTrimmedLeft (rowHeight + 1), juce::Justification::centredLeft, true);
     }
@@ -1727,6 +1728,15 @@ void MainComponent::resized()
                 {
                     put (newPatternButton, second.removeFromRight (h));
                     second.removeFromRight (2);
+                    // round 190oj: at 1920 px the box was 67 px and every new project showed "Patter..."; when it would
+                    // be narrower than a pattern's name needs, the PATTERN caption keeps only its icon (FL shows no
+                    // caption there) and the box takes its room
+                    if (constexpr int roomy = 96; second.getWidth() < roomy && patternLabelArea.getWidth() > h + 4)
+                    {
+                        const auto freed = patternLabelArea.getWidth() - (h + 4);
+                        patternLabelArea.setWidth (h + 4);
+                        second.setLeft (second.getX() - freed);
+                    }
                 }
                 put (patternBox, second.reduced (0, 1));
                 break;
