@@ -463,7 +463,8 @@ private:
         g.setFont (theme::font (theme::type::small));
         g.setColour (theme::colour::textSecondary);
         g.drawText (right, width - 12 - rightWidth, 5, rightWidth, 18, juce::Justification::centredRight, true);
-        g.setColour (detailColour);
+        // (round 190oj WG-7: the grey path read 2.84:1 on the selected row's red; there it takes the secondary text)
+        g.setColour (selected && detailColour == theme::colour::textDisabled ? theme::colour::textSecondary : detailColour);
         g.drawText (detail, 32, 24, width - 44, 16, juce::Justification::centredLeft, true);
     }
 

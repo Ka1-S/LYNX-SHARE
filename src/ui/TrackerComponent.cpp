@@ -867,12 +867,17 @@ void TrackerComponent::resized()
     place (i.rpbLabel, theme::labelColumnWidth ({ &i.rpbLabel }, 64, 110));
     place (i.rpbBox, 54);
     place (i.highlightLabel, theme::labelColumnWidth ({ &i.highlightLabel }, 90, 150));
+    // (round 190oj WG-14: 12 px between the groups, so "[−] Octave 4 [+]" and "[−] Step 1 [+]" read as pairs — with 4 px
+    // everywhere the Octave "−" seemed to belong to Highlight)
+    top.removeFromLeft (8);
     place (i.octaveDown, 22);
     place (i.octaveLabel, theme::labelColumnWidth ({ &i.octaveLabel }, 62, 110));
     place (i.octaveUp, 22);
+    top.removeFromLeft (8);
     place (i.stepDown, 22);
     place (i.stepLabel, theme::labelColumnWidth ({ &i.stepLabel }, 52, 100));
     place (i.stepUp, 22);
+    top.removeFromLeft (8);
     place (i.hexButton, theme::buttonWidth (i.hexButton, 46, 80));
     place (i.editButton, theme::buttonWidth (i.editButton, 56, 110));
     place (i.followButton, theme::buttonWidth (i.followButton, 62, 120));

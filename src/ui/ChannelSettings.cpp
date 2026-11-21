@@ -77,6 +77,7 @@
 #include "ui/I18n.h"
 #include "ui/PluginSkin.h"
 #include "ui/Theme.h"
+#include "ui/TextCache.h"
 #include "ui/WaveformView.h"
 #include "ui/SoundFontEditor.h"
 #include "ui/VfxEditors.h"
@@ -5419,7 +5420,12 @@ public:
         g.setFont (theme::font (theme::type::caption));
         g.setColour (theme::colour::textPrimary);
         // squeezed (down to 65 %) before an ellipsis: translated captions are often longer (round 165o)
-        g.drawFittedText (spec.text (shown), valueArea.toNearestInt(), juce::Justification::centred, 1, 0.65f);
+        auto valueText = spec.text (shown);
+        // (round 190oj WG-5: a value read in several units — Levels adjustment's "100% 0.0dB 1.00" — shows its first one
+        // under the knob when the whole does not fit, as FL does; the hint bar keeps the whole)
+        if (valueText.containsChar (' ') && textcache::stringWidth (g.getCurrentFont(), valueText) > valueArea.getWidth())
+            valueText = valueText.upToFirstOccurrenceOf (" ", false, false);
+        g.drawFittedText (valueText, valueArea.toNearestInt(), juce::Justification::centred, 1, 0.65f);
         g.setColour (theme::colour::textSecondary);
         g.drawFittedText (theme::caps (label), caption.toNearestInt(), juce::Justification::centred, 1, 0.65f);
     }
@@ -6773,7 +6779,9 @@ public:
         // centre; RANGE right of PITCH; TRACK 7 px in)
         const auto w = getWidth(), h = getHeight();
         on.setBounds (w - 229, 0, 30, h);
-        const int xs[] = { w - 197, w - 162, w - 128, w - 96, w - 52 };
+        // (round 190oj WG-1: RANGE at w-92, not w-96 — the PITCH and RANGE columns overlapped by 2 px and their captions
+        // ran together, "PITCHRANGE"; de "TONHÖHE" / "BEREICH" drew over each other)
+        const int xs[] = { w - 197, w - 162, w - 128, w - 92, w - 52 };
         const int ws[] = { 34, 34, 34, 32, 46 };
         for (std::size_t i = 0; i < header.size() && i < 5; ++i)
             header[i]->setBounds (xs[i], 0, ws[i], h);

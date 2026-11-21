@@ -118,14 +118,16 @@ struct Rows
     // a larger Text size wraps a note into more lines than the fixed heights had room for)
     juce::Rectangle<int> indentedNote (juce::Label& label, int minHeight)
     {
-        if (theme::textSize() <= 100)
-            return indented (minHeight); // (the standard size keeps its layout to the pixel)
         const auto width = area.getWidth() - labelWidth;
         const auto border = label.getBorderSize();
         juce::GlyphArrangement text;
         text.addJustifiedText (label.getFont(), label.getText(), 0.0f, 0.0f, (float) juce::jmax (40, width - border.getLeftAndRight()),
                                juce::Justification::topLeft);
         const auto needed = (int) std::ceil (text.getBoundingBox (0, -1, true).getHeight()) + border.getTopAndBottom() + 2;
+        // (the standard size keeps its layout to the pixel, unless the text needs another line: round 190oj WG-3, the
+        // German Animation-rate note was squeezed to ~7 px and cut in its fixed 32 px)
+        if (theme::textSize() <= 100 && needed <= h (minHeight) + 6)
+            return indented (minHeight);
         auto r = juce::Rectangle<int> (area.getX() + labelWidth, y, width, juce::jmax (h (minHeight), needed));
         y += r.getHeight() + rowGap;
         return r;
@@ -642,7 +644,7 @@ private:
         reducedEffects.setBounds (r.full (24));
         uiAnimations.setBounds (r.full (24));
         animationBox.setBounds (r.row (animationLabel, 180));
-        animationNote.setBounds (r.indented (32).translated (0, -3));
+        animationNote.setBounds (r.indentedNote (animationNote, 32).translated (0, -3)); // (round 190oj WG-3)
        #if JUCE_WINDOWS
         gpuRendering.setBounds (r.full (24));
         editorsInMain.setBounds (r.full (24));
@@ -651,7 +653,7 @@ private:
         r.section (startupTitle);
         templateBox.setBounds (r.row (templateLabel, 260));
         startupProjectBox.setBounds (r.row (startupProjectLabel, 260));
-        templateNote.setBounds (r.indented (32).translated (0, -3));
+        templateNote.setBounds (r.indentedNote (templateNote, 32).translated (0, -3)); // (round 190oj WG-3)
         for (auto* t : { &projectLayout, &splash, &startupSound, &scanAtStart, &supportNoteBox })
             t->setBounds (r.full (24));
         if (menuEntry.isVisible())

@@ -11012,8 +11012,19 @@ std::unique_ptr<juce::Component> MainComponent::makeHelpContent (const keys::Key
                     g.drawText (keys, x, y + 1, keyWidth, 18, juce::Justification::centred);
                     g.setColour (colour::textSecondary);
                     g.setFont (font (type::body));
-                    g.drawFittedText (tr (row.action), x + keyWidth + 10, y, columnWidth - keyWidth - 10, 20, juce::Justification::centredLeft, 1, 0.85f);
-                    y += 24;
+                    // (round 190oj WG-4: an action that does not fit on one line at 85 % takes two lines, instead of "res...")
+                    const auto action = tr (row.action);
+                    const auto room = columnWidth - keyWidth - 10;
+                    if (juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), action) * 0.85f > (float) room)
+                    {
+                        g.drawFittedText (action, x + keyWidth + 10, y, room, 38, juce::Justification::centredLeft, 2, 0.9f);
+                        y += 40;
+                    }
+                    else
+                    {
+                        g.drawFittedText (action, x + keyWidth + 10, y, room, 20, juce::Justification::centredLeft, 1, 0.85f);
+                        y += 24;
+                    }
                 }
 
                 y += 14;

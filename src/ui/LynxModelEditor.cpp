@@ -153,7 +153,8 @@ public:
         auto area = getLocalBounds().toFloat();
         const auto caption = area.removeFromBottom (12.0f);
         const auto valueArea = area.removeFromBottom (12.0f);
-        const auto size = juce::jmin (area.getWidth(), area.getHeight());
+        // (round 190oj WG-24: 6 px each side for the lit knob's glow, which the knob's own bounds cut with a hard edge)
+        const auto size = juce::jmin (area.getWidth() - 12.0f, area.getHeight());
         skin::KnobLook look;
         look.value = (float) position();
         look.bipolar = param().low < 0.0f && param().high > 0.0f;
