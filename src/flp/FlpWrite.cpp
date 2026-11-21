@@ -898,16 +898,20 @@ std::vector<std::uint8_t> writeProject (const Project& p, const WriteOptions& op
             out.u8 (evPlaylistTrackColourSet, (info.colour & 0xFFFFFF) != 0x485156 ? 1 : 0);
         }
     }
+    // the Playlist's view settings record FL writes after the arrangements, one per arrangement [DATA]: u32 index, f64
+    // scroll, f64 zoom, i32 vertical scroll, i32 vertical zoom (FL's row = 16 + 2·v px; FL 2026's new project writes 16
+    // = 48 px rows; round 190oo PAT-6: was 20 = 56 px, the row height now goes through)
+    for (std::size_t i = 0; i < std::max<std::size_t> (1, p.arrangements.size()); ++i)
     {
-        // the Playlist's view settings record FL writes after the arrangements [DATA]
+        const auto* a = i < p.arrangements.size() ? &p.arrangements[i] : nullptr;
         Blob v;
-        for (int k = 0; k < 2; ++k)
-            v.put<std::uint32_t> (0);
+        v.put<std::uint32_t> (a != nullptr ? (std::uint32_t) a->index : 0u);
+        v.put<std::uint32_t> (0);
         v.put<std::uint32_t> (0);
         v.put<std::uint32_t> (0);
         v.put<std::uint32_t> (0x40200000u);
         v.put<std::uint32_t> (0);
-        v.put<std::uint32_t> (20);
+        v.put<std::uint32_t> (a != nullptr && a->rowZoom >= 0 ? (std::uint32_t) a->rowZoom : 16u);
         out.data (evPlaylistF2, v.b);
     }
     out.u16 (evCurrentArrangement, (std::uint32_t) std::max (0, p.currentArrangement));

@@ -4252,6 +4252,12 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
         song.selectArrangement (fullest);
 
+        // the open arrangement's Playlist vertical zoom (event 0xF2, round 190oo PAT-6): FL opens Ookay - Thief with
+        // 26 px rows, a new project with 48 px; the tracks' size factors below then work on that row, as in FL
+        if (fullest < (int) project.arrangements.size())
+            if (const auto zoom = project.arrangements[(std::size_t) fullest].rowZoom; zoom >= 0)
+                song.playlistRowHeight = polish::flRowHeightForZoom (zoom);
+
         // Playlist track names, mute and colour (from the open arrangement); FL's default grey = no colour
         if (fullest < (int) importedTracks.size())
             for (const auto& t : *importedTracks[(std::size_t) fullest])

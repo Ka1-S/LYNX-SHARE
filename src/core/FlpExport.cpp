@@ -1474,6 +1474,7 @@ struct Converter
             flp::Arrangement a;
             a.index = i;
             a.name = arrangement.name;
+            a.rowZoom = polish::flZoomForRowHeight (song.playlistRowHeight); // FL's vertical zoom, event 0xF2 (round 190oo, PAT-6)
             for (const auto& m : current ? song.markers() : arrangement.markers)
                 a.markers.push_back (marker (m));
             for (const auto& clip : clips)
