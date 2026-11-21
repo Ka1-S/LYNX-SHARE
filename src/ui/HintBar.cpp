@@ -340,14 +340,19 @@ void InfoView::paint (juce::Graphics& g)
     const auto idle = title.isEmpty() && body.isEmpty();
     g.setColour (ll::text);
     g.setFont (theme::font (theme::type::small, true));
-    g.drawText (idle ? tr ("Info View") : title, bar.withTrimmedLeft (5).withTrimmedRight (4), juce::Justification::centredLeft, true);
+    textcache::drawText (g, idle ? tr ("Info View") : title, bar.withTrimmedLeft (5).withTrimmedRight (4), juce::Justification::centredLeft, true); // (cached glyphs: paint gate)
     g.setFont (theme::font (theme::type::small));
     // Live: 15 px lines from 6 px in (its text 15..226 in a 231 px view)
     const auto area = r.withTrimmedTop (4).reduced (6, 0).toFloat();
+    if (idle) // (one line from the text cache: a TextLayout draws its glyphs again every frame, +1.8 % of the clip grid's frame)
+    {
+        textcache::drawText (g, tr ("Point at anything to read about it here."), area.withHeight (15.0f), juce::Justification::centredLeft, true);
+        return;
+    }
     if (area.getWidth() != layoutWidth)
     {
         juce::AttributedString text;
-        text.append (idle ? tr ("Point at anything to read about it here.") : body, theme::font (theme::type::small), ll::text);
+        text.append (body, theme::font (theme::type::small), ll::text);
         text.setLineSpacing (15.0f - theme::font (theme::type::small).getHeight());
         text.setWordWrap (juce::AttributedString::byWord);
         layout.createLayout (text, area.getWidth());
