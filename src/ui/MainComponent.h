@@ -236,6 +236,7 @@ public:
     void openNextWithoutPlugins (bool on) { nextOpenWithoutPlugins = on; }
     juce::StringArray getMenuNamesForSnapshot() { return getMenuBarNames(); }
     juce::PopupMenu getMenuForSnapshot (int index) { return getMenuForIndex (index, {}); }
+    liveui::Context getLiveContextForSnapshot() { return liveContext(); } // (rollup 0.1.31 step 3: --rollup031s3shot)
     juce::PopupMenu getPanelMenuForSnapshot (workspace::Panel panel)
     {
         juce::PopupMenu menu;

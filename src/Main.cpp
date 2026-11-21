@@ -3307,6 +3307,13 @@ public:
             quit();
             return;
         }
+        // --rollup031s3shot <prefix> (rollup 0.1.31 step 3, round 190ny): src/Rollup031S3Shot.inc
+        if (args.contains ("--rollup031s3shot"))
+        {
+            setApplicationReturnValue (runRollup031S3Shot (args[args.indexOf ("--rollup031s3shot") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
         // --issuesshot190ns <prefix> (round 190ns, issues #231-#235): src/IssuesShot190ns.inc
         if (args.contains ("--issuesshot190ns"))
         {
@@ -18088,6 +18095,7 @@ private:
 #include "TrackerShot190nw.inc" // round 190nw
 #include "IssuesShot190nq.inc" // round 190nq (issues #193, #225-#230)
 #include "IssuesShot190ns.inc" // round 190ns (issues #231-#235)
+#include "Rollup031S3Shot.inc" // rollup 0.1.31 step 3 (round 190ny)
 #include "DetailsShot190kn.inc" // round 190kn
 #include "DetailsShot190ld.inc" // round 190ld
 #include "DetailsShot190lr.inc" // round 190lr
