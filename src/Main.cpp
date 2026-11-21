@@ -20632,15 +20632,23 @@ private:
             return c != nullptr ? *c : lynx::Clip();
         };
         const auto noteCount = [&offline] { return (int) offline.getSong().patterns[0].notes.size(); };
-        check ("the clip's loop is one bar with 9 notes in its pattern", clipNow().length == bar && noteCount() == 9);
+        // (the grid keeps a MIDI clip as long as its pattern: the loop is the pattern's two bars, all 9 notes inside it)
+        const auto loopBefore = clipNow().length;
+        int inLoop = 0;
+        for (const auto& n : offline.getSong().patterns[0].notes)
+            inLoop += n.start >= clipNow().offset && n.start < clipNow().offset + loopBefore ? 1 : 0;
+        const auto lastBefore = offline.getSong().patterns[0].notes.back().start;
+        line ("before: loop " + juce::String (clipNow().offset) + " + " + juce::String (loopBefore) + ", " + juce::String (noteCount()) + " notes, "
+              + juce::String (inLoop) + " in the loop");
+        check ("the clip is a MIDI clip with 9 notes in its pattern", loopBefore > 0 && noteCount() == 9);
         check ("the Duplicate button pressed", detail->duplicateLoopForCheck());
         settle();
         line ("after Duplicate Loop: loop " + juce::String (clipNow().offset) + " + " + juce::String (clipNow().length) + ", " + juce::String (noteCount()) + " notes, last at "
               + juce::String (offline.getSong().patterns[0].notes.back().start));
-        check ("Duplicate Loop: two bars, the loop's 8 notes copied, the note after the loop moved one bar on",
-               clipNow().length == 2 * bar && noteCount() == 17 && offline.getSong().patterns[0].notes.back().start == 2 * bar + lynx::ppq);
+        check ("Duplicate Loop: the loop twice as long, the notes in it copied one loop later",
+               clipNow().length == 2 * loopBefore && noteCount() == 9 + inLoop && offline.getSong().patterns[0].notes.back().start == lastBefore + loopBefore);
         write (*detail, "05-clip-after-duplicate-loop");
-        check ("one undo step brings the one-bar loop back", [&] { ui.runActionForSnapshot ("edit.undo"); settle(); return clipNow().length == bar && noteCount() == 9; }());
+        check ("one undo step brings the one-bar loop back", [&] { ui.runActionForSnapshot ("edit.undo"); settle(); return clipNow().length == loopBefore && noteCount() == 9; }());
 
         // --- detail-047: the Velocity lane's Randomize footer ---------------------------------------------------------
         auto& roll = ui.getPianoRollForSnapshot();
