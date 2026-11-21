@@ -1,4 +1,5 @@
 #include "engine/AudioEngine.h"
+#include <cstring> // (round 190nw: the module import's sample files)
 #include "core/SessionMixer.h"
 
 #include "core/TransistorBass.h"
@@ -58,6 +59,7 @@
 #include "core/DawProject.h" // round 190jf (B22)
 #include "core/GeneratorPresets.h"
 #include "core/FlmImport.h"
+#include "core/ModuleImport.h"
 #include "core/BandImport.h" // round 190ic: GarageBand projects
 #include "core/BlxImport.h"  // round 190jr: BandLab projects (.blx)
 #include "engine/ProjectPackage.h"
@@ -4688,8 +4690,10 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
         const auto dawProject = file.hasFileExtension ("dawproject");
         // a BandLab project (.blx, round 190jr): its revision JSON, the samples beside it
         const auto bandLab = file.hasFileExtension ("blx");
+        // a tracker module (.mod, .xm, .s3m, .it; round 190nw, core/ModuleImport.h) too
+        const auto module = file.hasFileExtension (moduleExtensions());
         std::optional<flp::Project> project;
-        if (! liveSet && ! mobileProject && ! garageBand && ! dawProject && ! bandLab)
+        if (! liveSet && ! mobileProject && ! garageBand && ! dawProject && ! bandLab && ! module)
             project = flp::parseProject ({ fileBytes, data.getSize() });
         loadtrace::add ("parse", loadtrace::msSince (started));
 
@@ -4812,6 +4816,46 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                     out.error = utf8 (dawError.empty() ? "not a readable DAWproject file" : dawError.c_str());
                     return;
                 }
+                out.song = std::move (*song);
+            }
+            else if (module)
+            {
+                // the samples become WAV files in "<module> samples" beside the module (as an FL Studio Mobile share's
+                // samples sit beside its .flm); where that folder can't be written, in LYNX's settings folder
+                ModuleImportOptions moduleOptions;
+                moduleOptions.report = &out.report;
+                auto folder = file.getParentDirectory().getChildFile (file.getFileNameWithoutExtension() + " samples");
+                if (! folder.createDirectory() || ! folder.hasWriteAccess())
+                {
+                    const auto hash = juce::String::toHexString ((juce::int64) juce::DefaultHashFunctions::generateHash (
+                        file.getFullPathName() + juce::String (file.getSize()), 0x7FFFFFFF));
+                    folder = PluginHost::settingsFolder().getChildFile ("module-samples").getChildFile (juce::File::createLegalFileName (file.getFileNameWithoutExtension()) + "-" + hash);
+                    folder.createDirectory();
+                }
+                moduleOptions.saveSample = [folder] (const std::vector<std::uint8_t>& wav, const std::string& name) -> std::string {
+                    const auto target = folder.getChildFile (juce::File::createLegalFileName (juce::String::fromUTF8 (name.c_str())));
+                    juce::MemoryBlock existing;
+                    if (target.existsAsFile() && target.loadFileAsData (existing) && existing.getSize() == wav.size()
+                        && std::memcmp (existing.getData(), wav.data(), wav.size()) == 0)
+                        return target.getFullPathName().toStdString(); // (imported before: the same file)
+                    if (! target.replaceWithData (wav.data(), wav.size()))
+                        return {};
+                    return target.getFullPathName().toStdString();
+                };
+                std::string moduleError;
+                if (data.getSize() > (std::size_t) 256 * 1024 * 1024)
+                {
+                    out.error = utf8 ("the module is larger than 256 MB");
+                    return;
+                }
+                auto song = importModule (std::vector<std::uint8_t> (fileBytes, fileBytes + data.getSize()), moduleOptions, &moduleError);
+                if (! song)
+                {
+                    out.error = utf8 (moduleError.empty() ? "not a readable module" : moduleError.c_str());
+                    return;
+                }
+                if (song->info.title.empty())
+                    song->info.title = file.getFileNameWithoutExtension().toStdString();
                 out.song = std::move (*song);
             }
             else if (bandLab)

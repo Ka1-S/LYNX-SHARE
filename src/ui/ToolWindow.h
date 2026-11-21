@@ -9,7 +9,9 @@ namespace lynx
 // A small non-modal window that owns `content`, stays above the main window and deletes itself when
 // closed (close button or Esc). Used by the note tool dialogs, the undo history and the quick-add palette.
 // `key` identifies the window: opening another with the same key closes the previous one.
-juce::DocumentWindow* openToolWindow (std::unique_ptr<juce::Component> content, const juce::String& title, const juce::String& key = {});
+// `resizable` (round 190nw, the Tracker): the window can be resized, down to a third of the content's size.
+juce::DocumentWindow* openToolWindow (std::unique_ptr<juce::Component> content, const juce::String& title, const juce::String& key = {},
+                                      bool resizable = false);
 
 // Closes the tool window that holds `content` (from inside it, e.g. an Accept button).
 void closeToolWindowOf (juce::Component& content);

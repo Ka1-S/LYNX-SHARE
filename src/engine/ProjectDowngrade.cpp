@@ -1445,6 +1445,11 @@ void toRelease0130 (juce::var& root, Losses& lost)
                               listOf (laws), true });
     }
 
+    // round 190nw: the tracker editor's view settings (rows per beat, columns, track groups). A view: the notes are the
+    // patterns' own, so 0.1.30 plays and shows them in its Piano roll as they are
+    if (drop (o, "tracker"))
+        lost.push_back ({ TR_NOOP ("The tracker's view settings (rows per beat, columns, track groups) are left out; the notes are unchanged"), {}, false });
+
     // round 190ne (core/TrackClips.h): track clips and "Clips own their notes". Nothing they play changes: the clips are
     // patterns; 0.1.30 lists them with the others and its pencil places the track's pattern, as FL does
     {

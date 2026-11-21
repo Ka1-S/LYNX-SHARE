@@ -59,7 +59,7 @@ between them at any time in *View › Layout style*; the project stays the same,
    in it.
 
 It opens FL Studio (`.flp`), Ableton Live (`.als`), FL Studio Mobile (`.flm`), DAWproject (`.dawproject`), GarageBand
-(`.band`) and BandLab (`.blx`) projects, and exports `.flp`, `.als` and `.dawproject` back, so your work is not locked in. It is written from scratch in C++20 with JUCE 8, licensed under the
+(`.band`) and BandLab (`.blx`) projects and tracker modules (`.mod`, `.xm`, `.s3m`, `.it`), and exports `.flp`, `.als` and `.dawproject` back, so your work is not locked in. It is written from scratch in C++20 with JUCE 8, licensed under the
 AGPL-3.0, and still an **alpha**.
 
 **It's for you if you…**
@@ -75,7 +75,7 @@ AGPL-3.0, and still an **alpha**.
 | | |
 |---|---|
 | 🎹 **The FL Studio workflow** | Channel Rack, Piano Roll, Playlist with several arrangements, and a Mixer with inserts, sends and sidechain. The default layout, never watered down. |
-| 📂 **Your projects come with you** | Opens `.flp`, `.als` (Live 11 and 12), `.flm`, `.dawproject`, GarageBand `.band` and BandLab `.blx`; exports `.flp`, `.als` and `.dawproject`. FL Studio's native plugins play on LYNX SHARE's own engines, so a project that uses them plays without FL Studio installed. |
+| 📂 **Your projects come with you** | Opens `.flp`, `.als` (Live 11 and 12), `.flm`, `.dawproject`, GarageBand `.band`, BandLab `.blx` and tracker modules (`.mod`, `.xm`, `.s3m`, `.it`); exports `.flp`, `.als` and `.dawproject`. FL Studio's native plugins play on LYNX SHARE's own engines, so a project that uses them plays without FL Studio installed. |
 | 🎛️ **Three workflows, one program** | The FL Studio workflow by default, a Clip-launch workflow in the style of Ableton Live, and a Simple workflow that mixes BandLab's one-window style with FL Studio Mobile's. Switch any time in *View › Layout style*; the project stays the same. |
 | 🤝 **Make music together** | Send a project to a friend as one file, or work on it live with up to three other people, end-to-end encrypted. |
 | ⚡ **Lightweight** | A lock-free engine that spreads channels and mixer tracks across CPU cores, skips idle channels, renders ahead what you are not playing live and streams long audio from disk. Measured on one Windows PC, LYNX SHARE 0.1.28 opened FL's *Thief* demo in 5.2 s with 345 MB of memory (FL Studio 2026: 12.2 s, 874 MB), its window was ready in about 1 s (FL Studio: 1.7 s), and a playing song is drawn at 143 frames a second (FL Studio: 143.8) ([0.1.28 notes](https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.28-alpha)). |
@@ -232,7 +232,7 @@ drawn LFOs, chaos sources and a rack of effects.
 
 ## Opens your projects
 
-*File › Open* (or a double-click in the Browser) takes `.lynx`, `.flp`, `.als`, `.flm`, `.dawproject`, GarageBand `.band`, BandLab `.blx` and MIDI files. Missing samples
+*File › Open* (or a double-click in the Browser) takes `.lynx`, `.flp`, `.als`, `.flm`, `.dawproject`, GarageBand `.band`, BandLab `.blx`, tracker modules (`.mod`, `.xm`, `.s3m`, `.it`) and MIDI files. Missing samples
 are listed in the Missing files window, and *Help › Last project import report* tells you what was converted,
 approximated or left out. The original file is never changed: saving writes a `.lynx` project.
 
@@ -244,6 +244,7 @@ approximated or left out. The original file is never changed: saving writes a `.
 | **FL Studio Mobile** `.flm` | ✅ partial | — | Arrangement, samples, drum kits, several instruments and effects, automation and chord sets. |
 | **GarageBand** `.band` (GarageBand 10, GarageBand for iOS) | ✅ partial | — | Tracks, MIDI and audio regions, tempo, key, levels, pan and mute, as Simple-workflow tracks. |
 | **BandLab** `.blx` (BandLab project downloaded by Cakewalk / Sonar) | ✅ partial | — | Tracks, MIDI and audio regions with their loops, tempo, key, levels, pan, mute, volume and pan automation and the common effects, as Simple-workflow tracks. |
+| **Tracker modules** `.mod` `.xm` `.s3m` `.it` (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker) | ✅ partial | — | Instruments as Sampler channels with their samples, patterns, the order list as the Playlist, speed and tempo, note volume, pan, delay and cut. Tick effects (arpeggio, vibrato, slides...) and envelopes are listed in the report; the built-in Tracker (View › Tracker) edits the notes the tracker way. |
 | **MIDI** `.mid` | ✅ | ✅ | Notes, into or out of the Piano Roll or the whole song. |
 | **LYNX SHARE** `.lynx` | ✅ | ✅ | The native format (JSON), with autosave. *File › Save a copy for an older LYNX...* writes a copy that 0.1.27 or 0.1.28 can open. |
 

@@ -1,4 +1,5 @@
 #include "ui/SimpleDock.h"
+#include "ui/TrackerComponent.h"
 #include "ui/DemoMode.h" // (round 190np: the Drum Machine is a demo::CellSource)
 
 #include <algorithm>
@@ -2858,6 +2859,69 @@ private:
 #include "ui/SimpleControlsPage.inc" // round 190ke: the Controls tab
 #include "ui/SimpleStepsPage.inc"    // round 190lr: the Drum Machine tab
 
+// Round 190nw: the Tracker tab, the track's pattern in the tracker editor (ui/TrackerComponent.h, compact: no pattern box
+// or side panel), the track's channel only. A track without a pattern gets the "New pattern" button (as the Editor tab).
+class SimpleDock::TrackerPage final : public juce::Component
+{
+public:
+    explicit TrackerPage (AudioEngine& e) : engine (e)
+    {
+        makePattern.setButtonText (tr ("New pattern"));
+        makePattern.setTooltip (tr ("An empty 4-bar pattern on this track, to write notes into"));
+        makePattern.onClick = [this] {
+            const auto t = track;
+            engine.editSong ([t] (Song& s) { simpletracks::ensurePattern (s, t); });
+            update();
+        };
+        addChildComponent (makePattern);
+    }
+
+    void show (int newTrack, int newChannel)
+    {
+        track = newTrack;
+        channel = newChannel;
+        update();
+    }
+
+    void update()
+    {
+        const auto& song = engine.getSong();
+        const auto pattern = track >= 0 && isVisible() ? simpletracks::patternOf (song, track) : -1;
+        if (pattern >= 0 && editor == nullptr)
+        {
+            editor = makeTracker (engine, true);
+            addAndMakeVisible (*editor);
+            resized();
+        }
+        if (editor != nullptr)
+        {
+            editor->setVisible (pattern >= 0);
+            if (pattern >= 0 && (editor->shownPattern() != pattern || shownChannel != channel))
+            {
+                shownChannel = channel;
+                editor->setOnlyChannels (channel >= 0 ? std::optional<std::vector<int>> (std::vector<int> { channel }) : std::nullopt);
+                editor->showPattern (pattern);
+            }
+        }
+        makePattern.setVisible (pattern < 0 && track >= 0 && isVisible());
+    }
+
+    void visibilityChanged() override { update(); }
+    void resized() override
+    {
+        if (editor != nullptr)
+            editor->setBounds (getLocalBounds());
+        makePattern.setBounds (getLocalBounds().withSizeKeepingCentre (180, 32));
+    }
+    juce::Component* trackerComponent() { return editor.get(); }
+
+private:
+    AudioEngine& engine;
+    std::unique_ptr<TrackerComponent> editor;
+    juce::TextButton makePattern;
+    int track = -1, channel = -1, shownChannel = -2;
+};
+
 SimpleDock::SimpleDock (AudioEngine& e, Hooks h) : engine (e), hooks (std::move (h))
 {
     controlsPage = std::make_unique<ControlsPage> (e);
@@ -2894,13 +2958,18 @@ SimpleDock::SimpleDock (AudioEngine& e, Hooks h) : engine (e), hooks (std::move 
     stepsButton.setButtonText (tr ("Drum Machine"));
     stepsButton.setTooltip (tr ("The drum track's step grid: patterns A to H, length and swing"));
     stepsButton.setComponentID ("simple.dock.steps");
+    trackerButton.setButtonText (tr ("Tracker"));
+    trackerButton.setTooltip (tr ("The track's notes as rows: typed from the keyboard, tracker style"));
+    trackerButton.setComponentID ("simple.dock.tracker");
+    trackerPage = std::make_unique<TrackerPage> (engine);
+    addChildComponent (*trackerPage);
     // round 190dv: what the first-song tour's ring finds
     setComponentID ("simple.dock"); // (round 190jp: the tour keeps its card off the dock)
     keyboardButton.setComponentID ("simple.dock.keyboard");
     editorButton.setComponentID ("simple.dock.editor");
     effectsButton.setComponentID ("simple.dock.effects");
     const std::pair<juce::TextButton*, Tab> tabs[] { { &instrumentButton, Tab::instrument }, { &keyboardButton, Tab::keyboard },
-                                                     { &editorButton, Tab::editor }, { &padsButton, Tab::pads }, { &stepsButton, Tab::steps }, { &controlsButton, Tab::controls },
+                                                     { &editorButton, Tab::editor }, { &trackerButton, Tab::tracker }, { &padsButton, Tab::pads }, { &stepsButton, Tab::steps }, { &controlsButton, Tab::controls },
                                                      { &effectsButton, Tab::effects } };
     for (auto [b, t] : tabs)
     {
@@ -2927,6 +2996,7 @@ SimpleDock::SimpleDock (AudioEngine& e, Hooks h) : engine (e), hooks (std::move 
     padsButton.glyph = (int) ui::simplelook::Glyph::pads;
     controlsButton.glyph = (int) ui::simplelook::Glyph::dials;
     stepsButton.glyph = (int) ui::simplelook::Glyph::drumMachine;
+    trackerButton.glyph = (int) ui::simplelook::Glyph::tracker;
     hideButton.setButtonText (tr ("Hide the track dock"));
     hideButton.setTooltip (tr ("Hide the track dock"));
     hideButton.onClick = [this] {
@@ -2975,11 +3045,12 @@ void SimpleDock::refresh()
     instrumentButton.setVisible (instrumentTab);
     keyboardButton.setVisible (playTabs);
     editorButton.setVisible (playTabs);
+    trackerButton.setVisible (playTabs);
     padsButton.setVisible (padsTab);
     stepsButton.setVisible (stepsTab);
     controlsTab = track >= 0 && insert > 0 && insert < (int) song.mixer.size();
     controlsButton.setVisible (controlsTab);
-    if ((tab == Tab::instrument && ! instrumentTab) || ((tab == Tab::keyboard || tab == Tab::editor) && ! playTabs) || (tab == Tab::pads && ! padsTab)
+    if ((tab == Tab::instrument && ! instrumentTab) || ((tab == Tab::keyboard || tab == Tab::editor || tab == Tab::tracker) && ! playTabs) || (tab == Tab::pads && ! padsTab)
         || (tab == Tab::controls && ! controlsTab) || (tab == Tab::steps && ! stepsTab))
         tab = Tab::effects;
     if (! tabChosen && (instrumentTab || playTabs))
@@ -2994,6 +3065,7 @@ void SimpleDock::refresh()
     instrumentPage->show (instrumentTab ? channel : -1);
     showPage();
     editorPage->show (playTabs ? track : -1, channel);
+    trackerPage->show (playTabs ? track : -1, channel);
     padsPage->show (padsTab ? track : -1);
     stepsPage->show (stepsTab ? track : -1);
     controlsPage->show (controlsTab ? track : -1, channel, controlsTab ? insert : -1);
@@ -3005,7 +3077,7 @@ void SimpleDock::refresh()
 void SimpleDock::setTab (Tab t)
 {
     tabChosen = true; // (a refresh keeps a tab that was asked for)
-    if ((t == Tab::instrument && ! instrumentTab) || ((t == Tab::keyboard || t == Tab::editor) && ! playTabs) || (t == Tab::pads && ! padsTab)
+    if ((t == Tab::instrument && ! instrumentTab) || ((t == Tab::keyboard || t == Tab::editor || t == Tab::tracker) && ! playTabs) || (t == Tab::pads && ! padsTab)
         || (t == Tab::controls && ! controlsTab) || (t == Tab::steps && ! stepsTab))
         t = Tab::effects;
     const auto padsBefore = tab == Tab::pads;
@@ -3023,7 +3095,7 @@ void SimpleDock::cycleTab()
     if (instrumentTab)
         shown.push_back (Tab::instrument);
     if (playTabs)
-        shown.push_back (Tab::keyboard), shown.push_back (Tab::editor);
+        shown.push_back (Tab::keyboard), shown.push_back (Tab::editor), shown.push_back (Tab::tracker);
     if (padsTab)
         shown.push_back (Tab::pads);
     if (stepsTab)
@@ -3038,6 +3110,7 @@ void SimpleDock::cycleTab()
 void SimpleDock::showPage()
 {
     auto& button = tab == Tab::instrument ? instrumentButton : tab == Tab::keyboard ? keyboardButton : tab == Tab::editor ? editorButton
+                 : tab == Tab::tracker                                      ? trackerButton
                  : tab == Tab::pads                                         ? padsButton
                  : tab == Tab::steps                                        ? stepsButton
                  : tab == Tab::controls                                     ? controlsButton
@@ -3054,6 +3127,7 @@ void SimpleDock::showPage()
     instrumentPage->setVisible (tab == Tab::instrument);
     effectsPage->setVisible (tab == Tab::effects);
     editorPage->setVisible (tab == Tab::editor);
+    trackerPage->setVisible (tab == Tab::tracker);
     padsPage->setVisible (tab == Tab::pads);
     stepsPage->setVisible (tab == Tab::steps);
     controlsPage->setVisible (tab == Tab::controls);
@@ -3068,6 +3142,7 @@ void SimpleDock::showKeyboard()
 }
 
 void SimpleDock::editorTakenBack() { editorPage->takenBackByPanel(); }
+juce::Component* SimpleDock::trackerForSnapshot() { return trackerPage != nullptr ? trackerPage->trackerComponent() : nullptr; }
 void SimpleDock::padsLoadForCheck (int pad, const juce::File& file) { padsPage->loadFileForCheck (pad, file); }
 void SimpleDock::padsSelectForCheck (int pad) { padsPage->select (pad); }
 void SimpleDock::padsModeForCheck (int mode) { padsPage->setModeForCheck (mode); }
@@ -3463,13 +3538,13 @@ void SimpleDock::resized()
     auto strip = stripAll.withSizeKeepingCentre (stripAll.getWidth(), tabHeight);
     followButton.setBounds (strip.removeFromRight (190).withTrimmedRight (10).withSizeKeepingCentre (180, juce::jmin (24, tabHeight)));
     // the tabs sit after the track's name, left of the middle
-    const auto count = 1 + (instrumentTab ? 1 : 0) + (playTabs ? 2 : 0) + (padsTab ? 1 : 0) + (stepsTab ? 1 : 0) + (controlsTab ? 1 : 0);
+    const auto count = 1 + (instrumentTab ? 1 : 0) + (playTabs ? 3 : 0) + (padsTab ? 1 : 0) + (stepsTab ? 1 : 0) + (controlsTab ? 1 : 0);
     auto tabs = strip.withLeft (juce::jmin (300, getWidth() / 3)).withWidth (tabWidth * count);
     std::vector<juce::TextButton*> shown;
     if (instrumentTab)
         shown.push_back (&instrumentButton);
     if (playTabs)
-        shown.push_back (&keyboardButton), shown.push_back (&editorButton);
+        shown.push_back (&keyboardButton), shown.push_back (&editorButton), shown.push_back (&trackerButton);
     if (padsTab)
         shown.push_back (&padsButton);
     if (stepsTab)
@@ -3487,6 +3562,7 @@ void SimpleDock::resized()
     effectsPage->setBounds (body);
     instrumentPage->setBounds (body);
     editorPage->setBounds (body);
+    trackerPage->setBounds (body);
     padsPage->setBounds (body);
     stepsPage->setBounds (body);
     controlsPage->setBounds (body);

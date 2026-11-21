@@ -263,6 +263,8 @@ APP_SOURCES+=(src/core/FmSynth.cpp src/core/AlsDevicesFm.cpp)
 APP_SOURCES+=(src/core/physmod/ModalBank.cpp src/core/physmod/LynxModel.cpp src/core/LynxModelBank.cpp)
 # Track clips: "Clips own their notes" on FL's instrument tracks (round 190ne)
 APP_SOURCES+=(src/core/TrackClips.cpp)
+# The tracker editor and the module import (round 190nw)
+APP_SOURCES+=(src/core/TrackerGrid.cpp src/core/ModuleImport.cpp src/ui/TrackerComponent.cpp)
 # Helix: LYNX's own wavetable synth and the import of Live's Wavetable onto it (round 190ja)
 APP_SOURCES+=(src/core/WavetableSynth.cpp src/core/WavetableTables.cpp src/core/WavetableUser.cpp src/core/AlsDevicesWt.cpp)
 # Braid (Live's Meld) and the spectral effects' import, round 190ko
@@ -356,6 +358,7 @@ APP_SOURCES+=(src/core/FlExtraFx.cpp src/core/Scratcher.cpp src/core/Dvs.cpp src
 APP_SOURCES+=(src/core/VisualFx.cpp src/core/FruityDance.cpp src/ui/VisualEditors.cpp src/ui/VisualGl.cpp src/ui/DanceView.cpp)
 
 for lib in wavpack vorbis lame pocketpy monocypher; do declare "TP_KEY_$lib=$(tree_hash third_party/$lib)"; done
+TP_KEY_libxmp_lite="$(tree_hash third_party/libxmp-lite)"
 
 echo "WavPack (decoder, C)..."
 mkdir -p "$OUT/wavpack"
@@ -391,6 +394,15 @@ obj="$OUT/pocketpy/pocketpy.o"
 if [[ ! -f "$obj" || third_party/pocketpy/pocketpy.c -nt "$obj" || third_party/pocketpy/pocketpy.h -nt "$obj" ]]; then
     cached "$obj" "$TP_KEY_pocketpy" -- "$ZIG" cc -target "$TARGET" -O2 -w -std=c11 -DPK_ENABLE_OS=0 -DPK_ENABLE_WATCHDOG=1 -Ithird_party/pocketpy -c third_party/pocketpy/pocketpy.c -o "$obj"
 fi
+
+echo "libxmp-lite (module reader, C)..."
+mkdir -p "$OUT/libxmp"
+for f in third_party/libxmp-lite/src/*.c third_party/libxmp-lite/src/loaders/*.c; do
+    obj="$OUT/libxmp/$(basename "$f" .c).o"
+    if [[ ! -f "$obj" || "$f" -nt "$obj" ]]; then
+        cached "$obj" "$TP_KEY_libxmp_lite" -- "$ZIG" cc -target "$TARGET" -O2 -w -std=c99 -DLIBXMP_CORE_PLAYER -DLIBXMP_STATIC -Ithird_party/libxmp-lite/include/libxmp-lite -Ithird_party/libxmp-lite/src -c "$f" -o "$obj"
+    fi
+done
 
 echo "Monocypher (live session encryption, C)..."
 mkdir -p "$OUT/monocypher"
@@ -446,7 +458,7 @@ APP_LIBS=(-lole32 -loleaut32 -luuid -lwinmm -lws2_32 -lshlwapi -lversion -lwinin
           -ld2d1 -ldcomp -ldwrite -ldxgi -ld3d11 -ldxguid -lwsock32 -lopengl32 -lpropsys -lmfplat -lmfreadwrite -lmfuuid -lksuser -lavrt -lwinhttp -lbcrypt
           -liphlpapi) # (iphlpapi: Ableton Link's network interfaces, round 190gl)
 link_start=$(date +%s)
-LINK_INPUTS=("$OUT"/juce/*.o "${APP_OBJECTS[@]}" "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT/LYNX.res")
+LINK_INPUTS=("$OUT"/juce/*.o "${APP_OBJECTS[@]}" "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT"/libxmp/*.o "$OUT/LYNX.res")
 plain_link() {
     "$ZIG" c++ -target "$TARGET" "${WIN_OPT[@]}" "${WIN_LTO[@]}" -o "$OUT/LYNX.exe" "${LINK_INPUTS[@]}" -Wl,--subsystem,windows "${APP_LIBS[@]}"
 }
@@ -508,7 +520,7 @@ if [[ "${LYNX_BUILD_PLUGINS:-0}" == 1 ]]; then
     }
     plugin_link() { # <output> <objects...>
         local output="$1"; shift
-        "$ZIG" c++ -target "$TARGET" "${WIN_OPT[@]}" "${WIN_LTO[@]}" -shared -s -o "$output" "$@" "$OUT/plugin/ExportProcessor.o" "${PLUGIN_OBJECTS[@]}" "$OUT"/juce/*.o "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT/plugin/LynxPlugin.res" "${PLUGIN_LIBS[@]}" -Wl,--gc-sections
+        "$ZIG" c++ -target "$TARGET" "${WIN_OPT[@]}" "${WIN_LTO[@]}" -shared -s -o "$output" "$@" "$OUT/plugin/ExportProcessor.o" "${PLUGIN_OBJECTS[@]}" "$OUT"/juce/*.o "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT"/libxmp/*.o "$OUT/plugin/LynxPlugin.res" "${PLUGIN_LIBS[@]}" -Wl,--gc-sections
         rm -f "$(dirname "$output")"/*.lib "$(dirname "$output")"/*.pdb # (the linker's import library: not part of a plugin)
     }
     ( cd resources && "$ZIG" rc /fo "$OUT_ABS/plugin/LynxPlugin.res" LynxPlugin.rc )
@@ -527,7 +539,7 @@ if [[ "${LYNX_BUILD_PLUGINS:-0}" == 1 ]]; then
         index=$((index + 1))
     done < <(sed -nE 's/^LYNX_PLUGIN \("([^"]+)", ([01]), [^,]+, [^,]+, "[^"]+", (0x[0-9a-f]+), "([^"]+)", ([12])\)$/\1~\2~\3~\4~\5/p' src/plugin/plugins.def)
     plugin_cxx "$OUT/plugin/plugexporttest.o" tools/plugexporttest.cpp -Wall -Wextra
-    plugin_cxx_link=("$OUT/plugin/plugexporttest.o" "$OUT/plugin/ExportProcessor.o" "${PLUGIN_OBJECTS[@]}" "$OUT"/juce/*.o "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT/LYNX.res")
+    plugin_cxx_link=("$OUT/plugin/plugexporttest.o" "$OUT/plugin/ExportProcessor.o" "${PLUGIN_OBJECTS[@]}" "$OUT"/juce/*.o "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT"/libxmp/*.o "$OUT/LYNX.res")
     "$ZIG" c++ -target "$TARGET" "${WIN_OPT[@]}" "${WIN_LTO[@]}" -o "$OUT/plugexporttest.exe" "${plugin_cxx_link[@]}" "${PLUGIN_LIBS[@]}"
     ls -la "$OUT"/plugins/*.clap "$OUT"/plugins/*/Contents/x86_64-win/*
 fi

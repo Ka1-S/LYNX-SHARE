@@ -3011,6 +3011,28 @@ juce::String toJson (const Song& song, bool stampVersion)
         root->setProperty ("autoCrossfades", true);
     if (song.linkTracksToMixer) // round 190gz (issue #170): LYNX's "Link Playlist tracks to mixer tracks"
         root->setProperty ("linkTracksToMixer", true);
+    if (! song.tracker.isDefault()) // round 190nw: the tracker editor's view settings (only when changed)
+    {
+        auto* t = new juce::DynamicObject();
+        t->setProperty ("rowsPerBeat", song.tracker.rowsPerBeat);
+        t->setProperty ("pan", song.tracker.showPan);
+        t->setProperty ("delay", song.tracker.showDelay);
+        t->setProperty ("fx", song.tracker.showFx);
+        juce::Array<juce::var> groups;
+        for (const auto& g : song.tracker.groups)
+        {
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("name", str (g.name));
+            juce::Array<juce::var> channels;
+            for (auto uid : g.channels)
+                channels.add (uidVar (uid));
+            o->setProperty ("channels", channels);
+            groups.add (juce::var (o));
+        }
+        if (! groups.isEmpty())
+            t->setProperty ("groups", groups);
+        root->setProperty ("tracker", juce::var (t));
+    }
     if (song.compCrossfadeMs != Song::defaultCompCrossfadeMs)
         root->setProperty ("compCrossfadeMs", (double) song.compCrossfadeMs);
     if (song.playTruncatedNotes)
@@ -3922,6 +3944,25 @@ std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error,
     song.performanceMode = (bool) root.getProperty ("performanceMode", false);
     song.autoCrossfades = (bool) root.getProperty ("autoCrossfades", false);
     song.linkTracksToMixer = (bool) root.getProperty ("linkTracksToMixer", false); // (round 190gz; older projects: off)
+    if (const auto* t = root["tracker"].getDynamicObject()) // (round 190nw; older projects: the defaults)
+    {
+        song.tracker.rowsPerBeat = juce::jlimit (TrackerSettings::minRowsPerBeat, TrackerSettings::maxRowsPerBeat, (int) t->getProperty ("rowsPerBeat"));
+        song.tracker.showPan = (bool) t->getProperty ("pan");
+        song.tracker.showDelay = t->hasProperty ("delay") ? (bool) t->getProperty ("delay") : true;
+        song.tracker.showFx = t->hasProperty ("fx") ? (bool) t->getProperty ("fx") : true;
+        if (const auto* groups = t->getProperty ("groups").getArray())
+            for (const auto& g : *groups)
+            {
+                TrackerGroup group;
+                group.name = g["name"].toString().toStdString();
+                if (const auto* channels = g["channels"].getArray())
+                    for (const auto& c : *channels)
+                        if (const auto uid = uidFrom (c); uid != 0)
+                            group.channels.push_back (uid);
+                if (group.channels.size() >= 2)
+                    song.tracker.groups.push_back (std::move (group));
+            }
+    }
     song.compCrossfadeMs = juce::jlimit (0.0f, 100.0f, (float) (double) root.getProperty ("compCrossfadeMs", (double) Song::defaultCompCrossfadeMs));
     song.playTruncatedNotes = (bool) root.getProperty ("playTruncatedNotes", false);
     song.muteRunsEffects = (bool) root.getProperty ("muteRunsEffects", false); // (round 190y; older projects: off)

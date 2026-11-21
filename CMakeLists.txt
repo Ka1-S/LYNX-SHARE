@@ -41,6 +41,8 @@ add_library(lynx_core STATIC
     src/core/ClipLauncher.cpp
     src/core/SessionOps.cpp
     src/core/TrackClips.cpp
+    src/core/TrackerGrid.cpp
+    src/core/ModuleImport.cpp
     src/core/RemoteMap.cpp
     src/core/DrawMode.cpp
     src/core/AutoPointEdit.cpp
@@ -402,6 +404,16 @@ target_include_directories(monocypher PUBLIC third_party/monocypher)
 target_compile_options(monocypher PRIVATE $<$<NOT:$<C_COMPILER_ID:MSVC>>:-w>)
 target_link_libraries(lynx_core PUBLIC monocypher)
 
+# libxmp-lite 4.7.4 (MIT; third_party/libxmp-lite, LYNX's read-only accessors in src/lynx_xmp_extra.c): reads .mod, .xm,
+# .s3m and .it for the module import (round 190nw, core/ModuleImport.h)
+file(GLOB LIBXMP_SOURCES third_party/libxmp-lite/src/*.c third_party/libxmp-lite/src/loaders/*.c)
+add_library(libxmp_lite STATIC ${LIBXMP_SOURCES})
+target_include_directories(libxmp_lite PUBLIC third_party/libxmp-lite/include/libxmp-lite PRIVATE third_party/libxmp-lite/src)
+target_compile_definitions(libxmp_lite PUBLIC LIBXMP_STATIC PRIVATE LIBXMP_CORE_PLAYER $<IF:$<C_COMPILER_ID:MSVC>,_USE_MATH_DEFINES,_REENTRANT>)
+set_target_properties(libxmp_lite PROPERTIES C_STANDARD 99)
+target_compile_options(libxmp_lite PRIVATE $<$<NOT:$<C_COMPILER_ID:MSVC>>:-w>)
+target_link_libraries(lynx_core PUBLIC libxmp_lite)
+
 # LAME's libmp3lame (LGPL; third_party/lame, encoder only, configured by third_party/lame/src/config.h)
 file(GLOB LAME_SOURCES third_party/lame/src/*.c)
 add_library(lame_encoder STATIC ${LAME_SOURCES})
@@ -442,6 +454,10 @@ target_link_libraries(flpdump PRIVATE lynx_core)
 
 add_executable(renderwav tools/renderwav.cpp)
 target_link_libraries(renderwav PRIVATE lynx_core)
+
+# a tracker module rendered by libxmp-lite's own player (round 190nw): the reference for the module import's renders
+add_executable(modrender tools/modrender.cpp)
+target_link_libraries(modrender PRIVATE libxmp_lite)
 
 # the audio engine's CPU per block, headless (round 190ge): perfbench <scenario> [--block N] [--threads N] ...
 add_executable(perfbench tools/perfbench.cpp)
@@ -671,6 +687,7 @@ if(LYNX_BUILD_APP)
         src/ui/MidiClipboard.cpp
         src/ui/AudioClipboard.cpp
         src/ui/EventEditor.cpp
+        src/ui/TrackerComponent.cpp
         src/ui/AudioEditor.cpp
         src/ui/AudioEditorTools.cpp
         src/ui/ArticulatorTools.cpp

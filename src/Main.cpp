@@ -89,6 +89,7 @@
 #include "core/FlWrapper.h"
 #include "engine/AudioEngine.h"
 #include "engine/ProjectDowngrade.h"
+#include "ui/TrackerComponent.h"
 #include "core/ClipLauncher.h"
 #include "core/SimpleSteps.h"
 #include "core/DirectWaveState.h"
@@ -3317,6 +3318,14 @@ public:
         if (args.contains ("--issuesshot190ng"))
         {
             setApplicationReturnValue (runIssuesShot190ng (args[args.indexOf ("--issuesshot190ng") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+        // --tracker190nwshot <prefix> [module] (round 190nw, 0.1.31: the built-in tracker): src/TrackerShot190nw.inc
+        if (args.contains ("--tracker190nwshot"))
+        {
+            const auto i = args.indexOf ("--tracker190nwshot");
+            setApplicationReturnValue (runTrackerShot190nw (args[i + 1].unquoted(), i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String()) ? 0 : 1);
             quit();
             return;
         }
@@ -8256,6 +8265,68 @@ private:
                 trackclips190neResult = "ERROR an ordinary pattern or a linked clip went";
         }
 
+        // round 190nw (0.1.31): the tracker. Its settings are saved only when changed (an older project's file stays the
+        // same bytes) and come back; the copies for 0.1.30 / 0.1.28 drop them with one loss line; a module imports in a
+        // real engine (one note, one Sampler channel, its sample written) and its notes render.
+        juce::String tracker190nwResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            juce::String why;
+            const auto plainJson = lynx::ProjectFile::toJson (song);
+            if (plainJson.contains ("\"tracker\""))
+                tracker190nwResult = "ERROR settings written for a project that never changed them";
+            if (const auto reread = lynx::ProjectFile::fromJson (plainJson, why); tracker190nwResult == "OK" && (! reread || lynx::ProjectFile::toJson (*reread) != plainJson))
+                tracker190nwResult = "ERROR an older project changed";
+            for (int c = 0; c < 2; ++c)
+                song.channels.emplace_back().name = "T" + std::to_string (c);
+            lynx::uids::normalize (song);
+            song.tracker.rowsPerBeat = 8;
+            song.tracker.showPan = true;
+            song.tracker.groups.push_back ({ "Drums", { song.channels[song.channels.size() - 2].uid, song.channels.back().uid } });
+            const auto json = lynx::ProjectFile::toJson (song);
+            const auto back = lynx::ProjectFile::fromJson (json, why);
+            if (tracker190nwResult == "OK" && (! back || ! (back->tracker == song.tracker)))
+                tracker190nwResult = "ERROR round trip " + why;
+            for (const auto* release : { "0.1.30", "0.1.28" })
+            {
+                const auto copy = lynx::olderlynx::forRelease (song, release);
+                const auto said = std::any_of (copy.lost.begin(), copy.lost.end(), [] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).contains ("tracker's view settings"); });
+                if (tracker190nwResult == "OK" && (! copy.ok || copy.json.contains ("\"tracker\"") || ! said))
+                    tracker190nwResult = "ERROR copy for " + juce::String (release);
+            }
+            // a ProTracker module of one note, through the engine's import (its sample written beside it)
+            const auto folder = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-selftest-190nw-" + juce::String (juce::Time::currentTimeMillis()));
+            folder.createDirectory();
+            std::vector<std::uint8_t> mod (1084 + 1024 + 128, 0);
+            std::memcpy (mod.data(), "selftest", 8);
+            mod[20 + 22] = 0, mod[20 + 23] = 64, mod[20 + 25] = 64, mod[20 + 29] = 1; // sample 1: 128 bytes, volume 64, no loop
+            for (int k = 1; k < 31; ++k)
+                mod[(std::size_t) (20 + k * 30 + 29)] = 1;
+            mod[950] = 1, mod[951] = 127;
+            std::memcpy (mod.data() + 1080, "M.K.", 4);
+            mod[1084] = 0x01, mod[1085] = 0xAC, mod[1086] = 0x10; // row 0: C-2 (428), sample 1
+            for (int i = 0; i < 128; ++i)
+                mod[(std::size_t) (1084 + 1024 + i)] = (std::uint8_t) (std::int8_t) std::lround (90.0 * std::sin (i * 0.39));
+            const auto modFile = folder.getChildFile ("one note.mod");
+            modFile.replaceWithData (mod.data(), mod.size());
+            lynx::AudioEngine e (false);
+            juce::String error;
+            if (tracker190nwResult == "OK" && ! e.importFlpFile (modFile, error))
+                tracker190nwResult = "ERROR module import: " + error;
+            const auto& imported = e.getSong();
+            if (tracker190nwResult == "OK" && (imported.channels.size() != 1 || imported.patterns.empty() || imported.patterns.front().notes.size() != 1
+                                               || ! folder.getChildFile ("one note samples").getChildFile ("01-01.wav").existsAsFile()))
+                tracker190nwResult = "ERROR module import: " + juce::String ((int) imported.channels.size()) + " channel(s), "
+                                     + juce::String (imported.patterns.empty() ? 0 : (int) imported.patterns.front().notes.size()) + " note(s)";
+            if (tracker190nwResult == "OK")
+            {
+                const auto peak = e.renderOffline (1.0, 44100.0, nullptr);
+                if (peak < 0.01f)
+                    tracker190nwResult = "ERROR the imported note is silent (peak " + juce::String (peak) + ")";
+            }
+            folder.deleteRecursively();
+        }
+
         const auto motionOverlayResult = lynx::ui::MotionOverlay::selfTest(); // (round 190ip)
         // round 190bm (0.1.25 showed the Mixer and the Playlist black): their cached pictures shown on native and
         // software targets against straight paints (ui/PictureCheck.h; --picturetest runs more sizes and scales)
@@ -8295,7 +8366,7 @@ private:
                         && mixerBasics == "OK" && fontsResult == "OK" && paintCachesResult.startsWith ("OK") && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && takeoverOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && exportParity.startsWith ("OK") && exportLive.startsWith ("OK") && midiHotplug.startsWith ("OK") && midiOutPorts.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
-                        && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
+                        && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
@@ -8370,6 +8441,7 @@ private:
                << "livewf190ef=" << livewf190efResult << "\n"
                << "livewf190em=" << livewf190emResult << "\n"
                << "trackclips190ne=" << trackclips190neResult << "\n"
+               << "tracker190nw=" << tracker190nwResult << "\n"
                << "midigen190fm_saved=" << midigen190fmResult << "\n"
                << "trackauto190gz_saved=" << trackauto190gzResult << "\n"
                << "clipenv190gi_saved=" << clipenv190giResult << "\n"
@@ -16361,7 +16433,7 @@ private:
         juce::String error, report;
         bool ok = false;
 
-        if (input.hasFileExtension ("flp;als;flm;songtmpl;band;blx")) // (round 190ic: a GarageBand .band folder too)
+        if (input.hasFileExtension ("flp;als;flm;songtmpl;band;blx;mod;xm;s3m;it")) // (round 190ic: a GarageBand .band folder too; 190nw: a module)
             ok = offline.importFlpFile (input, error);
         else if (auto song = lynx::ProjectFile::load (input, error))
         {
@@ -16438,7 +16510,7 @@ private:
                     }
                 }
             }
-            if (input.hasFileExtension ("flp;als;flm;songtmpl;band;blx"))
+            if (input.hasFileExtension ("flp;als;flm;songtmpl;band;blx;mod;xm;s3m;it"))
                 ok = loader.importFlpFile (input, error);
             else if (auto song = lynx::ProjectFile::load (input, error))
             {
@@ -17944,6 +18016,7 @@ private:
 #include "Mixer221Shot190ng.inc" // round 190ng (issue #221)
 #include "IssuesShot190ng.inc" // round 190ng (issues #215, #217, #219, #220, #222)
 #include "TrackClipsShot190ne.inc" // round 190ne
+#include "TrackerShot190nw.inc" // round 190nw
 #include "IssuesShot190nq.inc" // round 190nq (issues #193, #225-#230)
 #include "IssuesShot190ns.inc" // round 190ns (issues #231-#235)
 #include "DetailsShot190kn.inc" // round 190kn
@@ -20313,7 +20386,7 @@ private:
                     }
             }
 
-            if (input.hasFileExtension ("flp;als")) // a Live set opens through the same import (round 182b)
+            if (input.hasFileExtension ("flp;als;mod;xm;s3m;it")) // a Live set opens through the same import (round 182b); a module too (190nw)
                 ok = loader.importFlpFile (input, error);
             else if (auto song = lynx::ProjectFile::load (input, error))
             {
