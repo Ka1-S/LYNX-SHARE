@@ -350,6 +350,9 @@ public:
 
     std::function<void (wc::Mode)> onModePicked;
     std::function<void()> onHoldToggled;
+    // round 190oa (DP-76): a slot that was FL's Fruity dB Meter keeps its conventions (FL manual): the dB level under
+    // the mouse, right-click resets the peak holds, a level above -6 dB in orange
+    bool dbMeterLook = false;
 
     wc::Mode shownMode() const { return wc::resolve (wc::modeOf (feed.param (wc::mode)), getWidth(), getHeight()); }
 
@@ -415,6 +418,12 @@ public:
         }
         if (! e.mods.isPopupMenu())
             return;
+        if (dbMeterLook && shownMode() == wc::Mode::peakMeter && ! e.mods.isShiftDown()) // (Shift+right-click: the mode menu)
+        {
+            meter.resetPeaks();
+            repaint();
+            return;
+        }
         juce::PopupMenu menu;
         const auto current = wc::modeOf (feed.param (wc::mode));
         for (int m = 0; m < wc::modeCount; ++m)
@@ -790,6 +799,15 @@ private:
             grad.addColour (0.82, theme::colour::meterMid);
             g.setGradientFill (grad);
             g.fillRoundedRectangle (lit, 3.0f);
+            if (dbMeterLook) // (round 190oa, DP-76, FL manual: "Any signal above -6 dB is displayed in orange")
+            {
+                const auto sixY = bar.getBottom() - y01 (-6.0f) * bar.getHeight();
+                if (lit.getY() < sixY)
+                {
+                    g.setColour (juce::Colour (0xfff0c44d)); // (capture 190oa C3: FL's 240,196,77)
+                    g.fillRect (lit.withBottom (sixY));
+                }
+            }
             const auto peakY = bar.getBottom() - y01 (meter.peakDb (ch)) * bar.getHeight();
             g.setColour (meter.peakDb (ch) > 0.0f ? theme::colour::meterClip : theme::colour::textPrimary);
             g.fillRect (bar.getX(), peakY - 1.0f, bar.getWidth(), 2.0f);
@@ -918,8 +936,27 @@ private:
                 hoverText = juce::String (ms, 1) + " ms  " + juce::String (juce::Decibels::gainToDecibels (std::abs (level)), 1) + " dB";
                 break;
             }
+            case wc::Mode::peakMeter: // (round 190oa, DP-76: FL's dB Meter shows the level at the mouse)
+            {
+                const auto bars = meterBars (getLocalBounds().toFloat());
+                const auto floor = (float) wc::meterFloorDb (feed.param (wc::meterScale));
+                if (bars.getHeight() > 0.0f && hover.y >= bars.getY() && hover.y <= bars.getBottom())
+                    hoverText = juce::String (floor * (float) (hover.y - bars.getY()) / bars.getHeight(), 1) + " dB";
+                else
+                    hoverText.clear();
+                break;
+            }
             default: hoverText.clear(); break;
         }
+    }
+    // the meter's bar area (paintMeter's layout)
+    static juce::Rectangle<float> meterBars (juce::Rectangle<float> area)
+    {
+        auto inner = area.reduced (12.0f, 14.0f);
+        inner.removeFromTop (16.0f);
+        inner.removeFromLeft (40.0f);
+        inner.removeFromBottom (22.0f);
+        return inner;
     }
 
     TapFeed& feed;
@@ -949,6 +986,8 @@ public:
         addAndMakeVisible (display);
         display.onModePicked = [this] (wc::Mode m) { setMode (m); };
         display.onHoldToggled = [this] { toggleHold(); };
+        if (const auto* fx = target.current(); fx != nullptr && fx->flOrigin.plugin == "Fruity dB Meter") // (round 190oa, DP-76)
+            display.dbMeterLook = true;
         for (int m = 0; m < wc::modeCount; ++m)
         {
             auto b = std::make_unique<SkinButton> (tr (wc::modeName ((wc::Mode) m)), accent);
