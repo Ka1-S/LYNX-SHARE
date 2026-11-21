@@ -13630,7 +13630,16 @@ private:
                     // round 190ok (P24): Settings › Audio › "Safe overloads" (core/OverloadGuard.h), since the start
                     const auto& guard = app.engine->getOverloadGuard();
                     text << "    safe overloads " << (guard.isEnabled() ? "on" : "off") << ": engaged " << (juce::int64) guard.timesEngaged()
-                         << " times" << (guard.engaged() ? " (now)" : "") << ", yielded " << juce::String (guard.yieldedMs(), 0) << " ms\n";
+                         << " times" << (guard.engaged() ? " (now)" : "") << ", yielded " << juce::String (guard.yieldedMs(), 0) << " ms";
+                    // round 190os: the last release in this step — why, and how long after the callbacks kept their
+                    // deadline again
+                    if (const auto at = guard.lastReleaseAtMs(); at >= wallStart && guard.lastReleaseReason() != lynx::OverloadGuard::notReleased)
+                    {
+                        const char* why[] { "", "the transport stopped", "the load dropped", "a probe passed" };
+                        text << "; let go " << juce::String (at - wallStart, 0) << " ms into the step (" << why[juce::jlimit (0, 3, guard.lastReleaseReason())]
+                             << ", " << juce::String (guard.lastReleaseLagMs(), 0) << " ms after the callbacks kept their deadline)";
+                    }
+                    text << "\n";
                 }
                 if (threadsWanted && wall > 0.0)
                 {
@@ -13896,8 +13905,51 @@ private:
                                    }, {}, playMs });
             // round 190ok (P24): LYNX_UIPERF_RECOVERY=1 — the song stopped after it, 3 s: the safe-overload guard lets go
             // and the callbacks keep their deadline again (the report's "safe overloads" line: no "(now)")
+            // (round 190os: and when the guard let go after the stop was asked)
             if (juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_RECOVERY", "0") == "1")
-                run->steps.push_back ({ "overlay A/B: playlist maximised, stopped after the song (recovery)", [this] { engine->stop(); }, {}, 3000 });
+            {
+                auto stopAt = std::make_shared<double> (0.0);
+                run->steps.push_back ({ "overlay A/B: playlist maximised, stopped after the song (recovery)", [this, stopAt] {
+                                           *stopAt = juce::Time::getMillisecondCounterHiRes();
+                                           engine->stop();
+                                       }, {}, 3000, [this, stopAt] {
+                                           const auto& guard = engine->getOverloadGuard();
+                                           const auto at = guard.lastReleaseAtMs();
+                                           return at >= *stopAt && guard.lastReleaseReason() != lynx::OverloadGuard::notReleased
+                                                      ? "    safe overloads let go " + juce::String (at - *stopAt, 1) + " ms after the stop\n"
+                                                      : juce::String ("    safe overloads: not let go after the stop\n");
+                                       } });
+            }
+            // round 190os: LYNX_UIPERF_LOAD_ENDS=<ms> — the song played again, and that many ms in every note and every
+            // playlist clip removed while the transport keeps running: the notes stop, the tails die out and the overload ends while playing.
+            // The report's "safe overloads" line says when the guard let go after the callbacks kept their deadline.
+            if (const auto endsMs = juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_LOAD_ENDS", "0").getIntValue(); endsMs > 0)
+            {
+                auto emptiedAt = std::make_shared<double> (0.0);
+                run->steps.push_back ({ "overlay A/B: playlist maximised, the load ends while playing", [this, ui, endsMs, emptiedAt] {
+                                           ui->selectTabForSnapshot (2);
+                                           engine->getTransport().songMode = true;
+                                           engine->rewind();
+                                           engine->play();
+                                           juce::Timer::callAfterDelay (endsMs, [this, emptiedAt] {
+                                               *emptiedAt = juce::Time::getMillisecondCounterHiRes();
+                                               engine->editSong ([] (lynx::Song& song) {
+                                                   for (auto& pattern : song.patterns)
+                                                       pattern.notes.clear();
+                                                   song.playlist.clear(); // (its audio and automation clips too)
+                                               }, false);
+                                           });
+                                       }, {}, endsMs + 4000, [this, emptiedAt] {
+                                           const auto& guard = engine->getOverloadGuard();
+                                           const auto at = guard.lastReleaseAtMs();
+                                           const auto playing = engine->getTransport().playing.load();
+                                           engine->stop();
+                                           return "    notes removed (still playing: " + juce::String (playing ? "yes" : "no") + "); safe overloads "
+                                                  + (at >= *emptiedAt && *emptiedAt > 0.0 ? "let go " + juce::String (at - *emptiedAt, 0) + " ms after it, "
+                                                                                              + juce::String (guard.lastReleaseLagMs(), 0) + " ms after the callbacks kept their deadline\n"
+                                                                                        : juce::String ("not let go after it\n"));
+                                       } });
+            }
             run->steps.push_back ({ "overlay A/B: piano roll maximised, pattern playing", [ui, playPattern] { ui->selectTabForSnapshot (1); playPattern(); }, {}, playMs,
                                    [this] { engine->stop(); return juce::String(); } });
         }

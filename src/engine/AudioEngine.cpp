@@ -7660,8 +7660,11 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
                 const auto end = juce::Time::getMillisecondCounterHiRes();
                 engine.rtStats.record (start, end - start, 1000.0 * samples / rate, slowest);
                 // round 190ok (FL's "Safe overloads", TOP25 P24): in a real overload with the UI starving, a slice of the
-                // CPU is given up after the block's output is written (core/OverloadGuard.h)
-                if (const auto yield = engine.overloadGuard.afterCallback (end, end - start, 1000.0 * samples / rate); yield > 0.0)
+                // CPU is given up after the block's output is written (core/OverloadGuard.h; round 190os: never right
+                // after the transport stops, so the tails render at full speed)
+                if (const auto yield = engine.overloadGuard.afterCallback (end, end - start, 1000.0 * samples / rate,
+                                                                           engine.transport.playing.load (std::memory_order_relaxed));
+                    yield > 0.0)
                     OverloadGuard::sleepFor (yield);
             }
         }
