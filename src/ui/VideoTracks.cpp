@@ -790,6 +790,25 @@ void VideoLanesView::paint (juce::Graphics& g)
     g.fillRect (0, getHeight() - 1, getWidth(), 1);
 }
 
+bool VideoLanesView::waitForThumbnails (int timeoutMs)
+{
+    const auto end = juce::Time::getMillisecondCounterHiRes() + timeoutMs;
+    for (;;)
+    {
+        bool pending = false;
+        {
+            std::lock_guard<std::mutex> lock (stripLock);
+            for (const auto& [path, s] : strips)
+                pending = pending || ! s->done;
+        }
+        if (! pending)
+            return true;
+        if (juce::Time::getMillisecondCounterHiRes() > end)
+            return false;
+        juce::Thread::sleep (20);
+    }
+}
+
 void VideoLanesView::timerCallback()
 {
     // the playhead (moves with the Playlist's) and thumbnails arriving

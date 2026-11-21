@@ -429,7 +429,16 @@
             liveEngine.dispatchPendingMessages();
             savePng (live.createComponentSnapshot (live.getLocalBounds(), true, 1.0f), prefix + "-" + tag + "-set.png");
             auto& pl = live.getPlaylistForSnapshot();
-            const auto cache = pl.cacheSelfTest ([] { ui::WaveformCache::getInstance()->waitUntilIdle (60000); }, juce::File (prefix).getParentDirectory());
+            // (rollup 0.1.31 step 3: the settle step waits for the video lanes' thumbnails too, as for the waveforms: under load
+            // they were still arriving when the scroll's pictures were taken, 547-12 484 px apart; after both, a few px)
+            const auto settle = [&live, &liveEngine] {
+                ui::WaveformCache::getInstance()->waitUntilIdle (60000);
+                live.createComponentSnapshot (live.getLocalBounds(), true, 1.0f); // (a paint asks for the strips it shows)
+                VideoLanesView::waitForThumbnails (60000);
+                liveEngine.dispatchPendingMessages();
+            };
+            settle();
+            const auto cache = pl.cacheSelfTest (settle, juce::File (prefix).getParentDirectory());
             // (the video lanes' thumbnails arrive in the background, so a picture taken while they come in differs there; the
             // scroll is what #193 is about: the old shift area moved the pinned lanes, ~190 000 px off on this set)
             int scrollOff = -1;

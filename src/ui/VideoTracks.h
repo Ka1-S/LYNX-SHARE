@@ -85,6 +85,10 @@ public:
 
     void refresh(); // the song changed
 
+    // Shot routes / tests (rollup 0.1.31 step 3, #193 flake): waits until every thumbnail strip asked for so far is made
+    // (they come from a background thread). False when one is still being made after `timeoutMs`.
+    static bool waitForThumbnails (int timeoutMs);
+
 private:
     void timerCallback() override;
     struct Hit
