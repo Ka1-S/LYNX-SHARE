@@ -1,8 +1,11 @@
 #include "ui/TrackerComponent.h"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
 #include <map>
 #include <unordered_map>
 
@@ -14,11 +17,13 @@
 #include "engine/AudioEngine.h"
 #include "ui/FrameTicker.h"
 #include "ui/I18n.h"
+#include "ui/PaintAB.h"
 #include "ui/ShortcutManager.h"
 #include "ui/TextCache.h"
 #include "ui/Theme.h"
 #include "ui/ToolWindow.h"
 #include "ui/WindowOwner.h"
+#include "platform/ThreadInstructions.h"
 
 namespace lynx
 {
@@ -103,6 +108,7 @@ struct TrackerComponent::Impl
         std::vector<FieldGeom> fields;
         // an empty cell and a sustained one drawn as one text each (the fields line up: a monospace font)
         juce::String emptyText, sustainText;
+        std::vector<juce::String> placeholders; // per field: its dots / dashes (round 190ob: made once, not per cell)
     };
     struct TrackGeom
     {
@@ -110,6 +116,7 @@ struct TrackerComponent::Impl
         std::vector<ColumnGeom> columns;
     };
     std::vector<TrackGeom> geom;
+    std::vector<std::uint64_t> geomHash; // per track: its columns and fields (round 190ob, the chunk signatures)
     int gridWidth = 0, numberWidth = 40;
     // children
     juce::ComboBox patternBox, rpbBox;
@@ -125,23 +132,32 @@ struct TrackerComponent::Impl
         juce::Image image;
         int width = 0;
     };
-    std::unordered_map<juce::String, Picture> pictures;
+    // (round 190ob: keyed by the colour, the height and the text themselves: no key string is built per cell)
+    struct PictureKey
+    {
+        juce::uint32 argb = 0;
+        int height = 0;
+        juce::String text;
+        bool operator== (const PictureKey& o) const noexcept { return argb == o.argb && height == o.height && text == o.text; }
+    };
+    struct PictureKeyHash
+    {
+        std::size_t operator() (const PictureKey& k) const noexcept { return k.text.hash() ^ ((std::size_t) k.argb * 0x9E3779B97F4A7C15ull) ^ (std::size_t) k.height; }
+    };
+    std::unordered_map<PictureKey, Picture, PictureKeyHash> pictures;
     float picturesScale = 0.0f;
     juce::Font picturesFont { juce::FontOptions {} };
+    juce::Font monoNow { juce::FontOptions {} }; // the grid's font (the paint's, once per paint)
 
-    void drawGridText (juce::Graphics& g, const juce::String& text, juce::Colour colour, int x, int y, int height)
+    const Picture& picture (const juce::String& text, juce::Colour colour, int height, float scale)
     {
-        if (text.isEmpty())
-            return;
-        const auto scale = g.getInternalContext().getPhysicalPixelScaleFactor();
-        const auto font = theme::monoFont (theme::type::small + 1.0f);
-        if (scale != picturesScale || font != picturesFont || pictures.size() > 6000)
+        if (scale != picturesScale || monoNow != picturesFont || pictures.size() > 6000)
         {
             pictures.clear();
             picturesScale = scale;
-            picturesFont = font;
+            picturesFont = monoNow;
         }
-        const auto key = juce::String::toHexString ((juce::int64) colour.getARGB()) + juce::String::charToString ('|') + juce::String (height) + "|" + text;
+        PictureKey key { colour.getARGB(), height, text };
         auto it = pictures.find (key);
         if (it == pictures.end())
         {
@@ -150,18 +166,172 @@ struct TrackerComponent::Impl
             p.image = juce::Image (juce::Image::ARGB, std::max (1, (int) std::ceil ((float) p.width * scale)), std::max (1, (int) std::ceil ((float) height * scale)), true);
             juce::Graphics ig (p.image);
             ig.addTransform (juce::AffineTransform::scale (scale));
-            ig.setFont (font);
+            ig.setFont (monoNow);
             ig.setColour (colour);
             ig.drawText (text, 0, 0, p.width, height, juce::Justification::centredLeft, false);
-            it = pictures.emplace (key, std::move (p)).first;
+            it = pictures.emplace (std::move (key), std::move (p)).first;
         }
-        if (! g.clipRegionIntersects ({ x, y, it->second.width, height }))
+        return it->second;
+    }
+
+    void drawGridText (juce::Graphics& g, const juce::String& text, juce::Colour colour, int x, int y, int height)
+    {
+        if (text.isEmpty())
+            return;
+        const auto scale = g.getInternalContext().getPhysicalPixelScaleFactor();
+        const auto& p = picture (text, colour, height, scale);
+        if (! g.clipRegionIntersects ({ x, y, p.width, height }))
             return;
         g.setOpacity (1.0f); // (an image is drawn at the current colour's opacity: the picture holds its own colour)
         if (scale == 1.0f)
-            g.drawImageAt (it->second.image, x, y);
+            g.drawImageAt (p.image, x, y);
         else
-            g.drawImage (it->second.image, juce::Rectangle<float> ((float) x, (float) y, (float) it->second.width, (float) height));
+            g.drawImage (p.image, juce::Rectangle<float> ((float) x, (float) y, (float) p.width, (float) height));
+    }
+
+    // ---- texts made once (round 190ob): the key names, and the numbers by digits and base
+    std::array<juce::String, 128> keyTexts;
+    std::uint64_t keyTextsHash = 0;
+    std::unordered_map<int, juce::String> numberTexts;
+    const juce::String& keyName (int key)
+    {
+        if (key < 0 || key > 127)
+        {
+            static const juce::String unknown ("???");
+            return unknown;
+        }
+        auto& t = keyTexts[(std::size_t) key];
+        if (t.isEmpty())
+            t = juce::String::fromUTF8 (keyText (key).c_str());
+        return t;
+    }
+    const juce::String& number (int value, int digits, bool inHex)
+    {
+        if (value < 0 || value > 0xFFFFF || digits > 7)
+        {
+            static juce::String scratch;
+            scratch = numberText (value, digits, inHex);
+            return scratch;
+        }
+        const auto key = (value << 4) | (digits << 1) | (inHex ? 1 : 0);
+        auto it = numberTexts.find (key);
+        if (it == numberTexts.end())
+        {
+            if (numberTexts.size() > 20000)
+                numberTexts.clear();
+            it = numberTexts.emplace (key, juce::String (numberText (value, digits, inHex))).first;
+        }
+        return it->second;
+    }
+
+    // ---- the row-chunk cache (round 190ob). The cells of chunkRows rows of one track (and the row numbers) are painted
+    // once into an opaque image and drawn as that image on every frame that shows them again: scrolling, following the
+    // playhead, an edit in another track. A chunk is painted again when what it shows changes (its signature: the
+    // track's notes as its cells show them, its columns, the grid's settings, colours and font). The rows of the cursor,
+    // of the playhead and of a block are painted straight on top, as before. The same pixels as painting straight
+    // (--tracker190nwshot checks it); off at fractional pixel scales, where a row does not start on a pixel.
+    static constexpr int chunkRows = 16;
+    static constexpr std::size_t chunkBudget = 48u << 20; // bytes of chunk images kept
+    struct Chunk
+    {
+        juce::Image image;
+        std::uint64_t signature = 0, used = 0;
+        std::size_t bytes = 0;
+    };
+    std::unordered_map<std::uint64_t, Chunk> chunks; // (track + 1) << 40 | chunk
+    std::size_t chunkBytes = 0;
+    std::uint64_t paints = 0;
+    int chunkRendersLeft = 0; // new chunks this paint may still make
+    std::vector<std::uint64_t> trackHash; // per track: its notes as the cells show them
+    bool useChunks = true;
+
+    static std::uint64_t mix (std::uint64_t h, std::uint64_t v) noexcept
+    {
+        h ^= v + 0x9E3779B97F4A7C15ull + (h << 6) + (h >> 2);
+        h ^= h >> 31;
+        h *= 0xBF58476D1CE4E5B9ull;
+        return h ^ (h >> 29);
+    }
+    static std::uint64_t bits (float f) noexcept
+    {
+        std::uint32_t u = 0;
+        std::memcpy (&u, &f, sizeof u);
+        return u;
+    }
+
+    void dropChunks (int track)
+    {
+        if (track < -1)
+        {
+            chunks.clear();
+            chunkBytes = 0;
+            return;
+        }
+        for (auto it = chunks.begin(); it != chunks.end();)
+            if ((int) (it->first >> 40) - 1 == track)
+            {
+                chunkBytes -= it->second.bytes;
+                it = chunks.erase (it);
+            }
+            else
+                ++it;
+    }
+    size_t chunkCount() const noexcept { return chunks.size(); }
+
+    void hashTracks()
+    {
+        const auto& l = owner.layout;
+        trackHash.assign (l.tracks.size(), 0x51ED270B27A3C5D1ull);
+        const auto p = patternIndex();
+        const auto* notes = p >= 0 ? &song().patterns[(std::size_t) p].notes : nullptr;
+        for (const auto& pl : l.placed)
+        {
+            if (pl.track < 0 || pl.track >= (int) trackHash.size())
+                continue;
+            auto h = trackHash[(std::size_t) pl.track];
+            for (const std::uint64_t v : { (std::uint64_t) pl.column, (std::uint64_t) pl.startRow, (std::uint64_t) pl.offRow, (std::uint64_t) pl.startDelay,
+                                           (std::uint64_t) pl.offDelay, (std::uint64_t) pl.shortNote, (std::uint64_t) pl.offShown, (std::uint64_t) pl.occupiedEnd })
+                h = mix (h, v);
+            if (notes != nullptr && pl.note >= 0 && pl.note < (int) notes->size())
+            {
+                const auto& n = (*notes)[(std::size_t) pl.note];
+                for (const std::uint64_t v : { (std::uint64_t) n.key, (std::uint64_t) n.channel, (std::uint64_t) n.muted, (std::uint64_t) n.slide, (std::uint64_t) n.porta,
+                                               bits (n.velocity), bits (n.pan), bits (n.chance), bits (n.release), bits (n.finePitch), (std::uint64_t) n.length })
+                    h = mix (h, v);
+            }
+            trackHash[(std::size_t) pl.track] = h;
+        }
+    }
+
+    // what every chunk shows the same way: the grid's settings, font, colours and note names
+    std::uint64_t gridHash (float scale)
+    {
+        using namespace theme;
+        const auto& l = owner.layout;
+        std::uint64_t h = 0x2545F4914F6CDD1Dull;
+        for (const std::uint64_t v : { (std::uint64_t) hex, bits (cw), (std::uint64_t) rowHeight, bits (scale), (std::uint64_t) l.rows, (std::uint64_t) l.rowsPerBeat,
+                                       (std::uint64_t) l.rowsPerBar, (std::uint64_t) l.rowTicks, (std::uint64_t) l.delayDigits, (std::uint64_t) numberWidth,
+                                       (std::uint64_t) monoNow.toString().hash() })
+            h = mix (h, v);
+        for (auto c : { colour::bg0, colour::bg2, colour::bg3, colour::textPrimary, colour::textSecondary, colour::textDisabled, colour::info, colour::warning,
+                        colour::accent, colour::border })
+            h = mix (h, c.getARGB());
+        return mix (h, keyTextsHash);
+    }
+
+    // the note names (the app's: English, solfege...): the key texts made once follow them (every paint, cached or not)
+    void followNoteNames()
+    {
+        std::uint64_t names = 0;
+        for (int k = 0; k < 12; ++k)
+            for (auto ch : notenames::pitchName (k))
+                names = mix (names, (unsigned char) ch);
+        if (names != keyTextsHash)
+        {
+            keyTextsHash = names;
+            for (auto& t : keyTexts)
+                t.clear();
+        }
     }
 
     Impl (TrackerComponent& o, AudioEngine& e)
@@ -223,6 +393,7 @@ struct TrackerComponent::Impl
         shown.fx = s.tracker.showFx;
         owner.layout = p >= 0 ? build (s, p, buildOptions()) : Layout {};
         owner.cursor = clampCursor (owner.layout, shown, owner.cursor);
+        hashTracks();
         computeGeometry();
         updateScrollBars();
         updateToolbar();
@@ -231,6 +402,7 @@ struct TrackerComponent::Impl
 
     void computeGeometry()
     {
+        dimRuns.clear(); // (keyed by the columns' places)
         const auto font = theme::monoFont (theme::type::small + 1.0f);
         cw = std::max (5.0f, juce::GlyphArrangement::getStringWidth (font, "0000000000") / 10.0f);
         rowHeight = (int) std::ceil (font.getHeight() + 4.0f);
@@ -268,6 +440,7 @@ struct TrackerComponent::Impl
                     fg.offset = offset;
                     fg.width = (int) std::ceil (cw * (float) fg.chars);
                     const auto dots = juce::String::repeatedString (f.field == Field::note ? "-" : ".", fg.chars);
+                    cg.placeholders.push_back (dots);
                     cg.emptyText << dots;
                     cg.sustainText << (f.field == Field::note ? juce::String::repeatedString (" ", fg.chars) : dots);
                     // the fx letter sits right against its value; other fields have a space between them
@@ -289,6 +462,23 @@ struct TrackerComponent::Impl
             geom.push_back (std::move (tg));
         }
         gridWidth = x;
+        // (round 190ob) what the chunks of each track depend on in the geometry, relative to the track's left
+        geomHash.assign (geom.size(), 0);
+        for (std::size_t t = 0; t < geom.size(); ++t)
+        {
+            const auto& tg = geom[t];
+            auto h = mix (0x7F4A7C159E3779B9ull, (std::uint64_t) tg.width);
+            for (const auto& cg : tg.columns)
+            {
+                h = mix (mix (mix (h, (std::uint64_t) (cg.x - tg.x)), (std::uint64_t) cg.width), cg.emptyText.hash());
+                h = mix (h, cg.sustainText.hash());
+                for (const auto& f : cg.fields)
+                    for (const std::uint64_t v : { (std::uint64_t) f.field, (std::uint64_t) f.fxSlot, (std::uint64_t) (f.x - tg.x), (std::uint64_t) f.width,
+                                                   (std::uint64_t) f.chars, (std::uint64_t) f.offset })
+                        h = mix (h, v);
+            }
+            geomHash[t] = h;
+        }
     }
 
     // ---------------------------------------------------------------------------------------- areas
@@ -669,6 +859,493 @@ struct TrackerComponent::Impl
         return true;
     }
 
+    // ---------------------------------------------------------------------------------------- painting the rows
+    // (round 190ob: the cells and row backgrounds as functions, so a chunk of the cache and a straight paint draw the
+    // very same things; `plain` = without the cursor, the playhead and the block — a cached chunk)
+    juce::Colour rowColour (std::int64_t r, bool plain) const
+    {
+        using namespace theme;
+        const auto& l = owner.layout;
+        if (! plain && r == owner.playRow)
+            return colour::accentMuted;
+        return r % std::max (1, l.rowsPerBar) == 0 ? colour::bg3 : r % std::max (1, l.rowsPerBeat) == 0 ? colour::bg2 : colour::bg0;
+    }
+
+    // the row's background over `rr` (the playhead's colour, the cursor row's tint) and its number at x `numberX`
+    void paintRowBackground (juce::Graphics& g, std::int64_t r, juce::Rectangle<int> rr, int numberX, bool plain)
+    {
+        using namespace theme;
+        const auto& l = owner.layout;
+        g.setColour (rowColour (r, plain));
+        g.fillRect (rr);
+        const auto playing = ! plain && r == owner.playRow;
+        if (! plain && r == owner.cursor.row && ! playing)
+        {
+            g.setColour (colour::textPrimary.withAlpha (0.05f));
+            g.fillRect (rr);
+        }
+        drawGridText (g, number ((int) r, std::max (2, hex ? 2 : decimalDigits (std::max<std::int64_t> (1, l.rows - 1))), hex),
+                      playing ? colour::textPrimary : r % std::max (1, l.rowsPerBeat) == 0 ? colour::textSecondary : colour::textDisabled, numberX, rr.getY(),
+                      rr.getHeight());
+    }
+
+    // the dim placeholder run of a column: its fields in `mask` (bit = field index) as one text, each at its place
+    std::map<std::pair<const ColumnGeom*, std::uint32_t>, juce::String> dimRuns;
+    const juce::String& dimRun (const ColumnGeom& cg, std::uint32_t mask)
+    {
+        auto& text = dimRuns[{ &cg, mask }];
+        if (text.isEmpty())
+            for (std::size_t f = 0; f < cg.fields.size(); ++f)
+                if ((mask >> f) & 1u)
+                {
+                    while (text.length() < cg.fields[f].offset)
+                        text << " ";
+                    text << cg.placeholders[f];
+                }
+        return text;
+    }
+
+    // one cell (track t, note column c, row r) with the row's top at y; ox: where the grid's x 0 is
+    void paintCell (juce::Graphics& g, int t, int c, std::int64_t r, int ox, int y, juce::Colour trackColour, const std::vector<Note>* notes, bool plain,
+                    const Selection& sel, bool hasSel)
+    {
+        using namespace theme;
+        const auto& l = owner.layout;
+        const auto& cg = geom[(std::size_t) t].columns[(std::size_t) c];
+        const auto h = rowHeight;
+        if (! g.clipRegionIntersects ({ ox + cg.x - 2, y, cg.width + 10, h }))
+            return; // (a playhead step repaints two rows: the others are not even looked at)
+        const auto cell = cellAt (l, t, c, r);
+        if (! plain && hasSel && sel.contains (l, t, c, r))
+        {
+            g.setColour (colour::selectionFill);
+            g.fillRect (juce::Rectangle<int> (ox + cg.x - 2, y, cg.width + 2, h));
+        }
+        const Note* n = cell.kind == Cell::Kind::start && notes != nullptr ? &(*notes)[(std::size_t) cell.placed->note] : nullptr;
+        // the note's fx in their slot order (tracker::shownFx, without a list made per cell)
+        std::array<Fx, fxKinds> fxList {};
+        int fxCount = 0;
+        if (n != nullptr)
+        {
+            for (int k = 0; k < fxKinds; ++k)
+                if ((Fx) k != Fx::cut && fxActive (*n, (Fx) k))
+                    fxList[(std::size_t) fxCount++] = (Fx) k;
+            if (cell.placed->shortNote)
+                fxList[(std::size_t) fxCount++] = Fx::cut;
+        }
+        if (cell.kind == Cell::Kind::sustain)
+        {
+            // the sustain line, in the track's colour
+            g.setColour (trackColour.withAlpha (0.7f));
+            g.fillRect (ox + cg.x + 2, y, 2, h);
+        }
+        const auto cursorHere = ! plain && r == owner.cursor.row && t == owner.cursor.track && c == owner.cursor.column;
+        const auto dim = colour::textDisabled.withAlpha (0.55f);
+        if ((cell.kind == Cell::Kind::empty || cell.kind == Cell::Kind::sustain) && ! cursorHere)
+        {
+            // one text for the whole cell (most cells): the dim placeholders
+            drawGridText (g, cell.kind == Cell::Kind::empty ? cg.emptyText : cg.sustainText, dim, ox + cg.x, y, h);
+            return;
+        }
+        static const juce::String offText ("OFF"), noText;
+        static const std::array<juce::String, fxKinds> letters = [] {
+            std::array<juce::String, fxKinds> out;
+            for (int k = 0; k < fxKinds; ++k)
+                out[(std::size_t) k] = juce::String::charToString ((juce::juce_wchar) fxLetter ((Fx) k));
+            return out;
+        }();
+        std::uint32_t dimMask = 0;
+        for (std::size_t fi = 0; fi < cg.fields.size(); ++fi)
+        {
+            const auto& f = cg.fields[fi];
+            const juce::Rectangle<int> box (ox + f.x, y, f.width + 2, h);
+            const juce::String* text = &cg.placeholders[fi];
+            auto col = dim;
+            switch (f.field)
+            {
+                case Field::note:
+                    if (n != nullptr)
+                    {
+                        text = &keyName (n->key);
+                        col = n->muted ? colour::textDisabled : colour::textPrimary;
+                    }
+                    else if (cell.kind == Cell::Kind::off)
+                    {
+                        text = &offText;
+                        col = colour::accent;
+                    }
+                    else if (cell.kind == Cell::Kind::sustain)
+                        text = &noText;
+                    break;
+                case Field::ins:
+                    if (n != nullptr)
+                    {
+                        text = &number (n->channel + 1, f.chars, hex);
+                        col = colour::info;
+                    }
+                    break;
+                case Field::vol:
+                    if (n != nullptr)
+                    {
+                        text = &number ((int) std::lround (n->velocity * 127.0f), f.chars, hex);
+                        col = colour::textSecondary;
+                    }
+                    break;
+                case Field::pan:
+                    if (n != nullptr)
+                    {
+                        text = &number ((int) std::lround ((n->pan + 1.0f) * 64.0f), f.chars, hex);
+                        col = colour::textSecondary;
+                    }
+                    break;
+                case Field::dly:
+                {
+                    const auto d = n != nullptr ? cell.placed->startDelay : cell.kind == Cell::Kind::off ? cell.placed->offDelay : 0;
+                    if (d > 0)
+                    {
+                        text = &number (d, f.chars, hex);
+                        col = colour::info;
+                    }
+                    break;
+                }
+                case Field::fxLetter:
+                    if (f.fxSlot < fxCount)
+                    {
+                        text = &letters[(std::size_t) fxList[(std::size_t) f.fxSlot]];
+                        col = colour::warning;
+                    }
+                    break;
+                case Field::fxValue:
+                    if (f.fxSlot < fxCount)
+                    {
+                        text = &number (fxValueOf (*n, fxList[(std::size_t) f.fxSlot], n->length), f.chars, hex);
+                        col = colour::warning;
+                    }
+                    break;
+            }
+            const auto placeholder = text->isNotEmpty() && (text == &cg.placeholders[fi] || text->containsOnly (".") || text->containsOnly ("-"));
+            if (placeholder) // (the dim placeholders of the cell go out as one text, below)
+            {
+                if (text == &cg.placeholders[fi])
+                    dimMask |= 1u << fi;
+                else
+                    dimMask |= 1u << 31; // (a value written as dots: the slow way below)
+            }
+            else if (text->isNotEmpty())
+                drawGridText (g, *text, col, box.getX(), box.getY(), box.getHeight());
+            // the cursor
+            if (cursorHere && f.field == owner.cursor.field && (f.field != Field::fxLetter && f.field != Field::fxValue ? true : f.fxSlot == owner.cursor.fxSlot))
+            {
+                g.setColour (editOn ? colour::accent : colour::textPrimary.withAlpha (0.8f));
+                g.drawRect (box.expanded (1, 0), 1);
+            }
+        }
+        if (dimMask == 0)
+            return;
+        if ((dimMask >> 31) == 0)
+        {
+            drawGridText (g, dimRun (cg, dimMask), dim, ox + cg.x, y, h);
+            return;
+        }
+        // (never in practice: a number shown as dots) the run as the cell's texts say
+        juce::String run;
+        for (std::size_t fi = 0; fi < cg.fields.size(); ++fi)
+        {
+            const auto& f = cg.fields[fi];
+            juce::String text;
+            switch (f.field)
+            {
+                case Field::ins: text = n != nullptr ? number (n->channel + 1, f.chars, hex) : cg.placeholders[fi]; break;
+                case Field::vol: text = n != nullptr ? number ((int) std::lround (n->velocity * 127.0f), f.chars, hex) : cg.placeholders[fi]; break;
+                case Field::pan: text = n != nullptr ? number ((int) std::lround ((n->pan + 1.0f) * 64.0f), f.chars, hex) : cg.placeholders[fi]; break;
+                case Field::fxValue: text = f.fxSlot < fxCount ? number (fxValueOf (*n, fxList[(std::size_t) f.fxSlot], n->length), f.chars, hex) : cg.placeholders[fi]; break;
+                default: text = ((dimMask >> fi) & 1u) != 0 ? cg.placeholders[fi] : juce::String(); break;
+            }
+            if (text.isNotEmpty() && (text.containsOnly (".") || text.containsOnly ("-")))
+            {
+                while (run.length() < f.offset)
+                    run << " ";
+                run << text;
+            }
+        }
+        drawGridText (g, run, dim, ox + cg.x, y, h);
+    }
+
+    // a track's rows [r0, r1) with the first one's top at y0: its border line from lineTop to lineBottom, then its cells
+    void paintTrackRows (juce::Graphics& g, int t, std::int64_t r0, std::int64_t r1, int ox, int y0, float lineTop, float lineBottom,
+                         const std::vector<Note>* notes, bool plain, const Selection& sel, bool hasSel)
+    {
+        const auto& tg = geom[(std::size_t) t];
+        const auto& track = owner.layout.tracks[(std::size_t) t];
+        const auto trackColour = channelColour (song(), track.channels.empty() ? 0 : track.channels.front());
+        g.setColour (theme::colour::border);
+        g.drawVerticalLine (ox + tg.x + tg.width - 1, lineTop, lineBottom);
+        for (int c = 0; c < (int) tg.columns.size(); ++c)
+            for (auto r = r0; r < r1; ++r)
+                paintCell (g, t, c, r, ox, y0 + (int) (r - r0) * rowHeight, trackColour, notes, plain, sel, hasSel);
+    }
+
+    // a chunk of the cache drawn at (x, y): track t's (−1: the row numbers) rows k · chunkRows on; painted first when
+    // missing or out of date
+    void drawChunk (juce::Graphics& g, int t, std::int64_t k, int x, int y, std::uint64_t gridSignature, float scale, const std::vector<Note>* notes)
+    {
+        const auto& l = owner.layout;
+        const auto r0 = k * chunkRows, r1 = std::min<std::int64_t> (r0 + chunkRows, l.rows);
+        const auto w = t < 0 ? numberWidth - 1 : geom[(std::size_t) t].width;
+        const auto h = (int) (r1 - r0) * rowHeight;
+        if (w <= 0 || h <= 0)
+            return;
+        const auto key = ((std::uint64_t) (t + 1) << 40) | (std::uint64_t) k;
+        if (! g.clipRegionIntersects ({ x, y, w, h }))
+        {
+            // in view but outside this paint's clip (a playhead step): kept fresh for the cache, not painted
+            if (const auto it = chunks.find (key); it != chunks.end())
+                it->second.used = paints;
+            return;
+        }
+        const auto colourOf = [&] { const auto& ch = l.tracks[(std::size_t) t].channels; return channelColour (song(), ch.empty() ? 0 : ch.front()).getARGB(); };
+        const auto signature = t < 0 ? mix (gridSignature, (std::uint64_t) k)
+                                     : mix (mix (mix (mix (gridSignature, (std::uint64_t) k), trackHash[(std::size_t) t]), geomHash[(std::size_t) t]), colourOf());
+        const auto pw = (int) std::ceil ((float) w * scale), ph = (int) std::ceil ((float) h * scale);
+        const auto found = chunks.find (key);
+        const auto valid = found != chunks.end() && ! found->second.image.isNull() && found->second.signature == signature
+                           && found->second.image.getWidth() == pw && found->second.image.getHeight() == ph;
+        if (! valid && chunkRendersLeft <= 0)
+        {
+            // over this paint's budget of new chunks (a view's first frame, a scroll to far away): this one is painted
+            // straight, in view only, and made on a later frame (no timer: the next paint that shows it)
+            juce::Graphics::ScopedSaveState state (g);
+            g.reduceClipRegion ({ x, y, w, h });
+            const auto from = std::max (r0, owner.firstRow), to = std::min (r1, owner.firstRow + visibleRows() + 1);
+            const auto rowY = [&] (std::int64_t r) { return y + (int) (r - r0) * rowHeight; };
+            if (t < 0)
+            {
+                for (auto r = from; r < to; ++r)
+                    paintRowBackground (g, r, { x, rowY (r), w, rowHeight }, x + 6, true);
+                g.setColour (theme::colour::border);
+                g.drawVerticalLine (x + numberWidth - 2, (float) y, (float) (y + h));
+            }
+            else if (from < to)
+            {
+                for (auto r = from; r < to; ++r)
+                {
+                    g.setColour (rowColour (r, true));
+                    g.fillRect (x, rowY (r), w, rowHeight);
+                }
+                paintTrackRows (g, t, from, to, x - geom[(std::size_t) t].x, rowY (from), (float) y, (float) (y + h), notes, true, {}, false);
+            }
+            return;
+        }
+        if (! valid)
+            --chunkRendersLeft;
+        auto& chunk = chunks[key];
+        if (! valid)
+        {
+            if (chunk.image.isNull() || chunk.image.getWidth() != pw || chunk.image.getHeight() != ph)
+            {
+                chunkBytes -= chunk.bytes;
+                chunk.image = juce::Image (juce::Image::RGB, pw, ph, false);
+                chunk.bytes = (std::size_t) pw * (std::size_t) ph * 4;
+                chunkBytes += chunk.bytes;
+            }
+            chunk.signature = signature;
+            juce::Graphics cg (chunk.image);
+            if (scale != 1.0f)
+                cg.addTransform (juce::AffineTransform::scale (scale));
+            if (t < 0)
+            {
+                for (auto r = r0; r < r1; ++r)
+                    paintRowBackground (cg, r, { 0, (int) (r - r0) * rowHeight, w, rowHeight }, 6, true);
+                cg.setColour (theme::colour::border);
+                cg.drawVerticalLine (numberWidth - 2, 0.0f, (float) h);
+            }
+            else
+            {
+                for (auto r = r0; r < r1; ++r)
+                {
+                    cg.setColour (rowColour (r, true));
+                    cg.fillRect (0, (int) (r - r0) * rowHeight, w, rowHeight);
+                }
+                paintTrackRows (cg, t, r0, r1, -geom[(std::size_t) t].x, 0, 0.0f, (float) h, notes, true, {}, false);
+            }
+        }
+        chunk.used = paints;
+        if (scale == 1.0f)
+            g.drawImageAt (chunk.image, x, y);
+        else
+            g.drawImage (chunk.image, juce::Rectangle<float> ((float) x, (float) y, (float) w, (float) h));
+    }
+
+    // over the budget: the chunks shown longest ago go (down to three quarters of it; never the ones in view)
+    void trimChunks()
+    {
+        if (chunkBytes <= chunkBudget)
+            return;
+        std::vector<std::pair<std::uint64_t, std::uint64_t>> byAge; // (last shown, key)
+        byAge.reserve (chunks.size());
+        for (const auto& [key, chunk] : chunks)
+            if (chunk.used != paints)
+                byAge.emplace_back (chunk.used, key);
+        std::sort (byAge.begin(), byAge.end());
+        for (const auto& [used, key] : byAge)
+        {
+            if (chunkBytes <= chunkBudget / 4 * 3)
+                break;
+            const auto it = chunks.find (key);
+            chunkBytes -= it->second.bytes;
+            chunks.erase (it);
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------- the track headers
+    // track t's header with the grid's x 0 at ox and its top at y: a colour bar, the name, M S, the field captions
+    void paintTrackHeader (juce::Graphics& g, int t, int ox, int y)
+    {
+        using namespace theme;
+        const auto& s = song();
+        const auto& tg = geom[(std::size_t) t];
+        const auto& track = owner.layout.tracks[(std::size_t) t];
+        const juce::Rectangle<int> box (ox + tg.x, y, tg.width - 1, headerHeight);
+        if (! g.clipRegionIntersects (box))
+            return;
+        const auto first = track.channels.empty() ? 0 : track.channels.front();
+        g.setColour (channelColour (s, first));
+        g.fillRect (box.withHeight (3));
+        g.setColour (colour::textPrimary);
+        g.setFont (font (type::small, true));
+        textcache::drawText (g, headerName (t), juce::Rectangle<int> (box.getX() + 6, box.getY() + 4, box.getWidth() - 50, 18), juce::Justification::centredLeft, true);
+        // M S
+        const auto [muted, solo] = muteSolo (t);
+        g.setFont (font (type::caption, true));
+        g.setColour (muted ? colour::warning : colour::textDisabled);
+        textcache::drawText (g, "M", juce::Rectangle<int> (box.getRight() - 40, box.getY() + 4, 18, 18), juce::Justification::centred, false);
+        g.setColour (solo ? colour::ledOn : colour::textDisabled);
+        textcache::drawText (g, "S", juce::Rectangle<int> (box.getRight() - 20, box.getY() + 4, 18, 18), juce::Justification::centred, false);
+        // the field captions of each note column
+        g.setFont (font (type::caption));
+        g.setColour (colour::textSecondary);
+        for (const auto& cg : tg.columns)
+            for (const auto& f : cg.fields)
+            {
+                if (f.field == Field::fxValue)
+                    continue;
+                const auto caption = f.field == Field::fxLetter ? juce::String ("Fx") : fieldName (f.field);
+                textcache::drawText (g, caption, juce::Rectangle<int> (ox + f.x, y + headerHeight - 18, f.width + (f.field == Field::fxLetter ? 20 : 4), 16),
+                                     juce::Justification::centredLeft, false);
+            }
+        g.setColour (colour::border);
+        g.drawVerticalLine (box.getRight(), (float) y, (float) (y + headerHeight));
+    }
+
+    juce::String headerName (int t) const
+    {
+        const auto& track = owner.layout.tracks[(std::size_t) t];
+        auto name = juce::String::fromUTF8 (track.name.c_str());
+        if (track.group)
+            name << " · " << tr ("group of {0}", { juce::String ((int) track.channels.size()) });
+        return name;
+    }
+
+    std::pair<bool, bool> muteSolo (int t) const
+    {
+        const auto& s = song();
+        const auto& track = owner.layout.tracks[(std::size_t) t];
+        bool muted = true, solo = true;
+        for (auto ch : track.channels)
+            muted = muted && ch < (int) s.channels.size() && s.channels[(std::size_t) ch].muted;
+        for (int ch = 0; ch < (int) s.channels.size(); ++ch)
+        {
+            const auto inTrack = std::find (track.channels.begin(), track.channels.end(), ch) != track.channels.end();
+            solo = solo && (inTrack ? ! s.channels[(std::size_t) ch].muted : s.channels[(std::size_t) ch].muted);
+        }
+        solo = solo && s.channels.size() > track.channels.size();
+        return { muted, solo };
+    }
+
+    // every track's header as one picture (x 0 = the first track's left); false when it cannot be (too wide)
+    juce::Image headerImage;
+    std::uint64_t headerSignature = 0;
+    bool headerPicture (float scale)
+    {
+        using namespace theme;
+        const auto& l = owner.layout;
+        const auto w = gridWidth - numberWidth;
+        if (l.tracks.empty() || w <= 0 || (float) w * scale > 16384.0f || geom.size() < l.tracks.size())
+            return false;
+        // what the picture shows
+        std::uint64_t h = mix (mix (mix (0x6A09E667F3BCC908ull, (std::uint64_t) w), bits (scale)), (std::uint64_t) numberWidth);
+        for (const auto& f : { font (type::small, true), font (type::caption, true), font (type::caption) })
+            h = mix (h, f.toString().hash());
+        for (auto c : { colour::bg2, colour::textPrimary, colour::warning, colour::textDisabled, colour::ledOn, colour::textSecondary, colour::border })
+            h = mix (h, c.getARGB());
+        for (int f = 0; f <= (int) Field::dly; ++f)
+            h = mix (h, fieldName ((Field) f).hash());
+        for (int t = 0; t < (int) l.tracks.size(); ++t)
+        {
+            const auto& track = l.tracks[(std::size_t) t];
+            const auto [muted, solo] = muteSolo (t);
+            h = mix (mix (mix (mix (h, headerName (t).hash()), (std::uint64_t) muted * 2 + (std::uint64_t) solo), geomHash[(std::size_t) t]),
+                     (std::uint64_t) geom[(std::size_t) t].x);
+            h = mix (h, channelColour (song(), track.channels.empty() ? 0 : track.channels.front()).getARGB());
+        }
+        if (! headerImage.isNull() && h == headerSignature)
+            return true;
+        const auto pw = (int) std::ceil ((float) w * scale), ph = (int) std::ceil ((float) headerHeight * scale);
+        if (headerImage.isNull() || headerImage.getWidth() != pw || headerImage.getHeight() != ph)
+            headerImage = juce::Image (juce::Image::RGB, pw, ph, false);
+        headerSignature = h;
+        juce::Graphics hg (headerImage);
+        if (scale != 1.0f)
+            hg.addTransform (juce::AffineTransform::scale (scale));
+        hg.setColour (colour::bg2);
+        hg.fillRect (0, 0, w, headerHeight);
+        for (int t = 0; t < (int) l.tracks.size(); ++t)
+            paintTrackHeader (hg, t, -numberWidth, 0);
+        return true;
+    }
+
+    // ---- a part of the window as a picture (round 190ob: the side panel, the hint bar). `signature` 0 = paint it
+    // straight; else the picture is drawn, made again (over `background`) when the signature changes. The part draws in
+    // the component's coordinates; the picture starts on whole pixels, so its pixels are the straight paint's. `margin`:
+    // the picture reaches that far around the part (over the background), so a shape's anti-aliased edge on the part's
+    // border is rasterised inside the picture as it is on the screen.
+    struct PartPicture
+    {
+        juce::Image image;
+        std::uint64_t signature = 0;
+    };
+    PartPicture sidePicture, hintPicture;
+    template <typename Draw>
+    void drawPart (juce::Graphics& g, PartPicture& p, juce::Rectangle<int> part, float scale, std::uint64_t signature, juce::Colour background, int margin, Draw&& draw)
+    {
+        if (part.isEmpty() || ! g.clipRegionIntersects (part))
+            return;
+        if (signature == 0)
+        {
+            draw (g);
+            return;
+        }
+        const auto area = part.expanded (margin);
+        const auto pw = (int) std::ceil ((float) area.getWidth() * scale), ph = (int) std::ceil ((float) area.getHeight() * scale);
+        if (p.image.isNull() || p.image.getWidth() != pw || p.image.getHeight() != ph || p.signature != signature)
+        {
+            if (p.image.isNull() || p.image.getWidth() != pw || p.image.getHeight() != ph)
+                p.image = juce::Image (juce::Image::RGB, pw, ph, false);
+            p.signature = signature;
+            juce::Graphics pg (p.image);
+            if (scale != 1.0f)
+                pg.addTransform (juce::AffineTransform::scale (scale));
+            pg.setOrigin (-area.getX(), -area.getY());
+            pg.setColour (background);
+            pg.fillRect (area);
+            draw (pg);
+        }
+        if (scale == 1.0f)
+            g.drawImageAt (p.image, area.getX(), area.getY());
+        else
+            g.drawImage (p.image, area.toFloat());
+    }
+
     juce::String hintText() const
     {
         const auto& l = owner.layout;
@@ -829,6 +1506,22 @@ void TrackerComponent::showPattern (int pattern)
 
 int TrackerComponent::shownPattern() const noexcept { return impl->patternIndex(); }
 
+void TrackerComponent::showChannel (int channel)
+{
+    impl->refresh(); // (the channel was just selected: its track is there now)
+    const auto t = layout.trackOfChannel (channel);
+    if (t < 0)
+        return;
+    impl->endValueEntry();
+    cursor.track = t;
+    cursor.column = 0;
+    cursor.field = tracker::Field::note;
+    cursor = tracker::clampCursor (layout, impl->shown, cursor);
+    hasSelection = false;
+    impl->ensureVisible();
+    repaint();
+}
+
 void TrackerComponent::setOnlyChannels (std::optional<std::vector<int>> channels)
 {
     impl->onlyChannels = std::move (channels);
@@ -892,189 +1585,153 @@ void TrackerComponent::paint (juce::Graphics& g)
     auto& i = *impl;
     const auto& s = engine.getSong();
     const auto& l = layout;
-    g.fillAll (colour::bg1);
-    g.setColour (colour::bg3);
-    g.fillRect (i.toolbarArea());
-
     const auto grid = i.gridArea();
     const auto rows = i.rowsArea();
-    g.setColour (colour::bg0);
-    g.fillRect (grid);
+    // (round 190ob) on whole pixels (a scale of 1, 2...) each pixel is filled once where it can be: the toolbar, the grid
+    // and the hint bar by their own parts, the window's background only around them. At a fractional scale the edges
+    // are blended, so the backgrounds go down in their old order.
+    const auto scale = g.getInternalContext().getPhysicalPixelScaleFactor();
+    const auto wholePixels = scale >= 1.0f && scale <= 4.0f && scale == std::floor (scale);
+    if (wholePixels)
+    {
+        juce::RectangleList<int> around (getLocalBounds());
+        around.subtract (i.toolbarArea());
+        around.subtract (grid);
+        around.subtract (i.hintArea());
+        g.setColour (colour::bg1);
+        g.fillRectList (around);
+    }
+    else
+        g.fillAll (colour::bg1);
+    g.setColour (colour::bg3);
+    g.fillRect (i.toolbarArea());
+    if (! wholePixels)
+    {
+        g.setColour (colour::bg0);
+        g.fillRect (grid);
+    }
 
     const auto pattern = i.patternIndex();
     const auto* notes = pattern >= 0 ? &s.patterns[(std::size_t) pattern].notes : nullptr;
     const auto mono = monoFont (type::small + 1.0f);
+    i.monoNow = mono;
+    i.followNoteNames();
     const auto visible = i.visibleRows();
     const auto lastRow = std::min (l.rows, firstRow + visible + 1);
     const auto sel = i.selection();
     const auto hasSel = hasSelection;
 
-    // ---- rows: backgrounds (bars, beats), the playhead and the cursor rows
+    // ---- rows: backgrounds (bars, beats), the playhead and the cursor rows, the row numbers, the cells
     {
         juce::Graphics::ScopedSaveState state (g);
         g.reduceClipRegion (rows);
-        for (auto r = firstRow; r < lastRow; ++r)
+        // below the last row: the grid's own background
+        const auto rowsBottom = rows.getY() + (int) std::max<std::int64_t> (0, lastRow - firstRow) * i.rowHeight;
+        if (wholePixels && rowsBottom < rows.getBottom())
         {
-            const auto rr = i.rowRect (r);
-            if (! g.clipRegionIntersects (rr))
-                continue;
-            auto bg = r % std::max (1, l.rowsPerBar) == 0 ? colour::bg3 : r % std::max (1, l.rowsPerBeat) == 0 ? colour::bg2 : colour::bg0;
-            if (r == playRow)
-                bg = colour::accentMuted;
-            g.setColour (bg);
-            g.fillRect (rr);
-            if (r == cursor.row && r != playRow)
-            {
-                g.setColour (colour::textPrimary.withAlpha (0.05f));
-                g.fillRect (rr);
-            }
-            // the row number
-            i.drawGridText (g, numberText ((int) r, std::max (2, hex ? 2 : decimalDigits (std::max<std::int64_t> (1, l.rows - 1))), hex),
-                            r == playRow ? colour::textPrimary : r % std::max (1, l.rowsPerBeat) == 0 ? colour::textSecondary : colour::textDisabled,
-                            rr.getX() + 6, rr.getY(), rr.getHeight());
+            g.setColour (colour::bg0);
+            g.fillRect (rows.withTop (rowsBottom));
         }
-        g.setColour (colour::border);
-        g.drawVerticalLine (rows.getX() + i.numberWidth - 2, (float) rows.getY(), (float) rows.getBottom());
-
-        // ---- the cells
-        g.reduceClipRegion (rows.withTrimmedLeft (i.numberWidth - 1));
+        const auto remainderLines = [&] { // (below the last row the straight paint's full-height lines show: the cached one draws them there)
+            if (rowsBottom >= rows.getBottom())
+                return;
+            juce::Graphics::ScopedSaveState below (g);
+            g.reduceClipRegion (rows.withTop (rowsBottom));
+            g.setColour (colour::border);
+            g.drawVerticalLine (rows.getX() + i.numberWidth - 2, (float) rows.getY(), (float) rows.getBottom());
+            g.reduceClipRegion (rows.withTrimmedLeft (i.numberWidth - 1));
+            for (int t = 0; t < (int) l.tracks.size() && t < (int) i.geom.size(); ++t)
+            {
+                const auto& tg = i.geom[(std::size_t) t];
+                g.drawVerticalLine (grid.getX() - scrollX + tg.x + tg.width - 1, (float) rows.getY(), (float) rows.getBottom());
+            }
+        };
         const auto ox = grid.getX() - scrollX;
+        const auto cellsClip = rows.withTrimmedLeft (i.numberWidth - 1);
+        int t0 = -1, t1 = -2; // the tracks in view
         for (int t = 0; t < (int) l.tracks.size() && t < (int) i.geom.size(); ++t)
         {
             const auto& tg = i.geom[(std::size_t) t];
             if (ox + tg.x > rows.getRight() || ox + tg.x + tg.width < rows.getX() + i.numberWidth)
                 continue;
-            const auto& track = l.tracks[(std::size_t) t];
-            const auto trackColour = channelColour (s, track.channels.empty() ? 0 : track.channels.front());
-            g.setColour (colour::border);
-            g.drawVerticalLine (ox + tg.x + tg.width - 1, (float) rows.getY(), (float) rows.getBottom());
-            for (int c = 0; c < (int) tg.columns.size(); ++c)
-            {
-                const auto& cg = tg.columns[(std::size_t) c];
-                for (auto r = firstRow; r < lastRow; ++r)
-                {
-                    const auto rr = i.rowRect (r);
-                    if (! g.clipRegionIntersects (rr.withX (ox + cg.x - 2).withWidth (cg.width + 10)))
-                        continue; // (a playhead step repaints two rows: the others are not even looked at)
-                    const auto cell = cellAt (l, t, c, r);
-                    const auto selected = hasSel && sel.contains (l, t, c, r);
-                    if (selected)
-                    {
-                        g.setColour (colour::selectionFill);
-                        g.fillRect (juce::Rectangle<int> (ox + cg.x - 2, rr.getY(), cg.width + 2, rr.getHeight()));
-                    }
-                    const Note* n = cell.kind == Cell::Kind::start && notes != nullptr ? &(*notes)[(std::size_t) cell.placed->note] : nullptr;
-                    std::vector<Fx> fxList;
-                    if (n != nullptr)
-                        fxList = shownFx (l, *cell.placed, *n);
-                    if (cell.kind == Cell::Kind::sustain)
-                    {
-                        // the sustain line, in the track's colour
-                        g.setColour (trackColour.withAlpha (0.7f));
-                        g.fillRect (ox + cg.x + 2, rr.getY(), 2, rr.getHeight());
-                    }
-                    const auto cursorHere = r == cursor.row && t == cursor.track && c == cursor.column;
-                    if ((cell.kind == Cell::Kind::empty || cell.kind == Cell::Kind::sustain) && ! cursorHere)
-                    {
-                        // one text for the whole cell (most cells): the dim placeholders
-                        g.setColour (colour::textDisabled.withAlpha (0.55f));
-                        i.drawGridText (g, cell.kind == Cell::Kind::empty ? cg.emptyText : cg.sustainText, colour::textDisabled.withAlpha (0.55f), ox + cg.x,
-                                        rr.getY(), rr.getHeight());
-                        continue;
-                    }
-                    juce::String dimRun;
-                    for (const auto& f : cg.fields)
-                    {
-                        const juce::Rectangle<int> box (ox + f.x, rr.getY(), f.width + 2, rr.getHeight());
-                        juce::String text;
-                        auto col = colour::textDisabled.withAlpha (0.55f);
-                        switch (f.field)
-                        {
-                            case Field::note:
-                                if (n != nullptr)
-                                {
-                                    text = juce::String::fromUTF8 (keyText (n->key).c_str());
-                                    col = n->muted ? colour::textDisabled : colour::textPrimary;
-                                }
-                                else if (cell.kind == Cell::Kind::off)
-                                {
-                                    text = "OFF";
-                                    col = colour::accent;
-                                }
-                                else if (cell.kind == Cell::Kind::sustain)
-                                    text.clear();
-                                else
-                                    text = juce::String::repeatedString ("-", f.chars);
-                                break;
-                            case Field::ins:
-                                text = n != nullptr ? juce::String (numberText (n->channel + 1, f.chars, hex)) : juce::String::repeatedString (".", f.chars);
-                                if (n != nullptr)
-                                    col = colour::info;
-                                break;
-                            case Field::vol:
-                                text = n != nullptr ? juce::String (numberText ((int) std::lround (n->velocity * 127.0f), f.chars, hex)) : juce::String::repeatedString (".", f.chars);
-                                if (n != nullptr)
-                                    col = colour::textSecondary;
-                                break;
-                            case Field::pan:
-                                text = n != nullptr ? juce::String (numberText ((int) std::lround ((n->pan + 1.0f) * 64.0f), f.chars, hex)) : juce::String::repeatedString (".", f.chars);
-                                if (n != nullptr)
-                                    col = colour::textSecondary;
-                                break;
-                            case Field::dly:
-                            {
-                                const auto d = n != nullptr ? cell.placed->startDelay : cell.kind == Cell::Kind::off ? cell.placed->offDelay : 0;
-                                text = d > 0 ? juce::String (numberText (d, f.chars, hex)) : juce::String::repeatedString (".", f.chars);
-                                if (d > 0)
-                                    col = colour::info;
-                                break;
-                            }
-                            case Field::fxLetter:
-                                if (f.fxSlot < (int) fxList.size())
-                                {
-                                    text = juce::String::charToString ((juce::juce_wchar) fxLetter (fxList[(std::size_t) f.fxSlot]));
-                                    col = colour::warning;
-                                }
-                                else
-                                    text = ".";
-                                break;
-                            case Field::fxValue:
-                                if (f.fxSlot < (int) fxList.size())
-                                {
-                                    text = numberText (fxValueOf (*n, fxList[(std::size_t) f.fxSlot], n->length), f.chars, hex);
-                                    col = colour::warning;
-                                }
-                                else
-                                    text = juce::String::repeatedString (".", f.chars);
-                                break;
-                        }
-                        const auto placeholder = text.isNotEmpty() && (text.containsOnly (".") || text.containsOnly ("-"));
-                        if (placeholder) // (the dim placeholders of the cell go out as one text, below)
-                        {
-                            while (dimRun.length() < f.offset)
-                                dimRun << " ";
-                            dimRun << text;
-                        }
-                        else if (text.isNotEmpty())
-                            i.drawGridText (g, text, col, box.getX(), box.getY(), box.getHeight());
-                        // the cursor
-                        if (r == cursor.row && t == cursor.track && c == cursor.column && f.field == cursor.field
-                            && (f.field != Field::fxLetter && f.field != Field::fxValue ? true : f.fxSlot == cursor.fxSlot))
-                        {
-                            g.setColour (i.editOn ? colour::accent : colour::textPrimary.withAlpha (0.8f));
-                            g.drawRect (box.expanded (1, 0), 1);
-                        }
-                    }
-                    if (dimRun.isNotEmpty())
-                    {
-                        i.drawGridText (g, dimRun, colour::textDisabled.withAlpha (0.55f), ox + cg.x, rr.getY(), rr.getHeight());
-                    }
-                }
-            }
+            if (t0 < 0)
+                t0 = t;
+            t1 = t;
         }
+        const auto cached = i.useChunks && ui::paintCache() && wholePixels && lastRow > firstRow;
+        // the rows painted straight over the chunks: the cursor's, the playhead's and the block's
+        const auto straight = [&] (std::int64_t r) { return r == playRow || r == cursor.row || (hasSel && r >= sel.row0 && r <= sel.row1); };
+        if (! cached)
+        {
+            // no cache: every row as before the cache (the backgrounds and numbers, the numbers' line, then the tracks)
+            for (auto r = firstRow; r < lastRow; ++r)
+            {
+                const auto rr = i.rowRect (r);
+                if (g.clipRegionIntersects (rr))
+                    i.paintRowBackground (g, r, rr, rr.getX() + 6, false);
+            }
+            g.setColour (colour::border);
+            g.drawVerticalLine (rows.getX() + i.numberWidth - 2, (float) rows.getY(), (float) rows.getBottom());
+            g.reduceClipRegion (cellsClip);
+            for (auto t = t0; t >= 0 && t <= t1; ++t)
+                i.paintTrackRows (g, t, firstRow, lastRow, ox, i.rowRect (firstRow).getY(), (float) rows.getY(), (float) rows.getBottom(), notes, false, sel, hasSel);
+        }
+        else
+        {
+            ++i.paints;
+            const auto gridSignature = i.gridHash (scale);
+            const auto k0 = firstRow / Impl::chunkRows, k1 = (lastRow - 1) / Impl::chunkRows;
+            // a quarter of the chunks in view may be made per paint (enough for a row of chunks scrolling in or an edit
+            // in a few tracks); a first frame paints the rest straight and the following paints make them
+            i.chunkRendersLeft = std::max (8, (int) ((k1 - k0 + 1) * (std::max (0, t1 - t0 + 1) + 1)) / 4);
+            const auto chunkY = [&] (std::int64_t k) { return rows.getY() + (int) (k * Impl::chunkRows - firstRow) * i.rowHeight; };
+            for (auto k = k0; k <= k1; ++k)
+                i.drawChunk (g, -1, k, rows.getX(), chunkY (k), gridSignature, scale, notes);
+            juce::Graphics::ScopedSaveState cells (g);
+            g.reduceClipRegion (cellsClip);
+            // between the row numbers and the first track, and right of the last one: the rows' backgrounds
+            const auto left = t0 >= 0 ? ox + i.geom[(std::size_t) t0].x : rows.getRight();
+            const auto right = t0 >= 0 ? ox + i.geom[(std::size_t) t1].x + i.geom[(std::size_t) t1].width : rows.getRight();
+            for (auto r = firstRow; r < lastRow; ++r)
+            {
+                if (straight (r))
+                    continue;
+                const auto rr = i.rowRect (r);
+                g.setColour (i.rowColour (r, true));
+                if (left > cellsClip.getX())
+                    g.fillRect (cellsClip.getX(), rr.getY(), left - cellsClip.getX(), rr.getHeight());
+                if (right < rows.getRight())
+                    g.fillRect (right, rr.getY(), rows.getRight() - right, rr.getHeight());
+            }
+            for (auto t = t0; t >= 0 && t <= t1; ++t)
+                for (auto k = k0; k <= k1; ++k)
+                    i.drawChunk (g, t, k, ox + i.geom[(std::size_t) t].x, chunkY (k), gridSignature, scale, notes);
+        }
+        if (cached)
+            remainderLines(); // (outside the cells' clip: the row numbers' line too)
+        // the cursor's, the playhead's and the block's rows over the chunks, each in its own clip
+        for (auto r = firstRow; cached && r < lastRow; ++r)
+        {
+            if (! straight (r))
+                continue;
+            const auto rr = i.rowRect (r);
+            if (! g.clipRegionIntersects (rr))
+                continue;
+            juce::Graphics::ScopedSaveState row (g);
+            g.reduceClipRegion (rr);
+            i.paintRowBackground (g, r, rr, rr.getX() + 6, false);
+            g.setColour (colour::border);
+            g.drawVerticalLine (rows.getX() + i.numberWidth - 2, (float) rows.getY(), (float) rows.getBottom());
+            g.reduceClipRegion (cellsClip);
+            for (auto t = t0; t >= 0 && t <= t1; ++t)
+                i.paintTrackRows (g, t, r, r + 1, ox, rr.getY(), (float) rows.getY(), (float) rows.getBottom(), notes, false, sel, hasSel);
+        }
+        if (cached)
+            i.trimChunks();
     }
 
-    // ---- the track headers: a colour bar, the name, M S, the field captions
+    // ---- the track headers: a colour bar, the name, M S, the field captions (round 190ob: on whole pixels as one
+    // picture of every track's header, painted again when a name, a colour, a mute / solo or the columns change)
     {
         juce::Graphics::ScopedSaveState state (g);
         const auto header = grid.withHeight (headerHeight);
@@ -1085,52 +1742,16 @@ void TrackerComponent::paint (juce::Graphics& g)
         textcache::drawText (g, tr ("Row"), juce::Rectangle<int> (header.getX() + 6, header.getBottom() - 18, i.numberWidth, 16), juce::Justification::centredLeft, false);
         g.reduceClipRegion (header.withTrimmedLeft (i.numberWidth - 1));
         const auto ox = grid.getX() - scrollX;
-        for (int t = 0; t < (int) l.tracks.size() && t < (int) i.geom.size(); ++t)
+        if (wholePixels && i.useChunks && ui::paintCache() && i.headerPicture (scale))
         {
-            const auto& tg = i.geom[(std::size_t) t];
-            const auto& track = l.tracks[(std::size_t) t];
-            const juce::Rectangle<int> box (ox + tg.x, header.getY(), tg.width - 1, headerHeight);
-            if (! g.clipRegionIntersects (box))
-                continue;
-            const auto first = track.channels.empty() ? 0 : track.channels.front();
-            g.setColour (channelColour (s, first));
-            g.fillRect (box.withHeight (3));
-            g.setColour (colour::textPrimary);
-            g.setFont (font (type::small, true));
-            auto name = juce::String::fromUTF8 (track.name.c_str());
-            if (track.group)
-                name << " · " << tr ("group of {0}", { juce::String ((int) track.channels.size()) });
-            textcache::drawText (g, name, juce::Rectangle<int> (box.getX() + 6, box.getY() + 4, box.getWidth() - 50, 18), juce::Justification::centredLeft, true);
-            // M S
-            bool muted = true, solo = true;
-            for (auto ch : track.channels)
-                muted = muted && ch < (int) s.channels.size() && s.channels[(std::size_t) ch].muted;
-            for (int ch = 0; ch < (int) s.channels.size(); ++ch)
-            {
-                const auto inTrack = std::find (track.channels.begin(), track.channels.end(), ch) != track.channels.end();
-                solo = solo && (inTrack ? ! s.channels[(std::size_t) ch].muted : s.channels[(std::size_t) ch].muted);
-            }
-            solo = solo && s.channels.size() > track.channels.size();
-            g.setFont (font (type::caption, true));
-            g.setColour (muted ? colour::warning : colour::textDisabled);
-            textcache::drawText (g, "M", juce::Rectangle<int> (box.getRight() - 40, box.getY() + 4, 18, 18), juce::Justification::centred, false);
-            g.setColour (solo ? colour::ledOn : colour::textDisabled);
-            textcache::drawText (g, "S", juce::Rectangle<int> (box.getRight() - 20, box.getY() + 4, 18, 18), juce::Justification::centred, false);
-            // the field captions of each note column
-            g.setFont (font (type::caption));
-            g.setColour (colour::textSecondary);
-            for (const auto& cg : tg.columns)
-                for (const auto& f : cg.fields)
-                {
-                    if (f.field == Field::fxValue)
-                        continue;
-                    const auto caption = f.field == Field::fxLetter ? juce::String ("Fx") : fieldName (f.field);
-                    textcache::drawText (g, caption, juce::Rectangle<int> (ox + f.x, header.getBottom() - 18, f.width + (f.field == Field::fxLetter ? 20 : 4), 16),
-                                         juce::Justification::centredLeft, false);
-                }
-            g.setColour (colour::border);
-            g.drawVerticalLine (box.getRight(), (float) header.getY(), (float) header.getBottom());
+            if (scale == 1.0f)
+                g.drawImageAt (i.headerImage, ox + i.numberWidth, header.getY());
+            else
+                g.drawImage (i.headerImage, juce::Rectangle<float> ((float) (ox + i.numberWidth), (float) header.getY(), (float) (i.gridWidth - i.numberWidth), (float) headerHeight));
         }
+        else
+            for (int t = 0; t < (int) l.tracks.size() && t < (int) i.geom.size(); ++t)
+                i.paintTrackHeader (g, t, ox, header.getY());
         g.setColour (colour::borderStrong);
         g.drawHorizontalLine (header.getBottom() - 1, (float) header.getX(), (float) header.getRight());
     }
@@ -1143,77 +1764,95 @@ void TrackerComponent::paint (juce::Graphics& g)
                           rows.reduced (30), juce::Justification::centred, 3);
     }
 
-    // ---- the side panel: the Sequence (the Playlist's order, read only) and the legend
+    // ---- the side panel: the Sequence (the Playlist's order, read only) and the legend (painted straight: a picture of it
+    // moved its rounded corners' anti-aliasing by a level)
     if (i.sidePanel())
     {
-        auto side = i.sideArea();
-        g.setColour (colour::bg2);
-        g.fillRoundedRectangle (side.toFloat(), radius::md);
-        side.reduce (10, 8);
-        g.setColour (colour::textPrimary);
-        g.setFont (font (type::small, true));
-        textcache::drawText (g, tr ("Sequence (the Playlist, read only)"), side.removeFromTop (22), juce::Justification::centredLeft, true);
-        std::vector<const Clip*> clips;
-        for (const auto& c : s.playlist)
-            if (c.kind == ClipKind::pattern && c.pattern >= 0 && c.pattern < (int) s.patterns.size())
-                clips.push_back (&c);
-        std::stable_sort (clips.begin(), clips.end(), [] (const Clip* a, const Clip* b) { return a->start != b->start ? a->start < b->start : a->track < b->track; });
-        const auto listRows = std::min<int> ((int) clips.size(), 9);
-        g.setFont (monoFont (type::small));
-        for (int k = 0; k < listRows; ++k)
-        {
-            const auto* c = clips[(std::size_t) k];
-            auto row = side.removeFromTop (22);
-            if (c->pattern == pattern)
+        const auto area = i.sideArea();
+        i.drawPart (g, i.sidePicture, area, scale, 0, colour::bg1, 0, [&] (juce::Graphics& pg) {
+            auto side = area;
+            pg.setColour (colour::bg2);
+            pg.fillRoundedRectangle (side.toFloat(), radius::md);
+            side.reduce (10, 8);
+            pg.setColour (colour::textPrimary);
+            pg.setFont (font (type::small, true));
+            textcache::drawText (pg, tr ("Sequence (the Playlist, read only)"), side.removeFromTop (22), juce::Justification::centredLeft, true);
+            std::vector<const Clip*> clips;
+            for (const auto& c : s.playlist)
+                if (c.kind == ClipKind::pattern && c.pattern >= 0 && c.pattern < (int) s.patterns.size())
+                    clips.push_back (&c);
+            std::stable_sort (clips.begin(), clips.end(), [] (const Clip* a, const Clip* b) { return a->start != b->start ? a->start < b->start : a->track < b->track; });
+            const auto listRows = std::min<int> ((int) clips.size(), 9);
+            pg.setFont (monoFont (type::small));
+            for (int k = 0; k < listRows; ++k)
             {
-                g.setColour (colour::accentMuted);
-                g.fillRoundedRectangle (row.toFloat(), radius::sm);
+                const auto* c = clips[(std::size_t) k];
+                auto row = side.removeFromTop (22);
+                if (c->pattern == pattern)
+                {
+                    pg.setColour (colour::accentMuted);
+                    pg.fillRoundedRectangle (row.toFloat(), radius::sm);
+                }
+                pg.setColour (colour::textSecondary);
+                textcache::drawText (pg, numberText (k, 2, hex), row.removeFromLeft (30).withTrimmedLeft (4), juce::Justification::centredLeft, false);
+                pg.setColour (colour::textPrimary);
+                const auto barsValue = (double) c->length / (double) std::max<std::int64_t> (1, s.barTicks());
+                const auto bars = std::abs (barsValue - std::round (barsValue)) < 1.0e-9 ? juce::String ((int) std::lround (barsValue)) : juce::String (barsValue, 2);
+                textcache::drawText (pg, tr ("{0} bars", { bars }), row.removeFromRight (70).withTrimmedRight (6), juce::Justification::centredRight, false);
+                textcache::drawText (pg, juce::String::fromUTF8 (s.patterns[(std::size_t) c->pattern].name.c_str()), row, juce::Justification::centredLeft, true);
             }
-            g.setColour (colour::textSecondary);
-            textcache::drawText (g, numberText (k, 2, hex), row.removeFromLeft (30).withTrimmedLeft (4), juce::Justification::centredLeft, false);
-            g.setColour (colour::textPrimary);
-            const auto barsValue = (double) c->length / (double) std::max<std::int64_t> (1, s.barTicks());
-            const auto bars = std::abs (barsValue - std::round (barsValue)) < 1.0e-9 ? juce::String ((int) std::lround (barsValue)) : juce::String (barsValue, 2);
-            textcache::drawText (g, tr ("{0} bars", { bars }), row.removeFromRight (70).withTrimmedRight (6), juce::Justification::centredRight, false);
-            textcache::drawText (g, juce::String::fromUTF8 (s.patterns[(std::size_t) c->pattern].name.c_str()), row, juce::Justification::centredLeft, true);
-        }
-        if ((int) clips.size() > listRows)
-        {
-            g.setColour (colour::textDisabled);
-            textcache::drawText (g, tr ("... {0} more", { juce::String ((int) clips.size() - listRows) }), side.removeFromTop (18), juce::Justification::centredLeft, false);
-        }
-        g.setFont (font (type::caption));
-        g.setColour (colour::textDisabled);
-        textcache::drawText (g, tr ("A pattern placed again is the same pattern (no copy)."), side.removeFromTop (20), juce::Justification::centredLeft, true);
-        side.removeFromTop (8);
-        g.setColour (colour::textPrimary);
-        g.setFont (font (type::small, true));
-        textcache::drawText (g, tr ("Fx column (the notes' own fields)"), side.removeFromTop (22), juce::Justification::centredLeft, true);
-        g.setFont (font (type::caption));
-        for (int k = 0; k < fxKinds && side.getHeight() > 18; ++k)
-        {
-            g.setColour (colour::textSecondary);
-            textcache::drawText (g, tr (fxDescription ((Fx) k)), side.removeFromTop (18), juce::Justification::centredLeft, true);
-        }
-        side.removeFromTop (6);
-        g.setColour (colour::textDisabled);
-        g.drawFittedText (tr ("Notes that overlap get extra note columns. A line runs down from a note while it sounds; OFF is where it ends."),
-                          side.removeFromTop (48), juce::Justification::topLeft, 3);
+            if ((int) clips.size() > listRows)
+            {
+                pg.setColour (colour::textDisabled);
+                textcache::drawText (pg, tr ("... {0} more", { juce::String ((int) clips.size() - listRows) }), side.removeFromTop (18), juce::Justification::centredLeft, false);
+            }
+            pg.setFont (font (type::caption));
+            pg.setColour (colour::textDisabled);
+            textcache::drawText (pg, tr ("A pattern placed again is the same pattern (no copy)."), side.removeFromTop (20), juce::Justification::centredLeft, true);
+            side.removeFromTop (8);
+            pg.setColour (colour::textPrimary);
+            pg.setFont (font (type::small, true));
+            textcache::drawText (pg, tr ("Fx column (the notes' own fields)"), side.removeFromTop (22), juce::Justification::centredLeft, true);
+            pg.setFont (font (type::caption));
+            for (int k = 0; k < fxKinds && side.getHeight() > 18; ++k)
+            {
+                pg.setColour (colour::textSecondary);
+                textcache::drawText (pg, tr (fxDescription ((Fx) k)), side.removeFromTop (18), juce::Justification::centredLeft, true);
+            }
+            side.removeFromTop (6);
+            pg.setColour (colour::textDisabled);
+            textcache::drawFittedText (pg, tr ("Notes that overlap get extra note columns. A line runs down from a note while it sounds; OFF is where it ends."),
+                                       side.removeFromTop (48), juce::Justification::topLeft, 3); // (round 190ob: laid out once)
+        });
     }
 
-    // ---- the hint bar
+    // ---- the hint bar (on whole pixels a picture, made again when its text changes)
     {
-        auto hint = i.hintArea();
-        g.setColour (colour::bg3);
-        g.fillRect (hint);
-        hint.reduce (10, 2);
-        g.setColour (colour::textPrimary);
-        g.setFont (font (type::small));
-        textcache::drawText (g, i.hintText(), hint.removeFromTop (17), juce::Justification::centredLeft, true);
-        g.setColour (colour::textDisabled);
-        g.setFont (font (type::caption));
-        textcache::drawText (g, tr ("Keys: Z-M / Q-P notes (the typing keyboard), 1 OFF, 0-9 A-F values, Del clear, Insert / Backspace rows, Tab next track, Ctrl+Up/Down transpose, Space play"),
-                             hint, juce::Justification::centredLeft, true);
+        const auto area = i.hintArea();
+        const auto text = i.hintText();
+        std::uint64_t signature = 0;
+        if (wholePixels && i.useChunks && ui::paintCache())
+        {
+            signature = Impl::mix (Impl::mix (Impl::mix (Impl::mix ((std::uint64_t) area.getWidth(), (std::uint64_t) area.getHeight()), Impl::bits (scale)), text.hash()),
+                                   tr ("Keys: Z-M / Q-P notes (the typing keyboard), 1 OFF, 0-9 A-F values, Del clear, Insert / Backspace rows, Tab next track, Ctrl+Up/Down transpose, Space play").hash());
+            for (const auto& f : { font (type::small), font (type::caption) })
+                signature = Impl::mix (signature, f.toString().hash());
+            for (auto c : { colour::bg3, colour::textPrimary, colour::textDisabled })
+                signature = Impl::mix (signature, c.getARGB());
+        }
+        i.drawPart (g, i.hintPicture, area, scale, signature, colour::bg3, 0, [&] (juce::Graphics& pg) {
+            auto hint = area;
+            pg.setColour (colour::bg3);
+            pg.fillRect (hint);
+            hint.reduce (10, 2);
+            pg.setColour (colour::textPrimary);
+            pg.setFont (font (type::small));
+            textcache::drawText (pg, text, hint.removeFromTop (17), juce::Justification::centredLeft, true);
+            pg.setColour (colour::textDisabled);
+            pg.setFont (font (type::caption));
+            textcache::drawText (pg, tr ("Keys: Z-M / Q-P notes (the typing keyboard), 1 OFF, 0-9 A-F values, Del clear, Insert / Backspace rows, Tab next track, Ctrl+Up/Down transpose, Space play"),
+                                 hint, juce::Justification::centredLeft, true);
+        });
     }
 }
 
@@ -1428,6 +2067,7 @@ void TrackerComponent::visibilityChanged()
     {
         impl->preview.releaseAll();
         impl->endValueEntry();
+        impl->dropChunks (-2); // (round 190ob: a hidden tracker keeps no chunk images)
     }
     else if (impl->refresh())
         repaint();
@@ -1612,6 +2252,106 @@ double TrackerComponent::paintRowsBenchMs (int frames)
     return std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - t0).count() / std::max (1, frames);
 }
 
+namespace
+{
+std::uint64_t pixelHash (const juce::Image& image)
+{
+    const juce::Image::BitmapData data (image, juce::Image::BitmapData::readOnly);
+    std::uint64_t h = 1469598103934665603ull;
+    for (int y = 0; y < data.height; ++y)
+    {
+        const auto* line = data.getLinePointer (y);
+        for (int x = 0; x < data.width * data.pixelStride; ++x)
+            h = (h ^ line[x]) * 1099511628211ull;
+    }
+    return h;
+}
+} // namespace
+
+TrackerComponent::BenchResult TrackerComponent::paintBench (BenchFrame kind, int frames)
+{
+    juce::Image image (juce::Image::ARGB, std::max (1, getWidth()), std::max (1, getHeight()), true, juce::SoftwareImageType());
+    {
+        juce::Graphics g (image);
+        paint (g); // (warm the caches)
+    }
+    const auto start = firstRow;
+    platform::ThreadInstructions counter;
+    std::vector<double> ms;
+    std::vector<long long> instructions;
+    for (int f = 0; f < frames; ++f)
+    {
+        juce::Graphics g (image);
+        if (kind == BenchFrame::scroll)
+        {
+            firstRow = std::clamp<std::int64_t> (start + f + 1, 0, std::max<std::int64_t> (0, layout.rows - impl->visibleRows()));
+            impl->updateScrollBars();
+        }
+        else if (kind == BenchFrame::uncached)
+            impl->dropChunks (-2);
+        else if (kind == BenchFrame::edit)
+            impl->dropChunks (cursor.track);
+        if (kind == BenchFrame::playhead)
+        {
+            juce::RectangleList<int> clip (impl->rowRect (firstRow + 3));
+            clip.add (impl->rowRect (firstRow + 4));
+            g.reduceClipRegion (clip);
+        }
+        const auto i0 = counter.now();
+        const auto t0 = std::chrono::steady_clock::now();
+        paint (g);
+        const auto t1 = std::chrono::steady_clock::now();
+        const auto i1 = counter.now();
+        ms.push_back (std::chrono::duration<double, std::milli> (t1 - t0).count());
+        instructions.push_back (i0 >= 0 && i1 >= 0 ? i1 - i0 : -1);
+    }
+    firstRow = start;
+    impl->updateScrollBars();
+    BenchResult r;
+    if (! ms.empty())
+    {
+        std::sort (ms.begin(), ms.end());
+        std::sort (instructions.begin(), instructions.end());
+        r.ms = ms[ms.size() / 2];
+        r.instructions = instructions[instructions.size() / 2];
+    }
+    r.pixels = pixelHash (image);
+    return r;
+}
+
+std::uint64_t TrackerComponent::framePixelsForCheck (bool cached)
+{
+    juce::Image image (juce::Image::ARGB, std::max (1, getWidth()), std::max (1, getHeight()), true, juce::SoftwareImageType());
+    const auto was = impl->useChunks;
+    impl->useChunks = cached;
+    {
+        juce::Graphics g (image);
+        paint (g);
+    }
+    impl->useChunks = was;
+    // (diagnostics: LYNX_TRACKER_DUMP=<prefix> writes each compared frame)
+    if (const auto* dump = std::getenv ("LYNX_TRACKER_DUMP"); dump != nullptr && *dump != 0)
+    {
+        static int frame = 0;
+        juce::FileOutputStream out (juce::File (juce::String (dump) + "-" + juce::String (frame++) + (cached ? "-cached" : "-straight") + ".png"));
+        if (out.openedOk())
+        {
+            out.setPosition (0);
+            out.truncate();
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        }
+    }
+    return pixelHash (image);
+}
+
+void TrackerComponent::scrollToRowForCheck (std::int64_t row)
+{
+    firstRow = row;
+    impl->updateScrollBars();
+}
+
+size_t TrackerComponent::cachedChunksForCheck() const noexcept { return impl->chunkCount(); }
+
 double TrackerComponent::paintBenchMs (int frames)
 {
     juce::Image image (juce::Image::ARGB, std::max (1, getWidth()), std::max (1, getHeight()), true);
@@ -1627,17 +2367,23 @@ double TrackerComponent::paintBenchMs (int frames)
 }
 
 // ------------------------------------------------------------------------------------------------------- the window
-void openTracker (AudioEngine& engine, int pattern)
+void openTracker (AudioEngine& engine, int pattern, int channel)
 {
     if (auto* w = findToolWindow ("tracker"))
     {
         if (auto* t = dynamic_cast<TrackerComponent*> (w->getContentComponent()))
+        {
             t->showPattern (pattern);
+            if (channel >= 0)
+                t->showChannel (channel);
+        }
         w->toFront (true);
         return;
     }
     auto content = std::make_unique<TrackerComponent> (engine);
     content->showPattern (pattern);
+    if (channel >= 0)
+        content->showChannel (channel);
     openToolWindow (std::move (content), tr ("Tracker"), "tracker", true);
 }
 

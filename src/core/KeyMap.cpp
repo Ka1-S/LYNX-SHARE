@@ -116,9 +116,11 @@ std::vector<Action> makeActions()
         // FL's AlignAllChannelEditorsAction, ShortCut 8315 = Shift+F12 (round 169k)
         { "view.alignChannelEditors", TR_NOOP ("Align all channel editors"), Context::global, { chord (f12, shift) } },
         { "view.touchKeyboard", TR_NOOP ("Show or hide the Touch keyboard"), Context::global, { chord (f7, alt) } },
-        // round 190nw (0.1.31): LYNX's tracker editor (a view of the patterns' notes). No key by default: the proposed
-        // Shift+F7 waits for a check of FL's own use of it (study190nd owner decision 6); bind one in the shortcut editor
-        { "view.tracker", TR_NOOP ("Show or hide the Tracker (the pattern's notes as rows and channels)"), Context::global, {} },
+        // round 190nw (0.1.31): LYNX's tracker editor (a view of the patterns' notes). Round 190ob: Shift+F7, beside FL's
+        // F7 (Piano roll), the other view of the same notes. FL 2026 has no Shift+F7: its ShortcutsModule binds none
+        // (DFM dump of round 167j: F7 Piano roll, Alt+F7 Touch controller only) and FL did nothing on it in the live
+        // check (round 190ob, /mnt/e/lynx-work/190ob); no LYNX key uses it in any context.
+        { "view.tracker", TR_NOOP ("Show or hide the Tracker (the pattern's notes as rows and channels)"), Context::global, { chord (f7, shift) } },
         { "panel.maximisePlaylist", TR_NOOP ("Maximize or restore the Playlist"), Context::global, { chord (enter) } },
 
         // patterns

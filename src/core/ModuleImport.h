@@ -16,8 +16,15 @@
 //  - a note lasts until its channel's next note, note off or cut (at most to its clip's end), with the volume and pan
 //    libxmp plays it at (set volume, default volumes, global / channel / instrument volume, panning) as its velocity and
 //    pan; note delay and note cut are exact ticks; tone portamento is the note's porta;
-//  - what stage 1 does not import (tick effects: arpeggio, vibrato, slides, retrigger, sample offset...; envelopes, IT
-//    new note actions, filters) is counted per kind in the import report.
+//  - round 190ob (stage 2 start): the volume of a sounding note as libxmp plays it on every frame (volume slides and
+//    sets, the volume column, global / channel volume, tremolo, tremor, the volume envelope while the note is held)
+//    becomes the automation of its channel's Volume multiplier (Levels adjustment, FL's channel parameter 0x11) on
+//    the .lynx file's value steps (a set on a row's first frame as a jump, a slide's ticks as straight lines); an instrument sounding
+//    in several module channels at once, each with its own changes, gets a channel per module channel; libxmp's linear
+//    pan law: a channel whose notes share one pan level (MOD / S3M) gets that level as its gain and the notes libxmp's
+//    left / right balance;
+//  - what is not imported yet (tick effects: arpeggio, vibrato, pitch slides, retrigger, sample offset...; pan changes,
+//    pan / pitch / filter envelopes, IT new note actions, filters) is counted per kind in the import report.
 // JUCE-free (tests: tests/ModuleImport190nwTests.inc).
 
 #include <cstdint>
@@ -41,6 +48,10 @@ struct ModuleImportSummary
     int heldOverClipEnd = 0;     // notes the module holds past a pattern clip's end (LYNX ends them there)
     double seconds = 0.0;        // the song's length as libxmp plays it (once, without its loop)
     std::int64_t loopTick = -1;  // where the module loops back to (the song loop marker), -1 = it ends
+    // round 190ob: the volume changes of sounding notes as the channels' Volume multiplier automation
+    int volumeChangedNotes = 0;  // played notes whose volume changes while they sound
+    int volumeAutomations = 0, volumePoints = 0;
+    int splitChannels = 0;       // channels added for an instrument sounding in several module channels at once
 };
 
 struct ModuleImportOptions

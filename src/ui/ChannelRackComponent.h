@@ -60,6 +60,10 @@ public:
     void visibilityChanged() override;
 
     std::function<void()> onOpenPianoRoll;
+    // round 190ob: the channel menu's "Edit in tracker" (the main window opens the Tracker on the channel's track) and
+    // the key an action has now, for the menu's items ("" = none)
+    std::function<void (int channel)> onOpenTracker;
+    std::function<juce::String (const char* actionId)> actionKeyText;
     // FL's piano roll preview (manual "Channel Rack › Piano roll preview", round 190mk DE-33): "Left-click the preview to
     // show/hide the Piano roll window"; "Right-Click to open the Piano roll centered on the notes clicked" (the tick)
     std::function<void (int row)> onPreviewClick;

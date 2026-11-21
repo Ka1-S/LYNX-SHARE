@@ -8588,7 +8588,7 @@ private:
         // round 190nw (0.1.31): the tracker. Its settings are saved only when changed (an older project's file stays the
         // same bytes) and come back; the copies for 0.1.30 / 0.1.28 drop them with one loss line; a module imports in a
         // real engine (one note, one Sampler channel, its sample written) and its notes render.
-        juce::String tracker190nwResult = "OK";
+        juce::String tracker190nwResult = "OK", tracker190obResult = "OK";
         {
             auto song = lynx::Song::makeDefault();
             juce::String why;
@@ -8644,6 +8644,31 @@ private:
                 if (peak < 0.01f)
                     tracker190nwResult = "ERROR the imported note is silent (peak " + juce::String (peak) + ")";
             }
+            // round 190ob: the same note, its sample looping, with a volume set on row 1 (C10, no note): its channel's
+            // Volume multiplier automation comes in, is saved and read back the same, and the note still sounds
+            if (tracker190obResult == "OK")
+            {
+                mod[1084 + 16 + 2] = 0x0C, mod[1084 + 16 + 3] = 0x10;
+                mod[20 + 28] = 0, mod[20 + 29] = 64; // (the sample loops whole: the note still sounds on row 1)
+                const auto volumeFile = folder.getChildFile ("one note volume.mod");
+                volumeFile.replaceWithData (mod.data(), mod.size());
+                lynx::AudioEngine ve (false);
+                if (! ve.importFlpFile (volumeFile, error))
+                    tracker190obResult = "ERROR module import: " + error;
+                else
+                {
+                    const auto& vs = ve.getSong();
+                    const auto automation = std::find_if (vs.automations.begin(), vs.automations.end(), [] (const lynx::Automation& a) {
+                        return a.target.kind == lynx::AutomationTargetKind::channelAdjust && a.target.param == lynx::leveladjust::volume && a.target.index == 0;
+                    });
+                    if (automation == vs.automations.end() || automation->points.size() < 2)
+                        tracker190obResult = "ERROR no volume automation";
+                    else if (const auto reread = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (vs), why); ! reread || reread->automations != vs.automations)
+                        tracker190obResult = "ERROR the automation changed on the .lynx round trip " + why;
+                    else if (ve.renderOffline (1.0, 44100.0, nullptr) < 0.001f)
+                        tracker190obResult = "ERROR the note is silent";
+                }
+            }
             folder.deleteRecursively();
         }
 
@@ -8686,7 +8711,7 @@ private:
                         && mixerBasics == "OK" && fontsResult == "OK" && paintCachesResult.startsWith ("OK") && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && takeoverOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && exportParity.startsWith ("OK") && exportLive.startsWith ("OK") && midiHotplug.startsWith ("OK") && midiOutPorts.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
-                        && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
+                        && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
                         && helix4khs190ocResult == "OK" && rollup031s4Result == "OK"
@@ -8763,6 +8788,7 @@ private:
                << "livewf190em=" << livewf190emResult << "\n"
                << "trackclips190ne=" << trackclips190neResult << "\n"
                << "tracker190nw=" << tracker190nwResult << "\n"
+               << "tracker190ob=" << tracker190obResult << "\n"
                << "midigen190fm_saved=" << midigen190fmResult << "\n"
                << "trackauto190gz_saved=" << trackauto190gzResult << "\n"
                << "clipenv190gi_saved=" << clipenv190giResult << "\n"

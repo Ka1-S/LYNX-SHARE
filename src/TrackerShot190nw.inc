@@ -247,6 +247,22 @@
             const auto menuNamed = [&] (const juce::String& name) { return names.indexOf (name) >= 0 ? ui.getMenuForSnapshot (names.indexOf (name)) : juce::PopupMenu(); };
             check ("View has Tracker", texts (menuNamed (tr ("View"))).joinIntoString ("|").contains (tr ("Tracker")));
             check ("Patterns has Edit in tracker", texts (menuNamed (tr ("Patterns"))).joinIntoString ("|").contains (tr ("Edit in tracker")));
+            // round 190ob: the Channel rack's channel menu, "Edit in tracker" right after FL's Piano roll (with its key)
+            {
+                const auto channelMenu = ui.getRackForSnapshot().getChannelMenuForSnapshot (2);
+                const auto items = texts (channelMenu);
+                int pianoAt = -1, trackerAt = -1;
+                for (int k = 0; k < items.size(); ++k)
+                {
+                    if (pianoAt < 0 && items[k].startsWith (tr ("Piano Roll")))
+                        pianoAt = k;
+                    if (trackerAt < 0 && items[k].startsWith (tr ("Edit in tracker")))
+                        trackerAt = k;
+                }
+                check ("190ob: the channel menu has Edit in tracker after Piano Roll", pianoAt >= 0 && trackerAt == pianoAt + 1, items.joinIntoString (" | "));
+                check ("190ob: Edit in tracker shows its key (Shift+F7)", trackerAt >= 0 && items[trackerAt].contains ("Shift+F7"), trackerAt >= 0 ? items[trackerAt] : juce::String());
+                saveMenus (juce::StringArray { "Channel" }, std::vector<juce::PopupMenu> { channelMenu }, prefix + "-12-channel-menu.png");
+            }
             // Clip-launch: a pattern clip in the grid
             ui.setLayoutStyle (layoutstyle::Style::clipLaunch, false);
             engine.dispatchPendingMessages();
@@ -365,7 +381,59 @@
             line ("paint bench 64 x 512 at 1920x1080: " + juce::String (ms, 3) + " ms a full frame, layout rebuild " + juce::String (buildMs, 3) + " ms ("
                   + juce::String ((int) p.notes.size()) + " notes)");
             check ("the layout rebuild of a 10k-note pattern under 20 ms", buildMs < 20.0, juce::String (buildMs, 2));
+            // round 190ob: every kind of frame, median wall time and instructions, and the frame's pixels
+            for (const auto& [kind, name] : { std::pair<TrackerComponent::BenchFrame, const char*> { TrackerComponent::BenchFrame::same, "full frame, same" },
+                                              { TrackerComponent::BenchFrame::scroll, "full frame, scrolled a row" },
+                                              { TrackerComponent::BenchFrame::uncached, "full frame, nothing cached" },
+                                              { TrackerComponent::BenchFrame::edit, "full frame, after an edit in one track" },
+                                              { TrackerComponent::BenchFrame::playhead, "playhead step (two rows)" } })
+            {
+                const auto r = bench.paintBench (kind, 30);
+                line ("bench190ob " + juce::String (name) + ": median " + juce::String (r.ms, 3) + " ms, instructions median "
+                      + juce::String (r.instructions) + ", pixels " + juce::String::toHexString ((juce::int64) r.pixels));
+            }
             write (bench, "11-bench-64x512");
+            // the cached frames are the uncached frames, pixel for pixel: scrolled, the cursor, a block, the playhead, decimal
+            {
+                bool same = true;
+                juce::String where;
+                const auto compare = [&] (const juce::String& state) {
+                    const auto a = bench.framePixelsForCheck (true), b = bench.framePixelsForCheck (true), c = bench.framePixelsForCheck (false);
+                    if (a != c || b != c)
+                    {
+                        same = false;
+                        where << state << " ";
+                    }
+                };
+                compare ("top");
+                bench.scrollToRowForCheck (37);
+                compare ("row37");
+                tracker::Cursor cur;
+                cur.track = 2;
+                cur.row = 45;
+                cur.field = tracker::Field::vol;
+                bench.setCursorForCheck (cur);
+                compare ("cursor");
+                tracker::Cursor a0, a1;
+                a0.track = 1;
+                a0.row = 40;
+                a1.track = 3;
+                a1.row = 52;
+                bench.setSelectionForCheck (a0, a1);
+                compare ("block");
+                bench.setPlayRowForSnapshot (50);
+                compare ("playhead");
+                bench.setPlayRowForSnapshot (-1);
+                TrackerComponent::hex = false;
+                bench.resized();
+                compare ("decimal");
+                TrackerComponent::hex = true;
+                bench.resized();
+                bench.scrollToRowForCheck (512);
+                compare ("end");
+                check ("bench190ob: the cached frames equal the uncached ones pixel for pixel", same, where);
+                line ("bench190ob chunks cached: " + juce::String ((int) bench.cachedChunksForCheck()));
+            }
         }
         return finish();
     }

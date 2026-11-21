@@ -574,6 +574,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
     // the workspace panels
     rack.onOpenPianoRoll = [this] { openPianoRoll(); };
+    rack.onOpenTracker = [this] (int channel) { openTracker (engine, -1, channel); }; // (round 190ob)
+    rack.actionKeyText = [this] (const char* actionId) { return shortcutText (actionId); };
     // round 190mk (DE-33, FL's manual): a click on a channel's piano roll preview shows / hides the Piano roll; a right-click
     // opens it scrolled to the clicked spot
     rack.onPreviewClick = [this] (int row) {

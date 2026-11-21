@@ -18067,3 +18067,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "CrossPaste190nzTests.inc" // round 190nz: issue #232 stage 2 (copy and paste between windows)
 #include "Issues190odTests.inc" // round 190od: issues #236, #238, #239, #240
 #include "Perf190ofTests.inc" // round 190of: the monitor's Longest / Spikes, the split CPU meter (P24), latency check
+#include "Tracker190obTests.inc" // round 190ob (0.1.31): tracker follow-ups (module volume automation, the default key)
