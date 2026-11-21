@@ -1,5 +1,5 @@
 ---
-source: c3a082f5e3
+source: 25e9858762
 ---
 LYNX SHARE 將專案儲存為 `.lynx` 檔案。它也能開啟其他程式的專案、載入常見的音訊檔案，並匯出音訊、MIDI 和給其他程式使用的專案。下表列出 0.1.30 alpha 的所有格式。
 
@@ -20,7 +20,7 @@ LYNX SHARE 將專案儲存為 `.lynx` 檔案。它也能開啟其他程式的專
 | `.zip` | `檔案 › 開啟...` 會把它解壓縮到資料夾，並開啟裡面的專案 | `檔案 › 匯出 › 專案及取樣（.zip）...` | 也能開啟 FL Studio 的壓縮循環包 |
 | `.lynxpack` | 先顯示摘要再開啟。其中一部分會合併到主持人的專案 | `檔案 › 線上工作階段 › 傳送專案...` | 在[線上協作](/wiki/online-sessions/)中傳送的專案或部分內容。第三方外掛的部分會以音訊算繪加上外掛設定的方式傳送 |
 | `.flp` | `檔案 › 開啟...` | `檔案 › 匯出 › FL Studio 專案...`，一個 FL Studio 2026 專案或壓縮循環包 | 原生外掛在重新製作的引擎上播放，精確度各不相同。FLEX 套件絕不會被開啟。匯出時，僅限 LYNX 的樂器和效果器會被算繪為音訊，或換成最接近的 FL 外掛，調變器則會被略過。見[從 FL Studio 轉換](/wiki/coming-from-fl-studio/) |
-| `.flm` | `檔案 › 開啟...` | 否 | FL Studio Mobile 專案。部分支援：MiniSynth、Transistor Bass、3x Osc、GMSynth、SuperSaw、DW Sampler、Slicer 和 DirectWave 以外的樂器會改用內建合成器播放 |
+| `.flm` | `檔案 › 開啟...` | `檔案 › 將副本儲存為 FL Studio Mobile 專案 (.flm)...` | FL Studio Mobile 專案。部分支援：MiniSynth、Transistor Bass、3x Osc、GMSynth、SuperSaw、DW Sampler、Slicer 和 DirectWave 以外的樂器會改用內建合成器播放。匯出是一份副本：保留音符、速度、混音器、FL Studio Mobile 自帶的樂器、DW Sampler、3x Osc、鼓組、效果器，以及混音器音量和聲像、效果器、DW Sampler 和 GMSynth 的自動化，取樣放在旁邊。副本中，其他樂器的音符保留在 MiniSynth 上，沒有 FLM 模組的效果器和其他目標（合成器自身的旋鈕、第三方外掛）的自動化會被省略；儲存前會有一個視窗列出這些內容。 |
 | `.als` | `檔案 › 開啟...`，Live 11 和 12 的套裝 | `檔案 › 匯出 › Ableton Live 套裝 (.als)...`，適用於 Live 12 或 Live 11 | 匯入時，Live 中沒有 LYNX SHARE 對應項目的裝置會被捨棄。匯出時，LYNX SHARE 自己的樂器和效果器不會被轉換（Helix 會變成 Wavetable），效果器參數的自動化和插入軌之間的路由會被捨棄。見[從 Ableton Live 轉換](/wiki/coming-from-ableton/) |
 | `.dawproject` | `檔案 › 開啟...` | `檔案 › 匯出 › DAWproject (.dawproject)...` | Bitwig、Studio One、Cubase 等程式使用的開放交換格式：軌道、資料夾、片段、音符、帶 warp 標記的音訊、自動化、速度、標記、帶傳送的混音器，以及帶狀態的 VST3、VST2 和 CLAP 外掛。匯入時，音符效果器和 MIDI 表情會被略過；匯出時，片段網格、其他編排和部分逐音符的細節會被略過。兩個方向都會列出被略過的內容 |
 | `.band` | `檔案 › 開啟...`（專案套件、其中的 `projectData` 檔案或它的 zip） | 否 | GarageBand 10 或 GarageBand for iOS 專案，作為簡易工作流程的音軌。部分匯入：樂器音軌用內建合成器和鼓來播放，GarageBand for iOS 中製作的 Sampler 樂器除外。GarageBand 11 及更早版本的專案無法讀取 |

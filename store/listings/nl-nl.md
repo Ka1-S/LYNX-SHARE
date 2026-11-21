@@ -26,7 +26,7 @@ Hij is gebouwd om licht en snel te blijven op elke pc.
 • Licht: een lock-free audio-engine die kanalen en mixertracks over je processorkernen verdeelt, inactieve kanalen overslaat en lange audiobestanden rechtstreeks van schijf streamt.
 • Compleet: meer dan 100 ingebouwde instrumenten en effecten — synths, drumcomputers, samplers, EQ's, compressors, limiters, reverbs, delays, toonhoogtecorrectie, visualizers en meer.
 • Je eigen plugins: host VST3-, CLAP- en VST2-instrumenten en -effecten, elk optioneel in een eigen sandboxproces, zodat een crashende plugin je sessie niet onderuit haalt.
-• Je projecten: opent FL Studio-projecten (.flp) met patterns, noten, mixer, automatisering en samples; opent en bewaart Ableton Live 11/12-sets (.als), inclusief Session-clips; opent en bewaart DAWproject-bestanden (.dawproject) voor Bitwig, Studio One, Cubase en andere apps; exporteert .flp terug naar FL Studio; importeert FL Studio Mobile-projecten (.flm, gedeeltelijk), GarageBand-projecten (.band, gedeeltelijk), BandLab-projecten (.blx, gedeeltelijk) en MIDI-bestanden.
+• Je projecten: opent FL Studio-projecten (.flp) met patterns, noten, mixer, automatisering en samples; opent en bewaart Ableton Live 11/12-sets (.als), inclusief Session-clips; opent en bewaart DAWproject-bestanden (.dawproject) voor Bitwig, Studio One, Cubase en andere apps; exporteert .flp terug naar FL Studio en bewaart kopieën als .flm voor FL Studio Mobile; importeert FL Studio Mobile-projecten (.flm, gedeeltelijk), GarageBand-projecten (.band, gedeeltelijk), BandLab-projecten (.blx, gedeeltelijk) en MIDI-bestanden.
 • Trackermodules: .mod-, .xm-, .s3m- en .it-bestanden gaan open met hun samples, patterns en tempo, en een ingebouwde
 tracker bewerkt de noten.
 • Audiobewerking: ARA 2-plugins zoals Melodyne werken direct op audioclips, een polyfone noteneditor verplaatst en stemt losse noten binnen akkoorden opnieuw af, en audio wordt omgezet naar MIDI.
@@ -49,7 +49,7 @@ LYNX SHARE 0.1.30: lichter dan ooit, met ongeveer de helft van de CPU van FL Stu
 ## Features
 
 1. Drie werkwijzen in één programma: patterns in FL Studio-stijl als standaard, clips starten in Ableton Live-stijl, of een Eenvoudige werkwijze in de stijl van BandLab en FL Studio Mobile
-2. Opent FL Studio- (.flp), Ableton Live- (.als), FL Studio Mobile- (.flm), DAWproject-, GarageBand- en BandLab-projecten en MIDI-bestanden; bewaart .flp, .als en .dawproject
+2. Opent FL Studio- (.flp), Ableton Live- (.als), FL Studio Mobile- (.flm), DAWproject-, GarageBand-, BandLab-projecten en MIDI; bewaart .flp, .als, .dawproject en .flm-kopieën
 3. Meer dan 100 ingebouwde instrumenten en effecten
 4. Host VST3-, CLAP- en VST2-plugins, optioneel gesandboxt in een eigen proces
 5. Audio met lage latency: ASIO, WASAPI gedeeld en exclusief

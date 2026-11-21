@@ -138,6 +138,7 @@
 #include "ui/AlsExportDialog.h"
 #include "ui/ActionSearch.h" // round 190nq (#228)
 #include "ui/DawProjectExport.h" // round 190jf (B22)
+#include "ui/FlmExportDialog.h" // round 190og (app-0003)
 #include "ui/OtherAppsExport.h"
 #include "ui/FlStudioExportDialog.h"
 #include "ui/FruitySlicerEditor.h"
@@ -958,6 +959,11 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     mapmode::tag (stopButton, remotemap::Target::of (RemoteAction::stop));
     mapmode::tag (recordButton, remotemap::Target::of (RemoteAction::record));
     mapmode::tag (metronomeButton, remotemap::Target::of (RemoteAction::metronome));
+    // round gap190og (mapping-0028): Live's overdub "+", Punch-In, Loop and Punch-Out switches (the Clip-launch bar's)
+    mapmode::tag (blendButton, remotemap::Target::of (RemoteAction::overdub));
+    mapmode::tag (punchButton, remotemap::Target::of (RemoteAction::punchIn));
+    mapmode::tag (liveLoopButton, remotemap::Target::of (RemoteAction::loopSwitch));
+    mapmode::tag (punchOutButton, remotemap::Target::of (RemoteAction::punchOut));
     mapmode::tag (tempoDisplay, remotemap::Target::parameter ({ AutomationTargetKind::tempo, 0, 0, 0 }));
     setTypingPiano (typingPiano);
     setKeyboardSettingsListener ([this] { saveUiSettings(); }); // round 190ds: the keyboards' modes are UI settings
@@ -3014,6 +3020,20 @@ void MainComponent::fireRemote (const remotemap::Fire& f)
         case RemoteAction::cancelLaunch:
             if (press)
                 engine.launcherCommand ({ launcher::Command::Type::cancelLaunch });
+            break;
+        // round gap190og (mapping-0028): a press switches it, as a click on the Control Bar's button does
+        case RemoteAction::overdub:
+            if (press)
+                runAction ("record.blend");
+            break;
+        case RemoteAction::loopSwitch:
+            if (press)
+                toggleLiveLoop();
+            break;
+        case RemoteAction::punchIn:
+        case RemoteAction::punchOut:
+            if (press)
+                runAction (t.action == RemoteAction::punchIn ? "record.punchIn" : "record.punchOut");
             break;
     }
 }
@@ -10141,6 +10161,52 @@ void MainComponent::setTweakedValue (const AutomationTarget& target, float value
     engine.noteTweaked (target);
 }
 
+// Round gap190og (coverage live4:deviceview-0012): the Clip-launch layout's Edit menu has Live's second block, Cut Ctrl+X,
+// Copy Ctrl+C, Paste Ctrl+V, Duplicate Ctrl+D, Delete Del [SHOT /mnt/e/lynx-work/live190gu/screens-live/live-edit-menu.png].
+// They act where the keyboard is, as the keys do: on the Device View's selected device ("Edit menu commands such as cut,
+// copy, paste, and duplicate can be used on devices. Pasted devices are inserted in front of the selected device", Live 12
+// manual) — also when nothing in the window has the keyboard and the Device View shows — otherwise on the focused view
+// (the clip grid's slot, the Playlist...), through its own key handling.
+void MainComponent::addLiveEditItems (juce::PopupMenu& menu)
+{
+    menu.addSeparator();
+    const juce::Component::SafePointer<juce::Component> focused (juce::Component::getCurrentlyFocusedComponent());
+    const auto inside = focused != nullptr && (focused.getComponent() == this || isParentOf (focused.getComponent()));
+    const auto devices = detailView != nullptr
+                      && (detailView->devicesHaveFocus (focused.getComponent())
+                          || (! inside && detailView->isVisible() && ui::showingOrShot (*detailView) && detailView->getPage() == DetailView::Page::devices));
+    using C = DetailView::EditCommand;
+    struct Item
+    {
+        const char* text;
+        const char* key;
+        C command;
+        juce::KeyPress press;
+    };
+    const auto ctrl = juce::ModifierKeys::commandModifier;
+    const Item items[] = { { TR_NOOP ("Cut"), "Ctrl+X", C::cut, juce::KeyPress ('x', ctrl, 0) },
+                           { TR_NOOP ("Copy"), "Ctrl+C", C::copy, juce::KeyPress ('c', ctrl, 0) },
+                           { TR_NOOP ("Paste"), "Ctrl+V", C::paste, juce::KeyPress ('v', ctrl, 0) },
+                           { TR_NOOP ("Duplicate"), "Ctrl+D", C::duplicate, juce::KeyPress ('d', ctrl, 0) },
+                           { TR_NOOP ("Delete"), "Del", C::remove, juce::KeyPress (juce::KeyPress::deleteKey) } };
+    for (const auto& item : items)
+    {
+        const auto enabled = devices ? detailView->canEditDevice (item.command) : inside;
+        menu.addItem (tr (item.text) + "\t" + item.key, enabled, false, [this, focused, devices, command = item.command, press = item.press] {
+            if (devices)
+            {
+                if (detailView != nullptr)
+                    detailView->editDevice (command);
+                return;
+            }
+            for (auto* c = focused.getComponent(); c != nullptr; c = c->getParentComponent())
+                if (c->keyPressed (press))
+                    return;
+        });
+    }
+    menu.addSeparator();
+}
+
 juce::StringArray MainComponent::getMenuBarNames()
 {
     // FL's menu bar order (REA round 139): FILE EDIT ADD PATTERNS VIEW OPTIONS TOOLS HELP
@@ -10422,6 +10488,14 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Save to new project folder..."), [this] { saveToNewProjectFolder(); });
         menu.addItem (tr ("Save as template..."), [this] { saveAsTemplate(); });
         menu.addItem (tr ("Save a copy for an older LYNX..."), [this] { saveCopyForOlder(); }); // (round 190hq, LYNX extra)
+        // round 190og (FLM coverage app-0003, LYNX extra: FL Studio writes no .flm): the song for FL Studio Mobile, with
+        // what the copy loses listed first (ui/FlmExportDialog.h)
+        menu.addItem (tr ("Save a copy as FL Studio Mobile project (.flm)..."), [this] {
+            showFlmExportDialog (engine, this,
+                                 currentFile != juce::File() ? currentFile.getParentDirectory()
+                                                             : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+                                 projectStem (projectName));
+        });
         menu.addItem (tr ("Delete unused recordings and save..."), [this] { deleteUnusedRecordingsAndSave(); });
         menu.addSeparator();
         {
@@ -10552,6 +10626,8 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
                 menu.addItem ((redoItem.step >= 0 ? tr ("Redo {0}", { stepName (redoItem.step) }) : tr ("Nothing to redo")) + shortcutText (redoItem.action),
                               redoItem.enabled, false, [this] { undoRedo (true); });
         }
+        if (layoutStyle == layoutstyle::Style::clipLaunch) // (round gap190og: Live's Edit block after Undo / Redo)
+            addLiveEditItems (menu);
         menu.addItem (tr ("Undo history...") + shortcutText ("edit.history"), [this] { showHistory(); });
         menu.addItem (tr ("Audio editor..."), [this] { openAudioEditor (engine); });
         menu.addSeparator();

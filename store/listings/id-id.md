@@ -26,7 +26,7 @@ Dibuat agar tetap ringan dan cepat di PC mana pun.
 • Ringan: mesin audio lock-free yang membagi channel dan track mixer ke seluruh core CPU, melewati channel yang tidak aktif, dan melakukan streaming audio panjang langsung dari disk.
 • Lengkap: lebih dari 100 instrumen dan efek bawaan — synth, drum machine, sampler, EQ, compressor, limiter, reverb, delay, koreksi pitch, visualizer, dan banyak lagi.
 • Plugin Anda: mendukung instrumen dan efek VST3, CLAP, dan VST2, masing-masing opsional berjalan di proses sandbox tersendiri sehingga plugin yang crash tidak bisa merusak sesi Anda.
-• Proyekmu: membuka proyek FL Studio (.flp) beserta pattern, not, mixer, otomasi, dan sample; membuka dan menyimpan set Ableton Live 11/12 (.als), termasuk klip Session; membuka dan menyimpan file DAWproject (.dawproject) untuk Bitwig, Studio One, Cubase, dan aplikasi lain; mengekspor .flp kembali ke FL Studio; mengimpor proyek FL Studio Mobile (.flm, sebagian), GarageBand (.band, sebagian), BandLab (.blx, sebagian), dan file MIDI.
+• Proyekmu: membuka proyek FL Studio (.flp) beserta pattern, not, mixer, otomasi, dan sample; membuka dan menyimpan set Ableton Live 11/12 (.als), termasuk klip Session; membuka dan menyimpan file DAWproject (.dawproject) untuk Bitwig, Studio One, Cubase, dan aplikasi lain; mengekspor .flp kembali ke FL Studio dan menyimpan salinan .flm untuk FL Studio Mobile; mengimpor proyek FL Studio Mobile (.flm, sebagian), GarageBand (.band, sebagian), BandLab (.blx, sebagian), dan file MIDI.
 • Modul tracker: file .mod, .xm, .s3m, dan .it terbuka dengan sample, pattern, dan tempo-nya, dan tracker bawaan
 mengedit not-notnya.
 • Pengeditan audio: plugin ARA 2 seperti Melodyne bekerja langsung pada klip audio, editor not polifonik menggeser dan menyetel ulang not tunggal di dalam akor, dan audio bisa diubah menjadi MIDI.
@@ -49,7 +49,7 @@ LYNX SHARE 0.1.30: lebih ringan dari sebelumnya, memakai sekitar separuh CPU FL 
 ## Features
 
 1. Tiga alur kerja dalam satu program: pattern ala FL Studio secara bawaan, peluncuran klip ala Ableton Live, atau Alur kerja sederhana bergaya BandLab dan FL Studio Mobile
-2. Membuka proyek FL Studio (.flp), Ableton Live (.als), FL Studio Mobile (.flm), DAWproject, GarageBand, dan BandLab serta file MIDI; menyimpan .flp, .als, dan .dawproject
+2. Membuka proyek FL Studio (.flp), Ableton Live (.als), FL Studio Mobile (.flm), DAWproject, GarageBand, BandLab, dan MIDI; menyimpan .flp, .als, .dawproject, dan salinan .flm
 3. Lebih dari 100 instrumen dan efek bawaan
 4. Mendukung plugin VST3, CLAP, dan VST2, opsional diisolasi di proses tersendiri
 5. Audio latensi rendah: ASIO, WASAPI shared dan exclusive

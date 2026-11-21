@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="f8304275";
+window.LYNX_LANG=lang;window.LYNX_V="029fbf8b";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=f8304275">
+<link rel="stylesheet" href="/assets/site.css?v=029fbf8b">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -114,6 +114,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <p>The <code>.flp</code> is an FL Studio 2026 project. Samplers, audio clips, FL Studio's own generators and effects, third-party plugins, patterns, the Playlist, the Mixer and automation go over with their settings. For the things FL Studio does not have, you choose between <code>Render them to audio (sounds the same)</code> and <code>Use the nearest FL plugin (stays editable, may sound different)</code>. With the second choice, LYNX-only instruments are left out. Modulators are always left out. A report lists what was rendered, replaced or left out. Details are in <a href="/wiki/coming-from-fl-studio/">Coming from FL Studio</a>.</p>
 <p>The <code>.als</code> holds a MIDI track per channel, audio tracks, groups, returns, sends, racks and Drum Racks, VST2 and VST3 plugins with their state, markers, and volume, pan and tempo automation. LYNX SHARE's own instruments and effects are not converted, though their tracks and notes are kept. Helix is the exception: it becomes Live's Wavetable. Automation of effect parameters and insert-to-insert routes are dropped. Details are in <a href="/wiki/coming-from-ableton/">Coming from Ableton Live</a>.</p>
 <p>The <code>.dawproject</code> holds tracks, folders, clips, notes, audio with its warp markers, automation, tempo, markers, the mixer with sends, and VST3, VST2 and CLAP plugins with their state. LYNX SHARE's own instruments and effects are written so that LYNX SHARE can open them again. The clip grid, other arrangements and some per-note details are left out, and a report lists them.</p>
+<p><code>File › Save a copy as FL Studio Mobile project (.flm)...</code> writes an <code>.flm</code> for FL Studio Mobile and copies the samples into a <code>&lt;name&gt; Samples</code> folder beside it. Before it saves, a window lists what the copy loses, as <code>File › Save a copy for an older LYNX...</code> does. The <code>.flm</code> keeps the notes and patterns (FL Studio Mobile has one pattern per track), the tempo, beats per bar, key and chord set, the mixer's levels, panning, mute, solo and sends to buses, FL Studio Mobile's own instruments (MiniSynth, SuperSaw, GMSynth and Transistor Bass, and FL Studio's MiniSynth and Transistor Bass), drum samplers as a drum kit, Layers as a rack with several instruments, every Pocket (FLM) effect with its mix, and audio clips with their level, pan, pitch and reverse. It also writes the DW Sampler (with its zones) and 3x Osc, and automation clips of mixer level and pan, of the Pocket (FLM) effects and of the DW Sampler's and GMSynth's own values. Other instruments (for now including FL Studio Mobile's Slicer and SoundFont Player) keep their notes on FL Studio Mobile's MiniSynth, and effects without an FLM module and automation of other targets, such as the synths' own knobs and third-party plugins, are left out; all of it is listed.</p>
 <h2 id="good-to-know">Good to know</h2>
 <ul><li><code>Dither</code> is greyed out for MP3, OGG, M4A and 32-bit WAV, and the tempo and marker options are greyed out for every format but WAV.</li><li>With <code>Playlist selection</code> and no selection in the Playlist, the whole song is rendered. The window warns you.</li><li>If the Master insert is muted, the window warns that the file will be silent.</li><li><code>Also write a video with this mix</code> appears only when the project has a video track, and it needs FFmpeg.</li><li><code>Render through the hardware in real time</code> appears only when the project has an active hardware insert. That export takes as long as the song.</li><li>Render to audio, where an insert is bounced to an audio clip, plays about 5 dB louder than the insert it replaces in this version.</li></ul>
 <h2 id="related">Related</h2>
@@ -127,8 +128,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=f8304275" defer></script>
-<script src="/assets/wiki.js?v=f8304275" defer></script>
-<script src="/assets/motion.js?v=f8304275" defer></script>
+<script src="/assets/site.js?v=029fbf8b" defer></script>
+<script src="/assets/wiki.js?v=029fbf8b" defer></script>
+<script src="/assets/motion.js?v=029fbf8b" defer></script>
 </body>
 </html>

@@ -27,7 +27,7 @@ Mobile: tracce e timeline, loop, pad e registrazione rapida, con un primo brano 
 • Leggera: un motore audio lock-free che distribuisce canali e tracce del mixer sui core della CPU, salta i canali inattivi e legge l'audio lungo direttamente dal disco.
 • Completa: oltre 100 strumenti ed effetti integrati — sintetizzatori, drum machine, sampler, EQ, compressori, limiter, riverberi, delay, correzione dell'intonazione, visualizzatori e molto altro.
 • I tuoi plugin: carica strumenti ed effetti VST3, CLAP e VST2, ognuno opzionalmente in un proprio processo isolato (sandbox), così un plugin che va in crash non fa cadere la tua sessione.
-• I tuoi progetti: apre i progetti di FL Studio (.flp) con pattern, note, mixer, automazioni e sample; apre e salva i set di Ableton Live 11/12 (.als), clip della Session comprese; apre e salva i file DAWproject (.dawproject) per Bitwig, Studio One, Cubase e altre app; esporta .flp verso FL Studio; importa i progetti di FL Studio Mobile (.flm, in parte), GarageBand (.band, in parte), BandLab (.blx, in parte) e i file MIDI.
+• I tuoi progetti: apre i progetti di FL Studio (.flp) con pattern, note, mixer, automazioni e sample; apre e salva i set di Ableton Live 11/12 (.als), clip della Session comprese; apre e salva i file DAWproject (.dawproject) per Bitwig, Studio One, Cubase e altre app; esporta .flp verso FL Studio e copie .flm per FL Studio Mobile; importa i progetti di FL Studio Mobile (.flm, in parte), GarageBand (.band, in parte), BandLab (.blx, in parte) e i file MIDI.
 • Moduli tracker: i file .mod, .xm, .s3m e .it si aprono con i loro campioni, pattern e tempo, e un tracker integrato
 modifica le note.
 • Editing audio: i plugin ARA 2 come Melodyne lavorano direttamente sulle clip audio, un editor di note polifonico sposta e riaccorda le singole note all'interno degli accordi, e l'audio si converte in MIDI.
@@ -50,7 +50,7 @@ LYNX SHARE 0.1.30: più leggero che mai, con circa la metà della CPU di FL Stud
 ## Features
 
 1. Tre workflow in un solo programma: pattern in stile FL Studio come predefinito, lancio di clip in stile Ableton Live o un Flusso semplice in stile BandLab e FL Studio Mobile
-2. Apre i progetti di FL Studio (.flp), Ableton Live (.als), FL Studio Mobile (.flm), DAWproject, GarageBand e BandLab e i file MIDI; salva .flp, .als e .dawproject
+2. Apre i progetti di FL Studio (.flp), Ableton Live (.als), FL Studio Mobile (.flm), DAWproject, GarageBand e BandLab e i file MIDI; salva .flp, .als e .dawproject, e copie .flm per FL Studio Mobile
 3. Oltre 100 strumenti ed effetti integrati
 4. Carica plugin VST3, CLAP e VST2, opzionalmente isolati in un proprio processo
 5. Audio a bassa latenza: ASIO, WASAPI condiviso ed esclusivo

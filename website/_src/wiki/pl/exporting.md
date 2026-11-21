@@ -1,5 +1,5 @@
 ---
-source: 850a06503b
+source: d980e5fc0f
 ---
 ![Okno eksportu z wybranym WAV: zakres, ogon i pliki po lewej, format po prawej, opcje miksu poniżej](/assets/img/wiki/export.webp)
 
@@ -89,6 +89,8 @@ Zaznacz `Także pełny miks`, żeby dostać miks obok stemów. Linia na dole pok
 `.als` zawiera ścieżkę MIDI na kanał, ścieżki audio, grupy, zwroty, sendy, racki i Racki perkusyjne, pluginy VST2 i VST3 z ich stanem, znaczniki oraz automatykę głośności, panoramy i tempa. Własne instrumenty i efekty LYNX SHARE nie są konwertowane, choć ich ścieżki i nuty zostają. Wyjątkiem jest Helix: staje się Wavetable z Live. Automatyka parametrów efektów i trasy insert do insertu są pomijane. Szczegóły są w [Przejściu z Ableton Live](/wiki/coming-from-ableton/).
 
 `.dawproject` zawiera ścieżki, foldery, klipy, nuty, audio ze znacznikami warp, automatykę, tempo, znaczniki, mikser z wysyłkami oraz pluginy VST3, VST2 i CLAP z ich stanem. Własne instrumenty i efekty LYNX SHARE są zapisywane tak, żeby LYNX SHARE mógł je znowu otworzyć. Siatka klipów, inne aranżacje i niektóre szczegóły pojedynczych nut są pomijane, a raport je wymienia.
+
+`Plik › Zapisz kopię jako projekt FL Studio Mobile (.flm)...` zapisuje plik `.flm` dla FL Studio Mobile i kopiuje sample do folderu `<name> Samples` obok. Przed zapisem okno wypisuje, co kopia traci, tak jak przy `Plik › Zapisz kopię dla starszego LYNX...`. Plik `.flm` zachowuje nuty i patterny (FL Studio Mobile ma jeden pattern na ścieżkę), tempo, liczbę uderzeń na takt, tonację i zestaw akordów, poziomy, panoramę, wyciszenie i solo miksera oraz wysyłki do busów, własne instrumenty FL Studio Mobile (MiniSynth, SuperSaw, GMSynth i Transistor Bass oraz MiniSynth i Transistor Bass z FL Studio), samplery perkusyjne jako zestaw perkusyjny, Layery jako rack z kilkoma instrumentami, każdy efekt Pocket (FLM) z jego miksem oraz klipy audio z poziomem, panoramą, wysokością dźwięku i odwróceniem. Plik zawiera też DW Sampler (z jego strefami) i 3x Osc oraz klipy automatyki poziomu i panoramy miksera, efektów Pocket (FLM) i własnych wartości DW Samplera i GMSynth. Pozostałe instrumenty (na razie także Slicer i SoundFont Player z FL Studio Mobile) zachowują nuty na MiniSynth z FL Studio Mobile, a efekty bez modułu FLM i automatyka innych celów, takich jak własne pokrętła syntezatorów i wtyczki innych firm, są pomijane; wszystko trafia na listę.
 
 ## Warto wiedzieć
 

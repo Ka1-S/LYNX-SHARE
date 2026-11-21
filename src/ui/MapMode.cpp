@@ -107,6 +107,11 @@ std::pair<juce::String, juce::String> describe (AudioEngine& engine, const remot
         case RemoteAction::record: return { tr ("Transport"), tr ("Record") };
         case RemoteAction::sessionRecord: return { tr ("Clip grid"), tr ("Session Record") };
         case RemoteAction::metronome: return { tr ("Transport"), tr ("Metronome") };
+        // round gap190og (mapping-0028): Live's names of the Control Bar's other switches (live-exe-strings-u16.txt)
+        case RemoteAction::overdub: return { tr ("Transport"), tr ("Arrangement Overdub") };
+        case RemoteAction::loopSwitch: return { tr ("Transport"), tr ("Arrangement Loop switch") };
+        case RemoteAction::punchIn: return { tr ("Transport"), tr ("Punch-in switch") };
+        case RemoteAction::punchOut: return { tr ("Transport"), tr ("Punch-out switch") };
         // round 190kc: the crossfader's positions and Live's Relative Session Mapping Strip, as Live 12.4's Key Mappings list
         // names them (shots/ref/live-keymap-browser.png)
         case RemoteAction::crossfaderLeft: return { tr ("Main") + " | " + tr ("Mixer"), tr ("Crossfader Left") };

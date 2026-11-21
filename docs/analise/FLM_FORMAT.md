@@ -24,7 +24,7 @@ Evidence markers:
 | Chunk | 4-byte tag + u32 body size + body. The writer writes the size as a placeholder and patches it once the body is done | PROVEN-REA writers 0x18059bdb0 (RMOd), 0x180757d80 (CHNL), 0x18075c150 (CLIP) |
 | Byte order | Little-endian. Every reader has a "swap" flag that reverses each field (a big-endian path), but no sample uses it | PROVEN-REA (byte-reversal loops in every reader) |
 | Nested container | Some chunk bodies start with a 4-byte *versioned magic*, then hold child chunks: `10KR` rack, `10HC`/`20HC` channel, `20LC` clip, `20LS` sample, `10MS` drum-sample set. The two digits are the version (10 = 1.0, 20 = 2.0) | PROVEN-REA (rack expects 0x524B3031 at 0x18059b100; channel checks 0x43483031 version byte 2; clip/sample writers emit 0x434C3032 / 0x534C3032) |
-| Unknown chunks | The song loader logs "Error when loading chunk %s" and goes on. The rack loader skips any tag it does not know | PROVEN-REA 0x18076b9e0, 0x18059b100 |
+| Unknown chunks | The song loader passes over a tag it does not know without a message; "Error when loading chunk %s" is logged (and loading goes on) only when a known chunk fails to read (round 190og). The rack loader skips any tag it does not know | PROVEN-REA 0x18076b9e0, 0x18059b100 |
 | Fixed strings | Fixed-size, NUL-padded byte arrays (256, 512, 1024 or 2048 bytes) | PROVEN-REA |
 | Counted strings | Some are u32 length + bytes (`lp32`), some u16 length + bytes (`lp16`). No NUL; UTF-8 in the samples | PROVEN-REA / PROVEN-FILE |
 
@@ -159,7 +159,7 @@ PROVEN-REA:
 | 1028 | f64 | **display order** (0 = master, 1, 2, …). PROVEN-FILE: a permutation |
 | 1036 | f32 | **the channel's colour as a hue** 0…1 (clamped). FLM draws HSL(frac(0.83 + 0.73·hue), 0.9, 0.63) — the shipped theme's accent saturation and lightness — and its FLP export colours FL's channels the same way. Round 190fn, PROVEN-REA on FLM 5.0.3 (`CSeqChannel::SetState`, `MakeChannelColor`, `CColor::SetHSL`, `Theme::accentSaturation` / `accentLightness`); LYNX colours the channel's channels, Playlist rows and inserts with it |
 | 1040 | f64, f64 | INFERRED: track height / view (1.137…, NaN) |
-| 1056 | u32, u32 | two booleans. INFERRED: mute and solo (both 0 in the samples) |
+| 1056 | u32, u32 | two booleans: **input monitoring** (+1056) and **record arm** (+1060) (round 190og, PROVEN-REA on FLM 5.0.3: `CSeqChannel::GetState` writes the channel's bytes +0x221 then +0x220; `CChannelRack::RenderSound` takes the device input only with +0x221 on; `CSeqChannel::IsArmedForRecording` returns +0x220). Not mute / solo: those are RPRM [2] / [3] |
 | 1064 | 16 bytes | channel GUID |
 | 1080 | u32 | channel id |
 | 1084 | 3 × lp32 | default type name ("DW Sampler 3", "Instrument 2", "Audio 4"), user name ("Grand Piano"), alternative name |
@@ -777,7 +777,7 @@ decoder serves both paths: opening a `.flm` directly, and replacing the inert Mo
 
 1. (closed, round 190u) EVN2 bytes 14–19: velocity = byte / 255, pan = byte / 255, fine pitch, repeat count, slide flag.
    Pan, drum pitch, repeat and slide notes are imported since round 190ab. Open: the DW sampler's velocity → level law.
-2. ~~CHHD colour~~ (round 190fn: a hue, §4); its two flags at 1056; SEND words [1], [3], [4]. (RPRM [2], [3] are Mute and Solo, §3.2; how FLM
+2. ~~CHHD colour~~ (round 190fn: a hue, §4); ~~its two flags at 1056~~ (round 190og: input monitoring, record arm); SEND words [1], [3], [4]. (RPRM [2], [3] are Mute and Solo, §3.2; how FLM
    applies them on load is not traced.)
 3. ~~The automation point shape codes~~: closed in round 187d. The saved points are the sampled curve (§4).
 4. The per-module parameter value → unit maps. Each LYNX engine needs its own mapping (MiniSynth, DirectWave and
@@ -799,3 +799,14 @@ decoder serves both paths: opening a `.flm` directly, and replacing the inert Mo
    black box: what a render must measure is in round 190fe's notes) (round 190dw: where a linked slot plays is settled, §7.9); how a kit sample's legacy `STRC`
    stretch sounds (two samples of one demo song; since round 190de LYNX stretches them with its own stretcher); the module's octave shift
    and the second dispatch switch next to the key range (0x420 / 0x42c in the module object: not found in the file).
+
+## 10. Writing a file (round 190og: LYNX's .flm export)
+
+LYNX's writer (`core/FlmFormat.h` `write`, the reader's inverse; `core/FlmExport.h` maps a LYNX song onto it) writes what
+FLM 5 writes: HEAD (358 bytes + the app version "5.0.4"), KEYB when there is a chord set, META (3081), TDIV, the racks
+(master first) and the channels in that order, every container with its version magic ("10KR", "20HC", "20LC", "20LS",
+"10MS"), every module with HEAD, DESC, PRST, ADD1, PRMS, SMPR and its CSTM, an audio track's rack with FLM's empty slot.
+GUIDs are made from the names, so the same song gives the same bytes. It adds one chunk of its own at the end, "LYNX"
+(the patterns' grouping and names, with a checksum of the bytes before it), which FLM's loader skips (§1) and LYNX's
+import uses only while the checksum holds. What the export maps and the laws: `REA_rodada190og.md` §3. Validated by FLM
+itself: FL's "FL Studio Mobile" generator renders the exported file (`REA_rodada190og.md` §4).

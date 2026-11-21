@@ -26,7 +26,7 @@ Her PC'de hafif ve hızlı kalacak şekilde yapıldı.
 • Hafif: kanalları ve mixer kanallarını işlemci çekirdeklerine dağıtan, boştaki kanalları atlayan ve uzun ses dosyalarını doğrudan diskten akıtan kilitsiz (lock-free) bir ses motoru.
 • Eksiksiz: 100'den fazla dahili enstrüman ve efekt — synth'ler, davul makineleri, sampler'lar, EQ'lar, kompresörler, limiter'lar, reverb'ler, delay'ler, perde düzeltme, görselleştiriciler ve daha fazlası.
 • Kendi eklentileriniz: VST3, CLAP ve VST2 enstrüman ve efektlerini çalıştırır; isterseniz her biri kendi sandbox işleminde çalışır, böylece çöken bir eklenti oturumunuzu çökertemez.
-• Projelerin: FL Studio projelerini (.flp) pattern'leri, notaları, mixer'ı, otomasyonu ve sample'larıyla açar; Ableton Live 11/12 setlerini (.als) Session klipleriyle birlikte açar ve kaydeder; Bitwig, Studio One, Cubase ve diğer uygulamalar için DAWproject dosyalarını (.dawproject) açar ve kaydeder; .flp'yi FL Studio'ya geri aktarır; FL Studio Mobile (.flm, kısmen), GarageBand (.band, kısmen) ve BandLab (.blx, kısmen) projelerini ve MIDI dosyalarını içe aktarır.
+• Projelerin: FL Studio projelerini (.flp) pattern'leri, notaları, mixer'ı, otomasyonu ve sample'larıyla açar; Ableton Live 11/12 setlerini (.als) Session klipleriyle birlikte açar ve kaydeder; Bitwig, Studio One, Cubase ve diğer uygulamalar için DAWproject dosyalarını (.dawproject) açar ve kaydeder; .flp'yi FL Studio'ya geri aktarır ve FL Studio Mobile için .flm kopyaları kaydeder; FL Studio Mobile (.flm, kısmen), GarageBand (.band, kısmen) ve BandLab (.blx, kısmen) projelerini ve MIDI dosyalarını içe aktarır.
 • Tracker modülleri: .mod, .xm, .s3m ve .it dosyaları sample'ları, pattern'leri ve temposuyla açılır, yerleşik bir
 tracker notaları düzenler.
 • Ses düzenleme: Melodyne gibi ARA 2 plugin'leri ses kliplerinde yerinde çalışır, polifonik bir nota editörü akorların içindeki tek tek notaları taşır ve yeniden akort eder, ses de MIDI'ye dönüştürülür.
@@ -49,7 +49,7 @@ LYNX SHARE 0.1.30: hiç olmadığı kadar hafif; test PC'mizde FL'nin Thief demo
 ## Features
 
 1. Tek programda üç iş akışı: varsayılan olarak FL Studio tarzı pattern'ler, Ableton Live tarzı klip başlatma ya da BandLab ve FL Studio Mobile tarzında bir Basit iş akışı
-2. FL Studio (.flp), Ableton Live (.als), FL Studio Mobile (.flm), DAWproject, GarageBand ve BandLab projelerini ve MIDI dosyalarını açar; .flp, .als ve .dawproject kaydeder
+2. FL Studio (.flp), Ableton Live (.als), FL Studio Mobile (.flm), DAWproject, GarageBand, BandLab projelerini ve MIDI dosyalarını açar; .flp, .als, .dawproject ve .flm kopyaları kaydeder
 3. 100'den fazla dahili enstrüman ve efekt
 4. VST3, CLAP ve VST2 eklenti desteği, isteğe bağlı olarak ayrı işlemde izole
 5. Düşük gecikmeli ses: ASIO, paylaşımlı ve özel modda WASAPI

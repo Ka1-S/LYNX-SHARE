@@ -1,5 +1,5 @@
 ---
-source: 327d10fb40
+source: ca313fc42b
 ---
 LYNX SHARE는 창을 열지 않고도 실행할 수 있습니다. 옵션 하나는 프로젝트를 오디오로 렌더링하고, 다른 옵션들은 FL Studio 프로젝트나 Ableton Live 세트로 변환하며, 테스트용 옵션도 여러 개 있습니다. 프로젝트 자체의 검사에도 같은 옵션을 씁니다.
 
@@ -37,6 +37,7 @@ LYNX.exe --no-plugins project.lynx
 | `--stems <project> <base.wav>` | 채널이 있는 믹서 인서트마다 WAV 하나를 씁니다. `base - 1.wav`, `base - 2.wav` 등입니다 |
 | `--export-flp <project> <out.flp>` | FL Studio 프로젝트를 씁니다. `out.zip`을 주면 압축된 루프 패키지를 씁니다 |
 | `--export-flp ... --substitute` | LYNX 전용 플러그인을 오디오로 렌더링하지 않고 가장 비슷한 FL 플러그인으로 바꿉니다 |
+| `--export-flm <project> <out.flm>` | FL Studio Mobile 프로젝트를 쓰고, 샘플을 옆의 `<name> Samples` 폴더에 복사합니다 |
 | `--export-als <project> <folder>` | Live 12용 Ableton Live 세트를 `<folder>/<name> Project/<name>.als`에 씁니다 |
 | `--export-als ... --live11` | Live 11용 세트를 씁니다 |
 | `--export-bundle <project> <folder>` | `파일 › 내보내기 › 다른 앱용...`의 패키지를 폴더에 씁니다 |

@@ -23,7 +23,7 @@ LYNX SHARE는 비트와 곡을 만들기 위한 무료 오픈 소스 디지털 �
 • 가벼움: 락프리(lock-free) 오디오 엔진이 채널과 믹서 트랙을 CPU 코어 전체에 분산하고, 쉬고 있는 채널은 건너뛰며, 긴 오디오는 디스크에서 스트리밍합니다.
 • 풍부한 구성: 신스, 드럼 머신, 샘플러, EQ, 컴프레서, 리미터, 리버브, 딜레이, 피치 보정, 비주얼라이저 등 100개가 넘는 내장 악기와 이펙트.
 • 내 플러그인 그대로: VST3, CLAP, VST2 악기와 이펙트를 호스팅하며, 플러그인마다 별도의 샌드박스 프로세스에서 실행할 수 있어 플러그인이 크래시가 나도 세션은 멈추지 않습니다.
-• 내 프로젝트: FL Studio 프로젝트(.flp)를 패턴, 노트, 믹서, 오토메이션, 샘플과 함께 엽니다. Ableton Live 11/12 세트(.als)를 Session 클립까지 포함해 열고 저장하며, Bitwig, Studio One, Cubase 등 다른 앱을 위한 DAWproject 파일(.dawproject)도 열고 저장합니다. .flp로 FL Studio에 다시 내보내고, FL Studio Mobile 프로젝트(.flm, 일부), GarageBand 프로젝트(.band, 일부), BandLab 프로젝트(.blx, 일부)와 MIDI 파일을 가져옵니다.
+• 내 프로젝트: FL Studio 프로젝트(.flp)를 패턴, 노트, 믹서, 오토메이션, 샘플과 함께 엽니다. Ableton Live 11/12 세트(.als)를 Session 클립까지 포함해 열고 저장하며, Bitwig, Studio One, Cubase 등 다른 앱을 위한 DAWproject 파일(.dawproject)도 열고 저장합니다. .flp로 FL Studio에 다시 내보내고, FL Studio Mobile용 .flm 사본도 저장하고, FL Studio Mobile 프로젝트(.flm, 일부), GarageBand 프로젝트(.band, 일부), BandLab 프로젝트(.blx, 일부)와 MIDI 파일을 가져옵니다.
 • 트래커 모듈: .mod, .xm, .s3m, .it 파일을 샘플, 패턴, 템포와 함께 열고, 내장 트래커로 노트를 편집합니다.
 • 오디오 편집: Melodyne 같은 ARA 2 플러그인이 오디오 클립 위에서 바로 작동하고, 폴리포닉 노트 에디터로 코드 안의 개별 음을 옮기고 음높이를 다시 맞출 수 있으며, 오디오를 MIDI로 변환할 수 있습니다.
 • 낮은 레이턴시: ASIO(어떤 장치에서도 쓸 수 있는 LYNX SHARE 자체 ASIO 드라이버 포함), WASAPI 공유 모드와 독점 모드.
@@ -43,7 +43,7 @@ LYNX SHARE 0.1.30: 그 어느 때보다 가볍게. 테스트 PC에서 FL의 Thie
 ## Features
 
 1. 한 프로그램에 세 가지 워크플로: 기본은 FL Studio 스타일 패턴, Ableton Live 스타일 클립 실행, 또는 BandLab과 FL Studio Mobile 스타일의 간단한 워크플로
-2. FL Studio(.flp), Ableton Live(.als), FL Studio Mobile(.flm), DAWproject, GarageBand, BandLab 프로젝트와 MIDI 파일을 열고, .flp, .als, .dawproject로 저장합니다
+2. FL Studio(.flp), Ableton Live(.als), FL Studio Mobile(.flm), DAWproject, GarageBand, BandLab 프로젝트와 MIDI 파일을 열고, .flp, .als, .dawproject로 저장하고, FL Studio Mobile용 .flm 사본도 저장합니다
 3. 100개 이상의 내장 악기와 이펙트
 4. VST3, CLAP, VST2 플러그인 호스팅, 별도 프로세스 샌드박스 실행 선택 가능
 5. 저지연 오디오: ASIO, WASAPI 공유 및 독점 모드

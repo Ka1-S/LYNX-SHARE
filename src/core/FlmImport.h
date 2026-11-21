@@ -19,6 +19,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -40,6 +41,9 @@ struct FlmImportOptions
     // searched before `resourceRoot`. FL's copy holds only part of the app's factory content (77 of the 168 files the
     // demo songs use, no EXP packs), and users without FL have none: LYNX never ships Image-Line content.
     std::vector<std::string> userResourceRoots;
+    // Round 190og: filled with (FLM channel index in the file, content id) → the pattern made for it (the .flm export's
+    // LYNX chunk regroups them; see importFlm). nullptr = not wanted.
+    std::map<std::pair<int, std::uint32_t>, int>* contentPatterns = nullptr;
 };
 
 // FLM's resources inside an FL Studio installation folder (FlPathRoots::factoryData), or "" when there is none.

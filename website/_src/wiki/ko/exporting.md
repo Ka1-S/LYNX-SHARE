@@ -1,5 +1,5 @@
 ---
-source: 850a06503b
+source: d980e5fc0f
 ---
 ![WAV가 선택된 내보내기 창: 왼쪽에 범위, 테일, 파일, 오른쪽에 형식, 아래쪽에 믹스 옵션](/assets/img/wiki/export.webp)
 
@@ -89,6 +89,8 @@ LYNX SHARE 밖으로 나가는 모든 것은 `파일 › 내보내기`를 거칩
 `.als`에는 채널마다 MIDI 트랙, 오디오 트랙, 그룹, 리턴, 센드, 랙, Drum Rack, 상태가 있는 VST2와 VST3 플러그인, 마커, 볼륨, 팬, 템포 오토메이션이 들어갑니다. LYNX SHARE 자체의 악기와 이펙트는 변환되지 않지만 트랙과 노트는 유지됩니다. 예외는 Helix로, Live의 Wavetable이 됩니다. 이펙트 파라미터의 오토메이션과 인서트 간 라우트는 빠집니다. 자세한 내용은 [Ableton Live에서 넘어오기](/wiki/coming-from-ableton/)에 있습니다.
 
 `.dawproject`에는 트랙, 폴더, 클립, 노트, 워프 마커가 있는 오디오, 오토메이션, 템포, 마커, 센드가 있는 믹서, 상태가 담긴 VST3, VST2, CLAP 플러그인이 들어갑니다. LYNX SHARE 자체의 악기와 이펙트는 LYNX SHARE가 다시 열 수 있게 기록됩니다. 클립 그리드, 다른 어레인지먼트, 노트별 세부 정보 일부는 빠지며, 보고서에 목록으로 나옵니다.
+
+`파일 › FL Studio Mobile 프로젝트(.flm)로 사본 저장...`은 FL Studio Mobile용 `.flm`을 쓰고 샘플을 옆의 `<name> Samples` 폴더에 복사합니다. 저장하기 전에 `파일 › 이전 LYNX용 사본 저장...`처럼 사본에서 사라지는 것을 창에 나열합니다. `.flm`에는 노트와 패턴(FL Studio Mobile은 트랙마다 패턴이 하나), 템포, 마디당 박자 수, 키와 코드 세트, 믹서의 레벨, 팬, 뮤트, 솔로와 버스로 가는 센드, FL Studio Mobile 고유의 악기(MiniSynth, SuperSaw, GMSynth, Transistor Bass, 그리고 FL Studio의 MiniSynth와 Transistor Bass), 드럼 키트가 되는 드럼 샘플러, 여러 악기가 든 랙이 되는 레이어, 믹스가 있는 모든 Pocket(FLM) 이펙트, 레벨, 팬, 피치, 리버스가 있는 오디오 클립이 담깁니다. DW Sampler(존 포함)와 3x Osc도 쓰며, 믹서 레벨과 팬, Pocket(FLM) 이펙트, DW Sampler와 GMSynth 자체 값의 오토메이션 클립도 씁니다. 그 밖의 악기(당분간 FL Studio Mobile의 Slicer와 SoundFont Player 포함)는 노트가 FL Studio Mobile의 MiniSynth에 남고, FLM 모듈이 없는 이펙트와 신스 자체의 노브나 서드파티 플러그인 같은 그 밖의 대상의 오토메이션은 빠지며, 모두 목록에 나옵니다.
 
 ## 알아 두기
 

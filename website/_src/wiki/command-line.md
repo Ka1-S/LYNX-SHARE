@@ -39,6 +39,7 @@ Opens a `.lynx` project without loading its third-party plugins, as `File › Op
 | `--stems <project> <base.wav>` | Writes one WAV per Mixer insert that has channels: `base - 1.wav`, `base - 2.wav` and so on |
 | `--export-flp <project> <out.flp>` | Writes an FL Studio project. With `out.zip` it writes a zipped loop package |
 | `--export-flp ... --substitute` | Swaps LYNX-only plugins for the nearest FL plugin instead of rendering them to audio |
+| `--export-flm <project> <out.flm>` | Writes an FL Studio Mobile project, and copies the samples into a `<name> Samples` folder beside it |
 | `--export-als <project> <folder>` | Writes an Ableton Live set to `<folder>/<name> Project/<name>.als`, for Live 12 |
 | `--export-als ... --live11` | Writes the set for Live 11 |
 | `--export-bundle <project> <folder>` | Writes the package of `File › Export › For other apps...` into the folder |

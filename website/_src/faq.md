@@ -29,7 +29,7 @@ Partly. A `.flm` opens with its arrangement, samples, drum kits, DW Sampler and 
 
 ## Can I send a project back to FL Studio or Live?
 
-Yes. `File › Export › FL Studio project...` writes a `.flp`, `File › Export › Ableton Live set (.als)...` writes a set for Live 12 or Live 11, and `File › Export › DAWproject (.dawproject)...` writes a file that Bitwig, Studio One, Cubase and other apps open. What the other program does not have is rendered to audio or left out, and a report says which. The limits are on the [File formats](/wiki/file-formats/) page.
+Yes. `File › Export › FL Studio project...` writes a `.flp`, `File › Export › Ableton Live set (.als)...` writes a set for Live 12 or Live 11, and `File › Export › DAWproject (.dawproject)...` writes a file that Bitwig, Studio One, Cubase and other apps open. `File › Save a copy as FL Studio Mobile project (.flm)...` writes a copy for FL Studio Mobile, with its samples in a folder beside it. What the other program does not have is rendered to audio or left out, and a report says which. The limits are on the [File formats](/wiki/file-formats/) page.
 
 ## Do my VST plugins work?
 

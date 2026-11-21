@@ -1,5 +1,5 @@
 ---
-source: 327d10fb40
+source: ca313fc42b
 ---
 LYNX SHAREは、ウィンドウを開かずに実行することもできます。プロジェクトをオーディオにレンダリングするオプション、FL StudioプロジェクトやAbleton Liveセットに変換するオプション、テスト用のオプションがいくつかあります。プロジェクト自身のチェックも、同じオプションを使っています。
 
@@ -37,6 +37,7 @@ LYNX.exe --no-plugins project.lynx
 | `--stems <project> <base.wav>` | チャンネルのあるミキサーのインサートごとに1つのWAVを書き出す: `base - 1.wav`、`base - 2.wav` のように続く |
 | `--export-flp <project> <out.flp>` | FL Studioプロジェクトを書き出す。`out.zip` を指定すると、zip形式のループパッケージを書き出す |
 | `--export-flp ... --substitute` | LYNX専用のプラグインを、オーディオにレンダリングする代わりに、最も近いFLのプラグインに置き換える |
+| `--export-flm <project> <out.flm>` | FL Studio Mobileのプロジェクトを書き出し、サンプルを隣の `<name> Samples` フォルダーにコピーする |
 | `--export-als <project> <folder>` | Live 12向けに、Ableton Liveセットを `<folder>/<name> Project/<name>.als` に書き出す |
 | `--export-als ... --live11` | Live 11向けのセットを書き出す |
 | `--export-bundle <project> <folder>` | `ファイル › エクスポート › 他のアプリ用...` のパッケージを、フォルダーに書き出します |

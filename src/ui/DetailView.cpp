@@ -1,4 +1,5 @@
 #include "ui/TextCache.h"
+#include "ui/ShotShowing.h"
 #include "ui/DetailView.h"
 #include "core/StandIns.h"
 #include "ui/MapMode.h"
@@ -12,6 +13,7 @@
 #include "core/AlsImport.h"
 #include "core/Braid.h"
 #include "core/ClipLauncher.h"
+#include "core/ClipLoopOps.h"
 #include "core/ClipSample.h"
 #include "core/DetailChain.h"
 #include "core/RackOps.h"
@@ -216,10 +218,12 @@ public:
         slotActions.extendSlotMenu = [this] (juce::PopupMenu& menu, int slot) {
             const auto key = tagOf (slot);
             // round 190ce: the reference's device menu starts with Cut / Copy, then Fold [shot d04]; Paste and
-            // Duplicate are its Edit menu's commands on the selected device
+            // Duplicate are its Edit menu's commands on the selected device. Round gap190og (deviceview-0012): "Pasted
+            // devices are inserted in front of the selected device" [DOC Live 12 manual, Working with Instruments and
+            // Effects] (before: after it)
             menu.addItem (tr ("Cut") + "\tCtrl+X", [this, slot] { copyDevice (slot, true); });
             menu.addItem (tr ("Copy") + "\tCtrl+C", [this, slot] { copyDevice (slot, false); });
-            menu.addItem (tr ("Paste") + "\tCtrl+V", deviceClipboard().has_value() && effectCount() < maxEffectSlots, false, [this, slot] { pasteDevice (slot + 1); });
+            menu.addItem (tr ("Paste") + "\tCtrl+V", deviceClipboard().has_value() && effectCount() < maxEffectSlots, false, [this, slot] { pasteDevice (slot); });
             menu.addItem (tr ("Duplicate") + "\tCtrl+D", effectCount() < maxEffectSlots, false, [this, slot] { duplicateDevice (slot, -1); });
             menu.addSeparator();
             menu.addItem (folded.count (key) > 0 ? tr ("Unfold") : tr ("Fold"), [this, key] { toggleFold (key); });
@@ -313,6 +317,46 @@ public:
         toggleOn (cards[(std::size_t) i]);
         return true;
     }
+    // round gap190og (deviceview-0012): Live's Edit menu on the selected device — Cut, Copy, Paste, Duplicate, Delete
+    // [SHOT live190gu/screens-live/live-edit-menu.png; DOC Live 12 manual: "Edit menu commands such as cut, copy, paste,
+    // and duplicate can be used on devices", "select Delete from the Edit menu"]. Paste goes in front of the selected
+    // device, at the end of the chain with none (or the instrument) selected.
+    enum class EditCommand { cut, copy, paste, duplicate, remove };
+    bool canEdit (EditCommand command) const
+    {
+        const auto i = selectedCard();
+        const auto effect = i >= 0 && cards[(std::size_t) i].kind == Card::effect;
+        switch (command)
+        {
+            case EditCommand::cut:
+            case EditCommand::copy:
+            case EditCommand::remove: return effect;
+            case EditCommand::paste: return insert >= 0 && deviceClipboard().has_value() && effectCount() < maxEffectSlots;
+            case EditCommand::duplicate: return effect && effectCount() < maxEffectSlots;
+        }
+        return false;
+    }
+    bool runEdit (EditCommand command)
+    {
+        if (! canEdit (command))
+            return false;
+        const auto i = selectedCard();
+        const auto effect = i >= 0 && cards[(std::size_t) i].kind == Card::effect;
+        const auto slot = effect ? cards[(std::size_t) i].index : -1;
+        switch (command)
+        {
+            case EditCommand::cut: copyDevice (slot, true); break;
+            case EditCommand::copy: copyDevice (slot, false); break;
+            case EditCommand::paste: pasteDevice (effect ? slot : effectCount()); break;
+            case EditCommand::duplicate: duplicateDevice (slot, -1); break;
+            case EditCommand::remove:
+                slotActions.deleteSlot (slot);
+                refresh();
+                break;
+        }
+        return true;
+    }
+
     bool duplicateCard (int i)
     {
         if (i < 0 || i >= (int) cards.size() || cards[(std::size_t) i].kind != Card::effect)
@@ -596,7 +640,7 @@ public:
             }
             if (! shift && code == 'V')
             {
-                pasteDevice (slot + 1);
+                pasteDevice (slot); // (round gap190og: in front of the selected device, Live's rule)
                 return true;
             }
             if (code == 'G')
@@ -2382,6 +2426,12 @@ public:
         addAndMakeVisible (signature);
         loop.setButtonText (tr ("Loop"));
         loop.onClick = [this] { editSlot ([on = loop.getToggleState()] (ClipGridSlot& slot) { slot.loop = on; }); };
+        // round gap190og (detail-019): Live 12's Clip panel "Duplicate" button under Start / End = Duplicate Loop [SHOT
+        // ableton187c/shots/live-01-velocity-lane.png; STR DuplicateLoop in Live's ClipRegionPanel; DOC manual 8.9]
+        duplicateLoop.setButtonText (tr ("Duplicate"));
+        duplicateLoop.setTooltip (tr ("Duplicate Loop: the loop and its notes twice as long; notes after the loop move on with its end"));
+        duplicateLoop.onClick = [this] { duplicateClipLoop(); };
+        addAndMakeVisible (duplicateLoop);
         legato.setButtonText (tr ("Legato"));
         legato.setTooltip (tr ("Legato (keep the position)"));
         legato.onClick = [this] { editSlot ([on = legato.getToggleState()] (ClipGridSlot& slot) { slot.legato = on; }); };
@@ -2799,7 +2849,7 @@ private:
     {
         return { &start, &end, &position, &length, &followTime, &setStart, &setEnd, &setPosition, &setLength, &followOn, &linked, &invert, &reverse,
                  &makeLegato, &humanize, &duplicate, &quantize, &randomize, &timesTwo, &divideTwo, &fitScale, &chordHelper, &addInterval, &scaleMode, &groove, &mode,
-                 &quant, &followA, &followB, &scaleRoot, &scaleName, &loop, &legato, &nameLabel, &startLabel, &endLabel, &lengthLabel,
+                 &quant, &followA, &followB, &scaleRoot, &scaleName, &loop, &duplicateLoop, &legato, &nameLabel, &startLabel, &endLabel, &lengthLabel,
                  &positionLabel, &grooveLabel, &signatureLabel, &modeLabel, &quantLabel, &scaleLabel, &signature, &commitGroove };
     }
     // the look follows the layout's switch (checked on every layout and load; nothing changes while it stays the same)
@@ -2894,6 +2944,13 @@ private:
             put (start, { x0, y, half, row });
             put (end, { x0 + half + 4, y, half, row });
             y += row + 5;
+            if (hasNotes) // (round gap190og, detail-019: Live's Duplicate button between the Start / End fields and Loop)
+            {
+                put (duplicateLoop, { x0, y, inner, row });
+                y += row + 5;
+            }
+            else
+                duplicateLoop.setBounds ({});
             put (loop, { x0, y, inner, row });
             y += row + 5;
             labelRow (positionLabel, &setPosition, x0, half);
@@ -2917,7 +2974,7 @@ private:
             y += row + 6;
         }
         else
-            hide ({ &startLabel, &setStart, &endLabel, &setEnd, &start, &end, &loop, &positionLabel, &setPosition, &lengthLabel, &setLength, &position,
+            hide ({ &startLabel, &setStart, &endLabel, &setEnd, &start, &end, &loop, &duplicateLoop, &positionLabel, &setPosition, &lengthLabel, &setLength, &position,
                     &length, &signatureLabel, &grooveLabel, &signature, &groove, &scaleLabel, &scaleMode, &scaleRoot, &scaleName, &commitGroove });
         // Launch (+ Follow Action)
         headerY[1] = y;
@@ -3359,6 +3416,37 @@ private:
         });
     }
 
+    // round gap190og (detail-019): Live's Duplicate Loop on this MIDI clip (core/ClipLoopOps.h; one undo step)
+    void duplicateClipLoop()
+    {
+        const int t = track, sc = scene;
+        engine.editSong ([t, sc] (Song& song) {
+            if (auto* c = gridClip (song, t, sc))
+                cliploop::duplicateLoop (song, *c);
+        });
+        load();
+    }
+    static Clip* gridClip (Song& song, int t, int sc)
+    {
+        if (! song.clipGrid)
+            return nullptr;
+        for (auto& c : song.clipGrid->clips)
+            if (c.track == t && c.length > 0 && c.gridSlot >= 0 && c.gridSlot < (int) song.clipGrid->slots.size()
+                && song.clipGrid->slots[(std::size_t) c.gridSlot].scene == sc)
+                return &c;
+        return nullptr;
+    }
+public:
+    bool duplicateLoopForCheck()
+    {
+        if (! ui::showingOrShot (duplicateLoop) || duplicateLoop.getBounds().isEmpty() || ! duplicateLoop.isEnabled())
+            return false;
+        duplicateClipLoop(); // (what its click does; triggerClick would post it)
+        return true;
+    }
+    juce::Rectangle<int> duplicateLoopBoundsForCheck() const { return duplicateLoop.getBounds(); }
+private:
+
     // a note tool on every note of the clip's pattern (one undo step)
     void notes (std::function<void (Pattern&, const std::vector<int>&, const Song&)> fn)
     {
@@ -3427,6 +3515,8 @@ private:
     bool loading = false;
     std::unique_ptr<ui::TimerWhileShowing> showingTimer;
     juce::ToggleButton loop, legato;
+    // round gap190og (detail-019): Live's Duplicate Loop button of the Clip panel (its Live column only; MIDI clips)
+    liveclip::PillButton duplicateLoop { "duplicateLoop" };
     // round 190hr: the Follow Action controls
     juce::Label followTitle;
     juce::TextButton followOn, linked;
@@ -3454,6 +3544,7 @@ private:
 class DetailView::ClipPage final : public juce::Component, private juce::ChangeListener
 {
 public:
+    bool duplicateLoopForCheck() { return column.isVisible() && column.duplicateLoopForCheck(); } // (round gap190og)
     ClipPage (AudioEngine& e, Hooks& h) : engine (e), hooks (h), column (e)
     {
         addChildComponent (column); // (slice 2b: shown while a grid clip is)
@@ -3539,6 +3630,7 @@ public:
             if (roll->liveNoteColour != colour)
             {
                 roll->liveNoteColour = colour;
+                roll->liveFooterCheck(); // (round gap190og: Live's Velocity footer comes with the Live notes)
                 roll->repaint();
             }
         }
@@ -3575,7 +3667,10 @@ public:
         dropEvents();
         dockedTrack = dockedScene = -1;
         if (auto* roll = dynamic_cast<PianoRollComponent*> (editor)) // (round 190jn: its own colours again at home)
+        {
             roll->liveNoteColour = juce::Colours::transparentBlack;
+            roll->liveFooterCheck(); // (round gap190og: no Live footer outside the dock)
+        }
         if (editor != nullptr && hooks.undockPianoRoll != nullptr)
         {
             editor = nullptr;
@@ -3915,6 +4010,7 @@ void DetailView::editorTakenBack() { clipPage->editorTakenBack(); }
 void DetailView::releaseEditor() { clipPage->release(); }
 void DetailView::setClipTab (bool envelopes) { clipPage->showTab (envelopes); }
 void DetailView::setMpeTab() { clipPage->showTab (false, true); }
+bool DetailView::duplicateLoopForCheck() { return clipPage != nullptr && clipPage->duplicateLoopForCheck(); } // (round gap190og)
 
 void DetailView::showPage()
 {
@@ -4170,6 +4266,19 @@ void DetailView::clipSectionsForSnapshot (bool clipOpen, bool launchOpen, bool n
 hotswap::Target DetailView::selectedDeviceTarget() const { return devicesPage && isShowing() ? chain->selectedTarget() : hotswap::Target(); }
 void DetailView::hotSwapChanged() { chain->repaint(); }
 void DetailView::selectCardForCheck (int card) { chain->selectCard (card); }
+// round gap190og (deviceview-0012): the main window's Edit menu (Clip-launch layout) on the Device View
+bool DetailView::devicesHaveFocus (const juce::Component* focused) const
+{
+    return chain != nullptr && chain->isVisible() && ui::showingOrShot (*chain) && focused != nullptr && (focused == chain.get() || chain->isParentOf (focused));
+}
+bool DetailView::canEditDevice (EditCommand command) const
+{
+    return chain != nullptr && chain->isVisible() && ui::showingOrShot (*chain) && chain->canEdit ((DeviceChain::EditCommand) command);
+}
+bool DetailView::editDevice (EditCommand command)
+{
+    return chain != nullptr && chain->isVisible() && ui::showingOrShot (*chain) && chain->runEdit ((DeviceChain::EditCommand) command);
+}
 bool DetailView::duplicateCardForCheck (int card) { return chain->duplicateCard (card); }
 bool DetailView::groupCardForCheck (int card, bool ungroup) { return chain->groupCardForCheck (card, ungroup); }
 juce::PopupMenu DetailView::cardMenuForSnapshot (int card)

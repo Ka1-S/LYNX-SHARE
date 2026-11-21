@@ -1,5 +1,5 @@
 ---
-source: 327d10fb40
+source: ca313fc42b
 ---
 LYNX SHARE penceresini açmadan da çalışır. Bir seçenek projeyi sese render eder, diğerleri onu FL Studio projesine veya Ableton Live set'ine dönüştürür, birkaçı da test içindir. Projenin kendi kontrolleri de aynı seçenekleri kullanır.
 
@@ -37,6 +37,7 @@ Bir `.lynx` projesini, `Dosya › Üçüncü taraf plugin'ler olmadan aç...` gi
 | `--stems <project> <base.wav>` | Kanalı olan her Mixer insert'i için bir WAV yazar: `base - 1.wav`, `base - 2.wav` ve böyle devam eder |
 | `--export-flp <project> <out.flp>` | Bir FL Studio projesi yazar. `out.zip` ile sıkıştırılmış bir loop paketi yazar |
 | `--export-flp ... --substitute` | Yalnızca LYNX'te bulunan plugin'leri sese render etmek yerine en yakın FL plugin'iyle değiştirir |
+| `--export-flm <project> <out.flm>` | Bir FL Studio Mobile projesi yazar ve sample'ları yanındaki `<name> Samples` klasörüne kopyalar |
 | `--export-als <project> <folder>` | Live 12 için `<folder>/<name> Project/<name>.als` konumuna bir Ableton Live set'i yazar |
 | `--export-als ... --live11` | Set'i Live 11 için yazar |
 | `--export-bundle <project> <folder>` | `Dosya › Dışa aktar › Diğer uygulamalar için...` paketini klasöre yazar |
