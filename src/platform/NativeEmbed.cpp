@@ -167,34 +167,43 @@ double editorContentScale (const juce::Component& editor)
     return (bool) editor.getProperties()["lynxDpiUnaware"] ? 1.0 : primaryScale();
 }
 
+namespace
+{
+#if JUCE_WINDOWS
+using GetDpiContext = void* (WINAPI*) (HWND);  // GetWindowDpiAwarenessContext
+using GetAwareness = int (WINAPI*) (void*);    // GetAwarenessFromDpiAwarenessContext (0 = DPI_AWARENESS_UNAWARE)
+struct DpiWalk
+{
+    GetDpiContext getContext = nullptr;
+    GetAwareness getAwareness = nullptr;
+    int windows = 0, unaware = 0;
+};
+
+BOOL CALLBACK countDpiWindow (HWND h, LPARAM l)
+{
+    auto& w = *reinterpret_cast<DpiWalk*> (l);
+    ++w.windows;
+    if (w.getAwareness (w.getContext (h)) == 0)
+        ++w.unaware;
+    return TRUE;
+}
+#endif
+} // namespace
+
 int dpiUnawareWindowCount (void* nativeWindow, int& windows)
 {
     windows = 0;
 #if JUCE_WINDOWS
     if (nativeWindow == nullptr)
         return -1;
-    using GetCtx = void* (WINAPI*) (HWND);  // GetWindowDpiAwarenessContext
-    using GetAw = int (WINAPI*) (void*);    // GetAwarenessFromDpiAwarenessContext (0 = DPI_AWARENESS_UNAWARE)
     auto* user32 = GetModuleHandleW (L"user32.dll");
-    struct Walk
-    {
-        GetCtx getCtx;
-        GetAw getAw;
-        int windows = 0, unaware = 0;
-    };
-    Walk walk { reinterpret_cast<GetCtx> (reinterpret_cast<void*> (GetProcAddress (user32, "GetWindowDpiAwarenessContext"))),
-                reinterpret_cast<GetAw> (reinterpret_cast<void*> (GetProcAddress (user32, "GetAwarenessFromDpiAwarenessContext"))) };
-    if (walk.getCtx == nullptr || walk.getAw == nullptr)
+    DpiWalk walk;
+    walk.getContext = reinterpret_cast<GetDpiContext> (reinterpret_cast<void*> (GetProcAddress (user32, "GetWindowDpiAwarenessContext")));
+    walk.getAwareness = reinterpret_cast<GetAwareness> (reinterpret_cast<void*> (GetProcAddress (user32, "GetAwarenessFromDpiAwarenessContext")));
+    if (walk.getContext == nullptr || walk.getAwareness == nullptr)
         return -1;
-    const auto count = [] (HWND h, LPARAM l) -> BOOL {
-        auto& w = *reinterpret_cast<Walk*> (l);
-        ++w.windows;
-        if (w.getAw (w.getCtx (h)) == 0)
-            ++w.unaware;
-        return TRUE;
-    };
-    count (static_cast<HWND> (nativeWindow), (LPARAM) &walk);
-    EnumChildWindows (static_cast<HWND> (nativeWindow), count, (LPARAM) &walk);
+    countDpiWindow (static_cast<HWND> (nativeWindow), (LPARAM) &walk);
+    EnumChildWindows (static_cast<HWND> (nativeWindow), countDpiWindow, (LPARAM) &walk);
     windows = walk.windows;
     return walk.unaware;
 #else
@@ -203,4 +212,3 @@ int dpiUnawareWindowCount (void* nativeWindow, int& windows)
 #endif
 }
 } // namespace lynx::platform
-
