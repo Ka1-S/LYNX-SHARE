@@ -1275,6 +1275,15 @@ public:
     void select (int row, bool preview)
     {
         row = rows.empty() ? -1 : juce::jlimit (0, (int) rows.size() - 1, row);
+        // (round 190oa, DF-109: a picture's line is never selected: stepping down passes it, up lands on its entry)
+        if (row >= 0 && rows[(std::size_t) row]->thumbPart >= 0)
+        {
+            const auto owner = row - rows[(std::size_t) row]->thumbPart - 1;
+            if (row > selected && selected >= owner)
+                row = juce::jmin ((int) rows.size() - 1, owner + thumbRowCount + 1);
+            else
+                row = juce::jmax (0, owner);
+        }
         if (row != selected)
         {
             repaintRow (selected);
@@ -1535,6 +1544,17 @@ public:
             auto r = juce::Rectangle<int> (0, i * rowHeight, getWidth(), rowHeight);
             if (! flat && ! live && n.depth > 0)
                 addGuides (guides, n, r);
+            if (n.thumbPart >= 0 && n.thumbOwner != nullptr) // (round 190oa, DF-109: a line of the entry's picture)
+            {
+                const auto& pic = n.thumbOwner->thumb;
+                const auto top = r.getY() - n.thumbPart * rowHeight + 2;
+                const auto h = (float) thumbHeight, w = juce::jmin ((float) thumbMaxWidth, h * (float) pic.getWidth() / (float) juce::jmax (1, pic.getHeight()));
+                const auto x = (float) (6 + n.thumbOwner->depth * 14 + 12 + 21);
+                const juce::Graphics::ScopedSaveState keep (g);
+                g.reduceClipRegion (r);
+                g.drawImage (pic, juce::Rectangle<float> (x, (float) top, w, h), juce::RectanglePlacement::centred);
+                continue;
+            }
 
             // an open project section sits on a slightly raised band (FL draws its open folders on a band)
             if ((n.kind == Kind::project || n.kind == Kind::category) && n.expanded)
@@ -1718,7 +1738,11 @@ public:
     int rowAt (int y) const
     {
         const auto row = y / rowHeight;
-        return y >= 0 && row < (int) rows.size() ? row : -1;
+        if (y < 0 || row >= (int) rows.size())
+            return -1;
+        if (const auto part = rows[(std::size_t) row]->thumbPart; part >= 0) // (round 190oa: a picture's line = its entry)
+            return juce::jmax (0, row - part - 1);
+        return row;
     }
 
     // --- files dragged in from the system (issue #12): copied into the folder under the mouse ----------------------
@@ -2395,7 +2419,15 @@ private:
                                         : item.colour != 0                               ? juce::Colour (item.colour)
                                                                                          : juce::Colour();
                     const auto selected = engine != nullptr && engine->getSelectedChannel() == item.index;
-                    add (std::move (item), icon, colour).current = selected;
+                    const auto plugin = channel.instrument == InstrumentKind::plugin;
+                    // (round 190oa, DF-109: FL draws generator plugins' pictures; sample / audio clip channels are text)
+                    auto picture = engine != nullptr && ! countOnly && ! projectcontents::playsSampleFile (channel.instrument)
+                                       ? entryPicture (song, item, &gens (*engine))
+                                       : juce::Image();
+                    auto& node = add (std::move (item), icon, colour);
+                    node.current = selected;
+                    node.folder = plugin && engine != nullptr && ! countOnly; // (round 190oa, DF-120: a plugin opens to its parameters)
+                    addThumb (node, picture);
                 }
                 break;
             case Category::automation:
@@ -2966,6 +2998,8 @@ private:
         for (auto& c : n.children)
         {
             rows.push_back (c.get());
+            for (auto& t : c->thumbRows) // (round 190oa, DF-109: the picture's lines, right under its entry)
+                rows.push_back (t.get());
             if (c->folder && c->expanded)
                 addRows (*c);
         }
@@ -5991,6 +6025,12 @@ void BrowserComponent::showHistory()
 bool BrowserComponent::historyShownForCheck() const
 {
     return shownTab() == projectTab && tree->categoryOpen (Category::history);
+}
+
+bool BrowserComponent::revealProjectParameters (bool effect, int index, int slot)
+{
+    setTab (projectTab);
+    return tree->revealParameters (effect, index, slot) >= 0;
 }
 
 bool BrowserComponent::revealProjectPattern (int pattern)
