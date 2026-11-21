@@ -1860,22 +1860,29 @@ void PianoRollComponent::paint (juce::Graphics& g)
             return pressed ? accent : colour;
         };
         const auto labelClass = scaleIndex() > 0 ? scaleRoot() : 0; // (once per paint)
-        // FL's black keys at rest (round 190oo O-2): one horizontal gradient for all of them, dark at the left to lighter
-        // at the tip (FL 2026: #2a2b2d -> #4e4f51), filled before the loop as one rectangle list; a lit (hovered,
-        // pressed) black key is filled in the loop in its own colour
+        // FL's black keys at rest (round 190oo O-2): dark at the left to lighter at the tip (FL 2026: #2a2b2d -> #4e4f51),
+        // filled before the loop as eight solid steps of the shade, each one rectangle list over every visible black key
+        // (a gradient fill cost +1.9 % of the Piano roll's frame, --paintbench; eight steps of ~6 px read as FL's shade);
+        // a lit (hovered, pressed) black key is filled in the loop in its own colour
         if (flKeys)
         {
-            juce::RectangleList<int> blacks;
+            constexpr int steps = 8;
+            juce::RectangleList<int> blacks[steps];
             const auto inset = rowHeight >= 12 ? 1 : 0;
             for (int key = 0; key < 128; ++key)
                 if (isBlackKey (key) && rows.shown (key) && keyColour (key) == keyBlack)
                     if (const auto y = keyToY (key); y <= keys.getBottom() && y + rowHeight >= keys.getY())
-                        blacks.addWithoutMerging ({ 0, y + inset, blackWidth, rowHeight - 2 * inset });
-            if (! blacks.isEmpty())
-            {
-                g.setGradientFill (juce::ColourGradient (keyBlack, 0.0f, 0.0f, keyBlack.interpolatedWith (keyWhite, 0.18f), (float) blackWidth, 0.0f, false));
-                g.fillRectList (blacks);
-            }
+                        for (int k = 0; k < steps; ++k)
+                        {
+                            const auto x0 = blackWidth * k / steps, x1 = blackWidth * (k + 1) / steps;
+                            blacks[k].addWithoutMerging ({ x0, y + inset, x1 - x0, rowHeight - 2 * inset });
+                        }
+            for (int k = 0; k < steps; ++k)
+                if (! blacks[k].isEmpty())
+                {
+                    g.setColour (keyBlack.interpolatedWith (keyWhite, 0.18f * ((float) k + 0.5f) / (float) steps));
+                    g.fillRectList (blacks[k]);
+                }
         }
         for (int key = 0; key < 128; ++key)
         {

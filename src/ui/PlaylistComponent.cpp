@@ -4090,6 +4090,13 @@ void PlaylistComponent::paintLiveEnvelopeLanes (juce::Graphics& g, juce::Rectang
                 line.lineTo (px, py);
             started = true;
         };
+        // (perf: the flat stretches between and after the clips are filled 2 px bars, not stroked path — a lane is mostly
+        // flat and stroking the whole width of every lane cost +1.3 % in the tall-lane arrangement, --paintbench)
+        g.setColour (envelope);
+        const auto flat = [&g] (float x0, float x1, float py) {
+            if (x1 > x0)
+                g.fillRect (juce::Rectangle<float> (x0, py - 1.0f, x1 - x0, 2.0f));
+        };
         auto level = cliplanes::clipStartValue (song, song.playlist[(std::size_t) list.front()]);
         auto cursor = from;
         for (const auto i : list)
@@ -4105,13 +4112,13 @@ void PlaylistComponent::paintLiveEnvelopeLanes (juce::Graphics& g, juce::Rectang
             if (x0 >= to)
                 break;
             if (x0 > cursor) // (flat up to the clip)
-            {
-                lineTo (cursor, yOf (level));
-                lineTo (x0, yOf (level));
-            }
+                flat (cursor, x0, yOf (level));
             const auto a = juce::jmax (x0, cursor), b = juce::jmin (x1, to); // (an overlapping clip: from where the last one ended)
             if (a >= b)
                 continue;
+            // (the clip's curve: a new subpath from the flat level, so the step into its first value is drawn)
+            line.startNewSubPath (a, yOf (level));
+            started = true;
             const auto yAt = [&] (float sx) {
                 const auto songTick = xToTick ((int) sx);
                 return yOf (automation.playAt ((double) c.offset + songTick - (double) c.start, songTick)); // (with its LFO)
@@ -4135,14 +4142,9 @@ void PlaylistComponent::paintLiveEnvelopeLanes (juce::Graphics& g, juce::Rectang
             level = cliplanes::clipEndValue (song, c);
         }
         if (cursor < to) // (after the last clip: the value it ended on, to the lane's end)
-        {
-            lineTo (cursor, yOf (level));
-            lineTo (to, yOf (level));
-        }
-        if (! started)
-            continue;
-        g.setColour (envelope);
-        g.strokePath (line, juce::PathStrokeType (2.0f));
+            flat (cursor, to, yOf (level));
+        if (started)
+            g.strokePath (line, juce::PathStrokeType (2.0f));
 
         // the breakpoints: hollow rings (the lane shows through), the clips' own points
         // (Live shows a breakpoint as a ring only where it can be picked: on a densely recorded envelope the rings would

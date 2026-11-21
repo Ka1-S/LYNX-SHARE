@@ -25938,6 +25938,14 @@ private:
                  << juce::String (1000.0 * (lynx::threadCpuSeconds() - cpu0), 1) << " ms message thread CPU, working set "
                  << juce::String ((double) lynx::toolbar::PerformanceMeter::processMemoryBytes() / 1048576.0, 0) << " MB\n";
         }
+        // LYNX_PAINTBENCH_ROW=<px> (round 190oo): the Playlist's row height after the open, so a build whose .flp import
+        // reads FL's own row height (PAT-6: Thief at 26 px) can be compared with one at 48 px for the same drawing
+        if (const auto row = juce::SystemStats::getEnvironmentVariable ("LYNX_PAINTBENCH_ROW", {}).getIntValue(); row > 0)
+        {
+            offline.editSong ([row] (lynx::Song& s) { s.playlistRowHeight = row; }, false);
+            offline.dispatchPendingMessages();
+            text << "playlist rows forced to " << row << " px (LYNX_PAINTBENCH_ROW)\n";
+        }
         const auto& song = offline.getSong();
         text << "channels " << (int) song.channels.size() << ", patterns " << (int) song.patterns.size() << ", playlist clips " << (int) song.playlist.size()
              << ", inserts " << (int) song.mixer.size() << "\n";
