@@ -3,6 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/EventPaneSplit.h"
+#include "ui/LiveClipLook.h"
 #include "core/KeyRegions.h"
 #include "core/LiveGrid.h"
 #include "core/MagicLasso.h"
@@ -350,6 +351,16 @@ public:
     // (ableton190o live-01-clipview-notes.png); transparent = LYNX's note colours. Only the dock sets it.
     juce::Colour liveNoteColour { juce::Colours::transparentBlack };
     bool liveNotes() const;
+    // Round gap190og (coverage live1:detail-047): Live's Velocity Controls under the lanes of the docked Clip View (Live
+    // look): the Randomize button and its Randomization Amount slider (1…127; typed digits + Enter randomize too)
+    // [DOC Live 12 manual 10.5.12; SHOT /mnt/e/lynx-work/ableton187c/shots/live-01-velocity-lane.png]. The amount is a UI
+    // setting of the session (100: the capture's value), not saved.
+    static inline int liveRandomizeAmount = 100;
+    static constexpr int liveFooterBar = 18; // Live: a 1 px #242424 line + 17 px of #363636 (the capture's y 977…994)
+    int liveFooterHeight() const;
+    void liveFooterCheck(); // (the dock, after a change liveNotes() depends on: lays the footer out when it comes or goes)
+    void liveRandomizeVelocity();
+    juce::Rectangle<int> liveRandomizeBoundsForCheck() const { return liveRandomize.getBounds(); }
     // Round 190hr (detail-055, miditools-098): docked in the Clip-launch detail view, the editor uses the reference's
     // grid (core/LiveGrid.h: adaptive / fixed, narrower / wider, triplet, snap; its value at the toolbar's grid place)
     // and its Quantize (Ctrl+U) / Quantize Settings (Ctrl+Shift+U), which the Clip View's MIDI Tools Quantize tool does
@@ -494,6 +505,11 @@ private:
     IconButton followButton { "follow", Icon::follow }; // Follow (auto scrolling) on/off, EditorGlobals (round 162)
     void quantizeOperation (int kind); // 0 = starts, 1 = starts and lengths (quick quantize), 2 = starts 50% toward the grid
     juce::ComboBox laneBox; // what the bottom lane edits: velocity, pan or fine pitch
+    // round gap190og (detail-047): Live's Velocity Controls footer (docked, Live look, the Velocity lane shown)
+    class LiveAmountBox;
+    liveclip::PillButton liveRandomize { "liveRandomize" };
+    std::unique_ptr<LiveAmountBox> liveRandomAmount;
+    int laidFooter = 0; // the footer height the last layout gave
     class ScaleBox final : public IconComboBox
     {
     public:

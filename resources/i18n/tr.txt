@@ -12279,3 +12279,14 @@ countries: tr
 "{0}: 3x Osc custom shape (the sample stays on this computer)" = "{0}: 3x Osc özel dalga biçimi (sample bu bilgisayarda kalır)"
 "Automation clips of targets FL Studio Mobile can't automate ({0})" = "FL Studio Mobile'ın otomasyon yapamadığı hedeflerin otomasyon klipleri ({0})"
 "The loop is saved as FL Studio Mobile's play loop, which starts switched off" = "Döngü, FL Studio Mobile'ın kapalı başlayan çalma döngüsü olarak kaydedilir"
+
+# --- round gap190og: Live's Crop Clip, Duplicate Loop, Velocity Randomize, mappable transport switches
+"Crop Clip" = "Klibi kırp"
+"Duplicate Loop: the loop and its notes twice as long; notes after the loop move on with its end" = "Döngüyü çoğalt: döngü ve notaları iki kat uzar; döngüden sonraki notalar döngünün sonuyla birlikte kayar"
+"Arrangement Overdub" = "Aranjman overdub"
+"Arrangement Loop switch" = "Aranjman döngü anahtarı"
+"Punch-in switch" = "Punch-in anahtarı"
+"Punch-out switch" = "Punch-out anahtarı"
+"Randomize: the selected notes' velocities (all the notes with none selected) move at random by up to the amount beside it" = "Rastgele yap: seçili notaların velocity değerleri (hiçbiri seçili değilse tüm notalar) yanındaki değere kadar rastgele değişir"
+"Randomization Amount" = "Rastgelelik miktarı"
+"Randomization Amount: velocities move up or down by up to this much (drag, or type a number and press Enter)" = "Rastgelelik miktarı: velocity en fazla bu kadar artar ya da azalır (sürükleyin veya bir sayı yazıp Enter'a basın)"

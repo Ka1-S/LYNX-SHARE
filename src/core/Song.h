@@ -2314,7 +2314,13 @@ enum class RemoteAction : std::uint8_t
     parameter, clipSlot, sceneLaunch, trackStop, stopAllClips, play, stop, record, sessionRecord, metronome,
     // round 190kc: Live's crossfader positions (Crossfader Left / Center / Right) and its Relative Session Mapping Strip
     // (Scene Up / Down, Launch the highlighted scene, Cancel Launch, a track's clip at the highlighted scene: track)
-    crossfaderLeft, crossfaderCentre, crossfaderRight, sceneUp, sceneDown, launchSelectedScene, cancelLaunch, launchSelectedClip
+    crossfaderLeft, crossfaderCentre, crossfaderRight, sceneUp, sceneDown, launchSelectedScene, cancelLaunch, launchSelectedClip,
+    // round gap190og (coverage live4:mapping-0028): the rest of Live's mappable transport switches — Arrangement Overdub,
+    // the Arrangement Loop switch, Punch-In and Punch-Out [SHOT live190ei/shots/live-key-map-mode-full.png: Key Map Mode
+    // marks them in the Control Bar; DOC Live 12 manual 30.2 "Switches and buttons — Among them [...] the Control Bar's
+    // tap tempo, metronome and transport controls"; STR live-exe-strings-u16.txt 2180-2186, 5273: "Arrangement Overdub",
+    // "Arrangement Loop switch", "Punch-in switch", "Punch-out switch"]. Appended: saved projects keep their numbers.
+    overdub, loopSwitch, punchIn, punchOut
 };
 // A mapping of a computer key (Key Map Mode), or of a MIDI controller / key to something other than a parameter (MIDI
 // Map Mode; a parameter's MIDI mapping is a MidiLink, FL's storage). Saved with the project (the reference saves key

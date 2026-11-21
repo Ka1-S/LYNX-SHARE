@@ -12279,3 +12279,14 @@ countries: jp
 "{0}: 3x Osc custom shape (the sample stays on this computer)" = "{0}: 3x Osc のカスタム波形（サンプルはこのコンピューターに残ります）"
 "Automation clips of targets FL Studio Mobile can't automate ({0})" = "FL Studio Mobile がオートメーションできないターゲットのオートメーションクリップ ({0})"
 "The loop is saved as FL Studio Mobile's play loop, which starts switched off" = "ループは FL Studio Mobile の再生ループとして保存されます（最初はオフです）"
+
+# --- round gap190og: Live's Crop Clip, Duplicate Loop, Velocity Randomize, mappable transport switches
+"Crop Clip" = "クリップをクロップ"
+"Duplicate Loop: the loop and its notes twice as long; notes after the loop move on with its end" = "ループを複製: ループとそのノートが2倍の長さになり、ループより後のノートはループの終わりと一緒に移動します"
+"Arrangement Overdub" = "アレンジメントオーバーダブ"
+"Arrangement Loop switch" = "アレンジメントループスイッチ"
+"Punch-in switch" = "パンチインスイッチ"
+"Punch-out switch" = "パンチアウトスイッチ"
+"Randomize: the selected notes' velocities (all the notes with none selected) move at random by up to the amount beside it" = "ランダム化: 選択したノート（選択がなければすべてのノート）のベロシティを、隣の値まででランダムに変えます"
+"Randomization Amount" = "ランダム化量"
+"Randomization Amount: velocities move up or down by up to this much (drag, or type a number and press Enter)" = "ランダム化量: ベロシティはこの値まで上下します（ドラッグ、または数値を入力して Enter）"

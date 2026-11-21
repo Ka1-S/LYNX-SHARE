@@ -12279,3 +12279,14 @@ countries: es mx ar co cl pe ve
 "{0}: 3x Osc custom shape (the sample stays on this computer)" = "{0}: forma personalizada del 3x Osc (la muestra se queda en este equipo)"
 "Automation clips of targets FL Studio Mobile can't automate ({0})" = "Clips de automatización de destinos que FL Studio Mobile no automatiza ({0})"
 "The loop is saved as FL Studio Mobile's play loop, which starts switched off" = "El bucle se guarda como el bucle de reproducción de FL Studio Mobile, que empieza desactivado"
+
+# --- round gap190og: Live's Crop Clip, Duplicate Loop, Velocity Randomize, mappable transport switches
+"Crop Clip" = "Recortar clip"
+"Duplicate Loop: the loop and its notes twice as long; notes after the loop move on with its end" = "Duplicar loop: el loop y sus notas pasan a durar el doble; las notas después del loop se mueven con su final"
+"Arrangement Overdub" = "Overdub del arreglo"
+"Arrangement Loop switch" = "Interruptor de loop del arreglo"
+"Punch-in switch" = "Interruptor de punch-in"
+"Punch-out switch" = "Interruptor de punch-out"
+"Randomize: the selected notes' velocities (all the notes with none selected) move at random by up to the amount beside it" = "Aleatorizar: las velocidades de las notas seleccionadas (todas las notas si no hay ninguna seleccionada) cambian al azar hasta el valor de al lado"
+"Randomization Amount" = "Cantidad de aleatorización"
+"Randomization Amount: velocities move up or down by up to this much (drag, or type a number and press Enter)" = "Cantidad de aleatorización: las velocidades suben o bajan como máximo este valor (arrastra, o escribe un número y pulsa Enter)"

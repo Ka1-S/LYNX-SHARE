@@ -3779,6 +3779,18 @@ public:
             return;
         }
 
+        if (args.contains ("--gapshot190og"))
+        {
+            // LYNX.exe --gapshot190og prefix [--shot-scale 1.5 --shot-suffix @150] (round gap190og, coverage rows still open on
+            // 0.1.31): in the Clip-launch layout, the Edit menu's Live block on the Device View (deviceview-0012), the Clip
+            // panel's Duplicate (Loop) button (detail-019), the clip menu's Crop Clip and Ctrl+Shift+J (detail-020), the
+            // Velocity lane's Randomize footer (detail-047), Key Map Mode on the transport switches (mapping-0028);
+            // checks in prefix-checks.txt
+            runGapShot190og (args[args.indexOf ("--gapshot190og") + 1].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--undoshot190mz"))
         {
             // LYNX.exe --undoshot190mz prefix [--shot-scale 1.5 --shot-suffix @150] (round 190mz, issue #214): the main
@@ -20438,6 +20450,317 @@ private:
             auto additions = lynx::makeExportPanelWithAdditions (offline);
             shoot (*additions, "export");
         }
+    }
+
+    void runGapShot190og (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        const juce::ScopedValueSetter<bool> shown (lynx::ui::showingForShots(), true);
+        juce::String checks;
+        int failures = 0;
+        const auto flush = [&] { juce::File (lynx::shot::file (juce::File (prefix + "-checks.txt"))).replaceWithText (checks + (failures == 0 ? "ALL OK\n" : juce::String (failures) + " FAILED\n")); };
+        const auto check = [&] (const juce::String& what, bool ok) {
+            checks << (ok ? "ok   " : "FAIL ") << what << "\n";
+            failures += ok ? 0 : 1;
+            flush();
+        };
+        const auto line = [&] (const juce::String& what) { checks << "     " << what << "\n"; flush(); };
+        const auto menuRows = [] (const juce::PopupMenu& menu) {
+            juce::StringArray rows;
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                rows.add (it.getItem().isSeparator ? juce::String ("--") : (it.getItem().isEnabled ? "" : "(off) ") + it.getItem().text.replace ("\t", " | "));
+            return rows;
+        };
+        const auto itemOf = [] (const juce::PopupMenu& menu, const juce::String& start) -> const juce::PopupMenu::Item* {
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                if (! it.getItem().isSeparator && it.getItem().text.startsWith (start))
+                    return &it.getItem();
+            return nullptr;
+        };
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        ui.setSize (1600, 900);
+        const auto settle = [&] {
+            for (int k = 0; k < 3; ++k)
+                offline.dispatchPendingMessages();
+        };
+        const auto write = [&prefix, &settle] (juce::Component& c, const juce::String& name) {
+            settle();
+            savePng (lynx::shot::snapshot (c), prefix + "-" + name + ".png");
+        };
+        const auto area = [&prefix, &settle] (juce::Component& c, juce::Rectangle<int> r, const juce::String& name) {
+            settle();
+            savePng (lynx::shot::snapshot (c).getClippedImage ((r.toFloat() * lynx::shot::scale()).toNearestInt()), prefix + "-" + name + ".png");
+        };
+        ui.setVisible (true);
+        lynx::DetailView::shownSetting = true;
+        lynx::DetailView::devicesPage = true;
+        ui.setClipLaunchWorkflow (true);
+        ui.showPanelsForSnapshot ({ lynx::workspace::Panel::playlist });
+        const auto bar = 4 * lynx::ppq;
+        offline.editSong ([bar] (lynx::Song& s) {
+            if (s.channels.size() < 1)
+                s.channels.resize (1);
+            s.channels[0].name = "Keys";
+            s.channels[0].instrument = lynx::InstrumentKind::synth;
+            s.channels[0].mixerTrack = 2;
+            if (s.mixer.size() < 4)
+                s.mixer.resize (4);
+            s.mixer[2].name = "Keys";
+            s.mixer[2].effects.clear();
+            for (auto kind : { lynx::EffectKind::eq, lynx::EffectKind::compressor, lynx::EffectKind::delay })
+                s.mixer[2].effects.push_back (lynx::makeEffectSlot (kind));
+            while (s.patterns.size() < 1)
+                s.patterns.emplace_back();
+            auto& p = s.patterns[0];
+            p.name = "Chords";
+            p.notes.clear();
+            // a one-bar loop with a rising line; a note crossing the loop's end and one after it (Duplicate Loop / Crop)
+            const int keys[] { 60, 64, 67, 72, 71, 67, 64, 62 };
+            for (int i = 0; i < 8; ++i)
+            {
+                lynx::Note n;
+                n.channel = 0;
+                n.key = keys[i];
+                n.start = i * (bar / 8);
+                n.length = bar / 8 - 60;
+                n.velocity = (float) (40 + i * 10) / 127.0f;
+                p.notes.push_back (n);
+            }
+            lynx::Note tail;
+            tail.channel = 0;
+            tail.key = 55;
+            tail.start = bar + lynx::ppq;
+            tail.length = lynx::ppq;
+            p.notes.push_back (tail);
+            p.lengthTicks = 2 * bar;
+            s.playlistTracks.resize (std::max<std::size_t> (s.playlistTracks.size(), 3));
+            s.playlistTracks[1].name = "Keys";
+            lynx::Clip clip;
+            clip.pattern = 0;
+            clip.length = bar;
+            lynx::launcher::setClip (s, 1, 0, clip);
+            if (auto* c = const_cast<lynx::Clip*> (lynx::launcher::clipAt (*s.clipGrid, 1, 0)))
+                c->offset = 0, c->length = bar; // (a one-bar loop over the two-bar pattern)
+        }, false);
+        settle();
+        ui.resized();
+        auto* detail = ui.getDetailViewForSnapshot();
+        auto* grid = ui.getClipGridForSnapshot();
+        if (detail == nullptr || grid == nullptr)
+        {
+            check ("the Clip-launch layout has its detail view and grid", false);
+            return;
+        }
+        const auto editMenu = [&ui] {
+            const auto names = ui.getMenuNamesForSnapshot();
+            return ui.getMenuForSnapshot (juce::jmax (0, names.indexOf (lynx::tr ("Edit"))));
+        };
+        const auto fxNames = [&offline] {
+            juce::StringArray names;
+            for (const auto& fx : offline.getSong().mixer[2].effects)
+                names.add (juce::String ((int) fx.kind));
+            return names.joinIntoString (",");
+        };
+
+        // --- deviceview-0012: the Edit menu's Live block on the Device View ---------------------------------------------
+        detail->showSelection (1, 0);
+        detail->setPage (lynx::DetailView::Page::devices);
+        settle();
+        detail->selectCardForCheck (2); // (card 0 the instrument, 1 the EQ, 2 the Compressor)
+        settle();
+        write (ui, "01-devices-window");
+        write (*detail, "01b-devices");
+        {
+            const auto menu = editMenu();
+            saveMenus (juce::StringArray { lynx::tr ("Edit") }, std::vector<juce::PopupMenu> { menu }, prefix + "-02-edit-menu-device.png");
+            line ("Edit menu: " + menuRows (menu).joinIntoString ("  //  "));
+            const auto* cut = itemOf (menu, lynx::tr ("Cut") + "\t");
+            const auto* paste = itemOf (menu, lynx::tr ("Paste") + "\t");
+            check ("Edit menu (Clip-launch): Live's Cut | Ctrl+X, Copy, Paste, Duplicate, Delete | Del after Undo / Redo",
+                   cut != nullptr && cut->text.endsWith ("Ctrl+X") && itemOf (menu, lynx::tr ("Copy") + "\tCtrl+C") != nullptr
+                       && paste != nullptr && itemOf (menu, lynx::tr ("Duplicate") + "\tCtrl+D") != nullptr && itemOf (menu, lynx::tr ("Delete") + "\tDel") != nullptr
+                       && menuRows (menu).indexOf ("--") < menuRows (menu).indexOf (lynx::tr ("Cut") + " | Ctrl+X"));
+            check ("a selected device: Cut / Copy / Duplicate / Delete on, Paste off with nothing copied", cut != nullptr && cut->isEnabled && paste != nullptr && ! paste->isEnabled);
+        }
+        const auto invoke = [&] (const juce::String& start) {
+            const auto menu = editMenu();
+            if (const auto* item = itemOf (menu, start); item != nullptr && item->isEnabled && item->action != nullptr)
+            {
+                item->action();
+                settle();
+                return true;
+            }
+            return false;
+        };
+        line ("effects before: " + fxNames());
+        check ("Edit > Copy on the Compressor", invoke (lynx::tr ("Copy") + "\t"));
+        detail->selectCardForCheck (3); // the Delay
+        settle();
+        check ("Edit > Paste with the Delay selected: in front of it (Live: \"Pasted devices are inserted in front of the selected device\")",
+               invoke (lynx::tr ("Paste") + "\t") && fxNames() == juce::String ((int) lynx::EffectKind::eq) + "," + juce::String ((int) lynx::EffectKind::compressor) + ","
+                                                                       + juce::String ((int) lynx::EffectKind::compressor) + "," + juce::String ((int) lynx::EffectKind::delay));
+        line ("effects after Paste: " + fxNames());
+        write (*detail, "03-devices-after-paste");
+        check ("Edit > Duplicate", invoke (lynx::tr ("Duplicate") + "\t") && offline.getSong().mixer[2].effects.size() == 5);
+        check ("Edit > Delete", invoke (lynx::tr ("Delete") + "\t") && offline.getSong().mixer[2].effects.size() == 4);
+        detail->selectCardForCheck (2); // (Delete left nothing selected)
+        settle();
+        check ("Edit > Cut", invoke (lynx::tr ("Cut") + "\t") && offline.getSong().mixer[2].effects.size() == 3);
+        line ("effects after Duplicate, Delete, Cut: " + fxNames());
+        // the Pattern layout keeps FL's Edit menu
+        ui.setClipLaunchWorkflow (false);
+        settle();
+        check ("the Pattern layout's Edit menu has no Live block", itemOf (editMenu(), lynx::tr ("Cut") + "\t") == nullptr);
+        ui.setClipLaunchWorkflow (true);
+        settle();
+        ui.resized();
+
+        // --- detail-019: the Clip panel's Duplicate (Loop) button ------------------------------------------------------
+        detail->showSelection (1, 0);
+        detail->setPage (lynx::DetailView::Page::clip);
+        detail->setClipTab (false);
+        lynx::DetailView::devicesPage = false;
+        detail->clipSectionsForSnapshot (true, true, true, 0);
+        settle();
+        ui.resized();
+        write (ui, "04-clip-window");
+        write (*detail, "04b-clip-detail");
+        const auto clipNow = [&offline] () -> lynx::Clip {
+            const auto& g = offline.getSong().clipGrid;
+            const auto* c = g ? lynx::launcher::clipAt (*g, 1, 0) : nullptr;
+            return c != nullptr ? *c : lynx::Clip();
+        };
+        const auto noteCount = [&offline] { return (int) offline.getSong().patterns[0].notes.size(); };
+        check ("the clip's loop is one bar with 9 notes in its pattern", clipNow().length == bar && noteCount() == 9);
+        check ("the Duplicate button pressed", detail->duplicateLoopForCheck());
+        settle();
+        line ("after Duplicate Loop: loop " + juce::String (clipNow().offset) + " + " + juce::String (clipNow().length) + ", " + juce::String (noteCount()) + " notes, last at "
+              + juce::String (offline.getSong().patterns[0].notes.back().start));
+        check ("Duplicate Loop: two bars, the loop's 8 notes copied, the note after the loop moved one bar on",
+               clipNow().length == 2 * bar && noteCount() == 17 && offline.getSong().patterns[0].notes.back().start == 2 * bar + lynx::ppq);
+        write (*detail, "05-clip-after-duplicate-loop");
+        check ("one undo step brings the one-bar loop back", [&] { ui.runActionForSnapshot ("edit.undo"); settle(); return clipNow().length == bar && noteCount() == 9; }());
+
+        // --- detail-047: the Velocity lane's Randomize footer ---------------------------------------------------------
+        auto& roll = ui.getPianoRollForSnapshot();
+        roll.setLaneForSnapshot (lynx::PianoRollComponent::laneVelocity);
+        settle();
+        ui.resized();
+        settle();
+        const auto footer = roll.liveRandomizeBoundsForCheck();
+        line ("roll " + roll.getBounds().toString() + ", footer " + juce::String (roll.liveFooterHeight()) + " px, Randomize " + footer.toString());
+        check ("the docked roll (Live look) shows Live's Velocity footer with Randomize", roll.liveFooterHeight() == lynx::PianoRollComponent::liveFooterBar && ! footer.isEmpty());
+        write (ui, "06-velocity-footer-window");
+        if (roll.getParentComponent() != nullptr)
+            area (roll, roll.getLocalBounds().removeFromBottom (90), "06b-velocity-footer");
+        {
+            std::vector<float> before;
+            for (const auto& n : offline.getSong().patterns[0].notes)
+                before.push_back (n.velocity);
+            lynx::PianoRollComponent::liveRandomizeAmount = 20;
+            roll.liveRandomizeVelocity();
+            settle();
+            int moved = 0, within = 0;
+            const auto& notes = offline.getSong().patterns[0].notes;
+            for (std::size_t i = 0; i < notes.size() && i < before.size(); ++i)
+            {
+                const auto d = std::abs (juce::roundToInt (notes[i].velocity * 127.0f) - juce::roundToInt (before[i] * 127.0f));
+                moved += d > 0 ? 1 : 0;
+                within += d <= 20 ? 1 : 0;
+            }
+            line ("Randomize (amount 20, nothing selected): " + juce::String (moved) + " of " + juce::String ((int) notes.size()) + " notes moved");
+            check ("Randomize with nothing selected moves the notes' velocities by at most the amount", moved > 0 && within == (int) notes.size());
+            lynx::PianoRollComponent::liveRandomizeAmount = 100;
+            write (ui, "07-velocity-after-randomize");
+        }
+
+        // --- detail-020: Crop Clip in the clip's menu and on Ctrl+Shift+J ---------------------------------------------
+        {
+            const auto menu = lynx::clipGridSlotMenu (*grid, 1, 0);
+            saveMenus (juce::StringArray { "Clip" }, std::vector<juce::PopupMenu> { menu }, prefix + "-08-clip-menu.png");
+            line ("clip menu: " + menuRows (menu).joinIntoString ("  //  "));
+            const auto rows = menuRows (menu);
+            const auto crop = rows.indexOf (lynx::tr ("Crop Clip") + " | Ctrl+Shift+J");
+            check ("the clip menu (Live look) has Crop Clip | Ctrl+Shift+J in its own group before the colours",
+                   crop > 0 && rows[crop - 1] == "--" && rows[crop + 1] == "--" && rows.indexOf (lynx::tr ("Deactivate Clip") + " | 0") < crop);
+        }
+        offline.editSong ([bar] (lynx::Song& s) {
+            if (auto* c = s.clipGrid ? const_cast<lynx::Clip*> (lynx::launcher::clipAt (*s.clipGrid, 1, 0)) : nullptr)
+                c->offset = bar / 2, c->length = bar / 2; // the loop on the second half bar
+        });
+        settle();
+        lynx::selectClipGridSlotForSnapshot (*grid, 1, 0);
+        const auto keyed = lynx::clipGridKeyForSnapshot (*grid, juce::KeyPress ('j', juce::ModifierKeys::commandModifier | juce::ModifierKeys::shiftModifier, 0));
+        settle();
+        juce::String kept;
+        for (const auto& n : offline.getSong().patterns[0].notes)
+            kept << n.start << ":" << n.key << " ";
+        line ("after Ctrl+Shift+J: loop " + juce::String (clipNow().offset) + " + " + juce::String (clipNow().length) + ", notes " + kept);
+        check ("Ctrl+Shift+J crops the clip: the half bar's 4 notes kept, moved to the start; the loop starts at 0",
+               keyed && noteCount() == 4 && offline.getSong().patterns[0].notes.front().start == 0 && clipNow().offset == 0 && clipNow().length == bar / 2);
+        write (*detail, "09-clip-after-crop");
+
+        // --- mapping-0028: Key Map Mode on the transport switches -------------------------------------------------------
+        {
+            using namespace lynx::remotemap;
+            offline.editSong ([] (lynx::Song& s) {
+                assignKey (s, Target::of (lynx::RemoteAction::overdub), 'O');
+                assignKey (s, Target::of (lynx::RemoteAction::loopSwitch), 'L');
+                assignKey (s, Target::of (lynx::RemoteAction::punchIn), 'I');
+                assignKey (s, Target::of (lynx::RemoteAction::punchOut), 'U');
+            });
+            settle();
+            for (const auto mode : { Mode::key, Mode::midi })
+            {
+                ui.setMapMode (mode);
+                settle();
+                if (auto* overlay = ui.mapOverlayForSnapshot())
+                {
+                    overlay->refresh();
+                    const auto& spots = overlay->spots();
+                    const auto count = [&spots] (lynx::RemoteAction a) { return (int) std::count_if (spots.begin(), spots.end(), [a] (const auto& sp) { return sp.target.action == a; }); };
+                    line (juce::String (mode == Mode::key ? "key" : "midi") + " map: " + juce::String ((int) spots.size()) + " spots; overdub " + juce::String (count (lynx::RemoteAction::overdub))
+                          + ", loop " + juce::String (count (lynx::RemoteAction::loopSwitch)) + ", punch in " + juce::String (count (lynx::RemoteAction::punchIn)) + ", punch out "
+                          + juce::String (count (lynx::RemoteAction::punchOut)));
+                    check (juce::String (mode == Mode::key ? "Key" : "MIDI") + " Map Mode: Arrangement Overdub, Loop, Punch-In and Punch-Out are mappable in the Control Bar",
+                           count (lynx::RemoteAction::overdub) == 1 && count (lynx::RemoteAction::loopSwitch) == 1 && count (lynx::RemoteAction::punchIn) == 1
+                               && count (lynx::RemoteAction::punchOut) == 1);
+                }
+                write (ui, mode == Mode::key ? "10-keymap" : "11-midimap");
+                if (mode == Mode::key)
+                    area (ui, ui.getLocalBounds().removeFromTop (60), "10b-keymap-controlbar");
+                if (mode == Mode::key)
+                    if (auto* browser = ui.mappingBrowserForSnapshot())
+                        write (*browser, "12-key-mappings-browser");
+            }
+            ui.setMapMode (Mode::off);
+            settle();
+            // the mapped keys switch them, and the mappings survive a save
+            const auto options = [&offline] { return offline.getRecordOptions(); };
+            const auto blend = options().mode;
+            const auto loopBefore = offline.getSong().loopPlays();
+            const auto inBefore = options().punchLoopRegion && options().punchIn;
+            const auto press = [&] (int key) {
+                for (const auto& f : keyFires (offline.getSong(), key, true))
+                    ui.fireRemote (f);
+                settle();
+            };
+            press ('O');
+            press ('L');
+            press ('I');
+            check ("the mapped keys switch Overdub, Loop and Punch-In", options().mode != blend && offline.getSong().loopPlays() != loopBefore
+                                                                           && (options().punchLoopRegion && options().punchIn) != inBefore);
+            juce::String error;
+            const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (offline.getSong()), error);
+            int kept4 = 0;
+            if (back)
+                for (const auto& m : back->remoteMappings)
+                    kept4 += m.action == lynx::RemoteAction::overdub || m.action == lynx::RemoteAction::loopSwitch || m.action == lynx::RemoteAction::punchIn
+                                     || m.action == lynx::RemoteAction::punchOut ? 1 : 0;
+            check ("the four mappings are saved with the project and read back", kept4 == 4);
+        }
+        flush();
     }
 
     void runUndoShot190mz (const juce::String& prefix)

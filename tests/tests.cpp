@@ -18068,3 +18068,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "CrossPaste190nzTests.inc" // round 190nz: issue #232 stage 2 (copy and paste between windows)
 #include "Issues190odTests.inc" // round 190od: issues #236, #238, #239, #240
 #include "Perf190ofTests.inc" // round 190of: the monitor's Longest / Spikes, the split CPU meter (P24), latency check
+#include "Gap190ogTests.inc" // round gap190og (0.1.31): Live Duplicate Loop, Crop Clip, velocity Randomize, mappable transport, Edit menu on devices

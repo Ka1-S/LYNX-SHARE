@@ -46,7 +46,11 @@ bool valid (const Target& t) noexcept
         case RemoteAction::stop:
         case RemoteAction::record:
         case RemoteAction::sessionRecord:
-        case RemoteAction::metronome: return true;
+        case RemoteAction::metronome:
+        case RemoteAction::overdub: // (round gap190og)
+        case RemoteAction::loopSwitch:
+        case RemoteAction::punchIn:
+        case RemoteAction::punchOut: return true;
     }
     return false;
 }
@@ -337,7 +341,11 @@ bool canBeGlobal (const Target& t) noexcept
         case RemoteAction::sceneUp:
         case RemoteAction::sceneDown:
         case RemoteAction::launchSelectedScene:
-        case RemoteAction::cancelLaunch: return true;
+        case RemoteAction::cancelLaunch:
+        case RemoteAction::overdub: // (round gap190og: transport switches, set-wide)
+        case RemoteAction::loopSwitch:
+        case RemoteAction::punchIn:
+        case RemoteAction::punchOut: return true;
         case RemoteAction::clipSlot:
         case RemoteAction::trackStop:
         case RemoteAction::launchSelectedClip: return false;

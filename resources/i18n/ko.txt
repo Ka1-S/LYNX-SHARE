@@ -12279,3 +12279,14 @@ countries: kr
 "{0}: 3x Osc custom shape (the sample stays on this computer)" = "{0}: 3x Osc 사용자 파형(샘플은 이 컴퓨터에 남음)"
 "Automation clips of targets FL Studio Mobile can't automate ({0})" = "FL Studio Mobile이 오토메이션할 수 없는 대상의 오토메이션 클립 ({0})"
 "The loop is saved as FL Studio Mobile's play loop, which starts switched off" = "루프는 FL Studio Mobile의 재생 루프로 저장되며, 처음에는 꺼져 있습니다"
+
+# --- round gap190og: Live's Crop Clip, Duplicate Loop, Velocity Randomize, mappable transport switches
+"Crop Clip" = "클립 자르기"
+"Duplicate Loop: the loop and its notes twice as long; notes after the loop move on with its end" = "루프 복제: 루프와 그 노트가 두 배 길이가 되고, 루프 뒤의 노트는 루프 끝과 함께 이동합니다"
+"Arrangement Overdub" = "어레인지먼트 오버더브"
+"Arrangement Loop switch" = "어레인지먼트 루프 스위치"
+"Punch-in switch" = "펀치인 스위치"
+"Punch-out switch" = "펀치아웃 스위치"
+"Randomize: the selected notes' velocities (all the notes with none selected) move at random by up to the amount beside it" = "랜덤화: 선택한 노트(선택이 없으면 모든 노트)의 벨로시티를 옆의 값까지 무작위로 바꿉니다"
+"Randomization Amount" = "랜덤화 양"
+"Randomization Amount: velocities move up or down by up to this much (drag, or type a number and press Enter)" = "랜덤화 양: 벨로시티가 최대 이 값만큼 오르내립니다 (드래그하거나 숫자를 입력하고 Enter)"
