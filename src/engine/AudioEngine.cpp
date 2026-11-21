@@ -6601,6 +6601,9 @@ void AudioEngine::updateRealtimeStats()
     // the message thread's pulse: this 30 Hz timer arriving late means the UI is saturated
     {
         const auto now = juce::Time::getMillisecondCounterHiRes();
+        // round 190ok: the safe-overload guard's view of the UI, and FL's Settings › Audio › "Safe overloads"
+        overloadGuard.uiPulse (now);
+        overloadGuard.setEnabled (flsettings::options().safeOverloads.load (std::memory_order_relaxed));
         if (lastUiPulseMs > 0.0)
             uiPulse.maxGapMs = juce::jmax (uiPulse.maxGapMs, now - lastUiPulseMs);
         lastUiPulseMs = now;
@@ -6786,6 +6789,9 @@ juce::String AudioEngine::describeRealtime (bool withUnits) const
              << "), the last " << d.secondsAgo << " s ago: " << (d.cause == dropouts::Cause::system ? "driver / system late" : "processing")
              << ", load " << juce::String (d.load * 100.0, 0) << "%"
              << (d.slowest.isNotEmpty() ? ", slowest " + d.slowest + " " + juce::String (d.slowestMs, 2) + " ms" : juce::String()) << "\n";
+    if (overloadGuard.timesEngaged() > 0 || overloadGuard.engaged()) // (round 190ok: Settings › Audio › "Safe overloads")
+        text << "  safe overloads: engaged " << (juce::int64) overloadGuard.timesEngaged() << " times" << (overloadGuard.engaged() ? " (now)" : "")
+             << ", the audio gave up " << juce::String (overloadGuard.yieldedMs(), 0) << " ms to keep the screen responsive\n";
     if (latencyRepublishes > 0)
         text << "  latency changes re-planned PDC " << latencyRepublishes << " times (last: unit " << lastLatencyChange << ")\n";
     if (rackProcessor != nullptr) // (round 190gq: Options › Audio settings › "Render ahead")
@@ -7650,7 +7656,14 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
             // round 190gg: with the block's slowest channel / effect call (named if the block missed its deadline)
             const auto slowest = engine.rackProcessor != nullptr ? engine.rackProcessor->getRenderer().takeBlockSlowest() : 0;
             if (rate > 0.0)
-                engine.rtStats.record (start, juce::Time::getMillisecondCounterHiRes() - start, 1000.0 * samples / rate, slowest);
+            {
+                const auto end = juce::Time::getMillisecondCounterHiRes();
+                engine.rtStats.record (start, end - start, 1000.0 * samples / rate, slowest);
+                // round 190ok (FL's "Safe overloads", TOP25 P24): in a real overload with the UI starving, a slice of the
+                // CPU is given up after the block's output is written (core/OverloadGuard.h)
+                if (const auto yield = engine.overloadGuard.afterCallback (end, end - start, 1000.0 * samples / rate); yield > 0.0)
+                    OverloadGuard::sleepFor (yield);
+            }
         }
         AudioEngine& engine;
         double start;
@@ -8104,6 +8117,7 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
 void AudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
 {
     rtStats.deviceRestarted();
+    overloadGuard.restart(); // (round 190ok)
     rt::resetForNewDevice();
     transport.sampleRate.store (device->getCurrentSampleRate());
     meters.rollingLog.setSampleRate (device->getCurrentSampleRate()); // (the audio thread isn't running yet: it may allocate)

@@ -12073,3 +12073,10 @@ countries: fr be ch ca lu
 "The longest single call since the reset, in milliseconds (red: half of the audio buffer or more)" = "L'appel le plus long depuis la remise à zéro, en millisecondes (rouge : la moitié du tampon audio ou plus)"
 "Calls that took more than half of the time their own audio lasts: one plugin alone near the deadline, what makes the sound stutter" = "Appels qui ont pris plus de la moitié du temps que dure leur propre audio : un plugin seul près de la limite, ce qui fait hacher le son"
 "Live part {0}%, rendered ahead {1}% (together {2}% of one core)." = "Partie en direct {0} %, rendu en avance {1} % (ensemble {2} % d'un cœur)."
+
+# round 190ok: safe overloads (P24), generator smart disable (D2), the smart-disable tip (D1)
+"Safe overloads" = "Surcharges sécurisées"
+"No risk of GUI freezing when overloads occur" = "Aucun risque de blocage de l'interface en cas de surcharge"
+"Smart disable for new instrument plugins" = "Désactivation intelligente pour les nouveaux plugins d'instrument"
+"New channels with an instrument plugin get Smart disable on: the plugin is not called while it gets no notes and its sound has been silent for 4 seconds. FL Studio starts a new generator with it off." = "Les nouveaux canaux avec un plugin d'instrument ont la désactivation intelligente activée : le plugin n'est pas appelé tant qu'il ne reçoit aucune note et que son son est silencieux depuis 4 secondes. FL Studio crée un nouveau générateur avec elle désactivée."
+"Tip: {0} of the {1} effects in this project have Smart disable off, as FL Studio saved them, so they keep working in silence ({2}% CPU with the song stopped). Tools > Macros > Switch smart disable for all plugins turns it on for all of them." = "Astuce : {0} des {1} effets de ce projet ont la désactivation intelligente coupée, comme FL Studio les a enregistrés, ils continuent donc de travailler dans le silence ({2} % de CPU morceau arrêté). Outils > Macros > Basculer la désactivation intelligente de tous les plugins l'active pour tous."

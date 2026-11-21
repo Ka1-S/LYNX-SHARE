@@ -1,4 +1,5 @@
 #include "core/MixSuite.h"
+#include "core/FastMath.h"
 #include "core/RenDynamics.h"
 #include "core/VitaminLaw.h"
 
@@ -3097,6 +3098,37 @@ float shape (Style s, float x) noexcept
     }
 }
 
+// round 190ok (D3): the curves that call tanh, with FastMath's (inline and branch-free: a block of them vectorises)
+namespace
+{
+inline float tubeFast (float x) noexcept
+{
+    constexpr float bias = 0.15f, knee = 2.0f;
+    const float tb = std::tanh (bias); // (a constant: folded by the compiler, the same value shape() uses)
+    return knee * (fastmath::tanh (x / knee + bias) - tb) / (1.0f - tb * tb);
+}
+inline float tubeBiasedFast (float x) noexcept
+{
+    constexpr float bias = 0.35f;
+    const float tb = std::tanh (bias);
+    return (fastmath::tanh (x + bias) - tb) / (1.0f - tb * tb);
+}
+} // namespace
+
+float shapeFast (Style s, float x) noexcept
+{
+    switch (s)
+    {
+        case Style::tube: return tubeFast (x);
+        case Style::tubeBiased: return tubeBiasedFast (x);
+        case Style::fuzz:
+            if (x < 0.0f)
+                return fastmath::tanh (1.5f * x) / 1.5f;
+            return shape (s, x);
+        default: return shape (s, x);
+    }
+}
+
 // ---- round 150: the measured characters (REA_rodada150b) ----
 namespace
 {
@@ -3690,6 +3722,9 @@ public:
     {
         if (initial != nullptr) linOn = linearPhase (*initial);
     }
+    // round 190ok (D3): 2 = the tube curves with core/FastMath.h's tanh (0 / 1: std::tanh, as projects saved before)
+    void setEngineRev (int rev) noexcept override { engineRev = rev; }
+    int engineRev = 0;
 
     void prepare (double rate) noexcept override
     {
@@ -4060,6 +4095,23 @@ private:
             auto right = [&ex, s] (float x) noexcept { return ex.shapeWithFeedback (s, x, 1); };
             os[0].process (wl.data(), n, left);
             os[1].process (wr.data(), n, right);
+        }
+        else if (engineRev >= 2 && (s == Style::tube || s == Style::tubeBiased))
+        {
+            // round 190ok (D3, the plugin quality gate: perf190ok/d3): the tube curves with FastMath's tanh, one lambda
+            // per style so the oversampled block's curve loop vectorises
+            if (s == Style::tube)
+            {
+                auto curve = [] (float x) noexcept { return tubeFast (x); };
+                os[0].process (wl.data(), n, curve);
+                os[1].process (wr.data(), n, curve);
+            }
+            else
+            {
+                auto curve = [] (float x) noexcept { return tubeBiasedFast (x); };
+                os[0].process (wl.data(), n, curve);
+                os[1].process (wr.data(), n, curve);
+            }
         }
         else
         {

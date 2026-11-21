@@ -1,4 +1,5 @@
 #include "engine/HostingTests.h"
+#include "platform/PrefaultMemory.h"
 
 #include <algorithm>
 #include <chrono>
@@ -946,6 +947,10 @@ int runPluginBench (const juce::String& listOrPlugin, const juce::String& report
         {
             juce::String note;
             const auto mem0 = processMemoryMb();
+            // round 190ok: LYNX_PB_PREFAULT=1 pre-faults the memory the plugin mapped while it loaded and prepared
+            // (platform/PrefaultMemory.h), to compare its audio thread's page faults with and without
+            const auto prefaultOn = juce::SystemStats::getEnvironmentVariable ("LYNX_PB_PREFAULT", "0") == "1";
+            const auto mapsBefore = prefaultOn ? prefault::mappings() : std::vector<prefault::Region> {};
             const auto t0 = juce::Time::getMillisecondCounterHiRes();
             juce::String error;
             auto instance = createRightInstance (host.getFormats(), type, rate, block, error);
@@ -960,6 +965,12 @@ int runPluginBench (const juce::String& listOrPlugin, const juce::String& report
             const auto mem1 = processMemoryMb();
             const auto p0 = juce::Time::getMillisecondCounterHiRes();
             preparePlugin (*instance, rate, block);
+            if (prefaultOn)
+            {
+                const auto pf = prefault::populateNew (mapsBefore);
+                note << "prefault " << (juce::int64) pf.regions << " regions / " << juce::String ((double) pf.bytes / 1048576.0, 1) << " MB"
+                     << (pf.supported ? "" : " (not supported)") << "; ";
+            }
             const auto prepareMs = juce::Time::getMillisecondCounterHiRes() - p0;
             const auto mem2 = processMemoryMb();
             const auto instrument = type.isInstrument || instance->getTotalNumInputChannels() == 0;
@@ -1009,6 +1020,14 @@ int runPluginBench (const juce::String& listOrPlugin, const juce::String& report
                 p.processBlock (buffer, midi);
                 return peakOut();
             });
+            // round 190ok: LYNX_PB_BLOCKS=<file> appends the signal phase's work per block (finding a period in spikes)
+            if (const auto dump = juce::SystemStats::getEnvironmentVariable ("LYNX_PB_BLOCKS", {}); dump.isNotEmpty())
+            {
+                juce::String rows;
+                for (std::size_t b = 0; b < signal.work.size(); ++b)
+                    rows << type.name << "\t" << (int) b << "\t" << juce::String (signal.work[b], 0) << "\t" << juce::String (signal.wallUs[b], 1) << "\n";
+                juce::File (dump).appendText (rows);
+            }
             auto silence = runPhase (signalBlocks, false, [&] (int b) {
                 feed (Feed::silence, false, b == 0);
                 p.processBlock (buffer, midi);

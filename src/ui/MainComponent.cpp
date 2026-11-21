@@ -45,6 +45,7 @@
 #include "ui/UiTrace.h"
 #include "core/LoadTrace.h"
 #include "ui/MainComponent.h"
+#include "core/SmartDisableTip.h"
 #include "ui/Motion.h"
 #include "ui/RemoteControlSettings.h"
 #include "ui/NativeChild.h"
@@ -7563,6 +7564,7 @@ void MainComponent::timerCallback()
         resized();
     }
     const uitrace::Scope trace ("MainComponent timer", false);
+    smartTipTick(); // (round 190ok, D1)
     engine.getMeters().expirePower (juce::Time::getMillisecondCounter()); // (round 190lr: the RMS sums stop with their reader)
     {
         const uitrace::Scope part ("timer: toolbar displays", false);
@@ -9055,6 +9057,14 @@ void MainComponent::importFlp (const juce::File& file)
 
 void MainComponent::flpImported (const juce::File& file)
 {
+    // round 190ok (D1): an FL project: its stopped load is measured over the next seconds (smartTipTick)
+    perfMeter.setSmartDisableTip ({});
+    smartTip = {};
+    if (file.hasFileExtension ("flp"))
+    {
+        smartTip.armed = true;
+        smartTip.armedAt = smartTip.since = juce::Time::getMillisecondCounterHiRes();
+    }
     {
         currentFile = juce::File(); // imported: "Save" asks where to write the .lynx
         importedFlpFile = file;
@@ -9672,14 +9682,71 @@ void MainComponent::changeDeclickOfSelectedClips (int mode)
     });
 }
 
+juce::String MainComponent::smartDisableTipText (int off, int total, double stoppedLoad) const
+{
+    return tr ("Tip: {0} of the {1} effects in this project have Smart disable off, as FL Studio saved them, so they keep working in silence "
+               "({2}% CPU with the song stopped). Tools > Macros > Switch smart disable for all plugins turns it on for all of them.",
+               { juce::String (off), juce::String (total), juce::String (juce::roundToInt (stoppedLoad * 100.0)) });
+}
+
+void MainComponent::showSmartDisableTip (int off, int total, double stoppedLoad, bool firstTimeNotice)
+{
+    const auto text = smartDisableTipText (off, total, stoppedLoad);
+    perfMeter.setSmartDisableTip (text);
+    if (! firstTimeNotice)
+        return;
+    // once: the first project that needs it (the CPU meter's hint keeps it for every such project)
+    const auto shown = PluginHost::settingsFolder().getChildFile ("smart-disable-tip.txt");
+    if (shown.existsAsFile())
+        return;
+    shown.replaceWithText ("1");
+    ui::postNotice ({ text }, 20000);
+}
+
+void MainComponent::smartTipTick()
+{
+    if (! smartTip.armed)
+        return;
+    const auto now = juce::Time::getMillisecondCounterHiRes();
+    if (now - smartTip.armedAt > 120000.0) // (never stopped long enough with a device: given up)
+    {
+        smartTip.armed = false;
+        return;
+    }
+    // the stopped load: the device running, the song stopped, after a second to settle; 3 s of the meter's values
+    if (engine.getDeviceManager().getCurrentAudioDevice() == nullptr || engine.bounceStillPlaying())
+    {
+        smartTip.since = now;
+        smartTip.loadSum = 0.0;
+        smartTip.samples = 0;
+        return;
+    }
+    if (now - smartTip.since < 1000.0)
+        return;
+    smartTip.loadSum += engine.getDeviceManager().getCpuUsage();
+    ++smartTip.samples;
+    if (now - smartTip.since < 4000.0 || smartTip.samples < 10)
+        return;
+    smartTip.armed = false;
+    const auto load = smartTip.loadSum / smartTip.samples;
+    const auto c = smarttip::count (engine.getSong());
+    if (smarttip::due (c, load))
+        showSmartDisableTip (c.off, c.total, load, true);
+}
+
 void MainComponent::switchSmartDisableForAll()
 {
+    perfMeter.setSmartDisableTip ({}); // (round 190ok: the tip's advice taken)
     // FL's Tools › Macros › "Switch smart disable for all plugins" (FLEngine FUN_0124d430, REA round 139): every
-    // effect slot of every insert is set to smart disable
+    // effect slot of every insert is set to smart disable, and so is every plugin channel (round 190ok, D2: LYNX's hosted
+    // instruments now sleep through silence as FL's generators do)
     engine.editSong ([] (Song& s) {
         for (auto& track : s.mixer)
             for (auto& slot : track.effects)
                 slot.smartDisable = true;
+        for (auto& c : s.channels)
+            if (c.instrument == InstrumentKind::plugin)
+                c.setSmartDisable (true);
     });
 }
 

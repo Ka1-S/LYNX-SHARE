@@ -279,6 +279,7 @@ public:
         hintBar.setHint (hint, live);
     }
     juce::Rectangle<int> getToolbarBoundsForSnapshot() const { return { 0, 0, getWidth(), toolbarHeight }; }
+    void switchSmartDisableForAllForSnapshot() { switchSmartDisableForAll(); } // (round 190ok)
     // every visible control with a quick tip (toolbar and panel title bars), in this component's coordinates
     std::vector<std::pair<juce::Rectangle<int>, juce::String>> getQuickTipsForSnapshot();
     // --snapshot: a toolbar layout (icon size, hidden/reordered groups) without saving it
@@ -552,6 +553,20 @@ private:
     void exportForOtherApps();          // File › Export › For other apps... (round 184a S9; also the Finish dock's row)
     void exportMidiFile();
     void switchSmartDisableForAll();
+    // Round 190ok (owner decision D1): after an .flp import, the stopped load is measured for a few seconds; a project with
+    // Smart disable off on most of its effects (as FL saved them) and a heavy stopped load gets the tip that points at
+    // the macro above: once in the hint bar (the first time ever), and in the CPU meter's hint while it holds
+    struct SmartTipWatch
+    {
+        bool armed = false;
+        double armedAt = 0.0, since = 0.0, loadSum = 0.0;
+        int samples = 0;
+    } smartTip;
+    void smartTipTick();
+public:
+    juce::String smartDisableTipText (int off, int total, double stoppedLoad) const;
+    void showSmartDisableTip (int off, int total, double stoppedLoad, bool firstTimeNotice);
+private:
     void autoCloseDevice(); // Settings › Audio › "Auto close" (round 190bx), from the timer
     bool deviceClosedByAutoClose = false;
     void confirmPrepareForMidiExport();

@@ -645,6 +645,10 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
     // which gave the same samples on every Maximus state measured): dropped, nothing to report
     forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String&) { drop (e, "engineRev"); });
 
+    // round 190ok: ChannelDef::smartDisable (FL's generator smart disable for a hosted instrument): an older LYNX runs the
+    // plugin all the time, the same sound (dropped, nothing to report)
+    forEachChannel (root, [&] (juce::DynamicObject& c, int) { drop (c, "smartDisable"); });
+
     // rollup step 6, round natives190kj: ChannelDef::engineRev (Harmor 1 = a part with a sample in its IMG section plays
     // FL's resynthesis; 0.1.28 plays such a part's timbres) and Newtone's state version 3 (+ the key, each note's voiced
     // end and velocity): 0.1.28 reads up to version 2 and would load no notes at all, so the state is written as version

@@ -1,4 +1,5 @@
 #include "core/EchoSuite.h"
+#include "core/FastMath.h"
 
 #include <atomic>
 #include <algorithm>
@@ -1095,6 +1096,11 @@ const char* const styleNames[styleCount] = { "Single", "Ratio", "Quad", "Dual", 
 class Echoform final : public Effect
 {
 public:
+    // round 190ok (D3): 2 = the per-sample LFO sines through core/FastMath.h (0 / 1: std::sin, as projects saved before)
+    void setEngineRev (int rev) noexcept override { engineRev = rev; }
+    int engineRev = 0;
+    double lfoSin (double phase) const noexcept { return engineRev >= 2 ? fastmath::sin2pi (phase) : std::sin (twoPi * phase); }
+
     void prepare (double rate) noexcept override
     {
         sr = rate;
@@ -1462,7 +1468,7 @@ private:
                         ph -= std::floor (ph);
                         // round 150: a triangle where the reference's delay track is one (wobbleRandom 2), in the sine's phase
                         const auto u = ph + 0.25 - std::floor (ph + 0.25);
-                        modMs[c] = vd->wobbleRandom == 2 ? wobbleMs * (1.0 - 4.0 * std::abs (u - 0.5)) : wobbleMs * std::sin (twoPi * ph);
+                        modMs[c] = vd->wobbleRandom == 2 ? wobbleMs * (1.0 - 4.0 * std::abs (u - 0.5)) : wobbleMs * lfoSin (ph);
                     }
                 }
                 if (ppV) // round 150: the ping-pong's second side repeats the first one's echo as it is
@@ -1486,10 +1492,10 @@ private:
                         switch (lfoShape) // round 144: the LFO's wave (0 = the sine as before)
                         {
                             case 1: w = 1.0 - 4.0 * std::abs (ph - 0.5); break;                            // triangle
-                            case 2: w = std::tanh (6.0 * std::sin (twoPi * ph)) / std::tanh (6.0); break; // square (soft edges)
+                            case 2: w = std::tanh (6.0 * lfoSin (ph)) / std::tanh (6.0); break; // square (soft edges)
                             case 3: w = 2.0 * ph - 1.0; break;                                             // saw
                             case 4: w = 0.5 * s.drift.next (rate * 2.0, sr); break;                        // random
-                            default: w = std::sin (twoPi * ph); break;
+                            default: w = lfoSin (ph); break;
                         }
                         // round 190dl: Clock — the swing is a fraction of the echo time (½ · depth), as a clocked line's
                         modMs[c] = clockMod ? 0.5 * depth * (c == 0 ? tL : tR) * w : modAmountMs * depth * depth * w;
@@ -1621,7 +1627,7 @@ private:
                     }
                     case Mode::phaser:
                     {
-                        const auto lfo = std::sin (twoPi * (lfoPhase + (c == 1 ? 0.25 : 0.0)));
+                        const auto lfo = lfoSin (lfoPhase + (c == 1 ? 0.25 : 0.0));
                         const auto fc = std::clamp (200.0 * std::pow (8.0, (double) ageV) * std::pow (2.0, 2.0 * depth * lfo), 40.0, 0.4 * sr);
                         const auto t = std::tan (pi * fc / sr);
                         const auto a = (float) ((t - 1.0) / (t + 1.0));

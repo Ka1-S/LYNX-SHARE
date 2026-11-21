@@ -12073,3 +12073,10 @@ countries: cn sg
 "The longest single call since the reset, in milliseconds (red: half of the audio buffer or more)" = "自重置以来最长的单次调用，单位毫秒（红色：音频缓冲区的一半或更多）"
 "Calls that took more than half of the time their own audio lasts: one plugin alone near the deadline, what makes the sound stutter" = "耗时超过其自身音频时长一半的调用：单个插件就接近极限，这会让声音卡顿"
 "Live part {0}%, rendered ahead {1}% (together {2}% of one core)." = "实时部分 {0}%，提前渲染 {1}%（合计一个核心的 {2}%）。"
+
+# round 190ok: safe overloads (P24), generator smart disable (D2), the smart-disable tip (D1)
+"Safe overloads" = "安全过载"
+"No risk of GUI freezing when overloads occur" = "过载时界面不会卡死"
+"Smart disable for new instrument plugins" = "新乐器插件使用智能禁用"
+"New channels with an instrument plugin get Smart disable on: the plugin is not called while it gets no notes and its sound has been silent for 4 seconds. FL Studio starts a new generator with it off." = "带乐器插件的新通道会开启智能禁用：插件在没有收到音符且声音已静音 4 秒时不会被调用。FL Studio 新建的生成器默认关闭此项。"
+"Tip: {0} of the {1} effects in this project have Smart disable off, as FL Studio saved them, so they keep working in silence ({2}% CPU with the song stopped). Tools > Macros > Switch smart disable for all plugins turns it on for all of them." = "提示：此项目的 {1} 个效果中有 {0} 个按 FL Studio 的保存关闭了智能禁用，因此在静音时仍在处理（歌曲停止时 CPU {2}%）。工具 > 宏 > 切换所有插件的智能禁用 可将它们全部打开。"

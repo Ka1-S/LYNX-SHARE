@@ -1545,6 +1545,8 @@ ui::Hint PerformanceMeter::hintAt (juce::Point<int> p)
         if (underruns > 0 && driverTip.isNotEmpty())
             h.text << "  " << tr ("Tip: Windows Audio (shared) drops out more easily; choose the ASIO driver \"{0}\" in Options > Audio settings.",
                                   { driverTip });
+        if (smartTipText.isNotEmpty()) // (round 190ok, D1)
+            h.text << "  " << smartTipText;
         h.value = juce::String (cpu * 100.0, 1) + "%" + (peakLoad > 0.0 ? "  (" + tr ("peak {0}%", { juce::String (juce::roundToInt (peakLoad * 100.0)) }) + ")" : juce::String());
         // round 190of (P24): with render-ahead at work, its two parts (the bar shows the live part: the deadline)
         if (splitAhead >= 0.0005)
