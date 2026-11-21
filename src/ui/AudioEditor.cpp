@@ -475,6 +475,7 @@ public:
 
     ~AudioEditor() override
     {
+        subscribeStripLevel (false); // (round 190oa)
         if (slotMode())
         {
             // the plugin goes on without its window: a recording continues (AudioEngine::pumpEdisonRecordings), the audio stays in the slot
@@ -1522,9 +1523,17 @@ public:
             }
         };
 
+        thresholdStrip = {};
         if (full)
         {
             auto panel = area.removeFromTop (panelHeight).reduced (8, 6);
+            // round 190oa (DP-59, capture 190oa C10): FL's narrow input meter at the top panel's far right, "Click to set
+            // noise threshold" (an Edison slot: the level the On input / Input recording waits for)
+            if (slotMode())
+            {
+                thresholdStrip = panel.removeFromRight (14);
+                panel.removeFromRight (8);
+            }
             // the tool grid at the right: 2 rows x 9, 36 x 28, 4 px apart (the edit tools sit in the small row)
             const auto gridTools = n - editTools;
             const auto rows = 2, columns = juce::jmax (toolColumns, (gridTools + rows - 1) / rows);
@@ -1665,6 +1674,7 @@ public:
             g.drawEllipse (ring, 1.0f);
         }
         paintStrip (g);
+        paintThresholdStrip (g);
 
         paintRuler (g);
         paintClipLane (g);
@@ -1693,9 +1703,83 @@ public:
         paintInfo (g);
     }
 
+    // --- round 190oa (DP-59): the input meter that sets the noise threshold -------------------------------------
+    juce::Rectangle<int> thresholdStrip;
+    float stripLevel = 0.0f; // the slot's input peak (falling), linear
+    int stripKey = -1;       // the slot's level subscription (ProcessTimes::levelWanted)
+    static constexpr float stripFloorDb = -60.0f;
+    float stripGainAt (int y) const
+    {
+        const auto r = thresholdStrip.toFloat().reduced (0.0f, 2.0f);
+        const auto db = stripFloorDb * juce::jlimit (0.0f, 1.0f, ((float) y - r.getY()) / juce::jmax (1.0f, r.getHeight()));
+        return juce::Decibels::decibelsToGain (db, stripFloorDb - 1.0f);
+    }
+    float stripY (float gain) const
+    {
+        const auto r = thresholdStrip.toFloat().reduced (0.0f, 2.0f);
+        const auto db = juce::jlimit (stripFloorDb, 0.0f, juce::Decibels::gainToDecibels (gain, stripFloorDb));
+        return r.getY() + r.getHeight() * db / stripFloorDb;
+    }
+    void paintThresholdStrip (juce::Graphics& g) const
+    {
+        if (thresholdStrip.isEmpty())
+            return;
+        const auto r = thresholdStrip.toFloat();
+        g.setColour (theme::colour::bg0);
+        g.fillRect (r);
+        if (stripLevel > 1.0e-4f)
+        {
+            g.setColour (theme::colour::meterLow);
+            g.fillRect (r.reduced (3.0f, 0.0f).withTop (stripY (stripLevel)).withBottom (r.getBottom() - 2.0f));
+        }
+        g.setColour (theme::colour::warning);
+        g.fillRect (juce::Rectangle<float> (r.getX(), stripY (shownNoiseThreshold()) - 1.0f, r.getWidth(), 2.0f));
+        g.setColour (theme::colour::border);
+        g.drawRect (r, 1.0f);
+    }
+    void subscribeStripLevel (bool on)
+    {
+        auto* times = engine.getProcessTimes();
+        if (times == nullptr)
+            return;
+        if (on && stripKey < 0)
+            if (const auto [t, i] = slotPlace(); t >= 0)
+                if (const auto key = t * maxEffectSlots + i; key >= 0 && (std::size_t) key < times->levelWanted.size())
+                {
+                    stripKey = key;
+                    times->levelWanted[(std::size_t) key].fetch_add (1, std::memory_order_relaxed);
+                }
+        if (! on && stripKey >= 0)
+        {
+            times->levelWanted[(std::size_t) stripKey].fetch_sub (1, std::memory_order_relaxed);
+            stripKey = -1;
+        }
+    }
+    void stripTick()
+    {
+        if (thresholdStrip.isEmpty())
+            return;
+        subscribeStripLevel (true);
+        auto* times = engine.getProcessTimes();
+        if (times == nullptr || stripKey < 0)
+            return;
+        const auto peak = times->slotLevels[(std::size_t) stripKey * 2].exchange (0.0f, std::memory_order_relaxed);
+        const auto next = juce::jmax (peak, stripLevel * 0.85f);
+        if (std::abs (stripY (next) - stripY (stripLevel)) >= 1.0f || (next < 1.0e-4f) != (stripLevel < 1.0e-4f))
+            repaint (thresholdStrip);
+        stripLevel = next < 1.0e-4f ? 0.0f : next;
+    }
+
     // --- mouse ----------------------------------------------------------------------------------------------
     void mouseDown (const juce::MouseEvent& e) override
     {
+        if (e.eventComponent == this && thresholdStrip.contains (e.getPosition()) && e.mods.isLeftButtonDown()) // round 190oa (DP-59)
+        {
+            noiseThreshold = -1.0f; // (the slot's own threshold, as FL's one noise threshold)
+            setSlotParam (edisonfx::noiseThreshold, juce::jlimit (0.0f, 1.0f, stripGainAt (e.y)));
+            repaint();
+            return;
+        }
         if (e.eventComponent == &scrubButton)
         {
             scrubMouseDown (e);
@@ -1979,7 +2063,15 @@ public:
 
     // round 190ld (DP-59): FL's hint bar over the waveform (capture 190ld F30, fl-edison-hint-F30/F30b): the time under the
     // mouse as "s:ms" ("0:500") and the level at the mouse's height in dB and linear ("-18.34dB 0.12")
-    ui::Hint hintAt (juce::Point<int>) override { return waveHintAt (getMouseXYRelative()); }
+    ui::Hint hintAt (juce::Point<int>) override
+    {
+        if (const auto at = getMouseXYRelative(); thresholdStrip.contains (at)) // round 190oa (DP-59): FL's hint
+        {
+            const auto gain = stripGainAt (at.y);
+            return { tr ("Click to set noise threshold"), juce::String (juce::Decibels::gainToDecibels (gain, -100.0f), 1) + "dB " + juce::String (gain, 2), false, false };
+        }
+        return waveHintAt (getMouseXYRelative());
+    }
 
     // (--details190ldshot: the hint at a point given as fractions of the waveform area)
     ui::Hint waveHintForSnapshot (float fx, float fy) const
@@ -4960,6 +5052,7 @@ private:
 
     void timerCallback() override
     {
+        stripTick(); // (round 190oa, DP-59)
         if (slotMode() && session != nullptr)
         {
             const auto* fx = slotDef();
