@@ -6,6 +6,7 @@
 #include "ui/FileChoosers.h"
 #include "ui/ImageReadback.h"
 #include "ui/MixerComponent.h"
+#include "ui/AraMenu.h"
 #include "core/SelectionRename.h"
 #include "core/MixSnapshots.h"
 #include "ui/PluginOffTag.h"
@@ -8003,6 +8004,9 @@ juce::Rectangle<int> EffectsPanel::sidechainButtonBounds() const
 
 void EffectsPanel::openPluginWindow (int slot)
 {
+    // round 190oq (issue #243): an ARA insert opens the plugin's editor with the audio clips routed here
+    if (aramenu::isAraSlot (engine, track, slot) && aramenu::openInsertEditor (engine, track))
+        return;
     // Online Sessions P5-A1: an effect the session's host plays on this insert opens its parameter editor
     if (liveui::showHostedEditor ({ { live::Kind::insert, (std::uint64_t) juce::jmax (0, track), 0 }, slot }))
         return;
@@ -8096,6 +8100,10 @@ void EffectsPanel::showAddMenu (int row)
 
 int EffectsPanel::placeEffectAtRow (int row, EffectSlot fx)
 {
+    // round 190oq (issue #243): an ARA plugin put on an insert that audio clip channels go to edits their clips (REAPER,
+    // Logic, Studio One); the slot menu switches it off
+    const auto araOn = fx.kind == EffectKind::plugin && ! fx.ara && aramenu::araByDefault (engine, track, fx.plugin);
+    fx.ara = fx.ara || araOn;
     int at = -1;
     engine.editSong ([t = track, row, &fx, &at] (Song& song) {
         if (t < 0 || t >= (int) song.mixer.size() || (int) song.mixer[(std::size_t) t].effects.size() >= maxEffectSlots)
@@ -8110,6 +8118,8 @@ int EffectsPanel::placeEffectAtRow (int row, EffectSlot fx)
     });
     if (at < 0)
         return at;
+    if (araOn)
+        aramenu::hintSlotAra (engine, track, at, true);
     selectedSlot = at;
     if ((*slots())[(std::size_t) at].kind != EffectKind::plugin) // (plugins: their own window, below)
         openEditor (at); // FL opens the effect's window when it is loaded (round 170h, fl-09)
@@ -8313,6 +8323,8 @@ void EffectsPanel::showSlotMenu (int slot)
                 onHotSwapSlot (t, slot);
         });
     menu.addItem (tr ("Audio editor (record this insert)..."), [this] { openAudioEditorForInsert (engine, track); });
+    // round 190oq (issue #243): an ARA plugin edits the audio clips routed to this mixer track
+    aramenu::addSlotItems (menu, engine, track, slot);
 
     // side inputs: another track's output feeds the compressor's detector, or the vocoder's modulator/carrier. Round
     // 177b: every effect with a side input (plugins with a sidechain bus too) gets the picker, which makes the route

@@ -1367,6 +1367,10 @@ struct EffectSlot
     // mute LEDs", round 190ld): soloing another slot of the insert (Ctrl/Alt+click) leaves this one as it is. Saved only
     // when on ("lockState"); FL's .flp keeps it in the UI state only.
     bool lockState = false;
+    // Round 190oq (issue #243, core/AraRegions.h): an ARA plugin in this slot plays and edits the audio clips of the
+    // audio clip channels routed to this mixer track (as REAPER / Logic / Studio One host ARA on a track insert). Saved
+    // only when on ("ara"); FL hosts no ARA (an FL import never has it).
+    bool ara = false;
     FlOrigin flOrigin;    // imported from FL: the original effect plugin (round 171e)
     InstanceTag instance; // runtime identity of the slot (never saved, not compared)
 

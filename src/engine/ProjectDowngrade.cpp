@@ -1076,6 +1076,11 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             if (drop (c, "ara"))
                 edited.add (channelName (juce::var (&c), i));
         });
+        // round 190oq (issue #243): an ARA plugin on a mixer insert is a plain insert effect there
+        forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
+            if (drop (e, "ara"))
+                edited.add (where);
+        });
         drop (o, "araDocuments");
         if (! edited.isEmpty())
             lost.push_back ({ TR_NOOP ("Audio clips edited in an ARA plugin (Melodyne...) play without those edits: {0}"), listOf (edited), false });
