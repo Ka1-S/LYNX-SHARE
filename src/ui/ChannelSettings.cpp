@@ -6825,6 +6825,25 @@ public:
         }
     }
 
+    bool isHeaderCollapsed() const noexcept { return headerCollapsed;}
+
+    void setHeaderCollapsed (bool collapsed)
+    {
+        if (headerCollapsed == collapsed)
+            return;
+        headerCollapsed = collapsed;
+        for (auto& t : tabs)
+            t->setVisible (! headerCollapsed);
+        if (controls != nullptr)
+            controls->setVisible (! headerCollapsed);
+        const auto size = desiredSize();
+        if (size.x != getWidth() || size.y != getHeight())
+            setSize (size.x, size.y);
+        else
+            resized();
+        repaint();
+    }
+
     void presetLoaded (bool hasPage, const juce::String& oldName, const juce::String& newName)
     {
         if (hasPage && ! pages.empty())
@@ -6847,12 +6866,16 @@ public:
     void paint (juce::Graphics& g) override
     {
         g.fillAll (theme::colour::bg2);
-        g.setColour (theme::colour::bg3);
-        g.fillRect (getLocalBounds().removeFromTop (headerHeight));
-        g.setColour (theme::colour::border);
-        g.drawHorizontalLine (headerHeight - 1, 0.0f, (float) getWidth());
-        for (auto& t : tabs) // FL's tabs sit side by side; a 1 px line closes each
-            g.fillRect (t->getRight(), 0, 1, headerHeight - 1);
+        const auto hh = currentHeaderHeight();
+        if (hh > 0)
+        {
+            g.setColour (theme::colour::bg3);
+            g.fillRect (getLocalBounds().removeFromTop (hh));
+            g.setColour (theme::colour::border);
+            g.drawHorizontalLine (hh - 1, 0.0f, (float) getWidth());
+            for (auto& t : tabs) // FL's tabs sit side by side; a 1 px line closes each
+                g.fillRect (t->getRight(), 0, 1, hh - 1);
+        }
     }
 
     // Round 190in: the window's title bar shows the ▸ menu and the presets (docked: LYNX's own title bar); the strip
@@ -6878,24 +6901,29 @@ public:
 
     void resized() override
     {
-        auto strip = getLocalBounds().removeFromTop (headerHeight - 1);
-        if (menuArrow.isVisible())
-            menuArrow.setBounds (strip.removeFromLeft (20).withSizeKeepingCentre (20, 24));
-        for (auto& t : tabs) // FL's 44 px icon tabs, side by side, the strip's whole height
+        const auto hh = currentHeaderHeight();
+        if (hh > 0)
         {
-            t->setBounds (strip.removeFromLeft (44));
-            strip.removeFromLeft (1);
-        }
-        if (controls != nullptr)
-            controls->setBounds (getWidth() - ChannelHeaderControls::preferredWidth, 0, ChannelHeaderControls::preferredWidth, headerHeight - 1);
-        if (presetBar != nullptr && ! presetsInTitle) // one row after the tabs (FW-5: where there is no title bar of LYNX's)
-        {
-            strip.removeFromLeft (8);
-            const auto room = (controls != nullptr ? controls->getX() : getWidth()) - 8 - strip.getX();
-            presetBar->setBounds (strip.withWidth (juce::jlimit (0, 280, room)).withSizeKeepingCentre (juce::jlimit (0, 280, room), 22));
+            auto strip = getLocalBounds().removeFromTop (hh - 1);
+            if (menuArrow.isVisible())
+                menuArrow.setBounds (strip.removeFromLeft (20).withSizeKeepingCentre (20, 24));
+            for (auto& t : tabs) // FL's 44 px icon tabs, side by side, the strip's whole height
+            {
+                t->setBounds (strip.removeFromLeft (44));
+                strip.removeFromLeft (1);
+            }
+            if (controls != nullptr)
+                controls->setBounds (getWidth() - ChannelHeaderControls::preferredWidth, 0, ChannelHeaderControls::preferredWidth, hh - 1);
+            if (presetBar != nullptr && ! presetsInTitle) // one row after the tabs (FW-5: where there is no title bar of LYNX's)
+            {
+                strip.removeFromLeft (8);
+                const auto room = (controls != nullptr ? controls->getX() : getWidth()) - 8 - strip.getX();
+                presetBar->setBounds (strip.withWidth (juce::jlimit (0, 280, room)).withSizeKeepingCentre (juce::jlimit (0, 280, room), 22));
+            }
         }
         // each page keeps its own size (some scale their drawing with it), centred under the header
-        const auto body = getLocalBounds().withTrimmedTop (headerHeight);
+        // when hh(current header height) is 0 the body just starts at the top, so the plugin's own size never changes
+        const auto body = getLocalBounds().withTrimmedTop (hh);
         const juce::ScopedValueSetter<bool> placing (laying, true);
         for (std::size_t i = 0; i < pages.size(); ++i)
         {
@@ -6923,8 +6951,9 @@ public:
                     width = juce::jmax (width, size.x);
                     height = juce::jmax (height, size.y);
                 }
-                if (width != getWidth() || headerHeight + height != getHeight())
-                    setSize (width, headerHeight + height);
+                const auto size = desiredSize();
+                if (size.x != getWidth() || size.y != getHeight())
+                    setSize (size.x, size.y);
                 else
                     resized();
                 return;
@@ -6932,9 +6961,22 @@ public:
     }
 
 private:
+    int currentHeaderHeight() const noexcept { return headerCollapsed ? 0 : headerHeight; }
+
+    juce::Point<int> desiredSize() const
+    {
+        int width = node ? 1 MiscPanel::preferredWidth, height = node ? 1 : MiscPanel::preferredHeight;
+        for (const auto& size : sizes)
+        {
+            width = juce::jmax (width, size.x);
+            height = juce::jmax (height, size.y);
+        }
+        return { width, currentHeaderHeight() = height };
+    }
     AudioEngine& engine;
     int channel;
     bool node = false;
+    bool headerCollapsed = false; // set only by SettingsWindow, only when docked; see setHeaderCollapsed()
     int current = 0;
     std::vector<std::unique_ptr<IconButton>> tabs;
     std::vector<std::unique_ptr<juce::Component>> pages;
@@ -7217,6 +7259,38 @@ private:
 };
 
 void openWindow (AudioEngine& engine, int channel, bool modulation);
+
+class HeaderToggle final : public juce::Button
+{
+public:
+    HeaderToggle() : juce::Button ("headerToggle")
+    {
+        setWantsKeyboardFocus (false);
+        setMouseClickGrabsKeyboardFocus (false);
+        setClickingToggleState (true);
+        setTooltip (tr("Show / hide the header"));
+    }
+
+    void paintButton (juce::Graphic& g, bool over, bool /*down*/) override
+    {
+        const auto r = getLocalBounds().toFloat();
+        const auto cx = r.getCentreX(), cy = r.getCentreY();
+        constexpr float bodyR = 4.5f, toothlen = 2.2f, toothHalfW = 1.0f;
+        juce::Path p;
+        p.addEllipse (cx - bodyR, cy - bodyR, bodyR * 2.0f, bodyR * 2.0f);
+        for (int i = 0; i < 8; i++)
+        {
+            juce::Path tooth;
+            tooth.addRectangle (-toothHalfW, -(bodyR + toothlen), toothHalfW * 2.0f, toothlen + 1.0f);
+            tooth.applyTransform (juce::AffineTransform::rotation (juce::MathConstants<float>::twoPi * (float) i / 8.0f)
+                                        .translated (cx, cy));
+            p.addPath (tooth);
+        }
+        g.setColor (getToggleState() || over ? theme::colour::accent : theme::colour::textSecondary);
+        g.filePath (p);
+    }
+};
+
 class SettingsWindow;
 std::vector<std::unique_ptr<SettingsWindow>>& windows();
 
@@ -7302,9 +7376,12 @@ public:
             {
                 setTitleBarTextCentred (false);
                 getProperties().set ("lynxTitleTwoTone", true);
-                getProperties().set ("lynxTitleLeft", 20);
+                getProperties().set ("lynxTitleLeft", 44); // room for both titleMenu and headerToggle
                 titleMenu.onClick = [this, frame] { frame->showWrapperMenu (titleMenu); };
                 Component::addAndMakeVisible (titleMenu);
+                headerToggle.onClick = [this, frame] { frame->setHeaderCollapsed (! headerToggle.getToggleState()); };
+                Component::addAndMakeVisible (headerToggle);
+                frame->setHeaderCollapsed (true); // starts hidden; click to reveal it
                 frame->movePresetsToTitleBar (*this);
                 titlePresets = frame->presetComponent();
                 getProperties().set ("lynxTitleRight", titlePresets != nullptr ? titlePresetsWidth + 6 : 0);
@@ -7319,6 +7396,8 @@ public:
         const auto bar = getTitleBarArea();
         if (titleMenu.isVisible())
             titleMenu.setBounds (bar.getX() + 2, bar.getY(), 18, bar.getHeight());
+        if (headerToggle.isVisible())
+            headerToggle.setBounds (bar.getX() + 24, bar.getY(), 18, bar.getHeight());
         if (titlePresets != nullptr && titlePresets->getParentComponent() == this)
         {
             auto right = bar.getRight();
@@ -7444,7 +7523,9 @@ private:
     ScaledContent* scaled = nullptr; // (owned by the window: its content)
     wrappermenu::MenuArrow titleMenu;               // FL's ▸ in LYNX's title bar (docked)
     juce::Component* titlePresets = nullptr;        // the frame's preset bar, moved into the title bar (owned by the frame)
-    static constexpr int titlePresetsWidth = 190;
+    HeaderToggle headerToggle;
+    juce::Component* titlePresets = nullptr; // shows/hides the frame's own header strip (docked only)
+    static constexpr int titlePresetsWidth = 190; // the frame's preset bar, moved into the title bar (owned by the frame)
 };
 
 std::vector<std::unique_ptr<SettingsWindow>>& windows()
