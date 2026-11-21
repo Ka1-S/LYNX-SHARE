@@ -10373,7 +10373,12 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             // FL: the row's Alt+1 … Alt+0 on the right (round 190ld, DF-137); the folder stays beside the name
             const auto id = "file.recent" + std::to_string (i + 1);
             const auto keyText = shortcutText (id.c_str()).trimCharactersAtStart ("\t");
-            juce::PopupMenu::Item item (keyText.isEmpty() ? file.getFileName() : file.getFileName() + "  (" + file.getParentDirectory().getFileName() + ")");
+            // (round 190oo PAT-19: FL lists the file name alone; the folder only tells two files of one name apart — the
+            // review read "thief.flp  (flp)" as a format suffix)
+            bool twin = false;
+            for (int k = 0; k < shown && ! twin; ++k)
+                twin = k != i && recent.getFile (k).getFileName() == file.getFileName();
+            juce::PopupMenu::Item item (keyText.isEmpty() || ! twin ? file.getFileName() : file.getFileName() + "  (" + file.getParentDirectory().getFileName() + ")");
             item.shortcutKeyDescription = keyText.isNotEmpty() ? keyText : file.getParentDirectory().getFileName(); // (else its folder on the right)
             item.setEnabled (file.existsAsFile()).setAction ([this, file] { confirmDiscard ([this, file] { openFile (file); }); });
             menu.addItem (std::move (item));

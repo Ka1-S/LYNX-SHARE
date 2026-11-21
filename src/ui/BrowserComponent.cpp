@@ -3638,7 +3638,8 @@ BrowserComponent::BrowserComponent (AudioEngine& e, Role r)
     });
     focusWatcher = std::make_unique<FocusWatcher> (*this);
 
-    searchBox.setTextToShowWhenEmpty (tr ("Search (Ctrl+F): kick -loop, snare OR clap, hat*.wav"), theme::colour::textDisabled);
+    // (round 190oo CS-22: Live's short placeholder; the syntax example is in the hint below, it was cut at every width)
+    searchBox.setTextToShowWhenEmpty (tr ("Search (Ctrl+F)"), theme::colour::textDisabled);
     searchBox.addListener (this);
     searchBox.setEscapeAndReturnKeysConsumed (true);
     ui::setHint (searchBox, tr ("Search the selected folder (or every folder) and below; in PROJECT, the project's items: words must all match; "

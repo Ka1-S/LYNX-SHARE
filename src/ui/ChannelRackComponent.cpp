@@ -1162,7 +1162,7 @@ void ChannelRackComponent::paint (juce::Graphics& g)
 
     paintLane (g);
     const auto addY = rowY ((int) song.channels.size());
-    g.setColour (textDisabled);
+    g.setColour (theme::colour::textSecondary); // (round 190oo PAT-14: an informative hint, 7:1; was textDisabled 2.9:1)
     g.setFont (theme::font (theme::type::small));
     textcache::drawText (g, tr ("or drop an audio file here"), gridLeft() + 4, addY + positionStripHeight, 400, rowHeight - positionStripHeight,
                          juce::Justification::centredLeft);

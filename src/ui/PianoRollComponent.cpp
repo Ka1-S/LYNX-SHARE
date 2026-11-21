@@ -1959,7 +1959,8 @@ void PianoRollComponent::paint (juce::Graphics& g)
             if (isC || hovered || pressed || everyKey || (list && rowHeight >= 8))
             {
                 g.setFont (isC && ! list ? theme::font (juce::jmin (theme::type::body, fontHeight + 1.0f), true) : theme::font (fontHeight, isC));
-                g.setColour (pressed ? onAccent : black ? textPrimary.withAlpha (hovered ? 1.0f : 0.85f) : isC ? bg0 : bg0.withAlpha (everyKey ? 0.72f : 0.55f));
+                // (round 190oo PAT-15: the hovered white key's name in the C keys' full ink, 11.9:1; it was at 55 %)
+                g.setColour (pressed ? onAccent : black ? textPrimary.withAlpha (hovered ? 1.0f : 0.85f) : isC || hovered ? bg0 : bg0.withAlpha (everyKey ? 0.72f : 0.55f));
                 const auto area = black ? juce::Rectangle<int> (2, y, blackWidth - 4, rowHeight)
                                   : isC  ? juce::Rectangle<int> (8, y, keyboardWidth - 13, rowHeight)
                                          : juce::Rectangle<int> (blackWidth, y, keyboardWidth - blackWidth - 5, rowHeight);

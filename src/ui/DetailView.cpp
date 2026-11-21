@@ -99,7 +99,10 @@ juce::String insertName (const Song& song, int insert)
     if (insert < 0 || insert >= (int) song.mixer.size())
         return {};
     const auto own = utf8 (song.mixer[(std::size_t) insert].name);
-    return own.isNotEmpty() ? tr ("Insert {0}", { juce::String (insert) }) + " " + own : tr ("Insert {0}", { juce::String (insert) });
+    const auto number = tr ("Insert {0}", { juce::String (insert) });
+    // (round 190oo CS-13: an insert still called by its default name read "Insert 1 Insert 1")
+    const auto isDefault = own == "Insert " + juce::String (insert) || own == number;
+    return own.isNotEmpty() && ! isDefault ? number + " " + own : number;
 }
 
 juce::String trackName (const Song& song, int track)

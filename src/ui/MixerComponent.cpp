@@ -2059,8 +2059,13 @@ void MixerStrips::paint (juce::Graphics& g)
             const auto ms = 1000.0 * engine.getLatencySamples() / juce::jmax (1.0, engine.getTransport().sampleRate.load());
             g.setColour (colour::textSecondary);
             g.setFont (font (10.0f));
-            textcache::drawFittedText (g, "PDC " + juce::String (ms, 1) + " ms", soloArea (t).withX (x + 30).withWidth (w - 36),
-                              juce::Justification::centredLeft, 1, 0.8f); // the Master has no solo: use its spot
+            // (round 190oo PAT-11: when "PDC 13.8 ms" does not fit the spot, "13.8 ms" — the hint names it — instead of
+            // a squeezed "PDC 13.8 ..."; the Master has no solo: its spot)
+            const auto spot = soloArea (t).withX (x + 30).withWidth (w - 36);
+            const auto value = juce::String (ms, 1) + " ms";
+            const auto full = "PDC " + value;
+            const auto fits = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), full) <= (float) spot.getWidth();
+            textcache::drawFittedText (g, fits ? full : value, spot, juce::Justification::centredLeft, 1, 0.8f);
         }
 
         // pan and stereo separation
