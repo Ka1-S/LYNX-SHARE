@@ -320,6 +320,13 @@ bool PlaylistComponent::pointKeyPressed (const juce::KeyPress& key)
     if (haveSelection && mods.isCommandDown() && ! mods.isShiftDown() && ! mods.isAltDown() && (letter == 'C' || letter == 'X'))
     {
         pointClipboard = autopoints::copy (*points, selectedPoints);
+        if (windowclip::enabled()) // (issue #232, round 190nz: and to another LYNX SHARE window)
+        {
+            crossclipboard::Payload copy;
+            copy.kind = crossclipboard::Kind::points;
+            copy.points = pointClipboard;
+            windowclip::publish (std::move (copy));
+        }
         if (letter == 'X')
         {
             editSpot (pointSpot, [sel = selectedPoints] (std::vector<AutomationPoint>& list) { autopoints::erase (list, sel); });
@@ -327,12 +334,17 @@ bool PlaylistComponent::pointKeyPressed (const juce::KeyPress& key)
         }
         return true;
     }
-    // Ctrl+V with copied points and the mouse on a curve: pasted at the mouse (snapped), selected
-    if (! pointClipboard.empty() && mods.isCommandDown() && ! mods.isShiftDown() && ! mods.isAltDown() && letter == 'V')
+    // Ctrl+V with copied points and the mouse on a curve: pasted at the mouse (snapped), selected (issue #232, round 190nz:
+    // points copied in another LYNX SHARE window too)
+    if (mods.isCommandDown() && ! mods.isShiftDown() && ! mods.isAltDown() && letter == 'V')
     {
         const auto at = lastMouse; // (the last mouse position over the Playlist)
         const auto spot = curveSpotAt (at);
         if (! spot.valid())
+            return false;
+        if (auto incoming = windowclip::incoming (crossclipboard::Kind::points); incoming && ! incoming->points.empty())
+            pointClipboard = std::move (incoming->points);
+        if (pointClipboard.empty())
             return false;
         const auto songTick = snap (xToTick (at.x), true);
         const auto tick = juce::jmax<std::int64_t> (0, spot.clip >= 0 ? songTick - spotSongTick (spot, 0) : songTick);

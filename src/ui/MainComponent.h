@@ -41,6 +41,7 @@
 #include "ui/Motion.h"
 #include "ui/Toolbar.h"
 #include "ui/Updater.h"
+#include "ui/WindowAudio.h" // issue #232 stage 2 (round 190nz)
 #include "ui/ValueControl.h"
 #include "ui/Workspace.h"
 #include "ui/ActionSearch.h" // round 190nq (#228)
@@ -237,6 +238,14 @@ public:
     juce::StringArray getMenuNamesForSnapshot() { return getMenuBarNames(); }
     juce::PopupMenu getMenuForSnapshot (int index) { return getMenuForIndex (index, {}); }
     liveui::Context getLiveContextForSnapshot() { return liveContext(); } // (rollup 0.1.31 step 3: --rollup031s3shot)
+    // issue #232 stage 2 (round 190nz, --tabs2shot190nz): the Window menu and the audio device bar without other windows
+    juce::PopupMenu windowMenuForSnapshot() { return windowMenu(); }
+    void setProjectNameForSnapshot (const juce::String& name) { projectName = name; updateTitle(); }
+    void showWindowMenuForSnapshot (bool on) { windowMenuShown = on; menuItemsChanged(); resized(); }
+    windowaudio::Link* windowAudioForSnapshot() { return windowAudio.get(); }
+    juce::Component& windowAudioBarForSnapshot() { return windowAudioBar; }
+    // a message from another LYNX SHARE window (ui/LynxWindows.h): activate, the audio device's hand-over, hello / bye
+    void windowMessage (const juce::String& verb, int from);
     juce::PopupMenu getPanelMenuForSnapshot (workspace::Panel panel)
     {
         juce::PopupMenu menu;
@@ -1058,6 +1067,12 @@ private:
     Workspace workspace; // after the panels' contents: it is destroyed first
     updater::UpdateBar updateBar; // "LYNX SHARE x.y.z is available" under the toolbar (round 166b)
     juce::Label remoteControlBar;
+    // issue #232 stage 2 (round 190nz): "<device> plays in another LYNX SHARE window" under the toolbar, with "Make this
+    // window the one that plays" (ui/WindowAudio.h); the Window menu while other LYNX SHARE windows are open
+    windowaudio::Bar windowAudioBar;
+    std::unique_ptr<windowaudio::Link> windowAudio;
+    bool windowMenuShown = false;
+    juce::PopupMenu windowMenu();
     std::unique_ptr<juce::Component> danceStage; // the dance channels' dancers over the workspace (ui/DanceView.h, round 165e)
 
     std::unique_ptr<juce::FileChooser> fileChooser;

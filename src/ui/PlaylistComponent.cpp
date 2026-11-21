@@ -65,6 +65,8 @@
 #include "core/PlaylistTrackOps.h"
 #include "core/TrackHeaderGestures.h"
 #include "core/FolderDrag.h" // round 190jf (B17)
+#include "core/CrossPaste.h"   // issue #232 stage 2 (round 190nz)
+#include "ui/WindowClipboard.h"
 #include "core/KeyFollow.h"
 #include "core/SimpleTracks.h"
 #include "core/RegionLoop.h"
@@ -8741,7 +8743,7 @@ juce::PopupMenu PlaylistComponent::editMenu()
     juce::PopupMenu m;
     m.addItem (tr ("Cut") + "\tCtrl+X", any, false, [this] { copySelection(); deleteSelection(); });
     m.addItem (tr ("Copy") + "\tCtrl+C", any, false, [this] { copySelection(); });
-    m.addItem (tr ("Paste") + "\tCtrl+V", ! clipboard.empty(), false, [this] { pasteClips(); });
+    m.addItem (tr ("Paste") + "\tCtrl+V", canPasteClips(), false, [this] { pasteClips(); });
     m.addItem (tr ("Duplicate") + "\tCtrl+B", any || time, false, [this] { duplicateSelection(); });
     // round 190ne (core/TrackClips.h): copies that keep sharing the clip's notes (only track clips differ from Duplicate)
     m.addItem (tr ("Duplicate as linked copies") + key ("playlist.duplicateLinked"), any || time, false, [this] { duplicateSelection (true); });
@@ -11270,7 +11272,7 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
         setSelection (targets);
         copySelection();
     });
-    menu.addItem (theme::mnemonic (tr ("Paste here"), 'P') + "\tCtrl+V", ! clipboard.empty(), false, [this, at = snap (xToTick (mouseX), true)] { pasteClips (at); });
+    menu.addItem (theme::mnemonic (tr ("Paste here"), 'P') + "\tCtrl+V", canPasteClips(), false, [this, at = snap (xToTick (mouseX), true)] { pasteClips (at); });
     menu.addItem (theme::mnemonic (many ? tr ("Delete selected") : tr ("Delete"), 'D') + "\tDel", [this, targets] {
         setSelection (targets);
         deleteSelection();
@@ -11739,7 +11741,7 @@ juce::PopupMenu PlaylistComponent::buildAudioClipMenu (int index, int mouseX)
         setSelection (targets);
         copySelection();
     });
-    menu.addItem (theme::mnemonic (tr ("Paste here"), 'P') + "\tCtrl+V", ! clipboard.empty(), false, [this, at = snap (xToTick (mouseX), true)] { pasteClips (at); });
+    menu.addItem (theme::mnemonic (tr ("Paste here"), 'P') + "\tCtrl+V", canPasteClips(), false, [this, at = snap (xToTick (mouseX), true)] { pasteClips (at); });
     return menu;
 }
 
@@ -13112,11 +13114,33 @@ void PlaylistComponent::copySelection()
         clipboard.push_back (engine.getSong().playlist[(std::size_t) i]);
     // round 190ne: the track clips travel with the clipboard (a cut deletes a track clip with its last clip)
     clipboardPatterns = trackclips::carry (engine.getSong(), clipboard);
+    publishCopiedClips (engine); // (issue #232: and to another LYNX SHARE window)
+}
+
+void PlaylistComponent::publishCopiedClips (AudioEngine& engine)
+{
+    if (! windowclip::enabled() || clipboard.empty())
+        return;
+    crossclipboard::Payload copy;
+    copy.kind = crossclipboard::Kind::clips;
+    std::vector<int> sources;
+    copy.fragment = crosspaste::clipsFragment (engine.getSong(), clipboard, clipboardPatterns, &sources);
+    for (std::size_t i = 0; i < sources.size() && i < copy.fragment.channels.size(); ++i)
+        windowclip::captureChannel (engine, sources[i], copy.fragment.channels[i]);
+    windowclip::publish (std::move (copy));
+}
+
+bool PlaylistComponent::canPasteClips()
+{
+    return ! clipboard.empty() || windowclip::hasIncoming (crossclipboard::Kind::clips);
 }
 
 void PlaylistComponent::pasteClips (std::int64_t at)
 {
-    if (clipboard.empty())
+    // issue #232 (round 190nz): clips copied in another LYNX SHARE window come with what they play (core/CrossPaste.h)
+    const auto incoming = windowclip::incoming (crossclipboard::Kind::clips);
+    const auto& source = incoming ? incoming->fragment.playlist : clipboard;
+    if (source.empty())
         return;
 
     // pastes at `at` (the clip menu's "Paste here"), else where the layout puts it (issue #211, round 190mq,
@@ -13124,8 +13148,8 @@ void PlaylistComponent::pasteClips (std::int64_t at)
     // keeping tracks and spacing
     const auto& song = engine.getSong();
     pasteplace::Where w;
-    w.first = clipboard.front().start;
-    for (const auto& c : clipboard)
+    w.first = source.front().start;
+    for (const auto& c : source)
         w.first = juce::jmin (w.first, c.start);
     w.viewFrom = (std::int64_t) std::max (0.0, scrollTicks);
     w.viewTo = (std::int64_t) xToTick (gridArea().getRight());
@@ -13142,9 +13166,15 @@ void PlaylistComponent::pasteClips (std::int64_t at)
                                   });
     std::vector<int> added;
 
-    engine.editSong ([&added, target, first] (Song& s) {
-        auto pasted = clipboard;
-        trackclips::materialize (s, pasted, clipboardPatterns); // (round 190ne: a pasted track clip is a unique copy)
+    engine.editSong ([&added, &incoming, target, first] (Song& s) {
+        std::vector<Clip> pasted;
+        if (incoming)
+            pasted = crosspaste::importClips (s, incoming->fragment); // (one undo step with the paste)
+        else
+        {
+            pasted = clipboard;
+            trackclips::materialize (s, pasted, clipboardPatterns); // (round 190ne: a pasted track clip is a unique copy)
+        }
         for (auto c : pasted)
         {
             if (c.kind == ClipKind::pattern && c.pattern >= (int) s.patterns.size())
@@ -13161,6 +13191,8 @@ void PlaylistComponent::pasteClips (std::int64_t at)
     });
     setSelection (added);
     sortClips (added);
+    if (incoming)
+        ui::postHint ({ windowclip::pastedFrom (*incoming) }, 2500);
 }
 
 void PlaylistComponent::duplicateSelection (bool linked)

@@ -3,6 +3,8 @@
 #include "ui/TrackerComponent.h"
 #include "ui/PaintAB.h"
 #include "ui/PlaylistComponent.h"
+#include "core/CrossPaste.h"   // issue #232 stage 2 (round 190nz)
+#include "ui/WindowClipboard.h"
 
 #include <algorithm>
 #include <set>
@@ -2353,6 +2355,7 @@ public:
             first.uid = 0;
             first.start = 0;
             PlaylistComponent::setCopiedClips ({ first }, carriedOf (block.clips.front().content)); // (round 190ne: a track clip travels along)
+            PlaylistComponent::publishCopiedClips (engine); // (issue #232: its first clip to another LYNX SHARE window)
             copiedBlock = std::move (block);
             copiedSlot.reset();
             copiedSlotStamp = PlaylistComponent::copiedStamp();
@@ -2370,6 +2373,7 @@ public:
         clip.uid = 0;
         clip.start = 0;
         PlaylistComponent::setCopiedClips ({ clip }, carriedOf (*content)); // (round 190ne: a track clip travels along)
+        PlaylistComponent::publishCopiedClips (engine); // (issue #232: and to another LYNX SHARE window)
         copiedSlot = std::move (content);
         copiedSlotStamp = PlaylistComponent::copiedStamp();
         if (cutToo)
@@ -2388,11 +2392,32 @@ public:
     {
         if ((copiedSlot || copiedBlock) && copiedSlotStamp == PlaylistComponent::copiedStamp())
             return true;
+        if (windowclip::hasIncoming (crossclipboard::Kind::clips)) // (issue #232: copied in another LYNX SHARE window)
+            return true;
         const auto& clips = PlaylistComponent::copiedClips();
         return std::any_of (clips.begin(), clips.end(), [] (const Clip& c) { return c.kind == ClipKind::pattern || c.kind == ClipKind::audio; });
     }
     void pasteSlot (int track, int scene)
     {
+        // issue #232 (round 190nz): a clip copied in another LYNX SHARE window: its first pattern or audio clip, with what
+        // it plays (core/CrossPaste.h)
+        if (auto incoming = windowclip::incoming (crossclipboard::Kind::clips))
+        {
+            auto& clips = incoming->fragment.playlist;
+            clips.erase (std::remove_if (clips.begin(), clips.end(), [] (const Clip& c) { return c.kind == ClipKind::automation; }), clips.end());
+            if (! clips.empty())
+            {
+                clips.resize (1);
+                engine.editSong ([&incoming, track, scene] (Song& s) {
+                    const auto pasted = crosspaste::importClips (s, incoming->fragment);
+                    if (! pasted.empty())
+                        session::putClip (s, pasted.front(), track, scene);
+                });
+                ui::postHint ({ windowclip::pastedFrom (*incoming) }, 2500);
+                repaint();
+                return;
+            }
+        }
         if (copiedBlock && copiedSlotStamp == PlaylistComponent::copiedStamp()) // round 190lx (DL-29): top-left on the slot
         {
             engine.editSong ([=, block = *copiedBlock] (Song& s) { session::pasteBlock (s, track, scene, block); });

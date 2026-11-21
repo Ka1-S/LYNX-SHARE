@@ -10,6 +10,7 @@
 #include "core/ChordReadout.h"
 #include "core/RowBands.h"
 #include "core/PastePlace.h"
+#include "ui/WindowClipboard.h" // issue #232 stage 2 (round 190nz)
 #include "core/LayoutStyle.h"
 #include "core/KeyMap.h"
 #include "core/NoteNames.h"
@@ -5313,6 +5314,18 @@ void PianoRollComponent::deleteSelection()
 void PianoRollComponent::copySelection()
 {
     clipboard = noteedit::copy (currentPattern (engine.getSong()), selectionOrAll());
+    publishNotes();
+}
+
+// issue #232 stage 2 (round 190nz): the note clipboard also on the system clipboard, for another LYNX SHARE window
+void PianoRollComponent::publishNotes()
+{
+    if (! windowclip::enabled() || clipboard.empty())
+        return;
+    crossclipboard::Payload copy;
+    copy.kind = crossclipboard::Kind::notes;
+    copy.notes = clipboard;
+    windowclip::publish (std::move (copy));
 }
 
 // Pain point 26 (round 177d, LYNX's own; FL's ghost notes can only be looked at): the ghost notes on show (the other
@@ -5340,11 +5353,18 @@ void PianoRollComponent::copyGhostNotes()
         return;
     const auto count = (int) ghosts.size();
     clipboard = std::move (ghosts);
+    publishNotes();
     ui::postHint ({ tr ("Copied {0} ghost notes: Ctrl+V pastes them into this channel", { juce::String (count) }) }, 2500);
 }
 
 void PianoRollComponent::paste()
 {
+    // issue #232 (round 190nz): notes copied in another LYNX SHARE window paste here, on the channel being edited
+    auto incoming = windowclip::incoming (crossclipboard::Kind::notes);
+    if (incoming && ! incoming->notes.empty())
+        clipboard = incoming->notes;
+    else
+        incoming.reset();
     if (clipboard.empty())
         return;
 
@@ -5353,13 +5373,16 @@ void PianoRollComponent::paste()
     // notes are selected, ready to drag.
     const auto offset = pasteOffset();
     std::vector<int> added;
-    const auto channel = allChannels ? -1 : engine.getSelectedChannel(); // ("All": each note keeps its channel)
+    // ("All": each note keeps its channel; another window's notes go on the channel being edited)
+    const auto channel = allChannels && ! incoming ? -1 : engine.getSelectedChannel();
     editNotes ([&added, channel, offset] (Pattern& p) {
         added = noteedit::paste (p, clipboard, offset, channel);
         notetools::regroup (p, added); // copies of grouped notes form groups of their own
     });
     setSelection (added);
     sortNotes();
+    if (incoming)
+        ui::postHint ({ windowclip::pastedFrom (*incoming) }, 2500);
 }
 
 std::int64_t PianoRollComponent::pasteOffset() const
@@ -6136,6 +6159,7 @@ bool PianoRollComponent::saveScore (const juce::File& file) const
 void PianoRollComponent::setNoteClipboard (std::vector<Note> notes)
 {
     clipboard = std::move (notes);
+    publishNotes();
 }
 
 bool PianoRollComponent::copyToMidiClipboard() const
@@ -6347,7 +6371,8 @@ juce::PopupMenu PianoRollComponent::editMenu()
     menu.addItem (theme::mnemonic (tr ("Cut"), 't') + "\tCtrl+X", ! selection.empty(), false, [this] { copySelection(); deleteSelection(); });
     menu.addItem (theme::mnemonic (tr ("Copy"), 'C') + "\tCtrl+C", [this] { copySelection(); });
     menu.addItem (tr ("Copy ghost notes"), ! visibleGhostNotes().empty(), false, [this] { copyGhostNotes(); }); // (LYNX, round 177d)
-    menu.addItem (theme::mnemonic (tr ("Paste"), 'P') + "\tCtrl+V", ! clipboard.empty(), false, [this] { paste(); });
+    menu.addItem (theme::mnemonic (tr ("Paste"), 'P') + "\tCtrl+V", ! clipboard.empty() || windowclip::hasIncoming (crossclipboard::Kind::notes), false,
+                  [this] { paste(); });
     menu.addItem (theme::mnemonic (tr ("Duplicate"), 'u') + "\tCtrl+B", [this] { duplicateSelection(); });
     menu.addItem (theme::mnemonic (tr ("Delete"), 'D') + "\tDel", ! selection.empty(), false, [this] { deleteSelection(); });
     menu.addItem (theme::mnemonic (tr ("Delete all"), 'a') + keyText ("pianoRoll.deleteAll"), [this] { runAction ("pianoRoll.deleteAll"); });

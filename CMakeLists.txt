@@ -43,6 +43,7 @@ add_library(lynx_core STATIC
     src/core/TrackClips.cpp
     src/core/TrackerGrid.cpp
     src/core/ModuleImport.cpp
+    src/core/CrossPaste.cpp
     src/core/RemoteMap.cpp
     src/core/DrawMode.cpp
     src/core/AutoPointEdit.cpp
@@ -685,6 +686,10 @@ if(LYNX_BUILD_APP)
         src/ui/NoteToolDialogs.cpp
         src/ui/PianoRollScripts.cpp
         src/ui/MidiClipboard.cpp
+        src/ui/WindowClipboard.cpp
+        src/ui/LynxWindows.cpp
+        src/ui/WindowAudio.cpp
+        src/engine/CrossClipboard.cpp
         src/ui/AudioClipboard.cpp
         src/ui/EventEditor.cpp
         src/ui/TrackerComponent.cpp
@@ -836,6 +841,19 @@ if(LYNX_BUILD_APP)
         target_link_libraries(lynx_remote_project_tests PRIVATE bcrypt advapi32)
     endif()
     add_test(NAME lynx_remote_project_tests COMMAND lynx_remote_project_tests)
+    # round 190nz (issue #232 stage 2): the cross-window clipboard's documents and side file
+    add_executable(lynx_crossclipboard_tests
+        tests/CrossClipboardTests.cpp
+        src/engine/CrossClipboard.cpp
+        src/engine/ProjectFile.cpp)
+    target_include_directories(lynx_crossclipboard_tests PRIVATE src)
+    target_compile_definitions(lynx_crossclipboard_tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0
+        JUCE_APPLICATION_VERSION_STRING="${PROJECT_VERSION}")
+    target_link_libraries(lynx_crossclipboard_tests PRIVATE lynx_core juce::juce_core)
+    if(WIN32)
+        target_link_libraries(lynx_crossclipboard_tests PRIVATE bcrypt advapi32)
+    endif()
+    add_test(NAME lynx_crossclipboard_tests COMMAND lynx_crossclipboard_tests)
 endif()
 
 # LYNX's own effects and instruments as VST3 / CLAP plugins for other hosts (round 180b, docs/PLUGIN_EXPORT.md). Off by

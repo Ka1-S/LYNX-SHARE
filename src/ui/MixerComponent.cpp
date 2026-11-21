@@ -69,6 +69,7 @@
 #include "core/MiddleEllipsis.h"
 #include "core/MixerRouteArrow.h"
 #include "core/StripInserts.h"
+#include "ui/WindowClipboard.h" // issue #232 stage 2 (round 190nz)
 
 namespace lynx
 {
@@ -3825,6 +3826,62 @@ int insertTrack (AudioEngine& engine, int at, const juce::File& file)
 }
 } // namespace mixerpresets
 
+// issue #232 stage 2 (round 190nz): Copy / Paste mixer track state (the File submenu), within one window and between
+// LYNX SHARE windows (ui/WindowClipboard.h); this window's own copy until another window copies something newer
+static std::vector<MixerTrack>& copiedTrackStates()
+{
+    static std::vector<MixerTrack> states;
+    return states;
+}
+
+static void copyTrackStates (AudioEngine& engine, std::vector<int> tracks)
+{
+    std::sort (tracks.begin(), tracks.end());
+    std::vector<MixerTrack> states;
+    const auto& song = engine.getSong();
+    for (const auto t : tracks)
+        if (t >= 0 && t < (int) song.mixer.size())
+        {
+            auto state = song.mixer[(std::size_t) t];
+            windowclip::captureMixerTrack (engine, t, state);
+            states.push_back (std::move (state));
+        }
+    if (states.empty())
+        return;
+    copiedTrackStates() = states;
+    crossclipboard::Payload copy;
+    copy.kind = crossclipboard::Kind::mixerTracks;
+    copy.mixerTracks = std::move (states);
+    windowclip::publish (std::move (copy));
+}
+
+static bool canPasteTrackStates()
+{
+    return ! copiedTrackStates().empty() || windowclip::hasIncoming (crossclipboard::Kind::mixerTracks);
+}
+
+// One state: every target gets it. Several: the first target and the tracks after it get them in order (or the selected
+// tracks, when as many are selected).
+static void pasteTrackStates (AudioEngine& engine, std::vector<int> targets)
+{
+    const auto incoming = windowclip::incoming (crossclipboard::Kind::mixerTracks);
+    const auto& states = incoming ? incoming->mixerTracks : copiedTrackStates();
+    std::sort (targets.begin(), targets.end());
+    if (states.empty() || targets.empty())
+        return;
+    engine.editSong ([&] (Song& s) {
+        const auto count = (int) s.mixer.size();
+        for (std::size_t i = 0; i < (states.size() == 1 ? targets.size() : states.size()); ++i)
+        {
+            const auto t = states.size() == 1 ? targets[i] : targets.size() == states.size() ? targets[i] : targets.front() + (int) i;
+            if (t >= 0 && t < count)
+                ProjectFile::applyMixerTrackState (s.mixer[(std::size_t) t], states[states.size() == 1 ? 0 : i], true);
+        }
+    });
+    if (incoming)
+        ui::postHint ({ windowclip::pastedFrom (*incoming) }, 2500);
+}
+
 bool saveMixerTrackState (AudioEngine& engine, int track, const juce::File& file)
 {
     if (track < 0 || track >= (int) engine.getSong().mixer.size())
@@ -4101,6 +4158,13 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                     saveMixerTrackState (safe->engine, t, fc.getResult().withFileExtension (ProjectFile::mixerTrackStateExtension));
             });
         });
+        // issue #232 stage 2 (round 190nz, LYNX extra): a state through the clipboard, also to another LYNX SHARE window
+        // (the effects with their plugins' settings as they are now, level, pan, EQ, name and colour; routing stays)
+        file.addSeparator();
+        file.addItem (targets.size() > 1 ? tr ("Copy {0} mixer track states", { juce::String ((int) targets.size()) }) : tr ("Copy mixer track state"),
+                      [this, targets] { copyTrackStates (engine, targets); });
+        file.addItem (tr ("Paste mixer track state"), canPasteTrackStates(), false, [this, targets] { pasteTrackStates (engine, targets); });
+        file.addSeparator();
         file.addItem (tr ("Browse states"), [] {
             mixerStatesFolder().createDirectory();
             mixerStatesFolder().startAsProcess();

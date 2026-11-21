@@ -118,6 +118,11 @@ public:
     void cutSelected();
     void copySelected();
     void pasteSelected();
+    // issue #232 stage 2 (round 190nz, LYNX extra): the selected channels themselves (instrument, plugin state, sample)
+    // copied, also for another LYNX SHARE window, and pasted as new channels below the selection
+    void copyChannels();
+    void pasteChannels();
+    static bool canPasteChannels();
     void sendSelectedToInserts();
     void toggleMute (int channel);
     void toggleSoloLock (int channel); // FL: Shift+click on the mute switch (round 190ih)
@@ -266,6 +271,7 @@ private:
     void paintZipStrips (juce::Graphics& g);
     int filterGroup = -1;
     static inline ChannelStepsClipboard stepClipboard; // Cut / Copy / Paste (Ctrl+X / C / V, the channel menu)
+    static inline Song copiedChannels; // Copy channels (round 190nz: a fragment, core/CrossPaste.h)
     int visibleIndex (int row) const; // the row's place among the shown rows
     int shownCount() const;
     int rowAtY (int y) const;       // row under y (the lane counts as its channel's row)

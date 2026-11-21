@@ -745,6 +745,11 @@ public:
     static const std::vector<Clip>& copiedClips() noexcept { return clipboard; }
     static const trackclips::Carried& copiedPatterns() noexcept { return clipboardPatterns; }
     static std::uint64_t copiedStamp() noexcept { return clipboardStamp; }
+    // issue #232 stage 2 (round 190nz, ui/WindowClipboard.h): the clipboard's clips, with what they play, on the system
+    // clipboard for another LYNX SHARE window (the clip grid's copies too); and whether a paste has something (this
+    // window's copy or another window's)
+    static void publishCopiedClips (AudioEngine& engine);
+    static bool canPasteClips();
     // round 190ld (--details190ldshot): the Simple header's Fx pill and its chain preset
     juce::Rectangle<int> trackFxForSnapshot (int track) const { return trackFx (track); }
     juce::String simpleFxPresetForSnapshot (int track) const { return simpleFxPreset (track); }
