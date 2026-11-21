@@ -1335,10 +1335,12 @@ void PianoRollComponent::paint (juce::Graphics& g)
                 g.fillPath (corner);
             }
 
-            if (n.porta) // porta: slanted stroke at the start, like the glide
-            {
+            if (n.porta) // porta (round 190oa, DE-81, capture 190oa fl-pr-porta-mark: FL's "/" ~10 × 7 px near the note's right
+            {            // end, 3 px in, centred, in the note's label colour)
+                const auto w = juce::jmin (10.0f, juce::jmax (3.0f, r.getWidth() - 6.0f)), h = juce::jmin (7.0f, r.getHeight() - 4.0f);
+                const auto x1 = r.getRight() - 3.0f, cy = r.getCentreY();
                 g.setColour (bg0.withAlpha (0.65f));
-                g.drawLine (r.getX() + 2.0f, r.getBottom() - 2.0f, r.getX() + 9.0f, r.getY() + 2.0f, 2.0f);
+                g.drawLine (x1 - w, cy + h * 0.5f, x1, cy - h * 0.5f, 2.0f);
             }
 
             if (n.slide) // slide mark: FL's manual (Piano roll): "slide notes have a small triangle on the right" (round 190kn, DE-80)
