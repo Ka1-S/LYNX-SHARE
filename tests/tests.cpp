@@ -18007,3 +18007,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Bugs190nqTests.inc" // round 190nq: issues #229, #193, #223, #226 (bugs)
 #include "Issues190nqTests.inc" // round 190nq: issues #225, #227, #228, #230
 #include "Issues190nsTests.inc" // round 190ns: issues #231, #233, #234, #235
+#include "CrossPaste190nzTests.inc" // round 190nz: issue #232 stage 2 (copy and paste between windows)

@@ -218,6 +218,8 @@
 #include "core/TrackIconScale.h"
 #include "core/EscClose.h"
 #include "ui/MainComponent.h"
+#include "ui/LynxWindows.h"     // --tabs2test190nz (issue #232 stage 2)
+#include "ui/WindowClipboard.h"
 #include "ui/SimpleDock.h"
 #include "core/ScaleKeys.h"
 #include "core/KeyFollow.h"
@@ -3244,6 +3246,15 @@ public:
         if (args.contains ("--issuesshot190nq"))
         {
             setApplicationReturnValue (runIssuesShot190nq (args[args.indexOf ("--issuesshot190nq") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+        // --tabs2test190nz <a|b> <folder> (round 190nz, issue #232 stage 2: copy and paste between two LYNX windows):
+        // src/Tabs2Test190nz.inc
+        if (args.contains ("--tabs2test190nz"))
+        {
+            const auto i = args.indexOf ("--tabs2test190nz");
+            setApplicationReturnValue (runTabs2Test190nz (args[i + 1].unquoted(), juce::File (args[i + 2].unquoted())) ? 0 : 1);
             quit();
             return;
         }
@@ -17831,6 +17842,7 @@ private:
 #include "TrackClipsShot190ne.inc" // round 190ne
 #include "IssuesShot190nq.inc" // round 190nq (issues #193, #225-#230)
 #include "IssuesShot190ns.inc" // round 190ns (issues #231-#235)
+#include "Tabs2Test190nz.inc" // round 190nz (issue #232 stage 2)
 #include "DetailsShot190kn.inc" // round 190kn
 #include "DetailsShot190ld.inc" // round 190ld
 #include "DetailsShot190lr.inc" // round 190lr

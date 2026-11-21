@@ -170,6 +170,8 @@ public:
     bool copyToMidiClipboard() const;
     // Round 190nr: notes made elsewhere (Transistor Bass's "Copy as MIDI") on the note clipboard: Ctrl+V pastes them
     static void setNoteClipboard (std::vector<Note> notes);
+    // issue #232 stage 2 (round 190nz, ui/WindowClipboard.h): the note clipboard on the system clipboard too
+    static void publishNotes();
     void pasteFromMidiClipboard();
     // File › Browse scores: the main window opens the Browser at FL's score folder
     std::function<void()> onBrowseScores;

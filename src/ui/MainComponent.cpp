@@ -151,6 +151,8 @@
 #include "core/HintMarkup.h"
 #include "core/SongStats.h"
 #include "core/TrackClips.h"
+#include "ui/LynxWindows.h"     // issue #232 stage 2 (round 190nz)
+#include "ui/WindowClipboard.h"
 
 #if JUCE_PLUGINHOST_VST3
 namespace juce
@@ -244,6 +246,19 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     remoteControlBar.setColour (juce::Label::textColourId, theme::colour::textPrimary);
     remoteControlBar.setJustificationType (juce::Justification::centredLeft);
     updateBar.onVisibilityChanged = [this] { resized(); };
+    // issue #232 stage 2 (round 190nz): the other LYNX SHARE windows (Window menu, the audio device only one may use)
+    addChildComponent (windowAudioBar);
+    windowAudio = std::make_unique<windowaudio::Link> (engine, windowAudioBar, [this] { resized(); }, [this] { engine.stop(); });
+    if (restoreUserSettings && windows::enabled())
+    {
+        windows::Entry me;
+        me.project = projectName;
+        windows::start (me, [safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::String& verb, int from, const juce::String&) {
+            if (safe != nullptr)
+                safe->windowMessage (verb, from);
+        });
+        windowMenuShown = ! windows::others().empty();
+    }
     if (restoreUserSettings) // (the real window: Update saves the project as on quit and reopens it)
         updater::setHost ({ [safe = juce::Component::SafePointer<MainComponent> (this)] (std::function<void()> then) {
                                if (safe != nullptr)
@@ -1113,6 +1128,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
 MainComponent::~MainComponent()
 {
+    windows::stop(); // (issue #232: "bye" to the other windows)
+    windowAudio.reset();
     ui::keyfocus::uninstall (*this); // (round 190ng)
     EffectsPanel::onHotSwapSlot = nullptr; // (round 190ce: it calls this window)
     if (pluginDatabaseWatcher != nullptr) // (round 190mf: nobody watches the folder any more)
@@ -1765,6 +1782,8 @@ void MainComponent::layoutUnderToolbar()
         updateBar.setBounds (below.removeFromTop (updater::UpdateBar::height));
     if (remoteControlBar.isVisible())
         remoteControlBar.setBounds (below.removeFromTop (24));
+    if (windowAudioBar.isVisible())
+        windowAudioBar.setBounds (below.removeFromTop (windowaudio::Bar::height));
     workspace.setBounds (below);
     if (danceStage != nullptr)
     {
@@ -7873,6 +7892,9 @@ bool MainComponent::shouldReclaimKeyboardFocus()
 void MainComponent::updateTitle()
 {
     repaint (titleArea); // the project name in the toolbar
+    // issue #232 stage 2 (round 190nz): what the other windows' Window menu and a pasted copy call this project
+    windowclip::setProjectName (projectName);
+    windows::update ([this] (windows::Entry& e) { e.project = projectName; });
     if (! engine.isModified()) // what is on disk now: the reference for "unused recordings" after a Discard
         savedSamples = safety::referencedSamples (engine.getSong());
 
@@ -9983,7 +10005,68 @@ void MainComponent::setTweakedValue (const AutomationTarget& target, float value
 juce::StringArray MainComponent::getMenuBarNames()
 {
     // FL's menu bar order (REA round 139): FILE EDIT ADD PATTERNS VIEW OPTIONS TOOLS HELP
+    // issue #232 stage 2 (round 190nz, LYNX extra): WINDOW before HELP while other LYNX SHARE windows are open
+    if (windowMenuShown)
+        return { tr ("File"), tr ("Edit"), tr ("Add"), tr ("Patterns"), tr ("View"), tr ("Options"), tr ("Tools"), tr ("Window"), tr ("Help") };
     return { tr ("File"), tr ("Edit"), tr ("Add"), tr ("Patterns"), tr ("View"), tr ("Options"), tr ("Tools"), tr ("Help") };
+}
+
+// The open LYNX SHARE windows (this one ticked): a click brings that window to the front (ui/LynxWindows.h)
+juce::PopupMenu MainComponent::windowMenu()
+{
+    juce::PopupMenu menu;
+    menu.addSectionHeader (tr ("LYNX SHARE windows"));
+    const auto untitled = tr ("Untitled");
+    const auto playing = [] (const juce::String& type, const juce::String& name) {
+        return name.isEmpty() && type.isEmpty() ? juce::String() : "   (" + tr ("plays through {0}", { name.isNotEmpty() ? name : type }) + ")";
+    };
+    const auto own = windowaudio::openDevice (engine.getDeviceManager());
+    menu.addItem (tr ("{0} (this window)", { projectName.isNotEmpty() ? projectName : untitled }) + playing (own.type, own.name), true, true, [] {});
+    for (const auto& e : windows::others())
+        menu.addItem ((e.project.isNotEmpty() ? e.project : untitled) + playing (e.deviceType, e.deviceName), [pid = e.pid] {
+            windows::allowToFront (pid);
+            if (! windows::send (pid, "activate"))
+                ui::postHint ({ tr ("That window is no longer open") }, 3000);
+        });
+    if (windowAudio != nullptr && windowAudio->holder() != 0)
+    {
+        menu.addSeparator();
+        menu.addItem (tr ("Make this window the one that plays"), [this] {
+            if (windowAudio != nullptr)
+                windowAudio->playHere();
+        });
+    }
+    menu.addSeparator();
+    menu.addItem (tr ("Open in new window..."), [this] { chooseFileToOpenInNewWindow(); });
+    return menu;
+}
+
+void MainComponent::windowMessage (const juce::String& verb, int from)
+{
+    if (verb == "activate")
+    {
+        if (auto* top = getTopLevelComponent())
+        {
+            if (auto* peer = top->getPeer(); peer != nullptr && peer->isMinimised())
+                peer->setMinimised (false);
+            juce::Process::makeForegroundProcess();
+            top->toFront (true);
+        }
+        if (platform::testMode())
+            platform::testModeLog ("window activated by " + juce::String (from));
+        return;
+    }
+    if (windowAudio != nullptr)
+        windowAudio->received (verb, from);
+    if (verb == "hello" || verb == "bye" || verb == "changed")
+    {
+        const auto shown = ! windows::others().empty();
+        if (shown != std::exchange (windowMenuShown, shown))
+        {
+            menuItemsChanged();
+            resized(); // (the toolbar makes room for the menu bar's new width)
+        }
+    }
 }
 
 juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String&)
@@ -9991,6 +10074,13 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
     juce::PopupMenu menu;
     // the bar's position → the menu built below (0 File, 1 Edit, 2 View, 3 Patterns, 4 Options, 5 Help, 10 Add, 11 Tools)
     static constexpr int menus[] = { 0, 1, 10, 3, 2, 4, 11, 5 };
+    if (windowMenuShown) // (issue #232: WINDOW sits before HELP)
+    {
+        if (barIndex == 7)
+            return windowMenu();
+        if (barIndex > 7)
+            --barIndex;
+    }
     const auto index = juce::isPositiveAndBelow (barIndex, (int) std::size (menus)) ? menus[barIndex] : 5;
     // round qafix190kq (QA-8): in the Clip-launch / Simple layouts the View menu is not split into the two columns of a
     // menu taller than 70 % of the screen (JUCE fix 40, FL's split): "Layout style" landed in the first column, and its

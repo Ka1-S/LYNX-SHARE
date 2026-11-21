@@ -63,6 +63,8 @@
 #include "core/ChannelLoops.h"
 #include "core/SoundFont.h"
 #include "core/Vfx.h"
+#include "core/CrossPaste.h"   // issue #232 stage 2 (round 190nz)
+#include "ui/WindowClipboard.h"
 #include "ui/SoundFontEditor.h"
 
 namespace lynx
@@ -2219,6 +2221,55 @@ void ChannelRackComponent::copySelected()
 {
     const auto& song = engine.getSong();
     stepClipboard = copyChannelSteps (song.activePattern(), engine.getSelectedChannels(), (int) song.channels.size());
+    if (windowclip::enabled() && ! stepClipboard.empty()) // (issue #232, round 190nz: and to another LYNX SHARE window)
+    {
+        crossclipboard::Payload copy;
+        copy.kind = crossclipboard::Kind::steps;
+        copy.steps = stepClipboard;
+        windowclip::publish (std::move (copy));
+    }
+}
+
+void ChannelRackComponent::copyChannels()
+{
+    const auto rows = engine.getSelectedChannels();
+    if (rows.empty())
+        return;
+    auto fragment = crosspaste::channelsFragment (engine.getSong(), rows);
+    auto sorted = rows;
+    std::sort (sorted.begin(), sorted.end());
+    sorted.erase (std::unique (sorted.begin(), sorted.end()), sorted.end());
+    for (std::size_t i = 0; i < sorted.size() && i < fragment.channels.size(); ++i)
+        windowclip::captureChannel (engine, sorted[i], fragment.channels[i]); // (the plugins' settings as they are now)
+    copiedChannels = fragment;
+    crossclipboard::Payload copy;
+    copy.kind = crossclipboard::Kind::channels;
+    copy.fragment = std::move (fragment);
+    windowclip::publish (std::move (copy));
+    ui::postHint ({ copiedChannels.channels.size() > 1 ? tr ("Copied {0} channels", { juce::String ((int) copiedChannels.channels.size()) })
+                                                       : tr ("Copied the channel") },
+                  2000);
+}
+
+bool ChannelRackComponent::canPasteChannels()
+{
+    return ! copiedChannels.channels.empty() || windowclip::hasIncoming (crossclipboard::Kind::channels);
+}
+
+void ChannelRackComponent::pasteChannels()
+{
+    const auto incoming = windowclip::incoming (crossclipboard::Kind::channels);
+    const auto& fragment = incoming ? incoming->fragment : copiedChannels;
+    if (fragment.channels.empty())
+        return;
+    const auto rows = engine.getSelectedChannels();
+    const auto at = rows.empty() ? (int) engine.getSong().channels.size() : *std::max_element (rows.begin(), rows.end()) + 1;
+    std::vector<int> added;
+    engine.editSong ([&] (Song& s) { added = crosspaste::importChannels (s, fragment, at); });
+    if (! added.empty())
+        selectRows (added, added.front());
+    if (incoming)
+        ui::postHint ({ windowclip::pastedFrom (*incoming) }, 2500);
 }
 
 void ChannelRackComponent::cutSelected()
@@ -2233,6 +2284,9 @@ void ChannelRackComponent::cutSelected()
 
 void ChannelRackComponent::pasteSelected()
 {
+    // issue #232 (round 190nz): steps copied in another LYNX SHARE window
+    if (auto incoming = windowclip::incoming (crossclipboard::Kind::steps); incoming && ! incoming->steps.empty())
+        stepClipboard = std::move (incoming->steps);
     if (stepClipboard.empty() || engine.getSelectedChannels().empty())
         return;
     engine.editSong ([rows = engine.getSelectedChannels(), clip = stepClipboard] (Song& s) {
@@ -3210,6 +3264,9 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
     // FL's Loop Starter channel menu (round 168b): Replace sample, Generate steps, Locked, One-shot category
     loopstarterui::addChannelMenu (menu, engine, channel);
     menu.addItem (selected > 1 ? theme::mnemonic (tr ("Clone {0} channels", { juce::String (selected) }), 'C') : theme::mnemonic (tr ("Clone"), 'C') + "\tAlt+C", [this] { cloneSelected(); });
+    // issue #232 stage 2 (round 190nz, LYNX extra): the channels themselves, also to another LYNX SHARE window
+    menu.addItem (selected > 1 ? tr ("Copy {0} channels", { juce::String (selected) }) : tr ("Copy channel"), [this] { copyChannels(); });
+    menu.addItem (tr ("Paste channels"), canPasteChannels(), false, [this] { pasteChannels(); });
 
     if (selected > 1)
         menu.addItem (theme::mnemonic (tr ("Delete {0} channels", { juce::String (selected) }), 'D') + "\tAlt+Del", selected < count, false, [this] { deleteSelected(); });
@@ -3334,7 +3391,8 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
         });
         menu.addItem (theme::mnemonic (tr ("Cut"), 't') + "\tCtrl+X", hasNotes, false, [this] { cutSelected(); });
         menu.addItem (theme::mnemonic (tr ("Copy"), 'o') + "\tCtrl+C", hasNotes, false, [this] { copySelected(); });
-        menu.addItem (theme::mnemonic (tr ("Paste"), 'p') + "\tCtrl+V", ! stepClipboard.empty(), false, [this] { pasteSelected(); });
+        menu.addItem (theme::mnemonic (tr ("Paste"), 'p') + "\tCtrl+V", ! stepClipboard.empty() || windowclip::hasIncoming (crossclipboard::Kind::steps), false,
+                      [this] { pasteSelected(); });
     }
     menu.addSeparator();
     menu.addItem (theme::mnemonic (tr ("Fill each 2 steps"), '2'), [this] { fillSelected (2); });
