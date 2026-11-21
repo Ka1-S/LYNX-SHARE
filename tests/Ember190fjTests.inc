@@ -22,6 +22,8 @@ inline Render renderCase (const Case& c)
 {
     using namespace lynx;
     auto slot = makeEffectSlot (EffectKind::ember);
+    slot.engineRev = 1; // (rollup 0.1.31 step 5: the goldens are the C library's maths; round 190ok's revision 2 (FastMath,
+                        // the default of a new slot) is gated by its own quality check, not by these hashes)
     if (c.saved >= 0)
         upgradeLoadedEffectParams (slot, (std::size_t) c.saved);
     if (c.classic)
