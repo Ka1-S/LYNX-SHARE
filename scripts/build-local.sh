@@ -58,6 +58,8 @@ CORE="$CORE src/core/physmod/ModalBank.cpp src/core/physmod/LynxModel.cpp src/co
 CORE="$CORE src/core/TrackClips.cpp"
 # The tracker editor's model and the module import (round 190nw)
 CORE="$CORE src/core/TrackerGrid.cpp src/core/ModuleImport.cpp"
+# Copy and paste between LYNX SHARE windows: what a pasted clip brings along (round 190nz, #232 stage 2)
+CORE="$CORE src/core/CrossPaste.cpp"
 # Helix: LYNX's own wavetable synth and the import of Live's Wavetable onto it (round 190ja)
 CORE="$CORE src/core/WavetableSynth.cpp src/core/WavetableTables.cpp src/core/WavetableUser.cpp src/core/AlsDevicesWt.cpp"
 # Braid (Live's Meld) and the spectral effects' import, round 190ko

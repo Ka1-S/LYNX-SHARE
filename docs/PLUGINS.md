@@ -106,7 +106,7 @@ LYNX SHARE ships **native** plugins inspired by the third-party plugins producer
 | Kilohearts kHs Channel Mixer | **Utility** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
 | Kilohearts kHs Stereo | **Utility** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
 | Kilohearts kHs Ladder Filter | **Filter** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
-| Kilohearts kHs Nonlinear Filter | **Filter** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
+| Kilohearts kHs Nonlinear Filter | **Effector** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
 | Kilohearts kHs Compressor | **Compressor** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
 | Kilohearts kHs Compactor | **Compressor** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
 | Kilohearts kHs Dynamics | **Compressor** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
