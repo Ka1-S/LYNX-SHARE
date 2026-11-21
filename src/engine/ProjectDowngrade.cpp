@@ -23,6 +23,7 @@
 #include "core/Reeverb2.h"
 #include "core/VoiceShift.h"
 #include "core/VoiceTools.h"
+#include "core/WavetableSynth.h"
 
 #include <cmath>
 #include <functional>
@@ -1425,24 +1426,58 @@ void toRelease0130 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("LYNX Model is not in this release: its channels become empty Samplers and play nothing: {0}"), listOf (lynxModel), true });
     }
 
-    // round 190nh: the Kilohearts part-2 laws on Effector (hidden [12] codes 41 … 48, 49 kept for the Nonlinear Filter;
-    // set only by the Kilohearts translator). 0.1.30 reads [12] in eighths (round 190nb's five laws, codes 8 … 40, which
-    // stay), so codes 41 … 43 would play its Shaper law on these values: [12 …] are cut and Effector plays the algorithm
-    // its visible Type names
+    // round 190nh: the Kilohearts part-2 laws on Effector (hidden [12] codes 41 … 48; round 190oc: 49, the Nonlinear
+    // Filter; set only by the Kilohearts translator). 0.1.30 reads [12] in eighths (round 190nb's five laws, codes 8 … 40,
+    // which stay), so codes 41 … 43 would play its Shaper law on these values: [12 …] are cut and Effector plays the
+    // algorithm its visible Type names (the Nonlinear Filter: Filter)
     {
-        juce::StringArray laws;
+        juce::StringArray laws, nonlinear;
         forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
             auto* params = arrayOf (e.getProperty ("params"));
             if (params == nullptr || e.getProperty ("kind").toString() != "effector" || params->size() <= khsdsp::lawParam)
                 return;
-            if (khsdsp::lawCode (khsdsp::lawOf ((float) (double) (*params)[khsdsp::lawParam])) < 41)
+            const auto law = khsdsp::lawOf ((float) (double) (*params)[khsdsp::lawParam]);
+            if (khsdsp::lawCode (law) < 41)
                 return;
-            addOnce (laws, where);
+            addOnce (law == khsdsp::Law::nonlinearFilter ? nonlinear : laws, where);
             params->removeRange (khsdsp::lawParam, params->size() - khsdsp::lawParam);
         });
         if (! laws.isEmpty())
             lost.push_back ({ TR_NOOP ("Effector's newer Kilohearts laws (the Comb Filter, Chorus, Trance Gate, Phaser, Distortion, Bitcrush, Frequency Shifter and Ensemble stand-ins) play Effector's own algorithm: {0}"),
                               listOf (laws), true });
+        if (! nonlinear.isEmpty())
+            lost.push_back ({ TR_NOOP ("Effector's Kilohearts Nonlinear Filter law (the kHs Nonlinear Filter stand-in) plays Effector's own Filter: {0}"),
+                              listOf (nonlinear), true });
+    }
+
+    // round 190oc: Helix round 4 (a fourth state block after 0.1.30's, revision 4): unison on the granular and spectral
+    // oscillators and reverse grains. 0.1.30 reads the first wt::ext4Base values (revision 3 at most); the block is cut and
+    // the revision taken back to 3, so the channel plays as there (one voice, forwards). A loss only when the block plays
+    // something (a unison of more than one voice, or reverse grains); its automation then names values 0.1.30 has not
+    {
+        juce::StringArray helix4;
+        const auto& d = wt::defaults();
+        forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
+            if (c.getProperty ("instrument").toString() != "helix")
+                return;
+            auto values = juce::StringArray::fromTokens (c.getProperty ("modelParams").toString(), " ", "");
+            values.removeEmptyStrings();
+            if (values.size() <= wt::ext4Base)
+                return;
+            const auto at = [&] (int k) { return k < values.size() ? values[k].getFloatValue() : (float) d[(std::size_t) k]; };
+            const auto revision = wt::extBase + wt::ext::revision;
+            if (at (revision) >= 3.5f
+                && (std::lround (at (wt::ext4Base + wt::ext4::grainUnison)) > 1 || std::lround (at (wt::ext4Base + wt::ext4::specUnison)) > 1
+                    || at (wt::ext4Base + wt::ext4::grainReverse) > 0.0f))
+                addOnce (helix4, channelName (juce::var (&c), i));
+            values.removeRange (wt::ext4Base, values.size() - wt::ext4Base);
+            if (at (revision) > (float) wt::revision190mt)
+                values.set (revision, juce::String (wt::revision190mt));
+            c.setProperty ("modelParams", values.joinIntoString (" "));
+        });
+        if (! helix4.isEmpty())
+            lost.push_back ({ TR_NOOP ("Helix's unison on the granular and spectral oscillators and its reverse grains play one voice, forwards (their automation does nothing): {0}"),
+                              listOf (helix4), true });
     }
 
     // round 190nw: the tracker editor's view settings (rows per beat, columns, track groups). A view: the notes are the

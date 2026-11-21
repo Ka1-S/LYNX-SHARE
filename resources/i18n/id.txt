@@ -12168,3 +12168,7 @@ countries: id
 "Copy mixer track state" = "Salin status trek mixer"
 "Copy {0} mixer track states" = "Salin status {0} trek mixer"
 "Paste mixer track state" = "Tempel status trek mixer"
+"Grain Unison" = "Unison butir"
+"Spectral Unison" = "Unison spektral"
+"Effector's Kilohearts Nonlinear Filter law (the kHs Nonlinear Filter stand-in) plays Effector's own Filter: {0}" = "Hukum Kilohearts Nonlinear Filter pada Effector (pengganti kHs Nonlinear Filter) memainkan Filter milik Effector: {0}"
+"Helix's unison on the granular and spectral oscillators and its reverse grains play one voice, forwards (their automation does nothing): {0}" = "Unison osilator granular dan spektral Helix serta butir terbaliknya memainkan satu suara, maju (otomasinya tidak berpengaruh): {0}"

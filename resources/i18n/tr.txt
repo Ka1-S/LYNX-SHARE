@@ -12168,3 +12168,7 @@ countries: tr
 "Copy mixer track state" = "Mikser kanalı durumunu kopyala"
 "Copy {0} mixer track states" = "{0} mikser kanalının durumunu kopyala"
 "Paste mixer track state" = "Mikser kanalı durumunu yapıştır"
+"Grain Unison" = "Tane unison"
+"Spectral Unison" = "Spektral unison"
+"Effector's Kilohearts Nonlinear Filter law (the kHs Nonlinear Filter stand-in) plays Effector's own Filter: {0}" = "Effector'ün Kilohearts Nonlinear Filter yasası (kHs Nonlinear Filter yerine geçen) Effector'ün kendi Filter'ını çalar: {0}"
+"Helix's unison on the granular and spectral oscillators and its reverse grains play one voice, forwards (their automation does nothing): {0}" = "Helix'in granüler ve spektral osilatörlerindeki unison ve ters taneleri tek ses, ileri doğru çalar (otomasyonları hiçbir şey yapmaz): {0}"

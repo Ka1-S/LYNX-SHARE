@@ -79,6 +79,7 @@
 #include "core/MasterLooks.h"
 #include "core/Harmor.h"
 #include "core/KiloheartsDsp.h" // (rollup step 14: the copy for 0.1.28 self-test)
+#include "core/WavetableSynth.h" // (round 190oc: the copy for 0.1.30 self-test)
 #include "flp/Flp.h"
 #include "core/DemoSongs.h"
 #include "core/FirstSongTour.h"
@@ -3515,6 +3516,15 @@ public:
             // the Matrix page (macros, Helix+'s rows); --shot-scale 1.5 --shot-suffix @150 for the 150 % pictures.
             const auto i = args.indexOf ("--helixshot190mi");
             runHelixShot190mi (args[i + 1].unquoted(), i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String ("Growl FM"));
+            quit();
+            return;
+        }
+        if (args.contains ("--helixshot190oc"))
+        {
+            // LYNX --helixshot190oc prefix: round 190oc off-screen: the Pattern layout's Helix channel window with round 4's
+            // row (Grain Swarm, Spectral Ensemble; Frozen Choir and Triple Stack for the side by side with 190mt), the strip's
+            // row alone; paint costs in prefix-checks.txt
+            runHelixShot190oc (args[args.indexOf ("--helixshot190oc") + 1].unquoted());
             quit();
             return;
         }
@@ -8023,6 +8033,60 @@ private:
                 keys190nuResult = "ERROR MIDI file opened as a project " + midiError;
         }
 
+        // round 190oc: the copy for 0.1.30 cuts Helix round 4's block (revision 4 back to 3; a loss line only when a unison
+        // or reverse grains play) and the Kilohearts Nonlinear Filter law (code 49, its own loss line); the copy for 0.1.28
+        // still turns Helix into an empty Sampler after it; a Helix channel of revision 4 at the block's defaults loses nothing
+        juce::String helix4khs190ocResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            if (song.mixer.size() < 3)
+                song.mixer.resize (3);
+            lynx::ChannelDef plain, swarm;
+            plain.name = "Plain", swarm.name = "Swarm";
+            plain.instrument = swarm.instrument = lynx::InstrumentKind::helix;
+            const auto d = lynx::helixDefaults();
+            plain.modelParams = swarm.modelParams = d;
+            swarm.modelParams[(std::size_t) (lynx::wt::ext4Base + lynx::wt::ext4::grainUnison)] = 5.0f;
+            swarm.modelParams[(std::size_t) (lynx::wt::ext4Base + lynx::wt::ext4::grainReverse)] = 0.4f;
+            song.channels.push_back (plain);
+            song.channels.push_back (swarm);
+            auto nlf = lynx::makeEffectSlot (lynx::EffectKind::effector);
+            nlf.params[(std::size_t) lynx::khsdsp::lawParam] = lynx::khsdsp::lawValue (lynx::khsdsp::Law::nonlinearFilter);
+            nlf.params[(std::size_t) lynx::khsdsp::valueParam + 2] = 0.5f;
+            song.mixer[2].effects.push_back (nlf);
+            const auto copy = lynx::olderlynx::forRelease (song, "0.1.30");
+            const auto older = lynx::olderlynx::forRelease (song, "0.1.28");
+            const auto count = [] (const lynx::olderlynx::Copy& c, const char* start) {
+                return (int) std::count_if (c.lost.begin(), c.lost.end(), [start] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).startsWith (start); });
+            };
+            const auto parsed = juce::JSON::parse (copy.json);
+            int helixCut = 0, revisions3 = 0;
+            juce::String lossDetail;
+            for (const auto& l : copy.lost)
+                if (juce::String (l.text).startsWith ("Helix's unison"))
+                    lossDetail = l.detail;
+            if (const auto* channels = parsed["channels"].getArray())
+                for (const auto& c : *channels)
+                    if (c["instrument"].toString() == "helix")
+                    {
+                        auto values = juce::StringArray::fromTokens (c["modelParams"].toString(), " ", "");
+                        values.removeEmptyStrings();
+                        helixCut += values.size() == lynx::wt::ext4Base ? 1 : 0;
+                        revisions3 += values.size() > lynx::wt::extBase && values[lynx::wt::extBase].getFloatValue() == 3.0f ? 1 : 0;
+                    }
+            if (! copy.ok || ! older.ok)
+                helix4khs190ocResult = "ERROR copy " + copy.error + older.error;
+            else if (helixCut != 2 || revisions3 != 2)
+                helix4khs190ocResult = "ERROR Helix block in the copy (cut " + juce::String (helixCut) + ", revision 3 " + juce::String (revisions3) + ")";
+            else if (count (copy, "Helix's unison") != 1 || ! lossDetail.contains ("Swarm") || lossDetail.contains ("Plain"))
+                helix4khs190ocResult = "ERROR Helix loss line: " + lossDetail;
+            else if (parsed["mixer"][2]["effects"][0]["params"].size() > lynx::khsdsp::lawParam || count (copy, "Effector's Kilohearts Nonlinear Filter") != 1
+                     || count (copy, "Effector's newer Kilohearts laws") != 0)
+                helix4khs190ocResult = "ERROR Nonlinear Filter law in the copy";
+            else if (older.json.contains ("\"helix\"") || count (older, "Helix is not in this release") != 1)
+                helix4khs190ocResult = "ERROR copy for 0.1.28 after the 0.1.30 step";
+        }
+
         // round 190dr: the Session mixer's sections come back from a project (a project without them: Live's defaults);
         // a device dragged to another track and a Warp switch are one undo step each in a real engine
         juce::String livescr190drResult = "OK";
@@ -8455,6 +8519,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
+                        && helix4khs190ocResult == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK")
                         && danceWindowResult == "OK" && clickActivationResult == "OK" && motionOverlayResult.startsWith ("OK")
@@ -8541,6 +8606,7 @@ private:
                << "rollup031s2_copy_for_0130=" << rollup031s2Result << "\n"
                << "keys190nu_key_markers=" << keys190nuResult << "\n"
                << "rollup031s3_copy_for_0130=" << rollup031s3Result << "\n"
+               << "helix4_khs190oc_copy_for_0130=" << helix4khs190ocResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 
@@ -29054,6 +29120,105 @@ private:
             juce::FileOutputStream out (file);
             juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (*page), out);
             check ("channel window page", page->getWidth() > 0);
+        }
+        juce::File (prefix + "-checks.txt").replaceWithText (checks);
+    }
+
+    void runHelixShot190oc (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        juce::String checks;
+        const auto check = [&checks] (const juce::String& what, bool ok) { checks << (ok ? "ok   " : "FAIL ") << what << "\n"; };
+        const auto& bank = lynx::banks::bankOf (lynx::InstrumentKind::helix);
+        const auto load = [&] (const juce::String& name) {
+            int index = -1;
+            for (int b = 0; b < (int) bank.size(); ++b)
+                if (juce::String (bank[(std::size_t) b].name) == name)
+                    index = b;
+            check ("preset " + name, index >= 0);
+            offline.editSong ([index] (lynx::Song& s) {
+                if (s.channels.empty())
+                    s.channels.resize (1);
+                lynx::ChannelDef c;
+                c.instrument = lynx::InstrumentKind::helix;
+                c.name = "Helix";
+                c.mixerTrack = s.channels[0].mixerTrack;
+                if (auto loaded = lynx::banks::withPreset (c, std::max (index, 0)))
+                    c = *loaded;
+                s.channels[0] = c;
+            }, false);
+            offline.dispatchPendingMessages();
+        };
+        const auto locate = [] (lynx::Song& s) -> lynx::ChannelDef* { return s.channels.empty() ? nullptr : &s.channels[0]; };
+        const auto save = [&prefix, &offline] (juce::Component& c, const char* name) {
+            offline.dispatchPendingMessages();
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (c), out);
+        };
+        const auto paintCost = [&checks] (juce::Component& c, const char* what) {
+            double best = 1.0e9;
+            for (int run = 0; run < 3; ++run)
+            {
+                juce::Image image (juce::Image::ARGB, c.getWidth(), c.getHeight(), true);
+                const auto t0 = juce::Time::getMillisecondCounterHiRes();
+                for (int f = 0; f < 30; ++f)
+                {
+                    juce::Graphics g (image);
+                    c.paintEntireComponent (g, false);
+                }
+                best = std::min (best, (juce::Time::getMillisecondCounterHiRes() - t0) / 30.0);
+            }
+            checks << "paint " << what << " " << juce::String (best, 3) << " ms per frame (" << c.getWidth() << " x " << c.getHeight() << ")\n";
+        };
+        // each part of a window alone (the strip, the device), its paint cost
+        const auto parts = [&checks] (juce::Component& page) {
+            for (int i = 0; i < page.getNumChildComponents(); ++i)
+            {
+                auto* child = page.getChildComponent (i);
+                juce::Image image (juce::Image::ARGB, std::max (1, child->getWidth()), std::max (1, child->getHeight()), true);
+                double best = 1.0e9;
+                for (int run = 0; run < 3; ++run)
+                {
+                    const auto t0 = juce::Time::getMillisecondCounterHiRes();
+                    for (int f = 0; f < 10; ++f)
+                    {
+                        juce::Graphics g (image);
+                        child->paintEntireComponent (g, false);
+                    }
+                    best = std::min (best, (juce::Time::getMillisecondCounterHiRes() - t0) / 10.0);
+                }
+                checks << "  part " << juce::String (best, 3) << " ms " << typeid (*child).name() << " " << child->getBounds().toString() << "\n";
+            }
+        };
+        // the channel window (Pattern layout, LYNX's look): Helix+'s strip with round 4's row
+        load ("Grain Swarm");
+        {
+            auto page = lynx::makeHelixEditor (offline, locate, 0);
+            check ("window page holds the six strip rows", page->getHeight() >= lynx::helixDeviceHeight + 16 + 446);
+            save (*page, "01-window-grain-swarm");
+            paintCost (*page, "window (Grain Swarm)");
+        }
+        load ("Spectral Ensemble");
+        {
+            auto page = lynx::makeHelixEditor (offline, locate, 0);
+            save (*page, "02-window-spectral-ensemble");
+            paintCost (*page, "window (Spectral Ensemble)");
+            parts (*page);
+        }
+        load ("Frozen Choir");
+        {
+            auto page = lynx::makeHelixEditor (offline, locate, 0);
+            save (*page, "03-window-frozen-choir");
+        }
+        load ("Triple Stack");
+        {
+            auto page = lynx::makeHelixEditor (offline, locate, 0);
+            save (*page, "04-window-triple");
+            paintCost (*page, "window (Triple Stack)");
+            parts (*page);
         }
         juce::File (prefix + "-checks.txt").replaceWithText (checks);
     }

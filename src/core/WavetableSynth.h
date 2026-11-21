@@ -104,7 +104,7 @@ constexpr int extTargetCount = 4, plusTargetCount = targetCount + extTargetCount
 // render exactly as before). Oscillator 3 (Live's oscillator set + a second warp), the sample oscillator, user tables
 // (their data in ChannelDef::pluginState, see HelixUserData), macros 5…8, two chaos sources, the frequency shifter, the
 // EQ and the multiband compressor in the rack, anti-aliased hard-edged warps. Every value defaults to "off".
-constexpr int revision190mi = 1, revision190ml = 2, revision190mt = 3, currentRevision = revision190mt;
+constexpr int revision190mi = 1, revision190ml = 2, revision190mt = 3, revision190oc = 4, currentRevision = revision190oc;
 constexpr int newSourceCount = 6;  // Macro 5…8, Chaos 1, Chaos 2
 constexpr int newTargetCount = 12; // oscillator 3's six rows and Warp 2, the sample's pitch / gain / pan, Shift, Multiband
 constexpr int allSourceCount = plusSourceCount + newSourceCount;   // 23
@@ -153,10 +153,27 @@ constexpr int autoEnd = 22;                                          // the auto
 constexpr int cells = autoEnd;                                       // the new rows × every source
 constexpr int count = cells + newTargetCount3 * allSourceCount;
 } // namespace ext3
-constexpr int stateSize = ext3Base + ext3::count;
+
+// --- Helix round 4 (round 190oc): a fourth block after round 3's, gated by the same revision value (4 = this block live;
+// 0 … 3 render exactly as before): unison for the granular and the spectral oscillators (voices, detune, width) and reverse
+// grains. Every value in defaults() leaves the sound as it was (one voice, no reverse); no new matrix rows.
+constexpr int ext4Base = ext3Base + ext3::count;
+namespace ext4
+{
+constexpr int reserved = 0;                                          // (state, not automatable)
+constexpr int grainUnison = 1, grainDetune = 2, grainWidth = 3, grainReverse = 4;
+constexpr int specUnison = 5, specDetune = 6, specWidth = 7;
+constexpr int autoEnd = 8;                                           // the automatable values are 1 … autoEnd − 1
+constexpr int count = autoEnd;
+} // namespace ext4
+constexpr int stateSize = ext4Base + ext4::count;
 constexpr int maxGrains = 16;        // grains sounding at once per voice
+constexpr int maxGrainsUnison = 24;  // (round 4: with grain unison)
 constexpr int maxSpectralPartials = 64;
 constexpr int spectralFrames = 64;   // analysis frames over the sample
+constexpr int maxOscUnison = 8;      // (round 4: the granular and spectral oscillators' unison voices)
+constexpr int maxSpectralBank = 128; // (round 4: partials sounding per voice over all unison voices: two full banks)
+constexpr double unisonDetuneCents = 50.0; // (round 4: Detune 1 = the outer voices ± 50 cents, as Classic unison)
 
 // a matrix cell's value index for any target (Live's 52, Helix+'s 4, Helix+ 2's 12) and any source (Live's 13, the 8
 // macros, the chaos sources)
@@ -179,7 +196,8 @@ constexpr bool automatable (int index) noexcept
 {
     return (index >= 0 && index < paramCount) || (index > extBase + ext::revision && index < extBase + ext::autoEnd)
            || (index > ext2Base + ext2::reserved && index < ext2Base + ext2::autoEnd)
-           || (index > ext3Base + ext3::reserved && index < ext3Base + ext3::autoEnd);
+           || (index > ext3Base + ext3::reserved && index < ext3Base + ext3::autoEnd)
+           || (index > ext4Base + ext4::reserved && index < ext4Base + ext4::autoEnd);
 }
 // oscillator k's (0…2) value of Live's oscillator set (osc::on … osc::gain), its table value and its second warp's values
 constexpr int oscIndex (int k, int field) noexcept { return k < 2 ? oscBase (k) + field : ext2Base + ext2::osc3 + field; }
@@ -384,6 +402,10 @@ double shiftHz (double shift) noexcept;                                     // t
 double spectralShiftHz (double shift) noexcept;   // the spectral oscillator's Shift −1…1 → Hz added to every partial
 double spectralExponent (double stretch) noexcept; // Stretch −1…1 → the partials' exponent around the root (1: none)
 int sampleLevelFor (double ratio) noexcept;        // the band-limited level a read at `ratio` source samples per sample takes
+// Helix round 4 (round 190oc) laws: unison voice u of n's place −1 … 1 (0 for one voice), and the spectral oscillator's
+// partials per unison voice (n voices share maxSpectralBank, at most maxSpectralPartials each)
+double oscUnisonSpread (int u, int n) noexcept;
+int spectralUnisonStride (int n) noexcept;
 float grainWindow (float x) noexcept;              // the grains' window at 0…1
 double warpPhase (int mode, double amount, double phase) noexcept;        // the phase warps (0…1 → 0…1)
 float drawnLfo (const double* points, double x) noexcept;                  // a drawn LFO at phase x (points: count, x/y/curve…)
@@ -465,7 +487,7 @@ std::vector<float> helixDefaults();
 // the channel's state as doubles (missing values = defaults)
 std::vector<double> helixState (const ChannelDef& channel);
 // grows a channel's values to the whole state (missing ones as they read: a missing Helix+ block stays revision 0);
-// `helixPlus`: a Helix+ value is about to be set, so the blocks go live (revision 3, round 190mt; 190ml: 2; 190mi: 1)
+// `helixPlus`: a Helix+ value is about to be set, so the blocks go live (revision 4, round 190oc; 190mt: 3; 190ml: 2; 190mi: 1)
 void padHelixState (ChannelDef& channel, bool helixPlus);
 const std::vector<EngineParam>& helixEngineParams();
 namespace modelparams

@@ -12168,3 +12168,7 @@ countries: tw hk mo
 "Copy mixer track state" = "複製混音軌道狀態"
 "Copy {0} mixer track states" = "複製 {0} 個混音軌道的狀態"
 "Paste mixer track state" = "貼上混音軌道狀態"
+"Grain Unison" = "顆粒齊奏"
+"Spectral Unison" = "頻譜齊奏"
+"Effector's Kilohearts Nonlinear Filter law (the kHs Nonlinear Filter stand-in) plays Effector's own Filter: {0}" = "Effector 的 Kilohearts Nonlinear Filter 規律（kHs Nonlinear Filter 的替代）改為播放 Effector 自身的 Filter：{0}"
+"Helix's unison on the granular and spectral oscillators and its reverse grains play one voice, forwards (their automation does nothing): {0}" = "Helix 顆粒與頻譜振盪器的齊奏及其反向顆粒以單聲部、正向播放（其自動化不起作用）：{0}"

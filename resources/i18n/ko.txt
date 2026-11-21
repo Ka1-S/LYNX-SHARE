@@ -12168,3 +12168,7 @@ countries: kr
 "Copy mixer track state" = "믹서 트랙 상태 복사"
 "Copy {0} mixer track states" = "믹서 트랙 {0}개의 상태 복사"
 "Paste mixer track state" = "믹서 트랙 상태 붙여넣기"
+"Grain Unison" = "그레인 유니즌"
+"Spectral Unison" = "스펙트럴 유니즌"
+"Effector's Kilohearts Nonlinear Filter law (the kHs Nonlinear Filter stand-in) plays Effector's own Filter: {0}" = "Effector의 Kilohearts Nonlinear Filter 법칙(kHs Nonlinear Filter 대체)은 Effector 자체의 Filter를 재생합니다: {0}"
+"Helix's unison on the granular and spectral oscillators and its reverse grains play one voice, forwards (their automation does nothing): {0}" = "Helix의 그래뉼러·스펙트럴 오실레이터 유니즌과 역재생 그레인은 한 보이스, 정방향으로 재생됩니다(해당 오토메이션은 동작하지 않음): {0}"

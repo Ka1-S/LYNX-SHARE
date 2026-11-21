@@ -844,7 +844,8 @@ int translateKilohearts (const std::vector<std::uint8_t>& state, EffectSlot& slo
     // names the nearest Effector algorithm, Wet is the snapin's mix, the law and its values sit in the hidden [12 …]
     if (kind == EffectKind::effector
         && (type == "ring_mod" || type == "reverser" || type == "resonator" || type == "phase_distortion" || type == "shaper"
-            || type == "comb_filter" || type == "chorus" || type == "trance_gate" || type == "phaser" || type == "distortion" || type == "bitcrush" || type == "frequency_shifter" || type == "unison"))
+            || type == "comb_filter" || type == "chorus" || type == "trance_gate" || type == "phaser" || type == "distortion" || type == "bitcrush" || type == "frequency_shifter" || type == "unison"
+            || type == "dirty_filter"))
     {
         namespace k = khsdsp;
         auto hidden = [&] (int index, double v) { slot.params[(std::size_t) index] = (float) std::clamp (v, 0.0, 1.0); ++n; };
@@ -960,6 +961,26 @@ int translateKilohearts (const std::vector<std::uint8_t>& state, EffectSlot& slo
             hidden (k::valueParam + 3, t / 5.0);
             hidden (k::valueParam + 4, m.num ("dynamics", 0.0));
             hidden (k::valueParam + 5, m.flag ("dc_filter", true) ? 1.0 : 0.0);
+        }
+        else if (type == "dirty_filter")
+        {
+            // round 190oc: DirtyFilterDsp read in HeartCore (REA_rodada190oc); the type and mode by their saved names
+            typeIs (4); // Filter
+            hidden (k::lawParam, k::lawValue (k::Law::nonlinearFilter));
+            static constexpr const char* types[5] { "low_pass", "band_pass", "high_pass", "notch", "all_pass" };
+            static constexpr const char* modes[9] { "clean", "saturated", "tubular", "clipped", "warm", "biased", "fuzzy", "metallic", "digital" };
+            int t = 0, d = 1;
+            for (int i = 0; i < 5; ++i)
+                if (m.str ("filter_type") == types[i])
+                    t = i;
+            for (int i = 0; i < 9; ++i)
+                if (m.str ("dirt_type") == modes[i])
+                    d = i;
+            hidden (k::valueParam, t / 4.0);
+            hidden (k::valueParam + 1, d / 8.0);
+            hidden (k::valueParam + 2, k::enc::logValue (m.num ("cutoff", 440.0), k::enc::nlfCutLo, k::enc::nlfCutHi));
+            hidden (k::valueParam + 3, k::enc::logValue (m.num ("q", 0.707), k::enc::nlfQLo, k::enc::nlfQHi));
+            hidden (k::valueParam + 4, m.num ("drive", 0.25));
         }
         else if (type == "phaser")
         {

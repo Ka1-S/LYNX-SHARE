@@ -12168,3 +12168,7 @@ countries: ru by kz
 "Copy mixer track state" = "Копировать состояние дорожки микшера"
 "Copy {0} mixer track states" = "Копировать состояния дорожек микшера ({0})"
 "Paste mixer track state" = "Вставить состояние дорожки микшера"
+"Grain Unison" = "Унисон гранул"
+"Spectral Unison" = "Спектральный унисон"
+"Effector's Kilohearts Nonlinear Filter law (the kHs Nonlinear Filter stand-in) plays Effector's own Filter: {0}" = "Закон Kilohearts Nonlinear Filter в Effector (замена kHs Nonlinear Filter) играет собственный Filter Effector: {0}"
+"Helix's unison on the granular and spectral oscillators and its reverse grains play one voice, forwards (their automation does nothing): {0}" = "Унисон гранулярного и спектрального осцилляторов Helix и его обратные гранулы звучат одним голосом, вперёд (их автоматизация ничего не делает): {0}"

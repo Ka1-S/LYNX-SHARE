@@ -12168,3 +12168,7 @@ countries: nl be
 "Copy mixer track state" = "Mixertrackstatus kopiëren"
 "Copy {0} mixer track states" = "Status van {0} mixertracks kopiëren"
 "Paste mixer track state" = "Mixertrackstatus plakken"
+"Grain Unison" = "Grain-unisono"
+"Spectral Unison" = "Spectraal unisono"
+"Effector's Kilohearts Nonlinear Filter law (the kHs Nonlinear Filter stand-in) plays Effector's own Filter: {0}" = "De Kilohearts Nonlinear Filter-wet van Effector (de vervanger van kHs Nonlinear Filter) speelt het eigen Filter van Effector: {0}"
+"Helix's unison on the granular and spectral oscillators and its reverse grains play one voice, forwards (their automation does nothing): {0}" = "Het unisono van de granulaire en spectrale oscillators van Helix en de omgekeerde grains spelen één stem, vooruit (hun automatisering doet niets): {0}"
