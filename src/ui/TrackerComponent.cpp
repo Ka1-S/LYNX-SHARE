@@ -2321,7 +2321,15 @@ TrackerComponent::BenchResult TrackerComponent::paintBench (BenchFrame kind, int
 
 std::uint64_t TrackerComponent::framePixelsForCheck (bool cached)
 {
+    // (rollup 0.1.31 step 5: the frame is drawn the way the window draws it. The chunks are images of the platform's own
+    // kind (Direct2D bitmaps on Windows) and the window paints with that renderer too, so on Windows a software target
+    // compared Direct2D's text and colours in the chunks with the software renderer's in the straight frame: 7,700 text
+    // edge pixels and 1-level colour steps apart, though the window shows the same either way)
+   #if JUCE_WINDOWS
+    juce::Image image (juce::Image::ARGB, std::max (1, getWidth()), std::max (1, getHeight()), true, juce::NativeImageType());
+   #else
     juce::Image image (juce::Image::ARGB, std::max (1, getWidth()), std::max (1, getHeight()), true, juce::SoftwareImageType());
+   #endif
     const auto was = impl->useChunks;
     impl->useChunks = cached;
     {
