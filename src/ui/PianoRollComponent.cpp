@@ -8,6 +8,7 @@
 #include "ui/MixerComponent.h"
 #include "ui/PaintAB.h"
 #include "core/ChordReadout.h"
+#include "core/ClipLoopOps.h"
 #include "core/RowBands.h"
 #include "core/PastePlace.h"
 #include "core/LayoutStyle.h"
@@ -184,6 +185,100 @@ bool isMidiFile (const juce::File& f) { return f.hasFileExtension ("mid;midi"); 
 
 } // namespace
 
+
+// Live's Randomization Amount slider: a 38 x 13 box, 1 px #111111 edge, the value's share of 127 filled teal (#007383)
+// over #242424, the number in the middle [SHOT live-01-velocity-lane.png x 566…603, y 980…992]. Drag up / down or the
+// wheel change it; typed digits then Enter set it and randomize (manual 10.5.12), Escape forgets them.
+class PianoRollComponent::LiveAmountBox final : public juce::Component, public juce::SettableTooltipClient
+{
+public:
+    std::function<void()> onEnter;
+    LiveAmountBox()
+    {
+        setWantsKeyboardFocus (true);
+        setTitle (tr ("Randomization Amount"));
+        setTooltip (tr ("Randomization Amount: velocities move up or down by up to this much (drag, or type a number and press Enter)"));
+    }
+    void paint (juce::Graphics& g) override
+    {
+        const auto r = getLocalBounds();
+        g.setColour (juce::Colour (0xff111111));
+        g.fillRect (r);
+        const auto inner = r.reduced (1);
+        g.setColour (juce::Colour (0xff242424));
+        g.fillRect (inner);
+        const auto value = typed.isNotEmpty() ? juce::jlimit (0, 127, typed.getIntValue()) : PianoRollComponent::liveRandomizeAmount;
+        g.setColour (juce::Colour (0xff007383));
+        g.fillRect (inner.withWidth (juce::roundToInt ((float) inner.getWidth() * (float) value / 127.0f)));
+        g.setColour (typed.isNotEmpty() ? juce::Colour (0xffffad56) : juce::Colour (0xffb0b0b0));
+        g.setFont (theme::font (theme::type::caption));
+        textcache::drawText (g, typed.isNotEmpty() ? typed : juce::String (value), r, juce::Justification::centred, false);
+    }
+    void mouseDown (const juce::MouseEvent&) override
+    {
+        dragFrom = PianoRollComponent::liveRandomizeAmount;
+        grabKeyboardFocus();
+    }
+    void mouseDrag (const juce::MouseEvent& e) override { set (dragFrom - e.getDistanceFromDragStartY() / 2); }
+    void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& w) override
+    {
+        set (PianoRollComponent::liveRandomizeAmount + (w.deltaY > 0 ? 1 : w.deltaY < 0 ? -1 : 0));
+    }
+    bool keyPressed (const juce::KeyPress& key) override
+    {
+        const auto c = key.getTextCharacter();
+        if (c >= '0' && c <= '9' && typed.length() < 3)
+        {
+            typed << juce::String::charToString (c);
+            repaint();
+            return true;
+        }
+        if (key.isKeyCode (juce::KeyPress::backspaceKey) && typed.isNotEmpty())
+        {
+            typed = typed.dropLastCharacters (1);
+            repaint();
+            return true;
+        }
+        if (key.isKeyCode (juce::KeyPress::returnKey) && typed.isNotEmpty())
+        {
+            typeForCheck (typed);
+            return true;
+        }
+        if (key.isKeyCode (juce::KeyPress::escapeKey) && typed.isNotEmpty())
+        {
+            typed.clear();
+            repaint();
+            return true;
+        }
+        return false;
+    }
+    void focusLost (FocusChangeType) override
+    {
+        typed.clear();
+        repaint();
+    }
+    // the value typed and validated with Enter: set, then the notes randomized
+    void typeForCheck (const juce::String& text)
+    {
+        typed.clear();
+        set (text.getIntValue());
+        if (onEnter != nullptr)
+            onEnter();
+    }
+
+private:
+    void set (int v)
+    {
+        v = juce::jlimit (1, 127, v);
+        if (v != PianoRollComponent::liveRandomizeAmount)
+        {
+            PianoRollComponent::liveRandomizeAmount = v;
+            repaint();
+        }
+    }
+    juce::String typed;
+    int dragFrom = 0;
+};
 
 PianoRollComponent::PianoRollComponent (AudioEngine& e)
     : engine (e)
@@ -433,8 +528,21 @@ PianoRollComponent::PianoRollComponent (AudioEngine& e)
     laneBox.setSelectedId (1, juce::dontSendNotification);
     laneBox.setWantsKeyboardFocus (false);
     laneBox.setMouseClickGrabsKeyboardFocus (false);
-    laneBox.onChange = [this] { repaint(); };
+    laneBox.onChange = [this] {
+        if (fitKeysToNotes) // (round gap190og: the Live footer comes and goes with the Velocity lane)
+            resized();
+        repaint();
+    };
     addAndMakeVisible (laneBox);
+    // round gap190og (detail-047): Live's Velocity Controls (shown by resized only in the docked Live look)
+    liveRandomize.setButtonText (tr ("Randomize"));
+    liveRandomize.setTooltip (tr ("Randomize: the selected notes' velocities (all the notes with none selected) move at random by up to the amount beside it"));
+    liveRandomize.setWantsKeyboardFocus (false);
+    liveRandomize.onClick = [this] { liveRandomizeVelocity(); };
+    addChildComponent (liveRandomize);
+    liveRandomAmount = std::make_unique<LiveAmountBox>();
+    liveRandomAmount->onEnter = [this] { liveRandomizeVelocity(); };
+    addChildComponent (*liveRandomAmount);
 
     setOpaque (true); // paints every pixel: nothing behind it is redrawn while scrolling
 
@@ -455,7 +563,35 @@ PianoRollComponent::~PianoRollComponent()
 juce::Rectangle<int> PianoRollComponent::gridArea() const
 {
     return getLocalBounds().withTrimmedLeft (keyboardWidth).withTrimmedTop (headerHeight)
-        .withTrimmedRight (scrollBarSize).withTrimmedBottom (velocityHeight + eventPaneBarArea().getHeight());
+        .withTrimmedRight (scrollBarSize).withTrimmedBottom (velocityHeight + eventPaneBarArea().getHeight() + liveFooterHeight());
+}
+
+// Round gap190og (detail-047): Live's footer under the editor lanes holds the Velocity Controls; LYNX draws it while the
+// dock shows the Velocity lane in the Live look (elsewhere 0: the Pattern layout's Piano roll and the FL look stay as they are)
+int PianoRollComponent::liveFooterHeight() const
+{
+    return liveNotes() && ! mpeStacked && velocityHeight >= 24 && laneBox.getSelectedId() == laneVelocity ? liveFooterBar : 0;
+}
+
+void PianoRollComponent::liveFooterCheck()
+{
+    if (liveFooterHeight() != laidFooter)
+    {
+        resized();
+        repaint();
+    }
+}
+
+void PianoRollComponent::liveRandomizeVelocity()
+{
+    // the selected notes, or every note of the channel shown when none is selected (manual 10.5.12)
+    const auto target = selectionOrAll();
+    if (target.empty())
+        return;
+    const auto amount = liveRandomizeAmount;
+    const auto seed = (std::uint32_t) juce::Random::getSystemRandom().nextInt();
+    editNotes ([&target, amount, seed] (Pattern& p) { cliploop::randomizeVelocity (p, target, amount, seed); });
+    repaint();
 }
 
 juce::Rectangle<int> PianoRollComponent::velocityArea() const
@@ -497,7 +633,7 @@ void PianoRollComponent::layoutEventPane()
         // at least 22 px a lane, so the notes stay in view; core/MpeTab.h)
         if (mpeStacked)
             velocityHeight = mpetab::areaHeight (mpetab::countOf (mpeShownLanes), getHeight() - headerHeight);
-        eventPaneBarTop = getHeight() - velocityHeight;
+        eventPaneBarTop = getHeight() - velocityHeight - liveFooterHeight();
         return;
     }
     // the bar's travel: from under the ruler (the grid folded away) to the bottom edge (the event editor folded away);
@@ -775,6 +911,22 @@ void PianoRollComponent::resized()
     place (moreButton, h);
     place (chordLabel, 84, true);
     laneBox.setBounds (2, velocityArea().getY() + 4, keyboardWidth - 4, 20);
+    laidFooter = liveFooterHeight();
+    if (const auto footer = laidFooter; footer > 0)
+    {
+        // Live's footer (capture x 500…559 the button, 566…603 the amount; both 13 px high, 3 px under the footer's line)
+        const auto y = getHeight() - footer + 3;
+        laneBox.setBounds (4, y - 1, keyboardWidth - 8, 15); // (Live: the lane chooser sits in the footer, at its left)
+        liveRandomize.setBounds (keyboardWidth + 22, y, 60, 13);
+        liveRandomAmount->setBounds (liveRandomize.getRight() + 6, y, 38, 13);
+        liveRandomize.setVisible (true);
+        liveRandomAmount->setVisible (true);
+    }
+    else
+    {
+        liveRandomize.setVisible (false);
+        liveRandomAmount->setVisible (false);
+    }
     laneBox.setVisible (velocityHeight >= 24 && ! mpeStacked); // (the event editor folded away: FL hides its target panel too; the MPE tab names its lanes)
     overview.setBounds (keyboardWidth, toolbarHeight, getWidth() - keyboardWidth - zoomWheelSize, overviewHeight);
     vBar.setBounds (getWidth() - scrollBarSize, headerHeight, scrollBarSize, gridArea().getHeight());
@@ -2030,6 +2182,17 @@ void PianoRollComponent::paint (juce::Graphics& g)
                 g.drawText (text, pill.withTrimmedLeft (24.0f).withTrimmedRight (6.0f), juce::Justification::centredLeft, true);
             }
         }
+    }
+
+    // round gap190og (detail-047): Live's footer under the lanes (its Velocity Controls are child buttons): a 1 px #242424
+    // line, then #363636 [SHOT live-01-velocity-lane.png y 977…994]
+    if (const auto footer = liveFooterHeight(); footer > 0)
+    {
+        const auto top = getHeight() - footer;
+        g.setColour (juce::Colour (0xff242424));
+        g.fillRect (0, top, getWidth(), 1);
+        g.setColour (theme::livelook::surface);
+        g.fillRect (0, top + 1, getWidth(), footer - 1);
     }
 
     // round 190mr (DE-63, capture 190mr prhold): FL's hold ring, a thin light arc at the mouse growing clockwise from 12

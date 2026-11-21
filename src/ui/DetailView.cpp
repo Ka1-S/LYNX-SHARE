@@ -3630,6 +3630,7 @@ public:
             if (roll->liveNoteColour != colour)
             {
                 roll->liveNoteColour = colour;
+                roll->liveFooterCheck(); // (round gap190og: Live's Velocity footer comes with the Live notes)
                 roll->repaint();
             }
         }
@@ -3666,7 +3667,10 @@ public:
         dropEvents();
         dockedTrack = dockedScene = -1;
         if (auto* roll = dynamic_cast<PianoRollComponent*> (editor)) // (round 190jn: its own colours again at home)
+        {
             roll->liveNoteColour = juce::Colours::transparentBlack;
+            roll->liveFooterCheck(); // (round gap190og: no Live footer outside the dock)
+        }
         if (editor != nullptr && hooks.undockPianoRoll != nullptr)
         {
             editor = nullptr;
