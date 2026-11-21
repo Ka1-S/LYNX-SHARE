@@ -6632,7 +6632,86 @@ private:
     // round 190lx (DP-31): Transient Processor's lower trace (FL manual "Visualization Controls")
     bool tpTraceDisplay (const char* id) const { return kind == EffectKind::transientProcessor && id != nullptr && std::strcmp (id, "envelope") == 0; }
     bool tpTraceItem (const LayoutItem& item) const { return item.type == Item::display && tpTraceDisplay (item.display); }
-    bool monitorPaused = false; // round 190ld (DP-25): the Limiter's graph paused by a click (Maximus' Monitor never is)
+    bool monitorPaused = false; // round 190ld (DP-25): the Limiter's graph paused by a click (round 190oa: Maximus' Monitor too)
+    // round 190oa (DP-24 / DP-25, capture 190oa C1): FL's toolbar at the left of the Limiter's graph — Options ▾, "Show input
+    // peaks", "Show analysis & gain envelopes", "Show level markers", then the "Scrolling speed" slider (up = faster)
+    bool limShowIn = true, limShowEnv = true, limShowMarkers = true, limSpeedDragging = false;
+    float limSpeed = 0.5f;
+    // round 190oa (DP-27, capture 190oa C2): Maximus' "Monitor scrolling speed" (left slow, right fast)
+    float maxSpeed = 0.5f;
+    bool maxSpeedDragging = false;
+    static double speedFactor (float v) { return std::pow (4.0, ((double) v - 0.5) * 2.0); } // (0.5 = the default speed)
+    juce::Rectangle<float> limGraph (const LayoutItem& item) const { return rectOf (item).reduced (6.0f * scale()).withTrimmedLeft (18.0f * scale()); }
+    juce::Rectangle<float> limPanel (const LayoutItem& item) const
+    {
+        const auto inner = rectOf (item).reduced (6.0f * scale());
+        return inner.withWidth (16.0f * scale());
+    }
+    juce::Rectangle<float> limPart (const LayoutItem& item, int i) const // 0 options, 1 input, 2 envelopes, 3 markers
+    {
+        const auto p = limPanel (item);
+        const auto s = scale();
+        return { p.getX(), p.getY() + (2.0f + 14.0f * (float) i) * s, p.getWidth(), 12.0f * s };
+    }
+    juce::Rectangle<float> limSlider (const LayoutItem& item) const
+    {
+        const auto p = limPanel (item);
+        return p.withTrimmedTop (62.0f * scale()).reduced (3.0f * scale(), 4.0f * scale());
+    }
+    int limPartAt (const LayoutItem& item, juce::Point<float> p) const // 0..3 the parts, 4 the slider, -1 none
+    {
+        for (int i = 0; i < 4; ++i)
+            if (limPart (item, i).contains (p))
+                return i;
+        return limSlider (item).expanded (2.0f * scale()).contains (p) ? 4 : -1;
+    }
+    void limSetSpeedAt (const LayoutItem& item, float y)
+    {
+        const auto t = limSlider (item);
+        limSpeed = juce::jlimit (0.0f, 1.0f, (t.getBottom() - y) / juce::jmax (1.0f, t.getHeight()));
+        repaint (rectOf (item).getSmallestIntegerContainer());
+    }
+    void limOptionsMenu (const LayoutItem& item)
+    {
+        juce::PopupMenu m;
+        m.addItem (tr ("Show input peaks"), true, limShowIn, [this] { limShowIn = ! limShowIn; repaint(); });
+        m.addItem (tr ("Show analysis & gain envelopes"), true, limShowEnv, [this] { limShowEnv = ! limShowEnv; repaint(); });
+        m.addItem (tr ("Show level markers"), true, limShowMarkers, [this] { limShowMarkers = ! limShowMarkers; repaint(); });
+        m.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea (localAreaToGlobal (limPart (item, 0).getSmallestIntegerContainer())));
+    }
+    void paintLimiterTools (juce::Graphics& g, const LayoutItem& item, bool enabled) const
+    {
+        const auto s = scale();
+        const auto dim = [enabled] (juce::Colour c, bool on) { return c.withMultipliedAlpha ((enabled ? 1.0f : 0.5f) * (on ? 1.0f : 0.35f)); };
+        g.setColour (juce::Colour (0xff1c2124));
+        g.fillRect (limPanel (item));
+        const auto c0 = limPart (item, 0).getCentre(), c1 = limPart (item, 1).getCentre(), c2 = limPart (item, 2).getCentre(), c3 = limPart (item, 3).getCentre();
+        juce::Path tri;
+        tri.addTriangle (c0.x - 3.5f * s, c0.y - 2.0f * s, c0.x + 3.5f * s, c0.y - 2.0f * s, c0.x, c0.y + 2.5f * s);
+        g.setColour (dim (theme::colour::textSecondary, true));
+        g.fillPath (tri);
+        g.setColour (dim (juce::Colour (0xff836bb2), limShowIn)); // input peaks: a purple bar
+        g.fillRect (juce::Rectangle<float> (2.0f * s, 9.0f * s).withCentre (c1));
+        g.setColour (dim (juce::Colour (0xff6fbf3a), limShowEnv)); // analysis (green ring) and gain (white slash) envelopes
+        g.drawEllipse (juce::Rectangle<float> (6.0f * s, 6.0f * s).withCentre (c2.translated (-2.0f * s, 0.0f)), 1.3f * s);
+        g.setColour (dim (juce::Colours::white, limShowEnv));
+        g.drawLine (c2.x + 0.5f * s, c2.y + 3.0f * s, c2.x + 4.5f * s, c2.y - 3.0f * s, 1.3f * s);
+        g.setColour (dim (limShowMarkers ? juce::Colour (0xff836bb2) : theme::colour::textSecondary, true)); // level markers: "="
+        g.fillRect (juce::Rectangle<float> (8.0f * s, 1.5f * s).withCentre (c3.translated (0.0f, -2.0f * s)));
+        g.fillRect (juce::Rectangle<float> (8.0f * s, 1.5f * s).withCentre (c3.translated (0.0f, 2.0f * s)));
+        const auto t = limSlider (item);
+        g.setColour (juce::Colour (0xff4a5258));
+        g.fillRect (juce::Rectangle<float> (1.0f * s, t.getHeight()).withCentre (t.getCentre()));
+        g.setColour (juce::Colour (0xffb5bcc0));
+        g.fillRect (juce::Rectangle<float> (t.getWidth(), 4.0f * s).withCentre ({ t.getCentreX(), t.getBottom() - limSpeed * t.getHeight() }));
+    }
+    // FL's "II PAUSE" caption (capture 190oa C1 / C2: white, top-right of the paused display)
+    void paintPauseCaption (juce::Graphics& g, juce::Rectangle<float> area) const
+    {
+        g.setColour (juce::Colours::white);
+        g.setFont (theme::font (juce::jmax (8.0f, 10.0f * scale()), true));
+        g.drawText ("II " + tr ("PAUSE"), area.reduced (6.0f * scale(), 4.0f * scale()).toNearestInt(), juce::Justification::topRight, false);
+    }
     bool limiterGraphShown() const
     {
         const auto* fx = current();
@@ -6657,7 +6736,7 @@ private:
     }
     // the history over `area`: newest column at the right edge, one column per pixel at 100 %; the input as a light fill,
     // its part above the output in purple, the gain (output / input) as a line on the same axis (1 = the 0 dB line)
-    void paintMonitor (juce::Graphics& g, juce::Rectangle<float> area, bool maximusLook, bool enabled) const
+    void paintMonitor (juce::Graphics& g, juce::Rectangle<float> area, bool maximusLook, bool enabled, bool showIn = true, bool showGain = true) const
     {
         const auto n = monitor.size();
         if (n == 0)
@@ -6696,8 +6775,9 @@ private:
         g.setColour (dim (juce::Colour (maximusLook ? 0xffadbfb0 : 0xffd5ead7)));
         g.fillRectList (fills);
         g.setColour (dim (juce::Colour (maximusLook ? 0xff6e5d94 : 0xff836bb2)));
-        g.fillRectList (purples);
-        if (started)
+        if (showIn) // (round 190oa: FL's "Show input peaks")
+            g.fillRectList (purples);
+        if (started && showGain) // (round 190oa: FL's "Show analysis & gain envelopes")
         {
             g.setColour (dim (juce::Colour (maximusLook ? 0xffd6e3e6 : 0xffd5ffff)));
             g.strokePath (gain, juce::PathStrokeType (juce::jmax (1.0f, colW)));
