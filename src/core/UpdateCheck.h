@@ -101,9 +101,20 @@ enum class Method
 };
 Method methodFor (Flavour);
 
+// The Linux packages' architecture in their file names: "aarch64" in an arm64 build, else "x86_64" (round 190oy)
+constexpr const char* buildLinuxArch() noexcept
+{
+#if defined(__aarch64__)
+    return "aarch64";
+#else
+    return "x86_64";
+#endif
+}
+
 // The asset a flavour uses (index into `assets`), or -1: the installer "*-setup-x64.exe", the portable
-// "*-windows-x64.zip", macOS "*.dmg", the AppImage "*-x86_64.AppImage", the tarball "*-linux-x86_64.tar.gz".
-int assetFor (Flavour, const std::vector<Asset>& assets);
+// "*-windows-x64.zip", macOS "*.dmg", the AppImage "*-<arch>.AppImage", the tarball "*-linux-<arch>.tar.gz" (arch =
+// linuxArch: "x86_64" or "aarch64"; an arm64 build never takes the x86_64 packages, nor the other way round).
+int assetFor (Flavour, const std::vector<Asset>& assets, const char* linuxArch = buildLinuxArch());
 int checksumsAsset (const std::vector<Asset>& assets); // "SHA256SUMS.txt", or -1
 
 // --- checksums --------------------------------------------------------------------------------------------------

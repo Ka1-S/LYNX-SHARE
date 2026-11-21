@@ -1,0 +1,220 @@
+# LYNX SHARE for Linux on arm64 (aarch64: Raspberry Pi 4/5 with a 64-bit OS, Ubuntu / Debian / Fedora arm64, Asahi
+# Linux...), round 190oy. Built natively on GitHub's arm64 runners (ubuntu-24.04-arm: free for public repositories).
+#
+#   version   the package label (input, or CMakeLists.txt's version + the commit)
+#   package   (ubuntu-24.04-arm, Ubuntu 22.04 container, glibc 2.35)  the same steps as release.yml's x86_64 Linux job:
+#             CMake + GCC 13, glibc check, self-test, open test, demo project, LYNX-<label>-aarch64.AppImage (+ .zsync)
+#             and LYNX-<label>-linux-aarch64.tar.gz (scripts/package-linux.sh, ARCH=aarch64), the AppImage start checks
+#   core      (ubuntu-24.04-arm)  the core test suite (scripts/build-local.sh, g++), as tests.yml's Core jobs
+#   perf      (ubuntu-24.04-arm and ubuntu-24.04)  tools/perfbench on the same scenarios on both runners: arm64 against
+#             x86_64 on GitHub's hosted machines (4 vCPUs each)
+#
+# release.yml calls it (workflow_call: the package job only) and attaches the arm64 packages to the release. A push to a
+# ci-arm64/** branch or a manual run (workflow_dispatch) runs all three jobs.
+name: Linux arm64
+
+on:
+  push:
+    branches: ['ci-arm64/**']
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      label:
+        description: 'package label (release.yml passes its own)'
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+env:
+  JUCE_VERSION: 8.0.4
+  JUCE_SHA256: 0effe9823a6fd8a4f98e5c08be7d308350e417b2d15dcf34011e778fefbbf005
+
+jobs:
+  version:
+    name: Version
+    runs-on: ubuntu-24.04
+    outputs:
+      label: ${{ steps.version.outputs.label }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Label
+        id: version
+        shell: bash
+        env:
+          INPUT_LABEL: ${{ inputs.label }}
+        run: |
+          version="$(sed -n 's/^project(LYNX VERSION \([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' CMakeLists.txt)"
+          [[ -n "$version" ]] || { echo "::error::no version in CMakeLists.txt"; exit 1; }
+          label="${INPUT_LABEL:-$version-${GITHUB_SHA::7}}"
+          echo "label=$label" >> "$GITHUB_OUTPUT"
+          echo "LYNX arm64 $label"
+
+  package:
+    name: Linux arm64 (AppImage, tar.gz)
+    needs: version
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 180
+    container:
+      image: ubuntu:22.04
+      options: --cap-add=SYS_ADMIN   # lets check-appimage-start.sh run the AppImage in a network namespace (offline)
+    env:
+      LABEL: ${{ needs.version.outputs.label }}
+      DEBIAN_FRONTEND: noninteractive
+      MAX_GLIBC: '2.35'
+      ARCH: aarch64
+    steps:
+      - name: Build dependencies (Ubuntu 22.04 + GCC 13 from ppa:ubuntu-toolchain-r/test)
+        run: |
+          uname -m
+          apt-get update -q
+          apt-get install -y -q --no-install-recommends ca-certificates curl git gnupg software-properties-common
+          add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          apt-get update -q
+          apt-get install -y -q gcc-13 g++-13 cmake ninja-build pkg-config file binutils xvfb xauth x11-utils python3 \
+            fonts-dejavu-core libasound2-dev libjack-jackd2-dev libx11-dev libxrandr-dev libxinerama-dev \
+            libxcursor-dev libxext-dev libxcomposite-dev libfreetype-dev libfontconfig1-dev libgl-dev desktop-file-utils zsync
+          ldd --version | head -1
+          g++-13 --version | head -1
+
+      - uses: actions/checkout@v5
+
+      - name: JUCE (checksum verified)
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          curl -fsSL -o juce.tar.gz "https://github.com/juce-framework/JUCE/archive/refs/tags/$JUCE_VERSION.tar.gz"
+          echo "$JUCE_SHA256  juce.tar.gz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/juce" && tar xzf juce.tar.gz -C "$RUNNER_TEMP/juce" --strip-components 1 && rm juce.tar.gz
+
+      # (-j3: the runner has 4 cores and 16 GB; Main.cpp and the LTO link need several GB each)
+      - name: Build
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DFETCHCONTENT_SOURCE_DIR_JUCE="$RUNNER_TEMP/juce" \
+            -DCMAKE_C_COMPILER=gcc-13 -DCMAKE_CXX_COMPILER=g++-13
+          cmake --build build --target LYNX -- -k 0 -j3
+          file build/LYNX_artefacts/Release/LYNX
+          sha256sum build/LYNX_artefacts/Release/LYNX
+
+      - name: Runs on glibc ${{ env.MAX_GLIBC }} without the system's libstdc++
+        run: ./scripts/check-linux-compat.sh build/LYNX_artefacts/Release/LYNX "$MAX_GLIBC"
+
+      - name: Self-test and demo project
+        run: |
+          bin=build/LYNX_artefacts/Release/LYNX
+          xvfb-run -a "$bin" --selftest "$PWD/selftest.txt" "$PWD/selftest-demo.lynx" || true
+          cat selftest.txt
+          grep -q '^result=OK' selftest.txt
+          xvfb-run -a "$bin" --opentest "$PWD/opentest.txt" || true
+          tail -3 opentest.txt; grep -E 'FAIL|HANG' opentest.txt || true
+          grep -q '^result=OK' opentest.txt
+          xvfb-run -a "$bin" --showcase "$PWD/Demo.lynx" || true
+          test -s Demo.lynx
+
+      - name: Package
+        run: ./scripts/package-linux.sh build/LYNX_artefacts/Release/LYNX "$LABEL" dist Demo.lynx
+
+      - name: AppImage starts offline and shows its window
+        run: REQUIRE_OFFLINE=1 ./scripts/check-appimage-start.sh "dist/LYNX-$LABEL-aarch64.AppImage" 20
+
+      - name: AppImage starts on a system without fonts
+        run: FONTS=none ./scripts/check-appimage-start.sh "dist/LYNX-$LABEL-aarch64.AppImage" 20
+
+      - name: Upload package
+        uses: actions/upload-artifact@v7
+        with:
+          name: LYNX-${{ env.LABEL }}-linux-aarch64
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Upload the self-test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: arm64-selftest-${{ env.LABEL }}
+          path: |
+            selftest.txt
+            opentest.txt
+          retention-days: 14
+          if-no-files-found: ignore
+
+  core:
+    name: Core (ubuntu-24.04-arm, g++)
+    if: ${{ !inputs.label }}   # (not when release.yml calls it)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 240
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 1500M
+      CCACHE_COMPILERCHECK: content
+    steps:
+      - uses: actions/checkout@v5
+      - name: ccache
+        run: for i in 1 2 3 4 5 6; do sudo apt-get update -q && sudo apt-get install -y -q ccache python3-numpy && break; [ $i = 6 ] && exit 1; sleep 30; done
+      - uses: actions/cache/restore@v4
+        with:
+          path: .ccache
+          key: ccache-core-ubuntu-24.04-arm-g++-${{ github.sha }}
+          restore-keys: ccache-core-ubuntu-24.04-arm-g++-
+      - name: Build and test the core (no JUCE)
+        env:
+          CXX: ccache g++
+          LYNX_TEST_JOBS: auto
+        run: |
+          uname -m; g++ --version | head -1
+          ccache --zero-stats > /dev/null
+          ./scripts/build-local.sh
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: .ccache
+          key: ccache-core-ubuntu-24.04-arm-g++-${{ github.sha }}
+      - name: Upload the test logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: core-test-logs-ubuntu-24.04-arm
+          path: build-local/lynx_tests.shards
+          retention-days: 14
+          if-no-files-found: ignore
+
+  perf:
+    name: perfbench (${{ matrix.os }})
+    if: ${{ !inputs.label }}   # (not when release.yml calls it)
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04-arm, ubuntu-24.04]
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build tools/perfbench (Release, no JUCE)
+        run: |
+          for i in 1 2 3 4 5 6; do sudo apt-get update -q && sudo apt-get install -y -q ninja-build && break; [ $i = 6 ] && exit 1; sleep 30; done
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLYNX_BUILD_APP=OFF -DCMAKE_C_COMPILER=gcc-13 -DCMAKE_CXX_COMPILER=g++-13
+          cmake --build build --target perfbench
+      - name: Scenarios
+        run: |
+          uname -m; nproc; grep -m1 -E 'model name|CPU part' /proc/cpuinfo || true; lscpu | grep -E 'Model name|Vendor' || true
+          sudo sysctl -w kernel.perf_event_paranoid=1 > /dev/null 2>&1 || true
+          mkdir -p perf
+          for s in calibrate demo synth100 inserts50 stream automation big200 idle; do
+            echo "=== $s"
+            build/perfbench "$s" --reps 3 --gate 2>&1 | tee "perf/$s.txt" | tail -6
+          done
+          for b in 64 256; do
+            echo "=== synth100 --block $b"
+            build/perfbench synth100 --block "$b" --reps 3 --gate 2>&1 | tee "perf/synth100-b$b.txt" | tail -4
+          done
+          echo "=== synth100 --threads 3"
+          build/perfbench synth100 --threads 3 --reps 3 --gate 2>&1 | tee perf/synth100-t3.txt | tail -4
+          grep -h '^GATE' perf/*.txt > perf/gate-lines.txt || true
+      - name: Upload the results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: perfbench-${{ matrix.os }}
+          path: perf/*
+          retention-days: 30
+          if-no-files-found: ignore

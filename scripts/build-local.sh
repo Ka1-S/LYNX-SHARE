@@ -23,6 +23,11 @@ CORE="src/flp/Flp.cpp src/core/Song.cpp src/core/MarkerPlan.cpp src/core/NoteEdi
 
 # (the generated test chunks include tests/*.inc; the same flags everywhere keep one cached object per core file)
 FLAGS="$FLAGS -iquote tests"
+# Linux arm64 (a native build or a cross one, CXX=aarch64-linux-gnu-g++): a signed plain char, as on x86 and Apple
+# arm64 (CMakeLists.txt does the same; round 190oy)
+if $CXX -dM -E -x c++ /dev/null 2> /dev/null | grep -q '__aarch64__' && ! $CXX -dM -E -x c++ /dev/null 2> /dev/null | grep -q '__APPLE__'; then
+    FLAGS="$FLAGS -fsigned-char"
+fi
 
 mkdir -p build-local build-local/wavpack
 # workflow shell (key map, workspace layout, rack operations)
@@ -341,6 +346,16 @@ if [[ -n "$TOOLS_QUEUE" && -f "$TOOLS_QUEUE" ]]; then
         xargs -P "$tools_jobs" -d '\n' -I{} bash -c '{}' < "$TOOLS_QUEUE"
         rm -f "$TOOLS_QUEUE"
     fi
+fi
+# LYNX_TESTS_RUN=0: build only, run nothing (a cross build, e.g. CXX=aarch64-linux-gnu-g++, whose tests then run under
+# qemu-user or on an arm64 machine: docs/BUILDING.md "Linux arm64")
+if [[ "${LYNX_TESTS_RUN:-1}" == 0 ]]; then
+    if [[ -n "${tools_pid:-}" ]]; then
+        wait "$tools_pid" || true
+        [[ "$(cat build-local/tools.rc 2> /dev/null)" == 0 ]] || { echo "build-local: the tools did not build (build-local/tools.log)" >&2; exit 1; }
+    fi
+    echo "build-local: built (LYNX_TESTS_RUN=0: no tests run)"
+    exit 0
 fi
 # LYNX_TEST_JOBS=<n> (or "auto": the CPUs) runs the tests in parallel shards, then the timing-sensitive ones alone
 # (scripts/run-tests.sh: same tests, same checks, the same "N checks, M failures" line). Unset or 1: one process, as before.
