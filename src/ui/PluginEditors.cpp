@@ -32,6 +32,7 @@
 #include "core/FruityShapers.h"
 #include "core/FlCurve.h"
 #include "core/GrossBeat.h"
+#include "core/FruityVocoder.h"
 #include "core/GrossBeatLocator.h"
 #include "core/LynxTune.h"
 #include "core/MaximusFx.h"
@@ -225,7 +226,7 @@ public:
         if (levelMeter && ! node.locate)
             if (auto* times = engine.getProcessTimes(); times != nullptr && levelKey() < times->levelWanted.size())
                 times->levelWanted[levelKey()].fetch_add (1, std::memory_order_relaxed);
-        if ((kind == EffectKind::vocoder || kind == EffectKind::fruityMultiband) && ! node.locate) // round 190ld (DP-32) / 190mf (DP-29): live band levels
+        if ((kind == EffectKind::vocoder || kind == EffectKind::fruityMultiband || kind == EffectKind::maximus) && ! node.locate) // round 190ld (DP-32) / 190mf (DP-29) / 190oa (DP-27): live band levels
             if (auto* times = engine.getProcessTimes(); times != nullptr && levelKey() < times->metersWanted.size())
                 times->metersWanted[levelKey()].fetch_add (1, std::memory_order_relaxed);
         if (! node.locate)
@@ -247,7 +248,7 @@ public:
         if (levelMeter && ! node.locate)
             if (auto* times = engine.getProcessTimes(); times != nullptr && levelKey() < times->levelWanted.size())
                 times->levelWanted[levelKey()].fetch_sub (1, std::memory_order_relaxed);
-        if ((kind == EffectKind::vocoder || kind == EffectKind::fruityMultiband) && ! node.locate)
+        if ((kind == EffectKind::vocoder || kind == EffectKind::fruityMultiband || kind == EffectKind::maximus) && ! node.locate)
             if (auto* times = engine.getProcessTimes(); times != nullptr && levelKey() < times->metersWanted.size())
                 times->metersWanted[levelKey()].fetch_sub (1, std::memory_order_relaxed);
         engine.removeChangeListener (this);
@@ -451,6 +452,7 @@ public:
                 && (plugui::displayTakesMouse (item.display) // round 168x: the list lives in PluginLayout (Maximus' curve added)
                     || isBars (item) || isRhythmEdit (item) || isRhythmPatterns (item)
                     || isGbAny (item) // round 168m: Gross Beat's editor parts
+                    || (kind == EffectKind::grossBeat && isGbItem (item, "gbjog") && gbState().options[7] != 0) // (round 190oa: the scratch dial)
                     || (limiterViewItem (item) && (limiterViewPartAt (item, p) >= 0 || limiterGraphShown())))) // round 190jd: the Limiter's view switch (190ld: and its graph, click = pause)
                 return i;
             if (item.type == Item::display || (item.param == nullptr && ! hasStyle (item, plugui::pageTabs)))
