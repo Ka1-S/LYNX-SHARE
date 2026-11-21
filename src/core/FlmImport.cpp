@@ -2983,6 +2983,8 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                 int envelopeRow = -1;
                 for (const auto& clip : lane.clips)
                     addAudioClip (ctx, clip, rowIndex, insert, row.name, envelopeRow);
+                // (round 190og, [EXEC] REA_rodada190og §4: the rack's held pitch bend does not move its audio clips — FL's
+                // render of an FLM song whose audio clips got it plays them shorter than the song does — so it stays off them)
                 continue;
             }
 

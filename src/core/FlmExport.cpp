@@ -13,6 +13,7 @@
 #include "core/FlmFormat.h"
 #include "core/FlmSlicer.h"
 #include "core/GmsMobile.h"
+#include "core/ModelParams.h"
 #include "core/ProjectKey.h"
 #include "core/ScaleKeys.h"
 #include "core/TransistorBass.h"
@@ -719,8 +720,8 @@ FlmExportResult exportFlm (const Song& song, const FlmExportOptions& options)
                || k == InstrumentKind::vfx || k == InstrumentKind::fruitydance || k == InstrumentKind::layer || k == InstrumentKind::audioClip;
     };
     const auto isPad = [] (const ChannelDef& c) {
-        return c.instrument == InstrumentKind::sampler && c.zones.empty() && ! flmdw::isChannel (c) && ! flmslicer::isChannel (c) && c.sampler.slices.empty()
-               && ! c.samplePath.empty();
+        // (a sampler whose file is missing stays a pad: its notes and settings go over, the missing file is listed)
+        return c.instrument == InstrumentKind::sampler && c.zones.empty() && ! flmdw::isChannel (c) && ! flmslicer::isChannel (c) && c.sampler.slices.empty();
     };
 
     struct Out
@@ -917,12 +918,26 @@ FlmExportResult exportFlm (const Song& song, const FlmExportOptions& options)
                 const auto frac = [&song] (int ch) { const auto p = song.channels[(std::size_t) ch].sampler.pitch; return p - std::round (p); };
                 const auto f0 = frac (o.pads.front());
                 if (std::abs (f0) > 1.0e-3f && std::all_of (o.pads.begin(), o.pads.end(), [&] (int ch) { return std::abs (frac (ch) - f0) < 1.0e-3f; }))
-                    padBend = f0;
+                {
+                    // the bend's whole semitones: the pitch most pads share (they sit at Speed 0, as in FLM's own kits).
+                    // FLM's Speed and the rack's bend are not the same transposition ([EXEC] REA_rodada190og §4: a kit
+                    // written as Speed + the bend's fraction plays 5.6 ms late against the song), so the split matters
+                    std::map<long, int> count;
+                    for (const auto ch : o.pads)
+                        ++count[std::lround (song.channels[(std::size_t) ch].sampler.pitch * 1000.0f)];
+                    const auto mode = std::max_element (count.begin(), count.end(), [] (const auto& a, const auto& b) { return a.second < b.second; })->first;
+                    padBend = (float) mode / 1000.0f;
+                    if (std::abs (padBend) > 24.0f || std::any_of (o.pads.begin(), o.pads.end(), [&] (int ch) {
+                            return std::abs (song.channels[(std::size_t) ch].sampler.pitch - padBend) > 24.0f; }))
+                        padBend = f0;
+                }
             }
             for (std::size_t k = 0; k < o.pads.size(); ++k)
             {
                 const auto& c = song.channels[(std::size_t) o.pads[k]];
                 auto s = sampleRef (ctx, c.samplePath, c.name);
+                if (c.samplePath.empty())
+                    ctx.losses.add ("Samples not found on this computer ({0}): their notes stay, FL Studio Mobile plays nothing for them", c.name);
                 s.slotId = (int) k + 1;
                 namespace sp = flm::samplepad;
                 s.params.assign (sp::defaults, sp::defaults + sp::count);
@@ -1297,7 +1312,21 @@ FlmExportResult exportFlm (const Song& song, const FlmExportOptions& options)
                         const auto o = outOfChannel.find (t.index);
                         const auto dw = flmdw::isChannel (c) && t.param >= flmdw::automationBase && t.param < flmdw::automationBase + flmdw::paramCount;
                         const auto gm = c.instrument == InstrumentKind::gms && flmBuild (c) && t.param >= 0 && t.param < gmsmobile::paramCount;
-                        if (o != outOfChannel.end() && outs[(std::size_t) o->second].children.empty() && (dw || gm))
+                        // MiniSynth / SuperSaw (FLM's engines in LYNX): engine value k is FLM's parameter k + 1, through the
+                        // engine's parameter range (the import's generatorLaneTarget turned around)
+                        const auto* ep = (c.instrument == InstrumentKind::minisynth || c.instrument == InstrumentKind::pocketSuperSaw)
+                                             ? modelparams::find (c.instrument, t.param)
+                                             : nullptr;
+                        if (o != outOfChannel.end() && outs[(std::size_t) o->second].children.empty() && ep != nullptr
+                            && ! (c.instrument == InstrumentKind::minisynth && t.param == 3) && t.param >= 0)
+                        {
+                            l.out = o->second;
+                            l.module = 1;
+                            l.param = t.param + 1;
+                            l.name = ep->name + " : " + c.name;
+                            l.value = [ep] (float v) { return std::clamp (ep->raw (v), 0.0f, 1.0f); };
+                        }
+                        else if (o != outOfChannel.end() && outs[(std::size_t) o->second].children.empty() && (dw || gm))
                         {
                             l.out = o->second;
                             l.module = 1;

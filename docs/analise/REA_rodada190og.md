@@ -91,7 +91,27 @@ FL does not close by itself after this generator's render, so a timeout with the
 through FLM's own engine. Tools: `/mnt/e/lynx-work/coverage190og/flm/tools/` (`mkflp_og.py` builds the FL project,
 `flrender.sh` renders, `flmx` = .flm → LYNX → .flm outside the app).
 
-RESULTS: see §4.1 (filled in below by the round).
+Song: FLM's own demo "Nucleon - Tokyo" (FL's copy of the demo songs: Image-Line content read as data, never in the
+repo), rendered as it is, and after .flm → LYNX (the .flm import) → .flm (the export). Scorer: `scripts/flref_compare.py
+pair` (FL's render of the original against FL's render of the export).
+
+| Step | What the render showed | Change |
+|---|---|---|
+| noise floor | the same project rendered twice by FL: **bit-identical** (esr −226 dB): FLM's render is deterministic, so every difference below is the file's | — |
+| first export | FLM **opens and plays** the LYNX-written song (all channels sound); against the original: rms +2.0 dB, highs (> 4 kHz) −12.6 dB, env_corr 0.54 | — |
+| kit samples | FLM writes each kit sample's place (0, 1, 2…) in MAIN's first f64 and −1 for a clip's sample [FILE, all 20 files]; with −1 on every pad, FLM's drum set played the wrong slots: highs −12.6 → **−2.4 dB** | writer fixed |
+| MiniSynth automation | the "FLT Freq" lane was dropped (listed); now written through the engine's parameter range | export fixed |
+| a kit's held bend | writing the bend's whole semitones on each pad's Speed (equal in LYNX) is **not** equal in FLM: the render ran 245 samples (5.6 ms) late, env_corr 0.44; the bend kept on RPRM [4] with the pads at their own Speed: lag 0, env_corr **0.87**, esr −3.4 dB | export: the kit's bend = the pitch most pads share |
+| audio clips and the rack's bend | the export with the bend added to audio clips played them shorter than the original (45.5 s vs 47.5 s): FLM's held bend does not move audio clips (the import keeps leaving it off them) | none (experiment) |
+| Autoduck (legacy) as module 29, Reverb (legacy) with 21 of its 22 values, the audio racks' held bend | each swapped back to the original's bytes: renders **bit-identical** to the export's → no effect | none |
+
+After these fixes the whole song scores rms +2.9 dB, esr −3.4 dB, gesr −7.0 dB, env_corr 0.87, lag 0. Rendering one
+channel alone (the other lanes' clips removed in both files): the drums are the same sound (env_corr **0.99**, gesr
+−14.1 dB) **3.6 dB louder** in the export. The one difference left in that channel is its route: the 4.x demo has no SEND
+(FLM's default route; the song also holds an empty "Kick Mix" bus), the export a SEND to the master at 0 dB as FLM 5
+writes it. Open point: which route FLM 4.x songs' default is (`RHED`'s third word is the next suspect: −1 in the demo,
+2 on its bus). A render of the export without its SENDs wrote no file (as FL's render of the original with only its
+Chords lane: FL exits "ok" without a wav), so it was not settled this round.
 
 ## 5. Other FLM facts read this round (for the next rounds)
 

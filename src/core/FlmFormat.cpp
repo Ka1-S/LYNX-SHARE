@@ -673,12 +673,14 @@ std::string backslashes (std::string s)
     return s;
 }
 
-void writeSample (Writer& w, const SampleRef& s, int slot)
+// `index`: the sample's place in its drum set (0, 1, 2…), −1 for an audio clip's sample (FLM writes the place in MAIN's
+// first f64: every kit of FLM's own files counts 0, 1, 2…, every clip sample has −1; round 190og, PROVEN-FILE)
+void writeSample (Writer& w, const SampleRef& s, int slot, int index)
 {
     w.text ("20LS");
     w.chunk ("MAIN", [&] {
         w.u32 (0xFFFFFFFFu);
-        w.f64 (-1.0);
+        w.f64 ((double) index);
         w.fixed (s.name, 512);
         w.fixed ({}, 512);
         w.u8 (s.reverse ? 1 : 0);
@@ -781,7 +783,7 @@ void writeRack (Writer& w, const Rack& rack)
                 w.u8 (k < (int) rack.pads.size() ? rack.pads[(std::size_t) k] : (std::uint8_t) k);
         });
         for (std::size_t k = 0; k < rack.kit.size(); ++k)
-            w.chunk ("SMPl", [&] { writeSample (w, rack.kit[k], (int) k + 1); });
+            w.chunk ("SMPl", [&] { writeSample (w, rack.kit[k], (int) k + 1, (int) k); });
     });
     for (const auto& m : rack.modules)
         w.chunk ("RMOd", [&] { writeModule (w, m); });
@@ -813,7 +815,7 @@ void writeClip (Writer& w, const Clip& clip)
             w.f64 (0.0);
     });
     if (clip.sample)
-        w.chunk ("CLSm", [&] { writeSample (w, *clip.sample, 1); });
+        w.chunk ("CLSm", [&] { writeSample (w, *clip.sample, 1, -1); });
     w.chunk ("EVN2", [&] {
         w.u16 (20);
         for (const auto& e : clip.events)
