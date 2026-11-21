@@ -4145,8 +4145,11 @@ void PlaylistComponent::paintLiveEnvelopeLanes (juce::Graphics& g, juce::Rectang
         g.strokePath (line, juce::PathStrokeType (2.0f));
 
         // the breakpoints: hollow rings (the lane shows through), the clips' own points
+        // (Live shows a breakpoint as a ring only where it can be picked: on a densely recorded envelope the rings would
+        // merge into a thick band, so a ring closer than 8 px to the last one drawn is left out; the line still has it)
         if (h < 10)
             continue;
+        auto lastRing = -1.0e9f;
         for (const auto i : list)
         {
             const auto& c = song.playlist[(std::size_t) i];
@@ -4159,8 +4162,9 @@ void PlaylistComponent::paintLiveEnvelopeLanes (juce::Graphics& g, juce::Rectang
                 if (songTick < (double) c.start || songTick > (double) c.end())
                     continue;
                 const auto x = (float) tickToX (songTick);
-                if (x < from - 4.0f || x > to + 4.0f)
+                if (x < from - 4.0f || x > to + 4.0f || x - lastRing < 8.0f)
                     continue;
+                lastRing = x;
                 g.drawEllipse (x - 2.5f, yOf (p.value) - 2.5f, 5.0f, 5.0f, 1.5f);
             }
         }

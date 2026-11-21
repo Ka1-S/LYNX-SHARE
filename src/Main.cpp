@@ -137,6 +137,8 @@
 #include "platform/Package.h"
 #include "core/AlsExport.h"
 #include "core/AlsImport.h"
+#include "core/LiveScaleControl.h" // round 190oo (--design190ooshot)
+#include "core/PlaylistViewOptions.h"
 #include "core/PianoRollScript.h"
 #include "ui/ScriptPanel.h"
 #include "ui/AlsExportDialog.h"

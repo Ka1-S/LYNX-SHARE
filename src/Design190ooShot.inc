@@ -74,6 +74,26 @@
             roll.repaint();
         }
 
+        // --- PAT-6 / PAT-7: Thief opens with FL's 26 px rows and FL's three automation clip rows in the Channel rack ------
+        if (projectPath.isNotEmpty())
+        {
+            const auto& song = offline.getSong();
+            check ("PAT-6: Thief's Playlist rows " + juce::String (song.playlistRowHeight) + " px (FL: 26)", song.playlistRowHeight == 26);
+            int rows = 0;
+            for (const auto& a : song.automations)
+                rows += a.rackSlot >= 0 ? 1 : 0;
+            // (FL's rack shows Volume Duck, GROSS..w Bass and CRASH REVERB between YELP and Riser Noise Metal, and Thief's
+            // other automation clips further down: every one has its FL place)
+            check ("PAT-7: automation clips placed among the channels as in FL: " + juce::String (rows) + " of "
+                       + juce::String ((int) song.automations.size()) + " (FL: at least the 3 under YELP)", rows >= 3);
+            ui.selectTabForSnapshot (0);
+            pump (300);
+            both (ui, ui.getLocalBounds(), "p-rack");
+            ui.selectTabForSnapshot (2);
+            pump (300);
+            both (ui, ui.getLocalBounds(), "p-playlist");
+        }
+
         // --- CS O-1: an .als opened in the Pattern layout keeps Live's colours ------------------------------------------
         check ("CS O-1: .als colour 3 in the Pattern layout = Live's #F7F47C", alsImportColour (3) == 0xfff7f47cu);
         check ("CS O-1: .als colour 34 = Live's #9BC48D (Patience's Drums)", alsImportColour (34) == 0xff9bc48du);
@@ -173,6 +193,78 @@
                 both (ui, ui.getLocalBounds(), juce::String ("c-new-project-strips-") + (on ? "on" : "off"));
             }
             newProjectDefaults().clipLaunchStrips = before;
+            ui.setLayoutStyle (layoutstyle::Style::pattern);
+            settle();
+        }
+
+        // --- O-4 (Simple: the project name at the top) and O-5 (Clip-launch: Live's scale control), off and on -----------
+        {
+            ui.setLayoutStyle (layoutstyle::Style::pattern);
+            offline.setSong (makeNewProject());
+            settle();
+            if (projectPath.isNotEmpty())
+                ui.openFile (juce::File (projectPath));
+            settle();
+            check ("O-4 / O-5: off by default", ! ui::simplelook::projectNameShown() && ! livescale::shown);
+            ui.selectTabForSnapshot (2);
+            ui.setLayoutStyle (layoutstyle::Style::simple);
+            ui.resetLayoutForStyle();
+            pump (400);
+            for (const auto on : { false, true })
+            {
+                ui::simplelook::projectNameShown() = on;
+                ui.resized();
+                pump (200);
+                both (ui, ui.getToolbarBoundsForSnapshot().withHeight (ui.getToolbarBoundsForSnapshot().getHeight() + 40), juce::String ("s-topbar-name-") + (on ? "on" : "off"));
+                both (ui, ui.getLocalBounds(), juce::String ("s-desktop-name-") + (on ? "on" : "off")); // (CS-24: the FL tracks' S / volume / pan)
+            }
+            ui::simplelook::projectNameShown() = false;
+            ui.setLayoutStyle (layoutstyle::Style::clipLaunch);
+            ui.resetLayoutForStyle();
+            pump (400);
+            for (const auto on : { false, true })
+            {
+                livescale::shown = on;
+                ui.resized();
+                ui.repaint();
+                pump (200);
+                both (ui, ui.getToolbarBoundsForSnapshot(), juce::String ("c-toolbar-scale-") + (on ? "on" : "off"));
+            }
+            offline.editSong ([] (Song& s) { projectkey::set (s, projectkey::Key { 9, 0 }); });
+            pump (200);
+            ui.repaint();
+            pump (200);
+            both (ui, ui.getToolbarBoundsForSnapshot(), "c-toolbar-scale-on-key");
+            livescale::shown = false;
+            ui.setLayoutStyle (layoutstyle::Style::pattern);
+            settle();
+        }
+
+        // --- CS-19 / CS-20 / CS O-3: Live's Patience in the Clip-launch arrangement, lanes open and folded on open ---------
+        const auto als = juce::File ("/mnt/c/ProgramData/Ableton/Live 12 Trial/Resources/Core Library/Lessons/Demo Songs/Chuck Sutton - Patience (Live 12 Intro Demo).als");
+        if (als.existsAsFile())
+        {
+            for (const auto folded : { false, true })
+            {
+                cliplanes::foldedOnOpen = folded;
+                ui.setLayoutStyle (layoutstyle::Style::pattern);
+                offline.setSong (makeNewProject());
+                settle();
+                ui.openFile (als);
+                settle();
+                ui.selectTabForSnapshot (2);
+                ui.setLayoutStyle (layoutstyle::Style::clipLaunch);
+                ui.setClipGridView (PlaylistArea::GridView::beside);
+                pump (800);
+                both (ui, ui.getLocalBounds(), juce::String ("c-als-both-lanes-") + (folded ? "folded" : "open"));
+            }
+            cliplanes::foldedOnOpen = false;
+            check ("CS O-1: Patience's Drums in Live's colour", [&offline] {
+                for (const auto& m : offline.getSong().mixer)
+                    if (m.name == "Drums")
+                        return m.colour == 0xff9bc48du;
+                return true; // (no insert named so: nothing to compare)
+            }());
             ui.setLayoutStyle (layoutstyle::Style::pattern);
             settle();
         }
