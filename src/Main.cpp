@@ -2,6 +2,9 @@
 #include "engine/AraHost.h"
 #include "engine/FileSort.h"
 #include "platform/Paths.h"
+#include "core/SectionOps.h"    // round 190ol (P1: the Sections lane)
+#include "core/SignatureEdit.h" // round 190ol (P6)
+#include "ui/SectionsLane190ol.h" // round 190ol (P1: the shot route drives the lane)
 #include "core/Offline.h"
 #include "core/GrooveAudio.h"
 #include "core/EditorScale.h"
@@ -3295,6 +3298,14 @@ public:
         if (args.contains ("--issuesshot190ht"))
         {
             setApplicationReturnValue (runIssuesShot190ht (args[args.indexOf ("--issuesshot190ht") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
+        // --sections190olshot <prefix> (round 190ol, research190oe P1 / P6): src/SectionsShot190ol.inc
+        if (args.contains ("--sections190olshot"))
+        {
+            setApplicationReturnValue (runSectionsShot190ol (args[args.indexOf ("--sections190olshot") + 1].unquoted()) ? 0 : 1);
             quit();
             return;
         }
@@ -8257,6 +8268,82 @@ private:
             }
         }
 
+        // round 190ol (research190oe P1 / P6): the Sections lane in .lynx (both arrangements, and a project without sections
+        // keeps its JSON with no "sections" key), a section move as one undo step that restores the song bit for bit, the
+        // copies for 0.1.30 / 0.1.28 (sections become plain markers at their starts, one view line), and a 4/4 -> 7/8 -> 4/4
+        // song's metronome table (core/SignatureEdit.h)
+        juce::String sections190olResult = "OK";
+        {
+            const auto bar = 4 * (std::int64_t) lynx::ppq;
+            auto song = lynx::Song::makeDefault();
+            song.playlistTracks.resize (juce::jmax<std::size_t> (2, song.playlistTracks.size()));
+            lynx::Clip c;
+            c.pattern = 0;
+            c.track = 0;
+            c.length = 2 * bar;
+            song.playlist = { c };
+            c.start = 2 * bar;
+            c.track = 1;
+            song.playlist.push_back (c);
+            song.sections() = { { 0, 2 * bar, "Intro", 0, 1 }, { 2 * bar, 2 * bar, "Verse", 0xFF336699u, 2 } };
+            song.addArrangement ("Second", true);
+            song.sections().push_back ({ 4 * bar, bar, "Outro", 0, 3 });
+            song.selectArrangement (0);
+            juce::String why;
+            const auto json = lynx::ProjectFile::toJson (song);
+            const auto back = lynx::ProjectFile::fromJson (json, why);
+            if (! back || back->arrangements.size() != 2 || back->arrangements[0].sections != song.arrangements[0].sections
+                || back->arrangements[1].sections != song.arrangements[1].sections || back->sections().size() != 2 || back->sections()[1].colour != 0xFF336699u)
+                sections190olResult = "ERROR round trip " + why;
+            else if (lynx::ProjectFile::toJson (lynx::Song::makeDefault()).contains ("\"sections\""))
+                sections190olResult = "ERROR a project without sections writes the key";
+            // one undo step, bit for bit
+            if (sections190olResult == "OK")
+            {
+                lynx::AudioEngine e (false);
+                e.setSong (song);
+                const auto before = lynx::ProjectFile::toJson (e.getSong());
+                e.editSong ([] (lynx::Song& s) { lynx::sections::move (s, 1, 0); });
+                const auto moved = e.getSong().sections().size() == 2 && e.getSong().sections()[0].name == "Verse";
+                e.undo();
+                if (! moved || lynx::ProjectFile::toJson (e.getSong()) != before)
+                    sections190olResult = juce::String ("ERROR undo of a section move (moved ") + (moved ? "yes" : "no") + ")";
+            }
+            // the copies for older LYNX: plain markers at the sections' starts, "sections" gone, one line
+            for (const auto* release : { "0.1.30", "0.1.28" })
+            {
+                if (sections190olResult != "OK")
+                    break;
+                const auto copy = lynx::olderlynx::forRelease (song, release);
+                const auto lines = std::count_if (copy.lost.begin(), copy.lost.end(), [] (const lynx::olderlynx::Loss& l) {
+                    return juce::String (l.text).contains ("Sections lane");
+                });
+                juce::String why2;
+                const auto old = copy.ok ? lynx::ProjectFile::fromJson (copy.json, why2) : std::nullopt;
+                if (! copy.ok || copy.json.contains ("\"sections\"") || lines != 1 || ! old)
+                    sections190olResult = juce::String ("ERROR the copy for ") + release;
+                else if (old->arrangements[0].markers.size() != 2 || old->arrangements[0].markers[1].name != "Verse" || old->arrangements[0].markers[1].tick != 2 * bar
+                         || old->arrangements[1].markers.size() != 3 || ! old->arrangements[0].sections.empty())
+                    sections190olResult = juce::String ("ERROR the markers in the copy for ") + release;
+            }
+            // P6: the metronome follows 4/4 -> 7/8 (bar 3) -> 4/4 (bar 5)
+            if (sections190olResult == "OK")
+            {
+                auto meter = lynx::Song::makeDefault();
+                const auto seven = 7 * (std::int64_t) lynx::ppq / 2;
+                lynx::signatureedit::set (meter, 2 * bar, 7, 8);
+                lynx::signatureedit::set (meter, 2 * bar + 2 * seven, 4, 4);
+                lynx::AudioEngine e (false);
+                e.setSong (meter);
+                e.dispatchPendingMessages();
+                const auto& t = e.getTransport();
+                if (t.signatureCount.load() != 3 || t.signatureTick[1].load() != 2 * bar || t.signatureLength[1].load() != seven
+                    || t.signatureBeat[1].load() != (std::int64_t) lynx::ppq / 2 || t.signatureTick[2].load() != 2 * bar + 2 * seven
+                    || t.signatureLength[2].load() != bar || meter.barAt (2 * bar + 2 * seven).number != 5)
+                    sections190olResult = "ERROR the metronome's signature table (" + juce::String (t.signatureCount.load()) + " entries)";
+            }
+        }
+
         // round 190dr: the Session mixer's sections come back from a project (a project without them: Live's defaults);
         // a device dragged to another track and a Warp switch are one undo step each in a real engine
         juce::String livescr190drResult = "OK";
@@ -8689,7 +8776,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK")
                         && danceWindowResult == "OK" && clickActivationResult == "OK" && motionOverlayResult.startsWith ("OK")
@@ -8778,6 +8865,7 @@ private:
                << "rollup031s3_copy_for_0130=" << rollup031s3Result << "\n"
                << "helix4_khs190oc_copy_for_0130=" << helix4khs190ocResult << "\n"
                << "rollup031s4_copy_for_0130=" << rollup031s4Result << "\n"
+               << "sections190ol=" << sections190olResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 
@@ -37051,6 +37139,7 @@ private:
 #include "PrChordShot190kd.inc" // round 190kd
 #include "ModalShot190mc.inc" // round 190mc
 #include "KeysShot190nu.inc" // round chord2_190nu
+#include "SectionsShot190ol.inc" // round 190ol (research190oe P1 / P6)
 #include "PrShot190jv.inc" // round 190jv
 #include "HostPlay190ll.inc" // round 190ll (issue #199)
 #include "IssuesShot190ll.inc" // round 190ll (issues #200, #201, #203)
