@@ -229,6 +229,13 @@ public:
             return;
         }
         const auto world = toWorld (e.position);
+        // round 190oa (DP-64, capture 190oa C8): FL's Alt+click on a node opens its plugin window, keeping the others open
+        if (e.mods.isAltDown() && e.mods.isLeftButtonDown() && ! e.mods.isPopupMenu())
+            if (const auto n = nodeAt (*doc, world); n >= 0)
+            {
+                openNodeEditor (n);
+                return;
+            }
         if (e.mods.isMiddleButtonDown()) // round 190ld (DP-64): FL's middle-drag pans the map
         {
             dragging = Drag::view;
@@ -332,7 +339,33 @@ public:
         }
         if (const auto* doc = currentDoc())
             if (const auto n = nodeAt (*doc, toWorld (e.position)); n >= 0)
+            {
+                closeOtherNodeEditors (n); // (round 190oa, DP-64, capture 190oa C8: FL's double-click keeps one window open)
                 openNodeEditor (n);
+            }
+    }
+
+    // the plugin windows of this map's other nodes, closed (hosted plugins' windows and the nodes' own editor windows)
+    void closeOtherNodeEditors (int keep)
+    {
+        const auto* d = currentDoc();
+        auto* graph = runningGraph();
+        if (d == nullptr)
+            return;
+        for (int m = 0; m < (int) d->nodes.size(); ++m)
+        {
+            if (m == keep)
+                continue;
+            if (graph != nullptr)
+            {
+                if (auto* fx = dynamic_cast<PluginEffect*> (graph->effectAt (m).get()); fx != nullptr && PluginWindows::isOpen (fx->getInstance()))
+                    PluginWindows::close (fx->getInstance());
+                if (auto* in = dynamic_cast<PluginInstrument*> (graph->instrumentAt (m).get()); in != nullptr && PluginWindows::isOpen (in->getInstance()))
+                    PluginWindows::close (in->getInstance());
+            }
+            if (auto* w = findToolWindow (target.key() + "-node-" + juce::String (m)))
+                delete w;
+        }
     }
 
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override
@@ -340,10 +373,10 @@ public:
         if (surfaceView)
             return;
         // round 190ld (DP-64): FL's navigation — the wheel scrolls the map (up / down; Shift or a sideways swipe: left /
-        // right), Alt+wheel zooms around the mouse (Ctrl+wheel too, LYNX's earlier zoom gesture)
-        if (! e.mods.isAltDown() && ! e.mods.isCtrlDown() && ! e.mods.isCommandDown())
+        // right); round 190oa (capture 190oa C8): Alt+wheel scrolls it sideways too, as FL's; Ctrl+wheel zooms (LYNX)
+        if (! e.mods.isCtrlDown() && ! e.mods.isCommandDown())
         {
-            const auto sideways = e.mods.isShiftDown() || std::abs (wheel.deltaX) > std::abs (wheel.deltaY);
+            const auto sideways = e.mods.isShiftDown() || e.mods.isAltDown() || std::abs (wheel.deltaX) > std::abs (wheel.deltaY);
             const auto amount = (sideways ? (std::abs (wheel.deltaX) > std::abs (wheel.deltaY) ? wheel.deltaX : wheel.deltaY) : wheel.deltaY) * 240.0f / zoom;
             if (sideways)
                 offset.x -= amount;
@@ -711,6 +744,7 @@ private:
     float activityPhase = 0.0f;           // px along the cables
     std::vector<float> nodeCpu;           // [node] % of real time
     std::vector<int> nodeLatencyTotal;    // [node] its output's latency (samples) along the longest path
+    std::vector<int> nodeLatencySelf; // (round 190oa: each node's own latency)
     float totalCpu = 0.0f, modulesCpu = 0.0f;
     std::vector<std::uint64_t> lastNodeNs;
     std::uint64_t lastGraphNs = 0;
