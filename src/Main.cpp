@@ -25946,6 +25946,12 @@ private:
             offline.dispatchPendingMessages();
             text << "playlist rows forced to " << row << " px (LYNX_PAINTBENCH_ROW)\n";
         }
+        // LYNX_PAINTBENCH_KEYS=0|1|2 (round 190oo): the Piano roll's keyboard style (flat, lined piano keys, FL's keys)
+        if (const auto keys = juce::SystemStats::getEnvironmentVariable ("LYNX_PAINTBENCH_KEYS", {}); keys.isNotEmpty())
+        {
+            lynx::PianoRollComponent::keyStyle = lynx::pianokeys::styleFromInt (keys.getIntValue());
+            text << "keyboard style " << keys.getIntValue() << " (LYNX_PAINTBENCH_KEYS)\n";
+        }
         const auto& song = offline.getSong();
         text << "channels " << (int) song.channels.size() << ", patterns " << (int) song.patterns.size() << ", playlist clips " << (int) song.playlist.size()
              << ", inserts " << (int) song.mixer.size() << "\n";
