@@ -699,6 +699,8 @@ if(LYNX_BUILD_APP)
         src/ui/ArticulatorTools.cpp
         src/ui/SampleProperties.cpp
         src/ui/ToolWindow.cpp
+        src/ui/DeleteFade.cpp
+        src/ui/StartPage.cpp
         src/ui/SpeechDialog.cpp
         src/ui/TempoTapper.cpp
         src/ui/TempoDetectionDialog.cpp

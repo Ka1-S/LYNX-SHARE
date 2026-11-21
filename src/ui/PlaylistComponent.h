@@ -22,6 +22,7 @@
 #include "core/StripSilence.h"
 #include "core/TrackClips.h" // round 190ne
 #include "engine/AudioEngine.h"
+#include "ui/DeleteFade.h"
 #include "ui/EditorTools.h"
 #include "ui/FrameTicker.h"
 #include "ui/MotionOverlay.h"
@@ -291,6 +292,8 @@ public:
     juce::Rectangle<int> trackLaneArrowForSnapshot (int track) const { return trackLaneArrow (track); }
     double xOfTickForSnapshot (double tick) const { return tickToX (tick); }
     juce::Rectangle<int> clipBoundsForSnapshot (int clip) const { return clipBounds (clip); } // (round 190gi)
+    ui::DeleteFade& deleteFadeForSnapshot() noexcept { return deleteFade; } // (round 190oq, issue #250)
+    void deleteSelectionForSnapshot() { deleteSelection(); }
     // round 190nx (--demo, ui.clipmenu): selects the clip and opens its context menu at the clip, as a right-click on it does,
     // with no mouse needed. Returns the clip's rectangle on screen, or an empty one when the clip is not in view
     juce::Rectangle<int> openClipMenuForDemo (int clip);
@@ -1188,6 +1191,10 @@ private:
     friend class VideoLanesView;
     std::unique_ptr<VideoLanesView> videoLanes;
     int videoHeight = 0; // 0 = fit the lanes
+
+    // issue #250 (round 190oq): deleted clips fade out as FL's do (ui/DeleteFade.h); `fadeOut` before they go
+    ui::DeleteFade deleteFade { *this, ui::DeleteFade::playlistMs };
+    void fadeOut (const std::vector<int>& clips);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PlaylistComponent)
 };

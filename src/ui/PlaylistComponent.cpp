@@ -3389,8 +3389,23 @@ void PlaylistComponent::paintFolderDrop (juce::Graphics& g)
     }
 }
 
+void PlaylistComponent::fadeOut (const std::vector<int>& clips)
+{
+    // issue #250 (round 190oq): each deleted clip in view leaves FL's ghost (nothing at all when Animations are off or
+    // effects reduced: ui/DeleteFade.h)
+    if (! ui::DeleteFade::enabled())
+        return;
+    const auto& song = engine.getSong();
+    const auto grid = gridArea();
+    for (const auto i : clips)
+        if (i >= 0 && i < (int) song.playlist.size())
+            if (const auto r = clipBounds (i); r.intersects (grid))
+                deleteFade.add (r.toFloat(), liveClipColour (song.playlist[(std::size_t) i]));
+}
+
 void PlaylistComponent::paintOverChildren (juce::Graphics& g)
 {
+    deleteFade.paint (g, gridArea()); // (issue #250: nothing while no clip is fading)
     paintDropGhost (g); // (round 190im: a drag's landing place)
     paintFolderDrop (g); // round 190jf (B17)
     if (headerGripLit || drag == Drag::headerWidth) // round 190jq (issue #164): the edge being dragged, in the accent
@@ -6436,6 +6451,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         if (hit >= 0)
         {
             erasedSomething = true;
+            fadeOut ({ hit }); // (issue #250)
             engine.editSong ([hit] (Song& s) { s.playlist.erase (s.playlist.begin() + hit); });
         }
         return;
@@ -6490,7 +6506,10 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             drag = Drag::erase;
             setSelection ({});
             if (hit >= 0)
+            {
+                fadeOut ({ hit }); // (issue #250)
                 engine.editSong ([hit] (Song& s) { s.playlist.erase (s.playlist.begin() + hit); });
+            }
             return;
 
         case EditTool::mute:
@@ -7373,6 +7392,7 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
             if (hit >= 0)
             {
                 erasedSomething = true;
+                fadeOut ({ hit }); // (issue #250)
                 engine.editSong ([hit] (Song& s) { s.playlist.erase (s.playlist.begin() + hit); });
             }
             return;
@@ -13103,6 +13123,7 @@ void PlaylistComponent::deleteSelection()
         return;
 
     auto doomed = selection;
+    fadeOut (doomed); // (issue #250)
     setSelection ({});
     engine.editSong ([&doomed] (Song& s) {
         std::sort (doomed.rbegin(), doomed.rend());

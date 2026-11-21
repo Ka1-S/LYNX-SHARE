@@ -2609,6 +2609,7 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
         if (hit >= 0)
         {
             erasedSomething = true;
+            fadeOut ({ hit }); // (issue #250)
             editNotes ([hit] (Pattern& p) { noteedit::remove (p, { hit }); });
         }
         return;
@@ -2647,7 +2648,10 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
             drag = Drag::erase;
             setSelection ({});
             if (hit >= 0)
+            {
+                fadeOut ({ hit }); // (issue #250)
                 editNotes ([hit] (Pattern& p) { noteedit::remove (p, { hit }); });
+            }
             return;
 
         case EditTool::mute:
@@ -3131,6 +3135,7 @@ void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
             if (hit >= 0)
             {
                 erasedSomething = true;
+                fadeOut ({ hit }); // (issue #250)
                 editNotes ([hit] (Pattern& p) { noteedit::remove (p, { hit }); });
             }
             return;
@@ -5310,8 +5315,31 @@ void PianoRollComponent::deleteSelection()
         return;
 
     const auto doomed = selection;
+    fadeOut (doomed); // (issue #250)
     setSelection ({});
     editNotes ([&doomed] (Pattern& p) { noteedit::remove (p, doomed); });
+}
+
+void PianoRollComponent::fadeOut (const std::vector<int>& notes)
+{
+    // issue #250 (round 190oq): each deleted note in view leaves FL's ghost (nothing at all when Animations are off or
+    // effects reduced: ui/DeleteFade.h)
+    if (! ui::DeleteFade::enabled())
+        return;
+    const auto& pattern = currentPattern (engine.getSong());
+    const auto grid = gridArea().toFloat();
+    for (const auto i : notes)
+        if (i >= 0 && i < (int) pattern.notes.size())
+        {
+            const auto& n = pattern.notes[(std::size_t) i];
+            if (const auto r = noteRect (n.start, n.length, n.key); r.intersects (grid))
+                deleteFade.add (r, theme::noteGroupColour (n.colour, n.velocity));
+        }
+}
+
+void PianoRollComponent::paintOverChildren (juce::Graphics& g)
+{
+    deleteFade.paint (g, gridArea()); // (issue #250: nothing while no note is fading)
 }
 
 void PianoRollComponent::copySelection()
