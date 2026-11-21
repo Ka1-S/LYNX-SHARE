@@ -28,7 +28,7 @@ Elle est conçue pour rester légère et rapide sur n'importe quel PC.
 • Légère : un moteur audio sans verrous (lock-free) qui répartit les canaux et les pistes du mixer sur les cœurs de votre processeur, ignore les canaux inactifs et lit les longs fichiers audio directement depuis le disque.
 • Complète : plus de 100 instruments et effets intégrés — synthés, boîtes à rythmes, samplers, égaliseurs, compresseurs, limiteurs, reverbs, delays, correction de hauteur, visualiseurs et bien plus.
 • Vos plugins : charge des instruments et effets VST3, CLAP et VST2, chacun pouvant tourner dans son propre processus isolé (sandbox), pour qu'un plugin qui plante ne fasse pas tomber votre session.
-• Vos projets : ouvre les projets FL Studio (.flp) avec leurs patterns, notes, mixer, automation et samples ; ouvre et enregistre les sets Ableton Live 11/12 (.als), clips de la Session compris ; ouvre et enregistre les fichiers DAWproject (.dawproject) pour Bitwig, Studio One, Cubase et d'autres applications ; exporte des .flp vers FL Studio ; importe les projets FL Studio Mobile (.flm, en partie), GarageBand (.band, en partie), BandLab (.blx, en partie) et les fichiers MIDI.
+• Vos projets : ouvre les projets FL Studio (.flp) avec leurs patterns, notes, mixer, automation et samples ; ouvre et enregistre les sets Ableton Live 11/12 (.als), clips de la Session compris ; ouvre et enregistre les fichiers DAWproject (.dawproject) pour Bitwig, Studio One, Cubase et d'autres applications ; exporte des .flp vers FL Studio et des copies en .flm pour FL Studio Mobile ; importe les projets FL Studio Mobile (.flm, en partie), GarageBand (.band, en partie), BandLab (.blx, en partie) et les fichiers MIDI.
 • Modules de tracker : les fichiers .mod, .xm, .s3m et .it s'ouvrent avec leurs samples, leurs patterns et leur tempo,
 et un tracker intégré édite les notes.
 • Édition audio : les plugins ARA 2 comme Melodyne travaillent directement sur les clips audio, un éditeur de notes polyphonique déplace et réaccorde des notes isolées au sein des accords, et l'audio se convertit en MIDI.
@@ -51,7 +51,7 @@ LYNX SHARE 0.1.30 : plus léger que jamais, avec environ la moitié du CPU de FL
 ## Features
 
 1. Trois flux de travail dans un seul programme : des patterns façon FL Studio par défaut, le lancement de clips façon Ableton Live, ou un Flux simple dans le style de BandLab et de FL Studio Mobile
-2. Ouvre les projets FL Studio (.flp), Ableton Live (.als), FL Studio Mobile (.flm), DAWproject, GarageBand et BandLab et les fichiers MIDI ; enregistre en .flp, .als et .dawproject
+2. Ouvre FL Studio (.flp), Ableton Live (.als), FL Studio Mobile (.flm), DAWproject, GarageBand, BandLab et MIDI ; enregistre en .flp, .als, .dawproject et en copies .flm
 3. Plus de 100 instruments et effets intégrés
 4. Charge les plugins VST3, CLAP et VST2, avec isolation optionnelle dans leur propre processus
 5. Audio à faible latence : ASIO, WASAPI partagé et exclusif

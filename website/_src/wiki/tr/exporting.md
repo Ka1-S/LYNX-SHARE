@@ -1,5 +1,5 @@
 ---
-source: 850a06503b
+source: d980e5fc0f
 ---
 ![WAV seçili dışa aktarma penceresi: solda aralık, kuyruk ve dosyalar, sağda format, altta miks seçenekleri](/assets/img/wiki/export.webp)
 
@@ -89,6 +89,8 @@ Stem'lerin yanında miksi de almak için `Tam mix de` kutusunu işaretleyin. Alt
 `.als`, her kanal için bir MIDI izi, ses izleri, gruplar, return'ler, send'ler, rack'ler ve Drum Rack'ler, durumlarıyla VST2 ve VST3 plugin'leri, işaretçiler ile ses, pan ve tempo otomasyonunu içerir. LYNX SHARE'in kendi enstrümanları ve efektleri dönüştürülmez, ama izleri ve notaları korunur. İstisna Helix'tir: Live'ın Wavetable'ı olur. Efekt parametrelerinin otomasyonu ve insert'ten insert'e yönlendirmeler atılır. Ayrıntılar [Ableton Live'dan geliyorsanız](/wiki/coming-from-ableton/) sayfasında.
 
 `.dawproject`; track'leri, klasörleri, klipleri, notaları, warp işaretçileriyle sesi, otomasyonu, tempoyu, işaretçileri, send'li mixer'ı ve durumlarıyla VST3, VST2 ve CLAP plugin'lerini içerir. LYNX SHARE'in kendi enstrümanları ve efektleri, LYNX SHARE'in onları yeniden açabileceği şekilde yazılır. Klip ızgarası, diğer aranjmanlar ve nota başına bazı ayrıntılar dışarıda kalır ve bir rapor bunları listeler.
+
+`Dosya › FL Studio Mobile projesi (.flm) olarak kopya kaydet...`, FL Studio Mobile için bir `.flm` yazar ve sample'ları yanındaki `<name> Samples` klasörüne kopyalar. Kaydetmeden önce bir pencere, `Dosya › Eski bir LYNX için kopya kaydet...` gibi, kopyanın neleri kaybettiğini listeler. `.flm` notaları ve pattern'leri (FL Studio Mobile'da track başına bir pattern vardır), tempoyu, ölçü başına vuruş sayısını, tonu ve akor setini, mixer'ın seviyelerini, panını, mute ve solo durumunu ve bus'lara gönderimleri, FL Studio Mobile'ın kendi enstrümanlarını (MiniSynth, SuperSaw, GMSynth ve Transistor Bass ile FL Studio'nun MiniSynth ve Transistor Bass'ı), davul sampler'larını bir davul seti olarak, Layer'ları birkaç enstrümanlı bir rack olarak, her Pocket (FLM) efektini mix'iyle ve ses kliplerini seviyesi, panı, perdesi ve ters çevirmesiyle korur. Ayrıca DW Sampler'ı (bölgeleriyle) ve 3x Osc'yi, mixer seviyesi ve panı, Pocket (FLM) efektleri ile DW Sampler ve GMSynth'in kendi değerleri için otomasyon kliplerini yazar. Diğer enstrümanlar (şimdilik FL Studio Mobile'ın Slicer'ı ve SoundFont Player'ı da) notalarını FL Studio Mobile'ın MiniSynth'i üzerinde tutar, FLM modülü olmayan efektler ve synth'lerin kendi düğmeleri ile üçüncü taraf plugin'ler gibi diğer hedeflerin otomasyonu dışarıda kalır; hepsi listelenir.
 
 ## Bilmekte fayda var
 

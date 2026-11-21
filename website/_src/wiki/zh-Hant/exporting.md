@@ -1,5 +1,5 @@
 ---
-source: 850a06503b
+source: d980e5fc0f
 ---
 ![選取 WAV 的匯出視窗：左側是範圍、尾音和檔案，右側是格式，下方是混音選項](/assets/img/wiki/export.webp)
 
@@ -89,6 +89,8 @@ source: 850a06503b
 `.als` 包含每個通道一條 MIDI 軌道、音訊軌道、群組、回送、傳送、機架和鼓機架、帶有狀態的 VST2 和 VST3 外掛、標記，以及音量、聲像和速度的自動化。LYNX SHARE 自己的樂器和效果器不會被轉換，但它們的軌道和音符會保留。Helix 是例外：它會變成 Live 的 Wavetable。效果器參數的自動化和插入軌之間的路由會被捨棄。詳情見[從 Ableton Live 轉換](/wiki/coming-from-ableton/)。
 
 `.dawproject` 包含軌道、資料夾、片段、音符、帶變速標記的音訊、自動化、速度、標記、帶傳送的混音器，以及帶狀態的 VST3、VST2 和 CLAP 外掛。LYNX SHARE 自己的樂器和效果器會以 LYNX SHARE 能再次開啟的方式寫出。片段格線、其他編排和部分逐音符的細節會被略過，並由一份報告列出。
+
+`檔案 › 將副本儲存為 FL Studio Mobile 專案 (.flm)...` 會寫出供 FL Studio Mobile 使用的 `.flm`，並把取樣複製到旁邊的 `<name> Samples` 資料夾。儲存前，視窗會像 `檔案 › 為舊版 LYNX 儲存副本...` 那樣列出副本會遺失的內容。`.flm` 保留音符和模式（FL Studio Mobile 每條軌道一個模式）、速度、每小節拍數、調性和和弦組、混音器的音量、聲像、靜音、獨奏以及到匯流排的傳送、FL Studio Mobile 自帶的樂器（MiniSynth、SuperSaw、GMSynth 和 Transistor Bass，以及 FL Studio 的 MiniSynth 和 Transistor Bass）、變成鼓組的鼓取樣器、變成含多個樂器的機架的 Layer、每個帶混合量的 Pocket (FLM) 效果器，以及帶音量、聲像、音高和反轉的音訊片段。它還會寫出 DW Sampler（含其區域）和 3x Osc，以及混音器音量和聲像、Pocket (FLM) 效果器、DW Sampler 和 GMSynth 自身數值的自動化片段。其他樂器（目前也包括 FL Studio Mobile 的 Slicer 和 SoundFont Player）的音符保留在 FL Studio Mobile 的 MiniSynth 上，沒有 FLM 模組的效果器和其他目標（如合成器自身的旋鈕和第三方外掛）的自動化會被省略，全部都會列出。
 
 ## 須知
 

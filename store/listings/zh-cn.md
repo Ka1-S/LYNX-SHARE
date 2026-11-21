@@ -23,7 +23,7 @@ LYNX SHARE是一款免费开源的数字音频工作站，用来制作节拍和�
 • 轻量：无锁音频引擎将通道和混音轨分配到所有 CPU 核心，自动跳过空闲通道，长音频直接从硬盘流式读取。
 • 齐全：100 多款内置乐器和效果器——合成器、鼓机、采样器、均衡器、压缩器、限幅器、混响、延迟、音高校正、可视化工具等等。
 • 你的插件：支持 VST3、CLAP 和 VST2 乐器与效果器，每个插件都可选择在独立的沙箱进程中运行，插件崩溃也不会拖垮整个工程。
-• 你的工程：打开FL Studio工程（.flp），包括模式、音符、混音器、自动化和采样；打开并保存Ableton Live 11/12套装（.als），包括Session片段；打开并保存DAWproject文件（.dawproject），可用于Bitwig、Studio One、Cubase等应用；可导出.flp回到FL Studio；可导入FL Studio Mobile工程（.flm，部分支持）、GarageBand工程（.band，部分支持）、BandLab工程（.blx，部分支持）和MIDI文件。
+• 你的工程：打开FL Studio工程（.flp），包括模式、音符、混音器、自动化和采样；打开并保存Ableton Live 11/12套装（.als），包括Session片段；打开并保存DAWproject文件（.dawproject），可用于Bitwig、Studio One、Cubase等应用；可导出.flp回到FL Studio，也可为FL Studio Mobile保存.flm副本；可导入FL Studio Mobile工程（.flm，部分支持）、GarageBand工程（.band，部分支持）、BandLab工程（.blx，部分支持）和MIDI文件。
 • Tracker 模块：.mod、.xm、.s3m 和 .it 文件连同采样、模式和速度一起打开，内置的跟踪器可以编辑音符。
 • 音频编辑：Melodyne等ARA 2插件可直接在音频片段上工作，复音音符编辑器可移动和重新调音和弦中的单个音符，音频还可转换为MIDI。
 • 低延迟：支持 ASIO（包括适用于任何设备的 LYNX SHARE 自带 ASIO 驱动）以及 WASAPI 共享和独占模式。
@@ -43,7 +43,7 @@ LYNX SHARE 0.1.30：前所未有地轻量，在我们的测试电脑上播放FL�
 ## Features
 
 1. 一个程序，三种工作流程：默认是FL Studio风格的模式，或Ableton Live风格的片段启动，或BandLab和FL Studio Mobile风格的简易工作流程
-2. 打开FL Studio（.flp）、Ableton Live（.als）、FL Studio Mobile（.flm）、DAWproject、GarageBand和BandLab工程以及MIDI文件；保存为.flp、.als和.dawproject
+2. 打开FL Studio（.flp）、Ableton Live（.als）、FL Studio Mobile（.flm）、DAWproject、GarageBand和BandLab工程以及MIDI文件；保存为.flp、.als和.dawproject，并可为FL Studio Mobile保存.flm副本
 3. 100 多款内置乐器和效果器
 4. 支持 VST3、CLAP 和 VST2 插件，可选在独立进程中沙箱运行
 5. 低延迟音频：ASIO、WASAPI 共享和独占模式

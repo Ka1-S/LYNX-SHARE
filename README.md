@@ -59,7 +59,7 @@ between them at any time in *View › Layout style*; the project stays the same,
    in it.
 
 It opens FL Studio (`.flp`), Ableton Live (`.als`), FL Studio Mobile (`.flm`), DAWproject (`.dawproject`), GarageBand
-(`.band`) and BandLab (`.blx`) projects and tracker modules (`.mod`, `.xm`, `.s3m`, `.it`), and exports `.flp`, `.als` and `.dawproject` back, so your work is not locked in. It is written from scratch in C++20 with JUCE 8, licensed under the
+(`.band`) and BandLab (`.blx`) projects and tracker modules (`.mod`, `.xm`, `.s3m`, `.it`), and exports `.flp`, `.als`, `.dawproject` and `.flm` back, so your work is not locked in. It is written from scratch in C++20 with JUCE 8, licensed under the
 AGPL-3.0, and still an **alpha**.
 
 **It's for you if you…**
@@ -75,7 +75,7 @@ AGPL-3.0, and still an **alpha**.
 | | |
 |---|---|
 | 🎹 **The FL Studio workflow** | Channel Rack, Piano Roll, Playlist with several arrangements, and a Mixer with inserts, sends and sidechain. The default layout, never watered down. |
-| 📂 **Your projects come with you** | Opens `.flp`, `.als` (Live 11 and 12), `.flm`, `.dawproject`, GarageBand `.band`, BandLab `.blx` and tracker modules (`.mod`, `.xm`, `.s3m`, `.it`); exports `.flp`, `.als` and `.dawproject`. FL Studio's native plugins play on LYNX SHARE's own engines, so a project that uses them plays without FL Studio installed. |
+| 📂 **Your projects come with you** | Opens `.flp`, `.als` (Live 11 and 12), `.flm`, `.dawproject`, GarageBand `.band`, BandLab `.blx` and tracker modules (`.mod`, `.xm`, `.s3m`, `.it`); exports `.flp`, `.als`, `.dawproject` and `.flm`. FL Studio's native plugins play on LYNX SHARE's own engines, so a project that uses them plays without FL Studio installed. |
 | 🎛️ **Three layouts, one program** | The FL Studio workflow by default, a Clip-launch layout in the style of Ableton Live, and a Simple layout that mixes BandLab's one-window style with FL Studio Mobile's. Switch any time in *View › Layout style*; the project stays the same. |
 | 🤝 **Make music together** | Send a project to a friend as one file, or work on it live with up to three other people, end-to-end encrypted. |
 | ⚡ **Lightweight** | A lock-free engine that spreads channels and mixer tracks across CPU cores, skips idle channels, renders ahead what you are not playing live and streams long audio from disk. Measured on one Windows PC, LYNX SHARE 0.1.28 opened FL's *Thief* demo in 5.2 s with 345 MB of memory (FL Studio 2026: 12.2 s, 874 MB), its window was ready in about 1 s (FL Studio: 1.7 s), and a playing song is drawn at 143 frames a second (FL Studio: 143.8) ([0.1.28 notes](https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.28-alpha)). |
@@ -241,7 +241,7 @@ approximated or left out. The original file is never changed: saving writes a `.
 | **FL Studio** `.flp` | ✅ | ✅ | Channels, samples, patterns, every arrangement, automation, the mixer and native plugins with their settings. |
 | **Ableton Live** `.als` (Live 11 and 12) | ✅ | ✅ | Tracks, clips, warp markers, groups, returns, automation, racks and many of Live's devices. Session clips land in the clip grid. |
 | **DAWproject** `.dawproject` (Bitwig, Studio One, Cubase and other apps) | ✅ | ✅ | Tracks, folders, clips, notes, audio with its warp markers, automation, tempo and markers, the mixer with sends, and VST3 / VST2 / CLAP plugins with their state. The clip grid, other arrangements and some per-note details stay behind (listed in the report). |
-| **FL Studio Mobile** `.flm` | ✅ partial | — | Arrangement, samples, drum kits, several instruments and effects, automation and chord sets. |
+| **FL Studio Mobile** `.flm` | ✅ partial | ✅ a copy, with losses listed | Arrangement, samples, drum kits, several instruments and effects, automation and chord sets. Export is *File › Save a copy as FL Studio Mobile project (.flm)...*; see below. |
 | **GarageBand** `.band` (GarageBand 10, GarageBand for iOS) | ✅ partial | — | Tracks, MIDI and audio regions, tempo, key, levels, pan and mute, as Simple-layout tracks. |
 | **BandLab** `.blx` (BandLab project downloaded by Cakewalk / Sonar) | ✅ partial | — | Tracks, MIDI and audio regions with their loops, tempo, key, levels, pan, mute, volume and pan automation and the common effects, as Simple-layout tracks. |
 | **Tracker modules** `.mod` `.xm` `.s3m` `.it` (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker) | ✅ partial | — | Instruments as Sampler channels with their samples, patterns, the order list as the Playlist, speed and tempo, note volume, pan, delay and cut. Tick effects (arpeggio, vibrato, slides...) and envelopes are listed in the report; the built-in Tracker (View › Tracker) edits the notes the tracker way. |
@@ -279,7 +279,7 @@ More in the [format notes](docs/analise/ALS_FORMAT.md).
 </details>
 
 <details>
-<summary><strong>FL Studio Mobile (<code>.flm</code>): import only, partial</strong></summary>
+<summary><strong>FL Studio Mobile (<code>.flm</code>): import partial, export as a copy</strong></summary>
 
 Tempo, time signature and the arrangement (note, drum and audio lanes), samples, drum kits with each pad's settings,
 DW Sampler and DirectWave programs, the Slicer, the MiniSynth, Transistor Bass, 3x Osc, GMSynth and SuperSaw
@@ -287,6 +287,17 @@ instruments, FL Studio Mobile's effects, the mixer's levels, panning and routing
 locker. Point *Settings › Files › FL Studio Mobile resources* at your own copy of the app's Resources folder and the
 factory sounds play. FL Studio Mobile Rack channels in an `.flp` play on the same engines. Other instruments play LYNX SHARE's built-in synth for now, and anything not converted is listed in the import
 report. More in the [format notes](docs/analise/FLM_FORMAT.md).
+
+*File › Save a copy as FL Studio Mobile project (.flm)...* writes an `.flm` and copies the samples into a `<name> Samples`
+folder beside it. Before it saves, a window lists what the copy loses, as *Save a copy for an older LYNX...* does. The
+`.flm` keeps the notes and patterns (FL Studio Mobile has one pattern per track), tempo, beats per bar, key and chord set,
+the mixer's levels, panning, mute, solo and sends to buses, FL Studio Mobile's own instruments (MiniSynth, SuperSaw,
+GMSynth and Transistor Bass, and FL Studio's MiniSynth and Transistor Bass), drum samplers as a drum kit, Layers as a
+rack with several instruments, every Pocket (FLM) effect with its mix, and audio clips with their level, pan, pitch and
+reverse. It also writes the DW Sampler (with its zones) and 3x Osc, and automation clips of mixer level and pan, of the
+Pocket (FLM) effects and of the DW Sampler's and GMSynth's own values. Other instruments (for now including FL Studio
+Mobile's Slicer and SoundFont Player) keep their notes on FL Studio Mobile's MiniSynth, and effects without an FLM module
+and automation of other targets, such as the synths' own knobs and third-party plugins, are left out; all of it is listed.
 
 </details>
 
@@ -453,6 +464,7 @@ LYNX.exe project.lynx                          open a project (.lynx, .flp, .als
 LYNX.exe --export project.flp out.flac         render the song (wav/flac/ogg/mp3/aif; m4a on Windows and macOS)
 LYNX.exe --render project.flp out.wav 20       render 20 s of the current pattern (24-bit WAV)
 LYNX.exe --export-flp project.lynx out.flp     export an FL Studio project (.zip: with the samples)
+LYNX.exe --export-flm project.lynx out.flm     export an FL Studio Mobile project (samples in <name> Samples)
 LYNX.exe --export-als project.flp folder [--live11]  export an Ableton Live set (<name> Project/<name>.als)
 LYNX.exe --selftest report.txt [demo.lynx]     self-test without an audio device
 LYNX.exe --snapshot prefix project.flp         draw the UI (and its windows) to PNG
@@ -490,7 +502,7 @@ rough today:
 - Not every FL Studio plugin sounds exactly like the original; [`docs/PLUGINS.md`](docs/PLUGINS.md) gives each one a status, from exact to approximate.
 - Many but not all of Live's own devices are converted from `.als` sets, and LYNX SHARE's own instruments and effects are not written into exported sets yet.
 - GarageBand `.band` and BandLab `.blx` import is partial (instrument sounds are replaced by LYNX SHARE's), and the `.blx` reader was tested on made-up projects only.
-- `.flm` import is partial, and FL Studio Mobile projects cannot be exported.
+- `.flm` import is partial, and the `.flm` export is a copy: instruments FL Studio Mobile does not have keep only their notes (on its MiniSynth), and effects without an FLM module and automation of other targets (the synths' own knobs, third-party plugins) are left out; a window lists them before saving.
 - The Windows build is not code-signed and the macOS build is not notarized yet, so both systems warn the first time. The macOS build has had little testing on real Macs.
 
 Each release's notes list its known issues. The details are in [`docs/STATUS.md`](docs/STATUS.md) (what works, what

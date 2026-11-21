@@ -1,5 +1,5 @@
 ---
-source: 850a06503b
+source: d980e5fc0f
 ---
 ![La ventana de exportación con WAV seleccionado: rango, cola y archivos a la izquierda, formato a la derecha, opciones de mezcla debajo](/assets/img/wiki/export.webp)
 
@@ -89,6 +89,8 @@ El `.flp` es un proyecto de FL Studio 2026. Los samplers, clips de audio, genera
 El `.als` contiene una pista MIDI por canal, pistas de audio, grupos, retornos, envíos, racks y Drum Racks, plugins VST2 y VST3 con su estado, marcadores, y automatización de volumen, pan y tempo. Los instrumentos y efectos propios de LYNX SHARE no se convierten, aunque se conservan sus pistas y notas. Helix es la excepción: pasa a ser el Wavetable de Live. La automatización de parámetros de efectos y las rutas de insert a insert se descartan. Los detalles están en [Si vienes de Ableton Live](/wiki/coming-from-ableton/).
 
 El `.dawproject` contiene pistas, carpetas, clips, notas, audio con sus marcadores de warp, automatización, tempo, marcadores, el mezclador con envíos y plugins VST3, VST2 y CLAP con su estado. Los instrumentos y efectos propios de LYNX SHARE se escriben de forma que LYNX SHARE pueda volver a abrirlos. La cuadrícula de clips, otros arreglos y algunos detalles por nota se dejan fuera, y un informe los lista.
+
+`Archivo › Guardar una copia como proyecto de FL Studio Mobile (.flm)...` escribe un `.flm` para FL Studio Mobile y copia los samples en una carpeta `<name> Samples` al lado. Antes de guardar, una ventana enumera lo que pierde la copia, como en `Archivo › Guardar una copia para un LYNX anterior...`. El `.flm` conserva las notas y los patrones (FL Studio Mobile tiene un patrón por pista), el tempo, los tiempos por compás, la tonalidad y el conjunto de acordes, los niveles, el panning, el silencio y el solo del mixer y los envíos a buses, los instrumentos propios de FL Studio Mobile (MiniSynth, SuperSaw, GMSynth y Transistor Bass, y el MiniSynth y el Transistor Bass de FL Studio), los samplers de batería como un drum kit, las Layers como un rack con varios instrumentos, cada efecto Pocket (FLM) con su mezcla y los clips de audio con su nivel, panning, tono e inversión. También escribe el DW Sampler (con sus zonas) y 3x Osc, y clips de automatización del nivel y el panning del mixer, de los efectos Pocket (FLM) y de los valores propios del DW Sampler y de GMSynth. Los demás instrumentos (por ahora también el Slicer y el SoundFont Player de FL Studio Mobile) conservan sus notas en el MiniSynth de FL Studio Mobile, y los efectos sin módulo FLM y la automatización de otros destinos, como los mandos propios de los sintetizadores y los plugins de terceros, se dejan fuera; todo se enumera.
 
 ## Conviene saber
 

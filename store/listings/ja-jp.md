@@ -23,7 +23,7 @@ LYNX SHAREは、ビートや曲を作るための無料・オープンソース�
 • 軽快：ロックフリーのオーディオエンジンがチャンネルとミキサートラックをCPUの各コアに分散。鳴っていないチャンネルは処理をスキップし、長いオーディオはディスクからストリーミング再生します。
 • 充実：シンセ、ドラムマシン、サンプラー、EQ、コンプレッサー、リミッター、リバーブ、ディレイ、ピッチ補正、ビジュアライザーなど、100種類以上の内蔵インストゥルメントとエフェクト。
 • お気に入りのプラグインも：VST3、CLAP、VST2のインストゥルメントとエフェクトをホスト。各プラグインを個別のサンドボックスプロセスで動かすこともでき、プラグインがクラッシュしてもセッションは落ちません。
-• あなたのプロジェクト: FL Studioのプロジェクト (.flp) をパターン、ノート、ミキサー、オートメーション、サンプルごと開けます。Ableton Live 11/12のセット (.als) をSessionのクリップも含めて開いて保存でき、Bitwig、Studio One、Cubaseなどのアプリ向けにDAWprojectファイル (.dawproject) も開いて保存できます。.flpとしてFL Studioへ書き出せ、FL Studio Mobileのプロジェクト (.flm、一部)、GarageBandのプロジェクト (.band、一部)、BandLabのプロジェクト (.blx、一部)、MIDIファイルもインポートできます。
+• あなたのプロジェクト: FL Studioのプロジェクト (.flp) をパターン、ノート、ミキサー、オートメーション、サンプルごと開けます。Ableton Live 11/12のセット (.als) をSessionのクリップも含めて開いて保存でき、Bitwig、Studio One、Cubaseなどのアプリ向けにDAWprojectファイル (.dawproject) も開いて保存できます。.flpとしてFL Studioへ書き出せ、FL Studio Mobile用に.flmのコピーも保存でき、FL Studio Mobileのプロジェクト (.flm、一部)、GarageBandのプロジェクト (.band、一部)、BandLabのプロジェクト (.blx、一部)、MIDIファイルもインポートできます。
 • トラッカーモジュール：.mod、.xm、.s3m、.it ファイルをサンプル、パターン、テンポごと開き、内蔵トラッカーでノートを
 編集できます。
 • オーディオ編集: MelodyneなどのARA 2プラグインがオーディオクリップ上でそのまま動作し、ポリフォニックのノートエディターでコード内の単音を動かしたりピッチを修正したりでき、オーディオをMIDIに変換できます。
@@ -44,7 +44,7 @@ LYNX SHARE 0.1.30: これまでで最も軽く。テストPCでFLのThiefデモ�
 ## Features
 
 1. 1つのプログラムに3つのワークフロー: 既定はFL Studio風のパターン、Ableton Live風のクリップ起動、またはBandLabとFL Studio Mobileのスタイルのシンプルワークフロー
-2. FL Studio (.flp)、Ableton Live (.als)、FL Studio Mobile (.flm)、DAWproject、GarageBand、BandLabのプロジェクトとMIDIファイルを開き、.flp、.als、.dawprojectで保存
+2. FL Studio (.flp)、Ableton Live (.als)、FL Studio Mobile (.flm)、DAWproject、GarageBand、BandLabのプロジェクトとMIDIファイルを開き、.flp、.als、.dawprojectで保存し、FL Studio Mobile用に.flmのコピーも保存
 3. 100種類以上の内蔵インストゥルメントとエフェクト
 4. VST3、CLAP、VST2プラグインをホスト。個別プロセスでのサンドボックス実行も可能
 5. 低レイテンシーのオーディオ：ASIO、WASAPI共有モード・排他モード

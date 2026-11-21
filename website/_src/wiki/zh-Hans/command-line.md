@@ -1,5 +1,5 @@
 ---
-source: 327d10fb40
+source: ca313fc42b
 ---
 LYNX SHARE 也可以不打开窗口直接运行。一个选项可以把工程渲染为音频，另外一些可以把它转换为 FL Studio 工程或 Ableton Live 套装，还有几个用于测试。工程自身的检查也使用同样的选项。
 
@@ -37,6 +37,7 @@ LYNX.exe --no-plugins project.lynx
 | `--stems <project> <base.wav>` | 为每个带有通道的混音台插入轨写出一个 WAV：`base - 1.wav`、`base - 2.wav`，依此类推 |
 | `--export-flp <project> <out.flp>` | 写出 FL Studio 工程。若为 `out.zip`，则写出压缩的循环包 |
 | `--export-flp ... --substitute` | 把仅限 LYNX 的插件换成最接近的 FL 插件，而不是把它们渲染为音频 |
+| `--export-flm <project> <out.flm>` | 写出 FL Studio Mobile 工程，并把采样复制到旁边的 `<name> Samples` 文件夹 |
 | `--export-als <project> <folder>` | 把 Ableton Live 套装写到 `<folder>/<name> Project/<name>.als`，适用于 Live 12 |
 | `--export-als ... --live11` | 写出适用于 Live 11 的套装 |
 | `--export-bundle <project> <folder>` | 把 `文件 › 导出 › 用于其他应用...` 的包写入该文件夹 |

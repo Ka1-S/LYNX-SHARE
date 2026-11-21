@@ -1,5 +1,5 @@
 ---
-source: 850a06503b
+source: d980e5fc0f
 ---
 ![Jendela ekspor dengan WAV terpilih: rentang, tail, dan file di kiri, format di kanan, opsi mix di bawah](/assets/img/wiki/export.webp)
 
@@ -89,6 +89,8 @@ Centang `Juga mix penuh` untuk mendapatkan mix di samping stem. Baris di bagian 
 `.als` berisi track MIDI per channel, track audio, grup, return, send, rack dan Drum Rack, plugin VST2 dan VST3 beserta state-nya, marker, serta otomasi volume, pan, dan tempo. Instrumen dan efek bawaan LYNX SHARE tidak dikonversi, tetapi track dan not-nya tetap disimpan. Helix adalah pengecualian: ia menjadi Wavetable milik Live. Otomasi parameter efek dan rute antar insert dibuang. Rinciannya ada di [Pindahan dari Ableton Live](/wiki/coming-from-ableton/).
 
 `.dawproject` berisi track, folder, clip, not, audio beserta penanda warp-nya, otomasi, tempo, marker, mixer dengan send, dan plugin VST3, VST2, dan CLAP beserta state-nya. Instrumen dan efek bawaan LYNX SHARE ditulis sedemikian rupa sehingga LYNX SHARE bisa membukanya lagi. Grid clip, aransemen lain, dan beberapa detail per not dilewati, dan sebuah laporan mencantumkannya.
+
+`File › Simpan salinan sebagai proyek FL Studio Mobile (.flm)...` menulis file `.flm` untuk FL Studio Mobile dan menyalin sample ke folder `<name> Samples` di sebelahnya. Sebelum menyimpan, sebuah jendela mencantumkan apa yang hilang dari salinan, seperti pada `File › Simpan salinan untuk LYNX yang lebih lama...`. File `.flm` mempertahankan not dan pattern (FL Studio Mobile punya satu pattern per track), tempo, ketukan per birama, tangga nada dan set akor, level, panning, mute, dan solo mixer serta send ke bus, instrumen milik FL Studio Mobile (MiniSynth, SuperSaw, GMSynth, dan Transistor Bass, serta MiniSynth dan Transistor Bass dari FL Studio), sampler drum sebagai drum kit, Layer sebagai rack dengan beberapa instrumen, setiap efek Pocket (FLM) dengan mix-nya, dan klip audio dengan level, panning, pitch, dan reverse-nya. File ini juga menulis DW Sampler (beserta zonanya) dan 3x Osc, serta klip otomasi untuk level dan panning mixer, efek Pocket (FLM), dan nilai milik DW Sampler dan GMSynth. Instrumen lain (untuk sementara termasuk Slicer dan SoundFont Player milik FL Studio Mobile) mempertahankan notnya di MiniSynth milik FL Studio Mobile, sedangkan efek tanpa modul FLM dan otomasi target lain, seperti kenop milik synth dan plugin pihak ketiga, dibuang; semuanya dicantumkan.
 
 ## Baik diketahui
 

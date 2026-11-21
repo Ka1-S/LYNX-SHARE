@@ -30,7 +30,7 @@ parados e lê áudios longos direto do disco.
 compressores, limitadores, reverbs, delays, afinação de voz, visualizadores e mais.
 • Seus plugins: carrega instrumentos e efeitos VST3, CLAP e VST2, cada um opcionalmente em um processo separado
 (sandbox), para que um plugin que trave não derrube sua sessão.
-• Seus projetos: abre projetos do FL Studio (.flp) com patterns, notas, mixer, automação e samples; abre e salva sets do Ableton Live 11/12 (.als), com os clipes da Session; abre e salva arquivos DAWproject (.dawproject) para Bitwig, Studio One, Cubase e outros apps; exporta .flp de volta para o FL Studio; importa projetos do FL Studio Mobile (.flm, parcial), do GarageBand (.band, parcial), do BandLab (.blx, parcial) e arquivos MIDI.
+• Seus projetos: abre projetos do FL Studio (.flp) com patterns, notas, mixer, automação e samples; abre e salva sets do Ableton Live 11/12 (.als), com os clipes da Session; abre e salva arquivos DAWproject (.dawproject) para Bitwig, Studio One, Cubase e outros apps; exporta .flp de volta para o FL Studio e salva cópias em .flm para o FL Studio Mobile; importa projetos do FL Studio Mobile (.flm, parcial), do GarageBand (.band, parcial), do BandLab (.blx, parcial) e arquivos MIDI.
 • Módulos de tracker: arquivos .mod, .xm, .s3m e .it abrem com seus samples, patterns e andamento, e um tracker
 embutido edita as notas.
 • Edição de áudio: plugins ARA 2, como o Melodyne, trabalham direto nos clipes de áudio, um editor de notas polifônico move e reafina notas isoladas dentro de acordes, e o áudio é convertido em MIDI.
@@ -55,7 +55,7 @@ LYNX SHARE 0.1.30: mais leve do que nunca, usando cerca de metade da CPU do FL S
 ## Features
 
 1. Três workflows em um só programa: patterns no estilo do FL Studio por padrão, disparo de clipes no estilo do Ableton Live ou um Fluxo simples no estilo do BandLab e do FL Studio Mobile
-2. Abre projetos do FL Studio (.flp), do Ableton Live (.als), do FL Studio Mobile (.flm), DAWproject, GarageBand e BandLab e arquivos MIDI; salva .flp, .als e .dawproject
+2. Abre projetos do FL Studio (.flp), Ableton Live (.als), FL Studio Mobile (.flm), DAWproject, GarageBand, BandLab e MIDI; salva .flp, .als, .dawproject e cópias .flm
 3. Mais de 100 instrumentos e efeitos embutidos
 4. Carrega plugins VST3, CLAP e VST2, opcionalmente isolados em processo próprio
 5. Áudio com baixa latência: ASIO, WASAPI compartilhado e exclusivo

@@ -1,5 +1,5 @@
 ---
-source: 327d10fb40
+source: ca313fc42b
 ---
 LYNX SHARE funziona anche senza aprire la sua finestra. Un'opzione renderizza un progetto in audio, altre lo convertono in un progetto FL Studio o in un set di Ableton Live, e diverse servono per i test. I controlli del progetto stesso usano le stesse opzioni.
 
@@ -37,6 +37,7 @@ Apre un progetto `.lynx` senza caricare i suoi plugin di terze parti, come fa `F
 | `--stems <project> <base.wav>` | Scrive un WAV per ogni insert del Mixer che ha canali: `base - 1.wav`, `base - 2.wav` e così via |
 | `--export-flp <project> <out.flp>` | Scrive un progetto FL Studio. Con `out.zip` scrive un pacchetto di loop zippato |
 | `--export-flp ... --substitute` | Sostituisce i plugin solo LYNX con il plugin FL più vicino invece di renderizzarli in audio |
+| `--export-flm <project> <out.flm>` | Scrive un progetto di FL Studio Mobile e copia i sample in una cartella `<name> Samples` accanto |
 | `--export-als <project> <folder>` | Scrive un set di Ableton Live in `<folder>/<name> Project/<name>.als`, per Live 12 |
 | `--export-als ... --live11` | Scrive il set per Live 11 |
 | `--export-bundle <project> <folder>` | Scrive nella cartella il pacchetto di `File › Esporta › Per altre app...` |

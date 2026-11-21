@@ -35,7 +35,7 @@ limiters, reverbs, delays, pitch correction, visualizers and more.
 crashing plugin cannot take your session down.
 • Your projects: opens FL Studio projects (.flp) with their patterns, notes, mixer, automation and samples; opens and
 saves Ableton Live 11/12 sets (.als), Session clips included; opens and saves DAWproject files (.dawproject) for
-Bitwig, Studio One, Cubase and other apps; exports .flp back to FL Studio; imports FL Studio Mobile projects (.flm,
+Bitwig, Studio One, Cubase and other apps; exports .flp back to FL Studio and saves .flm copies for FL Studio Mobile; imports FL Studio Mobile projects (.flm,
 partial), GarageBand projects (.band, partial), BandLab projects (.blx, partial) and MIDI files.
 • Tracker modules: .mod, .xm, .s3m and .it files open with their samples, patterns and tempo, and a built-in tracker
 edits the notes.
@@ -67,7 +67,7 @@ for around 40 reported issues.
 ## Features
 
 1. Three layouts in one program: FL Studio-style patterns by default, Ableton Live-style clip launching, or a Simple layout in the style of BandLab and FL Studio Mobile
-2. Opens FL Studio (.flp), Ableton Live (.als), FL Studio Mobile (.flm), DAWproject, GarageBand and BandLab projects and MIDI files; saves .flp, .als and .dawproject
+2. Opens FL Studio (.flp), Ableton Live (.als), FL Studio Mobile (.flm), DAWproject, GarageBand and BandLab projects and MIDI files; saves .flp, .als and .dawproject, and .flm copies for FL Studio Mobile
 3. 100+ built-in instruments and effects
 4. Hosts VST3, CLAP and VST2 plugins, optionally sandboxed in their own process
 5. Low-latency audio: ASIO, WASAPI shared and exclusive

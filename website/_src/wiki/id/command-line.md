@@ -1,5 +1,5 @@
 ---
-source: 327d10fb40
+source: ca313fc42b
 ---
 LYNX SHARE juga bisa berjalan tanpa membuka jendelanya. Satu opsi merender proyek menjadi audio, opsi lain mengonversinya ke proyek FL Studio atau set Ableton Live, dan beberapa lagi ada untuk pengujian. Pemeriksaan milik proyek ini sendiri memakai opsi yang sama.
 
@@ -37,6 +37,7 @@ Membuka proyek `.lynx` tanpa memuat plugin pihak ketiganya, seperti yang dilakuk
 | `--stems <project> <base.wav>` | Menulis satu WAV per insert Mixer yang punya channel: `base - 1.wav`, `base - 2.wav`, dan seterusnya |
 | `--export-flp <project> <out.flp>` | Menulis proyek FL Studio. Dengan `out.zip` menulis paket loop yang di-zip |
 | `--export-flp ... --substitute` | Menukar plugin khusus LYNX dengan plugin FL terdekat, bukan merendernya menjadi audio |
+| `--export-flm <project> <out.flm>` | Menulis proyek FL Studio Mobile dan menyalin sample ke folder `<name> Samples` di sebelahnya |
 | `--export-als <project> <folder>` | Menulis set Ableton Live ke `<folder>/<name> Project/<name>.als`, untuk Live 12 |
 | `--export-als ... --live11` | Menulis set untuk Live 11 |
 | `--export-bundle <project> <folder>` | Menulis paket dari `File › Ekspor › Untuk aplikasi lain...` ke dalam folder |
