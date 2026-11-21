@@ -115,6 +115,11 @@ inline constexpr Item items[] = {
     { "playlist.rulerSeeksAnyTool", TR_NOOP ("Playlist"), TR_NOOP ("A click on the ruler moves the song position with every tool"),
       TR_NOOP ("In FL Studio a click on the Playlist's or Piano roll's ruler with the Select or Zoom tool selects or zooms a time range and leaves the song position. On: those tools move the song position too, like the others; Ctrl+drag, a double-click drag or a right drag still select a range. Off by default. Also in the Playlist ruler's right-click menu."),
       "ui-options.txt:rulerSeeksAnyTool" },
+    // round 190ol (research190oe P1, owner decision O-1): the Pattern layout's Sections lane (the Simple layout shows it once
+    // the song has a section; the Clip-launch layout has none)
+    { "playlist.sectionsLane", TR_NOOP ("Playlist"), TR_NOOP ("Sections lane"),
+      TR_NOOP ("A lane under the Playlist's ruler with named song sections (Intro, Verse, Chorus...): drag one to move it with every clip, automation and marker under it, Ctrl+drag to copy it, drop it onto another to swap them. FL Studio has only time markers; an .flp export writes a marker at each section's start. Also in the Playlist menu › View."),
+      "ui-options.txt:sectionsLane" },
     { "midi.gamepad", TR_NOOP ("Controllers"), TR_NOOP ("Use a game controller"),
       TR_NOOP ("A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page."),
       "midi-settings.txt:gamepad" },

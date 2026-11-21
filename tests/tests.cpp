@@ -18071,3 +18071,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Tracker190obTests.inc" // round 190ob (0.1.31): tracker follow-ups (module volume automation, the default key)
 #include "Gap190ogTests.inc" // round gap190og (0.1.31): Live Duplicate Loop, Crop Clip, velocity Randomize, mappable transport, Edit menu on devices
 #include "Host190ohTests.inc" // round 190oh: plugin host review, FL's wrapper Settings › GUI (P3)
+#include "Sections190olTests.inc" // round 190ol (0.1.31): the Sections lane (P1) and Simple time signature changes (P6)

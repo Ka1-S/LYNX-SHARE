@@ -3,6 +3,7 @@
 #include "ui/TrackerComponent.h"
 #include "ui/PaintAB.h"
 #include "ui/PlaylistComponent.h"
+#include "core/SectionOps.h" // round 190ol (P1: scenes from sections)
 #include "core/CrossPaste.h"   // issue #232 stage 2 (round 190nz)
 #include "ui/WindowClipboard.h"
 
@@ -3338,6 +3339,14 @@ private:
 
     void addGridOptions (juce::PopupMenu& menu)
     {
+        // round 190ol (research190oe P1; Live users' "markers to scenes"): one scene per section of the arrangement's
+        // Sections lane, named and coloured after it, with each track's clip of that section (core/SectionOps.h)
+        const auto sectionCount = (int) engine.getSong().sections().size();
+        menu.addItem (tr ("Create scenes from sections") + (sectionCount > 0 ? " (" + juce::String (sectionCount) + ")" : juce::String()), sectionCount > 0, false, [this] {
+            engine.editSong ([] (Song& s) { sections::createScenes (s); });
+            clampScroll();
+            repaint();
+        });
         // round 190ef: the reference's View › Scene Tempo And Time Signature (a preference, kept with the UI settings)
         menu.addItem (tr ("Scene tempo and time signature"), true, sceneFieldsOn, [this] {
             sceneFieldsOn = ! sceneFieldsOn;

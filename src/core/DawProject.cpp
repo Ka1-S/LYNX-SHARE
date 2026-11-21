@@ -28,6 +28,7 @@
 #include "core/MissingFiles.h"
 #include "core/NativeEngines.h"
 #include "core/PluginPresets.h"
+#include "core/Sections.h"
 #include "core/TempoMarkers.h"
 #include "core/XmlLite.h"
 #include "core/ZipLite.h"
@@ -3255,8 +3256,12 @@ DawProjectExportResult exportDawProject (const Song& song, const DawProjectExpor
     }
     // markers, tempo and signature changes
     std::vector<const Marker*> plain, signatures;
-    for (const auto& m : song.markers())
+    // (round 190ol: DAWproject has no sections: a marker at each section's start, named after it)
+    const auto withSections = sections::markersWithSections (song.markers(), song.sections());
+    for (const auto& m : withSections)
         (m.isSignature() ? signatures : plain).push_back (&m);
+    if (! song.sections().empty())
+        x.note ("Song sections written as markers at their starts");
     if (! plain.empty())
     {
         auto& markers = arrangement.add ("Markers");

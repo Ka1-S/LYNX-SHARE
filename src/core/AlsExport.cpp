@@ -1,3 +1,4 @@
+#include "core/Sections.h"
 #include "core/AlsExport.h"
 #include "core/ClipEnvelope.h"
 
@@ -2245,7 +2246,8 @@ struct Exporter
         {
             locs->kids.clear();
             int id = 0;
-            for (const auto& m : song.markers())
+            // (round 190ol: Live has no Sections lane: a locator at each section's start, named after it)
+            for (const auto& m : sections::markersWithSections (song.markers(), song.sections()))
             {
                 if (m.action != Marker::none || m.numerator > 0)
                     continue;

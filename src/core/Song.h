@@ -2458,6 +2458,20 @@ struct PatternBlock
     bool operator== (const PatternBlock&) const = default;
 };
 
+// A song section of the Sections lane (round 190ol, P1 of research190oe; the arranger track of GarageBand / Studio Pro,
+// core/Sections.h): a named stretch of the arrangement, [start, start + length) in ticks, on whole bars. The sections of
+// an arrangement are sorted by start and never overlap; a gap between two is allowed. LYNX extra: FL and Live have none
+// (an .flp / .als / DAWproject export writes plain time markers / locators / markers at their starts).
+struct SongSection
+{
+    std::int64_t start = 0, length = 0;
+    std::string name;
+    std::uint32_t colour = 0; // 0xFFRRGGBB; 0 = automatic (by its place, sections::colourOf)
+    std::uint64_t uid = 0;    // stable within the arrangement (a drag keeps hold of its section by it)
+    std::int64_t end() const noexcept { return start + length; }
+    bool operator== (const SongSection&) const = default;
+};
+
 struct Arrangement
 {
     std::string name;
@@ -2466,6 +2480,9 @@ struct Arrangement
     std::vector<Marker> markers;           // sorted by tick (stay here even for the current arrangement)
     std::uint64_t uid = 0;                 // stable id (Online Sessions, round 168a)
     std::vector<PatternBlock> blocks {};   // Pattern Blocks (round 170f); empty for the current one: Song::blocks
+    // round 190ol: the Sections lane (SongSection), sorted; like the markers, kept here for the current arrangement too.
+    // Saved in .lynx as the arrangement's "sections" only when there are some (older LYNX ignores the key)
+    std::vector<SongSection> sections {};
     bool operator== (const Arrangement&) const = default;
 };
 
@@ -2890,6 +2907,9 @@ struct Song
     std::vector<Marker>& markers();
     const std::vector<Marker>& markers() const;
     void addMarker (Marker marker); // keeps the order
+    // Sections of the current arrangement (round 190ol, core/Sections.h)
+    std::vector<SongSection>& sections();
+    const std::vector<SongSection>& sections() const;
 
     // Bars that play in [from, to), taking the markers' time signature changes into account
     // (before the first one, the song's meter applies: beatsPerBar / beatUnit).

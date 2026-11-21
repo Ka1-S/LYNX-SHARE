@@ -7,6 +7,7 @@
 #include "core/Details190mv.h" // (round 190mv: Master pitch in Hz)
 #include "core/LayoutStyle.h"
 #include "core/MarkerPlan.h"
+#include "core/SignatureEdit.h"
 #include "core/Timecode.h"
 #include "core/TempoMap.h"
 #include "core/ValueMath.h" // (round 190mv: the phase nudge)
@@ -2632,6 +2633,8 @@ void SignatureBox::setLook (toolbarlayout::Look l)
 juce::String SignatureBox::text() const
 {
     const auto& song = engine.getSong();
+    if (look == toolbarlayout::Look::simple) // round 190ol (P6): the signature at the song's start (a change at bar 1 included)
+        return juce::String (signatureedit::text (signatureedit::atStart (song)));
     return juce::String (song.beatsPerBar) + " / " + juce::String (song.beatUnit);
 }
 
@@ -2639,7 +2642,8 @@ void SignatureBox::update()
 {
     // (the timer's check compares two numbers; the text is made only when they changed)
     const auto& song = engine.getSong();
-    if (const auto now = song.beatsPerBar * 1000 + song.beatUnit; now != shownSignature)
+    const auto start = look == toolbarlayout::Look::simple ? signatureedit::atStart (song) : std::pair { song.beatsPerBar, song.beatUnit };
+    if (const auto now = start.first * 1000 + start.second; now != shownSignature)
     {
         shownSignature = now;
         shown = text();
@@ -2664,9 +2668,11 @@ void SignatureBox::paint (juce::Graphics& g)
 
 juce::PopupMenu SignatureBox::makeMenu()
 {
-    // (the Pattern menu's "Song time signature" list)
     juce::PopupMenu menu;
     const auto& song = engine.getSong();
+    if (look == toolbarlayout::Look::simple)
+        return simpleMenu (true); // (the numerator's list; mouseDown picks the half that was clicked)
+    // (the Pattern menu's "Song time signature" list)
     for (int beats : { 2, 3, 4, 5, 6, 7, 8, 9, 12 })
         menu.addItem (juce::String (beats) + "/4", true, song.beatsPerBar == beats && song.beatUnit == 4, [this, beats] {
             engine.editSong ([beats] (Song& s) {
@@ -2678,14 +2684,59 @@ juce::PopupMenu SignatureBox::makeMenu()
     return menu;
 }
 
+// Round 190ol (P6, BandLab live check s/ANSWERS.md): BandLab's "4 / 4" is two controls — a click on the top number opens a
+// list of numerators (1-6), one on the bottom number a list of denominators (1, 2, 4, 8); the "/" does nothing. They set
+// the signature at the song's start (core/SignatureEdit.h: a change at bar 1 is updated instead). LYNX's own values follow
+// after a separator: numerators 7-16 and the denominator 16. Changes from a bar on are on the ruler's right-click.
+juce::PopupMenu SignatureBox::simpleMenu (bool numerator)
+{
+    juce::PopupMenu menu;
+    const auto now = signatureedit::atStart (engine.getSong());
+    const auto set = [this, numerator] (int value) {
+        engine.editSong ([numerator, value] (Song& s) {
+            const auto sig = signatureedit::atStart (s);
+            signatureedit::set (s, 0, numerator ? value : sig.first, numerator ? sig.second : value);
+        });
+        update();
+    };
+    if (numerator)
+    {
+        for (int n = 1; n <= signatureedit::maxNumerator; ++n)
+        {
+            if (n == signatureedit::bandlabMaxNumerator + 1)
+                menu.addSeparator();
+            menu.addItem (juce::String (n), true, now.first == n, [set, n] { set (n); });
+        }
+    }
+    else
+    {
+        for (const auto d : signatureedit::bandlabDenominators)
+            menu.addItem (juce::String (d), true, now.second == d, [set, d] { set (d); });
+        menu.addSeparator();
+        menu.addItem ("16", true, now.second == 16, [set] { set (16); });
+    }
+    return menu;
+}
+
 void SignatureBox::mouseDown (const juce::MouseEvent& e)
 {
+    if (look == toolbarlayout::Look::simple)
+    {
+        // the half under the pointer: the numerator left of the "/", the denominator right of it (a narrow middle: nothing)
+        const auto centre = getWidth() / 2;
+        if (std::abs (e.x - centre) <= 3)
+            return;
+        simpleMenu (e.x < centre).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
+        return;
+    }
     if (e.mods.isLeftButtonDown() || e.mods.isPopupMenu())
         makeMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
 }
 
 ui::Hint SignatureBox::hintAt (juce::Point<int>)
 {
+    if (look == toolbarlayout::Look::simple) // (round 190ol, P6)
+        return { tr ("Song time signature at the start; right-click the timeline's ruler to change it from a bar on"), {}, false, true };
     return { tr ("Song time signature"), {}, false, true };
 }
 

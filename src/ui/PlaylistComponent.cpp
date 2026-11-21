@@ -104,6 +104,9 @@
 #include "ui/QuickPick.h"
 #include "ui/Icons.h"
 #include "ui/SimpleLook.h"
+#include "core/SectionOps.h"    // round 190ol (the Sections lane)
+#include "core/SignatureEdit.h" // round 190ol (P6: Simple time signature changes)
+#include "ui/SectionsLane190ol.h" // round 190ol (P1: the Sections lane)
 #include "core/LoopAnalysis.h" // round 190kx
 #include "core/TrackClips.h" // round 190ne
 #include "ui/LoopInfo.h"
@@ -536,6 +539,8 @@ void paintClipOutline (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour
 }
 
 } // namespace
+
+#include "SectionsLane190ol.inc" // round 190ol (research190oe P1): the Sections lane
 
 // Zoomed far out, a song of chopped audio shows a thousand clips a few pixels wide. Painted one by one, each is a
 // handful of rounded paths (frame, header, waveform, outline), and the GPU renderer pays per path: Thief's Playlist
@@ -1206,6 +1211,8 @@ PlaylistComponent::PlaylistComponent (AudioEngine& e)
     addChildComponent (*blocksView);
     videoLanes = std::make_unique<VideoLanesView> (engine, *this);
     addChildComponent (*videoLanes);
+    sectionsLane = std::make_unique<SectionsLaneView> (engine, *this); // round 190ol
+    addChildComponent (*sectionsLane);
 
     grid::fillEditorBox (snapBox);
     snapBox.setTooltip (tr ("Playlist snap (magnet): \"Main\" follows the snap in the toolbar, or pick this window's own; hold Alt while dragging to ignore it"));
@@ -1435,7 +1442,7 @@ int PlaylistComponent::videoSectionHeight() const
     if (natural <= 0)
         return 0;
     // (the clip tracks keep two rows; with the Pattern Blocks section too, the video lanes take at most half)
-    const auto available = getHeight() - headerHeight;
+    const auto available = getHeight() - headerHeight - sectionsLaneHeight();
     const auto least = VideoLanesView::dividerHeight + 20;
     const auto most = juce::jmax (least, engine.getSong().patternBlocksOn ? available / 2 : available - 2 * baseRowHeight());
     return juce::jlimit (least, most, videoHeight > 0 ? videoHeight : natural);
@@ -1873,7 +1880,11 @@ void PlaylistComponent::resized()
     blocksView->setBounds (0, getHeight() - blocks, getWidth(), blocks);
     blocksView->setVisible (blocksShown);
     const auto video = videoSectionHeight();
-    videoLanes->setBounds (0, headerHeight, getWidth(), video);
+    const auto lane = sectionsLaneHeight(); // round 190ol: the Sections lane, right under the ruler
+    laidOutSectionsHeight = lane;
+    sectionsLane->setBounds (0, headerHeight, getWidth(), lane);
+    sectionsLane->setVisible (lane > 0);
+    videoLanes->setBounds (0, headerHeight + lane, getWidth(), video);
     videoLanes->setVisible (video > 0);
     updateScrollBars();
 
@@ -8159,7 +8170,8 @@ void PlaylistComponent::insertTimeSelection()
         return;
 
     setSelection ({});
-    engine.editSong ([from = song.loopStart, to = song.loopEnd] (Song& s) { noteedit::insertTime (s.playlist, s.markers(), from, to - from); });
+    engine.editSong ([from = song.loopStart, to = song.loopEnd] (Song& s) { noteedit::insertTime (s.playlist, s.markers(), from, to - from);
+                                                                      sections::insertTime (s.sections(), from, to - from); }); // (round 190ol)
     sortClips();
 }
 
@@ -8171,7 +8183,8 @@ void PlaylistComponent::deleteTimeSelection()
         return;
 
     setSelection ({});
-    engine.editSong ([from = song.loopStart, to = song.loopEnd] (Song& s) { noteedit::deleteTime (s.playlist, s.markers(), from, to); });
+    engine.editSong ([from = song.loopStart, to = song.loopEnd] (Song& s) { noteedit::deleteTime (s.playlist, s.markers(), from, to);
+                                                                      sections::deleteTime (s.sections(), from, to); }); // (round 190ol)
     sortClips();
 }
 
@@ -8183,6 +8196,7 @@ void PlaylistComponent::setLiveStyle (bool on)
     liveStyle = on;
     refreshTrackLayout(); // (round 190gw: the Clip-launch layout keeps LYNX's 38 px default row; round 190jn: Live's 19 px in its look)
     updateHeaderWidth();  // (round 190jn: Live's header row is wider)
+    sectionsLaneChanged(); // (round 190ol: no Sections lane in the Clip-launch layout)
     updateScrollBars();
     repaint();
 }
@@ -8546,7 +8560,8 @@ void PlaylistComponent::sliceInsertTimeSelection()
         return;
 
     setSelection ({});
-    engine.editSong ([from = song.loopStart, to = song.loopEnd] (Song& s) { noteedit::sliceInsertTime (s.playlist, s.markers(), from, to - from); });
+    engine.editSong ([from = song.loopStart, to = song.loopEnd] (Song& s) { noteedit::sliceInsertTime (s.playlist, s.markers(), from, to - from);
+                                                                      sections::insertTime (s.sections(), from, to - from); }); // (round 190ol)
     sortClips();
 }
 
@@ -8560,6 +8575,8 @@ void PlaylistComponent::trimTimeSelection()
     setSelection ({});
     engine.editSong ([from = song.loopStart, to = song.loopEnd] (Song& s) {
         noteedit::trimTime (s.playlist, s.markers(), from, to);
+        sections::deleteTime (s.sections(), to, std::numeric_limits<std::int64_t>::max() / 4); // (round 190ol)
+        sections::deleteTime (s.sections(), 0, from);
         s.loopStart = s.loopEnd = 0; // (FL clears the time selection after a trim, FUN_00eb35f0)
     });
     sortClips();
@@ -9441,6 +9458,7 @@ void PlaylistComponent::setSimpleHeaders (bool on)
     headerWidth = -1; // (always laid out again)
     updateHeaderWidth();
     refreshTrackLayout(); // (round 190jq: no automation lanes in Simple)
+    sectionsLaneChanged(); // (round 190ol: the lane's look and visibility follow the layout)
 }
 
 void PlaylistComponent::selectTrackChannel (int track)
@@ -10350,7 +10368,7 @@ void PlaylistComponent::editTempoMarker (std::int64_t tick, int existing)
                              true);
 }
 
-void PlaylistComponent::showRulerMenu (int x)
+juce::PopupMenu PlaylistComponent::rulerMenu (int x)
 {
     const auto& song = engine.getSong();
     const auto tick = juce::jmax<std::int64_t> (0, snap (xToTick (x), true));
@@ -10362,6 +10380,19 @@ void PlaylistComponent::showRulerMenu (int x)
             near = i;
 
     juce::PopupMenu menu;
+    // round 190ol (research190oe P6, GarageBand's complaint G1): the Simple layout's time signature change at the bar under
+    // the pointer (core/SignatureEdit.h); the FL items below stay
+    if (simpleHeaders)
+    {
+        const auto bar = signatureedit::barLine (song, (std::int64_t) juce::jmax (0.0, xToTick (x)));
+        menu.addItem (tr ("Change time signature here..."), [this, bar] { askSimpleSignature (bar); });
+        if (bar > 0 && signatureedit::changeAt (song, bar) >= 0)
+            menu.addItem (tr ("Delete this time signature change"), [this, bar] {
+                engine.editSong ([bar] (Song& s) { signatureedit::remove (s, bar); });
+                repaint();
+            });
+        menu.addSeparator();
+    }
     menu.addItem (tr ("Add marker here..."), [this, tick] { editMarkerName (tick, -1); });
 
     juce::PopupMenu signatures;
@@ -10596,7 +10627,42 @@ void PlaylistComponent::showRulerMenu (int x)
         menu.addSubMenu (tr ("Zoom"), zoom);
     }
 
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    return menu;
+}
+
+void PlaylistComponent::showRulerMenu (int x)
+{
+    rulerMenu (x).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+}
+
+// Round 190ol (P6): the Simple layout's "Change time signature here...": numerator 1-16, denominator 2 / 4 / 8 / 16, the
+// signature in force at that bar to start with; on bar 1 it is the song's own (the top bar's box shows it)
+void PlaylistComponent::askSimpleSignature (std::int64_t bar)
+{
+    const auto& song = engine.getSong();
+    const auto current = bar <= 0 ? signatureedit::atStart (song) : markers::signatureAt (song, bar);
+    auto* window = new juce::AlertWindow (tr ("Change time signature here..."), tr ("From bar {0}", { juce::String (song.barAt (bar).number) }),
+                                          juce::MessageBoxIconType::NoIcon, this);
+    juce::StringArray numerators, denominators;
+    for (int n = signatureedit::minNumerator; n <= signatureedit::maxNumerator; ++n)
+        numerators.add (juce::String (n));
+    for (const auto d : signatureedit::denominators)
+        denominators.add (juce::String (d));
+    window->addComboBox ("numerator", numerators, tr ("Numerator"));
+    window->addComboBox ("denominator", denominators, tr ("Denominator"));
+    window->getComboBoxComponent ("numerator")->setText (juce::String (current.first), juce::dontSendNotification);
+    window->getComboBoxComponent ("denominator")->setText (juce::String (signatureedit::clampDenominator (current.second)), juce::dontSendNotification);
+    window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    window->enterModalState (true, juce::ModalCallbackFunction::create ([this, bar, window] (int result) {
+                                 if (result != 1)
+                                     return;
+                                 const auto n = window->getComboBoxComponent ("numerator")->getText().getIntValue();
+                                 const auto d = window->getComboBoxComponent ("denominator")->getText().getIntValue();
+                                 engine.editSong ([bar, n, d] (Song& s) { signatureedit::set (s, bar, n, d); });
+                                 repaint();
+                             }),
+                             true);
 }
 
 void PlaylistComponent::editMarkerName (std::int64_t tick, int existing)
@@ -14419,6 +14485,8 @@ void PlaylistComponent::changeListenerCallback (juce::ChangeBroadcaster* source)
     if (engine.getSong().patternBlocksOn != blocksShown) // Pattern Blocks turned on / off (menu, undo, another project)
         resized();
     if (videoSectionHeight() != videoLanes->getHeight()) // video tracks added / removed / resized (round 174d)
+        resized();
+    else if (sectionsLaneHeight() != laidOutSectionsHeight) // round 190ol: the first section added, the last removed, undo
         resized();
     blocksView->refresh();
     videoLanes->refresh();

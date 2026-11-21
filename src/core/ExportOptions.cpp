@@ -431,6 +431,7 @@ std::string toText (const Options& o)
       << "playlistMarkers=" << (o.playlistMarkers ? 1 : 0) << "\n"
       << "masterLufs=" << o.masterLufs << "\n"
       << "sections=" << (o.sections ? 1 : 0) << "\n"
+      << "songSections=" << (o.songSections ? 1 : 0) << "\n"
       << "nameTemplate=" << o.nameTemplate << "\n"; // (issue #215, round 190ng)
     return s.str();
 }
@@ -471,6 +472,7 @@ Options fromText (const std::string& text)
     o.playlistMarkers = toInt (kv, "playlistMarkers", d.playlistMarkers ? 1 : 0) != 0;
     o.masterLufs = toDouble (kv, "masterLufs", d.masterLufs);
     o.sections = toInt (kv, "sections", d.sections ? 1 : 0) != 0;
+    o.songSections = toInt (kv, "songSections", d.songSections ? 1 : 0) != 0; // (round 190ol)
     if (const auto it = kv.find ("nameTemplate"); it != kv.end() && ! it->second.empty())
         o.nameTemplate = it->second;
     return clamped (o);
@@ -1027,12 +1029,29 @@ Options sectionOptions (Options o)
     o.range = Range::selection;
     o.loops = 1;
     o.sections = false;
+    o.songSections = false;
     return o;
 }
 
 bool exportsSections (const Song& song, const Options& o)
 {
-    return o.sections && o.range == Range::song && ! o.master && ! markerSections (song).empty();
+    return (o.sections || o.songSections) && o.range == Range::song && ! o.master && ! exportSections (song, o).empty();
+}
+
+std::vector<Section> laneSections (const Song& song)
+{
+    std::vector<Section> out;
+    for (const auto& s : song.sections())
+        if (s.length > 0)
+            out.push_back ({ s.name.empty() ? "Section " + std::to_string (out.size() + 1) : s.name, s.start, s.end() });
+    return out;
+}
+
+std::vector<Section> exportSections (const Song& song, const Options& o)
+{
+    if (o.songSections)
+        return laneSections (song);
+    return o.sections ? markerSections (song) : std::vector<Section>();
 }
 
 std::string sectionBaseName (const std::string& base, int number, int count, const std::string& name)
@@ -1055,7 +1074,7 @@ int fileCount (const Song& song, const Options& o, const std::vector<int>& onlyT
     if (! exportsSections (song, o))
         return parts (song, o) * perRender;
     int files = 0;
-    for (const auto& section : markerSections (song))
+    for (const auto& section : exportSections (song, o))
         files += parts (makeSectionSong (song, section), sectionOptions (o));
     return files * perRender;
 }

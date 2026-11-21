@@ -1,4 +1,5 @@
 #include "core/BandImport.h"
+#include "core/SectionOps.h"
 
 #include <algorithm>
 #include <cctype>
@@ -408,6 +409,11 @@ Song importBand (const band::Project& project, const BandImportOptions& options)
     std::stable_sort (song.playlist.begin(), song.playlist.end(), [] (const Clip& a, const Clip& b) { return a.start < b.start; });
     if (song.patterns.empty())
         song.patterns.push_back (Pattern {}); // (a song keeps at least one pattern)
+    // round 190ol: GarageBand's song sections / arrangement markers also fill the Sections lane (each to the next one; the
+    // markers stay, as before)
+    if (sections > 0 || ! project.markers.empty())
+        if (const auto made = sections::fromMarkers (song); made > 0)
+            note (report, &FlpImportReport::converted, "GarageBand: song sections (also in the Sections lane)", made);
     return song;
 }
 

@@ -3,6 +3,7 @@
 #include "ui/KeyFocus.h"
 #include "ui/TrackIcons.h"
 #include "ui/WindowPlaces.h" // (round 190oa, DF-130)
+#include "core/Sections.h"
 #include "core/EscClose.h"
 #include "core/DetailChain.h"
 #include "core/MeterScale.h"
@@ -4375,6 +4376,7 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
                 toggleTouchKeyboard (engine);
         };
         host.setTitleAccessory = [this] (juce::Component* c, int width) { workspace.setTitleAccessory (Panel::playlist, c, width); };
+        host.toggleSections = [this] { playlist.toggleSimpleSections(); }; // round 190ol (P1): the Simple title bar's Sections button
         host.toggleLoops = [this] { // round 190lx (DS-42): the Simple title bar's Loops button
             if (isLoopsDockShowing())
                 hideLoopsDock();
@@ -5204,6 +5206,11 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
                     playlist.headerOptionsChanged();
                     saveUiSettings();
                 });
+                // round 190ol (research190oe P1, owner decision O-1): LYNX's Sections lane, off by default in this layout (the
+                // Simple layout has its title bar button, the Clip-launch layout none)
+                view.addSeparator();
+                view.addItem (tr ("Sections lane") + " (LYNX)", layoutStyle == layoutstyle::Style::pattern, sections::patternLaneOn(),
+                              [] { workflowextras::setExtra ("playlist.sectionsLane", ! sections::patternLaneOn()); });
                 menu.addSubMenu (tr ("View"), view);
             }
             {

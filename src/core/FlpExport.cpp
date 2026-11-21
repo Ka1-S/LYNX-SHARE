@@ -1,3 +1,4 @@
+#include "core/Sections.h"
 #include "core/ClipEnvelope.h"
 #include "core/FlCurve.h"
 #include "core/NoteRepeat.h"
@@ -1468,6 +1469,8 @@ struct Converter
     }
 
     // ---- the Playlist ----
+    int sectionMarkers = 0; // (round 190ol)
+
     void arrangements()
     {
         for (int i = 0; i < (int) song.arrangements.size(); ++i)
@@ -1478,8 +1481,11 @@ struct Converter
             flp::Arrangement a;
             a.index = i;
             a.name = arrangement.name;
-            for (const auto& m : current ? song.markers() : arrangement.markers)
+            // round 190ol: FL has no Sections lane: each section becomes a plain time marker at its start, named after it
+            int fromSections = 0;
+            for (const auto& m : sections::markersWithSections (current ? song.markers() : arrangement.markers, arrangement.sections, &fromSections))
                 a.markers.push_back (marker (m));
+            sectionMarkers += fromSections;
             for (const auto& clip : clips)
                 if (auto item = playlistItem (clip))
                     a.items.push_back (*item);
@@ -1489,6 +1495,9 @@ struct Converter
             out.arrangements.push_back (std::move (a));
         }
         report.exact.push_back ("Playlist: " + std::to_string (song.arrangements.size()) + " arrangement(s), tracks, markers");
+        if (std::any_of (song.arrangements.begin(), song.arrangements.end(), [] (const Arrangement& x) { return ! x.sections.empty(); }))
+            report.notes.push_back ("Song sections: FL has no Sections lane; " + std::to_string (sectionMarkers)
+                                    + " time marker(s) at the sections' starts, named after them (moving a section in FL moves only its marker)");
     }
 
     std::optional<flp::PlaylistItem> playlistItem (const Clip& clip) const

@@ -43,6 +43,7 @@ class PatternBlocksView;
 class EffectsPanel;
 class PatternPicker;
 class VideoLanesView;
+class SectionsLaneView;
 
 // FL-style Playlist (arrangement): tracks vertically, time horizontally.
 //  - a tool strip (Pencil, Brush, Eraser, Mute, Knife, Lasso, Zoom, Listen, Slip); with the Pencil:
@@ -461,7 +462,16 @@ public:
     // has video tracks. `height` = the section's height (the divider drag; 0 = fit the lanes), clamped to the window.
     void setVideoHeight (int height);
     int videoSectionHeight() const;
-    int tracksTop() const { return headerHeight + videoSectionHeight(); } // the clip tracks' top edge
+    int tracksTop() const { return headerHeight + sectionsLaneHeight() + videoSectionHeight(); } // the clip tracks' top edge
+    // The Sections lane (round 190ol, core/Sections.h; owner decision O-1): a thin lane under the ruler with the song's
+    // sections. Simple: shown once the song has a section (the title bar's "Sections" button adds the first one, or hides
+    // and shows it again); Pattern: the LYNX extra "Sections lane" (Playlist menu › View), off by default; Clip-launch: off.
+    bool sectionsLaneShown() const;
+    int sectionsLaneHeight() const; // 0 when hidden
+    static constexpr int sectionsLaneFlHeight = 18, sectionsLaneSimpleHeight = 44;
+    void toggleSimpleSections();   // the Simple title bar's "Sections" button
+    void sectionsLaneChanged();    // the extra switched, a layout change: lay the lane out again
+    SectionsLaneView* getSectionsLaneForSnapshot() { return sectionsLane.get(); }
     VideoLanesView* getVideoLanesForSnapshot() { return videoLanes.get(); }
     static juce::Colour audioClipColour (const ChannelDef& channel);
 
@@ -713,9 +723,13 @@ private:
     void askToMakeClipsUnique (std::vector<int> placed, std::vector<int> channels);
     void showClipMenu (int clip);
     void showRulerMenu (int x);                           // markers, time signature and loop
+public:
+    juce::PopupMenu rulerMenu (int x);                    // (round 190ol: the menu itself, also for the shots)
+private:
     static juce::String markerLabel (const Marker& m);   // the text of a marker's tag on the ruler
     int markerTagAt (int x, int y) const;                 // the marker whose tag is under (x, y), or -1
     void editMarkerName (std::int64_t tick, int existing); // existing = index, or -1 to create
+    void askSimpleSignature (std::int64_t bar);            // round 190ol (P6): the Simple ruler's time signature dialog
     // Round 190hq (B11, core/TempoMarkers.h): the tempo markers' tags on the ruler (LYNX extra): the one under (x, y), or
     // -1; the dialog that adds one at `tick` (existing −1) or edits marker `existing`; the tag being dragged
     int tempoTagAt (int x, int y) const;
@@ -1188,6 +1202,11 @@ private:
     friend class VideoLanesView;
     std::unique_ptr<VideoLanesView> videoLanes;
     int videoHeight = 0; // 0 = fit the lanes
+    // The Sections lane (round 190ol)
+    friend class SectionsLaneView;
+    std::unique_ptr<SectionsLaneView> sectionsLane;
+    bool simpleSectionsHidden = false; // the Simple "Sections" button hid a lane that has sections (view only)
+    int laidOutSectionsHeight = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PlaylistComponent)
 };

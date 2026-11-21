@@ -18,6 +18,7 @@
 
 #include "core/MixerOps.h"
 #include "core/NoteEdit.h"
+#include "core/Sections.h"
 #include "core/Song.h"
 
 namespace lynx::arrange
@@ -235,6 +236,7 @@ inline void pasteTime (Song& song, std::int64_t at, const TimeClip& time)
         return;
     noteedit::sliceInsertTime (song.playlist, song.markers(), at, time.length);
     insertLaneTime (song, at, time.length);
+    sections::insertTime (song.sections(), at, time.length); // (round 190ol: the Sections lane follows)
     for (auto c : time.clips)
     {
         const auto valid = c.kind == ClipKind::pattern   ? c.pattern >= 0 && c.pattern < (int) song.patterns.size()
@@ -263,6 +265,7 @@ inline void deleteTime (Song& song, std::int64_t from, std::int64_t to)
         return;
     noteedit::deleteTime (song.playlist, song.markers(), from, to);
     deleteLaneTime (song, from, to);
+    sections::deleteTime (song.sections(), from, to); // (round 190ol: the Sections lane follows)
 }
 
 // Cut Time: Copy Time, then Delete Time.
