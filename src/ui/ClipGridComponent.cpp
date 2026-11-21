@@ -10,6 +10,7 @@
 #include <cstring>
 
 #include "core/ClipLauncher.h"
+#include "core/ClipLoopOps.h"
 #include "core/Comping.h"
 #include "core/SessionMixer.h"
 #include "core/DetailChain.h"
@@ -978,6 +979,14 @@ public:
             && sessionkeys::defaultKeyActs (sessionkeys::Command::gridDeactivateClip) && launcher::clipAt (*grid, selectedTrack, selectedScene) != nullptr)
         {
             toggleClipActive (selectedTrack, selectedScene);
+            return true;
+        }
+        // round gap190og (detail-020): Live's Crop Clip key (Ctrl+Shift+J) on the selected MIDI clip, Clip-launch layout only
+        if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && ! key.getModifiers().isAltDown() && ! sceneSelected && ! titleSelected
+            && juce::CharacterFunctions::toUpperCase ((juce::juce_wchar) code) == 'J' && sessionkeys::defaultKeyActs (sessionkeys::Command::gridCropClip)
+            && canCropClip (selectedTrack, selectedScene))
+        {
+            cropClip (selectedTrack, selectedScene);
             return true;
         }
         // round 190bv: the clipboard, duplicate and a new empty MIDI clip
@@ -2616,6 +2625,13 @@ public:
             menu.addItem ((slot->active ? tr ("Deactivate Clip") : tr ("Activate Clip")) + sessionkeys::menuKey (sessionkeys::Command::gridDeactivateClip),
                           [this, track, scene] { toggleClipActive (track, scene); });
             menu.addSeparator();
+            // round gap190og (detail-020): Live's Crop Clip, its own group before the colours [SHOT
+            // details2_190ld/shots/ref/live-clip-menu.png "Crop Clip  Ctrl+Shift+J"]; MIDI clips (an audio clip's is Crop Sample)
+            if (canCropClip (track, scene))
+            {
+                menu.addItem (tr ("Crop Clip") + sessionkeys::menuKey (sessionkeys::Command::gridCropClip), [this, track, scene] { cropClip (track, scene); });
+                menu.addSeparator();
+            }
             menu.addSubMenu (tr ("Change color"), ui::colourMenu (slot->colour, [this, track, scene] (std::uint32_t c) {
                 editSlot (track, scene, [c] (ClipGridSlot& s) { s.colour = c; });
             }, mouseArea()));
@@ -2672,6 +2688,31 @@ public:
         menu.addSeparator();
         addGridOptions (menu);
         return menu;
+    }
+
+    // round gap190og (detail-020): Live's Crop Clip (core/ClipLoopOps.h): the MIDI clip's notes outside its loop (Start..End
+    // with Loop off) go and the kept span starts its pattern; one undo step
+    bool canCropClip (int track, int scene) const
+    {
+        const auto& song = engine.getSong();
+        const auto* grid = gridOf();
+        const auto* c = grid != nullptr ? launcher::clipAt (*grid, track, scene) : nullptr;
+        return c != nullptr && cliploop::canEdit (*c, song);
+    }
+    void cropClip (int track, int scene)
+    {
+        engine.editSong ([track, scene] (Song& s) {
+            if (! s.clipGrid)
+                return;
+            for (auto& c : s.clipGrid->clips)
+                if (c.track == track && c.length > 0 && c.gridSlot >= 0 && c.gridSlot < (int) s.clipGrid->slots.size()
+                    && s.clipGrid->slots[(std::size_t) c.gridSlot].scene == scene)
+                {
+                    cliploop::cropClip (s, c);
+                    return;
+                }
+        });
+        repaint();
     }
 
 private:
