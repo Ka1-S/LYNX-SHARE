@@ -284,7 +284,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         {
             safe->saveUiSettings();
             safe->playlist.refreshViewOptions(); // (round 190jq: header width, pointer click, automation clip lanes)
-            if (trackonly::active())
+            if (workflowextras::trackOnlySwitchedOn()) // (issue #246: only when the mode comes on; the rack may be opened after)
                 safe->hidePanelForTrackOnly();
         }
     };
@@ -4097,9 +4097,9 @@ void MainComponent::toggleMode()
 
 void MainComponent::togglePanel (Panel panel)
 {
-    if (panel == Panel::channelRack && workflowextras::refusesChannelRack()) // round 190iu: Track-only mode
-        return;
     workspace.toggle (panel);
+    if (panel == Panel::channelRack && workspace.isPanelVisible (panel)) // issue #246: Track-only mode lets it open
+        workflowextras::channelRackOpened();
     refreshPanelButtons();
 }
 
@@ -4120,9 +4120,9 @@ void MainComponent::fitChannelRack (bool width)
 
 void MainComponent::showPanel (Panel panel)
 {
-    if (panel == Panel::channelRack && workflowextras::refusesChannelRack()) // round 190iu: Track-only mode
-        return;
     workspace.show (panel);
+    if (panel == Panel::channelRack) // issue #246: Track-only mode lets it open
+        workflowextras::channelRackOpened();
     refreshPanelButtons();
 }
 

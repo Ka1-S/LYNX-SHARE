@@ -73,8 +73,10 @@ inline constexpr Item items[] = {
       TR_NOOP ("A track that holds only automation clips of one instrument (or of a linked mixer track) is drawn right under that instrument's track, as a lane that folds with the track's arrow; the clips stay clips on their own tracks. On by default in the Clip-launch layout, as Live's lanes. Also in the Playlist menu."),
       "ui-options.txt:clipLanesPattern" },
     // round 190iu (issue #191.5): FL's instrument tracks, every instrument on one, the Channel rack hidden
-    { "layout.trackOnly", TR_NOOP ("Playlist"), TR_NOOP ("Track-only mode (no Channel rack: 1 track = 1 instrument)"),
-      TR_NOOP ("In the Pattern layout the Channel rack stays hidden and every instrument you add gets its own instrument track, whose pencil places that instrument's own pattern. Also in View › Layout style."),
+    // round 190oq (issue #246): the rack is hidden when the mode comes on but opens again (F6), as FL keeps an instrument
+    // track's channel in its rack
+    { "layout.trackOnly", TR_NOOP ("Playlist"), TR_NOOP ("Track-only mode (1 track = 1 instrument, the Channel rack hidden)"),
+      TR_NOOP ("In the Pattern layout every instrument you add gets its own instrument track, whose pencil places that instrument's own pattern. The Channel rack is hidden when the mode comes on; F6 still opens it, listing the same instruments, each playing through its track's mixer track. Also in View › Layout style."),
       "ui-options.txt:trackOnly" },
     { "pianoRoll.songBarsRuler", TR_NOOP ("Piano Roll"), TR_NOOP ("Ruler: song bars (LYNX)"),
       TR_NOOP ("The Piano roll's ruler shows the bar numbers of the place in the song where the pattern plays. Also in the Piano roll's View menu."),

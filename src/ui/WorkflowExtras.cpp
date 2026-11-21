@@ -1,4 +1,6 @@
 #include "ui/WorkflowExtras.h"
+
+#include <utility>
 #include "core/EscClose.h"
 #include "core/RulerGestures.h" // round 190nq (#227)
 
@@ -45,18 +47,29 @@ void offerTracksForEveryInstrument()
 
 void bind (AudioEngine* engine) { boundEngine = engine; }
 
-bool refusesChannelRack()
+bool channelRackOpened()
 {
-    if (! trackonly::active())
+    // issue #246 (round 190oq): the Channel rack opens in Track-only mode too (FL keeps an instrument track's channel in
+    // its Channel rack); a hint says what it lists, once per session
+    static bool told = false;
+    if (! trackonly::active() || std::exchange (told, true))
         return false;
-    ui::postHint ({ tr ("Track-only mode: the Channel rack is off. Each instrument has its own Playlist track (View › Layout style)"), {} }, 3000);
+    ui::postHint ({ tr ("Track-only mode: the Channel rack lists the instruments of the instrument tracks; each plays through its track's mixer track"), {} }, 4000);
     return true;
+}
+
+bool trackOnlySwitchedOn()
+{
+    // (the rack is hidden when the mode comes on, not again at every other switch)
+    static bool last = false;
+    const auto now = trackonly::active();
+    return now && ! std::exchange (last, now);
 }
 
 void addLayoutItems (juce::PopupMenu& menu, bool patternLayout)
 {
     menu.addSeparator();
-    menu.addItem (tr ("Track-only mode (no Channel rack: 1 track = 1 instrument)"), patternLayout, trackonly::enabled(),
+    menu.addItem (tr ("Track-only mode (1 track = 1 instrument, the Channel rack hidden)"), patternLayout, trackonly::enabled(),
                   [] { setExtra ("layout.trackOnly", ! trackonly::enabled()); });
 }
 
