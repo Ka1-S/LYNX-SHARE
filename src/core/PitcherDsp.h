@@ -267,6 +267,11 @@ public:
         }
     }
 
+    // round 190oa (DP-81, capture 190oa C11: FL's INPUT PITCH and OUTPUT PITCH strips): the detected pitch class of the
+    // left (reference) channel, 0 … 12 from C (continuous, −1 = none), and where the correction takes it. Audio thread.
+    float inputClass() const noexcept { return freq[0] > 0.0f && cls[0] >= 0.0f ? std::fmod (cls[0] + 12.0f, 12.0f) : -1.0f; }
+    float outputClass() const noexcept { return freq[0] > 0.0f && cls[0] >= 0.0f ? std::fmod (cls[0] + sm[0] + 24.0f, 12.0f) : -1.0f; }
+
 private:
     void configure (const Params& p) noexcept
     {

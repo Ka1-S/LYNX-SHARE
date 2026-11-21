@@ -209,6 +209,7 @@ public:
                 && (std::strcmp (item.display, "grmeter") == 0 || std::strcmp (item.display, "grleds") == 0 || std::strcmp (item.display, "vumeter") == 0 || std::strcmp (item.display, "iometer") == 0 || std::strcmp (item.display, "outmeter") == 0 || std::strcmp (item.display, "limitpill") == 0 || std::strcmp (item.display, "gcmeter") == 0
                     || std::strcmp (item.display, "pitchgraph") == 0 || std::strcmp (item.display, "panpos") == 0 || std::strcmp (item.display, "hwping") == 0
                     || std::strcmp (item.display, "pitchtrace") == 0 || std::strcmp (item.display, "pitchring") == 0 || std::strcmp (item.display, "tssenvelope") == 0
+                    || std::strcmp (item.display, "pitchin") == 0 // (round 190oa, DP-81: Pitcher's input / output pitch)
                     || dynui::isLive (item.display) || designui::isLive (item.display)))
             {
                 liveDisplays = true;
