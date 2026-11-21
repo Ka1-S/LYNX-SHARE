@@ -3316,6 +3316,15 @@ public:
             return;
         }
 
+        // --design190ooshot <prefix> [project] (round 190oo, design review 2): src/Design190ooShot.inc
+        if (args.contains ("--design190ooshot"))
+        {
+            const auto i = args.indexOf ("--design190ooshot");
+            setApplicationReturnValue (runDesign190ooShot (args[i + 1].unquoted(), i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String()) ? 0 : 1);
+            quit();
+            return;
+        }
+
         // --rollup031s3shot <prefix> (rollup 0.1.31 step 3, round 190ny): src/Rollup031S3Shot.inc
         if (args.contains ("--rollup031s3shot"))
         {
@@ -18106,6 +18115,7 @@ private:
 #include "IssuesShot190ns.inc" // round 190ns (issues #231-#235)
 #include "Rollup031S3Shot.inc" // rollup 0.1.31 step 3 (round 190ny)
 #include "Design190ojShot.inc" // round 190oj (design review of every view)
+#include "Design190ooShot.inc" // round 190oo (design review 2: the owner's options and the round's fixes)
 #include "DetailsShot190kn.inc" // round 190kn
 #include "DetailsShot190ld.inc" // round 190ld
 #include "DetailsShot190lr.inc" // round 190lr
