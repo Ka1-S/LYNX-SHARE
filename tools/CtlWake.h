@@ -620,6 +620,12 @@ inline std::vector<Hint> hintsFor (InstrumentKind kind, const std::vector<Contro
             out.back().apply = withRich;
             named ("Helix 3: the sample on an octave up (a rich falling tone)", { { "Sample On", 1.0f }, { "Sample Transpose", 12.0f } });
             out.back().apply = withRich;
+            // (round 190oc) Helix round 4: the granular / spectral oscillators' unison needs them on and voices to detune and
+            // spread; reverse grains need the grains on
+            named ("Helix 4: the grains on, five unison voices (a falling tone)", { { "Grain On", 1.0f }, { "Grain Unison", 5.0f } });
+            out.back().apply = withSample;
+            named ("Helix 4: the spectral oscillator on, four unison voices (a rich falling tone)", { { "Spectral On", 1.0f }, { "Spectral Unison", 4.0f } });
+            out.back().apply = withRich;
             break;
         }
         case InstrumentKind::braid:

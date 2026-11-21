@@ -99,7 +99,8 @@ TEST (helix190ja_parameters_and_laws)
     // then round 3's)
     const auto plusEnd = w::paramCount + w::ext::autoEnd - 1;
     const auto plus2End = plusEnd + w::ext2::autoEnd - 1;
-    CHECK ((int) table.size() == plus2End + w::ext3::autoEnd - 1);
+    const auto plus3End = plus2End + w::ext3::autoEnd - 1;
+    CHECK ((int) table.size() == plus3End + w::ext4::autoEnd - 1); // (190oc: round 4's after)
     std::set<std::string> names;
     for (int i = 0; i < (int) table.size(); ++i)
     {
@@ -107,7 +108,8 @@ TEST (helix190ja_parameters_and_laws)
         const auto index = i < w::paramCount ? i
                            : i < plusEnd     ? w::extBase + 1 + (i - w::paramCount)
                            : i < plus2End    ? w::ext2Base + 1 + (i - plusEnd)
-                                             : w::ext3Base + 1 + (i - plus2End);
+                           : i < plus3End    ? w::ext3Base + 1 + (i - plus2End)
+                                             : w::ext4Base + 1 + (i - plus3End);
         CHECK (p.index == index && ! p.name.empty() && p.high > p.low);
         names.insert (p.name);
         const auto d = w::defaults()[(std::size_t) index];

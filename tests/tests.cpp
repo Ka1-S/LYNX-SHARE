@@ -17653,6 +17653,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Helix190miTests.inc" // round 190mi
 #include "Helix190mlTests.inc" // round 190ml
 #include "Helix190mtTests.inc" // round 190mt
+#include "Helix190ocTests.inc" // round 190oc: Helix round 4 (grain / spectral unison, reverse grains)
 #include "AlsDevices190fmTests.inc"
 #include "Merge180cTests.inc"
 #include "Slicer180cTests.inc"
