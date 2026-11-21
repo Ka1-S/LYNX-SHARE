@@ -2894,12 +2894,20 @@ public: // (the class stays public from here, as before)
             // ceiling (white) and the compressor threshold (cyan) as still lines on FL's level axis, the history
             // scrolling right to left while the song plays. The ceiling knob is the axis itself (law3, 0..+12 dB).
             const auto yAt = [&] (float v01) { return std::round (inner.getBottom() - inner.getHeight() * juce::jlimit (0.0f, 1.0f, v01)); };
-            paintMonitor (g, inner, false, fx.enabled);
-            const auto thresholdLevel = (float) ((std::pow (7.0, (double) param01 ("Comp. threshold")) - 1.0) / 6.0); // law7
-            g.setColour (juce::Colour (0xff268396).withMultipliedAlpha (fx.enabled ? 1.0f : 0.4f));
-            g.fillRect (inner.getX(), yAt (dynhistory::axis (thresholdLevel)), inner.getWidth(), 1.0f);
-            g.setColour (juce::Colour (0xffb8c0bf).withMultipliedAlpha (fx.enabled ? 1.0f : 0.4f));
-            g.fillRect (inner.getX(), yAt (param01 ("Ceiling")), inner.getWidth(), 1.0f);
+            // round 190oa (DP-24 / DP-25, capture 190oa C1): the graph right of FL's toolbar; its toggles and speed
+            const auto graph = limGraph (item);
+            paintMonitor (g, graph, false, fx.enabled, limShowIn, limShowEnv);
+            if (limShowMarkers) // FL's "Show level markers" (on by default)
+            {
+                const auto thresholdLevel = (float) ((std::pow (7.0, (double) param01 ("Comp. threshold")) - 1.0) / 6.0); // law7
+                g.setColour (juce::Colour (0xff268396).withMultipliedAlpha (fx.enabled ? 1.0f : 0.4f));
+                g.fillRect (graph.getX(), yAt (dynhistory::axis (thresholdLevel)), graph.getWidth(), 1.0f);
+                g.setColour (juce::Colour (0xffb8c0bf).withMultipliedAlpha (fx.enabled ? 1.0f : 0.4f));
+                g.fillRect (graph.getX(), yAt (param01 ("Ceiling")), graph.getWidth(), 1.0f);
+            }
+            paintLimiterTools (g, item, fx.enabled);
+            if (monitorPaused)
+                paintPauseCaption (g, graph.withTrimmedRight (96.0f * s)); // (left of the GRAPH | CURVE switch)
             // round 190mf (DP-26, capture 190mf A2 fl-limiter-knee-held.png): while the KNEE knob is held, FL draws the
             // compressor's static transfer at the display's bottom-left in teal: 1:1 on the level axis up to the
             // threshold, then the ratio's slope, the knee rounding the corner; ~1.19 display heights wide, its last ~8 px
@@ -4805,6 +4813,40 @@ public: // (the class stays public from here, as before)
             mbSetSpeedAt (item, e.position.x);
             return;
         }
+        if (limiterViewItem (item) && limiterGraphShown() && ! e.mods.isPopupMenu()) // round 190oa (DP-24 / DP-25): FL's toolbar
+            if (const auto part = limPartAt (item, e.position); part >= 0)
+            {
+                if (part == 0)
+                    limOptionsMenu (item);
+                else if (part == 4)
+                {
+                    limSpeedDragging = true;
+                    dragItem = index;
+                    limSetSpeedAt (item, e.position.y);
+                }
+                else
+                    (part == 1 ? limShowIn : part == 2 ? limShowEnv : limShowMarkers) ^= true;
+                repaint (r.getSmallestIntegerContainer());
+                return;
+            }
+        if (kind == EffectKind::maximus && item.type == Item::display && item.display != nullptr && ! e.mods.isPopupMenu()) // round 190oa (DP-27)
+        {
+            if (std::strcmp (item.display, "maxspeed") == 0)
+            {
+                maxSpeedDragging = true;
+                dragItem = index;
+                const auto t = r.reduced (2.0f * scale(), 0.0f);
+                maxSpeed = juce::jlimit (0.0f, 1.0f, (e.position.x - t.getX()) / juce::jmax (1.0f, t.getWidth()));
+                repaint (r.getSmallestIntegerContainer());
+                return;
+            }
+            if (std::strcmp (item.display, "maxbands") == 0) // FL: "Clicking on the display area will Pause the display"
+            {
+                monitorPaused = ! monitorPaused;
+                repaint (r.getSmallestIntegerContainer());
+                return;
+            }
+        }
         if (limiterViewItem (item) || tpTraceItem (item)) // round 190ld (DP-25): FL's "Click on the display to Pause" (again: it scrolls on)
         {
             if (! e.mods.isPopupMenu())
@@ -5847,8 +5889,24 @@ private:
         if (tpTraceItem (item)) // round 190lx (DP-31)
             return { tr ("Transient Processor: input peaks (green), output peaks (purple), the transient processing (red; above the middle line a boost, below a cut)  [LMB] pause / resume"),
                      monitorPaused ? tr ("Paused") : juce::String(), false, false };
+        if (limiterViewItem (item) && limiterGraphShown()) // round 190oa (DP-24 / DP-25): FL's toolbar hints
+            switch (limPartAt (item, p))
+            {
+                case 0: return { tr ("Options"), {}, false, true };
+                case 1: return { tr ("Show input peaks"), limShowIn ? tr ("On") : tr ("Off"), false, false };
+                case 2: return { tr ("Show analysis & gain envelopes"), limShowEnv ? tr ("On") : tr ("Off"), false, false };
+                case 3: return { tr ("Show level markers"), limShowMarkers ? tr ("On") : tr ("Off"), false, false };
+                case 4: return { tr ("Scrolling speed"), juce::String (juce::roundToInt (speedFactor (limSpeed) * 100.0)) + "%", false, false };
+                default: break;
+            }
+        if (isVocBands (item)) // round 190oa (DP-33): FL's hint
+            return { vocHint (item, p), {}, false, false };
+        if (kind == EffectKind::maximus && item.type == Item::display && juce::String (item.display) == "maxspeed") // round 190oa (DP-27)
+            return { tr ("Monitor scrolling speed"), juce::String (juce::roundToInt (speedFactor (maxSpeed) * 100.0)) + "%", false, false };
+        if (kind == EffectKind::maximus && item.type == Item::display && juce::String (item.display) == "maxbands")
+            return { tr ("Monitor: the selected band's level going in and out  [LMB] pause / resume"), monitorPaused ? "II " + tr ("PAUSE") : juce::String(), false, false };
         if (limiterViewItem (item)) // round 190ld (DP-25)
-            return { tr ("Analysis display  [LMB] pause / resume"), monitorPaused ? tr ("Paused") : juce::String(), false, false };
+            return { tr ("Analysis display  [LMB] pause / resume"), monitorPaused ? "II " + tr ("PAUSE") : juce::String(), false, false };
         if (item.type == Item::display && juce::String (item.display) == "sgamount")
             return { tr ("Amount: drag up or down (Ctrl: fine)"), juce::String (soundgoodizerAmount() * 100.0f, 0) + "%", false, false };
         if (item.type == Item::display && juce::String (item.display) == "sgpresets")
@@ -5884,8 +5942,9 @@ private:
             return { tr ("MIDI input port number: drag up / down (\"...\" = none). The MIDI Out channels on this port play Pitcher's MIDI mode and Harmonize"), {}, false, false };
         if (item.type == Item::display && juce::String (item.display) == "equosend") // round 173d3: FL's hint
             return { tr ("Send track number"), current() != nullptr && current()->sendTracks[0] > 0 ? insertName (current()->sendTracks[0]) : juce::String ("---"), false, false };
-        if (isGbAny (item)) // round 168m
-            return { gbHint (item, p), {}, false, true };
+        if (isGbAny (item) || (kind == EffectKind::grossBeat && isGbItem (item, "gbjog"))) // round 168m (190oa: the dial, automatable)
+            return { gbHint (item, p), isGbItem (item, "gbjog") && gbScratching ? gbScratchText() : juce::String(), isGbItem (item, "gbjog"),
+                     ! isGbItem (item, "gbjog") };
         if (item.type == Item::display)
             return { tr ("Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)")
                          + "  " + tr ("Outside the bands: drag up or down = the main level (Alt+click: reset)"), // (round 190kn, DP-20)
