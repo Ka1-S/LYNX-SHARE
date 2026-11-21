@@ -1,4 +1,6 @@
 #include "ui/SlotWatch.h"
+#include "ui/HintBar.h"
+#include "ui/WindowPlaces.h"
 #include "ui/WindowOwner.h"
 #include "ui/ControllerEditors.h"
 
@@ -460,6 +462,23 @@ public:
                 g.drawVerticalLine ((int) pt.x, area.getY(), area.getBottom());
             }
         }
+        // round 190oa (DP-71): FL's tension handle in the middle of each segment (drag up / down, Ctrl = fine,
+        // right-click = straight line)
+        for (int i = 0; i + 1 < c.count; ++i)
+            if (const auto h = handleAt (c, i); h.x >= 0.0f)
+            {
+                g.setColour (theme::colour::bg0);
+                g.fillEllipse (juce::Rectangle<float> (7.0f, 7.0f).withCentre (h));
+                g.setColour (i == bendSegment ? juce::Colour (0xffffa53c) : curveColour); // (capture 190oa C5: orange while dragged)
+                g.drawEllipse (juce::Rectangle<float> (7.0f, 7.0f).withCentre (h), 1.4f);
+            }
+        if (crosshair && dragged >= 0 && dragged < c.count) // (capture 190oa C5: a thin grey cross through the point)
+        {
+            const auto pt = juce::Point<float> (toX (c, c.time[(std::size_t) dragged]), toY (c.level[(std::size_t) dragged]));
+            g.setColour (theme::colour::textDisabled);
+            g.drawHorizontalLine ((int) pt.y, area.getX(), area.getRight());
+            g.drawVerticalLine ((int) pt.x, area.getY(), area.getBottom());
+        }
         if (live)
         {
             g.setColour (theme::colour::accent.withAlpha (0.7f));
@@ -495,6 +514,23 @@ public:
     {
         const auto c = get();
         dragged = hit (c, e.position);
+        const auto handle = dragged < 0 ? hitHandle (c, e.position) : -1;
+        if (handle >= 0) // round 190oa (DP-71): a tension handle
+        {
+            if (e.mods.isPopupMenu()) // FL: "Right-click the handle to reset to a straight line"
+            {
+                auto v = c;
+                v.tension[(std::size_t) handle] = 0.0f;
+                set (v);
+                return;
+            }
+            bendSegment = handle;
+            bendStartY = e.position.y;
+            bendStart = c.tension[(std::size_t) handle];
+            fineFrom = { e.position.y, bendStart, e.mods.isCtrlDown() };
+            repaint();
+            return;
+        }
         if (e.mods.isPopupMenu())
         {
             if (dragged < 0) // round 165, FL: right-click adds a point there, dragged while the button is held
@@ -518,7 +554,10 @@ public:
             bendSegment = segmentAt (c, e.position.x);
             bendStartY = e.position.y;
             bendStart = bendSegment >= 0 ? c.tension[(std::size_t) bendSegment] : 0.0f;
+            fineFrom = { e.position.y, bendStart, e.mods.isCtrlDown() };
         }
+        if (dragged >= 0) // (FL's axis locks keep the point's position at the press)
+            pressed = { c.time[(std::size_t) dragged], c.level[(std::size_t) dragged] };
     }
 
     void mouseDrag (const juce::MouseEvent& e) override
@@ -526,8 +565,18 @@ public:
         auto c = get();
         if (bendSegment >= 0 && bendSegment < c.count - 1)
         {
-            c.tension[(std::size_t) bendSegment] = juce::jlimit (-1.0f, 1.0f, bendStart + (e.position.y - bendStartY) / 120.0f);
+            // FL: "Hold CTRL during adjustment to fine tune" (a tenth of the speed, from where Ctrl went down)
+            const auto fine = e.mods.isCtrlDown();
+            if (fine != fineFrom.fine)
+                fineFrom = { e.position.y, c.tension[(std::size_t) bendSegment], fine };
+            // capture 190oa C5: 0.5 % a pixel (10 px up: 20 % -> 15 %), Ctrl ≈ 20× finer (0.025 %)
+            c.tension[(std::size_t) bendSegment] = juce::jlimit (-1.0f, 1.0f, fineFrom.value + (e.position.y - fineFrom.y) / (fine ? 4000.0f : 200.0f));
             set (c);
+            // FL's hint while it bends: "Point 2 to 3 tension 20.00%"
+            ui::postHint ({ tr ("Point {0} to {1} tension {2}%", { juce::String (bendSegment + 1), juce::String (bendSegment + 2),
+                                                                     juce::String (c.tension[(std::size_t) bendSegment] * 100.0f, 2) }),
+                            {}, false, false },
+                          1500);
             return;
         }
         if (dragged < 0 || dragged >= c.count)
@@ -535,15 +584,24 @@ public:
         const auto lo = dragged > 0 ? c.time[(std::size_t) dragged - 1] : 0.0f;
         const auto hi = dragged + 1 < c.count ? c.time[(std::size_t) dragged + 1] : (axis == Axis::time ? 1.0e6f : 1.0f);
         // the first point of a time curve stays at 0; a map's points move freely within 0..1
-        c.time[(std::size_t) dragged] = dragged == 0 && axis == Axis::time ? 0.0f : juce::jlimit (lo, hi, fromX (c, e.position.x));
-        c.level[(std::size_t) dragged] = juce::jlimit (0.0f, 1.0f, fromY (e.position.y));
+        // round 190oa (DP-71; capture 190oa C5, FL 2026): Shift or Ctrl while dragging a point keeps its level (it moves in
+        // time only, a crosshair through it) — FL 2026 does both the same (its manual gives Ctrl the other axis)
+        const auto keepLevel = e.mods.isShiftDown() || e.mods.isCtrlDown(), keepTime = false;
+        crosshair = keepLevel;
+        c.time[(std::size_t) dragged] = dragged == 0 && axis == Axis::time ? 0.0f
+                                        : keepTime                       ? juce::jlimit (lo, hi, pressed.x)
+                                                                         : juce::jlimit (lo, hi, fromX (c, e.position.x));
+        c.level[(std::size_t) dragged] = keepLevel ? pressed.y : juce::jlimit (0.0f, 1.0f, fromY (e.position.y));
         set (c);
     }
 
     void mouseUp (const juce::MouseEvent&) override
     {
+        if (bendSegment >= 0 || crosshair)
+            repaint();
         dragged = -1;
         bendSegment = -1;
+        crosshair = false;
     }
 
     void mouseDoubleClick (const juce::MouseEvent& e) override
@@ -635,6 +693,26 @@ private:
         return -1;
     }
 
+    // round 190oa (DP-71): the tension handle of segment i, on the curve half way between its points (x < 0: none,
+    // the points share a column)
+    juce::Point<float> handleAt (const ControllerCurve& c, int i) const
+    {
+        const auto x0 = toX (c, c.time[(std::size_t) i]), x1 = toX (c, c.time[(std::size_t) i + 1]);
+        if (x1 - x0 < 12.0f)
+            return { -1.0f, -1.0f };
+        const auto y0 = toY (c.level[(std::size_t) i]), y1 = toY (c.level[(std::size_t) i + 1]);
+        const auto k = c.tension[(std::size_t) i];
+        const auto shaped = k != 0.0f ? std::pow (0.5f, std::pow (2.0f, k * 3.0f)) : 0.5f;
+        return { x0 + (x1 - x0) * 0.5f, y0 + (y1 - y0) * shaped };
+    }
+    int hitHandle (const ControllerCurve& c, juce::Point<float> p) const
+    {
+        for (int i = 0; i + 1 < c.count; ++i)
+            if (const auto h = handleAt (c, i); h.x >= 0.0f && p.getDistanceFrom (h) < 6.0f)
+                return i;
+        return -1;
+    }
+
     int segmentAt (const ControllerCurve& c, float x) const
     {
         for (int i = 0; i + 1 < c.count; ++i)
@@ -663,12 +741,15 @@ private:
             });
             menu.addSeparator();
         }
-        menu.addItem (tr ("Right-click or double-click adds a point, drag moves it, Alt+click deletes it, Alt+drag bends a segment"), false, false, [] {});
+        menu.addItem (tr ("Right-click or double-click adds a point, drag moves it (Shift or Ctrl keeps its level), Alt+click deletes it; drag a segment's handle to bend it (Ctrl = fine, right-click = straight)"), false, false, [] {});
         menu.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
     }
 
     int dragged = -1, bendSegment = -1;
     float bendStartY = 0.0f, bendStart = 0.0f;
+    struct FineFrom { float y = 0.0f, value = 0.0f; bool fine = false; } fineFrom; // (round 190oa: Ctrl = fine tension)
+    juce::Point<float> pressed;                                                   // the dragged point at the press
+    bool crosshair = false;                                                       // (FL's thin cross while an axis is kept)
 };
 
 // FL's X/Y modulation pad: drag the dot to set the global Mod X / Mod Y.
