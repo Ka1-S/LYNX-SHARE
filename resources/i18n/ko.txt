@@ -12196,3 +12196,4 @@ countries: kr
 "Automatic colors and icons" = "자동 색과 아이콘"
 "Audio and automation clips use note colors" = "오디오 및 오토메이션 클립에 노트 색 사용"
 "Use the note color list to find random colors for new clips" = "새 클립의 색을 노트 색 목록에서 무작위로 고르기"
+"{0} slide note(s) move only the pitch: the sounding notes keep their velocity, pan and Mod X / Y (FL's slide of the note properties)" = "슬라이드 노트 {0}개는 피치만 움직입니다: 울리는 노트의 벨로시티, 팬, Mod X / Y는 그대로입니다(FL의 노트 속성 슬라이드)"

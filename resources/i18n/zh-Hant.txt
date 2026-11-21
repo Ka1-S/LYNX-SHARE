@@ -12196,3 +12196,4 @@ countries: tw hk mo
 "Automatic colors and icons" = "自動顏色與圖示"
 "Audio and automation clips use note colors" = "音訊和自動化片段使用音符顏色"
 "Use the note color list to find random colors for new clips" = "從音符顏色清單中為新片段隨機選擇顏色"
+"{0} slide note(s) move only the pitch: the sounding notes keep their velocity, pan and Mod X / Y (FL's slide of the note properties)" = "{0} 個滑音音符只移動音高：正在發聲的音符保留其力度、聲像和 Mod X / Y（FL 的音符屬性滑音）"

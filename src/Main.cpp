@@ -80,6 +80,7 @@
 #include "core/Harmor.h"
 #include "core/KiloheartsDsp.h" // (rollup step 14: the copy for 0.1.28 self-test)
 #include "core/WavetableSynth.h" // (round 190oc: the copy for 0.1.30 self-test)
+#include "core/AutoLook.h" // (rollup 0.1.31 step 4: the copy for 0.1.30 self-test)
 #include "flp/Flp.h"
 #include "core/DemoSongs.h"
 #include "core/FirstSongTour.h"
@@ -8095,6 +8096,114 @@ private:
                 helix4khs190ocResult = "ERROR copy for 0.1.28 after the 0.1.30 step";
         }
 
+        // rollup 0.1.31 step 4 (round 190oi): the copies for 0.1.30 / 0.1.28 of a project with everything step 4 brought:
+        // 190oc's Helix round-4 block and Effector law 49 (each one line), 190od's slide of the note properties (#236: the
+        // key goes; one line counting only slide notes that move something), 190od's #239 colours and icons by name and a
+        // #238 "no colour" channel (ordinary project data: kept as they are), 190nz's clipboard (no project data). The 0.1.30
+        // copy keeps every key but "slideNoteProps"; a project whose slide notes move nothing, or saved before #236, gets no
+        // slide line
+        juce::String rollup031s4Result = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            if (song.mixer.size() < 3)
+                song.mixer.resize (3);
+            song.slideNoteProps = true;
+            lynx::ChannelDef bass, lead, swarm, plain;
+            bass.name = "Bass 808", lead.name = "Lead", swarm.name = "Swarm", plain.name = "No colour";
+            swarm.instrument = lynx::InstrumentKind::helix;
+            swarm.modelParams = lynx::helixDefaults();
+            swarm.modelParams[(std::size_t) (lynx::wt::ext4Base + lynx::wt::ext4::specUnison)] = 4.0f;
+            for (auto* c : { &bass, &lead, &swarm, &plain })
+                song.channels.push_back (*c);
+            const int bassIndex = (int) song.channels.size() - 4, leadIndex = bassIndex + 1;
+            auto nlf = lynx::makeEffectSlot (lynx::EffectKind::effector);
+            nlf.params[(std::size_t) lynx::khsdsp::lawParam] = lynx::khsdsp::lawValue (lynx::khsdsp::Law::nonlinearFilter);
+            song.mixer[2].effects.push_back (nlf);
+            lynx::autolook::Rules rules;
+            rules.on = true;
+            rules.list.push_back ({ "bass", lynx::autolook::Match::contains, 0xFF2266AAu, 7, lynx::autolook::everything });
+            const auto coloured = lynx::autolook::applyAll (song, rules);
+            auto& p = song.patterns[(std::size_t) song.currentPattern];
+            const auto note = [] (int channel, juce::int64 start, int key, float velocity, float pan, bool slide) {
+                lynx::Note n;
+                n.channel = channel, n.start = start, n.length = lynx::ppq, n.key = key, n.velocity = velocity, n.pan = pan, n.slide = slide;
+                return n;
+            };
+            p.notes.push_back (note (bassIndex, 0, 36, 0.78f, 0.0f, false));
+            p.notes.push_back (note (bassIndex, lynx::ppq / 2, 43, 0.3f, 0.0f, true));      // moves the velocity
+            p.notes.push_back (note (bassIndex, lynx::ppq, 41, 0.78f, -0.5f, true));        // moves the pan
+            p.notes.push_back (note (leadIndex, 0, 60, 0.78f, 0.0f, false));
+            p.notes.push_back (note (leadIndex, lynx::ppq / 2, 64, 0.78f, 0.0f, true));     // pitch only: sounds the same in 0.1.30
+            lynx::uids::normalize (song);
+            const auto keysOf = [] (const juce::var& v) {
+                std::set<juce::String> keys;
+                std::function<void (const juce::var&, const juce::String&)> walk = [&] (const juce::var& x, const juce::String& path) {
+                    if (auto* o = x.getDynamicObject())
+                        for (const auto& prop : o->getProperties())
+                        {
+                            if (path.isEmpty() && (prop.name.toString() == "savedBy" || prop.name.toString() == "copiedFrom"))
+                                continue;
+                            keys.insert (path + "/" + prop.name.toString());
+                            walk (prop.value, path + "/" + prop.name.toString());
+                        }
+                    else if (auto* a = x.getArray())
+                        for (const auto& e : *a)
+                            walk (e, path + "[]");
+                };
+                walk (v, {});
+                return keys;
+            };
+            auto expected = keysOf (juce::JSON::parse (lynx::ProjectFile::toJson (song)));
+            const auto hadKey = expected.erase ("/slideNoteProps") == 1;
+            const auto countOf = [] (const lynx::olderlynx::Copy& c, const char* start) {
+                return (int) std::count_if (c.lost.begin(), c.lost.end(), [start] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).startsWith (start); });
+            };
+            const char* slideLine = "{0} slide note(s) move only the pitch";
+            if (coloured != 1 || ! hadKey)
+                rollup031s4Result = "ERROR set-up (coloured " + juce::String (coloured) + ")";
+            for (const auto* release : { "0.1.30", "0.1.28" })
+            {
+                if (rollup031s4Result != "OK")
+                    break;
+                const auto copy = lynx::olderlynx::forRelease (song, release);
+                juce::String why;
+                const auto back = copy.ok ? lynx::ProjectFile::fromJson (copy.json, why) : std::optional<lynx::Song> {};
+                juce::String slideDetail;
+                for (const auto& l : copy.lost)
+                    if (juce::String (l.text).startsWith (slideLine))
+                        slideDetail = l.detail;
+                const auto is130 = juce::String (release) == "0.1.30";
+                if (! copy.ok || ! back)
+                    rollup031s4Result = juce::String ("ERROR copy ") + release + " " + copy.error + why;
+                else if (copy.json.contains ("slideNoteProps") || back->slideNoteProps)
+                    rollup031s4Result = juce::String ("ERROR slideNoteProps left in the copy for ") + release;
+                else if (countOf (copy, slideLine) != 1 || slideDetail != "2")
+                    rollup031s4Result = juce::String ("ERROR the slide line in the copy for ") + release + " (" + slideDetail + ")";
+                else if (countOf (copy, "Effector's Kilohearts Nonlinear Filter") != 1 || (is130 && countOf (copy, "Helix's unison") != 1)
+                         || (! is130 && countOf (copy, "Helix is not in this release") != 1))
+                    rollup031s4Result = juce::String ("ERROR 190oc's lines in the copy for ") + release;
+                else if (back->patterns[(std::size_t) back->currentPattern].notes != p.notes)
+                    rollup031s4Result = juce::String ("ERROR the notes in the copy for ") + release;
+                else if (back->channels[(std::size_t) bassIndex].colour != 0xFF2266AAu || back->channels[(std::size_t) bassIndex].icon != 7
+                         || back->channels[(std::size_t) bassIndex + 3].colour != 0 || back->channels[(std::size_t) leadIndex].colour != song.channels[(std::size_t) leadIndex].colour)
+                    rollup031s4Result = juce::String ("ERROR #239 / #238 colours in the copy for ") + release;
+                else if (is130 && (copy.lost.size() != 3 || keysOf (juce::JSON::parse (copy.json)) != expected))
+                    rollup031s4Result = "ERROR the copy for 0.1.30 drops more than step 4's three (" + juce::String ((int) copy.lost.size()) + " lines)";
+            }
+            // slide notes that move nothing, and a project saved before #236 (key off): no slide line
+            if (rollup031s4Result == "OK")
+            {
+                auto still = song;
+                auto& sp = still.patterns[(std::size_t) still.currentPattern];
+                sp.notes.erase (std::remove_if (sp.notes.begin(), sp.notes.end(), [bassIndex] (const lynx::Note& n) { return n.slide && n.channel == bassIndex; }), sp.notes.end());
+                auto before = song;
+                before.slideNoteProps = false;
+                const auto a = lynx::olderlynx::forRelease (still, "0.1.30"), b = lynx::olderlynx::forRelease (before, "0.1.30");
+                if (! a.ok || ! b.ok || countOf (a, slideLine) != 0 || countOf (b, slideLine) != 0)
+                    rollup031s4Result = "ERROR a slide line where nothing moves";
+            }
+        }
+
         // round 190dr: the Session mixer's sections come back from a project (a project without them: Live's defaults);
         // a device dragged to another track and a Warp switch are one undo step each in a real engine
         juce::String livescr190drResult = "OK";
@@ -8527,7 +8636,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK")
                         && danceWindowResult == "OK" && clickActivationResult == "OK" && motionOverlayResult.startsWith ("OK")
@@ -8615,6 +8724,7 @@ private:
                << "keys190nu_key_markers=" << keys190nuResult << "\n"
                << "rollup031s3_copy_for_0130=" << rollup031s3Result << "\n"
                << "helix4_khs190oc_copy_for_0130=" << helix4khs190ocResult << "\n"
+               << "rollup031s4_copy_for_0130=" << rollup031s4Result << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 

@@ -12196,3 +12196,4 @@ countries: ru by kz
 "Automatic colors and icons" = "Автоматические цвета и значки"
 "Audio and automation clips use note colors" = "Аудио- и клипы автоматизации используют цвета нот"
 "Use the note color list to find random colors for new clips" = "Новые клипы получают случайные цвета из списка цветов нот"
+"{0} slide note(s) move only the pitch: the sounding notes keep their velocity, pan and Mod X / Y (FL's slide of the note properties)" = "{0} нот(ы) slide меняют только высоту: звучащие ноты сохраняют velocity, панораму и Mod X / Y (slide свойств нот, как в FL)"

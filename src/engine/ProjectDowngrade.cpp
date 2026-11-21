@@ -25,8 +25,10 @@
 #include "core/VoiceTools.h"
 #include "core/WavetableSynth.h"
 
+#include <algorithm>
 #include <cmath>
 #include <functional>
+#include <vector>
 
 // TR_NOOP marks the loss texts for translation (tools/i18n_keys.py); the UI translates them
 #ifndef TR_NOOP
@@ -1478,6 +1480,40 @@ void toRelease0130 (juce::var& root, Losses& lost)
         if (! helix4.isEmpty())
             lost.push_back ({ TR_NOOP ("Helix's unison on the granular and spectral oscillators and its reverse grains play one voice, forwards (their automation does nothing): {0}"),
                               listOf (helix4), true });
+    }
+
+    // round 190od (issue #236): FL's slide of the note properties ("slideNoteProps": a slide note moves the sounding notes'
+    // velocity, pan and Mod X / Y to its own, as it moves their pitch). 0.1.30 slides the pitch only. The key goes; a loss
+    // line only when it plays: a slide note whose velocity, pan or Mod X / Y differs from another note of its channel in
+    // the same pattern (slide notes like the notes they slide sound the same in 0.1.30). Rollup 0.1.31 step 4
+    if (drop (o, "slideNoteProps"))
+    {
+        int moving = 0;
+        if (auto* patterns = arrayOf (root["patterns"]))
+            for (auto& p : *patterns)
+            {
+                auto* notes = arrayOf (p["notes"]);
+                if (notes == nullptr)
+                    continue;
+                // a note array: [start, length, channel, key, velocity (, pan, fine pitch, muted, slide, porta, release, mod X, mod Y ...)]
+                struct Props { int channel; double velocity, pan, modX, modY; bool slide; };
+                std::vector<Props> props;
+                for (const auto& n : *notes)
+                    if (n.isArray() && n.size() >= 5)
+                        props.push_back ({ (int) n[2], (double) n[4], n.size() >= 8 ? (double) n[5] : 0.0,
+                                           n.size() >= 13 ? (double) n[11] : 0.5, n.size() >= 13 ? (double) n[12] : 0.5,
+                                           n.size() >= 9 && (bool) n[8] });
+                for (const auto& s : props)
+                    if (s.slide
+                        && std::any_of (props.begin(), props.end(), [&s] (const Props& n) {
+                               return ! n.slide && n.channel == s.channel
+                                      && (n.velocity != s.velocity || n.pan != s.pan || n.modX != s.modX || n.modY != s.modY);
+                           }))
+                        ++moving;
+            }
+        if (moving > 0)
+            lost.push_back ({ TR_NOOP ("{0} slide note(s) move only the pitch: the sounding notes keep their velocity, pan and Mod X / Y (FL's slide of the note properties)"),
+                              juce::String (moving), true });
     }
 
     // round 190nw: the tracker editor's view settings (rows per beat, columns, track groups). A view: the notes are the

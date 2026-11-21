@@ -12196,3 +12196,4 @@ countries: es mx ar co cl pe ve
 "Automatic colors and icons" = "Colores e iconos automáticos"
 "Audio and automation clips use note colors" = "Los clips de audio y de automatización usan los colores de nota"
 "Use the note color list to find random colors for new clips" = "Usa la lista de colores de nota para elegir colores aleatorios para los clips nuevos"
+"{0} slide note(s) move only the pitch: the sounding notes keep their velocity, pan and Mod X / Y (FL's slide of the note properties)" = "{0} nota(s) de slide mueven solo la altura: las notas que suenan conservan su velocity, pan y Mod X / Y (el slide de las propiedades de nota de FL)"
