@@ -124,7 +124,15 @@ public:
     hotswap::Target selectedDeviceTarget() const;
     void hotSwapChanged(); // the Browser's link began, moved or ended: the cards' buttons are drawn again
 
+    // Round gap190og (deviceview-0012): Live's Edit menu commands (the Clip-launch layout's Edit menu) on the Device View's
+    // selected device. `devicesHaveFocus`: the keyboard focus lies in the device chain (the menu then acts on it).
+    enum class EditCommand { cut, copy, paste, duplicate, remove };
+    bool devicesHaveFocus (const juce::Component* focused) const;
+    bool canEditDevice (EditCommand command) const;
+    bool editDevice (EditCommand command);
+
     // tests and --snapshot
+    bool duplicateLoopForCheck(); // (round gap190og, detail-019: the Clip page's Duplicate button pressed)
     void selectCardForCheck (int card);
     bool duplicateCardForCheck (int card);
     bool groupCardForCheck (int card, bool ungroup); // (round 190hr: Ctrl+G / Ctrl+Shift+G on the instrument card)

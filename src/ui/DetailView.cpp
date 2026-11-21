@@ -1,4 +1,5 @@
 #include "ui/TextCache.h"
+#include "ui/ShotShowing.h"
 #include "ui/DetailView.h"
 #include "core/StandIns.h"
 #include "ui/MapMode.h"
@@ -216,10 +217,12 @@ public:
         slotActions.extendSlotMenu = [this] (juce::PopupMenu& menu, int slot) {
             const auto key = tagOf (slot);
             // round 190ce: the reference's device menu starts with Cut / Copy, then Fold [shot d04]; Paste and
-            // Duplicate are its Edit menu's commands on the selected device
+            // Duplicate are its Edit menu's commands on the selected device. Round gap190og (deviceview-0012): "Pasted
+            // devices are inserted in front of the selected device" [DOC Live 12 manual, Working with Instruments and
+            // Effects] (before: after it)
             menu.addItem (tr ("Cut") + "\tCtrl+X", [this, slot] { copyDevice (slot, true); });
             menu.addItem (tr ("Copy") + "\tCtrl+C", [this, slot] { copyDevice (slot, false); });
-            menu.addItem (tr ("Paste") + "\tCtrl+V", deviceClipboard().has_value() && effectCount() < maxEffectSlots, false, [this, slot] { pasteDevice (slot + 1); });
+            menu.addItem (tr ("Paste") + "\tCtrl+V", deviceClipboard().has_value() && effectCount() < maxEffectSlots, false, [this, slot] { pasteDevice (slot); });
             menu.addItem (tr ("Duplicate") + "\tCtrl+D", effectCount() < maxEffectSlots, false, [this, slot] { duplicateDevice (slot, -1); });
             menu.addSeparator();
             menu.addItem (folded.count (key) > 0 ? tr ("Unfold") : tr ("Fold"), [this, key] { toggleFold (key); });
@@ -313,6 +316,46 @@ public:
         toggleOn (cards[(std::size_t) i]);
         return true;
     }
+    // round gap190og (deviceview-0012): Live's Edit menu on the selected device — Cut, Copy, Paste, Duplicate, Delete
+    // [SHOT live190gu/screens-live/live-edit-menu.png; DOC Live 12 manual: "Edit menu commands such as cut, copy, paste,
+    // and duplicate can be used on devices", "select Delete from the Edit menu"]. Paste goes in front of the selected
+    // device, at the end of the chain with none (or the instrument) selected.
+    enum class EditCommand { cut, copy, paste, duplicate, remove };
+    bool canEdit (EditCommand command) const
+    {
+        const auto i = selectedCard();
+        const auto effect = i >= 0 && cards[(std::size_t) i].kind == Card::effect;
+        switch (command)
+        {
+            case EditCommand::cut:
+            case EditCommand::copy:
+            case EditCommand::remove: return effect;
+            case EditCommand::paste: return insert >= 0 && deviceClipboard().has_value() && effectCount() < maxEffectSlots;
+            case EditCommand::duplicate: return effect && effectCount() < maxEffectSlots;
+        }
+        return false;
+    }
+    bool runEdit (EditCommand command)
+    {
+        if (! canEdit (command))
+            return false;
+        const auto i = selectedCard();
+        const auto effect = i >= 0 && cards[(std::size_t) i].kind == Card::effect;
+        const auto slot = effect ? cards[(std::size_t) i].index : -1;
+        switch (command)
+        {
+            case EditCommand::cut: copyDevice (slot, true); break;
+            case EditCommand::copy: copyDevice (slot, false); break;
+            case EditCommand::paste: pasteDevice (effect ? slot : effectCount()); break;
+            case EditCommand::duplicate: duplicateDevice (slot, -1); break;
+            case EditCommand::remove:
+                slotActions.deleteSlot (slot);
+                refresh();
+                break;
+        }
+        return true;
+    }
+
     bool duplicateCard (int i)
     {
         if (i < 0 || i >= (int) cards.size() || cards[(std::size_t) i].kind != Card::effect)
@@ -596,7 +639,7 @@ public:
             }
             if (! shift && code == 'V')
             {
-                pasteDevice (slot + 1);
+                pasteDevice (slot); // (round gap190og: in front of the selected device, Live's rule)
                 return true;
             }
             if (code == 'G')
@@ -4170,6 +4213,19 @@ void DetailView::clipSectionsForSnapshot (bool clipOpen, bool launchOpen, bool n
 hotswap::Target DetailView::selectedDeviceTarget() const { return devicesPage && isShowing() ? chain->selectedTarget() : hotswap::Target(); }
 void DetailView::hotSwapChanged() { chain->repaint(); }
 void DetailView::selectCardForCheck (int card) { chain->selectCard (card); }
+// round gap190og (deviceview-0012): the main window's Edit menu (Clip-launch layout) on the Device View
+bool DetailView::devicesHaveFocus (const juce::Component* focused) const
+{
+    return chain != nullptr && chain->isVisible() && ui::showingOrShot (*chain) && focused != nullptr && (focused == chain.get() || chain->isParentOf (focused));
+}
+bool DetailView::canEditDevice (EditCommand command) const
+{
+    return chain != nullptr && chain->isVisible() && ui::showingOrShot (*chain) && chain->canEdit ((DeviceChain::EditCommand) command);
+}
+bool DetailView::editDevice (EditCommand command)
+{
+    return chain != nullptr && chain->isVisible() && ui::showingOrShot (*chain) && chain->runEdit ((DeviceChain::EditCommand) command);
+}
 bool DetailView::duplicateCardForCheck (int card) { return chain->duplicateCard (card); }
 bool DetailView::groupCardForCheck (int card, bool ungroup) { return chain->groupCardForCheck (card, ungroup); }
 juce::PopupMenu DetailView::cardMenuForSnapshot (int card)

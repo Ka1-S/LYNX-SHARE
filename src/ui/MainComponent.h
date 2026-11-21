@@ -1006,6 +1006,7 @@ private:
     void refreshSongNotes(); // the song changed: the panels above follow
     bool lanesBeforeClipLaunch = false; // the Automation lanes setting to go back to
     void addLayoutStyleItems (juce::PopupMenu& menu);
+    void addLiveEditItems (juce::PopupMenu& menu); // round gap190og (deviceview-0012): Live's Cut / Copy / Paste / Duplicate / Delete
     std::unique_ptr<juce::Component> clipGridView, clipGridSwitch; // made when Clip-launch workflow is first chosen (round 181a)
     // round 190ef: the map modes' overlay and Mapping Browser (made when a map mode is first switched on), and the
     // computer keys held that fired a key mapping (their release fires it again)

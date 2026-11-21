@@ -10023,6 +10023,52 @@ void MainComponent::setTweakedValue (const AutomationTarget& target, float value
     engine.noteTweaked (target);
 }
 
+// Round gap190og (coverage live4:deviceview-0012): the Clip-launch layout's Edit menu has Live's second block, Cut Ctrl+X,
+// Copy Ctrl+C, Paste Ctrl+V, Duplicate Ctrl+D, Delete Del [SHOT /mnt/e/lynx-work/live190gu/screens-live/live-edit-menu.png].
+// They act where the keyboard is, as the keys do: on the Device View's selected device ("Edit menu commands such as cut,
+// copy, paste, and duplicate can be used on devices. Pasted devices are inserted in front of the selected device", Live 12
+// manual) — also when nothing in the window has the keyboard and the Device View shows — otherwise on the focused view
+// (the clip grid's slot, the Playlist...), through its own key handling.
+void MainComponent::addLiveEditItems (juce::PopupMenu& menu)
+{
+    menu.addSeparator();
+    const juce::Component::SafePointer<juce::Component> focused (juce::Component::getCurrentlyFocusedComponent());
+    const auto inside = focused != nullptr && (focused.getComponent() == this || isParentOf (focused.getComponent()));
+    const auto devices = detailView != nullptr
+                      && (detailView->devicesHaveFocus (focused.getComponent())
+                          || (! inside && detailView->isVisible() && ui::showingOrShot (*detailView) && detailView->getPage() == DetailView::Page::devices));
+    using C = DetailView::EditCommand;
+    struct Item
+    {
+        const char* text;
+        const char* key;
+        C command;
+        juce::KeyPress press;
+    };
+    const auto ctrl = juce::ModifierKeys::commandModifier;
+    const Item items[] = { { TR_NOOP ("Cut"), "Ctrl+X", C::cut, juce::KeyPress ('x', ctrl, 0) },
+                           { TR_NOOP ("Copy"), "Ctrl+C", C::copy, juce::KeyPress ('c', ctrl, 0) },
+                           { TR_NOOP ("Paste"), "Ctrl+V", C::paste, juce::KeyPress ('v', ctrl, 0) },
+                           { TR_NOOP ("Duplicate"), "Ctrl+D", C::duplicate, juce::KeyPress ('d', ctrl, 0) },
+                           { TR_NOOP ("Delete"), "Del", C::remove, juce::KeyPress (juce::KeyPress::deleteKey) } };
+    for (const auto& item : items)
+    {
+        const auto enabled = devices ? detailView->canEditDevice (item.command) : inside;
+        menu.addItem (tr (item.text) + "\t" + item.key, enabled, false, [this, focused, devices, command = item.command, press = item.press] {
+            if (devices)
+            {
+                if (detailView != nullptr)
+                    detailView->editDevice (command);
+                return;
+            }
+            for (auto* c = focused.getComponent(); c != nullptr; c = c->getParentComponent())
+                if (c->keyPressed (press))
+                    return;
+        });
+    }
+    menu.addSeparator();
+}
+
 juce::StringArray MainComponent::getMenuBarNames()
 {
     // FL's menu bar order (REA round 139): FILE EDIT ADD PATTERNS VIEW OPTIONS TOOLS HELP
@@ -10366,6 +10412,8 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
                 menu.addItem ((redoItem.step >= 0 ? tr ("Redo {0}", { stepName (redoItem.step) }) : tr ("Nothing to redo")) + shortcutText (redoItem.action),
                               redoItem.enabled, false, [this] { undoRedo (true); });
         }
+        if (layoutStyle == layoutstyle::Style::clipLaunch) // (round gap190og: Live's Edit block after Undo / Redo)
+            addLiveEditItems (menu);
         menu.addItem (tr ("Undo history...") + shortcutText ("edit.history"), [this] { showHistory(); });
         menu.addItem (tr ("Audio editor..."), [this] { openAudioEditor (engine); });
         menu.addSeparator();
