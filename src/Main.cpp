@@ -129,6 +129,8 @@
 #include "ui/TiltViewport.h"
 #if JUCE_LINUX
  #include <dlfcn.h> // (round 190ou: --hwheel254test presses X11 buttons through XTest)
+ #include <sys/prctl.h> // (round 190ou: --multieditor255test LYNX_ME_PTRACE=1)
+ #include <unistd.h>
 #endif
 #include "engine/HostingTests.h"
 #include "core/EdisonFx.h"
@@ -1913,6 +1915,18 @@ public:
             // LYNX.exe --claprestarttest "LYNX Test Restart.clap" report.txt (tools/testplugin/lynx_test_restart.c)
             const auto i = args.indexOf ("--claprestarttest");
             runClapRestartTest (args[i + 1].unquoted(), args[i + 2].unquoted());
+            return;
+        }
+
+        if (args.contains ("--multieditor255test"))
+        {
+            // LYNX --multieditor255test report.txt <plugin>[::Name] ... (round 190ou, issue #255): several plugin editors open
+            // and in use while a keyboard plays; the audio must keep running (src/MultiEditor255Test.inc)
+            const auto i = args.indexOf ("--multieditor255test");
+            juce::StringArray plugins;
+            for (int k = i + 2; k < args.size() && ! args[k].startsWith ("--"); ++k)
+                plugins.add (args[k].unquoted());
+            runMultiEditor255Test (args[i + 1].unquoted(), plugins);
             return;
         }
 
@@ -18915,6 +18929,7 @@ private:
 #include "DetailsShot190mk.inc" // round 190mk
 #include "DetailsShot190mp.inc" // round 190mp
 #include "HWheel254Test.inc" // round 190ou: issue #254, the horizontal wheel
+#include "MultiEditor255Test.inc" // round 190ou: issue #255, several plugin editors in use
 #include "DetailsShot190mr.inc" // round 190mr
 #include "DetailsShot190mv.inc" // round 190mv
 #include "DetailsShot190my.inc" // round 190my
