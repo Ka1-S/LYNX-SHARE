@@ -5285,6 +5285,11 @@ public: // (the class stays public from here, as before)
             gbEnvelopeDrag (e, activeLayout().items[(std::size_t) dragItem]);
             return;
         }
+        if (gbScratching) // round 190oa (DP-8): the scratch dial
+        {
+            gbScratchDrag (e);
+            return;
+        }
         if (portDragStart >= -1 && dragItem >= 0) // round 190ez: Pitcher's MIDI port, one number per 11 px (FL: 33 px up
         {                                         // took "..." to 2, live FL check 190ew)
             const auto port = juce::jlimit (-1, 255, portDragStart + (int) std::floor ((portDragY - e.position.y) / 11.0f));
@@ -5369,6 +5374,8 @@ public: // (the class stays public from here, as before)
         if (kind == EffectKind::fruityLimiter) // (round 190mf, DP-26: the knee curve goes with the release)
             juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<juce::Component> (this)] { if (safe != nullptr) safe->repaint(); });
         tpSpeedDragging = false;
+        limSpeedDragging = maxSpeedDragging = vocDragging = false; // (round 190oa)
+        vocLastColumn = -1;
         if (std::exchange (mbSpeedDragging, false)) // round 190mk (DP-30)
         {
             dragItem = -1;
@@ -5414,6 +5421,11 @@ public: // (the class stays public from here, as before)
         if (gbDragging) // round 168m
         {
             gbEnvelopeUp();
+            dragItem = -1;
+        }
+        if (gbScratching) // round 190oa (DP-8): released, the dial springs back
+        {
+            gbScratchUp();
             dragItem = -1;
         }
         tuneKeyRelease(); // LYNX Tune's keyboard without LATCH: the edit lasts while the key is held
@@ -5721,6 +5733,11 @@ private:
         if (index < 0)
             return;
         const auto& item = activeLayout().items[(std::size_t) index];
+        if (kind == EffectKind::grossBeat && isGbItem (item, "gbjog")) // round 190oa (DP-8): the scratch dial
+        {
+            gbScratchWheel (wheel);
+            return;
+        }
         if (isWaveShaperGraph (item) || isGbAny (item) || isMaximusCurve (item) || isPhilterCurve (item))
             return;
         if (item.type == Item::display && juce::String (item.display) == "tssenvelope") // FL's envelope view speed

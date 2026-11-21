@@ -29,6 +29,46 @@
     int gbDragPoint = -1, gbDragTension = -1, gbHoverPoint = -1, gbHoverHandle = -1;
     int gbHoverCell = -1; // the slot under the mouse in a grid (kind × 36 + slot)
     bool gbDragging = false;
+    // round 190oa (DP-8; FL manual "click on the clock-dial and move your mouse up/down", REA 190oa R5: TScratchWheel,
+    // parameter 8, released = back to no offset): the scratch dial's drag
+    bool gbScratching = false;
+    float gbScratchFromY = 0.0f, gbScratchFrom = 0.0f;
+    // capture 190oa C4: 22 px down = "-000:00:033", 42 px = "-000:00:063" (≈ 1.5 ticks of 96 a beat per px): the whole
+    // offset (two bars = 768 ticks) in ≈ 512 px
+    static constexpr float gbScratchPixels = 512.0f;
+    // FL's hint value while held: the offset back in bars:beats:ticks (96 a beat), "-000:00:033"
+    juce::String gbScratchText() const
+    {
+        const auto ticks = juce::roundToInt (gbScratchValue() * 768.0f);
+        return "-" + juce::String (ticks / 384).paddedLeft ('0', 3) + ":" + juce::String ((ticks % 384) / 96).paddedLeft ('0', 2) + ":"
+               + juce::String (ticks % 96).paddedLeft ('0', 3);
+    }
+    float gbScratchValue() const { return current() != nullptr ? current()->params[(std::size_t) grossbeat::scratchParam] : 0.0f; }
+    void gbScratchDrag (const juce::MouseEvent& e)
+    {
+        // down = further back in time (FL's raw falls from 65536, LYNX's value rises from 0)
+        setValue (grossbeat::scratchParam, juce::jlimit (0.0f, 1.0f, gbScratchFrom + (e.position.y - gbScratchFromY) / (gbScratchPixels * scale())));
+        repaintGbDial();
+    }
+    void gbScratchUp()
+    {
+        gbScratching = false;
+        if (gbScratchValue() != 0.0f) // FL's mouse-up: the dial springs back (the audio glides back through the smoothers)
+            setValue (grossbeat::scratchParam, 0.0f);
+        repaintGbDial();
+    }
+    void gbScratchWheel (const juce::MouseWheelDetails& wheel) // FL: ±0x800 of 0x10000 a notch
+    {
+        const auto up = (wheel.deltaY > 0.0f) != wheel.isReversed;
+        setValue (grossbeat::scratchParam, juce::jlimit (0.0f, 1.0f, gbScratchValue() + (up ? -1.0f : 1.0f) / 32.0f));
+        repaintGbDial();
+    }
+    void repaintGbDial()
+    {
+        for (const auto& item : activeLayout().items)
+            if (isGbItem (item, "gbjog"))
+                repaint (rectOf (item).getSmallestIntegerContainer().expanded (2));
+    }
     std::vector<grossbeat::EditPoint> gbDragPoints;
     float gbTensionStart = 0.0f, gbTensionSign = 1.0f;
     float gbLastTension = 0.0f; // FL gives a new point the tension used last (editor field 0x15dc)
@@ -1399,6 +1439,17 @@
     {
         if (gbFocusOnClick && getWantsKeyboardFocus()) // round 190mk: Options › Focus on click (any click takes the keys)
             grabKeyboardFocus();
+        if (isGbItem (item, "gbjog")) // round 190oa (DP-8): the scratch dial
+        {
+            if (gbState().options[7] == 0 || ! e.mods.isLeftButtonDown())
+                return false;
+            gbScratching = true;
+            gbScratchFromY = e.position.y;
+            gbScratchFrom = gbScratchValue();
+            dragItem = index;
+            repaintGbDial();
+            return true;
+        }
         if (item.type == Item::radio && item.param != nullptr) // FL: a click in a slot grid shows that slot's envelope
         {
             gbSelected.clear(); // (round 190mf: another slot's points)
@@ -1535,6 +1586,8 @@
 
     juce::String gbHint (const LayoutItem& item, juce::Point<float> p) const
     {
+        if (isGbItem (item, "gbjog")) // round 190oa (DP-8): FL's hint, with LYNX's gestures
+            return tr ("Time offset (scratching)") + "  " + tr ("[LMB] drag up / down to scratch (released, it springs back)  [Wheel] step");
         if (isGbItem (item, "gbopts"))
             return tr ("Options: trigger slots from MIDI notes (time slots: keys C5 to B7, volume slots: C2 to B4), click reduction, attack compensation, DC offset, HQ resampling, scratching clock; MIDI input port");
         if (isGbItem (item, "gbtools"))
@@ -1621,6 +1674,17 @@
                 const auto a = juce::MathConstants<float>::twoPi * (float) i / 12.0f;
                 g.setColour (i == 0 ? (fx.enabled ? accent : colour::textSecondary) : colour::textDisabled);
                 g.fillEllipse (juce::Rectangle<float> (4.0f * s, 4.0f * s).withCentre ({ c.x + std::sin (a) * radius * 0.85f, c.y - std::cos (a) * radius * 0.85f }));
+            }
+            // round 190oa (DP-8; REA 190oa R5, FL's TScratchWheel paint): turned back from no offset, an arc from the top
+            // over raw / 65536 of the turn (white while the dial is held), the indicator at its end
+            if (const auto turned = gbScratchValue(); turned > 0.0f)
+            {
+                const auto turn = 1.0f - turned, end = -juce::MathConstants<float>::twoPi * turn;
+                juce::Path arc;
+                arc.addCentredArc (c.x, c.y, radius * 0.62f, radius * 0.62f, 0.0f, 0.0f, end, true);
+                g.setColour (gbScratching ? juce::Colours::white : (fx.enabled ? accent : colour::textSecondary));
+                g.strokePath (arc, juce::PathStrokeType (juce::jmax (1.5f, 2.0f * s)));
+                g.fillEllipse (juce::Rectangle<float> (5.0f * s, 5.0f * s).withCentre ({ c.x + std::sin (end) * radius * 0.62f, c.y - std::cos (end) * radius * 0.62f }));
             }
             // round 190lx (DP-9): FL's read-position ring (1 px, ~11 px across) while playing, counter-clockwise with the delay
             if (const auto deg = gbDialAngle (gbLive); deg >= 0.0f)

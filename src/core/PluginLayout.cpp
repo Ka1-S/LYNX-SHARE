@@ -756,6 +756,7 @@ Layout grossBeat()
     v.push_back (display (298, 529, 532, 30, "gbslot"));
     l.editedElsewhere.push_back ("Time slot"); // the slot grids
     l.editedElsewhere.push_back ("Volume slot");
+    l.editedElsewhere.push_back ("Time offset (scratching)"); // (round 190oa, DP-8: the scratch dial "gbjog")
     return l;
 }
 
