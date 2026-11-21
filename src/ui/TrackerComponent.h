@@ -37,6 +37,8 @@ public:
     int shownPattern() const noexcept;
     // Only these channels (a Simple track's); nullopt = every channel with notes, and the selected one
     void setOnlyChannels (std::optional<std::vector<int>> channels);
+    // The cursor to the track of `channel` (when it has one), scrolled into view (round 190ob).
+    void showChannel (int channel);
 
     // User settings (ui-options.txt: trackerHex, trackerOctave, trackerStep, trackerFollow)
     static inline bool hex = true;
@@ -57,6 +59,27 @@ public:
     double paintBenchMs (int frames);
     double paintRowsBenchMs (int frames); // a playhead step: two rows
     int rowsRepaintedForCheck() const noexcept { return lastRowsRepainted; }
+    // round 190ob: the bench's frames, each painted whole into a 1:1 image: the median wall time and the median of the
+    // instructions the thread retires (-1: no counter), and the last frame's pixels (a hash)
+    enum class BenchFrame
+    {
+        same,     // the same frame again (nothing moved)
+        scroll,   // one row further down each frame (wheel / follow scrolling)
+        uncached, // the row-chunk cache emptied before each frame (the first frame of a view, fractional scales)
+        edit,     // one track's chunks dropped before each frame (what an edit in that track repaints)
+        playhead  // the two rows of a playhead step (not a whole frame)
+    };
+    struct BenchResult
+    {
+        double ms = 0.0;
+        long long instructions = -1;
+        std::uint64_t pixels = 0;
+    };
+    BenchResult paintBench (BenchFrame kind, int frames);
+    // one whole frame's pixels (a hash) with the row-chunk cache used or bypassed: the two must be identical
+    std::uint64_t framePixelsForCheck (bool cached);
+    void scrollToRowForCheck (std::int64_t row);
+    size_t cachedChunksForCheck() const noexcept;
 
     void paint (juce::Graphics& g) override;
     void resized() override;
@@ -87,8 +110,9 @@ private:
     friend struct Impl;
 };
 
-// The tool window (one): opens it, or brings it to the front, on `pattern` (-1: the current pattern, which it follows).
-void openTracker (AudioEngine& engine, int pattern = -1);
+// The tool window (one): opens it, or brings it to the front, on `pattern` (-1: the current pattern, which it follows);
+// `channel` >= 0: the cursor goes to that channel's track (round 190ob: the Channel rack's "Edit in tracker").
+void openTracker (AudioEngine& engine, int pattern = -1, int channel = -1);
 void closeTracker();
 bool isTrackerOpen();
 // The window's editor on its own (for --snapshot style captures).

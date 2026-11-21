@@ -3126,6 +3126,20 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
         if (onOpenPianoRoll)
             onOpenPianoRoll();
     });
+    // round 190ob (LYNX's own, beside FL's Piano roll: the other view of the same notes): the Tracker on this channel's
+    // track (the channel is selected first when it is not, so it has a track even without notes)
+    menu.addItem (tr ("Edit in tracker") + (actionKeyText ? actionKeyText ("view.tracker") : juce::String()), [this, channel] {
+        if (channel >= (int) engine.getSong().channels.size())
+            return;
+        const auto& selected = engine.getSelectedChannels();
+        if (std::find (selected.begin(), selected.end(), channel) == selected.end())
+        {
+            selectionAnchor = channel;
+            selectRows ({ channel }, channel);
+        }
+        if (onOpenTracker)
+            onOpenTracker (channel);
+    });
     menu.addItem (tr ("Graph editor") + "\tCtrl+K", true, graphLanes, [this] { toggleGraphLanes(); });
     menu.addSeparator();
     menu.addItem (theme::mnemonic (tr ("Rename, color and icon..."), 'R') + "\tF2", [this, channel] { rename (channel); }); // (FL's text, round 190ng)

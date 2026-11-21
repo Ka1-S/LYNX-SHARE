@@ -1,7 +1,8 @@
-/* LYNX addition (round 190nw, not part of libxmp-lite 4.7.4; MIT like the library): three read-only facts the module
- * import needs that libxmp keeps in its internal context and does not publish through xmp.h. */
+/* LYNX addition (round 190nw, not part of libxmp-lite 4.7.4; MIT like the library): read-only facts the module import
+ * needs that libxmp keeps in its internal context and does not publish through xmp.h. */
 
 #include "common.h"
+#include "player.h"
 #include "lynx_xmp_extra.h"
 
 double libxmp_get_frame_time(struct context_data *ctx);
@@ -38,4 +39,15 @@ int lynx_xmp_sustain_loop(xmp_context opaque, int smp, int *start, int *end)
 	*start = m->xtra[smp].sus;
 	*end = m->xtra[smp].sue;
 	return *end > *start;
+}
+
+/* Round 190ob: 1 when the sample of module channel `chn` has played to its end (libxmp then reports its volume as 0:
+ * the note is silent because its sample ended, not because its volume changed), else 0. */
+int lynx_xmp_sample_ended(xmp_context opaque, int chn)
+{
+	struct context_data *ctx = (struct context_data *)opaque;
+	struct player_data *p = &ctx->p;
+	if (p->xc_data == NULL || chn < 0 || chn >= ctx->m.mod.chn)
+		return 0;
+	return (p->xc_data[chn].note_flags & NOTE_SAMPLE_END) != 0;
 }

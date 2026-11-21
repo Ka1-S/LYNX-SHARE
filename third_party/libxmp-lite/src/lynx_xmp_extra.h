@@ -12,6 +12,7 @@ double lynx_xmp_sample_rate(xmp_context ctx, int smp);
 double lynx_xmp_frame_ms(xmp_context ctx);
 int lynx_xmp_period_type(xmp_context ctx);
 int lynx_xmp_sustain_loop(xmp_context ctx, int smp, int *start, int *end);
+int lynx_xmp_sample_ended(xmp_context ctx, int chn); /* round 190ob */
 
 #ifdef __cplusplus
 }
