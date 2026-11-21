@@ -11,6 +11,7 @@
 #include "core/ScaleDetect.h"
 #include "engine/FlStudio.h"
 #include "ui/ChordStripView.h"
+#include "ui/DialogFrame.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 #include "ui/ToolWindow.h"
@@ -223,7 +224,7 @@ public:
             initChordTool();
 
         title.setText (tr (noteToolTitle (tool)), juce::dontSendNotification);
-        title.setFont (theme::font (theme::type::title, true));
+        ui::dialog::styleTitle (title); // (round 190oo, WG-6: the one dialog title row, centred, 44 px)
         addAndMakeVisible (title);
         info.setFont (theme::font (theme::type::small));
         info.setColour (juce::Label::textColourId, theme::colour::textSecondary);
@@ -233,7 +234,7 @@ public:
         for (auto* b : { &acceptButton, &resetButton, &cancelButton })
             addAndMakeVisible (b);
 
-        acceptButton.setColour (juce::TextButton::buttonColourId, theme::colour::accent);
+        ui::dialog::styleButton (acceptButton, true); // (WG-6: Reset | Cancel | Accept, the one accent button at the far right)
         acceptButton.onClick = [this] { accept(); };
         resetButton.onClick = [this] { resetControls(); };
         cancelButton.onClick = [this] { close(); };
@@ -247,7 +248,7 @@ public:
             addAndMakeVisible (extraButton);
         }
 
-        int height = 92 + 44 + (hasExtraButton() ? rowHeight : 0);
+        int height = 92 + 44 + titleGrowth + (hasExtraButton() ? rowHeight : 0);
         for (const auto& c : controls)
             height += c.kind == Control::header ? headerHeight : c.joinPrevious ? 0 : rowHeight;
         if (stripView != nullptr) // (round 190kd: FL's chord viewer above the options, as wide as FL's tool)
@@ -283,7 +284,7 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        g.fillAll (theme::colour::bg2);
+        ui::dialog::paintFrame (g, getLocalBounds().toFloat(), ui::dialog::Kind::window); // (round 190oo, WG-6)
 
         // section lines under the headers
         g.setColour (theme::colour::border);
@@ -294,8 +295,8 @@ public:
 
     void resized() override
     {
-        auto area = getLocalBounds().reduced (14, 10);
-        title.setBounds (area.removeFromTop (24));
+        title.setBounds (ui::dialog::titleRow (getLocalBounds()));
+        auto area = ui::dialog::bodyOf (getLocalBounds()).reduced (14, 10);
         info.setBounds (area.removeFromTop (36));
         area.removeFromTop (6);
         if (stripView != nullptr)
@@ -343,6 +344,8 @@ public:
 
 private:
     static constexpr int rowHeight = 30, headerHeight = 26;
+    // the title row (WG-6) is 21 px taller than the old 24 px title line under a 10 px margin
+    static constexpr int titleGrowth = ui::dialog::titleRowHeight + 1 - 24;
 
     bool hasExtraButton() const noexcept
     {

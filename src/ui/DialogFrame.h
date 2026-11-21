@@ -7,6 +7,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include "core/DialogRules.h"
 #include "ui/Theme.h"
 
 // One dialog system for LYNX's own dialogs (round 190jp, design190ia slice 20 X-DIALOG = SG-20/21/22 + FW-17).
@@ -44,6 +45,24 @@ inline void paintDim (juce::Graphics& g, juce::Rectangle<int> area)
     g.fillRect (area);
 }
 
+// A horizontal band (the accent strip, a divider) on whole physical pixels (round 190oo, WG-22): at @150 the 3 px strip
+// was 4.5 rows (4 full and one at 50 %) and the 1 px divider a full row and a faint one. The band's rows are rounded to
+// whole device pixels (a 1 px hairline stays one device row per whole scale step: 1 @150, 2 @200); at a whole scale it
+// is the plain fill it always was.
+inline void fillBand (juce::Graphics& g, float x, float y, float width, float height)
+{
+    const auto scale = g.getInternalContext().getPhysicalPixelScaleFactor();
+    if (scale <= 0.0f || std::abs (scale - std::round (scale)) < 0.01f)
+    {
+        g.fillRect (x, y, width, height);
+        return;
+    }
+    juce::Graphics::ScopedSaveState keep (g);
+    g.addTransform (juce::AffineTransform::scale (1.0f / scale)); // (device pixels from here on)
+    const auto left = std::round (x * scale), right = std::round ((x + width) * scale), top = std::round (y * scale);
+    g.fillRect (left, top, right - left, dialogrules::bandRows (height, scale));
+}
+
 // The frame of a dialog card at `card` (body, border, accent strip; the title row's divider when `withTitleRow`).
 inline void paintFrame (juce::Graphics& g, juce::Rectangle<float> card, Kind kind, bool withTitleRow = true)
 {
@@ -74,10 +93,10 @@ inline void paintFrame (juce::Graphics& g, juce::Rectangle<float> card, Kind kin
     if (withTitleRow) // the divider under the title row
     {
         g.setColour (border);
-        g.fillRect (card.getX() + 1.0f, std::round (card.getY()) + (float) titleRowHeight, card.getWidth() - 2.0f, 1.0f);
+        fillBand (g, card.getX() + 1.0f, std::round (card.getY()) + (float) titleRowHeight, card.getWidth() - 2.0f, 1.0f);
     }
     g.setColour (accent); // the brand's strip (Support's, now on every LYNX-own modal), over the frame's top line
-    g.fillRect (card.withHeight ((float) accentStrip));
+    fillBand (g, card.getX(), card.getY(), card.getWidth(), (float) accentStrip);
 }
 
 // The title row of a card (below the strip, above the divider) and the area under it.
@@ -129,6 +148,43 @@ inline juce::AttributedString sentence (const juce::String& text, const juce::St
     s.setWordWrap (juce::AttributedString::byWord);
     s.setLineSpacing (2.0f);
     return s;
+}
+
+// A plain sentence (no name to highlight), wrapped by word as `sentence` wraps.
+inline juce::AttributedString plainSentence (const juce::String& text)
+{
+    juce::AttributedString s;
+    s.append (text, theme::font (theme::type::body), theme::colour::textPrimary);
+    s.setWordWrap (juce::AttributedString::byWord);
+    s.setLineSpacing (2.0f);
+    return s;
+}
+
+// The sentence of a dialog in `area` (laid out in `layout`), after LYNX's round sign when the dialog has an icon.
+inline void paintSentence (juce::Graphics& g, juce::Rectangle<int> area, const juce::TextLayout& layout, juce::MessageBoxIconType icon)
+{
+    if (area.isEmpty())
+        return;
+    auto text = area.toFloat();
+    if (icon != juce::MessageBoxIconType::NoIcon)
+    {
+        // LYNX's round sign (as every alert of the app): ? i !
+        const auto box = text.removeFromLeft (32.0f).withHeight (32.0f);
+        text.removeFromLeft (14.0f);
+        const auto tint = icon == juce::MessageBoxIconType::WarningIcon ? theme::colour::warning
+                          : icon == juce::MessageBoxIconType::InfoIcon  ? theme::colour::info
+                                                                         : theme::colour::accent;
+        g.setColour (tint.withAlpha (0.16f));
+        g.fillEllipse (box);
+        g.setColour (tint);
+        g.setFont (theme::font (18.0f, true));
+        g.drawText (icon == juce::MessageBoxIconType::QuestionIcon ? "?" : icon == juce::MessageBoxIconType::InfoIcon ? "i" : "!", box,
+                    juce::Justification::centred);
+        // a one-line sentence sits on the sign's middle
+        if (layout.getHeight() < 32.0f)
+            text = text.withTrimmedTop ((32.0f - layout.getHeight()) / 2.0f);
+    }
+    layout.draw (g, text);
 }
 
 // A dialog button with FL's underlined access letter (the key that presses it).
@@ -305,28 +361,7 @@ public:
     {
         paintFrame (g, getLocalBounds().toFloat(), Kind::window);
         paintTitle (g, getLocalBounds(), getName());
-        if (textArea.isEmpty())
-            return;
-        auto text = textArea.toFloat();
-        if (hasIcon())
-        {
-            // LYNX's round sign (as every alert of the app): ? i !
-            const auto box = text.removeFromLeft (32.0f).withHeight (32.0f);
-            text.removeFromLeft (14.0f);
-            const auto tint = icon == juce::MessageBoxIconType::WarningIcon ? theme::colour::warning
-                              : icon == juce::MessageBoxIconType::InfoIcon  ? theme::colour::info
-                                                                             : theme::colour::accent;
-            g.setColour (tint.withAlpha (0.16f));
-            g.fillEllipse (box);
-            g.setColour (tint);
-            g.setFont (theme::font (18.0f, true));
-            g.drawText (icon == juce::MessageBoxIconType::QuestionIcon ? "?" : icon == juce::MessageBoxIconType::InfoIcon ? "i" : "!", box,
-                        juce::Justification::centred);
-            // a one-line sentence sits on the sign's middle
-            if (textLayout.getHeight() < 32.0f)
-                text = text.withTrimmedTop ((32.0f - textLayout.getHeight()) / 2.0f);
-        }
-        textLayout.draw (g, text);
+        paintSentence (g, textArea, textLayout, icon);
     }
 
     bool keyPressed (const juce::KeyPress& key) override
@@ -381,5 +416,266 @@ private:
     juce::OwnedArray<Button> buttons;
     std::vector<juce::Component*> contents;
     bool buttonsCentred = false;
+};
+
+// A LYNX dialog made of JUCE's AlertWindow parts (round 190oo, design review 2 WG-6): the windows built with addButton /
+// addTextEditor / addComboBox / addCustomComponent, and JUCE's own message boxes (showMessageBoxAsync, showOkCancelBox,
+// showAsync: theme::LookAndFeel::createAlertWindow makes them as one), on the one dialog frame: the strip and the 44 px
+// title row, the sentence after the round sign, the parts one under the other (centred; a field as wide as the
+// sentence, its label above it), the buttons at the bottom right, exactly one in the accent: the Return one (in a box
+// without a Return button, the first one: the keyboard focus and so Return go there, as in JUCE's own layout).
+// The AlertWindow API stays as it was (getTextEditorContents, getButton, every button's shortcuts and result).
+// The add* calls and setMessage below hide AlertWindow's own (they also lay the window out again): call them on the Alert
+// or its subclass. Order::lynx puts the other buttons first, then the Escape one (Cancel), the Return one (the primary)
+// at the far right; Order::asAdded keeps the order the buttons were added in (FL's message windows: Yes | No).
+class Alert : public juce::AlertWindow
+{
+public:
+    enum class Order
+    {
+        lynx,
+        asAdded
+    };
+
+    Alert (const juce::String& title, const juce::String& message, juce::MessageBoxIconType iconType = juce::MessageBoxIconType::NoIcon,
+           juce::Component* associated = nullptr, int width = 460)
+        : juce::AlertWindow (title, message, iconType, associated), icon (iconType), around (associated), minWidth (width)
+    {
+        if (message.trim().isNotEmpty())
+        {
+            sentenceText = plainSentence (message);
+            sentenceSource = message;
+        }
+        ready = true;
+        relayout();
+    }
+
+    void setButtonOrder (Order o)
+    {
+        order = o;
+        relayout();
+    }
+    void setMinimumWidth (int width)
+    {
+        minWidth = width;
+        relayout();
+    }
+    void setSentence (juce::AttributedString text)
+    {
+        sentenceText = std::move (text);
+        relayout();
+    }
+    void setMessage (const juce::String& text)
+    {
+        juce::AlertWindow::setMessage (text);
+        sentenceSource = text;
+        setSentence (text.trim().isNotEmpty() ? plainSentence (text) : juce::AttributedString());
+    }
+
+    void addButton (const juce::String& name, int returnValue, const juce::KeyPress& key1 = juce::KeyPress(), const juce::KeyPress& key2 = juce::KeyPress())
+    {
+        juce::AlertWindow::addButton (name, returnValue, key1, key2);
+        relayout();
+    }
+    void addTextEditor (const juce::String& name, const juce::String& initialContents, const juce::String& onScreenLabel = {}, bool isPasswordBox = false)
+    {
+        juce::AlertWindow::addTextEditor (name, initialContents, {}, isPasswordBox); // (the frame draws the label)
+        if (auto* e = getTextEditor (name))
+            fields.push_back ({ e, onScreenLabel });
+        relayout();
+    }
+    void addComboBox (const juce::String& name, const juce::StringArray& items, const juce::String& onScreenLabel = {})
+    {
+        juce::AlertWindow::addComboBox (name, items, {});
+        if (auto* c = getComboBoxComponent (name))
+            fields.push_back ({ c, onScreenLabel });
+        relayout();
+    }
+    void addCustomComponent (juce::Component* component)
+    {
+        juce::AlertWindow::addCustomComponent (component);
+        relayout();
+    }
+
+    // Sizes and places everything (it keeps its centre once shown). The add* calls do it; call it after resizing a part.
+    void relayout()
+    {
+        if (! ready)
+            return;
+        std::vector<juce::Component*> parts;
+        juce::Component* accessLabel = nullptr;
+        for (auto* c : getChildren())
+        {
+            if (isAlertButton (c))
+                continue;
+            if (dynamic_cast<juce::Label*> (c) != nullptr && ! isCustom (c))
+                accessLabel = c; // (AlertWindow's invisible message label, for screen readers)
+            else
+                parts.push_back (c);
+        }
+
+        // the buttons: their order, their look, their size
+        int primaryIndex = -1, cancelIndex = -1;
+        for (int i = 0; i < getNumButtons(); ++i)
+            if (auto* b = getButton (i))
+            {
+                if (primaryIndex < 0 && b->isRegisteredForShortcut (juce::KeyPress (juce::KeyPress::returnKey)))
+                    primaryIndex = i;
+                else if (cancelIndex < 0 && b->isRegisteredForShortcut (juce::KeyPress (juce::KeyPress::escapeKey)))
+                    cancelIndex = i;
+            }
+        primaryIndex = dialogrules::primaryButton (getNumButtons(), primaryIndex, cancelIndex);
+        auto* primary = primaryIndex >= 0 ? getButton (primaryIndex) : nullptr;
+        // the keyboard focus goes where JUCE's own layout sent it, whatever the order on screen: the first button added
+        // first (it took Return in the boxes without a Return button), then the others in the order they were added
+        for (int i = 0; i < getNumButtons(); ++i)
+            if (auto* b = getButton (i))
+                b->setExplicitFocusOrder (i + 1);
+        std::vector<juce::Button*> row;
+        for (const auto i : dialogrules::buttonOrder (getNumButtons(), primaryIndex, cancelIndex, order == Order::asAdded))
+            if (auto* b = getButton (i))
+                row.push_back (b);
+        auto width = minWidth;
+        auto rowWidth = -buttonGap;
+        for (auto* b : row)
+        {
+            styleButton (*b, b == primary);
+            const auto text = juce::GlyphArrangement::getStringWidth (theme::font (theme::type::body), b->getButtonText());
+            b->setSize (juce::jmax (minButtonWidth, (int) std::ceil (text) + 32), buttonHeight);
+            rowWidth += b->getWidth() + buttonGap;
+        }
+        width = juce::jmax (width, rowWidth + 2 * padding);
+        for (auto* c : parts)
+            if (! isField (c))
+                width = juce::jmax (width, c->getWidth() + 2 * padding);
+        const auto sign = icon != juce::MessageBoxIconType::NoIcon;
+        if (sentenceText.getNumAttributes() > 0 && sentenceSource.isNotEmpty())
+        {
+            // a word the text width can't hold (a file path) widens the window, up to 720 px, as JUCE's own grew
+            float widest = 0.0f;
+            for (const auto& word : juce::StringArray::fromTokens (sentenceSource, " \t\r\n", {}))
+                widest = juce::jmax (widest, juce::GlyphArrangement::getStringWidth (theme::font (theme::type::body), word));
+            width = juce::jmax (width, juce::jmin (720, (int) std::ceil (widest) + 4 + 2 * padding + (sign ? 46 : 0)));
+        }
+
+        // top to bottom: the title row, the sentence, the parts, the buttons
+        const auto inner = width - 2 * padding;
+        auto y = titleRowHeight + 1 + 20;
+        textArea = {};
+        if (sentenceText.getNumAttributes() > 0)
+        {
+            textLayout.createLayout (sentenceText, (float) (inner - (sign ? 46 : 0)));
+            const auto h = juce::jmax (sign ? 32 : 0, (int) std::ceil (textLayout.getHeight()));
+            textArea = { padding, y, inner, h };
+            y += h + 16;
+        }
+        if (accessLabel != nullptr)
+            accessLabel->setBounds (textArea);
+        for (auto* c : parts)
+        {
+            if (labelOf (c).isNotEmpty() || (isCustom (c) && c->getName().isNotEmpty()))
+                y += 18;
+            if (isField (c))
+            {
+                c->setBounds (padding, y, inner, 26);
+                y += 26 + 10;
+            }
+            else
+            {
+                c->setTopLeftPosition ((width - c->getWidth()) / 2, y);
+                y += c->getHeight() + 10;
+            }
+        }
+        y += parts.empty() ? 8 : 10;
+        if (! row.empty())
+            y += buttonHeight;
+        y += 20;
+        // (as JUCE's own: never taller than the screen; the buttons stay at the bottom)
+        auto height = y;
+        if (getParentComponent() == nullptr && getParentHeight() > 200)
+            height = juce::jmin (height, getParentHeight() - 50);
+
+        if (isVisible())
+            setBounds (getBounds().withSizeKeepingCentre (width, height));
+        else
+            centreAroundComponent (around, width, height);
+        auto x = width - padding;
+        for (auto it = row.rbegin(); it != row.rend(); ++it)
+        {
+            x -= (*it)->getWidth();
+            (*it)->setTopLeftPosition (x, height - 20 - buttonHeight);
+            x -= buttonGap;
+        }
+        repaint();
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        paintFrame (g, getLocalBounds().toFloat(), Kind::window);
+        paintTitle (g, getLocalBounds(), getName());
+        paintSentence (g, textArea, textLayout, icon);
+        // the labels above the fields (and above a named part, as AlertWindow draws them)
+        g.setColour (theme::colour::textSecondary);
+        g.setFont (theme::font (theme::type::small));
+        for (const auto& f : fields)
+            if (f.label.isNotEmpty() && f.part->isVisible())
+                g.drawFittedText (f.label, f.part->getX(), f.part->getY() - 17, f.part->getWidth(), 15, juce::Justification::centredLeft, 1);
+        for (int i = 0; i < getNumCustomComponents(); ++i)
+            if (auto* c = getCustomComponent (i); c != nullptr && c->isVisible() && c->getName().isNotEmpty())
+                g.drawFittedText (c->getName(), c->getX(), c->getY() - 17, c->getWidth(), 15, juce::Justification::centredLeft, 1);
+    }
+
+    void lookAndFeelChanged() override
+    {
+        juce::AlertWindow::lookAndFeelChanged(); // (JUCE's own layout sizes the window: ours follows)
+        relayout();
+    }
+
+private:
+    struct Field
+    {
+        juce::Component* part;
+        juce::String label;
+    };
+
+    bool isAlertButton (const juce::Component* c) const
+    {
+        for (int i = 0; i < getNumButtons(); ++i)
+            if (getButton (i) == c)
+                return true;
+        return false;
+    }
+    bool isCustom (const juce::Component* c) const
+    {
+        for (int i = 0; i < getNumCustomComponents(); ++i)
+            if (getCustomComponent (i) == c)
+                return true;
+        return false;
+    }
+    bool isField (const juce::Component* c) const
+    {
+        for (const auto& f : fields)
+            if (f.part == c)
+                return true;
+        return false;
+    }
+    juce::String labelOf (const juce::Component* c) const
+    {
+        for (const auto& f : fields)
+            if (f.part == c)
+                return f.label;
+        return {};
+    }
+
+    juce::MessageBoxIconType icon;
+    juce::Component* around;
+    int minWidth;
+    Order order = Order::lynx;
+    bool ready = false;
+    juce::AttributedString sentenceText;
+    juce::String sentenceSource; // (the plain text of a sentence made from a string: its longest word sizes the window)
+    juce::TextLayout textLayout;
+    juce::Rectangle<int> textArea;
+    std::vector<Field> fields;
 };
 } // namespace lynx::ui::dialog

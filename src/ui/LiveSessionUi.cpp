@@ -9,6 +9,7 @@
 #include "ui/LiveChat.h"
 #include "ui/LiveRemoteUi.h"
 #include "ui/PluginWindow.h"
+#include "ui/DialogFrame.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
@@ -203,9 +204,11 @@ void leave (Context c)
                                         }));
 }
 
+// (round 190oo, WG-6: both on the one dialog frame, ui::dialog::Alert: the leave / keep answer left, the Return one in
+// the accent at the far right)
 std::unique_ptr<juce::AlertWindow> makeRejoinDialog (const juce::String& hostName, const juce::String& when)
 {
-    auto w = std::make_unique<juce::AlertWindow> (
+    auto w = std::make_unique<ui::dialog::Alert> (
         tr ("Go back into the live session"),
         (hostName.isNotEmpty() ? tr ("LYNX SHARE closed while you were in {0}'s live session ({1}).", { hostName, when })
                                : tr ("LYNX SHARE closed while you were in a live session ({0}).", { when }))
@@ -219,7 +222,7 @@ std::unique_ptr<juce::AlertWindow> makeRejoinDialog (const juce::String& hostNam
 std::unique_ptr<juce::AlertWindow> makeMediaLimitDialog (const juce::String& name, juce::int64 used, juce::int64 limit)
 {
     auto size = [] (juce::int64 bytes) { return juce::String::fromUTF8 (lynx::live::mediaSize (bytes).c_str()); };
-    auto w = std::make_unique<juce::AlertWindow> (
+    auto w = std::make_unique<ui::dialog::Alert> (
         tr ("Live session"),
         tr ("{0} has sent {1} of audio files into this session; the limit for one guest is {2}. Their newest files are waiting on their computer.",
             { name, size (used), size (limit) })

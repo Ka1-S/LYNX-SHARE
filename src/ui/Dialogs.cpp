@@ -11,6 +11,7 @@
 #include "engine/AudioEngine.h"
 #include "engine/MidiFileIo.h"
 #include "ui/ColourPicker.h"
+#include "ui/DialogFrame.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 #include "ui/TrackIcons.h"
@@ -86,13 +87,14 @@ private:
     juce::Rectangle<int> cell (int i) const { return { 2 + i * (size + gap), 2, size, size }; }
 };
 
-class NameAndColourWindow final : public juce::AlertWindow
+// (round 190oo, WG-6: on the one dialog frame, ui::dialog::Alert: title row, Cancel | OK with OK in the accent)
+class NameAndColourWindow final : public ui::dialog::Alert
 {
 public:
     // `icon` (FL's index, 0 = none; -1 = no icon section): issue #220 (round 190ng), FL's "Rename, color and icon" sets the
     // icon in the same window (FL: its Icon button, F5); LYNX shows its icon picker with the search box under the colours
     NameAndColourWindow (const juce::String& title, const juce::String& name, std::uint32_t colour, int icon = -1)
-        : juce::AlertWindow (title, {}, juce::MessageBoxIconType::NoIcon), swatches (colour)
+        : ui::dialog::Alert (title, {}, juce::MessageBoxIconType::NoIcon, nullptr, 400), swatches (colour)
     {
         addTextEditor ("name", name, tr ("Name"));
         addCustomComponent (&swatches);
@@ -147,7 +149,7 @@ public:
             return true;
         }
 
-        return juce::AlertWindow::keyPressed (key);
+        return ui::dialog::Alert::keyPressed (key);
     }
 
     std::uint32_t colour() const { return swatches.colour; }
@@ -221,11 +223,13 @@ private:
     juce::String noteText;
 };
 
-class RecordChoiceWindow final : public juce::AlertWindow
+// (round 190oo, WG-6: on the one dialog frame, ui::dialog::Alert; Cancel stays a secondary button: the choices are the
+// big buttons)
+class RecordChoiceWindow final : public ui::dialog::Alert
 {
 public:
     RecordChoiceWindow()
-        : juce::AlertWindow (tr ("Recording"), tr ("What would you like to record?"), juce::MessageBoxIconType::NoIcon)
+        : ui::dialog::Alert (tr ("Recording"), tr ("What would you like to record?"), juce::MessageBoxIconType::NoIcon, nullptr, 400)
     {
         dontAsk.setButtonText (tr ("Don't ask again (right-click the record button for the recording filter)"));
         // as wide as the longest text needs (round 190cj), within the choices' limits; longer notes wrap
@@ -307,11 +311,12 @@ public:
     }
 };
 
-class MidiImportWindow final : public juce::AlertWindow
+// (round 190oo, WG-6: on the one dialog frame, ui::dialog::Alert: the file name as its sentence, Cancel | Accept)
+class MidiImportWindow final : public ui::dialog::Alert
 {
 public:
     MidiImportWindow (const juce::String& fileName, const midiimport::ParsedMidi& midi, const midiimport::Options& o, bool pianoRoll, bool eventLane = false)
-        : juce::AlertWindow (tr ("Import MIDI data"), fileName, juce::MessageBoxIconType::NoIcon),
+        : ui::dialog::Alert (tr ("Import MIDI data"), fileName, juce::MessageBoxIconType::NoIcon, nullptr, 400),
           roll (pianoRoll),
           lane (eventLane),
           kept (o)
@@ -688,11 +693,12 @@ private:
     juce::TextButton toLast, swap, toFirst;
 };
 
-class GradientWindow final : public juce::AlertWindow
+// (round 190oo, WG-6: on the one dialog frame, ui::dialog::Alert; FL's row: Reset all on the left, Accept at the far right)
+class GradientWindow final : public ui::dialog::Alert
 {
 public:
     GradientWindow (juce::Colour first, juce::Colour last, int count)
-        : juce::AlertWindow (tr ("Gradient editor"), {}, juce::MessageBoxIconType::NoIcon), panel (first, last, count)
+        : ui::dialog::Alert (tr ("Gradient editor"), {}, juce::MessageBoxIconType::NoIcon, nullptr, 400), panel (first, last, count)
     {
         addCustomComponent (&panel);
         hint.setText (tr ("Click First or Last, then pick its color below"), juce::dontSendNotification);
@@ -756,14 +762,15 @@ std::unique_ptr<juce::AlertWindow> makeGradientColourDialog (juce::Colour first,
 
 namespace
 {
-class SamplePitchWindow final : public juce::AlertWindow
+// (round 190oo, WG-6: on the one dialog frame, ui::dialog::Alert: Reset | Cancel | OK, OK in the accent at the far right)
+class SamplePitchWindow final : public ui::dialog::Alert
 {
 public:
     SamplePitchWindow (float pitch, bool keepLength, bool audioClip)
-        : juce::AlertWindow (tr ("Pitch"),
+        : ui::dialog::Alert (tr ("Pitch"),
                              audioClip ? tr ("Transposes this audio clip's file (every clip of it follows).")
                                        : tr ("Transposes the sample. The Piano Roll's keys still play it chromatically around its root note."),
-                             juce::MessageBoxIconType::NoIcon)
+                             juce::MessageBoxIconType::NoIcon, nullptr, 420)
     {
         const auto semitones = (int) std::lround (pitch);
         const auto cents = (int) std::lround ((pitch - (float) semitones) * 100.0f);
@@ -837,36 +844,30 @@ namespace lynx
 {
 namespace
 {
-// FL's message text: "|bar-delimited|" words in the accent colour, wrapped at the window's width
-class FlMessageText final : public juce::Component
+// FL's message text: "|bar-delimited|" words in the accent colour (wrapped at the window's width by the dialog)
+juce::AttributedString flMessageSentence (const juce::String& text)
 {
-public:
-    explicit FlMessageText (const juce::String& text)
-    {
-        const auto parts = juce::StringArray::fromTokens (text, "|", {});
-        for (int i = 0; i < parts.size(); ++i)
-            layoutText.append (parts[i], theme::font (theme::type::body), i % 2 == 1 ? theme::colour::accent : theme::colour::textPrimary);
-        layoutText.setWordWrap (juce::AttributedString::byWord);
-        layoutText.setJustification (juce::Justification::topLeft);
-        juce::TextLayout layout;
-        layout.createLayout (layoutText, (float) width);
-        setSize (width, (int) std::ceil (layout.getHeight()) + 8);
-    }
-
-    void paint (juce::Graphics& g) override { layoutText.draw (g, getLocalBounds().toFloat().withTrimmedTop (2.0f)); }
-
-private:
-    static constexpr int width = 380;
     juce::AttributedString layoutText;
-};
+    const auto parts = juce::StringArray::fromTokens (text, "|", {});
+    for (int i = 0; i < parts.size(); ++i)
+        layoutText.append (parts[i], theme::font (theme::type::body), i % 2 == 1 ? theme::colour::accent : theme::colour::textPrimary);
+    layoutText.setWordWrap (juce::AttributedString::byWord);
+    layoutText.setJustification (juce::Justification::topLeft);
+    return layoutText;
+}
 
-class FlMessageWindow final : public juce::AlertWindow
+// (round 190oo, WG-6: on the one dialog frame, ui::dialog::Alert: the title row, the text after the round sign; the
+// buttons keep FL's order, Yes | No, the first one (Return) in the accent)
+class FlMessageWindow final : public ui::dialog::Alert
 {
 public:
+    static constexpr int textWidth = 380;
+
     explicit FlMessageWindow (const FlMessage& m)
-        : juce::AlertWindow (m.title, {}, m.icon), text (m.text)
+        : ui::dialog::Alert (m.title, {}, m.icon, nullptr, rowWidth (m) + 2 * ui::dialog::padding)
     {
-        addCustomComponent (&text);
+        setButtonOrder (Order::asAdded);
+        setSentence (flMessageSentence (m.text));
         for (int i = 0; i < m.options.size(); ++i) // (round 190jv: FL's exclusive choices; one is always ticked)
         {
             auto* b = choices.add (new juce::ToggleButton (m.options[i]));
@@ -874,7 +875,7 @@ public:
             // custom component above it, so the name goes)
             b->setName ({});
             b->getProperties().set ("lynxRadio", true);
-            b->setSize (text.getWidth(), 26);
+            b->setSize (rowWidth (m), 26);
             b->setRadioGroupId (190);
             b->setClickingTogglesState (true);
             b->setToggleState (i == juce::jlimit (0, m.options.size() - 1, m.option), juce::dontSendNotification);
@@ -888,7 +889,7 @@ public:
                 b->setSize (220, 28);
                 b->onClick = [this, i] { exitModalState (i + 1); };
                 auto* row = rows.add (new juce::Component());
-                row->setSize (text.getWidth(), 32);
+                row->setSize (rowWidth (m), 32);
                 row->addAndMakeVisible (b);
                 b->setTopLeftPosition ((row->getWidth() - b->getWidth()) / 2, 2);
                 addCustomComponent (row);
@@ -899,7 +900,7 @@ public:
             remember.setButtonText (tr ("Remember my choice"));
             // issue #221 (round 190ng): only Yes is remembered; this says where to undo it
             remember.setTooltip (tr ("Only Yes is remembered. Settings › General › Manage messages asks again"));
-            remember.setSize (text.getWidth(), 26);
+            remember.setSize (rowWidth (m), 26);
             addCustomComponent (&remember);
         }
         if (m.buttons.size() <= 2)
@@ -919,7 +920,9 @@ public:
     }
 
 private:
-    FlMessageText text;
+    // the rows under the text: as wide as the text and its sign
+    static int rowWidth (const FlMessage& m) { return textWidth + (m.icon != juce::MessageBoxIconType::NoIcon ? 46 : 0); }
+
     juce::OwnedArray<juce::ToggleButton> choices;
     juce::OwnedArray<juce::TextButton> stacked;
     juce::OwnedArray<juce::Component> rows;

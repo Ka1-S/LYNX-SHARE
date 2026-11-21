@@ -31,6 +31,7 @@
 #include "core/UiFontChoice.h"
 #include "platform/Paths.h"
 #include "ui/CondensedFontData.h"
+#include "ui/DialogFrame.h"
 #include "ui/LabelFont.h"
 #include "ui/Icons.h"
 #include "ui/ImageCaches.h"
@@ -1767,7 +1768,10 @@ void LookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& button,
     const auto standard = base == bg4 || base == accent;
     if (standard)
     {
-        const auto look = buttonColours (themes::ButtonKind::secondary, on || base == accent, highlighted ? 1.0f : 0.0f, down, button.isEnabled());
+        // (round 190oo, WG-23: a disabled primary takes the secondary disabled look, bg4 + textDisabled as its neighbours;
+        // the dim red with grey text read 2.2:1. A toggled-on button keeps its on look when disabled.)
+        const auto look = buttonColours (themes::ButtonKind::secondary, on || (base == accent && button.isEnabled()), highlighted ? 1.0f : 0.0f, down,
+                                         button.isEnabled());
         base = look.fill;
         edge = look.edge;
     }
@@ -2484,6 +2488,41 @@ juce::Font LookAndFeel::getAlertWindowTitleFont() { return uiFont (type::title, 
 juce::Font LookAndFeel::getAlertWindowMessageFont() { return uiFont (type::body); }
 juce::Font LookAndFeel::getAlertWindowFont() { return uiFont (type::body); }
 
+juce::AlertWindow* LookAndFeel::createAlertWindow (const juce::String& title, const juce::String& message, const juce::String& button1,
+                                                   const juce::String& button2, const juce::String& button3, juce::MessageBoxIconType iconType,
+                                                   int numButtons, juce::Component* associatedComponent)
+{
+    // round 190oo (design review 2, WG-6): JUCE's message boxes (the plugin crash prompt, the OK / Cancel questions, the
+    // notices) are made on ui::dialog::Alert, the one dialog frame; the buttons, results and shortcuts are JUCE's own
+    // (LookAndFeel_V2::createAlertWindow). A box without a message is a progress window (ThreadWithProgressWindow adds its
+    // bar and status text through the AlertWindow base afterwards): that one stays JUCE's.
+    if (message.trim().isEmpty())
+        return juce::LookAndFeel_V4::createAlertWindow (title, message, button1, button2, button3, iconType, numButtons, associatedComponent);
+
+    auto* alert = new lynx::ui::dialog::Alert (title, message, iconType, associatedComponent);
+    if (numButtons == 1)
+        alert->addButton (button1, 0, juce::KeyPress (juce::KeyPress::escapeKey), juce::KeyPress (juce::KeyPress::returnKey));
+    else if (numButtons == 2 || numButtons == 3)
+    {
+        const juce::KeyPress key1 ((int) juce::CharacterFunctions::toLowerCase (button1[0]), 0, 0);
+        auto key2 = juce::KeyPress ((int) juce::CharacterFunctions::toLowerCase (button2[0]), 0, 0);
+        if (key1 == key2)
+            key2 = juce::KeyPress();
+        if (numButtons == 2)
+        {
+            alert->addButton (button1, 1, juce::KeyPress (juce::KeyPress::returnKey), key1);
+            alert->addButton (button2, 0, juce::KeyPress (juce::KeyPress::escapeKey), key2);
+        }
+        else
+        {
+            alert->addButton (button1, 1, key1);
+            alert->addButton (button2, 2, key2);
+            alert->addButton (button3, 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        }
+    }
+    return alert;
+}
+
 void LookAndFeel::drawAlertBox (juce::Graphics& g, juce::AlertWindow& alert, const juce::Rectangle<int>& textArea, juce::TextLayout& textLayout)
 {
     auto bounds = alert.getLocalBounds().toFloat();
@@ -2491,7 +2530,7 @@ void LookAndFeel::drawAlertBox (juce::Graphics& g, juce::AlertWindow& alert, con
     g.setColour (borderStrong);
     g.drawRect (bounds, 1.0f);
     g.setColour (accent);
-    g.fillRect (bounds.removeFromTop (3.0f));
+    lynx::ui::dialog::fillBand (g, bounds.getX(), bounds.getY(), bounds.getWidth(), 3.0f); // (round 190oo, WG-22: whole device rows)
 
     auto iconSpace = 0;
     const auto type = alert.getAlertType();

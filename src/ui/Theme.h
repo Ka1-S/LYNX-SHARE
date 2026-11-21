@@ -495,6 +495,10 @@ public:
     juce::Rectangle<int> getTooltipBounds (const juce::String& tipText, juce::Point<int> screenPos, juce::Rectangle<int> parentArea) override;
     void drawTooltip (juce::Graphics&, const juce::String& text, int width, int height) override;
     void drawAlertBox (juce::Graphics&, juce::AlertWindow&, const juce::Rectangle<int>& textArea, juce::TextLayout&) override;
+    // JUCE's message boxes (showMessageBoxAsync, showOkCancelBox, showAsync...) on LYNX's one dialog frame (round 190oo, WG-6)
+    juce::AlertWindow* createAlertWindow (const juce::String& title, const juce::String& message, const juce::String& button1,
+                                          const juce::String& button2, const juce::String& button3, juce::MessageBoxIconType iconType,
+                                          int numButtons, juce::Component* associatedComponent) override;
     int getAlertWindowButtonHeight() override { return 30; }
     juce::Font getAlertWindowTitleFont() override;
     juce::Font getAlertWindowMessageFont() override;

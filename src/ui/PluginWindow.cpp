@@ -2643,10 +2643,10 @@ CrashPrompt crashPrompt (const juce::String& plugin, bool onLoad)
 std::unique_ptr<juce::Component> makeCrashPromptPanel (const juce::String& plugin, bool onLoad)
 {
     const auto p = crashPrompt (plugin, onLoad);
-    auto window = std::make_unique<juce::AlertWindow> (p.title, p.message, juce::MessageBoxIconType::WarningIcon);
-    for (int i = 0; i < p.buttons.size(); ++i)
-        window->addButton (p.buttons[i], i + 1 < p.buttons.size() ? i + 1 : 0);
-    return window;
+    // (round 190oo, WG-6: the box the prompt really shows, AlertWindow::showAsync's: made by the look and feel, which
+    // puts it on the one dialog frame; the buttons' results and keys are JUCE's, 1, 2, ... and 0 for the last)
+    return std::unique_ptr<juce::Component> (juce::LookAndFeel::getDefaultLookAndFeel().createAlertWindow (
+        p.title, p.message, p.buttons[0], p.buttons[1], p.buttons[2], juce::MessageBoxIconType::WarningIcon, p.buttons.size(), nullptr));
 }
 
 std::unique_ptr<juce::Component> makeCrashNoticePanel (const juce::String& plugin, bool offerSeparate)

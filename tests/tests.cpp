@@ -18064,3 +18064,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Lanes190ooTests.inc" // round 190oo (design review 2, lanes): Live envelope lanes (CS-19), lanes folded on open (CS O-3), Live scale control (O-5)
 #include "SimpleFl190ooTests.inc" // round 190oo (design review 2, CS-24): S / volume / pan on an FL project's tracks in Simple
 #include "Pat6_190ooTests.inc" // round 190oo (design review 2): PAT-6, the Playlist row from FL's vertical zoom (event 0xF2)
+#include "DialogRules190ooTests.inc" // round 190oo: the one dialog system's button order and pixel bands (core/DialogRules.h)

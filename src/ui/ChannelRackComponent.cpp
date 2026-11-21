@@ -36,6 +36,7 @@
 #include "core/FlSynths.h"
 #include "core/MidiControls.h"
 #include "ui/ToolWindow.h"
+#include "ui/DialogFrame.h"
 #include "ui/LoopStarterWindow.h"
 #include "core/Rack.h"
 #include "core/Slicer.h"
@@ -2339,12 +2340,12 @@ public:
         setup (length, lengthLabel, tr ("Length (steps)"), 1, 32, 16);
         setup (rotation, rotationLabel, tr ("Rotation"), -16, 16, 0);
         title.setText (tr ("Euclidean fill: {0}", { juce::String::fromUTF8 (song.channels[(std::size_t) channel].name.c_str()) }), juce::dontSendNotification);
-        title.setFont (theme::font (theme::type::title, true));
+        ui::dialog::styleTitle (title); // (round 190oo, WG-6: the one dialog title row, centred, 44 px)
         addAndMakeVisible (title);
 
         for (auto* b : { &accept, &cancel })
             addAndMakeVisible (b);
-        accept.setColour (juce::TextButton::buttonColourId, theme::colour::accent);
+        ui::dialog::styleButton (accept, true); // (WG-6: Cancel | Accept, the one accent button at the far right)
         accept.onClick = [this] {
             restore();
             const auto rhythm = current();
@@ -2353,7 +2354,7 @@ public:
             closeToolWindowOf (*this);
         };
         cancel.onClick = [this] { closeToolWindowOf (*this); };
-        setSize (380, 330);
+        setSize (380, 330 + titleGrowth);
         preview();
     }
 
@@ -2365,10 +2366,10 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        g.fillAll (theme::colour::bg2);
+        ui::dialog::paintFrame (g, getLocalBounds().toFloat(), ui::dialog::Kind::window); // (round 190oo, WG-6)
         // the rhythm as a ring of steps, the first step at the top
         const auto rhythm = current();
-        const auto ring = juce::Rectangle<float> (0, 150, (float) getWidth(), 120).withSizeKeepingCentre (110, 110);
+        const auto ring = juce::Rectangle<float> (0, (float) (150 + titleGrowth), (float) getWidth(), 120).withSizeKeepingCentre (110, 110);
         const auto n = (int) rhythm.size();
 
         for (int i = 0; i < n; ++i)
@@ -2388,9 +2389,8 @@ public:
 
     void resized() override
     {
-        auto area = getLocalBounds().reduced (12, 10);
-        title.setBounds (area.removeFromTop (24));
-        area.removeFromTop (6);
+        title.setBounds (ui::dialog::titleRow (getLocalBounds()));
+        auto area = ui::dialog::bodyOf (getLocalBounds()).reduced (12, 10);
         for (auto [s, l] : { std::pair { &pulses, &pulsesLabel }, std::pair { &length, &lengthLabel }, std::pair { &rotation, &rotationLabel } })
         {
             auto row = area.removeFromTop (30);
@@ -2426,6 +2426,9 @@ private:
             }, false);
         repaint();
     }
+
+    // the title row (WG-6): the rows start 15 px lower than under the old 24 px title line
+    static constexpr int titleGrowth = ui::dialog::titleRowHeight + 1 + 10 - 40;
 
     AudioEngine& engine;
     int channel, patternIndex = 0, steps = 16;
