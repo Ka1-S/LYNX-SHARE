@@ -5,12 +5,13 @@
 #   package   (ubuntu-24.04-arm, Ubuntu 22.04 container, glibc 2.35)  the same steps as release.yml's x86_64 Linux job:
 #             CMake + GCC 13, glibc check, self-test, open test, demo project, LYNX-<label>-aarch64.AppImage (+ .zsync)
 #             and LYNX-<label>-linux-aarch64.tar.gz (scripts/package-linux.sh, ARCH=aarch64), the AppImage start checks
-#   core      (ubuntu-24.04-arm)  the core test suite (scripts/build-local.sh, g++), as tests.yml's Core jobs
+#   core      (ubuntu-24.04-arm)  the core test suite (scripts/build-local.sh) with g++ and clang++, as tests.yml's Core
+#             jobs, and core-release-gcc with the release's GCC 13 (toolchain PPA) in the Ubuntu 22.04 container
 #   perf      (ubuntu-24.04-arm and ubuntu-24.04)  tools/perfbench on the same scenarios on both runners: arm64 against
 #             x86_64 on GitHub's hosted machines (4 vCPUs each)
 #
 # release.yml calls it (workflow_call: the package job only) and attaches the arm64 packages to the release. A push to a
-# ci-arm64/** branch or a manual run (workflow_dispatch) runs all three jobs.
+# ci-arm64/** branch or a manual run (workflow_dispatch) runs every job.
 name: Linux arm64
 
 on:
@@ -140,10 +141,14 @@ jobs:
           if-no-files-found: ignore
 
   core:
-    name: Core (ubuntu-24.04-arm, g++)
+    name: Core (ubuntu-24.04-arm, ${{ matrix.compiler }})
     if: ${{ !inputs.label }}   # (not when release.yml calls it)
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [g++, clang++]
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 1500M
@@ -151,30 +156,64 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: ccache
-        run: for i in 1 2 3 4 5 6; do sudo apt-get update -q && sudo apt-get install -y -q ccache python3-numpy && break; [ $i = 6 ] && exit 1; sleep 30; done
+        run: for i in 1 2 3 4 5 6; do sudo apt-get update -q && sudo apt-get install -y -q ccache && break; [ $i = 6 ] && exit 1; sleep 30; done
       - uses: actions/cache/restore@v4
         with:
           path: .ccache
-          key: ccache-core-ubuntu-24.04-arm-g++-${{ github.sha }}
-          restore-keys: ccache-core-ubuntu-24.04-arm-g++-
+          key: ccache-core-ubuntu-24.04-arm-${{ matrix.compiler }}-${{ github.sha }}
+          restore-keys: ccache-core-ubuntu-24.04-arm-${{ matrix.compiler }}-
       - name: Build and test the core (no JUCE)
         env:
-          CXX: ccache g++
+          CXX: ccache ${{ matrix.compiler }}
           LYNX_TEST_JOBS: auto
         run: |
-          uname -m; g++ --version | head -1
+          uname -m; ${{ matrix.compiler }} --version | head -1
           ccache --zero-stats > /dev/null
           ./scripts/build-local.sh
       - uses: actions/cache/save@v4
         if: always()
         with:
           path: .ccache
-          key: ccache-core-ubuntu-24.04-arm-g++-${{ github.sha }}
+          key: ccache-core-ubuntu-24.04-arm-${{ matrix.compiler }}-${{ github.sha }}
       - name: Upload the test logs
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: core-test-logs-ubuntu-24.04-arm
+          name: core-test-logs-ubuntu-24.04-arm-${{ matrix.compiler }}
+          path: build-local/lynx_tests.shards
+          retention-days: 14
+          if-no-files-found: ignore
+
+  # the release's compiler: GCC 13.4 from the toolchain PPA in the package job's Ubuntu 22.04 container
+  core-release-gcc:
+    name: Core (arm64, Ubuntu 22.04, GCC 13 PPA)
+    if: ${{ !inputs.label }}
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 240
+    container:
+      image: ubuntu:22.04
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: GCC 13 (ppa:ubuntu-toolchain-r/test)
+        run: |
+          apt-get update -q
+          apt-get install -y -q --no-install-recommends ca-certificates curl git gnupg software-properties-common python3
+          add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          apt-get update -q
+          apt-get install -y -q gcc-13 g++-13
+          g++-13 --version | head -1
+      - uses: actions/checkout@v5
+      - name: Build and test the core (no JUCE)
+        env:
+          CXX: g++-13
+          LYNX_TEST_JOBS: auto
+        run: ./scripts/build-local.sh
+      - name: Upload the test logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: core-test-logs-arm64-gcc13-ppa
           path: build-local/lynx_tests.shards
           retention-days: 14
           if-no-files-found: ignore
