@@ -1532,7 +1532,9 @@ ui::Hint PerformanceMeter::hintAt (juce::Point<int> p)
 
     if (p.y < getHeight() / 2)
     {
-        h.text = tr ("CPU: how much of the audio deadline the processing takes; near 100% the sound breaks up");
+        // (round 190ok, D1: the smart-disable tip first while it holds, so the hint bar's two lines show it)
+        h.text = smartTipText.isNotEmpty() ? smartTipText + "  " : juce::String();
+        h.text << tr ("CPU: how much of the audio deadline the processing takes; near 100% the sound breaks up");
         if (underruns > 0)
             h.text << "  " << tr ("{0} underruns (the sound broke up; red number)", { juce::String ((juce::int64) underruns) });
         if (overDeadline > 0 || lateCalls > 0)

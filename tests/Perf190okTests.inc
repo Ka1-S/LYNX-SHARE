@@ -165,3 +165,32 @@ TEST (perf190ok_channel_smart_disable_keeps_the_fl_flags_in_step)
     d.smartDisable = true;
     CHECK (! (c == d)); // (undo and the rack rebuild see it)
 }
+
+// ---- D1: the smart-disable tip (core/SmartDisableTip.h)
+#include "core/SmartDisableTip.h"
+
+TEST (perf190ok_smart_disable_tip_only_for_heavy_projects_with_most_slots_off)
+{
+    using namespace lynx;
+    auto song = Song::makeDefault();
+    for (auto& t : song.mixer) // (the default project's own effects out of the way)
+        t.effects.clear();
+    auto add = [&song] (int track, bool smart, bool enabled = true) {
+        auto slot = makeEffectSlot (EffectKind::reverb);
+        slot.smartDisable = smart;
+        slot.enabled = enabled;
+        song.mixer[(std::size_t) track].effects.push_back (slot);
+    };
+    for (int t = 1; t <= 9; ++t)
+        add (t, false);
+    add (10, true);
+    add (11, false, false); // (a switched-off slot is not counted)
+    const auto c = smarttip::count (song);
+    CHECK (c.off == 9 && c.total == 10);
+    CHECK (smarttip::due (c, 0.16));        // Exoplanet-like
+    CHECK (! smarttip::due (c, 0.01));      // a light stopped project: no tip
+    CHECK (! smarttip::due ({ 4, 77 }, 0.5)); // Thief: 4 of 77 off
+    CHECK (! smarttip::due ({ 7, 7 }, 0.5));  // too few slots
+    CHECK (! smarttip::due ({ 8, 17 }, 0.5)); // under half
+    CHECK (smarttip::due ({ 116, 118 }, 0.161));
+}
