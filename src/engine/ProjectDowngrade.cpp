@@ -1574,6 +1574,44 @@ void toRelease0130 (juce::var& root, Losses& lost)
 
     // round 190nu (chord2_190nu): the Piano roll's key markers
     keyMarkersFor0130 (root, lost);
+
+    // round 190ol (P1): the Sections lane. 0.1.30 has no sections: each becomes a plain Playlist marker at its start, named
+    // after it (unless a plain marker of that name is already there), so the song's parts stay visible and "Sections from
+    // markers" brings them back. Nothing plays differently: a view line, only when the project has sections
+    {
+        int converted = 0;
+        if (auto* arrangements = arrayOf (root["arrangements"]))
+            for (auto& a : *arrangements)
+            {
+                auto* ao = objectOf (a);
+                if (ao == nullptr)
+                    continue;
+                const auto list = ao->getProperty ("sections");
+                if (! drop (*ao, "sections") || ! list.isArray())
+                    continue;
+                juce::Array<juce::var> markers;
+                if (auto* old = arrayOf (ao->getProperty ("markers")))
+                    markers = *old;
+                for (const auto& sec : *list.getArray())
+                {
+                    if (! sec.isArray() || sec.size() < 3)
+                        continue;
+                    const auto tick = (juce::int64) sec[0];
+                    const auto name = sec[2].toString();
+                    const auto there = std::any_of (markers.begin(), markers.end(), [&] (const juce::var& m) {
+                        return m.isArray() && m.size() >= 4 && (juce::int64) m[0] == tick && m[1].toString() == name && (int) m[2] == 0
+                               && (m.size() < 5 || (int) m[4] == 0);
+                    });
+                    if (! there)
+                        markers.add (juce::Array<juce::var> { tick, name, 0, 4 });
+                    ++converted;
+                }
+                std::stable_sort (markers.begin(), markers.end(), [] (const juce::var& x, const juce::var& y) { return (juce::int64) x[0] < (juce::int64) y[0]; });
+                ao->setProperty ("markers", markers);
+            }
+        if (converted > 0)
+            lost.push_back ({ TR_NOOP ("{0} song section(s) of the Sections lane become plain Playlist markers at their starts"), juce::String (converted), false });
+    }
 }
 
 struct Step

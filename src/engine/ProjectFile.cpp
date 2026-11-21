@@ -1,4 +1,5 @@
 #include "engine/ProjectFile.h"
+#include "core/Sections.h"
 #include "core/EditorScale.h"
 #include "core/ClipEnvelope.h"
 #include "core/WarpModes.h"
@@ -3774,7 +3775,7 @@ juce::String toJson (const Song& song, bool stampVersion)
     }
 
     const auto anyMarkers = std::any_of (song.arrangements.begin(), song.arrangements.end(),
-                                         [] (const Arrangement& a) { return ! a.markers.empty() || ! a.blocks.empty(); });
+                                         [] (const Arrangement& a) { return ! a.markers.empty() || ! a.blocks.empty() || ! a.sections.empty(); });
 
     if (song.arrangements.size() > 1 || anyMarkers)
     {
@@ -3808,6 +3809,16 @@ juce::String toJson (const Song& song, bool stampVersion)
                     markers.add (one);
                 }
                 o->setProperty ("markers", markers);
+            }
+
+            // round 190ol: the Sections lane, [start, length, name, colour, uid] (colour 0 = automatic); older LYNX skips it
+            if (! a.sections.empty())
+            {
+                juce::Array<juce::var> list;
+                for (const auto& sec : a.sections)
+                    list.add (juce::Array<juce::var> { (juce::int64) sec.start, (juce::int64) sec.length, str (sec.name), (juce::int64) sec.colour,
+                                                       (juce::int64) sec.uid });
+                o->setProperty ("sections", list);
             }
 
             arrangements.add (juce::var (o.release()));
@@ -4706,6 +4717,15 @@ std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error,
                                                          m.size() == 5 ? juce::jlimit (0, 255, (int) m[4]) : 0 });
 
             std::stable_sort (arrangement.markers.begin(), arrangement.markers.end(), [] (const Marker& x, const Marker& y) { return x.tick < y.tick; });
+            if (auto* list = a["sections"].getArray()) // (round 190ol: the Sections lane)
+            {
+                for (const auto& v : *list)
+                    if (v.isArray() && v.size() >= 3)
+                        arrangement.sections.push_back ({ juce::jmax<juce::int64> (0, (juce::int64) v[0]), juce::jmax<juce::int64> (0, (juce::int64) v[1]),
+                                                          v[2].toString().toStdString(), v.size() >= 4 ? (std::uint32_t) (juce::int64) v[3] : 0u,
+                                                          v.size() >= 5 ? (std::uint64_t) juce::jmax<juce::int64> (0, (juce::int64) v[4]) : 0u });
+                sections::normalize (arrangement.sections);
+            }
             song.arrangements.push_back (std::move (arrangement));
         }
 

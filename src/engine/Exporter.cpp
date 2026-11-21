@@ -1259,7 +1259,7 @@ StemPlan planStemExport (const Song& song, const Options& options, const juce::F
     {
         plan.sectioned = true;
         const auto ext = extension (options.format);
-        const auto sections = markerSections (song);
+        const auto sections = exportSections (song, options); // (round 190ol: the Sections lane's or the markers')
         const auto each = sectionOptions (options);
         const auto baseName = base.getFileNameWithoutExtension().toStdString();
         for (std::size_t i = 0; i < sections.size(); ++i)
