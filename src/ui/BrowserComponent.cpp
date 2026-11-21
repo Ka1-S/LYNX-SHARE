@@ -1,3 +1,4 @@
+#include "ui/TiltViewport.h"
 #include "ui/TypeAhead.h"
 #include "ui/PluginPresetMenu.h"
 #include "ui/ExternalDrag.h"
@@ -3815,7 +3816,7 @@ BrowserComponent::BrowserComponent (AudioEngine& e, Role r)
     loopPanel = std::make_unique<LoopPanel> (*this);
     addChildComponent (*loopPanel);
     sidebar = std::make_unique<LiveSidebar> (*this);
-    sidebarView = std::make_unique<juce::Viewport>();
+    sidebarView = std::make_unique<ui::TiltViewport>();
     sidebarView->setViewedComponent (sidebar.get(), false);
     sidebarView->setScrollBarsShown (true, false);
     sidebarView->setScrollBarThickness (8);
@@ -3895,7 +3896,7 @@ BrowserComponent::BrowserComponent (AudioEngine& e, Role r)
 
     for (auto [view, list] : { std::pair { &treeView, tree.get() }, std::pair { &resultsView, results.get() } })
     {
-        *view = std::make_unique<juce::Viewport>();
+        *view = std::make_unique<ui::TiltViewport>(); // (issue #254: the horizontal wheel scrolls the list as FL's Browser)
         (*view)->setViewedComponent (list, false);
         (*view)->setScrollBarsShown (true, false);
         (*view)->setScrollBarThickness (10);

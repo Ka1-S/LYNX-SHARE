@@ -126,6 +126,10 @@
 #include "engine/ClapFormat.h"
 #include "engine/ClapTeardownTest.h"
 #include "engine/RenderAgainTest.h"
+#include "ui/TiltViewport.h"
+#if JUCE_LINUX
+ #include <dlfcn.h> // (round 190ou: --hwheel254test presses X11 buttons through XTest)
+#endif
 #include "engine/HostingTests.h"
 #include "core/EdisonFx.h"
 #include "engine/ProjectFile.h"
@@ -1909,6 +1913,16 @@ public:
             // LYNX.exe --claprestarttest "LYNX Test Restart.clap" report.txt (tools/testplugin/lynx_test_restart.c)
             const auto i = args.indexOf ("--claprestarttest");
             runClapRestartTest (args[i + 1].unquoted(), args[i + 2].unquoted());
+            return;
+        }
+
+        if (args.contains ("--hwheel254test"))
+        {
+            // LYNX --hwheel254test report.txt (round 190ou, issue #254): the horizontal wheel in the Playlist (three layouts),
+            // Piano roll, Mixer and Browser, off screen (src/HWheel254Test.inc)
+            const auto i = args.indexOf ("--hwheel254test");
+            setApplicationReturnValue (runHWheel254Test (args[i + 1].unquoted()) ? 0 : 1);
+            quit();
             return;
         }
 
@@ -18900,6 +18914,7 @@ private:
 #include "DetailsShot190mf.inc" // round 190mf
 #include "DetailsShot190mk.inc" // round 190mk
 #include "DetailsShot190mp.inc" // round 190mp
+#include "HWheel254Test.inc" // round 190ou: issue #254, the horizontal wheel
 #include "DetailsShot190mr.inc" // round 190mr
 #include "DetailsShot190mv.inc" // round 190mv
 #include "DetailsShot190my.inc" // round 190my

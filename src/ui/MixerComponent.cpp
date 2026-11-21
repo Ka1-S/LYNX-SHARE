@@ -3232,6 +3232,20 @@ juce::PopupMenu MixerStrips::buildSendMenu (int t)
 
 void MixerStrips::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
 {
+    // issue #254 (round 190ou): a notch of the horizontal wheel (a tilt wheel, a second wheel) scrolls the strips one
+    // insert sideways, as in FL 2026 (Thief: three notches, three inserts), wherever the mouse is over them
+    if (! flmods::ctrl (e.mods) && ! e.mods.isAltDown())
+        if (const auto w = flmods::normalisedWheel (wheel); gesture::horizontalWheelNotch (w.deltaX, w.deltaY, w.isSmooth, e.mods.isShiftDown()) != 0)
+        {
+            const auto notch = gesture::horizontalWheelNotch (w.deltaX, w.deltaY, w.isSmooth, false);
+            if (auto* view = findParentComponentOfClass<juce::Viewport>())
+            {
+                const auto room = juce::jmax (0, getWidth() - view->getViewWidth());
+                view->setViewPosition (juce::jlimit (0, room, view->getViewPositionX() + notch * spec().stripWidth), view->getViewPositionY());
+            }
+            return;
+        }
+
     if (const auto i = vcaAt (e.x); i >= 0 && ! ui::wheelScrolling() && vcaPartAt (i, e.getPosition()) == Part::fader)
     {
         if (const auto v = ui::wheelValue (engine.getSong().vcas[(std::size_t) i].level, e, wheel, vcaSpec (i)))
