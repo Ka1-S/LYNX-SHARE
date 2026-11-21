@@ -49,7 +49,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
             for (const auto& name : juce::StringArray::fromTokens (names, " ", ""))
                 result[owner].emplace (name, DocumentField { child, array });
         };
-        add (S::root, "bpm beatsPerBar swing chanceSeed channelGroups masterPitch substitutesBypassed cleanMixer performanceMode crossfader crossfadeCurve "
+        add (S::root, "bpm beatsPerBar swing chanceSeed channelGroups masterPitch mainVolume substitutesBypassed cleanMixer performanceMode crossfader crossfadeCurve "
              "autoCrossfades compCrossfadeMs playTruncatedNotes fastDeclick panLaw autoPdc compensateAutomations timeSettings "
              "scaleHighlight dataFolder currentPattern playlist patternBlocks blocks playlistTracks playlistTrackHeights "
              "playlistTrackColours playlistTrackGroups playlistCompTracks playlistTakeLanes playlistTrackLocks playlistTrackSoloLocks playlistTrackLanes "

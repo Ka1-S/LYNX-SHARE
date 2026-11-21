@@ -112,6 +112,9 @@ public:
     // falling in ~0.6 s with no peak hold, a short stub at rest) and the value in dB. Other looks keep the knob.
     void setLook (toolbarlayout::Look l);
     bool isSlider() const noexcept { return look == toolbarlayout::Look::simple && kind == Kind::volume; }
+    // round 190oa (DF-21, owner decision F1): outside Simple the volume knob is FL's main (monitor) volume, the song's
+    // mainVolume on the device output; Simple's BandLab slider stays the Master insert's fader
+    bool monitor() const noexcept { return kind == Kind::volume && ! isSlider(); }
     // one frame of the meter (the main window's 30 Hz timer, Simple only): repaints the rail when a bar moved a pixel
     void tickMeter (double nowMs);
     static constexpr int sliderWidth = 196; // speaker 20 + rail 112 + value 64

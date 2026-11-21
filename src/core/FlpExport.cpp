@@ -789,6 +789,8 @@ struct Converter
         out.beatUnit = meterUnit (song.beatUnit);
         out.swing = std::clamp (iround (song.swing * 128.0), 0, 128);
         out.mainPitch = iround (song.masterPitch);
+        if (song.mainVolume != unityFader) // (round 190oa, DF-21: FlpWrite writes FL's 12800 unless the project has its own)
+            out.controls.push_back ({ { flp::ControlId::mainVolume }, iround (song.mainVolume * 16000.0f) });
         out.currentPattern = std::clamp (song.currentPattern, 0, std::max (0, (int) song.patterns.size() - 1)) + 1;
         out.songMode = song.mode == PlayMode::song ? 1 : 0;
         out.showInfo = song.info.showOnOpen;

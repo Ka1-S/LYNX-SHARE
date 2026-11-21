@@ -243,6 +243,7 @@ struct ControlId
     static constexpr int mixerEqBase = 0x1FD0;  // track EQ: + group·8 + band (REA_rodada6 §1)
     static constexpr int mixerSendBase = 0x2000; // + destination track
     static constexpr int pluginParamBase = 0x8000;
+    static constexpr std::uint32_t mainVolume = 0x40000000; // the toolbar's main volume, 0…16000 (12800 = 0 dB; round 190oa)
     static constexpr std::uint32_t tempo = 0x40000005; // tempo automation: 0..1 = 60..180 BPM (checked against the demos)
 
     bool isTempo() const noexcept { return raw == tempo; }

@@ -3414,6 +3414,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
     for (const auto& control : project.controls)
     {
+        if (control.id.raw == flp::ControlId::mainVolume) // round 190oa (DF-21): the toolbar's main volume, 0…16000
+            song.mainVolume = std::clamp (control.value / 16000.0f, 0.0f, 1.0f);
         if (! control.id.isMixer())
             continue;
 

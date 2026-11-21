@@ -2988,6 +2988,8 @@ juce::String toJson (const Song& song, bool stampVersion)
     }
     if (song.masterPitch != 0.0f)
         root->setProperty ("masterPitch", (double) song.masterPitch);
+    if (song.mainVolume != unityFader) // (round 190oa, DF-21)
+        root->setProperty ("mainVolume", (double) song.mainVolume);
     if (song.masterLook.id != 0) // the Finish dock's Master look (round 189k)
     {
         const auto& l = song.masterLook;
@@ -3893,6 +3895,7 @@ std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error,
         for (const auto& name : *groups)
             song.channelGroups.push_back (name.toString().toStdString());
     song.masterPitch = juce::jlimit (-1200.0f, 1200.0f, (float) (double) root.getProperty ("masterPitch", 0.0));
+    song.mainVolume = juce::jlimit (0.0f, 1.0f, (float) (double) root.getProperty ("mainVolume", (double) unityFader));
     {
         const auto t = juce::StringArray::fromTokens (root.getProperty ("masterLook", "").toString(), " ", "");
         song.masterLook = {};

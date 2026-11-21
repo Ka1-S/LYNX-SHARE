@@ -2708,6 +2708,11 @@ struct Song
     std::uint32_t chanceSeed = 0;
     std::vector<std::string> channelGroups; // the Channel Rack's filter groups (FL's "All" dropdown), by name
     float masterPitch = 0.0f; // cents, -1200..1200: shifts every note of the built-in instruments (the toolbar's master pitch)
+    // round 190oa (DF-21, owner decision F1; FL manual "Monitor Volume changes are not reflected in renders and it can't
+    // be automated", REA 190oa R2: FL's gain (11^v − 1) / 10 on the output, skipped while rendering, saved in the project
+    // as control 0x40000000, 0…16000 with 12800 = 0 dB): the toolbar's main volume, a fader position (unityFader = 0 dB)
+    // applied to what the audio device plays only — never in an export, never automated
+    float mainVolume = unityFader;
     ProjectInfo info;
     MasterLookSettings masterLook;
     // Online Sessions (round 168a): the project's lineage (random 128-bit hex, kept by copies and packages), the last
