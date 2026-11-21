@@ -91,7 +91,7 @@ bool samePluginProcessing (const PluginRef& a, const PluginRef& b) noexcept
            && a.hostMaxBuffer == b.hostMaxBuffer && a.bitSize == b.bitSize && a.releaseVelocity == b.releaseVelocity
            && a.sendBendRange == b.sendBendRange && a.bendRange == b.bendRange && a.modXAftertouch == b.modXAftertouch
            && a.allNotesOffOnStop == b.allNotesOffOnStop && a.resetOnFlush == b.resetOnFlush && a.sendLoopPosition == b.sendLoopPosition
-           && a.mpe == b.mpe;
+           && a.mpe == b.mpe && a.dpiAware == b.dpiAware; // (FL: "DPI aware (requires reloading the plugin)", round 190oh)
 }
 
 // A hosted plugin's settings live in its running instance: the song only holds what was saved, and the instance is

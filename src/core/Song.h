@@ -326,6 +326,14 @@ struct PluginRef
     // GitHub #198 (round 190ks): the notes the plugin plays from its own window (pads / keys clicked in it, sent on its MIDI
     // output) are recorded on its channel while recording, as played notes; off: they are not. Projects saved before: on
     bool recordOwnNotes = true;
+    // FL's wrapper Settings › GUI (round 190oh, P3; Fruity Wrapper's DFM VisualPanel, flags from FL 2026 saves with each
+    // box toggled [DATA]; FL's defaults [UI]): "DPI aware (requires reloading the plugin)" (wrapper flag 0x04000000, on):
+    // off = on Windows the plugin and its editor are made in a DPI-unaware context, so Windows draws the editor at 96 dpi
+    // and stretches it to the display's scale (for plugins that appear too big or too small); a change reloads the plugin
+    bool dpiAware = true;
+    // "Scale editor dimensions" (wrapper flag 0x40000000, off): the size the editor reports is taken in logical pixels
+    // (multiplied by the display's scale), for editors that appear cut off on a high-resolution screen
+    bool scaleEditorDimensions = false;
 
     bool operator== (const PluginRef& o) const
     {
@@ -340,7 +348,7 @@ struct PluginRef
                && allowHostKeys == o.allowHostKeys && hostKeysFirst == o.hostKeysFirst
                && detached == o.detached && playedBy == o.playedBy && values == o.values
                && pinned == o.pinned && velocityMode == o.velocityMode && fixedVelocity == o.fixedVelocity
-               && recordOwnNotes == o.recordOwnNotes;
+               && recordOwnNotes == o.recordOwnNotes && dpiAware == o.dpiAware && scaleEditorDimensions == o.scaleEditorDimensions;
     }
 };
 

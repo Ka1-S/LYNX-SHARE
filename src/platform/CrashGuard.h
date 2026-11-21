@@ -51,7 +51,8 @@ std::uint32_t run (Fn&& fn) noexcept
 // This build catches a plugin's faults in call() (Windows SEH; Linux / macOS on x86-64 / ARM64 signals)
 bool pluginFaultsCaught() noexcept;
 
-// Round 190gg (B4): faults on a hosted plugin's OWN threads (Linux / macOS on x86-64 / ARM64; the app only, not the
+// Round 190gg (B4): faults on a hosted plugin's OWN threads (Linux / macOS on x86-64 / ARM64; Windows x64 since round
+// 190oh, see parkFaultingPluginThread; the app only, not the
 // exported plugins' runtime; nothing on Windows). A thread the plugin started (its GUI renderer, a disk streamer, a
 // licence check) runs no LYNX call, so call() cannot catch its fault. The handler of call() now also looks at a fault
 // outside every guarded call: when, from the faulting instruction to the thread's first frame (which the walk must
@@ -64,6 +65,12 @@ bool pluginFaultsCaught() noexcept;
 // start, in a module nobody watches, or while another fault is being looked at.
 // watchPluginModule: message thread, after the module was loaded in this process (an absolute path; at most 128).
 void watchPluginModule (const std::string& fileUtf8) noexcept;
+// Round 190oh: the same on Windows (x64). There the fault of a plugin's own thread reaches the top-level filter only
+// when nothing of the plugin's handled it; the crash handler (Main.cpp onCrash) calls this first: when the fault is a
+// watched plugin's thread's (the rules above, plus a walk to the thread's first frame in ntdll), it is noted and the
+// thread waits forever inside this call; otherwise false and the crash handler goes on. Elsewhere always false (the
+// signal handler parks the thread before any crash handler runs).
+bool parkFaultingPluginThread (void* exceptionPointers) noexcept;
 bool pluginThreadFaultsCaught() noexcept;
 struct PluginThreadFault
 {

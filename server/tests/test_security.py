@@ -212,6 +212,74 @@ class RelayLimitTests(unittest.IsolatedAsyncioTestCase):
             await relay.sweep(empty.created + relay.ROOM_HOURS * 3600 + 1)
             self.assertNotIn("cccccccccc", relay.rooms)
 
+class RelayOutboxTests(unittest.IsolatedAsyncioTestCase):
+    """Round 190oh: a peer that reads slowly holds up nobody else (no head-of-line blocking) and is closed past its limit."""
+
+    class Socket:
+        def __init__(self, gate=None):
+            self.closed = False
+            self.got = []
+            self.gate = gate
+            self.close_code = None
+
+        async def send_bytes(self, data):
+            if self.gate is not None:
+                await self.gate.wait()
+            self.got.append(data)
+
+        async def send_str(self, text):
+            self.got.append(text)
+
+        async def close(self, code=1000, message=b""):
+            self.closed = True
+            self.close_code = code
+
+    async def test_a_slow_reader_does_not_delay_the_others(self):
+        gate = asyncio.Event()
+        slow, fast = self.Socket(gate), self.Socket()
+        slow_box, fast_box = relay.Outbox(slow, limit=10_000), relay.Outbox(fast, limit=10_000)
+        for i in range(5):
+            self.assertTrue(slow_box.put(b"m" * 1000))       # never waits, even though nothing is read
+            self.assertTrue(fast_box.put(bytes([i]) * 10))
+        await asyncio.sleep(0.05)
+        self.assertEqual(len(fast.got), 5)                   # all of them, in order
+        self.assertEqual([g[0] for g in fast.got], [0, 1, 2, 3, 4])
+        self.assertEqual(slow.got, [])
+        gate.set()
+        await asyncio.sleep(0.05)
+        self.assertEqual(len(slow.got), 5)
+        self.assertEqual(slow_box.waiting, 0)
+        await slow_box.finish()
+        await fast_box.finish()
+
+    async def test_a_peer_over_its_queue_limit_is_closed(self):
+        gate = asyncio.Event()
+        slow = self.Socket(gate)
+        box = relay.Outbox(slow, limit=2500)
+        self.assertTrue(box.put(b"x" * 1000))
+        self.assertTrue(box.put(b"x" * 1000))
+        self.assertFalse(box.put(b"x" * 1000))               # over 2500 waiting: closed as too slow
+        await asyncio.sleep(0.01)
+        self.assertTrue(slow.closed)
+        self.assertEqual(slow.close_code, relay.CLOSE_SLOW)
+        self.assertFalse(box.put(b"y"))
+        gate.set()
+        await box.finish()
+
+    async def test_control_messages_keep_their_place_among_frames(self):
+        sock = self.Socket()
+        room = relay.Room("abcdefghij", "t" * 43, "h" * 43, "client")
+        room.peers[2] = sock
+        room.outboxes[2] = relay.Outbox(sock)
+        room.outboxes[2].put(b"frame-1")
+        await relay.broadcast(room, {"type": "join", "peer": 3})
+        room.outboxes[2].put(b"frame-2")
+        await asyncio.sleep(0.02)
+        self.assertEqual(sock.got[0], b"frame-1")
+        self.assertIn('"join"', sock.got[1])
+        self.assertEqual(sock.got[2], b"frame-2")
+        await room.outboxes[2].finish()
+
 
 if __name__ == "__main__":
     unittest.main()

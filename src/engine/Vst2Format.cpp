@@ -539,7 +539,7 @@ public:
                 onMainThread ([this, w = index, h = (int) value] {
                     if (auto* e = editor.getComponent())
                     {
-                        const auto scale = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->scale;
+                        const auto scale = platform::editorSizeScale (*e); // (round 190oh)
                         e->setSize (juce::roundToInt (w / scale), juce::roundToInt (h / scale));
                     }
                 });
@@ -733,12 +733,8 @@ public:
         : AudioProcessorEditor (p),
           owner (p)
     {
-        const auto scale = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->scale;
         setSize (480, 320);
-        abi::Rect* rect = nullptr;
-        owner.effect->dispatcher (owner.effect, abi::editGetRect, 0, 0, &rect, 0.0f);
-        if (rect != nullptr && rect->right > rect->left && rect->bottom > rect->top)
-            setSize (juce::roundToInt ((rect->right - rect->left) / scale), juce::roundToInt ((rect->bottom - rect->top) / scale));
+        fitToPlugin();
         addAndMakeVisible (embed);
         owner.editor = this;
         startTimer (20);
@@ -753,7 +749,20 @@ public:
 
     void resized() override { embed.setBounds (getLocalBounds()); }
 
+    // round 190oh (P3): FL's wrapper Settings › GUI marked this editor (platform::setEditorScaling): size again
+    void setScaleFactor (float) override { fitToPlugin(); }
+
 private:
+    // the plugin's reported size (physical pixels) in this window's units (platform::editorSizeScale, round 190oh)
+    void fitToPlugin()
+    {
+        abi::Rect* rect = nullptr;
+        owner.effect->dispatcher (owner.effect, abi::editGetRect, 0, 0, &rect, 0.0f);
+        const auto scale = platform::editorSizeScale (*this);
+        if (rect != nullptr && rect->right > rect->left && rect->bottom > rect->top)
+            setSize (juce::roundToInt ((rect->right - rect->left) / scale), juce::roundToInt ((rect->bottom - rect->top) / scale));
+    }
+
     void timerCallback() override
     {
         if (opened)
@@ -763,14 +772,9 @@ private:
         }
         if (! embed.create())
             return; // not on screen yet
-        const auto scale = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->scale;
         owner.effect->dispatcher (owner.effect, abi::editOpen, 0, 0, embed.nativeHandle(), 0.0f);
         opened = true;
-        // some plugins only know their size once open
-        abi::Rect* rect = nullptr;
-        owner.effect->dispatcher (owner.effect, abi::editGetRect, 0, 0, &rect, 0.0f);
-        if (rect != nullptr && rect->right > rect->left && rect->bottom > rect->top)
-            setSize (juce::roundToInt ((rect->right - rect->left) / scale), juce::roundToInt ((rect->bottom - rect->top) / scale));
+        fitToPlugin(); // some plugins only know their size once open
     }
 
     Vst2Instance& owner;

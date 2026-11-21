@@ -11,6 +11,7 @@
 #include <cerrno>
 #include <cstring>
 #include <ctime>
+#include <cwctype>
 #include <deque>
 #include <map>
 #include <mutex>
@@ -1066,6 +1067,149 @@ std::vector<std::uintptr_t> sampleThread (HANDLE) { return {}; }
 
 } // namespace
 
+#if defined(LYNX_UNWIND) && ! defined(LYNX_EXPORT_VERSION)
+ #define LYNX_WIN_THREAD_GUARD 1
+// Round 190oh (plugin host review): round 190gg's guard for faults on a hosted plugin's OWN threads, on Windows. A thread
+// the plugin started (its renderer, a disk streamer, a licence check) runs no LYNX call, so call() cannot catch its
+// fault and it reached the crash handler: LYNX ended. Windows calls the top-level filter (JUCE's, then onCrash) only
+// for a fault nobody handled — after the plugin's own handlers (copy protections that fault on purpose and handle it
+// are never touched here). parkWindowsPluginThread, the first thing onCrash does, then parks the thread for good when
+// ALL of: the fault is one that may be caught at all (crashreport::editorFaultCatchable: not a heap corruption, a stack
+// overflow or a fail-fast); the thread's frames walk to its first frame in ntdll; no frame is LYNX's executable; and the
+// first frame outside Windows' own modules is in a module given to watchPluginModule (the plugin's file, or a file in
+// its bundle folder). The app then switches every instance of that plugin off (engine/PluginHost.h,
+// switchOffPluginsOfThreadFaults), as on Linux / macOS. Anything else goes on to the crash file as before.
+namespace
+{
+constexpr int winWatchedCapacity = 128;
+struct WinWatched
+{
+    wchar_t path[1024] {};
+    char utf8[1024] {};
+    std::atomic<int> ready { 0 };
+};
+WinWatched winWatched[winWatchedCapacity];
+std::atomic<int> winWatchedCount { 0 };
+
+struct WinThreadFault
+{
+    std::atomic<int> module { -1 };
+    std::atomic<std::uint32_t> code { 0 };
+    std::atomic<std::uintptr_t> offset { 0 };
+};
+constexpr int winThreadFaultCapacity = 16;
+WinThreadFault winThreadFaults[winThreadFaultCapacity];
+std::atomic<int> winThreadFaultTotal { 0 };
+std::atomic<int> winThreadFaultChecking { 0 };
+
+// the watched module `path` is (its file, or a file in its bundle folder; case and slash kind ignored), -1 = none
+int winWatchedModuleOf (const wchar_t* path) noexcept
+{
+    const auto same = [] (wchar_t a, wchar_t b) {
+        if (a == L'/')
+            a = L'\\';
+        if (b == L'/')
+            b = L'\\';
+        return std::towupper ((std::wint_t) a) == std::towupper ((std::wint_t) b);
+    };
+    const auto count = std::min (winWatchedCount.load (std::memory_order_acquire), winWatchedCapacity);
+    for (int i = 0; i < count; ++i)
+    {
+        if (winWatched[i].ready.load (std::memory_order_acquire) != 1)
+            continue;
+        const wchar_t* w = winWatched[i].path;
+        std::size_t k = 0;
+        while (w[k] != 0 && path[k] != 0 && same (w[k], path[k]))
+            ++k;
+        if (w[k] == 0 && (path[k] == 0 || path[k] == L'\\' || path[k] == L'/'))
+            return i;
+    }
+    return -1;
+}
+
+// a module of Windows itself (System32, SysWOW64, WinSxS...), as the editor guard's systemModule
+bool winSystemModule (const wchar_t* path) noexcept
+{
+    wchar_t windows[MAX_PATH] = {};
+    const auto n = GetWindowsDirectoryW (windows, MAX_PATH);
+    return n > 0 && n < MAX_PATH && CompareStringOrdinal (path, (int) n, windows, (int) n, TRUE) == CSTR_EQUAL;
+}
+
+// the frames of `context` (SEH frame: a broken stack ends the walk, no C++ objects here)
+int unwindGuarded (const CONTEXT& context, std::uintptr_t* frames, int capacity) noexcept
+{
+    __try
+    {
+        return unwind (context, frames, capacity);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        return 0;
+    }
+}
+
+bool parkWindowsPluginThread (EXCEPTION_POINTERS* ep) noexcept
+{
+    if (ep == nullptr || ep->ExceptionRecord == nullptr || ep->ContextRecord == nullptr
+        || winWatchedCount.load (std::memory_order_acquire) == 0)
+        return false;
+    const auto code = (std::uint32_t) ep->ExceptionRecord->ExceptionCode;
+    if (! crashreport::editorFaultCatchable (code) || ! walksToThreadStart (*ep->ContextRecord))
+        return false;
+    auto idle = 0;
+    if (! winThreadFaultChecking.compare_exchange_strong (idle, 1))
+        return false; // (another fault is being looked at: the crash handler)
+    static std::uintptr_t frames[256]; // (one checker at a time: the flag above)
+    const auto count = unwindGuarded (*ep->ContextRecord, frames, 256);
+    const auto self = GetModuleHandleW (nullptr);
+    int watchedIndex = -1, blamed = -1;
+    std::uintptr_t blamedBase = 0;
+    for (int i = 0; i < count; ++i)
+    {
+        HMODULE module = nullptr;
+        if (! GetModuleHandleExW (GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                                  reinterpret_cast<LPCWSTR> (frames[i]), &module) || module == nullptr)
+        {
+            if (blamed < 0)
+                break; // generated code before any module: nobody to blame
+            continue;
+        }
+        if (module == self)
+        {
+            watchedIndex = -1; // a LYNX frame anywhere on the thread: LYNX's own thread (or a LYNX call): a crash
+            blamed = count;
+            break;
+        }
+        static wchar_t path[1024];
+        if (GetModuleFileNameW (module, path, 1024) == 0)
+            continue;
+        if (blamed < 0 && ! winSystemModule (path))
+        {
+            blamed = i;
+            blamedBase = (std::uintptr_t) module;
+            watchedIndex = winWatchedModuleOf (path);
+            if (watchedIndex < 0)
+                break; // a module nobody watches: the crash handler
+        }
+    }
+    if (watchedIndex < 0 || blamed < 0 || blamed >= count)
+    {
+        winThreadFaultChecking.store (0);
+        return false;
+    }
+    const auto n = winThreadFaultTotal.load (std::memory_order_relaxed);
+    auto& slot = winThreadFaults[n % winThreadFaultCapacity];
+    slot.module.store (watchedIndex, std::memory_order_relaxed);
+    slot.code.store (code, std::memory_order_relaxed);
+    slot.offset.store (frames[blamed] - blamedBase, std::memory_order_relaxed);
+    winThreadFaultTotal.store (n + 1, std::memory_order_release);
+    winThreadFaultChecking.store (0);
+    for (;;) // parked for good: the thread is the plugin's; whatever it held stays held
+        Sleep (INFINITE);
+}
+} // namespace
+#endif
+
 std::string describeAddress (const void* address)
 {
 #if defined(_WIN32)
@@ -1252,14 +1396,46 @@ void watchPluginModule (const std::string& fileUtf8) noexcept
     watchedCount.store (count + 1, std::memory_order_release);
     if (guardState.load (std::memory_order_acquire) != 2)
         installFaultGuard(); // (the handler that parks the thread; hardenSignals installs it in the app anyway)
+#elif defined(LYNX_WIN_THREAD_GUARD)
+    // round 190oh: Windows (an absolute path: a drive letter or a UNC path; the slashes kept as given)
+    if (fileUtf8.size() < 3 || fileUtf8.size() >= sizeof (WinWatched::utf8) || ! (fileUtf8[1] == ':' || (fileUtf8[0] == '\\' && fileUtf8[1] == '\\')))
+        return;
+    auto path = fileUtf8;
+    while (path.size() > 3 && (path.back() == '/' || path.back() == '\\'))
+        path.pop_back();
+    wchar_t wide[1024] = {};
+    if (MultiByteToWideChar (CP_UTF8, 0, path.c_str(), -1, wide, 1024) == 0)
+        return;
+    static std::mutex writers;
+    const std::lock_guard<std::mutex> lock (writers);
+    const auto count = winWatchedCount.load (std::memory_order_relaxed);
+    for (int i = 0; i < count; ++i)
+        if (path == winWatched[i].utf8)
+            return;
+    if (count >= winWatchedCapacity)
+        return;
+    std::memcpy (winWatched[count].utf8, path.c_str(), path.size() + 1);
+    std::memcpy (winWatched[count].path, wide, sizeof (wide));
+    winWatched[count].ready.store (1, std::memory_order_release);
+    winWatchedCount.store (count + 1, std::memory_order_release);
 #else
     (void) fileUtf8;
 #endif
 }
 
+bool parkFaultingPluginThread (void* exceptionPointers) noexcept
+{
+#if defined(LYNX_WIN_THREAD_GUARD)
+    return parkWindowsPluginThread (static_cast<EXCEPTION_POINTERS*> (exceptionPointers)); // (returns only when it did not park)
+#else
+    (void) exceptionPointers;
+    return false;
+#endif
+}
+
 bool pluginThreadFaultsCaught() noexcept
 {
-#if defined(LYNX_PLUGIN_THREAD_GUARD) && (defined(__x86_64__) || defined(__aarch64__))
+#if (defined(LYNX_PLUGIN_THREAD_GUARD) && (defined(__x86_64__) || defined(__aarch64__))) || defined(LYNX_WIN_THREAD_GUARD)
     return true;
 #else
     return false;
@@ -1270,6 +1446,8 @@ int pluginThreadFaultCount() noexcept
 {
 #if defined(LYNX_PLUGIN_THREAD_GUARD)
     return threadFaultTotal.load (std::memory_order_acquire);
+#elif defined(LYNX_WIN_THREAD_GUARD)
+    return winThreadFaultTotal.load (std::memory_order_acquire);
 #else
     return 0;
 #endif
@@ -1293,6 +1471,25 @@ std::vector<PluginThreadFault> pluginThreadFaults()
         std::snprintf (offset, sizeof (offset), "+0x%llx", (unsigned long long) slot.offset.load (std::memory_order_relaxed));
         auto name = f.module;
         if (const auto slash = name.find_last_of ('/'); slash != std::string::npos)
+            name = name.substr (slash + 1);
+        f.where = name + offset;
+        list.push_back (std::move (f));
+    }
+#elif defined(LYNX_WIN_THREAD_GUARD)
+    const auto total = winThreadFaultTotal.load (std::memory_order_acquire);
+    for (int i = std::max (0, total - winThreadFaultCapacity); i < total; ++i)
+    {
+        const auto& slot = winThreadFaults[i % winThreadFaultCapacity];
+        const auto module = slot.module.load (std::memory_order_relaxed);
+        if (module < 0 || module >= winWatchedCapacity)
+            continue;
+        PluginThreadFault f;
+        f.module = winWatched[module].utf8;
+        f.code = slot.code.load (std::memory_order_relaxed);
+        char offset[40];
+        std::snprintf (offset, sizeof (offset), "+0x%llx", (unsigned long long) slot.offset.load (std::memory_order_relaxed));
+        auto name = f.module;
+        if (const auto slash = name.find_last_of ("/\\"); slash != std::string::npos)
             name = name.substr (slash + 1);
         f.where = name + offset;
         list.push_back (std::move (f));

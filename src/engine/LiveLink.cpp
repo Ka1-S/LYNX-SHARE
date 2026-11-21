@@ -435,7 +435,7 @@ void Connection::run (std::string url, std::string token, std::string userAgent)
         {
             std::size_t off = 0;
             const unsigned flags = m.first ? wsBinary : wsText;
-            while (off < m.second.size() || (m.second.empty() && off == 0))
+            while ((off < m.second.size() || (m.second.empty() && off == 0)) && ! stopping.load())
             {
                 std::size_t sent = 0;
                 const auto r = c.wsSend (h, m.second.data() + off, m.second.size() - off, &sent, 0, flags);
@@ -450,8 +450,16 @@ void Connection::run (std::string url, std::string token, std::string userAgent)
                 {
                     closed.text = "send failed";
                     done = true;
+                    break;
                 }
-                break;
+                // round 190oh: a frame curl took only part of (the socket's buffer is full: a message over ~64 KiB over
+                // TLS to a far relay) goes on with the rest, the same frame and flags. Leaving it half-sent made the
+                // next message fail (curl error 43), the link closed and a guest's upload started again from its
+                // first piece, for ever (seen from this PC on relay.lynx-share.com; never from a relay close by)
+                if (off >= m.second.size())
+                    break;
+                pollfd p { fd, POLLOUT, 0 };
+                ::poll (&p, 1, 50);
             }
         }
         pollfd p { fd, POLLIN, 0 };

@@ -12290,3 +12290,8 @@ countries: nl be
 "Randomize: the selected notes' velocities (all the notes with none selected) move at random by up to the amount beside it" = "Willekeurig: de velocities van de geselecteerde noten (alle noten als er geen is geselecteerd) veranderen willekeurig tot de waarde ernaast"
 "Randomization Amount" = "Willekeurigheid"
 "Randomization Amount: velocities move up or down by up to this much (drag, or type a number and press Enter)" = "Willekeurigheid: velocities gaan hoogstens zoveel omhoog of omlaag (sleep, of typ een getal en druk op Enter)"
+"GUI" = "Interface"
+"DPI aware (requires reloading the plugin)" = "DPI-bewust (plugin moet opnieuw worden geladen)"
+"For plugins that appear too big or small" = "Voor plugins die te groot of te klein lijken"
+"Scale editor dimensions" = "Editorafmetingen schalen"
+"Scale dimensions of plugins that appear cut-off on a high resolution screen" = "Schaalt de afmetingen van plugins die op een scherm met hoge resolutie afgesneden lijken"

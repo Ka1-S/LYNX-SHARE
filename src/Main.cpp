@@ -170,6 +170,7 @@
 #include "ui/GeneratorPresetMenu.h"
 #include "core/GeneratorPresets.h"
 #include "ui/PluginWindow.h"
+#include "platform/NativeEmbed.h"
 #include "ui/Motion.h"
 #include "ui/ShotShowing.h"
 #include "ui/SimpleLook.h"
@@ -391,6 +392,10 @@ juce::File crashFolderForTest; // --faulttest: where the crash file goes instead
 // Crashed: try to save the project and write the backtrace (like FL's "emergency save").
 void onCrash (void* exceptionPointers)
 {
+    // round 190oh (Windows): a fault on a hosted plugin's own thread that nothing handled — that thread waits for good
+    // inside this call and the main window's timer switches the plugin off (crashguard::parkFaultingPluginThread)
+    if (lynx::crashguard::parkFaultingPluginThread (exceptionPointers))
+        return;
     // (round 190ci: once. The hook for stacks Windows cannot walk, crashguard::setUnwalkableFaultHandler, may have run
     // this before the top-level filter does)
     static std::atomic<bool> reported { false };
@@ -1790,6 +1795,17 @@ public:
             // hosted plugin receives after a wrapper MIDI option changes while it runs
             const auto i = args.indexOf ("--wrappermiditest");
             runWrapperMidiTest (args[i + 1].unquoted(), args[i + 2].unquoted());
+            return;
+        }
+
+        if (args.contains ("--wrappershot190oh"))
+        {
+            // LYNX --wrappershot190oh plugin <folder> [--open] (round 190oh, P3: FL's wrapper Settings › GUI): the
+            // plugin (any format; an effect on insert 1) and its wrapper Settings tab drawn offscreen at 100 % and 150 %,
+            // with FL's defaults and with "DPI aware" off + "Scale editor dimensions" on; --open also opens its editor
+            // with each setting (a real window: Windows reports the editor windows' DPI awareness) -> report.txt
+            const auto i = args.indexOf ("--wrappershot190oh");
+            runWrapperShot190oh (args[i + 1].unquoted(), args[i + 2].unquoted(), args.contains ("--open"));
             return;
         }
 
@@ -13003,6 +13019,160 @@ private:
     // LYNX.exe --wrappershot "LYNX Test Drums.dll" <folder> (round 188d): the wrapper's Processing tab drawn offscreen
     // (no window, no focus) for the FL | LYNX review: wrap-default.png (a fresh plugin), wrap-automap.png (Auto map
     // outputs, output 3 off: FL's shot b23), wrap-settings.png. Scale 1.5 (FL's shots are at 150 %).
+    // (round 190oh, --wrappershot190oh: the steps run from a timer, so the editors' windows get their messages)
+    struct WrapperShot190oh final : juce::Timer
+    {
+        std::function<bool()> step; // false: done
+        void timerCallback() override
+        {
+            if (! step())
+                stopTimer();
+        }
+    };
+    std::unique_ptr<WrapperShot190oh> wrapperShot190oh;
+
+    void runWrapperShot190oh (const juce::String& pluginPath, const juce::String& folderPath, bool openEditors)
+    {
+        struct State
+        {
+            juce::File folder;
+            juce::String report;
+            bool ok = true;
+            std::shared_ptr<lynx::AudioEngine> engine;
+            std::optional<juce::PluginDescription> type;
+            int phase = 0, wait = 0;
+            void expect (const char* name, bool value)
+            {
+                report << name << "=" << (value ? 1 : 0) << "\n";
+                ok = ok && value;
+            }
+            static lynx::PluginRef* find (lynx::Song& s)
+            {
+                return s.mixer.size() < 2 || s.mixer[1].effects.empty() ? nullptr : &s.mixer[1].effects[0].plugin;
+            }
+            std::shared_ptr<lynx::PluginEffect> effect() { return std::dynamic_pointer_cast<lynx::PluginEffect> (engine->getEffect (1, 0)); }
+            bool save (const juce::String& name, float scale)
+            {
+                auto fx = effect();
+                if (fx == nullptr)
+                    return false;
+                const auto image = lynx::wrapperSettingsSnapshot (*engine, &State::find, fx->getInstance(), false, 0, scale, 1, 0);
+                auto file = folder.getChildFile (name);
+                file.deleteFile();
+                juce::FileOutputStream out (file);
+                return out.openedOk() && juce::PNGImageFormat().writeImageToStream (image, out);
+            }
+            void open()
+            {
+                if (auto fx = effect())
+                {
+                    lynx::PluginWindows::WrapperContext context;
+                    context.engine = engine.get();
+                    context.find = &State::find;
+                    context.track = 1;
+                    context.slot = 0;
+                    lynx::PluginWindows::open (fx, fx->getInstance(), type->name, context);
+                }
+            }
+            // what the open editor was marked with and (Windows) the DPI awareness of its window and of the windows
+            // inside it (the plugin's own)
+            void describe (const char* tag)
+            {
+                auto fx = effect();
+                if (fx == nullptr)
+                    return;
+                auto& instance = fx->getInstance();
+                auto* editor = instance.getActiveEditor();
+                report << tag << ".editor=" << (editor != nullptr ? 1 : 0);
+                if (editor != nullptr)
+                    report << " size=" << editor->getWidth() << "x" << editor->getHeight()
+                           << " unaware_mark=" << (int) (bool) editor->getProperties()["lynxDpiUnaware"]
+                           << " dims_mark=" << (int) (bool) editor->getProperties()["lynxScaleEditorDimensions"];
+                report << " docked=" << (int) lynx::PluginWindows::isDocked (instance);
+                int windows = 0;
+                if (const auto unaware = lynx::platform::dpiUnawareWindowCount (lynx::PluginWindows::hostWindowHandle (instance), windows); unaware >= 0)
+                {
+                    report << " windows=" << windows << " unaware_windows=" << unaware;
+                    expect ((juce::String (tag) + "_unaware_as_set").toRawUTF8(),
+                            juce::String (tag) == "default" ? unaware == 0 : (windows > 0 && unaware == windows));
+                }
+                report << "\n";
+                lynx::PluginWindows::close (instance);
+            }
+            void change()
+            {
+                engine->editSong ([] (lynx::Song& s) {
+                    s.mixer[1].effects[0].plugin.dpiAware = false;
+                    s.mixer[1].effects[0].plugin.scaleEditorDimensions = true;
+                });
+                engine->renderOffline (0.05, 48000.0); // ("DPI aware" reloads the plugin)
+            }
+        };
+        auto st = std::make_shared<State>();
+        st->folder = juce::File (folderPath);
+        st->folder.createDirectory();
+        st->engine = std::make_shared<lynx::AudioEngine> (false);
+        st->engine->getPluginHost().addPluginFile (juce::File (pluginPath));
+        for (const auto& t : st->engine->getPluginHost().getKnownPlugins().getTypes())
+            if (! st->type && (juce::File (t.fileOrIdentifier) == juce::File (pluginPath) || juce::File (pluginPath).isAChildOf (juce::File (t.fileOrIdentifier))
+                               || juce::File (t.fileOrIdentifier).isAChildOf (juce::File (pluginPath))))
+                st->type = t;
+        st->expect ("plugin_found", st->type.has_value());
+        if (st->type)
+        {
+            st->report << "plugin=" << st->type->name << " (" << st->type->pluginFormatName << ")\n";
+            auto song = lynx::Song::makeDefault();
+            auto slot = lynx::makeEffectSlot (lynx::EffectKind::plugin);
+            slot.plugin.id = st->type->createIdentifierString().toStdString();
+            slot.plugin.name = st->type->name.toStdString();
+            song.mixer[1].effects = { slot };
+            st->engine->setSong (song);
+            st->engine->renderOffline (0.05, 48000.0);
+            const auto* ref = State::find (const_cast<lynx::Song&> (st->engine->getSong()));
+            st->expect ("fl_defaults", ref != nullptr && ref->dpiAware && ! ref->scaleEditorDimensions);
+            st->expect ("shot_default_100", st->save ("gui-default.png", 1.0f));
+            st->expect ("shot_default_150", st->save ("gui-default@150.png", 1.5f));
+        }
+        auto finish = [this, st] {
+            st->folder.getChildFile ("report.txt").replaceWithText (st->report + "result=" + (st->ok ? "OK" : "FAIL") + "\n");
+            st->engine.reset();
+            setApplicationReturnValue (st->ok ? 0 : 1);
+            quit();
+        };
+        if (! st->type || ! openEditors)
+        {
+            if (st->type)
+            {
+                st->change();
+                st->expect ("shot_changed_100", st->save ("gui-changed.png", 1.0f));
+                st->expect ("shot_changed_150", st->save ("gui-changed@150.png", 1.5f));
+            }
+            finish();
+            return;
+        }
+        // with --open: open the editor (default settings), look after 1 s, close; change; open again, look, close
+        wrapperShot190oh = std::make_unique<WrapperShot190oh>();
+        wrapperShot190oh->step = [st, finish] {
+            if (st->wait-- > 0)
+                return true;
+            switch (st->phase++)
+            {
+                case 0: st->open(); st->wait = 10; return true;
+                case 1: st->describe ("default"); st->wait = 3; return true;
+                case 2:
+                    st->change();
+                    st->expect ("shot_changed_100", st->save ("gui-changed.png", 1.0f));
+                    st->expect ("shot_changed_150", st->save ("gui-changed@150.png", 1.5f));
+                    st->open();
+                    st->wait = 10;
+                    return true;
+                case 3: st->describe ("changed"); st->wait = 3; return true;
+                default: finish(); return false;
+            }
+        };
+        wrapperShot190oh->startTimer (100);
+    }
+
     void runWrapperShot (const juce::String& pluginPath, const juce::String& folderPath)
     {
         const juce::File folder (folderPath);

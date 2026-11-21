@@ -12290,3 +12290,8 @@ countries: fr be ch ca lu
 "Randomize: the selected notes' velocities (all the notes with none selected) move at random by up to the amount beside it" = "Aléatoire : les vélocités des notes sélectionnées (toutes les notes si aucune n'est sélectionnée) changent au hasard jusqu'à la valeur à côté"
 "Randomization Amount" = "Quantité aléatoire"
 "Randomization Amount: velocities move up or down by up to this much (drag, or type a number and press Enter)" = "Quantité aléatoire : les vélocités montent ou descendent au plus de cette valeur (glissez, ou tapez un nombre puis Entrée)"
+"GUI" = "Interface"
+"DPI aware (requires reloading the plugin)" = "Compatible DPI (nécessite de recharger le plugin)"
+"For plugins that appear too big or small" = "Pour les plugins qui s'affichent trop grands ou trop petits"
+"Scale editor dimensions" = "Mettre à l'échelle les dimensions de l'éditeur"
+"Scale dimensions of plugins that appear cut-off on a high resolution screen" = "Met à l'échelle les dimensions des plugins qui apparaissent coupés sur un écran haute résolution"

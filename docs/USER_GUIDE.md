@@ -148,6 +148,20 @@ running in a separate process or in the 32-bit bridge, and on Windows, Linux and
 SHARE's own panels the drag stays LYNX SHARE's, so the Channel rack, the Playlist and the Mixer take it as before. You
 can also drag a sample out to another program.
 
+## Plugin windows that look too big, too small or cut off (Windows)
+
+Open the plugin's window, click the wrapper settings tab (the gear) and look at **Settings › GUI**, as in FL Studio:
+
+- **DPI aware (requires reloading the plugin)**, on by default: the plugin draws itself at your display's scale. Turn
+  it off for an old plugin that looks tiny or blurry-wrong at 125-200 %: Windows then draws its window at 100 % and
+  enlarges it. Such a window always opens as a window of its own (not docked), and it can look a little soft.
+- **Scale editor dimensions**, off by default: turn it on when a plugin's window is cut off on a high-resolution
+  screen (part of the plugin is outside the window). LYNX SHARE then makes the window as large as the plugin draws.
+
+Changing either closes the plugin's window; open it again. Both settings are saved with the project and with FL Studio
+projects you export or import. On Linux and macOS the plugin follows the display's scale by itself ("DPI aware" is
+greyed out).
+
 ## Online sessions: make a song with a friend (phase 1, packages)
 
 Send your project to a friend, who records their part in their own LYNX SHARE with their own plugins and sends it back; you

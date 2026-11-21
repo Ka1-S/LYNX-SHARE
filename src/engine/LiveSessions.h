@@ -240,6 +240,7 @@ public:
         juce::int64 packedSaved = 0; // bytes FLAC saved on the media sent
         int hashedOffThread = 0;
         int mediaRefused = 0, rejoined = 0;
+        int mediaResumed = 0; // round 190oh: transfers that went on from a piece after a drop (sender side)
         int hostedRendered = 0, valueEditsRefused = 0; // P5-A1: parts rendered for their owners, proposals over the rate limit
     };
     Stats getStats() const noexcept { return stats; }
@@ -277,6 +278,7 @@ private:
         std::uint32_t fromTag = 0;    // (the peer number changes when it reconnects)
         bool packed = false;          // FLAC pack pieces ('F')
         bool verifying = false;       // complete: being checked off the message thread
+        bool resumeAsked = false;     // round 190oh: asked to go on from piece `got` after a drop
         juce::String name;
         juce::File file;
         int count = 0, got = 0;
@@ -293,6 +295,7 @@ private:
     livecrypto::Keys keys;
     std::unique_ptr<livecrypto::Sealer> sealer;
     std::unique_ptr<livecrypto::Opener> opener;
+    std::array<std::uint8_t, 32> openerKey {}; // (round 190oh: the session the opener belongs to)
     livelink::Connection link;
     juce::String roomId, hostToken, wsUrl;
     int myPeer = 0, hostPeer = 0;
@@ -404,7 +407,7 @@ private:
     void tokenize (Song& song);
     void detokenize (Song& song, int fromPeer);
     juce::String shaOf (const juce::File& f);
-    void serve (int to, const juce::String& sha);
+    void serve (int to, const juce::String& sha, int resumeFrom = 0, bool resumePacked = false);
     void finishMedia (const juce::String& sha, bool ok);
     juce::String nameOf (std::uint32_t tag) const;
     void releaseHeld();

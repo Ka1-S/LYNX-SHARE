@@ -147,6 +147,34 @@ std::vector<std::uint8_t> Sealer::seal (const std::vector<std::uint8_t>& plain)
 
 Opener::Opener (const std::array<std::uint8_t, 32>& k) : key (k) {}
 
+bool Opener::fresh (Seen& s, std::uint64_t counter) noexcept
+{
+    if (counter == 0)
+        return false; // (counters start at 1)
+    if (counter > s.last)
+    {
+        const auto shift = counter - s.last;
+        if (s.last == 0 || shift > 64)
+            s.window = 0;
+        else if (shift == 64)
+            s.window = (std::uint64_t) 1 << 63; // (only the old highest is still inside)
+        else
+            s.window = (s.window << shift) | ((std::uint64_t) 1 << (shift - 1)); // (the old highest is bit shift - 1)
+        s.last = counter;
+        return true;
+    }
+    if (counter == s.last)
+        return false;
+    const auto back = s.last - counter; // 1 … : bit back - 1
+    if (back > 64)
+        return false;
+    const auto bit = (std::uint64_t) 1 << (back - 1);
+    if ((s.window & bit) != 0)
+        return false;
+    s.window |= bit;
+    return true;
+}
+
 std::optional<std::vector<std::uint8_t>> Opener::open (const std::vector<std::uint8_t>& frame, std::uint64_t* senderOut)
 {
     if (frame.size() < overhead || frame[0] != magic || frame[1] != version)
@@ -157,10 +185,15 @@ std::optional<std::vector<std::uint8_t>> Opener::open (const std::vector<std::ui
         != 0)
         return std::nullopt;
     const auto sender = get64 (inner.data()), counter = get64 (inner.data() + 8);
-    auto& seen = last[sender];
-    if (counter <= seen)
+    auto it = senders.find (sender);
+    if (it == senders.end())
+    {
+        if (senders.size() >= maxSenders) // (the sender seen first is an old connection's)
+            senders.erase (std::min_element (senders.begin(), senders.end(), [] (const auto& a, const auto& b) { return a.second.order < b.second.order; }));
+        it = senders.emplace (sender, Seen { 0, 0, ++sendersSeen }).first;
+    }
+    if (! fresh (it->second, counter))
         return std::nullopt; // (a replay)
-    seen = counter;
     if (senderOut != nullptr)
         *senderOut = sender;
     return std::vector<std::uint8_t> (inner.begin() + 16, inner.end());

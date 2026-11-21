@@ -37,6 +37,7 @@
 #include "ui/WindowPlaces.h"
 #include "ui/ChannelSettings.h"
 #include "platform/Paths.h"
+#include "platform/NativeEmbed.h"
 #include "ui/Theme.h"
 
 #if JUCE_WINDOWS
@@ -533,7 +534,8 @@ public:
 
     // (+ Options › Bit size where it applies; + the MIDI group's Velocity row for an instrument, round 190ao)
     // (round 190ks: + the MIDI group's "Record notes from the plugin window" row)
-    int preferredHeight() const { return (bridge32Supported() ? 474 : 410) + rowHeight + (instrumentChannel ? rowHeight : 0); }
+    // (round 190oh: + the GUI group, two rows)
+    int preferredHeight() const { return (bridge32Supported() ? 474 : 410) + rowHeight + (instrumentChannel ? rowHeight : 0) + headerHeight + 2 * rowHeight + 16; }
     void selectTab (int t) { showTab (juce::jlimit (0, 2, t)); }
 
     void paint (juce::Graphics& g) override
@@ -673,6 +675,15 @@ public:
                 label (row.removeFromLeft (80), tr ("Bit size"));
                 show (bitSize, row.removeFromLeft (110).reduced (0, 2));
             }
+            // FL's Settings › GUI (round 190oh, P3): "DPI aware", "Scale editor dimensions" (FL's other GUI boxes have
+            // no LYNX behaviour and are left out, as the Processing / Troubleshooting tabs do)
+            int guiRows = 0;
+            for (const auto& o : wrapperOptions())
+                guiRows += juce::String (o.section) == "GUI" ? 1 : 0;
+            auto gui = group (area, headerHeight + guiRows * rowHeight + 8, tr ("GUI"));
+            for (std::size_t i = 0; i < wrapperOptions().size(); ++i)
+                if (juce::String (wrapperOptions()[i].section) == "GUI")
+                    show (*toggles[(int) i], gui.removeFromTop (rowHeight));
         }
         else
         {
@@ -875,6 +886,11 @@ private:
         {
             toggles[(int) i]->setToggleState (ref->*(options[i].member), juce::dontSendNotification);
             toggles[(int) i]->setEnabled (! options[i].needsFixed || ref->fixedBuffers);
+           #if ! JUCE_WINDOWS
+            // (round 190oh: Windows' DPI awareness; elsewhere the editor follows the display's scale by itself)
+            if (options[i].member == &PluginRef::dpiAware)
+                toggles[(int) i]->setEnabled (false);
+           #endif
         }
         // with Options › "Run plugins in a separate process" every plugin already runs bridged
         for (std::size_t i = 0; i < options.size(); ++i)
@@ -1378,9 +1394,30 @@ bool canDock (const juce::AudioPluginInstance& plugin)
     return nativechild::dockingEnabled() && dockWorkspace() != nullptr && ! isSandboxedPlugin (plugin);
 }
 
+// FL's wrapper Settings › GUI (round 190oh, P3) for the editor about to open: its plugin's PluginRef, or nullptr
+const PluginRef* editorRef (const PluginWindows::WrapperContext& context)
+{
+    return context.engine != nullptr && context.find ? context.find (const_cast<Song&> (context.engine->getSong())) : nullptr;
+}
+
+// "DPI aware" off (Windows; a plugin in LYNX's own process): the editor and the window around it are made in a
+// DPI-unaware context, so Windows draws them at 96 dpi and stretches them to the display's scale — the whole window,
+// as JUCE's plugin host does it (a DPI-unaware child inside LYNX's per-monitor-aware windows would need every
+// container window made for mixed hosting). Such a window is always a window of its own (it can't dock).
+bool dpiUnawareEditor (const juce::AudioPluginInstance& plugin, const PluginWindows::WrapperContext& context)
+{
+   #if JUCE_WINDOWS
+    const auto* ref = editorRef (context);
+    return ref != nullptr && ! ref->dpiAware && ! isSandboxedPlugin (plugin);
+   #else
+    juce::ignoreUnused (plugin, context);
+    return false;
+   #endif
+}
+
 bool opensDetached (const juce::AudioPluginInstance& plugin, const PluginWindows::WrapperContext& context)
 {
-    if (! canDock (plugin))
+    if (! canDock (plugin) || dpiUnawareEditor (plugin, context))
         return true;
     if (context.engine != nullptr && context.find)
         if (const auto* ref = context.find (const_cast<Song&> (context.engine->getSong())))
@@ -1721,6 +1758,9 @@ public:
 
     // A plugin in a separate process shows its editor in a window of that process: LYNX can't keep that one in front.
     bool pinnable() const { return ! isSandboxedPlugin (*key()); }
+    // (round 190oh: FL's "DPI aware" off. The first native window is made inside PluginWindows::open's DPI-unaware
+    // scope; this keeps a native window made again later unaware too)
+    const bool dpiUnaware = dpiUnawareEditor (*key(), getContext());
     bool pinnedOnTop() const override { return pinned; }
     void setPinnedOnTop (bool on) override { setPinned (on, true); }
 
@@ -1760,6 +1800,10 @@ public:
     // Auto-Tune Pro editor, 2026-10-25). (Re-applied whenever the native window is re-created.)
     void addToDesktop (int styleFlags, void* nativeWindowToAttachTo) override
     {
+        // (round 190oh: a DPI-unaware editor's window stays DPI-unaware when its native window is made again)
+        std::optional<juce::ScopedDPIAwarenessDisabler> dpi;
+        if (dpiUnaware)
+            dpi.emplace();
         DocumentWindow::addToDesktop (styleFlags, nativeWindowToAttachTo);
         useClassicRendering();
     }
@@ -2432,8 +2476,22 @@ void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const
     // the same one). A plugin that crashes making it is switched off like after a crash while playing, and the
     // "Plugin crashed" prompt says so; no window opens.
     crashguard::note (("making the editor of " + plugin.getName()).toStdString());
+    // FL's wrapper Settings › GUI (round 190oh, P3): "DPI aware" off makes the editor and its window DPI-unaware
+    // (Windows); "Scale editor dimensions" takes the size the editor reports in logical pixels. The default path (both
+    // at FL's defaults) is unchanged: no scope, no property, no re-fit.
+    const auto unaware = dpiUnawareEditor (plugin, context);
+    const auto* ref = editorRef (context);
+    const auto scaleDims = ref != nullptr && ref->scaleEditorDimensions && ! isSandboxedPlugin (plugin);
+    if (ref != nullptr && isSandboxedPlugin (plugin)) // (its process makes the window: it gets the settings of now)
+        setSandboxedEditorScaling (plugin, ref->dpiAware, ref->scaleEditorDimensions);
+    std::optional<juce::ScopedDPIAwarenessDisabler> dpi;
+    if (unaware)
+        dpi.emplace();
     if (! callPluginFromUi (plugin, "making its editor", [&plugin] { plugin.createEditorIfNeeded(); }))
         return;
+    if (unaware || scaleDims)
+        if (auto* editor = plugin.getActiveEditor())
+            platform::setEditorScaling (*editor, unaware, scaleDims);
     // round 190oa (DF-130): the window keeps its place with the project (FL's wrapper record): a mixer slot's by its
     // place, a channel's by the channel
     juce::String placeKey;
@@ -2442,12 +2500,13 @@ void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const
     else if (context.channel && context.engine != nullptr && context.find)
     {
         auto& song = const_cast<Song&> (context.engine->getSong());
-        if (const auto* ref = context.find (song))
+        if (const auto* channelRef = context.find (song))
             for (int c = 0; c < (int) song.channels.size(); ++c)
-                if (&song.channels[(std::size_t) c].plugin == ref)
+                if (&song.channels[(std::size_t) c].plugin == channelRef)
                     placeKey = windowplaces::channelKey (song.channels[(std::size_t) c].uid, c);
     }
     open[&plugin] = makeHost (std::move (owner), plugin, title, std::move (context));
+    dpi.reset();
     if (auto* window = dynamic_cast<juce::Component*> (open[&plugin].get()); window != nullptr && placeKey.isNotEmpty())
         windowplaces::tag (*window, placeKey);
     // FL's "Limit the number of open plugin editors" (round 189o, core/EditorLimit.h): past 25, the oldest closes
