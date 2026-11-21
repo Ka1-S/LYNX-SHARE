@@ -4809,6 +4809,24 @@ public: // (the class stays public from here, as before)
 
         if (kind == EffectKind::grossBeat && gbMouseDown (e, item, index)) // round 168m: the envelope editor and slot settings
             return;
+        if (isVocBands (item) && e.mods.isLeftButtonDown()) // round 190oa (DP-33): FL's band levels drawn with the mouse
+        {
+            vocDragging = true;
+            dragItem = index;
+            vocDrag (item, e.position, true);
+            return;
+        }
+        // round 190oa (DP-44, capture 190oa C6): FL's right-click on one of Love Philter's eight unit switches shows that
+        // unit (its page), with no menu and no solo
+        if (kind == EffectKind::lovePhilter && e.mods.isPopupMenu() && item.type == Item::toggle && item.param != nullptr)
+            for (int u = 0; u < 8; ++u)
+                if (juce::String (item.param) == "Unit " + juce::String (u + 1) + " on") // (core/PluginLayout168r.inc philterName)
+                {
+                    page = page - page % 8 + u;
+                    hoverItem = -1;
+                    repaint();
+                    return;
+                }
 
         // round 190jd: Fruity Limiter's display switch (FL's scrolling graph by default; LYNX's transfer curve as a second view)
         if (! e.mods.isPopupMenu() && limiterViewItem (item))
@@ -5325,6 +5343,24 @@ public: // (the class stays public from here, as before)
         if (tpSpeedDragging && dragItem >= 0 && dragItem < (int) activeLayout().items.size()) // round 190lx (DP-31)
         {
             tpSetSpeedAt (activeLayout().items[(std::size_t) dragItem], e.position.y);
+            return;
+        }
+        if (vocDragging && dragItem >= 0 && dragItem < (int) activeLayout().items.size()) // round 190oa (DP-33)
+        {
+            vocDrag (activeLayout().items[(std::size_t) dragItem], e.position, false);
+            return;
+        }
+        if (limSpeedDragging && dragItem >= 0 && dragItem < (int) activeLayout().items.size()) // round 190oa (DP-25)
+        {
+            limSetSpeedAt (activeLayout().items[(std::size_t) dragItem], e.position.y);
+            return;
+        }
+        if (maxSpeedDragging && dragItem >= 0 && dragItem < (int) activeLayout().items.size()) // round 190oa (DP-27)
+        {
+            const auto r = rectOf (activeLayout().items[(std::size_t) dragItem]);
+            const auto t = r.reduced (2.0f * scale(), 0.0f);
+            maxSpeed = juce::jlimit (0.0f, 1.0f, (e.position.x - t.getX()) / juce::jmax (1.0f, t.getWidth()));
+            repaint (r.getSmallestIntegerContainer());
             return;
         }
         if (mbSpeedDragging && dragItem >= 0 && dragItem < (int) activeLayout().items.size()) // round 190mk (DP-30)

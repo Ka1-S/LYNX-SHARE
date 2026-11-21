@@ -142,6 +142,22 @@ std::vector<std::uint8_t> serialise (const State& s)
     return d;
 }
 
+float bandHz (const State& s, int band) noexcept
+{
+    auto lo = edgeHz (s.c[freqMin]), hi = edgeHz (s.c[freqMax]);
+    if (lo > hi)
+        lo = hi - 1.0f;
+    const auto sv = (float) s.c[freqScale] / 128.0f;
+    const auto scale = (float) (std::llrint ((double) (float) (dmath::exp ((double) sv * dmath::ln (10000.0)) - 1.0)) + 1);
+    const auto lnScale = dmath::ln ((double) (scale + 1.0f));
+    const auto edge = [&] (int i) {
+        const auto t = (float) ((double) i / (double) std::max (1, s.bands));
+        const auto u = (float) (dmath::exp ((double) t * lnScale) - 1.0) / scale;
+        return centsOf (lo + u * (hi - lo));
+    };
+    return hzOf ((edge (band) + edge (band + 1)) * 0.5f);
+}
+
 float edgeHz (int raw) noexcept
 {
     const auto t = (float) ((double) raw * (1.0 / 65536.0));
