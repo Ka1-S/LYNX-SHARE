@@ -12226,3 +12226,9 @@ countries: nl be
 "self: {0} samples" = "eigen: {0} samples"
 "The main (monitor) volume of the toolbar; exports and the mix are the same" = "Het hoofdvolume (meeluistervolume) van de werkbalk; exports en de mix blijven gelijk"
 "Gross Beat's scratch offset (Time offset (scratching)) plays without the offset: {0}" = "De scratch-verschuiving van Gross Beat (Time offset (scratching)) speelt zonder de verschuiving: {0}"
+# round 190of: the Plugin performance monitor's Longest / Spikes, the split CPU meter (P24)
+"Longest" = "Langste"
+"Spikes" = "Pieken"
+"The longest single call since the reset, in milliseconds (red: half of the audio buffer or more)" = "De langste enkele aanroep sinds de reset, in milliseconden (rood: de helft van de audiobuffer of meer)"
+"Calls that took more than half of the time their own audio lasts: one plugin alone near the deadline, what makes the sound stutter" = "Aanroepen die meer dan de helft van de duur van hun eigen audio kostten: één plugin alleen dicht bij de grens, wat het geluid laat haperen"
+"Live part {0}%, rendered ahead {1}% (together {2}% of one core)." = "Live deel {0}%, vooruit gerenderd {1}% (samen {2}% van één kern)."

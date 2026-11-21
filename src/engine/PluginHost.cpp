@@ -586,13 +586,8 @@ PluginInstrument::PluginInstrument (std::unique_ptr<juce::AudioPluginInstance> i
         routeOffset[k].store (0);
         routeActive[k].store (k >= outs.size() || outs[k].activeByDefault);
     }
-    if (! outs.empty())
-    {
-        aux.resize (outs.size());
-        for (auto& a : aux)
-            for (auto& side : a)
-                side.assign ((std::size_t) auxCapacity, 0.0f);
-    }
+    // (the outputs' own buffers, 128 KiB per output, are made by configure() once an output plays on another insert:
+    // round 190of — a 16-output plugin held 2 MiB for them whether or not anything was routed)
     if (fixedBlock > 0)
     {
         // (every output channel goes through the fixed blocks: the other outputs keep their place too)
@@ -1281,7 +1276,7 @@ void PluginInstrument::mixOutputs (const float* const* ch, int numChannels, int 
         }
         return;
     }
-    const auto viaAux = anyAux.load (std::memory_order_relaxed) && ! aux.empty();
+    const auto viaAux = anyAux.load (std::memory_order_acquire) && ! aux.empty();
     for (std::size_t k = 0; k < outs.size(); ++k)
     {
         const auto& o = outs[k];
@@ -1323,13 +1318,23 @@ void PluginInstrument::configure (const ChannelDef& channel, double) noexcept
         routeActive[k].store (on, std::memory_order_relaxed);
         elsewhere = elsewhere || (on && route.offset != 0);
     }
-    anyAux.store (elsewhere && ! aux.empty(), std::memory_order_relaxed);
+    // round 190of: the outputs' buffers on first use. Never on the audio thread (the rack's build); the audio thread
+    // reads `aux` only after it sees anyAux, which is stored after them (and they are never made smaller)
+    if (elsewhere && aux.empty() && ! outs.empty())
+    {
+        std::vector<std::array<std::vector<float>, 2>> made (outs.size());
+        for (auto& a : made)
+            for (auto& side : a)
+                side.assign ((std::size_t) auxCapacity, 0.0f);
+        aux = std::move (made);
+    }
+    anyAux.store (elsewhere && ! aux.empty(), std::memory_order_release);
 }
 
 void PluginInstrument::beginChunk (int n) noexcept
 {
     auxCursor = 0;
-    if (! anyAux.load (std::memory_order_relaxed))
+    if (! anyAux.load (std::memory_order_acquire))
         return;
     for (auto& a : aux)
         for (auto& side : a)

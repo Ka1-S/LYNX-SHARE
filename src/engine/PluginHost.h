@@ -238,7 +238,7 @@ public:
     const std::vector<PluginOutputInfo>& outputs() const noexcept { return outs; }
     void configure (const ChannelDef& channel, double bpm) noexcept override;
     void beginChunk (int n) noexcept override;
-    int auxOutputCount() const noexcept override { return anyAux.load (std::memory_order_relaxed) ? (int) outs.size() : 0; }
+    int auxOutputCount() const noexcept override { return anyAux.load (std::memory_order_acquire) ? (int) outs.size() : 0; }
     int auxOutputTrack (int k) const noexcept override;
     const float* auxOutputData (int k, int side) const noexcept override;
 

@@ -196,6 +196,11 @@ public:
     // Round 190gg (B5): the dropouts since the start, the last one's time and cause (ui/PluginMonitorWindow.h
     // describeDropouts), at the end of the CPU hint
     void setDropouts (const juce::String& text) { dropoutText = text; }
+    // Round 190of (P24, the split CPU meter): render-ahead's counters (core/RenderAhead.h Stats liveNs / aheadNs /
+    // audioNs, counted up); the hint shows the live part and the part rendered ahead since the last call
+    void setSplit (std::uint64_t liveNs, std::uint64_t aheadNs, std::uint64_t audioNs);
+    double liveShare() const noexcept { return splitLive; }   // (tests / shots: the last figures, 1 = one core)
+    double aheadShare() const noexcept { return splitAhead; }
     // round 190iv: Live's CPU box ("26 %" over an orange load bar, 54 x 17); FL's look is unchanged
     void setLook (toolbarlayout::Look l);
     void paint (juce::Graphics& g) override;
@@ -232,6 +237,8 @@ private:
     juce::StringArray heaviest;
     juce::uint32 lastGlitchAt = 0; // ms counter of the last new over-deadline callback (0 = none)
     double cpu = 0.0, cpuSmoothed = 0.0;
+    std::uint64_t lastLiveNs = 0, lastAheadNs = 0, lastAudioNs = 0; // (round 190of)
+    double splitLive = 0.0, splitAhead = 0.0;
     toolbarlayout::Look look = toolbarlayout::Look::fl;
     std::int64_t memory = 0;
     int voices = 0, peakVoices = 0, fps = 0;

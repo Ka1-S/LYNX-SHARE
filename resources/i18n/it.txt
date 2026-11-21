@@ -12226,3 +12226,9 @@ countries: it ch sm
 "self: {0} samples" = "propria: {0} campioni"
 "The main (monitor) volume of the toolbar; exports and the mix are the same" = "Il volume principale (di ascolto) della barra degli strumenti; esportazioni e mix restano uguali"
 "Gross Beat's scratch offset (Time offset (scratching)) plays without the offset: {0}" = "L'offset di scratch di Gross Beat (Time offset (scratching)) suona senza l'offset: {0}"
+# round 190of: the Plugin performance monitor's Longest / Spikes, the split CPU meter (P24)
+"Longest" = "Più lunga"
+"Spikes" = "Picchi"
+"The longest single call since the reset, in milliseconds (red: half of the audio buffer or more)" = "La chiamata singola più lunga dal reset, in millisecondi (rosso: metà del buffer audio o più)"
+"Calls that took more than half of the time their own audio lasts: one plugin alone near the deadline, what makes the sound stutter" = "Chiamate che hanno richiesto più della metà del tempo che dura il loro audio: un plugin da solo vicino al limite, ciò che fa scattare il suono"
+"Live part {0}%, rendered ahead {1}% (together {2}% of one core)." = "Parte dal vivo {0}%, renderizzato in anticipo {1}% (insieme {2}% di un core)."

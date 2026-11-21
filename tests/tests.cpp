@@ -18066,3 +18066,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Tracker190nwTests.inc" // round 190nw (0.1.31): the built-in tracker, stage 1 (core/TrackerGrid.h, core/ModuleImport.h)
 #include "CrossPaste190nzTests.inc" // round 190nz: issue #232 stage 2 (copy and paste between windows)
 #include "Issues190odTests.inc" // round 190od: issues #236, #238, #239, #240
+#include "Perf190ofTests.inc" // round 190of: the monitor's Longest / Spikes, the split CPU meter (P24), latency check
