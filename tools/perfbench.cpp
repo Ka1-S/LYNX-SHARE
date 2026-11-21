@@ -373,6 +373,21 @@ int main (int argc, char** argv)
     }
 
     const auto importMs = std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - import0).count();
+    // round 190of: LYNX_PB_SMARTALL=1 = FL's Tools > Macros > "Switch smart disable for all plugins" (every slot on), and
+    // LYNX_PB_SLOTS=1 lists how many slots have it on as imported
+    {
+        int on = 0, all = 0;
+        for (auto& track : song.mixer)
+            for (auto& slot : track.effects)
+            {
+                ++all;
+                on += slot.smartDisable ? 1 : 0;
+                if (std::getenv ("LYNX_PB_SMARTALL") != nullptr)
+                    slot.smartDisable = true;
+            }
+        if (std::getenv ("LYNX_PB_SLOTS") != nullptr)
+            std::printf ("slots: %d, smart disable on in %d%s\n", all, on, std::getenv ("LYNX_PB_SMARTALL") != nullptr ? " (now all on)" : "");
+    }
     std::int64_t songTicks = 0;
     song = makeExportSong (song, true, (std::int64_t) std::ceil (ticksPerSample (song.bpm, sampleRate) * sampleRate), songTicks);
     const auto tps = ticksPerSample (song.bpm, sampleRate);
@@ -417,6 +432,8 @@ int main (int argc, char** argv)
         renderer->prepare (sampleRate, std::max (2048, blockSize));
         renderer->setProfiling (units);
         auto bank = std::make_unique<MeterBank>();
+        const auto levels = std::getenv ("LYNX_PB_LEVELS") != nullptr; // (round 190of)
+        std::vector<float> trackPeaks (song.mixer.size(), 0.0f);
         auto live = std::make_unique<LiveEventQueue>();
         auto midiLive = std::make_unique<LiveEventQueue>();
         // render-ahead (round 190gq): the controller as ChannelRackProcessor drives it, the snapshot from an exchange
@@ -556,9 +573,17 @@ int main (int argc, char** argv)
                 if ((pos / (std::size_t) blockSize) % std::max<std::size_t> (1, (std::size_t) (sampleRate / 60 / blockSize)) == 0)
                 {
                     counter.pause();
+                    // round 190of: LYNX_PB_LEVELS=1 keeps each insert's highest peak over the last 2 s of rep 0 (what keeps a
+                    // stopped project's chains awake: smart disable needs -96 dB)
+                    const auto lastSeconds = rep == 0 && levels && (double) pos >= (double) totalSamples - 2.0 * sampleRate;
                     for (int t = 0; t < (int) song.mixer.size(); ++t)
                         for (int s = 0; s < 2; ++s)
-                            (void) bank->takePeak (t, s), (void) bank->takeViewPeak (t, s);
+                        {
+                            const auto peak = bank->takePeak (t, s);
+                            (void) bank->takeViewPeak (t, s);
+                            if (lastSeconds && t < (int) trackPeaks.size())
+                                trackPeaks[(std::size_t) t] = std::max (trackPeaks[(std::size_t) t], peak);
+                        }
                     counter.resume();
                 }
         }
@@ -632,6 +657,11 @@ int main (int argc, char** argv)
                 std::fwrite (right.data(), sizeof (float), right.size(), f);
                 std::fclose (f);
             }
+        if (rep == 0 && levels) // (round 190of: the inserts still above -140 dB at the end)
+            for (std::size_t t = 0; t < trackPeaks.size(); ++t)
+                if (trackPeaks[t] > 1.0e-7f)
+                    std::printf ("level insert %d \"%s\": %.1f dBFS%s\n", (int) t, song.mixer[t].name.c_str(), 20.0 * std::log10 (trackPeaks[t]),
+                                 trackPeaks[t] > 1.5849e-5f ? " (above smart disable's -96 dB)" : "");
         if (rep == 0)
             firstHash = h;
         sameHash = sameHash && h == firstHash;
