@@ -32,6 +32,7 @@
 // A caught crash leaves the plugin in an unknown state: the caller must never call that instance again (PluginEffect /
 // PluginInstrument switch to bypass / silence and report it, engine/PluginHost.h).
 
+#include <atomic>
 #include <cstdint>
 #include <string>
 #include <type_traits>
@@ -238,4 +239,12 @@ std::string lastHangFile();
 // named with LYNX.pdb next to it; system DLLs by their nearest export or module). Other platforms: nothing.
 void startMainProfiler (const std::string& fileUtf8, int intervalUs = 1000, int windowS = 5) noexcept;
 void stopMainProfiler() noexcept;
+
+// Round 190os (--uiperf with LYNX_UIPERF_STALLS=<folder>): a wall-clock sampler for frame stalls. Called on the message
+// thread: every `intervalUs` a time-critical thread records the CPU cycles every thread of this process ran since the
+// last sample, the stacks of the message thread and of the threads whose name contains one of `stackNames` (sampled
+// by copy, as the profiler above, whether they run or wait), and `*tag` (the safe-overload guard's state).
+// stopStallSampler writes them to the file (format in CrashGuard.cpp). Windows x64 only; elsewhere nothing.
+void startStallSampler (const std::vector<std::string>& stackNames, int intervalUs, const std::atomic<int>* tag) noexcept;
+void stopStallSampler (const std::string& fileUtf8) noexcept;
 } // namespace lynx::crashguard

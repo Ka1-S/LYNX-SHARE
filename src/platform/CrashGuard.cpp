@@ -23,6 +23,8 @@
  #include <windows.h>
  #include <dbghelp.h>
  #include <mmsystem.h>
+ #include <tlhelp32.h>
+ #include <intrin.h>
 #else
  #include <signal.h>
  #include <fcntl.h>
@@ -1935,6 +1937,283 @@ void stopMainProfiler() noexcept
         p.uiThread = nullptr;
     }
     catch (...) {}
+#endif
+}
+
+// --- wall-clock stall sampler (round 190os) ------------------------------------------------------------------------
+
+namespace
+{
+struct StallSampler
+{
+    std::mutex lock;
+    std::condition_variable wake;
+    std::thread thread;
+    bool quit = false;
+    int intervalUs = 2000;
+    const std::atomic<int>* tag = nullptr;
+#if defined(LYNX_UNWIND)
+    struct Watched
+    {
+        HANDLE handle = nullptr;
+        unsigned id = 0;
+        std::string name;
+        std::uintptr_t stackBase = 0, start = 0; // its stack's top (TEB) and start address (a driver's thread: its module)
+        bool stacks = false;                     // sampled with its stack (else its cycles only, and its stack while busy)
+        bool audio = false;                      // an audio thread (never suspended)
+        int priority = 0;
+        ULONG64 lastCycles = 0, lastCycles0 = 0;
+    };
+    std::vector<Watched> threads;
+    struct Sample
+    {
+        double ms = 0.0;
+        int tag = 0;
+        std::uint64_t processCycles = 0;
+        std::vector<std::pair<int, std::uint64_t>> cycles;                 // (thread index, cycles since the last sample)
+        std::vector<std::pair<int, std::vector<std::uintptr_t>>> stacks; // (thread index, frames)
+    };
+    std::vector<Sample> samples;
+    double qpcToMs = 0.0;
+    std::uint64_t busyCycles = 0;
+    std::uint64_t tsc0 = 0, tsc1 = 0;
+    double ms0 = 0.0, ms1 = 0.0;
+#endif
+};
+StallSampler& stallSampler()
+{
+    static StallSampler s;
+    return s;
+}
+
+#if defined(LYNX_UNWIND)
+double stallNowMs (const StallSampler& s)
+{
+    LARGE_INTEGER c {};
+    QueryPerformanceCounter (&c);
+    return (double) c.QuadPart * s.qpcToMs; // (the clock of juce::Time::getMillisecondCounterHiRes on Windows)
+}
+
+void stallLoop()
+{
+    auto& s = stallSampler();
+    SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+    timeBeginPeriod (1);
+    std::vector<std::uint8_t> stackCopy;
+    ULONG64 lastProcess = 0;
+    QueryProcessCycleTime (GetCurrentProcess(), &lastProcess);
+    for (;;)
+    {
+        {
+            std::unique_lock<std::mutex> l (s.lock);
+            if (s.wake.wait_for (l, std::chrono::microseconds (s.intervalUs), [&s] { return s.quit; }))
+                break;
+        }
+        if (s.samples.size() >= 200000)
+            continue;
+        StallSampler::Sample sample;
+        sample.ms = stallNowMs (s);
+        sample.tag = s.tag != nullptr ? s.tag->load (std::memory_order_relaxed) : 0;
+        ULONG64 process = 0;
+        QueryProcessCycleTime (GetCurrentProcess(), &process);
+        sample.processCycles = process - lastProcess;
+        lastProcess = process;
+        for (int i = 0; i < (int) s.threads.size(); ++i)
+        {
+            auto& t = s.threads[(std::size_t) i];
+            ULONG64 cycles = 0;
+            if (! QueryThreadCycleTime (t.handle, &cycles))
+                continue;
+            if (cycles != t.lastCycles)
+                sample.cycles.emplace_back (i, cycles - t.lastCycles);
+            t.lastCycles = cycles;
+            // (the threads asked for always; any other thread that ran at least ~0.2 ms since the last sample, except the
+            // audio threads, which are never suspended here)
+            const auto busy = cycles - t.lastCycles0 > s.busyCycles && ! t.audio;
+            t.lastCycles0 = cycles;
+            if ((t.stacks || busy) && t.stackBase != 0)
+                if (auto frames = sampleByCopy (t.handle, t.stackBase, stackCopy); ! frames.empty())
+                {
+                    if (frames.size() > 28)
+                        frames.resize (28);
+                    sample.stacks.emplace_back (i, std::move (frames));
+                }
+        }
+        s.samples.push_back (std::move (sample));
+    }
+    timeEndPeriod (1);
+}
+
+// a thread's stack top (from its TEB) and start address, through ntdll's NtQueryInformationThread
+void threadFacts (HANDLE thread, std::uintptr_t& stackBase, std::uintptr_t& start)
+{
+    using Query = LONG (WINAPI*) (HANDLE, int, void*, ULONG, ULONG*);
+    static const auto query = reinterpret_cast<Query> (reinterpret_cast<void*> (GetProcAddress (GetModuleHandleW (L"ntdll.dll"), "NtQueryInformationThread")));
+    stackBase = start = 0;
+    if (query == nullptr)
+        return;
+    struct BasicInformation
+    {
+        LONG exitStatus;
+        void* tebBaseAddress;
+        void* uniqueProcess;
+        void* uniqueThread;
+        ULONG_PTR affinityMask;
+        LONG priority, basePriority;
+    } basic {};
+    if (query (thread, 0 /* ThreadBasicInformation */, &basic, sizeof (basic), nullptr) >= 0 && basic.tebBaseAddress != nullptr)
+        stackBase = (std::uintptr_t) reinterpret_cast<const NT_TIB*> (basic.tebBaseAddress)->StackBase;
+    void* address = nullptr;
+    if (query (thread, 9 /* ThreadQuerySetWin32StartAddress */, &address, sizeof (address), nullptr) >= 0)
+        start = (std::uintptr_t) address;
+}
+#endif
+} // namespace
+
+void startStallSampler (const std::vector<std::string>& stackNames, int intervalUs, const std::atomic<int>* tag) noexcept
+{
+#if defined(LYNX_UNWIND)
+    try
+    {
+        auto& s = stallSampler();
+        if (s.thread.joinable())
+            return;
+        LARGE_INTEGER f {};
+        QueryPerformanceFrequency (&f);
+        s.qpcToMs = 1000.0 / (double) f.QuadPart;
+        s.intervalUs = std::max (500, intervalUs);
+        s.tag = tag;
+        s.quit = false;
+        s.samples.clear();
+        s.samples.reserve (16384);
+        for (auto& t : s.threads)
+            CloseHandle (t.handle);
+        s.threads.clear();
+        using GetDescription = HRESULT (WINAPI*) (HANDLE, PWSTR*);
+        static const auto getDescription = (GetDescription) (void*) GetProcAddress (GetModuleHandleW (L"kernel32.dll"), "GetThreadDescription");
+        const auto self = GetCurrentThreadId();
+        const auto snapshot = CreateToolhelp32Snapshot (TH32CS_SNAPTHREAD, 0);
+        if (snapshot == INVALID_HANDLE_VALUE)
+            return;
+        THREADENTRY32 entry {};
+        entry.dwSize = sizeof (entry);
+        for (auto ok = Thread32First (snapshot, &entry); ok; ok = Thread32Next (snapshot, &entry))
+        {
+            if (entry.th32OwnerProcessID != GetCurrentProcessId())
+                continue;
+            StallSampler::Watched t;
+            t.id = entry.th32ThreadID;
+            t.handle = OpenThread (THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, t.id);
+            if (t.handle == nullptr)
+                continue;
+            if (getDescription != nullptr)
+            {
+                PWSTR text = nullptr;
+                if (SUCCEEDED (getDescription (t.handle, &text)) && text != nullptr)
+                {
+                    t.name = narrow (text);
+                    LocalFree (text);
+                }
+            }
+            threadFacts (t.handle, t.stackBase, t.start);
+            t.priority = GetThreadPriority (t.handle);
+            t.audio = t.name.find ("LYNX worker") != std::string::npos || t.name.find ("LYNX audio") != std::string::npos
+                      || t.name.find ("render-ahead") != std::string::npos || t.priority >= THREAD_PRIORITY_TIME_CRITICAL;
+            t.stacks = t.id == self;
+            for (const auto& n : stackNames)
+                t.stacks = t.stacks || (! n.empty() && t.name.find (n) != std::string::npos);
+            QueryThreadCycleTime (t.handle, &t.lastCycles);
+            t.lastCycles0 = t.lastCycles;
+            if (t.id == self)
+                t.name = "(message thread) " + t.name;
+            s.threads.push_back (std::move (t));
+        }
+        CloseHandle (snapshot);
+        s.tsc0 = __rdtsc();
+        s.ms0 = stallNowMs (s);
+        {
+            // ~0.2 ms of a core in cycles (the time-stamp counter's rate, measured over 20 ms)
+            const auto t0 = __rdtsc();
+            const auto m0 = stallNowMs (s);
+            Sleep (20);
+            s.busyCycles = (std::uint64_t) ((double) (__rdtsc() - t0) / std::max (1.0, stallNowMs (s) - m0) * 0.2);
+        }
+        s.thread = std::thread (stallLoop);
+    }
+    catch (...) {}
+#else
+    (void) stackNames;
+    (void) intervalUs;
+    (void) tag;
+#endif
+}
+
+void stopStallSampler (const std::string& fileUtf8) noexcept
+{
+#if defined(LYNX_UNWIND)
+    try
+    {
+        auto& s = stallSampler();
+        if (! s.thread.joinable())
+            return;
+        {
+            const std::lock_guard<std::mutex> l (s.lock);
+            s.quit = true;
+        }
+        s.wake.notify_all();
+        s.thread.join();
+        s.tsc1 = __rdtsc();
+        s.ms1 = stallNowMs (s);
+        auto* out = std::fopen (fileUtf8.c_str(), "wb");
+        if (out != nullptr)
+        {
+            // the format (perf190os/s/stalls.py reads it): R <cycles per ms>; H <index> <id> <stacks 0|1> <start> <name>;
+            // S <ms> <tag> <process cycles> then the threads that ran "<index>:<cycles>"; K <index> <frames…> (hex);
+            // A <address> <LYNX.exe+0x… or module!export>
+            std::fprintf (out, "R %.3f\n", s.ms1 > s.ms0 ? (double) (s.tsc1 - s.tsc0) / (s.ms1 - s.ms0) : 0.0);
+            for (std::size_t i = 0; i < s.threads.size(); ++i)
+            {
+                const auto& t = s.threads[i];
+                std::fprintf (out, "H %zu %u %d %s p%d %s\n", i, t.id, t.stacks ? 1 : 0,
+                              t.start != 0 ? describeAddress (reinterpret_cast<const void*> (t.start)).c_str() : "?", t.priority, t.name.c_str());
+            }
+            std::map<std::uintptr_t, int> addresses;
+            for (const auto& sample : s.samples)
+            {
+                std::fprintf (out, "S %.3f %d %llu", sample.ms, sample.tag, (unsigned long long) sample.processCycles);
+                for (const auto& [i, c] : sample.cycles)
+                    std::fprintf (out, " %d:%llu", i, (unsigned long long) c);
+                std::fprintf (out, "\n");
+                for (const auto& [i, frames] : sample.stacks)
+                {
+                    std::fprintf (out, "K %d", i);
+                    for (const auto f : frames)
+                    {
+                        std::fprintf (out, " %llx", (unsigned long long) f);
+                        addresses[f] = 0;
+                    }
+                    std::fprintf (out, "\n");
+                }
+            }
+            const auto base = (std::uintptr_t) GetModuleHandleW (nullptr);
+            for (const auto& [a, unused] : addresses)
+            {
+                if (inOwnModule (a))
+                    std::fprintf (out, "A %llx LYNX.exe+0x%llx\n", (unsigned long long) a, (unsigned long long) (a - base));
+                else
+                    std::fprintf (out, "A %llx %s\n", (unsigned long long) a, functionOf (a).c_str());
+            }
+            std::fclose (out);
+        }
+        for (auto& t : s.threads)
+            CloseHandle (t.handle);
+        s.threads.clear();
+        s.samples.clear();
+        s.samples.shrink_to_fit();
+    }
+    catch (...) {}
+#else
+    (void) fileUtf8;
 #endif
 }
 

@@ -13515,6 +13515,9 @@ private:
             lynx::RtStats::Snapshot rtStart; // (presentsStart: 190jy's, above)
             std::map<std::string, std::pair<long long, long long>> tickersStart; // round 190kr
             int coveredStart = 0;
+            // round 190os: LYNX_UIPERF_STALLS=<folder>, each step's wall-clock thread samples and frame times there
+            // (crashguard::startStallSampler; perf190os/s/stalls.py)
+            juce::String stallsFolder = juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_STALLS", {});
 
             UiPerf (LynxApplication& a, juce::File r) : app (a), report (std::move (r))
             {
@@ -13555,6 +13558,18 @@ private:
                     cpuStart = lynx::processCpuSeconds();
                     messageCpuStart = lynx::threadCpuSeconds();
                     peerCpuStart = peerCpuSeconds (peerPid);
+                    // round 190os: LYNX_UIPERF_UIPRIO="<priority>[,m]" — the UI's helper threads (Direct2D's swap chain
+                    // waiters, the vblank and timer threads; with ",m" the message thread too) at that Windows thread
+                    // priority, for the stall A/B
+                    if (const auto prio = juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_UIPRIO", {}); prio.isNotEmpty())
+                        text << "    (UI threads at priority " << prio.getIntValue() << ": "
+                             << lynx::setThreadPriorities ({ "swap chain", "VBlank", "Timer" }, prio.endsWith (",m"), prio.getIntValue()) << " set)\n";
+                    // LYNX_UIPERF_DRVPRIO=<priority>: the graphics driver's own threads in this process (NVIDIA, AMD, Intel)
+                    if (const auto prio = juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_DRVPRIO", {}); prio.isNotEmpty())
+                        text << "    (driver threads at priority " << prio.getIntValue() << ": "
+                             << lynx::setThreadPriorities ({ "module:nvwgf2um", "module:amdxx", "module:atidxx", "module:igd10", "module:igd12" }, false, prio.getIntValue()) << " set)\n";
+                    if (stallsFolder.isNotEmpty())
+                        lynx::crashguard::startStallSampler ({ "swap chain", "VBlank", "Timer" }, 2000, &app.engine->getOverloadGuard().stateTag());
                     presentsStart = uiPerfPresents();
                     if (threadsWanted) // round 190ih: LYNX_UIPERF_THREADS=1, the CPU of every thread over the step
                         threadsStart = lynx::threadCpuList();
@@ -13680,6 +13695,16 @@ private:
                                  << " " << juce::String (1000.0 * (double) (counts.first - before.first) / wall, 0) << "/" << juce::String (1000.0 * (double) (counts.second - before.second) / wall, 0);
                     }
                     text << "; covered skips " << juce::String (1000.0 * (double) (lynx::nativechild::coveredSkips().load() - coveredStart) / wall, 0) << "/s\n";
+                }
+                if (stallsFolder.isNotEmpty())
+                {
+                    juce::File (stallsFolder).createDirectory();
+                    lynx::crashguard::stopStallSampler (juce::File (stallsFolder).getChildFile ("stall-" + juce::String ((int) step) + ".txt").getFullPathName().toStdString());
+                    juce::String list;
+                    for (const auto t : frames)
+                        list << juce::String (t, 3) << "\n";
+                    juce::File (stallsFolder).getChildFile ("frames-" + juce::String ((int) step) + ".txt").replaceWithText (list);
+                    text << "    stall samples: " << stallsFolder << " (step " << (int) step << ")\n";
                 }
                 if (s.finish)
                     text << s.finish();

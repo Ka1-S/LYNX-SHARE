@@ -164,6 +164,62 @@ std::vector<ThreadCpu> threadCpuList()
     return out;
 }
 
+int setThreadPriorities (const std::vector<std::string>& nameParts, bool messageThread, int priority)
+{
+    int changed = 0;
+   #if JUCE_WINDOWS
+    using GetDescription = HRESULT (WINAPI*) (HANDLE, PWSTR*);
+    static const auto getDescription = (GetDescription) (void*) GetProcAddress (GetModuleHandleW (L"kernel32.dll"), "GetThreadDescription");
+    const auto snapshot = CreateToolhelp32Snapshot (TH32CS_SNAPTHREAD, 0);
+    if (snapshot == INVALID_HANDLE_VALUE)
+        return 0;
+    THREADENTRY32 entry {};
+    entry.dwSize = sizeof (entry);
+    const auto self = GetCurrentProcessId(), me = GetCurrentThreadId();
+    for (auto ok = Thread32First (snapshot, &entry); ok; ok = Thread32Next (snapshot, &entry))
+    {
+        if (entry.th32OwnerProcessID != self)
+            continue;
+        const auto thread = OpenThread (THREAD_QUERY_INFORMATION | THREAD_SET_LIMITED_INFORMATION, FALSE, entry.th32ThreadID);
+        if (thread == nullptr)
+            continue;
+        auto wanted = messageThread && entry.th32ThreadID == me;
+        // ("module:<name>": a thread that starts in that module, e.g. a graphics driver's own threads)
+        for (const auto& part : nameParts)
+            if (! wanted && part.rfind ("module:", 0) == 0)
+            {
+                using Query = LONG (WINAPI*) (HANDLE, int, void*, ULONG, ULONG*);
+                static const auto query = reinterpret_cast<Query> (reinterpret_cast<void*> (GetProcAddress (GetModuleHandleW (L"ntdll.dll"), "NtQueryInformationThread")));
+                void* start = nullptr;
+                HMODULE module = nullptr;
+                wchar_t path[MAX_PATH] = {};
+                if (query != nullptr && query (thread, 9 /* ThreadQuerySetWin32StartAddress */, &start, sizeof (start), nullptr) >= 0
+                    && GetModuleHandleExW (GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCWSTR) start, &module)
+                    && GetModuleFileNameW (module, path, MAX_PATH) > 0)
+                    wanted = juce::File (juce::String (path)).getFileName().containsIgnoreCase (juce::String (part.substr (7)));
+            }
+        if (! wanted && getDescription != nullptr)
+        {
+            PWSTR text = nullptr;
+            if (SUCCEEDED (getDescription (thread, &text)) && text != nullptr)
+            {
+                const auto name = juce::String (text);
+                LocalFree (text);
+                for (const auto& part : nameParts)
+                    wanted = wanted || name.contains (juce::String (part));
+            }
+        }
+        if (wanted && SetThreadPriority (thread, priority))
+            ++changed;
+        CloseHandle (thread);
+    }
+    CloseHandle (snapshot);
+   #else
+    juce::ignoreUnused (nameParts, messageThread, priority);
+   #endif
+    return changed;
+}
+
 std::uint64_t processCpuCycles()
 {
    #if JUCE_WINDOWS
