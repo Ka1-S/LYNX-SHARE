@@ -44,7 +44,7 @@ jobs:
         run: |
           ulimit -s 1048576 || true
           if [[ "$RELEASE_OPT" == true ]]; then export LYNX_WIN_OPT="-O2 -Xclang -O3" LYNX_WIN_LTO=thin; fi
-          ZIG="$RUNNER_TEMP/zig/zig" JUCE_DIR="$RUNNER_TEMP/juce" OUT=build-win JOBS="$(nproc)" scripts/build-windows-zig.sh
+          ZIG="$RUNNER_TEMP/zig/zig" JUCE_DIR="$RUNNER_TEMP/juce" OUT=build-win JOBS=3 scripts/build-windows-zig.sh
 
       - uses: actions/upload-artifact@v4
         with:
