@@ -289,3 +289,38 @@ TEST (research190on_p10_stacked_lanes)
     CHECK (keys::findAction ("pianoRoll.stackedLanes") != nullptr && keys::findAction ("pianoRoll.stackedLanes")->defaults.empty());
 }
 
+// ==== 190on Online: removing a guest
+#include "core/LiveCrypto.h"
+#include "core/LiveRekey.h"
+
+TEST (research190on_online_remove_guest_new_code_for_new_joins)
+{
+    using namespace lynx;
+    livecrypto::Invite now { "abcdefghij", livecrypto::newSecret() };
+    const auto next = liverekey::rotated (now);
+    CHECK (next.room == now.room && next.secret != now.secret);
+    CHECK (livecrypto::parseCode (livecrypto::formatCode (next)).has_value());
+    const auto oldKeys = livecrypto::derive (now), newKeys = livecrypto::derive (next);
+    CHECK (oldKeys.relayToken != newKeys.relayToken && oldKeys.key != newKeys.key);
+    // the relay takes the new token (43..128 url-safe characters)
+    CHECK (newKeys.relayToken.size() >= 43 && newKeys.relayToken.find_first_not_of ("0123456789abcdef") == std::string::npos);
+    CHECK (liverekey::kickBody (2, true, newKeys.relayToken) == "{\"peer\":2,\"ban\":true,\"token\":\"" + newKeys.relayToken + "\"}");
+    CHECK (liverekey::kickBody (3, true, {}) == "{\"peer\":3,\"ban\":true}");
+    CHECK (liverekey::kickBody (-1, false, {}) == "{\"peer\":0,\"ban\":false}");
+    // the switch as LiveSessionManager does it: a guest still in the session opens what was sealed with the old key on
+    // the way (its previous opener) and what comes with the new one; the removed guest's old key opens nothing new
+    livecrypto::Sealer oldSealer (oldKeys.key), newSealer (newKeys.key);
+    livecrypto::Opener removedGuest (oldKeys.key);
+    livecrypto::Opener previous (oldKeys.key), current (newKeys.key);
+    const std::vector<std::uint8_t> hello { 'h', 'i' };
+    const auto inFlight = oldSealer.seal (hello);
+    const auto after = newSealer.seal (hello);
+    auto open = [&] (const std::vector<std::uint8_t>& frame) {
+        auto plain = current.open (frame);
+        return plain ? plain : previous.open (frame);
+    };
+    CHECK (open (inFlight).has_value());
+    CHECK (open (after).has_value());
+    CHECK (! removedGuest.open (after).has_value());
+    CHECK (! open (inFlight).has_value()); // (a replay is still refused)
+}

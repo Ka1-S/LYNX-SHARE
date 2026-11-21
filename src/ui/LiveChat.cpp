@@ -176,8 +176,9 @@ void showPermissions (LiveSessionManager& live)
     auto* w = new juce::AlertWindow (tr ("People and permissions"),
                                      tr ("What each person may change, from now on. Turning a permission off never deletes anything."),
                                      juce::MessageBoxIconType::NoIcon);
+    // (round 190on: the last choice removes the person; owner decision, recommended: a new invite code for new joins)
     const juce::StringArray roles { tr ("Their own channels, patterns, inserts and rows"), tr ("Their own parts + tempo and project settings"),
-                                    tr ("Everything"), tr ("Listen only (no edits)") };
+                                    tr ("Everything"), tr ("Listen only (no edits)"), tr ("Remove from the session") };
     const juce::StringArray keeps { tr ("Only their own part"), tr ("A full copy of the project") };
     for (const auto& p : guests)
     {
@@ -189,15 +190,25 @@ void showPermissions (LiveSessionManager& live)
         w->addComboBox ("keep" + id, keeps, tr ("{0} keeps at the end", { p.name }));
         w->getComboBoxComponent ("keep" + id)->setSelectedItemIndex (p.keepFull ? 1 : 0, juce::dontSendNotification);
     }
+    w->addComboBox ("code", { tr ("Give the session a new invite code (the people still in it keep going)"), tr ("Keep the same code") },
+                    tr ("When someone is removed"));
+    w->getComboBoxComponent ("code")->setSelectedItemIndex (0, juce::dontSendNotification);
     w->addButton (tr ("Apply"), 1, juce::KeyPress (juce::KeyPress::returnKey));
     w->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
     w->enterModalState (true, juce::ModalCallbackFunction::create ([w, guests, &live] (int result) {
                             if (result != 1 || ! live.isActive())
                                 return;
+                            const auto newCode = w->getComboBoxComponent ("code")->getSelectedItemIndex() != 1;
+                            std::vector<std::uint32_t> removing;
                             for (const auto& p : guests)
                             {
                                 const auto id = juce::String ((int) p.tag);
                                 const int role = w->getComboBoxComponent ("role" + id)->getSelectedItemIndex();
+                                if (role == 4)
+                                {
+                                    removing.push_back (p.tag);
+                                    continue;
+                                }
                                 live::Permissions perms;
                                 perms.settings = role == 1;
                                 perms.editEverything = role == 2;
@@ -206,6 +217,9 @@ void showPermissions (LiveSessionManager& live)
                                 if (! (perms == p.permissions) || full != p.keepFull)
                                     live.setPermissions (p.tag, perms, full);
                             }
+                            // (one new code for all of them: only the last removal changes it)
+                            for (std::size_t i = 0; i < removing.size(); ++i)
+                                live.removeGuest (removing[i], newCode && i + 1 == removing.size());
                         }),
                         true);
 }
