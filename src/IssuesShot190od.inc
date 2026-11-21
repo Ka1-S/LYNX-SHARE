@@ -22,7 +22,9 @@
             savePng (c.createComponentSnapshot (area, true, 1.5f), prefix + "-" + name + "@150.png");
         };
         const auto pump = [] {
+#if JUCE_LINUX || JUCE_WINDOWS // (rollup 0.1.31 step 4: macOS has no such JUCE function; the route runs on Linux / Windows)
             for (int i = 0; i < 256 && juce::detail::dispatchNextMessageOnSystemQueue (true); ++i) {}
+#endif
         };
         const auto findId = [] (juce::Component& root, const juce::String& id) -> juce::Component* {
             std::function<juce::Component* (juce::Component&)> find = [&] (juce::Component& c) -> juce::Component* {
