@@ -10204,6 +10204,7 @@ countries: cn sg
 "{0} audio clip envelope(s): those clips play at their own level and pan" = "{0} 个音频剪辑包络：这些剪辑将按自身的电平和声像播放"
 "{0} Playlist clip groove(s): those clips play straight" = "{0} 个播放列表剪辑律动：这些剪辑将直接播放"
 "Automation clips with several targets or a formula drive only their first target, 1:1: {0}" = "具有多个目标或公式的自动化剪辑只会 1:1 控制其第一个目标：{0}"
+"Automation clips linked to several controls move them 1:1 and win over the other clips of those controls: {0}" = "链接到多个控件的自动化剪辑以 1:1 移动它们，并优先于这些控件的其他剪辑：{0}"
 "The time signature's beat unit: n/{0} becomes n/4" = "拍号的拍单位：n/{0} 变为 n/4"
 "\"Link Playlist tracks to mixer tracks\" (a setting)" = "“Link Playlist tracks to mixer tracks”（一项设置）"
 "MIDI generator settings" = "MIDI 生成器设置"

@@ -241,6 +241,14 @@ int main (int argc, char** argv)
                 song.mixer[(std::size_t) t].effects[(std::size_t) k].params[(std::size_t) prm] = v;
         }
     }
+    // LYNX_MUTE="name|name…": channels with these names muted (round 190ov: what one channel adds to a render)
+    if (const char* e = std::getenv ("LYNX_MUTE"))
+    {
+        std::string list = std::string ("|") + e + "|";
+        for (auto& c : song.channels)
+            if (list.find ("|" + c.name + "|") != std::string::npos)
+                c.muted = true;
+    }
     if (const char* e = std::getenv ("LYNX_DISABLE"))
     {
         std::istringstream list (e);

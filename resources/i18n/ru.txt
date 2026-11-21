@@ -10204,6 +10204,7 @@ countries: ru by kz
 "{0} audio clip envelope(s): those clips play at their own level and pan" = "Огибающих аудиоклипов: {0}; эти клипы играют со своим уровнем и панорамой"
 "{0} Playlist clip groove(s): those clips play straight" = "Грувов клипов Playlist: {0}; эти клипы играют ровно"
 "Automation clips with several targets or a formula drive only their first target, 1:1: {0}" = "Клипы автоматизации с несколькими целями или формулой управляют только первой целью, 1:1: {0}"
+"Automation clips linked to several controls move them 1:1 and win over the other clips of those controls: {0}" = "Клипы автоматизации, связанные с несколькими регуляторами, двигают их 1:1 и перекрывают другие клипы этих регуляторов: {0}"
 "The time signature's beat unit: n/{0} becomes n/4" = "Длительность доли в размере: n/{0} станет n/4"
 "\"Link Playlist tracks to mixer tracks\" (a setting)" = "\"Link Playlist tracks to mixer tracks\" (настройка)"
 "MIDI generator settings" = "Настройки MIDI-генератора"

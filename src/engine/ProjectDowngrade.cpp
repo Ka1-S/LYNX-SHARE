@@ -28,6 +28,8 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <map>
+#include <set>
 #include <vector>
 
 // TR_NOOP marks the loss texts for translation (tools/i18n_keys.py); the UI translates them
@@ -1430,6 +1432,60 @@ void toRelease0130 (juce::var& root, Losses& lost)
         });
         if (! lynxModel.isEmpty())
             lost.push_back ({ TR_NOOP ("LYNX Model is not in this release: its channels become empty Samplers and play nothing: {0}"), listOf (lynxModel), true });
+    }
+
+    // round 190ov: FL automation clips linked to several controls (target links on an FL import). 0.1.30 plays target links
+    // 1:1 (no sixth element: a control's own scale, set where LYNX counts the control differently from FL), and a link's
+    // control always follows the linked clip, even where another clip of that control plays. The scales go (the copy opened
+    // again in a newer LYNX plays what 0.1.30 plays); a line for the clips with a scale or a control shared with another
+    // clip in the Playlist
+    {
+        std::set<int> withClips;
+        forEachClip (root, [&] (juce::Array<juce::var>& c) {
+            if (c.size() >= 7 && (int) c[5] == 2)
+                withClips.insert ((int) c[6]);
+        });
+        const auto key = [] (const juce::var& t) {
+            return t.isArray() && t.size() >= 4 ? t[0].toString() + "/" + t[1].toString() + "/" + t[2].toString() + "/" + t[3].toString() : juce::String();
+        };
+        std::map<juce::String, int> drivers; // control → how many automations with clips drive it
+        if (auto* automations = arrayOf (root["automations"]))
+            for (int i = 0; i < automations->size(); ++i)
+                if (withClips.count (i) != 0)
+                {
+                    const auto& a = (*automations)[i];
+                    if (auto* links = arrayOf (a["links"]); links != nullptr && ! links->isEmpty())
+                    {
+                        std::set<juce::String> own;
+                        for (const auto& l : *links)
+                            own.insert (key (l));
+                        for (const auto& k : own)
+                            ++drivers[k];
+                    }
+                    else if (! a.hasProperty ("source"))
+                        ++drivers[key (a["target"])];
+                }
+        juce::StringArray changed;
+        if (auto* automations = arrayOf (root["automations"]))
+            for (int i = 0; i < automations->size(); ++i)
+                if (auto* links = arrayOf ((*automations)[i]["links"]))
+                {
+                    bool scaled = false, shared = false;
+                    for (auto& l : *links)
+                        if (auto* fields = arrayOf (l))
+                        {
+                            if (fields->size() > 5)
+                            {
+                                fields->resize (5);
+                                scaled = true;
+                            }
+                            shared = shared || (withClips.count (i) != 0 && drivers[key (l)] > 1);
+                        }
+                    if ((scaled && withClips.count (i) != 0) || shared)
+                        changed.add ("\"" + (*automations)[i].getProperty ("name", {}).toString() + "\"");
+                }
+        if (! changed.isEmpty())
+            lost.push_back ({ TR_NOOP ("Automation clips linked to several controls move them 1:1 and win over the other clips of those controls: {0}"), listOf (changed), true });
     }
 
     // round 190nh: the Kilohearts part-2 laws on Effector (hidden [12] codes 41 … 48; round 190oc: 49, the Nonlinear

@@ -3292,7 +3292,17 @@ juce::String toJson (const Song& song, bool stampVersion)
         {
             juce::Array<juce::var> links;
             for (const auto& l : a.links)
-                links.add (juce::Array<juce::var> { targetKindName (l.target.kind), l.target.index, l.target.slot, l.target.param, str (l.formula) });
+            {
+                juce::Array<juce::var> link { targetKindName (l.target.kind), l.target.index, l.target.slot, l.target.param, str (l.formula) };
+                if (! l.scale.empty()) // round 190ov: the control's own scale (FL imports), a sixth element only when there is one
+                {
+                    juce::Array<juce::var> scale;
+                    for (auto v : l.scale)
+                        scale.add ((double) v);
+                    link.add (scale);
+                }
+                links.add (link);
+            }
             o->setProperty ("links", links);
         }
         if (a.tempoMarkers) // round 190hq: the Playlist ruler's tempo markers (core/TempoMarkers.h)
@@ -4189,7 +4199,14 @@ std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error,
             if (auto* links = a["links"].getArray()) // round 190gw
                 for (const auto& l : *links)
                     if (l.isArray() && l.size() >= 5)
-                        automation.links.push_back ({ { targetKindFromName (l[0].toString()), (int) l[1], (int) l[2], (int) l[3] }, l[4].toString().toStdString() });
+                    {
+                        Automation::Link link { { targetKindFromName (l[0].toString()), (int) l[1], (int) l[2], (int) l[3] }, l[4].toString().toStdString(), {} };
+                        if (l.size() >= 6) // round 190ov: the control's own scale
+                            if (auto* scale = l[5].getArray(); scale != nullptr && scale->size() >= 2)
+                                for (const auto& v : *scale)
+                                    link.scale.push_back (juce::jlimit (0.0f, 1.0f, (float) (double) v));
+                        automation.links.push_back (std::move (link));
+                    }
             if (! automation.links.empty())
                 automation.target = automation.links.front().target;
             if (auto* curve = a["curve"].getArray())

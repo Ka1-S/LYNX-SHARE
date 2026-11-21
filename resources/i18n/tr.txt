@@ -10204,6 +10204,7 @@ countries: tr
 "{0} audio clip envelope(s): those clips play at their own level and pan" = "{0} ses klibi zarfı: bu klipler kendi seviyesinde ve panında çalar"
 "{0} Playlist clip groove(s): those clips play straight" = "{0} Playlist klip groove'u: bu klipler düz çalar"
 "Automation clips with several targets or a formula drive only their first target, 1:1: {0}" = "Birden çok hedefli veya formüllü otomasyon klipleri yalnızca ilk hedefini, 1:1 sürer: {0}"
+"Automation clips linked to several controls move them 1:1 and win over the other clips of those controls: {0}" = "Birden çok kontrole bağlı otomasyon klipleri onları 1:1 hareket ettirir ve bu kontrollerin diğer kliplerinin önüne geçer: {0}"
 "The time signature's beat unit: n/{0} becomes n/4" = "Ölçü işaretinin vuruş birimi: n/{0}, n/4 olur"
 "\"Link Playlist tracks to mixer tracks\" (a setting)" = "\"Link Playlist tracks to mixer tracks\" (bir ayar)"
 "MIDI generator settings" = "MIDI üreteci ayarları"

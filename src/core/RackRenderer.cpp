@@ -2232,6 +2232,39 @@ void RackState::buildAutomationTables()
                         lane.clipSlots.push_back ({ peer, a });
                         break;
                     }
+    // round 190ov: the targets of target links (FL's clips linked to several controls), each with every clip that drives
+    // it — the links on it and the automations of that one target. A target with more than one plays as one slot (below);
+    // those automations of one target bind nothing themselves.
+    struct SharedTarget
+    {
+        AutomationTarget target;
+        std::vector<std::pair<int, int>> members; // (automation, link; −1 = the automation's own target)
+    };
+    std::vector<SharedTarget> linkTargets;
+    for (int a = 0; a < count; ++a)
+        if (const auto& automation = automations[(std::size_t) a]; ! automation.links.empty() && ! automation.isLive())
+            for (int l = 0; l < (int) automation.links.size(); ++l)
+            {
+                const auto& t = automation.links[(std::size_t) l].target;
+                auto it = std::find_if (linkTargets.begin(), linkTargets.end(), [&t] (const SharedTarget& s) { return s.target == t; });
+                if (it == linkTargets.end())
+                    it = linkTargets.insert (linkTargets.end(), SharedTarget { t, {} });
+                it->members.push_back ({ a, l });
+            }
+    for (auto& shared : linkTargets)
+    {
+        if (shared.target.kind == AutomationTargetKind::none)
+            continue;
+        for (int b = 0; b < count; ++b)
+            if (playsClips (b) && automations[(std::size_t) b].target == shared.target)
+            {
+                shared.members.push_back ({ b, -1 });
+                automationFollowers[(std::size_t) b] = 1;
+                automationGroups[(std::size_t) b].clear();
+            }
+        std::sort (shared.members.begin(), shared.members.end()); // (ascending: the lowest automation keeps a tie)
+    }
+
     // otherwise the last automation of the same target wins (a live controller link, Performance mode clips)
     for (int a = 0; a < count; ++a)
     {
@@ -2277,17 +2310,43 @@ void RackState::buildAutomationTables()
             bind (slot++, lane.target);
         }
 
-    // round 190gw: the target links of an automation clip with several (FL's "Crossfade with" clip): one slot each
+    // round 190gw: the target links of an automation clip with several (FL's "Crossfade with" clip): one slot each;
+    // round 190ov: one per target, shared with the other clips that drive it (linkTargets above)
     linkSlots.clear();
-    for (int a = 0; a < count; ++a)
-        if (const auto& automation = automations[(std::size_t) a]; ! automation.links.empty() && ! automation.isLive())
-            for (const auto& link : automation.links)
+    for (const auto& shared : linkTargets)
+    {
+        if (slot >= maxAutomations)
+            break;
+        const auto& [first, firstLink] = shared.members.front();
+        LinkSlot made;
+        made.slot = slot;
+        if (shared.members.size() == 1)
+        {
+            const auto& link = automations[(std::size_t) first].links[(std::size_t) firstLink];
+            made.automation = first;
+            made.formula = linkformula::Formula::compile (link.formula);
+            made.scale = link.scale;
+        }
+        else
+        {
+            made.automation = -1;
+            for (const auto& [a, l] : shared.members)
             {
-                if (slot >= maxAutomations)
-                    break;
-                linkSlots.push_back ({ a, slot, linkformula::Formula::compile (link.formula) });
-                bind (slot++, link.target);
+                LinkMember member;
+                member.automation = a;
+                member.link = l;
+                if (l >= 0)
+                {
+                    const auto& link = automations[(std::size_t) a].links[(std::size_t) l];
+                    member.formula = linkformula::Formula::compile (link.formula);
+                    member.scale = link.scale;
+                }
+                made.members.push_back (std::move (member));
             }
+        }
+        linkSlots.push_back (std::move (made));
+        bind (slot++, shared.target);
+    }
 
     // round 177b: modulators, after everything else (a modulated target follows its automation or its own value)
     modRoutes.clear();
@@ -2923,6 +2982,51 @@ namespace
 // of the target play, the one that started last (same start: the lowest automation); between clips, the end of the clip
 // that ended last, whichever automation it belongs to; before the first clip, NaN: the control's own value. Depends only
 // on position, so playing from any point (or exporting) gives the same result.
+// round 190ov: a link's value through its scale (Automation::Link::scaled)
+float linkScaled (const std::vector<float>& scale, float v) noexcept
+{
+    v = std::clamp (v, 0.0f, 1.0f);
+    if (scale.size() < 2)
+        return v;
+    const auto x = v * (float) (scale.size() - 1);
+    const auto i = std::min ((std::size_t) x, scale.size() - 2);
+    const auto f = x - (float) i;
+    return std::clamp (scale[i] + (scale[i + 1] - scale[i]) * f, 0.0f, 1.0f);
+}
+
+// round 190ov: the value of a target several clips drive (RackState::LinkSlot::members), as automationValueAt picks the
+// clip of a group, then through that clip's link (1:1 for an automation of that one target)
+float linkGroupValueAt (const RackState& state, const RackState::LinkSlot& link, double tick) noexcept
+{
+    const auto& song = state.song;
+    const Clip* playing = nullptr;
+    const Clip* ended = nullptr;
+    const RackState::LinkMember* playingMember = nullptr;
+    const RackState::LinkMember* endedMember = nullptr;
+    for (const auto& member : link.members)
+        for (const auto i : state.automationClips[(std::size_t) member.automation]) // sorted by start
+        {
+            const auto& c = song.playlist[(std::size_t) i];
+            if (tick < (double) c.start)
+                break;
+            if (tick < (double) c.end())
+            {
+                if (playing == nullptr || c.start > playing->start)
+                    playing = &c, playingMember = &member;
+            }
+            else if (ended == nullptr || c.end() > ended->end() || (c.end() == ended->end() && c.start > ended->start))
+                ended = &c, endedMember = &member;
+        }
+    const auto through = [] (const RackState::LinkMember& m, float v) noexcept {
+        return m.link < 0 ? v : linkScaled (m.scale, m.formula.map (v));
+    };
+    if (playing != nullptr)
+        return through (*playingMember, song.automations[(std::size_t) playingMember->automation].playAt (tick - (double) playing->start + (double) playing->offset, tick));
+    if (ended != nullptr)
+        return through (*endedMember, song.automations[(std::size_t) endedMember->automation].playAt ((double) (ended->length + ended->offset), (double) ended->end()));
+    return std::numeric_limits<float>::quiet_NaN();
+}
+
 float automationValueAt (const RackState& state, int slot, double tick) noexcept
 {
     const auto& song = state.song;
@@ -3130,11 +3234,17 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
     for (std::size_t a = 0; a < state.automationClips.size(); ++a)
         if (! state.automationClips[a].empty() && state.automationFollowers[a] == 0)
             automationValues[a] = automationValueAt (state, (int) a, tick);
-    // round 190gw: an automation's target links take its value through their formulas (NaN: the targets' own values)
+    // round 190gw: an automation's target links take its value through their formulas (NaN: the targets' own values);
+    // round 190ov: then their scales, and a target several clips drive takes the one that plays
     for (const auto& link : state.linkSlots)
     {
+        if (! link.members.empty())
+        {
+            automationValues[(std::size_t) link.slot] = linkGroupValueAt (state, link, tick);
+            continue;
+        }
         const auto v = automationValues[(std::size_t) link.automation];
-        automationValues[(std::size_t) link.slot] = std::isnan (v) ? v : link.formula.map (v);
+        automationValues[(std::size_t) link.slot] = std::isnan (v) ? v : linkScaled (link.scale, link.formula.map (v));
     }
 
     // automation lanes (round 177b): the lane's curve in song time, except where a clip of the same target plays

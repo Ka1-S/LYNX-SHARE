@@ -8371,6 +8371,7 @@ private:
         // the Play one kept); 190ob's tracker volume automation (a channel Volume multiplier clip: kept point for point);
         // 190on's stacked lanes and palette are profile settings and 190og's .flm export keeps no settings (the song is the
         // same after an export). The 0.1.30 copy keeps every key but the three dropped ones and has exactly three lines
+        const auto autolinks190ovResult = runAutoLinks190ovCheck(); // round 190ov (src/AutoLinks190ovCheck.inc)
         juce::String rollup031s5Result = "OK";
         {
             auto song = lynx::Song::makeDefault();
@@ -9051,7 +9052,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && autolinks190ovResult == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK")
                         && generatorSmartResult.startsWith ("OK")
@@ -9144,6 +9145,7 @@ private:
                << "helix4_khs190oc_copy_for_0130=" << helix4khs190ocResult << "\n"
                << "rollup031s4_copy_for_0130=" << rollup031s4Result << "\n"
                << "rollup031s5_copy_for_0130=" << rollup031s5Result << "\n"
+               << "autolinks190ov=" << autolinks190ovResult << "\n"
                << "sections190ol=" << sections190olResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
@@ -18890,6 +18892,7 @@ private:
 #include "DetailsShot190oa.inc" // round 190oa
 #include "RackShot190nc.inc" // round 190nc
 #include "OnboardShot190np.inc" // round 190np
+#include "AutoLinks190ovCheck.inc" // round 190ov (FL automation clips linked to several controls)
     // --trackautoshot190gz (round 190gz): see the dispatch above
     bool runTrackAutoShot190gz (const juce::String& prefix)
     {

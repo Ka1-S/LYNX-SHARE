@@ -1393,7 +1393,26 @@ struct Converter
                 continue;
             }
             std::function<float (float)> map;
-            const auto id = controlFor (src.target, &map);
+            auto id = controlFor (src.target, &map);
+            // round 190ov: a clip with target links (FL's clip linked to several controls, or LYNX's "Crossfade with"):
+            // one 0xE3 record per link FL has, its formula in an 0xE6 after it; the points are the clip's own value, which
+            // FL sends each link
+            std::vector<flp::AutomationLink> linkIds; // (channel set below; each with its formula, FL's 0xE6)
+            if (! src.links.empty())
+            {
+                map = {};
+                for (const auto& link : src.links)
+                {
+                    if (const auto linkId = controlFor (link.target))
+                    {
+                        if (std::find_if (linkIds.begin(), linkIds.end(), [&] (const flp::AutomationLink& x) { return x.target.raw == linkId->raw; }) == linkIds.end())
+                            linkIds.push_back ({ 0, *linkId, link.formula });
+                    }
+                    else if (link.target.kind != AutomationTargetKind::none)
+                        report.dropped.push_back ("Automation '" + src.name + "': a target link with no FL equivalent");
+                }
+                id = linkIds.empty() ? std::nullopt : std::optional<flp::ControlId> (linkIds.front().target);
+            }
             if (! id && src.target.kind != AutomationTargetKind::none)
             {
                 report.dropped.push_back ("Automation '" + src.name + "': its target has no FL equivalent");
@@ -1455,7 +1474,13 @@ struct Converter
                     f.rawPoints = lfo.fl.rawPoints; // unchanged since the import: its records byte for byte
             }
             automationChannel[a] = c.index;
-            if (id)
+            if (! linkIds.empty())
+                for (auto linkId : linkIds)
+                {
+                    linkId.channel = c.index;
+                    out.automationLinks.push_back (std::move (linkId));
+                }
+            else if (id)
                 out.automationLinks.push_back ({ c.index, *id });
             out.channels.push_back (std::move (c));
         }

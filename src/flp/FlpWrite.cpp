@@ -126,6 +126,7 @@ enum : std::uint32_t
     evControlValues = 0xE1,
     evAutomationLink = 0xE3,
     evChannelTracking = 0xE4,
+    evLinkFormula = 0xE6, // round 190ov: a link's mapping formula, right after its 0xE3 record
     evChannelLevelAdjust = 0xE5,
     evFilterGroupName = 0xE7,
     evPlaylistItems = 0xE9,
@@ -840,6 +841,8 @@ std::vector<std::uint8_t> writeProject (const Project& p, const WriteOptions& op
             b.put<std::uint32_t> (8);
             b.put<std::uint32_t> (0x1D5);
             out.data (evAutomationLink, b.b);
+            if (! link.formula.empty()) // (FL writes none for its default "Input")
+                out.text (evLinkFormula, link.formula);
         }
         for (const auto& link : p.controllerLinks)
         {

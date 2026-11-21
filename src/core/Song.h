@@ -2085,6 +2085,13 @@ struct Automation
     {
         AutomationTarget target;
         std::string formula; // over `Input` (core/LinkFormula.h); "" = 1:1
+        // Round 190ov: the target's own value scale after the formula — FL's normalised value of the control (what an FL
+        // automation clip with several links sends each of them) → the target's 0..1 in LYNX, sampled evenly over 0..1
+        // and read with linear interpolation. Empty = the same scale (every LYNX-made link, and FL controls LYNX keeps on
+        // FL's scale). Set by the .flp import for a control whose LYNX equivalent counts differently (a mapped effect
+        // parameter, the tempo of a clip without a range).
+        std::vector<float> scale;
+        float scaled (float v) const noexcept; // `v` through `scale` (clamped to 0..1; v itself when there is none)
         bool operator== (const Link&) const = default;
     };
     std::vector<Link> links;

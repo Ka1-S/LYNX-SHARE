@@ -18074,3 +18074,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Sections190olTests.inc" // round 190ol (0.1.31): the Sections lane (P1) and Simple time signature changes (P6)
 #include "Research190onTests.inc" // round 190on: command palette (P2), Tab to transient (P8), stacked lanes (P10), removing a guest
 #include "Perf190okTests.inc" // round 190ok: safe overloads (P24), generator smart disable (D2), the smart-disable tip (D1), fast maths (D3)
+#include "AutoLinks190ovTests.inc" // round 190ov (0.1.31): FL automation clips linked to several controls
