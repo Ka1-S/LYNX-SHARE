@@ -67,6 +67,8 @@
 #include "core/NativeEngines.h"
 #include "core/PresetCycle.h"
 #include "core/GeneratorPresets.h"
+#include "core/PluginHelp.h"
+#include "ui/WindowPlaces.h"
 #include "ui/GeneratorPresetMenu.h"
 #include "ui/ControllerEditors.h"
 #include "ui/HintBar.h"
@@ -7057,6 +7059,34 @@ juce::PopupMenu ChannelFrame::buildWrapperMenu()
             if (locateInBrowserHandler())
                 locateInBrowserHandler() (folder);
         };
+    // round 190oa (DF-131): FL's Help opens the plugin's manual page; LYNX opens its wiki page (a sample channel: the
+    // Channel rack's page, as FL's channel settings help)
+    if (const auto* d = channel >= 0 && channel < (int) engine.getSong().channels.size() ? &engine.getSong().channels[(std::size_t) channel] : nullptr;
+        d != nullptr && d->instrument != InstrumentKind::plugin)
+    {
+        const auto sampleChannel = d->instrument == InstrumentKind::sampler || d->instrument == InstrumentKind::audioClip;
+        if (sampleChannel)
+        {
+            // capture 190oa B4 (an Audio clip channel): no Help; the Channel column ends with Sample ▸ = the waveform's
+            // menu (Reload, Save as..., Locate file, the clipboard, the editors, Open in new ... channel, Detect tempo,
+            // Get properties, the two views)
+            spec.showHelp = false;
+            for (auto& page : pages)
+                if (auto* panel = dynamic_cast<SettingsPanel*> (page.get()))
+                {
+                    const juce::Component::SafePointer<SettingsPanel> safe (panel);
+                    spec.sample = [safe] (juce::PopupMenu& m) {
+                        if (safe != nullptr)
+                            m = safe->waveMenuForShot();
+                    };
+                    break;
+                }
+        }
+        else
+            spec.help = [url = pluginhelp::pageFor (genpresets::engineName (d->instrument), true)] {
+                juce::URL (juce::String::fromUTF8 (url.c_str())).launchInDefaultBrowser();
+            };
+    }
     // FL's Route to free mixer track (Ctrl+L): the channel to the first free insert
     spec.routeToFreeMixerTrack = [this] {
         engine.editSong ([ch = channel] (Song& s) {
