@@ -6965,13 +6965,13 @@ private:
 
     juce::Point<int> desiredSize() const
     {
-        int width = node ? 1 MiscPanel::preferredWidth, height = node ? 1 : MiscPanel::preferredHeight;
+        int width = node ? 1 : MiscPanel::preferredWidth, height = node ? 1 : MiscPanel::preferredHeight;
         for (const auto& size : sizes)
         {
             width = juce::jmax (width, size.x);
             height = juce::jmax (height, size.y);
         }
-        return { width, currentHeaderHeight() = height };
+        return { width, currentHeaderHeight() + height };
     }
     AudioEngine& engine;
     int channel;
@@ -7267,11 +7267,11 @@ public:
     {
         setWantsKeyboardFocus (false);
         setMouseClickGrabsKeyboardFocus (false);
-        setClickingToggleState (true);
+        setClickingTogglesState (true);
         setTooltip (tr("Show / hide the header"));
     }
 
-    void paintButton (juce::Graphic& g, bool over, bool /*down*/) override
+    void paintButton (juce::Graphics& g, bool over, bool /*down*/) override
     {
         const auto r = getLocalBounds().toFloat();
         const auto cx = r.getCentreX(), cy = r.getCentreY();
@@ -7286,8 +7286,8 @@ public:
                                         .translated (cx, cy));
             p.addPath (tooth);
         }
-        g.setColor (getToggleState() || over ? theme::colour::accent : theme::colour::textSecondary);
-        g.filePath (p);
+        g.setColour (getToggleState() || over ? theme::colour::accent : theme::colour::textSecondary);
+        g.fillPath (p);
     }
 };
 
@@ -7523,8 +7523,7 @@ private:
     ScaledContent* scaled = nullptr; // (owned by the window: its content)
     wrappermenu::MenuArrow titleMenu;               // FL's ▸ in LYNX's title bar (docked)
     juce::Component* titlePresets = nullptr;        // the frame's preset bar, moved into the title bar (owned by the frame)
-    HeaderToggle headerToggle;
-    juce::Component* titlePresets = nullptr; // shows/hides the frame's own header strip (docked only)
+    HeaderToggle headerToggle; // shows/hides the frame's own header strip (docked only)
     static constexpr int titlePresetsWidth = 190; // the frame's preset bar, moved into the title bar (owned by the frame)
 };
 
