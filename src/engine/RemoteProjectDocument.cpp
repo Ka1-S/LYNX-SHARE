@@ -150,7 +150,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         add (S::pattern, "name uid length colour loopOn loopStarterGenre loopMode channelLoops markers notes");
         add (S::pattern, "events", S::events, true);
         add (S::events, "target events");
-        add (S::automation, "name uid target points source curve lfo lfoFl recordLive colour tempoMarkers");
+        add (S::automation, "name uid target points source curve lfo lfoFl recordLive colour tempoMarkers rackSlot");
         add (S::automation, "links", S::readOnly);
         add (S::modulator, "name shape sync beats hz phase unipolar seed routes");
         add (S::vca, "name colour level muted members parent");

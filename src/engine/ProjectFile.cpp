@@ -3295,6 +3295,8 @@ juce::String toJson (const Song& song, bool stampVersion)
         }
         if (a.colour != 0) // round 190ig: the clip's colour (FL: its channel's); absent = none, as older files
             o->setProperty ("colour", (juce::int64) a.colour);
+        if (a.rackSlot >= 0) // round 190oo (PAT-7): its row in the Channel rack; absent = after the channels, as older files
+            o->setProperty ("rackSlot", a.rackSlot);
         if (const auto& l = a.lfo; ! l.isDefault()) // round 177b: FL's clip LFO
         {
             juce::Array<juce::var> amp;
@@ -4159,6 +4161,7 @@ std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error,
                 automation.source = { (int) source[0], (int) source[1], (int) source[2], source.size() >= 4 ? (int) source[3] : -1 };
             automation.recordLive = (bool) a["recordLive"];
             automation.colour = (std::uint32_t) (juce::int64) a.getProperty ("colour", 0);
+            automation.rackSlot = juce::jmax (-1, (int) a.getProperty ("rackSlot", -1)); // (round 190oo, PAT-7)
             automation.tempoMarkers = (bool) a["tempoMarkers"] && automation.target.kind == AutomationTargetKind::tempo; // (round 190hq)
             if (auto* links = a["links"].getArray()) // round 190gw
                 for (const auto& l : *links)

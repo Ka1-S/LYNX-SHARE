@@ -1480,6 +1480,13 @@ void toRelease0130 (juce::var& root, Losses& lost)
 
     // round 190nu (chord2_190nu): the Piano roll's key markers
     keyMarkersFor0130 (root, lost);
+
+    // round 190oo (PAT-7, core/RackAutomation.h): the automation clips' rows in the Channel rack. 0.1.30's rack has no
+    // automation rows and the clips play the same: dropped without a loss line
+    if (auto* automations = arrayOf (root["automations"]))
+        for (auto& a : *automations)
+            if (auto* ao = objectOf (a))
+                drop (*ao, "rackSlot");
 }
 
 struct Step

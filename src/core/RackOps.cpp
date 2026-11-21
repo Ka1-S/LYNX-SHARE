@@ -1,4 +1,5 @@
 #include "core/RackOps.h"
+#include "core/RackAutomation.h" // round 190oo (PAT-7)
 #include "core/TrackClips.h"
 
 #include "core/MidiControls.h"
@@ -835,6 +836,7 @@ int insertChannel (Song& song, int index, ChannelDef channel)
         order.push_back (i);
 
     permuteChannels (song, order);
+    rackauto::channelsInserted (song, index); // round 190oo (PAT-7): the automation clip rows below stay below
     return index;
 }
 

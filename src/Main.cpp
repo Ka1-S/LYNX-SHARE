@@ -207,6 +207,7 @@
 #include "ui/TrackIcons.h"
 #include "core/MeterScale.h"
 #include "core/RackOps.h"
+#include "core/RackAutomation.h" // round 190oo (PAT-7, --selftest rackauto190oo)
 #include "core/Layer.h"
 #include "core/XyController.h"
 #include "core/FlCurve.h"
@@ -8420,6 +8421,43 @@ private:
             folder.deleteRecursively();
         }
 
+        // round 190oo (design review 2, PAT-7; core/RackAutomation.h): the automation clips' Channel rack rows. A .lynx
+        // round trip keeps each clip's place; a clip without one (every clip of an older file) writes nothing and reads
+        // back after the channels; the copy for 0.1.30 drops the key without a loss line.
+        juce::String rackauto190ooResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            for (int c = 0; c < 3; ++c)
+                song.channels.emplace_back().name = "R" + std::to_string (c);
+            lynx::Automation placed, appended;
+            placed.name = "placed";
+            placed.points = { { 0, 0.2f, 0.0f }, { lynx::ppq, 0.8f, 0.0f } };
+            placed.rackSlot = 1;
+            appended = placed;
+            appended.name = "appended";
+            appended.rackSlot = -1;
+            song.automations.push_back (placed);
+            song.automations.push_back (appended);
+            juce::String why;
+            const auto json = lynx::ProjectFile::toJson (song);
+            const auto back = lynx::ProjectFile::fromJson (json, why);
+            if (! back || back->automations.size() != 2 || back->automations[0].rackSlot != 1 || back->automations[1].rackSlot != -1
+                || lynx::rackauto::order (*back) != lynx::rackauto::order (song))
+                rackauto190ooResult = "ERROR round trip " + why;
+            const auto plain = lynx::Song::makeDefault();
+            const auto plainJson = lynx::ProjectFile::toJson (plain);
+            if (rackauto190ooResult == "OK" && plainJson.contains ("rackSlot"))
+                rackauto190ooResult = "ERROR rackSlot written for a project without placed clips";
+            auto older = song;
+            older.automations[0].rackSlot = -1; // (as a file saved before round 190oo)
+            if (const auto reread = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (older), why); rackauto190ooResult == "OK"
+                && (! reread || reread->automations.size() != 2 || reread->automations[0].rackSlot != -1 || lynx::ProjectFile::toJson (older).contains ("rackSlot")))
+                rackauto190ooResult = "ERROR an older project's clips";
+            const auto copy = lynx::olderlynx::forRelease (song, "0.1.30");
+            if (rackauto190ooResult == "OK" && (! copy.ok || copy.json.contains ("rackSlot")))
+                rackauto190ooResult = "ERROR copy for 0.1.30";
+        }
+
         const auto motionOverlayResult = lynx::ui::MotionOverlay::selfTest(); // (round 190ip)
         // round 190bm (0.1.25 showed the Mixer and the Playlist black): their cached pictures shown on native and
         // software targets against straight paints (ui/PictureCheck.h; --picturetest runs more sizes and scales)
@@ -8459,7 +8497,7 @@ private:
                         && mixerBasics == "OK" && fontsResult == "OK" && paintCachesResult.startsWith ("OK") && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && takeoverOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && exportParity.startsWith ("OK") && exportLive.startsWith ("OK") && midiHotplug.startsWith ("OK") && midiOutPorts.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
-                        && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
+                        && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && rackauto190ooResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
@@ -8535,6 +8573,7 @@ private:
                << "livewf190em=" << livewf190emResult << "\n"
                << "trackclips190ne=" << trackclips190neResult << "\n"
                << "tracker190nw=" << tracker190nwResult << "\n"
+               << "rackauto190oo=" << rackauto190ooResult << "\n"
                << "midigen190fm_saved=" << midigen190fmResult << "\n"
                << "trackauto190gz_saved=" << trackauto190gzResult << "\n"
                << "clipenv190gi_saved=" << clipenv190giResult << "\n"

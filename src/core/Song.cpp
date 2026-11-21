@@ -427,6 +427,10 @@ void Song::removeChannel (int index)
         else if (automation.source.channel > index)
             --automation.source.channel;
 
+    for (auto& automation : automations) // round 190oo (PAT-7): the automation clip rows keep their place in the rack
+        if (automation.rackSlot > index)
+            --automation.rackSlot;
+
     for (auto& c : channels) // Layer children (round 164)
     {
         auto& kids = c.layer.children;

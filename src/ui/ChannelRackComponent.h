@@ -11,6 +11,7 @@
 #include "core/HeldNotes.h"
 
 #include "core/RackOps.h"
+#include "core/RackAutomation.h"
 #include "core/RackZip.h"
 #include "engine/AudioEngine.h"
 #include "ui/TimerWhileShowing.h"
@@ -225,7 +226,9 @@ public:
     static constexpr int stepWidth = 18; // (round 190io, FM-11: FL's keycap pitch is 16, LYNX 18; was 22)
 
 private:
-    enum class Area { none, mute, pan, volume, route, name, select, grid, addRow, laneLevels, lane, loop, zipped };
+    // autoName / autoRow (round 190oo, PAT-7): an automation clip row's button / the rest of it; `row` is then the
+    // automation's index (Song::automations), never a channel
+    enum class Area { none, mute, pan, volume, route, name, select, grid, addRow, laneLevels, lane, loop, zipped, autoName, autoRow };
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
     void timerCallback() override;
@@ -256,7 +259,20 @@ private:
     int gridLeft() const noexcept { return selectLeft() + selectWidth + 8; }
     juce::Rectangle<int> rowBounds (int row) const;
     juce::Rectangle<int> previewMuteBounds (int row) const; // (round 190mk: the preview's round mute button)
-    int rowY (int row) const;       // top of a row (rows below the graph lane shift down)
+    int rowY (int row) const;       // top of a row (rows below the graph lane and the automation clip rows shift down)
+    int baseRowY (int row) const;   // the same without the automation clip rows (round 190oo)
+    // FL's automation clip channels (round 190oo, design review 2 PAT-7; core/RackAutomation.h): the automation clips' rows
+    // between the channel rows, in the rack's order, while the filter shows them (empty: none, the code paths as before);
+    // autoBefore[k] = how many of them sit above channel row k (k = the channel count: the "add channel" row)
+    std::vector<rackauto::Row> autoRows;
+    std::vector<int> autoBefore;
+    void refreshAutomationRows();
+    int automationRowTop (int i) const; // i: index into autoRows
+    int automationRowAt (int y) const;  // index into autoRows of the row under y, -1 none
+    juce::Rectangle<int> automationRowBounds (int automation) const;
+    void paintAutomationSteps (juce::Graphics& g, juce::Rectangle<int> clip);
+    void paintAutomationButtons (juce::Graphics& g, juce::Rectangle<int> column);
+    void showAutomationMenu (int automation);
     // round 190mk (DE-38): the rows' places while any channel is zipped (empty: none is, FL's fixed 30 px rows)
     rackzip::Layout zipLayout;
     void refreshZipLayout();
