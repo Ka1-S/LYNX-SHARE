@@ -126,6 +126,9 @@ public:
     void toggleProjectPickerForSnapshot() { toggleProjectPicker(); }
     juce::Component* projectPickerForSnapshot() const noexcept { return projectPickerView.get(); }
     void showDesktopForSnapshot (bool extraPanels);
+    // View › Reset layout: the default window layout, then the layout style's own panels (applyStyleDefaultPanels)
+    void resetLayoutForStyle();
+    void startNewProjectForSnapshot (Song song) { startNewProject (std::move (song), {}); } // (round 190oj: File › New's path)
     // The Clip-launch workflow's layout (round 181a): the clip grid beside the Playlist, or flipped. Nothing exists until
     // it is first turned on. Moves panels only; the project does not change, except that it gets an (empty) grid.
     void setClipLaunchWorkflow (bool on, bool swapLayout = true) { setLayoutStyle (on ? layoutstyle::Style::clipLaunch : layoutstyle::Style::pattern, swapLayout); }
@@ -433,6 +436,7 @@ private:
     int fittedChannelCount = -1;
     void showPanel (Panel panel);
     void refreshPanelButtons();
+    void applyStyleDefaultPanels (layoutstyle::Style style); // (round 190oj)
     void showWindowsTip(); // the first starts name the window buttons in the hint bar (round 168t)
     void saveLayoutAs();
     juce::PopupMenu layoutsMenu();

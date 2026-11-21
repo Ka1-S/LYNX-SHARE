@@ -1879,7 +1879,7 @@ void PlaylistComponent::resized()
         showSongAfterOpen();
 }
 
-void PlaylistComponent::showSongAfterOpen()
+void PlaylistComponent::showSongAfterOpen (bool newProject)
 {
     const auto width = gridArea().getWidth();
     fitSongPending = width < 100;
@@ -1896,7 +1896,8 @@ void PlaylistComponent::showSongAfterOpen()
     static const auto flOpenZoom = juce::SystemStats::getEnvironmentVariable ("LYNX_FL_OPEN_ZOOM", "1") != "0";
     if (flClipLook() && flOpenZoom)
     {
-        pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), 16.0 / (double) juce::jmax<std::int64_t> (1, engine.getSong().barTicks()));
+        // (round 190oj: File › New opens FL's new project at ~60 px a bar, measured on FL 2026: bar 5 at +240 px)
+        pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), (newProject ? 60.0 : 16.0) / (double) juce::jmax<std::int64_t> (1, engine.getSong().barTicks()));
         updateScrollBars();
         repaint();
         return;

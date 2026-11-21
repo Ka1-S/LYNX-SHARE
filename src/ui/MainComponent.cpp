@@ -4276,6 +4276,35 @@ void MainComponent::setSimpleLargeControls (bool on)
     saveUiSettings();
 }
 
+// A layout style's own first look of the workspace, over the default window layout: Clip-launch hides the Channel rack
+// (one click away, on the toolbar); Simple is one window, the tracks and the timeline (the other panels stay one click
+// away: View, F5…F9). Used the first time a style is chosen and by View › Reset layout (round 190oj: in Clip-launch and
+// Simple, Reset layout brought back the Pattern layout's Channel rack over the clip grid / the Simple tracks).
+void MainComponent::applyStyleDefaultPanels (layoutstyle::Style style)
+{
+    using layoutstyle::Style;
+    if (style == Style::clipLaunch)
+    {
+        workspace.hide (Panel::channelRack);
+        workspace.show (Panel::playlist);
+    }
+    else if (style == Style::simple)
+    {
+        for (auto panel : { Panel::channelRack, Panel::pianoRoll, Panel::mixer, Panel::browser })
+            workspace.hide (panel);
+        workspace.show (Panel::playlist);
+        if (! workspace.isMaximised (Panel::playlist))
+            workspace.toggleMaximised (Panel::playlist);
+    }
+}
+
+void MainComponent::resetLayoutForStyle()
+{
+    workspace.resetLayout();
+    applyStyleDefaultPanels (layoutStyle);
+    refreshPanelButtons();
+}
+
 void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
 {
     using layoutstyle::Style;
@@ -4456,20 +4485,8 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         layoutFile (from).replaceWithText (workspace.getLayoutText());
         if (const auto saved = layoutFile (style); saved.existsAsFile())
             workspace.applyLayoutText (saved.loadFileAsString());
-        else if (style == Style::clipLaunch)
-        {
-            workspace.hide (Panel::channelRack); // one click away, on the toolbar
-            workspace.show (Panel::playlist);
-        }
-        else if (style == Style::simple)
-        {
-            // one window: the tracks and the timeline fill it; the other panels stay one click away (View, F5…F9)
-            for (auto panel : { Panel::channelRack, Panel::pianoRoll, Panel::mixer, Panel::browser })
-                workspace.hide (panel);
-            workspace.show (Panel::playlist);
-            if (! workspace.isMaximised (Panel::playlist))
-                workspace.toggleMaximised (Panel::playlist);
-        }
+        else
+            applyStyleDefaultPanels (style);
         refreshPanelButtons();
         if (isShowing())
             grabKeyboardFocus(); // (the new layout must not leave the keys in the Browser's search box)
@@ -8784,6 +8801,9 @@ void MainComponent::startNewProject (Song song, const juce::File& file)
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not save"), error);
     }
     updateTitle();
+    // round 190oj: a new project starts at bar 1, as an opened one does (FL's File › New); before, the Playlist kept the
+    // last project's scroll and zoom, so a new song showed an empty grid from bar 39 or so
+    playlist.showSongAfterOpen (engine.getSong().playlist.empty()); // (a demo / starter song opens as an opened one)
 }
 
 // The user's choice after a plugin's editor crashed (issue #32): save under a new name now, and/or run that plugin in a
@@ -10403,10 +10423,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             rare.addSubMenu (tr ("Detached panels (own window)"), detach);
         }
         menu.addSeparator();
-        menu.addItem (tr ("Reset layout"), [this] {
-            workspace.resetLayout();
-            refreshPanelButtons();
-        });
+        menu.addItem (tr ("Reset layout"), [this] { resetLayoutForStyle(); });
         rare.addItem (tr ("Save layout as..."), [this] { saveLayoutAs(); });
         rare.addSubMenu (tr ("Load layout"), layoutsMenu());
         addLayoutStyleItems (menu);

@@ -467,7 +467,7 @@ public:
 
     // A project was just opened: scroll to the start and, when the song is longer than the view, zoom out
     // to show all of it (FL opens a project with the arrangement in view). Waits for a size if not laid out.
-    void showSongAfterOpen();
+    void showSongAfterOpen (bool newProject = false); // (round 190oj: File › New: FL's new-project zoom, ~60 px a bar)
 
     // The track selected by a header click (FL's mark next to the LED), −1 = none; selectTrack selects one track as a
     // click on its header does, without the menus, and scrolls it into view (round 184a, S4: a new Simple track; S16:
