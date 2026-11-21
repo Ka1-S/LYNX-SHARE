@@ -13,6 +13,7 @@
 #include "core/AlsImport.h"
 #include "core/Braid.h"
 #include "core/ClipLauncher.h"
+#include "core/ClipLoopOps.h"
 #include "core/ClipSample.h"
 #include "core/DetailChain.h"
 #include "core/RackOps.h"
@@ -2425,6 +2426,12 @@ public:
         addAndMakeVisible (signature);
         loop.setButtonText (tr ("Loop"));
         loop.onClick = [this] { editSlot ([on = loop.getToggleState()] (ClipGridSlot& slot) { slot.loop = on; }); };
+        // round gap190og (detail-019): Live 12's Clip panel "Duplicate" button under Start / End = Duplicate Loop [SHOT
+        // ableton187c/shots/live-01-velocity-lane.png; STR DuplicateLoop in Live's ClipRegionPanel; DOC manual 8.9]
+        duplicateLoop.setButtonText (tr ("Duplicate"));
+        duplicateLoop.setTooltip (tr ("Duplicate Loop: the loop and its notes twice as long; notes after the loop move on with its end"));
+        duplicateLoop.onClick = [this] { duplicateClipLoop(); };
+        addAndMakeVisible (duplicateLoop);
         legato.setButtonText (tr ("Legato"));
         legato.setTooltip (tr ("Legato (keep the position)"));
         legato.onClick = [this] { editSlot ([on = legato.getToggleState()] (ClipGridSlot& slot) { slot.legato = on; }); };
@@ -2842,7 +2849,7 @@ private:
     {
         return { &start, &end, &position, &length, &followTime, &setStart, &setEnd, &setPosition, &setLength, &followOn, &linked, &invert, &reverse,
                  &makeLegato, &humanize, &duplicate, &quantize, &randomize, &timesTwo, &divideTwo, &fitScale, &chordHelper, &addInterval, &scaleMode, &groove, &mode,
-                 &quant, &followA, &followB, &scaleRoot, &scaleName, &loop, &legato, &nameLabel, &startLabel, &endLabel, &lengthLabel,
+                 &quant, &followA, &followB, &scaleRoot, &scaleName, &loop, &duplicateLoop, &legato, &nameLabel, &startLabel, &endLabel, &lengthLabel,
                  &positionLabel, &grooveLabel, &signatureLabel, &modeLabel, &quantLabel, &scaleLabel, &signature, &commitGroove };
     }
     // the look follows the layout's switch (checked on every layout and load; nothing changes while it stays the same)
@@ -2937,6 +2944,13 @@ private:
             put (start, { x0, y, half, row });
             put (end, { x0 + half + 4, y, half, row });
             y += row + 5;
+            if (hasNotes) // (round gap190og, detail-019: Live's Duplicate button between the Start / End fields and Loop)
+            {
+                put (duplicateLoop, { x0, y, inner, row });
+                y += row + 5;
+            }
+            else
+                duplicateLoop.setBounds ({});
             put (loop, { x0, y, inner, row });
             y += row + 5;
             labelRow (positionLabel, &setPosition, x0, half);
@@ -2960,7 +2974,7 @@ private:
             y += row + 6;
         }
         else
-            hide ({ &startLabel, &setStart, &endLabel, &setEnd, &start, &end, &loop, &positionLabel, &setPosition, &lengthLabel, &setLength, &position,
+            hide ({ &startLabel, &setStart, &endLabel, &setEnd, &start, &end, &loop, &duplicateLoop, &positionLabel, &setPosition, &lengthLabel, &setLength, &position,
                     &length, &signatureLabel, &grooveLabel, &signature, &groove, &scaleLabel, &scaleMode, &scaleRoot, &scaleName, &commitGroove });
         // Launch (+ Follow Action)
         headerY[1] = y;
@@ -3402,6 +3416,37 @@ private:
         });
     }
 
+    // round gap190og (detail-019): Live's Duplicate Loop on this MIDI clip (core/ClipLoopOps.h; one undo step)
+    void duplicateClipLoop()
+    {
+        const int t = track, sc = scene;
+        engine.editSong ([t, sc] (Song& song) {
+            if (auto* c = gridClip (song, t, sc))
+                cliploop::duplicateLoop (song, *c);
+        });
+        load();
+    }
+    static Clip* gridClip (Song& song, int t, int sc)
+    {
+        if (! song.clipGrid)
+            return nullptr;
+        for (auto& c : song.clipGrid->clips)
+            if (c.track == t && c.length > 0 && c.gridSlot >= 0 && c.gridSlot < (int) song.clipGrid->slots.size()
+                && song.clipGrid->slots[(std::size_t) c.gridSlot].scene == sc)
+                return &c;
+        return nullptr;
+    }
+public:
+    bool duplicateLoopForCheck()
+    {
+        if (! ui::showingOrShot (duplicateLoop) || duplicateLoop.getBounds().isEmpty() || ! duplicateLoop.isEnabled())
+            return false;
+        duplicateClipLoop(); // (what its click does; triggerClick would post it)
+        return true;
+    }
+    juce::Rectangle<int> duplicateLoopBoundsForCheck() const { return duplicateLoop.getBounds(); }
+private:
+
     // a note tool on every note of the clip's pattern (one undo step)
     void notes (std::function<void (Pattern&, const std::vector<int>&, const Song&)> fn)
     {
@@ -3470,6 +3515,8 @@ private:
     bool loading = false;
     std::unique_ptr<ui::TimerWhileShowing> showingTimer;
     juce::ToggleButton loop, legato;
+    // round gap190og (detail-019): Live's Duplicate Loop button of the Clip panel (its Live column only; MIDI clips)
+    liveclip::PillButton duplicateLoop { "duplicateLoop" };
     // round 190hr: the Follow Action controls
     juce::Label followTitle;
     juce::TextButton followOn, linked;
@@ -3497,6 +3544,7 @@ private:
 class DetailView::ClipPage final : public juce::Component, private juce::ChangeListener
 {
 public:
+    bool duplicateLoopForCheck() { return column.isVisible() && column.duplicateLoopForCheck(); } // (round gap190og)
     ClipPage (AudioEngine& e, Hooks& h) : engine (e), hooks (h), column (e)
     {
         addChildComponent (column); // (slice 2b: shown while a grid clip is)
@@ -3958,6 +4006,7 @@ void DetailView::editorTakenBack() { clipPage->editorTakenBack(); }
 void DetailView::releaseEditor() { clipPage->release(); }
 void DetailView::setClipTab (bool envelopes) { clipPage->showTab (envelopes); }
 void DetailView::setMpeTab() { clipPage->showTab (false, true); }
+bool DetailView::duplicateLoopForCheck() { return clipPage != nullptr && clipPage->duplicateLoopForCheck(); } // (round gap190og)
 
 void DetailView::showPage()
 {
