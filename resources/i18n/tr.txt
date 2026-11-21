@@ -12168,3 +12168,11 @@ countries: tr
 "Automation clip: [LMB] open it  [RMB] menu" = "Otomasyon klibi: [LMB] aç  [RMB] menü"
 "Rename automation clip" = "Otomasyon klibini yeniden adlandır"
 "Indexing folders... {0}" = "Klasörler dizinleniyor... {0}"
+
+# round 190ow (PAT-7 rest, DE-123: automation clip rows)
+"Mute the automation clip: it drives nothing while muted" = "Otomasyon klibini sessize al: sessizken hiçbir şeyi sürmez"
+"Select the automation clip row: [LMB] alone  [Ctrl+LMB] add" = "Otomasyon klibi satırını seç: [LMB] yalnız bu  [Ctrl+LMB] ekle"
+"Steps start the automation clip: [LMB] set or clear  [drag] paint" = "Adımlar otomasyon klibini başlatır: [LMB] koy veya kaldır  [sürükle] boya"
+"{0} step(s) or note(s) on automation clip rows start no clip (the clips in the Playlist play as before)" = "Otomasyon klibi satırlarındaki {0} adım veya nota hiçbir klibi başlatmaz (Playlist'teki klipler eskisi gibi çalar)"
+"An automation clip's LFO keeps the clip's first range (its MIN / MAX knobs are written into the points)" = "Bir otomasyon klibinin LFO'su klibin ilk aralığını korur (MIN / MAX düğmeleri noktalara yazılır)"
+"Muted automation clips lose their target, so they stay silent: {0}" = "Sessize alınmış otomasyon klipleri hedeflerini kaybeder, böylece sessiz kalır: {0}"

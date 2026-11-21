@@ -12168,3 +12168,11 @@ countries: id
 "Automation clip: [LMB] open it  [RMB] menu" = "Clip otomasi: [LMB] buka  [RMB] menu"
 "Rename automation clip" = "Ganti nama clip otomasi"
 "Indexing folders... {0}" = "Mengindeks folder... {0}"
+
+# round 190ow (PAT-7 rest, DE-123: automation clip rows)
+"Mute the automation clip: it drives nothing while muted" = "Bisukan clip otomasi: saat dibisukan, clip tidak menggerakkan apa pun"
+"Select the automation clip row: [LMB] alone  [Ctrl+LMB] add" = "Pilih baris clip otomasi: [LMB] hanya ini  [Ctrl+LMB] tambah"
+"Steps start the automation clip: [LMB] set or clear  [drag] paint" = "Step memulai clip otomasi: [LMB] pasang atau hapus  [seret] lukis"
+"{0} step(s) or note(s) on automation clip rows start no clip (the clips in the Playlist play as before)" = "{0} step atau not pada baris clip otomasi tidak memulai clip (clip di Playlist diputar seperti sebelumnya)"
+"An automation clip's LFO keeps the clip's first range (its MIN / MAX knobs are written into the points)" = "LFO clip otomasi tetap memakai rentang awal clip (knob MIN / MAX-nya ditulis ke titik-titik)"
+"Muted automation clips lose their target, so they stay silent: {0}" = "Clip otomasi yang dibisukan kehilangan targetnya, jadi tetap senyap: {0}"

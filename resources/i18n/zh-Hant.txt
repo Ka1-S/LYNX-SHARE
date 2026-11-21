@@ -12168,3 +12168,11 @@ countries: tw hk mo
 "Automation clip: [LMB] open it  [RMB] menu" = "自動化片段：[LMB] 開啟  [RMB] 選單"
 "Rename automation clip" = "重新命名自動化片段"
 "Indexing folders... {0}" = "正在索引資料夾... {0}"
+
+# round 190ow (PAT-7 rest, DE-123: automation clip rows)
+"Mute the automation clip: it drives nothing while muted" = "將自動化片段靜音：靜音時不驅動任何參數"
+"Select the automation clip row: [LMB] alone  [Ctrl+LMB] add" = "選取自動化片段列：[LMB] 僅此列  [Ctrl+LMB] 加入"
+"Steps start the automation clip: [LMB] set or clear  [drag] paint" = "步進啟動自動化片段：[LMB] 設定或清除  [拖曳] 繪製"
+"{0} step(s) or note(s) on automation clip rows start no clip (the clips in the Playlist play as before)" = "自動化片段列上的 {0} 個步進或音符不會啟動片段（播放清單中的片段照常播放）"
+"An automation clip's LFO keeps the clip's first range (its MIN / MAX knobs are written into the points)" = "自動化片段的 LFO 保留片段最初的範圍（其 MIN / MAX 旋鈕寫入各點）"
+"Muted automation clips lose their target, so they stay silent: {0}" = "已靜音的自動化片段失去目標，因此保持無聲：{0}"

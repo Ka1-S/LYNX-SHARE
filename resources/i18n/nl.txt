@@ -12168,3 +12168,11 @@ countries: nl be
 "Automation clip: [LMB] open it  [RMB] menu" = "Automation clip: [LMB] openen  [RMB] menu"
 "Rename automation clip" = "Automation clip hernoemen"
 "Indexing folders... {0}" = "Mappen indexeren... {0}"
+
+# round 190ow (PAT-7 rest, DE-123: automation clip rows)
+"Mute the automation clip: it drives nothing while muted" = "Automation clip dempen: gedempt stuurt hij niets aan"
+"Select the automation clip row: [LMB] alone  [Ctrl+LMB] add" = "Rij van de automation clip selecteren: [LMB] alleen deze  [Ctrl+LMB] toevoegen"
+"Steps start the automation clip: [LMB] set or clear  [drag] paint" = "Stappen starten de automation clip: [LMB] zetten of wissen  [slepen] tekenen"
+"{0} step(s) or note(s) on automation clip rows start no clip (the clips in the Playlist play as before)" = "{0} stap(pen) of noot/noten op rijen van automation clips starten geen clip (de clips in de Playlist spelen zoals eerst)"
+"An automation clip's LFO keeps the clip's first range (its MIN / MAX knobs are written into the points)" = "De LFO van een automation clip houdt het eerste bereik van de clip (de MIN- / MAX-knoppen worden in de punten geschreven)"
+"Muted automation clips lose their target, so they stay silent: {0}" = "Gedempte automation clips verliezen hun doel en blijven dus stil: {0}"

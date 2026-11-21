@@ -12168,3 +12168,11 @@ countries: jp
 "Automation clip: [LMB] open it  [RMB] menu" = "オートメーションクリップ: [LMB] 開く  [RMB] メニュー"
 "Rename automation clip" = "オートメーションクリップ名を変更"
 "Indexing folders... {0}" = "フォルダーをインデックス作成中... {0}"
+
+# round 190ow (PAT-7 rest, DE-123: automation clip rows)
+"Mute the automation clip: it drives nothing while muted" = "オートメーションクリップをミュート: ミュート中は何も動かしません"
+"Select the automation clip row: [LMB] alone  [Ctrl+LMB] add" = "オートメーションクリップの行を選択: [LMB] この行だけ  [Ctrl+LMB] 追加"
+"Steps start the automation clip: [LMB] set or clear  [drag] paint" = "ステップでオートメーションクリップを開始: [LMB] 設定/解除  [ドラッグ] ペイント"
+"{0} step(s) or note(s) on automation clip rows start no clip (the clips in the Playlist play as before)" = "オートメーションクリップの行にある {0} 個のステップ/ノートはクリップを開始しません (プレイリストのクリップはこれまでどおり再生されます)"
+"An automation clip's LFO keeps the clip's first range (its MIN / MAX knobs are written into the points)" = "オートメーションクリップの LFO はクリップの最初の範囲を保ちます (MIN / MAX ノブの値はポイントに書き込まれます)"
+"Muted automation clips lose their target, so they stay silent: {0}" = "ミュートされたオートメーションクリップはターゲットを失い、無音のままです: {0}"

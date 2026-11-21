@@ -12168,3 +12168,11 @@ countries: es mx ar co cl pe ve
 "Automation clip: [LMB] open it  [RMB] menu" = "Clip de automatización: [LMB] abrirlo  [RMB] menú"
 "Rename automation clip" = "Renombrar clip de automatización"
 "Indexing folders... {0}" = "Indexando carpetas... {0}"
+
+# round 190ow (PAT-7 rest, DE-123: automation clip rows)
+"Mute the automation clip: it drives nothing while muted" = "Silenciar el clip de automatización: silenciado, no mueve nada"
+"Select the automation clip row: [LMB] alone  [Ctrl+LMB] add" = "Seleccionar la fila del clip de automatización: [LMB] solo esta  [Ctrl+LMB] añadir"
+"Steps start the automation clip: [LMB] set or clear  [drag] paint" = "Los pasos inician el clip de automatización: [LMB] poner o quitar  [arrastrar] pintar"
+"{0} step(s) or note(s) on automation clip rows start no clip (the clips in the Playlist play as before)" = "{0} paso(s) o nota(s) en filas de clips de automatización no inician ningún clip (los clips de la Playlist suenan como antes)"
+"An automation clip's LFO keeps the clip's first range (its MIN / MAX knobs are written into the points)" = "El LFO de un clip de automatización conserva el primer rango del clip (sus perillas MIN / MAX se escriben en los puntos)"
+"Muted automation clips lose their target, so they stay silent: {0}" = "Los clips de automatización silenciados pierden su destino, así que siguen en silencio: {0}"
