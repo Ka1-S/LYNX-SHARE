@@ -70,6 +70,7 @@ public:
         : engine (e), host (e.getPluginHost()), persistent (keep), onFolders (std::move (folders))
     {
         search.setTextToShowWhenEmpty (tr ("Search name, vendor, format or file"), theme::colour::textDisabled);
+        focusOnOpen (search); // (issue #244)
         search.setFont (theme::font (theme::type::body));
         search.setIndents (8, 6);
         search.onTextChange = [this] { refilter(); };

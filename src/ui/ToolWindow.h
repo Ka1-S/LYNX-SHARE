@@ -13,6 +13,13 @@ namespace lynx
 juce::DocumentWindow* openToolWindow (std::unique_ptr<juce::Component> content, const juce::String& title, const juce::String& key = {},
                                       bool resizable = false);
 
+// Issue #244 (round 190oq): `c` (a search box) takes the keyboard focus when its tool window opens, so typing goes
+// straight into it. Marks the component; openToolWindow gives it the focus once the window shows (and once more right
+// after, as the window's activation arrives on some systems only then).
+void focusOnOpen (juce::Component& c);
+// The component marked with focusOnOpen inside `root`, or nullptr (tests / shots).
+juce::Component* focusOnOpenTarget (juce::Component& root);
+
 // Closes the tool window that holds `content` (from inside it, e.g. an Accept button).
 void closeToolWindowOf (juce::Component& content);
 
