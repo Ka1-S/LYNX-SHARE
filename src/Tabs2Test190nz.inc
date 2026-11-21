@@ -28,7 +28,9 @@
         const auto pump = [] (int ms) {
             const auto end = juce::Time::getMillisecondCounter() + (juce::uint32) ms;
             while (juce::Time::getMillisecondCounter() < end)
+#if JUCE_LINUX || JUCE_WINDOWS // (rollup 0.1.31 step 4: macOS has no such JUCE function; the route runs on Linux / Windows)
                 if (! juce::detail::dispatchNextMessageOnSystemQueue (true))
+#endif
                     juce::Thread::sleep (5);
         };
         const auto mark = [&dir] (const juce::String& name) { dir.getChildFile (name).create(); };
