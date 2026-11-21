@@ -8491,11 +8491,15 @@ private:
                 std::vector<lynx::Marker> backSignatures;
                 int sectionMarkers = 0;
                 if (back)
+                {
                     for (const auto& m : back->markers())
+                    {
                         if (m.isSignature())
                             backSignatures.push_back (m);
                         else if (m.name == "Intro" || m.name == "Verse")
                             ++sectionMarkers;
+                    }
+                }
                 const auto bars = song.barsBetween (0, 400 * lynx::ppq);
                 const auto backBars = back ? back->barsBetween (0, 400 * lynx::ppq) : std::vector<lynx::Bar> {};
                 const auto backFx = back && back->mixer.size() > 2 && back->mixer[2].effects.size() >= 2 ? back->mixer[2].effects[back->mixer[2].effects.size() - 2].plugin : lynx::PluginRef {};
@@ -8547,7 +8551,7 @@ private:
         {
             const auto bar = 4 * (std::int64_t) lynx::ppq;
             auto song = lynx::Song::makeDefault();
-            song.playlistTracks.resize (juce::jmax<std::size_t> (2, song.playlistTracks.size()));
+            song.playlistTracks.resize (std::max<std::size_t> (2, song.playlistTracks.size())); // (std::max: juce::jmax<std::size_t> instantiates SIMDRegister<unsigned long> on macOS arm64)
             lynx::Clip c;
             c.pattern = 0;
             c.track = 0;
