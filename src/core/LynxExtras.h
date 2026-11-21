@@ -102,6 +102,10 @@ inline constexpr Item items[] = {
     { "simple.loopDetect", TR_NOOP ("Simple workflow"), TR_NOOP ("Dropped loops take the tempo and key found in their audio"),
       TR_NOOP ("In the Simple layout a loop whose file and name don't say its tempo or key is analysed when it is dropped: a loop of whole beats keeps the project's tempo and a key it finds follows the project key, as BandLab's loops do. On by default. Also in the Browser options menu of the Simple layout."),
       "ui-options.txt:simpleLoopDetect" },
+    // round 190oo (design review 2, O-4 / CS-28): BandLab names the project above its transport
+    { "simple.projectName", TR_NOOP ("Simple workflow"), TR_NOOP ("Project name at the top (BandLab)"),
+      TR_NOOP ("In the Simple layout the project's name shows centred at the top of the window, over the transport, as BandLab shows it. Also in the View menu of the Simple layout."),
+      "ui-options.txt:simpleProjectName" },
     { "record.lastLoopPassPlays", TR_NOOP ("Recording"), TR_NOOP ("After loop recording, only the last pass plays"),
       TR_NOOP ("The earlier passes stay under it, muted, to pick from. Also in the recording options menu."),
       "ui-options.txt:recordLastPassPlays" },

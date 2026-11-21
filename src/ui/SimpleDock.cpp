@@ -1330,7 +1330,9 @@ private:
             g.setColour (n == 0 ? colour::textDisabled : selected ? colour::textPrimary : colour::textSecondary);
             g.setFont (font (type::body, selected));
             g.drawText (soundCategoryText ((soundlib::Category) row), 10, 0, width - 50, height, juce::Justification::centredLeft, true);
-            g.setColour (colour::textDisabled);
+            // (round 190oo, CS-31: the counts were textDisabled, 2.95:1 on the list; #8f939b reads >= 4.5:1, the selected row's
+            // textSecondary on accentMuted too; an empty category's 0 stays disabled with its name)
+            g.setColour (n == 0 ? colour::textDisabled : selected ? colour::textSecondary : juce::Colour (0xff8f939b));
             g.setFont (font (type::caption));
             g.drawText (juce::String (n), width - 40, 0, 32, height, juce::Justification::centredRight, false);
         }

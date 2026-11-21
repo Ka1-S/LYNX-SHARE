@@ -3018,6 +3018,17 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 }
                 if (const auto box = trackAudition (t); ! box.isEmpty())
                     textRight = juce::jmin (textRight, (float) box.getX());
+                // round 190oo (CS-24): the insert this Simple header acts on also plays other tracks: a link mark on a small
+                // plate, its ink black or white, whichever reads better on it (>= 4.58:1, simplelook::inkOn)
+                if (const auto mark = trackSharedMark (t); ! mark.isEmpty())
+                {
+                    const auto box = mark.toFloat();
+                    const auto fill = plate.overlaidWith (colour::textSecondary.withAlpha (hovered && hover.shared ? 0.36f : 0.24f));
+                    g.setColour (fill);
+                    g.fillRoundedRectangle (box, radius::sm);
+                    icons::draw (g, Icon::link, box.reduced (2.0f), ui::simplelook::inkOn (fill));
+                    textRight = juce::jmin (textRight, box.getX() - 2.0f);
+                }
 
                 // the track's icon before its name, as FL's track header shows it (round 168h)
                 auto textLeft = (int) left + (simpleHeaders ? 12 : 6);
@@ -6206,8 +6217,12 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         }
 
         // the Simple headers (round 184a), and the linked ones (round 190gz): M, S, volume, pan and "+FX" act on the
-        // track's mixer insert
-        if (const auto insert = simpleInsert (track); insert > 0 && ! flmods::popup (e.mods) && ! (! simpleHeaders && onLed && flmods::ctrl (e.mods)))
+        // track's mixer insert. Round 190oo (CS-24): an FL track's Simple header acts on the insert its clips play through
+        // (core/SimpleHeaderTarget.h); its M stays the Playlist track's mute (the code after this block, with FL's Shift /
+        // Alt / Ctrl clicks), so muting it never silences the other tracks on that insert
+        const auto borrowedLed = simpleHeaders && onLed && ! headerTarget (track).own;
+        if (const auto insert = headerInsert (track);
+            insert > 0 && ! borrowedLed && ! flmods::popup (e.mods) && ! (! simpleHeaders && onLed && flmods::ctrl (e.mods)))
         {
             const auto p = e.getPosition();
             if (onLed && ! simpleHeaders && engine.getSong().isTrackMuted (track))
@@ -9157,7 +9172,10 @@ void PlaylistComponent::paintSimpleHeaderControls (juce::Graphics& g, int t, juc
         g.setColour (juce::Colour (trackColour));
         g.fillRoundedRectangle (plateArea.withWidth (4.0f).reduced (0.0f, 2.0f), 1.5f);
     }
-    const auto insert = simpleInsert (t);
+    // round 190oo (CS-24): an FL track's header acts on the insert its clips play through (core/SimpleHeaderTarget.h);
+    // its M stays the Playlist track's mute, so a lit M always means this track is silent
+    const auto& target = headerTarget (t);
+    const auto insert = headerInsert (t);
     const auto* m = insert > 0 ? &song.mixer[(std::size_t) insert] : nullptr;
     const auto buttonFont = font (ui::simplelook::largeControls() ? type::body : type::small, true);
     const auto button = [&g, &buttonFont] (juce::Rectangle<float> r, const char* text, bool on, juce::Colour onColour, bool lit) {
@@ -9167,7 +9185,7 @@ void PlaylistComponent::paintSimpleHeaderControls (juce::Graphics& g, int t, juc
         g.setFont (buttonFont);
         g.drawText (text, r, juce::Justification::centred, false);
     };
-    button (trackLed (t).toFloat(), "M", m != nullptr ? m->muted : song.isTrackMuted (t), colour::warning, hovered && hover.led);
+    button (trackLed (t).toFloat(), "M", simplehdr::muteLit (song, t, target), colour::warning, hovered && hover.led);
     if (const auto solo = trackSolo (t).toFloat(); ! solo.isEmpty() && m != nullptr)
         button (solo, "S", m->solo, colour::info, hovered && hover.solo);
 
@@ -9258,6 +9276,46 @@ int PlaylistComponent::simpleInsert (int track) const
     return linkedHeaders() ? simpletracks::insertOf (engine.getSong(), track) : -1;
 }
 
+// Round 190oo (CS-24): the Simple headers' targets, built once per published song (one pass over the clips; a level-only
+// edit, as a volume drag, publishes no new count: the routing it reads cannot have changed)
+const simplehdr::HeaderTarget& PlaylistComponent::headerTarget (int track) const
+{
+    static const simplehdr::HeaderTarget none;
+    if (! simpleHeaders)
+        return none;
+    if (headerTargetStamp != engine.getPublishCount())
+    {
+        headerTargetList = simplehdr::headerTargets (engine.getSong());
+        headerTargetStamp = engine.getPublishCount();
+    }
+    return track >= 0 && track < (int) headerTargetList.size() ? headerTargetList[(std::size_t) track] : none;
+}
+
+int PlaylistComponent::headerInsert (int track) const
+{
+    if (! simpleHeaders)
+        return simpleInsert (track); // (the linked headers: their own insert only)
+    const auto insert = headerTarget (track).insert;
+    return insert > 0 && insert < (int) engine.getSong().mixer.size() ? insert : -1;
+}
+
+// Round 190oo (CS-24): a small link mark left of M (and of an audio track's arm / input buttons) when the insert the
+// header acts on also plays other tracks; pointing at it names them (hint bar)
+juce::Rectangle<int> PlaylistComponent::trackSharedMark (int track) const
+{
+    if (! simpleHeaders || noteedit::isFoldedAway (engine.getSong(), track))
+        return {};
+    if (const auto& target = headerTarget (track); target.insert <= 0 || target.sharedWith <= 0)
+        return {};
+    const auto led = trackLed (track);
+    auto leftmost = led.getX();
+    for (const auto& other : { trackArm (track), trackInput (track), trackArrow (track), trackAudition (track) })
+        if (! other.isEmpty() && other.getY() < led.getBottom() && other.getBottom() > led.getY())
+            leftmost = juce::jmin (leftmost, other.getX());
+    const auto size = juce::jmin (simpleSizes().icon, led.getHeight());
+    return { leftmost - 4 - size, led.getCentreY() - size / 2, size, size };
+}
+
 bool PlaylistComponent::linkedHeaders() const
 {
     return ! simpleHeaders && engine.getSong().linkTracksToMixer;
@@ -9283,7 +9341,7 @@ void PlaylistComponent::updateHeaderWidth()
 
 juce::Rectangle<int> PlaylistComponent::trackSolo (int track) const
 {
-    if (simpleInsert (track) < 0 || noteedit::isFoldedAway (engine.getSong(), track))
+    if (headerInsert (track) < 0 || noteedit::isFoldedAway (engine.getSong(), track)) // (round 190oo CS-24: an FL track's too)
         return {};
     if (simpleHeaders) // (round 190jc: right of M)
         return trackLed (track).translated (simpleSizes().button + simpleSizes().gap, 0);
@@ -9293,7 +9351,7 @@ juce::Rectangle<int> PlaylistComponent::trackSolo (int track) const
 juce::Rectangle<int> PlaylistComponent::trackVolume (int track) const
 {
     const auto h = heightOf (track);
-    if (simpleInsert (track) < 0 || h < (simpleHeaders ? simpleTwoRows() : linkedTwoRows) || noteedit::isFoldedAway (engine.getSong(), track))
+    if (headerInsert (track) < 0 || h < (simpleHeaders ? simpleTwoRows() : linkedTwoRows) || noteedit::isFoldedAway (engine.getSong(), track))
         return {};
     if (simpleHeaders)
     {
@@ -9340,7 +9398,7 @@ juce::Font PlaylistComponent::simpleFxFont()
 // round 190ld (details DS-13, BandLab B11 "Fx Bass Boost"): the insert's chain preset, "" = none
 juce::String PlaylistComponent::simpleFxPreset (int track) const
 {
-    const auto insert = simpleInsert (track);
+    const auto insert = headerInsert (track); // (round 190oo CS-24: an FL track's borrowed insert too)
     const auto& song = engine.getSong();
     return insert > 0 && insert < (int) song.mixer.size() ? juce::String::fromUTF8 (song.mixer[(std::size_t) insert].chainPreset.c_str()) : juce::String();
 }
@@ -13682,6 +13740,7 @@ PlaylistComponent::Hover PlaylistComponent::hoverAt (juce::Point<int> p) const
             h.volume = trackVolume (h.track).expanded (0, 4).contains (p);
             h.pan = trackPan (h.track).expanded (2).contains (p);
             h.fx = trackFx (h.track).contains (p);
+            h.shared = trackSharedMark (h.track).contains (p); // round 190oo (CS-24)
             h.insertItem = insertsItemAt (h.track, p); // issue #154
             h.insertLed = h.insertItem >= 0 && p.x < trackInserts (h.track).getX() + trackinserts::ledWidth + 1;
         }
@@ -13918,10 +13977,27 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
         return hint;
     }
 
-    if (h.header && simpleInsert (h.track) > 0 && (h.led || h.solo || h.volume || h.pan || h.fx))
+    // round 190oo (CS-24): the "shared" mark: the insert this header acts on also plays other tracks (their names)
+    if (h.header && h.shared)
     {
-        // the Simple headers (round 184a): their controls are the track's mixer track's
-        const auto& m = song.mixer[(std::size_t) simpleInsert (h.track)];
+        const auto& target = headerTarget (h.track);
+        juce::StringArray others;
+        for (const auto u : target.others)
+            if (others.size() < 4)
+                others.add (trackName (u));
+        if (target.sharedWith > others.size())
+            others.add ("...");
+        hint.text = tr ("Shared mixer track: volume, pan, solo and effects here act on every track it plays; M mutes only this track");
+        hint.value = tr ("Also plays {0}", { others.joinIntoString (", ") });
+        return hint;
+    }
+
+    if (const auto insert = headerInsert (h.track);
+        h.header && insert > 0 && (h.solo || h.volume || h.pan || h.fx || (h.led && (! simpleHeaders || headerTarget (h.track).own))))
+    {
+        // the Simple headers (round 184a): their controls are the track's mixer track's (round 190oo, CS-24: an FL track's
+        // M is its Playlist mute, described with the plain header below)
+        const auto& m = song.mixer[(std::size_t) insert];
         hint.text = h.led      ? (simpleHeaders ? tr ("Track: [LMB] mute / unmute its mixer track")
                                             : tr ("Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track"))
                     : h.solo   ? tr ("Track: [LMB] solo its mixer track")
@@ -13934,7 +14010,7 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
             hint.value = juce::String (juce::roundToInt (m.pan * 100.0f));
         else if (h.fx && ! m.chainPreset.empty()) // round 190dg: the track's chain preset, as the dock names it
             hint.value = juce::String::fromUTF8 (m.chainPreset.c_str())
-                         + (chains::unchanged (song, simpleInsert (h.track)) ? juce::String() : " " + tr ("(edited)"));
+                         + (chains::unchanged (song, insert) ? juce::String() : " " + tr ("(edited)"));
         else
             hint.value = trackName (h.track);
         return hint;
@@ -14096,7 +14172,7 @@ void PlaylistComponent::mouseDoubleClick (const juce::MouseEvent& e)
         if (trackLed (track).expanded (3).contains (e.getPosition()) || trackArrow (track).contains (e.getPosition())
             || trackArm (track).expanded (2).contains (e.getPosition()) || trackInput (track).expanded (2).contains (e.getPosition()))
             return;
-        if (const auto insert = simpleInsert (track); insert > 0)
+        if (const auto insert = headerInsert (track); insert > 0) // (round 190oo CS-24: an FL track's borrowed insert too)
         {
             // the Simple headers: a double-click resets the volume (to 0 dB) or the pan (centre); on the name it renames.
             // The linked headers (round 190gz): the same on volume / pan; elsewhere FL's double-click
@@ -14113,7 +14189,7 @@ void PlaylistComponent::mouseDoubleClick (const juce::MouseEvent& e)
             }
             if (trackSolo (track).contains (p) || trackFx (track).contains (p))
                 return;
-            if (simpleHeaders)
+            if (simpleHeaders && simpleInsert (track) > 0) // (an FL track's name keeps FL's double-click: its clip's source)
             {
                 renameTrack (track);
                 return;

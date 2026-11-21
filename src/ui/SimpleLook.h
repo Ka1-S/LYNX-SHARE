@@ -16,6 +16,16 @@ inline bool& largeControls()
     return on;
 }
 
+// Round 190oo (design review 2, option O-4 / CS-28, a LYNX extra, off by default): the project's name centred at the
+// top of the Simple layout's top bar, over the capsules, as BandLab shows "New Project" (View › "Project name at the
+// top (BandLab)" in the Simple layout; Settings › LYNX extras "simple.projectName"; ui-options.txt simpleProjectName).
+// Off: the top bar is as before.
+inline bool& projectNameShown()
+{
+    static bool on = false;
+    return on;
+}
+
 // `normal` px, or `large` px with Large controls on
 inline int px (int normal, int large) { return largeControls() ? large : normal; }
 inline float px (float normal, float large) { return largeControls() ? large : normal; }

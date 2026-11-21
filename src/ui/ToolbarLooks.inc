@@ -586,6 +586,7 @@ void MainComponent::layoutSimpleToolbar (juce::Rectangle<int> bar, int menuWidth
     lookCapsules.clear();
     lookDividers.clear();
     lookMenuRow = lookBand = {};
+    simpleNameArea = {}; // (round 190oo, O-4)
     auto toolbar = bar.reduced (8, toolbarLayout.visible ? 5 : 3);
     const auto h = rowHeight, row1 = toolbar.getY(), row2 = toolbar.getY() + rowHeight + 2;
     auto put = [] (juce::Component& c, juce::Rectangle<int> r) {
@@ -718,6 +719,35 @@ void MainComponent::layoutSimpleToolbar (juce::Rectangle<int> bar, int menuWidth
         right.removeFromRight (4);
     }
     put (moreButton, right.removeFromRight (sb::moreWidth).withSizeKeepingCentre (sb::moreWidth, sb::moreWidth));
+
+    // round 190oo (O-4, CS-28; LYNX extra, off by default): the project's name centred at the top, over the capsules, as
+    // BandLab's "New Project" (mockups/O-4-simple-project-name.png). It takes the strip above the capsules, centred on
+    // the window, as wide as the parts that reach into that strip (the menus at the left, the master pitch knob and the
+    // file buttons of the first row) leave free on both sides; with less than 60 px it is not shown.
+    if (ui::simplelook::projectNameShown())
+    {
+        const auto strip = juce::Rectangle<int> (bar.getX(), bar.getY() + 1, bar.getWidth(), capY - bar.getY() - 1);
+        const auto centre = bar.getCentreX();
+        int leftEdge = bar.getX() + 8, rightEdge = bar.getRight() - 8;
+        for (auto* c : getChildren())
+        {
+            const auto b = c->getBounds();
+            if (! c->isVisible() || b.getBottom() > toolbarHeight || ! b.intersects (strip))
+                continue; // (only the toolbar's own parts; a window-wide overlay is not one)
+            if (b.getX() <= centre && b.getRight() >= centre)
+            {
+                leftEdge = rightEdge = centre; // a part over the centre: no room
+                break;
+            }
+            if (b.getRight() < centre)
+                leftEdge = juce::jmax (leftEdge, b.getRight() + 8);
+            else
+                rightEdge = juce::jmin (rightEdge, b.getX() - 8);
+        }
+        const auto half = juce::jmin (centre - leftEdge, rightEdge - centre, 220);
+        if (half >= 30 && strip.getHeight() >= 10)
+            simpleNameArea = { centre - half, strip.getY(), 2 * half, strip.getHeight() };
+    }
 }
 
 // --- Clip-launch: Live's control bar -----------------------------------------------------------------------------------
@@ -732,6 +762,7 @@ void MainComponent::layoutLiveControlBar (juce::Rectangle<int> bar, int menuWidt
     snapLabelArea = patternLabelArea = transportArea = modeArea = {};
     lookCapsules.clear();
     lookDividers.clear();
+    simpleNameArea = {}; // (round 190oo, O-4: the Simple top bar's only)
     auto put = [] (juce::Component& c, juce::Rectangle<int> r) {
         c.setVisible (true);
         c.setBounds (r);
@@ -884,6 +915,23 @@ void MainComponent::paintLookToolbar (juce::Graphics& g)
     {
         g.setColour (toolbarLook == Look::live ? juce::Colour (0xff222222) : colour::bg1);
         g.fillRoundedRectangle (hintBar.getBounds().toFloat(), radius::md);
+    }
+
+    // round 190oo (O-4, LYNX extra): the Simple top bar's centred project name, as the window title and the other layouts
+    // name it ("Untitled" until it has one), in the primary ink (#eceef2 on bg3: well over 4.5:1), shortened in the middle
+    if (toolbarLook == Look::simple && ! simpleNameArea.isEmpty())
+    {
+        const auto nameFont = font (type::small, true);
+        const auto name = projectName.isNotEmpty() ? projectName : tr ("Untitled");
+        if (name != simpleNameFor || simpleNameArea.getWidth() != simpleNameFitWidth)
+        {
+            simpleNameFor = name;
+            simpleNameFitWidth = simpleNameArea.getWidth();
+            simpleNameFitted = fitMiddle (name, nameFont, (float) simpleNameFitWidth);
+        }
+        g.setFont (nameFont);
+        g.setColour (colour::textPrimary);
+        g.drawText (simpleNameFitted, simpleNameArea, juce::Justification::centred, false);
     }
 
     if (! titleArea.isEmpty())

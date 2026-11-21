@@ -848,6 +848,11 @@ private:
     IconButton snapToggleButton { "snapToggle", Icon::magnet };
     std::vector<int> dividers; // x positions of the toolbar panel separators
     juce::Rectangle<int> snapLabelArea, patternLabelArea, titleArea, transportArea;
+    // round 190oo (O-4, LYNX extra): the Simple top bar's centred project name (empty: off or no room) and its fitted
+    // text, made again only when the name or the room changes (no work in paint)
+    juce::Rectangle<int> simpleNameArea;
+    juce::String simpleNameFor, simpleNameFitted;
+    int simpleNameFitWidth = -1;
     std::unique_ptr<ui::QuickTipWindow> quickTips; // the tool names under the mouse (ui/HintBar.h)
     void setQuickTips();
     void showLanguageChoice (const juce::String& id);

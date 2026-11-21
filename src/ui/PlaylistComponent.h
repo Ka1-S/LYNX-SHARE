@@ -21,6 +21,7 @@
 #include "core/PlaylistViewOptions.h"
 #include "core/StripSilence.h"
 #include "core/TrackClips.h" // round 190ne
+#include "core/SimpleHeaderTarget.h" // round 190oo (CS-24)
 #include "engine/AudioEngine.h"
 #include "ui/EditorTools.h"
 #include "ui/FrameTicker.h"
@@ -910,6 +911,15 @@ private:
     int insertsPressTrack = -1, insertsPressItem = -1, insertsDropTrack = -1, insertsDropAt = -1;
     bool insertsDragging = false;
     int simpleInsert (int track) const; // the insert a Simple (or linked) header's controls act on, -1 none
+    // Round 190oo (design review 2, CS-24): an FL project's tracks in the Simple headers get S, volume, pan and "+FX" on
+    // the insert their clips play through (the Session mixer's rule; the mute and solo rules: core/SimpleHeaderTarget.h).
+    // headerInsert: the insert S / volume / pan / "+FX" act on (simpleInsert, or the borrowed insert in the Simple
+    // headers), -1 none. The targets are built once per published song (the engine's publish count).
+    int headerInsert (int track) const;
+    const simplehdr::HeaderTarget& headerTarget (int track) const;
+    juce::Rectangle<int> trackSharedMark (int track) const; // the "shared" mark left of M (empty: none)
+    mutable std::vector<simplehdr::HeaderTarget> headerTargetList;
+    mutable std::uint64_t headerTargetStamp = ~(std::uint64_t) 0;
     // LYNX's "Link Playlist tracks to mixer tracks" (round 190gz, issue #170): with FL's headers, the project's switch is
     // on. The headers are then wider and a linked track's header carries its mixer track's M, S, volume and pan (the
     // Simple headers' controls, laid out for FL's row heights: one row of buttons, the volume bar and pan from 34 px).
@@ -1139,6 +1149,7 @@ private:
         bool header = false, led = false, arrow = false, arm = false, input = false, audition = false;
         bool solo = false, volume = false, pan = false, fx = false; // the Simple headers' controls (round 184a)
         bool addTrack = false; // round 190jc: the round "+" under the Simple tracks
+        bool shared = false;   // round 190oo (CS-24): the Simple header's "shared" mark
         int divider = -1; // the track whose bottom edge in the headers is under the mouse (resizes it)
         int insertItem = -1; // issue #154: the insert effects column's row (an effect, trackinserts::addRow; -1 none)
         bool insertLed = false; // ... and its on/off dot
@@ -1147,7 +1158,8 @@ private:
         {
             return fade == o.fade && clip == o.clip && track == o.track && target == o.target && header == o.header && led == o.led && arrow == o.arrow
                    && arm == o.arm && input == o.input && audition == o.audition && solo == o.solo && volume == o.volume && pan == o.pan && fx == o.fx
-                   && divider == o.divider && insertItem == o.insertItem && insertLed == o.insertLed && addTrack == o.addTrack;
+                   && divider == o.divider && insertItem == o.insertItem && insertLed == o.insertLed && addTrack == o.addTrack
+                   && shared == o.shared;
         }
     };
     Hover hover;

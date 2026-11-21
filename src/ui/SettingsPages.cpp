@@ -31,6 +31,7 @@
 #include "ui/PianoRollComponent.h"
 #include "ui/PlaylistComponent.h"
 #include "ui/PluginSkin.h"
+#include "ui/SimpleLook.h" // round 190oo (O-4)
 #include "ui/Updater.h"
 
 #include <algorithm>
@@ -2664,6 +2665,7 @@ bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_v
     if (id == "record.lastLoopPassPlays") return engine.getRecordOptions().lastLoopPassPlays;
     if (id == "detail.windowKey") return DetailView::extraWindowKey;
     if (id == "detail.selectInMixer") return DetailView::extraSelectInMixer;
+    if (id == "simple.projectName") return ui::simplelook::projectNameShown(); // round 190oo (O-4)
     if (id == "midi.gamepad") return engine.getMidiPrefs().gamepad;
     return false;
 }
@@ -2781,6 +2783,14 @@ void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_
         options.lastLoopPassPlays = on;
         engine.setRecordOptions (options);
         saved();
+    }
+    else if (id == "simple.projectName") // round 190oo (O-4): the main window's action also lays the top bar out again
+    {
+        if (! toggledBy ("simple.projectName"))
+        {
+            ui::simplelook::projectNameShown() = on;
+            saved();
+        }
     }
     else if (id == "detail.windowKey" || id == "detail.selectInMixer")
     {

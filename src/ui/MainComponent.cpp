@@ -2391,6 +2391,15 @@ bool MainComponent::runAction (const std::string& id)
 {
     auto is = [&id] (const char* name) { return id == name; };
 
+    if (id == "simple.projectName") // round 190oo (O-4, LYNX extra): View › Project name at the top (Simple layout)
+    {
+        ui::simplelook::projectNameShown() = ! ui::simplelook::projectNameShown();
+        resized();
+        repaint (0, 0, getWidth(), toolbarHeight);
+        saveUiSettings();
+        return true;
+    }
+
     if (id.rfind ("view.detail", 0) == 0) // round 183a: Clip-launch workflow only (false: the chord falls through as before)
         return runDetailAction (id);
 
@@ -3515,6 +3524,8 @@ void MainComponent::loadUiSettings()
             AudioEngine::alsSessionOnPlaylist = on;
         else if (key == "simpleLargeControls") // round 190jc: View › Large controls (Simple layout)
             ui::simplelook::largeControls() = on;
+        else if (key == "simpleProjectName") // round 190oo (O-4, LYNX extra): the project name centred at the top (Simple)
+            ui::simplelook::projectNameShown() = on;
         else if (key == "followPlaylist" || key == "followPianoRoll")
             EditorGlobals::get().setFollowing (key == "followPianoRoll", on, false);
         else if (key == "followChannelRack" || key == "followAudioEditor")
@@ -3825,6 +3836,7 @@ void MainComponent::saveUiSettings()
                                       + "\ndetailExtraSelectInMixer=" + juce::String (DetailView::extraSelectInMixer ? 1 : 0)
                                       + "\nalsSessionOnPlaylist=" + juce::String (AudioEngine::alsSessionOnPlaylist.load() ? 1 : 0)
                                       + "\nsimpleLargeControls=" + juce::String (ui::simplelook::largeControls() ? 1 : 0)
+                                      + "\nsimpleProjectName=" + juce::String (ui::simplelook::projectNameShown() ? 1 : 0) // (round 190oo, O-4)
                                       + "\nfollowPlaylist=" + juce::String (EditorGlobals::get().isFollowing (false) ? 1 : 0)
                                       + "\nfollowPianoRoll=" + juce::String (EditorGlobals::get().isFollowing (true) ? 1 : 0)
                                       + "\nfollowChannelRack=" + juce::String (EditorGlobals::get().isFollowingView (EditorGlobals::FollowView::channelRack) ? 1 : 0)
@@ -4421,7 +4433,8 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         host.statusForSnapshot = [this] (const juce::String& text) {
             using S = toolbarlayout::SaveState;
             saveStatusFrozen = true;
-            const auto state = text.isEmpty() ? S::fresh : text == tr ("All changes saved") ? S::saved : text == tr ("Not saved yet") ? S::unsaved : S::backedUp;
+            const auto state = text.isEmpty() || text == tr ("Nothing to save yet") ? S::fresh // (round 190oo, CS-32)
+                               : text == tr ("All changes saved") ? S::saved : text == tr ("Not saved yet") ? S::unsaved : S::backedUp;
             saveStatus.set (state, text.isEmpty() ? tr ("Nothing to save yet") : text);
         };
         // round 190bu: the dock for the selected track sits where Clip-launch's detail view does (never both)
@@ -4468,6 +4481,21 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         };
         // the Simple headers' "+FX": the dock's Effects tab on that track (round 190bu; the Mixer shows the same slots)
         playlist.onTrackEffects = [this] (int insert) {
+            // round 190oo (CS-24): an FL track's "+FX" acts on the insert its clips play through, which no Simple track
+            // owns (the dock shows Simple tracks only): the Mixer opens with that insert selected, its effects in view
+            const auto& song = engine.getSong();
+            bool ownedBySimpleTrack = false;
+            for (int t = 0; t < (int) song.playlistTracks.size() && ! ownedBySimpleTrack; ++t)
+                ownedBySimpleTrack = simpletracks::kindOf (song, t).has_value() && simpletracks::insertOf (song, t) == insert;
+            if (! ownedBySimpleTrack)
+            {
+                if (insert > 0 && insert < (int) song.mixer.size())
+                {
+                    showPanel (Panel::mixer);
+                    mixer.selectTrack (insert);
+                }
+                return;
+            }
             if (simpleWorkflow != nullptr)
                 simpleWorkflow->showEffectsOfInsert (insert);
         };
@@ -8029,6 +8057,7 @@ bool MainComponent::shouldReclaimKeyboardFocus()
 void MainComponent::updateTitle()
 {
     repaint (titleArea); // the project name in the toolbar
+    repaint (simpleNameArea); // (round 190oo, O-4: the Simple top bar's centred name)
     if (! engine.isModified()) // what is on disk now: the reference for "unused recordings" after a Discard
         savedSamples = safety::referencedSamples (engine.getSong());
 
@@ -8267,8 +8296,8 @@ juce::String MainComponent::simpleSaveStatus() const
 
 juce::String MainComponent::simpleSaveStatusText (bool modified, bool hasFile, juce::int64 backupMs, juce::int64 nowMs)
 {
-    if (! modified)
-        return hasFile ? tr ("All changes saved") : juce::String();
+    if (! modified) // (round 190oo, CS-32 / design190ia SG-17: the fourth state has the top bar's own text, never blank)
+        return hasFile ? tr ("All changes saved") : tr ("Nothing to save yet");
     if (backupMs <= 0)
         return tr ("Not saved yet");
     const auto minutes = (int) ((nowMs - backupMs) / 60000);
@@ -10568,6 +10597,8 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         if (layoutStyle == layoutstyle::Style::simple) // round 190jc (owner decision 9): touch-size controls, Simple only
             menu.addItem (tr ("Large controls (touch size)"), true, ui::simplelook::largeControls(),
                           [this] { setSimpleLargeControls (! ui::simplelook::largeControls()); });
+        if (layoutStyle == layoutstyle::Style::simple) // round 190oo (O-4, LYNX extra, off by default): BandLab's centred name
+            menu.addItem (tr ("Project name at the top (BandLab)"), true, ui::simplelook::projectNameShown(), [this] { runAction ("simple.projectName"); });
         {
             // FL's View › Background (audit round 165z-a): the workspace image and colour of Options › Theme
             juce::PopupMenu background;

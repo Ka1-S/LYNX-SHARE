@@ -26123,18 +26123,21 @@ private:
         };
         if (play != nullptr && stop != nullptr && rec != nullptr)
         {
+            // (round 190oo, CS-35: the main window's own transport states, as its timer sets them while the engine plays —
+            // the offline engine does not play, so the route drives them: Play shows BandLab's Pause, Back-to-start Stop)
+            ui.transportForSnapshot (false, false);
             write (lynx::shot::snapshot (ui, capsuleArea()), "simple-transport-idle");
             play->setState (juce::Button::buttonOver);
             write (lynx::shot::snapshot (ui, capsuleArea()), "simple-transport-hover");
             play->setState (juce::Button::buttonDown);
             write (lynx::shot::snapshot (ui, capsuleArea()), "simple-transport-pressed");
             play->setState (juce::Button::buttonNormal);
-            play->setToggleState (true, juce::dontSendNotification);
+            ui.transportForSnapshot (true, true);
             write (lynx::shot::snapshot (ui, capsuleArea()), "simple-transport-playing");
             rec->setToggleState (true, juce::dontSendNotification);
             write (lynx::shot::snapshot (ui, capsuleArea()), "simple-transport-recording");
-            play->setToggleState (false, juce::dontSendNotification);
             rec->setToggleState (false, juce::dontSendNotification);
+            ui.transportForSnapshot (false, false);
         }
         if (auto* status = ui.toolbarPartForSnapshot ("status"))
         {
@@ -28755,13 +28758,36 @@ private:
                     simple->setStatusForSnapshot (text);
                     offline.dispatchPendingMessages();
                     states << n << ": " << text << "\n";
-                    writeImage (lynx::shot::snapshot (ui, ui.getLocalBounds().withTop (juce::jmin (ui.getHeight() - 1, 70)).withHeight (juce::jmin (ui.getHeight(), 44))),
+                    // (round 190oo, CS-32: the status is the top bar's since round 190iv: its rows 0..74, not the title band)
+                    writeImage (lynx::shot::snapshot (ui, ui.getLocalBounds().withHeight (juce::jmin (ui.getHeight(), 74))),
                                 ("status-" + juce::String (n++)).toRawUTF8());
                 }
                 juce::File (prefix + "-status.txt").replaceWithText (states);
                 simple->setStatusForSnapshot (lynx::MainComponent::simpleSaveStatusText (true, true, now - 125000, now));
                 offline.dispatchPendingMessages();
                 write ("simple-status");
+            }
+            // round 190oo (design review 2): the top bar while the transport plays (CS-35: Play shows BandLab's Pause,
+            // Back-to-start becomes Stop; the offline engine does not play, so the main window's states are driven), and
+            // the LYNX extra O-4 (the project's name centred at the top, "Untitled" while it has none) at this size and at
+            // 1280 px, then off again
+            {
+                const auto topBar = [&ui] { return ui.getLocalBounds().withHeight (juce::jmin (ui.getHeight(), 80)); };
+                ui.transportForSnapshot (true, false);
+                writeImage (lynx::shot::snapshot (ui, topBar()), "topbar-playing");
+                ui.transportForSnapshot (false, false);
+                writeImage (lynx::shot::snapshot (ui, topBar()), "topbar-stopped");
+                lynx::ui::simplelook::projectNameShown() = true;
+                ui.resized();
+                writeImage (lynx::shot::snapshot (ui, topBar()), "topbar-project-name");
+                const auto wide = ui.getWidth(), tall = ui.getHeight();
+                ui.setSize (1280, tall);
+                offline.dispatchPendingMessages();
+                writeImage (lynx::shot::snapshot (ui, topBar()), "topbar-project-name-1280");
+                ui.setSize (wide, tall);
+                lynx::ui::simplelook::projectNameShown() = false;
+                ui.resized();
+                offline.dispatchPendingMessages();
             }
             // slice S8: the Finish dock, empty, then with a look on the Master (Balanced, Normal, a little Tone)
             simple->showFinish();

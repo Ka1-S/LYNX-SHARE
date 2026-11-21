@@ -335,16 +335,19 @@ void InfoView::paint (juce::Graphics& g)
     const auto bar = r.removeFromTop (17);
     g.setColour (ll::raised);
     g.fillRect (bar);
+    // round 190oo (CS-17, Live's Info View): before anything has been pointed at, its own title and a line saying what it
+    // is for, not an empty box
+    const auto idle = title.isEmpty() && body.isEmpty();
     g.setColour (ll::text);
     g.setFont (theme::font (theme::type::small, true));
-    g.drawText (title, bar.withTrimmedLeft (5).withTrimmedRight (4), juce::Justification::centredLeft, true);
+    g.drawText (idle ? tr ("Info View") : title, bar.withTrimmedLeft (5).withTrimmedRight (4), juce::Justification::centredLeft, true);
     g.setFont (theme::font (theme::type::small));
     // Live: 15 px lines from 6 px in (its text 15..226 in a 231 px view)
     const auto area = r.withTrimmedTop (4).reduced (6, 0).toFloat();
     if (area.getWidth() != layoutWidth)
     {
         juce::AttributedString text;
-        text.append (body, theme::font (theme::type::small), ll::text);
+        text.append (idle ? tr ("Point at anything to read about it here.") : body, theme::font (theme::type::small), ll::text);
         text.setLineSpacing (15.0f - theme::font (theme::type::small).getHeight());
         text.setWordWrap (juce::AttributedString::byWord);
         layout.createLayout (text, area.getWidth());
