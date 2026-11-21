@@ -862,7 +862,16 @@ public:
     }
     bool outputMutedForTicks() const noexcept { return muteTicksLeft.load (std::memory_order_relaxed) > 0.0; }
     static float tapperMuteGain (double left, double total) noexcept; // (round 190my: FL's curve, 1 when done)
+    // Round 190oa (DF-10; REA 190oa R4, FL's FUN_011c9ab0): what can start a "Wait for input" — a moved parameter
+    // (automation), a played note, a tap of the tempo tapper, a launched clip. With "Respect recording filter" on while
+    // recording, only the kinds the recording filter records (Audio in the filter: any kind; the tapper: always).
+    enum class WaitInput : std::uint8_t { automation = 1, notes = 2, clips = 8, tapper = 16 };
+    void inputArrived (WaitInput kind) noexcept { startOnInput (kind); }
     void setListenGain (float gain) noexcept { listenGain.store (gain, std::memory_order_relaxed); }
+    // round 190oa (DF-21): the toolbar's main volume (FL's monitor volume): the song's mainVolume (a fader position) on
+    // the device output only. Not an undo step, not automatable, never in an export; the project remembers it.
+    void setMainVolume (float position);
+    float mainVolumeGainNow() const noexcept { return mainVolumeGain.load (std::memory_order_relaxed); }
     float getListenGain() const noexcept { return listenGain.load (std::memory_order_relaxed); }
     // round 190ld (FL's Sync indicator colours): messages a project link / mapping and a global link / mapping took
     // (message thread, counted in applyControllers)
@@ -1561,9 +1570,13 @@ private:
     RecordOptions recordOptions;
     std::vector<int> takeClearedChannels; // replace mode: channels already cleared in this take
     std::atomic<bool> waitingForInput { false };
-    void startOnInput() noexcept; // MIDI or UI thread: the first note while waiting starts playback
+    // MIDI or UI thread: the first input while waiting starts playback (round 190oa: of the kinds FL's wait takes)
+    void startOnInput (WaitInput kind = WaitInput::notes) noexcept;
     void preparePlay() noexcept;  // play()'s start without the start itself (a Play that waits for input, round 190ld)
-    std::atomic<bool> notesStartWait { true }; // round 190ld: "Respect recording filter" with notes not recorded = false
+    // round 190oa (DF-10; REA 190oa R4): FL's recording filter bits for the wait (1 automation, 2 notes, 4 audio, 8 clips)
+    // and whether "Respect recording filter" is on (it acts only while recording)
+    std::atomic<int> waitFilter { 15 };
+    std::atomic<bool> waitRespects { false };
     std::vector<int> armedInserts;
     // round 190aq: the inserts "Low latency while recording" bypasses latency-adding slots on, as last published
     std::vector<char> publishedLowLatency;
@@ -1624,6 +1637,7 @@ private:
     std::atomic<std::uint32_t> midiActivity { 0 }, midiPlayed { 0 };
     std::uint32_t midiProjectLinked = 0, midiGlobalLinked = 0; // (message thread, round 190ld)
     std::atomic<float> listenGain { 1.0f };
+    std::atomic<float> mainVolumeGain { 1.0f }; // (round 190oa: faderGain (song.mainVolume), set by the message thread)
     std::atomic<double> muteTicksLeft { 0.0 }, muteTicksTotal { 0.0 }; // (round 190my: muteOutputForTicks; the audio thread counts down)
     float listenGainNow = 1.0f; // (audio thread: the gain the last block ended at)
     prefs::MidiPrefs midiPrefs;                      // UI thread

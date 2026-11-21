@@ -7010,8 +7010,8 @@ void MainComponent::TempoDisplay::showTap()
 
 juce::String MainComponent::idleHint() const
 {
-    if (engine.isWaitingForInput())
-        return tr ("Recording: waiting for the first note ([Space] cancels)");
+    if (engine.isWaitingForInput()) // (round 190oa, DF-10: a note, a moved control, a launched clip or a tempo tap starts it)
+        return tr ("Waiting for input: a played note or a moved control starts it ([Space] cancels)");
 
     if (engine.isCountingIn())
         return tr ("Recording: count-in...");

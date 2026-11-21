@@ -98,7 +98,9 @@ public:
 
         // Sync: during playback the playhead jumps to the nearest beat, so the beat falls on the tap
         auto& transport = engine.getTransport();
-        if (sync.getToggleState() && transport.playing.load())
+        if (sync.getToggleState() && engine.isWaitingForInput()) // round 190oa (DF-10; REA 190oa R4: FL's tap with Sync
+            engine.inputArrived (AudioEngine::WaitInput::tapper);  // starts a "Wait for input" playback, on the beat)
+        else if (sync.getToggleState() && transport.playing.load())
             engine.seek (controls::nearestBeatTicks (transport.positionTicks.load()));
 
         // FL (REA 190my R3, FUN_00f11ce0): with Mute ticked and Apply tempo on, the 2nd to 5th taps of a run (the ones
