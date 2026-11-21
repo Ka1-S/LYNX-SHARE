@@ -145,6 +145,7 @@
 #include "ui/ParametricEqEditor.h"
 #include "ui/PluginWindow.h"
 #include "ui/I18n.h"
+#include "core/TextFit.h"
 #include "ui/Theme.h"
 #include "ui/TypeAhead.h"
 #include "ui/WaveformView.h"
@@ -524,6 +525,10 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     patternBox.setTooltip (tr ("Current pattern (Numpad +/-: next/previous, F4: next empty, F2: rename)"));
     patternBox.onStep = [this] (int delta) { stepPatternFromSelector (delta); };
     gridBox.setScrollWheelEnabled (true);
+    // round 190oo (PAT-18): the snap and pattern boxes keep one font size; a name too long for a narrow box (1280 px:
+    // "Line (follows zoom)") ends in "..." instead of shrinking (Theme.cpp positionComboBoxText)
+    for (auto* box : std::initializer_list<juce::ComboBox*> { &gridBox, &patternBox })
+        box->getProperties().set ("lynxComboEllipsis", true);
     patternBox.onChange = [this]
     {
         const auto index = patternBox.getSelectedId() - 1; // (round 190ne: ids are pattern indices + 1)
@@ -1323,6 +1328,8 @@ void MainComponent::resized()
         return w;
     };
     menuBar.getProperties().set ("lynxTightMenuBar", false);
+    menuBar.getProperties().set ("lynxCondensedMenuBar", false); // (round 190oo WG-11: set again below when needed)
+    menuBar.getProperties().set ("lynxMenuBarScale", 1.0);
     int menuWidth = measureMenu();
     if (menuWidth > 390) // translated menu titles (German, Russian...): English stays as it was
     {
@@ -1406,6 +1413,8 @@ void MainComponent::resized()
             int gap, minHint;
             bool fileWide, tightMenu;
             std::array<bool, toolbarlayout::groupCount> fits;
+            bool condensedMenu = false; // (round 190oo WG-11)
+            double menuScale = 1.0;
         };
         auto tighter = widths;
         tighter[(std::size_t) Group::transport] -= 12 + 36; // the tempo and the song position, as narrow as the compact ones
@@ -1418,11 +1427,32 @@ void MainComponent::resized()
             return w;
         };
         const auto alreadyTight = (bool) menuBar.getProperties().getWithDefault ("lynxTightMenuBar", false);
+        // Round 190oo (design review 2, WG-11): in German and Russian (and French, Portuguese, Turkish, Dutch... by
+        // measure) the translated menu titles set the hint column's width: at 1920 px the panels need ~1550 px, which
+        // leaves ~350 px for the menu, and de's eight titles take ~395-440 px even with the tight padding, so the Chord
+        // panel and the output scope dropped while English keeps them. Before a panel goes, the menu gives up width:
+        // level 3 draws the titles in the condensed face (Open Sans Condensed, ~78 % as wide, the face of Settings >
+        // "Condensed labels"), level 4 also squeezes them horizontally, by just enough and never below 0.9. Translated
+        // menus only: English (and an English menu at any width) keeps its layout to the pixel.
+        const auto mayCondense = i18n::current() != "en";
+        const auto condensedMenuWidth = [&] (double scale) {
+            menuBar.getProperties().set ("lynxTightMenuBar", true);
+            menuBar.getProperties().set ("lynxCondensedMenuBar", true);
+            menuBar.getProperties().set ("lynxMenuBarScale", scale);
+            const auto w = measureMenu();
+            menuBar.getProperties().set ("lynxTightMenuBar", alreadyTight);
+            menuBar.getProperties().set ("lynxCondensedMenuBar", false);
+            menuBar.getProperties().set ("lynxMenuBarScale", 1.0);
+            return w;
+        };
+        const auto menuItems = getMenuBarNames().size();
         std::vector<Form> forms;
-        for (int level = 0; level < 3; ++level)
+        for (int level = 0; level < 5; ++level)
         {
             if (level == 2 && (alreadyTight || menuWidth + 8 <= 320))
-                break; // (the menu doesn't set the hint column's width: its padding gives nothing)
+                continue; // (the menu doesn't set the hint column's width: its padding gives nothing)
+            if (level >= 3 && (! mayCondense || menuWidth + 8 <= 320))
+                break;
             auto base = tighter;
             auto formGap = 13, formHint = minHint;
             if (level >= 1)
@@ -1430,14 +1460,31 @@ void MainComponent::resized()
                 formGap = 12;
                 base[(std::size_t) Group::output] -= 12;
             }
-            if (level >= 2)
+            if (level == 2)
                 formHint = juce::jmax (tightMenuWidth() + 8, 320);
+            if (level == 3)
+                formHint = juce::jmax (condensedMenuWidth (1.0) + 8, 320);
             for (const auto wideFile : { fileWide, false })
             {
                 auto w = base;
                 if (! wideFile)
                     w[(std::size_t) Group::file] = 3 * h + 4;
-                forms.push_back ({ w, formGap, formHint, wideFile, level >= 2, toolbarlayout::fit (toolbarLayout, w, formGap, room, formHint) });
+                auto scale = 1.0;
+                if (level == 4)
+                {
+                    // the room the shown panels leave for the hint column, and the squeeze that fits the menu into it
+                    int panels = 0;
+                    for (const auto& e : toolbarLayout.entries)
+                        if (e.shown)
+                            panels += w[(std::size_t) e.group] + formGap;
+                    const auto full = condensedMenuWidth (1.0), padding = 8 * menuItems;
+                    scale = textfit::menuSqueeze (room, panels, full - padding, padding, menuItems);
+                    formHint = juce::jmax (condensedMenuWidth (scale) + 8, 320);
+                }
+                Form form { w, formGap, formHint, wideFile, level >= 2, toolbarlayout::fit (toolbarLayout, w, formGap, room, formHint) };
+                form.condensedMenu = level >= 3;
+                form.menuScale = scale;
+                forms.push_back (form);
                 if (! fileWide)
                     break;
             }
@@ -1458,6 +1505,8 @@ void MainComponent::resized()
             if (best->tightMenu)
             {
                 menuBar.getProperties().set ("lynxTightMenuBar", true);
+                menuBar.getProperties().set ("lynxCondensedMenuBar", best->condensedMenu); // (round 190oo WG-11)
+                menuBar.getProperties().set ("lynxMenuBarScale", best->menuScale);
                 menuWidth = measureMenu();
             }
         }
@@ -1617,6 +1666,20 @@ void MainComponent::resized()
             titleArea = {};
         placeHintBar (column.withY (row2).withHeight (h).reduced (0, 1));
         fixedToolbarArea = juce::Rectangle<int> (column.getX() - 4, 0, column.getWidth() + 8, toolbarHeight);
+    }
+    // round 190oo (WG-11): the menu bar places its titles in its own resized(), which JUCE runs only when the bar's bounds
+    // change; a new padding, face or squeeze at the same bounds would keep the titles where the old ones were
+    {
+        auto& props = menuBar.getProperties();
+        const auto menuLook = juce::String ((bool) props.getWithDefault ("lynxTightMenuBar", false) ? "t" : "-")
+                              + ((bool) props.getWithDefault ("lynxCondensedMenuBar", false) ? "c" : "-")
+                              + juce::String ((double) props.getWithDefault ("lynxMenuBarScale", 1.0), 3);
+        if (props.getWithDefault ("lynxMenuLaidOut", juce::var()).toString() != menuLook)
+        {
+            props.set ("lynxMenuLaidOut", menuLook);
+            menuBar.resized();
+            menuBar.repaint();
+        }
     }
 
     snapLabelArea = patternLabelArea = transportArea = modeArea = {};

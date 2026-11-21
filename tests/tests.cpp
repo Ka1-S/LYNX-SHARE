@@ -18066,3 +18066,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Pat6_190ooTests.inc" // round 190oo (design review 2): PAT-6, the Playlist row from FL's vertical zoom (event 0xF2)
 #include "DialogRules190ooTests.inc" // round 190oo: the one dialog system's button order and pixel bands (core/DialogRules.h)
 #include "RackAutomation190ooTests.inc" // round 190oo (design review 2, PAT-7): FL's automation clip channels in the Channel rack
+#include "TextFit190ooTests.inc" // round 190oo (design review 2, fit): translated menu titles give up width before toolbar panels drop, knob captions

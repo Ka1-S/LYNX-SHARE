@@ -168,6 +168,12 @@ void saveUiFont (const juce::String& family);
 // Same for a text button (its padding included).
 int buttonWidth (const juce::TextButton& button, int minWidth, int maxWidth);
 
+// Round 190oo (design review 2, WG-13 / WG-31): for boxes laid out for the English texts (fixed widths, not sized yet):
+// how much wider than its English text the translation of any of `english` is in `font` (the largest difference; 0 in
+// English and when no translation is longer). A fixed English width + this keeps the English layout to the pixel and
+// gives a long translation (de "Übernehmen", ru "Насыщенность") the room it needs.
+int translationExtra (const juce::Font& font, std::initializer_list<const char*> english);
+
 // --- menus -------------------------------------------------------------------------------------------
 // Options › General › Menu density (round 163): compact rows close to native Windows / FL menus (the default),
 // or the roomier rows of LYNX 0.1.17 and older.

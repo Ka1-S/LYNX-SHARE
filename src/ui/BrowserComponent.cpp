@@ -5487,7 +5487,7 @@ void BrowserComponent::paint (juce::Graphics& g)
     if (! statusArea.isEmpty())
     {
         g.setFont (theme::font (theme::type::caption));
-        g.setColour (theme::colour::textDisabled);
+        g.setColour (theme::colour::textSecondary); // (round 190oo PAT-13: textDisabled read too dim)
         g.drawText (statusLine, statusArea, juce::Justification::centredLeft, true);
     }
 }
@@ -6227,7 +6227,7 @@ void BrowserComponent::indexStatusChanged()
             line << "  ·  " << (searchPartial ? tr ("{0} folders indexed", { juce::String ((int) st.listed) }) : tr ("checking the index..."));
     }
     else if (st.busy && (st.rebuilding || st.listed > 0))
-        line = tr ("Indexing the Browser's folders for search: {0} folders...", { juce::String ((int) st.listed) });
+        line = tr ("Indexing folders... {0}", { juce::String ((int) st.listed) }); // (round 190oo PAT-13: short, it was cut)
 
     if (line != statusLine)
     {

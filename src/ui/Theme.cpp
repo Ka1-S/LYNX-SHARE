@@ -32,6 +32,7 @@
 #include "platform/Paths.h"
 #include "ui/CondensedFontData.h"
 #include "ui/DialogFrame.h"
+#include "ui/I18n.h"
 #include "ui/LabelFont.h"
 #include "ui/Icons.h"
 #include "ui/ImageCaches.h"
@@ -1263,6 +1264,19 @@ int buttonWidth (const juce::TextButton& button, int minWidth, int maxWidth)
     return juce::jlimit (minWidth, juce::jmax (minWidth, maxWidth), needed);
 }
 
+int translationExtra (const juce::Font& font, std::initializer_list<const char*> english)
+{
+    float extra = 0.0f;
+    for (const auto* text : english)
+    {
+        const auto source = juce::String::fromUTF8 (text);
+        const auto shown = tr (text);
+        if (shown != source)
+            extra = juce::jmax (extra, juce::GlyphArrangement::getStringWidth (font, shown) - juce::GlyphArrangement::getStringWidth (font, source));
+    }
+    return juce::jmax (0, (int) std::ceil (extra));
+}
+
 themes::Palette currentPalette()
 {
     auto c = [] (juce::Colour x) { return x.getARGB(); };
@@ -1926,6 +1940,13 @@ void LookAndFeel::positionComboBoxText (juce::ComboBox& box, juce::Label& label)
     const auto arrowSize = juce::jmin (14, juce::roundToInt ((float) box.getHeight() * 0.6f));
     label.setBounds (2, 1, box.getWidth() - arrowSize - 12, box.getHeight() - 2);
     label.setFont (getComboBoxFont (box));
+    // round 190oo (PAT-18): a box that asks for it keeps its font size and ends a long text in "..." (one line)
+    static const juce::Identifier ellipsisId ("lynxComboEllipsis"), oneLineId ("lynxOneLine");
+    if ((bool) box.getProperties().getWithDefault (ellipsisId, false))
+    {
+        label.setMinimumHorizontalScale (1.0f);
+        label.getProperties().set (oneLineId, true);
+    }
     const auto own = box.findColour (juce::ComboBox::textColourId);
     label.setColour (juce::Label::textColourId, box.isEnabled() ? own : own == textPrimary ? textDisabled : own.withMultipliedAlpha (0.5f));
 }
@@ -2189,19 +2210,44 @@ juce::Font LookAndFeel::getMenuBarFont (juce::MenuBarComponent& bar, int, const 
     // cap 7; 15 gives cap 8 in about 335 px at 1920); the Simple and Live menu rows keep theirs. (Rollup: both through
     // round 190je's labelFont, so Condensed labels still applies to the menu bar.)
     if ((bool) bar.getProperties().getWithDefault ("lynxFlMenuBar", false))
+    {
+        // round 190oo (WG-11): a long translated menu that would push toolbar panels out at 1920 px takes the condensed
+        // face at the same size (MainComponent's toolbar layout sets this only when it keeps more panels)
+        static const juce::Identifier condensedId ("lynxCondensedMenuBar");
+        if ((bool) bar.getProperties().getWithDefault (condensedId, false))
+            return cachedFont (type::title, 3);
         return labelFont (type::title);
+    }
     return labelFont (type::body);
 }
+
+namespace
+{
+int menuBarPadding (juce::MenuBarComponent& bar)
+{
+    return (bool) bar.getProperties().getWithDefault ("lynxTightMenuBar", false)  ? 8
+           : (bool) bar.getProperties().getWithDefault ("lynxFlMenuBar", false) ? 12
+                                                                                 : 16;
+}
+
+// round 190oo (WG-11): the horizontal squeeze of the menu titles (1 = none; the toolbar layout keeps it >= 0.9)
+float menuBarScale (juce::MenuBarComponent& bar)
+{
+    static const juce::Identifier scaleId ("lynxMenuBarScale");
+    return juce::jlimit (0.5f, 1.0f, (float) (double) bar.getProperties().getWithDefault (scaleId, 1.0));
+}
+} // namespace
 
 int LookAndFeel::getMenuBarItemWidth (juce::MenuBarComponent& bar, int itemIndex, const juce::String& itemText)
 {
     // a long (translated) menu bar takes tighter item padding so the toolbar keeps its panels (round 165o)
     // (round 190jo: the Pattern toolbar's larger menu text with FL's closer items, 12 px: the bar keeps its ~292 px, as FL's
     // eight menus take, so no toolbar panel drops out)
-    const auto padding = (bool) bar.getProperties().getWithDefault ("lynxTightMenuBar", false)  ? 8
-                         : (bool) bar.getProperties().getWithDefault ("lynxFlMenuBar", false) ? 12
-                                                                                               : 16;
-    return juce::roundToInt (juce::GlyphArrangement::getStringWidth (getMenuBarFont (bar, itemIndex, itemText), itemText)) + padding;
+    const auto padding = menuBarPadding (bar);
+    const auto text = juce::GlyphArrangement::getStringWidth (getMenuBarFont (bar, itemIndex, itemText), itemText);
+    if (const auto scale = menuBarScale (bar); scale < 0.999f) // (round 190oo WG-11: squeezed titles, see drawMenuBarItem)
+        return (int) std::ceil (text * scale) + padding;
+    return juce::roundToInt (text) + padding;
 }
 
 void LookAndFeel::drawMenuBarItem (juce::Graphics& g, int width, int height, int itemIndex, const juce::String& itemText, bool isMouseOverItem,
@@ -2219,6 +2265,13 @@ void LookAndFeel::drawMenuBarItem (juce::Graphics& g, int width, int height, int
     g.setFont (getMenuBarFont (bar, itemIndex, itemText));
     // (round 190mh, perf: the laid-out title from the text cache, the same glyphs at the item's origin; round 190jo's larger
     // Pattern-toolbar titles were shaped again on every paint)
+    if (const auto scale = menuBarScale (bar); scale < 0.999f)
+    {
+        // round 190oo (WG-11): the title squeezed into the item less its padding, so the gaps between titles stay
+        const auto padding = menuBarPadding (bar);
+        textcache::drawFittedText (g, itemText, padding / 2, 0, width - padding, height, juce::Justification::centred, 1, juce::jmax (0.5f, scale - 0.05f));
+        return;
+    }
     textcache::drawFittedText (g, itemText, 0, 0, width, height, juce::Justification::centred, 1);
 }
 
@@ -2445,7 +2498,8 @@ void LookAndFeel::drawLabel (juce::Graphics& g, juce::Label& label)
         g.setColour (label.findColour (juce::Label::textColourId).withMultipliedAlpha (alpha));
         g.setFont (font);
         const auto textArea = getLabelBorderSize (label).subtractedFrom (label.getLocalBounds());
-        const auto lines = juce::jmax (1, (int) ((float) textArea.getHeight() / font.getHeight()));
+        static const juce::Identifier oneLineId ("lynxOneLine"); // (round 190oo PAT-18, positionComboBoxText)
+        const auto lines = (bool) label.getProperties().getWithDefault (oneLineId, false) ? 1 : juce::jmax (1, (int) ((float) textArea.getHeight() / font.getHeight()));
         g.drawFittedText (label.getText(), textArea, label.getJustificationType(), lines, label.getMinimumHorizontalScale());
         tooltipIfCut (label, label, font, label.getText(), textArea, lines, label.getMinimumHorizontalScale());
     }

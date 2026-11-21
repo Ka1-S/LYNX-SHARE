@@ -254,7 +254,14 @@ public:
         if (stripView != nullptr) // (round 190kd: FL's chord viewer above the options, as wide as FL's tool)
             height += stripView->preferredHeight() + 6;
 
-        setSize (stripView != nullptr ? 720 : 440, height);
+        // round 190oo (design review 2, WG-13): the label column takes the width its translations need (de "Nächsten Akkord
+        // automatisch lernen", ru "Автоматически учить следующий аккорд" were squeezed into 134 px), up to 260 px; the panel
+        // grows by what it adds. English keeps its 150 px column.
+        if (i18n::current() != "en")
+            for (std::size_t c = 0; c < controls.size(); ++c)
+                if (controls[c].kind != Control::header && ! controls[c].joinPrevious)
+                    labelColumn = juce::jlimit (labelColumn, 260, theme::labelColumnWidth ({ labels[c].get() }, 0, 400) + controls[c].indent);
+        setSize ((stripView != nullptr ? 720 : 440) + labelColumn - 150, height);
         preview();
     }
 
@@ -317,7 +324,7 @@ public:
                 continue; // placed with the control before it
 
             auto row = area.removeFromTop (rowHeight).reduced (0, 3);
-            labels[c]->setBounds (row.removeFromLeft (150).withTrimmedLeft (controls[c].indent));
+            labels[c]->setBounds (row.removeFromLeft (labelColumn).withTrimmedLeft (controls[c].indent));
             if (c + 1 < controls.size() && controls[c + 1].joinPrevious && editors[c] != nullptr && editors[c + 1] != nullptr)
             {
                 // two editors on one row: a narrow first one (the key), the rest for the second (the list)
@@ -332,7 +339,7 @@ public:
         }
 
         if (hasExtraButton())
-            extraButton.setBounds (area.removeFromTop (rowHeight).reduced (0, 3).withTrimmedLeft (150).withWidth (160));
+            extraButton.setBounds (area.removeFromTop (rowHeight).reduced (0, 3).withTrimmedLeft (labelColumn).withWidth (160));
 
         auto buttons = area.removeFromBottom (30);
         acceptButton.setBounds (buttons.removeFromRight (100));
@@ -346,6 +353,7 @@ private:
     static constexpr int rowHeight = 30, headerHeight = 26;
     // the title row (WG-6) is 21 px taller than the old 24 px title line under a 10 px margin
     static constexpr int titleGrowth = ui::dialog::titleRowHeight + 1 - 24;
+    int labelColumn = 150; // (round 190oo WG-13: wider for long translations, see the constructor)
 
     bool hasExtraButton() const noexcept
     {
