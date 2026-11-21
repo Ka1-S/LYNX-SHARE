@@ -8637,8 +8637,6 @@ private:
             song.mode = lynx::PlayMode::song;
             const auto render = [] (lynx::AudioEngine& engine) {
                 std::vector<float> out;
-                engine.stop();
-                engine.seek (0.0); // (a render plays on from where the last one ended)
                 lynx::AudioEngine::RenderOptions o;
                 o.seconds = 2.5;
                 o.sampleRate = 44100.0;
@@ -8658,7 +8656,7 @@ private:
                     m = std::max (m, std::abs (x));
                 return m;
             };
-            // (every comparison renders from a fresh engine: a second render of one engine goes on from its voices' state)
+            // (every comparison renders the first time on its engine: see the note below)
             const auto renderSong = [&render] (const lynx::Song& s) {
                 lynx::AudioEngine fresh (false);
                 fresh.setSong (s);
@@ -8675,31 +8673,50 @@ private:
             e.undo();
             if (trackstates190opResult == "OK" && lynx::trackstates::isHidden (e.getSong(), 1))
                 trackstates190opResult = "ERROR undo of Hide";
-            // deactivate the Bass channel, then insert 1 (Lead plays only into it): silence in the end
+            // (each render below is the first of its engine: a second render of one engine here plays nothing — the
+            // notes of a render are not scheduled again — so every state gets its own engine)
+            // deactivate the Bass channel (the real menu path: states captured first, one undo step): Lead alone
             auto lead = song;
             lead.channels[1].muted = true;
             const auto leadOnly = renderSong (lead);
-            e.setDeactivated ({ 1 }, {}, true);
-            const auto noBass = render (e);
+            lynx::AudioEngine e1 (false);
+            e1.setSong (song);
+            e1.setDeactivated ({ 1 }, {}, true);
+            const auto noBass = render (e1);
             float diff = 0.0f;
             for (std::size_t i = 0; i < std::min (noBass.size(), leadOnly.size()); ++i)
                 diff = std::max (diff, std::abs (noBass[i] - leadOnly[i]));
-            if (trackstates190opResult == "OK" && (! e.channelDeactivated (1) || noBass.size() != leadOnly.size() || diff > 1.0e-6f))
-                trackstates190opResult = "ERROR deactivated channel is not silent (diff " + juce::String (diff, 7) + ")";
-            e.setDeactivated ({}, { 1 }, true);
-            const auto silent = render (e);
-            if (trackstates190opResult == "OK" && (! e.channelDeactivated (0) || ! e.insertDeactivated (1) || peak (silent) > 1.0e-6f))
-                trackstates190opResult = "ERROR deactivated insert is not silent (peak " + juce::String (peak (silent), 7) + ")";
-            e.undo();
-            e.undo();
-            // Reactivate: the song is the one before (a fresh render nulls with the first), and this engine plays both
-            // instruments again (not their placeholders)
-            const auto back = renderSong (e.getSong());
-            const auto again = render (e);
             if (trackstates190opResult == "OK"
-                && (back != plain || e.channelDeactivated (1) || e.insertDeactivated (1) || e.getSong().channels != song.channels || e.getSong().mixer != song.mixer
-                    || std::abs (peak (again) - peak (plain)) > 0.05f * peak (plain)))
-                trackstates190opResult = "ERROR reactivated render differs (peak " + juce::String (peak (again), 4) + " / " + juce::String (peak (plain), 4) + ")";
+                && (! e1.channelDeactivated (1) || noBass.size() != leadOnly.size() || diff > 1.0e-6f || peak (noBass) < 0.01f))
+                trackstates190opResult = "ERROR deactivated channel is not silent (diff " + juce::String (diff, 7) + ")";
+            // then insert 1, into which Lead plays (Lead goes with it): silence
+            lynx::AudioEngine e2 (false);
+            e2.setSong (song);
+            e2.setDeactivated ({ 1 }, {}, true);
+            e2.setDeactivated ({}, { 1 }, true);
+            const auto silent = render (e2);
+            if (trackstates190opResult == "OK" && (! e2.channelDeactivated (0) || ! e2.insertDeactivated (1) || peak (silent) > 1.0e-6f))
+                trackstates190opResult = "ERROR deactivated insert is not silent (peak " + juce::String (peak (silent), 7) + ")";
+            // Reactivate (two undo steps) on an engine that ran the placeholders: its first render nulls with the plain
+            // song's (a placeholder kept for a reactivated unit would play nothing)
+            lynx::AudioEngine e3 (false);
+            e3.setSong (song);
+            const auto opened = e3.getSong(); // (as the engine holds it: ids given)
+            e3.setDeactivated ({ 1 }, {}, true);
+            e3.capturePluginStates(); // (as a save in between does: the shape keeps the placeholders)
+            e3.setDeactivated ({}, { 1 }, true);
+            e3.undo();
+            e3.undo();
+            const auto back = render (e3);
+            float backDiff = back.size() == plain.size() ? 0.0f : 1.0f;
+            for (std::size_t i = 0; i < std::min (back.size(), plain.size()); ++i)
+                backDiff = std::max (backDiff, std::abs (back[i] - plain[i]));
+            if (trackstates190opResult == "OK"
+                && (backDiff > 1.0e-6f || e3.channelDeactivated (1) || e3.insertDeactivated (1) || e3.getSong().channels != opened.channels
+                    || e3.getSong().mixer != opened.mixer))
+                trackstates190opResult = "ERROR reactivated render differs (peak " + juce::String (peak (back), 4) + " / " + juce::String (peak (plain), 4)
+                                         + ", diff " + juce::String (backDiff, 8) + ", channels " + juce::String (e3.getSong().channels == opened.channels ? "same" : "differ")
+                                         + ", mixer " + juce::String (e3.getSong().mixer == opened.mixer ? "same" : "differ") + ")";
             // the .lynx round trip, an older project, the copy for 0.1.30, the .flp report
             auto flagged = song;
             lynx::trackstates::setHidden (flagged, { 3 }, true);
