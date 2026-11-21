@@ -281,5 +281,132 @@ class RelayOutboxTests(unittest.IsolatedAsyncioTestCase):
         await room.outboxes[2].finish()
 
 
+
+class RelayKickTests(unittest.IsolatedAsyncioTestCase):
+    """Round 190on: the host removes a guest (POST /v1/rooms/<room>/kick): its slot is freed, its address stays out of
+    the room, and the room token can change for new joins while the peers already in stay connected."""
+
+    async def asyncSetUp(self):
+        from aiohttp.test_utils import TestClient, TestServer
+        self.patches = [patch.object(relay, "rooms", {}), patch.object(relay, "room_limiter", common.RateLimiter(100, 3600)),
+                        patch.object(relay, "connect_limiter", common.RateLimiter(1000, 60))]
+        for p in self.patches:
+            p.start()
+        self.client = TestClient(TestServer(relay.make_app()))
+        await self.client.start_server()
+
+    async def asyncTearDown(self):
+        await self.client.close()
+        for p in reversed(self.patches):
+            p.stop()
+
+    async def open_room(self, token):
+        r = await self.client.post("/v1/rooms", json={"token": token}, headers={"X-Forwarded-For": "192.0.2.1"})
+        self.assertEqual(r.status, 201)
+        body = await r.json()
+        return body["room"], body["hostToken"]
+
+    async def join(self, room, token, ip):
+        ws = await self.client.ws_connect(f"/v1/rooms/{room}/ws", protocols=(relay.SUBPROTOCOL,),
+                                          headers={"Authorization": f"Bearer {token}", "X-Forwarded-For": ip})
+        welcome = await ws.receive_json(timeout=3)
+        self.assertEqual(welcome["type"], "welcome")
+        return ws, welcome["peer"]
+
+    async def try_join(self, room, token, ip):
+        from aiohttp import WSServerHandshakeError
+        try:
+            ws, _ = await self.join(room, token, ip)
+        except WSServerHandshakeError as e:
+            return e.status
+        await ws.close()
+        return 101
+
+    async def kick(self, room, host_token, body, ip="192.0.2.1"):
+        r = await self.client.post(f"/v1/rooms/{room}/kick", json=body,
+                                   headers={"Authorization": f"Bearer {host_token}", "X-Forwarded-For": ip})
+        return r.status, (await r.json() if r.status == 200 else None)
+
+    async def next_binary(self, ws):
+        while True:
+            msg = await ws.receive(timeout=3)
+            if msg.type.name == "BINARY":
+                return msg.data
+            if msg.type.name in ("CLOSE", "CLOSED", "CLOSING", "ERROR"):
+                return None
+
+    async def test_remove_with_a_new_code_for_new_joins_only(self):
+        old, new = "a" * 43, "b" * 43
+        room, host_token = await self.open_room(old)
+        host, host_peer = await self.join(room, old, "192.0.2.1")
+        ana, ana_peer = await self.join(room, old, "198.51.100.7")
+        lia, lia_peer = await self.join(room, old, "203.0.113.9")
+        self.assertEqual(await self.kick(room, "x" * 43, {"peer": ana_peer}), (401, None))
+        status, body = await self.kick(room, host_token, {"peer": ana_peer, "token": new})
+        self.assertEqual(status, 200)
+        self.assertTrue(body["removed"])
+        # Ana's socket is closed with 4003; her slot is free at once
+        while True:
+            msg = await ana.receive(timeout=3)
+            if msg.type.name in ("CLOSE", "CLOSED"):
+                break
+        self.assertEqual(ana.close_code, relay.CLOSE_REMOVED)
+        for _ in range(100):  # (the relay's side of the connection ends right after)
+            if ana_peer not in relay.rooms[room].peers:
+                break
+            await asyncio.sleep(0.01)
+        self.assertNotIn(ana_peer, relay.rooms[room].peers)
+        # the host and Lia stay connected and still reach each other
+        await host.send_bytes(bytes([lia_peer]) + b"still here")
+        self.assertEqual(await self.next_binary(lia), bytes([host_peer]) + b"still here")
+        # the old code no longer lets anybody in; Ana is refused with the new one too (her address)
+        self.assertEqual(await self.try_join(room, old, "192.0.2.200"), 401)
+        self.assertEqual(await self.try_join(room, new, "198.51.100.7"), 403)
+        # somebody new with the new code takes the free slot
+        mia, mia_peer = await self.join(room, new, "192.0.2.77")
+        self.assertEqual(mia_peer, ana_peer)
+        for ws in (host, lia, mia):
+            await ws.close()
+
+    async def test_remove_keeping_the_code(self):
+        code = "c" * 43
+        room, host_token = await self.open_room(code)
+        host, _ = await self.join(room, code, "192.0.2.1")
+        ana, ana_peer = await self.join(room, code, "198.51.100.7")
+        self.assertEqual((await self.kick(room, host_token, {"peer": ana_peer}))[0], 200)
+        await ana.receive(timeout=3)
+        # the code still works for others, not for the removed guest's address
+        self.assertEqual(await self.try_join(room, code, "198.51.100.7"), 403)
+        self.assertEqual(await self.try_join(room, code, "203.0.113.50"), 101)
+        # without "ban" the guest may come back (the host only freed the slot)
+        lia, lia_peer = await self.join(room, code, "203.0.113.9")
+        self.assertEqual((await self.kick(room, host_token, {"peer": lia_peer, "ban": False}))[0], 200)
+        await lia.receive(timeout=3)
+        self.assertEqual(await self.try_join(room, code, "203.0.113.9"), 101)
+        await host.close()
+
+    async def test_a_guest_on_the_hosts_network_is_removed_without_locking_the_host_out(self):
+        code = "d" * 43
+        room, host_token = await self.open_room(code)
+        host, _ = await self.join(room, code, "192.0.2.1")
+        same, same_peer = await self.join(room, code, "192.0.2.1")
+        self.assertEqual((await self.kick(room, host_token, {"peer": same_peer}))[0], 200)
+        await same.receive(timeout=3)
+        self.assertEqual(relay.rooms[room].banned, set())
+        self.assertEqual(await self.try_join(room, code, "192.0.2.1"), 101)
+        await host.close()
+
+    async def test_kick_rejects_bad_bodies(self):
+        room, host_token = await self.open_room("e" * 43)
+        for body in ({"peer": "1"}, {"peer": 9}, {"peer": -1}, {"peer": True}, {"peer": 1, "ban": "yes"}, {"peer": 1, "token": "short"}):
+            self.assertEqual((await self.kick(room, host_token, body))[0], 400, body)
+        self.assertEqual((await self.kick("zzzzzzzzzz", host_token, {"peer": 1}))[0], 404)
+        # peer 0 with a token only changes the token; nobody is removed
+        status, body = await self.kick(room, host_token, {"peer": 0, "token": "f" * 43})
+        self.assertEqual((status, body["removed"]), (200, False))
+        self.assertEqual(await self.try_join(room, "e" * 43, "203.0.113.1"), 401)
+        self.assertEqual(await self.try_join(room, "f" * 43, "203.0.113.1"), 101)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -153,6 +153,12 @@ public:
     bool isFollowingTransport() const noexcept { return following; }
     // The host changes what a guest may do (and what the guest keeps at the end) during the session.
     void setPermissions (std::uint32_t tag, live::Permissions permissions, bool keepFull);
+    // Round 190on (owner decision, recommended; core/LiveRekey.h): the host removes a guest from the session. The relay
+    // closes their connection (the place is free at once) and keeps their address out of the room; their part stays in
+    // the project. `newCode` (the default in the UI): the session gets a new invite code for new joins only — the guests
+    // still connected switch to it by themselves, sealed with the old code's key. false = "Keep the same code".
+    void removeGuest (std::uint32_t tag, bool newCode);
+    int removedGuests() const noexcept { return removed; } // (tests: how many the host removed)
     live::Permissions myPermissions() const noexcept { return myPerms; }
     int standInsRendering() const noexcept { return rendering ? 1 : 0; }
     // the host's count of the session's audio files against its limits (round 190ah)
@@ -296,6 +302,11 @@ private:
     std::unique_ptr<livecrypto::Sealer> sealer;
     std::unique_ptr<livecrypto::Opener> opener;
     std::array<std::uint8_t, 32> openerKey {}; // (round 190oh: the session the opener belongs to)
+    // round 190on: after an invite code change, the key before it still opens frames that were on the way
+    std::unique_ptr<livecrypto::Opener> previousOpener;
+    int removed = 0;
+    void kickAtRelay (int relayPeer, bool ban, std::optional<livecrypto::Invite> next, juce::String who);
+    void switchInvite (const livecrypto::Invite& next); // seal with the new key from now on, open with both
     livelink::Connection link;
     juce::String roomId, hostToken, wsUrl;
     int myPeer = 0, hostPeer = 0;

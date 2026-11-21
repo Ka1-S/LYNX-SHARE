@@ -75,9 +75,10 @@ enum class Icon
     // round 190oa (DL-58, capture 190oa L1 live-auto-arm / live-reenable-lit): Live's Automation Arm and Re-Enable
     // Automation glyphs
     automationArm,     // two small rings joined by a rising line
-    reEnableAutomation // an arrow pointing left
+    reEnableAutomation, // an arrow pointing left
+    search             // round 190on (P2): the command palette, a magnifier (no plus: Icon::zoom is the zoom tool's)
 };
-constexpr int iconCount = (int) Icon::reEnableAutomation + 1;
+constexpr int iconCount = (int) Icon::search + 1;
 
 namespace icons
 {

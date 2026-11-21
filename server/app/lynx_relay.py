@@ -38,6 +38,8 @@ CLOSE_SLOW = 4002                                                          # Web
 # Round 190oh: what may wait for one peer that reads slowly before it is closed (it reconnects and resumes). Every
 # peer has its own outbox, so a slow reader never holds up what its sender sends to the others.
 PEER_QUEUE_BYTES = env_int("LYNX_RELAY_PEER_QUEUE", 16 * 1024 * 1024)
+CLOSE_REMOVED = 4003                                                       # WebSocket close code: the host removed this peer
+MAX_BANS = 64                                                              # removed clients remembered per room
 SUBPROTOCOL = "lynx-relay.v1"
 # A room token the host chose (LYNX derives it from the invite code, so a guest who has the code can connect without the
 # server ever handing the token out). Only its SHA-256 is kept, like every token here.
@@ -88,6 +90,11 @@ class Room:
         self.bytes = 0                 # relayed so far
         self.last_frame = self.created
         self.outboxes: dict[int, Outbox] = {}  # round 190oh: one per connected peer
+        # round 190on: the host can remove a peer (kick). Each connection's salted client key is kept (in memory, never
+        # logged) so that a removed peer cannot come back into this room from the same address with the old code.
+        self.peer_keys: dict[int, str] = {}
+        self.banned: set[str] = set()
+        self.closing: set[asyncio.Task] = set()   # (kicks under way: kept so the tasks are not collected early)
 
     def over_limit(self, now: float) -> str:
         """Why this room must close now ("" = it may go on)."""
@@ -233,6 +240,55 @@ async def close_room(request: web.Request) -> web.Response:
     return web.Response(status=204)
 
 
+async def kick(request: web.Request) -> web.Response:
+    """Round 190on: the host removes a peer. Body {"peer": n, "ban": true, "token": "<new room token>"}: the peer's
+    socket is closed with 4003 (its slot is free at once); "ban" (default true) keeps its client address out of this
+    room; "token" replaces the room token for new connections (the peers already connected stay: the invite code
+    changed for new joins only). Every field but "peer" is optional; "peer" 0 with a token only changes the token."""
+    room = rooms.get(request.match_info["room"])
+    if not room:
+        return fail(404, "no such room")
+    if not token_matches(bearer(request), room.host_hash):
+        return fail(401, "missing or wrong host token")
+    try:
+        body = await request.json()
+    except ValueError:
+        return fail(400, "the body must be JSON")
+    if not isinstance(body, dict):
+        return fail(400, "the body must be a JSON object")
+    peer = body.get("peer", 0)
+    if not isinstance(peer, int) or isinstance(peer, bool) or peer < 0 or peer > MAX_PEERS:
+        return fail(400, f"peer: 0 to {MAX_PEERS}")
+    ban = body.get("ban", True)
+    if not isinstance(ban, bool):
+        return fail(400, "ban: true or false")
+    new_token = body.get("token") or ""
+    if new_token and (not isinstance(new_token, str) or not CHOSEN_TOKEN.match(new_token)):
+        return fail(400, "token: 43 to 128 characters A-Z a-z 0-9 _ -")
+    # (the body read may have yielded: the room may be gone)
+    if rooms.get(room.id) is not room:
+        return fail(404, "no such room")
+    removed = False
+    if peer:
+        key = room.peer_keys.get(peer)
+        # (never the host's own address: a guest on the host's network would lock the host out of its room)
+        if ban and key and key != client_key(request) and len(room.banned) < MAX_BANS:
+            room.banned.add(key)
+        ws = room.peers.get(peer)
+        if ws is not None and not ws.closed:
+            removed = True
+            # (the close handshake waits for the peer: the host gets its answer at once; the slot is freed when the
+            # peer's connection ends, at the latest after aiohttp's close timeout)
+            task = asyncio.create_task(ws.close(code=CLOSE_REMOVED, message=b"removed by host"))
+            room.closing.add(task)
+            task.add_done_callback(room.closing.discard)
+    if new_token:
+        room.token_hash = token_hash(new_token)
+    log.info("room %s…: host removed peer %d%s%s", room.id[:4], peer, " (banned)" if ban and peer else "",
+             ", new token" if new_token else "")
+    return json_response(200, {"ok": True, "removed": removed, "peers": sorted(room.peers)})
+
+
 async def drop_room(room: Room, reason: str, code: int = 4000) -> None:
     rooms.pop(room.id, None)
     for ws in list(room.peers.values()):
@@ -270,6 +326,8 @@ async def connect(request: web.Request) -> web.StreamResponse:
         return fail(404, "no such room")
     if not token_matches(room_token_from(request), room.token_hash):
         return fail(401, "missing or wrong room token")
+    if client_key(request) in room.banned:  # round 190on: removed by the host
+        return fail(403, "the host removed you from this session")
     slot = room.free_slot()
     if slot is None:
         return fail(409, f"room is full ({MAX_PEERS} peers)")
@@ -278,6 +336,7 @@ async def connect(request: web.Request) -> web.StreamResponse:
     await ws.prepare(request)
     room.peers[slot] = ws
     room.outboxes[slot] = box = Outbox(ws)
+    room.peer_keys[slot] = client_key(request)
     room.touched = time.time()
     await send_json(ws, {"type": "welcome", "peer": slot, "peers": sorted(room.peers), "maxPeers": MAX_PEERS}, room, slot)
     await broadcast(room, {"type": "join", "peer": slot}, skip=slot)
@@ -337,6 +396,7 @@ async def connect(request: web.Request) -> web.StreamResponse:
     finally:
         if room.peers.get(slot) is ws:
             del room.peers[slot]
+            room.peer_keys.pop(slot, None)
         if room.outboxes.get(slot) is box:
             del room.outboxes[slot]
         await box.finish()
@@ -385,6 +445,7 @@ def make_app() -> web.Application:
     app.router.add_get("/health", health)
     app.router.add_post("/v1/rooms", create_room)
     app.router.add_delete("/v1/rooms/{room}", close_room)
+    app.router.add_post("/v1/rooms/{room}/kick", kick)
     app.router.add_get("/v1/rooms/{room}/ws", connect)
     app.on_startup.append(on_startup)
     app.on_shutdown.append(on_shutdown)

@@ -168,7 +168,8 @@
             {
                 const auto all = search->matchCount();
                 line ("actions listed: " + juce::String (all));
-                check ("every action of the key map is listed", all == (int) keys::actions().size());
+                // (round 190on: the command palette lists the menus, extras, settings and recent projects too)
+                check ("every action of the key map is listed", all >= (int) keys::actions().size());
                 write (ui, ui.getLocalBounds(), "228-search-all");
                 search->setQuery ("metro");
                 line ("\"metro\": " + juce::String (search->matchCount()) + " actions, first " + juce::String (search->selectedId()));

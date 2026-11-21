@@ -138,6 +138,8 @@
 #include "ui/AudioCheck.h"
 #include "ui/AlsExportDialog.h"
 #include "ui/ActionSearch.h" // round 190nq (#228)
+#include "core/LynxExtras.h" // round 190on (P2: the command palette lists the extras)
+#include "ui/SettingsPages.h"
 #include "ui/DawProjectExport.h" // round 190jf (B22)
 #include "ui/FlmExportDialog.h" // round 190og (app-0003)
 #include "ui/OtherAppsExport.h"
@@ -388,6 +390,13 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     redoButton.setTooltip (withKey (tr ("Redo"), "edit.redo"));
     redoButton.onClick = [this] { undoRedo (true); };
     redoButton.onRightClick = [this] { showHistory(); };
+    // round 190on (research190oe P2, owner decision O-2): the command palette's magnifier beside the menus
+    paletteButton.setTooltip (tr ("Command palette: find and run any command, menu item, LYNX extra or setting"));
+    paletteButton.onClick = [this] { showActionSearch(); };
+    paletteButton.setFlat (true);
+    paletteButton.setWantsKeyboardFocus (false);
+    paletteButton.setMouseClickGrabsKeyboardFocus (false);
+    addChildComponent (paletteButton);
     audioEditorButton.setTooltip (tr ("Open audio editor / New audio editor"));
     audioEditorButton.onClick = [this] { openMasterAudioEditor (false); };
     audioEditorButton.onRightClick = [this] { openMasterAudioEditor (true); };
@@ -1633,6 +1642,7 @@ void MainComponent::resized()
         const auto menu = row.withWidth (juce::jmin (menuWidth + 8, row.getWidth()));
         put (menuBar, menu);
         titleArea = {};
+        paletteButton.setVisible (false);
         placeHintBar (row.withTrimmedLeft (menu.getWidth() + 12).withWidth (juce::jmin (900, row.getWidth() - menu.getWidth() - 12)).reduced (0, 1));
         fixedToolbarArea = bar;
     }
@@ -1644,7 +1654,11 @@ void MainComponent::resized()
         titleArea = column.withY (row1).withHeight (h).withTrimmedLeft (menu.getWidth() + 12).withTrimmedRight (4);
         if (titleArea.getWidth() < 60)
             titleArea = {};
-        placeHintBar (column.withY (row2).withHeight (h).reduced (0, 1));
+        // round 190on (P2): the command palette's magnifier at the hint bar's right end (FL's help line: "Point at
+        // anything for help"); the menus' row keeps FL's look
+        auto hintRow = column.withY (row2).withHeight (h).reduced (0, 1);
+        placePaletteButton (hintRow, true);
+        placeHintBar (hintRow);
         fixedToolbarArea = juce::Rectangle<int> (column.getX() - 4, 0, column.getWidth() + 8, toolbarHeight);
     }
 
@@ -2385,16 +2399,111 @@ bool MainComponent::keyFromPluginView (const juce::KeyPress& key, bool optionOn)
     return optionOn && keyFromSecondaryWindow (key);
 }
 
-// #228 (round 190nq): the action search over the main window ("?"); Enter runs the action as its keys would
+// #228 (round 190nq): the action search over the main window ("?"); Enter runs the action as its keys would.
+// Round 190on (research190oe P2): the command palette (Ctrl+Shift+Y, "?" and the toolbar's magnifier) — the same box
+// with the main menus' items, the LYNX extras' switches, the Settings pages and the recent projects too. Built on every
+// open (menus show what can run now; nothing is kept while the box is closed).
+std::vector<PaletteItem> MainComponent::commandPaletteItems()
+{
+    std::vector<PaletteItem> items;
+    const juce::Component::SafePointer<MainComponent> safe (this);
+    // 1. every action of the key map
+    for (auto& e : actionSearchEntries (keyMap))
+    {
+        PaletteItem p;
+        p.run = [safe, id = e.id] {
+            if (id == "help.searchActions" || id == "view.commandPalette")
+                return true;
+            return safe != nullptr && safe->runAction (id);
+        };
+        p.entry = std::move (e);
+        items.push_back (std::move (p));
+    }
+    // 2. the main menus' items (the recent projects come below, once)
+    const auto names = getMenuBarNames();
+    {
+        const juce::ScopedValueSetter<bool> indexing (indexingMenusForPalette, true);
+        for (int i = 0; i < names.size(); ++i)
+        {
+            const auto menu = getMenuForIndex (i, names[i]);
+            addMenuItems (items, menu, names[i], tr ("Recent projects"));
+        }
+    }
+    menuBar.getProperties().set ("lynxOneColumnMenu", false); // (getMenuForIndex set it for the View menu)
+    // 3. the LYNX extras' switches, as Settings › LYNX extras switches them
+    for (const auto& x : extras::items)
+    {
+        PaletteItem p;
+        p.entry.kind = actionsearch::Kind::extra;
+        p.entry.id = "extra:" + std::string (x.id);
+        p.entry.english = std::string (x.title);
+        p.entry.text = tr (std::string (x.title).c_str()).toStdString();
+        p.entry.where = tr (std::string (x.section).c_str()).toStdString();
+        p.entry.state = (lynxExtraOn (engine, settingsHooks(), x.id) ? tr ("on") : tr ("off")).toStdString();
+        p.run = [safe, id = std::string (x.id), title = juce::String (p.entry.text)] {
+            if (safe == nullptr)
+                return false;
+            const auto hooks = safe->settingsHooks();
+            const auto on = ! lynxExtraOn (safe->engine, hooks, id);
+            setLynxExtra (safe->engine, hooks, id, on, true);
+            ui::postHint ({ tr ("{0}: {1}", { title, lynxExtraOn (safe->engine, hooks, id) ? tr ("on") : tr ("off") }) }, 3000);
+            return true;
+        };
+        items.push_back (std::move (p));
+    }
+    // 4. the Settings pages
+    const std::pair<SettingsPage, const char*> pages[] = { { SettingsPage::midi, TR_NOOP ("MIDI") },       { SettingsPage::audio, TR_NOOP ("Audio") },
+                                                           { SettingsPage::general, TR_NOOP ("General") }, { SettingsPage::files, TR_NOOP ("Files") },
+                                                           { SettingsPage::theme, TR_NOOP ("Theme") },     { SettingsPage::project, TR_NOOP ("Project") },
+                                                           { SettingsPage::info, TR_NOOP ("Info") },       { SettingsPage::link, TR_NOOP ("Ableton Link") },
+                                                           { SettingsPage::extras, TR_NOOP ("LYNX extras") } };
+    for (const auto& [page, name] : pages)
+    {
+        PaletteItem p;
+        p.entry.kind = actionsearch::Kind::setting;
+        p.entry.id = "settings:" + std::string (name);
+        p.entry.english = "Settings: " + std::string (name);
+        p.entry.text = (tr ("Settings") + ": " + tr (name)).toStdString();
+        p.run = [safe, page = (int) page] {
+            if (safe != nullptr)
+                safe->openSettings (page);
+            return safe != nullptr;
+        };
+        items.push_back (std::move (p));
+    }
+    // 5. the recent projects
+    for (int i = 0; i < recent.getNumFiles(); ++i)
+    {
+        const auto file = recent.getFile (i);
+        PaletteItem p;
+        p.entry.kind = actionsearch::Kind::recent;
+        p.entry.id = "recent:" + file.getFullPathName().toStdString();
+        p.entry.text = p.entry.english = file.getFileName().toStdString();
+        p.entry.where = file.getParentDirectory().getFullPathName().toStdString();
+        p.entry.enabled = file.existsAsFile();
+        if (i < 10)
+            p.entry.keys = shortcutText (("file.recent" + std::to_string (i + 1)).c_str()).trimCharactersAtStart ("\t").toStdString();
+        p.run = [safe, file] {
+            if (safe == nullptr || ! file.existsAsFile())
+                return false;
+            safe->confirmDiscard ([safe, file] {
+                if (safe != nullptr)
+                    safe->openFile (file);
+            });
+            return true;
+        };
+        items.push_back (std::move (p));
+    }
+    return items;
+}
+
 void MainComponent::showActionSearch()
 {
     if (actionSearch != nullptr)
         return;
-    actionSearch = std::make_unique<ActionSearchOverlay> (keyMap, [this] (const std::string& id) {
-        if (id == "help.searchActions")
-            return true;
-        return runAction (id);
-    });
+    const auto started = juce::Time::getMillisecondCounterHiRes();
+    actionSearch = std::make_unique<ActionSearchOverlay> (commandPaletteItems());
+    lastPaletteOpenMs = juce::Time::getMillisecondCounterHiRes() - started;
     actionSearch->onClose = [safe = juce::Component::SafePointer<MainComponent> (this)] {
         juce::MessageManager::callAsync ([safe] {
             if (safe != nullptr && safe->actionSearch != nullptr)
@@ -2780,8 +2889,12 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("edit.undo")) flUndo();
     else if (is ("edit.undoBackwards")) flUndoBackwards();
     else if (is ("edit.redo")) undoRedo (true);
-    else if (is ("help.searchActions")) // #228 (round 190nq)
+    else if (is ("help.searchActions") || is ("view.commandPalette")) // #228 (round 190nq); round 190on (P2)
         showActionSearch();
+    else if (is ("audioEditor.nextTransient")) return audioEditorTransient (1, false); // round 190on (P8)
+    else if (is ("audioEditor.prevTransient")) return audioEditorTransient (-1, false);
+    else if (is ("audioEditor.extendToNextTransient")) return audioEditorTransient (1, true);
+    else if (is ("audioEditor.extendToPrevTransient")) return audioEditorTransient (-1, true);
     else if (is ("help.shortcuts"))
     {
         if (helpWindow != nullptr) // F1 again closes the sheet (issue #23)
@@ -3456,6 +3569,10 @@ void MainComponent::loadUiSettings()
             ChordHelperPanel::pinnedFirst = on;
         else if (key == "prSongBars")
             PianoRollComponent::songBarsRuler = on;
+        else if (key == "prStackedLanesExtra") // (round 190on, P10)
+            PianoRollComponent::stackedLanesExtra = on;
+        else if (key == "prStackedLanes")
+            PianoRollComponent::stackedLanesSaved = line.fromFirstOccurrenceOf ("=", false, false).trim().toStdString();
         else if (key == "polyPrepareOnOpen") // (round 190lo: a LYNX extra, ui/PolyEditor.h)
             PolyEditorWindows::prepareOnOpen = on;
         else if (key == "prKeyStyle") // (round 190j: 0 = flat, FL's; 1 = piano keys)
@@ -3812,6 +3929,8 @@ void MainComponent::saveUiSettings()
                                       + "\nchordFavourites=" + juce::String (modalhelp::favouritesText (ChordHelperPanel::favourites))
                                       + "\nchordPinnedFirst=" + juce::String (ChordHelperPanel::pinnedFirst ? 1 : 0)
                                       + "\nprSongBars=" + juce::String (PianoRollComponent::songBarsRuler ? 1 : 0)
+                                      + "\nprStackedLanesExtra=" + juce::String (PianoRollComponent::stackedLanesExtra ? 1 : 0)
+                                      + "\nprStackedLanes=" + juce::String (PianoRollComponent::stackedLanesSaved)
                                       + "\npolyPrepareOnOpen=" + juce::String (PolyEditorWindows::prepareOnOpen ? 1 : 0)
                                       + "\nprKeyStyle=" + juce::String ((int) PianoRollComponent::keyStyle)
                                       + "\naudioLogEnabled=" + juce::String (engine.getRollingLog().isEnabled() ? 1 : 0)
@@ -9415,6 +9534,12 @@ void MainComponent::openLynxProject (const juce::File& file, bool withoutPlugins
 void MainComponent::openSettings (int page)
 {
     lastSettingsPage = page; // (issue #181: Ctrl+, opens this page next time)
+    showSettings (engine, (SettingsPage) juce::jlimit (0, (int) SettingsPage::link, page), settingsHooks()); // (Theme was clamped to MIDI)
+}
+
+// (round 190on: also the command palette's, which switches the LYNX extras as the Settings page does)
+SettingsHooks MainComponent::settingsHooks()
+{
     const juce::Component::SafePointer<MainComponent> safe (this);
     SettingsHooks hooks;
     hooks.browserFoldersChanged = [safe] {
@@ -9623,7 +9748,7 @@ void MainComponent::openSettings (int page)
         if (safe != nullptr)
             safe->updateGamepad();
     };
-    showSettings (engine, (SettingsPage) juce::jlimit (0, (int) SettingsPage::link, page), std::move (hooks)); // (Theme was clamped to MIDI)
+    return hooks;
 }
 
 void MainComponent::showPluginManager()
@@ -10036,6 +10161,24 @@ void MainComponent::save (bool askForFile, std::function<void()> afterSaved)
                               });
 }
 
+// round 190on (P2): the command palette's magnifier, a square as tall as the row: at the row's left (Clip-launch: right of
+// the menus) or at its right end (Pattern / Simple: the hint bar's row); hidden when the row has no room for it and
+// 150 px of the rest
+void MainComponent::placePaletteButton (juce::Rectangle<int>& row, bool atRight)
+{
+    const auto side = juce::jmin (row.getHeight(), 26);
+    if (row.getWidth() < side + 150)
+    {
+        paletteButton.setVisible (false);
+        return;
+    }
+    const auto square = atRight ? row.removeFromRight (side) : row.removeFromLeft (side);
+    if (atRight)
+        row.removeFromRight (4);
+    paletteButton.setBounds (square.withSizeKeepingCentre (side, side));
+    paletteButton.setVisible (true);
+}
+
 void MainComponent::placeHintBar (juce::Rectangle<int> row)
 {
     // the read-out takes the right part of the hint row once something was tweaked (2/5 of it, 170..280 px), and
@@ -10304,11 +10447,16 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
     if (index == 10)
     {
         // FL's ADD menu: a channel (LYNX's instruments and the installed plugins), a pattern, the plugin tools
-        menu.addSectionHeader (tr ("Channel"));
-        rack.addInstrumentItems (menu, -1);
-        // the Channel Rack's and the mixer slots' view switch (Categories / Simple / Tree), so that the three menus are
-        // one (issue #104)
-        quickpick::addFolderViewItems (menu, engine);
+        // (round 190on: not while the command palette lists the menus — every generator's preset folders are read for it,
+        // seconds on a big install; the palette's user adds channels with the Plugin picker)
+        if (! indexingMenusForPalette)
+        {
+            menu.addSectionHeader (tr ("Channel"));
+            rack.addInstrumentItems (menu, -1);
+            // the Channel Rack's and the mixer slots' view switch (Categories / Simple / Tree), so that the three menus are
+            // one (issue #104)
+            quickpick::addFolderViewItems (menu, engine);
+        }
         menu.addSectionHeader (tr ("Other"));
         // FL's "Automation for last tweaked parameter" (Add_AutoLastMenu → FUN_01231100, REA round 143)
         const auto last = engine.getLastTweaked (0);

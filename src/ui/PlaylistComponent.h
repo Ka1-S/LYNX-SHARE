@@ -289,6 +289,7 @@ public:
     juce::Component& pointerButtonForSnapshot() noexcept { return pointerButton; }
     void refreshViewOptions();
     double playheadTickForSnapshot() const noexcept { return playheadTick; }
+    void setPlayheadForSnapshot (double tick) { engine.jumpTo (tick); playheadTick = tick; } // (round 190on: as a ruler click, stopped)
     juce::Rectangle<int> trackLaneArrowForSnapshot (int track) const { return trackLaneArrow (track); }
     double xOfTickForSnapshot (double tick) const { return tickToX (tick); }
     juce::Rectangle<int> clipBoundsForSnapshot (int clip) const { return clipBounds (clip); } // (round 190gi)
@@ -745,6 +746,11 @@ private:
     // FL's Select › time keys (round 167k: EESelAroundSelAction Ctrl+Enter, EESelPrev/NextAction Ctrl+Left/Right)
     void selectTimeAroundSelection();
     void moveTimeSelection (int direction);
+    // round 190on (P8, core/TransientNav.h): Tab to transient — the song position (`extend`: the time selection's edge) to the
+    // next / previous attack of the selected audio clips (none selected: every audio clip)
+    bool moveToTransient (int direction, bool extend);
+    std::vector<double> clipAttacks (int index); // (file seconds, found once per sample)
+    std::map<std::string, std::pair<std::weak_ptr<const SampleData>, std::vector<double>>> transientCache;
     void deleteSelection();
     void copySelection();
 public:

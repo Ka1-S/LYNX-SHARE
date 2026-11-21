@@ -551,6 +551,52 @@ int run (const juce::StringArray& args)
     // (they knock at the same moment: who is let in first, and so gets tag 2, is the network's choice)
     check (anaTag + liaTag == 5 && (anaTag == 2 || anaTag == 3) && host.engine->getSong().session.participants.size() == 3, "participants: host 1, Ana " + juce::String ((int) anaTag) + ", Lia " + juce::String ((int) liaTag));
     check (host.live->getPeople().size() == 3 && ana.live->getPeople().size() == 3, "presence: " + juce::String ((int) ana.live->getPeople().size()) + " people online");
+
+    // round 190on (--remove-only: a relay with POST /v1/rooms/<room>/kick, this branch's server/; the rest of the run is
+    // skipped): the host removes Lia with a new invite code. Lia is out; Ana, still in, goes on with the new code without
+    // typing it; the old code lets nobody in any more; edits keep flowing both ways under the new key.
+    if (args.contains ("--remove-only"))
+    {
+        juce::String endedWhy;
+        lia.live->onEnded = [&endedWhy] (const juce::String& why) { endedWhy = why; };
+        host.live->removeGuest (liaTag, true);
+        const bool out = pumpUntil ([&] { return ! lia.live->isActive() && host.live->getPeople().size() == 2 && host.live->getInviteCode() != code
+                                                 && ana.live->getInviteCode() == host.live->getInviteCode(); },
+                                    20000);
+        check (out && endedWhy.contains ("removed"), "190on: the host removed Lia (\"" + endedWhy + "\"); Ana has the new code without typing it");
+        check (host.live->getInviteCode() != code && livecrypto::parseCode (host.live->getInviteCode().toStdString()).has_value()
+                   && livecrypto::parseCode (host.live->getInviteCode().toStdString())->room == livecrypto::parseCode (code.toStdString())->room,
+               "190on: same room, new code");
+        ana.engine->editSong ([] (Song& s) { s.patterns.emplace_back().name = "Ana after the new code"; });
+        check (pumpUntil ([&] { return converged ({ &ana }) && patternIndex (host.engine->getSong(), "Ana after the new code") >= 0; }, 15000),
+               "190on: Ana's edit reached the host under the new code");
+        host.engine->editSong ([] (Song& s) { s.patterns.emplace_back().name = "Host after the new code"; });
+        check (pumpUntil ([&] { return converged ({ &ana }) && patternIndex (ana.engine->getSong(), "Host after the new code") >= 0; }, 15000),
+               "190on: the host's edit reached Ana");
+        // the old code lets nobody in; the new one does
+        rui.live->join (code, options (rui));
+        pumpUntil ([&] { return ! rui.live->isActive(); }, 15000);
+        check (! rui.live->isActive() && host.live->getPeople().size() == 2, "190on: the old code no longer gets in (" + rui.live->getStatus() + ")");
+        rui.engine = std::make_unique<AudioEngine> (false);
+        rui.live = std::make_unique<LiveSessionManager> (*rui.engine);
+        rui.live->join (host.live->getInviteCode(), options (rui));
+        check (pumpUntil ([&] { return converged ({ &ana, &rui }) && host.live->getPeople().size() == 3; }, 30000),
+               "190on: a newcomer with the new code gets in (" + rui.live->getStatus() + ")");
+        check (host.live->removedGuests() == 1, "190on: one guest removed");
+        // "Keep the same code": Rui removed, the code stays
+        const auto kept = host.live->getInviteCode();
+        host.live->removeGuest (rui.live->myTag(), false);
+        const bool gone = pumpUntil ([&] { return ! rui.live->isActive() && host.live->getPeople().size() == 2; }, 20000);
+        settle (1500);
+        check (gone && host.live->getInviteCode() == kept && ana.live->getInviteCode() == kept, "190on: \"Keep the same code\": Rui removed, the code unchanged");
+        host.live->leave();
+        pumpUntil ([&] { return ! ana.live->isActive(); }, 10000);
+        for (auto& p : peers)
+            p->live.reset();
+        line (ok ? "result=OK" : "result=FAILED");
+        dir.deleteRecursively();
+        return ok ? 0 : 1;
+    }
     {
         const auto& s = ana.engine->getSong();
         const auto k = channelIndex (s, "Host kick");

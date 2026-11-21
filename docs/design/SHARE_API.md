@@ -185,6 +185,23 @@ frame (`LYNX_RELAY_MAX_FRAME`); each peer may send 4 MiB/s on average (beyond th
 down instead of dropping, so the stream stays reliable and ordered). WebSocket pings every 25 s keep NAT mappings
 alive.
 
+### 3.4 Removing a peer (round 190on)
+
+`POST /v1/rooms/<room>/kick` with `Authorization: Bearer <hostToken>` and the body
+`{"peer": 2, "ban": true, "token": "<new room token>"}` → `200 {"ok":true,"removed":true,"peers":[1,3]}`.
+
+- `peer` (0…4): its socket is closed with WebSocket code **4003** ("removed by host"); its peer number is free at once.
+  `0` removes nobody (only the token changes).
+- `ban` (default `true`): the peer's client address (the same salted in-memory key as the rate limits, never logged)
+  may not connect to this room again: `403` before the upgrade. The host's own address is never banned (a guest on the
+  host's network), and a room remembers at most 64.
+- `token` (optional, 43…128 characters as in §3.1): the room token for **new** connections from now on; the peers
+  already connected stay. LYNX SHARE sends the derived token of a new invite code (same room, new secret), and gives the
+  new code to the guests still in the session inside the encrypted stream, so only newcomers need it.
+- `400` for a body that is not a JSON object or a field of the wrong shape, `401` wrong host token, `404` unknown room.
+- LYNX SHARE also calls it (with `ban`, no `token`) for a knocker the host turned away, so that one can't knock again
+  with the same code.
+
 ### 3.3 Mapping to ONLINE_SESSIONS.md
 
 - §6.1 `RelayLink` = one WebSocket per peer; the `SessionLink` framing (`u32 length | u8 type | u8 stream |

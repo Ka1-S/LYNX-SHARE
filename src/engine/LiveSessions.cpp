@@ -1,5 +1,7 @@
 #include "engine/LiveSessions.h"
 
+#include "core/LiveRekey.h" // round 190on (removing a guest)
+
 #include <algorithm>
 #include <atomic>
 #include <condition_variable>
@@ -944,10 +946,12 @@ void LiveSessionManager::handleEvent (const livelink::Event& e)
     {
         // a session that was running reconnects by itself (unless the room is gone or the code no longer works)
         const bool running = state == State::live || state == State::waitingHost || state == State::reconnecting;
-        if (running && e.code != 401 && e.code != 404 && e.code != 4000 && e.code != 4001)
+        if (running && e.code != 401 && e.code != 403 && e.code != 404 && e.code != 4000 && e.code != 4001 && e.code != 4003)
             return lostConnection (tr ("The connection to the session was lost."));
         juce::String why;
-        if (e.code == 401)
+        if (e.code == 403 || e.code == 4003) // round 190on: removed by the host (the relay keeps this address out)
+            why = tr ("The host removed you from the live session.");
+        else if (e.code == 401)
             why = tr ("The invite code is wrong.");
         else if (e.code == 404)
             why = tr ("There is no such session: it has ended, or the code is wrong.");
@@ -1001,6 +1005,8 @@ void LiveSessionManager::handleFrame (int from, std::vector<std::uint8_t> payloa
     else
         return;
     auto plain = opener->open (sealed);
+    if (! plain && previousOpener != nullptr) // (round 190on: sealed before its sender switched to the new code)
+        plain = previousOpener->open (sealed);
     if (! plain || plain->empty())
         return; // another key (a wrong code), changed on the way or replayed
     ++stats.received;
@@ -1110,6 +1116,20 @@ void LiveSessionManager::handleMessage (int from, const juce::var& m)
         hostPeer = from;
     if (from != hostPeer || hostPeer == 0)
         return;
+    if (t == "removed") // round 190on: the host removed this computer from the session
+        return end (tr ("The host removed you from the live session.") + " "
+                        + (keepFull ? tr ("The project stays as it is.") : tr ("Your part of the project stays here.")),
+                    ! keepFull);
+    if (t == "rekey") // round 190on: the session has a new invite code (someone was removed); this computer goes on with it
+    {
+        if (const auto next = livecrypto::parseCode (utf8 (m["code"].toString())); next && next->room == invite.room && next->secret != invite.secret)
+        {
+            switchInvite (*next);
+            if (onHint)
+                onHint (tr ("The live session has a new invite code. You stay in it."));
+        }
+        return;
+    }
     if (t == "deny" && m["reason"].toString() == "resume")
         return end (keepFull ? tr ("The host no longer knows this computer in the session. The project stays as it is.")
                              : tr ("The host no longer knows this computer in the session. Your part of the project stays here."),
@@ -1233,6 +1253,95 @@ void LiveSessionManager::handleMessage (int from, const juce::var& m)
 
 // --- the host -------------------------------------------------------------------------------------------------------
 
+// --- round 190on: removing a guest (core/LiveRekey.h) ------------------------------------------------------------------
+
+void LiveSessionManager::removeGuest (std::uint32_t tag, bool newCode)
+{
+    if (! host || ! authority || tag == session::hostTag)
+        return;
+    int relayPeer = 0;
+    juce::String name;
+    for (auto it = peers.begin(); it != peers.end(); ++it)
+        if (it->second.accepted && it->second.tag == tag)
+        {
+            relayPeer = it->first;
+            name = it->second.name;
+            sendJson (relayPeer, message ("removed")); // (before the relay closes the connection: the guest says why)
+            peers.erase (it);
+            break;
+        }
+    if (auto a = away.find (tag); a != away.end()) // (a guest whose connection dropped can't come back either)
+    {
+        if (name.isEmpty())
+            name = a->second.name;
+        away.erase (a);
+    }
+    if (name.isEmpty())
+        return;
+    ++removed;
+    authority->setPermissions (tag, [] { live::Permissions p; p.listener = true; return p; }()); // (nothing more from them)
+    journalDirty = true;
+    sendPeople (true);
+    broadcastNeeds();
+    std::optional<livecrypto::Invite> next;
+    if (newCode)
+        next = liverekey::rotated (invite);
+    kickAtRelay (relayPeer, true, next, name);
+}
+
+void LiveSessionManager::kickAtRelay (int relayPeer, bool ban, std::optional<livecrypto::Invite> next, juce::String who)
+{
+    if (roomId.isEmpty() || hostToken.isEmpty() || (relayPeer <= 0 && ! next))
+        return;
+    const auto url = options.relay.trimCharactersAtEnd ("/") + "/v1/rooms/" + roomId + "/kick";
+    const auto token = next ? livecrypto::derive (*next).relayToken : std::string();
+    const auto body = str (liverekey::kickBody (relayPeer, ban, token));
+    if (io == nullptr)
+        return;
+    // (on the io worker; the answer is handled on the message thread by pump(), as every finished job's)
+    io->post ([this, url, bearer = hostToken, body, next, who]() -> Worker::Done {
+        const auto answer = relayRequest ("POST", url, bearer, body, 8000);
+        return [this, status = answer.status, next, who] {
+            if (! host || ! isActive())
+                return;
+            if (status != 200)
+            {
+                if (onHint && who.isNotEmpty())
+                    onHint (tr ("{0} left the session here, but the relay could not be told ({1}): they may knock again with the code.",
+                                { who, status == 0 ? tr ("no connection") : juce::String (status) }));
+                return;
+            }
+            if (next)
+                switchInvite (*next);
+            if (onHint && who.isNotEmpty())
+                onHint (next ? tr ("{0} was removed from the live session. New invite code: {1}", { who, inviteCode })
+                             : tr ("{0} was removed from the live session", { who }));
+        };
+    });
+}
+
+void LiveSessionManager::switchInvite (const livecrypto::Invite& next)
+{
+    if (host) // the guests still here get the new code, sealed with the old key (the removed one is gone already)
+        for (const auto& [n, p] : peers)
+            if (p.accepted)
+            {
+                auto m = message ("rekey");
+                set (m, "code", str (livecrypto::formatCode (next)));
+                sendJson (n, m);
+            }
+    invite = next;
+    keys = livecrypto::derive (invite);
+    inviteCode = str (livecrypto::formatCode (invite));
+    previousOpener = std::move (opener);
+    opener = std::make_unique<livecrypto::Opener> (keys.key);
+    openerKey = keys.key; // (rollup 0.1.31 step 5: a reconnect after the switch keeps this opener, round 190oh's rule)
+    sealer = std::make_unique<livecrypto::Sealer> (keys.key);
+    journalDirty = true;
+    if (onChange)
+        onChange();
+}
+
 void LiveSessionManager::deny (int to, const juce::String& reason)
 {
     auto m = message ("deny");
@@ -1276,6 +1385,8 @@ void LiveSessionManager::onHello (int from, const juce::var& m)
             return accept (from);
         deny (from, "declined");
         peers.erase (it);
+        // round 190on: the relay frees the place and keeps that address out, so the same code can't knock again
+        kickAtRelay (from, true, std::nullopt, {});
     });
 }
 

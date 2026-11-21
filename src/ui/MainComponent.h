@@ -49,6 +49,7 @@
 namespace lynx
 {
 class GamepadInput;
+struct SettingsHooks; // (ui/SettingsPages.h)
 namespace folderwatch
 {
 class Watcher;
@@ -373,12 +374,19 @@ private:
     // project (only when something is missing; the FL import report follows it), else from the menu (always).
     void showMissingFiles (bool afterOpening);
     void openSettings (int page); // ui/SettingsDialog.h SettingsPage: 0 Project, 1 Info, 2 Files, 3 General, 4 Audio, 5 MIDI
+    SettingsHooks settingsHooks(); // (round 190on: openSettings' hooks, the command palette's too)
     int lastSettingsPage = 3; // the page openSettings showed last (SettingsPage::general at first): Ctrl+, opens it (issue #181)
     void showPluginManager();
     void showShortcutManager();
     void showActionSearch(); // #228 (round 190nq): "?"
+    std::vector<PaletteItem> commandPaletteItems(); // round 190on (P2): what the command palette lists
+    double lastPaletteOpenMs = 0.0;                 // (how long the last open took: --snapshot)
+    bool indexingMenusForPalette = false;           // (getMenuForIndex leaves the Add menu's generator tree out meanwhile)
 public:
     ActionSearchOverlay* actionSearchForSnapshot() const { return actionSearch.get(); }
+    double paletteOpenMsForSnapshot() const noexcept { return lastPaletteOpenMs; }
+    juce::Component& paletteButtonForSnapshot() noexcept { return paletteButton; }
+    void closeActionSearchForSnapshot() { actionSearch = nullptr; } // (the box goes at once, not on the next message)
 private:
     std::unique_ptr<ActionSearchOverlay> actionSearch;
     int scansSeen = 0; // background plugin scans already announced in the hint bar
@@ -671,6 +679,8 @@ private:
     // FL's toolbar "Open audio editor / New audio editor" (round 190mv, DF-35; capture 190mv A9): left = the Master's audio
     // editor (Edison into the Master's first empty slot, or the one there), right = a new one
     IconButton audioEditorButton { "audioEditor", Icon::scissors };
+    IconButton paletteButton { "commandPalette", Icon::search }; // round 190on (P2): beside the menus, opens the command palette
+    void placePaletteButton (juce::Rectangle<int>& row, bool atRight = false); // (takes its square from the row, or hides it)
     void openMasterAudioEditor (bool newOne);
     IconButton playButton { "play", Icon::play };
     IconButton stopButton { "stop", Icon::stop };
