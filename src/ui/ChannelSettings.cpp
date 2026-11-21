@@ -7467,6 +7467,10 @@ public:
                                         .translated (cx, cy));
             p.addPath (tooth);
         }
+        juce::Path hole;
+        hole.addEllipse (cx -holeR, cy -holeR, holeR * 2.0f, hole * 2.0f);
+        p.setUsingNonZeroWinding (false); // even-odd fill: the hole subtracts from the body instead of adding to it
+        p.addPath (hole);
         g.setColour (getToggleState() || over ? theme::colour::accent : theme::colour::textSecondary);
         g.fillPath (p);
     }
