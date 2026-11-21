@@ -12639,3 +12639,4 @@ countries: es mx ar co cl pe ve
 "The script changed since this project was saved: its settings may not fit." = "El script cambió desde que se guardó este proyecto: sus ajustes pueden no encajar."
 "This script draws its own display; LYNX SHARE shows its sliders." = "Este script dibuja su propia pantalla; LYNX SHARE muestra sus sliders."
 "JSFX scripts are not in this release: their slots become empty (a switched-off Utility on an insert, an empty Sampler on a channel): {0}" = "Los scripts JSFX no existen en esta versión: sus slots quedan vacíos (un Utility apagado en un insert, un Sampler vacío en un canal): {0}"
+"Show / hide the header" = "Mostrar / ocultar el encabezado"

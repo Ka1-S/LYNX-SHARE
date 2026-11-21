@@ -12639,3 +12639,4 @@ countries: id
 "The script changed since this project was saved: its settings may not fit." = "Skrip berubah sejak proyek ini disimpan: pengaturannya mungkin tidak cocok."
 "This script draws its own display; LYNX SHARE shows its sliders." = "Skrip ini menggambar tampilannya sendiri; LYNX SHARE menampilkan slider-nya."
 "JSFX scripts are not in this release: their slots become empty (a switched-off Utility on an insert, an empty Sampler on a channel): {0}" = "Skrip JSFX tidak ada di versi ini: slotnya menjadi kosong (Utility yang dimatikan di insert, Sampler kosong di kanal): {0}"
+"Show / hide the header" = "Tampilkan / sembunyikan header"

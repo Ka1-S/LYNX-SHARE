@@ -12639,3 +12639,4 @@ countries: nl be
 "The script changed since this project was saved: its settings may not fit." = "Het script is veranderd sinds dit project is opgeslagen: de instellingen passen misschien niet."
 "This script draws its own display; LYNX SHARE shows its sliders." = "Dit script tekent zijn eigen display; LYNX SHARE toont de schuifregelaars."
 "JSFX scripts are not in this release: their slots become empty (a switched-off Utility on an insert, an empty Sampler on a channel): {0}" = "JSFX-scripts bestaan niet in deze versie: hun slots worden leeg (een uitgeschakelde Utility op een insert, een lege Sampler op een kanaal): {0}"
+"Show / hide the header" = "Koptekst tonen / verbergen"

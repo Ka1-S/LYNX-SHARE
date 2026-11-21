@@ -12639,3 +12639,4 @@ countries: jp
 "The script changed since this project was saved: its settings may not fit." = "このプロジェクトの保存後にスクリプトが変更されました: 設定が合わない可能性があります。"
 "This script draws its own display; LYNX SHARE shows its sliders." = "このスクリプトは独自の表示を描画します。LYNX SHARE はスライダーを表示します。"
 "JSFX scripts are not in this release: their slots become empty (a switched-off Utility on an insert, an empty Sampler on a channel): {0}" = "このバージョンには JSFX スクリプトがありません: スロットは空になります (インサートでは無効の Utility、チャンネルでは空の Sampler): {0}"
+"Show / hide the header" = "ヘッダーの表示 / 非表示"

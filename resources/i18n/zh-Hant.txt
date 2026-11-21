@@ -12639,3 +12639,4 @@ countries: tw hk mo
 "The script changed since this project was saved: its settings may not fit." = "儲存此專案後腳本已變更：其設定可能不再適用。"
 "This script draws its own display; LYNX SHARE shows its sliders." = "此腳本繪製自己的顯示畫面；LYNX SHARE 顯示其滑桿。"
 "JSFX scripts are not in this release: their slots become empty (a switched-off Utility on an insert, an empty Sampler on a channel): {0}" = "此版本沒有 JSFX 腳本：它們的插槽變為空（插入上為關閉的 Utility，通道上為空的 Sampler）：{0}"
+"Show / hide the header" = "顯示 / 隱藏標題列"

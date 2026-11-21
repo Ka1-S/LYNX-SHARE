@@ -12639,3 +12639,4 @@ countries: it ch sm
 "The script changed since this project was saved: its settings may not fit." = "Lo script è cambiato da quando questo progetto è stato salvato: le sue impostazioni potrebbero non andare bene."
 "This script draws its own display; LYNX SHARE shows its sliders." = "Questo script disegna il proprio display; LYNX SHARE mostra i suoi slider."
 "JSFX scripts are not in this release: their slots become empty (a switched-off Utility on an insert, an empty Sampler on a channel): {0}" = "Gli script JSFX non esistono in questa versione: i loro slot restano vuoti (un Utility spento su un insert, un Sampler vuoto su un canale): {0}"
+"Show / hide the header" = "Mostra / nascondi l'intestazione"
