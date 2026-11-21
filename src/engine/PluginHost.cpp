@@ -1210,6 +1210,7 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
                 {
                     noteSmartBlock (count, hadEvents, view.getArrayOfReadPointers(), view.getNumChannels());
                     collectMidiOutput (pending);
+                }
             }
             pending.clear();
             const auto channels = (int) (scratch.size() / (std::size_t) blockSize);
@@ -1247,16 +1248,16 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
         hardwareBlockAt = chunkOffset + done; // (round 190jl)
         hardwarePositions = true;
         rememberMidi (midi);
-        const TimedParameterQueue::Scope timedChanges (timed, chunkOffset + done, count); // (round 190jg)
         const auto hadEvents = ! midi.isEmpty(); // (round 190ok: generator smart disable)
+        const TimedParameterQueue::Scope timedChanges (timed, chunkOffset + done, count); // (round 190jg)
         if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }, crashed, name); code != 0)
         {
             midi.clear();
             failed (code);
             return;
         }
-        collectMidiOutput (midi);
         noteSmartBlock (count, hadEvents, view.getArrayOfReadPointers(), view.getNumChannels());
+        collectMidiOutput (midi);
         midi.clear();
         recoveryMidi = false;
 
@@ -1315,10 +1316,10 @@ void PluginInstrument::mixOutputs (const float* const* ch, int numChannels, int 
 void PluginInstrument::configure (const ChannelDef& channel, double) noexcept
 {
     channelTrack.store (channel.mixerTrack, std::memory_order_relaxed);
-    bool elsewhere = false;
     // round 190ok (D2): FL's generator smart disable, with the wrapper's "Allow smart disable"
     smartHold.store (gensmart::holdSamples (plugin->getSampleRate()), std::memory_order_relaxed);
     smartOn.store (channel.smartDisable && channel.plugin.allowSmartDisable, std::memory_order_relaxed);
+    bool elsewhere = false;
     for (std::size_t k = 0; k < outs.size(); ++k)
     {
         const auto route = channel.plugin.outputRoute ((int) k);
@@ -1341,7 +1342,6 @@ void PluginInstrument::configure (const ChannelDef& channel, double) noexcept
     anyAux.store (elsewhere && ! aux.empty(), std::memory_order_release);
 }
 
-void PluginInstrument::beginChunk (int n) noexcept
 bool PluginInstrument::idle() const noexcept
 {
     // (round 190ok, D2) asleep: 4 s of silent output with nothing sent to it; anything queued for it (a note, a MIDI
@@ -1361,6 +1361,7 @@ void PluginInstrument::noteSmartBlock (int n, bool events, const float* const* c
     smart.rendered (n, events, ! events && gensmart::silent (channels, numChannels, n));
 }
 
+void PluginInstrument::beginChunk (int n) noexcept
 {
     auxCursor = 0;
     if (! anyAux.load (std::memory_order_acquire))
@@ -1989,7 +1990,6 @@ juce::String pluginStateContentionSelfTest()
     catch (const std::exception& e) { return "ERROR " + juce::String::fromUTF8 (e.what()); }
 }
 
-void PluginEffect::setConnections (const SlotConnections& c)
 // Round 190ok (owner decision D2): FL's generator smart disable through PluginInstrument, with an in-process probe synth
 // (a held note plays a constant level; it counts its blocks). The rack skips a channel while idle() says so (and no note
 // comes): here the same loop.
@@ -2102,6 +2102,7 @@ juce::String generatorSmartDisableSelfTest()
     }
 }
 
+void PluginEffect::setConnections (const SlotConnections& c)
 {
     for (int o = 0; o < maxPluginConnections; ++o)
         outputMode[(std::size_t) o].store (c.routed ? c.outputs[(std::size_t) o] : -1, std::memory_order_relaxed);
@@ -4171,6 +4172,10 @@ std::unique_ptr<juce::AudioPluginInstance> PluginHost::createInstance (const Plu
 
     crashguard::note (("loading plugin " + description->name + " (" + description->pluginFormatName + ", "
                        + juce::File (description->fileOrIdentifier).getFileName() + ")").toStdString());
+    // round 190ok: the memory the plugin maps while it loads, prepares and takes its settings is faulted in here, off the
+    // audio thread (platform/PrefaultMemory.h; Linux; LYNX_PREFAULT=0 leaves it out)
+    static const bool prefaultOn = juce::SystemStats::getEnvironmentVariable ("LYNX_PREFAULT", "1") != "0";
+    const auto mapsBefore = prefaultOn ? prefault::mappings() : std::vector<prefault::Region> {};
     auto instance = createRightInstance (formats, *description, sampleRate, maxBlockSize, message);
     crashguard::note (("loaded plugin " + description->name + (instance == nullptr ? juce::String (" (failed)") : juce::String())).toStdString());
 
@@ -4207,6 +4212,8 @@ std::unique_ptr<juce::AudioPluginInstance> PluginHost::createInstance (const Plu
             }
         }
     }
+    if (prefaultOn)
+        (void) prefault::populateNew (mapsBefore);
 
     return instance;
 }
