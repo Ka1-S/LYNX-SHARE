@@ -43,7 +43,7 @@ private:
 //   dpiUnaware: the editor and its window were made DPI-unaware (Windows draws them at 96 dpi and stretches them): the
 //               plugin is told scale 1 and its size is in the window's own pixels;
 //   scaleDims:  "Scale editor dimensions": the size the plugin reports is taken in logical pixels.
-// JUCE's VST3 window reads "lynxScaleEditorDimensions" (cmake/LynxPatchJuce.cmake, fix 190oh); LYNX's CLAP and VST2
+// JUCE's VST3 window reads "lynxScaleEditorDimensions" (cmake/LynxPatchJuce.cmake, fix 47); LYNX's CLAP and VST2
 // editors use the two functions below. An editor that was never marked is sized as before.
 void setEditorScaling (juce::Component& editor, bool dpiUnaware, bool scaleDims);
 // the scale a reported editor size is divided by (the primary display's; 1 for a marked editor)

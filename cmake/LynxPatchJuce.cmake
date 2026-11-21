@@ -322,7 +322,7 @@
 #       deeper tree made Clip-launch's Arrangement +9 % slower before this). Equal keys stay JUCE's equal keys.
 #    Both caches are pure functions of their keys, so the pixels are the same; the memory is a few MB at most.
 #
-# fix 190oh. Every platform ("fix 190oh" in round online_host_190oh's branch),
+# 47. Every platform ("fix 190oh" in round online_host_190oh's branch),
 #    juce_audio_processors/format_types/juce_VST3PluginFormat.cpp (round 190oh, P3: FL's wrapper Settings › GUI): the
 #    VST3 editor window's two size conversions (componentToVST3Rect / vst3ToComponentRect) leave the display's scale out
 #    when LYNX marked the editor "lynxScaleEditorDimensions" (FL's "Scale editor dimensions", or a DPI-unaware window):
@@ -621,9 +621,9 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("VST3 sample-accurate automation" "LYNX patch (round 190jg, fix 39): the automation's changes inside"
             "        cachedParamValues.ifSet ([&] (Steinberg::int32 index, float value)|NL|        {|NL|            inputParameterChanges->set (cachedParamValues.getParamID (index), value, 0);|NL|        });|NL|"
             "        cachedParamValues.ifSet ([&] (Steinberg::int32 index, float value)|NL|        {|NL|            inputParameterChanges->set (cachedParamValues.getParamID (index), value, 0);|NL|        });|NL||NL|        // LYNX patch (round 190jg, fix 39): the automation's changes inside this block, at their sample offsets (LYNX's|NL|        // engine/TimedParameters.h; indices as getParameters()). The last one is the parameter's value afterwards.|NL|        for (int k = 0; k < lynxTimedParamCount; ++k)|NL|        {|NL|            const auto& list = getParameters();|NL|            const auto index = lynxTimedParamIndices[k];|NL|            if (! isPositiveAndBelow (index, list.size()))|NL|                continue;|NL|            if (auto* p = dynamic_cast<VST3Parameter*> (list[index]))|NL|            {|NL|                const auto value = jlimit (0.0f, 1.0f, lynxTimedParamValues[k]);|NL|                inputParameterChanges->set (cachedParamValues.getParamID (p->lynxVstIndex()), value, jlimit (0, numSamples - 1, lynxTimedParamOffsets[k]));|NL|                cachedParamValues.exchangeWithoutNotifying (p->lynxVstIndex(), value);|NL|                parameterDispatcher.push (p->lynxVstIndex(), value);|NL|            }|NL|        }|NL|")
-        lynx_juce_fix("VST3 editor size: Scale editor dimensions" "LYNX patch (round 190oh, fix 190oh): FL's"
+        lynx_juce_fix("VST3 editor size: Scale editor dimensions (fix 47)" "LYNX patch (round 190oh, fix 47): FL's"
             "        const auto combinedScale = nativeScaleFactor * getDesktopScaleFactor();"
-            "        // LYNX patch (round 190oh, fix 190oh): FL's wrapper \"Scale editor dimensions\" (or a DPI-unaware window): the|NL|        // plugin's reported size is taken in logical pixels (src/platform/NativeEmbed.h, setEditorScaling)|NL|        const auto combinedScale = ((bool) getProperties()[\"lynxScaleEditorDimensions\"] ? 1.0f : nativeScaleFactor) * getDesktopScaleFactor();")
+            "        // LYNX patch (round 190oh, fix 47): FL's wrapper \"Scale editor dimensions\" (or a DPI-unaware window): the|NL|        // plugin's reported size is taken in logical pixels (src/platform/NativeEmbed.h, setEditorScaling)|NL|        const auto combinedScale = ((bool) getProperties()[\"lynxScaleEditorDimensions\"] ? 1.0f : nativeScaleFactor) * getDesktopScaleFactor();")
     elseif(file MATCHES "juce_Windowing_windows.cpp$")
         lynx_juce_fix("layered child window keeps its place when repainted" "LYNX patch (round 190cj): a child window's position"
             "        UpdateLayeredWindow (hwnd, nullptr, &pos, &size, sourceHdc, &p, 0, &bf, ULW_ALPHA);"
