@@ -5754,7 +5754,8 @@ void EffectsPanel::paintEq (juce::Graphics& g)
             else
                 curve.lineTo (inner.getX() + (float) i, y);
         }
-        g.setColour (eq.active() ? colour::accent : colour::textSecondary.withAlpha (0.6f));
+        // (round 190oa, DF-86: FL's curve turns orange, 255,203,106, while a right-drag sets a band's level)
+        g.setColour (eqLevelDrag && isEqPoint (dragParam) ? juce::Colour (0xffffcb6a) : eq.active() ? colour::accent : colour::textSecondary.withAlpha (0.6f));
         g.strokePath (curve, juce::PathStrokeType (1.5f));
 
         for (int b = 0; b < 3; ++b)
@@ -6929,6 +6930,16 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
         if (isEqPoint (eqControl))
         {
             dragParam = eqControl;
+            // round 190oa (DF-86, capture 190oa A5): FL's right-drag moves the band's level only (its curve orange while
+            // it does); the left drag sets frequency and level from the mouse
+            eqLevelDrag = e.mods.isRightButtonDown();
+            if (eqLevelDrag)
+            {
+                const auto band = (std::size_t) (eqPointBase - eqControl);
+                eqLevelFrom = { e.position.y, engine.getSong().mixer[(std::size_t) track].eq.gainDb[band] };
+                repaint (eqGraphBounds());
+                return;
+            }
             setEqFromGraph (eqPointBase - eqControl, e.getPosition());
             return;
         }
@@ -7245,7 +7256,21 @@ void EffectsPanel::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseW
         return;
     if (auto eqControl = eqControlAt (e.getPosition()); eqControl != 0)
     {
-        if (isEqPoint (eqControl)) // the wheel over a handle changes the band's width
+        // round 190oa (DF-86, capture 190oa A5: FL's wheel over a band changes its level, ≈ 0.8 dB a notch); Ctrl+wheel
+        // keeps LYNX's width
+        if (isEqPoint (eqControl) && ! e.mods.isCtrlDown() && wheel.deltaY != 0.0f)
+        {
+            const auto band = (std::size_t) (eqPointBase - eqControl);
+            const auto now = engine.getSong().mixer[(std::size_t) track].eq.gainDb[band];
+            const auto db = juce::jlimit (-eqRangeDb, eqRangeDb, std::round ((now + (wheel.deltaY > 0.0f ? 0.8f : -0.8f) * (wheel.isReversed ? -1.0f : 1.0f)) * 10.0f) / 10.0f);
+            engine.editSong ([t = track, band, db] (Song& s) {
+                if (t < (int) s.mixer.size())
+                    s.mixer[(std::size_t) t].eq.gainDb[band] = db;
+            });
+            showTip (eqParamBase - (int) band * 3, -1, true);
+            return;
+        }
+        if (isEqPoint (eqControl)) // (Ctrl) the band's width
             eqControl = eqParamBase - (eqPointBase - eqControl) * 3 - 2;
         if (const auto v = ui::wheelValue (valueOf (eqControl, -1), e, wheel, specFor (eqControl, -1)))
         {
@@ -7316,7 +7341,7 @@ ui::Hint EffectsPanel::hintAt (juce::Point<int> p)
             return ui::valueHint (specFor (eqControl, -1), valueOf (eqControl, -1), gesture);
         ui::Hint h;
         const auto band = eqPointBase - eqControl;
-        h.text = tr ("EQ: [LMB] drag the band's frequency and level  [Wheel] width  [2xLMB] back to 0 dB");
+        h.text = tr ("EQ: [LMB] drag the band's frequency and level  [RMB] drag its level  [Wheel] level  [Ctrl][Wheel] width  [2xLMB] back to 0 dB");
         h.value = tr ("Band {0}", { juce::String (band + 1) }) + " - " + tr (eqBandNames[band]);
         return h;
     }
@@ -7426,6 +7451,17 @@ void EffectsPanel::mouseDrag (const juce::MouseEvent& e)
 
     if (isEqPoint (dragParam))
     {
+        if (eqLevelDrag) // (round 190oa, DF-86: FL's right-drag = the level alone, on the graph's dB scale)
+        {
+            const auto graph = eqGraphBounds().toFloat().reduced (4.0f);
+            const auto db = juce::jlimit (-eqRangeDb, eqRangeDb,
+                                          std::round ((eqLevelFrom.second + (eqLevelFrom.first - e.position.y) / (graph.getHeight() * 0.5f) * eqRangeDb) * 10.0f) / 10.0f);
+            engine.editSong ([t = track, band = eqPointBase - dragParam, db] (Song& s) {
+                if (t < (int) s.mixer.size())
+                    s.mixer[(std::size_t) t].eq.gainDb[(std::size_t) band] = db;
+            });
+            return;
+        }
         setEqFromGraph (eqPointBase - dragParam, e.getPosition());
         return;
     }
@@ -7559,8 +7595,33 @@ void EffectsPanel::mouseExit (const juce::MouseEvent&)
     }
 }
 
+bool EffectsPanel::eqGestureForSnapshot (int band, int dy, int notches)
+{
+    const auto at = eqHandle (band);
+    auto source = juce::Desktop::getInstance().getMainMouseSource();
+    const auto now = juce::Time::getCurrentTime();
+    const auto event = [&] (juce::Point<float> p, juce::ModifierKeys mods) {
+        return juce::MouseEvent (source, p, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, this, this, now, at, now, 1, p != at);
+    };
+    if (notches != 0)
+    {
+        juce::MouseWheelDetails wheel { 0.0f, notches > 0 ? 0.25f : -0.25f, false, false, false };
+        for (int i = 0; i < std::abs (notches); ++i)
+            mouseWheelMove (event (at, {}), wheel);
+        return false;
+    }
+    const juce::ModifierKeys right (juce::ModifierKeys::rightButtonModifier);
+    mouseDown (event (at, right));
+    mouseDrag (event (at.translated (0.0f, (float) -dy), right));
+    const auto orange = eqLevelDrag;
+    mouseUp (event (at.translated (0.0f, (float) -dy), right));
+    return orange;
+}
+
 void EffectsPanel::mouseUp (const juce::MouseEvent& e)
 {
+    if (std::exchange (eqLevelDrag, false)) // (round 190oa: the curve's own colour again)
+        repaint (eqGraphBounds());
     // a click on the slot's name (not a drag, not the second click of a double-click) shows or hides its window (FL)
     if (dragSlot >= 0 && dropSlot < 0 && ! e.mouseWasDraggedSinceMouseDown() && e.getNumberOfClicks() == 1)
     {
