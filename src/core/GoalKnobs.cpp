@@ -7,6 +7,7 @@
 
 #include "core/Effects.h"
 #include "core/FacetEq.h"
+#include "core/FruityDynamics.h"
 
 #ifndef TR_NOOP
  #define TR_NOOP(text) text // marks a literal for translation (tools/i18n_keys.py scans core too)
@@ -42,10 +43,10 @@ float facetHz (double hz) { return facet::hzValue (hz); }
 float facetDb (double db) { return facet::gainValue (db); }
 float facetShape (facet::Shape s) { return facet::shapeValue (s); }
 
-const std::array<Goal, count>& table()
+const std::array<Goal, lastId>& table()
 {
     // clang-format off
-    static const std::array<Goal, count> goals { {
+    static const std::array<Goal, lastId> goals { {
         // Aether's dynamic air: mostly the mid band (its detector is instant), a little of the high band (its 2 ms attack
         // lets a hit's first milliseconds through, +8 dB on a hot snare at 62 %: round 190dg keeps it at 10 % or less);
         // the output comes down as the air goes up (−1.3 dB at half, −1.9 dB at the top), so the knob adds brightness,
@@ -95,12 +96,16 @@ const std::array<Goal, count>& table()
           { { "Style", 0.0f, 0.0f, 0.0f }, { "Drive", 0.0f, 0.26f, 0.48f }, { "Tone", 0.5f, 0.44f, 0.38f },
             { "Low cut", 0.0f, 0.0f, 0.0f }, { "High cut", 1.0f, 0.90f, 0.80f }, { "Auto gain", 1.0f, 1.0f, 1.0f },
             { "Output", 0.5f, 0.5f, 0.5f }, { "Mix", 0.0f, 1.0f, 1.0f } } },
+        // Round 190ot (research190oe P5): FL's Fruity Limiter, its compressor keyed by the track picked in "Duck under..."
+        // (EffectSlot::sidechain). Built from the limiter's own laws (duckMoves); the limiter section stays as a new FL
+        // instance has it. Starts at the "Pumping" style (simpletracks::duckAmount)
+        { TR_NOOP ("Duck"), TR_NOOP ("Dips this track on every hit of another track (sidechain)."), EffectKind::fruityLimiter, 0.55f, {} },
     } };
     // clang-format on
     return goals;
 }
 
-const Goal* goalOf (int id) noexcept { return id >= 1 && id <= count ? &table()[(std::size_t) (id - 1)] : nullptr; }
+const Goal* goalOf (int id) noexcept { return id >= 1 && id <= lastId ? &table()[(std::size_t) (id - 1)] : nullptr; }
 
 float lerp (float a, float b, float t) noexcept { return a + (b - a) * t; }
 
@@ -132,6 +137,28 @@ void eachMove (int id, float amount, F&& f)
     if (g == nullptr)
         return;
     amount = clamp01 (amount);
+    if (id == duck)
+    {
+        // Fruity Limiter's compressor (FL's laws, core/FruityDynamics.cpp limiterParamText), at 0 / 25 / 50 / 75 / 100 %:
+        // the threshold (0 dB = the compressor off: the knob at 0 leaves the track as it was), the ratio, a hard knee,
+        // 1 ms attack and the release (about 150 ms at half). Round 190ot's render test: a kick at -6 dBFS dips a pad by
+        // 6 dB or more on each hit at half (tests/SimpleDuck190otTests.inc)
+        static constexpr float thresholdDb[5] { 0.0f, -12.0f, -24.0f, -32.0f, -40.0f };
+        static constexpr float ratio[5] { 1.0f, 3.0f, 6.0f, 10.0f, 20.0f };
+        static constexpr float releaseMs[5] { 120.0f, 135.0f, 150.0f, 180.0f, 220.0f };
+        const auto value = [] (int control, double raw) {
+            const auto lo = fldyn::limiterMin[(std::size_t) control], hi = fldyn::limiterMax[(std::size_t) control];
+            return fldyn::normalised ((int) std::lround (std::clamp (raw, (double) lo, (double) hi)), lo, hi);
+        };
+        const auto ln7 = std::log (7.0), ln51 = std::log (51.0), ln501 = std::log (501.0);
+        const auto gain = std::pow (10.0, (double) at (thresholdDb, amount) / 20.0);
+        f (8, value (8, 1000.0 * std::log (1.0 + 6.0 * gain) / ln7));                            // Comp. threshold (law7)
+        f (9, value (9, 1000.0 * std::log ((double) (at (ratio, amount) - 1.0f) / 0.38 + 1.0) / ln51)); // Ratio n:1
+        f (10, value (10, 0.0));                                                                   // Knee: hard
+        f (11, value (11, 10000.0 * std::log (1.0 + 1.0 / 2.0) / ln501));                         // Comp. attack 1 ms
+        f (12, value (12, 10000.0 * std::log (1.0 + (double) at (releaseMs, amount) / 4.0) / ln501)); // Comp. release
+        return;
+    }
     if (id == bass)
     {
         using facet::Shape;

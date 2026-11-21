@@ -382,6 +382,25 @@ public:
                 engine.editSong ([t, v] (Song& s) { simpletracks::setReverbSend (s, t, v < 0.005f ? 0.0f : v); });
         };
         addAndMakeVisible (reverb);
+        // round 190ot (research190oe P5): the second shared send, an echo (GarageBand's Echo and Reverb sends)
+        styleCaption (echoCaption, tr ("Echo"));
+        addAndMakeVisible (echoCaption);
+        echo.resetValue = 0.0f;
+        echo.setTooltip (tr ("How much of the track goes to the shared echo (one Echo insert for every track, a dotted quarter note at the song's tempo)"));
+        echo.setTitle (tr ("Echo"));
+        echo.onChange = [this] (float v) {
+            const auto t = insert;
+            if (t > 0)
+                engine.editSong ([t, v] (Song& s) { simpletracks::setEchoSend (s, t, v < 0.005f ? 0.0f : v); });
+        };
+        addAndMakeVisible (echo);
+        // round 190ot: "Duck under..." — the track dips on every hit of the one picked (sidechain pumping in one pick)
+        styleCaption (duckCaption, tr ("Duck under"));
+        addAndMakeVisible (duckCaption);
+        duckButton.setTooltip (tr ("Dips this track on every hit of another track, a kick say (sidechain pumping). The Duck card's knob sets how much"));
+        duckButton.setComponentID ("simple.dock.duck");
+        duckButton.onClick = [this] { duckMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&duckButton)); };
+        addAndMakeVisible (duckButton);
 
         view.setViewedComponent (&strip, false);
         view.setScrollBarsShown (false, true);
@@ -419,8 +438,16 @@ public:
         previousPreset.setEnabled (has);
         nextPreset.setEnabled (has);
         blend.setEnabled (has);
-        reverb.setEnabled (has && insert > 0 && insert != simpletracks::sharedReverb (song));
         reverb.setValue (has ? simpletracks::reverbSend (song, insert) : 0.0f);
+        const auto bus = has && insert > 0 && insert != simpletracks::sharedReverb (song) && insert != simpletracks::sharedEcho (song);
+        reverb.setEnabled (bus);
+        echo.setEnabled (bus);
+        echo.setValue (has ? simpletracks::echoSend (song, insert) : 0.0f);
+        duckButton.setEnabled (bus);
+        {
+            const auto trigger = has ? simpletracks::duckTrigger (song, insert) : -1;
+            duckButton.setButtonText ((trigger > 0 ? insertTitle (trigger) : tr ("None")) + glyph (" \xe2\x96\xbe"));
+        }
         addCard.setEnabled (has);
         if (! has)
         {
@@ -486,12 +513,20 @@ public:
         second.removeFromLeft (8);
         bypassButton.setBounds (second.removeFromLeft (26));
         side.removeFromTop (8);
+        // round 190ot: "Duck under [track ▾]" (a caption, then its picker), then Blend | Reverb | Echo
+        auto duckRow = side.removeFromTop (24);
+        duckCaption.setBounds (duckRow.removeFromLeft (76));
+        duckButton.setBounds (duckRow);
+        side.removeFromTop (8);
         auto captions = side.removeFromTop (16);
         auto knobs = side.removeFromTop (juce::jmin (84, side.getHeight()));
-        blendCaption.setBounds (captions.removeFromLeft (90));
-        blend.setBounds (knobs.removeFromLeft (90).withWidth (72));
-        reverbCaption.setBounds (captions);
-        reverb.setBounds (knobs.withWidth (72));
+        const auto third = side.getWidth() / 3;
+        blendCaption.setBounds (captions.removeFromLeft (third));
+        blend.setBounds (knobs.removeFromLeft (third).withSizeKeepingCentre (juce::jmin (third - 4, 64), knobs.getHeight()).withX (blendCaption.getX()));
+        reverbCaption.setBounds (captions.removeFromLeft (third));
+        reverb.setBounds (knobs.removeFromLeft (third).withSizeKeepingCentre (juce::jmin (third - 4, 64), knobs.getHeight()).withX (reverbCaption.getX()));
+        echoCaption.setBounds (captions);
+        echo.setBounds (knobs.withSizeKeepingCentre (juce::jmin (third - 4, 64), knobs.getHeight()).withX (echoCaption.getX()));
         r.removeFromLeft (pad);
         view.setBounds (r);
         layoutStrip();
@@ -583,6 +618,71 @@ public:
         menu.addSeparator();
         menu.addItem (tr ("More effects..."), [this] { slotActions.showAddMenuFor (nextFreeRow()); });
         return menu;
+    }
+
+    // round 190ot: "Duck under..." — None, the other tracks of the song (a track this one feeds cannot be picked: the
+    // sidechain would make a loop), then the three styles (the Duck card's knob at Subtle / Pumping / Hard)
+    juce::PopupMenu duckMenu()
+    {
+        juce::PopupMenu menu;
+        const auto& song = engine.getSong();
+        const auto t = insert;
+        if (t <= 0 || t >= (int) song.mixer.size())
+            return menu;
+        const auto trigger = simpletracks::duckTrigger (song, t);
+        menu.addSectionHeader (tr ("Duck under"));
+        menu.addItem (tr ("None"), trigger > 0 || simpletracks::duckSlot (song, t) >= 0, trigger <= 0, [this] { pickDuck (-1); });
+        std::vector<int> seen;
+        for (int track = 0; track < (int) song.playlistTracks.size(); ++track)
+        {
+            if (! simpletracks::kindOf (song, track))
+                continue;
+            const auto from = simpletracks::insertOf (song, track);
+            if (from <= 0 || from == t || std::find (seen.begin(), seen.end(), from) != seen.end())
+                continue;
+            seen.push_back (from);
+            const auto possible = song.routes (from, t) || song.canRoute (from, t);
+            menu.addItem (trackTitle (song, track), possible, from == trigger, [this, from] { pickDuck (from); });
+        }
+        if (seen.empty())
+            menu.addItem (tr ("(no other track yet)"), false, false, nullptr);
+        menu.addSeparator();
+        menu.addSectionHeader (tr ("Style"));
+        const auto slot = simpletracks::duckSlot (song, t);
+        const auto amount = slot >= 0 ? song.mixer[(std::size_t) t].effects[(std::size_t) slot].goalAmount : -1.0f;
+        for (const auto style : { simpletracks::DuckStyle::subtle, simpletracks::DuckStyle::pumping, simpletracks::DuckStyle::hard })
+        {
+            const auto value = simpletracks::duckAmount (style);
+            menu.addItem (duckStyleText (style), slot >= 0, slot >= 0 && std::abs (amount - value) < 0.005f, [this, value] {
+                const auto at = insert;
+                engine.editSong ([at, value] (Song& s) { simpletracks::setDuckAmount (s, at, value); });
+            });
+        }
+        return menu;
+    }
+
+    void pickDuck (int from)
+    {
+        const auto t = insert;
+        if (t <= 0)
+            return;
+        engine.editSongStructural ([t, from] (Song& s) { simpletracks::setDuck (s, t, from); });
+    }
+
+    static juce::String duckStyleText (simpletracks::DuckStyle style)
+    {
+        using S = simpletracks::DuckStyle;
+        return style == S::subtle ? trc ("@duck style: Subtle") : style == S::pumping ? trc ("@duck style: Pumping") : trc ("@duck style: Hard");
+    }
+
+    // a mixer insert as the Simple layout names it: the track that plays through it, else the insert's own name
+    juce::String insertTitle (int at) const
+    {
+        const auto& song = engine.getSong();
+        for (int track = 0; track < (int) song.playlistTracks.size(); ++track)
+            if (simpletracks::kindOf (song, track) && simpletracks::insertOf (song, track) == at)
+                return trackTitle (song, track);
+        return at > 0 && at < (int) song.mixer.size() ? utf8 (song.mixer[(std::size_t) at].name) : juce::String();
     }
 
     // --- edits (each through the Mixer's own paths) -------------------------------------------------------------------
@@ -713,6 +813,10 @@ public:
     }
     void blendForCheck (float v) { blend.turnTo (v); }
     void reverbForCheck (float v) { reverb.turnTo (v); }
+    void echoForCheck (float v) { echo.turnTo (v); }                       // round 190ot
+    void duckForCheck (int from) { pickDuck (from); }
+    juce::PopupMenu duckMenuForCheck() { return duckMenu(); }
+    juce::String duckButtonTextForCheck() const { return duckButton.getButtonText(); }
     void bypassForCheck() { bypassButton.onClick(); }                     // round 190kn
     bool bypassLitForCheck() const noexcept { return bypassButton.bypassed; }
     const juce::Component* cardForSnapshot (int card) const
@@ -779,6 +883,8 @@ private:
             const auto effectName = quickpick::slotName (owner.engine, slot);
             title = goal != 0 ? goalText (goal) : effectName;
             sub = goal != 0 ? effectName : tr ("Mix");
+            if (goal == goals::duck) // round 190ot: the trigger it listens to
+                sub = slot.sidechain > 0 ? tr ("under {0}", { owner.insertTitle (slot.sidechain) }) : tr ("under no track yet");
             knob.resetValue = goal != 0 ? goals::defaultAmount (goal) : 1.0f;
             knob.setValue (goal != 0 ? slot.goalAmount : slot.mix);
             knob.setDimmed (! on);
@@ -948,12 +1054,12 @@ private:
     }
 
     EffectsPanel slotActions;
-    juce::Label presetCaption, blendCaption, reverbCaption, emptyHint;
-    juce::TextButton presetButton, saveButton;
+    juce::Label presetCaption, blendCaption, reverbCaption, echoCaption, duckCaption, emptyHint;
+    juce::TextButton presetButton, saveButton, duckButton;
     ChevronButton previousPreset { false }, nextPreset { true };
     ChainBypassButton bypassButton;
     AddCardButton addCard;
-    DockKnob blend, reverb;
+    DockKnob blend, reverb, echo;
     juce::Viewport view;
     Strip strip { *this };
     std::vector<std::unique_ptr<Card>> cards;
@@ -3695,6 +3801,10 @@ void SimpleDock::removeCardForCheck (int card) { effectsPage->remove (card); }
 void SimpleDock::addOneKnobForCheck (int goal) { effectsPage->addOneKnob (goal); }
 void SimpleDock::setBlendForCheck (float value) { effectsPage->blendForCheck (value); }
 void SimpleDock::setReverbForCheck (float value) { effectsPage->reverbForCheck (value); }
+void SimpleDock::setEchoForCheck (float value) { effectsPage->echoForCheck (value); }
+void SimpleDock::duckUnderForCheck (int triggerInsert) { effectsPage->duckForCheck (triggerInsert); }
+juce::PopupMenu SimpleDock::duckMenuForCheck() { return effectsPage->duckMenuForCheck(); }
+juce::String SimpleDock::duckButtonTextForCheck() const { return effectsPage->duckButtonTextForCheck(); }
 juce::Rectangle<int> SimpleDock::cardBoundsForSnapshot (int card) const
 {
     const auto* c = effectsPage->cardForSnapshot (card);
