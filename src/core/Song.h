@@ -1088,6 +1088,12 @@ struct ChannelDef
     // FL's channel icon (.flp 0x9B, REA round 168j): FL's icon index, 0 = none. Kept and saved; drawn by the icon UI.
     int icon = 0;
     int flWrapperFlags = -1; // an imported .flp channel's plugin record flags (0xD4 +16, 0x20 = Smart disable): back in the export
+    // FL's generator "Smart disable" (the plugin menu's CPU › Smart disable; REA round 190of: FLEngine FUN_00cf35a0), for a
+    // hosted instrument (round 190ok, owner decision D2): on = the plugin is not called while it has no events and its
+    // output has been under -96 dB for 4 s (core/GeneratorSmartDisable.h). FL's default for a new generator is off; an
+    // .flp import takes the channel's 0xD4 bit 0x20 (kept in step with flWrapperFlags); a project saved before round
+    // 190ok has it off (it plays as it did). Native engines keep their own lossless idle skip.
+    bool smartDisable = false;
     // FL's plugin menu › Scaling (round 190he, core/EditorScale.h): the size of the channel's settings window, a
     // percentage of FL's size; 0 = LYNX's default (125 %)
     int editorScale = 0;
@@ -1122,6 +1128,13 @@ struct ChannelDef
     bool hasKeyRegion() const noexcept { return keyLow > 0 || keyHigh < 127; }
     bool inKeyRegion (int key) const noexcept { return key >= keyLow && key <= keyHigh; }
     bool operator== (const ChannelDef&) const = default;
+    // round 190ok: switches FL's generator smart disable, keeping an imported channel's FL flags in step (the .flp export)
+    void setSmartDisable (bool on) noexcept
+    {
+        smartDisable = on;
+        if (flWrapperFlags >= 0)
+            flWrapperFlags = on ? (flWrapperFlags | 0x20) : (flWrapperFlags & ~0x20);
+    }
 };
 
 enum class EffectKind : std::uint8_t

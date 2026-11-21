@@ -1204,6 +1204,7 @@ bool ungroupChannel (Song& song, int channel)
     ch.pluginState = inner.pluginState;
     ch.flOrigin = inner.flOrigin;
     ch.flWrapperFlags = inner.flWrapperFlags;
+    ch.smartDisable = inner.smartDisable; // (round 190ok)
     song.forEachTarget ([&] (AutomationTarget& t) {
         if (t.kind != AutomationTargetKind::channelParam || t.index != channel)
             return;

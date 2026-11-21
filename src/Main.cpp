@@ -5946,6 +5946,7 @@ private:
         }
         offline.setRecording (true);
         offline.play();
+        const auto generatorSmartResult = lynx::generatorSmartDisableSelfTest(); // (round 190ok, D2)
         offline.getTransport().positionTicks.store (960.0);
         offline.sendLiveNote (2, 72, 0.9f, true, true);
         offline.getTransport().positionTicks.store (1920.0);
@@ -8230,6 +8231,7 @@ private:
                << "project=" << (projectOk ? "OK" : "ERROR " + error) << "\n"
                << "playlist_track_modes_roundtrip=" << (trackModes122Ok ? "OK" : "ERROR") << "\n"
                << "project_features=" << (richOk ? "OK" : "ERROR") << "\n"
+                        && generatorSmartResult.startsWith ("OK")
                << "hardware_outputs=" << (hwOutOk ? "OK" : "ERROR") << "\n"
                << "plugin_host_keys_option=" << (hostKeysOk ? "OK" : "ERROR") << "\n"
                << "plugin_levels_new_project=" << (pluginLevelsOk ? "OK" : "ERROR") << "\n"
@@ -8263,6 +8265,7 @@ private:
                << "midi=" << (midiOk ? "OK" : "ERROR") << "\n"
                << "package=" << (packageOk ? "OK" : "ERROR") << "\n"
                << "projectSave=" << (projectSaveOk ? "OK" : "ERROR") << "\n"
+               << "generator_smart_disable=" << generatorSmartResult << "\n"
                << "online_session=" << sessionResult << "\n"
                << "live_session=" << liveResult << "\n"
                << "wavpack=" << wavpack << "\n"

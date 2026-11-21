@@ -2091,6 +2091,8 @@ juce::var channelToVar (const ChannelDef& c)
         o->setProperty ("editorScale", c.editorScale);
         if (c.flWrapperFlags >= 0)
             o->setProperty ("flWrapperFlags", c.flWrapperFlags);
+        if (c.smartDisable) // (round 190ok: FL's generator smart disable; absent = off, as every project before it)
+            o->setProperty ("smartDisable", true);
     if (! c.flOrigin.empty()) // the FL generator it was imported from (round 171e)
         o->setProperty ("flOrigin", flOriginToVar (c.flOrigin));
     if (c.loopStarterPattern >= 0) // FL's Loop Starter (round 168b): [pattern, slot, category, locked]
@@ -2431,6 +2433,7 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
     if (const auto scale = (int) c.getProperty ("editorScale", 0); scale > 0) // (0 / missing = Host, LYNX's default size)
         def.editorScale = editorscale::storedFor (scale);
     def.flWrapperFlags = (int) c.getProperty ("flWrapperFlags", -1);
+    def.smartDisable = (bool) c.getProperty ("smartDisable", false); // (round 190ok)
     if (c.hasProperty ("flOrigin"))
         def.flOrigin = flOriginFromVar (c["flOrigin"]);
     if (const auto& from = c["receiveFrom"]; from.isArray() && from.size() >= 2)

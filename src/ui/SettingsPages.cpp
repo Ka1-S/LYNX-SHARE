@@ -913,7 +913,7 @@ public:
                                                                  &formatLabel, &formatBox, &takeNames, &latencyTitle, &latencyText, &pingOutLabel, &pingOutBox,
                                                                  &pingInLabel, &pingInBox, &measureButton, &pingNote, &useMeasured, &offsetLabel, &offsetSlider, &offsetNote,
                                                                  &mixerTitle, &metronomeTrackLabel, &metronomeTrackBox, &metronomeTrackNote, &playTruncated, &resetPlugins,
-                                                                 &autoClose, &safeOverloads, &cpuTitle, &threadGenerators, &threadMixer, &smartDisableAll, &renderAhead, &resamplingLabel, &resamplingBox, &resamplingNote })
+                                                                 &autoClose, &safeOverloads, &cpuTitle, &threadGenerators, &threadMixer, &smartDisableAll, &smartDisableNew, &renderAhead, &resamplingLabel, &resamplingBox, &resamplingNote })
             add (*c);
         setupRecordingControls();
         setupMixerControls();
@@ -1037,7 +1037,7 @@ private:
         offsetSlider.setBounds (r.row (offsetLabel, 200));
         offsetNote.setBounds (r.full (32).translated (0, -3));
         r.section (cpuTitle); // (FL's order: Input / output, CPU, Mixer)
-        for (auto* t : { &threadGenerators, &threadMixer, &smartDisableAll, &renderAhead })
+        for (auto* t : { &threadGenerators, &threadMixer, &smartDisableAll, &smartDisableNew, &renderAhead })
             t->setBounds (r.full (24));
         r.section (mixerTitle);
         resamplingBox.setBounds (r.row (resamplingLabel, 260)); // (FL: the Mixer panel's first row)
@@ -1114,6 +1114,11 @@ private:
         flag (threadMixer, tr ("Multithreaded mixer processing"), tr ("May increase CPU performance"), o.multithreadMixer);
         flag (smartDisableAll, tr ("Smart disable"),
               tr ("May increase CPU performance. Off: every effect is processed all the time, whatever its own Smart disable switch says"), o.smartDisable);
+        // LYNX extra (round 190ok, owner decision D2): FL's generator smart disable on for new instrument plugins
+        flag (smartDisableNew, tr ("Smart disable for new instrument plugins"),
+              tr ("New channels with an instrument plugin get Smart disable on: the plugin is not called while it gets no notes and its "
+                  "sound has been silent for 4 seconds. FL Studio starts a new generator with it off."),
+              o.smartDisableNewPlugins);
         // LYNX extra (round 190gq, core/RenderAhead.h; owner decision O22: on by default)
         flag (renderAhead, tr ("Render ahead (lower CPU at small buffers)"),
               tr ("Tracks nobody plays live are rendered a little ahead on another thread, so heavy projects hold small buffers. Inputs, the "
@@ -1545,7 +1550,7 @@ private:
     // FL's Settings › Audio options of round 190bx (core/FlSettings.h)
     juce::ToggleButton autoClose, safeOverloads;
     SectionTitle cpuTitle { tr ("CPU") };
-    juce::ToggleButton threadGenerators, threadMixer, smartDisableAll, renderAhead;
+    juce::ToggleButton threadGenerators, threadMixer, smartDisableAll, smartDisableNew, renderAhead;
     juce::Label resamplingLabel, resamplingNote;
     juce::ComboBox resamplingBox;
     juce::Label metronomeTrackLabel, metronomeTrackNote;

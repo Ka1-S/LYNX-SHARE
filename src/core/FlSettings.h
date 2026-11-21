@@ -8,12 +8,14 @@
 //   Audio › CPU      multithreadGenerators   "Multithreaded generator processing"
 //                    multithreadMixer        "Multithreaded mixer processing"
 //                    smartDisable            "Smart disable"
+//                    smartDisableNewPlugins  LYNX extra (round 190ok, off): new hosted-instrument channels get FL's
+//                                            generator "Smart disable" on (FL's default for a new generator: off)
 //   Audio › Output   autoCloseDevice         "Auto close": the audio device is free for other programs while LYNX is
 //                                            not the program in front
-//   General › Misc   restoreStateAfterSolo   "Restore previous state after solo"
-//                    autoNameChannels        "Auto name channels"
 //                    safeOverloads           "Safe overloads" (round 190ok, core/OverloadGuard.h): in a real overload
 //                                            with the UI starving, the audio gives up a slice of the CPU (FL: checked)
+//   General › Misc   restoreStateAfterSolo   "Restore previous state after solo"
+//                    autoNameChannels        "Auto name channels"
 //   General › Adv.   readSampleTempo         "Read sample tempo information"
 //   General › Undo   historyNewestFirst      "Show recent changes at the top"
 //                    undoKnobTweaks          "Undo knob tweaks" (round 190mv; AudioEngine::controlTweakedForUndo)
@@ -68,11 +70,12 @@ struct Options
     std::atomic<bool> multithreadGenerators { true };
     std::atomic<bool> multithreadMixer { true };
     std::atomic<bool> smartDisable { true };
+    std::atomic<bool> smartDisableNewPlugins { false }; // round 190ok (LYNX extra)
     std::atomic<bool> autoCloseDevice { false };
+    std::atomic<bool> safeOverloads { true }; // round 190ok (FL's SafeOverloadBox: Checked)
     std::atomic<bool> restoreStateAfterSolo { false };
     std::atomic<bool> autoNameChannels { true };
     std::atomic<bool> readSampleTempo { true };
-    std::atomic<bool> safeOverloads { true }; // round 190ok (FL's SafeOverloadBox: Checked)
     std::atomic<bool> historyNewestFirst { false };
     std::atomic<bool> historyOnUndo { false };
     std::atomic<bool> undoKnobTweaks { true }; // round 190mv (DF-134): FL's General › Undo history › "Undo knob tweaks"
@@ -95,12 +98,13 @@ inline void reset() noexcept
     o.multithreadGenerators = true;
     o.multithreadMixer = true;
     o.smartDisable = true;
+    o.smartDisableNewPlugins = false;
     o.autoCloseDevice = false;
+    o.safeOverloads = true;
     o.restoreStateAfterSolo = false;
     o.autoNameChannels = true;
     o.readSampleTempo = true;
     o.historyNewestFirst = false;
-    o.safeOverloads = true;
     o.historyOnUndo = false;
     o.undoKnobTweaks = true;
     o.projectSizeWarnMb = projectSizeDefault;
@@ -138,13 +142,14 @@ inline bool parse (std::string_view key, std::string_view value) noexcept
     if (key == "flMultithreadGenerators") return flag (o.multithreadGenerators, true);
     if (key == "flMultithreadMixer") return flag (o.multithreadMixer, true);
     if (key == "flSmartDisable") return flag (o.smartDisable, true);
+    if (key == "smartDisableNewPlugins") return flag (o.smartDisableNewPlugins, false);
     if (key == "flAutoCloseDevice") return flag (o.autoCloseDevice, false);
+    if (key == "flSafeOverloads") return flag (o.safeOverloads, true);
     if (key == "flRestoreStateAfterSolo") return flag (o.restoreStateAfterSolo, false);
     if (key == "flAutoNameChannels") return flag (o.autoNameChannels, true);
     if (key == "flReadSampleTempo") return flag (o.readSampleTempo, true);
     if (key == "flHistoryNewestFirst") return flag (o.historyNewestFirst, false);
     if (key == "flHistoryOnUndo") return flag (o.historyOnUndo, false);
-    if (key == "flSafeOverloads") return flag (o.safeOverloads, true);
     if (key == "flUndoKnobTweaks") return flag (o.undoKnobTweaks, true);
     if (key == "flClickHold") return flag (o.clickHold, false);
     if (key == "flBothButtonsSteps") return flag (o.bothButtonsSteps, false);
@@ -173,14 +178,15 @@ inline std::string serialise()
            + flag ("flMultithreadGenerators", o.multithreadGenerators.load())
            + flag ("flMultithreadMixer", o.multithreadMixer.load())
            + flag ("flSmartDisable", o.smartDisable.load())
+           + flag ("smartDisableNewPlugins", o.smartDisableNewPlugins.load())
            + flag ("flAutoCloseDevice", o.autoCloseDevice.load())
+           + flag ("flSafeOverloads", o.safeOverloads.load())
            + flag ("flRestoreStateAfterSolo", o.restoreStateAfterSolo.load())
            + flag ("flAutoNameChannels", o.autoNameChannels.load())
            + flag ("flReadSampleTempo", o.readSampleTempo.load())
            + flag ("flHistoryNewestFirst", o.historyNewestFirst.load())
            + flag ("flHistoryOnUndo", o.historyOnUndo.load())
            + flag ("flUndoKnobTweaks", o.undoKnobTweaks.load())
-           + flag ("flSafeOverloads", o.safeOverloads.load())
            + "\nflProjectSizeWarnMb=" + std::to_string (o.projectSizeWarnMb.load())
            + flag ("flClickHold", o.clickHold.load())
            + flag ("flBothButtonsSteps", o.bothButtonsSteps.load())

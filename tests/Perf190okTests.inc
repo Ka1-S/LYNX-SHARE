@@ -110,3 +110,58 @@ TEST (perf190ok_overload_guard_engages_only_when_audio_and_ui_both_starve)
     OverloadGuard::sleepFor (0.0);
     OverloadGuard::sleepFor (-1.0);
 }
+
+// ---- D2: FL's generator smart disable (core/GeneratorSmartDisable.h; the plugin side: --selftest "generator smart disable")
+#include "core/GeneratorSmartDisable.h"
+
+TEST (perf190ok_generator_smart_disable_sleeps_after_4_s_of_silence_and_wakes_on_events)
+{
+    using namespace lynx;
+    const auto hold = gensmart::holdSamples (48000.0);
+    CHECK (hold == 192000);
+    gensmart::State s;
+    // 3.9 s of silence: still awake; an audible block starts the count again
+    for (int i = 0; i < 3900 * 48 / 256; ++i)
+        s.rendered (256, false, true);
+    CHECK (! s.asleep (hold));
+    s.rendered (256, false, false);
+    CHECK (s.silentSamples == 0);
+    // an event (a note sent) also starts it again, even on a silent block
+    for (int i = 0; i < 100; ++i)
+        s.rendered (256, false, true);
+    s.rendered (256, true, true);
+    CHECK (s.silentSamples == 0);
+    // 4 s of continuous silence with nothing sent: asleep
+    for (int i = 0; i * 256 < hold; ++i)
+        s.rendered (256, false, true);
+    CHECK (s.asleep (hold));
+    s.wake();
+    CHECK (! s.asleep (hold));
+    // the silence test: -96 dB and under is silence, a NaN or anything louder is not
+    std::vector<float> a (256, 1.0e-5f), b (256, -1.5e-5f);
+    const float* both[2] { a.data(), b.data() };
+    CHECK (gensmart::silent (both, 2, 256));
+    b[100] = 2.0e-5f;
+    CHECK (! gensmart::silent (both, 2, 256));
+    b[100] = std::numeric_limits<float>::quiet_NaN();
+    CHECK (! gensmart::silent (both, 2, 256));
+    const float* none[1] { nullptr };
+    CHECK (gensmart::silent (none, 1, 256));
+}
+
+TEST (perf190ok_channel_smart_disable_keeps_the_fl_flags_in_step)
+{
+    using namespace lynx;
+    ChannelDef c;
+    CHECK (! c.smartDisable); // FL's default for a new generator, and every project before round 190ok
+    c.setSmartDisable (true);
+    CHECK (c.smartDisable && c.flWrapperFlags == -1); // (not imported: no FL flags to keep)
+    c.flWrapperFlags = 0x150;
+    c.setSmartDisable (true);
+    CHECK (c.flWrapperFlags == 0x170);
+    c.setSmartDisable (false);
+    CHECK (! c.smartDisable && c.flWrapperFlags == 0x150);
+    ChannelDef d = c;
+    d.smartDisable = true;
+    CHECK (! (c == d)); // (undo and the rack rebuild see it)
+}

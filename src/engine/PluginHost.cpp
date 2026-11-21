@@ -1,4 +1,6 @@
 #include "engine/PluginHost.h"
+#include "core/FlSettings.h"
+#include "platform/PrefaultMemory.h"
 #include "platform/Paths.h"
 
 #include <algorithm>
@@ -1198,12 +1200,15 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
             if (! crashed.load (std::memory_order_relaxed))
             {
                 rememberMidi (pending);
+                const auto hadEvents = ! pending.isEmpty(); // (round 190ok: generator smart disable)
                 if (const auto code = runBlock (BlockCall { plugin.get(), &view, &pending }, crashed, name); code != 0)
                 {
                     failed (code);
                     view.clear(); // silent from here on
                 }
                 else
+                {
+                    noteSmartBlock (count, hadEvents, view.getArrayOfReadPointers(), view.getNumChannels());
                     collectMidiOutput (pending);
             }
             pending.clear();
@@ -1243,6 +1248,7 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
         hardwarePositions = true;
         rememberMidi (midi);
         const TimedParameterQueue::Scope timedChanges (timed, chunkOffset + done, count); // (round 190jg)
+        const auto hadEvents = ! midi.isEmpty(); // (round 190ok: generator smart disable)
         if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }, crashed, name); code != 0)
         {
             midi.clear();
@@ -1250,6 +1256,7 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
             return;
         }
         collectMidiOutput (midi);
+        noteSmartBlock (count, hadEvents, view.getArrayOfReadPointers(), view.getNumChannels());
         midi.clear();
         recoveryMidi = false;
 
@@ -1309,6 +1316,9 @@ void PluginInstrument::configure (const ChannelDef& channel, double) noexcept
 {
     channelTrack.store (channel.mixerTrack, std::memory_order_relaxed);
     bool elsewhere = false;
+    // round 190ok (D2): FL's generator smart disable, with the wrapper's "Allow smart disable"
+    smartHold.store (gensmart::holdSamples (plugin->getSampleRate()), std::memory_order_relaxed);
+    smartOn.store (channel.smartDisable && channel.plugin.allowSmartDisable, std::memory_order_relaxed);
     for (std::size_t k = 0; k < outs.size(); ++k)
     {
         const auto route = channel.plugin.outputRoute ((int) k);
@@ -1332,6 +1342,25 @@ void PluginInstrument::configure (const ChannelDef& channel, double) noexcept
 }
 
 void PluginInstrument::beginChunk (int n) noexcept
+bool PluginInstrument::idle() const noexcept
+{
+    // (round 190ok, D2) asleep: 4 s of silent output with nothing sent to it; anything queued for it (a note, a MIDI
+    // message, a reset) wakes it, and so does switching smart disable off here or globally
+    return smartOn.load (std::memory_order_relaxed) && flsettings::options().smartDisable.load (std::memory_order_relaxed)
+           && smart.asleep (smartHold.load (std::memory_order_relaxed)) && midi.isEmpty() && pending.isEmpty()
+           && ! resetPending.load (std::memory_order_relaxed) && ! crashed.load (std::memory_order_relaxed);
+}
+
+void PluginInstrument::noteSmartBlock (int n, bool events, const float* const* channels, int numChannels) noexcept
+{
+    if (! smartOn.load (std::memory_order_relaxed))
+    {
+        smart.wake();
+        return;
+    }
+    smart.rendered (n, events, ! events && gensmart::silent (channels, numChannels, n));
+}
+
 {
     auxCursor = 0;
     if (! anyAux.load (std::memory_order_acquire))
@@ -1961,6 +1990,118 @@ juce::String pluginStateContentionSelfTest()
 }
 
 void PluginEffect::setConnections (const SlotConnections& c)
+// Round 190ok (owner decision D2): FL's generator smart disable through PluginInstrument, with an in-process probe synth
+// (a held note plays a constant level; it counts its blocks). The rack skips a channel while idle() says so (and no note
+// comes): here the same loop.
+juce::String generatorSmartDisableSelfTest()
+{
+    struct Synth final : juce::AudioPluginInstance
+    {
+        Synth() : AudioPluginInstance (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)) {}
+        const juce::String getName() const override { return "Smart disable probe"; }
+        void fillInPluginDescription (juce::PluginDescription& d) const override { d.name = getName(); d.isInstrument = true; }
+        void prepareToPlay (double, int) override {}
+        void releaseResources() override {}
+        void processBlock (juce::AudioBuffer<float>& audio, juce::MidiBuffer& messages) override
+        {
+            ++blocks;
+            for (const auto event : messages)
+                if (event.numBytes >= 3 && (event.data[0] & 0xf0) == 0x90 && event.data[2] != 0)
+                    held = true;
+                else if (event.numBytes >= 3 && ((event.data[0] & 0xf0) == 0x80 || (event.data[0] & 0xf0) == 0x90))
+                    held = false;
+            for (int ch = 0; ch < audio.getNumChannels(); ++ch)
+                std::fill_n (audio.getWritePointer (ch), audio.getNumSamples(), held ? 0.25f : 0.0f);
+        }
+        double getTailLengthSeconds() const override { return 0.0; }
+        bool acceptsMidi() const override { return true; }
+        bool producesMidi() const override { return false; }
+        bool hasEditor() const override { return false; }
+        juce::AudioProcessorEditor* createEditor() override { return nullptr; }
+        int getNumPrograms() override { return 1; }
+        int getCurrentProgram() override { return 0; }
+        void setCurrentProgram (int) override {}
+        const juce::String getProgramName (int) override { return {}; }
+        void changeProgramName (int, const juce::String&) override {}
+        void getStateInformation (juce::MemoryBlock&) override {}
+        void setStateInformation (const void*, int) override {}
+        std::atomic<int> blocks { 0 };
+        bool held = false;
+    };
+    try
+    {
+        constexpr int block = 256;
+        constexpr double rate = 48000.0;
+        auto made = std::make_unique<Synth>();
+        auto* probe = made.get();
+        preparePlugin (*made, rate, block);
+        PluginInstrument inst (std::move (made), block);
+        ChannelDef channel;
+        channel.instrument = InstrumentKind::plugin;
+        auto& global = flsettings::options().smartDisable;
+        const auto globalBefore = global.load();
+        const juce::ScopeGuard restore { [&global, globalBefore] { global.store (globalBefore); } };
+        global.store (true);
+        std::vector<float> l (block), r (block);
+        // the rack's loop: a channel that is idle and gets no note is not called
+        const auto run = [&] (double seconds) {
+            for (int i = 0; i < (int) (seconds * rate / block); ++i)
+                if (! inst.idle())
+                {
+                    std::fill (l.begin(), l.end(), 0.0f);
+                    std::fill (r.begin(), r.end(), 0.0f);
+                    inst.render (l.data(), r.data(), block, 1.0f, 1.0f);
+                }
+        };
+        // off (FL's default, every old project): called all the time
+        inst.configure (channel, 120.0);
+        run (6.0);
+        const auto offBlocks = probe->blocks.load();
+        if (inst.idle() || offBlocks < (int) (5.9 * rate / block))
+            return "ERROR off: the plugin was not called all the time";
+        // on: asleep after 4 s of silence, not called any more
+        channel.setSmartDisable (true);
+        inst.configure (channel, 120.0);
+        probe->blocks = 0;
+        run (3.9);
+        if (inst.idle())
+            return "ERROR asleep before 4 s";
+        run (0.2);
+        if (! inst.idle())
+            return "ERROR not asleep after 4 s of silence";
+        const auto asleepAt = probe->blocks.load();
+        run (5.0);
+        if (probe->blocks.load() != asleepAt)
+            return "ERROR called while asleep";
+        // a note wakes it at once, and it plays; a held note keeps it awake (its output is audible)
+        inst.noteOn (60, 0.8f);
+        if (inst.idle())
+            return "ERROR a note did not wake it";
+        run (6.0);
+        if (inst.idle() || probe->blocks.load() < asleepAt + (int) (5.9 * rate / block) || l[0] < 0.2f)
+            return "ERROR a held note did not keep it awake";
+        // released: asleep again 4 s later
+        inst.noteOff (60);
+        run (4.2);
+        if (! inst.idle())
+            return "ERROR not asleep again after the release";
+        // the global switch (Settings › Audio › CPU › Smart disable) and the wrapper's "Allow smart disable" wake it
+        global.store (false);
+        if (inst.idle())
+            return "ERROR the global switch did not wake it";
+        global.store (true);
+        channel.plugin.allowSmartDisable = false;
+        inst.configure (channel, 120.0);
+        if (inst.idle())
+            return "ERROR Allow smart disable off did not wake it";
+        return "OK (" + juce::String (offBlocks) + " blocks off, asleep after " + juce::String (asleepAt) + ")";
+    }
+    catch (const std::exception& e)
+    {
+        return "ERROR " + juce::String (e.what());
+    }
+}
+
 {
     for (int o = 0; o < maxPluginConnections; ++o)
         outputMode[(std::size_t) o].store (c.routed ? c.outputs[(std::size_t) o] : -1, std::memory_order_relaxed);

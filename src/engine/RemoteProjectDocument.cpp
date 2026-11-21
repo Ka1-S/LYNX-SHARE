@@ -89,7 +89,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         add (S::info, "url showOnOpen created workSeconds", S::readOnly);
         add (S::channel, "name instrument volume pan muted ghostHidden soloLock zipped sample controllerState pluginState modelParams zones "
              "mixer maxPolyphony colour group swingMix arp cut keyRegion receiveFrom icon editorScale flWrapperFlags loopStarter uid "
-             "cutOthersOnly cutAtNoteEnd simplePad engineRev"); // (engineRev: natives190kj, rollup step 6)
+             "cutOthersOnly cutAtNoteEnd simplePad engineRev smartDisable"); // (engineRev: natives190kj, rollup step 6; smartDisable: round 190ok)
         add (S::channel, "freeze trackFreeze", S::readOnly); // (rendered stems: files LYNX wrote, and the live channel)
         add (S::channel, "plugin", S::plugin);
         add (S::channel, "flOrigin", S::origin);

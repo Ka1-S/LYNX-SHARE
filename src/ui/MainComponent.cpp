@@ -9675,11 +9675,15 @@ void MainComponent::changeDeclickOfSelectedClips (int mode)
 void MainComponent::switchSmartDisableForAll()
 {
     // FL's Tools › Macros › "Switch smart disable for all plugins" (FLEngine FUN_0124d430, REA round 139): every
-    // effect slot of every insert is set to smart disable
+    // effect slot of every insert is set to smart disable, and so is every plugin channel (round 190ok, D2: LYNX's hosted
+    // instruments now sleep through silence as FL's generators do)
     engine.editSong ([] (Song& s) {
         for (auto& track : s.mixer)
             for (auto& slot : track.effects)
                 slot.smartDisable = true;
+        for (auto& c : s.channels)
+            if (c.instrument == InstrumentKind::plugin)
+                c.setSmartDisable (true);
     });
 }
 
