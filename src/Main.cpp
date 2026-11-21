@@ -8183,6 +8183,7 @@ private:
             p.notes.push_back (note (bassIndex, lynx::ppq, 41, 0.78f, -0.5f, true));        // moves the pan
             p.notes.push_back (note (leadIndex, 0, 60, 0.78f, 0.0f, false));
             p.notes.push_back (note (leadIndex, lynx::ppq / 2, 64, 0.78f, 0.0f, true));     // pitch only: sounds the same in 0.1.30
+            p.sortNotes(); // (the order a project reads back in)
             lynx::uids::normalize (song);
             const auto keysOf = [] (const juce::var& v) {
                 std::set<juce::String> keys;
