@@ -4,7 +4,7 @@
 
 <h1 align="center">LYNX SHARE</h1>
 
-<p align="center"><strong>A lightweight DAW with three workflows in one program: FL Studio-style patterns, Ableton Live-style clip launching and a simple one-window mode.</strong><br>
+<p align="center"><strong>A lightweight DAW with three layouts in one program: FL Studio-style patterns, Ableton Live-style clip launching and a simple one-window mode.</strong><br>
 Free and open source, for Windows, macOS and Linux. Opens your FL Studio, Ableton Live and FL Studio Mobile projects.</p>
 
 <p align="center">
@@ -45,16 +45,16 @@ Free and open source, for Windows, macOS and Linux. Opens your FL Studio, Ableto
 
 ## What is LYNX SHARE?
 
-LYNX SHARE is a free, open-source digital audio workstation with three workflows in one program. You can switch
+LYNX SHARE is a free, open-source digital audio workstation with three layouts in one program. You can switch
 between them at any time in *View › Layout style*; the project stays the same, only the windows change.
 
-1. **The FL Studio workflow** (the default, *Pattern workflow* in the menu): you build patterns in the **Channel Rack**
+1. **The FL Studio workflow** (the default, *Pattern layout* in the menu): you build patterns in the **Channel Rack**
    and **Piano Roll**, arrange them in the **Playlist** and mix in the **Mixer**, with the windows and shortcuts where
    you expect them.
-2. **The Clip-launch workflow**, in the style of Ableton Live: a grid of clips and scenes to launch, a Session mixer
+2. **The Clip-launch layout**, in the style of Ableton Live: a grid of clips and scenes to launch, a Session mixer
    under it, and a Clip View and Device View for the selected clip and track. Live sets open with their Session clips
    in the grid.
-3. **The Simple workflow**, which mixes BandLab's approachable one-window style with the way FL Studio Mobile works:
+3. **The Simple layout**, which mixes BandLab's approachable one-window style with the way FL Studio Mobile works:
    tracks and a timeline in one window, loops and pads, and quick recording. FL Studio Mobile projects (`.flm`) open
    in it.
 
@@ -76,7 +76,7 @@ AGPL-3.0, and still an **alpha**.
 |---|---|
 | 🎹 **The FL Studio workflow** | Channel Rack, Piano Roll, Playlist with several arrangements, and a Mixer with inserts, sends and sidechain. The default layout, never watered down. |
 | 📂 **Your projects come with you** | Opens `.flp`, `.als` (Live 11 and 12), `.flm`, `.dawproject`, GarageBand `.band`, BandLab `.blx` and tracker modules (`.mod`, `.xm`, `.s3m`, `.it`); exports `.flp`, `.als` and `.dawproject`. FL Studio's native plugins play on LYNX SHARE's own engines, so a project that uses them plays without FL Studio installed. |
-| 🎛️ **Three workflows, one program** | The FL Studio workflow by default, a Clip-launch workflow in the style of Ableton Live, and a Simple workflow that mixes BandLab's one-window style with FL Studio Mobile's. Switch any time in *View › Layout style*; the project stays the same. |
+| 🎛️ **Three layouts, one program** | The FL Studio workflow by default, a Clip-launch layout in the style of Ableton Live, and a Simple layout that mixes BandLab's one-window style with FL Studio Mobile's. Switch any time in *View › Layout style*; the project stays the same. |
 | 🤝 **Make music together** | Send a project to a friend as one file, or work on it live with up to three other people, end-to-end encrypted. |
 | ⚡ **Lightweight** | A lock-free engine that spreads channels and mixer tracks across CPU cores, skips idle channels, renders ahead what you are not playing live and streams long audio from disk. Measured on one Windows PC, LYNX SHARE 0.1.28 opened FL's *Thief* demo in 5.2 s with 345 MB of memory (FL Studio 2026: 12.2 s, 874 MB), its window was ready in about 1 s (FL Studio: 1.7 s), and a playing song is drawn at 143 frames a second (FL Studio: 143.8) ([0.1.28 notes](https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.28-alpha)). |
 | 🆓 **Free, open source, clean-room** | No price, no account, no subscription. Every behaviour was studied from the outside and written from scratch: no Image-Line or Ableton code is in it. |
@@ -120,13 +120,13 @@ any insert to any hardware output.
 </tr>
 </table>
 
-### The Clip-launch workflow, in the style of Ableton Live (optional)
+### The Clip-launch layout, in the style of Ableton Live (optional)
 
 <p align="center">
-  <img src="docs/img/clip-launch.png" alt="The Clip-launch workflow: a clip grid with scenes next to the Playlist" width="100%">
+  <img src="docs/img/clip-launch.png" alt="The Clip-launch layout: a clip grid with scenes next to the Playlist" width="100%">
 </p>
 
-*View › Layout style › Clip-launch workflow* adds an Ableton Live-style clip grid next to the Playlist: tracks are
+*View › Layout style › Clip-launch layout* adds an Ableton Live-style clip grid next to the Playlist: tracks are
 columns, scenes are rows. Clips have launch modes, quantisation and follow actions, and a selected clip opens in a Clip
 View. Under the grid there is a Session mixer; there are also instrument, audio-effect and MIDI-effect racks, a Drum
 Rack, Draw Mode and MIDI / Key Map Modes, Live's Freeze Track and Bounce, clip envelopes, and **Ableton Link** to play
@@ -134,17 +134,17 @@ in sync with Live and other Link apps; return tracks, Sends and a crossfader as 
 their Session clips and scenes straight into the grid. The
 FL Studio workflow stays the default, and nothing is taken away from it.
 
-### The Simple workflow, in the style of BandLab and FL Studio Mobile (optional)
+### The Simple layout, in the style of BandLab and FL Studio Mobile (optional)
 
-*View › Layout style › Simple workflow* mixes BandLab's approachable one-window style with the way FL Studio Mobile
+*View › Layout style › Simple layout* mixes BandLab's approachable one-window style with the way FL Studio Mobile
 works: the tracks and the timeline in one window, loops and pads, and quick recording. FL Studio Mobile projects
 (`.flm`) open in it too. Add a voice, an instrument, a 16-pad sampler or a starter beat in one click, bring in a folder of
 stems and MIDI from another app, program a beat in the Drum Machine, tune up with the tuner, shape the sound with eight one-knob effects, play chords on a Chord pad and save the song as a file from the Finish dock. *Make my first song*
-walks you through it step by step. The setup wizard offers all three workflows at the first start.
+walks you through it step by step. The setup wizard offers all three layouts at the first start.
 
 <p align="center">
-  <img src="docs/img/drum-machine.png" alt="The Simple workflow with the Drum Machine open under a drum track" width="100%">
-  <br><sub>The Simple workflow: a drum track and its BandLab-style Drum Machine.</sub>
+  <img src="docs/img/drum-machine.png" alt="The Simple layout with the Drum Machine open under a drum track" width="100%">
+  <br><sub>The Simple layout: a drum track and its BandLab-style Drum Machine.</sub>
 </p>
 
 ### Instruments and effects
@@ -242,8 +242,8 @@ approximated or left out. The original file is never changed: saving writes a `.
 | **Ableton Live** `.als` (Live 11 and 12) | ✅ | ✅ | Tracks, clips, warp markers, groups, returns, automation, racks and many of Live's devices. Session clips land in the clip grid. |
 | **DAWproject** `.dawproject` (Bitwig, Studio One, Cubase and other apps) | ✅ | ✅ | Tracks, folders, clips, notes, audio with its warp markers, automation, tempo and markers, the mixer with sends, and VST3 / VST2 / CLAP plugins with their state. The clip grid, other arrangements and some per-note details stay behind (listed in the report). |
 | **FL Studio Mobile** `.flm` | ✅ partial | — | Arrangement, samples, drum kits, several instruments and effects, automation and chord sets. |
-| **GarageBand** `.band` (GarageBand 10, GarageBand for iOS) | ✅ partial | — | Tracks, MIDI and audio regions, tempo, key, levels, pan and mute, as Simple-workflow tracks. |
-| **BandLab** `.blx` (BandLab project downloaded by Cakewalk / Sonar) | ✅ partial | — | Tracks, MIDI and audio regions with their loops, tempo, key, levels, pan, mute, volume and pan automation and the common effects, as Simple-workflow tracks. |
+| **GarageBand** `.band` (GarageBand 10, GarageBand for iOS) | ✅ partial | — | Tracks, MIDI and audio regions, tempo, key, levels, pan and mute, as Simple-layout tracks. |
+| **BandLab** `.blx` (BandLab project downloaded by Cakewalk / Sonar) | ✅ partial | — | Tracks, MIDI and audio regions with their loops, tempo, key, levels, pan, mute, volume and pan automation and the common effects, as Simple-layout tracks. |
 | **Tracker modules** `.mod` `.xm` `.s3m` `.it` (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker) | ✅ partial | — | Instruments as Sampler channels with their samples, patterns, the order list as the Playlist, speed and tempo, note volume, pan, delay and cut. Tick effects (arpeggio, vibrato, slides...) and envelopes are listed in the report; the built-in Tracker (View › Tracker) edits the notes the tracker way. |
 | **MIDI** `.mid` | ✅ | ✅ | Notes, into or out of the Piano Roll or the whole song. |
 | **LYNX SHARE** `.lynx` | ✅ | ✅ | The native format (JSON), with autosave. *File › Save a copy for an older LYNX...* writes a copy that 0.1.27 or 0.1.28 can open. |
@@ -293,7 +293,7 @@ report. More in the [format notes](docs/analise/FLM_FORMAT.md).
 <details>
 <summary><strong>GarageBand (<code>.band</code>): import only, partial</strong></summary>
 
-Projects saved by GarageBand 10 for Mac or GarageBand for iOS open as Simple-workflow tracks: tempo, time signature,
+Projects saved by GarageBand 10 for Mac or GarageBand for iOS open as Simple-layout tracks: tempo, time signature,
 key, song sections (as markers), each track's level, pan and mute, MIDI regions with their notes, and audio regions
 from the project's Media folder (with their trim). Open the `.band` package itself, the `projectData` file inside it,
 or a zip of it. GarageBand's instruments and effects are not stored in a readable form: instrument tracks play
@@ -301,7 +301,7 @@ LYNX SHARE's built-in synth (a preset chosen by the patch name) and drum kits it
 instruments you made in GarageBand for iOS: their recordings are inside the project and play on a Sampler track. Smart Drums, Drummer
 and pattern regions, take folders, tempo changes and Apple Loops that are not inside the project are listed in the
 import report. Projects from GarageBand 6–11 (2013 and older) are not readable: save them again in GarageBand 10, or
-export the tracks as audio (or MIDI) and bring the folder in with the Simple workflow's *Folder...* import.
+export the tracks as audio (or MIDI) and bring the folder in with the Simple layout's *Folder...* import.
 
 </details>
 
@@ -309,12 +309,12 @@ export the tracks as audio (or MIDI) and bring the folder in with the Simple wor
 <summary><strong>BandLab (<code>.blx</code>): import only, partial</strong></summary>
 
 A BandLab project downloaded by Cakewalk or Sonar (*Documents\BandLab\Downloads\<project>*, the `.blx` with its audio
-and MIDI files beside it) opens as Simple-workflow tracks: tempo, time signature, key, each track's volume, pan, mute,
+and MIDI files beside it) opens as Simple-layout tracks: tempo, time signature, key, each track's volume, pan, mute,
 volume and pan automation (as automation lanes) and its send to BandLab's shared reverb, MIDI regions with their notes
 and audio regions with their offset, gain, fades, pitch and speed; looped regions repeat. BandLab's compressor, 3-band
 and graphic EQs, reverbs, delays, chorus, distortions and limiters come over on LYNX SHARE's effects; other pedals,
 the Mastering preset, BandLab's instrument sounds and sampler kits are listed in the import report (instrument tracks
-play LYNX SHARE's built-in synth and drums). Open the `.blx`, or pick its folder with the Simple workflow's *Folder...*
+play LYNX SHARE's built-in synth and drums). Open the `.blx`, or pick its folder with the Simple layout's *Folder...*
 import. Without Cakewalk, BandLab's *Download › Tracks* stems and MIDI come in with the same *Folder...* import. The
 reader follows BandLab's project data as BandLab's own apps write it and was tested on made-up projects only: if a `.blx`
 of yours doesn't open as it should, please open an issue.
@@ -427,7 +427,7 @@ place with [Gear Lever](https://github.com/mijorus/gearlever) or AppImageUpdate.
 ## Getting started
 
 1. **Install** LYNX SHARE (above) and open it.
-2. **The setup wizard** picks the language, tests your audio device, lets you choose one of the three workflows and
+2. **The setup wizard** picks the language, tests your audio device, lets you choose one of the three layouts and
    scans your plugin folders in the background: the standard VST3 and CLAP folders plus the ones FL Studio uses on the
    same computer. You can skip it and reopen it later from *Options › Setup wizard*.
 3. **Open a project** with *File › Open*: one of yours (`.flp`, `.als`, `.flm`, MIDI), or the demo project

@@ -1,5 +1,5 @@
 ---
-source: ab2c2f14eb
+source: 69754c6d42
 ---
 ![设置窗口的常规页面，顶部是各个页面标签](/assets/img/wiki/settings-general.webp)
 

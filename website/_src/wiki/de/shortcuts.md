@@ -1,5 +1,5 @@
 ---
-source: 98cfcfdbfe
+source: 3043ff188d
 ---
 ![Das Fenster Tastenkürzel verwalten: eine durchsuchbare Liste von Aktionen mit ihren Tasten](/assets/img/wiki/shortcuts.webp)
 

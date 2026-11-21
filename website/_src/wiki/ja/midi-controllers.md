@@ -1,5 +1,5 @@
 ---
-source: d2bebc77b1
+source: cbd205f138
 ---
 ![設定のMIDIページ。入力デバイス、マスター同期付きの出力デバイス、外部同期](/assets/img/wiki/settings-midi.webp)
 

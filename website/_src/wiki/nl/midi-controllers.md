@@ -1,5 +1,5 @@
 ---
-source: d2bebc77b1
+source: cbd205f138
 ---
 ![De MIDI-pagina van de instellingen: ingangsapparaten, uitgangsapparaten met master sync, en externe sync](/assets/img/wiki/settings-midi.webp)
 

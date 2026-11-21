@@ -1,5 +1,5 @@
 ---
-source: 0101adbb66
+source: f1d1d236dc
 ---
 LYNX SHARE ist eine kostenlose Open-Source-DAW für Windows, macOS und Linux mit drei Arbeitsabläufen in einem Programm. Der Standard ist der FL-Studio-Arbeitsablauf: Du programmierst Patterns im Channel Rack und im Piano Roll, arrangierst sie in der Playlist und mischst sie im Mixer. Der Clip-Start-Arbeitsablauf startet Clips und Szenen aus einem Raster, im Stil von Ableton Live, und der Einfache Arbeitsablauf verbindet den zugänglichen Ein-Fenster-Stil von BandLab mit der Arbeitsweise von FL Studio Mobile. `Ansicht › Layout-Stil` wechselt jederzeit zwischen ihnen. Sie öffnet FL-Studio-Projekte (`.flp`), Ableton-Live-Sets (`.als`) und FL-Studio-Mobile-Projekte (`.flm`) und speichert im eigenen Format `.lynx`.
 

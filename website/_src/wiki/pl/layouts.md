@@ -1,5 +1,5 @@
 ---
-source: 4ac6a04fd7
+source: 9974ffb64e
 ---
 ![Układ z uruchamianiem klipów: siatka klipów i scen po lewej, wybór pluginu i Playlist po prawej](/assets/img/cliplaunch.webp)
 

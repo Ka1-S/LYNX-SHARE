@@ -1,5 +1,5 @@
 ---
-source: 094cbefd18
+source: 896ead3e2d
 ---
 ![Das Aufnahmefenster fragt, was aufgenommen werden soll: Audio, Noten und Automation, alles, oder Audio in den Audio-Editor](/assets/img/wiki/record-dialog.webp)
 

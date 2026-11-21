@@ -7,7 +7,7 @@ LYNX SHARE has three layouts. Coming from Logic, Cubase, Reaper, Pro Tools or St
 
 ## Your first steps
 
-1. **Pick the layout.** The first time LYNX SHARE starts, a welcome card asks where you are coming from (0.1.31). Click `Logic, Cubase, Reaper, Pro Tools or Studio One`: the Simple layout opens on its New track card, and the Mixer comes up with your first track. In 0.1.30, choose `View › Layout style › Simple workflow`, and open the Mixer with `F9`.
+1. **Pick the layout.** The first time LYNX SHARE starts, a welcome card asks where you are coming from (0.1.31). Click `Logic, Cubase, Reaper, Pro Tools or Studio One`: the Simple layout opens on its New track card, and the Mixer comes up with your first track. In 0.1.30, choose `View › Layout style › Simple layout`, and open the Mixer with `F9`.
 2. **Add a track.** `+ Add track` offers `Voice / audio`, `Instrument`, `Drums`, `Sampler`, `Guitar / bass`, `Import` and `Loops`. Play an instrument track with the computer keys, the on-screen keyboard or a MIDI keyboard.
 3. **Record.** Pick your audio device in `Options › Audio settings...`, then see [Record your voice](/learn/record-voice/).
 

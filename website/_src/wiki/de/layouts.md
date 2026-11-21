@@ -1,5 +1,5 @@
 ---
-source: 4ac6a04fd7
+source: 9974ffb64e
 ---
 ![Der Clip-Start-Arbeitsablauf: links ein Raster aus Clips und Szenen, rechts die Auswahl und die Playlist](/assets/img/cliplaunch.webp)
 

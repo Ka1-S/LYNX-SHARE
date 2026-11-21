@@ -199,6 +199,7 @@
 #include "core/Templates.h"
 #include "flp/Flp.h"
 #include "ui/I18nData.h"
+#include "ui/I18nEnglish.h"
 #include "ui/I18nLocale.h"
 #include "core/CrashReport.h"
 #include "core/RenderAhead.h"
@@ -6914,6 +6915,55 @@ TEST (translations_embedded_table_is_up_to_date)
                 std::printf ("  %s.txt changed since the last python3 tools/make_i18n.py\n", id.c_str());
         }
     CHECK (files == (int) std::size (lynx::i18n::data::tables));
+}
+
+TEST (translations_english_display_table)
+{
+    // rollup 0.1.31 step 3 (round 190ny): English shows the three styles of View › Layout style as layouts through its
+    // display table (resources/i18n/en/display.txt, embedded as ui/I18nEnglish.h); the tr() keys stay, so every key of
+    // the table is a key of the translation tables, keeps its placeholders, and the embedded copy is up to date
+    using namespace i18ntest;
+    const auto text = readFile ("resources/i18n/en/display.txt");
+    CHECK (text == std::string (lynx::i18n::data::englishDisplay));
+    if (text != std::string (lynx::i18n::data::englishDisplay))
+        std::printf ("  resources/i18n/en/display.txt changed since the last python3 tools/make_i18n.py\n");
+    std::vector<std::string> duplicates, unused;
+    const auto table = parseTable (text, duplicates);
+    const auto reference = parseTable (readFile ("resources/i18n/pt-BR.txt"), unused);
+    CHECK (duplicates.empty());
+    CHECK (table.size() >= 15);
+    const auto placeholders = [] (const std::string& s) {
+        std::multiset<std::string> out;
+        for (auto at = s.find ('{'); at != std::string::npos; at = s.find ('{', at + 1))
+            if (const auto end = s.find ('}', at); end != std::string::npos)
+                out.insert (s.substr (at, end - at + 1));
+        return out;
+    };
+    int notKeys = 0, workflow = 0;
+    for (const auto& [key, value] : table)
+    {
+        if (reference.count (key) == 0)
+        {
+            ++notKeys;
+            std::printf ("  English display key \"%s\" is not a key of the translation tables\n", key.c_str());
+        }
+        CHECK (placeholders (key) == placeholders (value));
+        workflow += value.find ("orkflow") != std::string::npos ? 1 : 0;
+    }
+    CHECK (notKeys == 0);
+    CHECK (workflow == 0);
+    CHECK (table.count ("Pattern workflow (default)") == 1 && table.at ("Pattern workflow (default)") == "Pattern layout (default)");
+    CHECK (table.count ("Clip-launch workflow") == 1 && table.at ("Clip-launch workflow") == "Clip-launch layout");
+    CHECK (table.count ("Simple workflow") == 1 && table.at ("Simple workflow") == "Simple layout");
+    // every key with "workflow" that English shows is in it
+    int missing = 0;
+    for (const auto& [key, value] : reference)
+        if (key.find ("orkflow") != std::string::npos && table.count (key) == 0)
+        {
+            ++missing;
+            std::printf ("  \"%s\" still shows \"workflow\" in English\n", key.c_str());
+        }
+    CHECK (missing == 0);
 }
 
 TEST (translations_no_value_is_a_python_dict)

@@ -1,5 +1,5 @@
 ---
-source: 2d8c9a0f61
+source: d41b1225ef
 ---
 `파일 › 열기...` (`Ctrl+O`) 메뉴는 LYNX SHARE 자체 `.lynx` 프로젝트와 `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx`, `.mid` 파일을 엽니다. 다른 프로그램의 프로젝트는 가져오기로 처리됩니다. 저장되지 않은 새 LYNX SHARE 프로젝트가 만들어지고, 원본 파일에는 절대 쓰지 않습니다.
 

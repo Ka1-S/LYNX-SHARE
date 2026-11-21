@@ -1,5 +1,5 @@
 ---
-source: 731a47d8e0
+source: e3c62e25a8
 ---
 ![Basit yerleşim: zaman çizelgesinde izler, bir başlangıç beat'i ve Drum Machine](/assets/img/learn/simple-beat-2.webp)
 

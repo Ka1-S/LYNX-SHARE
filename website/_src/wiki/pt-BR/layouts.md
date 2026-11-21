@@ -1,5 +1,5 @@
 ---
-source: 4ac6a04fd7
+source: 9974ffb64e
 ---
 ![O layout de lançamento de clipes: uma grade de clipes e cenas à esquerda, o Picker e a Playlist à direita](/assets/img/cliplaunch.webp)
 

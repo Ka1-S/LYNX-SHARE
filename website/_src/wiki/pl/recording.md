@@ -1,5 +1,5 @@
 ---
-source: 094cbefd18
+source: 896ead3e2d
 ---
 ![Okno Nagrywanie pyta, co nagrywać: audio, nuty i automatykę, wszystko albo audio do edytora audio](/assets/img/wiki/record-dialog.webp)
 

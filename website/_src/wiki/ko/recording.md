@@ -1,5 +1,5 @@
 ---
-source: 094cbefd18
+source: 896ead3e2d
 ---
 ![녹음 창이 무엇을 녹음할지 묻는 화면: 오디오, 노트와 오토메이션, 전체, 오디오 에디터로 오디오](/assets/img/wiki/record-dialog.webp)
 

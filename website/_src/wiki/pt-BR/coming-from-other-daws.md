@@ -1,5 +1,5 @@
 ---
-source: 4f845ea565
+source: 20cf7fed48
 ---
 O LYNX SHARE tem três layouts. Se você vem do Logic, Cubase, Reaper, Pro Tools ou Studio One, comece pelo **Layout Simple com o Mixer à mão**: uma faixa por instrumento ou voz numa linha do tempo, como você já conhece. O Layout Pattern, o jeito de trabalhar do FL Studio, está lá para quando você quiser patterns.
 

@@ -1,5 +1,5 @@
 ---
-source: 49950b37a3
+source: 222ec28779
 ---
 LYNX SHARE projeleri `.lynx` dosyası olarak kaydeder. Ayrıca başka programların projelerini açar, yaygın ses dosyalarını yükler ve ses, MIDI ve diğer programlar için projeleri dışa aktarır. Tablo, 0.1.30 alpha sürümünün bütün formatlarını listeler.
 

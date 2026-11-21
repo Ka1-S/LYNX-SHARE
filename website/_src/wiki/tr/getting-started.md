@@ -1,5 +1,5 @@
 ---
-source: 0101adbb66
+source: f1d1d236dc
 ---
 LYNX SHARE; Windows, macOS ve Linux için tek programda üç iş akışı sunan, ücretsiz ve açık kaynaklı bir DAW'dır. Varsayılan, FL Studio iş akışıdır: pattern'leri Channel Rack ve Piano Roll'da programlar, Playlist'te aranje eder ve Mixer'de mixlersiniz. Klip başlatma iş akışı, Ableton Live tarzında klipleri ve sahneleri bir gridden başlatır; Basit iş akışı ise BandLab'in kolay tek pencereli tarzını FL Studio Mobile'ın çalışma biçimiyle birleştirir. `Görünüm › Yerleşim stili` aralarında istediğiniz zaman geçiş yapar. FL Studio projelerini (`.flp`), Ableton Live set'lerini (`.als`) ve FL Studio Mobile projelerini (`.flm`) açar, kendi `.lynx` formatında kaydeder.
 

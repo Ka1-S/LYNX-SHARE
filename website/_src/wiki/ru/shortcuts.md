@@ -1,5 +1,5 @@
 ---
-source: 98cfcfdbfe
+source: 3043ff188d
 ---
 ![Окно «Горячие клавиши»: список действий с поиском и клавишами каждого](/assets/img/wiki/shortcuts.webp)
 

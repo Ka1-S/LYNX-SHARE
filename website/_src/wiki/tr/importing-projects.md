@@ -1,5 +1,5 @@
 ---
-source: 2d8c9a0f61
+source: d41b1225ef
 ---
 `Dosya › Aç...` (`Ctrl+O`), LYNX SHARE'in kendi `.lynx` projelerini ve ayrıca `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx` ve `.mid` dosyalarını açar. Başka bir programdan gelen proje bir içe aktarmadır: yeni, kaydedilmemiş bir LYNX SHARE projesi olur ve özgün dosyaya asla yazılmaz.
 

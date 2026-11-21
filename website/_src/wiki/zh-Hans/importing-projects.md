@@ -1,5 +1,5 @@
 ---
-source: 2d8c9a0f61
+source: d41b1225ef
 ---
 `文件 › 打开...`（`Ctrl+O`）可以打开 LYNX SHARE 自己的 `.lynx` 工程，也可以打开 `.flp`、`.als`、`.flm`、`.dawproject`、`.band`、`.blx` 和 `.mid` 文件。来自其他程序的工程属于导入：它会成为一个新的、未保存的 LYNX SHARE 工程，原文件绝不会被写入。
 

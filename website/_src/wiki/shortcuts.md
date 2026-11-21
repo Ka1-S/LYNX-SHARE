@@ -81,7 +81,7 @@ Some of these keys do something else inside an editor that has focus. In the Pia
 
 ## Clip View and Device View
 
-These keys work in the Clip-launch workflow only.
+These keys work in the Clip-launch layout only.
 
 | Key | What it does |
 |---|---|

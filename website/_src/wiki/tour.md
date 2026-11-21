@@ -81,7 +81,7 @@ The Browser is the background of the desktop: it stays docked at the side and th
 - Until you move, resize or detach something, the windows take their default places again whenever the main window changes size. After that, your arrangement is remembered and scales with the window.
 - `F12` closes the plugin, channel settings and tool windows. It does not close the five main windows.
 - While the typing keyboard piano is on (`Ctrl+T`), letter keys play notes and most single-letter shortcuts are paused.
-- `View › Layout style` switches between the Pattern workflow (the default) and the Clip-launch workflow, which adds a clip grid beside the Playlist.
+- `View › Layout style` switches between the Pattern layout (the default) and the Clip-launch layout, which adds a clip grid beside the Playlist.
 
 ## Related
 

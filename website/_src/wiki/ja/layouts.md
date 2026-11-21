@@ -1,5 +1,5 @@
 ---
-source: 4ac6a04fd7
+source: 9974ffb64e
 ---
 ![クリップ起動ワークフロー。左にクリップとシーンのグリッド、右にピッカーとプレイリスト](/assets/img/cliplaunch.webp)
 

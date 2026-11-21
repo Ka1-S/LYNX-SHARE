@@ -1,5 +1,5 @@
 ---
-source: 4f845ea565
+source: 20cf7fed48
 ---
 LYNX SHARE ma trzy układy. Jeśli przechodzisz z Logic, Cubase, Reapera, Pro Tools lub Studio One, zacznij od **Prostego układu z Mixerem pod ręką**: jedna ścieżka na instrument lub głos na osi czasu, tak jak znasz. Układ Pattern, czyli praca jak w FL Studio, czeka, gdy zechcesz pracować na patternach.
 

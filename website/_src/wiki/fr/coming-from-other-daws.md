@@ -1,5 +1,5 @@
 ---
-source: 4f845ea565
+source: 20cf7fed48
 ---
 LYNX SHARE a trois dispositions. Si vous venez de Logic, Cubase, Reaper, Pro Tools ou Studio One, commencez par la **disposition simple avec le Mixer à portée de main** : une piste par instrument ou par voix sur une timeline, comme vous la connaissez. La disposition Patterns, la façon de travailler de FL Studio, est là quand vous voulez des patterns.
 

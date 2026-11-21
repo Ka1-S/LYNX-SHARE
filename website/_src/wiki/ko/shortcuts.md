@@ -1,5 +1,5 @@
 ---
-source: 98cfcfdbfe
+source: 3043ff188d
 ---
 ![단축키 관리 창: 검색할 수 있는 동작 목록과 각 동작의 키](/assets/img/wiki/shortcuts.webp)
 

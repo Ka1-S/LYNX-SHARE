@@ -1,5 +1,5 @@
 ---
-source: 4f845ea565
+source: 20cf7fed48
 ---
 LYNX SHARE tiene tres diseños. Si vienes de Logic, Cubase, Reaper, Pro Tools o Studio One, empieza por el **Diseño simple con el Mixer a mano**: una pista por instrumento o voz en una línea de tiempo, como ya conoces. El Diseño Patrón, la forma de trabajar de FL Studio, está ahí para cuando quieras patrones.
 

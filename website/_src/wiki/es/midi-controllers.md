@@ -1,5 +1,5 @@
 ---
-source: d2bebc77b1
+source: cbd205f138
 ---
 ![La página MIDI de la configuración: dispositivos de entrada, dispositivos de salida con sincronización maestra y sincronización externa](/assets/img/wiki/settings-midi.webp)
 

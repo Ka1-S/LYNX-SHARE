@@ -1,5 +1,5 @@
 ---
-source: 4ac6a04fd7
+source: 9974ffb64e
 ---
 ![Il Clip-launch workflow: una griglia di clip e scene a sinistra, il Selettore e la Playlist a destra](/assets/img/cliplaunch.webp)
 

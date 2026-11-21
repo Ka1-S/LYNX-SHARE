@@ -1,5 +1,5 @@
 ---
-source: edf15b371e
+source: 2f9287257f
 ---
 ![데모 프로젝트가 열린 메인 창: 위에 툴바, 왼쪽에 브라우저, 뒤에 플레이리스트, 그 위에 떠 있는 채널 랙](/assets/img/wiki/desktop.webp)
 

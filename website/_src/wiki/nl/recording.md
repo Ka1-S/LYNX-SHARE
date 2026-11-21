@@ -1,5 +1,5 @@
 ---
-source: 094cbefd18
+source: 896ead3e2d
 ---
 ![Het venster Opname vraagt wat er opgenomen moet worden: audio, noten en automatisering, alles, of audio in de audio-editor](/assets/img/wiki/record-dialog.webp)
 

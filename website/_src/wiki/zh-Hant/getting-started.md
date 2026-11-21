@@ -1,5 +1,5 @@
 ---
-source: 0101adbb66
+source: f1d1d236dc
 ---
 LYNX SHARE 是一款免費、開放原始碼的 DAW，支援 Windows、macOS 和 Linux，一個程式裡有三種工作流程。預設是 FL Studio 工作流程：你在通道機架和鋼琴捲軸中編寫樣式，在播放清單中編排，在混音器中混音。片段啟動工作流程以 Ableton Live 的風格從網格啟動片段和場景，簡易工作流程則把 BandLab 易上手的單一視窗風格和 FL Studio Mobile 的工作方式結合在一起。`檢視 › 版面樣式` 可隨時在它們之間切換。它可以開啟 FL Studio 專案（`.flp`）、Ableton Live 套裝（`.als`）和 FL Studio Mobile 專案（`.flm`），並以自己的 `.lynx` 格式儲存。
 

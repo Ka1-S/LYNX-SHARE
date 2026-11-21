@@ -1,5 +1,5 @@
 ---
-source: 4f845ea565
+source: 20cf7fed48
 ---
 LYNX SHARE'in üç yerleşimi vardır. Logic, Cubase, Reaper, Pro Tools veya Studio One'dan geliyorsanız, **Mixer'ın elinizin altında olduğu Basit yerleşimle** başlayın: bildiğiniz gibi, zaman çizelgesinde her enstrüman veya ses için bir iz. Pattern yerleşimi, yani FL Studio'nun çalışma biçimi, pattern istediğinizde orada durur.
 

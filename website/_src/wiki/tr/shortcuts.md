@@ -1,5 +1,5 @@
 ---
-source: 98cfcfdbfe
+source: 3043ff188d
 ---
 ![Kısayolları yönet penceresi: her eylemin tuşlarıyla aranabilir bir liste](/assets/img/wiki/shortcuts.webp)
 

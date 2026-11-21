@@ -1,5 +1,5 @@
 ---
-source: 094cbefd18
+source: 896ead3e2d
 ---
 ![La ventana Grabación pregunta qué grabar: audio, notas y automatización, todo, o audio en el editor de audio](/assets/img/wiki/record-dialog.webp)
 

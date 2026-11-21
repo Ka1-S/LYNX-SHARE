@@ -1,5 +1,5 @@
 ---
-source: d2bebc77b1
+source: cbd205f138
 ---
 ![设置中的 MIDI 页面：输入设备、带主同步的输出设备，以及外部同步](/assets/img/wiki/settings-midi.webp)
 

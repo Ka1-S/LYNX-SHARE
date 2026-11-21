@@ -1,5 +1,5 @@
 ---
-source: d2bebc77b1
+source: cbd205f138
 ---
 ![MIDI 설정 페이지: 입력 장치, 마스터 동기화가 있는 출력 장치, 외부 동기화](/assets/img/wiki/settings-midi.webp)
 

@@ -9,7 +9,7 @@ Pick the **Simple layout**. It is one window with your tracks on a timeline, loo
 
 ## Your first three things
 
-1. **Pick the layout.** The first time LYNX SHARE starts, a welcome card asks where you are coming from (0.1.31). Click `BandLab, FL Studio Mobile or GarageBand`: the window switches to the Simple layout with a starter beat on a Drums track. In 0.1.30, choose `View › Layout style › Simple workflow`.
+1. **Pick the layout.** The first time LYNX SHARE starts, a welcome card asks where you are coming from (0.1.31). Click `BandLab, FL Studio Mobile or GarageBand`: the window switches to the Simple layout with a starter beat on a Drums track. In 0.1.30, choose `View › Layout style › Simple layout`.
 2. **Make a beat.** Click the squares of the Drum Machine under the timeline. See [Make a beat in the Simple layout](/learn/simple-beat/).
 3. **Add a loop and your voice.** `Loops` opens the loop panel: drag a loop onto the timeline. Then [record your voice](/learn/record-voice/) on a Voice track.
 

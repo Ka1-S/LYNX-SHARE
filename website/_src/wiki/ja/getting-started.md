@@ -1,5 +1,5 @@
 ---
-source: 0101adbb66
+source: f1d1d236dc
 ---
 LYNX SHAREは、Windows、macOS、Linuxで使える無料のオープンソースDAWで、1つのプログラムに3つのワークフローがあります。既定はFL Studioのワークフローです。チャンネルラックとピアノロールでパターンを打ち込み、プレイリストでアレンジし、ミキサーでミックスします。クリップ起動ワークフローは、Ableton Live風にグリッドからクリップとシーンを起動し、シンプルワークフローは、BandLabの親しみやすい1ウィンドウのスタイルにFL Studio Mobileの作り方を組み合わせています。`表示 › レイアウトスタイル` でいつでも切り替えられます。FL Studioのプロジェクト (`.flp`)、Ableton Liveのセット (`.als`)、FL Studio Mobileのプロジェクト (`.flm`) を開け、独自の `.lynx` 形式で保存します。
 

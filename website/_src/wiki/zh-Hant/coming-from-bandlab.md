@@ -1,5 +1,5 @@
 ---
-source: 731a47d8e0
+source: e3c62e25a8
 ---
 ![簡易版面：時間軸上的音軌、起始節拍和鼓機](/assets/img/learn/simple-beat-2.webp)
 

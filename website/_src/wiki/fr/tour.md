@@ -1,5 +1,5 @@
 ---
-source: edf15b371e
+source: 2f9287257f
 ---
 ![La fenêtre principale avec le projet de démonstration : barre d'outils en haut, Browser à gauche, Playlist derrière et Channel Rack flottant par-dessus](/assets/img/wiki/desktop.webp)
 

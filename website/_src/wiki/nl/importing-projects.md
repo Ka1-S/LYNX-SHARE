@@ -1,5 +1,5 @@
 ---
-source: 2d8c9a0f61
+source: d41b1225ef
 ---
 `Bestand › Openen...` (`Ctrl+O`) opent de eigen `.lynx`-projecten van LYNX SHARE en ook `.flp`-, `.als`-, `.flm`-, `.dawproject`-, `.band`-, `.blx`- en `.mid`-bestanden. Een project uit een ander programma is een import: het wordt een nieuw, niet-opgeslagen LYNX SHARE-project, en het originele bestand wordt nooit overschreven.
 

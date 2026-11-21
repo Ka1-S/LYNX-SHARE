@@ -1,5 +1,5 @@
 ---
-source: 113a3155f8
+source: dd17f63a9b
 ---
 ![클립 실행 레이아웃: 플레이리스트 옆에 장면이 있는 클립 그리드](/assets/img/cliplaunch.webp)
 

@@ -1,5 +1,5 @@
 ---
-source: 094cbefd18
+source: 896ead3e2d
 ---
 ![Jendela Rekaman menanyakan apa yang direkam: audio, not dan otomasi, semuanya, atau audio ke editor audio](/assets/img/wiki/record-dialog.webp)
 

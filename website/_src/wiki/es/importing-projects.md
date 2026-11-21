@@ -1,5 +1,5 @@
 ---
-source: 2d8c9a0f61
+source: d41b1225ef
 ---
 `Archivo › Abrir...` (`Ctrl+O`) abre los proyectos `.lynx` propios de LYNX SHARE y también archivos `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx` y `.mid`. Un proyecto de otro programa es una importación: se convierte en un proyecto nuevo de LYNX SHARE sin guardar, y el archivo original nunca se modifica.
 

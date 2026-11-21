@@ -1,5 +1,5 @@
 ---
-source: edf15b371e
+source: 2f9287257f
 ---
 ![Het hoofdvenster met het demoproject: werkbalk bovenaan, Browser links, Playlist erachter en het Channel Rack dat erboven zweeft](/assets/img/wiki/desktop.webp)
 

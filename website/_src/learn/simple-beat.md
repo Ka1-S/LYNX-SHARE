@@ -9,7 +9,7 @@ summary: From the first start to a beat of your own in about a minute: the start
 1. Start LYNX SHARE. The first time, a welcome card asks where you are coming from (0.1.31).
 2. Click `BandLab, FL Studio Mobile or GarageBand`. The window switches to the Simple layout, and a starter beat is placed on a Drums track.
 
-In 0.1.30, choose `View › Layout style › Simple workflow`, click `+ Add track`, then `Drums`, and pick one of the starter beats. The same menu switches layouts at any time. The project stays as it is.
+In 0.1.30, choose `View › Layout style › Simple layout`, click `+ Add track`, then `Drums`, and pick one of the starter beats. The same menu switches layouts at any time. The project stays as it is.
 
 ## Play the beat
 

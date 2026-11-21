@@ -1,5 +1,5 @@
 ---
-source: d2bebc77b1
+source: cbd205f138
 ---
 ![La page MIDI des réglages : périphériques d'entrée, périphériques de sortie avec synchro maître, et synchro externe](/assets/img/wiki/settings-midi.webp)
 

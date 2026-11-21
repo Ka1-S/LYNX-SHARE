@@ -1,5 +1,5 @@
 ---
-source: d2bebc77b1
+source: cbd205f138
 ---
 ![Strona MIDI w ustawieniach: urządzenia wejściowe, urządzenia wyjściowe z synchronizacją master i synchronizacja zewnętrzna](/assets/img/wiki/settings-midi.webp)
 

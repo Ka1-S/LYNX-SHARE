@@ -1,5 +1,5 @@
 ---
-source: 4f845ea565
+source: 20cf7fed48
 ---
 LYNX SHARE heeft drie lay-outs. Kom je van Logic, Cubase, Reaper, Pro Tools of Studio One, begin dan met de **Eenvoudige lay-out met de Mixer bij de hand**: één track per instrument of stem op een tijdlijn, zoals je het kent. De Patroonlay-out, de werkwijze van FL Studio, is er voor wanneer je patterns wilt.
 

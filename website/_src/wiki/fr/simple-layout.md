@@ -1,5 +1,5 @@
 ---
-source: 2ccec7b23f
+source: 9fe217dd37
 ---
 `Vue › Style de disposition › Disposition simple` affiche une fenêtre avec les pistes et la timeline. Il mêle le style accessible en une seule fenêtre de BandLab à la façon de travailler de FL Studio Mobile (pistes, boucles, pads et enregistrement rapide), et convient à un premier morceau. Les projets FL Studio Mobile (`.flm`) s'y ouvrent, comme dans les autres dispositions. L'assistant de configuration le propose au premier démarrage, à côté de la disposition Pattern (celle par défaut) et de la disposition par lancement de clips.
 

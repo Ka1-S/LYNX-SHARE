@@ -1,5 +1,5 @@
 ---
-source: edf15b371e
+source: 2f9287257f
 ---
 ![Główne okno z projektem demo: pasek narzędzi na górze, Browser po lewej, Playlist z tyłu i Channel Rack unoszący się nad nim](/assets/img/wiki/desktop.webp)
 

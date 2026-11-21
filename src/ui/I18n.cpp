@@ -5,6 +5,7 @@
 #include "core/Inflate.h"
 #include "engine/PluginHost.h"
 #include "ui/I18nData.h"
+#include "ui/I18nEnglish.h"
 #include "ui/I18nLocale.h"
 
 namespace lynx
@@ -177,7 +178,8 @@ void initialise (const juce::StringArray& args)
     }
 
     currentId() = id;
-    const auto table = tableText (id);
+    // English has no translation table; its display table (resources/i18n/en/display.txt) changes what a few keys show
+    const auto table = id == "en" ? juce::String::fromUTF8 (data::englishDisplay) : tableText (id);
     juce::LocalisedStrings::setCurrentMappings (table.isEmpty() ? nullptr : new juce::LocalisedStrings (table, false));
 }
 } // namespace i18n

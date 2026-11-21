@@ -1,5 +1,5 @@
 ---
-source: 4f845ea565
+source: 20cf7fed48
 ---
 LYNX SHARE 有三種版面。如果你從 Logic、Cubase、Reaper、Pro Tools 或 Studio One 轉過來，請從 **搭配混音器的簡易版面** 開始：時間軸上每個樂器或聲音一條音軌，和你熟悉的一樣。想用樣式時，還有模式版面，也就是 FL Studio 的工作方式。
 

@@ -1,5 +1,5 @@
 ---
-source: ab2c2f14eb
+source: 69754c6d42
 ---
 ![上部にページタブが並ぶ設定ウィンドウの全般ページ](/assets/img/wiki/settings-general.webp)
 

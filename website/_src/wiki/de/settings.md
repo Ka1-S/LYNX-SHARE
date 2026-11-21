@@ -1,5 +1,5 @@
 ---
-source: ab2c2f14eb
+source: 69754c6d42
 ---
 ![Die Seite Allgemein des Einstellungsfensters, mit den Seitenreitern oben](/assets/img/wiki/settings-general.webp)
 

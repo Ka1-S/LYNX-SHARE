@@ -1,5 +1,5 @@
 ---
-source: 2ccec7b23f
+source: 9fe217dd37
 ---
 `Tampilan › Gaya tata letak › Alur kerja sederhana` menampilkan satu jendela berisi track dan linimasa. Alur kerja ini memadukan gaya satu jendela BandLab yang mudah dengan cara kerja FL Studio Mobile (track, loop, pad, dan perekaman cepat), dan cocok untuk lagu pertama. Proyek FL Studio Mobile (`.flm`) bisa dibuka di dalamnya, seperti di alur kerja lainnya. Wizard pengaturan menawarkannya saat pertama kali dijalankan, di samping Alur kerja pattern (bawaan) dan Alur kerja peluncuran klip.
 

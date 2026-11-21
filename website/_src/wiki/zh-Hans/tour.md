@@ -1,5 +1,5 @@
 ---
-source: edf15b371e
+source: 2f9287257f
 ---
 ![带有演示工程的主窗口：顶部是工具栏，左侧是浏览器，后面是播放列表，通道机架浮在它上面](/assets/img/wiki/desktop.webp)
 

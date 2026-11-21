@@ -1,5 +1,5 @@
 ---
-source: 731a47d8e0
+source: e3c62e25a8
 ---
 ![Простая раскладка: дорожки на шкале времени, стартовый бит и Drum Machine](/assets/img/learn/simple-beat-2.webp)
 

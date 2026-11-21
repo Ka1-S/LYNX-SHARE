@@ -1,5 +1,5 @@
 ---
-source: ab2c2f14eb
+source: 69754c6d42
 ---
 ![De pagina Algemeen van het venster Instellingen, met de paginatabs bovenaan](/assets/img/wiki/settings-general.webp)
 

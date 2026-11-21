@@ -117,7 +117,7 @@ The arrangement box in the toolbar switches between arrangements. A project can 
 ## Good to know
 
 - The Playlist is heard only in Song mode. In Pattern mode, `Space` plays the current pattern, whatever is on the tracks.
-- `View › Layout style › Clip-launch workflow` adds a grid of clips and scenes next to the Playlist. It is optional. See [Layouts](/wiki/layouts/).
+- `View › Layout style › Clip-launch layout` adds a grid of clips and scenes next to the Playlist. It is optional. See [Layouts](/wiki/layouts/).
 - With several overlapping automation clips on one control, the choice of which one plays can differ from FL Studio's (0.1.25 release notes).
 - As in FL Studio, a pattern plays from one clip at a time. When a later clip of the same pattern starts, on any track, the earlier clip starts no more notes from there. Clips of different patterns play together. This holds in new projects and FL Studio projects. A .lynx project saved before 0.1.27 keeps playing every clip in full.
 - A tempo moved by a linked MIDI controller does not resize audio clips.

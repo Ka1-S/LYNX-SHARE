@@ -1,5 +1,5 @@
 ---
-source: 731a47d8e0
+source: e3c62e25a8
 ---
 ![El Diseño simple: pistas en una línea de tiempo, un beat inicial y la Drum Machine](/assets/img/learn/simple-beat-2.webp)
 

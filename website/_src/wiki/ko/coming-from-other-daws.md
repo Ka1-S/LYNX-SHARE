@@ -1,5 +1,5 @@
 ---
-source: 4f845ea565
+source: 20cf7fed48
 ---
 LYNX SHARE에는 레이아웃이 세 가지 있습니다. Logic, Cubase, Reaper, Pro Tools, Studio One에서 오셨다면 **믹서를 곁에 둔 간단한 레이아웃**으로 시작하세요. 익숙한 방식대로 악기나 목소리마다 트랙 하나가 타임라인에 놓입니다. 패턴이 필요하면 FL Studio 방식의 패턴 레이아웃을 쓰면 됩니다.
 

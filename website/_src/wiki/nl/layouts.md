@@ -1,5 +1,5 @@
 ---
-source: 4ac6a04fd7
+source: 9974ffb64e
 ---
 ![De Clipstart-lay-out: links een raster van clips en scènes, rechts de Picker en de Playlist](/assets/img/cliplaunch.webp)
 

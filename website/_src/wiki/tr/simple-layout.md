@@ -1,5 +1,5 @@
 ---
-source: 2ccec7b23f
+source: 9fe217dd37
 ---
 `Görünüm › Yerleşim stili › Basit iş akışı` parçaların ve zaman çizelgesinin olduğu tek bir pencere gösterir. BandLab'in kolay tek pencereli tarzını FL Studio Mobile'ın çalışma biçimiyle (parçalar, loop'lar, pad'ler ve hızlı kayıt) birleştirir ve ilk şarkı için uygundur. FL Studio Mobile projeleri (`.flm`), diğer iş akışlarında olduğu gibi bu iş akışında da açılır. Kurulum sihirbazı bunu ilk açılışta, Pattern iş akışının (varsayılan) ve Klip başlatma iş akışının yanında sunar.
 

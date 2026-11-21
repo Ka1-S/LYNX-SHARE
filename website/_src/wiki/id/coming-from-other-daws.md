@@ -1,5 +1,5 @@
 ---
-source: 4f845ea565
+source: 20cf7fed48
 ---
 LYNX SHARE punya tiga tata letak. Kalau kamu datang dari Logic, Cubase, Reaper, Pro Tools, atau Studio One, mulailah dengan **tata letak sederhana dengan Mixer di dekatmu**: satu track per instrumen atau suara di linimasa, seperti yang kamu kenal. Tata letak Pattern, cara kerja FL Studio, tersedia kalau kamu ingin pattern.
 

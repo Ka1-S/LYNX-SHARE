@@ -1,5 +1,5 @@
 ---
-source: 4f845ea565
+source: 20cf7fed48
 ---
 LYNX SHARE 有三种布局。如果你从 Logic、Cubase、Reaper、Pro Tools 或 Studio One 转过来，请从 **带着混音台的简易布局** 开始：时间线上每个乐器或声音一条音轨，和你熟悉的一样。想用样式时，还有模式布局，也就是 FL Studio 的工作方式。
 

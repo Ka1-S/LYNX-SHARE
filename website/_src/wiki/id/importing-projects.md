@@ -1,5 +1,5 @@
 ---
-source: 2d8c9a0f61
+source: d41b1225ef
 ---
 `File › Buka...` (`Ctrl+O`) membuka proyek `.lynx` milik LYNX SHARE sendiri dan juga file `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx`, dan `.mid`. Proyek dari program lain adalah impor: ia menjadi proyek LYNX SHARE baru yang belum disimpan, dan file aslinya tidak pernah ditulisi.
 

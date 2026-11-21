@@ -1,5 +1,5 @@
 ---
-source: 98cfcfdbfe
+source: 3043ff188d
 ---
 ![La ventana Gestionar atajos: una lista con búsqueda de acciones con las teclas de cada una](/assets/img/wiki/shortcuts.webp)
 

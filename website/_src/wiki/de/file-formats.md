@@ -1,5 +1,5 @@
 ---
-source: 49950b37a3
+source: 222ec28779
 ---
 LYNX SHARE speichert Projekte als `.lynx`-Dateien. Es öffnet auch Projekte anderer Programme, lädt die gängigen Audiodateien und exportiert Audio, MIDI und Projekte für andere Programme. Die Tabelle listet jedes Format von 0.1.30 alpha.
 

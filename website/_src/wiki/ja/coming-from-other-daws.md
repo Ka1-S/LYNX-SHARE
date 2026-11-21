@@ -1,5 +1,5 @@
 ---
-source: 4f845ea565
+source: 20cf7fed48
 ---
 LYNX SHAREにはレイアウトが3つあります。Logic、Cubase、Reaper、Pro Tools、Studio Oneから来た方は、**ミキサーを手元に置いたシンプルレイアウト**から始めましょう。楽器や声ごとに1トラックがタイムライン上に並ぶ、おなじみの形です。パターンを使いたくなったら、FL Studio流のパターンレイアウトがあります。
 

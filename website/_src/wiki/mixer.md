@@ -119,7 +119,7 @@ When you pick an external input for an insert that also records other audio, LYN
 - The route switches appear on the other strips, not on the selected one.
 - The limit is 500 inserts per project and ten effect slots per insert.
 - Edison's recording is kept as a WAV file in the project's folder, not inside the project file.
-- The Session mixer under the clip grid belongs to the Clip-launch workflow only. It shows the same inserts as this Mixer. See [Layouts](/wiki/layouts/).
+- The Session mixer under the clip grid belongs to the Clip-launch layout only. It shows the same inserts as this Mixer. See [Layouts](/wiki/layouts/).
 
 ## Related
 

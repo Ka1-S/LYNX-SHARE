@@ -1,5 +1,5 @@
 ---
-source: 094cbefd18
+source: 896ead3e2d
 ---
 ![La fenêtre d'enregistrement demande quoi enregistrer : audio, notes et automation, tout, ou audio dans l'éditeur audio](/assets/img/wiki/record-dialog.webp)
 

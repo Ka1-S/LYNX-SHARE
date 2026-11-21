@@ -1,5 +1,5 @@
 ---
-source: 094cbefd18
+source: 896ead3e2d
 ---
 ![Kayıt penceresi ne kaydedileceğini soruyor: ses, notalar ve otomasyon, her şey ya da ses editörüne ses](/assets/img/wiki/record-dialog.webp)
 

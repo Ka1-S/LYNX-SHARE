@@ -73,6 +73,12 @@ def app_dict(lid):
     un = lambda x: re.sub(r"\\(.)", lambda m: {"n": "\n", "t": "\t"}.get(m.group(1), m.group(1)), x)
     for m in re.finditer(r'^"((?:[^"\\]|\\.)*)"\s*=\s*"((?:[^"\\]|\\.)*)"', f.read_text(encoding="utf-8") if f.exists() else "", re.M):
         out[un(m.group(1))] = un(m.group(2))
+    # English shows a few keys differently (its display table, resources/i18n/en/display.txt): a page quoting the English
+    # label ("Simple layout") gets the translation of its key ("Simple workflow")
+    en = ROOT / "resources/i18n/en/display.txt"
+    for m in re.finditer(r'^"((?:[^"\\]|\\.)*)"\s*=\s*"((?:[^"\\]|\\.)*)"', en.read_text(encoding="utf-8") if en.exists() and out else "", re.M):
+        if un(m.group(1)) in out:
+            out.setdefault(un(m.group(2)), out[un(m.group(1))])
     return out
 
 

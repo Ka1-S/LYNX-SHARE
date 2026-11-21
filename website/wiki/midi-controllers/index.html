@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="103b886a";
+window.LYNX_LANG=lang;window.LYNX_V="71ab33c7";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=103b886a">
+<link rel="stylesheet" href="/assets/site.css?v=71ab33c7">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -115,7 +115,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <ol><li>On the MIDI page, open the device's box that reads <code>Any MIDI channel</code> and choose <code>MPE controller</code>.</li><li>In the box that appears beside it, choose the member channels, from <code>Channel 2</code> to <code>Channels 2-16</code>.</li><li>Play. To record, see <a href="/wiki/recording/">Recording</a>.</li></ol>
 <ul><li>A recorded note keeps one value of each: its bend as fine pitch, its timbre as Mod X and its strongest pressure as Mod Y. It is not a curve.</li><li>Of the built-in instruments, the Sampler and the built-in synth follow these values.</li><li>A third-party plugin receives MPE when <code>MPE</code> is on under <code>MIDI</code> in the plugin window's <code>Wrapper settings</code>. Each note then goes out on its own MIDI channel, 2 to 16.</li><li>It has not been tried with a real MPE controller yet.</li></ul>
 <h2 id="midi-map-mode-and-key-map-mode">MIDI Map Mode and Key Map Mode</h2>
-<p>In the <a href="/wiki/layouts/">Clip-launch workflow</a>, clips, scenes and buttons can be mapped as in Ableton Live. The <code>MIDI</code> and <code>Key</code> buttons beside the <code>Both</code>, <code>Grid</code>, <code>Song</code> switch turn the modes on, as do <code>Ctrl+M</code> and <code>Ctrl+K</code>.</p>
+<p>In the <a href="/wiki/layouts/">Clip-launch layout</a>, clips, scenes and buttons can be mapped as in Ableton Live. The <code>MIDI</code> and <code>Key</code> buttons beside the <code>Both</code>, <code>Grid</code>, <code>Song</code> switch turn the modes on, as do <code>Ctrl+M</code> and <code>Ctrl+K</code>.</p>
 <ol><li>Press <code>Ctrl+M</code> for MIDI Map Mode, or <code>Ctrl+K</code> for Key Map Mode. Every element that can be mapped is tinted, blue for MIDI and orange for keys.</li><li>Click an element: a clip slot, a scene, a track's stop button, <code>Stop all clips</code>, play, stop, record, <code>Session Record</code>, the metronome, or a knob of the Session mixer or the Device View.</li><li>Move a control or press a key on your MIDI device, or press a computer key in Key Map Mode. The element shows its assignment, for example <code>1/19</code> (channel and controller).</li><li>The mappings are listed in place of the Browser: Channel, Note/Control or Key, Path, Name, Min and Max. Drag Min or Max, or double-click to type a value. Right-click a row for <code>Invert Range</code> and <code>Delete</code>.</li><li>Press the same key again to end the mode.</li></ol>
 <h2 id="the-typing-keyboard">The typing keyboard</h2>
 <p><code>Ctrl+T</code>, or <code>Options › Typing keyboard to piano</code>, turns the computer keyboard into a piano. The rows from <code>Z</code> to <code>M</code> and from <code>Q</code> to <code>P</code> play the selected channels.</p>
@@ -128,7 +128,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <p><code>Output devices</code> on the MIDI page sends the transport to hardware and other software. Tick <code>Send master sync</code> for a device and choose <code>MIDI clock</code> (with Start, Continue, Stop and Song Position Pointer) or MIDI Time Code. <code>Offset (ms)</code> sends the sync later with a positive value and earlier with a negative one. <code>Send all notes off</code> sends that message to the device on init and after an export.</p>
 <p><code>External clock sync</code> works the other way: LYNX SHARE follows the MIDI clock of the input you choose, with its tempo, Start, Continue, Stop and Song Position Pointer. <code>External sync offset (milliseconds)</code> plays LYNX SHARE later with a positive value and earlier with a negative one. <code>Status</code> shows whether a clock is running.</p>
 <h2 id="good-to-know">Good to know</h2>
-<ul><li>Choosing an input for <code>External clock sync</code> turns that device on under <code>Input devices</code>.</li><li>A tempo moved by a linked MIDI controller does not resize audio clips. Type or set the final tempo instead.</li><li>To record what you play, see <a href="/wiki/recording/">Recording</a>. Incoming notes can be snapped to a scale in the <a href="/wiki/piano-roll/">Piano roll</a>.</li><li>MIDI CC, channel aftertouch and pitch bend sent to a plugin can be automated with <code>Automate MIDI controller (CC, aftertouch, pitch bend)</code>.</li><li>A note held by a pedal is recorded up to the moment the pedal comes up.</li><li>An automation clip does not take a control back while you move it from a controller. The control follows its automation again when playback next starts.</li><li>Note links made in <code>Remote control settings</code> are not written to a .flp export.</li><li><code>Ctrl+M</code> and <code>Ctrl+K</code> start the map modes in the Clip-launch workflow only. Map Mode has no macro mapping or note ranges yet.</li></ul>
+<ul><li>Choosing an input for <code>External clock sync</code> turns that device on under <code>Input devices</code>.</li><li>A tempo moved by a linked MIDI controller does not resize audio clips. Type or set the final tempo instead.</li><li>To record what you play, see <a href="/wiki/recording/">Recording</a>. Incoming notes can be snapped to a scale in the <a href="/wiki/piano-roll/">Piano roll</a>.</li><li>MIDI CC, channel aftertouch and pitch bend sent to a plugin can be automated with <code>Automate MIDI controller (CC, aftertouch, pitch bend)</code>.</li><li>A note held by a pedal is recorded up to the moment the pedal comes up.</li><li>An automation clip does not take a control back while you move it from a controller. The control follows its automation again when playback next starts.</li><li>Note links made in <code>Remote control settings</code> are not written to a .flp export.</li><li><code>Ctrl+M</code> and <code>Ctrl+K</code> start the map modes in the Clip-launch layout only. Map Mode has no macro mapping or note ranges yet.</li></ul>
 <h2 id="related">Related</h2>
 <ul><li><a href="/wiki/recording/">Recording</a></li><li><a href="/wiki/automation/">Automation</a></li><li><a href="/wiki/channel-rack/">Channel rack</a></li><li><a href="/wiki/settings/">Settings</a></li><li><a href="/wiki/shortcuts/">Shortcuts</a></li></ul></div></div><nav class="wpn"><a href="/wiki/exporting/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="wk.exporting.t">Exporting</b></a><a href="/wiki/undo-history/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="wk.undo-history.t">Undo and history</b></a></nav></article></div>
 </main>
@@ -140,8 +140,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=103b886a" defer></script>
-<script src="/assets/wiki.js?v=103b886a" defer></script>
-<script src="/assets/motion.js?v=103b886a" defer></script>
+<script src="/assets/site.js?v=71ab33c7" defer></script>
+<script src="/assets/wiki.js?v=71ab33c7" defer></script>
+<script src="/assets/motion.js?v=71ab33c7" defer></script>
 </body>
 </html>

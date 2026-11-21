@@ -1,5 +1,5 @@
 ---
-source: 2ccec7b23f
+source: 9fe217dd37
 ---
 `Widok › Styl układu › Prosty układ` pokazuje jedno okno ze ścieżkami i osią czasu. Łączy przystępny, jednookienkowy styl BandLab ze sposobem pracy FL Studio Mobile (ścieżki, pętle, pady i szybkie nagrywanie) i dobrze nadaje się na pierwszy utwór. Otwierają się w nim projekty FL Studio Mobile (`.flm`), tak jak w pozostałych układach. Kreator konfiguracji proponuje go przy pierwszym uruchomieniu, obok układu Pattern (domyślnego) i układu z uruchamianiem klipów.
 

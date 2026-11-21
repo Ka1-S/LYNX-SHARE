@@ -1,5 +1,5 @@
 ---
-source: 094cbefd18
+source: 896ead3e2d
 ---
 ![La finestra Registrazione chiede cosa registrare: audio, note e automazione, tutto, oppure audio nell'editor audio](/assets/img/wiki/record-dialog.webp)
 

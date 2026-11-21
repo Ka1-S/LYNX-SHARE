@@ -1,5 +1,5 @@
 ---
-source: 094cbefd18
+source: 896ead3e2d
 ---
 ![録音ウィンドウが、録音する対象を尋ねている。オーディオ、ノートとオートメーション、すべて、オーディオエディターへのオーディオ](/assets/img/wiki/record-dialog.webp)
 

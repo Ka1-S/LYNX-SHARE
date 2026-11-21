@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="103b886a";
+window.LYNX_LANG=lang;window.LYNX_V="71ab33c7";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=103b886a">
+<link rel="stylesheet" href="/assets/site.css?v=71ab33c7">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -120,7 +120,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <h2 id="keys">Keys</h2>
 <div class="tablewrap"><table><thead><tr><th>Command</th><th>Key</th><th>What it does</th></tr></thead><tbody><tr><td>Select all</td><td><code>Ctrl+A</code></td><td>Selects every clip</td></tr><tr><td>Copy, cut, paste</td><td><code>Ctrl+C</code> / <code>Ctrl+X</code> / <code>Ctrl+V</code></td><td>Copies, cuts or pastes clips</td></tr><tr><td>Duplicate</td><td><code>Ctrl+B</code></td><td>Duplicates the selection</td></tr><tr><td>Delete</td><td><code>Del</code></td><td>Deletes the selected clips</td></tr><tr><td>Ripple delete</td><td><code>Shift+Del</code></td><td>Deletes the selected clips and closes the gaps</td></tr><tr><td>Ripple editing</td><td><code>Shift+S</code></td><td>Turns ripple editing on or off</td></tr><tr><td>Mute, unmute</td><td><code>Alt+M</code> / <code>Shift+Alt+M</code></td><td>Mutes or unmutes the selected clips</td></tr><tr><td>Shift clips</td><td><code>Shift+Left</code> / <code>Shift+Right</code></td><td>Moves the selected clips one snap step</td></tr><tr><td>Shift to another track</td><td><code>Shift+Up</code> / <code>Shift+Down</code></td><td>Moves the selected clips one track</td></tr><tr><td>Nudge clips</td><td><code>Alt+Left</code> / <code>Alt+Right</code></td><td>Moves the selected clips one screen pixel, without snap</td></tr><tr><td>Make unique</td><td><code>Ctrl+Shift+V</code></td><td>Makes the selected clips unique</td></tr><tr><td>Merge</td><td><code>Ctrl+G</code></td><td>Merges pattern clips</td></tr><tr><td>Stretch</td><td><code>Shift+M</code></td><td>Switches Stretch for resizing audio clips</td></tr><tr><td>Insert time</td><td><code>Ctrl+Ins</code></td><td>Inserts the time selection's length across all tracks</td></tr><tr><td>Delete time</td><td><code>Ctrl+Del</code></td><td>Removes the time selection across all tracks</td></tr><tr><td>Add marker</td><td><code>Alt+T</code></td><td>Adds a marker</td></tr><tr><td>Zoom</td><td><code>PageUp</code> / <code>PageDown</code></td><td>Zooms in or out</td></tr><tr><td>Zoom to fit</td><td><code>Shift+4</code></td><td>Zooms to show everything</td></tr><tr><td>Maximize</td><td><code>Enter</code></td><td>Maximizes or restores the Playlist</td></tr></tbody></table></div>
 <h2 id="good-to-know">Good to know</h2>
-<ul><li>The Playlist is heard only in Song mode. In Pattern mode, <code>Space</code> plays the current pattern, whatever is on the tracks.</li><li><code>View › Layout style › Clip-launch workflow</code> adds a grid of clips and scenes next to the Playlist. It is optional. See <a href="/wiki/layouts/">Layouts</a>.</li><li>With several overlapping automation clips on one control, the choice of which one plays can differ from FL Studio's (0.1.25 release notes).</li><li>As in FL Studio, a pattern plays from one clip at a time. When a later clip of the same pattern starts, on any track, the earlier clip starts no more notes from there. Clips of different patterns play together. This holds in new projects and FL Studio projects. A .lynx project saved before 0.1.27 keeps playing every clip in full.</li><li>A tempo moved by a linked MIDI controller does not resize audio clips.</li><li>On Linux, video needs FFmpeg.</li></ul>
+<ul><li>The Playlist is heard only in Song mode. In Pattern mode, <code>Space</code> plays the current pattern, whatever is on the tracks.</li><li><code>View › Layout style › Clip-launch layout</code> adds a grid of clips and scenes next to the Playlist. It is optional. See <a href="/wiki/layouts/">Layouts</a>.</li><li>With several overlapping automation clips on one control, the choice of which one plays can differ from FL Studio's (0.1.25 release notes).</li><li>As in FL Studio, a pattern plays from one clip at a time. When a later clip of the same pattern starts, on any track, the earlier clip starts no more notes from there. Clips of different patterns play together. This holds in new projects and FL Studio projects. A .lynx project saved before 0.1.27 keeps playing every clip in full.</li><li>A tempo moved by a linked MIDI controller does not resize audio clips.</li><li>On Linux, video needs FFmpeg.</li></ul>
 <h2 id="related">Related</h2>
 <ul><li><a href="/wiki/channel-rack/">Channel rack</a></li><li><a href="/wiki/automation/">Automation</a></li><li><a href="/wiki/recording/">Recording</a></li><li><a href="/wiki/exporting/">Exporting</a></li><li><a href="/wiki/layouts/">Layouts</a></li></ul></div></div><nav class="wpn"><a href="/wiki/piano-roll/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="wk.piano-roll.t">Piano roll</b></a><a href="/wiki/mixer/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="wk.mixer.t">Mixer</b></a></nav></article></div>
 </main>
@@ -132,8 +132,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=103b886a" defer></script>
-<script src="/assets/wiki.js?v=103b886a" defer></script>
-<script src="/assets/motion.js?v=103b886a" defer></script>
+<script src="/assets/site.js?v=71ab33c7" defer></script>
+<script src="/assets/wiki.js?v=71ab33c7" defer></script>
+<script src="/assets/motion.js?v=71ab33c7" defer></script>
 </body>
 </html>

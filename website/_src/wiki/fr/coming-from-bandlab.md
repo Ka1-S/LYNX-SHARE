@@ -1,5 +1,5 @@
 ---
-source: 731a47d8e0
+source: e3c62e25a8
 ---
 ![La disposition simple : des pistes sur une timeline, un beat de départ et la Drum Machine](/assets/img/learn/simple-beat-2.webp)
 

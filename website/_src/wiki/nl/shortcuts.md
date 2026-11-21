@@ -1,5 +1,5 @@
 ---
-source: 98cfcfdbfe
+source: 3043ff188d
 ---
 ![Het venster Sneltoetsen beheren: een doorzoekbare lijst van acties met de toetsen van elke actie](/assets/img/wiki/shortcuts.webp)
 

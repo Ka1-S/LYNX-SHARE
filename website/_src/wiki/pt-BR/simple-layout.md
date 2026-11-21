@@ -1,5 +1,5 @@
 ---
-source: 2ccec7b23f
+source: 9fe217dd37
 ---
 `Exibir › Estilo de layout › Layout Simple` mostra uma janela com as faixas e a linha do tempo. Ele mistura o estilo acessível de janela única do BandLab com o jeito de trabalhar do FL Studio Mobile (faixas, loops, pads e gravação rápida) e serve bem para uma primeira música. Projetos do FL Studio Mobile (`.flm`) abrem nele, como nos outros layouts. O assistente de configuração o oferece na primeira vez que o programa abre, ao lado do Layout Pattern (o padrão) e do Layout de lançamento de clipes.
 

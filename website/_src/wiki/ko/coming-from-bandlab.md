@@ -1,5 +1,5 @@
 ---
-source: 731a47d8e0
+source: e3c62e25a8
 ---
 ![간단한 레이아웃: 타임라인 위의 트랙, 스타터 비트, 드럼 머신](/assets/img/learn/simple-beat-2.webp)
 

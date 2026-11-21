@@ -1,5 +1,5 @@
 ---
-source: 731a47d8e0
+source: e3c62e25a8
 ---
 ![简易布局：时间线上的音轨、起始节拍和鼓机](/assets/img/learn/simple-beat-2.webp)
 

@@ -5,13 +5,13 @@ status: full
 ---
 ![The Clip-launch layout: a clip grid with scenes beside the Playlist](/assets/img/cliplaunch.webp)
 
-LYNX SHARE starts in the Pattern workflow: a Channel rack, patterns and a Playlist. The Clip-launch workflow is optional and adds a clip grid with scenes beside the Playlist. LYNX SHARE reads and writes `.als` sets. It is not affiliated with Ableton.
+LYNX SHARE starts in the Pattern layout: a Channel rack, patterns and a Playlist. The Clip-launch layout is optional and adds a clip grid with scenes beside the Playlist. LYNX SHARE reads and writes `.als` sets. It is not affiliated with Ableton.
 
 This page is for Bitwig Studio users too: the clip grid works the same way, and Bitwig's DAWproject files (`.dawproject`) open with `File › Open...` and are written by `File › Export › DAWproject (.dawproject)...`.
 
 ## Your first steps
 
-1. **Pick the layout.** The first time LYNX SHARE starts, a welcome card asks where you are coming from (0.1.31). Click `Ableton Live or Bitwig`: the Clip-launch layout opens. In 0.1.30, choose `View › Layout style › Clip-launch workflow`.
+1. **Pick the layout.** The first time LYNX SHARE starts, a welcome card asks where you are coming from (0.1.31). Click `Ableton Live or Bitwig`: the Clip-launch layout opens. In 0.1.30, choose `View › Layout style › Clip-launch layout`.
 2. **Fill a slot.** Drag a sample or a pattern from the Browser into a slot, or right-click an empty slot and choose `Put a pattern here`.
 3. **Launch.** Click the triangle at the left of a clip, or the triangle of a scene in the `Scenes` column to launch the whole row. Or open one of your `.als` sets (below).
 
@@ -25,17 +25,17 @@ What is different from Live:
 ## Open a Live set
 
 1. Choose `File › Open...` (`Ctrl+O`) and pick the `.als`. Sets saved by Live 11 and Live 12 are read.
-2. Choose `View › Layout style › Clip-launch workflow` to work with the clip grid, where the set's Session clips and scenes go.
+2. Choose `View › Layout style › Clip-launch layout` to work with the clip grid, where the set's Session clips and scenes go.
 3. Use the `Grid / Both / Song` switch in the Playlist's title bar to show the grid, the Playlist, or both.
 4. Choose `File › Save`. It asks where to write a `.lynx` file. The `.als` is not changed.
 
-`View › Layout style › Pattern workflow (default)` goes back. The same choice is in `Options › General settings...`. Patterns and the Channel rack stay available in both layouts.
+`View › Layout style › Pattern layout (default)` goes back. The same choice is in `Options › General settings...`. Patterns and the Channel rack stay available in both layouts.
 
 ## What maps to what
 
 | In Live | In LYNX SHARE |
 |---|---|
-| Session view | The clip grid of the Clip-launch workflow |
+| Session view | The clip grid of the Clip-launch layout |
 | Arrangement view | The Playlist |
 | Tracks | Playlist tracks, which are the columns of the clip grid |
 | Scenes | Scenes, the rows of the clip grid. A scene can set the tempo when launched |
