@@ -229,7 +229,7 @@ float flHeaderHeight (juce::Rectangle<float> r) { return juce::jlimit (11.0f, 15
 
 // FL's track header (round 190ig, FM-23): the plate in the track's own colour (FL's grey #485156 without one), the name in a
 // light tint of it (FL: #AAF2A6 on #237719, colour + 130 per channel), or the primary text where the tint would be too faint
-juce::Colour flHeaderFill (std::uint32_t colour) { return colour != 0 ? juce::Colour (colour).withAlpha (1.0f) : juce::Colour (0xff485156); }
+juce::Colour flHeaderFill (std::uint32_t colour) { return colour != 0 ? juce::Colour (colour).withAlpha (1.0f) : theme::colour::defaultTrack; }
 juce::Colour flHeaderInk (juce::Colour plate)
 {
     const auto f = [] (juce::uint8 v) { return (juce::uint8) juce::jmin (255, (int) v + 130); };

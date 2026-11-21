@@ -12202,3 +12202,4 @@ countries: br
 
 # rollup 0.1.31 step 2 (issue #233 on the welcome card)
 "Only the newest version number is asked for; nothing about you is sent." = "Só o número da versão mais nova é consultado; nada sobre você é enviado."
+"Tracks, mixer tracks and channels without a color of their own. Click: edit this color with the picker. Double-click: the theme's own color." = "Faixas, faixas do mixer e canais sem cor própria. Clique: edite esta cor com o seletor. Clique duplo: a cor do próprio tema."

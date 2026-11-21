@@ -12067,3 +12067,4 @@ countries: tr
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak hold'lu tepe ölçer (sol/sağ)  [LMB] clip ışığını temizler"
+"Tracks, mixer tracks and channels without a color of their own. Click: edit this color with the picker. Double-click: the theme's own color." = "Kendi rengi olmayan parçalar, mikser parçaları ve kanallar. Tıklama: bu rengi seçiciyle düzenle. Çift tıklama: temanın kendi rengi."

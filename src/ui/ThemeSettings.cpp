@@ -119,6 +119,7 @@ void applyDrawingDots (const themes::Spec& spec)
     colour::audioClip = dot (themes::Dot::waves, audioClip);
     colour::stepOn = theme::stepOn = dot (themes::Dot::steps, colour::accent);
     colour::selection = dot (themes::Dot::selection, colour::accent);
+    colour::defaultTrack = dot (themes::Dot::tracks, juce::Colour (0xff485156)); // (issue #238: FL's grey unless set)
 }
 
 void apply (const themes::Spec& spec, bool save)
@@ -703,12 +704,15 @@ public:
             add (l);
         }
         // FL's colour dots: a click lets the picker below edit that colour, a double-click gives it back to the theme
-        const juce::String dotNames[] = { tr ("Selection"), tr ("Highlight"), tr ("Mute"), tr ("Option"), tr ("Steps"), tr ("Meters"), tr ("Waves"), tr ("Text") };
+        const juce::String dotNames[] = { tr ("Selection"), tr ("Highlight"), tr ("Mute"), tr ("Option"), tr ("Steps"), tr ("Meters"), tr ("Waves"), tr ("Text"), tr ("Tracks") };
         for (int i = 0; i < themes::dotCount; ++i)
         {
             auto& d = dots[(std::size_t) i];
             d.setButtonText (dotNames[i]);
-            d.setTooltip (tr ("Click: edit this color with the picker. Double-click: the theme's own color."));
+            d.setComponentID ("theme.dot." + juce::String (themes::dotId ((themes::Dot) i))); // (round 190od: tests find a dot)
+            d.setTooltip (i == (int) themes::Dot::tracks // (issue #238)
+                              ? tr ("Tracks, mixer tracks and channels without a color of their own. Click: edit this color with the picker. Double-click: the theme's own color.")
+                              : tr ("Click: edit this color with the picker. Double-click: the theme's own color."));
             d.onClick = [this, i] { selectDot (i); };
             d.addMouseListener (this, false);
             add (d);
@@ -990,6 +994,7 @@ private:
             case D::meters: return theme::colour::meterLow;
             case D::waves: return theme::colour::audioClip;
             case D::text: return juce::Colour (palette.textPrimary);
+            case D::tracks: return juce::Colour (0xff485156); // (FL's grey)
         }
         return juce::Colour (palette.textPrimary);
     }
@@ -1232,7 +1237,7 @@ private:
     juce::Label presetNote, adjustNote, contrastNote, imageName, fitLabel, opacityLabel, dimLabel, imageListLabel, imageNote, soundName, soundNote, abNote;
     std::array<juce::Slider, knobCount> knobs;
     std::array<juce::Label, knobCount> knobLabels;
-    std::array<DotButton, themes::dotCount> dots { DotButton ({}), DotButton ({}), DotButton ({}), DotButton ({}),
+    std::array<DotButton, themes::dotCount> dots { DotButton ({}), DotButton ({}), DotButton ({}), DotButton ({}), DotButton ({}),
                                                    DotButton ({}), DotButton ({}), DotButton ({}), DotButton ({}) };
     int selectedDot = -1;
     juce::TextButton slotA, slotB;

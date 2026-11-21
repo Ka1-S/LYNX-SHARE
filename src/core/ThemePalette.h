@@ -145,9 +145,13 @@ const char* imageFitId (ImageFit fit); // "fill", "fit", "stretch", "tile", "cen
 ImageFit imageFitFromId (const std::string& id);
 
 // FL's colour dots on its Theme page (round 190jp, design190ia FW-20): the colours of the selection, the highlight, muted
-// things, options, lit steps, meters, waveforms and the text, each the theme's own unless set (0).
-enum class Dot : int { selection = 0, highlight, mute, option, steps, meters, waves, text };
-constexpr int dotCount = 8;
+// things, options, lit steps, meters, waveforms and the text, each the theme's own unless set (0). Issue #238 (round 190od,
+// LYNX's own dot; FL's theme files carry the same role as their channel / pattern / Playlist track default colours,
+// "channels.colors." / "pattern.defaultcolor" / "forms.eventeditform.playlist.track.background"): Tracks = the colour
+// drawn for Playlist tracks, mixer tracks and channels that have no colour of their own (FL's grey #485156 unless set).
+// The project keeps "no colour" (0): a theme changes the look, never the project's data.
+enum class Dot : int { selection = 0, highlight, mute, option, steps, meters, waves, text, tracks };
+constexpr int dotCount = 9;
 const char* dotId (Dot dot); // "selection", "highlight", ... (the .lynxtheme keys)
 
 // A theme: what a .lynxtheme file holds and what Options › Theme edits.

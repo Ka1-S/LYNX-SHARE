@@ -12067,3 +12067,4 @@ countries: ru by kz
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] открыть/закрыть редактор  [Alt]+[LMB] не закрывать другие  [Ctrl]+[LMB] прослушать  [2xLMB] Piano Roll  [LMB] перетаскивание вверх/вниз меняет порядок  [RMB] меню канала"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Пиковый индикатор (левый/правый) с удержанием пика  [LMB] сбрасывает индикатор клиппинга"
+"Tracks, mixer tracks and channels without a color of their own. Click: edit this color with the picker. Double-click: the theme's own color." = "Дорожки, дорожки микшера и каналы без собственного цвета. Щелчок: изменить этот цвет в палитре. Двойной щелчок: цвет самой темы."

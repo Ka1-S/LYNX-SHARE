@@ -63,7 +63,7 @@ TEST (polish190jp_colour_dots_set_their_tokens)
     CHECK (p.selectionFill == 0x2e00ff00); // (the fill keeps its own alpha)
     CHECK (p.accent == defaultAccent);
     CHECK (spec.hasDots() && ! spec.isDefaultLook());
-    CHECK (std::string (dotId (Dot::selection)) == "selection" && std::string (dotId (Dot::text)) == "text" && dotCount == 8);
+    CHECK (std::string (dotId (Dot::selection)) == "selection" && std::string (dotId (Dot::text)) == "text" && dotCount == 9 && std::string (dotId (Dot::tracks)) == "tracks"); // (round 190od: + Tracks, issue #238)
 }
 
 #include "core/TextSize.h"

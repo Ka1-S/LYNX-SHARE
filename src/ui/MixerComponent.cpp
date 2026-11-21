@@ -1905,7 +1905,7 @@ void MixerStrips::paint (juce::Graphics& g)
 
         // FL's header band (round 190io, design190ia FM-30): the top 36 px filled with the insert's colour (FL: #8C1F1C on
         // insert 1), held at a brightness where its marks read; FL's grey for an insert without a colour. Rounded on top.
-        const auto band = colourFill (track.colour != 0 ? juce::Colour (track.colour) : juce::Colour (0xff485156), 0.45f, 0.6f)
+        const auto band = colourFill (track.colour != 0 ? juce::Colour (track.colour) : theme::colour::defaultTrack, 0.45f, 0.6f)
                               .withMultipliedAlpha (track.muted ? 0.55f : 1.0f);
         const auto bandArea = juce::Rectangle<float> ((float) x, 2.0f, (float) plateWidth, (float) rows().header - 2.0f);
         if (needs (bandArea.getSmallestIntegerContainer()))
