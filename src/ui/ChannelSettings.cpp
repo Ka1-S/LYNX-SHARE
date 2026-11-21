@@ -7275,7 +7275,7 @@ public:
     {
         const auto r = getLocalBounds().toFloat();
         const auto cx = r.getCentreX(), cy = r.getCentreY();
-        constexpr float bodyR = 4.5f, toothlen = 2.2f, toothHalfW = 1.0f;
+        constexpr float bodyR = 4.5f, holeR = 1.8f, toothlen = 2.2f, toothHalfW = 1.0f;
         juce::Path p;
         p.addEllipse (cx - bodyR, cy - bodyR, bodyR * 2.0f, bodyR * 2.0f);
         for (int i = 0; i < 8; i++)
@@ -7287,7 +7287,7 @@ public:
             p.addPath (tooth);
         }
         juce::Path hole;
-        hole.addEllipse (cx -holeR, cy -holeR, holeR * 2.0f, hole * 2.0f);
+        hole.addEllipse (cx - holeR, cy - holeR, holeR * 2.0f, holeR * 2.0f);
         p.setUsingNonZeroWinding (false); // even-odd fill: the hole subtracts from the body instead of adding to it
         p.addPath (hole);
         g.setColour (getToggleState() || over ? theme::colour::accent : theme::colour::textSecondary);
