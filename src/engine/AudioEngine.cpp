@@ -6295,9 +6295,10 @@ void AudioEngine::timerCallback()
     // Plugins are prepared at a fixed rate; if the device changed rate, recreate them.
     // A plugin whose latency changed (preset change, lookahead) requests a new PDC plan.
     const auto rateChanged = std::abs (transport.sampleRate.load() - lastPublishedShape.sampleRate) > 0.5;
-    const auto latencies = lastPublishedShape.currentLatencies();
-    if (! publishing && (rateChanged || latencies != lastPublishedShape.latencies)) // (not inside a publish: see publishSong)
+    // (round 190of: compared in place; the list is made only when it changed)
+    if (! publishing && (rateChanged || lastPublishedShape.latenciesDiffer (lastPublishedShape.latencies))) // (not inside a publish: see publishSong)
     {
+        const auto latencies = lastPublishedShape.currentLatencies();
         // the plugins made for the new rate start from what the running ones hold now (issue #134: they started from
         // the state of the last save or export, so a device at another rate undid every change made in their windows)
         if (rateChanged)

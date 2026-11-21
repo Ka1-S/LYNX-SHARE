@@ -226,6 +226,8 @@ struct RackState
     // Current latencies of instruments and effects, in the same layout as `latencies` (0 for the slots bypassed for
     // low latency).
     std::vector<int> currentLatencies() const;
+    // round 190of: currentLatencies() != known, without making the list (the engine asks 30 times a second)
+    bool latenciesDiffer (const std::vector<int>& known) const;
     void buildPdc (const RackState* previous);
 
     // Arpeggiators of channels with arpeggio on (nullptr for the others); reused across snapshots.

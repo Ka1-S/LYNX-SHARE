@@ -130,3 +130,25 @@ TEST (perf190of_split_meter_counts_the_live_part_and_the_part_rendered_ahead)
     CHECK (first.valid && std::abs (first.live - (double) live / (double) audio) < 1e-9 && std::abs (first.ahead - (double) ahead / (double) audio) < 1e-9);
     CHECK (! reader.take (st).valid); // nothing new since
 }
+
+TEST (perf190of_latencies_differ_without_making_the_list)
+{
+    using namespace lynx;
+    auto song = Song::makeDefault();
+    const auto state = RackState::build (song, nullptr, 44100.0);
+    const auto list = state->currentLatencies();
+    CHECK (! state->latenciesDiffer (list));
+    auto other = list;
+    if (! other.empty())
+    {
+        other.back() += 1;
+        CHECK (state->latenciesDiffer (other));
+        other = list;
+        other.pop_back();
+        CHECK (state->latenciesDiffer (other));
+    }
+    other = list;
+    other.push_back (0);
+    CHECK (state->latenciesDiffer (other));
+    CHECK (state->latenciesDiffer ({}) == ! list.empty());
+}

@@ -1607,34 +1607,62 @@ void RackState::buildTaskGraph (const std::vector<int>& depth)
     graphOk = true;
 }
 
+namespace
+{
+// Every unit's latency in the order of RackState::latencies (instruments, then each insert's slots); `take (value)`
+// returns false to stop early (round 190of: shared by currentLatencies and latenciesDiffer)
+template <typename Take>
+void eachLatency (const RackState& state, Take&& take)
+{
+    // a hosted plugin's latency set by hand in its wrapper settings (round 149) replaces what it reports
+    auto manual = [&state] (const PluginRef& ref, int reported) {
+        return ref.latencyOverrideMs >= 0.0f ? (int) std::lround (ref.latencyOverrideMs * 0.001 * state.sampleRate) : reported;
+    };
+    const auto& song = state.song;
+    for (std::size_t c = 0; c < state.instruments.size(); ++c)
+    {
+        const auto reported = state.instruments[c]->latencySamples();
+        if (! take (c < song.channels.size() && song.channels[c].instrument == InstrumentKind::plugin ? manual (song.channels[c].plugin, reported) : reported))
+            return;
+    }
+
+    for (std::size_t t = 0; t < state.effects.size(); ++t)
+        for (std::size_t s = 0; s < state.effects[t].size(); ++s)
+        {
+            if (lowlatency::bypassed (state.lowLatencySlots, (int) t, (int) s)) // (round 190aq: bypassed, nothing to compensate)
+            {
+                if (! take (0))
+                    return;
+                continue;
+            }
+            const auto reported = state.effects[t][s]->latencySamples();
+            const auto* slot = t < song.mixer.size() && s < song.mixer[t].effects.size() ? &song.mixer[t].effects[s] : nullptr;
+            if (! take (slot != nullptr && slot->kind == EffectKind::plugin ? manual (slot->plugin, reported) : reported))
+                return;
+        }
+}
+} // namespace
+
 std::vector<int> RackState::currentLatencies() const
 {
     std::vector<int> out;
-
-    // a hosted plugin's latency set by hand in its wrapper settings (round 149) replaces what it reports
-    auto manual = [this] (const PluginRef& ref, int reported) {
-        return ref.latencyOverrideMs >= 0.0f ? (int) std::lround (ref.latencyOverrideMs * 0.001 * sampleRate) : reported;
-    };
-    for (std::size_t c = 0; c < instruments.size(); ++c)
-    {
-        const auto reported = instruments[c]->latencySamples();
-        out.push_back (c < song.channels.size() && song.channels[c].instrument == InstrumentKind::plugin ? manual (song.channels[c].plugin, reported) : reported);
-    }
-
-    for (std::size_t t = 0; t < effects.size(); ++t)
-        for (std::size_t s = 0; s < effects[t].size(); ++s)
-        {
-            if (lowlatency::bypassed (lowLatencySlots, (int) t, (int) s)) // (round 190aq: bypassed, nothing to compensate)
-            {
-                out.push_back (0);
-                continue;
-            }
-            const auto reported = effects[t][s]->latencySamples();
-            const auto* slot = t < song.mixer.size() && s < song.mixer[t].effects.size() ? &song.mixer[t].effects[s] : nullptr;
-            out.push_back (slot != nullptr && slot->kind == EffectKind::plugin ? manual (slot->plugin, reported) : reported);
-        }
-
+    eachLatency (*this, [&out] (int latency) {
+        out.push_back (latency);
+        return true;
+    });
     return out;
+}
+
+bool RackState::latenciesDiffer (const std::vector<int>& known) const
+{
+    std::size_t at = 0;
+    auto differ = false;
+    eachLatency (*this, [&] (int latency) {
+        differ = at >= known.size() || known[at] != latency;
+        ++at;
+        return ! differ;
+    });
+    return differ || at != known.size();
 }
 
 void RackState::buildPdc (const RackState* previous)
