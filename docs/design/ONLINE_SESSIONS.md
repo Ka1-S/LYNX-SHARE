@@ -881,6 +881,31 @@ four, and guests must be able to tell a legitimate new host from anyone who mere
 | A song that points at an insert past the mixer's end | 0.5 round | The app never makes one (`Song::claimFreeInsert` grows the mixer), but a patch that did would leave the host with fewer mixer tracks than a guest who joins later (the project loader grows the mixer, the patch path does not). Found by `--livetest` when two guests were let in in the other order. The host should normalise a proposal the way the loader does. |
 | A guest journal on a second computer | — | By design the journal is per profile: going back in works on the computer that was in the session. |
 
+#### Round 190oh: review fixes
+
+Review: `/mnt/e/lynx-work/online_host_190oh/ONLINE.md` (round folder). Built:
+
+- **Linux / macOS link (P0):** `curl_ws_send` may take only part of a frame (`CURLE_OK`, fewer bytes) when the socket's
+  buffer is full; the loop stopped there and left the frame half sent, the next message failed (curl error 43), the
+  link closed and a guest's upload began again from its first piece, for ever. Seen on every Linux run from a home
+  connection to relay.lynx-share.com (27 reconnects in one `--livetest`); never from the VPS next to the relay. The
+  loop now goes on with the rest of the frame.
+- **Relay without head-of-line blocking:** per-peer outboxes (SHARE_API.md §3.1), close code 4002 for a peer that
+  reads too slowly. Needs a deploy (`server/deploy.sh`).
+- **Edits behind media:** the upload backlog is 256 KiB (was 1 MiB): an edit made during an upload waits for at most
+  two 256 KiB pieces in LYNX's queue.
+- **Transfers go on after a drop:** `want {sha, from, packed}` asks for the rest when the `.part` holds whole pieces;
+  the sender goes on from that piece when it still sends the same thing (its FLAC pack or the file), else from the
+  start, and the receiver then starts again too. An older LYNX SHARE ignores `from` and sends from the start, which the
+  receiver takes as a restart (no protocol change).
+- **Replay after a reconnect:** one `Opener` per session (not per connection), with a 64-frame anti-replay window per
+  sender (frames a little out of order are taken once): a frame recorded before a drop cannot be played back after it.
+
+Still open (ranked in ONLINE.md): the host cannot remove a guest (relay kick + knock rate limit; owner decision on a new
+code), plugin-window knob changes reach the session only with the next structural edit, control frames before media in
+the queue (now possible on the receiving side thanks to the window; the sending side needs one release with every
+receiver on 0.1.31 or a protocol bump), test hooks (conflict end to end, `--crash-after`, edit latency).
+
 ### P5-A1 as built (round 190ai): remote plugins — a guest uses a plugin only the host has
 
 Study: `REMOTE_PLUGINS.md` on `wip/remoteplug173c` (round 173c). The user's decisions (2026-11-05): start with A1; stay

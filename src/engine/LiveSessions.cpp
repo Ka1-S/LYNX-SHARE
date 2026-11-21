@@ -28,7 +28,10 @@ constexpr int maxFragments = 128;                // 64 MiB: the largest message 
 constexpr int chunkSize = 256 * 1024;            // media pieces
 constexpr juce::int64 maxMediaBytes = (juce::int64) 4 << 30;
 constexpr std::size_t maxJsonBytes = 64u << 20;
-constexpr std::size_t uploadBacklog = 1u << 20; // media wait while this much is queued (the song's changes go first)
+// media wait while this much is queued: the song's changes queued after it go out behind it (round 190oh: 1 MiB -> 256 KiB,
+// so an edit made during an upload waits for at most two media pieces, ~0.5 s at 1 Mbit/s instead of ~10 s; the queue
+// still refills before it runs dry at the relay's 4 MiB/s)
+constexpr std::size_t uploadBacklog = 256u << 10;
 const juce::String tokenPrefix = "lynx-media:";
 constexpr juce::int64 inlineHashBytes = 1 << 20; // files above this are hashed off the message thread
 constexpr int chatShown = 60;                    // chat lines a late guest gets
@@ -548,7 +551,14 @@ void LiveSessionManager::join (const juce::String& code, const Options& o)
 void LiveSessionManager::connect()
 {
     sealer = std::make_unique<livecrypto::Sealer> (keys.key);
-    opener = std::make_unique<livecrypto::Opener> (keys.key);
+    // round 190oh: one Opener for the whole session, not one per connection: what it remembers of every sender's
+    // counters survives a reconnect, so a frame recorded before the drop cannot be played back after it (a new
+    // connection's Sealer has a fresh random sender id, so its own counters start again from 1 without a clash)
+    if (opener == nullptr || openerKey != keys.key)
+    {
+        opener = std::make_unique<livecrypto::Opener> (keys.key);
+        openerKey = keys.key;
+    }
     wsUrl = wsUrlFor (options.relay, roomId);
     link.close();
     link.open (utf8 (wsUrl), keys.relayToken, userAgent());
@@ -1064,7 +1074,7 @@ void LiveSessionManager::handleMessage (int from, const juce::var& m)
             peer.position = (double) m["pos"];
         }
         else if (t == "want")
-            serve (from, m["sha"].toString());
+            serve (from, m["sha"].toString(), (int) m["from"], (bool) m["packed"]);
         else if (t == "resync")
             sendSnapshot (from);
         else if (t == "chat")
@@ -1211,7 +1221,7 @@ void LiveSessionManager::handleMessage (int from, const juce::var& m)
             onChange();
     }
     else if (t == "want")
-        serve (from, m["sha"].toString());
+        serve (from, m["sha"].toString(), (int) m["from"], (bool) m["packed"]);
     else if (t == "end")
     {
         keepFull = (bool) m["keepFull"] || keepFull;
@@ -1868,7 +1878,7 @@ void LiveSessionManager::request (const juce::String& sha, const juce::String& n
         onChange();
 }
 
-void LiveSessionManager::serve (int to, const juce::String& sha)
+void LiveSessionManager::serve (int to, const juce::String& sha, int resumeFrom, bool resumePacked)
 {
     if (! isSha (sha))
         return;
@@ -1912,7 +1922,22 @@ void LiveSessionManager::serve (int to, const juce::String& sha)
                 };
             });
         }
-        uploads.push_back ({ to, sha, file, 0, false });
+        // round 190oh: a peer whose transfer broke off (a dropped connection) asks to go on from the piece it has; that
+        // works when this computer still sends the same thing (the FLAC pack, or the file itself), else from the start
+        Upload u { to, sha, file, 0, false };
+        if (resumeFrom > 0)
+        {
+            const auto pack = packs.find (sha);
+            if (resumePacked && pack != packs.end() && pack->second.existsAsFile())
+                u.file = pack->second, u.packed = true;
+            if (resumePacked == u.packed)
+                u.next = std::min (resumeFrom, std::max (0, (int) ((u.file.getSize() - 1) / chunkSize)));
+            else
+                u.file = file, u.packed = false;
+            if (u.next > 0)
+                ++stats.mediaResumed;
+        }
+        uploads.push_back (u);
         return;
     }
     if (! host)
@@ -2015,6 +2040,14 @@ void LiveSessionManager::handleMediaChunk (int from, const std::uint8_t* data, s
     // back at a limit, then asked for it again): they are not the start of this one, which is still to come
     if (w.got == 0 && index != 0)
         return;
+    // round 190oh: we asked to go on from piece `got` (reroute) but the sender starts again (it no longer has what it
+    // sent before, or an older LYNX SHARE): start again too
+    if (index == 0 && w.got > 0 && w.resumeAsked)
+    {
+        part.deleteFile();
+        w.got = 0;
+        w.resumeAsked = false;
+    }
     if (total < 0 || total > maxMediaBytes || count != expected || index != w.got || length != expectedLength || (w.got > 0 && total != w.size))
     {
         part.deleteFile();
@@ -2053,6 +2086,7 @@ void LiveSessionManager::handleMediaChunk (int from, const std::uint8_t* data, s
         budget.received (w.fromTag, length);
         journalDirty = true;
     }
+    w.resumeAsked = false;
     if (++w.got == w.count)
         verifyArrived (sha);
 }
@@ -2391,16 +2425,28 @@ void LiveSessionManager::sendResume()
 
 void LiveSessionManager::reroute (std::uint32_t tag, int peer)
 {
-    // media that were coming from that participant come again from where they are now (from the start)
+    // media that were coming from that participant come again from where they are now: from the piece already here
+    // (round 190oh; before, from the start: a 500 MB take over a line that drops began again at every drop)
     for (auto& [sha, w] : wanted)
         if (w.fromTag == tag && ! w.verifying)
         {
-            w.file.withFileExtension (w.file.getFileExtension() + ".part").deleteFile();
+            const auto part = w.file.withFileExtension (w.file.getFileExtension() + ".part");
+            const auto resume = w.got > 0 && part.getSize() == (juce::int64) w.got * chunkSize;
+            if (! resume)
+            {
+                part.deleteFile();
+                w.got = 0;
+                w.packed = false;
+            }
             w.fromPeer = peer;
-            w.got = 0;
-            w.packed = false;
+            w.resumeAsked = resume;
             auto m = message ("want");
             set (m, "sha", sha);
+            if (resume)
+            {
+                set (m, "from", w.got);
+                set (m, "packed", w.packed);
+            }
             sendJson (peer, m);
         }
 }

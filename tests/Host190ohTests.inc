@@ -76,3 +76,37 @@ TEST (host190oh_wrapper_settings_gui_section)
     CHECK (! (a == b));
 }
 
+// Online Sessions review (round 190oh): the anti-replay window of the session's Opener
+TEST (online190oh_replay_window)
+{
+    using namespace lynx::livecrypto;
+    const Invite invite { "2syq75e66t", newSecret() };
+    const auto keys = derive (invite);
+    Sealer host (keys.key);
+    Opener rx (keys.key);
+    const std::vector<std::uint8_t> message { 'e', 'd', 'i', 't' };
+    std::vector<std::vector<std::uint8_t>> frames;
+    for (int i = 0; i < 70; ++i)
+        frames.push_back (host.seal (message));
+    // in order: each once
+    CHECK (rx.open (frames[0]) && ! rx.open (frames[0]));
+    // a little out of order (inside the 64 below the highest): taken once
+    CHECK (rx.open (frames[5]));
+    CHECK (rx.open (frames[2]) && rx.open (frames[1]) && ! rx.open (frames[2]) && ! rx.open (frames[1]));
+    CHECK (rx.open (frames[69]));                         // the highest jumps to 70
+    CHECK (rx.open (frames[6]) && ! rx.open (frames[6])); // counter 7: 63 below 70, still inside
+    CHECK (! rx.open (frames[4]));                        // counter 5: 65 below, outside the window
+    CHECK (! rx.open (frames[5]) && ! rx.open (frames[69]));
+    // a frame recorded before a reconnect cannot be played again: the session keeps its Opener (LiveSessions.cpp), and
+    // the new connection's Sealer has a new sender id whose counters start again
+    Sealer again (keys.key);
+    CHECK (again.id() != host.id() && rx.open (again.seal (message)) && ! rx.open (frames[3]));
+    // many connections: the oldest senders are forgotten past the cap, the newest still checked
+    for (std::size_t i = 0; i < Opener::maxSenders + 4; ++i)
+    {
+        Sealer s (keys.key);
+        CHECK (rx.open (s.seal (message)));
+    }
+    const auto last = again.seal (message);
+    CHECK (rx.open (last) && ! rx.open (last));
+}

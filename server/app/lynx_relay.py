@@ -34,6 +34,10 @@ ROOM_MAX_HOURS = env_int("LYNX_RELAY_ROOM_MAX_HOURS", 72)                  # a r
 ROOM_IDLE_HOURS = env_int("LYNX_RELAY_ROOM_IDLE_HOURS", 12)                # connected, but no frame for this long
 MAX_TEXT = 4096                                                            # bytes per control (text) message
 CLOSE_LIMIT = 4001                                                         # WebSocket close code: a limit was reached
+CLOSE_SLOW = 4002                                                          # WebSocket close code: the peer reads too slowly
+# Round 190oh: what may wait for one peer that reads slowly before it is closed (it reconnects and resumes). Every
+# peer has its own outbox, so a slow reader never holds up what its sender sends to the others.
+PEER_QUEUE_BYTES = env_int("LYNX_RELAY_PEER_QUEUE", 16 * 1024 * 1024)
 SUBPROTOCOL = "lynx-relay.v1"
 # A room token the host chose (LYNX derives it from the invite code, so a guest who has the code can connect without the
 # server ever handing the token out). Only its SHA-256 is kept, like every token here.
@@ -83,6 +87,7 @@ class Room:
         self.creator = creator         # the salted client key (rate limits only; never logged)
         self.bytes = 0                 # relayed so far
         self.last_frame = self.created
+        self.outboxes: dict[int, Outbox] = {}  # round 190oh: one per connected peer
 
     def over_limit(self, now: float) -> str:
         """Why this room must close now ("" = it may go on)."""
@@ -105,6 +110,58 @@ class Room:
 
 
 rooms: dict[str, Room] = {}
+
+
+class Outbox:
+    """Round 190oh: what goes to one peer, in order, written by a task of its own. Before this the relay forwarded each
+    frame with `await peer.send_bytes(...)` inside the sender's read loop, so one peer that read slowly held up
+    everything its sender sent to everyone else (a 128 KiB/s reader delayed edits to another peer by 4.5 s median,
+    12 s at worst). Now `put` never waits; a peer with more than PEER_QUEUE_BYTES waiting is closed (CLOSE_SLOW)."""
+
+    def __init__(self, ws: web.WebSocketResponse, limit: int | None = None):
+        self.ws = ws
+        self.limit = PEER_QUEUE_BYTES if limit is None else limit
+        self.queue: asyncio.Queue = asyncio.Queue()
+        self.waiting = 0               # bytes queued and not yet written
+        self.closed_slow = False
+        self.task = asyncio.create_task(self.run())
+
+    def put(self, item: bytes | str) -> bool:
+        """Queues a frame (bytes) or a control message (str); False when the peer is gone or was too slow."""
+        if self.closed_slow or self.ws.closed:
+            return False
+        self.waiting += len(item)
+        if self.waiting > self.limit:
+            self.closed_slow = True
+            log.warning("a peer read too slowly (%d bytes waiting): closed", self.waiting)
+            asyncio.create_task(self.ws.close(code=CLOSE_SLOW, message=b"too slow"))
+            return False
+        self.queue.put_nowait(item)
+        return True
+
+    async def run(self) -> None:
+        try:
+            while True:
+                item = await self.queue.get()
+                if item is None:
+                    return
+                self.waiting -= len(item)
+                if self.ws.closed:
+                    continue
+                if isinstance(item, str):
+                    await self.ws.send_str(item)
+                else:
+                    await self.ws.send_bytes(item)
+        except (ConnectionError, RuntimeError, asyncio.CancelledError):
+            return
+
+    async def finish(self) -> None:
+        self.queue.put_nowait(None)
+        self.task.cancel()
+        try:
+            await self.task
+        except asyncio.CancelledError:
+            pass
 
 
 def room_token_from(request: web.Request) -> str:
@@ -190,15 +247,19 @@ async def close_for_limit(room: Room, reason: str) -> None:
     await drop_room(room, reason, CLOSE_LIMIT)
 
 
-async def send_json(ws: web.WebSocketResponse, msg: dict) -> None:
-    if not ws.closed:
-        await ws.send_str(json.dumps(msg, separators=(",", ":")))
+async def send_json(ws: web.WebSocketResponse, msg: dict, room: Room | None = None, slot: int | None = None) -> None:
+    text = json.dumps(msg, separators=(",", ":"))
+    box = room.outboxes.get(slot) if room is not None and slot is not None else None
+    if box is not None and box.ws is ws:
+        box.put(text)  # (in order with the frames already waiting for that peer)
+    elif not ws.closed:
+        await ws.send_str(text)
 
 
 async def broadcast(room: Room, msg: dict, skip: int | None = None) -> None:
     for n, ws in list(room.peers.items()):
         if n != skip:
-            await send_json(ws, msg)
+            await send_json(ws, msg, room, n)
 
 
 async def connect(request: web.Request) -> web.StreamResponse:
@@ -216,8 +277,9 @@ async def connect(request: web.Request) -> web.StreamResponse:
     ws = web.WebSocketResponse(protocols=(SUBPROTOCOL,), heartbeat=25, max_msg_size=MAX_FRAME)
     await ws.prepare(request)
     room.peers[slot] = ws
+    room.outboxes[slot] = box = Outbox(ws)
     room.touched = time.time()
-    await send_json(ws, {"type": "welcome", "peer": slot, "peers": sorted(room.peers), "maxPeers": MAX_PEERS})
+    await send_json(ws, {"type": "welcome", "peer": slot, "peers": sorted(room.peers), "maxPeers": MAX_PEERS}, room, slot)
     await broadcast(room, {"type": "join", "peer": slot}, skip=slot)
     log.info("room %s…: peer %d joined (%d/%d)", room.id[:4], slot, len(room.peers), MAX_PEERS)
 
@@ -252,29 +314,32 @@ async def connect(request: web.Request) -> web.StreamResponse:
                 frames_total += 1
                 out = bytes([slot]) + data[1:]
                 targets = [n for n in room.peers if n != slot] if dest == 0 else [dest]
-                for n in targets:
-                    peer = room.peers.get(n)
-                    if peer is not None and not peer.closed:
-                        await peer.send_bytes(out)
+                for n in targets:  # (round 190oh: never waits for a slow reader)
+                    target = room.outboxes.get(n)
+                    if target is not None:
+                        target.put(out)
             elif msg.type == WSMsgType.TEXT:
                 if len(msg.data) > MAX_TEXT:
-                    await send_json(ws, {"type": "error", "error": "control message too long"})
+                    await send_json(ws, {"type": "error", "error": "control message too long"}, room, slot)
                     continue
                 try:
                     ctl = json.loads(msg.data)
                 except ValueError:
                     ctl = {}
                 if ctl.get("type") == "ping":
-                    await send_json(ws, {"type": "pong", "t": ctl.get("t")})
+                    await send_json(ws, {"type": "pong", "t": ctl.get("t")}, room, slot)
                 elif ctl.get("type") == "peers":
-                    await send_json(ws, {"type": "peers", "peers": sorted(room.peers)})
+                    await send_json(ws, {"type": "peers", "peers": sorted(room.peers)}, room, slot)
                 else:
-                    await send_json(ws, {"type": "error", "error": "unknown control message"})
+                    await send_json(ws, {"type": "error", "error": "unknown control message"}, room, slot)
             elif msg.type == WSMsgType.ERROR:
                 break
     finally:
         if room.peers.get(slot) is ws:
             del room.peers[slot]
+        if room.outboxes.get(slot) is box:
+            del room.outboxes[slot]
+        await box.finish()
         room.touched = time.time()
         await broadcast(room, {"type": "leave", "peer": slot})
         log.info("room %s…: peer %d left (%d/%d)", room.id[:4], slot, len(room.peers), MAX_PEERS)

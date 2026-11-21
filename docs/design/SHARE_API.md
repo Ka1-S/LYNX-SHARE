@@ -156,6 +156,11 @@ room). Today it only forwards/echoes; the session protocol on top is the app's (
   frame, 4 KiB per control (text) message. A room or connection that hits one is closed with WebSocket code **4001**
   (the app then tells the user and does not reconnect). `/health` → `relay.limits` lists them and `limitsHit` counts
   how often one was hit; no addresses are logged. Rooms live in memory only: nothing is written to disk.
+- **Per-peer outboxes (round 190oh)**: every peer has its own queue, written by a task of its own, so a peer that
+  reads slowly never holds up what its sender sends to the others (before, one 128 KiB/s reader delayed another peer's
+  edits by 4.5 s median, 12 s at worst; now 0.5 ms median locally). A peer with more than `LYNX_RELAY_PEER_QUEUE`
+  (16 MiB) waiting is closed with code **4002** ("too slow"); the app reconnects and its transfers go on from where
+  they were.
 
 ### 3.2 Connect
 

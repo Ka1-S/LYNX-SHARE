@@ -57,9 +57,24 @@ public:
     explicit Opener (const std::array<std::uint8_t, 32>& key);
     std::optional<std::vector<std::uint8_t>> open (const std::vector<std::uint8_t>& frame, std::uint64_t* sender = nullptr);
 
+    // Round 190oh: a frame is a replay when its sender's counter was seen before. Each sender has the highest counter
+    // seen and a window of the 64 below it (IPsec's anti-replay window): a frame that arrives a little out of order (a
+    // future sender that lets the song's changes overtake media pieces it sealed earlier) is still taken once;
+    // anything older than the window, or seen, is dropped. Senders past `maxSenders` (old connections) are forgotten,
+    // the oldest first.
+    static constexpr std::size_t maxSenders = 256;
+
 private:
+    struct Seen
+    {
+        std::uint64_t last = 0;   // highest counter
+        std::uint64_t window = 0; // bit k: counter last - 1 - k was seen
+        std::uint64_t order = 0;  // when this sender was first seen
+    };
     std::array<std::uint8_t, 32> key;
-    std::map<std::uint64_t, std::uint64_t> last; // sender -> highest counter
+    std::map<std::uint64_t, Seen> senders;
+    std::uint64_t sendersSeen = 0;
+    bool fresh (Seen& s, std::uint64_t counter) noexcept;
 };
 
 // The host's identity in a session (round 169j): when a host comes back after a drop or a restart, the guests check it
