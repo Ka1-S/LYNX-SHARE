@@ -2614,29 +2614,8 @@ inline void canvasHardcore (juce::Graphics& g, Rectangle<float> a, bool display)
         for (float y = a.getY(); y < a.getBottom(); y += 3.0f)
             g.fillRect (Rectangle<float> (a.getX(), y, a.getWidth(), 1.0f));
     }
-    // stomp-box silhouettes in a row along the bottom, each its own colour, joined by cables
-    const Colour shells[] { Colour (0xffd4561e), Colour (0xff2a7ad4), Colour (0xff3ab06a), Colour (0xffe0c03a), Colour (0xffb03a8a), Colour (0xffd8d8d8) };
-    const auto w = 46.0f, h = 62.0f;
-    const auto y = a.getBottom() - h * 0.55f;
-    int i = 0;
-    for (float x = a.getX() + 14.0f; x + w < a.getRight(); x += w + 20.0f, ++i)
-    {
-        const auto box = Rectangle<float> (x, y, w, h);
-        g.setColour (shells[i % 6].withAlpha (0.16f));
-        g.fillRoundedRectangle (box, 4.0f);
-        g.setColour (Colours::white.withAlpha (0.08f));
-        for (int k = 0; k < 2; ++k)
-            g.fillEllipse (Rectangle<float> (9.0f, 9.0f).withCentre ({ box.getX() + 13.0f + (float) k * 20.0f, box.getY() + 12.0f }));
-        g.fillRoundedRectangle (Rectangle<float> (22.0f, 10.0f).withCentre ({ box.getCentreX(), box.getY() + 38.0f }), 2.0f);
-        if (x + w * 2.0f + 20.0f < a.getRight()) // the cable to the next box
-        {
-            juce::Path cable;
-            cable.startNewSubPath (box.getRight(), box.getY() + 22.0f);
-            cable.quadraticTo (box.getRight() + 10.0f, box.getY() + 2.0f, box.getRight() + 20.0f, box.getY() + 22.0f);
-            g.setColour (Colours::black.withAlpha (0.5f));
-            g.strokePath (cable, juce::PathStrokeType (3.0f));
-        }
-    }
+    // (round 190oo, design review WG-29: the row of stomp-box silhouettes this canvas drew along the bottom sat behind the
+    // five module name buttons and was cut by the window's edge, so it read as a broken pedal shelf; the grille stays)
     softLight (g, { a.getCentreX(), a.getY() }, a.getWidth() * 0.5f, p.accent, 0.06f);
     vignette (g, a, 0.45f);
 }
