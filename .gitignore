@@ -16,3 +16,4 @@ __pycache__/
 *.obj
 build-ctl/
 build-plug/
+test-output.log
