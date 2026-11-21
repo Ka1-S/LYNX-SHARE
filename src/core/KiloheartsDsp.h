@@ -93,6 +93,10 @@ constexpr double driveLo = 0.25, driveHi = 16.0;
 constexpr double crushLo = 100.0, crushHi = 50000.0;
 // Frequency Shifter: [13] shift (v − ½) · 10 kHz (±5 kHz)
 // Ensemble: [13] voices / 16, [14] detune, [15] spread, [16] motion / 2 (random, symmetric, sine); the mix is Wet
+// round 190oc — Nonlinear Filter: [13] type / 4 (low, band, high pass, notch, all-pass), [14] mode / 8 (clean, saturated,
+// tubular, clipped, warm, biased, fuzzy, metallic, digital: the plug-in's order), [15] cutoff logv 20 … 20 480 Hz,
+// [16] Q logv 0.5 … 24, [17] drive; the mix is Wet
+constexpr double nlfCutLo = 20.0, nlfCutHi = 20480.0, nlfQLo = 0.5, nlfQHi = 24.0;
 inline double gateStepsPerBeat (float v) noexcept
 {
     static constexpr double steps[7] { 2.0, 3.0, 4.0, 6.0, 8.0, 12.0, 16.0 };
@@ -200,8 +204,12 @@ public:
         ensPos = 0.0;
         for (auto& v : ensAp)
             v = {};
+        nlfReset();
     }
     void setSongBeats (double b) noexcept { songBeats = b; songKnown = true; }
+    // round 190oc: LYNX's own half-band (the Nonlinear Filter's 2× resampler): its all-pass coefficients, A0's at the even
+    // places, A1's at the odd ones (tests, docs)
+    static std::vector<double> nonlinearHalfBand() { const auto& a = nlfHalfBand().a; return { a.begin(), a.end() }; }
     // round 190nh: the Trance Gate follows a song position only when it moves (a stopped transport: free running)
 
     void process (Law law, float* l, float* r, int n, const float* p, float mix, double bpm) noexcept
@@ -221,6 +229,7 @@ public:
             case Law::bitcrush: bitcrush (l, r, n, p, mix); break;
             case Law::freqShift: freqShift (l, r, n, p, mix); break;
             case Law::ensemble: ensemble (l, r, n, p, mix); break;
+            case Law::nonlinearFilter: nonlinearFilter (l, r, n, p, mix); break;
             default: break;
         }
     }
@@ -1354,6 +1363,338 @@ private:
             l[i] = (float) ((1.0 - mix) * line[0].back (b) + sl);
             r[i] = (float) ((1.0 - mix) * line[1].back (b) + sr);
         }
+    }
+    // ---- Nonlinear Filter (round 190oc) ------------------------------------------------------------------------
+    // DirtyFilterDsp read in HeartCore 2.4 (REA_rodada190oc): a state-variable filter of the Chamberlin form at eight
+    // times the rate, hp = x − lp + k · bp, bp += g · hp, lp += g · bp (k = (1 − e^(g / Q)) / g; g solves g + g³ / 24 = ω,
+    // ω = 2π · cutoff · scale / 8 fs: the first two terms of 2 asin (g / 2)); the mode bends it with drive d = 10^(dB / 20),
+    // dB = lo + Drive · (hi − lo) per mode:
+    //   0 clean: linear (0 dB);
+    //   1 saturated: the low pass fed back through f (d · lp) / d, f (a) = a + a³ / 3 + a⁵ / 5 (|a| ≤ 1, then 3a ∓ 22/15),
+    //     −12 … +24 dB, cutoff × 0.66^(D²), the low-pass output × 10^(0.35 D²);
+    //   2 tubular: both states scaled back onto the circle d · |(lp, bp)| ≤ 1, −12 … +16 dB;
+    //   3 clipped: both states clipped to ±d, +3 … −16 dB;
+    //   4 warm: x − lp through e (v) / d, e (v) = v − 0.9 tanh v (tanh as its [7/6] Padé fraction, |v| ≤ 4.373), v = d (x − lp),
+    //     +24 … 0 dB, cutoff × 1.5^(D²), band pass × 10^(D / 2), high pass × 10^(0.75 D + 0.1);
+    //   5 biased: the low pass fed back as (1 − h (−d · lp)) / d, h = exp on |a| ≤ 1, e · a above, (a + 2) / e below, −16 … +24 dB;
+    //   6 fuzzy: the band pass clipped to ±1 / d, 0 … +36 dB, band pass × 10^(D²);
+    //   7 metallic: x − lp through (0.75 sin v + 0.25 v) / d, −12 … +24 dB, cutoff × 1.2^(D²), band pass × 10^(D² / 4),
+    //     high pass × 10^(0.35 D⁴);
+    //   8 digital: x − lp through ⌊v⌋ + ½ averaged over v ± 0.05 (a box-filtered staircase), +24 … 0 dB.
+    // Out = cIn · x + cLp · lp[n−1] + cBp · bp[n−1] + cHp · hp[n] by type (low / band / high pass, notch = low + high or, in
+    // the fuzzy and digital modes, x − bp / Q, all-pass = low + high − bp / Q (digital: − 2 bp / Q)); the coefficients ramp
+    // across a block and jump when the mode changes. Around it: up 2× through a half-band, up 4× by Catmull-Rom between
+    // the 2× samples, down through a 6th-order Chebyshev II low pass (85 dB from 1.5 fs, the snapins' textbook design, as
+    // round 190nh's oversampler) keeping every 4th sample, down 2× through the half-band, then a cookbook 17 Hz high pass
+    // (Q 1/√2). The plug-in's half-band is a fixed coefficient table: LYNX designs its own (nlfHalfBand below).
+    //
+    // LYNX's own half-band: a two-branch polyphase IIR half-band, H (z) = ½ (A0 (z²) + z^-1 A1 (z²)), each branch a cascade
+    // of first-order all-passes (a + z^-1) / (1 + a z^-1); its coefficients come from the elliptic design of Valenzuela and
+    // Constantinides (IEE Proc. G 130, 1983: selectivity from the transition band, the nome's theta series), worked out
+    // here at first use with LYNX's own specification: nlfHalfBandCoefs coefficients (alternately to A0 and A1) and a
+    // transition band of nlfHalfBandTbw of the 2× rate (chosen on the references: lab/halfband.py, REA_rodada190oc §3).
+    static constexpr int nlfHalfBandCoefs = 8;        // (17th order: 109 dB stop band)
+    static constexpr double nlfHalfBandTbw = 0.054;   // (of the 2× rate: pass band to 0.223 × 2 fs, stop band from 0.277)
+    struct NlfHalfBand
+    {
+        std::array<double, nlfHalfBandCoefs> a {};
+        NlfHalfBand() noexcept
+        {
+            const int n = nlfHalfBandCoefs, order = 2 * n + 1;
+            const double k = std::pow (std::tan ((1.0 - 2.0 * nlfHalfBandTbw) * pi / 4.0), 2.0); // the selectivity
+            const double kp = std::pow (1.0 - k * k, 0.25);
+            const double e = 0.5 * (1.0 - kp) / (1.0 + kp);
+            const double q = e + 2.0 * std::pow (e, 5.0) + 15.0 * std::pow (e, 9.0) + 150.0 * std::pow (e, 13.0); // the nome
+            for (int i = 1; i <= n; ++i)
+            {
+                double num = 0.0, den = 0.0;
+                for (int m = 0; m < 12; ++m)
+                    num += (m % 2 == 0 ? 1.0 : -1.0) * std::pow (q, (double) (m * (m + 1))) * std::sin ((2 * m + 1) * i * pi / order);
+                for (int m = 1; m < 12; ++m)
+                    den += (m % 2 == 0 ? 1.0 : -1.0) * std::pow (q, (double) (m * m)) * std::cos (2.0 * m * i * pi / order);
+                const double w = 2.0 * std::pow (q, 0.25) * num / (1.0 + 2.0 * den), w2 = w * w;
+                const double x = std::sqrt ((1.0 - w2 * k) * (1.0 - w2 / k)) / (1.0 + w2);
+                a[(std::size_t) (i - 1)] = (1.0 - x) / (1.0 + x);
+            }
+        }
+    };
+    static const NlfHalfBand& nlfHalfBand() noexcept
+    {
+        static const NlfHalfBand h;
+        return h;
+    }
+    // one branch's all-pass chain (state x[n−1], y[n−1] per section), at the low rate
+    struct NlfBranch
+    {
+        std::array<double, nlfHalfBandCoefs> x1 {}, y1 {};
+        double run (const double* a, int first, double v) noexcept
+        {
+            for (int s = first, j = 0; s < nlfHalfBandCoefs; s += 2, ++j)
+            {
+                const double y = a[s] * (v - y1[(std::size_t) j]) + x1[(std::size_t) j];
+                x1[(std::size_t) j] = v;
+                y1[(std::size_t) j] = y;
+                v = y;
+            }
+            return v;
+        }
+    };
+    struct NlfChannel
+    {
+        NlfBranch up0, up1, dn0, dn1;
+        std::array<float, 4> hist {};        // the last four 2× samples (oldest first)
+        double lp = 0.0, bp = 0.0;           // the filter's states
+        double c1[3] {}, c2[3] {}, d1[3] {}, d2[3] {}; // the Chebyshev II sections (x and y history)
+        double dc[4] {};                     // the 17 Hz high pass (x1, x2, y1, y2)
+    };
+    std::array<NlfChannel, 2> nlfCh {};
+    struct NlfCoefs
+    {
+        double g = 0.0, k = 0.0, drive = 1.0, cLp = 0.0, cBp = 0.0, cHp = 0.0, cIn = 0.0;
+    };
+    NlfCoefs nlfNow {};
+    int nlfMode = -1;                        // (−1: nothing played yet — the first block takes its values at once)
+    double nlfForRate = 0.0;
+    double nlfB0[3] {}, nlfB1[3] {}, nlfA1[3] {}, nlfA2[3] {}; // (b2 = b0)
+    double nlfDc[5] {};
+    static NlfCoefs nlfDesign (int type, int mode, double cutoff, double q, double drive, double rate8) noexcept
+    {
+        NlfCoefs c;
+        double bp = 1.0;          // the band pass's coefficient the modes scale
+        bool lpOn = false, hpOn = false;
+        switch (type)
+        {
+            case 1: c.cBp = 1.0; break;
+            case 2: c.cHp = 1.0, hpOn = true, bp = 0.0; break;
+            case 3:
+                if (mode == 6 || mode == 8)
+                    c.cBp = bp = -1.0 / q, c.cIn = 1.0;
+                else
+                    c.cLp = c.cHp = 1.0, lpOn = hpOn = true, bp = 0.0;
+                break;
+            case 4:
+                c.cLp = c.cHp = 1.0, lpOn = hpOn = true;
+                c.cBp = bp = (mode == 8 ? -2.0 : -1.0) / q;
+                break;
+            default: c.cLp = 1.0, lpOn = true, bp = 0.0; break;
+        }
+        const double D = std::clamp (drive, 0.0, 1.0), D2 = D * D;
+        const auto db = [] (double v) { return std::pow (10.0, v / 20.0); };
+        double scale = 1.0, lo = 0.0, hi = 0.0;
+        switch (mode)
+        {
+            case 1: scale = std::pow (0.66, D2), lo = -12.0, hi = 24.0; if (lpOn) c.cLp = db (7.0 * D2); break;
+            case 2: lo = -12.0, hi = 16.0; break;
+            case 3: lo = 3.0, hi = -16.0; break;
+            case 4:
+                scale = std::pow (1.5, D2), lo = 24.0, hi = 0.0;
+                if (type != 2 && bp != 0.0) c.cBp = bp * db (10.0 * D);
+                if (hpOn) c.cHp = db (15.0 * D + 2.0);
+                break;
+            case 5: lo = -16.0, hi = 24.0; break;
+            case 6: lo = 0.0, hi = 36.0; if (bp != 0.0) c.cBp = bp * db (20.0 * D2); break;
+            case 7:
+                scale = std::pow (1.2, D2), lo = -12.0, hi = 24.0;
+                if (bp != 0.0) c.cBp = bp * db (5.0 * D2);
+                if (hpOn) c.cHp = db (7.0 * D2 * D2);
+                break;
+            case 8: lo = 24.0, hi = 0.0; break;
+            default: break;
+        }
+        c.drive = db (lo + D * (hi - lo));
+        const double w = scale * twoPi * cutoff / rate8;
+        // g + g³ / 24 = ω (Cardano: the one real root)
+        const double s = std::sqrt (144.0 * w * w + 512.0);
+        c.g = std::cbrt (12.0 * w + s) + std::cbrt (12.0 * w - s);
+        c.k = (1.0 - std::exp (c.g / q)) / c.g;
+        return c;
+    }
+    // the Catmull-Rom weights of the four 2× samples at t = ¼, ½, ¾, 1 between the second and the third: ½ (−t + 2t² − t³),
+    // ½ (2 − 5t² + 3t³), ½ (t + 4t² − 3t³), ½ (t³ − t²) (exact in float: multiples of 1/128)
+    static constexpr std::array<std::array<float, 4>, 4> nlfCatmull = [] {
+        std::array<std::array<float, 4>, 4> w {};
+        for (int j = 0; j < 4; ++j)
+        {
+            const double t = 0.25 * (j + 1), t2 = t * t, t3 = t2 * t;
+            w[(std::size_t) j] = { (float) (0.5 * (-t + 2.0 * t2 - t3)), (float) (0.5 * (2.0 - 5.0 * t2 + 3.0 * t3)), (float) (0.5 * (t + 4.0 * t2 - 3.0 * t3)),
+                                   (float) (0.5 * (t3 - t2)) };
+        }
+        return w;
+    }();
+    static double nlfTanh (double v) noexcept // the [7/6] Padé fraction of tanh (Lambert's continued fraction), |v| ≤ 4.373
+    {
+        v = std::clamp (v, -4.373000144958496, 4.373000144958496);
+        const double v2 = v * v;
+        return v * ((21.0 * v2 + 1260.0) * v2 + 10395.0) / (((v2 + 210.0) * v2 + 4725.0) * v2 + 10395.0);
+    }
+    static double nlfFloorInt (double u) noexcept // ∫₀ᵘ ⌊s⌋ ds
+    {
+        const double f = std::floor (u);
+        return 0.5 * f * (2.0 * u - f - 1.0);
+    }
+    // one step of the filter at 8 fs: x in, the output by type
+    static float nlfStep (NlfChannel& ch, double x, int mode, const NlfCoefs& c) noexcept
+    {
+        const double lp = ch.lp, bp = ch.bp, g = c.g, d = c.drive;
+        double hp;
+        switch (mode)
+        {
+            case 1:
+            {
+                const double a = d * lp;
+                const double f = a < -1.0 ? 3.0 * a + 22.0 / 15.0 : a > 1.0 ? 3.0 * a - 22.0 / 15.0 : a + a * a * a * (a * a / 5.0 + 1.0 / 3.0);
+                hp = c.k * bp + (x - f / d);
+                break;
+            }
+            case 4: { const double v = d * (x - lp); hp = c.k * bp + (v - 0.9 * nlfTanh (v)) / d; break; }
+            case 5:
+            {
+                const double a = -d * lp;
+                const double h = a < -1.0 ? (a + 2.0) / 2.718281828459045 : a > 1.0 ? 2.718281828459045 * a : std::exp (a);
+                hp = c.k * bp + x + (h - 1.0) / d;
+                break;
+            }
+            case 7: { const double v = d * (x - lp); hp = c.k * bp + (0.75 * std::sin (v) + 0.25 * v) / d; break; }
+            case 8:
+            {
+                const double v = d * (x - lp);
+                hp = c.k * bp + (10.0 * (nlfFloorInt (v + 0.05) - nlfFloorInt (v - 0.05)) + 0.5) / d;
+                break;
+            }
+            default: hp = c.k * bp + (x - lp); break;
+        }
+        double nbp = bp + g * hp, nlp;
+        switch (mode)
+        {
+            case 2:
+            {
+                nlp = lp + g * nbp;
+                const double r = d * std::sqrt (nlp * nlp + nbp * nbp);
+                const double s = r < 1.0 ? 1.0 : 1.0 / r;
+                nbp *= s, nlp *= s;
+                break;
+            }
+            case 3:
+                nbp = std::clamp (nbp, -d, d);
+                nlp = std::clamp (lp + g * nbp, -d, d);
+                break;
+            case 6:
+                nbp = std::clamp (d * nbp, -1.0, 1.0) / d;
+                nlp = lp + g * nbp;
+                break;
+            default: nlp = lp + g * nbp; break;
+        }
+        ch.lp = nlp;
+        ch.bp = nbp;
+        return (float) c.cIn * (float) x + (float) (c.cLp * lp) + (float) (c.cBp * bp) + (float) c.cHp * (float) hp;
+    }
+    void nonlinearFilter (float* l, float* r, int n, const float* p, float mix) noexcept
+    {
+        if (n <= 0)
+            return;
+        const int type = std::clamp ((int) std::lround (4.0 * p[valueParam]), 0, 4);
+        const int mode = std::clamp ((int) std::lround (8.0 * p[valueParam + 1]), 0, 8);
+        const double rate8 = 8.0 * fs;
+        const auto target = nlfDesign (type, mode, enc::logv (p[valueParam + 2], enc::nlfCutLo, enc::nlfCutHi),
+                                       enc::logv (p[valueParam + 3], enc::nlfQLo, enc::nlfQHi), p[valueParam + 4], rate8);
+        if (nlfForRate != fs)
+        {
+            nlfForRate = fs;
+            // the decimator: a 6th-order Chebyshev II low pass at 8 fs, 85 dB from 1.5 fs (textbook, unity at DC)
+            constexpr int order = 6;
+            const double eps = 1.0 / std::sqrt (std::pow (10.0, 85.0 / 10.0) - 1.0);
+            const double mu = std::asinh (1.0 / eps) / order;
+            const double kk = 1.0 / std::tan (pi * 1.5 * fs / rate8);
+            for (int s = 0; s < 3; ++s)
+            {
+                const double th = pi * (2.0 * s + 1.0) / (2.0 * order);
+                const double sr = -std::sinh (mu) * std::sin (th), si = std::cosh (mu) * std::cos (th);
+                const double den = sr * sr + si * si;
+                const double pr = sr / den, pim = -si / den;
+                const double Z = 1.0 / (std::cos (th) * std::cos (th)), B = -2.0 * pr, C = pr * pr + pim * pim;
+                const double gg = C / Z, a0 = kk * kk + B * kk + C;
+                nlfB0[s] = gg * (kk * kk + Z) / a0;
+                nlfB1[s] = gg * 2.0 * (Z - kk * kk) / a0;
+                nlfA1[s] = 2.0 * (C - kk * kk) / a0;
+                nlfA2[s] = (kk * kk - B * kk + C) / a0;
+            }
+            // the output's DC filter: a cookbook high pass, 17 Hz, Q 1/√2
+            const double w0 = twoPi * std::min (17.0, 0.49 * fs) / fs, cs = std::cos (w0), al = std::sin (w0) / (2.0 * 0.7071067811865476);
+            const double a0 = 1.0 + al;
+            nlfDc[0] = (1.0 + cs) / 2.0 / a0, nlfDc[1] = -(1.0 + cs) / a0, nlfDc[2] = nlfDc[0];
+            nlfDc[3] = -2.0 * cs / a0, nlfDc[4] = (1.0 - al) / a0;
+        }
+        NlfCoefs step {};
+        if (mode != nlfMode)
+            nlfNow = target, nlfMode = mode;
+        else
+        {
+            const double inv = 1.0 / (8.0 * n);
+            step = { (target.g - nlfNow.g) * inv, (target.k - nlfNow.k) * inv, (target.drive - nlfNow.drive) * inv, (target.cLp - nlfNow.cLp) * inv,
+                     (target.cBp - nlfNow.cBp) * inv, (target.cHp - nlfNow.cHp) * inv, (target.cIn - nlfNow.cIn) * inv };
+        }
+        const bool ramp = mode == nlfMode && (step.g != 0.0 || step.k != 0.0 || step.drive != 0.0 || step.cLp != 0.0 || step.cBp != 0.0
+                                              || step.cHp != 0.0 || step.cIn != 0.0);
+        const double* a = nlfHalfBand().a.data();
+        float* io[2] { l, r };
+        for (int i = 0; i < n; ++i)
+        {
+            // the coefficients this sample's eight steps use (the same for both channels; held: all eight the same)
+            NlfCoefs ramped[8];
+            const NlfCoefs* cs = ramped;
+            if (ramp)
+                for (int j = 0; j < 8; ++j)
+                {
+                    nlfNow.g += step.g, nlfNow.k += step.k, nlfNow.drive += step.drive, nlfNow.cLp += step.cLp;
+                    nlfNow.cBp += step.cBp, nlfNow.cHp += step.cHp, nlfNow.cIn += step.cIn;
+                    ramped[j] = nlfNow;
+                }
+            const int stride = ramp ? 1 : 0;
+            if (! ramp)
+                cs = &nlfNow;
+            for (int c = 0; c < 2; ++c)
+            {
+                auto& ch = nlfCh[(std::size_t) c];
+                const float x = io[c][i];
+                // up 2×: the two branches give the even and the odd 2× sample
+                const double u[2] { ch.up0.run (a, 0, x), ch.up1.run (a, 1, x) };
+                double half[2];
+                for (int h = 0; h < 2; ++h)
+                {
+                    auto& hs = ch.hist;
+                    hs[0] = hs[1], hs[1] = hs[2], hs[2] = hs[3], hs[3] = (float) u[h];
+                    // up 4× (Catmull-Rom between hs[1] and hs[2] at ¼, ½, ¾, 1), the filter, the decimator's low pass
+                    double y = 0.0;
+                    for (int j = 0; j < 4; ++j)
+                    {
+                        const auto& wj = nlfCatmull[(std::size_t) j];
+                        const float xi = wj[0] * hs[0] + wj[1] * hs[1] + wj[2] * hs[2] + wj[3] * hs[3];
+                        double v = nlfStep (ch, xi, mode, cs[(4 * h + j) * stride]);
+                        for (int s = 0; s < 3; ++s)
+                        {
+                            const double out = nlfB0[s] * v + nlfB1[s] * ch.c1[s] + nlfB0[s] * ch.c2[s] - nlfA1[s] * ch.d1[s] - nlfA2[s] * ch.d2[s];
+                            ch.c2[s] = ch.c1[s], ch.c1[s] = v;
+                            ch.d2[s] = ch.d1[s], ch.d1[s] = out;
+                            v = (double) (float) out;
+                        }
+                        y = v;
+                    }
+                    half[h] = y;
+                }
+                // down 2×: the odd 2× sample through A0, the even one through A1 (H's odd outputs kept)
+                const double down = 0.5 * (ch.dn0.run (a, 0, half[1]) + ch.dn1.run (a, 1, half[0]));
+                auto& z = ch.dc;
+                const double o = nlfDc[0] * down + nlfDc[1] * z[0] + nlfDc[2] * z[1] - nlfDc[3] * z[2] - nlfDc[4] * z[3];
+                z[1] = z[0], z[0] = down, z[3] = z[2], z[2] = o;
+                io[c][i] = (float) (x + mix * ((float) o - x));
+            }
+        }
+    }
+    void nlfReset() noexcept
+    {
+        for (auto& ch : nlfCh)
+            ch = {};
+        nlfMode = -1;
     }
 };
 } // namespace lynx::khsdsp

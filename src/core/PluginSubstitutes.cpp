@@ -1111,7 +1111,7 @@ translate = kilohearts
 [khs-nonlinear-filter]
 product = kHs Nonlinear Filter
 vendor = Kilohearts
-lynx = Filter
+lynx = Effector
 names = kHs Nonlinear Filter
 translate = kilohearts
 
