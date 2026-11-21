@@ -5,7 +5,7 @@
 #   LYNX-Plugins-<label>-win-x64.zip           (windows)
 #   LYNX-Plugins-<label>-linux-x86_64.tar.xz   (linux)
 #   LYNX-Plugins-<label>-macos-universal.tar.xz   (macos)
-# Inside: LYNX-Plugins-<label>/{CLAP/LYNX Plugins.clap, VST3/*.vst3, PLUGINS.txt, README.txt, install script, LICENSE,
+# Inside: LYNX-Plugins-<label>/{CLAP/LYNX Plugins.clap, VST3/*.vst3, LV2/*.lv2 (Linux, round 190ov), PLUGINS.txt, README.txt, install script, LICENSE,
 # THIRD_PARTY.md}. The plugins come from the build's plugins/ folder (cmake/LynxPlugins.cmake, scripts/build-windows-zig.sh).
 #
 #   scripts/package-plugins.sh <windows|linux|macos> <plugins dir> <label> <dist dir>
@@ -49,12 +49,21 @@ cp -R "$plugins/LYNX Plugins.clap" "$pkg/CLAP/"
     printf '%-26s %-11s %s\n' "Plugin" "Kind" "Formats"
 } > "$pkg/PLUGINS.txt"
 missing=0
+# (LV2 only when the build made LV2 bundles: cmake option LYNX_PLUGINS_LV2)
+lv2build=0
+compgen -G "$plugins/*.lv2" > /dev/null && lv2build=1
 while IFS='~' read -r name instrument built; do
     kind=effect; [[ "$instrument" == 1 ]] && kind=instrument
     formats=CLAP
     if [[ "$built" == 2 ]]; then
         formats="CLAP, VST3"
         if [[ -e "$plugins/$name.vst3" ]]; then cp -R "$plugins/$name.vst3" "$pkg/VST3/"; else echo "missing: $plugins/$name.vst3" >&2; missing=1; fi
+        if [[ "$os" == linux && $lv2build == 1 ]]; then # (round 190ov: LV2 bundles, dashes for the name's other characters)
+            lv2="${name//[^A-Za-z0-9]/-}.lv2"
+            formats="CLAP, VST3, LV2"
+            mkdir -p "$pkg/LV2"
+            if [[ -e "$plugins/$lv2/manifest.ttl" ]]; then cp -R "$plugins/$lv2" "$pkg/LV2/"; else echo "missing: $plugins/$lv2" >&2; missing=1; fi
+        fi
     fi
     printf '%-26s %-11s %s\n' "$name" "$kind" "$formats" >> "$pkg/PLUGINS.txt"
 done < <(sed -nE 's/^LYNX_PLUGIN \("([^"]+)", ([01]), [^,]+, [^,]+, "[^"]+", 0x[0-9a-f]+, "[^"]+", ([12])\)$/\1~\2~\3/p' src/plugin/plugins.def)

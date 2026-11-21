@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Checks an unpacked LYNX plugin download (scripts/package-plugins.sh) the way hosts will load it (round 188b,
 # docs/PLUGIN_EXPORT.md), on Windows (Git Bash), Linux or macOS:
-#   plugexporttest  the CLAP and each VST3: scan, null test against the engine, automation, state, editor, memory, CPU
+#   plugexporttest  the CLAP, each VST3 and each LV2 (Linux, round 190ov): scan, null test against the engine, automation, state, editor, memory, CPU
 #   pluginval       each VST3, strictness 10, no GUI tests (no screen on CI)
 #   clap-validator  the CLAP
 # Every report goes to <reports dir>; with [pictures], plugexporttest also draws each editor there (PNG).
@@ -36,10 +36,12 @@ run() { # <label> <log> <command...>
 clap=("$pkg"/CLAP/*.clap)
 vst3=()
 for b in "$pkg"/VST3/*.vst3; do [[ -e "$b" ]] && vst3+=("$b"); done
+lv2=()
+for b in "$pkg"/LV2/*.lv2; do [[ -e "$b" ]] && lv2+=("$b"); done
 [[ -e "${clap[0]}" ]] || { echo "no CLAP in $pkg/CLAP" >&2; exit 1; }
 
 # (${a[@]+"${a[@]}"}: macOS' bash 3.2 calls an empty array unbound under set -u)
-for p in "${clap[@]}" ${vst3[@]+"${vst3[@]}"}; do
+for p in "${clap[@]}" ${vst3[@]+"${vst3[@]}"} ${lv2[@]+"${lv2[@]}"}; do
     name="$(basename "$p")"
     extra=()
     [[ -n "$pictures" && "$p" == *.clap ]] && extra=("$(native "$reports")/editor-")

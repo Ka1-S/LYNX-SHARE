@@ -1,5 +1,5 @@
 ---
-source: 1c440a7810
+source: 13c966d353
 ---
 ![插件管理器的下半部分，带有一条说明：每个插件文件都在独立进程中检查](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -102,6 +102,16 @@ FL Studio 的原生插件，例如 Sytrus、Harmor 和 Patcher，只能在 FL St
 你在 FL Studio 内部搭建的内容会随 LYNX SHARE 工程一起保存。`FL Studio VSTi (Multi)` 有 16 路立体声输出，可以在各自独立的插入轨上播放（见上一节）。你的 FL Studio 许可证决定哪些 FL 插件能在其中使用。LYNX SHARE 自己不会加载 FL Studio 的插件文件。
 
 如果 FL Studio 插件被列为 `加载失败`，请在 `选项 › 插件管理器...` 中右键点击它，选择 `重试（立即扫描此文件）`。
+
+## 在其他 DAW 中使用 LYNX 自己的插件
+
+LYNX SHARE 自己的效果器和乐器，例如 Facet EQ、Apex Limiter、LYNX Tune 和 LYNX Model，也提供给其他 DAW 使用的插件版本。它们是[发布页面](https://github.com/Ka1-S/LYNX-SHARE/releases)上单独的可选下载：适用于 Windows、macOS 和 Linux 的 `LYNX-Plugins-<version>`。
+
+- 所有插件都在一个 CLAP 文件 `LYNX Plugins.clap` 里。其中一小部分也提供 VST3 版本。
+- 运行压缩包里的安装脚本（Windows 用 `install.cmd`，macOS 和 Linux 用 `install.sh`），然后在你的 DAW 里重新扫描插件。
+- 插件打开的编辑器和 LYNX SHARE 里的一样，它的状态可以在 LYNX SHARE 中作为工程打开。
+
+完整列表见 [PLUGINS-PACK.md](https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS-PACK.md)。
 
 ## 插件数据库文件夹
 

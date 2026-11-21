@@ -1,7 +1,8 @@
-# LYNX's own plugins as CLAP and VST3 (rounds 180b, 188b)
+# LYNX's own plugins as CLAP and VST3 (rounds 180b, 188b, 190ov)
 
 Status: **built by the release workflow as a separate, optional download** (the user's option C, 2026-11-08): every LYNX
-effect in one CLAP, a short list also as VST3, for Windows, Linux and macOS. It is never part of the app's installer, and
+effect in one CLAP, a short list also as VST3, for Windows, Linux and macOS. The
+user-facing summary is [PLUGINS-PACK.md](PLUGINS-PACK.md). It is never part of the app's installer, and
 the app's own build doesn't change (the option stays off there).
 
 ## What is exported
@@ -40,6 +41,22 @@ there. Plugin names are LYNX names only, never an FL Studio name (a test checks 
 | LYNX Voice Shift | pitch / formant | yes | |
 | LYNX Gemini Doubler | doubler | yes | |
 | LYNX Quell Denoiser | noise reduction | yes | |
+| LYNX Strike Shaper | transient designer (round 190ov) | yes | |
+| LYNX Anvil Bus | drum-bus processor (190ov) | yes | |
+| LYNX Corrode | degrader (190ov) | yes | |
+| LYNX Soundboard | resonant body (190ov) | yes | |
+| LYNX Platter | record-wear effect (190ov) | yes | |
+| LYNX Timeprism | spectral freezer / delay (190ov) | yes | |
+| LYNX Harmonia | spectral resonator (190ov) | yes | |
+| LYNX Model | instrument (physical models, 190ov) | yes | yes |
+
+LV2 (round 190ov, not shipped yet): with `-DLYNX_PLUGINS_LV2=ON` every VST3 of the list is also built as an LV2 bundle on
+Linux: JUCE's LV2 wrapper (`src/plugin/Lv2Entry.cpp`, the same entry as the VST3's), `<name with dashes>.lv2/` with the
+library and the `.ttl` files JUCE's `juce_LV2ManifestHelper` writes from it after the link; the URI is
+`https://lynx-share.com/plugins/lv2/<the clap id after "com.ka1-s.lynx.">`. `package-plugins.sh` packs them in `LV2/` when the
+build made them, `install.sh` copies them to `~/.lv2` and `plugexporttest` / `check-plugins.sh` load them through JUCE's LV2
+host. The option is off: in CI run 44955467954 the bundles built and packed, but JUCE's LV2 host failed on every one in
+`plugexporttest` (the effects crash, the instruments end on an X error). Queued for 0.1.32.
 
 The last column of the table says what is built: `0` nothing, `1` in the CLAP, `2` in the CLAP and as a VST3 of its own.
 The VST3 short list is the user's call: each VST3 carries the whole runtime (see "Sizes"), the CLAP holds them all at
@@ -47,10 +64,14 @@ the size of one. The CLAP announces each plugin's kind to the host (`clap/plugin
 reverb ...).
 
 The names were checked by a **web search only, with no trademark registry check**. Single words that other plugin makers
-may also use as product names (Nebula, Halo, Horizon, Orbit) always carry the "LYNX" prefix.
+may also use as product names (Nebula, Halo, Horizon, Orbit; round 190ov: Harmonia, also a Cherry Audio synth, Platter, also a
+Kontakt instrument, and Anvil, a guitar preamp plugin) always carry the "LYNX" prefix.
 
-Instruments other than FM10 follow later with their own names (round 188b report: a proposed list for the user). Until
-then they stay at `0`:
+Round 190ov added LYNX Model (LYNX's own physical models) and seven later LYNX-own effects. LYNX's own synths Tetra, Helix
+and Braid are not in the table yet: their names are close to other makers' products (Sequential's Tetra synth, Line 6's
+Helix / Helix Native, Mutable Instruments' Braids, also a Softube plugin), so they wait for export names of their own
+(the owner's call). Instruments that stand in for FL Studio's follow later with their own names (round 188b report: a
+proposed list for the user). Until then they stay at `0`:
 
 | Exported name | Engine inside LYNX | Kind | Built now |
 |---|---|---|---|
