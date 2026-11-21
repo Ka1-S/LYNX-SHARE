@@ -38,7 +38,7 @@ void MainComponent::setUpLookParts()
 {
     lookPartsReady = true;
     for (auto* c : std::initializer_list<juce::Component*> { &signatureBox, &quantBox, &saveStatus, &moreButton, &browserToggleButton,
-                                                             &backToArrangementButton, &captureButton, &sessionRecordButton, &drawModeButton,
+                                                             &backToArrangementButton, &captureButton, &automationArmButton, &reEnableAutomationButton, &sessionRecordButton, &drawModeButton,
                                                              &keyMapButton, &midiMapButton, &sessionViewButton, &arrangementViewButton, &cycleButton, &metronomeMenuButton,
                                                              &liveLoopButton, &punchOutButton, &nudgeDownButton, &nudgeUpButton })
     {
@@ -59,6 +59,20 @@ void MainComponent::setUpLookParts()
     backToArrangementButton.setTooltip (tr ("Tracks that launched a clip stay silent in the Playlist until this is pressed"));
     ui::setHint (backToArrangementButton, tr ("Back to Playlist") + ": " + tr ("Tracks that launched a clip stay silent in the Playlist until this is pressed"));
     backToArrangementButton.onClick = [this] { engine.launcherCommand ({ launcher::Command::Type::backToArrangement }); };
+
+    // round 190oa (DL-58, capture 190oa L1; Live's Info View texts)
+    const auto armText = tr ("Automation Arm: when on, manual parameter changes can be recorded (the recording filter's Automation)");
+    automationArmButton.setTooltip (armText);
+    ui::setHint (automationArmButton, armText);
+    automationArmButton.onClick = [this] {
+        auto o = engine.getRecordOptions();
+        o.recordAutomation = ! o.recordAutomation;
+        engine.setRecordOptions (o);
+    };
+    const auto reEnableText = tr ("Re-Enable Automation: gives back to their automation the parameters you moved by hand (lit while one is overridden)");
+    reEnableAutomationButton.setTooltip (reEnableText);
+    ui::setHint (reEnableAutomationButton, reEnableText);
+    reEnableAutomationButton.onClick = [this] { engine.reEnableAutomation(); };
 
     captureButton.setTooltip (tr ("Capture MIDI: the notes just played without recording into the pattern"));
     ui::setHint (captureButton, tr ("Capture MIDI: the notes just played without recording into the pattern"));
@@ -354,7 +368,7 @@ void MainComponent::toggleCycle()
 
 std::vector<juce::Component*> MainComponent::lookOnlyParts()
 {
-    std::vector<juce::Component*> parts { &signatureBox, &quantBox, &saveStatus, &moreButton, &browserToggleButton, &backToArrangementButton, &captureButton,
+    std::vector<juce::Component*> parts { &signatureBox, &quantBox, &saveStatus, &moreButton, &browserToggleButton, &backToArrangementButton, &captureButton, &automationArmButton, &reEnableAutomationButton,
                                           &sessionRecordButton, &drawModeButton, &keyMapButton, &midiMapButton, &sessionViewButton, &arrangementViewButton, &cycleButton, &metronomeMenuButton,
                                           &liveLoopButton, &punchOutButton, &nudgeDownButton, &nudgeUpButton };
     if (simpleWorkflow != nullptr)
@@ -510,7 +524,7 @@ void MainComponent::applyToolbarLook()
     for (auto* b : { &liveLoopButton, &punchOutButton })
         b->setLook (BL::liveBox, 14.0f);
     refreshRecordOptionButtons();
-    for (auto* b : { &browserToggleButton, &backToArrangementButton, &captureButton, &sessionRecordButton, &drawModeButton, &keyMapButton, &midiMapButton })
+    for (auto* b : { &browserToggleButton, &backToArrangementButton, &captureButton, &automationArmButton, &reEnableAutomationButton, &sessionRecordButton, &drawModeButton, &keyMapButton, &midiMapButton })
         b->setLook (BL::liveBox, 13.0f);
     for (auto* b : { &sessionViewButton, &arrangementViewButton })
         b->setLook (BL::liveSelector, 15.0f);
@@ -783,6 +797,8 @@ void MainComponent::layoutLiveControlBar (juce::Rectangle<int> bar, int menuWidt
             case I::stop: return &stopButton;
             case I::record: return &recordButton;
             case I::overdub: return &blendButton;
+            case I::automationArm: return &automationArmButton; // (round 190oa)
+            case I::reEnableAutomation: return &reEnableAutomationButton;
             case I::capture: return &captureButton;
             case I::sessionRecord: return &sessionRecordButton;
             case I::punch: return &punchButton;
@@ -932,6 +948,10 @@ void MainComponent::updateLookFields()
         liveLoopButton.setToggleState (on, juce::dontSendNotification);
     if (const auto on = engine.isSessionRecording(); sessionRecordButton.getToggleState() != on)
         sessionRecordButton.setToggleState (on, juce::dontSendNotification);
+    if (const auto on = engine.getRecordOptions().recordAutomation; automationArmButton.getToggleState() != on) // (round 190oa, DL-58)
+        automationArmButton.setToggleState (on, juce::dontSendNotification);
+    if (const auto on = engine.automationOverridden(); reEnableAutomationButton.getToggleState() != on)
+        reEnableAutomationButton.setToggleState (on, juce::dontSendNotification);
     const auto view = playlistArea.getGridView();
     const auto session = view != PlaylistArea::GridView::song, arrangement = view != PlaylistArea::GridView::grid;
     if (sessionViewButton.getToggleState() != session)
@@ -973,7 +993,8 @@ juce::Component* MainComponent::toolbarPartForSnapshot (const juce::String& name
         { "draw", &drawModeButton }, { "computerKeys", &typingPianoButton }, { "keyMap", &keyMapButton }, { "midiMap", &midiMapButton },
         { "cpu", &perfMeter }, { "more", &moreButton }, { "sessionView", &sessionViewButton }, { "arrangementView", &arrangementViewButton },
         { "status", &saveStatus }, { "masterVolume", &masterVolume }, { "masterPitch", &masterPitch }, { "undo", &undoButton }, { "redo", &redoButton },
-        { "cycle", &cycleButton }, { "metronomeMenu", &metronomeMenuButton }, { "countIn", &countInButton }, { "waitInput", &waitInputButton }, { "midiLight", &midiLight } // (round 190ld)
+        { "cycle", &cycleButton }, { "metronomeMenu", &metronomeMenuButton }, { "countIn", &countInButton }, { "waitInput", &waitInputButton }, { "midiLight", &midiLight }, // (round 190ld)
+        { "automationArm", &automationArmButton }, { "reEnableAutomation", &reEnableAutomationButton } // (round 190oa)
     };
     if (name == "finish")
         return simpleWorkflow != nullptr ? simpleWorkflow->finishComponent() : nullptr;
@@ -1036,6 +1057,8 @@ juce::PopupMenu MainComponent::makeToolbarMoreMenu()
         };
         item (I::tap, tr ("Tap tempo"), false, [this] { tapTempoButton.triggerClick(); });
         item (I::overdub, tr ("Blend recorded notes"), blendButton.getToggleState(), [this] { runAction ("record.blend"); });
+        item (I::automationArm, tr ("Automation Arm"), engine.getRecordOptions().recordAutomation, [this] { automationArmButton.triggerClick(); });
+        item (I::reEnableAutomation, tr ("Re-Enable Automation"), engine.automationOverridden(), [this] { engine.reEnableAutomation(); });
         item (I::capture, tr ("Capture MIDI: the notes just played without recording into the pattern"), false, [this] { runAction ("record.captureMidi"); });
         item (I::punch, tr ("Punch-In"), punchButton.getToggleState(), [this] { runAction ("record.punchIn"); });
         item (I::loopSwitch, tr ("Loop"), liveLoopButton.getToggleState(), [this] { toggleLiveLoop(); });

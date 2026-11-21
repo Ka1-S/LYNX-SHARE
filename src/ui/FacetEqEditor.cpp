@@ -1,5 +1,6 @@
 #include "core/PluginLayout.h"
 #include "ui/SlotWatch.h"
+#include "ui/WindowPlaces.h"
 #include "ui/FacetEqEditor.h"
 #include "core/MixerOps.h"
 #include "core/ShownEffectSlot.h"
@@ -2024,6 +2025,7 @@ void open (AudioEngine& engine, int track, int slot)
     const auto title = juce::String ("Facet EQ - ") + (name.isNotEmpty() ? name : tr ("Insert {0}", { juce::String (track) })) + " ("
                        + tr ("slot {0}", { juce::String (slot + 1) }) + ")";
     open[key] = std::make_unique<FacetEqWindow> (engine, track, slot, title);
+    windowplaces::tag (*open[key], windowplaces::slotKey (track, slot)); // (round 190oa, DF-130: its place kept with the project)
 }
 
 void closeAll()

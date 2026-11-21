@@ -536,6 +536,9 @@ public:
     void setTrack (int track);
     int getSelectedSlot() const noexcept { return selectedSlot; }
     juce::Rectangle<int> slotBoundsForCheck (int row) const { return slotBounds (row); } // --selftest (ui/MixerBasicsCheck.h)
+    // round 190oa (DF-86, --details190oashot): FL's EQ gestures on band `band`'s handle — a right-drag of `dy` px up,
+    // or `notches` wheel notches; true while the right-drag paints the curve orange (between press and release)
+    bool eqGestureForSnapshot (int band, int dy, int notches);
     void deleteSlot (int slot); // removes the slot's effect (its menu's Delete, the Delete key)
     void groupIntoRack (int slot, bool all); // round 183c: Live's Group, the slot (or the chain) into an Audio Effect Rack
     void selectSlot (int slot)
@@ -694,6 +697,8 @@ private:
     int track = 0;
     int selectedSlot = -1;
     int dragParam = -1;
+    bool eqLevelDrag = false;                    // (round 190oa, DF-86: FL's right-drag on an EQ band = its level)
+    std::pair<float, float> eqLevelFrom { 0.0f, 0.0f }; // (the press: mouse y, the band's level in dB)
     float dragStart = 0.0f;
     ui::ValueDrag drag;
 
@@ -739,6 +744,7 @@ public:
         return menu;
     }
     int getSelectedTrack() const noexcept { return strips.getSelectedTrack(); }
+    EffectsPanel& getEffectsForSnapshot() noexcept { return effects; } // (round 190oa)
     // Round 183a: the strips' meters run (they are on screen), and the level one shows.
     bool metersShowing() const { return strips.isShowing(); }
     float shownLevel (int track, int side) const noexcept { return strips.shownLevel (track, side); }

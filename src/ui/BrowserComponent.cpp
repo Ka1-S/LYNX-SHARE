@@ -4,6 +4,8 @@
 #include "ui/GeneratorPresetMenu.h"
 #include "ui/FileChoosers.h"
 #include "ui/QuickPick.h"
+#include "ui/PluginThumbs.h"
+#include "engine/GeneratorCatalog.h"
 #include "engine/FlStudio.h"
 #include "ui/BrowserComponent.h"
 
@@ -76,6 +78,7 @@
 #include "ui/WaveformView.h"
 #include "ui/AudioEditor.h"
 #include "ui/AutomationUi.h"
+#include "ui/RemoteControl.h"
 #include "ui/ChannelRackComponent.h"
 #include "ui/MixerComponent.h"
 #include "ui/SoundFontEditor.h"
@@ -747,7 +750,106 @@ public:
         std::string group;
         bool isGroup = false;
         int collection = -1; // kind == collection: which one (0 = Starred)
+        // round 190oa (DF-120, capture 190oa B4): FL's Current project › Effects / Generators entries open to their
+        // plugin's parameters (what the wrapper menu's Browse parameters shows); a parameter row's target
+        AutomationTarget parameter;
+        // round 190oa (DF-109, capture 190oa B3): FL draws the plugin's editor picture (~106 × 52) on its own lines under
+        // an effect / plugin generator entry of Current project; LYNX: the Plugin picker's picture, over `thumbRows`
+        // pseudo rows (`thumbPart` 0, 1, 2 of the picture's lines; `thumbOwner` = the entry)
+        juce::Image thumb;
+        std::vector<std::unique_ptr<Node>> thumbRows;
+        int thumbPart = -1;
+        Node* thumbOwner = nullptr;
     };
+    static constexpr int thumbRowCount = 3, thumbHeight = 52, thumbMaxWidth = 106;
+
+    // The Plugin picker's picture of a mixer slot's effect or of a plugin channel's generator (null: none rendered)
+    static juce::Image entryPicture (const Song& song, const projectcontents::Item& item, const std::vector<generators::Entry>* gens)
+    {
+        std::string key;
+        bool native = true;
+        if (item.kind == projectcontents::Kind::effect && item.index >= 0 && item.index < (int) song.mixer.size() && item.slot >= 0
+            && item.slot < (int) song.mixer[(std::size_t) item.index].effects.size())
+        {
+            const auto& slot = song.mixer[(std::size_t) item.index].effects[(std::size_t) item.slot];
+            if (slot.kind == EffectKind::plugin)
+                key = slot.plugin.id, native = false;
+            else
+                key = std::string ("lynx:fx:") + effectInfo (slot.kind).name;
+        }
+        else if (item.kind == projectcontents::Kind::generator && item.index >= 0 && item.index < (int) song.channels.size() && gens != nullptr)
+        {
+            const auto& ch = song.channels[(std::size_t) item.index];
+            for (const auto& e : *gens)
+                if (ch.instrument == InstrumentKind::plugin ? (! ch.plugin.id.empty() && e.key == ch.plugin.id) : (e.kind == ch.instrument && e.folder != 3))
+                {
+                    key = e.key, native = e.folder != 3;
+                    break;
+                }
+        }
+        if (key.empty())
+            return {};
+        const auto file = pluginthumbs::fileFor (key, native);
+        return file.existsAsFile() ? juce::ImageCache::getFromFile (file) : juce::Image();
+    }
+    static const std::vector<generators::Entry>& gens (AudioEngine& engine)
+    {
+        static std::vector<generators::Entry> cache;
+        static juce::uint32 at = 0;
+        if (const auto now = juce::Time::getMillisecondCounter(); cache.empty() || now - at > 5000)
+        {
+            cache = generators::entries (engine);
+            at = now;
+        }
+        return cache;
+    }
+    static void addThumb (Node& node, juce::Image picture)
+    {
+        if (! picture.isValid())
+            return;
+        node.thumb = picture;
+        for (int part = 0; part < thumbRowCount; ++part)
+        {
+            auto t = std::make_unique<Node>();
+            t->kind = Kind::item;
+            t->thumbPart = part;
+            t->thumbOwner = &node;
+            t->depth = node.depth;
+            t->parent = node.parent;
+            node.thumbRows.push_back (std::move (t));
+        }
+    }
+
+    // The parameters an effect / generator entry lists (FL: every parameter of the plugin, a knob icon each): a native
+    // effect's own, a hosted plugin's. Native generators list none here (their controls live in their windows).
+    static std::vector<std::pair<AutomationTarget, juce::String>> parametersOf (AudioEngine& engine, const projectcontents::Item& item)
+    {
+        std::vector<std::pair<AutomationTarget, juce::String>> out;
+        const auto& song = engine.getSong();
+        if (item.kind == projectcontents::Kind::effect && item.index >= 0 && item.index < (int) song.mixer.size() && item.slot >= 0
+            && item.slot < (int) song.mixer[(std::size_t) item.index].effects.size())
+        {
+            const auto& slot = song.mixer[(std::size_t) item.index].effects[(std::size_t) item.slot];
+            if (slot.kind == EffectKind::plugin)
+            {
+                if (auto* p = dynamic_cast<PluginEffect*> (engine.getEffect (item.index, item.slot).get()))
+                    for (int i = 0; i < p->getInstance().getParameters().size(); ++i)
+                        out.push_back ({ { AutomationTargetKind::effectParam, item.index, item.slot, i }, p->getInstance().getParameters()[i]->getName (60) });
+            }
+            else
+            {
+                const auto& info = effectInfo (slot.kind);
+                for (int i = 0; i < (int) info.params.size(); ++i)
+                    out.push_back ({ { AutomationTargetKind::effectParam, item.index, item.slot, i }, tr (info.params[(std::size_t) i].name) });
+            }
+        }
+        else if (item.kind == projectcontents::Kind::generator && item.index >= 0 && item.index < (int) song.channels.size()
+                 && song.channels[(std::size_t) item.index].instrument == InstrumentKind::plugin)
+            if (auto* p = dynamic_cast<PluginInstrument*> (engine.getChannelInstrument (item.index).get()))
+                for (int i = 0; i < p->getInstance().getParameters().size(); ++i)
+                    out.push_back ({ { AutomationTargetKind::channelParam, item.index, 0, i }, p->getInstance().getParameters()[i]->getName (60) });
+        return out;
+    }
 
     // What a row is to the collections (core/BrowserCollections.h): a file's or folder's path, a Plugin database
     // entry's key; empty = a row that can't be in one (the project's items, headings).
@@ -1275,6 +1377,15 @@ public:
     void select (int row, bool preview)
     {
         row = rows.empty() ? -1 : juce::jlimit (0, (int) rows.size() - 1, row);
+        // (round 190oa, DF-109: a picture's line is never selected: stepping down passes it, up lands on its entry)
+        if (row >= 0 && rows[(std::size_t) row]->thumbPart >= 0)
+        {
+            const auto owner = row - rows[(std::size_t) row]->thumbPart - 1;
+            if (row > selected && selected >= owner)
+                row = juce::jmin ((int) rows.size() - 1, owner + thumbRowCount + 1);
+            else
+                row = juce::jmax (0, owner);
+        }
         if (row != selected)
         {
             repaintRow (selected);
@@ -1535,6 +1646,17 @@ public:
             auto r = juce::Rectangle<int> (0, i * rowHeight, getWidth(), rowHeight);
             if (! flat && ! live && n.depth > 0)
                 addGuides (guides, n, r);
+            if (n.thumbPart >= 0 && n.thumbOwner != nullptr) // (round 190oa, DF-109: a line of the entry's picture)
+            {
+                const auto& pic = n.thumbOwner->thumb;
+                const auto top = r.getY() - n.thumbPart * rowHeight + 2;
+                const auto h = (float) thumbHeight, w = juce::jmin ((float) thumbMaxWidth, h * (float) pic.getWidth() / (float) juce::jmax (1, pic.getHeight()));
+                const auto x = (float) (6 + n.thumbOwner->depth * 14 + 12 + 21);
+                const juce::Graphics::ScopedSaveState keep (g);
+                g.reduceClipRegion (r);
+                g.drawImage (pic, juce::Rectangle<float> (x, (float) top, w, h), juce::RectanglePlacement::centred);
+                continue;
+            }
 
             // an open project section sits on a slightly raised band (FL draws its open folders on a band)
             if ((n.kind == Kind::project || n.kind == Kind::category) && n.expanded)
@@ -1718,7 +1840,11 @@ public:
     int rowAt (int y) const
     {
         const auto row = y / rowHeight;
-        return y >= 0 && row < (int) rows.size() ? row : -1;
+        if (y < 0 || row >= (int) rows.size())
+            return -1;
+        if (const auto part = rows[(std::size_t) row]->thumbPart; part >= 0) // (round 190oa: a picture's line = its entry)
+            return juce::jmax (0, row - part - 1);
+        return row;
     }
 
     // --- files dragged in from the system (issue #12): copied into the folder under the mouse ----------------------
@@ -1885,6 +2011,14 @@ public:
             select (row, false);
             if (e.getNumberOfClicks() == 1) // a click opens / closes it (the second click of a double click does not undo it)
                 toggle (n);
+            if (n.kind == Kind::item && e.getNumberOfClicks() == 1) // (round 190oa: a generator entry still selects its channel)
+                itemClicked (n);
+            return;
+        }
+
+        if (n.parameter.kind != AutomationTargetKind::none) // (round 190oa, DF-120: a parameter row)
+        {
+            select (row, false);
             return;
         }
 
@@ -1948,6 +2082,11 @@ public:
             return;
 
         const auto& n = *rows[(std::size_t) row];
+        if (n.parameter.kind != AutomationTargetKind::none) // (round 190oa, DF-120: a parameter: its automation clip)
+        {
+            createAutomationClip (browser.engine, n.parameter);
+            return;
+        }
         if (browser.isHotSwapping() && (n.kind == Kind::plugin || n.kind == Kind::file)) // round 190ce: it replaces the linked device
         {
             select (row, false);
@@ -2029,6 +2168,13 @@ public:
                 }
                 break;
             case Kind::item:
+                if (n.parameter.kind != AutomationTargetKind::none) // (round 190oa, DF-120)
+                {
+                    h.text = describeAutomationTarget (browser.engine, n.parameter) + "  " + tr ("[2xLMB] create an automation clip  [RMB] menu");
+                    h.automatable = true;
+                    h.hasMenu = true;
+                    return h;
+                }
                 return itemHint (n);
             case Kind::plugins:
                 h.text = tr ("Plugin database: LYNX SHARE's built-in generators and effects, FL's engines and the installed plugins") + "  "
@@ -2135,6 +2281,31 @@ public:
 
     // round 190my (FL's Project picker, right-click on a pattern tile): the pattern's row in Current project › Patterns,
     // selected and in view; −1 when it isn't listed
+    int revealParameters (bool effect, int index, int slot)
+    {
+        openProjectSections ({ effect ? Category::effects : Category::generators });
+        for (int i = 0; i < (int) rows.size(); ++i)
+        {
+            auto& n = *rows[(std::size_t) i];
+            if (n.kind == Kind::item && n.parameter.kind == AutomationTargetKind::none
+                && n.item.kind == (effect ? projectcontents::Kind::effect : projectcontents::Kind::generator) && n.item.index == index
+                && (! effect || n.item.slot == slot))
+            {
+                if (n.folder && ! n.expanded)
+                    toggle (n);
+                for (int j = 0; j < (int) rows.size(); ++j) // (the rows were made again)
+                    if (rows[(std::size_t) j] == &n)
+                    {
+                        select (j, false);
+                        scrollToRow (j);
+                        return j;
+                    }
+                return i;
+            }
+        }
+        return -1;
+    }
+
     int revealPattern (int index)
     {
         openProjectSections ({ Category::patterns });
@@ -2213,6 +2384,23 @@ private:
         if (n.loaded)
             return;
         n.loaded = true;
+
+        if (n.kind == Kind::item && (n.item.kind == projectcontents::Kind::effect || n.item.kind == projectcontents::Kind::generator)) // (round 190oa)
+        {
+            n.children.clear();
+            for (const auto& [target, name] : parametersOf (browser.engine, n.item))
+            {
+                auto c = std::make_unique<Node>();
+                c->kind = Kind::item;
+                c->label = name;
+                c->icon = Icon::tweak;
+                c->depth = n.depth + 1;
+                c->parent = &n;
+                c->parameter = target;
+                n.children.push_back (std::move (c));
+            }
+            return;
+        }
 
         if (n.kind == Kind::project)
         {
@@ -2382,7 +2570,12 @@ private:
                 break;
             case Category::effects:
                 for (auto& item : projectcontents::effects (song))
-                    add (item, item.plugin ? Icon::plugin : Icon::mixer, item.colour != 0 ? juce::Colour (item.colour) : juce::Colour());
+                {
+                    auto picture = engine != nullptr && ! countOnly ? entryPicture (song, item, nullptr) : juce::Image();
+                    auto& node = add (item, item.plugin ? Icon::plugin : Icon::mixer, item.colour != 0 ? juce::Colour (item.colour) : juce::Colour());
+                    node.folder = engine != nullptr && ! countOnly; // (round 190oa, DF-120: opens to its parameters)
+                    addThumb (node, picture);                       // (round 190oa, DF-109: its picture under it)
+                }
                 break;
             case Category::generators:
                 for (auto& item : projectcontents::generators (song))
@@ -2395,7 +2588,15 @@ private:
                                         : item.colour != 0                               ? juce::Colour (item.colour)
                                                                                          : juce::Colour();
                     const auto selected = engine != nullptr && engine->getSelectedChannel() == item.index;
-                    add (std::move (item), icon, colour).current = selected;
+                    const auto plugin = channel.instrument == InstrumentKind::plugin;
+                    // (round 190oa, DF-109: FL draws generator plugins' pictures; sample / audio clip channels are text)
+                    auto picture = engine != nullptr && ! countOnly && ! projectcontents::playsSampleFile (channel.instrument)
+                                       ? entryPicture (song, item, &gens (*engine))
+                                       : juce::Image();
+                    auto& node = add (std::move (item), icon, colour);
+                    node.current = selected;
+                    node.folder = plugin && engine != nullptr && ! countOnly; // (round 190oa, DF-120: a plugin opens to its parameters)
+                    addThumb (node, picture);
                 }
                 break;
             case Category::automation:
@@ -2702,6 +2903,13 @@ private:
     {
         auto& engine = browser.engine;
         juce::PopupMenu menu;
+        if (n.parameter.kind != AutomationTargetKind::none) // (round 190oa, DF-120: a parameter row)
+        {
+            menu.addItem (tr ("Create automation clip"), [&engine, t = n.parameter] { createAutomationClip (engine, t); });
+            menu.addItem (tr ("Link to controller..."), [&engine, t = n.parameter] { openRemoteControlSettings (engine, { t }); });
+            present (menu);
+            return;
+        }
         auto safe = juce::Component::SafePointer<FileTree> (this);
         auto expandItems = [&menu, safe, &n] {
             Node* target = &n;
@@ -2966,6 +3174,8 @@ private:
         for (auto& c : n.children)
         {
             rows.push_back (c.get());
+            for (auto& t : c->thumbRows) // (round 190oa, DF-109: the picture's lines, right under its entry)
+                rows.push_back (t.get());
             if (c->folder && c->expanded)
                 addRows (*c);
         }
@@ -5991,6 +6201,12 @@ void BrowserComponent::showHistory()
 bool BrowserComponent::historyShownForCheck() const
 {
     return shownTab() == projectTab && tree->categoryOpen (Category::history);
+}
+
+bool BrowserComponent::revealProjectParameters (bool effect, int index, int slot)
+{
+    setTab (projectTab);
+    return tree->revealParameters (effect, index, slot) >= 0;
 }
 
 bool BrowserComponent::revealProjectPattern (int pattern)

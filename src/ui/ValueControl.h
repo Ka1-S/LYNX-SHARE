@@ -140,6 +140,10 @@ struct Hint
     juce::String value;        // its current value ("" if none)
     bool automatable = false;  // can be automated / linked to MIDI
     bool hasMenu = false;      // right-click opens a menu
+    // round 190oa (DF-45, FL manual "Icon display" + capture 190oa A3): FL's status icon beside the hint — a red circle
+    // with "!" on a hint that asks for attention ("Waiting for input..."), a piano keyboard on a played note's hint
+    enum class Mark : std::uint8_t { none, warning, note };
+    Mark mark = Mark::none;
 
     bool isEmpty() const noexcept { return text.isEmpty() && value.isEmpty(); }
 };

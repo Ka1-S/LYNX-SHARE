@@ -186,6 +186,7 @@ public:
     // of the Song), and a project that has one opens with it (Settings › General › "Load the window layout saved with a
     // project")
     ProjectFile::WindowLayout currentWindowLayout() const;
+    void reopenProjectWindows (const std::vector<juce::String>& keys); // (round 190oa, DF-130)
     void applyProjectWindowLayout (const ProjectFile::WindowLayout& layout);
     bool layoutInSaves = false; // (--details190mrshot: the off-screen window keeps its layout in saves too)
     void warnIfProjectTooBig (const juce::File& file); // round 190mr (DF-147)
@@ -728,6 +729,9 @@ private:
         void mouseUp (const juce::MouseEvent& e) override;
         void mouseDoubleClick (const juce::MouseEvent& e) override;
         void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
+        // round 190oa (DF-15, capture 190oa A7): FL's number display takes digits typed while the left button is held
+        // on it ("123" with the button down = 123 BPM at once); a plain click leaves the keys to the typing keyboard
+        bool keyPressed (const juce::KeyPress& key) override;
         ui::Hint hintAt (juce::Point<int> position) override;
         void showMenu();
         juce::PopupMenu buildMenu(); // (round 190mp: the shots read it)
@@ -740,6 +744,8 @@ private:
         AudioEngine& engine;
         double startBpm = 0.0;
         bool dragOnDecimals = false, dragging = false;
+        juce::String typed;                                      // (round 190oa: the digits typed while held)
+        juce::Component::SafePointer<juce::Component> focusBefore; // (the keys go back there on release)
         int decimalX = 0; // x of the decimal point, from the last paint
     };
     TempoDisplay tempoDisplay { engine };
@@ -922,6 +928,10 @@ private:
     juce::PopupMenu makeCountInMenu();   // round 190ld: FL's right-click on Count-in / Wait for input
     juce::PopupMenu makeWaitInputMenu();
     IconButton captureButton { "captureMidi", Icon::capture };
+    // round 190oa (DL-58, capture 190oa L1): Live's Automation Arm (the recording filter's Automation) and Re-Enable
+    // Automation (lit while a moved control overrides its automation; a click hands them back)
+    IconButton automationArmButton { "automationArm", Icon::automationArm };
+    IconButton reEnableAutomationButton { "reEnableAutomation", Icon::reEnableAutomation };
     IconButton sessionRecordButton { "sessionRecord", Icon::sessionRecord };
     IconButton drawModeButton { "drawMode", Icon::draw };
     IconButton keyMapButton { "keyMap", Icon::none };

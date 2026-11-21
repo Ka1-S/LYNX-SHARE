@@ -71,9 +71,13 @@ enum class Icon
     // round 190lx (DL-61, capture190ji live-loop-punch-z3): Live's Punch-In, Loop and Punch-Out switch glyphs
     punchIn,           // a high run, a slope down, a low run
     liveLoop,          // an open box with an arrow head pointing left in its bottom gap
-    punchOut           // a low run, a slope up, a high run
+    punchOut,          // a low run, a slope up, a high run
+    // round 190oa (DL-58, capture 190oa L1 live-auto-arm / live-reenable-lit): Live's Automation Arm and Re-Enable
+    // Automation glyphs
+    automationArm,     // two small rings joined by a rising line
+    reEnableAutomation // an arrow pointing left
 };
-constexpr int iconCount = (int) Icon::punchOut + 1;
+constexpr int iconCount = (int) Icon::reEnableAutomation + 1;
 
 namespace icons
 {

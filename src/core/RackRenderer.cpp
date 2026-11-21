@@ -3567,6 +3567,7 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
 {
     if (foreignChannel (i)) // (render-ahead: the other renderer renders it; the boundary brings it here)
     {
+        releasingVoices[(std::size_t) i] = 0; // (round 190oa: its tail isn't heard here)
         importChannel (i, n);
         return;
     }
@@ -3632,6 +3633,7 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
         && std::none_of (events.begin(), events.end(), [&] (const NoteEvent& e) { return e.channel == i || routed (e.channel); }))
     {
         channelSilent[(std::size_t) i] = 1;
+        releasingVoices[(std::size_t) i] = 0; // (round 190oa: no tail left)
         return;
     }
     channelSilent[(std::size_t) i] = 0;
@@ -3926,6 +3928,20 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
         instrument.setNoteSource (0);
     renderUntil (n);
 
+    // round 190oa (DF-29): released voices count until the channel's tail has died away (−100 dB); looked at only
+    // while there are some
+    if (auto& releasing = releasingVoices[(std::size_t) i]; releasing != 0)
+    {
+        const auto quiet = [n] (const float* x) {
+            float peak = 0.0f;
+            for (int k = 0; k < n; ++k)
+                peak = std::max (peak, std::abs (x[k]));
+            return peak < 1.0e-5f;
+        };
+        if (instrument.idle() || (quiet (l) && quiet (r)))
+            releasing = 0;
+    }
+
     // PDC: this channel arrives before the track's others; delay until aligned
     if ((std::size_t) i < state.channelDelays.size() && state.channelDelays[(std::size_t) i] != nullptr)
         state.channelDelays[(std::size_t) i]->process (l, r, n);
@@ -3983,7 +3999,9 @@ static bool hasLiveMeters (EffectKind kind) noexcept
            || kind == EffectKind::peakController // issue #66: its display's Peak + LFO, Peak and LFO lines
            || kind == EffectKind::grossBeat // round 190ih: its playback locator and the playing / queued slots
            || kind == EffectKind::vocoder // round 190ld: Fruity Vocoder's live band levels (only while its editor shows them)
-           || kind == EffectKind::fruityMultiband; // round 190mf: Fruity Multiband Compressor's band meters (the same)
+           || kind == EffectKind::fruityMultiband // round 190mf: Fruity Multiband Compressor's band meters (the same)
+           || kind == EffectKind::maximus // round 190oa: Maximus' Monitor band levels (the same)
+           || kind == EffectKind::pitchCorrect; // round 190oa: Pitcher's input / output pitch strips
 }
 
 RackState::SlotPlan RackState::planSlot (const RackState& state, int track, std::size_t i) noexcept
@@ -5119,6 +5137,8 @@ void RackRenderer::publishSoundingKeys (int channels) noexcept
     channels = std::clamp (channels, 0, maxChannels);
     const auto top = std::max (channels, publishedTop);
     publishedTop = 0;
+    const auto bits = [] (const NoteMask& m) { return std::popcount (m[0]) + std::popcount (m[1]); };
+    int voices = 0; // (round 190oa, DF-29)
     for (int i = 0; i < top; ++i)
     {
         auto& was = publishedNotes[(std::size_t) i];
@@ -5132,7 +5152,13 @@ void RackRenderer::publishSoundingKeys (int channels) noexcept
                 strikes[(std::size_t) i].store (strikes[(std::size_t) i].load (std::memory_order_relaxed) + 1u, std::memory_order_relaxed);
             struck = {};
         }
-        if (now[0] != 0 || now[1] != 0)
+        auto& releasing = releasingVoices[(std::size_t) i];
+        if (now != was) // the keys let go of this block start releasing
+            releasing = (std::uint16_t) std::min (999, (int) releasing + bits ({ was[0] & ~now[0], was[1] & ~now[1] }));
+        if (i >= channels)
+            releasing = 0;
+        voices += bits (now) + releasing;
+        if (now[0] != 0 || now[1] != 0 || releasing != 0)
             publishedTop = i + 1;
         if (now == was)
             continue;
@@ -5140,6 +5166,7 @@ void RackRenderer::publishSoundingKeys (int channels) noexcept
         sounding[(std::size_t) i][0].store (now[0], std::memory_order_relaxed);
         sounding[(std::size_t) i][1].store (now[1], std::memory_order_relaxed);
     }
+    voicesNow.store (voices, std::memory_order_relaxed);
 }
 
 double RackRenderer::ticksToNextEvent (const RackState& state, double tick) noexcept
@@ -5475,7 +5502,7 @@ void RackRenderer::chunkPrelude (const RackState& state, bool playing, double st
     chunkTick = startTick;
     chunkPlaying = playing;
     // FL: playback starting puts every control the user moved back under its automation (issue #125)
-    if (playing && ! releaseWasPlaying && anyReleased.load (std::memory_order_relaxed))
+    if (playing && ! releaseWasPlaying && anyReleased.load (std::memory_order_relaxed) && ! keepReleasedOnPlay.load (std::memory_order_relaxed))
     {
         for (auto& w : released)
             w.store (0, std::memory_order_relaxed);
@@ -7688,6 +7715,7 @@ void RackRenderer::adoptGlobals (const RackRenderer& from) noexcept
     }
     anyOverridden.store (from.anyOverridden.load (std::memory_order_relaxed), std::memory_order_relaxed);
     anyReleased.store (from.anyReleased.load (std::memory_order_relaxed), std::memory_order_relaxed);
+    keepReleasedOnPlay.store (from.keepReleasedOnPlay.load (std::memory_order_relaxed), std::memory_order_relaxed);
     releaseWasPlaying = from.releaseWasPlaying;
     modSeconds = from.modSeconds;
     compensateTick = from.compensateTick;

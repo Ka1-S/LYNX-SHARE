@@ -545,7 +545,7 @@ MasterKnob::MasterKnob (AudioEngine& e, Kind k) : engine (e), kind (k)
 
 bool MasterKnob::available() const
 {
-    return kind == Kind::pitch || ! engine.getSong().mixer.empty();
+    return kind == Kind::pitch || monitor() || ! engine.getSong().mixer.empty();
 }
 
 double MasterKnob::value() const
@@ -554,6 +554,8 @@ double MasterKnob::value() const
 
     if (kind == Kind::pitch)
         return song.masterPitch;
+    if (monitor())
+        return song.mainVolume;
 
     return song.mixer.empty() ? (double) unityFader : (double) song.mixer.front().volume;
 }
@@ -568,6 +570,8 @@ void MasterKnob::setValue (double v)
 
     if (kind == Kind::pitch)
         engine.editSong ([v] (Song& song) { song.masterPitch = (float) v; });
+    else if (monitor())
+        engine.setMainVolume ((float) v);
     else
         engine.editLevels ([v] (Song& song) {
             if (! song.mixer.empty())
@@ -579,6 +583,8 @@ void MasterKnob::setValue (double v)
 
 ui::ValueSpec MasterKnob::spec() const
 {
+    if (kind == Kind::volume && monitor())
+        return ui::faderSpec (tr ("Main volume"), unityFader); // (round 190oa, DF-21: no automation target, as FL's)
     if (kind == Kind::volume)
     {
         auto s = ui::faderSpec (tr ("Master volume"), unityFader);
@@ -792,7 +798,7 @@ void MasterKnob::mouseDown (const juce::MouseEvent& e)
 
     if (e.mods.isPopupMenu())
     {
-        ui::showValueMenu (*this, kind == Kind::volume ? &engine : nullptr, spec(), value(), [this] (double v) { setValue (v); });
+        ui::showValueMenu (*this, kind == Kind::volume && ! monitor() ? &engine : nullptr, spec(), value(), [this] (double v) { setValue (v); });
         return;
     }
 
@@ -867,7 +873,8 @@ ui::Hint MasterKnob::hintAt (juce::Point<int>)
     if (! available())
         return { tr ("Master volume: this project has no mixer"), {}, false, false };
 
-    const auto gesture = kind == Kind::volume
+    const auto gesture = monitor() ? tr ("Main volume: what you hear, not in exports, not automatable (the Master insert's fader is in the Mixer)") + "  " + ui::valueGestures()
+                         : kind == Kind::volume
                              ? tr ("level of everything you hear (the Master insert's fader)") + "  " + ui::valueGestures()
                              : tr ("tunes the built-in instruments  [LMB] drag (semitones)  [Shift] cents  [Wheel] semitone  [Ctrl][Wheel] cent  [Alt][LMB] reset  [RMB] menu");
     return ui::valueHint (spec(), value(), gesture);
@@ -1545,7 +1552,7 @@ ui::Hint PerformanceMeter::hintAt (juce::Point<int> p)
     }
     else
     {
-        h.text = tr ("Polyphony: notes sounding now in the song and from the keyboard (voices still releasing are not counted)");
+        h.text = tr ("Polyphony: voices being mixed now (notes sounding and still releasing, audio and automation clips playing)");
         h.value = juce::String (voices) + "  (" + tr ("max {0}", { juce::String (peakVoices) }) + ")";
     }
 

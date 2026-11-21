@@ -2,6 +2,7 @@
 #include "ui/ControllerBridge.h"
 #include "ui/KeyFocus.h"
 #include "ui/TrackIcons.h"
+#include "ui/WindowPlaces.h" // (round 190oa, DF-130)
 #include "core/EscClose.h"
 #include "core/DetailChain.h"
 #include "core/MeterScale.h"
@@ -602,6 +603,11 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     };
     openMixerInsertHandler() = rack.onOpenMixerInsert; // and on the channel window's TRACK box (round 168s)
     channelWrapperItemsHandler() = [this] (int channel, wrappermenu::Spec& spec) { rack.fillWindowMenu (channel, spec); }; // (round 190in, R8)
+    wrappermenu::browseParametersHandler() = [this] (bool effect, int index, int slot) { // (round 190oa, DF-120)
+        if (! workspace.isPanelVisible (Panel::browser))
+            runAction ("panel.browser");
+        browser.revealProjectParameters (effect, index, slot);
+    };
     locateInBrowserHandler() = [this] (const juce::File& file) { // (the sampler's File row, round 190df)
         showPanel (Panel::browser);
         browser.locateFile (file);
@@ -4304,6 +4310,7 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
     const auto partsReady = [this] (Style s) {
         return s == Style::pattern || (s == Style::clipLaunch && clipGridView != nullptr) || (s == Style::simple && simpleWorkflow != nullptr);
     };
+    engine.setLiveAutomationOverride (style == Style::clipLaunch); // (round 190oa, DL-58: Live's Re-Enable Automation)
     if (style == from && partsReady (style))
         return;
     // each style's own parts are made the first time it is chosen (nothing of them exists in Pattern workflow)
@@ -5590,18 +5597,68 @@ ProjectFile::WindowLayout MainComponent::currentWindowLayout() const
 {
     if (! persistent && ! layoutInSaves) // (the command-line modes: no layout of their own to keep)
         return {};
-    return { (int) layoutStyle, workspace.getLayoutText() };
+    return { (int) layoutStyle, workspace.getLayoutText(), windowplaces::toVar() }; // (round 190oa: the windows' places)
 }
 
 void MainComponent::applyProjectWindowLayout (const ProjectFile::WindowLayout& layout)
 {
     // FL opens a project with the windows where they were saved; LYNX does so for the layout style the project was saved
     // in (each style keeps a layout of its own), and only when the option is on (on, as FL)
-    if ((! persistent && ! layoutInSaves) || layout.text.isEmpty() || layout.style != (int) layoutStyle
-        || ! flsettings::options().projectWindowLayout.load())
+    if ((! persistent && ! layoutInSaves) || ! flsettings::options().projectWindowLayout.load())
+        return;
+    // round 190oa (DF-130; REA 190oa R3: FL's wrapper records keep each window's place and open state): the project's
+    // channel and plugin windows open where they were, the ones that were open opened again
+    windowplaces::fromVar (layout.places);
+    std::vector<juce::String> reopen;
+    for (const auto& [key, place] : windowplaces::all())
+        if (place.open)
+            reopen.push_back (key);
+    if (! reopen.empty())
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<MainComponent> (this), reopen] {
+            if (safe != nullptr)
+                safe->reopenProjectWindows (reopen);
+        });
+    if (layout.text.isEmpty() || layout.style != (int) layoutStyle)
         return;
     if (workspace.applyLayoutText (layout.text))
         platform::testModeLog ("project window layout applied");
+}
+
+void MainComponent::reopenProjectWindows (const std::vector<juce::String>& keys)
+{
+    const auto& song = engine.getSong();
+    const auto selectedTrack = mixer.getSelectedTrack();
+    int opened = 0;
+    for (const auto& key : keys)
+    {
+        const auto parts = juce::StringArray::fromTokens (key, ":", "");
+        if (parts.size() == 2 && (parts[0] == "ch" || parts[0] == "chi"))
+        {
+            int channel = -1;
+            for (int c = 0; c < (int) song.channels.size() && channel < 0; ++c)
+                if (parts[0] == "ch" ? juce::String ((juce::int64) song.channels[(std::size_t) c].uid) == parts[1] : c == parts[1].getIntValue())
+                    channel = c;
+            if (channel < 0)
+                continue;
+            if (song.channels[(std::size_t) channel].instrument == InstrumentKind::plugin)
+                rack.openChannelPluginWindow (channel);
+            else
+                openChannelSettings (engine, channel);
+            ++opened;
+        }
+        else if (parts.size() == 3 && parts[0] == "fx")
+        {
+            const auto track = parts[1].getIntValue(), slot = parts[2].getIntValue();
+            if (track >= 0 && track < (int) song.mixer.size() && slot >= 0 && slot < (int) song.mixer[(std::size_t) track].effects.size())
+            {
+                mixer.openSlotEditor (track, slot);
+                ++opened;
+            }
+        }
+    }
+    if (selectedTrack >= 0 && selectedTrack != mixer.getSelectedTrack())
+        mixer.selectTrack (selectedTrack);
+    platform::testModeLog ("project windows reopened: " + juce::String (opened));
 }
 
 void MainComponent::refreshSongNotes()
@@ -6735,9 +6792,10 @@ void MainComponent::updateLiveNoteHint()
         return;
     const auto key = juce::String (notenames::keyName (livenote::key (note)));
     const auto velocity = juce::String (livenote::velocity (note));
-    ui::postHint ({ livenote::on (note) ? tr ("Note on: {0} / velocity: {1}", { key, velocity })
-                                                   : tr ("Note off: {0} / velocity: {1}", { key, velocity }), {}, false, false },
-                  2500);
+    ui::Hint hint { livenote::on (note) ? tr ("Note on: {0} / velocity: {1}", { key, velocity }) : tr ("Note off: {0} / velocity: {1}", { key, velocity }),
+                    {}, false, false };
+    hint.mark = ui::Hint::Mark::note; // (round 190oa, DF-45: FL's piano keyboard icon, capture 190oa A3 (g))
+    ui::postHint (hint, 2500);
 }
 
 void MainComponent::refreshModeButton()
@@ -6991,12 +7049,32 @@ void MainComponent::TempoDisplay::mouseDown (const juce::MouseEvent& e)
     startBpm = engine.shownTempo();
     dragOnDecimals = isOnDecimals (e.x);
     dragging = true;
+    typed.clear();
+    // (round 190oa, DF-15: the keys come here while the button is held)
+    focusBefore = juce::Component::getCurrentlyFocusedComponent();
+    setWantsKeyboardFocus (true);
+    grabKeyboardFocus();
     repaint();
+}
+
+bool MainComponent::TempoDisplay::keyPressed (const juce::KeyPress& key)
+{
+    const auto c = key.getTextCharacter();
+    if (! dragging || ! ((c >= '0' && c <= '9') || (c == '.' && ! typed.containsChar ('.'))))
+        return false;
+    typed << juce::String::charToString (c);
+    // the number so far, once it is a tempo FL takes (10 BPM and up): "1" waits, "12" = 12, "123" = 123
+    if (const auto bpm = typed.getDoubleValue(); bpm >= 10.0 && bpm <= controls::clampTempo (1.0e9))
+    {
+        engine.noteTweaked ({ AutomationTargetKind::tempo, 0 });
+        setBpm (bpm);
+    }
+    return true;
 }
 
 void MainComponent::TempoDisplay::mouseDrag (const juce::MouseEvent& e)
 {
-    if (dragging)
+    if (dragging && typed.isEmpty()) // (round 190oa: a typed value is not dragged away)
     {
         engine.noteTweaked ({ AutomationTargetKind::tempo, 0 });
         setBpm (controls::tempoDrag (startBpm, -e.getDistanceFromDragStartY(), dragOnDecimals, e.mods.isCtrlDown()));
@@ -7006,6 +7084,12 @@ void MainComponent::TempoDisplay::mouseDrag (const juce::MouseEvent& e)
 void MainComponent::TempoDisplay::mouseUp (const juce::MouseEvent&)
 {
     dragging = false;
+    typed.clear();
+    setWantsKeyboardFocus (false); // (round 190oa: the keys go back where they were)
+    if (focusBefore != nullptr && focusBefore->isShowing())
+        focusBefore->grabKeyboardFocus();
+    else if (auto* top = getTopLevelComponent())
+        top->grabKeyboardFocus();
     repaint();
 }
 
@@ -7073,8 +7157,8 @@ void MainComponent::TempoDisplay::showTap()
 
 juce::String MainComponent::idleHint() const
 {
-    if (engine.isWaitingForInput())
-        return tr ("Recording: waiting for the first note ([Space] cancels)");
+    if (engine.isWaitingForInput()) // (round 190oa, DF-10: a note, a moved control, a launched clip or a tempo tap starts it)
+        return tr ("Waiting for input: a played note or a moved control starts it ([Space] cancels)");
 
     if (engine.isCountingIn())
         return tr ("Recording: count-in...");
@@ -7787,7 +7871,11 @@ void MainComponent::timerCallback()
         if (engine.isLearningMidi())
             hint.text = tr ("Move a knob/fader on the MIDI controller to link it to the parameter...");
         else if (engine.isWaitingForInput() || engine.isCountingIn() || engine.isLinkWaiting())
+        {
             hint.text = idleHint();
+            if (engine.isWaitingForInput()) // (round 190oa, DF-45: FL's red "!" beside "Waiting for input...")
+                hint.mark = ui::Hint::Mark::warning;
+        }
         else if (auto posted = ui::postedHint())
         {
             hint = *posted;
@@ -7859,11 +7947,12 @@ void MainComponent::timerCallback()
     {
         const uitrace::Scope part ("timer: performance meter", false);
         meterTicks = 0;
-        const auto held = (int) heldKeys.size();
-        const auto notes = playing ? songstats::soundingNotes (engine.getSong(), transport.positionTicks.load()) : 0;
+        // round 190oa (DF-29, owner decision F5; REA 190oa R1): FL's voices being mixed — every channel's sounding and
+        // still-releasing voices (the renderer's count: song, keyboard, MIDI, audio clips) and the automation clips playing
+        const auto notes = engine.voicesSounding() + (playing ? songstats::automationClipsAt (engine.getSong(), transport.positionTicks.load()) : 0);
         if (toolbar::PerformanceMeter::secondView == toolbar::PerformanceMeter::framesPerSecond) // round 190ld: View FPS
             perfMeter.setFramesPerSecond (ui::FrameTicker::uiFrameRate());
-        perfMeter.setValues (engine.getDeviceManager().getCpuUsage(), toolbar::PerformanceMeter::processMemoryBytes(), notes + held);
+        perfMeter.setValues (engine.getDeviceManager().getCpuUsage(), toolbar::PerformanceMeter::processMemoryBytes(), notes);
         const auto rt = engine.getRtStats().snapshot();
         juce::StringArray heaviest;
         for (const auto& u : engine.getHeaviestUnits())

@@ -61,4 +61,17 @@ inline int soundingNotes (const Song& song, double tick)
 
     return count;
 }
+// Round 190oa (DF-29; REA 190oa R1: FL's polyphony counts a voice for every automation clip playing): the unmuted
+// automation clips under the playhead in song mode.
+inline int automationClipsAt (const Song& song, double tick)
+{
+    if (song.mode != PlayMode::song || tick < 0.0)
+        return 0;
+    int count = 0;
+    for (const auto& clip : song.playlist)
+        if (clip.kind == ClipKind::automation && ! clip.muted && ! song.isTrackMuted (clip.track) && tick >= (double) clip.start
+            && tick < (double) clip.end())
+            ++count;
+    return count;
+}
 } // namespace lynx::songstats

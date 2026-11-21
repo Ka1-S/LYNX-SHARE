@@ -2989,6 +2989,8 @@ juce::String toJson (const Song& song, bool stampVersion)
     }
     if (song.masterPitch != 0.0f)
         root->setProperty ("masterPitch", (double) song.masterPitch);
+    if (song.mainVolume != unityFader) // (round 190oa, DF-21)
+        root->setProperty ("mainVolume", (double) song.mainVolume);
     if (song.masterLook.id != 0) // the Finish dock's Master look (round 189k)
     {
         const auto& l = song.masterLook;
@@ -3926,6 +3928,7 @@ std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error,
         for (const auto& name : *groups)
             song.channelGroups.push_back (name.toString().toStdString());
     song.masterPitch = juce::jlimit (-1200.0f, 1200.0f, (float) (double) root.getProperty ("masterPitch", 0.0));
+    song.mainVolume = juce::jlimit (0.0f, 1.0f, (float) (double) root.getProperty ("mainVolume", (double) unityFader));
     {
         const auto t = juce::StringArray::fromTokens (root.getProperty ("masterLook", "").toString(), " ", "");
         song.masterLook = {};
@@ -4834,10 +4837,14 @@ std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error,
 juce::String withWindowLayout (const juce::String& json, const WindowLayout& layout)
 {
     const auto end = json.lastIndexOfChar ('}');
-    if (layout.text.isEmpty() || end < 0)
+    if ((layout.text.isEmpty() && layout.places.isVoid()) || end < 0)
         return json;
-    const auto value = juce::JSON::toString (juce::var (juce::Array<juce::var> { layout.style, layout.text }), true);
-    return json.substring (0, end).trimEnd() + ",\n  \"windowLayout\": " + value + "\n" + json.substring (end);
+    juce::String add;
+    if (layout.text.isNotEmpty())
+        add << ",\n  \"windowLayout\": " << juce::JSON::toString (juce::var (juce::Array<juce::var> { layout.style, layout.text }), true);
+    if (! layout.places.isVoid()) // (round 190oa, DF-130)
+        add << ",\n  \"windowPlaces\": " << juce::JSON::toString (layout.places, true);
+    return json.substring (0, end).trimEnd() + add + "\n" + json.substring (end);
 }
 
 WindowLayout windowLayoutOf (const juce::var& root)
@@ -4848,6 +4855,7 @@ WindowLayout windowLayoutOf (const juce::var& root)
         layout.style = (int) v[0];
         layout.text = v[1].toString();
     }
+    layout.places = root["windowPlaces"]; // (round 190oa, DF-130)
     return layout;
 }
 

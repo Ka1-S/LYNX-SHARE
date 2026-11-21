@@ -228,6 +228,7 @@ public:
     void setButtonWidth (int percent); // 0 = size to fit the longest name
     static constexpr int selectWidth = 12;
     static constexpr int stepWidth = 18; // (round 190io, FM-11: FL's keycap pitch is 16, LYNX 18; was 22)
+    void openChannelPluginWindow (int channel) { openPluginWindow (channel); } // (round 190oa: a project's windows reopened)
 
 private:
     enum class Area { none, mute, pan, volume, route, name, select, grid, addRow, laneLevels, lane, loop, zipped };

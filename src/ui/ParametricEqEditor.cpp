@@ -340,7 +340,9 @@ bool Analyser::update (AudioEngine& engine, int track, int slot, bool claim, juc
     const auto key = track * maxEffectSlots + slot;
     if (tap.key.load (std::memory_order_relaxed) != key)
     {
-        if (claim) tap.key.store (key);
+        // (round 190oa, DC-15, capture 190oa C13: FL's Parametric EQ 2 shows its live spectrum as it opens: an editor
+        // takes the free tap without being pointed at; the one pointed at still takes it from another)
+        if (claim || tap.key.load (std::memory_order_relaxed) < 0) tap.key.store (key);
         bool moved = false;
         for (auto& v : line) if (v > -200.0f) { v = juce::jmax (-200.0f, v - 1.5f); moved = true; }
         return moved;

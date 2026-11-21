@@ -1,4 +1,5 @@
 #include "ui/FlExtraEditors.h"
+#include "ui/WindowPlaces.h"
 
 #include <algorithm>
 #include <cmath>
@@ -1367,7 +1368,10 @@ void open (AudioEngine& engine, int track, int slot)
     const auto name = track == 0 ? tr ("Master") : juce::String::fromUTF8 (mixer[(std::size_t) track].name.c_str());
     const auto title = juce::String (effectInfo (kind).name) + " - " + (name.isNotEmpty() ? name : tr ("Insert {0}", { juce::String (track) })) + " ("
                        + tr ("slot {0}", { juce::String (slot + 1) }) + ")";
-    openWindow (slotTarget (engine, track, slot), kind, title, "mixer-" + juce::String (track) + "-" + juce::String (slot) + "-" + juce::String ((int) kind));
+    const auto windowKey = "mixer-" + juce::String (track) + "-" + juce::String (slot) + "-" + juce::String ((int) kind);
+    openWindow (slotTarget (engine, track, slot), kind, title, windowKey);
+    if (auto it = extraWindows().find (windowKey); it != extraWindows().end()) // (round 190oa, DF-130: its place kept with the project)
+        windowplaces::tag (*it->second, windowplaces::slotKey (track, slot));
 }
 
 void openNode (const VisualTarget& target, const juce::String& title, const juce::String& key)

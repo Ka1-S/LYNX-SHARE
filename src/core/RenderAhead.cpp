@@ -230,6 +230,12 @@ void RenderAhead::setOverriddenSlots (const std::vector<int>& slots) noexcept
     ahead->setOverriddenSlots (slots);
 }
 
+void RenderAhead::setKeepReleasedOnPlay (bool keep) noexcept
+{
+    live.setKeepReleasedOnPlay (keep);
+    ahead->setKeepReleasedOnPlay (keep);
+}
+
 void RenderAhead::setReleasedSlots (const std::vector<int>& slots) noexcept
 {
     live.setReleasedSlots (slots);

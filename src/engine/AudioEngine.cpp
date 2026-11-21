@@ -1278,7 +1278,8 @@ void AudioEngine::setRecordOptions (const RecordOptions& options)
     recordOptions.postRollBars = juce::jlimit (0, 8, options.postRollBars);
     recordOptions.catchWindow = juce::jlimit<std::int64_t> (0, ppq, options.catchWindow);
     compensatePlayed.store (options.compensateOutput);
-    notesStartWait.store (! options.waitRespectFilter || options.recordNotes);
+    waitFilter.store ((options.recordAutomation ? 1 : 0) | (options.recordNotes ? 2 : 0) | (options.recordAudio ? 4 : 0) | (options.recordClips ? 8 : 0));
+    waitRespects.store (options.waitRespectFilter);
     updateLinearSong();
     refreshLowLatency(); // (round 190aq: the option switched while an insert is live)
     sendChangeMessage();
@@ -1361,10 +1362,19 @@ void AudioEngine::startPlayback()
     play();
 }
 
-void AudioEngine::startOnInput() noexcept
+void AudioEngine::startOnInput (WaitInput kind) noexcept
 {
-    if (! notesStartWait.load (std::memory_order_relaxed)) // (round 190ld: FL's "Respect recording filter")
+    if (! waitingForInput.load (std::memory_order_relaxed))
         return;
+    // FL's "Respect recording filter" (round 190ld; REA 190oa R4): only while recording; Audio in the filter lets any
+    // input start it, the tapper always does. (FL's own test for clips never matches — a slip in FL; LYNX follows the
+    // filter's Clips switch.)
+    if (waitRespects.load (std::memory_order_relaxed) && transport.recording.load (std::memory_order_relaxed) && kind != WaitInput::tapper)
+    {
+        const auto filter = waitFilter.load (std::memory_order_relaxed);
+        if ((filter & 4) == 0 && (filter & (int) kind) == 0)
+            return;
+    }
     if (waitingForInput.exchange (false))
         transport.playing.store (true);
 }
@@ -1808,6 +1818,11 @@ void AudioEngine::clearScoreLog()
 NoteMask AudioEngine::soundingKeys (int channel) const noexcept
 {
     return rackProcessor != nullptr ? rackProcessor->soundingKeys (channel) : NoteMask {};
+}
+
+int AudioEngine::voicesSounding() const noexcept
+{
+    return rackProcessor != nullptr ? rackProcessor->voicesSounding() : 0;
 }
 
 std::uint32_t AudioEngine::noteStrikes (int channel) const noexcept
@@ -3738,6 +3753,8 @@ void AudioEngine::launcherCommand (const launcher::Command& command)
         return;
     using T = launcher::Command::Type;
     const auto starts = command.type == T::launch || command.type == T::launchScene || command.type == T::record;
+    if (starts)
+        startOnInput (WaitInput::clips); // (round 190oa, DF-10: FL's clip trigger starts a wait for input)
     if (! transport.playing.load() && ! starts && command.type != T::backToArrangement && command.type != T::trackBackToArrangement && command.type != T::reset
         && command.type != T::recordEnd) // (a recordEnd while stopped cancels a recording that never began)
         return;
@@ -5295,8 +5312,24 @@ ClipAudio AudioEngine::renderClipAudio (std::size_t clipIndex)
     return lynx::renderClipAudio (song, clipIndex, transport.sampleRate.load(), rackFactories());
 }
 
+void AudioEngine::setMainVolume (float position)
+{
+    position = juce::jlimit (0.0f, 1.0f, position);
+    if (song.mainVolume != position)
+    {
+        song.mainVolume = position;
+        if (! modified)
+        {
+            modified = true; // (FL: the project keeps it; no undo step)
+            sendChangeMessage();
+        }
+    }
+    mainVolumeGain.store (faderGain (position), std::memory_order_relaxed);
+}
+
 void AudioEngine::publishSong()
 {
+    mainVolumeGain.store (faderGain (song.mainVolume), std::memory_order_relaxed); // (round 190oa: a loaded / undone song's main volume)
     // Issue #134: a hosted plugin may run the message loop while it is created (a licence or trial box, COM, a splash
     // window), and what that loop dispatches can ask for a publish while this one is still building its rack: the
     // engine's own timer (after a device change to another sample rate it sees the old rate until this publish ends, so
@@ -5713,6 +5746,7 @@ void AudioEngine::noteTweaked (const AutomationTarget& target, bool held)
 {
     if (target.kind == AutomationTargetKind::none)
         return;
+    startOnInput (WaitInput::automation); // (round 190oa, DF-10: FL's moved parameter starts a wait for input)
 
     if (multilink) // round 177b-4: FL's Multilink queues the moved controls in order
         multilink->add (target);
@@ -5741,6 +5775,35 @@ void AudioEngine::noteTweaked (const AutomationTarget& target, bool held)
     }
     it->lastMs = now;
     it->held = it->held || held;
+}
+
+void AudioEngine::setLiveAutomationOverride (bool liveOverride) noexcept
+{
+    liveAutomationOverride = liveOverride;
+    if (rackProcessor != nullptr)
+        rackProcessor->setKeepReleasedOnPlay (liveOverride);
+}
+
+bool AudioEngine::automationOverridden() const
+{
+    std::vector<int> one;
+    for (const auto& t : releasedTargets)
+    {
+        RackState::slotsOfTarget (song, t, one);
+        if (! one.empty())
+            return true;
+    }
+    return false;
+}
+
+void AudioEngine::reEnableAutomation()
+{
+    if (releasedTargets.empty())
+        return;
+    releasedTargets.clear();
+    if (rackProcessor != nullptr)
+        rackProcessor->setReleasedSlots ({});
+    sendChangeMessage();
 }
 
 void AudioEngine::publishReleasedTargets()
@@ -6325,7 +6388,8 @@ void AudioEngine::timerCallback()
     pumpGrossBeatPicks();
     controllerIo.pump (controllerLearnTick); // (controller profiles, round 190aw)
     // playback started: the moved controls follow their automation again (the renderer cleared its own mask)
-    if (const auto playing = transport.playing.load(); playing != std::exchange (releasedWasPlaying, playing) && playing)
+    if (const auto playing = transport.playing.load(); playing != std::exchange (releasedWasPlaying, playing) && playing
+                                                       && ! liveAutomationOverride) // (round 190oa: Live keeps them until Re-Enable)
         releasedTargets.clear();
     else if (! releasedTargets.empty())
         publishReleasedTargets(); // (the slots follow the song: an automation added or removed renumbers them)
@@ -7987,7 +8051,8 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
         }
 
         // round 190ld: the Finish dock's loudness-matched "Hear without" (the device's output only)
-        if (const auto want = listenGain.load (std::memory_order_relaxed); want != 1.0f || listenGainNow != 1.0f)
+        if (const auto want = listenGain.load (std::memory_order_relaxed) * mainVolumeGain.load (std::memory_order_relaxed);
+            want != 1.0f || listenGainNow != 1.0f)
         {
             for (int ch = 0; ch < numOutputChannels; ++ch)
                 if (auto* out = outputs[(std::size_t) ch]; out != nullptr)

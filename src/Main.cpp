@@ -270,6 +270,8 @@ namespace juce::detail { bool dispatchNextMessageOnSystemQueue (bool returnIfNoP
 #include "ui/SampleProperties.h"
 #include "ui/TempoTapper.h"
 #include "ui/ProjectPickerView.h" // (round 190my)
+#include "ui/WindowPlaces.h" // (round 190oa)
+#include "ui/HintBar.h" // (round 190oa)
 #include "core/EventEdit.h"
 #include "core/FacetEq.h"
 #include "core/LimiterLaw.h" // (rollup step 9: the copy for 0.1.28 self-test)
@@ -2942,6 +2944,14 @@ public:
             // the Next-3 card, the empty-state hints, the tips and the Help menu, 100 % and @150, with <prefix>-checks.txt
             const auto i = args.indexOf ("--onboard190npshot");
             setApplicationReturnValue (runOnboardShot190np (args[i + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+        if (args.contains ("--details190oashot"))
+        {
+            // LYNX --details190oashot prefix project.flp: round 190oa off screen (src/DetailsShot190oa.inc)
+            const auto i = args.indexOf ("--details190oashot");
+            setApplicationReturnValue (runDetailsShot190oa (args[i + 1].unquoted(), i + 2 < args.size() ? args[i + 2].unquoted() : juce::String()) ? 0 : 1);
             quit();
             return;
         }
@@ -18303,6 +18313,7 @@ private:
 #include "DetailsShot190mr.inc" // round 190mr
 #include "DetailsShot190mv.inc" // round 190mv
 #include "DetailsShot190my.inc" // round 190my
+#include "DetailsShot190oa.inc" // round 190oa
 #include "RackShot190nc.inc" // round 190nc
 #include "OnboardShot190np.inc" // round 190np
     // --trackautoshot190gz (round 190gz): see the dispatch above

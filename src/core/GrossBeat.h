@@ -24,7 +24,11 @@
 
 namespace lynx::grossbeat
 {
-constexpr int paramCount = 8;
+constexpr int paramCount = 9;
+// round 190oa (DP-8; REA 190oa R5, FL's TScratchWheel / ProcessParam case 8): parameter 8 is the scratch dial's "Time
+// offset (scratching)", FL raw 0 … 65536 with 65536 = no offset (s = raw / 65536 − 1, −1 = two bars back). LYNX keeps it
+// as 1 − raw / 65536 (0 = no offset), so every project saved before it (8 parameters) is unchanged.
+constexpr int scratchParam = 8;
 constexpr int slotsPerKind = 36;
 
 // One point of a slot envelope (FL's TCustomMEnvelope "map": Δx in beats, level 0..1, tension, curve type) plus the

@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstring>
 
+#include "core/AudioEdit.h"
 #include "core/FlAutoSlicer.h"
 #include "core/Instruments.h"
 #include "core/Slicex.h"
@@ -17,6 +18,7 @@
 #include "core/Song.h"
 #include "engine/AudioEngine.h"
 #include "engine/SampleLibrary.h"
+#include "platform/Paths.h"
 #include "ui/FrameTicker.h"
 #include "ui/I18n.h"
 #include "ui/MotionOverlay.h"
@@ -907,6 +909,7 @@ public:
     std::function<int()> selected; // the region shown in the region settings when it is on this deck, else −1
     std::function<void (int, bool)> select; // (region, play it)
     std::function<void (int)> menu;
+    std::function<void (int)> playRaw; // (round 190oa, DP-51: right-click on a region plays its raw audio)
     std::function<std::int64_t (int, std::int64_t)> snap;      // where a dragged start lands (region, frame)
     std::function<void (int, std::int64_t)> moveStart;         // a tab was dropped
     std::function<void (int, std::int64_t)> moveEnd;           // an end tab was dropped (region, the first frame after it)
@@ -1291,8 +1294,12 @@ public:
         }
         if (e.mods.isPopupMenu())
         {
-            if (menu)
-                menu (regionAt (p.x));
+            // round 190oa (DP-51), FL manual (Slicex): "If you Right-click a region this plays the raw audio without any
+            // articulation settings"; the region's menu is on its tab (above)
+            if (const auto r = regionAt (p.x); r >= 0 && playRaw)
+                playRaw (r);
+            else if (menu)
+                menu (r);
             return;
         }
         // the wave: FL's selection. Without one a drag makes it; with one the nearer edge goes to the mouse (a click
@@ -2038,6 +2045,7 @@ public:
                     selectRegion (d, i, false);
                 regionMenu (false);
             };
+            v.playRaw = [this, d] (int i) { selectRegion (d, i, true); }; // (round 190oa: the region's raw audio)
             addAndMakeVisible (v);
         }
         // FL's keyboard (0x898cf0) marks the keys with regions on the current deck (deck A's outside the full display mode)
@@ -2232,6 +2240,21 @@ public:
             return on ? "line at " + juce::String (deckView[(std::size_t) d].getPlayFrame(), 0) : juce::String ("no line");
         }
         else if (cmd == "title") return nameLabel.getText();
+        else if (cmd == "append") // (round 190oa, DP-51) append <path>: Shift+drop of a sample from the Browser
+        {
+            const auto before = regions[(std::size_t) deck].size();
+            const auto ok = appendSample (deck, w.joinIntoString (" ", 1));
+            return (ok ? "appended " : "not appended ") + juce::String ((int) before) + " -> " + juce::String ((int) regions[(std::size_t) deck].size())
+                   + " regions, " + juce::String (samples[(std::size_t) deck] != nullptr ? (int) samples[(std::size_t) deck]->frames() : 0) + " frames";
+        }
+        else if (cmd == "rawplay") // (round 190oa, DP-51) rawplay <fraction>: a right-click on the wave there
+        {
+            const auto p = at (w[1], waveY);
+            const auto now = juce::Time::getCurrentTime();
+            view.mouseDown (juce::MouseEvent (juce::Desktop::getInstance().getMainMouseSource(), p, juce::ModifierKeys (juce::ModifierKeys::rightButtonModifier),
+                                              0.0f, 0.0f, 0.0f, 0.0f, 0.0f, &view, &view, now, p, now, 1, false));
+            return "preview deck " + juce::String (previewDeck) + " from " + juce::String ((juce::int64) previewFrom);
+        }
         else if (cmd == "keys")
         {
             juce::String text;
@@ -2284,7 +2307,105 @@ public:
         for (int d = 0; d < 2; ++d)
             if (deckView[(std::size_t) d].isVisible() && deckView[(std::size_t) d].getBounds().contains (getWidth() / 2, y))
                 deck = d;
+        // round 190oa (DP-51), FL manual (Slicex › Loading): "Holding Shift + Dragging from the Browser will append the new
+        // sample or slices to the existing data"
+        if (juce::ModifierKeys::currentModifiers.isShiftDown() && appendSample (deck, files[0]))
+            return;
         loadSample (deck, files[0]);
+    }
+
+    // round 190oa (DP-51): the sample (its slices, or one region when it has none) added after the deck's audio; the
+    // deck's WAV is rewritten (FL embeds the joined sample). False: nothing to append to (an empty deck, a deck that
+    // isn't a WAV) — the drop then loads as usual.
+    bool appendSample (int deck, const juce::String& path)
+    {
+        if (samples[(std::size_t) deck] == nullptr || ! canEmbed (deck) || frozen (deck))
+            return false;
+        const auto oldWav = deckWav (deck);
+        audioedit::Document doc;
+        if (oldWav.empty() || ! audioedit::decodeWav (oldWav.data(), oldWav.size(), doc) || doc.audio.empty())
+            return false;
+        const auto added = engine.getSampleLibrary().load (path);
+        if (added == nullptr || added->frames() == 0)
+            return false;
+        audioedit::Document more;
+        more.audio.sampleRate = added->sampleRate;
+        const auto frames = added->frames();
+        more.audio.channels.emplace_back (added->leftData(), added->leftData() + frames);
+        if (const auto* right = added->rightData(); right != nullptr && right != added->leftData())
+            more.audio.channels.emplace_back (right, right + frames);
+        auto starts = added->markerStarts;
+        if (starts.empty())
+            starts = flslice::autoSlice (more.audio.channels[0].data(), more.audio.channels.size() > 1 ? more.audio.channels[1].data() : nullptr,
+                                         (std::int64_t) frames, added->sampleRate);
+        if (starts.empty() || starts.front() > 0)
+            starts.insert (starts.begin(), 0);
+        for (const auto start : starts)
+        {
+            audioedit::Marker m;
+            m.start = m.end = start;
+            more.markers.push_back (m);
+        }
+        if (std::abs (more.audio.sampleRate - doc.audio.sampleRate) > 0.5)
+            audioedit::resample (more, doc.audio.sampleRate);
+        // the same channel count on both sides (a mono side is doubled)
+        const auto width = std::max (doc.audio.numChannels(), more.audio.numChannels());
+        for (auto* d : { &doc, &more })
+            while (d->audio.numChannels() < width)
+                d->audio.channels.push_back (d->audio.channels[0]);
+        const auto offset = doc.audio.frames();
+        for (int c = 0; c < width; ++c)
+        {
+            auto& to = doc.audio.channels[(std::size_t) c];
+            const auto& from = more.audio.channels[(std::size_t) c];
+            to.insert (to.end(), from.begin(), from.end());
+        }
+        const auto oldCount = regions[(std::size_t) deck].size();
+        if (doc.markers.empty()) // (a deck WAV without cue points: its whole sample was one region)
+        {
+            audioedit::Marker m;
+            doc.markers.push_back (m);
+        }
+        for (auto m : more.markers)
+        {
+            m.start += offset;
+            m.end += offset;
+            doc.markers.push_back (m);
+        }
+        const auto wav = audioedit::encodeWav (doc, audioedit::WavFormat::float32);
+        std::int64_t joined = 0;
+        const auto list = slicex::wavRegions (wav, joined);
+        if (wav.empty() || list.size() <= oldCount)
+            return false;
+        // the joined sample becomes the deck's file (LYNX/Edits, as Edison's edits), its regions in its cue points; the
+        // regions kept their settings, the added ones get the defaults
+        const auto folder = juce::File::getSpecialLocation (juce::File::userMusicDirectory).getChildFile ("LYNX/Edits");
+        folder.createDirectory();
+        const auto base = juce::File (juce::String::fromUTF8 (paths[(std::size_t) deck].c_str())).getFileNameWithoutExtension();
+        const auto file = folder.getNonexistentChildFile ((base.isNotEmpty() ? base : juce::String ("Slicex")) + " (appended)", ".wav");
+        if (! file.replaceWithData (wav.data(), wav.size()))
+            return false;
+        engine.getSampleLibrary().forget (file.getFullPathName());
+        auto records = state.decks[(std::size_t) deck].regions;
+        records.resize (list.size(), slicex::defaultRegion());
+        auto st = state;
+        const auto joinedPath = file.getFullPathName().toStdString();
+        slicex::setDeckFile (st, deck, joinedPath, (int) list.size());
+        st.decks[(std::size_t) deck].regions = records;
+        const auto bytes = slicex::write (st);
+        engine.editSong ([l = locate, bytes, joinedPath, deck] (Song& song) {
+            if (auto* d = l ? l (song) : nullptr)
+            {
+                d->pluginState = bytes;
+                if (deck == 0)
+                    d->samplePath = joinedPath;
+                else
+                    slicex::setDeckBPath (*d, joinedPath);
+            }
+        }, true);
+        reload();
+        platform::testModeLog ("slicex appended " + juce::String ((int) (list.size() - oldCount)) + " regions");
+        return true;
     }
 
     void paint (juce::Graphics& g) override

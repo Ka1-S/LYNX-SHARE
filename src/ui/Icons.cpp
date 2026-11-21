@@ -605,6 +605,15 @@ Shape make (Icon icon)
         case Icon::punchIn:
             polyline (st, { { 1.5f, 7.5f }, { 9.5f, 7.5f }, { 14.5f, 16.5f }, { 22.5f, 16.5f } });
             break;
+        case Icon::automationArm:
+            st.addEllipse (5.0f, 13.5f, 5.5f, 5.5f);
+            st.addEllipse (13.5f, 5.0f, 5.5f, 5.5f);
+            line (st, 9.5f, 14.5f, 14.5f, 9.5f);
+            break;
+        case Icon::reEnableAutomation:
+            fi.addTriangle (4.0f, 12.0f, 11.0f, 7.0f, 11.0f, 17.0f);
+            fi.addRectangle (10.0f, 10.8f, 9.0f, 2.4f);
+            break;
         case Icon::punchOut:
             polyline (st, { { 1.5f, 16.5f }, { 9.5f, 16.5f }, { 14.5f, 7.5f }, { 22.5f, 7.5f } });
             break;
@@ -1228,10 +1237,14 @@ void IconButton::paintLook (juce::Graphics& g, bool highlighted, bool down)
     else if (look == Look::liveBox)
     {
         // Live 12.4 (CL-2, ref/live-session.png): #363636 boxes, hover #464646, pressed #1e1e1e, lit #ffad56
-        const juce::Colour rest { 0xff363636 }, over { 0xff464646 }, pressed { 0xff1e1e1e }, lit { 0xffffad56 };
+        // (round 190oa, capture 190oa L1: Re-Enable Automation lights red-orange #e76942; idle, its arrow is #696969)
+        const auto reEnable = icon == Icon::reEnableAutomation;
+        const juce::Colour rest { 0xff363636 }, over { 0xff464646 }, pressed { 0xff1e1e1e }, lit { reEnable ? 0xffe76942u : 0xffffad56u };
         g.setColour (down ? pressed : on ? lit : rest.interpolatedWith (over, h));
         g.fillRect (area);
-        fg = on && ! down ? juce::Colour (0xff070707) : juce::Colour (0xffb5b5b5).interpolatedWith (juce::Colours::white, h * 0.35f);
+        fg = on && ! down ? juce::Colour (0xff070707)
+             : reEnable   ? juce::Colour (0xff696969).interpolatedWith (juce::Colours::white, h * 0.35f)
+                          : juce::Colour (0xffb5b5b5).interpolatedWith (juce::Colours::white, h * 0.35f);
     }
     else if (look == Look::liveSelector)
     {

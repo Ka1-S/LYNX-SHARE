@@ -657,6 +657,10 @@ public:
     // Round 190ih (FL's channel activity light, PLAN R4): how many blocks struck a note on the channel (any source: song,
     // pattern, typing keyboard, MIDI, Piano roll preview, arpeggiator); a change since the last look = a new note-on,
     // even one shorter than the UI's frame. Safe to read from any thread.
+    // Round 190oa (DF-29, owner decision F5; REA 190oa R1: FL's polyphony readout is the count of its voice pool's lists —
+    // generator voices kept until their release ends, audio clips, automation clips, plugin notes): the notes sounding on
+    // every channel plus the ones released whose channel still sounds (its release tail), as of the last block. Any thread.
+    int voicesSounding() const noexcept { return voicesNow.load (std::memory_order_relaxed); }
     std::uint32_t noteStrikes (int channel) const noexcept
     {
         return channel >= 0 && channel < maxChannels ? strikes[(std::size_t) channel].load (std::memory_order_relaxed) : 0u;
@@ -772,6 +776,8 @@ public:
     // its automation until playback starts again, stopped or playing. The slots set here are released that way; the
     // renderer forgets them itself when the transport starts (and the engine its list of moved targets).
     void setReleasedSlots (const std::vector<int>& slots) noexcept;
+    // round 190oa (DL-58): Live's override — the released slots stay released when playback starts (FL: they go back)
+    void setKeepReleasedOnPlay (bool keep) noexcept { keepReleasedOnPlay.store (keep, std::memory_order_relaxed); }
     bool isSlotOverridden (int slot) const noexcept
     {
         if (slot < 0 || slot >= RackState::maxAutomations)
@@ -1162,6 +1168,11 @@ private:
     void startPropSlide (int channel, const NoteEvent& slide, int flTicks, bool flLaw) noexcept;
     void stepPropSlide (Instrument& instrument, int channel, int step) noexcept;
     std::array<NoteMask, maxChannels> publishedNotes {};     // what soundingKeys holds (stored only on a change)
+    std::atomic<bool> keepReleasedOnPlay { false };         // (round 190oa, DL-58)
+    // round 190oa (DF-29): per channel, the notes released since the channel last fell silent (their voices still
+    // release; renderChannel zeroes it once the channel is idle / below −100 dB), and the block's total
+    std::array<std::uint16_t, maxChannels> releasingVoices {};
+    std::atomic<int> voicesNow { 0 };
     int publishedTop = 0;                                   // channels past it have nothing published
     void publishSoundingKeys (int channels) noexcept;
     std::array<VoiceOrder, maxChannels> voiceOrders {};      // sounding notes in order, for the channels' Max polyphony
