@@ -3805,6 +3805,24 @@ void ChannelRackComponent::filesDropped (const juce::StringArray& files, int x, 
     int row = 0;
     const auto area = areaAt (x, y, row);
     auto target = (area == Area::none || area == Area::addRow) ? -1 : row;
+    // round 190oa (DF-101, capture 190oa B1): FL opens a new sample channel's window as it drops, unless Alt is held
+    const auto channelsBefore = engine.getSong().channels.size();
+    const auto altHeld = juce::ModifierKeys::getCurrentModifiersRealtime().isAltDown();
+    const struct OpenAfter
+    {
+        ChannelRackComponent& rack;
+        std::size_t before;
+        bool alt;
+        ~OpenAfter()
+        {
+            const auto now = rack.engine.getSong().channels.size();
+            if (alt || now <= before || ! rack.isShowing())
+                return;
+            const auto last = (int) now - 1;
+            if (const auto kind = rack.engine.getSong().channels.back().instrument; kind == InstrumentKind::sampler || kind == InstrumentKind::audioClip)
+                openChannelSettings (rack.engine, last);
+        }
+    } openAfter { *this, channelsBefore, altHeld };
 
     for (const auto& f : files)
     {
