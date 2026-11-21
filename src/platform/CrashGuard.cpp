@@ -1578,7 +1578,7 @@ void onSampleSignal (int)
     sampledCount.store (backtrace (sampledFrames, 64), std::memory_order_release);
 }
 
-std::vector<std::uintptr_t> sampleThread (pthread_t thread)
+std::vector<std::uintptr_t> sampleOnce (pthread_t thread)
 {
     sampledCount.store (-1);
     if (pthread_kill (thread, SIGPROF) != 0)
@@ -1589,6 +1589,23 @@ std::vector<std::uintptr_t> sampleThread (pthread_t thread)
     std::vector<std::uintptr_t> frames;
     for (int i = 2; i < n; ++i) // (the handler and the signal trampoline first)
         frames.push_back ((std::uintptr_t) sampledFrames[i]);
+    return frames;
+}
+
+std::vector<std::uintptr_t> sampleThread (pthread_t thread)
+{
+    // Round 190oy (Linux arm64): GitHub's arm64 runner sampled only 2 frames of a thread spinning on the clock (most
+    // likely the signal landed in the vDSO's clock_gettime, which the unwinder can't leave there). A stack shorter than
+    // 3 frames is sampled again, up to 5 times 10 ms apart, and the longest one is kept; a full first sample (x86) is
+    // kept as it is
+    auto frames = sampleOnce (thread);
+    for (int retry = 0; retry < 5 && frames.size() < 3; ++retry)
+    {
+        std::this_thread::sleep_for (std::chrono::milliseconds (10));
+        auto again = sampleOnce (thread);
+        if (again.size() > frames.size())
+            frames = std::move (again);
+    }
     return frames;
 }
 #endif
