@@ -582,6 +582,10 @@ private:
     void showVersions();
     void openProjectAsCopy (const juce::File& file, const juce::String& name);
     void exportPackage();
+    // issue #251 (round 190oq): writes FL's zipped loop package `zip` (the project named after it, its files beside it)
+    void writePackage (const juce::File& zip);
+    void exportDataFiles();   // FL's File › Export › Project data files... (copies, nothing re-pointed)
+    void collectAllAndSave(); // Live's File › Collect All and Save (LYNX extra): the files into the project's folder
     sessionui::Context sessionContext(); // the File › Online session commands (round 168a)
     liveui::Context liveContext();       // the live session's (round 169b)
     void startLiveFromCommandLine();     // --live-host code.txt / --live-join CODE|@code.txt (scripted GUI checks)
