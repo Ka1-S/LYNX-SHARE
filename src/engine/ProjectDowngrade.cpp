@@ -1654,7 +1654,7 @@ void toRelease0130 (juce::var& root, Losses& lost)
     // Round 190ok (D2): ChannelDef::smartDisable (FL's generator smart disable of a hosted instrument): 0.1.30 runs the
     // plugin all the time, the same sound: dropped without a line (as 190ok's own 0.1.28 step). Rollup 0.1.31 step 5
     forEachEffect (root, [] (juce::DynamicObject& e, const juce::String&) {
-        if ((int) e.getProperty ("engineRev", 0) > 1)
+        if ((int) e.getProperty ("engineRev") > 1)
             e.setProperty ("engineRev", 1);
     });
     forEachChannel (root, [] (juce::DynamicObject& c, int) { drop (c, "smartDisable"); });
