@@ -5,8 +5,8 @@
 #   package   (ubuntu-24.04-arm, Ubuntu 22.04 container, glibc 2.35)  the same steps as release.yml's x86_64 Linux job:
 #             CMake + GCC 13, glibc check, self-test, open test, demo project, LYNX-<label>-aarch64.AppImage (+ .zsync)
 #             and LYNX-<label>-linux-aarch64.tar.gz (scripts/package-linux.sh, ARCH=aarch64), the AppImage start checks
-#   core      (ubuntu-24.04-arm)  the core test suite (scripts/build-local.sh) with g++ and clang++, as tests.yml's Core
-#             jobs, and core-release-gcc with the release's GCC 13 (toolchain PPA) in the Ubuntu 22.04 container
+#   core      (ubuntu-24.04-arm)  the core test suite (scripts/build-local.sh) with clang++, as tests.yml's Core jobs, and
+#             core-release-gcc with the release's GCC 13.4 (toolchain PPA) in the Ubuntu 22.04 container
 #   perf      (ubuntu-24.04-arm and ubuntu-24.04)  tools/perfbench on the same scenarios on both runners: arm64 against
 #             x86_64 on GitHub's hosted machines (4 vCPUs each)
 #
@@ -145,10 +145,13 @@ jobs:
     if: ${{ !inputs.label }}   # (not when release.yml calls it)
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 240
+    # (clang++ only: Ubuntu 24.04's own g++ 13.3 fails 5 checks of 7.6 million on arm64 (range-for loops over
+    # braced lists of enum values) that GCC 13.4, the release's compiler (job below), and clang pass: a GCC 13.3 code
+    # generation fault, round 190oy)
     strategy:
       fail-fast: false
       matrix:
-        compiler: [g++, clang++]
+        compiler: [clang++]
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 1500M

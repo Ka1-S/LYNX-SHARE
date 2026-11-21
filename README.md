@@ -224,7 +224,7 @@ drawn LFOs, chaos sources and a rack of effects.
   <br><sub>Online sessions: the menu, starting a live session, and the session chat.</sub>
 </p>
 
-| | Windows 10 / 11 | macOS 11+ (Apple Silicon and Intel) | Linux x86_64 |
+| | Windows 10 / 11 | macOS 11+ (Apple Silicon and Intel) | Linux x86_64 and arm64 |
 |---|---|---|---|
 | **Plugin formats** | VST3, CLAP, VST2 (32-bit plugins through a bridge) | VST3, CLAP, Audio Units | VST3, CLAP, LV2, VST2 |
 | **Audio drivers** | WASAPI, DirectSound, ASIO | Core Audio | PipeWire, JACK, ALSA |
@@ -401,6 +401,7 @@ Get the latest build from the [releases page](https://github.com/Ka1-S/LYNX-SHAR
 | **Windows** 10 / 11, 64-bit | `LYNX-<v>-setup-x64.exe` (installer) or `LYNX-<v>-windows-x64.zip` (portable) | Per-user installer, no admin rights. Also on the [Microsoft Store](https://apps.microsoft.com/detail/9NQRFBFDCX6N), which keeps it updated. |
 | **macOS** 11 Big Sur or newer | `LYNX-<v>-macos-universal.dmg` | Universal: Apple Silicon and Intel. |
 | **Linux** x86_64, glibc 2.35+ | `LYNX-<v>-x86_64.AppImage` or `LYNX-<v>-linux-x86_64.tar.gz` | Ubuntu 22.04+, Debian 12+, Fedora 36+, current Arch / Manjaro. |
+| **Linux** arm64 (aarch64), glibc 2.35+ | `LYNX-<v>-aarch64.AppImage` or `LYNX-<v>-linux-aarch64.tar.gz` | From 0.1.31. Raspberry Pi 4 / 5 with a 64-bit OS, Ubuntu / Debian / Fedora arm64. Built and self-tested on GitHub's arm64 runners. |
 
 Every file is built from the tagged source by GitHub Actions ([`release.yml`](.github/workflows/release.yml)) and
 listed with its SHA-256 in `SHA256SUMS.txt`. Once installed, LYNX SHARE tells you when a new version is out.
@@ -551,6 +552,9 @@ sudo apt install build-essential cmake ninja-build pkg-config libasound2-dev lib
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
+
+The same commands build for Linux arm64 on an arm64 machine (Raspberry Pi 5, an arm64 server); cross compiling from
+x86_64 and running the core tests under qemu-user is described in [`docs/PLATFORMS.md`](docs/PLATFORMS.md#linux-arm64).
 
 **macOS.** Needs the Xcode command line tools (`xcode-select --install`), CMake and Ninja (e.g. `brew install cmake
 ninja`). Leave out `CMAKE_OSX_ARCHITECTURES` to build for the current Mac only.

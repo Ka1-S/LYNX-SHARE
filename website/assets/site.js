@@ -99,7 +99,9 @@ const RELEASES = 'https://github.com/Ka1-S/LYNX-SHARE/releases/latest';
 const DL = {   // main = primary package, alt = second format; tests run on asset names, newest release with a match wins
   win:   {main: [/setup.*\.exe$/i, /\.exe$/i], alt: [/windows.*\.zip$/i]},
   mac:   {main: [/macos.*\.dmg$/i, /\.dmg$/i]},
-  linux: {main: [/\.AppImage$/i], alt: [/linux.*\.tar\.gz$/i]}
+  // (x86_64 and arm64 by name: a release from 0.1.31 has both; older ones have only the x86_64 files, so the arm64
+  // buttons find nothing there and keep the releases page)
+  linux: {main: [/x86_64\.AppImage$/i], alt: [/linux-x86_64\.tar\.gz$/i], arm: [/aarch64\.AppImage$/i], armalt: [/linux-aarch64\.tar\.gz$/i]}
 };
 const dlUrl = {};
 function detectOS(){
@@ -115,6 +117,8 @@ function detectOS(){
   return '';
 }
 const userOS = detectOS();
+// a Linux arm64 visitor (the browser says "Linux aarch64"): the main download link offers the arm64 AppImage
+const userArm = userOS === 'linux' && /aarch64|arm64/i.test(((navigator.userAgentData && navigator.userAgentData.platform) || '') + ' ' + (navigator.platform || '') + ' ' + (navigator.userAgent || ''));
 function renderDownload(){
   $$('[data-dl]').forEach(a => { a.href = dlUrl[a.dataset.dl] || RELEASES; });
   $$('[data-os]').forEach(e => {
@@ -123,7 +127,8 @@ function renderDownload(){
     if (e.classList.contains('btn')){ e.classList.toggle('btn-red', you); e.classList.toggle('btn-ghost', !you); }
     const em = e.querySelector('em[data-yours]'); if (em) em.textContent = you ? t('dl.yours') : '';
   });
-  $$('.dl-link').forEach(a => { if (userOS && dlUrl[userOS + '.main']) a.href = dlUrl[userOS + '.main']; });
+  const mainKey = userArm && dlUrl['linux.arm'] ? 'linux.arm' : userOS + '.main';
+  $$('.dl-link').forEach(a => { if (userOS && dlUrl[mainKey]) a.href = dlUrl[mainKey]; });
   const badge = $('#storeBadge');   // Microsoft's own localized badge
   if (badge) badge.src = 'https://get.microsoft.com/images/' + ({'en':'en-us','zh-Hans':'zh-cn','zh-Hant':'zh-tw','pt-BR':'pt-br'}[lang] || lang) + '%20light.svg';
 }
