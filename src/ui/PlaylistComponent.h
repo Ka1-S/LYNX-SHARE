@@ -120,6 +120,10 @@ public:
     // FL's Playlist menu › View › "Hide collapsed grouped tracks" (EEHideCollapsedAction, HideCollapsedSubTracks; FL manual:
     // "Collapsed grouped tracks will be hidden"; round 190jf): the members of a collapsed group get no row at all
     static inline bool hideCollapsedGroups = false;
+    // Round 190op (P4, LYNX extra): the Playlist menu's "Show hidden tracks": hidden tracks (PlaylistTrack::hidden) get
+    // their rows back, drawn dimmed with a crossed eye, so they can be shown again; the Clip-launch grid shows their
+    // columns. A view preference (saved with the UI settings).
+    static inline bool showHiddenTracks = false;
     // #230 (round 190nq): FL 2026's Playlist menu › View › "Show fade previews" (EEEnablePreviewFadesAction, on by default,
     // [SHOT] 190nq f08c / f12c / f13c): an audio clip's waveform is drawn with its fades applied
     static inline bool showFadePreviews = true;
@@ -926,6 +930,10 @@ private:
     void colourTracks (const std::vector<int>& tracks, std::uint32_t colour);
     bool isTrackSelected (int track) const;
     std::vector<int> tracksForMenu (int track) const;
+    bool trackStateMenus() const;                                  // round 190op (P4)
+    void paintTrackStateMarks (juce::Graphics& g, juce::Rectangle<int> headers, int rows); // round 190op (P4)
+    bool anyHiddenTracks = false; // round 190op (P4): the song holds hidden tracks (updateProjection)
+    void addDeactivateTrackItem (juce::PopupMenu& menu, int track); // round 190op (P4)
     // round 190dx: FL's new instrument tracks (core trackmodes::addInstrumentTrack; on an instrument track the
     // generator is replaced, FL's EEPLTrackMorePlugMenuClick)
     juce::PopupMenu buildAddTrackMenu();

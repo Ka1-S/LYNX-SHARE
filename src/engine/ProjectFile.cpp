@@ -2335,6 +2335,8 @@ juce::var channelToVar (const ChannelDef& c)
             f->setProperty ("insert", c.freeze.insert);
         o->setProperty (c.freeze.insert != 0 ? "trackFreeze" : "freeze", juce::var (f.release()));
     }
+    if (c.deactivated) // round 190op (P4): written only when on
+        o->setProperty ("deactivated", true);
 
     return juce::var (o.release());
 }
@@ -2724,6 +2726,7 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
             def.freeze.source = f["source"].toString().toStdString();
             def.freeze.insert = juce::String (key) == "trackFreeze" ? (int) f.getProperty ("insert", -1) : 0;
         }
+    def.deactivated = (bool) c.getProperty ("deactivated", false); // round 190op (P4)
     // projects saved before round 168l: an FL engine's (or another generator's) Mono / Porta, imported from FL, was
     // only in the LYNX Synth's settings (the Mono box came from FL's Mono flag or a Max of 1; a Max of 1 is not Mono)
     if (const auto& misc = c["misc"]; def.instrument != InstrumentKind::synth && ! misc.hasProperty ("mono") && ! misc.hasProperty ("porta"))
@@ -2757,6 +2760,8 @@ juce::var mixerTrackToVar (const MixerTrack& t)
         o->setProperty ("separator", true);
     if (t.folded)
         o->setProperty ("folded", true);
+    if (t.deactivated) // round 190op (P4)
+        o->setProperty ("deactivated", true);
     if (t.dock != MixerDock::middle)
         o->setProperty ("dock", t.dock == MixerDock::left ? "left" : "right");
 
@@ -2882,6 +2887,7 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
     track.threaded = (bool) t.getProperty ("threaded", true);
     track.separator = (bool) t.getProperty ("separator", false);
     track.folded = (bool) t.getProperty ("folded", false);
+    track.deactivated = (bool) t.getProperty ("deactivated", false); // round 190op (P4)
     track.dock = t["dock"].toString() == "left" ? MixerDock::left : t["dock"].toString() == "right" ? MixerDock::right : MixerDock::middle;
     track.toMaster = (bool) t.getProperty ("toMaster", true);
     track.masterLevel = juce::jlimit (0.0f, maxFaderGain, (float) (double) t.getProperty ("masterLevel", 1.0));
@@ -3771,6 +3777,14 @@ juce::String toJson (const Song& song, bool stampVersion)
                 foldedTracks.add ((int) i);
         if (! foldedTracks.isEmpty())
             root->setProperty ("playlistTracksFolded", foldedTracks);
+
+        // hidden tracks (round 190op, P4): the indices; a project without any has no such property
+        juce::Array<juce::var> hiddenTracks;
+        for (std::size_t i = 0; i < song.playlistTracks.size(); ++i)
+            if (song.playlistTracks[i].hidden)
+                hiddenTracks.add ((int) i);
+        if (! hiddenTracks.isEmpty())
+            root->setProperty ("playlistTracksHidden", hiddenTracks);
     }
 
     const auto anyMarkers = std::any_of (song.arrangements.begin(), song.arrangements.end(),
@@ -4675,6 +4689,16 @@ std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error,
                 if (song.playlistTracks.size() <= index)
                     song.playlistTracks.resize (index + 1);
                 song.playlistTracks[index].folded = true;
+            }
+
+    if (auto* hiddenTracks = root["playlistTracksHidden"].getArray()) // round 190op (P4)
+        for (const auto& t : *hiddenTracks)
+            if ((int) t >= 0 && (int) t < 500)
+            {
+                const auto index = (std::size_t) (int) t;
+                if (song.playlistTracks.size() <= index)
+                    song.playlistTracks.resize (index + 1);
+                song.playlistTracks[index].hidden = true;
             }
 
     if (auto* arrangements = root["arrangements"].getArray(); arrangements != nullptr && ! arrangements->isEmpty())

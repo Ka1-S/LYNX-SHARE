@@ -146,6 +146,8 @@ std::vector<Action> makeActions()
         { "record.punch", TR_NOOP ("Punch in/out on the loop region on/off"), Context::global, {} },
         { "record.quickAudio", TR_NOOP ("Record audio now: arm the selected insert and record (press again to stop)"), Context::global, { chord ('R', shift) } },
         { "record.captureMidi", TR_NOOP ("Capture MIDI: the notes just played without recording into the pattern"), Context::global, { chord ('R', ctrl | shift | alt) } },
+        // LYNX extra (round 190op, P7; Live 13's "Capture Automation"): no default key, FL's and Live 12's lists stay free
+        { "record.captureAutomation", TR_NOOP ("Capture automation: the moves just made without recording become automation"), Context::global, {} },
 
         // files and history
         { "file.new", TR_NOOP ("New project"), Context::global, { chord ('N', ctrl) } },
@@ -338,6 +340,9 @@ std::vector<Action> makeActions()
         { "playlist.linkTracks", TR_NOOP ("Link Playlist tracks to mixer tracks (current project) on/off"), Context::playlist, {} },
         // LYNX extra (round 190ht, issue #154): the linked headers list their mixer track's insert effects
         { "playlist.trackInserts", TR_NOOP ("Show insert effects on linked tracks on/off"), Context::playlist, {} },
+        // LYNX extra (round 190op, P4): hidden Playlist tracks
+        { "playlist.showHiddenTracks", TR_NOOP ("Show hidden tracks on/off"), Context::playlist, {} },
+        { "playlist.hideUnusedTracks", TR_NOOP ("Hide unused tracks"), Context::playlist, {} },
         // FL's legacy Pattern Blocks (round 170f, issue #60)
         { "playlist.patternBlocks", TR_NOOP ("Pattern blocks (current project) on/off"), Context::playlist, {} },
         { "playlist.automationLanes", TR_NOOP ("Automation lanes on/off"), Context::playlist, {} },

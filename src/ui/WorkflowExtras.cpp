@@ -3,6 +3,7 @@
 #include "core/RulerGestures.h" // round 190nq (#227)
 
 #include "core/TrackClips.h"
+#include "core/TrackStates.h"
 
 #include "core/LaneView.h"
 #include "core/LayoutStyle.h"
@@ -91,6 +92,8 @@ bool readUiOption (const juce::String& key, bool on)
         trackclips::setShownInSelector (on);
     else if (key == "rulerSeeksAnyTool") // issue #227 (round 190nq, LYNX extra)
         ruler::seekWithAnyTool() = on;
+    else if (key == "trackStates") // round 190op (P4, LYNX extra): Hide / Deactivate in the Pattern layout's menus
+        trackstates::patternMenus() = on;
     else
         return false;
     return true;
@@ -116,7 +119,8 @@ juce::String uiOptionsText()
            + "\nsimpleLoopDetect=" + juce::String (loopanalysis::dropDetects().load() ? 1 : 0) // (round 190kx)
            + "\nescClosesWindows=" + juce::String (escclose::enabled() ? 1 : 0) // (round 190ng, issue #217)
            + "\ntrackClipsShown=" + juce::String (trackclips::shownInSelector() ? 1 : 0) // (round 190ne)
-           + "\nrulerSeeksAnyTool=" + juce::String (ruler::seekWithAnyTool() ? 1 : 0); // (round 190nq, issue #227)
+           + "\nrulerSeeksAnyTool=" + juce::String (ruler::seekWithAnyTool() ? 1 : 0) // (round 190nq, issue #227)
+           + "\ntrackStates=" + juce::String (trackstates::patternMenus() ? 1 : 0); // (round 190op, P4)
 }
 
 std::optional<bool> extraOn (std::string_view id)
@@ -143,6 +147,8 @@ std::optional<bool> extraOn (std::string_view id)
         return escclose::enabled();
     if (id == "playlist.rulerSeeksAnyTool") // round 190nq (issue #227)
         return ruler::seekWithAnyTool();
+    if (id == "playlist.trackStates") // round 190op (P4)
+        return trackstates::patternMenus();
     return std::nullopt;
 }
 
@@ -174,6 +180,8 @@ bool setExtra (std::string_view id, bool on)
         escclose::enabled() = on;
     else if (id == "playlist.rulerSeeksAnyTool") // round 190nq (issue #227)
         ruler::seekWithAnyTool() = on;
+    else if (id == "playlist.trackStates") // round 190op (P4)
+        trackstates::patternMenus() = on;
     else
         return false;
     if (onChanged)

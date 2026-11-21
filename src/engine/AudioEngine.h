@@ -27,6 +27,7 @@
 #include "core/HardwareOutput.h"
 #include "core/LiveRecordView.h"
 #include "core/Recorder.h"
+#include "core/CaptureAutomation.h"
 #include "core/PedalHold.h"
 #include "core/TakeRecording.h"
 #include "core/WorkerPool.h"
@@ -447,6 +448,19 @@ public:
     //     (session::phraseTempo).
     // `placed`: the row written (−1: nothing captured). The notes play on the track's instrument channel.
     CaptureResult captureMidiToSlot (int track, int scene, int& placed, bool& into);
+    // Record › Capture automation (round 190op, research190oe P7; LYNX extra after Live 13's announced Capture Automation):
+    // the knob / fader / button moves made while playing without recording (core/CaptureAutomation.h, the last two
+    // minutes) become automation — the last continuous gesture of each moved control, in the layout's form: the Pattern
+    // layout an automation clip (a lane while lanes are on), Clip-launch the Arrangement lane or, for a control moved
+    // while a grid clip played on its track, that clip's envelope, Simple a lane; Pattern mode the current pattern's events.
+    // One undo step; a second capture takes only newer moves. UI thread.
+    struct AutomationCaptureResult
+    {
+        int controls = 0, points = 0;
+    };
+    AutomationCaptureResult captureAutomation();
+    const captureauto::Buffer& getAutomationCapture() const noexcept { return automationCapture; } // (tests)
+    void addAutomationCaptureSample (const captureauto::Entry& e) { automationCapture.add (e); } // (tests, --selftest)
 
     // Per-insert record arm: each armed insert records its own audio input (Mixer › insert › input source) into
     // its own take (arming one turns audio recording on; disarming the last one turns it off). Not saved.
@@ -967,6 +981,19 @@ public:
     int switchPluginOn (const std::string& id);
     bool channelPluginOff (int channel) const noexcept { return std::find (channelsOff.begin(), channelsOff.end(), channel) != channelsOff.end(); }
     bool insertPluginOff (int track) const noexcept { return std::find (insertsOff.begin(), insertsOff.end(), track) != insertsOff.end(); }
+    // Round 190op (P4, LYNX extra): Deactivate. A deactivated channel / insert (by hand, or one that plays only into a
+    // deactivated insert: core/TrackStates.h deactivate::effective) is not loaded and carries silence, as of the last
+    // publish. setDeactivated switches the given channels and inserts off or on again, one undo step; switching off first
+    // keeps what their running plugins hold (capturePluginStates), so Reactivate loads the same state.
+    bool channelDeactivated (int channel) const noexcept
+    {
+        return channel >= 0 && channel < (int) deactivatedChannels.size() && deactivatedChannels[(std::size_t) channel] != 0;
+    }
+    bool insertDeactivated (int track) const noexcept
+    {
+        return track >= 0 && track < (int) deactivatedInserts.size() && deactivatedInserts[(std::size_t) track] != 0;
+    }
+    void setDeactivated (const std::vector<int>& channels, const std::vector<int>& inserts, bool off);
 
     // Edits the song and publishes it to audio. `undoable` edits go into the history;
     // all edits made while the same mouse click is held down
@@ -1631,6 +1658,10 @@ private:
     std::atomic<bool> clockRunning { false }, compensatePlayed { true };
     CountInCatch takeCatch; // UI thread
     double lastCaptureMs = -1.0; // UI thread: the newest note Capture MIDI took
+    captureauto::Buffer automationCapture; // (round 190op) UI thread: the moves made while playing, not recording
+    double lastAutomationCaptureMs = -1.0; // UI thread: the newest move Capture automation took
+    // round 190op: the grid clip a control's track plays now (its pattern, its own position and end), for the capture
+    bool sessionClipOf (const AutomationTarget& target, int& pattern, double& local, std::int64_t& end) const;
     std::array<std::atomic<float>, scopeSize> scope {}; // ring buffer of the output (written by audio)
     std::array<std::atomic<float>, scopeSize> scopeSide {}; // (round 190mv) its side, (L - R) / 2
     std::atomic<int> scopeWrite { 0 };
@@ -1897,6 +1928,7 @@ private:
     };
     std::vector<FreezeCheck> freezeChecks;             // [channel] (freezeOutOfDate)
     std::vector<int> channelsOff, insertsOff;         // (channelPluginOff / insertPluginOff, round 190ap), as of the last publish
+    std::vector<char> deactivatedChannels, deactivatedInserts; // (channelDeactivated / insertDeactivated, round 190op)
     bool rebuildPlugins = false;                      // switchPluginOn's publish: the slots of rebuildPluginId ("" = all) are created anew
     std::string rebuildPluginId;
     // Issue #36 (u-he Presswerk crashed in its VST3 teardown, freed from the engine's timer callback): the racks the

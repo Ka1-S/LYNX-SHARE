@@ -69,6 +69,8 @@
 #include "core/MiddleEllipsis.h"
 #include "core/MixerRouteArrow.h"
 #include "core/StripInserts.h"
+#include "core/LayoutStyle.h"
+#include "core/TrackStates.h" // round 190op (P4)
 #include "ui/WindowClipboard.h" // issue #232 stage 2 (round 190nz)
 
 namespace lynx
@@ -2012,7 +2014,7 @@ void MixerStrips::paint (juce::Graphics& g)
         // amber R before the name)
         const auto standIn = engine.insertPlaysStandIn (t);
         // round 190ap: opened without third-party plugins, a plugin of this insert is still off (a grey power tag)
-        const auto pluginOff = ! standIn && engine.insertPluginOff (t);
+        const auto pluginOff = ! standIn && (engine.insertPluginOff (t) || engine.insertDeactivated (t)); // (round 190op: deactivated too)
         const auto name = juce::String::fromUTF8 (track.name.c_str());
         if (const auto box = nameArea (t); ! sp.verticalName)
         {
@@ -3389,6 +3391,8 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
                 h.text = name + " - " + tr ("Stand-in: a plugin of this insert is not installed on this PC, a render of its sound plays (the plugins' settings are kept)");
             else if (engine.insertPluginOff (t)) // round 190ap
                 h.text = name + " - " + tr ("A plugin of this insert is switched off: the project was opened without third-party plugins (its settings are kept; File › Switch plugins back on...)");
+            if (engine.insertDeactivated (t)) // round 190op (P4)
+                h.text = name + " - " + tr ("Deactivated: its effects are unloaded and it carries silence (its settings are kept; [RMB] › Reactivate)");
             break;
         case Part::body:
         case Part::none:
@@ -4126,6 +4130,14 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         menu.addItem (tr ("Unassign from Audio track(s)"), anyLinked, false,
                       [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::unassignAudioTracks (s, targets); }); });
     }
+    // round 190op (P4, LYNX extra; owner decision O-3): Deactivate unloads the insert's effects (and what plays only into
+    // it); it carries silence, its routing stays. Every selected track with it; the Master and the Current track never
+    if (const auto off = song.mixer[(std::size_t) t].deactivated;
+        t > 0 && ! isCurrent && (layoutstyle::current() != layoutstyle::Style::pattern || trackstates::patternMenus() || off))
+        menu.addItem (off ? tr ("Reactivate") : (several ? tr ("Deactivate selected tracks") : tr ("Deactivate")), true, off, [this, targets, off] {
+            engine.setDeactivated ({}, targets, ! off);
+            repaint();
+        });
     menu.addSeparator();
 
     // FL's "File" submenu (REA round 167q, TFXForm's FileMenu): open/save a state, Browse states and the "States" list

@@ -155,6 +155,7 @@
 #include "core/HintMarkup.h"
 #include "core/SongStats.h"
 #include "core/TrackClips.h"
+#include "core/TrackStates.h"
 #include "ui/LynxWindows.h"     // issue #232 stage 2 (round 190nz)
 #include "ui/WindowClipboard.h"
 
@@ -2585,6 +2586,14 @@ bool MainComponent::runAction (const std::string& id)
         else
             ui::postHint ({ tr ("Capture MIDI: nothing to capture (play some notes first, without recording)"), {}, false, false }, 4000);
     }
+    else if (is ("record.captureAutomation")) // round 190op (P7, LYNX extra; Live 13's announced Capture Automation)
+    {
+        const auto r = engine.captureAutomation();
+        if (r.controls > 0)
+            ui::postHint ({ tr ("Capture automation: the moves of {0} control(s) written as automation", { juce::String (r.controls) }), {}, false, false }, 4000);
+        else
+            ui::postHint ({ tr ("Capture automation: nothing to capture (move a control while playing, without recording)"), {}, false, false }, 4000);
+    }
     else if (is ("record.waitForInput"))
     {
         auto o = engine.getRecordOptions();
@@ -3327,6 +3336,8 @@ void MainComponent::loadUiSettings()
             PlaylistComponent::showInstrumentTrackLevels = on;
         else if (key == "hideCollapsedGroups") // round 190jf: Playlist › View › Hide collapsed grouped tracks
             PlaylistComponent::hideCollapsedGroups = on;
+        else if (key == "showHiddenTracks") // round 190op (P4): Playlist › Show hidden tracks
+            PlaylistComponent::showHiddenTracks = on;
         else if (key == "fadePreviews") // #230 (round 190nq): Playlist › View › Show fade previews
             PlaylistComponent::showFadePreviews = on;
         else if (key == "automationLanes") // round 177b: Playlist › Automation lanes
@@ -3735,6 +3746,7 @@ void MainComponent::saveUiSettings()
                                       + "\naudioTrackLevels=" + juce::String (PlaylistComponent::showAudioTrackLevels ? 1 : 0)
                                       + "\ninstrumentTrackLevels=" + juce::String (PlaylistComponent::showInstrumentTrackLevels ? 1 : 0)
                                       + "\nhideCollapsedGroups=" + juce::String (PlaylistComponent::hideCollapsedGroups ? 1 : 0)
+                                      + "\nshowHiddenTracks=" + juce::String (PlaylistComponent::showHiddenTracks ? 1 : 0)
                                       + "\nfadePreviews=" + juce::String (PlaylistComponent::showFadePreviews ? 1 : 0)
                                       + "\nautomationLanes=" + juce::String (autolanes::shown() ? 1 : 0)
                                       + "\ntrackInserts=" + juce::String (PlaylistComponent::showTrackInserts ? 1 : 0)
@@ -5120,6 +5132,13 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             action (menu, "playlist.blocksToClips", tr ("Turn pattern blocks into clips"), ! engine.getSong().blocks.empty());
             action (menu, "playlist.automationLanes", tr ("Automation lanes"), true, autolanes::shown()); // round 177b
             action (menu, "playlist.trackInserts", tr ("Show insert effects on linked tracks"), true, PlaylistComponent::showTrackInserts); // round 190ht
+            // round 190op (P4, LYNX extra; always offered while the project holds hidden tracks)
+            if (const auto hidden = trackstates::hiddenCount (engine.getSong());
+                hidden > 0 || trackstates::patternMenus() || layoutStyle != layoutstyle::Style::pattern)
+            {
+                action (menu, "playlist.showHiddenTracks", tr ("Show hidden tracks ({0})", { juce::String (hidden) }), true, PlaylistComponent::showHiddenTracks);
+                action (menu, "playlist.hideUnusedTracks", tr ("Hide unused tracks"));
+            }
             workflowextras::addPlaylistMenuItems ([&] (const char* id, const juce::String& text, bool enabled, bool ticked) { action (menu, id, text, enabled, ticked); });
             action (menu, "playlist.follow", tr ("Follow the playhead (auto scrolling)"), true, EditorGlobals::get().isFollowing (false));
             action (menu, "playlist.quantizeStarts", tr ("Quantize the clips' starts"));
@@ -5810,6 +5829,9 @@ void MainComponent::addRecordOptions (juce::PopupMenu& menu)
                   [set] { set ([] (AudioEngine::RecordOptions& r) { r.compensateOutput = ! r.compensateOutput; }); });
     menu.addItem (tr ("Capture MIDI: the notes just played without recording into the pattern") + shortcutText ("record.captureMidi"),
                   [this] { runAction ("record.captureMidi"); });
+    // round 190op (P7, LYNX extra): the knob and fader moves just made, as automation
+    menu.addItem (tr ("Capture automation: the moves just made without recording become automation") + shortcutText ("record.captureAutomation"),
+                  [this] { runAction ("record.captureAutomation"); });
     // round 163: punch in/out on the loop region, pre-roll and post-roll (bars)
     {
         auto bars = [&set] (juce::PopupMenu& m, int now, std::function<void (AudioEngine::RecordOptions&, int)> apply) {

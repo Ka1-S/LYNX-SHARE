@@ -1985,6 +1985,16 @@ struct Exporter
             if (perInsert.count ((int) m) == 0 && ! returnOf.count ((int) m) && ! buses.count ((int) m) && ! song.mixer[m].effects.empty())
                 note ("Mixer insert with effects but no channel not exported: " + song.mixer[m].name);
 
+        // round 190op (P4): Live has no deactivated tracks (its Track Activator is a mute): a deactivated unit is written with
+        // its Activator off, so the set sounds as LYNX plays it, its devices and their states kept
+        for (auto& t : ordered)
+            if ((t.insert > 0 && t.insert < (int) song.mixer.size() && song.mixer[(std::size_t) t.insert].deactivated)
+                || (t.channel >= 0 && t.channel < (int) song.channels.size() && song.channels[(std::size_t) t.channel].deactivated))
+            {
+                t.muted = true;
+                note ("Deactivated tracks written with their Track Activator off (Live has no deactivated tracks; the devices are kept)");
+            }
+
         // nodes
         const auto returns = (int) returnInsert.size();
         exportReturns = returnInsert;

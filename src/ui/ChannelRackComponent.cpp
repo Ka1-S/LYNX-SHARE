@@ -64,6 +64,8 @@
 #include "core/SoundFont.h"
 #include "core/Vfx.h"
 #include "core/CrossPaste.h"   // issue #232 stage 2 (round 190nz)
+#include "core/LayoutStyle.h"
+#include "core/TrackStates.h" // round 190op (P4)
 #include "ui/WindowClipboard.h"
 #include "ui/SoundFontEditor.h"
 
@@ -1291,9 +1293,12 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                     g.setFont (theme::font (10.0f, true));
                     g.drawText ("R", tag, juce::Justification::centred, false);
                 }
-                // round 190ap: opened without third-party plugins, this channel's plugin is still off (a grey power tag)
-                else if (engine.channelPluginOff (row))
+                // round 190ap: opened without third-party plugins, this channel's plugin is still off (a grey power tag);
+                // round 190op (P4): a deactivated channel has the same tag and a dimmed plate
+                else if (engine.channelPluginOff (row) || engine.channelDeactivated (row))
                 {
+                    if (engine.channelDeactivated (row))
+                        theme::fillRoundRect (g, nameArea, theme::radius::md, bg1.withAlpha (0.45f));
                     badgeWidth = 16.0f;
                     juce::Graphics::ScopedSaveState keepFont (g);
                     ui::drawPluginOffTag (g, juce::Rectangle<float> (nameArea.getRight() - (locked ? 34.0f : 18.0f), nameArea.getCentreY() - 6.5f, 14.0f, 13.0f));
@@ -2974,6 +2979,8 @@ ui::Hint ChannelRackComponent::hintAt (juce::Point<int> p)
                 h.text = name + " - " + tr ("Stand-in: its plugin is not installed on this PC, a render of this part plays (the plugin's settings are kept)");
             else if (engine.channelPluginOff (row)) // round 190ap
                 h.text = name + " - " + tr ("Plugin switched off: the project was opened without third-party plugins (its settings are kept; File › Switch plugins back on...)");
+            if (engine.channelDeactivated (row)) // round 190op (P4)
+                h.text = name + " - " + tr ("Deactivated: its instrument is unloaded and it is silent (its settings are kept; [RMB] › Reactivate)");
             // Freeze (round 190ay): what a frozen channel is, and what to do when its audio needs attention
             if (row >= 0 && row < (int) song.channels.size() && song.channels[(std::size_t) row].freeze.on())
                 h.text = name + " - " + frozenHint (row);
@@ -3260,6 +3267,27 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
             });
             menu.addItem (several ? tr ("Re-freeze selected channels") : tr ("Re-freeze"), [this, targets] { freezeChannels (targets); });
         }
+    }
+    // round 190op (P4, LYNX extra; owner decision O-3): Deactivate unloads the instrument with nothing rendered (Freeze
+    // renders); the clicked channel, or every selected one when it is among them
+    if (layoutstyle::current() != layoutstyle::Style::pattern || trackstates::patternMenus() || c.deactivated)
+    {
+        std::vector<int> targets;
+        const auto& rows = engine.getSelectedChannels();
+        if (selected > 1 && std::binary_search (rows.begin(), rows.end(), channel))
+        {
+            for (const auto r : rows)
+                if (r >= 0 && r < count && engine.getSong().channels[(std::size_t) r].deactivated == c.deactivated)
+                    targets.push_back (r);
+        }
+        else
+            targets.push_back (channel);
+        const auto off = c.deactivated;
+        menu.addItem (off ? tr ("Reactivate") : (targets.size() > 1 ? tr ("Deactivate selected channels") : tr ("Deactivate")), true, off,
+                      [this, targets, off] {
+                          engine.setDeactivated (targets, {}, ! off);
+                          repaint();
+                      });
     }
     // FL's Loop Starter channel menu (round 168b): Replace sample, Generate steps, Locked, One-shot category
     loopstarterui::addChannelMenu (menu, engine, channel);

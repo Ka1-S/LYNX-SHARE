@@ -79,6 +79,8 @@
 #include "core/ShowcaseSong.h"
 #include "core/SynthPresets.h"
 #include "core/WorkerPool.h"
+#include "core/TrackStates.h"
+#include <sstream>
 
 // round 190gp: A/B switches of this round's changes, looked up weakly (the same tool links with the objects from before
 // them, which do not have them): LYNX_DECLARED_TAILS=0 (smart disable's fixed hold), LYNX_SYNTH_LANES=0 (the synth's
@@ -272,6 +274,7 @@ int main (int argc, char** argv)
     bool offline = false, meters = true, stopped = scenario == "idle" || scenario == "afterstop", units = false, aheadMode = false, paced = false, appTransport = false,
          aheadAlways = false;
     std::vector<int> liveChannels;
+    std::vector<std::string> deactivateSpecs;
     int loopBars = 0;
     bool gate = false;
     const bool playWarmup = scenario == "afterstop"; // (the warmup plays, the measured part is stopped)
@@ -314,6 +317,8 @@ int main (int argc, char** argv)
             loopBars = std::max (0, std::atoi (next()));
         else if (a == "--gate") // (perfgate190id: one machine-readable GATE line at the end, scripts/perf_gate.py)
             gate = true;
+        else if (a == "--deactivate") // round 190op (P4): "c:1,2" channels / "i:3,4" inserts deactivated (core/TrackStates.h)
+            deactivateSpecs.push_back (next());
     }
 
     constexpr int sampleRate = 44100;
@@ -387,6 +392,19 @@ int main (int argc, char** argv)
             }
         if (std::getenv ("LYNX_PB_SLOTS") != nullptr)
             std::printf ("slots: %d, smart disable on in %d%s\n", all, on, std::getenv ("LYNX_PB_SMARTALL") != nullptr ? " (now all on)" : "");
+    }
+    // round 190op (P4): deactivated channels / inserts (RackState::build plays the projection: they are not loaded)
+    for (const auto& spec : deactivateSpecs)
+    {
+        if (spec.size() < 3 || spec[1] != ':')
+            continue;
+        std::vector<int> list;
+        std::stringstream ss (spec.substr (2));
+        for (std::string item; std::getline (ss, item, ',');)
+            if (! item.empty())
+                list.push_back (std::atoi (item.c_str()));
+        const auto n = spec[0] == 'c' ? deactivate::setChannels (song, list, true) : deactivate::setInserts (song, list, true);
+        std::printf ("deactivated %d %s (%s)\n", n, spec[0] == 'c' ? "channel(s)" : "insert(s)", spec.c_str());
     }
     std::int64_t songTicks = 0;
     song = makeExportSong (song, true, (std::int64_t) std::ceil (ticksPerSample (song.bpm, sampleRate) * sampleRate), songTicks);
