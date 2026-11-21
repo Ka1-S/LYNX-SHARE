@@ -3,6 +3,7 @@
 #include "ui/Motion.h"
 #include "ui/FileChoosers.h"
 #include "ui/PianoRollComponent.h"
+#include "core/MuteKeys.h"
 #include "core/RulerGestures.h" // round 190nq (#227)
 #include "ui/ChordHelper.h"
 #include "ui/MixerComponent.h"
@@ -5627,7 +5628,17 @@ bool PianoRollComponent::handleKey (const juce::KeyPress& key)
     // Shift+Alt+M unmutes, Ctrl+D deselects. (Ctrl+M stays FL's metronome.)
     if (alt && ! cmd && letter == 'M')
     {
-        setNotesMuted (! shift);
+        auto mute = ! shift;
+        // issue #249 (round 190oq, LYNX extra, off = FL): Alt+M on notes that are all muted unmutes them
+        if (mute && mutekeys::toggles())
+        {
+            const auto& notes = currentPattern (engine.getSong()).notes;
+            const auto target = selectionOrAll();
+            mute = target.empty() || ! std::all_of (target.begin(), target.end(), [&notes] (int i) {
+                return i >= 0 && i < (int) notes.size() && notes[(std::size_t) i].muted;
+            });
+        }
+        setNotesMuted (mute);
         return true;
     }
 

@@ -27,6 +27,7 @@
 #include "ui/ImageReadback.h"
 #include "ui/TextCache.h"
 #include "ui/PlaylistComponent.h"
+#include "core/MuteKeys.h"
 #include "core/TempoMarkers.h"
 #include "core/PaintTemplate.h"
 #include "ui/PaintAB.h" // (round 190md: LYNX_PAINT_SAVINGS=0 paints the end veil as before)
@@ -8788,6 +8789,9 @@ juce::PopupMenu PlaylistComponent::editMenu()
     m.addSeparator();
     m.addItem (tr ("Mute") + key ("playlist.muteClips"), [this] { runAction ("playlist.muteClips"); });
     m.addItem (tr ("Unmute") + key ("playlist.unmuteClips"), [this] { runAction ("playlist.unmuteClips"); });
+    // issue #249 (round 190oq, LYNX extra): Alt+M switches both ways (FL's only mutes)
+    m.addItem (tr ("Alt+M toggles: pressed again, it unmutes (LYNX)"), true, mutekeys::toggles(),
+               [] { workflowextras::setExtra ("editing.muteKeyToggles", ! mutekeys::toggles()); });
     m.addSeparator();
     m.addItem (tr ("Insert space") + "\tCtrl+Ins", time, false, [this] { insertTimeSelection(); });
     m.addItem (tr ("Slice & insert space") + "\tCtrl+Alt+Ins", time, false, [this] { runAction ("playlist.sliceInsertSpace"); });
@@ -12426,7 +12430,11 @@ bool PlaylistComponent::runAction (const std::string& id)
         const auto& song = engine.getSong();
         const auto from = song.hasLoop() ? song.loopStart : (std::int64_t) 0;
         const auto to = song.hasLoop() ? song.loopEnd : std::numeric_limits<std::int64_t>::max();
-        engine.editSong ([chosen = selection, mute = is ("playlist.muteClips"), from, to] (Song& s) { clipops::setClipsMuted (s, chosen, mute, from, to); });
+        auto mute = is ("playlist.muteClips");
+        // issue #249 (round 190oq, LYNX extra, off = FL's Alt+M that only mutes): pressed again, it unmutes
+        if (mute && mutekeys::toggles() && clipops::allClipsMuted (song, selection, from, to))
+            mute = false;
+        engine.editSong ([chosen = selection, mute, from, to] (Song& s) { clipops::setClipsMuted (s, chosen, mute, from, to); });
     }
     else if (is ("playlist.mergePatternClips")) mergePatternClipsByKey();
     else if (is ("playlist.mergeSimilarClips")) mergeSimilarClipsByKey();
