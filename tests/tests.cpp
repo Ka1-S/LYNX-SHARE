@@ -17794,6 +17794,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "SimpleNext190dsTests.inc"
 #include "FirstSongTour190dvTests.inc"
 #include "Onboarding190npTests.inc" // round 190np: first-run onboarding (core/Onboarding.h)
+#include "Offline190nxTests.inc" // round 190nx: offline mode (core/Offline.h)
 #include "SimplePads190foTests.inc"
 #include "Rollup027Tests.inc"
 #include "Edison190cdTests.inc"

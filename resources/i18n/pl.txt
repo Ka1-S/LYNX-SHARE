@@ -12068,3 +12068,11 @@ countries: pl
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] otwórz/zamknij edytor  [Alt]+[LMB] nie zamykaj innych  [Ctrl]+[LMB] odsłuch  [2xLMB] Piano Roll  [LMB] przeciągnij w górę/dół zmienia kolejność  [RMB] menu kanału"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Miernik szczytowy (lewy/prawy) z podtrzymaniem  [LMB] gasi lampkę przesterowania"
+
+# round 190nx: offline mode (LYNX_OFFLINE=1 / --offline)
+"LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline), so it does not connect to the internet: no update check and no update download." = "LYNX SHARE jest w trybie offline (LYNX_OFFLINE lub --offline) i nie łączy się z internetem: bez sprawdzania i pobierania aktualizacji."
+"Live sessions are off: LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline) and opens no network connection." = "Sesje na żywo są wyłączone: LYNX SHARE jest w trybie offline (LYNX_OFFLINE lub --offline) i nie otwiera żadnego połączenia sieciowego."
+"LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline) and opens no network connection, so live sessions are off. Send project... and Merge a part... still work: they use files you send yourself." = "LYNX SHARE jest w trybie offline (LYNX_OFFLINE lub --offline) i nie otwiera żadnego połączenia sieciowego, więc sesje na żywo są wyłączone. Wyślij projekt... i Scal partię... nadal działają: używają plików, które wysyłasz sam."
+"Live sessions are off: offline mode" = "Sesje na żywo wyłączone: tryb offline"
+"LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline), so the stem model is not downloaded." = "LYNX SHARE jest w trybie offline (LYNX_OFFLINE lub --offline), więc model stemów nie jest pobierany."
+"LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline), so the stem model is not downloaded. Extracting stems needs it once: start LYNX SHARE without offline mode, or copy the model file into {0}." = "LYNX SHARE jest w trybie offline (LYNX_OFFLINE lub --offline), więc model stemów nie jest pobierany. Wyodrębnianie stemów potrzebuje go raz: uruchom LYNX SHARE bez trybu offline albo skopiuj plik modelu do {0}."

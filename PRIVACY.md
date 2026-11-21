@@ -50,6 +50,26 @@ user or the person installing or operating it.
   is tried again at the next start; switch it off to stop that). Only the four things above need a connection.
   **Third-party plugins** are other programs and may connect by themselves (licence checks, preset stores), also while
   they are scanned: see below.
+- **Offline mode, for sandboxes and packagers.** Set the environment variable `LYNX_OFFLINE=1` (also `true`, `yes`,
+  `on`; `0`, `false`, `no`, `off` and an empty value leave it off), or start LYNX SHARE with `--offline`, and the
+  program guarantees that it opens **no network connection of its own**, whatever the settings say:
+  - the update check does not run (not at start-up, not from *Help › Check for updates*), and an update download or
+    *Go back to ...* says that the program is offline instead;
+  - *File › Online session › Start live session...* and *Join live session...* are greyed out with a note ("Live
+    sessions are off: offline mode"), a resumed or scripted start ends with the same explanation, and the relay is never
+    contacted. *Send project...* and *Merge a part...* still work: they only write and read `.lynxpack` files you send
+    yourself;
+  - a crash report is never uploaded: it stays in `crash-reports/pending` next to the settings and is sent at a later
+    start, once the mode is off and you agree;
+  - a download is refused with a message: the stem model (*Extract stems from sample*) is not fetched when it is not
+    installed yet (an installed model works as usual; copy the file into the models folder to use it offline).
+  It does not touch the settings: the same installation behaves as before when the variable is gone. What it does not
+  cover: *Help* and *Support LYNX SHARE* links open your web browser, as a click of yours always did, and third-party
+  plugins are other programs (see below); run LYNX SHARE in a network namespace or with `firejail --net=none` as well if
+  you must also contain those. Proof: `tests/offline-network-test.sh` runs `LYNX --offlinetest` (the update check, a
+  crash-report upload, starting and joining a live session, the relay's HTTP) under `unshare -rn` with `strace` and counts
+  the `connect()` calls to internet addresses: none with `LYNX_OFFLINE=1`, none with `--offline`, and some in the control
+  run without the mode (so the count can see them). The mode's one switch is `src/core/Offline.h`.
 - **No personal data is collected.** The update check sends nothing about you or your computer; a crash report
   leaves your computer only when you choose to send it.
 - **Local files only.** LYNX SHARE writes only to files you choose (projects, exports) and to its own settings folder

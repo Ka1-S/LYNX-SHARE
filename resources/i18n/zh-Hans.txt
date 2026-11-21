@@ -12068,3 +12068,11 @@ countries: cn sg
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 打开/关闭编辑器  [Alt]+[LMB] 保持其他编辑器打开  [Ctrl]+[LMB] 试听  [2xLMB] 钢琴卷帘  [LMB] 上下拖动重新排序  [RMB] 通道菜单"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值电平表（左/右）带峰值保持  [LMB] 清除削波指示灯"
+
+# round 190nx: offline mode (LYNX_OFFLINE=1 / --offline)
+"LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline), so it does not connect to the internet: no update check and no update download." = "LYNX SHARE 处于离线模式（LYNX_OFFLINE 或 --offline），不会连接互联网：不检查更新，也不下载更新。"
+"Live sessions are off: LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline) and opens no network connection." = "实时会话已关闭：LYNX SHARE 处于离线模式（LYNX_OFFLINE 或 --offline），不会打开任何网络连接。"
+"LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline) and opens no network connection, so live sessions are off. Send project... and Merge a part... still work: they use files you send yourself." = "LYNX SHARE 处于离线模式（LYNX_OFFLINE 或 --offline），不会打开任何网络连接，因此实时会话已关闭。发送工程... 和 合并部分... 仍可使用：它们使用你自己发送的文件。"
+"Live sessions are off: offline mode" = "实时会话已关闭：离线模式"
+"LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline), so the stem model is not downloaded." = "LYNX SHARE 处于离线模式（LYNX_OFFLINE 或 --offline），因此不会下载分轨模型。"
+"LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline), so the stem model is not downloaded. Extracting stems needs it once: start LYNX SHARE without offline mode, or copy the model file into {0}." = "LYNX SHARE 处于离线模式（LYNX_OFFLINE 或 --offline），因此不会下载分轨模型。提取分轨需要它一次：请在关闭离线模式的情况下启动 LYNX SHARE，或把模型文件复制到 {0}。"

@@ -12068,3 +12068,11 @@ countries: it ch sm
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] apri/chiudi l'editor  [Alt]+[LMB] lascia aperti gli altri  [Ctrl]+[LMB] ascolta  [2xLMB] Piano Roll  [LMB] trascina su/giù riordina  [RMB] menu del canale"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Meter di picco (sinistra/destra) con peak hold  [LMB] spegne la spia di clip"
+
+# round 190nx: offline mode (LYNX_OFFLINE=1 / --offline)
+"LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline), so it does not connect to the internet: no update check and no update download." = "LYNX SHARE è in modalità offline (LYNX_OFFLINE o --offline) e non si connette a internet: nessuna ricerca né download di aggiornamenti."
+"Live sessions are off: LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline) and opens no network connection." = "Le sessioni live sono disattivate: LYNX SHARE è in modalità offline (LYNX_OFFLINE o --offline) e non apre alcuna connessione di rete."
+"LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline) and opens no network connection, so live sessions are off. Send project... and Merge a part... still work: they use files you send yourself." = "LYNX SHARE è in modalità offline (LYNX_OFFLINE o --offline) e non apre alcuna connessione di rete, quindi le sessioni live sono disattivate. Invia progetto... e Unisci una parte... funzionano ancora: usano file che invii tu stesso."
+"Live sessions are off: offline mode" = "Sessioni live disattivate: modalità offline"
+"LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline), so the stem model is not downloaded." = "LYNX SHARE è in modalità offline (LYNX_OFFLINE o --offline), quindi il modello degli stem non viene scaricato."
+"LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline), so the stem model is not downloaded. Extracting stems needs it once: start LYNX SHARE without offline mode, or copy the model file into {0}." = "LYNX SHARE è in modalità offline (LYNX_OFFLINE o --offline), quindi il modello degli stem non viene scaricato. L'estrazione degli stem lo richiede una volta: avvia LYNX SHARE senza la modalità offline o copia il file del modello in {0}."

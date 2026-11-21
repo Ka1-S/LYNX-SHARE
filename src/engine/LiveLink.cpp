@@ -1,4 +1,5 @@
 #include "engine/LiveLink.h"
+#include "core/Offline.h"
 #include "platform/CvWait.h"
 
 #include <chrono>
@@ -79,6 +80,11 @@ void Connection::open (const std::string& url, const std::string& token, const s
         const std::lock_guard<std::mutex> g (lock);
         incoming.clear();
     }
+    if (offline::enabled()) // (the callers check available() first: this is the last line)
+    {
+        state = 3;
+        return;
+    }
     stopping = false;
     state = 1;
     reader = std::thread ([this, url, token, userAgent] { run (url, token, userAgent); });
@@ -110,7 +116,16 @@ std::wstring widen (const std::string& s)
 
 Connection::Connection() : impl (std::make_unique<Impl>()) {}
 
-bool Connection::available (std::string*) { return true; }
+bool Connection::available (std::string* why)
+{
+    if (offline::enabled()) // no connection at all (round 190nx)
+    {
+        if (why != nullptr)
+            *why = offline::whyShort;
+        return false;
+    }
+    return true;
+}
 
 void Connection::run (std::string url, std::string token, std::string userAgent)
 {
@@ -356,6 +371,12 @@ Connection::Connection() : impl (std::make_unique<Impl>()) {}
 
 bool Connection::available (std::string* why)
 {
+    if (offline::enabled()) // no connection at all (round 190nx)
+    {
+        if (why != nullptr)
+            *why = offline::whyShort;
+        return false;
+    }
     if (why != nullptr)
         *why = curl().why;
     return curl().ok();
@@ -525,7 +546,7 @@ HttpAnswer http (const std::string& method, const std::string& url, const std::v
                  const std::string& userAgent, int timeoutSeconds)
 {
     HttpAnswer answer;
-    if (! httpAvailable())
+    if (offline::enabled() || ! httpAvailable())
         return answer;
     auto& c = curl();
     void* h = c.easyInit();

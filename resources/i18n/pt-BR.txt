@@ -12203,3 +12203,11 @@ countries: br
 
 # rollup 0.1.31 step 2 (issue #233 on the welcome card)
 "Only the newest version number is asked for; nothing about you is sent." = "Só o número da versão mais nova é consultado; nada sobre você é enviado."
+
+# round 190nx: offline mode (LYNX_OFFLINE=1 / --offline)
+"LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline), so it does not connect to the internet: no update check and no update download." = "O LYNX SHARE está em modo offline (LYNX_OFFLINE ou --offline) e não se conecta à internet: sem verificação nem download de atualizações."
+"Live sessions are off: LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline) and opens no network connection." = "As sessões ao vivo estão desligadas: o LYNX SHARE está em modo offline (LYNX_OFFLINE ou --offline) e não abre nenhuma conexão de rede."
+"LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline) and opens no network connection, so live sessions are off. Send project... and Merge a part... still work: they use files you send yourself." = "O LYNX SHARE está em modo offline (LYNX_OFFLINE ou --offline) e não abre nenhuma conexão de rede, então as sessões ao vivo estão desligadas. Enviar projeto... e Mesclar uma parte... continuam funcionando: usam arquivos que você mesmo envia."
+"Live sessions are off: offline mode" = "Sessões ao vivo desligadas: modo offline"
+"LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline), so the stem model is not downloaded." = "O LYNX SHARE está em modo offline (LYNX_OFFLINE ou --offline), então o modelo de stems não é baixado."
+"LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline), so the stem model is not downloaded. Extracting stems needs it once: start LYNX SHARE without offline mode, or copy the model file into {0}." = "O LYNX SHARE está em modo offline (LYNX_OFFLINE ou --offline), então o modelo de stems não é baixado. Extrair stems precisa dele uma vez: inicie o LYNX SHARE sem o modo offline ou copie o arquivo do modelo para {0}."
