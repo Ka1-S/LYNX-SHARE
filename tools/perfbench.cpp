@@ -744,17 +744,23 @@ int main (int argc, char** argv)
     // build from the previous one, as AudioEngine publishes it: unchanged channels and effects are kept.
     const auto firstBuild = buildMs.front();
     const auto rebuild = buildMs.size() > 1 ? median (std::vector<double> (buildMs.begin() + 1, buildMs.end())) : firstBuild;
-    std::vector<double> editMs;
+    // (rollup 0.1.31 step 5, round 190ok's gate proposal: 12 edits, not 5, and the instructions each one retires on this
+    // thread, so the gate can hold the edit to its count while one ~5 ms timing moves +-25 % run to run)
+    std::vector<double> editMs, editInstr;
     {
+        InstructionCounter editCounter;
         auto previous = RackState::build (song, nullptr, sampleRate, provider);
         const auto trace = std::getenv ("PERFBENCH_TRACE_EDIT") != nullptr; // (the phases of the last edit snapshot)
-        for (int k = 0; k < 5; ++k)
+        for (int k = 0; k < 12; ++k)
         {
             if (trace)
                 loadtrace::begin ("edit");
+            editCounter.start();
             const auto t0 = std::chrono::steady_clock::now();
             auto next = RackState::build (song, previous.get(), sampleRate, provider);
             editMs.push_back (std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - t0).count());
+            editCounter.pause();
+            editInstr.push_back ((double) editCounter.read());
             previous = std::move (next);
             if (trace)
                 loadtrace::end();
@@ -763,6 +769,7 @@ int main (int argc, char** argv)
             std::printf ("%s", loadtrace::table().c_str());
     }
     const auto edit = median (editMs);
+    const auto editInstructions = median (editInstr); // (-1: no CPU counter)
     std::printf ("project: import %.1f ms, first build %.1f ms, rebuild %.1f ms, edit snapshot %.1f ms (medians), peak memory %.0f MB; %zu channels, "
                  "%zu inserts, %zu playlist clips, %zu automations\n",
                  importMs, firstBuild, rebuild, edit, peakRssMb(), song.channels.size(), song.mixer.size(), song.playlist.size(), song.automations.size());
@@ -773,6 +780,8 @@ int main (int argc, char** argv)
                      scenario.c_str(), blockSize, threads, audioMs / 1000.0, 100.0 * median (cpu) / audioMs, median (nsPerSample),
                      median (instr) < 0 ? -1.0 : (double) median (instr) / (double) totalSamples, importMs, firstBuild, rebuild, edit, peakRssMb(),
                      (unsigned long long) firstHash, sameHash ? 1 : 0);
+        if (editInstructions > 0)
+            std::printf (" edit_instr=%.0f", editInstructions);
         if (paced)
             std::printf (" dropouts_per_min=%.2f overruns_per_min=%.2f", median (droppedPerMin), median (overPerMin));
         std::printf ("\n");

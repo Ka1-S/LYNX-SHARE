@@ -8,6 +8,9 @@ scripts/perf-gate.sh runs the measurements into a results folder; this script re
                                                              cells to measure again in <dir>/retry.txt
   perf_gate.py update  <results dir> <baseline.json>      -> writes the baseline from these results (keeps its
                                                              thresholds)
+  perf_gate.py ab      <results dir>                      -> <dir>/summary-ab.md: the interleaved A/B of perf-gate.sh ab
+                                                             (<dir>/base vs <dir>/new, median vs median); exit 1 on a
+                                                             regression
 
 Files in the results folder (written by perf-gate.sh):
   calib-<n>.txt              perfbench calibrate (GATE scenario=calibrate calib_ms=...)
@@ -32,6 +35,16 @@ calibration moves with the runner's memory system: one CPU model's frames came o
 for the same code. Where the run and the baseline both have a cell's instruction count, the count gates it (tight
 threshold) and the time is reported only ("slower (time only)"); elsewhere the time gates, as before.
 
+Wall-clock cells and their instruction counts (rollup 0.1.31 step 5, round 190ok's proposal, ROLLUP031-S4-CELLS.md): one
+stored run of a ~5 ms edit or of a CPU share moves +-12 ... 25 % on the same binary minutes apart, so a baseline's lucky
+run set bars that later runs missed by 40-100 %. Now (1) a bench cell's cpu_norm is held to its instr_per_sample and the
+edit_norm to its edit_instr (perfbench counts the 12 edits' instructions) the way paint_norm is held to paint_instr: when
+both sides counted the cell's instructions and the count stayed within its limit, a slower time is reported, not failed
+("slower (time only)"); a time failure counts when its instruction cell moved too, or (2) when an interleaved A/B against
+main confirms it: `perf-gate.sh ab` runs main's perfbench (BASE_PERFBENCH) and this one alternately, >= 5 rounds
+(main, new, new, main, ...), and compares the MEDIANS of each side's runs (`perf_gate.py ab`), every wall-clock cell
+included. Cells without an instruction count (build / rebuild / import, save / load, open) gate on time as before.
+
 A metric regresses when it is worse than the baseline by more than its relative threshold AND by more than its
 absolute floor (small values are noisy in absolute terms). Missing metrics that the baseline has fail too (a step
 that stopped working). Metrics without a baseline are reported as new and never fail.
@@ -49,6 +62,7 @@ DEFAULT_THRESHOLDS = {
     "build_norm": [0.30, 0.2],
     "rebuild_norm": [0.30, 0.2],
     "edit_norm": [0.30, 0.05],
+    "edit_instr": [0.05, 50000.0],      # instructions of one edit's snapshot, median of 12 (rollup 0.1.31 step 5)
     "import_norm": [0.30, 0.2],
     "rss_mb": [0.10, 12.0],
     "paint_norm": [0.30, 0.03],
@@ -82,7 +96,11 @@ def calibration(d):
     return vals[len(vals) // 2], vals
 
 
-def collect(d):
+# the instruction cell that holds a wall-clock cell (rollup 0.1.31 step 5: cpu_norm and edit_norm, as paint_norm)
+COUNTED_BY = {"cpu_norm": "instr_per_sample", "edit_norm": "edit_instr", "paint_norm": "paint_instr"}
+
+
+def collect(d, pick=min):
     calib, calibs = calibration(d)
     runs = defaultdict(list)  # metric -> values
     info = {}
@@ -109,6 +127,8 @@ def collect(d):
                     add(base + "rebuild_norm", float(g["rebuild_ms"]) / calib)
                     if "edit_ms" in g:
                         add(base + "edit_norm", float(g["edit_ms"]) / calib)
+                    if float(g.get("edit_instr", -1)) > 0:
+                        add(base + "edit_instr", float(g["edit_instr"]))
                     add(base + "import_norm", float(g["import_ms"]) / calib)
                     add(base + "rss_mb", float(g["rss_mb"]))
                 info["hash/" + cell] = g["hash"]
@@ -149,7 +169,7 @@ def collect(d):
                     add("project/" + pm.group(1) + "/save_norm", float(g["save_ms"]) / calib)
                     add("project/" + pm.group(1) + "/load_norm", float(g["load_ms"]) / calib)
                     info["lynx_hash/" + pm.group(1)] = g.get("text_hash", "")
-    metrics = {k: min(v) for k, v in runs.items()}
+    metrics = {k: pick(v) for k, v in runs.items()}
     return {"calib_ms": calib, "calib_runs": calibs, "metrics": metrics, "runs": dict(runs), "info": info,
             "machine": open(os.path.join(d, "machine.txt")).read().strip() if os.path.exists(os.path.join(d, "machine.txt")) else ""}
 
@@ -217,10 +237,15 @@ def compare(d, baseline_path, show=False):
         delta = (c - b) / b if b > 0 else 0.0
         worse = c > b * (1.0 + rel) and c - b > floor
         verdict = "FAIL" if worse else ("better" if c < b * (1.0 - rel) and b - c > floor else "ok")
-        # (a paint cell whose instructions both sides counted: the count gates it, its time is reported only)
-        counted = key[: -len("paint_norm")] + "paint_instr"
-        if key.endswith("/paint_norm") and counted in bm and counted in cm and worse:
-            worse, verdict = False, "slower (time only: the instruction count gates this cell)"
+        # (a wall-clock cell whose instructions both sides counted: the count gates it, its time is reported only; a paint
+        # cell always so since rollup 0.1.30 step 9, a CPU share or an edit while its count stayed in its limit: step 5)
+        name = key.rsplit("/", 1)[1]
+        counted = key[: -len(name)] + COUNTED_BY.get(name, "")
+        if name in COUNTED_BY and counted in bm and counted in cm and worse:
+            crel, cfloor = threshold_for(counted, thresholds)
+            count_moved = cm[counted] > bm[counted] * (1.0 + crel * factor) and cm[counted] - bm[counted] > cfloor
+            if name == "paint_norm" or not count_moved:
+                worse, verdict = False, "slower (time only: the instruction count gates this cell; perf-gate.sh ab to confirm)"
         if worse:
             failed.append(key)
             retry.add(cell_of(key))
@@ -286,9 +311,51 @@ def update(d, baseline_path, show=False):
     return 0
 
 
+def median(v):
+    v = sorted(v)
+    n = len(v)
+    return v[n // 2] if n % 2 else 0.5 * (v[n // 2 - 1] + v[n // 2])
+
+
+def ab(d, show=False):
+    """Rollup 0.1.31 step 5 (round 190ok's proposal): main (<d>/base) and this build (<d>/new) measured alternately in one
+    session by perf-gate.sh ab; each metric is the median of its side's runs and the new one fails past the metric's
+    threshold, every wall-clock cell included (this comparison is the A/B that confirms a time failure)."""
+    b, n = collect(os.path.join(d, "base"), pick=median), collect(os.path.join(d, "new"), pick=median)
+    thresholds = dict(DEFAULT_THRESHOLDS)
+    rows, failed = [], []
+    for key in sorted(set(b["metrics"]) | set(n["metrics"])):
+        if key not in b["metrics"] or key not in n["metrics"]:
+            rows.append((key, fmt(b["metrics"].get(key, -1)), fmt(n["metrics"].get(key, -1)), "", "one side only"))
+            continue
+        bv, nv = b["metrics"][key], n["metrics"][key]
+        rel, floor = threshold_for(key, thresholds)
+        worse = nv > bv * (1.0 + rel) and nv - bv > floor
+        runs = "%d / %d" % (len(b["runs"].get(key, [])), len(n["runs"].get(key, [])))
+        if worse:
+            failed.append(key)
+        verdict = "FAIL" if worse else ("better" if nv < bv * (1.0 - rel) and bv - nv > floor else "ok")
+        rows.append((key, fmt(bv), fmt(nv), "%+.1f%%" % (100.0 * (nv - bv) / bv if bv > 0 else 0.0), "%s (limit +%.0f%%, runs %s)" % (verdict, 100 * rel, runs)))
+    out = ["# Performance A/B (interleaved): %s" % ("FAILED" if failed else "passed"), "",
+           "main: %s, calibration median %.2f ms (runs %s)" % (b["machine"], b["calib_ms"], ", ".join("%.2f" % x for x in b["calib_runs"])),
+           "new: %s, calibration median %.2f ms (runs %s)" % (n["machine"], n["calib_ms"], ", ".join("%.2f" % x for x in n["calib_runs"])), "",
+           "Median of each side's runs; times divided by the side's median calibration; lower is better.", "",
+           "| metric | main | new | change | verdict |", "|---|---|---|---|---|"]
+    out += ["| %s |" % " | ".join(r) for r in rows]
+    if failed:
+        out += ["", "**Regressed (A/B):** " + ", ".join(failed)]
+    text = "\n".join(out) + "\n"
+    open(os.path.join(d, "summary-ab.md"), "w").write(text)
+    if show:
+        print(text)
+    return 1 if failed else 0
+
+
 if __name__ == "__main__":
-    if len(sys.argv) < 3 or sys.argv[1] not in ("collect", "compare", "update"):
+    if len(sys.argv) < 3 or sys.argv[1] not in ("collect", "compare", "update", "ab"):
         sys.exit(__doc__)
+    if sys.argv[1] == "ab":
+        sys.exit(ab(sys.argv[2], show=True))
     if sys.argv[1] == "collect":
         r = collect(sys.argv[2])
         json.dump(r, open(os.path.join(sys.argv[2], "results.json"), "w"), indent=1, sort_keys=True)

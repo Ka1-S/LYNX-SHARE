@@ -50,6 +50,11 @@ Steps:
    per frame, and a cell whose instructions the run and the baseline both have is gated on them (5 %), its time only
    reported (the time divided by the calibration moves with the runner's memory system); add a CPU model's counts with
    `PERF_GATE_ONLY_METRICS=paint_instr scripts/perf_gate.py update <results> <baseline>` (every other number stays).
+   Wall-clock cells (since 0.1.31): the audio CPU share is held to its instructions per sample and the edit snapshot
+   (median of 12 edits) to its instruction count the same way, so a slower time whose count stayed in its limit is
+   reported, not failed. A time failure counts when its instruction cell moved too, or when the interleaved A/B against
+   main confirms it: build main's perfbench, then `BASE_PERFBENCH=<main's perfbench> FL=1 CORES=7-11 scripts/perf-gate.sh
+   ab` (main and this build alternately, at least 5 rounds, median against median, `summary-ab.md`).
 3. Optional local package check: `scripts/make-installer.sh` (defaults to `build-win/LYNX.exe`) writes the installer,
    the zip and `SHA256SUMS.txt` to `dist/`. NSIS: `makensis` on PATH, `$MAKENSIS`, or the NSIS zip release unpacked
    into `~/opt/nsis-<version>` (its `makensis.exe` runs through WSL interop). Quick installer check:
