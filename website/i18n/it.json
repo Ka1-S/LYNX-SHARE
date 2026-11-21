@@ -404,6 +404,8 @@
 "fe.fmBlx": "Un progetto BandLab scaricato da Cakewalk o Sonar: tracce, regioni con i loro loop, tempo, tonalità, il mix, l'automazione di volume e pan e gli effetti comuni di BandLab, come tracce del flusso semplice.",
 "fe.fmInst": "I programmi e i banchi di DirectWave si aprono e si salvano; gli strumenti .gig si aprono come canali DirectWave; i sample .ncw di Kontakt si aprono come gli altri file audio. Gli strumenti Kontakt .nki richiedono Kontakt stesso.",
 "fe.fmMid": "Come nuovo progetto, oppure in quello corrente dal Piano Roll.",
+"fe.fmModN": "Moduli tracker",
+"fe.fmMod": "Moduli di ProTracker, FastTracker 2, Scream Tracker 3 e Impulse Tracker: gli strumenti diventano canali Sampler con i loro campioni, il brano diventa pattern nella Playlist con i suoi cambi di tempo, e il tracker integrato modifica le note. Slide, vibrato, arpeggi e inviluppi sono elencati nel rapporto.",
 "fe.fmAudio": "Audio",
 "fe.fmAud": "WAV a 16 bit, 24 bit o 32 bit float, AIFF a 16 o 24 bit, M4A (AAC) con l'encoder del sistema su Windows e macOS. Stem: un file per insert del mixer, per canale o per traccia della Playlist.",
 "fe.fmMore": "Tutti i formati e i loro limiti",

@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="d8d51a52";
+window.LYNX_LANG=lang;window.LYNX_V="0b6ebf23";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=d8d51a52">
+<link rel="stylesheet" href="/assets/site.css?v=0b6ebf23">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -179,6 +179,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
         <tr><td>.blx<br><span class="muted">BandLab</span></td><td data-i18n="fe.part">Partial</td><td data-i18n="fe.no">No</td><td data-i18n="fe.fmBlx">A BandLab project downloaded by Cakewalk or Sonar: tracks, regions with their loops, tempo, key, the mix, volume and pan automation and BandLab's common effects, as Simple-layout tracks.</td></tr>
         <tr><td>.dwp, .dwb, .gig, .ncw<br><span class="muted">DirectWave, GigaStudio, Kontakt</span></td><td data-i18n="fe.yes">Yes</td><td>.dwp, .dwb</td><td data-i18n="fe.fmInst">DirectWave programs and banks open and save; .gig instruments open as DirectWave channels; Kontakt's .ncw samples open like other audio files. Kontakt .nki instruments need Kontakt itself.</td></tr>
         <tr><td>.mid</td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.fmMid">As a new project, or into the current one from the Piano roll.</td></tr>
+        <tr><td>.mod, .xm, .s3m, .it<br><span class="muted" data-i18n="fe.fmModN">Tracker modules</span></td><td data-i18n="fe.part">Partial</td><td data-i18n="fe.no">No</td><td data-i18n="fe.fmMod">ProTracker, FastTracker 2, Scream Tracker 3 and Impulse Tracker modules: the instruments become Sampler channels with their samples, the song becomes patterns in the Playlist with its tempo changes, and the built-in tracker edits the notes. Slides, vibrato, arpeggios and envelopes are listed in the report.</td></tr>
         <tr><td data-i18n="fe.fmAudio">Audio</td><td>WAV, AIFF, FLAC, OGG, MP3, M4A</td><td>WAV, MP3, FLAC, OGG, AIFF, M4A</td><td data-i18n="fe.fmAud">WAV at 16-bit, 24-bit or 32-bit float, AIFF at 16 or 24-bit, M4A (AAC) with the system's encoder on Windows and macOS. Stems: one file per mixer insert, per channel or per Playlist track.</td></tr>
       </tbody>
     </table></div>
@@ -289,8 +290,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=d8d51a52" defer></script>
-<script src="/assets/features.js?v=d8d51a52" defer></script>
-<script src="/assets/motion.js?v=d8d51a52" defer></script>
+<script src="/assets/site.js?v=0b6ebf23" defer></script>
+<script src="/assets/features.js?v=0b6ebf23" defer></script>
+<script src="/assets/motion.js?v=0b6ebf23" defer></script>
 </body>
 </html>

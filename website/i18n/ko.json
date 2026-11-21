@@ -404,6 +404,8 @@
 "fe.fmBlx": "Cakewalk 또는 Sonar가 내려받은 BandLab 프로젝트: 트랙, 루프가 있는 리전, 템포, 키, 믹스, 볼륨과 팬 오토메이션, BandLab의 흔한 이펙트가 간단한 레이아웃 트랙으로 들어옵니다.",
 "fe.fmInst": "DirectWave 프로그램과 뱅크는 열고 저장할 수 있습니다. .gig 악기는 DirectWave 채널로 열리고, Kontakt의 .ncw 샘플은 다른 오디오 파일처럼 열립니다. Kontakt .nki 악기는 Kontakt 자체가 필요합니다.",
 "fe.fmMid": "새 프로젝트로, 또는 피아노 롤에서 현재 프로젝트로 가져옵니다.",
+"fe.fmModN": "트래커 모듈",
+"fe.fmMod": "ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker 모듈: 악기는 샘플과 함께 샘플러 채널이 되고, 곡은 템포 변화와 함께 Playlist의 패턴이 되며, 내장 트래커로 노트를 편집합니다. 슬라이드, 비브라토, 아르페지오, 엔벨로프는 보고서에 나옵니다.",
 "fe.fmAudio": "오디오",
 "fe.fmAud": "16비트, 24비트, 32비트 float WAV, 16 또는 24비트 AIFF, Windows와 macOS에서는 시스템 인코더를 쓰는 M4A(AAC). 스템: 믹서 인서트별, 채널별, 플레이리스트 트랙별로 파일 하나씩.",
 "fe.fmMore": "모든 형식과 제한",

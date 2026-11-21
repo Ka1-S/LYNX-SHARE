@@ -404,6 +404,8 @@
 "fe.fmBlx": "由 Cakewalk 或 Sonar 下载的 BandLab 工程：轨道、带循环的区域、速度、调性、混音、音量和声像自动化，以及 BandLab 的常用效果器，作为简易工作流程的音轨。",
 "fe.fmInst": "DirectWave 的程序和音色库可以打开和保存；.gig 乐器会作为 DirectWave 通道打开；Kontakt 的 .ncw 采样像其他音频文件一样打开。Kontakt 的 .nki 乐器需要 Kontakt 本身。",
 "fe.fmMid": "作为新工程，或从钢琴卷帘导入当前工程。",
+"fe.fmModN": "Tracker 模块",
+"fe.fmMod": "ProTracker、FastTracker 2、Scream Tracker 3 和 Impulse Tracker 模块：乐器会变成带有采样的采样器通道，乐曲会连同速度变化变成播放列表中的模式，内置跟踪器可以编辑音符。滑音、颤音、琶音和包络会列在报告中。",
 "fe.fmAudio": "音频",
 "fe.fmAud": "16 位、24 位或 32 位浮点的 WAV，16 位或 24 位的 AIFF，以及 M4A（AAC，在 Windows 和 macOS 上使用系统的编码器）。分轨：每个混音台插入轨、每个通道或每个播放列表轨道一个文件。",
 "fe.fmMore": "所有格式及其限制",

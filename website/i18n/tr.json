@@ -404,6 +404,8 @@
 "fe.fmBlx": "Cakewalk veya Sonar'ın indirdiği bir BandLab projesi: track'ler, loop'larıyla region'lar, tempo, tonalite, mix, ses seviyesi ve pan otomasyonu ile BandLab'in yaygın efektleri; Basit iş akışı track'leri olarak.",
 "fe.fmInst": "DirectWave programları ve bankaları açılır ve kaydedilir; .gig enstrümanları DirectWave kanalları olarak açılır; Kontakt'ın .ncw sample'ları diğer ses dosyaları gibi açılır. Kontakt .nki enstrümanları için Kontakt'ın kendisi gerekir.",
 "fe.fmMid": "Yeni bir proje olarak veya Piano Roll'dan geçerli projeye.",
+"fe.fmModN": "Tracker modülleri",
+"fe.fmMod": "ProTracker, FastTracker 2, Scream Tracker 3 ve Impulse Tracker modülleri: enstrümanlar sample'larıyla birlikte Sampler kanallarına, şarkı tempo değişiklikleriyle birlikte Playlist'te pattern'lere dönüşür ve yerleşik tracker notaları düzenler. Slide, vibrato, arpej ve zarflar raporda listelenir.",
 "fe.fmAudio": "Ses",
 "fe.fmAud": "16 bit, 24 bit veya 32 bit float WAV, 16 veya 24 bit AIFF, Windows ve macOS'ta sistemin kodlayıcısıyla M4A (AAC). Stem'ler: mixer insert'i, kanal veya Playlist track'i başına bir dosya.",
 "fe.fmMore": "Tüm formatlar ve sınırları",

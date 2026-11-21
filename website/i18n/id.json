@@ -404,6 +404,8 @@
 "fe.fmBlx": "Proyek BandLab yang diunduh oleh Cakewalk atau Sonar: track, region beserta loop-nya, tempo, nada dasar, mix, otomasi volume dan pan, dan efek umum BandLab, sebagai track Alur kerja sederhana.",
 "fe.fmInst": "Program dan bank DirectWave bisa dibuka dan disimpan; instrumen .gig terbuka sebagai channel DirectWave; sample .ncw Kontakt terbuka seperti file audio lain. Instrumen .nki Kontakt memerlukan Kontakt itu sendiri.",
 "fe.fmMid": "Sebagai proyek baru, atau ke proyek yang sedang terbuka dari Piano Roll.",
+"fe.fmModN": "Modul tracker",
+"fe.fmMod": "Modul ProTracker, FastTracker 2, Scream Tracker 3, dan Impulse Tracker: instrumennya menjadi channel Sampler dengan sample-nya, lagunya menjadi pattern di Playlist dengan perubahan temponya, dan tracker bawaan mengedit not-notnya. Slide, vibrato, arpeggio, dan envelope dicantumkan di laporan.",
 "fe.fmAudio": "Audio",
 "fe.fmAud": "WAV 16-bit, 24-bit, atau 32-bit float, AIFF 16 atau 24-bit, M4A (AAC) dengan encoder sistem di Windows dan macOS. Stem: satu file per insert mixer, per channel, atau per track Playlist.",
 "fe.fmMore": "Semua format dan batasannya",
