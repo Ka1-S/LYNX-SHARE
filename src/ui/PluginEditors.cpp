@@ -1450,10 +1450,13 @@ public: // (the class stays public from here, as before)
                         g.setColour (peqview::bandColour (o).withAlpha (o == chosen ? 1.0f : 0.45f));
                         g.fillRect (cell.withWidth (juce::jmax (2.0f, 3.0f * s)));
                     }
+                    const auto litFill = vertical ? peqview::bandColour (o) : (fx.enabled ? accent : colour::textSecondary);
                     if (o == chosen)
-                        skin::button (g, vertical ? cell.withTrimmedLeft (juce::jmax (2.0f, 3.0f * s)) : cell, true, false,
-                                      vertical ? peqview::bandColour (o) : (fx.enabled ? accent : colour::textSecondary), radius::sm);
-                    g.setColour (o == chosen ? colour::textPrimary : colour::textSecondary);
+                        skin::button (g, vertical ? cell.withTrimmedLeft (juce::jmax (2.0f, 3.0f * s)) : cell, true, false, litFill, radius::sm);
+                    // (round 190oj WG-25: a skin with a light accent — Vintage Phaser's cream — read white-on-cream at 1.35:1;
+                    // the chosen tab's text is dark there)
+                    g.setColour (o != chosen ? colour::textSecondary
+                                             : theme::contrast (colour::textPrimary, litFill) >= 3.0f ? colour::textPrimary : juce::Colour (0xff1b1d22));
                     g.setFont (font (juce::jmax (8.0f, 10.0f * s), true));
                     g.drawFittedText (caps (texts[(std::size_t) o]), cell.toNearestInt(),
                                       juce::Justification::centred, 1, 0.7f);

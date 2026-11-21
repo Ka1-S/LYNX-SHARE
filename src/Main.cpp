@@ -144,6 +144,8 @@
 #include "platform/Package.h"
 #include "core/AlsExport.h"
 #include "core/AlsImport.h"
+#include "core/LiveScaleControl.h" // round 190oo (--design190ooshot)
+#include "core/PlaylistViewOptions.h"
 #include "core/PianoRollScript.h"
 #include "ui/ScriptPanel.h"
 #include "ui/AlsExportDialog.h"
@@ -215,6 +217,7 @@
 #include "ui/TrackIcons.h"
 #include "core/MeterScale.h"
 #include "core/RackOps.h"
+#include "core/RackAutomation.h" // round 190oo (PAT-7, --selftest rackauto190oo)
 #include "core/Layer.h"
 #include "core/XyController.h"
 #include "core/FlCurve.h"
@@ -3364,6 +3367,24 @@ public:
             quit();
             return;
         }
+        // --design190ojshot <prefix> [project] (round 190oj, design review): src/Design190ojShot.inc
+        if (args.contains ("--design190ojshot"))
+        {
+            const auto i = args.indexOf ("--design190ojshot");
+            setApplicationReturnValue (runDesign190ojShot (args[i + 1].unquoted(), i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String()) ? 0 : 1);
+            quit();
+            return;
+        }
+
+        // --design190ooshot <prefix> [project] (round 190oo, design review 2): src/Design190ooShot.inc
+        if (args.contains ("--design190ooshot"))
+        {
+            const auto i = args.indexOf ("--design190ooshot");
+            setApplicationReturnValue (runDesign190ooShot (args[i + 1].unquoted(), i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String()) ? 0 : 1);
+            quit();
+            return;
+        }
+
         // --rollup031s3shot <prefix> (rollup 0.1.31 step 3, round 190ny): src/Rollup031S3Shot.inc
         if (args.contains ("--rollup031s3shot"))
         {
@@ -9009,6 +9030,43 @@ private:
             folder.deleteRecursively();
         }
 
+        // round 190oo (design review 2, PAT-7; core/RackAutomation.h): the automation clips' Channel rack rows. A .lynx
+        // round trip keeps each clip's place; a clip without one (every clip of an older file) writes nothing and reads
+        // back after the channels; the copy for 0.1.30 drops the key without a loss line.
+        juce::String rackauto190ooResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            for (int c = 0; c < 3; ++c)
+                song.channels.emplace_back().name = "R" + std::to_string (c);
+            lynx::Automation placed, appended;
+            placed.name = "placed";
+            placed.points = { { 0, 0.2f, 0.0f }, { lynx::ppq, 0.8f, 0.0f } };
+            placed.rackSlot = 1;
+            appended = placed;
+            appended.name = "appended";
+            appended.rackSlot = -1;
+            song.automations.push_back (placed);
+            song.automations.push_back (appended);
+            juce::String why;
+            const auto json = lynx::ProjectFile::toJson (song);
+            const auto back = lynx::ProjectFile::fromJson (json, why);
+            if (! back || back->automations.size() != 2 || back->automations[0].rackSlot != 1 || back->automations[1].rackSlot != -1
+                || lynx::rackauto::order (*back) != lynx::rackauto::order (song))
+                rackauto190ooResult = "ERROR round trip " + why;
+            const auto plain = lynx::Song::makeDefault();
+            const auto plainJson = lynx::ProjectFile::toJson (plain);
+            if (rackauto190ooResult == "OK" && plainJson.contains ("rackSlot"))
+                rackauto190ooResult = "ERROR rackSlot written for a project without placed clips";
+            auto older = song;
+            older.automations[0].rackSlot = -1; // (as a file saved before round 190oo)
+            if (const auto reread = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (older), why); rackauto190ooResult == "OK"
+                && (! reread || reread->automations.size() != 2 || reread->automations[0].rackSlot != -1 || lynx::ProjectFile::toJson (older).contains ("rackSlot")))
+                rackauto190ooResult = "ERROR an older project's clips";
+            const auto copy = lynx::olderlynx::forRelease (song, "0.1.30");
+            if (rackauto190ooResult == "OK" && (! copy.ok || copy.json.contains ("rackSlot")))
+                rackauto190ooResult = "ERROR copy for 0.1.30";
+        }
+
         const auto motionOverlayResult = lynx::ui::MotionOverlay::selfTest(); // (round 190ip)
         // round 190bm (0.1.25 showed the Mixer and the Playlist black): their cached pictures shown on native and
         // software targets against straight paints (ui/PictureCheck.h; --picturetest runs more sizes and scales)
@@ -9048,7 +9106,7 @@ private:
                         && mixerBasics == "OK" && fontsResult == "OK" && paintCachesResult.startsWith ("OK") && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && takeoverOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && exportParity.startsWith ("OK") && exportLive.startsWith ("OK") && midiHotplug.startsWith ("OK") && midiOutPorts.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
-                        && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
+                        && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
                         && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK"
@@ -9128,6 +9186,7 @@ private:
                << "trackclips190ne=" << trackclips190neResult << "\n"
                << "tracker190nw=" << tracker190nwResult << "\n"
                << "tracker190ob=" << tracker190obResult << "\n"
+               << "rackauto190oo=" << rackauto190ooResult << "\n"
                << "midigen190fm_saved=" << midigen190fmResult << "\n"
                << "trackauto190gz_saved=" << trackauto190gzResult << "\n"
                << "clipenv190gi_saved=" << clipenv190giResult << "\n"
@@ -18876,6 +18935,8 @@ private:
 #include "Rollup031S3Shot.inc" // rollup 0.1.31 step 3 (round 190ny)
 #include "Tabs2Test190nz.inc" // round 190nz (issue #232 stage 2)
 #include "IssuesShot190od.inc" // round 190od (issues #236-#242)
+#include "Design190ojShot.inc" // round 190oj (design review of every view)
+#include "Design190ooShot.inc" // round 190oo (design review 2: the owner's options and the round's fixes)
 #include "DetailsShot190kn.inc" // round 190kn
 #include "SmartTipShot190ok.inc" // round 190ok (D1)
 #include "DetailsShot190ld.inc" // round 190ld
@@ -26978,6 +27039,20 @@ private:
                  << juce::String (1000.0 * (lynx::threadCpuSeconds() - cpu0), 1) << " ms message thread CPU, working set "
                  << juce::String ((double) lynx::toolbar::PerformanceMeter::processMemoryBytes() / 1048576.0, 0) << " MB\n";
         }
+        // LYNX_PAINTBENCH_ROW=<px> (round 190oo): the Playlist's row height after the open, so a build whose .flp import
+        // reads FL's own row height (PAT-6: Thief at 26 px) can be compared with one at 48 px for the same drawing
+        if (const auto row = juce::SystemStats::getEnvironmentVariable ("LYNX_PAINTBENCH_ROW", {}).getIntValue(); row > 0)
+        {
+            offline.editSong ([row] (lynx::Song& s) { s.playlistRowHeight = row; }, false);
+            offline.dispatchPendingMessages();
+            text << "playlist rows forced to " << row << " px (LYNX_PAINTBENCH_ROW)\n";
+        }
+        // LYNX_PAINTBENCH_KEYS=0|1|2 (round 190oo): the Piano roll's keyboard style (flat, lined piano keys, FL's keys)
+        if (const auto keys = juce::SystemStats::getEnvironmentVariable ("LYNX_PAINTBENCH_KEYS", {}); keys.isNotEmpty())
+        {
+            lynx::PianoRollComponent::keyStyle = lynx::pianokeys::styleFromInt (keys.getIntValue());
+            text << "keyboard style " << keys.getIntValue() << " (LYNX_PAINTBENCH_KEYS)\n";
+        }
         const auto& song = offline.getSong();
         text << "channels " << (int) song.channels.size() << ", patterns " << (int) song.patterns.size() << ", playlist clips " << (int) song.playlist.size()
              << ", inserts " << (int) song.mixer.size() << "\n";
@@ -27204,18 +27279,21 @@ private:
         };
         if (play != nullptr && stop != nullptr && rec != nullptr)
         {
+            // (round 190oo, CS-35: the main window's own transport states, as its timer sets them while the engine plays —
+            // the offline engine does not play, so the route drives them: Play shows BandLab's Pause, Back-to-start Stop)
+            ui.transportForSnapshot (false, false);
             write (lynx::shot::snapshot (ui, capsuleArea()), "simple-transport-idle");
             play->setState (juce::Button::buttonOver);
             write (lynx::shot::snapshot (ui, capsuleArea()), "simple-transport-hover");
             play->setState (juce::Button::buttonDown);
             write (lynx::shot::snapshot (ui, capsuleArea()), "simple-transport-pressed");
             play->setState (juce::Button::buttonNormal);
-            play->setToggleState (true, juce::dontSendNotification);
+            ui.transportForSnapshot (true, true);
             write (lynx::shot::snapshot (ui, capsuleArea()), "simple-transport-playing");
             rec->setToggleState (true, juce::dontSendNotification);
             write (lynx::shot::snapshot (ui, capsuleArea()), "simple-transport-recording");
-            play->setToggleState (false, juce::dontSendNotification);
             rec->setToggleState (false, juce::dontSendNotification);
+            ui.transportForSnapshot (false, false);
         }
         if (auto* status = ui.toolbarPartForSnapshot ("status"))
         {
@@ -29836,13 +29914,36 @@ private:
                     simple->setStatusForSnapshot (text);
                     offline.dispatchPendingMessages();
                     states << n << ": " << text << "\n";
-                    writeImage (lynx::shot::snapshot (ui, ui.getLocalBounds().withTop (juce::jmin (ui.getHeight() - 1, 70)).withHeight (juce::jmin (ui.getHeight(), 44))),
+                    // (round 190oo, CS-32: the status is the top bar's since round 190iv: its rows 0..74, not the title band)
+                    writeImage (lynx::shot::snapshot (ui, ui.getLocalBounds().withHeight (juce::jmin (ui.getHeight(), 74))),
                                 ("status-" + juce::String (n++)).toRawUTF8());
                 }
                 juce::File (prefix + "-status.txt").replaceWithText (states);
                 simple->setStatusForSnapshot (lynx::MainComponent::simpleSaveStatusText (true, true, now - 125000, now));
                 offline.dispatchPendingMessages();
                 write ("simple-status");
+            }
+            // round 190oo (design review 2): the top bar while the transport plays (CS-35: Play shows BandLab's Pause,
+            // Back-to-start becomes Stop; the offline engine does not play, so the main window's states are driven), and
+            // the LYNX extra O-4 (the project's name centred at the top, "Untitled" while it has none) at this size and at
+            // 1280 px, then off again
+            {
+                const auto topBar = [&ui] { return ui.getLocalBounds().withHeight (juce::jmin (ui.getHeight(), 80)); };
+                ui.transportForSnapshot (true, false);
+                writeImage (lynx::shot::snapshot (ui, topBar()), "topbar-playing");
+                ui.transportForSnapshot (false, false);
+                writeImage (lynx::shot::snapshot (ui, topBar()), "topbar-stopped");
+                lynx::ui::simplelook::projectNameShown() = true;
+                ui.resized();
+                writeImage (lynx::shot::snapshot (ui, topBar()), "topbar-project-name");
+                const auto wide = ui.getWidth(), tall = ui.getHeight();
+                ui.setSize (1280, tall);
+                offline.dispatchPendingMessages();
+                writeImage (lynx::shot::snapshot (ui, topBar()), "topbar-project-name-1280");
+                ui.setSize (wide, tall);
+                lynx::ui::simplelook::projectNameShown() = false;
+                ui.resized();
+                offline.dispatchPendingMessages();
             }
             // slice S8: the Finish dock, empty, then with a look on the Master (Balanced, Normal, a little Tone)
             simple->showFinish();
@@ -33141,10 +33242,11 @@ private:
         auto& roll = ui.getPianoRollForSnapshot();
         line ("piano roll rows: " + juce::String (roll.rowHeight) + " px");
         check ("FL's 18 px rows by default", roll.rowHeight == 18);
+        const auto keysBefore = lynx::PianoRollComponent::keyStyle; // (round 190oo: FL's keys are the default)
         lynx::PianoRollComponent::keyStyle = lynx::pianokeys::Style::piano;
         roll.repaint();
         saveSnapshot (ui, prefix + "-pr-pianokeys.png");
-        lynx::PianoRollComponent::keyStyle = lynx::pianokeys::Style::flat;
+        lynx::PianoRollComponent::keyStyle = keysBefore;
         lynx::notenames::everyKey.store (true);
         roll.repaint();
         saveSnapshot (ui, prefix + "-pr-allnames.png");
@@ -36402,10 +36504,14 @@ private:
             {
                 // View › Keyboard style › Piano keys (round 190j, discussion #136), also with tall keys
                 auto& roll = ui.getPianoRollForSnapshot();
+                const auto keysBefore = lynx::PianoRollComponent::keyStyle; // (round 190oo: FL's keys are the default)
                 lynx::PianoRollComponent::keyStyle = lynx::pianokeys::Style::piano;
                 roll.repaint();
                 saveSnapshot (ui, prefix + "-pianoroll-pianokeys.png");
                 lynx::PianoRollComponent::keyStyle = lynx::pianokeys::Style::flat;
+                roll.repaint();
+                saveSnapshot (ui, prefix + "-pianoroll-flatkeys.png");
+                lynx::PianoRollComponent::keyStyle = keysBefore;
                 roll.repaint();
                 // round 190j (discussion #10): the toolbar in a narrow window: the chord stamp as an icon button, and
                 // the menu button still there

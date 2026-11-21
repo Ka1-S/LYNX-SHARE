@@ -61,7 +61,7 @@ void drawBox (juce::Graphics& g, juce::Rectangle<int> r, const juce::String& tex
     textcache::drawText (g, text, inner, juce::Justification::centredLeft, true);
 }
 
-void drawToggle (juce::Graphics& g, juce::Rectangle<int> r, const juce::String& text, bool on, juce::Colour onColour, bool hot)
+void drawToggle (juce::Graphics& g, juce::Rectangle<int> r, const juce::String& text, bool on, juce::Colour onColour, bool hot, bool fit = false)
 {
     const auto box = r.toFloat().reduced (0.5f);
     theme::fillRoundRect (g, box, 2.0f, on ? onColour : hot ? c::bg5 : c::bg4);
@@ -72,7 +72,20 @@ void drawToggle (juce::Graphics& g, juce::Rectangle<int> r, const juce::String& 
     }
     g.setColour (on ? c::bg0 : c::textSecondary);
     g.setFont (theme::font (theme::type::caption, on));
-    textcache::drawText (g, text, r, juce::Justification::centred, false);
+    if (fit) // (round 190oj, the monitor switch: a name wider than its part narrows a little rather than losing letters)
+        textcache::drawFittedText (g, text, r.reduced (1, 0), juce::Justification::centred, 1, 0.75f);
+    else
+        textcache::drawText (g, text, r, juce::Justification::centred, false);
+}
+
+// Live's In | Auto | Off switch (round 190oj: in three equal 20 px parts "Auto" was cut to "Aut"): Auto gets two fifths
+// of the row, In and Off three tenths each, 2 px apart
+juce::Rectangle<int> monitorPart (juce::Rectangle<int> r, int index)
+{
+    const auto room = r.getWidth() - 4;
+    const auto side = room * 3 / 10, middle = room - 2 * side;
+    const auto x = index == 0 ? r.getX() : index == 1 ? r.getX() + side + 2 : r.getX() + side + middle + 4;
+    return { x, r.getY(), index == 0 ? side : index == 1 ? middle : r.getRight() - x, r.getHeight() };
 }
 
 void drawLabel (juce::Graphics& g, juce::Rectangle<int> r, const juce::String& text)
@@ -582,10 +595,7 @@ juce::Rectangle<int> SessionMixerComponent::partBounds (int column, Part part, i
         {
             if (sections.io == 0 || main || ret || strip.notes || strip.insert <= 0)
                 return {};
-            const auto r = full (ioY + 63, 16);
-            const auto each = (r.getWidth() - 4) / 3;
-            const auto i = part == Part::monIn ? 0 : part == Part::monAuto ? 1 : 2;
-            return { r.getX() + i * (each + 2), r.getY(), i == 2 ? r.getRight() - (r.getX() + 2 * (each + 2)) : each, r.getHeight() };
+            return monitorPart (full (ioY + 63, 16), part == Part::monIn ? 0 : part == Part::monAuto ? 1 : 2);
         }
         case Part::output:
             return sections.io > 0 && ! main && strip.insert > 0 ? full (ioY + 93, 16) : juce::Rectangle<int>();
@@ -660,10 +670,7 @@ juce::Rectangle<int> SessionMixerComponent::livePartBounds (int column, Part par
         {
             if (sections.io == 0 || main || ret || strip.notes || strip.insert <= 0)
                 return {};
-            const auto r = full (ioY + 63, 16);
-            const auto each = (r.getWidth() - 4) / 3;
-            const auto i = part == Part::monIn ? 0 : part == Part::monAuto ? 1 : 2;
-            return { r.getX() + i * (each + 2), r.getY(), i == 2 ? r.getRight() - (r.getX() + 2 * (each + 2)) : each, r.getHeight() };
+            return monitorPart (full (ioY + 63, 16), part == Part::monIn ? 0 : part == Part::monAuto ? 1 : 2);
         }
         case Part::output:
             return sections.io > 0 && ! main && strip.insert > 0 ? full (ioY + 93, 16) : R();
@@ -1035,9 +1042,9 @@ void SessionMixerComponent::paintStrip (juce::Graphics& g, int column)
                          m->inputChannel >= (int) names.size());
             label (51, tr ("Monitor"));
             const auto mode = sessionmixer::monitorOf (m->monitor);
-            drawToggle (g, partBounds (column, Part::monIn), tr ("In"), mode == sessionmixer::Monitor::in, c::warning, hot (Part::monIn));
-            drawToggle (g, partBounds (column, Part::monAuto), tr ("Auto"), mode == sessionmixer::Monitor::autoMode, c::warning, hot (Part::monAuto));
-            drawToggle (g, partBounds (column, Part::monOff), tr ("Off"), mode == sessionmixer::Monitor::off, c::warning, hot (Part::monOff));
+            drawToggle (g, partBounds (column, Part::monIn), tr ("In"), mode == sessionmixer::Monitor::in, c::warning, hot (Part::monIn), true);
+            drawToggle (g, partBounds (column, Part::monAuto), tr ("Auto"), mode == sessionmixer::Monitor::autoMode, c::warning, hot (Part::monAuto), true);
+            drawToggle (g, partBounds (column, Part::monOff), tr ("Off"), mode == sessionmixer::Monitor::off, c::warning, hot (Part::monOff), true);
         }
         if (m != nullptr)
         {
@@ -1086,7 +1093,7 @@ void SessionMixerComponent::paintStrip (juce::Graphics& g, int column)
         const auto top = sections.total() - sections.volume;
         if (m == nullptr && ! main)
         {
-            g.setColour (c::textDisabled);
+            g.setColour (c::textSecondary); // (round 190oj CS-11: was 2.6:1)
             g.setFont (theme::font (theme::type::caption));
             textcache::drawFittedText (g, strip.insertCount > 1 ? tr ("{0} mixer tracks", { juce::String (strip.insertCount) }) : tr ("No mixer track"),
                               juce::Rectangle<int> (x0 + pad, top + 20, w - 2 * pad, 36), juce::Justification::centred, 2);
@@ -1300,7 +1307,8 @@ void SessionMixerComponent::paintStripLive (juce::Graphics& g, int column, int s
     const auto toggle = [&] (Part part, const juce::String& t, bool on) {
         const auto r = partBounds (column, part);
         liveWell (g, r, on ? lv::on : hot (part) ? lv::raised : lv::well);
-        text (t, r, juce::Justification::centred, on ? lv::ink : lv::text);
+        g.setColour (on ? lv::ink : lv::text); // (round 190oj: narrows a little rather than losing letters: "Aut")
+        textcache::drawFittedText (g, t, r.reduced (1, 0), juce::Justification::centred, 1, 0.75f);
     };
     const auto label = [&] (int y, const juce::String& t) { text (t, { content.getX() + 4, y, content.getWidth() - 8, 12 }, juce::Justification::centredLeft); };
     if (sections.io > 0 && main) // round 190nc (DL-110): Cue Out over Main Out (190mv B1 co3.png)
@@ -1398,7 +1406,7 @@ void SessionMixerComponent::paintStripLive (juce::Graphics& g, int column, int s
     const auto top = liveTop + sections.io + sections.sends + sections.trackOptions;
     if (m == nullptr && ! main)
     {
-        g.setColour (lv::text.withAlpha (0.6f));
+        g.setColour (lv::text); // (round 190oj CS-11: at 60 % it read 2.56:1 on the strip)
         textcache::drawFittedText (g, strip.insertCount > 1 ? tr ("{0} mixer tracks", { juce::String (strip.insertCount) }) : tr ("No mixer track"),
                                    juce::Rectangle<int> (content.getX() + 4, top + 20, content.getWidth() - 8, 36), juce::Justification::centred, 2);
     }

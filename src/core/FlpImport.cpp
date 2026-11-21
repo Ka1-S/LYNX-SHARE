@@ -1,5 +1,6 @@
 #include "core/FlCurve.h"
 #include "core/FlpImport.h"
+#include "core/RackAutomation.h" // round 190oo (PAT-7)
 #include "core/FlmImport.h" // round 190fn: the FL Studio Mobile Rack generator
 #include "core/FruityDance.h"
 #include "core/FlpExport.h"
@@ -667,6 +668,9 @@ void splitDrumChannel (Song& song, int channel, const std::vector<DrumPad>& pads
              || t.kind == AutomationTargetKind::channelParam || t.kind == AutomationTargetKind::channelAdjust) && t.index >= 0)
             t.index = shift (t.index);
     });
+
+    // round 190oo (PAT-7): the automation clip rows under the kit stay under its pads
+    rackauto::channelsInserted (song, channel + 1, inserted);
 }
 
 bool isFlSynthPresetPlugin (const std::string& pluginName)
@@ -3984,6 +3988,16 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             lfo.fl.rawAmp = lfo.amp;
         }
 
+        // round 190oo (PAT-7, core/RackAutomation.h): the clip's row in the Channel rack where FL's channel order has it,
+        // above the next channel that is not an automation clip (none after it: after the last channel, −1)
+        for (auto next = (std::size_t) (&c - project.channels.data()) + 1; next < project.channels.size(); ++next)
+            if (const auto& n = project.channels[next]; n.type != flp::ChannelType::automationClip)
+            {
+                if (const auto mapped = channelMap.find (n.index); mapped != channelMap.end())
+                    a.rackSlot = mapped->second;
+                break;
+            }
+
         automationMap[c.index] = (int) song.automations.size();
         song.automations.push_back (std::move (a));
     }
@@ -4257,6 +4271,12 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         }
 
         song.selectArrangement (fullest);
+
+        // the open arrangement's Playlist vertical zoom (event 0xF2, round 190oo PAT-6): FL opens Ookay - Thief with
+        // 26 px rows, a new project with 48 px; the tracks' size factors below then work on that row, as in FL
+        if (fullest < (int) project.arrangements.size())
+            if (const auto zoom = project.arrangements[(std::size_t) fullest].rowZoom; zoom >= 0)
+                song.playlistRowHeight = polish::flRowHeightForZoom (zoom);
 
         // Playlist track names, mute and colour (from the open arrangement); FL's default grey = no colour
         if (fullest < (int) importedTracks.size())

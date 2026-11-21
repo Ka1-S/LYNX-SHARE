@@ -848,9 +848,13 @@ private:
         adjustTitle.setBounds (row (24));
         {
             auto r = row (64);
+            // round 190oo (WG-13): the knob pitch grows by what the longest translated caption adds (ru "Насыщенность" was
+            // "Насыщенно..." in 64 px); English keeps FL's 64 px
+            const auto pitch = 64 + juce::jmin (36, theme::translationExtra (theme::font (theme::type::small),
+                                                                            { "Hue", "Saturation", "Brightness", "Contrast", "Text" }));
             for (int i = 0; i < knobCount; ++i)
             {
-                auto cell = r.removeFromLeft (64);
+                auto cell = r.removeFromLeft (pitch);
                 knobs[(std::size_t) i].setBounds (cell.removeFromTop (44).withSizeKeepingCentre (40, 40));
                 knobLabels[(std::size_t) i].setBounds (cell);
             }

@@ -36,6 +36,7 @@
 #include "core/FlSynths.h"
 #include "core/MidiControls.h"
 #include "ui/ToolWindow.h"
+#include "ui/DialogFrame.h"
 #include "ui/LoopStarterWindow.h"
 #include "core/Rack.h"
 #include "core/Slicer.h"
@@ -408,6 +409,7 @@ void ChannelRackComponent::groupSelected()
 void ChannelRackComponent::updateSize()
 {
     refreshZipLayout(); // (round 190mk: zipped channels' strips)
+    refreshAutomationRows(); // (round 190oo, PAT-7: the automation clip rows, after the strips they keep whole)
     const auto rows = shownCount() + 1; // +1 = "add channel" row
     // FL's ghost steps: when the rack is wider than the pattern, the free width shows faint steps after its end;
     // clicking one adds a step there and makes the pattern longer (issue #11)
@@ -416,7 +418,7 @@ void ChannelRackComponent::updateSize()
     if (const auto* holder = getParentComponent())
         ghostSteps = juce::jmax (0, (holder->getWidth() - gridLeft() - 8 - loopColumn) / stepWidth - numSteps());
     setSize (gridLeft() + shownSteps() * stepWidth + 8 + loopColumn,
-             (zipLayout.top.empty() ? rows * rowHeight : zipLayout.total) + 8 + (graphRow() >= 0 ? laneHeight : 0));
+             (zipLayout.top.empty() ? rows * rowHeight : zipLayout.total) + (int) autoRows.size() * rowHeight + 8 + (graphRow() >= 0 ? laneHeight : 0));
 }
 
 // --- FL's Channel button width (round 190mk, DE-39) ---------------------------------------------------------------------
@@ -552,6 +554,14 @@ int ChannelRackComponent::graphRow() const
 
 int ChannelRackComponent::rowY (int row) const
 {
+    const auto base = baseRowY (row);
+    if (autoBefore.empty() || row < 0) // (round 190oo: no automation clip rows, the rows as before)
+        return base;
+    return base + autoBefore[(std::size_t) juce::jmin (row, (int) autoBefore.size() - 1)] * rowHeight;
+}
+
+int ChannelRackComponent::baseRowY (int row) const
+{
     const auto lane = graphRow();
     const auto offset = lane >= 0 && row > lane ? laneHeight : 0;
     if (const auto count = (int) zipLayout.top.size() - 1; count >= 0 && row >= 0) // (round 190mk: zipped strips)
@@ -564,9 +574,29 @@ int ChannelRackComponent::rowAtY (int y) const
     if (y < 4)
         return -1;
 
+    // round 190oo (PAT-7): the automation clip rows above y move it up a row each; on one, the channel row under it
+    // answers (the drags and drops that look for a channel; areaAt finds the automation row itself first)
+    if (! autoRows.empty())
+    {
+        int above = 0;
+        for (int i = 0; i < (int) autoRows.size(); ++i)
+        {
+            const auto top = automationRowTop (i);
+            if (y >= top + rowHeight)
+                ++above;
+            else
+            {
+                if (y >= top)
+                    return autoRows[(std::size_t) i].gap;
+                break;
+            }
+        }
+        y -= above * rowHeight;
+    }
+
     if (const auto lane = graphRow(); lane >= 0)
     {
-        const auto laneTop = rowY (lane) + rowHeight;
+        const auto laneTop = baseRowY (lane) + rowHeight;
         if (y >= laneTop && y < laneTop + laneHeight)
             return lane;
         if (y >= laneTop + laneHeight)
@@ -846,11 +876,19 @@ void ChannelRackComponent::burnMidi (int channel, bool toNewPattern)
 ChannelRackComponent::Area ChannelRackComponent::areaAt (int x, int y, int& row) const
 {
     const auto channels = (int) engine.getSong().channels.size();
-    row = rowAtY (y);
     const auto rackX = x;
 
     if (x < stickyX + gridLeft()) // the controls column (painted at the visible left edge)
         x -= stickyX;
+
+    // round 190oo (PAT-7): an automation clip row (FL's automation clip channel): its button, or the rest of the row
+    if (const auto automationRow = autoRows.empty() ? -1 : automationRowAt (y); automationRow >= 0)
+    {
+        row = autoRows[(std::size_t) automationRow].automation;
+        return x >= nameLeft() && x < selectLeft() ? Area::autoName : Area::autoRow;
+    }
+
+    row = rowAtY (y);
 
     if (row < 0 || row > channels)
         return Area::none;
@@ -1162,9 +1200,12 @@ void ChannelRackComponent::paint (juce::Graphics& g)
         }
     }
 
+    if (! autoRows.empty()) // round 190oo (PAT-7): the automation clip rows' steps
+        paintAutomationSteps (g, clip);
+
     paintLane (g);
     const auto addY = rowY ((int) song.channels.size());
-    g.setColour (textDisabled);
+    g.setColour (theme::colour::textSecondary); // (round 190oo PAT-14: an informative hint, 7:1; was textDisabled 2.9:1)
     g.setFont (theme::font (theme::type::small));
     textcache::drawText (g, tr ("or drop an audio file here"), gridLeft() + 4, addY + positionStripHeight, 400, rowHeight - positionStripHeight,
                          juce::Justification::centredLeft);
@@ -1355,6 +1396,9 @@ void ChannelRackComponent::paint (juce::Graphics& g)
             }
         }
 
+        if (! autoRows.empty()) // round 190oo (PAT-7): the automation clip rows' controls and buttons
+            paintAutomationButtons (g, column);
+
         paintLane (g);
         {
             const auto box = racklayout::addChannelBox (nameLeft(), nameWidth, addY, rowHeight);
@@ -1386,6 +1430,195 @@ void ChannelRackComponent::paint (juce::Graphics& g)
 
     if (advancedLoopShown())
         paintLoopColumn (g);
+}
+
+// --- FL's automation clip channels (round 190oo, design review 2 PAT-7; core/RackAutomation.h) ------------------------
+// FL lists every automation clip as a channel of the rack (Thief: "Volume Duck", "GROSS..w Bass", "CRASH REVERB" between
+// YELP and "Riser..Metal", design190ia shots/ref/fl-channelrack.png). Here they are rows of their own between the channel
+// rows: the channel rows keep their indices, so the selection, the filter groups, the Piano roll's channel, the mixer
+// routing and the steps never see them.
+
+void ChannelRackComponent::refreshAutomationRows()
+{
+    autoRows.clear();
+    autoBefore.clear();
+    const auto& song = engine.getSong();
+    if (song.automations.empty() || ! rackauto::shownUnder (song, filterGroup))
+        return;
+    autoRows = rackauto::rows (song);
+    if (autoRows.empty())
+        return;
+    // a row inside a zipped strip (round 190mk) goes right below the strip: the strip stays whole
+    if (! zipLayout.first.empty())
+    {
+        const auto count = (int) song.channels.size();
+        for (auto& r : autoRows)
+            while (r.gap < count && r.gap < (int) zipLayout.first.size() && zipLayout.first[(std::size_t) r.gap] != r.gap)
+                ++r.gap;
+        std::stable_sort (autoRows.begin(), autoRows.end(), [] (const rackauto::Row& a, const rackauto::Row& b) { return a.gap < b.gap; });
+    }
+    autoBefore = rackauto::rowsBefore (song, autoRows);
+}
+
+int ChannelRackComponent::automationRowTop (int i) const
+{
+    // the channel rows above its gap (the graph lane and the zipped strips included) and the automation rows before it
+    return baseRowY (autoRows[(std::size_t) i].gap) + i * rowHeight;
+}
+
+int ChannelRackComponent::automationRowAt (int y) const
+{
+    for (int i = 0; i < (int) autoRows.size(); ++i)
+    {
+        const auto top = automationRowTop (i);
+        if (y < top)
+            return -1; // (top to bottom: the others are lower)
+        if (y < top + rowHeight)
+            return i;
+    }
+    return -1;
+}
+
+juce::Rectangle<int> ChannelRackComponent::automationRowBounds (int automation) const
+{
+    for (int i = 0; i < (int) autoRows.size(); ++i)
+        if (autoRows[(std::size_t) i].automation == automation)
+            return { 0, automationRowTop (i), getWidth(), rowHeight };
+    return {};
+}
+
+// FL draws an automation clip channel's steps as any channel's (idle: LYNX does not start a clip from steps, the triggered
+// playback of details DE-123); the piano roll overview leaves the row empty (a clip has no notes)
+void ChannelRackComponent::paintAutomationSteps (juce::Graphics& g, juce::Rectangle<int> clip)
+{
+    if (pianoRollView)
+        return;
+    using namespace theme::colour;
+    const auto steps = shownSteps(), realSteps = numSteps();
+    for (int i = 0; i < (int) autoRows.size(); ++i)
+    {
+        const auto y = automationRowTop (i);
+        if (y > clip.getBottom() || y + rowHeight < clip.getY())
+            continue;
+        for (int start = 0; start < steps; start += 8)
+        {
+            const auto first = juce::Rectangle<int> (gridLeft() + start * stepWidth + 1, y + 5, stepWidth - 3, rowHeight - 10); // (stepBounds)
+            if (first.getX() + 8 * stepWidth < clip.getX() || first.getX() > clip.getRight())
+                continue;
+            if (start + 8 <= realSteps)
+                drawIdleStepStrip (g, first, stepWidth, theme::stepOff (start), theme::stepOff (start + 4), bg2);
+            else if (start >= realSteps && start + 8 <= steps)
+                theme::drawStepStripOver (g, first, stepWidth, theme::stepOff (start), theme::stepOff (start + 4), true, bg2);
+            else
+                for (int step = start; step < juce::jmin (start + 8, steps); ++step)
+                {
+                    const auto r = first.withX (gridLeft() + step * stepWidth + 1);
+                    const auto fill = theme::stepOff (step);
+                    if (step < realSteps)
+                    {
+                        paintKeycap (g, r, fill, false);
+                        continue;
+                    }
+                    theme::fillRoundRect (g, r.toFloat(), keycapRadius, fill.withMultipliedAlpha (0.35f)); // (a ghost step)
+                    g.setColour (fill.brighter (0.25f).withMultipliedAlpha (0.55f));
+                    g.drawRoundedRectangle (r.toFloat().reduced (0.5f), keycapRadius, 1.0f);
+                }
+        }
+    }
+}
+
+// FL's row (fl-channelrack.png rows y 834-894): the mute light on, the two knobs (FL's are the clip's range, minimum and
+// maximum; a LYNX clip spans its target's whole range: 0 and 1), the curve glyph where the mixer track box is, the button
+// in the clip's colour (FL's grey #485156 without one) with the name in white and no icon, the selector's empty slot
+void ChannelRackComponent::paintAutomationButtons (juce::Graphics& g, juce::Rectangle<int> column)
+{
+    using namespace theme::colour;
+    const auto& song = engine.getSong();
+    for (int i = 0; i < (int) autoRows.size(); ++i)
+    {
+        const auto a = autoRows[(std::size_t) i].automation;
+        const auto y = automationRowTop (i);
+        if (a < 0 || a >= (int) song.automations.size() || y > column.getBottom() || y + rowHeight < column.getY())
+            continue;
+        const auto& automation = song.automations[(std::size_t) a];
+
+        if (column.getX() < selectLeft() || ! ui::paintSavings()) // (as the channel rows: a playhead frame skips them)
+        {
+            g.setColour (theme::muteLed (false));
+            g.fillEllipse (juce::Rectangle<float> (9.0f, (float) y + rowHeight / 2.0f - 4.5f, 9.0f, 9.0f));
+
+            const auto knob = [y] (int left) { return juce::Rectangle<float> ((float) left, (float) y, (float) knobWidth, (float) rowHeight).reduced (1.0f, 2.0f); };
+            theme::drawKnob (g, knob (muteWidth), 0.0f, false, knobArc, false);
+            theme::drawKnob (g, knob (muteWidth + knobWidth), 1.0f, false, knobArc, false);
+
+            if (showMixerSelectors) // FL's curve glyph: two small rings joined by a rising line
+            {
+                const auto box = juce::Rectangle<float> ((float) (muteWidth + 2 * knobWidth + 1), (float) y + 7.0f, (float) routeWidth - 3.0f, (float) rowHeight - 14.0f);
+                const auto centre = box.getCentre();
+                const juce::Point<float> low (centre.x - 5.0f, centre.y + 3.5f), high (centre.x + 5.0f, centre.y - 3.5f);
+                const auto along = (high - low) / low.getDistanceFrom (high) * 2.0f;
+                g.setColour (textSecondary.withAlpha (0.75f));
+                g.drawEllipse (juce::Rectangle<float> (4.0f, 4.0f).withCentre (low), 1.0f);
+                g.drawEllipse (juce::Rectangle<float> (4.0f, 4.0f).withCentre (high), 1.0f);
+                g.drawLine (juce::Line<float> (low + along, high - along), 1.0f);
+            }
+
+            const auto nameArea = juce::Rectangle<float> ((float) nameLeft(), (float) y + 3, (float) nameWidth, (float) rowHeight - 6);
+            auto fill = theme::colourFill (automation.colour != 0 ? juce::Colour (automation.colour) : juce::Colour (0xff485156), 0.42f, 0.58f);
+            if (hoverArea == Area::autoName && hoverRow == a)
+                fill = fill.brighter (0.12f);
+            theme::fillPlate (g, nameArea, theme::radius::sm, fill.withMultipliedBrightness (1.06f), fill.withMultipliedBrightness (0.94f));
+            g.setColour (onAccent.withAlpha (0.92f));
+            g.setFont (theme::font (theme::type::body + 1.0f));
+            const auto textArea = nameArea.withTrimmedLeft (nameAlignLeft ? 7.0f : 6.0f).withTrimmedRight (nameAlignLeft ? 5.0f : 6.0f);
+            const auto name = automation.name.empty() ? tr ("Automation clip") : juce::String::fromUTF8 (automation.name.c_str());
+            textcache::drawText (g, theme::fitMiddle (name, g.getCurrentFont(), textArea.getWidth()), textArea,
+                                 nameAlignLeft ? juce::Justification::centredLeft : juce::Justification::centred, false);
+            g.setFont (theme::font (theme::type::body));
+        }
+
+        const auto slot = juce::Rectangle<float> ((float) selectLeft() + 1.0f, (float) y + 3.0f, (float) selectWidth - 2.0f, (float) rowHeight - 6.0f);
+        theme::fillRoundRect (g, slot, 2.0f, border);
+        theme::fillRoundRect (g, slot.reduced (1.0f), 1.5f, bg1);
+    }
+}
+
+// Right-click on an automation clip row: what LYNX already does with a clip (the Playlist's automation clip items)
+void ChannelRackComponent::showAutomationMenu (int automation)
+{
+    const auto& song = engine.getSong();
+    if (automation < 0 || automation >= (int) song.automations.size())
+        return;
+    const auto& a = song.automations[(std::size_t) automation];
+    const auto gap = rackauto::gapOf (song, a);
+    const auto count = (int) song.channels.size();
+    juce::PopupMenu menu;
+    menu.addSectionHeader (a.name.empty() ? tr ("Automation clip") : juce::String::fromUTF8 (a.name.c_str()));
+    menu.addItem (tr ("Edit points..."), [this, automation] { openAutomationEditor (engine, automation); });
+    menu.addItem (tr ("Rename and color..."), [this, automation] {
+        const auto& s = engine.getSong();
+        if (automation >= (int) s.automations.size())
+            return;
+        const auto& clip = s.automations[(std::size_t) automation];
+        showNameAndColourDialog (tr ("Rename automation clip"), juce::String::fromUTF8 (clip.name.c_str()), clip.colour,
+                                 [this, automation] (const juce::String& name, std::uint32_t colour) {
+                                     engine.editSong ([automation, text = name.toStdString(), colour] (Song& edited) {
+                                         if (automation < (int) edited.automations.size())
+                                         {
+                                             edited.automations[(std::size_t) automation].name = text;
+                                             edited.automations[(std::size_t) automation].colour = colour;
+                                         }
+                                     });
+                                 });
+    });
+    menu.addSeparator();
+    menu.addItem (tr ("Move up"), gap > 0, false, [this, automation] { engine.editSong ([automation] (Song& s) { rackauto::moveRow (s, automation, -1); }); });
+    menu.addItem (tr ("Move down"), gap < count, false, [this, automation] { engine.editSong ([automation] (Song& s) { rackauto::moveRow (s, automation, 1); }); });
+    menu.addSeparator();
+    menu.addItem (tr ("Delete automation (all of its clips)"), [this, automation] {
+        engine.editSong ([automation] (Song& s) { s.removeAutomation (automation); });
+    });
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
 }
 
 // The miniature of a channel's piano-roll notes across its step area (FL shows one once a channel has notes
@@ -1596,6 +1829,8 @@ void ChannelRackComponent::setHover (Area area, int row, int step)
             repaint (laneBounds());
         else if (a == Area::addRow)
             repaint (rowBounds ((int) engine.getSong().channels.size()));
+        else if (a == Area::autoName || a == Area::autoRow) // (round 190oo: `r` is an automation)
+            repaint (automationRowBounds (r));
         else if (r >= 0)
             repaint (rowBounds (r));
     };
@@ -1704,6 +1939,20 @@ bool ChannelRackComponent::moveSelected (int delta)
     const auto primaryIndex = (int) (std::find (rows.begin(), rows.end(), primary) - rows.begin());
     bool moved = false;
     std::vector<int> after;
+
+    // round 190oo (PAT-7): FL moves channels past an automation clip channel as past any channel: an automation clip row
+    // right next to the selected block goes to its other side, the channels keep their rows (core/RackAutomation.h)
+    if (! autoRows.empty())
+        if (const auto pass = rackauto::passFor (engine.getSong(), rows, delta); pass.first >= 0)
+        {
+            engine.editSong ([pass] (Song& s) {
+                if (pass.first < (int) s.automations.size())
+                    s.automations[(std::size_t) pass.first].rackSlot = pass.second;
+            });
+            updateSize();
+            repaint();
+            return true;
+        }
 
     engine.editSongStructural ([&] (Song& s) {
         after = rows;
@@ -2396,12 +2645,12 @@ public:
         setup (length, lengthLabel, tr ("Length (steps)"), 1, 32, 16);
         setup (rotation, rotationLabel, tr ("Rotation"), -16, 16, 0);
         title.setText (tr ("Euclidean fill: {0}", { juce::String::fromUTF8 (song.channels[(std::size_t) channel].name.c_str()) }), juce::dontSendNotification);
-        title.setFont (theme::font (theme::type::title, true));
+        ui::dialog::styleTitle (title); // (round 190oo, WG-6: the one dialog title row, centred, 44 px)
         addAndMakeVisible (title);
 
         for (auto* b : { &accept, &cancel })
             addAndMakeVisible (b);
-        accept.setColour (juce::TextButton::buttonColourId, theme::colour::accent);
+        ui::dialog::styleButton (accept, true); // (WG-6: Cancel | Accept, the one accent button at the far right)
         accept.onClick = [this] {
             restore();
             const auto rhythm = current();
@@ -2410,7 +2659,7 @@ public:
             closeToolWindowOf (*this);
         };
         cancel.onClick = [this] { closeToolWindowOf (*this); };
-        setSize (380, 330);
+        setSize (380, 330 + titleGrowth);
         preview();
     }
 
@@ -2422,10 +2671,10 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        g.fillAll (theme::colour::bg2);
+        ui::dialog::paintFrame (g, getLocalBounds().toFloat(), ui::dialog::Kind::window); // (round 190oo, WG-6)
         // the rhythm as a ring of steps, the first step at the top
         const auto rhythm = current();
-        const auto ring = juce::Rectangle<float> (0, 150, (float) getWidth(), 120).withSizeKeepingCentre (110, 110);
+        const auto ring = juce::Rectangle<float> (0, (float) (150 + titleGrowth), (float) getWidth(), 120).withSizeKeepingCentre (110, 110);
         const auto n = (int) rhythm.size();
 
         for (int i = 0; i < n; ++i)
@@ -2445,9 +2694,8 @@ public:
 
     void resized() override
     {
-        auto area = getLocalBounds().reduced (12, 10);
-        title.setBounds (area.removeFromTop (24));
-        area.removeFromTop (6);
+        title.setBounds (ui::dialog::titleRow (getLocalBounds()));
+        auto area = ui::dialog::bodyOf (getLocalBounds()).reduced (12, 10);
         for (auto [s, l] : { std::pair { &pulses, &pulsesLabel }, std::pair { &length, &lengthLabel }, std::pair { &rotation, &rotationLabel } })
         {
             auto row = area.removeFromTop (30);
@@ -2484,6 +2732,9 @@ private:
         repaint();
     }
 
+    // the title row (WG-6): the rows start 15 px lower than under the old 24 px title line
+    static constexpr int titleGrowth = ui::dialog::titleRowHeight + 1 + 10 - 40;
+
     AudioEngine& engine;
     int channel, patternIndex = 0, steps = 16;
     std::vector<Note> originals;
@@ -2517,6 +2768,14 @@ void ChannelRackComponent::mouseDown (const juce::MouseEvent& e)
     switch (area)
     {
         case Area::none:
+            return;
+
+        case Area::autoName: // round 190oo (PAT-7): FL's automation clip channel; its button opens the clip
+        case Area::autoRow:
+            if (flmods::popup (e.mods))
+                showAutomationMenu (row);
+            else if (area == Area::autoName && e.mods.isLeftButtonDown())
+                openAutomationEditor (engine, row);
             return;
 
         case Area::zipped: // round 190mk (FL's manual: "Right-Click the button of a zipped Channel to unzip it")
@@ -2808,8 +3067,9 @@ void ChannelRackComponent::mouseDrag (const juce::MouseEvent& e)
         const auto count = (int) engine.getSong().channels.size();
         const auto target = juce::jlimit (0, count - 1, rowAtY (e.y));
 
-        // move the selection one row at a time until the grabbed channel is under the mouse
-        for (int guard = 0; guard < count && engine.getSelectedChannel() != target; ++guard)
+        // move the selection one row at a time until the grabbed channel is under the mouse (round 190oo: passing an
+        // automation clip row is a step too)
+        for (int guard = 0; guard < count + (int) autoRows.size() && engine.getSelectedChannel() != target; ++guard)
             if (! moveSelected (target < engine.getSelectedChannel() ? -1 : 1))
                 break;
         return;
@@ -2947,6 +3207,19 @@ ui::Hint ChannelRackComponent::hintAt (juce::Point<int> p)
     const auto& song = engine.getSong();
     ui::Hint h;
 
+    if (area == Area::autoName || area == Area::autoRow) // round 190oo (PAT-7): FL's automation clip channel
+    {
+        if (row >= 0 && row < (int) song.automations.size())
+        {
+            const auto& a = song.automations[(std::size_t) row];
+            h.text = (a.name.empty() ? tr ("Automation clip") : juce::String::fromUTF8 (a.name.c_str())) + " - "
+                     + tr ("Automation clip: [LMB] open it  [RMB] menu");
+            h.value = tr ("Automation clip"); // (FL names the channel's type on the right)
+            h.hasMenu = true;
+        }
+        return h;
+    }
+
     if (row >= 0 && row < (int) song.channels.size() && (area == Area::pan || area == Area::volume || area == Area::route))
     {
         const auto active = knobDrag != Area::none && drag.isActive();
@@ -3049,6 +3322,8 @@ void ChannelRackComponent::applyPaint (const juce::MouseEvent& e)
         step %= loop; // a loop repeat edits the step it repeats
 
     if (laneBounds().contains (e.getPosition()) || (advancedLoopShown() && e.x >= loopBoxBounds (0).getX() - 3))
+        return;
+    if (! autoRows.empty() && automationRowAt (e.y) >= 0) // (round 190oo: an automation clip row has no steps to draw)
         return;
 
     if (row < 0 || row >= (int) song.channels.size() || step < 0 || step >= shownSteps() || e.x < stickyX + gridLeft()
@@ -3879,7 +4154,7 @@ void ChannelRackComponent::filesDropped (const juce::StringArray& files, int x, 
 {
     int row = 0;
     const auto area = areaAt (x, y, row);
-    auto target = (area == Area::none || area == Area::addRow) ? -1 : row;
+    auto target = (area == Area::none || area == Area::addRow || area == Area::autoName || area == Area::autoRow) ? -1 : row; // (190oo: no channel)
     // round 190oa (DF-101, capture 190oa B1): FL opens a new sample channel's window as it drops, unless Alt is held
     const auto channelsBefore = engine.getSong().channels.size();
     const auto altHeld = juce::ModifierKeys::getCurrentModifiersRealtime().isAltDown();
@@ -4071,7 +4346,8 @@ void ChannelRackComponent::itemDropped (const SourceDetails& details)
         {
             int row = 0;
             const auto area = areaAt (details.localPosition.x, details.localPosition.y, row);
-            if (area != Area::none && area != Area::addRow && row >= 0 && row < (int) engine.getSong().channels.size())
+            if (area != Area::none && area != Area::addRow && area != Area::autoName && area != Area::autoRow && row >= 0
+                && row < (int) engine.getSong().channels.size())
             {
                 closeEditor (row);
                 const auto kind = c->instrument;
@@ -4100,8 +4376,8 @@ void ChannelRackComponent::itemDropped (const SourceDetails& details)
         int row = 0;
         const auto area = areaAt (details.localPosition.x, details.localPosition.y, row);
         const auto& song = engine.getSong();
-        if (area != Area::none && area != Area::addRow && row >= 0 && row < (int) song.channels.size()
-            && song.channels[(std::size_t) row].instrument == InstrumentKind::soundfont)
+        if (area != Area::none && area != Area::addRow && area != Area::autoName && area != Area::autoRow && row >= 0
+            && row < (int) song.channels.size() && song.channels[(std::size_t) row].instrument == InstrumentKind::soundfont)
             loadSoundFontInto (engine, row, path, bank, program);
         else
             addSoundFontChannel (engine, path, bank, program);

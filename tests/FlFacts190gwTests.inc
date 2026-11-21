@@ -136,9 +136,10 @@ TEST (flfacts190gw_fl_default_row_is_48)
             if (t.index == 1)
                 size1 = t.heightScale;
     CHECK (std::abs (size1 - 2.0f) < 1.0e-6f);
-    // ...and FL opens it at 200 % of its own 48 px row
+    // ...and FL opens it at 200 % of the row the export writes in event 0xF2 (round 190oo PAT-6: the song's 38 px row
+    // goes through as FL's vertical zoom 11; before, every export opened on FL's 48 px row and this row was 80 px)
     const auto back = importFlp (project);
-    CHECK (back.playlistRowHeight == 48 && back.playlistTracks.size() >= 2 && back.playlistTracks[1].height == 80);
+    CHECK (back.playlistRowHeight == 38 && back.playlistTracks.size() >= 2 && back.playlistTracks[1].height == 60);
 }
 
 TEST (flfacts190gw_mixer_insert_multiple_range)

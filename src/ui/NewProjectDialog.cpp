@@ -147,7 +147,7 @@ public:
             const auto r = juce::Rectangle<int> (width - 8 - markWidth, 5, markWidth, 15);
             g.setColour (theme::colour::accent.withAlpha (0.22f));
             g.fillRoundedRectangle (r.toFloat(), 3.0f);
-            g.setColour (theme::colour::accent);
+            g.setColour (juce::Colour (0xffff8a8c)); // (round 190oo WG-10: the accent's light ink, 6.96:1 on the tint; the accent was 3.1:1)
             g.drawText (mark, r, juce::Justification::centred, false);
             nameWidth -= markWidth + 6;
             g.setFont (theme::font (theme::type::body, true));

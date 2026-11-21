@@ -406,6 +406,11 @@ struct Arrangement
     std::vector<PlaylistItem> items;
     std::vector<PlaylistTrackInfo> tracks; // only the ones the file describes
     std::vector<TimeMarker> markers;
+    // Event 0xF2 (28 B, one per arrangement after all of them; FL's saver FUN_00f40840 / loader, REA round 190oo PAT-6):
+    // u32 arrangement index, f64 horizontal scroll, f64 horizontal zoom, i32 vertical scroll, i32 vertical zoom. The
+    // vertical zoom `v` sets FL's Playlist row: 16 + 2·v px at 100 % UI scale (FL 2026's new project 16 → 48 px, Ookay -
+    // Thief 5 → 26 px). −1 = not in the file.
+    int rowZoom = -1;
 };
 
 struct MixerInsert

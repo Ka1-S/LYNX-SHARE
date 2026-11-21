@@ -128,6 +128,9 @@ public:
     void toggleProjectPickerForSnapshot() { toggleProjectPicker(); }
     juce::Component* projectPickerForSnapshot() const noexcept { return projectPickerView.get(); }
     void showDesktopForSnapshot (bool extraPanels);
+    // View › Reset layout: the default window layout, then the layout style's own panels (applyStyleDefaultPanels)
+    void resetLayoutForStyle();
+    void startNewProjectForSnapshot (Song song) { startNewProject (std::move (song), {}); } // (round 190oj: File › New's path)
     // The Clip-launch workflow's layout (round 181a): the clip grid beside the Playlist, or flipped. Nothing exists until
     // it is first turned on. Moves panels only; the project does not change, except that it gets an (empty) grid.
     void setClipLaunchWorkflow (bool on, bool swapLayout = true) { setLayoutStyle (on ? layoutstyle::Style::clipLaunch : layoutstyle::Style::pattern, swapLayout); }
@@ -452,6 +455,7 @@ private:
     int fittedChannelCount = -1;
     void showPanel (Panel panel);
     void refreshPanelButtons();
+    void applyStyleDefaultPanels (layoutstyle::Style style); // (round 190oj)
     void showWindowsTip(); // the first starts name the window buttons in the hint bar (round 168t)
     void saveLayoutAs();
     juce::PopupMenu layoutsMenu();
@@ -561,6 +565,7 @@ private:
     juce::Rectangle<int> fixedToolbarArea;       // the menu and the hint bar
     void newProject (bool askAlways = false); // File › New: the New project window unless turned off
     void startNewProject (Song song, const juce::File& file);
+    static Song withClipLaunchStrips (Song song); // round 190oo (CS O-2)
     void saveAsTemplate();
     void saveCopyForOlder(); // round 190hq (B20): File › "Save a copy for an older LYNX..."
     void chooseFileToOpen();
@@ -883,6 +888,11 @@ private:
     IconButton snapToggleButton { "snapToggle", Icon::magnet };
     std::vector<int> dividers; // x positions of the toolbar panel separators
     juce::Rectangle<int> snapLabelArea, patternLabelArea, titleArea, transportArea;
+    // round 190oo (O-4, LYNX extra): the Simple top bar's centred project name (empty: off or no room) and its fitted
+    // text, made again only when the name or the room changes (no work in paint)
+    juce::Rectangle<int> simpleNameArea;
+    juce::String simpleNameFor, simpleNameFitted;
+    int simpleNameFitWidth = -1;
     std::unique_ptr<ui::QuickTipWindow> quickTips; // the tool names under the mouse (ui/HintBar.h)
     void setQuickTips();
     void showLanguageChoice (const juce::String& id);
@@ -977,6 +987,12 @@ private:
     juce::PopupMenu makeKeyMenu();
     void refreshKeyPanel();
     void setProjectKey (std::optional<projectkey::Key> key);
+    // Round 190oo (O-5, core/LiveScaleControl.h): Live's scale switch / root / mode in the Clip-launch control bar. The key
+    // the choosers show while the switch is off (the last one set; Major on C at first), not saved, as Live keeps them.
+    projectkey::Key scaleShown {};
+    bool scaleShownSet = false;
+    void showKeyPart (int part);
+    void setLiveScaleControl (bool on); // the LYNX extra's switch (Settings › LYNX extras, the Key menu)
     void showChordText();
     void addAudioLoggerMenu (juce::PopupMenu& menu);
     void dumpAudioLog();

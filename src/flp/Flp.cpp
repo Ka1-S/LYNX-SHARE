@@ -109,6 +109,7 @@ enum : std::uint32_t
     evMixerInsertLatencyBypass = 0x31, // u8 "Bypass track latency compensation" of the insert opened by the last 0xEC (REA round 165f-mixer)
     evMixerInsertRecordSource = 0xA5,  // u32 record source point 0..5 of the insert opened by the last 0xEC (REA round 165f-mixer)
     evArrangementName = 0xF1,
+    evArrangementView = 0xF2,   // 28 B per arrangement: u32 index, f64 scroll, f64 zoom, i32 vertical scroll, i32 vertical zoom (round 190oo, PAT-6)
     evTimeMarker = 0x94,          // u32 type << 24 | position
     evTimeMarkerNumerator = 0x21, // u8
     evTimeMarkerDenominator = 0x22,
@@ -1151,6 +1152,17 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
             case evArrangementName:
                 if (section == Section::arrangement)
                     arrangement().name = text (e);
+                break;
+
+            case evArrangementView: // FL writes them after every arrangement: the record names its own (round 190oo, PAT-6)
+                if (e.data.size() >= 28)
+                {
+                    const auto index = (int) readLE<std::uint32_t> (e.data, 0);
+                    const auto zoom = readLE<std::int32_t> (e.data, 24);
+                    for (auto& a : project.arrangements)
+                        if (a.index == index && zoom >= 0 && zoom <= 4096)
+                            a.rowZoom = (int) zoom;
+                }
                 break;
 
             case evTimeMarker:

@@ -79,6 +79,8 @@
 #include "ui/I18n.h"
 #include "ui/PluginSkin.h"
 #include "ui/Theme.h"
+#include "ui/TextCache.h"
+#include "core/TextFit.h"
 #include "ui/WaveformView.h"
 #include "ui/SoundFontEditor.h"
 #include "ui/VfxEditors.h"
@@ -3754,9 +3756,12 @@ public:
             locateButton.setBounds (R (224, 13, 19, 23));
             loadButton.setBounds (R (192, 13, 32, 23));
             fileLabel.setFont (theme::font (textFont, true));
-            fileLabel.setBounds (R (11, 15, 24, 15));
+            // round 190oo (WG-13): the caption grows by what its translation needs over "File" (de "Datei" was "Da..." in
+            // 24 units); the file name gives the room up. English keeps its 24 units.
+            const auto fileExtra = juce::jmin (40, (int) std::ceil ((float) theme::translationExtra (fileLabel.getFont(), { "File" }) / scale));
+            fileLabel.setBounds (R (11, 15, 24 + fileExtra, 15));
             fileName.setFont (theme::font (textFont));
-            fileName.setBounds (R (38, 13, 152, 21));
+            fileName.setBounds (R (38 + fileExtra, 13, 152 - fileExtra, 21));
         }
         groups.push_back ({ R (7, 50, 268, 110), tr ("Content"), 0 });
         keepOnDisk.setBounds (R (12, 75, 126, 21));
@@ -3764,8 +3769,13 @@ public:
         loadRegionsBox.setBounds (R (140, 75, 128, 21));
         loadMarkersBox.setBounds (R (140, 96, 128, 21));
         declickLabel.setFont (theme::font (textFont));
-        declickLabel.setBounds (R (14, 126, 100, 23));
-        declick.setBounds (R (116, 126, 152, 23));
+        {
+            // round 190oo (WG-13): ru "Режим устранения щелчков" was squeezed into 100 units; the caption takes what its
+            // translation adds (up to 40 units, the list keeps 112 for "Transient (generic)"), English stays as it was
+            const auto extra = juce::jmin (40, (int) std::ceil ((float) theme::translationExtra (declickLabel.getFont(), { "Declicking mode" }) / scale));
+            declickLabel.setBounds (R (14, 126, 100 + extra, 23));
+            declick.setBounds (R (116 + extra, 126, 152 - extra, 23));
+        }
 
         if (! clipChannel)
             groups.push_back ({ R (7, 168, 268, 79), tr ("Playback"), 0 });
@@ -5413,7 +5423,7 @@ public:
             return;
         }
         auto area = getLocalBounds().toFloat();
-        const auto caption = area.removeFromBottom (13.0f);
+        const auto caption = area.removeFromBottom (twoLineCaption && getHeight() >= 70 ? 19.0f : 13.0f); // (round 190oo WG-31)
         if (digitBox)
         {
             // FL's digiwheel (c_f14): a display about 22 px high, the value right-aligned before up / down marks; here dark,
@@ -5424,8 +5434,7 @@ public:
             g.drawFittedText (spec.text (getter()), box.withTrimmedRight (theme::digitMarksWidth).reduced (3.0f, 0.0f).toNearestInt(),
                               juce::Justification::centredRight, 1, 0.6f);
             g.setColour (theme::colour::textSecondary);
-            g.setFont (theme::font (theme::type::caption));
-            g.drawFittedText (theme::caps (label), caption.toNearestInt(), juce::Justification::centred, 1, 0.65f);
+            drawCaption (g, caption);
             return;
         }
         const auto valueArea = area.removeFromBottom (13.0f);
@@ -5437,9 +5446,38 @@ public:
         g.setFont (theme::font (theme::type::caption));
         g.setColour (theme::colour::textPrimary);
         // squeezed (down to 65 %) before an ellipsis: translated captions are often longer (round 165o)
-        g.drawFittedText (spec.text (shown), valueArea.toNearestInt(), juce::Justification::centred, 1, 0.65f);
+        auto valueText = spec.text (shown);
+        // (round 190oj WG-5: a value read in several units — Levels adjustment's "100% 0.0dB 1.00" — shows its first one
+        // under the knob when the whole does not fit, as FL does; the hint bar keeps the whole)
+        if (valueText.containsChar (' ') && textcache::stringWidth (g.getCurrentFont(), valueText) > valueArea.getWidth())
+            valueText = valueText.upToFirstOccurrenceOf (" ", false, false);
+        g.drawFittedText (valueText, valueArea.toNearestInt(), juce::Justification::centred, 1, 0.65f);
         g.setColour (theme::colour::textSecondary);
-        g.drawFittedText (theme::caps (label), caption.toNearestInt(), juce::Justification::centred, 1, 0.65f);
+        drawCaption (g, caption);
+    }
+
+    // Round 190oo (design review 2, WG-31): the caption under the knob keeps 2 px from each side, so neighbouring
+    // captions stay >= 4 px apart (ru "ГРУППА ОБРЕЗ..." ran into "ОБРЕЗАЕТСЯ", de "WIEDERHOLEN" was squeezed to ~0.6),
+    // squeezed to 80 % at most; a longer one takes the 9 px caption face, on two lines when its page gave the knob the
+    // room (twoLineCaption, MiscPanel), else on one. An English caption that fits draws as before.
+    bool twoLineCaption = false;
+
+    bool captionNeedsTwoLines (float width) const
+    {
+        const auto text = theme::caps (label);
+        return textfit::captionFit (textcache::stringWidth (theme::font (theme::type::caption), text), width - 4.0f, text.containsChar (' '), true)
+               == textfit::CaptionFit::twoLines;
+    }
+
+    void drawCaption (juce::Graphics& g, juce::Rectangle<float> caption) const
+    {
+        const auto text = theme::caps (label);
+        const auto box = caption.reduced (2.0f, 0.0f).toNearestInt();
+        const auto normal = theme::font (theme::type::caption);
+        const auto fit = textfit::captionFit (textcache::stringWidth (normal, text), (float) box.getWidth(), text.containsChar (' '),
+                                              twoLineCaption && getHeight() >= 70);
+        g.setFont (fit == textfit::CaptionFit::normal ? normal : theme::font (9.0f));
+        g.drawFittedText (text, box, juce::Justification::centred, fit == textfit::CaptionFit::twoLines ? 2 : 1, 0.8f);
     }
 
     void mouseDown (const juce::MouseEvent& e) override
@@ -6084,13 +6122,22 @@ public:
             sections.push_back ({ r, title });
             return r.withTrimmedTop (20).reduced (6, 4);
         };
-        constexpr int knobW = 50, knobH = 64;
-        auto row = [] (juce::Rectangle<int>& r, std::initializer_list<FrameKnob*> ks) {
+        constexpr int knobW = 50;
+        // round 190oo (WG-31): a caption that does not fit the knob's pitch on one line at 80 % (es "GRUPO DE CORTE", fr
+        // "GROUPE DE COUPURE", ru "ГРУППА ОБРЕЗКИ") takes two lines; then every knob row is 6 px taller, so the knobs
+        // keep their size and the captions their line. English: no change.
+        bool twoLines = false;
+        for (const auto& k : knobs)
+            twoLines = twoLines || k->captionNeedsTwoLines ((float) knobW);
+        for (const auto& k : knobs)
+            k->twoLineCaption = twoLines;
+        const int knobH = twoLines ? 70 : 64;
+        auto row = [knobH] (juce::Rectangle<int>& r, std::initializer_list<FrameKnob*> ks) {
             auto line = r.removeFromTop (knobH);
             for (auto* k : ks)
                 k->setBounds (line.removeFromLeft (knobW));
         };
-        auto top = area.removeFromTop (118);
+        auto top = area.removeFromTop (twoLines ? 124 : 118);
         {
             auto levels = section (top.removeFromLeft (4 * knobW + 12), tr ("Levels adjustment"));
             row (levels, { pan, volume, modX, modY });
@@ -6791,7 +6838,9 @@ public:
         // centre; RANGE right of PITCH; TRACK 7 px in)
         const auto w = getWidth(), h = getHeight();
         on.setBounds (w - 229, 0, 30, h);
-        const int xs[] = { w - 197, w - 162, w - 128, w - 96, w - 52 };
+        // (round 190oj WG-1: RANGE at w-92, not w-96 — the PITCH and RANGE columns overlapped by 2 px and their captions
+        // ran together, "PITCHRANGE"; de "TONHÖHE" / "BEREICH" drew over each other)
+        const int xs[] = { w - 197, w - 162, w - 128, w - 92, w - 52 };
         const int ws[] = { 34, 34, 34, 32, 46 };
         for (std::size_t i = 0; i < header.size() && i < 5; ++i)
             header[i]->setBounds (xs[i], 0, ws[i], h);

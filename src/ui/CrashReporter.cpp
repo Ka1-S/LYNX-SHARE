@@ -10,6 +10,7 @@
 #include "platform/Paths.h"
 #include "engine/PluginHost.h"
 #include "engine/PluginSandbox.h"
+#include "ui/DialogFrame.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
 #include "ui/ImageReadback.h"
@@ -583,6 +584,10 @@ public:
         : session (std::move (s)), separatePlugin (std::move (plugin)), onSeparate (std::move (separateFn)), devices (d), manual (isManual)
     {
         input = makeInput (session, manual ? juce::String ("manual") : session.kind(), devices);
+        // round 190oo (WG-6): the one dialog title row, centred, 44 px (the window's own title)
+        titleLabel.setText (manual ? tr ("Report a problem") : tr ("LYNX SHARE closed unexpectedly"), juce::dontSendNotification);
+        ui::dialog::styleTitle (titleLabel);
+        addAndMakeVisible (titleLabel);
 
         settingsui::styleLabel (message, manual ? tr ("Describe what happened. LYNX SHARE adds its version, your system (operating system, CPU, graphics "
                                                      "card, audio device) and, if you want, the newest crash / freeze files and this session's last "
@@ -627,8 +632,7 @@ public:
             toggle (always, tr ("Always send without asking"), false);
 
         sendButton.setButtonText (tr ("Send"));
-        sendButton.setColour (juce::TextButton::buttonColourId, theme::colour::accent);
-        sendButton.setColour (juce::TextButton::textColourOffId, theme::colour::onAccent);
+        ui::dialog::styleButton (sendButton, true);
         showButton.setButtonText (tr ("Show what will be sent"));
         cancelButton.setButtonText (manual ? tr ("Cancel") : tr ("Don't send"));
         githubButton.setButtonText (tr ("Report on GitHub instead"));
@@ -665,7 +669,8 @@ public:
 
     void resized() override
     {
-        auto r = getLocalBounds().reduced (16);
+        titleLabel.setBounds (ui::dialog::titleRow (getLocalBounds()));
+        auto r = ui::dialog::bodyOf (getLocalBounds()).reduced (16);
         message.setBounds (r.removeFromTop (messageHeight()));
         r.removeFromTop (8);
         if (manual)
@@ -684,12 +689,13 @@ public:
         if (! manual)
             always.setBounds (r.removeFromTop (24));
         r.removeFromTop (10);
+        // (WG-6: LYNX's one order, right-aligned: Show what will be sent | Don't send | Send, the accent at the far right)
         auto buttons = r.removeFromTop (30);
-        sendButton.setBounds (buttons.removeFromLeft (110));
-        buttons.removeFromLeft (8);
-        showButton.setBounds (buttons.removeFromLeft (200));
-        buttons.removeFromLeft (8);
-        cancelButton.setBounds (buttons.removeFromLeft (110));
+        sendButton.setBounds (buttons.removeFromRight (110));
+        buttons.removeFromRight (8);
+        cancelButton.setBounds (buttons.removeFromRight (110));
+        buttons.removeFromRight (8);
+        showButton.setBounds (buttons.removeFromRight (200));
         r.removeFromTop (8);
         auto links = r.removeFromTop (26);
         githubButton.setBounds (links.removeFromLeft (220));
@@ -702,7 +708,7 @@ public:
         }
     }
 
-    void paint (juce::Graphics& g) override { g.fillAll (theme::colour::bg2); }
+    void paint (juce::Graphics& g) override { ui::dialog::paintFrame (g, getLocalBounds().toFloat(), ui::dialog::Kind::window); }
 
 private:
     int messageHeight() const
@@ -720,7 +726,7 @@ private:
     void resizeToFit()
     {
         const int rows = (manual ? 20 + 90 + 6 + 20 + 26 + 8 + 24 : 0) + (separatePlugin.isNotEmpty() ? 24 : 0) + 24 + (manual ? 0 : 24);
-        const int height = 16 + messageHeight() + 8 + rows + 10 + 30 + 8 + 26 + (previewShown ? 10 + 320 : 0) + 16;
+        const int height = ui::dialog::titleRowHeight + 1 + 16 + messageHeight() + 8 + rows + 10 + 30 + 8 + 26 + (previewShown ? 10 + 320 : 0) + 16;
         setSize (getWidth(), height);
         preview.setVisible (previewShown);
         if (auto* w = findParentComponentOfClass<juce::DialogWindow>())
@@ -811,7 +817,7 @@ private:
     bool manual, previewShown = false;
     cr::ReportInput input;
     juce::String json;
-    juce::Label message, descriptionLabel, emailLabel;
+    juce::Label titleLabel, message, descriptionLabel, emailLabel;
     juce::TextEditor description, email, preview;
     juce::ToggleButton separate, fileNames, always, attach;
     juce::TextButton sendButton, showButton, cancelButton, githubButton, folderButton;

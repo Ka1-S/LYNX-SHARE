@@ -2097,6 +2097,10 @@ struct Automation
     bool tempoMarkers = false;
     bool isLive() const noexcept { return source.track >= 0 || source.channel >= 0; }
     std::uint64_t uid = 0; // stable id (Online Sessions, round 168a)
+    // FL's automation clip channel in the Channel rack (round 190oo, design review 2 PAT-7; core/RackAutomation.h): the
+    // clip's row sits above channel row `rackSlot` (FL's channel order of an imported .flp); −1 = after the last channel
+    // (a clip made in LYNX, and every clip of a project saved before round 190oo). Saved as "rackSlot" when set.
+    int rackSlot = -1;
     float mapLive (float v) const noexcept; // applies the curve
 
     // Value at `tick` (before the first point = first value; after the last = last).

@@ -1676,6 +1676,13 @@ void toRelease0130 (juce::var& root, Losses& lost)
         if (newer > 0)
             lost.push_back ({ TR_NOOP ("{0} key / MIDI mapping(s) of Overdub, the Loop switch, Punch-in or Punch-out are left out"), juce::String (newer), false });
     }
+
+    // round 190oo (PAT-7, core/RackAutomation.h): the automation clips' rows in the Channel rack. 0.1.30's rack has no
+    // automation rows and the clips play the same: dropped without a loss line
+    if (auto* automations = arrayOf (root["automations"]))
+        for (auto& a : *automations)
+            if (auto* ao = objectOf (a))
+                drop (*ao, "rackSlot");
 }
 
 struct Step

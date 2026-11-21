@@ -14,6 +14,7 @@
 #include "core/FlSettings.h"
 #include "core/LayoutStyle.h"
 #include "core/LynxExtras.h"
+#include "core/Templates.h" // round 190oo (CS O-2: newProjectDefaults)
 #include "ui/PolyEditor.h"
 #include "ui/WorkflowExtras.h" // round 190iu
 #include "core/PlaylistOps.h"
@@ -31,6 +32,7 @@
 #include "ui/PianoRollComponent.h"
 #include "ui/PlaylistComponent.h"
 #include "ui/PluginSkin.h"
+#include "ui/SimpleLook.h" // round 190oo (O-4)
 #include "ui/Updater.h"
 
 #include <algorithm>
@@ -117,17 +119,21 @@ struct Rows
 
     // a note under a control: as tall as its text needs at the width it gets (wrapped), at least `minHeight` (issue #189:
     // a larger Text size wraps a note into more lines than the fixed heights had room for)
-    juce::Rectangle<int> indentedNote (juce::Label& label, int minHeight)
+    // (round 190oo WG-32: `indent` false: the full page width, as full() places it)
+    juce::Rectangle<int> indentedNote (juce::Label& label, int minHeight, bool indent = true)
     {
-        if (theme::textSize() <= 100)
-            return indented (minHeight); // (the standard size keeps its layout to the pixel)
-        const auto width = area.getWidth() - labelWidth;
+        const auto left = indent ? labelWidth : 0;
+        const auto width = area.getWidth() - left;
         const auto border = label.getBorderSize();
         juce::GlyphArrangement text;
         text.addJustifiedText (label.getFont(), label.getText(), 0.0f, 0.0f, (float) juce::jmax (40, width - border.getLeftAndRight()),
                                juce::Justification::topLeft);
         const auto needed = (int) std::ceil (text.getBoundingBox (0, -1, true).getHeight()) + border.getTopAndBottom() + 2;
-        auto r = juce::Rectangle<int> (area.getX() + labelWidth, y, width, juce::jmax (h (minHeight), needed));
+        // (the standard size keeps its layout to the pixel, unless the text needs another line: round 190oj WG-3, the
+        // German Animation-rate note was squeezed to ~7 px and cut in its fixed 32 px)
+        if (theme::textSize() <= 100 && needed <= h (minHeight) + 6)
+            return indent ? indented (minHeight) : full (minHeight);
+        auto r = juce::Rectangle<int> (area.getX() + left, y, width, juce::jmax (h (minHeight), needed));
         y += r.getHeight() + rowGap;
         return r;
     }
@@ -643,7 +649,7 @@ private:
         reducedEffects.setBounds (r.full (24));
         uiAnimations.setBounds (r.full (24));
         animationBox.setBounds (r.row (animationLabel, 180));
-        animationNote.setBounds (r.indented (32).translated (0, -3));
+        animationNote.setBounds (r.indentedNote (animationNote, 32).translated (0, -3)); // (round 190oj WG-3)
        #if JUCE_WINDOWS
         gpuRendering.setBounds (r.full (24));
         editorsInMain.setBounds (r.full (24));
@@ -652,7 +658,7 @@ private:
         r.section (startupTitle);
         templateBox.setBounds (r.row (templateLabel, 260));
         startupProjectBox.setBounds (r.row (startupProjectLabel, 260));
-        templateNote.setBounds (r.indented (32).translated (0, -3));
+        templateNote.setBounds (r.indentedNote (templateNote, 32).translated (0, -3)); // (round 190oj WG-3)
         for (auto* t : { &projectLayout, &splash, &startupSound, &scanAtStart, &supportNoteBox })
             t->setBounds (r.full (24));
         if (menuEntry.isVisible())
@@ -2134,19 +2140,21 @@ private:
         clockBox.setBounds (r.row (clockLabel, 300));
         clockOffset.setBounds (r.row (clockOffsetLabel, 140));
         clockStatus.setBounds (r.row (clockStatusLabel, 0));
-        clockNote.setBounds (r.indented (16).translated (0, -3));
+        // (round 190oo WG-32: the notes grow when their text needs another line, as round 190oj's WG-3 on General: the
+        // ru / de notes were squeezed and cut in their fixed heights; English keeps its layout to the pixel)
+        clockNote.setBounds (r.indentedNote (clockNote, 16).translated (0, -3));
 
         r.section (notesTitle);
         velocityBox.setBounds (r.row (velocityLabel, 300));
-        velocityNote.setBounds (r.indented (16).translated (0, -3));
+        velocityNote.setBounds (r.indentedNote (velocityNote, 16).translated (0, -3));
         perfBox.setBounds (r.row (perfLabel, 300));
-        perfNote.setBounds (r.indented (32).translated (0, -3));
+        perfNote.setBounds (r.indentedNote (perfNote, 32).translated (0, -3));
         jumpBox.setBounds (r.row (jumpLabel, 300));
-        jumpNote.setBounds (r.indented (32).translated (0, -3));
+        jumpNote.setBounds (r.indentedNote (jumpNote, 32).translated (0, -3));
 
         r.section (controllersTitle);
         typeLabel.setVisible (false); // (round 190aw: the Controller type is each input device's, above, as in FL)
-        typeValue.setBounds (r.full (20));
+        typeValue.setBounds (r.indentedNote (typeValue, 20, false)); // (round 190oo WG-32: "Generic controller: ..." grows too)
         pickup.setBounds (r.full (24));
         pickupNote.setBounds (r.note (pickupNote, 16));
         footPedal.setBounds (r.full (24)); // (FL: right under Pickup, round 187a [UI shots/fl d07c])
@@ -2503,7 +2511,9 @@ public:
             juce::AttributedString text (label.getText());
             text.setFont (noteFont);
             juce::TextLayout fitted;
-            fitted.createLayout (text, (float) juce::jmax (40, w - 8));
+            // (round 190oo WG-32: at the width the label draws in, its borders taken off; a ru / de note that wrapped one
+            // line more there than measured here was cut in its box)
+            fitted.createLayout (text, (float) juce::jmax (40, w - juce::jmax (8, label.getBorderSize().getLeftAndRight() + 2)));
             return juce::jmax (1, fitted.getNumLines());
         };
         intro.setBounds (r.full (4 + 15 * linesOf (intro, r.area.getWidth())));
@@ -2670,14 +2680,17 @@ bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_v
     if (id == "mixer.followPlaylist") return MixerStrips::followPlaylist;
     if (id == "playlist.automationLanes") return autolanes::shown();
     if (id == "playlist.trackInserts") return PlaylistComponent::showTrackInserts;
+    if (id == "playlist.shadeFadedAudio") return PlaylistComponent::shadeFadedAudio; // (round 190oo O-1)
     if (id == "pianoRoll.songBarsRuler") return PianoRollComponent::songBarsRuler;
     if (id == "pianoRoll.stackedLanes") return PianoRollComponent::stackedLanesExtra; // (round 190on, P10)
     if (id == "polyEdit.prepareOnOpen") return PolyEditorWindows::prepareOnOpen; // (round 190lo)
     if (id == "general.hoverValues") return hooks.getGeneral && hooks.getGeneral().hoverValues;
     if (id == "project.linkTracks") return hooks.getGeneral && hooks.getGeneral().linkTracksInNewProjects;
+    if (id == "project.clipLaunchStrips") return newProjectDefaults().clipLaunchStrips; // (round 190oo CS O-2)
     if (id == "record.lastLoopPassPlays") return engine.getRecordOptions().lastLoopPassPlays;
     if (id == "detail.windowKey") return DetailView::extraWindowKey;
     if (id == "detail.selectInMixer") return DetailView::extraSelectInMixer;
+    if (id == "simple.projectName") return ui::simplelook::projectNameShown(); // round 190oo (O-4)
     if (id == "midi.gamepad") return engine.getMidiPrefs().gamepad;
     return false;
 }
@@ -2756,6 +2769,11 @@ void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_
             saved();
         }
     }
+    else if (id == "playlist.shadeFadedAudio") // round 190oo (O-1): Playlist › View › Shade faded audio
+    {
+        PlaylistComponent::shadeFadedAudio = on;
+        saved(); // (saves and repaints the Playlist)
+    }
     else if (id == "pianoRoll.songBarsRuler")
     {
         if (! toggledBy ("pianoRoll.songBarsRuler"))
@@ -2787,12 +2805,25 @@ void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_
             hooks.setGeneral (options);
         }
     }
+    else if (id == "project.clipLaunchStrips") // round 190oo (CS O-2): kept with the new projects' defaults
+    {
+        newProjectDefaults().clipLaunchStrips = on;
+        saved();
+    }
     else if (id == "record.lastLoopPassPlays")
     {
         auto options = engine.getRecordOptions();
         options.lastLoopPassPlays = on;
         engine.setRecordOptions (options);
         saved();
+    }
+    else if (id == "simple.projectName") // round 190oo (O-4): the main window's action also lays the top bar out again
+    {
+        if (! toggledBy ("simple.projectName"))
+        {
+            ui::simplelook::projectNameShown() = on;
+            saved();
+        }
     }
     else if (id == "detail.windowKey" || id == "detail.selectInMixer")
     {

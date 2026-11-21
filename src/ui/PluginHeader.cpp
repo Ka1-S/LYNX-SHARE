@@ -328,7 +328,8 @@ void PresetBar::paint (juce::Graphics& g, juce::Colour accent) const
         const auto r = side == 0 ? rA : rB;
         const auto lit = (side == 1) == showingB;
         skin::button (g, r, lit, hovered == (side == 0 ? Part::a : Part::b), accent, radius::sm);
-        g.setColour (lit ? colour::textPrimary : colour::textSecondary);
+        // (round 190oj WG-25: on a light skin accent the lit letter is dark, as the tabs')
+        g.setColour (! lit ? colour::textSecondary : contrast (colour::textPrimary, accent) >= 3.0f ? colour::textPrimary : juce::Colour (0xff1b1d22));
         g.setFont (font (type::small, true));
         g.drawText (side == 0 ? "A" : "B", r, juce::Justification::centred, false);
     }

@@ -7,6 +7,7 @@
 
 #include "core/LaneView.h"
 #include "core/LayoutStyle.h"
+#include "core/LiveScaleControl.h" // round 190oo (O-5)
 #include "core/MidiDrop.h"
 #include "core/LoopAnalysis.h" // round 190kx
 #include "core/PlaylistViewOptions.h"
@@ -94,6 +95,10 @@ bool readUiOption (const juce::String& key, bool on)
         ruler::seekWithAnyTool() = on;
     else if (key == "sectionsLane") // round 190ol (P1): the Pattern layout's Sections lane
         sections::patternLaneOn() = on;
+    else if (key == "clipLanesFoldedLive") // round 190oo (CS O-3, LYNX extra)
+        cliplanes::foldedOnOpen = on;
+    else if (key == "liveScaleControl") // round 190oo (O-5, LYNX extra)
+        livescale::shown = on;
     else
         return false;
     return true;
@@ -120,7 +125,9 @@ juce::String uiOptionsText()
            + "\nescClosesWindows=" + juce::String (escclose::enabled() ? 1 : 0) // (round 190ng, issue #217)
            + "\ntrackClipsShown=" + juce::String (trackclips::shownInSelector() ? 1 : 0) // (round 190ne)
            + "\nrulerSeeksAnyTool=" + juce::String (ruler::seekWithAnyTool() ? 1 : 0) // (round 190nq, issue #227)
-           + "\nsectionsLane=" + juce::String (sections::patternLaneOn() ? 1 : 0); // (round 190ol, P1)
+           + "\nsectionsLane=" + juce::String (sections::patternLaneOn() ? 1 : 0) // (round 190ol, P1)
+           + "\nclipLanesFoldedLive=" + juce::String (cliplanes::foldedOnOpen ? 1 : 0) // (round 190oo, CS O-3)
+           + "\nliveScaleControl=" + juce::String (livescale::shown ? 1 : 0); // (round 190oo, O-5)
 }
 
 std::optional<bool> extraOn (std::string_view id)
@@ -149,6 +156,10 @@ std::optional<bool> extraOn (std::string_view id)
         return ruler::seekWithAnyTool();
     if (id == "playlist.sectionsLane") // round 190ol (P1)
         return sections::patternLaneOn();
+    if (id == "playlist.clipLanesFolded") // round 190oo (CS O-3)
+        return cliplanes::foldedOnOpen;
+    if (id == "controlBar.liveScale") // round 190oo (O-5)
+        return livescale::shown;
     return std::nullopt;
 }
 
@@ -182,6 +193,10 @@ bool setExtra (std::string_view id, bool on)
         ruler::seekWithAnyTool() = on;
     else if (id == "playlist.sectionsLane") // round 190ol (P1)
         sections::patternLaneOn() = on;
+    else if (id == "playlist.clipLanesFolded") // round 190oo (CS O-3: from the next project opened)
+        cliplanes::foldedOnOpen = on;
+    else if (id == "controlBar.liveScale") // round 190oo (O-5)
+        livescale::shown = on;
     else
         return false;
     if (onChanged)
@@ -193,7 +208,8 @@ bool setExtra (std::string_view id, bool on)
 
 bool runAction (const std::string& id)
 {
-    if (id == "playlist.wheelZones" || id == "editing.tempTools" || id == "playlist.midiDrop" || id == "layout.trackOnly" || id == "playlist.headerWidth")
+    if (id == "playlist.wheelZones" || id == "editing.tempTools" || id == "playlist.midiDrop" || id == "layout.trackOnly" || id == "playlist.headerWidth"
+        || id == "playlist.clipLanesFolded" || id == "controlBar.liveScale") // (round 190oo: CS O-3, O-5)
         return setExtra (id, ! extraOn (id).value_or (true));
     // round 190jq: the pointer-click switch itself (toolbar button, menu, key); on also shows its button
     if (id == "playlist.pointerClick")
@@ -240,6 +256,8 @@ void addPlaylistMenuItems (const std::function<void (const char*, const juce::St
         const auto style = layoutstyle::current();
         add ("playlist.clipLanes", tr ("Automation clips as lanes under their tracks"), style != layoutstyle::Style::simple,
              cliplanes::shownIn (style == layoutstyle::Style::clipLaunch, style == layoutstyle::Style::simple));
+        if (style == layoutstyle::Style::clipLaunch) // round 190oo (CS O-3, LYNX extra: Live folds its automation lanes)
+            add ("playlist.clipLanesFolded", tr ("Automation lanes start folded when a project opens (Clip-launch layout)"), true, cliplanes::foldedOnOpen);
         add ("playlist.pointerClick", tr ("Click on an empty spot selects and moves the song position (pointer click)"), style != layoutstyle::Style::simple, pointerclick::on);
         add ("playlist.headerWidth", tr ("Drag the track header column's right edge to widen it"), style != layoutstyle::Style::simple, headerwidth::draggable);
     }

@@ -31,6 +31,8 @@
 #include "core/UiFontChoice.h"
 #include "platform/Paths.h"
 #include "ui/CondensedFontData.h"
+#include "ui/DialogFrame.h"
+#include "ui/I18n.h"
 #include "ui/LabelFont.h"
 #include "ui/Icons.h"
 #include "ui/ImageCaches.h"
@@ -422,9 +424,10 @@ ClipLook clipBody (juce::Colour clipColour, juce::Colour trackColour, ClipKind k
         case ClipStyle::livePastel: // Live 12.4 (round 190ia CL-5, CL-17, CL-18): one block in the colour, dark marks
             look.headerTop = look.headerBottom = look.body = clipColour.withAlpha (1.0f);
             look.edge = liveShade (clipColour, 0.66f).withAlpha (1.0f);
-            look.content = look.compactContent = liveShade (clipColour, 0.15f).withAlpha (1.0f);
+            // (round 190oj: Live's dark marks only where they read on the colour; on a dark colour the light ones)
+            look.content = look.compactContent = liveMarkOn (clipColour, 0.15f, 3.0f, clipColour.withAlpha (1.0f).brighter (0.9f));
             look.contentFill = juce::Colours::transparentBlack;
-            look.ink = liveShade (clipColour, 0.24f).withAlpha (1.0f);
+            look.ink = liveMarkOn (clipColour, 0.24f, 4.5f, colour::textPrimary);
             break;
         case ClipStyle::bandlabHue: // BandLab web Studio (round 190ia SG-5: header ×0.45, body ×0.57, waveform the hue)
             look.headerTop = look.headerBottom = liveShade (trackColour, 0.45f).withAlpha (1.0f);
@@ -436,6 +439,27 @@ ClipLook clipBody (juce::Colour clipColour, juce::Colour trackColour, ClipKind k
             break;
     }
     return look;
+}
+
+juce::Colour liveMarkOn (juce::Colour fill, float k, float ratio, juce::Colour light)
+{
+    // a direct-mapped cache (256 entries, message thread): paint asks once per clip / slot, from a handful of colours
+    struct Entry
+    {
+        juce::uint32 fill = 0, light = 0, chosen = 0;
+        std::int32_t k = -1, ratio = -1;
+    };
+    static std::array<Entry, 256> cache;
+    const auto kKey = (std::int32_t) (k * 1000.0f + 0.5f), ratioKey = (std::int32_t) (ratio * 100.0f + 0.5f);
+    const auto argb = fill.getARGB(), lightArgb = light.getARGB();
+    auto& e = cache[(argb ^ (argb >> 11) ^ (lightArgb >> 3) ^ (juce::uint32) kKey ^ ((juce::uint32) ratioKey << 4)) & 255u];
+    if (e.fill == argb && e.light == lightArgb && e.k == kKey && e.ratio == ratioKey)
+        return juce::Colour (e.chosen);
+    const auto opaque = fill.withAlpha (1.0f);
+    const auto dark = liveShade (opaque, k);
+    const auto chosen = contrast (dark, opaque) >= ratio ? dark : light;
+    e = { argb, lightArgb, chosen.getARGB(), kKey, ratioKey };
+    return chosen;
 }
 
 float contrast (juce::Colour a, juce::Colour b)
@@ -1240,6 +1264,19 @@ int buttonWidth (const juce::TextButton& button, int minWidth, int maxWidth)
     return juce::jlimit (minWidth, juce::jmax (minWidth, maxWidth), needed);
 }
 
+int translationExtra (const juce::Font& font, std::initializer_list<const char*> english)
+{
+    float extra = 0.0f;
+    for (const auto* text : english)
+    {
+        const auto source = juce::String::fromUTF8 (text);
+        const auto shown = tr (text);
+        if (shown != source)
+            extra = juce::jmax (extra, juce::GlyphArrangement::getStringWidth (font, shown) - juce::GlyphArrangement::getStringWidth (font, source));
+    }
+    return juce::jmax (0, (int) std::ceil (extra));
+}
+
 themes::Palette currentPalette()
 {
     auto c = [] (juce::Colour x) { return x.getARGB(); };
@@ -1745,7 +1782,10 @@ void LookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& button,
     const auto standard = base == bg4 || base == accent;
     if (standard)
     {
-        const auto look = buttonColours (themes::ButtonKind::secondary, on || base == accent, highlighted ? 1.0f : 0.0f, down, button.isEnabled());
+        // (round 190oo, WG-23: a disabled primary takes the secondary disabled look, bg4 + textDisabled as its neighbours;
+        // the dim red with grey text read 2.2:1. A toggled-on button keeps its on look when disabled.)
+        const auto look = buttonColours (themes::ButtonKind::secondary, on || (base == accent && button.isEnabled()), highlighted ? 1.0f : 0.0f, down,
+                                         button.isEnabled());
         base = look.fill;
         edge = look.edge;
     }
@@ -1900,6 +1940,13 @@ void LookAndFeel::positionComboBoxText (juce::ComboBox& box, juce::Label& label)
     const auto arrowSize = juce::jmin (14, juce::roundToInt ((float) box.getHeight() * 0.6f));
     label.setBounds (2, 1, box.getWidth() - arrowSize - 12, box.getHeight() - 2);
     label.setFont (getComboBoxFont (box));
+    // round 190oo (PAT-18): a box that asks for it keeps its font size and ends a long text in "..." (one line)
+    static const juce::Identifier ellipsisId ("lynxComboEllipsis"), oneLineId ("lynxOneLine");
+    if ((bool) box.getProperties().getWithDefault (ellipsisId, false))
+    {
+        label.setMinimumHorizontalScale (1.0f);
+        label.getProperties().set (oneLineId, true);
+    }
     const auto own = box.findColour (juce::ComboBox::textColourId);
     label.setColour (juce::Label::textColourId, box.isEnabled() ? own : own == textPrimary ? textDisabled : own.withMultipliedAlpha (0.5f));
 }
@@ -2163,19 +2210,44 @@ juce::Font LookAndFeel::getMenuBarFont (juce::MenuBarComponent& bar, int, const 
     // cap 7; 15 gives cap 8 in about 335 px at 1920); the Simple and Live menu rows keep theirs. (Rollup: both through
     // round 190je's labelFont, so Condensed labels still applies to the menu bar.)
     if ((bool) bar.getProperties().getWithDefault ("lynxFlMenuBar", false))
+    {
+        // round 190oo (WG-11): a long translated menu that would push toolbar panels out at 1920 px takes the condensed
+        // face at the same size (MainComponent's toolbar layout sets this only when it keeps more panels)
+        static const juce::Identifier condensedId ("lynxCondensedMenuBar");
+        if ((bool) bar.getProperties().getWithDefault (condensedId, false))
+            return cachedFont (type::title, 3);
         return labelFont (type::title);
+    }
     return labelFont (type::body);
 }
+
+namespace
+{
+int menuBarPadding (juce::MenuBarComponent& bar)
+{
+    return (bool) bar.getProperties().getWithDefault ("lynxTightMenuBar", false)  ? 8
+           : (bool) bar.getProperties().getWithDefault ("lynxFlMenuBar", false) ? 12
+                                                                                 : 16;
+}
+
+// round 190oo (WG-11): the horizontal squeeze of the menu titles (1 = none; the toolbar layout keeps it >= 0.9)
+float menuBarScale (juce::MenuBarComponent& bar)
+{
+    static const juce::Identifier scaleId ("lynxMenuBarScale");
+    return juce::jlimit (0.5f, 1.0f, (float) (double) bar.getProperties().getWithDefault (scaleId, 1.0));
+}
+} // namespace
 
 int LookAndFeel::getMenuBarItemWidth (juce::MenuBarComponent& bar, int itemIndex, const juce::String& itemText)
 {
     // a long (translated) menu bar takes tighter item padding so the toolbar keeps its panels (round 165o)
     // (round 190jo: the Pattern toolbar's larger menu text with FL's closer items, 12 px: the bar keeps its ~292 px, as FL's
     // eight menus take, so no toolbar panel drops out)
-    const auto padding = (bool) bar.getProperties().getWithDefault ("lynxTightMenuBar", false)  ? 8
-                         : (bool) bar.getProperties().getWithDefault ("lynxFlMenuBar", false) ? 12
-                                                                                               : 16;
-    return juce::roundToInt (juce::GlyphArrangement::getStringWidth (getMenuBarFont (bar, itemIndex, itemText), itemText)) + padding;
+    const auto padding = menuBarPadding (bar);
+    const auto text = juce::GlyphArrangement::getStringWidth (getMenuBarFont (bar, itemIndex, itemText), itemText);
+    if (const auto scale = menuBarScale (bar); scale < 0.999f) // (round 190oo WG-11: squeezed titles, see drawMenuBarItem)
+        return (int) std::ceil (text * scale) + padding;
+    return juce::roundToInt (text) + padding;
 }
 
 void LookAndFeel::drawMenuBarItem (juce::Graphics& g, int width, int height, int itemIndex, const juce::String& itemText, bool isMouseOverItem,
@@ -2193,6 +2265,13 @@ void LookAndFeel::drawMenuBarItem (juce::Graphics& g, int width, int height, int
     g.setFont (getMenuBarFont (bar, itemIndex, itemText));
     // (round 190mh, perf: the laid-out title from the text cache, the same glyphs at the item's origin; round 190jo's larger
     // Pattern-toolbar titles were shaped again on every paint)
+    if (const auto scale = menuBarScale (bar); scale < 0.999f)
+    {
+        // round 190oo (WG-11): the title squeezed into the item less its padding, so the gaps between titles stay
+        const auto padding = menuBarPadding (bar);
+        textcache::drawFittedText (g, itemText, padding / 2, 0, width - padding, height, juce::Justification::centred, 1, juce::jmax (0.5f, scale - 0.05f));
+        return;
+    }
     textcache::drawFittedText (g, itemText, 0, 0, width, height, juce::Justification::centred, 1);
 }
 
@@ -2419,7 +2498,8 @@ void LookAndFeel::drawLabel (juce::Graphics& g, juce::Label& label)
         g.setColour (label.findColour (juce::Label::textColourId).withMultipliedAlpha (alpha));
         g.setFont (font);
         const auto textArea = getLabelBorderSize (label).subtractedFrom (label.getLocalBounds());
-        const auto lines = juce::jmax (1, (int) ((float) textArea.getHeight() / font.getHeight()));
+        static const juce::Identifier oneLineId ("lynxOneLine"); // (round 190oo PAT-18, positionComboBoxText)
+        const auto lines = (bool) label.getProperties().getWithDefault (oneLineId, false) ? 1 : juce::jmax (1, (int) ((float) textArea.getHeight() / font.getHeight()));
         g.drawFittedText (label.getText(), textArea, label.getJustificationType(), lines, label.getMinimumHorizontalScale());
         tooltipIfCut (label, label, font, label.getText(), textArea, lines, label.getMinimumHorizontalScale());
     }
@@ -2462,6 +2542,41 @@ juce::Font LookAndFeel::getAlertWindowTitleFont() { return uiFont (type::title, 
 juce::Font LookAndFeel::getAlertWindowMessageFont() { return uiFont (type::body); }
 juce::Font LookAndFeel::getAlertWindowFont() { return uiFont (type::body); }
 
+juce::AlertWindow* LookAndFeel::createAlertWindow (const juce::String& title, const juce::String& message, const juce::String& button1,
+                                                   const juce::String& button2, const juce::String& button3, juce::MessageBoxIconType iconType,
+                                                   int numButtons, juce::Component* associatedComponent)
+{
+    // round 190oo (design review 2, WG-6): JUCE's message boxes (the plugin crash prompt, the OK / Cancel questions, the
+    // notices) are made on ui::dialog::Alert, the one dialog frame; the buttons, results and shortcuts are JUCE's own
+    // (LookAndFeel_V2::createAlertWindow). A box without a message is a progress window (ThreadWithProgressWindow adds its
+    // bar and status text through the AlertWindow base afterwards): that one stays JUCE's.
+    if (message.trim().isEmpty())
+        return juce::LookAndFeel_V4::createAlertWindow (title, message, button1, button2, button3, iconType, numButtons, associatedComponent);
+
+    auto* alert = new lynx::ui::dialog::Alert (title, message, iconType, associatedComponent);
+    if (numButtons == 1)
+        alert->addButton (button1, 0, juce::KeyPress (juce::KeyPress::escapeKey), juce::KeyPress (juce::KeyPress::returnKey));
+    else if (numButtons == 2 || numButtons == 3)
+    {
+        const juce::KeyPress key1 ((int) juce::CharacterFunctions::toLowerCase (button1[0]), 0, 0);
+        auto key2 = juce::KeyPress ((int) juce::CharacterFunctions::toLowerCase (button2[0]), 0, 0);
+        if (key1 == key2)
+            key2 = juce::KeyPress();
+        if (numButtons == 2)
+        {
+            alert->addButton (button1, 1, juce::KeyPress (juce::KeyPress::returnKey), key1);
+            alert->addButton (button2, 0, juce::KeyPress (juce::KeyPress::escapeKey), key2);
+        }
+        else
+        {
+            alert->addButton (button1, 1, key1);
+            alert->addButton (button2, 2, key2);
+            alert->addButton (button3, 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        }
+    }
+    return alert;
+}
+
 void LookAndFeel::drawAlertBox (juce::Graphics& g, juce::AlertWindow& alert, const juce::Rectangle<int>& textArea, juce::TextLayout& textLayout)
 {
     auto bounds = alert.getLocalBounds().toFloat();
@@ -2469,7 +2584,7 @@ void LookAndFeel::drawAlertBox (juce::Graphics& g, juce::AlertWindow& alert, con
     g.setColour (borderStrong);
     g.drawRect (bounds, 1.0f);
     g.setColour (accent);
-    g.fillRect (bounds.removeFromTop (3.0f));
+    lynx::ui::dialog::fillBand (g, bounds.getX(), bounds.getY(), bounds.getWidth(), 3.0f); // (round 190oo, WG-22: whole device rows)
 
     auto iconSpace = 0;
     const auto type = alert.getAlertType();

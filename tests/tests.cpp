@@ -18074,3 +18074,10 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Sections190olTests.inc" // round 190ol (0.1.31): the Sections lane (P1) and Simple time signature changes (P6)
 #include "Research190onTests.inc" // round 190on: command palette (P2), Tab to transient (P8), stacked lanes (P10), removing a guest
 #include "Perf190okTests.inc" // round 190ok: safe overloads (P24), generator smart disable (D2), the smart-disable tip (D1), fast maths (D3)
+#include "Design190ooTests.inc" // round 190oo (0.1.31): design review 2, the owner's options with rules in core
+#include "Lanes190ooTests.inc" // round 190oo (design review 2, lanes): Live envelope lanes (CS-19), lanes folded on open (CS O-3), Live scale control (O-5)
+#include "SimpleFl190ooTests.inc" // round 190oo (design review 2, CS-24): S / volume / pan on an FL project's tracks in Simple
+#include "Pat6_190ooTests.inc" // round 190oo (design review 2): PAT-6, the Playlist row from FL's vertical zoom (event 0xF2)
+#include "DialogRules190ooTests.inc" // round 190oo: the one dialog system's button order and pixel bands (core/DialogRules.h)
+#include "RackAutomation190ooTests.inc" // round 190oo (design review 2, PAT-7): FL's automation clip channels in the Channel rack
+#include "TextFit190ooTests.inc" // round 190oo (design review 2, fit): translated menu titles give up width before toolbar panels drop, knob captions

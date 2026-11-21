@@ -38,6 +38,7 @@
 #include "core/LiveNote.h"
 #include "core/LiveKeys.h"
 #include "core/KeyGuess.h"
+#include "core/LiveScaleControl.h" // (round 190oo, O-5)
 #include "core/ProjectKey.h"
 #include "core/ScaleKeys.h"
 #include "core/SimplePads.h"
@@ -151,6 +152,7 @@
 #include "ui/ParametricEqEditor.h"
 #include "ui/PluginWindow.h"
 #include "ui/I18n.h"
+#include "core/TextFit.h"
 #include "ui/Theme.h"
 #include "ui/TypeAhead.h"
 #include "ui/WaveformView.h"
@@ -289,6 +291,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         {
             safe->saveUiSettings();
             safe->playlist.refreshViewOptions(); // (round 190jq: header width, pointer click, automation clip lanes)
+            safe->refreshKeyPanel(); // (round 190oo, O-5: Live's three-part scale control on / off)
+            safe->keyPanel.repaint();
             if (trackonly::active())
                 safe->hidePanelForTrackOnly();
         }
@@ -328,7 +332,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         if (std::exchange (showExtendedHintAfterLoad, false)) // round 190mr (DF-49)
             showExtendedHint (true);
         // the start-up song follows Options › Mixer too (round 163) and the automatic crossfades of new projects (166e)
-        engine.setSong (makeNewProject());
+        engine.setSong (withClipLaunchStrips (makeNewProject()));
         skin::onStyleSettingsChanged = [safe = juce::Component::SafePointer<MainComponent> (this)] { // an editor's own style was picked
             if (safe != nullptr) safe->saveUiSettings();
         };
@@ -551,6 +555,10 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     patternBox.setTooltip (tr ("Current pattern (Numpad +/-: next/previous, F4: next empty, F2: rename)"));
     patternBox.onStep = [this] (int delta) { stepPatternFromSelector (delta); };
     gridBox.setScrollWheelEnabled (true);
+    // round 190oo (PAT-18): the snap and pattern boxes keep one font size; a name too long for a narrow box (1280 px:
+    // "Line (follows zoom)") ends in "..." instead of shrinking (Theme.cpp positionComboBoxText)
+    for (auto* box : std::initializer_list<juce::ComboBox*> { &gridBox, &patternBox })
+        box->getProperties().set ("lynxComboEllipsis", true);
     patternBox.onChange = [this]
     {
         const auto index = patternBox.getSelectedId() - 1; // (round 190ne: ids are pattern indices + 1)
@@ -997,6 +1005,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     addChildComponent (chordNearHint);
     chordPanel.onMenu = [this] { showChordPanelMenu(); };
     keyPanel.onClick = [this] { showKeyMenu(); };
+    keyPanel.onPart = [this] (int part) { showKeyPart (part); }; // (round 190oo, O-5)
     linkToggle.setComponentID ("toolbar.link");
     linkToggle.onConfigure = [this] { openSettings ((int) SettingsPage::link); };
     keyPanel.setComponentID ("toolbar.key"); // (round 190dv: the first-song tour's ring)
@@ -1326,14 +1335,15 @@ void MainComponent::paint (juce::Graphics& g)
 
     // captions that name the snap and pattern selectors, after their icons (the magnet is a button)
     g.setFont (font (type::caption - 1.0f, true));
-    g.setColour (colour::textDisabled);
+    g.setColour (colour::textSecondary); // (round 190oj: textDisabled was 3.98:1 on the toolbar)
     if (! snapLabelArea.isEmpty())
         if (snapLabelArea.getWidth() > rowHeight + 20) // (the narrowest toolbar keeps only the magnet)
-            g.drawText (tr ("SNAP"), snapLabelArea.withTrimmedLeft (rowHeight + 1), juce::Justification::centredLeft, true);
+            g.drawText (tr ("SNAP"), snapLabelArea.withTrimmedLeft (rowHeight + 4), juce::Justification::centredLeft, true); // (+3: it touched the magnet)
     if (! patternLabelArea.isEmpty())
     {
         const auto iconBox = patternLabelArea.withWidth (rowHeight).toFloat();
         icons::draw (g, Icon::pattern, iconBox.withSizeKeepingCentre (14.0f, 14.0f), colour::textDisabled);
+        g.setColour (colour::textSecondary);
         if (patternLabelArea.getWidth() > rowHeight + 20)
             g.drawText (tr ("PATTERN"), patternLabelArea.withTrimmedLeft (rowHeight + 1), juce::Justification::centredLeft, true);
     }
@@ -1362,6 +1372,8 @@ void MainComponent::resized()
         return w;
     };
     menuBar.getProperties().set ("lynxTightMenuBar", false);
+    menuBar.getProperties().set ("lynxCondensedMenuBar", false); // (round 190oo WG-11: set again below when needed)
+    menuBar.getProperties().set ("lynxMenuBarScale", 1.0);
     int menuWidth = measureMenu();
     if (menuWidth > 390) // translated menu titles (German, Russian...): English stays as it was
     {
@@ -1445,6 +1457,8 @@ void MainComponent::resized()
             int gap, minHint;
             bool fileWide, tightMenu;
             std::array<bool, toolbarlayout::groupCount> fits;
+            bool condensedMenu = false; // (round 190oo WG-11)
+            double menuScale = 1.0;
         };
         auto tighter = widths;
         tighter[(std::size_t) Group::transport] -= 12 + 36; // the tempo and the song position, as narrow as the compact ones
@@ -1457,11 +1471,32 @@ void MainComponent::resized()
             return w;
         };
         const auto alreadyTight = (bool) menuBar.getProperties().getWithDefault ("lynxTightMenuBar", false);
+        // Round 190oo (design review 2, WG-11): in German and Russian (and French, Portuguese, Turkish, Dutch... by
+        // measure) the translated menu titles set the hint column's width: at 1920 px the panels need ~1550 px, which
+        // leaves ~350 px for the menu, and de's eight titles take ~395-440 px even with the tight padding, so the Chord
+        // panel and the output scope dropped while English keeps them. Before a panel goes, the menu gives up width:
+        // level 3 draws the titles in the condensed face (Open Sans Condensed, ~78 % as wide, the face of Settings >
+        // "Condensed labels"), level 4 also squeezes them horizontally, by just enough and never below 0.9. Translated
+        // menus only: English (and an English menu at any width) keeps its layout to the pixel.
+        const auto mayCondense = i18n::current() != "en";
+        const auto condensedMenuWidth = [&] (double scale) {
+            menuBar.getProperties().set ("lynxTightMenuBar", true);
+            menuBar.getProperties().set ("lynxCondensedMenuBar", true);
+            menuBar.getProperties().set ("lynxMenuBarScale", scale);
+            const auto w = measureMenu();
+            menuBar.getProperties().set ("lynxTightMenuBar", alreadyTight);
+            menuBar.getProperties().set ("lynxCondensedMenuBar", false);
+            menuBar.getProperties().set ("lynxMenuBarScale", 1.0);
+            return w;
+        };
+        const auto menuItems = getMenuBarNames().size();
         std::vector<Form> forms;
-        for (int level = 0; level < 3; ++level)
+        for (int level = 0; level < 5; ++level)
         {
             if (level == 2 && (alreadyTight || menuWidth + 8 <= 320))
-                break; // (the menu doesn't set the hint column's width: its padding gives nothing)
+                continue; // (the menu doesn't set the hint column's width: its padding gives nothing)
+            if (level >= 3 && (! mayCondense || menuWidth + 8 <= 320))
+                break;
             auto base = tighter;
             auto formGap = 13, formHint = minHint;
             if (level >= 1)
@@ -1469,14 +1504,31 @@ void MainComponent::resized()
                 formGap = 12;
                 base[(std::size_t) Group::output] -= 12;
             }
-            if (level >= 2)
+            if (level == 2)
                 formHint = juce::jmax (tightMenuWidth() + 8, 320);
+            if (level == 3)
+                formHint = juce::jmax (condensedMenuWidth (1.0) + 8, 320);
             for (const auto wideFile : { fileWide, false })
             {
                 auto w = base;
                 if (! wideFile)
                     w[(std::size_t) Group::file] = 3 * h + 4;
-                forms.push_back ({ w, formGap, formHint, wideFile, level >= 2, toolbarlayout::fit (toolbarLayout, w, formGap, room, formHint) });
+                auto scale = 1.0;
+                if (level == 4)
+                {
+                    // the room the shown panels leave for the hint column, and the squeeze that fits the menu into it
+                    int panels = 0;
+                    for (const auto& e : toolbarLayout.entries)
+                        if (e.shown)
+                            panels += w[(std::size_t) e.group] + formGap;
+                    const auto full = condensedMenuWidth (1.0), padding = 8 * menuItems;
+                    scale = textfit::menuSqueeze (room, panels, full - padding, padding, menuItems);
+                    formHint = juce::jmax (condensedMenuWidth (scale) + 8, 320);
+                }
+                Form form { w, formGap, formHint, wideFile, level >= 2, toolbarlayout::fit (toolbarLayout, w, formGap, room, formHint) };
+                form.condensedMenu = level >= 3;
+                form.menuScale = scale;
+                forms.push_back (form);
                 if (! fileWide)
                     break;
             }
@@ -1497,6 +1549,8 @@ void MainComponent::resized()
             if (best->tightMenu)
             {
                 menuBar.getProperties().set ("lynxTightMenuBar", true);
+                menuBar.getProperties().set ("lynxCondensedMenuBar", best->condensedMenu); // (round 190oo WG-11)
+                menuBar.getProperties().set ("lynxMenuBarScale", best->menuScale);
                 menuWidth = measureMenu();
             }
         }
@@ -1662,6 +1716,20 @@ void MainComponent::resized()
         placeHintBar (hintRow);
         fixedToolbarArea = juce::Rectangle<int> (column.getX() - 4, 0, column.getWidth() + 8, toolbarHeight);
     }
+    // round 190oo (WG-11): the menu bar places its titles in its own resized(), which JUCE runs only when the bar's bounds
+    // change; a new padding, face or squeeze at the same bounds would keep the titles where the old ones were
+    {
+        auto& props = menuBar.getProperties();
+        const auto menuLook = juce::String ((bool) props.getWithDefault ("lynxTightMenuBar", false) ? "t" : "-")
+                              + ((bool) props.getWithDefault ("lynxCondensedMenuBar", false) ? "c" : "-")
+                              + juce::String ((double) props.getWithDefault ("lynxMenuBarScale", 1.0), 3);
+        if (props.getWithDefault ("lynxMenuLaidOut", juce::var()).toString() != menuLook)
+        {
+            props.set ("lynxMenuLaidOut", menuLook);
+            menuBar.resized();
+            menuBar.repaint();
+        }
+    }
 
     snapLabelArea = patternLabelArea = transportArea = modeArea = {};
 
@@ -1776,6 +1844,15 @@ void MainComponent::resized()
                 {
                     put (newPatternButton, second.removeFromRight (h));
                     second.removeFromRight (2);
+                    // round 190oj: at 1920 px the box was 67 px and every new project showed "Patter..."; when it would
+                    // be narrower than a pattern's name needs, the PATTERN caption keeps only its icon (FL shows no
+                    // caption there) and the box takes its room
+                    if (constexpr int roomy = 96; second.getWidth() < roomy && patternLabelArea.getWidth() > h + 4)
+                    {
+                        const auto freed = patternLabelArea.getWidth() - (h + 4);
+                        patternLabelArea.setWidth (h + 4);
+                        second.setLeft (second.getX() - freed);
+                    }
                 }
                 put (patternBox, second.reduced (0, 1));
                 break;
@@ -2522,6 +2599,15 @@ void MainComponent::showActionSearch()
 bool MainComponent::runAction (const std::string& id)
 {
     auto is = [&id] (const char* name) { return id == name; };
+
+    if (id == "simple.projectName") // round 190oo (O-4, LYNX extra): View › Project name at the top (Simple layout)
+    {
+        ui::simplelook::projectNameShown() = ! ui::simplelook::projectNameShown();
+        resized();
+        repaint (0, 0, getWidth(), toolbarHeight);
+        saveUiSettings();
+        return true;
+    }
 
     if (id.rfind ("view.detail", 0) == 0) // round 183a: Clip-launch workflow only (false: the chord falls through as before)
         return runDetailAction (id);
@@ -3466,6 +3552,8 @@ void MainComponent::loadUiSettings()
             PlaylistComponent::hideCollapsedGroups = on;
         else if (key == "fadePreviews") // #230 (round 190nq): Playlist › View › Show fade previews
             PlaylistComponent::showFadePreviews = on;
+        else if (key == "shadeFadedAudio") // round 190oo (O-1): Playlist › View › Shade faded audio (LYNX)
+            PlaylistComponent::shadeFadedAudio = on;
         else if (key == "automationLanes") // round 177b: Playlist › Automation lanes
             autolanes::setShown (on);
         else if (key == "trackInserts") // round 190ht (issue #154): Playlist › Edit › Show insert effects on linked tracks
@@ -3576,9 +3664,15 @@ void MainComponent::loadUiSettings()
             PianoRollComponent::stackedLanesSaved = line.fromFirstOccurrenceOf ("=", false, false).trim().toStdString();
         else if (key == "polyPrepareOnOpen") // (round 190lo: a LYNX extra, ui/PolyEditor.h)
             PolyEditorWindows::prepareOnOpen = on;
-        else if (key == "prKeyStyle") // (round 190j: 0 = flat, FL's; 1 = piano keys)
-            PianoRollComponent::keyStyle = line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue() == 1 ? pianokeys::Style::piano
-                                                                                                                  : pianokeys::Style::flat;
+        else if (key == "prKeyStyle") // (round 190j: 0 = flat, the default then; 1 = piano keys)
+        {
+            // round 190oo (O-2): FL's keys are the default now, so a 0 written while flat was the default is no choice
+            // and is skipped; "prKeyStyle2" (written after it) holds the style since
+            if (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue() == 1)
+                PianoRollComponent::keyStyle = pianokeys::Style::piano;
+        }
+        else if (key == "prKeyStyle2") // (round 190oo: 0 = flat, 1 = lined piano keys, 2 = FL's keys)
+            PianoRollComponent::keyStyle = pianokeys::styleFromInt (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "audioLogEnabled")
             engine.getRollingLog().setEnabled (on);
         else if (key == "audioLogSeconds")
@@ -3661,6 +3755,8 @@ void MainComponent::loadUiSettings()
             AudioEngine::alsSessionOnPlaylist = on;
         else if (key == "simpleLargeControls") // round 190jc: View › Large controls (Simple layout)
             ui::simplelook::largeControls() = on;
+        else if (key == "simpleProjectName") // round 190oo (O-4, LYNX extra): the project name centred at the top (Simple)
+            ui::simplelook::projectNameShown() = on;
         else if (key == "followPlaylist" || key == "followPianoRoll")
             EditorGlobals::get().setFollowing (key == "followPianoRoll", on, false);
         else if (key == "followChannelRack" || key == "followAudioEditor")
@@ -3877,6 +3973,7 @@ void MainComponent::saveUiSettings()
                                       + "\ninstrumentTrackLevels=" + juce::String (PlaylistComponent::showInstrumentTrackLevels ? 1 : 0)
                                       + "\nhideCollapsedGroups=" + juce::String (PlaylistComponent::hideCollapsedGroups ? 1 : 0)
                                       + "\nfadePreviews=" + juce::String (PlaylistComponent::showFadePreviews ? 1 : 0)
+                                      + "\nshadeFadedAudio=" + juce::String (PlaylistComponent::shadeFadedAudio ? 1 : 0)
                                       + "\nautomationLanes=" + juce::String (autolanes::shown() ? 1 : 0)
                                       + "\ntrackInserts=" + juce::String (PlaylistComponent::showTrackInserts ? 1 : 0)
                                       + workflowextras::uiOptionsText() // round 190iu
@@ -3933,7 +4030,8 @@ void MainComponent::saveUiSettings()
                                       + "\nprStackedLanesExtra=" + juce::String (PianoRollComponent::stackedLanesExtra ? 1 : 0)
                                       + "\nprStackedLanes=" + juce::String (PianoRollComponent::stackedLanesSaved)
                                       + "\npolyPrepareOnOpen=" + juce::String (PolyEditorWindows::prepareOnOpen ? 1 : 0)
-                                      + "\nprKeyStyle=" + juce::String ((int) PianoRollComponent::keyStyle)
+                                      + "\nprKeyStyle=" + juce::String (PianoRollComponent::keyStyle == pianokeys::Style::piano ? 1 : 0) // (older builds)
+                                      + "\nprKeyStyle2=" + juce::String ((int) PianoRollComponent::keyStyle)
                                       + "\naudioLogEnabled=" + juce::String (engine.getRollingLog().isEnabled() ? 1 : 0)
                                       + "\naudioLogSeconds=" + juce::String (engine.getRollingLog().lengthSeconds())
                                       + "\naudioLogPreEffects=" + juce::String (engine.getRollingLog().getPosition() == RollingAudioLog::Position::preEffects ? 1 : 0)
@@ -3971,6 +4069,7 @@ void MainComponent::saveUiSettings()
                                       + "\ndetailExtraSelectInMixer=" + juce::String (DetailView::extraSelectInMixer ? 1 : 0)
                                       + "\nalsSessionOnPlaylist=" + juce::String (AudioEngine::alsSessionOnPlaylist.load() ? 1 : 0)
                                       + "\nsimpleLargeControls=" + juce::String (ui::simplelook::largeControls() ? 1 : 0)
+                                      + "\nsimpleProjectName=" + juce::String (ui::simplelook::projectNameShown() ? 1 : 0) // (round 190oo, O-4)
                                       + "\nfollowPlaylist=" + juce::String (EditorGlobals::get().isFollowing (false) ? 1 : 0)
                                       + "\nfollowPianoRoll=" + juce::String (EditorGlobals::get().isFollowing (true) ? 1 : 0)
                                       + "\nfollowChannelRack=" + juce::String (EditorGlobals::get().isFollowingView (EditorGlobals::FollowView::channelRack) ? 1 : 0)
@@ -4446,6 +4545,35 @@ void MainComponent::setSimpleLargeControls (bool on)
     saveUiSettings();
 }
 
+// A layout style's own first look of the workspace, over the default window layout: Clip-launch hides the Channel rack
+// (one click away, on the toolbar); Simple is one window, the tracks and the timeline (the other panels stay one click
+// away: View, F5…F9). Used the first time a style is chosen and by View › Reset layout (round 190oj: in Clip-launch and
+// Simple, Reset layout brought back the Pattern layout's Channel rack over the clip grid / the Simple tracks).
+void MainComponent::applyStyleDefaultPanels (layoutstyle::Style style)
+{
+    using layoutstyle::Style;
+    if (style == Style::clipLaunch)
+    {
+        workspace.hide (Panel::channelRack);
+        workspace.show (Panel::playlist);
+    }
+    else if (style == Style::simple)
+    {
+        for (auto panel : { Panel::channelRack, Panel::pianoRoll, Panel::mixer, Panel::browser })
+            workspace.hide (panel);
+        workspace.show (Panel::playlist);
+        if (! workspace.isMaximised (Panel::playlist))
+            workspace.toggleMaximised (Panel::playlist);
+    }
+}
+
+void MainComponent::resetLayoutForStyle()
+{
+    workspace.resetLayout();
+    applyStyleDefaultPanels (layoutStyle);
+    refreshPanelButtons();
+}
+
 void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
 {
     using layoutstyle::Style;
@@ -4540,7 +4668,8 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         host.statusForSnapshot = [this] (const juce::String& text) {
             using S = toolbarlayout::SaveState;
             saveStatusFrozen = true;
-            const auto state = text.isEmpty() ? S::fresh : text == tr ("All changes saved") ? S::saved : text == tr ("Not saved yet") ? S::unsaved : S::backedUp;
+            const auto state = text.isEmpty() || text == tr ("Nothing to save yet") ? S::fresh // (round 190oo, CS-32)
+                               : text == tr ("All changes saved") ? S::saved : text == tr ("Not saved yet") ? S::unsaved : S::backedUp;
             saveStatus.set (state, text.isEmpty() ? tr ("Nothing to save yet") : text);
         };
         // round 190bu: the dock for the selected track sits where Clip-launch's detail view does (never both)
@@ -4587,6 +4716,21 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         };
         // the Simple headers' "+FX": the dock's Effects tab on that track (round 190bu; the Mixer shows the same slots)
         playlist.onTrackEffects = [this] (int insert) {
+            // round 190oo (CS-24): an FL track's "+FX" acts on the insert its clips play through, which no Simple track
+            // owns (the dock shows Simple tracks only): the Mixer opens with that insert selected, its effects in view
+            const auto& song = engine.getSong();
+            bool ownedBySimpleTrack = false;
+            for (int t = 0; t < (int) song.playlistTracks.size() && ! ownedBySimpleTrack; ++t)
+                ownedBySimpleTrack = simpletracks::kindOf (song, t).has_value() && simpletracks::insertOf (song, t) == insert;
+            if (! ownedBySimpleTrack)
+            {
+                if (insert > 0 && insert < (int) song.mixer.size())
+                {
+                    showPanel (Panel::mixer);
+                    mixer.selectTrack (insert);
+                }
+                return;
+            }
             if (simpleWorkflow != nullptr)
                 simpleWorkflow->showEffectsOfInsert (insert);
         };
@@ -4628,20 +4772,8 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         layoutFile (from).replaceWithText (workspace.getLayoutText());
         if (const auto saved = layoutFile (style); saved.existsAsFile())
             workspace.applyLayoutText (saved.loadFileAsString());
-        else if (style == Style::clipLaunch)
-        {
-            workspace.hide (Panel::channelRack); // one click away, on the toolbar
-            workspace.show (Panel::playlist);
-        }
-        else if (style == Style::simple)
-        {
-            // one window: the tracks and the timeline fill it; the other panels stay one click away (View, F5…F9)
-            for (auto panel : { Panel::channelRack, Panel::pianoRoll, Panel::mixer, Panel::browser })
-                workspace.hide (panel);
-            workspace.show (Panel::playlist);
-            if (! workspace.isMaximised (Panel::playlist))
-                workspace.toggleMaximised (Panel::playlist);
-        }
+        else
+            applyStyleDefaultPanels (style);
         refreshPanelButtons();
         if (isShowing())
             grabKeyboardFocus(); // (the new layout must not leave the keys in the Browser's search box)
@@ -5331,6 +5463,12 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
                 view.addSeparator();
                 view.addItem (tr ("Sections lane") + " (LYNX)", layoutStyle == layoutstyle::Style::pattern, sections::patternLaneOn(),
                               [] { workflowextras::setExtra ("playlist.sectionsLane", ! sections::patternLaneOn()); });
+                // round 190oo (design review O-1, a LYNX extra): shade the faded part as the Clip-launch layout does
+                view.addItem (tr ("Shade faded audio (LYNX)"), true, PlaylistComponent::shadeFadedAudio, [this] {
+                    PlaylistComponent::shadeFadedAudio = ! PlaylistComponent::shadeFadedAudio;
+                    playlist.headerOptionsChanged();
+                    saveUiSettings();
+                });
                 menu.addSubMenu (tr ("View"), view);
             }
             {
@@ -7653,12 +7791,74 @@ juce::String keyLabel (const projectkey::Key& key)
 {
     return juce::String (projectkey::rootName (key.root)) + " " + tr (juce::String (projectkey::shortScaleName (key.flScale)));
 }
+
+// round 190oo (O-5): the mode chooser's name ("Major", "Minor", "Dorian"; FL's own name for the rest)
+juce::String scaleModeLabel (int flScale)
+{
+    const auto name = tr (juce::String (projectkey::shortScaleName (flScale)));
+    return name.substring (0, 1).toUpperCase() + name.substring (1);
+}
 } // namespace
 
 void MainComponent::refreshKeyPanel()
 {
     const auto key = projectkey::get (engine.getSong());
     keyPanel.setText (key ? keyLabel (*key) : juce::String());
+    // round 190oo (O-5): the three-part control shows the key, or (switched off) the last one shown
+    if (key)
+        scaleShown = *key;
+    else if (! scaleShownSet)
+        scaleShown = projectkey::Key { 0, projectkey::commonFirst().front() };
+    scaleShownSet = true;
+    keyPanel.setScaleParts (key.has_value(), juce::String (projectkey::rootName (scaleShown.root)), scaleModeLabel (scaleShown.flScale));
+}
+
+// Round 190oo (O-5): a click on Live's scale switch turns the project key on (the root and mode shown) or off; the root
+// and mode choosers pick from the Key menu's lists. Off, a choice only changes what the choosers show, as Live keeps its
+// root and mode while Scale Mode is off; the switch then turns that key on.
+void MainComponent::showKeyPart (int part)
+{
+    const auto current = projectkey::get (engine.getSong());
+    if (part == (int) livescale::Part::toggle)
+    {
+        setProjectKey (current ? std::nullopt : std::optional<projectkey::Key> (scaleShown));
+        return;
+    }
+    const auto choose = [this, on = current.has_value()] (projectkey::Key key) {
+        scaleShown = key;
+        if (on)
+            setProjectKey (key);
+        else
+            refreshKeyPanel();
+    };
+    juce::PopupMenu menu;
+    if (part == (int) livescale::Part::root)
+    {
+        for (int r = 0; r < 12; ++r)
+            menu.addItem (juce::String (projectkey::rootName (r)), true, scaleShown.root == r,
+                          [choose, r, scale = scaleShown.flScale] { choose (projectkey::Key { r, scale }); });
+    }
+    else
+    {
+        const auto order = projectkey::commonFirst();
+        juce::PopupMenu more;
+        for (std::size_t i = 0; i < order.size(); ++i)
+        {
+            const auto flScale = order[i];
+            auto item = [choose, flScale, root = scaleShown.root] { choose (projectkey::Key { root, flScale }); };
+            if ((int) i < keyguess::commonScales)
+                menu.addItem (scaleModeLabel (flScale), true, scaleShown.flScale == flScale, item);
+            else
+                more.addItem (juce::String (notetools::flReferenceScales()[(std::size_t) flScale].name), true, scaleShown.flScale == flScale, item);
+        }
+        menu.addSubMenu (tr ("More scales"), more);
+    }
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&keyPanel));
+}
+
+void MainComponent::setLiveScaleControl (bool on)
+{
+    workflowextras::setExtra ("controlBar.liveScale", on); // (saves; onChanged repaints the key box)
 }
 
 void MainComponent::setProjectKey (std::optional<projectkey::Key> key)
@@ -7718,6 +7918,11 @@ juce::PopupMenu MainComponent::makeKeyMenu()
     menu.addSubMenu (tr ("More scales"), more);
     menu.addSeparator();
     menu.addItem (tr ("None"), true, ! current, [this] { setProjectKey (std::nullopt); });
+    if (layoutStyle == layoutstyle::Style::clipLaunch) // round 190oo (O-5, LYNX extra; also in Settings › LYNX extras)
+    {
+        menu.addSeparator();
+        menu.addItem (tr ("Live's scale control: switch, root and mode (LYNX)"), true, livescale::shown, [this] { setLiveScaleControl (! livescale::shown); });
+    }
     return menu;
 }
 
@@ -8181,6 +8386,7 @@ void MainComponent::updateTitle()
     // issue #232 stage 2 (round 190nz): what the other windows' Window menu and a pasted copy call this project
     windowclip::setProjectName (projectName);
     windows::update ([this] (windows::Entry& e) { e.project = projectName; });
+    repaint (simpleNameArea); // (round 190oo, O-4: the Simple top bar's centred name)
     if (! engine.isModified()) // what is on disk now: the reference for "unused recordings" after a Discard
         savedSamples = safety::referencedSamples (engine.getSong());
 
@@ -8419,8 +8625,8 @@ juce::String MainComponent::simpleSaveStatus() const
 
 juce::String MainComponent::simpleSaveStatusText (bool modified, bool hasFile, juce::int64 backupMs, juce::int64 nowMs)
 {
-    if (! modified)
-        return hasFile ? tr ("All changes saved") : juce::String();
+    if (! modified) // (round 190oo, CS-32 / design190ia SG-17: the fourth state has the top bar's own text, never blank)
+        return hasFile ? tr ("All changes saved") : tr ("Nothing to save yet");
     if (backupMs <= 0)
         return tr ("Not saved yet");
     const auto minutes = (int) ((nowMs - backupMs) / 60000);
@@ -9024,12 +9230,22 @@ void MainComponent::openStartupProject()
     startNewProject (std::move (song), {});
 }
 
+// Round 190oo (design review CS O-2, a LYNX extra, off by default): a new, empty project made while the Clip-launch
+// layout shows links Track N to insert N (core/Templates.h linkClipLaunchStrips), so the Session mixer shows a strip on
+// every column as a new Live set does. Demos and starter songs (they have clips) and the other layouts are unchanged.
+Song MainComponent::withClipLaunchStrips (Song song)
+{
+    if (newProjectDefaults().clipLaunchStrips && layoutstyle::current() == layoutstyle::Style::clipLaunch && song.playlist.empty())
+        linkClipLaunchStrips (song, newProjectDefaults().playlistTracks);
+    return song;
+}
+
 void MainComponent::startNewProject (Song song, const juce::File& file)
 {
     forgetSeekMark();
     engine.stop();
     engine.rewind();
-    engine.setSong (std::move (song));
+    engine.setSong (withClipLaunchStrips (std::move (song)));
     engine.markCreatedNow(); // Project info › created (a template's own date is kept, as FL does)
     currentFile = juce::File();
     projectName = {};
@@ -9050,6 +9266,9 @@ void MainComponent::startNewProject (Song song, const juce::File& file)
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not save"), error);
     }
     updateTitle();
+    // round 190oj: a new project starts at bar 1, as an opened one does (FL's File › New); before, the Playlist kept the
+    // last project's scroll and zoom, so a new song showed an empty grid from bar 39 or so
+    playlist.showSongAfterOpen (engine.getSong().playlist.empty()); // (a demo / starter song opens as an opened one)
 }
 
 // The user's choice after a plugin's editor crashed (issue #32): save under a new name now, and/or run that plugin in a
@@ -10799,7 +11018,12 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             // FL: the row's Alt+1 … Alt+0 on the right (round 190ld, DF-137); the folder stays beside the name
             const auto id = "file.recent" + std::to_string (i + 1);
             const auto keyText = shortcutText (id.c_str()).trimCharactersAtStart ("\t");
-            juce::PopupMenu::Item item (keyText.isEmpty() ? file.getFileName() : file.getFileName() + "  (" + file.getParentDirectory().getFileName() + ")");
+            // (round 190oo PAT-19: FL lists the file name alone; the folder only tells two files of one name apart — the
+            // review read "thief.flp  (flp)" as a format suffix)
+            bool twin = false;
+            for (int k = 0; k < shown && ! twin; ++k)
+                twin = k != i && recent.getFile (k).getFileName() == file.getFileName();
+            juce::PopupMenu::Item item (keyText.isEmpty() || ! twin ? file.getFileName() : file.getFileName() + "  (" + file.getParentDirectory().getFileName() + ")");
             item.shortcutKeyDescription = keyText.isNotEmpty() ? keyText : file.getParentDirectory().getFileName(); // (else its folder on the right)
             item.setEnabled (file.existsAsFile()).setAction ([this, file] { confirmDiscard ([this, file] { openFile (file); }); });
             menu.addItem (std::move (item));
@@ -10887,10 +11111,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             rare.addSubMenu (tr ("Detached panels (own window)"), detach);
         }
         menu.addSeparator();
-        menu.addItem (tr ("Reset layout"), [this] {
-            workspace.resetLayout();
-            refreshPanelButtons();
-        });
+        menu.addItem (tr ("Reset layout"), [this] { resetLayoutForStyle(); });
         rare.addItem (tr ("Save layout as..."), [this] { saveLayoutAs(); });
         rare.addSubMenu (tr ("Load layout"), layoutsMenu());
         addLayoutStyleItems (menu);
@@ -10923,6 +11144,8 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         if (layoutStyle == layoutstyle::Style::simple) // round 190jc (owner decision 9): touch-size controls, Simple only
             menu.addItem (tr ("Large controls (touch size)"), true, ui::simplelook::largeControls(),
                           [this] { setSimpleLargeControls (! ui::simplelook::largeControls()); });
+        if (layoutStyle == layoutstyle::Style::simple) // round 190oo (O-4, LYNX extra, off by default): BandLab's centred name
+            menu.addItem (tr ("Project name at the top (BandLab)"), true, ui::simplelook::projectNameShown(), [this] { runAction ("simple.projectName"); });
         {
             // FL's View › Background (audit round 165z-a): the workspace image and colour of Options › Theme
             juce::PopupMenu background;
@@ -11469,8 +11692,19 @@ std::unique_ptr<juce::Component> MainComponent::makeHelpContent (const keys::Key
                     g.drawText (keys, x, y + 1, keyWidth, 18, juce::Justification::centred);
                     g.setColour (colour::textSecondary);
                     g.setFont (font (type::body));
-                    g.drawFittedText (tr (row.action), x + keyWidth + 10, y, columnWidth - keyWidth - 10, 20, juce::Justification::centredLeft, 1, 0.85f);
-                    y += 24;
+                    // (round 190oj WG-4: an action that does not fit on one line at 85 % takes two lines, instead of "res...")
+                    const auto action = tr (row.action);
+                    const auto room = columnWidth - keyWidth - 10;
+                    if (juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), action) * 0.85f > (float) room)
+                    {
+                        g.drawFittedText (action, x + keyWidth + 10, y, room, 38, juce::Justification::centredLeft, 2, 0.9f);
+                        y += 40;
+                    }
+                    else
+                    {
+                        g.drawFittedText (action, x + keyWidth + 10, y, room, 20, juce::Justification::centredLeft, 1, 0.85f);
+                        y += 24;
+                    }
                 }
 
                 y += 14;

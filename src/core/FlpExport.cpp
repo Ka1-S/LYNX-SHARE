@@ -1481,6 +1481,7 @@ struct Converter
             flp::Arrangement a;
             a.index = i;
             a.name = arrangement.name;
+            a.rowZoom = polish::flZoomForRowHeight (song.playlistRowHeight); // FL's vertical zoom, event 0xF2 (round 190oo, PAT-6)
             // round 190ol: FL has no Sections lane: each section becomes a plain time marker at its start, named after it
             int fromSections = 0;
             for (const auto& m : sections::markersWithSections (current ? song.markers() : arrangement.markers, arrangement.sections, &fromSections))

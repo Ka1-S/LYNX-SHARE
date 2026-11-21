@@ -364,10 +364,10 @@ public:
             g.setColour (c::textSecondary);
             g.setFont (theme::font (theme::type::caption));
             g.drawText (tr ("Stop all clips"), stop.withX (stop.getRight() + 6).withWidth (sceneWidthNow() - 30), juce::Justification::centredLeft, true);
+            // (round 190oj CS-10: a solid square as Live's and as the tracks' stop squares; with a light outline it read
+            // as an unticked checkbox)
             g.setColour (stopAllDown ? c::bg6 : juce::Colour (0xff1e1e1e));
             g.fillRect (stop.withSizeKeepingCentre (9, 9));
-            g.setColour (c::textSecondary);
-            g.drawRect (stop.withSizeKeepingCentre (9, 9), 1);
             return;
         }
         // the footer: controls on the scene side and the buttons, on a band
@@ -1767,8 +1767,8 @@ public:
     static juce::Colour liveInk (juce::Colour fill)
     {
         // (the Live-pastel style of the shared clip colours, theme::clipBody: ink = colour × 0.24)
-        return fill.getPerceivedBrightness() > 0.55f ? theme::clipBody (fill, fill, ClipKind::pattern, theme::ClipStyle::livePastel).ink
-                                                     : theme::livelook::text.brighter (0.4f);
+        // (round 190oj, CS-6: chosen by contrast, not by brightness: "Mello" #258ed0 took light ink at 2.1:1)
+        return theme::liveMarkOn (fill, 0.24f, 4.5f, theme::livelook::text.brighter (0.4f));
     }
     // Live's grid text: LYNX's UI font at 12 px, 12 % wider — Live's own face is wider at the same 7 px cap ("Drums" 30 px
     // in Live, 26 px in LYNX's plain font; round 190ia's font note); Live's face itself is not copied

@@ -52,11 +52,15 @@ struct NewProjectDefaults
     bool autoCrossfades = true;
     // LYNX extra (round 190gz, issue #170): "Link Playlist tracks to mixer tracks in new projects" (off: FL's tracks)
     bool linkTracks = false;
+    // LYNX extra (round 190oo, design review CS O-2, off by default): a new project made while the Clip-launch layout
+    // shows starts with Track N linked to mixer insert N (linkClipLaunchStrips), so its Session mixer shows a full strip
+    // on every column, as a new Live set does
+    bool clipLaunchStrips = false;
 
     bool operator== (const NewProjectDefaults&) const = default;
 
     // "key=value" lines for ui-options.txt (keys newInserts, newMasterChain, newCleanMixer, playlistTracks,
-    // newAutoCrossfades, newLinkTracks) and back;
+    // newAutoCrossfades, newLinkTracks, newClipLaunchStrips) and back;
     // unknown or missing keys keep the defaults, values are clamped.
     std::string toText() const;
     void readKey (const std::string& key, const std::string& value);
@@ -72,6 +76,14 @@ void applyNewProjectDefaults (Song& song, const NewProjectDefaults& defaults);
 
 // The app's current choice (Options › Mixer; the main window loads it from ui-options.txt).
 NewProjectDefaults& newProjectDefaults();
+
+// Round 190oo (design review CS O-2): Live's new set gives every track its own mixer strip. With the switch "Link
+// Playlist tracks to mixer tracks" on (autolink), the first `tracks` Playlist tracks are linked to inserts 1..N in order:
+// track N whose channel N already plays through insert N becomes that channel's instrument track (named after it), every
+// other unassigned track an audio track on insert N (FL's Track mode, named as FL names it: "Insert N"); a track already
+// linked, or an insert another track holds, is left alone. Nothing is routed differently, so the song sounds the same.
+// Returns how many tracks were linked.
+int linkClipLaunchStrips (Song& song, int tracks);
 // A new project from a built-in template (-1 = LYNX's default song) with the current defaults applied.
 Song makeNewProject (int templateIndex = -1);
 

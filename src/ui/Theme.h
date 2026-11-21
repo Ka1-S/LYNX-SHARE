@@ -171,6 +171,12 @@ void saveUiFont (const juce::String& family);
 // Same for a text button (its padding included).
 int buttonWidth (const juce::TextButton& button, int minWidth, int maxWidth);
 
+// Round 190oo (design review 2, WG-13 / WG-31): for boxes laid out for the English texts (fixed widths, not sized yet):
+// how much wider than its English text the translation of any of `english` is in `font` (the largest difference; 0 in
+// English and when no translation is longer). A fixed English width + this keeps the English layout to the pixel and
+// gives a long translation (de "Übernehmen", ru "Насыщенность") the room it needs.
+int translationExtra (const juce::Font& font, std::initializer_list<const char*> english);
+
 // --- menus -------------------------------------------------------------------------------------------
 // Options › General › Menu density (round 163): compact rows close to native Windows / FL menus (the default),
 // or the roomier rows of LYNX 0.1.17 and older.
@@ -320,6 +326,11 @@ ClipLook clipBody (juce::Colour clipColour, juce::Colour trackColour, ClipKind k
 // --- FL's colour-filled buttons and tinted names (round 190io, design190ia FM-10 / FM-30 / FM-31) ------------------------
 // WCAG contrast ratio of two colours (1 … 21).
 float contrast (juce::Colour a, juce::Colour b);
+
+// Live's marks on a clip or track colour (round 190oj, design190oj CS-4/5/6): the colour × k (Live: name ×0.24, waveform
+// ×0.15; 7–10:1 on Live's pastels) when that reaches `ratio` on the fill, else `light` — on LYNX's and FL's darker colours
+// Live's dark ink read 1.5–3:1. Cached per colour (message thread; paint calls it per clip).
+juce::Colour liveMarkOn (juce::Colour fill, float k, float ratio, juce::Colour light);
 
 // A user colour as FL fills a button or a header band with it: the colour itself (FL keeps its saturation: Synth Bass
 // #0E4498, Grv Kick #8A211A measured in fl-channelrack.png), its brightness held in [lo, hi] so white text on it keeps
@@ -493,6 +504,10 @@ public:
     juce::Rectangle<int> getTooltipBounds (const juce::String& tipText, juce::Point<int> screenPos, juce::Rectangle<int> parentArea) override;
     void drawTooltip (juce::Graphics&, const juce::String& text, int width, int height) override;
     void drawAlertBox (juce::Graphics&, juce::AlertWindow&, const juce::Rectangle<int>& textArea, juce::TextLayout&) override;
+    // JUCE's message boxes (showMessageBoxAsync, showOkCancelBox, showAsync...) on LYNX's one dialog frame (round 190oo, WG-6)
+    juce::AlertWindow* createAlertWindow (const juce::String& title, const juce::String& message, const juce::String& button1,
+                                          const juce::String& button2, const juce::String& button3, juce::MessageBoxIconType iconType,
+                                          int numButtons, juce::Component* associatedComponent) override;
     int getAlertWindowButtonHeight() override { return 30; }
     juce::Font getAlertWindowTitleFont() override;
     juce::Font getAlertWindowMessageFont() override;

@@ -8,6 +8,7 @@
 #include "core/Offline.h"
 #include "platform/Package.h"
 #include "platform/Paths.h"
+#include "ui/DialogFrame.h"
 #include "ui/I18n.h"
 #include "ui/SetupWizard.h"
 #include "ui/Theme.h"
@@ -1382,8 +1383,7 @@ public:
     explicit NotesPanel (const update::Release& r) : notes (update::releaseNotes (r.body))
     {
         title.setText (r.name.empty() ? "LYNX SHARE " + versionText (r) : fromUtf8 (r.name), juce::dontSendNotification);
-        title.setFont (theme::font (theme::type::title + 3.0f, true));
-        title.setColour (juce::Label::textColourId, theme::colour::textPrimary);
+        ui::dialog::styleTitle (title); // (round 190oo, WG-6: the one dialog title row, centred, 44 px)
         addAndMakeVisible (title);
 
         viewport.setViewedComponent (&notes, false);
@@ -1401,8 +1401,7 @@ public:
         };
         const auto canUpdate = controller().phase == Phase::available && update::methodFor (flavour()) != update::Method::none;
         updateButton.setButtonText (update::methodFor (flavour()) == update::Method::openPage ? tr ("Download...") : tr ("Update"));
-        updateButton.setColour (juce::TextButton::buttonColourId, theme::colour::accent);
-        updateButton.setColour (juce::TextButton::textColourOffId, theme::colour::onAccent);
+        ui::dialog::styleButton (updateButton, true);
         updateButton.onClick = [this] {
             startUpdate();
             closeButton.triggerClick();
@@ -1416,7 +1415,7 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        g.fillAll (theme::colour::bg2);
+        ui::dialog::paintFrame (g, getLocalBounds().toFloat(), ui::dialog::Kind::window); // (round 190oo, WG-6)
         g.setColour (theme::colour::bg1);
         g.fillRect (viewport.getBounds());
         g.setColour (theme::colour::border);
@@ -1425,20 +1424,20 @@ public:
 
     void resized() override
     {
-        auto r = getLocalBounds().reduced (16);
-        title.setBounds (r.removeFromTop (30));
-        r.removeFromTop (8);
+        title.setBounds (ui::dialog::titleRow (getLocalBounds()));
+        auto r = ui::dialog::bodyOf (getLocalBounds()).reduced (16);
         auto buttons = r.removeFromBottom (30);
         r.removeFromBottom (12);
         viewport.setBounds (r.reduced (1));
         notes.fitWidth (viewport.getMaximumVisibleWidth());
-        closeButton.setBounds (buttons.removeFromRight (100));
-        buttons.removeFromRight (8);
+        // (WG-6: LYNX's one order: Open on GitHub on the left; Close, then Update in the accent at the far right)
         if (updateButton.isVisible())
         {
             updateButton.setBounds (buttons.removeFromRight (120));
             buttons.removeFromRight (8);
         }
+        closeButton.setBounds (buttons.removeFromRight (100));
+        buttons.removeFromRight (8);
         githubButton.setBounds (buttons.removeFromLeft (150));
     }
 

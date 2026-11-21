@@ -169,6 +169,19 @@ inline float flSizeForHeight (int height, int base = defaultTrackHeight)
     return (float) std::max (0, clampTrackHeight (height) - minTrackHeight) / (float) (base - minTrackHeight);
 }
 
+// FL's Playlist vertical zoom (the .flp's event 0xF2 i32 at +24, round 190oo PAT-6) ↔ its row height at 100 % UI scale:
+// 16 + 2·v px (FL's vertical zoom setter 0xe83850 hands the row layout FUN_00ea0b30 the smallest row + 2·v; FL 2026's new
+// project v = 16 → 48 px, Ookay - Thief v = 5 → 26 px), within LYNX's row limits.
+inline int flRowHeightForZoom (int zoom)
+{
+    return clampTrackHeight (minTrackHeight + 2 * std::max (0, zoom));
+}
+
+inline int flZoomForRowHeight (int height)
+{
+    return (clampTrackHeight (height) - minTrackHeight) / 2;
+}
+
 // Heights of tracks 0..n-1 laid out top to bottom: `heights[i]` (0 or missing = `fallback`).
 struct TrackLayout
 {

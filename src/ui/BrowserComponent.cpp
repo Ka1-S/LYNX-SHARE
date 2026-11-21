@@ -3848,7 +3848,8 @@ BrowserComponent::BrowserComponent (AudioEngine& e, Role r)
     });
     focusWatcher = std::make_unique<FocusWatcher> (*this);
 
-    searchBox.setTextToShowWhenEmpty (tr ("Search (Ctrl+F): kick -loop, snare OR clap, hat*.wav"), theme::colour::textDisabled);
+    // (round 190oo CS-22: Live's short placeholder; the syntax example is in the hint below, it was cut at every width)
+    searchBox.setTextToShowWhenEmpty (tr ("Search (Ctrl+F)"), theme::colour::textDisabled);
     searchBox.addListener (this);
     searchBox.setEscapeAndReturnKeysConsumed (true);
     ui::setHint (searchBox, tr ("Search the selected folder (or every folder) and below; in PROJECT, the project's items: words must all match; "
@@ -5645,7 +5646,10 @@ void BrowserComponent::resized()
     sidebarView->setVisible (liveLayout);
     if (liveLayout)
     {
-        const auto sideWidth = juce::jlimit (84, 120, area.getWidth() / 3);
+        // (round 190oj: at the default 258 px browser a third was 84 px and the English names were cut — "Instrume...",
+        // "Audio Eff...", "User Libr..."; Live's sidebar is ~100 px with a smaller face: 40 %, at least 100 px, and the
+        // names shrink a little before they are cut, in LiveSidebar::paint)
+        const auto sideWidth = juce::jlimit (juce::jmin (100, area.getWidth() / 2), 132, area.getWidth() * 2 / 5);
         sidebarView->setBounds (area.removeFromLeft (sideWidth));
         sidebar->setSize (sideWidth - (sidebar->getHeight() > sidebarView->getHeight() ? 8 : 0), sidebar->getHeight());
         area.removeFromLeft (1);
@@ -5693,7 +5697,7 @@ void BrowserComponent::paint (juce::Graphics& g)
     if (! statusArea.isEmpty())
     {
         g.setFont (theme::font (theme::type::caption));
-        g.setColour (theme::colour::textDisabled);
+        g.setColour (theme::colour::textSecondary); // (round 190oo PAT-13: textDisabled read too dim)
         g.drawText (statusLine, statusArea, juce::Justification::centredLeft, true);
     }
 }
@@ -6439,7 +6443,7 @@ void BrowserComponent::indexStatusChanged()
             line << "  ·  " << (searchPartial ? tr ("{0} folders indexed", { juce::String ((int) st.listed) }) : tr ("checking the index..."));
     }
     else if (st.busy && (st.rebuilding || st.listed > 0))
-        line = tr ("Indexing the Browser's folders for search: {0} folders...", { juce::String ((int) st.listed) });
+        line = tr ("Indexing folders... {0}", { juce::String ((int) st.listed) }); // (round 190oo PAT-13: short, it was cut)
 
     if (line != statusLine)
     {

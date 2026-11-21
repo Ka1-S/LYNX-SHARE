@@ -286,16 +286,27 @@ public:
     std::function<void()> onClick;
     // round 190iv: BandLab's Key capsule ("D min"; "Key" while none) in Simple, Live's key box in Clip-launch
     void setLook (toolbarlayout::Look l);
+    // Round 190oo (O-5, core/LiveScaleControl.h): Live's three-part scale control, in the Live look while
+    // livescale::shown is on. `on`: a key is set; `root` / `mode`: what the choosers show (the last key while off).
+    void setScaleParts (bool on, const juce::String& root, const juce::String& mode);
+    bool threeParts() const noexcept;
+    // a left click on one of the three parts (0 the switch, 1 the root, 2 the mode); a right click still runs onClick
+    std::function<void (int part)> onPart;
 
     void paint (juce::Graphics& g) override;
     void mouseDown (const juce::MouseEvent& e) override;
     void mouseEnter (const juce::MouseEvent&) override { repaint(); }
     void mouseExit (const juce::MouseEvent&) override { repaint(); }
+    void mouseMove (const juce::MouseEvent&) override; // (round 190oo: the hovered part)
     ui::Hint hintAt (juce::Point<int> position) override;
 
 private:
     juce::String text;
     toolbarlayout::Look look = toolbarlayout::Look::fl;
+    bool scaleOn = false;
+    juce::String rootText { "C" }, modeText { "Major" };
+    int hoveredPart = -1;
+    void paintThreeParts (juce::Graphics& g);
 };
 
 // Ableton Link's switch (round 190gl), as the reference DAW's control bar has it (its manual's "The Link Toggle in the

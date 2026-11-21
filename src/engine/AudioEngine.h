@@ -1029,6 +1029,9 @@ public:
     juce::ChangeBroadcaster& getLevelsBroadcaster() noexcept { return levelsChanged; }
     // + 1 at every full publish (not at a level-only edit): listeners can tell a drag's level change from the rest
     std::uint64_t getPublishCount() const noexcept { return publishCount; }
+    // + 1 at every setSong (a project opened, imported or made new; round 190oo, CS O-3: views that set something up once
+    // per opened project, e.g. the Clip-launch arrangement's folded automation lanes)
+    std::uint64_t getOpenCount() const noexcept { return openCount; }
 
     // Changes since the last save/open (for the "*" in the title and the "save changes?" prompt).
     bool isModified() const noexcept { return modified; }
@@ -1868,6 +1871,7 @@ private:
     juce::ChangeBroadcaster levelsChanged;
     std::uint64_t levelEdits = 0;                // (diagnostics / tests)
     std::uint64_t publishCount = 0;
+    std::uint64_t openCount = 0; // (round 190oo: getOpenCount)
     // Issue #134: a publish asked for while one is still building its rack (a plugin being created ran the message
     // loop: the engine's timer, an edit) waits until that one is done; see publishSong
     bool publishing = false, publishAgain = false;

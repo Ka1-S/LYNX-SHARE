@@ -21,6 +21,7 @@
 #include "core/PlaylistViewOptions.h"
 #include "core/StripSilence.h"
 #include "core/TrackClips.h" // round 190ne
+#include "core/SimpleHeaderTarget.h" // round 190oo (CS-24)
 #include "engine/AudioEngine.h"
 #include "ui/EditorTools.h"
 #include "ui/FrameTicker.h"
@@ -124,6 +125,10 @@ public:
     // #230 (round 190nq): FL 2026's Playlist menu › View › "Show fade previews" (EEEnablePreviewFadesAction, on by default,
     // [SHOT] 190nq f08c / f12c / f13c): an audio clip's waveform is drawn with its fades applied
     static inline bool showFadePreviews = true;
+    // round 190oo (design review O-1, a LYNX extra, off by default): Playlist › View › "Shade faded audio (LYNX)" — the
+    // Pattern layout also shades what a fade takes away, as the Clip-launch layout and issue #230's reference (Live) do;
+    // FL 2026 draws only the curve (and the fade preview). Kept with the UI settings ("shadeFadedAudio").
+    static inline bool shadeFadedAudio = false;
     void headerOptionsChanged(); // repaints and saves
     std::function<void()> onViewOptionChanged; // an app-wide view option changed (round 177b: Automation lanes): save it
 
@@ -478,7 +483,7 @@ public:
 
     // A project was just opened: scroll to the start and, when the song is longer than the view, zoom out
     // to show all of it (FL opens a project with the arrangement in view). Waits for a size if not laid out.
-    void showSongAfterOpen();
+    void showSongAfterOpen (bool newProject = false); // (round 190oj: File › New: FL's new-project zoom, ~60 px a bar)
 
     // The track selected by a header click (FL's mark next to the LED), −1 = none; selectTrack selects one track as a
     // click on its header does, without the menus, and scrolls it into view (round 184a, S4: a new Simple track; S16:
@@ -545,6 +550,18 @@ private:
     void updateProjection (int count);
     bool laneHidden (int owner) const; // the owner's lanes are folded away (its arrow, a folded track or group)
     void paintClipLaneHeader (juce::Graphics& g, int track, int y, int height, bool hovered);
+    // Round 190oo (CS-19): Live's look draws each automation clip lane as one envelope (a 2 px #ff4d47 line, 6 px hollow
+    // breakpoints) over the lane's whole length instead of clip blocks. The lanes' clips in time order are worked out with
+    // the projection (cliplanes::laneClipLists), so a paint only walks the visible rows' lists.
+    std::vector<std::vector<int>> laneClips;
+    void paintLiveEnvelopeLanes (juce::Graphics& g, juce::Rectangle<int> grid);
+    // Round 190oo (CS O-3): the engine's open count the lanes were last folded for (cliplanes::foldedOnOpen): a project
+    // opened is folded the first time the Clip-launch arrangement shows it
+    std::uint64_t foldedForOpen = 0;
+    void foldLanesAfterOpen();
+    // Round 190oo (CS-20): a take lane under Live's headers has no activator / number box (Live's take-lane header is
+    // the name and the audition speaker only)
+    bool liveTakeLane (int track) const;
     bool showClipProgress = true, showTrackProgress = true; // FL's View › Performance clip / track progress
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
@@ -919,6 +936,15 @@ private:
     int insertsPressTrack = -1, insertsPressItem = -1, insertsDropTrack = -1, insertsDropAt = -1;
     bool insertsDragging = false;
     int simpleInsert (int track) const; // the insert a Simple (or linked) header's controls act on, -1 none
+    // Round 190oo (design review 2, CS-24): an FL project's tracks in the Simple headers get S, volume, pan and "+FX" on
+    // the insert their clips play through (the Session mixer's rule; the mute and solo rules: core/SimpleHeaderTarget.h).
+    // headerInsert: the insert S / volume / pan / "+FX" act on (simpleInsert, or the borrowed insert in the Simple
+    // headers), -1 none. The targets are built once per published song (the engine's publish count).
+    int headerInsert (int track) const;
+    const simplehdr::HeaderTarget& headerTarget (int track) const;
+    juce::Rectangle<int> trackSharedMark (int track) const; // the "shared" mark left of M (empty: none)
+    mutable std::vector<simplehdr::HeaderTarget> headerTargetList;
+    mutable std::uint64_t headerTargetStamp = ~(std::uint64_t) 0;
     // LYNX's "Link Playlist tracks to mixer tracks" (round 190gz, issue #170): with FL's headers, the project's switch is
     // on. The headers are then wider and a linked track's header carries its mixer track's M, S, volume and pan (the
     // Simple headers' controls, laid out for FL's row heights: one row of buttons, the volume bar and pan from 34 px).
@@ -1148,6 +1174,7 @@ private:
         bool header = false, led = false, arrow = false, arm = false, input = false, audition = false;
         bool solo = false, volume = false, pan = false, fx = false; // the Simple headers' controls (round 184a)
         bool addTrack = false; // round 190jc: the round "+" under the Simple tracks
+        bool shared = false;   // round 190oo (CS-24): the Simple header's "shared" mark
         int divider = -1; // the track whose bottom edge in the headers is under the mouse (resizes it)
         int insertItem = -1; // issue #154: the insert effects column's row (an effect, trackinserts::addRow; -1 none)
         bool insertLed = false; // ... and its on/off dot
@@ -1156,7 +1183,8 @@ private:
         {
             return fade == o.fade && clip == o.clip && track == o.track && target == o.target && header == o.header && led == o.led && arrow == o.arrow
                    && arm == o.arm && input == o.input && audition == o.audition && solo == o.solo && volume == o.volume && pan == o.pan && fx == o.fx
-                   && divider == o.divider && insertItem == o.insertItem && insertLed == o.insertLed && addTrack == o.addTrack;
+                   && divider == o.divider && insertItem == o.insertItem && insertLed == o.insertLed && addTrack == o.addTrack
+                   && shared == o.shared;
         }
     };
     Hover hover;

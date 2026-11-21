@@ -72,6 +72,10 @@ inline constexpr Item items[] = {
     { "playlist.clipLanes", TR_NOOP ("Playlist"), TR_NOOP ("Automation clips as lanes under their tracks"),
       TR_NOOP ("A track that holds only automation clips of one instrument (or of a linked mixer track) is drawn right under that instrument's track, as a lane that folds with the track's arrow; the clips stay clips on their own tracks. On by default in the Clip-launch layout, as Live's lanes. Also in the Playlist menu."),
       "ui-options.txt:clipLanesPattern" },
+    // round 190oo (design review CS O-2): Live's new set has a full mixer strip on every track
+    { "project.clipLaunchStrips", TR_NOOP ("Playlist"), TR_NOOP ("New Clip-launch projects: a mixer track for every track"),
+      TR_NOOP ("A new project made in the Clip-launch layout links Track N to mixer track N, so every column of the Session mixer shows its strip, as a new Live set does. Only empty new projects; nothing is routed differently. Also in the Mixer menu › New projects."),
+      "ui-options.txt:newClipLaunchStrips" },
     // round 190iu (issue #191.5): FL's instrument tracks, every instrument on one, the Channel rack hidden
     { "layout.trackOnly", TR_NOOP ("Playlist"), TR_NOOP ("Track-only mode (no Channel rack: 1 track = 1 instrument)"),
       TR_NOOP ("In the Pattern layout the Channel rack stays hidden and every instrument you add gets its own instrument track, whose pencil places that instrument's own pattern. Also in View › Layout style."),
@@ -102,6 +106,10 @@ inline constexpr Item items[] = {
     { "simple.loopDetect", TR_NOOP ("Simple workflow"), TR_NOOP ("Dropped loops take the tempo and key found in their audio"),
       TR_NOOP ("In the Simple layout a loop whose file and name don't say its tempo or key is analysed when it is dropped: a loop of whole beats keeps the project's tempo and a key it finds follows the project key, as BandLab's loops do. On by default. Also in the Browser options menu of the Simple layout."),
       "ui-options.txt:simpleLoopDetect" },
+    // round 190oo (design review 2, O-4 / CS-28): BandLab names the project above its transport
+    { "simple.projectName", TR_NOOP ("Simple workflow"), TR_NOOP ("Project name at the top (BandLab)"),
+      TR_NOOP ("In the Simple layout the project's name shows centred at the top of the window, over the transport, as BandLab shows it. Also in the View menu of the Simple layout."),
+      "ui-options.txt:simpleProjectName" },
     { "record.lastLoopPassPlays", TR_NOOP ("Recording"), TR_NOOP ("After loop recording, only the last pass plays"),
       TR_NOOP ("The earlier passes stay under it, muted, to pick from. Also in the recording options menu."),
       "ui-options.txt:recordLastPassPlays" },
@@ -124,6 +132,18 @@ inline constexpr Item items[] = {
     { "playlist.sectionsLane", TR_NOOP ("Playlist"), TR_NOOP ("Sections lane"),
       TR_NOOP ("A lane under the Playlist's ruler with named song sections (Intro, Verse, Chorus...): drag one to move it with every clip, automation and marker under it, Ctrl+drag to copy it, drop it onto another to swap them. FL Studio has only time markers; an .flp export writes a marker at each section's start. Also in the Playlist menu › View."),
       "ui-options.txt:sectionsLane" },
+    // round 190oo (design review O-1, issue #230): FL 2026 draws only the fade curve; Live (and #230's picture) shade
+    { "playlist.shadeFadedAudio", TR_NOOP ("Playlist"), TR_NOOP ("Shade faded audio (LYNX)"),
+      TR_NOOP ("The Pattern layout also darkens the part of an audio clip that a fade takes away, as the Clip-launch layout and Live do; FL Studio draws only the fade curve. Also in Playlist › View."),
+      "ui-options.txt:shadeFadedAudio" },
+    // round 190oo (CS O-3): Live folds a track's automation lanes; LYNX's Clip-launch arrangement shows them open
+    { "playlist.clipLanesFolded", TR_NOOP ("Playlist"), TR_NOOP ("Automation lanes start folded when a project opens (Clip-launch layout)"),
+      TR_NOOP ("As in Live, a project opened or imported shows its tracks' automation lanes folded the first time the Clip-launch arrangement shows it; each track's lane arrow unfolds them. Also in the Playlist menu of the Clip-launch layout."),
+      "ui-options.txt:clipLanesFoldedLive" },
+    // round 190oo (O-5): Live 12's scale switch, root and mode instead of the one key box
+    { "controlBar.liveScale", TR_NOOP ("Clip-launch workflow"), TR_NOOP ("Live's scale control: switch, root and mode (LYNX)"),
+      TR_NOOP ("The Clip-launch control bar shows Live's three scale controls instead of the one key box: the scale switch turns the project key on or off, the root and the mode choose it, and both stay dimmed while the switch is off. A right-click still opens the Key menu. Also in the Key menu of the Clip-launch layout."),
+      "ui-options.txt:liveScaleControl" },
     { "midi.gamepad", TR_NOOP ("Controllers"), TR_NOOP ("Use a game controller"),
       TR_NOOP ("A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page."),
       "midi-settings.txt:gamepad" },

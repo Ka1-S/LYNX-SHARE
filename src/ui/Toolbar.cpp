@@ -6,6 +6,7 @@
 #include "core/CountIn.h"
 #include "core/Details190mv.h" // (round 190mv: Master pitch in Hz)
 #include "core/LayoutStyle.h"
+#include "core/LiveScaleControl.h" // (round 190oo, O-5)
 #include "core/MarkerPlan.h"
 #include "core/SignatureEdit.h"
 #include "core/Timecode.h"
@@ -771,7 +772,7 @@ void MasterKnob::paint (juce::Graphics& g)
         const auto side = juce::jmin (area.getHeight(), area.getWidth());
         drawKnob (g, area.withSizeKeepingCentre (side, side), value01, kind == Kind::pitch,
                   available() ? colour::knobArc : colour::textDisabled, hover && available());
-        g.setColour (colour::textDisabled);
+        g.setColour (colour::textSecondary); // (round 190oj: the caption was 3.98:1)
         g.setFont (font (type::caption - 1.0f, true));
         g.drawText (kind == Kind::volume ? tr ("MASTER") : tr ("PITCH"), text.withHeight (10.0f).translated (0.0f, 1.0f), juce::Justification::centred, true);
         g.setColour (drag.isActive() ? colour::textPrimary : colour::textSecondary);
@@ -784,7 +785,7 @@ void MasterKnob::paint (juce::Graphics& g)
 
     area.removeFromLeft (5.0f);
     auto caption = area.removeFromTop (area.getHeight() / 2.0f);
-    g.setColour (colour::textDisabled);
+    g.setColour (colour::textSecondary); // (round 190oj: the caption was 3.98:1)
     g.setFont (font (type::caption - 1.0f, true));
     g.drawText (kind == Kind::volume ? tr ("MASTER") : tr ("PITCH"), caption.withTrimmedTop (1.0f), juce::Justification::bottomLeft, true);
     g.setColour (drag.isActive() ? colour::textPrimary : colour::textSecondary);
@@ -1103,7 +1104,7 @@ void PerformanceMeter::paint (juce::Graphics& g)
 
     // CPU: caption, bar, percent
     g.setFont (caption);
-    g.setColour (colour::textDisabled);
+    g.setColour (colour::textSecondary); // (round 190oj: the caption was 3.98:1)
     g.drawText (tr ("CPU"), row1.removeFromLeft (30), juce::Justification::centredLeft, false);
     g.setFont (number);
     g.setColour (colour::textSecondary);
@@ -1158,7 +1159,7 @@ void PerformanceMeter::paint (juce::Graphics& g)
     // memory and polyphony
     auto left = row2.removeFromLeft (row2.getWidth() * 58 / 100);
     g.setFont (caption);
-    g.setColour (colour::textDisabled);
+    g.setColour (colour::textSecondary); // (round 190oj: the caption was 3.98:1)
     g.drawText (tr ("RAM"), left.removeFromLeft (30), juce::Justification::centredLeft, false);
     g.setFont (number);
     g.setColour (colour::textSecondary);
@@ -1415,14 +1416,93 @@ void KeyPanel::setLook (toolbarlayout::Look l)
     }
 }
 
+void KeyPanel::setScaleParts (bool on, const juce::String& root, const juce::String& mode)
+{
+    if (on != scaleOn || root != rootText || mode != modeText)
+    {
+        scaleOn = on;
+        rootText = root;
+        modeText = mode;
+        if (threeParts())
+            repaint();
+    }
+}
+
+bool KeyPanel::threeParts() const noexcept { return look == toolbarlayout::Look::live && livescale::shown; }
+
+void KeyPanel::mouseMove (const juce::MouseEvent& e)
+{
+    const auto part = threeParts() ? (int) livescale::partAt (e.x, getWidth()) : -1;
+    if (part != hoveredPart)
+    {
+        hoveredPart = part;
+        repaint();
+    }
+}
+
+// Round 190oo (O-5): Live 12's scale switch, root and mode (live-arrangement-audiolane.png at 100 %: #363636 boxes, the
+// switch's glyph #b5b5b5; the choosers' text and arrows dimmed while the switch is off — Live's #696969 reads 2.4:1 on
+// #363636, so LYNX dims to #9e9e9e, 4.5:1). The switch on: Live's lit #ffad56 with the dark glyph.
+void KeyPanel::paintThreeParts (juce::Graphics& g)
+{
+    const auto parts = livescale::split (getWidth());
+    const auto h = getHeight();
+    const auto over = isMouseOver (true);
+    const juce::Rectangle<int> toggle (parts.toggleX, 0, parts.toggleW, h), root (parts.rootX, 0, parts.rootW, h), mode (parts.modeX, 0, parts.modeW, h);
+    paintLiveBox (g, toggle, over && hoveredPart == 0, scaleOn);
+    paintLiveBox (g, root, over && hoveredPart == 1);
+    paintLiveBox (g, mode, over && hoveredPart == 2);
+
+    // "♭#": a flat at the lower left, a sharp raised at the upper right (LYNX vectors)
+    {
+        const auto ink = scaleOn ? live::onLit : live::text;
+        const auto side = juce::jmin ((float) toggle.getWidth() - 4.0f, (float) h - 4.0f, 13.0f);
+        const auto b = toggle.toFloat().withSizeKeepingCentre (side, side);
+        juce::Path flat;
+        const auto fx = b.getX() + side * 0.12f, fTop = b.getY() + side * 0.22f, fBottom = b.getBottom() - side * 0.04f;
+        flat.startNewSubPath (fx, fTop);
+        flat.lineTo (fx, fBottom);
+        flat.quadraticTo (fx + side * 0.38f, fBottom - side * 0.14f, fx + side * 0.30f, fBottom - side * 0.32f);
+        flat.quadraticTo (fx + side * 0.18f, fBottom - side * 0.42f, fx, fBottom - side * 0.24f);
+        juce::Path sharp;
+        const auto sx = b.getX() + side * 0.48f, sw = side * 0.48f, sy = b.getY(), sh = side * 0.56f;
+        sharp.startNewSubPath (sx + sw * 0.30f, sy + sh * 0.02f);
+        sharp.lineTo (sx + sw * 0.22f, sy + sh);
+        sharp.startNewSubPath (sx + sw * 0.78f, sy);
+        sharp.lineTo (sx + sw * 0.70f, sy + sh * 0.98f);
+        sharp.startNewSubPath (sx, sy + sh * 0.40f);
+        sharp.lineTo (sx + sw, sy + sh * 0.30f);
+        sharp.startNewSubPath (sx, sy + sh * 0.74f);
+        sharp.lineTo (sx + sw, sy + sh * 0.64f);
+        g.setColour (ink);
+        g.strokePath (flat, juce::PathStrokeType (1.2f));
+        g.strokePath (sharp, juce::PathStrokeType (1.0f));
+    }
+
+    const auto dim = juce::Colour (0xff9e9e9e);
+    const auto ink = scaleOn ? live::text : dim;
+    g.setFont (theme::font (theme::type::caption));
+    g.setColour (ink);
+    g.drawFittedText (rootText, root.withTrimmedRight (10).reduced (3, 0), juce::Justification::centredLeft, 1, 0.75f);
+    paintLiveArrow (g, root, ink);
+    g.setColour (ink);
+    g.drawFittedText (modeText, mode.withTrimmedRight (10).reduced (3, 0), juce::Justification::centredLeft, 1, 0.75f);
+    paintLiveArrow (g, mode, ink);
+}
+
 void KeyPanel::paint (juce::Graphics& g)
 {
     using namespace theme;
+    if (threeParts()) // round 190oo (O-5, LYNX extra): Live's scale switch + root + mode
+    {
+        paintThreeParts (g);
+        return;
+    }
     if (look == toolbarlayout::Look::live) // round 190iv: Live's key / scale box ("C# minor ▾")
     {
         const auto area = getLocalBounds();
         paintLiveBox (g, area, isMouseOver (true));
-        paintLiveText (g, text.isEmpty() ? tr ("none") : text, area.withTrimmedRight (10), false, juce::Justification::centredLeft);
+        paintLiveText (g, text.isEmpty() ? tr ("No scale") : text, area.withTrimmedRight (10), false, juce::Justification::centredLeft);
         paintLiveArrow (g, area, live::text);
         return;
     }
@@ -1468,12 +1548,27 @@ void KeyPanel::paint (juce::Graphics& g)
 
 void KeyPanel::mouseDown (const juce::MouseEvent& e)
 {
+    if (threeParts() && e.mods.isLeftButtonDown() && ! e.mods.isPopupMenu() && onPart) // round 190oo (O-5)
+    {
+        onPart ((int) livescale::partAt (e.x, getWidth()));
+        return;
+    }
     if ((e.mods.isLeftButtonDown() || e.mods.isPopupMenu()) && onClick)
         onClick();
 }
 
-ui::Hint KeyPanel::hintAt (juce::Point<int>)
+ui::Hint KeyPanel::hintAt (juce::Point<int> position)
 {
+    if (threeParts()) // round 190oo (O-5)
+        switch (livescale::partAt (position.x, getWidth()))
+        {
+            case livescale::Part::toggle:
+                return { tr ("Scale: on, the project key is used; off, no key. Right-click for the Key menu"), scaleOn ? tr ("On") : tr ("Off"), false, true };
+            case livescale::Part::root:
+                return { tr ("Root"), rootText, false, true };
+            case livescale::Part::mode:
+                return { tr ("Scale"), modeText, false, true };
+        }
     return { tr ("Project key: the scale the song is in. Click to choose it, or to guess it from the notes"), {}, false, false };
 }
 

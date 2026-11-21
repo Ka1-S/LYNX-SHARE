@@ -698,9 +698,12 @@ public:
             presetLabel.setBounds (row.removeFromLeft (theme::labelColumnWidth ({ &presetLabel }, 50, 110)));
             sameAsLastButton.setBounds (row.removeFromRight (juce::jlimit (130, 200, sameAsLastButton.getBestWidthForHeight (26))));
             row.removeFromRight (14);
-            deletePresetButton.setBounds (row.removeFromRight (72));
+            // (round 190oo WG-13: the buttons grow by what their translation needs, ru "Сохранить..." was "Сохранит..."
+            // in 72 px; English keeps 72)
+            const auto buttonFont = theme::font (theme::type::body);
+            deletePresetButton.setBounds (row.removeFromRight (72 + juce::jmin (60, theme::translationExtra (buttonFont, { "Delete" }))));
             row.removeFromRight (6);
-            savePresetButton.setBounds (row.removeFromRight (72));
+            savePresetButton.setBounds (row.removeFromRight (72 + juce::jmin (60, theme::translationExtra (buttonFont, { "Save..." }))));
             row.removeFromRight (8);
             presetBox.setBounds (row);
             area.removeFromTop (presetRowHeight - 26);
