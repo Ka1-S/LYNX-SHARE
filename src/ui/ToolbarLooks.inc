@@ -613,6 +613,7 @@ void MainComponent::layoutSimpleToolbar (juce::Rectangle<int> bar, int menuWidth
         const auto menu = row.withWidth (juce::jmin (menuWidth + 8, row.getWidth()));
         put (menuBar, menu);
         titleArea = {};
+        paletteButton.setVisible (false);
         placeHintBar (row.withTrimmedLeft (menu.getWidth() + 12).withWidth (juce::jmin (900, row.getWidth() - menu.getWidth() - 12)).reduced (0, 1));
         fixedToolbarArea = bar;
         return;
@@ -653,7 +654,9 @@ void MainComponent::layoutSimpleToolbar (juce::Rectangle<int> bar, int menuWidth
         titleArea = column.withY (row1).withHeight (h).withTrimmedLeft (menu.getWidth() + 12).withTrimmedRight (4);
         if (titleArea.getWidth() < 60)
             titleArea = {};
-        placeHintBar (column.withY (row2).withHeight (h).reduced (0, 1));
+        auto hintRow = column.withY (row2).withHeight (h).reduced (0, 1); // (round 190on: the palette's magnifier at its right end)
+        placePaletteButton (hintRow, true);
+        placeHintBar (hintRow);
         fixedToolbarArea = juce::Rectangle<int> (column.getX() - 4, 0, column.getWidth() + 8, toolbarHeight);
     }
 
@@ -758,7 +761,9 @@ void MainComponent::layoutLiveControlBar (juce::Rectangle<int> bar, int menuWidt
         auto row = lookMenuRow.reduced (8, 0);
         const auto menu = row.removeFromLeft (juce::jmin (menuWidth + 8, row.getWidth()));
         put (menuBar, menu);
-        row.removeFromLeft (12);
+        row.removeFromLeft (2);
+        placePaletteButton (row); // (round 190on: the palette's magnifier right of the menus)
+        row.removeFromLeft (paletteButton.isVisible() ? 8 : 10);
         titleArea = row.removeFromRight (juce::jmin (320, row.getWidth() / 3));
         if (titleArea.getWidth() < 60)
             titleArea = {};

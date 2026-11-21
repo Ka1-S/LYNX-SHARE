@@ -12232,3 +12232,8 @@ countries: jp
 "The longest single call since the reset, in milliseconds (red: half of the audio buffer or more)" = "リセット以降で最も長い 1 回の呼び出し (ミリ秒、赤: オーディオバッファの半分以上)"
 "Calls that took more than half of the time their own audio lasts: one plugin alone near the deadline, what makes the sound stutter" = "自分のオーディオの長さの半分以上かかった呼び出し: 1 つのプラグインだけで限界近く、音が途切れる原因"
 "Live part {0}%, rendered ahead {1}% (together {2}% of one core)." = "ライブ部分 {0}%、先行レンダリング {1}% (合計 1 コアの {2}%)。"
+"Command palette: find and run any command, menu item, LYNX extra or setting" = "コマンドパレット：あらゆるコマンド、メニュー項目、LYNX の追加機能、設定を検索して実行"
+"Search commands, menus, LYNX extras, settings and recent projects" = "コマンド、メニュー、LYNX の追加機能、設定、最近のプロジェクトを検索"
+"{0} item(s)   Up / Down: pick   Enter: run   Esc: close" = "{0} 件   上 / 下：選択   Enter：実行   Esc：閉じる"
+"That item can't be used now (it is greyed in its menu too)." = "この項目は今は使えません（メニューでもグレー表示です）。"
+"{0}: {1}" = "{0}：{1}"

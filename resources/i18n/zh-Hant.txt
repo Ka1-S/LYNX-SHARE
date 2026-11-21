@@ -12232,3 +12232,8 @@ countries: tw hk mo
 "The longest single call since the reset, in milliseconds (red: half of the audio buffer or more)" = "自重設以來最長的單次呼叫，單位毫秒（紅色：音訊緩衝區的一半或更多）"
 "Calls that took more than half of the time their own audio lasts: one plugin alone near the deadline, what makes the sound stutter" = "耗時超過其自身音訊長度一半的呼叫：單一外掛就接近極限，這會讓聲音卡頓"
 "Live part {0}%, rendered ahead {1}% (together {2}% of one core)." = "即時部分 {0}%，預先算繪 {1}%（合計一個核心的 {2}%）。"
+"Command palette: find and run any command, menu item, LYNX extra or setting" = "命令面板：尋找並執行任何命令、選單項目、LYNX 附加功能或設定"
+"Search commands, menus, LYNX extras, settings and recent projects" = "搜尋命令、選單、LYNX 附加功能、設定和最近的專案"
+"{0} item(s)   Up / Down: pick   Enter: run   Esc: close" = "{0} 項   上 / 下：選擇   Enter：執行   Esc：關閉"
+"That item can't be used now (it is greyed in its menu too)." = "此項目前無法使用（在其選單中也顯示為灰色）。"
+"{0}: {1}" = "{0}：{1}"

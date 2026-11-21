@@ -12232,3 +12232,8 @@ countries: es mx ar co cl pe ve
 "The longest single call since the reset, in milliseconds (red: half of the audio buffer or more)" = "La llamada más larga desde el reinicio, en milisegundos (rojo: la mitad del búfer de audio o más)"
 "Calls that took more than half of the time their own audio lasts: one plugin alone near the deadline, what makes the sound stutter" = "Llamadas que tardaron más de la mitad del tiempo que dura su propio audio: un plugin solo cerca del límite, lo que hace que el sonido se entrecorte"
 "Live part {0}%, rendered ahead {1}% (together {2}% of one core)." = "Parte en vivo {0}%, renderizado por adelantado {1}% (juntos {2}% de un núcleo)."
+"Command palette: find and run any command, menu item, LYNX extra or setting" = "Paleta de comandos: busca y ejecuta cualquier comando, elemento de menú, extra de LYNX o ajuste"
+"Search commands, menus, LYNX extras, settings and recent projects" = "Buscar comandos, menús, extras de LYNX, ajustes y proyectos recientes"
+"{0} item(s)   Up / Down: pick   Enter: run   Esc: close" = "{0} elemento(s)   Arriba / Abajo: elegir   Intro: ejecutar   Esc: cerrar"
+"That item can't be used now (it is greyed in its menu too)." = "Ese elemento no se puede usar ahora (también está en gris en su menú)."
+"{0}: {1}" = "{0}: {1}"

@@ -3321,6 +3321,13 @@ public:
             quit();
             return;
         }
+        // --research190onshot <prefix> (round 190on: research190oe P2, P8, P10): src/Research190onShot.inc
+        if (args.contains ("--research190onshot"))
+        {
+            setApplicationReturnValue (runResearchShot190on (args[args.indexOf ("--research190onshot") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
         // --issuesshot190nq <prefix> (round 190nq, issues #193, #225-#230): src/IssuesShot190nq.inc
         if (args.contains ("--issuesshot190nq"))
         {
@@ -18342,6 +18349,7 @@ private:
 #include "TrackClipsShot190ne.inc" // round 190ne
 #include "TrackerShot190nw.inc" // round 190nw
 #include "IssuesShot190nq.inc" // round 190nq (issues #193, #225-#230)
+#include "Research190onShot.inc" // round 190on (research190oe P2, P8, P10)
 #include "IssuesShot190ns.inc" // round 190ns (issues #231-#235)
 #include "Rollup031S3Shot.inc" // rollup 0.1.31 step 3 (round 190ny)
 #include "Tabs2Test190nz.inc" // round 190nz (issue #232 stage 2)

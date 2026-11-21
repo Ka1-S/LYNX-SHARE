@@ -614,6 +614,10 @@ Shape make (Icon icon)
             fi.addTriangle (4.0f, 12.0f, 11.0f, 7.0f, 11.0f, 17.0f);
             fi.addRectangle (10.0f, 10.8f, 9.0f, 2.4f);
             break;
+        case Icon::search: // round 190on: a lens and its handle
+            st.addEllipse (4.0f, 4.0f, 12.0f, 12.0f);
+            line (st, 14.3f, 14.3f, 20.0f, 20.0f);
+            break;
         case Icon::punchOut:
             polyline (st, { { 1.5f, 16.5f }, { 9.5f, 16.5f }, { 14.5f, 7.5f }, { 22.5f, 7.5f } });
             break;

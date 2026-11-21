@@ -12232,3 +12232,8 @@ countries: tr
 "The longest single call since the reset, in milliseconds (red: half of the audio buffer or more)" = "Sıfırlamadan bu yana en uzun tek çağrı, milisaniye cinsinden (kırmızı: ses arabelleğinin yarısı veya daha fazlası)"
 "Calls that took more than half of the time their own audio lasts: one plugin alone near the deadline, what makes the sound stutter" = "Kendi seslerinin süresinin yarısından fazlasını alan çağrılar: tek başına sınıra yakın bir eklenti, sesin takılmasına yol açan şey"
 "Live part {0}%, rendered ahead {1}% (together {2}% of one core)." = "Canlı kısım %{0}, önceden işlenen %{1} (birlikte bir çekirdeğin %{2}'si)."
+"Command palette: find and run any command, menu item, LYNX extra or setting" = "Komut paleti: herhangi bir komutu, menü öğesini, LYNX ekstrasını veya ayarı bul ve çalıştır"
+"Search commands, menus, LYNX extras, settings and recent projects" = "Komutları, menüleri, LYNX ekstralarını, ayarları ve son projeleri ara"
+"{0} item(s)   Up / Down: pick   Enter: run   Esc: close" = "{0} öğe   Yukarı / Aşağı: seç   Enter: çalıştır   Esc: kapat"
+"That item can't be used now (it is greyed in its menu too)." = "Bu öğe şu anda kullanılamıyor (menüsünde de gri)."
+"{0}: {1}" = "{0}: {1}"

@@ -12232,3 +12232,8 @@ countries: nl be
 "The longest single call since the reset, in milliseconds (red: half of the audio buffer or more)" = "De langste enkele aanroep sinds de reset, in milliseconden (rood: de helft van de audiobuffer of meer)"
 "Calls that took more than half of the time their own audio lasts: one plugin alone near the deadline, what makes the sound stutter" = "Aanroepen die meer dan de helft van de duur van hun eigen audio kostten: één plugin alleen dicht bij de grens, wat het geluid laat haperen"
 "Live part {0}%, rendered ahead {1}% (together {2}% of one core)." = "Live deel {0}%, vooruit gerenderd {1}% (samen {2}% van één kern)."
+"Command palette: find and run any command, menu item, LYNX extra or setting" = "Opdrachtenpalet: elke opdracht, elk menu-item, LYNX-extra of elke instelling vinden en uitvoeren"
+"Search commands, menus, LYNX extras, settings and recent projects" = "Opdrachten, menu's, LYNX-extra's, instellingen en recente projecten zoeken"
+"{0} item(s)   Up / Down: pick   Enter: run   Esc: close" = "{0} item(s)   Omhoog / Omlaag: kiezen   Enter: uitvoeren   Esc: sluiten"
+"That item can't be used now (it is greyed in its menu too)." = "Dat item kan nu niet worden gebruikt (het is ook grijs in zijn menu)."
+"{0}: {1}" = "{0}: {1}"
