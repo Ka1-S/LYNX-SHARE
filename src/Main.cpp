@@ -7881,6 +7881,74 @@ private:
                 if (rollup031s2Result != "OK")
                     break;
             }
+        }
+
+        // rollup 0.1.31 step 3 (round 190ny): the copies for 0.1.30 / 0.1.28 drop what this step's rounds save and nothing
+        // else — 190nu's key markers' keys ("markerKeys" beside each pattern's marker list; the markers and their names
+        // stay) and 190nw's tracker view settings (root "tracker"; the notes are the patterns' own) — each with its one
+        // line, in both copies; 190nx (offline switch, --demo) and 190nt (site) save nothing in a project
+        juce::String rollup031s3Result = "OK";
+        {
+            using namespace lynx::keyregions;
+            auto song = lynx::Song::makeDefault();
+            auto& p = song.patterns[(std::size_t) song.currentPattern];
+            p.markers.push_back ({ 2 * lynx::ppq, "Verse", 0, 4 });
+            addKeyMarker (p, 0, { State::key, { 9, flScaleNamed ("Minor Harmonic") } });
+            addKeyMarker (p, 4 * lynx::ppq, { State::key, { 2, flScaleNamed ("Other Dorian") } });
+            for (int c = 0; c < 2; ++c)
+                song.channels.emplace_back().name = "S3-" + std::to_string (c);
+            lynx::uids::normalize (song);
+            song.tracker.rowsPerBeat = 6;
+            song.tracker.showPan = true;
+            song.tracker.groups.push_back ({ "Pair", { song.channels[song.channels.size() - 2].uid, song.channels.back().uid } });
+            const auto keysOf = [] (const juce::var& v) {
+                std::set<juce::String> keys;
+                std::function<void (const juce::var&, const juce::String&)> walk = [&] (const juce::var& x, const juce::String& path) {
+                    if (auto* o = x.getDynamicObject())
+                        for (const auto& prop : o->getProperties())
+                        {
+                            if (path.isEmpty() && (prop.name.toString() == "savedBy" || prop.name.toString() == "copiedFrom")) // (the copy's stamp)
+                                continue;
+                            keys.insert (path + "/" + prop.name.toString());
+                            walk (prop.value, path + "/" + prop.name.toString());
+                        }
+                    else if (auto* a = x.getArray())
+                        for (const auto& e : *a)
+                            walk (e, path + "[]");
+                };
+                walk (v, {});
+                return keys;
+            };
+            const auto json = lynx::ProjectFile::toJson (song);
+            auto expected = keysOf (juce::JSON::parse (json));
+            for (auto it = expected.begin(); it != expected.end();)
+                it = it->startsWith ("/tracker") || it->contains ("/markerKeys") ? expected.erase (it) : std::next (it);
+            const char* lines[] = { "key marker(s) in the Piano roll", "The tracker's view settings" };
+            for (const auto* release : { "0.1.30", "0.1.28" })
+            {
+                const auto copy = lynx::olderlynx::forRelease (song, release);
+                juce::String why;
+                const auto back = copy.ok ? lynx::ProjectFile::fromJson (copy.json, why) : std::optional<lynx::Song> {};
+                const auto count = [&copy] (const char* l) {
+                    return (int) std::count_if (copy.lost.begin(), copy.lost.end(), [l] (const lynx::olderlynx::Loss& x) { return juce::String (x.text).contains (l); });
+                };
+                if (! copy.ok || ! back)
+                    rollup031s3Result = juce::String ("ERROR copy ") + release + " " + copy.error + why;
+                else if (copy.json.contains ("markerKeys") || copy.json.contains ("\"tracker\""))
+                    rollup031s3Result = juce::String ("ERROR 0.1.31 keys left in the copy for ") + release;
+                else if (std::any_of (std::begin (lines), std::end (lines), [&] (const char* l) { return count (l) != 1; }))
+                    rollup031s3Result = juce::String ("ERROR loss lines in the copy for ") + release + " (" + juce::String ((int) copy.lost.size()) + ")";
+                else if (const auto& bp = back->patterns[(std::size_t) back->currentPattern];
+                         bp.markers.size() != p.markers.size() || bp.notes != p.notes
+                         || std::any_of (bp.markers.begin(), bp.markers.end(), [] (const lynx::Marker& m) { return keyOf (m).has_value(); }))
+                    rollup031s3Result = juce::String ("ERROR markers / notes in the copy for ") + release;
+                else if (juce::String (release) == "0.1.30" && (copy.lost.size() != 2 || keysOf (juce::JSON::parse (copy.json)) != expected))
+                    rollup031s3Result = "ERROR the copy for 0.1.30 drops more than the two (" + juce::String ((int) copy.lost.size()) + " lines)";
+                if (rollup031s3Result != "OK")
+                    break;
+            }
+        }
+
         // round chord2_190nu (discussion #105): the Piano roll's key markers come back from a project (their keys beside the
         // marker list, so older releases keep the markers), the copy for 0.1.30 / 0.1.28 drops the keys with a line, and
         // a MIDI file carries them as key signatures (with the exact scale in a "Key: ..." marker meta event)
@@ -8368,7 +8436,7 @@ private:
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && exportParity.startsWith ("OK") && exportLive.startsWith ("OK") && midiHotplug.startsWith ("OK") && midiOutPorts.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
-                        && keys190nuResult == "OK"
+                        && keys190nuResult == "OK" && rollup031s3Result == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK")
                         && danceWindowResult == "OK" && clickActivationResult == "OK" && motionOverlayResult.startsWith ("OK")
@@ -8454,6 +8522,7 @@ private:
                << "rollup031_copy_for_0130=" << rollup031Result << "\n"
                << "rollup031s2_copy_for_0130=" << rollup031s2Result << "\n"
                << "keys190nu_key_markers=" << keys190nuResult << "\n"
+               << "rollup031s3_copy_for_0130=" << rollup031s3Result << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 
