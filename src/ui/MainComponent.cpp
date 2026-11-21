@@ -125,6 +125,7 @@
 #include "ui/Dialogs.h"
 #include "ui/DialogFrame.h"
 #include "ui/EventEditor.h"
+#include "ui/TrackerComponent.h"
 #include "ui/EditorTools.h"
 #include "ui/AudioEditor.h"
 #include "ui/TempoTapper.h"
@@ -1097,6 +1098,10 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
             safe->mixer.selectTrack (insert);
     });
     simpleClickKeys.up = [this] (juce::Component* clicked) { simpleClickEnded (clicked); };
+    TrackerComponent::onSettingsChanged = [safe = juce::Component::SafePointer<MainComponent> (this)] { // (round 190nw)
+        if (safe != nullptr)
+            safe->saveUiSettings();
+    };
     setSecondaryWindowKeyHandler ([safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::KeyPress& key) {
         return safe != nullptr && safe->keyFromSecondaryWindow (key);
     });
@@ -2638,6 +2643,13 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("view.closeUnfocusedWindows")) closeUnfocusedWindows();
     else if (is ("view.alignChannelEditors")) alignAllChannelEditors (engine.getSelectedChannel());
     else if (is ("view.touchKeyboard")) toggleTouchKeyboard (engine);
+    else if (is ("view.tracker")) // round 190nw: the tracker editor's tool window
+    {
+        if (isTrackerOpen())
+            closeTracker();
+        else
+            openTracker (engine);
+    }
     else if (is ("view.closePluginWindows") || is ("view.closeWindows"))
     {
         PluginWindows::closeAll();
@@ -3222,7 +3234,15 @@ void MainComponent::loadUiSettings()
         const auto key = line.upToFirstOccurrenceOf ("=", false, false).trim();
         const auto on = line.fromFirstOccurrenceOf ("=", false, false).trim() == "1";
 
-        if (key == "typingPiano")
+        if (key == "trackerHex") // (round 190nw)
+            TrackerComponent::hex = on;
+        else if (key == "trackerOctave")
+            TrackerComponent::octave = juce::jlimit (TrackerComponent::minOctave, TrackerComponent::maxOctave, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
+        else if (key == "trackerStep")
+            TrackerComponent::editStep = juce::jlimit (0, TrackerComponent::maxEditStep, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
+        else if (key == "trackerFollow")
+            TrackerComponent::follow = on;
+        else if (key == "typingPiano")
             typingPiano = on;
         else if (key == "typingOctave")
             typingOctave = keys::typingpiano::clampOctave (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
@@ -3682,6 +3702,10 @@ void MainComponent::saveUiSettings()
                                       + "\ntrackInserts=" + juce::String (PlaylistComponent::showTrackInserts ? 1 : 0)
                                       + workflowextras::uiOptionsText() // round 190iu
                                       + "\npickerPanel=" + juce::String (pickerPanelOn ? 1 : 0)
+                                      + "\ntrackerHex=" + juce::String (TrackerComponent::hex ? 1 : 0) // (round 190nw)
+                                      + "\ntrackerOctave=" + juce::String (TrackerComponent::octave)
+                                      + "\ntrackerStep=" + juce::String (TrackerComponent::editStep)
+                                      + "\ntrackerFollow=" + juce::String (TrackerComponent::follow ? 1 : 0)
                                       + "\nalternateUndo=" + juce::String (alternateUndo ? 1 : 0) // (read by older versions)
                                       + "\nalternateUndoMode=" + juce::String (alternateUndo ? 1 : 0)
                                       + "\neditPatternsIn="
@@ -6586,6 +6610,8 @@ juce::PopupMenu MainComponent::makePatternMenu (std::vector<int> picked)
                             }); });
 
     menu.addSubMenu (tr ("Song time signature"), signatures);
+    // round 190nw (LYNX's own, after FL's items): the pattern's notes in the tracker
+    menu.addItem (tr ("Edit in tracker") + shortcutText ("view.tracker"), [this] { openTracker (engine); });
     menu.addSeparator();
     menu.addItem (tr ("Delete pattern") + shortcutText ("pattern.delete"), song.patterns.size() > 1, false,
                   [this, index] { engine.editSong ([index] (Song& s) { s.removePattern (index); }); });
@@ -8916,7 +8942,7 @@ void MainComponent::chooseFileToOpenNow()
 {
     fileChooser = lynx::ui::makeFileChooser (tr ("Open project"), currentFile.getParentDirectory(),
                                                        juce::String ("*") + ProjectFile::extension
-                                                           + ";*.dawproj;*.dawproject;*.flp;*.als;*.flm;*.band;projectData;ProjectData;*.blx;*.zip;*.lynxpack;*.mid;*.midi");
+                                                           + ";*.dawproj;*.dawproject;*.flp;*.als;*.flm;*.band;projectData;ProjectData;*.blx;*.zip;*.lynxpack;*.mid;*.midi;*.mod;*.xm;*.s3m;*.it");
 
     // (a GarageBand .band is a folder: macOS's dialog shows it as one file; elsewhere its "projectData" is picked)
     lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
@@ -9008,7 +9034,7 @@ void MainComponent::openFile (const juce::File& file)
 
     // (a Live set takes the .flp import's path, round 175a; an FL Studio Mobile project too, round 182c; a GarageBand
     // project too, round 190ic)
-    if (file.hasFileExtension ("flp;als;flm;songtmpl;dawproject;blx") || ProjectPackage::garageBandPackage (file) == file)
+    if (file.hasFileExtension ("flp;als;flm;songtmpl;dawproject;blx;mod;xm;s3m;it") || ProjectPackage::garageBandPackage (file) == file)
     {
         if (! persistent) // (command-line modes open synchronously, without scanning)
         {
@@ -9062,6 +9088,7 @@ void MainComponent::flpImported (const juce::File& file)
                                 : file.hasFileExtension ("flm;songtmpl") ? tr ("(imported from FL Studio Mobile)")
                                 : file.hasFileExtension ("band")         ? tr ("(imported from GarageBand)")
                                 : file.hasFileExtension ("blx")          ? tr ("(imported from BandLab)")
+                                : file.hasFileExtension ("mod;xm;s3m;it") ? tr ("(imported from a tracker module)")
                                                                          : tr ("(imported from FL Studio)"));
         updateTitle();
         playlist.showSongAfterOpen();
@@ -9115,7 +9142,7 @@ void MainComponent::chooseFileToOpenInNewWindow()
 {
     fileChooser = lynx::ui::makeFileChooser (tr ("Open in new window"), currentFile.getParentDirectory(),
                                              juce::String ("*") + ProjectFile::extension
-                                                 + ";*.dawproj;*.dawproject;*.flp;*.als;*.flm;*.band;projectData;ProjectData;*.blx;*.zip;*.lynxpack;*.mid;*.midi");
+                                                 + ";*.dawproj;*.dawproject;*.flp;*.als;*.flm;*.band;projectData;ProjectData;*.blx;*.zip;*.lynxpack;*.mid;*.midi;*.mod;*.xm;*.s3m;*.it");
     lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                              [safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::FileChooser& chooser) {
                                  if (const auto result = chooser.getResult(); safe != nullptr && (result.existsAsFile() || result.isDirectory()))
@@ -10380,6 +10407,8 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         rare.addItem (tr ("Plugin database (in the Browser)") + shortcutText ("view.pluginDatabase"), [this] { runAction ("view.pluginDatabase"); });
         rare.addItem (tr ("Project picker") + shortcutText ("view.projectPicker"), [this] { toggleProjectPicker(); }); // (round 190my, FL's View menu; Windows and tools in Clip-launch / Simple)
         menu.addItem (tr ("Audio editor") + shortcutText ("view.audioEditor"), [this] { openAudioEditorForSelection(); });
+        // round 190nw: the tracker editor (LYNX's own; FL has none): Windows and tools in Clip-launch / Simple
+        rare.addItem (tr ("Tracker") + shortcutText ("view.tracker"), true, isTrackerOpen(), [this] { runAction ("view.tracker"); });
         rare.addItem (tr ("Tempo tapper") + shortcutText ("view.tempoTapper"), [this] { openTempoTapper (engine); });
         rare.addItem (tr ("Sample browser (separate window)") + shortcutText ("view.sampleBrowser"), true, findToolWindow ("sampleBrowser") != nullptr,
                       [this] { toggleSampleBrowser(); });
@@ -10729,7 +10758,7 @@ void MainComponent::showLanguageChoice (const juce::String& id)
 
 bool MainComponent::isProjectFile (const juce::File& file)
 {
-    return file.hasFileExtension (juce::String (ProjectFile::extension) + ";dawproj;dawproject;flp;als;flm;blx;zip;" + sessionpack::extension);
+    return file.hasFileExtension (juce::String (ProjectFile::extension) + ";dawproj;dawproject;flp;als;flm;blx;zip;mod;xm;s3m;it;" + sessionpack::extension);
 }
 
 bool MainComponent::isInterestedInFileDrag (const juce::StringArray& files)

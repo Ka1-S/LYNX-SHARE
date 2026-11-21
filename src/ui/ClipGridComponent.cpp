@@ -1,5 +1,6 @@
 #include "ui/TextCache.h"
 #include "ui/ClipGridComponent.h"
+#include "ui/TrackerComponent.h"
 #include "ui/PaintAB.h"
 #include "ui/PlaylistComponent.h"
 
@@ -2577,6 +2578,16 @@ public:
         addGrooveItems (menu, track, scene, true, false);
     }
 
+    // round 190nw (LYNX's own): a pattern clip's notes in the tracker editor, on that clip's pattern
+    void addEditInTracker (juce::PopupMenu& menu, int track, int scene)
+    {
+        const auto* grid = gridOf();
+        const auto* clip = grid != nullptr ? launcher::clipAt (*grid, track, scene) : nullptr;
+        if (clip == nullptr || clip->kind != ClipKind::pattern || clip->pattern < 0 || clip->pattern >= (int) engine.getSong().patterns.size())
+            return;
+        menu.addItem (tr ("Edit in tracker"), [this, pattern = clip->pattern] { openTracker (engine, pattern); });
+    }
+
 public:
     juce::PopupMenu buildSlotMenu (int track, int scene)
     {
@@ -2610,6 +2621,7 @@ public:
             }, mouseArea()));
             menu.addSeparator();
             addClipOptions (menu, track, scene, false);
+            addEditInTracker (menu, track, scene);
             menu.addItem (tr ("Paste") + "\tCtrl+V", canPaste(), false, [this, track, scene] { pasteSlot (track, scene); });
             menu.addSeparator();
             addGridOptions (menu);
@@ -2635,6 +2647,7 @@ public:
                 editSlot (track, scene, [c] (ClipGridSlot& s) { s.colour = c; });
             }, mouseArea()));
             addGrooveItems (menu, track, scene, true, true);
+            addEditInTracker (menu, track, scene);
             menu.addSeparator();
             menu.addItem (tr ("Cut") + "\tCtrl+X", [this, track, scene] { copySlot (track, scene, true); });
             menu.addItem (tr ("Copy") + "\tCtrl+C", [this, track, scene] { copySlot (track, scene, false); });

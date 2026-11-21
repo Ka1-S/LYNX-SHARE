@@ -56,6 +56,8 @@ CORE="$CORE src/core/FmSynth.cpp src/core/AlsDevicesFm.cpp"
 CORE="$CORE src/core/physmod/ModalBank.cpp src/core/physmod/LynxModel.cpp src/core/LynxModelBank.cpp"
 # Track clips: "Clips own their notes" on FL's instrument tracks (round 190ne)
 CORE="$CORE src/core/TrackClips.cpp"
+# The tracker editor's model and the module import (round 190nw)
+CORE="$CORE src/core/TrackerGrid.cpp src/core/ModuleImport.cpp"
 # Helix: LYNX's own wavetable synth and the import of Live's Wavetable onto it (round 190ja)
 CORE="$CORE src/core/WavetableSynth.cpp src/core/WavetableTables.cpp src/core/WavetableUser.cpp src/core/AlsDevicesWt.cpp"
 # Braid (Live's Meld) and the spectral effects' import, round 190ko
@@ -166,6 +168,13 @@ mkdir -p build-local/pocketpy
 obj=build-local/pocketpy/pocketpy.o
 [[ -f "$obj" && "$obj" -nt third_party/pocketpy/pocketpy.c && "$obj" -nt third_party/pocketpy/pocketpy.h ]] || $CC -c -O2 -w -std=c11 -DPK_ENABLE_OS=0 -DPK_ENABLE_WATCHDOG=1 -Ithird_party/pocketpy third_party/pocketpy/pocketpy.c -o "$obj"
 WAVPACK="$WAVPACK $obj"
+# libxmp-lite 4.7.4 (MIT; third_party/libxmp-lite): the module import's reader (round 190nw)
+mkdir -p build-local/libxmp
+for f in third_party/libxmp-lite/src/*.c third_party/libxmp-lite/src/loaders/*.c; do
+    obj="build-local/libxmp/$(basename "$f" .c).o"
+    [[ -f "$obj" && "$obj" -nt "$f" ]] || $CC -c -O2 -w -std=c99 -DLIBXMP_CORE_PLAYER -DLIBXMP_STATIC -D_REENTRANT -Ithird_party/libxmp-lite/include/libxmp-lite -Ithird_party/libxmp-lite/src "$f" -o "$obj"
+done
+WAVPACK="$WAVPACK $(ls build-local/libxmp/*.o | tr '\n' ' ')"
 # Monocypher (BSD-2 / CC0; third_party/monocypher): the live sessions' encryption (round 169b)
 mkdir -p build-local/monocypher
 obj=build-local/monocypher/monocypher.o

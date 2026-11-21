@@ -1,0 +1,41 @@
+/* LYNX addition (round 190nw, not part of libxmp-lite 4.7.4; MIT like the library): three read-only facts the module
+ * import needs that libxmp keeps in its internal context and does not publish through xmp.h. */
+
+#include "common.h"
+#include "lynx_xmp_extra.h"
+
+double libxmp_get_frame_time(struct context_data *ctx);
+
+/* The rate (Hz) sample `smp` plays at on libxmp's note 60 (period 428, its "C-5"): the sample's c5spd. */
+double lynx_xmp_sample_rate(xmp_context opaque, int smp)
+{
+	struct context_data *ctx = (struct context_data *)opaque;
+	struct module_data *m = &ctx->m;
+	if (smp < 0 || smp >= m->mod.smp || m->xtra == NULL)
+		return (double)m->c4rate;
+	return m->xtra[smp].c5spd > 0.0 ? m->xtra[smp].c5spd : (double)m->c4rate;
+}
+
+/* The length of the frame (tick) just played, in milliseconds, without the rounding of xmp_frame_info.frame_time. */
+double lynx_xmp_frame_ms(xmp_context opaque)
+{
+	return libxmp_get_frame_time((struct context_data *)opaque);
+}
+
+/* 0 Amiga periods, 1 Amiga periods with the range limit, 2 linear, 3 C-speed (libxmp's PERIOD_*). */
+int lynx_xmp_period_type(xmp_context opaque)
+{
+	return ((struct context_data *)opaque)->m.period_type;
+}
+
+/* The sustain loop of sample `smp` (IT): 1 and its frames [start, end) when it has one, else 0. */
+int lynx_xmp_sustain_loop(xmp_context opaque, int smp, int *start, int *end)
+{
+	struct context_data *ctx = (struct context_data *)opaque;
+	struct module_data *m = &ctx->m;
+	if (smp < 0 || smp >= m->mod.smp || m->xtra == NULL || !(m->mod.xxs[smp].flg & XMP_SAMPLE_SLOOP))
+		return 0;
+	*start = m->xtra[smp].sus;
+	*end = m->xtra[smp].sue;
+	return *end > *start;
+}

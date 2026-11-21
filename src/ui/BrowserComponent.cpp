@@ -96,7 +96,7 @@ bool isAudio (const juce::File& f)
 
 bool isListed (const juce::File& f)
 {
-    return f.hasFileExtension ("wav;flac;ogg;mp3;aif;aiff;wv;ncw;mid;midi;lynx;flp;als;flm;fst;sf2;sf3;sfz;dwp;dwb;gig");
+    return f.hasFileExtension ("wav;flac;ogg;mp3;aif;aiff;wv;ncw;mid;midi;lynx;flp;als;flm;fst;sf2;sf3;sfz;dwp;dwb;gig;mod;xm;s3m;it");
 }
 
 constexpr int maxResults = 500;
@@ -6736,7 +6736,7 @@ void BrowserComponent::openFile (const juce::File& file)
         return;
     }
 
-    if (file.hasFileExtension ("lynx;flp;als;flm;mid;midi") && onOpenProject)
+    if (file.hasFileExtension ("lynx;flp;als;flm;mid;midi;mod;xm;s3m;it") && onOpenProject) // (round 190nw: tracker modules)
         onOpenProject (file);
 }
 

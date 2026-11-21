@@ -2693,6 +2693,28 @@ struct MasterLookSettings
     bool operator== (const MasterLookSettings&) const = default;
 };
 
+// LYNX extra, round 190nw (0.1.31; core/TrackerGrid.h, ui/TrackerComponent.h): the tracker editor's settings for this
+// project. The tracker is a VIEW of the patterns' own notes (no other data): these only say how it shows them — rows per
+// beat, the shown columns, and track groups (several rack channels in one tracker track, told apart by its Ins column;
+// channels by their uid, so moving channels keeps the groups). Saved in .lynx only when not the default; the .flp / .als
+// exports and older LYNX releases ignore it.
+struct TrackerGroup
+{
+    std::string name;
+    std::vector<std::uint64_t> channels; // ChannelDef::uid, in the group's order
+    bool operator== (const TrackerGroup&) const = default;
+};
+
+struct TrackerSettings
+{
+    static constexpr int minRowsPerBeat = 1, maxRowsPerBeat = 16;
+    int rowsPerBeat = 4;
+    bool showPan = false, showDelay = true, showFx = true;
+    std::vector<TrackerGroup> groups;
+    bool isDefault() const noexcept { return *this == TrackerSettings {}; }
+    bool operator== (const TrackerSettings&) const = default;
+};
+
 struct Song
 {
     double bpm = 130.0;
@@ -2710,6 +2732,7 @@ struct Song
     float masterPitch = 0.0f; // cents, -1200..1200: shifts every note of the built-in instruments (the toolbar's master pitch)
     ProjectInfo info;
     MasterLookSettings masterLook;
+    TrackerSettings tracker; // round 190nw: the tracker editor's view settings (TrackerSettings)
     // Online Sessions (round 168a): the project's lineage (random 128-bit hex, kept by copies and packages), the last
     // uid counter used and who works on it (uids::normalize fills the first two)
     std::string projectId;
