@@ -918,6 +918,10 @@ private:
     juce::PopupMenu makeCountInMenu();   // round 190ld: FL's right-click on Count-in / Wait for input
     juce::PopupMenu makeWaitInputMenu();
     IconButton captureButton { "captureMidi", Icon::capture };
+    // round 190oa (DL-58, capture 190oa L1): Live's Automation Arm (the recording filter's Automation) and Re-Enable
+    // Automation (lit while a moved control overrides its automation; a click hands them back)
+    IconButton automationArmButton { "automationArm", Icon::automationArm };
+    IconButton reEnableAutomationButton { "reEnableAutomation", Icon::reEnableAutomation };
     IconButton sessionRecordButton { "sessionRecord", Icon::sessionRecord };
     IconButton drawModeButton { "drawMode", Icon::draw };
     IconButton keyMapButton { "keyMap", Icon::none };

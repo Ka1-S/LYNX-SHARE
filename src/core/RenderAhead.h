@@ -189,6 +189,7 @@ public:
     // the touched / released automation slots (RackRenderer::setOverriddenSlots / setReleasedSlots) reach both renderers
     void setOverriddenSlots (const std::vector<int>& slots) noexcept;
     void setReleasedSlots (const std::vector<int>& slots) noexcept;
+    void setKeepReleasedOnPlay (bool keep) noexcept; // (round 190oa, DL-58: both renderers)
     void setProfiling (bool on) noexcept;
     // The render-ahead thread renders nothing more (the engine is going away: its snapshots are about to be freed);
     // returns once it is idle. prepare() lets it work again.

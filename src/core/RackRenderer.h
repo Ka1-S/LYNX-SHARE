@@ -776,6 +776,8 @@ public:
     // its automation until playback starts again, stopped or playing. The slots set here are released that way; the
     // renderer forgets them itself when the transport starts (and the engine its list of moved targets).
     void setReleasedSlots (const std::vector<int>& slots) noexcept;
+    // round 190oa (DL-58): Live's override — the released slots stay released when playback starts (FL: they go back)
+    void setKeepReleasedOnPlay (bool keep) noexcept { keepReleasedOnPlay.store (keep, std::memory_order_relaxed); }
     bool isSlotOverridden (int slot) const noexcept
     {
         if (slot < 0 || slot >= RackState::maxAutomations)
@@ -1145,6 +1147,11 @@ private:
     };
     std::array<SlideTicks, maxChannels> slideTicks {};
     std::array<NoteMask, maxChannels> publishedNotes {};     // what soundingKeys holds (stored only on a change)
+    std::atomic<bool> keepReleasedOnPlay { false };         // (round 190oa, DL-58)
+    // round 190oa (DF-29): per channel, the notes released since the channel last fell silent (their voices still
+    // release; renderChannel zeroes it once the channel is idle / below −100 dB), and the block's total
+    std::array<std::uint16_t, maxChannels> releasingVoices {};
+    std::atomic<int> voicesNow { 0 };
     int publishedTop = 0;                                   // channels past it have nothing published
     void publishSoundingKeys (int channels) noexcept;
     std::array<VoiceOrder, maxChannels> voiceOrders {};      // sounding notes in order, for the channels' Max polyphony

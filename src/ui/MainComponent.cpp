@@ -4249,6 +4249,7 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
     const auto partsReady = [this] (Style s) {
         return s == Style::pattern || (s == Style::clipLaunch && clipGridView != nullptr) || (s == Style::simple && simpleWorkflow != nullptr);
     };
+    engine.setLiveAutomationOverride (style == Style::clipLaunch); // (round 190oa, DL-58: Live's Re-Enable Automation)
     if (style == from && partsReady (style))
         return;
     // each style's own parts are made the first time it is chosen (nothing of them exists in Pattern workflow)

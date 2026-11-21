@@ -833,6 +833,12 @@ public:
     void setCurrentTrackSource (int track);
     int getCurrentTrackSource() const noexcept { return currentSource; }
     void tweakReleased (const AutomationTarget& target);
+    // Round 190oa (DL-58, Live 12 manual 25.4 "Re-Enable Automation"): Live's override state in the Clip-launch layout.
+    // A control moved by hand leaves its automation (the engine's released targets, FL's rule) — in Live until the
+    // Control Bar's Re-Enable Automation is pressed, not at the next Play. `liveOverride` = the Clip-launch layout's way.
+    void setLiveAutomationOverride (bool liveOverride) noexcept;
+    bool automationOverridden() const; // a control with automation is overridden (Live lights Re-Enable Automation)
+    void reEnableAutomation();         // every overridden control follows its automation again
     // 0 = the last tweaked parameter, 1 = the one before it.
     std::optional<AutomationTarget> getLastTweaked (int which = 0) const;
     // The target's current value 0..1 (a hosted plugin's parameter and MIDI controls included); < 0 when it is gone.
@@ -1503,6 +1509,7 @@ private:
     // until it starts again (RackRenderer::setReleasedSlots). Not while recording automation (the touch rule above).
     std::vector<AutomationTarget> releasedTargets;
     bool releasedWasPlaying = false;
+    bool liveAutomationOverride = false; // (round 190oa, DL-58)
     void publishReleasedTargets();
     // Song mode, no loop region: once a parameter moved while recording, the song plays on past its end (no wrap to
     // the start) until recording stops, and the take's clip grows with the playhead (issue #12: it cut itself)
