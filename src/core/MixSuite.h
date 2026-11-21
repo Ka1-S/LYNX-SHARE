@@ -66,8 +66,12 @@ public:
                 upBlock (st[(std::size_t) level], cur, len, other);
                 std::swap (cur, other);
             }
+            // (round 190ok: the pad delay first, then the curve, in two passes: the same values in the same order, and a
+            // stateless curve now vectorises)
             for (int i = 0; i < len; ++i)
-                cur[i] = f (padIn (cur[i]));
+                cur[i] = padIn (cur[i]);
+            for (int i = 0; i < len; ++i)
+                cur[i] = f (cur[i]);
             for (int level = stages - 1; level >= 0; --level, len /= 2)
             {
                 downBlock (st[(std::size_t) level], cur, len / 2, other);
@@ -774,6 +778,9 @@ constexpr double thumpQ = 1.6;          // the low cut's Q with THUMP on [EXEC t
 // the drive on the reference's 0 … 10 scale (the read-out of the single-band mode): 3.6 dB per step
 double driveSteps (float v) noexcept;
 float shape (Style s, float x) noexcept; // the transfer curve (no drive, no DC removal)
+// Round 190ok (D3, EffectSlot::engineRev 2): the same curve with core/FastMath.h's tanh (Tube, Tube biased and Fuzz's
+// negative side; within 2.4 ulp of std::tanh); the other styles are shape()'s own
+float shapeFast (Style s, float x) noexcept;
 int bandCount (float v) noexcept;      // 1 .. 4 (the Bands parameter alone; activeBands() adds bandsMore)
 double crossoverHz (float v) noexcept; // 30 Hz .. 18 kHz (log)
 float crossoverValue (double hz) noexcept;

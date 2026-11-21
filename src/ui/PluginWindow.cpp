@@ -2970,5 +2970,17 @@ void addPluginWrapperItems (juce::PopupMenu& menu, AudioEngine& engine, juce::Au
         return;
     menu.addSectionHeader (tr ("Parameters"));
     menu.addItem (tr ("Link all parameters..."), ! targets.empty(), false, [&engine, targets] { openRemoteControlSettings (engine, targets, false); });
+    // FL's generator menu "CPU › Smart disable" (REA round 139 B6; the generator rule: round 190of): round 190ok (D2)
+    if (base.kind == AutomationTargetKind::channelParam && base.index >= 0 && base.index < (int) engine.getSong().channels.size())
+    {
+        const auto channel = base.index;
+        menu.addSectionHeader (tr ("CPU"));
+        menu.addItem (tr ("Smart disable"), true, engine.getSong().channels[(std::size_t) channel].smartDisable, [&engine, channel] {
+            engine.editSong ([channel] (Song& song) {
+                if (channel < (int) song.channels.size())
+                    song.channels[(std::size_t) channel].setSmartDisable (! song.channels[(std::size_t) channel].smartDisable);
+            });
+        });
+    }
 }
 } // namespace lynx

@@ -7,6 +7,7 @@
 #include "ui/SectionsLane190ol.h" // round 190ol (P1: the shot route drives the lane)
 #include "core/Offline.h"
 #include "core/GrooveAudio.h"
+#include "core/SmartDisableTip.h" // (round 190ok: --smarttipshot190ok)
 #include "core/EditorScale.h"
 #include "core/SimplePads.h"
 
@@ -3876,6 +3877,16 @@ public:
             return;
         }
 
+        if (args.contains ("--smarttipshot190ok"))
+        {
+            // LYNX --smarttipshot190ok <folder> [project.flp] (round 190ok, D1): the smart-disable tip at 100 / 150 %
+            const auto i = args.indexOf ("--smarttipshot190ok");
+            const auto project = i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String();
+            setApplicationReturnValue (runSmartTipShot190ok (args[i + 1].unquoted(), project) ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--monitorshot190of"))
         {
             // LYNX --monitorshot190of <folder> (round 190of): the Plugin performance monitor with its sample numbers
@@ -6145,6 +6156,7 @@ private:
         }();
 
         const auto hostedStateContentionResult = lynx::pluginStateContentionSelfTest();
+        const auto generatorSmartResult = lynx::generatorSmartDisableSelfTest(); // (round 190ok, D2)
 
         // recording from the PC keyboard: a one-beat note lands in the pattern, in a single undo step
         // (Blend on: this checks that the take joins the pattern's notes; a new install starts with Blend off)
@@ -9035,6 +9047,7 @@ private:
                         && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK")
+                        && generatorSmartResult.startsWith ("OK")
                         && danceWindowResult == "OK" && clickActivationResult == "OK" && motionOverlayResult.startsWith ("OK")
                         && editorHolesResult.startsWith ("OK");
 
@@ -9068,6 +9081,7 @@ private:
                << "remote_history=" << remoteHistoryResult << "\n"
                << "hosted_state_lock=" << hostedStateLockResult << "\n"
                << "hosted_state_contention=" << hostedStateContentionResult << "\n"
+               << "generator_smart_disable=" << generatorSmartResult << "\n"
                << "fonts=" << fontsResult << "\n"
                << "paint_caches=" << paintCachesResult << "\n"
                << "motion_overlay=" << motionOverlayResult << "\n"
@@ -14591,6 +14605,10 @@ private:
                     text << "    callbacks " << juce::String ((juce::int64) (r.callbacks - rtStart.callbacks)) << ", over the deadline "
                          << juce::String ((juce::int64) (r.overBudget - rtStart.overBudget)) << ", 80-100 % " << juce::String ((juce::int64) (r.nearBudget - rtStart.nearBudget))
                          << ", late " << juce::String ((juce::int64) (r.lateCalls - rtStart.lateCalls)) << "\n";
+                    // round 190ok (P24): Settings › Audio › "Safe overloads" (core/OverloadGuard.h), since the start
+                    const auto& guard = app.engine->getOverloadGuard();
+                    text << "    safe overloads " << (guard.isEnabled() ? "on" : "off") << ": engaged " << (juce::int64) guard.timesEngaged()
+                         << " times" << (guard.engaged() ? " (now)" : "") << ", yielded " << juce::String (guard.yieldedMs(), 0) << " ms\n";
                 }
                 if (threadsWanted && wall > 0.0)
                 {
@@ -14854,6 +14872,10 @@ private:
                                        engine->rewind();
                                        engine->play();
                                    }, {}, playMs });
+            // round 190ok (P24): LYNX_UIPERF_RECOVERY=1 — the song stopped after it, 3 s: the safe-overload guard lets go
+            // and the callbacks keep their deadline again (the report's "safe overloads" line: no "(now)")
+            if (juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_RECOVERY", "0") == "1")
+                run->steps.push_back ({ "overlay A/B: playlist maximised, stopped after the song (recovery)", [this] { engine->stop(); }, {}, 3000 });
             run->steps.push_back ({ "overlay A/B: piano roll maximised, pattern playing", [ui, playPattern] { ui->selectTabForSnapshot (1); playPattern(); }, {}, playMs,
                                    [this] { engine->stop(); return juce::String(); } });
         }
@@ -18848,6 +18870,7 @@ private:
 #include "Tabs2Test190nz.inc" // round 190nz (issue #232 stage 2)
 #include "IssuesShot190od.inc" // round 190od (issues #236-#242)
 #include "DetailsShot190kn.inc" // round 190kn
+#include "SmartTipShot190ok.inc" // round 190ok (D1)
 #include "DetailsShot190ld.inc" // round 190ld
 #include "DetailsShot190lr.inc" // round 190lr
 #include "DetailsShot190lx.inc" // round 190lx

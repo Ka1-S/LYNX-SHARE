@@ -196,6 +196,10 @@ public:
     // Round 190gg (B5): the dropouts since the start, the last one's time and cause (ui/PluginMonitorWindow.h
     // describeDropouts), at the end of the CPU hint
     void setDropouts (const juce::String& text) { dropoutText = text; }
+    // Round 190ok (owner decision D1): an imported FL project with Smart disable off on most of its effects and a heavy
+    // stopped load: the tip that points at Tools › Macros › "Switch smart disable for all plugins" (empty = none)
+    void setSmartDisableTip (const juce::String& text) { smartTipText = text; }
+    const juce::String& smartDisableTip() const noexcept { return smartTipText; }
     // Round 190of (P24, the split CPU meter): render-ahead's counters (core/RenderAhead.h Stats liveNs / aheadNs /
     // audioNs, counted up); the hint shows the live part and the part rendered ahead since the last call
     void setSplit (std::uint64_t liveNs, std::uint64_t aheadNs, std::uint64_t audioNs);
@@ -232,7 +236,7 @@ public:
 private:
     std::uint64_t overDeadline = 0, lateCalls = 0, underruns = 0;
     int deviceUnderruns = -1;
-    juce::String driverTip, dropoutText;
+    juce::String driverTip, dropoutText, smartTipText;
     double peakLoad = 0.0;
     juce::StringArray heaviest;
     juce::uint32 lastGlitchAt = 0; // ms counter of the last new over-deadline callback (0 = none)

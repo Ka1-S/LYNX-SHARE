@@ -26,6 +26,7 @@
 #include "core/Mpe.h"
 #include "core/Vfx.h"
 #include "core/ModuleWarmup.h"
+#include "core/GeneratorSmartDisable.h"
 
 namespace lynx
 {
@@ -241,8 +242,19 @@ public:
     int auxOutputCount() const noexcept override { return anyAux.load (std::memory_order_acquire) ? (int) outs.size() : 0; }
     int auxOutputTrack (int k) const noexcept override;
     const float* auxOutputData (int k, int side) const noexcept override;
+    // Round 190ok (owner decision D2): FL's generator smart disable (core/GeneratorSmartDisable.h). With the channel's
+    // "Smart disable" on (ChannelDef::smartDisable, taken by configure), the wrapper's "Allow smart disable" and the
+    // global switch, the plugin sleeps after 4 s of silent output with nothing sent to it: idle() then tells the rack not
+    // to call it until a note or MIDI message comes.
+    bool idle() const noexcept override;
+    bool smartDisableActive() const noexcept { return smartOn.load (std::memory_order_relaxed); } // (tests)
+    bool sleeping() const noexcept { return idle(); }                                                // (tests)
 
 private:
+    std::atomic<bool> smartOn { false };
+    std::atomic<std::int64_t> smartHold { gensmart::holdSamples (44100.0) };
+    gensmart::State smart; // audio thread
+    void noteSmartBlock (int n, bool events, const float* const* channels, int numChannels) noexcept;
     void mixOutputs (const float* const* channels, int numChannels, int at, int count, float gl, float gr, float* left, float* right) noexcept;
     friend juce::String pluginStateContentionSelfTest();
     std::vector<PluginOutputInfo> outs;
@@ -446,6 +458,8 @@ bool hasSideBus (const juce::AudioPluginInstance& plugin);
 // with fixed blocks: the slot's sidechain reaches the bus, and silence once the slot has none. "OK" or what failed.
 juce::String pluginSidechainSelfTest();
 juce::String pluginStateContentionSelfTest();
+// round 190ok (D2): FL's generator smart disable through PluginInstrument ("OK …" or "ERROR …")
+juce::String generatorSmartDisableSelfTest();
 
 // Plugin formats, known-plugin list (saved in AppData) and instance creation.
 // UI thread, except the scan functions (any thread; one scan at a time) and the background scan.

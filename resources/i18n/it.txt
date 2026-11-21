@@ -12355,3 +12355,9 @@ countries: it ch sm
 "When someone is removed" = "Quando qualcuno viene rimosso"
 "FL's wrapper GUI settings (DPI aware off, Scale editor dimensions) are left out: these plugin windows open with the default ones: {0}" = "Le impostazioni GUI del wrapper di FL (DPI aware disattivato, Scale editor dimensions) vengono tralasciate: le finestre di questi plugin si aprono con quelle predefinite: {0}"
 "{0} key / MIDI mapping(s) of Overdub, the Loop switch, Punch-in or Punch-out are left out" = "{0} assegnazione/i di tasto / MIDI di Overdub, dell'interruttore Loop, Punch-in o Punch-out vengono tralasciate"
+# round 190ok: safe overloads (P24), generator smart disable (D2), the smart-disable tip (D1)
+"Safe overloads" = "Sovraccarichi sicuri"
+"No risk of GUI freezing when overloads occur" = "Nessun rischio che l'interfaccia si blocchi in caso di sovraccarico"
+"Smart disable for new instrument plugins" = "Smart disable per i nuovi plugin strumento"
+"New channels with an instrument plugin get Smart disable on: the plugin is not called while it gets no notes and its sound has been silent for 4 seconds. FL Studio starts a new generator with it off." = "I nuovi canali con un plugin strumento hanno lo smart disable attivo: il plugin non viene chiamato finché non riceve note e il suo suono è in silenzio da 4 secondi. FL Studio crea un nuovo generatore con l'opzione disattivata."
+"Tip: Smart disable is off on {0} of {1} effects. Try Tools > Macros > Switch smart disable for all plugins" = "Suggerimento: lo smart disable è spento su {0} effetti su {1}. Prova Strumenti > Macro > Attiva/disattiva smart disable per tutti i plugin"

@@ -1104,6 +1104,9 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         def.ghostHidden = ! c.ghostShown;   // 0x32: the channel's ghost notes in the Piano Roll (REA_rodada167l §5)
         def.icon = std::clamp (c.icon, 0, 0xFFFF); // 0x9B (REA round 168j)
         def.flWrapperFlags = c.wrapperFlags;
+        // FL's generator "Smart disable" (0xD4 bit 0x20; REA round 190of): a hosted instrument sleeps through silence as in FL
+        // (round 190ok, owner decision D2: new imports only; native engines keep their own lossless idle skip)
+        def.smartDisable = c.wrapperFlags >= 0 && (c.wrapperFlags & 0x20) != 0;
 
         if (c.colour != 0)
             def.colour = 0xFF000000u | c.colour;

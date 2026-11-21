@@ -89,6 +89,7 @@ add_library(lynx_core STATIC
     src/core/Comping.cpp
     src/core/Pdc.cpp
     src/core/WorkerPool.cpp
+    src/core/OverloadGuard.cpp
     src/core/TimeStretch.cpp
     src/core/WarpEngines.cpp
     src/core/Arpeggiator.cpp

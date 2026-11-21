@@ -12355,3 +12355,9 @@ countries: id
 "When someone is removed" = "Saat seseorang dikeluarkan"
 "FL's wrapper GUI settings (DPI aware off, Scale editor dimensions) are left out: these plugin windows open with the default ones: {0}" = "Pengaturan GUI wrapper FL (DPI aware mati, Scale editor dimensions) tidak disertakan: jendela plugin ini terbuka dengan pengaturan bawaan: {0}"
 "{0} key / MIDI mapping(s) of Overdub, the Loop switch, Punch-in or Punch-out are left out" = "{0} pemetaan tombol / MIDI untuk Overdub, sakelar Loop, Punch-in atau Punch-out tidak disertakan"
+# round 190ok: safe overloads (P24), generator smart disable (D2), the smart-disable tip (D1)
+"Safe overloads" = "Overload aman"
+"No risk of GUI freezing when overloads occur" = "Tanpa risiko antarmuka membeku saat terjadi overload"
+"Smart disable for new instrument plugins" = "Smart disable untuk plugin instrumen baru"
+"New channels with an instrument plugin get Smart disable on: the plugin is not called while it gets no notes and its sound has been silent for 4 seconds. FL Studio starts a new generator with it off." = "Channel baru dengan plugin instrumen mendapat smart disable aktif: plugin tidak dipanggil selama tidak menerima not dan suaranya sudah senyap selama 4 detik. FL Studio memulai generator baru dengan fitur ini mati."
+"Tip: Smart disable is off on {0} of {1} effects. Try Tools > Macros > Switch smart disable for all plugins" = "Tips: smart disable mati pada {0} dari {1} efek. Coba Alat > Makro > Alihkan smart disable untuk semua plugin"

@@ -12355,3 +12355,9 @@ countries: tw hk mo
 "When someone is removed" = "移出某人時"
 "FL's wrapper GUI settings (DPI aware off, Scale editor dimensions) are left out: these plugin windows open with the default ones: {0}" = "FL 包裝器的 GUI 設定（關閉 DPI aware、Scale editor dimensions）不會保留：這些外掛視窗以預設設定開啟：{0}"
 "{0} key / MIDI mapping(s) of Overdub, the Loop switch, Punch-in or Punch-out are left out" = "Overdub、Loop 開關、Punch-in 或 Punch-out 的 {0} 個按鍵 / MIDI 對應不會保留"
+# round 190ok: safe overloads (P24), generator smart disable (D2), the smart-disable tip (D1)
+"Safe overloads" = "安全過載"
+"No risk of GUI freezing when overloads occur" = "過載時介面不會卡住"
+"Smart disable for new instrument plugins" = "新樂器外掛使用智慧停用"
+"New channels with an instrument plugin get Smart disable on: the plugin is not called while it gets no notes and its sound has been silent for 4 seconds. FL Studio starts a new generator with it off." = "帶樂器外掛的新通道會開啟智慧停用：外掛在沒有收到音符且聲音已靜音 4 秒時不會被呼叫。FL Studio 新建的產生器預設關閉此項。"
+"Tip: Smart disable is off on {0} of {1} effects. Try Tools > Macros > Switch smart disable for all plugins" = "提示：{1} 個效果中有 {0} 個關閉了智慧停用。試試 工具 > 巨集 > 切換所有外掛的智慧停用"

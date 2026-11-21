@@ -2332,6 +2332,9 @@ int ChannelRackComponent::addChannel (ChannelDef c, bool openEditor, int insert)
     int index = 0;
     if (filterGroup >= 0 && c.group < 0) // a new channel joins the group shown (FL)
         c.group = filterGroup;
+    // round 190ok (D2): Settings › Audio › "Smart disable for new instrument plugins" (LYNX extra; FL's default: off)
+    if (c.instrument == InstrumentKind::plugin && flsettings::options().smartDisableNewPlugins.load())
+        c.setSmartDisable (true);
     engine.editSong ([&] (Song& s) { index = addChannelRouted (s, c, insert); });
     selectionAnchor = index;
     selectRows ({ index }, index);

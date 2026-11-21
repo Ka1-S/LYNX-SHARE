@@ -39,6 +39,7 @@
 #include "engine/AraHost.h"
 #include "core/RenderAhead.h"
 #include "core/RtStats.h"
+#include "core/OverloadGuard.h"
 #include "core/Dropouts.h"
 #include "core/ScoreLog.h"
 #include "core/FlpImport.h"
@@ -1215,6 +1216,7 @@ public:
     // Real-time health of the audio callback (REA round 87): callbacks over their deadline, late device calls, load.
     const RtStats& getRtStats() const noexcept { return rtStats; }
     RtStats& getRtStats() noexcept { return rtStats; }
+    const OverloadGuard& getOverloadGuard() const noexcept { return overloadGuard; } // (round 190ok)
     // round 190kb: the renderer's worker pool (its waiting statistics for --uiperf; null without workers)
     const WorkerPool* getWorkerPool() const noexcept { return workers.get(); }
 
@@ -1341,6 +1343,7 @@ private:
     void chooseSafeBufferSize();
     void updateRealtimeStats(); // timer: unit loads over a window, glitch log
     RtStats rtStats;
+    OverloadGuard overloadGuard; // round 190ok: FL's Settings › Audio › "Safe overloads" (core/OverloadGuard.h)
     // Round 190hn (engine/ExportParityTest.cpp): called on the audio thread right after the device callback took the
     // position requests (Rewind, a seek), so the self-test can make the UI's start land exactly there; nullptr otherwise
     std::atomic<void (*) (void*)> afterPositionRequests { nullptr };
