@@ -295,6 +295,8 @@ $CXX $FLAGS $CORE $WAVPACK tools/renderwav.cpp -o build-local/renderwav 2> >(gre
 $CXX $FLAGS $CORE $WAVPACK tools/alsrender.cpp -o build-local/alsrender 2> >(grep -v 'glibc version' >&2)
 # LYNX Model's renderer / cost per voice (round 190ni: the timbre score's and the calibration's renders)
 $CXX $FLAGS $CORE $WAVPACK tools/physmodrender.cpp -o build-local/physmodrender 2> >(grep -v 'glibc version' >&2)
+# a tracker module rendered by libxmp-lite's own player (round 190nw): the module import's reference renders
+$CXX $FLAGS -DLIBXMP_STATIC -Ithird_party/libxmp-lite/include/libxmp-lite tools/modrender.cpp $(ls build-local/libxmp/*.o | tr '\n' ' ') -lm -o build-local/modrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/OggVorbis.cpp $(ls build-local/vorbis/*.o | tr '\n' ' ') tools/oggdecode.cpp -o build-local/oggdecode 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS $CORE $WAVPACK tools/comparewav.cpp -o build-local/comparewav 2> >(grep -v 'glibc version' >&2)
 # LYNX effects offline, the LYNX side of the third-party parity harness (round tp172b)
