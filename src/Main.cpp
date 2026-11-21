@@ -8393,6 +8393,7 @@ private:
             synth.plugin.id = "VST3:old-synth";
             synth.plugin.name = "Old Synth";
             synth.plugin.dpiAware = false;
+            synth.smartDisable = true; // (merge 6, 190ok D2: dropped without a line)
             song.channels.push_back (synth);
             const auto synthIndex = (int) song.channels.size() - 1;
             lynx::EffectSlot fx;
@@ -8401,6 +8402,8 @@ private:
             fx.plugin.name = "Tiny EQ";
             fx.plugin.scaleEditorDimensions = true;
             song.mixer[2].effects.push_back (fx);
+            auto ember = lynx::makeEffectSlot (lynx::EffectKind::ember); // (merge 6, 190ok D3: engine revision 2 -> 1 in the copies)
+            song.mixer[2].effects.push_back (ember);
             // gap190og: a key mapped to Arrangement Overdub (newer) and one to Play (0.1.30 has it)
             lynx::RemoteMapping overdub, play;
             overdub.source = play.source = lynx::RemoteMapping::Source::key;
@@ -8437,7 +8440,7 @@ private:
             };
             auto expected = keysOf (juce::JSON::parse (json));
             const auto hadKeys = expected.erase ("/arrangements[]/sections") == 1 && expected.erase ("/channels[]/plugin/dpiAware") == 1
-                                 && expected.erase ("/mixer[]/effects[]/plugin/scaleEditorDimensions") == 1;
+                                 && expected.erase ("/mixer[]/effects[]/plugin/scaleEditorDimensions") == 1 && expected.erase ("/channels[]/smartDisable") == 1;
             const auto countOf = [] (const lynx::olderlynx::Copy& c, const char* start) {
                 return (int) std::count_if (c.lost.begin(), c.lost.end(), [start] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).startsWith (start); });
             };
@@ -8474,7 +8477,8 @@ private:
                             ++sectionMarkers;
                 const auto bars = song.barsBetween (0, 400 * lynx::ppq);
                 const auto backBars = back ? back->barsBetween (0, 400 * lynx::ppq) : std::vector<lynx::Bar> {};
-                const auto backFx = back && back->mixer.size() > 2 && ! back->mixer[2].effects.empty() ? back->mixer[2].effects.back().plugin : lynx::PluginRef {};
+                const auto backFx = back && back->mixer.size() > 2 && back->mixer[2].effects.size() >= 2 ? back->mixer[2].effects[back->mixer[2].effects.size() - 2].plugin : lynx::PluginRef {};
+                const auto backEmberRev = back && back->mixer.size() > 2 && ! back->mixer[2].effects.empty() ? back->mixer[2].effects.back().engineRev : -1;
                 if (! copy.ok || ! back)
                     rollup031s5Result = juce::String ("ERROR copy ") + release + " " + copy.error + why;
                 else if (copy.json.contains ("\"sections\"") || ! back->sections().empty() || sectionMarkers != 2
@@ -8497,6 +8501,9 @@ private:
                 else if (back->remoteMappings.size() != 1 || back->remoteMappings[0].action != lynx::RemoteAction::play
                          || countOf (copy, "{0} key / MIDI mapping(s) of Overdub") != 1 || detailOf (copy, "{0} key / MIDI mapping(s) of Overdub") != "1")
                     rollup031s5Result = juce::String ("ERROR gap190og's transport mappings in the copy for ") + release;
+                else if (copy.json.contains ("smartDisable") || back->channels[(std::size_t) synthIndex].smartDisable || song.mixer[2].effects.back().engineRev != 2
+                         || backEmberRev != (is130 ? 1 : 0))
+                    rollup031s5Result = juce::String ("ERROR 190ok's smart disable / engine revision in the copy for ") + release + " (rev " + juce::String (backEmberRev) + ")";
                 else if (back->automations != song.automations)
                     rollup031s5Result = juce::String ("ERROR 190ob's volume automation in the copy for ") + release;
                 else if (is130 && (copy.lost.size() != 3 || keysOf (juce::JSON::parse (copy.json)) != expected))

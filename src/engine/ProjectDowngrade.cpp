@@ -1647,6 +1647,18 @@ void toRelease0130 (juce::var& root, Losses& lost)
                               listOf (editors), false });
     }
 
+    // round 190ok (D3): EffectSlot::engineRev 2 = LYNX's own devices (Ember, Prism, Crest, Echoform...) compute their
+    // per-sample tanh / exp / log / pow / sin with core/FastMath.h. 0.1.30 knows revisions 0 and 1 (Maximus: ">= 1"), so it
+    // plays a slot at 2 as at 1, with the C library's maths (190ok's nulls: at most -135 dBFS apart). The copy says 1, so
+    // the copy opened again in a newer LYNX plays what 0.1.30 plays, bit for bit; nothing audible to report.
+    // Round 190ok (D2): ChannelDef::smartDisable (FL's generator smart disable of a hosted instrument): 0.1.30 runs the
+    // plugin all the time, the same sound: dropped without a line (as 190ok's own 0.1.28 step). Rollup 0.1.31 step 5
+    forEachEffect (root, [] (juce::DynamicObject& e, const juce::String&) {
+        if ((int) e.getProperty ("engineRev", 0) > 1)
+            e.setProperty ("engineRev", 1);
+    });
+    forEachChannel (root, [] (juce::DynamicObject& c, int) { drop (c, "smartDisable"); });
+
     // round gap190og (coverage live4:mapping-0028): key and MIDI mappings of Live's Arrangement Overdub, Loop switch,
     // Punch-In and Punch-Out (RemoteAction values after launchSelectedClip). 0.1.30 skips an action it does not know when
     // it reads the project, so they go here with a line instead of vanishing silently. Rollup 0.1.31 step 5
