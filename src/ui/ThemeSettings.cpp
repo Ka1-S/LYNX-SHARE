@@ -483,7 +483,9 @@ public:
     };
 
     std::function<void (int)> onPick;
-    static constexpr int columns = 3, gap = 12, nameHeight = 20;
+    // issue #237 (round 190od): `frame` = room for the chosen thumbnail's frame (2 px, drawn outside the picture), so
+    // the first column's left edge and the last column's right edge are not cut off
+    static constexpr int columns = 3, gap = 12, nameHeight = 20, frame = 2;
 
     // (the thumbnails are made only for items that are new to the grid: an edit that rebuilds the list reuses them)
     void setItems (std::vector<Item> items)
@@ -544,12 +546,12 @@ public:
     const std::vector<Item>& items() const { return list; }
 
 private:
-    static int thumbWidth (int width) { return (width - (columns - 1) * gap) / columns; }
+    static int thumbWidth (int width) { return (width - 2 * frame - (columns - 1) * gap) / columns; }
     static int thumbHeight (int width) { return thumbWidth (width) * 104 / 184; } // (FL's 184 x 104)
     juce::Rectangle<int> cellOf (int i) const
     {
         const auto w = thumbWidth (getWidth()), h = thumbHeight (getWidth()) + nameHeight;
-        return { (i % columns) * (w + gap), (i / columns) * (h + gap) + 2, w, h };
+        return { frame + (i % columns) * (w + gap), (i / columns) * (h + gap) + frame, w, h };
     }
     int indexAt (juce::Point<int> p) const
     {
@@ -583,8 +585,10 @@ public:
     void paintButton (juce::Graphics& g, bool over, bool) override
     {
         using namespace theme;
+        // issue #237 (round 190od): the ring of the chosen dot (2.5 px out, 2 px wide) reaches 3.5 px above the dot; the
+        // dot sat 2 px from the top, so the ring's top was cut off. 4.5 px keeps the whole ring inside.
         const auto d = 31.0f;
-        const auto circle = juce::Rectangle<float> ((float) getWidth() / 2.0f - d / 2.0f, 2.0f, d, d);
+        const auto circle = juce::Rectangle<float> ((float) getWidth() / 2.0f - d / 2.0f, 4.5f, d, d);
         g.setColour (this->colour);
         g.fillEllipse (circle);
         g.setColour (juce::Colours::black);
@@ -653,6 +657,7 @@ public:
 
         // round 190jp (design190ia FW-20): FL's preset thumbnails instead of a list
         presetGrid.onPick = [this] (int index) { choosePreset (index); };
+        presetGrid.setComponentID ("theme.presets"); // (round 190od: --issuesshot190od finds it)
         importButton.onClick = [this] { importTheme(); };
         exportButton.onClick = [this] { exportTheme (false); };
         savePreset.onClick = [this] { exportTheme (true); };
