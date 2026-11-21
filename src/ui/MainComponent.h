@@ -938,6 +938,12 @@ private:
     juce::PopupMenu makeKeyMenu();
     void refreshKeyPanel();
     void setProjectKey (std::optional<projectkey::Key> key);
+    // Round 190oo (O-5, core/LiveScaleControl.h): Live's scale switch / root / mode in the Clip-launch control bar. The key
+    // the choosers show while the switch is off (the last one set; Major on C at first), not saved, as Live keeps them.
+    projectkey::Key scaleShown {};
+    bool scaleShownSet = false;
+    void showKeyPart (int part);
+    void setLiveScaleControl (bool on); // the LYNX extra's switch (Settings › LYNX extras, the Key menu)
     void showChordText();
     void addAudioLoggerMenu (juce::PopupMenu& menu);
     void dumpAudioLog();

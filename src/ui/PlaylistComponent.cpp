@@ -1617,15 +1617,19 @@ void PlaylistComponent::updateProjection (int count)
 {
     const auto on = clipLanesShown();
     // (worked out again after a song change or a switch; a zoom or a scroll keeps it)
-    const auto stamp = (engine.getPublishCount() * 1000003u + (std::uint64_t) count) * 2u + (on ? 1u : 0u);
+    // (round 190oo: + the Clip-launch look, whose envelope lists are made here too)
+    const auto stamp = (engine.getPublishCount() * 1000003u + (std::uint64_t) count) * 4u + (on ? 1u : 0u) + (liveStyle ? 2u : 0u);
     if (stamp == projectionStamp && (int) projection.order.size() == count)
         return;
     projectionStamp = stamp;
     const auto& song = engine.getSong();
     projection = cliplanes::project (song, count, on);
     laneNames.assign ((std::size_t) count, {});
+    laneClips.clear(); // (round 190oo, CS-19: rebuilt below while lanes are drawn)
     if (! projection.any())
         return;
+    if (liveStyle)
+        laneClips = cliplanes::laneClipLists (song, projection, count);
     for (const auto& c : song.playlist)
         if (projection.isChild (c.track) && laneNames[(std::size_t) c.track].isEmpty() && c.kind == ClipKind::automation && c.automation >= 0
             && c.automation < (int) song.automations.size())
@@ -1637,6 +1641,35 @@ bool PlaylistComponent::laneHidden (int owner) const
     const auto& song = engine.getSong();
     return (owner < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) owner].lanesFolded) || arrange::isFolded (song, owner)
            || noteedit::isFoldedAway (song, owner) || heightOf (owner) <= 0;
+}
+
+// Round 190oo (CS O-3): a project just opened shows its automation lanes folded the first time the Clip-launch arrangement
+// shows it, when the LYNX extra is on (Live folds them). One edit that is not an undo step and does not mark the project
+// changed; nothing at all when no lane is open. Runs once per opened project: later unfolding stays.
+void PlaylistComponent::foldLanesAfterOpen()
+{
+    const auto opened = engine.getOpenCount();
+    if (opened == foldedForOpen || ! liveStyle || simpleHeaders)
+        return; // (another layout: kept for when the Clip-launch arrangement first shows the project)
+    foldedForOpen = opened;
+    if (! cliplanes::foldedOnOpen)
+        return;
+    const auto& song = engine.getSong();
+    const auto lanes = cliplanes::project (song, numTracks(), cliplanes::shownIn (true, false));
+    auto tracks = cliplanes::tracksToFold (song, lanes, autolanes::shown());
+    if (tracks.empty())
+        return;
+    engine.editSong ([tracks = std::move (tracks)] (Song& s) {
+        for (const auto t : tracks)
+            if (t >= 0 && t < (int) s.playlistTracks.size())
+                s.playlistTracks[(std::size_t) t].lanesFolded = true;
+    }, false);
+}
+
+bool PlaylistComponent::liveTakeLane (int track) const
+{
+    const auto& tracks = engine.getSong().playlistTracks;
+    return liveHeaders() && track >= 0 && track < (int) tracks.size() && tracks[(std::size_t) track].takeLane;
 }
 
 void PlaylistComponent::paintClipLaneHeader (juce::Graphics& g, int t, int y, int height, bool hovered)
@@ -2235,6 +2268,19 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 continue;
             }
 
+            if (c.kind == ClipKind::automation && live && projection.isChild (c.track) && c.gridSlot < 0)
+            {
+                // round 190oo (CS-19): Live draws no block on an automation lane, only its envelope (paintLiveEnvelopeLanes,
+                // after the clips); a selected clip shows as Live's selected time range under the line
+                if (isSelected (i))
+                {
+                    g.setColour (juce::Colour (0xff5a737a)); // (Live's selection on a lane, warp190cg-08a: #5a737a)
+                    g.fillRect (r);
+                }
+                veilIfMuted (c, r);
+                continue;
+            }
+
             if (c.kind == ClipKind::automation)
             {
                 paintAutomationClip (g, c, r);
@@ -2337,6 +2383,8 @@ void PlaylistComponent::paint (juce::Graphics& g)
             const uitrace::Part tally (uitrace::part::batch);
             smallClips.fill (g);
         }
+        if (live)
+            paintLiveEnvelopeLanes (g, grid); // round 190oo (CS-19; nothing without automation clip lanes)
 
         // round 190jr: the Simple layout's region loop handles (BandLab's circular arrow at a region's top right)
         if (simpleHeaders)
@@ -2842,6 +2890,8 @@ void PlaylistComponent::paint (juce::Graphics& g)
                         }
                     }
                 }
+                else if (live && liveTakeLane (t))
+                    textRight = plateArea.getRight() - 2.0f; // round 190oo (CS-20): Live's take lane has no activator / number
                 else if (live)
                 {
                     // Live's track activator (live-arrangement.png x 1509..1554, y 187..199): 44 x 11 px #ffad56 in a 1 px
@@ -3981,6 +4031,129 @@ void PlaylistComponent::paintAutomationClip (juce::Graphics& g, const Clip& c, j
             g.setColour (theme::colour::automation.brighter (0.5f));
             g.fillEllipse (x - 2.5f, y - 2.5f, 5.0f, 5.0f);
         }
+}
+
+// Round 190oo (CS-19, Live 12 warp190cg-08a-live-automation-lane-before-fold.png, measured): an automation lane is one
+// envelope over the lane's whole width — a 2 px #ff4d47 line, each breakpoint a hollow ring of 6 px in the same red —
+// over the lane's own background, no clip block. The clips of the lane join into the one line: before the first clip it
+// holds the first clip's start value, between and after them the value the clip before ended on (what LYNX plays there).
+// Only the repainted columns are sampled (every 2 px on each clip's own grid, as paintAutomationClip, so a partial repaint
+// draws the same line); a lane list is worked out with the projection, not here.
+void PlaylistComponent::paintLiveEnvelopeLanes (juce::Graphics& g, juce::Rectangle<int> grid)
+{
+    if (laneClips.empty())
+        return;
+    const auto& song = engine.getSong();
+    const auto visible = g.getClipBounds().toFloat().getIntersection (grid.toFloat());
+    if (visible.isEmpty())
+        return;
+    const juce::Colour envelope { 0xffff4d47 };
+    const auto from = juce::jmax ((float) grid.getX(), visible.getX() - 4.0f), to = juce::jmin ((float) grid.getRight(), visible.getRight() + 4.0f);
+    const auto rows = juce::jmin ((int) laneClips.size(), numTracks());
+    // (the lists are made at the change message after an edit: a paint before it must not read a removed clip)
+    const auto valid = [&song] (int i) {
+        if (i < 0 || i >= (int) song.playlist.size())
+            return false;
+        const auto& c = song.playlist[(std::size_t) i];
+        return c.kind == ClipKind::automation && c.automation >= 0 && c.automation < (int) song.automations.size();
+    };
+    for (int t = 0; t < rows; ++t)
+    {
+        const auto& list = laneClips[(std::size_t) t];
+        if (list.empty() || ! std::all_of (list.begin(), list.end(), valid))
+            continue;
+        const auto h = heightOf (t);
+        const auto y = trackToY (t);
+        if (h < 6 || (float) y > visible.getBottom() || (float) (y + h) < visible.getY())
+            continue;
+        // the line's range: the lane above Live's 2 px separator, room for the rings at the top and the bottom
+        const auto body = juce::Rectangle<float> ((float) grid.getX(), (float) y + 3.0f, (float) grid.getWidth(), juce::jmax (1.0f, (float) h - 8.0f));
+        const auto yOf = [&body] (float v) { return body.getBottom() - juce::jlimit (0.0f, 1.0f, v) * body.getHeight(); };
+
+        juce::Path line;
+        bool started = false;
+        const auto lineTo = [&line, &started] (float px, float py) {
+            if (! started)
+                line.startNewSubPath (px, py);
+            else
+                line.lineTo (px, py);
+            started = true;
+        };
+        auto level = cliplanes::clipStartValue (song, song.playlist[(std::size_t) list.front()]);
+        auto cursor = from;
+        for (const auto i : list)
+        {
+            const auto& c = song.playlist[(std::size_t) i];
+            const auto& automation = song.automations[(std::size_t) c.automation];
+            const auto x0 = (float) tickToX ((double) c.start), x1 = (float) tickToX ((double) c.end());
+            if (x1 <= from)
+            {
+                level = cliplanes::clipEndValue (song, c);
+                continue;
+            }
+            if (x0 >= to)
+                break;
+            if (x0 > cursor) // (flat up to the clip)
+            {
+                lineTo (cursor, yOf (level));
+                lineTo (x0, yOf (level));
+            }
+            const auto a = juce::jmax (x0, cursor), b = juce::jmin (x1, to); // (an overlapping clip: from where the last one ended)
+            if (a >= b)
+                continue;
+            const auto yAt = [&] (float sx) {
+                const auto songTick = xToTick ((int) sx);
+                return yOf (automation.playAt ((double) c.offset + songTick - (double) c.start, songTick)); // (with its LFO)
+            };
+            auto lastY = 0.0f;
+            bool first = true;
+            for (auto k = (int) std::floor ((a - x0) / 2.0f);; ++k)
+            {
+                const auto x = juce::jmin (b, x0 + 2.0f * (float) k);
+                const auto py = yAt (x);
+                if (first || ! started)
+                    lineTo (juce::jmax (a, x), py);
+                else // (Hold, Stairs and Pulse segments keep square corners, as in the clip)
+                    automationLineTo (line, x - 2.0f, lastY, x, py, [&] { return yAt (x - 1.0f); });
+                lastY = py;
+                first = false;
+                if (x >= b)
+                    break;
+            }
+            cursor = b;
+            level = cliplanes::clipEndValue (song, c);
+        }
+        if (cursor < to) // (after the last clip: the value it ended on, to the lane's end)
+        {
+            lineTo (cursor, yOf (level));
+            lineTo (to, yOf (level));
+        }
+        if (! started)
+            continue;
+        g.setColour (envelope);
+        g.strokePath (line, juce::PathStrokeType (2.0f));
+
+        // the breakpoints: hollow rings (the lane shows through), the clips' own points
+        if (h < 10)
+            continue;
+        for (const auto i : list)
+        {
+            const auto& c = song.playlist[(std::size_t) i];
+            const auto x0 = tickToX ((double) c.start), x1 = tickToX ((double) c.end());
+            if (x1 < (double) from - 4.0 || x0 > (double) to + 4.0)
+                continue;
+            for (const auto& p : song.automations[(std::size_t) c.automation].points)
+            {
+                const auto songTick = (double) (c.start + p.tick - c.offset);
+                if (songTick < (double) c.start || songTick > (double) c.end())
+                    continue;
+                const auto x = (float) tickToX (songTick);
+                if (x < from - 4.0f || x > to + 4.0f)
+                    continue;
+                g.drawEllipse (x - 2.5f, yOf (p.value) - 2.5f, 5.0f, 5.0f, 1.5f);
+            }
+        }
+    }
 }
 
 void PlaylistComponent::paintClipEnvelope (juce::Graphics& g, const Clip& c, const ClipEnvelope& envelope)
@@ -5993,7 +6166,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             return;
         }
 
-        const auto onLed = trackLed (track).expanded (3).contains (e.getPosition());
+        const auto onLed = ! liveTakeLane (track) && trackLed (track).expanded (3).contains (e.getPosition()); // (round 190oo: none drawn there)
         const auto onArrow = trackArrow (track).contains (e.getPosition());
 
         if (trackAudition (track).expanded (2).contains (e.getPosition()))
@@ -8204,6 +8377,7 @@ void PlaylistComponent::setLiveStyle (bool on)
     if (on == liveStyle)
         return;
     liveStyle = on;
+    foldLanesAfterOpen(); // round 190oo (CS O-3: a project opened in another layout folds when the arrangement first shows it)
     refreshTrackLayout(); // (round 190gw: the Clip-launch layout keeps LYNX's 38 px default row; round 190jn: Live's 19 px in its look)
     updateHeaderWidth();  // (round 190jn: Live's header row is wider)
     updateScrollBars();
@@ -13498,7 +13672,7 @@ PlaylistComponent::Hover PlaylistComponent::hoverAt (juce::Point<int> p) const
         h.track = yToTrack (p.y);
         h.divider = dividerAt (p);
         const auto folded = noteedit::isFoldedAway (engine.getSong(), h.track);
-        h.led = ! folded && h.divider < 0 && trackLed (h.track).expanded (3).contains (p);
+        h.led = ! folded && h.divider < 0 && ! liveTakeLane (h.track) && trackLed (h.track).expanded (3).contains (p); // (round 190oo, CS-20)
         h.arrow = ! folded && h.divider < 0 && trackArrow (h.track).contains (p);
         h.arm = ! folded && h.divider < 0 && trackArm (h.track).expanded (2).contains (p);
         h.input = ! folded && h.divider < 0 && trackInput (h.track).expanded (2).contains (p);
@@ -14407,6 +14581,7 @@ void PlaylistComponent::changeListenerCallback (juce::ChangeBroadcaster* source)
 
     followButton.setToggleState (EditorGlobals::get().isFollowing (false), juce::dontSendNotification);
     refreshArrangementBox();
+    foldLanesAfterOpen(); // round 190oo (CS O-3; nothing unless a project was just opened)
     refreshTrackLayout();
     updateHeaderWidth(); // round 190gz: the project's "Link Playlist tracks to mixer tracks" (menu, undo, another project)
     if (engine.getSong().patternBlocksOn != blocksShown) // Pattern Blocks turned on / off (menu, undo, another project)

@@ -3893,6 +3893,7 @@ void AudioEngine::setSong (Song newSong)
     sessionRedo.clear();
     sessionAfterOpen = false;
     song = std::move (newSong);
+    ++openCount; // (round 190oo: getOpenCount)
     workSince = (double) juce::Time::currentTimeMillis();
     flsettings::forgetSolos(); // (round 190bx: a solo's remembered mute states belong to the project that had it)
     clipops::updateCrossfades (song);

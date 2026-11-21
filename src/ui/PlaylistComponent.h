@@ -538,6 +538,18 @@ private:
     void updateProjection (int count);
     bool laneHidden (int owner) const; // the owner's lanes are folded away (its arrow, a folded track or group)
     void paintClipLaneHeader (juce::Graphics& g, int track, int y, int height, bool hovered);
+    // Round 190oo (CS-19): Live's look draws each automation clip lane as one envelope (a 2 px #ff4d47 line, 6 px hollow
+    // breakpoints) over the lane's whole length instead of clip blocks. The lanes' clips in time order are worked out with
+    // the projection (cliplanes::laneClipLists), so a paint only walks the visible rows' lists.
+    std::vector<std::vector<int>> laneClips;
+    void paintLiveEnvelopeLanes (juce::Graphics& g, juce::Rectangle<int> grid);
+    // Round 190oo (CS O-3): the engine's open count the lanes were last folded for (cliplanes::foldedOnOpen): a project
+    // opened is folded the first time the Clip-launch arrangement shows it
+    std::uint64_t foldedForOpen = 0;
+    void foldLanesAfterOpen();
+    // Round 190oo (CS-20): a take lane under Live's headers has no activator / number box (Live's take-lane header is
+    // the name and the audition speaker only)
+    bool liveTakeLane (int track) const;
     bool showClipProgress = true, showTrackProgress = true; // FL's View › Performance clip / track progress
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override;

@@ -18061,3 +18061,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issues190nsTests.inc" // round 190ns: issues #231, #233, #234, #235
 #include "Tracker190nwTests.inc" // round 190nw (0.1.31): the built-in tracker, stage 1 (core/TrackerGrid.h, core/ModuleImport.h)
 #include "Design190ooTests.inc" // round 190oo (0.1.31): design review 2, the owner's options with rules in core
+#include "Lanes190ooTests.inc" // round 190oo (design review 2, lanes): Live envelope lanes (CS-19), lanes folded on open (CS O-3), Live scale control (O-5)

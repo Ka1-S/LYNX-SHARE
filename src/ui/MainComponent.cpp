@@ -35,6 +35,7 @@
 #include "core/LiveNote.h"
 #include "core/LiveKeys.h"
 #include "core/KeyGuess.h"
+#include "core/LiveScaleControl.h" // (round 190oo, O-5)
 #include "core/ProjectKey.h"
 #include "core/ScaleKeys.h"
 #include "core/SimplePads.h"
@@ -267,6 +268,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         {
             safe->saveUiSettings();
             safe->playlist.refreshViewOptions(); // (round 190jq: header width, pointer click, automation clip lanes)
+            safe->refreshKeyPanel(); // (round 190oo, O-5: Live's three-part scale control on / off)
+            safe->keyPanel.repaint();
             if (trackonly::active())
                 safe->hidePanelForTrackOnly();
         }
@@ -955,6 +958,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     addChildComponent (chordNearHint);
     chordPanel.onMenu = [this] { showChordPanelMenu(); };
     keyPanel.onClick = [this] { showKeyMenu(); };
+    keyPanel.onPart = [this] (int part) { showKeyPart (part); }; // (round 190oo, O-5)
     linkToggle.setComponentID ("toolbar.link");
     linkToggle.onConfigure = [this] { openSettings ((int) SettingsPage::link); };
     keyPanel.setComponentID ("toolbar.key"); // (round 190dv: the first-song tour's ring)
@@ -7442,12 +7446,74 @@ juce::String keyLabel (const projectkey::Key& key)
 {
     return juce::String (projectkey::rootName (key.root)) + " " + tr (juce::String (projectkey::shortScaleName (key.flScale)));
 }
+
+// round 190oo (O-5): the mode chooser's name ("Major", "Minor", "Dorian"; FL's own name for the rest)
+juce::String scaleModeLabel (int flScale)
+{
+    const auto name = tr (juce::String (projectkey::shortScaleName (flScale)));
+    return name.substring (0, 1).toUpperCase() + name.substring (1);
+}
 } // namespace
 
 void MainComponent::refreshKeyPanel()
 {
     const auto key = projectkey::get (engine.getSong());
     keyPanel.setText (key ? keyLabel (*key) : juce::String());
+    // round 190oo (O-5): the three-part control shows the key, or (switched off) the last one shown
+    if (key)
+        scaleShown = *key;
+    else if (! scaleShownSet)
+        scaleShown = projectkey::Key { 0, projectkey::commonFirst().front() };
+    scaleShownSet = true;
+    keyPanel.setScaleParts (key.has_value(), juce::String (projectkey::rootName (scaleShown.root)), scaleModeLabel (scaleShown.flScale));
+}
+
+// Round 190oo (O-5): a click on Live's scale switch turns the project key on (the root and mode shown) or off; the root
+// and mode choosers pick from the Key menu's lists. Off, a choice only changes what the choosers show, as Live keeps its
+// root and mode while Scale Mode is off; the switch then turns that key on.
+void MainComponent::showKeyPart (int part)
+{
+    const auto current = projectkey::get (engine.getSong());
+    if (part == (int) livescale::Part::toggle)
+    {
+        setProjectKey (current ? std::nullopt : std::optional<projectkey::Key> (scaleShown));
+        return;
+    }
+    const auto choose = [this, on = current.has_value()] (projectkey::Key key) {
+        scaleShown = key;
+        if (on)
+            setProjectKey (key);
+        else
+            refreshKeyPanel();
+    };
+    juce::PopupMenu menu;
+    if (part == (int) livescale::Part::root)
+    {
+        for (int r = 0; r < 12; ++r)
+            menu.addItem (juce::String (projectkey::rootName (r)), true, scaleShown.root == r,
+                          [choose, r, scale = scaleShown.flScale] { choose (projectkey::Key { r, scale }); });
+    }
+    else
+    {
+        const auto order = projectkey::commonFirst();
+        juce::PopupMenu more;
+        for (std::size_t i = 0; i < order.size(); ++i)
+        {
+            const auto flScale = order[i];
+            auto item = [choose, flScale, root = scaleShown.root] { choose (projectkey::Key { root, flScale }); };
+            if ((int) i < keyguess::commonScales)
+                menu.addItem (scaleModeLabel (flScale), true, scaleShown.flScale == flScale, item);
+            else
+                more.addItem (juce::String (notetools::flReferenceScales()[(std::size_t) flScale].name), true, scaleShown.flScale == flScale, item);
+        }
+        menu.addSubMenu (tr ("More scales"), more);
+    }
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&keyPanel));
+}
+
+void MainComponent::setLiveScaleControl (bool on)
+{
+    workflowextras::setExtra ("controlBar.liveScale", on); // (saves; onChanged repaints the key box)
 }
 
 void MainComponent::setProjectKey (std::optional<projectkey::Key> key)
@@ -7507,6 +7573,11 @@ juce::PopupMenu MainComponent::makeKeyMenu()
     menu.addSubMenu (tr ("More scales"), more);
     menu.addSeparator();
     menu.addItem (tr ("None"), true, ! current, [this] { setProjectKey (std::nullopt); });
+    if (layoutStyle == layoutstyle::Style::clipLaunch) // round 190oo (O-5, LYNX extra; also in Settings › LYNX extras)
+    {
+        menu.addSeparator();
+        menu.addItem (tr ("Live's scale control: switch, root and mode (LYNX)"), true, livescale::shown, [this] { setLiveScaleControl (! livescale::shown); });
+    }
     return menu;
 }
 
