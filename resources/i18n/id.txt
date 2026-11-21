@@ -12353,3 +12353,5 @@ countries: id
 "Give the session a new invite code (the people still in it keep going)" = "Beri sesi kode undangan baru (yang masih di dalam tetap lanjut)"
 "Keep the same code" = "Pertahankan kode yang sama"
 "When someone is removed" = "Saat seseorang dikeluarkan"
+"FL's wrapper GUI settings (DPI aware off, Scale editor dimensions) are left out: these plugin windows open with the default ones: {0}" = "Pengaturan GUI wrapper FL (DPI aware mati, Scale editor dimensions) tidak disertakan: jendela plugin ini terbuka dengan pengaturan bawaan: {0}"
+"{0} key / MIDI mapping(s) of Overdub, the Loop switch, Punch-in or Punch-out are left out" = "{0} pemetaan tombol / MIDI untuk Overdub, sakelar Loop, Punch-in atau Punch-out tidak disertakan"

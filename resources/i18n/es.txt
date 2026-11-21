@@ -12353,3 +12353,5 @@ countries: es mx ar co cl pe ve
 "Give the session a new invite code (the people still in it keep going)" = "Dar a la sesión un nuevo código de invitación (quienes siguen en ella continúan)"
 "Keep the same code" = "Mantener el mismo código"
 "When someone is removed" = "Cuando se quita a alguien"
+"FL's wrapper GUI settings (DPI aware off, Scale editor dimensions) are left out: these plugin windows open with the default ones: {0}" = "Los ajustes de GUI del wrapper de FL (DPI aware desactivado, Scale editor dimensions) se omiten: las ventanas de estos plugins se abren con los predeterminados: {0}"
+"{0} key / MIDI mapping(s) of Overdub, the Loop switch, Punch-in or Punch-out are left out" = "Se omiten {0} asignación(es) de tecla / MIDI de Overdub, el interruptor Loop, Punch-in o Punch-out"

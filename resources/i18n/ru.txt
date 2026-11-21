@@ -12353,3 +12353,5 @@ countries: ru by kz
 "Give the session a new invite code (the people still in it keep going)" = "Дать сессии новый код приглашения (те, кто уже в ней, продолжают)"
 "Keep the same code" = "Оставить тот же код"
 "When someone is removed" = "Когда кого-то удаляют"
+"FL's wrapper GUI settings (DPI aware off, Scale editor dimensions) are left out: these plugin windows open with the default ones: {0}" = "Настройки GUI обёртки FL (DPI aware выключено, Scale editor dimensions) не сохраняются: окна этих плагинов открываются с настройками по умолчанию: {0}"
+"{0} key / MIDI mapping(s) of Overdub, the Loop switch, Punch-in or Punch-out are left out" = "{0} назначение(я) клавиш / MIDI для Overdub, переключателя Loop, Punch-in или Punch-out не сохраняются"

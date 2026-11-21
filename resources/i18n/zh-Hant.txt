@@ -12353,3 +12353,5 @@ countries: tw hk mo
 "Give the session a new invite code (the people still in it keep going)" = "為工作階段產生新的邀請碼（仍在其中的人繼續）"
 "Keep the same code" = "保留相同的邀請碼"
 "When someone is removed" = "移出某人時"
+"FL's wrapper GUI settings (DPI aware off, Scale editor dimensions) are left out: these plugin windows open with the default ones: {0}" = "FL 包裝器的 GUI 設定（關閉 DPI aware、Scale editor dimensions）不會保留：這些外掛視窗以預設設定開啟：{0}"
+"{0} key / MIDI mapping(s) of Overdub, the Loop switch, Punch-in or Punch-out are left out" = "Overdub、Loop 開關、Punch-in 或 Punch-out 的 {0} 個按鍵 / MIDI 對應不會保留"

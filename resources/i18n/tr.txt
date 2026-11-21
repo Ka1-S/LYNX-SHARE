@@ -12353,3 +12353,5 @@ countries: tr
 "Give the session a new invite code (the people still in it keep going)" = "Oturuma yeni bir davet kodu ver (oturumda kalanlar devam eder)"
 "Keep the same code" = "Aynı kodu koru"
 "When someone is removed" = "Biri çıkarıldığında"
+"FL's wrapper GUI settings (DPI aware off, Scale editor dimensions) are left out: these plugin windows open with the default ones: {0}" = "FL sarmalayıcısının GUI ayarları (DPI aware kapalı, Scale editor dimensions) dışarıda kalır: bu eklentilerin pencereleri varsayılan ayarlarla açılır: {0}"
+"{0} key / MIDI mapping(s) of Overdub, the Loop switch, Punch-in or Punch-out are left out" = "Overdub, Loop anahtarı, Punch-in veya Punch-out için {0} tuş / MIDI eşlemesi dışarıda kalır"

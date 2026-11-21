@@ -12353,3 +12353,5 @@ countries: nl be
 "Give the session a new invite code (the people still in it keep going)" = "De sessie een nieuwe uitnodigingscode geven (wie er nog in zit, gaat door)"
 "Keep the same code" = "Dezelfde code houden"
 "When someone is removed" = "Als iemand wordt verwijderd"
+"FL's wrapper GUI settings (DPI aware off, Scale editor dimensions) are left out: these plugin windows open with the default ones: {0}" = "De GUI-instellingen van FL's wrapper (DPI aware uit, Scale editor dimensions) vervallen: de vensters van deze plugins openen met de standaardinstellingen: {0}"
+"{0} key / MIDI mapping(s) of Overdub, the Loop switch, Punch-in or Punch-out are left out" = "{0} toets- / MIDI-toewijzing(en) van Overdub, de Loop-schakelaar, Punch-in of Punch-out vervallen"

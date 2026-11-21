@@ -1612,6 +1612,54 @@ void toRelease0130 (juce::var& root, Losses& lost)
         if (converted > 0)
             lost.push_back ({ TR_NOOP ("{0} song section(s) of the Sections lane become plain Playlist markers at their starts"), juce::String (converted), false });
     }
+
+    // round 190oh (P3): FL's wrapper Settings › GUI, "DPI aware" (saved only when off) and "Scale editor dimensions" (saved
+    // only when on), on every plugin reference (a channel's plugin, an insert slot's plugin and what it stands in for).
+    // 0.1.30 opens every editor DPI aware at the size it reports: the keys go; a window only, so a view line naming the
+    // plugins, only when one of them was set. Rollup 0.1.31 step 5
+    {
+        juce::StringArray editors;
+        std::function<void (const juce::var&)> walk = [&] (const juce::var& v) {
+            if (auto* a = arrayOf (v))
+            {
+                for (auto& item : *a)
+                    walk (item);
+                return;
+            }
+            auto* obj = objectOf (v);
+            if (obj == nullptr)
+                return;
+            const auto name = obj->getProperty ("name").toString();
+            const auto dpi = drop (*obj, "dpiAware");
+            const auto dims = drop (*obj, "scaleEditorDimensions");
+            if (dpi || dims)
+                addOnce (editors, name.isNotEmpty() ? name : juce::String ("?"));
+            for (auto& p : obj->getProperties())
+                walk (p.value);
+        };
+        walk (juce::var (&o));
+        if (! editors.isEmpty())
+            lost.push_back ({ TR_NOOP ("FL's wrapper GUI settings (DPI aware off, Scale editor dimensions) are left out: these plugin windows open with the default ones: {0}"),
+                              listOf (editors), false });
+    }
+
+    // round gap190og (coverage live4:mapping-0028): key and MIDI mappings of Live's Arrangement Overdub, Loop switch,
+    // Punch-In and Punch-Out (RemoteAction values after launchSelectedClip). 0.1.30 skips an action it does not know when
+    // it reads the project, so they go here with a line instead of vanishing silently. Rollup 0.1.31 step 5
+    if (auto* mappings = arrayOf (root["remoteMappings"]))
+    {
+        int newer = 0;
+        for (int i = mappings->size(); --i >= 0;)
+            if ((int) (*mappings)[i].getProperty ("action", -1) > (int) RemoteAction::launchSelectedClip)
+            {
+                mappings->remove (i);
+                ++newer;
+            }
+        if (mappings->isEmpty())
+            drop (o, "remoteMappings");
+        if (newer > 0)
+            lost.push_back ({ TR_NOOP ("{0} key / MIDI mapping(s) of Overdub, the Loop switch, Punch-in or Punch-out are left out"), juce::String (newer), false });
+    }
 }
 
 struct Step

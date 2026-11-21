@@ -8352,6 +8352,153 @@ private:
             }
         }
 
+        // rollup 0.1.31 step 5 (round 190or): Save a copy for 0.1.30 / 0.1.28 with everything step 5 saves. 190ol's sections
+        // (plain markers at their starts, one view line); 190ol's Simple time signature changes (ordinary signature markers
+        // 0.1.30 has: kept, n/1 and 7/8 included); 190oh's wrapper GUI flags on a channel's plugin and an insert's plugin (keys
+        // dropped, one view line naming both); gap190og's transport mappings (the Overdub key mapping dropped with a line,
+        // the Play one kept); 190ob's tracker volume automation (a channel Volume multiplier clip: kept point for point);
+        // 190on's stacked lanes and palette are profile settings and 190og's .flm export keeps no settings (the song is the
+        // same after an export). The 0.1.30 copy keeps every key but the three dropped ones and has exactly three lines
+        juce::String rollup031s5Result = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            if (song.mixer.size() < 3)
+                song.mixer.resize (3);
+            // 190ol: two sections; Simple signature changes at the start (5/1, BandLab's n/1: the song's meter) and on bar 9 (7/8:
+            // a signature marker)
+            lynx::sections::add (song, "Intro");
+            lynx::sections::add (song, "Verse");
+            lynx::signatureedit::set (song, 0, 5, 1);
+            lynx::signatureedit::set (song, song.barAt (0).tick + 8 * 5 * lynx::ppq * 4, 7, 8);
+            std::vector<lynx::Marker> signatures;
+            for (const auto& m : song.markers())
+                if (m.isSignature())
+                    signatures.push_back (m);
+            // 190oh: a plugin channel with DPI aware off, an insert plugin with Scale editor dimensions on
+            lynx::ChannelDef synth;
+            synth.name = "Old Synth";
+            synth.instrument = lynx::InstrumentKind::plugin;
+            synth.plugin.id = "VST3:old-synth";
+            synth.plugin.name = "Old Synth";
+            synth.plugin.dpiAware = false;
+            song.channels.push_back (synth);
+            const auto synthIndex = (int) song.channels.size() - 1;
+            lynx::EffectSlot fx;
+            fx.kind = lynx::EffectKind::plugin;
+            fx.plugin.id = "VST3:tiny-eq";
+            fx.plugin.name = "Tiny EQ";
+            fx.plugin.scaleEditorDimensions = true;
+            song.mixer[2].effects.push_back (fx);
+            // gap190og: a key mapped to Arrangement Overdub (newer) and one to Play (0.1.30 has it)
+            lynx::RemoteMapping overdub, play;
+            overdub.source = play.source = lynx::RemoteMapping::Source::key;
+            overdub.key = 'O', overdub.action = lynx::RemoteAction::overdub;
+            play.key = 'P', play.action = lynx::RemoteAction::play;
+            song.remoteMappings = { overdub, play };
+            // 190ob: the tracker import's volume automation (the channel's Levels "Volume multiplier", 5000 = 100 %)
+            lynx::Automation volume;
+            volume.name = "Old Synth volume (ch 1)";
+            volume.target.kind = lynx::AutomationTargetKind::channelAdjust;
+            volume.target.index = synthIndex;
+            volume.target.param = lynx::leveladjust::volume;
+            volume.points = { { 0, 0.5f }, { lynx::ppq, 0.25f }, { 2 * lynx::ppq, 0.4f } };
+            song.automations.push_back (volume);
+            lynx::uids::normalize (song);
+            const auto json = lynx::ProjectFile::toJson (song);
+            const auto keysOf = [] (const juce::var& v) {
+                std::set<juce::String> keys;
+                std::function<void (const juce::var&, const juce::String&)> walk = [&] (const juce::var& x, const juce::String& path) {
+                    if (auto* o = x.getDynamicObject())
+                        for (const auto& prop : o->getProperties())
+                        {
+                            if (path.isEmpty() && (prop.name.toString() == "savedBy" || prop.name.toString() == "copiedFrom"))
+                                continue;
+                            keys.insert (path + "/" + prop.name.toString());
+                            walk (prop.value, path + "/" + prop.name.toString());
+                        }
+                    else if (auto* a = x.getArray())
+                        for (const auto& e : *a)
+                            walk (e, path + "[]");
+                };
+                walk (v, {});
+                return keys;
+            };
+            auto expected = keysOf (juce::JSON::parse (json));
+            const auto hadKeys = expected.erase ("/arrangements[]/sections") == 1 && expected.erase ("/channels[]/plugin/dpiAware") == 1
+                                 && expected.erase ("/mixer[]/effects[]/plugin/scaleEditorDimensions") == 1;
+            const auto countOf = [] (const lynx::olderlynx::Copy& c, const char* start) {
+                return (int) std::count_if (c.lost.begin(), c.lost.end(), [start] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).startsWith (start); });
+            };
+            const auto detailOf = [] (const lynx::olderlynx::Copy& c, const char* start) {
+                for (const auto& l : c.lost)
+                    if (juce::String (l.text).startsWith (start))
+                        return juce::String (l.detail);
+                return juce::String();
+            };
+            if (! hadKeys || song.sections().size() != 2 || song.beatsPerBar != 5 || song.beatUnit != 1 || signatures.size() != 1 || signatures[0].numerator != 7)
+                rollup031s5Result = "ERROR set-up (" + juce::String ((int) signatures.size()) + " signature changes)";
+            // (190og: the .flm export reads the song and keeps nothing in it)
+            if (rollup031s5Result == "OK")
+            {
+                const auto flm = lynx::exportFlm (song);
+                if (flm.bytes.empty() || lynx::ProjectFile::toJson (song) != json)
+                    rollup031s5Result = "ERROR the .flm export (" + juce::String ((int) flm.bytes.size()) + " bytes)";
+            }
+            for (const auto* release : { "0.1.30", "0.1.28" })
+            {
+                if (rollup031s5Result != "OK")
+                    break;
+                const auto copy = lynx::olderlynx::forRelease (song, release);
+                juce::String why;
+                const auto back = copy.ok ? lynx::ProjectFile::fromJson (copy.json, why) : std::optional<lynx::Song> {};
+                const auto is130 = juce::String (release) == "0.1.30";
+                std::vector<lynx::Marker> backSignatures;
+                int sectionMarkers = 0;
+                if (back)
+                    for (const auto& m : back->markers())
+                        if (m.isSignature())
+                            backSignatures.push_back (m);
+                        else if (m.name == "Intro" || m.name == "Verse")
+                            ++sectionMarkers;
+                const auto bars = song.barsBetween (0, 400 * lynx::ppq);
+                const auto backBars = back ? back->barsBetween (0, 400 * lynx::ppq) : std::vector<lynx::Bar> {};
+                const auto backFx = back && back->mixer.size() > 2 && ! back->mixer[2].effects.empty() ? back->mixer[2].effects.back().plugin : lynx::PluginRef {};
+                if (! copy.ok || ! back)
+                    rollup031s5Result = juce::String ("ERROR copy ") + release + " " + copy.error + why;
+                else if (copy.json.contains ("\"sections\"") || ! back->sections().empty() || sectionMarkers != 2
+                         || countOf (copy, "{0} song section(s) of the Sections lane") != 1)
+                    rollup031s5Result = juce::String ("ERROR 190ol's sections in the copy for ") + release;
+                else if (backSignatures.size() != signatures.size()
+                         || ! std::equal (signatures.begin(), signatures.end(), backSignatures.begin(), [] (const lynx::Marker& a, const lynx::Marker& b) {
+                                return a.tick == b.tick && a.numerator == b.numerator && a.denominator == b.denominator;
+                            })
+                         || back->beatsPerBar != song.beatsPerBar || back->beatUnit != song.beatUnit
+                         || ! std::equal (bars.begin(), bars.end(), backBars.begin(), backBars.end(), [] (const lynx::Bar& a, const lynx::Bar& b) {
+                                return a.tick == b.tick && a.length == b.length && a.number == b.number;
+                            }))
+                    rollup031s5Result = juce::String ("ERROR 190ol's time signature changes in the copy for ") + release;
+                else if (copy.json.contains ("dpiAware") || copy.json.contains ("scaleEditorDimensions") || ! back->channels[(std::size_t) synthIndex].plugin.dpiAware
+                         || backFx.scaleEditorDimensions || backFx.name != "Tiny EQ"
+                         || countOf (copy, "FL's wrapper GUI settings") != 1 || ! detailOf (copy, "FL's wrapper GUI settings").contains ("Old Synth")
+                         || ! detailOf (copy, "FL's wrapper GUI settings").contains ("Tiny EQ"))
+                    rollup031s5Result = juce::String ("ERROR 190oh's wrapper GUI settings in the copy for ") + release + " (" + detailOf (copy, "FL's wrapper GUI settings") + ")";
+                else if (back->remoteMappings.size() != 1 || back->remoteMappings[0].action != lynx::RemoteAction::play
+                         || countOf (copy, "{0} key / MIDI mapping(s) of Overdub") != 1 || detailOf (copy, "{0} key / MIDI mapping(s) of Overdub") != "1")
+                    rollup031s5Result = juce::String ("ERROR gap190og's transport mappings in the copy for ") + release;
+                else if (back->automations != song.automations)
+                    rollup031s5Result = juce::String ("ERROR 190ob's volume automation in the copy for ") + release;
+                else if (is130 && (copy.lost.size() != 3 || keysOf (juce::JSON::parse (copy.json)) != expected))
+                    rollup031s5Result = "ERROR the copy for 0.1.30 drops more than step 5's three (" + juce::String ((int) copy.lost.size()) + " lines)";
+            }
+            // a project without any of them: no step-5 line (the default song)
+            if (rollup031s5Result == "OK")
+            {
+                const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.30");
+                if (! plain.ok || ! plain.lost.empty())
+                    rollup031s5Result = "ERROR lines for a project with none of step 5's data (" + juce::String ((int) plain.lost.size()) + ")";
+            }
+        }
+
         // round 190ol (research190oe P1 / P6): the Sections lane in .lynx (both arrangements, and a project without sections
         // keeps its JSON with no "sections" key), a section move as one undo step that restores the song bit for bit, the
         // copies for 0.1.30 / 0.1.28 (sections become plain markers at their starts, one view line), and a 4/4 -> 7/8 -> 4/4
@@ -8885,7 +9032,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK")
                         && danceWindowResult == "OK" && clickActivationResult == "OK" && motionOverlayResult.startsWith ("OK")
@@ -8975,6 +9122,7 @@ private:
                << "rollup031s3_copy_for_0130=" << rollup031s3Result << "\n"
                << "helix4_khs190oc_copy_for_0130=" << helix4khs190ocResult << "\n"
                << "rollup031s4_copy_for_0130=" << rollup031s4Result << "\n"
+               << "rollup031s5_copy_for_0130=" << rollup031s5Result << "\n"
                << "sections190ol=" << sections190olResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";

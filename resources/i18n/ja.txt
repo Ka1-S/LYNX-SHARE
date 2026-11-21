@@ -12353,3 +12353,5 @@ countries: jp
 "Give the session a new invite code (the people still in it keep going)" = "セッションに新しい招待コードを付ける（参加中の人はそのまま続けられます）"
 "Keep the same code" = "同じコードのままにする"
 "When someone is removed" = "誰かを外すとき"
+"FL's wrapper GUI settings (DPI aware off, Scale editor dimensions) are left out: these plugin windows open with the default ones: {0}" = "FL のラッパーの GUI 設定(DPI aware オフ、Scale editor dimensions)は含まれません: これらのプラグインのウィンドウは既定の設定で開きます: {0}"
+"{0} key / MIDI mapping(s) of Overdub, the Loop switch, Punch-in or Punch-out are left out" = "Overdub、Loop スイッチ、Punch-in、Punch-out のキー / MIDI 割り当て {0} 件は含まれません"

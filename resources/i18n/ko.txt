@@ -12353,3 +12353,5 @@ countries: kr
 "Give the session a new invite code (the people still in it keep going)" = "세션에 새 초대 코드 부여(이미 참여 중인 사람은 계속 진행)"
 "Keep the same code" = "같은 코드 유지"
 "When someone is removed" = "누군가를 내보낼 때"
+"FL's wrapper GUI settings (DPI aware off, Scale editor dimensions) are left out: these plugin windows open with the default ones: {0}" = "FL 래퍼의 GUI 설정(DPI aware 끔, Scale editor dimensions)은 빠집니다: 이 플러그인 창은 기본 설정으로 열립니다: {0}"
+"{0} key / MIDI mapping(s) of Overdub, the Loop switch, Punch-in or Punch-out are left out" = "Overdub, Loop 스위치, Punch-in 또는 Punch-out의 키 / MIDI 매핑 {0}개가 빠집니다"
