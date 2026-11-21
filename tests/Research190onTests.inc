@@ -146,3 +146,99 @@ TEST (research190on_p2_palette_key_and_languages)
     }
 }
 
+// ==== 190on P8: Tab to transient
+#include "core/ClipWarp.h"
+#include "core/TransientNav.h"
+
+namespace research190on
+{
+// a drum loop: `hits` sharp noise bursts `period` seconds apart (the first at `first`), 44.1 kHz mono
+inline lynx::SampleData drumLoop (int hits, double first, double period, double seconds)
+{
+    lynx::SampleData s;
+    s.sampleRate = 44100.0;
+    s.left.assign ((std::size_t) (seconds * s.sampleRate), 0.0f);
+    std::uint32_t seed = 12345;
+    for (int h = 0; h < hits; ++h)
+    {
+        const auto at = (std::size_t) std::llround ((first + h * period) * s.sampleRate);
+        for (std::size_t i = 0; i < (std::size_t) (0.12 * s.sampleRate) && at + i < s.left.size(); ++i)
+        {
+            seed = seed * 1664525u + 1013904223u;
+            const auto noise = (float) ((double) (seed >> 8) / (double) (1u << 24) * 2.0 - 1.0);
+            s.left[at + i] = 0.8f * noise * (float) std::exp (-(double) i / (0.02 * s.sampleRate));
+        }
+    }
+    return s;
+}
+} // namespace research190on
+
+TEST (research190on_p8_tab_to_transient_visits_a_drum_loops_hits)
+{
+    using namespace lynx;
+    const double first = 0.05, period = 0.25;
+    const auto sample = research190on::drumLoop (8, first, period, 2.1);
+    const auto attacks = clipwarp::attacks (sample);
+    CHECK (attacks.size() == 8);
+    Song song;
+    song.bpm = 120.0;
+    ChannelDef ch;
+    ch.instrument = InstrumentKind::audioClip;
+    song.channels.push_back (ch);
+    Clip c;
+    c.kind = ClipKind::audio;
+    c.channel = 0;
+    c.start = 4 * ppq; // bar 2
+    c.length = 4 * ppq;
+    song.playlist.push_back (c);
+    const auto stops = transientnav::stops (song, { 0 }, [&] (int) { return attacks; });
+    CHECK (stops.size() == 8);
+    // 8 presses from the clip's start visit the 8 hits in order, each within 1 ms
+    const auto ticksPerSecond = song.bpm / 60.0 * ppq;
+    std::int64_t position = c.start;
+    for (int k = 0; k < 8; ++k)
+    {
+        const auto next = transientnav::step (stops, position, 1);
+        CHECK (next.has_value());
+        if (! next)
+            break;
+        const auto seconds = (double) (*next - c.start) / ticksPerSecond;
+        CHECK (std::abs (seconds - (first + k * period)) <= 0.001);
+        position = *next;
+    }
+    CHECK (! transientnav::step (stops, position, 1)); // nothing after the last
+    // and back
+    const auto back = transientnav::step (stops, position, -1);
+    CHECK (back && *back == stops[6]);
+    CHECK (! transientnav::step (stops, stops.front(), -1));
+    // Shift: the time selection grows to the next / previous stop
+    using transientnav::Range;
+    auto sel = transientnav::extend ({}, stops[2], stops, 1);
+    CHECK (sel == (Range { stops[2], stops[3] }));
+    sel = transientnav::extend (sel, stops[2], stops, 1);
+    CHECK (sel == (Range { stops[2], stops[4] }));
+    sel = transientnav::extend (sel, stops[2], stops, -1);
+    CHECK (sel == (Range { stops[1], stops[4] }));
+    CHECK (transientnav::extend (Range { stops[0], stops[7] }, 0, stops, 1) == (Range { stops[0], stops[7] })); // nothing beyond
+    CHECK (transientnav::extend ({}, stops[3], stops, -1) == (Range { stops[2], stops[3] }));
+    // a clip whose playing part starts after two hits (offset) only has the six later ones, shifted
+    song.playlist[0].offset = (std::int64_t) std::llround (0.5 * ticksPerSecond);
+    const auto later = transientnav::clipStops (song, song.playlist[0], attacks);
+    CHECK (later.size() == 6);
+    // a clip with no attack stops at its edges; a reversed one has no attacks
+    const auto edges = transientnav::stops (song, { 0 }, [] (int) { return std::vector<double> {}; });
+    CHECK (edges == (std::vector<std::int64_t> { c.start, c.start + c.length }));
+    song.playlist[0].reversed = true;
+    CHECK (transientnav::clipStops (song, song.playlist[0], attacks).empty());
+    // the audio editor's frames: attacks, else markers and ends
+    CHECK (transientnav::frameStops ({ 30, 10, 30 }, { 0, 100 }) == (std::vector<std::int64_t> { 10, 30 }));
+    CHECK (transientnav::frameStops ({}, { 100, 0, 50 }) == (std::vector<std::int64_t> { 0, 50, 100 }));
+    // the actions exist, unbound in every layout (Tab is FL's, Shift+Tab Live's, Alt+arrows the Playlist's nudge)
+    for (const auto* id : { "playlist.nextTransient", "playlist.prevTransient", "playlist.extendToNextTransient", "playlist.extendToPrevTransient",
+                            "audioEditor.nextTransient", "audioEditor.prevTransient", "audioEditor.extendToNextTransient", "audioEditor.extendToPrevTransient" })
+    {
+        const auto* a = keys::findAction (id);
+        CHECK (a != nullptr && a->defaults.empty());
+    }
+}
+

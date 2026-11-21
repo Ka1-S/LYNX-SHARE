@@ -2882,6 +2882,10 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("edit.redo")) undoRedo (true);
     else if (is ("help.searchActions") || is ("view.commandPalette")) // #228 (round 190nq); round 190on (P2)
         showActionSearch();
+    else if (is ("audioEditor.nextTransient")) return audioEditorTransient (1, false); // round 190on (P8)
+    else if (is ("audioEditor.prevTransient")) return audioEditorTransient (-1, false);
+    else if (is ("audioEditor.extendToNextTransient")) return audioEditorTransient (1, true);
+    else if (is ("audioEditor.extendToPrevTransient")) return audioEditorTransient (-1, true);
     else if (is ("help.shortcuts"))
     {
         if (helpWindow != nullptr) // F1 again closes the sheet (issue #23)

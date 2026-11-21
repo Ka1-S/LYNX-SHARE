@@ -367,6 +367,17 @@ std::vector<Action> makeActions()
         { "playlist.swipeSelectionToComp", TR_NOOP ("Send the time selection of the take lane to its comp"), Context::playlist, {} },
         { "playlist.timePrevious", TR_NOOP ("Select previous time"), Context::playlist, { chord (left, ctrl) } },
         { "playlist.timeNext", TR_NOOP ("Select next time"), Context::playlist, { chord (right, ctrl) } },
+        // round 190on (research190oe P8, core/TransientNav.h): Pro Tools' Tab to transient, a LYNX extra. No default key in
+        // any layout: Tab is FL's (Pattern), Shift+Tab Live's clip / device switch (Clip-launch), Alt+Left / Right the
+        // Playlist's nudge (Simple's tracks are the Playlist's); the user picks keys in the Shortcut manager
+        { "playlist.nextTransient", TR_NOOP ("Song position to the next transient of the selected audio clips"), Context::playlist, {} },
+        { "playlist.prevTransient", TR_NOOP ("Song position to the previous transient of the selected audio clips"), Context::playlist, {} },
+        { "playlist.extendToNextTransient", TR_NOOP ("Extend the time selection to the next transient"), Context::playlist, {} },
+        { "playlist.extendToPrevTransient", TR_NOOP ("Extend the time selection to the previous transient"), Context::playlist, {} },
+        { "audioEditor.nextTransient", TR_NOOP ("Audio editor / Clip View: cursor to the next transient"), Context::global, {} },
+        { "audioEditor.prevTransient", TR_NOOP ("Audio editor / Clip View: cursor to the previous transient"), Context::global, {} },
+        { "audioEditor.extendToNextTransient", TR_NOOP ("Audio editor / Clip View: extend the selection to the next transient"), Context::global, {} },
+        { "audioEditor.extendToPrevTransient", TR_NOOP ("Audio editor / Clip View: extend the selection to the previous transient"), Context::global, {} },
         // FL 2026's Playlist › Time markers (round 167k: EEMarkerAdd2Menu 32852, EEMarkerAddAutoMenu 16468,
         // EEMarkerAddTSChangeMenu 41044, EEMarkerAddSongLoopMenu 8276); Ctrl+T stays the typing piano elsewhere
         { "playlist.markerAdd", TR_NOOP ("Time markers: Add one..."), Context::playlist, { chord ('T', alt) } },

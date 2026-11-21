@@ -1,4 +1,6 @@
 #include "ui/AudioEditor.h"
+
+#include "core/TransientNav.h" // round 190on (P8)
 #include "ui/AudioEditorTools.h"
 #include "ui/AudioToMidi.h"
 #include "ui/PolyEditor.h"
@@ -281,6 +283,7 @@ class AudioEditor final : public juce::Component,
 public:
     AudioEditor (AudioEngine& e, Source s) : engine (e), source (std::move (s))
     {
+        lastActive = this; // (round 190on, P8: the editor the transient keys go to when none has the focus)
         auto setupIcon = [this] (IconButton& b, const juce::String& tip) {
             b.setFlat (true);
             b.setTooltip (tip);
@@ -475,6 +478,8 @@ public:
 
     ~AudioEditor() override
     {
+        if (lastActive == this)
+            lastActive = nullptr;
         subscribeStripLevel (false); // (round 190oa)
         if (slotMode())
         {
@@ -909,6 +914,57 @@ public:
         syncAxis();
         repaint();
     }
+    // --- round 190on (research190oe P8): Tab to transient (core/TransientNav.h) ---------------------------------------------
+    static inline AudioEditor* lastActive = nullptr;
+
+    // The cursor (or, with `extend`, the selection's edge) to the next / previous attack — the transient ticks the warp
+    // lane shows; a file with none stops at its markers', regions' and own ends. False: no audio.
+    bool moveToTransient (int direction, bool extend)
+    {
+        const auto frames = doc.audio.frames();
+        if (frames <= 0 || ! (doc.audio.sampleRate > 0.0))
+            return false;
+        findWarpAttacks();
+        std::vector<std::int64_t> attacks, fallback { 0, frames };
+        for (const auto a : warpAttacks)
+            attacks.push_back ((std::int64_t) std::llround (a * doc.audio.sampleRate));
+        for (const auto& m : doc.markers)
+        {
+            fallback.push_back (m.start);
+            if (m.isRegion())
+                fallback.push_back (m.end);
+        }
+        const auto stops = transientnav::frameStops (std::move (attacks), std::move (fallback));
+        std::int64_t shown = cursor;
+        if (extend)
+        {
+            const transientnav::Range now { selection.start, selection.end };
+            const auto next = transientnav::extend (now, cursor, stops, direction);
+            if (next == now)
+                return true;
+            selection = { next.from, next.to };
+            shown = direction > 0 ? next.to : next.from;
+        }
+        else
+        {
+            const auto from = selection.empty() ? cursor : (direction > 0 ? selection.end : selection.start);
+            const auto to = transientnav::step (stops, from, direction);
+            if (! to)
+                return true;
+            setCursor (*to);
+            shown = *to;
+        }
+        if (frameToX ((double) shown) < (float) waveArea.getX() || frameToX ((double) shown) > (float) waveArea.getRight())
+        {
+            viewStart = unitOfFrame ((double) shown) - (double) waveArea.getWidth() * fpp * 0.5;
+            clampView();
+        }
+        repaint();
+        return true;
+    }
+    std::int64_t cursorForTests() const noexcept { return cursor; }
+    ae::Range selectionForTests() const noexcept { return selection; }
+
     void findWarpAttacks()
     {
         if (warpAttacksOf == doc.audio.channels.data() && ! warpAttacks.empty())
@@ -1773,6 +1829,7 @@ public:
     // --- mouse ----------------------------------------------------------------------------------------------
     void mouseDown (const juce::MouseEvent& e) override
     {
+        lastActive = this;
         if (e.eventComponent == this && thresholdStrip.contains (e.getPosition()) && e.mods.isLeftButtonDown()) // round 190oa (DP-59)
         {
             noiseThreshold = -1.0f; // (the slot's own threshold, as FL's one noise threshold)
@@ -6774,6 +6831,29 @@ juce::PopupMenu audioEditorMainMenuForSnapshot (juce::Component& component)
 {
     auto* editor = dynamic_cast<AudioEditor*> (&component);
     return editor != nullptr ? editor->mainMenu() : juce::PopupMenu();
+}
+
+// round 190on (P8): the transient keys go to the audio editor that has the focus, else to the one used last (a window or
+// the Clip-launch Clip View) while it is on screen
+bool audioEditorTransient (int direction, bool extend)
+{
+    AudioEditor* target = nullptr;
+    if (auto* focused = juce::Component::getCurrentlyFocusedComponent())
+        target = dynamic_cast<AudioEditor*> (focused) != nullptr ? dynamic_cast<AudioEditor*> (focused) : focused->findParentComponentOfClass<AudioEditor>();
+    if (target == nullptr && AudioEditor::lastActive != nullptr && AudioEditor::lastActive->isShowing())
+        target = AudioEditor::lastActive;
+    return target != nullptr && target->moveToTransient (direction, extend);
+}
+
+bool audioEditorTransientForSnapshot (juce::Component& component, int direction, bool extend, std::int64_t& cursor, std::int64_t& selStart, std::int64_t& selEnd)
+{
+    auto* editor = dynamic_cast<AudioEditor*> (&component);
+    if (editor == nullptr || ! editor->moveToTransient (direction, extend))
+        return false;
+    cursor = editor->cursorForTests();
+    selStart = editor->selectionForTests().start;
+    selEnd = editor->selectionForTests().end;
+    return true;
 }
 
 juce::StringArray audioEditorMenuForSnapshot (juce::Component& component)

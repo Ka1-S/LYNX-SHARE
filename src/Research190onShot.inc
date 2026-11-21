@@ -209,6 +209,78 @@
             closePalette();
         }
 
+        // ================= P8: Tab to transient =================
+        {
+            ui.showPanelsForSnapshot ({ Panel::playlist });
+            ws.activate (Panel::playlist);
+            engine.dispatchPendingMessages();
+            auto& pl = ui.getPlaylistForSnapshot();
+            pl.setSize (juce::jmax (pl.getWidth(), 1200), juce::jmax (pl.getHeight(), 500));
+            pl.setViewForSnapshot (400.0, 0, 0);
+            pl.setPlayheadForSnapshot ((double) bar);
+            engine.dispatchPendingMessages();
+            const auto ticksPerSecond = engine.getSong().bpm / 60.0 * ppq;
+            int visited = 0;
+            double worstMs = 0.0;
+            for (int k = 0; k < 8; ++k)
+            {
+                pl.runAction ("playlist.nextTransient");
+                engine.dispatchPendingMessages();
+                const auto at = (pl.playheadTickForSnapshot() - (double) bar) / ticksPerSecond;
+                const auto errMs = std::abs (at - (firstHit + k * hitPeriod)) * 1000.0;
+                worstMs = std::max (worstMs, errMs);
+                visited += errMs <= 1.0 ? 1 : 0;
+            }
+            line ("Playlist: 8 presses, worst error " + juce::String (worstMs, 3) + " ms");
+            check ("Playlist: 8 presses visit the 8 hits in order (within 1 ms)", visited == 8);
+            pl.runAction ("playlist.prevTransient");
+            engine.dispatchPendingMessages();
+            check ("Playlist: back one hit", std::abs ((pl.playheadTickForSnapshot() - (double) bar) / ticksPerSecond - (firstHit + 6 * hitPeriod)) <= 0.001);
+            pl.setPlayheadForSnapshot ((double) bar);
+            pl.runAction ("playlist.nextTransient");
+            pl.runAction ("playlist.extendToNextTransient");
+            pl.runAction ("playlist.extendToNextTransient");
+            pl.runAction ("playlist.extendToNextTransient");
+            engine.dispatchPendingMessages();
+            const auto& song = engine.getSong();
+            const auto selFrom = (double) (song.loopStart - bar) / ticksPerSecond, selTo = (double) (song.loopEnd - bar) / ticksPerSecond;
+            line ("Playlist: Shift x3 -> time selection " + juce::String (selFrom, 4) + " .. " + juce::String (selTo, 4) + " s of the clip");
+            check ("Playlist: Shift extends the time selection hit by hit", song.hasLoop() && std::abs (selFrom - firstHit) <= 0.001 && std::abs (selTo - (firstHit + 3 * hitPeriod)) <= 0.001);
+            pl.repaint();
+            engine.dispatchPendingMessages();
+            write (pl, { 0, 0, juce::jmin (pl.getWidth(), 1200), 200 }, "p8-playlist-selection");
+            engine.editSong ([] (Song& s) { s.loopStart = s.loopEnd = 0; }, false);
+
+            // the audio editor (the same editor as the Clip-launch Clip View)
+            auto panel = makeAudioEditorPanel (engine, drumChannel, 0, false);
+            check ("audio editor panel", panel != nullptr);
+            if (panel != nullptr)
+            {
+                panel->setSize (1000, 380);
+                engine.dispatchPendingMessages();
+                int hits = 0;
+                double worst = 0.0;
+                std::int64_t cursor = 0, s0 = 0, s1 = 0;
+                for (int k = 0; k < 8; ++k)
+                    if (audioEditorTransientForSnapshot (*panel, 1, false, cursor, s0, s1))
+                    {
+                        const auto err = std::abs ((double) cursor / 44100.0 - (firstHit + k * hitPeriod)) * 1000.0;
+                        worst = std::max (worst, err);
+                        hits += err <= 1.0 ? 1 : 0;
+                    }
+                line ("audio editor: 8 presses, worst error " + juce::String (worst, 3) + " ms");
+                check ("audio editor: 8 presses visit the 8 hits (within 1 ms)", hits == 8);
+                audioEditorTransientForSnapshot (*panel, -1, false, cursor, s0, s1);
+                audioEditorTransientForSnapshot (*panel, -1, false, cursor, s0, s1);
+                audioEditorTransientForSnapshot (*panel, 1, true, cursor, s0, s1);
+                audioEditorTransientForSnapshot (*panel, 1, true, cursor, s0, s1);
+                line ("audio editor: selection " + juce::String ((double) s0 / 44100.0, 4) + " .. " + juce::String ((double) s1 / 44100.0, 4) + " s");
+                check ("audio editor: Shift extends the selection hit by hit",
+                       std::abs ((double) s0 / 44100.0 - (firstHit + 5 * hitPeriod)) <= 0.001 && std::abs ((double) s1 / 44100.0 - (firstHit + 7 * hitPeriod)) <= 0.001);
+                write (*panel, panel->getLocalBounds(), "p8-audioeditor-selection");
+            }
+        }
+
         juce::File (prefix + "-checks.txt").replaceWithText (checks + (allOk ? "result=OK\n" : "result=FAIL\n"));
         wav.deleteFile();
         return allOk;

@@ -1,4 +1,5 @@
 #include <cstring>
+#include "core/TransientNav.h" // round 190on (P8)
 #include "core/TrackIconScale.h"
 #include "core/SelectionRename.h"
 #include "core/FlCurve.h"
@@ -12407,6 +12408,10 @@ bool PlaylistComponent::runAction (const std::string& id)
     else if (is ("playlist.swipeSelectionToComp")) swipeTimeSelectionToComp (currentTrack);
     else if (is ("playlist.timePrevious")) moveTimeSelection (-1);
     else if (is ("playlist.timeNext")) moveTimeSelection (1);
+    else if (is ("playlist.nextTransient")) moveToTransient (1, false); // round 190on (P8)
+    else if (is ("playlist.prevTransient")) moveToTransient (-1, false);
+    else if (is ("playlist.extendToNextTransient")) moveToTransient (1, true);
+    else if (is ("playlist.extendToPrevTransient")) moveToTransient (-1, true);
     else if (is ("playlist.markerAdd")) addMarkerByKey();
     else if (is ("playlist.markerAuto")) addAutoMarker();
     else if (is ("playlist.markerSignature")) addSignatureChangeByKey();
@@ -13020,6 +13025,83 @@ void PlaylistComponent::moveTimeSelection (int direction)
         updateScrollBars();
     }
     repaint();
+}
+
+// round 190on (research190oe P8, core/TransientNav.h): Tab to transient. The song position (or, with `extend`, the time
+// selection's edge) goes to the next / previous attack of the selected audio clips (none selected: of every audio clip);
+// a clip with no attack stops at its edges. The attacks are found once per sample (clipwarp::attacks, the audio editor's).
+std::vector<double> PlaylistComponent::clipAttacks (int index)
+{
+    const auto& song = engine.getSong();
+    if (index < 0 || index >= (int) song.playlist.size())
+        return {};
+    const auto& clip = song.playlist[(std::size_t) index];
+    if (clip.channel < 0 || clip.channel >= (int) song.channels.size())
+        return {};
+    const auto path = juce::String::fromUTF8 (song.channels[(std::size_t) clip.channel].samplePath.c_str());
+    const auto sample = engine.getSampleLibrary().load (path);
+    if (sample == nullptr)
+        return {};
+    auto& cached = transientCache[path.toStdString()];
+    if (cached.first.lock() != sample)
+        cached = { sample, clipwarp::attacks (*sample) };
+    return cached.second;
+}
+
+bool PlaylistComponent::moveToTransient (int direction, bool extend)
+{
+    const auto& song = engine.getSong();
+    std::vector<int> clips;
+    for (const auto i : selection)
+        if (i >= 0 && i < (int) song.playlist.size() && song.playlist[(std::size_t) i].kind == ClipKind::audio)
+            clips.push_back (i);
+    if (clips.empty())
+        for (int i = 0; i < (int) song.playlist.size(); ++i)
+            if (song.playlist[(std::size_t) i].kind == ClipKind::audio)
+                clips.push_back (i);
+    const auto stops = transientnav::stops (song, clips, [this] (int i) { return clipAttacks (i); });
+    if (stops.empty())
+    {
+        ui::postHint ({ tr ("No audio clip to go through: transients are found in audio clips"), {}, false, false }, 3000);
+        return false;
+    }
+    // (stopped: the position this view shows — a jump reaches the engine's transport with its next audio block)
+    const auto playing = engine.getTransport().playing.load();
+    const auto position = (std::int64_t) std::llround (std::max (0.0, ! playing && playheadTick >= 0.0 ? playheadTick : engine.songPlayheadTicks()));
+    std::int64_t shown = position;
+    if (extend)
+    {
+        const transientnav::Range now = song.hasLoop() ? transientnav::Range { song.loopStart, song.loopEnd } : transientnav::Range {};
+        const auto next = transientnav::extend (now, position, stops, direction);
+        if (next == now)
+            return true;
+        engine.editSong ([next] (Song& s) {
+            s.loopStart = next.from;
+            s.loopEnd = next.to;
+            s.mode = PlayMode::song;
+        }, false);
+        shown = direction > 0 ? next.to : next.from;
+    }
+    else
+    {
+        const auto to = transientnav::step (stops, position, direction);
+        if (! to)
+            return true;
+        if (song.mode != PlayMode::song)
+            engine.editSong ([] (Song& s) { s.mode = PlayMode::song; }, false);
+        engine.jumpTo ((double) *to);
+        playheadTick = (double) *to;
+        shown = *to;
+    }
+    // keep it in view
+    const auto visible = gridArea().getWidth() / pixelsPerTick;
+    if ((double) shown < scrollTicks || (double) shown > scrollTicks + visible)
+    {
+        scrollTicks = std::max (0.0, (double) shown - visible * 0.25);
+        updateScrollBars();
+    }
+    repaint();
+    return true;
 }
 
 void PlaylistComponent::placeLoopMarker()
