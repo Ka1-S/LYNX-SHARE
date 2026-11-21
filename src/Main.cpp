@@ -866,7 +866,7 @@ public:
 
         // round 190jg (BUILD-LIST 11 + 18, engine/HostingTests.h): grouped plugin processes, CLAP extensions, timing
         if (args.contains ("--sandboxgrouptest") || args.contains ("--sandboxbench") || args.contains ("--clapext")
-            || args.contains ("--automationtimingtest"))
+            || args.contains ("--automationtimingtest") || args.contains ("--pluginbench"))
         {
             const auto value = [&args] (const char* name, int fallback) {
                 return args.contains (name) ? args[args.indexOf (name) + 1].getIntValue() : fallback;
@@ -878,6 +878,12 @@ public:
             else if (const auto b = args.indexOf ("--sandboxbench"); b >= 0)
                 code = lynx::runSandboxBench (args[b + 1].unquoted(), args[b + 2].unquoted(), value ("--plugins", 8), value ("--block", 256),
                                               args.contains ("--seconds") ? args[args.indexOf ("--seconds") + 1].getDoubleValue() : 5.0);
+            else if (const auto pb = args.indexOf ("--pluginbench"); pb >= 0) // round 190of: per-plugin cost (engine/HostingTests.h)
+                code = lynx::runPluginBench (args[pb + 1].unquoted(), args[pb + 2].unquoted(), value ("--block", 256),
+                                             args.contains ("--rate") ? args[args.indexOf ("--rate") + 1].getDoubleValue() : 48000.0,
+                                             args.contains ("--seconds") ? args[args.indexOf ("--seconds") + 1].getDoubleValue() : 4.0, value ("--types", 8),
+                                             args.contains ("--names") ? args[args.indexOf ("--names") + 1].unquoted() : juce::String(),
+                                             args.contains ("--editors"));
             else if (const auto c = args.indexOf ("--clapext"); c >= 0)
                 code = lynx::runClapExtTest (args[c + 1].unquoted(), args[c + 2].unquoted());
             else if (const auto t = args.indexOf ("--automationtimingtest"); t >= 0)

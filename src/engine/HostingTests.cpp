@@ -23,10 +23,18 @@
 #include "engine/PluginSandbox.h"
 #include "platform/PowerThrottling.h"
 
+#include "platform/ThreadInstructions.h"
+
 #if JUCE_WINDOWS
  #include <windows.h>
+ #include <psapi.h>
 #else
+ #include <dlfcn.h>
+ #include <sys/resource.h>
  #include <unistd.h>
+#endif
+#if defined(__SSE__) || defined(_M_X64) || defined(__x86_64__)
+ #include <xmmintrin.h>
 #endif
 
 // Round 190jg: see engine/HostingTests.h.
@@ -692,5 +700,442 @@ int runAutomationTimingTest (const juce::String& pluginPath, const juce::String&
     report << "result=" << (failures == 0 ? "OK" : "FAILED") << "\n";
     juce::File (reportPath).replaceWithText (report);
     return failures == 0 ? 0 : 1;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Round 190of: --pluginbench (see engine/HostingTests.h)
+namespace
+{
+// the process's private memory (Windows: private bytes; Linux: resident anonymous + file pages, from statm)
+double processMemoryMb()
+{
+   #if JUCE_WINDOWS
+    PROCESS_MEMORY_COUNTERS_EX counters {};
+    if (GetProcessMemoryInfo (GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*) &counters, sizeof (counters)))
+        return (double) counters.PrivateUsage / 1048576.0;
+    return 0.0;
+   #else
+    const auto fields = juce::StringArray::fromTokens (juce::File ("/proc/self/statm").loadFileAsString(), " ", "");
+    return fields.size() > 1 ? fields[1].getDoubleValue() * (double) sysconf (_SC_PAGESIZE) / 1048576.0 : 0.0;
+   #endif
+}
+
+// the calling thread's work counter: instructions retired in user space (Linux) or its CPU cycles (Windows)
+struct WorkCounter
+{
+    platform::ThreadInstructions instructions;
+    long long now() const
+    {
+       #if JUCE_WINDOWS
+        ULONG64 cycles = 0;
+        QueryThreadCycleTime (GetCurrentThread(), &cycles);
+        return (long long) cycles;
+       #else
+        return instructions.now();
+       #endif
+    }
+    static const char* unit()
+    {
+       #if JUCE_WINDOWS
+        return "cycles";
+       #else
+        return "instructions";
+       #endif
+    }
+};
+
+// Linux: LD_PRELOAD=tools/pluginbench/libbenchcount.so counts malloc-family calls and mutex locks made by a thread
+// while it has counting on (lynxbench_counts); without it these columns are "-"
+using CountFn = void (*) (int on, unsigned long* allocations, unsigned long* locks);
+CountFn countHook()
+{
+   #if JUCE_WINDOWS
+    return nullptr;
+   #else
+    static const auto fn = (CountFn) dlsym (RTLD_DEFAULT, "lynxbench_counts");
+    return fn;
+   #endif
+}
+
+struct ThreadSwitches
+{
+    long voluntary = 0, minorFaults = 0;
+    static ThreadSwitches now()
+    {
+        ThreadSwitches s;
+       #if defined(RUSAGE_THREAD)
+        rusage u {};
+        if (getrusage (RUSAGE_THREAD, &u) == 0)
+        {
+            s.voluntary = u.ru_nvcsw;
+            s.minorFaults = u.ru_minflt;
+        }
+       #endif
+        return s;
+    }
+};
+
+struct Phase
+{
+    std::vector<double> work, wallUs; // per block
+    std::vector<float> peak;          // per block, the output's peak
+    unsigned long allocations = 0, locks = 0;
+    long switches = 0, faults = 0;
+    double median (bool wall = false) const
+    {
+        auto v = wall ? wallUs : work;
+        if (v.empty())
+            return 0.0;
+        std::nth_element (v.begin(), v.begin() + (std::ptrdiff_t) (v.size() / 2), v.end());
+        return v[v.size() / 2];
+    }
+    double mean (bool wall = false) const
+    {
+        const auto& v = wall ? wallUs : work;
+        double sum = 0.0;
+        for (const auto x : v)
+            sum += x;
+        return v.empty() ? 0.0 : sum / (double) v.size();
+    }
+    double quantile (double q, bool wall = false) const
+    {
+        auto v = wall ? wallUs : work;
+        if (v.empty())
+            return 0.0;
+        std::sort (v.begin(), v.end());
+        return v[(std::size_t) ((double) (v.size() - 1) * q)];
+    }
+    double max (bool wall = false) const
+    {
+        const auto& v = wall ? wallUs : work;
+        return v.empty() ? 0.0 : *std::max_element (v.begin(), v.end());
+    }
+    // blocks whose work exceeds `factor` x the median (a spike: something the plugin does now and then)
+    int spikes (double factor) const
+    {
+        const auto m = median();
+        int n = 0;
+        for (const auto x : work)
+            n += m > 0.0 && x > factor * m ? 1 : 0;
+        return n;
+    }
+};
+
+enum class Feed { signal, silence };
+
+// Runs `blocks` blocks of `process` on its own thread (FTZ/DAZ as the audio threads have it, unless `denormals`)
+template <typename Process>
+Phase runPhase (int blocks, bool denormals, Process&& process)
+{
+    Phase phase;
+    phase.work.resize ((std::size_t) blocks);
+    phase.wallUs.resize ((std::size_t) blocks);
+    phase.peak.resize ((std::size_t) blocks);
+    std::thread audio ([&] {
+        const lynx::ScopedFlushDenormals noDenormals;
+       #if defined(__SSE__) || defined(_M_X64) || defined(__x86_64__)
+        if (denormals)
+            _mm_setcsr (_mm_getcsr() & ~0x8040u);
+       #else
+        juce::ignoreUnused (denormals);
+       #endif
+        WorkCounter counter;
+        const auto hook = countHook();
+        const auto before = ThreadSwitches::now();
+        if (hook != nullptr)
+            hook (1, nullptr, nullptr);
+        for (int b = 0; b < blocks; ++b)
+        {
+            const auto t0 = std::chrono::steady_clock::now();
+            const auto w0 = counter.now();
+            phase.peak[(std::size_t) b] = process (b);
+            const auto w1 = counter.now();
+            phase.wallUs[(std::size_t) b] = std::chrono::duration<double, std::micro> (std::chrono::steady_clock::now() - t0).count();
+            phase.work[(std::size_t) b] = (double) (w1 - w0);
+        }
+        if (hook != nullptr)
+            hook (0, &phase.allocations, &phase.locks);
+        const auto after = ThreadSwitches::now();
+        phase.switches = after.voluntary - before.voluntary;
+        phase.faults = after.minorFaults - before.minorFaults;
+    });
+    audio.join();
+    return phase;
+}
+
+// the first block from which the output stays under −96 dB (FL's smart-disable silence), −1 = never
+int silentFrom (const Phase& p)
+{
+    int from = -1;
+    for (int b = 0; b < (int) p.peak.size(); ++b)
+        if (p.peak[(std::size_t) b] > 1.5849e-5f)
+            from = -1;
+        else if (from < 0)
+            from = b;
+    return from;
+}
+
+juce::String num (double v, int decimals = 0)
+{
+    return juce::String (v, decimals);
+}
+} // namespace
+
+int runPluginBench (const juce::String& listOrPlugin, const juce::String& reportPath, int block, double rate, double seconds, int typesPerFile,
+                    const juce::String& nameFilter, bool editors)
+{
+    block = juce::jlimit (16, 4096, block);
+    rate = juce::jlimit (8000.0, 384000.0, rate);
+    seconds = juce::jlimit (0.5, 120.0, seconds);
+    setPluginSandboxAlerts (false);
+    juce::StringArray lines;
+    const juce::File list (listOrPlugin);
+    if (list.existsAsFile() && (list.hasFileExtension ("txt") || list.hasFileExtension ("lst")))
+        lines.addLines (list.loadFileAsString());
+    else
+        lines.add (listOrPlugin);
+    const auto filters = juce::StringArray::fromTokens (nameFilter, ",", "");
+
+    juce::String out;
+    out << "# LYNX --pluginbench: block " << block << ", " << rate << " Hz, " << seconds << " s per phase; work = " << WorkCounter::unit()
+        << " per block on the bench thread\n";
+    out << "# load average at the start: " << juce::File ("/proc/loadavg").loadFileAsString().upToFirstOccurrenceOf (" ", false, false) << "\n";
+    out << "file\tplugin\tformat\tkind\tscan_ms\tload_ms\tprepare_ms\tram_load_mb\tram_prepare_mb\tlatency\ttail_s\t"
+           "work_med\twork_p99\twork_max\twall_med_us\twall_p99_us\twall_max_us\tcpu_pct\tpeak_pct\tspikes4x\tover_half\t"
+           "allocs\tlocks\tswitches\tfaults\tsilent_after_ms\tsilence_work_med\tsilence_ratio\tdenormal_ratio\twrap_work_med\twrap_overhead_pct\t"
+           "editor_ms\tram_editor_mb\trelease_ms\tnote\n";
+    const auto budgetUs = block / rate * 1.0e6;
+    const auto signalBlocks = juce::jmax (50, (int) (seconds * rate / block));
+    juce::String errors;
+
+    for (auto line : lines)
+    {
+        line = line.trim();
+        if (line.isEmpty() || line.startsWithChar ('#'))
+            continue;
+        const auto path = line.upToFirstOccurrenceOf ("\t", false, false).trim();
+        const auto only = line.containsChar ('\t') ? line.fromFirstOccurrenceOf ("\t", false, false).trim() : juce::String();
+        PluginHost host (false);
+        const auto s0 = juce::Time::getMillisecondCounterHiRes();
+        host.addPluginFile (juce::File (path));
+        const auto scanMs = juce::Time::getMillisecondCounterHiRes() - s0;
+        std::vector<juce::PluginDescription> types;
+        for (const auto& t : host.getKnownPlugins().getTypes())
+            if (juce::File (t.fileOrIdentifier) == juce::File (path) || t.fileOrIdentifier == path)
+            {
+                auto wanted = only.isEmpty() || t.name.containsIgnoreCase (only);
+                if (wanted && ! filters.isEmpty())
+                {
+                    wanted = false;
+                    for (const auto& f : filters)
+                        wanted = wanted || t.name.containsIgnoreCase (f.trim());
+                }
+                if (wanted)
+                    types.push_back (t);
+            }
+        if (types.empty())
+        {
+            out << path << "\t-\t-\t-\t" << num (scanMs) << "\t" << juce::String::repeatedString ("\t-", 29) << "\tnot found or not loadable\n";
+            juce::File (reportPath).replaceWithText (out);
+            continue;
+        }
+        if ((int) types.size() > typesPerFile)
+            types.resize ((std::size_t) typesPerFile);
+
+        for (const auto& type : types)
+        {
+            juce::String note;
+            const auto mem0 = processMemoryMb();
+            const auto t0 = juce::Time::getMillisecondCounterHiRes();
+            juce::String error;
+            auto instance = createRightInstance (host.getFormats(), type, rate, block, error);
+            const auto loadMs = juce::Time::getMillisecondCounterHiRes() - t0;
+            if (instance == nullptr)
+            {
+                out << path << "\t" << type.name << "\t" << type.pluginFormatName << "\t-\t" << num (scanMs) << "\t" << num (loadMs)
+                    << juce::String::repeatedString ("\t-", 29) << "\tload failed: " << error.replaceCharacters ("\t\n", "  ") << "\n";
+                juce::File (reportPath).replaceWithText (out);
+                continue;
+            }
+            const auto mem1 = processMemoryMb();
+            const auto p0 = juce::Time::getMillisecondCounterHiRes();
+            preparePlugin (*instance, rate, block);
+            const auto prepareMs = juce::Time::getMillisecondCounterHiRes() - p0;
+            const auto mem2 = processMemoryMb();
+            const auto instrument = type.isInstrument || instance->getTotalNumInputChannels() == 0;
+            auto& p = *instance;
+
+            juce::AudioBuffer<float> buffer (juce::jmax (2, p.getTotalNumInputChannels(), p.getTotalNumOutputChannels()), block);
+            juce::MidiBuffer midi;
+            double phaseAngle = 0.0;
+            const int keys[] = { 48, 55, 60, 64 };
+            auto feed = [&] (Feed f, bool first, bool release) {
+                buffer.clear();
+                midi.clear();
+                if (instrument || p.acceptsMidi())
+                {
+                    if (first && f == Feed::signal)
+                        for (const auto key : keys)
+                            midi.addEvent (juce::MidiMessage::noteOn (1, key, (juce::uint8) 100), 0);
+                    if (release)
+                        for (const auto key : keys)
+                            midi.addEvent (juce::MidiMessage::noteOff (1, key), 0);
+                }
+                if (! instrument && f == Feed::signal)
+                    for (int i = 0; i < block; ++i)
+                    {
+                        // a 110 Hz saw-ish tone with harmonics (a compressor / EQ / reverb sees a full band)
+                        const auto v = 0.2f * (float) (std::sin (phaseAngle) + 0.5 * std::sin (3.0 * phaseAngle) + 0.25 * std::sin (7.0 * phaseAngle));
+                        phaseAngle += juce::MathConstants<double>::twoPi * 110.0 / rate;
+                        for (int c = 0; c < juce::jmin (2, buffer.getNumChannels()); ++c)
+                            buffer.setSample (c, i, v);
+                    }
+            };
+            auto peakOut = [&] {
+                auto peak = 0.0f;
+                for (int c = 0; c < juce::jmin (2, buffer.getNumChannels()); ++c)
+                    peak = juce::jmax (peak, buffer.getMagnitude (c, 0, block));
+                return peak;
+            };
+
+            // warm-up (the first blocks allocate, plugins settle), then signal, then silence (notes released / input zero)
+            for (int b = 0; b < 20; ++b)
+            {
+                feed (Feed::signal, b == 0, false);
+                p.processBlock (buffer, midi);
+            }
+            auto signal = runPhase (signalBlocks, false, [&] (int) {
+                feed (Feed::signal, false, false);
+                p.processBlock (buffer, midi);
+                return peakOut();
+            });
+            auto silence = runPhase (signalBlocks, false, [&] (int b) {
+                feed (Feed::silence, false, b == 0);
+                p.processBlock (buffer, midi);
+                return peakOut();
+            });
+            // denormals: the same signal / silence with flush-to-zero off (what a plugin meets when nothing sets it)
+            for (int b = 0; b < (int) (0.5 * rate / block); ++b)
+            {
+                feed (Feed::signal, b == 0, false);
+                p.processBlock (buffer, midi);
+            }
+            auto silenceDenormal = runPhase (signalBlocks, true, [&] (int b) {
+                feed (Feed::silence, false, b == 0);
+                p.processBlock (buffer, midi);
+                return peakOut();
+            });
+            const auto latency = p.getLatencySamples();
+            const auto tail = p.getTailLengthSeconds();
+
+            // LYNX's wrapper (the effect slot / channel instrument adapter) around the same instance: what LYNX adds
+            double wrapMedian = 0.0, releaseMs = 0.0;
+            {
+                std::vector<float> l ((std::size_t) block), r ((std::size_t) block);
+                double angle = 0.0;
+                const auto timedRelease = [&releaseMs] (auto& owner) {
+                    const auto r0 = juce::Time::getMillisecondCounterHiRes();
+                    owner = nullptr;
+                    releaseMs = juce::Time::getMillisecondCounterHiRes() - r0;
+                };
+                if (instrument)
+                {
+                    auto wrapped = std::make_unique<PluginInstrument> (std::move (instance), block);
+                    for (const auto key : keys)
+                        wrapped->noteOn (key, 0.8f);
+                    for (int b = 0; b < 20; ++b)
+                        wrapped->render (l.data(), r.data(), block, 1.0f, 1.0f);
+                    const auto wrap = runPhase (signalBlocks, false, [&] (int) {
+                        std::fill (l.begin(), l.end(), 0.0f);
+                        std::fill (r.begin(), r.end(), 0.0f);
+                        wrapped->render (l.data(), r.data(), block, 1.0f, 1.0f);
+                        return 0.0f;
+                    });
+                    wrapMedian = wrap.median();
+                    wrapped->allNotesOff();
+                    timedRelease (wrapped);
+                }
+                else
+                {
+                    auto wrapped = std::make_unique<PluginEffect> (std::move (instance), block);
+                    EffectParams params {};
+                    auto fill = [&] {
+                        for (int i = 0; i < block; ++i)
+                        {
+                            const auto v = 0.2f * (float) (std::sin (angle) + 0.5 * std::sin (3.0 * angle) + 0.25 * std::sin (7.0 * angle));
+                            angle += juce::MathConstants<double>::twoPi * 110.0 / rate;
+                            l[(std::size_t) i] = r[(std::size_t) i] = v;
+                        }
+                    };
+                    for (int b = 0; b < 20; ++b)
+                    {
+                        fill();
+                        wrapped->process (l.data(), r.data(), block, params, 120.0);
+                    }
+                    const auto wrap = runPhase (signalBlocks, false, [&] (int) {
+                        fill();
+                        wrapped->process (l.data(), r.data(), block, params, 120.0);
+                        return 0.0f;
+                    });
+                    wrapMedian = wrap.median();
+                    timedRelease (wrapped);
+                }
+            }
+
+            // the editor (optional): opened on a new instance, shown in a window of its own, then closed
+            double editorMs = -1.0, editorMb = 0.0;
+            if (editors)
+            {
+                auto second = createRightInstance (host.getFormats(), type, rate, block, error);
+                if (second != nullptr && second->hasEditor())
+                {
+                    preparePlugin (*second, rate, block);
+                    const auto before = processMemoryMb();
+                    const auto e0 = juce::Time::getMillisecondCounterHiRes();
+                    std::unique_ptr<juce::AudioProcessorEditor> editor (second->createEditorIfNeeded());
+                    if (editor != nullptr)
+                    {
+                        editor->addToDesktop (juce::ComponentPeer::windowHasTitleBar);
+                        editor->setVisible (true);
+                        editorMs = juce::Time::getMillisecondCounterHiRes() - e0;
+                        editorMb = processMemoryMb() - before;
+                        editor->setVisible (false);
+                        editor->removeFromDesktop();
+                        second->editorBeingDeleted (editor.get());
+                        editor = nullptr;
+                    }
+                }
+                if (second != nullptr)
+                    second->releaseResources();
+            }
+
+            const auto silentAt = silentFrom (silence);
+            const auto silentMs = silentAt < 0 ? -1.0 : silentAt * budgetUs / 1000.0;
+            // the cost of steady silence: the last half of the silence phase
+            Phase tailHalf;
+            tailHalf.work.assign (silence.work.begin() + (std::ptrdiff_t) (silence.work.size() / 2), silence.work.end());
+            Phase tailHalfDen;
+            tailHalfDen.work.assign (silenceDenormal.work.begin() + (std::ptrdiff_t) (silenceDenormal.work.size() / 2), silenceDenormal.work.end());
+            const auto sigMed = signal.median();
+            const auto overHalf = (int) std::count_if (signal.wallUs.begin(), signal.wallUs.end(), [budgetUs] (double us) { return us > 0.5 * budgetUs; });
+            const auto hook = countHook() != nullptr;
+            if (signal.peak.empty() || *std::max_element (signal.peak.begin(), signal.peak.end()) < 1.0e-6f)
+                note << "silent output with the test signal; ";
+            out << path << "\t" << type.name << "\t" << type.pluginFormatName << "\t" << (instrument ? "instrument" : "effect") << "\t" << num (scanMs) << "\t"
+                << num (loadMs, 1) << "\t" << num (prepareMs, 1) << "\t" << num (mem1 - mem0, 1) << "\t" << num (mem2 - mem1, 1) << "\t" << latency << "\t"
+                << num (tail, 2) << "\t" << num (sigMed) << "\t" << num (signal.quantile (0.99)) << "\t" << num (signal.max()) << "\t"
+                << num (signal.median (true), 1) << "\t" << num (signal.quantile (0.99, true), 1) << "\t" << num (signal.max (true), 1) << "\t"
+                << num (signal.mean (true) / budgetUs * 100.0, 2) << "\t" << num (signal.max (true) / budgetUs * 100.0, 1) << "\t" << signal.spikes (4.0) << "\t"
+                << overHalf << "\t" << (hook ? juce::String ((juce::int64) signal.allocations) : juce::String ("-")) << "\t"
+                << (hook ? juce::String ((juce::int64) signal.locks) : juce::String ("-")) << "\t" << (int) signal.switches << "\t" << (int) signal.faults << "\t"
+                << num (silentMs, 0) << "\t" << num (tailHalf.median()) << "\t" << num (sigMed > 0 ? tailHalf.median() / sigMed : 0.0, 2) << "\t"
+                << num (tailHalf.median() > 0 ? tailHalfDen.median() / tailHalf.median() : 0.0, 2) << "\t" << num (wrapMedian) << "\t"
+                << num (sigMed > 0 ? (wrapMedian - sigMed) / sigMed * 100.0 : 0.0, 1) << "\t" << num (editorMs, 1) << "\t" << num (editorMb, 1) << "\t"
+                << num (releaseMs, 1) << "\t" << note << "\n";
+            juce::File (reportPath).replaceWithText (out); // (what was reached, if a plugin crashes the run)
+        }
+    }
+    juce::File (reportPath).replaceWithText (out + "result=OK\n");
+    return 0;
 }
 } // namespace lynx
