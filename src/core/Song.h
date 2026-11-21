@@ -2626,6 +2626,16 @@ inline void resetWorkTime (ProjectInfo& info, double nowSeconds) noexcept
     info.workSeconds = 0.0;
 }
 
+// Issue #240 (round 190od): a template is where a project starts, not part of its history. A user's template keeps the
+// date and the working time it was saved with, so a project made from it showed the template's "Created" and counted on
+// from the time spent building the template. A new project from a template (and a template being saved) drops both:
+// the new project is dated when it starts (AudioEngine::markCreatedNow) and its clock starts at 0:00:00.
+inline void clearProjectClock (ProjectInfo& info) noexcept
+{
+    info.created = 0.0;
+    info.workSeconds = 0.0;
+}
+
 // Online Sessions (docs/design/ONLINE_SESSIONS.md §2, round 168a): who works on a project. The host (the project's
 // owner) has tag 1; each friend the project is sent to gets the next tag, and the entities he creates carry it in
 // their uid (uids::tagOf), so "his area" needs no table. Inserts and Playlist rows are positional: each guest gets a

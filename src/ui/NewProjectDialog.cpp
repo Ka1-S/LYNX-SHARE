@@ -430,6 +430,7 @@ private:
         if (auto song = ProjectFile::load (item.file, error))
         {
             adoptFlPluginLevels (*song); // (round 190ad: FL's plugin levels, unless it holds plugins made under LYNX's)
+            clearProjectClock (song->info); // (issue #240: a new project, dated now, working time from 0:00:00)
             return std::move (*song);
         }
         return makeNewProject();
@@ -599,6 +600,7 @@ std::optional<Song> makeFromTemplate (const TemplateChoice& choice)
             if (auto song = ProjectFile::load (file, error)) // (a user's template stays as saved)
             {
                 adoptFlPluginLevels (*song); // (round 190ad: FL's plugin levels, unless it holds plugins made under LYNX's)
+                clearProjectClock (song->info); // (issue #240: but the new project starts now, its working time at 0:00:00)
                 return song;
             }
             return std::nullopt;
@@ -628,7 +630,9 @@ bool saveUserTemplate (const Song& song, const juce::String& name, juce::String&
         error = tr ("could not create {0}", { folder.getFullPathName() });
         return false;
     }
-    return ProjectFile::save (song, folder.getChildFile (legal + ProjectFile::extension), error);
+    auto copy = song;
+    clearProjectClock (copy.info); // (issue #240: a template has no date or working time of its own)
+    return ProjectFile::save (copy, folder.getChildFile (legal + ProjectFile::extension), error);
 }
 
 void showNewProjectDialog (NewProjectCallback onCreate)
