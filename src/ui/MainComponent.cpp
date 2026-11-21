@@ -7796,11 +7796,12 @@ void MainComponent::timerCallback()
     {
         const uitrace::Scope part ("timer: performance meter", false);
         meterTicks = 0;
-        const auto held = (int) heldKeys.size();
-        const auto notes = playing ? songstats::soundingNotes (engine.getSong(), transport.positionTicks.load()) : 0;
+        // round 190oa (DF-29, owner decision F5; REA 190oa R1): FL's voices being mixed — every channel's sounding and
+        // still-releasing voices (the renderer's count: song, keyboard, MIDI, audio clips) and the automation clips playing
+        const auto notes = engine.voicesSounding() + (playing ? songstats::automationClipsAt (engine.getSong(), transport.positionTicks.load()) : 0);
         if (toolbar::PerformanceMeter::secondView == toolbar::PerformanceMeter::framesPerSecond) // round 190ld: View FPS
             perfMeter.setFramesPerSecond (ui::FrameTicker::uiFrameRate());
-        perfMeter.setValues (engine.getDeviceManager().getCpuUsage(), toolbar::PerformanceMeter::processMemoryBytes(), notes + held);
+        perfMeter.setValues (engine.getDeviceManager().getCpuUsage(), toolbar::PerformanceMeter::processMemoryBytes(), notes);
         const auto rt = engine.getRtStats().snapshot();
         juce::StringArray heaviest;
         for (const auto& u : engine.getHeaviestUnits())

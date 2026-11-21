@@ -72,8 +72,11 @@ public:
     void setRenderAheadTargets (const renderahead::Targets* targets) noexcept { ahead->setTargets (targets); }
     NoteMask soundingKeys (int channel) const noexcept { return ahead->rendererOf (channel).soundingKeys (channel); }
     std::uint32_t noteStrikes (int channel) const noexcept { return ahead->rendererOf (channel).noteStrikes (channel); }
+    // round 190oa (DF-29): the voices sounding (each renderer counts the channels it renders)
+    int voicesSounding() const noexcept { return renderer.voicesSounding() + ahead->aheadRenderer().voicesSounding(); }
     void setOverriddenSlots (const std::vector<int>& slots) noexcept { ahead->setOverriddenSlots (slots); }
     void setReleasedSlots (const std::vector<int>& slots) noexcept { ahead->setReleasedSlots (slots); }
+    void setKeepReleasedOnPlay (bool keep) noexcept { ahead->setKeepReleasedOnPlay (keep); } // (round 190oa, DL-58)
     void setProfiling (bool on) noexcept { ahead->setProfiling (on); }
     bool renderAheadOwnsWorkers() const noexcept { return ahead->ownsWorkers(); }
     void haltRenderAhead() noexcept { ahead->halt(); }

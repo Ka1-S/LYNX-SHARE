@@ -534,6 +534,7 @@ public:
     NoteMask soundingKeys (int channel) const noexcept;
     // round 190ih: a counter that moves with every block that struck a note on the channel (the rack's activity light)
     std::uint32_t noteStrikes (int channel) const noexcept;
+    int voicesSounding() const noexcept; // round 190oa (DF-29): the toolbar's polyphony (FL's voices being mixed)
 
     // FL's score logger (REA round 165f): every note played on a MIDI input or the typing keyboard, recording or
     // not, for Tools › Dump score log to selected pattern. Any thread (a short spin lock; never the audio thread).
@@ -792,6 +793,7 @@ public:
     ControllerSeen lastControllerSeen() const noexcept { return controllerSeen; }
     // A controller message as if a device had sent it (tests, --snapshot). Message thread.
     void injectControllerForTest (int cc, int channel, int value, int port = -1);
+    void timerCallbackForTests() { timerCallback(); } // (round 190oa: the engine's periodic step, for --details190oashot)
     // Round 190em: a played note in the score log (Capture MIDI's source) at a given time (--selftest).
     void logPlayedNoteForTest (double ms, int channel, int key, float velocity, bool on, double tick = -1.0);
     // Round 190ef, the reference's MIDI Map Mode / Key Map Mode (core/RemoteMap.h). In MIDI Map Mode the controllers and

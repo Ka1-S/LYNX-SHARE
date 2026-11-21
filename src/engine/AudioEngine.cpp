@@ -1806,6 +1806,11 @@ NoteMask AudioEngine::soundingKeys (int channel) const noexcept
     return rackProcessor != nullptr ? rackProcessor->soundingKeys (channel) : NoteMask {};
 }
 
+int AudioEngine::voicesSounding() const noexcept
+{
+    return rackProcessor != nullptr ? rackProcessor->voicesSounding() : 0;
+}
+
 std::uint32_t AudioEngine::noteStrikes (int channel) const noexcept
 {
     return rackProcessor != nullptr ? rackProcessor->noteStrikes (channel) : 0u;
