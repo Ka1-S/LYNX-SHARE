@@ -201,6 +201,9 @@ public:
     // round 190my (DF-143, FL's Project picker: a right-click on a pattern tile): Current project › Patterns opened, that
     // pattern selected and in view; false when it isn't listed
     bool revealProjectPattern (int pattern);
+    // round 190oa (DF-120): Current project › Effects (`effect`: insert `index`, slot `slot`) or › Generators (channel
+    // `index`) with the entry open on its parameters, selected and in view
+    bool revealProjectParameters (bool effect, int index, int slot);
     bool historyShownForCheck() const;
     // round 190ke (--simplegb190keshot): "LYNX content" with these folders open ("lynx-content", "lynx-content/Beats"...),
     // and the rows listed now (tree / tag-filter results)

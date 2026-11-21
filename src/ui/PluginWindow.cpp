@@ -1534,6 +1534,12 @@ public:
                                                                         : AutomationTarget {};
             if (const auto targets = allPluginParameterTargets (plugin, base); ! targets.empty())
                 spec.linkAll = [engine, targets] { openRemoteControlSettings (*engine, targets, false); };
+            // round 190oa (DF-120, capture 190oa B4): Browse parameters = the Browser's Current project entry, open
+            if (wrappermenu::browseParametersHandler() && (channelIndex >= 0 || (context.track >= 0 && context.slot >= 0)))
+                spec.browseParameters = [channelIndex, t = context.track, sl = context.slot] {
+                    if (wrappermenu::browseParametersHandler())
+                        wrappermenu::browseParametersHandler() (channelIndex < 0, channelIndex >= 0 ? channelIndex : t, sl);
+                };
             if (context.find)
                 if (const auto* ref = context.find (const_cast<Song&> (engine->getSong())))
                 {

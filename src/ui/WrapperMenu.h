@@ -29,6 +29,15 @@ namespace lynx::wrappermenu
 using Action = std::function<void()>;
 using Fill = std::function<void (juce::PopupMenu&)>;
 
+// round 190oa (DF-120, capture 190oa B4): FL's Browse parameters — the Browser goes to Current project › Effects (an
+// effect: mixer track `index`, slot `slot`) or › Generators (a channel: `index`, slot −1) with that entry open on its
+// parameters. The main window sets it.
+inline std::function<void (bool effect, int index, int slot)>& browseParametersHandler()
+{
+    static std::function<void (bool, int, int)> handler;
+    return handler;
+}
+
 struct Spec
 {
     // first block

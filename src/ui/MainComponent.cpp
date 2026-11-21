@@ -583,6 +583,11 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     };
     openMixerInsertHandler() = rack.onOpenMixerInsert; // and on the channel window's TRACK box (round 168s)
     channelWrapperItemsHandler() = [this] (int channel, wrappermenu::Spec& spec) { rack.fillWindowMenu (channel, spec); }; // (round 190in, R8)
+    wrappermenu::browseParametersHandler() = [this] (bool effect, int index, int slot) { // (round 190oa, DF-120)
+        if (! workspace.isPanelVisible (Panel::browser))
+            runAction ("panel.browser");
+        browser.revealProjectParameters (effect, index, slot);
+    };
     locateInBrowserHandler() = [this] (const juce::File& file) { // (the sampler's File row, round 190df)
         showPanel (Panel::browser);
         browser.locateFile (file);
