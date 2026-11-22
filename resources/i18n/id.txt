@@ -12382,3 +12382,5 @@ countries: id
 "Automation clip: [LMB] open it  [RMB] menu" = "Clip otomasi: [LMB] buka  [RMB] menu"
 "Rename automation clip" = "Ganti nama clip otomasi"
 "Indexing folders... {0}" = "Mengindeks folder... {0}"
+# --- round 190oz: Save a copy for 0.1.30, held FL step notes
+"{0} FL step note(s) on generators end after one step (FL lets them sound on)" = "{0} not step FL pada generator berhenti setelah satu step (FL membiarkannya terus berbunyi)"

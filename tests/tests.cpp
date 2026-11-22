@@ -18082,3 +18082,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "RackAutomation190ooTests.inc" // round 190oo (design review 2, PAT-7): FL's automation clip channels in the Channel rack
 #include "TextFit190ooTests.inc" // round 190oo (design review 2, fit): translated menu titles give up width before toolbar panels drop, knob captions
 #include "OldSteps190ozTests.inc" // round 190oz: FL <= 11 step grids (0x41 + 0x5B / 0x48 ... in a channel) become step notes
+#include "HeldSteps190ozTests.inc" // round 190oz: FL step notes on generators are held (no note-off)

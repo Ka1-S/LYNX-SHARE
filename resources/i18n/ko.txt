@@ -12382,3 +12382,5 @@ countries: kr
 "Automation clip: [LMB] open it  [RMB] menu" = "오토메이션 클립: [LMB] 열기  [RMB] 메뉴"
 "Rename automation clip" = "오토메이션 클립 이름 변경"
 "Indexing folders... {0}" = "폴더 색인 중... {0}"
+# --- round 190oz: Save a copy for 0.1.30, held FL step notes
+"{0} FL step note(s) on generators end after one step (FL lets them sound on)" = "제너레이터의 FL 스텝 노트 {0}개가 한 스텝 후에 끝납니다(FL에서는 계속 울립니다)"

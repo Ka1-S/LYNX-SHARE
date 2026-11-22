@@ -12382,3 +12382,5 @@ countries: tr
 "Automation clip: [LMB] open it  [RMB] menu" = "Otomasyon klibi: [LMB] aç  [RMB] menü"
 "Rename automation clip" = "Otomasyon klibini yeniden adlandır"
 "Indexing folders... {0}" = "Klasörler dizinleniyor... {0}"
+# --- round 190oz: Save a copy for 0.1.30, held FL step notes
+"{0} FL step note(s) on generators end after one step (FL lets them sound on)" = "Jeneratörlerdeki {0} FL adım notası bir adım sonra biter (FL onları çalmaya devam ettirir)"

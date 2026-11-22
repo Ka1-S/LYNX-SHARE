@@ -1579,6 +1579,21 @@ void toRelease0130 (juce::var& root, Losses& lost)
     // round 190nu (chord2_190nu): the Piano roll's key markers
     keyMarkersFor0130 (root, lost);
 
+    // round 190oz: FL's step notes on generators, held (a pattern's "heldNotes"); 0.1.30 plays them one step long
+    {
+        int held = 0;
+        if (auto* patterns = arrayOf (root["patterns"]))
+            for (auto& p : *patterns)
+                if (auto* po = objectOf (p))
+                {
+                    if (auto* h = arrayOf (po->getProperty ("heldNotes")))
+                        held += h->size();
+                    drop (*po, "heldNotes");
+                }
+        if (held > 0)
+            lost.push_back ({ TR_NOOP ("{0} FL step note(s) on generators end after one step (FL lets them sound on)"), juce::String (held), true });
+    }
+
     // round 190ol (P1): the Sections lane. 0.1.30 has no sections: each becomes a plain Playlist marker at its start, named
     // after it (unless a plain marker of that name is already there), so the song's parts stay visible and "Sections from
     // markers" brings them back. Nothing plays differently: a view line, only when the project has sections

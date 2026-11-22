@@ -3566,6 +3566,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     };
 
     std::map<int, int> patternMap; // FL index -> our dense index
+    // FL's generator channels (round 190oz): a step note (length 0) on one of them is held (Note::held)
+    std::map<int, bool> flGenerator;
+    for (const auto& c : project.channels)
+        flGenerator[c.index] = c.type == flp::ChannelType::instrument || c.type == flp::ChannelType::native;
 
     for (const auto& src : project.patterns)
     {
@@ -3599,8 +3603,11 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
             Note note;
             note.start = rescale (n.position);
-            // Step notes (length 0) play for one step.
+            // Step notes (length 0) play for one step; on a generator FL never ends them (round 190oz): held
             note.length = n.length > 0 ? rescale (n.length) : ticksPerStep;
+            if (n.length == 0)
+                if (const auto g = flGenerator.find (n.channel); g != flGenerator.end() && g->second)
+                    note.held = true;
             note.channel = it->second;
             note.key = n.key; // FL and MIDI use the same numbering; only the octave name differs
             note.velocity = std::clamp (n.velocity / 128.0f, 0.0f, 1.0f);

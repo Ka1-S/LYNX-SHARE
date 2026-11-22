@@ -3173,7 +3173,7 @@ juce::String toJson (const Song& song, bool stampVersion)
                 o->setProperty ("markerKeys", keys);
         }
 
-        juce::Array<juce::var> notes;
+        juce::Array<juce::var> notes, held;
 
         for (const auto& n : p.notes)
         {
@@ -3233,10 +3233,14 @@ juce::String toJson (const Song& song, bool stampVersion)
                     note.add (n.repeat);
             }
 
+            if (n.held) // (round 190oz: FL's held step notes, by their place in "notes")
+                held.add (notes.size());
             notes.add (note);
         }
 
         o->setProperty ("notes", notes);
+        if (! held.isEmpty())
+            o->setProperty ("heldNotes", held);
 
         // event editor lanes: [kind, index, slot, param] + [[tick, value], ...]
         juce::Array<juce::var> lanes;
@@ -4086,9 +4090,16 @@ std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error,
                     }
             std::stable_sort (pattern.markers.begin(), pattern.markers.end(), [] (const Marker& x, const Marker& y) { return x.tick < y.tick; });
 
+            std::vector<int> heldAt; // (round 190oz: FL's held step notes, by their place in "notes")
+            if (const auto* h = p["heldNotes"].getArray())
+                for (const auto& v : *h)
+                    heldAt.push_back ((int) v);
+            std::sort (heldAt.begin(), heldAt.end());
+            int noteAt = -1;
             if (auto* notes = p["notes"].getArray())
                 for (const auto& n : *notes)
                 {
+                    ++noteAt;
                     if (! n.isArray() || n.size() < 5)
                         continue;
 
@@ -4138,6 +4149,7 @@ std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error,
                             note.repeat = juce::jlimit (0, noterepeat::rateCount, (int) n[20]);
                     }
 
+                    note.held = std::binary_search (heldAt.begin(), heldAt.end(), noteAt);
                     if (note.channel >= 0 && note.channel < (int) song.channels.size())
                         pattern.notes.push_back (note);
                 }

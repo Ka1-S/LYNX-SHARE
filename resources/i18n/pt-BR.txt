@@ -12516,3 +12516,5 @@ countries: br
 "Automation clip: [LMB] open it  [RMB] menu" = "Clipe de automação: [LMB] abrir  [RMB] menu"
 "Rename automation clip" = "Renomear clipe de automação"
 "Indexing folders... {0}" = "Indexando pastas... {0}"
+# --- round 190oz: Save a copy for 0.1.30, held FL step notes
+"{0} FL step note(s) on generators end after one step (FL lets them sound on)" = "{0} nota(s) de step do FL em geradores terminam após um step (o FL as deixa soando)"

@@ -8543,6 +8543,39 @@ private:
             }
         }
 
+        // round 190oz: FL's held step notes (Note::held) in .lynx ("heldNotes", only when a pattern has one), back from it,
+        // and the copy for 0.1.30 (the marks dropped with one sound line, the notes kept one step long)
+        juce::String heldSteps190ozResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            const auto plainJson = lynx::ProjectFile::toJson (song);
+            if (song.patterns.empty())
+                song.patterns.emplace_back();
+            auto& notes = song.patterns[0].notes;
+            notes.clear();
+            lynx::Note held, plain;
+            held.start = 0, held.channel = 0, held.held = true;
+            plain.start = lynx::ticksPerStep * 4, plain.channel = 0;
+            notes = { held, plain };
+            const auto json = lynx::ProjectFile::toJson (song);
+            juce::String why;
+            const auto back = lynx::ProjectFile::fromJson (json, why);
+            const auto copy = lynx::olderlynx::forRelease (song, "0.1.30");
+            const auto lines = (int) std::count_if (copy.lost.begin(), copy.lost.end(), [] (const lynx::olderlynx::Loss& l) {
+                return juce::String (l.text).startsWith ("{0} FL step note(s) on generators") && l.detail == "1" && l.sound;
+            });
+            juce::String why2;
+            const auto old = copy.ok ? lynx::ProjectFile::fromJson (copy.json, why2) : std::optional<lynx::Song> {};
+            if (plainJson.contains ("heldNotes") || ! json.contains ("heldNotes"))
+                heldSteps190ozResult = "ERROR the .lynx key";
+            else if (! back || back->patterns.empty() || back->patterns[0].notes.size() != 2 || ! back->patterns[0].notes[0].held
+                     || back->patterns[0].notes[1].held || back->patterns[0].notes[0].start != 0)
+                heldSteps190ozResult = "ERROR the .lynx round trip " + why;
+            else if (! copy.ok || copy.json.contains ("heldNotes") || lines != 1 || ! old || old->patterns.empty()
+                     || old->patterns[0].notes.size() != 2 || old->patterns[0].notes[0].held)
+                heldSteps190ozResult = "ERROR the copy for 0.1.30 (" + juce::String (lines) + " lines) " + copy.error + why2;
+        }
+
         // round 190ol (research190oe P1 / P6): the Sections lane in .lynx (both arrangements, and a project without sections
         // keeps its JSON with no "sections" key), a section move as one undo step that restores the song bit for bit, the
         // copies for 0.1.30 / 0.1.28 (sections become plain markers at their starts, one view line), and a 4/4 -> 7/8 -> 4/4
@@ -9208,6 +9241,7 @@ private:
                << "rollup031s4_copy_for_0130=" << rollup031s4Result << "\n"
                << "rollup031s5_copy_for_0130=" << rollup031s5Result << "\n"
                << "sections190ol=" << sections190olResult << "\n"
+               << "heldsteps190oz=" << heldSteps190ozResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 

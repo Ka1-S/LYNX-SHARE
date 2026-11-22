@@ -12382,3 +12382,5 @@ countries: jp
 "Automation clip: [LMB] open it  [RMB] menu" = "オートメーションクリップ: [LMB] 開く  [RMB] メニュー"
 "Rename automation clip" = "オートメーションクリップ名を変更"
 "Indexing folders... {0}" = "フォルダーをインデックス作成中... {0}"
+# --- round 190oz: Save a copy for 0.1.30, held FL step notes
+"{0} FL step note(s) on generators end after one step (FL lets them sound on)" = "ジェネレーター上の FL のステップノート {0} 個は 1 ステップで終わります（FL では鳴り続けます）"

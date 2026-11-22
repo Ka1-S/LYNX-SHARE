@@ -206,6 +206,12 @@ int main (int argc, char** argv)
     {
         song = lynx::importFlp (flp::parseProject (bytes), options);
         std::printf ("import: %.0f ms\n", std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - importStart).count());
+        std::size_t held = 0; // FL's held step notes (round 190oz)
+        for (const auto& pat : song.patterns)
+            for (const auto& n : pat.notes)
+                held += n.heldStep() ? 1 : 0;
+        if (held > 0)
+            std::printf ("held step notes: %zu\n", held);
     }
     catch (const flp::Error& e)
     {

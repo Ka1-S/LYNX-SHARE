@@ -12382,3 +12382,5 @@ countries: tw hk mo
 "Automation clip: [LMB] open it  [RMB] menu" = "自動化片段：[LMB] 開啟  [RMB] 選單"
 "Rename automation clip" = "重新命名自動化片段"
 "Indexing folders... {0}" = "正在索引資料夾... {0}"
+# --- round 190oz: Save a copy for 0.1.30, held FL step notes
+"{0} FL step note(s) on generators end after one step (FL lets them sound on)" = "產生器上的 {0} 個 FL 步進音符在一步後結束（FL 中會持續發聲）"

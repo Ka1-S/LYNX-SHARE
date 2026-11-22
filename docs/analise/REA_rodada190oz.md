@@ -65,16 +65,32 @@ Minimal projects cut from the demo (only one playlist item kept, `scripts/onlypa
 | hats19 (pattern 19) | 29 dots up to step 56, velocities 6…127 | −60 dB residual over the whole pattern |
 | claps (patterns 15, 1, 3) | shifts 41–45 / 48 of a step | onsets and levels within 1 dB (noise operators: not sample-exact) |
 
-## 5. Step notes on generators are held [EXEC]
+## 5. Step notes on generators are held until the channel's next note [EXEC]
 
-FL never sends the note-off of a step note (length 0) on a generator channel (channel type 2). Two dots added to a pad
-(Saw Pad Dry) and one to an organ (Org Classic) in a cut of the demo: both sound to the end of the 269 s render and
-beyond (`fl/out/pad42.wav`, `org42.wav`). Round 171e saw the same on 3x Osc. A Sytrus kick therefore decays through
-its envelope's held part instead of its release: FL's kick is −22 dB 150 ms after the hit where a one-step note gives
-−45 dB. See §6 for what LYNX does with it.
+FL sends no note-off at the end of a step note (length 0) on a generator channel (channel type 2): the voice sounds
+until **the channel's next note starts** (any key), and FL ends it then; the last one sounds on (to the end of the
+render and beyond). Cuts of the demo with steps added (`scripts/adddots.py`): one dot on an organ (Org Classic) or a
+pad (Saw Pad Dry) sounds to the end of the 269 s render (`fl/out/org42.wav`, `pad42.wav`; the pattern clip ends at
+1.45 s); an organ step at C5 then one at G5 eight steps later (`org2k.wav`): C4 / C5 fall 60 dB within 0.2 s of the second
+step while G4 / G5 sound on for the rest of the render. Not the clip's end, not one step. A Sytrus kick therefore
+decays through its envelope's held part: FL's kick is −22 dB 150 ms after the hit where a one-step note gives −45 dB.
+(Round 171e saw 3x Osc voices pile up from step notes: notes on several channels / the last notes of a loop.)
+Holding them without that release made LYNX's Overcome render 3× slower (Sytrus voices end only once released).
 
 ## 6. For LYNX
 
 - `flp::parseEvents` keeps the grids (`OldStepGrids`) and converts them as §3 for projects below 11.5.0 (the notes join
   the pattern's own, then the usual sort). Tests: `flp_old_step_grids_*` (tests/OldSteps190ozTests.inc).
-- Not modelled: the pre-2.0.1 Mod Y law and the pre-2.2.0 Mod X laws (no such file in the corpus).
+- §5: an imported step note (length 0) on an FL generator channel (types 1 / 2) is `Note::held`; while it keeps its one
+  step of length (`heldStep()`) the schedulers send its "on" only (no "off", no repeats; a held note before a clip's
+  offset has nothing left, as FL's length 0) and `ScheduledNotes` sends its "off" (its id) on the sample of the
+  channel's next "on", before it. .lynx: the pattern's `heldNotes` (places in `notes`);
+  .flp export: back as length 0; Save a copy for 0.1.30 drops the marks with one line. Samplers keep one-step notes.
+  Tests: `flp_import_step_notes_on_generators_are_held`, `scheduler_held_step_note_has_no_off`, --selftest
+  `heldsteps190oz`.
+- Checked [EXEC]: the kick cut (kick2) matches FL at −84 dB over the whole render (one-step notes: −12.6 dB); solo
+  renders of other demos' held channels: Harmless (Galactic) closer to FL (median 50 ms level error 3.4 → 1.8 dB),
+  BassDrum (Oxygen) and Ogun (Ogun Dream) unchanged; Ogun in Astes keeps its tails 8–10 dB above FL's below −55 dB
+  (LYNX's Ogun voice handling, open).
+- Not modelled: the pre-2.0.1 Mod Y law and the pre-2.2.0 Mod X laws (no such file in the corpus); the step loop's
+  wrap on channels with their own loop (no old file uses one).

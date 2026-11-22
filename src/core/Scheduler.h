@@ -126,6 +126,7 @@ public:
     void clear() noexcept
     {
         count = 0;
+        heldCount = 0;
         overflow = false;
         clock = 0.0;
     }
@@ -147,6 +148,7 @@ public:
     // channels inserted, removed or moved: from[c] = the old index of channel c (−1 = a new channel)
     void moveChannels (const std::vector<int>& from) noexcept;
     int sounding() const noexcept { return count; }
+    int heldSteps() const noexcept { return heldCount; }
 
 private:
     struct Entry
@@ -157,6 +159,10 @@ private:
     };
     std::array<Entry, capacity> entries {};
     int count = 0;
+    // FL's held step notes (round 190oz, REA_rodada190oz §5): a step note on a generator (an "on" with lengthTicks < 0)
+    // sounds until its channel's next note starts; then its "off" comes on that note's sample, before it. One per channel.
+    std::array<Entry, 1024> held {};
+    int heldCount = 0;
     bool overflow = false; // a note could not be kept: every "off" passes until the next clear()
     double clock = 0.0;    // ticks played since clear()
     std::uint32_t nextId = 1; // (round 190ej: 1 … 2^24 − 1; the top byte is left for NoteEcho's repeats, noteEchoId)

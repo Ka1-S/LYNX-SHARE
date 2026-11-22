@@ -270,6 +270,12 @@ void schedulePatternLoop (const Pattern& pattern,
             emit ((double) start, on);
             continue; // slide has no "off": the original note continues until its own end
         }
+        if (note.heldStep()) // FL's step note on a generator (round 190oz): no note-off, no repeats
+        {
+            on.lengthTicks = -1.0f;
+            emit ((double) start, on);
+            continue;
+        }
 
         // FL's note repeat (issue #208, core/NoteRepeat.h): each strike is a note of its own, to the next strike
         noterepeat::forEachStrike (note, start, timing.length, [&] (std::int64_t strikeStart, std::int64_t strikeLength, int) {
@@ -338,13 +344,35 @@ void ScheduledNotes::process (EventBuffer& events, int numSamples, double tps) n
 
     const auto total = events.size();
     auto kept = 0;
+    // (round 190oz) the "off"s of held step notes whose channel starts a note in this block
+    struct HeldOff { int channel, key, offset; std::uint32_t id; };
+    std::array<HeldOff, 64> heldOffs; // (trivial: nothing is written unless a held step ends)
+    int heldOffCount = 0;
     for (int i = 0; i < total; ++i)
     {
         const auto e = events[i];
         const auto note = e.channel >= 0 && e.key >= 0 && e.key < audioClipKeyBase;
 
+        if (note && e.type == NoteEvent::Type::on && heldCount > 0)
+            for (int k = 0; k < heldCount; ++k)
+                if (held[(std::size_t) k].channel == e.channel)
+                {
+                    if (heldOffCount < (int) heldOffs.size())
+                        heldOffs[(std::size_t) heldOffCount++] = { e.channel, held[(std::size_t) k].key, e.sampleOffset, held[(std::size_t) k].id };
+                    held[(std::size_t) k] = held[(std::size_t) --heldCount];
+                    break;
+                }
+
         auto id = 0u;
-        if (note && e.type == NoteEvent::Type::on)
+        if (note && e.type == NoteEvent::Type::on && e.lengthTicks < 0.0f)
+        {
+            // a held step note (round 190oz): its id, no end of its own; its channel's next note ends it
+            id = nextId;
+            nextId = nextId >= 0xffffffu ? 1u : nextId + 1u;
+            if (heldCount < (int) held.size())
+                held[(std::size_t) heldCount++] = { e.channel, e.key, 0.0, id };
+        }
+        else if (note && e.type == NoteEvent::Type::on)
         {
             if (count < capacity)
             {
@@ -387,6 +415,18 @@ void ScheduledNotes::process (EventBuffer& events, int numSamples, double tps) n
     events.resize (kept);
 
     auto added = false;
+    for (int k = 0; k < heldOffCount; ++k)
+    {
+        NoteEvent off;
+        off.type = NoteEvent::Type::off;
+        off.channel = heldOffs[(std::size_t) k].channel;
+        off.key = heldOffs[(std::size_t) k].key;
+        off.velocity = 0.0f;
+        off.sampleOffset = heldOffs[(std::size_t) k].offset;
+        off.noteId = heldOffs[(std::size_t) k].id;
+        events.add (off);
+        added = true;
+    }
     for (int k = 0; k < count;)
     {
         const auto due = (entries[(std::size_t) k].end - clock) / tps + dueSamples; // samples into this block
@@ -424,6 +464,17 @@ void ScheduledNotes::moveChannels (const std::vector<int>& from) noexcept
         entries[(std::size_t) kept++] = entry;
     }
     count = kept;
+    kept = 0;
+    for (int k = 0; k < heldCount; ++k) // (round 190oz: the held step notes follow their channels too)
+    {
+        auto entry = held[(std::size_t) k];
+        const auto moved = std::find (from.begin(), from.end(), entry.channel);
+        if (moved == from.end())
+            continue;
+        entry.channel = (int) (moved - from.begin());
+        held[(std::size_t) kept++] = entry;
+    }
+    heldCount = kept;
 }
 
 ScheduleIndex makeScheduleIndex (const Song& song)
@@ -812,7 +863,10 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
             auto off = std::min (on + timing.length, clip.end());
 
             // FL's "Play truncated notes in clips" (FUN_010608a0): a note starting before the clip's offset keeps what is
-            // left of it from the clip's start (dropped when nothing is left); off: dropped
+            // left of it from the clip's start (dropped when nothing is left); off: dropped. A held step note has
+            // nothing left (length 0 in FL, round 190oz)
+            if (start < clip.offset && note.heldStep())
+                continue;
             if (start < clip.offset)
             {
                 const auto left = start + timing.length - clip.offset;
@@ -844,6 +898,12 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
             {
                 e.type = NoteEvent::Type::slide;
                 e.slideSamples = (float) ((double) (off - on) / tps);
+                emitOccurrences ((double) on, loop, startTick, endTick, tps, numSamples, e, out, roll);
+                continue;
+            }
+            if (note.heldStep()) // FL's step note on a generator (round 190oz): no note-off, no repeats
+            {
+                e.lengthTicks = -1.0f;
                 emitOccurrences ((double) on, loop, startTick, endTick, tps, numSamples, e, out, roll);
                 continue;
             }
