@@ -2012,6 +2012,16 @@ void toRelease0130 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("In Song mode these patterns' notes play without their own pitch / timbre / pressure curves in this release: {0}"),
                               listOf (curvedInClips), true });
     }
+    // round 190pa (P21): the automation write mode. 0.1.30 records automation FL's way (Read): a line naming the mode
+    if (const auto mode = root["automationWriteMode"].toString(); mode.isNotEmpty())
+    {
+        drop (o, "automationWriteMode");
+        if (mode != "read")
+            lost.push_back ({ TR_NOOP ("The automation write mode ({0}) goes back to FL's Record automation (Read)"), mode.substring (0, 1).toUpperCase() + mode.substring (1), false });
+    }
+    // round 190pa (P14): the range on chosen tracks (a selection: nothing plays differently)
+    if (drop (o, "trackRange"))
+        lost.push_back ({ TR_NOOP ("The range selected on some Playlist tracks is left out"), juce::String(), false });
 }
 
 struct Step

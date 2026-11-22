@@ -969,6 +969,15 @@ private:
     double stoppedAtTicks = -1.0; // round 190ld (DL-66): where Space last stopped the song
     juce::PopupMenu makeCountInMenu();   // round 190ld: FL's right-click on Count-in / Wait for input
     juce::PopupMenu makeWaitInputMenu();
+    // round 190pa (P21, core/AutomationModes.h): the automation write mode (Read = FL's Record automation, Touch, Latch,
+    // Write), its menu (the recording menus, Automation Arm's right-click) and its badge on Record / Automation Arm
+    juce::PopupMenu makeAutomationModeMenu();
+    void setAutomationWriteMode (int mode);
+    void refreshAutomationModeBadge();
+  public:
+    juce::PopupMenu automationModeMenuForSnapshot() { return makeAutomationModeMenu(); }
+    void setAutomationWriteModeForSnapshot (int mode) { setAutomationWriteMode (mode); }
+  private:
     IconButton captureButton { "captureMidi", Icon::capture };
     // round 190oa (DL-58, capture 190oa L1): Live's Automation Arm (the recording filter's Automation) and Re-Enable
     // Automation (lit while a moved control overrides its automation; a click hands them back)

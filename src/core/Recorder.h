@@ -170,6 +170,10 @@ struct AutomationWrite
     int automation = -1;        // in/out: the automation this take writes (song mode)
     std::int64_t lastLocal = -1; // in/out: the last point written (the automation's or the pattern's ticks)
     bool createdByTake = false; // in/out
+    // round 190pa (P21, Touch): whether the automation held a curve before this stretch was written, and the value that
+    // curve had just after the stretch's last point (the curve Touch glides back to)
+    bool hadCurve = false;      // in/out
+    float returnValue = -1.0f;  // in/out
 };
 // Song mode.
 void commitAutomationPoints (Song& song, AutomationWrite& w, std::vector<RecordedValue> points, std::int64_t grid, bool linear = false);
@@ -198,6 +202,18 @@ AutomationDestination recordedAutomationDestination (bool songMode, int layoutSt
 // line within this much (0..1 of the parameter's range; Ramer-Douglas-Peucker along the value axis).
 constexpr float recordThinTolerance = 1.0f / 512.0f;
 void thinRecordedCurve (std::vector<AutomationPoint>& points, float tolerance = recordThinTolerance);
+
+// --- round 190pa (research190oe P21): automation write modes (core/AutomationModes.h) ---------------------------------
+// One frame of a take for one touched control (AudioEngine::updateAutomationRecording, every layout): `mode` as
+// automodes::Mode. Returns false when the gesture is over (nothing is added); else adds the point at `tick` to
+// `pending`, and with Write first a point at `takeStart` (the take's start) holding the same value, once per control
+// (`started`).
+bool automationTakeFrame (int mode, bool held, double msSinceMove, double tick, float value, double takeStart, bool& started,
+                          std::vector<RecordedValue>& pending);
+// Touch: the stretch just written into `a` (its last point at w.lastLocal) glides back to the curve that was there over
+// `ticks`, instead of jumping back on the next tick; nothing when the automation held no curve before the gesture.
+// Returns true when it changed the points.
+bool glideBackToCurve (Automation& a, const AutomationWrite& w, std::int64_t ticks);
 // The points of one batch of a gesture into automation `a` (its own ticks): what lay under the gesture is replaced, the
 // curve before and after it stays; thinned (thinRecordedCurve). commitAutomationPoints and commitLanePoints use it.
 void writeRecordedStretch (Automation& a, std::vector<AutomationPoint> fresh, AutomationWrite& w);

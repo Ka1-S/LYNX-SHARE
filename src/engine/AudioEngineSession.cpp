@@ -3,6 +3,7 @@
 // clip and sends it on into loop playback. docs/analise/REA_rodada190bv.md says what follows the studied program.
 
 #include "engine/AudioEngine.h"
+#include "core/AutomationModes.h" // round 190pa (P21)
 
 #include <algorithm>
 #include <cmath>
@@ -301,6 +302,7 @@ AudioEngine::AutomationCaptureResult AudioEngine::captureAutomation()
     const auto style = layoutstyle::current();
     const auto lanes = style != layoutstyle::Style::pattern || autolanes::shown();
     double newest = lastAutomationCaptureMs;
+    const auto mode = automodes::fromInt (song.automationWriteMode); // (round 190pa, P21)
     editSong ([&] (Song& s) {
         for (const auto& g : gestures)
         {
@@ -316,6 +318,20 @@ AudioEngine::AutomationCaptureResult AudioEngine::captureAutomation()
             }
             result.points += (int) points.size();
             ++result.controls;
+            // round 190pa (P21): Latch holds the gesture's last value to where its play pass stopped, Write also writes
+            // its first value from where the pass started (a grid clip's envelope keeps the gesture as it was)
+            if (first.clipPattern < 0)
+            {
+                const auto& last = g.points.back();
+                if (const auto* pass = automationCapture.pass (last.pass); pass != nullptr && automodes::holdsToEnd (mode) && pass->endTick > last.tick)
+                    points.push_back ({ pass->endTick, last.value });
+                if (const auto* pass = automationCapture.pass (first.pass); pass != nullptr && automodes::writesFromStart (mode) && pass->startTick < first.tick)
+                    points.insert (points.begin(), { pass->startTick, first.value });
+            }
+            const auto glide = [&] {
+                if (automodes::glidesBack (mode) && w.automation >= 0 && w.automation < (int) s.automations.size())
+                    glideBackToCurve (s.automations[(std::size_t) w.automation], w, automodes::returnTicks (s.bpm, ppq));
+            };
             if (first.clipPattern >= 0 && first.clipPattern < (int) s.patterns.size()) // a grid clip played: its envelope
                 commitClipEnvelopePoints (s, first.clipPattern, w, std::move (points), first.clipEnd, 0);
             else if (! first.songMode) // Pattern mode: the current pattern's events, as a take
@@ -326,13 +342,17 @@ AudioEngine::AutomationCaptureResult AudioEngine::captureAutomation()
                     commitEventPoints (s, pattern, w, std::move (points), loop, 0);
             }
             else if (lanes)
+            {
                 commitLanePoints (s, w, std::move (points), 0);
+                glide();
+            }
             else
             {
                 // (a new clip starts as one bar: it is made to reach the gesture's last bar, as a take's clip grows)
-                const auto last = songTickForRecorded (s, g.points.back().tick);
+                const auto last = songTickForRecorded (s, points.back().tick);
                 commitAutomationPoints (s, w, std::move (points), 0);
                 growTakeClip (s, w, last + 1, true);
+                glide();
             }
         }
     });

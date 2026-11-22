@@ -21,6 +21,7 @@
 #include "core/StartPage.h"
 #include "core/TrackOnly.h"
 #include "core/WheelZones.h"
+#include "core/RangeEdit.h" // round 190pa (P14)
 #include "engine/AudioEngine.h"
 #include "engine/MidiFileIo.h"
 #include "ui/HintBar.h"
@@ -121,6 +122,8 @@ bool readUiOption (const juce::String& key, bool on)
         mutekeys::setToggles (on);
     else if (key == "startPage") // issue #252 (round 190oq; on by default, FL-exact)
         startpage::setEnabled (on);
+    else if (key == "rangeEdits") // round 190pa (P14, LYNX extra): Ctrl+Alt+drag ranges in the Pattern layout
+        rangeedit::patternLayoutOn() = on;
     else
         return false;
     return true;
@@ -152,7 +155,8 @@ juce::String uiOptionsText()
            + "\nliveScaleControl=" + juce::String (livescale::shown ? 1 : 0) // (round 190oo, O-5)
            + "\ntrackStates=" + juce::String (trackstates::patternMenus() ? 1 : 0) // (round 190op, P4)
            + "\nmuteKeyToggles=" + juce::String (mutekeys::toggles() ? 1 : 0) // (round 190oq, issue #249)
-           + "\nstartPage=" + juce::String (startpage::enabled() ? 1 : 0); // (round 190oq, issue #252)
+           + "\nstartPage=" + juce::String (startpage::enabled() ? 1 : 0) // (round 190oq, issue #252)
+           + "\nrangeEdits=" + juce::String (rangeedit::patternLayoutOn() ? 1 : 0); // (round 190pa, P14)
 }
 
 std::optional<bool> extraOn (std::string_view id)
@@ -191,6 +195,8 @@ std::optional<bool> extraOn (std::string_view id)
         return mutekeys::toggles();
     if (id == "general.startPage") // round 190oq (issue #252)
         return startpage::enabled();
+    if (id == "playlist.rangeEdits") // round 190pa (P14)
+        return rangeedit::patternLayoutOn();
     return std::nullopt;
 }
 
@@ -234,6 +240,8 @@ bool setExtra (std::string_view id, bool on)
         mutekeys::setToggles (on);
     else if (id == "general.startPage") // round 190oq (issue #252)
         startpage::setEnabled (on);
+    else if (id == "playlist.rangeEdits") // round 190pa (P14)
+        rangeedit::patternLayoutOn() = on;
     else
         return false;
     if (onChanged)

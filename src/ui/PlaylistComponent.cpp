@@ -3529,6 +3529,9 @@ void PlaylistComponent::paintOverChildren (juce::Graphics& g)
         g.drawRect (range, 1.0f);
     }
 
+    if (drag == Drag::range || drag == Drag::rangeMove || ! engine.getSong().trackRange.empty()) // round 190pa (P14)
+        paintTrackRange (g);
+
     const auto& song = engine.getSong();
     if (song.performanceMode)
     {
@@ -6220,6 +6223,10 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
+    // round 190pa (P14, core/RangeEdit.h): Ctrl+Alt+drag draws a range on chosen tracks; a drag inside it moves its
+    // content, a right-click opens its menu; any other press clears it
+    if (rangeMouseDown (e))
+        return;
     // issue #207 (round 190lw): the pen, a curve's rubber band and a selected points' move (LYNX extras)
     if (pointMouseDown (e, -1))
         return;
@@ -7173,6 +7180,11 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
 {
     if (insertsMouseDrag (e)) // issue #154: an effect dragged from a linked header's list
         return;
+    if (drag == Drag::range || drag == Drag::rangeMove) // round 190pa (P14)
+    {
+        rangeMouseDrag (e);
+        return;
+    }
     if (drag == Drag::pen || drag == Drag::pointBand || drag == Drag::pointsMove) // issue #207 (round 190lw)
     {
         pointMouseDrag (e);
@@ -8082,6 +8094,12 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
     EditorGlobals::get().pauseFollowIfEdited (EditorGlobals::FollowView::playlist, followEditStamp, engine.getPublishCount());
     if (insertsMouseUp (e)) // issue #154: a click or a drag in a linked header's effects list
     {
+        drag = Drag::none;
+        return;
+    }
+    if (drag == Drag::range || drag == Drag::rangeMove) // round 190pa (P14)
+    {
+        rangeMouseUp (e);
         drag = Drag::none;
         return;
     }
@@ -13723,6 +13741,7 @@ void PlaylistComponent::copySelection()
 {
     clipboard.clear();
     ++clipboardStamp;
+    rangeClipboardNewest() = false; // (round 190pa: Ctrl+V pastes clips again)
 
     for (auto i : selection)
         clipboard.push_back (engine.getSong().playlist[(std::size_t) i]);
@@ -13880,6 +13899,8 @@ bool PlaylistComponent::handleKey (const juce::KeyPress& key)
     const auto letter = keys::letterOfKeyCode (code); // (0 for F-keys, numpad, arrows: issue #12)
 
     if (pointKeyPressed (key)) // issue #207 (round 190lw): Delete / Esc / Ctrl+C / X / V on selected points
+        return true;
+    if (rangeKeyPressed (key)) // round 190pa (P14): the keys of a range on chosen tracks (only while there is one)
         return true;
 
     // (issue #219, round 190ng: Backspace's snap on / off is the key map's playlist.snapToggle / pianoRoll.snapToggle now, so it
@@ -16854,5 +16875,6 @@ int PlaylistComponent::flHeaderWidthNow() noexcept
 }
 
 #include "PlaylistPoints190lw.inc" // issue #207 (round 190lw)
+#include "PlaylistRange190pa.inc" // round 190pa (research190oe P14): ranges on chosen tracks
 
 } // namespace lynx

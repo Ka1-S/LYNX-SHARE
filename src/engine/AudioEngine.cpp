@@ -1,5 +1,6 @@
 #include "engine/AudioEngine.h"
 #include <cstring> // (round 190nw: the module import's sample files)
+#include "core/AutomationModes.h" // round 190pa (P21)
 #include "core/AutoLook.h"
 #include "core/NewClipColours.h"
 #include "core/SessionMixer.h"
@@ -5981,8 +5982,26 @@ void AudioEngine::updateAutomationRecording (bool active)
     };
 
     // writes what was sampled (one undo step for the whole take); `ended` = the gestures that are over
+    // round 190pa (P21, Touch): the ended gestures written into an automation clip or a lane glide back to the curve
+    const auto writeMode = automodes::fromInt (song.automationWriteMode);
+    auto glideTargets = [&] (const std::vector<AutomationTarget>& ended, bool toSession) {
+        std::vector<AutomationTarget> out;
+        if (! automodes::glidesBack (writeMode) || toSession)
+            return out;
+        const auto songMode = song.mode == PlayMode::song;
+        const auto style = (int) layoutstyle::current();
+        for (const auto& target : ended)
+            if (std::any_of (takeWrites.begin(), takeWrites.end(), [&] (const AutomationWrite& w) {
+                    return w.target == target && w.lastLocal >= 0 && w.automation >= 0 && w.hadCurve
+                           && recordedAutomationDestination (songMode, style, target) != AutomationDestination::patternEvents;
+                }))
+                out.push_back (target);
+        return out;
+    };
+
     auto commit = [&] (const std::vector<AutomationTarget>& ended, bool toSession) {
-        if (std::none_of (touches.begin(), touches.end(), [] (const Touch& t) { return ! t.pending.empty(); }))
+        const auto glides = glideTargets (ended, toSession);
+        if (glides.empty() && std::none_of (touches.begin(), touches.end(), [] (const Touch& t) { return ! t.pending.empty(); }))
             return;
         if (toSession) // (round 190mx: the session's clips take them when they exist; updateSlotRecording)
         {
@@ -6020,6 +6039,14 @@ void AudioEngine::updateAutomationRecording (bool active)
                     }
                     t.pending.clear();
                 }
+            if (! glides.empty()) // (round 190pa: Touch's return glide, Pro Tools' AutoMatch)
+            {
+                const auto ticks = automodes::returnTicks (s.bpm, ppq);
+                for (const auto& target : glides)
+                    for (const auto& w : takeWrites)
+                        if (w.target == target && w.automation >= 0 && w.automation < (int) s.automations.size())
+                            glideBackToCurve (s.automations[(std::size_t) w.automation], w, ticks);
+            }
         }, ! automationTakeHasUndoStep);
         automationTakeHasUndoStep = true;
         for (const auto& target : ended)
@@ -6066,7 +6093,19 @@ void AudioEngine::updateAutomationRecording (bool active)
 
     if (! recording)
     {
-        commit ({}, std::exchange (sessionAutomationPass, false));
+        {
+            // round 190pa (P21): a take that stops while controls are touched ends their gestures (Touch glides back)
+            std::vector<AutomationTarget> stopping;
+            if (automodes::glidesBack (writeMode) && ! takeWrites.empty())
+                for (const auto& t : touches)
+                    stopping.push_back (t.target);
+            commit (stopping, std::exchange (sessionAutomationPass, false));
+        }
+        // round 190pa (P21): Capture automation's play passes (Latch / Write extend a captured gesture to them)
+        if (transport.playing.load() && ! active)
+            automationCapture.notePlaying (estimatedPositionNow());
+        else
+            automationCapture.noteStopped();
         // round 190op (P7): playing without recording, the moved controls go into Capture automation's buffer
         if (transport.playing.load() && ! active && ! touches.empty())
         {
@@ -6082,6 +6121,7 @@ void AudioEngine::updateAutomationRecording (bool active)
                 e.tick = songTick;
                 e.value = juce::jlimit (0.0f, 1.0f, value);
                 e.songMode = song.mode == PlayMode::song;
+                e.pass = automationCapture.currentPass(); // (round 190pa)
                 if (! sessionClipOf (t.target, e.clipPattern, e.clipTick, e.clipEnd))
                     e.clipPattern = -1;
                 automationCapture.add (e);
@@ -6093,6 +6133,7 @@ void AudioEngine::updateAutomationRecording (bool active)
         {
             growClips (lastAutomationTick, true);
             takeWrites.clear();
+            automationTakeStart = -1.0; // (round 190pa)
             automationTakeHasUndoStep = false;
             automationLoopLength = 0;
             lastAutomationTick = -1;
@@ -6111,6 +6152,8 @@ void AudioEngine::updateAutomationRecording (bool active)
     }
 
     const auto tick = sessionMode ? slotClockNow() : estimatedPositionNow(); // (the session's clips run on the launcher's clock)
+    if (automationTakeStart < 0.0) // round 190pa (P21, Write): where the take started
+        automationTakeStart = tick;
 
     // FL's "Record automation" of an internal-controller link (round 190cs): the controller's output, as the link maps
     // it, is written like a hand move for as long as automation is recorded
@@ -6141,16 +6184,15 @@ void AudioEngine::updateAutomationRecording (bool active)
     std::vector<AutomationTarget> ended;
     for (auto& t : touches)
     {
-        const auto alive = t.held || now - t.lastMs < 350.0;
         const auto value = t.liveValue >= 0.0f ? t.liveValue : currentTargetValue (t.target);
         if (value < 0.0f)
         {
             ended.push_back (t.target);
             continue;
         }
-        if (alive)
-            t.pending.push_back ({ tick, value });
-        else
+        // FL's gesture rule (held, or moved within 350 ms) in Read; Latch / Write keep writing until the take stops, Write
+        // from the take's start (round 190pa, core/AutomationModes.h)
+        if (! automationTakeFrame (song.automationWriteMode, t.held, now - t.lastMs, tick, value, automationTakeStart, t.started, t.pending))
             ended.push_back (t.target);
     }
 

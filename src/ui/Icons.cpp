@@ -1577,6 +1577,39 @@ bool IconButton::tileCacheUsable (juce::Graphics& g, int& scale) const
 
 void IconButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
 {
+    paintButtonBody (g, highlighted, down);
+    if (badge.isNotEmpty()) // (round 190pa)
+        paintBadge (g);
+}
+
+void IconButton::setBadge (const juce::String& newBadge, juce::Colour colour)
+{
+    if (newBadge == badge && colour == badgeColour)
+        return;
+    badge = newBadge;
+    badgeColour = colour;
+    repaint();
+}
+
+void IconButton::paintBadge (juce::Graphics& g)
+{
+    // a pill in the top-right corner: 10 px high at 100 %, the text in the band's darkest colour on the badge colour. A
+    // small box (Live's 17 px control-bar boxes) gets a smaller pill in its bottom-right corner, off the glyph's centre
+    const auto small = getHeight() < 22;
+    const auto font = theme::font (small ? 7.0f : 8.5f, true);
+    const auto h = small ? 8.0f : juce::jmin (10.0f, (float) getHeight() * 0.42f);
+    const auto w = juce::jmax (h, juce::GlyphArrangement::getStringWidth (font, badge) + (small ? 2.0f : 4.0f));
+    const auto r = small ? juce::Rectangle<float> ((float) getWidth() - w, (float) getHeight() - h, w, h)
+                         : juce::Rectangle<float> ((float) getWidth() - w - 1.0f, 1.0f, w, h);
+    g.setColour (badgeColour);
+    g.fillRoundedRectangle (r, h * 0.5f);
+    g.setColour (theme::colour::bg0);
+    g.setFont (font);
+    g.drawText (badge, r, juce::Justification::centred, false);
+}
+
+void IconButton::paintButtonBody (juce::Graphics& g, bool highlighted, bool down)
+{
     using namespace theme;
     if (look == Look::flTile)
     {

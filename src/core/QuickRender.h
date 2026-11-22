@@ -77,6 +77,11 @@ Result planSelection (const Song& song, const std::vector<int>& selected, bool f
 // (the latter needs a time selection: none = empty).
 Result planTrack (const Song& song, int track, bool withGroup, Start start, Plan& plan);
 
+// Round 190pa (P14, core/RangeEdit.h): a range on chosen tracks: `clips` (rangeedit::renderClips) over [from, to), as
+// a time selection (the clips are cut at its edges and only their parts inside are muted); the new track goes above
+// `topTrack`. Result::nothingSelected when nothing in the range plays.
+Result planRange (const Song& song, const std::vector<int>& clips, int topTrack, std::int64_t from, std::int64_t to, Plan& plan);
+
 // The copy of the song that renders a plan: only its clips and the automation clips of the other tracks play, over
 // the plan's range (song.loopStart / loopEnd = the range; render it with exportopts::Range::selection).
 Song makePlanRenderSong (const Song& song, const Plan& plan);

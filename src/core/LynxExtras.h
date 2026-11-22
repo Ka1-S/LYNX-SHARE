@@ -158,6 +158,10 @@ inline constexpr Item items[] = {
     { "general.startPage", TR_NOOP ("Windows"), TR_NOOP ("Show the start page when LYNX starts (recent projects and templates)"),
       TR_NOOP ("At start-up a page lists the recent projects (with a search box) and the templates over the start-up project, which stays open behind it (Esc keeps it). Not on the first start, which shows the welcome card, nor when a project is opened from a file. Also in File › Start page..."),
       "ui-options.txt:startPage" },
+    // round 190pa (research190oe P14): REAPER's razor edits; FL's Playlist has no range on some tracks only
+    { "playlist.rangeEdits", TR_NOOP ("Playlist"), TR_NOOP ("Range edits on chosen tracks (Ctrl+Alt+drag)"),
+      TR_NOOP ("Ctrl+Alt+drag in the Playlist draws a time range over only the tracks (or the one automation lane) it crosses: Delete, Cut, Copy, Paste, Duplicate, Split and Render to audio then act on just that part, clips and automation lanes, and a drag inside it moves it. The other tracks stay as they are. Also always on in the Clip-launch layout's Arrangement."),
+      "ui-options.txt:rangeEdits" },
     { "midi.gamepad", TR_NOOP ("Controllers"), TR_NOOP ("Use a game controller"),
       TR_NOOP ("A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page."),
       "midi-settings.txt:gamepad" },

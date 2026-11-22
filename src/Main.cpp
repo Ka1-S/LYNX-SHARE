@@ -21,6 +21,8 @@
 #include "core/FruityBasicFx.h" // (round 190my: Fruity Balance in --details190myshot)
 #include "core/TrackClips.h"
 #include "core/TrackStates.h"
+#include "core/RangeEdit.h" // round 190pa (P14)
+#include "core/AutomationModes.h" // round 190pa (P21)
 #include "core/Groove.h"
 #include "core/DrawMode.h"
 #include "core/SessionOps.h"
@@ -3496,6 +3498,13 @@ public:
         {
             const auto i = args.indexOf ("--tracker190nwshot");
             setApplicationReturnValue (runTrackerShot190nw (args[i + 1].unquoted(), i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String()) ? 0 : 1);
+            quit();
+            return;
+        }
+        // --automodes190pashot <prefix> (round 190pa, 0.1.32: automation write modes, range edits on chosen tracks): src/AutoModesShot190pa.inc
+        if (args.contains ("--automodes190pashot"))
+        {
+            setApplicationReturnValue (runAutoModesShot190pa (args[args.indexOf ("--automodes190pashot") + 1].unquoted()) ? 0 : 1);
             quit();
             return;
         }
@@ -9543,6 +9552,130 @@ private:
                 trackstates190opResult = "ERROR a second capture took the same moves again";
         }
 
+        // round 190pa (research190oe P21 / P14, LYNX extras): automation write modes and range edits on chosen tracks. The
+        // .lynx round trip keeps the mode and the range and writes neither for a project without them; the copies for
+        // 0.1.30 / 0.1.28 drop them with a line each; Capture automation in a real engine with Latch holds the gesture's
+        // last value to where its play pass stopped and Write writes its first value from where the pass started (Read
+        // as before); a range Delete / Duplicate on two tracks changes only them and is one undo step, undone bit for bit.
+        juce::String automodes190paResult = "OK";
+        {
+            const auto bar = (std::int64_t) 4 * lynx::ppq;
+            lynx::Song song;
+            song.mixer = lynx::Song::defaultMixer (4);
+            song.bpm = 120.0;
+            song.mode = lynx::PlayMode::song;
+            song.patterns.resize (4);
+            for (int t = 0; t < 4; ++t)
+            {
+                lynx::Clip c;
+                c.pattern = t;
+                c.track = t;
+                c.start = 0;
+                c.length = 16 * bar;
+                song.playlist.push_back (c);
+            }
+            song.playlistTracks.resize (4);
+            juce::String why;
+            const auto plainJson = lynx::ProjectFile::toJson (song);
+            if (plainJson.contains ("trackRange") || plainJson.contains ("automationWriteMode"))
+                automodes190paResult = "ERROR written for a project without them";
+            auto flagged = song;
+            flagged.automationWriteMode = 2;
+            flagged.trackRange = lynx::rangeedit::fromCorners (4 * bar, 8 * bar, 1, 2);
+            const auto reread = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (flagged), why);
+            if (automodes190paResult == "OK" && (! reread || reread->automationWriteMode != 2 || ! (reread->trackRange == flagged.trackRange)))
+                automodes190paResult = "ERROR round trip " + why;
+            for (const char* release : { "0.1.30", "0.1.28" })
+            {
+                const auto copy = lynx::olderlynx::forRelease (flagged, release);
+                const auto said = [&copy] (const char* text) {
+                    return std::any_of (copy.lost.begin(), copy.lost.end(), [text] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).contains (text); });
+                };
+                if (automodes190paResult == "OK"
+                    && (! copy.ok || copy.json.contains ("trackRange") || copy.json.contains ("automationWriteMode") || ! said ("automation write mode")
+                        || ! said ("range selected on some Playlist tracks")))
+                    automodes190paResult = "ERROR copy for " + juce::String (release);
+            }
+
+            // Capture automation per mode: one gesture of insert 1's volume at bars 2..2.5 of a pass that played 1..4
+            for (int mode = 0; mode < 4 && automodes190paResult == "OK"; ++mode)
+            {
+                lynx::AudioEngine cap (false);
+                auto s = song;
+                s.automationWriteMode = mode;
+                cap.setSong (s);
+                const lynx::AutomationTarget volume { lynx::AutomationTargetKind::mixerVolume, 1, 0, 0 };
+                auto& buffer = cap.automationCaptureForTests();
+                buffer.notePlaying ((double) bar);
+                for (int i = 0; i <= 4; ++i)
+                {
+                    lynx::captureauto::Entry x;
+                    x.target = volume;
+                    x.ms = 1000.0 + 100.0 * i;
+                    x.tick = (double) (2 * bar) + i * (double) bar / 8.0;
+                    x.value = 0.2f + 0.15f * (float) i;
+                    x.pass = buffer.currentPass();
+                    buffer.notePlaying (x.tick);
+                    cap.addAutomationCaptureSample (x);
+                }
+                buffer.notePlaying ((double) (4 * bar));
+                buffer.noteStopped();
+                if (cap.captureAutomation().controls != 1)
+                {
+                    automodes190paResult = "ERROR capture in mode " + juce::String (mode);
+                    break;
+                }
+                const auto& song2 = cap.getSong();
+                const auto& a = song2.automations.back();
+                const lynx::Clip* clip = nullptr;
+                for (const auto& c : song2.playlist)
+                    if (c.kind == lynx::ClipKind::automation && c.automation == (int) song2.automations.size() - 1)
+                        clip = &c;
+                if (clip == nullptr)
+                {
+                    automodes190paResult = "ERROR no automation clip in mode " + juce::String (mode);
+                    break;
+                }
+                const auto valueAt = [&] (double songTick) { return a.valueAt (songTick - (double) clip->start + (double) clip->offset); };
+                const auto lastPoint = a.points.empty() ? (std::int64_t) -1 : a.points.back().tick + clip->start - clip->offset;
+                const auto firstPoint = a.points.empty() ? (std::int64_t) -1 : a.points.front().tick + clip->start - clip->offset;
+                const auto holds = std::abs (valueAt (3.5 * (double) bar) - 0.8f) < 0.01f && lastPoint >= 4 * bar - 1;
+                const auto fromStart = firstPoint <= bar && std::abs (valueAt (1.5 * (double) bar) - 0.2f) < 0.01f;
+                const bool ok = mode == 0 || mode == 1 ? (! holds && ! fromStart && firstPoint == 2 * bar)
+                              : mode == 2          ? (holds && ! fromStart && firstPoint == 2 * bar)
+                                                   : (holds && fromStart);
+                if (! ok)
+                    automodes190paResult = "ERROR capture curve in mode " + juce::String (mode) + " (first " + juce::String (firstPoint) + ", last "
+                                           + juce::String (lastPoint) + ")";
+            }
+
+            // range edits on tracks 2-3 (1, 2): one undo step each, the other tracks untouched, undo bit for bit
+            if (automodes190paResult == "OK")
+            {
+                lynx::AudioEngine e (false);
+                e.setSong (song);
+                const auto before = e.getSong().playlist;
+                e.editSong ([bar] (lynx::Song& s) { s.trackRange = lynx::rangeedit::fromCorners (4 * bar, 8 * bar, 1, 2); }, false);
+                const auto steps = e.getHistoryPosition();
+                e.editSong ([] (lynx::Song& s) { lynx::rangeedit::clearRange (s, s.trackRange); });
+                const auto& after = e.getSong().playlist;
+                const auto count = [] (const std::vector<lynx::Clip>& list, int track) {
+                    return (int) std::count_if (list.begin(), list.end(), [track] (const lynx::Clip& c) { return c.track == track; });
+                };
+                if (e.getHistoryPosition() != steps + 1 || count (after, 0) != 1 || count (after, 3) != 1 || count (after, 1) != 2 || count (after, 2) != 2)
+                    automodes190paResult = "ERROR range delete";
+                e.undo();
+                if (automodes190paResult == "OK" && ! (e.getSong().playlist == before))
+                    automodes190paResult = "ERROR range delete undo";
+                e.editSong ([] (lynx::Song& s) { s.trackRange = lynx::rangeedit::duplicateRange (s, s.trackRange); });
+                if (automodes190paResult == "OK" && (e.getSong().trackRange.from != 8 * bar || count (e.getSong().playlist, 1) != 3 || count (e.getSong().playlist, 0) != 1))
+                    automodes190paResult = "ERROR range duplicate";
+                e.undo();
+                if (automodes190paResult == "OK" && (! (e.getSong().playlist == before) || e.getSong().trackRange.from != 4 * bar))
+                    automodes190paResult = "ERROR range duplicate undo";
+            }
+        }
+
         // round 190nw (0.1.31): the tracker. Its settings are saved only when changed (an older project's file stays the
         // same bytes) and come back; the copies for 0.1.30 / 0.1.28 drop them with one loss line; a module imports in a
         // real engine (one note, one Sampler channel, its sample written) and its notes render.
@@ -9894,6 +10027,7 @@ private:
                << "livewf190em=" << livewf190emResult << "\n"
                << "trackclips190ne=" << trackclips190neResult << "\n"
                << "trackstates190op=" << trackstates190opResult << "\n"
+               << "automodes190pa=" << automodes190paResult << "\n"
                << "tracker190nw=" << tracker190nwResult << "\n"
                << "tracker190ob=" << tracker190obResult << "\n"
                << "rackauto190oo=" << rackauto190ooResult << "\n"
@@ -19724,6 +19858,7 @@ private:
 #include "IssuesShot190ng.inc" // round 190ng (issues #215, #217, #219, #220, #222)
 #include "TrackClipsShot190ne.inc" // round 190ne
 #include "TrackStatesShot190op.inc" // round 190op
+#include "AutoModesShot190pa.inc" // round 190pa
 #include "TrackerShot190nw.inc" // round 190nw
 #include "IssuesShot190nq.inc" // round 190nq (issues #193, #225-#230)
 #include "Research190onShot.inc" // round 190on (research190oe P2, P8, P10)

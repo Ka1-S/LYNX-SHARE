@@ -462,6 +462,7 @@ public:
     AutomationCaptureResult captureAutomation();
     const captureauto::Buffer& getAutomationCapture() const noexcept { return automationCapture; } // (tests)
     void addAutomationCaptureSample (const captureauto::Entry& e) { automationCapture.add (e); } // (tests, --selftest)
+    captureauto::Buffer& automationCaptureForTests() noexcept { return automationCapture; } // (round 190pa: its play passes)
 
     // Per-insert record arm: each armed insert records its own audio input (Mixer › insert › input source) into
     // its own take (arming one turns audio recording on; disarming the last one turns it off). Not saved.
@@ -1530,7 +1531,9 @@ private:
         bool held = false;
         std::vector<RecordedValue> pending; // sampled, not yet written
         float liveValue = -1.0f; // an internal controller's value to write instead of the control's (round 190cs)
+        bool started = false;    // round 190pa (P21, Write): the take's start point was written
     };
+    double automationTakeStart = -1.0; // round 190pa (P21): where the automation take started (transport position)
     std::vector<Touch> touches;
     int automationCommitCountdown = 0;
     bool automationTakeHasUndoStep = false;

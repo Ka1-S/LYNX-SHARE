@@ -1,4 +1,5 @@
 #include "engine/ProjectFile.h"
+#include "core/AutomationModes.h" // round 190pa (P21)
 #include "core/Sections.h"
 #include "core/EditorScale.h"
 #include "core/ClipEnvelope.h"
@@ -3943,6 +3944,23 @@ juce::String toJson (const Song& song, bool stampVersion)
         root->setProperty ("loop", juce::Array<juce::var> { (juce::int64) song.loopStart, (juce::int64) song.loopEnd });
     if (song.loopOff) // round 190cg: the loop switch (only when off: older versions loop the range, as before)
         root->setProperty ("loopOff", true);
+    // round 190pa (P14): the range on chosen tracks, {from, to, tracks[, lane]}; none written without one
+    if (! song.trackRange.empty())
+    {
+        auto* range = new juce::DynamicObject();
+        range->setProperty ("from", (juce::int64) song.trackRange.from);
+        range->setProperty ("to", (juce::int64) song.trackRange.to);
+        juce::Array<juce::var> tracks;
+        for (const auto t : song.trackRange.tracks)
+            tracks.add (t);
+        range->setProperty ("tracks", tracks);
+        if (song.trackRange.laneAutomation >= 0)
+            range->setProperty ("lane", song.trackRange.laneAutomation);
+        root->setProperty ("trackRange", juce::var (range));
+    }
+    // round 190pa (P21): the automation write mode, only when not Read (FL's Record automation)
+    if (song.automationWriteMode != 0)
+        root->setProperty ("automationWriteMode", juce::String (automodes::idOf (automodes::fromInt (song.automationWriteMode))));
     if (song.tempoViewHigh > song.tempoViewLow) // round 190cg: the tempo lane's shown range (BPM)
         root->setProperty ("tempoView", juce::Array<juce::var> { song.tempoViewLow, song.tempoViewHigh });
 
@@ -4940,6 +4958,24 @@ std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error,
         song.loopEnd = juce::jmax<juce::int64> (song.loopStart, (juce::int64) loop[1]);
     }
     song.loopOff = (bool) root.getProperty ("loopOff", false);
+    if (const auto& range = root["trackRange"]; range.isObject()) // round 190pa (P14)
+    {
+        TrackRange r;
+        r.from = juce::jmax<juce::int64> (0, (juce::int64) range.getProperty ("from", 0));
+        r.to = juce::jmax<juce::int64> (r.from, (juce::int64) range.getProperty ("to", 0));
+        if (const auto* tracks = range["tracks"].getArray())
+            for (const auto& t : *tracks)
+                if ((int) t >= 0 && (int) t < 500)
+                    r.tracks.push_back ((int) t);
+        std::sort (r.tracks.begin(), r.tracks.end());
+        r.tracks.erase (std::unique (r.tracks.begin(), r.tracks.end()), r.tracks.end());
+        r.laneAutomation = (int) range.getProperty ("lane", -1);
+        if (r.laneAutomation < -1)
+            r.laneAutomation = -1;
+        if (! r.empty())
+            song.trackRange = r;
+    }
+    song.automationWriteMode = (int) automodes::fromId (root.getProperty ("automationWriteMode", "read").toString().toStdString()); // round 190pa (P21)
     if (const auto& view = root["tempoView"]; view.isArray() && view.size() == 2 && (double) view[1] > (double) view[0])
     {
         song.tempoViewLow = juce::jlimit (minTempo, maxTempo, (double) view[0]);

@@ -171,8 +171,17 @@ public:
     void paintButton (juce::Graphics&, bool highlighted, bool down) override;
     void buttonStateChanged() override;
 
+    // Round 190pa (P21): a short tag in the button's top-right corner, e.g. the armed automation write mode ("L" for
+    // Latch) on the Record / Automation Arm button; empty = none (nothing is drawn, as before)
+    void setBadge (const juce::String& newBadge, juce::Colour colour);
+    const juce::String& getBadge() const noexcept { return badge; }
+
 private:
     void timerCallback() override;
+    void paintButtonBody (juce::Graphics&, bool highlighted, bool down);
+    void paintBadge (juce::Graphics&);
+    juce::String badge;
+    juce::Colour badgeColour;
     void paintLook (juce::Graphics&, bool highlighted, bool down);
     void paintFlTile (juce::Graphics&, bool highlighted, bool down);
     bool tileCacheUsable (juce::Graphics&, int& scale) const;
