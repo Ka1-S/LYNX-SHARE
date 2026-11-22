@@ -809,6 +809,11 @@ if(LYNX_BUILD_APP)
         target_link_libraries(LYNX PRIVATE "-framework AVFoundation" "-framework CoreMedia" "-framework CoreVideo")
         target_link_libraries(LYNX PRIVATE "-framework AudioToolbox" "-framework CoreFoundation") # M4A export (engine/AacEncoderMac.cpp)
         target_link_libraries(LYNX PRIVATE ${CMAKE_DL_LIBS}) # (libcurl loaded at run time: engine/LiveLink.cpp)
+        # the main thread's stack: 32 MB instead of macOS's fixed 8 MB (rollup 0.1.31 step 6). --selftest keeps its items'
+        # engines and songs on the main thread's stack (round 190mo: 7.4 MB; GCC's frame is 9.2 MB at step 6) and Linux
+        # raises its limit at run time (platform::allowMainThreadStack); on macOS only the linker sets it, and CI's App
+        # macOS self-test was killed at its first line. Reserved address space only
+        target_link_options(LYNX PRIVATE "LINKER:-stack_size,0x2000000")
     else()
         # ALSA (linked) + JACK (loaded at run time; PipeWire serves JACK clients through pipewire-jack)
         target_compile_definitions(LYNX PRIVATE JUCE_ALSA=1 JUCE_JACK=1 JUCE_PLUGINHOST_LV2=1)
