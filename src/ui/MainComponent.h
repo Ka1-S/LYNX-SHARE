@@ -1147,6 +1147,7 @@ private:
     std::unique_ptr<juce::Component> danceStage; // the dance channels' dancers over the workspace (ui/DanceView.h, round 165e)
 
     std::unique_ptr<juce::FileChooser> fileChooser;
+    juce::File demoSaveTarget; // round 190pl (--demo file.save): the file the next Save as... writes without its file dialog
     juce::File currentFile;
     juce::File importedFlpFile; // the .flp the current project was imported from (until another project is opened)
     juce::String importedSuffix; // " (imported from FL Studio)" in the title until saved as .lynx

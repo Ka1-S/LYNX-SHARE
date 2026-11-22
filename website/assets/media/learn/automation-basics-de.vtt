@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Automation bewegt einen Regler über die Zeit, von selbst, jedes Mal, wenn der Song spielt.
+
+00:00:09.000 --> 00:00:14.600
+Rechtsklicke einen beliebigen Regler, hier den Cutoff des Synths, und wähle Automationsclip erstellen.
+
+00:00:15.000 --> 00:00:20.600
+Der Clip landet in der Playlist, und sein Editor öffnet sich mit der Kurve.
+
+00:00:21.000 --> 00:00:26.600
+Ziehe die Punkte: Der Cutoff startet hoch und fällt über den Takt ab.
+
+00:00:27.000 --> 00:00:33.000
+Drücke Wiedergabe im Song-Modus: Der Regler folgt der Kurve.
+
+00:00:33.400 --> 00:00:39.800
+Im Einfachen Layout zeigt der Button Automation unter jeder Spur eine Bahn.

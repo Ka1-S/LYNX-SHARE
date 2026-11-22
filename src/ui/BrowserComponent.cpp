@@ -1,5 +1,6 @@
 #include "ui/TiltViewport.h"
 #include "ui/TypeAhead.h"
+#include "ui/DemoMode.h" // round 190pl
 #include "ui/PluginPresetMenu.h"
 #include "ui/ExternalDrag.h"
 #include "ui/GeneratorPresetMenu.h"
@@ -677,9 +678,27 @@ private:
 
 class BrowserComponent::FileTree final : public juce::Component,
                                          public ui::HintSource,
+                                         public demo::CellSource,
                                          public juce::FileDragAndDropTarget
 {
 public:
+    // round 190pl (--demo): a row is a cell (column = the list's row, the cell's row is ignored), so a script can click or
+    // drag it; "name" finds the row by its label or file name
+    juce::Rectangle<int> demoCellBounds (int, int row) const override
+    {
+        if (! juce::isPositiveAndBelow (row, (int) rows.size()))
+            return {};
+        return { 0, row * rowHeight, getWidth(), rowHeight };
+    }
+    // (the first row whose label, file name or file name without its extension is `name`)
+    juce::Rectangle<int> demoCellNamed (int, const juce::String& name) const override
+    {
+        for (int i = 0; i < (int) rows.size(); ++i)
+            if (const auto* n = rows[(std::size_t) i]; n->label == name || n->file.getFileName() == name || n->file.getFileNameWithoutExtension() == name)
+                return demoCellBounds (0, i);
+        return {};
+    }
+
     // FL layout: 24 px rows (design slice FM-S7 / finding FM-9: FL's tree rows are 23 px with a larger face than LYNX's
     // 22 px ones); the Clip-launch layout's Live-style list: 19 px (Live's row pitch, CL-22). Round 190iz.
     static constexpr int flRowHeight = 24, liveRowHeight = 19;
@@ -3857,6 +3876,7 @@ BrowserComponent::BrowserComponent (AudioEngine& e, Role r)
 
     // (round 190oo CS-22: Live's short placeholder; the syntax example is in the hint below, it was cut at every width)
     searchBox.setTextToShowWhenEmpty (tr ("Search (Ctrl+F)"), theme::colour::textDisabled);
+    searchBox.setComponentID ("browser.search"); // (round 190pl: --demo)
     searchBox.addListener (this);
     searchBox.setEscapeAndReturnKeysConsumed (true);
     ui::setHint (searchBox, tr ("Search the selected folder (or every folder) and below; in PROJECT, the project's items: words must all match; "
@@ -3900,6 +3920,8 @@ BrowserComponent::BrowserComponent (AudioEngine& e, Role r)
 
     tree = std::make_unique<FileTree> (*this, false);
     results = std::make_unique<FileTree> (*this, true);
+    tree->setComponentID ("browser.tree");       // (round 190pl: --demo, rows as cells)
+    results->setComponentID ("browser.results");
 
     for (auto [view, list] : { std::pair { &treeView, tree.get() }, std::pair { &resultsView, results.get() } })
     {

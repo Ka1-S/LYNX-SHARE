@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Automation moves a knob over time, by itself, every time the song plays.
+
+00:00:09.000 --> 00:00:14.600
+Right-click any knob, here the synth's Cutoff, and choose Create automation clip.
+
+00:00:15.000 --> 00:00:20.600
+The clip goes into the Playlist, and its editor opens with the curve.
+
+00:00:21.000 --> 00:00:26.600
+Drag the points: the Cutoff starts high and falls over the bar.
+
+00:00:27.000 --> 00:00:33.000
+Press Play in Song mode: the knob follows the curve.
+
+00:00:33.400 --> 00:00:39.800
+In the Simple layout, the Automation button shows a lane under each track.

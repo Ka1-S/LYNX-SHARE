@@ -5399,6 +5399,7 @@ std::optional<EffectSlot> newAddableEffect (EffectKind kind, double bpm)
 EffectsPanel::EffectsPanel (AudioEngine& e)
     : engine (e)
 {
+    setComponentID ("mixer.slots"); // (round 190pl: --demo, its slots as cells)
     setWantsKeyboardFocus (false);
     setMouseClickGrabsKeyboardFocus (false);
     engine.addChangeListener (this);

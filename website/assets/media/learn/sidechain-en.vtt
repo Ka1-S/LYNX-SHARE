@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Sidechain ducking: the bass dips on every kick, so both are heard.
+
+00:00:09.000 --> 00:00:14.600
+In the Simple layout it's one pick: the bass track's Duck under, then Drums.
+
+00:00:15.000 --> 00:00:22.000
+Now the bass breathes with the beat. The Duck knob sets how deep.
+
+00:00:22.400 --> 00:00:27.000
+The Pattern layout way, in the Mixer:
+
+00:00:27.400 --> 00:00:33.000
+Select Drums, right-click the chords' arrow: Sidechain to this track.
+
+00:00:33.400 --> 00:00:39.000
+Then add a compressor to the chords: it listens to the drums.
+
+00:00:39.400 --> 00:00:45.600
+Every hit pushes the chords down for a moment: the classic pump.

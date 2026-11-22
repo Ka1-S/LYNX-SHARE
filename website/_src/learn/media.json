@@ -1,4 +1,20 @@
 {
+ "assets/media/learn/automation-basics-en-1080.mp4": {
+  "size": 4255177,
+  "sha256": "4d88794b8b3f302105f0e1083d88d453bbceeaaa9755fafb9caa6f93a37e3b34"
+ },
+ "assets/media/learn/automation-basics-en-720.mp4": {
+  "size": 2583840,
+  "sha256": "36053ad95e8f4052dab3a67a7417fb85ba6dd0b44c86ab79110d0aee100efe5a"
+ },
+ "assets/media/learn/automation-basics-pt-BR-1080.mp4": {
+  "size": 4327869,
+  "sha256": "937e889460f175e82af28a83aba8b9f3196f202b32e4ab08495f0409956c8863"
+ },
+ "assets/media/learn/automation-basics-pt-BR-720.mp4": {
+  "size": 2655493,
+  "sha256": "e4dea9fe6705530dd432ce791a49fac816080ef7f6c8b5f199e18d480149dbbb"
+ },
  "assets/media/learn/clip-launch-tour-en-1080.mp4": {
   "size": 3248596,
   "sha256": "9d6b33a26b1961796f9b971f2d88e13311ed430d2f26b5e8f41153336364f7c3"
@@ -31,6 +47,54 @@
   "size": 2224501,
   "sha256": "ab784ff607491eaa2a11e88f8a9430346a61c97e21385c83d3a143a1bf2e69c4"
  },
+ "assets/media/learn/eq-basics-en-1080.mp4": {
+  "size": 5490617,
+  "sha256": "5828105b195a89d1f45176fe997b13b2829a1a6645fb28f4a470dbe2a11a6e12"
+ },
+ "assets/media/learn/eq-basics-en-720.mp4": {
+  "size": 3291280,
+  "sha256": "84194cee37f02af7a3993888500524c58bb024ddfbedd508348c834472310229"
+ },
+ "assets/media/learn/eq-basics-pt-BR-1080.mp4": {
+  "size": 5490177,
+  "sha256": "201b82c2cd307eda5b39bd22c060b1371ac7f3f67c8344b2ea5b1f8c0b98ec66"
+ },
+ "assets/media/learn/eq-basics-pt-BR-720.mp4": {
+  "size": 3306383,
+  "sha256": "c0820d85e9ff26234f6aee2c7705731c7a09076f2537dcc7122996fbf411f49b"
+ },
+ "assets/media/learn/export-mp3-en-1080.mp4": {
+  "size": 3712983,
+  "sha256": "f0f22bbaf9b096c9f8d14facb8207149dcf0aa94740d3eda973cddb3f3bdc9eb"
+ },
+ "assets/media/learn/export-mp3-en-720.mp4": {
+  "size": 2275608,
+  "sha256": "2cc37e5c31856dec7e7431a25db1c2ac76dc55217b59234a794e34d9f6975345"
+ },
+ "assets/media/learn/export-mp3-pt-BR-1080.mp4": {
+  "size": 3851902,
+  "sha256": "39cf7fd792d4c5eb021744e56c127b7d2110cd51336f9c99130f9578d8e1d094"
+ },
+ "assets/media/learn/export-mp3-pt-BR-720.mp4": {
+  "size": 2376266,
+  "sha256": "c155533cf15417646d51945375dd37e47e394c7f2092efb15a2b9a24188033d0"
+ },
+ "assets/media/learn/first-song-tour-en-1080.mp4": {
+  "size": 3491724,
+  "sha256": "3f9640a54703f3bfbfcb4ee6aff0dc3af6be313fc87a413b0b65c17e0220496d"
+ },
+ "assets/media/learn/first-song-tour-en-720.mp4": {
+  "size": 2305124,
+  "sha256": "e2ec3a93297349e88e35f4d9633c4a7f6ed0b080cf2ebd704bbf02eb06194ff5"
+ },
+ "assets/media/learn/first-song-tour-pt-BR-1080.mp4": {
+  "size": 3704204,
+  "sha256": "ba7c1198fd03fb05889b43b810a1a3b0762b464865566b84dbbec7b639321ad4"
+ },
+ "assets/media/learn/first-song-tour-pt-BR-720.mp4": {
+  "size": 2392342,
+  "sha256": "11d75e2d3bea32e54416cd5cd9b6c0e844c0476a7f47e6fec804300228a3fee1"
+ },
  "assets/media/learn/lynx-instruments-en-1080.mp4": {
   "size": 3562805,
   "sha256": "90b506225546c5de24bb37d71a762a526ac3d3e80144cca62886c6d0a2caf94b"
@@ -46,6 +110,38 @@
  "assets/media/learn/lynx-instruments-pt-BR-720.mp4": {
   "size": 2181977,
   "sha256": "ab822596175c719d04bb6ec363ac8e669dd3f83204ddafbf9fc2fb80a6a365ef"
+ },
+ "assets/media/learn/midi-keyboard-en-1080.mp4": {
+  "size": 3097005,
+  "sha256": "4031843c5a26ae2cf3b431e54a63e483e981718d06b9da113b0c5cca5e64bfe5"
+ },
+ "assets/media/learn/midi-keyboard-en-720.mp4": {
+  "size": 1979429,
+  "sha256": "1279f1eaba455df22adf807a1fdfe44cf576fc4d7881f6afbfb5dc761a1d04ea"
+ },
+ "assets/media/learn/midi-keyboard-pt-BR-1080.mp4": {
+  "size": 3289540,
+  "sha256": "da3dfab1342ab5288979706ba3bd90b9eea404bab53548c64fa39dc141d18bc9"
+ },
+ "assets/media/learn/midi-keyboard-pt-BR-720.mp4": {
+  "size": 2103167,
+  "sha256": "73df0a511fe1a7f75c9e68afc6e591c30c971d10aaae4eb09db79cf84ae8471a"
+ },
+ "assets/media/learn/mixing-basics-en-1080.mp4": {
+  "size": 3530214,
+  "sha256": "c926f34350ddaa772bd4fa27fdc711acc2ab66d12c6bdbc16821412b2fba272b"
+ },
+ "assets/media/learn/mixing-basics-en-720.mp4": {
+  "size": 2173374,
+  "sha256": "8a56df4ee5d6bce140080000d7c824e25ece435fc489354084e793f1b4b23cd2"
+ },
+ "assets/media/learn/mixing-basics-pt-BR-1080.mp4": {
+  "size": 3826230,
+  "sha256": "7ac5cb7b2f1a667c1c0fb24b60cb8e4e04d7422b45c7e8d97e37f5c8fff1677c"
+ },
+ "assets/media/learn/mixing-basics-pt-BR-720.mp4": {
+  "size": 2367770,
+  "sha256": "ac3042145d3ef30331d83370fe6b583bf1eb5ff275a9ca7a0ec15ad2f3e2b6dd"
  },
  "assets/media/learn/modulators-en-1080.mp4": {
   "size": 2248775,
@@ -175,6 +271,38 @@
   "size": 2466436,
   "sha256": "a21c30463b5260f3c36ea92c9ef4a9c9db409bdcaa9a71c259b21675fe1e6366"
  },
+ "assets/media/learn/save-backups-en-1080.mp4": {
+  "size": 3940364,
+  "sha256": "35216fbe8a25232e7da8d07e4477ae04bd8969e2bafc7a5f3f0541460906ed4d"
+ },
+ "assets/media/learn/save-backups-en-720.mp4": {
+  "size": 2439604,
+  "sha256": "bc28f340afd36f4b2ed77d374ff21a101a1ee3b244120213493c530d2ac8a250"
+ },
+ "assets/media/learn/save-backups-pt-BR-1080.mp4": {
+  "size": 4072077,
+  "sha256": "4c6c641f2e0c4b49eea05940ef9877bb20c6738c8500378bda8622ffe3c24413"
+ },
+ "assets/media/learn/save-backups-pt-BR-720.mp4": {
+  "size": 2538702,
+  "sha256": "a2ebd5cf619ec5024b75f66b5117db229383392c64b142a03cdbfd4a20d9b9dc"
+ },
+ "assets/media/learn/sidechain-en-1080.mp4": {
+  "size": 4728864,
+  "sha256": "3b90016cc10bc6585633816f55d5378c92deb9823a2bf2a9c8cca0bd26fc9d32"
+ },
+ "assets/media/learn/sidechain-en-720.mp4": {
+  "size": 2967942,
+  "sha256": "eae8e9f42ba5624580ca1c8913b921387181abdae4f35cf4834475d165b04d7a"
+ },
+ "assets/media/learn/sidechain-pt-BR-1080.mp4": {
+  "size": 4826469,
+  "sha256": "e8cdad78c062b8602d2b3ac2540542d0d0ad1838613b8e6bf72f877e688e96e1"
+ },
+ "assets/media/learn/sidechain-pt-BR-720.mp4": {
+  "size": 3064866,
+  "sha256": "6fd6a93da528d5fd7732caa984c271d557d72f2d8decf247b3d17bf0d503daf4"
+ },
  "assets/media/learn/simple-beat-en-1080.mp4": {
   "size": 4328164,
   "sha256": "6180797c5ddd333bce804dbdcd7c98bf92cb92443798dab2bd46e03225743a54"
@@ -190,6 +318,22 @@
  "assets/media/learn/simple-beat-pt-BR-720.mp4": {
   "size": 2679738,
   "sha256": "18c024fb55cb4ef6f124d9214c11099ba15c301b1ac6ce0f2e3faa9339c18491"
+ },
+ "assets/media/learn/simple-loops-en-1080.mp4": {
+  "size": 2988254,
+  "sha256": "59ff940ccfb1a4bbdab9fb7951c12dfa2f0e087a75b6a1c1e21332896fc79809"
+ },
+ "assets/media/learn/simple-loops-en-720.mp4": {
+  "size": 1915119,
+  "sha256": "25a93637dd97a67f58fee3021595b0b26650be1f6eac29284800a2288572527d"
+ },
+ "assets/media/learn/simple-loops-pt-BR-1080.mp4": {
+  "size": 3168380,
+  "sha256": "2cf3261bab249e0eb47c10d78583dfdd5d0f6855bb9d365e6d5432141ac6bae9"
+ },
+ "assets/media/learn/simple-loops-pt-BR-720.mp4": {
+  "size": 2091807,
+  "sha256": "914d58b767c69b64d4815594bd294df826ebc25c7d6755f3b343a803856ec358"
  },
  "assets/media/learn/song-sections-en-1080.mp4": {
   "size": 1899920,
@@ -238,5 +382,37 @@
  "assets/media/learn/tracker-pt-BR-720.mp4": {
   "size": 1337814,
   "sha256": "9cf09c42afdc0a18618e48756460919d1d33fa7c49066260de56bd018f5cf950"
+ },
+ "assets/media/learn/vocal-chain-en-1080.mp4": {
+  "size": 4143735,
+  "sha256": "8a8d743a52cc2d15e58f4daf59fcc12d30258c7920e78370fcfa74d1eb67dbe0"
+ },
+ "assets/media/learn/vocal-chain-en-720.mp4": {
+  "size": 2668982,
+  "sha256": "b70c947ec84f0a7d04941da8b9a609e2dad90f5fca07f1d45dd49ac0fd22d5bd"
+ },
+ "assets/media/learn/vocal-chain-pt-BR-1080.mp4": {
+  "size": 4220443,
+  "sha256": "917f6ab461fb28e1ac333adb02b5ecd2a824ed0152fa545f3eb89bbb858a8fe0"
+ },
+ "assets/media/learn/vocal-chain-pt-BR-720.mp4": {
+  "size": 2718190,
+  "sha256": "20554c07f072b832852293f0b08fe437756d15077da7bb0d250413cb919f165e"
+ },
+ "assets/media/learn/vst-plugins-en-1080.mp4": {
+  "size": 3846860,
+  "sha256": "7e36fce7cb36e8930967f82965bcee45632d00459a3be54b1f29b5788dad661b"
+ },
+ "assets/media/learn/vst-plugins-en-720.mp4": {
+  "size": 2392502,
+  "sha256": "bedfb37412a627b114998a5bc9f25c739c54f732378d6afa7ee53a555b251580"
+ },
+ "assets/media/learn/vst-plugins-pt-BR-1080.mp4": {
+  "size": 3941944,
+  "sha256": "d52300189d5d1e42879065c33d45aecda1db3e4f8ae235083a4ba68b9b1fbe7d"
+ },
+ "assets/media/learn/vst-plugins-pt-BR-720.mp4": {
+  "size": 2488404,
+  "sha256": "f373eed249310934b6bc0ac13a25725e12c22028d5e716e1176e8468b613e993"
  }
 }

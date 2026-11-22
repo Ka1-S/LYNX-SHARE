@@ -2,6 +2,7 @@
 
 #include "core/PluginCatalog.h"
 #include "core/Vfx.h"
+#include "ui/DemoMode.h"
 #include "ui/I18n.h"
 #include "ui/PluginManager.h"
 #include "ui/PluginPickerView.h"
@@ -34,6 +35,7 @@ struct Group
 };
 
 class PluginPicker final : public juce::Component,
+                           public demo::CellSource,
                            private juce::TextEditor::Listener,
                            private juce::KeyListener
 {
@@ -84,8 +86,32 @@ public:
         countLabel.setColour (juce::Label::textColourId, theme::colour::textSecondary);
         addAndMakeVisible (countLabel);
 
+        // round 190pl: by component ID for --demo (docs/DEMO_MODE.md); the list's rows are cells (column = the row shown,
+        // "name": by the plugin's name)
+        setComponentID ("pluginChooser");
+        search.setComponentID ("pluginChooser.search");
+        instrumentsTab.setComponentID ("pluginChooser.instruments");
+        effectsTab.setComponentID ("pluginChooser.effects");
+        manageButton.setComponentID ("pluginChooser.manage");
+        scanButton.setComponentID ("pluginChooser.scan");
+        addButton.setComponentID ("pluginChooser.add");
+
         setKind (instruments);
         setSize (760, 520);
+    }
+
+    juce::Rectangle<int> demoCellBounds (int, int row) const override
+    {
+        if (! juce::isPositiveAndBelow (row, (int) shown.size()))
+            return {};
+        return getLocalArea (&list, list.getRowPosition (row, true));
+    }
+    juce::Rectangle<int> demoCellNamed (int, const juce::String& name) const override
+    {
+        for (int i = 0; i < (int) shown.size(); ++i)
+            if (juce::String::fromUTF8 (entries[(std::size_t) shown[(std::size_t) i]].name.c_str()) == name)
+                return demoCellBounds (0, i);
+        return {};
     }
 
     void paint (juce::Graphics& g) override { g.fillAll (theme::colour::bg2); }

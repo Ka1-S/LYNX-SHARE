@@ -84,6 +84,56 @@ the Playlist's Draw tool places the selected pattern, a clip grid slot launches 
 `LYNX --demo190pgcheck <prefix> <project.lynx>` runs these operations against a real window (on a private X server) and
 writes `<prefix>-checks.txt`; run it with `--lang pt-BR` too.
 
+### Operations of tutorial batch 2 (round 190pl)
+
+These answer like the others (no guards). Some of them change the project or write files, exactly as the menu items they
+stand for do; `mixer.route` is one undo step.
+
+| Operation | Arguments | Result |
+|---|---|---|
+| `ui.export` | `format` (`wav`, `mp3`, `ogg`, `flac`, `aiff`, `m4a`), `path` (optional, absolute), `run` (optional, default true) | Opens the Export window of File › Export › *format* file... (ID `export.window`). With `path`, its `Export...` button (`export.start`) writes that file without the system's file dialog (once). `run: false` only arms the path, for a script that opens the window through the real menu. `opened`, `screen` |
+| `file.export` | `format`, `path` | The same render without a window, here and now (the song in Song mode, else the pattern; the window's remembered choices): `file`, `bytes`, `seconds`, `peakDb` |
+| `file.save` | `path` (optional, absolute), `newVersion` (optional), `run` (optional) | Save (the project's own file), Save as `path` without the file dialog, or Save new version (`Song_2`...). `path` with `run: false`: the next File › Save as... writes it. `file`, `name`, `modified` |
+| `midi.input` | `events`: `[{ "type": "note", "note", "velocity" (1–127), "at" (s from now), "length" (s), "channel" (1–16) }, { "type": "cc", "cc", "value", "at" }]` | Plays the virtual input **LYNX demo keyboard**, which `--demo` lists in Options › MIDI like a plugged-in device. Its notes go through that device's MIDI settings (on / off, MIDI channel, what it plays), recording and Map Mode as a keyboard's do. `device`, `messages`, `seconds` |
+| `plugin.scan` | `folders` (optional: absolute, existing), `add` (optional, default true), `status` (optional) | Scans the folders in the background as the Plugin manager's Find new plugins does, and adds them to the plugin folders unless `add` is false (no folders: the plugin folders). `status: true` answers `running`, `progress`, `found`, `finished`, `known` instead |
+| `ui.drag` | `from`, `to` (each `{ "target", "cell"?, "at"?, "dx"?, "dy"? }`, as ui.click's, `dx` / `dy` pixels from there), `mods` (optional: `["ctrl", "shift", "alt"]`), `seconds` (optional, default 0.6) | A press, moves and a release delivered **through the window** (JUCE's `ComponentPeer::handleMouseEvent`, as the system's mouse events arrive; nothing reaches the operating system): a drag-and-drop (a loop onto the timeline, a plugin picture onto a slot) drops where it ends, a clip moves, a knob or an EQ band turns. Answers at once with `from` / `to` (screen points); the drag takes its time |
+| `ui.controlmenu` | `target` (`param:...`), or `channel` / `insert` (+ `slot`) with `parameter` (an index, `volume` or `pan`) | A right-click on the control that sets that parameter in any open LYNX window: the knob's own menu opens (Create automation clip, Link to controller, Modulate with...) where the pointer is, as the knob's does. `screen` (the knob) |
+| `ui.type` | `target` (a text field), `text`, `interval` (optional, ms per character, default 70), `replace` (optional) | Types the text into the field one character at a time, as the keyboard would (the field takes the focus; its listeners see each change; no key event reaches the system): `typing`, `seconds` |
+| `ui.repaint` | — | Paints every LYNX window again (`repainted`): a private X server without a compositor can keep a closed menu's pixels on screen |
+| `mixer.route` | `from` (an insert), `to` (a track, 0 = Master), `kind` (`route`, `routeOnly`, `sidechain`, `sidechainOnly`; default `route`), `level` (optional, linear 0–1.25) | The route arrow's menu items in one undo step: `sends`, `toMaster` |
+
+Also new in round 190pl:
+
+- **`"cell": { "row", "name" }`**: on controls that can look their cells up by what they show (the Browser's lists, the
+  Plugin picker's tiles, the Plugin manager's rows), the cell that shows that name.
+- **`param:` targets** for `ui.find`, `ui.click` and `ui.drag`: a control by the parameter it sets —
+  `param:channel.<c>.<p>` (an instrument parameter), `param:channel.<c>.volume` / `.pan`, `param:insert.<t>.<slot>.<p>`
+  (an insert effect's parameter), `param:insert.<t>.volume` / `.pan`. Found in every open window: a knob tagged with its
+  parameter, or the part of an effect editor that answers with it.
+- **`ui.click` `peer: true`** (with `mods` optional): the press and the release go through the window, so whatever is on top
+  at that point gets them (a list's row, a table's cell).
+- **`ui.editor` `insert` + `slot`**: an insert effect's editor window, ID `editor`.
+- **`ui.show`** `pluginManager` and `versions`.
+- **Cells**: `mixer.strips` row 3 = a track's route arrow, 4 = its fader's cap where it is now, 5 = its pan knob, 6 = its solo
+  switch, 7 = its header (a click selects the track); `mixer.slots` (the Mixer's insert slots, column = the slot); `browser.tree` / `browser.results` (the Browser's and
+  the Loops dock's lists, column = the row; `"name"` finds a row by its label); `automationEditor` (an automation clip's editor: row 0 = point *column*, row 1 = the grid at 16th *column*, top to bottom =
+  its value range); `pluginChooser` (the Mixer slot's More plugins... window: column = the row shown, `"name"` by the plugin's
+  name); `pluginPicker` (row 0 = a tile, column = its
+  place or `"name"`; row 1 = a category tab); `versions` (row = the list's row);
+  `pluginManager` (row = the table's row shown); `facetEq` (row 0 = band *column*'s node; row 1 = the listen switch,
+  column 0 the EQ, 1 the source, 2 the target, 3 the Compare menu; row 2 = the chosen band's shape menu; rows 76–124 = the graph at *column* Hz and *row − 100* dB).
+- **IDs**: the Export window `export.window`, `export.format.<wav|mp3|ogg|flac|aiff|m4a>`, `export.start`, `export.cancel`,
+  `export.range`, `export.mp3Bitrate`; the Versions window `versions`, `versions.list`, `versions.open`, `versions.show`,
+  `versions.label`, `versions.newVersion`; the Plugin manager `pluginManager`, `pluginManager.search`, `.list`, `.scanNew`,
+  `.rescanAll`, `.stop`, `.folders`, `.addFile`, `.status`, `.filter.<all|instruments|effects|favourites|failed>`;
+  Options › MIDI's inputs `midi.input.<n>` with `.enabled`, `.channel`, `.plays`; Facet EQ's editor `facetEq`; the Browser's
+  search box `browser.search`; the Mixer's insert slots `mixer.slots`; the plugin chooser `pluginChooser` with `.search`,
+  `.instruments`, `.effects`, `.manage`, `.scan`, `.add`; the F8 Plugin picker `pluginPicker`; an automation clip's editor
+  `automationEditor`.
+
+`LYNX --demo190plcheck <prefix>` runs these against a real window (on a private X server) and writes
+`<prefix>-checks.txt` (files in `<prefix>-files/`); run it with `--lang pt-BR` too.
+
 ### Useful component IDs
 
 | Where | IDs |

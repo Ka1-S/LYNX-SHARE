@@ -14,6 +14,7 @@
 #include "core/FacetEq.h"
 #include "core/RackRenderer.h"
 #include "engine/Text.h"
+#include "ui/DemoMode.h"
 #include "ui/I18n.h"
 #include "ui/PluginHeader.h"
 #include "ui/PluginSkin.h"
@@ -82,6 +83,7 @@ void drawPowerGlyph (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour c
 
 class FacetEqEditor final : public juce::Component,
                             public ui::HintSource,
+                            public ::lynx::demo::CellSource,
                             private juce::ChangeListener,
                             private juce::Timer
 {
@@ -103,6 +105,7 @@ public:
                 if (shape (fx->params[(std::size_t) param (b, 0)]) != Shape::off) { selected = b; break; }
         engine.addChangeListener (this);
         setWantsKeyboardFocus (true);
+        setComponentID ("facetEq"); // (round 190pl: --demo finds it, and its cells, by this ID)
         setSize (960, 560);
         if (demo)
         {
@@ -217,6 +220,25 @@ public:
         const auto key = (std::size_t) (track * maxEffectSlots + slot) * ProcessTimes::meterOutputs + (std::size_t) b;
         if (times == nullptr || key >= times->effectMeters.size()) return 0.0;
         return (double) times->effectMeters[key].load (std::memory_order_relaxed) * 60.0;
+    }
+
+    // round 190pl (--demo, docs/DEMO_MODE.md): row 0 = band `column`'s node (a band that is on); row 1 = the listen switch's
+    // segment `column` (0 the EQ, 1 the source: this track without it, 2 the target, 3 the Compare menu); row 2 = the chosen
+    // band's shape menu; rows 76-124 = the
+    // graph's point at `column` Hz and row - 100 dB (a double click there adds a band; a node dragged there moves the band)
+    juce::Rectangle<int> demoCellBounds (int row, int column) const override
+    {
+        if (row == 0)
+            return bandOn (column) ? juce::Rectangle<float> (16.0f, 16.0f).withCentre (nodePosition (column)).toNearestInt() : juce::Rectangle<int>();
+        if (row == 1)
+            return column >= 0 && column <= 3 ? listenSegment (column).toNearestInt() : juce::Rectangle<int>();
+        if (row == 2) // the chosen band's panel: its shape menu (Bell, Low cut...)
+            for (const auto& c : controls())
+                if (c.type == Ctl::shapeMenu)
+                    return c.r.toNearestInt();
+        if (row >= 76 && row <= 124 && column >= (int) minHz && column <= (int) maxHz)
+            return juce::Rectangle<float> (4.0f, 4.0f).withCentre ({ xForHz ((double) column), yForDb ((double) (row - 100)) }).toNearestInt();
+        return {};
     }
 
     juce::Point<float> nodePosition (int b) const

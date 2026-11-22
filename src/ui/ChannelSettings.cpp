@@ -1,5 +1,6 @@
 #include <optional>
 #include "ui/ModRing.h"
+#include "ui/DemoMode.h" // round 190pl
 #include "ui/WindowOwner.h"
 #include "core/NoteNames.h"
 #include "ui/ChannelSettings.h"
@@ -518,6 +519,7 @@ private:
 // Physical-model channels (Sakura, Drumpad; REA_rodada28): knobs for the main raw FL parameters (0..1)
 class ModelPanel final : public juce::Component,
                          public juce::TooltipClient,
+                         public demo::ParamSource,
                          public juce::DragAndDropTarget,
                          public juce::FileDragAndDropTarget,
                          private juce::ChangeListener,
@@ -1554,6 +1556,21 @@ public:
         if (layout == nullptr)
             return 1.0f;
         return juce::jmax (0.4f, juce::jmin ((float) (getWidth() - 16) / (float) layout->width, (float) (getHeight() - layoutTop() - 8) / (float) layout->height));
+    }
+
+    // round 190pl (--demo "param:" targets): where a designed page paints the knob of a parameter
+    juce::Rectangle<int> demoParamBounds (int kind, int index, int slot, int param) const override
+    {
+        if (layout == nullptr)
+            return {};
+        const AutomationTarget want { (AutomationTargetKind) kind, index, slot, param };
+        for (const auto& item : layout->items)
+            if (item.param != nullptr && (item.type == plugui::Item::knob || item.type == plugui::Item::vslider || item.type == plugui::Item::hslider)
+                && conditionHolds (item))
+                if (const auto* k = knobFor (item.param))
+                    if (const auto t = modring::taggedTarget (*k); t && *t == want)
+                        return layoutRect (item).toNearestInt();
+        return {};
     }
 
     juce::Rectangle<float> layoutRect (const plugui::LayoutItem& item) const

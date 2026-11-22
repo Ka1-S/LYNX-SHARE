@@ -10676,6 +10676,16 @@ void MainComponent::save (bool askForFile, std::function<void()> afterSaved)
         return;
     }
 
+    // round 190pl (--demo file.save): a take's Save as... writes the file the script gave, without the file dialog (it would
+    // show the computer's folders)
+    if (demo::active() && demoSaveTarget != juce::File())
+    {
+        const auto file = ProjectFile::withProjectExtension (std::exchange (demoSaveTarget, juce::File()));
+        file.getParentDirectory().createDirectory();
+        write (file);
+        return;
+    }
+
     const auto startFolder = currentFile.isAChildOf (autosaveFolder()) ? juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
                                                                        : currentFile.getParentDirectory();
     // (issue #251: FL's Save as also offers its zipped loop package, "Zipped song file (*.zip)")

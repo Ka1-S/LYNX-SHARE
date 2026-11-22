@@ -3066,6 +3066,14 @@ public:
             return;
         }
 
+        if (args.contains ("--demo190plcheck"))
+        {
+            // LYNX --demo190plcheck prefix: round 190pl, the --demo operations of tutorial batch 2 (src/Demo190plCheck.inc)
+            const auto i = args.indexOf ("--demo190plcheck");
+            setApplicationReturnValue (runDemoCheck190pl (args[i + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
         if (args.contains ("--demo190pgcheck"))
         {
             // LYNX --demo190pgcheck prefix project.lynx: round 190pg, the --demo operations of the tutorial videos (src/Demo190pgCheck.inc)
@@ -20395,6 +20403,7 @@ private:
 #include "RackShot190nc.inc" // round 190nc
 #include "OnboardShot190np.inc" // round 190np
 #include "Demo190pgCheck.inc" // round 190pg
+#include "Demo190plCheck.inc" // round 190pl
 #include "AutoLinks190ovCheck.inc" // round 190ov (FL automation clips linked to several controls)
     // --trackautoshot190gz (round 190gz): see the dispatch above
     bool runTrackAutoShot190gz (const juce::String& prefix)

@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+L'automazione muove una manopola nel tempo, da sola, ogni volta che il brano suona.
+
+00:00:09.000 --> 00:00:14.600
+Clic destro su qualsiasi manopola, qui il Cutoff del synth, e scegli Crea clip di automazione.
+
+00:00:15.000 --> 00:00:20.600
+Il clip va nella Playlist e il suo editor si apre con la curva.
+
+00:00:21.000 --> 00:00:26.600
+Trascina i punti: il Cutoff parte alto e scende lungo la battuta.
+
+00:00:27.000 --> 00:00:33.000
+Premi Play in modalità Song: la manopola segue la curva.
+
+00:00:33.400 --> 00:00:39.800
+Nel layout Simple, il pulsante Automazione mostra una corsia sotto ogni traccia.

@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Otomasi menggerakkan kenop seiring waktu, sendiri, setiap kali lagu diputar.
+
+00:00:09.000 --> 00:00:14.600
+Klik kanan kenop mana pun, di sini Cutoff synth, dan pilih Create automation clip.
+
+00:00:15.000 --> 00:00:20.600
+Clip masuk ke Playlist, dan editornya terbuka dengan kurvanya.
+
+00:00:21.000 --> 00:00:26.600
+Seret titik-titiknya: Cutoff mulai tinggi dan turun sepanjang bar.
+
+00:00:27.000 --> 00:00:33.000
+Tekan Play di mode Song: kenop mengikuti kurva.
+
+00:00:33.400 --> 00:00:39.800
+Di tata letak sederhana, tombol Automation menampilkan jalur di bawah tiap track.
