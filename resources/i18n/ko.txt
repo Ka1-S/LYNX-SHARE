@@ -12640,3 +12640,6 @@ countries: kr
 "This script draws its own display; LYNX SHARE shows its sliders." = "이 스크립트는 자체 화면을 그립니다. LYNX SHARE는 슬라이더를 보여 줍니다."
 "JSFX scripts are not in this release: their slots become empty (a switched-off Utility on an insert, an empty Sampler on a channel): {0}" = "이 버전에는 JSFX 스크립트가 없습니다: 슬롯이 비게 됩니다 (인서트에서는 꺼진 Utility, 채널에서는 빈 Sampler): {0}"
 "Show / hide the header" = "헤더 표시 / 숨기기"
+# --- rollup 0.1.31 step 7: Save a copy for 0.1.30 (round 190pi)
+"Ogun and Autogun play every note at the channel's level in this release (FL's link velocity is left out): {0}" = "이 릴리스에서 Ogun과 Autogun은 모든 노트를 채널 레벨로 연주합니다(FL의 링크 벨로시티는 빠집니다): {0}"
+"Automation of Sytrus' main knobs (master level, LFO, pitch, Mod X / Y) does nothing in this release: {0}" = "Sytrus 메인 노브(master level, LFO, pitch, Mod X / Y)의 오토메이션은 이 릴리스에서 아무 동작도 하지 않습니다: {0}"

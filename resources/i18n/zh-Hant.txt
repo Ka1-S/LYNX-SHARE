@@ -12640,3 +12640,6 @@ countries: tw hk mo
 "This script draws its own display; LYNX SHARE shows its sliders." = "此腳本繪製自己的顯示畫面；LYNX SHARE 顯示其滑桿。"
 "JSFX scripts are not in this release: their slots become empty (a switched-off Utility on an insert, an empty Sampler on a channel): {0}" = "此版本沒有 JSFX 腳本：它們的插槽變為空（插入上為關閉的 Utility，通道上為空的 Sampler）：{0}"
 "Show / hide the header" = "顯示 / 隱藏標題列"
+# --- rollup 0.1.31 step 7: Save a copy for 0.1.30 (round 190pi)
+"Ogun and Autogun play every note at the channel's level in this release (FL's link velocity is left out): {0}" = "在此版本中，Ogun 和 Autogun 以通道電平播放每個音符（不含 FL 的連結力度）：{0}"
+"Automation of Sytrus' main knobs (master level, LFO, pitch, Mod X / Y) does nothing in this release: {0}" = "Sytrus 主旋鈕（master level、LFO、pitch、Mod X / Y）的自動化在此版本中不起作用：{0}"

@@ -18,6 +18,8 @@
 #include "core/LynxTune.h"
 #include "core/LynxVerbs.h"
 #include "core/MixSuite.h"
+#include "core/Ogun.h"
+#include "core/SytrusEngine.h"
 #include "core/NewtoneFx.h"
 #include "core/PeakShapes.h"
 #include "core/RackRenderer.h"
@@ -2126,6 +2128,41 @@ void toRelease0130 (juce::var& root, Losses& lost)
     // round 190pa (P14): the range on chosen tracks (a selection: nothing plays differently)
     if (drop (o, "trackRange"))
         lost.push_back ({ TR_NOOP ("The range selected on some Playlist tracks is left out"), juce::String(), false });
+
+    // rollup 0.1.31 step 7 (round 190pi): (a) Ogun / Autogun with FL's link velocity (ChannelDef::engineRev 2, a patch that
+    // leaves it on): 0.1.30 plays every note of them at the channel's level; written at revision 1, so the copy plays the
+    // same in newer LYNX. (b) Sytrus' main page (master level, LFO, pitch, Mod X / Y) takes automation from 0.1.31 on: in
+    // 0.1.30 such a clip moves nothing. Lines; the data stays
+    {
+        juce::StringArray oguns, sytrusClips;
+        std::set<int> sytrusChannels;
+        forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
+            const auto kind = c.getProperty ("instrument").toString();
+            if (kind == "sytrus")
+                sytrusChannels.insert (i);
+            if ((kind != "ogun" && kind != "autogun") || (int) c.getProperty ("engineRev") < 2)
+                return;
+            c.setProperty ("engineRev", 1);
+            juce::MemoryOutputStream decoded;
+            if (juce::Base64::convertFromBase64 (decoded, c.getProperty ("pluginState").toString()))
+            {
+                const auto* bytes = static_cast<const std::uint8_t*> (decoded.getData());
+                if (ogunLinksVelocity (std::vector<std::uint8_t> (bytes, bytes + decoded.getDataSize()), kind == "autogun"))
+                    addOnce (oguns, channelName (juce::var (&c), i));
+            }
+        });
+        if (auto* automations = arrayOf (root["automations"]))
+            for (const auto& a : *automations)
+                if (const auto t = a["target"]; t.isArray() && t.size() >= 3 && t[0].toString() == "channelParam"
+                                                && sytrusChannels.count ((int) t[1]) != 0 && sytrus::automatable ((int) t[2]))
+                    addOnce (sytrusClips, a["name"].toString());
+        if (! oguns.isEmpty())
+            lost.push_back ({ TR_NOOP ("Ogun and Autogun play every note at the channel's level in this release (FL's link velocity is left out): {0}"),
+                              listOf (oguns), true });
+        if (! sytrusClips.isEmpty())
+            lost.push_back ({ TR_NOOP ("Automation of Sytrus' main knobs (master level, LFO, pitch, Mod X / Y) does nothing in this release: {0}"),
+                              listOf (sytrusClips), true });
+    }
 }
 
 struct Step

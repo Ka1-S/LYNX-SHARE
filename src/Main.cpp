@@ -8961,6 +8961,160 @@ private:
             }
         }
 
+        // rollup 0.1.31 step 7: Save a copy for 0.1.30 / 0.1.28 of everything step 7 brought. One project with 190pf's Chord
+        // lane (2 chords, a following channel), 190pe's track versions (2 on a track), 190pa's write mode (Latch) and range,
+        // 190pj's JSFX insert, 190pi's Ogun (engine revision 2) and an automation clip of Sytrus' Mod X; each copy: every line
+        // once (the Ogun line only for a patch with link velocity: none here without FL's files), the chords as markers,
+        // none of the new keys left, Ogun at revision 1 (0.1.30), both copies read back; the default song gets none of them.
+        // (Note repeats / conditions, research190oe P19: not built, nothing to convert; the header gear's choice is window
+        // state, never in a copy.)
+        juce::String rollup031s7Result = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            if (song.playlistTracks.size() < 3)
+                song.playlistTracks.resize (3);
+            lynx::SongChord am, g7;
+            am.start = 0, am.length = 4 * lynx::ppq, am.root = 9, am.quality = 1;
+            g7.start = 4 * lynx::ppq, g7.length = 4 * lynx::ppq, g7.root = 7, g7.quality = 0, g7.extensions = { 10 }, g7.bass = 11;
+            song.chords() = { am, g7 };
+            lynx::ChannelDef follower;
+            follower.name = "Follower";
+            follower.followChords = 1;
+            song.channels.push_back (follower);
+            lynx::ChannelDef ogun;
+            ogun.name = "Ogun Pad";
+            ogun.instrument = lynx::InstrumentKind::ogun; // (engineRev 2: a new channel)
+            song.channels.push_back (ogun);
+            const auto ogunIndex = (int) song.channels.size() - 1;
+            lynx::ChannelDef sytrus;
+            sytrus.name = "Sytrus Lead";
+            sytrus.instrument = lynx::InstrumentKind::sytrus;
+            song.channels.push_back (sytrus);
+            lynx::Automation modX;
+            modX.name = "Sytrus Mod X";
+            modX.target.kind = lynx::AutomationTargetKind::channelParam;
+            modX.target.index = (int) song.channels.size() - 1;
+            modX.target.param = 18;
+            modX.points = { { 0, 0.2f }, { lynx::ppq, 0.8f } };
+            song.automations.push_back (modX);
+            song.automationWriteMode = 2; // (Latch)
+            song.trackRange.from = 0, song.trackRange.to = 2 * lynx::ppq, song.trackRange.tracks = { 0, 1 };
+            lynx::EffectSlot jsfx;
+            jsfx.kind = lynx::EffectKind::plugin;
+            jsfx.plugin.id = "JSFX-chokehold/soft_clipper";
+            jsfx.plugin.name = "soft_clipper";
+            if (song.mixer.size() < 3)
+                song.mixer.resize (3);
+            song.mixer[2].effects.push_back (jsfx);
+            lynx::Clip clip;
+            clip.pattern = 0;
+            clip.track = 1;
+            clip.length = 4 * lynx::ppq;
+            song.playlist.push_back (clip);
+            const auto versioned = lynx::trackversions::add (song, 1, lynx::trackversions::Start::empty, "Take B", "Take A") >= 0;
+            lynx::uids::normalize (song);
+
+            const auto countOf = [] (const lynx::olderlynx::Copy& c, const char* start) {
+                return (int) std::count_if (c.lost.begin(), c.lost.end(), [start] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).startsWith (start); });
+            };
+            const char* const lines[] = { "{0} chord(s) of the Chord lane become plain Playlist markers", "{0} channel(s) followed the Chord lane",
+                                          "{0} track version(s) that are not active are left out", "The automation write mode ({0}) goes back",
+                                          "The range selected on some Playlist tracks is left out", "JSFX scripts are not in this release",
+                                          "Automation of Sytrus' main knobs" };
+            if (! versioned || song.channels[(std::size_t) ogunIndex].engineRev != 2)
+                rollup031s7Result = "ERROR set-up";
+            for (const auto* release : { "0.1.30", "0.1.28" })
+            {
+                if (rollup031s7Result != "OK")
+                    break;
+                const auto is130 = juce::String (release) == "0.1.30";
+                const auto copy = lynx::olderlynx::forRelease (song, release);
+                juce::String why;
+                const auto back = copy.ok ? lynx::ProjectFile::fromJson (copy.json, why) : std::optional<lynx::Song> {};
+                if (! copy.ok || ! back)
+                {
+                    rollup031s7Result = juce::String ("ERROR copy ") + release + " " + copy.error + why;
+                    break;
+                }
+                for (const auto* line : lines)
+                    if (countOf (copy, line) != 1)
+                    {
+                        rollup031s7Result = juce::String ("ERROR the copy for ") + release + ": \"" + line + "\" " + juce::String (countOf (copy, line)) + " times";
+                        break;
+                    }
+                if (rollup031s7Result != "OK")
+                    break;
+                const auto& json = copy.json;
+                const auto markerNamed = [&back] (const char* name) {
+                    return std::any_of (back->markers().begin(), back->markers().end(), [name] (const lynx::Marker& m) { return m.name == name; });
+                };
+                if (countOf (copy, "Ogun and Autogun play every note") != 0)
+                    rollup031s7Result = juce::String ("ERROR an Ogun line without a link-velocity patch in the copy for ") + release;
+                else if (json.contains ("\"chords\"") || json.contains ("followChords") || json.contains ("playlistTrackVersions")
+                         || json.contains ("automationWriteMode") || json.contains ("trackRange") || json.contains ("JSFX-"))
+                    rollup031s7Result = juce::String ("ERROR a new key is left in the copy for ") + release;
+                else if (! markerNamed ("Am") || ! markerNamed ("G7/B"))
+                    rollup031s7Result = juce::String ("ERROR the chords are not markers in the copy for ") + release;
+                else if (is130 && back->channels[(std::size_t) ogunIndex].engineRev != 1)
+                    rollup031s7Result = "ERROR Ogun's revision in the copy for 0.1.30 (" + juce::String (back->channels[(std::size_t) ogunIndex].engineRev) + ")";
+                else if (back->playlistTracks.size() < 2 || ! back->playlistTracks[1].versions.empty()
+                         || std::none_of (back->playlist.begin(), back->playlist.end(), [] (const lynx::Clip& c) { return c.track == 1; }) == false)
+                    rollup031s7Result = juce::String ("ERROR track 2 is not its active (empty) version in the copy for ") + release;
+                else if (back->automations.empty() || back->automations[0].points.size() != 2)
+                    rollup031s7Result = juce::String ("ERROR the Sytrus clip's data in the copy for ") + release;
+            }
+            if (rollup031s7Result == "OK")
+            {
+                const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.30");
+                if (! plain.ok || ! plain.lost.empty())
+                    rollup031s7Result = "ERROR lines for a project with none of step 7's data (" + juce::String ((int) plain.lost.size()) + ")";
+            }
+        }
+
+        // rollup 0.1.31 step 7 (PRs #248 / #256 by FKHR26): the docked channel window's header shows by default; its gear hides
+        // it, a window of the same channel opened again hides it too (the choice kept per window), the project's window
+        // places carry it ([key, "headerHidden"]) and give it back, an older project's places (0.1.30's shape) none; the gear
+        // shows it again
+        juce::String headerGearResult = "OK";
+        {
+            lynx::AudioEngine e (false);
+            lynx::windowplaces::fromVar ({});
+            const auto shownIn = [] (juce::Component* w) { return w == nullptr ? std::optional<bool> {} : lynx::channelWindowHeaderShown (*w); };
+            auto first = lynx::makeChannelWindowForShot (e, 0, 0);
+            if (shownIn (first.get()) != std::optional<bool> (true))
+                headerGearResult = "ERROR not shown by default";
+            else if (! lynx::pressChannelHeaderGear (*first) || shownIn (first.get()) != std::optional<bool> (false))
+                headerGearResult = "ERROR the gear did not hide it";
+            first.reset();
+            if (headerGearResult == "OK")
+            {
+                auto again = lynx::makeChannelWindowForShot (e, 0, 0);
+                const auto saved = lynx::windowplaces::toVar();
+                const auto savedText = juce::JSON::toString (saved, true);
+                if (shownIn (again.get()) != std::optional<bool> (false))
+                    headerGearResult = "ERROR the choice was not kept for the window";
+                else if (! savedText.contains ("headerHidden"))
+                    headerGearResult = "ERROR the places do not carry it: " + savedText;
+                else
+                {
+                    again.reset();
+                    lynx::windowplaces::fromVar (juce::JSON::parse (juce::String ("[[\"ch:1\", 10, 10, 300, 200, false]]")));
+                    auto older = lynx::makeChannelWindowForShot (e, 0, 0);
+                    if (shownIn (older.get()) != std::optional<bool> (true))
+                        headerGearResult = "ERROR hidden after an older project's places";
+                    older.reset();
+                    lynx::windowplaces::fromVar (saved);
+                    auto restored = lynx::makeChannelWindowForShot (e, 0, 0);
+                    if (headerGearResult == "OK" && shownIn (restored.get()) != std::optional<bool> (false))
+                        headerGearResult = "ERROR the saved places did not give it back";
+                    else if (headerGearResult == "OK" && (! lynx::pressChannelHeaderGear (*restored) || shownIn (restored.get()) != std::optional<bool> (true)
+                                                          || ! lynx::windowplaces::hiddenHeaders().empty()))
+                        headerGearResult = "ERROR the gear did not show it again";
+                }
+            }
+            lynx::windowplaces::fromVar ({});
+        }
+
         // round 190ot (research190oe P5): the Simple layout's "Duck under..." and shared Echo send in .lynx (the duck's goal,
         // Amount, side input and level-0 route; the Echo send) and in the copies for 0.1.30 / 0.1.28: the same slot, side input,
         // route and sends (an ordinary Fruity Limiter there), one view line, none for a project without a duck
@@ -10189,6 +10343,8 @@ private:
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
                         && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
+                        && rollup031s7Result == "OK" && headerGearResult == "OK" // (rollup 0.1.31 step 7, and the three rounds' items its branches reported but did not count:)
+                        && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
                         && renderAgainResult.startsWith ("OK")
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK") && modulators190oxResult == "OK"
@@ -10290,6 +10446,8 @@ private:
                << "rollup031s4_copy_for_0130=" << rollup031s4Result << "\n"
                << "rollup031s5_copy_for_0130=" << rollup031s5Result << "\n"
                << "rollup031s6_copy_for_0130=" << rollup031s6Result << "\n"
+               << "rollup031s7_copy_for_0130=" << rollup031s7Result << "\n"
+               << "headergear248=" << headerGearResult << "\n"
                << "simpleduck190ot=" << simpleDuck190otResult << "\n"
                << "tracks190pe=" << tracks190peResult << "\n"
                << "autolinks190ov=" << autolinks190ovResult << "\n"

@@ -12640,3 +12640,6 @@ countries: it ch sm
 "This script draws its own display; LYNX SHARE shows its sliders." = "Questo script disegna il proprio display; LYNX SHARE mostra i suoi slider."
 "JSFX scripts are not in this release: their slots become empty (a switched-off Utility on an insert, an empty Sampler on a channel): {0}" = "Gli script JSFX non esistono in questa versione: i loro slot restano vuoti (un Utility spento su un insert, un Sampler vuoto su un canale): {0}"
 "Show / hide the header" = "Mostra / nascondi l'intestazione"
+# --- rollup 0.1.31 step 7: Save a copy for 0.1.30 (round 190pi)
+"Ogun and Autogun play every note at the channel's level in this release (FL's link velocity is left out): {0}" = "Ogun e Autogun suonano ogni nota al livello del canale in questa versione (il link velocity di FL è escluso): {0}"
+"Automation of Sytrus' main knobs (master level, LFO, pitch, Mod X / Y) does nothing in this release: {0}" = "L'automazione delle manopole principali di Sytrus (master level, LFO, pitch, Mod X / Y) non fa nulla in questa versione: {0}"
