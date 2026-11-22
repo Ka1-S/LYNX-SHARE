@@ -1,7 +1,7 @@
-# LYNX's own plugins as CLAP and VST3 (rounds 180b, 188b, 190ov)
+# LYNX's own plugins as CLAP, VST3 and LV2 (rounds 180b, 188b, 190ov, 190pk)
 
 Status: **built by the release workflow as a separate, optional download** (the user's option C, 2026-11-08): every LYNX
-effect in one CLAP, a short list also as VST3, for Windows, Linux and macOS. The
+effect in one CLAP, a short list also as VST3 (and on Linux as LV2), for Windows, Linux and macOS. The
 user-facing summary is [PLUGINS-PACK.md](PLUGINS-PACK.md). It is never part of the app's installer, and
 the app's own build doesn't change (the option stays off there).
 
@@ -50,13 +50,30 @@ there. Plugin names are LYNX names only, never an FL Studio name (a test checks 
 | LYNX Chimefield | spectral resonator (190ov; the Harmonia engine) | yes | |
 | LYNX Model | instrument (physical models, 190ov) | yes | yes |
 
-LV2 (round 190ov, not shipped yet): with `-DLYNX_PLUGINS_LV2=ON` every VST3 of the list is also built as an LV2 bundle on
-Linux: JUCE's LV2 wrapper (`src/plugin/Lv2Entry.cpp`, the same entry as the VST3's), `<name with dashes>.lv2/` with the
-library and the `.ttl` files JUCE's `juce_LV2ManifestHelper` writes from it after the link; the URI is
-`https://lynx-share.com/plugins/lv2/<the clap id after "com.ka1-s.lynx.">`. `package-plugins.sh` packs them in `LV2/` when the
-build made them, `install.sh` copies them to `~/.lv2` and `plugexporttest` / `check-plugins.sh` load them through JUCE's LV2
-host. The option is off: in CI run 44955467954 the bundles built and packed, but JUCE's LV2 host failed on every one in
-`plugexporttest` (the effects crash, the instruments end on an X error). Queued for 0.1.32.
+LV2 (Linux; rounds 190ov and 190pk, shipped since 0.1.32): every VST3 of the list is also built as an LV2 bundle on Linux
+(`-DLYNX_PLUGINS_LV2`, on by default; it does nothing elsewhere): JUCE's LV2 wrapper (`src/plugin/Lv2Entry.cpp`, the same
+entry as the VST3's), `<name with dashes>.lv2/` with the library and the `.ttl` files JUCE's `juce_LV2ManifestHelper` writes
+from it after the link; the URI is `https://lynx-share.com/plugins/lv2/<the clap id after "com.ka1-s.lynx.">` and never
+changes. `package-plugins.sh` packs them in `LV2/`, `install.sh` copies them to `~/.lv2`, and `check-plugins.sh` runs
+`plugexporttest` (through JUCE's LV2 host) and `lv2lint` on each. Round 190ov's CI run 44955467954 had them failing in
+`plugexporttest`; round 190pk found two JUCE bugs behind that (`cmake/LynxPatchJuce.cmake`, fix 190pk):
+- the effects crashed: JUCE's LV2 wrapper declares the side-chain ports `lv2:connectionOptional` (a host may leave them
+  unconnected) but copied their input from the NULL pointer such a host gives. An unconnected port is silence now.
+- FM10 and LYNX Model ended on an X error (BadAtom, X_ChangeProperty, atom 0): on an X server no window manager ever ran
+  on (CI's Xvfb) the WM_PROTOCOLS atom doesn't exist, and JUCE set it on every new window with atom 0 (and read WM_STATE /
+  _NET_WM_STATE with atom 0). The LYNX app ignores X errors; a plugin's host has Xlib's default handler, which exits.
+
+`plugexporttest`'s "attempt to map invalid URI <bundle path>" line is lilv's: JUCE's host first tries the path as a URI,
+then loads it as a bundle. Harmless. Two things the LV2 host test needs: JUCE's LV2 host lists the plugin's parameters
+in an order of its own (plus a "Bypass" for the `lv2:enabled` port), so `plugexporttest` finds the engine's parameter
+`i` by its id (`...:p<i>`); and JUCE's host tells an instrument by its class only when the LV2 specification bundles are
+in `~/.lv2`, `/usr/lib/lv2` or `/usr/local/lib/lv2` (CI installs `lv2-dev`; every Linux with an LV2 host has them).
+
+`lv2lint` (built from its author's repository at a fixed commit in CI) runs with `-Mpack` and two of its checks skipped,
+both about JUCE's wrapper rather than LYNX: "Plugin Run" fails a `run()` that takes any mutex, and JUCE's takes the
+processor's callback lock (uncontended unless the host is loading a state; JUCE's VST3 wrapper does the same), and "UI
+Resize Interface" fails the `ui:resize` extension data JUCE's editor offers. Its warnings left: no `doap:license`, the
+editor uses instance-access, the editor lives in the plugin's binary.
 
 The last column of the table says what is built: `0` nothing, `1` in the CLAP, `2` in the CLAP and as a VST3 of its own.
 The VST3 short list is the user's call: each VST3 carries the whole runtime (see "Sizes"), the CLAP holds them all at
@@ -99,8 +116,8 @@ Each release has, next to the app, one archive per system and a checksum file. L
 | `LYNX-Plugins-<version>-linux-x86_64.tar.xz` | Linux x86_64, glibc 2.35 or later (Ubuntu 22.04 and later) |
 | `LYNX-Plugins-<version>-SHA256SUMS.txt` | the SHA-256 of the three archives |
 
-Inside: `CLAP/LYNX Plugins.clap` (every plugin), `VST3/*.vst3` (the short list), `PLUGINS.txt`, `README.txt`, an install
-script, `LICENSE` and `THIRD_PARTY.md`.
+Inside: `CLAP/LYNX Plugins.clap` (every plugin), `VST3/*.vst3` (the short list), on Linux `LV2/*.lv2` (the same short
+list), `PLUGINS.txt`, `README.txt`, an install script, `LICENSE` and `THIRD_PARTY.md`.
 
 - **Windows:** right-click `install.cmd` > Run as administrator. It copies the CLAP to
   `C:\Program Files\Common Files\CLAP` and the VST3 bundles to `C:\Program Files\Common Files\VST3`. Or copy them there
@@ -108,7 +125,7 @@ script, `LICENSE` and `THIRD_PARTY.md`.
 - **macOS:** in Terminal, in the unpacked folder: `sh install.sh`. It copies them to `~/Library/Audio/Plug-Ins/CLAP` and
   `~/Library/Audio/Plug-Ins/VST3` and clears the download quarantine. The bundles are signed ad hoc only: there is no
   Apple Developer ID yet, so they are not notarized.
-- **Linux:** `sh install.sh` copies them to `~/.clap` and `~/.vst3`. `sh install.sh --uninstall` removes them.
+- **Linux:** `sh install.sh` copies them to `~/.clap`, `~/.vst3` and `~/.lv2`. `sh install.sh --uninstall` removes them.
 - Then rescan in the host. FL Studio: Options > Manage plugins > Find installed plugins. FL Studio finds VST3 only in
   the system folder (its manual: VST3 plugins "must be installed to default system locations").
 - Check a download: `sha256sum <file>` (Linux), `shasum -a 256 <file>` (macOS) or `Get-FileHash <file> -Algorithm
@@ -246,6 +263,10 @@ The download (round 188b, 1 CLAP + 7 VST3):
 | `LYNX-Plugins-<v>-macos-universal.tar.xz` (arm64 + x86_64 in each binary; Archive Utility opens it) | 22.2 MB |
 | `LYNX-Plugins-<v>-win-x64.zip` (zip compresses each file alone; each binary 24.9 MB, with section flags) | 84.6 MB |
 
+Round 190pk's Linux package (1 CLAP with 36 plugins, 8 VST3, 8 LV2) is 26.3 MB from CI (GCC 13), 31.6 MB locally
+(GCC 15): the 256 MiB window holds
+only about five of its 48 MB binaries, so the LV2 bundles, packed after the VST3s, add their own share.
+
 Per instance, measured in plugexporttest:
 
 - memory: 1.2 to 2.2 MB more per extra instance;
@@ -283,6 +304,14 @@ controls stay hidden in the plugins for now.
   chain takes its output energy to 0.14 of the quiet case). LYNX's own CLAP host has no side buses, so the CLAP's second
   port is checked by clap-validator only, not with audio.
 - Ableton Live has not been tested, at the user's request.
+- LV2, round 190pk: CI run 45010577680 (Plugins workflow, Linux job) passes all 34 checks of the archive, the 8 LV2
+  bundles' `plugexporttest` and `lv2lint` among them. Locally (Linux, WSL, a private Xvfb with no window manager) the 8
+  bundles of the packed archive pass
+  `plugexporttest` (scan, instrument / effect, null test at the defaults and with every parameter moved, side-chain
+  bus, state, editor, 8 more instances) and `lv2lint`; jalv 1.8.0 (JACK's dummy driver) runs each for 10 s and lv2bench
+  (lilv 0.26.2) instantiates, runs 1,024 blocks and frees each. The same run passes every CLAP and VST3 check
+  (`plugexporttest`, pluginval strictness 10, clap-validator). Not tried in Ardour, Carla, Qtractor or Zrythm yet, and
+  the editor only inside JUCE's host (jalv's command-line host shows no X11 editor).
 - FL Studio 2026 (Windows), round 180b: Facet EQ and FM10, as CLAP (through `CLAP_PATH`) and as VST3 (from
   `Common Files\VST3`): load, play, both editors, a saved project reopens with its state, FL exits in about 1.4 s.
 - FL Studio 2026 (Windows), round 188b, the release download from CI: ADD > Refresh plugin list (fast scan) lists all 27

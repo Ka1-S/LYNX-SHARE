@@ -1,4 +1,4 @@
-// plugexporttest <plugin.vst3 | plugin.clap | plugin.lv2 (Linux, round 190ov)> <report.txt> [editor picture prefix]
+// plugexporttest <plugin.vst3 | plugin.clap | plugin.lv2 (Linux, rounds 190ov and 190pk)> <report.txt> [editor picture prefix]
 // Loads LYNX's exported plugins the way a host does (round 180b, docs/PLUGIN_EXPORT.md) and checks, with no window on screen:
 // the scan, the sound against the same engine run directly in this process (null test), automation, the state (a new
 // instance sounds the same; the state opens as a .lynx project), the editor, memory per instance and CPU.
@@ -451,6 +451,23 @@ void testPlugin (juce::AudioPluginFormat& format, const juce::PluginDescription&
     if (instance == nullptr)
         return;
     report << "  first instance: +" << juce::String (memoryMb() - base, 1) << " MB\n";
+    // the effect engine's parameter i in the host's list. JUCE's LV2 host lists the plugin's lv2:Parameter properties in
+    // an order of its own and adds the lv2:enabled port as "Bypass": there it is the one whose id ends in ":p<i>" (the
+    // plugin's parameter id, round 190pk); the VST3 and CLAP hosts keep the plugin's order
+    const auto lv2 = format.getName() == "LV2";
+    auto engineParameter = [&] (int i) -> juce::AudioProcessorParameter*
+    {
+        const auto& all = instance->getParameters();
+        if (lv2)
+        {
+            for (auto* p : all)
+                if (auto* hosted = dynamic_cast<juce::HostedAudioProcessorParameter*> (p))
+                    if (hosted->getParameterID().endsWith (":p" + juce::String (i)))
+                        return p;
+            return nullptr;
+        }
+        return juce::isPositiveAndBelow (i, all.size()) ? all[i] : nullptr;
+    };
     check (instance->getParameters().size() > 0, "parameters: " + juce::String (instance->getParameters().size()));
 
     double seconds = 0.0;
@@ -474,15 +491,15 @@ void testPlugin (juce::AudioPluginFormat& format, const juce::PluginDescription&
         {
             // its external side chain on: a loud side signal compresses the main input
             const auto& names = effectInfo (entry->effect).params;
-            for (int i = 0; i < (int) names.size() && i < instance->getParameters().size(); ++i)
-                if (juce::String::fromUTF8 (names[(std::size_t) i].name) == "External SC")
-                    instance->getParameters()[i]->setValue (1.0f);
+            for (int i = 0; i < (int) names.size(); ++i)
+                if (auto* p = engineParameter (i); p != nullptr && juce::String::fromUTF8 (names[(std::size_t) i].name) == "External SC")
+                    p->setValue (1.0f);
             const auto quiet = renderWithSide (*instance, 0.0f), loud = renderWithSide (*instance, 0.9f);
             const auto energy = [] (const Audio& a) { double e = 0.0; for (auto v : a.l) e += (double) v * v; return e; };
             check (energy (loud) < 0.7 * energy (quiet), "external side chain through the bus compresses: " + juce::String (energy (loud) / juce::jmax (1.0e-12, energy (quiet)), 3));
-            for (int i = 0; i < (int) names.size() && i < instance->getParameters().size(); ++i)
-                if (juce::String::fromUTF8 (names[(std::size_t) i].name) == "External SC")
-                    instance->getParameters()[i]->setValue (0.0f);
+            for (int i = 0; i < (int) names.size(); ++i)
+                if (auto* p = engineParameter (i); p != nullptr && juce::String::fromUTF8 (names[(std::size_t) i].name) == "External SC")
+                    p->setValue (0.0f);
         }
     }
 
@@ -493,12 +510,16 @@ void testPlugin (juce::AudioPluginFormat& format, const juce::PluginDescription&
         // defaults are flat (its output is its input), so this is the null test that says something.
         auto params = makeEffectSlot (entry->effect).params;
         const auto named = (int) effectInfo (entry->effect).params.size();
-        for (int i = 0; i < named && i < parameters.size(); ++i)
-        {
-            const auto v = 0.5f + 0.45f * (float) std::sin ((double) i * 0.7);
-            parameters[i]->setValue (v);
-            params[(std::size_t) i] = parameters[i]->getValue();
-        }
+        int found = 0;
+        for (int i = 0; i < named; ++i)
+            if (auto* p = engineParameter (i))
+            {
+                const auto v = 0.5f + 0.45f * (float) std::sin ((double) i * 0.7);
+                p->setValue (v);
+                params[(std::size_t) i] = p->getValue();
+                ++found;
+            }
+        check (found == juce::jmin (named, parameters.size()), "the host lists the engine's parameters: " + juce::String (found) + " of " + juce::String (named));
         const auto wet = render (*instance, false);
         const auto d = wet.difference (direct = directEffect (entry->effect, params));
         check (d < 1.0e-5, "null test with " + juce::String (named) + " parameters moved by the host: peak difference " + juce::String (d, 8)

@@ -1,5 +1,5 @@
 ---
-source: 13c966d353
+source: 828f1d5e8c
 ---
 ![Bagian bawah Pengelola plugin, dengan catatan bahwa setiap file plugin diperiksa di proses terpisah](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -107,7 +107,7 @@ Jika plugin FL Studio tercantum sebagai `Gagal dimuat`, klik kanan di `Opsi › 
 
 Efek dan instrumen milik LYNX SHARE sendiri, seperti Facet EQ, Apex Limiter, LYNX Tune, dan LYNX Model, juga tersedia sebagai plugin untuk DAW lain. Semuanya unduhan terpisah dan opsional di [halaman rilis](https://github.com/Ka1-S/LYNX-SHARE/releases): `LYNX-Plugins-<version>` untuk Windows, macOS, dan Linux.
 
-- Semua plugin ada dalam satu file CLAP, `LYNX Plugins.clap`. Daftar pendek juga tersedia sebagai VST3.
+- Semua plugin ada dalam satu file CLAP, `LYNX Plugins.clap`. Daftar pendek juga tersedia sebagai VST3 dan, di Linux, sebagai LV2.
 - Jalankan skrip instalasi di dalam arsip (`install.cmd` di Windows, `install.sh` di macOS dan Linux), lalu pindai ulang plugin di DAW Anda.
 - Plugin membuka editor yang sama seperti di dalam LYNX SHARE, dan state-nya bisa dibuka di LYNX SHARE sebagai proyek.
 

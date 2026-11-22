@@ -1,5 +1,5 @@
 ---
-source: 13c966d353
+source: 828f1d5e8c
 ---
 ![Het onderste deel van het Pluginbeheer, met de opmerking dat elk pluginbestand in een apart proces wordt onderzocht](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -107,7 +107,7 @@ Als de FL Studio-plugin als `Laden mislukt` wordt vermeld, klik dan met de recht
 
 De eigen effecten en instrumenten van LYNX SHARE, zoals Facet EQ, Apex Limiter, LYNX Tune en LYNX Model, zijn er ook als plugins voor andere DAW's. Ze zijn een aparte, optionele download op de [releasepagina](https://github.com/Ka1-S/LYNX-SHARE/releases): `LYNX-Plugins-<version>` voor Windows, macOS en Linux.
 
-- Alle plugins zitten in één CLAP-bestand, `LYNX Plugins.clap`. Een korte lijst is er ook als VST3.
+- Alle plugins zitten in één CLAP-bestand, `LYNX Plugins.clap`. Een korte lijst is er ook als VST3 en, op Linux, als LV2.
 - Start het installatiescript in het archief (`install.cmd` op Windows, `install.sh` op macOS en Linux) en laat je DAW de plugins opnieuw scannen.
 - Een plugin opent dezelfde editor als in LYNX SHARE, en zijn status opent in LYNX SHARE als project.
 

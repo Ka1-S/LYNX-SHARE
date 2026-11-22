@@ -22,7 +22,11 @@ if [ "$1" = "--uninstall" ]; then
     for b in "$here"/LV2/*.lv2; do
         [ -e "$b" ] && rm -rf "$lv2/$(basename "$b")"
     done
-    echo "LYNX plugins removed from $clap and $vst3."
+    if [ -d "$here/LV2" ]; then
+        echo "LYNX plugins removed from $clap, $vst3 and $lv2."
+    else
+        echo "LYNX plugins removed from $clap and $vst3."
+    fi
     exit 0
 fi
 
