@@ -263,7 +263,8 @@ The download (round 188b, 1 CLAP + 7 VST3):
 | `LYNX-Plugins-<v>-macos-universal.tar.xz` (arm64 + x86_64 in each binary; Archive Utility opens it) | 22.2 MB |
 | `LYNX-Plugins-<v>-win-x64.zip` (zip compresses each file alone; each binary 24.9 MB, with section flags) | 84.6 MB |
 
-Round 190pk's local Linux package (1 CLAP with 36 plugins, 8 VST3, 8 LV2; GCC 15) is 31.6 MB: the 256 MiB window holds
+Round 190pk's Linux package (1 CLAP with 36 plugins, 8 VST3, 8 LV2) is 26.3 MB from CI (GCC 13), 31.6 MB locally
+(GCC 15): the 256 MiB window holds
 only about five of its 48 MB binaries, so the LV2 bundles, packed after the VST3s, add their own share.
 
 Per instance, measured in plugexporttest:
@@ -303,7 +304,9 @@ controls stay hidden in the plugins for now.
   chain takes its output energy to 0.14 of the quiet case). LYNX's own CLAP host has no side buses, so the CLAP's second
   port is checked by clap-validator only, not with audio.
 - Ableton Live has not been tested, at the user's request.
-- LV2, round 190pk (Linux, WSL, a private Xvfb with no window manager): the 8 bundles of the packed archive pass
+- LV2, round 190pk: CI run 45010577680 (Plugins workflow, Linux job) passes all 34 checks of the archive, the 8 LV2
+  bundles' `plugexporttest` and `lv2lint` among them. Locally (Linux, WSL, a private Xvfb with no window manager) the 8
+  bundles of the packed archive pass
   `plugexporttest` (scan, instrument / effect, null test at the defaults and with every parameter moved, side-chain
   bus, state, editor, 8 more instances) and `lv2lint`; jalv 1.8.0 (JACK's dummy driver) runs each for 10 s and lv2bench
   (lilv 0.26.2) instantiates, runs 1,024 blocks and frees each. The same run passes every CLAP and VST3 check
