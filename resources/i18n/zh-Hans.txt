@@ -11752,6 +11752,7 @@ countries: cn sg
 "Export the wave table" = "导出波表"
 "Table editor" = "波表编辑器"
 "Helix+: LYNX's extra controls beside the device" = "Helix+：设备旁边 LYNX 的额外控件"
+"{0}+: LYNX's extra controls beside the device" = "{0}+：设备旁边 LYNX 的额外控件"
 "Oscillator 3" = "振荡器3"
 "User tables" = "用户波表"
 "Macros 5-8" = "宏 5-8"

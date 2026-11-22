@@ -8,6 +8,7 @@
 
 #include <juce_audio_formats/juce_audio_formats.h>
 
+#include "core/PluginLayout.h"
 #include "core/Song.h"
 #include "core/WavetableSynth.h"
 #include "engine/AudioEngine.h"
@@ -2955,6 +2956,11 @@ public:
         plus.setVisible (showPlus);
         well.isOn = [] { return showPlus; };
         well.onClick = [this] { setPlus (! showPlus); };
+        // (rollup 0.1.31 step 8: as a plugin in another host, LYNX Wavecoil, the well names the plugin, not the engine)
+        if (plugui::hostedElsewhere)
+            if (const auto* c = locator (channel) (const_cast<Song&> (e.getSong())); c != nullptr && ! c->name.empty())
+                well.setTooltip (tr ("{0}+: LYNX's extra controls beside the device")
+                                     .replace ("{0}", u8 (c->name).fromFirstOccurrenceOf ("LYNX ", false, false)));
     }
     void setPlus (bool shown)
     {

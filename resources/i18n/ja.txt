@@ -11752,6 +11752,7 @@ countries: jp
 "Export the wave table" = "ウェーブテーブルを書き出す"
 "Table editor" = "テーブルエディター"
 "Helix+: LYNX's extra controls beside the device" = "Helix+: デバイスの横にあるLYNX独自の追加コントロール"
+"{0}+: LYNX's extra controls beside the device" = "{0}+: デバイスの横にあるLYNX独自の追加コントロール"
 "Oscillator 3" = "オシレーター3"
 "User tables" = "ユーザーテーブル"
 "Macros 5-8" = "マクロ5-8"

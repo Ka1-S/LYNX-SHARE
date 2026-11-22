@@ -11752,6 +11752,7 @@ countries: pl
 "Export the wave table" = "Eksportuj wavetable"
 "Table editor" = "Edytor tablicy"
 "Helix+: LYNX's extra controls beside the device" = "Helix+: dodatkowe regulatory LYNX obok urządzenia"
+"{0}+: LYNX's extra controls beside the device" = "{0}+: dodatkowe regulatory LYNX obok urządzenia"
 "Oscillator 3" = "Oscylator 3"
 "User tables" = "Tablice użytkownika"
 "Macros 5-8" = "Makra 5-8"

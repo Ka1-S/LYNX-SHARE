@@ -11752,6 +11752,7 @@ countries: kr
 "Export the wave table" = "웨이브테이블 내보내기"
 "Table editor" = "테이블 에디터"
 "Helix+: LYNX's extra controls beside the device" = "Helix+: 디바이스 옆의 LYNX 추가 컨트롤"
+"{0}+: LYNX's extra controls beside the device" = "{0}+: 디바이스 옆의 LYNX 추가 컨트롤"
 "Oscillator 3" = "오실레이터 3"
 "User tables" = "사용자 테이블"
 "Macros 5-8" = "매크로 5-8"

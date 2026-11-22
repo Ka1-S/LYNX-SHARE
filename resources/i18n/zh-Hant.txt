@@ -11752,6 +11752,7 @@ countries: tw hk mo
 "Export the wave table" = "匯出波表"
 "Table editor" = "波表編輯器"
 "Helix+: LYNX's extra controls beside the device" = "Helix+：裝置旁邊 LYNX 的額外控制項"
+"{0}+: LYNX's extra controls beside the device" = "{0}+：裝置旁邊 LYNX 的額外控制項"
 "Oscillator 3" = "振盪器3"
 "User tables" = "使用者波表"
 "Macros 5-8" = "巨集 5-8"

@@ -11752,6 +11752,7 @@ countries: ru by kz
 "Export the wave table" = "Экспортировать вейвтейбл"
 "Table editor" = "Редактор таблицы"
 "Helix+: LYNX's extra controls beside the device" = "Helix+: дополнительные регуляторы LYNX рядом с устройством"
+"{0}+: LYNX's extra controls beside the device" = "{0}+: дополнительные регуляторы LYNX рядом с устройством"
 "Oscillator 3" = "Осциллятор 3"
 "User tables" = "Пользовательские таблицы"
 "Macros 5-8" = "Макросы 5-8"
