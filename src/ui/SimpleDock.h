@@ -129,6 +129,11 @@ public:
     void addOneKnobForCheck (int goal);
     void setBlendForCheck (float value);
     void setReverbForCheck (float value); // round 190fo: the track's send to the shared reverb
+    // round 190ot (research190oe P5): the shared Echo send, "Duck under..." (−1: None) and its menu / button text
+    void setEchoForCheck (float value);
+    void duckUnderForCheck (int triggerInsert);
+    juce::PopupMenu duckMenuForCheck();
+    juce::String duckButtonTextForCheck() const;
     // round 190dg (--simple190dgshot): where card `card` is in the dock, and a search typed into the sound list
     juce::Rectangle<int> cardBoundsForSnapshot (int card) const;
     void setSearchForSnapshot (const juce::String& text);

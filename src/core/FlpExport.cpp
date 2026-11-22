@@ -22,6 +22,7 @@
 #include "core/FlStateWrite.h"
 #include "core/FlWrapper.h"
 #include "core/FruityDance.h"
+#include "core/GoalKnobs.h"
 #include "core/PatternBlocks.h"
 #include "core/ThreeOsc.h"
 #include "core/TimeStretch.h"
@@ -749,6 +750,9 @@ struct Converter
     // the FL slot (0..9) of each exported effect: (track, LYNX slot) → FL slot
     std::map<std::pair<int, int>, int> slotMap;
     std::map<std::pair<int, int>, std::string> slotPlugin; // → FL plugin name ("Fruity Wrapper" for hosted plugins)
+    // round 190ot: slots written as FL's own plugin from LYNX's parameters (a Master look, the Simple layout's Duck):
+    // their side input index is set by fixSideInputs as an imported state's is
+    std::set<std::pair<int, int>> ownState;
 
     std::uint32_t ticks (std::int64_t t) const { return (std::uint32_t) std::max<std::int64_t> (0, (t * filePpq + ppq / 2) / ppq); } // (rounded)
     std::string path (const std::string& p) const { return options.samplePath && ! p.empty() ? options.samplePath (p) : p; }
@@ -1732,6 +1736,16 @@ struct Converter
                     slot.plugin = native->first;
                     slot.state = native->second;
                     what = native->first;
+                    ownState.insert ({ t, s });
+                }
+                else if (fx.kind == EffectKind::fruityLimiter && fx.goal == goals::duck && ! originMatches (fx))
+                {
+                    // the Simple layout's "Duck under..." (round 190ot): FL's Fruity Limiter with the slot's settings, its
+                    // side input the trigger's place in the insert's inputs (fixSideInputs)
+                    slot.plugin = "Fruity Limiter";
+                    slot.state = flstate::limiter (fx.params, fruityLimiterDefaultState());
+                    what = "Fruity Limiter (Duck, sidechain)";
+                    ownState.insert ({ t, s });
                 }
                 else if (originMatches (fx))
                 {
@@ -1830,10 +1844,11 @@ struct Converter
                 if (found == slotMap.end())
                     continue;
                 const auto& fx = effects[(std::size_t) s];
-                if (! originMatches (fx))
+                const auto own = ownState.count ({ t, s }) > 0;
+                if (! own && ! originMatches (fx))
                     continue;
                 auto slot = std::find_if (m.slots.begin(), m.slots.end(), [row = found->second] (const flp::MixerInsert::Slot& x) { return x.index == row; });
-                if (slot == m.slots.end() || slot->plugin != fx.flOrigin.plugin)
+                if (slot == m.slots.end() || (! own && slot->plugin != fx.flOrigin.plugin))
                     continue;
                 auto& d = slot->state;
                 if (slot->plugin == "Fruity Limiter" && rd (d, 0) >= 6)

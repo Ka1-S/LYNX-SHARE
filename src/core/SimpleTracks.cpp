@@ -8,11 +8,19 @@
 #include <cstdlib>
 
 #include "core/AutoWarp.h"
+#include "core/DetailChain.h"
+#include "core/EchoSuite.h"
+#include "core/GoalKnobs.h"
+#include "core/MixerOps.h"
 #include "core/EffectPresets.h"
 #include "core/Effects.h"
 #include "core/PlaylistOps.h"
 #include "core/PlaylistTrackOps.h"
 #include "core/ProjectKey.h"
+
+#ifndef TR_NOOP
+ #define TR_NOOP(text) text // marks a literal for translation (tools/i18n_keys.py scans core too)
+#endif
 
 namespace lynx::simpletracks
 {
@@ -583,6 +591,176 @@ bool setReverbSend (Song& song, int insert, float level)
         at->level = level;
     else
         sends.push_back ({ reverb, level, false });
+    return true;
+}
+
+namespace
+{
+// a send from `insert` to the shared bus `bus` (−1: none): its level, 0 without one
+float busSend (const Song& song, int insert, int bus)
+{
+    if (bus < 0 || insert <= 0 || insert >= (int) song.mixer.size() || insert == bus)
+        return 0.0f;
+    for (const auto& s : song.mixer[(std::size_t) insert].sends)
+        if (s.target == bus)
+            return s.level;
+    return 0.0f;
+}
+
+bool setBusSend (Song& song, int insert, float level, int bus)
+{
+    if (bus < 0 || bus == insert)
+        return level <= 0.0f;
+    auto& sends = song.mixer[(std::size_t) insert].sends;
+    const auto at = std::find_if (sends.begin(), sends.end(), [bus] (const MixerSend& s) { return s.target == bus; });
+    if (level <= 0.0f)
+    {
+        if (at != sends.end())
+            sends.erase (at);
+        return true;
+    }
+    if (at != sends.end())
+        at->level = level;
+    else
+        sends.push_back ({ bus, level, false });
+    return true;
+}
+} // namespace
+
+int sharedEcho (const Song& song)
+{
+    for (int i = 1; i < (int) song.mixer.size(); ++i)
+        if (const auto& m = song.mixer[(std::size_t) i]; m.name == "Echo" && ! m.effects.empty() && m.effects.front().kind == EffectKind::echoform)
+            return i;
+    return -1;
+}
+
+int ensureSharedEcho (Song& song)
+{
+    if (const auto have = sharedEcho (song); have >= 0)
+        return have;
+    const auto insert = trackmodes::freeMixerTrack (song);
+    if (insert <= 0 || insert >= (int) song.mixer.size())
+        return -1;
+    auto& m = song.mixer[(std::size_t) insert];
+    m.name = "Echo";
+    m.colour = 0xFF4F9A8Cu;
+    m.inputChannel = -1;
+    auto fx = makeEffectSlot (EffectKind::echoform);
+    // a return: only the echoes (Mix fully wet); both sides a dotted quarter at the project's tempo (Sync "dotted" =
+    // 0.75, Note 1/4 = 0.45: echoform::syncKind / noteIndex), feedback 35 % (0 … 200 % over 0 … 1), the repeats a
+    // little darker and without lows (the "Echo" one-knob effect's filters)
+    namespace ef = echosuite::echoform;
+    for (const auto& [param, value] : { std::pair { ef::mix, 1.0f }, { ef::syncL, 0.75f }, { ef::noteL, 0.45f }, { ef::syncR, 0.75f },
+                                        { ef::noteR, 0.45f }, { ef::feedback, 0.175f }, { ef::lowCut, 0.15f }, { ef::highCut, 0.5f } })
+        fx.params[(std::size_t) param] = value;
+    m.effects.push_back (std::move (fx));
+    return insert;
+}
+
+float echoSend (const Song& song, int insert) { return busSend (song, insert, sharedEcho (song)); }
+
+bool setEchoSend (Song& song, int insert, float level)
+{
+    if (insert <= 0 || insert >= (int) song.mixer.size())
+        return false;
+    level = std::clamp (level, 0.0f, 1.0f);
+    return setBusSend (song, insert, level, level > 0.0f ? ensureSharedEcho (song) : sharedEcho (song));
+}
+
+const char* duckStyleName (DuckStyle style) noexcept
+{
+    switch (style)
+    {
+        case DuckStyle::subtle: return TR_NOOP ("Subtle");
+        case DuckStyle::pumping: return TR_NOOP ("Pumping");
+        case DuckStyle::hard: return TR_NOOP ("Hard");
+    }
+    return "";
+}
+
+float duckAmount (DuckStyle style) noexcept
+{
+    switch (style)
+    {
+        case DuckStyle::subtle: return 0.3f;
+        case DuckStyle::pumping: return 0.55f;
+        case DuckStyle::hard: return 0.85f;
+    }
+    return 0.55f;
+}
+
+int duckSlot (const Song& song, int insert)
+{
+    if (! validInsert (song, insert))
+        return -1;
+    const auto& fx = song.mixer[(std::size_t) insert].effects;
+    for (int i = 0; i < (int) fx.size(); ++i)
+        if (fx[(std::size_t) i].goal == goals::duck && fx[(std::size_t) i].kind == EffectKind::fruityLimiter)
+            return i;
+    return -1;
+}
+
+int duckTrigger (const Song& song, int insert)
+{
+    const auto slot = duckSlot (song, insert);
+    return slot < 0 ? -1 : song.mixer[(std::size_t) insert].effects[(std::size_t) slot].sidechain;
+}
+
+namespace
+{
+// the level-0 send `from` → `to` made for a side input goes when no effect of `to` listens to `from` any more (a send
+// with a level is the user's own and stays)
+void dropUnusedSidechainSend (Song& song, int from, int to)
+{
+    if (from <= 0 || from >= (int) song.mixer.size() || ! validInsert (song, to))
+        return;
+    const auto& fx = song.mixer[(std::size_t) to].effects;
+    if (std::any_of (fx.begin(), fx.end(), [from] (const EffectSlot& e) { return e.sidechain == from || e.sidechain2 == from; }))
+        return;
+    auto& sends = song.mixer[(std::size_t) from].sends;
+    sends.erase (std::remove_if (sends.begin(), sends.end(), [to] (const MixerSend& s) { return s.target == to && s.level <= 0.0f; }), sends.end());
+}
+} // namespace
+
+DuckResult setDuck (Song& song, int insert, int trigger, float amount)
+{
+    if (! validInsert (song, insert) || trigger == insert || (trigger >= 0 && ! validInsert (song, trigger)))
+        return DuckResult::invalid;
+    auto slot = duckSlot (song, insert);
+    const auto old = slot >= 0 ? song.mixer[(std::size_t) insert].effects[(std::size_t) slot].sidechain : -1;
+    if (trigger < 0)
+    {
+        if (slot >= 0)
+        {
+            mixerops::removeEffectKeepRows (song, insert, slot);
+            dropUnusedSidechainSend (song, old, insert);
+        }
+        return DuckResult::removed;
+    }
+    if (! song.routes (trigger, insert) && ! song.canRoute (trigger, insert))
+        return DuckResult::cycle;
+    if (slot < 0)
+    {
+        slot = detailchain::insertEffectAt (song, insert, goals::make (goals::duck, amount), (int) song.mixer[(std::size_t) insert].effects.size());
+        if (slot < 0)
+            return DuckResult::full;
+    }
+    else if (amount >= 0.0f)
+        goals::setAmount (song.mixer[(std::size_t) insert].effects[(std::size_t) slot], amount);
+    if (mixerops::sidechainFrom (song, insert, slot, trigger) != mixerops::SidechainPick::linked)
+        return DuckResult::invalid; // (checked above: not reached)
+    if (old != trigger)
+        dropUnusedSidechainSend (song, old, insert);
+    return DuckResult::set;
+}
+
+bool setDuckAmount (Song& song, int insert, float amount)
+{
+    const auto slot = duckSlot (song, insert);
+    if (slot < 0)
+        return false;
+    goals::setAmount (song.mixer[(std::size_t) insert].effects[(std::size_t) slot], amount);
     return true;
 }
 

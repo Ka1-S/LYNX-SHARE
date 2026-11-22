@@ -13,6 +13,10 @@
 //   Level     Glow Leveler      peak reduction with auto make-up
 //   Dirty     Ember Saturator   hard drive, level-matched
 //   Warm      Ember Saturator   gentle drive, softer highs
+//   Duck      Fruity Limiter    (round 190ot, research190oe P5) its compressor keyed by another track: the threshold
+//                               goes down and the ratio up with the knob, fast attack, about 150 ms release. Not in the
+//                               "+" menu (count): the dock's "Duck under..." picker adds it with its side input
+//                               (core/SimpleTracks.h setDuck). FL's own plugin, so the .flp export writes it as it is.
 //
 // Every knob at 0 leaves the sound as it was (wet 0, 0 dB or no drive). The laws are piecewise linear over the
 // effect's own 0..1 parameter values; the values are LYNX's own, tuned by measurement (round 190bu: loudness on pink
@@ -27,8 +31,9 @@
 
 namespace lynx::goals
 {
-enum Id : int { none = 0, brighter, echo, punch, room, bass, level, dirty, warm };
-constexpr int count = 8; // ids 1…8
+enum Id : int { none = 0, brighter, echo, punch, room, bass, level, dirty, warm, duck };
+constexpr int count = 8; // ids 1…8: the "+" menu's one-knob effects
+constexpr int lastId = duck; // every id with a table entry (round 190ot: Duck, added by the "Duck under..." picker)
 
 const char* name (int id) noexcept;        // English name (the UI translates it); "" for a bad id
 const char* description (int id) noexcept; // one short line

@@ -8,6 +8,7 @@
 #include "core/Offline.h"
 #include "core/GrooveAudio.h"
 #include "core/SmartDisableTip.h" // (round 190ok: --smarttipshot190ok)
+#include "core/SimpleTracks.h" // (round 190ot: --simpleduck190otshot)
 #include "core/EditorScale.h"
 #include "core/SimplePads.h"
 #include "core/SimSynth.h" // (round 190om: the selftest's SimSynth channel)
@@ -3917,6 +3918,14 @@ public:
             // notice, the Plugin manager's "Separate process" column and the monitor's dropout line (no window opens)
             const auto i = args.indexOf ("--stabilityshot");
             runStabilityShot (args[i + 1].unquoted());
+            return;
+        }
+
+        if (args.contains ("--simpleduck190otshot"))
+        {
+            // LYNX --simpleduck190otshot <folder> (round 190ot, research190oe P5): "Duck under..." and the Echo send at 100 / 150 %
+            setApplicationReturnValue (runSimpleDuckShot190ot (args[args.indexOf ("--simpleduck190otshot") + 1].unquoted()) ? 0 : 1);
+            quit();
             return;
         }
 
@@ -8573,6 +8582,51 @@ private:
             }
         }
 
+        // round 190ot (research190oe P5): the Simple layout's "Duck under..." and shared Echo send in .lynx (the duck's goal,
+        // Amount, side input and level-0 route; the Echo send) and in the copies for 0.1.30 / 0.1.28: the same slot, side input,
+        // route and sends (an ordinary Fruity Limiter there), one view line, none for a project without a duck
+        juce::String simpleDuck190otResult = "OK";
+        {
+            namespace st = lynx::simpletracks;
+            auto song = lynx::Song::makeDefault();
+            st::Request q;
+            q.kind = st::Kind::audio;
+            q.name = "Kick";
+            const auto kick = st::addTrack (song, q).insert;
+            q.name = "Pad";
+            const auto pad = st::addTrack (song, q).insert;
+            const auto set = st::setDuck (song, pad, kick, 0.7f) == st::DuckResult::set && st::setEchoSend (song, pad, 0.3f);
+            const auto keeps = [&] (const std::optional<lynx::Song>& back) {
+                if (! back || (int) back->mixer.size() <= pad)
+                    return false;
+                const auto slot = st::duckSlot (*back, pad);
+                return slot >= 0 && st::duckTrigger (*back, pad) == kick && back->routes (kick, pad) && back->routeLevel (kick, pad) == 0.0f
+                       && std::abs (back->mixer[(std::size_t) pad].effects[(std::size_t) slot].goalAmount - 0.7f) < 1.0e-4f
+                       && st::sharedEcho (*back) == st::sharedEcho (song) && std::abs (st::echoSend (*back, pad) - 0.3f) < 1.0e-4f;
+            };
+            juce::String why;
+            if (! set || kick <= 0 || pad <= 0)
+                simpleDuck190otResult = "ERROR set-up";
+            else if (! keeps (lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), why)))
+                simpleDuck190otResult = "ERROR .lynx round trip " + why;
+            for (const auto* release : { "0.1.30", "0.1.28" })
+            {
+                if (simpleDuck190otResult != "OK")
+                    break;
+                const auto copy = lynx::olderlynx::forRelease (song, release);
+                const auto lines = std::count_if (copy.lost.begin(), copy.lost.end(), [] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).contains ("Duck under"); });
+                if (! copy.ok || ! keeps (lynx::ProjectFile::fromJson (copy.json, why)) || lines != 1)
+                    simpleDuck190otResult = juce::String ("ERROR the copy for ") + release + " (" + juce::String ((int) lines) + " duck lines) " + why;
+            }
+            if (simpleDuck190otResult == "OK")
+            {
+                st::setDuck (song, pad, -1);
+                const auto copy = lynx::olderlynx::forRelease (song, "0.1.30");
+                if (std::any_of (copy.lost.begin(), copy.lost.end(), [] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).contains ("Duck under"); }))
+                    simpleDuck190otResult = "ERROR a duck line without a duck";
+            }
+        }
+
         // round 190ol (research190oe P1 / P6): the Sections lane in .lynx (both arrangements, and a project without sections
         // keeps its JSON with no "sections" key), a section move as one undo step that restores the song bit for bit, the
         // copies for 0.1.30 / 0.1.28 (sections become plain markers at their starts, one view line), and a 4/4 -> 7/8 -> 4/4
@@ -9399,7 +9453,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && tracker190omResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK")
                         && generatorSmartResult.startsWith ("OK")
@@ -9495,6 +9549,7 @@ private:
                << "helix4_khs190oc_copy_for_0130=" << helix4khs190ocResult << "\n"
                << "rollup031s4_copy_for_0130=" << rollup031s4Result << "\n"
                << "rollup031s5_copy_for_0130=" << rollup031s5Result << "\n"
+               << "simpleduck190ot=" << simpleDuck190otResult << "\n"
                << "sections190ol=" << sections190olResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
@@ -19310,6 +19365,7 @@ private:
 #include "IssuesShot190oq.inc" // round 190oq (issues #243-#252)
 #include "DetailsShot190kn.inc" // round 190kn
 #include "SmartTipShot190ok.inc" // round 190ok (D1)
+#include "SimpleDuckShot190ot.inc" // round 190ot (research190oe P5)
 #include "DetailsShot190ld.inc" // round 190ld
 #include "DetailsShot190lr.inc" // round 190lr
 #include "DetailsShot190lx.inc" // round 190lx

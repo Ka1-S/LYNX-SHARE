@@ -1666,6 +1666,22 @@ void toRelease0130 (juce::var& root, Losses& lost)
                               listOf (editors), false });
     }
 
+    // round 190ot (research190oe P5): the Simple layout's "Duck under..." is a Fruity Limiter whose one-knob goal is 9
+    // (goals::duck), keyed by the trigger through a level-0 send. 0.1.30 knows goals 1 … 8 only: the slot plays exactly
+    // the same (ordinary parameters, side input and send) but its card shows the Limiter's Mix instead of the Amount
+    // knob. The goal stays in the copy (opened again here it is a duck again); a view line, only when there is one.
+    // The shared Echo bus is an ordinary insert with Echoform and ordinary sends: nothing to change
+    {
+        int ducks = 0;
+        forEachEffect (root, [&ducks] (juce::DynamicObject& e, const juce::String&) {
+            if (e.getProperty ("kind").toString() == "fruityLimiter" && (int) e.getProperty ("goal") == 9)
+                ++ducks;
+        });
+        if (ducks > 0)
+            lost.push_back ({ TR_NOOP ("{0} \"Duck under...\" effect(s) of the Simple layout show as an ordinary Fruity Limiter with its side input (the sound is the same)"),
+                              juce::String (ducks), false });
+    }
+
     // round 190ok (D3): EffectSlot::engineRev 2 = LYNX's own devices (Ember, Prism, Crest, Echoform...) compute their
     // per-sample tanh / exp / log / pow / sin with core/FastMath.h. 0.1.30 knows revisions 0 and 1 (Maximus: ">= 1"), so it
     // plays a slot at 2 as at 1, with the C library's maths (190ok's nulls: at most -135 dBFS apart). The copy says 1, so

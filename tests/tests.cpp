@@ -18086,3 +18086,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Perf190osTests.inc" // round 190os: the safe-overload guard lets go at the stop and within 1 s of the overload's end
 #include "Tracker190omTests.inc" // round 190om (0.1.31): tracker stage 2 (pattern events, pitch curves, Bxx / Vxx), SimSynth velocity
 #include "TrackStates190opTests.inc" // round 190op (0.1.31): Hide / Deactivate tracks (P4), Capture automation (P7)
+#include "SimpleDuck190otTests.inc" // round 190ot (0.1.31): Simple "Duck under..." (sidechain in one pick) and the shared Echo send (P5)
