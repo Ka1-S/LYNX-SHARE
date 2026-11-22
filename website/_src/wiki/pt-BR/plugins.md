@@ -1,5 +1,5 @@
 ---
-source: 13c966d353
+source: 828f1d5e8c
 ---
 ![A parte de baixo do Gerenciador de plugins, com a nota de que cada arquivo de plugin é examinado em um processo separado](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -107,7 +107,7 @@ Se o plugin do FL Studio aparecer como `Falhou ao carregar`, clique nele com o b
 
 Os efeitos e instrumentos do próprio LYNX SHARE, como Facet EQ, Apex Limiter, LYNX Tune e LYNX Model, também vêm como plugins para outras DAWs. Eles são um download separado e opcional na [página de releases](https://github.com/Ka1-S/LYNX-SHARE/releases): `LYNX-Plugins-<version>` para Windows, macOS e Linux.
 
-- Todos os plugins estão num só arquivo CLAP, `LYNX Plugins.clap`. Uma lista curta vem também como VST3.
+- Todos os plugins estão num só arquivo CLAP, `LYNX Plugins.clap`. Uma lista curta vem também como VST3 e, no Linux, como LV2.
 - Rode o script de instalação do arquivo (`install.cmd` no Windows, `install.sh` no macOS e no Linux) e examine os plugins de novo na sua DAW.
 - Um plugin abre o mesmo editor que dentro do LYNX SHARE, e o estado dele abre no LYNX SHARE como projeto.
 

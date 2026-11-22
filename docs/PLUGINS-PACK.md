@@ -12,14 +12,14 @@ plugins use LYNX's own product names, which all start with "LYNX".
 
 | Plugin | Kind | Formats |
 |---|---|---|
-| LYNX Facet EQ | 8-band EQ | CLAP, VST3 |
-| LYNX Apex Limiter | true-peak limiter | CLAP, VST3 |
-| LYNX Crest Compressor | compressor | CLAP, VST3 |
-| LYNX Atrium | room reverb | CLAP, VST3 |
-| LYNX Echoform | multi-mode delay | CLAP, VST3 |
-| LYNX Tune | vocal pitch correction | CLAP, VST3 |
-| LYNX FM10 | FM instrument | CLAP, VST3 |
-| LYNX Model | physical-model instrument (marimba, vibraphone, xylophone, glockenspiel, tubular bells, kalimba) | CLAP, VST3 |
+| LYNX Facet EQ | 8-band EQ | CLAP, VST3, LV2 (Linux) |
+| LYNX Apex Limiter | true-peak limiter | CLAP, VST3, LV2 (Linux) |
+| LYNX Crest Compressor | compressor | CLAP, VST3, LV2 (Linux) |
+| LYNX Atrium | room reverb | CLAP, VST3, LV2 (Linux) |
+| LYNX Echoform | multi-mode delay | CLAP, VST3, LV2 (Linux) |
+| LYNX Tune | vocal pitch correction | CLAP, VST3, LV2 (Linux) |
+| LYNX FM10 | FM instrument | CLAP, VST3, LV2 (Linux) |
+| LYNX Model | physical-model instrument (marimba, vibraphone, xylophone, glockenspiel, tubular bells, kalimba) | CLAP, VST3, LV2 (Linux) |
 | LYNX Prism Multiband, Sentry Gate, Glow Leveler, Hush De-esser | dynamics | CLAP |
 | LYNX Ridge Strip, Kiln Channel, Fret Channel, Shell Channel | channel strips | CLAP |
 | LYNX Aether, Ember Saturator | air band / exciter, saturation | CLAP |
@@ -35,13 +35,12 @@ plugins use LYNX's own product names, which all start with "LYNX".
 | LYNX Chimefield | spectral resonator | CLAP |
 
 The CLAP holds every plugin in one file; each VST3 carries the whole LYNX engine, about 30 MB, so only a short list comes
-as VST3. Audio Units (macOS) are not built yet: Logic users can load the
+as VST3. On Linux the same short list also comes as LV2 bundles (since 0.1.32). Audio Units (macOS) are not built yet: Logic users can load the
 CLAP through a CLAP-to-AU host, or wait for a native AU.
 
 New in 0.1.31 (round 190ov): Strike Shaper, Anvil Bus, Corrode, Soundboard, Platter, Timeprism and Chimefield in the CLAP,
 LYNX Model as CLAP and VST3. The Harmonia engine exports as LYNX Chimefield (Cherry Audio sells a Harmonia synth); inside
-LYNX it keeps its name. LV2 bundles for Linux are built behind an option (`LYNX_PLUGINS_LV2`) but not shipped yet:
-they still fail the host test (planned for 0.1.32).
+LYNX it keeps its name. New in 0.1.32: the VST3 list also as LV2 on Linux.
 
 ### Not in the pack yet
 
@@ -62,7 +61,7 @@ Unpack the archive and run the install script in it:
 |---|---|---|
 | Windows | right-click `install.cmd` > Run as administrator | `C:\Program Files\Common Files\CLAP`, `...\VST3` |
 | macOS | `sh install.sh` in Terminal | `~/Library/Audio/Plug-Ins/CLAP`, `.../VST3` |
-| Linux | `sh install.sh` | `~/.clap`, `~/.vst3` |
+| Linux | `sh install.sh` | `~/.clap`, `~/.vst3`, `~/.lv2` |
 
 Then rescan the plugins in your host. `--uninstall` (Windows: `/uninstall`) removes them again. Each archive's
 SHA-256 is in `LYNX-Plugins-<version>-SHA256SUMS.txt`.

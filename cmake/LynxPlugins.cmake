@@ -72,9 +72,9 @@ else()
 endif()
 
 set(LYNX_PLUGIN_OUT "${CMAKE_BINARY_DIR}/plugins")
-# round 190ov: the VST3 short list also as LV2 bundles on Linux (JUCE's LV2 wrapper, plugin/Lv2Entry.cpp). Off: the bundles
-# build, but JUCE's LV2 host in plugexporttest failed on every one (CI run 44955467954); queued for 0.1.32
-option(LYNX_PLUGINS_LV2 "Linux: build the VST3 short list as LV2 bundles too (not shipped yet)" OFF)
+# round 190ov: the VST3 short list also as LV2 bundles on Linux (JUCE's LV2 wrapper, plugin/Lv2Entry.cpp). On since round
+# 190pk (0.1.32), which fixed what made JUCE's LV2 host fail on them (cmake/LynxPatchJuce.cmake, fix 190pk)
+option(LYNX_PLUGINS_LV2 "Linux: build the VST3 short list as LV2 bundles too" ON)
 # every built entry of the one table, src/plugin/plugins.def; the index counts the built entries (plugin/ExportCatalog.h).
 # built = 2: a VST3 of its own as well (built = 1: in the CLAP only)
 file(STRINGS src/plugin/plugins.def LYNX_PLUGIN_LINES REGEX "^LYNX_PLUGIN .*, [12][)]$")
@@ -120,6 +120,22 @@ foreach(line IN LISTS LYNX_PLUGIN_LINES)
             set(lv2_defs LYNX_EXPORT_INDEX=${index} JucePlugin_Name="${name}" JucePlugin_IsSynth=${CMAKE_MATCH_2}
                 JucePlugin_PluginCode=${CMAKE_MATCH_3} JucePlugin_Vst3Category="${CMAKE_MATCH_4}"
                 JucePlugin_LV2URI="https://lynx-share.com/plugins/lv2/${lv2_id}")
+            # (round 190pk: an effect's LV2 class from its VST3 category, so LV2 hosts file it; JUCE wrote lv2:Plugin)
+            set(lv2_class "")
+            set(lv2_category "${CMAKE_MATCH_4}") # (copied: the MATCHES below resets CMAKE_MATCH_<n>)
+            if(CMAKE_MATCH_2 STREQUAL "0")
+                foreach(pair "EQ=EQPlugin" "Dynamics=DynamicsPlugin" "Reverb=ReverbPlugin" "Delay=DelayPlugin" "Pitch=PitchPlugin")
+                    string(REPLACE "=" ";" pair "${pair}")
+                    list(GET pair 0 word)
+                    list(GET pair 1 cls)
+                    if(lv2_class STREQUAL "" AND lv2_category MATCHES "(^|[|])${word}")
+                        set(lv2_class "lv2:${cls}")
+                    endif()
+                endforeach()
+            endif()
+            if(NOT lv2_class STREQUAL "")
+                list(APPEND lv2_defs JucePlugin_LV2Class="${lv2_class}")
+            endif()
             string(REGEX REPLACE "[^A-Za-z0-9]" "-" lv2_name "${name}")
             set(lv2_target "lynx_lv2_${index}")
             add_library(${lv2_target} MODULE src/plugin/Lv2Entry.cpp)

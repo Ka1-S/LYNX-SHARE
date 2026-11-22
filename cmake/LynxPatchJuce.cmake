@@ -342,6 +342,23 @@
 #    horizontal wheel did nothing on Linux. They now come as a wheel event with deltaX = +/-50/256 (6 = left = positive,
 #    as Windows' WM_MOUSEHWHEEL gives it through JUCE) and deltaY 0, not smooth.
 #
+# fix 190pk (round lv2_190pk, the LV2 plugin pack on Linux; the integration round numbers it):
+#  a. Linux/BSD only, juce_gui_basics/native/juce_XWindowSystem_linux.cpp: WM_PROTOCOLS, WM_TAKE_FOCUS, WM_DELETE_WINDOW
+#     and _NET_WM_PING are created when missing, as JUCE already does for its other atoms. On an X server no window
+#     manager ever ran on (a fresh Xvfb, CI's xvfb-run) they don't exist, so every new window set its WM_PROTOCOLS
+#     property with atom 0: BadAtom on X_ChangeProperty. A standalone JUCE app ignores X errors (its own handler); a
+#     plugin's host has Xlib's default handler, which ends the process: plugexporttest ended on LYNX FM10's and LYNX
+#     Model's LV2 editors. isIconic / isHidden no longer read WM_STATE / _NET_WM_STATE when those atoms don't exist
+#     (BadAtom on X_GetProperty, the next error the LV2 editors hit there).
+#  b. Every platform (compiled only for LV2), juce_audio_plugin_client/juce_audio_plugin_client_LV2.cpp: JUCE's LV2
+#     wrapper enables every bus and declares the ports of a bus that is off by default (the effects' side chain)
+#     lv2:connectionOptional, i.e. a host may connect them to NULL, but it copied the input from there: the 6 LV2 effects
+#     crashed in their first run() under JUCE's own LV2 host, which connects NULL for each channel its buffer lacks. An
+#     unconnected input is silence now, and an unconnected output is skipped while the processor is suspended. The
+#     .ttl files it writes (juce_LV2ManifestHelper) give parameter ranges and scale points as decimals ("1.0": "1" is an
+#     integer, which lv2lint failed on every parameter), and an effect its LV2 class when the build defines
+#     JucePlugin_LV2Class (cmake/LynxPlugins.cmake, from the VST3 category; else lv2:Plugin, as before).
+#
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
 
@@ -519,9 +536,36 @@ function(lynx_patch_juce_file file)
             "    if (configure.window != peerHandle && isParentWindowOf (configure.window, peerHandle))|NL|        dismissBlockingModals (peer);"
             "    // LYNX patch (issue #45): a frame that moved, not a restack|NL|    if (configure.window != peerHandle && isParentWindowOf (configure.window, peerHandle) && lynxWindowMovedOrResized (configure))|NL|        dismissBlockingModals (peer);")
 
+        lynx_juce_fix("WM_PROTOCOLS atoms created (fix 190pk)" "LYNX patch (fix 190pk): created when missing"
+            "    protocols                    = getIfExists (display, \"WM_PROTOCOLS\");|NL|    protocolList [TAKE_FOCUS]    = getIfExists (display, \"WM_TAKE_FOCUS\");|NL|    protocolList [DELETE_WINDOW] = getIfExists (display, \"WM_DELETE_WINDOW\");|NL|    protocolList [PING]          = getIfExists (display, \"_NET_WM_PING\");|NL|"
+            "    // LYNX patch (fix 190pk): created when missing. On an X server no window manager ever ran on (a fresh Xvfb)|NL|    // these atoms don't exist yet, and every new window set its WM_PROTOCOLS property with atom 0: BadAtom, which ends|NL|    // a plugin's host (JUCE installs its X error handler only in a standalone app)|NL|    protocols                    = getCreating (display, \"WM_PROTOCOLS\");|NL|    protocolList [TAKE_FOCUS]    = getCreating (display, \"WM_TAKE_FOCUS\");|NL|    protocolList [DELETE_WINDOW] = getCreating (display, \"WM_DELETE_WINDOW\");|NL|    protocolList [PING]          = getCreating (display, \"_NET_WM_PING\");|NL|")
+
+        lynx_juce_fix("no WM_STATE read with atom 0 (fix 190pk)" "LYNX patch (fix 190pk): no WM_STATE atom"
+            "    XWindowSystemUtilities::ScopedXLock xLock;|NL|    XWindowSystemUtilities::GetXProperty prop (display, w, atoms.state, 0, 64, false, atoms.state);|NL|"
+            "    // LYNX patch (fix 190pk): no WM_STATE atom (no window manager ever ran), so no window has that property; asking with|NL|    // atom 0 was a BadAtom error|NL|    if (atoms.state == None)|NL|        return false;|NL||NL|    XWindowSystemUtilities::ScopedXLock xLock;|NL|    XWindowSystemUtilities::GetXProperty prop (display, w, atoms.state, 0, 64, false, atoms.state);|NL|")
+        lynx_juce_fix("no _NET_WM_STATE read with atom 0 (fix 190pk)" "LYNX patch (fix 190pk): no _NET_WM_STATE atom"
+            "    XWindowSystemUtilities::ScopedXLock xLock;|NL|    XWindowSystemUtilities::GetXProperty prop (display, w, atoms.windowState, 0, 128, false, XA_ATOM);|NL|"
+            "    // LYNX patch (fix 190pk): no _NET_WM_STATE atom (no EWMH window manager ever ran), so no window has that property|NL|    if (atoms.windowState == None)|NL|        return false;|NL||NL|    XWindowSystemUtilities::ScopedXLock xLock;|NL|    XWindowSystemUtilities::GetXProperty prop (display, w, atoms.windowState, 0, 128, false, XA_ATOM);|NL|")
+
         lynx_juce_fix("horizontal wheel (buttons 6 / 7) (fix 49)" "LYNX patch (fix 49, issue #254)"
             "    auto mapIndex = (uint32) (buttonPressEvent.button - Button1);|NL|"
             "    // LYNX patch (fix 49, issue #254): buttons 6 / 7 are the horizontal wheel (a tilt wheel, a second wheel), left /|NL|    // right; JUCE dropped them. deltaX > 0 = left, as Windows' WM_MOUSEHWHEEL comes through JUCE|NL|    if (buttonPressEvent.button == 6 || buttonPressEvent.button == 7)|NL|    {|NL|        MouseWheelDetails wheel;|NL|        wheel.deltaX = buttonPressEvent.button == 6 ? 50.0f / 256.0f : -50.0f / 256.0f;|NL|        wheel.deltaY = 0.0f;|NL|        wheel.isReversed = false;|NL|        wheel.isSmooth = false;|NL|        wheel.isInertial = false;|NL||NL|        peer->handleMouseWheel (MouseInputSource::InputSourceType::mouse, getLogicalMousePos (buttonPressEvent, peer->getPlatformScaleFactor()),|NL|                                getEventTime (buttonPressEvent), wheel);|NL|        return;|NL|    }|NL||NL|    auto mapIndex = (uint32) (buttonPressEvent.button - Button1);|NL|")
+    elseif(file MATCHES "juce_audio_plugin_client_LV2.cpp$")
+        lynx_juce_fix("LV2: optional audio inputs may stay unconnected (fix 190pk)" "LYNX patch (fix 190pk): an input port"
+            "        for (auto i = 0, end = processor->getTotalNumInputChannels(); i < end; ++i)|NL|            audio.copyFrom (i, 0, ports.getBufferForAudioInput (i), audio.getNumSamples());|NL|"
+            "        // LYNX patch (fix 190pk): an input port the host left unconnected is silence. JUCE declares the ports of a bus that|NL|        // is off by default (a side chain) lv2:connectionOptional, so a host may connect them to NULL, and copying from|NL|        // there crashed (JUCE's own LV2 host does it for every channel its buffer doesn't have)|NL|        for (auto i = 0, end = processor->getTotalNumInputChannels(); i < end; ++i)|NL|        {|NL|            if (const auto* input = ports.getBufferForAudioInput (i))|NL|                audio.copyFrom (i, 0, input, audio.getNumSamples());|NL|            else|NL|                audio.clear (i, 0, audio.getNumSamples());|NL|        }|NL|")
+        lynx_juce_fix("LV2: parameter ranges as decimals (fix 190pk)" "LYNX patch (fix 190pk): decimals"
+            "            os << \"\\\\tlv2:default \" << defaultValue << \" ;\\\\n\"|NL|                  \"\\\\tlv2:minimum \" << min << \" ;\\\\n\"|NL|                  \"\\\\tlv2:maximum \" << max;|NL|"
+            "            // LYNX patch (fix 190pk): decimals (\"0.0\", not \"0\": an integer literal is no atom:Float; lv2lint failed every|NL|            // parameter on it)|NL|            const auto lynxDecimal = [] (float v) { const String text (v); return text.containsAnyOf (\".eE\") ? text : text + \".0\"; };|NL||NL|            os << \"\\\\tlv2:default \" << lynxDecimal (defaultValue) << \" ;\\\\n\"|NL|                  \"\\\\tlv2:minimum \" << lynxDecimal (min) << \" ;\\\\n\"|NL|                  \"\\\\tlv2:maximum \" << lynxDecimal (max);|NL|")
+        lynx_juce_fix("LV2: scale points as decimals (fix 190pk)" "LYNX patch (fix 190pk): a decimal"
+            "                          \"\\\\t\\\\trdf:value \" << value << \" ;\\\\n\"|NL|"
+            "                          \"\\\\t\\\\trdf:value \" << lynxDecimal (value) << \" ;\\\\n\" // LYNX patch (fix 190pk): a decimal|NL|")
+        lynx_juce_fix("LV2: the effect's plugin class (fix 190pk)" "LYNX patch (fix 190pk): the effect's class"
+            "             #else|NL|              \"lv2:Plugin\"|NL|             #endif|NL|"
+            "             #elif defined (JucePlugin_LV2Class) // LYNX patch (fix 190pk): the effect's class (lv2:EQPlugin, ...)|NL|              JucePlugin_LV2Class|NL|             #else|NL|              \"lv2:Plugin\"|NL|             #endif|NL|")
+        lynx_juce_fix("LV2: unconnected outputs while suspended (fix 190pk)" "LYNX patch (fix 190pk): an output port"
+            "                    const auto ptr = ports.getBufferForAudioOutput (i);|NL|                    std::fill (ptr, ptr + numSteps, 0.0f);|NL|"
+            "                    const auto ptr = ports.getBufferForAudioOutput (i);|NL||NL|                    if (ptr != nullptr) // LYNX patch (fix 190pk): an output port the host left unconnected|NL|                        std::fill (ptr, ptr + numSteps, 0.0f);|NL|")
     elseif(file MATCHES "juce_CoreGraphicsContext_mac.mm$")
         lynx_juce_fix("no gradient flood from an empty path" "LYNX patch (issue #11): an empty path"
             "        CGContextReplacePathWithStrokedPath (context.get());|NL||NL|    ScopedCGContextState scopedState (context.get());"
@@ -867,6 +911,7 @@ function(lynx_patch_juce juce_dir)
     lynx_patch_juce_file("${juce_dir}/modules/juce_audio_processors/format_types/juce_VST3Common.h")
     lynx_patch_juce_file("${juce_dir}/modules/juce_audio_processors/format_types/juce_VST3PluginFormat.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_events/native/juce_Messaging_windows.cpp")
+    lynx_patch_juce_file("${juce_dir}/modules/juce_audio_plugin_client/juce_audio_plugin_client_LV2.cpp")
     # (Windows only, so a Linux or macOS configure never rewrites it in a JUCE checkout that others share)
     if(WIN32 OR CMAKE_SCRIPT_MODE_FILE)
         lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_FileChooser_windows.cpp")
