@@ -1,5 +1,5 @@
 ---
-source: 1c440a7810
+source: 13c966d353
 ---
 ![Plugin yöneticisinin alt kısmı; her plugin dosyasının ayrı bir süreçte incelendiğini belirten notla](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -102,6 +102,16 @@ FL Studio'nun yerel plugin'leri, örneğin Sytrus, Harmor ve Patcher, yalnızca 
 FL Studio içinde kurduğunuz şey LYNX SHARE projesiyle birlikte kaydedilir. `FL Studio VSTi (Multi)` ayrı insert'lerde çalabilen 16 stereo çıkışa sahiptir (yukarıdaki bölüme bakın). FL Studio lisansınız, hangi FL plugin'lerinin içinde çalışacağını belirler. LYNX SHARE, FL Studio'nun plugin dosyalarını kendi başına yüklemez.
 
 FL Studio plugin'i `Yüklenemedi` olarak listeleniyorsa, ona `Seçenekler › Plugin yöneticisi...` içinde sağ tıklayın ve `Tekrar dene (bu dosyayı şimdi tara)` seçeneğini seçin.
+
+## LYNX'in kendi pluginleri başka DAW'larda
+
+LYNX SHARE'in kendi efektleri ve enstrümanları, örneğin Facet EQ, Apex Limiter, LYNX Tune ve LYNX Model, başka DAW'lar için plugin olarak da gelir. [Sürümler sayfasında](https://github.com/Ka1-S/LYNX-SHARE/releases) ayrı ve isteğe bağlı bir indirmedir: Windows, macOS ve Linux için `LYNX-Plugins-<version>`.
+
+- Bütün pluginler tek bir CLAP dosyasında, `LYNX Plugins.clap` içindedir. Kısa bir liste VST3 olarak da gelir.
+- Arşivdeki kurulum betiğini çalıştırın (Windows'ta `install.cmd`, macOS ve Linux'ta `install.sh`), ardından DAW'ınızda pluginleri yeniden tarayın.
+- Bir plugin LYNX SHARE içindekiyle aynı editörü açar ve durumu LYNX SHARE'de proje olarak açılır.
+
+Tam liste [PLUGINS-PACK.md](https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS-PACK.md) dosyasındadır.
 
 ## Plugin database klasörü
 

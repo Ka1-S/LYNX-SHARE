@@ -10204,6 +10204,7 @@ countries: pl
 "{0} audio clip envelope(s): those clips play at their own level and pan" = "Obwiednie klipów audio: {0}; te klipy grają z własnym poziomem i panoramą"
 "{0} Playlist clip groove(s): those clips play straight" = "Groove klipów Playlisty: {0}; te klipy grają równo"
 "Automation clips with several targets or a formula drive only their first target, 1:1: {0}" = "Klipy automatyki z kilkoma celami lub formułą sterują tylko pierwszym celem, 1:1: {0}"
+"Automation clips linked to several controls move them 1:1 and win over the other clips of those controls: {0}" = "Klipy automatyki połączone z kilkoma kontrolkami poruszają nimi 1:1 i wygrywają z innymi klipami tych kontrolek: {0}"
 "The time signature's beat unit: n/{0} becomes n/4" = "Jednostka miary w metrum: n/{0} staje się n/4"
 "\"Link Playlist tracks to mixer tracks\" (a setting)" = "\"Link Playlist tracks to mixer tracks\" (ustawienie)"
 "MIDI generator settings" = "Ustawienia generatora MIDI"

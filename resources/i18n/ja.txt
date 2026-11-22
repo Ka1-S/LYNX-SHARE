@@ -10204,6 +10204,7 @@ countries: jp
 "{0} audio clip envelope(s): those clips play at their own level and pan" = "オーディオクリップのエンベロープ{0}個: それらのクリップは自身のレベルとパンで再生されます"
 "{0} Playlist clip groove(s): those clips play straight" = "プレイリストのクリップグルーブ{0}個: それらのクリップはストレートに再生されます"
 "Automation clips with several targets or a formula drive only their first target, 1:1: {0}" = "複数のターゲットまたは数式を持つオートメーションクリップは、最初のターゲットだけを1:1で制御します: {0}"
+"Automation clips linked to several controls move them 1:1 and win over the other clips of those controls: {0}" = "複数のコントロールにリンクされたオートメーションクリップは、それらを1:1で動かし、同じコントロールのほかのクリップより優先されます: {0}"
 "The time signature's beat unit: n/{0} becomes n/4" = "拍子の拍の単位: n/{0}はn/4になります"
 "\"Link Playlist tracks to mixer tracks\" (a setting)" = "「Link Playlist tracks to mixer tracks」(設定)"
 "MIDI generator settings" = "MIDIジェネレーターの設定"

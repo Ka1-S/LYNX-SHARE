@@ -1,5 +1,5 @@
 ---
-source: 1c440a7810
+source: 13c966d353
 ---
 ![Bagian bawah Pengelola plugin, dengan catatan bahwa setiap file plugin diperiksa di proses terpisah](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -102,6 +102,16 @@ Plugin native FL Studio, seperti Sytrus, Harmor, dan Patcher, hanya berjalan di 
 Apa yang kamu buat di dalam FL Studio disimpan bersama proyek LYNX SHARE. `FL Studio VSTi (Multi)` punya 16 output stereo, yang bisa dimainkan di insert terpisah (lihat bagian di atas). Lisensi FL Studio-mu menentukan plugin FL mana yang berfungsi di dalamnya. LYNX SHARE tidak memuat file plugin FL Studio dengan sendirinya.
 
 Jika plugin FL Studio tercantum sebagai `Gagal dimuat`, klik kanan di `Opsi › Pengelola plugin...` dan pilih `Coba lagi (pindai file ini sekarang)`.
+
+## Plugin LYNX sendiri di DAW lain
+
+Efek dan instrumen milik LYNX SHARE sendiri, seperti Facet EQ, Apex Limiter, LYNX Tune, dan LYNX Model, juga tersedia sebagai plugin untuk DAW lain. Semuanya unduhan terpisah dan opsional di [halaman rilis](https://github.com/Ka1-S/LYNX-SHARE/releases): `LYNX-Plugins-<version>` untuk Windows, macOS, dan Linux.
+
+- Semua plugin ada dalam satu file CLAP, `LYNX Plugins.clap`. Daftar pendek juga tersedia sebagai VST3.
+- Jalankan skrip instalasi di dalam arsip (`install.cmd` di Windows, `install.sh` di macOS dan Linux), lalu pindai ulang plugin di DAW Anda.
+- Plugin membuka editor yang sama seperti di dalam LYNX SHARE, dan state-nya bisa dibuka di LYNX SHARE sebagai proyek.
+
+Daftar lengkapnya ada di [PLUGINS-PACK.md](https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS-PACK.md).
 
 ## Folder Plugin database
 

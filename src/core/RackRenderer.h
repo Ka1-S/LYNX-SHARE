@@ -137,10 +137,21 @@ struct RackState
     std::vector<std::vector<int>> sharedLanes;
     // round 190gw: automation clips with several target links (FL's "Target links", Automation::links): each link takes
     // a slot after the event lanes whose value is the clip's own through the link's mapping formula
+    // Round 190ov (FL's demos: clips linked to several controls): a link's target that other clips drive too plays them as
+    // one, as issue #97's groups do — the clip that plays (the last one started) or else the last one that ended decides,
+    // through its own link (`link` ≥ 0) or 1:1 (−1: an automation of that one target, which then binds nothing itself).
+    struct LinkMember
+    {
+        int automation = 0, link = -1;
+        linkformula::Formula formula;
+        std::vector<float> scale;
+    };
     struct LinkSlot
     {
         int automation = 0, slot = 0;
         linkformula::Formula formula;
+        std::vector<float> scale;          // round 190ov: Automation::Link::scale
+        std::vector<LinkMember> members;   // round 190ov: empty = this link alone, from its automation's value
     };
     std::vector<LinkSlot> linkSlots;
     std::vector<std::vector<int>> patternClips; // per pattern: its clips in the Playlist, by start

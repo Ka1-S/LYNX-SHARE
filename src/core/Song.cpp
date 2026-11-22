@@ -1548,6 +1548,17 @@ float Automation::mapLive (float v) const noexcept
     return std::clamp (curve[i] + (curve[i + 1] - curve[i]) * f, 0.0f, 1.0f);
 }
 
+float Automation::Link::scaled (float v) const noexcept
+{
+    v = std::clamp (v, 0.0f, 1.0f);
+    if (scale.size() < 2)
+        return v;
+    const auto x = v * (float) (scale.size() - 1);
+    const auto i = std::min ((std::size_t) x, scale.size() - 2);
+    const auto f = x - (float) i;
+    return std::clamp (scale[i] + (scale[i + 1] - scale[i]) * f, 0.0f, 1.0f);
+}
+
 float PatternEvents::valueAt (double tick) const noexcept
 {
     if (events.empty())

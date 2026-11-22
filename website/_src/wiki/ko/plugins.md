@@ -1,5 +1,5 @@
 ---
-source: 1c440a7810
+source: 13c966d353
 ---
 ![각 플러그인 파일을 별도 프로세스에서 검사한다는 안내가 있는 플러그인 관리자 아래쪽](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -102,6 +102,16 @@ Sytrus, Harmor, Patcher 같은 FL Studio의 네이티브 플러그인은 FL Stud
 FL Studio 안에서 만든 내용은 LYNX SHARE 프로젝트와 함께 저장됩니다. `FL Studio VSTi (Multi)`에는 스테레오 출력이 16개 있으며, 각각 다른 인서트에서 재생할 수 있습니다(앞 섹션 참고). FL Studio 안에서 어떤 FL 플러그인이 작동하는지는 사용 중인 FL Studio 라이선스가 정합니다. LYNX SHARE가 FL Studio의 플러그인 파일을 단독으로 불러오지는 않습니다.
 
 FL Studio 플러그인이 `불러오기 실패`로 표시되면 `옵션 › 플러그인 관리자...`에서 마우스 오른쪽 버튼으로 눌러 `다시 시도(지금 이 파일 스캔)`를 선택하세요.
+
+## 다른 DAW에서 쓰는 LYNX 자체 플러그인
+
+Facet EQ, Apex Limiter, LYNX Tune, LYNX Model 같은 LYNX SHARE 자체 이펙트와 악기는 다른 DAW용 플러그인으로도 제공됩니다. [릴리스 페이지](https://github.com/Ka1-S/LYNX-SHARE/releases)에서 따로 받는 선택 사항이며, Windows, macOS, Linux용 `LYNX-Plugins-<version>`입니다.
+
+- 모든 플러그인이 CLAP 파일 하나, `LYNX Plugins.clap`에 들어 있습니다. 일부는 VST3로도 제공됩니다.
+- 압축 파일 안의 설치 스크립트(Windows는 `install.cmd`, macOS와 Linux는 `install.sh`)를 실행한 다음 DAW에서 플러그인을 다시 스캔하세요.
+- 플러그인은 LYNX SHARE 안에서와 같은 에디터를 열고, 그 상태는 LYNX SHARE에서 프로젝트로 열립니다.
+
+전체 목록은 [PLUGINS-PACK.md](https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS-PACK.md)에 있습니다.
 
 ## Plugin database 폴더
 

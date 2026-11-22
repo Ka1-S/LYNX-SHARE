@@ -271,6 +271,7 @@ struct AutomationLink
 {
     int channel = 0;
     ControlId target;
+    std::string formula; // round 190ov: the link's mapping formula (event 0xE6 after the record); "" = FL's default "Input"
 };
 
 // Links a controller's output (Peak Controller in a mixer slot, Envelope Controller in a channel...)

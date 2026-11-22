@@ -38,8 +38,9 @@ Cross-check: the same 0xD7 record already gave LYNX "main pitch" at byte 0x0B an
 0xD7 base +0x284 plus exactly those bytes [DECOMP], so the 0xD7 base is right.
 
 Other channel events: **0x20** = channel +0x892 bit 0 (saved only by the full-project saver) — not traced to a
-control yet; **0x30** = +0x224 (0 in every demo); **0x32** = +0x1fc (1 in 1 171 channels); **0xAA** = +0x714, a count
-of target links (strings 0xF5…0xFF follow when > 0; −1 / 0 in the demos); **0x33** = bits (0 in every demo);
+control yet; **0x30** = +0x224 (0 in every demo); **0x32** = +0x1fc (1 in 1 171 channels); **0xAA** = +0x714, the channel's
+Loop Starter index (strings 0xF5…0xFF follow when > 0; −1 / 0 in the demos; round 190ov corrected the earlier reading
+"a count of target links": docs/analise/REA_rodada190ov.md §1.4); **0x33** = bits (0 in every demo);
 **0x9B** does not occur in the demos.
 
 How often the demos use them [DATA, 3 442 channels]: Reverse on 89 channels, Normalize on 134, Fade out on 140, Fade

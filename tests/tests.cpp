@@ -18088,3 +18088,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "TrackStates190opTests.inc" // round 190op (0.1.31): Hide / Deactivate tracks (P4), Capture automation (P7)
 #include "SimpleDuck190otTests.inc" // round 190ot (0.1.31): Simple "Duck under..." (sidechain in one pick) and the shared Echo send (P5)
 #include "HWheel254Tests.inc" // round 190ou: issue #254, the horizontal wheel
+#include "AutoLinks190ovTests.inc" // round 190ov (0.1.31): FL automation clips linked to several controls
+#include "PluginPack190ovTests.inc" // round 190ov (0.1.31): the later LYNX-own engines in the plugin pack

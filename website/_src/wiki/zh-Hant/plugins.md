@@ -1,5 +1,5 @@
 ---
-source: 1c440a7810
+source: 13c966d353
 ---
 ![外掛管理器的下半部，附有每個外掛檔案都在獨立處理程序中檢查的說明](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -102,6 +102,16 @@ FL Studio 的原生外掛，例如 Sytrus、Harmor 和 Patcher，只能在 FL St
 你在 FL Studio 內部建立的內容會隨 LYNX SHARE 專案一起儲存。`FL Studio VSTi (Multi)` 有 16 路立體聲輸出，可以在各自獨立的插入軌上播放（見上一節）。你的 FL Studio 授權決定哪些 FL 外掛能在其中使用。LYNX SHARE 自己不會載入 FL Studio 的外掛檔案。
 
 如果 FL Studio 外掛被列為 `載入失敗`，請在 `選項 › 外掛管理器...` 中對它按右鍵，選擇 `重試（立即掃描此檔案）`。
+
+## 在其他 DAW 中使用 LYNX 自己的外掛
+
+LYNX SHARE 自己的效果器與樂器，例如 Facet EQ、Apex Limiter、LYNX Tune 和 LYNX Model，也提供給其他 DAW 使用的外掛版本。它們是[發佈頁面](https://github.com/Ka1-S/LYNX-SHARE/releases)上另外的選用下載：適用於 Windows、macOS 和 Linux 的 `LYNX-Plugins-<version>`。
+
+- 所有外掛都在一個 CLAP 檔案 `LYNX Plugins.clap` 裡。其中一小部分也提供 VST3 版本。
+- 執行壓縮檔裡的安裝腳本（Windows 用 `install.cmd`，macOS 和 Linux 用 `install.sh`），然後在你的 DAW 裡重新掃描外掛。
+- 外掛開啟的編輯器和 LYNX SHARE 裡的一樣，它的狀態可以在 LYNX SHARE 中當作專案開啟。
+
+完整清單請見 [PLUGINS-PACK.md](https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS-PACK.md)。
 
 ## 外掛資料庫資料夾
 
