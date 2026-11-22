@@ -1,4 +1,68 @@
 {
+ "assets/media/learn/clip-launch-tour-en-1080.mp4": {
+  "size": 3248596,
+  "sha256": "9d6b33a26b1961796f9b971f2d88e13311ed430d2f26b5e8f41153336364f7c3"
+ },
+ "assets/media/learn/clip-launch-tour-en-720.mp4": {
+  "size": 2050695,
+  "sha256": "10d87ecef0398248eacc165e4ca6214131464480ff23e90de9603a2c590458a2"
+ },
+ "assets/media/learn/clip-launch-tour-pt-BR-1080.mp4": {
+  "size": 3342408,
+  "sha256": "643079d8a50364a4187a4a52ddfcaa08172cd4f60e46a1ab562c9cc38288af54"
+ },
+ "assets/media/learn/clip-launch-tour-pt-BR-720.mp4": {
+  "size": 2131648,
+  "sha256": "83a4c866af606e3176bec87c33dba9ec69a9af7e0e397dc4c7ad9a4b8b829294"
+ },
+ "assets/media/learn/command-palette-en-1080.mp4": {
+  "size": 3814616,
+  "sha256": "f3e5838516e9cb758e57102918a6332520eb4656e3edcb0ee6776115a64516ec"
+ },
+ "assets/media/learn/command-palette-en-720.mp4": {
+  "size": 2159866,
+  "sha256": "897c7d9cc143b20c1e1382f0472efb9d0b9c4c81432ffa9a98033bbf76953bc2"
+ },
+ "assets/media/learn/command-palette-pt-BR-1080.mp4": {
+  "size": 3939965,
+  "sha256": "79be4d3e0bb89f82c71f918822beb5948243ac17ece5bb9a081ee353d8068067"
+ },
+ "assets/media/learn/command-palette-pt-BR-720.mp4": {
+  "size": 2224501,
+  "sha256": "ab784ff607491eaa2a11e88f8a9430346a61c97e21385c83d3a143a1bf2e69c4"
+ },
+ "assets/media/learn/lynx-instruments-en-1080.mp4": {
+  "size": 3562805,
+  "sha256": "90b506225546c5de24bb37d71a762a526ac3d3e80144cca62886c6d0a2caf94b"
+ },
+ "assets/media/learn/lynx-instruments-en-720.mp4": {
+  "size": 2106373,
+  "sha256": "32623fcae99bccd10ec67cfb1ed3e087cc4e71c632c7da54191ba448287fdc67"
+ },
+ "assets/media/learn/lynx-instruments-pt-BR-1080.mp4": {
+  "size": 3658303,
+  "sha256": "824e01488f5d3f3d9b8a12cd69038f9c4aab653e48c7fe1cb085cc1714f37525"
+ },
+ "assets/media/learn/lynx-instruments-pt-BR-720.mp4": {
+  "size": 2181977,
+  "sha256": "ab822596175c719d04bb6ec363ac8e669dd3f83204ddafbf9fc2fb80a6a365ef"
+ },
+ "assets/media/learn/modulators-en-1080.mp4": {
+  "size": 2248775,
+  "sha256": "1a039c0297c2d0bc8717bfefa645b112052c597fc6ee27a188379ea854deb2b7"
+ },
+ "assets/media/learn/modulators-en-720.mp4": {
+  "size": 1411057,
+  "sha256": "1f19c34d4eaaefc74288d4fbf8c35ddf3d3d590c0308629f9cad322bc7b37c2e"
+ },
+ "assets/media/learn/modulators-pt-BR-1080.mp4": {
+  "size": 2323861,
+  "sha256": "580952bcfd85c402aeaebf1cea11abcdac82838f6d397c3f3554475c58fd08ad"
+ },
+ "assets/media/learn/modulators-pt-BR-720.mp4": {
+  "size": 1458042,
+  "sha256": "5190f3857d9d0616e7db85259e2c023407678b39a8d16fbad47ed884a508e2cf"
+ },
  "assets/media/learn/online-session-en-1080.mp4": {
   "size": 3150386,
   "sha256": "d30d193aa76a914d8d8af05fbfc587e4c56afed0992285aa221ca2acd37216bb"
@@ -14,6 +78,86 @@
  "assets/media/learn/online-session-pt-BR-720.mp4": {
   "size": 2245836,
   "sha256": "8b289697a1a2869b4038ea6b21e04731331fbb0fb9c5f0b8207960ee6b26cc25"
+ },
+ "assets/media/learn/open-als-en-1080.mp4": {
+  "size": 2370455,
+  "sha256": "9cd25766a780708a08d6afffc44f64b3150bbc98ba2fcf0a537322df1d74c4d3"
+ },
+ "assets/media/learn/open-als-en-720.mp4": {
+  "size": 1508332,
+  "sha256": "5886423b40bde50f9de296ff984cdcf6ebfbb2cdf10177ed9a4a444651052967"
+ },
+ "assets/media/learn/open-als-pt-BR-1080.mp4": {
+  "size": 2514147,
+  "sha256": "2deee9f80d891bb5347f73973cd0d1bf1826a56815b191ffc62176c3f0cf46f0"
+ },
+ "assets/media/learn/open-als-pt-BR-720.mp4": {
+  "size": 1571072,
+  "sha256": "24a879eb21b81fc8def090bfcb04dbccfad0a84c95e262b3034a400300335725"
+ },
+ "assets/media/learn/open-flp-en-1080.mp4": {
+  "size": 3545391,
+  "sha256": "0585f5fd90226a7c589b66c7d5b38b1f83b1ba33783a736645fa1d3dc1608f32"
+ },
+ "assets/media/learn/open-flp-en-720.mp4": {
+  "size": 2058423,
+  "sha256": "7d2732399c41b7e269f18ad6773059612afc22f46dd68d32fa2025dc9b94a5cd"
+ },
+ "assets/media/learn/open-flp-pt-BR-1080.mp4": {
+  "size": 3565129,
+  "sha256": "2c9b11018d7312c9b9193e857ec94763bc4808a601b12836b8712bdf70e16ffe"
+ },
+ "assets/media/learn/open-flp-pt-BR-720.mp4": {
+  "size": 2129847,
+  "sha256": "730a85fcbdf008fb17e56f1b51331febbad18c2c0a616e7894f8eb68db3d7fd7"
+ },
+ "assets/media/learn/open-mobile-en-1080.mp4": {
+  "size": 2822238,
+  "sha256": "81dca587bec98aa7bf330ba26a0da660c4d8dbf098e345597795147ea4283371"
+ },
+ "assets/media/learn/open-mobile-en-720.mp4": {
+  "size": 1787082,
+  "sha256": "31d4247f08e4e5e8ef336b251b034f8e16fefcd0ce990f193692feb6b5ddde72"
+ },
+ "assets/media/learn/open-mobile-pt-BR-1080.mp4": {
+  "size": 2921230,
+  "sha256": "6036baf00b88039428d51063f06c893959cb06e372b8f554218090d044d3e1cd"
+ },
+ "assets/media/learn/open-mobile-pt-BR-720.mp4": {
+  "size": 1819499,
+  "sha256": "ddcc5014cc1ff118c629839bda6e1c1e41409c92d154e2d0d4be275326cdeff1"
+ },
+ "assets/media/learn/pattern-tour-en-1080.mp4": {
+  "size": 4496344,
+  "sha256": "85c96d2433a68895356c5e0066a2e8e3ce1360cbb3e2de0027e1ac46f2fa5840"
+ },
+ "assets/media/learn/pattern-tour-en-720.mp4": {
+  "size": 2694020,
+  "sha256": "3cf7618eeff2df530316ce870ba64a0491d1cd859d0099cef34c3db32af10d8e"
+ },
+ "assets/media/learn/pattern-tour-pt-BR-1080.mp4": {
+  "size": 4555573,
+  "sha256": "b311bc9c6b654ce184272ff7f784f02bb1f969755018b757dfc4d48d26259788"
+ },
+ "assets/media/learn/pattern-tour-pt-BR-720.mp4": {
+  "size": 2690465,
+  "sha256": "0b32252135611986149174bcecb1af5c975fc42cc43a4f3de285e37075efa7f0"
+ },
+ "assets/media/learn/poly-editor-en-1080.mp4": {
+  "size": 2219521,
+  "sha256": "a4b3a4af754f214c57e28cb34db64b9056623383a0494ed00c19c5dc74876c83"
+ },
+ "assets/media/learn/poly-editor-en-720.mp4": {
+  "size": 1361160,
+  "sha256": "743e8f0f6ebd8d55030c24fdff0d9c62553c66f2d6a1fcecedd1dde223629846"
+ },
+ "assets/media/learn/poly-editor-pt-BR-1080.mp4": {
+  "size": 2221773,
+  "sha256": "fbf04f09973c8339f849af719dbb766f2d347d4b59cddbf9165760e9804e99ae"
+ },
+ "assets/media/learn/poly-editor-pt-BR-720.mp4": {
+  "size": 1417881,
+  "sha256": "467d998a6bfb8bf60716c5a5e6c6ab084279c42e71f4ebdd836d1484978d4fba"
  },
  "assets/media/learn/record-voice-en-1080.mp4": {
   "size": 3831762,
@@ -46,5 +190,53 @@
  "assets/media/learn/simple-beat-pt-BR-720.mp4": {
   "size": 2679738,
   "sha256": "18c024fb55cb4ef6f124d9214c11099ba15c301b1ac6ce0f2e3faa9339c18491"
+ },
+ "assets/media/learn/song-sections-en-1080.mp4": {
+  "size": 1899920,
+  "sha256": "802ba369286dc768e9b21c7a146e16ebb483095e0d994c3a6c058848fe17ba7b"
+ },
+ "assets/media/learn/song-sections-en-720.mp4": {
+  "size": 1248847,
+  "sha256": "b423f7612e37d010f63ecec7865fa3ede1d852ae401b9bbbcb984f6202562dfb"
+ },
+ "assets/media/learn/song-sections-pt-BR-1080.mp4": {
+  "size": 1951390,
+  "sha256": "74df9338dbdfe8e6aa2bd3866037a0bdca0c10631d4c92062ca49dd84952a7d1"
+ },
+ "assets/media/learn/song-sections-pt-BR-720.mp4": {
+  "size": 1296864,
+  "sha256": "282382af0983b1504c9a5f2c99d255fbaec22b3529fdfed0cb5a78a497dd959c"
+ },
+ "assets/media/learn/switch-layouts-en-1080.mp4": {
+  "size": 3780195,
+  "sha256": "84c8032c320130ef644121d8848e13906b3c58159ee979fd8e2b836e9e5d95ab"
+ },
+ "assets/media/learn/switch-layouts-en-720.mp4": {
+  "size": 2324538,
+  "sha256": "d816f1f46fcfce771c2796a17527f670bbcce24016f3ff5668f611c4b3891983"
+ },
+ "assets/media/learn/switch-layouts-pt-BR-1080.mp4": {
+  "size": 4010276,
+  "sha256": "aeb3d7fae7fcc097b318fc741192a99092c5d7bc2d10a2f520dcf0f0dc8b3448"
+ },
+ "assets/media/learn/switch-layouts-pt-BR-720.mp4": {
+  "size": 2418266,
+  "sha256": "78a0c873e419d42d852dcecbcddb5d26c4c8985fec6384810d47e39d88d6d5e0"
+ },
+ "assets/media/learn/tracker-en-1080.mp4": {
+  "size": 2197018,
+  "sha256": "920ab4598b58393a4b8638dad336b1eb100b02df902db17b93e208f1aa912bb5"
+ },
+ "assets/media/learn/tracker-en-720.mp4": {
+  "size": 1371291,
+  "sha256": "51401bc1575ea3c770241965c5b9f397e01c19af4cd92364ec4f0ed681443467"
+ },
+ "assets/media/learn/tracker-pt-BR-1080.mp4": {
+  "size": 2190537,
+  "sha256": "b332204386ac688a6e5d004c718eb6695b1ed5ff7a4349b587242ad9fbf83c64"
+ },
+ "assets/media/learn/tracker-pt-BR-720.mp4": {
+  "size": 1337814,
+  "sha256": "9cf09c42afdc0a18618e48756460919d1d33fa7c49066260de56bd018f5cf950"
  }
 }

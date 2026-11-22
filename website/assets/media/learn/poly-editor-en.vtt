@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+These chords are an audio recording: one clip, every note mixed together.
+
+00:00:08.800 --> 00:00:13.800
+Right-click the clip and choose Edit notes, polyphonic.
+
+00:00:14.000 --> 00:00:19.600
+LYNX SHARE finds every note of the chords and draws each one on its own.
+
+00:00:19.800 --> 00:00:25.400
+Drag the top note down a semitone: G major becomes G minor. The other notes stay.
+
+00:00:25.600 --> 00:00:30.800
+Press Play in the editor to hear the chord with the new note.
+
+00:00:31.000 --> 00:00:36.600
+Each edit is one undo step, and the song plays the edited audio.

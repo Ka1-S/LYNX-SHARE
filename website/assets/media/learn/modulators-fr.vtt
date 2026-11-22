@@ -1,0 +1,16 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Les modulateurs bougent les boutons pour vous : LFO, enveloppes, pas et macros.
+
+00:00:08.800 --> 00:00:13.600
+Faites un clic droit sur un bouton, ici le Cutoff du synthé, et choisissez Moduler avec.
+
+00:00:13.800 --> 00:00:19.400
+Choisissez Nouveau LFO. Le LFO est créé et appliqué au bouton d'un coup.
+
+00:00:19.600 --> 00:00:25.000
+Appuyez sur Lecture. L'anneau autour du bouton montre le LFO qui le déplace.
+
+00:00:25.200 --> 00:00:30.600
+Outils, Modulateurs les liste tous : forme, vitesse et profondeur.

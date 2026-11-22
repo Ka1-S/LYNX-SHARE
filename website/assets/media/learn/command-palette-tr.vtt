@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Bir komut mu arıyorsunuz? Komut paletini açmak için soru işareti tuşuna basın.
+
+00:00:08.800 --> 00:00:14.200
+İstediğinizi yazın. Her menü öğesi, kısayol ve ayar listede.
+
+00:00:14.400 --> 00:00:19.200
+Çalıştırmak için Enter'a basın. Burada Tracker açılır.
+
+00:00:19.400 --> 00:00:24.800
+Şimdi CPU. Şarkı çalarken araç çubuğundaki CPU ölçeri yükü gösterir.
+
+00:00:25.000 --> 00:00:30.400
+Plugin performans monitörü için çift tıklayın: her plugin'in CPU'su.
+
+00:00:30.600 --> 00:00:37.200
+CPU tasarrufu için Araçlar, Tüm plugin'ler için smart disable'ı değiştir: sessiz plugin dinlenir.
