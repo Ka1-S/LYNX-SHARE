@@ -1,5 +1,5 @@
 ---
-source: 6620e7eee1
+source: 34014064c8
 ---
 ![Plugin yöneticisinin alt kısmı; her plugin dosyasının ayrı bir süreçte incelendiğini belirten notla](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -110,6 +110,7 @@ FL Studio plugin'i `Yüklenemedi` olarak listeleniyorsa, ona `Seçenekler › Pl
 LYNX SHARE'in kendi efektleri ve enstrümanları, örneğin Facet EQ, Apex Limiter, LYNX Tune ve LYNX Model, başka DAW'lar için plugin olarak da gelir. [Sürümler sayfasında](https://github.com/Ka1-S/LYNX-SHARE/releases) ayrı ve isteğe bağlı bir indirmedir: Windows, macOS ve Linux için `LYNX-Plugins-<version>`.
 
 - Bütün pluginler tek bir CLAP dosyasında, `LYNX Plugins.clap` içindedir. Kısa bir liste VST3 olarak, Linux'ta ise LV2 olarak da gelir.
+- Paketteki enstrümanlar: LYNX FM10, LYNX Model, LYNX Fourfold, LYNX Wavecoil ve LYNX Duoloom.
 - Arşivdeki kurulum betiğini çalıştırın (Windows'ta `install.cmd`, macOS ve Linux'ta `install.sh`), ardından DAW'ınızda pluginleri yeniden tarayın.
 - Bir plugin LYNX SHARE içindekiyle aynı editörü açar ve durumu LYNX SHARE'de proje olarak açılır.
 

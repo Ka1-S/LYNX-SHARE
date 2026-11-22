@@ -1,4 +1,4 @@
-# LYNX's own plugins as CLAP, VST3 and LV2 (rounds 180b, 188b, 190ov, 190pk)
+# LYNX's own plugins as CLAP, VST3 and LV2 (rounds 180b, 188b, 190ov, 190pk, 190pq)
 
 Status: **built by the release workflow as a separate, optional download** (the user's option C, 2026-11-08): every LYNX
 effect in one CLAP, a short list also as VST3 (and on Linux as LV2), for Windows, Linux and macOS. The
@@ -49,6 +49,9 @@ there. Plugin names are LYNX names only, never an FL Studio name (a test checks 
 | LYNX Timeprism | spectral freezer / delay (190ov) | yes | |
 | LYNX Chimefield | spectral resonator (190ov; the Harmonia engine) | yes | |
 | LYNX Model | instrument (physical models, 190ov) | yes | yes |
+| LYNX Fourfold | instrument (4-operator FM: the Tetra engine, 190pq) | yes | yes |
+| LYNX Wavecoil | instrument (wavetable: the Helix engine, 190pq) | yes | yes |
+| LYNX Duoloom | instrument (two-engine macro synth: the Braid engine, 190pq) | yes | yes |
 
 LV2 (Linux; rounds 190ov and 190pk, shipped since 0.1.31): every VST3 of the list is also built as an LV2 bundle on Linux
 (`-DLYNX_PLUGINS_LV2`, on by default; it does nothing elsewhere): JUCE's LV2 wrapper (`src/plugin/Lv2Entry.cpp`, the same
@@ -87,18 +90,25 @@ always carry the "LYNX" prefix.
 Round 190ov added LYNX Model (LYNX's own physical models) and seven later LYNX-own effects. LYNX's own synths Tetra, Helix
 and Braid export under names of their own (owner decision, rollup 0.1.31 step 6), because their engine names are other
 makers' products (Sequential's Tetra synth, Line 6's Helix / Helix Native, Mutable Instruments' Braids, also a Softube
-plugin): **LYNX Fourfold**, **LYNX Wavecoil** and **LYNX Duoloom**. They stay at `0` for now: CI plugins run
-44975814572 built them into the CLAP, but `plugexporttest` aborted in the CLAP (`std::length_error`) and clap-validator's
-state-reproducibility-binary failed on Fourfold and Wavecoil (queued for 0.1.32). Tetra and Braid have no preset bank:
-their plugin starts from the engine's defaults (`plugexport::instrumentChannel`). The Harmonia engine exports as **LYNX
+plugin): **LYNX Fourfold**, **LYNX Wavecoil** and **LYNX Duoloom**, built as CLAP, VST3 and LV2 since round 190pq
+(0.1.32). Tetra and Braid have no preset bank: their plugin starts from the engine's defaults
+(`plugexport::instrumentChannel`). CI plugins run 44975814572 had held them back (step 6) with two failures, both fixed in
+round 190pq:
+- `plugexporttest` aborted in the CLAP (`std::length_error`, `basic_string::_M_create`; a segmentation fault locally):
+  its reference render (`directInstrument`) dereferenced the empty `banks::defaultChannel` of Tetra / Braid and copied a
+  `ChannelDef` from garbage. A bug in the test tool, not in the plugins: it now starts from `plugexport::instrumentChannel`,
+  as the plugin does.
+- clap-validator's state-reproducibility-binary (save, load into a new instance, save again: the same bytes) failed on
+  Fourfold and Wavecoil: every save wrote each host value back into the channel through the parameter's range
+  (raw -> 0..1 -> raw), which moves some values by a float step, and `modelParams` are written with 7 digits, so the
+  second save differed in a last digit (Fourfold `modelParams` 46 and 138, Wavecoil 46 and 63). A save now writes only
+  the values the host moved. `.lynx` loading is unchanged. `plugexporttest` checks the same thing on every plugin
+  and format (every parameter moved, a third instance loads the state and saves it back byte for byte). The Harmonia engine exports as **LYNX
 Chimefield** (Cherry Audio sells a Harmonia synth). Inside LYNX the engines keep their names. Instruments that stand in for FL Studio's follow later with their own names (round 188b report: a
 proposed list for the user). Until then they stay at `0`:
 
 | Exported name | Engine inside LYNX | Kind | Built now |
 |---|---|---|---|
-| LYNX Fourfold | Tetra | instrument | no (host tests: rollup 0.1.31 step 6) |
-| LYNX Wavecoil | Helix | instrument | no (host tests) |
-| LYNX Duoloom | Braid | instrument | no (host tests) |
 | LYNX Osc Trio | 3x Osc | instrument | no (needs a host parameter table) |
 | LYNX SimOsc | SimSynth | instrument | no |
 | LYNX Harmlite | Harmless | instrument | no |

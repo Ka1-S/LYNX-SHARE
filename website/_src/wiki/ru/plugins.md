@@ -1,5 +1,5 @@
 ---
-source: 6620e7eee1
+source: 34014064c8
 ---
 ![Нижняя часть Менеджера плагинов с пометкой о том, что каждый файл плагина проверяется в отдельном процессе](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -110,6 +110,7 @@ VST2 в macOS не поддерживается. В Linux плагины для 
 Собственные эффекты и инструменты LYNX SHARE, например Facet EQ, Apex Limiter, LYNX Tune и LYNX Model, есть и в виде плагинов для других DAW. Это отдельная необязательная загрузка на [странице релизов](https://github.com/Ka1-S/LYNX-SHARE/releases): `LYNX-Plugins-<version>` для Windows, macOS и Linux.
 
 - Все плагины лежат в одном файле CLAP, `LYNX Plugins.clap`. Короткий список есть также в VST3, а в Linux — в LV2.
+- Инструменты в пакете: LYNX FM10, LYNX Model, LYNX Fourfold, LYNX Wavecoil и LYNX Duoloom.
 - Запустите скрипт установки из архива (`install.cmd` в Windows, `install.sh` в macOS и Linux), затем заново просканируйте плагины в своей DAW.
 - Плагин открывает тот же редактор, что и внутри LYNX SHARE, а его состояние открывается в LYNX SHARE как проект.
 
