@@ -1093,6 +1093,10 @@ struct ChannelDef
     std::uint64_t uid = 0;
     std::vector<StandIn> standIns;
     FreezeState freeze; // (round 190ay) frozen: its stems play, its instrument is not loaded
+    // LYNX extra, round 190op (P4, owner decision O-3): "Deactivate". The channel's instrument / plugin is not loaded and
+    // the channel makes no sound (nothing is rendered, unlike Freeze); its settings, plugin state and notes stay here as
+    // they were, so Reactivate loads the same sound again (core/TrackStates.h deactivate::project). Saved ("deactivated").
+    bool deactivated = false;
     // FL's channel icon (.flp 0x9B, REA round 168j): FL's icon index, 0 = none. Kept and saved; drawn by the icon UI.
     int icon = 0;
     int flWrapperFlags = -1; // an imported .flp channel's plugin record flags (0xD4 +16, 0x20 = Smart disable): back in the export
@@ -1736,6 +1740,10 @@ struct MixerTrack
     // result. At most one, kept as the last mixer track (mixerops::currentTrack), with no inputs, routes or fader of its
     // own; the mixer draws it as a meter-only strip left of the Master. Made when it is first clicked. Saved.
     bool current = false;
+    // LYNX extra, round 190op (P4, owner decision O-3): "Deactivate". The insert's effects are not loaded and it carries
+    // silence (its sends and sidechains too; the routing stays); so does whatever plays only into it (core/TrackStates.h
+    // deactivate::effective). The effects' settings stay as they were. Saved ("deactivated").
+    bool deactivated = false;
     // A return's Pre / Post toggle (Live's SendsPre, per return): on, every send into it leaves before the sending
     // track's fader (MixerSend::pre); new sends take it. Saved.
     bool returnPre = false;
@@ -2451,6 +2459,9 @@ struct PlaylistTrack
     // Pattern layout (FL's own instrument track), on for new instrument tracks in the Clip-launch and Simple layouts.
     // Saved ("playlistOwnClips"); an .flp keeps FL's instrument track.
     bool ownClips = false;
+    // LYNX extra, round 190op (P4): "Hide track". The row (and in the Clip-launch layout its column) is left out of view
+    // until "Show hidden tracks" is on; the track still plays. View only; saved ("playlistTracksHidden").
+    bool hidden = false;
     bool operator== (const PlaylistTrack&) const = default;
 };
 

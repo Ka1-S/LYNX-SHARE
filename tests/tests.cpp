@@ -18081,3 +18081,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "DialogRules190ooTests.inc" // round 190oo: the one dialog system's button order and pixel bands (core/DialogRules.h)
 #include "RackAutomation190ooTests.inc" // round 190oo (design review 2, PAT-7): FL's automation clip channels in the Channel rack
 #include "TextFit190ooTests.inc" // round 190oo (design review 2, fit): translated menu titles give up width before toolbar panels drop, knob captions
+#include "TrackStates190opTests.inc" // round 190op (0.1.31): Hide / Deactivate tracks (P4), Capture automation (P7)

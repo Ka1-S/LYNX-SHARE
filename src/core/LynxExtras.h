@@ -144,6 +144,10 @@ inline constexpr Item items[] = {
     { "controlBar.liveScale", TR_NOOP ("Clip-launch workflow"), TR_NOOP ("Live's scale control: switch, root and mode (LYNX)"),
       TR_NOOP ("The Clip-launch control bar shows Live's three scale controls instead of the one key box: the scale switch turns the project key on or off, the root and the mode choose it, and both stay dimmed while the switch is off. A right-click still opens the Key menu. Also in the Key menu of the Clip-launch layout."),
       "ui-options.txt:liveScaleControl" },
+    // round 190op (research190oe P4): Cubase / Studio Pro hide and disable tracks; FL has neither
+    { "playlist.trackStates", TR_NOOP ("Playlist"), TR_NOOP ("Hide and deactivate tracks"),
+      TR_NOOP ("The Playlist track menu gets Hide track, the Playlist menu Show hidden tracks and Hide unused tracks, and the Channel rack and Mixer menus Deactivate: a deactivated channel or insert unloads its plugins and is silent, its settings kept. Also always on in the Clip-launch and Simple layouts."),
+      "ui-options.txt:trackStates" },
     { "midi.gamepad", TR_NOOP ("Controllers"), TR_NOOP ("Use a game controller"),
       TR_NOOP ("A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page."),
       "midi-settings.txt:gamepad" },

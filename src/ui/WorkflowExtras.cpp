@@ -4,6 +4,7 @@
 #include "core/Sections.h"      // round 190ol (P1)
 
 #include "core/TrackClips.h"
+#include "core/TrackStates.h"
 
 #include "core/LaneView.h"
 #include "core/LayoutStyle.h"
@@ -99,6 +100,8 @@ bool readUiOption (const juce::String& key, bool on)
         cliplanes::foldedOnOpen = on;
     else if (key == "liveScaleControl") // round 190oo (O-5, LYNX extra)
         livescale::shown = on;
+    else if (key == "trackStates") // round 190op (P4, LYNX extra): Hide / Deactivate in the Pattern layout's menus
+        trackstates::patternMenus() = on;
     else
         return false;
     return true;
@@ -127,7 +130,8 @@ juce::String uiOptionsText()
            + "\nrulerSeeksAnyTool=" + juce::String (ruler::seekWithAnyTool() ? 1 : 0) // (round 190nq, issue #227)
            + "\nsectionsLane=" + juce::String (sections::patternLaneOn() ? 1 : 0) // (round 190ol, P1)
            + "\nclipLanesFoldedLive=" + juce::String (cliplanes::foldedOnOpen ? 1 : 0) // (round 190oo, CS O-3)
-           + "\nliveScaleControl=" + juce::String (livescale::shown ? 1 : 0); // (round 190oo, O-5)
+           + "\nliveScaleControl=" + juce::String (livescale::shown ? 1 : 0) // (round 190oo, O-5)
+           + "\ntrackStates=" + juce::String (trackstates::patternMenus() ? 1 : 0); // (round 190op, P4)
 }
 
 std::optional<bool> extraOn (std::string_view id)
@@ -160,6 +164,8 @@ std::optional<bool> extraOn (std::string_view id)
         return cliplanes::foldedOnOpen;
     if (id == "controlBar.liveScale") // round 190oo (O-5)
         return livescale::shown;
+    if (id == "playlist.trackStates") // round 190op (P4)
+        return trackstates::patternMenus();
     return std::nullopt;
 }
 
@@ -197,6 +203,8 @@ bool setExtra (std::string_view id, bool on)
         cliplanes::foldedOnOpen = on;
     else if (id == "controlBar.liveScale") // round 190oo (O-5)
         livescale::shown = on;
+    else if (id == "playlist.trackStates") // round 190op (P4)
+        trackstates::patternMenus() = on;
     else
         return false;
     if (onChanged)
