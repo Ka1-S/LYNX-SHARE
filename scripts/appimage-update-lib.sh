@@ -2,6 +2,8 @@
 # The live site holds the address's target (update/.htaccess, a 302 to a release's .zsync), not this repository, so a site
 # deploy from an old checkout cannot move or remove it.
 UPDATE_ADDRESS="${LYNX_UPDATE_ADDRESS:-https://lynx-share.com/update/LYNX-x86_64.AppImage.zsync}"
+# the arm64 AppImage's address (round 190oy, from 0.1.31): the same file holds both redirects
+UPDATE_ADDRESS_AARCH64="${LYNX_UPDATE_ADDRESS_AARCH64:-https://lynx-share.com/update/LYNX-aarch64.AppImage.zsync}"
 UPDATE_REPO="${LYNX_UPDATE_REPO:-Ka1-S/LYNX-SHARE}"
 # the first release whose AppImage reads the address
 UPDATE_FIRST_VERSION="v0.1.25"
@@ -24,12 +26,13 @@ update_target()
 # The tag in a target URL.
 update_target_tag() { sed -n 's#.*/releases/download/\([^/]*\)/.*#\1#p' <<<"$1"; }
 
-# update/.htaccess for a target URL, on stdout.
+# update/.htaccess for a target URL, on stdout: update_htaccess <x86_64 .zsync URL> [<aarch64 .zsync URL>]
 update_htaccess()
 {
     printf '%s\n' "# Written by scripts/publish-appimage-update.sh. The AppImage's fixed update address: the newest published release." \
-                  "Redirect 302 /update/LYNX-x86_64.AppImage.zsync $1" \
-                  '<IfModule mod_headers.c>' 'Header always set Cache-Control "no-store"' '</IfModule>'
+                  "Redirect 302 /update/LYNX-x86_64.AppImage.zsync $1"
+    [[ -z "${2:-}" ]] || printf '%s\n' "Redirect 302 /update/LYNX-aarch64.AppImage.zsync $2"
+    printf '%s\n' '<IfModule mod_headers.c>' 'Header always set Cache-Control "no-store"' '</IfModule>'
 }
 
 # Uploads one file to a path of the site, nothing else: site_upload <local file> <path on the site>

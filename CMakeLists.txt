@@ -14,6 +14,12 @@ if(NOT MSVC)
     add_compile_options(-ffp-contract=off)
 endif()
 
+# Linux on ARM makes a plain `char` unsigned (x86 and Apple arm64: signed). The readers of FL's, Live's and the other
+# formats were written and tested with a signed char: Linux arm64 builds keep it (round 190oy)
+if(NOT MSVC AND NOT APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+    add_compile_options(-fsigned-char)
+endif()
+
 # FL Slayer's exact engine (x87 arithmetic under its own control word): with GCC 15 at -O1 and above, inlining in this
 # file breaks it (some presets silent or NaN against the DLL goldens; Clang and GCC -O0 / -fno-inline are exact; root
 # cause not isolated, REA round 117). Linux GCC builds compile it without inlining (Slayer about 1.7x slower there).

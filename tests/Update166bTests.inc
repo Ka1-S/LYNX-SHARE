@@ -133,7 +133,8 @@ TEST (update166b_asset_choice_per_flavour)
     if (releases.size() != 4)
         return;
     const auto& assets = releases[1].assets;
-    auto name = [&] (Flavour f) { const auto i = assetFor (f, assets); return i < 0 ? std::string ("-") : assets[(std::size_t) i].name; };
+    // (the x86_64 Linux packages, whatever this build's architecture: round 190oy added the arm64 ones)
+    auto name = [&] (Flavour f) { const auto i = assetFor (f, assets, "x86_64"); return i < 0 ? std::string ("-") : assets[(std::size_t) i].name; };
     CHECK (name (Flavour::windowsInstaller) == "LYNX-0.1.22-alpha-setup-x64.exe");
     CHECK (name (Flavour::windowsPortable) == "LYNX-0.1.22-alpha-windows-x64.zip");
     CHECK (name (Flavour::macos) == "LYNX-0.1.22-alpha-macos-universal.dmg");
@@ -142,6 +143,32 @@ TEST (update166b_asset_choice_per_flavour)
     CHECK (name (Flavour::store) == "-");
     CHECK (checksumsAsset (assets) == 8);
     CHECK (assetFor (Flavour::windowsInstaller, releases[2].assets) == -1 && checksumsAsset (releases[2].assets) == -1);
+}
+
+TEST (arm64_190oy_linux_packages_per_architecture)
+{
+    // Linux arm64 (round 190oy): an arm64 build updates from LYNX-<v>-aarch64.AppImage / -linux-aarch64.tar.gz and never
+    // takes the x86_64 packages (nor an x86_64 build the arm64 ones); a release without arm64 packages offers it nothing
+    using namespace lynx::update;
+    std::vector<Asset> assets;
+    for (const char* n : { "LYNX-0.1.31-alpha-x86_64.AppImage", "LYNX-0.1.31-alpha-x86_64.AppImage.zsync",
+                           "LYNX-0.1.31-alpha-linux-x86_64.tar.gz", "LYNX-0.1.31-alpha-aarch64.AppImage",
+                           "LYNX-0.1.31-alpha-aarch64.AppImage.zsync", "LYNX-0.1.31-alpha-linux-aarch64.tar.gz",
+                           "LYNX-Plugins-0.1.31-alpha-linux-aarch64.tar.xz", "SHA256SUMS.txt" })
+        assets.push_back ({ n, std::string ("https://example.invalid/") + n, 1 });
+    auto name = [&] (Flavour f, const char* arch) { const auto i = assetFor (f, assets, arch); return i < 0 ? std::string ("-") : assets[(std::size_t) i].name; };
+    CHECK (name (Flavour::linuxAppImage, "aarch64") == "LYNX-0.1.31-alpha-aarch64.AppImage");
+    CHECK (name (Flavour::linuxTarball, "aarch64") == "LYNX-0.1.31-alpha-linux-aarch64.tar.gz");
+    CHECK (name (Flavour::linuxAppImage, "x86_64") == "LYNX-0.1.31-alpha-x86_64.AppImage");
+    CHECK (name (Flavour::linuxTarball, "x86_64") == "LYNX-0.1.31-alpha-linux-x86_64.tar.gz");
+    const std::vector<Asset> x86Only (assets.begin(), assets.begin() + 3);
+    CHECK (assetFor (Flavour::linuxAppImage, x86Only, "aarch64") == -1 && assetFor (Flavour::linuxTarball, x86Only, "aarch64") == -1);
+#if defined(__aarch64__)
+    CHECK (std::string (buildLinuxArch()) == "aarch64");
+#else
+    CHECK (std::string (buildLinuxArch()) == "x86_64");
+#endif
+    CHECK (assetFor (Flavour::linuxAppImage, assets) == assetFor (Flavour::linuxAppImage, assets, buildLinuxArch()));
 }
 
 TEST (update166b_checksum_verification)

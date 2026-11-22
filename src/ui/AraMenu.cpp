@@ -30,6 +30,8 @@ juce::File binaryOf (const juce::File& file)
     const auto arch = juce::String ("x86_64-win");
    #elif JUCE_MAC
     const auto arch = juce::String ("MacOS");
+   #elif defined(__aarch64__)
+    const auto arch = juce::String ("aarch64-linux");
    #else
     const auto arch = juce::String ("x86_64-linux");
    #endif

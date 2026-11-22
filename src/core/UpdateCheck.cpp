@@ -551,16 +551,17 @@ Method methodFor (Flavour f)
     return Method::none;
 }
 
-int assetFor (Flavour f, const std::vector<Asset>& assets)
+int assetFor (Flavour f, const std::vector<Asset>& assets, const char* linuxArch)
 {
-    const char* suffix = nullptr;
+    const std::string arch = linuxArch != nullptr ? linuxArch : "x86_64";
+    std::string suffix;
     switch (f)
     {
         case Flavour::windowsInstaller: suffix = "-setup-x64.exe"; break;
         case Flavour::windowsPortable: suffix = "-windows-x64.zip"; break;
         case Flavour::macos: suffix = ".dmg"; break;
-        case Flavour::linuxAppImage: suffix = "-x86_64.AppImage"; break;
-        case Flavour::linuxTarball: suffix = "-linux-x86_64.tar.gz"; break;
+        case Flavour::linuxAppImage: suffix = "-" + arch + ".AppImage"; break;
+        case Flavour::linuxTarball: suffix = "-linux-" + arch + ".tar.gz"; break;
         case Flavour::store:
         case Flavour::unknown: return -1;
     }
