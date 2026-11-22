@@ -5410,16 +5410,6 @@ public:
     }
 
 private:
-    // The window's size comes only from the tab now showing — not the largest tab, as it used to (issue: switching
-    // to a smaller tab never shrank the window). showTab() and childBoundsChanged() both resize through this.
-    juce::Point<int> desiredSize() const
-    {
-        if (current < 0 || current >= 0 (int) sizes.size())
-            return { 1, headerHeight + 1}
-        const auto& size = sizes[(std::size_t) current];
-        return { juce::jmax (1, size.x), headerHeight + juce::jmax (1, size.y) };
-    }
-
     AudioEngine& engine;
     std::function<ui::ValueSpec()> specOf;
     std::function<double()> getter;
@@ -6820,7 +6810,7 @@ public:
             tabs[(std::size_t) i]->setToggleState (i == index, juce::dontSendNotification);
         }
         const auto size = desiredSize();
-        if (size.x != getWidth || size.y != getHeight())
+        if (size.x != getWidth() || size.y != getHeight())
             setSize (size.x, size.y);
         else
             resized();
@@ -6930,6 +6920,16 @@ public:
     }
 
 private:
+    // The window's size comes only from the tab now showing — not the largest tab, as it used to (issue: switching
+    // to a smaller tab never shrank the window). showTab() and childBoundsChanged() both resize through this.
+    juce::Point<int> desiredSize() const
+    {
+        if (current < 0 || current >= (int) sizes.size())
+            return { 1, headerHeight + 1 };
+        const auto& size = sizes[(std::size_t) current];
+        return { juce::jmax (1, size.x), headerHeight + juce::jmax (1, size.y) };
+    }
+
     AudioEngine& engine;
     int channel;
     bool node = false;
