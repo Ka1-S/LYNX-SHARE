@@ -296,6 +296,11 @@ Round 190pk's Linux package (1 CLAP with 36 plugins, 8 VST3, 8 LV2) is 26.3 MB f
 (GCC 15): the 256 MiB window holds
 only about five of its 48 MB binaries, so the LV2 bundles, packed after the VST3s, add their own share.
 
+Round 190pq (1 CLAP with 39 plugins, 11 VST3, 11 LV2; CI run 45058238805): the Linux archive is 27.1 MB (CI's
+artifact, xz inside), 31.7 MB locally; the Windows zip is 195.4 MB (8 VST3: 140.8 MB in round 190ov): each Windows
+VST3 is compressed on its own, so each of the three synths adds about 18 MB there; macOS universal 39.0 MB (34.6 MB).
+The Windows build at JOBS=2 took 1 h 10 min (45 min with 8 VST3), macOS universal 2 h 22 min.
+
 Per instance, measured in plugexporttest:
 
 - memory: 1.2 to 2.2 MB more per extra instance;
@@ -341,6 +346,10 @@ controls stay hidden in the plugins for now.
   (lilv 0.26.2) instantiates, runs 1,024 blocks and frees each. The same run passes every CLAP and VST3 check
   (`plugexporttest`, pluginval strictness 10, clap-validator). Not tried in Ardour, Carla, Qtractor or Zrythm yet, and
   the editor only inside JUCE's host (jalv's command-line host shows no X11 editor).
+- Round 190pq: CI run 45058238805 (Plugins workflow): Linux 46 / 46 checks pass (plugexporttest on the CLAP, 11 VST3 and
+  11 LV2; pluginval strictness 10 on 11 VST3; clap-validator; lv2lint on 11 LV2), Windows and macOS universal 24 / 24
+  each (plugexporttest on the CLAP and 11 VST3, pluginval on 11 VST3, clap-validator). The same 46 pass locally. New in plugexporttest: a state saved again after a load is the
+  same bytes with every parameter moved, on every plugin and format.
 - FL Studio 2026 (Windows), round 180b: Facet EQ and FM10, as CLAP (through `CLAP_PATH`) and as VST3 (from
   `Common Files\VST3`): load, play, both editors, a saved project reopens with its state, FL exits in about 1.4 s.
 - FL Studio 2026 (Windows), round 188b, the release download from CI: ADD > Refresh plugin list (fast scan) lists all 27
