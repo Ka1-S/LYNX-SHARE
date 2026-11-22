@@ -1904,6 +1904,62 @@ void toRelease0130 (juce::var& root, Losses& lost)
         if (macroClips > 0)
             lost.push_back ({ TR_NOOP ("{0} automation clip(s) of a Macro modulator's knob stay as unlinked clips"), juce::String (macroClips), true });
     }
+
+    // rollup 0.1.31 step 6 (round 190oq, issue #243): an ARA plugin on a mixer insert. 0.1.30 hosts ARA on an audio clip
+    // channel only and does not read the slot's "ara": the plugin there is an ordinary insert effect and the routed clips
+    // play without its edits. The key goes with a line (the 0.1.28 step then finds nothing left to drop)
+    {
+        juce::StringArray inserts;
+        forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
+            if (drop (e, "ara"))
+                addOnce (inserts, where);
+        });
+        if (! inserts.isEmpty())
+            lost.push_back ({ TR_NOOP ("ARA plugins on mixer inserts play as ordinary insert effects in this release (the audio clips routed there play without their edits): {0}"),
+                              listOf (inserts), true });
+    }
+
+    // rollup 0.1.31 step 6 (round 190om, decisions 4 and 5): what 0.1.30 plays differently although nothing is dropped.
+    // (a) A control that event lanes of several patterns drive: 0.1.30 binds it to the last pattern's lane only (the other
+    // patterns' events do nothing there); this release plays the lane of the pattern whose clip started last, as FL.
+    // (b) Notes' own curves (MPE, a module's slides) in Playlist clips: 0.1.30 sends them in Pattern mode only, so in Song
+    // mode those notes play their key. Lines only; the copy keeps every event and curve.
+    {
+        std::map<juce::String, juce::StringArray> lanePatterns; // a lane's target (as JSON) -> the patterns with a lane on it
+        juce::StringArray curvedInClips;
+        std::set<int> placed;
+        if (auto* clips = arrayOf (root["playlist"]))
+            for (const auto& c : *clips)
+                if (c.isArray() && c.size() >= 6 && (int) c[5] == 0)
+                    placed.insert ((int) c[0]);
+        if (auto* patterns = arrayOf (root["patterns"]))
+            for (int pi = 0; pi < patterns->size(); ++pi)
+            {
+                const auto& p = (*patterns)[pi];
+                const auto name = p["name"].toString().isNotEmpty() ? p["name"].toString() : "Pattern " + juce::String (pi + 1);
+                if (auto* lanes = arrayOf (p["events"]))
+                    for (const auto& l : *lanes)
+                        if (auto* events = arrayOf (l["events"]); events != nullptr && ! events->isEmpty())
+                            addOnce (lanePatterns[juce::JSON::toString (l["target"], true)], name);
+                if (placed.count (pi) != 0)
+                    if (auto* notes = arrayOf (p["notes"]))
+                        if (std::any_of (notes->begin(), notes->end(), [] (const juce::var& n) {
+                                return n.isArray() && n.size() > 19 && ! n[19].isVoid() && ! n[19].isUndefined();
+                            }))
+                            addOnce (curvedInClips, name);
+            }
+        juce::StringArray shared;
+        for (const auto& [target, names] : lanePatterns)
+            if (names.size() > 1)
+                for (const auto& n : names)
+                    addOnce (shared, n);
+        if (! shared.isEmpty())
+            lost.push_back ({ TR_NOOP ("Controls that several patterns' event lanes drive follow only the last pattern's lane in this release: {0}"),
+                              listOf (shared), true });
+        if (! curvedInClips.isEmpty())
+            lost.push_back ({ TR_NOOP ("In Song mode these patterns' notes play without their own pitch / timbre / pressure curves in this release: {0}"),
+                              listOf (curvedInClips), true });
+    }
 }
 
 struct Step

@@ -12503,3 +12503,6 @@ countries: nl be
 "The last note's key on {0} (C5 = centre)" = "De toets van de laatste noot op {0} (C5 = midden)"
 "The last note's velocity on {0}" = "De velocity van de laatste noot op {0}"
 "Modulators move knobs around their own value (an automation clip on the same knob still sets that value)." = "Modulators bewegen knoppen rond hun eigen waarde (een automatiseringsclip op dezelfde knop zet die waarde nog steeds)."
+"Controls that several patterns' event lanes drive follow only the last pattern's lane in this release: {0}" = "Regelaars die door de eventbanen van meerdere patterns worden bewogen, volgen in deze versie alleen de baan van het laatste pattern: {0}"
+"In Song mode these patterns' notes play without their own pitch / timbre / pressure curves in this release: {0}" = "In de Song-modus spelen de noten van deze patterns in deze versie zonder hun eigen toonhoogte- / klankkleur- / drukcurves: {0}"
+"ARA plugins on mixer inserts play as ordinary insert effects in this release (the audio clips routed there play without their edits): {0}" = "ARA-plugins op mixer-inserts spelen in deze versie als gewone insert-effecten (de audioclips die erheen gerouteerd zijn spelen zonder hun bewerkingen): {0}"

@@ -12503,3 +12503,6 @@ countries: jp
 "The last note's key on {0} (C5 = centre)" = "{0}の最後のノートのキー（C5 = 中央）"
 "The last note's velocity on {0}" = "{0}の最後のノートのベロシティ"
 "Modulators move knobs around their own value (an automation clip on the same knob still sets that value)." = "モジュレーターはノブを自身の値を中心に動かします（同じノブのオートメーションクリップは引き続きその値を設定します）。"
+"Controls that several patterns' event lanes drive follow only the last pattern's lane in this release: {0}" = "複数のパターンのイベントレーンが動かすコントロールは、このリリースでは最後のパターンのレーンだけに従います: {0}"
+"In Song mode these patterns' notes play without their own pitch / timbre / pressure curves in this release: {0}" = "Song モードでは、これらのパターンのノートはこのリリースでノート自身のピッチ / 音色 / プレッシャーのカーブなしで鳴ります: {0}"
+"ARA plugins on mixer inserts play as ordinary insert effects in this release (the audio clips routed there play without their edits): {0}" = "ミキサーのインサートの ARA プラグインは、このリリースでは通常のインサートエフェクトとして動作します(そこにルーティングされたオーディオクリップは編集なしで鳴ります): {0}"

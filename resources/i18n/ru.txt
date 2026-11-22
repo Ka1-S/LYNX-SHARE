@@ -12503,3 +12503,6 @@ countries: ru by kz
 "The last note's key on {0} (C5 = centre)" = "Клавиша последней ноты на {0} (C5 = центр)"
 "The last note's velocity on {0}" = "Velocity последней ноты на {0}"
 "Modulators move knobs around their own value (an automation clip on the same knob still sets that value)." = "Модуляторы двигают ручки вокруг их собственного значения (клип автоматизации на той же ручке по-прежнему задаёт это значение)."
+"Controls that several patterns' event lanes drive follow only the last pattern's lane in this release: {0}" = "Регуляторы, которые двигают дорожки событий нескольких паттернов, в этой версии следуют только дорожке последнего паттерна: {0}"
+"In Song mode these patterns' notes play without their own pitch / timbre / pressure curves in this release: {0}" = "В режиме Song ноты этих паттернов в этой версии звучат без собственных кривых высоты / тембра / нажима: {0}"
+"ARA plugins on mixer inserts play as ordinary insert effects in this release (the audio clips routed there play without their edits): {0}" = "ARA-плагины на инсертах микшера в этой версии работают как обычные инсертные эффекты (направленные туда аудиоклипы звучат без своих правок): {0}"

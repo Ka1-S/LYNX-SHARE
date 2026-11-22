@@ -12503,3 +12503,6 @@ countries: id
 "The last note's key on {0} (C5 = centre)" = "Tuts not terakhir di {0} (C5 = tengah)"
 "The last note's velocity on {0}" = "Velocity not terakhir di {0}"
 "Modulators move knobs around their own value (an automation clip on the same knob still sets that value)." = "Modulator menggerakkan kenop di sekitar nilainya sendiri (klip otomasi pada kenop yang sama tetap mengatur nilai itu)."
+"Controls that several patterns' event lanes drive follow only the last pattern's lane in this release: {0}" = "Kontrol yang digerakkan oleh lajur event beberapa pattern hanya mengikuti lajur pattern terakhir di rilis ini: {0}"
+"In Song mode these patterns' notes play without their own pitch / timbre / pressure curves in this release: {0}" = "Di mode Song, not pattern ini diputar tanpa kurva pitch / timbre / tekanannya sendiri di rilis ini: {0}"
+"ARA plugins on mixer inserts play as ordinary insert effects in this release (the audio clips routed there play without their edits): {0}" = "Plugin ARA pada insert mixer diputar sebagai efek insert biasa di rilis ini (klip audio yang diarahkan ke sana diputar tanpa editannya): {0}"

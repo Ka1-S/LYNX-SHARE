@@ -12503,3 +12503,6 @@ countries: tr
 "The last note's key on {0} (C5 = centre)" = "{0} üzerindeki son notanın tuşu (C5 = orta)"
 "The last note's velocity on {0}" = "{0} üzerindeki son notanın velocity değeri"
 "Modulators move knobs around their own value (an automation clip on the same knob still sets that value)." = "Modülatörler düğmeleri kendi değerleri etrafında hareket ettirir (aynı düğmedeki bir otomasyon klibi bu değeri yine belirler)."
+"Controls that several patterns' event lanes drive follow only the last pattern's lane in this release: {0}" = "Birden çok pattern'in olay şeritlerinin oynattığı kontroller bu sürümde yalnızca son pattern'in şeridini izler: {0}"
+"In Song mode these patterns' notes play without their own pitch / timbre / pressure curves in this release: {0}" = "Song modunda bu pattern'lerin notaları bu sürümde kendi perde / tını / basınç eğrileri olmadan çalar: {0}"
+"ARA plugins on mixer inserts play as ordinary insert effects in this release (the audio clips routed there play without their edits): {0}" = "Mikser insert'lerindeki ARA eklentileri bu sürümde sıradan insert efektleri gibi çalar (oraya yönlendirilen ses klipleri düzenlemeleri olmadan çalar): {0}"

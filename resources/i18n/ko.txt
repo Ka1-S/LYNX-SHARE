@@ -12503,3 +12503,6 @@ countries: kr
 "The last note's key on {0} (C5 = centre)" = "{0}의 마지막 노트 키 (C5 = 중앙)"
 "The last note's velocity on {0}" = "{0}의 마지막 노트 벨로시티"
 "Modulators move knobs around their own value (an automation clip on the same knob still sets that value)." = "모듈레이터는 노브를 자체 값을 중심으로 움직입니다 (같은 노브의 오토메이션 클립은 여전히 그 값을 설정합니다)."
+"Controls that several patterns' event lanes drive follow only the last pattern's lane in this release: {0}" = "여러 패턴의 이벤트 레인이 움직이는 컨트롤은 이 릴리스에서 마지막 패턴의 레인만 따릅니다: {0}"
+"In Song mode these patterns' notes play without their own pitch / timbre / pressure curves in this release: {0}" = "Song 모드에서 이 패턴들의 노트는 이 릴리스에서 노트 자체의 피치 / 음색 / 압력 곡선 없이 연주됩니다: {0}"
+"ARA plugins on mixer inserts play as ordinary insert effects in this release (the audio clips routed there play without their edits): {0}" = "믹서 인서트의 ARA 플러그인은 이 릴리스에서 일반 인서트 이펙트로 동작합니다(그곳으로 라우팅된 오디오 클립은 편집 없이 재생됩니다): {0}"

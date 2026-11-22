@@ -12503,3 +12503,6 @@ countries: de at ch li lu
 "The last note's key on {0} (C5 = centre)" = "Die Taste der letzten Note auf {0} (C5 = Mitte)"
 "The last note's velocity on {0}" = "Die Velocity der letzten Note auf {0}"
 "Modulators move knobs around their own value (an automation clip on the same knob still sets that value)." = "Modulatoren bewegen Regler um ihren eigenen Wert (ein Automationsclip auf demselben Regler setzt diesen Wert weiterhin)."
+"Controls that several patterns' event lanes drive follow only the last pattern's lane in this release: {0}" = "Regler, die von den Event-Spuren mehrerer Patterns bewegt werden, folgen in dieser Version nur der Spur des letzten Patterns: {0}"
+"In Song mode these patterns' notes play without their own pitch / timbre / pressure curves in this release: {0}" = "Im Song-Modus spielen die Noten dieser Patterns in dieser Version ohne ihre eigenen Tonhöhen- / Klangfarben- / Druckkurven: {0}"
+"ARA plugins on mixer inserts play as ordinary insert effects in this release (the audio clips routed there play without their edits): {0}" = "ARA-Plugins auf Mixer-Inserts spielen in dieser Version als gewöhnliche Insert-Effekte (die dorthin gerouteten Audioclips spielen ohne ihre Bearbeitungen): {0}"

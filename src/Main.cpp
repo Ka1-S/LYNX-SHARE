@@ -8646,6 +8646,177 @@ private:
             }
         }
 
+        // rollup 0.1.31 step 6: "Save a copy for 0.1.30 / 0.1.28" over every round of the step. One project with: 190om's SimSynth
+        // (engine revision 2, the velocity law), two patterns' event lanes on one control and a note with a pitch curve in a
+        // Playlist clip (decisions 4 / 5: lines only); 190op's hidden track and deactivated insert; 190oq's ARA plugin on an
+        // insert (#243); 190ot's "Duck under..."; 190ov's clip linked to two controls with a scale; 190ow's step on an
+        // automation row, a re-ranged clip and a muted clip; 190ox's Steps modulator. Each line once in each copy, none of the
+        // new keys left in the 0.1.30 copy, both copies read back; the default song gets none of these lines
+        juce::String rollup031s6Result = "OK";
+        {
+            namespace st = lynx::simpletracks;
+            auto song = lynx::Song::makeDefault();
+            st::Request q;
+            q.kind = st::Kind::audio;
+            q.name = "Kick";
+            const auto kick = st::addTrack (song, q).insert;
+            q.name = "Pad";
+            const auto pad = st::addTrack (song, q).insert;
+            const auto duckSet = st::setDuck (song, pad, kick, 0.6f) == st::DuckResult::set;
+            lynx::ChannelDef sim;
+            sim.name = "Sim Lead";
+            sim.instrument = lynx::InstrumentKind::simsynth; // (engineRev 2: a new channel)
+            song.channels.push_back (sim);
+            const auto simIndex = (int) song.channels.size() - 1;
+            while (song.patterns.size() < 2)
+                song.patterns.push_back (song.patterns.front());
+            song.patterns[0].name = "Lanes A";
+            song.patterns[1].name = "Lanes B";
+            lynx::AutomationTarget simVolume;
+            simVolume.kind = lynx::AutomationTargetKind::channelVolume;
+            simVolume.index = simIndex;
+            for (int p = 0; p < 2; ++p)
+            {
+                lynx::PatternEvents lane;
+                lane.target = simVolume;
+                lane.events = { { 0, 0.3f + 0.2f * (float) p } };
+                song.patterns[(std::size_t) p].events.push_back (lane);
+                lynx::Clip clip;
+                clip.pattern = p;
+                clip.track = 0;
+                clip.start = (std::int64_t) p * 4 * lynx::ppq;
+                clip.length = 4 * lynx::ppq;
+                song.playlist.push_back (clip);
+            }
+            {
+                lynx::Note bent;
+                bent.channel = simIndex;
+                bent.length = lynx::ppq;
+                lynx::NoteCurves curves;
+                curves.lane (lynx::NoteCurveLane::pitch) = { { 0.0f, 0.0f }, { (float) lynx::ppq, 200.0f } };
+                bent.curves = curves;
+                song.patterns[0].notes.push_back (bent);
+            }
+            if (song.playlistTracks.size() < 4)
+                song.playlistTracks.resize (4);
+            song.playlistTracks[3].hidden = true;
+            song.mixer[(std::size_t) kick].deactivated = true;
+            lynx::EffectSlot ara;
+            ara.kind = lynx::EffectKind::plugin;
+            ara.plugin.id = "VST3:ara-editor";
+            ara.plugin.name = "ARA Editor";
+            ara.ara = true;
+            song.mixer[(std::size_t) pad].effects.push_back (ara);
+            // 190ov: a clip linked to two controls, the first with a scale; 190ow: a step on its row, a re-ranged clip, a muted one
+            lynx::Automation linked;
+            linked.name = "Linked";
+            linked.target = simVolume;
+            lynx::Automation::Link first, second;
+            first.target = simVolume;
+            first.scale = { 0.0f, 0.4f, 1.0f };
+            second.target.kind = lynx::AutomationTargetKind::channelPan;
+            second.target.index = simIndex;
+            linked.links = { first, second };
+            linked.points = { { 0, 0.2f }, { lynx::ppq, 0.8f } };
+            song.automations.push_back (linked);
+            const auto linkedIndex = (int) song.automations.size() - 1;
+            lynx::Clip autoClip;
+            autoClip.kind = lynx::ClipKind::automation;
+            autoClip.automation = linkedIndex;
+            autoClip.track = 2;
+            autoClip.length = 4 * lynx::ppq;
+            song.playlist.push_back (autoClip);
+            lynx::Automation ranged = linked;
+            ranged.name = "Ranged";
+            ranged.links.clear();
+            ranged.target.kind = lynx::AutomationTargetKind::mixerVolume;
+            ranged.target.index = pad;
+            ranged.rangeMin = 0.25f;
+            ranged.rangeMax = 0.75f;
+            song.automations.push_back (ranged);
+            lynx::Automation muted = ranged;
+            muted.name = "Muted";
+            muted.rangeMin = 0.0f;
+            muted.rangeMax = 1.0f;
+            muted.target.kind = lynx::AutomationTargetKind::mixerPan;
+            muted.muted = true;
+            song.automations.push_back (muted);
+            lynx::Note step;
+            step.channel = (int) song.automations.size() - 2; // ("Ranged": a step on its rack row)
+            step.length = 0;
+            song.patterns[1].autoNotes.push_back (step);
+            auto steps = lynx::Modulator::make (lynx::ModKind::steps);
+            steps.name = "Steps 1";
+            lynx::ModRoute route;
+            route.target.kind = lynx::AutomationTargetKind::mixerPan;
+            route.target.index = pad;
+            steps.routes.push_back (route);
+            song.modulators.push_back (steps);
+            lynx::uids::normalize (song);
+
+            const auto countOf = [] (const lynx::olderlynx::Copy& c, const char* start) {
+                return (int) std::count_if (c.lost.begin(), c.lost.end(), [start] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).startsWith (start); });
+            };
+            const char* const lines[] = { "SimSynth plays every note at full level", "Controls that several patterns' event lanes drive",
+                                          "In Song mode these patterns' notes play without", "{0} hidden Playlist track(s) show again",
+                                          "Deactivated channels and inserts load their plugins again", "ARA plugins on mixer inserts play as ordinary",
+                                          "{0} \"Duck under...\" effect(s)", "Automation clips linked to several controls move them 1:1",
+                                          "{0} step(s) or note(s) on automation clip rows start no clip", "An automation clip's LFO keeps",
+                                          "Muted automation clips lose their target", "These modulators are not in this release" };
+            if (! duckSet || kick <= 0 || pad <= 0 || song.channels[(std::size_t) simIndex].engineRev != 2)
+                rollup031s6Result = "ERROR set-up";
+            for (const auto* release : { "0.1.30", "0.1.28" })
+            {
+                if (rollup031s6Result != "OK")
+                    break;
+                const auto is130 = juce::String (release) == "0.1.30";
+                const auto copy = lynx::olderlynx::forRelease (song, release);
+                juce::String why;
+                const auto back = copy.ok ? lynx::ProjectFile::fromJson (copy.json, why) : std::optional<lynx::Song> {};
+                if (! copy.ok || ! back)
+                {
+                    rollup031s6Result = juce::String ("ERROR copy ") + release + " " + copy.error + why;
+                    break;
+                }
+                for (const auto* line : lines)
+                {
+                    // (no LFO on the re-ranged clip: that line must not show)
+                    const auto want = juce::String (line).startsWith ("An automation clip's LFO") ? 0 : 1;
+                    if (countOf (copy, line) != want)
+                    {
+                        rollup031s6Result = juce::String ("ERROR the copy for ") + release + ": \"" + line + "\" " + juce::String (countOf (copy, line)) + " times";
+                        break;
+                    }
+                }
+                if (rollup031s6Result != "OK")
+                    break;
+                const auto json = copy.json;
+                if (json.contains ("playlistTracksHidden") || json.contains ("\"deactivated\"") || json.contains ("\"ara\": true") || json.contains ("autoNotes")
+                    || json.contains ("modulators190ox"))
+                    rollup031s6Result = juce::String ("ERROR a new key is left in the copy for ") + release;
+                else if (is130 && back->channels[(std::size_t) simIndex].engineRev != 1)
+                    rollup031s6Result = "ERROR SimSynth's revision in the copy for 0.1.30 (" + juce::String (back->channels[(std::size_t) simIndex].engineRev) + ")";
+                else if (! back->mixer[(std::size_t) kick].muted || back->mixer[(std::size_t) kick].deactivated || (back->playlistTracks.size() > 3 && back->playlistTracks[3].hidden))
+                    rollup031s6Result = juce::String ("ERROR 190op's units in the copy for ") + release;
+                else if (is130 && (back->patterns.size() < 2 || back->patterns[0].events != song.patterns[0].events || back->patterns[1].events != song.patterns[1].events
+                                   || back->patterns[0].notes.empty() || ! back->patterns[0].notes.back().curves.has()))
+                    rollup031s6Result = "ERROR the copy for 0.1.30 lost 190om's lanes or curves (lines only)";
+                else if (back->automations.size() < 3 || (is130 && back->automations[(std::size_t) linkedIndex].links.size() != 2)
+                         || (! back->automations[(std::size_t) linkedIndex].links.empty() && ! back->automations[(std::size_t) linkedIndex].links[0].scale.empty()) || back->automations.back().target.kind != lynx::AutomationTargetKind::none
+                         || back->automations[back->automations.size() - 2].reranged())
+                    rollup031s6Result = juce::String ("ERROR 190ov / 190ow's clips in the copy for ") + release;
+                else if (is130 && (back->modulators.size() != song.modulators.size() - 1))
+                    rollup031s6Result = "ERROR 190ox's Steps modulator in the copy for 0.1.30 (" + juce::String ((int) back->modulators.size()) + ")";
+            }
+            // the default song: none of these lines
+            if (rollup031s6Result == "OK")
+            {
+                const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.30");
+                if (! plain.ok || ! plain.lost.empty())
+                    rollup031s6Result = "ERROR lines for a project with none of step 6's data (" + juce::String ((int) plain.lost.size()) + ")";
+            }
+        }
+
         // round 190ot (research190oe P5): the Simple layout's "Duck under..." and shared Echo send in .lynx (the duck's goal,
         // Amount, side input and level-0 route; the Echo send) and in the copies for 0.1.30 / 0.1.28: the same slot, side input,
         // route and sends (an ordinary Fruity Limiter there), one view line, none for a project without a duck
@@ -9573,7 +9744,7 @@ private:
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
                         && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && autolinks190ovResult == "OK"
-                        && trackstates190opResult == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
+                        && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && renderAgainResult.startsWith ("OK")
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK") && modulators190oxResult == "OK"
@@ -9672,6 +9843,7 @@ private:
                << "helix4_khs190oc_copy_for_0130=" << helix4khs190ocResult << "\n"
                << "rollup031s4_copy_for_0130=" << rollup031s4Result << "\n"
                << "rollup031s5_copy_for_0130=" << rollup031s5Result << "\n"
+               << "rollup031s6_copy_for_0130=" << rollup031s6Result << "\n"
                << "simpleduck190ot=" << simpleDuck190otResult << "\n"
                << "autolinks190ov=" << autolinks190ovResult << "\n"
                << "sections190ol=" << sections190olResult << "\n"
