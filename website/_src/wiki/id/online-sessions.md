@@ -1,5 +1,5 @@
 ---
-source: 7db9a73959
+source: bf45e1d436
 ---
 Ada dua cara mengerjakan proyek bersama orang lain, dan keduanya ada di `File › Sesi online`. Paket adalah file yang kamu kirim ke teman, yang lalu mengirim sebuah bagian kembali. Tidak butuh jaringan, akun, atau server. Sesi live menghubungkan semua orang lewat internet melalui relay LYNX SHARE, dan setiap perubahan sampai ke semua orang. Hingga 4 orang ikut dalam satu proyek, termasuk kamu.
 
@@ -69,7 +69,7 @@ Menu `File › Sesi online` punya perintah berikut selama sesi berjalan:
 | `Akhiri sesi live` | Untuk host. Semua orang keluar, dan kodenya berhenti berlaku |
 | `Keluar dari sesi live` | Untuk tamu. Bagianmu dari proyek tetap bersamamu |
 
-Di `Orang dan izin...`, setiap orang mendapat salah satu dari empat peran: `Channel, pattern, insert, dan barisnya sendiri`, `Bagiannya sendiri + tempo dan pengaturan proyek`, `Semuanya`, atau `Hanya mendengarkan (tanpa suntingan)`. Mematikan sebuah izin tidak pernah menghapus apa pun.
+Di `Orang dan izin...`, setiap orang mendapat salah satu dari empat peran: `Channel, pattern, insert, dan barisnya sendiri`, `Bagiannya sendiri + tempo dan pengaturan proyek`, `Semuanya`, atau `Hanya mendengarkan (tanpa suntingan)`. Mematikan sebuah izin tidak pernah menghapus apa pun. Pilihan kelima, `Keluarkan dari sesi`, mengeluarkan orang itu dari sesi. Secara bawaan sesi lalu mendapat kode undangan baru untuk yang bergabung berikutnya, dan orang yang masih di dalamnya terus berjalan; `Pertahankan kode yang sama` mempertahankan kode lama.
 
 ## Plugin yang tidak dimiliki orang lain
 

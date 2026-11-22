@@ -1,5 +1,5 @@
 ---
-source: d980e5fc0f
+source: b05790879f
 ---
 ![A janela de exportação com WAV selecionado: intervalo, cauda e arquivos à esquerda, formato à direita, opções de mixagem embaixo](/assets/img/wiki/export.webp)
 
@@ -67,6 +67,8 @@ Os botões escolhem o formato. O M4A só aparece onde o sistema tem um codificad
 
 Marque `Também a mixagem completa` para ter a mixagem ao lado dos stems. A linha de baixo mostra quantos arquivos serão gravados.
 
+Quando a música tem seções na faixa Sections, `Um arquivo por seção` a corta nas seções e dá a cada arquivo o nome da sua seção. Com stems, cada seção recebe o seu próprio conjunto.
+
 `Arquivo › Exportar › Todas as trilhas da Playlist` e `Todos os grupos de trilhas da Playlist` gravam um arquivo por faixa da Playlist ou por grupo. No menu do Mixer, `Gravação em disco › Renderizar as faixas armadas em arquivo(s) WAV...` (`Alt+R`) abre a janela de exportação só para os inserts armados.
 
 ## Outras entradas do menu Exportar
@@ -75,7 +77,8 @@ Marque `Também a mixagem completa` para ter a mixagem ao lado dos stems. A linh
 |---|---|---|
 | `Arquivo MIDI...` | `Ctrl+Shift+M` | Grava as notas como um arquivo MIDI padrão (`.mid`) |
 | `Masterizar...` | `Ctrl+Alt+M` | Renderiza o projeto e masteriza até um alvo de loudness em LUFS, no seu computador |
-| `Projeto com samples (.zip)...` | nenhuma | O projeto e os samples dele em um só arquivo compactado |
+| `Pacote de loops zipado...` | nenhuma | O projeto e todos os samples que ele usa em um só `.zip`, como o pacote zipado de loop do FL Studio |
+| `Arquivos de dados do projeto...` | nenhuma | Copia todos os arquivos que o projeto usa para uma pasta que você escolhe; o projeto continua usando os próprios arquivos |
 | `Projeto do FL Studio...` | nenhuma | Um `.flp`, ou um pacote zipado de loop com todos os samples |
 | `Set do Ableton Live (.als)...` | nenhuma | Um set para o Live 12 ou Live 11 |
 | `DAWproject (.dawproject)...` | nenhuma | Um projeto para o Bitwig Studio, o Studio One, o Cubase e outros programas que leem DAWproject |
@@ -84,7 +87,7 @@ Marque `Também a mixagem completa` para ter a mixagem ao lado dos stems. A linh
 
 ## Exportar para o FL Studio, o Ableton Live e o DAWproject
 
-O `.flp` é um projeto do FL Studio 2026. Samplers, clipes de áudio, geradores e efeitos próprios do FL Studio, plugins de terceiros, patterns, a Playlist, o Mixer e a automação passam com as suas configurações. Para o que o FL Studio não tem, você escolhe entre `Renderizar em áudio (soa igual)` e `Usar o plugin do FL mais próximo (continua editável, pode soar diferente)`. Com a segunda escolha, os instrumentos só do LYNX ficam de fora. Os moduladores sempre ficam de fora. Um relatório lista o que foi renderizado, substituído ou deixado de fora. Os detalhes estão em [Vindo do FL Studio](/wiki/coming-from-fl-studio/).
+O `.flp` é um projeto do FL Studio 2026. Samplers, clipes de áudio, geradores e efeitos próprios do FL Studio, plugins de terceiros, patterns, a Playlist, o Mixer e a automação passam com as suas configurações. Para o que o FL Studio não tem, você escolhe entre `Renderizar em áudio (soa igual)` e `Usar o plugin do FL mais próximo (continua editável, pode soar diferente)`. Com a segunda escolha, os instrumentos só do LYNX ficam de fora. Os moduladores que seguem a posição da música viram clipes de automação: um LFO sincronizado vira o LFO de clipe do FL Studio, e passos, fontes aleatórias e macros viram pontos. Seguidores, envelopes, keytrack e velocity ficam de fora. Um relatório lista o que foi renderizado, substituído ou deixado de fora. Os detalhes estão em [Vindo do FL Studio](/wiki/coming-from-fl-studio/).
 
 O `.als` contém uma faixa MIDI por canal, faixas de áudio, grupos, retornos, sends, racks e Drum Racks, plugins VST2 e VST3 com o estado deles, marcadores e automação de volume, pan e tempo. Os instrumentos e efeitos próprios do LYNX SHARE não são convertidos, mas as faixas e notas deles são mantidas. O Helix é a exceção: ele vira o Wavetable do Live. A automação de parâmetros de efeito e as rotas de insert para insert são descartadas. Os detalhes estão em [Vindo do Ableton Live](/wiki/coming-from-ableton/).
 

@@ -1,5 +1,5 @@
 ---
-source: d980e5fc0f
+source: b05790879f
 ---
 ![Okno eksportu z wybranym WAV: zakres, ogon i pliki po lewej, format po prawej, opcje miksu poniżej](/assets/img/wiki/export.webp)
 
@@ -67,6 +67,8 @@ Przyciski wybierają format. M4A jest dostępny tylko tam, gdzie system ma enkod
 
 Zaznacz `Także pełny miks`, żeby dostać miks obok stemów. Linia na dole pokazuje, ile plików zostanie zapisanych.
 
+Gdy utwór ma sekcje na ścieżce sekcji, `Jeden plik na sekcję` tnie go na sekcjach i nazywa każdy plik od jego sekcji. Przy stemach każda sekcja dostaje własny zestaw.
+
 `Plik › Eksportuj › Wszystkie ścieżki Playlisty` i `Wszystkie grupy ścieżek Playlisty` zapisują po jednym pliku na ścieżkę Playlisty albo na grupę. W menu Mixera `Nagrywanie na dysk › Renderuj uzbrojone ścieżki do pliku(-ów) WAV...` (`Alt+R`) otwiera okno eksportu tylko dla uzbrojonych insertów.
 
 ## Pozostałe pozycje menu Eksportuj
@@ -75,7 +77,8 @@ Zaznacz `Także pełny miks`, żeby dostać miks obok stemów. Linia na dole pok
 |---|---|---|
 | `Plik MIDI...` | `Ctrl+Shift+M` | Zapisuje nuty jako standardowy plik MIDI (`.mid`) |
 | `Mastering...` | `Ctrl+Alt+M` | Renderuje projekt i masteruje go do docelowej głośności w LUFS, na twoim komputerze |
-| `Projekt z samplami (.zip)...` | brak | Projekt i jego sample w jednym archiwum |
+| `Spakowany pakiet loopów...` | brak | Projekt i każdy używany przez niego sampel w jednym pliku `.zip`, jako spakowany pakiet loopów FL Studio |
+| `Pliki danych projektu...` | brak | Kopiuje każdy plik używany przez projekt do wybranego folderu; projekt nadal używa własnych plików |
 | `Projekt FL Studio...` | brak | Plik `.flp` albo spakowana paczka pętli ze wszystkimi samplami |
 | `Set Ableton Live (.als)...` | brak | Set dla Live 12 lub Live 11 |
 | `DAWproject (.dawproject)...` | brak | Projekt dla Bitwig Studio, Studio One, Cubase i innych programów, które czytają DAWproject |
@@ -84,7 +87,7 @@ Zaznacz `Także pełny miks`, żeby dostać miks obok stemów. Linia na dole pok
 
 ## Eksport do FL Studio, Ableton Live i DAWproject
 
-`.flp` to projekt FL Studio 2026. Samplery, klipy audio, własne generatory i efekty FL Studio, pluginy zewnętrzne, patterny, Playlist, Mixer i automatyka przechodzą z ustawieniami. Dla rzeczy, których FL Studio nie ma, wybierasz między `Wyrenderuj do audio (brzmi tak samo)` a `Użyj najbliższej wtyczki FL (pozostaje edytowalna, może brzmieć inaczej)`. Przy drugim wyborze instrumenty tylko z LYNX są pomijane. Modulatory są pomijane zawsze. Raport wylicza, co wyrenderowano, zastąpiono lub pominięto. Szczegóły są w [Przejściu z FL Studio](/wiki/coming-from-fl-studio/).
+`.flp` to projekt FL Studio 2026. Samplery, klipy audio, własne generatory i efekty FL Studio, pluginy zewnętrzne, patterny, Playlist, Mixer i automatyka przechodzą z ustawieniami. Dla rzeczy, których FL Studio nie ma, wybierasz między `Wyrenderuj do audio (brzmi tak samo)` a `Użyj najbliższej wtyczki FL (pozostaje edytowalna, może brzmieć inaczej)`. Przy drugim wyborze instrumenty tylko z LYNX są pomijane. Modulatory, które podążają za pozycją w utworze, stają się klipami automatyki: zsynchronizowane LFO staje się klipowym LFO FL Studio, a kroki, losowe źródła i makra stają się punktami. Followery, obwiednie, keytrack i velocity są pomijane. Raport wylicza, co wyrenderowano, zastąpiono lub pominięto. Szczegóły są w [Przejściu z FL Studio](/wiki/coming-from-fl-studio/).
 
 `.als` zawiera ścieżkę MIDI na kanał, ścieżki audio, grupy, zwroty, sendy, racki i Racki perkusyjne, pluginy VST2 i VST3 z ich stanem, znaczniki oraz automatykę głośności, panoramy i tempa. Własne instrumenty i efekty LYNX SHARE nie są konwertowane, choć ich ścieżki i nuty zostają. Wyjątkiem jest Helix: staje się Wavetable z Live. Automatyka parametrów efektów i trasy insert do insertu są pomijane. Szczegóły są w [Przejściu z Ableton Live](/wiki/coming-from-ableton/).
 

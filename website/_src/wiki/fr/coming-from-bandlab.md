@@ -1,5 +1,5 @@
 ---
-source: e3c62e25a8
+source: 736421c170
 ---
 ![La disposition simple : des pistes sur une timeline, un beat de départ et la Drum Machine](/assets/img/learn/simple-beat-2.webp)
 
@@ -42,10 +42,12 @@ Choisissez la **disposition simple**. C'est une seule fenêtre avec vos pistes s
 | Paroles | `Paroles` |
 | Accordeur | `Accordeur` dans la barre d'outils |
 | Table de mixage | `F9` |
+| Parties du morceau (intro, couplet, refrain) | `Sections` dans la barre de titre : des parties qui se déplacent, se copient et se répètent d'un bloc |
+| Baisser le beat sous la voix, un envoi d'écho | `Atténuer sous` et le bouton `Écho`, à côté de `Réverb` dans l'onglet `Effets` du dock |
 
 ## Vos projets
 
-- **FL Studio Mobile** (`.flm`) : `Fichier › Ouvrir...` l'ouvre. L'import est partiel : le tempo, les pistes, les patterns, les clips audio, les kits de batterie, le DW Sampler, le Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw et les effets de FLM sont repris. Les autres instruments de FLM jouent le synthé intégré de LYNX SHARE.
+- **FL Studio Mobile** (`.flm`) : `Fichier › Ouvrir...` l'ouvre. L'import est partiel : le tempo, les pistes, les patterns, les clips audio, les kits de batterie, le DW Sampler, le Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw et les effets de FLM sont repris. Les autres instruments de FLM jouent le synthé intégré de LYNX SHARE. `Fichier › Enregistrer une copie comme projet FL Studio Mobile (.flm)...` en écrit une copie pour FL Studio Mobile.
 - **GarageBand** (`.band`, de GarageBand 10 ou de GarageBand pour iOS) : `Fichier › Ouvrir...` l'ouvre sous forme de pistes de la disposition simple, avec leurs régions, le tempo, la tonalité et le mixage. Les pistes d'instruments jouent le synthé et la batterie intégrés de LYNX SHARE, car GarageBand ne stocke pas leurs sons sous une forme que d'autres programmes peuvent lire.
 - **BandLab** (`.blx`, un projet téléchargé par Cakewalk ou Sonar) : `Fichier › Ouvrir...` l'ouvre sous forme de pistes de la disposition simple, avec les régions, le tempo, la tonalité, le mixage, l'automation du volume et du panoramique et les effets courants. Les sons d'instruments et les autres effets de BandLab sont listés dans le rapport d'import.
 - **Stems de n'importe quelle application** : exportez les pistes en fichiers audio ou MIDI, mettez-les dans un seul dossier, puis cliquez sur `+ Ajouter une piste`, et sur `Dossier...` à côté de `Importer`. Chaque fichier devient une piste qui commence au début.

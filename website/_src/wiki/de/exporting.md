@@ -1,5 +1,5 @@
 ---
-source: d980e5fc0f
+source: b05790879f
 ---
 ![Das Export-Fenster mit gewähltem WAV: Bereich, Ausklang und Dateien links, Format rechts, Mix-Optionen darunter](/assets/img/wiki/export.webp)
 
@@ -67,6 +67,8 @@ Die Buttons wählen das Format. M4A wird nur angeboten, wo das System einen AAC-
 
 Hake `Auch den Gesamtmix` an, um den Mix neben den Stems zu bekommen. Die Zeile unten zeigt, wie viele Dateien geschrieben werden.
 
+Wenn der Song Abschnitte in der Abschnittsspur hat, schneidet `Eine Datei pro Abschnitt` ihn an den Abschnitten und benennt jede Datei nach ihrem Abschnitt. Bei Stems bekommt jeder Abschnitt einen eigenen Satz.
+
 `Datei › Exportieren › Alle Playlist-Spuren` und `Alle Playlist-Spurgruppen` schreiben eine Datei pro Playlist-Spur oder pro Gruppe. Im Menü des Mixers öffnet `Aufnahme auf Festplatte › Aufnahmebereite Inserts in WAV-Datei(en) rendern...` (`Alt+R`) das Export-Fenster nur für die scharfgeschalteten Inserts.
 
 ## Weitere Einträge des Menüs Exportieren
@@ -75,7 +77,8 @@ Hake `Auch den Gesamtmix` an, um den Mix neben den Stems zu bekommen. Die Zeile 
 |---|---|---|
 | `MIDI-Datei...` | `Ctrl+Shift+M` | Schreibt die Noten als Standard-MIDI-Datei (`.mid`) |
 | `Mastern...` | `Ctrl+Alt+M` | Rendert das Projekt und mastert es auf einen Lautheitswert in LUFS, auf deinem Computer |
-| `Projekt mit Samples (.zip)...` | keine | Das Projekt und seine Samples in einem Archiv |
+| `Gezipptes Loop-Paket...` | keine | Das Projekt und jedes Sample, das es nutzt, in einer `.zip`, als gezipptes Loop-Paket von FL Studio |
+| `Projektdatendateien...` | keine | Kopiert jede vom Projekt genutzte Datei in einen Ordner deiner Wahl; das Projekt nutzt weiter seine eigenen Dateien |
 | `FL Studio-Projekt...` | keine | Eine `.flp` oder ein gezipptes Loop-Paket mit jedem Sample |
 | `Ableton-Live-Set (.als)...` | keine | Ein Set für Live 12 oder Live 11 |
 | `DAWproject (.dawproject)...` | keine | Ein Projekt für Bitwig Studio, Studio One, Cubase und andere Programme, die DAWproject lesen |
@@ -84,7 +87,7 @@ Hake `Auch den Gesamtmix` an, um den Mix neben den Stems zu bekommen. Die Zeile 
 
 ## Export nach FL Studio, Ableton Live und DAWproject
 
-Die `.flp` ist ein FL-Studio-2026-Projekt. Sampler, Audioclips, die eigenen Generatoren und Effekte von FL Studio, Plugins von Drittanbietern, Patterns, die Playlist, der Mixer und die Automation gehen mit ihren Einstellungen hinüber. Für Dinge, die FL Studio nicht hat, wählst du zwischen `Zu Audio rendern (klingt gleich)` und `Das nächstliegende FL-Plugin verwenden (bleibt bearbeitbar, kann anders klingen)`. Bei der zweiten Wahl werden Instrumente nur für LYNX weggelassen. Modulatoren werden immer weggelassen. Ein Bericht listet, was gerendert, ersetzt oder weggelassen wurde. Details stehen unter [Umstieg von FL Studio](/wiki/coming-from-fl-studio/).
+Die `.flp` ist ein FL-Studio-2026-Projekt. Sampler, Audioclips, die eigenen Generatoren und Effekte von FL Studio, Plugins von Drittanbietern, Patterns, die Playlist, der Mixer und die Automation gehen mit ihren Einstellungen hinüber. Für Dinge, die FL Studio nicht hat, wählst du zwischen `Zu Audio rendern (klingt gleich)` und `Das nächstliegende FL-Plugin verwenden (bleibt bearbeitbar, kann anders klingen)`. Bei der zweiten Wahl werden Instrumente nur für LYNX weggelassen. Modulatoren, die der Songposition folgen, werden zu Automationsclips: Ein synchronisierter LFO wird zum Clip-LFO von FL Studio, und Steps, Zufallsquellen und Makros werden zu Punkten. Follower, Hüllkurven, Keytrack und Velocity werden weggelassen. Ein Bericht listet, was gerendert, ersetzt oder weggelassen wurde. Details stehen unter [Umstieg von FL Studio](/wiki/coming-from-fl-studio/).
 
 Die `.als` enthält pro Kanal eine MIDI-Spur, Audiospuren, Gruppen, Returns, Sends, Racks und Drum Racks, VST2- und VST3-Plugins mit ihrem Zustand, Marker sowie Automation von Lautstärke, Pan und Tempo. Die eigenen Instrumente und Effekte von LYNX SHARE werden nicht umgewandelt, ihre Spuren und Noten bleiben aber erhalten. Helix ist die Ausnahme: Es wird zu Wavetable von Live. Automation von Effektparametern und Routen von Insert zu Insert entfallen. Details stehen unter [Umstieg von Ableton Live](/wiki/coming-from-ableton/).
 

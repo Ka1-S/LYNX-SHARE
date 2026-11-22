@@ -1,5 +1,5 @@
 ---
-source: 68d518394b
+source: 7342d4fb1f
 ---
 LYNX SHARE bildiğiniz iş akışını korur: Channel Rack, pattern'ler, Playlist ve Mixer, aynı tuşlarla. `.flp` projelerini doğrudan açar ve geri yazabilir.
 
@@ -92,7 +92,7 @@ Dosya bir FL Studio 2026 projesidir. Sampler'lar, ses klipleri, FL'nin kendi jen
 ## Bilmekte fayda var
 
 - FLEX paketleri şifrelidir ve asla açılmaz. Bir FLEX kanalına, preset adına göre seçilen bir synth patch'i verilir.
-- Modülatörler `.flp` dışa aktarmasında dışarıda bırakılır ve dışa aktarma raporu bunu belirtir.
+- Bir `.flp` dışa aktarmasında, şarkı konumunu izleyen modülatörler otomasyon klipleri olur (senkronlu bir LFO, FL Studio'nun klip LFO'su olur). Takipçiler, zarflar, keytrack ve velocity dışarıda bırakılır ve dışa aktarma raporu bunu belirtir.
 - İçe aktarma raporu, dahili synth ile nelerin yaklaştırıldığını, nelerin karşılığı olmadığını, hangi plugin'lerin bulunduğunu ya da kurulu olmadığını, hangi efektlerin dışarıda bırakıldığını veya kısmen yeniden üretildiğini ve kaç sample'ın eksik olduğunu listeler.
 - Kurulu olmayan bir üçüncü taraf efekt, aynı role sahip bir LYNX SHARE efektiyle değiştirilir. Asıl efekt projede kalır.
 

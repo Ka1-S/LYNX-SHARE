@@ -1,5 +1,5 @@
 ---
-source: 13c966d353
+source: e408a05a2c
 ---
 ![Plugin yöneticisinin alt kısmı; her plugin dosyasının ayrı bir süreçte incelendiğini belirten notla](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -12,7 +12,7 @@ LYNX SHARE, başka yapımcıların enstrüman ve efekt plugin'lerini barındır�
 3. Plugin seçici için `F8` tuşuna basın ve plugin adının bir kısmını yazın.
 4. Ona çift tıklayın veya `Enter` tuşuna basın. Enstrüman yeni bir kanal olur. Efekt seçili Mixer insert'ine girer.
 
-İlk açılışta kurulum sihirbazı plugin klasörlerini listeler ve arka planda tarar. `Seçenekler › Kurulum sihirbazı (dil, ses, plugin klasörleri)...` onu yeniden açar. LYNX SHARE ayrıca her açılıştan birkaç saniye sonra yeni plugin'leri arar.
+İlk açılışta, karşılama kartı açıkken LYNX SHARE plugin klasörlerini arka planda tarar. `Seçenekler › Kurulum sihirbazı (dil, ses, plugin klasörleri)...` klasörleri yeniden gösterir. LYNX SHARE ayrıca her açılıştan birkaç saniye sonra yeni plugin'leri arar.
 
 ## Sisteme göre formatlar
 

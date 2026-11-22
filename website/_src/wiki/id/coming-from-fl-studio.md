@@ -1,5 +1,5 @@
 ---
-source: 68d518394b
+source: 7342d4fb1f
 ---
 LYNX SHARE mempertahankan alur kerja yang sudah kamu kenal: Channel Rack, pattern, Playlist, dan Mixer, dengan tombol yang sama. Program ini membuka proyek `.flp` secara langsung dan bisa menulisnya kembali.
 
@@ -92,7 +92,7 @@ File itu adalah proyek FL Studio 2026. Sampler, clip audio, generator dan efek b
 ## Baik diketahui
 
 - Paket FLEX dienkripsi dan tidak pernah dibuka. Channel FLEX mendapat patch synth yang dipilih berdasarkan nama preset-nya.
-- Modulator dilewati dalam ekspor `.flp`, dan laporan ekspor menyebutkannya.
+- Pada ekspor `.flp`, modulator yang mengikuti posisi lagu menjadi clip otomasi (LFO yang tersinkron menjadi LFO clip milik FL Studio). Follower, envelope, keytrack, dan velocity dilewati, dan laporan ekspor menyebutkannya.
 - Laporan impor mencantumkan apa yang diperkirakan oleh synth bawaan, apa yang tidak punya padanan, plugin mana yang ditemukan atau belum terpasang, efek mana yang dilewati atau hanya sebagian direproduksi, dan berapa banyak sample yang hilang.
 - Efek pihak ketiga yang belum terpasang diganti dengan efek LYNX SHARE yang berperan sama. Aslinya tetap ada di proyek.
 

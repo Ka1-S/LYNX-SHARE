@@ -1,5 +1,5 @@
 ---
-source: e3c62e25a8
+source: 736421c170
 ---
 ![El Diseño simple: pistas en una línea de tiempo, un beat inicial y la Drum Machine](/assets/img/learn/simple-beat-2.webp)
 
@@ -42,10 +42,12 @@ Elige el **Diseño simple**. Es una sola ventana con tus pistas en una línea de
 | Letras | `Letra` |
 | Afinador | `Afinador` en la barra de herramientas |
 | Mixer | `F9` |
+| Partes de la canción (intro, estrofa, estribillo) | `Secciones` en la barra de título: partes que se mueven, se copian y se repiten enteras |
+| Atenuar el beat bajo la voz, un envío de eco | `Atenuar bajo` y el mando `Eco`, junto a `Reverb` en la pestaña `Efectos` del dock |
 
 ## Tus proyectos
 
-- **FL Studio Mobile** (`.flm`): `Archivo › Abrir...` lo abre. La importación es parcial: pasan el tempo, las pistas, los patrones, los clips de audio, los kits de batería, el DW Sampler, el Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw y los efectos de FLM. Los demás instrumentos de FLM suenan con el sintetizador integrado de LYNX SHARE.
+- **FL Studio Mobile** (`.flm`): `Archivo › Abrir...` lo abre. La importación es parcial: pasan el tempo, las pistas, los patrones, los clips de audio, los kits de batería, el DW Sampler, el Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw y los efectos de FLM. Los demás instrumentos de FLM suenan con el sintetizador integrado de LYNX SHARE. `Archivo › Guardar una copia como proyecto de FL Studio Mobile (.flm)...` escribe una copia para FL Studio Mobile.
 - **GarageBand** (`.band`, de GarageBand 10 o de GarageBand para iOS): `Archivo › Abrir...` lo abre como pistas del Diseño simple, con sus regiones, tempo, tonalidad y mezcla. Las pistas de instrumento suenan con el sintetizador y la batería integrados de LYNX SHARE, porque GarageBand no guarda sus sonidos en una forma que otros programas puedan leer.
 - **BandLab** (`.blx`, un proyecto descargado por Cakewalk o Sonar): `Archivo › Abrir...` lo abre como pistas del Diseño simple, con regiones, tempo, tonalidad, la mezcla, la automatización de volumen y pan y los efectos comunes. Los sonidos de instrumento de BandLab y otros efectos aparecen en el informe de importación.
 - **Stems de cualquier app**: exporta las pistas como archivos de audio o MIDI, ponlos en una carpeta, y luego haz clic en `+ Añadir pista` y en `Carpeta...` junto a `Importar`. Cada archivo se convierte en una pista que empieza al principio.

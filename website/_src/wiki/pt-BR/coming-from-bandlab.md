@@ -1,5 +1,5 @@
 ---
-source: e3c62e25a8
+source: 736421c170
 ---
 ![O Layout Simple: faixas numa linha do tempo, uma batida inicial e a Drum Machine](/assets/img/learn/simple-beat-2.webp)
 
@@ -42,10 +42,12 @@ Escolha o **Layout Simple**. É uma janela só, com as suas faixas numa linha do
 | Letras | `Letra` |
 | Afinador | `Afinador` na barra de ferramentas |
 | Mixer | `F9` |
+| Partes da música (intro, verso, refrão) | `Seções` na barra de título: partes que se movem, copiam e repetem como um todo |
+| Abaixar a batida sob o vocal, um envio de eco | `Abaixar sob` e o knob `Eco`, ao lado de `Reverb` na aba `Efeitos` do dock |
 
 ## Seus projetos
 
-- **FL Studio Mobile** (`.flm`): `Arquivo › Abrir...` o abre. A importação é parcial: andamento, faixas, patterns, clipes de áudio, kits de bateria, o DW Sampler, o Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw e os efeitos do FLM vêm junto. Os outros instrumentos do FLM tocam no synth embutido do LYNX SHARE.
+- **FL Studio Mobile** (`.flm`): `Arquivo › Abrir...` o abre. A importação é parcial: andamento, faixas, patterns, clipes de áudio, kits de bateria, o DW Sampler, o Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw e os efeitos do FLM vêm junto. Os outros instrumentos do FLM tocam no synth embutido do LYNX SHARE. `Arquivo › Salvar uma cópia como projeto do FL Studio Mobile (.flm)...` grava uma cópia de volta para o FL Studio Mobile.
 - **GarageBand** (`.band`, do GarageBand 10 ou do GarageBand para iOS): `Arquivo › Abrir...` o abre como faixas do Layout Simple, com regiões, andamento, tonalidade e mix. As faixas de instrumento tocam no synth e na bateria embutidos do LYNX SHARE, porque o GarageBand não guarda os sons deles num formato que outros programas leiam.
 - **BandLab** (`.blx`, um projeto baixado pelo Cakewalk ou pelo Sonar): `Arquivo › Abrir...` o abre como faixas do Layout Simple, com regiões, andamento, tonalidade, o mix, automação de volume e pan e os efeitos comuns. Os sons de instrumento do BandLab e outros efeitos aparecem no relatório de importação.
 - **Stems de qualquer app**: exporte as faixas como arquivos de áudio ou MIDI, ponha todos numa pasta, depois clique em `+ Adicionar faixa` e em `Pasta...` ao lado de `Importar`. Cada arquivo vira uma faixa que começa no início.

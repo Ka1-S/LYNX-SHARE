@@ -1,7 +1,7 @@
 ---
-source: f1d1d236dc
+source: f439a070b5
 ---
-LYNX SHARE to darmowy DAW o otwartym kodzie dla Windows, macOS i Linuksa z trzema układami w jednym programie. Domyślny jest układ Pattern: programujesz patterny w Channel Rack i Piano Roll, aranżujesz je w Playliście i miksujesz w Mixerze. Układ z uruchamianiem klipów uruchamia klipy i sceny z siatki, w stylu Ableton Live, a Prosty układ łączy przystępny, jednookienkowy styl BandLab ze sposobem pracy FL Studio Mobile. `Widok › Styl układu` przełącza między nimi w dowolnej chwili. Otwiera projekty FL Studio (`.flp`), sety Ableton Live (`.als`) i projekty FL Studio Mobile (`.flm`), a zapisuje we własnym formacie `.lynx`.
+LYNX SHARE to darmowy DAW o otwartym kodzie dla Windows, macOS i Linuksa z trzema układami w jednym programie. Domyślny jest układ Pattern: programujesz patterny w Channel Rack i Piano Roll, aranżujesz je w Playliście i miksujesz w Mixerze. Układ z uruchamianiem klipów uruchamia klipy i sceny z siatki, w stylu Ableton Live, a Prosty układ łączy przystępny, jednookienkowy styl BandLab ze sposobem pracy FL Studio Mobile. `Widok › Styl układu` przełącza między nimi w dowolnej chwili. Otwiera projekty FL Studio (`.flp`), sety Ableton Live (`.als`), projekty FL Studio Mobile (`.flm`), pliki DAWproject, projekty GarageBand i BandLab oraz moduły trackerowe, eksportuje `.flp`, `.als`, `.dawproject` i `.flm`, a zapisuje we własnym formacie `.lynx`.
 
 To wersja alfa. Spodziewaj się błędów i zapisuj często.
 
@@ -9,7 +9,7 @@ To wersja alfa. Spodziewaj się błędów i zapisuj często.
 
 1. Sprawdź w tabeli poniżej, czy Twój system jest obsługiwany.
 2. Pobierz i zainstaluj program. [Instalacja](/wiki/install/) podaje kroki dla każdego systemu.
-3. Uruchom go. Krótki kreator konfiguracji wybiera język, testuje wyjście audio, pozwala wybrać jeden z trzech układów i wymienia foldery pluginów, które potem są skanowane w tle. Możesz go pominąć i otworzyć później przez `Opcje › Kreator konfiguracji (język, audio, foldery pluginów)...`.
+3. Uruchom go. Karta powitalna pyta, skąd przychodzisz, i jednym kliknięciem otwiera odpowiedni układ. Ustawia też język, testuje dźwięk i pyta, czy sprawdzać aktualizacje, a foldery pluginów są w tym czasie skanowane w tle. `Więcej ustawień (sterownik audio, foldery pluginów)...` otwiera pełny kreator konfiguracji, także w `Opcje › Kreator konfiguracji (język, audio, foldery pluginów)...`.
 4. Jeśli nic nie słychać, przejdź do [Ustawień audio](/wiki/audio-setup/).
 5. Przeczytaj [Przegląd okna](/wiki/tour/), a potem zrób [Twój pierwszy utwór](/wiki/first-song/).
 
@@ -19,7 +19,7 @@ To wersja alfa. Spodziewaj się błędów i zapisuj często.
 |---|---|
 | Windows | Windows 10 lub 11, 64-bitowy |
 | macOS | macOS 11 Big Sur lub nowszy, Intel lub Apple silicon |
-| Linux | x86_64 z glibc 2.35 lub nowszym (Ubuntu 22.04+, Debian 12+, Fedora 36+, aktualny Arch lub Manjaro), X11 lub XWayland |
+| Linux | x86_64 lub arm64 z glibc 2.35 lub nowszą (Ubuntu 22.04+, Debian 12+, Fedora 36+, aktualny Arch lub Manjaro; arm64 także na Raspberry Pi 4 lub 5 z 64-bitowym systemem), X11 lub XWayland |
 
 Nie potrzebujesz interfejsu audio. LYNX SHARE gra przez urządzenie dźwiękowe, którego Twój system już używa. FL Studio też nie jest potrzebne. Jeśli jest zainstalowane na tym samym komputerze, LYNX SHARE znajduje jego sample i używa tych samych plików pluginów dla projektów `.flp`.
 

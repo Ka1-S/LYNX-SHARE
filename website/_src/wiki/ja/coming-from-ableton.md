@@ -1,5 +1,5 @@
 ---
-source: dd17f63a9b
+source: 4ca4775a35
 ---
 ![クリップ起動レイアウト: プレイリストの横にシーン付きのクリップグリッドがある](/assets/img/cliplaunch.webp)
 
@@ -88,6 +88,8 @@ Liveとの違い:
 - Live標準のデバイスの多くは、設定とオートメーションごと、LYNX SHARE独自のものとして読み込まれます: EQ Eight、EQ Three、Channel EQ、Compressor、Glue Compressor、Multiband Dynamics、Limiter、Gate、Utility、Reverb、Hybrid Reverb、Delay、Echo、Grain Delay、Auto Filter、Saturator、Overdrive、Roar、Erosion、Vinyl Distortion、Corpus、Chorus-Ensemble、Redux、Auto Pan、Drum Buss、Spectral Time、Spectral Resonator、Looper、Simpler、Sampler、Drift、Operator、Wavetable、Meld。ほかは外され、インポートレポートに一覧で出ます。
 - Instrument RackとAudio Effect Rackは、チェーン、ゾーン、マクロごと読み込まれ、Drum RackはLYNX SHAREのDrum Rackになります。LiveのArpeggiatorは、チャンネルのアルペジエーターになります。Pitch、Velocity、Chord、Note Length、MIDI Effect Rackは、ノートに書き込まれます。
 - 省かれたものは、読み込みレポートに一覧で載ります。
+- デバイスビューでは、ラックがチェーンのデバイスをインラインで表示し、マクロマップモード (ラックの `マップ` ボタン) でデバイスのパラメーターをマクロに割り当てられます。Liveと同じです。
+- セッションミキサーにはLiveのSolo / Cueスイッチがあり、ヘッドフォン用の `Cue Out` と `キューボリューム` を備えます。
 - 書き出したセットでは、重なっているオーディオクリップをLiveがトリムします。
 - Liveのセットのワープマーカーは、読み込み時に保持され、エクスポート時に書き戻されます。
 

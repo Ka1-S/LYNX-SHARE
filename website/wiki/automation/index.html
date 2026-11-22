@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="5b5089a8";
+window.LYNX_LANG=lang;window.LYNX_V="937f1ef5";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=5b5089a8">
+<link rel="stylesheet" href="/assets/site.css?v=937f1ef5">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -111,11 +111,11 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <h2 id="recording-your-moves">Recording your moves</h2>
 <p>Turn on recording with <code>Automation</code> ticked in the recording filter, press play and move the control. In Song mode the moves become an automation clip. In Pattern mode they become events in the current pattern. See <a href="/wiki/recording/">Recording</a>.</p>
 <h2 id="links-and-modulators">Links and modulators</h2>
-<ul><li><code>Link to MIDI controller (move a knob on the controller)</code> is covered in <a href="/wiki/midi-controllers/">MIDI controllers</a>.</li><li><code>Link to internal controller</code> lets an Envelope, Formula or Peak Controller in the project drive the control. Add one of them first.</li><li><code>Modulate</code> attaches a modulator, an LFO or a random source that moves a LYNX SHARE knob around its own value. <code>Tools › Modulators...</code> lists them.</li></ul>
+<ul><li><code>Link to MIDI controller (move a knob on the controller)</code> is covered in <a href="/wiki/midi-controllers/">MIDI controllers</a>.</li><li><code>Link to internal controller</code> lets an Envelope, Formula or Peak Controller in the project drive the control. Add one of them first.</li><li><code>Modulate with</code> attaches a modulator that moves the control around its own value: an LFO, an envelope follower, an ADSR envelope, steps, a random source, a macro, keytrack or velocity. It works on LYNX SHARE's knobs and on third-party plugins' parameters. You can also drag a modulator onto a knob, and a ring on the knob shows the movement. <code>Tools › Modulators...</code> lists them.</li></ul>
 <h2 id="automation-lanes">Automation lanes</h2>
 <p>Lanes are off by default. Turn on <code>Automation lanes</code> in the Playlist's menu. Each track header then has a button that adds a lane under the track, and the control menu gains <code>Automate in lane</code>. In a lane, click to add or drag a point, right-click to delete one, and <code>Alt</code>+drag to bend the line. The lane's menu has <code>To automation clip</code>.</p>
 <h2 id="good-to-know">Good to know</h2>
-<ul><li>A new clip starts at the time selection if there is one, otherwise at the playhead in Song mode. Turn off <code>Create automation clips at the playback position</code> in <code>Options › General settings...</code> to start at the beginning of the song.</li><li>Several clips on one control each play in their own place. Before its first clip, a control keeps its own value.</li><li>At the start of a clip the control reaches the new value in about 8 ms. FL Studio glides there, so an imported project can differ slightly at those points.</li><li>Where clips on the same control overlap, the one LYNX SHARE picks can differ from the one FL Studio picks.</li><li>Modulators only work on LYNX SHARE's own knobs, and they are left out when you export to <code>.flp</code>.</li></ul>
+<ul><li>A new clip starts at the time selection if there is one, otherwise at the playhead in Song mode. Turn off <code>Create automation clips at the playback position</code> in <code>Options › General settings...</code> to start at the beginning of the song.</li><li>Several clips on one control each play in their own place. Before its first clip, a control keeps its own value.</li><li>At the start of a clip the control reaches the new value in about 8 ms. FL Studio glides there, so an imported project can differ slightly at those points.</li><li>Where clips on the same control overlap, the one LYNX SHARE picks can differ from the one FL Studio picks.</li><li>On a <code>.flp</code> export, modulators that follow the song position become automation clips (a synced LFO becomes FL Studio's clip LFO). Followers, envelopes, keytrack and velocity are left out, and the report lists them.</li><li>Moved a control while playing without recording? <code>Capture automation</code> in the recording options turns the last moves into automation afterwards.</li></ul>
 <h2 id="related">Related</h2>
 <ul><li><a href="/wiki/playlist/">Playlist</a></li><li><a href="/wiki/recording/">Recording</a></li><li><a href="/wiki/midi-controllers/">MIDI controllers</a></li><li><a href="/wiki/mixer/">Mixer</a></li><li><a href="/wiki/shortcuts/">Shortcuts</a></li></ul></div></div><nav class="wpn"><a href="/wiki/layouts/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="wk.layouts.t">Layouts</b></a><a href="/wiki/recording/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="wk.recording.t">Recording</b></a></nav></article></div>
 </main>
@@ -127,8 +127,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=5b5089a8" defer></script>
-<script src="/assets/wiki.js?v=5b5089a8" defer></script>
-<script src="/assets/motion.js?v=5b5089a8" defer></script>
+<script src="/assets/site.js?v=937f1ef5" defer></script>
+<script src="/assets/wiki.js?v=937f1ef5" defer></script>
+<script src="/assets/motion.js?v=937f1ef5" defer></script>
 </body>
 </html>

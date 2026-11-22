@@ -94,7 +94,7 @@ The file is an FL Studio 2026 project. Samplers, audio clips, FL's own generator
 ## Good to know
 
 - FLEX packs are encrypted and are never opened. A FLEX channel gets a synth patch chosen by its preset name.
-- Modulators are left out of a `.flp` export, and the export report says so.
+- On a `.flp` export, modulators that follow the song position become automation clips (a synced LFO becomes FL Studio's clip LFO). Followers, envelopes, keytrack and velocity are left out, and the export report says so.
 - The import report lists what was approximated by the built-in synth, what had no equivalent, which plugins were found or are not installed, which effects were left out or partly reproduced, and how many samples are missing.
 - A third-party effect that is not installed is replaced by a LYNX SHARE effect with the same role. The original stays in the project.
 

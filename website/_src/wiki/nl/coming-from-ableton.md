@@ -1,5 +1,5 @@
 ---
-source: dd17f63a9b
+source: 4ca4775a35
 ---
 ![De Clip-launch-indeling: een clipraster met scènes naast de Playlist](/assets/img/cliplaunch.webp)
 
@@ -88,6 +88,8 @@ Een rapport na de export toont wat is weggelaten.
 - Veel eigen devices van Live komen binnen als die van LYNX SHARE, met hun instellingen en automatisering: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Hybrid Reverb, Delay, Echo, Grain Delay, Auto Filter, Saturator, Overdrive, Roar, Erosion, Vinyl Distortion, Corpus, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Spectral Time, Spectral Resonator, Looper, Simpler, Sampler, Drift, Operator, Wavetable en Meld. De andere worden weggelaten en vermeld in het importrapport.
 - Instrument- en Audio Effect Racks komen binnen met hun ketens, zones en macro's, en een Drum Rack wordt het Drum Rack van LYNX SHARE. De Arpeggiator van Live wordt de arpeggiator van het kanaal. Pitch, Velocity, Chord, Note Length en MIDI Effect Racks worden in de noten verwerkt.
 - Het importrapport toont wat is weggelaten.
+- In de Device View toont een rack de devices van zijn ketens inline, en de Macro Map-modus (de `Map`-knoppen van het rack) geeft een deviceparameter aan een macro, zoals in Live.
+- De Session-mixer heeft de Solo / Cue-schakelaar van Live, met een `Cue Out` voor je hoofdtelefoon en een `Cue-volume`.
 - Live knipt overlappende audioclips in een geëxporteerde set bij.
 - Warp-markeringen uit een Live-set blijven bij het importeren behouden en worden bij het exporteren teruggeschreven.
 

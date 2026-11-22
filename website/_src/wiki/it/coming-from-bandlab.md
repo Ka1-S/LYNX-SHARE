@@ -1,5 +1,5 @@
 ---
-source: e3c62e25a8
+source: 736421c170
 ---
 ![Il layout semplice: tracce su una timeline, un beat di partenza e la Drum Machine](/assets/img/learn/simple-beat-2.webp)
 
@@ -42,10 +42,12 @@ Scegli il **layout semplice**. È una sola finestra con le tue tracce su una tim
 | Testi | `Testo` |
 | Accordatore | `Accordatore` nella barra degli strumenti |
 | Mixer | `F9` |
+| Parti del brano (intro, strofa, ritornello) | `Sezioni` nella barra del titolo: parti che si spostano, si copiano e si ripetono per intero |
+| Abbassare il beat sotto la voce, un send d'eco | `Abbassa sotto` e la manopola `Eco`, accanto a `Reverb` nella scheda `Effetti` del dock |
 
 ## I tuoi progetti
 
-- **FL Studio Mobile** (`.flm`): `File › Apri...` lo apre. L'importazione è parziale: arrivano tempo, tracce, pattern, clip audio, drum kit, il DW Sampler, lo Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw e gli effetti di FLM. Gli altri strumenti di FLM suonano con il synth integrato di LYNX SHARE.
+- **FL Studio Mobile** (`.flm`): `File › Apri...` lo apre. L'importazione è parziale: arrivano tempo, tracce, pattern, clip audio, drum kit, il DW Sampler, lo Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw e gli effetti di FLM. Gli altri strumenti di FLM suonano con il synth integrato di LYNX SHARE. `File › Salva una copia come progetto FL Studio Mobile (.flm)...` scrive una copia per FL Studio Mobile.
 - **GarageBand** (`.band`, da GarageBand 10 o GarageBand per iOS): `File › Apri...` lo apre come tracce del layout semplice con le loro regioni, tempo, tonalità e mix. Le tracce di strumento suonano con il synth e la batteria integrati di LYNX SHARE, perché GarageBand non salva i loro suoni in una forma che altri programmi possano leggere.
 - **BandLab** (`.blx`, un progetto scaricato da Cakewalk o Sonar): `File › Apri...` lo apre come tracce del layout semplice con regioni, tempo, tonalità, il mix, l'automazione di volume e pan e gli effetti più comuni. I suoni degli strumenti di BandLab e gli altri effetti sono elencati nel report di importazione.
 - **Stem da qualsiasi app**: esporta le tracce come file audio o MIDI, mettile in una sola cartella, poi clicca `+ Aggiungi traccia`, e `Cartella...` accanto a `Importa`. Ogni file diventa una traccia che parte dall'inizio.

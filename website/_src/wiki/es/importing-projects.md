@@ -1,11 +1,11 @@
 ---
-source: d41b1225ef
+source: a29416cb8c
 ---
 `Archivo › Abrir...` (`Ctrl+O`) abre los proyectos `.lynx` propios de LYNX SHARE y también archivos `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx` y `.mid`. Un proyecto de otro programa es una importación: se convierte en un proyecto nuevo de LYNX SHARE sin guardar, y el archivo original nunca se modifica.
 
 ## Abrir un proyecto de otro programa
 
-1. Elige `Archivo › Abrir...` y selecciona el archivo `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx` o `.mid`.
+1. Elige `Archivo › Abrir...` y selecciona el archivo `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx`, `.mid`, `.zip` o de módulo de tracker (`.mod`, `.xm`, `.s3m`, `.it`).
 2. Espera mientras LYNX SHARE busca los plugins y samples del proyecto.
 3. Si no se encontró algo, se abre la ventana `Archivos que faltan`. Indícale dónde están tus samples, o ciérrala.
 4. La barra de título muestra ahora de dónde viene el proyecto, por ejemplo "(importado de FL Studio)".
@@ -22,6 +22,8 @@ source: d41b1225ef
 | `.band` (GarageBand 10, GarageBand para iOS) | Pistas, regiones MIDI y de audio, tempo, compás, tonalidad, secciones como marcadores, nivel, pan y silencio, como pistas del diseño simple. Instrumentos Sampler hechos en GarageBand para iOS | Las pistas de instrumento suenan con el sintetizador integrado y la batería. Las regiones de Drummer, las carpetas de tomas y los cambios de tempo se listan. Los proyectos de GarageBand 11 y anteriores no se pueden leer |
 | `.blx` (BandLab) | Pistas, regiones MIDI y de audio con sus bucles, tempo, compás, tonalidad, volumen, pan y silencio, automatización de volumen y pan, y los efectos comunes, como pistas del diseño simple | Las pistas de instrumento suenan con el sintetizador integrado y la batería. Los demás efectos y el preset de Mastering se dejan fuera y se listan. Probado solo con proyectos inventados |
 | `.mid` | Notas, compases y todos los cambios de tempo | Un archivo MIDI no lleva sonidos: los canales reciben el sintetizador de LYNX SHARE o un canal MIDI Out |
+| `.mod`, `.xm`, `.s3m`, `.it` (módulos de tracker) | Instrumentos como canales Sampler con sus samples, patrones, la lista de orden como Playlist, velocidad y tempo, volumen de nota, panorama, retardo y corte; los cambios de volumen y panorama como eventos del canal (MOD y XM), y los slides, el vibrato, los arpegios y las envolventes de tono como curvas de tono de las notas | Los demás efectos y las envolventes de instrumento se cuentan en el informe de importación. `Ver › Ventanas y herramientas › Tracker` edita las notas a la manera de un tracker |
+| `.zip` | El paquete de loops comprimido de FL Studio, o un proyecto exportado con sus samples: se descomprime en una carpeta propia y luego se abre el proyecto de dentro con sus samples | |
 
 Los plugins VST2, VST3 y CLAP de terceros de un `.flp` o de un `.dawproject`, y los VST2 y VST3 de un `.als`, se cargan con su estado guardado si el mismo plugin está instalado en tu ordenador.
 
@@ -86,6 +88,15 @@ Para recuperar el plugin real, instálalo, elige `Opciones › Buscar plugins` y
 | `Importar compases` | El compás del archivo pasa a ser el del proyecto |
 
 `Ctrl+M` en el [Piano Roll](/wiki/piano-roll/) importa un archivo MIDI en el canal actual.
+
+## Importar pistas de otro proyecto
+
+`Archivo › Importar › Tracks from another project...` trae pistas de otro proyecto al que tienes abierto, sin cerrarlo. Lee todos los formatos que lee `Archivo › Abrir...`.
+
+1. Elige el proyecto. Una ventana lista sus pistas de la Playlist y lo que contiene cada una.
+2. Marca las pistas que quieres.
+3. Elige si vienen también `With mixer inserts and effects` y `With automation`, y `Place them at` el inicio de la canción o el inicio de la selección de tiempo.
+4. Haz clic para importar. Las pistas, canales, patrones e inserts nuevos llegan como un solo paso, así que un solo deshacer los quita todos.
 
 ## Conviene saber
 

@@ -1,5 +1,5 @@
 ---
-source: dd17f63a9b
+source: 4ca4775a35
 ---
 ![Układ Clip-launch: siatka klipów ze scenami obok Playlisty](/assets/img/cliplaunch.webp)
 
@@ -88,6 +88,8 @@ Raport po eksporcie wymienia, co pominięto.
 - Wiele własnych urządzeń Live wchodzi jako własne urządzenia LYNX SHARE, z ustawieniami i automatyką: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Hybrid Reverb, Delay, Echo, Grain Delay, Auto Filter, Saturator, Overdrive, Roar, Erosion, Vinyl Distortion, Corpus, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Spectral Time, Spectral Resonator, Looper, Simpler, Sampler, Drift, Operator, Wavetable i Meld. Pozostałe są pomijane i wymienione w raporcie importu.
 - Racki Instrument i Audio Effect wchodzą ze swoimi łańcuchami, strefami i makrami, a Rack perkusyjny staje się Rackiem perkusyjnym LYNX SHARE. Arpeggiator z Live staje się arpeggiatorem kanału. Pitch, Velocity, Chord, Note Length i Racki MIDI Effect są zapisywane w nutach.
 - Raport importu wymienia, co pominięto.
+- W widoku Device rack pokazuje urządzenia swoich łańcuchów w linii, a tryb Macro Map (przyciski `Mapa` racka) przypisuje parametr urządzenia do makra, tak jak w Live.
+- Mikser sesji ma przełącznik Solo / Cue z Live, z wyjściem `Cue Out` na słuchawki i regulatorem `Głośność odsłuchu`.
 - Live przycina klipy audio, które na siebie nachodzą, w wyeksportowanym secie.
 - Znaczniki warp z setu Live są zachowywane przy imporcie i zapisywane z powrotem przy eksporcie.
 

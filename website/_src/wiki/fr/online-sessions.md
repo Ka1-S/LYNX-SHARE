@@ -1,5 +1,5 @@
 ---
-source: 7db9a73959
+source: bf45e1d436
 ---
 Il y a deux façons de travailler à plusieurs sur un projet, et les deux sont sous `Fichier › Session en ligne`. Un paquet est un fichier que vous envoyez à un ami, qui vous renvoie une partie. Il ne demande ni réseau, ni compte, ni serveur. Une session en direct relie tout le monde par internet via le relais LYNX SHARE, et chaque modification parvient à tous. Jusqu'à 4 personnes participent à un projet, vous compris.
 
@@ -69,7 +69,7 @@ Le menu `Fichier › Session en ligne` contient ces commandes tant qu'une sessio
 | `Mettre fin à la session en direct` | Pour l'hôte. Tout le monde part, et le code cesse de fonctionner |
 | `Quitter la session en direct` | Pour un invité. Votre partie du projet reste chez vous |
 
-Dans `Personnes et autorisations...`, chaque personne reçoit l'un de quatre rôles : `Ses propres canaux, patterns, inserts et lignes`, `Ses propres parties + tempo et réglages du projet`, `Tout` ou `Écoute seule (aucune modification)`. Retirer une autorisation ne supprime jamais rien.
+Dans `Personnes et autorisations...`, chaque personne reçoit l'un de quatre rôles : `Ses propres canaux, patterns, inserts et lignes`, `Ses propres parties + tempo et réglages du projet`, `Tout` ou `Écoute seule (aucune modification)`. Retirer une autorisation ne supprime jamais rien. Le cinquième choix, `Retirer de la session`, sort la personne de la session. Par défaut, la session reçoit alors un nouveau code d'invitation pour les nouvelles arrivées, et ceux qui y sont encore continuent ; `Garder le même code` garde l'ancien.
 
 ## Les plugins que les autres n'ont pas
 

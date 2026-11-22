@@ -1,5 +1,5 @@
 ---
-source: d980e5fc0f
+source: b05790879f
 ---
 ![La fenêtre d'export avec WAV sélectionné : étendue, queue et fichiers à gauche, format à droite, options de mixage en dessous](/assets/img/wiki/export.webp)
 
@@ -67,6 +67,8 @@ Les boutons choisissent le format. Le M4A n'est proposé que là où le système
 
 Cochez `Et le mixage complet` pour obtenir le mixage à côté des stems. La ligne en bas indique combien de fichiers seront écrits.
 
+Quand le morceau a des sections dans la piste des sections, `Un fichier par section` le découpe aux sections et nomme chaque fichier d'après sa section. Avec les stems, chaque section a son propre jeu.
+
 `Fichier › Exporter › Toutes les pistes de la Playlist` et `Tous les groupes de pistes de la Playlist` écrivent un fichier par piste ou par groupe de la Playlist. Dans le menu du Mixer, `Enregistrement sur disque › Rendre les pistes armées en fichier(s) WAV...` (`Alt+R`) ouvre la fenêtre d'export pour les seuls inserts armés.
 
 ## Autres entrées du menu Export
@@ -75,7 +77,8 @@ Cochez `Et le mixage complet` pour obtenir le mixage à côté des stems. La lig
 |---|---|---|
 | `Fichier MIDI...` | `Ctrl+Shift+M` | Écrit les notes dans un fichier MIDI standard (`.mid`) |
 | `Masteriser...` | `Ctrl+Alt+M` | Rend le projet et le masterise vers une cible de loudness en LUFS, sur votre ordinateur |
-| `Projet avec samples (.zip)...` | aucune | Le projet et ses samples dans une seule archive |
+| `Paquet de loops zippé...` | aucune | Le projet et tous les samples qu'il utilise dans un seul `.zip`, comme le paquet de boucles zippé de FL Studio |
+| `Fichiers de données du projet...` | aucune | Copie tous les fichiers utilisés par le projet dans un dossier que vous choisissez ; le projet continue d'utiliser ses propres fichiers |
 | `Projet FL Studio...` | aucune | Un `.flp`, ou un paquet de boucles zippé avec tous les samples |
 | `Set Ableton Live (.als)...` | aucune | Un set pour Live 12 ou Live 11 |
 | `DAWproject (.dawproject)...` | aucune | Un projet pour Bitwig Studio, Studio One, Cubase et les autres applications qui lisent DAWproject |
@@ -84,7 +87,7 @@ Cochez `Et le mixage complet` pour obtenir le mixage à côté des stems. La lig
 
 ## Exporter vers FL Studio, Ableton Live et DAWproject
 
-Le `.flp` est un projet FL Studio 2026. Les samplers, clips audio, générateurs et effets propres à FL Studio, plugins tiers, patterns, la Playlist, le Mixer et l'automation passent avec leurs réglages. Pour ce que FL Studio n'a pas, vous choisissez entre `Les rendre en audio (même son)` et `Utiliser le plugin FL le plus proche (reste modifiable, peut sonner différemment)`. Avec le second choix, les instruments propres à LYNX sont laissés de côté. Les modulateurs sont toujours laissés de côté. Un rapport liste ce qui a été rendu, remplacé ou laissé de côté. Les détails sont dans [Venir de FL Studio](/wiki/coming-from-fl-studio/).
+Le `.flp` est un projet FL Studio 2026. Les samplers, clips audio, générateurs et effets propres à FL Studio, plugins tiers, patterns, la Playlist, le Mixer et l'automation passent avec leurs réglages. Pour ce que FL Studio n'a pas, vous choisissez entre `Les rendre en audio (même son)` et `Utiliser le plugin FL le plus proche (reste modifiable, peut sonner différemment)`. Avec le second choix, les instruments propres à LYNX sont laissés de côté. Les modulateurs qui suivent la position du morceau deviennent des clips d'automation : un LFO synchronisé devient le LFO de clip de FL Studio, et les pas, les sources aléatoires et les macros deviennent des points. Les suiveurs, les enveloppes, le keytrack et la vélocité sont laissés de côté. Un rapport liste ce qui a été rendu, remplacé ou laissé de côté. Les détails sont dans [Venir de FL Studio](/wiki/coming-from-fl-studio/).
 
 Le `.als` contient une piste MIDI par canal, des pistes audio, des groupes, des retours, des envois, des racks et des Drum Racks, des plugins VST2 et VST3 avec leur état, des marqueurs, et l'automation du volume, du pan et du tempo. Les instruments et effets propres à LYNX SHARE ne sont pas convertis, mais leurs pistes et leurs notes sont conservées. Helix est l'exception : il devient le Wavetable de Live. L'automation des paramètres d'effets et les routages d'insert à insert sont abandonnés. Les détails sont dans [Venir d'Ableton Live](/wiki/coming-from-ableton/).
 

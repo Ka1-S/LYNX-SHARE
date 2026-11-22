@@ -1,5 +1,5 @@
 ---
-source: dd17f63a9b
+source: 4ca4775a35
 ---
 ![片段启动布局：播放列表旁边是带有场景的片段网格](/assets/img/cliplaunch.webp)
 
@@ -88,6 +88,8 @@ LYNX SHARE 默认以模式工作流程启动：通道机架、样式和播放列
 - Live 自己的许多设备会作为 LYNX SHARE 自己的设备导入，连同设置和自动化：EQ Eight、EQ Three、Channel EQ、Compressor、Glue Compressor、Multiband Dynamics、Limiter、Gate、Utility、Reverb、Hybrid Reverb、Delay、Echo、Grain Delay、Auto Filter、Saturator、Overdrive、Roar、Erosion、Vinyl Distortion、Corpus、Chorus-Ensemble、Redux、Auto Pan、Drum Buss、Spectral Time、Spectral Resonator、Looper、Simpler、Sampler、Drift、Operator、Wavetable 和 Meld。其余的会被丢弃并列在导入报告中。
 - Instrument Rack 和 Audio Effect Rack 会连同链、区域和宏一起导入，Drum Rack 会变成 LYNX SHARE 的 Drum Rack。Live 的 Arpeggiator 会变成通道的琶音器。Pitch、Velocity、Chord、Note Length 和 MIDI Effect Rack 会写入音符。
 - 导入报告会列出被略去的内容。
+- 在设备视图中，机架会内联显示其链中的设备，宏映射模式（机架的 `映射` 按钮）会把设备参数交给宏，与 Live 一样。
+- 会话混音器有 Live 的独奏 / Cue 开关，带给耳机用的 `Cue Out` 和 `监听音量`。
 - 在导出的套装中，Live 会修剪相互重叠的音频片段。
 - Live 套装中的扭曲标记在导入时保留，导出时写回。
 

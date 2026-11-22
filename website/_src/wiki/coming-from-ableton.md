@@ -90,6 +90,8 @@ A report after the export lists what was left out.
 - Many of Live's own devices come in as LYNX SHARE's own, with their settings and automation: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Hybrid Reverb, Delay, Echo, Grain Delay, Auto Filter, Saturator, Overdrive, Roar, Erosion, Vinyl Distortion, Corpus, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Spectral Time, Spectral Resonator, Looper, Simpler, Sampler, Drift, Operator, Wavetable and Meld. The others are dropped and listed in the import report.
 - Instrument and Audio Effect Racks come in with their chains, zones and macros, and a Drum Rack becomes LYNX SHARE's Drum Rack. Live's Arpeggiator becomes the channel's arpeggiator. Pitch, Velocity, Chord, Note Length and MIDI Effect Racks are written into the notes.
 - The import report lists what was left out.
+- In the Device View a rack shows its chains' devices inline, and Macro Map mode (the rack's `Map` buttons) gives a device parameter to a macro, as in Live.
+- The Session mixer has Live's Solo / Cue switch, with a `Cue Out` for your headphones and a `Cue Volume`.
 - Live trims audio clips that overlap in an exported set.
 - Warp markers from a Live set are kept on import and written back on export.
 

@@ -1,5 +1,5 @@
 ---
-source: b96330a448
+source: 1aea1764bf
 ---
 ![De automatiseringseditor met een curve die over zes maten stijgt](/assets/img/wiki/automation.webp)
 
@@ -76,7 +76,7 @@ Zet opnemen aan met `Automatisering` aangevinkt in het opnamefilter, druk op afs
 
 - `Koppelen aan MIDI-controller (beweeg een knop op de controller)` komt aan bod in [MIDI-controllers](/wiki/midi-controllers/).
 - `Koppelen aan interne controller` laat een Envelope-, Formula- of Peak Controller in het project de regelaar aansturen. Voeg er eerst een toe.
-- `Moduleren` koppelt een modulator, een LFO of een willekeurige bron die een LYNX SHARE-knop om zijn eigen waarde heen beweegt. `Extra › Modulators...` toont ze in een lijst.
+- `Moduleren met` koppelt een modulator die het bedieningselement om zijn eigen waarde heen beweegt: een LFO, een envelopevolger, een ADSR-envelope, steps, een willekeurige bron, een macro, keytrack of velocity. Het werkt op de knoppen van LYNX SHARE en op parameters van plugins van derden. Je kunt een modulator ook op een knop slepen, en een ring op de knop toont de beweging. `Extra › Modulators...` toont ze in een lijst.
 
 ## Automatiseringsbanen
 
@@ -88,7 +88,8 @@ Banen staan standaard uit. Zet `Automatiseringsbanen` aan in het menu van de Pla
 - Meerdere clips op één regelaar spelen elk op hun eigen plek. Vóór zijn eerste clip houdt een regelaar zijn eigen waarde.
 - Aan het begin van een clip bereikt de regelaar de nieuwe waarde in ongeveer 8 ms. FL Studio glijdt er naartoe, dus een geïmporteerd project kan op die punten licht afwijken.
 - Waar clips op dezelfde regelaar overlappen, kan de clip die LYNX SHARE kiest verschillen van die FL Studio kiest.
-- Modulators werken alleen op de eigen knoppen van LYNX SHARE en worden weggelaten als je exporteert naar `.flp`.
+- Bij een `.flp`-export worden modulators die de songpositie volgen automatiseringsclips (een gesynchroniseerde LFO wordt de clip-LFO van FL Studio). Followers, envelopes, keytrack en velocity worden weggelaten, en het rapport toont ze.
+- Een bedieningselement bewogen tijdens het afspelen zonder op te nemen? `Automatisering vastleggen` in de opnameopties maakt achteraf automatisering van de laatste bewegingen.
 
 ## Gerelateerd
 

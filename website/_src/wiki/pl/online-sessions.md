@@ -1,5 +1,5 @@
 ---
-source: 7db9a73959
+source: bf45e1d436
 ---
 Z innymi osobami można pracować nad projektem na dwa sposoby, oba w `Plik › Sesja online`. Paczka to plik, który wysyłasz znajomemu, a on odsyła partię z powrotem. Nie potrzebuje sieci, konta ani serwera. Sesja na żywo łączy wszystkich przez internet przez przekaźnik LYNX SHARE, a każda zmiana trafia do wszystkich. W jednym projekcie bierze udział do 4 osób, razem z tobą.
 
@@ -69,7 +69,7 @@ Menu `Plik › Sesja online` ma te polecenia, gdy sesja trwa:
 | `Zakończ sesję na żywo` | Dla gospodarza. Wszyscy wychodzą, a kod przestaje działać |
 | `Opuść sesję na żywo` | Dla gościa. Twoja partia projektu zostaje u ciebie |
 
-W `Osoby i uprawnienia...` każda osoba dostaje jedną z czterech ról: `Własne kanały, patterny, inserty i wiersze`, `Własne partie + tempo i ustawienia projektu`, `Wszystko` albo `Tylko słuchanie (bez edycji)`. Wyłączenie uprawnienia nigdy niczego nie usuwa.
+W `Osoby i uprawnienia...` każda osoba dostaje jedną z czterech ról: `Własne kanały, patterny, inserty i wiersze`, `Własne partie + tempo i ustawienia projektu`, `Wszystko` albo `Tylko słuchanie (bez edycji)`. Wyłączenie uprawnienia nigdy niczego nie usuwa. Piąty wybór, `Usuń z sesji`, usuwa osobę z sesji. Domyślnie sesja dostaje wtedy nowy kod zaproszenia dla nowych dołączających, a osoby, które w niej zostały, grają dalej; `Zachowaj ten sam kod` zachowuje stary kod.
 
 ## Pluginy, których inni nie mają
 

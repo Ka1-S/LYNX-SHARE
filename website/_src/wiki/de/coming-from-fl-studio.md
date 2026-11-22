@@ -1,5 +1,5 @@
 ---
-source: 68d518394b
+source: 7342d4fb1f
 ---
 LYNX SHARE behält die Arbeitsweise, die du kennst: ein Channel Rack, Patterns, eine Playlist und einen Mixer, auf denselben Tasten. Es öffnet `.flp`-Projekte direkt und kann auch eines zurückschreiben.
 
@@ -92,7 +92,7 @@ Die Datei ist ein FL-Studio-2026-Projekt. Sampler, Audioclips, die eigenen Gener
 ## Gut zu wissen
 
 - FLEX-Packs sind verschlüsselt und werden nie geöffnet. Ein FLEX-Kanal bekommt einen Synth-Patch, der nach seinem Preset-Namen gewählt wird.
-- Modulatoren werden bei einem `.flp`-Export weggelassen, und der Exportbericht sagt das.
+- Bei einem `.flp`-Export werden Modulatoren, die der Songposition folgen, zu Automationsclips (ein synchronisierter LFO wird zum Clip-LFO von FL Studio). Follower, Hüllkurven, Keytrack und Velocity werden weggelassen, und der Exportbericht sagt das.
 - Der Importbericht listet, was vom eingebauten Synth angenähert wurde, was keine Entsprechung hatte, welche Plugins gefunden wurden oder nicht installiert sind, welche Effekte weggelassen oder nur teilweise nachgebildet wurden und wie viele Samples fehlen.
 - Ein Effekt von Drittanbietern, der nicht installiert ist, wird durch einen LYNX-SHARE-Effekt mit derselben Aufgabe ersetzt. Das Original bleibt im Projekt.
 

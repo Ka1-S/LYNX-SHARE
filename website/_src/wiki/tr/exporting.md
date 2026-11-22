@@ -1,5 +1,5 @@
 ---
-source: d980e5fc0f
+source: b05790879f
 ---
 ![WAV seçili dışa aktarma penceresi: solda aralık, kuyruk ve dosyalar, sağda format, altta miks seçenekleri](/assets/img/wiki/export.webp)
 
@@ -67,6 +67,8 @@ Düğmeler formatı seçer. M4A yalnızca sistemde bir AAC kodlayıcı olduğund
 
 Stem'lerin yanında miksi de almak için `Tam mix de` kutusunu işaretleyin. Alttaki satır kaç dosya yazılacağını gösterir.
 
+Şarkının Sections şeridinde bölümleri varsa `Bölüm başına bir dosya` onu bölümlerden keser ve her dosyayı kendi bölümünün adıyla adlandırır. Stem'lerde her bölüm kendi setini alır.
+
 `Dosya › Dışa aktar › Tüm Playlist izleri` ve `Tüm Playlist iz grupları`, her Playlist izi ya da her grup için bir dosya yazar. Mixer'ın menüsündeki `Diske kayıt › Kayda hazır kanalları WAV dosya(lar)ına render al...` (`Alt+R`), dışa aktarma penceresini yalnızca kayda hazır insert'ler için açar.
 
 ## Export menüsünün diğer girişleri
@@ -75,7 +77,8 @@ Stem'lerin yanında miksi de almak için `Tam mix de` kutusunu işaretleyin. Alt
 |---|---|---|
 | `MIDI dosyası...` | `Ctrl+Shift+M` | Notaları standart bir MIDI dosyası (`.mid`) olarak yazar |
 | `Masterla...` | `Ctrl+Alt+M` | Projeyi render eder ve bilgisayarınızda LUFS cinsinden bir ses yüksekliği hedefine masterlar |
-| `Sample'larla proje (.zip)...` | yok | Proje ve sample'ları tek bir arşivde |
+| `Sıkıştırılmış loop paketi...` | yok | Proje ve kullandığı her sample tek bir `.zip` içinde, FL Studio'nun sıkıştırılmış loop paketi olarak |
+| `Proje veri dosyaları...` | yok | Projenin kullandığı her dosyayı seçtiğiniz bir klasöre kopyalar; proje kendi dosyalarını kullanmaya devam eder |
 | `FL Studio projesi...` | yok | Bir `.flp` ya da her sample'ı içeren sıkıştırılmış loop paketi |
 | `Ableton Live seti (.als)...` | yok | Live 12 veya Live 11 için bir set |
 | `DAWproject (.dawproject)...` | yok | Bitwig Studio, Studio One, Cubase ve DAWproject okuyan diğer uygulamalar için bir proje |
@@ -84,7 +87,7 @@ Stem'lerin yanında miksi de almak için `Tam mix de` kutusunu işaretleyin. Alt
 
 ## FL Studio'ya, Ableton Live'a ve DAWproject'e dışa aktarmak
 
-`.flp` bir FL Studio 2026 projesidir. Sampler'lar, ses klipleri, FL Studio'nun kendi jeneratörleri ve efektleri, üçüncü taraf plugin'ler, pattern'ler, Playlist, Mixer ve otomasyon ayarlarıyla birlikte geçer. FL Studio'da karşılığı olmayan şeyler için `Sese render et (aynı ses)` ile `En yakın FL eklentisini kullan (düzenlenebilir kalır, farklı duyulabilir)` arasında seçim yaparsınız. İkinci seçenekte yalnızca LYNX'e özgü enstrümanlar dışarıda kalır. Modülatörler her zaman dışarıda bırakılır. Bir rapor, nelerin render edildiğini, değiştirildiğini ya da dışarıda bırakıldığını listeler. Ayrıntılar [FL Studio'dan geliyorsanız](/wiki/coming-from-fl-studio/) sayfasında.
+`.flp` bir FL Studio 2026 projesidir. Sampler'lar, ses klipleri, FL Studio'nun kendi jeneratörleri ve efektleri, üçüncü taraf plugin'ler, pattern'ler, Playlist, Mixer ve otomasyon ayarlarıyla birlikte geçer. FL Studio'da karşılığı olmayan şeyler için `Sese render et (aynı ses)` ile `En yakın FL eklentisini kullan (düzenlenebilir kalır, farklı duyulabilir)` arasında seçim yaparsınız. İkinci seçenekte yalnızca LYNX'e özgü enstrümanlar dışarıda kalır. Şarkı konumunu izleyen modülatörler otomasyon klipleri olur: senkronlu bir LFO FL Studio'nun klip LFO'su olur; adımlar, rastgele kaynaklar ve makrolar noktalara dönüşür. Takipçiler, zarflar, keytrack ve velocity dışarıda bırakılır. Bir rapor, nelerin render edildiğini, değiştirildiğini ya da dışarıda bırakıldığını listeler. Ayrıntılar [FL Studio'dan geliyorsanız](/wiki/coming-from-fl-studio/) sayfasında.
 
 `.als`, her kanal için bir MIDI izi, ses izleri, gruplar, return'ler, send'ler, rack'ler ve Drum Rack'ler, durumlarıyla VST2 ve VST3 plugin'leri, işaretçiler ile ses, pan ve tempo otomasyonunu içerir. LYNX SHARE'in kendi enstrümanları ve efektleri dönüştürülmez, ama izleri ve notaları korunur. İstisna Helix'tir: Live'ın Wavetable'ı olur. Efekt parametrelerinin otomasyonu ve insert'ten insert'e yönlendirmeler atılır. Ayrıntılar [Ableton Live'dan geliyorsanız](/wiki/coming-from-ableton/) sayfasında.
 

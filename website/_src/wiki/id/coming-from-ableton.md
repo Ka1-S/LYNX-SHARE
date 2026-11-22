@@ -1,5 +1,5 @@
 ---
-source: dd17f63a9b
+source: 4ca4775a35
 ---
 ![Layout Clip-launch: kisi klip dengan scene di samping Playlist](/assets/img/cliplaunch.webp)
 
@@ -88,6 +88,8 @@ Laporan setelah ekspor mencantumkan apa yang tidak ikut ditulis.
 - Banyak device bawaan Live masuk sebagai milik LYNX SHARE sendiri, beserta pengaturan dan otomasinya: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Hybrid Reverb, Delay, Echo, Grain Delay, Auto Filter, Saturator, Overdrive, Roar, Erosion, Vinyl Distortion, Corpus, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Spectral Time, Spectral Resonator, Looper, Simpler, Sampler, Drift, Operator, Wavetable, dan Meld. Sisanya dibuang dan dicantumkan di laporan impor.
 - Instrument Rack dan Audio Effect Rack masuk beserta rantai, zona, dan makronya, dan Drum Rack menjadi Drum Rack milik LYNX SHARE. Arpeggiator milik Live menjadi arpeggiator channel. Pitch, Velocity, Chord, Note Length, dan MIDI Effect Rack ditulis ke dalam not.
 - Laporan impor mencantumkan apa yang tidak ikut diimpor.
+- Di Device View, sebuah rack menampilkan device dari rantainya secara inline, dan mode Macro Map (tombol `Map` pada rack) memberikan parameter device ke sebuah makro, seperti di Live.
+- Mixer Session punya sakelar Solo / Cue milik Live, dengan `Cue Out` untuk headphone-mu dan `Volume cue`.
 - Live memangkas clip audio yang saling tumpang tindih dalam set yang diekspor.
 - Warp marker dari set Live dipertahankan saat impor dan ditulis kembali saat ekspor.
 
