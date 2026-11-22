@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -15,6 +16,7 @@
 
 #include "core/Effects.h"
 #include "core/LynxBanks.h"
+#include "core/ModelParams.h"
 #include "core/RackRenderer.h"
 #include "engine/ClapFormat.h"
 #include "engine/ProjectFile.h"
@@ -355,6 +357,8 @@ struct RawClapHost
 
 void clapStateLoadIsSilent (const juce::File& file, const Entry& entry)
 {
+    std::fprintf (stderr, "plugexporttest: CLAP state in a plain host: %s\n", entry.name); // (the report is written at the end; this says where a crash was)
+    std::fflush (stderr);
     // a state with moved parameters, from the same engine in this process
     std::unique_ptr<juce::AudioProcessor> source (plugexport::makeProcessor (entry));
     for (auto* p : source->getParameters())
@@ -438,6 +442,8 @@ const Entry* entryNamed (const juce::String& name)
 
 void testPlugin (juce::AudioPluginFormat& format, const juce::PluginDescription& description, const juce::String& picturePrefix)
 {
+    std::fprintf (stderr, "plugexporttest: %s (%s)\n", description.name.toRawUTF8(), format.getName().toRawUTF8());
+    std::fflush (stderr);
     const auto* entry = entryNamed (description.name);
     check (entry != nullptr, "known name: " + description.name);
     if (entry == nullptr)
@@ -530,11 +536,23 @@ void testPlugin (juce::AudioPluginFormat& format, const juce::PluginDescription&
     }
     else
     {
-        const auto was = parameters[1]->getValue();
-        parameters[1]->setValue (was < 0.5f ? was + 0.3f : was - 0.3f);
-        report << "  moved '" << parameters[1]->getName (64) << "' " << was << " -> " << parameters[1]->getValue() << "\n";
-        const auto changed = render (*instance, true);
-        check (changed.difference (sound) > 1.0e-3, "the moved parameter changes the sound, difference " + juce::String (changed.difference (sound), 5));
+        // the engine's first continuous parameter after its first one (VST3 / CLAP: the host's parameter 1, as before). JUCE's
+        // LV2 host lists them in an order of its own: there it is found by its id (round 190pq: its parameter 1 was Fourfold's
+        // stepped "A On" switch, which a move of 0.3 leaves as it was)
+        juce::AudioProcessorParameter* moved = nullptr;
+        if (const auto* table = modelparams::tableOf (entry->synth); table != nullptr && table->params != nullptr)
+            for (std::size_t k = 1; moved == nullptr && k < table->params->size(); ++k)
+                if (const auto& e = (*table->params)[k]; ! (e.stepped && e.high > e.low && e.high - e.low <= 4096.0f)) // (the plugin's rule for a discrete parameter)
+                    moved = lv2 ? engineParameter (e.index) : engineParameter ((int) k);
+        check (moved != nullptr, "the host lists a continuous parameter of the engine");
+        if (moved != nullptr)
+        {
+            const auto was = moved->getValue();
+            moved->setValue (was < 0.5f ? was + 0.3f : was - 0.3f);
+            report << "  moved '" << moved->getName (64) << "' " << was << " -> " << moved->getValue() << "\n";
+            const auto changed = render (*instance, true);
+            check (changed.difference (sound) > 1.0e-3, "the moved parameter changes the sound, difference " + juce::String (changed.difference (sound), 5));
+        }
     }
 
     // state: a new instance of what we just heard sounds the same

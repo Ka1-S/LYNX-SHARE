@@ -33,7 +33,10 @@ public:
     WaveformCache();
     ~WaveformCache() override;
 
-    JUCE_DECLARE_SINGLETON_SINGLETHREADED_INLINE (WaveformCache, true)
+    // (may be created again after JUCE's shutdown deleted it, round 190pq: a plugin of the pack shuts JUCE down with its last
+    // instance, but the host keeps the library loaded — JUCE's own thread_local text shaping pins it — so the next
+    // instrument's editor got no cache and crashed in a host that removed every LYNX plugin and added one again)
+    JUCE_DECLARE_SINGLETON_SINGLETHREADED_INLINE (WaveformCache, false)
 
     using Source = std::function<std::shared_ptr<const SampleData>()>;
 
