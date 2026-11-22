@@ -104,8 +104,18 @@ struct RackState
         float base = 0.5f;          // the target's own value
         int modulator = 0;
         float depth = 0.0f;
+        bool hosted = false;        // round 190ox: a hosted plugin's parameter (base = ModRoute::base)
     };
     std::vector<ModPlay> modRoutes;
+    // Round 190ox (modulators stage 2): per modulator, what feeds it — the follower's insert, the notes' channel (−1:
+    // none) — and the slot of an automation that drives a Macro's knob (−1: its own value). Empty without modulators.
+    struct ModFeed
+    {
+        int track = -1, channel = -1, macroSlot = -1;
+    };
+    std::vector<ModFeed> modFeeds;
+    std::vector<char> followedTracks; // per insert: a follower reads its level (empty: none)
+    bool modStateful = false;         // a follower, envelope, keytrack or velocity modulator routes somewhere
     // Several automations with clips on one target play as one (issue #97, FL's rule: docs/analise/REA_rodada177b.md):
     // the last of them holds the slot and lists them all here (ascending; empty = it plays alone); the others are
     // marked as followers: they bind nothing and compute nothing.
@@ -1065,6 +1075,23 @@ private:
     void updateAutomation (const RackState& state, double startTick) noexcept;
     void updateModulators (const RackState& state, double tick, int numSamples) noexcept; // round 177b
     double modSeconds = 0.0; // the free-running modulators' clock
+    // Round 190ox: the stateful modulators' state (envelopes, followers, the last note; audio thread), the followed
+    // inserts' last peak, and per channel the notes struck so far with the last one's key and velocity
+    static constexpr int maxStatefulModulators = 256;
+    std::array<modenv::State, maxStatefulModulators> modStates {};
+    std::array<float, maxMixerTracks> followPeak {};        // [insert]
+    std::array<std::uint32_t, maxChannels> notesStruck {};
+    std::array<std::uint8_t, maxChannels> lastNoteKey {};
+    std::array<float, maxChannels> lastNoteVelocity {};
+    void noteStruck (int channel, int key, float velocity) noexcept
+    {
+        if (channel >= 0 && channel < maxChannels)
+        {
+            ++notesStruck[(std::size_t) channel];
+            lastNoteKey[(std::size_t) channel] = (std::uint8_t) std::clamp (key, 0, 127);
+            lastNoteVelocity[(std::size_t) channel] = velocity;
+        }
+    }
     // ticks from `tick` to the next pattern event (or pattern clip edge) that changes a lane's value; +inf if none
     static double ticksToNextEvent (const RackState& state, double tick) noexcept;
     // bindings from this automation slot on (andLive: and those of live controllers, the links)

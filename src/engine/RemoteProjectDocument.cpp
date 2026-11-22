@@ -80,6 +80,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         add (S::root, "patterns", S::pattern, true);
         add (S::root, "automations", S::automation, true);
         add (S::root, "modulators", S::modulator, true);
+        add (S::root, "modulators190ox", S::modulator, true); // (round 190ox: the modulators stage 2 kinds)
         add (S::root, "vcas", S::vca, true);
         add (S::root, "mixer", S::mixer, true);
         add (S::root, "video", S::video);
@@ -154,6 +155,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         add (S::automation, "name uid target points source curve lfo lfoFl recordLive colour tempoMarkers rackSlot");
         add (S::automation, "links", S::readOnly);
         add (S::modulator, "name shape sync beats hz phase unipolar seed routes");
+        add (S::modulator, "at host kind input attack decay sustain release gain steps glide smooth macro"); // (round 190ox)
         add (S::vca, "name colour level muted members parent");
         add (S::video, "rate startTimecode rateFromVideo timecodeRuler burnIn");
         add (S::video, "tracks", S::videoTrack, true);

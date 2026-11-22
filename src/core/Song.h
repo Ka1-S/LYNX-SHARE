@@ -1851,7 +1851,9 @@ enum class AutomationTargetKind : std::uint8_t
     // 0 pan (0…1 = −1…1), 1 volume (0…1 = 0…200 %, FL's whole 0…25600 travel), 3 Mod X, 4 Mod Y (0…1 = −1…1)
     channelAdjust,
     // Live's crossfader (round 190kc, the Main track's CrossFade): 0..1 = left..right (Song::crossfader -1..1)
-    crossfader
+    crossfader,
+    // index = modulator (Song::modulators): a Macro modulator's knob (round 190ox; LYNX's own). 0..1 = its value
+    modulatorMacro
 };
 
 namespace leveladjust
@@ -2122,8 +2124,27 @@ struct ModRoute
 {
     AutomationTarget target;
     float depth = 0.25f; // -1..1 of the target's whole range
+    // Round 190ox: a hosted plugin's parameter (VST3 / AU / LV2 / VST2 / CLAP, a Patcher's published one): its value lives
+    // in the plugin, so the host keeps the user's own value here (0..1) and sends clamp (base + depth × mod). −1 = none
+    // (LYNX's own controls: their value is in the song). An automation of the target still sets the base.
+    float base = -1.0f;
     bool operator== (const ModRoute&) const = default;
 };
+
+// Round 190ox, modulators stage 2 (research 190oe P9): the kind of source. An LFO is stage 1's (every modulator saved
+// before this round); the others are LYNX's own, saved where older releases do not read them (ProjectFile).
+enum class ModKind : std::uint8_t
+{
+    lfo,      // shape × rate (stage 1)
+    follower, // envelope follower: an insert's level (attack, release, gain)
+    envelope, // ADSR envelope retriggered by a channel's notes
+    steps,    // step sequencer: 1-32 values, a step length, glide
+    random,   // sample and hold: a new value per step, smoothed
+    macro,    // a plain knob (automatable: AutomationTargetKind::modulatorMacro)
+    keytrack, // the last note's key on a channel (C5 = 0, ±5 octaves = ±1)
+    velocity  // the last note's velocity on a channel
+};
+constexpr int modKindCount = 8;
 
 struct Modulator
 {
@@ -2136,12 +2157,55 @@ struct Modulator
     bool unipolar = false;       // 0..1 instead of -1..1
     std::uint32_t seed = 1;      // the random shapes' sequence
     std::vector<ModRoute> routes;
+
+    // --- round 190ox: stage 2 (every field below keeps its default on an LFO, so stage 1's modulators stay as they were)
+    ModKind kind = ModKind::lfo;
+    // Where the modulator sits (LYNX's Modulators panel groups by it): a channel (channelVolume, index = channel), a
+    // mixer insert (mixerVolume, index = insert) or nowhere (none). Kept as targets so moving / deleting channels and
+    // inserts carries them along (Song::forEachTarget).
+    AutomationTarget host;
+    // The follower's insert (mixerVolume) or the note source of an envelope / keytrack / velocity (channelVolume);
+    // none = the host's own (a channel host's insert for a follower).
+    AutomationTarget input;
+    float attack = 10.0f, decay = 300.0f, sustain = 0.6f, release = 250.0f; // ms (follower: attack and release)
+    float gain = 0.0f;           // follower: input gain, dB
+    std::vector<float> steps;    // step sequencer: −1..1 each (1-32 of them); `beats` is one step's length
+    float glide = 0.0f;          // steps: 0..1 of a step spent sliding to the next value
+    float smooth = 0.0f;         // random: 0 = stepped (sample and hold) … 1 = smooth curve
+    float macro = 0.0f;          // macro: the knob's value, 0..1
     bool operator== (const Modulator&) const = default;
 
     // The output at `cycles` (cycles since the song start, or since the modulator started when free).
     float output (double cycles) const noexcept;
-    static bool canModulate (const Song& song, const AutomationTarget& target) noexcept; // LYNX's own controls
+    // Round 190ox: the step sequencer's and the random source's output at `stepsIn` steps (a step = `beats` / 1 / hz).
+    float stepOutput (double stepsIn) const noexcept;
+    // Whether its output follows the song position alone (LFO, steps, random synced; macro): an export can bake it.
+    bool deterministic() const noexcept;
+    // A new modulator of `kind` with that kind's defaults ("Steps 1": 8 steps of 1/16…).
+    static Modulator make (ModKind kind);
+    static const char* kindName (ModKind kind) noexcept; // English (TR_NOOP'd at the UI): "LFO", "Envelope follower"…
+    static bool canModulate (const Song& song, const AutomationTarget& target) noexcept; // LYNX's own controls, hosted plugins
+    // A hosted plugin's (or a Patcher's published) parameter: its base lives in ModRoute::base.
+    static bool isHostedTarget (const Song& song, const AutomationTarget& target) noexcept;
 };
+
+namespace modenv
+{
+// The ADSR / follower state the renderer keeps per modulator (audio thread). `advance` moves it by `seconds`.
+struct State
+{
+    float level = 0.0f;
+    std::uint8_t stage = 0; // envelope: 0 idle, 1 attack, 2 decay, 3 sustain, 4 release
+    std::uint32_t notesSeen = 0;
+    float lastKey = 60.0f, lastVelocity = 0.0f;
+    float smoothed = 0.0f;
+    bool primed = false, primedSmooth = false;
+};
+// The envelope over `seconds` with the notes held or not (`gate`), retriggered when `trigger`.
+void envelope (const Modulator& m, State& s, bool gate, bool trigger, double seconds) noexcept;
+// The follower towards `peak` (linear, after the gain) over `seconds`.
+void follow (const Modulator& m, State& s, float peak, double seconds) noexcept;
+} // namespace modenv
 
 // One chord of a keyboard chord set (round 190ds; FL Studio Mobile's KEYB entries {baseNote, extensions, octave,
 // quality}, docs/analise/FLM_FORMAT.md §2): root pitch class, quality (0 major, 1 minor, 2 augmented, 3 diminished,
@@ -2854,8 +2918,12 @@ struct Song
             for (auto& lane : p.events)
                 fn (lane.target);
         for (auto& m : modulators)
+        {
             for (auto& r : m.routes)
                 fn (r.target);
+            fn (m.host); // (round 190ox: where it sits and what it follows)
+            fn (m.input);
+        }
     }
     void removeDeadMidiLinks();
 
@@ -3152,6 +3220,8 @@ struct Song
 
     // Removes an automation and its clips.
     void removeAutomation (int index);
+    // Round 190ox: deletes modulator `index`; what pointed at a later Macro's knob moves down, at this one's goes.
+    void removeModulator (int index);
 
     // Current value (from the model, without automation) of the target, 0..1; -1 if the target doesn't exist.
     float targetValue (const AutomationTarget& target) const noexcept;

@@ -7260,8 +7260,18 @@ void AudioEngine::capturePluginStatesInto (Song& target, bool requireAll)
                 target.araDocuments.push_back (std::move (doc));
         }
 
-    const auto capture = [requireAll] (auto* plugin) {
-        auto state = plugin->captureState();
+    // round 190ox: a modulated parameter of a hosted plugin is saved at its base (the user's value), not mid-swing
+    const auto basesOf = [&target] (AutomationTargetKind kind, int index, int slot) {
+        std::vector<std::pair<int, float>> bases;
+        for (const auto& m : target.modulators)
+            for (const auto& r : m.routes)
+                if (r.target.kind == kind && r.target.index == index && (kind != AutomationTargetKind::effectParam || r.target.slot == slot)
+                    && r.base >= 0.0f && r.depth != 0.0f && r.target.param >= 0)
+                    bases.emplace_back (r.target.param, std::clamp (r.base, 0.0f, 1.0f));
+        return bases;
+    };
+    const auto capture = [requireAll] (auto* plugin, const std::vector<std::pair<int, float>>& bases = {}) {
+        auto state = bases.empty() ? plugin->captureState() : plugin->captureState (bases);
         if (! state && requireAll) throw RemoteError ("failed", "Cannot capture a live device; no project changes were made");
         return state;
     };
@@ -7278,14 +7288,14 @@ void AudioEngine::capturePluginStatesInto (Song& target, bool requireAll)
     for (std::size_t i = 0; i < target.channels.size(); ++i)
         if (auto* p = dynamic_cast<PluginInstrument*> (getChannelInstrument ((int) i).get()))
             if (target.channels[i].plugin.playedBy == 0) // (P5-A1: a plugin shared in a live session keeps no state, only values)
-                if (auto state = capture (p)) // (a plugin that crashed keeps the state saved before)
+                if (auto state = capture (p, basesOf (AutomationTargetKind::channelParam, (int) i, 0))) // (a plugin that crashed keeps the state saved before)
                     target.channels[i].plugin.state = std::move (*state);
 
     for (std::size_t t = 0; t < target.mixer.size(); ++t)
         for (std::size_t s = 0; s < target.mixer[t].effects.size(); ++s)
             if (auto* p = dynamic_cast<PluginEffect*> (getEffect ((int) t, (int) s).get()))
                 if (target.mixer[t].effects[s].plugin.playedBy == 0)
-                    if (auto state = capture (p))
+                    if (auto state = capture (p, basesOf (AutomationTargetKind::effectParam, (int) t, (int) s)))
                         target.mixer[t].effects[s].plugin.state = std::move (*state);
 
     // the plugins inside Patchers (REA_rodada141), nested ones too

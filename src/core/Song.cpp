@@ -1359,12 +1359,31 @@ float Song::targetValue (const AutomationTarget& t) const noexcept
                        : -1.0f;
         case AutomationTargetKind::tempo: return valueFromTempo (bpm);
         case AutomationTargetKind::crossfader: return std::clamp ((crossfader + 1.0f) * 0.5f, 0.0f, 1.0f); // (round 190kc)
+        case AutomationTargetKind::modulatorMacro: // (round 190ox: a Macro modulator's knob)
+            return t.index >= 0 && t.index < (int) modulators.size() && modulators[(std::size_t) t.index].kind == ModKind::macro
+                       ? modulators[(std::size_t) t.index].macro
+                       : -1.0f;
         case AutomationTargetKind::vcaLevel:
             return t.index >= 0 && t.index < (int) vcas.size() ? vcas[(std::size_t) t.index].level : -1.0f;
         case AutomationTargetKind::none: break;
     }
 
     return -1.0f;
+}
+
+void Song::removeModulator (int index)
+{
+    if (index < 0 || index >= (int) modulators.size())
+        return;
+    modulators.erase (modulators.begin() + index);
+    forEachTarget ([index] (AutomationTarget& t) {
+        if (t.kind != AutomationTargetKind::modulatorMacro)
+            return;
+        if (t.index == index)
+            t = AutomationTarget {};
+        else if (t.index > index)
+            --t.index;
+    });
 }
 
 float Song::modulationBase (const AutomationTarget& t) const noexcept
@@ -1397,6 +1416,11 @@ bool Song::setTargetValue (const AutomationTarget& t, float v) noexcept
         case AutomationTargetKind::mixerPan: if (! validTrack) return false; mixer[(std::size_t) t.index].pan = v * 2.0f - 1.0f; return true;
         case AutomationTargetKind::tempo: bpm = tempoFromValue (v); return true;
         case AutomationTargetKind::crossfader: crossfader = v * 2.0f - 1.0f; return true; // (round 190kc)
+        case AutomationTargetKind::modulatorMacro: // (round 190ox)
+            if (t.index < 0 || t.index >= (int) modulators.size() || modulators[(std::size_t) t.index].kind != ModKind::macro)
+                return false;
+            modulators[(std::size_t) t.index].macro = v;
+            return true;
         case AutomationTargetKind::vcaLevel:
             if (t.index < 0 || t.index >= (int) vcas.size())
                 return false;
@@ -1811,9 +1835,179 @@ float Modulator::output (double cycles) const noexcept
     return unipolar ? (y + 1.0f) * 0.5f : y;
 }
 
+float Modulator::stepOutput (double stepsIn) const noexcept
+{
+    const auto c = stepsIn + (double) phase;
+    const auto whole = std::floor (c);
+    const auto f = (float) (c - whole); // 0..1 within the step
+    float y = 0.0f;
+    if (kind == ModKind::steps)
+    {
+        const auto count = (std::int64_t) steps.size();
+        if (count == 0)
+            return 0.0f;
+        const auto at = [&] (std::int64_t k) { return std::clamp (steps[(std::size_t) (((k % count) + count) % count)], -1.0f, 1.0f); };
+        const auto a = at ((std::int64_t) whole);
+        y = a;
+        // glide: the last `glide` of the step slides to the next value (an S curve, no click at either end)
+        if (glide > 0.0f && f > 1.0f - glide)
+        {
+            const auto u = (f - (1.0f - glide)) / glide;
+            const auto s = u * u * (3.0f - 2.0f * u);
+            y = a + (at ((std::int64_t) whole + 1) - a) * s;
+        }
+    }
+    else // random: sample and hold, `smooth` of each step spent moving to the next value (1 = a smooth curve)
+    {
+        const auto a = modNoise (seed, (std::int64_t) whole);
+        y = a;
+        if (smooth > 0.0f && f > 1.0f - smooth)
+        {
+            const auto u = (f - (1.0f - smooth)) / smooth;
+            const auto s = u * u * (3.0f - 2.0f * u);
+            y = a + (modNoise (seed, (std::int64_t) whole + 1) - a) * s;
+        }
+    }
+    return unipolar ? (y + 1.0f) * 0.5f : y;
+}
+
+bool Modulator::deterministic() const noexcept
+{
+    switch (kind)
+    {
+        case ModKind::lfo: return sync;
+        case ModKind::steps:
+        case ModKind::random: return sync;
+        case ModKind::macro: return true;
+        case ModKind::follower:
+        case ModKind::envelope:
+        case ModKind::keytrack:
+        case ModKind::velocity: break;
+    }
+    return false;
+}
+
+const char* Modulator::kindName (ModKind kind) noexcept
+{
+    switch (kind)
+    {
+        case ModKind::lfo: return "LFO";
+        case ModKind::follower: return "Envelope follower";
+        case ModKind::envelope: return "ADSR envelope";
+        case ModKind::steps: return "Steps";
+        case ModKind::random: return "Random";
+        case ModKind::macro: return "Macro";
+        case ModKind::keytrack: return "Keytrack";
+        case ModKind::velocity: return "Velocity";
+    }
+    return "LFO";
+}
+
+Modulator Modulator::make (ModKind kind)
+{
+    Modulator m;
+    m.kind = kind;
+    switch (kind)
+    {
+        case ModKind::lfo: break;
+        case ModKind::follower: m.unipolar = true; break;
+        case ModKind::envelope: m.unipolar = true; break;
+        case ModKind::steps:
+            m.beats = 0.25; // 1/16 per step
+            m.steps = { 1.0f, -0.5f, 0.5f, -1.0f, 0.75f, -0.25f, 0.25f, -0.75f };
+            break;
+        case ModKind::random: m.beats = 0.25; break;
+        case ModKind::macro: m.unipolar = true; break;
+        case ModKind::keytrack: break;
+        case ModKind::velocity: m.unipolar = true; break;
+    }
+    return m;
+}
+
+namespace modenv
+{
+namespace
+{
+// a one-pole's share of the way to its target after `seconds` with time constant `ms` (0 ms: all of it)
+float approach (float ms, double seconds) noexcept
+{
+    return ms <= 0.05f ? 1.0f : (float) (1.0 - std::exp (-seconds * 1000.0 / (double) ms));
+}
+} // namespace
+
+void envelope (const Modulator& m, State& s, bool gate, bool trigger, double seconds) noexcept
+{
+    if (trigger)
+        s.stage = 1;
+    else if (! gate && s.stage >= 1 && s.stage <= 3)
+        s.stage = 4;
+    // linear attack (to 1 in `attack` ms), exponential decay and release (time constants), as the synths' own
+    switch (s.stage)
+    {
+        case 1:
+        {
+            const auto step = m.attack <= 0.05f ? 1.0f : (float) (seconds * 1000.0 / (double) m.attack);
+            s.level = std::min (1.0f, s.level + step);
+            if (s.level >= 1.0f)
+                s.stage = 2;
+            break;
+        }
+        case 2:
+        case 3:
+        {
+            const auto target = std::clamp (m.sustain, 0.0f, 1.0f);
+            s.level += (target - s.level) * approach (m.decay, seconds);
+            if (std::abs (s.level - target) < 1.0e-4f)
+                s.level = target, s.stage = 3;
+            break;
+        }
+        case 4:
+            s.level += (0.0f - s.level) * approach (m.release, seconds);
+            if (s.level < 1.0e-5f)
+                s.level = 0.0f, s.stage = 0;
+            break;
+        default: break;
+    }
+}
+
+void follow (const Modulator& m, State& s, float peak, double seconds) noexcept
+{
+    const auto in = std::clamp (peak * std::pow (10.0f, m.gain / 20.0f), 0.0f, 1.0f);
+    s.level += (in - s.level) * approach (in > s.level ? m.attack : m.release, seconds);
+}
+} // namespace modenv
+
+bool Modulator::isHostedTarget (const Song& song, const AutomationTarget& t) noexcept
+{
+    if (t.kind == AutomationTargetKind::effectParam && t.index >= 0 && t.index < (int) song.mixer.size() && t.slot >= 0
+        && t.slot < (int) song.mixer[(std::size_t) t.index].effects.size())
+    {
+        const auto kind = song.mixer[(std::size_t) t.index].effects[(std::size_t) t.slot].kind;
+        return kind == EffectKind::plugin || kind == EffectKind::patcher;
+    }
+    if (t.kind == AutomationTargetKind::channelParam && t.index >= 0 && t.index < (int) song.channels.size())
+    {
+        const auto kind = song.channels[(std::size_t) t.index].instrument;
+        return kind == InstrumentKind::plugin || kind == InstrumentKind::patcher;
+    }
+    return false;
+}
+
 bool Modulator::canModulate (const Song& song, const AutomationTarget& t) noexcept
 {
-    // LYNX's own controls: not the tempo, not a plugin's parameters (their value lives in the plugin)
+    // round 190ox: a hosted plugin's parameters too (the base is kept host-side, ModRoute::base); not their MIDI
+    // controls (a CC per block), not a missing plugin's stand-in, not a macro (a modulator does not drive another)
+    if (t.kind == AutomationTargetKind::modulatorMacro)
+        return false;
+    if (isHostedTarget (song, t))
+    {
+        if (t.param < 0 || midictl::isMidiParam (t.param))
+            return false;
+        if (t.kind == AutomationTargetKind::effectParam && song.mixer[(std::size_t) t.index].effects[(std::size_t) t.slot].isSubstitute())
+            return false;
+        return true;
+    }
+    // LYNX's own controls: not the tempo
     if (t.kind == AutomationTargetKind::none || t.kind == AutomationTargetKind::tempo || song.targetValue (t) < 0.0f)
         return false;
     if (t.kind == AutomationTargetKind::effectParam && t.index >= 0 && t.index < (int) song.mixer.size() && t.slot >= 0

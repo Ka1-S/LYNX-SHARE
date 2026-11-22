@@ -1683,6 +1683,53 @@ void toRelease0130 (juce::var& root, Losses& lost)
         for (auto& a : *automations)
             if (auto* ao = objectOf (a))
                 drop (*ao, "rackSlot");
+
+    // round 190ox (modulators stage 2): 0.1.30 has LFO modulators on LYNX's own controls only. The other kinds (they sit
+    // in "modulators190ox", which 0.1.30 does not read) go with a line naming them; an LFO's routes to a hosted
+    // plugin's parameters (which 0.1.30 would refuse) and the stage 2 fields go too; an automation of a Macro's knob
+    // stays as an unlinked clip
+    {
+        juce::StringArray kinds, hosted;
+        if (auto* more = arrayOf (root["modulators190ox"]))
+            for (const auto& m : *more)
+            {
+                const auto kind = (int) m.getProperty ("kind", 0);
+                const auto kindText = juce::String (Modulator::kindName ((ModKind) juce::jlimit (0, modKindCount - 1, kind)));
+                addOnce (kinds, m["name"].toString() + " (" + kindText + ")");
+            }
+        drop (o, "modulators190ox");
+        if (auto* mods = arrayOf (root["modulators"]))
+            for (auto& m : *mods)
+                if (auto* mo = objectOf (m))
+                {
+                    drop (*mo, "at");
+                    drop (*mo, "host");
+                    if (auto* routes = arrayOf (mo->getProperty ("routes")))
+                        for (int i = routes->size(); --i >= 0;)
+                            if ((*routes)[i].size() >= 6) // (a hosted plugin's parameter: its base as the sixth value)
+                            {
+                                routes->remove (i);
+                                addOnce (hosted, mo->getProperty ("name").toString());
+                            }
+                }
+        int macroClips = 0;
+        if (auto* automations = arrayOf (root["automations"]))
+            for (auto& a : *automations)
+                if (auto* ao = objectOf (a))
+                    if (const auto t = ao->getProperty ("target"); t.isArray() && t.size() >= 1 && t[0].toString() == "modulatorMacro")
+                    {
+                        ao->setProperty ("target", juce::Array<juce::var> { "none", 0, 0, 0 });
+                        ++macroClips;
+                    }
+        if (! kinds.isEmpty())
+            lost.push_back ({ TR_NOOP ("These modulators are not in this release (it has LFO modulators only): their targets keep their own values: {0}"),
+                              listOf (kinds), true });
+        if (! hosted.isEmpty())
+            lost.push_back ({ TR_NOOP ("Modulation of hosted plugins' parameters is not in this release: these modulators move LYNX's own controls only: {0}"),
+                              listOf (hosted), true });
+        if (macroClips > 0)
+            lost.push_back ({ TR_NOOP ("{0} automation clip(s) of a Macro modulator's knob stay as unlinked clips"), juce::String (macroClips), true });
+    }
 }
 
 struct Step

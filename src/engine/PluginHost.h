@@ -85,6 +85,9 @@ public:
     bool takePending() noexcept { return pending.exchange (false, std::memory_order_acq_rel); }
     bool take (int index, float& value) noexcept;
     int size() const noexcept { return count; }
+    // Round 190ox: while a state is captured with the modulated parameters at their base, the audio thread's values wait
+    void hold (bool on) noexcept { holding.store (on, std::memory_order_release); }
+    bool held() const noexcept { return holding.load (std::memory_order_acquire); }
 
 private:
     struct Value
@@ -96,6 +99,7 @@ private:
     std::unique_ptr<Value[]> values;
     std::atomic<bool> pending { false };
     std::atomic<std::uint32_t> restoreEpoch { 1 };
+    std::atomic<bool> holding { false };
 };
 
 // A hosted plugin's audio outputs as FL's wrapper lists them in Processing › Connections (round 188d, issue #114):
@@ -199,6 +203,9 @@ public:
     bool hasCrashed() const noexcept { return crashed.load (std::memory_order_relaxed); }
     // The plugin's state for saving (base64, as capturePluginState), or nullopt after a crash (keep the saved one).
     std::optional<std::string> captureState();
+    // Round 190ox: the same with these parameters at the values given (the modulated ones at their base: the saved state
+    // holds the user's value, not a moment of the modulation); the audio thread's changes wait meanwhile.
+    std::optional<std::string> captureState (const std::vector<std::pair<int, float>>& bases);
     // State restoration is serialized with this instance's processing by its callback lock (capture is not: it runs
     // beside processing, as on JUCE's own hosts; round 190ha).
     bool restoreState (const std::string& state);
@@ -366,6 +373,9 @@ public:
     bool hasCrashed() const noexcept { return crashed.load (std::memory_order_relaxed); }
     // The plugin's state for saving (base64, as capturePluginState), or nullopt after a crash (keep the saved one).
     std::optional<std::string> captureState();
+    // Round 190ox: the same with these parameters at the values given (the modulated ones at their base: the saved state
+    // holds the user's value, not a moment of the modulation); the audio thread's changes wait meanwhile.
+    std::optional<std::string> captureState (const std::vector<std::pair<int, float>>& bases);
     // State restoration is serialized with this instance's processing by its callback lock (capture is not: it runs
     // beside processing, as on JUCE's own hosts; round 190ha).
     bool restoreState (const std::string& state);

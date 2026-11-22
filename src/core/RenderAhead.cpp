@@ -440,6 +440,23 @@ bool RenderAhead::computePartition (const RackState& state, const Block& block, 
                     unite (source, units[k]);
     }
 
+    // round 190ox: a follower's insert / an envelope's channel and what the modulator drives stay on one side (the state
+    // lives in the renderer that runs the source)
+    for (const auto& route : state.modRoutes)
+    {
+        if ((std::size_t) route.modulator >= state.modFeeds.size() || (std::size_t) route.modulator >= song.modulators.size())
+            continue;
+        const auto& feed = state.modFeeds[(std::size_t) route.modulator];
+        const auto source = feed.track >= 0 ? (okTrack (feed.track) ? track (feed.track) : -1) : (feed.channel >= 0 && okChannel (feed.channel) ? feed.channel : -1);
+        if (source < 0)
+            continue;
+        int units[2] {};
+        const auto& mod = song.modulators[(std::size_t) route.modulator];
+        for (const auto& r : mod.routes)
+            for (int k = 0, n = unitOf (r.target, units); k < n; ++k)
+                unite (source, units[k]);
+    }
+
     // --- the closure: a group with a live member is live; whatever a live unit feeds is live
     for (auto changed = true; changed;)
     {

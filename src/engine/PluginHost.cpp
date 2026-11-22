@@ -490,7 +490,7 @@ std::uint32_t flushParameters (juce::AudioPluginInstance& plugin, HostedParamete
 void audioParameter (juce::AudioPluginInstance& plugin, HostedParameterChanges& changes,
                      std::atomic<bool>& crashed, const std::string& name, int index, float value) noexcept
 {
-    if (! changes.contains (index)) return;
+    if (! changes.contains (index) || changes.held()) return; // (round 190ox: a capture at the base values runs)
     const juce::CriticalSection::ScopedTryLockType lock (plugin.getCallbackLock());
     if (! lock.isLocked())
     {
@@ -501,6 +501,30 @@ void audioParameter (juce::AudioPluginInstance& plugin, HostedParameterChanges& 
     changes.clear (index); // a later successful automation value supersedes the queued one
     if (const auto code = crashguard::run ([&] { applyParameter (plugin, changes, index, value); }); code != 0)
         recordCrashOnce (crashed, name, code);
+}
+
+std::optional<std::string> guardedState (juce::AudioPluginInstance& plugin, std::atomic<bool>& crashed, const std::string& name);
+
+// round 190ox: the state with these parameters at the given values (a modulated parameter's base)
+std::optional<std::string> stateAtBases (juce::AudioPluginInstance& plugin, HostedParameterChanges& changes, std::atomic<bool>& crashed,
+                                         const std::string& name, const std::vector<std::pair<int, float>>& bases)
+{
+    if (bases.empty() || crashed.load())
+        return guardedState (plugin, crashed, name);
+    changes.hold (true);
+    if (const auto code = crashguard::run ([&] {
+            for (const auto& [index, value] : bases)
+                if (changes.contains (index))
+                    setPluginParameter (plugin, index, value);
+        }); code != 0)
+    {
+        changes.hold (false);
+        recordCrashOnce (crashed, name, code);
+        return std::nullopt;
+    }
+    auto state = guardedState (plugin, crashed, name);
+    changes.hold (false);
+    return state;
 }
 
 std::optional<std::string> guardedState (juce::AudioPluginInstance& plugin, std::atomic<bool>& crashed, const std::string& name)
@@ -770,6 +794,11 @@ void PluginInstrument::failed (std::uint32_t code) noexcept
 std::optional<std::string> PluginInstrument::captureState()
 {
     return guardedState (*plugin, crashed, name);
+}
+
+std::optional<std::string> PluginInstrument::captureState (const std::vector<std::pair<int, float>>& bases)
+{
+    return stateAtBases (*plugin, parameterChanges, crashed, name, bases);
 }
 
 bool PluginInstrument::restoreState (const std::string& state)
@@ -1474,6 +1503,11 @@ void PluginEffect::failed (std::uint32_t code) noexcept
 std::optional<std::string> PluginEffect::captureState()
 {
     return guardedState (*plugin, crashed, name);
+}
+
+std::optional<std::string> PluginEffect::captureState (const std::vector<std::pair<int, float>>& bases)
+{
+    return stateAtBases (*plugin, parameterChanges, crashed, name, bases);
 }
 
 bool PluginEffect::restoreState (const std::string& state)

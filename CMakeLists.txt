@@ -360,6 +360,7 @@ target_sources(lynx_core PRIVATE
     src/core/PluginMonitor.cpp
     src/core/ProjectContents.cpp
     src/core/PlaylistOps.cpp
+    src/core/ModulatorExport.cpp
     src/core/QuickRender.cpp
     src/core/TempoDetect.cpp
     src/core/AutoWarp.cpp
@@ -567,6 +568,7 @@ if(LYNX_BUILD_APP)
         src/engine/Bridge32Test.cpp
         src/engine/ClapTeardownTest.cpp
         src/engine/HostingTests.cpp
+        src/engine/Modulators190oxTest.cpp
         src/engine/Exporter.cpp
         # M4A export through the system's AAC encoder (owner decision D5): each file compiles on its own platform only
         # (Windows: Media Foundation, linked below; macOS: AudioToolbox; elsewhere: not available)
@@ -621,6 +623,7 @@ if(LYNX_BUILD_APP)
         src/ui/OtherAppsExport.cpp
         src/ui/AutoSamplerDialog.cpp
         src/ui/AutomationUi.cpp
+        src/ui/ModRing.cpp
         src/ui/RemoteControl.cpp
         src/ui/ControllerEditors.cpp
         src/ui/MidiOutEditor.cpp

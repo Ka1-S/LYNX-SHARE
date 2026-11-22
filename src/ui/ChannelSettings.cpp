@@ -1,4 +1,5 @@
 #include <optional>
+#include "ui/ModRing.h"
 #include "ui/WindowOwner.h"
 #include "core/NoteNames.h"
 #include "ui/ChannelSettings.h"
@@ -1393,6 +1394,7 @@ public:
         {
             const auto target = [this, index] { return AutomationTarget { AutomationTargetKind::channelParam, ref.index, 0, index }; };
             ui::setOwnMenu (*knob);
+            modring::tagSlider (*knob, target()); // (round 190ox: its modulation rings)
             knob->onMenu = [this, k = knob.get(), target] { ui::showSliderMenu (*k, &engine, target()); };
             if (instrumentKind == InstrumentKind::transistorbass && (index == tbprog::sequence || index == tbprog::patch))
                 knob->onMenu = [this, k = knob.get(), index] { showTransistorBassList (index == tbprog::patch, *k); }; // (FL: right-click to browse)
@@ -1427,6 +1429,7 @@ public:
                 return AutomationTarget { AutomationTargetKind::channelParam, ref.index, 0, drumcontrols::absoluteIndex (instrumentKind, *control, drumPart) };
             };
             ui::setOwnMenu (*knob);
+            modring::tagSlider (*knob, target()); // (round 190ox)
             knob->onMenu = [this, k = knob.get(), target] { ui::showSliderMenu (*k, &engine, target()); };
             knob->onDragStart = [this, target] { engine.noteTweaked (target(), true); engine.controlTweakedForUndo(); };
             knob->onDragEnd = [this, target] { engine.tweakReleased (target()); };
@@ -3609,6 +3612,7 @@ public:
                 break;
             const auto target = [this, param] { return AutomationTarget { AutomationTargetKind::channelParam, ref.index, 0, param }; };
             ui::setOwnMenu (*slider);
+            modring::tagSlider (*slider, target()); // (round 190ox)
             slider->onMenu = [this, slider, target] { ui::showSliderMenu (*slider, &engine, target()); };
             slider->onDragStart = [this, target] { engine.noteTweaked (target(), true); engine.controlTweakedForUndo(); };
             slider->onDragEnd = [this, target] { engine.tweakReleased (target()); };
@@ -5026,6 +5030,7 @@ private:
     void wire (MenuSlider& slider, int k)
     {
         ui::setOwnMenu (slider);
+        modring::tagSlider (slider, targetOf (k)); // (round 190ox)
         slider.onMenu = [this, &slider, k] { ui::showSliderMenu (slider, &engine, targetOf (k)); };
         slider.onDragStart = [this, k] { engine.noteTweaked (targetOf (k), true); engine.controlTweakedForUndo(); };
         slider.onDragEnd = [this, k] { engine.tweakReleased (targetOf (k)); };

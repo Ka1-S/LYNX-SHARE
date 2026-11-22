@@ -49,6 +49,7 @@
 #include "ui/UiTrace.h"
 #include "core/LoadTrace.h"
 #include "ui/MainComponent.h"
+#include "ui/ModRing.h"
 #include "ui/ChordHelper.h"
 #include "core/SmartDisableTip.h"
 #include "ui/Motion.h"
@@ -902,6 +903,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
     ui::installSliderContract();
     // FL's Last tweaked and automation recording (REA round 143): every automatable control reports its moves
+    modring::setEngine (&engine); // round 190ox: the knobs' modulation rings
     ui::onTweak = [this] (const AutomationTarget& t) {
         engine.noteTweaked (t);
         engine.controlTweakedForUndo(); // (round 190mv, DF-134: FL's "Undo knob tweaks")
@@ -1236,6 +1238,8 @@ MainComponent::~MainComponent()
     themeui::previewStartupSound = nullptr;
     onEditEventsInPianoRoll = nullptr;
     PluginWindows::onGesture = nullptr;
+    modring::setArmed (-1);
+    modring::setEngine (nullptr);
    #if JUCE_PLUGINHOST_VST3
     juce::lynxVst3ParamMenuHook = nullptr;
     vst3MenuEngine() = nullptr;
