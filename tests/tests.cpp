@@ -18081,3 +18081,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "DialogRules190ooTests.inc" // round 190oo: the one dialog system's button order and pixel bands (core/DialogRules.h)
 #include "RackAutomation190ooTests.inc" // round 190oo (design review 2, PAT-7): FL's automation clip channels in the Channel rack
 #include "TextFit190ooTests.inc" // round 190oo (design review 2, fit): translated menu titles give up width before toolbar panels drop, knob captions
+#include "Perf190osTests.inc" // round 190os: the safe-overload guard lets go at the stop and within 1 s of the overload's end

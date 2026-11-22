@@ -194,6 +194,9 @@ struct ThreadCpu
     std::uint64_t cycles = 0; // (round 190kb)
 };
 std::vector<ThreadCpu> threadCpuList();
+// Round 190os: SetThreadPriority(priority) on this process's threads whose name contains one of `nameParts` (and on the
+// calling thread with `messageThread`); how many were set. Windows only (elsewhere 0).
+int setThreadPriorities (const std::vector<std::string>& nameParts, bool messageThread, int priority);
 // Round 190kb: the CPU cycles this process has run (Windows: QueryProcessCycleTime — counted at every context switch,
 // exact, where the times above are sampled at the clock tick and miss or overcount short bursts) and the rate of
 // that count (the time-stamp counter's, measured once); 0 where the platform has no such count. ThreadCpu::cycles:

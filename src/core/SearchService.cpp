@@ -7,8 +7,41 @@
 #include <cstdio>
 #include <exception>
 
+#if defined(_WIN32)
+ #ifndef NOMINMAX
+  #define NOMINMAX
+ #endif
+ #ifndef WIN32_LEAN_AND_MEAN
+  #define WIN32_LEAN_AND_MEAN
+ #endif
+ #include <windows.h>
+#elif defined(__APPLE__)
+ #include <pthread.h>
+ #include <pthread/qos.h>
+#endif
+
 namespace lynx::search
 {
+namespace
+{
+// Round 190os: the worker's own work — loading the index, the background passes over the folders, reloads — runs at the
+// system's background priority (Windows: background mode, which also lowers its disk priority; macOS: the background
+// QoS class); a search the user typed runs at the normal priority. A pass at the start of LYNX took ~55 % of a core
+// for seconds; on a PC with 2 CPUs and an overloaded song that starved the screen (frame gaps of 220-254 ms, the
+// graphics driver's thread waiting behind it: perf190os/HANDOFF.md). Linux: unchanged (an unprivileged thread cannot
+// come back from a lower priority).
+void backgroundPriority (bool on) noexcept
+{
+   #if defined(_WIN32)
+    SetThreadPriority (GetCurrentThread(), on ? THREAD_MODE_BACKGROUND_BEGIN : THREAD_MODE_BACKGROUND_END);
+   #elif defined(__APPLE__)
+    pthread_set_qos_class_self_np (on ? QOS_CLASS_BACKGROUND : QOS_CLASS_USER_INITIATED, 0);
+   #else
+    (void) on;
+   #endif
+}
+} // namespace
+
 Service::Service (FileSystem fileSystem, Callbacks cb)
     : fs (std::move (fileSystem)), callbacks (std::move (cb))
 {
@@ -138,6 +171,7 @@ void Service::setStatus (const std::function<void (IndexStatus&)>& change, bool 
 
 void Service::run()
 {
+    backgroundPriority (true);
     loadIndex();
 
     for (;;)
@@ -173,7 +207,11 @@ void Service::run()
         try
         {
             if (job)
+            {
+                backgroundPriority (false);
                 runSearch (*job);
+                backgroundPriority (true);
+            }
             else if (reloadNow)
                 reloadIndex();
             else if (pass && ! runPass (*pass))
@@ -186,6 +224,7 @@ void Service::run()
         }
         catch (const std::exception& e) // never takes the app down: the search falls back to what is indexed
         {
+            backgroundPriority (true);
             std::fprintf (stderr, "browser search: %s\n", e.what());
             setStatus ([] (IndexStatus& s) { s.busy = false; s.current.clear(); });
         }

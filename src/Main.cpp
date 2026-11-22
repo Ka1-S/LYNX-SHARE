@@ -14563,6 +14563,9 @@ private:
             lynx::RtStats::Snapshot rtStart; // (presentsStart: 190jy's, above)
             std::map<std::string, std::pair<long long, long long>> tickersStart; // round 190kr
             int coveredStart = 0;
+            // round 190os: LYNX_UIPERF_STALLS=<folder>, each step's wall-clock thread samples and frame times there
+            // (crashguard::startStallSampler; perf190os/s/stalls.py)
+            juce::String stallsFolder = juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_STALLS", {});
 
             UiPerf (LynxApplication& a, juce::File r) : app (a), report (std::move (r))
             {
@@ -14603,6 +14606,18 @@ private:
                     cpuStart = lynx::processCpuSeconds();
                     messageCpuStart = lynx::threadCpuSeconds();
                     peerCpuStart = peerCpuSeconds (peerPid);
+                    // round 190os: LYNX_UIPERF_UIPRIO="<priority>[,m]" — the UI's helper threads (Direct2D's swap chain
+                    // waiters, the vblank and timer threads; with ",m" the message thread too) at that Windows thread
+                    // priority, for the stall A/B
+                    if (const auto prio = juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_UIPRIO", {}); prio.isNotEmpty())
+                        text << "    (UI threads at priority " << prio.getIntValue() << ": "
+                             << lynx::setThreadPriorities ({ "swap chain", "VBlank", "Timer" }, prio.endsWith (",m"), prio.getIntValue()) << " set)\n";
+                    // LYNX_UIPERF_DRVPRIO=<priority>: the graphics driver's own threads in this process (NVIDIA, AMD, Intel)
+                    if (const auto prio = juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_DRVPRIO", {}); prio.isNotEmpty())
+                        text << "    (driver threads at priority " << prio.getIntValue() << ": "
+                             << lynx::setThreadPriorities ({ "module:nvwgf2um", "module:amdxx", "module:atidxx", "module:igd10", "module:igd12" }, false, prio.getIntValue()) << " set)\n";
+                    if (stallsFolder.isNotEmpty())
+                        lynx::crashguard::startStallSampler ({ "swap chain", "VBlank", "Timer" }, 2000, &app.engine->getOverloadGuard().stateTag());
                     presentsStart = uiPerfPresents();
                     if (threadsWanted) // round 190ih: LYNX_UIPERF_THREADS=1, the CPU of every thread over the step
                         threadsStart = lynx::threadCpuList();
@@ -14678,7 +14693,16 @@ private:
                     // round 190ok (P24): Settings › Audio › "Safe overloads" (core/OverloadGuard.h), since the start
                     const auto& guard = app.engine->getOverloadGuard();
                     text << "    safe overloads " << (guard.isEnabled() ? "on" : "off") << ": engaged " << (juce::int64) guard.timesEngaged()
-                         << " times" << (guard.engaged() ? " (now)" : "") << ", yielded " << juce::String (guard.yieldedMs(), 0) << " ms\n";
+                         << " times" << (guard.engaged() ? " (now)" : "") << ", yielded " << juce::String (guard.yieldedMs(), 0) << " ms";
+                    // round 190os: the last release in this step — why, and how long after the callbacks kept their
+                    // deadline again
+                    if (const auto at = guard.lastReleaseAtMs(); at >= wallStart && guard.lastReleaseReason() != lynx::OverloadGuard::notReleased)
+                    {
+                        const char* why[] { "", "the transport stopped", "the load dropped", "a probe passed" };
+                        text << "; let go " << juce::String (at - wallStart, 0) << " ms into the step (" << why[juce::jlimit (0, 3, guard.lastReleaseReason())]
+                             << ", " << juce::String (guard.lastReleaseLagMs(), 0) << " ms after the callbacks kept their deadline)";
+                    }
+                    text << "\n";
                 }
                 if (threadsWanted && wall > 0.0)
                 {
@@ -14719,6 +14743,16 @@ private:
                                  << " " << juce::String (1000.0 * (double) (counts.first - before.first) / wall, 0) << "/" << juce::String (1000.0 * (double) (counts.second - before.second) / wall, 0);
                     }
                     text << "; covered skips " << juce::String (1000.0 * (double) (lynx::nativechild::coveredSkips().load() - coveredStart) / wall, 0) << "/s\n";
+                }
+                if (stallsFolder.isNotEmpty())
+                {
+                    juce::File (stallsFolder).createDirectory();
+                    lynx::crashguard::stopStallSampler (juce::File (stallsFolder).getChildFile ("stall-" + juce::String ((int) step) + ".txt").getFullPathName().toStdString());
+                    juce::String list;
+                    for (const auto t : frames)
+                        list << juce::String (t, 3) << "\n";
+                    juce::File (stallsFolder).getChildFile ("frames-" + juce::String ((int) step) + ".txt").replaceWithText (list);
+                    text << "    stall samples: " << stallsFolder << " (step " << (int) step << ")\n";
                 }
                 if (s.finish)
                     text << s.finish();
@@ -14944,8 +14978,51 @@ private:
                                    }, {}, playMs });
             // round 190ok (P24): LYNX_UIPERF_RECOVERY=1 — the song stopped after it, 3 s: the safe-overload guard lets go
             // and the callbacks keep their deadline again (the report's "safe overloads" line: no "(now)")
+            // (round 190os: and when the guard let go after the stop was asked)
             if (juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_RECOVERY", "0") == "1")
-                run->steps.push_back ({ "overlay A/B: playlist maximised, stopped after the song (recovery)", [this] { engine->stop(); }, {}, 3000 });
+            {
+                auto stopAt = std::make_shared<double> (0.0);
+                run->steps.push_back ({ "overlay A/B: playlist maximised, stopped after the song (recovery)", [this, stopAt] {
+                                           *stopAt = juce::Time::getMillisecondCounterHiRes();
+                                           engine->stop();
+                                       }, {}, 3000, [this, stopAt] {
+                                           const auto& guard = engine->getOverloadGuard();
+                                           const auto at = guard.lastReleaseAtMs();
+                                           return at >= *stopAt && guard.lastReleaseReason() != lynx::OverloadGuard::notReleased
+                                                      ? "    safe overloads let go " + juce::String (at - *stopAt, 1) + " ms after the stop\n"
+                                                      : juce::String ("    safe overloads: not let go after the stop\n");
+                                       } });
+            }
+            // round 190os: LYNX_UIPERF_LOAD_ENDS=<ms> — the song played again, and that many ms in every note and every
+            // playlist clip removed while the transport keeps running: the notes stop, the tails die out and the overload ends while playing.
+            // The report's "safe overloads" line says when the guard let go after the callbacks kept their deadline.
+            if (const auto endsMs = juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_LOAD_ENDS", "0").getIntValue(); endsMs > 0)
+            {
+                auto emptiedAt = std::make_shared<double> (0.0);
+                run->steps.push_back ({ "overlay A/B: playlist maximised, the load ends while playing", [this, ui, endsMs, emptiedAt] {
+                                           ui->selectTabForSnapshot (2);
+                                           engine->getTransport().songMode = true;
+                                           engine->rewind();
+                                           engine->play();
+                                           juce::Timer::callAfterDelay (endsMs, [this, emptiedAt] {
+                                               *emptiedAt = juce::Time::getMillisecondCounterHiRes();
+                                               engine->editSong ([] (lynx::Song& song) {
+                                                   for (auto& pattern : song.patterns)
+                                                       pattern.notes.clear();
+                                                   song.playlist.clear(); // (its audio and automation clips too)
+                                               }, false);
+                                           });
+                                       }, {}, endsMs + 4000, [this, emptiedAt] {
+                                           const auto& guard = engine->getOverloadGuard();
+                                           const auto at = guard.lastReleaseAtMs();
+                                           const auto playing = engine->getTransport().playing.load();
+                                           engine->stop();
+                                           return "    notes removed (still playing: " + juce::String (playing ? "yes" : "no") + "); safe overloads "
+                                                  + (at >= *emptiedAt && *emptiedAt > 0.0 ? "let go " + juce::String (at - *emptiedAt, 0) + " ms after it, "
+                                                                                              + juce::String (guard.lastReleaseLagMs(), 0) + " ms after the callbacks kept their deadline\n"
+                                                                                        : juce::String ("not let go after it\n"));
+                                       } });
+            }
             run->steps.push_back ({ "overlay A/B: piano roll maximised, pattern playing", [ui, playPattern] { ui->selectTabForSnapshot (1); playPattern(); }, {}, playMs,
                                    [this] { engine->stop(); return juce::String(); } });
         }
