@@ -73,6 +73,7 @@
 #include "core/ProjectSafety.h"
 #include "core/SoftClip.h"
 #include "core/Scheduler.h"
+#include "core/TrackStates.h"
 #include "engine/ChannelRackProcessor.h"
 #include "engine/DllAsioDevice.h"
 #include "engine/PipeWireDevice.h"
@@ -5506,6 +5507,19 @@ void AudioEngine::publishSong()
     const Song& unprojected = thawedSong ? *thawedSong : song;
     if (standins::hasAny (unprojected))
         projectedSong = standins::project (unprojected, [this] (const PluginRef& ref) { return ! plugins.isInstalled (ref); }, &projected);
+    // round 190op (P4, LYNX extra): deactivated channels and inserts are not loaded; the engine plays silent placeholders
+    // in their places (core/TrackStates.h deactivate::project). Nothing changes for a project without any.
+    {
+        auto off = deactivate::effective (unprojected);
+        if (off.any)
+        {
+            if (! projectedSong)
+                projectedSong = unprojected;
+            deactivate::project (*projectedSong, off);
+        }
+        deactivatedChannels = std::move (off.channels);
+        deactivatedInserts = std::move (off.inserts);
+    }
     const Song& played = projectedSong ? *projectedSong : unprojected;
     {
         // round 190ap: the slots whose plugin is switched off ("Open without third-party plugins"), for their badges
@@ -6029,6 +6043,26 @@ void AudioEngine::updateAutomationRecording (bool active)
     if (! recording)
     {
         commit ({}, std::exchange (sessionAutomationPass, false));
+        // round 190op (P7): playing without recording, the moved controls go into Capture automation's buffer
+        if (transport.playing.load() && ! active && ! touches.empty())
+        {
+            const auto songTick = estimatedPositionNow();
+            for (const auto& t : touches)
+            {
+                const auto value = currentTargetValue (t.target);
+                if (value < 0.0f)
+                    continue;
+                captureauto::Entry e;
+                e.target = t.target;
+                e.ms = now;
+                e.tick = songTick;
+                e.value = juce::jlimit (0.0f, 1.0f, value);
+                e.songMode = song.mode == PlayMode::song;
+                if (! sessionClipOf (t.target, e.clipPattern, e.clipTick, e.clipEnd))
+                    e.clipPattern = -1;
+                automationCapture.add (e);
+            }
+        }
         touches.clear();
         overrideTouched();
         if (! active)
@@ -7325,6 +7359,16 @@ void AudioEngine::capturePluginStatesInto (Song& target, bool requireAll)
 
 }
 
+void AudioEngine::setDeactivated (const std::vector<int>& channels, const std::vector<int>& inserts, bool off)
+{
+    if (off)
+        capturePluginStates(); // (their running plugins' settings go into the song before the instances are released)
+    editSong ([&] (Song& s) {
+        deactivate::setChannels (s, channels, off);
+        deactivate::setInserts (s, inserts, off);
+    });
+}
+
 void AudioEngine::capturePluginStates()
 {
     stampWorkTime();
@@ -7332,6 +7376,9 @@ void AudioEngine::capturePluginStates()
     capturePluginStatesInto (song, false);
     lastPublishedShape.song.channels = song.channels;
     lastPublishedShape.song.mixer = song.mixer;
+    // round 190op: the shape keeps the deactivated units' placeholders it was built with (a later build compares with it)
+    if (deactivate::Effective off { deactivatedChannels, deactivatedInserts, true }; ! deactivatedChannels.empty() || ! deactivatedInserts.empty())
+        deactivate::projectUnits (lastPublishedShape.song.channels, lastPublishedShape.song.mixer, off);
 }
 
 Song AudioEngine::snapshotForRemoteControl()

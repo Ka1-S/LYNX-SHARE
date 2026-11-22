@@ -5,6 +5,7 @@
 #include "core/PlaylistOps.h"
 #include "core/FlpExport.h"
 #include "core/TrackClips.h"
+#include "core/TrackStates.h"
 #include "core/Fpc.h"
 #include "core/SamplerPage.h"
 
@@ -1897,6 +1898,22 @@ flp::Project toProject (const Song& input, const Options& options, Report& repor
     // track clips (round 190ne, core/TrackClips.h): FL has no such flag, so each is an ordinary pattern on FL's
     // instrument track; identical ones are merged first (the owner's choice: silently), and more patterns than FL's
     // 999 are reported
+    // round 190op (P4, LYNX extras): FL can neither hide a Playlist track nor deactivate a channel or insert. Hidden tracks
+    // are written visible; deactivated units are written active, with the settings and plugin states the project holds
+    if (const auto n = trackstates::hiddenCount (song); n > 0)
+        report.notes.push_back ("Hidden tracks: " + std::to_string (n) + " track(s) written visible (FL cannot hide Playlist tracks)");
+    {
+        std::string units;
+        int count = 0;
+        for (std::size_t i = 0; i < song.channels.size(); ++i)
+            if (song.channels[i].deactivated)
+                units += (count++ > 0 ? ", " : "") + song.channels[i].name;
+        for (std::size_t t = 1; t < song.mixer.size(); ++t)
+            if (song.mixer[t].deactivated)
+                units += (count++ > 0 ? ", " : "") + (song.mixer[t].name.empty() ? "Insert " + std::to_string (t) : song.mixer[t].name);
+        if (count > 0)
+            report.notes.push_back ("Deactivated: " + units + " written active with their settings and plugin states (FL has no deactivated tracks)");
+    }
     trackclips::mergeIdentical (song);
     if ((int) song.patterns.size() > trackclips::flPatternLimit)
         report.notes.push_back ("Warning: " + std::to_string (song.patterns.size()) + " patterns are more than the "

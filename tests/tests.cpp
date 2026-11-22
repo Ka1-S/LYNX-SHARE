@@ -18084,3 +18084,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "TextFit190ooTests.inc" // round 190oo (design review 2, fit): translated menu titles give up width before toolbar panels drop, knob captions
 #include "Perf190osTests.inc" // round 190os: the safe-overload guard lets go at the stop and within 1 s of the overload's end
 #include "Tracker190omTests.inc" // round 190om (0.1.31): tracker stage 2 (pattern events, pitch curves, Bxx / Vxx), SimSynth velocity
+#include "TrackStates190opTests.inc" // round 190op (0.1.31): Hide / Deactivate tracks (P4), Capture automation (P7)

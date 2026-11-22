@@ -10,6 +10,8 @@
 
 #include "core/DetailChain.h"
 #include "core/SessionOps.h"
+#include "core/LayoutStyle.h"
+#include "core/PlaylistOps.h"
 #include "ui/I18n.h"
 
 namespace lynx
@@ -262,6 +264,80 @@ void AudioEngine::routeSessionAutomation (const AutomationTarget& target, std::v
             it->points.insert (it->points.end(), points.begin(), points.end());
             return;
         }
+}
+
+bool AudioEngine::sessionClipOf (const AutomationTarget& target, int& pattern, double& local, std::int64_t& end) const
+{
+    if (clipLauncher == nullptr || ! song.clipGrid || layoutstyle::current() != layoutstyle::Style::clipLaunch)
+        return false;
+    const auto now = slotClockNow();
+    for (int track = 0; track < launcher::maxTracks; ++track)
+    {
+        const auto& rt = clipLauncher->tracks[(std::size_t) track];
+        const auto scene = rt.playing.load (std::memory_order_relaxed);
+        if (scene < 0)
+            continue;
+        const auto* clip = launcher::clipAt (*song.clipGrid, track, scene);
+        if (clip == nullptr || clip->kind != ClipKind::pattern || clip->pattern < 0 || clip->pattern >= (int) song.patterns.size() || clip->length <= 0
+            || ! detailchain::holds (detailchain::forTrack (song, track), target))
+            continue;
+        auto at = std::fmod (now - rt.anchor.load (std::memory_order_relaxed), (double) clip->length);
+        if (at < 0.0)
+            at += (double) clip->length;
+        pattern = clip->pattern;
+        local = (double) clip->offset + at;
+        end = clip->offset + clip->length;
+        return true;
+    }
+    return false;
+}
+
+AudioEngine::AutomationCaptureResult AudioEngine::captureAutomation()
+{
+    AutomationCaptureResult result;
+    const auto gestures = captureauto::lastGestures (automationCapture.entries(), lastAutomationCaptureMs, 2 * std::max<std::int64_t> (1, song.barTicks()));
+    if (gestures.empty())
+        return result;
+    const auto style = layoutstyle::current();
+    const auto lanes = style != layoutstyle::Style::pattern || autolanes::shown();
+    double newest = lastAutomationCaptureMs;
+    editSong ([&] (Song& s) {
+        for (const auto& g : gestures)
+        {
+            const auto& first = g.points.front();
+            AutomationWrite w;
+            w.target = g.target;
+            w.name = nameAutomation ? nameAutomation (g.target) : std::string ("Automation");
+            std::vector<RecordedValue> points;
+            for (const auto& p : g.points)
+            {
+                points.push_back ({ first.clipPattern >= 0 ? p.clipTick : p.tick, p.value });
+                newest = std::max (newest, p.ms);
+            }
+            result.points += (int) points.size();
+            ++result.controls;
+            if (first.clipPattern >= 0 && first.clipPattern < (int) s.patterns.size()) // a grid clip played: its envelope
+                commitClipEnvelopePoints (s, first.clipPattern, w, std::move (points), first.clipEnd, 0);
+            else if (! first.songMode) // Pattern mode: the current pattern's events, as a take
+            {
+                const auto pattern = juce::jlimit (0, std::max (0, (int) s.patterns.size() - 1), s.currentPattern);
+                const auto loop = s.patterns.empty() ? ppq * 4 : s.patterns[(std::size_t) pattern].effectiveLength (s.meter());
+                if (! s.patterns.empty())
+                    commitEventPoints (s, pattern, w, std::move (points), loop, 0);
+            }
+            else if (lanes)
+                commitLanePoints (s, w, std::move (points), 0);
+            else
+            {
+                // (a new clip starts as one bar: it is made to reach the gesture's last bar, as a take's clip grows)
+                const auto last = songTickForRecorded (s, g.points.back().tick);
+                commitAutomationPoints (s, w, std::move (points), 0);
+                growTakeClip (s, w, last + 1, true);
+            }
+        }
+    });
+    lastAutomationCaptureMs = newest;
+    return result;
 }
 
 void AudioEngine::commitSessionAutomation()

@@ -1697,6 +1697,35 @@ void toRelease0130 (juce::var& root, Losses& lost)
         for (auto& a : *automations)
             if (auto* ao = objectOf (a))
                 drop (*ao, "rackSlot");
+    // round 190op (P4): hidden Playlist tracks (a view: they show again, nothing they play changes)
+    if (auto* hidden = arrayOf (root["playlistTracksHidden"]))
+    {
+        const auto count = hidden->size();
+        drop (o, "playlistTracksHidden");
+        lost.push_back ({ TR_NOOP ("{0} hidden Playlist track(s) show again"), juce::String (count), false });
+    }
+
+    // round 190op (P4): deactivated channels and inserts. 0.1.30 has no such state: they come back muted, so the mix sounds
+    // the same, and their plugins load again
+    {
+        juce::StringArray units;
+        forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
+            if (drop (c, "deactivated"))
+            {
+                units.add (channelName (juce::var (&c), i));
+                c.setProperty ("muted", true);
+            }
+        });
+        if (auto* mixer = arrayOf (root["mixer"]))
+            for (int t = 0; t < mixer->size(); ++t)
+                if (auto* m = objectOf ((*mixer)[t]); m != nullptr && drop (*m, "deactivated"))
+                {
+                    units.add (insertName (root["mixer"], t));
+                    m->setProperty ("muted", true);
+                }
+        if (! units.isEmpty())
+            lost.push_back ({ TR_NOOP ("Deactivated channels and inserts load their plugins again and come back muted: {0}"), listOf (units), false });
+    }
 }
 
 struct Step

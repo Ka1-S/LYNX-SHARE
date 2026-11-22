@@ -1,5 +1,6 @@
 #include "core/Crossfader.h"
 #include "core/RackRenderer.h"
+#include "core/TrackStates.h"
 #include "core/LynxVerbs.h"
 #include "core/PolyEdit.h"
 #include "core/Dropouts.h"
@@ -944,6 +945,10 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                                                    const Factories& factories)
 {
     const auto& samples = factories.samples;
+    // round 190op (P4): deactivated channels and inserts are never built (the app's engine passes its projection
+    // already; the export plugin and the tools come through here). Nothing changes for a song without any.
+    if (deactivate::anyMarked (song))
+        deactivate::project (song, deactivate::effective (song));
 
     auto state = std::make_unique<RackState>();
     state->live = std::make_shared<LiveLevels> (song);

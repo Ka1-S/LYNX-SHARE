@@ -1274,6 +1274,15 @@ struct Imp
                 r.mixerTrack = insert;
             }
         }
+        // round 190op (P4): a track that is not loaded (DAWproject's Track "loaded" = false: deactivated, its plugins not
+        // loaded) comes in deactivated, its settings kept
+        if (t.attr ("loaded") == "false")
+        {
+            if (insert > 0)
+                song.mixer[(std::size_t) insert].deactivated = true;
+            if (notes && r.channel >= 0 && r.channel < (int) song.channels.size())
+                song.channels[(std::size_t) r.channel].deactivated = true;
+        }
         song.playlistTracks.push_back (r);
         rowOfTrack[id] = (int) song.playlistTracks.size() - 1;
         for (const auto& sub : subTracks)
@@ -2939,7 +2948,12 @@ DawProjectExportResult exportDawProject (const Song& song, const DawProjectExpor
                 content = "automation";
             if (content.empty())
                 content = "audio";
-            t.set ("id", n.trackId).set ("name", n.name).set ("contentType", content).set ("loaded", "true");
+            // round 190op (P4): a deactivated unit is a track that is not loaded (DAWproject's "loaded"; plugins unloaded,
+            // their states still written)
+            const auto off = (n.insert > 0 && n.insert < (int) song.mixer.size() && n.owns && song.mixer[(std::size_t) n.insert].deactivated)
+                             || (n.kind == TNode::Kind::notes && n.channel >= 0 && n.channel < (int) song.channels.size()
+                                 && song.channels[(std::size_t) n.channel].deactivated);
+            t.set ("id", n.trackId).set ("name", n.name).set ("contentType", content).set ("loaded", off ? "false" : "true");
             if (n.colour != 0)
                 t.set ("color", colourText (n.colour));
             if (! n.channelId.empty())
