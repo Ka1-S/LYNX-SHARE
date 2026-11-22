@@ -209,6 +209,16 @@
         check ("ui.show pluginManager opens it (IDs pluginManager, .scanNew, .folders, .search, .filter.effects)" + why (r),
                ok (r) && found ("pluginManager") && found ("pluginManager.scanNew") && found ("pluginManager.folders") && found ("pluginManager.search")
                    && found ("pluginManager.filter.effects"));
+        r = op ("ui.type", json (R"({"target":"pluginManager.search","text":"xyz","interval":10})"));
+        settleFor (300);
+        {
+            juce::TextEditor* box = nullptr;
+            for (int i = 0; i < juce::Desktop::getInstance().getNumComponents() && box == nullptr; ++i)
+                if (auto* top = juce::Desktop::getInstance().getComponent (i))
+                    box = dynamic_cast<juce::TextEditor*> (lynx::onboardui::findShowing (*top, "pluginManager.search"));
+            check ("ui.type types into the Plugin manager's search box" + why (r), ok (r) && box != nullptr && box->getText() == "xyz");
+        }
+        check ("ui.type refuses a control that is not a text field", ! ok (op ("ui.type", json (R"({"target":"pluginManager.scanNew","text":"a"})"))));
         closeAllToolWindows();
         settle();
 

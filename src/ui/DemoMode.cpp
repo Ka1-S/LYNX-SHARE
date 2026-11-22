@@ -53,7 +53,7 @@ juce::StringArray operations()
     return { "ui.window", "ui.find", "ui.click", "ui.hover", "ui.list", "ui.layout", "ui.select_track", "ui.show", "ui.welcome", "ui.clipmenu", "ui.polyeditor",
              "ui.open", "ui.action", "ui.editor", "ui.place", "ui.polynotes", "session.start", "session.status",
              // round 190pl (tutorial batch 2)
-             "ui.export", "file.export", "file.save", "midi.input", "plugin.scan", "ui.drag", "ui.controlmenu", "mixer.route", "ui.repaint" };
+             "ui.export", "file.export", "file.save", "midi.input", "plugin.scan", "ui.drag", "ui.controlmenu", "mixer.route", "ui.repaint", "ui.type" };
 }
 
 bool isLocalRelay (const juce::String& url)
@@ -1106,6 +1106,27 @@ juce::var MainComponent::handleDemoOp (const juce::String& op, const juce::var& 
         PeerGesture::drag (*fromComp->getTopLevelComponent(), path, keysOf (args["mods"]), false, stepMs);
         return object ({ { "from", object ({ { "x", from.x }, { "y", from.y } }) }, { "to", object ({ { "x", to.x }, { "y", to.y } }) },
                          { "seconds", seconds } });
+    }
+    // Text typed into a text field (a search box), one character every "interval" ms (default 70), as the keyboard would:
+    // the field takes the keyboard focus and its listeners see each change. No key event reaches the operating system.
+    if (op == "ui.type")
+    {
+        auto* editor = dynamic_cast<juce::TextEditor*> (&find());
+        if (editor == nullptr)
+            fail ("The target is not a text field");
+        const auto typed = args["text"].toString().substring (0, 200);
+        const auto interval = args["interval"].isInt() ? juce::jlimit (0, 1000, (int) args["interval"]) : 70;
+        if (args["replace"].isBool() && (bool) args["replace"])
+            editor->clear();
+        editor->grabKeyboardFocus();
+        editor->moveCaretToEnd();
+        const juce::Component::SafePointer<juce::TextEditor> safe (editor);
+        for (int i = 0; i < typed.length(); ++i)
+            juce::Timer::callAfterDelay (juce::jmax (1, i * interval), [safe, c = typed.substring (i, i + 1)] {
+                if (safe != nullptr)
+                    safe->insertTextAtCaret (c);
+            });
+        return object ({ { "typing", typed }, { "seconds", (double) typed.length() * interval / 1000.0 } });
     }
     // A route between Mixer tracks in one undo step, as the route arrow's menu makes it: kind route (a send at unity, or
     // "level" 0..1.25 linear), routeOnly, sidechain (a level-0 send that the target's compressors listen to), sidechainOnly
