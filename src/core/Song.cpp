@@ -1113,6 +1113,20 @@ const std::vector<SongSection>& Song::sections() const
     return arrangements.empty() ? none : arrangements[(std::size_t) std::clamp (currentArrangement, 0, (int) arrangements.size() - 1)].sections;
 }
 
+std::vector<SongChord>& Song::chords()
+{
+    if (arrangements.empty())
+        arrangements.push_back ({ "Arrangement 1", {}, 0, 0, {} });
+
+    return arrangements[(std::size_t) std::clamp (currentArrangement, 0, (int) arrangements.size() - 1)].chords;
+}
+
+const std::vector<SongChord>& Song::chords() const
+{
+    static const std::vector<SongChord> none;
+    return arrangements.empty() ? none : arrangements[(std::size_t) std::clamp (currentArrangement, 0, (int) arrangements.size() - 1)].chords;
+}
+
 void Song::addMarker (Marker marker)
 {
     auto& list = markers();
@@ -1207,6 +1221,7 @@ int Song::addArrangement (const std::string& name, bool copyCurrent)
         a.loopEnd = loopEnd;
         a.markers = markers();
         a.sections = sections(); // (round 190ol)
+        a.chords = chords();     // (round 190pf)
     }
 
     arrangements.push_back (std::move (a));

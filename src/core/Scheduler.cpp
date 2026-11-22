@@ -1,4 +1,5 @@
 #include "core/Scheduler.h"
+#include "core/ChordLane.h"
 #include "core/NoteRepeat.h"
 #include "core/ClipEnvelope.h"
 
@@ -830,7 +831,9 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
             NoteEvent e;
             e.type = NoteEvent::Type::on;
             e.channel = note.channel;
-            e.key = note.key;
+            // round 190pf (core/ChordLane.h): a channel that follows the Chord lane plays the note moved onto the chord
+            // under it (its "off" comes from this event, so it has the same key); every other channel: the note's key
+            e.key = chordlane::playedKey (song, channelOf (&song.channels, note.channel), note.key, on);
             e.velocity = grooveVelocity;
             e.pan = note.pan;
             e.cents = note.finePitch;
