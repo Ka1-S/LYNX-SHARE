@@ -9179,6 +9179,119 @@ private:
             }
         }
 
+        // rollup 0.1.31 step 8: Save a copy for 0.1.30 / 0.1.28 of engine revision 3 (round 190pr, ChannelDef::engineRev: FL
+        // imports and new channels) and of the export's marker switch (Song::exportMarkers). One project with a channel of
+        // every kind a revision gates (SimSynth, Ogun, Autogun: 2; Harmor, Sytrus: 3) and a plain Synth, all new (3), a
+        // Harmor filter clip, a Sytrus note off the default Mod Y, a Start marker after bar 1 and a skip marker. Each copy:
+        // 190pr's three lines once, no exportMarkers key, the markers kept as markers; 0.1.30: SimSynth / Ogun / Autogun at 1,
+        // Harmor / Sytrus / the Synth at 2; 0.1.28: no revision at all (0). Revisions stay ordered: a project saved before
+        // (every channel at 2, the switch off) reads back as it was saved and gets none of 190pr's lines.
+        juce::String rollup031s8Result = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            song.exportMarkers = true;
+            lynx::Marker start, skip;
+            start.tick = 4 * lynx::ppq, start.action = lynx::Marker::start, start.name = "Start 190s8";
+            skip.tick = 8 * lynx::ppq, skip.action = lynx::Marker::markerSkip, skip.name = "Skip 190s8";
+            song.addMarker (start);
+            song.addMarker (skip);
+            const lynx::InstrumentKind kinds[] = { lynx::InstrumentKind::simsynth, lynx::InstrumentKind::ogun, lynx::InstrumentKind::autogun,
+                                                   lynx::InstrumentKind::harmor, lynx::InstrumentKind::sytrus, lynx::InstrumentKind::synth };
+            const int want130[] = { 1, 1, 1, 2, 2, 2 };
+            const auto first = (int) song.channels.size();
+            for (const auto kind : kinds)
+            {
+                lynx::ChannelDef c;
+                c.name = "Rev3 " + std::to_string ((int) song.channels.size() - first + 1);
+                c.instrument = kind;
+                song.channels.push_back (c);
+            }
+            const auto harmorIndex = first + 3, sytrusIndex = first + 4;
+            if (song.patterns.empty())
+                song.patterns.emplace_back();
+            lynx::Note click;
+            click.channel = sytrusIndex, click.key = 60, click.length = lynx::ppq, click.modY = 0.8f;
+            song.patterns[0].notes.push_back (click);
+            lynx::Automation cutoff;
+            cutoff.name = "Harmor cutoff s8";
+            cutoff.target = { lynx::AutomationTargetKind::channelParam, harmorIndex, 0, 52 };
+            cutoff.points = { { 0, 0.2f }, { lynx::ppq, 0.8f } };
+            song.automations.push_back (cutoff);
+
+            const auto countOf = [] (const lynx::olderlynx::Copy& c, const char* begin) {
+                return (int) std::count_if (c.lost.begin(), c.lost.end(), [begin] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).startsWith (begin); });
+            };
+            const char* const lines[] = { "The export plays the song straight through in this release", "Automation of Harmor's filter frequencies",
+                                          "Sytrus plays every note at the default Mod X / Y" };
+            const auto markersKept = [] (const lynx::Song& s) {
+                const auto& m = s.markers();
+                return std::any_of (m.begin(), m.end(), [] (const lynx::Marker& x) { return x.name == "Start 190s8"; })
+                       && std::any_of (m.begin(), m.end(), [] (const lynx::Marker& x) { return x.name == "Skip 190s8"; });
+            };
+            juce::String why;
+            const auto json = lynx::ProjectFile::toJson (song);
+            const auto back = lynx::ProjectFile::fromJson (json, why);
+            const auto n = (int) song.channels.size();
+            if (std::any_of (song.channels.begin() + first, song.channels.end(), [] (const lynx::ChannelDef& c) { return c.engineRev != 3; }))
+                rollup031s8Result = "ERROR set-up: a new channel is not at revision 3";
+            else if (! back || ! back->exportMarkers || (int) back->channels.size() != n
+                     || std::any_of (back->channels.begin() + first, back->channels.end(), [] (const lynx::ChannelDef& c) { return c.engineRev != 3; }))
+                rollup031s8Result = "ERROR the .lynx did not keep revision 3 / the export's markers " + why;
+            for (const auto* release : { "0.1.30", "0.1.28" })
+            {
+                if (rollup031s8Result != "OK")
+                    break;
+                const auto is130 = juce::String (release) == "0.1.30";
+                const auto copy = lynx::olderlynx::forRelease (song, release);
+                juce::String why2;
+                const auto old = copy.ok ? lynx::ProjectFile::fromJson (copy.json, why2) : std::optional<lynx::Song> {};
+                if (! copy.ok || ! old || (int) old->channels.size() != n)
+                {
+                    rollup031s8Result = juce::String ("ERROR copy ") + release + " " + copy.error + why2;
+                    break;
+                }
+                for (const auto* line : lines)
+                    if (countOf (copy, line) != 1)
+                    {
+                        rollup031s8Result = juce::String ("ERROR the copy for ") + release + ": \"" + line + "\" " + juce::String (countOf (copy, line)) + " times";
+                        break;
+                    }
+                if (rollup031s8Result != "OK")
+                    break;
+                if (copy.json.contains ("exportMarkers") || old->exportMarkers)
+                    rollup031s8Result = juce::String ("ERROR the export's marker switch is left in the copy for ") + release;
+                else if (! markersKept (*old))
+                    rollup031s8Result = juce::String ("ERROR the Start / skip markers are gone from the copy for ") + release;
+                else if (! is130 && copy.json.contains ("engineRev"))
+                    rollup031s8Result = "ERROR a revision is left in the copy for 0.1.28";
+                else
+                    for (int k = 0; k < (int) std::size (kinds); ++k)
+                        if (const auto rev = old->channels[(std::size_t) (first + k)].engineRev; rev != (is130 ? want130[k] : 0))
+                        {
+                            rollup031s8Result = juce::String ("ERROR the copy for ") + release + ": channel " + juce::String (first + k + 1)
+                                                + " at revision " + juce::String (rev) + " (want " + juce::String (is130 ? want130[k] : 0) + ")";
+                            break;
+                        }
+            }
+            if (rollup031s8Result == "OK")
+            {
+                auto before = song; // (a project saved before round 190pr: revision 2 at most, the switch off)
+                before.exportMarkers = false;
+                for (auto& c : before.channels)
+                    c.engineRev = std::min (c.engineRev, 2);
+                juce::String why3;
+                const auto again = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (before), why3);
+                const auto copy = lynx::olderlynx::forRelease (before, "0.1.30");
+                if (! again || again->exportMarkers
+                    || std::any_of (again->channels.begin() + first, again->channels.end(), [] (const lynx::ChannelDef& c) { return c.engineRev != 2; }))
+                    rollup031s8Result = "ERROR a project saved before 190pr does not read back as saved " + why3;
+                else if (! copy.ok || std::any_of (std::begin (lines), std::end (lines), [&] (const char* l) { return countOf (copy, l) != 0; }))
+                    rollup031s8Result = "ERROR 190pr's lines for a project saved before it";
+                else if (const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.30"); ! plain.ok || ! plain.lost.empty())
+                    rollup031s8Result = "ERROR lines for the default song (" + juce::String ((int) plain.lost.size()) + ")";
+            }
+        }
+
         // rollup 0.1.31 step 7 (PRs #248 / #256 by FKHR26): the docked channel window's header shows by default; its gear hides
         // it, a window of the same channel opened again hides it too (the choice kept per window), the project's window
         // places carry it ([key, "headerHidden"]) and give it back, an older project's places (0.1.30's shape) none; the gear
@@ -10452,7 +10565,7 @@ private:
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
                         && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
-                        && rollup031s7Result == "OK" && headerGearResult == "OK" // (rollup 0.1.31 step 7, and the three rounds' items its branches reported but did not count:)
+                        && rollup031s7Result == "OK" && rollup031s8Result == "OK" && headerGearResult == "OK" // (rollup 0.1.31 step 7, and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
                         && flparity190prResult == "OK"
                         && renderAgainResult.startsWith ("OK") && determinismResult.startsWith ("OK")
@@ -10558,6 +10671,7 @@ private:
                << "rollup031s5_copy_for_0130=" << rollup031s5Result << "\n"
                << "rollup031s6_copy_for_0130=" << rollup031s6Result << "\n"
                << "rollup031s7_copy_for_0130=" << rollup031s7Result << "\n"
+               << "rollup031s8_copy_for_0130=" << rollup031s8Result << "\n"
                << "headergear248=" << headerGearResult << "\n"
                << "simpleduck190ot=" << simpleDuck190otResult << "\n"
                << "tracks190pe=" << tracks190peResult << "\n"

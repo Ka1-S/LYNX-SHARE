@@ -2234,6 +2234,15 @@ void toRelease0130 (juce::var& root, Losses& lost)
         if (! sytrusNotes.isEmpty())
             lost.push_back ({ TR_NOOP ("Sytrus plays every note at the default Mod X / Y in this release: {0}"), listOf (sytrusNotes), true });
     }
+
+    // rollup 0.1.31 step 8: every other channel at engine revision 3 (FL imports and new channels since round 190pr) is
+    // written at 2. Revision 3 changes only Harmor and Sytrus (both written at 2 above) and revision 2 only SimSynth and
+    // Ogun / Autogun (written at 1 above), so the copy plays the same here and in newer LYNX, and a channel 0.1.30 later
+    // turns into a Harmor or Sytrus cannot carry revision 3's laws back into a newer LYNX. 0.1.28 drops the key.
+    forEachChannel (root, [&] (juce::DynamicObject& c, int) {
+        if (c.hasProperty ("engineRev") && (int) c.getProperty ("engineRev") > 2)
+            c.setProperty ("engineRev", 2);
+    });
 }
 
 struct Step
