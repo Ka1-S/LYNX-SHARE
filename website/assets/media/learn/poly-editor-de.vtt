@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Diese Akkorde sind eine Audioaufnahme: ein Clip, alle Noten gemischt.
+
+00:00:08.800 --> 00:00:13.800
+Klicke mit der rechten Maustaste auf den Clip und wähle Noten bearbeiten (polyphon).
+
+00:00:14.000 --> 00:00:19.600
+LYNX SHARE findet jede Note der Akkorde und zeichnet sie einzeln.
+
+00:00:19.800 --> 00:00:25.400
+Ziehe die oberste Note einen Halbton nach unten: G-Dur wird zu g-Moll. Die anderen Noten bleiben.
+
+00:00:25.600 --> 00:00:30.800
+Drücke im Editor Play, um den Akkord mit der neuen Note zu hören.
+
+00:00:31.000 --> 00:00:36.600
+Jede Änderung ist ein Undo-Schritt, und der Song spielt das bearbeitete Audio.

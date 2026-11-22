@@ -17,13 +17,16 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/ModalHelper.h"
+#include "ui/DemoMode.h"
 #include "engine/AudioEngine.h"
 
 namespace lynx
 {
-class ChordHelperPanel final : public juce::Component, public juce::TooltipClient, private juce::ChangeListener, private juce::Timer
+class ChordHelperPanel final : public juce::Component, public juce::TooltipClient, public demo::CellSource, private juce::ChangeListener, private juce::Timer
 {
 public:
+    // round 190pg (--demo, docs/DEMO_MODE.md): row 0 = the related keys, row 1 = the chords; column = the row of that list
+    juce::Rectangle<int> demoCellBounds (int row, int column) const override;
     enum class Look
     {
         fl,     // Pattern layout

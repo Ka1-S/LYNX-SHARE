@@ -427,6 +427,13 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     patternModeButton.setComponentID ("toolbar.patternMode");
     songModeButton.setComponentID ("toolbar.songMode");
     tempoDisplay.setComponentID ("toolbar.tempo");
+    // round 190pg: the editors by component ID (--demo: ui.find / ui.click with a "cell" reach a step, a key and step of
+    // the Piano roll, a track and step of the Playlist, a Mixer track; docs/DEMO_MODE.md)
+    perfMeter.setComponentID ("toolbar.cpu");
+    rack.setComponentID ("channelRack");
+    pianoRoll.setComponentID ("pianoRoll");
+    playlist.setComponentID ("playlist");
+    mixer.getStripsForSnapshot().setComponentID ("mixer.strips");
     playButton.onClick = [this] {
         // round 190jj: the Simple capsule's Play shows Pause while the song runs (BandLab), and pauses
         if (toolbarlayout::transportStates (toolbarLook).stopWhilePlaying
@@ -2591,6 +2598,7 @@ void MainComponent::showActionSearch()
         return;
     const auto started = juce::Time::getMillisecondCounterHiRes();
     actionSearch = std::make_unique<ActionSearchOverlay> (commandPaletteItems());
+    actionSearch->setComponentID ("palette"); // (round 190pg: --demo)
     lastPaletteOpenMs = juce::Time::getMillisecondCounterHiRes() - started;
     actionSearch->onClose = [safe = juce::Component::SafePointer<MainComponent> (this)] {
         juce::MessageManager::callAsync ([safe] {
@@ -4499,6 +4507,9 @@ public:
         both.setButtonText (tr ("Both"));
         grid.setButtonText (tr ("Grid"));
         song.setButtonText (tr ("Song"));
+        both.setComponentID ("clipLaunch.both"); // (round 190pg: --demo)
+        grid.setComponentID ("clipLaunch.grid");
+        song.setComponentID ("clipLaunch.song");
         both.setToggleState (true, juce::dontSendNotification);
         for (const auto& [button, view] : buttons)
         {
@@ -4609,6 +4620,7 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
     if (style == Style::clipLaunch && clipGridView == nullptr)
     {
         clipGridView = makeClipGrid (engine);
+        clipGridView->setComponentID ("clipGrid"); // (round 190pg: --demo cells: a slot, a scene's launch button)
         clipGridSwitch = std::make_unique<ClipGridSwitch> ([this] (PlaylistArea::GridView view) { setClipGridView (view); });
         if (auto* flip = dynamic_cast<ClipGridSwitch*> (clipGridSwitch.get())) // (round 190ef)
         {
@@ -11571,7 +11583,10 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Missing files..."), [this] { showMissingFiles (false); });
         menu.addItem (tr ("Last project import report"), [this] {
             const auto& r = engine.getImportReport();
-            if (r.converted.empty() && r.approximated.empty() && r.unsupported.empty() && r.notReproduced.empty() && r.droppedEffects.empty() && r.partialEffects.empty() && r.missingSamples == 0
+            // round 190pg: "converted" is not listed by showImportReport, so a project whose plugins were all converted got no
+            // window at all from this item; it is "everything was converted" now. Relocated samples are listed, so they count.
+            if (r.approximated.empty() && r.unsupported.empty() && r.notReproduced.empty() && r.droppedEffects.empty() && r.partialEffects.empty() && r.missingSamples == 0
+                && r.relocatedSamples == 0
                 && engine.getMissingPlugins().isEmpty() && engine.getMatchedPlugins().isEmpty() && engine.getPluginsWithoutState().isEmpty()
                 && engine.getPluginHost().getLoadFailures().isEmpty())
                 juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Project import"),

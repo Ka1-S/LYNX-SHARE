@@ -400,8 +400,11 @@ public:
     {
         addAndMakeVisible (models);
         addAndMakeVisible (bar);
+        models.setComponentID ("model.models"); // (round 190pg: --demo; six equal segments, marimba first)
+        bar.setComponentID ("model.bar");
         const auto knob = [this] (std::vector<std::unique_ptr<Knob>>& group, int index, const char* caption) {
             group.push_back (std::make_unique<Knob> (page, index, tr (caption)));
+            group.back()->setComponentID ("model." + juce::String (caption).toLowerCase()); // (round 190pg: --demo, e.g. model.hardness)
             addAndMakeVisible (*group.back());
         };
         knob (mallet, p::hardness, TR_NOOP ("Hardness"));

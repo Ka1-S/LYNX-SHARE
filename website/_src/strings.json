@@ -91,6 +91,7 @@
     "lr.l.clip": "Clip-launch layout",
     "lr.l.any": "Any layout",
     "lr.lv.beginner": "Beginner",
+    "lr.lv.intermediate": "Intermediate",
     "wkg.from.d": "Where things are when you know another program: BandLab, FL Studio Mobile, GarageBand, FL Studio, Ableton Live, Bitwig, Logic, Cubase or Reaper, and the Simple layout.",
     "lr.yt": "Watch on YouTube",
     "lr.ytN": "The YouTube player loads only after this click."

@@ -28,6 +28,7 @@
 #include "core/Sections.h"
 #include "engine/AudioEngine.h"
 #include "ui/ColourPicker.h"
+#include "ui/DemoMode.h"
 #include "ui/FlMods.h"
 #include "ui/I18n.h"
 #include "ui/PlaylistComponent.h"
@@ -65,7 +66,8 @@ inline std::string nextSectionName (const std::vector<SongSection>& list)
 }
 
 class SectionsLaneView final : public juce::Component,
-                               public ui::HintSource
+                               public ui::HintSource,
+                               public demo::CellSource
 {
 public:
     SectionsLaneView (AudioEngine& e, PlaylistComponent& p) : engine (e), playlist (p)
@@ -83,6 +85,15 @@ public:
         const auto& list = engine.getSong().sections();
         selectedUid = index >= 0 && index < (int) list.size() ? list[(std::size_t) index].uid : 0;
         repaint();
+    }
+
+    // round 190pg (--demo, docs/DEMO_MODE.md): column = a section's block (0 = the first), -1 = the "+" button; row unused
+    juce::Rectangle<int> demoCellBounds (int, int column) const override
+    {
+        const auto& list = engine.getSong().sections();
+        if (column == -1)
+            return addButton();
+        return column >= 0 && column < (int) list.size() ? blockOf (list[(std::size_t) column]).toNearestInt() : juce::Rectangle<int>();
     }
 
     // --- geometry ------------------------------------------------------------------------------------------------------

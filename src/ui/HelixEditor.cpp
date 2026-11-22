@@ -211,8 +211,9 @@ public:
     Ctl (Page& p, int i, Kind k, juce::String cap = {}, Curve c = Curve::linear) : page (p), index (i), kind (k), curve (c), label (std::move (cap))
     {
         setRepaintsOnMouseActivity (true);
+        setComponentID ("helix." + juce::String (i)); // (round 190pg: --demo, by its engine parameter)
     }
-    void setIndex (int i) { index = i; repaint(); }
+    void setIndex (int i) { index = i; setComponentID ("helix." + juce::String (i)); repaint(); }
     void setLabel (juce::String s) { label = std::move (s); repaint(); }
     const EngineParam& param() const { return paramOf (index); }
     bool liveKnob = false; // (Helix+ 2's card panel: Live's own knob, theme::livelook)

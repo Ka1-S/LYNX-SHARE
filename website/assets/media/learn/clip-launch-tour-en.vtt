@@ -1,0 +1,28 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+The Clip-launch layout works like Ableton Live: a grid of clips, scenes and the arrangement.
+
+00:00:08.800 --> 00:00:14.200
+This is LYNX's demo song. Its sections: Intro, Verse and Chorus.
+
+00:00:14.400 --> 00:00:19.800
+Right-click a slot and choose Create scenes from sections.
+
+00:00:20.000 --> 00:00:25.000
+Each section is now a scene, with every track's clip in it.
+
+00:00:25.200 --> 00:00:30.400
+Click a scene's launch button: its clips start together.
+
+00:00:30.600 --> 00:00:35.800
+Launch the next scene. It takes over at the next bar.
+
+00:00:36.000 --> 00:00:41.000
+Click one clip to launch just that track.
+
+00:00:41.200 --> 00:00:46.600
+The Device view, Ctrl+Alt+4, shows the track's devices.
+
+00:00:46.800 --> 00:00:52.000
+Song shows the arrangement. Both shows the grid and the arrangement together.
