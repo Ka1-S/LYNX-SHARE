@@ -198,6 +198,23 @@
             PlaylistComponent::showHiddenTracks = true;
             ui.resized();
             engine.dispatchPendingMessages();
+            if (auto* grid = ui.getClipGridForSnapshot()) // (round 190ou: the Session mixer's columns, as the grid's timer sets them)
+                syncClipGridMixerForSnapshot (*grid);
+            if (auto* grid = ui.getClipGridForSnapshot()) // (round 190ou: the deactivated track's strip is dimmed)
+                if (auto* mixer = clipGridMixer (*grid))
+                {
+                    const auto image = mixer->createComponentSnapshot (mixer->getLocalBounds(), true, 1.0f);
+                    const auto mean = [&image, mixer] (int column) { // (the strip's mean brightness)
+                        double sum = 0.0;
+                        int n = 0;
+                        for (int y = 0; y < image.getHeight(); y += 2)
+                            for (int x = mixer->stripXForSnapshot (column) + 2; x < mixer->stripXForSnapshot (column) + mixer->stripWidthForSnapshot (column) - 2; x += 2, ++n)
+                                sum += image.getPixelAt (x, y).getBrightness();
+                        return (float) (sum / juce::jmax (1, n));
+                    };
+                    const auto lead = mean (1), bass = mean (2);
+                    check ("cliplaunch_session_strip_dimmed", bass < lead * 0.8f, juce::String (bass, 3) + " / " + juce::String (lead, 3));
+                }
             write (ui, "14-cliplaunch-grid-hidden-shown");
             ui.setClipGridView (PlaylistArea::GridView::song);
             engine.dispatchPendingMessages();

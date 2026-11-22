@@ -876,6 +876,7 @@ public:
     }
 
     SessionMixerComponent* sessionMixer() noexcept { return mixer.get(); }
+    void syncMixerForSnapshot() { syncMixer(); }
     void deviceDropForSnapshot (int t) { setDeviceDropTrack (t); }
 
     // The Detail View's listener (round 183a; none in Pattern workflow, where no grid exists).
@@ -3870,6 +3871,12 @@ SessionMixerComponent* clipGridMixer (juce::Component& grid)
 {
     auto* g = dynamic_cast<ClipGridComponent*> (&grid);
     return g != nullptr ? g->sessionMixer() : nullptr;
+}
+
+void syncClipGridMixerForSnapshot (juce::Component& grid) // (round 190ou: off-screen routes run no timer)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        g->syncMixerForSnapshot();
 }
 
 void setClipGridDeviceDropForSnapshot (juce::Component& grid, int track)
