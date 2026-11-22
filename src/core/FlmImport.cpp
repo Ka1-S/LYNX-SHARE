@@ -2142,7 +2142,7 @@ std::optional<EffectSlot> flmRackFxSlot (const std::vector<std::uint8_t>& state,
             note (&FlpImportReport::droppedEffects, "FL Studio Mobile: " + moduleLabel (m.type));
             continue;
         }
-        if (chain.size() + mapped.slots.size() > (std::size_t) maxEffectSlots)
+        if (chain.size() + mapped.slots.size() > (std::size_t) flEffectSlots)
         {
             note (&FlpImportReport::droppedEffects, "FL Studio Mobile: " + moduleLabel (m.type) + " (the rack holds more than LYNX's slots)");
             continue;
@@ -2599,7 +2599,7 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                 ctx.note (&FlpImportReport::droppedEffects, "FL Studio Mobile: " + moduleLabel (m.type));
                 continue;
             }
-            if (effects.size() + mapped.slots.size() > (std::size_t) maxEffectSlots)
+            if (effects.size() + mapped.slots.size() > (std::size_t) flEffectSlots)
             {
                 ctx.note (&FlpImportReport::droppedEffects, "FL Studio Mobile: " + moduleLabel (m.type) + " (the insert's effect slots are full)");
                 continue;

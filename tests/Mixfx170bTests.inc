@@ -1,6 +1,7 @@
 // Round 170b (Busy Works' beat video, macOS): FL's mixer multi-selection routing, FL's effect slot places (move up /
 // down, the wheel, into empty slots), the trackpad's wheel steps over a slot, and the plugin menus' categories.
 
+#include "core/LowLatency.h"
 #include "core/MixerOps.h"
 #include "core/PluginCatalog.h"
 #include "core/ValueMath.h"
@@ -117,8 +118,8 @@ TEST (mixfx170b_effect_rows_stay_in_the_ten_slots)
     fx[1].row = 2; // (out of order in a file: it follows the previous one)
     fx[2].row = -1;
     CHECK ((mo::effectRows (fx) == std::vector<int> { 4, 5, 6 }));
-    fx[0].row = 9;
-    CHECK ((mo::effectRows (fx) == std::vector<int> { 7, 8, 9 })); // (pulled up to fit)
+    fx[0].row = lynx::maxEffectSlots - 1;
+    CHECK ((mo::effectRows (fx) == std::vector<int> { lynx::maxEffectSlots - 3, lynx::maxEffectSlots - 2, lynx::maxEffectSlots - 1 })); // (pulled up to fit)
     std::vector<lynx::EffectSlot> full (lynx::maxEffectSlots);
     const auto rows = mo::effectRows (full);
     for (int i = 0; i < lynx::maxEffectSlots; ++i)
@@ -192,4 +193,33 @@ TEST (mixfx170b_plugin_menus_group_by_fl_category_lynx_first)
     CHECK ((names == std::vector<std::string> { pc::lynxCategory, "Delay reverb", "Dynamics", "Misc", "My chain" }));
     CHECK (tree[0].items.size() == 2);
     CHECK (pc::allItems (tree).size() == builtins.size());
+}
+
+// More mixer slots (feature/more-mixer-slots): an insert shows FL's 10 rows, grows row by row up to maxEffectSlots,
+// always shows the rows holding effects, and shrinks only over an empty last row; Move up / down wraps over the rows shown
+TEST (more_mixer_slots_rows_grow_and_shrink)
+{
+    namespace mo = lynx::mixerops;
+    lynx::Song song;
+    song.mixer.resize (2);
+    auto& t = song.mixer[1];
+    CHECK (mo::effectRowCount (t) == lynx::flEffectSlots);
+    CHECK (! mo::removeEffectRow (song, 1)); // (never below FL's 10)
+    CHECK (mo::addEffectRow (song, 1) && mo::effectRowCount (t) == lynx::flEffectSlots + 1);
+    CHECK (mo::addEffectRow (song, 1) && mo::effectRowCount (t) == lynx::flEffectSlots + 2);
+    // an effect in the last row keeps it
+    CHECK (mo::insertEffectAtRow (song, 1, lynx::EffectSlot {}, lynx::flEffectSlots + 1) == 0);
+    CHECK (! mo::removeEffectRow (song, 1));
+    // Move down from the last row wraps to the first, Move up from it to the last row shown
+    CHECK (mo::moveEffectBy (song, 1, 0, +1) == 0 && mo::effectRows (t.effects)[0] == 0);
+    CHECK (mo::moveEffectBy (song, 1, 0, -1) == 0 && mo::effectRows (t.effects)[0] == lynx::flEffectSlots + 1);
+    mo::removeEffectKeepRows (song, 1, 0);
+    CHECK (mo::removeEffectRow (song, 1) && mo::effectRowCount (t) == lynx::flEffectSlots + 1);
+    CHECK (mo::removeEffectRow (song, 1) && mo::effectRowCount (t) == lynx::flEffectSlots && t.slotRows == 0);
+    // an effect further down than the rows asked for shows its row; the cap holds
+    CHECK (mo::insertEffectAtRow (song, 1, lynx::EffectSlot {}, 20) >= 0 && mo::effectRowCount (t) == 21);
+    while (mo::addEffectRow (song, 1)) {}
+    CHECK (mo::effectRowCount (t) == lynx::maxEffectSlots);
+    CHECK (mo::insertEffectAtRow (song, 1, lynx::EffectSlot {}, lynx::maxEffectSlots) < 0);
+    CHECK (lynx::lowlatency::bypassed ({ lynx::lowlatency::SlotMask { 1u } << 31 }, 0, 31));
 }

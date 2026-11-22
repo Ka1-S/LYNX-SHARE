@@ -12045,3 +12045,6 @@ countries: br
 "Insert a wildcard at the cursor" = "Inserir um curinga no cursor"
 "File:" = "Arquivo:"
 "Stems:" = "Stems:"
+"+ Add slot" = "+ Adicionar slot"
+"{0} slots (the most)" = "{0} slots (o máximo)"
+"Remove slot" = "Remover slot"

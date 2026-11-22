@@ -1652,10 +1652,10 @@ void RackState::buildPdc (const RackState* previous)
             for (std::size_t s = 0; s < effects[t].size(); ++s)
             {
                 const auto latency = *next++;
-                if (t < lowLatencyTracks.size() && lowLatencyTracks[t] != 0 && s < 16 && latency > 0 && t < song.mixer.size()
+                if (t < lowLatencyTracks.size() && lowLatencyTracks[t] != 0 && s < 32 && latency > 0 && t < song.mixer.size()
                     && s < song.mixer[t].effects.size() && song.slotActive (song.mixer[t].effects[s]))
                 {
-                    masks[t] = (lowlatency::SlotMask) (masks[t] | (1u << s));
+                    masks[t] = (lowlatency::SlotMask) (masks[t] | (std::uint32_t { 1 } << s));
                     saved[t][s] = latency;
                     any = true;
                 }

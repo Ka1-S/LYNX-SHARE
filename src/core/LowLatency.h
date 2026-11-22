@@ -109,10 +109,11 @@ inline std::vector<char> bypassTracks (const Song& song, const std::vector<int>&
     return std::any_of (path.begin(), path.end(), [] (char c) { return c != 0; }) ? path : std::vector<char> {};
 }
 
-// The slots of a track as a bit mask (bit s = slot s), maxEffectSlots ≤ 16.
-using SlotMask = std::uint16_t;
+// The slots of a track as a bit mask (bit s = slot s), maxEffectSlots ≤ 32.
+using SlotMask = std::uint32_t;
+static_assert (maxEffectSlots <= 32, "lowlatency::SlotMask holds one bit per slot");
 inline bool bypassed (const std::vector<SlotMask>& masks, int track, int slot) noexcept
 {
-    return track >= 0 && (std::size_t) track < masks.size() && slot >= 0 && slot < 16 && ((masks[(std::size_t) track] >> slot) & 1u) != 0;
+    return track >= 0 && (std::size_t) track < masks.size() && slot >= 0 && slot < 32 && ((masks[(std::size_t) track] >> slot) & 1u) != 0;
 }
 } // namespace lynx::lowlatency
