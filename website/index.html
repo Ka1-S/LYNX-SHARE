@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="f30b9328";
+window.LYNX_LANG=lang;window.LYNX_V="f37c4471";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=f30b9328">
+<link rel="stylesheet" href="/assets/site.css?v=f37c4471">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -121,7 +121,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
       <h2 data-i18n="home.whatT">What it does</h2>
       <p data-i18n="home.what1">You build patterns in the Channel rack and the Piano roll, arrange them with audio and automation clips in the Playlist, and mix in the Mixer: up to 500 insert tracks with 10 effect slots each, sends and sidechain. If you know FL Studio, the windows, mouse gestures and shortcuts are where you expect them.</p>
       <p data-i18n="home.what2">Projects from other programs open directly. An .flp comes in with its channels, samples, patterns, arrangement, automation and mixer, and FL Studio's native plugins are replaced by LYNX SHARE's own engines. Live 11 and 12 sets open too, and their Session clips land in an optional clip grid with scenes. View › Layout style switches between the three layouts at any time: FL Studio's patterns, that clip grid in the style of Ableton Live, and a Simple layout with tracks, loops, pads and quick recording in one window, in the style of BandLab and FL Studio Mobile.</p>
-      <p data-i18n="home.what3">Third-party plugins load as VST3 and CLAP on every system, plus Audio Units on macOS and LV2 on Linux. VST2 plugins load on Windows and Linux, and on Windows 32-bit plugins run through a bridge.</p>
+      <p data-i18n="home.what3">Third-party plugins load as VST3 and CLAP on every system, plus Audio Units on macOS and LV2 on Linux. VST2 plugins load on Windows and Linux, and on Windows 32-bit plugins run through a bridge. JSFX scripts run on every system too.</p>
       <h3 data-i18n="home.missT">What is missing</h3>
       <p data-i18n="home.miss">It is an alpha, so expect bugs and keep backups. Not every FL Studio plugin is recreated exactly: the <a href="/features/#plugins">plugin list</a> gives the status of each one. Only some of Live's own devices are converted, and in .flm projects only some of FL Studio Mobile's instruments are recreated. The Windows build is not code-signed and the macOS build is not notarized yet, so both systems warn the first time you open it.</p>
       <p><a class="btn btn-ghost btn-sm" href="/features/" data-i18n="home.moreF">All features</a> <a class="btn btn-ghost btn-sm" href="/wiki/getting-started/" data-i18n="home.moreW">Getting started</a></p>
@@ -133,7 +133,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
       <div><dt data-i18n="fact.lic">Licence</dt><dd data-i18n="fact.licV">AGPL-3.0, <a href="https://github.com/Ka1-S/LYNX-SHARE">source on GitHub</a></dd></div>
       <div><dt data-i18n="fact.opens">Opens</dt><dd data-i18n="fact.opensV">.lynx (its own format), .flp, .als (Live 11 and 12), .flm (partial), .dawproject, GarageBand .band (partial), BandLab .blx (partial), .mid, tracker modules .mod, .xm, .s3m, .it (partial), zipped projects .zip</dd></div>
       <div><dt data-i18n="fact.exports">Exports</dt><dd data-i18n="fact.exportsV">WAV, MP3, FLAC, OGG, AIFF, M4A, stems, MIDI, .flp, .als, .dawproject, .flm, zipped loop packages .zip</dd></div>
-      <div><dt data-i18n="fact.plug">Plugins</dt><dd data-i18n="fact.plugV">VST3 and CLAP; Audio Units on macOS; LV2 on Linux; VST2 on Windows and Linux</dd></div>
+      <div><dt data-i18n="fact.plug">Plugins</dt><dd data-i18n="fact.plugV">VST3 and CLAP; Audio Units on macOS; LV2 on Linux; VST2 on Windows and Linux; JSFX everywhere</dd></div>
       <div><dt data-i18n="fact.lang">Languages</dt><dd data-i18n="fact.langV" data-count="15">15, the same as this site</dd></div>
     </dl>
   </div>
@@ -236,7 +236,7 @@ LYNX --showcase Demo.lynx     # writes the demo project</code></pre>
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=f30b9328" defer></script>
-<script src="/assets/motion.js?v=f30b9328" defer></script>
+<script src="/assets/site.js?v=f37c4471" defer></script>
+<script src="/assets/motion.js?v=f37c4471" defer></script>
 </body>
 </html>

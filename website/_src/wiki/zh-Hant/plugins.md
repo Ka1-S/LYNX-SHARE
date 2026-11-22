@@ -1,5 +1,5 @@
 ---
-source: 70262846ff
+source: 6620e7eee1
 ---
 ![外掛管理器的下半部，附有每個外掛檔案都在獨立處理程序中檢查的說明](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -18,11 +18,13 @@ LYNX SHARE 可以代管其他廠商的樂器和效果器外掛。它透過掃描
 
 | 系統 | 代管的格式 |
 |---|---|
-| Windows | VST3、CLAP、VST2 |
-| macOS | VST3、CLAP、Audio Units |
-| Linux | VST3、CLAP、LV2、VST2 |
+| Windows | VST3、CLAP、VST2、JSFX |
+| macOS | VST3、CLAP、Audio Units、JSFX |
+| Linux | VST3、CLAP、LV2、VST2、JSFX |
 
 macOS 上不代管 VST2。在 Linux 上，Windows 外掛可透過 [yabridge](https://github.com/robbert-vdh/yabridge) 和 Wine 運作，這兩者需要你自行安裝：請把 yabridge 同步的資料夾加為外掛資料夾。
+
+JSFX 腳本是 REAPER 的效果器和樂器格式，可在所有系統上執行：LYNX SHARE 內附 31 個免費腳本（來自 chokehold，MIT 授權），位於瀏覽器的 `外掛資料庫 › 效果器 › JSFX` 和 `外掛資料庫 › 產生器 › JSFX`，也可在外掛選擇器中找到。`Documents/LYNX/JSFX` 和 REAPER 的 Effects 資料夾中的腳本也會被找到，`設定 › 檔案 › JSFX 資料夾` 可新增更多資料夾。LYNX SHARE 在自己的面板中顯示腳本的滑桿；自行繪製介面的腳本只顯示其滑桿。
 
 ## 外掛管理器
 

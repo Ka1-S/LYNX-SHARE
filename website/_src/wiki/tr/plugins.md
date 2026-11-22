@@ -1,5 +1,5 @@
 ---
-source: 70262846ff
+source: 6620e7eee1
 ---
 ![Plugin yöneticisinin alt kısmı; her plugin dosyasının ayrı bir süreçte incelendiğini belirten notla](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -18,11 +18,13 @@ LYNX SHARE, başka yapımcıların enstrüman ve efekt plugin'lerini barındır�
 
 | Sistem | Barındırılan formatlar |
 |---|---|
-| Windows | VST3, CLAP, VST2 |
-| macOS | VST3, CLAP, Audio Units |
-| Linux | VST3, CLAP, LV2, VST2 |
+| Windows | VST3, CLAP, VST2, JSFX |
+| macOS | VST3, CLAP, Audio Units, JSFX |
+| Linux | VST3, CLAP, LV2, VST2, JSFX |
 
 VST2, macOS'ta barındırılmaz. Linux'ta Windows plugin'leri, kendinizin kurduğu [yabridge](https://github.com/robbert-vdh/yabridge) ve Wine üzerinden çalışır: yabridge'in senkronladığı klasörü plugin klasörü olarak ekleyin.
+
+REAPER'ın efekt ve enstrüman biçimi olan JSFX betikleri her sistemde çalışır: LYNX SHARE ile 31 ücretsiz betik (chokehold'un, MIT lisansı) gelir; Browser'da `Plugin veritabanı › Efektler › JSFX` ve `Plugin veritabanı › Üreteçler › JSFX` altında ve plugin seçicide bulunur. `Documents/LYNX/JSFX` içindeki ve REAPER'ın Effects klasöründeki betikler de bulunur, `Ayarlar › Dosyalar › JSFX klasörleri` başka klasörler ekler. LYNX SHARE bir betiğin kaydırıcılarını kendi panelinde gösterir; kendi ekranını çizen bir betik yalnızca kaydırıcılarını gösterir.
 
 ## Plugin yöneticisi
 

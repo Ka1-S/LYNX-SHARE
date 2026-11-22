@@ -1,5 +1,5 @@
 ---
-source: 70262846ff
+source: 6620e7eee1
 ---
 ![プラグインマネージャーの下部。各プラグインファイルは別プロセスで調べるという注記がある](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -18,11 +18,13 @@ LYNX SHAREは、ほかのメーカーのインストゥルメントとエフェ�
 
 | システム | ホストできる形式 |
 |---|---|
-| Windows | VST3、CLAP、VST2 |
-| macOS | VST3、CLAP、Audio Units |
-| Linux | VST3、CLAP、LV2、VST2 |
+| Windows | VST3、CLAP、VST2、JSFX |
+| macOS | VST3、CLAP、Audio Units、JSFX |
+| Linux | VST3、CLAP、LV2、VST2、JSFX |
 
 macOSでは、VST2はホストできません。Linuxでは、ご自身でインストールした[yabridge](https://github.com/robbert-vdh/yabridge)とWineを通して、Windowsのプラグインが動きます。yabridgeが同期するフォルダーを、プラグインフォルダーとして追加してください。
+
+REAPERのエフェクトとインストゥルメントの形式であるJSFXスクリプトは、どのシステムでも動きます。LYNX SHAREには無料のスクリプト31本(chokeholdのもの、MITライセンス)が付属し、ブラウザーの`プラグインデータベース › エフェクト › JSFX`と`プラグインデータベース › ジェネレーター › JSFX`、プラグインの選択から使えます。`Documents/LYNX/JSFX`とREAPERのEffectsフォルダーのスクリプトも見つかり、`設定 › ファイル › JSFX フォルダー`でフォルダーを追加できます。LYNX SHAREはスクリプトのスライダーを専用のパネルに表示します。独自の画面を描くスクリプトでは、スライダーだけが表示されます。
 
 ## プラグインマネージャー
 

@@ -1,5 +1,5 @@
 ---
-source: 70262846ff
+source: 6620e7eee1
 ---
 ![插件管理器的下半部分，带有一条说明：每个插件文件都在独立进程中检查](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -18,11 +18,13 @@ LYNX SHARE 可以承载其他厂商的乐器和效果器插件。它通过扫描
 
 | 系统 | 承载的格式 |
 |---|---|
-| Windows | VST3、CLAP、VST2 |
-| macOS | VST3、CLAP、Audio Units |
-| Linux | VST3、CLAP、LV2、VST2 |
+| Windows | VST3、CLAP、VST2、JSFX |
+| macOS | VST3、CLAP、Audio Units、JSFX |
+| Linux | VST3、CLAP、LV2、VST2、JSFX |
 
 macOS 上不承载 VST2。在 Linux 上，Windows 插件可通过 [yabridge](https://github.com/robbert-vdh/yabridge) 和 Wine 使用，二者需要你自己安装：把 yabridge 同步到的文件夹添加为插件文件夹。
+
+JSFX 脚本是 REAPER 的效果器和乐器格式，可在所有系统上运行：LYNX SHARE 自带 31 个免费脚本（来自 chokehold，MIT 许可），位于浏览器的 `插件数据库 › 效果器 › JSFX` 和 `插件数据库 › 发生器 › JSFX`，也可在插件选择器中找到。`Documents/LYNX/JSFX` 和 REAPER 的 Effects 文件夹中的脚本也会被找到，`设置 › 文件 › JSFX 文件夹` 可添加更多文件夹。LYNX SHARE 在自己的面板中显示脚本的滑块；自己绘制界面的脚本只显示其滑块。
 
 ## 插件管理器
 

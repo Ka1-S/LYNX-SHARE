@@ -306,6 +306,9 @@ for guests who don't have the host's plugins. The host can let a guest only list
 
 - **Hosts** VST3 and CLAP on every system, plus Audio Units on macOS, LV2 on Linux and VST2 on Windows and Linux;
   32-bit plugins on Windows run through a bridge.
+- **JSFX scripts**, REAPER's effect and instrument format, run on every system, in slots and as instruments, with their
+  sliders in LYNX SHARE's own panel; 31 free scripts (MIT) come with it, and your own folders or REAPER's Effects folder
+  are found too.
 - **Crash-safe:** plugin scanning always runs in separate processes, and a plugin can run in its own process too, so
   one that crashes goes silent instead of taking your project down. A performance monitor shows what each plugin costs.
 - **The plugin pack:** 36 of LYNX SHARE's own effects and instruments, from Facet EQ to LYNX Model, also work in other
@@ -325,7 +328,7 @@ for guests who don't have the host's plugins. The host can let a guest only list
 
 | | Windows 10 / 11 | macOS 11+ (Apple Silicon and Intel) | Linux x86_64 and arm64 |
 |---|---|---|---|
-| **Plugin formats** | VST3, CLAP, VST2 (32-bit plugins through a bridge) | VST3, CLAP, Audio Units | VST3, CLAP, LV2, VST2 |
+| **Plugin formats** | VST3, CLAP, VST2 (32-bit plugins through a bridge), JSFX | VST3, CLAP, Audio Units, JSFX | VST3, CLAP, LV2, VST2, JSFX |
 | **Audio drivers** | WASAPI, DirectSound, ASIO | Core Audio | PipeWire, JACK, ALSA |
 | **Settings folder** | `%APPDATA%\LYNX` | `~/Library/Application Support/LYNX` | `~/.config/LYNX` |
 
@@ -740,7 +743,7 @@ them. VST is a registered trademark of Steinberg Media Technologies GmbH.
 Logo by **w3teal**.
 
 Built with [JUCE](https://juce.com), [CLAP](https://github.com/free-audio/clap), the [WavPack](https://www.wavpack.com)
-decoder and the Steinberg ASIO SDK; their licences are listed in [`THIRD_PARTY.md`](THIRD_PARTY.md). Thanks to everyone
+decoder, [ysfx](https://github.com/JoepVanlier/ysfx) with WDL's EEL2 (JSFX) and the Steinberg ASIO SDK; their licences are listed in [`THIRD_PARTY.md`](THIRD_PARTY.md). Thanks to everyone
 who reported bugs and sent pull requests.
 
 ## Code signing policy

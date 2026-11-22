@@ -1,5 +1,5 @@
 ---
-source: 70262846ff
+source: 6620e7eee1
 ---
 ![Bagian bawah Pengelola plugin, dengan catatan bahwa setiap file plugin diperiksa di proses terpisah](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -18,11 +18,13 @@ Pada awal pertama, LYNX SHARE memindai folder plugin di latar belakang selagi ka
 
 | Sistem | Format yang dijalankan |
 |---|---|
-| Windows | VST3, CLAP, VST2 |
-| macOS | VST3, CLAP, Audio Units |
-| Linux | VST3, CLAP, LV2, VST2 |
+| Windows | VST3, CLAP, VST2, JSFX |
+| macOS | VST3, CLAP, Audio Units, JSFX |
+| Linux | VST3, CLAP, LV2, VST2, JSFX |
 
 VST2 tidak dijalankan di macOS. Di Linux, plugin Windows bekerja lewat [yabridge](https://github.com/robbert-vdh/yabridge) dan Wine, yang kamu instal sendiri: tambahkan folder tujuan sinkronisasi yabridge sebagai folder plugin.
+
+Skrip JSFX, format efek dan instrumen REAPER, berjalan di setiap sistem: 31 skrip gratis (dari chokehold, lisensi MIT) disertakan dengan LYNX SHARE, di Browser pada `Database plugin › Efek › JSFX` dan `Database plugin › Generator › JSFX` serta di pemilih plugin. Skrip di `Documents/LYNX/JSFX` dan di folder Effects REAPER juga ditemukan, dan `Pengaturan › File › Folder JSFX` menambahkan folder lain. LYNX SHARE menampilkan slider sebuah skrip di panelnya sendiri; skrip yang menggambar tampilannya sendiri hanya menampilkan slidernya.
 
 ## Pengelola plugin
 

@@ -1,5 +1,5 @@
 ---
-source: 70262846ff
+source: 6620e7eee1
 ---
 ![각 플러그인 파일을 별도 프로세스에서 검사한다는 안내가 있는 플러그인 관리자 아래쪽](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -18,11 +18,13 @@ LYNX SHARE는 다른 제작사의 악기와 이펙트 플러그인을 호스팅�
 
 | 시스템 | 호스팅하는 형식 |
 |---|---|
-| Windows | VST3, CLAP, VST2 |
-| macOS | VST3, CLAP, Audio Units |
-| Linux | VST3, CLAP, LV2, VST2 |
+| Windows | VST3, CLAP, VST2, JSFX |
+| macOS | VST3, CLAP, Audio Units, JSFX |
+| Linux | VST3, CLAP, LV2, VST2, JSFX |
 
 macOS에서는 VST2를 호스팅하지 않습니다. Linux에서는 직접 설치하는 [yabridge](https://github.com/robbert-vdh/yabridge)와 Wine을 통해 Windows 플러그인이 동작합니다. yabridge가 동기화하는 폴더를 플러그인 폴더로 추가하세요.
+
+REAPER의 이펙트·악기 형식인 JSFX 스크립트는 모든 시스템에서 실행됩니다. LYNX SHARE에는 무료 스크립트 31개(chokehold 제작, MIT 라이선스)가 함께 들어 있으며, 브라우저의 `플러그인 데이터베이스 › 이펙트 › JSFX`와 `플러그인 데이터베이스 › 제너레이터 › JSFX`, 플러그인 선택기에서 찾을 수 있습니다. `Documents/LYNX/JSFX`와 REAPER의 Effects 폴더에 있는 스크립트도 찾아내며, `설정 › 파일 › JSFX 폴더`에서 폴더를 더 추가할 수 있습니다. LYNX SHARE는 스크립트의 슬라이더를 자체 패널에 보여 줍니다. 자체 화면을 그리는 스크립트는 슬라이더만 보여 줍니다.
 
 ## 플러그인 관리자
 

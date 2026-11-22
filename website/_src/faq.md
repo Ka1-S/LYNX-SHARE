@@ -35,6 +35,8 @@ Yes. `File › Export › FL Studio project...` writes a `.flp`, `File › Expor
 
 VST3 and CLAP plugins load on every system. VST2 loads on Windows and Linux, Audio Units on macOS and LV2 on Linux. On Windows, 32-bit VST2 and VST3 plugins run through a bridge. See [Plugins](/wiki/plugins/).
 
+JSFX scripts, REAPER's effect and instrument format, run on every system too; 31 free scripts come with LYNX SHARE.
+
 ## Is it stable?
 
 It is an alpha. It opens, plays and exports whole projects, but it is not yet a replacement for the DAW you rely on every day. Save often and report what breaks.
@@ -83,7 +85,7 @@ Yes. LYNX SHARE starts and works fully offline, also in a sandbox without networ
 
 ## Can I use LYNX SHARE's own effects in another DAW?
 
-Yes. The LYNX plugin pack has 36 of LYNX SHARE's own effects and instruments, from Facet EQ to LYNX Model, as plugins for other DAWs on Windows, macOS and Linux: every one in a single CLAP file, and a short list also as VST3. It is a separate, optional download (`LYNX-Plugins`) on the [releases page](https://github.com/Ka1-S/LYNX-SHARE/releases). FL Studio's native plugins that LYNX SHARE recreates are not in it. See [Plugins](/wiki/plugins/#lynx-s-own-plugins-in-other-daws).
+Yes. The LYNX plugin pack has 36 of LYNX SHARE's own effects and instruments, from Facet EQ to LYNX Model, as plugins for other DAWs on Windows, macOS and Linux: every one in a single CLAP file, and a short list also as VST3 and, on Linux, LV2. It is a separate, optional download (`LYNX-Plugins`) on the [releases page](https://github.com/Ka1-S/LYNX-SHARE/releases). FL Studio's native plugins that LYNX SHARE recreates are not in it. See [Plugins](/wiki/plugins/#lynx-s-own-plugins-in-other-daws).
 
 ## Can several people work on one project?
 

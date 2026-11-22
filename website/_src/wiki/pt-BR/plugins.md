@@ -1,5 +1,5 @@
 ---
-source: 70262846ff
+source: 6620e7eee1
 ---
 ![A parte de baixo do Gerenciador de plugins, com a nota de que cada arquivo de plugin é examinado em um processo separado](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -18,11 +18,13 @@ Na primeira execução, o LYNX SHARE examina as pastas de plugins em segundo pla
 
 | Sistema | Formatos hospedados |
 |---|---|
-| Windows | VST3, CLAP, VST2 |
-| macOS | VST3, CLAP, Audio Units |
-| Linux | VST3, CLAP, LV2, VST2 |
+| Windows | VST3, CLAP, VST2, JSFX |
+| macOS | VST3, CLAP, Audio Units, JSFX |
+| Linux | VST3, CLAP, LV2, VST2, JSFX |
 
 O VST2 não é hospedado no macOS. No Linux, plugins do Windows funcionam por meio do [yabridge](https://github.com/robbert-vdh/yabridge) e do Wine, que você mesmo instala: adicione a pasta que o yabridge sincroniza como pasta de plugins.
+
+Scripts JSFX, o formato de efeitos e instrumentos do REAPER, rodam em todos os sistemas: o LYNX SHARE vem com 31 scripts gratuitos (do chokehold, licença MIT), no Browser em `Banco de plugins › Efeitos › JSFX` e `Banco de plugins › Geradores › JSFX` e no seletor de plugins. Scripts em `Documents/LYNX/JSFX` e na pasta Effects do REAPER também são encontrados, e `Configurações › Arquivos › Pastas de JSFX` adiciona mais pastas. O LYNX SHARE mostra os sliders de um script num painel próprio; um script que desenha a própria tela mostra só os sliders.
 
 ## O Gerenciador de plugins
 

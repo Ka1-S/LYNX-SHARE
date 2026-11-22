@@ -1,5 +1,5 @@
 ---
-source: 70262846ff
+source: 6620e7eee1
 ---
 ![Der untere Teil des Plugin-Managers mit dem Hinweis, dass jede Plugin-Datei in einem separaten Prozess geprüft wird](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -18,11 +18,13 @@ Beim ersten Start durchsucht LYNX SHARE die Plugin-Ordner im Hintergrund, währe
 
 | System | Gehostete Formate |
 |---|---|
-| Windows | VST3, CLAP, VST2 |
-| macOS | VST3, CLAP, Audio Units |
-| Linux | VST3, CLAP, LV2, VST2 |
+| Windows | VST3, CLAP, VST2, JSFX |
+| macOS | VST3, CLAP, Audio Units, JSFX |
+| Linux | VST3, CLAP, LV2, VST2, JSFX |
 
 VST2 wird unter macOS nicht gehostet. Unter Linux laufen Windows-Plugins über [yabridge](https://github.com/robbert-vdh/yabridge) und Wine, die du selbst installierst: Füge den Ordner, in den yabridge synchronisiert, als Plugin-Ordner hinzu.
+
+JSFX-Skripte, das Effekt- und Instrumentformat von REAPER, laufen auf jedem System: 31 freie Skripte (von chokehold, MIT-Lizenz) liegen LYNX SHARE bei, im Browser unter `Plugin-Datenbank › Effekte › JSFX` und `Plugin-Datenbank › Generatoren › JSFX` und in der Plugin-Auswahl. Skripte in `Documents/LYNX/JSFX` und in REAPERs Effects-Ordner werden ebenfalls gefunden, und `Einstellungen › Dateien › JSFX-Ordner` fügt weitere Ordner hinzu. LYNX SHARE zeigt die Slider eines Skripts in einem eigenen Panel; ein Skript, das seine eigene Anzeige zeichnet, zeigt nur seine Slider.
 
 ## Der Plugin-Manager
 
