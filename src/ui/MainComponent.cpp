@@ -10647,9 +10647,12 @@ juce::StringArray MainComponent::getMenuBarNames()
 {
     // FL's menu bar order (REA round 139): FILE EDIT ADD PATTERNS VIEW OPTIONS TOOLS HELP
     // issue #232 stage 2 (round 190nz, LYNX extra): WINDOW before HELP while other LYNX SHARE windows are open
+    // round 190pb (WG-11): the ADD title has its own key ("Add" is also every Add button): German takes Live's term for
+    // this menu, "Erzeugen", so the German toolbar keeps every panel at 1920 px; the other languages keep their "Add"
+    const auto add = trc ("@menu bar: Add");
     if (windowMenuShown)
-        return { tr ("File"), tr ("Edit"), tr ("Add"), tr ("Patterns"), tr ("View"), tr ("Options"), tr ("Tools"), tr ("Window"), tr ("Help") };
-    return { tr ("File"), tr ("Edit"), tr ("Add"), tr ("Patterns"), tr ("View"), tr ("Options"), tr ("Tools"), tr ("Help") };
+        return { tr ("File"), tr ("Edit"), add, tr ("Patterns"), tr ("View"), tr ("Options"), tr ("Tools"), tr ("Window"), tr ("Help") };
+    return { tr ("File"), tr ("Edit"), add, tr ("Patterns"), tr ("View"), tr ("Options"), tr ("Tools"), tr ("Help") };
 }
 
 // The open LYNX SHARE windows (this one ticked): a click brings that window to the front (ui/LynxWindows.h)

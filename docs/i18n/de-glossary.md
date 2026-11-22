@@ -188,6 +188,7 @@ BPM, st, ct), note names (C4, F#), MIDI terms (MIDI, CC, NRPN, MPE), and the pro
 | scan for plugins | Nach Plugins suchen | |
 | folder / file | Ordner / Datei | file manager = Dateimanager |
 | File / Edit / View / Options / Help (menus) | Datei / Bearbeiten / Ansicht / Optionen / Hilfe | the "Tools" menu stays "Tools" (the menu bar must stay narrow for the toolbar) |
+| Add (the menu bar's title, key "@menu bar: Add") | Erzeugen | Ableton Live's German name for its menu of new tracks and clips; FL's German "Hinzufügen" is the widest title and pushed the Chord panel out of the toolbar at 1920 px (round 190pb). Add buttons and items stay "Hinzufügen" |
 | Exit | Beenden | |
 | language | Sprache | |
 | shortcuts | Tastenkürzel | |

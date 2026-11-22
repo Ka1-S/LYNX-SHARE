@@ -3665,6 +3665,7 @@ countries: id
 "Version" = "Versi"
 "Path" = "Path"
 "Add" = "Tambah"
+"@menu bar: Add" = "Tambah"
 "Other" = "Lainnya"
 "Browser find" = "Pencarian Browser"
 "One-click audio recording: arm the selected insert..." = "Rekaman audio sekali klik: siagakan insert terpilih..."

@@ -3665,6 +3665,7 @@ countries: tw hk mo
 "Version" = "版本"
 "Path" = "路徑"
 "Add" = "新增"
+"@menu bar: Add" = "新增"
 "Other" = "其他"
 "Browser find" = "瀏覽器尋找"
 "One-click audio recording: arm the selected insert..." = "一鍵音訊錄製：預備所選插入軌..."

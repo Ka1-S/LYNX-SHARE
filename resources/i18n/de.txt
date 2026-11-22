@@ -3665,6 +3665,7 @@ countries: de at ch li lu
 "Version" = "Version"
 "Path" = "Pfad"
 "Add" = "Hinzufügen"
+"@menu bar: Add" = "Erzeugen"
 "Other" = "Sonstige"
 "Browser find" = "Im Browser suchen"
 "One-click audio recording: arm the selected insert..." = "Audioaufnahme mit einem Klick: ausgewähltes Insert aufnahmebereit schalten..."
