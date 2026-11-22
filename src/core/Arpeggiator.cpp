@@ -34,12 +34,23 @@ void Arpeggiator::hold (const NoteEvent& on) noexcept
         heldKeys[(std::size_t) i] = heldKeys[(std::size_t) i - 1];
         heldVelocity[(std::size_t) i] = heldVelocity[(std::size_t) i - 1];
         heldExpression[(std::size_t) i] = heldExpression[(std::size_t) i - 1];
+        heldOrder[(std::size_t) i] = heldOrder[(std::size_t) i - 1];
         --i;
     }
 
     heldKeys[(std::size_t) i] = key;
     heldVelocity[(std::size_t) i] = on.velocity;
     heldExpression[(std::size_t) i] = expressionOf (on);
+    heldOrder[(std::size_t) i] = arrivals++;
+}
+
+int Arpeggiator::firstHeld() const noexcept
+{
+    auto first = 0;
+    for (int i = 1; i < heldCount; ++i)
+        if (heldOrder[(std::size_t) i] - heldOrder[(std::size_t) first] > 0x80000000u) // (wraps)
+            first = i;
+    return first;
 }
 
 void Arpeggiator::release (int key) noexcept
@@ -52,6 +63,7 @@ void Arpeggiator::release (int key) noexcept
                 heldKeys[(std::size_t) j] = heldKeys[(std::size_t) j + 1];
                 heldVelocity[(std::size_t) j] = heldVelocity[(std::size_t) j + 1];
                 heldExpression[(std::size_t) j] = heldExpression[(std::size_t) j + 1];
+                heldOrder[(std::size_t) j] = heldOrder[(std::size_t) j + 1];
             }
 
             --heldCount;
@@ -250,7 +262,6 @@ void Arpeggiator::process (int channel, const NoteEvent* in, int inCount, double
             }
             const auto key = keyAt (s, index);
             const auto source = (std::size_t) (s.chord.empty() ? index % heldCount : 0);
-            const auto velocity = heldVelocity[source];
 
             if (s.slide && sliding && sounding >= 0)
             {
@@ -258,6 +269,7 @@ void Arpeggiator::process (int channel, const NoteEvent* in, int inCount, double
                 e.type = NoteEvent::Type::slide;
                 e.key = key;
                 e.slideSamples = (float) (std::min (noteTicks, stepTicks) * 0.25 / tps);
+                e.arpGlide = true; // (round 190pi: the pitch only — before, it moved the voice to velocity 0, issue #236's slide)
                 emit (e);
             }
             else
@@ -266,8 +278,11 @@ void Arpeggiator::process (int channel, const NoteEvent* in, int inCount, double
                     emitOffs (e);
                 e.type = NoteEvent::Type::on;
                 e.key = key;
-                e.velocity = velocity;
-                apply (heldExpression[source], e);
+                // FL's Slide arpeggio (round 190pi [EXEC]): its one voice takes the first held note's velocity and
+                // expression, whichever key it starts on; without Slide each note takes its own held note's
+                const auto from = s.slide && flSlideLaw ? (std::size_t) firstHeld() : source;
+                e.velocity = heldVelocity[from];
+                apply (heldExpression[from], e);
                 emit (e);
                 sounding = key;
                 sliding = s.slide;

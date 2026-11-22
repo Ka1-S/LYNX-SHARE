@@ -1955,6 +1955,9 @@ struct Voice
     bool lynxReleased = false;
     double notePan = 0;
     double fvol = 1, fpan = 0, fcutH = 0, fresH = 0, FP = 0, relvel = 0, note = 0, vel = 0;
+    // FL's host: Final.Vol = Init.Vol · channel volume while the voice's "link velocity" is on (round 190pi: Ogun leaves it
+    // on when byte +0x20a is set, REA_rodada190pi §3); the channel's level changes keep it
+    double hostVol = 1;
     HostSlide slide; // a slide note moving Final.Pitch (issue #14)
     int keyi = 0, state = 1, cnt = 0;
     bool firstChunk = true;
@@ -2108,6 +2111,8 @@ public:
         if (v == nullptr)
             return -1;
         startVoice (*v, key, vel, fvol, fpan, pofs, fcut, fres, relvel);
+        v->hostVol = nextHostVol;
+        nextHostVol = 1.0;
         v->id = ++serial;
         v->lynxKey = lynxKey;
         v->lynxNote = nextLynxNote;
@@ -2152,7 +2157,26 @@ public:
     void setLevels (double fvol, double fpan) noexcept
     {
         for (auto* v : order)
-            v->fvol = fvol, v->fpan = v->notePan + fpan;
+            v->fvol = fvol * v->hostVol, v->fpan = v->notePan + fpan;
+    }
+
+    // FL's link velocity (round 190pi [EXEC: FL 2026 /R renders of Ogun's default patch and Astes' Chase at velocity 25 /
+    // 50 / 100 / 128, −21.7 / −12.7 / 0 / +6.3 dB = Init.Vol]): Ogun sends the host "link velocity off" (voice event 6)
+    // only while byte +0x20a is 0 (REA_rodada37 §1.4: "ask host event 6"); otherwise Final.Vol carries Init.Vol
+    bool linksVelocity() const noexcept { return pt->flag (0x20a) != 0; }
+    double nextHostVol = 1.0; // (the next noteOn's Init.Vol factor)
+
+    // a slide note moves a sounding voice's Init.Vol (with link velocity) and pan (issue #236, round 190pi)
+    void setNoteLevels (int key, double hostVol, double notePan, double channelVol, double channelPan) noexcept
+    {
+        for (auto* v : order)
+            if (v->lynxKey == key && ! v->lynxReleased && ! v->dead)
+            {
+                if (hostVol >= 0.0)
+                    v->hostVol = hostVol, v->fvol = channelVol * hostVol;
+                if (! std::isnan (notePan))
+                    v->notePan = notePan, v->fpan = notePan + channelPan;
+            }
     }
 
     int voices() const noexcept { return (int) order.size(); }
@@ -3795,7 +3819,10 @@ public:
         const auto pofs = (double) knob + (double) nextCents;
         engine->nextLiveRef = live.ref (knob);
         engine->nextLynxNote = startingNoteId();
-        engine->noteOn (key, std::clamp ((double) velocity, 0.0, 1.0), channelVol, (double) nextPan + channelPan, pofs, 0.0, 0.0,
+        const auto vel = std::clamp ((double) velocity, 0.0, 1.0);
+        const auto hostVol = engine->linksVelocity() ? initVolume (vel) : 1.0; // (round 190pi: FL's link velocity)
+        engine->nextHostVol = hostVol;
+        engine->noteOn (key, vel, channelVol * hostVol, (double) nextPan + channelPan, pofs, 0.0, 0.0,
                         0.5, 0, key, (double) nextPan);
         engine->nextLynxNote = 0;
         nextPan = 0.0f, nextCents = 0.0f;
@@ -3822,6 +3849,26 @@ public:
         take();
         if (engine != nullptr)
             engine->releaseKey (key, endingNoteId());
+    }
+
+    // FL's velocity → Init.Vol, (11^(1.28·v) − 1)/10 (REA_rodada28 §4.1)
+    static double initVolume (double vel) noexcept { return (std::pow (11.0, 1.28 * std::clamp (vel, 0.0, 1.0)) - 1.0) / 10.0; }
+
+    // FL's slide notes move the sounding notes' Init.Vol (with link velocity) and pan (issue #236, round 190pi)
+    void voiceProperty (int key, int prop, float value) noexcept override
+    {
+        if (! std::isfinite (value) || (prop != 0 /* vfx::Prop::velocity */ && prop != 2 /* vfx::Prop::pan */))
+            return;
+        take();
+        if (engine == nullptr)
+            return;
+        if (prop == 0)
+        {
+            if (engine->linksVelocity())
+                engine->setNoteLevels (key, initVolume ((double) value), std::nan (""), channelVol, channelPan);
+        }
+        else
+            engine->setNoteLevels (key, -1.0, std::clamp ((double) value, -1.0, 1.0), channelVol, channelPan);
     }
 
     void allNotesOff() noexcept override

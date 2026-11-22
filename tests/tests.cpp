@@ -10635,7 +10635,10 @@ TEST (autogun_template_channels)
         opt.autogun = true;
         opt.sgState = sgState;
         opt.tempo = 120.0; // the instrument is configured at 120 BPM
-        const auto ref = lynx::ogun::renderReference (c.pluginState, { { 0, 60, 0.75, 1.0, 0.0, 0.0, 0.0, 0.0, 0.5, 6144 } }, 44100.0, 16384, opt);
+        // (round 190pi: FL's host hands a velocity-linked voice Final.Vol = Init.Vol, (11^(1.28·v) − 1)/10 — Autogun's
+        // default patch scales with the velocity in FL 2026's renders, REA_rodada190pi §3; this state links it)
+        const auto finalVol = (std::pow (11.0, 1.28 * 0.75) - 1.0) / 10.0;
+        const auto ref = lynx::ogun::renderReference (c.pluginState, { { 0, 60, 0.75, finalVol, 0.0, 0.0, 0.0, 0.0, 0.5, 6144 } }, 44100.0, 16384, opt);
         auto inst = lynx::makeInstrument (lynx::InstrumentKind::autogun);
         inst->configure (c, 120.0);
         inst->prepare (44100.0);
@@ -18088,6 +18091,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "TextFit190ooTests.inc" // round 190oo (design review 2, fit): translated menu titles give up width before toolbar panels drop, knob captions
 #include "OldSteps190ozTests.inc" // round 190oz: FL <= 11 step grids (0x41 + 0x5B / 0x48 ... in a channel) become step notes
 #include "HeldSteps190ozTests.inc" // round 190oz: FL step notes on generators are held (no note-off)
+#include "FlParity190piTests.inc" // round 190pi: Sytrus slide velocity, arpeggio glides, chord slides, Ogun link velocity, FL 11 parameters
 #include "Perf190osTests.inc" // round 190os: the safe-overload guard lets go at the stop and within 1 s of the overload's end
 #include "Tracker190omTests.inc" // round 190om (0.1.31): tracker stage 2 (pattern events, pitch curves, Bxx / Vxx), SimSynth velocity
 #include "Rollup031s6Tests.inc" // rollup 0.1.31 step 6: gold sweep for 190om decisions 4-5 (LYNX_SWEEP_DIR)

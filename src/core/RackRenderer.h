@@ -1244,6 +1244,8 @@ private:
     struct NoteProps
     {
         float velocity = 0.78125f, pan = 0.0f, modX = 0.5f, modY = 0.5f;
+        float cents = 0.0f; // (round 190pi) the note's own cents as its voice started (a chord slide's interval)
+        std::int8_t colour = 0; // (round 190pi) its colour: a slide note moves the notes of its own colour only
     };
     struct PropSlide
     {
@@ -1253,11 +1255,16 @@ private:
         std::array<NoteProps, maxKeys> from {};
         NoteProps to;
         int steps = 0; // FL ticks (n): steps 0…n, the last one at the slide's end
+        // (round 190pi) its own ticks: where it started (song ticks) and the next step — a pitch slide that starts while
+        // it runs (an arpeggiator's Slide step) has its own schedule (SlideTicks) and no longer stops this one
+        double start = 0.0;
+        int k = 0;
         bool flLaw = false; // an FL native generator: the level moves linearly in FL's volume (InitLevels.Vol), not in velocity
     };
     std::vector<NoteProps> noteProps;  // maxChannels × 128 (prepare)
     std::vector<PropSlide> propSlides; // maxChannels (prepare)
-    void startPropSlide (int channel, const NoteEvent& slide, int flTicks, bool flLaw) noexcept;
+    // (`only`: the keys it moves — round 190pi, the slide note's colour —; null: every held key)
+    void startPropSlide (int channel, const NoteEvent& slide, int flTicks, bool flLaw, const NoteMask* only = nullptr) noexcept;
     void stepPropSlide (Instrument& instrument, int channel, int step) noexcept;
     std::array<NoteMask, maxChannels> publishedNotes {};     // what soundingKeys holds (stored only on a change)
     std::atomic<bool> keepReleasedOnPlay { false };         // (round 190oa, DL-58)

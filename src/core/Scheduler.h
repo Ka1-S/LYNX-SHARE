@@ -38,6 +38,9 @@ struct NoteEvent
     float slideSamples = 0.0f; // slide: glide duration
     bool porta = false;        // the note inverts the channel's porta
     bool echo = false;         // a repeat of the channel's echo delay (FL's generated voices: not in the Mono list, round 168l)
+    // slide: the arpeggiator's own Slide step (round 190pi) — it glides the arpeggio's voice to its next key and moves
+    // nothing else (a slide note of the song still moves the voice's velocity, pan and Mod X / Y, issue #236)
+    bool arpGlide = false;
     // audio clips: fades (in samples) and the position within the clip when the note starts
     float clipElapsed = 0.0f, clipRemaining = 0.0f, fadeIn = 0.0f, fadeOut = 0.0f;
     // bit 0: the fade-in is a crossfade (FL's S curve, clipops::crossfadeCurve), bit 1: the fade-out (round 166e);

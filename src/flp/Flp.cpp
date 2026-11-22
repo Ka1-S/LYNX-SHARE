@@ -588,6 +588,16 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
     auto channel = [&]() -> Channel& { return findOrAdd (project.channels, currentChannel); };
     auto pattern = [&]() -> Pattern& { return findOrAdd (project.patterns, currentPattern); };
     auto arrangement = [&]() -> Arrangement& { return findOrAdd (project.arrangements, currentArrangement); };
+    // FL before 12 (11.0.3 / 11.1.0 in the demos: Housework, Overcome) numbered a channel's plugin parameters from 0x2000,
+    // FL 12 on from 0x8000 (ControlId::pluginParamBase); every FL 12+ demo uses 0x8000 and no other channel control lies in
+    // 0x2000…0x7FFF (round 190pi: Overcome's "Cut" / "Res" / "Vol" clips on Sytrus' parameters 18 / 19 / 0 [EXEC: FL 2026
+    // renders of the intro with and without them])
+    auto oldPluginParam = [&] (std::uint32_t raw) -> std::uint32_t {
+        const auto p = raw & 0xFFFFu;
+        if (project.versionNumber > 0 && project.versionNumber < version (12, 0, 0) && raw < 0x10000000u && p >= 0x2000u && p < 0x8000u)
+            return raw + 0x6000u;
+        return raw;
+    };
 
     // FL <= 11 step grids (see OldStepGrids): FL's loader keeps the pattern of the last 0x41 (capped at 999) and the
     // channel of the last 0x40 for them, whatever section the event comes in
@@ -1485,7 +1495,7 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
             {
                 std::vector<ControlEvent> list;
                 for (std::size_t o = 0; o + 12 <= e.data.size(); o += 12)
-                    list.push_back ({ readLE<std::uint32_t> (e.data, o), normalizeControlId (readLE<std::uint32_t> (e.data, o + 4)),
+                    list.push_back ({ readLE<std::uint32_t> (e.data, o), ControlId { oldPluginParam (normalizeControlId (readLE<std::uint32_t> (e.data, o + 4)).raw) },
                                       readLE<std::int32_t> (e.data, o + 8) });
                 if (e.id == evInitControls)
                     project.initControls.insert (project.initControls.end(), list.begin(), list.end());
@@ -1514,7 +1524,7 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
                         else if (param == 0x1F01)
                             value *= 100;
                     }
-                    project.controls.push_back ({ normalizeControlId (raw), value });
+                    project.controls.push_back ({ ControlId { oldPluginParam (normalizeControlId (raw).raw) }, value });
                 }
                 break;
 
@@ -1522,8 +1532,8 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
                 for (std::size_t o = 0; o + 20 <= e.data.size(); o += 20)
                     if ((readLE<std::uint32_t> (e.data, o + 12) & 8) != 0) // 8 = automation clip (4 = remote control)
                     {
-                        const auto source = readLE<std::uint32_t> (e.data, o);
-                        const auto target = normalizeControlId (readLE<std::uint32_t> (e.data, o + 8));
+                        const auto source = oldPluginParam (readLE<std::uint32_t> (e.data, o));
+                        const ControlId target { oldPluginParam (normalizeControlId (readLE<std::uint32_t> (e.data, o + 8)).raw) };
 
                         if ((source & 0xFFFFu) >= 0x8000u) // output of a controller, not a clip
                         {

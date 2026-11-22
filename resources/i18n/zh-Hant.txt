@@ -12508,3 +12508,6 @@ countries: tw hk mo
 "Controls that several patterns' event lanes drive follow only the last pattern's lane in this release: {0}" = "由多個 pattern 的事件軌道驅動的控制項在此版本中只跟隨最後一個 pattern 的軌道：{0}"
 "In Song mode these patterns' notes play without their own pitch / timbre / pressure curves in this release: {0}" = "在 Song 模式下，這些 pattern 的音符在此版本中不帶自身的音高 / 音色 / 壓力曲線播放：{0}"
 "ARA plugins on mixer inserts play as ordinary insert effects in this release (the audio clips routed there play without their edits): {0}" = "混音器插入槽上的 ARA 外掛在此版本中作為一般插入效果器運作（路由到那裡的音訊片段不帶其編輯播放）：{0}"
+# --- round 190pi: Save a copy for 0.1.30, chord slides and Slide arpeggios
+"{0} slide note(s) over chords or notes of other colours take every held note to the slide note's key (FL moves only its colour's notes, all by one interval)" = "和弦或其他顏色音符上的 {0} 個滑音音符把每個按住的音符都移到滑音音符的鍵上（FL 只移動同色的音符，全部移動同一個音程）"
+"{0} channel(s) with a Slide arpeggio start it at the velocity of the note it plays first, not of the first note held" = "{0} 個使用 Slide 琶音的通道以最先演奏的音符的力度開始，而不是最先按住的音符"

@@ -1,5 +1,6 @@
 #include "core/Crossfader.h"
 #include "core/RackRenderer.h"
+#include "core/SytrusEngine.h"
 #include "core/TrackStates.h"
 #include "core/LynxVerbs.h"
 #include "core/PolyEdit.h"
@@ -2206,6 +2207,8 @@ void RackState::buildAutomationTables()
                                       && t.param < samplerparam::count)
                                   // the knobs of an FL engine kept in the channel's state (round 168n)
                                   || modelparams::find (song.channels[(std::size_t) t.index].instrument, t.param) != nullptr
+                                  // Sytrus' main page (round 190pi: master level / LFO / pitch, Mod X / Y)
+                                  || (song.channels[(std::size_t) t.index].instrument == InstrumentKind::sytrus && sytrus::automatable (t.param))
                                   // LYNX Synth's knobs (issue #152, round 190he)
                                   || (song.channels[(std::size_t) t.index].instrument == InstrumentKind::synth && synthparam::valid (t.param))
                                   // FL Studio Mobile's DW Sampler: its own 34 values (round 190de)
@@ -4026,7 +4029,7 @@ bool RackRenderer::stepsSlides (InstrumentKind k) noexcept
 // equal steps, one per FL tick, the first a sample after the slide's start and the last at its end — the law round
 // 190hg measured for the pitch. The voices take the steps as voice properties (Instrument::voiceProperty); an engine
 // without them keeps its level, as before.
-void RackRenderer::startPropSlide (int channel, const NoteEvent& slide, int flTicks, bool flLaw) noexcept
+void RackRenderer::startPropSlide (int channel, const NoteEvent& slide, int flTicks, bool flLaw, const NoteMask* only) noexcept
 {
     if ((std::size_t) channel >= propSlides.size() || (std::size_t) channel * 128 + 128 > noteProps.size())
         return;
@@ -4036,7 +4039,7 @@ void RackRenderer::startPropSlide (int channel, const NoteEvent& slide, int flTi
     p.flLaw = flLaw;
     p.to = { std::clamp (slide.velocity, 0.0f, 1.0f), std::clamp (slide.pan, -1.0f, 1.0f), std::clamp (slide.modX, 0.0f, 1.0f),
              std::clamp (slide.modY, 0.0f, 1.0f) };
-    const auto& held = heldNotes[(std::size_t) channel];
+    const auto& held = only != nullptr ? *only : heldNotes[(std::size_t) channel];
     const auto* props = noteProps.data() + (std::size_t) channel * 128;
     bool moves = false;
     for (int key = 0; key < 128 && p.count < PropSlide::maxKeys; ++key)
@@ -4078,6 +4081,7 @@ void RackRenderer::stepPropSlide (Instrument& instrument, int channel, int step)
             now.velocity = last ? b.velocity : std::clamp (std::log (10.0f * g + 1.0f) / (1.28f * std::log (11.0f)), 0.0f, 1.0f);
         }
         auto& was = props[key];
+        now.cents = was.cents, now.colour = was.colour;
         if (now.velocity != was.velocity)
             instrument.voiceProperty (key, (int) vfx::Prop::velocity, now.velocity);
         if (now.pan != was.pan)
@@ -4174,21 +4178,31 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
     // the render calls up to `end`, split on the ticks of a stepped slide note (round 190jv): an engine moves a voice's
     // pitch between two calls, so each step lands on its tick, and the first one a sample after the slide's start
     auto& ticks = slideTicks[(std::size_t) i];
+    auto* props = (std::size_t) i < propSlides.size() ? &propSlides[(std::size_t) i] : nullptr;
     const auto renderUntil = [&] (int end) noexcept {
-        while (ticks.k <= ticks.n && ticks.n > 0)
+        while (true)
         {
-            const auto at = ticks.k == 0 ? (ticks.start - chunkStartTick) / chunkTps + 1.0
-                                         : (ticks.start + ticks.k * flTickTicks - chunkStartTick) / chunkTps;
+            // the next tick of the pitch slide and of the note properties' slide (issue #236; round 190pi: each on its
+            // own schedule — the same ticks when one slide note moves both)
+            const auto tickAt = [&] (double start, int k) {
+                return k == 0 ? (start - chunkStartTick) / chunkTps + 1.0 : (start + k * flTickTicks - chunkStartTick) / chunkTps;
+            };
+            const auto pitchAt = ticks.k <= ticks.n && ticks.n > 0 ? tickAt (ticks.start, ticks.k) : HUGE_VAL;
+            const auto propAt = props != nullptr && props->count > 0 && props->k <= props->steps && props->steps > 0
+                                    ? tickAt (props->start, props->k) : HUGE_VAL;
+            const auto at = std::min (pitchAt, propAt);
             if (! std::isfinite (at) || at >= (double) end)
                 break;
-            const auto step = ticks.k++;
             const auto split = (int) std::lround (at);
             if (split > position && split < end)
             {
                 instrument.render (l + position, r + position, split - position, gl, gr);
                 position = split;
             }
-            stepPropSlide (instrument, i, step); // (issue #236: the note properties step on the same ticks)
+            if (pitchAt == at)
+                ++ticks.k;
+            if (propAt == at)
+                stepPropSlide (instrument, i, props->k++);
         }
         if (end > position)
         {
@@ -4211,6 +4225,7 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
                 arp.input[(std::size_t) inCount++] = e;
 
         int outCount = 0;
+        arp.flSlideLaw = state.song.slideNoteProps; // (round 190pi)
         arp.process (i, arp.input.data(), inCount, chunkStartTick, chunkTps, n, c.arp, arp.output.data(), outCount);
         for (int k = 0; k < outCount; ++k) // (the arpeggio's notes are its own: no scheduled note's identity, round 190ej)
             arp.output[(std::size_t) k].noteId = 0;
@@ -4392,7 +4407,7 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
                 {
                     const auto [modX, modY] = modTracking ? channelmisc::trackedModulation (c.misc, e.key, e.velocity, e.modX, e.modY)
                                                           : std::pair<float, float> { e.modX, e.modY };
-                    noteProps[(std::size_t) i * 128 + (std::size_t) e.key] = { velocity, pan, modX, modY };
+                    noteProps[(std::size_t) i * 128 + (std::size_t) e.key] = { velocity, pan, modX, modY, noteCents, e.colour };
                 }
                 instrument.noteOnAt (e.key, velocity, e.startSeconds);
                 instrument.setNextNoteId (0);
@@ -4403,24 +4418,59 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
         {
             // FL's native generators: the slide moves in steps on FL's ticks (round 190jv, core/HostSlide.h Steps)
             const auto flTicks = stepsSlides (c.instrument) ? (int) std::lround ((double) e.slideSamples * chunkTps / flTickTicks) : 0;
+            const auto ticksBefore = ticks; // (round 190pi: a slide that moves nothing leaves them)
             if (flTicks > 0)
             {
                 HostSlide::pendingSteps() = { flTicks, (float) (flTickTicks / chunkTps / std::max (1.0, (double) e.slideSamples)) };
                 ticks = { chunkStartTick + (double) e.sampleOffset * chunkTps, 0, flTicks };
             }
-            instrument.slideTo (e.key, e.cents + c.misc.fineTune + (c.misc.mainPitch ? state.song.masterPitch : 0.0f), e.slideSamples);
+            const auto slideCents = e.cents + c.misc.fineTune + (c.misc.mainPitch ? state.song.masterPitch : 0.0f);
+            // FL's slide note (round 190pi, REA_rodada190pi §2): it moves the held notes of its own colour only, each by the
+            // interval from the highest of them to its key (HostSlide::pendingShift) — not every voice to its key; with
+            // none of its colour held it moves nothing. One held key of its colour and nothing else: the plain slide
+            NoteMask group {};
+            bool plain = true, none = false;
+            if (state.song.slideNoteProps && ! e.arpGlide && ! channelMono (c) && (std::size_t) i * 128 + 128 <= noteProps.size())
+            {
+                const auto& keys = heldNotes[(std::size_t) i];
+                const auto* props = noteProps.data() + (std::size_t) i * 128;
+                int top = -1, inGroup = 0, all = 0;
+                for (int k = 0; k < 128; ++k)
+                    if ((keys[(std::size_t) (k >> 6)] >> (k & 63)) & 1u)
+                    {
+                        ++all;
+                        if (props[k].colour == e.colour)
+                            group[(std::size_t) (k >> 6)] |= std::uint64_t { 1 } << (k & 63), ++inGroup, top = k;
+                    }
+                none = all > 0 && inGroup == 0;
+                plain = all == 0 || (inGroup == 1 && all == 1);
+                if (! plain && ! none)
+                {
+                    auto& shift = HostSlide::pendingShift();
+                    shift = { true, 100.0f * (float) (e.key - top) + slideCents - props[top].cents, e.key, group };
+                }
+            }
+            if (! none)
+                instrument.slideTo (e.key, slideCents, e.slideSamples);
+            HostSlide::pendingShift() = {};
             HostSlide::pendingSteps() = {};
+            if (none)
+            {
+                ticks = ticksBefore; // (FL 2026 [EXEC]: a slide note of a colour no held note has moves nothing)
+                continue;
+            }
             // issue #236 (round 190od): FL's slide note moves the sounding notes' velocity, pan and Mod X / Y to its own
             // as well, in the same n + 1 steps on FL's ticks (every engine: the property steps are the host's)
-            if (state.song.slideNoteProps && ! c.muted)
+            // (an arpeggiator's own Slide step glides the pitch only, round 190pi)
+            if (state.song.slideNoteProps && ! c.muted && ! e.arpGlide)
             {
                 const auto n = std::max (0, (int) std::lround ((double) e.slideSamples * chunkTps / flTickTicks));
-                startPropSlide (i, e, n, stepsSlides (c.instrument));
-                if (propSlides[(std::size_t) i].count > 0)
+                startPropSlide (i, e, n, stepsSlides (c.instrument), plain ? nullptr : &group);
+                if (auto& p = propSlides[(std::size_t) i]; p.count > 0)
                 {
-                    if (n > 0 && flTicks == 0) // (an engine that glides its pitch: the render calls split for the steps only)
-                        ticks = { chunkStartTick + (double) e.sampleOffset * chunkTps, 0, n };
-                    else if (n == 0) // (shorter than a tick: at once)
+                    p.start = chunkStartTick + (double) e.sampleOffset * chunkTps; // (its own ticks, round 190pi)
+                    p.k = 0;
+                    if (n == 0) // (shorter than a tick: at once)
                         stepPropSlide (instrument, i, 0);
                 }
             }

@@ -23,6 +23,9 @@ public:
                   const ArpSettings& settings, NoteEvent* out, int& outCount) noexcept;
 
     void reset() noexcept;
+    // FL's slide law (Song::slideNoteProps, round 190pi): a Slide arpeggio's voice takes the first held note's velocity
+    // and expression (off: the note it starts on, as before)
+    bool flSlideLaw = false;
 
     std::array<NoteEvent, maxEvents> input {}, output {};
 
@@ -49,6 +52,11 @@ private:
     std::array<int, maxHeld> heldKeys {};
     std::array<float, maxHeld> heldVelocity {};
     std::array<Expression, maxHeld> heldExpression {};
+    // (round 190pi) the order the held notes came in: FL's Slide arpeggio is one voice with the first held note's
+    // velocity and expression [EXEC: FL 2026 renders of Sytrus with Overcome's Flute arpeggio, held notes at 100 / 25]
+    std::array<std::uint32_t, maxHeld> heldOrder {};
+    std::uint32_t arrivals = 0;
+    int firstHeld() const noexcept; // the held note that came first (an index)
     int heldCount = 0;
     int step = 0;          // position in the sequence
     int repeatCount = 0;

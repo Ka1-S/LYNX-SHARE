@@ -12508,3 +12508,6 @@ countries: jp
 "Controls that several patterns' event lanes drive follow only the last pattern's lane in this release: {0}" = "複数のパターンのイベントレーンが動かすコントロールは、このリリースでは最後のパターンのレーンだけに従います: {0}"
 "In Song mode these patterns' notes play without their own pitch / timbre / pressure curves in this release: {0}" = "Song モードでは、これらのパターンのノートはこのリリースでノート自身のピッチ / 音色 / プレッシャーのカーブなしで鳴ります: {0}"
 "ARA plugins on mixer inserts play as ordinary insert effects in this release (the audio clips routed there play without their edits): {0}" = "ミキサーのインサートの ARA プラグインは、このリリースでは通常のインサートエフェクトとして動作します(そこにルーティングされたオーディオクリップは編集なしで鳴ります): {0}"
+# --- round 190pi: Save a copy for 0.1.30, chord slides and Slide arpeggios
+"{0} slide note(s) over chords or notes of other colours take every held note to the slide note's key (FL moves only its colour's notes, all by one interval)" = "和音や他の色のノートの上にある {0} 個のスライド・ノートは、押さえているすべてのノートをスライド・ノートのキーへ移します(FL は同じ色のノートだけを同じ音程だけ動かします)"
+"{0} channel(s) with a Slide arpeggio start it at the velocity of the note it plays first, not of the first note held" = "Slide アルペジオの {0} チャンネルは、最初に押さえたノートではなく最初に鳴らすノートのベロシティで始まります"
