@@ -1312,7 +1312,13 @@ private:
         if (down) // (the notice: at least a readable size, the editor's when that is larger)
             setSize (juce::jmax (minimumWidth(), getWidth()), juce::jmax (150 + headerHeight, getHeight()));
         else if (editor != nullptr)
-            setSize (juce::jmax (minimumWidth(), editor->getWidth()), editor->getHeight() + headerHeight);
+        {
+            // A fixed-size editor (most VST2/VST3 UIs) never stretches to fill the header's reserved width, so
+            // forcing the window that wide just left blank space beside it.
+            // Only a resizable editor benefits from the floor; a fixed one just gets exactly what it needs.
+            const auto w = editor->isResizable() ? juce::jmax (minimumWidth(), editor->getWidth()) : editor->getWidth();
+            setSize (w, editor->getHeight() + headerHeight);
+        }
     }
 
     void show (bool showSettings)
