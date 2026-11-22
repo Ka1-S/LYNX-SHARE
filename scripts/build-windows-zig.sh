@@ -291,6 +291,7 @@ APP_SOURCES+=(src/engine/ExportParityTest.cpp src/engine/MidiHotplugTest.cpp src
 # round 190az: a CLAP plugin deleted on another thread while the message thread is blocked
 APP_SOURCES+=(src/engine/ClapTeardownTest.cpp)
 APP_SOURCES+=(src/engine/RenderAgainTest.cpp) # round 190ou: offline renders made again (--renderagaintest, --selftest)
+APP_SOURCES+=(src/engine/Determinism190poTest.cpp) # round 190po: one render on any threads (--determinismtest190po, --selftest)
 APP_SOURCES+=(src/ui/ModRing.cpp src/engine/Modulators190oxTest.cpp) # round 190ox: modulation rings, --selftest modulators190ox (rollup 0.1.31 step 6)
 APP_SOURCES+=(src/engine/HostingTests.cpp) # (round 190jg: --sandboxgrouptest, --sandboxbench, --clapext, --automationtimingtest)
 # LYNX substitutes for missing third-party plugins (round 98)

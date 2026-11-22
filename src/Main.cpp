@@ -129,6 +129,7 @@
 #include "engine/ClapFormat.h"
 #include "engine/ClapTeardownTest.h"
 #include "engine/RenderAgainTest.h"
+#include "engine/Determinism190poTest.h"
 #include "ui/TiltViewport.h"
 #if JUCE_LINUX
  #include <dlfcn.h> // (round 190ou: --hwheel254test presses X11 buttons through XTest)
@@ -1950,6 +1951,19 @@ public:
             // Piano roll, Mixer and Browser, off screen (src/HWheel254Test.inc)
             const auto i = args.indexOf ("--hwheel254test");
             setApplicationReturnValue (runHWheel254Test (args[i + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--determinismtest190po"))
+        {
+            // LYNX --determinismtest190po report.txt (round 190po, engine/Determinism190poTest.cpp): a render is the same
+            // bit for bit on one thread and on several, and two exports have one hash (Windows: the x87 precision)
+            const auto i = args.indexOf ("--determinismtest190po");
+            juce::String lines;
+            const auto result = lynx::determinism190po::check ([&lines] (const juce::String& line) { lines << line << "\n"; });
+            juce::File (args[i + 1].unquoted()).replaceWithText (lines + "determinism190po=" + result + "\n");
+            setApplicationReturnValue (result.startsWith ("OK") ? 0 : 1);
             quit();
             return;
         }
@@ -9738,6 +9752,7 @@ private:
         const auto stemsResult = stemsSinglePassSelfTest(); // round 190gj
         const auto exportFormatsResult = lynx::shortexport::formatsCheck(); // AIFF and M4A (owner decision D5)
         const auto renderAgainResult = lynx::renderagain::check(); // round 190ou: offline renders made again
+        const auto determinismResult = lynx::determinism190po::check(); // round 190po: one render on any threads (Windows' x87)
         juce::LookAndFeel::setDefaultLookAndFeel (&lookBefore);
         const auto ok = editorsResult.startsWith ("OK") && ! faultResult.startsWith ("ERROR") && stemsResult == "OK" && exportFormatsResult.startsWith ("OK")
                         && mixerBasics == "OK" && fontsResult == "OK" && paintCachesResult.startsWith ("OK") && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && takeoverOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
@@ -9748,7 +9763,7 @@ private:
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
                         && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
-                        && renderAgainResult.startsWith ("OK")
+                        && renderAgainResult.startsWith ("OK") && determinismResult.startsWith ("OK")
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK") && modulators190oxResult == "OK"
                         && generatorSmartResult.startsWith ("OK")
@@ -9851,6 +9866,7 @@ private:
                << "autolinks190ov=" << autolinks190ovResult << "\n"
                << "sections190ol=" << sections190olResult << "\n"
                << "renderagain190ou=" << renderAgainResult << "\n"
+               << "determinism190po=" << determinismResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 
