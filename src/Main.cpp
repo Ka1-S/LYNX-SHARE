@@ -7184,7 +7184,9 @@ private:
         std::fegetenv (&fpBeforeJsfx);
         const auto fpModeNow = [] {
            #if defined (__aarch64__) && ! defined (_MSC_VER)
-            return (juce::uint64) __builtin_aarch64_get_fpcr();
+            juce::uint64 fpcr = 0; // (an instruction, not GCC's __builtin_aarch64_get_fpcr: Apple clang has no such builtin)
+            asm volatile ("mrs %0, fpcr" : "=r" (fpcr));
+            return fpcr;
            #else
             return (juce::uint64) std::fegetround();
            #endif
@@ -9356,7 +9358,7 @@ private:
         {
             const auto bar = 4 * (std::int64_t) lynx::ppq;
             auto song = lynx::Song::makeDefault();
-            song.playlistTracks.resize (juce::jmax<std::size_t> (2, song.playlistTracks.size()));
+            song.playlistTracks.resize (std::max<std::size_t> (2, song.playlistTracks.size())); // (std::max: juce::jmax<std::size_t> instantiates SIMDRegister<unsigned long> on macOS arm64)
             lynx::Clip c;
             c.pattern = 0;
             c.track = 0;
