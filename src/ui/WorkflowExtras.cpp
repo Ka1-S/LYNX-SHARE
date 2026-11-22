@@ -119,7 +119,7 @@ bool readUiOption (const juce::String& key, bool on)
         trackstates::patternMenus() = on;
     else if (key == "muteKeyToggles") // issue #249 (round 190oq, LYNX extra)
         mutekeys::setToggles (on);
-    else if (key == "startPage") // issue #252 (round 190oq, LYNX extra)
+    else if (key == "startPage") // issue #252 (round 190oq; on by default, FL-exact)
         startpage::setEnabled (on);
     else
         return false;

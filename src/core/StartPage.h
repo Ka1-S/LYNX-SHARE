@@ -4,8 +4,8 @@
 // has one: its "Welcome to FL Studio" window (TWelcomeWizard, REA_rodada190oq §6) lists "Recent projects" (up to 50, the
 // file name, its folder and how long ago it changed), demo projects, "Other projects..." and "Start a new ... project",
 // and shows at every start without a file until "Do not show this in the future" is ticked; Bitwig (Dashboard) and Studio
-// One (Start page) have theirs, Live 12 has none. LYNX's page is drawn in LYNX's own look with FL's contents. Off by
-// default for now (owner decision pending: FL shows its window by default); on, it shows over the start-up project,
+// One (Start page) have theirs, Live 12 has none. LYNX's page is drawn in LYNX's own look with FL's contents. On by
+// default, as FL's window (owner decision, rollup 0.1.31 step 6); it shows over the start-up project,
 // which stays open behind it (Esc or × keeps it). The first run keeps its welcome card (round 190np) and never shows the
 // page in the same start. Also File › Start page... at any time.
 //
@@ -23,7 +23,7 @@ namespace lynx::startpage
 {
 inline std::atomic<bool>& enabledFlag() noexcept
 {
-    static std::atomic<bool> on { false };
+    static std::atomic<bool> on { true }; // (FL-exact: FL shows its Welcome window at every start)
     return on;
 }
 inline bool enabled() noexcept { return enabledFlag().load (std::memory_order_relaxed); }

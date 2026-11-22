@@ -4527,7 +4527,7 @@ public:
             mainWindow->showSetupWizard();
             startupTrace.mark ("after the window: setup wizard shown");
         }
-        // issue #252 (round 190oq, LYNX extra, off by default): the start page over the start-up project, never over the
+        // issue #252 (round 190oq; on by default as FL's Welcome window, rollup 0.1.31 step 6): the start page over the start-up project, never over the
         // first run's card, never when a file was given to open
         if (lynx::startpage::showAtStart (lynx::startpage::enabled(), fileToOpen != juce::File(), action != StartAction::none,
                                           openTimeReport != juce::File() || lynx::platform::testMode()))

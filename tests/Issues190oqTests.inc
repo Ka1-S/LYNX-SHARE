@@ -194,8 +194,9 @@ TEST (issues190oq_243_bar_signatures_follow_the_markers)
 TEST (issues190oq_252_start_page_logic)
 {
     using namespace lynx::startpage;
-    // off by default; only on a normal start without a file, never over the first run's card
-    CHECK (! enabled());
+    // on by default (FL's Welcome window shows at every start; owner decision, rollup 0.1.31 step 6); only on a normal
+    // start without a file, never over the first run's card
+    CHECK (enabled());
     CHECK (showAtStart (true, false, false, false));
     CHECK (! showAtStart (false, false, false, false) && ! showAtStart (true, true, false, false) && ! showAtStart (true, false, true, false)
            && ! showAtStart (true, false, false, true));

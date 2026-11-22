@@ -232,7 +232,7 @@
 
         // ================= #252: the start page (LYNX extra) =================
         {
-            check ("#252 off by default (owner decision pending: FL shows its Welcome window by default)", ! startpage::enabled());
+            check ("#252 on by default (owner decision: FL shows its Welcome window at every start)", startpage::enabled());
             startpageui::Host host;
             const std::int64_t day = 24LL * 3600 * 1000;
             host.nowMs = juce::Time (2026, 10, 21, 18, 0, 0).toMilliseconds();
