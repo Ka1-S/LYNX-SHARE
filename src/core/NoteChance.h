@@ -12,10 +12,12 @@
 // see the same draw, whatever the block size; each new loop pass draws again.
 
 #include <algorithm>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <vector>
 
+#include "core/NoteConditions.h"
 #include "core/Song.h"
 
 namespace lynx::chance
@@ -39,13 +41,29 @@ constexpr std::uint64_t context (std::uint32_t seed, std::uint64_t clip, std::in
 
 // One note in a context: everything a draw needs. `notes` + `index` find the note's Play One group (lazily: only an
 // occurrence that is actually emitted scans the pattern).
+// Round 190pm (P19): a note's Condition sees the pass `passBase + pass * passStride` (a clip's own passes: the ones before
+// this one and how many it has per song loop) and `fill`; `gain` is a strike's velocity factor (its ratchet's bend).
 struct Roll
 {
     std::uint64_t place = 0;
     const Note* note = nullptr;
     const std::vector<Note>* notes = nullptr;
     std::size_t index = 0;
+    std::int64_t passBase = 0, passStride = 1;
+    bool fill = false;
+    float gain = 1.0f;
 };
+
+// Round 190pm: Fill (the Piano roll's switch for the notes with a Fill / Not fill condition). Live playback reads it once
+// a block (RackRenderer, with a live input); renders and exports always play with Fill off.
+inline std::atomic<bool>& fillSwitch() noexcept
+{
+    static std::atomic<bool> on { false };
+    return on;
+}
+
+// A note that needs a draw or a pass check when it plays
+constexpr bool rolls (const Note& n) noexcept { return n.hasChance() || n.hasCondition(); }
 
 constexpr std::uint64_t noteIdentity (const Note& n) noexcept
 {
@@ -71,7 +89,9 @@ inline void groupRank (const std::vector<Note>& notes, std::size_t index, int& r
 inline bool plays (const Roll& r, std::int64_t pass, float& velocity) noexcept
 {
     const auto& n = *r.note;
-    velocity = n.velocity;
+    velocity = noterepeat::strikeVelocity (n.velocity, r.gain);
+    if (n.hasCondition() && ! noteconditions::plays (n, r.passBase + pass * r.passStride, r.fill))
+        return false;
     if (! n.hasChance())
         return true;
     const auto occurrence = mix (r.place ^ mix ((std::uint64_t) pass * 0xD6E8FEB86659FD93ull));
@@ -94,18 +114,19 @@ inline bool plays (const Roll& r, std::int64_t pass, float& velocity) noexcept
     {
         const auto u = unit (mix (occurrence ^ noteIdentity (n) ^ 0x7E1D3Aull));
         // Live's velocities are 1…127: the range never takes a note below 1
-        velocity = (float) std::clamp ((double) n.velocity + (double) n.velocityRange * u, 1.0 / 127.0, 1.0);
+        velocity = noterepeat::strikeVelocity ((float) std::clamp ((double) n.velocity + (double) n.velocityRange * u, 1.0 / 127.0, 1.0), r.gain);
     }
     return true;
 }
 
 // The notes of a pattern as its first pass plays them (MIDI export of the realised notes): the ones that play, at the
-// velocity they play
+// velocity they play. Round 190pm: a note's Condition on that pass (Fill off) and its ratchets as notes of their own.
 inline std::vector<Note> realised (const std::vector<Note>& notes, std::uint32_t seed, std::uint64_t clip = 0, std::int64_t pass = 0)
 {
     std::vector<Note> out;
     out.reserve (notes.size());
     const auto place = context (seed, clip);
+    auto ratcheted = false;
     for (std::size_t i = 0; i < notes.size(); ++i)
     {
         auto v = 0.0f;
@@ -117,8 +138,12 @@ inline std::vector<Note> realised (const std::vector<Note>& notes, std::uint32_t
         n.velocityRange = 0.0f;
         n.chanceGroup = 0;
         n.chanceOne = false;
+        n.condition = notecondition::always;
+        n.cycle = 0;
+        n.cycleMask = 0;
+        ratcheted = ratcheted || n.hasRatchets();
         out.push_back (n);
     }
-    return out;
+    return ratcheted ? noteconditions::withRatchetsAsNotes (out) : out;
 }
 } // namespace lynx::chance

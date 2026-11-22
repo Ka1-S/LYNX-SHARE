@@ -1,5 +1,6 @@
 #include "core/Sections.h"
 #include "core/AlsExport.h"
+#include "core/NoteConditions.h"
 #include "core/ClipEnvelope.h"
 
 #include <algorithm>
@@ -1217,10 +1218,22 @@ struct Exporter
             loop->value ("HiddenLoopStart", "0");
             loop->value ("HiddenLoopEnd", num (len));
         }
+        // round 190pm (P19): Live 12 has no ratchets: they go as their strikes, notes of their own (Chance and Velocity
+        // Deviation stay on each); a Condition has no Live field (the note plays on every pass), listed once a set
+        int ratcheted = 0;
+        const auto clipNotes = noteconditions::withRatchetsAsNotes (p.notes, &ratcheted);
         std::map<int, std::vector<const Note*>> byKey;
-        for (const auto& n : p.notes)
+        auto conditioned = false;
+        for (const auto& n : clipNotes)
             if (n.channel == channel && n.start >= offset && n.start < offset + length)
+            {
                 byKey[n.key].push_back (&n);
+                conditioned = conditioned || n.hasCondition();
+            }
+        if (ratcheted > 0)
+            note ("Notes with ratchets are written as their strikes, notes of their own (Live has no ratchets)");
+        if (conditioned)
+            note ("Notes with a Condition (first pass, fill, cycle) play on every pass in Live (it has no note conditions)");
         auto* keyTracks = c.at ("Notes/KeyTracks");
         int noteId = 1, kt = 0;
         // Live 12's probability groups (round 187c): each group's notes by NoteId [LIVE 12.4 save: NoteProbabilityGroup

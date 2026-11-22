@@ -4,6 +4,7 @@
 #include "ui/TrackIcons.h"
 #include "ui/WindowPlaces.h" // (round 190oa, DF-130)
 #include "core/Sections.h"
+#include "core/NoteChance.h" // round 190pm: Fill
 #include "core/EscClose.h"
 #include "core/DetailChain.h"
 #include "core/MeterScale.h"
@@ -111,6 +112,7 @@
 #include "ui/NewProjectDialog.h"
 #include "ui/PluginMonitorWindow.h"
 #include "ui/SimpleLook.h"
+#include "ui/TouchInput.h" // round 190pm (P23): Touch mode
 #include "ui/TouchKeyboard.h"
 #include "engine/MidiFileIo.h"
 #include "engine/ProjectFile.h"
@@ -1040,6 +1042,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         ui::keyfocus::install (*this);
     }
     if (startupMark != nullptr) startupMark ("main window: toolbar, menus, controllers");
+    juce::Desktop::getInstance().addGlobalMouseListener (&touchWatcher); // (round 190pm, P23: the Touch mode suggestion)
     setSize (1180, 642);
     startTimerHz (30);
     uiTraceMonitor.start ([this, last = std::make_shared<RtStats::Snapshot>()] {
@@ -1173,6 +1176,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
 MainComponent::~MainComponent()
 {
+    juce::Desktop::getInstance().removeGlobalMouseListener (&touchWatcher); // (round 190pm)
     windows::stop(); // (issue #232: "bye" to the other windows)
     windowAudio.reset();
     ui::keyfocus::uninstall (*this); // (round 190ng)
@@ -1356,6 +1360,7 @@ void MainComponent::paint (juce::Graphics& g)
 
 void MainComponent::resized()
 {
+    placeTouchSuggestion(); // (round 190pm)
     using toolbarlayout::Group;
     if (const auto size = toolbarlayout::effectiveIconSize (toolbarLayout.iconSize, getWidth()); size != appliedIconSize)
         applyIconSizing (size);
@@ -2605,6 +2610,12 @@ bool MainComponent::runAction (const std::string& id)
 {
     auto is = [&id] (const char* name) { return id == name; };
 
+    if (id == "simple.touchMode") // round 190pm (P23, LYNX extra): View › Touch mode (Simple layout)
+    {
+        setTouchMode (! ui::touchmode::enabled());
+        return true;
+    }
+
     if (id == "simple.projectName") // round 190oo (O-4, LYNX extra): View › Project name at the top (Simple layout)
     {
         ui::simplelook::projectNameShown() = ! ui::simplelook::projectNameShown();
@@ -2889,6 +2900,12 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("view.closeUnfocusedWindows")) closeUnfocusedWindows();
     else if (is ("view.alignChannelEditors")) alignAllChannelEditors (engine.getSelectedChannel());
     else if (is ("view.touchKeyboard")) toggleTouchKeyboard (engine);
+    else if (is ("transport.fill")) // round 190pm (P19)
+    {
+        const auto on = ! chance::fillSwitch().load();
+        chance::fillSwitch().store (on);
+        ui::postHint ({ tr ("Fill: {0}", { on ? tr ("on") : tr ("off") }) }, 2000);
+    }
     else if (is ("view.tracker")) // round 190nw: the tracker editor's tool window
     {
         if (isTrackerOpen())
@@ -3772,6 +3789,12 @@ void MainComponent::loadUiSettings()
             ui::simplelook::largeControls() = on;
         else if (key == "simpleProjectName") // round 190oo (O-4, LYNX extra): the project name centred at the top (Simple)
             ui::simplelook::projectNameShown() = on;
+        else if (key == "touchMode") // round 190pm (P23, LYNX extra): Touch mode
+            ui::touchmode::enabled() = on;
+        else if (key == "touchModeAsked")
+            ui::touchmode::asked() = on;
+        else if (key == "touchModeLarge")
+            touchMadeLarge = on;
         else if (key == "followPlaylist" || key == "followPianoRoll")
             EditorGlobals::get().setFollowing (key == "followPianoRoll", on, false);
         else if (key == "followChannelRack" || key == "followAudioEditor")
@@ -4086,6 +4109,9 @@ void MainComponent::saveUiSettings()
                                       + "\nalsSessionOnPlaylist=" + juce::String (AudioEngine::alsSessionOnPlaylist.load() ? 1 : 0)
                                       + "\nsimpleLargeControls=" + juce::String (ui::simplelook::largeControls() ? 1 : 0)
                                       + "\nsimpleProjectName=" + juce::String (ui::simplelook::projectNameShown() ? 1 : 0) // (round 190oo, O-4)
+                                      + "\ntouchMode=" + juce::String (ui::touchmode::enabled() ? 1 : 0) // (round 190pm, P23)
+                                      + "\ntouchModeAsked=" + juce::String (ui::touchmode::asked() ? 1 : 0)
+                                      + "\ntouchModeLarge=" + juce::String (touchMadeLarge ? 1 : 0)
                                       + "\nfollowPlaylist=" + juce::String (EditorGlobals::get().isFollowing (false) ? 1 : 0)
                                       + "\nfollowPianoRoll=" + juce::String (EditorGlobals::get().isFollowing (true) ? 1 : 0)
                                       + "\nfollowChannelRack=" + juce::String (EditorGlobals::get().isFollowingView (EditorGlobals::FollowView::channelRack) ? 1 : 0)
@@ -4549,6 +4575,79 @@ void MainComponent::syncClipLaunchSwitches()
 }
 
 
+// Round 190pm (research190oe P23): Touch mode (ui/TouchInput.h). On: the Simple layout's controls at touch size (Large
+// controls, switched back off with Touch mode when it was Touch mode that switched them on) and the editors' gestures.
+void MainComponent::setTouchMode (bool on)
+{
+    ui::touchmode::enabled() = on;
+    ui::touchmode::asked() = true;
+    if (on && ! ui::simplelook::largeControls())
+    {
+        touchMadeLarge = true;
+        setSimpleLargeControls (true);
+    }
+    else if (! on && touchMadeLarge)
+    {
+        touchMadeLarge = false;
+        setSimpleLargeControls (false);
+    }
+    hideTouchSuggestion();
+    ui::postHint ({ tr ("Touch mode: {0}", { on ? tr ("on") : tr ("off") }) }, 2500);
+    saveUiSettings();
+}
+
+// The suggestion card, once: the first finger on the window, or the Simple layout shown on a touch screen
+void MainComponent::suggestTouchMode()
+{
+    if (ui::touchmode::enabled() || ui::touchmode::asked() || touchSuggestion != nullptr || ui::showingForShots())
+        return;
+    touchSuggestion = ui::touchmode::makeSuggestion ([safe = juce::Component::SafePointer<MainComponent> (this)] (bool turnOn) {
+        if (safe == nullptr)
+            return;
+        juce::MessageManager::callAsync ([safe, turnOn] {
+            if (safe == nullptr)
+                return;
+            ui::touchmode::asked() = true;
+            if (turnOn)
+            {
+                if (safe->layoutStyle != layoutstyle::Style::simple)
+                    safe->setLayoutStyle (layoutstyle::Style::simple);
+                safe->setTouchMode (true);
+            }
+            safe->hideTouchSuggestion();
+            safe->saveUiSettings();
+        });
+    });
+    addAndMakeVisible (*touchSuggestion);
+    placeTouchSuggestion();
+    touchSuggestion->toFront (false);
+}
+
+void MainComponent::hideTouchSuggestion()
+{
+    if (touchSuggestion == nullptr)
+        return;
+    removeChildComponent (touchSuggestion.get());
+    touchSuggestion.reset();
+}
+
+void MainComponent::placeTouchSuggestion()
+{
+    if (touchSuggestion == nullptr)
+        return;
+    const auto size = touchSuggestion->getBounds().withPosition (0, 0);
+    touchSuggestion->setBounds (size.withPosition (getWidth() - size.getWidth() - 16, getHeight() - size.getHeight() - 40));
+}
+
+void MainComponent::TouchWatcher::mouseDown (const juce::MouseEvent& e)
+{
+    if (e.source.isTouch() && ! ui::touchmode::enabled() && ! ui::touchmode::asked())
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<MainComponent> (&owner)] {
+            if (safe != nullptr)
+                safe->suggestTouchMode();
+        });
+}
+
 void MainComponent::setSimpleLargeControls (bool on)
 {
     // round 190jc (owner decision 9, design190ia SG-C/SG-D): the Simple headers, the dock and the pads at touch size
@@ -4808,6 +4907,12 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
     if (! clipLaunch && detailView != nullptr) // (round 183a: a docked Piano roll goes back to its panel)
         detailView->releaseEditor();
     layoutStyle = style;
+    ui::touchmode::simpleLayout() = style == Style::simple; // (round 190pm, P23: two-finger gestures, knob pop-ups)
+    if (style == Style::simple && from != Style::simple && ui::touchmode::touchScreenPoints() > 0) // (a touch screen: suggest Touch mode)
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<MainComponent> (this)] {
+            if (safe != nullptr)
+                safe->suggestTouchMode();
+        });
     const bool meterLawChanged = layoutstyle::current() != style && ! meterscale::alternate();
     layoutstyle::setCurrent (style); // (round 190cm: the clip grid's and the audio editor's Ableton-style keys follow it)
     if (meterLawChanged) // (round 190mf: FL's meter law in Pattern, the straight axis in the other layouts)
@@ -11248,6 +11353,8 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         if (layoutStyle == layoutstyle::Style::simple) // round 190jc (owner decision 9): touch-size controls, Simple only
             menu.addItem (tr ("Large controls (touch size)"), true, ui::simplelook::largeControls(),
                           [this] { setSimpleLargeControls (! ui::simplelook::largeControls()); });
+        if (layoutStyle == layoutstyle::Style::simple) // round 190pm (P23, LYNX extra, off by default): fingers on a touch screen
+            menu.addItem (tr ("Touch mode"), true, ui::touchmode::enabled(), [this] { runAction ("simple.touchMode"); });
         if (layoutStyle == layoutstyle::Style::simple) // round 190oo (O-4, LYNX extra, off by default): BandLab's centred name
             menu.addItem (tr ("Project name at the top (BandLab)"), true, ui::simplelook::projectNameShown(), [this] { runAction ("simple.projectName"); });
         {

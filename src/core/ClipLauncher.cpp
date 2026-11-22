@@ -997,6 +997,7 @@ void Player::process (const Song& song, const ClipGrid& grid, const GridIndex& i
             auto& v = virtuals[(std::size_t) numVirtual++];
             v.clip = *clip;
             v.slot = p.slot;
+            v.pass = (std::int64_t) std::max (0.0, k);
             v.clip.start = (std::int64_t) std::llround (vs);
             v.clip.length = std::max<std::int64_t> (1, (std::int64_t) std::llround (ve) - v.clip.start);
             v.clip.offset = clip->offset + (std::int64_t) std::llround (vs - ws);
@@ -1066,14 +1067,14 @@ void Player::process (const Song& song, const ClipGrid& grid, const GridIndex& i
 }
 
 void schedulePasses (const Song& song, const Player& player, double clock, int numSamples, double tps, EventBuffer& out,
-                     const ScheduleIndex* index) noexcept
+                     const ScheduleIndex* index, bool fill = false) noexcept
 {
     if (player.virtualCount() == 0)
         return;
     for (int i = 0; i < player.virtualCount(); ++i)
     {
         const auto& v = player.virtualClip (i);
-        scheduleSingleClip (song, v.clip, slotKeyBase + (std::size_t) v.slot, clock, numSamples, tps, out, index);
+        scheduleSingleClip (song, v.clip, slotKeyBase + (std::size_t) v.slot, clock, numSamples, tps, out, index, v.pass, fill);
     }
     out.sortByOffset();
 }
@@ -1157,7 +1158,8 @@ void cutPlaylistTrack (const Song& song, int track, double songTick, double offs
 } // namespace
 
 void playBlock (Runtime& runtime, const Song& song, const ClipGrid& grid, const GridIndex& gridIndex, double startTick, int numSamples,
-                double tps, EventBuffer& out, bool resume, const ScheduleIndex* index, bool wrap, bool chase, ScheduledNotes& notes) noexcept
+                double tps, EventBuffer& out, bool resume, const ScheduleIndex* index, bool wrap, bool chase, ScheduledNotes& notes,
+                bool fill) noexcept
 {
     if (numSamples <= 0 || tps <= 0.0)
         return;
@@ -1178,8 +1180,8 @@ void playBlock (Runtime& runtime, const Song& song, const ClipGrid& grid, const 
         if (const auto* clip = clipOfSlot (grid, gridIndex, cut.slot); clip != nullptr && clip->kind == ClipKind::pattern)
             cutPatternNotes (song, *clip, cut.position, cut.at - clock, sampleOf (cut.at), index, out, notes);
     }
-    scheduleSongAround (song, player.taken(), player.givenBack(), startTick, numSamples, tps, out, resume, index, wrap, chase);
-    schedulePasses (song, player, clock, numSamples, tps, out, index);
+    scheduleSongAround (song, player.taken(), player.givenBack(), startTick, numSamples, tps, out, resume, index, wrap, chase, fill);
+    schedulePasses (song, player, clock, numSamples, tps, out, index, fill);
     out.sortByOffset();
     runtime.clock = clock + numSamples * tps;
     runtime.running.store (true, std::memory_order_relaxed);

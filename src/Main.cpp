@@ -99,6 +99,9 @@
 #include "core/FlWrapper.h"
 #include "engine/AudioEngine.h"
 #include "engine/ProjectDowngrade.h"
+#include "engine/RemoteNotes.h" // (round 190pm: --selftest repeats190pm)
+#include "core/NoteConditions.h" // (round 190pm)
+#include "ui/TouchInput.h" // (round 190pm)
 #include "ui/TrackerComponent.h"
 #include "core/ClipLauncher.h"
 #include "core/SimpleSteps.h"
@@ -3980,6 +3983,14 @@ public:
             // notice, the Plugin manager's "Separate process" column and the monitor's dropout line (no window opens)
             const auto i = args.indexOf ("--stabilityshot");
             runStabilityShot (args[i + 1].unquoted());
+            return;
+        }
+
+        if (args.contains ("--repeats190pmshot"))
+        {
+            // LYNX --repeats190pmshot <folder> (round 190pm, research190oe P19 / P23): Note Repeats and Conditions, Touch mode
+            setApplicationReturnValue (runRepeatsShot190pm (args[args.indexOf ("--repeats190pmshot") + 1].unquoted()) ? 0 : 1);
+            quit();
             return;
         }
 
@@ -8865,6 +8876,55 @@ private:
             }
         }
 
+        // round 190pm (research190oe P19): Note Repeats and Conditions in .lynx (every field), through the online sessions' note
+        // codec (optional fields), and in the copies for 0.1.30 / 0.1.28 (ratchets as notes of their own, one view line;
+        // conditions dropped, one sound line), none of it for a project without them
+        juce::String repeats190pmResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            if (song.patterns.empty())
+                song.patterns.resize (1);
+            if (song.channels.empty())
+                song.channels.resize (1);
+            lynx::Note a;
+            a.start = 0;
+            a.length = lynx::ppq;
+            a.ratchets = 4;
+            a.ratchetVelocity = -0.5f;
+            lynx::Note b = a;
+            b.start = lynx::ppq;
+            b.ratchets = 0;
+            b.ratchetVelocity = 0.0f;
+            b.condition = lynx::notecondition::notFirst;
+            b.cycle = 4;
+            b.cycleMask = 0b1010;
+            song.patterns[0].notes = { a, b };
+            juce::String why;
+            const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), why);
+            if (! back || back->patterns[0].notes != song.patterns[0].notes)
+                repeats190pmResult = "ERROR .lynx round trip " + why;
+            for (const auto& n : song.patterns[0].notes)
+                if (repeats190pmResult == "OK" && lynx::remote_notes::fromValue (lynx::remote_notes::toValue (n), song.channels.size()) != n)
+                    repeats190pmResult = "ERROR the online sessions' note codec";
+            for (const auto* release : { "0.1.30", "0.1.28" })
+            {
+                if (repeats190pmResult != "OK")
+                    break;
+                const auto copy = lynx::olderlynx::forRelease (song, release);
+                const auto old = copy.ok ? lynx::ProjectFile::fromJson (copy.json, why) : std::optional<lynx::Song> {};
+                const auto lines = std::count_if (copy.lost.begin(), copy.lost.end(), [] (const lynx::olderlynx::Loss& l) {
+                    return juce::String (l.text).contains ("ratchets") || juce::String (l.text).contains ("Condition");
+                });
+                if (! old || old->patterns[0].notes.size() != 5 || lines != 2)
+                    repeats190pmResult = juce::String ("ERROR the copy for ") + release + " (" + juce::String ((int) lines) + " lines) " + why;
+            }
+            song.patterns[0].notes = { lynx::Note {} };
+            if (repeats190pmResult == "OK")
+                for (const auto& l : lynx::olderlynx::forRelease (song, "0.1.30").lost)
+                    if (juce::String (l.text).contains ("ratchets") || juce::String (l.text).contains ("Condition"))
+                        repeats190pmResult = "ERROR a line without ratchets or conditions";
+        }
+
         // round 190ol (research190oe P1 / P6): the Sections lane in .lynx (both arrangements, and a project without sections
         // keeps its JSON with no "sections" key), a section move as one undo step that restores the song bit for bit, the
         // copies for 0.1.30 / 0.1.28 (sections become plain markers at their starts, one view line), and a 4/4 -> 7/8 -> 4/4
@@ -9746,7 +9806,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && tracker190omResult == "OK" && rackauto190owResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && autolinks190ovResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && repeats190pmResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && renderAgainResult.startsWith ("OK")
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
@@ -9848,6 +9908,7 @@ private:
                << "rollup031s5_copy_for_0130=" << rollup031s5Result << "\n"
                << "rollup031s6_copy_for_0130=" << rollup031s6Result << "\n"
                << "simpleduck190ot=" << simpleDuck190otResult << "\n"
+               << "repeats190pm=" << repeats190pmResult << "\n"
                << "autolinks190ov=" << autolinks190ovResult << "\n"
                << "sections190ol=" << sections190olResult << "\n"
                << "renderagain190ou=" << renderAgainResult << "\n"
@@ -19667,6 +19728,7 @@ private:
 #include "DetailsShot190kn.inc" // round 190kn
 #include "SmartTipShot190ok.inc" // round 190ok (D1)
 #include "SimpleDuckShot190ot.inc" // round 190ot (research190oe P5)
+#include "Repeats190pmShot.inc" // round 190pm (research190oe P19, P23)
 #include "DetailsShot190ld.inc" // round 190ld
 #include "DetailsShot190lr.inc" // round 190lr
 #include "DetailsShot190lx.inc" // round 190lx

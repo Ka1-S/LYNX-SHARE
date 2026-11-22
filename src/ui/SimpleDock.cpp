@@ -36,6 +36,7 @@
 #include "ui/Motion.h"
 #include "ui/Theme.h"
 #include "ui/TouchKeyboard.h"
+#include "ui/TouchInput.h"
 
 namespace lynx
 {
@@ -144,6 +145,8 @@ public:
 
     void mouseDown (const juce::MouseEvent& e) override
     {
+        if (touch.mouseDown (e)) // round 190pm (P23): Touch mode, a long press opens the value pop-up
+            return;
         if (e.mods.isPopupMenu())
             return;
         dragging = true;
@@ -153,15 +156,31 @@ public:
     }
     void mouseDrag (const juce::MouseEvent& e) override
     {
+        if (touch.mouseDrag (e))
+            return;
         if (! dragging)
             return;
         const auto span = e.mods.isShiftDown() ? 640.0f : 160.0f;
         turnTo (start - (float) e.getDistanceFromDragStartY() / span);
     }
-    void mouseUp (const juce::MouseEvent&) override
+    void mouseUp (const juce::MouseEvent& e) override
     {
+        if (touch.mouseUp (e))
+            return;
         dragging = false;
         repaint();
+    }
+    // round 190pm (P23): the value pop-up with − and + (Touch mode's long press; tests call it)
+    void openValuePopup()
+    {
+        const juce::Component::SafePointer<DockKnob> safe (this);
+        ui::touchmode::showValuePopup (
+            *this, [safe] { return safe != nullptr ? safe->shown : 0.0f; },
+            [safe] (float v) {
+                if (safe != nullptr)
+                    safe->turnTo (v);
+            },
+            [safe] (float v) { return safe != nullptr && safe->valueText ? safe->valueText (v) : percent (v); });
     }
     void mouseDoubleClick (const juce::MouseEvent&) override { turnTo (resetValue); }
     void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& wheel) override
@@ -186,6 +205,7 @@ public:
 private:
     float shown = 0.0f, start = 0.0f;
     bool dragging = false, dimmed = false;
+    ui::touchmode::Deferral touch { ui::touchmode::Deferral::Hooks { this, [this] (const juce::MouseEvent&) { openValuePopup(); }, {}, {}, false } };
 };
 
 // A small flat button of a card's title bar and of the sound picker (‹ › ×). Round 190jc (design190ia SG-9, SG-10): vector

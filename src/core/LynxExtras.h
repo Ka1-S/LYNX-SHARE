@@ -112,6 +112,10 @@ inline constexpr Item items[] = {
     { "simple.projectName", TR_NOOP ("Simple workflow"), TR_NOOP ("Project name at the top (BandLab)"),
       TR_NOOP ("In the Simple layout the project's name shows centred at the top of the window, over the transport, as BandLab shows it. Also in the View menu of the Simple layout."),
       "ui-options.txt:simpleProjectName" },
+    // round 190pm (research190oe P23): a tablet or a touch screen (FL Studio Mobile and BandLab by finger, interpreted)
+    { "simple.touchMode", TR_NOOP ("Simple workflow"), TR_NOOP ("Touch mode"),
+      TR_NOOP ("For a touch screen: in the Simple layout the controls are finger-sized, two fingers scroll the timeline and the editor and a pinch zooms them, and a long press on a knob opens a value pop-up with - and +. In every layout a long press opens the menu of what is under the finger. A mouse works as before. Suggested once when a finger is first used. Also in the View menu of the Simple layout."),
+      "ui-options.txt:touchMode" },
     { "record.lastLoopPassPlays", TR_NOOP ("Recording"), TR_NOOP ("After loop recording, only the last pass plays"),
       TR_NOOP ("The earlier passes stay under it, muted, to pick from. Also in the recording options menu."),
       "ui-options.txt:recordLastPassPlays" },

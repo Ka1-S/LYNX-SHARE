@@ -95,6 +95,7 @@ struct VirtualClip
 {
     Clip clip;               // start/length/offset on the Player's clock (offset includes the clip's own offset)
     std::size_t playlistIndex = 0;
+    std::int64_t pass = 0;   // round 190pm: the clip's loops played before this one since it was launched (notes' Conditions)
 };
 
 class Player
@@ -166,7 +167,7 @@ int trackZoneClips (const Song& song, const std::vector<int>& zone, int track, s
 
 // Schedules the Player's passes of this block (after scheduleSong; the block = [clock, clock + numSamples · tps)).
 void schedulePerformance (const Song& song, const Player& player, double clock, int numSamples, double tps,
-                          EventBuffer& out, const ScheduleIndex* index = nullptr) noexcept;
+                          EventBuffer& out, const ScheduleIndex* index = nullptr, bool fill = false) noexcept;
 
 // Recording: turns a pass into a clip copy for the arrangement (the zone clip moved to the song position).
 bool recordedClip (const Song& song, const RecordedPass& pass, Clip& out);

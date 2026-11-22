@@ -1800,6 +1800,20 @@ struct MixSnapshot
 };
 constexpr int maxMixSnapshots = 16;
 
+// A note's Condition (round 190pm, research190oe P19: Note::condition; core/NoteConditions.h)
+namespace notecondition
+{
+enum : std::uint8_t
+{
+    always = 0,
+    firstPass, // only the first pass (Elektron's FIRST, Bitwig's Occurrence "First")
+    notFirst,  // every pass but the first
+    fill,      // only while Fill is on (the Piano roll's Fill switch, live playback only)
+    notFill,   // only while Fill is off
+    count
+};
+}
+
 struct Note
 {
     std::int64_t start = 0;   // ticks
@@ -1837,6 +1851,21 @@ struct Note
     // (recorded from an MPE controller, drawn in the Piano roll's MPE lanes, Live's per-note expression); none = the
     // note plays its fine pitch, Mod X and Mod Y alone, as before
     NoteCurvesRef curves;
+    // Note Repeats and Conditions (round 190pm, research190oe P19; LYNX additions next to Chance, core/NoteChance.h: Bitwig's
+    // note Repeats / Occurrence / Recurrence and Elektron's trig conditions; FL 2026 and Live 12 have neither):
+    // - `ratchets` 2..8 strikes the note that many times, splitting its length evenly (0 or 1 = once); FL's `repeat` rate
+    //   above wins when it is set. `ratchetVelocity` (-1..1) bends the strikes' velocities in a line from the note's own to
+    //   velocity × (1 + ratchetVelocity) on the last (it bends FL's repeats too);
+    // - `condition` (NoteCondition) and the cycle (`cycle` 2..16 passes, `cycleMask` bit i = it plays on pass i + 1 of
+    //   the cycle; 0 = every pass) pick the loop passes the note plays on: a pattern's pass in Pattern mode, a clip's own
+    //   pass (its repeats, the song loop's and a launched clip's loops) elsewhere. Both must pass, then the Chance draws.
+    int ratchets = 0;
+    float ratchetVelocity = 0.0f;
+    std::uint8_t condition = 0;
+    std::uint8_t cycle = 0;
+    std::uint16_t cycleMask = 0;
+    bool hasRatchets() const noexcept { return ratchets > 1; }
+    bool hasCondition() const noexcept { return condition != 0 || cycle > 1; }
     bool operator== (const Note&) const = default; // (Online Sessions P2: entity comparison, round 169b)
 };
 

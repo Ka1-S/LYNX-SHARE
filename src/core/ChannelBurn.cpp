@@ -111,12 +111,17 @@ std::vector<Note> playedNotes (const Song& song, int patternIndex, int channel)
         for (auto n : source)
         {
             const auto t = playedTiming (n, song.swing, &c);
-            // FL's note repeat (issue #208): each strike becomes a note of its own
-            noterepeat::forEachStrike (n, t.start, std::max<std::int64_t> (1, t.length), [&] (std::int64_t at, std::int64_t length, int) {
+            // FL's note repeat (issue #208): each strike becomes a note of its own (round 190pm: the ratchets too, at their
+            // velocity bend)
+            const auto strikes = noterepeat::strikeCount (n, std::max<std::int64_t> (1, t.length));
+            noterepeat::forEachStrike (n, t.start, std::max<std::int64_t> (1, t.length), [&] (std::int64_t at, std::int64_t length, int k) {
                 auto strike = n;
                 strike.start = at;
                 strike.length = std::max<std::int64_t> (1, length);
                 strike.repeat = 0;
+                strike.ratchets = 0;
+                strike.ratchetVelocity = 0.0f;
+                strike.velocity = noterepeat::strikeVelocity (n.velocity, noterepeat::strikeGain (n, k, strikes));
                 if (strike.start < patternLength)
                     out.push_back (strike);
             });
@@ -139,8 +144,11 @@ std::vector<Note> playedNotes (const Song& song, int patternIndex, int channel)
             out.push_back (copy);
             continue;
         }
-        noterepeat::forEachStrike (n, t.start, std::max<std::int64_t> (1, t.length), [&] (std::int64_t at, std::int64_t length, int) {
-            events.push_back ({ at, eventOf (n, NoteEvent::Type::on, channel) });
+        const auto strikes = noterepeat::strikeCount (n, std::max<std::int64_t> (1, t.length));
+        noterepeat::forEachStrike (n, t.start, std::max<std::int64_t> (1, t.length), [&] (std::int64_t at, std::int64_t length, int k) {
+            auto on = eventOf (n, NoteEvent::Type::on, channel);
+            on.velocity = noterepeat::strikeVelocity (on.velocity, noterepeat::strikeGain (n, k, strikes));
+            events.push_back ({ at, on });
             events.push_back ({ at + std::max<std::int64_t> (1, length), eventOf (n, NoteEvent::Type::off, channel) });
         });
         lastEvent = std::max (lastEvent, t.start + std::max<std::int64_t> (1, t.length));

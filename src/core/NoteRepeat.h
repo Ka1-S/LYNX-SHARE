@@ -37,15 +37,39 @@ constexpr std::int64_t interval (int index) noexcept
     return index >= 1 && index <= rateCount ? (std::int64_t) ppq * ticks960[(std::size_t) (index - 1)] / 960 : 0;
 }
 
+// Round 190pm (research190oe P19): a note's ratchets (Note::ratchets, a LYNX addition) strike it that many times in even
+// parts of its length; FL's repeat rate wins when it is set.
+constexpr int maxRatchets = 8;
+
+inline int ratchetCount (const Note& note) noexcept { return note.repeat == 0 && note.ratchets > 1 ? std::min (note.ratchets, maxRatchets) : 1; }
+
 // The strikes of a note that plays from `start` for `length` ticks: strike k at start + k * interval, lasting to the
 // next one (the last to the note's end). Calls `strike (startTick, lengthTicks, k)` for each, the first (k = 0) being the
 // note itself; a note without repeat is one strike. At most `maxStrikes` (a long note at a fast rate stays bounded).
+// Ratchets (round 190pm) split `full` ticks (the note's whole played length; -1 = `length`) evenly from `start`: the
+// strikes that start before start + length play, the last one cut there (a note cut by the end of its clip).
 template <typename Strike>
-void forEachStrike (const Note& note, std::int64_t start, std::int64_t length, Strike&& strike, int maxStrikes = 4096)
+void forEachStrike (const Note& note, std::int64_t start, std::int64_t length, Strike&& strike, int maxStrikes = 4096, std::int64_t full = -1)
 {
     const auto step = interval (note.repeat);
     if (step <= 0 || length <= step)
     {
+        if (const auto n = ratchetCount (note); n > 1)
+        {
+            const auto whole = full > 0 ? std::max (full, length) : length;
+            if (whole >= n)
+            {
+                for (int k = 0; k < n; ++k)
+                {
+                    const auto from = start + whole * k / n;
+                    if (from >= start + length)
+                        break;
+                    const auto to = std::min (start + whole * (k + 1) / n, start + length);
+                    strike (from, std::max<std::int64_t> (1, to - from), k);
+                }
+                return;
+            }
+        }
         strike (start, length, 0);
         return;
     }
@@ -57,6 +81,24 @@ void forEachStrike (const Note& note, std::int64_t start, std::int64_t length, S
 inline int strikeCount (const Note& note, std::int64_t length) noexcept
 {
     const auto step = interval (note.repeat);
-    return step <= 0 || length <= step ? 1 : (int) std::min<std::int64_t> (4096, (length + step - 1) / step);
+    if (step <= 0 || length <= step)
+        return length >= ratchetCount (note) ? ratchetCount (note) : 1;
+    return (int) std::min<std::int64_t> (4096, (length + step - 1) / step);
 }
+
+// Round 190pm: strike k's velocity factor of `count` strikes (Note::ratchetVelocity: a line from 1 to 1 + ratchetVelocity
+// on the last strike); exactly 1 when the note has no velocity bend
+inline float strikeGain (const Note& note, int k, int count) noexcept
+{
+    if (note.ratchetVelocity == 0.0f || count <= 1 || k <= 0)
+        return 1.0f;
+    return 1.0f + note.ratchetVelocity * (float) std::min (k, count - 1) / (float) (count - 1);
+}
+
+// A velocity times a strike's factor, within 1/127 … 1 (a factor of exactly 1 leaves it as it is)
+inline float strikeVelocity (float velocity, float gain) noexcept
+{
+    return gain == 1.0f ? velocity : std::clamp (velocity * gain, 1.0f / 127.0f, 1.0f);
+}
+
 } // namespace lynx::noterepeat

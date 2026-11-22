@@ -1,6 +1,7 @@
 #include "core/Sections.h"
 #include "core/ClipEnvelope.h"
 #include "core/FlCurve.h"
+#include "core/NoteConditions.h"
 #include "core/NoteRepeat.h"
 #include "core/PlaylistOps.h"
 #include "core/FlpExport.h"
@@ -1321,7 +1322,24 @@ struct Converter
                 p.channelLoops.push_back ({ l.channel, l.setting });
             for (const auto& m : src.markers)
                 p.markers.push_back (marker (m));
+            // round 190pm (P19): ratchets FL's repeat rates hold exactly go as that rate (FL's own note repeat); the others as
+            // their strikes, notes of their own. A Condition has no FL equivalent: the note plays on every pass
+            std::vector<Note> written;
+            written.reserve (src.notes.size());
             for (const auto& n : src.notes)
+            {
+                ratchetsAsRate += n.hasRatchets() && noteconditions::flRateFor (n) > 0 ? 1 : 0;
+                conditions += n.hasCondition() ? 1 : 0;
+                if (n.hasRatchets() && noterepeat::ratchetCount (n) > 1 && noteconditions::flRateFor (n) == 0 && n.length >= noterepeat::ratchetCount (n))
+                {
+                    ++ratchetsAsNotes;
+                    for (const auto& s : noteconditions::ratchetNotes (n))
+                        written.push_back (s);
+                }
+                else
+                    written.push_back (n);
+            }
+            for (const auto& n : written)
             {
                 if (n.channel < 0 || n.channel >= (int) song.channels.size())
                     continue;
@@ -1344,6 +1362,8 @@ struct Converter
                 f.extra = (std::uint8_t) ((n.colour & 0x0F) | (n.porta ? 0x10 : 0) | (n.muted ? 0x20 : 0));
                 f.group = (std::uint16_t) std::max (0, n.group);
                 f.repeats = (std::uint8_t) std::clamp (n.repeat, 0, noterepeat::rateCount); // (issue #208)
+                if (n.repeat == 0 && n.hasRatchets())
+                    f.repeats = (std::uint8_t) noteconditions::flRateFor (n); // (round 190pm: the ratchets at FL's rate)
                 p.notes.push_back (f);
             }
             std::stable_sort (p.notes.begin(), p.notes.end(), [] (const flp::Note& a, const flp::Note& b) { return a.position < b.position; });
@@ -1363,7 +1383,15 @@ struct Converter
             out.patterns.push_back (std::move (p));
         }
         report.exact.push_back (std::to_string (song.patterns.size()) + " patterns (notes with every property, names, colours)");
+        if (ratchetsAsRate > 0)
+            report.exact.push_back (std::to_string (ratchetsAsRate) + " note(s) with ratchets: as FL's note repeat at the same rate");
+        if (ratchetsAsNotes > 0)
+            report.notes.push_back (std::to_string (ratchetsAsNotes)
+                                    + " note(s) with ratchets: written as their strikes, notes of their own (FL's repeat rates can't hold them)");
+        if (conditions > 0)
+            report.notes.push_back (std::to_string (conditions) + " note(s) with a Condition (first pass, fill, cycle): FL has none, they play on every pass");
     }
+    int ratchetsAsRate = 0, ratchetsAsNotes = 0, conditions = 0; // (round 190pm)
 
     flp::TimeMarker marker (const Marker& m) const
     {

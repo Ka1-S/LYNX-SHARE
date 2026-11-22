@@ -190,8 +190,10 @@ void schedulePatternLoop (const Pattern& pattern,
                           const std::vector<ChannelDef>* channels = nullptr,
                           bool chase = false,
                           double linearOrigin = -1.0,
-                          std::uint32_t chanceSeed = 0) noexcept;
+                          std::uint32_t chanceSeed = 0,
+                          bool fill = false) noexcept;
 // `chanceSeed` (round 187c): Song::chanceSeed, for the notes with Chance or a Velocity Range (core/NoteChance.h).
+// `fill` (round 190pm): Fill on, for the notes with a Fill / Not fill Condition (core/NoteConditions.h; live playback only).
 // `linearOrigin` >= 0 (round 170e5, Loop record off in Pattern mode): the pattern plays once from that transport tick,
 // every note (also those past `patternLength`) and no repeat; before it nothing plays.
 // `chase` (both schedulers): playback starts at startTick and FL's Settings › Audio › "Play truncated notes on
@@ -273,7 +275,8 @@ void scheduleSong (const Song& song,
                    bool resume = false,
                    const ScheduleIndex* index = nullptr,
                    bool wrap = true,
-                   bool chase = false) noexcept;
+                   bool chase = false,
+                   bool fill = false) noexcept; // (round 190pm: Fill on, for the notes' Conditions)
 // The Playlist while clips of the grid hold tracks (Clip-launch workflow, core/ClipLauncher.h). As scheduleSong, except: on a
 // `taken` track nothing starts (the ends of what was sounding still come), and on a `givenBack` track what is in
 // progress at startTick starts there, in the middle.
@@ -281,10 +284,11 @@ constexpr int scheduleMaskTracks = 500;
 using TrackMask = std::bitset<scheduleMaskTracks>;
 void scheduleSongAround (const Song& song, const TrackMask& taken, const TrackMask& givenBack, double startTick, int numSamples,
                          double ticksPerSampleValue, EventBuffer& out, bool resume, const ScheduleIndex* index, bool wrap,
-                         bool chase) noexcept;
+                         bool chase, bool fill = false) noexcept;
 
 // One clip played once where it is (no song loop), its events in the block (not sorted): Performance mode's passes.
+// Round 190pm: `pass` = the clip's loops played before this one (a launched clip's), for its notes' Conditions; `fill` = Fill on.
 void scheduleSingleClip (const Song& song, const Clip& clip, std::size_t clipIndex, double startTick, int numSamples, double tps,
-                         EventBuffer& out, const ScheduleIndex* index = nullptr) noexcept;
+                         EventBuffer& out, const ScheduleIndex* index = nullptr, std::int64_t pass = 0, bool fill = false) noexcept;
 // (wrap = false: the song plays once and is silent past its end — audio recording without a loop region, round 163)
 } // namespace lynx

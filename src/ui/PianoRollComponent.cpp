@@ -32,6 +32,8 @@
 #include "core/ScaleDetect.h"
 #include "core/Mpe.h"
 #include "core/NoteCurves.h"
+#include "core/NoteConditions.h"
+#include "core/NoteChance.h"
 #include "core/DrawMode.h"
 #include "core/Rack.h"
 
@@ -1908,6 +1910,25 @@ void PianoRollComponent::paint (juce::Graphics& g)
                 g.fillEllipse (r.getRight() - 6.0f, r.getY() + 1.5f, 3.5f, 3.5f);
             }
 
+            // round 190pm (P19): ratchets as thin dividers where each strike starts, a Condition as a small bar along the bottom
+            // edge (LYNX's own marks, clear of the label; drawn only on notes that have them)
+            if (n.hasRatchets() && n.repeat == 0 && r.getWidth() > 8.0f && r.getHeight() > 4.0f)
+            {
+                const auto strikes = noterepeat::ratchetCount (n);
+                g.setColour (bg0.withAlpha (0.55f));
+                for (int k = 1; k < strikes; ++k)
+                {
+                    const auto x = r.getX() + r.getWidth() * (float) k / (float) strikes;
+                    if (x - r.getX() >= 2.0f)
+                        g.fillRect (juce::Rectangle<float> (x - 0.5f, r.getY() + 2.0f, 1.0f, r.getHeight() - 4.0f));
+                }
+            }
+            if (n.hasCondition() && r.getWidth() > 12.0f && r.getHeight() > 6.0f)
+            {
+                g.setColour (bg0.withAlpha (0.7f));
+                g.fillRect (juce::Rectangle<float> (r.getX() + 3.0f, r.getBottom() - 3.0f, juce::jmin (8.0f, r.getWidth() - 6.0f), 1.5f));
+            }
+
             // a Chance below 100 % (round 187c): a small triangle in the top-left corner, as Live 12 marks it ("A small
             // triangle is displayed in the upper-left corner of notes with probability values less than 100%")
             if ((n.chance < 1.0f || n.chanceGroup != 0) && r.getWidth() > 6.0f && r.getHeight() > 5.0f)
@@ -2187,6 +2208,16 @@ void PianoRollComponent::paint (juce::Graphics& g)
                 }
                 if (hovered)
                     g.drawEllipse (x - 5.0f, top - 5.0f, 11.0f, 11.0f, 1.0f);
+                // round 190pm: the Ratchets and Condition lanes name a note's value beside its mark ("4x", "2+4:4"), only on
+                // the notes that have one
+                if ((laneId() == laneRatchets && n.hasRatchets()) || (laneId() == laneCondition && n.hasCondition()))
+                {
+                    const auto label = laneId() == laneRatchets ? juce::String (noterepeat::ratchetCount (n)) + "x" : conditionText (n);
+                    g.setColour (textPrimary.withAlpha (0.85f));
+                    g.setFont (theme::font (theme::type::caption));
+                    const auto ty = juce::jlimit ((float) lane.getY() + 14.0f, (float) lane.getBottom() - 14.0f, top - 15.0f);
+                    textcache::drawText (g, label, juce::Rectangle<float> (x + 5.0f, ty, 90.0f, 13.0f).toNearestInt(), juce::Justification::centredLeft, false);
+                }
             }
 
             if (drag == Drag::velocityLine && paintingLane == heldLane) // the line being drawn (in the lane it is drawn in)
@@ -2668,6 +2699,10 @@ void PianoRollComponent::addNoteLanes()
     laneBox.addItem (tr ("Mod Y"), laneModY);
     laneBox.addItem (tr ("Chance"), laneChance);
     laneBox.addItem (tr ("Velocity range (LYNX)"), laneVelocityRange);
+    // round 190pm (research190oe P19): the notes' ratchets, their velocity bend and their Condition (LYNX additions)
+    laneBox.addItem (tr ("Ratchets (LYNX)"), laneRatchets);
+    laneBox.addItem (tr ("Ratchet velocity (LYNX)"), laneRatchetVelocity);
+    laneBox.addItem (tr ("Condition (LYNX)"), laneCondition);
     // MPE stage 2 (round 190hy, issue #108): each note's own pitch bend / slide (CC 74) / pressure curve, as Live 11+'s
     // note expression lanes (LYNX additions: FL 2026 has no per-note curves)
     laneBox.addItem (tr ("MPE pitch bend"), laneMpePitch);
@@ -2686,6 +2721,13 @@ float PianoRollComponent::laneValue (const Note& n) const
         case laneModY: return n.modY;
         case laneChance: return n.chance;
         case laneVelocityRange: return (n.velocityRange + 1.0f) * 0.5f;
+        case laneRatchets: return (float) (noterepeat::ratchetCount (n) - 1) / (float) (noterepeat::maxRatchets - 1);
+        case laneRatchetVelocity: return (n.ratchetVelocity + 1.0f) * 0.5f;
+        case laneCondition:
+        {
+            const auto preset = noteconditions::presetOf (n); // (a cycle of several passes: at the top)
+            return preset < 0 ? 1.0f : (float) preset / (float) (noteconditions::presetCount - 1);
+        }
         case laneMpePitch: return 0.5f; // (the MPE lanes edit curves, not one value: round 190hy)
         case laneMpeSlide: return n.modX;
         case laneMpePressure: return mpe::pressureOfModY (n.modY);
@@ -2708,6 +2750,16 @@ void PianoRollComponent::setLaneValue (Note& n, float v) const
         case laneVelocityRange: // whole Live velocity steps (1/127); snaps to none
             n.velocityRange = std::abs (v - 0.5f) < 0.02f ? 0.0f : std::round ((v * 2.0f - 1.0f) * 127.0f) / 127.0f;
             break;
+        case laneRatchets: // 1 … 8 strikes, in steps (1 = none)
+        {
+            const auto strikes = 1 + juce::roundToInt (v * (float) (noterepeat::maxRatchets - 1));
+            n.ratchets = strikes > 1 ? strikes : 0;
+            break;
+        }
+        case laneRatchetVelocity: // whole percents; snaps to none
+            n.ratchetVelocity = std::abs (v - 0.5f) < 0.02f ? 0.0f : std::round ((v * 2.0f - 1.0f) * 100.0f) / 100.0f;
+            break;
+        case laneCondition: noteconditions::apply (n, noteconditions::preset (juce::roundToInt (v * (float) (noteconditions::presetCount - 1)))); break;
         case laneMpePitch:
         case laneMpeSlide:
         case laneMpePressure: break; // (curves: the MPE lanes' own gestures edit them)
@@ -2715,10 +2767,45 @@ void PianoRollComponent::setLaneValue (Note& n, float v) const
     }
 }
 
+// round 190pm: what a lane value reads as in the hint bar while it is set ("4 strikes", "+20%", "2:4"); "" = a percent
+juce::String PianoRollComponent::laneValueText (float v) const
+{
+    v = juce::jlimit (0.0f, 1.0f, v);
+    Note n;
+    switch (laneId())
+    {
+        case laneRatchets:
+        {
+            setLaneValue (n, v);
+            const auto strikes = noterepeat::ratchetCount (n);
+            return strikes <= 1 ? tr ("No ratchets") : tr ("{0} strikes", { juce::String (strikes) });
+        }
+        case laneRatchetVelocity:
+            setLaneValue (n, v);
+            return (n.ratchetVelocity > 0.0f ? "+" : "") + juce::String (juce::roundToInt (n.ratchetVelocity * 100.0f)) + "%";
+        case laneCondition:
+            setLaneValue (n, v);
+            return conditionText (n);
+        default: return {};
+    }
+}
+
+juce::String PianoRollComponent::conditionText (const Note& n)
+{
+    if (! n.hasCondition())
+        return tr ("Always");
+    juce::StringArray parts;
+    if (n.condition != notecondition::always)
+        parts.add (tr (noteconditions::occurrenceName (n.condition)));
+    if (n.cycle > 1)
+        parts.add (noteconditions::cycleText (n.cycle, n.cycleMask));
+    return parts.joinIntoString (", ");
+}
+
 bool PianoRollComponent::laneIsBipolar() const
 {
     const auto id = laneId();
-    return id == lanePan || id == laneFinePitch || id == laneVelocityRange || id == laneMpePitch || id >= eventLaneIdBase;
+    return id == lanePan || id == laneFinePitch || id == laneVelocityRange || id == laneRatchetVelocity || id == laneMpePitch || id >= eventLaneIdBase;
 }
 
 bool PianoRollComponent::laneIsChance() const { return laneId() == laneChance; }
@@ -2865,6 +2952,8 @@ void PianoRollComponent::beginTimeZoom (const juce::MouseEvent& e)
 
 void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
 {
+    if (touchInput.mouseDown (e)) // round 190pm (P23): a finger in Touch mode is held back until it means something
+        return;
     const AudioEngine::UndoGesture undoGesture (engine, AudioEngine::UndoGesture::begin); // (round 190jv: one undo step per gesture)
     followEditStamp = engine.getPublishCount(); // (round 190im, R15)
     if (engine.getSong().channels.empty())
@@ -3482,6 +3571,8 @@ void PianoRollComponent::holdFired (int serial)
 
 void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
 {
+    if (touchInput.mouseDrag (e)) // round 190pm (P23)
+        return;
     if (boundaryDrag >= 0) // round 190on (P10): two stacked lanes' heights
     {
         std::vector<float> weights;
@@ -3963,7 +4054,9 @@ void PianoRollComponent::postDragHint (const juce::MouseEvent& e)
             const auto value = drag == Drag::velocitySet ? laneSetValue
                                                          : juce::jlimit (0.0f, 1.0f, (float) (lane.getBottom() - 2 - e.y) / (float) (lane.getHeight() - 8));
             hint.text = tr ("Setting {0}", { laneName() });
-            hint.value = juce::String (juce::roundToInt (value * 100.0f)) + "%";
+            hint.value = laneValueText (value);
+            if (hint.value.isEmpty())
+                hint.value = juce::String (juce::roundToInt (value * 100.0f)) + "%";
             break;
         }
         case Drag::select:
@@ -4009,6 +4102,8 @@ void PianoRollComponent::postDragHint (const juce::MouseEvent& e)
 
 void PianoRollComponent::mouseUp (const juce::MouseEvent& e)
 {
+    if (touchInput.mouseUp (e)) // round 190pm (P23)
+        return;
     const AudioEngine::UndoGesture undoGesture (engine, AudioEngine::UndoGesture::end); // (closes when mouseUp returns)
     if (boundaryDrag >= 0) // round 190on (P10): the heights are kept
     {
@@ -4694,6 +4789,88 @@ void PianoRollComponent::runOperation (const std::function<std::vector<int> (Pat
     sortNotes();
 }
 
+// Round 190pm (research190oe P19): ratchets and Conditions for the selected notes (all when none is selected), the Fill
+// switch and the lanes; LYNX additions next to Chance
+juce::PopupMenu PianoRollComponent::repeatsMenu()
+{
+    juce::PopupMenu menu;
+    const auto& notes = currentPattern (engine.getSong()).notes;
+    const auto target = selectionOrAll();
+    const auto all = [&] (const std::function<bool (const Note&)>& test) {
+        return ! target.empty() && std::all_of (target.begin(), target.end(), [&] (int i) { return i >= 0 && i < (int) notes.size() && test (notes[(std::size_t) i]); });
+    };
+    const auto setAll = [this] (std::function<void (Note&)> change) {
+        runOperation ([change] (Pattern& p, const std::vector<int>& t) {
+            for (auto i : t)
+                if (i >= 0 && i < (int) p.notes.size())
+                    change (p.notes[(std::size_t) i]);
+            return t;
+        });
+    };
+
+    juce::PopupMenu ratchets;
+    ratchets.addItem (tr ("No ratchets"), true, all ([] (const Note& n) { return ! n.hasRatchets(); }), [setAll] { setAll ([] (Note& n) { n.ratchets = 0; }); });
+    for (int count = 2; count <= noterepeat::maxRatchets; ++count)
+        ratchets.addItem (tr ("{0} strikes", { juce::String (count) }), true, all ([count] (const Note& n) { return n.ratchets == count; }),
+                          [setAll, count] { setAll ([count] (Note& n) { n.ratchets = count; }); });
+    ratchets.addSeparator();
+    for (const auto& [name, bend] : { std::pair { TR_NOOP ("Even velocity"), 0.0f }, { TR_NOOP ("Fade out (to 30%)"), -0.7f },
+                                      { TR_NOOP ("Fade in (from 50%)"), 1.0f } })
+    {
+        const auto b = bend;
+        ratchets.addItem (tr (name), true, all ([b] (const Note& n) { return n.ratchetVelocity == b; }), [setAll, b] { setAll ([b] (Note& n) { n.ratchetVelocity = b; }); });
+    }
+    menu.addSubMenu (tr ("Ratchets"), ratchets);
+
+    juce::PopupMenu condition;
+    for (int c = notecondition::always; c < notecondition::count; ++c)
+        condition.addItem (tr (noteconditions::occurrenceName (c)), true,
+                           all ([c] (const Note& n) { return n.condition == c && n.cycle <= 1; }),
+                           [setAll, c] { setAll ([c] (Note& n) { n.condition = (std::uint8_t) c; n.cycle = 0; n.cycleMask = 0; }); });
+    condition.addSeparator();
+    for (int length = 2; length <= noteconditions::maxPresetCycle; ++length)
+    {
+        juce::PopupMenu cycle;
+        for (int pass = 1; pass <= length; ++pass)
+        {
+            const auto mask = (std::uint16_t) (1u << (pass - 1));
+            cycle.addItem (juce::String (noteconditions::cycleText (length, mask)), true,
+                           all ([length, mask] (const Note& n) { return n.cycle == length && n.cycleMask == mask; }),
+                           [setAll, length, mask] { setAll ([length, mask] (Note& n) { n.cycle = (std::uint8_t) length; n.cycleMask = mask; }); });
+        }
+        if (length == 4) // (two of four: Bitwig's Recurrence with two passes lit)
+        {
+            cycle.addSeparator();
+            for (const std::uint16_t mask : { (std::uint16_t) 0b0101, (std::uint16_t) 0b1010 })
+                cycle.addItem (juce::String (noteconditions::cycleText (4, mask)), true,
+                               all ([mask] (const Note& n) { return n.cycle == 4 && n.cycleMask == mask; }),
+                               [setAll, mask] { setAll ([mask] (Note& n) { n.cycle = 4; n.cycleMask = mask; }); });
+        }
+        condition.addSubMenu (tr ("Cycle of {0} passes", { juce::String (length) }), cycle);
+    }
+    condition.addItem (tr ("No cycle"), true, all ([] (const Note& n) { return n.cycle <= 1; }), [setAll] { setAll ([] (Note& n) { n.cycle = 0; n.cycleMask = 0; }); });
+    menu.addSubMenu (tr ("Condition"), condition);
+
+    menu.addSeparator();
+    menu.addItem (tr ("Fill (the notes with a Fill condition play)"), true, chance::fillSwitch().load(), [this] {
+        chance::fillSwitch().store (! chance::fillSwitch().load());
+        repaint();
+    });
+    menu.addItem (tr ("Reset ratchets and conditions"), [setAll] {
+        setAll ([] (Note& n) {
+            n.ratchets = 0;
+            n.ratchetVelocity = 0.0f;
+            n.condition = notecondition::always;
+            n.cycle = 0;
+            n.cycleMask = 0;
+        });
+    });
+    menu.addSeparator();
+    menu.addItem (tr ("Show the ratchets lane"), true, laneId() == laneRatchets, [this] { laneBox.setSelectedId (laneRatchets); });
+    menu.addItem (tr ("Show the condition lane"), true, laneId() == laneCondition, [this] { laneBox.setSelectedId (laneCondition); });
+    return menu;
+}
+
 void PianoRollComponent::showMoreMenu()
 {
     moreMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&moreButton));
@@ -5021,6 +5198,7 @@ juce::PopupMenu PianoRollComponent::toolsMenu()
             laneBox.setSelectedId (laneChance);
         });
         menu.addSubMenu (tr ("Chance (LYNX)"), chance);
+        menu.addSubMenu (tr ("Repeats and conditions (LYNX)"), repeatsMenu()); // (round 190pm)
     }
     menu.addSeparator();
     menu.addItem (tr ("Edit events..."), [this] {
@@ -5732,6 +5910,58 @@ void PianoRollComponent::glideFrame()
     updateScrollBars();
     glideX.current = scrollTicks; // the scroll bar may have clamped it
     gliding = glideX.isMoving() || glideY.isMoving();
+    repaint();
+}
+
+// Round 190pm (research190oe P23, ui/TouchInput.h): Touch mode's gestures on the Piano roll. A long press on a note opens
+// its properties (the Note inspector, as a double click; FL's right click deletes: that stays on the mouse's right button),
+// in the grid elsewhere the Piano roll's menu, outside the grid the right click there; two fingers pan (Simple layout) and
+// a pinch zooms the time around their centre.
+void PianoRollComponent::touchLongPress (const juce::MouseEvent& rightClick)
+{
+    if (gridArea().contains (rightClick.getPosition()))
+    {
+        bool edge = false;
+        if (const auto hit = noteAt (rightClick.x, rightClick.y, edge); hit >= 0)
+        {
+            const auto indices = isSelected (hit) ? selection : std::vector<int> { hit };
+            const auto& n = currentPattern (engine.getSong()).notes[(std::size_t) hit];
+            const auto area = juce::Rectangle<int> ((int) tickToX ((double) n.start), keyToY (n.key), juce::jmax (8, (int) (n.length * pixelsPerTick)), rowHeight);
+            lastTouchActionForSnapshot = "note inspector " + juce::String (hit);
+            if (! ui::showingForShots())
+                showNoteInspector (engine, indices, hit, localAreaToGlobal (area));
+            return;
+        }
+        lastTouchActionForSnapshot = "menu";
+        if (! ui::showingForShots())
+            moreMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (
+            juce::Rectangle<int> (1, 1).withPosition (localPointToGlobal (rightClick.getPosition()))));
+        return;
+    }
+    lastTouchActionForSnapshot = "right click";
+    const juce::Component::SafePointer<PianoRollComponent> safe (this);
+    mouseDown (rightClick);
+    if (safe != nullptr)
+        mouseUp (rightClick);
+}
+
+void PianoRollComponent::touchPan (float dx, float dy)
+{
+    gliding = false;
+    scrollTicks = juce::jmax (0.0, scrollTicks - (double) dx / pixelsPerTick);
+    scrollY = juce::jlimit (0, juce::jmax (0, rows.count * rowHeight - gridArea().getHeight()), scrollY - juce::roundToInt (dy));
+    updateScrollBars();
+    repaint();
+}
+
+void PianoRollComponent::touchPinch (float scale, juce::Point<float> centre)
+{
+    gliding = false;
+    const auto anchorPixels = (double) juce::jmax (0.0f, centre.x - (float) keyboardWidth);
+    const auto zoomed = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, pixelsPerTick * (double) scale);
+    scrollTicks = gesture::zoomAnchored (scrollTicks, pixelsPerTick, zoomed, anchorPixels);
+    pixelsPerTick = zoomed;
+    updateScrollBars();
     repaint();
 }
 

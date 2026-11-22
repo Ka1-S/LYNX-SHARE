@@ -751,6 +751,7 @@ if(LYNX_BUILD_APP)
         src/ui/MidiToolsPanel.cpp
         src/ui/ChordHelper.cpp
         src/ui/TouchKeyboard.cpp
+        src/ui/TouchInput.cpp
         src/ui/QuickAddPalette.cpp
         src/ui/PluginPickerView.cpp
         src/ui/PickerLook.cpp

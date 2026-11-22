@@ -18,6 +18,7 @@
 #include "core/LynxVerbs.h"
 #include "core/MixSuite.h"
 #include "core/NewtoneFx.h"
+#include "core/NoteRepeat.h"
 #include "core/PeakShapes.h"
 #include "core/RackRenderer.h"
 #include "core/Reeverb2.h"
@@ -1415,12 +1416,80 @@ void keyMarkersFor0130 (juce::var& root, Losses& lost)
                           juce::String (keyMarkers), false });
 }
 
+// Round 190pm (research190oe P19): a note's ratchets and Condition (note array [21 … 25]). 0.1.30 reads up to [20], FL's
+// repeat. Ratchets become their strikes as notes of their own (the same sound: even parts of the note, each at its
+// velocity bend; FL's repeat, when set, wins as in this release, so those notes just lose the extra fields); a Condition
+// can't be kept: the note plays on every pass there.
+void noteRepeatsFor0130 (juce::var& root, Losses& lost)
+{
+    int ratcheted = 0, conditioned = 0;
+    if (auto* patterns = arrayOf (root["patterns"]))
+        for (auto& p : *patterns)
+        {
+            auto* notes = arrayOf (p["notes"]);
+            if (notes == nullptr)
+                continue;
+            bool split = false;
+            juce::Array<juce::var> out;
+            for (auto& n : *notes)
+            {
+                auto* fields = arrayOf (n);
+                if (fields == nullptr || fields->size() <= 21)
+                {
+                    out.add (n);
+                    continue;
+                }
+                const auto ratchets = juce::jlimit (0, noterepeat::maxRatchets, (int) (*fields)[21]);
+                const auto bend = fields->size() > 22 ? (float) (double) (*fields)[22] : 0.0f;
+                const auto condition = fields->size() > 23 ? (int) (*fields)[23] : 0;
+                const auto cycle = fields->size() > 24 ? (int) (*fields)[24] : 0;
+                if (condition != 0 || cycle > 1)
+                    ++conditioned;
+                fields->removeRange (21, fields->size() - 21);
+                const auto start = (juce::int64) (*fields)[0], length = (juce::int64) (*fields)[1];
+                if (ratchets <= 1 || (int) (*fields)[20] != 0 || length < ratchets)
+                {
+                    out.add (n);
+                    continue;
+                }
+                ++ratcheted;
+                split = true;
+                Note shape; // (the strikes as the scheduler plays them: core/NoteRepeat.h)
+                shape.ratchets = ratchets;
+                shape.ratchetVelocity = bend;
+                const auto velocity = (float) (double) (*fields)[4];
+                noterepeat::forEachStrike (shape, start, length, [&] (std::int64_t at, std::int64_t strikeLength, int k) {
+                    juce::Array<juce::var> strike (*fields);
+                    strike.set (0, (juce::int64) at);
+                    strike.set (1, (juce::int64) strikeLength);
+                    const auto v = noterepeat::strikeVelocity (velocity, noterepeat::strikeGain (shape, k, ratchets));
+                    strike.set (4, v == velocity ? (*fields)[4] : juce::var (juce::roundToInt (v * 1000.0f) / 1000.0));
+                    out.add (strike);
+                });
+            }
+            if (split)
+            {
+                std::stable_sort (out.begin(), out.end(), [] (const juce::var& a, const juce::var& b) {
+                    return (juce::int64) a[0] < (juce::int64) b[0];
+                });
+                *notes = out;
+            }
+        }
+    if (ratcheted > 0)
+        lost.push_back ({ TR_NOOP ("{0} note(s) with ratchets become their strikes as notes of their own (the sound is the same)"),
+                          juce::String (ratcheted), false });
+    if (conditioned > 0)
+        lost.push_back ({ TR_NOOP ("{0} note(s) with a Condition (first pass, fill, cycle) play on every pass in this release"),
+                          juce::String (conditioned), true });
+}
+
 // Rollup 0.1.31 (round 190no): what the 0.1.31 rounds save that 0.1.30 cannot hold, each loss reported only when the
 // project has it. A copy for an older release runs this step first, so the later steps never see these. Round 190nc's
 // Macro Map writes ordinary macro mappings (targets 0.1.30 has): nothing to change for it.
 void toRelease0130 (juce::var& root, Losses& lost)
 {
     auto& o = *objectOf (root);
+    noteRepeatsFor0130 (root, lost);
 
     // round 190ni: LYNX Model. 0.1.30 would play an unknown instrument as its basic synth: an empty Sampler (silent) keeps
     // the channel, its notes and its routing, as Tetra / Helix / Braid in the copy for 0.1.28

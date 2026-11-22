@@ -116,6 +116,8 @@ std::vector<Action> makeActions()
         // FL's AlignAllChannelEditorsAction, ShortCut 8315 = Shift+F12 (round 169k)
         { "view.alignChannelEditors", TR_NOOP ("Align all channel editors"), Context::global, { chord (f12, shift) } },
         { "view.touchKeyboard", TR_NOOP ("Show or hide the Touch keyboard"), Context::global, { chord (f7, alt) } },
+        // round 190pm (research190oe P19): Fill for the notes' Conditions; no default key (Settings › Keys, the palette)
+        { "transport.fill", TR_NOOP ("Fill on or off (notes with a Fill condition)"), Context::global, {} },
         // round 190nw (0.1.31): LYNX's tracker editor (a view of the patterns' notes). Round 190ob: Shift+F7, beside FL's
         // F7 (Piano roll), the other view of the same notes. FL 2026 has no Shift+F7: its ShortcutsModule binds none
         // (DFM dump of round 167j: F7 Piano roll, Alt+F7 Touch controller only) and FL did nothing on it in the live
