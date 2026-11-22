@@ -136,30 +136,35 @@ public:
             return;
         }
         const auto scale = g.getInternalContext().getPhysicalPixelScaleFactor();
-        CacheKey key { engine.getSong().sections(), selectedUid, hover.section, (int) hover.part, playlist.scrollTicks, playlist.pixelsPerTick, getWidth(),
-                       getHeight(), playlist.headerWidth, simpleLook(), scale, theme::colour::bg1.getARGB(), theme::colour::warning.getARGB() };
-        if (! cacheValid || ! (key == cacheKey))
+        // (round 190pb, Windows: the key's fields compared where they are; the sections are copied only for a new picture,
+        // not on every paint)
+        const auto& sectionsNow = engine.getSong().sections();
+        const auto same = cacheValid && cacheKey.sections == sectionsNow && cacheKey.selected == selectedUid && cacheKey.hoverSection == hover.section
+                          && cacheKey.hoverPart == (int) hover.part && cacheKey.scrollTicks == playlist.scrollTicks
+                          && cacheKey.pixelsPerTick == playlist.pixelsPerTick && cacheKey.width == getWidth() && cacheKey.height == getHeight()
+                          && cacheKey.headerWidth == playlist.headerWidth && cacheKey.simple == simpleLook() && cacheKey.scale == scale
+                          && cacheKey.ground == theme::colour::bg1.getARGB() && cacheKey.marker == theme::colour::warning.getARGB();
+        if (! same)
         {
-            cache = juce::Image (juce::Image::RGB, juce::jmax (1, juce::roundToInt ((float) getWidth() * scale)),
-                                 juce::jmax (1, juce::roundToInt ((float) getHeight() * scale)), false);
+            cacheKey = { sectionsNow, selectedUid, hover.section, (int) hover.part, playlist.scrollTicks, playlist.pixelsPerTick, getWidth(),
+                         getHeight(), playlist.headerWidth, simpleLook(), scale, theme::colour::bg1.getARGB(), theme::colour::warning.getARGB() };
+            // (round 190pb: the picture of the same size is drawn over again, not made anew: on Windows a new one is a new
+            // Direct2D bitmap; paintLane fills every pixel of it)
+            const auto w = juce::jmax (1, juce::roundToInt ((float) getWidth() * scale)), h = juce::jmax (1, juce::roundToInt ((float) getHeight() * scale));
+            if (! cache.isValid() || cache.getWidth() != w || cache.getHeight() != h)
+                cache = juce::Image (juce::Image::RGB, w, h, false);
             juce::Graphics cg (cache);
             cg.addTransform (juce::AffineTransform::scale (scale));
             paintLane (cg);
-            cacheKey = std::move (key);
             cacheValid = true;
         }
         g.drawImage (cache, getLocalBounds().toFloat());
     }
 
-    void paintLane (juce::Graphics& g)
+    void paintHeader (juce::Graphics& g)
     {
         using namespace theme;
-        const auto& song = engine.getSong();
-        const auto& list = song.sections();
         const auto simple = simpleLook();
-        const auto gridRight = getWidth() - PlaylistComponent::scrollBarSize;
-        g.fillAll (simple ? colour::bg1 : colour::bg2); // (opaque: the scroll bar's column too)
-        // header column: the lane's name and its "+"
         g.setColour (simple ? colour::bg2 : colour::bg3);
         g.fillRect (0, 0, playlist.headerWidth, getHeight());
         g.setColour (colour::textSecondary);
@@ -184,6 +189,47 @@ public:
         }
         g.setColour (colour::border);
         g.fillRect (playlist.headerWidth - 1, 0, 1, getHeight());
+        g.setColour (colour::border); // (the lane's bottom line, which paintLane draws over the header too)
+        g.fillRect (0, getHeight() - 1, playlist.headerWidth, 1);
+    }
+
+    void paintLane (juce::Graphics& g)
+    {
+        using namespace theme;
+        const auto& song = engine.getSong();
+        const auto& list = song.sections();
+        const auto simple = simpleLook();
+        const auto gridRight = getWidth() - PlaylistComponent::scrollBarSize;
+        g.fillAll (simple ? colour::bg1 : colour::bg2); // (opaque: the scroll bar's column too)
+        // header column: the lane's name and its "+" (round 190pb: from a picture of it, made again when the look, the hover,
+        // the size, the palette or the language change; it sits at the lane's origin, so the picture is the same drawing.
+        // On Direct2D the "+" glyph is a new path geometry and the name a new glyph run on every rebuild of the lane)
+        const auto headerScale = g.getInternalContext().getPhysicalPixelScaleFactor();
+        const auto whole = (int) std::round (headerScale);
+        if (ui::paintCache() && whole >= 1 && whole <= 3 && std::abs (headerScale - (float) whole) <= 1.0e-4f && playlist.headerWidth > 0)
+        {
+            auto key = textcache::detail::mixHash (0x13198a2e03707344ull, (std::uint64_t) whole);
+            for (const std::uint64_t v : { (std::uint64_t) playlist.headerWidth, (std::uint64_t) getHeight(), (std::uint64_t) (simple ? 1 : 0),
+                                           (std::uint64_t) (hover.part == Hit::add ? 1 : 0), (std::uint64_t) theme::paletteStampNow(),
+                                           (std::uint64_t) tr ("Sections").hashCode64(), (std::uint64_t) colour::border.getARGB(),
+                                           (std::uint64_t) colour::bg3.getARGB(), (std::uint64_t) juce::roundToInt (font (simple ? type::small : type::caption, simple).getHeight() * 1000.0f) })
+                key = textcache::detail::mixHash (key, v);
+            if (key != headerKey || ! headerPicture.isValid())
+            {
+                headerKey = key;
+                headerPicture = juce::Image (juce::Image::RGB, playlist.headerWidth * whole, getHeight() * whole, false);
+                juce::Graphics hg (headerPicture);
+                hg.addTransform (juce::AffineTransform::scale ((float) whole));
+                paintHeader (hg);
+            }
+            g.setColour (juce::Colours::black); // (an image is drawn with the current colour's alpha as its opacity)
+            if (whole == 1)
+                g.drawImageAt (headerPicture, 0, 0);
+            else
+                g.drawImage (headerPicture, juce::Rectangle<float> (0.0f, 0.0f, (float) playlist.headerWidth, (float) getHeight()), juce::RectanglePlacement::stretchToFit);
+        }
+        else
+            paintHeader (g);
         // the lane
         g.setColour (simple ? colour::bg1 : colour::bg2);
         g.fillRect (playlist.headerWidth, 0, gridRight - playlist.headerWidth, getHeight());
@@ -267,7 +313,8 @@ public:
         g.setColour (fill.withMultipliedAlpha (alpha));
         g.fillRect (juce::Rectangle<float> (r.getX(), 0.0f, 1.0f, (float) getHeight()));
         g.setFont (font (type::caption, true));
-        const auto width = juce::jmin (r.getWidth(), (float) juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), name) + 8.0f);
+        // (round 190pb: the name's width from the text cache, the same number; JUCE shapes the text on every measure)
+        const auto width = juce::jmin (r.getWidth(), (float) (int) std::ceil (textcache::stringWidth (g.getCurrentFont(), name)) + 8.0f);
         const auto tag = juce::Rectangle<float> (r.getX(), (float) getHeight() - 13.0f, width, 11.0f);
         g.fillRoundedRectangle (tag, 2.0f);
         g.setColour (colour::bg0.withMultipliedAlpha (alpha));
@@ -657,6 +704,8 @@ private:
     PlaylistComponent& playlist;
     CacheKey cacheKey;
     juce::Image cache;
+    juce::Image headerPicture; // (round 190pb: the header column, see paintLane)
+    std::uint64_t headerKey = 0;
     bool cacheValid = false;
     enum class Drag { none, move, resize };
     Drag drag = Drag::none;
