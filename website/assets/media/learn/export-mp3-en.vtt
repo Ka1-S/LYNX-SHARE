@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.400
+Song ready? Export it as a file anyone can play, MP3 or WAV.
+
+00:00:08.800 --> 00:00:13.600
+Choose File, Export, MP3 file.
+
+00:00:14.000 --> 00:00:19.400
+MP3 is chosen. WAV keeps every detail, MP3 is small.
+
+00:00:19.800 --> 00:00:25.000
+Pick the bitrate: higher sounds better. What to render: the whole song.
+
+00:00:25.400 --> 00:00:30.400
+Click Export. Next time, Ctrl+Shift+R opens this window.
+
+00:00:30.800 --> 00:00:36.400
+Done. The file is in your Music folder, ready to share.

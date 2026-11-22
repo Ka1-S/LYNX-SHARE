@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Sidechain-ducking: de bas zakt bij elke kick, zodat je ze allebei hoort.
+
+00:00:09.000 --> 00:00:14.600
+In de Eenvoudige lay-out is het één keuze: Duiken onder op de bastrack, dan Drums.
+
+00:00:15.000 --> 00:00:22.000
+Nu ademt de bas mee met de beat. De knop Duck bepaalt hoe diep.
+
+00:00:22.400 --> 00:00:27.000
+Zo doe je het in de Pattern-lay-out, in de Mixer:
+
+00:00:27.400 --> 00:00:33.000
+Selecteer Drums en klik met rechts op de pijl van de akkoorden: Sidechain naar deze track.
+
+00:00:33.400 --> 00:00:39.000
+Voeg dan een compressor toe aan de akkoorden: hij luistert naar de drums.
+
+00:00:39.400 --> 00:00:45.600
+Elke slag duwt de akkoorden even omlaag: de klassieke pomp.

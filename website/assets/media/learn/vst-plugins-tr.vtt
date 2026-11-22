@@ -1,0 +1,25 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+LYNX, VST3 ve CLAP plugin'lerini çalıştırır. Seçenekler, Plugin yöneticisi bunları listeler.
+
+00:00:09.000 --> 00:00:14.400
+Plugin klasörleri LYNX'in nereye baktığını gösterir: standart klasörler ve eklediğiniz her klasör.
+
+00:00:14.800 --> 00:00:20.400
+Yeni plugin bul her dosyayı ayrı bir süreçte denetler, böylece kötü bir plugin LYNX'i çökertemez.
+
+00:00:20.800 --> 00:00:26.000
+Burada: Dragonfly Reverb ve LSP koleksiyonu gibi ücretsiz plugin'ler.
+
+00:00:26.400 --> 00:00:31.600
+Birini kullanmak için bir Mixer izi seçip boş bir yuvaya tıklayın...
+
+00:00:32.000 --> 00:00:37.600
+...Plugin, Daha fazla plugin, ve adıyla bulun.
+
+00:00:38.000 --> 00:00:43.000
+Ekle, plugin'in kendi penceresini açar.
+
+00:00:43.400 --> 00:00:49.000
+Çal'a basın: akorlar artık salon reverb'inde çınlıyor.

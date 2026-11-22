@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+La automatización mueve un potenciómetro en el tiempo, sola, cada vez que suena la canción.
+
+00:00:09.000 --> 00:00:14.600
+Clic derecho en cualquier potenciómetro, aquí el Cutoff del sintetizador, y elige Crear clip de automatización.
+
+00:00:15.000 --> 00:00:20.600
+El clip va a la Playlist, y su editor se abre con la curva.
+
+00:00:21.000 --> 00:00:26.600
+Arrastra los puntos: el Cutoff empieza alto y baja a lo largo del compás.
+
+00:00:27.000 --> 00:00:33.000
+Pulsa Play en el modo Song: el potenciómetro sigue la curva.
+
+00:00:33.400 --> 00:00:39.800
+En el diseño Simple, el botón Automatización muestra un carril bajo cada pista.
