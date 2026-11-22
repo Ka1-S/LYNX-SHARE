@@ -1587,10 +1587,13 @@ void onSampleSignal (int, siginfo_t*, void* context)
     if (n < 5 && context != nullptr) // (fewer than 3 frames beyond the handler and the trampoline)
     {
         const auto& mc = static_cast<const ucontext_t*> (context)->uc_mcontext;
+        // return addresses can carry a pointer-authentication code in their top bits (CPUs with PAC; seen on the arm
+        // runner): user addresses on Linux arm64 have 48 bits
+        const auto strip = [] (std::uint64_t a) { return reinterpret_cast<void*> (a & ((std::uint64_t (1) << 48) - 1)); };
         n = 2; // (sampleThread drops the first two: the handler and the trampoline)
         sampledFrames[n++] = reinterpret_cast<void*> (mc.pc);
         if (mc.regs[30] != 0)
-            sampledFrames[n++] = reinterpret_cast<void*> (mc.regs[30]);
+            sampledFrames[n++] = strip (mc.regs[30]);
         const auto sp = (std::uintptr_t) mc.sp;
         auto fp = (std::uintptr_t) mc.regs[29], last = sp - 1; // (the interrupted function's own record can be at sp)
         const auto top = sampledStackTop != 0 ? sampledStackTop : sp + (1u << 20);
@@ -1600,8 +1603,8 @@ void onSampleSignal (int, siginfo_t*, void* context)
             const auto ret = record[1];
             if (ret == 0)
                 break;
-            if (n == 3 || (void*) ret != sampledFrames[n - 1]) // (the link register already gave the first caller)
-                sampledFrames[n++] = reinterpret_cast<void*> (ret);
+            if (n == 3 || strip (ret) != sampledFrames[n - 1]) // (the link register already gave the first caller)
+                sampledFrames[n++] = strip (ret);
             last = fp;
             fp = record[0];
         }
