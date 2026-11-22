@@ -117,14 +117,7 @@
             }
 
             static std::int64_t nowMs() { return (std::int64_t) juce::Time::getMillisecondCounterHiRes(); }
-            static int processId()
-            {
-               #if JUCE_WINDOWS
-                return (int) GetCurrentProcessId();
-               #else
-                return (int) getpid();
-               #endif
-            }
+            static int processId() { return lynx::windows::processId(); } // (ui/LynxWindows: Windows has no getpid here; rollup 0.1.31 step 6)
 
             // LYNX_ME_DEVICE=1: the real audio device (on Linux PipeWire when its daemon answers, as the app picks it);
             // a second callback on the device marks the device thread's blocks, the engine's scope gives the level
