@@ -84,7 +84,7 @@ countries: nl be
 "Last project import report" = "Laatste projectimportrapport"
 "Project import" = "Projectimport"
 "Nothing to report (no project from another app imported in this session, or everything was converted)." = "Niets te melden (geen project uit een andere app geïmporteerd in deze sessie, of alles is omgezet)."
-"Opens .flp, .als, .flm, .dawproject, .band and .blx projects; exports .flp, .als and .dawproject." = "Opent .flp-, .als-, .flm-, .dawproject-, .band- en .blx-projecten; exporteert .flp, .als en .dawproject."
+"Opens .flp, .als, .flm, .dawproject, .band and .blx projects; exports .flp, .als, .flm and .dawproject." = "Opent .flp-, .als-, .flm-, .dawproject-, .band- en .blx-projecten; exporteert .flp, .als, .flm en .dawproject."
 "About LYNX SHARE" = "Over LYNX SHARE"
 "Built-in plugins (online list)..." = "Ingebouwde plugins (online lijst)..."
 "Lightweight C++/JUCE DAW: FL Studio-style patterns and Ableton Live-style clips.\nIndependent implementation: no Image-Line or Ableton code was copied." = "Lichtgewicht C++/JUCE-DAW: patterns in FL Studio-stijl en clips in Ableton Live-stijl.\nOnafhankelijke implementatie: er is geen code van Image-Line of Ableton gekopieerd."

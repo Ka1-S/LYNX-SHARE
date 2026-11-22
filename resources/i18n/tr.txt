@@ -84,7 +84,7 @@ countries: tr
 "Last project import report" = "Son proje içe aktarma raporu"
 "Project import" = "Proje içe aktarma"
 "Nothing to report (no project from another app imported in this session, or everything was converted)." = "Bildirilecek bir şey yok (bu oturumda başka bir uygulamadan proje içe aktarılmadı veya her şey dönüştürüldü)."
-"Opens .flp, .als, .flm, .dawproject, .band and .blx projects; exports .flp, .als and .dawproject." = ".flp, .als, .flm, .dawproject, .band ve .blx projelerini açar; .flp, .als ve .dawproject olarak dışa aktarır."
+"Opens .flp, .als, .flm, .dawproject, .band and .blx projects; exports .flp, .als, .flm and .dawproject." = ".flp, .als, .flm, .dawproject, .band ve .blx projelerini açar; .flp, .als, .flm ve .dawproject olarak dışa aktarır."
 "About LYNX SHARE" = "LYNX SHARE hakkında"
 "Built-in plugins (online list)..." = "Dahili plugin'ler (çevrimiçi liste)..."
 "Lightweight C++/JUCE DAW: FL Studio-style patterns and Ableton Live-style clips.\nIndependent implementation: no Image-Line or Ableton code was copied." = "Hafif bir C++/JUCE DAW: FL Studio tarzı pattern'ler ve Ableton Live tarzı klipler.\nBağımsız uygulama: Image-Line'a veya Ableton'a ait hiçbir kod kopyalanmadı."

@@ -84,7 +84,7 @@ countries: kr
 "Last project import report" = "마지막 프로젝트 가져오기 보고서"
 "Project import" = "프로젝트 가져오기"
 "Nothing to report (no project from another app imported in this session, or everything was converted)." = "보고할 내용이 없습니다(이번 세션에서 다른 앱의 프로젝트를 가져오지 않았거나 모두 변환되었습니다)."
-"Opens .flp, .als, .flm, .dawproject, .band and .blx projects; exports .flp, .als and .dawproject." = ".flp, .als, .flm, .dawproject, .band, .blx 프로젝트를 열고 .flp, .als, .dawproject로 내보냅니다."
+"Opens .flp, .als, .flm, .dawproject, .band and .blx projects; exports .flp, .als, .flm and .dawproject." = ".flp, .als, .flm, .dawproject, .band, .blx 프로젝트를 열고 .flp, .als, .flm, .dawproject로 내보냅니다."
 "About LYNX SHARE" = "LYNX SHARE 정보"
 "Built-in plugins (online list)..." = "내장 플러그인(온라인 목록)..."
 "Lightweight C++/JUCE DAW: FL Studio-style patterns and Ableton Live-style clips.\nIndependent implementation: no Image-Line or Ableton code was copied." = "가벼운 C++/JUCE DAW: FL Studio 스타일 패턴과 Ableton Live 스타일 클립.\n독립적인 구현: Image-Line이나 Ableton의 코드를 복사하지 않았습니다."

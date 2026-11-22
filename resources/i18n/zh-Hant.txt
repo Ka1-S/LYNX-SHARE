@@ -84,7 +84,7 @@ countries: tw hk mo
 "Last project import report" = "上次專案匯入報告"
 "Project import" = "專案匯入"
 "Nothing to report (no project from another app imported in this session, or everything was converted)." = "沒有可報告的內容（本次工作階段未匯入其他應用程式的專案，或所有內容均已轉換）。"
-"Opens .flp, .als, .flm, .dawproject, .band and .blx projects; exports .flp, .als and .dawproject." = "可開啟 .flp、.als、.flm、.dawproject、.band 和 .blx 專案；可匯出 .flp、.als 和 .dawproject。"
+"Opens .flp, .als, .flm, .dawproject, .band and .blx projects; exports .flp, .als, .flm and .dawproject." = "可開啟 .flp、.als、.flm、.dawproject、.band 和 .blx 專案；可匯出 .flp、.als、.flm 和 .dawproject。"
 "About LYNX SHARE" = "關於LYNX SHARE"
 "Built-in plugins (online list)..." = "內建外掛（線上清單）..."
 "Lightweight C++/JUCE DAW: FL Studio-style patterns and Ableton Live-style clips.\nIndependent implementation: no Image-Line or Ableton code was copied." = "輕量級C++/JUCE DAW：FL Studio風格的模式與Ableton Live風格的片段。\n獨立實作：未複製任何Image-Line或Ableton程式碼。"

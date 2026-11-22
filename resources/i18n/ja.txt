@@ -84,7 +84,7 @@ countries: jp
 "Last project import report" = "前回のプロジェクトインポートレポート"
 "Project import" = "プロジェクトのインポート"
 "Nothing to report (no project from another app imported in this session, or everything was converted)." = "報告事項はありません (このセッションで他のアプリのプロジェクトをインポートしていないか、すべて変換されました)。"
-"Opens .flp, .als, .flm, .dawproject, .band and .blx projects; exports .flp, .als and .dawproject." = ".flp、.als、.flm、.dawproject、.band、.blxプロジェクトを開き、.flp、.als、.dawprojectに書き出せます。"
+"Opens .flp, .als, .flm, .dawproject, .band and .blx projects; exports .flp, .als, .flm and .dawproject." = ".flp、.als、.flm、.dawproject、.band、.blxプロジェクトを開き、.flp、.als、.flm、.dawprojectに書き出せます。"
 "About LYNX SHARE" = "LYNX SHAREについて"
 "Built-in plugins (online list)..." = "内蔵プラグイン (オンライン一覧)..."
 "Lightweight C++/JUCE DAW: FL Studio-style patterns and Ableton Live-style clips.\nIndependent implementation: no Image-Line or Ableton code was copied." = "軽量なC++/JUCE製DAW: FL Studio風のパターンとAbleton Live風のクリップ。\n独立した実装です: Image-LineやAbletonのコードは一切コピーしていません。"

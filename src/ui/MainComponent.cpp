@@ -11668,7 +11668,7 @@ std::unique_ptr<juce::AlertWindow> MainComponent::makeAboutWindow()
                  tr ("Lightweight C++/JUCE DAW: FL Studio-style patterns and Ableton Live-style clips.\n"
                      "Independent implementation: no Image-Line or Ableton code was copied.")
                      // round 190mw (owner rule: the app lists every project format it opens and exports)
-                     + "\n" + tr ("Opens .flp, .als, .flm, .dawproject, .band and .blx projects; exports .flp, .als and .dawproject."),
+                     + "\n" + tr ("Opens .flp, .als, .flm, .dawproject, .band and .blx projects; exports .flp, .als, .flm and .dawproject."),
                  theme::font (theme::type::body), theme::colour::textPrimary);
             add (credits,
                  tr ("Logo by {0}", { "w3teal" }) // the community member who made it
