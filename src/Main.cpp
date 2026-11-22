@@ -9064,9 +9064,11 @@ private:
                     rollup031s7Result = juce::String ("ERROR the chords are not markers in the copy for ") + release;
                 else if (is130 && back->channels[(std::size_t) ogunIndex].engineRev != 1)
                     rollup031s7Result = "ERROR Ogun's revision in the copy for 0.1.30 (" + juce::String (back->channels[(std::size_t) ogunIndex].engineRev) + ")";
-                else if (back->playlistTracks.size() < 2 || ! back->playlistTracks[1].versions.empty()
-                         || std::none_of (back->playlist.begin(), back->playlist.end(), [] (const lynx::Clip& c) { return c.track == 1; }) == false)
-                    rollup031s7Result = juce::String ("ERROR track 2 is not its active (empty) version in the copy for ") + release;
+                else if ((back->playlistTracks.size() > 1 && ! back->playlistTracks[1].versions.empty()) // (an empty default row may not be written)
+                         || std::any_of (back->playlist.begin(), back->playlist.end(), [] (const lynx::Clip& c) { return c.track == 1; }))
+                    rollup031s7Result = juce::String ("ERROR track 2 is not its active (empty) version in the copy for ") + release + " (rows "
+                                        + juce::String ((int) back->playlistTracks.size()) + ", clips on it "
+                                        + juce::String ((int) std::count_if (back->playlist.begin(), back->playlist.end(), [] (const lynx::Clip& c) { return c.track == 1; })) + ")";
                 else if (back->automations.empty() || back->automations[0].points.size() != 2)
                     rollup031s7Result = juce::String ("ERROR the Sytrus clip's data in the copy for ") + release;
             }
