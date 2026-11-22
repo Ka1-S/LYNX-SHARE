@@ -2157,6 +2157,9 @@ void RackState::buildAutomationTables()
 
     pluginParams.clear();
     routeAutos.clear();
+    modFeeds.assign (song.modulators.size(), {}); // (round 190ox: before the binds, which note a Macro's automation)
+    followedTracks.clear();
+    modStateful = false;
     hasAutomation = false;
     tempoAutomation = -1;
     crossfaderAutomation = -1;
@@ -2249,6 +2252,12 @@ void RackState::buildAutomationTables()
 
             case AutomationTargetKind::tempo: tempoAutomation = a; break;
             case AutomationTargetKind::crossfader: crossfaderAutomation = a; break; // (round 190kc)
+            case AutomationTargetKind::modulatorMacro: // (round 190ox: a Macro modulator's knob, read by updateModulators)
+                if (t.index >= 0 && t.index < (int) modFeeds.size() && song.modulators[(std::size_t) t.index].kind == ModKind::macro)
+                    modFeeds[(std::size_t) t.index].macroSlot = a;
+                else
+                    used = false;
+                break;
             case AutomationTargetKind::vcaLevel:
                 if (t.index >= 0 && t.index < (int) song.vcas.size())
                     vcaLevelAuto[(std::size_t) t.index] = a;
@@ -2495,19 +2504,89 @@ void RackState::buildAutomationTables()
             }
             case AutomationTargetKind::tempo:
             case AutomationTargetKind::crossfader:
+            case AutomationTargetKind::modulatorMacro:
             case AutomationTargetKind::none: break;
         }
         return -1;
+    };
+    // round 190ox: a hosted plugin's parameter is bound in pluginParams (an effect slot's too)
+    const auto hostedSlot = [this] (const AutomationTarget& t) {
+        auto found = -1;
+        for (const auto& p : pluginParams)
+            if (t.kind == AutomationTargetKind::channelParam ? (p.channel == t.index && p.param == t.param)
+                                                             : (p.channel < 0 && p.track == t.index && p.slot == t.slot && p.param == t.param))
+                found = p.automation;
+        return found;
     };
     for (int m = 0; m < (int) song.modulators.size(); ++m)
         for (const auto& route : song.modulators[(std::size_t) m].routes)
         {
             if (slot >= maxAutomations || route.depth == 0.0f || ! Modulator::canModulate (song, route.target))
                 continue;
-            const auto source = boundSlot (route.target);
-            modRoutes.push_back ({ slot, source, std::clamp (song.modulationBase (route.target), 0.0f, 1.0f), m, route.depth });
+            const auto hosted = Modulator::isHostedTarget (song, route.target);
+            const auto source = hosted ? hostedSlot (route.target) : boundSlot (route.target);
+            if (hosted)
+            {
+                if (source < 0 && route.base < 0.0f)
+                    continue; // (no base known: the plugin keeps its own value)
+                // the modulated value is the one the plugin gets: the automation's own binding sends nothing any more
+                // (its slot still computes the base), so the two never take turns within a block
+                const auto& t = route.target;
+                pluginParams.erase (std::remove_if (pluginParams.begin(), pluginParams.end(),
+                                                    [&t] (const PluginParamBinding& p) {
+                                                        return t.kind == AutomationTargetKind::channelParam
+                                                                   ? (p.channel == t.index && p.param == t.param)
+                                                                   : (p.channel < 0 && p.track == t.index && p.slot == t.slot && p.param == t.param);
+                                                    }),
+                                    pluginParams.end());
+            }
+            const auto base = hosted ? std::clamp (route.base, 0.0f, 1.0f) : std::clamp (song.modulationBase (route.target), 0.0f, 1.0f);
+            modRoutes.push_back ({ slot, source, base, m, route.depth, hosted });
             bind (slot++, route.target);
         }
+    // round 190ox: what feeds each routed modulator (resolved here, so the audio thread only reads)
+    for (const auto& r : modRoutes)
+    {
+        const auto& mod = song.modulators[(std::size_t) r.modulator];
+        auto& feed = modFeeds[(std::size_t) r.modulator];
+        const auto hostChannel = mod.host.kind == AutomationTargetKind::channelVolume && mod.host.index >= 0 && mod.host.index < (int) song.channels.size()
+                                     ? mod.host.index : -1;
+        switch (mod.kind)
+        {
+            case ModKind::follower:
+            {
+                auto t = -1;
+                if (mod.input.kind == AutomationTargetKind::mixerVolume)
+                    t = mod.input.index;
+                else if (mod.host.kind == AutomationTargetKind::mixerVolume)
+                    t = mod.host.index;
+                else if (hostChannel >= 0)
+                    t = song.channels[(std::size_t) hostChannel].mixerTrack;
+                if (t >= 0 && t < (int) song.mixer.size() && t < maxMixerTracks)
+                {
+                    feed.track = t;
+                    if (followedTracks.size() < song.mixer.size())
+                        followedTracks.assign (song.mixer.size(), 0);
+                    followedTracks[(std::size_t) t] = 1;
+                }
+                modStateful = true;
+                break;
+            }
+            case ModKind::envelope:
+            case ModKind::keytrack:
+            case ModKind::velocity:
+            {
+                const auto c = mod.input.kind == AutomationTargetKind::channelVolume ? mod.input.index : hostChannel;
+                feed.channel = c >= 0 && c < (int) song.channels.size() ? c : -1;
+                modStateful = true;
+                break;
+            }
+            case ModKind::lfo:
+            case ModKind::steps:
+            case ModKind::random:
+            case ModKind::macro: break;
+        }
+    }
 
     // the tempo can move while playing: tempo automation or FL's pattern Tempo events (issue #86)
     tempoMap = tempoAutomation >= 0 || tempomap::hasTempoEvents (song);
@@ -3510,15 +3589,123 @@ void RackRenderer::updateModulators (const RackState& state, double tick, int nu
 {
     const auto& song = state.song;
     const auto beats = std::max (0.0, tick) / (double) ppq;
+    const auto seconds = sampleRate > 0.0 ? numSamples / sampleRate : 0.0;
+
+    // round 190ox: the stateful sources move once per chunk (control rate), each modulator once however many targets
+    // it drives; a source with jumps (steps, random, macro, the last note) is smoothed over ~5 ms so nothing clicks
+    if (state.modStateful)
+    {
+        int last = -1;
+        for (const auto& r : state.modRoutes)
+        {
+            if (r.modulator == last || r.modulator < 0 || r.modulator >= (int) song.modulators.size() || r.modulator >= maxStatefulModulators)
+                continue;
+            last = r.modulator;
+            const auto& m = song.modulators[(std::size_t) r.modulator];
+            const auto& feed = state.modFeeds[(std::size_t) r.modulator];
+            auto& st = modStates[(std::size_t) r.modulator];
+            switch (m.kind)
+            {
+                case ModKind::follower:
+                    modenv::follow (m, st, feed.track >= 0 ? followPeak[(std::size_t) feed.track] : 0.0f, seconds);
+                    break;
+                case ModKind::envelope:
+                {
+                    const auto c = feed.channel;
+                    const auto struck = c >= 0 && c < maxChannels ? notesStruck[(std::size_t) c] : st.notesSeen;
+                    auto gate = false;
+                    if (c >= 0 && c < maxChannels)
+                        for (const auto word : heldNotes[(std::size_t) c])
+                            gate = gate || word != 0;
+                    const auto trigger = st.primed && struck != st.notesSeen;
+                    st.notesSeen = struck;
+                    st.primed = true;
+                    modenv::envelope (m, st, gate || trigger, trigger, seconds);
+                    break;
+                }
+                case ModKind::keytrack:
+                case ModKind::velocity:
+                    if (feed.channel >= 0 && feed.channel < maxChannels && notesStruck[(std::size_t) feed.channel] != 0)
+                    {
+                        st.lastKey = (float) lastNoteKey[(std::size_t) feed.channel];
+                        st.lastVelocity = lastNoteVelocity[(std::size_t) feed.channel];
+                    }
+                    break;
+                case ModKind::lfo:
+                case ModKind::steps:
+                case ModKind::random:
+                case ModKind::macro: break;
+            }
+        }
+    }
+
+    int lastMod = -1;
+    float value = 0.0f;
     for (const auto& r : state.modRoutes)
     {
         if (r.modulator < 0 || r.modulator >= (int) song.modulators.size())
             continue;
         const auto& m = song.modulators[(std::size_t) r.modulator];
-        const auto cycles = m.sync ? beats / std::max (1.0e-3, m.beats) : modSeconds * std::max (0.0, m.hz);
+        if (r.modulator != lastMod) // (a modulator's routes are next to each other: its output once)
+        {
+            lastMod = r.modulator;
+            const auto cycles = m.sync ? beats / std::max (1.0e-3, m.beats) : modSeconds * std::max (0.0, m.hz);
+            if (m.kind == ModKind::lfo)
+                value = m.output (cycles); // (stage 1's modulators exactly as before)
+            else
+            {
+                auto* st = r.modulator < maxStatefulModulators ? &modStates[(std::size_t) r.modulator] : nullptr;
+                auto y = 0.0f;
+                auto smoothed = false;
+                switch (m.kind)
+                {
+                    case ModKind::steps:
+                    case ModKind::random: y = m.stepOutput (cycles); smoothed = m.kind == ModKind::random ? m.smooth <= 0.0f : m.glide <= 0.0f; break;
+                    case ModKind::macro:
+                    {
+                        const auto slot = (std::size_t) r.modulator < state.modFeeds.size() ? state.modFeeds[(std::size_t) r.modulator].macroSlot : -1;
+                        const auto automated = slot >= 0 ? automationValues[(std::size_t) slot] : std::numeric_limits<float>::quiet_NaN();
+                        const auto v = std::isnan (automated) ? m.macro : automated;
+                        y = m.unipolar ? v : v * 2.0f - 1.0f;
+                        smoothed = true;
+                        break;
+                    }
+                    case ModKind::follower:
+                    case ModKind::envelope:
+                    {
+                        const auto level = st != nullptr ? st->level : 0.0f; // 0..1
+                        y = m.unipolar ? level : level * 2.0f - 1.0f;
+                        break;
+                    }
+                    case ModKind::keytrack:
+                        y = st != nullptr ? std::clamp ((st->lastKey - 60.0f) / 60.0f, -1.0f, 1.0f) : 0.0f; // (C5 = 0, ±5 octaves)
+                        if (m.unipolar)
+                            y = (y + 1.0f) * 0.5f;
+                        smoothed = true;
+                        break;
+                    case ModKind::velocity:
+                    {
+                        const auto v = st != nullptr ? std::clamp (st->lastVelocity, 0.0f, 1.0f) : 0.0f;
+                        y = m.unipolar ? v : v * 2.0f - 1.0f;
+                        smoothed = true;
+                        break;
+                    }
+                    case ModKind::lfo: break;
+                }
+                if (smoothed && st != nullptr)
+                {
+                    constexpr double tauMs = 5.0;
+                    const auto a = (float) (1.0 - std::exp (-seconds * 1000.0 / tauMs));
+                    st->smoothed = std::isnan (st->smoothed) || ! st->primedSmooth ? y : st->smoothed + (y - st->smoothed) * a;
+                    st->primedSmooth = true;
+                    y = st->smoothed;
+                }
+                value = y;
+            }
+        }
         const auto source = r.source >= 0 ? automationValues[(std::size_t) r.source] : std::numeric_limits<float>::quiet_NaN();
         const auto base = std::isnan (source) ? r.base : source;
-        automationValues[(std::size_t) r.slot] = std::clamp (base + r.depth * m.output (cycles), 0.0f, 1.0f);
+        automationValues[(std::size_t) r.slot] = std::clamp (base + r.depth * value, 0.0f, 1.0f);
     }
     if (sampleRate > 0.0)
         modSeconds += numSamples / sampleRate;
@@ -4143,6 +4330,8 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
             {
                 held[(std::size_t) (e.key >> 6)] |= bit;
                 struckNotes[(std::size_t) i][(std::size_t) (e.key >> 6)] |= bit;
+                if (state.modStateful) // (round 190ox: an envelope / keytrack / velocity modulator's notes)
+                    noteStruck (i, e.key, e.velocity);
             }
             // FL's key region (round 164): the channel plays only the notes inside it (audio clips: the key is the clip)
             const auto inRegion = c.instrument == InstrumentKind::audioClip || c.inKeyRegion (list[index].key);
@@ -5157,6 +5346,8 @@ void RackRenderer::process (const RackState* state,
                 {
                     held[(std::size_t) (e.key >> 6)] |= bit;
                     struckNotes[(std::size_t) std::min (e.channel, maxChannels - 1)][(std::size_t) (e.key >> 6)] |= bit;
+                    if (state->modStateful) // (round 190ox)
+                        noteStruck (e.channel, e.key, e.velocity);
                 }
                 if ((std::size_t) e.channel >= def.size())
                 {
@@ -7686,6 +7877,10 @@ void RackRenderer::runSilencedTrack (const RackState& state, int t, int n, const
 
 void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank* meters) noexcept
 {
+    // round 190ox: an envelope follower's insert: its level after the fader (silence unless set below)
+    const auto followed = (std::size_t) t < state.followedTracks.size() && state.followedTracks[(std::size_t) t] != 0 && t < maxMixerTracks;
+    if (followed)
+        followPeak[(std::size_t) t] = 0.0f;
     if (foreignTrack (t)) // (render-ahead: the other renderer runs it, and its inputs; the boundary brings its output here)
     {
         importTrack (state, t, n);
@@ -7850,6 +8045,8 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
         last = applyMatrix (l, r, l, r, n, from, target);
     }
     tap (RecordSource::postTrack, l, r);
+    if (followed && ! trackZeros (t))
+        followPeak[(std::size_t) t] = std::max (peakOf (l, n), peakOf (r, n));
 
     trackActive[(std::size_t) t] = silentOut ? 2 : 1;
     // round 190gj: the single-pass stems' tap (what this insert sends on). Rollup 0.1.28: through trackInput, as 190gp's

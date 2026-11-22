@@ -29,6 +29,7 @@
 #if defined(__SSE__) || defined(_M_X64) || defined(__x86_64__) || defined(__aarch64__) || defined(_M_ARM64) // x86 SSE, or ARM64 through core/Simd.h (sse2neon)
 #include "core/FlControlMenus.h"
 #include "core/LinkFormula.h"
+#include "core/ModulatorExport.h"
 #include "core/Multilink.h"
 #include "core/Simd.h"
 #endif
@@ -17736,6 +17737,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Lfo177bTests.inc"
 #include "Curves190bwTests.inc"
 #include "Mod177bTests.inc"
+#include "Mod190oxTests.inc" // round 190ox: modulators stage 2
 #include "UiFont179aTests.inc"
 #include "Multilink177bTests.inc"
 #include "Issue97Tests.inc"

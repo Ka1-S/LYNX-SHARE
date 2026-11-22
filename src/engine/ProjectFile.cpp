@@ -1439,6 +1439,7 @@ const char* targetKindName (AutomationTargetKind k)
         case AutomationTargetKind::vcaLevel: return "vcaLevel";
         case AutomationTargetKind::channelAdjust: return "channelAdjust";
         case AutomationTargetKind::crossfader: return "crossfader";
+        case AutomationTargetKind::modulatorMacro: return "modulatorMacro"; // (round 190ox)
         case AutomationTargetKind::none: break;
     }
     return "none";
@@ -1449,7 +1450,8 @@ AutomationTargetKind targetKindFromName (const juce::String& name)
     for (auto k : { AutomationTargetKind::channelVolume, AutomationTargetKind::channelPan, AutomationTargetKind::channelParam,
                     AutomationTargetKind::mixerVolume, AutomationTargetKind::mixerPan, AutomationTargetKind::effectParam,
                     AutomationTargetKind::tempo, AutomationTargetKind::effectMix, AutomationTargetKind::mixerSend,
-                    AutomationTargetKind::vcaLevel, AutomationTargetKind::channelAdjust, AutomationTargetKind::crossfader })
+                    AutomationTargetKind::vcaLevel, AutomationTargetKind::channelAdjust, AutomationTargetKind::crossfader,
+                    AutomationTargetKind::modulatorMacro })
         if (name == targetKindName (k))
             return k;
 
@@ -3382,12 +3384,17 @@ juce::String toJson (const Song& song, bool stampVersion)
     if (! automations.isEmpty())
         root->setProperty ("automations", automations);
 
-    // round 177b: LYNX's modulators
+    // round 177b: LYNX's modulators. Round 190ox (stage 2): the LFOs stay in "modulators" as before; the other kinds go
+    // in "modulators190ox", which older releases do not read (they would play them as LFOs), each with "at", its place
+    // in the list (then the LFOs carry theirs too). A hosted plugin route adds its base as a sixth value.
     if (! song.modulators.empty())
     {
-        juce::Array<juce::var> mods;
-        for (const auto& m : song.modulators)
+        juce::Array<juce::var> mods, more;
+        const auto mixed = std::any_of (song.modulators.begin(), song.modulators.end(), [] (const Modulator& m) { return m.kind != ModKind::lfo; });
+        const auto targetArray = [] (const AutomationTarget& t) { return juce::Array<juce::var> { targetKindName (t.kind), t.index, t.slot, t.param }; };
+        for (int i = 0; i < (int) song.modulators.size(); ++i)
         {
+            const auto& m = song.modulators[(std::size_t) i];
             auto o = std::make_unique<juce::DynamicObject>();
             o->setProperty ("name", str (m.name));
             o->setProperty ("shape", (int) m.shape);
@@ -3399,11 +3406,43 @@ juce::String toJson (const Song& song, bool stampVersion)
             o->setProperty ("seed", (juce::int64) m.seed);
             juce::Array<juce::var> routes;
             for (const auto& r : m.routes)
-                routes.add (juce::Array<juce::var> { targetKindName (r.target.kind), r.target.index, r.target.slot, r.target.param, (double) r.depth });
+            {
+                juce::Array<juce::var> route { targetKindName (r.target.kind), r.target.index, r.target.slot, r.target.param, (double) r.depth };
+                if (r.base >= 0.0f)
+                    route.add ((double) r.base);
+                routes.add (route);
+            }
             o->setProperty ("routes", routes);
-            mods.add (juce::var (o.release()));
+            if (mixed)
+                o->setProperty ("at", i);
+            if (m.host.kind != AutomationTargetKind::none)
+                o->setProperty ("host", targetArray (m.host));
+            if (m.kind == ModKind::lfo)
+            {
+                mods.add (juce::var (o.release()));
+                continue;
+            }
+            o->setProperty ("kind", (int) m.kind);
+            if (m.input.kind != AutomationTargetKind::none)
+                o->setProperty ("input", targetArray (m.input));
+            o->setProperty ("attack", (double) m.attack);
+            o->setProperty ("decay", (double) m.decay);
+            o->setProperty ("sustain", (double) m.sustain);
+            o->setProperty ("release", (double) m.release);
+            o->setProperty ("gain", (double) m.gain);
+            juce::Array<juce::var> steps;
+            for (const auto v : m.steps)
+                steps.add ((double) v);
+            o->setProperty ("steps", steps);
+            o->setProperty ("glide", (double) m.glide);
+            o->setProperty ("smooth", (double) m.smooth);
+            o->setProperty ("macro", (double) m.macro);
+            more.add (juce::var (o.release()));
         }
-        root->setProperty ("modulators", mods);
+        if (! mods.isEmpty())
+            root->setProperty ("modulators", mods);
+        if (! more.isEmpty())
+            root->setProperty ("modulators190ox", more);
     }
     if (song.soundfontModBaseReal) // round 190he: Soundfont knobs' modulation centres on the knob (absent = before 190he)
     {
@@ -4680,25 +4719,69 @@ std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error,
             }
 
     song.soundfontModBaseReal = root.hasProperty ("sfModBase190he"); // (round 190he; a project from before: 0.5, as then)
-    if (auto* mods = root["modulators"].getArray()) // round 177b: LYNX's modulators
-        for (const auto& v : *mods)
-        {
-            Modulator m;
-            m.name = v["name"].toString().toStdString();
-            m.shape = (ModShape) juce::jlimit (0, (int) ModShape::smoothRandom, (int) v.getProperty ("shape", 0));
-            m.sync = (bool) v.getProperty ("sync", true);
-            m.beats = juce::jlimit (1.0 / 64.0, 1024.0, (double) v.getProperty ("beats", 4.0));
-            m.hz = juce::jlimit (0.001, 100.0, (double) v.getProperty ("hz", 1.0));
-            m.phase = juce::jlimit (0.0f, 1.0f, (float) (double) v.getProperty ("phase", 0.0));
-            m.unipolar = (bool) v.getProperty ("unipolar", false);
-            m.seed = (std::uint32_t) (juce::int64) v.getProperty ("seed", 1);
-            if (auto* routes = v["routes"].getArray())
-                for (const auto& r : *routes)
-                    if (r.isArray() && r.size() >= 5)
-                        m.routes.push_back ({ { targetKindFromName (r[0].toString()), (int) r[1], (int) r[2], (int) r[3] },
-                                              juce::jlimit (-1.0f, 1.0f, (float) (double) r[4]) });
-            song.modulators.push_back (std::move (m));
-        }
+    {
+        // round 177b: LYNX's modulators; round 190ox: the other kinds from "modulators190ox", each at its place ("at")
+        std::vector<std::pair<int, Modulator>> read;
+        const auto targetOf = [] (const juce::var& t) {
+            AutomationTarget out;
+            if (t.isArray() && t.size() >= 4)
+                out = { targetKindFromName (t[0].toString()), (int) t[1], (int) t[2], (int) t[3] };
+            return out;
+        };
+        const auto readList = [&] (const juce::var& list, bool stage2) {
+            if (auto* mods = list.getArray())
+                for (const auto& v : *mods)
+                {
+                    Modulator m;
+                    m.name = v["name"].toString().toStdString();
+                    m.shape = (ModShape) juce::jlimit (0, (int) ModShape::smoothRandom, (int) v.getProperty ("shape", 0));
+                    m.sync = (bool) v.getProperty ("sync", true);
+                    m.beats = juce::jlimit (1.0 / 64.0, 1024.0, (double) v.getProperty ("beats", 4.0));
+                    m.hz = juce::jlimit (0.001, 100.0, (double) v.getProperty ("hz", 1.0));
+                    m.phase = juce::jlimit (0.0f, 1.0f, (float) (double) v.getProperty ("phase", 0.0));
+                    m.unipolar = (bool) v.getProperty ("unipolar", false);
+                    m.seed = (std::uint32_t) (juce::int64) v.getProperty ("seed", 1);
+                    if (auto* routes = v["routes"].getArray())
+                        for (const auto& r : *routes)
+                            if (r.isArray() && r.size() >= 5)
+                            {
+                                ModRoute route { { targetKindFromName (r[0].toString()), (int) r[1], (int) r[2], (int) r[3] },
+                                                 juce::jlimit (-1.0f, 1.0f, (float) (double) r[4]) };
+                                if (r.size() >= 6)
+                                    route.base = juce::jlimit (0.0f, 1.0f, (float) (double) r[5]);
+                                m.routes.push_back (route);
+                            }
+                    m.host = targetOf (v["host"]);
+                    if (stage2)
+                    {
+                        const auto kind = (int) v.getProperty ("kind", 0);
+                        if (kind <= 0 || kind >= modKindCount)
+                            continue; // (a kind from a newer release: left out)
+                        m.kind = (ModKind) kind;
+                        m.input = targetOf (v["input"]);
+                        m.attack = juce::jlimit (0.0f, 10000.0f, (float) (double) v.getProperty ("attack", 10.0));
+                        m.decay = juce::jlimit (0.0f, 20000.0f, (float) (double) v.getProperty ("decay", 300.0));
+                        m.sustain = juce::jlimit (0.0f, 1.0f, (float) (double) v.getProperty ("sustain", 0.6));
+                        m.release = juce::jlimit (0.0f, 20000.0f, (float) (double) v.getProperty ("release", 250.0));
+                        m.gain = juce::jlimit (-48.0f, 48.0f, (float) (double) v.getProperty ("gain", 0.0));
+                        if (auto* steps = v["steps"].getArray())
+                            for (const auto& x : *steps)
+                                if (m.steps.size() < 32)
+                                    m.steps.push_back (juce::jlimit (-1.0f, 1.0f, (float) (double) x));
+                        m.glide = juce::jlimit (0.0f, 1.0f, (float) (double) v.getProperty ("glide", 0.0));
+                        m.smooth = juce::jlimit (0.0f, 1.0f, (float) (double) v.getProperty ("smooth", 0.0));
+                        m.macro = juce::jlimit (0.0f, 1.0f, (float) (double) v.getProperty ("macro", 0.0));
+                    }
+                    const auto at = v.hasProperty ("at") ? (int) v["at"] : (int) read.size();
+                    read.emplace_back (at, std::move (m));
+                }
+        };
+        readList (root["modulators"], false);
+        readList (root["modulators190ox"], true);
+        std::stable_sort (read.begin(), read.end(), [] (const auto& a, const auto& b) { return a.first < b.first; });
+        for (auto& r : read)
+            song.modulators.push_back (std::move (r.second));
+    }
 
     if (auto* lanes = root["playlistTrackLanes"].getArray()) // round 177b (after the automations: indices checked)
         for (const auto& t : *lanes)

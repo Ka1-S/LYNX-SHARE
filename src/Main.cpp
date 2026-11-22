@@ -136,6 +136,8 @@
  #include <unistd.h>
 #endif
 #include "engine/HostingTests.h"
+#include "engine/Modulators190oxTest.h"
+#include "ui/ModRing.h"
 #include "core/EdisonFx.h"
 #include "engine/ProjectFile.h"
 #include "ui/RemoteControl.h"
@@ -3909,6 +3911,15 @@ public:
             return;
         }
 
+        if (args.contains ("--modshot190ox"))
+        {
+            // LYNX.exe --modshot190ox prefix [--shot-scale 1.5 --shot-suffix @150] (round 190ox, modulators stage 2): the
+            // Modulators window, rings on knobs, the Modulate with menu; checks in prefix-checks.txt
+            runModShot190ox (args[args.indexOf ("--modshot190ox") + 1].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--gapshot190og"))
         {
             // LYNX.exe --gapshot190og prefix [--shot-scale 1.5 --shot-suffix @150] (round gap190og, coverage rows still open on
@@ -6267,6 +6278,7 @@ private:
         }();
 
         const auto hostedStateContentionResult = lynx::pluginStateContentionSelfTest();
+        const auto modulators190oxResult = lynx::modulators190oxSelfTest(); // round 190ox: modulators stage 2
         const auto generatorSmartResult = lynx::generatorSmartDisableSelfTest(); // (round 190ok, D2)
 
         // recording from the PC keyboard: a one-beat note lands in the pattern, in a single undo step
@@ -9563,7 +9575,7 @@ private:
                         && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && autolinks190ovResult == "OK"
                         && renderAgainResult.startsWith ("OK")
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
-                        && hostedStateContentionResult.startsWith ("OK")
+                        && hostedStateContentionResult.startsWith ("OK") && modulators190oxResult == "OK"
                         && generatorSmartResult.startsWith ("OK")
                         && danceWindowResult == "OK" && clickActivationResult == "OK" && motionOverlayResult.startsWith ("OK")
                         && editorHolesResult.startsWith ("OK");
@@ -9598,6 +9610,7 @@ private:
                << "remote_history=" << remoteHistoryResult << "\n"
                << "hosted_state_lock=" << hostedStateLockResult << "\n"
                << "hosted_state_contention=" << hostedStateContentionResult << "\n"
+               << "modulators190ox=" << modulators190oxResult << "\n"
                << "generator_smart_disable=" << generatorSmartResult << "\n"
                << "fonts=" << fontsResult << "\n"
                << "paint_caches=" << paintCachesResult << "\n"
@@ -21524,6 +21537,124 @@ private:
             auto additions = lynx::makeExportPanelWithAdditions (offline);
             shoot (*additions, "export");
         }
+    }
+
+    // Round 190ox (modulators stage 2): the Modulators window with one modulator of each kind (the LFO in Assign mode),
+    // a native effect editor and the LYNX Synth page with modulation rings, the parameter menu's "Modulate with"
+    // submenu; checks in prefix-checks.txt. --shot-scale 1.5 --shot-suffix @150 for the 150 % pictures.
+    void runModShot190ox (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        const juce::ScopedValueSetter<bool> shown (lynx::ui::showingForShots(), true);
+        juce::String checks;
+        int failures = 0;
+        const auto flush = [&] { juce::File (lynx::shot::file (juce::File (prefix + "-checks.txt"))).replaceWithText (checks + (failures == 0 ? "ALL OK\n" : juce::String (failures) + " FAILED\n")); };
+        const auto check = [&] (const juce::String& what, bool ok) {
+            checks << (ok ? "ok   " : "FAIL ") << what << "\n";
+            failures += ok ? 0 : 1;
+            flush();
+        };
+        lynx::AudioEngine offline (false);
+        lynx::modring::setEngine (&offline);
+        const auto settle = [&] {
+            for (int k = 0; k < 3; ++k)
+                offline.dispatchPendingMessages();
+        };
+        const auto write = [&prefix, &settle] (juce::Component& c, const juce::String& name) {
+            settle();
+            savePng (lynx::shot::snapshot (c), prefix + "-" + name + ".png");
+        };
+        using namespace lynx;
+        offline.editSong ([] (Song& s) {
+            if (s.channels.size() < 2)
+                s.channels.resize (2);
+            s.channels[0].name = "Kick";
+            s.channels[0].instrument = InstrumentKind::sampler;
+            s.channels[0].mixerTrack = 1;
+            s.channels[1].name = "Keys";
+            s.channels[1].instrument = InstrumentKind::synth;
+            s.channels[1].mixerTrack = 2;
+            if (s.mixer.size() < 4)
+                s.mixer.resize (4);
+            s.mixer[1].name = "Kick";
+            s.mixer[2].name = "Keys";
+            s.mixer[2].effects.clear();
+            s.mixer[2].effects.push_back (makeEffectSlot (EffectKind::filter));
+            s.mixer[2].effects.push_back (makeEffectSlot (EffectKind::delay));
+            const AutomationTarget cutoff { AutomationTargetKind::effectParam, 2, 0, 1 }, res { AutomationTargetKind::effectParam, 2, 0, 2 }; // (the Filter's Cutoff, Reso.)
+            const AutomationTarget synthCutoff { AutomationTargetKind::channelParam, 1, 0, synthparam::target (synthparam::cutoff) };
+            const AutomationTarget synthRes { AutomationTargetKind::channelParam, 1, 0, synthparam::target (synthparam::resonance) };
+            s.modulators.clear();
+            auto add = [&s] (ModKind kind, const char* name, AutomationTarget host, std::vector<ModRoute> routes) {
+                auto m = Modulator::make (kind);
+                m.name = name;
+                m.host = host;
+                m.routes = std::move (routes);
+                s.modulators.push_back (m);
+                return (int) s.modulators.size() - 1;
+            };
+            const AutomationTarget onKick { AutomationTargetKind::mixerVolume, 1, 0, 0 }, onKeys { AutomationTargetKind::channelVolume, 1, 0, 0 };
+            add (ModKind::lfo, "LFO 1", { AutomationTargetKind::mixerVolume, 2, 0, 0 }, { { cutoff, 0.3f }, { synthCutoff, 0.2f } });
+            s.modulators.back().shape = ModShape::triangle;
+            add (ModKind::follower, "Follower 1", onKick, { { cutoff, -0.4f } });
+            s.modulators.back().input = { AutomationTargetKind::mixerVolume, 1, 0, 0 };
+            add (ModKind::envelope, "Envelope 1", onKeys, { { synthRes, 0.35f } });
+            add (ModKind::steps, "Steps 1", { AutomationTargetKind::mixerVolume, 2, 0, 0 }, { { res, 0.25f } });
+            add (ModKind::random, "Random 1", onKeys, { { synthCutoff, -0.15f } });
+            s.modulators.back().smooth = 0.5f;
+            add (ModKind::macro, "Macro 1", onKeys, { { synthRes, 0.2f }, { { AutomationTargetKind::effectParam, 2, 1, 0 }, 0.3f } });
+            s.modulators.back().macro = 0.4f;
+            add (ModKind::keytrack, "Keytrack 1", onKeys, { { synthCutoff, 0.1f } });
+            add (ModKind::velocity, "Velocity 1", onKeys, {});
+        }, false);
+        settle();
+        modring::setArmed (0);
+
+        // the Modulators window's panel, tall enough for every row
+        {
+            auto panel = makeModulatorsPanel (offline);
+            panel->setSize (900, 1500);
+            settle();
+            write (*panel, "modulators");
+        }
+        modring::setArmed (0); // (the panel ends Assign mode when it goes)
+        // a native editor's knobs with their rings (the filter's cutoff: LFO 1 armed, Follower 1)
+        {
+            modring::Ring ring;
+            check ("ring on the filter's cutoff: 2 routes, the armed one first",
+                   modring::ringFor ({ AutomationTargetKind::effectParam, 2, 0, 1 }, ring) && ring.count == 2 && ring.armedRoute == 0);
+            if (auto editor = makeNativeEffectEditor (offline, 2, 0))
+                write (*editor, "filter-rings");
+            if (auto editor = makeNativeEffectEditor (offline, 2, 1))
+                write (*editor, "delay-rings");
+            modring::setArmed (-1);
+            if (auto editor = makeNativeEffectEditor (offline, 2, 0))
+                write (*editor, "filter-rings-unarmed");
+        }
+        // the LYNX Synth page: its tagged knobs show rings
+        {
+            auto page = makeChannelSettingsPanel (offline, 1);
+            page->setSize (juce::jmax (page->getWidth(), 760), juce::jmax (page->getHeight(), 520));
+            write (*page, "synth-rings");
+        }
+        // the parameter menu: the Modulate with submenu of a knob (the routed ones ticked, a new one of each kind)
+        {
+            juce::PopupMenu menu;
+            addAutomationItem (menu, offline, { AutomationTargetKind::effectParam, 2, 0, 1 }, true);
+            juce::PopupMenu modulate;
+            juce::StringArray rows;
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                if (it.getItem().subMenu != nullptr && it.getItem().text == tr ("Modulate with"))
+                    modulate = *it.getItem().subMenu;
+            for (juce::PopupMenu::MenuItemIterator it (modulate); it.next();)
+                rows.add (it.getItem().text);
+            check ("Modulate with: the routed ones and a new one of each kind (" + rows.joinIntoString (" | ") + ")",
+                   rows.size() >= 8 + 8 + 1 && rows.contains (tr ("New {0}", { tr ("Envelope follower") })));
+            saveMenus (juce::StringArray { "Parameter menu", "Modulate with" }, std::vector<juce::PopupMenu> { menu, modulate },
+                       prefix + "-menu.png");
+        }
+        modring::setEngine (nullptr);
+        flush();
     }
 
     void runGapShot190og (const juce::String& prefix)
@@ -37803,7 +37934,7 @@ private:
                     song.modulators.push_back (r);
                 }, false);
                 auto mods = lynx::makeModulatorsPanel (offline);
-                mods->setSize (720, 360);
+                mods->setSize (900, 420); // (round 190ox: the stage 2 rows are wider)
                 saveWindow (std::move (mods), "-modulators.png");
                 offline.editSong ([] (lynx::Song& song) { song.modulators.clear(); }, false);
             }

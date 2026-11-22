@@ -5,6 +5,7 @@
 #include "core/PlaylistOps.h"
 #include "core/FlpExport.h"
 #include "core/RackAutomation.h" // round 190ow (PAT-7: FL's channel order)
+#include "core/ModulatorExport.h"
 #include "core/TrackClips.h"
 #include "core/TrackStates.h"
 #include "core/Fpc.h"
@@ -2063,11 +2064,17 @@ flp::Project toProject (const Song& input, const Options& options, Report& repor
     // automation lanes (round 177b): FL has none; each becomes an automation clip on a free track
     if (const auto n = autolanes::lanesToClips (song); n > 0)
         report.notes.push_back ("Automation lanes: " + std::to_string (n) + " lane(s) written as automation clips (FL has no lanes)");
-    // modulators (round 177b): FL has none; the modulated controls keep their own values
-    for (const auto& m : song.modulators)
-        if (! m.routes.empty())
-            report.dropped.push_back ("Modulator '" + m.name + "' (" + std::to_string (m.routes.size())
-                                      + " target(s)): FL has no modulators; the targets keep their own values");
+    // modulators (round 177b): FL has none. Round 190ox: what follows the song position alone becomes automation clips
+    // (FL's clip LFO for an LFO, points for steps and random, a flat clip for a macro); the rest is listed
+    {
+        auto baked = modexport::bakeForFl (song);
+        if (baked.clips > 0)
+            report.notes.push_back ("Modulators: " + std::to_string (baked.clips) + " route(s) written as automation clips (FL has no modulators)");
+        for (auto& n : baked.notes)
+            report.notes.push_back (std::move (n));
+        for (auto& l : baked.lost)
+            report.dropped.push_back (std::move (l));
+    }
     // track clips (round 190ne, core/TrackClips.h): FL has no such flag, so each is an ordinary pattern on FL's
     // instrument track; identical ones are merged first (the owner's choice: silently), and more patterns than FL's
     // 999 are reported
