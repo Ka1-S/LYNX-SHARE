@@ -1,5 +1,6 @@
 #include "core/Sections.h"
 #include "core/AlsExport.h"
+#include "core/TrackVersions.h"
 #include "core/ClipEnvelope.h"
 
 #include <algorithm>
@@ -2479,7 +2480,7 @@ struct Exporter
 };
 } // namespace
 
-AlsExportResult exportAls (const Song& song, const AlsExportOptions& options)
+AlsExportResult exportAls (const Song& input, const AlsExportOptions& options)
 {
     AlsExportResult result;
     const auto& sk = skeletons (options.version);
@@ -2488,6 +2489,15 @@ AlsExportResult exportAls (const Song& song, const AlsExportOptions& options)
         result.notes.push_back ("internal error: the set skeletons could not be read");
         return result;
     }
+    // track versions (round 190pe, a LYNX extra): Live has none; each track goes over as the version it plays
+    std::optional<Song> stripped;
+    if (trackversions::any (input))
+    {
+        stripped = input;
+        const auto n = trackversions::keepActiveOnly (*stripped);
+        result.notes.push_back ("Track versions: " + std::to_string (n) + " version(s) that are not active left out (each track is written as the version it plays)");
+    }
+    const auto& song = stripped ? *stripped : input;
     Exporter e { song, options, sk, result, false, {} };
     e.run();
     return result;

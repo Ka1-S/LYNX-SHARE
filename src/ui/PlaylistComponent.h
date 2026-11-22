@@ -983,6 +983,14 @@ private:
     void paintTrackStateMarks (juce::Graphics& g, juce::Rectangle<int> headers, int rows); // round 190op (P4)
     bool anyHiddenTracks = false; // round 190op (P4): the song holds hidden tracks (updateProjection)
     void addDeactivateTrackItem (juce::PopupMenu& menu, int track); // round 190op (P4)
+public:
+    // round 190pe (P20, LYNX extra; core/TrackVersions.h): the track's versions, as the track menu's submenu and the
+    // header's version chip (a click opens the same menu). Nothing is drawn or looked up while no track has versions.
+    juce::PopupMenu buildTrackVersionMenu (int track);
+    juce::Rectangle<int> trackVersionChip (int track) const;
+private:
+    void paintVersionChips (juce::Graphics& g, juce::Rectangle<int> headers, int rows);
+    void renameTrackVersion (int track, int version);
     // round 190dx: FL's new instrument tracks (core trackmodes::addInstrumentTrack; on an instrument track the
     // generator is replaced, FL's EEPLTrackMorePlugMenuClick)
     juce::PopupMenu buildAddTrackMenu();

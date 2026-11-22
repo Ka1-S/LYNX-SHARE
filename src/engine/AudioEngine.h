@@ -1105,6 +1105,19 @@ public:
     bool importFlpFile (const juce::File& file, juce::String& error, const std::map<std::string, std::string>& relocations = {},
                         bool asEdit = false);
 
+    // Round 190pe (P11, File › Import › Tracks from another project): another project read into a Song of its own, by the
+    // importer of its format (.lynx, .flp, .als, .flm, .band, .blx, DAWproject, modules), its plugins found or
+    // substituted as an import does. The open song is not touched. `decoded` keeps the decoded samples until the edit
+    // that brings the tracks in has built the rack. Message thread.
+    struct OtherProject
+    {
+        Song song;
+        FlpImportReport report;
+        juce::StringArray missingPlugins;
+        std::vector<std::shared_ptr<const SampleData>> decoded;
+    };
+    bool readOtherProject (const juce::File& file, OtherProject& out, juce::String& error);
+
     // The same import in steps, so a window can show progress while it runs (round 112): `prepareFlpImport` reads,
     // parses and imports the project and decodes its samples in parallel — no plugin is touched, so it may run on any
     // thread; `preloadPlugins` creates the project's hosted plugins one at a time (message thread; call it until it

@@ -4,6 +4,7 @@
 #include "core/NoteRepeat.h"
 #include "core/PlaylistOps.h"
 #include "core/FlpExport.h"
+#include "core/TrackVersions.h"
 #include "core/RackAutomation.h" // round 190ow (PAT-7: FL's channel order)
 #include "core/ModulatorExport.h"
 #include "core/TrackClips.h"
@@ -2051,6 +2052,9 @@ flp::Project toProject (const Song& input, const Options& options, Report& repor
 {
     // FL 2026 has no Pattern Blocks: they become pattern clips (each pattern on a track of its own, locked to content)
     Song song = input;
+    // track versions (round 190pe, a LYNX extra): FL has none; each track goes over as the version it plays
+    if (const auto n = trackversions::keepActiveOnly (song); n > 0)
+        report.notes.push_back ("Track versions: " + std::to_string (n) + " version(s) that are not active left out (each track is written as the version it plays)");
     if (patternblocks::active (song))
     {
         const auto n = patternblocks::toClipsInEveryArrangement (song);

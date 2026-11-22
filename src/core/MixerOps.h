@@ -4,6 +4,7 @@
 // sidechain gestures, linking channels, effect slot reordering). Pure functions over the Song model:
 // no JUCE, unit-tested in tests/WorkflowP2Tests.inc.
 
+#include <functional>
 #include <set>
 #include <string>
 #include <vector>
@@ -12,6 +13,11 @@
 
 namespace lynx::mixerops
 {
+// Every reference to an insert in `song` (channels, Playlist tracks, sends, side-chains, slot sends, automation, links,
+// mix snapshots) through `map` (old insert -> new number; -1 = gone: sends removed, channels to the Master, automation
+// without a target). The mixer itself is not reordered (round 190pe, core/TrackImport.h).
+void remapInsertReferences (Song& song, const std::function<int (int)>& map);
+
 // Swaps inserts a and b (both >= 1): everything that refers to them by number follows (channel routing,
 // sends, sidechain inputs, automation and MIDI targets, controller sources).
 void swapTracks (Song& song, int a, int b);

@@ -9,6 +9,9 @@
 #include "core/GrooveAudio.h"
 #include "core/SmartDisableTip.h" // (round 190ok: --smarttipshot190ok)
 #include "core/SimpleTracks.h" // (round 190ot: --simpleduck190otshot)
+#include "core/TrackImport.h"   // (round 190pe: --tracks190peshot, --selftest tracks190pe)
+#include "core/TrackVersions.h"
+#include "ui/TrackImportDialog.h"
 #include "core/EditorScale.h"
 #include "core/SimplePads.h"
 #include "core/SimSynth.h" // (round 190om: the selftest's SimSynth channel)
@@ -3500,6 +3503,13 @@ public:
             return;
         }
         // --trackstates190opshot <prefix> (round 190op, 0.1.31: Hide / Deactivate tracks, Capture automation): src/TrackStatesShot190op.inc
+        // --tracks190peshot <prefix> (round 190pe, 0.1.32: Track versions, Import tracks from another project): src/Tracks190peShot.inc
+        if (args.contains ("--tracks190peshot"))
+        {
+            setApplicationReturnValue (runTracks190peShot (args[args.indexOf ("--tracks190peshot") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
         if (args.contains ("--trackstates190opshot"))
         {
             setApplicationReturnValue (runTrackStatesShot190op (args[args.indexOf ("--trackstates190opshot") + 1].unquoted()) ? 0 : 1);
@@ -8823,6 +8833,89 @@ private:
         // round 190ot (research190oe P5): the Simple layout's "Duck under..." and shared Echo send in .lynx (the duck's goal,
         // Amount, side input and level-0 route; the Echo send) and in the copies for 0.1.30 / 0.1.28: the same slot, side input,
         // route and sends (an ordinary Fruity Limiter there), one view line, none for a project without a duck
+        // round 190pe (research190oe P20 / P11): a track's versions in .lynx (every version, the active one), a switch as one
+        // undo step that restores the song bit for bit, the copies for 0.1.30 / 0.1.28 (only the active version, one line;
+        // none without versions), and tracks of another project imported as one undo step
+        juce::String tracks190peResult = "OK";
+        {
+            namespace tv = lynx::trackversions;
+            auto song = lynx::Song::makeDefault();
+            song.playlist.clear();
+            lynx::ChannelDef vox;
+            vox.name = "Vox";
+            vox.instrument = lynx::InstrumentKind::audioClip;
+            vox.samplePath = "vox.wav";
+            const auto ins = song.nextFreeInsert(); // (an insert of its own: the version's chain)
+            vox.mixerTrack = ins;
+            song.channels.push_back (vox);
+            song.mixer[(std::size_t) ins].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::eq));
+            lynx::Clip c;
+            c.kind = lynx::ClipKind::audio;
+            c.channel = (int) song.channels.size() - 1;
+            c.track = 1;
+            c.length = 4 * lynx::ppq;
+            song.playlist.push_back (c);
+            song.playlistTracks.resize (2);
+            song.playlistTracks[1].name = "Vox";
+            const auto plain = lynx::ProjectFile::toJson (song);
+            tv::add (song, 1, tv::Start::duplicate, "B", "A");
+            for (auto& k : song.playlist)
+                if (k.track == 1)
+                    k.length = lynx::ppq;
+            song.mixer[(std::size_t) ins].effects[0].enabled = false;
+            juce::String why;
+            const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), why);
+            if (plain.contains ("playlistTrackVersions"))
+                tracks190peResult = "ERROR a project without versions writes the key";
+            else if (! back || back->playlistTracks.size() < 2 || back->playlistTracks[1].versions != song.playlistTracks[1].versions
+                     || back->playlistTracks[1].activeVersion != 1 || back->playlist != song.playlist)
+                tracks190peResult = "ERROR .lynx round trip " + why;
+            if (tracks190peResult == "OK")
+            {
+                lynx::AudioEngine e (false);
+                e.setSong (song);
+                // (editSongStructural first adds the working time so far to the song: the undo step holds that)
+                const auto json = [] (lynx::Song s) {
+                    s.info.workSeconds = 0.0;
+                    return lynx::ProjectFile::toJson (s);
+                };
+                const auto before = json (e.getSong());
+                e.editSongStructural ([] (lynx::Song& s) { tv::switchTo (s, 1, 0); });
+                const auto switched = tv::active (e.getSong(), 1) == 0 && e.getSong().mixer[(std::size_t) ins].effects[0].enabled;
+                e.undo();
+                if (! switched || json (e.getSong()) != before)
+                    tracks190peResult = juce::String ("ERROR undo of a version switch (switched ") + (switched ? "yes" : "no") + ")";
+                // tracks of another project: one undo step
+                if (tracks190peResult == "OK")
+                {
+                    auto other = song;
+                    lynx::trackimport::Result r;
+                    e.editSongStructural ([&r, &other] (lynx::Song& s) { r = lynx::trackimport::importTracks (s, other, { 1 }, {}); });
+                    const auto came = r.ok && r.tracks.size() == 1 && r.inserts.size() == 1 && tv::count (e.getSong(), r.tracks[0]) == 2;
+                    e.undo();
+                    if (! came || json (e.getSong()) != before)
+                        tracks190peResult = juce::String ("ERROR import of a track and its undo (came ") + (came ? "yes" : "no") + ")";
+                }
+            }
+            for (const auto* release : { "0.1.30", "0.1.28" })
+            {
+                if (tracks190peResult != "OK")
+                    break;
+                const auto copy = lynx::olderlynx::forRelease (song, release);
+                const auto lines = std::count_if (copy.lost.begin(), copy.lost.end(), [] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).contains ("track version"); });
+                const auto opened = lynx::ProjectFile::fromJson (copy.json, why);
+                if (! copy.ok || lines != 1 || copy.json.contains ("playlistTrackVersions") || ! opened || opened->playlist != song.playlist
+                    || opened->mixer[(std::size_t) ins].effects[0].enabled)
+                    tracks190peResult = juce::String ("ERROR the copy for ") + release + " (" + juce::String ((int) lines) + " lines) " + why;
+            }
+            if (tracks190peResult == "OK")
+            {
+                const auto copy = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.30");
+                if (std::any_of (copy.lost.begin(), copy.lost.end(), [] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).contains ("track version"); }))
+                    tracks190peResult = "ERROR a version line without versions";
+            }
+        }
+
         juce::String simpleDuck190otResult = "OK";
         {
             namespace st = lynx::simpletracks;
@@ -9746,7 +9839,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && tracker190omResult == "OK" && rackauto190owResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && autolinks190ovResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && renderAgainResult.startsWith ("OK")
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
@@ -9848,6 +9941,7 @@ private:
                << "rollup031s5_copy_for_0130=" << rollup031s5Result << "\n"
                << "rollup031s6_copy_for_0130=" << rollup031s6Result << "\n"
                << "simpleduck190ot=" << simpleDuck190otResult << "\n"
+               << "tracks190pe=" << tracks190peResult << "\n"
                << "autolinks190ov=" << autolinks190ovResult << "\n"
                << "sections190ol=" << sections190olResult << "\n"
                << "renderagain190ou=" << renderAgainResult << "\n"
@@ -19653,6 +19747,7 @@ private:
 #include "IssuesShot190ng.inc" // round 190ng (issues #215, #217, #219, #220, #222)
 #include "TrackClipsShot190ne.inc" // round 190ne
 #include "TrackStatesShot190op.inc" // round 190op
+#include "Tracks190peShot.inc" // round 190pe
 #include "TrackerShot190nw.inc" // round 190nw
 #include "IssuesShot190nq.inc" // round 190nq (issues #193, #225-#230)
 #include "Research190onShot.inc" // round 190on (research190oe P2, P8, P10)

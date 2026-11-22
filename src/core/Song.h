@@ -2509,6 +2509,21 @@ struct AutomationLane
     bool operator== (const AutomationLane&) const = default;
 };
 
+// LYNX extra, round 190pe (P20 of research190oe; core/TrackVersions.h): a named alternate version of a whole Playlist
+// track, as Cubase's Track Versions and Pro Tools' playlists. The active version's content is the track itself (its
+// clips in the arrangement it was made in, its automation lanes, its own insert's effects); every other version keeps
+// its own content here and plays nothing. Song::forEachClipList visits the stored clips, so a pattern, channel,
+// automation or track that is renumbered is renumbered here too.
+struct TrackVersion
+{
+    std::string name;
+    std::vector<Clip> clips {};           // not active: the track's clips (Clip::track = the track)
+    std::vector<AutomationLane> lanes {}; // not active: its automation lanes (their automations stay in Song::automations)
+    bool hasChain = false;                // not active: `chain` is the effects of the track's own insert in this version
+    std::vector<EffectSlot> chain {};
+    bool operator== (const TrackVersion&) const = default;
+};
+
 // Header of a Playlist track.
 struct PlaylistTrack
 {
@@ -2563,6 +2578,12 @@ struct PlaylistTrack
     // LYNX extra, round 190op (P4): "Hide track". The row (and in the Clip-launch layout its column) is left out of view
     // until "Show hidden tracks" is on; the track still plays. View only; saved ("playlistTracksHidden").
     bool hidden = false;
+    // LYNX extra, round 190pe (P20): the track's versions (TrackVersion); empty = none, the track as always. With some,
+    // there are at least two and versions[activeVersion] holds only its name. They belong to the arrangement with index
+    // `versionArrangement` (clips are per arrangement; the lanes and the mixer are shared). Saved ("playlistTrackVersions").
+    std::vector<TrackVersion> versions {};
+    int activeVersion = 0;
+    int versionArrangement = 0;
     bool operator== (const PlaylistTrack&) const = default;
 };
 
@@ -2985,6 +3006,10 @@ struct Song
                 fn (arrangements[i].clips);
         if (clipGrid)
             fn (clipGrid->clips);
+        for (auto& t : playlistTracks) // (round 190pe: the stored clips of the versions that are not active)
+            for (std::size_t v = 0; v < t.versions.size(); ++v)
+                if ((int) v != t.activeVersion)
+                    fn (t.versions[v].clips);
     }
     template <typename Fn>
     void forEachClipList (Fn&& fn) const
@@ -2995,6 +3020,10 @@ struct Song
                 fn (arrangements[i].clips);
         if (clipGrid)
             fn (clipGrid->clips);
+        for (const auto& t : playlistTracks)
+            for (std::size_t v = 0; v < t.versions.size(); ++v)
+                if ((int) v != t.activeVersion)
+                    fn (t.versions[v].clips);
     }
 
     // Applies `fn` to all Pattern Block lists (the current arrangement's and the stored ones).

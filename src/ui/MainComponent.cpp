@@ -145,6 +145,8 @@
 #include "ui/SettingsPages.h"
 #include "ui/DawProjectExport.h" // round 190jf (B22)
 #include "ui/FlmExportDialog.h" // round 190og (app-0003)
+#include "ui/TrackImportDialog.h" // round 190pe (P11)
+#include "core/ExportOptions.h"
 #include "ui/OtherAppsExport.h"
 #include "ui/FlStudioExportDialog.h"
 #include "ui/FruitySlicerEditor.h"
@@ -10414,6 +10416,97 @@ void MainComponent::importMidiFile()
     });
 }
 
+void MainComponent::importTracksFromProject()
+{
+    const auto folder = currentFile.existsAsFile() ? currentFile.getParentDirectory() : juce::File::getSpecialLocation (juce::File::userMusicDirectory);
+    fileChooser = lynx::ui::makeFileChooser (tr ("Import tracks from another project"), folder,
+                                             juce::String ("*") + ProjectFile::extension
+                                                 + ";*.flp;*.als;*.flm;*.songtmpl;*.band;projectData;ProjectData;*.blx;*.dawproject;*.mod;*.xm;*.s3m;*.it");
+    juce::Component::SafePointer<MainComponent> safe (this);
+    lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc) {
+        if (const auto file = fc.getResult(); safe != nullptr && (file.existsAsFile() || file.isDirectory()))
+            safe->importTracksFrom (file);
+    });
+}
+
+void MainComponent::importTracksFrom (const juce::File& picked)
+{
+    auto file = picked;
+    if (const auto band = ProjectPackage::garageBandPackage (file); band != juce::File()) // (a file inside a .band package)
+        file = band;
+    auto other = std::make_shared<AudioEngine::OtherProject>();
+    juce::String error;
+    juce::MouseCursor::showWaitCursor();
+    const auto read = engine.readOtherProject (file, *other, error);
+    juce::MouseCursor::hideWaitCursor();
+    if (! read)
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not import"), error);
+        return;
+    }
+    // the samples the importer could not find go back on their channels, for the Missing files window below
+    std::vector<std::pair<std::string, std::vector<std::string>>> missing;
+    for (const auto& m : other->report.missingFiles)
+        missing.push_back ({ m.path, m.usedBy });
+    trackimport::restoreMissingPaths (other->song, missing);
+
+    const auto& song = engine.getSong();
+    const auto selection = exportopts::hasSelection (song) ? song.loopStart : (std::int64_t) -1;
+    juce::Component::SafePointer<MainComponent> safe (this);
+    showTrackImportDialog (file.getFileName(), other->song, selection, [safe, other, file] (const TrackImportChoice& choice) {
+        if (safe == nullptr)
+            return;
+        if (choice.tracks.empty() && choice.options.channels.empty())
+        {
+            ui::postHint ({ tr ("No track was chosen: nothing was imported") }, 3000);
+            return;
+        }
+        trackimport::Result result;
+        safe->engine.editSongStructural ([&] (Song& s) { result = trackimport::importTracks (s, other->song, choice.tracks, choice.options); });
+        other->decoded.clear(); // (the rack has its samples now)
+        safe->playlist.repaint();
+        ui::postHint ({ tr ("Imported {0} track(s) from {1}", { juce::String ((int) result.tracks.size()), file.getFileName() }) }, 4000);
+        const auto report = trackImportReport (result, file.getFileName(), other->missingPlugins);
+        platform::testModeLog ("track import: " + report.replaceCharacter ('\n', '|'));
+
+        // what the new channels and inserts lack on this computer: the Missing files window, for them only
+        Song added;
+        added.channels.clear();
+        added.patterns.clear();
+        const auto& now = safe->engine.getSong();
+        for (const auto c : result.channels)
+            if (c >= 0 && c < (int) now.channels.size())
+                added.channels.push_back (now.channels[(std::size_t) c]);
+        added.mixer.assign (1, MixerTrack {});
+        for (const auto t : result.inserts)
+            if (t > 0 && t < (int) now.mixer.size())
+                added.mixer.push_back (now.mixer[(std::size_t) t]);
+        const auto exists = [] (const std::string& path) {
+            return juce::File::isAbsolutePath (juce::String::fromUTF8 (path.c_str())) && juce::File (juce::String::fromUTF8 (path.c_str())).existsAsFile();
+        };
+        MissingFilesInfo info;
+        info.files = findMissingSamples (added, exists);
+        info.projectName = file.getFileNameWithoutExtension();
+        info.searchFolders.add (file.getParentDirectory().getFullPathName());
+        if (! info.files.empty() && ! platform::testMode())
+        {
+            juce::Component::SafePointer<MainComponent> again (safe.getComponent());
+            showMissingFilesDialog (std::move (info), [again] (const std::map<std::string, std::string>& relocations) {
+                if (again != nullptr)
+                    again->engine.editSong ([&relocations] (Song& s) { applyRelocations (s, relocations); });
+            });
+        }
+        else if (! info.files.empty())
+            platform::testModeLog ("track import: Missing files window for " + juce::String ((int) info.files.size()) + " sample(s)");
+        if (! result.notes.empty() || ! other->missingPlugins.isEmpty())
+        {
+            if (platform::testMode())
+                return;
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Import tracks from another project"), report);
+        }
+    });
+}
+
 void MainComponent::importMidiFile (const juce::File& file, const MidiFileIo::ImportOptions& o)
 {
     juce::String error;
@@ -11046,6 +11139,9 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             // FL's File › Import (ImportMenu › ImportMIDIMenu → FileImportMIDIFileAction, REA round 143)
             juce::PopupMenu imports;
             imports.addItem (tr ("MIDI file..."), [this] { importMidiFile(); });
+            // round 190pe (P11, LYNX extra: FL Studio's File › Import holds MIDI file only; Pro Tools' Import Session Data,
+            // Cubase's Import Tracks from Project, Studio One's Import Song Data)
+            imports.addItem (tr ("Tracks from another project..."), [this] { importTracksFromProject(); });
             imports.addItem (tr ("Video file..."), [this] { videotracks::chooseAndImport (engine, this); }); // round 174d
             menu.addSubMenu (tr ("Import"), imports);
         }

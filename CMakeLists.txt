@@ -50,6 +50,8 @@ add_library(lynx_core STATIC
     src/core/TrackerGrid.cpp
     src/core/ModuleImport.cpp
     src/core/CrossPaste.cpp
+    src/core/TrackVersions.cpp
+    src/core/TrackImport.cpp
     src/core/RemoteMap.cpp
     src/core/DrawMode.cpp
     src/core/AutoPointEdit.cpp
@@ -625,6 +627,7 @@ if(LYNX_BUILD_APP)
         src/ui/AlsExportDialog.cpp
         src/ui/DawProjectExport.cpp
         src/ui/FlmExportDialog.cpp
+        src/ui/TrackImportDialog.cpp
         src/ui/GamepadInput.cpp
         src/ui/ControllerBridge.cpp
         src/ui/OtherAppsExport.cpp

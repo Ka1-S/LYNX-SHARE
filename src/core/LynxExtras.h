@@ -150,6 +150,10 @@ inline constexpr Item items[] = {
     { "playlist.trackStates", TR_NOOP ("Playlist"), TR_NOOP ("Hide and deactivate tracks"),
       TR_NOOP ("The Playlist track menu gets Hide track, the Playlist menu Show hidden tracks and Hide unused tracks, and the Channel rack and Mixer menus Deactivate: a deactivated channel or insert unloads its plugins and is silent, its settings kept. Also always on in the Clip-launch and Simple layouts."),
       "ui-options.txt:trackStates" },
+    // round 190pe (research190oe P20): Cubase's Track Versions, Pro Tools' playlists; FL has none
+    { "playlist.trackVersions", TR_NOOP ("Playlist"), TR_NOOP ("Track versions in the Playlist track menu"),
+      TR_NOOP ("The Playlist track menu gets Track versions: named alternate versions of a track's clips, automation lanes and own insert's effects, switched from the menu or the version tag on the header; Promote copies the time selection of another version into the one that plays. Also always on in the Clip-launch layout, and for a track that has versions."),
+      "ui-options.txt:trackVersions" },
     // round 190oq (issue #249): FL's Alt+M only mutes; this makes it switch both ways
     { "editing.muteKeyToggles", TR_NOOP ("Editing"), TR_NOOP ("Alt+M toggles: pressed again, it unmutes (LYNX)"),
       TR_NOOP ("In FL Studio Alt+M only mutes the selected clips or notes and Shift+Alt+M unmutes them. On: Alt+M on clips or notes that are all muted already unmutes them, in the Playlist and the Piano roll; Shift+Alt+M still unmutes. Also in the Playlist's Edit menu."),

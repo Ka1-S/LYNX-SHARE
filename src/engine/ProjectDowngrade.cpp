@@ -20,6 +20,7 @@
 #include "core/NewtoneFx.h"
 #include "core/PeakShapes.h"
 #include "core/RackRenderer.h"
+#include "core/TrackVersions.h"
 #include "core/Reeverb2.h"
 #include "core/VoiceShift.h"
 #include "core/VoiceTools.h"
@@ -1994,6 +1995,26 @@ Copy forRelease (const juce::String& projectJson, const juce::String& release)
         return copy;
     }
     const auto from = root["savedBy"].toString();
+    // round 190pe (P20): track versions are newer than every release a copy is for. Each track keeps the version it
+    // plays (the copy sounds the same); the others are left out, with the automation curves only their lanes used
+    if (root.hasProperty ("playlistTrackVersions"))
+    {
+        juce::String error;
+        if (auto song = ProjectFile::fromJson (projectJson, error))
+        {
+            if (const auto dropped = trackversions::keepActiveOnly (*song); dropped > 0)
+                copy.lost.push_back ({ TR_NOOP ("{0} track version(s) that are not active are left out: each track keeps the version it plays"),
+                                       juce::String (dropped), false });
+            auto again = juce::JSON::parse (ProjectFile::toJson (*song, false));
+            // (what the song does not hold, e.g. the window layout, stays as it was)
+            for (const auto& p : objectOf (root)->getProperties())
+                if (p.name.toString() != "playlistTrackVersions" && ! objectOf (again)->hasProperty (p.name))
+                    objectOf (again)->setProperty (p.name, p.value);
+            root = again;
+        }
+        else
+            drop (*objectOf (root), "playlistTrackVersions");
+    }
     for (const auto& s : steps)
     {
         s.apply (root, copy.lost);

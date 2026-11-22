@@ -3869,6 +3869,50 @@ juce::String toJson (const Song& song, bool stampVersion)
                 hiddenTracks.add ((int) i);
         if (! hiddenTracks.isEmpty())
             root->setProperty ("playlistTracksHidden", hiddenTracks);
+
+        // track versions (round 190pe, P20; core/TrackVersions.h): per track with versions {track, active, arrangement,
+        // versions: [{name, clips, lanes [[automation, height]...], chain [effects]}]}; the active one holds only its name
+        // (its content is the track's). A project without any has no such property; older LYNX skips it (the track then
+        // keeps its active version)
+        juce::Array<juce::var> versionRows;
+        for (std::size_t i = 0; i < song.playlistTracks.size(); ++i)
+            if (const auto& t = song.playlistTracks[i]; ! t.versions.empty())
+            {
+                auto row = std::make_unique<juce::DynamicObject>();
+                row->setProperty ("track", (int) i);
+                row->setProperty ("active", t.activeVersion);
+                row->setProperty ("arrangement", t.versionArrangement);
+                juce::Array<juce::var> list;
+                for (std::size_t v = 0; v < t.versions.size(); ++v)
+                {
+                    const auto& version = t.versions[v];
+                    auto o = std::make_unique<juce::DynamicObject>();
+                    o->setProperty ("name", str (version.name));
+                    if ((int) v != t.activeVersion)
+                    {
+                        o->setProperty ("clips", clipsToVar (version.clips, envelopes));
+                        if (! version.lanes.empty())
+                        {
+                            juce::Array<juce::var> lanes;
+                            for (const auto& l : version.lanes)
+                                lanes.add (juce::Array<juce::var> { l.automation, l.height });
+                            o->setProperty ("lanes", lanes);
+                        }
+                        if (version.hasChain)
+                        {
+                            juce::Array<juce::var> chain;
+                            for (const auto& slot : version.chain)
+                                chain.add (effectToVar (slot));
+                            o->setProperty ("chain", chain);
+                        }
+                    }
+                    list.add (juce::var (o.release()));
+                }
+                row->setProperty ("versions", list);
+                versionRows.add (juce::var (row.release()));
+            }
+        if (! versionRows.isEmpty())
+            root->setProperty ("playlistTrackVersions", versionRows);
     }
 
     const auto anyMarkers = std::any_of (song.arrangements.begin(), song.arrangements.end(),
@@ -4797,6 +4841,45 @@ std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error,
                         track.lanes.push_back ({ (int) l[0], l.size() >= 2 ? juce::jlimit (0, 2000, (int) l[1]) : 0 });
             }
 
+    if (auto* versionRows = root["playlistTrackVersions"].getArray()) // round 190pe (after the automations and the clips' sources)
+        for (const auto& row : *versionRows)
+        {
+            const auto index = (int) row["track"];
+            auto* list = row["versions"].getArray();
+            if (index < 0 || index >= 500 || list == nullptr || list->size() < 2)
+                continue;
+            if (song.playlistTracks.size() <= (std::size_t) index)
+                song.playlistTracks.resize ((std::size_t) index + 1);
+            auto& track = song.playlistTracks[(std::size_t) index];
+            track.versions.clear();
+            track.activeVersion = juce::jlimit (0, list->size() - 1, (int) row["active"]);
+            track.versionArrangement = juce::jmax (0, (int) row["arrangement"]);
+            for (int v = 0; v < list->size(); ++v)
+            {
+                const auto& o = (*list)[v];
+                TrackVersion version;
+                version.name = o["name"].toString().toStdString();
+                if (v != track.activeVersion)
+                {
+                    version.clips = clipsFromVar (o["clips"], song);
+                    for (auto& c : version.clips)
+                        c.track = index;
+                    if (auto* lanes = o["lanes"].getArray())
+                        for (const auto& l : *lanes)
+                            if (l.isArray() && l.size() >= 1 && (int) l[0] >= 0 && (int) l[0] < (int) song.automations.size())
+                                version.lanes.push_back ({ (int) l[0], l.size() >= 2 ? juce::jlimit (0, 2000, (int) l[1]) : 0 });
+                    if (auto* chain = o["chain"].getArray())
+                    {
+                        version.hasChain = true;
+                        for (const auto& e : *chain)
+                            if (auto slot = effectFromVar (e))
+                                version.chain.push_back (std::move (*slot));
+                    }
+                }
+                track.versions.push_back (std::move (version));
+            }
+        }
+
     if (auto* locks = root["playlistTrackLocks"].getArray())
         for (const auto& t : *locks)
             if (t.isArray() && t.size() >= 3 && (int) t[0] >= 0 && (int) t[0] < 500)
@@ -4919,6 +5002,10 @@ std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error,
         song.arrangements[(std::size_t) song.currentArrangement].clips.clear();
         song.arrangements[(std::size_t) song.currentArrangement].blocks.clear();
     }
+
+    for (auto& t : song.playlistTracks) // round 190pe: a track's versions belong to an arrangement the project has
+        if (t.versionArrangement >= (int) song.arrangements.size())
+            t.versionArrangement = 0;
 
     song.mode = root["mode"].toString() == "song" ? PlayMode::song : PlayMode::pattern;
 

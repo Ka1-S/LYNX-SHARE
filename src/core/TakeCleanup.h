@@ -41,7 +41,11 @@ inline int automationUses (const Song& song, int index)
         uses += (int) std::count_if (clips.begin(), clips.end(), [index] (const Clip& c) { return c.kind == ClipKind::automation && c.automation == index; });
     });
     for (const auto& t : song.playlistTracks)
+    {
         uses += (int) std::count_if (t.lanes.begin(), t.lanes.end(), [index] (const AutomationLane& l) { return l.automation == index; });
+        for (const auto& v : t.versions) // round 190pe: a lane kept by a track version that is not active
+            uses += (int) std::count_if (v.lanes.begin(), v.lanes.end(), [index] (const AutomationLane& l) { return l.automation == index; });
+    }
     return uses;
 }
 
