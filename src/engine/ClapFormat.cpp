@@ -1,4 +1,5 @@
 #include "engine/ClapFormat.h"
+#include "engine/JsfxFormat.h"
 #include "engine/Vst2Format.h"
 
 #include <algorithm>
@@ -1935,6 +1936,7 @@ void addPluginFormats (juce::AudioPluginFormatManager& manager)
     manager.addDefaultFormats();
     manager.addFormat (new ClapPluginFormat());
     manager.addFormat (new Vst2PluginFormat());
+    manager.addFormat (new JsfxPluginFormat()); // (round 190pj, issue #241)
 }
 
 std::string clapPluginId (const juce::PluginDescription& description)

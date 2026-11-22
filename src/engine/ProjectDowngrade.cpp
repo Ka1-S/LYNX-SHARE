@@ -1418,9 +1418,60 @@ void keyMarkersFor0130 (juce::var& root, Losses& lost)
 // Rollup 0.1.31 (round 190no): what the 0.1.31 rounds save that 0.1.30 cannot hold, each loss reported only when the
 // project has it. A copy for an older release runs this step first, so the later steps never see these. Round 190nc's
 // Macro Map writes ordinary macro mappings (targets 0.1.30 has): nothing to change for it.
+// Round 190pj (issue #241): JSFX scripts (hosted plugins of the "JSFX" format, which 0.1.30 and older do not have; their
+// slot would stay "plugin not installed" there). Every JSFX slot becomes empty: a mixer insert (or a Patcher / rack node)
+// becomes a switched-off Utility in its place (the later slots keep theirs; its automation is detached), a generator
+// channel an empty Sampler that plays nothing. One line says so. Called from toRelease0130 below.
+void jsfxFor0130 (juce::var& root, Losses& lost)
+{
+    auto& o = *objectOf (root);
+    const auto isJsfx = [] (const juce::var& plugin) { return plugin["id"].toString().startsWith ("JSFX-"); };
+    juce::StringArray where;
+    const auto empty = [] (juce::DynamicObject& e) {
+        juce::Array<juce::var> none;
+        e.setProperty ("kind", "utility");
+        e.setProperty ("on", false);
+        e.setProperty ("params", none);
+        for (const auto* gone : { "plugin", "mix", "engineRev", "displayView", "abOther", "abB", "ara" })
+            drop (e, gone);
+    };
+    if (auto* mixer = arrayOf (root["mixer"]))
+        for (int t = 0; t < mixer->size(); ++t)
+            if (auto* fx = arrayOf ((*mixer)[t]["effects"]))
+                for (int s = 0; s < fx->size(); ++s)
+                    if (auto* e = objectOf ((*fx)[s]); e != nullptr && e->getProperty ("kind").toString() == "plugin" && isJsfx (e->getProperty ("plugin")))
+                    {
+                        addOnce (where, insertName (o.getProperty ("mixer"), t) + juce::String::fromUTF8 (" \u203a ") + juce::String (s + 1));
+                        empty (*e);
+                        detachTargets (root, t, s);
+                    }
+    // inside Patchers and racks (the mixer's own slots are done above)
+    forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& in) {
+        if (e.getProperty ("kind").toString() == "plugin" && isJsfx (e.getProperty ("plugin")))
+        {
+            addOnce (where, in);
+            empty (e);
+        }
+    });
+    forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
+        if (c.getProperty ("instrument").toString() != "plugin" || ! isJsfx (c.getProperty ("plugin")))
+            return;
+        addOnce (where, channelName (juce::var (&c), i));
+        c.setProperty ("instrument", "sampler");
+        drop (c, "plugin");
+        drop (c, "pluginState");
+        drop (c, "samplePath");
+    });
+    if (! where.isEmpty())
+        lost.push_back ({ TR_NOOP ("JSFX scripts are not in this release: their slots become empty (a switched-off Utility on an insert, an empty Sampler on a channel): {0}"),
+                          listOf (where), true });
+}
+
 void toRelease0130 (juce::var& root, Losses& lost)
 {
     auto& o = *objectOf (root);
+
+    jsfxFor0130 (root, lost); // (round 190pj)
 
     // round 190ni: LYNX Model. 0.1.30 would play an unknown instrument as its basic synth: an empty Sampler (silent) keeps
     // the channel, its notes and its routing, as Tetra / Helix / Braid in the copy for 0.1.28

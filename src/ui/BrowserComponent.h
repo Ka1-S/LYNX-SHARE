@@ -215,6 +215,7 @@ public:
     std::size_t loopInfoQueuedForCheck();             // round 190kx: files the loop analysis still has to do
     juce::StringArray resultLabelsForCheck() const;
     void showPluginDatabaseForSnapshot();
+    void showJsfxForSnapshot(); // round 190pj: the Plugin database's JSFX categories (Generators and Effects) open
     std::vector<juce::PopupMenu> pluginDatabaseMenusForSnapshot(); // round 190bf: a folder's and an entry's right-click menus
     // FL's "Locate sample in browser" (the sampler's File row, round 190df): the ALL tab with the folders opened down to
     // the file, its row selected; false (and a note) when no folder the Browser shows holds it

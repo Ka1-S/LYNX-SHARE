@@ -127,6 +127,7 @@
 #include "engine/PluginSandbox.h"
 #include "engine/Bridge32Test.h"
 #include "engine/ClapFormat.h"
+#include "engine/JsfxFormat.h"
 #include "engine/ClapTeardownTest.h"
 #include "engine/RenderAgainTest.h"
 #include "ui/TiltViewport.h"
@@ -1961,6 +1962,28 @@ public:
             juce::String lines;
             const auto result = lynx::renderagain::check ([&lines] (const juce::String& line) { lines << line << "\n"; });
             juce::File (args[i + 1].unquoted()).replaceWithText (lines + "renderagain190ou=" + result + "\n");
+            setApplicationReturnValue (result.startsWith ("OK") ? 0 : 1);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--jsfxtest") || args.contains ("--jsfxbench"))
+        {
+            // LYNX --jsfxtest <folder>: the JSFX format end to end (round 190pj, issue #241; also in --selftest), report in
+            // <folder>/jsfx-selftest.txt. LYNX --jsfxbench <out.txt>: CPU per instance of every bundled script.
+            const auto test = args.contains ("--jsfxtest");
+            const auto i = args.indexOf (test ? "--jsfxtest" : "--jsfxbench");
+            const juce::File out (args[i + 1].unquoted());
+            juce::String result;
+            if (test)
+            {
+                out.createDirectory();
+                result = lynx::jsfx::selfTest (out);
+                out.getChildFile ("report.txt").replaceWithText ("jsfx190pj=" + result + "\n");
+            }
+            else
+                result = lynx::jsfx::bench (out);
+            std::cout << result << std::endl;
             setApplicationReturnValue (result.startsWith ("OK") ? 0 : 1);
             quit();
             return;
@@ -4025,6 +4048,15 @@ public:
             }
             setApplicationReturnValue (0);
             quit();
+            return;
+        }
+
+        if (args.contains ("--jsfxshots"))
+        {
+            // LYNX --jsfxshots <folder> [--shot-scale 1.5 --shot-suffix @150] (round 190pj): the JSFX slider panels of
+            // bundled scripts, the Browser's JSFX category and Settings › File with the JSFX folders, off screen
+            const auto i = args.indexOf ("--jsfxshots");
+            runJsfxShots (args[i + 1].unquoted());
             return;
         }
 
@@ -7097,6 +7129,8 @@ private:
 
         // round 177b: a plugin's sidechain bus gets the slot's sidechain (one-click sidechain)
         const auto sidechainResult = lynx::pluginSidechainSelfTest();
+        // round 190pj (issue #241): JSFX scripts in slots, their state, PDC, MIDI, file policy, the copy for older releases
+        const auto jsfxResult = lynx::jsfx::selfTest ({});
 
         // round 190ap: the Versions panel's list of files, and its labels on disk beside them
         const auto versionsResult = lynx::versionsSelfTest();
@@ -9751,7 +9785,7 @@ private:
                         && renderAgainResult.startsWith ("OK")
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK") && modulators190oxResult == "OK"
-                        && generatorSmartResult.startsWith ("OK")
+                        && generatorSmartResult.startsWith ("OK") && jsfxResult.startsWith ("OK")
                         && danceWindowResult == "OK" && clickActivationResult == "OK" && motionOverlayResult.startsWith ("OK")
                         && editorHolesResult.startsWith ("OK");
 
@@ -9811,6 +9845,7 @@ private:
                << "midi_out_ports=" << midiOutPorts.replace ("\n", " | ").trimCharactersAtEnd (" |") << "\n"
                << "plugin_art=" << artResult << "\n"
                << "plugin_sidechain=" << sidechainResult << "\n"
+               << "jsfx190pj=" << jsfxResult << "\n"
                << "versions_panel=" << versionsResult << "\n"
                << "plugins_off=" << pluginsOffResult << "\n"
                << "missing_files_rows=" << missingFilesResult << "\n"
@@ -37164,6 +37199,78 @@ private:
             offline.dispatchPendingMessages();
         }
         juce::File (prefix + "-report.txt").replaceWithText (report);
+    }
+
+    void runJsfxShots (const juce::String& folderPath)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        const juce::File folder (folderPath);
+        folder.createDirectory();
+        lynx::jsfx::installPack();
+        juce::StringArray made;
+        {
+            lynx::AudioEngine offline (false);
+            lynx::JsfxPluginFormat format;
+            auto& known = offline.getPluginHost().getKnownPlugins();
+            for (const auto& f : format.searchPathsForPlugins (juce::FileSearchPath (lynx::jsfx::packFolder().getFullPathName()), true, false))
+            {
+                juce::OwnedArray<juce::PluginDescription> found;
+                format.findAllTypesForFile (found, f);
+                for (auto* d : found)
+                    known.addType (*d);
+            }
+            // the slider panels (the plugin window's editor) of four bundled scripts
+            for (const auto* rel : { "chokehold/Clipper/soft_clipper.jsfx", "chokehold/Generator/test_signals.jsfx",
+                                     "chokehold/Instrument FX/mic_combiner.jsfx", "chokehold/MIDI/midi_chord_trigger.jsfx" })
+            {
+                const auto file = lynx::jsfx::packFolder().getChildFile (rel);
+                juce::OwnedArray<juce::PluginDescription> found;
+                format.findAllTypesForFile (found, file.getFullPathName());
+                if (found.isEmpty())
+                    continue;
+                juce::String error;
+                auto instance = format.createInstanceFromDescription (*found[0], 48000.0, 512, error);
+                if (instance == nullptr)
+                {
+                    made.add (juce::String (rel) + ": " + error);
+                    continue;
+                }
+                lynx::preparePlugin (*instance, 48000.0, 512);
+                juce::AudioBuffer<float> buffer (2, 512);
+                juce::MidiBuffer midi;
+                for (int b = 0; b < 8; ++b)
+                {
+                    buffer.clear();
+                    instance->processBlock (buffer, midi);
+                }
+                offline.dispatchPendingMessages(); // (the latency it reported)
+                std::unique_ptr<juce::AudioProcessorEditor> editor (instance->createEditor());
+                const auto name = "jsfx-panel-" + file.getFileNameWithoutExtension() + ".png";
+                saveSnapshot (*editor, folder.getChildFile (name).getFullPathName());
+                made.add (name);
+                editor = nullptr;
+            }
+            // the Browser's Plugin database with its JSFX categories open, in the default desktop
+            lynx::MainComponent ui (offline, false);
+            ui.setSize (1280, 720);
+            offline.dispatchPendingMessages();
+            ui.waitForBrowserForSnapshot();
+            ui.getBrowserForSnapshot().showJsfxForSnapshot();
+            offline.dispatchPendingMessages();
+            saveSnapshot (ui, folder.getChildFile ("jsfx-browser.png").getFullPathName());
+            saveArea (ui, ui.getBrowserForSnapshot().getBoundsInParent(), folder.getChildFile ("jsfx-browser-panel.png").getFullPathName());
+            made.add ("jsfx-browser.png");
+            // Settings › File with the JSFX folders list
+            auto settings = lynx::makeSettingsPanel (offline, lynx::SettingsPage::files);
+            if (settings->getWidth() < 200 || settings->getHeight() < 200)
+                settings->setSize (720, 640);
+            offline.dispatchPendingMessages();
+            saveSnapshot (*settings, folder.getChildFile ("jsfx-settings-files.png").getFullPathName());
+            made.add ("jsfx-settings-files.png");
+        }
+        folder.getChildFile ("jsfxshots.txt").replaceWithText (made.joinIntoString ("\n") + "\n");
+        setApplicationReturnValue (0);
+        quit();
     }
 
     void runSnapshot (const juce::String& prefix, const juce::String& projectPath)

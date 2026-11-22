@@ -287,6 +287,9 @@ juce::Colour rootColour (int index)
 
 namespace
 {
+// A scanned JSFX script's key (its plugin list identifier, "JSFX-<name>-...": round 190pj)
+bool isJsfxKey (const std::string& key) { return key.rfind ("JSFX-", 0) == 0; }
+
 // The plugin being dragged from the Plugin database (one drag at a time; message thread).
 struct DraggedPlugin
 {
@@ -1172,6 +1175,8 @@ public:
             // FL's VFX note processors (round 164b): channels with no sound, they play other channels / Patcher nodes
             auto vfxGens = folder (gens.get(), tr ("VFX (note effects)"), Icon::folder);
             auto installed = folder (gens.get(), tr ("Installed"), Icon::folder);
+            // round 190pj (issue #241): the JSFX scripts (the bundled pack and the JSFX folders) in a category of their own
+            auto jsfxGens = folder (gens.get(), "JSFX", Icon::folder);
             Node* folders[] = { lynxGens.get(), flGens.get(), vfxGens.get(), installed.get() };
             gens->folderKind = 1;
             for (auto [node, group] : { std::pair { folders[0], "LYNX" }, std::pair { folders[1], "FL engines" }, std::pair { folders[2], "VFX" },
@@ -1184,13 +1189,13 @@ public:
             for (auto& e : quickpick::generatorEntries (engine))
             {
                 auto* target = userFolderOf (mine, engine, true, e.key);
-                if (target == nullptr) target = folders[juce::jlimit (0, 3, e.folder)];
+                if (target == nullptr) target = e.folder == 3 && isJsfxKey (e.key) ? jsfxGens.get() : folders[juce::jlimit (0, 3, e.folder)];
                 generatorEntry (*target, named (e.key, e.label), e.detail, e.folder == 3 ? Icon::plugin : Icon::keyboard, e.make);
                 target->children.back()->pluginKey = e.key;
                 target->children.back()->original = e.label;
             }
             for (auto& [path, n] : mine) sortFolder (*n);
-            for (auto* f : { &lynxGens, &flGens, &vfxGens, &installed })
+            for (auto* f : { &lynxGens, &flGens, &vfxGens, &jsfxGens, &installed })
                 if (! (*f)->children.empty())
                 {
                     byLabel (**f);
@@ -1204,6 +1209,7 @@ public:
             auto lynxFx = folder (fxs.get(), "LYNX SHARE", Icon::folder);
             auto flFx = folder (fxs.get(), tr ("FL engines"), Icon::folder);
             auto installed = folder (fxs.get(), tr ("Installed"), Icon::folder);
+            auto jsfxFx = folder (fxs.get(), "JSFX", Icon::folder); // (round 190pj)
             Node* folders[] = { lynxFx.get(), flFx.get(), installed.get(), installed.get() };
             fxs->folderKind = 0;
             for (auto [node, group] : { std::pair { folders[0], "LYNX" }, std::pair { folders[1], "FL engines" }, std::pair { folders[2], "" } })
@@ -1215,13 +1221,13 @@ public:
             for (auto& e : quickpick::effectEntries (engine))
             {
                 auto* target = userFolderOf (mine, engine, false, e.key);
-                if (target == nullptr) target = folders[juce::jlimit (0, 3, e.folder)];
+                if (target == nullptr) target = e.folder == 3 && isJsfxKey (e.key) ? jsfxFx.get() : folders[juce::jlimit (0, 3, e.folder)];
                 effectEntry (*target, named (e.key, e.label), e.detail, e.folder == 3 ? Icon::plugin : Icon::mixer, e.make);
                 target->children.back()->pluginKey = e.key;
                 target->children.back()->original = e.label;
             }
             for (auto& [path, n] : mine) sortFolder (*n);
-            for (auto* f : { &lynxFx, &flFx, &installed })
+            for (auto* f : { &lynxFx, &flFx, &jsfxFx, &installed })
                 if (! (*f)->children.empty())
                 {
                     byLabel (**f);
@@ -6073,6 +6079,14 @@ void BrowserComponent::showPluginDatabaseForSnapshot()
 {
     openPluginFolders = { tr ("Plugin database"), tr ("Plugin database") + "/" + tr ("Generators"), tr ("Generators") + "/" + tr ("FL engines"),
                           tr ("Plugin database") + "/" + tr ("Effects"), tr ("Effects") + "/" + tr ("FL engines") };
+    setTab (allTab);
+    rebuildTree();
+}
+
+void BrowserComponent::showJsfxForSnapshot()
+{
+    openPluginFolders = { tr ("Plugin database"), tr ("Plugin database") + "/" + tr ("Generators"), tr ("Generators") + "/JSFX",
+                          tr ("Plugin database") + "/" + tr ("Effects"), tr ("Effects") + "/JSFX" };
     setTab (allTab);
     rebuildTree();
 }

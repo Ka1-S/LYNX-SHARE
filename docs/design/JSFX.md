@@ -330,3 +330,53 @@ gfx_probe <file.jsfx> <out.ppm> 640 400               # headless @gfx (needs the
 - its release window was too early.
 
 The downloaded sources (ysfx, the collections and the REAPER tarball) were deleted after the study; licence texts and header samples are kept in `out/licence-evidence/`. ysfx was read at commit `5c3452fee62583aa3d1b7e877d0c758c4024af89`.
+
+## 10. Stages 1–2 as built (round 190pj, 0.1.32)
+
+Branch `jsfx_190pj` (off `wip/rollup031`). What the design above asked for stages 1 and 2, and where it is:
+
+| Part | Where |
+|---|---|
+| ysfx vendored (Apache-2.0), trimmed: no @gfx (LICE / SWELL / stb), no plugin, tests or tools; one LYNX change, a host file filter | `third_party/ysfx` (`README-LYNX.md`), `CMakeLists.txt` target `lynx_ysfx` (linked into `lynx_core`), `scripts/build-windows-zig.sh`, `THIRD_PARTY.md` |
+| `JsfxPluginFormat` (scan in LYNX's own process, identity, instance, parameters, state, PDC, MIDI in / out, `.rpl` banks as programs, compile errors as the failure message) | `src/engine/JsfxFormat.h/.cpp`; registered in `addPluginFormats` (`src/engine/ClapFormat.cpp`) |
+| Identity, file policy and saved state, JUCE-free | `src/core/Jsfx.h/.cpp` |
+| Roots: Documents/LYNX/JSFX, the bundled pack (`<settings>/JSFX pack`), REAPER's Effects folder when it is there, Settings › File › JSFX folders | `jsfx::roots()`; Settings list in `src/ui/SettingsDialog.cpp` (`jsfx-folders.txt`) |
+| Scan: the JSFX roots only (not the VST folders), in process (`isTrivialToScan`), on the start-up warm-up thread and with every plugin scan; scripts gone from the roots leave the list | `PluginHost::scanJsfx`, `PluginHost::scanFiles`, `listPluginFiles` |
+| A project made on another computer finds the script by its relative path (the unique id is a hash of it; JUCE's identifier also carries a hash of the absolute path) | `jsfx::findPortable`, used by `PluginHost::find` |
+| Slider panel (the plugin window's editor) | `src/ui/JsfxPanel.cpp` |
+| Browser category: Plugin database › Generators › JSFX and › Effects › JSFX | `src/ui/BrowserComponent.cpp` |
+| Bundled pack: chokehold's 31 MIT scripts without @gfx, embedded in the executable and written to the settings folder when the pack changes | `resources/jsfx/chokehold`, `tools/make_jsfx_pack.py` → `src/engine/JsfxPackData.h` |
+| Save a copy for 0.1.30 / 0.1.28: JSFX slots become empty (an insert a switched-off Utility in its place, a channel an empty Sampler), one line says so | `jsfxFor0130` in `src/engine/ProjectDowngrade.cpp` |
+| Tests: core (`tests/Jsfx190pjTests.inc`: ids, paths, headers, state, the embedded pack, the runtime against upstream ysfx's render) and the app (`--selftest` / `--jsfxtest`: the format end to end) | `jsfx::selfTest`; the reference: `tools/jsfx_ref.cpp` → `src/engine/JsfxReference.h` |
+| CPU per instance | `LYNX --jsfxbench <out.txt>` (every bundled script) |
+| Shots | `LYNX --jsfxshots <folder> [--shot-scale 1.5 --shot-suffix @150]` |
+
+### Owner decisions taken (the recommended option of §8 each)
+
+1. **File access:** restricted. A script's `file_open`, file sliders and (later) `gfx_loadimg` open files only inside the
+   JSFX roots, their `Data` folders (`<root>/Data` and REAPER's `<root>/../Data`) and the open project's folder. The path
+   is resolved (symlinks and `..`) before the check. Scripts still have no write, exec or network API.
+2. **Bundled pack:** MIT only. This round ships chokehold's MIT scripts that have no @gfx display (31 of 39); the 8 with
+   @gfx and Saike's MIT set (mostly @gfx) wait for stage 3, where their displays can be drawn. No SoX (GPL-3) and never
+   REAPER's mixed-licence stock set; a local REAPER Effects folder is scanned when it is there.
+3. **How projects store scripts:** the relative id and a hash of the script's source, with the slider values and the
+   @serialize data; never the source. A missing script is a missing plugin as for any format; a script whose source
+   changed still loads and its panel says the settings may not fit.
+4. **Slider panel:** LYNX's generic plugin panel look (dark panels, red accent): one row per slider the script shows, a
+   bar for numbers (the script's own curve: linear / log / sqr; double-click resets, Ctrl drags fine), a menu for enum
+   and file sliders; hidden sliders (`-` names, `slider_show`) are left out but stay automatable. A header names the
+   script, its author and id, and shows its PDC when it has one.
+
+### Behaviour notes
+
+- Compiling happens where the instance is made (LYNX's loader thread for a project open); @init runs in `prepareToPlay`,
+  and on the audio thread only where REAPER runs it too (a transport start, a script's delayed init).
+- Sliders changed by the host or the panel are applied at the start of the next block (ysfx's @slider must not run
+  beside @sample); `slider_automate` from a script reaches the host from the message thread, so it records automation.
+- The state is taken under the processor's callback lock, as ysfx's plugin does (@serialize is script code); a block
+  that meets it plays dry, as for a state restore.
+- Latency changes the script makes while it runs are applied on the message thread (`setLatencySamples` informs the
+  listeners); the engine reads the plugin's latency as for any other.
+- Buses: stereo in / stereo out for an effect, stereo out for a generator. Scripts with more pins get silence on their
+  extra inputs (side-chain pins: a later stage).
+- Not in stages 1–2: @gfx (stage 3), the pack's @gfx scripts and Saike's set (stage 4), per-channel PDC.

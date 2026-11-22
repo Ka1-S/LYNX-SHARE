@@ -18094,3 +18094,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "HWheel254Tests.inc" // round 190ou: issue #254, the horizontal wheel
 #include "AutoLinks190ovTests.inc" // round 190ov (0.1.31): FL automation clips linked to several controls
 #include "PluginPack190ovTests.inc" // round 190ov (0.1.31): the later LYNX-own engines in the plugin pack
+#include "Jsfx190pjTests.inc" // round 190pj (0.1.32): JSFX support stages 1-2 (issue #241)

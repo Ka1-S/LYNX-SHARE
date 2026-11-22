@@ -22,6 +22,7 @@
 
 #include "engine/ClapFormat.h"
 #include "engine/Vst2Format.h"
+#include "engine/JsfxFormat.h"
 #include "engine/Vst3NoteTuning.h"
 #include "engine/PluginSandbox.h"
 #include "engine/TimedParameters.h"
@@ -2374,7 +2375,11 @@ juce::StringArray listPluginFiles (juce::AudioPluginFormatManager& formats, cons
     juce::StringArray files;
     for (auto* format : formats.getFormats())
         if (format->canScanForPlugins() && (withLv2 || format->getName() != "LV2"))
-            files.addArray (format->searchPathsForPlugins (format->getName() == "LV2" ? lv2Folders (paths) : paths, true, false));
+            // (JSFX scripts: in the JSFX roots only, Settings › File › JSFX folders; round 190pj)
+            files.addArray (format->searchPathsForPlugins (format->getName() == "LV2"                       ? lv2Folders (paths)
+                                                           : format->getName() == JsfxPluginFormat::formatName ? jsfx::roots()
+                                                                                                               : paths,
+                                                           true, false));
     return files;
 }
 
@@ -2478,6 +2483,8 @@ PluginHost::PluginHost (bool keep)
                 std::this_thread::sleep_for (std::chrono::milliseconds (50));
             if (! warmupQuit)
                 flPluginDatabase();
+            if (! warmupQuit)
+                scanJsfx(); // (round 190pj: the bundled pack and the JSFX folders are listed without a full scan)
         });
 }
 
@@ -2827,6 +2834,8 @@ bool PluginHost::scanOne (juce::AudioPluginFormat& format, const juce::String& f
 int PluginHost::scan (const juce::FileSearchPath& paths, const std::function<bool (float, const juce::String&)>& progress)
 {
     const auto before = known.getNumTypes();
+    if (persistent)
+        jsfx::installPack(); // (the bundled JSFX scripts, written once per pack version)
     auto lv2Done = false;
     {
         const std::scoped_lock lock (scanLock);
@@ -2908,6 +2917,30 @@ bool PluginHost::sameModule (const juce::PluginDescription& d, const juce::Strin
             && juce::File (d.fileOrIdentifier).isAChildOf (juce::File (file)));
 }
 
+int PluginHost::scanJsfx()
+{
+    if (persistent)
+        jsfx::installPack();
+    for (auto* format : formats.getFormats())
+        if (format->getName() == JsfxPluginFormat::formatName)
+        {
+            const auto files = format->searchPathsForPlugins (jsfx::roots(), true, false);
+            auto removed = false;
+            // scripts that are gone from the roots leave the list (a moved or deleted script)
+            for (const auto& d : known.getTypes())
+                if (d.pluginFormatName == JsfxPluginFormat::formatName && ! files.contains (d.fileOrIdentifier))
+                {
+                    known.removeType (d);
+                    removed = true;
+                }
+            const auto found = scanFiles (files, {});
+            if (removed && found == 0)
+                save();
+            return found;
+        }
+    return 0;
+}
+
 int PluginHost::scanFiles (const juce::StringArray& files, const std::function<bool (float, const juce::String&)>& progress)
 {
     const std::scoped_lock lock (scanLock);
@@ -2930,7 +2963,16 @@ int PluginHost::scanFiles (const juce::StringArray& files, const std::function<b
                 continue;
             if (! known.isListingUpToDate (file, *format) && ! listedInside (known, *format, file) && ! emptyScanIsCurrent (file))
             {
-                scanOne (*format, file);
+                if (format->isTrivialToScan())
+                {
+                    // JSFX (round 190pj): only a text header is read, nothing is loaded or run: in this process
+                    juce::OwnedArray<juce::PluginDescription> found;
+                    known.scanAndAddFile (file, false, found, *format);
+                    if (found.isEmpty())
+                        rememberEmptyScan (file);
+                }
+                else
+                    scanOne (*format, file);
                 unsaved = true;
             }
             break;
@@ -3290,7 +3332,10 @@ void PluginHost::findLv2Plugins()
 
 std::unique_ptr<juce::PluginDescription> PluginHost::find (const juce::String& id) const
 {
-    return known.getTypeForIdentifierString (id);
+    if (auto d = known.getTypeForIdentifierString (id))
+        return d;
+    // a JSFX script saved on another computer (or moved to another JSFX root): found by its relative path (round 190pj)
+    return jsfx::findPortable (known, id);
 }
 
 std::string PluginHost::bitnessKey (const juce::PluginDescription& d)

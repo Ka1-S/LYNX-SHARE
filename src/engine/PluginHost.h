@@ -507,6 +507,10 @@ public:
     int scan (const juce::FileSearchPath& paths, const std::function<bool (float, const juce::String&)>& progress);
     // The same for a given list of plugin files (targeted scan).
     int scanFiles (const juce::StringArray& files, const std::function<bool (float, const juce::String&)>& progress);
+    // JSFX scripts (round 190pj, issue #241): writes the bundled pack when this build's is newer, then lists the scripts
+    // of the JSFX roots (Settings › File › JSFX folders) in this process — a header is read, nothing runs — and drops
+    // the listed scripts that are gone. Returns how many were added. Any thread (as the scans).
+    int scanJsfx();
 
     // Background scan of pluginFolders() (or `paths`): never blocks the caller; poll backgroundScan() for progress.
     struct ScanState
