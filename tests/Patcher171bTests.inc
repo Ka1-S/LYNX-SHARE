@@ -386,3 +386,20 @@ TEST (patcher171b_fl_patcher_preset_with_event_links)
         }
     CHECK (std::isfinite (patcher141::run (song.mixer[1].effects[0], 0.5f, 512, 4).first));
 }
+
+// An FL Patcher cable into a Formula Controller's knob a / b / c (a Control Surface driving formulas) maps onto the
+// slot's parameters 0…2 on import instead of being dropped as "not mapped"
+TEST (patcher171b_formula_controller_knobs_map_from_fl)
+{
+    for (int k = 0; k < 3; ++k)
+    {
+        const auto map = lynx::effectParamFromFl ("Fruity Formula Controller", k);
+        CHECK (map.has_value());
+        if (map)
+        {
+            CHECK (map->param == k);
+            CHECK (! map->convert || std::abs (map->convert (0.25f) - 0.25f) < 1e-6f);
+        }
+    }
+    CHECK (! lynx::effectParamFromFl ("Fruity Formula Controller", 3).has_value());
+}

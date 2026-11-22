@@ -1751,6 +1751,10 @@ std::optional<FlParamMap> effectParamFromFl (const std::string& pluginName, int 
         || (is ("Fruity Blood Overdrive") && k >= 0 && k < flbasic::bloodOverdriveParams)
         || (is ("Fruity Send") && k >= 0 && k < 3)) // (pan, volume, dry; the insert is not a parameter in FL)
         return FlParamMap { k, [] (float v) { return std::clamp (v, 0.0f, 1.0f); } };
+    // Formula Controller: knobs a, b, c (FL parameters 0…2) → slot parameters 0…2, 0…1 as FL sends them; without this a
+    // Patcher cable from a Control Surface (or any controller) into a Formula Controller is dropped on import
+    if (is ("Fruity Formula Controller") && k >= 0 && k < 3)
+        return FlParamMap { k, [] (float v) { return std::clamp (v, 0.0f, 1.0f); } };
     // Hardcore's 50 parameters: FL sends 0…1 for all of them (the box types and the cabinet as raw numbers, REA_rodada71)
     if (is ("Hardcore") && k >= 0 && k < hardcore::numParams)
         return FlParamMap { k, [k] (float v) { return hardcore::toSlot (k, std::clamp (v, 0.0f, 1.0f)); } };
