@@ -222,7 +222,9 @@ TEST (pluginexport188b_table_codes_are_unique)
     }
     CHECK (rows > 0);
     CHECK (built == (int) lynx::plugexport::catalog.size());
-    CHECK (vst3 >= 1 && vst3 <= 10); // a short list: each VST3 carries the whole runtime (docs/PLUGIN_EXPORT.md)
+    // a short list: each VST3 carries the whole runtime (docs/PLUGIN_EXPORT.md). Round 190pq: 11, the three synths
+    // (Fourfold, Wavecoil, Duoloom) joined the eight, as the round's brief asked
+    CHECK (vst3 >= 1 && vst3 <= 11);
 }
 
 TEST (pluginexport188b_plugin_downloads_are_never_taken_for_the_app)

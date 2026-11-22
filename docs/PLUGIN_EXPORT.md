@@ -103,7 +103,26 @@ round 190pq:
   (raw -> 0..1 -> raw), which moves some values by a float step, and `modelParams` are written with 7 digits, so the
   second save differed in a last digit (Fourfold `modelParams` 46 and 138, Wavecoil 46 and 63). A save now writes only
   the values the host moved. `.lynx` loading is unchanged. `plugexporttest` checks the same thing on every plugin
-  and format (every parameter moved, a third instance loads the state and saves it back byte for byte). The Harmonia engine exports as **LYNX
+  and format (every parameter moved, a third instance loads the state and saves it back byte for byte).
+
+With those fixed, the CLAP test went further and found a crash that every LYNX instrument already had (FM10 and Model
+too): an instrument's editor crashed in a host that had removed every LYNX plugin and then added a LYNX instrument
+again. Each plugin instance holds a JUCE initialiser, and the last one to go shuts JUCE down, which deletes
+`WaveformCache` (a `DeletedAtShutdown` singleton). The library stays loaded, because JUCE's own `thread_local` text
+shaping registers a TLS destructor on the host's main thread, and that pins the library until the thread ends. The cache
+was declared "never create again after deletion", so the next instrument editor's `WaveformDisplay` got a null cache.
+It may be created again now (`src/ui/WaveformView.h`); the app deletes it only at its own shutdown. `plugexporttest`'s
+plain-host CLAP pass, which creates and frees one plugin at a time, covers this case. The instrument check also moves
+the engine's first continuous parameter by id under JUCE's LV2 host (that host lists parameters in its own order, and
+its parameter 1 was a stepped on / off switch on the three synths).
+
+The editor pictures `check-plugins.sh` draws showed two more things, both fixed in round 190pq:
+- LYNX Duoloom opened the Sampler's page (File, Time stretching, "No sample loaded"), not Braid's knob list.
+  `makeChannelSettingsPanel` had its own copy of the model-engine list, and round 190ko added Braid only to
+  `isModelKind`. The copy is gone, so the app's channel window for a Braid channel (Pattern layout) also shows the knob
+  list 190ko described, instead of the Sampler's page.
+- LYNX Fourfold's title strip printed "TETRA". As a plugin it prints the plugin's name (FOURFOLD), as the other
+  editors' name plates do; inside LYNX it stays TETRA. The knob-list page names the plugin as its description too. The Harmonia engine exports as **LYNX
 Chimefield** (Cherry Audio sells a Harmonia synth). Inside LYNX the engines keep their names. Instruments that stand in for FL Studio's follow later with their own names (round 188b report: a
 proposed list for the user). Until then they stay at `0`:
 
