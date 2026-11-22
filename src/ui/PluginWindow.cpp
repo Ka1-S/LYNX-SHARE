@@ -2111,7 +2111,7 @@ public:
         g.fillRect (strip);
         g.setColour (colour::border);
         g.fillRect (strip.removeFromBottom (1));
-        auto text = getLocalBounds().removeFromTop (titleHeight).withTrimmedLeft (menuButton.getRight() + 4).withTrimmedRight (2 * titleHeight + 6);
+        auto text = getLocalBounds().removeFromTop (titleHeight).withTrimmedLeft (headerToggle.getRight() + 4).withTrimmedRight (2 * titleHeight + 6);
         if (titlePresets != nullptr && titlePresets->getParentComponent() == this)
             text.setRight (titlePresets->getX() - 6);
         // FL's two tones (round 190in, FW-5): "Name" bright, " (target)" dim
