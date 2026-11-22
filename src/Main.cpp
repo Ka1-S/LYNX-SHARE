@@ -1,3 +1,4 @@
+#include <cfenv>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "engine/AraHost.h"
 #include "engine/FileSort.h"
@@ -7175,7 +7176,24 @@ private:
         // round 177b: a plugin's sidechain bus gets the slot's sidechain (one-click sidechain)
         const auto sidechainResult = lynx::pluginSidechainSelfTest();
         // round 190pj (issue #241): JSFX scripts in slots, their state, PDC, MIDI, file policy, the copy for older releases
+        // (rollup 0.1.31 step 7: the message thread's floating-point environment before and after it, reported and put back:
+        // the Linux arm64 self-test's float round trips, renders and paint tiles after this item differed from x86's)
+        std::fenv_t fpBeforeJsfx {};
+        std::fegetenv (&fpBeforeJsfx);
+        const auto fpModeNow = [] {
+           #if defined (__aarch64__) && ! defined (_MSC_VER)
+            return (juce::uint64) __builtin_aarch64_get_fpcr();
+           #else
+            return (juce::uint64) std::fegetround();
+           #endif
+        };
+        const auto fpModeBeforeJsfx = fpModeNow();
         const auto jsfxResult = lynx::jsfx::selfTest ({});
+        const auto fpModeAfterJsfx = fpModeNow();
+        std::fesetenv (&fpBeforeJsfx);
+        const auto jsfxFpResult = fpModeAfterJsfx == fpModeBeforeJsfx ? juce::String ("OK")
+                                                                      : "CHANGED 0x" + juce::String::toHexString ((juce::int64) fpModeBeforeJsfx) + " -> 0x"
+                                                                            + juce::String::toHexString ((juce::int64) fpModeAfterJsfx) + " (put back)";
 
         // round 190ap: the Versions panel's list of files, and its labels on disk beside them
         const auto versionsResult = lynx::versionsSelfTest();
@@ -10418,6 +10436,7 @@ private:
                << "plugin_art=" << artResult << "\n"
                << "plugin_sidechain=" << sidechainResult << "\n"
                << "jsfx190pj=" << jsfxResult << "\n"
+               << "jsfx_fp_environment=" << jsfxFpResult << "\n"
                << "versions_panel=" << versionsResult << "\n"
                << "plugins_off=" << pluginsOffResult << "\n"
                << "missing_files_rows=" << missingFilesResult << "\n"
