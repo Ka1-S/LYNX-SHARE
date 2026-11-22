@@ -126,9 +126,18 @@ juce::String modulators190oxSelfTest()
         m.routes = { { { AutomationTargetKind::mixerPan, 1, 0, 0 }, 0.25f } };
         older.modulators.push_back (m);
         const auto text = ProjectFile::toJson (older);
-        for (const auto* key : { "modulators190ox", "\"at\"", "\"host\"", "\"kind\"" })
-            if (text.contains (key))
-                return juce::String ("ERROR an LFO-only project writes ") + key;
+        const auto root = juce::JSON::parse (text);
+        if (root.hasProperty ("modulators190ox"))
+            return "ERROR an LFO-only project writes modulators190ox";
+        const auto* entry = root["modulators"][0].getDynamicObject();
+        if (entry == nullptr)
+            return "ERROR an LFO-only project lost its modulator";
+        const juce::StringArray stage1 { "name", "shape", "sync", "beats", "hz", "phase", "unipolar", "seed", "routes" };
+        for (const auto& p : entry->getProperties())
+            if (! stage1.contains (p.name.toString()))
+                return "ERROR an LFO-only project writes " + p.name.toString();
+        if (root["modulators"][0]["routes"][0].size() != 5)
+            return "ERROR an LFO-only route is not stage 1's five values";
         const auto again = ProjectFile::fromJson (text, why);
         if (! again || ! (again->modulators == older.modulators) || ProjectFile::toJson (*again) != text)
             return "ERROR an LFO-only project's round trip";
