@@ -5568,16 +5568,6 @@ public:
     }
 
 private:
-    // The window's size comes only from the tab now showing — not the largest tab, as it used to (issue: switching
-    // to a smaller tab never shrank the window). showTab() and childBoundsChanged() both resize through this.
-    juce::Point<int> desiredSize() const
-    {
-        if (current < 0 || current >= 0 (int) sizes.size())
-            return { 1, headerHeight + 1}
-        const auto& size = sizes[(std::size_t) current];
-        return { juce::jmax (1, size.x), headerHeight + juce::jmax (1, size.y) };
-    }
-
     AudioEngine& engine;
     std::function<ui::ValueSpec()> specOf;
     std::function<double()> getter;
@@ -6989,7 +6979,7 @@ public:
             tabs[(std::size_t) i]->setToggleState (i == index, juce::dontSendNotification);
         }
         const auto size = desiredSize();
-        if (size.x != getWidth || size.y != getHeight())
+        if (size.x != getWidth() || size.y != getHeight())
             setSize (size.x, size.y);
         else
             resized();
@@ -7129,16 +7119,16 @@ public:
 private:
     int currentHeaderHeight() const noexcept { return headerCollapsed ? 0 : headerHeight; }
 
+    // The window's size comes only from the tab now showing — not the largest tab, as it used to (issue: switching
+    // to a smaller tab never shrank the window). showTab() and childBoundsChanged() both resize through this.
     juce::Point<int> desiredSize() const
     {
-        int width = node ? 1 : MiscPanel::preferredWidth, height = node ? 1 : MiscPanel::preferredHeight;
-        for (const auto& size : sizes)
-        {
-            width = juce::jmax (width, size.x);
-            height = juce::jmax (height, size.y);
-        }
-        return { width, currentHeaderHeight() + height };
+        if (current < 0 || current >= (int) sizes.size())
+            return { 1, currentHeaderHeight() + 1 };
+        const auto& size = sizes[(std::size_t) current];
+        return { juce::jmax (1, size.x), currentHeaderHeight() + juce::jmax (1, size.y) };
     }
+
     AudioEngine& engine;
     int channel;
     bool node = false;

@@ -1388,7 +1388,7 @@ private:
                 editor->setTopLeftPosition (-12000, -12000); // (X11 positions are 16-bit, also when scaled)
         }
         if (settings)
-            setSize (juce::jmax (getWidth(), page.getWidth()), juce::jmax (getHeight(), page.preferredHeight() + currentHeaderHeight()));
+            setSize (juce::jmax (minimumWidth(), page.getWidth()), page.preferredHeight() + currentHeaderHeight());
         else
             fitEditor();
         resized();
