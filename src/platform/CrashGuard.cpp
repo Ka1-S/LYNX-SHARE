@@ -1584,7 +1584,7 @@ std::uintptr_t sampledStackTop = 0; // the sampled (UI) thread's stack end, from
 void onSampleSignal (int, siginfo_t*, void* context)
 {
     auto n = backtrace (sampledFrames, 64);
-    if (n < 4 && context != nullptr)
+    if (n < 5 && context != nullptr) // (fewer than 3 frames beyond the handler and the trampoline)
     {
         const auto& mc = static_cast<const ucontext_t*> (context)->uc_mcontext;
         n = 2; // (sampleThread drops the first two: the handler and the trampoline)
