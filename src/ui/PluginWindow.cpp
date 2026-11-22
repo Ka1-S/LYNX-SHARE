@@ -2140,6 +2140,7 @@ public:
     {
         auto strip = getLocalBounds().removeFromTop (titleHeight).reduced (3, 2);
         menuButton.setBounds (strip.removeFromLeft (18));
+        strip.removeFromLeft (4);
         headerToggle.setBounds (strip.removeFromLeft (18));
         closeButton.setBounds (strip.removeFromRight (strip.getHeight()));
         strip.removeFromRight (2);
