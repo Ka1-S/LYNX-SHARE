@@ -191,6 +191,7 @@ public:
     void paintOverChildren (juce::Graphics& g) override; // the outline while a folder is dragged over
     bool folderDragOver = false;
     void reloadUserFolders() { rebuildRoots(); } // after the list changed elsewhere (Settings > Files)
+    juce::Viewport* treeViewForTests() const noexcept { return treeView.get(); } // (round 190ou: --hwheel254test)
     void setSearchForSnapshot (const juce::String& text);
     // For snapshots: selects (and "previews" without sound) the first audio file under the first folder,
     // and puts the mouse over the row after it.

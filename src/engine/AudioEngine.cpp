@@ -827,6 +827,11 @@ float AudioEngine::renderOffline (const RenderOptions& options)
     setHqForAllPlugins (options.hqAllPlugins);
     setPluginsRenderMode (true); // and hosted plugins are told an export is running (FL: "notify about rendering mode")
     transport.sampleRate.store (sampleRate);
+    // Round 190ou: a render plays from the song's start at the song's tempo, as on a new engine. A second render on the
+    // same engine started where the first had stopped (the transport kept its end position, past a pattern's end: a
+    // silent file) and at the tempo the song's tempo automation had reached. The engine's position comes back after.
+    const auto positionBefore = transport.positionTicks.exchange (0.0);
+    transport.bpm.store (song.bpm);
     // round 164c: JUCE's graph builds its render sequence on the message thread. Prepared from the Export window's
     // thread it rebuilt later (asynchronously) and rendered silence until then: the first ~0.05–2 s of the song were
     // lost (the transport kept moving). It is prepared on the message thread, and the render waits for that.
@@ -947,6 +952,16 @@ float AudioEngine::renderOffline (const RenderOptions& options)
 
     stop();
     vfx::script::setSongEnded (false);
+    // Round 190ou: the rack sees the stop, as playback's next block shows it (the notes released, the note tools reset):
+    // a render after this one starts playing from a stopped transport, as on a new engine (one discarded block)
+    {
+        juce::AudioBuffer<float> view (buffer.getArrayOfWritePointers(), 2, blockSize);
+        view.clear();
+        midi.clear();
+        graph.processBlock (view, midi);
+    }
+    transport.positionTicks.store (positionBefore);
+    transport.bpm.store (song.bpm);
 
     if (rackProcessor != nullptr)
     {

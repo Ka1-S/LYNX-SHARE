@@ -128,6 +128,13 @@
 #include "engine/Bridge32Test.h"
 #include "engine/ClapFormat.h"
 #include "engine/ClapTeardownTest.h"
+#include "engine/RenderAgainTest.h"
+#include "ui/TiltViewport.h"
+#if JUCE_LINUX
+ #include <dlfcn.h> // (round 190ou: --hwheel254test presses X11 buttons through XTest)
+ #include <sys/prctl.h> // (round 190ou: --multieditor255test LYNX_ME_PTRACE=1)
+ #include <unistd.h>
+#endif
 #include "engine/HostingTests.h"
 #include "core/EdisonFx.h"
 #include "engine/ProjectFile.h"
@@ -1920,6 +1927,40 @@ public:
             // LYNX.exe --claprestarttest "LYNX Test Restart.clap" report.txt (tools/testplugin/lynx_test_restart.c)
             const auto i = args.indexOf ("--claprestarttest");
             runClapRestartTest (args[i + 1].unquoted(), args[i + 2].unquoted());
+            return;
+        }
+
+        if (args.contains ("--multieditor255test"))
+        {
+            // LYNX --multieditor255test report.txt <plugin>[::Name] ... (round 190ou, issue #255): several plugin editors open
+            // and in use while a keyboard plays; the audio must keep running (src/MultiEditor255Test.inc)
+            const auto i = args.indexOf ("--multieditor255test");
+            juce::StringArray plugins;
+            for (int k = i + 2; k < args.size() && ! args[k].startsWith ("--"); ++k)
+                plugins.add (args[k].unquoted());
+            runMultiEditor255Test (args[i + 1].unquoted(), plugins);
+            return;
+        }
+
+        if (args.contains ("--hwheel254test"))
+        {
+            // LYNX --hwheel254test report.txt (round 190ou, issue #254): the horizontal wheel in the Playlist (three layouts),
+            // Piano roll, Mixer and Browser, off screen (src/HWheel254Test.inc)
+            const auto i = args.indexOf ("--hwheel254test");
+            setApplicationReturnValue (runHWheel254Test (args[i + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--renderagaintest"))
+        {
+            // LYNX --renderagaintest report.txt (round 190ou, engine/RenderAgainTest.cpp): offline renders made again
+            const auto i = args.indexOf ("--renderagaintest");
+            juce::String lines;
+            const auto result = lynx::renderagain::check ([&lines] (const juce::String& line) { lines << line << "\n"; });
+            juce::File (args[i + 1].unquoted()).replaceWithText (lines + "renderagain190ou=" + result + "\n");
+            setApplicationReturnValue (result.startsWith ("OK") ? 0 : 1);
+            quit();
             return;
         }
 
@@ -9445,6 +9486,7 @@ private:
         const auto faultResult = faultReportSelfTest();
         const auto stemsResult = stemsSinglePassSelfTest(); // round 190gj
         const auto exportFormatsResult = lynx::shortexport::formatsCheck(); // AIFF and M4A (owner decision D5)
+        const auto renderAgainResult = lynx::renderagain::check(); // round 190ou: offline renders made again
         juce::LookAndFeel::setDefaultLookAndFeel (&lookBefore);
         const auto ok = editorsResult.startsWith ("OK") && ! faultResult.startsWith ("ERROR") && stemsResult == "OK" && exportFormatsResult.startsWith ("OK")
                         && mixerBasics == "OK" && fontsResult == "OK" && paintCachesResult.startsWith ("OK") && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && takeoverOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
@@ -9454,6 +9496,7 @@ private:
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
                         && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK"
+                        && renderAgainResult.startsWith ("OK")
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK")
                         && generatorSmartResult.startsWith ("OK")
@@ -9551,6 +9594,7 @@ private:
                << "rollup031s5_copy_for_0130=" << rollup031s5Result << "\n"
                << "simpleduck190ot=" << simpleDuck190otResult << "\n"
                << "sections190ol=" << sections190olResult << "\n"
+               << "renderagain190ou=" << renderAgainResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 
@@ -19372,6 +19416,8 @@ private:
 #include "DetailsShot190mf.inc" // round 190mf
 #include "DetailsShot190mk.inc" // round 190mk
 #include "DetailsShot190mp.inc" // round 190mp
+#include "HWheel254Test.inc" // round 190ou: issue #254, the horizontal wheel
+#include "MultiEditor255Test.inc" // round 190ou: issue #255, several plugin editors in use
 #include "DetailsShot190mr.inc" // round 190mr
 #include "DetailsShot190mv.inc" // round 190mv
 #include "DetailsShot190my.inc" // round 190my

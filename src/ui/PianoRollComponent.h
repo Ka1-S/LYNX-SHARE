@@ -327,6 +327,8 @@ public:
     int eventPaneBarTopForTests() const noexcept { return eventPaneBarTop; }
     // --undogesture190jv (round 190jv): the middle of the row of `key` at `tick`, in this component's coordinates
     // round 190mq (issues #211, #212, #213): the view and the time selection, for --issueshot190mq
+    double scrollTicksForTests() const noexcept { return scrollTicks; } // (round 190ou: --hwheel254test)
+    double pixelsPerTickForTests() const noexcept { return pixelsPerTick; }
     void setViewForTests (double firstTick, int rowPixels, int centreKey)
     {
         scrollTicks = firstTick;

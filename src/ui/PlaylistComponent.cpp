@@ -14855,6 +14855,15 @@ void PlaylistComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::M
         return;
     }
 
+    // issue #254 (round 190ou): a notch of the horizontal wheel (a tilt wheel, a second wheel) moves the view 1.5 beats
+    // sideways whatever the zoom, as in FL 2026 (a trackpad's swipe and Shift+wheel keep their own ways below)
+    if (! ctrl && ! alt)
+        if (const auto notch = gesture::horizontalWheelNotch (wheel.deltaX, wheel.deltaY, wheel.isSmooth, shift); notch != 0)
+        {
+            glideBy (notch * gesture::horizontalWheelBeats * ppq, 0.0);
+            return;
+        }
+
     // issue #154: the wheel scrolls a linked header's effects list when it has more rows than fit
     if (! shift && ! ctrl && ! alt && insertsWheel (e, wheel.deltaY))
         return;
