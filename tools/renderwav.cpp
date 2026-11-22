@@ -49,6 +49,8 @@
 #include "core/RackRenderer.h"
 #include "core/WorkerPool.h"
 #include "core/TimeStretch.h"
+#include "core/TempoMap.h"
+#include "core/ExportOptions.h"
 
 // LYNX_ALLOCS: every operator new while `counting` is set (inside RackRenderer::process) is counted
 namespace allocs
@@ -201,10 +203,87 @@ int main (int argc, char** argv)
         return std::vector<std::uint8_t> ((std::istreambuf_iterator<char> (f)), std::istreambuf_iterator<char>());
     };
 
+    // LYNX_REPORT=1: the import report (what is converted, approximated, unsupported, not reproduced, dropped) after the
+    // import (round 190pr: the demo song sweep's "what remains")
+    lynx::FlpImportReport report;
+    const bool printReport = std::getenv ("LYNX_REPORT") != nullptr;
+    if (printReport)
+        options.report = &report;
+
     const auto importStart = std::chrono::steady_clock::now();
     try
     {
-        song = lynx::importFlp (flp::parseProject (bytes), options);
+        const auto parsed = flp::parseProject (bytes);
+        song = lynx::importFlp (parsed, options);
+        if (printReport)
+        {
+            // the automation targets: clips (0xE3), song-start values (0xD8), pattern events (0xDF: per target, value range)
+            const auto who = [&] (flp::ControlId id) {
+                std::string s;
+                if (id.isChannel())
+                {
+                    for (const auto& c : parsed.channels)
+                        if (c.index == id.channel())
+                            s = "ch " + std::to_string (c.index) + " " + c.name + " [" + c.pluginName + "]";
+                }
+                else if (id.isMixer())
+                {
+                    s = "insert " + std::to_string (id.track()) + " slot " + std::to_string (id.slot());
+                    for (const auto& ins : parsed.mixer)
+                        if (ins.index == id.track())
+                            for (const auto& sl : ins.slots)
+                                if (sl.index == id.slot())
+                                    s += " [" + sl.plugin + "]";
+                }
+                char b[64];
+                std::snprintf (b, sizeof b, " param 0x%04x (%d)", id.param(), id.param() >= 0x8000 ? id.param() - 0x8000 : -1);
+                return s + b;
+            };
+            for (const auto& l : parsed.automationLinks)
+                std::printf ("auto clip ch %d -> %s\n", l.channel, who (l.target).c_str());
+            for (const auto& c : parsed.initControls)
+                std::printf ("init value %s = %d\n", who (c.id).c_str(), c.value);
+            std::map<std::uint32_t, std::pair<std::int32_t, std::int32_t>> ranges;
+            std::map<std::uint32_t, int> counts;
+            for (const auto& p : parsed.patterns)
+                for (const auto& e : p.controlEvents)
+                {
+                    auto [it, fresh] = ranges.try_emplace (e.id.raw, e.value, e.value);
+                    it->second.first = std::min (it->second.first, e.value);
+                    it->second.second = std::max (it->second.second, e.value);
+                    ++counts[e.id.raw];
+                }
+            for (const auto& [id, r] : ranges)
+                std::printf ("pattern events %s: %d events, %d..%d\n", who (flp::ControlId { id }).c_str(), counts[id], r.first, r.second);
+            const auto list = [] (const char* what, const std::map<std::string, int>& m) {
+                for (const auto& [k, n] : m)
+                    std::printf ("report %s: %s x%d\n", what, k.c_str(), n);
+            };
+            list ("converted", report.converted);
+            list ("approximated", report.approximated);
+            list ("unsupported", report.unsupported);
+            list ("not reproduced", report.notReproduced);
+            list ("dropped effect", report.droppedEffects);
+            list ("partial effect", report.partialEffects);
+            if (report.missingSamples > 0)
+                std::printf ("report missing samples: %d\n", report.missingSamples);
+            // the tempo map: the song's tempo every 4 bars and its playing time there
+            {
+                double seconds = 0.0;
+                const auto bar = (double) song.barTicks();
+                std::int64_t end = 0;
+                for (const auto& c : song.playlist)
+                    end = std::max (end, c.end());
+                for (double t = 0.0; t < (double) end; t += 1.0)
+                {
+                    const auto bpm = song.tempoAt (t);
+                    if (std::fmod (t, 4.0 * bar) == 0.0)
+                        std::printf ("tempo at bar %d: %.3f BPM, %.3f s\n", (int) (t / bar) + 1, bpm, seconds);
+                    seconds += 60.0 / (bpm * (double) lynx::ppq);
+                }
+                std::printf ("tempo map end %.3f s\n", seconds);
+            }
+        }
         std::printf ("import: %.0f ms\n", std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - importStart).count());
         std::size_t held = 0; // FL's held step notes (round 190oz)
         for (const auto& pat : song.patterns)
@@ -286,7 +365,21 @@ int main (int argc, char** argv)
     std::int64_t songTicks = 0;
 
     if (wholeSong) // with the app's empty tail (1 s), so the song does not wrap to its start inside the rendered tail
-        song = lynx::makeExportSong (song, true, (std::int64_t) std::ceil (lynx::ticksPerSample (song.bpm, 44100) * 44100.0), songTicks);
+    {
+        const auto tail = (std::int64_t) std::ceil (lynx::ticksPerSample (song.bpm, 44100) * 44100.0);
+        // round 190pr: following the Start / skip / pause markers, as the app's export (and FL's) when Song::exportMarkers is on
+        if (const auto spans = lynx::exportopts::exportSpans (song); spans.size() > 1 || (spans.size() == 1 && spans.front().first > 0))
+        {
+            lynx::exportopts::Options o;
+            o.range = lynx::exportopts::Range::song;
+            o.disableMaxPolyphony = false; // (as this tool renders every other song)
+            std::int64_t loopTicks = 0;
+            song = lynx::exportopts::makeRenderSong (song, o, tail, songTicks, loopTicks);
+            std::printf ("export follows the markers: %zu span(s), from tick %lld\n", spans.size(), (long long) spans.front().first);
+        }
+        else
+            song = lynx::makeExportSong (song, true, tail, songTicks);
+    }
 
     int chosen = argc > 3 && ! wholeSong ? std::atoi (argv[3]) : -1;
 
@@ -306,7 +399,12 @@ int main (int argc, char** argv)
     constexpr int sampleRate = 44100;
     const int blockSize = std::getenv ("LYNX_BLOCK") ? std::clamp (std::atoi (std::getenv ("LYNX_BLOCK")), 16, 8192) : 256;
     const auto tps = lynx::ticksPerSample (song.bpm, sampleRate);
-    auto totalSamples = (std::size_t) (lengthTicks / tps) + sampleRate; // +1 s of tail
+    // round 190pr: with tempo automation / tempo events the transport moves at the block's tempo, as the app's does
+    // (RackRenderer::currentBpm; before, this tool played every song at its start tempo: Secret Agent Rendezvous' first
+    // 24 bars at 110 instead of FL's 120 BPM); LYNX_FIXEDTEMPO=1: the old clock
+    const bool followTempo = lynx::tempomap::active (song) && std::getenv ("LYNX_FIXEDTEMPO") == nullptr;
+    auto totalSamples = followTempo ? (std::size_t) std::ceil (song.secondsForTicks (lengthTicks) * sampleRate) + sampleRate
+                                    : (std::size_t) (lengthTicks / tps) + sampleRate; // +1 s of tail
     if (const char* s = std::getenv ("LYNX_SECONDS"); s != nullptr && std::atof (s) > 0) // benchmark: render only the start
         totalSamples = std::min (totalSamples, (std::size_t) (std::atof (s) * sampleRate));
 
@@ -360,6 +458,24 @@ int main (int argc, char** argv)
             tracksWithFx += ! t.effects.empty();
         std::printf ("mixer: %zu edges (%zu with PDC delay), %zu tracks with effects\n", edges, delayed, tracksWithFx);
     }
+    // LYNX_LISTFX=1: every mixer track with effects or sends: fader, effects (kind, on, mix, unresolved plugins), sends
+    // (round 190pr: where a demo song's level goes)
+    if (std::getenv ("LYNX_LISTFX") != nullptr)
+        for (std::size_t t = 0; t < song.mixer.size(); ++t)
+        {
+            const auto& tr = song.mixer[t];
+            if (tr.effects.empty() && tr.sends.empty() && t != 0)
+                continue;
+            std::printf ("track %3zu %-24s vol %.3f pan %+.2f%s%s:", t, tr.name.c_str(), tr.volume, tr.pan, tr.muted ? " MUTED" : "",
+                         tr.toMaster ? "" : " (not to master)");
+            for (const auto& fx : tr.effects)
+                std::printf (" [@%d %s%s%s mix %.2f]", fx.row, lynx::effectInfo (fx.kind).name, fx.enabled ? "" : " off",
+                             fx.kind == lynx::EffectKind::plugin ? (" " + fx.plugin.name + (fx.plugin.foreign.format != lynx::ForeignPlugin::Format::none ? " UNRESOLVED" : "")).c_str() : "",
+                             fx.mix);
+            for (const auto& s : tr.sends)
+                std::printf (" ->%d(%.2f)", s.target, s.level);
+            std::printf ("\n");
+        }
     lynx::RackRenderer renderer;
     // LYNX_THREADS=n: n worker threads for the channels and mixer layers, as the app's audio engine uses
     std::unique_ptr<lynx::WorkerPool> pool;
@@ -423,7 +539,7 @@ int main (int argc, char** argv)
         blocksWithAllocs += allocs::count.load() != allocsBefore;
         wallMs.push_back (std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - t0).count());
         cpuMs.push_back (threadCpuMs() - c0);
-        tick += n * tps;
+        tick += n * (followTempo ? lynx::ticksPerSample (renderer.currentBpm(), sampleRate) : tps);
 
         if (realtime) // the next block starts one block later, like a sound card's callback
             std::this_thread::sleep_until (started + std::chrono::microseconds ((long long) ((pos + (std::size_t) n) * 1.0e6 / sampleRate)));

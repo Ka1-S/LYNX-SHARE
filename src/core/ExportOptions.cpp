@@ -1,5 +1,6 @@
 #include "core/ExportOptions.h"
 #include "core/ExportNaming.h"
+#include "core/MarkerPlan.h"
 #include "core/Scheduler.h"
 
 #include <algorithm>
@@ -483,6 +484,42 @@ bool hasSelection (const Song& song) noexcept
     return song.loopEnd > song.loopStart && song.loopStart >= 0;
 }
 
+std::vector<std::pair<std::int64_t, std::int64_t>> exportSpans (const Song& song)
+{
+    const auto end = song.songLength();
+    if (! song.exportMarkers || end <= 0)
+        return { { 0, std::max<std::int64_t> (end, 0) } };
+    const auto plan = makeMarkerPlan (song);
+    std::vector<std::pair<std::int64_t, std::int64_t>> spans;
+    auto pos = std::clamp<std::int64_t> (plan.start, 0, end); // (the first Start marker; none: bar 1)
+    bool jumped = false;
+    for (int guard = 0; guard <= MarkerPlan::maxJumps && pos < end; ++guard)
+    {
+        // the next Marker skip after `pos` — or on it, when a skip landed there: skips chain (Raubana's skips at 30720,
+        // 43008 and 49152 each land on the next one; FL's render plays none of those sections). FL's render does not stop
+        // at a Marker pause [EXEC: Raubana with its pause at 53760 ticks renders as without it] and cannot follow a marker
+        // loop, which jumps back
+        const MarkerJump* next = nullptr;
+        for (int i = 0; i < plan.count && next == nullptr; ++i)
+        {
+            const auto& j = plan.jumps[(std::size_t) i];
+            if ((j.at > pos || (jumped && j.at == pos)) && j.at < end && j.kind == MarkerJump::Kind::jump && j.to > j.at)
+                next = &j;
+        }
+        if (next == nullptr)
+            break;
+        if (next->at > pos)
+            spans.push_back ({ pos, next->at });
+        pos = next->to;
+        jumped = true;
+    }
+    if (pos < end)
+        spans.push_back ({ pos, end });
+    if (spans.empty())
+        spans.push_back ({ 0, 0 });
+    return spans;
+}
+
 Song makeRenderSong (const Song& original, const Options& o, std::int64_t tailTicks, std::int64_t& musicTicks, std::int64_t& loopTicks)
 {
     // FL's legacy Pattern Blocks (round 170f) are rendered as the clips they play as
@@ -494,27 +531,35 @@ Song makeRenderSong (const Song& original, const Options& o, std::int64_t tailTi
     base.auditionLane = base.auditionComp = -1; // an audition is for listening: an export renders what the song plays (round 177c)
     std::int64_t length = 0;
 
-    if (o.range == Range::selection && hasSelection (song))
+    // round 190pr (Song::exportMarkers): FL's export of the song follows its Start marker and Marker skips
+    const auto spans = o.range == Range::song ? exportSpans (song) : std::vector<std::pair<std::int64_t, std::int64_t>> {};
+    const auto followsMarkers = spans.size() > 1 || (spans.size() == 1 && spans.front().first > 0);
+    if ((o.range == Range::selection && hasSelection (song)) || followsMarkers)
     {
-        const auto from = song.loopStart, to = song.loopEnd;
+        const auto pieces = followsMarkers ? spans : std::vector<std::pair<std::int64_t, std::int64_t>> { { song.loopStart, song.loopEnd } };
         std::vector<Clip> cropped;
         // by start (the same start: the list's order): clips of a pattern cut at `from` all start there, and the one that
         // started last must stay the later one (FL's pattern clip takeover, issue #158)
         auto ordered = song.playlist;
         std::stable_sort (ordered.begin(), ordered.end(), [] (const Clip& a, const Clip& b) { return a.start < b.start; });
 
-        for (auto clip : ordered)
+        std::int64_t at = 0; // where the piece goes in the export
+        for (const auto& [from, to] : pieces)
         {
-            if (clip.end() <= from || clip.start >= to || clip.length <= 0)
-                continue;
-            if (clip.start < from)
-                clip = splitClip (clip, from);
-            if (clip.end() > to)
-                splitClip (clip, to); // keeps the head
-            clip.start -= from;
-            cropped.push_back (clip);
+            for (auto clip : ordered)
+            {
+                if (clip.end() <= from || clip.start >= to || clip.length <= 0)
+                    continue;
+                if (clip.start < from)
+                    clip = splitClip (clip, from);
+                if (clip.end() > to)
+                    splitClip (clip, to); // keeps the head
+                clip.start += at - from;
+                cropped.push_back (clip);
+            }
+            at += to - from;
         }
-
+        const auto from = (std::int64_t) 0, to = at;
         base.playlist = std::move (cropped);
         base.mode = PlayMode::song;
         std::int64_t ignored = 0;
@@ -573,8 +618,9 @@ Song makeRenderSong (const Song& original, const Options& o, std::int64_t tailTi
         for (auto& c : base.channels)
             c.maxPolyphony = 0;
 
-    // FL's export plays the song straight through: marker loops / skips / pauses and the Start / Loop markers act only
-    // while playing live (REA_rodada165f-markers §1.3: FL's renders of every marker action match the plain song)
+    // The rendered song plays straight through: marker loops / skips / pauses and the Start / Loop markers act only while
+    // playing live (REA_rodada165f-markers §1.3). Round 190pr (Song::exportMarkers, FL 2026's /R renders of its demos): the
+    // Start and skip markers already chose the spans above, so they too are plain markers here
     for (auto& a : base.arrangements)
         for (auto& m : a.markers)
             if (m.action == Marker::markerLoop || m.action == Marker::markerSkip || m.action == Marker::markerPause

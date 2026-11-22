@@ -12643,3 +12643,6 @@ countries: jp
 # --- rollup 0.1.31 step 7: Save a copy for 0.1.30 (round 190pi)
 "Ogun and Autogun play every note at the channel's level in this release (FL's link velocity is left out): {0}" = "このリリースでは、Ogun と Autogun はすべてのノートをチャンネルのレベルで鳴らします(FL のリンクベロシティは含まれません): {0}"
 "Automation of Sytrus' main knobs (master level, LFO, pitch, Mod X / Y) does nothing in this release: {0}" = "Sytrus のメインノブ(master level、LFO、pitch、Mod X / Y)のオートメーションは、このリリースでは何もしません: {0}"
+"Automation of Harmor's filter frequencies and Mod X / Y / Z does nothing in this release: {0}" = "Harmor のフィルター周波数と Mod X / Y / Z のオートメーションは、このリリースでは何もしません: {0}"
+"Sytrus plays every note at the default Mod X / Y in this release: {0}" = "このリリースでは Sytrus はすべてのノートを既定の Mod X / Y で再生します: {0}"
+"The export plays the song straight through in this release (from bar 1, past the skip markers)" = "このリリースではエクスポートは曲を通しで再生します(1 小節目から、スキップのマーカーを無視)"

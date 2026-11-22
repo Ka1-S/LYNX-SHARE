@@ -1,6 +1,7 @@
 #include "core/Crossfader.h"
 #include "core/RackRenderer.h"
 #include "core/SytrusEngine.h"
+#include "core/Harmor.h"
 #include "core/TrackStates.h"
 #include "core/LynxVerbs.h"
 #include "core/PolyEdit.h"
@@ -2209,6 +2210,9 @@ void RackState::buildAutomationTables()
                                   || modelparams::find (song.channels[(std::size_t) t.index].instrument, t.param) != nullptr
                                   // Sytrus' main page (round 190pi: master level / LFO / pitch, Mod X / Y)
                                   || (song.channels[(std::size_t) t.index].instrument == InstrumentKind::sytrus && sytrus::automatable (t.param))
+                                  // Harmor's filter frequencies and Mod X / Y / Z (round 190pr; engine revision 3 on)
+                                  || (song.channels[(std::size_t) t.index].instrument == InstrumentKind::harmor
+                                      && song.channels[(std::size_t) t.index].engineRev >= 3 && harmor::automatable (t.param))
                                   // LYNX Synth's knobs (issue #152, round 190he)
                                   || (song.channels[(std::size_t) t.index].instrument == InstrumentKind::synth && synthparam::valid (t.param))
                                   // FL Studio Mobile's DW Sampler: its own 34 values (round 190de)

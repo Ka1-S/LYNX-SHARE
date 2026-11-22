@@ -12643,3 +12643,6 @@ countries: id
 # --- rollup 0.1.31 step 7: Save a copy for 0.1.30 (round 190pi)
 "Ogun and Autogun play every note at the channel's level in this release (FL's link velocity is left out): {0}" = "Ogun dan Autogun memainkan setiap not pada level channel di rilis ini (link velocity FL tidak disertakan): {0}"
 "Automation of Sytrus' main knobs (master level, LFO, pitch, Mod X / Y) does nothing in this release: {0}" = "Otomasi kenop utama Sytrus (master level, LFO, pitch, Mod X / Y) tidak berpengaruh di rilis ini: {0}"
+"Automation of Harmor's filter frequencies and Mod X / Y / Z does nothing in this release: {0}" = "Otomasi frekuensi filter dan Mod X / Y / Z Harmor tidak berpengaruh di rilis ini: {0}"
+"Sytrus plays every note at the default Mod X / Y in this release: {0}" = "Di rilis ini Sytrus memainkan setiap not dengan Mod X / Y bawaan: {0}"
+"The export plays the song straight through in this release (from bar 1, past the skip markers)" = "Di rilis ini ekspor memutar lagu tanpa henti (dari bar 1, melewati marker skip)"

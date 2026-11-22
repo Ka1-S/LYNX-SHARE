@@ -347,6 +347,54 @@ std::optional<std::pair<int, int>> flRawRange (flp::ControlId id, const std::str
         return std::pair { transmitter::controlRange (k).lo, transmitter::controlRange (k).hi };
     if (plugin == "LuxeVerb" && k < luxeVerbControlCount)
         return std::pair { luxeverb::ranges[(std::size_t) k].lo, luxeverb::ranges[(std::size_t) k].hi };
+    if (plugin == "Harmor" && id.isChannel() && k < harmor::flParamCount) // (round 190pr: the DLL's own ranges)
+        return harmor::flParamRange (k);
+    // Round 190pr: the raw ranges of FL's own effects that the demos' song-start values (0xD8) and pattern events use most
+    // (REA_rodada190pr, EXEC: each plugin DLL's ProcessParam with REC_FromMIDI at 0 and 2^30, read back with REC_GetValue)
+    if (id.isMixer())
+    {
+        struct R
+        {
+            const char* plugin;
+            std::vector<std::pair<int, int>> ranges;
+        };
+        static const std::vector<R> table = {
+            { "Fruity Balance", { { -128, 128 }, { 0, 320 } } },
+            { "Fruity Fast LP", { { 0, 1024 }, { 0, 1024 } } },
+            { "Fruity Filter", { { 0, 1024 }, { 0, 1024 }, { 0, 1024 }, { 0, 1024 }, { 0, 1024 }, { 0, 1 } } },
+            { "Fruity Free Filter", { { 100, 700 }, { 0, 1024 }, { 0, 1024 }, { 0, 1024 } } },
+            { "Fruity WaveShaper", { { 64, 192 }, { 0, 128 }, { 0, 128 } } },
+            { "Fruity PanOMatic", { { 0, 256 }, { 0, 320 }, { 0, 2 }, { 0, 2 }, { 0, 128 }, { 0, 55000 } } },
+            { "Fruity Delay 2", { { -128, 128 }, { 0, 160 }, { 0, 160 }, { 0, 127 }, { 1, 768 }, { -512, 512 }, { 0, 2 }, { 0, 128 } } },
+            { "Fruity Delay 3", { { 0, 6000 }, { 0, 3 }, { 0, 1 }, { 0, 1 }, { 1, 768 }, { 0, 6000 }, { 0, 1000 }, { 0, 6000 }, { 0, 6000 },
+                                  { 0, 6000 }, { 0, 6000 }, { 0, 6000 }, { 0, 6000 }, { 0, 1 }, { 0, 6000 }, { 0, 3 }, { 0, 6000 },
+                                  { 0, 6000 }, { 0, 6000 }, { 0, 6000 }, { 0, 6000 }, { 0, 60000 }, { 0, 6000 }, { 0, 6000 },
+                                  { -3000, 3000 }, { 0, 6000 } } },
+            { "Fruity Limiter", { { 0, 2000 }, { 0, 1000 }, { 0, 2000 }, { 0, 10000 }, { 1, 8 }, { 0, 10000 }, { 1, 8 }, { 0, 10000 },
+                                  { 0, 1000 }, { -1000, 1000 }, { -1000, 1000 }, { 0, 10000 }, { 0, 10000 }, { 1, 8 }, { 0, 10000 },
+                                  { 0, 1000 }, { 0, 1000 }, { 0, 10000 } } },
+        };
+        static const std::vector<std::pair<int, int>> peq2 = [] {
+            std::vector<std::pair<int, int>> v;
+            for (int b = 0; b < 7; ++b) v.push_back ({ -1800, 1800 }); // band levels
+            for (int b = 0; b < 7; ++b) v.push_back ({ 0, 65536 });    // frequencies
+            for (int b = 0; b < 7; ++b) v.push_back ({ 0, 65536 });    // bandwidths
+            for (int b = 0; b < 7; ++b) v.push_back ({ 0, 7 });        // types
+            for (int b = 0; b < 7; ++b) v.push_back ({ -3, 3 });       // orders
+            v.push_back ({ -1800, 1800 });                              // main level
+            return v;
+        }();
+        if (plugin == "Fruity Parametric EQ 2" && k < (int) peq2.size())
+            return peq2[(std::size_t) k];
+        for (const auto& r : table)
+            if (plugin == r.plugin && k < (int) r.ranges.size())
+                return r.ranges[(std::size_t) k];
+    }
+    if (plugin == "Sytrus" && id.isChannel() && sytrus::automatable (k)) // (round 190pr: the main page round 190pi automates)
+    {
+        static constexpr int low[3] { 0, -128, -24 }, high[3] { 160, 128, 24 };
+        return k <= 2 ? std::pair { low[k], high[k] } : std::pair { 0, 512 };
+    }
     return std::nullopt;
 }
 
@@ -1010,6 +1058,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     song.playTruncatedNotes = project.playTruncatedNotes; // 0x1E (REA round 167g)
     song.muteRunsEffects = true;                          // FL's muted insert (round 190y)
     song.slideNoteProps = true;                           // FL's slide notes move the note properties (issue #236)
+    song.exportMarkers = true;                            // FL's export follows the Start and skip markers (round 190pr)
     song.patternClipTakeover = true;                      // FL's pattern clip takeover (issue #158)
     song.fastDeclick = project.fastDeclick;               // 0x28 (REA round 167h)
     song.panTriangular = (project.panLaw >> 1) == 1;       // 0x17: FL saves 2 × its pan-law mode (REA round 167j §1)
@@ -3957,6 +4006,38 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             AutomationTarget target;
             if (const auto convert = convertor (c.id, target))
             {
+                // Round 190pr: a Harmor parameter kept as a plain value of the state takes FL's song-start value there
+                // (FL hands it to ProcessParam before the song plays, REA_rodada190pr: Lightning's "saw chords" was
+                // saved with its filter shut, 0, and starts at 8192, wide open)
+                if (target.kind == AutomationTargetKind::channelParam && target.index >= 0 && target.index < (int) song.channels.size()
+                    && song.channels[(std::size_t) target.index].instrument == InstrumentKind::harmor
+                    && harmor::flParamInState (target.param))
+                    if (const auto slot = harmor::flParamSlot (target.param))
+                    {
+                        auto& st = song.channels[(std::size_t) target.index].pluginState;
+                        if (const auto at = harmorParamOffset (st, slot->first, slot->second); at >= 0)
+                        {
+                            const auto raw = (std::int32_t) c.value;
+                            std::memcpy (st.data() + at, &raw, 4);
+                            if (options.report != nullptr)
+                                ++options.report->converted["Harmor: song-start value of a parameter"];
+                        }
+                    }
+                // ... and Sytrus' main page (master level / LFO / pitch, Mod X / Y: main ints 0…2, 190, 191)
+                if (target.kind == AutomationTargetKind::channelParam && target.index >= 0 && target.index < (int) song.channels.size()
+                    && song.channels[(std::size_t) target.index].instrument == InstrumentKind::sytrus && sytrus::automatable (target.param))
+                {
+                    const auto mainIndex = target.param <= 2 ? target.param : 190 + target.param - 18;
+                    const auto& table = sytrus::settings();
+                    for (int k = 0; k < (int) table.size(); ++k)
+                        if (table[(std::size_t) k].index == mainIndex
+                            && sytrus::setSetting (song.channels[(std::size_t) target.index].pluginState, k, (int) c.value))
+                        {
+                            if (options.report != nullptr)
+                                ++options.report->converted["Sytrus: song-start value of a main-page knob"];
+                            break;
+                        }
+                }
                 const auto value = convert (c.value);
                 if (target.kind == AutomationTargetKind::tempo)
                     initialTempo = value; // (applied at the end: the audio clips' millisecond offsets use the file's tempo)

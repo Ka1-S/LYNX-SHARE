@@ -3069,6 +3069,8 @@ juce::String toJson (const Song& song, bool stampVersion)
         root->setProperty ("muteRunsEffects", true);
     if (song.slideNoteProps)
         root->setProperty ("slideNoteProps", true); // (issue #236)
+    if (song.exportMarkers)
+        root->setProperty ("exportMarkers", true); // (round 190pr)
     if (song.patternClipTakeover)
         root->setProperty ("patternClipTakeover", true);
     if (song.mutedInsertsSkip)
@@ -4165,6 +4167,7 @@ std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error,
     song.playTruncatedNotes = (bool) root.getProperty ("playTruncatedNotes", false);
     song.muteRunsEffects = (bool) root.getProperty ("muteRunsEffects", false); // (round 190y; older projects: off)
     song.slideNoteProps = (bool) root.getProperty ("slideNoteProps", false);   // (issue #236; older projects: off)
+    song.exportMarkers = (bool) root.getProperty ("exportMarkers", false); // (round 190pr; older projects: off)
     song.patternClipTakeover = (bool) root.getProperty ("patternClipTakeover", false); // (issue #158; older projects: off)
     song.mutedInsertsSkip = (bool) root.getProperty ("mutedInsertsSkip", false); // (LYNX option, round 190y)
     song.fastDeclick = (bool) root.getProperty ("fastDeclick", false);

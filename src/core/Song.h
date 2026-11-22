@@ -1053,7 +1053,8 @@ struct ChannelDef
     // plays as it did; new channels and FL imports get the current one. Harmor: 1 = resynthesis (a sample in the IMG
     // section) played as FL plays it (0: such a part plays its timbres, as LYNX did before). SimSynth: 2 = the note
     // velocity reaches its level through FL's Init.Vol law (round 190om; 0 and 1: every note at full level, as before).
-    int engineRev = 2;
+    // Harmor 3 (round 190pr): automation of its filter frequencies and Mod X / Y / Z moves them as in FL (before: ignored).
+    int engineRev = 3;
     SamplerSettings sampler; // used when instrument == sampler
     SynthSettings synth;     // used when instrument == synth
     float swingMix = 1.0f;   // how much of the global swing applies to this channel (0..1), as in FL
@@ -3183,6 +3184,13 @@ struct Song
     // it moves their pitch. Off = LYNX's behaviour before (a slide moved the pitch only); projects saved before keep it
     // off, .flp imports and new projects turn it on. Saved with the project.
     bool slideNoteProps = false;
+    // FL 2026's export follows two of the arrangement's marker actions (round 190pr, FL64 /R renders, REA_rodada190pr): it
+    // starts at the Start marker (Umziky with the marker at 1536, 2976 and 3456 ticks starts there; made a plain marker: bar
+    // 1) and jumps over each Marker skip's section (Raubana – LIFE: 89 s of music instead of 212 s; its skips made plain
+    // markers: 212 s). A Marker pause does not stop it and marker loops are not followed (as REA_rodada165f found). Off =
+    // LYNX before 0.1.32 (the song straight through); projects saved before keep it off, .flp imports and new projects turn
+    // it on. Saved with the project.
+    bool exportMarkers = false;
     // FL 2026 (round 190eh renders, issue #158): a pattern plays from one Playlist clip at a time. A clip of the same
     // pattern that starts later (on any track) takes over at its start: the earlier clip starts no more notes from there
     // (also after the later clip has ended), the notes it already started play to their ends (scheduleSong). Clips of

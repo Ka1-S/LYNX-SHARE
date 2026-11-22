@@ -2915,6 +2915,7 @@ struct Voice
     bool isSlave = false;
     double fs = 44100;
     float vel = 0.78125f, relvel = 1.0f, fvol = 1, fpan = 0, notePan = 0, initVol = 1;
+    double fcut = 0.0, fres = 0.0; // FL's Final.FCut / FRes (the note's Mod X / Y, −1…1; round 190pr)
     float pitch = 0, master = 1, base = 0, rampMax = 0, panMax = 0;
     float uvol = 1, upan = 0.5f, uphase = 0, udet = 1, envvar = 1.0f / 128, fxpan = 0, w34 = 1;
     double unisonX = 0.5;
@@ -3322,7 +3323,7 @@ struct Engine::Impl
         if (hasRand && ! d.mapDefault[4])
             a.stat = a.combine (a.stat, m[4].mapValue (rand));
         a.stat = a.combine (a.stat, m[5].mapValue (unisonX));
-        artTabs (a);
+        artTabs (a, v.fcut, v.fres);
         auto& e = a.env;
         e.init();
         a.lfo.env.init();
@@ -3366,16 +3367,17 @@ struct Engine::Impl
     }
 
     // the Mod X / Y map values of an articulator (its X / Y tables at the main page's Mod X / Y)
-    void artTabs (ArtSt& a) const noexcept
+    void artTabs (ArtSt& a, double fcut, double fres) const noexcept
     {
         const auto& d = *a.d;
         const auto& m = d.maps;
         a.ntabs = 0;
         const int mxy[2] { mval (190), mval (191) };
+        const double fl[2] { fcut, fres }; // (round 190pr: the voice's Final.FCut / FRes; 0 before)
         for (int j = 0; j < 2; ++j)
             if (! d.mapDefault[(std::size_t) (2 + j)])
             {
-                const auto ix = std::clamp<long long> (rnd (mxy[j] + 0.0 * 256.0), 0, 512); // Final.FCut/FRes = 0 in LYNX
+                const auto ix = std::clamp<long long> (rnd (mxy[j] + fl[j] * 256.0), 0, 512);
                 a.tabs[a.ntabs++] = m[(std::size_t) (2 + j)].mapValue ((double) ix / 512.0);
             }
     }
@@ -4575,6 +4577,7 @@ struct Engine::Impl
             v->key = (int) std::lround (note.key);
             v->isSlave = false;
             v->notePan = note.pan;
+            v->fcut = note.fcut, v->fres = note.fres;
             // FL velocity → Init.Vol = (11^(vel/100) − 1)/10 (REA_rodada28 §4.1, inference), used only with link velocity
             v->initVol = (float) ((std::pow (11.0, 1.28 * std::clamp ((double) note.velocity, 0.0, 1.0)) - 1.0) / 10.0);
             setupVoice (*v, nt, u);
@@ -5004,11 +5007,11 @@ void Engine::setMainValue (int mainIndex, int value) noexcept
         {
             for (auto& a : v->arts)
                 if (a.d != nullptr)
-                    impl->artTabs (a);
+                    impl->artTabs (a, v->fcut, v->fres);
             for (int s = 0; s < v->nslaves; ++s)
                 for (auto& a : v->slaves[s]->arts)
                     if (a.d != nullptr)
-                        impl->artTabs (a);
+                        impl->artTabs (a, v->slaves[s]->fcut, v->slaves[s]->fres);
         }
     }
 }
@@ -5126,6 +5129,7 @@ public:
         tempo.store (bpm > 0 ? bpm : 120.0);
         channelCents.store (channel.sampler.pitch * 100.0f);
         mono.store (channel.maxPolyphony == 1); // FL tells the generator its Max polyphony, never the Mono box (round 168l: 0xf6f240 → 0xfed7c0)
+        engineRev.store (channel.engineRev);
         const bool render = offlineRendering();
         if (channel.pluginState == loadedState && loadedRate == rate.load() && loadedMode == render)
             return;
@@ -5149,6 +5153,14 @@ public:
         nextPorta = porta;
     }
 
+    // the note's Mod X / Y (0…1, 0.5 = none) are FL's Final.FCut / FRes (−1…1) of its voices (round 190pr, engine revision 3
+    // on: Overcome's "Vinyl Click" plays 1111 four-tick notes whose Mod Y sets each click's level)
+    void setNextNoteModulation (float modX, float modY) noexcept override
+    {
+        nextFcut = std::clamp (2.0 * (double) modX - 1.0, -1.0, 1.0);
+        nextFres = std::clamp (2.0 * (double) modY - 1.0, -1.0, 1.0);
+    }
+
     void noteOn (int key, float velocity) noexcept override
     {
         take();
@@ -5163,6 +5175,9 @@ public:
         p.pan = nextPan;
         // LYNX's per-note porta flag inverts the patch's PORTA button, as FL's note colour 14 does (§6.4; inference)
         p.colour = nextPorta ? 14 : 0;
+        if (engineRev.load() >= 3)
+            p.fcut = nextFcut, p.fres = nextFres;
+        nextFcut = 0.0, nextFres = 0.0;
         p.id = ++serial;
         // (round 190ej: a scheduled note's voices carry its note id, so its end releases only them, as FL's Voice_Release)
         if (const auto note = startingNoteId(); note != 0)
@@ -5296,6 +5311,8 @@ private:
     std::atomic<bool> mode { false };
     float nextPan = 0.0f, nextCents = 0.0f;
     bool nextPorta = false;
+    double nextFcut = 0.0, nextFres = 0.0;   // (round 190pr: the next note's Final.FCut / FRes)
+    std::atomic<int> engineRev { 2 };       // ChannelDef::engineRev (3: the notes' Mod X / Y reach the voices)
     std::int64_t serial = 0;
     long long quiet = 1 << 30;
     std::array<int, 5> automated { INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN }; // (round 190pi, audio thread)

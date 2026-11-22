@@ -336,8 +336,8 @@ TEST (tracker190om_simsynth_plays_the_velocity_as_fl_does)
     // revision 1 (a project saved before): every velocity at full level, bit for bit the same
     CHECK (levelAt (1, 25.0f / 128.0f) == levelAt (1, 100.0f / 128.0f) && levelAt (1, 100.0f / 128.0f) == levelAt (1, 1.0f));
     CHECK (std::abs (levelAt (1, 0.5f) - ref) < 1e-9); // (and velocity 100 under the law is that full level)
-    // new channels take revision 2
-    CHECK (lynx::ChannelDef {}.engineRev == 2);
+    // new channels take revision 2 or later (round 190pr: 3)
+    CHECK (lynx::ChannelDef {}.engineRev >= 2);
 }
 
 TEST (tracker190om_survey_projects_whose_patterns_share_an_event_target)
