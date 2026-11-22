@@ -50,13 +50,13 @@ there. Plugin names are LYNX names only, never an FL Studio name (a test checks 
 | LYNX Chimefield | spectral resonator (190ov; the Harmonia engine) | yes | |
 | LYNX Model | instrument (physical models, 190ov) | yes | yes |
 
-LV2 (Linux; rounds 190ov and 190pk, shipped since 0.1.32): every VST3 of the list is also built as an LV2 bundle on Linux
+LV2 (Linux; rounds 190ov and 190pk, shipped since 0.1.31): every VST3 of the list is also built as an LV2 bundle on Linux
 (`-DLYNX_PLUGINS_LV2`, on by default; it does nothing elsewhere): JUCE's LV2 wrapper (`src/plugin/Lv2Entry.cpp`, the same
 entry as the VST3's), `<name with dashes>.lv2/` with the library and the `.ttl` files JUCE's `juce_LV2ManifestHelper` writes
 from it after the link; the URI is `https://lynx-share.com/plugins/lv2/<the clap id after "com.ka1-s.lynx.">` and never
 changes. `package-plugins.sh` packs them in `LV2/`, `install.sh` copies them to `~/.lv2`, and `check-plugins.sh` runs
 `plugexporttest` (through JUCE's LV2 host) and `lv2lint` on each. Round 190ov's CI run 44955467954 had them failing in
-`plugexporttest`; round 190pk found two JUCE bugs behind that (`cmake/LynxPatchJuce.cmake`, fix 190pk):
+`plugexporttest`; round 190pk found two JUCE bugs behind that (`cmake/LynxPatchJuce.cmake`, JUCE fix 50):
 - the effects crashed: JUCE's LV2 wrapper declares the side-chain ports `lv2:connectionOptional` (a host may leave them
   unconnected) but copied their input from the NULL pointer such a host gives. An unconnected port is silence now.
 - FM10 and LYNX Model ended on an X error (BadAtom, X_ChangeProperty, atom 0): on an X server no window manager ever ran

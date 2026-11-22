@@ -73,7 +73,7 @@ endif()
 
 set(LYNX_PLUGIN_OUT "${CMAKE_BINARY_DIR}/plugins")
 # round 190ov: the VST3 short list also as LV2 bundles on Linux (JUCE's LV2 wrapper, plugin/Lv2Entry.cpp). On since round
-# 190pk (0.1.32), which fixed what made JUCE's LV2 host fail on them (cmake/LynxPatchJuce.cmake, fix 190pk)
+# 190pk (0.1.31), which fixed what made JUCE's LV2 host fail on them (cmake/LynxPatchJuce.cmake, fix 50)
 option(LYNX_PLUGINS_LV2 "Linux: build the VST3 short list as LV2 bundles too" ON)
 # every built entry of the one table, src/plugin/plugins.def; the index counts the built entries (plugin/ExportCatalog.h).
 # built = 2: a VST3 of its own as well (built = 1: in the CLAP only)

@@ -35,12 +35,12 @@ plugins use LYNX's own product names, which all start with "LYNX".
 | LYNX Chimefield | spectral resonator | CLAP |
 
 The CLAP holds every plugin in one file; each VST3 carries the whole LYNX engine, about 30 MB, so only a short list comes
-as VST3. On Linux the same short list also comes as LV2 bundles (since 0.1.32). Audio Units (macOS) are not built yet: Logic users can load the
+as VST3. On Linux the same short list also comes as LV2 bundles (since 0.1.31). Audio Units (macOS) are not built yet: Logic users can load the
 CLAP through a CLAP-to-AU host, or wait for a native AU.
 
 New in 0.1.31 (round 190ov): Strike Shaper, Anvil Bus, Corrode, Soundboard, Platter, Timeprism and Chimefield in the CLAP,
 LYNX Model as CLAP and VST3. The Harmonia engine exports as LYNX Chimefield (Cherry Audio sells a Harmonia synth); inside
-LYNX it keeps its name. New in 0.1.32: the VST3 list also as LV2 on Linux.
+LYNX it keeps its name. New in 0.1.31: the VST3 list also as LV2 on Linux.
 
 ### Not in the pack yet
 
