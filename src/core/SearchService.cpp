@@ -25,7 +25,7 @@ namespace lynx::search
 namespace
 {
 // Round 190os: the worker's own work — loading the index, the background passes over the folders, reloads — runs at the
-// system's background priority (Windows: background mode, which also lowers its disk priority; macOS: the background
+// system's background priority (Windows: background mode, which also lowers its disk priority; macOS: the utility
 // QoS class); a search the user typed runs at the normal priority. A pass at the start of LYNX took ~55 % of a core
 // for seconds; on a PC with 2 CPUs and an overloaded song that starved the screen (frame gaps of 220-254 ms, the
 // graphics driver's thread waiting behind it: perf190os/HANDOFF.md). Linux: unchanged (an unprivileged thread cannot
@@ -35,7 +35,9 @@ void backgroundPriority (bool on) noexcept
    #if defined(_WIN32)
     SetThreadPriority (GetCurrentThread(), on ? THREAD_MODE_BACKGROUND_BEGIN : THREAD_MODE_BACKGROUND_END);
    #elif defined(__APPLE__)
-    pthread_set_qos_class_self_np (on ? QOS_CLASS_BACKGROUND : QOS_CLASS_USER_INITIATED, 0);
+    // (rollup 0.1.31 step 6: the utility class, not background: under QOS_CLASS_BACKGROUND macOS stretched the pass's
+    // waits so far that browser162's rebuild of 2,551 folders missed its 30 s on CI's macOS runner; Windows unchanged)
+    pthread_set_qos_class_self_np (on ? QOS_CLASS_UTILITY : QOS_CLASS_USER_INITIATED, 0);
    #else
     (void) on;
    #endif
