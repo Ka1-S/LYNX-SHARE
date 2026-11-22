@@ -380,3 +380,17 @@ Branch `jsfx_190pj` (off `wip/rollup031`). What the design above asked for stage
 - Buses: stereo in / stereo out for an effect, stereo out for a generator. Scripts with more pins get silence on their
   extra inputs (side-chain pins: a later stage).
 - Not in stages 1–2: @gfx (stage 3), the pack's @gfx scripts and Saike's set (stage 4), per-channel PDC.
+
+### Measured (Linux, Ryzen 5 3600, round 190pj)
+
+- **Reference render:** chokehold's soft_clipper through a LYNX mixer slot (`PluginEffect`) is bit-identical to ysfx run
+  directly and to upstream ysfx's own output (`tools/jsfx_ref.cpp`): 64 blocks of 512 frames, a slider change at block
+  32, all 32,768 frames equal.
+- **CPU per instance** (`--jsfxbench`, ns per stereo frame at 48 kHz, 512-frame blocks, two runs): the lightest bundled
+  scripts (volume, pan, MIDI chord trigger, DC filter) 25–65 ns, i.e. 0.12–0.3 % of one core in real time, which is the
+  fixed per-instance floor of §3.4; mid-weight effects (delay, EQ, dynamics, lo-fi) 400–770 ns (2–3.7 %); soft_clipper
+  with 2x oversampling 1.3–1.4 µs (6.5 %); amp_sim and cabinet_sim (a long convolution) 3.5–3.7 µs (17–18 %), the
+  scripts' own DSP.
+- **Gates:** 14 gold renders (renderwav, 11 FL demos' busiest patterns and 3 whole songs) byte-identical to the base;
+  `--paintbench` on Thief: every view's instructions within ±0.5 % of the base (noise), pixels identical except the
+  desktop frame, whose Browser now lists the bundled JSFX scripts.
