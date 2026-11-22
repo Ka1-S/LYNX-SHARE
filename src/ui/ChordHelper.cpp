@@ -131,6 +131,7 @@ ChordHelperPanel::ChordHelperPanel (AudioEngine& e, std::function<Target()> t, s
     const auto size = preferredSize (look);
     setSize (size.x, size.y);
     setRepaintsOnMouseActivity (false);
+    setComponentID ("chordHelper"); // (round 190pg: --demo)
     engine.addChangeListener (this);
     compute (true);
 }
@@ -522,6 +523,16 @@ int ChordHelperPanel::keyRowAt (juce::Point<int> p) const
         return -1;
     const auto row = (p.y - a.getY() - headHeight()) / rowHeight() + keyScroll;
     return row < (int) keys.size() ? row : -1;
+}
+
+juce::Rectangle<int> ChordHelperPanel::demoCellBounds (int row, int column) const
+{
+    const auto a = row == 0 ? keysArea() : row == 1 ? chordsArea() : juce::Rectangle<int>();
+    const auto count = row == 0 ? (int) keys.size() : (int) chords.size();
+    const auto shown = column - (row == 0 ? keyScroll : chordScroll);
+    if (a.isEmpty() || column < 0 || column >= count || shown < 0)
+        return {};
+    return juce::Rectangle<int> (a.getX(), a.getY() + headHeight() + shown * rowHeight(), a.getWidth(), rowHeight()).getIntersection (a);
 }
 
 int ChordHelperPanel::chordRowAt (juce::Point<int> p) const

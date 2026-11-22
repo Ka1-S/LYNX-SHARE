@@ -1481,6 +1481,7 @@ TrackerComponent::TrackerComponent (AudioEngine& e, bool compactIn) : engine (e)
     };
     addAndMakeVisible (i.hexButton);
     i.editButton.setButtonText (tr ("Edit"));
+    i.editButton.setComponentID (compact ? "simple.dock.tracker.edit" : "tracker.edit"); // (round 190pg: --demo)
     i.editButton.setClickingTogglesState (true);
     i.editButton.setColour (juce::TextButton::buttonOnColourId, theme::colour::accent);
     i.editButton.setTooltip (tr ("Edit (Ctrl+E here): the typing keys write notes at the cursor; off, they only play"));

@@ -1406,6 +1406,7 @@ public:
         };
         addAndMakeVisible (host);
         assign.setButtonText (tr ("Assign"));
+        assign.setComponentID ("modulators.assign." + juce::String (index)); // (round 190pg: --demo)
         assign.setTooltip (tr ("Assign mode: drag any LYNX knob to set this modulator's depth on it (click again to stop)"));
         assign.setColour (juce::TextButton::buttonOnColourId, modring::colour().withAlpha (0.55f));
         assign.onClick = [this] {
@@ -1889,6 +1890,7 @@ public:
     explicit ModulatorsPanel (AudioEngine& e) : engine (e)
     {
         add.setButtonText (tr ("+ Add modulator"));
+        add.setComponentID ("modulators.add"); // (round 190pg: --demo)
         add.onClick = [this] {
             juce::PopupMenu menu;
             for (int k = 0; k < modKindCount; ++k)
@@ -2003,6 +2005,7 @@ public:
     explicit ModulatorsWindow (AudioEngine& engine) : juce::DocumentWindow (tr ("Modulators"), theme::colour::bg1, DocumentWindow::closeButton)
     {
         setUsingNativeTitleBar (true);
+        setComponentID ("modulators"); // (round 190pg: --demo)
         setContentOwned (new ModulatorsPanel (engine), true);
         setResizable (true, false);
         setResizeLimits (640, 200, 4000, 2000);

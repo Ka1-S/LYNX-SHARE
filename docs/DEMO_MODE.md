@@ -29,15 +29,32 @@ A **target** is a control's component ID, such as `welcome.choice.mobile`, `simp
 button text (which is translated, so prefer IDs). Only controls that are showing are found. `ui.list` prints the IDs
 that are on screen now.
 
+Since round 190pg a target can also be:
+
+- **`menu:<English text>`**: an item of an open menu, or a title of the menu bar (`menu:View`, `menu:Layout style`,
+  `menu:Pattern workflow (default)`). The English text is the one in the code (the `tr ("…")` source), so the same script
+  works in every language: the item's text is compared with the text and with its translation, without a trailing `...`
+  and the shortcut after the tab; an item that ends in a count, such as `Create scenes from sections (3)`, also matches
+  `Create scenes from sections`. `ui.click` on a menu bar title opens its menu, on an item with a submenu opens the
+  submenu, on any other item runs it (the menu closes). `ui.hover` lights the item as the mouse would.
+- **a control in another LYNX window** (a plugin editor, a tool window, a dialog): when the main window has no control
+  with that ID or name, the other windows are searched too. `ui.editor` gives the editor window it opens the ID `editor`.
+
 | Operation | Arguments | Result |
 |---|---|---|
 | `ui.window` | — | `screen` (the main window's rectangle), `scale` (the display's scale), `layout`, `language` |
 | `ui.find` | `target`, `cell` (optional `{ "row", "column" }`: one cell of a control made of cells, such as the Simple Drum Machine, `simple.dock.drumMachine`; row 0 is the bottom row) | `found`, and `control`: `id`, `name`, `kind` (button, toggle, combo, slider, text, label, component), `text`, `on`, `enabled`, `showing`, `screen` (rectangle on screen, logical pixels), `window` (rectangle in the window) |
 | `ui.list` | `under` (optional target), `limit` (1–2000, default 500) | `controls`: the showing controls that have a component ID, described as by `ui.find` |
-| `ui.click` | `target`, `cell` (optional, as for `ui.find`: the cell is pressed and released through the control's own mouse handling, so a step toggles), `double` (optional), `at` (optional `{ "x": 0..1, "y": 0..1 }`, a point in the control as fractions of its size) | `clicked`, and `control` as it was before the click. A button runs its own click, as when its shortcut is pressed. A combo box opens its menu. Any other control receives a press and a release, delivered to the component itself. No input reaches the operating system |
+| `ui.click` | `target`, `cell` (optional, as for `ui.find`: the cell is pressed and released through the control's own mouse handling, so a step toggles), `double` (optional), `right` (optional: a right-click, e.g. a clip grid slot's menu; round 190pg), `at` (optional `{ "x": 0..1, "y": 0..1 }`, a point in the control, or in the cell, as fractions of its size) | `clicked`, and `control` as it was before the click. A button runs its own click, as when its shortcut is pressed. A combo box opens its menu. Any other control receives a press and a release, delivered to the component itself. No input reaches the operating system |
+| `ui.hover` | `target` | `hovered`, `control`. An open menu's item (`menu:…`) lights as under the mouse; for any other control only its rectangle is returned (round 190pg) |
+| `ui.open` | `file` (an absolute path) | `opened`. Opens a project or a file LYNX imports (`.lynx`, `.flp`, `.als`, `.flm`, `.dawproject`, `.blx`, `.band`, modules…) as File › Open does after its file dialog. The open project is not asked about (round 190pg) |
+| `ui.action` | `id` (a key-map action, `src/core/KeyMap.cpp`, e.g. `view.commandPalette`, `view.tracker`, `view.detailDevices`) | `ran`. Runs the action as its shortcut does; an id that runs nothing is an error (round 190pg) |
+| `ui.editor` | `channel` (index) | `channel`, `screen` (the new window's rectangle). Opens the channel's editor (its instrument's window), as a click on its name in the Channel rack does; the newest such window gets the component ID `editor` (round 190pg) |
+| `ui.place` | `target` (a control in a window of its own, or the window's ID: `editor`, `modulators`), `x`, `y` (screen pixels) | `screen`. Moves that window, kept on the screen (round 190pg) |
+| `ui.polynotes` | — | `notes`: the open polyphonic editor's notes, one line each: `k midi start-end [edit]` (`k` is the note's cell column of `polyEditor`) (round 190pg) |
 | `ui.layout` | `style`: `pattern`, `clipLaunch` or `simple` | `layout`. The same runtime switch as View › Layout style |
 | `ui.select_track` | `track` (Playlist track index) | `track`. In the Simple layout the dock shows that track |
-| `ui.show` | `panel`: `channelRack`, `pianoRoll`, `playlist`, `mixer`, `browser`, `loops` (the Simple layout's Loops dock), `welcome` (the welcome card), `gettingStarted` (the Next-3 card), `dock` (the Simple dock of the selected track) | `shown` |
+| `ui.show` | `channel` (optional, with `pianoRoll`: that channel is selected first and the Piano roll opens on its notes; round 190pg), `fit` (optional, with `playlist`: the whole song in view; round 190pg), `panel`: `channelRack`, `pianoRoll`, `playlist`, `mixer`, `browser`, `loops` (the Simple layout's Loops dock), `welcome` (the welcome card), `gettingStarted` (the Next-3 card), `dock` (the Simple dock of the selected track) | `shown` |
 | `ui.welcome` | `choice`: `mobile`, `fl`, `live`, `timeline`, `new` or `skip` | Applies that choice of the welcome card, as a click on it does |
 | `ui.clipmenu` | `clip` (the clip's `index` in the project snapshot's `playlist`) or `clipId` (its stable id, the snapshot's `playlist[].clipId`: 16 hex digits) | Selects the clip and opens its context menu anchored at the clip, as a right-click on it does, with no mouse needed. `clip`, `screen` (the clip's rectangle on screen, so a script can point at it), `menu`. Needs the Playlist showing (`ui.show` `playlist`) and the clip in view. The menu is not a window of the main window, so a script clicks its items with the keyboard path of its video, not with `ui.click` |
 | `ui.polyeditor` | `channel` (index), `channelId` (the snapshot's `channels[].channelId`), or `clip` / `clipId` (the channel that clip plays) | Opens the polyphonic note editor ("Edit notes (polyphonic)...") of an audio clip channel, as the clip menu item does. `channel`, `screen` (the editor window's rectangle on screen). Refused for a channel that is not an audio clip with a loaded sample, or that an ARA plugin edits |
@@ -45,6 +62,27 @@ that are on screen now.
 | `session.status` | — | `state` (idle, starting, connecting, knocking, loading, live, reconnecting, waitingHost, ended), `inviteCode`, `status`, `host` |
 
 Errors look like any other Remote Control error: `{"ok": false, "error": "No control showing with the ID or name …"}`.
+
+### Cells of the editors (round 190pg)
+
+`ui.find` and `ui.click` take `"cell": { "row", "column" }` on these controls too. A cell scrolled out of view is an error.
+
+| Target | Row | Column |
+|---|---|---|
+| `channelRack` | the rack's row (0 = the top channel) | the step (0 = the first) |
+| `pianoRoll` | the MIDI key (60 = C5) | the 16th step from the pattern's start |
+| `playlist` | the Playlist track (0 = the first) | the 16th step from the song's start (16 = bar 2) |
+| `mixer.strips` | 0 the fader, 1 the mute switch, 2 the meter | the Mixer track (0 = Master) |
+| `clipGrid` | the scene (-1: the column's stop button, -2: the column's title) | the grid's column (-1: the scene's launch button) |
+| `playlist.sectionsLane` | (any) | a section's block (0 = the first; -1: the "+" button that adds one) |
+| `chordHelper` | 0 the related keys, 1 the chords | the row of that list (0 = the first) |
+| `polyEditor` | (any) | a note's blob in the polyphonic editor (its number `k`, as `ui.polynotes` lists them) |
+
+A click on a cell is the control's own click there: a Channel rack step toggles, the Piano roll's Draw tool draws a note,
+the Playlist's Draw tool places the selected pattern, a clip grid slot launches or selects its clip.
+
+`LYNX --demo190pgcheck <prefix> <project.lynx>` runs these operations against a real window (on a private X server) and
+writes `<prefix>-checks.txt`; run it with `--lang pt-BR` too.
 
 ### Useful component IDs
 
@@ -55,6 +93,8 @@ Errors look like any other Remote Control error: `{"ok": false, "error": "No con
 | Empty-state hints | `empty.playlist`, `empty.clipGrid`, `empty.simple` (the cards); buttons `empty.channelRack`, `empty.demo`, `empty.open`, `empty.browse`, `empty.addTrack`, `empty.loops`, `empty.tour` |
 | Tips | `tip.songModeEmpty`, `tip.recordNoInput` (the cards); `tip.action`, `tip.gotIt`, `tip.noMore` |
 | Transport | `toolbar.play`, `toolbar.stop`, `toolbar.record`, `toolbar.patternMode`, `toolbar.songMode`, `toolbar.tempo`, `toolbar.key` |
+| Instruments (round 190pg) | `model.models` (LYNX Model's six models, marimba first, equal widths: use `at`), `model.bar` (its strike point), `model.hardness`, `model.position`, `model.velocity`, `model.noise`, `model.damping`, `model.resonator`, `model.motor`, `model.release`, `model.tone`, `model.volume`; `helix.<parameter index>` (every control of Helix's editors) |
+| Editors (round 190pg) | `toolbar.cpu` (the CPU panel; a double click opens the Plugin performance monitor), `palette` (the command palette), `modulators` (its window), `modulators.add`, `modulators.assign.<n>` (a modulator's Assign switch), `clipLaunch.both`, `clipLaunch.grid`, `clipLaunch.song` (the Clip-launch view switch), `channelRack`, `pianoRoll`, `playlist`, `mixer.strips`, `clipGrid` (with `cell`), `editor` (the window `ui.editor` opened), `tracker`, `tracker.edit` (its Edit switch), `playlist.sectionsLane`, `chordHelper`, `polyEditor`, `polyEditor.play`, `polyEditor.original` |
 | Simple layout (round 190dv) | `simple.dock.drumMachine` (with `cell`), `simple.addTrack`, `simple.loops`, `simple.lyrics`, `simple.automation`, `simple.tile.drums`, `simple.tile.instrument`, `simple.tile.voice`, `simple.starters`, `simple.dropLane`, `simple.finish`, `simple.dock.*` |
 
 Run `ui.list` against a running build for the full, current list.
