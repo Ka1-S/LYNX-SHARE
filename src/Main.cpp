@@ -3510,6 +3510,13 @@ public:
             quit();
             return;
         }
+        // --headergearshot248 <prefix> (rollup 0.1.31 step 7, PRs #248 / #256): src/HeaderGearShot248.inc
+        if (args.contains ("--headergearshot248"))
+        {
+            setApplicationReturnValue (runHeaderGearShot (args[args.indexOf ("--headergearshot248") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
         // --issuesshot190oq <prefix> (round 190oq, issues #243-#252): src/IssuesShot190oq.inc
         if (args.contains ("--issuesshot190oq"))
         {
@@ -20260,6 +20267,7 @@ private:
 #include "TrackStatesShot190op.inc" // round 190op
 #include "AutoModesShot190pa.inc" // round 190pa
 #include "Tracks190peShot.inc" // round 190pe
+#include "HeaderGearShot248.inc" // rollup 0.1.31 step 7 (PRs #248 / #256)
 #include "TrackerShot190nw.inc" // round 190nw
 #include "IssuesShot190nq.inc" // round 190nq (issues #193, #225-#230)
 #include "Research190onShot.inc" // round 190on (research190oe P2, P8, P10)
