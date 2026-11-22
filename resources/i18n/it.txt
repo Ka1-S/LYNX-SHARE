@@ -3665,6 +3665,7 @@ countries: it ch sm
 "Version" = "Versione"
 "Path" = "Percorso"
 "Add" = "Aggiungi"
+"@menu bar: Add" = "Aggiungi"
 "Other" = "Altro"
 "Browser find" = "Cerca nel Browser"
 "One-click audio recording: arm the selected insert..." = "Registrazione audio con un clic: arma l'insert selezionato..."

@@ -3665,6 +3665,7 @@ countries: ru by kz
 "Version" = "Версия"
 "Path" = "Путь"
 "Add" = "Добавить"
+"@menu bar: Add" = "Добавить"
 "Other" = "Другое"
 "Browser find" = "Поиск в Browser"
 "One-click audio recording: arm the selected insert..." = "Запись аудио в один клик: подготовить выбранный инсерт..."

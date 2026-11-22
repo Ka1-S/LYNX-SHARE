@@ -562,6 +562,29 @@ private:
     // the projection (cliplanes::laneClipLists), so a paint only walks the visible rows' lists.
     std::vector<std::vector<int>> laneClips;
     void paintLiveEnvelopeLanes (juce::Graphics& g, juce::Rectangle<int> grid);
+    // Round 190pb (rollup 0.1.31 step-5 paint regression: Patience's Clip-launch arrangement +72 % instructions a frame):
+    // each envelope lane's drawing worked out once for the grid's whole width and kept while nothing it shows changes (the
+    // song, the lane lists, the zoom, the scroll, the lane's place and height, the grid, the display scale): the line as
+    // its stroke outline, the flat stretches, the rings. A frame then fills them, the pixels of stroking and drawing them
+    // as before (JUCE strokes a path by filling the outline createStrokedPath makes; a ring is two circles, even-odd). A
+    // partial repaint (the playhead's columns) works out its own part as before: filling a whole lane's outline to show
+    // 14 px of it cost three times the old column.
+    struct EnvelopeLane
+    {
+        int track = -1, y = 0, h = 0;
+        std::vector<juce::Rectangle<float>> flats;
+        juce::Path stroke, rings;
+    };
+    struct EnvelopeLaneCache
+    {
+        std::uint64_t publish = ~(std::uint64_t) 0, projection = ~(std::uint64_t) 0;
+        double pixelsPerTick = 0.0, scrollTicks = 0.0;
+        juce::Rectangle<int> grid;
+        float scale = 0.0f;
+        std::vector<EnvelopeLane> lanes; // [track], track -1: not made yet
+    } envelopeCache;
+    // `from` / `to`: the x range the line is worked out for (a whole frame: the grid's; a partial repaint: its part)
+    void makeEnvelopeLane (EnvelopeLane& lane, int track, int y, int h, juce::Rectangle<int> grid, float from, float to, float scale) const;
     // Round 190oo (CS O-3): the engine's open count the lanes were last folded for (cliplanes::foldedOnOpen): a project
     // opened is folded the first time the Clip-launch arrangement shows it
     std::uint64_t foldedForOpen = 0;

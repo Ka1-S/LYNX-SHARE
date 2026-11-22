@@ -409,16 +409,32 @@
             }
             write (bench, "11-bench-64x512");
             // the cached frames are the uncached frames, pixel for pixel: scrolled, the cursor, a block, the playhead, decimal
+            // Round 190pb (owner's call, rollup 0.1.31 step 5): on Windows within 1 level per channel. There the chunks are
+            // Direct2D bitmaps and the straight frame is drawn by Direct2D into another bitmap; the header
+            // picture's track separators come out 1 level apart between the two (Direct2D's own antialiasing)
+            // (66 pixels at 1 level in step 5, s5/win/trdump9), which the software renderer of Linux / macOS never does:
+            // there the check stays exact. Any pixel more than 1 level off still fails on Windows.
             {
+               #if JUCE_WINDOWS
+                constexpr int tolerance = 1;
+               #else
+                constexpr int tolerance = 0;
+               #endif
                 bool same = true;
                 juce::String where;
+                int nearPixels = 0, nearLevel = 0;
                 const auto compare = [&] (const juce::String& state) {
-                    const auto a = bench.framePixelsForCheck (true), b = bench.framePixelsForCheck (true), c = bench.framePixelsForCheck (false);
-                    if (a != c || b != c)
+                    const auto a = bench.frameForCheck (true), b = bench.frameForCheck (true), c = bench.frameForCheck (false);
+                    int largestA = 0, anyA = 0, largestB = 0, anyB = 0;
+                    const auto overA = TrackerComponent::framesDifferForCheck (a, c, tolerance, largestA, anyA);
+                    const auto overB = TrackerComponent::framesDifferForCheck (b, c, tolerance, largestB, anyB);
+                    if (overA > 0 || overB > 0)
                     {
                         same = false;
-                        where << state << " ";
+                        where << state << " (" << juce::jmax (overA, overB) << " px, up to " << juce::jmax (largestA, largestB) << " levels) ";
                     }
+                    nearPixels = juce::jmax (nearPixels, juce::jmax (anyA, anyB));
+                    nearLevel = juce::jmax (nearLevel, juce::jmax (largestA, largestB));
                 };
                 compare ("top");
                 bench.scrollToRowForCheck (37);
@@ -446,7 +462,11 @@
                 bench.resized();
                 bench.scrollToRowForCheck (512);
                 compare ("end");
-                check ("bench190ob: the cached frames equal the uncached ones pixel for pixel", same, where);
+                line ("bench190ob pixel tolerance " + juce::String (tolerance) + " level(s); pixels apart at all: up to " + juce::String (nearPixels)
+                      + " a frame, by up to " + juce::String (nearLevel) + " level(s)");
+                check (tolerance == 0 ? "bench190ob: the cached frames equal the uncached ones pixel for pixel"
+                                      : "bench190ob: the cached frames equal the uncached ones within 1 level (Windows: Direct2D antialiasing)",
+                       same, where);
                 line ("bench190ob chunks cached: " + juce::String ((int) bench.cachedChunksForCheck()));
             }
         }

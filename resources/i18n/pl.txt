@@ -3665,6 +3665,7 @@ countries: pl
 "Version" = "Wersja"
 "Path" = "Ścieżka"
 "Add" = "Dodaj"
+"@menu bar: Add" = "Dodaj"
 "Other" = "Inne"
 "Browser find" = "Wyszukiwanie w Browserze"
 "One-click audio recording: arm the selected insert..." = "Nagrywanie audio jednym kliknięciem: uzbrój zaznaczony insert..."

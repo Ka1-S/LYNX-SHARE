@@ -3665,6 +3665,7 @@ countries: nl be
 "Version" = "Versie"
 "Path" = "Pad"
 "Add" = "Toevoegen"
+"@menu bar: Add" = "Toevoegen"
 "Other" = "Overig"
 "Browser find" = "Zoeken in Browser"
 "One-click audio recording: arm the selected insert..." = "Audio opnemen met één klik: geselecteerde insert armen..."

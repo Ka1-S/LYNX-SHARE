@@ -3665,6 +3665,7 @@ countries: jp
 "Version" = "バージョン"
 "Path" = "パス"
 "Add" = "追加"
+"@menu bar: Add" = "追加"
 "Other" = "その他"
 "Browser find" = "ブラウザー検索"
 "One-click audio recording: arm the selected insert..." = "ワンクリックオーディオ録音: 選択中のインサートを録音待機に..."

@@ -55,6 +55,10 @@ Steps:
    reported, not failed. A time failure counts when its instruction cell moved too, or when the interleaved A/B against
    main confirms it: build main's perfbench, then `BASE_PERFBENCH=<main's perfbench> FL=1 CORES=7-11 scripts/perf-gate.sh
    ab` (main and this build alternately, at least 5 rounds, median against median, `summary-ab.md`).
+   A UI change (a round, before it lands): `scripts/paint-gate.sh <LYNX before> <LYNX after>` on FL's Thief AND Live's
+   Patience (an .flp and an .als: the FL and the Live paths of every view; since round 190pb, after a design round gated
+   on Thief alone let Patience's Channel rack and Clip-launch arrangement get 44 % and 72 % dearer), instruction counts per
+   view and frame kind, 1 % per cell, whole-frame pixels equal unless the change means them to differ (`PIXELS=any`).
 3. Optional local package check: `scripts/make-installer.sh` (defaults to `build-win/LYNX.exe`) writes the installer,
    the zip and `SHA256SUMS.txt` to `dist/`. NSIS: `makensis` on PATH, `$MAKENSIS`, or the NSIS zip release unpacked
    into `~/opt/nsis-<version>` (its `makensis.exe` runs through WSL interop). Quick installer check:

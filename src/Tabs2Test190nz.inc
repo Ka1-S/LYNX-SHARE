@@ -7,6 +7,13 @@
     // processes meet through marker files in <folder>; every wait is bounded. B writes pictures (its Window menu, the
     // audio device bar, the menus with Copy / Paste) at the shot scale (LYNX_SHOT_SCALE=1.5 LYNX_SHOT_SUFFIX=@150 for
     // @150). Needs LYNX_TEST_MODE=1 LYNX_SYSTEM_CLIPBOARD=1 LYNX_WINDOWS=1 and the same XDG_CONFIG_HOME for both.
+    // Round 190pb (flaky under load in rollup 0.1.31 step 5): no step rests on time any more. The markers carry the
+    // run's key (A's and B's process ids), so a marker left in <folder> by an earlier run never lets a wait through (the
+    // step-5 runner reused its folder: B pasted before A had copied, A copied the next kind before B had pasted); the
+    // clipboard is read until A's text arrives (an X11 selection transfer of a loaded process can miss JUCE's ~100 ms
+    // read); the bar, the hand-over and the device are waited for as conditions; the setup both windows want is written
+    // to the settings folder the processes really use (LYNX_PROFILE_DIR moves it away from XDG_CONFIG_HOME, so the
+    // runner's audio-device.xml was never read and the device bar never came). Every wait stays bounded.
     bool runTabs2Test190nz (const juce::String& role, const juce::File& dir)
     {
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
@@ -33,17 +40,44 @@
 #endif
                     juce::Thread::sleep (5);
         };
-        const auto mark = [&dir] (const juce::String& name) { dir.getChildFile (name).create(); };
-        const auto waitFor = [&] (const juce::String& name, int seconds = 60) {
+        // (round 190pb) the run's key, "<A's pid> <B's pid>", once the two have met: every marker after that holds it
+        juce::String runKey;
+        const auto mark = [&dir, &runKey] (const juce::String& name) { dir.getChildFile (name).replaceWithText (runKey); };
+        const auto until = [&pump] (const std::function<bool()>& condition, int seconds) {
             const auto end = juce::Time::getMillisecondCounter() + (juce::uint32) seconds * 1000u;
-            while (! dir.getChildFile (name).exists())
+            while (! condition())
             {
                 if (juce::Time::getMillisecondCounter() > end)
-                    return false;
+                    return condition();
                 pump (20);
             }
             return true;
         };
+        const auto waitFor = [&] (const juce::String& name, int seconds = 120) {
+            return until ([&] { const auto f = dir.getChildFile (name); return f.existsAsFile() && f.loadFileAsString() == runKey; }, seconds);
+        };
+        {
+            // this role's markers of an earlier run go (the other process clears its own; the key keeps them apart anyway)
+            juce::StringArray own { "ready", "activated", "audio-released", "finished" };
+            for (const auto* step : { "notes", "big", "clips", "steps", "channels", "mixer", "points" })
+                own.add ((isA ? "copied-" : "done-") + juce::String (step));
+            for (const auto& name : own)
+                dir.getChildFile (role + "-" + name).deleteFile();
+        }
+        {
+            // (round 190pb) the stand-in setup both windows want, in the settings folder this process reads (a test profile's
+            // when LYNX_PROFILE_DIR is set): written when it is missing, never over another device
+            const auto setup = platform::settingsFile ("audio-device.xml");
+            const juce::String wantedSetup ("<?xml version=\"1.0\" encoding=\"UTF-8\"?><DEVICESETUP deviceType=\"ASIO\" audioOutputDeviceName=\"Test interface\" "
+                                            "audioInputDeviceName=\"\" audioDeviceRate=\"48000.0\" audioDeviceBufferSize=\"256\"/>");
+            if (! setup.existsAsFile())
+            {
+                setup.getParentDirectory().createDirectory();
+                setup.replaceWithText (wantedSetup);
+            }
+            const auto device = windowaudio::deviceOf (juce::XmlDocument::parse (setup).get());
+            check (role + ": the setup both windows want is ASIO / Test interface (" + setup.getFullPathName() + ")", device.type == "ASIO" && device.name == "Test interface");
+        }
         const auto write = [&dir] (juce::Component& c, juce::Rectangle<int> area, const juce::String& name) {
             area = area.getIntersection (c.getLocalBounds());
             if (! area.isEmpty())
@@ -185,10 +219,26 @@
             });
 
         const auto steps = juce::StringArray { "notes", "big", "clips", "steps", "channels", "mixer", "points" };
+        // (round 190pb) the handshake: A's "a-ready" names A; B answers with "b-ready" naming both, the run's key. A
+        // marker of a process that is gone (an earlier run) is not a live window of the registry: never taken.
+        const auto myPid = juce::String (windows::mine().pid);
+        const auto liveWindow = [] (int pid) {
+            const auto o = windows::others();
+            return pid > 0 && std::any_of (o.begin(), o.end(), [pid] (const windows::Entry& e) { return e.pid == pid; });
+        };
         if (isA)
         {
+            runKey = myPid;
             mark ("a-ready");
-            check ("A: B started", waitFor ("b-ready"));
+            check ("A: B started", until ([&] {
+                       const auto f = dir.getChildFile ("b-ready");
+                       const auto parts = juce::StringArray::fromTokens (f.existsAsFile() ? f.loadFileAsString() : juce::String(), " ", "");
+                       if (parts.size() != 2 || parts[0] != myPid || ! liveWindow (parts[1].getIntValue()))
+                           return false;
+                       runKey = parts.joinIntoString (" ");
+                       return true;
+                   }, 120));
+            line ("run " + runKey);
             for (const auto& step : steps)
             {
                 if (step == "notes")
@@ -246,13 +296,22 @@
             }
             check ("A: B asked this window to come to the front (Window menu)", waitFor ("a-activated"));
             // B asks for the audio device: this window lets it go (no device is open here; the entry says none now)
-            check ("A: B is done", waitFor ("b-finished", 90));
-            check ("A: let the audio device go (B asked; the entry names no device now)",
-                   ui.windowAudioForSnapshot() != nullptr && ui.windowAudioForSnapshot()->gaveAway() && windows::mine().deviceName.isEmpty());
+            check ("A: B is done", waitFor ("b-finished", 180));
+            check ("A: let the audio device go (B asked; the entry names no device now)", until ([&ui] {
+                       return ui.windowAudioForSnapshot() != nullptr && ui.windowAudioForSnapshot()->gaveAway() && windows::mine().deviceName.isEmpty();
+                   }, 30));
         }
         else
         {
-            check ("B: A started", waitFor ("a-ready"));
+            check ("B: A started", until ([&] {
+                       const auto f = dir.getChildFile ("a-ready");
+                       const auto pid = f.existsAsFile() ? f.loadFileAsString().trim() : juce::String();
+                       if (! liveWindow (pid.getIntValue()))
+                           return false;
+                       runKey = pid + " " + myPid;
+                       return true;
+                   }, 120));
+            line ("run " + runKey);
             mark ("b-ready");
             const auto pasteChecks = [&] (const juce::String& step) {
                 const auto& s = engine.getSong();
@@ -260,8 +319,12 @@
                 {
                     engine.setSelectedChannel (4);
                     engine.dispatchPendingMessages();
-                    const auto text = juce::SystemClipboard::getTextFromClipboard();
-                    check ("B: the system clipboard (the other process's X11 selection) holds A's notes", text.startsWith (crossclipboard::magic) && text.contains ("\nnotes "));
+                    juce::String text; // (round 190pb: read until A's selection arrives; one read of a loaded process can miss it)
+                    const auto arrived = until ([&text] {
+                        text = juce::SystemClipboard::getTextFromClipboard();
+                        return text.startsWith (crossclipboard::magic) && text.contains ("\nnotes ");
+                    }, 60);
+                    check ("B: the system clipboard (the other process's X11 selection) holds A's notes", arrived);
                     const auto before = (int) s.patterns[0].notes.size();
                     roll.handleKey (ctrl ('v'));
                     engine.dispatchPendingMessages();
@@ -402,23 +465,25 @@
             const auto menu = ui.windowMenuForSnapshot();
             writeMenu (menu, tr ("Window"), dir.getChildFile ("232-window-menu.png"));
             check ("B: Window menu > Album - track 1 brings A to the front",
-                   run (menu, juce::String ("Album - track 1") + "   (" + tr ("plays through {0}", { "Test interface" }) + ")") && waitFor ("a-activated", 20));
+                   run (menu, juce::String ("Album - track 1") + "   (" + tr ("plays through {0}", { "Test interface" }) + ")") && waitFor ("a-activated"));
 
             // the audio device: B wants A's (its saved setup), A plays through it: the bar, then the hand-over
             if (auto* link = ui.windowAudioForSnapshot())
             {
-                link->refresh();
-                check ("B: the bar names the device and A's project", ui.windowAudioBarForSnapshot().isVisible() && link->holder() == others.front().pid);
+                check ("B: the bar names the device and A's project", until ([&] {
+                           link->refresh();
+                           return ui.windowAudioBarForSnapshot().isVisible() && link->holder() == others.front().pid;
+                       }, 60));
                 write (ui, ui.getLocalBounds().withHeight (ui.windowAudioBarForSnapshot().getBottom() + 60), "audio-bar");
                 write (ui.windowAudioBarForSnapshot(), ui.windowAudioBarForSnapshot().getLocalBounds(), "audio-bar-only");
                 const auto menuWithBar = ui.windowMenuForSnapshot();
                 check ("B: the Window menu offers Make this window the one that plays", findItem (menuWithBar, tr ("Make this window the one that plays")) != nullptr);
                 link->playHere();
-                check ("B: A let the device go (audio-released)", waitFor ("b-audio-released", 20));
-                pump (300);
-                check ("B: no other window has the device now: the bar is gone", ! ui.windowAudioBarForSnapshot().isVisible());
-                const auto log2 = platform::settingsFile ("test-mode.log").loadFileAsString();
-                check ("B: and opens it (in a test: logged, no device is opened)", log2.contains ("audio device: would open ASIO: Test interface"));
+                check ("B: A let the device go (audio-released)", waitFor ("b-audio-released"));
+                check ("B: no other window has the device now: the bar is gone", until ([&ui] { return ! ui.windowAudioBarForSnapshot().isVisible(); }, 60));
+                check ("B: and opens it (in a test: logged, no device is opened)", until ([] {
+                           return platform::settingsFile ("test-mode.log").loadFileAsString().contains ("audio device: would open ASIO: Test interface");
+                       }, 60));
             }
             else
                 check ("B: the audio device link", false);

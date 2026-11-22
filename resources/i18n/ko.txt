@@ -3665,6 +3665,7 @@ countries: kr
 "Version" = "버전"
 "Path" = "경로"
 "Add" = "추가"
+"@menu bar: Add" = "추가"
 "Other" = "기타"
 "Browser find" = "브라우저 찾기"
 "One-click audio recording: arm the selected insert..." = "원클릭 오디오 녹음: 선택한 인서트 녹음 대기..."

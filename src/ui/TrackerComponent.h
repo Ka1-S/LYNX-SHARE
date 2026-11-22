@@ -78,6 +78,12 @@ public:
     BenchResult paintBench (BenchFrame kind, int frames);
     // one whole frame's pixels (a hash) with the row-chunk cache used or bypassed: the two must be identical
     std::uint64_t framePixelsForCheck (bool cached);
+    // the same frame as an image (round 190pb: the Windows check compares pixels within a tolerance, see
+    // framesDifferForCheck)
+    juce::Image frameForCheck (bool cached);
+    // pixels of `a` and `b` (same size) whose colour differs by more than `tolerance` levels in a channel; the largest
+    // difference in `largest` and the pixels that differ at all in `anyDifference`
+    static int framesDifferForCheck (const juce::Image& a, const juce::Image& b, int tolerance, int& largest, int& anyDifference);
     void scrollToRowForCheck (std::int64_t row);
     size_t cachedChunksForCheck() const noexcept;
 

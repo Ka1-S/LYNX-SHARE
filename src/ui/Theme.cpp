@@ -1189,6 +1189,11 @@ juce::String softwareRendererSelfTest()
     return cases > 300 ? "OK" : "ERROR too few edge table cases (" + juce::String (cases) + ")";
 }
 
+std::uint64_t paletteStampNow() noexcept
+{
+    return paletteStamp;
+}
+
 void setPalette (const themes::Palette& p)
 {
     ++paletteStamp;

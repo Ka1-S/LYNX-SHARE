@@ -3665,6 +3665,7 @@ countries: cn sg
 "Version" = "版本"
 "Path" = "路径"
 "Add" = "添加"
+"@menu bar: Add" = "添加"
 "Other" = "其他"
 "Browser find" = "浏览器查找"
 "One-click audio recording: arm the selected insert..." = "一键音频录制：预备所选插入轨..."

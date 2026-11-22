@@ -1530,13 +1530,53 @@ void ChannelRackComponent::paintAutomationSteps (juce::Graphics& g, juce::Rectan
     const auto steps = shownSteps(), realSteps = numSteps();
     const auto& song = engine.getSong();
     const auto& pattern = song.activePattern();
+    // round 190pb: whole strips only (no step drawn one by one: a ghost step's outline is a stroked path), a whole display
+    // scale, the software renderer's exact copies: the row's strips are drawn once into a picture, as they would be into
+    // the frame (each strip a tile blitted on the background), and the picture is copied into every automation row that
+    // shows only idle strips (rollup 0.1.31 step 7: since round 190ow a row can have steps of its own, a selection lift, a
+    // hovered step and playhead hits: such a row is drawn strip by strip below)
+    const juce::Image* shared = nullptr;
+    const auto s = g.getInternalContext().getPhysicalPixelScaleFactor();
+    const auto scale = (int) std::round (s);
+    const auto w = steps * stepWidth, h = rowHeight - 10;
+    if (! pianoRollView && ui::paintCache() && realSteps % 8 == 0 && steps % 8 == 0 && steps > 0 && scale >= 1 && scale <= 3
+        && std::abs (s - (float) scale) <= 1.0e-4f && bg2.isOpaque() && steps * stepWidth * scale <= 16384
+        && dynamic_cast<juce::LowLevelGraphicsSoftwareRenderer*> (&g.getInternalContext()) != nullptr)
+    {
+        auto key = textcache::detail::mixHash (0x243f6a8885a308d3ull, (std::uint64_t) steps);
+        for (const std::uint64_t v : { (std::uint64_t) realSteps, (std::uint64_t) scale, (std::uint64_t) theme::paletteStampNow(), (std::uint64_t) bg2.getARGB() })
+            key = textcache::detail::mixHash (key, v);
+        for (int start = 0; start < steps; start += 4)
+            key = textcache::detail::mixHash (key, (std::uint64_t) theme::stepOff (start).getARGB());
+        auto& picture = autoStepsPicture;
+        if (picture.key != key || ! picture.image.isValid())
+        {
+            picture.key = key;
+            picture.image = juce::Image (juce::Image::RGB, w * scale, h * scale, false, juce::SoftwareImageType());
+            juce::Graphics ig (picture.image);
+            ig.addTransform (juce::AffineTransform::scale ((float) scale));
+            ig.setColour (bg2); // (the rack's background, paint()'s fillAll, under and between the strips)
+            ig.fillRect (0, 0, w, h);
+            for (int start = 0; start < steps; start += 8)
+            {
+                const auto first = juce::Rectangle<int> (start * stepWidth + 1, 0, stepWidth - 3, h); // (stepBounds, at the picture's origin)
+                if (start + 8 <= realSteps)
+                    drawIdleStepStrip (ig, first, stepWidth, theme::stepOff (start), theme::stepOff (start + 4), bg2);
+                else
+                    theme::drawStepStripOver (ig, first, stepWidth, theme::stepOff (start), theme::stepOff (start + 4), true, bg2);
+            }
+        }
+        shared = &picture.image;
+    }
+    bool lastFromPicture = false;
     for (int i = 0; i < (int) autoRows.size(); ++i)
     {
         const auto y = automationRowTop (i);
         if (y > clip.getBottom() || y + rowHeight < clip.getY())
             continue;
         const auto a = autoRows[(std::size_t) i].automation;
-        if (automationSelected (a)) // (round 190ow: a selected row is lifted as a channel's)
+        const auto selected = automationSelected (a);
+        if (selected) // (round 190ow: a selected row is lifted as a channel's)
         {
             g.setColour (bg3);
             g.fillRect (0, y + 1, getWidth(), rowHeight - 2);
@@ -1550,11 +1590,24 @@ void ChannelRackComponent::paintAutomationSteps (juce::Graphics& g, juce::Rectan
                 {
                     const auto x0 = gridLeft() + (float) ((double) n.start / span * steps * stepWidth);
                     const auto len = n.length > 0 ? (double) n.length : (double) ticksPerStep;
-                    const auto w = juce::jmax (3.0f, (float) (len / span * steps * stepWidth) - 1.0f);
-                    g.fillRect (juce::Rectangle<float> (x0, (float) y + rowHeight / 2.0f - 2.0f, w, 4.0f));
+                    const auto nw = juce::jmax (3.0f, (float) (len / span * steps * stepWidth) - 1.0f);
+                    g.fillRect (juce::Rectangle<float> (x0, (float) y + rowHeight / 2.0f - 2.0f, nw, 4.0f));
                 }
             continue;
         }
+        const auto hoveredRow = hoverArea == Area::autoStep && hoverRow == a;
+        if (shared != nullptr && ! selected && ! hoveredRow
+            && std::none_of (pattern.autoNotes.begin(), pattern.autoNotes.end(), [a] (const auto& n) { return n.channel == a; }))
+        {
+            g.setColour (juce::Colours::black); // (an image is drawn with the current colour's alpha as its opacity)
+            if (scale == 1)
+                g.drawImageAt (*shared, gridLeft(), y + 5);
+            else
+                g.drawImage (*shared, juce::Rectangle<float> ((float) gridLeft(), (float) y + 5.0f, (float) w, (float) h), juce::RectanglePlacement::stretchToFit);
+            lastFromPicture = true;
+            continue;
+        }
+        lastFromPicture = false;
         for (int start = 0; start < steps; start += 8)
         {
             const auto first = juce::Rectangle<int> (gridLeft() + start * stepWidth + 1, y + 5, stepWidth - 3, rowHeight - 10); // (stepBounds)
@@ -1601,76 +1654,171 @@ void ChannelRackComponent::paintAutomationSteps (juce::Graphics& g, juce::Rectan
             if (! muted && step == playheadStep && step < realSteps)
                 paintStepHit (g, r.toFloat());
         }
-        if (hoverArea == Area::autoStep && hoverRow == a && hoverStep >= 0 && hoverStep < steps && paintMode == PaintMode::none)
+        if (hoveredRow && hoverStep >= 0 && hoverStep < steps && paintMode == PaintMode::none)
         {
             const auto r = juce::Rectangle<int> (gridLeft() + hoverStep * stepWidth + 1, y + 5, stepWidth - 3, rowHeight - 10);
             g.setColour (textSecondary.withAlpha (0.7f));
             g.drawRoundedRectangle (r.toFloat().reduced (0.5f), keycapRadius, 1.0f);
         }
     }
+    if (lastFromPicture && realSteps < steps) // (the colour the last ghost strip leaves set, as before)
+        g.setColour (theme::stepOff (steps - 8));
 }
 
-// FL's row (fl-channelrack.png rows y 834-894): the mute light on, the two knobs (FL's are the clip's range, minimum and
-// maximum; a LYNX clip spans its target's whole range: 0 and 1), the curve glyph where the mixer track box is, the button
-// in the clip's colour (FL's grey #485156 without one) with the name in white and no icon, the selector's empty slot
+// FL's automation clip rows' controls column (round 190pb: each row from its cached picture where the scale is whole)
 void ChannelRackComponent::paintAutomationButtons (juce::Graphics& g, juce::Rectangle<int> column)
 {
     using namespace theme::colour;
     const auto& song = engine.getSong();
+    const auto s = g.getInternalContext().getPhysicalPixelScaleFactor();
+    const auto scale = (int) std::round (s);
+    const auto pictures = ui::paintCache() && scale >= 1 && scale <= 3 && std::abs (s - (float) scale) <= 1.0e-4f && bg2.isOpaque();
+    // (the left part of a row is skipped by a playhead frame that only repaints the steps, as the channel rows' is)
+    const auto leftPart = column.getX() < selectLeft() || ! ui::paintSavings();
+    if (autoRowPictures.size() != autoRows.size())
+        autoRowPictures.assign (autoRows.size(), {});
+    std::uint64_t common = 0;
+    if (pictures)
+    {
+        // what every row's picture shares: the layout, the palette and the name's font
+        const auto font = theme::font (theme::type::body + 1.0f);
+        common = 0x9e3779b97f4a7c15ull;
+        for (const std::uint64_t v : { (std::uint64_t) scale, (std::uint64_t) theme::paletteStampNow(), (std::uint64_t) nameLeft(), (std::uint64_t) nameWidth,
+                                       (std::uint64_t) selectLeft(), (std::uint64_t) gridLeft(), (std::uint64_t) (showMixerSelectors ? 1 : 0),
+                                       (std::uint64_t) (nameAlignLeft ? 1 : 0), (std::uint64_t) bg2.getARGB(), (std::uint64_t) bg1.getARGB(),
+                                       (std::uint64_t) border.getARGB(), (std::uint64_t) textSecondary.getARGB(), (std::uint64_t) onAccent.getARGB(),
+                                       (std::uint64_t) knobArc.getARGB(),
+                                       (std::uint64_t) font.getTypefaceName().hashCode64(), (std::uint64_t) font.getTypefaceStyle().hashCode64(),
+                                       (std::uint64_t) juce::roundToInt (font.getHeight() * 1000.0f), (std::uint64_t) juce::roundToInt (font.getHorizontalScale() * 1000.0f),
+                                       (std::uint64_t) juce::roundToInt (font.getExtraKerningFactor() * 1000.0f), (std::uint64_t) (ui::paintSavings() ? 1 : 0) })
+            common = textcache::detail::mixHash (common, v);
+    }
+    bool drewLeft = false;
     for (int i = 0; i < (int) autoRows.size(); ++i)
     {
         const auto a = autoRows[(std::size_t) i].automation;
         const auto y = automationRowTop (i);
         if (a < 0 || a >= (int) song.automations.size() || y > column.getBottom() || y + rowHeight < column.getY())
             continue;
-        const auto& automation = song.automations[(std::size_t) a];
-
-        if (column.getX() < selectLeft() || ! ui::paintSavings()) // (as the channel rows: a playhead frame skips them)
+        if (! pictures)
         {
-            g.setColour (theme::muteLed (automation.muted)); // (round 190ow: FL's mute light, working)
-            g.fillEllipse (juce::Rectangle<float> (9.0f, (float) y + rowHeight / 2.0f - 4.5f, 9.0f, 9.0f));
-
-            // round 190ow: FL's MIN / MAX of the clip (its channel's pan / volume knobs)
-            const auto knob = [y] (int left) { return juce::Rectangle<float> ((float) left, (float) y, (float) knobWidth, (float) rowHeight).reduced (1.0f, 2.0f); };
-            const auto knobHover = [&] (Area which) { return hoverArea == which && hoverRow == a; };
-            theme::drawKnob (g, knob (muteWidth), automation.rangeMin, false, knobArc, knobHover (Area::autoMin) || (knobDrag == Area::autoMin && knobRow == a));
-            theme::drawKnob (g, knob (muteWidth + knobWidth), automation.rangeMax, false, knobArc, knobHover (Area::autoMax) || (knobDrag == Area::autoMax && knobRow == a));
-
-            if (showMixerSelectors) // FL's curve glyph: two small rings joined by a rising line
+            if (leftPart)
             {
-                const auto box = juce::Rectangle<float> ((float) (muteWidth + 2 * knobWidth + 1), (float) y + 7.0f, (float) routeWidth - 3.0f, (float) rowHeight - 14.0f);
-                const auto centre = box.getCentre();
-                const juce::Point<float> low (centre.x - 5.0f, centre.y + 3.5f), high (centre.x + 5.0f, centre.y - 3.5f);
-                const auto along = (high - low) / low.getDistanceFrom (high) * 2.0f;
-                g.setColour (textSecondary.withAlpha (0.75f));
-                g.drawEllipse (juce::Rectangle<float> (4.0f, 4.0f).withCentre (low), 1.0f);
-                g.drawEllipse (juce::Rectangle<float> (4.0f, 4.0f).withCentre (high), 1.0f);
-                g.drawLine (juce::Line<float> (low + along, high - along), 1.0f);
+                paintAutomationButton (g, a, y, true, true);
+                drewLeft = true;
             }
-
-            const auto nameArea = juce::Rectangle<float> ((float) nameLeft(), (float) y + 3, (float) nameWidth, (float) rowHeight - 6);
-            auto fill = theme::colourFill (automation.colour != 0 ? juce::Colour (automation.colour) : juce::Colour (0xff485156), 0.42f, 0.58f);
-            if (hoverArea == Area::autoName && hoverRow == a)
-                fill = fill.brighter (0.12f);
-            theme::fillPlate (g, nameArea, theme::radius::sm, fill.withMultipliedBrightness (1.06f), fill.withMultipliedBrightness (0.94f));
-            g.setColour (onAccent.withAlpha (0.92f));
-            g.setFont (theme::font (theme::type::body + 1.0f));
-            const auto textArea = nameArea.withTrimmedLeft (nameAlignLeft ? 7.0f : 6.0f).withTrimmedRight (nameAlignLeft ? 5.0f : 6.0f);
-            const auto name = automation.name.empty() ? tr ("Automation clip") : juce::String::fromUTF8 (automation.name.c_str());
-            textcache::drawText (g, theme::fitMiddle (name, g.getCurrentFont(), textArea.getWidth()), textArea,
-                                 nameAlignLeft ? juce::Justification::centredLeft : juce::Justification::centred, false);
-            g.setFont (theme::font (theme::type::body));
+            paintAutomationSlot (g, a, y);
+            continue;
         }
-
-        // the selector, outlined in the accent while the row is selected (round 190ow), lit while its clip plays from a step
-        const auto selected = automationSelected (a);
-        const auto hoveredSelect = hoverArea == Area::autoSelect && hoverRow == a;
-        const auto slot = juce::Rectangle<float> ((float) selectLeft() + 1.0f, (float) y + 3.0f, (float) selectWidth - 2.0f, (float) rowHeight - 6.0f);
-        theme::fillRoundRect (g, slot, 2.0f, selected ? (hoveredSelect ? accentHover : accent) : hoveredSelect ? textDisabled : border);
-        theme::fillRoundRect (g, slot.reduced (selected ? 2.0f : 1.0f), selected ? 1.0f : 1.5f, bg1);
-        if (! automation.muted && playheadStep >= 0 && playheadStep < numSteps() && song.activePattern().hasAutoStep (a, playheadStep))
-            theme::fillRoundRect (g, slot.reduced (selected ? 3.0f : 2.0f), 1.5f, juce::Colours::white.withAlpha (selected ? 0.75f : 0.9f));
+        // rollup 0.1.31 step 7: the picture also shows round 190ow's live knobs (the clip's range, hover / drag); the mute
+        // light, the curve glyph, the name and the selector (selected / hovered / lit by the playhead) are drawn over it
+        const auto& automation = song.automations[(std::size_t) a];
+        const auto knobState = [&] (Area which) { return (hoverArea == which && hoverRow == a) || (knobDrag == which && knobRow == a); };
+        const auto bits = [] (float v) { std::uint32_t u = 0; std::memcpy (&u, &v, sizeof u); return (std::uint64_t) u; };
+        auto key = textcache::detail::mixHash (common, (std::uint64_t) automation.colour);
+        for (const std::uint64_t v : { (std::uint64_t) (hoverArea == Area::autoName && hoverRow == a ? 1 : 0),
+                                       bits (automation.rangeMin), bits (automation.rangeMax),
+                                       (std::uint64_t) (knobState (Area::autoMin) ? 1 : 0), (std::uint64_t) (knobState (Area::autoMax) ? 1 : 0) })
+            key = textcache::detail::mixHash (key, v);
+        key = textcache::detail::mixHash (key, (std::uint64_t) (automation.name.empty() ? tr ("Automation clip") : juce::String::fromUTF8 (automation.name.c_str())).hashCode64());
+        auto& picture = autoRowPictures[(std::size_t) i];
+        if (picture.key != key || ! picture.image.isValid())
+        {
+            picture.key = key;
+            picture.image = juce::Image (juce::Image::RGB, gridLeft() * scale, rowHeight * scale, false,
+                                        #if JUCE_WINDOWS
+                                         juce::NativeImageType()
+                                        #else
+                                         juce::SoftwareImageType()
+                                        #endif
+                                         );
+            juce::Graphics ig (picture.image);
+            ig.addTransform (juce::AffineTransform::scale ((float) scale));
+            ig.setColour (bg2); // (the column's background, as paint() fills it under the rows)
+            ig.fillRect (0, 0, gridLeft(), rowHeight);
+            ig.setFont (g.getCurrentFont());
+            paintAutomationButton (ig, a, 0, false, true);
+        }
+        g.setColour (juce::Colours::black); // (an image is drawn with the current colour's alpha as its opacity)
+        if (scale == 1)
+            g.drawImageAt (picture.image, 0, y);
+        else
+            g.drawImage (picture.image, juce::Rectangle<float> (0.0f, (float) y, (float) gridLeft(), (float) rowHeight), juce::RectanglePlacement::stretchToFit);
+        if (leftPart)
+            paintAutomationButton (g, a, y, true, false);
+        drewLeft = drewLeft || leftPart;
+        paintAutomationSlot (g, a, y);
     }
+    if (drewLeft) // (the font a drawn row leaves, as before)
+        g.setFont (theme::font (theme::type::body));
+}
+
+// FL's row (fl-channelrack.png rows y 834-894): the mute light (round 190ow: working), the two knobs (FL's MIN / MAX of the
+// clip, round 190ow: its range), the curve glyph where the mixer track box is, the button in the clip's colour (FL's grey
+// #485156 without one) with the name in white and no icon; the selector's slot is paintAutomationSlot's
+void ChannelRackComponent::paintAutomationButton (juce::Graphics& g, int a, int y, bool curves, bool rest)
+{
+    using namespace theme::colour;
+    const auto& automation = engine.getSong().automations[(std::size_t) a];
+    // (the parts do not overlap: drawn in two passes, the pixels of one)
+    if (curves)
+    {
+        g.setColour (theme::muteLed (automation.muted)); // (round 190ow: FL's mute light, working)
+        g.fillEllipse (juce::Rectangle<float> (9.0f, (float) y + rowHeight / 2.0f - 4.5f, 9.0f, 9.0f));
+    }
+
+    if (rest) // round 190ow: FL's MIN / MAX of the clip (its channel's pan / volume knobs)
+    {
+        const auto knob = [y] (int left) { return juce::Rectangle<float> ((float) left, (float) y, (float) knobWidth, (float) rowHeight).reduced (1.0f, 2.0f); };
+        const auto knobHover = [&] (Area which) { return (hoverArea == which && hoverRow == a) || (knobDrag == which && knobRow == a); };
+        theme::drawKnob (g, knob (muteWidth), automation.rangeMin, false, knobArc, knobHover (Area::autoMin));
+        theme::drawKnob (g, knob (muteWidth + knobWidth), automation.rangeMax, false, knobArc, knobHover (Area::autoMax));
+    }
+
+    if (curves && showMixerSelectors) // FL's curve glyph: two small rings joined by a rising line
+    {
+        const auto box = juce::Rectangle<float> ((float) (muteWidth + 2 * knobWidth + 1), (float) y + 7.0f, (float) routeWidth - 3.0f, (float) rowHeight - 14.0f);
+        const auto centre = box.getCentre();
+        const juce::Point<float> low (centre.x - 5.0f, centre.y + 3.5f), high (centre.x + 5.0f, centre.y - 3.5f);
+        const auto along = (high - low) / low.getDistanceFrom (high) * 2.0f;
+        g.setColour (textSecondary.withAlpha (0.75f));
+        g.drawEllipse (juce::Rectangle<float> (4.0f, 4.0f).withCentre (low), 1.0f);
+        g.drawEllipse (juce::Rectangle<float> (4.0f, 4.0f).withCentre (high), 1.0f);
+        g.drawLine (juce::Line<float> (low + along, high - along), 1.0f);
+    }
+    const auto nameArea = juce::Rectangle<float> ((float) nameLeft(), (float) y + 3, (float) nameWidth, (float) rowHeight - 6);
+    if (rest)
+    {
+        auto fill = theme::colourFill (automation.colour != 0 ? juce::Colour (automation.colour) : juce::Colour (0xff485156), 0.42f, 0.58f);
+        if (hoverArea == Area::autoName && hoverRow == a)
+            fill = fill.brighter (0.12f);
+        theme::fillPlate (g, nameArea, theme::radius::sm, fill.withMultipliedBrightness (1.06f), fill.withMultipliedBrightness (0.94f));
+    }
+    if (! curves) // (the name with the straight parts: a name squeezed to fit is drawn as paths, which depend on where they are drawn)
+        return;
+    g.setColour (onAccent.withAlpha (0.92f));
+    g.setFont (theme::font (theme::type::body + 1.0f));
+    const auto textArea = nameArea.withTrimmedLeft (nameAlignLeft ? 7.0f : 6.0f).withTrimmedRight (nameAlignLeft ? 5.0f : 6.0f);
+    const auto name = automation.name.empty() ? tr ("Automation clip") : juce::String::fromUTF8 (automation.name.c_str());
+    textcache::drawText (g, theme::fitMiddle (name, g.getCurrentFont(), textArea.getWidth()), textArea,
+                         nameAlignLeft ? juce::Justification::centredLeft : juce::Justification::centred, false);
+    g.setFont (theme::font (theme::type::body));
+}
+
+// the selector, outlined in the accent while the row is selected (round 190ow), lit while its clip plays from a step; drawn
+// straight (it changes with the playhead), over the row's picture
+void ChannelRackComponent::paintAutomationSlot (juce::Graphics& g, int a, int y)
+{
+    using namespace theme::colour;
+    const auto& song = engine.getSong();
+    const auto& automation = song.automations[(std::size_t) a];
+    const auto selected = automationSelected (a);
+    const auto hoveredSelect = hoverArea == Area::autoSelect && hoverRow == a;
+    const auto slot = juce::Rectangle<float> ((float) selectLeft() + 1.0f, (float) y + 3.0f, (float) selectWidth - 2.0f, (float) rowHeight - 6.0f);
+    theme::fillRoundRect (g, slot, 2.0f, selected ? (hoveredSelect ? accentHover : accent) : hoveredSelect ? textDisabled : border);
+    theme::fillRoundRect (g, slot.reduced (selected ? 2.0f : 1.0f), selected ? 1.0f : 1.5f, bg1);
+    if (! automation.muted && playheadStep >= 0 && playheadStep < numSteps() && song.activePattern().hasAutoStep (a, playheadStep))
+        theme::fillRoundRect (g, slot.reduced (selected ? 3.0f : 2.0f), 1.5f, juce::Colours::white.withAlpha (selected ? 0.75f : 0.9f));
 }
 
 // Right-click on an automation clip row: what LYNX already does with a clip (the Playlist's automation clip items)

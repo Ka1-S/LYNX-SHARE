@@ -3665,6 +3665,7 @@ countries: tr
 "Version" = "Sürüm"
 "Path" = "Yol"
 "Add" = "Ekle"
+"@menu bar: Add" = "Ekle"
 "Other" = "Diğer"
 "Browser find" = "Browser'da bul"
 "One-click audio recording: arm the selected insert..." = "Tek tıkla ses kaydı: seçili insert'i kayda hazırla..."

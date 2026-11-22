@@ -3693,6 +3693,7 @@ countries: br
 "Version" = "Versão"
 "Path" = "Caminho"
 "Add" = "Adicionar"
+"@menu bar: Add" = "Adicionar"
 "Other" = "Outros"
 "Browser find" = "Buscar no Browser"
 "One-click audio recording: arm the selected insert..." = "Gravação de áudio com um clique: armar o insert selecionado..."
