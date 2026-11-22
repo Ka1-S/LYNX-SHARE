@@ -295,6 +295,15 @@
         engine.dispatchPendingMessages();
 
         // --- Smart Tempo: a free recording that speeds up from 100 to 120 BPM ---------------------------------------------
+        // (the clip's waveform strips are made off the message thread: a paint asks for them, then they are waited for)
+        const auto settleWaveforms = [&] {
+            pl.refreshViewOptions();
+            engine.dispatchPendingMessages();
+            ui::WaveformCache::getInstance()->waitUntilIdle (60000);
+            pl.createComponentSnapshot (pl.getLocalBounds(), true, 1.0f);
+            ui::WaveformCache::getInstance()->waitUntilIdle (60000);
+            engine.dispatchPendingMessages();
+        };
         {
             const double rate = 44100.0;
             std::vector<double> truth;
@@ -380,11 +389,13 @@
             engine.dispatchPendingMessages();
             check ("smarttempo_markers", tempomarkers::list (engine.getSong()).size() == 16 && engine.getSong().playlist[0].start < 2 * bar,
                    juce::String ((int) tempomarkers::list (engine.getSong()).size()));
+            settleWaveforms();
             snap ("smarttempo-after");
             engine.undo();
             engine.dispatchPendingMessages();
             check ("smarttempo_one_undo_step", ProjectFile::toJson (engine.getSong()) == json);
-            snap ("smarttempo-before"); // (the song as before Follow, after the undo: the clip's waveform is loaded by now)
+            settleWaveforms();
+            snap ("smarttempo-before"); // (the song as before Follow, after the undo)
             wav.deleteFile();
         }
 
