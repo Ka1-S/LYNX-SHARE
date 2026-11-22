@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/ChordLane.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/EventPaneSplit.h"
@@ -854,6 +855,13 @@ private:
     int previewKey = -1;
     int lastScaleDragKeys = 0; // (a snap-to-scale drag: the scale steps last applied)
     NoteMask litKeys {}; // keys sounding on the channel(s) shown: lit on the keyboard (issue #14, FL)
+    // round 190pf (research190oe P13): the Chord lane's chord at the song position, while "Highlight the Chord lane's
+    // chord" is on (the timer compares it; the grid repaints only when it changes)
+    chordlane::Highlight shownChord {};
+public:
+    chordlane::Highlight chordHighlightForShot() const noexcept { return shownChord; }
+    void setChordHighlightForShot (chordlane::Highlight h) { shownChord = h; repaint(); }
+private:
     NoteMask soundingNow() const;
     bool isLit (int key) const noexcept { return key >= 0 && key < 128 && ((litKeys[(std::size_t) (key >> 6)] >> (key & 63)) & 1u) != 0; }
     double playheadTick = -1.0;

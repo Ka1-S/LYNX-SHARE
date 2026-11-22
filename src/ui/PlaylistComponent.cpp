@@ -111,6 +111,8 @@
 #include "core/SectionOps.h"    // round 190ol (the Sections lane)
 #include "core/SignatureEdit.h" // round 190ol (P6: Simple time signature changes)
 #include "ui/SectionsLane190ol.h" // round 190ol (P1: the Sections lane)
+#include "ui/ChordLane190pf.h"   // round 190pf (P13: the Chord lane)
+#include "ui/SmartTempo190pf.h"  // round 190pf (P12: Smart Tempo)
 #include "core/LoopAnalysis.h" // round 190kx
 #include "core/TrackClips.h" // round 190ne
 #include "ui/LoopInfo.h"
@@ -561,6 +563,7 @@ void paintClipOutline (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour
 } // namespace
 
 #include "SectionsLane190ol.inc" // round 190ol (research190oe P1): the Sections lane
+#include "ChordLane190pf.inc"   // round 190pf (research190oe P13): the Chord lane
 
 // Zoomed far out, a song of chopped audio shows a thousand clips a few pixels wide. Painted one by one, each is a
 // handful of rounded paths (frame, header, waveform, outline), and the GPU renderer pays per path: Thief's Playlist
@@ -1233,6 +1236,8 @@ PlaylistComponent::PlaylistComponent (AudioEngine& e)
     addChildComponent (*videoLanes);
     sectionsLane = std::make_unique<SectionsLaneView> (engine, *this); // round 190ol
     addChildComponent (*sectionsLane);
+    chordLane = std::make_unique<ChordLaneView> (engine, *this); // round 190pf
+    addChildComponent (*chordLane);
 
     grid::fillEditorBox (snapBox);
     snapBox.setTooltip (tr ("Playlist snap (magnet): \"Main\" follows the snap in the toolbar, or pick this window's own; hold Alt while dragging to ignore it"));
@@ -1468,7 +1473,7 @@ int PlaylistComponent::videoSectionHeight() const
     if (natural <= 0)
         return 0;
     // (the clip tracks keep two rows; with the Pattern Blocks section too, the video lanes take at most half)
-    const auto available = getHeight() - headerHeight - sectionsLaneHeight();
+    const auto available = getHeight() - headerHeight - sectionsLaneHeight() - chordLaneHeight();
     const auto least = VideoLanesView::dividerHeight + 20;
     const auto most = juce::jmax (least, engine.getSong().patternBlocksOn ? available / 2 : available - 2 * baseRowHeight());
     return juce::jlimit (least, most, videoHeight > 0 ? videoHeight : natural);
@@ -1946,7 +1951,11 @@ void PlaylistComponent::resized()
     laidOutSectionsHeight = lane;
     sectionsLane->setBounds (0, headerHeight, getWidth(), lane);
     sectionsLane->setVisible (lane > 0);
-    videoLanes->setBounds (0, headerHeight + lane, getWidth(), video);
+    const auto chords = chordLaneHeight(); // round 190pf: the Chord lane, under the Sections lane
+    laidOutChordHeight = chords;
+    chordLane->setBounds (0, headerHeight + lane, getWidth(), chords);
+    chordLane->setVisible (chords > 0);
+    videoLanes->setBounds (0, headerHeight + lane + chords, getWidth(), video);
     videoLanes->setVisible (video > 0);
     updateScrollBars();
 
@@ -8418,7 +8427,8 @@ void PlaylistComponent::insertTimeSelection()
 
     setSelection ({});
     engine.editSong ([from = song.loopStart, to = song.loopEnd] (Song& s) { noteedit::insertTime (s.playlist, s.markers(), from, to - from);
-                                                                      sections::insertTime (s.sections(), from, to - from); }); // (round 190ol)
+                                                                      sections::insertTime (s.sections(), from, to - from);
+                                                                      chordlane::insertTime (s.chords(), from, to - from); }); // (round 190ol, 190pf)
     sortClips();
 }
 
@@ -8431,7 +8441,8 @@ void PlaylistComponent::deleteTimeSelection()
 
     setSelection ({});
     engine.editSong ([from = song.loopStart, to = song.loopEnd] (Song& s) { noteedit::deleteTime (s.playlist, s.markers(), from, to);
-                                                                      sections::deleteTime (s.sections(), from, to); }); // (round 190ol)
+                                                                      sections::deleteTime (s.sections(), from, to);
+                                                                      chordlane::deleteTime (s.chords(), from, to); }); // (round 190ol, 190pf)
     sortClips();
 }
 
@@ -8445,6 +8456,7 @@ void PlaylistComponent::setLiveStyle (bool on)
     refreshTrackLayout(); // (round 190gw: the Clip-launch layout keeps LYNX's 38 px default row; round 190jn: Live's 19 px in its look)
     updateHeaderWidth();  // (round 190jn: Live's header row is wider)
     sectionsLaneChanged(); // (round 190ol: no Sections lane in the Clip-launch layout)
+    chordLaneChanged();    // (round 190pf: the Chord lane's look follows the layout)
     updateScrollBars();
     repaint();
 }
@@ -8809,7 +8821,8 @@ void PlaylistComponent::sliceInsertTimeSelection()
 
     setSelection ({});
     engine.editSong ([from = song.loopStart, to = song.loopEnd] (Song& s) { noteedit::sliceInsertTime (s.playlist, s.markers(), from, to - from);
-                                                                      sections::insertTime (s.sections(), from, to - from); }); // (round 190ol)
+                                                                      sections::insertTime (s.sections(), from, to - from);
+                                                                      chordlane::insertTime (s.chords(), from, to - from); }); // (round 190ol, 190pf)
     sortClips();
 }
 
@@ -8825,6 +8838,8 @@ void PlaylistComponent::trimTimeSelection()
         noteedit::trimTime (s.playlist, s.markers(), from, to);
         sections::deleteTime (s.sections(), to, std::numeric_limits<std::int64_t>::max() / 4); // (round 190ol)
         sections::deleteTime (s.sections(), 0, from);
+        chordlane::deleteTime (s.chords(), to, std::numeric_limits<std::int64_t>::max() / 4); // (round 190pf)
+        chordlane::deleteTime (s.chords(), 0, from);
         s.loopStart = s.loopEnd = 0; // (FL clears the time selection after a trim, FUN_00eb35f0)
     });
     sortClips();
@@ -9753,6 +9768,7 @@ void PlaylistComponent::setSimpleHeaders (bool on)
     updateHeaderWidth();
     refreshTrackLayout(); // (round 190jq: no automation lanes in Simple)
     sectionsLaneChanged(); // (round 190ol: the lane's look and visibility follow the layout)
+    chordLaneChanged();    // (round 190pf)
 }
 
 void PlaylistComponent::selectTrackChannel (int track)
@@ -10780,6 +10796,8 @@ juce::PopupMenu PlaylistComponent::rulerMenu (int x)
                 engine.editSong ([bar] (Song& s) { signatureedit::remove (s, bar); });
                 repaint();
             });
+        // round 190pf (research190oe P13): the Chord lane (a LYNX extra in every layout; here beside the Simple ruler's own)
+        menu.addItem (tr ("Chord lane"), true, chordlane::laneOn(), [] { workflowextras::setExtra ("playlist.chordLane", ! chordlane::laneOn()); });
         menu.addSeparator();
     }
     menu.addItem (tr ("Add marker here..."), [this, tick] { editMarkerName (tick, -1); });
@@ -12097,6 +12115,12 @@ juce::PopupMenu PlaylistComponent::buildAudioClipMenu (int index, int mouseX)
     // edited one by one; the channel's clips play the edited render (an ARA-edited channel plays its plugin instead)
     menu.addItem (tr ("Edit notes (polyphonic)..."), sample != nullptr && ! channel.ara.active(), false,
                   [this, ch] { PolyEditorWindows::open (engine, ch); });
+    // round 190pf (research190oe P12, P13): Smart Tempo (the project's tempo follows this free recording; Pattern and
+    // Simple) and the Chord lane's chords from this clip's notes (shown with the lane)
+    if (! liveStyle)
+        menu.addItem (tr ("Make the project tempo follow this clip..."), sample != nullptr, false, [this, index] { followClipTempo (index); });
+    if (chordLaneShown() && chordLane != nullptr)
+        menu.addItem (tr ("Detect chords to the Chord lane"), sample != nullptr, false, [this, index] { chordLane->detectFromAudio (index); });
     addLiveTrackItems (engine, menu, index, targets, [safe = juce::Component::SafePointer<PlaylistComponent> (this)] {
         if (safe != nullptr)
         {
@@ -15010,6 +15034,10 @@ void PlaylistComponent::changeListenerCallback (juce::ChangeBroadcaster* source)
         resized();
     else if (sectionsLaneHeight() != laidOutSectionsHeight) // round 190ol: the first section added, the last removed, undo
         resized();
+    else if (chordLaneHeight() != laidOutChordHeight) // round 190pf: the Chord lane switched on / off
+        resized();
+    if (chordLane != nullptr && chordLane->isVisible())
+        chordLane->repaint(); // (its own picture is kept while the chords and the view stay the same)
     blocksView->refresh();
     videoLanes->refresh();
     updateScrollBars();

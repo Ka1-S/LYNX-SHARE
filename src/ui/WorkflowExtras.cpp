@@ -4,6 +4,7 @@
 #include "core/EscClose.h"
 #include "core/RulerGestures.h" // round 190nq (#227)
 #include "core/Sections.h"      // round 190ol (P1)
+#include "core/ChordLane.h"     // round 190pf (P13)
 
 #include "core/TrackClips.h"
 #include "core/TrackStates.h"
@@ -111,6 +112,10 @@ bool readUiOption (const juce::String& key, bool on)
         ruler::seekWithAnyTool() = on;
     else if (key == "sectionsLane") // round 190ol (P1): the Pattern layout's Sections lane
         sections::patternLaneOn() = on;
+    else if (key == "chordLane") // round 190pf (P13): the Chord lane, every layout
+        chordlane::laneOn() = on;
+    else if (key == "prChordHighlight") // round 190pf (P13): the Piano roll lights the Chord lane's chord
+        chordlane::pianoRollHighlight() = on;
     else if (key == "clipLanesFoldedLive") // round 190oo (CS O-3, LYNX extra)
         cliplanes::foldedOnOpen = on;
     else if (key == "liveScaleControl") // round 190oo (O-5, LYNX extra)
@@ -148,6 +153,8 @@ juce::String uiOptionsText()
            + "\ntrackClipsShown=" + juce::String (trackclips::shownInSelector() ? 1 : 0) // (round 190ne)
            + "\nrulerSeeksAnyTool=" + juce::String (ruler::seekWithAnyTool() ? 1 : 0) // (round 190nq, issue #227)
            + "\nsectionsLane=" + juce::String (sections::patternLaneOn() ? 1 : 0) // (round 190ol, P1)
+           + "\nchordLane=" + juce::String (chordlane::laneOn() ? 1 : 0) // (round 190pf, P13)
+           + "\nprChordHighlight=" + juce::String (chordlane::pianoRollHighlight() ? 1 : 0) // (round 190pf, P13)
            + "\nclipLanesFoldedLive=" + juce::String (cliplanes::foldedOnOpen ? 1 : 0) // (round 190oo, CS O-3)
            + "\nliveScaleControl=" + juce::String (livescale::shown ? 1 : 0) // (round 190oo, O-5)
            + "\ntrackStates=" + juce::String (trackstates::patternMenus() ? 1 : 0) // (round 190op, P4)
@@ -181,6 +188,10 @@ std::optional<bool> extraOn (std::string_view id)
         return ruler::seekWithAnyTool();
     if (id == "playlist.sectionsLane") // round 190ol (P1)
         return sections::patternLaneOn();
+    if (id == "playlist.chordLane") // round 190pf (P13)
+        return chordlane::laneOn();
+    if (id == "pianoRoll.chordHighlight") // round 190pf (P13)
+        return chordlane::pianoRollHighlight();
     if (id == "playlist.clipLanesFolded") // round 190oo (CS O-3)
         return cliplanes::foldedOnOpen;
     if (id == "controlBar.liveScale") // round 190oo (O-5)
@@ -224,6 +235,10 @@ bool setExtra (std::string_view id, bool on)
         ruler::seekWithAnyTool() = on;
     else if (id == "playlist.sectionsLane") // round 190ol (P1)
         sections::patternLaneOn() = on;
+    else if (id == "playlist.chordLane") // round 190pf (P13)
+        chordlane::laneOn() = on;
+    else if (id == "pianoRoll.chordHighlight") // round 190pf (P13)
+        chordlane::pianoRollHighlight() = on;
     else if (id == "playlist.clipLanesFolded") // round 190oo (CS O-3: from the next project opened)
         cliplanes::foldedOnOpen = on;
     else if (id == "controlBar.liveScale") // round 190oo (O-5)

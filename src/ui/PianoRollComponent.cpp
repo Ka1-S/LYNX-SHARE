@@ -1,4 +1,5 @@
 #include "ui/ShotShowing.h"
+#include "ui/WorkflowExtras.h" // round 190pf (the chord highlight switch)
 #include "ui/FlMods.h"
 #include "ui/Motion.h"
 #include "ui/FileChoosers.h"
@@ -1726,7 +1727,10 @@ void PianoRollComponent::paint (juce::Graphics& g)
             keyregions::Degrees degrees;
         };
         std::vector<RegionRows> regionRows;
-        if (gridHighlights && ! liveLookNotes && keyregions::hasKeyMarkers (pattern))
+        // round 190pf (P13): the Chord lane's chord at the song position lights its notes' rows (the scale's shade, the
+        // rows out of the chord the black-key shade); it wins over the scale and the key regions while it shows
+        const auto chordRows = gridHighlights && ! liveLookNotes && shownChord.root >= 0;
+        if (gridHighlights && ! liveLookNotes && ! chordRows && keyregions::hasKeyMarkers (pattern))
         {
             const auto rightTick = (std::int64_t) xToTick (grid.getRight()) + 1;
             for (const auto& span : keyregions::spans (pattern, std::max<std::int64_t> (rightTick, 1)))
@@ -1756,6 +1760,8 @@ void PianoRollComponent::paint (juce::Graphics& g)
                 // take the black-key shade, the rows in it the white-key one, black keys or not; rollup step 6: 190jo's
                 // black-key shade `prRowBlack`, as step 5 did for Automatic)
                 row = inScale (key) ? prRowIn : prRowBlack;
+            if (chordRows)
+                row = (shownChord.mask & (1 << (key % 12))) != 0 ? prRowIn : prRowBlack;
             if (liveLookNotes) // (round 190jn: Live's note editor, one grey with a darker line under each row)
                 row = juce::Colour (0xff464f53);
             if (bandRows.test ((std::size_t) key))
@@ -6508,6 +6514,24 @@ void PianoRollComponent::timerCallback()
         refreshChannelBox();
     updateChordReadout();
 
+    // round 190pf (P13): the rows follow the Chord lane's chord at the song position (a check of two ints per tick)
+    if (chordlane::pianoRollHighlight())
+    {
+        const auto& song = engine.getSong();
+        const auto now = song.chords().empty() ? chordlane::Highlight {}
+                                               : chordlane::highlightAt (song, (std::int64_t) engine.getTransport().positionTicks.load());
+        if (now != shownChord)
+        {
+            shownChord = now;
+            repaint();
+        }
+    }
+    else if (shownChord.root >= 0)
+    {
+        shownChord = {};
+        repaint();
+    }
+
     // the keys the channel plays light up on the keyboard (song, pattern, typing keyboard, MIDI)
     if (const auto lit = isShowing() ? soundingNow() : NoteMask {}; lit != litKeys)
     {
@@ -7059,6 +7083,11 @@ juce::PopupMenu PianoRollComponent::viewMenu()
     menu.addItem (tr ("Background waveform") + keyText ("pianoRoll.backgroundWave"), true, isBackgroundWaveShown(),
                   [this] { runAction ("pianoRoll.backgroundWave"); });
     menu.addItem (tr ("Ruler: song bars (LYNX)") + keyText ("pianoRoll.songBarsRuler"), true, songBarsRuler, [this] { runAction ("pianoRoll.songBarsRuler"); });
+    // round 190pf (research190oe P13): the rows light the Chord lane's chord at the song position
+    menu.addItem (tr ("Highlight the Chord lane's chord (LYNX)"), true, chordlane::pianoRollHighlight(), [this] {
+        workflowextras::setExtra ("pianoRoll.chordHighlight", ! chordlane::pianoRollHighlight());
+        repaint();
+    });
     if (layoutstyle::current() != layoutstyle::Style::clipLaunch) // (round 190on: the Clip-launch layout always offers them)
         menu.addItem (tr ("Stacked controller lanes (LYNX)") + keyText ("pianoRoll.stackedLanes"), true, stackedLanesExtra,
                       [this] { runAction ("pianoRoll.stackedLanes"); });
