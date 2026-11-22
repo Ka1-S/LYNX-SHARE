@@ -37,6 +37,7 @@ CORE="$CORE src/core/DawProject.cpp src/core/ZipLite.cpp" # DAWproject import / 
 CORE="$CORE src/core/RollingAudioLog.cpp src/core/ChordReadout.cpp src/core/NoteTools.cpp src/core/MidiTools.cpp src/core/MidiGenerate.cpp src/core/PianoRollTools.cpp src/core/EventEdit.cpp src/core/AudioEdit.cpp src/core/AudioEditTools.cpp src/core/FlAutoSlicer.cpp src/core/MixerOps.cpp src/core/History.cpp src/core/SearchQuery.cpp src/core/SearchIndex.cpp src/core/SearchService.cpp src/core/BrowserView.cpp src/core/EffectPresets.cpp src/core/PluginPresets.cpp src/core/GeneratorPresets.cpp src/core/ParamHelp.cpp"
 # Slicex as a channel (round 190l)
 CORE="$CORE src/core/SlicexInstrument.cpp"
+CORE="$CORE src/core/Jsfx.cpp" # JSFX scripts' identity, file policy and state (round 190pj)
 # Loop Starter, local (round 168b)
 CORE="$CORE src/core/LoopStarter.cpp"
 # Simple workflow: adding a track (round 184a)
@@ -189,6 +190,27 @@ mkdir -p build-local/monocypher
 obj=build-local/monocypher/monocypher.o
 [[ -f "$obj" && "$obj" -nt third_party/monocypher/monocypher.c ]] || $CC -c -O2 -w -Ithird_party/monocypher third_party/monocypher/monocypher.c -o "$obj"
 WAVPACK="$WAVPACK $obj"
+# ysfx + WDL's EEL2 (Apache-2.0 / zlib-style; third_party/ysfx): the JSFX runtime the tests check against upstream's
+# reference render (round 190pj; flags as CMakeLists.txt's lynx_ysfx: no @gfx, the GAS x86-64 code generator, empty on
+# other CPUs) (rollup 0.1.31 step 7: the Core jobs build with this script)
+mkdir -p build-local/ysfx
+YSFX_WDL=third_party/ysfx/thirdparty/WDL/source/WDL
+YSFX_DEFS="-DYSFX_API= -DYSFX_NO_GFX -DWDL_FFT_REALSIZE=8 -DWDL_LINEPARSE_ATOF=ysfx_wdl_atof -DNSEEL_ATOF=ysfx_wdl_atof -D_FILE_OFFSET_BITS=64 -Ithird_party/ysfx/include -Ithird_party/ysfx/sources -Ithird_party/ysfx/thirdparty/WDL/source -Ithird_party/ysfx/thirdparty/dr_libs"
+for f in third_party/ysfx/sources/ysfx*.cpp "$YSFX_WDL"/fft.c "$YSFX_WDL"/eel2/nseel-caltab.c "$YSFX_WDL"/eel2/nseel-cfunc.c \
+         "$YSFX_WDL"/eel2/nseel-compiler.c "$YSFX_WDL"/eel2/nseel-eval.c "$YSFX_WDL"/eel2/nseel-lextab.c "$YSFX_WDL"/eel2/nseel-ram.c \
+         "$YSFX_WDL"/eel2/nseel-yylex.c third_party/ysfx/sources/eel2-gas/sources/asm-nseel-x64-sse.S; do
+    name="$(basename "$f")"; obj="build-local/ysfx/${name%.*}.o"
+    if [[ ! -f "$obj" || "$f" -nt "$obj" ]]; then
+        case "$f" in
+            *.cpp) $CXX -c -O2 -w -std=gnu++17 -fsigned-char $YSFX_DEFS "$f" -o "$obj" ;;
+            *.S) $CC -c -O2 -w $YSFX_DEFS "$f" -o "$obj" ;;
+            *) $CC -c -O2 -w -std=gnu11 -fsigned-char $YSFX_DEFS "$f" -o "$obj" ;;
+        esac
+    fi
+    WAVPACK="$WAVPACK $obj"
+done
+[[ "$(uname -s)" == Linux ]] && WAVPACK="$WAVPACK -ldl -lpthread"
+FLAGS="$FLAGS -Ithird_party/ysfx/include -DYSFX_API="
 # zig links its compiler_rt, whose archive member also defines WEAK cos/sin/exp/log (double and x87 long double). When a
 # link needs any builtin of that member (128-bit division...), those copies replace glibc's libm, whose last bits the
 # x87 bit-exact goldens hold: the "no-LTO failures" of multiband_delay_exact and the Kepler tests (round speed185a; the
