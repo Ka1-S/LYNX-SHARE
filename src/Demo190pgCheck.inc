@@ -135,6 +135,17 @@
         check ("a click on Simple switches the layout", ok (r) && op ("ui.window", {})["layout"].toString() == "simple");
         check ("no menu item is found once the menu closed", ! (bool) op ("ui.find", json (R"({"target":"menu:Layout style"})"))["found"]);
         check ("a missing menu item is an error", ! ok (op ("ui.click", json (R"({"target":"menu:No such item"})"))));
+        // an item whose English text ends in "..." (its translation keeps the dots in the tables), two levels down
+        op ("ui.click", json (R"({"target":"menu:File"})"));
+        settle();
+        op ("ui.click", json (R"({"target":"menu:Export"})"));
+        settle();
+        r = op ("ui.find", json (R"({"target":"menu:Wave file..."})"));
+        check ("File › Export › Wave file... found by its English text: " + rectOf (r).toString(), (bool) r["found"] && ! rectOf (r).isEmpty());
+        r = op ("ui.find", json (R"({"target":"menu:Ableton Live set (.als)..."})"));
+        check ("and Ableton Live set (.als)...", (bool) r["found"]);
+        juce::PopupMenu::dismissAllActiveMenus();
+        settle();
 
         // --- the clip grid ---------------------------------------------------------------------------------------------------------
         op ("ui.layout", json (R"({"style":"clipLaunch"})"));

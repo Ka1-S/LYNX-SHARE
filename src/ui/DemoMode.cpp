@@ -181,7 +181,9 @@ juce::Component* findMenuItemIn (juce::Component& root, const juce::String& engl
 // the open menus first (the newest window on top), then the main window (its menu bar)
 juce::Component* findMenuItem (juce::Component& window, const juce::String& englishText)
 {
-    const auto english = menuText (englishText), translated = menuText (tr (english));
+    // (the translation of the text as written, "Wave file..." with its dots: the tables hold it that way)
+    const auto raw = englishText.upToFirstOccurrenceOf ("\t", false, false).trim();
+    const auto english = menuText (raw), translated = menuText (tr (raw));
     auto& desktop = juce::Desktop::getInstance();
     for (int i = desktop.getNumComponents(); --i >= 0;)
         if (auto* top = desktop.getComponent (i); top != nullptr && top != window.getTopLevelComponent() && top->isShowing())
