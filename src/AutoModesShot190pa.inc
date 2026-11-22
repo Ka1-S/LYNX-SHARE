@@ -2,7 +2,8 @@
     // chosen tracks) off-screen through the real components, in the three layouts: the Pattern Playlist with the range
     // extra off and on, a range over two tracks (Ctrl+Alt+drag's result), its menu, Delete / Duplicate on it, a range on
     // one automation lane; the record menu's "Automation write mode (LYNX)" submenu and the armed mode's badge on Record
-    // (Pattern, Simple) and on Automation Arm (Clip-launch); the Clip-launch Arrangement with a range. <prefix>-checks.txt
+    // (Pattern, Simple) and on Automation Arm (Clip-launch); the Clip-launch Arrangement with a range (a plain drag on
+    // empty space there, Live's time selection: rollup 0.1.31 step 7). <prefix>-checks.txt
     // lists the checks. Included in the app class of Main.cpp (savePng / saveMenus). @150: LYNX_SHOT_SCALE=1.5
     // LYNX_SHOT_SUFFIX=@150.
     bool runAutoModesShot190pa (const juce::String& prefix)
@@ -213,6 +214,41 @@
             auto& lp = ui.getPlaylistForSnapshot();
             lp.setViewForSnapshot (110.0, 0, 0);
             check ("cliplaunch_range_on", lp.rangeEditsOn());
+            // rollup 0.1.31 step 7 (Live-exact): the real gesture, a plain drag of the Select tool on empty space from bar 2
+            // on track 1 to bar 4 on track 3 (Live's time selection); Ctrl+Alt+drag draws nothing here (Live scrolls with
+            // it); a click without a drag leaves no range (Live's insert marker)
+            {
+                auto source = juce::Desktop::getInstance().getMainMouseSource();
+                const auto now = juce::Time::getCurrentTime();
+                const juce::ModifierKeys leftButton (juce::ModifierKeys::leftButtonModifier);
+                const auto gesture = [&] (juce::Point<int> a, juce::Point<int> b, juce::ModifierKeys mods) {
+                    const auto pa = a.toFloat(), pb = b.toFloat();
+                    const auto held = mods.withFlags (juce::ModifierKeys::leftButtonModifier);
+                    lp.mouseDown (juce::MouseEvent (source, pa, held, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &lp, &lp, now, pa, now, 1, false));
+                    if (a != b)
+                        lp.mouseDrag (juce::MouseEvent (source, pb, held, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &lp, &lp, now, pa, now, 1, true));
+                    lp.mouseUp (juce::MouseEvent (source, pb, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &lp, &lp, now, pa, now, 1, a != b));
+                    engine.dispatchPendingMessages();
+                };
+                lp.setToolForSnapshot (EditTool::lasso);
+                // (an empty spot: past the demo's clips, bars 10..12)
+                const auto ex = [&lp] (double b) { return lp.headerWidthForSnapshot() + (int) std::lround (b * 110.0) + 2; };
+                lp.setViewForSnapshot (110.0, 8, 0);
+                engine.dispatchPendingMessages();
+                const auto x0 = ex (2.0), x1 = ex (4.0);
+                gesture ({ x0, lp.trackRowForSnapshot (0).getCentreY() }, { x0 + 2, lp.trackRowForSnapshot (0).getCentreY() }, {});
+                check ("cliplaunch_click_no_range", engine.getSong().trackRange.empty());
+                gesture ({ x0, lp.trackRowForSnapshot (0).getCentreY() }, { x1, lp.trackRowForSnapshot (2).getCentreY() },
+                         juce::ModifierKeys (juce::ModifierKeys::ctrlModifier | juce::ModifierKeys::altModifier));
+                check ("cliplaunch_ctrl_alt_drag_no_range", engine.getSong().trackRange.empty());
+                gesture ({ x0, lp.trackRowForSnapshot (0).getCentreY() }, { x1, lp.trackRowForSnapshot (2).getCentreY() }, {});
+                const auto plain = engine.getSong().trackRange;
+                check ("cliplaunch_plain_drag_range", plain.tracks == std::vector<int> ({ 0, 1, 2 }) && plain.from == 10 * bar && plain.to == 12 * bar,
+                       juce::String (plain.from) + ".." + juce::String (plain.to) + " tracks " + juce::String ((int) plain.tracks.size()));
+                lp.setTrackRangeForSnapshot ({});
+                lp.setViewForSnapshot (110.0, 0, 0);
+                engine.dispatchPendingMessages();
+            }
             lp.drawRangeForSnapshot ({ lp.headerWidthForSnapshot() + 2 * 110 + 2, lp.trackRowForSnapshot (0).getCentreY() },
                                      { lp.headerWidthForSnapshot() + 4 * 110 + 2, lp.trackRowForSnapshot (2).getCentreY() });
             engine.dispatchPendingMessages();

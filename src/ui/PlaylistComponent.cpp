@@ -6223,7 +6223,8 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
-    // round 190pa (P14, core/RangeEdit.h): Ctrl+Alt+drag draws a range on chosen tracks; a drag inside it moves its
+    // round 190pa (P14, core/RangeEdit.h): Ctrl+Alt+drag (Pattern) or a plain drag on empty space (Clip-launch) draws a
+    // range on chosen tracks; a drag inside it moves its
     // content, a right-click opens its menu; any other press clears it
     if (rangeMouseDown (e))
         return;

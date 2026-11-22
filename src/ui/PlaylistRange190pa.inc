@@ -2,8 +2,9 @@
 // some tracks). Included by PlaylistComponent.cpp. core/RangeEdit.h does the work on the song; Song::trackRange holds the
 // range, so it is saved with the project and undo brings it back with the edit.
 //
-// Ctrl+Alt+drag in the grid draws it (FL 2026's Playlist has no Ctrl+Alt+drag of its own: Ctrl+drag selects, Alt turns
-// snap off), over the rows it crosses: the tracks' clips and automation lanes, or one lane when the drag stays on it. Its
+// Ctrl+Alt+drag in the grid draws it in the Pattern layout (FL 2026's Playlist has no Ctrl+Alt+drag of its own: Ctrl+drag
+// selects, Alt turns snap off); in the Clip-launch Arrangement a plain drag on empty space does, as Live's time selection
+// (rollup 0.1.31 step 7). Over the rows it crosses: the tracks' clips and automation lanes, or one lane when the drag stays on it. Its
 // edges sit on the nearest grid lines. A drag inside it moves what it holds (the clips are cut at its edges), a right-
 // click opens its menu, Delete / Ctrl+X / C / V / B (or D) / E act on it, Esc or any other press clears it.
 
@@ -142,10 +143,14 @@ void PlaylistComponent::drawRangeForSnapshot (juce::Point<int> a, juce::Point<in
 
 bool PlaylistComponent::rangeMouseDown (const juce::MouseEvent& e)
 {
-    if (! rangeEditsOn() || e.x < headerWidth || ! gridArea().contains (e.getPosition()))
+    if (rangeReplaying || ! rangeEditsOn() || e.x < headerWidth || ! gridArea().contains (e.getPosition()))
         return false;
     const auto left = e.mods.isLeftButtonDown() && ! e.mods.isRightButtonDown() && ! e.mods.isMiddleButtonDown();
-    if (left && flmods::ctrl (e.mods) && e.mods.isAltDown() && ! e.mods.isShiftDown())
+    const auto clipLaunch = layoutstyle::current() == layoutstyle::Style::clipLaunch;
+    rangePlainPress = false;
+    // the Pattern layout's extra: Ctrl+Alt+drag (in Live's Arrangement Ctrl+Alt+drag scrolls the display, Live 12 manual
+    // 42.16: the Clip-launch layout leaves it alone)
+    if (left && ! clipLaunch && flmods::ctrl (e.mods) && e.mods.isAltDown() && ! e.mods.isShiftDown())
     {
         drag = Drag::range;
         rangeDownPos = e.getPosition();
@@ -154,9 +159,7 @@ bool PlaylistComponent::rangeMouseDown (const juce::MouseEvent& e)
         return true;
     }
     const auto& song = engine.getSong();
-    if (song.trackRange.empty() || e.mods.isMiddleButtonDown())
-        return false;
-    if (rangeHit (e.getPosition()))
+    if (! song.trackRange.empty() && ! e.mods.isMiddleButtonDown() && rangeHit (e.getPosition()))
     {
         if (flmods::popup (e.mods))
         {
@@ -171,7 +174,33 @@ bool PlaylistComponent::rangeMouseDown (const juce::MouseEvent& e)
             return true;
         }
     }
-    setTrackRange ({}); // a press elsewhere clears it (and goes on as usual)
+    // rollup 0.1.31 step 7 (coordinator, Live-exact): in the Clip-launch Arrangement a plain drag of the Select tool on
+    // empty space is Live's time selection, over the tracks it crosses (Live 12 manual 6.6 "Selecting Clips and Time":
+    // "click and drag ... in the Arrangement's background"); a click without a drag does what it did (rangeMouseUp
+    // replays the press: the Select tool's insert marker, the pencil's clip). Draw Mode keeps its drawing
+    const auto pressTool = tools.getTool();
+    if (clipLaunch && left && ! e.mods.isAnyModifierKeyDown() && e.getNumberOfClicks() == 1 && ! drawmode::isOn()
+        && (pressTool == EditTool::lasso || pressTool == EditTool::pencil))
+    {
+        bool rightEdge = false;
+        const auto track = yToTrack (e.y);
+        if (track >= 0 && track < numTracks() && ! projection.isChild (track) && laneAt (e.getPosition()).track < 0
+            && clipAt (e.x, e.y, rightEdge) < 0)
+        {
+            setTrackRange ({});
+            setSelection ({}); // (as a press of the Select tool on empty space)
+            drag = Drag::range;
+            rangePlainPress = true;
+            rangePress.reset();
+            rangePress.emplace (e);
+            rangeDownPos = e.getPosition();
+            rangeDraft = {};
+            repaint();
+            return true;
+        }
+    }
+    if (! song.trackRange.empty())
+        setTrackRange ({}); // a press elsewhere clears it (and goes on as usual)
     return false;
 }
 
@@ -198,6 +227,23 @@ void PlaylistComponent::rangeMouseDrag (const juce::MouseEvent& e)
 
 void PlaylistComponent::rangeMouseUp (const juce::MouseEvent& e)
 {
+    if (drag == Drag::range && rangePlainPress && e.getDistanceFromDragStart() < 3 && rangePress.has_value())
+    {
+        // (a click, no drag: the press and the release as they were, e.g. Live's insert marker of the Select tool on the
+        // clicked lane, round 190mk, or the pencil's clip)
+        rangePlainPress = false;
+        rangeDraft = {};
+        drag = Drag::none;
+        const auto press = *rangePress;
+        rangePress.reset();
+        const juce::ScopedValueSetter<bool> replay (rangeReplaying, true);
+        mouseDown (press);
+        mouseUp (e);
+        repaint();
+        return;
+    }
+    rangePlainPress = false;
+    rangePress.reset();
     if (drag == Drag::range)
     {
         const auto r = rangeAt (rangeDownPos, e.getPosition());

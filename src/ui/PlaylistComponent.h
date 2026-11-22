@@ -1108,8 +1108,8 @@ private:
     void pointMouseUp (const juce::MouseEvent& e);
     bool pointKeyPressed (const juce::KeyPress& key);             // true: handled
     // round 190pa (research190oe P14, core/RangeEdit.h; PlaylistRange190pa.inc): a range on chosen tracks (REAPER's razor
-    // edit). Ctrl+Alt+drag draws it (the Clip-launch layout always; the Pattern layout with Settings › LYNX extras
-    // "Range edits on chosen tracks"), a drag inside it moves its content, Delete / Ctrl+X / C / V / B / D / E act on it,
+    // edit). A plain drag on empty space draws it in the Clip-launch Arrangement (Live's time selection, rollup 0.1.31 step 7);
+    // Ctrl+Alt+drag in the Pattern layout with Settings › LYNX extras "Range edits on chosen tracks"; a drag inside it moves its content, Delete / Ctrl+X / C / V / B / D / E act on it,
     // a right-click opens its menu, Esc or a press elsewhere clears it. Song::trackRange holds it.
 public:
     enum class RangeCommand { cut, copy, paste, clear, duplicate, split, render, deselect };
@@ -1132,6 +1132,9 @@ private:
     TrackRange rangeAt (juce::Point<int> a, juce::Point<int> b) const;
     TrackRange rangeDraft;
     juce::Point<int> rangeDownPos;
+    // (rollup 0.1.31 step 7) the Clip-launch Arrangement's plain drag on empty space: its press, replayed when it was a click
+    bool rangePlainPress = false, rangeReplaying = false;
+    std::optional<juce::MouseEvent> rangePress;
     static rangeedit::RangeClip& rangeClipboard();
     static bool& rangeClipboardNewest();
     static int& rangeClipboardTop();
