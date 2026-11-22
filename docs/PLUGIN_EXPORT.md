@@ -47,8 +47,11 @@ there. Plugin names are LYNX names only, never an FL Studio name (a test checks 
 | LYNX Soundboard | resonant body (190ov) | yes | |
 | LYNX Platter | record-wear effect (190ov) | yes | |
 | LYNX Timeprism | spectral freezer / delay (190ov) | yes | |
-| LYNX Harmonia | spectral resonator (190ov) | yes | |
+| LYNX Chimefield | spectral resonator (190ov; the Harmonia engine) | yes | |
 | LYNX Model | instrument (physical models, 190ov) | yes | yes |
+| LYNX Fourfold | instrument (4-operator FM: the Tetra engine) | yes | |
+| LYNX Wavecoil | instrument (wavetable: the Helix engine) | yes | |
+| LYNX Duoloom | instrument (two-engine macro synth: the Braid engine) | yes | |
 
 LV2 (round 190ov, not shipped yet): with `-DLYNX_PLUGINS_LV2=ON` every VST3 of the list is also built as an LV2 bundle on
 Linux: JUCE's LV2 wrapper (`src/plugin/Lv2Entry.cpp`, the same entry as the VST3's), `<name with dashes>.lv2/` with the
@@ -64,13 +67,15 @@ the size of one. The CLAP announces each plugin's kind to the host (`clap/plugin
 reverb ...).
 
 The names were checked by a **web search only, with no trademark registry check**. Single words that other plugin makers
-may also use as product names (Nebula, Halo, Horizon, Orbit; round 190ov: Harmonia, also a Cherry Audio synth, Platter, also a
-Kontakt instrument, and Anvil, a guitar preamp plugin) always carry the "LYNX" prefix.
+may also use as product names (Nebula, Halo, Horizon, Orbit; round 190ov: Platter, also a Kontakt instrument, and Anvil, a guitar preamp plugin)
+always carry the "LYNX" prefix.
 
 Round 190ov added LYNX Model (LYNX's own physical models) and seven later LYNX-own effects. LYNX's own synths Tetra, Helix
-and Braid are not in the table yet: their names are close to other makers' products (Sequential's Tetra synth, Line 6's
-Helix / Helix Native, Mutable Instruments' Braids, also a Softube plugin), so they wait for export names of their own
-(the owner's call). Instruments that stand in for FL Studio's follow later with their own names (round 188b report: a
+and Braid export under names of their own (owner decision, rollup 0.1.31 step 6), because their engine names are other
+makers' products (Sequential's Tetra synth, Line 6's Helix / Helix Native, Mutable Instruments' Braids, also a Softube
+plugin): **LYNX Fourfold**, **LYNX Wavecoil** and **LYNX Duoloom**, in the CLAP. The Harmonia engine exports as **LYNX
+Chimefield** (Cherry Audio sells a Harmonia synth). Inside LYNX the four engines keep their names. Tetra and Braid have
+no preset bank: their plugin starts from the engine's defaults. Instruments that stand in for FL Studio's follow later with their own names (round 188b report: a
 proposed list for the user). Until then they stay at `0`:
 
 | Exported name | Engine inside LYNX | Kind | Built now |

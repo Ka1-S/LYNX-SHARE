@@ -58,11 +58,15 @@ Song makeSong (const Entry& entry)
     song.playlist.clear();
     if (entry.instrument)
     {
-        if (auto channel = banks::defaultChannel (entry.synth, entry.name))
+        auto channel = banks::defaultChannel (entry.synth, entry.name);
+        if (! channel) // (rollup 0.1.31 step 6: an engine without a preset bank, Tetra and Braid, plays from its defaults)
         {
-            channel->mixerTrack = 0;
-            song.channels.push_back (std::move (*channel));
+            channel = ChannelDef {};
+            channel->instrument = entry.synth;
+            channel->name = entry.name;
         }
+        channel->mixerTrack = 0;
+        song.channels.push_back (std::move (*channel));
     }
     else
     {

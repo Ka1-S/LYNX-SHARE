@@ -361,7 +361,7 @@ original. The plugins FL Studio users reach for most are all at *Exact* or *Near
 *close*, the same algorithm within −60 dB. What each engine does and what it still lacks is in
 [`docs/PLUGINS.md`](docs/PLUGINS.md). Plugin names are Image-Line's trademarks, used only to describe compatibility.
 
-LYNX SHARE's own effects and instruments (36 of them, from Facet EQ to LYNX Model) are also available as plugins for
+LYNX SHARE's own effects and instruments (39 of them, from Facet EQ to LYNX Duoloom) are also available as plugins for
 other DAWs: every one in a single CLAP, a short list also as VST3. It is an optional, separate
 `LYNX-Plugins` download on the releases page for Windows, macOS and Linux; see [`docs/PLUGINS-PACK.md`](docs/PLUGINS-PACK.md).
 

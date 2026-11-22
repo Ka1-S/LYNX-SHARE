@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="5b5089a8";
+window.LYNX_LANG=lang;window.LYNX_V="d8f8275c";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=5b5089a8">
+<link rel="stylesheet" href="/assets/site.css?v=d8f8275c">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -127,7 +127,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <p>If the FL Studio plugin is listed as <code>Failed to load</code>, right-click it in <code>Options › Plugin manager...</code> and choose <code>Try again (scan this file now)</code>.</p>
 <h2 id="lynx-s-own-plugins-in-other-daws">LYNX's own plugins in other DAWs</h2>
 <p>LYNX SHARE's own effects and instruments, such as Facet EQ, Apex Limiter, LYNX Tune and LYNX Model, also come as plugins for other DAWs. They are a separate, optional download on the <a href="https://github.com/Ka1-S/LYNX-SHARE/releases">releases page</a>: <code>LYNX-Plugins-&lt;version&gt;</code> for Windows, macOS and Linux.</p>
-<ul><li>Every plugin is in one CLAP file, <code>LYNX Plugins.clap</code>. A short list also comes as VST3.</li><li>Run the install script in the archive (<code>install.cmd</code> on Windows, <code>install.sh</code> on macOS and Linux), then rescan the plugins in your DAW.</li><li>A plugin opens the same editor as inside LYNX SHARE, and its state opens in LYNX SHARE as a project.</li></ul>
+<ul><li>Every plugin is in one CLAP file, <code>LYNX Plugins.clap</code>. A short list also comes as VST3.</li><li>Instruments in the pack: LYNX FM10, LYNX Model, LYNX Fourfold, LYNX Wavecoil and LYNX Duoloom.</li><li>Run the install script in the archive (<code>install.cmd</code> on Windows, <code>install.sh</code> on macOS and Linux), then rescan the plugins in your DAW.</li><li>A plugin opens the same editor as inside LYNX SHARE, and its state opens in LYNX SHARE as a project.</li></ul>
 <p>The full list is in <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS-PACK.md">PLUGINS-PACK.md</a>.</p>
 <h2 id="the-plugin-database-folder">The Plugin database folder</h2>
 <p>The folders of the <a href="/wiki/browser/">Browser</a>'s Plugin database, the plugin picker and the plugin menus are a folder on disk: <code>LYNX/Plugin database</code> in your Documents folder. To open it, right-click <code>Plugin database</code> in the Browser and choose <code>Open</code>.</p>
@@ -150,8 +150,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=5b5089a8" defer></script>
-<script src="/assets/wiki.js?v=5b5089a8" defer></script>
-<script src="/assets/motion.js?v=5b5089a8" defer></script>
+<script src="/assets/site.js?v=d8f8275c" defer></script>
+<script src="/assets/wiki.js?v=d8f8275c" defer></script>
+<script src="/assets/motion.js?v=d8f8275c" defer></script>
 </body>
 </html>
