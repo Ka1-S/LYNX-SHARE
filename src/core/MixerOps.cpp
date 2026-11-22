@@ -294,37 +294,40 @@ void remapTrackReferences (Song& song, const std::function<int (int)>& map)
                 pt.mode = PlaylistTrackMode::unassigned;
         }
 
+    auto fix = [&map] (EffectSlot& slot) {
+        const auto exportsOrigin = originMatches (slot);
+        for (auto* source : { &slot.sidechain, &slot.sidechain2 })
+            if (*source > 0)
+                *source = std::max (-1, map (*source));
+        for (auto& send : slot.sendTracks)
+            if (send > 0)
+                send = std::max (0, map (send));
+        for (auto& t : slot.patcher.outputTracks)
+            if (t > 0)
+                t = std::max (0, map (t));
+        if (slot.kind == EffectKind::fruitySend)
+            remapTrackParam (slot.params[3], map);
+        else if (slot.kind == EffectKind::flTransporter)
+            remapTrackParam (slot.params[(std::size_t) transporter::sendParam], map);
+        if (exportsOrigin)
+        {
+            patchOriginTracks (slot); // (unchanged numbers write the same bytes)
+            slot.flOrigin.fingerprint = flpexport::fingerprint (slot);
+        }
+    };
     for (auto& track : song.mixer)
     {
         for (auto& send : track.sends)
             send.target = map (send.target);
         track.sends.erase (std::remove_if (track.sends.begin(), track.sends.end(), [] (const MixerSend& s) { return s.target <= 0; }),
                            track.sends.end());
-
-        auto fix = [&map] (EffectSlot& slot) {
-            const auto exportsOrigin = originMatches (slot);
-            for (auto* source : { &slot.sidechain, &slot.sidechain2 })
-                if (*source > 0)
-                    *source = std::max (-1, map (*source));
-            for (auto& send : slot.sendTracks)
-                if (send > 0)
-                    send = std::max (0, map (send));
-            for (auto& t : slot.patcher.outputTracks)
-                if (t > 0)
-                    t = std::max (0, map (t));
-            if (slot.kind == EffectKind::fruitySend)
-                remapTrackParam (slot.params[3], map);
-            else if (slot.kind == EffectKind::flTransporter)
-                remapTrackParam (slot.params[(std::size_t) transporter::sendParam], map);
-            if (exportsOrigin)
-            {
-                patchOriginTracks (slot); // (unchanged numbers write the same bytes)
-                slot.flOrigin.fingerprint = flpexport::fingerprint (slot);
-            }
-        };
         for (auto& slot : track.effects)
             forEachSlot (slot, fix);
     }
+    for (auto& pt : song.playlistTracks) // round 190pe: the device chains kept by track versions that are not active
+        for (auto& v : pt.versions)
+            for (auto& slot : v.chain)
+                forEachSlot (slot, fix);
 
     song.forEachTarget ([&map] (AutomationTarget& t) {
         if (! isTrackTarget (t.kind))
@@ -344,6 +347,12 @@ void remapTrackReferences (Song& song, const std::function<int (int)>& map)
     mixsnap::remap (song, map); // the mix snapshots' inserts and sends (round 190hp)
 }
 } // namespace
+
+// round 190pe (core/TrackImport.h): the same renumbering for a song of another project before its inserts come in
+void remapInsertReferences (Song& song, const std::function<int (int)>& map)
+{
+    remapTrackReferences (song, map);
+}
 
 void swapTracks (Song& song, int a, int b)
 {

@@ -1072,6 +1072,14 @@ void Song::removeAutomation (int index)
         for (auto& l : track.lanes)
             if (l.automation > index)
                 --l.automation;
+        for (auto& v : track.versions) // round 190pe: the lanes kept by a track's versions too
+        {
+            v.lanes.erase (std::remove_if (v.lanes.begin(), v.lanes.end(), [index] (const AutomationLane& l) { return l.automation == index; }),
+                           v.lanes.end());
+            for (auto& l : v.lanes)
+                if (l.automation > index)
+                    --l.automation;
+        }
     }
 
     forEachClipList ([index] (std::vector<Clip>& clips) {
@@ -1227,6 +1235,21 @@ void Song::removeArrangement (int index)
 
     if (currentArrangement > index)
         --currentArrangement;
+
+    // round 190pe (track versions): the versions made in the removed arrangement go (each track keeps its active one,
+    // which is in no other arrangement); later ones follow the renumbering
+    for (auto& t : playlistTracks)
+        if (! t.versions.empty())
+        {
+            if (t.versionArrangement == index)
+            {
+                t.versions.clear();
+                t.activeVersion = 0;
+                t.versionArrangement = 0;
+            }
+            else if (t.versionArrangement > index)
+                --t.versionArrangement;
+        }
 }
 
 namespace

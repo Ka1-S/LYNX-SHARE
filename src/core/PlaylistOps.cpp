@@ -347,13 +347,18 @@ void move (Song& song, int from, int to)
     song.arrangements.erase (song.arrangements.begin() + from);
     song.arrangements.insert (song.arrangements.begin() + to, std::move (item));
 
-    auto& cur = song.currentArrangement;
-    if (cur == from)
-        cur = to;
-    else if (from < cur && to >= cur)
-        --cur;
-    else if (from > cur && to <= cur)
-        ++cur;
+    const auto follow = [from, to] (int& cur) {
+        if (cur == from)
+            cur = to;
+        else if (from < cur && to >= cur)
+            --cur;
+        else if (from > cur && to <= cur)
+            ++cur;
+    };
+    follow (song.currentArrangement);
+    for (auto& t : song.playlistTracks) // round 190pe: track versions belong to their arrangement
+        if (! t.versions.empty())
+            follow (t.versionArrangement);
 }
 
 void rename (Song& song, int index, const std::string& name)
@@ -377,6 +382,9 @@ int duplicate (Song& song, int index)
     song.arrangements.insert (song.arrangements.begin() + index + 1, std::move (copy));
     if (song.currentArrangement > index)
         ++song.currentArrangement;
+    for (auto& t : song.playlistTracks) // round 190pe: track versions belong to their arrangement (not to the copy)
+        if (! t.versions.empty() && t.versionArrangement > index)
+            ++t.versionArrangement;
     return index + 1;
 }
 } // namespace lynx::arrangeops

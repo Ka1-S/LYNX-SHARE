@@ -1,4 +1,5 @@
 #include "core/DawProject.h"
+#include "core/TrackVersions.h"
 
 #include <algorithm>
 #include <charconv>
@@ -2686,9 +2687,18 @@ int depthOf (const Song& song, int row)
 }
 } // namespace
 
-DawProjectExportResult exportDawProject (const Song& song, const DawProjectExportOptions& opt)
+DawProjectExportResult exportDawProject (const Song& input, const DawProjectExportOptions& opt)
 {
     DawProjectExportResult res;
+    // track versions (round 190pe, a LYNX extra): DAWproject has none; each track goes over as the version it plays
+    std::optional<Song> stripped;
+    if (trackversions::any (input))
+    {
+        stripped = input;
+        const auto n = trackversions::keepActiveOnly (*stripped);
+        res.notes.push_back ("Track versions: " + std::to_string (n) + " version(s) that are not active left out (each track is written as the version it plays)");
+    }
+    const auto& song = stripped ? *stripped : input;
     Exp x (song, opt, res);
     const auto& clips = song.playlist;
 

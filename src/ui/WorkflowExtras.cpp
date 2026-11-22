@@ -7,6 +7,7 @@
 
 #include "core/TrackClips.h"
 #include "core/TrackStates.h"
+#include "core/TrackVersions.h" // round 190pe (P20)
 
 #include "core/LaneView.h"
 #include "core/LayoutStyle.h"
@@ -118,6 +119,8 @@ bool readUiOption (const juce::String& key, bool on)
         livescale::shown = on;
     else if (key == "trackStates") // round 190op (P4, LYNX extra): Hide / Deactivate in the Pattern layout's menus
         trackstates::patternMenus() = on;
+    else if (key == "trackVersions") // round 190pe (P20, LYNX extra): Track versions in the Pattern layout's track menu
+        trackversions::patternMenus() = on;
     else if (key == "muteKeyToggles") // issue #249 (round 190oq, LYNX extra)
         mutekeys::setToggles (on);
     else if (key == "startPage") // issue #252 (round 190oq; on by default, FL-exact)
@@ -154,6 +157,7 @@ juce::String uiOptionsText()
            + "\nclipLanesFoldedLive=" + juce::String (cliplanes::foldedOnOpen ? 1 : 0) // (round 190oo, CS O-3)
            + "\nliveScaleControl=" + juce::String (livescale::shown ? 1 : 0) // (round 190oo, O-5)
            + "\ntrackStates=" + juce::String (trackstates::patternMenus() ? 1 : 0) // (round 190op, P4)
+           + "\ntrackVersions=" + juce::String (trackversions::patternMenus() ? 1 : 0) // (round 190pe, P20)
            + "\nmuteKeyToggles=" + juce::String (mutekeys::toggles() ? 1 : 0) // (round 190oq, issue #249)
            + "\nstartPage=" + juce::String (startpage::enabled() ? 1 : 0) // (round 190oq, issue #252)
            + "\nrangeEdits=" + juce::String (rangeedit::patternLayoutOn() ? 1 : 0); // (round 190pa, P14)
@@ -191,6 +195,8 @@ std::optional<bool> extraOn (std::string_view id)
         return livescale::shown;
     if (id == "playlist.trackStates") // round 190op (P4)
         return trackstates::patternMenus();
+    if (id == "playlist.trackVersions") // round 190pe (P20)
+        return trackversions::patternMenus();
     if (id == "editing.muteKeyToggles") // round 190oq (issue #249)
         return mutekeys::toggles();
     if (id == "general.startPage") // round 190oq (issue #252)
@@ -236,6 +242,8 @@ bool setExtra (std::string_view id, bool on)
         livescale::shown = on;
     else if (id == "playlist.trackStates") // round 190op (P4)
         trackstates::patternMenus() = on;
+    else if (id == "playlist.trackVersions") // round 190pe (P20)
+        trackversions::patternMenus() = on;
     else if (id == "editing.muteKeyToggles") // round 190oq (issue #249)
         mutekeys::setToggles (on);
     else if (id == "general.startPage") // round 190oq (issue #252)

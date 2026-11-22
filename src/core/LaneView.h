@@ -100,8 +100,13 @@ inline int clipsToLanes (Song& song)
                 used = used || (k.kind == ClipKind::automation && k.automation == a);
         });
         for (const auto& t : song.playlistTracks)
+        {
             for (const auto& l : t.lanes)
                 used = used || l.automation == a;
+            for (const auto& v : t.versions) // (round 190pe: a track version's lanes)
+                for (const auto& l : v.lanes)
+                    used = used || l.automation == a;
+        }
         if (! used)
             song.removeAutomation (a);
     }

@@ -5258,6 +5258,32 @@ bool AudioEngine::importFlpFile (const juce::File& file, juce::String& error, co
     return finishFlpImport (std::move (prepared), asEdit);
 }
 
+bool AudioEngine::readOtherProject (const juce::File& file, OtherProject& out, juce::String& error)
+{
+    if (file.hasFileExtension (juce::String (ProjectFile::extension).substring (1)))
+    {
+        auto song = ProjectFile::load (file, error);
+        if (! song)
+            return false;
+        out.song = std::move (*song);
+        return true;
+    }
+    PreparedFlp prepared;
+    prepareFlpImport (file, {}, samples, prepared);
+    if (! prepared.ok)
+    {
+        error = prepared.error;
+        return false;
+    }
+    adoptPrepared (prepared); // (hosted plugins found by name, FL's own and missing ones substituted, as an open does)
+    plugins.clearPreloaded();
+    out.song = std::move (prepared.song);
+    out.report = std::move (prepared.report);
+    out.missingPlugins = prepared.missing;
+    out.decoded = std::move (prepared.decoded);
+    return true;
+}
+
 void AudioEngine::keepRunningPlugins (PreparedFlp& prepared)
 {
     // The open project imported again (Missing files › Apply): its plugins are already running with these settings,

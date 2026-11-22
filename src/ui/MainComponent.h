@@ -507,6 +507,9 @@ private:
     void addLastTweakedItems (juce::PopupMenu& menu, const AutomationTarget& target);
     // File › Import › MIDI file... (REA round 143)
     void importMidiFile();
+    // round 190pe (P11, LYNX extra): File › Import › Tracks from another project (ui/TrackImportDialog.h, core/TrackImport.h)
+    void importTracksFromProject();
+    void importTracksFrom (const juce::File& file);
     void importMidiFile (const juce::File& file, const MidiFileIo::ImportOptions& options);
     static float& lastTweakedClipboard();
     void setTweakedValue (const AutomationTarget& target, float value);

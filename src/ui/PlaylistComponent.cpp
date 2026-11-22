@@ -66,6 +66,7 @@
 #include "core/PlaylistOps.h"
 #include "core/PlaylistTrackOps.h"
 #include "core/TrackStates.h"
+#include "core/TrackVersions.h"
 #include "core/TrackHeaderGestures.h"
 #include "core/FolderDrag.h" // round 190jf (B17)
 #include "core/CrossPaste.h"   // issue #232 stage 2 (round 190nz)
@@ -3179,6 +3180,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
             }
 
             paintTrackStateMarks (g, headers, headerRows); // round 190op (P4: hidden tracks shown, deactivated tracks)
+            paintVersionChips (g, headers, headerRows);    // round 190pe (P20: tracks with versions)
             paintLaneHeaders (g, headers); // round 177b (nothing when lanes are off)
         }
     }
@@ -6268,6 +6270,13 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
                 showAddLaneMenu (track);
                 return;
             }
+        }
+
+        // round 190pe (P20): the version chip opens the track's versions
+        if (! flmods::popup (e.mods) && trackVersionChip (track).contains (e.getPosition()))
+        {
+            buildTrackVersionMenu (track).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+            return;
         }
 
         if (noteedit::isFoldedAway (engine.getSong(), track)) // a thin row of a folded group: only its menu
@@ -10355,6 +10364,10 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         if (liveStyle || simpleHeaders)
             addDeactivateTrackItem (menu, track);
     }
+    // round 190pe (P20, LYNX extra; Cubase's Track Versions, Pro Tools' playlists): the Clip-launch layout, the Pattern one
+    // with its Settings › LYNX extras switch (FL's menu stays FL's) or for a track that has versions already
+    if (! simpleHeaders && (liveStyle || trackversions::patternMenus() || trackversions::count (song, track) > 0))
+        menu.addSubMenu (tr ("Track versions"), buildTrackVersionMenu (track));
     menu.addSeparator();
     {
         const auto header = noteedit::groupHeaderOf (song, track);
@@ -10658,6 +10671,142 @@ void PlaylistComponent::addDeactivateTrackItem (juce::PopupMenu& menu, int track
                             : tr ("Track deactivated: its plugins are unloaded and it is silent (its settings are kept)"), {}, false, false }, 3000);
         repaint();
     });
+}
+
+// Round 190pe (P20, LYNX extra): the track's versions. The list (the active one ticked; a click switches), then New version
+// (empty, the device chain as it is), Duplicate version, Rename, Delete and, with a time selection, Promote: the selected
+// part of another version replaces that part of the active one (Pro Tools' "copy selection to main playlist").
+juce::PopupMenu PlaylistComponent::buildTrackVersionMenu (int track)
+{
+    const auto& song = engine.getSong();
+    juce::PopupMenu menu;
+    const auto count = trackversions::count (song, track);
+    const auto active = trackversions::active (song, track);
+    const auto here = count == 0 || trackversions::inCurrentArrangement (song, track);
+    const auto refresh = [this] {
+        sortClips();
+        refreshTrackLayout();
+        updateScrollBars();
+        repaint();
+    };
+    if (count > 0)
+    {
+        menu.addSectionHeader (tr ("Track versions"));
+        for (int v = 0; v < count; ++v)
+            menu.addItem (juce::String::fromUTF8 (trackversions::nameOf (song, track, v).c_str()), here, v == active, [this, track, v, refresh] {
+                setSelection ({});
+                engine.editSongStructural ([track, v] (Song& s) { trackversions::switchTo (s, track, v); });
+                refresh();
+            });
+        if (! here)
+            menu.addItem (tr ("(made in another arrangement: show that arrangement to switch them)"), false, false, [] {});
+        menu.addSeparator();
+    }
+    const auto first = tr ("Version {0}", { juce::String (1) }).toStdString();
+    const auto next = [&song, track, count] {
+        return trackversions::freeName (song, track, tr ("Version {0}", { juce::String (juce::jmax (2, count + 1)) }).toStdString());
+    };
+    menu.addItem (tr ("New version"), here, false, [this, track, next, first, refresh] {
+        setSelection ({});
+        const auto name = next();
+        engine.editSongStructural ([track, name, first] (Song& s) { trackversions::add (s, track, trackversions::Start::empty, name, first); });
+        refresh();
+    });
+    menu.addItem (tr ("Duplicate version"), here, false, [this, track, next, first, refresh] {
+        setSelection ({});
+        const auto name = next();
+        engine.editSongStructural ([track, name, first] (Song& s) { trackversions::add (s, track, trackversions::Start::duplicate, name, first); });
+        refresh();
+    });
+    menu.addItem (tr ("Rename version..."), count > 0, false, [this, track, active] { renameTrackVersion (track, active); });
+    menu.addItem (tr ("Delete version"), count > 0 && here, false, [this, track, active, refresh] {
+        setSelection ({});
+        engine.editSongStructural ([track, active] (Song& s) { trackversions::remove (s, track, active); });
+        refresh();
+    });
+    if (count > 1)
+    {
+        juce::PopupMenu promote;
+        const auto selection = exportopts::hasSelection (song);
+        for (int v = 0; v < count; ++v)
+            if (v != active)
+                promote.addItem (juce::String::fromUTF8 (trackversions::nameOf (song, track, v).c_str()), selection && here, false, [this, track, v, refresh] {
+                    setSelection ({});
+                    engine.editSong ([track, v] (Song& s) { trackversions::promote (s, track, v, s.loopStart, s.loopEnd); });
+                    refresh();
+                });
+        menu.addSubMenu (selection ? tr ("Promote the time selection from") : tr ("Promote the time selection from (select a time range first)"), promote, here);
+    }
+    return menu;
+}
+
+void PlaylistComponent::renameTrackVersion (int track, int version)
+{
+    auto* window = new juce::AlertWindow (tr ("Rename version"), {}, juce::MessageBoxIconType::NoIcon);
+    window->addTextEditor ("name", juce::String::fromUTF8 (trackversions::nameOf (engine.getSong(), track, version).c_str()));
+    window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    juce::Component::SafePointer<PlaylistComponent> safe (this);
+    window->enterModalState (true, juce::ModalCallbackFunction::create ([safe, track, version, window] (int result) {
+                                 const auto name = window->getTextEditorContents ("name").trim().toStdString();
+                                 if (safe != nullptr && result == 1 && ! name.empty())
+                                 {
+                                     safe->engine.editSong ([track, version, name] (Song& s) { trackversions::rename (s, track, version, name); });
+                                     safe->repaint();
+                                 }
+                             }),
+                             true);
+}
+
+// Round 190pe (P20): the chip of a track with versions, left of the header's buttons in the row's lower half (the name
+// keeps the upper one); none on a row too short for two lines, nor in the Simple layout (no versions there)
+juce::Rectangle<int> PlaylistComponent::trackVersionChip (int track) const
+{
+    const auto& song = engine.getSong();
+    if (simpleHeaders || trackversions::count (song, track) == 0 || noteedit::isFoldedAway (song, track) || projection.isChild (track))
+        return {};
+    const auto h = heightOf (track);
+    if (h < 30)
+        return {};
+    auto right = trackLed (track).getX();
+    for (const auto& r : { trackSolo (track), trackArrow (track), trackArm (track), trackInput (track), trackAddLane (track) })
+        if (! r.isEmpty())
+            right = juce::jmin (right, r.getX());
+    const auto name = juce::String::fromUTF8 (trackversions::nameOf (song, track, trackversions::active (song, track)).c_str());
+    const auto width = juce::jlimit (30, 92, juce::GlyphArrangement::getStringWidthInt (theme::font (theme::type::caption), name) + 18);
+    const auto left = juce::jmax (headerIndent (song, track) + 4, right - 4 - width);
+    return { left, trackToY (track) + h - 17, right - 4 - left, 14 };
+}
+
+void PlaylistComponent::paintVersionChips (juce::Graphics& g, juce::Rectangle<int> headers, int rows)
+{
+    const auto& song = engine.getSong();
+    if (simpleHeaders || ! trackversions::any (song))
+        return;
+    g.setFont (theme::font (theme::type::caption));
+    for (int t = 0; t < rows; ++t)
+    {
+        if (trackversions::count (song, t) == 0)
+            continue;
+        const auto chip = trackVersionChip (t);
+        if (chip.getWidth() < 24 || chip.getY() > headers.getBottom() || chip.getBottom() < headers.getY())
+            continue;
+        const auto box = chip.toFloat().reduced (0.5f);
+        const auto here = trackversions::inCurrentArrangement (song, t);
+        g.setColour (theme::colour::bg4);
+        g.fillRoundedRectangle (box, 3.0f);
+        g.setColour (theme::colour::borderStrong);
+        g.drawRoundedRectangle (box, 3.0f, 1.0f);
+        g.setColour (here ? theme::colour::textPrimary : theme::colour::textDisabled);
+        const auto name = juce::String::fromUTF8 (trackversions::nameOf (song, t, trackversions::active (song, t)).c_str());
+        g.drawFittedText (name, chip.withTrimmedLeft (5).withTrimmedRight (12), juce::Justification::centredLeft, 1, 0.85f);
+        // the drop-down caret
+        juce::Path caret;
+        const auto cx = box.getRight() - 7.0f, cy = box.getCentreY();
+        caret.addTriangle (cx - 3.0f, cy - 1.5f, cx + 3.0f, cy - 1.5f, cx, cy + 2.0f);
+        g.setColour (theme::colour::textSecondary);
+        g.fillPath (caret);
+    }
 }
 
 // round 190fo: the Simple track menu's Freeze, one channel after the other (each freeze runs in the background)
