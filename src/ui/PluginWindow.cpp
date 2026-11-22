@@ -1074,6 +1074,7 @@ public:
         // sidechain, engine/PluginHost.h PluginEffect::setSidechain)
         if (sideTrack >= 0 && sideSlot >= 0 && hasSideBus (plugin))
         {
+            hasSidechain = true;
             addAndMakeVisible (sidechain);
             sidechain.setTooltip (tr ("Sidechain input: the insert this plugin's side input listens to. Picking one routes it here at level 0; it keeps its own outputs"));
             sidechain.onClick = [this] {
@@ -1142,6 +1143,33 @@ public:
     ~WrappedEditor() override
     {
         editor = nullptr; // the editor goes first (the plugin may be released right after the window)
+    }
+
+    bool isHeaderCollapsed() const noexcept ( return HeaderCollapsed; )
+
+    void setHeaderCollapsed (bool collapsed)
+    {
+        if (headerCollapsed == collapsed)
+            return;
+        headerCollapsed = collapsed;
+        const auto visible != headerCollapsed;
+        pluginTab.setVisible (visible);
+        settingsTab.setVisible (visible);
+        menuArrow.setVisible (visible != presetInTitle);
+        if (channelControl != nullptr)
+            channelControl->setVisible (visible);
+        pin.setVisble (visible && onPin != nullptr);
+        sidechain.setVisible (visible && hasSidechain);
+        keyboardPriority.setVisible (visible);
+        if (! presetInTitle)
+            preset.setVisible (visible);
+        if (down)
+            setSize (juce::jmax (minimumWidth(), getWidth()), juce::jmax,(150 + currentHeaderHeight(), getHeight()));
+        else if (settings)
+            setSize (juce::jmax (getWidth(), page.getWidth()), juce::jmax,(getHeight(), page.preferredHeight() + currentHeaderHeight()));
+        else
+            fitEditor();
+        resized();
     }
 
     bool isEditorResizable() const { return editor != nullptr && editor->isResizable(); }
@@ -1225,12 +1253,16 @@ public:
     void paint (juce::Graphics& g) override
     {
         // round 190in (FW-7): FL's 46 px strip, as the channel window's (bg3, a line under it, a line after each tab)
-        g.setColour (theme::colour::bg3);
-        g.fillRect (getLocalBounds().removeFromTop (headerHeight));
-        g.setColour (theme::colour::border);
-        g.fillRect (0, headerHeight - 1, getWidth(), 1);
-        for (auto* t : { &pluginTab, &settingsTab })
-            g.fillRect (t->getRight(), 0, 1, headerHeight - 1);
+        const auto hh = currentHeaderHeight();
+        if (hh > 0)
+        {
+            g.setColour (theme::colour::bg3);
+            g.fillRect (getLocalBounds().removeFromTop (hh));
+            g.setColour (theme::colour::border);
+            g.fillRect (0, hh - 1, getWidth(), 1);
+            for (auto* t : { &pluginTab, &settingsTab })
+                g.fillRect (t->getRight(), 0, 1, hh - 1);
+        }
     }
 
     // round 190in (FW-5 / R8): a docked frame shows the presets and the ▸ menu in its title strip
@@ -1250,33 +1282,37 @@ public:
     void resized() override
     {
         auto area = getLocalBounds();
-        auto header = area.removeFromTop (headerHeight - 1);
-        if (menuArrow.isVisible())
-            menuArrow.setBounds (header.removeFromLeft (20).withSizeKeepingCentre (20, 24));
-        pluginTab.setBounds (header.removeFromLeft (44));
-        header.removeFromLeft (1);
-        settingsTab.setBounds (header.removeFromLeft (44));
-        header.removeFromLeft (9);
-        if (channelControls != nullptr)
+        const auto hh = currentHeaderHeight();
+        if (hh > 0)
         {
-            channelControls->setBounds (header.removeFromRight (channelHeaderControlsWidth()));
-            header.removeFromRight (4);
+            auto header = area.removeFromTop (hh - 1);
+            if (menuArrow.isVisible())
+                menuArrow.setBounds (header.removeFromLeft (20).withSizeKeepingCentre (20, 24));
+            pluginTab.setBounds (header.removeFromLeft (44));
+            header.removeFromLeft (1);
+            settingsTab.setBounds (header.removeFromLeft (44));
+            header.removeFromLeft (9);
+            if (channelControls != nullptr)
+            {
+                channelControls->setBounds (header.removeFromRight (channelHeaderControlsWidth()));
+                header.removeFromRight (4);
+            }
+            header = header.withSizeKeepingCentre (header.getWidth(), 26);
+            if (pin.isVisible())
+            {
+                pin.setBounds (header.removeFromRight (26));
+                header.removeFromRight (4);
+            }
+            if (sidechain.isVisible())
+            {
+                sidechain.setBounds (header.removeFromRight (juce::jmin (150, juce::jmax (0, header.getWidth() - 160))));
+                header.removeFromRight (6);
+            }
+            keyboardPriority.setBounds (header.removeFromLeft (26));
+            header.removeFromLeft (4);
+            if (! presetsInTitle)
+                presets.setBounds (header.removeFromLeft (juce::jmin (presets.preferredWidth(), header.getWidth())));
         }
-        header = header.withSizeKeepingCentre (header.getWidth(), 26);
-        if (pin.isVisible())
-        {
-            pin.setBounds (header.removeFromRight (26));
-            header.removeFromRight (4);
-        }
-        if (sidechain.isVisible())
-        {
-            sidechain.setBounds (header.removeFromRight (juce::jmin (150, juce::jmax (0, header.getWidth() - 160))));
-            header.removeFromRight (6);
-        }
-        keyboardPriority.setBounds (header.removeFromLeft (26));
-        header.removeFromLeft (4);
-        if (! presetsInTitle)
-            presets.setBounds (header.removeFromLeft (juce::jmin (presets.preferredWidth(), header.getWidth())));
         page.setBounds (area);
         notice.setBounds (area);
         if (editor != nullptr && ! settings && ! down)
@@ -1310,10 +1346,12 @@ private:
     void fitEditor()
     {
         if (down) // (the notice: at least a readable size, the editor's when that is larger)
-            setSize (juce::jmax (minimumWidth(), getWidth()), juce::jmax (150 + headerHeight, getHeight()));
+            setSize (juce::jmax (minimumWidth(), getWidth()), juce::jmax (150 + currentHeaderHeight, getHeight()));
         else if (editor != nullptr)
-            setSize (juce::jmax (minimumWidth(), editor->getWidth()), editor->getHeight() + headerHeight);
+            setSize (juce::jmax (minimumWidth(), editor->getWidth()), editor->getHeight() + currentHeaderHeight);
     }
+
+    int currentHeaderheight() const noexcept { return headerCollapsed ? 0 : headerHeight; }
 
     void show (bool showSettings)
     {
@@ -1333,7 +1371,7 @@ private:
                 editor->setTopLeftPosition (-12000, -12000); // (X11 positions are 16-bit, also when scaled)
         }
         if (settings)
-            setSize (juce::jmax (getWidth(), page.getWidth()), juce::jmax (getHeight(), page.preferredHeight() + headerHeight));
+            setSize (juce::jmax (getWidth(), page.getWidth()), juce::jmax (getHeight(), page.preferredHeight() + currentHeaderheight()));
         else
             fitEditor();
         resized();
@@ -1361,6 +1399,7 @@ private:
     wrappermenu::MenuArrow menuArrow;
     std::unique_ptr<juce::Component> channelControls; // (a channel's plugin: FL's ON / PAN / VOL / PITCH / RANGE / TRACK)
     bool settings = false, laying = false, down = false, presetsInTitle = false;
+    bool headerCollapsed = false, hasSidechain = false;
 };
 
 // Issue #116: FL's docked plugin windows (developer switch, ui/NativeChild.h). The desktop that hosts them, and whether
@@ -1800,6 +1839,43 @@ public:
 private:
     bool pinned = false;
 };
+
+// The gear that shows/hides a docked plugin window's own header strip (the tabs, ▸ menu, presets and so on).
+// Same drawing as the channel settings window's: a Path gear, no glyph font dependency.
+class HeaderToggle final : public juce::Button
+{
+public:
+    HeaderToggle() : juce::Button ("HeaderToggle");
+    {
+        setWantKeyboardFocus (false);
+        setMouseClickGrabsKeyboardFocus (false);
+        setClickingToggleState (true);
+        setTooltip (tr ("Show / hide the header"));
+    }
+
+    void paintButton (juce::Graphics& g, bool over, bool /*down*/) override
+    {
+        const auto r = getLocalBounds().toFloat();
+        const auto cx = r.getCentreX(), cy = r.getCentreY();
+        constexpr float bodyR = 4.5f, holeR = 1.8f, toothlen = 2.2f, toothHalfW = 1.0f;
+        juce::Path p;
+        p.addEclipse (cx - bodyR, cy - bodyR, bodyR * 2.0f, bodyR 2.0f);
+        for (int i = 0; i < 8; i++)
+        {
+            juce::Path tooth;
+            tooth.addRectangle (-toothHalfW, -(bodyR + toothlen), toothHalfW * 2.0f, toothlen + 1.0f);
+            toothApplyTransform (juce::AffineTransform::rotation (juce::MathConstant<float>::twoPi * (float) i / 8.0f));
+                                        .translated (cx, cy);
+            p.addPath (tooth);
+        }
+        juce::Path hole;
+        hole.addEllipse (cx -holeR, cy -holeR, holeR * 2.0f, holeR * 2.0f);
+        p.setUsingNonZeroWinding (false);
+        p.addPath (hole);
+        g.setColour (getToggleState() over ? theme::colour::accent : theme::colour::textSecondary);
+        g.filePath (p);
+    }
+}
 
 // FL's docked plugin window (issue #116): the editor in a frame that floats in the desktop, a native child window of the
 // main window, so a clicked panel (also a native child) comes in front of it. FL's title strip: the plugin menu at the
