@@ -11415,7 +11415,10 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Missing files..."), [this] { showMissingFiles (false); });
         menu.addItem (tr ("Last project import report"), [this] {
             const auto& r = engine.getImportReport();
-            if (r.converted.empty() && r.approximated.empty() && r.unsupported.empty() && r.notReproduced.empty() && r.droppedEffects.empty() && r.partialEffects.empty() && r.missingSamples == 0
+            // round 190pg: "converted" is not listed by showImportReport, so a project whose plugins were all converted got no
+            // window at all from this item; it is "everything was converted" now. Relocated samples are listed, so they count.
+            if (r.approximated.empty() && r.unsupported.empty() && r.notReproduced.empty() && r.droppedEffects.empty() && r.partialEffects.empty() && r.missingSamples == 0
+                && r.relocatedSamples == 0
                 && engine.getMissingPlugins().isEmpty() && engine.getMatchedPlugins().isEmpty() && engine.getPluginsWithoutState().isEmpty()
                 && engine.getPluginHost().getLoadFailures().isEmpty())
                 juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Project import"),
