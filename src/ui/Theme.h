@@ -358,6 +358,9 @@ void fillPlate (juce::Graphics& g, juce::Rectangle<float> r, float corner, juce:
 // too long. Cached by text, font height and width, so a paint measures each name once.
 juce::String fitMiddle (const juce::String& text, const juce::Font& font, float width);
 
+// Round 190pb: the palette's change count (setPalette), for keys of pictures drawn in the theme's colours.
+std::uint64_t paletteStampNow() noexcept;
+
 // Upper case for small caption headers, including accented Latin letters (ã -> Ã), which the C
 // runtime's towupper leaves alone on Windows.
 inline juce::String caps (const juce::String& text)

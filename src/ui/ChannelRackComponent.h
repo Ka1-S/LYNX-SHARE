@@ -282,6 +282,26 @@ private:
     juce::Rectangle<int> automationRowBounds (int automation) const;
     void paintAutomationSteps (juce::Graphics& g, juce::Rectangle<int> clip);
     void paintAutomationButtons (juce::Graphics& g, juce::Rectangle<int> column);
+    // one row's controls and button at row top `y` (round 190pb: also into the row's cached picture, at y 0). `curves`:
+    // the mute light, the curve glyph and the name (ellipses and squeezed glyphs: their outlines depend on where they are
+    // drawn in float precision, so they are drawn straight over the picture); `rest`: the knobs, the button's plate and
+    // the selector's slot
+    void paintAutomationButton (juce::Graphics& g, int automation, int y, bool curves, bool rest);
+    void paintAutomationSlot (juce::Graphics& g, int y);
+    // Round 190pb (rollup 0.1.31 step-5 paint regression: Patience's Channel rack +44 % instructions a frame, its automation
+    // clip rows): each row's controls column as one opaque picture on the column's background, made again when anything
+    // it shows changes (the key: the name, the colour, the hover, the layout, the palette, the font, the display scale);
+    // a frame copies it and draws the mute light and the curve glyph over it. Drawn straight where the display scale is
+    // not whole (as the idle step strips).
+    struct AutoRowPicture
+    {
+        std::uint64_t key = 0;
+        juce::Image image;
+    };
+    std::vector<AutoRowPicture> autoRowPictures; // [index into autoRows]
+    // (round 190pb) the automation rows' idle steps, the same in every row: one picture of the row's strips on the rack's
+    // background, copied once a row (it was ~13 strip blits a row on Patience's 100-step patterns)
+    AutoRowPicture autoStepsPicture;
     void showAutomationMenu (int automation);
     // round 190mk (DE-38): the rows' places while any channel is zipped (empty: none is, FL's fixed 30 px rows)
     rackzip::Layout zipLayout;

@@ -4072,8 +4072,6 @@ void PlaylistComponent::paintLiveEnvelopeLanes (juce::Graphics& g, juce::Rectang
     const auto visible = g.getClipBounds().toFloat().getIntersection (grid.toFloat());
     if (visible.isEmpty())
         return;
-    const juce::Colour envelope { 0xffff4d47 };
-    const auto from = juce::jmax ((float) grid.getX(), visible.getX() - 4.0f), to = juce::jmin ((float) grid.getRight(), visible.getRight() + 4.0f);
     const auto rows = juce::jmin ((int) laneClips.size(), numTracks());
     // (the lists are made at the change message after an edit: a paint before it must not read a removed clip)
     const auto valid = [&song] (int i) {
@@ -4082,6 +4080,26 @@ void PlaylistComponent::paintLiveEnvelopeLanes (juce::Graphics& g, juce::Rectang
         const auto& c = song.playlist[(std::size_t) i];
         return c.kind == ClipKind::automation && c.automation >= 0 && c.automation < (int) song.automations.size();
     };
+    // round 190pb: the lanes' drawings stay while the song, the lists, the view and the display scale do
+    const auto scale = g.getInternalContext().getPhysicalPixelScaleFactor();
+    auto& cache = envelopeCache;
+    if (cache.publish != engine.getPublishCount() || cache.projection != projectionStamp || cache.pixelsPerTick != pixelsPerTick
+        || cache.scrollTicks != scrollTicks || cache.grid != grid || cache.scale != scale || cache.lanes.size() != laneClips.size())
+    {
+        cache.publish = engine.getPublishCount();
+        cache.projection = projectionStamp;
+        cache.pixelsPerTick = pixelsPerTick;
+        cache.scrollTicks = scrollTicks;
+        cache.grid = grid;
+        cache.scale = scale;
+        cache.lanes.assign (laneClips.size(), {});
+    }
+    const juce::Colour envelope { 0xffff4d47 };
+    g.setColour (envelope);
+    // (a partial repaint: its own part of each line, as before round 190pb, drawn and not kept)
+    const auto from = juce::jmax ((float) grid.getX(), visible.getX() - 4.0f), to = juce::jmin ((float) grid.getRight(), visible.getRight() + 4.0f);
+    const auto whole = from <= (float) grid.getX() && to >= (float) grid.getRight();
+    EnvelopeLane part;
     for (int t = 0; t < rows; ++t)
     {
         const auto& list = laneClips[(std::size_t) t];
@@ -4091,100 +4109,132 @@ void PlaylistComponent::paintLiveEnvelopeLanes (juce::Graphics& g, juce::Rectang
         const auto y = trackToY (t);
         if (h < 6 || (float) y > visible.getBottom() || (float) (y + h) < visible.getY())
             continue;
-        // the line's range: the lane above Live's 2 px separator, room for the rings at the top and the bottom
-        const auto body = juce::Rectangle<float> ((float) grid.getX(), (float) y + 3.0f, (float) grid.getWidth(), juce::jmax (1.0f, (float) h - 8.0f));
-        const auto yOf = [&body] (float v) { return body.getBottom() - juce::jlimit (0.0f, 1.0f, v) * body.getHeight(); };
+        if (! whole)
+            makeEnvelopeLane (part, t, y, h, grid, from, to, scale);
+        auto& lane = whole ? cache.lanes[(std::size_t) t] : part;
+        if (whole && (lane.track != t || lane.y != y || lane.h != h))
+            makeEnvelopeLane (lane, t, y, h, grid, (float) grid.getX(), (float) grid.getRight(), scale);
+        // (the flat stretches, then the line, then the rings: the order they were drawn in)
+        for (const auto& r : lane.flats)
+            g.fillRect (r);
+        if (! lane.stroke.isEmpty())
+            g.fillPath (lane.stroke);
+        if (! lane.rings.isEmpty())
+            g.fillPath (lane.rings);
+    }
+}
 
-        juce::Path line;
-        bool started = false;
-        const auto lineTo = [&line, &started] (float px, float py) {
-            if (! started)
-                line.startNewSubPath (px, py);
-            else
-                line.lineTo (px, py);
-            started = true;
-        };
-        // (perf: the flat stretches between and after the clips are filled 2 px bars, not stroked path — a lane is mostly
-        // flat and stroking the whole width of every lane cost +1.3 % in the tall-lane arrangement, --paintbench)
-        g.setColour (envelope);
-        const auto flat = [&g] (float x0, float x1, float py) {
-            if (x1 > x0)
-                g.fillRect (juce::Rectangle<float> (x0, py - 1.0f, x1 - x0, 2.0f));
-        };
-        auto level = cliplanes::clipStartValue (song, song.playlist[(std::size_t) list.front()]);
-        auto cursor = from;
-        for (const auto i : list)
+// Round 190oo (CS-19, Live 12 warp190cg-08a-live-automation-lane-before-fold.png, measured): an automation lane is one
+// envelope over the lane's whole width — a 2 px #ff4d47 line, each breakpoint a hollow ring of 6 px in the same red —
+// over the lane's own background, no clip block. The clips of the lane join into the one line: before the first clip it
+// holds the first clip's start value, between and after them the value the clip before ended on (what LYNX plays there).
+// Sampled every 2 px on each clip's own grid, as paintAutomationClip; a lane list is worked out with the projection, not
+// here. Round 190pb: worked out into `lane` (a whole frame's is kept by paintLiveEnvelopeLanes).
+void PlaylistComponent::makeEnvelopeLane (EnvelopeLane& lane, int t, int y, int h, juce::Rectangle<int> grid, float from, float to, float scale) const
+{
+    lane = {};
+    lane.track = t;
+    lane.y = y;
+    lane.h = h;
+    const auto& song = engine.getSong();
+    const auto& list = laneClips[(std::size_t) t];
+    // the line's range: the lane above Live's 2 px separator, room for the rings at the top and the bottom
+    const auto body = juce::Rectangle<float> ((float) grid.getX(), (float) y + 3.0f, (float) grid.getWidth(), juce::jmax (1.0f, (float) h - 8.0f));
+    const auto yOf = [&body] (float v) { return body.getBottom() - juce::jlimit (0.0f, 1.0f, v) * body.getHeight(); };
+
+    juce::Path line;
+    bool started = false;
+    const auto lineTo = [&line, &started] (float px, float py) {
+        if (! started)
+            line.startNewSubPath (px, py);
+        else
+            line.lineTo (px, py);
+        started = true;
+    };
+    // (perf: the flat stretches between and after the clips are filled 2 px bars, not stroked path — a lane is mostly
+    // flat and stroking the whole width of every lane cost +1.3 % in the tall-lane arrangement, --paintbench)
+    const auto flat = [&lane] (float x0, float x1, float py) {
+        if (x1 > x0)
+            lane.flats.push_back (juce::Rectangle<float> (x0, py - 1.0f, x1 - x0, 2.0f));
+    };
+    auto level = cliplanes::clipStartValue (song, song.playlist[(std::size_t) list.front()]);
+    auto cursor = from;
+    for (const auto i : list)
+    {
+        const auto& c = song.playlist[(std::size_t) i];
+        const auto& automation = song.automations[(std::size_t) c.automation];
+        const auto x0 = (float) tickToX ((double) c.start), x1 = (float) tickToX ((double) c.end());
+        if (x1 <= from)
         {
-            const auto& c = song.playlist[(std::size_t) i];
-            const auto& automation = song.automations[(std::size_t) c.automation];
-            const auto x0 = (float) tickToX ((double) c.start), x1 = (float) tickToX ((double) c.end());
-            if (x1 <= from)
-            {
-                level = cliplanes::clipEndValue (song, c);
-                continue;
-            }
-            if (x0 >= to)
-                break;
-            if (x0 > cursor) // (flat up to the clip)
-                flat (cursor, x0, yOf (level));
-            const auto a = juce::jmax (x0, cursor), b = juce::jmin (x1, to); // (an overlapping clip: from where the last one ended)
-            if (a >= b)
-                continue;
-            // (the clip's curve: a new subpath from the flat level, so the step into its first value is drawn)
-            line.startNewSubPath (a, yOf (level));
-            started = true;
-            const auto yAt = [&] (float sx) {
-                const auto songTick = xToTick ((int) sx);
-                return yOf (automation.playAt ((double) c.offset + songTick - (double) c.start, songTick)); // (with its LFO)
-            };
-            auto lastY = 0.0f;
-            bool first = true;
-            for (auto k = (int) std::floor ((a - x0) / 2.0f);; ++k)
-            {
-                const auto x = juce::jmin (b, x0 + 2.0f * (float) k);
-                const auto py = yAt (x);
-                if (first || ! started)
-                    lineTo (juce::jmax (a, x), py);
-                else // (Hold, Stairs and Pulse segments keep square corners, as in the clip)
-                    automationLineTo (line, x - 2.0f, lastY, x, py, [&] { return yAt (x - 1.0f); });
-                lastY = py;
-                first = false;
-                if (x >= b)
-                    break;
-            }
-            cursor = b;
             level = cliplanes::clipEndValue (song, c);
-        }
-        if (cursor < to) // (after the last clip: the value it ended on, to the lane's end)
-            flat (cursor, to, yOf (level));
-        if (started)
-            g.strokePath (line, juce::PathStrokeType (2.0f));
-
-        // the breakpoints: hollow rings (the lane shows through), the clips' own points
-        // (Live shows a breakpoint as a ring only where it can be picked: on a densely recorded envelope the rings would
-        // merge into a thick band, so a ring closer than 8 px to the last one drawn is left out; the line still has it)
-        if (h < 10)
             continue;
-        auto lastRing = -1.0e9f;
-        for (const auto i : list)
+        }
+        if (x0 >= to)
+            break;
+        if (x0 > cursor) // (flat up to the clip)
+            flat (cursor, x0, yOf (level));
+        const auto a = juce::jmax (x0, cursor), b = juce::jmin (x1, to); // (an overlapping clip: from where the last one ended)
+        if (a >= b)
+            continue;
+        // (the clip's curve: a new subpath from the flat level, so the step into its first value is drawn)
+        line.startNewSubPath (a, yOf (level));
+        started = true;
+        const auto yAt = [&] (float sx) {
+            const auto songTick = xToTick ((int) sx);
+            return yOf (automation.playAt ((double) c.offset + songTick - (double) c.start, songTick)); // (with its LFO)
+        };
+        auto lastY = 0.0f;
+        bool first = true;
+        for (auto k = (int) std::floor ((a - x0) / 2.0f);; ++k)
         {
-            const auto& c = song.playlist[(std::size_t) i];
-            const auto x0 = tickToX ((double) c.start), x1 = tickToX ((double) c.end());
-            if (x1 < (double) from - 4.0 || x0 > (double) to + 4.0)
+            const auto x = juce::jmin (b, x0 + 2.0f * (float) k);
+            const auto py = yAt (x);
+            if (first || ! started)
+                lineTo (juce::jmax (a, x), py);
+            else // (Hold, Stairs and Pulse segments keep square corners, as in the clip)
+                automationLineTo (line, x - 2.0f, lastY, x, py, [&] { return yAt (x - 1.0f); });
+            lastY = py;
+            first = false;
+            if (x >= b)
+                break;
+        }
+        cursor = b;
+        level = cliplanes::clipEndValue (song, c);
+    }
+    if (cursor < to) // (after the last clip: the value it ended on, to the lane's end)
+        flat (cursor, to, yOf (level));
+    if (started && ! line.isEmpty()) // (what Graphics::strokePath fills: the outline made at the display's scale)
+        juce::PathStrokeType (2.0f).createStrokedPath (lane.stroke, line, {}, scale);
+
+    // the breakpoints: hollow rings (the lane shows through), the clips' own points
+    // (Live shows a breakpoint as a ring only where it can be picked: on a densely recorded envelope the rings would
+    // merge into a thick band, so a ring closer than 8 px to the last one drawn is left out; the line still has it)
+    if (h < 10)
+        return;
+    auto lastRing = -1.0e9f;
+    for (const auto i : list)
+    {
+        const auto& c = song.playlist[(std::size_t) i];
+        const auto x0 = tickToX ((double) c.start), x1 = tickToX ((double) c.end());
+        if (x1 < (double) from - 4.0 || x0 > (double) to + 4.0)
+            continue;
+        for (const auto& p : song.automations[(std::size_t) c.automation].points)
+        {
+            const auto songTick = (double) (c.start + p.tick - c.offset);
+            if (songTick < (double) c.start || songTick > (double) c.end())
                 continue;
-            for (const auto& p : song.automations[(std::size_t) c.automation].points)
-            {
-                const auto songTick = (double) (c.start + p.tick - c.offset);
-                if (songTick < (double) c.start || songTick > (double) c.end())
-                    continue;
-                const auto x = (float) tickToX (songTick);
-                if (x < from - 4.0f || x > to + 4.0f || x - lastRing < 8.0f)
-                    continue;
-                lastRing = x;
-                g.drawEllipse (x - 2.5f, yOf (p.value) - 2.5f, 5.0f, 5.0f, 1.5f);
-            }
+            const auto x = (float) tickToX (songTick);
+            if (x < from - 4.0f || x > to + 4.0f || x - lastRing < 8.0f)
+                continue;
+            lastRing = x;
+            // (Graphics::drawEllipse of a circle with a 1.5 px line: the circle 0.75 px larger and 0.75 px smaller, even-odd;
+            // the rings are 8 px apart or more, so one path of them all covers each pixel as drawing them one by one)
+            const auto area = juce::Rectangle<float> (x - 2.5f, yOf (p.value) - 2.5f, 5.0f, 5.0f);
+            lane.rings.addEllipse (area.expanded (0.75f));
+            lane.rings.addEllipse (area.reduced (0.75f));
         }
     }
+    lane.rings.setUsingNonZeroWinding (false);
 }
 
 void PlaylistComponent::paintClipEnvelope (juce::Graphics& g, const Clip& c, const ClipEnvelope& envelope)
@@ -8626,8 +8676,12 @@ bool PlaylistComponent::paintLiveLanesCached (juce::Graphics& g, juce::Rectangle
     const auto w = (int) scale * grid.getWidth(), h = (int) scale * grid.getHeight();
     if (key != liveLaneKey || liveLaneImage.getWidth() != w || liveLaneImage.getHeight() != h)
     {
-        if (liveLaneImage.getWidth() != w || liveLaneImage.getHeight() != h)
-            liveLaneImage = juce::Image (juce::Image::ARGB, w, h, false, juce::NativeImageType());
+        // (round 190pb: an opaque RGB picture: the grid's shading covers all of it with opaque colours, so it is the same
+        // pixels as ARGB, and the software renderer copies an RGB row (a 4-byte store a pixel into an ARGB target, JUCE fix
+        // 45; memcpy into an RGB one) where it blended every ARGB pixel: the Patience set's Clip-launch arrangement -14 M
+        // instructions a frame)
+        if (liveLaneImage.getWidth() != w || liveLaneImage.getHeight() != h || liveLaneImage.getFormat() != juce::Image::RGB)
+            liveLaneImage = juce::Image (juce::Image::RGB, w, h, false, juce::NativeImageType());
         juce::Graphics ig (liveLaneImage);
         ig.addTransform (juce::AffineTransform::translation ((float) -grid.getX(), (float) -grid.getY()).scaled (scale));
         paintLiveGrid (ig, grid);
