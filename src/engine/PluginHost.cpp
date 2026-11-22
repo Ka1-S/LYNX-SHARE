@@ -2963,9 +2963,11 @@ int PluginHost::scanFiles (const juce::StringArray& files, const std::function<b
                 continue;
             if (! known.isListingUpToDate (file, *format) && ! listedInside (known, *format, file) && ! emptyScanIsCurrent (file))
             {
-                if (format->isTrivialToScan())
+                // JSFX (round 190pj): only a text header is read, nothing is loaded or run: in this process. By name, not
+                // isTrivialToScan(): JUCE's LV2 format says it is trivial too, and LV2's plugin-by-plugin scan after a failed
+                // batch must stay in children (a bad bundle can crash; rollup 0.1.31 step 7, --lv2scantest)
+                if (format->getName() == JsfxPluginFormat::formatName)
                 {
-                    // JSFX (round 190pj): only a text header is read, nothing is loaded or run: in this process
                     juce::OwnedArray<juce::PluginDescription> found;
                     known.scanAndAddFile (file, false, found, *format);
                     if (found.isEmpty())
