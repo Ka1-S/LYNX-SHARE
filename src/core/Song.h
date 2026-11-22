@@ -2502,6 +2502,19 @@ struct SongSection
     bool operator== (const SongSection&) const = default;
 };
 
+// Round 190pa (research190oe P14, core/RangeEdit.h): a time range on chosen Playlist tracks only (REAPER's razor edit),
+// or on one automation lane of a track. The current arrangement's; saved with the project ("trackRange").
+struct TrackRange
+{
+    std::int64_t from = 0, to = 0; // [from, to) in ticks
+    std::vector<int> tracks;       // Playlist tracks, sorted, each once
+    int laneAutomation = -1;       // >= 0: only that automation lane (of tracks.front()), no clips
+    bool empty() const noexcept { return to <= from || tracks.empty(); }
+    bool covers (int track) const noexcept { return std::binary_search (tracks.begin(), tracks.end(), track); }
+    int top() const noexcept { return tracks.empty() ? 0 : tracks.front(); }
+    bool operator== (const TrackRange&) const = default;
+};
+
 struct Arrangement
 {
     std::string name;
@@ -2832,6 +2845,11 @@ struct Song
     // round 190cg (Live's Arrangement Loop switch; FL has none): the range above stays (the time selection, the export
     // range, the punch region) but playback does not loop it. False = FL's behaviour: a range loops. Saved with the project.
     bool loopOff = false;
+    // round 190pa (P14, LYNX extra): the range on chosen tracks (empty: none); FL's time selection above is apart
+    TrackRange trackRange;
+    // round 190pa (P21, core/AutomationModes.h): the automation write mode, 0 = Read (FL's Record automation, the
+    // default), 1 Touch, 2 Latch, 3 Write. Saved with the project ("automationWriteMode", only when not Read).
+    int automationWriteMode = 0;
     // The tempo lane's shown range in BPM (round 190cg; Live's range fields beside the tempo envelope): an automation
     // lane of the tempo spans tempoViewLow…tempoViewHigh instead of the whole 10…522. View only: the values stay.
     // 0 / 0 = the whole range (every project before this round). Saved with the project.

@@ -148,6 +148,10 @@ inline constexpr Item items[] = {
     { "playlist.trackStates", TR_NOOP ("Playlist"), TR_NOOP ("Hide and deactivate tracks"),
       TR_NOOP ("The Playlist track menu gets Hide track, the Playlist menu Show hidden tracks and Hide unused tracks, and the Channel rack and Mixer menus Deactivate: a deactivated channel or insert unloads its plugins and is silent, its settings kept. Also always on in the Clip-launch and Simple layouts."),
       "ui-options.txt:trackStates" },
+    // round 190pa (research190oe P14): REAPER's razor edits; FL's Playlist has no range on some tracks only
+    { "playlist.rangeEdits", TR_NOOP ("Playlist"), TR_NOOP ("Range edits on chosen tracks (Ctrl+Alt+drag)"),
+      TR_NOOP ("Ctrl+Alt+drag in the Playlist draws a time range over only the tracks (or the one automation lane) it crosses: Delete, Cut, Copy, Paste, Duplicate, Split and Render to audio then act on just that part, clips and automation lanes, and a drag inside it moves it. The other tracks stay as they are. Also always on in the Clip-launch layout's Arrangement."),
+      "ui-options.txt:rangeEdits" },
     { "midi.gamepad", TR_NOOP ("Controllers"), TR_NOOP ("Use a game controller"),
       TR_NOOP ("A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page."),
       "midi-settings.txt:gamepad" },

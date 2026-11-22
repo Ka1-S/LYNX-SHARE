@@ -1148,6 +1148,7 @@ void Song::selectArrangement (int index)
     to.blocks.clear();
     loopStart = to.loopStart;
     loopEnd = to.loopEnd;
+    trackRange = {}; // (round 190pa: a range on tracks belongs to the arrangement it was drawn in)
     currentArrangement = index;
 }
 

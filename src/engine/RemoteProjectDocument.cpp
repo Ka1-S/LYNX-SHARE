@@ -59,6 +59,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         add (S::root, "beatUnit masterLook muteRunsEffects patternClipTakeover mutedInsertsSkip pluginLevels keyboardChords midiGenerate "
              "playlistTracksFolded loopOff tempoView");
         add (S::root, "playlistTracksHidden"); // (round 190op, P4: hidden Playlist tracks)
+        add (S::root, "trackRange automationWriteMode"); // (round 190pa: P14 range on chosen tracks, P21 automation write mode)
         // rollup 0.1.28: the fields merged after round 190ha's base — 190gw's default row height, 190gz's link switch
         // (editable), 190gx's Beats-law mark (what the file was saved by) and 190gw's automation target links (read-only:
         // formulas and targets, as remoteMappings)

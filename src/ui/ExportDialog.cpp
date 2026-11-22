@@ -2286,6 +2286,18 @@ void consolidatePlaylistSelection (AudioEngine& engine, const std::vector<int>& 
     consolidate (engine, plan, renderFolder());
 }
 
+void consolidatePlaylistRange (AudioEngine& engine, const std::vector<int>& clips, int topTrack, std::int64_t from, std::int64_t to)
+{
+    quickrender::Plan plan;
+    const auto r = quickrender::planRange (engine.getSong(), clips, topTrack, from, to, plan);
+    if (r != quickrender::Result::ok)
+    {
+        explain (r);
+        return;
+    }
+    consolidate (engine, plan, renderFolder());
+}
+
 void renderPatternAsAudioClip (AudioEngine& engine, int pattern, int how)
 {
     const auto& song = engine.getSong();

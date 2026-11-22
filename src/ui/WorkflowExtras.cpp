@@ -17,6 +17,7 @@
 #include "core/TransportEdit.h"
 #include "core/TrackOnly.h"
 #include "core/WheelZones.h"
+#include "core/RangeEdit.h" // round 190pa (P14)
 #include "engine/AudioEngine.h"
 #include "engine/MidiFileIo.h"
 #include "ui/HintBar.h"
@@ -102,6 +103,8 @@ bool readUiOption (const juce::String& key, bool on)
         livescale::shown = on;
     else if (key == "trackStates") // round 190op (P4, LYNX extra): Hide / Deactivate in the Pattern layout's menus
         trackstates::patternMenus() = on;
+    else if (key == "rangeEdits") // round 190pa (P14, LYNX extra): Ctrl+Alt+drag ranges in the Pattern layout
+        rangeedit::patternLayoutOn() = on;
     else
         return false;
     return true;
@@ -131,7 +134,8 @@ juce::String uiOptionsText()
            + "\nsectionsLane=" + juce::String (sections::patternLaneOn() ? 1 : 0) // (round 190ol, P1)
            + "\nclipLanesFoldedLive=" + juce::String (cliplanes::foldedOnOpen ? 1 : 0) // (round 190oo, CS O-3)
            + "\nliveScaleControl=" + juce::String (livescale::shown ? 1 : 0) // (round 190oo, O-5)
-           + "\ntrackStates=" + juce::String (trackstates::patternMenus() ? 1 : 0); // (round 190op, P4)
+           + "\ntrackStates=" + juce::String (trackstates::patternMenus() ? 1 : 0) // (round 190op, P4)
+           + "\nrangeEdits=" + juce::String (rangeedit::patternLayoutOn() ? 1 : 0); // (round 190pa, P14)
 }
 
 std::optional<bool> extraOn (std::string_view id)
@@ -166,6 +170,8 @@ std::optional<bool> extraOn (std::string_view id)
         return livescale::shown;
     if (id == "playlist.trackStates") // round 190op (P4)
         return trackstates::patternMenus();
+    if (id == "playlist.rangeEdits") // round 190pa (P14)
+        return rangeedit::patternLayoutOn();
     return std::nullopt;
 }
 
@@ -205,6 +211,8 @@ bool setExtra (std::string_view id, bool on)
         livescale::shown = on;
     else if (id == "playlist.trackStates") // round 190op (P4)
         trackstates::patternMenus() = on;
+    else if (id == "playlist.rangeEdits") // round 190pa (P14)
+        rangeedit::patternLayoutOn() = on;
     else
         return false;
     if (onChanged)

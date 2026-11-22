@@ -11,6 +11,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/ArrangeOps.h"
+#include "core/RangeEdit.h"
 #include "core/AutoPointEdit.h"
 #include "core/InsertMark.h"
 #include "core/MagicLasso.h"
@@ -504,7 +505,8 @@ private:
     enum class Drag { none, move, resize, trimLeft, slip, erase, seek, loop, select, fadeIn, fadeOut, paint, muting, knife, zoomRange, listen, pan, timeMove, timeShift, autoPoint, autoTension,
                       lanePoint, laneTension, laneDraw, trackResize, headerSelect, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe, warpMarker,
                       tempoMarker, headerMove, regionLoop, headerWidth, fadeTension,
-                      pointBand, pointsMove, pen }; // (round 190lw, issue #207)
+                      pointBand, pointsMove, pen, // (round 190lw, issue #207)
+                      range, rangeMove }; // (round 190pa, P14)
     void swipeTimeSelectionToComp (int lane);
     // round 190mr (DL-68): Live's crossfade drag-over (the neighbour found when the handle passes the edge, both clips as
     // they were then: earlier first)
@@ -1079,6 +1081,34 @@ private:
     void pointMouseDrag (const juce::MouseEvent& e);
     void pointMouseUp (const juce::MouseEvent& e);
     bool pointKeyPressed (const juce::KeyPress& key);             // true: handled
+    // round 190pa (research190oe P14, core/RangeEdit.h; PlaylistRange190pa.inc): a range on chosen tracks (REAPER's razor
+    // edit). Ctrl+Alt+drag draws it (the Clip-launch layout always; the Pattern layout with Settings › LYNX extras
+    // "Range edits on chosen tracks"), a drag inside it moves its content, Delete / Ctrl+X / C / V / B / D / E act on it,
+    // a right-click opens its menu, Esc or a press elsewhere clears it. Song::trackRange holds it.
+public:
+    enum class RangeCommand { cut, copy, paste, clear, duplicate, split, render, deselect };
+    bool rangeEditsOn() const;
+    void rangeCommand (RangeCommand which);
+    void setTrackRangeForSnapshot (const TrackRange& r);
+    juce::PopupMenu rangeMenuForSnapshot() { return makeRangeMenu(); }
+    // the drawn range at a corner pair as the gesture leaves it (tests / shots: Ctrl+Alt+drag from `a` to `b`)
+    void drawRangeForSnapshot (juce::Point<int> a, juce::Point<int> b);
+private:
+    bool rangeMouseDown (const juce::MouseEvent& e);
+    void rangeMouseDrag (const juce::MouseEvent& e);
+    void rangeMouseUp (const juce::MouseEvent& e);
+    bool rangeKeyPressed (const juce::KeyPress& key);
+    void paintTrackRange (juce::Graphics& g);
+    juce::PopupMenu makeRangeMenu();
+    std::vector<juce::Rectangle<int>> rangeRects (const TrackRange& r) const;
+    bool rangeHit (juce::Point<int> p) const;
+    void setTrackRange (const TrackRange& r);
+    TrackRange rangeAt (juce::Point<int> a, juce::Point<int> b) const;
+    TrackRange rangeDraft;
+    juce::Point<int> rangeDownPos;
+    static rangeedit::RangeClip& rangeClipboard();
+    static bool& rangeClipboardNewest();
+    static int& rangeClipboardTop();
     void clearPointSelection();
     bool isPointSelected (const CurveSpot& s, int point) const;
     void paintPointSelection (juce::Graphics& g);                 // the selected points' rings and the rubber band

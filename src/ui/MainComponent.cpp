@@ -4,6 +4,7 @@
 #include "ui/TrackIcons.h"
 #include "ui/WindowPlaces.h" // (round 190oa, DF-130)
 #include "core/Sections.h"
+#include "core/AutomationModes.h" // round 190pa (P21)
 #include "core/EscClose.h"
 #include "core/DetailChain.h"
 #include "core/MeterScale.h"
@@ -6079,6 +6080,64 @@ juce::PopupMenu MainComponent::makeWaitInputMenu()
     return menu;
 }
 
+// round 190pa (research190oe P21, LYNX extra): Pro Tools' / Logic's / Cubase's automation write modes; Read is FL's
+// Record automation and stays the default (core/AutomationModes.h)
+juce::PopupMenu MainComponent::makeAutomationModeMenu()
+{
+    const auto now = engine.getSong().automationWriteMode;
+    juce::PopupMenu menu;
+    const std::pair<int, const char*> modes[] = {
+        { 0, TR_NOOP ("Read: FL Studio's Record automation (a moved control writes while you hold or move it)") },
+        { 1, TR_NOOP ("Touch: writes while you hold the control, then glides back to the curve that was there") },
+        { 2, TR_NOOP ("Latch: after you let go, keeps writing the last value until recording stops") },
+        { 3, TR_NOOP ("Write: the moved parameter is overwritten from where recording started until it stops") },
+    };
+    for (const auto& [mode, text] : modes)
+        menu.addItem (tr (text), true, now == mode, [this, m = mode] { setAutomationWriteMode (m); });
+    return menu;
+}
+
+void MainComponent::setAutomationWriteMode (int mode)
+{
+    mode = (int) automodes::fromInt (mode);
+    if (engine.getSong().automationWriteMode != mode)
+        engine.editSong ([mode] (Song& s) { s.automationWriteMode = mode; }, false);
+    refreshAutomationModeBadge();
+    if (mode != 0)
+        ui::postHint ({ tr ("Automation write mode: {0} (LYNX). Arm the recording filter's Automation and record to write with it",
+                            { automodes::fromInt (mode) == automodes::Mode::touch   ? trc ("@automation write mode: Touch")
+                              : automodes::fromInt (mode) == automodes::Mode::latch ? trc ("@automation write mode: Latch")
+                                                                                    : trc ("@automation write mode: Write") }),
+                        {}, false, false },
+                      4000);
+}
+
+void MainComponent::refreshAutomationModeBadge()
+{
+    const auto mode = automodes::fromInt (engine.getSong().automationWriteMode);
+    juce::String badge, name;
+    switch (mode)
+    {
+        case automodes::Mode::touch: badge = trc ("@automation write mode badge (Touch): T"); name = trc ("@automation write mode: Touch"); break;
+        case automodes::Mode::latch: badge = trc ("@automation write mode badge (Latch): L"); name = trc ("@automation write mode: Latch"); break;
+        case automodes::Mode::write: badge = trc ("@automation write mode badge (Write): W"); name = trc ("@automation write mode: Write"); break;
+        case automodes::Mode::read: break;
+    }
+    // the Clip-launch control bar's Automation Arm carries it; the other layouts' Record button. Write in the record
+    // colour (it replaces what was there), Touch and Latch in amber (Pro Tools' yellow automation modes)
+    const auto live = toolbarLook == toolbarlayout::Look::live;
+    const auto colour = mode == automodes::Mode::write ? theme::colour::record : theme::colour::warning;
+    recordButton.setBadge (live ? juce::String() : badge, colour);
+    automationArmButton.setBadge (live ? badge : juce::String(), colour);
+    if (badge.isNotEmpty())
+    {
+        const auto line = tr ("Automation write mode: {0} (LYNX; right-click Record or Automation Arm to change it)", { name });
+        auto& b = live ? (IconButton&) automationArmButton : (IconButton&) recordButton;
+        if (! b.getTooltip().contains (line))
+            b.setTooltip (b.getTooltip() + "\n" + line);
+    }
+}
+
 void MainComponent::addRecordOptions (juce::PopupMenu& menu)
 {
     const auto o = engine.getRecordOptions();
@@ -6119,6 +6178,8 @@ void MainComponent::addRecordOptions (juce::PopupMenu& menu)
     // round 190op (P7, LYNX extra): the knob and fader moves just made, as automation
     menu.addItem (tr ("Capture automation: the moves just made without recording become automation") + shortcutText ("record.captureAutomation"),
                   [this] { runAction ("record.captureAutomation"); });
+    // round 190pa (P21, LYNX extra): Touch / Latch / Write; Read (FL's) stays the default
+    menu.addSubMenu (tr ("Automation write mode (LYNX)"), makeAutomationModeMenu());
     // round 163: punch in/out on the loop region, pre-roll and post-roll (bars)
     {
         auto bars = [&set] (juce::PopupMenu& m, int now, std::function<void (AudioEngine::RecordOptions&, int)> apply) {
@@ -7117,6 +7178,7 @@ void MainComponent::refreshModeButton()
                              + "\n" + tr ("MIDI inputs: {0}", { inputs.isEmpty() ? tr ("none") : inputs.joinIntoString (", ") }));
     recordMenuButton.setToggleState (engine.isAudioRecordingArmed(), juce::dontSendNotification);
     recordMenuButton.setOnColour (theme::colour::accentMuted);
+    refreshAutomationModeBadge(); // (round 190pa: after the tooltip above, which it extends)
 
     const auto songMode = engine.getSong().mode == PlayMode::song;
     patternModeButton.setToggleState (! songMode, juce::dontSendNotification);

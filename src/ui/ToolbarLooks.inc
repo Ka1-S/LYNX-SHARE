@@ -69,6 +69,10 @@ void MainComponent::setUpLookParts()
         o.recordAutomation = ! o.recordAutomation;
         engine.setRecordOptions (o);
     };
+    // round 190pa (P21, LYNX extra): the automation write mode (Live has none; its Arm writes as Read / Touch)
+    automationArmButton.onRightClick = [this] {
+        makeAutomationModeMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&automationArmButton));
+    };
     const auto reEnableText = tr ("Re-Enable Automation: gives back to their automation the parameters you moved by hand (lit while one is overridden)");
     reEnableAutomationButton.setTooltip (reEnableText);
     ui::setHint (reEnableAutomationButton, reEnableText);

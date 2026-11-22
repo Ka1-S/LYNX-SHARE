@@ -30,6 +30,15 @@ struct Entry
     int clipPattern = -1;
     double clipTick = 0.0;
     std::int64_t clipEnd = 0;
+    int pass = 0; // round 190pa: the play pass it was made in (Buffer::notePlaying), 0: unknown
+};
+
+// Round 190pa (P21): one stretch of playing without recording (from a start to a stop), in transport positions as
+// Entry::tick; Latch holds a gesture's last value to the pass's end, Write also from its start.
+struct Pass
+{
+    int id = 0;
+    double startTick = 0.0, endTick = 0.0;
 };
 
 constexpr double defaultWindowMs = 2.0 * 60.0 * 1000.0; // the last two minutes
@@ -66,13 +75,41 @@ public:
             list.pop_front();
     }
 
+    // Round 190pa: the transport plays (not recording) at `tick` this frame / has stopped. A play after a stop, or a jump
+    // back, starts a new pass. currentPass(): the id new entries get (0 while stopped).
+    void notePlaying (double tick)
+    {
+        if (! playing || passes.empty() || tick < passes.back().endTick)
+        {
+            passes.push_back ({ ++passCounter, tick, tick });
+            if (passes.size() > maxPasses)
+                passes.pop_front();
+            playing = true;
+            return;
+        }
+        passes.back().endTick = tick;
+    }
+    void noteStopped() noexcept { playing = false; }
+    int currentPass() const noexcept { return playing && ! passes.empty() ? passes.back().id : 0; }
+    const Pass* pass (int id) const noexcept
+    {
+        for (const auto& p : passes)
+            if (p.id == id)
+                return &p;
+        return nullptr;
+    }
+
     void clear() { list.clear(); }
     bool empty() const noexcept { return list.empty(); }
     std::size_t size() const noexcept { return list.size(); }
     const std::deque<Entry>& entries() const noexcept { return list; }
 
 private:
+    static constexpr std::size_t maxPasses = 256;
     std::deque<Entry> list;
+    std::deque<Pass> passes;
+    int passCounter = 0;
+    bool playing = false;
 };
 
 struct Gesture

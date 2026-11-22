@@ -78,6 +78,8 @@ void consolidatePlaylistTrack (AudioEngine& engine, int track, bool fromSongStar
 // Tools › "Consolidate playlist selection" (Ctrl+Alt+C From selection start, Ctrl+Shift+Alt+C From song start): the same
 // for the selected clips (`selectedClips`: indices into the Playlist), the new track above the highest one.
 void consolidatePlaylistSelection (AudioEngine& engine, const std::vector<int>& selectedClips, bool fromSongStart);
+// Round 190pa (P14): the same for a range on chosen tracks (core/RangeEdit.h): its clips over its time, cut at its edges.
+void consolidatePlaylistRange (AudioEngine& engine, const std::vector<int>& clips, int topTrack, std::int64_t from, std::int64_t to);
 // Patterns › "Render as audio clip..." (how 0), "Quick render as audio clip" (1: the last choices, no window), "Render and
 // replace..." (2: the pattern's Playlist clips become clips of the render): a new audio clip channel named after it.
 void renderPatternAsAudioClip (AudioEngine& engine, int pattern, int how);
