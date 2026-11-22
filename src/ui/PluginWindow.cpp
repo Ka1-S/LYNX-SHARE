@@ -2139,9 +2139,10 @@ public:
     void resized() override
     {
         auto strip = getLocalBounds().removeFromTop (titleHeight).reduced (3, 2);
-        menuButton.setBounds (strip.removeFromLeft (18));
-        strip.removeFromLeft (4);
-        headerToggle.setBounds (strip.removeFromLeft (18));
+        const auto left = strip.getX();
+        menuButton.setBounds (left, 0, 18, titleHeight);
+        headerToggle.setBounds (left + 22, 0, 18, titleHeight);
+        strip.removeFromLeft (22 + 18);
         closeButton.setBounds (strip.removeFromRight (strip.getHeight()));
         strip.removeFromRight (2);
         minimiseButton.setBounds (strip.removeFromRight (strip.getHeight()));
