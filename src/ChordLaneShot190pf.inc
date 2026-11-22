@@ -355,7 +355,6 @@
                 engine.dispatchPendingMessages();
                 juce::Thread::sleep (25);
             }
-            snap ("smarttempo-before");
             {
                 juce::StringArray items;
                 const auto clipMenu = pl.getClipMenuForSnapshot (0);
@@ -385,6 +384,7 @@
             engine.undo();
             engine.dispatchPendingMessages();
             check ("smarttempo_one_undo_step", ProjectFile::toJson (engine.getSong()) == json);
+            snap ("smarttempo-before"); // (the song as before Follow, after the undo: the clip's waveform is loaded by now)
             wav.deleteFile();
         }
 
