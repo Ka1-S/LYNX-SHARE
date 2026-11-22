@@ -3757,6 +3757,10 @@ public:
         delete retired.exchange (nullptr);
         const auto b = bpm > 0.0 ? bpm : 120.0;
         channelCents.store (channel.sampler.pitch * 100.0f);
+        // rollup 0.1.31 step 7 (coordinator): FL's link velocity (round 190pi) from engine revision 2 on, as SimSynth's
+        // velocity law (ChannelDef::engineRev: new channels and .flp imports); a project saved before keeps its revision
+        // and plays every note at the channel's level, as LYNX did
+        linkVelocity.store (channel.engineRev >= 2);
         mono.store (channel.maxPolyphony == 1); // FL tells the generator its Max polyphony, never the Mono box (round 168l: 0xf6f240 → 0xfed7c0)
         const bool render = offlineRendering();
         const std::lock_guard<std::mutex> lock (buildMutex);
@@ -3820,7 +3824,7 @@ public:
         engine->nextLiveRef = live.ref (knob);
         engine->nextLynxNote = startingNoteId();
         const auto vel = std::clamp ((double) velocity, 0.0, 1.0);
-        const auto hostVol = engine->linksVelocity() ? initVolume (vel) : 1.0; // (round 190pi: FL's link velocity)
+        const auto hostVol = linkVelocity.load() && engine->linksVelocity() ? initVolume (vel) : 1.0; // (round 190pi: FL's link velocity)
         engine->nextHostVol = hostVol;
         engine->noteOn (key, vel, channelVol * hostVol, (double) nextPan + channelPan, pofs, 0.0, 0.0,
                         0.5, 0, key, (double) nextPan);
@@ -3851,6 +3855,8 @@ public:
             engine->releaseKey (key, endingNoteId());
     }
 
+    std::atomic<bool> linkVelocity { true }; // (ChannelDef::engineRev >= 2, rollup 0.1.31 step 7)
+
     // FL's velocity → Init.Vol, (11^(1.28·v) − 1)/10 (REA_rodada28 §4.1)
     static double initVolume (double vel) noexcept { return (std::pow (11.0, 1.28 * std::clamp (vel, 0.0, 1.0)) - 1.0) / 10.0; }
 
@@ -3864,7 +3870,7 @@ public:
             return;
         if (prop == 0)
         {
-            if (engine->linksVelocity())
+            if (linkVelocity.load() && engine->linksVelocity())
                 engine->setNoteLevels (key, initVolume ((double) value), std::nan (""), channelVol, channelPan);
         }
         else
@@ -4012,6 +4018,19 @@ private:
 };
 
 } // namespace
+
+bool ogunLinksVelocity (const std::vector<std::uint8_t>& state, bool autogun)
+{
+    try
+    {
+        const auto S = parseState (state, autogun);
+        return S.has_value() && S->byte (0x20a) != 0;
+    }
+    catch (...)
+    {
+        return false;
+    }
+}
 
 bool ogunStateUsable (const std::vector<std::uint8_t>& state)
 {

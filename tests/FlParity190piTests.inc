@@ -233,6 +233,18 @@ TEST (flparity190pi_ogun_link_velocity)
     const auto loud = render (*channel, { note (0, 96, 60, 0.78125f) });
     const auto soft = render (*channel, { note (0, 96, 60, 50.0f / 128.0f) });
     const auto ratio = rms (soft.l, 0, 90 * tick) / rms (loud.l, 0, 90 * tick);
+    // rollup 0.1.31 step 7: the law from engine revision 2 on (new channels, .flp imports); a channel of a project saved
+    // before (revision 0 / 1) plays as LYNX did: velocity 50 renders as 100 does, bit for bit (a slide too)
+    {
+        auto older = *channel;
+        older.engineRev = 1;
+        const auto oldLoud = render (older, { note (0, 96, 60, 0.78125f) });
+        const auto oldSoft = render (older, { note (0, 96, 60, 50.0f / 128.0f) });
+        const auto oldSlide = render (older, { note (0, 384, 60, 0.78125f), note (48, 48, 60, 50.0f / 128.0f, true) });
+        const auto oldHeld = render (older, { note (0, 384, 60, 0.78125f) });
+        CHECK (oldLoud.l == oldSoft.l && oldLoud.r == oldSoft.r);
+        CHECK (oldSlide.l == oldHeld.l);
+    }
     const auto expected = initVolume (50.0 / 128.0);
     std::printf ("  flparity190pi: Ogun velocity 50 / 100 = %.4f (Init.Vol %.4f)\n", ratio, expected);
     CHECK (std::abs (ratio - expected) < 0.06 * expected || std::abs (ratio - 1.0) < 0.06); // (a patch without link: unchanged)

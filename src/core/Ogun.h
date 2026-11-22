@@ -45,6 +45,10 @@ bool ogunStateUsable (const std::vector<std::uint8_t>& state);
 // REA_rodada57)
 bool autogunStateUsable (const std::vector<std::uint8_t>& state);
 
+// true when the state leaves FL's link velocity on (byte +0x20a, round 190pi): the host scales the voice by the note's
+// Init.Vol (LYNX does from ChannelDef::engineRev 2 on, rollup 0.1.31 step 7)
+bool ogunLinksVelocity (const std::vector<std::uint8_t>& state, bool autogun = false);
+
 // Raw integer parameter P[index] (0…63) of a state, or nullopt
 // An Ogun state of version 10…13 (FL's Plugin database Ogun is version 11) rewritten in version 14's layout, as Ogun's
 // own loader reads it (round 169l); newer or unreadable states unchanged. Keeps ogunParam / ogunSetParam valid.
