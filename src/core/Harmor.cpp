@@ -3683,6 +3683,26 @@ struct Patch
     std::shared_ptr<harmor::FxHook> rack; // the effects rack (this patch's own instance), null when every unit is off
 };
 
+// Round 190pr: FL's automation of the parameters harmor::automatable lists, as FL's ProcessParam stores them [DECOMP
+// FUN_00879540]: Mod X / Y / Z = raw / 512 (the voices glide to it through their own X / Y / Z smoothing), a filter's
+// frequency knob = lo + raw / 8192 · span in double (each voice's knob follows it with its own smoothing). In place: the
+// patch belongs to the one instance (or reference render) that built it (audio thread).
+void applyFlParam (Patch& P, int k, int raw) noexcept
+{
+    if (k >= 772 && k <= 774)
+    {
+        const auto v = (double) (float) ((double) raw * 0.001953125);
+        for (auto& part : P.parts)
+            (k == 772 ? part.modx : k == 773 ? part.mody : part.modz) = v;
+        return;
+    }
+    if (k < 0 || k >= 772 || (k % 386 != 52 && k % 386 != 64))
+        return;
+    const auto part = k / 386, f = k % 386 == 52 ? 0 : 1;
+    auto& fl = P.parts[(std::size_t) part].filt[(std::size_t) f];
+    fl.knob = (float) ((double) fl.lo + (double) raw * 0.0001220703125 * (double) fl.span);
+}
+
 // Harmor's effects rack (REA_rodada38) through the engine's FxHook slot
 class RackHook final : public harmor::FxHook
 {
@@ -4017,6 +4037,7 @@ struct NoteRec
     bool used = false, held = false, pressed = false, inHeads = false, inHeld = false;
     int key = 60, group = 0, nv = 0;
     double vel = 1, fv = 1, fp = 0, fpitch = 0, notePan = 0;
+    double initVol = 1; // FL's Init.Vol of the note (round 190pr: Final.Vol = Init.Vol × channel volume; 1 before)
     float liveRef = NAN; // the channel pitch it started with (round 167a: its records follow the live knob)
     long long st = 0, seq = 0;
     std::uint32_t lynxNote = 0; // the LYNX note id that started it (round 190ej)
@@ -4126,7 +4147,7 @@ public:
 
     // ---- notes (hmodel.render's note-on / note-off handling) ----
 
-    int noteOn (int key, double vel, double fv, double fp, double fpitch, double notePan = 0.0) noexcept
+    int noteOn (int key, double vel, double fv, double fp, double fpitch, double notePan = 0.0, double initVol = 1.0) noexcept
     {
         if (P == nullptr)
             return -1;
@@ -4135,7 +4156,7 @@ public:
             return -1;
         auto& nt = notes[(std::size_t) slot];
         nt.used = true, nt.pressed = true, nt.held = false, nt.inHeads = false, nt.inHeld = false;
-        nt.key = key, nt.vel = vel, nt.fv = fv, nt.fp = fp, nt.fpitch = fpitch, nt.notePan = notePan;
+        nt.key = key, nt.vel = vel, nt.fv = fv, nt.fp = fp, nt.fpitch = fpitch, nt.notePan = notePan, nt.initVol = initVol;
         nt.liveRef = nextLiveRef;
         nt.st = now, nt.seq = noteSeq++, nt.nv = 0, nt.group = 0;
         arpDirty = true;
@@ -4321,13 +4342,31 @@ public:
     }
 
     // FL's channel level changes reach the sounding notes through FinalLevels (chan.Vol, chan.Pan)
+    // FL's slide notes move a sounding note's Init.Vol (issue #236, round 190pr): the pressed notes of `key` take the new
+    // one, their records the new Final.Vol (Init.Vol × the channel volume `vol`)
+    void setNoteInitVol (int key, double initVol, double vol) noexcept
+    {
+        for (int i = 0; i < maxNotes; ++i)
+        {
+            auto& nt = notes[(std::size_t) i];
+            if (nt.used && nt.pressed && nt.key == key)
+                nt.initVol = initVol, nt.fv = vol * initVol;
+        }
+        for (int i = 0; i < liveCount; ++i)
+        {
+            auto& r = records[(std::size_t) live[(std::size_t) i]];
+            if (r.note >= 0 && notes[(std::size_t) r.note].key == key && notes[(std::size_t) r.note].pressed)
+                r.fvol = notes[(std::size_t) r.note].fv;
+        }
+    }
+
     void setChannelLevels (double vol, double pan) noexcept
     {
         for (int i = 0; i < maxNotes; ++i)
         {
             auto& nt = notes[(std::size_t) i];
             if (nt.used)
-                nt.fv = vol, nt.fp = nt.notePan + pan;
+                nt.fv = vol * nt.initVol, nt.fp = nt.notePan + pan;
         }
         for (int i = 0; i < liveCount; ++i)
         {
@@ -6662,6 +6701,7 @@ public:
         engine.setPoolSize (current.get());
         engine.setPatch (current.get());
         engine.seedRandom (fixedSeed);
+        reapplyAutomation();
     }
 
     void configure (const ChannelDef& channel, double songBpm) noexcept override
@@ -6733,7 +6773,12 @@ public:
         const auto knob = pitchCents.load();
         const auto fpitch = 100.0 * key - 6000.0 + (double) knob + (double) nextCents;
         engine.nextLiveRef = live.ref (knob);
-        engine.setLynxNote (engine.noteOn (key, vel, channelVol, (double) nextPan + channelPan, fpitch, (double) nextPan), startingNoteId());
+        // round 190pr: Harmor never asks the host to unlink the velocity (no voice event 6 at TriggerVoice [EXEC: hm.exe's
+        // host log]), so FL's Final.Vol is Init.Vol × the channel volume (Lightning's "sub bass": velocity 128 / 88 notes
+        // +6.3 / −2.8 dB against 100 in FL's render, LYNX before: the same level); engine revision < 3: Init.Vol 1
+        const auto initVol = engineRev >= 3 ? (std::pow (11.0, 1.28 * vel) - 1.0) / 10.0 : 1.0;
+        engine.setLynxNote (engine.noteOn (key, vel, channelVol * initVol, (double) nextPan + channelPan, fpitch, (double) nextPan, initVol),
+                            startingNoteId());
         nextPan = 0.0f;
         nextCents = 0.0f;
     }
@@ -6747,6 +6792,30 @@ public:
     }
 
     void allNotesOff() noexcept override { engine.allNotesOff(); }
+
+    // FL's slide notes move the sounding notes' Init.Vol (issue #236; round 190pr, engine revision 3 on: Harmor's level
+    // follows it through FL's link velocity, as Sytrus' and Ogun's do)
+    void voiceProperty (int key, int prop, float value) noexcept override
+    {
+        if (engineRev < 3 || prop != 0 /* vfx::Prop::velocity */ || ! std::isfinite (value))
+            return;
+        take();
+        engine.setNoteInitVol (key, (std::pow (11.0, 1.28 * std::clamp ((double) value, 0.0, 1.0)) - 1.0) / 10.0, channelVol);
+    }
+
+    // FL's automation (clips, pattern events) of the parameters harmor::automatable lists, value = FL's normalised one;
+    // projects saved before round 190pr (engine revision < 3) keep ignoring it (round 190pr)
+    void setParameter (int index, float value) noexcept override
+    {
+        if (engineRev < 3 || ! harmor::automatable (index) || ! std::isfinite (value))
+            return;
+        take();
+        const auto raw = harmor::flRawOf (index, (double) std::clamp (value, 0.0f, 1.0f));
+        for (std::size_t i = 0; i < automatedIndex.size(); ++i)
+            if (automatedIndex[i] == index)
+                automatedRaw[i] = raw;
+        applyAutomated (index, raw);
+    }
 
     bool idle() const noexcept override { return engine.idle() && engine.rackQuiet(); }
 
@@ -6788,7 +6857,29 @@ private:
         current = std::move (pending);
         pending.reset();
         engine.setPatch (current.get());
+        reapplyAutomation();
     }
+
+    // Round 190pr: FL's automation of the parameters harmor::automatable lists (engine revision 3 on), as FL's
+    // ProcessParam stores them [DECOMP FUN_00879540]: Mod X / Y / Z = raw / 512 (the voices glide to it through their own
+    // X / Y / Z smoothing), a filter's frequency knob = lo + raw / 8192 · span in double (each voice's knob follows it
+    // with its own smoothing). This instance built its patch, so it may change it in place (audio thread).
+    void applyAutomated (int k, int raw) noexcept
+    {
+        if (auto* P = const_cast<Patch*> (current.get()))
+            applyFlParam (*P, k, raw);
+    }
+
+    void reapplyAutomation() noexcept
+    {
+        for (std::size_t i = 0; i < automatedIndex.size(); ++i)
+            if (automatedRaw[i] != noValue)
+                applyAutomated (automatedIndex[i], automatedRaw[i]);
+    }
+
+    static constexpr std::array<int, 7> automatedIndex { 52, 64, 438, 450, 772, 773, 774 };
+    static constexpr int noValue = std::numeric_limits<int>::min();
+    std::array<int, 7> automatedRaw { noValue, noValue, noValue, noValue, noValue, noValue, noValue };
 
     Engine engine;
     std::mutex mutex;
@@ -6876,12 +6967,113 @@ std::unique_ptr<Instrument> makeHarmorInstrument() { return std::make_unique<Har
 
 namespace harmor
 {
+namespace
+{
+// FL's raw range of every parameter (REA_rodada190pr, EXEC: Harmor_x64.dll's own ProcessParam with REC_FromMIDI at
+// 0 and 2^30, read back with REC_GetValue; parts A and B alike)
+// part parameters 0…385 (parts A and B alike)
+constexpr std::array<std::pair<int, int>, 386> flPartRanges { {
+    { 0, 999 }, { -1000, 1000 }, { -384, 384 }, { 0, 1000 }, { 0, 1000 }, { 0, 2048 }, { 0, 2048 }, { 0, 2048 },
+    { 0, 1024 }, { 0, 1024 }, { -1000, 1000 }, { -2000, 2000 }, { 0, 2000 }, { 0, 1000 }, { 0, 1 }, { 0, 1 },
+    { 0, 1 }, { 0, 1000 }, { 0, 10000 }, { 0, 999 }, { 0, 1000 }, { 0, 1600 }, { 0, 1600 }, { 0, 10000 },
+    { 0, 1000 }, { 0, 1000 }, { -1000, 1000 }, { 0, 1000 }, { 0, 1000 }, { 0, 1024 }, { -2, 7 }, { -7, 8 },
+    { -1, 8 }, { -7, 8 }, { 1, 9 }, { 0, 4 }, { 0, 1 }, { 0, 256 }, { 0, 256 }, { -1000, 1000 }, { 10000, 160000 },
+    { 1, 9 }, { 10000, 160000 }, { 1, 9 }, { -6000, 6000 }, { 0, 1000 }, { 0, 1000 }, { 0, 1 }, { 0, 1 },
+    { -384, 384 }, { 0, 1200 }, { 0, 1 }, { 0, 8192 }, { 0, 1 }, { 0, 1000 }, { -2000, 2000 }, { -1000, 1000 },
+    { 0, 1000 }, { 0, 1 }, { 0, 1000 }, { -2400, 2400 }, { 0, 1 }, { 0, 2048 }, { 0, 1 }, { 0, 8192 }, { 0, 1 },
+    { 0, 1000 }, { -2000, 2000 }, { -1000, 1000 }, { 0, 1000 }, { 0, 1 }, { 0, 1000 }, { -2400, 2400 }, { 0, 1 },
+    { -1000, 1000 }, { 0, 1000 }, { 0, 1000 }, { 0, 2 }, { 0, 10000 }, { 0, 999 }, { -8000, 8000 },
+    { -2000, 2000 }, { -1000, 1000 }, { 0, 1048575 }, { -20000, 20000 }, { -60000, 60000 }, { -1000, 1000 },
+    { 0, 6 }, { 0, 1000 }, { 0, 1000 }, { 0, 3 }, { 0, 6 }, { -2000, 2000 }, { -600, 600 }, { 0, 1000 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 256 }, { 0, 256 }, { -128, 128 }, { 0, 256 }, { 512, 65536 }, { -128, 128 }, { -128, 128 }, { -112, 112 },
+    { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 },
+    { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 },
+    { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 },
+    { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 },
+    { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 }, { 0, 1001 },
+    { 0, 1001 }, { 0, 1001 }, { 0, 1001 }
+} };
+// global parameters 0…52
+constexpr std::array<std::pair<int, int>, 53> flGlobalRanges { {
+    { 0, 512 }, { 0, 512 }, { 0, 512 }, { 0, 2400 }, { 0, 1 }, { 0, 1 }, { 0, 1 }, { 0, 3 }, { 0, 1000 },
+    { -1000, 1000 }, { 0, 1000 }, { 0, 2000 }, { 0, 2000 }, { 0, 1 }, { -2400, 2400 }, { -1000, 1000 }, { 0, 1 },
+    { 0, 1000 }, { -500, 500 }, { 0, 2000 }, { -1000, 1000 }, { 500, 1100 }, { 0, 1 }, { 0, 1000 }, { 400, 1050 },
+    { -384, 384 }, { 1, 100 }, { 0, 100 }, { 0, 900 }, { 400, 1050 }, { 0, 4 }, { -1000, 1000 }, { 0, 9 },
+    { 0, 1024 }, { 0, 1024 }, { 0, 128 }, { 0, 128 }, { -128, 128 }, { -1000, 1000 }, { 0, 1 }, { 0, 2 },
+    { 0, 1000 }, { -384, 384 }, { -512, 512 }, { -1000, 1000 }, { -128, 128 }, { 0, 1000 }, { 400, 1050 },
+    { 0, 1 }, { 0, 1000 }, { 0, 2000 }, { 0, 2000 }, { 0, 2000 }
+} };
+} // namespace
+
+std::optional<std::pair<int, int>> flParamSlot (int k) noexcept
+{
+    if (k < 0 || k >= flParamCount)
+        return std::nullopt;
+    if (k >= 772)
+        return std::pair { -1, k - 772 };
+    return std::pair { k / 386, k % 386 };
+}
+
+std::optional<std::pair<int, int>> flParamRange (int k) noexcept
+{
+    const auto slot = flParamSlot (k);
+    if (! slot)
+        return std::nullopt;
+    return slot->first < 0 ? flGlobalRanges[(std::size_t) slot->second] : flPartRanges[(std::size_t) slot->second];
+}
+
+bool flParamInState (int k) noexcept
+{
+    const auto slot = flParamSlot (k);
+    return slot && (slot->first < 0 || slot->second < 95 || slot->second > 342); // (95…342: the articulators, FUN_00879380)
+}
+
+int flRawOf (int k, double v) noexcept
+{
+    const auto r = flParamRange (k);
+    if (! r)
+        return 0;
+    return r->first + (int) std::nearbyint (std::clamp (v, 0.0, 1.0) * (double) (r->second - r->first)); // (half to even)
+}
+
+bool automatable (int k) noexcept { return k == 52 || k == 64 || k == 438 || k == 450 || (k >= 772 && k <= 774); }
+
 float ippExpA11Model (float x) noexcept { return ippExpA11 (x); }
 float ippLnA11Model (float x) noexcept { return ippLnA11 (x); }
 
 std::vector<float> renderReference (const std::vector<std::uint8_t>& state, const std::vector<RefNote>& notes, double sampleRate,
                                     int length, int block, const std::vector<std::uint32_t>& mt, double bpm,
-                                    const std::vector<std::uint8_t>& compressorState, int engineRev)
+                                    const std::vector<std::uint8_t>& compressorState, int engineRev, const std::vector<RefParam>& params)
 {
     auto S = parseState (state);
     if (! S || length <= 0)
@@ -6903,6 +7095,8 @@ std::vector<float> renderReference (const std::vector<std::uint8_t>& state, cons
         if (nt.release >= 0)
             evs.push_back (nt.release);
     }
+    for (const auto& pr : params)
+        evs.push_back (pr.at);
     std::sort (evs.begin(), evs.end());
     std::vector<int> handle (notes.size(), -1);
     std::vector<float> out (2 * (std::size_t) length, 0.0f), l ((std::size_t) Engine::maxHostBlock), r (l.size());
@@ -6914,6 +7108,9 @@ std::vector<float> renderReference (const std::vector<std::uint8_t>& state, cons
         for (auto e : evs)
             if (n0 < e && e < n0 + ln)
                 ln = e - n0;
+        for (const auto& pr : params) // (before the notes of the same sample, as the harness sends them)
+            if (pr.at == n0)
+                applyFlParam (*patch, pr.k, pr.raw);
         for (std::size_t i = 0; i < notes.size(); ++i)
             if (notes[i].start == n0)
                 handle[i] = engine->noteOn (notes[i].key, notes[i].velocity, notes[i].finalVol, notes[i].finalPan,

@@ -12643,3 +12643,6 @@ countries: nl be
 # --- rollup 0.1.31 step 7: Save a copy for 0.1.30 (round 190pi)
 "Ogun and Autogun play every note at the channel's level in this release (FL's link velocity is left out): {0}" = "Ogun en Autogun spelen in deze versie elke noot op het niveau van het kanaal (FL's link velocity valt weg): {0}"
 "Automation of Sytrus' main knobs (master level, LFO, pitch, Mod X / Y) does nothing in this release: {0}" = "Automatisering van de hoofdknoppen van Sytrus (master level, LFO, pitch, Mod X / Y) doet in deze versie niets: {0}"
+"Automation of Harmor's filter frequencies and Mod X / Y / Z does nothing in this release: {0}" = "Automatisering van de filterfrequenties en Mod X / Y / Z van Harmor doet in deze versie niets: {0}"
+"Sytrus plays every note at the default Mod X / Y in this release: {0}" = "In deze versie speelt Sytrus elke noot met de standaard-Mod X / Y: {0}"
+"The export plays the song straight through in this release (from bar 1, past the skip markers)" = "In deze versie speelt de export het nummer in één keer door (vanaf maat 1, over de skipmarkers heen)"

@@ -1602,6 +1602,22 @@ void toRelease0130 (juce::var& root, Losses& lost)
                               listOf (helix4), true });
     }
 
+    // round 190pr: an export of the song follows its Start and Marker skip markers ("exportMarkers", FL 2026's renders);
+    // 0.1.30 exports the song straight through. The key goes; a line only when an arrangement has such a marker (markers:
+    // [tick, name, numerator, denominator, action]; action 2 skip, 5 Start after bar 1)
+    if (drop (o, "exportMarkers"))
+    {
+        bool followed = false;
+        if (auto* arrangements = arrayOf (root["arrangements"]))
+            for (const auto& a : *arrangements)
+                if (auto* markers = arrayOf (a["markers"]))
+                    for (const auto& m : *markers)
+                        if (m.isArray() && m.size() >= 5)
+                            followed = followed || (int) m[4] == 2 || ((int) m[4] == 5 && (juce::int64) m[0] > 0);
+        if (followed)
+            lost.push_back ({ TR_NOOP ("The export plays the song straight through in this release (from bar 1, past the skip markers)"), {}, true });
+    }
+
     // round 190od (issue #236): FL's slide of the note properties ("slideNoteProps": a slide note moves the sounding notes'
     // velocity, pan and Mod X / Y to its own, as it moves their pitch). 0.1.30 slides the pitch only. The key goes; a loss
     // line only when it plays: a slide note whose velocity, pan or Mod X / Y differs from another note of its channel in
@@ -2153,8 +2169,8 @@ void toRelease0130 (juce::var& root, Losses& lost)
         });
         if (auto* automations = arrayOf (root["automations"]))
             for (const auto& a : *automations)
-                if (const auto t = a["target"]; t.isArray() && t.size() >= 3 && t[0].toString() == "channelParam"
-                                                && sytrusChannels.count ((int) t[1]) != 0 && sytrus::automatable ((int) t[2]))
+                if (const auto t = a["target"]; t.isArray() && t.size() >= 4 && t[0].toString() == "channelParam"  // ([kind, index,
+                                                && sytrusChannels.count ((int) t[1]) != 0 && sytrus::automatable ((int) t[3])) // slot, param]; round 190pr: was t[2])
                     addOnce (sytrusClips, a["name"].toString());
         if (! oguns.isEmpty())
             lost.push_back ({ TR_NOOP ("Ogun and Autogun play every note at the channel's level in this release (FL's link velocity is left out): {0}"),
@@ -2162,6 +2178,61 @@ void toRelease0130 (juce::var& root, Losses& lost)
         if (! sytrusClips.isEmpty())
             lost.push_back ({ TR_NOOP ("Automation of Sytrus' main knobs (master level, LFO, pitch, Mod X / Y) does nothing in this release: {0}"),
                               listOf (sytrusClips), true });
+    }
+
+    // round 190pr: Harmor's filter 1 / 2 frequencies and Mod X / Y / Z follow their automation from ChannelDef::engineRev 3
+    // on; 0.1.30 ignores it. Written at revision 2, so the copy plays the same in newer LYNX. Lines; the data stays
+    {
+        juce::StringArray harmorClips;
+        std::set<int> harmorChannels;
+        forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
+            if (c.getProperty ("instrument").toString() != "harmor" || (int) c.getProperty ("engineRev") < 3)
+                return;
+            c.setProperty ("engineRev", 2);
+            harmorChannels.insert (i);
+        });
+        const auto drives = [&] (const juce::var& t) {
+            return t.isArray() && t.size() >= 4 && t[0].toString() == "channelParam" && harmorChannels.count ((int) t[1]) != 0
+                   && harmor::automatable ((int) t[3]); // ([kind, index, slot, param])
+        };
+        if (auto* automations = arrayOf (root["automations"]))
+            for (const auto& a : *automations)
+                if (drives (a["target"]))
+                    addOnce (harmorClips, a["name"].toString());
+        if (auto* patterns = arrayOf (root["patterns"]))
+            for (const auto& p : *patterns)
+                if (auto* lanes = arrayOf (p["events"]))
+                    for (const auto& l : *lanes)
+                        if (drives (l["target"]))
+                            addOnce (harmorClips, p["name"].toString());
+        if (! harmorClips.isEmpty())
+            lost.push_back ({ TR_NOOP ("Automation of Harmor's filter frequencies and Mod X / Y / Z does nothing in this release: {0}"),
+                              listOf (harmorClips), true });
+    }
+
+    // round 190pr: Sytrus hands the notes' Mod X / Y to its voices (FL's Final.FCut / FRes) from ChannelDef::engineRev 3 on;
+    // 0.1.30 plays every Sytrus note at the default. Written at revision 2; a line naming the Sytrus channels with notes
+    // off the default (notes: [start, length, channel, key, velocity, pan, fine, muted, slide, porta, release, mod X, mod Y…])
+    {
+        juce::StringArray sytrusNotes;
+        std::map<int, juce::String> sytrusChannels;
+        forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
+            if (c.getProperty ("instrument").toString() != "sytrus" || (int) c.getProperty ("engineRev") < 3)
+                return;
+            c.setProperty ("engineRev", 2);
+            sytrusChannels[i] = channelName (juce::var (&c), i);
+        });
+        if (! sytrusChannels.empty())
+            if (auto* patterns = arrayOf (root["patterns"]))
+                for (const auto& p : *patterns)
+                    if (auto* notes = arrayOf (p["notes"]))
+                        for (const auto& n : *notes)
+                            if (n.isArray() && n.size() >= 13)
+                                if (const auto found = sytrusChannels.find ((int) n[2]); found != sytrusChannels.end()
+                                    && (std::abs ((double) n[11] - 0.5) > 1.0e-3 || std::abs ((double) n[12] - 0.5) > 1.0e-3))
+                                    addOnce (sytrusNotes, found->second);
+        if (! sytrusNotes.isEmpty())
+            lost.push_back ({ TR_NOOP ("Sytrus plays every note at the default Mod X / Y in this release: {0}"), listOf (sytrusNotes), true });
     }
 }
 

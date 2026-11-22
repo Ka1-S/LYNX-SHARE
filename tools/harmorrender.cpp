@@ -1,6 +1,6 @@
 // Renders a Harmor state with LYNX's engine exactly like our round-34 reference model drives it (verification
 // harness, REA_rodada34 §1.25): harmorrender <state.bin> <out.f32> <length> <mt.txt|-> <rate> [blk=N] [bpm=X]
-//   [comp=<Harmor System\Compression\n.fst>] [note=start,key,velocity,finalVol,finalPan,release ...]. Writes interleaved stereo float32; mt.txt holds the
+//   [comp=<Harmor System\Compression\n.fst>] [note=start,key,velocity,finalVol,finalPan,release ...] [p=sample,k,raw ...]. Writes interleaved stereo float32; mt.txt holds the
 // DLL's Mersenne-Twister state (index, then 624 words) or "-" for LYNX's fixed seed.
 #include <cctype>
 #include <cstdio>
@@ -71,6 +71,7 @@ int main (int argc, char** argv)
     int blk = 512, rev = 1;
     double bpm = 120.0;
     std::vector<lynx::harmor::RefNote> notes;
+    std::vector<lynx::harmor::RefParam> params; // round 190pr: p=sample,k,raw (FL's parameter k set to raw, as hm.exe's p=)
     std::vector<std::uint8_t> comp;
     for (int i = 6; i < argc; ++i)
     {
@@ -88,6 +89,8 @@ int main (int argc, char** argv)
         }
         else if (a.rfind ("bpm=", 0) == 0)
             bpm = std::atof (a.c_str() + 4);
+        else if (lynx::harmor::RefParam pr; a.rfind ("p=", 0) == 0 && std::sscanf (a.c_str() + 2, "%d,%d,%d", &pr.at, &pr.k, &pr.raw) == 3)
+            params.push_back (pr);
         else if (a.rfind ("note=", 0) == 0)
         {
             lynx::harmor::RefNote n;
@@ -95,7 +98,7 @@ int main (int argc, char** argv)
                 notes.push_back (n);
         }
     }
-    const auto out = lynx::harmor::renderReference (state, notes, rate, length, blk, mt, bpm, comp, rev);
+    const auto out = lynx::harmor::renderReference (state, notes, rate, length, blk, mt, bpm, comp, rev, params);
     if (out.empty())
     {
         std::fprintf (stderr, "state not usable\n");

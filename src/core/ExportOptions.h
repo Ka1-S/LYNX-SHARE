@@ -210,6 +210,10 @@ Song makeRenderSong (const Song& song, const Options& o, std::int64_t tailTicks,
 
 // The selection exists (loop region set and inside the song).
 bool hasSelection (const Song& song) noexcept;
+// Round 190pr: the spans [from, to) of the song an export of it plays, in order. Song::exportMarkers on (FL 2026's
+// render): from the first Start marker (else bar 1) to the song's end, over every Marker skip's section; Marker pauses
+// and marker loops are not followed. Off: the whole song, { 0, end }
+std::vector<std::pair<std::int64_t, std::int64_t>> exportSpans (const Song& song);
 
 // Inserts that get sound: a channel goes to them or another insert sends to them (Master excluded). Round 190gh (B7):
 // also the inserts fed only by extra outputs — a hosted multi-output instrument's Connections (as the engine plays

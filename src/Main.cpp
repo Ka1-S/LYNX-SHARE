@@ -8797,6 +8797,61 @@ private:
                 slides190piResult = "ERROR the copy read back " + why;
         }
 
+        // round 190pr: "Save a copy for 0.1.30" of the export's marker actions (Song::exportMarkers: one sound line when an
+        // arrangement has a skip or Start marker, none otherwise; the key goes), of Harmor's automation and of Sytrus'
+        // note Mod X / Y (engine revision 3: written at 2, one line each naming the clip / channel); the .lynx keys read back
+        juce::String flparity190prResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            song.exportMarkers = true;
+            const auto has = [] (const lynx::olderlynx::Copy& copy, const char* start) {
+                return std::any_of (copy.lost.begin(), copy.lost.end(), [start] (const lynx::olderlynx::Loss& l) {
+                    return juce::String (l.text).startsWith (start) && l.sound;
+                });
+            };
+            const char* markerLine = "The export plays the song straight through in this release";
+            const char* harmorLine = "Automation of Harmor's filter frequencies";
+            const auto plain = lynx::olderlynx::forRelease (song, "0.1.30");
+            lynx::Marker skip;
+            skip.tick = 4 * lynx::ppq, skip.action = lynx::Marker::markerSkip, skip.name = "Skip";
+            song.addMarker (skip);
+            lynx::ChannelDef harmorChannel;
+            harmorChannel.name = "Harmor 190pr";
+            harmorChannel.instrument = lynx::InstrumentKind::harmor;
+            song.channels.push_back (harmorChannel);
+            lynx::ChannelDef sytrusChannel;
+            sytrusChannel.name = "Sytrus 190pr";
+            sytrusChannel.instrument = lynx::InstrumentKind::sytrus;
+            song.channels.push_back (sytrusChannel);
+            if (song.patterns.empty())
+                song.patterns.emplace_back();
+            lynx::Note click;
+            click.channel = (int) song.channels.size() - 1, click.key = 60, click.length = lynx::ppq, click.modY = 190.0f / 256.0f;
+            song.patterns[0].notes.push_back (click);
+            const char* sytrusLine = "Sytrus plays every note at the default Mod X / Y";
+            lynx::Automation clip;
+            clip.name = "Cutoff 190pr";
+            clip.target = { lynx::AutomationTargetKind::channelParam, (int) song.channels.size() - 2, 0, 52 };
+            song.automations.push_back (clip);
+            const auto json = lynx::ProjectFile::toJson (song);
+            juce::String why;
+            const auto back = lynx::ProjectFile::fromJson (json, why);
+            const auto copy = lynx::olderlynx::forRelease (song, "0.1.30");
+            juce::String why2;
+            const auto old = copy.ok ? lynx::ProjectFile::fromJson (copy.json, why2) : std::optional<lynx::Song> {};
+            const auto n = song.channels.size();
+            if (! plain.ok || has (plain, markerLine) || has (plain, harmorLine) || has (plain, sytrusLine))
+                flparity190prResult = "ERROR lines for a project without markers, Harmor automation or Sytrus Mod X / Y";
+            else if (! json.contains ("exportMarkers") || ! back || ! back->exportMarkers || back->channels.size() != n
+                     || back->channels[n - 2].engineRev != 3 || back->channels[n - 1].engineRev != 3)
+                flparity190prResult = "ERROR the .lynx keys " + why;
+            else if (! copy.ok || ! has (copy, markerLine) || ! has (copy, harmorLine) || ! has (copy, sytrusLine))
+                flparity190prResult = "ERROR the copy's lines " + copy.error;
+            else if (! old || old->exportMarkers || copy.json.contains ("exportMarkers") || old->channels.size() != n
+                     || old->channels[n - 2].engineRev != 2 || old->channels[n - 1].engineRev != 2)
+                flparity190prResult = "ERROR the copy read back " + why2;
+        }
+
         // round 190oz: FL's held step notes (Note::held) in .lynx ("heldNotes", only when a pattern has one), back from it,
         // and the copy for 0.1.30 (the marks dropped with one sound line, the notes kept one step long)
         juce::String heldSteps190ozResult = "OK";
@@ -8950,7 +9005,7 @@ private:
             const auto hasLane = [&simVolume] (const lynx::Pattern& p) {
                 return std::any_of (p.events.begin(), p.events.end(), [&simVolume] (const lynx::PatternEvents& l) { return l.target == simVolume && ! l.events.empty(); });
             };
-            if (! duckSet || kick <= 0 || pad <= 0 || song.channels[(std::size_t) simIndex].engineRev != 2)
+            if (! duckSet || kick <= 0 || pad <= 0 || song.channels[(std::size_t) simIndex].engineRev < 2) // (≥ 2: round 190pr's 3 too)
                 rollup031s6Result = "ERROR set-up";
             for (const auto* release : { "0.1.30", "0.1.28" })
             {
@@ -9064,7 +9119,7 @@ private:
                                           "{0} track version(s) that are not active are left out", "The automation write mode ({0}) goes back",
                                           "The range selected on some Playlist tracks is left out", "JSFX scripts are not in this release",
                                           "Automation of Sytrus' main knobs" };
-            if (! versioned || song.channels[(std::size_t) ogunIndex].engineRev != 2)
+            if (! versioned || song.channels[(std::size_t) ogunIndex].engineRev < 2) // (≥ 2: round 190pr's 3 too)
                 rollup031s7Result = "ERROR set-up";
             for (const auto* release : { "0.1.30", "0.1.28" })
             {
@@ -10246,7 +10301,7 @@ private:
                 const auto olderSaid = std::any_of (olderCopy.lost.begin(), olderCopy.lost.end(), [] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).contains ("SimSynth plays every note"); });
                 juce::String why2;
                 const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), why2);
-                if (sim.engineRev != 2 || ! copy.ok || ! said || olderSaid || ! back || back->channels.back().engineRev != 2)
+                if (sim.engineRev < 2 || ! copy.ok || ! said || olderSaid || ! back || back->channels.back().engineRev != sim.engineRev) // (≥ 2: round 190pr's 3 too)
                     tracker190omResult = "ERROR SimSynth revision: copy " + juce::String (said ? "said" : "silent") + (olderSaid ? ", old one said" : "");
             }
             folder.deleteRecursively();
@@ -10391,6 +10446,7 @@ private:
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && rollup031s7Result == "OK" && headerGearResult == "OK" // (rollup 0.1.31 step 7, and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
+                        && flparity190prResult == "OK"
                         && renderAgainResult.startsWith ("OK") && determinismResult.startsWith ("OK")
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK") && modulators190oxResult == "OK"
@@ -10501,6 +10557,7 @@ private:
                << "sections190ol=" << sections190olResult << "\n"
                << "heldsteps190oz=" << heldSteps190ozResult << "\n"
                << "slides190pi=" << slides190piResult << "\n"
+               << "flparity190pr=" << flparity190prResult << "\n"
                << "chordlane190pf=" << chordlane190pfResult << "\n"
                << "renderagain190ou=" << renderAgainResult << "\n"
                << "determinism190po=" << determinismResult << "\n"

@@ -315,6 +315,7 @@ void applyNewProjectDefaults (Song& song, const NewProjectDefaults& defaults)
     song.muteRunsEffects = true;    // (FL's muted insert, round 190y)
     song.patternClipTakeover = true; // (FL's pattern clip takeover, issue #158)
     song.slideNoteProps = true;      // (FL's slide notes move velocity, pan and Mod X / Y too, issue #236)
+    song.exportMarkers = true;       // (FL's export follows the Start and skip markers, round 190pr)
 }
 
 int linkClipLaunchStrips (Song& song, int tracks)

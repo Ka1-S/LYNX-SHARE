@@ -63,6 +63,9 @@ struct NoteParams
     float pan = 0.0f;       // note pan −1…1 (adds to Final.Pan)
     int colour = 0;         // note colour (14 inverts PORTA)
     std::int64_t id = 0;    // caller's handle (release by id)
+    // FL's Final.FCut / FRes of the voice, −1…1 (the note's Mod X / Y; round 190pr): they move the articulators' Mod X / Y
+    // map positions, main Mod X / Y + 256 · FCut / FRes [round 31's model]; 0 = the note's default (LYNX before)
+    double fcut = 0.0, fres = 0.0;
 };
 
 // The engine for one instance. Everything is allocated by prepare()/setPatch(); render never allocates except
