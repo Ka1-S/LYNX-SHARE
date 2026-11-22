@@ -78,6 +78,8 @@ option(LYNX_PLUGINS_LV2 "Linux: build the VST3 short list as LV2 bundles too" ON
 # every built entry of the one table, src/plugin/plugins.def; the index counts the built entries (plugin/ExportCatalog.h).
 # built = 2: a VST3 of its own as well (built = 1: in the CLAP only)
 file(STRINGS src/plugin/plugins.def LYNX_PLUGIN_LINES REGEX "^LYNX_PLUGIN .*, [12][)]$")
+# (round 190pq: an edit of the table re-runs CMake, so a newly built entry gets its targets in an existing build folder)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/plugin/plugins.def")
 set(index 0)
 set(LYNX_PLUGIN_TARGETS lynx_clap)
 foreach(line IN LISTS LYNX_PLUGIN_LINES)

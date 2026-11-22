@@ -190,9 +190,11 @@ Audio directInstrument (const Entry& entry)
     song.mixer.resize (2);
     song.mixer[0].effects.clear();
     song.mixer[1].effects.clear();
-    auto channel = banks::defaultChannel (entry.synth, entry.name);
-    channel->mixerTrack = 0;
-    song.channels.push_back (*channel);
+    // the plugin's own starting channel (round 190pq): Tetra and Braid have no preset bank, and dereferencing the empty
+    // banks::defaultChannel copied a ChannelDef from garbage (CI plugins run 44975814572: std::length_error in the CLAP)
+    auto channel = plugexport::instrumentChannel (entry);
+    channel.mixerTrack = 0;
+    song.channels.push_back (std::move (channel));
     auto state = RackState::build (song, nullptr, rate);
     auto renderer = std::make_unique<RackRenderer>();
     renderer->prepare (rate, block);
@@ -550,6 +552,30 @@ void testPlugin (juce::AudioPluginFormat& format, const juce::PluginDescription&
                                + (d < 1.0e-3 ? juce::String() : ", first at sample " + juce::String (restored.firstDifference (first, 1.0e-3))));
     }
     stateLoadIsSilent (format, description, state);
+
+    // round 190pq: every parameter moved (as a host's randomizer does), the state loaded into a new instance saves back
+    // byte for byte (clap-validator's state-reproducibility-binary failed on Fourfold and Wavecoil: values written back
+    // through their range moved by a float step)
+    if (auto third = make())
+    {
+        for (int i = 0; i < parameters.size(); ++i)
+            parameters[i]->setValue (0.5f + 0.49f * (float) std::sin ((double) i * 1.37 + 0.3));
+        juce::MemoryBlock saved, again;
+        instance->getStateInformation (saved);
+        third->setStateInformation (saved.getData(), (int) saved.getSize());
+        third->getStateInformation (again);
+        auto at = -1;
+        for (size_t i = 0; at < 0 && i < juce::jmin (again.getSize(), saved.getSize()); ++i)
+            if (again[i] != saved[i])
+                at = (int) i;
+        if (at < 0 && again.getSize() != saved.getSize())
+            at = (int) juce::jmin (again.getSize(), saved.getSize());
+        check (at < 0, "a loaded state saves back byte for byte with " + juce::String (parameters.size()) + " parameters moved"
+                           + (at < 0 ? juce::String() : ": " + juce::String ((int) again.getSize()) + " vs " + juce::String ((int) saved.getSize())
+                                                            + " bytes, first difference at byte " + juce::String (at)));
+    }
+    else
+        check (false, "third instance");
 
     // hosted editor object (never put on the screen)
     if (auto* editor = instance->createEditorIfNeeded())
