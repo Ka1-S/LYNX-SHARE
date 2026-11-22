@@ -1543,6 +1543,20 @@ void toRelease0130 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("Gross Beat's scratch offset (Time offset (scratching)) plays without the offset: {0}"), listOf (scratched), true });
     }
 
+    // round 190om: SimSynth's velocity law (ChannelDef::engineRev 2). 0.1.30 plays every SimSynth note at full level
+    {
+        juce::StringArray simsynth;
+        forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
+            if (c.getProperty ("instrument").toString() == "simsynth" && (int) c.getProperty ("engineRev") >= 2)
+            {
+                c.setProperty ("engineRev", 1);
+                addOnce (simsynth, channelName (juce::var (&c), i));
+            }
+        });
+        if (! simsynth.isEmpty())
+            lost.push_back ({ TR_NOOP ("SimSynth plays every note at full level in this release (the note velocity is left out): {0}"), listOf (simsynth), true });
+    }
+
     // round 190nw: the tracker editor's view settings (rows per beat, columns, track groups). A view: the notes are the
     // patterns' own, so 0.1.30 plays and shows them in its Piano roll as they are
     if (drop (o, "tracker"))

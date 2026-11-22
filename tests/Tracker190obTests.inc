@@ -1,6 +1,7 @@
 // Round 190ob (LYNX 0.1.31): tracker follow-ups. Stage 2 start of the module import: the volume changes of sounding
 // notes become the channels' Volume multiplier automation (core/ModuleImport.cpp), exact through .flp; the Tracker's
-// default key and its place in the Channel rack's channel menu.
+// default key and its place in the Channel rack's channel menu. (Round 190om makes exact volume changes pattern events:
+// these tests import with volumeAsPatternEvents off, the automation clip path every other channel still takes.)
 
 namespace tracker190ob
 {
@@ -65,7 +66,7 @@ inline double gainAt (const Automation& a, double tick) { return (double) levelA
 TEST (tracker190ob_volume_changes_become_volume_multiplier_automation)
 {
     using namespace tracker190ob;
-    const auto in = tracker190nw::importOf (volumeModFile (false));
+    const auto in = tracker190nw::importOf (volumeModFile (false), false);
     CHECK (in.song.has_value());
     if (! in.song)
         return;
@@ -109,7 +110,7 @@ TEST (tracker190ob_volume_changes_become_volume_multiplier_automation)
 TEST (tracker190ob_an_instrument_in_two_module_channels_gets_two_channels)
 {
     using namespace tracker190ob;
-    const auto in = tracker190nw::importOf (volumeModFile (true));
+    const auto in = tracker190nw::importOf (volumeModFile (true), false);
     CHECK (in.song.has_value());
     if (! in.song)
         return;
@@ -128,7 +129,7 @@ TEST (tracker190ob_an_instrument_in_two_module_channels_gets_two_channels)
 TEST (tracker190ob_volume_automation_survives_the_flp_round_trip)
 {
     using namespace tracker190ob;
-    const auto in = tracker190nw::importOf (volumeModFile (false));
+    const auto in = tracker190nw::importOf (volumeModFile (false), false);
     CHECK (in.song.has_value());
     if (! in.song)
         return;

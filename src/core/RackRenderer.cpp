@@ -66,6 +66,7 @@
 #include <cstring>
 #include <limits>
 #include <map>
+#include <tuple>
 #include <mutex>
 #include <thread>
 
@@ -2273,9 +2274,27 @@ void RackState::buildAutomationTables()
             if (lane.events.empty() || lane.target.kind == AutomationTargetKind::tempo || slot >= maxAutomations)
                 continue;
 
-            eventLanes.push_back ({ p, l, slot });
+            eventLanes.push_back ({ p, l, slot, -1 });
             bind (slot++, lane.target);
         }
+    // round 190om: lanes of several patterns on one target (the last one is bound to it): grouped, the bound slot first
+    sharedLanes.clear();
+    {
+        std::map<std::tuple<int, int, int, int>, std::vector<int>> byTarget;
+        for (int i = (int) eventLanes.size() - 1; i >= 0; --i)
+        {
+            const auto& t = song.patterns[(std::size_t) eventLanes[(std::size_t) i].pattern].events[(std::size_t) eventLanes[(std::size_t) i].lane].target;
+            byTarget[{ (int) t.kind, t.index, t.slot, t.param }].push_back (i);
+        }
+        for (auto& [target, group] : byTarget)
+        {
+            if (group.size() < 2)
+                continue;
+            for (const auto k : group)
+                eventLanes[(std::size_t) k].shared = eventLanes[(std::size_t) group.front()].slot;
+            sharedLanes.push_back (std::move (group));
+        }
+    }
 
     // round 190gw: the target links of an automation clip with several (FL's "Crossfade with" clip): one slot each
     linkSlots.clear();
@@ -3054,7 +3073,7 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
 
                 for (const auto& lane : state.eventLanes)
                     if (lane.pattern == current)
-                        automationValues[(std::size_t) lane.slot] = pattern.events[(std::size_t) lane.lane].valueAt (t);
+                        automationValues[(std::size_t) (lane.shared >= 0 ? lane.shared : lane.slot)] = pattern.events[(std::size_t) lane.lane].valueAt (t);
             }
         }
         else
@@ -3064,10 +3083,11 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
 
             // inside a clip of the pattern: its events; after one: the value it ended with; before the first:
             // no value (the target's own). Depends only on the position, like automation clips.
-            for (const auto& lane : state.eventLanes)
-            {
+            // (the lane's value and the start of its pattern's clip that gave it; −∞ before the first)
+            const auto laneValue = [&] (const RackState::EventLane& lane, double& from) noexcept {
                 const auto& events = song.patterns[(std::size_t) lane.pattern].events[(std::size_t) lane.lane];
                 auto value = std::numeric_limits<float>::quiet_NaN();
+                from = -std::numeric_limits<double>::infinity();
 
                 for (auto i : state.patternClips[(std::size_t) lane.pattern]) // sorted by start
                 {
@@ -3079,9 +3099,29 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
                     // a stretched clip loops its pattern (LYNX extra stretchedClipsLoop, issue #25), its events too
                     const auto period = (std::size_t) lane.pattern < state.schedule.patternLength.size() ? state.schedule.patternLength[(std::size_t) lane.pattern] : 0;
                     value = events.valueAt (patternTickInClip (c, tick < (double) c.end() ? tick : (double) c.end() - 1.0, period));
+                    from = (double) c.start;
                 }
-
-                automationValues[(std::size_t) lane.slot] = value;
+                return value;
+            };
+            for (const auto& lane : state.eventLanes)
+                if (lane.shared < 0)
+                {
+                    double from = 0.0;
+                    automationValues[(std::size_t) lane.slot] = laneValue (lane, from);
+                }
+            // round 190om: a target several patterns' lanes drive takes the value of the pattern whose clip started last
+            for (const auto& group : state.sharedLanes)
+            {
+                auto best = -std::numeric_limits<double>::infinity();
+                auto value = std::numeric_limits<float>::quiet_NaN();
+                for (const auto k : group) // (the bound lane first: it wins a tie, as it did alone)
+                {
+                    double from = 0.0;
+                    const auto v = laneValue (state.eventLanes[(std::size_t) k], from);
+                    if (from > best)
+                        best = from, value = v;
+                }
+                automationValues[(std::size_t) state.eventLanes[(std::size_t) group.front()].shared] = value;
             }
 
             // round 190mx (GitHub #198, Live's clip envelopes): a pattern clip the clip grid plays drives its pattern's
@@ -3106,7 +3146,7 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
                     const auto local = (double) c.offset + at;
                     for (const auto& lane : state.eventLanes)
                         if (lane.pattern == c.pattern)
-                            automationValues[(std::size_t) lane.slot] = song.patterns[(std::size_t) c.pattern].events[(std::size_t) lane.lane].valueAt (local);
+                            automationValues[(std::size_t) (lane.shared >= 0 ? lane.shared : lane.slot)] = song.patterns[(std::size_t) c.pattern].events[(std::size_t) lane.lane].valueAt (local);
                 }
             }
         }

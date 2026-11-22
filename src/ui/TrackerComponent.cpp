@@ -298,9 +298,21 @@ struct TrackerComponent::Impl
                 for (const std::uint64_t v : { (std::uint64_t) n.key, (std::uint64_t) n.channel, (std::uint64_t) n.muted, (std::uint64_t) n.slide, (std::uint64_t) n.porta,
                                                bits (n.velocity), bits (n.pan), bits (n.chance), bits (n.release), bits (n.finePitch), (std::uint64_t) n.length })
                     h = mix (h, v);
+                if (fxActive (n, Fx::bend)) // (round 190om: its Bxx)
+                    h = mix (h, 0x100u + (std::uint64_t) fxValueOf (n, Fx::bend, n.length));
             }
             trackHash[(std::size_t) pl.track] = h;
         }
+        // round 190om: the channel's Vxx rows
+        for (std::size_t t = 0; t < l.tracks.size(); ++t)
+            if (l.tracks[t].volumeSlot >= 0)
+            {
+                auto h = mix (trackHash[t], (std::uint64_t) l.tracks[t].volumeSlot);
+                for (std::size_t r = 0; r < l.tracks[t].volumeRows.size(); ++r)
+                    if (l.tracks[t].volumeRows[r] >= 0)
+                        h = mix (mix (h, (std::uint64_t) r), (std::uint64_t) l.tracks[t].volumeRows[r]);
+                trackHash[t] = h;
+            }
     }
 
     // what every chunk shows the same way: the grid's settings, font, colours and note names
@@ -729,10 +741,15 @@ struct TrackerComponent::Impl
         auto& c = owner.cursor;
         const auto& l = owner.layout;
         const auto cell = cellAt (l, c.track, c.column, c.row);
-        if (cell.placed == nullptr || (cell.kind != Cell::Kind::start && ! (cell.kind == Cell::Kind::off && c.field == Field::dly)))
+        const auto volumeSlot = isVolumeSlot (l, c); // (round 190om: a Vxx on any row)
+        if (! volumeSlot && (cell.placed == nullptr || (cell.kind != Cell::Kind::start && ! (cell.kind == Cell::Kind::off && c.field == Field::dly))))
+            return;
+        if (volumeSlot && c.field != Field::fxValue)
             return;
         std::optional<Fx> fx;
-        if (c.field == Field::fxValue && cell.kind == Cell::Kind::start)
+        if (volumeSlot)
+            fx = Fx::volume;
+        else if (c.field == Field::fxValue && cell.kind == Cell::Kind::start)
         {
             const auto list = shownFx (l, *cell.placed, song().patterns[(std::size_t) l.pattern].notes[(std::size_t) cell.placed->note]);
             if (c.fxSlot >= (int) list.size())
@@ -941,7 +958,10 @@ struct TrackerComponent::Impl
         }
         const auto cursorHere = ! plain && r == owner.cursor.row && t == owner.cursor.track && c == owner.cursor.column;
         const auto dim = colour::textDisabled.withAlpha (0.55f);
-        if ((cell.kind == Cell::Kind::empty || cell.kind == Cell::Kind::sustain) && ! cursorHere)
+        // round 190om: the channel's volume event in this row (Vxx in note column 0's volume slot), −1 = none
+        const auto& trackInfo = l.tracks[(std::size_t) t];
+        const auto volumeHere = c == 0 && trackInfo.volumeSlot >= 0 && r >= 0 && r < (std::int64_t) trackInfo.volumeRows.size() ? trackInfo.volumeRows[(std::size_t) r] : -1;
+        if ((cell.kind == Cell::Kind::empty || cell.kind == Cell::Kind::sustain) && ! cursorHere && volumeHere < 0)
         {
             // one text for the whole cell (most cells): the dim placeholders
             drawGridText (g, cell.kind == Cell::Kind::empty ? cg.emptyText : cg.sustainText, dim, ox + cg.x, y, h);
@@ -1014,11 +1034,21 @@ struct TrackerComponent::Impl
                         text = &letters[(std::size_t) fxList[(std::size_t) f.fxSlot]];
                         col = colour::warning;
                     }
+                    else if (volumeHere >= 0 && f.fxSlot == trackInfo.volumeSlot)
+                    {
+                        text = &letters[(std::size_t) Fx::volume];
+                        col = colour::warning;
+                    }
                     break;
                 case Field::fxValue:
                     if (f.fxSlot < fxCount)
                     {
                         text = &number (fxValueOf (*n, fxList[(std::size_t) f.fxSlot], n->length), f.chars, hex);
+                        col = colour::warning;
+                    }
+                    else if (volumeHere >= 0 && f.fxSlot == trackInfo.volumeSlot)
+                    {
+                        text = &number (volumeHere, f.chars, hex);
                         col = colour::warning;
                     }
                     break;
@@ -1369,13 +1399,15 @@ struct TrackerComponent::Impl
             case Field::fxValue:
             {
                 std::optional<Fx> fx;
-                if (cell.kind == Cell::Kind::start)
+                if (isVolumeSlot (l, c))
+                    fx = Fx::volume;
+                else if (cell.kind == Cell::Kind::start)
                 {
                     const auto list = shownFx (l, *cell.placed, song().patterns[(std::size_t) l.pattern].notes[(std::size_t) cell.placed->note]);
                     if (c.fxSlot < (int) list.size())
                         fx = list[(std::size_t) c.fxSlot];
                 }
-                text << (fx ? tr (fxDescription (*fx)) : tr ("type G P Y R T M for a note field"));
+                text << (fx ? tr (fxDescription (*fx)) : tr ("type G P Y R T M B for a note field"));
                 break;
             }
         }

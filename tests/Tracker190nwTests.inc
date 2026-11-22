@@ -355,10 +355,11 @@ struct Imported
     std::string error;
 };
 
-inline Imported importOf (const std::vector<std::uint8_t>& bytes)
+inline Imported importOf (const std::vector<std::uint8_t>& bytes, bool volumeAsPatternEvents = true) // (round 190om: false = 190ob's clips)
 {
     Imported out;
     ModuleImportOptions o;
+    o.volumeAsPatternEvents = volumeAsPatternEvents;
     o.report = &out.report;
     o.summary = &out.summary;
     o.saveSample = [&out] (const std::vector<std::uint8_t>& wav, const std::string& name) {
@@ -743,8 +744,8 @@ TEST (tracker190nw_import_mod)
     const auto* d2 = noteAt (s, p1, 0, 62);
     CHECK (d2 != nullptr && d2->length == 160 && d2->pan > 0.0f);
     CHECK (noteAt (s, p1, 8 * 240 + 80, 60) != nullptr);
-    // the arpeggio is not imported: the report says so
-    CHECK (in.report.notReproduced.count ("Module effect not imported: arpeggio (0xy)") == 1);
+    // the arpeggio: not imported in round 190nw; since round 190om the note's pitch curve (Tracker190omTests)
+    CHECK (in.report.converted.count ("Module effect as the note's pitch curve: arpeggio (0xy)") == 1);
     CHECK (s.patterns[(std::size_t) p0].lengthTicks == 64 * 240);
 }
 

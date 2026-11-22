@@ -129,8 +129,12 @@ struct RackState
     struct EventLane
     {
         int pattern = 0, lane = 0, slot = 0;
+        int shared = -1; // round 190om: several patterns' lanes of one target — the slot bound to it (else −1)
     };
     std::vector<EventLane> eventLanes;
+    // round 190om: the lanes (indices into eventLanes) of each target that several patterns' lanes drive, the bound slot
+    // first; the pattern whose clip started last drives the target, as in FL (before, only the last lane did)
+    std::vector<std::vector<int>> sharedLanes;
     // round 190gw: automation clips with several target links (FL's "Target links", Automation::links): each link takes
     // a slot after the event lanes whose value is the clip's own through the link's mapping formula
     struct LinkSlot

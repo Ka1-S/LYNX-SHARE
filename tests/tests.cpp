@@ -14993,6 +14993,7 @@ TEST (simsynth_engine)
     lynx::ChannelDef c;
     c.instrument = lynx::InstrumentKind::simsynth;
     c.pluginState = blobA;
+    c.engineRev = 1; // (round 190om: the revision before the velocity law, every note at Final.Vol 1)
     auto inst = lynx::makeInstrument (lynx::InstrumentKind::simsynth);
     inst->prepare (44100.0);
     inst->configure (c, 120.0);
@@ -18082,3 +18083,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "RackAutomation190ooTests.inc" // round 190oo (design review 2, PAT-7): FL's automation clip channels in the Channel rack
 #include "TextFit190ooTests.inc" // round 190oo (design review 2, fit): translated menu titles give up width before toolbar panels drop, knob captions
 #include "Perf190osTests.inc" // round 190os: the safe-overload guard lets go at the stop and within 1 s of the overload's end
+#include "Tracker190omTests.inc" // round 190om (0.1.31): tracker stage 2 (pattern events, pitch curves, Bxx / Vxx), SimSynth velocity

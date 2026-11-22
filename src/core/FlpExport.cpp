@@ -1466,6 +1466,16 @@ struct Converter
                 out.initControls.push_back ({ 0, *id, rawValue (v.target, v.value) });
         if (! song.midiLinks.empty())
             report.notes.push_back ("MIDI controller links stay in LYNX (FL keeps them per machine)");
+        // round 190om: a note's own pitch / timbre / pressure curves (MPE, an imported module's slides, vibrato and
+        // arpeggios) have no FL equivalent (FL's notes hold one value each): the notes play their key
+        {
+            int curved = 0;
+            for (const auto& p : song.patterns)
+                for (const auto& n : p.notes)
+                    curved += n.curves.has() ? 1 : 0;
+            if (curved > 0)
+                report.dropped.push_back (std::to_string (curved) + " notes' own pitch / timbre / pressure curves (FL's notes have none)");
+        }
     }
 
     // ---- the Playlist ----
