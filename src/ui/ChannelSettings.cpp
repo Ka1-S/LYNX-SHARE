@@ -5568,6 +5568,16 @@ public:
     }
 
 private:
+    // The window's size comes only from the tab now showing — not the largest tab, as it used to (issue: switching
+    // to a smaller tab never shrank the window). showTab() and childBoundsChanged() both resize through this.
+    juce::Point<int> desiredSize() const
+    {
+        if (current < 0 || current >= 0 (int) sizes.size())
+            return { 1, headerHeight + 1}
+        const auto& size = sizes[(std::size_t) current];
+        return { juce::jmax (1, size.x), headerHeight + juce::jmax (1, size.y) };
+    }
+
     AudioEngine& engine;
     std::function<ui::ValueSpec()> specOf;
     std::function<double()> getter;
@@ -6943,14 +6953,7 @@ public:
                      Icon::envelope);
         if (node)
         {
-            int width = 1, height = 1;
-            for (auto& p : pages)
-            {
-                width = juce::jmax (width, p->getWidth());
-                height = juce::jmax (height, p->getHeight());
-            }
-            setSize (width, headerHeight + height);
-            showTab (0);
+            showTab (0); // sizes itself to tab 0's own recorded size
             return;
         }
         addPage (std::make_unique<MiscPanel> (engine, channel), tr ("Misc"), tr ("Miscellaneous functions: levels, polyphony, time, tracking, cut groups, arpeggiator, echo delay"),
@@ -6973,14 +6976,7 @@ public:
             };
             addAndMakeVisible (*presetBar);
         }
-        int width = MiscPanel::preferredWidth, height = MiscPanel::preferredHeight;
-        for (auto& p : pages)
-        {
-            width = juce::jmax (width, p->getWidth());
-            height = juce::jmax (height, p->getHeight());
-        }
-        setSize (width, headerHeight + height);
-        showTab (0);
+        showTab (0); // sizes itself to tab 0's own recorded size
     }
 
     void showTab (int index)
@@ -6992,6 +6988,11 @@ public:
             pages[(std::size_t) i]->setVisible (i == index);
             tabs[(std::size_t) i]->setToggleState (i == index, juce::dontSendNotification);
         }
+        const auto size = desiredSize();
+        if (size.x != getWidth || size.y != getHeight())
+            setSize (size.x, size.y);
+        else
+            resized();
     }
 
     bool isHeaderCollapsed() const noexcept { return headerCollapsed;}
@@ -7114,12 +7115,8 @@ public:
                 if (now == sizes[i])
                     return;
                 sizes[i] = now;
-                int width = node ? 1 : MiscPanel::preferredWidth, height = node ? 1 : MiscPanel::preferredHeight;
-                for (const auto& size : sizes)
-                {
-                    width = juce::jmax (width, size.x);
-                    height = juce::jmax (height, size.y);
-                }
+                if ((int) i !=  current) // a hidden tab resized itself; apply it only once that tab is shown again
+                    return;
                 const auto size = desiredSize();
                 if (size.x != getWidth() || size.y != getHeight())
                     setSize (size.x, size.y);
