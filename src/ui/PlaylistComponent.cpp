@@ -28,6 +28,7 @@
 #include "ui/ImageReadback.h"
 #include "ui/TextCache.h"
 #include "ui/PlaylistComponent.h"
+#include "core/MuteKeys.h"
 #include "core/TempoMarkers.h"
 #include "core/PaintTemplate.h"
 #include "ui/PaintAB.h" // (round 190md: LYNX_PAINT_SAVINGS=0 paints the end veil as before)
@@ -3490,8 +3491,23 @@ void PlaylistComponent::paintFolderDrop (juce::Graphics& g)
     }
 }
 
+void PlaylistComponent::fadeOut (const std::vector<int>& clips)
+{
+    // issue #250 (round 190oq): each deleted clip in view leaves FL's ghost (nothing at all when Animations are off or
+    // effects reduced: ui/DeleteFade.h)
+    if (! ui::DeleteFade::enabled())
+        return;
+    const auto& song = engine.getSong();
+    const auto grid = gridArea();
+    for (const auto i : clips)
+        if (i >= 0 && i < (int) song.playlist.size())
+            if (const auto r = clipBounds (i); r.intersects (grid))
+                deleteFade.add (r.toFloat(), liveClipColour (song.playlist[(std::size_t) i]));
+}
+
 void PlaylistComponent::paintOverChildren (juce::Graphics& g)
 {
+    deleteFade.paint (g, gridArea()); // (issue #250: nothing while no clip is fading)
     paintDropGhost (g); // (round 190im: a drag's landing place)
     paintFolderDrop (g); // round 190jf (B17)
     if (headerGripLit || drag == Drag::headerWidth) // round 190jq (issue #164): the edge being dragged, in the accent
@@ -6672,6 +6688,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         if (hit >= 0)
         {
             erasedSomething = true;
+            fadeOut ({ hit }); // (issue #250)
             engine.editSong ([hit] (Song& s) { s.playlist.erase (s.playlist.begin() + hit); });
         }
         return;
@@ -6726,7 +6743,10 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             drag = Drag::erase;
             setSelection ({});
             if (hit >= 0)
+            {
+                fadeOut ({ hit }); // (issue #250)
                 engine.editSong ([hit] (Song& s) { s.playlist.erase (s.playlist.begin() + hit); });
+            }
             return;
 
         case EditTool::mute:
@@ -7609,6 +7629,7 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
             if (hit >= 0)
             {
                 erasedSomething = true;
+                fadeOut ({ hit }); // (issue #250)
                 engine.editSong ([hit] (Song& s) { s.playlist.erase (s.playlist.begin() + hit); });
             }
             return;
@@ -9032,6 +9053,9 @@ juce::PopupMenu PlaylistComponent::editMenu()
     m.addSeparator();
     m.addItem (tr ("Mute") + key ("playlist.muteClips"), [this] { runAction ("playlist.muteClips"); });
     m.addItem (tr ("Unmute") + key ("playlist.unmuteClips"), [this] { runAction ("playlist.unmuteClips"); });
+    // issue #249 (round 190oq, LYNX extra): Alt+M switches both ways (FL's only mutes)
+    m.addItem (tr ("Alt+M toggles: pressed again, it unmutes (LYNX)"), true, mutekeys::toggles(),
+               [] { workflowextras::setExtra ("editing.muteKeyToggles", ! mutekeys::toggles()); });
     m.addSeparator();
     m.addItem (tr ("Insert space") + "\tCtrl+Ins", time, false, [this] { insertTimeSelection(); });
     m.addItem (tr ("Slice & insert space") + "\tCtrl+Alt+Ins", time, false, [this] { runAction ("playlist.sliceInsertSpace"); });
@@ -12880,7 +12904,11 @@ bool PlaylistComponent::runAction (const std::string& id)
         const auto& song = engine.getSong();
         const auto from = song.hasLoop() ? song.loopStart : (std::int64_t) 0;
         const auto to = song.hasLoop() ? song.loopEnd : std::numeric_limits<std::int64_t>::max();
-        engine.editSong ([chosen = selection, mute = is ("playlist.muteClips"), from, to] (Song& s) { clipops::setClipsMuted (s, chosen, mute, from, to); });
+        auto mute = is ("playlist.muteClips");
+        // issue #249 (round 190oq, LYNX extra, off = FL's Alt+M that only mutes): pressed again, it unmutes
+        if (mute && mutekeys::toggles() && clipops::allClipsMuted (song, selection, from, to))
+            mute = false;
+        engine.editSong ([chosen = selection, mute, from, to] (Song& s) { clipops::setClipsMuted (s, chosen, mute, from, to); });
     }
     else if (is ("playlist.mergePatternClips")) mergePatternClipsByKey();
     else if (is ("playlist.mergeSimilarClips")) mergeSimilarClipsByKey();
@@ -13626,6 +13654,7 @@ void PlaylistComponent::deleteSelection()
         return;
 
     auto doomed = selection;
+    fadeOut (doomed); // (issue #250)
     setSelection ({});
     engine.editSong ([&doomed] (Song& s) {
         std::sort (doomed.rbegin(), doomed.rend());

@@ -77,8 +77,10 @@ inline constexpr Item items[] = {
       TR_NOOP ("A new project made in the Clip-launch layout links Track N to mixer track N, so every column of the Session mixer shows its strip, as a new Live set does. Only empty new projects; nothing is routed differently. Also in the Mixer menu › New projects."),
       "ui-options.txt:newClipLaunchStrips" },
     // round 190iu (issue #191.5): FL's instrument tracks, every instrument on one, the Channel rack hidden
-    { "layout.trackOnly", TR_NOOP ("Playlist"), TR_NOOP ("Track-only mode (no Channel rack: 1 track = 1 instrument)"),
-      TR_NOOP ("In the Pattern layout the Channel rack stays hidden and every instrument you add gets its own instrument track, whose pencil places that instrument's own pattern. Also in View › Layout style."),
+    // round 190oq (issue #246): the rack is hidden when the mode comes on but opens again (F6), as FL keeps an instrument
+    // track's channel in its rack
+    { "layout.trackOnly", TR_NOOP ("Playlist"), TR_NOOP ("Track-only mode (1 track = 1 instrument, the Channel rack hidden)"),
+      TR_NOOP ("In the Pattern layout every instrument you add gets its own instrument track, whose pencil places that instrument's own pattern. The Channel rack is hidden when the mode comes on; F6 still opens it, listing the same instruments, each playing through its track's mixer track. Also in View › Layout style."),
       "ui-options.txt:trackOnly" },
     { "pianoRoll.songBarsRuler", TR_NOOP ("Piano Roll"), TR_NOOP ("Ruler: song bars (LYNX)"),
       TR_NOOP ("The Piano roll's ruler shows the bar numbers of the place in the song where the pattern plays. Also in the Piano roll's View menu."),
@@ -148,6 +150,14 @@ inline constexpr Item items[] = {
     { "playlist.trackStates", TR_NOOP ("Playlist"), TR_NOOP ("Hide and deactivate tracks"),
       TR_NOOP ("The Playlist track menu gets Hide track, the Playlist menu Show hidden tracks and Hide unused tracks, and the Channel rack and Mixer menus Deactivate: a deactivated channel or insert unloads its plugins and is silent, its settings kept. Also always on in the Clip-launch and Simple layouts."),
       "ui-options.txt:trackStates" },
+    // round 190oq (issue #249): FL's Alt+M only mutes; this makes it switch both ways
+    { "editing.muteKeyToggles", TR_NOOP ("Editing"), TR_NOOP ("Alt+M toggles: pressed again, it unmutes (LYNX)"),
+      TR_NOOP ("In FL Studio Alt+M only mutes the selected clips or notes and Shift+Alt+M unmutes them. On: Alt+M on clips or notes that are all muted already unmutes them, in the Playlist and the Piano roll; Shift+Alt+M still unmutes. Also in the Playlist's Edit menu."),
+      "ui-options.txt:muteKeyToggles" },
+    // round 190oq (issue #252): a start page with the recent projects and templates (Bitwig's Dashboard, Studio One's Start page)
+    { "general.startPage", TR_NOOP ("Windows"), TR_NOOP ("Show the start page when LYNX starts (recent projects and templates)"),
+      TR_NOOP ("At start-up a page lists the recent projects (with a search box) and the templates over the start-up project, which stays open behind it (Esc keeps it). Not on the first start, which shows the welcome card, nor when a project is opened from a file. Also in File › Start page..."),
+      "ui-options.txt:startPage" },
     { "midi.gamepad", TR_NOOP ("Controllers"), TR_NOOP ("Use a game controller"),
       TR_NOOP ("A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page."),
       "midi-settings.txt:gamepad" },

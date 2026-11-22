@@ -14,6 +14,7 @@
 #include "core/StackedLanes.h"
 #include "engine/AudioEngine.h"
 #include "ui/TimerWhileShowing.h"
+#include "ui/DeleteFade.h"
 #include "ui/EditorTools.h"
 #include "ui/FrameTicker.h"
 #include "ui/MotionOverlay.h"
@@ -67,6 +68,7 @@ public:
     ~PianoRollComponent() override;
 
     void paint (juce::Graphics& g) override;
+    void paintOverChildren (juce::Graphics& g) override; // (round 190oq, issue #250: deleted notes fading)
     void resized() override;
     void setTitleBarInsets (int left, int right) override;
     void mouseDown (const juce::MouseEvent& e) override;
@@ -252,6 +254,9 @@ public:
     void setScaleForSnapshot (int root, int scale) { setScale (root, scale); }
     // issue #242 (round 190od): the toolbar scale box as a click opens it (JUCE's ComboBox marks the popup active first)
     juce::ComboBox& scaleBoxForTests() noexcept { return scaleBox; }
+    ui::DeleteFade& deleteFadeForSnapshot() noexcept { return deleteFade; } // (round 190oq, issue #250)
+    void deleteSelectionForSnapshot() { deleteSelection(); }
+    juce::Rectangle<int> gridAreaForSnapshot() const { return gridArea(); }
     juce::ComboBox& chordBoxForTests() noexcept { return chordBox; } // (rollup 0.1.31 step 4: #242 with 190nu's stamp box)
     // round 190jv: View › Scale highlighting › Automatic on / off, and the key it guessed (scaledetect; -1 none)
     void setAutoScale (bool on) { scaleBox.setSelectedId (on ? autoScaleId : 1, juce::sendNotificationSync); }
@@ -936,6 +941,10 @@ private:
     void addPatternSignatureByKey();
     int markerAtX (int x) const;          // the pattern marker drawn under x on the ruler, or -1
     void showPatternMarkerMenu (int index);
+
+    // issue #250 (round 190oq): deleted notes fade out as FL's do (ui/DeleteFade.h); `fadeOut` before they go
+    ui::DeleteFade deleteFade { *this, ui::DeleteFade::pianoRollMs };
+    void fadeOut (const std::vector<int>& notes);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PianoRollComponent)
     std::unique_ptr<ui::TimerWhileShowing> showingTimer; // the polling timer, only while on screen (round 174f)

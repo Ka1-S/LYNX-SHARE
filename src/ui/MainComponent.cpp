@@ -294,7 +294,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
             safe->playlist.refreshViewOptions(); // (round 190jq: header width, pointer click, automation clip lanes)
             safe->refreshKeyPanel(); // (round 190oo, O-5: Live's three-part scale control on / off)
             safe->keyPanel.repaint();
-            if (trackonly::active())
+            if (workflowextras::trackOnlySwitchedOn()) // (issue #246: only when the mode comes on; the rack may be opened after)
                 safe->hidePanelForTrackOnly();
         }
     };
@@ -4351,9 +4351,9 @@ void MainComponent::toggleMode()
 
 void MainComponent::togglePanel (Panel panel)
 {
-    if (panel == Panel::channelRack && workflowextras::refusesChannelRack()) // round 190iu: Track-only mode
-        return;
     workspace.toggle (panel);
+    if (panel == Panel::channelRack && workspace.isPanelVisible (panel)) // issue #246: Track-only mode lets it open
+        workflowextras::channelRackOpened();
     refreshPanelButtons();
 }
 
@@ -4374,9 +4374,9 @@ void MainComponent::fitChannelRack (bool width)
 
 void MainComponent::showPanel (Panel panel)
 {
-    if (panel == Panel::channelRack && workflowextras::refusesChannelRack()) // round 190iu: Track-only mode
-        return;
     workspace.show (panel);
+    if (panel == Panel::channelRack) // issue #246: Track-only mode lets it open
+        workflowextras::channelRackOpened();
     refreshPanelButtons();
 }
 
@@ -8973,31 +8973,98 @@ void MainComponent::startLiveFromCommandLine()
 
 void MainComponent::exportPackage()
 {
-    // FL's zipped loop package: the project and every sample it uses in one .zip
+    // FL's File › Export › Zipped loop package... (FileExportZipAction, REA round 190oq): the project and every file it
+    // uses in one .zip, the project named after the zip
     const auto stem = projectStem (projectName);
     const auto start = (currentFile != juce::File() ? currentFile.getParentDirectory()
                                                      : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory))
                            .getChildFile (stem + ".zip");
-    fileChooser = lynx::ui::makeFileChooser (tr ("Export project with samples"), start, "*.zip");
+    fileChooser = lynx::ui::makeFileChooser (tr ("Zipped loop package"), start, "*.zip");
     lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
-                              [safe = juce::Component::SafePointer<MainComponent> (this), stem] (const juce::FileChooser& chooser) {
-                                  auto zip = chooser.getResult();
-                                  if (safe == nullptr || zip == juce::File())
+                              [safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::FileChooser& chooser) {
+                                  const auto zip = chooser.getResult();
+                                  if (safe != nullptr && zip != juce::File())
+                                      safe->writePackage (zip.withFileExtension (".zip"));
+                              });
+}
+
+void MainComponent::writePackage (const juce::File& zip)
+{
+    engine.capturePluginStates();
+    ProjectPackage::Result result;
+    juce::String error;
+    if (! ProjectPackage::exportZip (engine.getSong(), zip.getFileNameWithoutExtension(), zip, result, error))
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not save"), error);
+        return;
+    }
+    auto text = tr ("{0} saved with {1} samples.", { zip.getFileName(), juce::String (result.files) });
+    if (! result.missing.isEmpty())
+        text << "\n\n" << tr ("Not on this PC (left out):") << "\n" << result.missing.joinIntoString ("\n");
+    juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Zipped loop package"), text);
+}
+
+void MainComponent::exportDataFiles()
+{
+    // FL's File › Export › Project data files... (REA round 190oq, FUN_011ec0f0: "Collect project data files", "Copy the %d
+    // files this project is currently using to..."): copies only; the project keeps using its own files
+    const auto count = (int) safety::referencedSamples (engine.getSong()).size();
+    fileChooser = lynx::ui::makeFileChooser (tr ("Copy the {0} files this project is currently using to...", { juce::String (count) }),
+                                             currentFile != juce::File() ? currentFile.getParentDirectory()
+                                                                         : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory));
+    lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+                              [safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::FileChooser& chooser) {
+                                  const auto folder = chooser.getResult();
+                                  if (safe == nullptr || folder == juce::File())
                                       return;
-                                  zip = zip.withFileExtension (".zip");
-                                  safe->engine.capturePluginStates();
                                   ProjectPackage::Result result;
                                   juce::String error;
-                                  if (! ProjectPackage::exportZip (safe->engine.getSong(), stem, zip, result, error))
+                                  if (! ProjectPackage::copyDataFiles (safe->engine.getSong(), folder, result, error))
                                   {
-                                      juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not save"), error);
+                                      juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not copy"), error);
                                       return;
                                   }
-                                  auto text = tr ("{0} saved with {1} samples.", { zip.getFileName(), juce::String (result.files) });
+                                  auto text = tr ("{0} files copied to {1}.", { juce::String (result.files), folder.getFullPathName() });
                                   if (! result.missing.isEmpty())
                                       text << "\n\n" << tr ("Not on this PC (left out):") << "\n" << result.missing.joinIntoString ("\n");
-                                  juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Export project with samples"), text);
+                                  juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Project data files"), text);
                               });
+}
+
+void MainComponent::collectAllAndSave()
+{
+    // Live's File › Collect All and Save (issue #251, round 190oq; LYNX extra): every file outside the project's folder is
+    // copied into <project folder>/Samples/Imported, the project uses the copies, then it is saved. A project never saved
+    // is first saved to a new project folder (FL's command), then collected.
+    if (currentFile == juce::File() || currentFile.isAChildOf (autosaveFolder()) || ! currentFile.hasFileExtension (ProjectFile::extension))
+    {
+        save (true, [safe = juce::Component::SafePointer<MainComponent> (this)] {
+            if (safe != nullptr && safe->currentFile != juce::File())
+                safe->collectAllAndSave();
+        });
+        return;
+    }
+    const auto folder = currentFile.getParentDirectory();
+    std::map<std::string, std::string> relink;
+    ProjectPackage::Result result;
+    juce::String error;
+    if (! ProjectPackage::collectIntoProject (engine.getSong(), folder, relink, result, error))
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not copy"), error);
+        return;
+    }
+    if (! relink.empty())
+        engine.editSong ([&relink] (Song& song) { applyRelocations (song, relink); });
+    save (false, [safe = juce::Component::SafePointer<MainComponent> (this), result, folder] {
+        if (safe == nullptr)
+            return;
+        auto text = result.files == 0 ? tr ("Every file of the project is already in its folder. Saved.")
+                                      : tr ("{0} files copied into {1}. The project now uses the copies and is saved.",
+                                            { juce::String (result.files), folder.getChildFile ("Samples").getChildFile ("Imported").getFullPathName() });
+        if (! result.missing.isEmpty())
+            text << "\n\n" << tr ("Not on this PC (left out):") << "\n" << result.missing.joinIntoString ("\n");
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Collect all and save"), text);
+    });
 }
 
 void MainComponent::collectSamples()
@@ -10433,13 +10500,19 @@ void MainComponent::save (bool askForFile, std::function<void()> afterSaved)
 
     const auto startFolder = currentFile.isAChildOf (autosaveFolder()) ? juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
                                                                        : currentFile.getParentDirectory();
-    fileChooser = lynx::ui::makeFileChooser (tr ("Save project"), startFolder, juce::String ("*") + ProjectFile::extension);
+    // (issue #251: FL's Save as also offers its zipped loop package, "Zipped song file (*.zip)")
+    fileChooser = lynx::ui::makeFileChooser (tr ("Save project"), startFolder, juce::String ("*") + ProjectFile::extension + ";*.zip");
 
     lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
                               [this, write] (const juce::FileChooser& chooser) {
                                   const auto chosen = chooser.getResult();
                                   if (chosen == juce::File())
                                       return;
+                                  if (chosen.hasFileExtension ("zip")) // FL: a .zip name saves the zipped loop package
+                                  {
+                                      writePackage (chosen);
+                                      return;
+                                  }
                                   const auto file = ProjectFile::withProjectExtension (chosen);
                                   // the dialog's overwrite warning was about the name typed, without the extension
                                   if (file != chosen && file != currentFile && file.existsAsFile())
@@ -10940,6 +11013,8 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             }
             menu.addSubMenu (tr ("Open in new window"), newWindow);
         }
+        // issue #252 (round 190oq, LYNX extra): the recent projects and templates on one page
+        menu.addItem (tr ("Start page..."), [this] { showStartPage(); });
         if (engine.pluginsOff())
             menu.addItem (tr ("Switch plugins back on..."), [this] { showPluginsOff(); });
         menu.addSeparator();
@@ -10949,6 +11024,8 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Save as...") + shortcutText ("file.saveAs"), [this] { save (true); });
         menu.addItem (tr ("Save new version") + shortcutText ("file.saveNewVersion"), [this] { saveNewVersion(); });
         menu.addItem (tr ("Save to new project folder..."), [this] { saveToNewProjectFolder(); });
+        // issue #251 (round 190oq, LYNX extra): Live's Collect All and Save
+        menu.addItem (tr ("Collect all and save"), [this] { collectAllAndSave(); });
         menu.addItem (tr ("Save as template..."), [this] { saveAsTemplate(); });
         menu.addItem (tr ("Save a copy for an older LYNX..."), [this] { saveCopyForOlder(); }); // (round 190hq, LYNX extra)
         // round 190og (FLM coverage app-0003, LYNX extra: FL Studio writes no .flm): the song for FL Studio Mobile, with
@@ -10989,7 +11066,8 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             exports.addSubMenu (tr ("All playlist tracks"), playlistTrackExportMenu (false));
             exports.addSubMenu (tr ("All playlist track groups"), playlistTrackExportMenu (true));
             exports.addSeparator();
-            exports.addItem (tr ("Project with samples (.zip)..."), [this] { exportPackage(); });
+            // FL's Export › Zipped loop package... and Project data files... (round 190oq, issue #251: FL's names and layout)
+            exports.addItem (tr ("Zipped loop package..."), [this] { exportPackage(); });
             // Export to FL Studio (round 171e, idea by Tookolld): a .flp or FL's zipped loop package
             exports.addItem (tr ("FL Studio project..."), [this] {
                 engine.capturePluginStates();
@@ -11016,7 +11094,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             exports.addItem (tr ("For other apps..."), [this] { exportForOtherApps(); });
             // FL's "Project bones..." (FileExportProjectBonesAction; REA round 168e)
             exports.addItem (tr ("Project bones..."), [this] { exportProjectBones (engine, currentFile.getParentDirectory(), projectName); });
-            exports.addItem (tr ("Project data files (collect the samples into a folder)..."), [this] { collectSamples(); });
+            exports.addItem (tr ("Project data files..."), [this] { exportDataFiles(); });
             menu.addSubMenu (tr ("Export"), exports);
         }
         {

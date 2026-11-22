@@ -21,7 +21,9 @@ juce::File fileFor (const std::string& path)
 bool exportZip (const Song& song, const juce::String& projectName, const juce::File& zip, Result& result, juce::String& error)
 {
     result = {};
-    const auto plan = safety::packagePlan (song, "samples");
+    // FL's zipped loop package (round 190oq, REA FUN_011dc560): the project and its files side by side, flat, by name
+    // (FL warns when two have one name and may lose one; LYNX gives the second a unique name instead)
+    const auto plan = safety::packagePlan (song, "");
 
     Song packed = song;
     std::map<std::string, std::string> relink;
@@ -97,6 +99,75 @@ bool collectSamples (const Song& song, const juce::File& folder, std::map<std::s
             return false;
         }
         relink[original] = target.getFullPathName().toStdString();
+        ++result.files;
+    }
+    return true;
+}
+
+bool copyDataFiles (const Song& song, const juce::File& folder, Result& result, juce::String& error)
+{
+    // FL's Export › Project data files (round 190oq, REA FUN_011ec0f0): every file the project uses copied flat into one
+    // folder (unique names, nothing overwritten); the project keeps its own paths and no project file is written
+    result = {};
+    if (! folder.createDirectory())
+    {
+        error = "could not create " + folder.getFullPathName();
+        return false;
+    }
+    for (const auto& original : safety::referencedSamples (song))
+    {
+        const auto source = fileFor (original);
+        if (! source.existsAsFile())
+        {
+            result.missing.add (str (original));
+            continue;
+        }
+        const auto stem = safety::uniqueName (source.getFileNameWithoutExtension().toStdString(), [&] (const std::string& n) {
+            return folder.getChildFile (str (n) + source.getFileExtension()).exists();
+        });
+        if (! source.copyFileTo (folder.getChildFile (str (stem) + source.getFileExtension())))
+        {
+            error = "could not copy " + source.getFullPathName();
+            return false;
+        }
+        ++result.files;
+    }
+    return true;
+}
+
+bool collectIntoProject (const Song& song, const juce::File& projectFolder, std::map<std::string, std::string>& relink, Result& result,
+                         juce::String& error)
+{
+    // Live's File › Collect All and Save (round 190oq, issue #251): the files outside the project's folder are copied into
+    // <project>/Samples/Imported and the project uses the copies; files already inside the folder stay where they are
+    result = {};
+    relink.clear();
+    const auto target = projectFolder.getChildFile ("Samples").getChildFile ("Imported");
+    for (const auto& original : safety::referencedSamples (song))
+    {
+        const auto source = fileFor (original);
+        if (! source.existsAsFile())
+        {
+            result.missing.add (str (original));
+            continue;
+        }
+        if (source.isAChildOf (projectFolder))
+            continue;
+        if (! target.createDirectory())
+        {
+            error = "could not create " + target.getFullPathName();
+            return false;
+        }
+        const auto stem = safety::uniqueName (source.getFileNameWithoutExtension().toStdString(), [&] (const std::string& n) {
+            return target.getChildFile (str (n) + source.getFileExtension()).exists();
+        });
+        const auto copy = target.getChildFile (str (stem) + source.getFileExtension());
+        if (! source.copyFileTo (copy))
+        {
+            error = "could not copy " + source.getFullPathName();
+            return false;
+        }
+        relink[original] = copy.getFullPathName().toStdString();
         ++result.files;
     }
     return true;

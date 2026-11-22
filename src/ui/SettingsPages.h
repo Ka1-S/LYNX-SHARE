@@ -127,6 +127,7 @@ class SectionTitle final : public juce::Component
 public:
     explicit SectionTitle (juce::String t = {}) : text (std::move (t)) {}
     void setText (const juce::String& t) { text = t; repaint(); }
+    const juce::String& getText() const noexcept { return text; } // (issue #247: Settings' search reads it)
 
     void paint (juce::Graphics& g) override
     {

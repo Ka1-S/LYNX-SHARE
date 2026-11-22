@@ -304,6 +304,12 @@ namespace juce::detail { bool dispatchNextMessageOnSystemQueue (bool returnIfNoP
 #include "ui/Theme.h"
 #include "ui/ThemeSettings.h"
 #include "ui/AutoLookEditor.h" // (round 190od, issue #239)
+#include "core/StartPage.h" // (round 190oq, issue #252)
+#include "core/MuteKeys.h"
+#include "core/AraRegions.h"
+#include "ui/StartPage.h"
+#include "ui/DeleteFade.h"
+#include "ui/AraMenu.h"
 #include "ui/WaveformView.h"
 #include "ui/WindowOwner.h"
 #include "ui/PluginKeysTest.h"
@@ -3403,6 +3409,13 @@ public:
             quit();
             return;
         }
+        // --issuesshot190oq <prefix> (round 190oq, issues #243-#252): src/IssuesShot190oq.inc
+        if (args.contains ("--issuesshot190oq"))
+        {
+            setApplicationReturnValue (runIssuesShot190oq (args[args.indexOf ("--issuesshot190oq") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
         // --issuesshot190od <prefix> (round 190od, issues #236-#242): src/IssuesShot190od.inc
         if (args.contains ("--issuesshot190od"))
         {
@@ -4513,6 +4526,14 @@ public:
         {
             mainWindow->showSetupWizard();
             startupTrace.mark ("after the window: setup wizard shown");
+        }
+        // issue #252 (round 190oq, LYNX extra, off by default): the start page over the start-up project, never over the
+        // first run's card, never when a file was given to open
+        if (lynx::startpage::showAtStart (lynx::startpage::enabled(), fileToOpen != juce::File(), action != StartAction::none,
+                                          openTimeReport != juce::File() || lynx::platform::testMode()))
+        {
+            mainWindow->getContent().showStartPage();
+            startupTrace.mark ("after the window: start page shown");
         }
     }
 
@@ -19286,6 +19307,7 @@ private:
 #include "IssuesShot190od.inc" // round 190od (issues #236-#242)
 #include "Design190ojShot.inc" // round 190oj (design review of every view)
 #include "Design190ooShot.inc" // round 190oo (design review 2: the owner's options and the round's fixes)
+#include "IssuesShot190oq.inc" // round 190oq (issues #243-#252)
 #include "DetailsShot190kn.inc" // round 190kn
 #include "SmartTipShot190ok.inc" // round 190ok (D1)
 #include "DetailsShot190ld.inc" // round 190ld

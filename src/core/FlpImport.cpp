@@ -319,6 +319,10 @@ std::optional<std::pair<int, int>> flRawRange (flp::ControlId id, const std::str
             return std::pair { -6400, 6400 };
         if (p == 0x1F01) // slot dry/wet
             return std::pair { 0, 12800 };
+        // issue #253 (round 190oq): a route's level (0x2000 + destination, 0 = Master), on the fader's 0…16000 like the
+        // static route levels read below
+        if (p >= flp::ControlId::mixerSendBase && p < flp::ControlId::mixerSendBase + maxMixerTracks)
+            return std::pair { 0, 16000 };
     }
 
     if (p < flp::ControlId::pluginParamBase)
@@ -397,6 +401,13 @@ AutomationTarget automationTargetFor (flp::ControlId id, const std::map<int, int
             t.kind = AutomationTargetKind::mixerVolume;
         else if (p == flp::ControlId::mixerPan)
             t.kind = AutomationTargetKind::mixerPan;
+        // issue #253 (round 190oq): FL's send levels ("To <insert>" / "To Master" knobs, 0x2000 + destination; the same
+        // control ids the project's static route levels use) were left without a target, so their clips played nothing
+        else if (p >= flp::ControlId::mixerSendBase && p < flp::ControlId::mixerSendBase + mixerTracks)
+        {
+            t.kind = AutomationTargetKind::mixerSend;
+            t.slot = p - flp::ControlId::mixerSendBase;
+        }
         else if (p >= flp::ControlId::pluginParamBase)
         {
             t.kind = AutomationTargetKind::effectParam;

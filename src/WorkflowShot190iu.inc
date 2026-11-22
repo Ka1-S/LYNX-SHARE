@@ -275,7 +275,9 @@
         trackonly::setEnabled (true);
         if (workflowextras::onChanged)
             workflowextras::onChanged();
-        check ("track_only_refuses_the_rack", workflowextras::refusesChannelRack());
+        // (issue #246, round 190oq: the rack is hidden when the mode comes on and opens again on request, as FL keeps an
+        // instrument track's channel in its Channel rack)
+        check ("track_only_hides_the_rack_when_it_comes_on", ! ui.workspaceForTest().isPanelVisible (workspace::Panel::channelRack));
         {
             const auto channels = song().channels.size();
             engine.editSong ([] (Song& s) { s.channels.push_back (mididrop::newChannel ("Strings")); });

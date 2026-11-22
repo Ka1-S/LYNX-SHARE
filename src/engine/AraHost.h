@@ -63,6 +63,9 @@ public:
     std::shared_ptr<void> ownerOf (std::uint64_t channelUid);
     // Tells the plugin's editor which regions to show: the clips `clipUids` of the channel (empty: all of the channel's)
     void showInEditor (std::uint64_t channelUid, const std::vector<std::uint64_t>& clipUids = {});
+    // Round 190oq (issue #243, an ARA insert): the editor of channel `editorChannel`'s instance shows every region of the
+    // channels `channelUids` (one document: the plugin lists each channel as a track)
+    void showChannelsInEditor (std::uint64_t editorChannel, const std::vector<std::uint64_t>& channelUids);
 
     // Every document as the plugin archives it now (for saving). Message thread.
     std::vector<AraDocumentArchive> archives();

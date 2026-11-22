@@ -51,7 +51,35 @@ public:
 
     juce::String key;
 };
+constexpr const char* focusMark = "lynxFocusOnOpen";
+
+// gives the marked component the focus unless it has it already (false: nothing marked or not showing)
+bool focusMarked (juce::Component& root)
+{
+    auto* target = focusOnOpenTarget (root);
+    if (target == nullptr || ! target->isShowing())
+        return false;
+    if (! target->hasKeyboardFocus (false))
+        target->grabKeyboardFocus();
+    return true;
+}
 } // namespace
+
+void focusOnOpen (juce::Component& c)
+{
+    c.getProperties().set (focusMark, true);
+    c.setWantsKeyboardFocus (true);
+}
+
+juce::Component* focusOnOpenTarget (juce::Component& root)
+{
+    if (root.getProperties().contains (focusMark))
+        return &root;
+    for (auto* child : root.getChildren())
+        if (auto* found = focusOnOpenTarget (*child))
+            return found;
+    return nullptr;
+}
 
 juce::DocumentWindow* openToolWindow (std::unique_ptr<juce::Component> content, const juce::String& title, const juce::String& key, bool resizable)
 {
@@ -76,6 +104,13 @@ juce::DocumentWindow* openToolWindow (std::unique_ptr<juce::Component> content, 
     window->setVisible (true);
     keepAboveMainWindow (*window);
     window->toFront (true);
+    // issue #244: a window with a search box opens with the caret in it (the "Find an effect" and "Manage shortcuts"
+    // windows did not: the content was added before the window showed, so its own focus request found it hidden)
+    if (focusMarked (*window))
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<juce::Component> (window)] {
+            if (safe != nullptr && safe->isShowing())
+                focusMarked (*safe);
+        });
     return window;
 }
 

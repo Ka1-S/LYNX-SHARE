@@ -1212,6 +1212,8 @@ juce::var effectToVar (const EffectSlot& slot)
         e->setProperty ("displayView", (int) slot.displayView);
     if (slot.lockState) // FL's slot lock state (round 190ld)
         e->setProperty ("lockState", true);
+    if (slot.ara) // round 190oq (issue #243): ARA on the insert
+        e->setProperty ("ara", true);
     if (slot.goal != 0) // a one-knob effect (round 190bu): the goal and where its knob stands
     {
         e->setProperty ("goal", (int) slot.goal);
@@ -1307,6 +1309,7 @@ std::optional<EffectSlot> effectFromVar (const juce::var& e)
     slot.look = (std::uint8_t) juce::jlimit (0, 255, (int) e.getProperty ("look", 0));
     slot.displayView = (std::uint8_t) juce::jlimit (0, 255, (int) e.getProperty ("displayView", 0)); // (round 190mk: Multiband's SPEED)
     slot.lockState = (bool) e.getProperty ("lockState", false);
+    slot.ara = (bool) e.getProperty ("ara", false);
     slot.goal = (std::uint8_t) juce::jlimit (0, 255, (int) e.getProperty ("goal", 0));
     slot.goalAmount = juce::jlimit (0.0f, 1.0f, (float) (double) e.getProperty ("goalAmount", 0.5));
 

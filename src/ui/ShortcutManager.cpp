@@ -146,6 +146,7 @@ public:
         search.setFont (theme::font (theme::type::body));
         search.setIndents (8, 6);
         search.onTextChange = [this] { refilter(); };
+        focusOnOpen (search); // (issue #244: typing goes straight into the search)
         addAndMakeVisible (search);
 
         where.addItem (tr ("All places"), 1);

@@ -4137,7 +4137,7 @@ bool AudioEngine::setChannelAra (int channel, const std::string& pluginId, const
     editSong ([&] (Song& s) {
         auto& c = s.channels[(std::size_t) channel];
         c.ara = pluginId.empty() ? AraLink {} : AraLink { pluginId, pluginName };
-        if (pluginId.empty() && ! ara::anyAraChannel (s))
+        if (pluginId.empty() && ! ara::anyAraChannel (s) && ! ara::anyAraInsert (s)) // (round 190oq: nor an ARA insert)
             s.araDocuments.clear(); // (the last one: no document is kept)
     });
     return true;
@@ -5520,7 +5520,16 @@ void AudioEngine::publishSong()
         deactivatedChannels = std::move (off.channels);
         deactivatedInserts = std::move (off.inserts);
     }
-    const Song& played = projectedSong ? *projectedSong : unprojected;
+    const Song& playedBeforeAra = projectedSong ? *projectedSong : unprojected;
+    // round 190oq (issue #243): an ARA plugin on a mixer insert plays the audio clip channels routed there (their ARA link
+    // in the song the rack plays; the slot itself is left empty: core/AraRegions.h projectInserts). Only songs with one.
+    std::optional<Song> araInsertSong;
+    if (AraHost::available() && ara::anyAraInsert (playedBeforeAra)) // (an export engine too: it borrows the live ARA instances)
+    {
+        araInsertSong = playedBeforeAra;
+        ara::projectInserts (*araInsertSong);
+    }
+    const Song& played = araInsertSong ? *araInsertSong : playedBeforeAra;
     {
         // round 190ap: the slots whose plugin is switched off ("Open without third-party plugins"), for their badges
         const auto hold = pluginsOff() || pluginHoldOwner.load() == nullptr ? pluginHoldState() : pluginhold::State();
@@ -5550,8 +5559,8 @@ void AudioEngine::publishSong()
                     play();
                 else if (request == 1)
                     stop();
-                else
-                    seek (std::max (0.0, seconds / ara::secondsPerTick (song)));
+                else // (round 190oq: through the tempo map)
+                    seek (std::max (0.0, ara::timeMap (song).ticksAt (seconds)));
             };
         }
         araHost->sync (played, transport.sampleRate.load());
@@ -7284,7 +7293,7 @@ void AudioEngine::capturePluginStatesInto (Song& target, bool requireAll)
 {
     // round 190kx: the ARA plugins' documents (their edits) as they are now; a document not made here (its plugin is
     // missing) keeps what the project had
-    if (araHost != nullptr && ara::anyAraChannel (target))
+    if (araHost != nullptr && (ara::anyAraChannel (target) || ara::anyAraInsert (target))) // (round 190oq: ARA inserts too)
         for (auto& doc : araHost->archives())
         {
             auto it = std::find_if (target.araDocuments.begin(), target.araDocuments.end(), [&doc] (const AraDocumentArchive& a) { return a.pluginId == doc.pluginId; });

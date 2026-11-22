@@ -307,10 +307,10 @@ juce::String ChannelRackComponent::filterName() const
 {
     const auto& groups = engine.getSong().channelGroups;
     if (filterGroup == rackfilter::audioClips)
-        return tr ("Audio clips");
+        return tr ("Audio");
     if (filterGroup == rackfilter::unsorted)
         return tr ("Unsorted");
-    return filterGroup >= 0 && filterGroup < (int) groups.size() ? juce::String::fromUTF8 (groups[(std::size_t) filterGroup].c_str()) : tr ("All");
+    return filterGroup >= 0 && filterGroup < (int) groups.size() ? juce::String::fromUTF8 (rackfilter::shownName (groups[(std::size_t) filterGroup]).c_str()) : tr ("All");
 }
 
 void ChannelRackComponent::showFilterMenu (juce::Component* target)
@@ -318,19 +318,22 @@ void ChannelRackComponent::showFilterMenu (juce::Component* target)
     const auto& song = engine.getSong();
     juce::PopupMenu menu;
     menu.addItem (tr ("All"), true, filterGroup == rackfilter::all, [this] { setFilterGroup (rackfilter::all); });
-    // FL's built-in views (round 168t, REA_rodada168t.md §3): the audio clip channels, and the channels in no group
-    menu.addItem (tr ("Unsorted"), true, filterGroup == rackfilter::unsorted, [this] { setFilterGroup (rackfilter::unsorted); });
-    menu.addItem (tr ("Audio clips"), true, filterGroup == rackfilter::audioClips, [this] { setFilterGroup (rackfilter::audioClips); });
-
-    bool separated = false;
-    for (int g = 0; g < (int) song.channelGroups.size(); ++g)
+    // FL 2026's list (round 190oq, issue #246; REA_rodada190oq §3): "All", a line, then the groups A–Z — its built-in
+    // "Audio" (the audio clip channels) and "Unsorted" (the channels in no group) among them, as LYNX's two views
+    // (round 168t: offered for every project), then the project's own groups
+    struct Entry
     {
-        if (rackfilter::isBuiltinName (song.channelGroups[(std::size_t) g]))
-            continue; // FL's own "Audio clips" / "Unsorted" groups: the two views above
-        if (! std::exchange (separated, true))
-            menu.addSeparator();
-        menu.addItem (juce::String::fromUTF8 (song.channelGroups[(std::size_t) g].c_str()), true, filterGroup == g, [this, g] { setFilterGroup (g); });
-    }
+        juce::String name;
+        int filter;
+    };
+    std::vector<Entry> entries { { tr ("Audio"), rackfilter::audioClips }, { tr ("Unsorted"), rackfilter::unsorted } };
+    for (int g = 0; g < (int) song.channelGroups.size(); ++g)
+        if (! rackfilter::isBuiltinName (song.channelGroups[(std::size_t) g])) // (FL's own "Audio" / "Unsorted": the views above)
+            entries.push_back ({ juce::String::fromUTF8 (rackfilter::shownName (song.channelGroups[(std::size_t) g]).c_str()), g });
+    std::stable_sort (entries.begin(), entries.end(), [] (const Entry& a, const Entry& b) { return a.name.compareIgnoreCase (b.name) < 0; });
+    menu.addSeparator();
+    for (const auto& e : entries)
+        menu.addItem (e.name, true, filterGroup == e.filter, [this, f = e.filter] { setFilterGroup (f); });
 
     menu.addSeparator();
     menu.addItem (tr ("Group selected...") + "\tAlt+G", [this] { groupSelected(); });
