@@ -7,7 +7,7 @@ status: full
 
 ## Open a project from another program
 
-1. Choose `File › Open...` and pick the `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx` or `.mid` file.
+1. Choose `File › Open...` and pick the `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx`, `.mid`, `.zip` or tracker module (`.mod`, `.xm`, `.s3m`, `.it`) file.
 2. Wait while LYNX SHARE looks for the project's plugins and samples.
 3. If something was not found, the `Missing files` window opens. Point it to your samples, or close it.
 4. The title bar now shows where the project came from, for example "(imported from FL Studio)".
@@ -24,6 +24,8 @@ status: full
 | `.band` (GarageBand 10, GarageBand for iOS) | Tracks, MIDI and audio regions, tempo, time signature, key, sections as markers, level, pan and mute, as Simple-layout tracks. Sampler instruments made in GarageBand for iOS | Instrument tracks play the built-in synth and drums. Drummer regions, take folders and tempo changes are listed. Projects from GarageBand 11 and older are not readable |
 | `.blx` (BandLab) | Tracks, MIDI and audio regions with their loops, tempo, time signature, key, volume, pan and mute, volume and pan automation, and the common effects, as Simple-layout tracks | Instrument tracks play the built-in synth and drums. Other effects and the Mastering preset are left out and listed. Tested on made-up projects only |
 | `.mid` | Notes, time signatures and every tempo change | A MIDI file carries no sounds: channels get the LYNX SHARE synth or a MIDI Out channel |
+| `.mod`, `.xm`, `.s3m`, `.it` (tracker modules) | Instruments as Sampler channels with their samples, patterns, the order list as the Playlist, speed and tempo, note volume, pan, delay and cut; volume and pan changes as the channel's events (MOD and XM), and slides, vibrato, arpeggios and pitch envelopes as the notes' pitch curves | Other effects and instrument envelopes are counted in the import report. `View › Windows and tools › Tracker` edits the notes the tracker way |
+| `.zip` | FL Studio's zipped loop package, or a project exported with its samples: unpacked into a folder of its own, then the project inside opens with its samples | |
 
 Third-party VST2, VST3 and CLAP plugins in an `.flp` or a `.dawproject`, and VST2 and VST3 plugins in an `.als`, load with their saved state if the same plugin is installed on your computer.
 
@@ -88,6 +90,15 @@ To get the real plugin back, install it, choose `Options › Scan for plugins`, 
 | `Import time signatures` | The file's time signature becomes the project's |
 
 `Ctrl+M` in the [Piano roll](/wiki/piano-roll/) imports a MIDI file into the current channel.
+
+## Import tracks from another project
+
+`File › Import › Tracks from another project...` brings tracks of another project into the open one, without closing it. It reads every format `File › Open...` reads.
+
+1. Choose the project. A window lists its Playlist tracks and what each one holds.
+2. Tick the tracks you want.
+3. Choose whether `With mixer inserts and effects` and `With automation` come along, and `Place them at` the song start or the start of the time selection.
+4. Click to import. The new tracks, channels, patterns and inserts arrive as one step, so one undo takes them all back.
 
 ## Good to know
 

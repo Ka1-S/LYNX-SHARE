@@ -1,5 +1,5 @@
 ---
-source: e3c62e25a8
+source: 736421c170
 ---
 ![Das Einfache Layout: Spuren auf einer Zeitleiste, ein Starter-Beat und die Drum Machine](/assets/img/learn/simple-beat-2.webp)
 
@@ -42,10 +42,12 @@ Wähle das **Einfache Layout**. Es ist ein Fenster mit deinen Spuren auf einer Z
 | Songtexte | `Text` |
 | Stimmgerät | `Stimmgerät` in der Symbolleiste |
 | Mixer | `F9` |
+| Songteile (Intro, Strophe, Refrain) | `Abschnitte` in der Titelleiste: Teile, die als Ganzes verschoben, kopiert und wiederholt werden |
+| Den Beat unter den Gesang ducken, ein Echo-Send | `Ducken unter` und der Regler `Echo`, neben `Hall` im Tab `Effekte` des Docks |
 
 ## Deine Projekte
 
-- **FL Studio Mobile** (`.flm`): `Datei › Öffnen...` öffnet es. Der Import ist teilweise: Tempo, Spuren, Patterns, Audio-Clips, Drum-Kits, der DW Sampler, der Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw und die Effekte von FLM kommen mit. Andere FLM-Instrumente spielen den eingebauten Synth von LYNX SHARE.
+- **FL Studio Mobile** (`.flm`): `Datei › Öffnen...` öffnet es. Der Import ist teilweise: Tempo, Spuren, Patterns, Audio-Clips, Drum-Kits, der DW Sampler, der Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw und die Effekte von FLM kommen mit. Andere FLM-Instrumente spielen den eingebauten Synth von LYNX SHARE. `Datei › Kopie als FL-Studio-Mobile-Projekt (.flm) speichern...` schreibt eine Kopie für FL Studio Mobile zurück.
 - **GarageBand** (`.band`, aus GarageBand 10 oder GarageBand für iOS): `Datei › Öffnen...` öffnet es als Spuren des Einfachen Layouts mit ihren Regionen, Tempo, Tonart und Mix. Instrumentenspuren spielen den eingebauten Synth und die Drums von LYNX SHARE, weil GarageBand ihre Klänge nicht in einer Form speichert, die andere Programme lesen können.
 - **BandLab** (`.blx`, ein Projekt, das von Cakewalk oder Sonar heruntergeladen wurde): `Datei › Öffnen...` öffnet es als Spuren des Einfachen Layouts mit Regionen, Tempo, Tonart, dem Mix, der Automation von Lautstärke und Panorama und den gängigen Effekten. Die Instrumentenklänge und andere Effekte von BandLab stehen im Importbericht.
 - **Stems aus jeder App**: Exportiere die Spuren als Audio- oder MIDI-Dateien, lege sie in einen Ordner, klicke dann auf `+ Spur hinzufügen` und auf `Ordner...` neben `Importieren`. Jede Datei wird zu einer Spur, die am Anfang beginnt.

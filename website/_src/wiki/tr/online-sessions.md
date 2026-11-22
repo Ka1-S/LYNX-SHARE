@@ -1,5 +1,5 @@
 ---
-source: 7db9a73959
+source: bf45e1d436
 ---
 Bir projede başkalarıyla çalışmanın iki yolu vardır ve ikisi de `Dosya › Çevrimiçi oturum` altındadır. Paket, bir arkadaşınıza gönderdiğiniz ve onun bir parti geri gönderdiği dosyadır. Ağ, hesap ya da sunucu gerektirmez. Canlı oturum ise herkesi internet üzerinden LYNX SHARE relay'i aracılığıyla bağlar ve her değişiklik herkese ulaşır. Bir projede siz dahil en fazla 4 kişi yer alır.
 
@@ -69,7 +69,7 @@ Oturum sürerken `Dosya › Çevrimiçi oturum` menüsünde şu komutlar bulunur
 | `Canlı oturumu sonlandır` | Ev sahibi için. Herkes ayrılır ve kod geçersiz olur |
 | `Canlı oturumdan ayrıl` | Bir misafir için. Projedeki partiniz sizde kalır |
 
-`Kişiler ve izinler...` içinde her kişiye dört rolden biri verilir: `Kendi kanalları, pattern'leri, insert'leri ve satırları`, `Kendi partileri + tempo ve proje ayarları`, `Her şey` veya `Yalnızca dinleme (düzenleme yok)`. Bir izni kapatmak hiçbir şeyi silmez.
+`Kişiler ve izinler...` içinde her kişiye dört rolden biri verilir: `Kendi kanalları, pattern'leri, insert'leri ve satırları`, `Kendi partileri + tempo ve proje ayarları`, `Her şey` veya `Yalnızca dinleme (düzenleme yok)`. Bir izni kapatmak hiçbir şeyi silmez. Beşinci seçenek olan `Oturumdan çıkar`, kişiyi oturumdan çıkarır. Varsayılan olarak oturum, yeni katılımlar için yeni bir davet kodu alır ve oturumda kalanlar devam eder; `Aynı kodu koru` eski kodu korur.
 
 ## Diğerlerinde olmayan plugin'ler
 

@@ -1,5 +1,5 @@
 ---
-source: 25e9858762
+source: 54585dcc5a
 ---
 LYNX SHARE projeleri `.lynx` dosyası olarak kaydeder. Ayrıca başka programların projelerini açar, yaygın ses dosyalarını yükler ve ses, MIDI ve diğer programlar için projeleri dışa aktarır. Tablo, 0.1.30 alpha sürümünün bütün formatlarını listeler.
 
@@ -17,7 +17,7 @@ Başka bir programın formatından açılan proje bir içe aktarmadır. `Dosya �
 | Format | Açma | Kaydetme / Dışa aktarma | Notlar |
 |---|---|---|---|
 | `.lynx` | `Dosya › Aç...` | `Dosya › Kaydet`, otomatik kayıtla birlikte | LYNX SHARE'in kendi proje formatı (JSON). `Dosya › Eski bir LYNX için kopya kaydet...`, 0.1.27 veya 0.1.28'in açabildiği bir kopya yazar ve o sürümün tutamadıklarını listeler |
-| `.zip` | `Dosya › Aç...` onu bir klasöre çıkarır ve içindeki projeyi açar | `Dosya › Dışa aktar › Sample'larla proje (.zip)...` | FL Studio'nun sıkıştırılmış loop paketini de açar |
+| `.zip` | `Dosya › Aç...` onu bir klasöre çıkarır ve içindeki projeyi açar | `Dosya › Dışa aktar › Sıkıştırılmış loop paketi...` | FL Studio'nun sıkıştırılmış loop paketini de açar |
 | `.lynxpack` | Bir özetten sonra açılır. Bir parti, host'un projesine birleştirilir | `Dosya › Çevrimiçi oturum › Projeyi gönder...` | Bir [çevrimiçi oturumda](/wiki/online-sessions/) gönderilen proje veya parti. Üçüncü taraf plugin partileri, ses render'ları ve plugin ayarlarıyla birlikte taşınır |
 | `.flp` | `Dosya › Aç...` | `Dosya › Dışa aktar › FL Studio projesi...`, bir FL Studio 2026 projesi veya sıkıştırılmış loop paketi | Yerel plugin'ler, değişen doğrulukta yeniden oluşturulmuş motorlarda çalar. FLEX paketleri asla açılmaz. Dışa aktarırken yalnızca LYNX'e özgü enstrümanlar ve efektler sese render edilir ya da en yakın FL plugin'iyle değiştirilir, modülatörler dışarıda bırakılır. Bkz. [FL Studio'dan geliyorsanız](/wiki/coming-from-fl-studio/) |
 | `.flm` | `Dosya › Aç...` | `Dosya › FL Studio Mobile projesi (.flm) olarak kopya kaydet...` | FL Studio Mobile projesi. Kısmi: MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, DW Sampler, Slicer ve DirectWave dışındaki enstrümanlar dahili synth ile çalar. Dışa aktarma bir kopyadır: notaları, tempoyu, mixer'ı, FL Studio Mobile'ın kendi enstrümanlarını, DW Sampler'ı, 3x Osc'yi, davul setlerini, efektleri ve mixer seviyesi, pan, efektler, DW Sampler ile GMSynth otomasyonunu korur, sample'lar yanında durur. Kopyada diğer enstrümanlar notalarını MiniSynth üzerinde tutar, FLM modülü olmayan efektler ve diğer hedeflerin (synth'lerin kendi düğmeleri, üçüncü taraf plugin'ler) otomasyonu dışarıda kalır; kaydetmeden önce bir pencere hepsini listeler. |
@@ -26,7 +26,7 @@ Başka bir programın formatından açılan proje bir içe aktarmadır. `Dosya �
 | `.band` | `Dosya › Aç...` (paket, içindeki `projectData` dosyası veya onun zip'i) | Hayır | GarageBand 10 veya iOS için GarageBand projesi, Basit iş akışı track'leri olarak. Kısmi: enstrüman track'leri, iOS için GarageBand'de yapılan Sampler enstrümanları dışında dahili synth'i ve davulları çalar. GarageBand 11 ve öncesinin projeleri okunamaz |
 | `.blx` | `Dosya › Aç...` veya klasörü, Basit iş akışının `Klasör...` içe aktarmasıyla | Hayır | Cakewalk veya Sonar'ın indirdiği BandLab projesi, region'lar, tempo, tonalite, mix, ses seviyesi ve pan otomasyonu ile yaygın efektlerle Basit iş akışı track'leri olarak. Kısmi: BandLab'in enstrüman sesleri ve diğer pedalları içe aktarma raporunda listelenir |
 | `.mid`, `.midi` | `Dosya › Aç...` yeni bir proje oluşturur. `Dosya › İçe aktar › MIDI dosyası...` ve Piano Roll mevcut projeye içe aktarır | `Dosya › Dışa aktar › MIDI dosyası...` (`Ctrl+Shift+M`) | |
-| `.mod`, `.xm`, `.s3m`, `.it` | `Dosya › Aç...` | Hayır | Tracker modülleri (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker). Enstrümanlar sample'larıyla birlikte Sampler kanallarına, şarkı tempo değişiklikleriyle birlikte pattern kliplerine dönüşür ve `Görünüm › Tracker` notaları düzenler. Kısmen: slide, vibrato ve arpej gibi efektler, zarflar ve çalan bir notadaki ses değişiklikleri içe aktarma raporunda listelenir |
+| `.mod`, `.xm`, `.s3m`, `.it` | `Dosya › Aç...` | Hayır | Tracker modülleri (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker). Enstrümanlar sample'larıyla birlikte Sampler kanallarına, şarkı tempo değişiklikleriyle birlikte pattern kliplerine dönüşür ve `Görünüm › Pencereler ve araçlar › Tracker` notaları düzenler. Kısmen: slide, vibrato ve arpej gibi efektler, zarflar ve çalan bir notadaki ses değişiklikleri içe aktarma raporunda listelenir |
 | `.wav` | Sample veya ses klibi olarak | `Dosya › Dışa aktar › Wave dosyası...`, 16 bit, 24 bit veya 32 bit float | İsteğe bağlı dither, tempo bilgisi, döngü işaretçileri ve Playlist işaretçileri |
 | `.mp3` | Sample veya ses klibi olarak | `Dosya › Dışa aktar › MP3 dosyası...` | Sabit bit hızı |
 | `.ogg` | Sample veya ses klibi olarak | `Dosya › Dışa aktar › OGG dosyası...` | |

@@ -20,10 +20,10 @@
 <h2 id="recording-your-moves">錄製你的動作</h2>
 <p>在錄製過濾器中勾選 <code>自動化</code> 以開啟錄製，按下播放並移動控制項。在歌曲模式下，這些動作會變成自動化片段。在樣式模式下，它們會變成目前樣式中的事件。見<a href="/wiki/recording/">錄音</a>。</p>
 <h2 id="links-and-modulators">關聯與調變器</h2>
-<ul><li><code>關聯到MIDI控制器（轉動控制器上的旋鈕）</code> 在 <a href="/wiki/midi-controllers/">MIDI 控制器</a>中說明。</li><li><code>關聯到內部控制器</code> 讓專案中的波封、公式或峰值控制器去驅動控制項。請先加入其中一個。</li><li><code>調變</code> 會附加一個調變器，也就是 LFO 或隨機來源，讓 LYNX SHARE 的旋鈕在它自己的數值附近移動。<code>工具 › 調變器...</code> 會列出它們。</li></ul>
+<ul><li><code>關聯到MIDI控制器（轉動控制器上的旋鈕）</code> 在 <a href="/wiki/midi-controllers/">MIDI 控制器</a>中說明。</li><li><code>關聯到內部控制器</code> 讓專案中的波封、公式或峰值控制器去驅動控制項。請先加入其中一個。</li><li><code>調變來源</code> 會附加一個調變器，讓控制項在它自己的數值附近移動：LFO、包絡跟隨器、ADSR 包絡、步進、隨機來源、巨集、按鍵追蹤或力度。它對 LYNX SHARE 的旋鈕和第三方外掛的參數都有效。你也可以把調變器拖到旋鈕上，旋鈕上的圓環會顯示它的移動。<code>工具 › 調變器...</code> 會列出它們。</li></ul>
 <h2 id="automation-lanes">自動化軌道</h2>
 <p>軌道預設是關閉的。在播放清單的選單中開啟 <code>自動化軌道</code>。之後每個軌道標頭都會有一個按鈕，可以在軌道下方新增一條軌道，控制項選單也會多出 <code>在軌道中自動化</code>。在軌道中，點擊以新增點或拖曳點，按右鍵刪除點，<code>Alt</code>+拖曳則可彎曲線條。軌道的選單中有 <code>轉為自動化片段</code>。</p>
 <h2 id="good-to-know">須知</h2>
-<ul><li>新片段如果有時間選取範圍，就從該範圍開始，否則在歌曲模式下從播放頭開始。若要從歌曲開頭開始，請在 <code>選項 › 一般設定...</code> 中關閉 <code>在播放位置建立自動化片段</code>。</li><li>同一個控制項上的多個片段各自在自己的位置播放。在第一個片段之前，控制項保持自己的數值。</li><li>片段開始時，控制項大約在 8 ms 內到達新的數值。FL Studio 是平滑滑過去，所以匯入的專案在這些位置可能略有不同。</li><li>同一個控制項上的片段重疊的地方，LYNX SHARE 選用的片段可能與 FL Studio 選用的不同。</li><li>調變器只對 LYNX SHARE 自己的旋鈕有效，匯出成 <code>.flp</code> 時會被略過。</li></ul>
+<ul><li>新片段如果有時間選取範圍，就從該範圍開始，否則在歌曲模式下從播放頭開始。若要從歌曲開頭開始，請在 <code>選項 › 一般設定...</code> 中關閉 <code>在播放位置建立自動化片段</code>。</li><li>同一個控制項上的多個片段各自在自己的位置播放。在第一個片段之前，控制項保持自己的數值。</li><li>片段開始時，控制項大約在 8 ms 內到達新的數值。FL Studio 是平滑滑過去，所以匯入的專案在這些位置可能略有不同。</li><li>同一個控制項上的片段重疊的地方，LYNX SHARE 選用的片段可能與 FL Studio 選用的不同。</li><li>匯出成 <code>.flp</code> 時，跟隨歌曲位置的調變器會變成自動化片段（同步的 LFO 會變成 FL Studio 的片段 LFO）。跟隨器、包絡、按鍵追蹤和力度會被略過，報告會列出它們。</li><li>播放時動了控制項卻沒有錄音？錄音選項中的 <code>擷取自動化</code> 會事後把最近的操作變成自動化。</li></ul>
 <h2 id="related">相關頁面</h2>
 <ul><li><a href="/wiki/playlist/">播放清單</a></li><li><a href="/wiki/recording/">錄音</a></li><li><a href="/wiki/midi-controllers/">MIDI 控制器</a></li><li><a href="/wiki/mixer/">混音器</a></li><li><a href="/wiki/shortcuts/">快速鍵</a></li></ul>

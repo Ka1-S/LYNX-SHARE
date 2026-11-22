@@ -1,5 +1,5 @@
 ---
-source: d980e5fc0f
+source: b05790879f
 ---
 ![Jendela ekspor dengan WAV terpilih: rentang, tail, dan file di kiri, format di kanan, opsi mix di bawah](/assets/img/wiki/export.webp)
 
@@ -67,6 +67,8 @@ Tombol-tombolnya memilih format. M4A hanya tersedia kalau sistem punya encoder A
 
 Centang `Juga mix penuh` untuk mendapatkan mix di samping stem. Baris di bagian bawah menunjukkan berapa file yang akan ditulis.
 
+Ketika lagu punya bagian di jalur Sections, `Satu file per bagian` memotongnya pada bagian-bagian itu dan menamai setiap file sesuai bagiannya. Dengan stem, setiap bagian mendapat set sendiri.
+
 `File › Ekspor › Semua track Playlist` dan `Semua grup track Playlist` menulis satu file per track atau per grup Playlist. Di menu Mixer, `Perekaman ke disk › Render track yang disiagakan ke file wave...` (`Alt+R`) membuka jendela ekspor hanya untuk insert yang disiagakan.
 
 ## Entri lain di menu Ekspor
@@ -75,7 +77,8 @@ Centang `Juga mix penuh` untuk mendapatkan mix di samping stem. Baris di bagian 
 |---|---|---|
 | `File MIDI...` | `Ctrl+Shift+M` | Menulis not sebagai file MIDI standar (`.mid`) |
 | `Master...` | `Ctrl+Alt+M` | Me-render proyek dan me-master-nya ke target loudness dalam LUFS, di komputermu |
-| `Proyek beserta sample (.zip)...` | tidak ada | Proyek beserta sample-nya dalam satu arsip |
+| `Paket loop zip...` | tidak ada | Proyek beserta semua sample yang dipakainya dalam satu `.zip`, sebagai paket loop zip FL Studio |
+| `File data proyek...` | tidak ada | Menyalin semua file yang dipakai proyek ke folder pilihanmu; proyek tetap memakai file-nya sendiri |
 | `Proyek FL Studio...` | tidak ada | Sebuah `.flp`, atau paket loop zip dengan semua sample |
 | `Set Ableton Live (.als)...` | tidak ada | Set untuk Live 12 atau Live 11 |
 | `DAWproject (.dawproject)...` | tidak ada | Proyek untuk Bitwig Studio, Studio One, Cubase, dan aplikasi lain yang membaca DAWproject |
@@ -84,7 +87,7 @@ Centang `Juga mix penuh` untuk mendapatkan mix di samping stem. Baris di bagian 
 
 ## Mengekspor ke FL Studio, Ableton Live, dan DAWproject
 
-`.flp` adalah proyek FL Studio 2026. Sampler, clip audio, generator dan efek bawaan FL Studio, plugin pihak ketiga, pattern, Playlist, Mixer, dan otomasi ikut terbawa beserta pengaturannya. Untuk hal-hal yang tidak dimiliki FL Studio, kamu memilih antara `Render ke audio (suaranya sama)` dan `Pakai plugin FL terdekat (tetap bisa diedit, suaranya bisa berbeda)`. Pada pilihan kedua, instrumen yang hanya ada di LYNX dilewati. Modulator selalu dilewati. Sebuah laporan mencantumkan apa yang di-render, diganti, atau dilewati. Rinciannya ada di [Pindahan dari FL Studio](/wiki/coming-from-fl-studio/).
+`.flp` adalah proyek FL Studio 2026. Sampler, clip audio, generator dan efek bawaan FL Studio, plugin pihak ketiga, pattern, Playlist, Mixer, dan otomasi ikut terbawa beserta pengaturannya. Untuk hal-hal yang tidak dimiliki FL Studio, kamu memilih antara `Render ke audio (suaranya sama)` dan `Pakai plugin FL terdekat (tetap bisa diedit, suaranya bisa berbeda)`. Pada pilihan kedua, instrumen yang hanya ada di LYNX dilewati. Modulator yang mengikuti posisi lagu menjadi clip otomasi: LFO yang tersinkron menjadi LFO clip milik FL Studio, dan step, sumber acak, serta makro menjadi titik. Follower, envelope, keytrack, dan velocity dilewati. Sebuah laporan mencantumkan apa yang di-render, diganti, atau dilewati. Rinciannya ada di [Pindahan dari FL Studio](/wiki/coming-from-fl-studio/).
 
 `.als` berisi track MIDI per channel, track audio, grup, return, send, rack dan Drum Rack, plugin VST2 dan VST3 beserta state-nya, marker, serta otomasi volume, pan, dan tempo. Instrumen dan efek bawaan LYNX SHARE tidak dikonversi, tetapi track dan not-nya tetap disimpan. Helix adalah pengecualian: ia menjadi Wavetable milik Live. Otomasi parameter efek dan rute antar insert dibuang. Rinciannya ada di [Pindahan dari Ableton Live](/wiki/coming-from-ableton/).
 

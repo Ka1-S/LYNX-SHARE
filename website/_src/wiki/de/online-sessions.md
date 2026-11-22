@@ -1,5 +1,5 @@
 ---
-source: 7db9a73959
+source: bf45e1d436
 ---
 Es gibt zwei Wege, mit anderen an einem Projekt zu arbeiten, und beide stehen unter `Datei › Online-Session`. Ein Paket ist eine Datei, die du an einen Freund schickst, der einen Part zurückschickt. Es braucht kein Netzwerk, kein Konto und keinen Server. Eine Live-Session verbindet alle über das Internet mit dem LYNX-SHARE-Relay, und jede Änderung erreicht alle. Bis zu 4 Personen arbeiten an einem Projekt, du eingeschlossen.
 
@@ -69,7 +69,7 @@ Das Menü `Datei › Online-Session` hat diese Befehle, solange eine Session lä
 | `Live-Session beenden` | Für den Host. Alle verlassen die Session, und der Code funktioniert nicht mehr |
 | `Live-Session verlassen` | Für einen Gast. Dein Part des Projekts bleibt bei dir |
 
-Unter `Personen und Rechte...` bekommt jede Person eine von vier Rollen: `Die eigenen Kanäle, Patterns, Inserts und Zeilen`, `Die eigenen Parts + Tempo und Projekteinstellungen`, `Alles` oder `Nur zuhören (keine Änderungen)`. Eine Berechtigung auszuschalten löscht nie etwas.
+Unter `Personen und Rechte...` bekommt jede Person eine von vier Rollen: `Die eigenen Kanäle, Patterns, Inserts und Zeilen`, `Die eigenen Parts + Tempo und Projekteinstellungen`, `Alles` oder `Nur zuhören (keine Änderungen)`. Eine Berechtigung auszuschalten löscht nie etwas. Die fünfte Wahl, `Aus der Session entfernen`, nimmt die Person aus der Session. Standardmäßig bekommt die Session dann einen neuen Einladungscode für neue Beitritte, und wer noch drin ist, macht weiter; `Denselben Code behalten` behält den alten.
 
 ## Plugins, die die anderen nicht haben
 

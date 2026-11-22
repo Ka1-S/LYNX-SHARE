@@ -1,5 +1,5 @@
 ---
-source: b96330a448
+source: 1aea1764bf
 ---
 ![Der Automationseditor mit einer Kurve, die über sechs Takte ansteigt](/assets/img/wiki/automation.webp)
 
@@ -76,7 +76,7 @@ Schalte die Aufnahme ein, mit angehaktem `Automation` im Aufnahmefilter, drücke
 
 - `Mit MIDI-Controller verknüpfen (einen Regler am Controller bewegen)` wird unter [MIDI-Controller](/wiki/midi-controllers/) behandelt.
 - `Mit internem Controller verknüpfen` lässt eine Hüllkurve (Envelope), eine Formel (Formula) oder einen Peak Controller im Projekt den Regler steuern. Füge zuerst einen davon hinzu.
-- `Modulieren` hängt einen Modulator an, einen LFO oder eine Zufallsquelle, die einen LYNX-SHARE-Regler um seinen eigenen Wert bewegt. `Tools › Modulatoren...` listet sie auf.
+- `Modulieren mit` hängt einen Modulator an, der den Regler um seinen eigenen Wert bewegt: einen LFO, einen Hüllkurvenfolger, eine ADSR-Hüllkurve, Steps, eine Zufallsquelle, ein Makro, Keytrack oder Velocity. Er wirkt auf die Regler von LYNX SHARE und auf die Parameter von Plugins von Drittanbietern. Du kannst einen Modulator auch auf einen Regler ziehen, und ein Ring am Regler zeigt die Bewegung. `Tools › Modulatoren...` listet sie auf.
 
 ## Automationsspuren
 
@@ -88,7 +88,8 @@ Automationsspuren sind standardmäßig aus. Schalte `Automationsspuren` im Menü
 - Mehrere Clips auf einem Regler spielen jeweils an ihrer eigenen Stelle. Vor seinem ersten Clip behält ein Regler seinen eigenen Wert.
 - Am Anfang eines Clips erreicht der Regler den neuen Wert in etwa 8 ms. FL Studio gleitet dorthin, deshalb kann ein importiertes Projekt an diesen Stellen leicht abweichen.
 - Wo sich Clips auf demselben Regler überlappen, kann der Clip, den LYNX SHARE wählt, ein anderer sein als der, den FL Studio wählt.
-- Modulatoren wirken nur auf die eigenen Regler von LYNX SHARE und werden beim Export nach `.flp` weggelassen.
+- Bei einem `.flp`-Export werden Modulatoren, die der Songposition folgen, zu Automationsclips (ein synchronisierter LFO wird zum Clip-LFO von FL Studio). Follower, Hüllkurven, Keytrack und Velocity werden weggelassen, und der Bericht listet sie auf.
+- Einen Regler bewegt, während der Song lief, aber ohne Aufnahme? `Automation aufnehmen` in den Aufnahmeoptionen macht aus den letzten Bewegungen nachträglich Automation.
 
 ## Siehe auch
 

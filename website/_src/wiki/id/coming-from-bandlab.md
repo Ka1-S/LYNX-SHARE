@@ -1,5 +1,5 @@
 ---
-source: e3c62e25a8
+source: 736421c170
 ---
 ![Tata letak sederhana: track di linimasa, beat awal, dan Drum Machine](/assets/img/learn/simple-beat-2.webp)
 
@@ -42,10 +42,12 @@ Pilih **tata letak sederhana**. Isinya satu jendela dengan track-mu di linimasa,
 | Lirik | `Lirik` |
 | Tuner | `Tuner` di toolbar |
 | Mixer | `F9` |
+| Bagian lagu (intro, bait, refrein) | `Bagian` di bilah judul: bagian yang bisa dipindah, disalin, dan diulang sebagai satu kesatuan |
+| Meredam beat di bawah vokal, send echo | `Redam di bawah` dan knob `Echo`, di samping `Reverb` di tab `Efek` pada dock |
 
 ## Proyekmu
 
-- **FL Studio Mobile** (`.flm`): `File › Buka...` membukanya. Impornya sebagian: tempo, track, pattern, clip audio, drum kit, DW Sampler, Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, dan efek FLM ikut masuk. Instrumen FLM lainnya dimainkan oleh synth bawaan LYNX SHARE.
+- **FL Studio Mobile** (`.flm`): `File › Buka...` membukanya. Impornya sebagian: tempo, track, pattern, clip audio, drum kit, DW Sampler, Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, dan efek FLM ikut masuk. Instrumen FLM lainnya dimainkan oleh synth bawaan LYNX SHARE. `File › Simpan salinan sebagai proyek FL Studio Mobile (.flm)...` menulis salinan kembali untuk FL Studio Mobile.
 - **GarageBand** (`.band`, dari GarageBand 10 atau GarageBand untuk iOS): `File › Buka...` membukanya sebagai track tata letak sederhana dengan region, tempo, kunci nada, dan mix-nya. Track instrumen dimainkan oleh synth dan drum bawaan LYNX SHARE, karena GarageBand tidak menyimpan suaranya dalam bentuk yang bisa dibaca program lain.
 - **BandLab** (`.blx`, proyek yang diunduh oleh Cakewalk atau Sonar): `File › Buka...` membukanya sebagai track tata letak sederhana dengan region, tempo, kunci nada, mix, otomasi volume dan pan, serta efek yang umum. Suara instrumen BandLab dan efek lainnya tercantum di laporan impor.
 - **Stem dari aplikasi apa pun**: ekspor track sebagai file audio atau MIDI, taruh di satu folder, lalu klik `+ Tambah trek`, dan `Folder...` di samping `Impor`. Setiap file menjadi track yang dimulai dari awal.

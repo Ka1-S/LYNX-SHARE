@@ -1,11 +1,11 @@
 ---
-source: d41b1225ef
+source: a29416cb8c
 ---
 `Bestand › Openen...` (`Ctrl+O`) opent de eigen `.lynx`-projecten van LYNX SHARE en ook `.flp`-, `.als`-, `.flm`-, `.dawproject`-, `.band`-, `.blx`- en `.mid`-bestanden. Een project uit een ander programma is een import: het wordt een nieuw, niet-opgeslagen LYNX SHARE-project, en het originele bestand wordt nooit overschreven.
 
 ## Een project uit een ander programma openen
 
-1. Kies `Bestand › Openen...` en selecteer het `.flp`-, `.als`-, `.flm`-, `.dawproject`-, `.band`-, `.blx`- of `.mid`-bestand.
+1. Kies `Bestand › Openen...` en selecteer het `.flp`-, `.als`-, `.flm`-, `.dawproject`-, `.band`-, `.blx`-, `.mid`-, `.zip`-bestand of trackermodule (`.mod`, `.xm`, `.s3m`, `.it`).
 2. Wacht terwijl LYNX SHARE de plugins en samples van het project zoekt.
 3. Als iets niet is gevonden, opent het venster `Ontbrekende bestanden`. Wijs het naar je samples, of sluit het.
 4. De titelbalk toont nu waar het project vandaan komt, bijvoorbeeld "(imported from FL Studio)".
@@ -22,6 +22,8 @@ source: d41b1225ef
 | `.band` (GarageBand 10, GarageBand voor iOS) | Tracks, MIDI- en audioregio's, tempo, maatsoort, toonsoort, secties als markers, niveau, pan en mute, als tracks van de Eenvoudige lay-out. Sampler-instrumenten die in GarageBand voor iOS zijn gemaakt | Instrumenttracks spelen de ingebouwde synth en drums. Drummer-regio's, take-mappen en tempowijzigingen worden vermeld. Projecten van GarageBand 11 en ouder zijn niet leesbaar |
 | `.blx` (BandLab) | Tracks, MIDI- en audioregio's met hun loops, tempo, maatsoort, toonsoort, volume, pan en mute, volume- en panautomatisering en de gebruikelijke effecten, als tracks van de Eenvoudige lay-out | Instrumenttracks spelen de ingebouwde synth en drums. Andere effecten en de Mastering-preset worden weggelaten en vermeld. Alleen getest op verzonnen projecten |
 | `.mid` | Noten, maatsoorten en elke tempowijziging | Een MIDI-bestand bevat geen geluiden: kanalen krijgen de LYNX SHARE-synth of een MIDI Out-kanaal |
+| `.mod`, `.xm`, `.s3m`, `.it` (trackermodules) | Instrumenten als Sampler-kanalen met hun samples, patterns, de volgordelijst als de Playlist, snelheid en tempo, notenvolume, pan, delay en cut; volume- en panwijzigingen als events van het kanaal (MOD en XM), en slides, vibrato, arpeggio's en toonhoogte-envelopes als toonhoogtecurves van de noten | Andere effecten en instrument-envelopes worden geteld in het importrapport. `Beeld › Vensters en hulpmiddelen › Tracker` bewerkt de noten op trackermanier |
+| `.zip` | Het gezipte looppakket van FL Studio, of een project dat met zijn samples is geëxporteerd: uitgepakt in een eigen map, waarna het project erin opent met zijn samples | |
 
 Plugins van derden in VST2-, VST3- en CLAP-formaat in een `.flp` of een `.dawproject`, en VST2- en VST3-plugins in een `.als`, laden met hun opgeslagen staat als dezelfde plugin op je computer is geïnstalleerd.
 
@@ -86,6 +88,15 @@ Om de echte plugin terug te krijgen, installeer je hem, kies je `Opties › Plug
 | `Maatsoorten importeren` | De maatsoort van het bestand wordt die van het project |
 
 `Ctrl+M` in de [Piano Roll](/wiki/piano-roll/) importeert een MIDI-bestand in het huidige kanaal.
+
+## Tracks uit een ander project importeren
+
+`Bestand › Importeren › Tracks uit een ander project...` haalt tracks van een ander project in het geopende project, zonder het te sluiten. Het leest elk formaat dat `Bestand › Openen...` leest.
+
+1. Kies het project. Een venster toont de Playlist-tracks en wat elk bevat.
+2. Vink de gewenste tracks aan.
+3. Kies of `Met mixerinserts en effecten` en `Met automatisering` meekomen, en `Plaatsen bij` het begin van het nummer of het begin van de tijdselectie.
+4. Klik om te importeren. De nieuwe tracks, kanalen, patterns en inserts komen als één stap binnen, zodat één keer ongedaan maken ze allemaal terugneemt.
 
 ## Goed om te weten
 

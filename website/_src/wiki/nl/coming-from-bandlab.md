@@ -1,5 +1,5 @@
 ---
-source: e3c62e25a8
+source: 736421c170
 ---
 ![De Eenvoudige lay-out: tracks op een tijdlijn, een startbeat en de Drum Machine](/assets/img/learn/simple-beat-2.webp)
 
@@ -42,10 +42,12 @@ Kies de **Eenvoudige lay-out**. Het is één venster met je tracks op een tijdli
 | Songteksten | `Songtekst` |
 | Stemapparaat | `Stemapparaat` in de werkbalk |
 | Mixer | `F9` |
+| Nummerdelen (intro, couplet, refrein) | `Secties` in de titelbalk: delen die als geheel worden verplaatst, gekopieerd en herhaald |
+| De beat onder de zang laten duiken, een echosend | `Duiken onder` en de knop `Echo`, naast `Reverb` in het tabblad `Effecten` van de dock |
 
 ## Je projecten
 
-- **FL Studio Mobile** (`.flm`): `Bestand › Openen...` opent het. De import is gedeeltelijk: tempo, tracks, patterns, audioclips, drumkits, de DW Sampler, de Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw en de effecten van FLM komen mee. Andere FLM-instrumenten spelen de ingebouwde synth van LYNX SHARE.
+- **FL Studio Mobile** (`.flm`): `Bestand › Openen...` opent het. De import is gedeeltelijk: tempo, tracks, patterns, audioclips, drumkits, de DW Sampler, de Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw en de effecten van FLM komen mee. Andere FLM-instrumenten spelen de ingebouwde synth van LYNX SHARE. `Bestand › Een kopie opslaan als FL Studio Mobile-project (.flm)...` schrijft een kopie terug voor FL Studio Mobile.
 - **GarageBand** (`.band`, van GarageBand 10 of GarageBand voor iOS): `Bestand › Openen...` opent het als tracks van de Eenvoudige lay-out, met hun regio's, tempo, toonsoort en mix. Instrumenttracks spelen de ingebouwde synth en drums van LYNX SHARE, omdat GarageBand hun geluiden niet opslaat in een vorm die andere programma's kunnen lezen.
 - **BandLab** (`.blx`, een project gedownload door Cakewalk of Sonar): `Bestand › Openen...` opent het als tracks van de Eenvoudige lay-out, met regio's, tempo, toonsoort, de mix, volume- en panautomatisering en de gewone effecten. De instrumentgeluiden en andere effecten van BandLab staan in het importrapport.
 - **Stems uit elke app**: exporteer de tracks als audio- of MIDI-bestanden, zet ze in één map, klik op `+ Spoor toevoegen` en daarna op `Map...` naast `Importeren`. Elk bestand wordt een track die aan het begin start.

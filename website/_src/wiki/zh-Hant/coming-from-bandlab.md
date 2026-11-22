@@ -1,5 +1,5 @@
 ---
-source: e3c62e25a8
+source: 736421c170
 ---
 ![簡易版面：時間軸上的音軌、起始節拍和鼓機](/assets/img/learn/simple-beat-2.webp)
 
@@ -42,10 +42,12 @@ source: e3c62e25a8
 | 歌詞 | `歌詞` |
 | 調音器 | 工具列中的 `調音器` |
 | 混音器 | `F9` |
+| 歌曲段落（前奏、主歌、副歌） | 標題列中的 `段落`：段落作為整體移動、複製和重複 |
+| 讓節拍在人聲之下閃避、回聲傳送 | 面板 `效果器` 分頁中 `殘響` 旁的 `閃避於` 和 `回聲` 旋鈕 |
 
 ## 你的專案
 
-- **FL Studio Mobile**（`.flm`）：`檔案 › 開啟...` 可以開啟。匯入是部分的：速度、音軌、樣式、音訊片段、鼓組、DW Sampler、Slicer、MiniSynth、Transistor Bass、3x Osc、GMSynth、SuperSaw 和 FLM 的效果器都會帶過來。FLM 的其他樂器用 LYNX SHARE 內建的合成器播放。
+- **FL Studio Mobile**（`.flm`）：`檔案 › 開啟...` 可以開啟。匯入是部分的：速度、音軌、樣式、音訊片段、鼓組、DW Sampler、Slicer、MiniSynth、Transistor Bass、3x Osc、GMSynth、SuperSaw 和 FLM 的效果器都會帶過來。FLM 的其他樂器用 LYNX SHARE 內建的合成器播放。 `檔案 › 將副本儲存為 FL Studio Mobile 專案 (.flm)...` 會寫回一份給 FL Studio Mobile 使用的副本。
 - **GarageBand**（`.band`，來自 GarageBand 10 或 iOS 版 GarageBand）：`檔案 › 開啟...` 會把它當作簡易版面的音軌開啟，附有區域、速度、調和混音。樂器音軌用 LYNX SHARE 內建的合成器和鼓播放，因為 GarageBand 沒有以其他程式能讀取的形式儲存它們的音色。
 - **BandLab**（`.blx`，由 Cakewalk 或 Sonar 下載的專案）：`檔案 › 開啟...` 會把它當作簡易版面的音軌開啟，附有區域、速度、調、混音、音量和聲像自動化以及常見的效果器。BandLab 的樂器音色和其他效果器會列在匯入報告中。
 - **來自任何應用程式的分軌**：把音軌匯出為音訊或 MIDI 檔案，放進同一個資料夾，然後點擊 `+ 新增音軌`，再點擊 `匯入` 旁邊的 `資料夾...`。每個檔案會成為一條從開頭開始的音軌。

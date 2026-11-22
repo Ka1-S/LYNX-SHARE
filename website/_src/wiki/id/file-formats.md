@@ -1,5 +1,5 @@
 ---
-source: 25e9858762
+source: 54585dcc5a
 ---
 LYNX SHARE menyimpan proyek sebagai file `.lynx`. Program ini juga membuka proyek dari program lain, memuat file audio yang umum, dan mengekspor audio, MIDI, dan proyek untuk program lain. Tabel mencantumkan setiap format di 0.1.30 alpha.
 
@@ -17,7 +17,7 @@ Proyek yang dibuka dari format program lain adalah impor. `File › Simpan` lalu
 | Format | Buka | Simpan / Ekspor | Catatan |
 |---|---|---|---|
 | `.lynx` | `File › Buka...` | `File › Simpan`, dengan simpan otomatis | Format proyek milik LYNX SHARE (JSON). `File › Simpan salinan untuk LYNX yang lebih lama...` menulis salinan yang bisa dibuka 0.1.27 atau 0.1.28, dan mencantumkan apa yang tidak bisa disimpan versi itu |
-| `.zip` | `File › Buka...` mengekstraknya ke folder dan membuka proyek di dalamnya | `File › Ekspor › Proyek beserta sample (.zip)...` | Juga membuka paket loop zip FL Studio |
+| `.zip` | `File › Buka...` mengekstraknya ke folder dan membuka proyek di dalamnya | `File › Ekspor › Paket loop zip...` | Juga membuka paket loop zip FL Studio |
 | `.lynxpack` | Terbuka setelah ringkasan. Sebuah bagian digabungkan ke proyek host | `File › Sesi online › Kirim proyek...` | Proyek atau bagian yang dikirim dalam [sesi online](/wiki/online-sessions/). Bagian plugin pihak ketiga dikirim sebagai render audio plus pengaturan plugin |
 | `.flp` | `File › Buka...` | `File › Ekspor › Proyek FL Studio...`, proyek FL Studio 2026 atau paket loop zip | Plugin bawaan dimainkan di engine buatan ulang dengan tingkat kemiripan yang beragam. Paket FLEX tidak pernah dibuka. Saat ekspor, instrumen dan efek yang hanya ada di LYNX di-render ke audio atau ditukar dengan plugin FL terdekat, dan modulator dilewati. Lihat [Pindahan dari FL Studio](/wiki/coming-from-fl-studio/) |
 | `.flm` | `File › Buka...` | `File › Simpan salinan sebagai proyek FL Studio Mobile (.flm)...` | Proyek FL Studio Mobile. Parsial: instrumen selain MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, DW Sampler, Slicer, dan DirectWave dimainkan dengan synth bawaan. Ekspor ini berupa salinan: not, tempo, mixer, instrumen milik FL Studio Mobile, DW Sampler, 3x Osc, drum kit, efek, dan otomasi level mixer, panning, efek, serta DW Sampler dan GMSynth ikut terbawa, dengan sample di sebelahnya. Dalam salinan, instrumen lain mempertahankan notnya di MiniSynth, sedangkan efek tanpa modul FLM dan otomasi target lain (kenop milik synth, plugin pihak ketiga) dibuang; sebuah jendela mencantumkan semuanya sebelum menyimpan. |
@@ -26,7 +26,7 @@ Proyek yang dibuka dari format program lain adalah impor. `File › Simpan` lalu
 | `.band` | `File › Buka...` (paketnya, file `projectData`-nya, atau zip-nya) | Tidak | Proyek GarageBand 10 atau GarageBand untuk iOS, sebagai track Alur kerja sederhana. Parsial: track instrumen memainkan synth dan drum bawaan, kecuali instrumen Sampler yang dibuat di GarageBand untuk iOS. Proyek dari GarageBand 11 dan yang lebih lama tidak bisa dibaca |
 | `.blx` | `File › Buka...`, atau foldernya dengan impor `Folder...` Alur kerja sederhana | Tidak | Proyek BandLab yang diunduh oleh Cakewalk atau Sonar, sebagai track Alur kerja sederhana dengan region, tempo, nada dasar, mix, otomasi volume dan pan, dan efek umum. Parsial: suara instrumen BandLab dan pedal lainnya dicantumkan di laporan impor |
 | `.mid`, `.midi` | `File › Buka...` membuat proyek baru. `File › Impor › File MIDI...` dan Piano Roll mengimpor ke proyek yang sedang terbuka | `File › Ekspor › File MIDI...` (`Ctrl+Shift+M`) | |
-| `.mod`, `.xm`, `.s3m`, `.it` | `File › Buka...` | Tidak | Modul tracker (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker). Instrumennya menjadi channel Sampler dengan sample-nya, lagunya menjadi klip pattern dengan perubahan temponya, dan `Tampilan › Tracker` mengedit not-notnya. Sebagian: efek seperti slide, vibrato dan arpeggio, envelope, serta perubahan volume pada not yang sedang berbunyi dicantumkan di laporan impor |
+| `.mod`, `.xm`, `.s3m`, `.it` | `File › Buka...` | Tidak | Modul tracker (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker). Instrumennya menjadi channel Sampler dengan sample-nya, lagunya menjadi klip pattern dengan perubahan temponya, dan `Tampilan › Jendela dan alat › Tracker` mengedit not-notnya. Sebagian: efek seperti slide, vibrato dan arpeggio, envelope, serta perubahan volume pada not yang sedang berbunyi dicantumkan di laporan impor |
 | `.wav` | Sebagai sample atau clip audio | `File › Ekspor › File Wave...`, 16 bit, 24 bit, atau 32 bit float | Dither, informasi tempo, marker loop, dan marker Playlist bersifat opsional |
 | `.mp3` | Sebagai sample atau clip audio | `File › Ekspor › File MP3...` | Bitrate konstan |
 | `.ogg` | Sebagai sample atau clip audio | `File › Ekspor › File OGG...` | |

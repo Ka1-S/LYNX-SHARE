@@ -48,42 +48,44 @@ Free and open source, for Windows, macOS and Linux. Opens your FL Studio, Ableto
 LYNX SHARE is a free, open-source digital audio workstation with three layouts in one program. You can switch
 between them at any time in *View › Layout style*; the project stays the same, only the windows change.
 
-1. **The FL Studio workflow** (the default, *Pattern layout* in the menu): you build patterns in the **Channel Rack**
-   and **Piano Roll**, arrange them in the **Playlist** and mix in the **Mixer**, with the windows and shortcuts where
-   you expect them.
+1. **The Pattern layout** (the default, the FL Studio workflow): you build patterns in the **Channel Rack** and
+   **Piano Roll**, arrange them in the **Playlist** and mix in the **Mixer**, with the windows and shortcuts where you
+   expect them.
 2. **The Clip-launch layout**, in the style of Ableton Live: a grid of clips and scenes to launch, a Session mixer
    under it, and a Clip View and Device View for the selected clip and track. Live sets open with their Session clips
    in the grid.
 3. **The Simple layout**, which mixes BandLab's approachable one-window style with the way FL Studio Mobile works:
-   tracks and a timeline in one window, loops and pads, and quick recording. FL Studio Mobile projects (`.flm`) open
-   in it.
+   tracks and a timeline in one window, loops and pads, a drum machine and quick recording. FL Studio Mobile projects
+   (`.flm`) open in it.
 
 It opens FL Studio (`.flp`), Ableton Live (`.als`), FL Studio Mobile (`.flm`), DAWproject (`.dawproject`), GarageBand
-(`.band`) and BandLab (`.blx`) projects and tracker modules (`.mod`, `.xm`, `.s3m`, `.it`), and exports `.flp`, `.als`, `.dawproject` and `.flm` back, so your work is not locked in. It is written from scratch in C++20 with JUCE 8, licensed under the
-AGPL-3.0, and still an **alpha**.
+(`.band`) and BandLab (`.blx`) projects, zipped FL Studio projects and tracker modules (`.mod`, `.xm`, `.s3m`, `.it`),
+and exports `.flp`, `.als`, `.dawproject` and `.flm` back, so your work is not locked in. It runs on Windows, macOS and
+Linux (x86_64 and arm64), works fully offline, is written from scratch in C++20 with JUCE 8, is licensed under the
+AGPL-3.0, and is still an **alpha**.
 
 **It's for you if you…**
 
 - know FL Studio and want a free, open-source DAW that works the same way, on Windows, macOS or Linux;
 - like to launch clips and scenes the way Ableton Live does, and want that next to patterns in the same program;
-- move projects between FL Studio, FL Studio Mobile and Ableton Live, or collaborate with people who use them;
-- are making your first song, maybe coming from BandLab or FL Studio Mobile, and want one simple window to start in;
-- have a modest computer and want a DAW that stays light.
+- move projects between FL Studio, FL Studio Mobile, Ableton Live and other DAWs, or collaborate with people who use them;
+- are making your first song, maybe coming from BandLab, FL Studio Mobile or GarageBand, and want one simple window to start in;
+- have a modest computer (or a Raspberry Pi) and want a DAW that stays light.
 
 ## Why LYNX SHARE
 
 | | |
 |---|---|
-| 🎹 **The FL Studio workflow** | Channel Rack, Piano Roll, Playlist with several arrangements, and a Mixer with inserts, sends and sidechain. The default layout, never watered down. |
-| 📂 **Your projects come with you** | Opens `.flp`, `.als` (Live 11 and 12), `.flm`, `.dawproject`, GarageBand `.band`, BandLab `.blx` and tracker modules (`.mod`, `.xm`, `.s3m`, `.it`); exports `.flp`, `.als`, `.dawproject` and `.flm`. FL Studio's native plugins play on LYNX SHARE's own engines, so a project that uses them plays without FL Studio installed. |
-| 🎛️ **Three layouts, one program** | The FL Studio workflow by default, a Clip-launch layout in the style of Ableton Live, and a Simple layout that mixes BandLab's one-window style with FL Studio Mobile's. Switch any time in *View › Layout style*; the project stays the same. |
+| 🎹 **The FL Studio workflow** | Channel Rack, Piano Roll, Playlist with several arrangements, and a Mixer with up to 500 inserts, sends and sidechain. The default layout, never watered down. |
+| 📂 **Your projects come with you** | Opens `.flp` (also zipped), `.als` (Live 11 and 12), `.flm`, `.dawproject`, GarageBand `.band`, BandLab `.blx` and tracker modules (`.mod`, `.xm`, `.s3m`, `.it`); exports `.flp`, `.als`, `.dawproject` and `.flm`. FL Studio's native plugins play on LYNX SHARE's own engines, so a project that uses them plays without FL Studio installed. |
+| 🎛️ **Three layouts, one program** | The Pattern layout by default, a Clip-launch layout in the style of Ableton Live, and a Simple layout that mixes BandLab's one-window style with FL Studio Mobile's. The first start asks where you are coming from and picks one; switch any time in *View › Layout style*. |
 | 🤝 **Make music together** | Send a project to a friend as one file, or work on it live with up to three other people, end-to-end encrypted. |
-| ⚡ **Lightweight** | A lock-free engine that spreads channels and mixer tracks across CPU cores, skips idle channels, renders ahead what you are not playing live and streams long audio from disk. Measured on one Windows PC, LYNX SHARE 0.1.28 opened FL's *Thief* demo in 5.2 s with 345 MB of memory (FL Studio 2026: 12.2 s, 874 MB), its window was ready in about 1 s (FL Studio: 1.7 s), and a playing song is drawn at 143 frames a second (FL Studio: 143.8) ([0.1.28 notes](https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.28-alpha)). |
-| 🆓 **Free, open source, clean-room** | No price, no account, no subscription. Every behaviour was studied from the outside and written from scratch: no Image-Line or Ableton code is in it. |
+| ⚡ **Lightweight** | A lock-free engine that spreads channels and mixer tracks across CPU cores, skips idle channels, renders ahead what you are not playing live and streams long audio from disk. Measured on one Windows PC, while FL's *Thief* demo plays LYNX SHARE 0.1.30 uses 27.5 % of one CPU core and 540 MB of memory (FL Studio 2026: 59.5 %, 898 MB), and opens it in 4.4 s (FL Studio: 8.1 s) ([0.1.30 notes](https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.30-alpha)). |
+| 🔒 **Free, private, clean-room** | No price, no account, no subscription, no telemetry, and nothing goes online before you say so. Every behaviour was studied from the outside and written from scratch: no Image-Line or Ableton code is in it. |
 
 ## Features
 
-### The FL Studio workflow (default)
+### The Pattern layout: the FL Studio workflow (default)
 
 <table>
 <tr>
@@ -91,14 +93,16 @@ AGPL-3.0, and still an **alpha**.
 <img src="docs/img/channel-rack.png" alt="Channel Rack">
 
 **Channel Rack.** A step sequencer with per-channel volume, pan, mute and solo, swing, multiple patterns, cut groups,
-an arpeggiator and the computer keyboard as a piano.
+an arpeggiator, layer channels and the computer keyboard as a piano. Automation clips show as rows, as in FL Studio;
+a channel can be frozen to audio, or deactivated so its instrument is unloaded until you need it.
 
 </td>
 <td width="50%" valign="top">
 <img src="docs/img/piano-roll.png" alt="Piano Roll">
 
-**Piano Roll.** Snap, chords and scales, note colours and groups, slide and porta notes, quantize, velocity, pan and
-pitch lanes, and MIDI import and export.
+**Piano Roll.** Snap, chords and scales, key markers that change the key along the song, a *Scale degree chord*
+stamp, note colours and groups, slide and porta notes, quantize, strum and arpeggiate tools, velocity, pan and pitch
+lanes (optionally up to five stacked at once), ghost notes, and MIDI import and export.
 
 </td>
 </tr>
@@ -106,41 +110,61 @@ pitch lanes, and MIDI import and export.
 <td width="50%" valign="top">
 <img src="docs/img/playlist.png" alt="Playlist">
 
-**Playlist.** Pattern, audio and automation clips on tracks, several arrangements per project, markers and FL's clip
-menu (split, chop, reverse, fit to tempo and more).
+**Playlist.** Pattern, audio, automation and video clips on tracks, several arrangements per project, markers, time
+selection and FL's clip menu (split, chop, merge, reverse, fit to tempo and more). An optional *Sections lane* moves,
+copies and repeats whole song parts; an instrument track can give each clip its own notes (*Clips own their notes*);
+and, as LYNX extras, tracks can be hidden, or deactivated to free CPU and memory.
 
 </td>
 <td width="50%" valign="top">
 <img src="docs/img/mixer.png" alt="Mixer">
 
-**Mixer.** Up to 500 inserts with 10 effect slots each, sends, sidechain, delay compensation and smart disable, plus
-any insert to any hardware output.
+**Mixer.** Up to 500 inserts with 10 effect slots each, sends, sidechain, a built-in EQ per track, VCA faders and
+groups, delay compensation and smart disable, a loudness meter, Edison on any slot, ARA plugins on an insert, and any
+insert to any hardware output.
 
 </td>
 </tr>
 </table>
 
-### The Clip-launch layout, in the style of Ableton Live (optional)
+- **Tracker:** *View › Windows and tools › Tracker* (Shift+F7), or *Edit in tracker* in a channel's menu, shows a pattern's notes as rows
+  and channels, the tracker way; it edits the same notes as the Piano Roll.
+- **Audio clips:** warp markers and Auto-warp, fades, take lanes and comping, and FL Studio's audio clip menu.
+- **Track versions** (a LYNX extra): named alternate versions of a track's clips, automation lanes and insert effects,
+  switched from the track menu.
+- **FL Studio's details:** the mouse gestures, the tool shortcuts, Remote control settings (*Link to controller...*),
+  multi-level undo (Ctrl+Z, as in FL 2026), the Current mixer track and the hint bar work the way they do in FL Studio.
+
+### The Clip-launch layout, in the style of Ableton Live
 
 <p align="center">
   <img src="docs/img/clip-launch.png" alt="The Clip-launch layout: a clip grid with scenes next to the Playlist" width="100%">
 </p>
 
-*View › Layout style › Clip-launch layout* adds an Ableton Live-style clip grid next to the Playlist: tracks are
-columns, scenes are rows. Clips have launch modes, quantisation and follow actions, and a selected clip opens in a Clip
-View. Under the grid there is a Session mixer; there are also instrument, audio-effect and MIDI-effect racks, a Drum
-Rack, Draw Mode and MIDI / Key Map Modes, Live's Freeze Track and Bounce, clip envelopes, and **Ableton Link** to play
-in sync with Live and other Link apps; return tracks, Sends and a crossfader as in Live's Session mixer. Live sets bring
-their Session clips and scenes straight into the grid. The
-FL Studio workflow stays the default, and nothing is taken away from it.
+*View › Layout style › Clip-launch layout* adds an Ableton Live-style clip grid next to the arrangement: tracks are
+columns, scenes are rows. Clips have launch modes, quantisation, legato, loop and follow actions, and a selected clip
+opens in a Clip View with Live 12's MIDI tools. Under the grid there is a Session mixer with return tracks, sends, a
+crossfader and Live's Solo / Cue (a Cue Out for your headphones). The Device View shows instrument, audio-effect and
+MIDI-effect racks with their chains inline, and a Macro Map mode assigns any device parameter to a macro. There is
+also a Drum Rack, Draw Mode, MIDI / Key Map Modes, Live's Freeze Track and Bounce, clip envelopes, and **Ableton
+Link** to play in sync with Live and other Link apps. Live sets bring their Session clips and scenes straight into the
+grid. The Pattern layout stays the default, and nothing is taken away from it.
 
-### The Simple layout, in the style of BandLab and FL Studio Mobile (optional)
+### The Simple layout, in the style of BandLab and FL Studio Mobile
 
 *View › Layout style › Simple layout* mixes BandLab's approachable one-window style with the way FL Studio Mobile
 works: the tracks and the timeline in one window, loops and pads, and quick recording. FL Studio Mobile projects
-(`.flm`) open in it too. Add a voice, an instrument, a 16-pad sampler or a starter beat in one click, bring in a folder of
-stems and MIDI from another app, program a beat in the Drum Machine, tune up with the tuner, shape the sound with eight one-knob effects, play chords on a Chord pad and save the song as a file from the Finish dock. *Make my first song*
-walks you through it step by step. The setup wizard offers all three layouts at the first start.
+(`.flm`) open in it too.
+
+- Add a voice, an instrument, a 16-pad sampler or a starter beat in one click, or bring in a folder of stems and MIDI
+  from another app.
+- Program a beat in the Drum Machine, browse loops that follow the song's key, play chords on a Chord pad, and tune up
+  with the tuner.
+- Shape each track with one-knob effects, Reverb and Echo sends, and *Duck under...*, which dips a track under another
+  one (the bass under the drums, for example).
+- Mark the song's parts (intro, verse, chorus) as sections, change the time signature mid-song, and save the song as a
+  file from the Finish dock.
+- *Make my first song* walks you through it step by step.
 
 <p align="center">
   <img src="docs/img/drum-machine.png" alt="The Simple layout with the Drum Machine open under a drum track" width="100%">
@@ -154,15 +178,19 @@ walks you through it step by step. The setup wizard offers all three layouts at 
 <td width="50%" valign="top">
 <img src="docs/img/synth.png" alt="The built-in three-oscillator synth">
 
-**Instruments.** A three-oscillator synth, a sampler with slices and time-stretch, a SoundFont player, drums, a Drum
-Rack, Slicex, FPC and DirectWave with FL Studio's editors, and engines for most of FL Studio's native synths.
+**Instruments.** A three-oscillator synth, a sampler with zones, slices, time-stretch and disk streaming, a SoundFont
+player, drums, a Drum Rack, Slicex, FPC and DirectWave with FL Studio's editors, Helix (a wavetable synth), Tetra (a
+4-operator FM synth), **LYNX Model** (physical models of marimba, vibraphone, xylophone, glockenspiel, tubular bells
+and kalimba), and engines for most of FL Studio's native synths.
 
 </td>
 <td width="50%" valign="top">
 <img src="docs/img/eq.png" alt="Facet EQ">
 
-**Effects.** EQs, compressors, limiters, gates, reverbs, delays, modulation, saturation, pitch correction, a vocoder,
-Edison (the audio editor) on any mixer slot, and Patcher for building your own chains.
+**Effects.** EQs, compressors, limiters, gates, de-essers, channel strips, reverbs, delays, modulation, saturation,
+pitch correction (LYNX Tune), a vocoder, a denoiser, Edison (the audio editor) on any mixer slot, and Patcher for
+building your own chains. Stand-ins for widely used third-party plugins take over when a project needs one you don't
+have ([below](#inspired-by-the-classics)).
 
 </td>
 </tr>
@@ -186,7 +214,8 @@ and mixes: move, retune, stretch or mute one of them, shape its modulation and d
 <img src="docs/img/ara-edit.png" alt="An audio clip's menu with Edit in ARA plugin and Melodyne">
 
 **ARA 2 plugins.** *Edit in ARA plugin* (clip menu › LYNX extras) opens an audio clip in Melodyne or another ARA 2
-plugin, which edits it in place, in time with the project.
+plugin, which edits it in place, in time with the project and its tempo map. An ARA plugin can also sit on a mixer
+insert and edit every clip routed there.
 
 </td>
 </tr>
@@ -195,34 +224,104 @@ plugin, which edits it in place, in time with the project.
 <img src="docs/img/chord-helper.png" alt="The Chord helper next to the Piano Roll: related keys and borrowed chords">
 
 **Chord helper.** *Tools › Chord helper* in the Piano Roll reads the selected chord and suggests related keys and
-borrowed chords, with how each one moves and feels; hear one on hover, click it to insert it.
+borrowed chords, with how each one moves and feels; hear one on hover, click it to insert it, and pin your favourites.
 
 </td>
 <td width="50%" valign="top">
 <img src="docs/img/helix-plus.png" alt="Helix with the Helix+ strip">
 
 **Helix and Helix+.** Helix, the wavetable synth, gets a Helix+ strip in its channel window: a third oscillator,
-sample, granular and spectral layers, your own wavetables, more warp modes, unison and filter types, eight macros,
-drawn LFOs, chaos sources and a rack of effects.
+sample, granular and spectral layers, your own wavetables (drawn, or made from audio), more warp modes, unison and
+filter types, eight macros, drawn LFOs, chaos sources and a rack of effects.
 
 </td>
 </tr>
 </table>
 
-### Everything else
+- **Chord lane** (a LYNX extra in every layout): the song's chords on a lane under the ruler. Draw them, pick them
+  from the key's chords, or detect them from the notes or an audio clip; channels can follow them, and the Piano Roll
+  can light the current chord's notes.
+- **Smart Tempo:** *Make the project tempo follow this clip...* puts a tempo marker on each bar of a recording played
+  without a click, so the bars follow the performance and the audio stays exactly as recorded.
+- Audio clips also convert to MIDI (polyphonic too), stems can be extracted from a sample, and Newtone corrects vocals.
 
-- **Automation:** any knob or fader becomes an automation clip with points and curves (all 13 of FL's curve modes); MIDI controllers link to any parameter.
-- **Recording:** notes from the computer keyboard or a MIDI keyboard (MPE too), and audio with punch in/out, loop takes and comping. MIDI Out channels play hardware synths.
-- **Audio editing:** ARA 2 plugins such as Melodyne edit audio clips in place; LYNX SHARE's own polyphonic note editor moves and retunes single notes inside chords and mixes; audio clips convert to MIDI (also polyphonic); stems can be extracted from a sample; Newtone corrects vocals.
-- **Export:** WAV (16/24/32-bit float), MP3, FLAC, OGG, AIFF (16/24-bit) and M4A (AAC, with the system's encoder on Windows and macOS); the song, one pattern, one file per marker section or stems (all mixer stems from one render); MIDI.
-- **Third-party plugins:** VST3 and CLAP on every system, plus the formats in the table below. Plugins can run in a separate process, so one that crashes goes silent instead of taking your project down.
-- **Online sessions:** *File › Online session* sends a project as one `.lynxpack` file, or starts a live session for up to four people.
-- **And more:** themes, undo on every edit, autosave and project versions, freezing a channel or a whole track to audio, Ableton Link, MIDI controller profiles, and the interface in 15 languages.
+### Automation and modulation
+
+- **Automation clips** for any knob or fader of a channel, the mixer, an effect or a plugin, with points and all 13 of
+  FL Studio's curve modes; optional automation lanes under tracks; record automation live.
+- **Write modes:** Read (FL Studio's Record automation, the default), Touch, Latch and Write, as LYNX extras.
+- **Capture automation:** moved a knob while playing without recording? *Capture automation* turns the last moves
+  into automation afterwards.
+- **Modulators:** an LFO, an envelope follower, an ADSR envelope, steps, a random source, a macro, keytrack or
+  velocity can move any knob around its own value, also on third-party plugins; drag a modulator onto a knob or use
+  *Modulate with* in the knob's menu, and a ring on the knob shows the movement.
+- **MIDI controllers:** link any parameter, or use the profiles for common controllers (Mackie Control, Launchkey,
+  APC Key 25, KeyLab Essential, nanoKONTROL2). MPE controllers play each note with its own bend, timbre and pressure.
+
+### Recording
+
+Notes from the computer keyboard or a MIDI keyboard (MPE too), and audio with punch in / out, loop takes and comping.
+MIDI Out channels play hardware synths, and a hardware insert brings outboard gear into the mixer with delay
+compensation.
+
+### Working in LYNX SHARE
+
+- **A welcome that fits you:** the first start asks where you are coming from (BandLab, FL Studio Mobile or GarageBand;
+  FL Studio; Ableton Live or Bitwig; Logic, Cubase, Reaper, Pro Tools or Studio One; or new to music) and sets up the
+  matching layout, with three first things to try. Later starts open on a start page with your recent projects and the
+  templates.
+- **Find anything:** *Search actions...* (`?` or Ctrl+Shift+Y) finds any command, menu item, LYNX extra or Settings
+  page by name; the Settings window has its own search (Ctrl+F).
+- **More than one project:** *File › Open in new window* opens a second project beside the first, and notes, clips,
+  patterns, channels and mixer settings copy and paste between them.
+- **Safe by default:** undo on every edit with an undo history, autosave and project versions, *Save a copy for an
+  older LYNX...*, and *Collect all and save*, which copies every sample the project uses next to it.
+- **Your look and language:** themes, automatic colours and icons by track name, and the interface in 15 languages.
+
+### Import and export
+
+- **Open:** `.lynx`, `.flp` (also FL's zipped loop packages), `.als`, `.flm`, `.dawproject`, GarageBand `.band`,
+  BandLab `.blx`, tracker modules and MIDI files, plus DirectWave, GigaStudio and Kontakt `.ncw` instruments and
+  samples. Details in [Opens your projects](#opens-your-projects).
+- **Export audio:** WAV (16/24/32-bit float), MP3, FLAC, OGG, AIFF (16/24-bit) and M4A (AAC, with the system's encoder
+  on Windows and macOS): the song, one pattern, one file per marker or section, or stems (all mixer stems from one
+  render).
+- **Export projects:** FL Studio (`.flp`, or a zipped loop package with every sample), Ableton Live 11 / 12 (`.als`),
+  DAWproject (`.dawproject`), FL Studio Mobile (`.flm`, a copy) and MIDI.
+- **Bring in parts of another project:** *File › Import › Tracks from another project...* takes the tracks you tick
+  from any project LYNX SHARE opens, with their clips and, if you want, their mixer inserts, effects and automation.
+
+### Online Sessions
+
+*File › Online session* sends a project as one `.lynxpack` file, with its samples, or starts a live session for up to
+four people: everyone edits the same project at once, with a chat, end-to-end encryption, and optional plugin sharing
+for guests who don't have the host's plugins. The host can let a guest only listen, or remove them from the session.
 
 <p align="center">
   <img src="website/assets/img/wiki/session-windows.webp" alt="The Online session menu, the Start live session window and the session chat" width="100%">
   <br><sub>Online sessions: the menu, starting a live session, and the session chat.</sub>
 </p>
+
+### Third-party plugins and the LYNX plugin pack
+
+- **Hosts** VST3 and CLAP on every system, plus Audio Units on macOS, LV2 on Linux and VST2 on Windows and Linux;
+  32-bit plugins on Windows run through a bridge.
+- **Crash-safe:** plugin scanning always runs in separate processes, and a plugin can run in its own process too, so
+  one that crashes goes silent instead of taking your project down. A performance monitor shows what each plugin costs.
+- **The plugin pack:** 36 of LYNX SHARE's own effects and instruments, from Facet EQ to LYNX Model, also work in other
+  DAWs: every one in a single CLAP, a short list also as VST3 and, on Linux, LV2. It is an optional `LYNX-Plugins` download for Windows,
+  macOS and Linux; see [`docs/PLUGINS-PACK.md`](docs/PLUGINS-PACK.md).
+
+### Performance
+
+- A lock-free, multi-core engine: channels and mixer tracks are processed in parallel, idle channels are skipped,
+  parts you are not playing live are rendered a little ahead, and long audio streams from disk.
+- *Safe overloads* (on by default, as in FL Studio) keeps the interface responsive when the CPU runs out; deactivating
+  the tracks and channels you are not using frees their CPU and memory.
+- Every release is measured against FL Studio on the same PC, and the automated tests check the engine's and the
+  interface's cost on every change. The latest numbers are in the [table above](#why-lynx-share).
+
+### Platforms
 
 | | Windows 10 / 11 | macOS 11+ (Apple Silicon and Intel) | Linux x86_64 and arm64 |
 |---|---|---|---|
@@ -230,23 +329,36 @@ drawn LFOs, chaos sources and a rack of effects.
 | **Audio drivers** | WASAPI, DirectSound, ASIO | Core Audio | PipeWire, JACK, ALSA |
 | **Settings folder** | `%APPDATA%\LYNX` | `~/Library/Application Support/LYNX` | `~/.config/LYNX` |
 
+Linux arm64 runs on a Raspberry Pi 4 / 5 with a 64-bit OS and on other arm64 machines.
+
+### Offline and private
+
+- LYNX SHARE starts and works fully offline. It never connects anywhere before the first-start window is answered,
+  and that window asks whether to check for updates (only the newest version number is asked for).
+- No account and no telemetry. Crash reports are opt-in: LYNX SHARE asks before sending one
+  ([details](#code-signing-policy)).
+- For sandboxes and packagers, `LYNX_OFFLINE=1` or `--offline` turns off every network connection of LYNX's own.
+- Every connection the program can make, and why, is listed in [`PRIVACY.md`](PRIVACY.md).
+
 ## Opens your projects
 
-*File › Open* (or a double-click in the Browser) takes `.lynx`, `.flp`, `.als`, `.flm`, `.dawproject`, GarageBand `.band`, BandLab `.blx`, tracker modules (`.mod`, `.xm`, `.s3m`, `.it`) and MIDI files. Missing samples
+*File › Open* (or a double-click in the Browser) takes `.lynx`, `.flp`, `.als`, `.flm`, `.dawproject`, GarageBand
+`.band`, BandLab `.blx`, tracker modules (`.mod`, `.xm`, `.s3m`, `.it`), MIDI files and zipped projects (FL Studio's
+zipped loop packages, or a project exported with its samples), which are unpacked into a folder of their own. Missing samples
 are listed in the Missing files window, and *Help › Last project import report* tells you what was converted,
 approximated or left out. The original file is never changed: saving writes a `.lynx` project.
 
 | Format | Open | Export | In short |
 |---|:---:|:---:|---|
-| **FL Studio** `.flp` | ✅ | ✅ | Channels, samples, patterns, every arrangement, automation, the mixer and native plugins with their settings. |
+| **FL Studio** `.flp`, zipped `.zip` | ✅ | ✅ | Channels, samples, patterns, every arrangement, automation, the mixer and native plugins with their settings. Export as `.flp` or as a zipped loop package with every sample. |
 | **Ableton Live** `.als` (Live 11 and 12) | ✅ | ✅ | Tracks, clips, warp markers, groups, returns, automation, racks and many of Live's devices. Session clips land in the clip grid. |
 | **DAWproject** `.dawproject` (Bitwig, Studio One, Cubase and other apps) | ✅ | ✅ | Tracks, folders, clips, notes, audio with its warp markers, automation, tempo and markers, the mixer with sends, and VST3 / VST2 / CLAP plugins with their state. The clip grid, other arrangements and some per-note details stay behind (listed in the report). |
 | **FL Studio Mobile** `.flm` | ✅ partial | ✅ a copy, with losses listed | Arrangement, samples, drum kits, several instruments and effects, automation and chord sets. Export is *File › Save a copy as FL Studio Mobile project (.flm)...*; see below. |
 | **GarageBand** `.band` (GarageBand 10, GarageBand for iOS) | ✅ partial | — | Tracks, MIDI and audio regions, tempo, key, levels, pan and mute, as Simple-layout tracks. |
 | **BandLab** `.blx` (BandLab project downloaded by Cakewalk / Sonar) | ✅ partial | — | Tracks, MIDI and audio regions with their loops, tempo, key, levels, pan, mute, volume and pan automation and the common effects, as Simple-layout tracks. |
-| **Tracker modules** `.mod` `.xm` `.s3m` `.it` (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker) | ✅ partial | — | Instruments as Sampler channels with their samples, patterns, the order list as the Playlist, speed and tempo, note volume, pan, delay and cut. Tick effects (arpeggio, vibrato, slides...) and envelopes are listed in the report; the built-in Tracker (View › Tracker) edits the notes the tracker way. |
+| **Tracker modules** `.mod` `.xm` `.s3m` `.it` (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker) | ✅ partial | — | Instruments as Sampler channels with their samples, patterns, the order list as the Playlist, speed and tempo, note volume, pan, delay and cut. Volume and pan changes become the channel's events (MOD and XM), and slides, vibrato, arpeggios and pitch envelopes become the notes' pitch curves; what is left out is counted in the report. The built-in Tracker (*View › Windows and tools › Tracker*) edits the notes the tracker way. |
 | **MIDI** `.mid` | ✅ | ✅ | Notes, into or out of the Piano Roll or the whole song. |
-| **LYNX SHARE** `.lynx` | ✅ | ✅ | The native format (JSON), with autosave. *File › Save a copy for an older LYNX...* writes a copy that 0.1.27 or 0.1.28 can open. |
+| **LYNX SHARE** `.lynx` | ✅ | ✅ | The native format (JSON), with autosave. *File › Save a copy for an older LYNX...* writes a copy that 0.1.30, 0.1.28 or 0.1.27 can open, and lists what that release loses. |
 
 Instruments and samples of other samplers open too: DirectWave programs and banks (`.dwp`, `.dwb`), GigaStudio `.gig`
 instruments (as DirectWave channels) and Kontakt's `.ncw` samples. Kontakt `.nki` instruments need Kontakt itself as a
@@ -362,8 +474,7 @@ original. The plugins FL Studio users reach for most are all at *Exact* or *Near
 [`docs/PLUGINS.md`](docs/PLUGINS.md). Plugin names are Image-Line's trademarks, used only to describe compatibility.
 
 LYNX SHARE's own effects and instruments (36 of them, from Facet EQ to LYNX Model) are also available as plugins for
-other DAWs: every one in a single CLAP, a short list also as VST3 and, on Linux, LV2. It is an optional, separate
-`LYNX-Plugins` download on the releases page for Windows, macOS and Linux; see [`docs/PLUGINS-PACK.md`](docs/PLUGINS-PACK.md).
+other DAWs in the optional `LYNX-Plugins` download ([above](#third-party-plugins-and-the-lynx-plugin-pack)).
 
 <!-- inspired:begin (generated by scripts/gen-inspired.py) -->
 ## Inspired by the classics
@@ -440,19 +551,23 @@ place with [Gear Lever](https://github.com/mijorus/gearlever) or AppImageUpdate.
 ## Getting started
 
 1. **Install** LYNX SHARE (above) and open it.
-2. **The setup wizard** picks the language, tests your audio device, lets you choose one of the three layouts and
-   scans your plugin folders in the background: the standard VST3 and CLAP folders plus the ones FL Studio uses on the
-   same computer. You can skip it and reopen it later from *Options › Setup wizard*.
-3. **Open a project** with *File › Open*: one of yours (`.flp`, `.als`, `.flm`, MIDI), or the demo project
-   (`Demo.lynx`, included with every download).
+2. **The welcome window** asks where you are coming from and sets up the matching layout in one click; it also sets
+   the language, tests your sound and asks whether to check for updates. Meanwhile your plugin folders are scanned in
+   the background: the standard VST3 and CLAP folders plus the ones FL Studio uses on the same computer. *More setup*
+   opens the full setup wizard (audio driver, plugin folders), which is also in *Options › Setup wizard*, and *Help ›
+   Welcome...* shows the window again.
+3. **Open a project** with *File › Open* or the start page: one of yours (`.flp`, `.als`, `.flm`, `.dawproject`,
+   MIDI...), or the demo project (`Demo.lynx`, included with every download).
 4. **Learn as you go** with the [wiki](https://lynx-share.com/wiki/):
    [Your first song](https://lynx-share.com/wiki/first-song/),
    [Coming from FL Studio](https://lynx-share.com/wiki/coming-from-fl-studio/),
    [Coming from Ableton Live](https://lynx-share.com/wiki/coming-from-ableton/) and the
-   [Simple layout](https://lynx-share.com/wiki/simple-layout/).
+   [Simple layout](https://lynx-share.com/wiki/simple-layout/), and the video tutorials on
+   [Learn](https://lynx-share.com/learn/).
 
 **Handy shortcuts:** Space plays and pauses, F5 / F6 / F7 / F8 / F9 show the Playlist / Channel Rack / Piano Roll /
-Browser / Mixer, L toggles Pattern / Song, and the keys `Z`…`M` and `Q`…`P` play the selected channel. The full list is
+Browser / Mixer, Shift+F7 the Tracker, L toggles Pattern / Song, `?` searches every action, and the keys `Z`…`M` and
+`Q`…`P` play the selected channel. The full list is
 on the [Shortcuts](https://lynx-share.com/wiki/shortcuts/) page.
 
 <details>
@@ -462,7 +577,7 @@ LYNX SHARE also runs without a window, to render and convert projects. On macOS 
 (`/Applications/LYNX.app/Contents/MacOS/LYNX` on macOS); the options are the same:
 
 ```
-LYNX.exe project.lynx                          open a project (.lynx, .flp, .als, .flm or .mid)
+LYNX.exe project.lynx                          open a project (.lynx, .flp, .als, .flm, .dawproject, .zip, .mid...)
 LYNX.exe --export project.flp out.flac         render the song (wav/flac/ogg/mp3/aif; m4a on Windows and macOS)
 LYNX.exe --render project.flp out.wav 20       render 20 s of the current pattern (24-bit WAV)
 LYNX.exe --export-flp project.lynx out.flp     export an FL Studio project (.zip: with the samples)
@@ -478,6 +593,7 @@ LYNX.exe --fldb rep.txt [project.flp] [--scan] FL Studio found here, its plugin 
 LYNX.exe --devices rep.txt                     list audio drivers and outputs
 LYNX.exe --devicetest "ASIO" "driver" rep.txt  open a driver for 1 s of silence and report it
 LYNX --uiperf project.flp rep.txt              time the UI drawing: Mixer, Playlist, Channel Rack, playing and scrolling
+LYNX --offline [project]                       start without any network connection of LYNX's own (also LYNX_OFFLINE=1)
 LYNX.AppImage --menu-entry on|off              Linux AppImage: add to / remove from the applications menu
 ```
 
@@ -505,6 +621,8 @@ rough today:
 - Many but not all of Live's own devices are converted from `.als` sets, and LYNX SHARE's own instruments and effects are not written into exported sets yet.
 - GarageBand `.band` and BandLab `.blx` import is partial (instrument sounds are replaced by LYNX SHARE's), and the `.blx` reader was tested on made-up projects only.
 - `.flm` import is partial, and the `.flm` export is a copy: instruments FL Studio Mobile does not have keep only their notes (on its MiniSynth), and effects without an FLM module and automation of other targets (the synths' own knobs, third-party plugins) are left out; a window lists them before saving.
+- Tracker module import is partial: some effects and instrument envelopes are not played yet (the import report counts them).
+- The plugin pack has no Audio Units yet, and LYNX SHARE's Tetra, Helix and Braid synths are not in it yet.
 - The Windows build is not code-signed and the macOS build is not notarized yet, so both systems warn the first time. The macOS build has had little testing on real Macs.
 
 Each release's notes list its known issues. The details are in [`docs/STATUS.md`](docs/STATUS.md) (what works, what

@@ -1,5 +1,5 @@
 ---
-source: dd17f63a9b
+source: 4ca4775a35
 ---
 ![Раскладка с запуском клипов: сетка клипов со сценами рядом с Playlist](/assets/img/cliplaunch.webp)
 
@@ -88,6 +88,8 @@ LYNX SHARE стартует в рабочем процессе с паттерн
 - Многие собственные устройства Live приходят как собственные устройства LYNX SHARE, со своими настройками и автоматизацией: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Hybrid Reverb, Delay, Echo, Grain Delay, Auto Filter, Saturator, Overdrive, Roar, Erosion, Vinyl Distortion, Corpus, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Spectral Time, Spectral Resonator, Looper, Simpler, Sampler, Drift, Operator, Wavetable и Meld. Остальные отбрасываются и перечисляются в отчете об импорте.
 - Рэки инструментов и аудиоэффектов приходят со своими цепочками, зонами и макросами, а Драм-рэк становится Драм-рэком LYNX SHARE. Arpeggiator из Live становится арпеджиатором канала. Pitch, Velocity, Chord, Note Length и рэки MIDI-эффектов записываются в ноты.
 - Отчет об импорте перечисляет, что было пропущено.
+- В виде устройств рэк показывает устройства своих цепочек прямо в строке, а режим Macro Map (кнопки `Map` рэка) отдаёт параметр устройства макросу, как в Live.
+- У микшера сессии есть переключатель Solo / Cue из Live, с `Cue Out` для ваших наушников и `Громкость Cue`.
 - Live обрезает перекрывающиеся аудиоклипы в экспортированном сете.
 - Варп-маркеры из сета Live сохраняются при импорте и записываются обратно при экспорте.
 

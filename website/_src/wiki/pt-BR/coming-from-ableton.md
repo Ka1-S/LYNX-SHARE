@@ -1,5 +1,5 @@
 ---
-source: dd17f63a9b
+source: 4ca4775a35
 ---
 ![O layout de disparo de clipes: uma grade de clipes com cenas ao lado da Playlist](/assets/img/cliplaunch.webp)
 
@@ -88,6 +88,8 @@ Um relatório depois da exportação lista o que ficou de fora.
 - Muitos dos devices do próprio Live entram como os do LYNX SHARE, com suas configurações e automação: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Hybrid Reverb, Delay, Echo, Grain Delay, Auto Filter, Saturator, Overdrive, Roar, Erosion, Vinyl Distortion, Corpus, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Spectral Time, Spectral Resonator, Looper, Simpler, Sampler, Drift, Operator, Wavetable e Meld. Os outros são descartados e listados no relatório de importação.
 - Os Instrument Racks e Audio Effect Racks entram com suas cadeias, zonas e macros, e um Drum Rack vira o Drum Rack do LYNX SHARE. O Arpeggiator do Live vira o arpejador do canal. Pitch, Velocity, Chord, Note Length e os MIDI Effect Racks são gravados nas notas.
 - O relatório de importação lista o que ficou de fora.
+- No Device View, um rack mostra os devices de suas cadeias na própria linha, e o modo Macro Map (os botões `Map` do rack) entrega o parâmetro de um device a uma macro, como no Live.
+- O mixer Session tem o interruptor Solo / Cue do Live, com um `Cue Out` para os seus fones e um `Volume do cue`.
 - O Live corta os clipes de áudio que se sobrepõem em um set exportado.
 - Os warp markers de um set do Live são mantidos na importação e gravados de volta na exportação.
 

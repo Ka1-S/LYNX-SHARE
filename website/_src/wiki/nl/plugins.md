@@ -1,5 +1,5 @@
 ---
-source: 828f1d5e8c
+source: 70262846ff
 ---
 ![Het onderste deel van het Pluginbeheer, met de opmerking dat elk pluginbestand in een apart proces wordt onderzocht](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -12,7 +12,7 @@ LYNX SHARE host instrument- en effectplugins van andere makers. Het vindt ze doo
 3. Druk op `F8` voor de Plugin-kiezer en typ een deel van de naam van de plugin.
 4. Dubbelklik erop of druk op `Enter`. Een instrument wordt een nieuw kanaal. Een effect komt in de geselecteerde Mixer-insert.
 
-Bij de eerste start toont de installatiewizard de pluginmappen en scant ze op de achtergrond. `Opties › Installatiewizard (taal, audio, pluginmappen)...` opent hem opnieuw. LYNX SHARE zoekt ook een paar seconden na elke start naar nieuwe plugins.
+Bij de eerste start scant LYNX SHARE de pluginmappen op de achtergrond terwijl de welkomstkaart open is. `Opties › Installatiewizard (taal, audio, pluginmappen)...` toont de mappen opnieuw. LYNX SHARE zoekt ook een paar seconden na elke start naar nieuwe plugins.
 
 ## Formaten per systeem
 

@@ -71,7 +71,7 @@ The `File › Online session` menu has these commands while a session runs:
 | `End live session` | For the host. Everyone leaves, and the code stops working |
 | `Leave live session` | For a guest. Your part of the project stays with you |
 
-In `People and permissions...`, each person gets one of four roles: `Their own channels, patterns, inserts and rows`, `Their own parts + tempo and project settings`, `Everything` or `Listen only (no edits)`. Turning a permission off never deletes anything.
+In `People and permissions...`, each person gets one of four roles: `Their own channels, patterns, inserts and rows`, `Their own parts + tempo and project settings`, `Everything` or `Listen only (no edits)`. Turning a permission off never deletes anything. The fifth choice, `Remove from the session`, takes the person out of the session. By default the session then gets a new invite code for new joins, and the people still in it keep going; `Keep the same code` keeps the old one.
 
 ## Plugins the others do not have
 

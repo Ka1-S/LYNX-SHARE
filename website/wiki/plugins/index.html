@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="4856414e";
+window.LYNX_LANG=lang;window.LYNX_V="f30b9328";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=4856414e">
+<link rel="stylesheet" href="/assets/site.css?v=f30b9328">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -93,7 +93,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <p>LYNX SHARE hosts instrument and effect plugins from other makers. It finds them by scanning the plugin folders, and <code>Options › Plugin manager...</code> shows what it found. LYNX SHARE's own instruments and effects are described in <a href="/wiki/built-in/">Built-in instruments and effects</a>.</p>
 <h2 id="scan-and-add-a-plugin">Scan and add a plugin</h2>
 <ol><li>Choose <code>Options › Scan for plugins</code>. Progress shows in the hint bar and you can keep working.</li><li>If the plugin is in a folder of its own, open <code>Options › Plugin manager...</code>, click <code>Plugin folders...</code>, add the folder, then click <code>Find new plugins</code>.</li><li>Press <code>F8</code> for the plugin picker and type part of the plugin's name.</li><li>Double-click it or press <code>Enter</code>. An instrument becomes a new channel. An effect goes into the selected Mixer insert.</li></ol>
-<p>On first start, the setup wizard lists the plugin folders and scans them in the background. <code>Options › Setup wizard (language, audio, plugin folders)...</code> opens it again. LYNX SHARE also looks for new plugins a few seconds after each start.</p>
+<p>On first start, LYNX SHARE scans the plugin folders in the background while the welcome card is open. <code>Options › Setup wizard (language, audio, plugin folders)...</code> shows the folders again. LYNX SHARE also looks for new plugins a few seconds after each start.</p>
 <h2 id="formats-per-system">Formats per system</h2>
 <div class="tablewrap"><table><thead><tr><th>System</th><th>Formats hosted</th></tr></thead><tbody><tr><td>Windows</td><td>VST3, CLAP, VST2</td></tr><tr><td>macOS</td><td>VST3, CLAP, Audio Units</td></tr><tr><td>Linux</td><td>VST3, CLAP, LV2, VST2</td></tr></tbody></table></div>
 <p>VST2 is not hosted on macOS. On Linux, Windows plugins work through <a href="https://github.com/robbert-vdh/yabridge">yabridge</a> and Wine, which you install yourself: add the folder yabridge syncs to as a plugin folder.</p>
@@ -150,8 +150,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=4856414e" defer></script>
-<script src="/assets/wiki.js?v=4856414e" defer></script>
-<script src="/assets/motion.js?v=4856414e" defer></script>
+<script src="/assets/site.js?v=f30b9328" defer></script>
+<script src="/assets/wiki.js?v=f30b9328" defer></script>
+<script src="/assets/motion.js?v=f30b9328" defer></script>
 </body>
 </html>

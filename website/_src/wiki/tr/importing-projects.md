@@ -1,11 +1,11 @@
 ---
-source: d41b1225ef
+source: a29416cb8c
 ---
 `Dosya › Aç...` (`Ctrl+O`), LYNX SHARE'in kendi `.lynx` projelerini ve ayrıca `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx` ve `.mid` dosyalarını açar. Başka bir programdan gelen proje bir içe aktarmadır: yeni, kaydedilmemiş bir LYNX SHARE projesi olur ve özgün dosyaya asla yazılmaz.
 
 ## Başka bir programdan proje açma
 
-1. `Dosya › Aç...` komutunu seçin ve `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx` veya `.mid` dosyasını seçin.
+1. `Dosya › Aç...` komutunu seçin ve `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx`, `.mid`, `.zip` veya tracker modülü (`.mod`, `.xm`, `.s3m`, `.it`) dosyasını seçin.
 2. LYNX SHARE projenin plugin'lerini ve sample'larını ararken bekleyin.
 3. Bir şey bulunamadıysa `Eksik dosyalar` penceresi (Eksik dosyalar) açılır. Onu sample'larınıza yönlendirin ya da kapatın.
 4. Başlık çubuğu artık projenin nereden geldiğini gösterir, örneğin "(imported from FL Studio)".
@@ -22,6 +22,8 @@ source: d41b1225ef
 | `.band` (GarageBand 10, iOS için GarageBand) | Track'ler, MIDI ve ses region'ları, tempo, ölçü işareti, tonalite, işaretçi olarak bölümler, seviye, pan ve mute, Basit iş akışı track'leri olarak. iOS için GarageBand'de yapılan Sampler enstrümanları | Enstrüman track'leri dahili synth'i ve davulları çalar. Drummer region'ları, take klasörleri ve tempo değişiklikleri listelenir. GarageBand 11 ve öncesinin projeleri okunamaz |
 | `.blx` (BandLab) | Loop'larıyla track'ler, MIDI ve ses region'ları, tempo, ölçü işareti, tonalite, ses seviyesi, pan ve mute, ses seviyesi ve pan otomasyonu ve yaygın efektler, Basit iş akışı track'leri olarak | Enstrüman track'leri dahili synth'i ve davulları çalar. Diğer efektler ve Mastering preset'i dışarıda bırakılır ve listelenir. Yalnızca uydurma projelerde test edildi |
 | `.mid` | Notalar, ölçü işaretleri ve her tempo değişikliği | Bir MIDI dosyası ses taşımaz: kanallar LYNX SHARE synth'ini ya da bir MIDI Out kanalı alır |
+| `.mod`, `.xm`, `.s3m`, `.it` (tracker modülleri) | Sample'larıyla Sampler kanalları olarak enstrümanlar, pattern'ler, Playlist olarak sıra listesi, hız ve tempo, nota ses düzeyi, pan, gecikme ve kesme; kanalın olayları olarak ses düzeyi ve pan değişiklikleri (MOD ve XM), notaların perde eğrileri olarak kayma, vibrato, arpej ve perde zarfları | Diğer efektler ve enstrüman zarfları içe aktarma raporunda sayılır. `Görünüm › Pencereler ve araçlar › Tracker` notaları tracker usulüyle düzenler |
+| `.zip` | FL Studio'nun sıkıştırılmış loop paketi veya sample'larıyla dışa aktarılmış bir proje: kendi klasörüne çıkarılır, sonra içindeki proje sample'larıyla açılır | |
 
 Bir `.flp` veya `.dawproject` içindeki üçüncü taraf VST2, VST3 ve CLAP plugin'leri ile bir `.als` içindeki VST2 ve VST3 plugin'leri, aynı plugin bilgisayarınızda kuruluysa kaydedilmiş durumlarıyla yüklenir.
 
@@ -86,6 +88,15 @@ Gerçek plugin'i geri almak için onu kurun, `Seçenekler › Plugin tara` seçe
 | `Ölçü işaretlerini içe aktar` | Dosyanın ölçü işareti projenin ölçü işareti olur |
 
 [Piano Roll](/wiki/piano-roll/)'daki `Ctrl+M`, bir MIDI dosyasını geçerli kanala içe aktarır.
+
+## Başka bir projeden izleri içe aktarma
+
+`Dosya › İçe aktar › Başka bir projeden parçalar...` başka bir projenin izlerini, açık projeyi kapatmadan içine getirir. `Dosya › Aç...` komutunun okuduğu her formatı okur.
+
+1. Projeyi seçin. Bir pencere onun Playlist izlerini ve her birinin içerdiklerini listeler.
+2. İstediğiniz izleri işaretleyin.
+3. `Mikser insert'leri ve efektlerle` ve `Otomasyonla` seçeneklerinin de gelip gelmeyeceğini ve `Şuraya yerleştir` şarkı başına mı yoksa zaman seçiminin başına mı konulacağını seçin.
+4. İçe aktarmak için tıklayın. Yeni izler, kanallar, pattern'ler ve insert'ler tek adım olarak gelir; yani tek bir geri alma hepsini geri götürür.
 
 ## Bilmekte fayda var
 

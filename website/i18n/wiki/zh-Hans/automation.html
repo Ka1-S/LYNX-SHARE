@@ -20,10 +20,10 @@
 <h2 id="recording-your-moves">录制你的操作</h2>
 <p>在录制过滤器中勾选 <code>自动化</code> 以开启录制，按下播放并移动控件。在歌曲模式下，这些操作会变成自动化片段。在样式模式下，它们会变成当前样式中的事件。见<a href="/wiki/recording/">录音</a>。</p>
 <h2 id="links-and-modulators">关联和调制器</h2>
-<ul><li><code>关联到MIDI控制器（转动控制器上的旋钮）</code> 在 <a href="/wiki/midi-controllers/">MIDI 控制器</a>中介绍。</li><li><code>关联到内部控制器</code> 让工程中的 Envelope、Formula 或 Peak Controller 驱动该控件。请先添加其中一个。</li><li><code>调制</code> 附加一个调制器，即 LFO 或随机源，让 LYNX SHARE 的旋钮围绕它自己的数值移动。<code>工具 › 调制器...</code> 会列出它们。</li></ul>
+<ul><li><code>关联到MIDI控制器（转动控制器上的旋钮）</code> 在 <a href="/wiki/midi-controllers/">MIDI 控制器</a>中介绍。</li><li><code>关联到内部控制器</code> 让工程中的 Envelope、Formula 或 Peak Controller 驱动该控件。请先添加其中一个。</li><li><code>调制来源</code> 附加一个调制器，让控件围绕它自己的数值移动：LFO、包络跟随器、ADSR 包络、步进、随机源、宏、按键跟踪或力度。它对 LYNX SHARE 的旋钮和第三方插件的参数都有效。你也可以把调制器拖到旋钮上，旋钮上的圆环会显示它的移动。<code>工具 › 调制器...</code> 会列出它们。</li></ul>
 <h2 id="automation-lanes">自动化轨道</h2>
 <p>轨道默认关闭。在播放列表的菜单中打开 <code>自动化轨道</code>。之后每个轨道头都有一个按钮，可在该轨道下方添加一条自动化轨道，控件菜单中也会多出 <code>在轨道中自动化</code>。在自动化轨道中，单击或拖动可添加点，右键单击可删除点，<code>Alt</code>+拖动可弯曲线条。该轨道的菜单中有 <code>转为自动化片段</code>。</p>
 <h2 id="good-to-know">须知</h2>
-<ul><li>新片段如果有时间选区，就从选区开始，否则在歌曲模式下从播放头开始。要让它从歌曲开头开始，请在 <code>选项 › 常规设置...</code> 中关闭 <code>在播放位置创建自动化片段</code>。</li><li>同一个控件上的多个片段各自在自己的位置播放。在第一个片段之前，控件保持它自己的值。</li><li>在片段开始处，控件会在约 8 ms 内到达新值。FL Studio 则是平滑滑过去，所以导入的工程在这些点上可能略有不同。</li><li>同一个控件上的片段重叠的地方，LYNX SHARE 选中的片段可能与 FL Studio 选中的不同。</li><li>调制器只对 LYNX SHARE 自己的旋钮有效，导出为 <code>.flp</code> 时会被舍去。</li></ul>
+<ul><li>新片段如果有时间选区，就从选区开始，否则在歌曲模式下从播放头开始。要让它从歌曲开头开始，请在 <code>选项 › 常规设置...</code> 中关闭 <code>在播放位置创建自动化片段</code>。</li><li>同一个控件上的多个片段各自在自己的位置播放。在第一个片段之前，控件保持它自己的值。</li><li>在片段开始处，控件会在约 8 ms 内到达新值。FL Studio 则是平滑滑过去，所以导入的工程在这些点上可能略有不同。</li><li>同一个控件上的片段重叠的地方，LYNX SHARE 选中的片段可能与 FL Studio 选中的不同。</li><li>导出为 <code>.flp</code> 时，跟随歌曲位置的调制器会变成自动化片段（同步的 LFO 会变成 FL Studio 的片段 LFO）。跟随器、包络、按键跟踪和力度会被舍去，报告会列出它们。</li><li>播放时动了控件却没有录音？录音选项中的 <code>捕获自动化</code> 会事后把最近的操作变成自动化。</li></ul>
 <h2 id="related">相关页面</h2>
 <ul><li><a href="/wiki/playlist/">播放列表</a></li><li><a href="/wiki/recording/">录音</a></li><li><a href="/wiki/midi-controllers/">MIDI 控制器</a></li><li><a href="/wiki/mixer/">混音台</a></li><li><a href="/wiki/shortcuts/">快捷键</a></li></ul>

@@ -44,10 +44,12 @@ Pick the **Simple layout**. It is one window with your tracks on a timeline, loo
 | Lyrics | `Lyrics` |
 | Tuner | `Tuner` in the toolbar |
 | Mixer | `F9` |
+| Song parts (intro, verse, chorus) | `Sections` in the title bar: parts that move, copy and repeat as a whole |
+| Ducking the beat under the vocal, an echo send | `Duck under` and the `Echo` knob, next to `Reverb` in the dock's `Effects` tab |
 
 ## Your projects
 
-- **FL Studio Mobile** (`.flm`): `File › Open...` opens it. The import is partial: tempo, tracks, patterns, audio clips, drum kits, the DW Sampler, the Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw and FLM's effects come over. Other FLM instruments play LYNX SHARE's built-in synth.
+- **FL Studio Mobile** (`.flm`): `File › Open...` opens it. The import is partial: tempo, tracks, patterns, audio clips, drum kits, the DW Sampler, the Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw and FLM's effects come over. Other FLM instruments play LYNX SHARE's built-in synth. `File › Save a copy as FL Studio Mobile project (.flm)...` writes a copy back for FL Studio Mobile.
 - **GarageBand** (`.band`, from GarageBand 10 or GarageBand for iOS): `File › Open...` opens it as Simple-layout tracks with their regions, tempo, key and mix. Instrument tracks play LYNX SHARE's built-in synth and drums, because GarageBand does not store their sounds in a form other programs can read.
 - **BandLab** (`.blx`, a project downloaded by Cakewalk or Sonar): `File › Open...` opens it as Simple-layout tracks with regions, tempo, key, the mix, volume and pan automation and the common effects. BandLab's instrument sounds and other effects are listed in the import report.
 - **Stems from any app**: export the tracks as audio or MIDI files, put them in one folder, then click `+ Add track`, and `Folder...` beside `Import`. Each file becomes a track that starts at the beginning.

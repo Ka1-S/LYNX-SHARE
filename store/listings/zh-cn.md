@@ -8,7 +8,7 @@ LYNX SHARE
 
 ## Short description
 
-免费开源的DAW，一个程序提供三种工作流程：FL Studio风格的模式（Channel Rack、Piano Roll、Playlist、Mixer）、Ableton Live风格的片段启动，以及BandLab和FL Studio Mobile风格的简易单窗口模式。可打开.flp、.als、.flm、.dawproject、GarageBand的.band和BandLab的.blx工程。
+免费开源的DAW，一个程序提供三种工作流程：FL Studio风格的模式（Channel Rack、Piano Roll、Playlist、Mixer）、Ableton Live风格的片段启动，以及BandLab和FL Studio Mobile风格的简易单窗口模式。可打开.flp、.als、.flm、.dawproject、GarageBand的.band和BandLab的.blx工程，并可导出.flp、.als、.dawproject和.flm。
 
 ## Description
 
@@ -18,16 +18,21 @@ LYNX SHARE是一款免费开源的数字音频工作站，用来制作节拍和�
 • Ableton Live风格的片段启动：片段和场景的网格、会话混音器，以及片段视图和设备视图。
 • 简易工作流程，把BandLab易上手的单窗口风格和FL Studio Mobile的工作方式结合在一起：音轨和时间线、循环、打击垫和快速录音，还有引导式的第一首歌。
 
+首次启动会询问你来自哪里，并打开相应的布局。
+
 它在任何PC上都能保持轻快。
 
 • 轻量：无锁音频引擎将通道和混音轨分配到所有 CPU 核心，自动跳过空闲通道，长音频直接从硬盘流式读取。
-• 齐全：100 多款内置乐器和效果器——合成器、鼓机、采样器、均衡器、压缩器、限幅器、混响、延迟、音高校正、可视化工具等等。
+• 齐全：100 多款内置乐器和效果器——合成器（波表、FM，以及LYNX Model的敲击乐器物理模型）、鼓机、采样器、均衡器、压缩器、限幅器、混响、延迟、音高校正、可视化工具等等——外加可作用于任何旋钮的调制器（LFO、包络跟随器、步进音序器等）。
 • 你的插件：支持 VST3、CLAP 和 VST2 乐器与效果器，每个插件都可选择在独立的沙箱进程中运行，插件崩溃也不会拖垮整个工程。
 • 你的工程：打开FL Studio工程（.flp），包括模式、音符、混音器、自动化和采样；打开并保存Ableton Live 11/12套装（.als），包括Session片段；打开并保存DAWproject文件（.dawproject），可用于Bitwig、Studio One、Cubase等应用；可导出.flp回到FL Studio，也可为FL Studio Mobile保存.flm副本；可导入FL Studio Mobile工程（.flm，部分支持）、GarageBand工程（.band，部分支持）、BandLab工程（.blx，部分支持）和MIDI文件。
 • Tracker 模块：.mod、.xm、.s3m 和 .it 文件连同采样、模式和速度一起打开，内置的跟踪器可以编辑音符。
+• 更快地编排：用于整段歌曲部分的段落轨、自带音符的轨道片段、可隐藏或停用轨道以节省 CPU、能找到每个操作的命令搜索，以及并排打开两个工程并可在其间复制粘贴。
+• 一起做音乐：把工程作为一个文件发出，或与最多三位朋友实时编辑，端到端加密。
 • 音频编辑：Melodyne等ARA 2插件可直接在音频片段上工作，复音音符编辑器可移动和重新调音和弦中的单个音符，音频还可转换为MIDI。
 • 低延迟：支持 ASIO（包括适用于任何设备的 LYNX SHARE 自带 ASIO 驱动）以及 WASAPI 共享和独占模式。
 • 录制音频和 MIDI（也支持 MPE）、编辑音频、自动化任意参数，导出为 WAV、FLAC、MP3、OGG、AIFF、M4A 或分轨（stems）。
+• 离线可用：无需账号，在你同意之前不会联网。
 • 界面语言：简体中文、繁体中文、英语、葡萄牙语、西班牙语、法语、德语、日语、韩语等 15 种语言。
 
 无需账号，没有订阅，没有广告，也没有遥测。LYNX SHARE 是自由软件（GNU AGPL-3.0），源代码托管在 GitHub 上。
@@ -43,7 +48,7 @@ LYNX SHARE 0.1.30：前所未有地轻量，在我们的测试电脑上播放FL�
 ## Features
 
 1. 一个程序，三种工作流程：默认是FL Studio风格的模式，或Ableton Live风格的片段启动，或BandLab和FL Studio Mobile风格的简易工作流程
-2. 打开FL Studio（.flp）、Ableton Live（.als）、FL Studio Mobile（.flm）、DAWproject、GarageBand和BandLab工程以及MIDI文件；保存为.flp、.als和.dawproject，并可为FL Studio Mobile保存.flm副本
+2. 打开FL Studio（.flp及压缩包）、Ableton Live（.als）、FL Studio Mobile（.flm）、DAWproject、GarageBand和BandLab工程以及MIDI文件；保存为.flp、.als、.dawproject和.flm副本
 3. 100 多款内置乐器和效果器
 4. 支持 VST3、CLAP 和 VST2 插件，可选在独立进程中沙箱运行
 5. 低延迟音频：ASIO、WASAPI 共享和独占模式
@@ -54,6 +59,11 @@ LYNX SHARE 0.1.30：前所未有地轻量，在我们的测试电脑上播放FL�
 10. 免费开源（AGPL-3.0）：无需账号，无广告，无遥测
 11. 支持托管ARA 2插件、复音音符编辑器和音频转MIDI
 12. 打开 Tracker 模块（.mod、.xm、.s3m、.it），并在内置跟踪器中编辑音符
+13. LYNX Model：马林巴、颤音琴、木琴、钟琴、管钟和卡林巴的物理模型
+14. 可作用于任何旋钮的调制器：LFO、包络跟随器、ADSR、步进、随机、宏、按键跟踪和力度
+15. 段落轨、隐藏和停用轨道，以及能找到每个命令的搜索
+16. 在线会话：与最多三位朋友实时编辑工程，端到端加密
+17. 离线可用：无需账号，在你允许之前不会联网
 
 ## Search terms
 

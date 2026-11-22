@@ -1,5 +1,5 @@
 ---
-source: e3c62e25a8
+source: 736421c170
 ---
 ![Basit yerleşim: zaman çizelgesinde izler, bir başlangıç beat'i ve Drum Machine](/assets/img/learn/simple-beat-2.webp)
 
@@ -42,10 +42,12 @@ source: e3c62e25a8
 | Şarkı sözleri | `Söz` |
 | Akort aleti | Araç çubuğunda `Akort aleti` |
 | Mikser | `F9` |
+| Şarkı bölümleri (giriş, kıta, nakarat) | Başlık çubuğundaki `Bölümler`: bütün olarak taşınan, kopyalanan ve tekrarlanan bölümler |
+| Ritmi vokalin altında kısmak, bir echo send'i | Dock'un `Efektler` sekmesinde `Reverb`'ün yanındaki `Altında kıs` ve `Eko` düğmesi |
 
 ## Projeleriniz
 
-- **FL Studio Mobile** (`.flm`): `Dosya › Aç...` onu açar. İçe aktarma kısmidir: tempo, izler, pattern'ler, ses klipleri, davul kit'leri, DW Sampler, Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw ve FLM'nin efektleri gelir. FLM'nin diğer enstrümanları LYNX SHARE'in dahili synth'ini çalar.
+- **FL Studio Mobile** (`.flm`): `Dosya › Aç...` onu açar. İçe aktarma kısmidir: tempo, izler, pattern'ler, ses klipleri, davul kit'leri, DW Sampler, Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw ve FLM'nin efektleri gelir. FLM'nin diğer enstrümanları LYNX SHARE'in dahili synth'ini çalar. `Dosya › FL Studio Mobile projesi (.flm) olarak kopya kaydet...` FL Studio Mobile için bir kopyayı geri yazar.
 - **GarageBand** (`.band`, GarageBand 10 veya iOS için GarageBand'dan): `Dosya › Aç...` onu region'ları, tempo, ton ve mix'iyle Basit yerleşim izleri olarak açar. Enstrüman izleri LYNX SHARE'in dahili synth'ini ve davullarını çalar, çünkü GarageBand seslerini diğer programların okuyabileceği bir biçimde saklamaz.
 - **BandLab** (`.blx`, Cakewalk veya Sonar'ın indirdiği bir proje): `Dosya › Aç...` onu region'ları, tempo, ton, mix, ses seviyesi ve pan otomasyonu ve yaygın efektleriyle Basit yerleşim izleri olarak açar. BandLab'in enstrüman sesleri ve diğer efektleri içe aktarma raporunda listelenir.
 - **Herhangi bir uygulamadan stem'ler**: izleri ses veya MIDI dosyaları olarak dışa aktarın, hepsini tek bir klasöre koyun, sonra `+ Parça ekle` düğmesine ve `İçe aktar` yanındaki `Klasör...` düğmesine tıklayın. Her dosya, başlangıçtan başlayan bir iz olur.

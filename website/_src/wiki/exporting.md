@@ -69,6 +69,8 @@ The buttons choose the format. M4A is offered only where the system has an AAC e
 
 Tick `Also the full mix` to get the mix next to the stems. The line at the bottom shows how many files will be written.
 
+When the song has sections in the Sections lane, `One file per section` cuts it at the sections and names each file after its section. With stems, each section gets its own set.
+
 `File › Export › All playlist tracks` and `All playlist track groups` write one file per Playlist track or per group. In the Mixer's menu, `Disk recording › Render armed tracks to wave file(s)...` (`Alt+R`) opens the export window for the armed inserts only.
 
 ## Other entries of the Export menu
@@ -77,7 +79,8 @@ Tick `Also the full mix` to get the mix next to the stems. The line at the botto
 |---|---|---|
 | `MIDI file...` | `Ctrl+Shift+M` | Writes the notes as a standard MIDI file (`.mid`) |
 | `Master...` | `Ctrl+Alt+M` | Renders the project and masters it to a loudness target in LUFS, on your computer |
-| `Project with samples (.zip)...` | none | The project and its samples in one archive |
+| `Zipped loop package...` | none | The project and every sample it uses in one `.zip`, as FL Studio's zipped loop package |
+| `Project data files...` | none | Copies every file the project uses to a folder you choose; the project keeps using its own files |
 | `FL Studio project...` | none | An `.flp`, or a zipped loop package with every sample |
 | `Ableton Live set (.als)...` | none | A set for Live 12 or Live 11 |
 | `DAWproject (.dawproject)...` | none | A project for Bitwig Studio, Studio One, Cubase and other apps that read DAWproject |
@@ -86,7 +89,7 @@ Tick `Also the full mix` to get the mix next to the stems. The line at the botto
 
 ## Exporting to FL Studio, Ableton Live and DAWproject
 
-The `.flp` is an FL Studio 2026 project. Samplers, audio clips, FL Studio's own generators and effects, third-party plugins, patterns, the Playlist, the Mixer and automation go over with their settings. For the things FL Studio does not have, you choose between `Render them to audio (sounds the same)` and `Use the nearest FL plugin (stays editable, may sound different)`. With the second choice, LYNX-only instruments are left out. Modulators are always left out. A report lists what was rendered, replaced or left out. Details are in [Coming from FL Studio](/wiki/coming-from-fl-studio/).
+The `.flp` is an FL Studio 2026 project. Samplers, audio clips, FL Studio's own generators and effects, third-party plugins, patterns, the Playlist, the Mixer and automation go over with their settings. For the things FL Studio does not have, you choose between `Render them to audio (sounds the same)` and `Use the nearest FL plugin (stays editable, may sound different)`. With the second choice, LYNX-only instruments are left out. Modulators that follow the song position become automation clips: a synced LFO becomes FL Studio's clip LFO, and steps, random sources and macros become points. Followers, envelopes, keytrack and velocity are left out. A report lists what was rendered, replaced or left out. Details are in [Coming from FL Studio](/wiki/coming-from-fl-studio/).
 
 The `.als` holds a MIDI track per channel, audio tracks, groups, returns, sends, racks and Drum Racks, VST2 and VST3 plugins with their state, markers, and volume, pan and tempo automation. LYNX SHARE's own instruments and effects are not converted, though their tracks and notes are kept. Helix is the exception: it becomes Live's Wavetable. Automation of effect parameters and insert-to-insert routes are dropped. Details are in [Coming from Ableton Live](/wiki/coming-from-ableton/).
 

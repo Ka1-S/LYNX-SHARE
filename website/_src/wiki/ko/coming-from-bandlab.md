@@ -1,5 +1,5 @@
 ---
-source: e3c62e25a8
+source: 736421c170
 ---
 ![간단한 레이아웃: 타임라인 위의 트랙, 스타터 비트, 드럼 머신](/assets/img/learn/simple-beat-2.webp)
 
@@ -42,10 +42,12 @@ source: e3c62e25a8
 | 가사 | `가사` |
 | 튜너 | 툴바의 `튜너` |
 | 믹서 | `F9` |
+| 곡의 부분(인트로, 벌스, 코러스) | 제목 표시줄의 `섹션`: 부분을 통째로 이동, 복사, 반복합니다 |
+| 비트를 보컬 아래로 눌러 주는 덕킹, 에코 센드 | 독의 `이펙트` 탭에서 `리버브` 옆에 있는 `덕킹 기준`와 `에코` 노브 |
 
 ## 내 프로젝트
 
-- **FL Studio Mobile**(`.flm`): `파일 › 열기...`으로 엽니다. 가져오기는 일부만 됩니다. 템포, 트랙, 패턴, 오디오 클립, 드럼 키트, DW Sampler, Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, FLM의 이펙트는 넘어옵니다. FLM의 다른 악기는 LYNX SHARE 내장 신스로 재생됩니다.
+- **FL Studio Mobile**(`.flm`): `파일 › 열기...`으로 엽니다. 가져오기는 일부만 됩니다. 템포, 트랙, 패턴, 오디오 클립, 드럼 키트, DW Sampler, Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, FLM의 이펙트는 넘어옵니다. FLM의 다른 악기는 LYNX SHARE 내장 신스로 재생됩니다. `파일 › FL Studio Mobile 프로젝트(.flm)로 사본 저장...`은 FL Studio Mobile용 사본을 다시 기록합니다.
 - **GarageBand**(`.band`, GarageBand 10 또는 iOS용 GarageBand): `파일 › 열기...`으로 열면 리전, 템포, 키, 믹스가 있는 간단한 레이아웃 트랙으로 들어옵니다. 악기 트랙은 LYNX SHARE 내장 신스와 드럼으로 재생됩니다. GarageBand가 악기 사운드를 다른 프로그램이 읽을 수 있는 형태로 저장하지 않기 때문입니다.
 - **BandLab**(`.blx`, Cakewalk나 Sonar가 내려받은 프로젝트): `파일 › 열기...`으로 열면 리전, 템포, 키, 믹스, 볼륨과 팬 오토메이션, 흔히 쓰는 이펙트가 있는 간단한 레이아웃 트랙으로 들어옵니다. BandLab의 악기 사운드와 다른 이펙트는 가져오기 보고서에 나열됩니다.
 - **어떤 앱의 스템이든**: 트랙을 오디오나 MIDI 파일로 내보내 한 폴더에 넣고, `+ 트랙 추가`을 클릭한 다음 `가져오기` 옆의 `폴더...`를 클릭하세요. 파일마다 처음부터 시작하는 트랙이 됩니다.

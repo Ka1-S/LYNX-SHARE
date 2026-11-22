@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="4856414e";
+window.LYNX_LANG=lang;window.LYNX_V="f30b9328";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=4856414e">
+<link rel="stylesheet" href="/assets/site.css?v=f30b9328">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -112,7 +112,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <figure><a class="shot" href="/assets/img/wiki/session-chat.webp"><img src="/assets/img/wiki/session-chat.webp" alt="Session chat" loading="lazy" width="436" height="419"></a></figure>
 <p>The <code>File › Online session</code> menu has these commands while a session runs:</p>
 <div class="tablewrap"><table><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody><tr><td><code>Session chat...</code></td><td>Opens the chat. The menu item shows the number of unread messages</td></tr><tr><td><code>Follow the host's transport</code></td><td>For guests: play, stop and position follow the host</td></tr><tr><td><code>People and permissions...</code></td><td>For the host: what each person may change, and what each keeps at the end</td></tr><tr><td><code>Share plugins with guests...</code></td><td>For the host: which of your plugins the guests may use. The menu item shows how many are shared</td></tr><tr><td><code>Show invite code...</code></td><td>For the host: shows the code again, with a <code>Copy</code> button</td></tr><tr><td><code>End live session</code></td><td>For the host. Everyone leaves, and the code stops working</td></tr><tr><td><code>Leave live session</code></td><td>For a guest. Your part of the project stays with you</td></tr></tbody></table></div>
-<p>In <code>People and permissions...</code>, each person gets one of four roles: <code>Their own channels, patterns, inserts and rows</code>, <code>Their own parts + tempo and project settings</code>, <code>Everything</code> or <code>Listen only (no edits)</code>. Turning a permission off never deletes anything.</p>
+<p>In <code>People and permissions...</code>, each person gets one of four roles: <code>Their own channels, patterns, inserts and rows</code>, <code>Their own parts + tempo and project settings</code>, <code>Everything</code> or <code>Listen only (no edits)</code>. Turning a permission off never deletes anything. The fifth choice, <code>Remove from the session</code>, takes the person out of the session. By default the session then gets a new invite code for new joins, and the people still in it keep going; <code>Keep the same code</code> keeps the old one.</p>
 <h2 id="plugins-the-others-do-not-have">Plugins the others do not have</h2>
 <p>A channel or insert whose plugin is not installed on your computer plays a stand-in, and shows an amber <code>R</code> badge in the Channel rack and the Mixer.</p>
 <ul><li>In a package, the stand-ins are audio renders made when the package is saved. They follow clips you move, but not edits to the notes of a plugin you do not have. Ask its owner for a new package.</li><li>In a live session, parts that use a plugin someone does not have are rendered by the person who has it and streamed to the others as audio.</li></ul>
@@ -139,8 +139,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=4856414e" defer></script>
-<script src="/assets/wiki.js?v=4856414e" defer></script>
-<script src="/assets/motion.js?v=4856414e" defer></script>
+<script src="/assets/site.js?v=f30b9328" defer></script>
+<script src="/assets/wiki.js?v=f30b9328" defer></script>
+<script src="/assets/motion.js?v=f30b9328" defer></script>
 </body>
 </html>

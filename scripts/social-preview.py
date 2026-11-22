@@ -29,7 +29,7 @@ TEXT = {
     "headline": ["FL Studio-style patterns,", "Ableton Live-style clips."],
     "lines": [
         "Channel Rack · Piano Roll · Playlist · Mixer",
-        "Opens .flp, .als and .flm · exports .flp and .als",
+        "Opens and exports .flp, .als, .flm, .dawproject",
         "VST3, CLAP, VST2, AU, LV2 · free and open source",
     ],
     "pills": ["Windows", "macOS", "Linux"],

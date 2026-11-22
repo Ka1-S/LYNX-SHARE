@@ -1,5 +1,5 @@
 ---
-source: 828f1d5e8c
+source: 70262846ff
 ---
 ![Bagian bawah Pengelola plugin, dengan catatan bahwa setiap file plugin diperiksa di proses terpisah](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -12,7 +12,7 @@ LYNX SHARE menjalankan plugin instrumen dan efek dari pembuat lain. Ia menemukan
 3. Tekan `F8` untuk pemilih plugin dan ketik sebagian nama plugin.
 4. Klik dua kali atau tekan `Enter`. Instrumen menjadi channel baru. Efek masuk ke insert Mixer yang dipilih.
 
-Pada awal pertama, wizard pengaturan mencantumkan folder plugin dan memindainya di latar belakang. `Opsi › Wizard penyiapan (bahasa, audio, folder plugin)...` membukanya lagi. LYNX SHARE juga mencari plugin baru beberapa detik setelah setiap awal.
+Pada awal pertama, LYNX SHARE memindai folder plugin di latar belakang selagi kartu selamat datang terbuka. `Opsi › Wizard penyiapan (bahasa, audio, folder plugin)...` menampilkan folder-nya lagi. LYNX SHARE juga mencari plugin baru beberapa detik setelah setiap awal.
 
 ## Format per sistem
 

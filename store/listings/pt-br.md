@@ -8,7 +8,7 @@ LYNX SHARE
 
 ## Short description
 
-DAW grátis e de código aberto com três workflows em um só programa: patterns no estilo do FL Studio (Channel Rack, Piano Roll, Playlist, Mixer), disparo de clipes no estilo do Ableton Live e um modo simples de janela única no estilo do BandLab e do FL Studio Mobile. Abre projetos .flp, .als, .flm, .dawproject, .band do GarageBand e .blx do BandLab.
+DAW grátis e de código aberto com três layouts em um só programa: patterns no estilo do FL Studio (Channel Rack, Piano Roll, Playlist, Mixer), disparo de clipes no estilo do Ableton Live e um modo simples de janela única no estilo do BandLab e do FL Studio Mobile. Abre projetos .flp, .als, .flm, .dawproject, .band do GarageBand e .blx do BandLab, e exporta .flp, .als, .dawproject e .flm.
 
 ## Description
 
@@ -22,21 +22,27 @@ de dispositivo.
 • Um Fluxo simples que mistura o estilo acessível de janela única do BandLab com o jeito de trabalhar do FL Studio
 Mobile: faixas e linha do tempo, loops, pads e gravação rápida, com uma primeira música guiada.
 
+A primeira execução pergunta de onde você vem e abre o layout correspondente.
+
 É feita para continuar leve e rápida em qualquer PC.
 
 • Leve: motor de áudio sem travas que distribui canais e faixas do mixer pelos núcleos do processador, ignora canais
 parados e lê áudios longos direto do disco.
-• Completo: mais de 100 instrumentos e efeitos embutidos — sintetizadores, baterias eletrônicas, samplers, EQs,
-compressores, limitadores, reverbs, delays, afinação de voz, visualizadores e mais.
+• Completo: mais de 100 instrumentos e efeitos embutidos — sintetizadores (wavetable, FM e os modelos físicos de instrumentos de percussão melódica do LYNX Model), baterias
+eletrônicas, samplers, EQs, compressores, limitadores, reverbs, delays, afinação de voz, visualizadores e mais, além de
+moduladores (LFOs, seguidores de envelope, step sequencers e mais) para qualquer knob.
 • Seus plugins: carrega instrumentos e efeitos VST3, CLAP e VST2, cada um opcionalmente em um processo separado
 (sandbox), para que um plugin que trave não derrube sua sessão.
 • Seus projetos: abre projetos do FL Studio (.flp) com patterns, notas, mixer, automação e samples; abre e salva sets do Ableton Live 11/12 (.als), com os clipes da Session; abre e salva arquivos DAWproject (.dawproject) para Bitwig, Studio One, Cubase e outros apps; exporta .flp de volta para o FL Studio e salva cópias em .flm para o FL Studio Mobile; importa projetos do FL Studio Mobile (.flm, parcial), do GarageBand (.band, parcial), do BandLab (.blx, parcial) e arquivos MIDI.
 • Módulos de tracker: arquivos .mod, .xm, .s3m e .it abrem com seus samples, patterns e andamento, e um tracker
 embutido edita as notas.
+• Organize mais rápido: uma faixa de Seções para partes inteiras da música, clipes de faixa com as próprias notas, faixas ocultas ou desativadas para economizar CPU, uma busca de comandos para toda ação e dois projetos abertos lado a lado com copiar e colar entre eles.
+• Faça música junto: envie um projeto como um só arquivo, ou edite-o ao vivo com até três amigos, com criptografia de ponta a ponta.
 • Edição de áudio: plugins ARA 2, como o Melodyne, trabalham direto nos clipes de áudio, um editor de notas polifônico move e reafina notas isoladas dentro de acordes, e o áudio é convertido em MIDI.
 • Baixa latência: ASIO (inclusive o driver ASIO do próprio LYNX SHARE, para qualquer dispositivo), WASAPI compartilhado e
 exclusivo.
 • Grave áudio e MIDI (MPE também), edite áudio, automatize qualquer parâmetro, exporte em WAV, FLAC, MP3, OGG, AIFF, M4A ou stems.
+• Funciona offline: sem conta, e nada vai para a internet até você permitir.
 • Interface em 15 idiomas: português do Brasil, inglês, espanhol, francês, alemão, italiano, holandês, polonês, russo, turco, indonésio, japonês, coreano e chinês (simplificado e tradicional).
 
 Sem conta, sem assinatura, sem anúncios e sem telemetria. O LYNX SHARE é software livre (GNU AGPL-3.0); o código-fonte
@@ -55,7 +61,7 @@ LYNX SHARE 0.1.30: mais leve do que nunca, usando cerca de metade da CPU do FL S
 ## Features
 
 1. Três workflows em um só programa: patterns no estilo do FL Studio por padrão, disparo de clipes no estilo do Ableton Live ou um Fluxo simples no estilo do BandLab e do FL Studio Mobile
-2. Abre projetos do FL Studio (.flp), Ableton Live (.als), FL Studio Mobile (.flm), DAWproject, GarageBand, BandLab e MIDI; salva .flp, .als, .dawproject e cópias .flm
+2. Abre projetos do FL Studio (.flp e zipados), Ableton Live (.als), FL Studio Mobile (.flm), DAWproject, GarageBand, BandLab e MIDI; salva cópias .flp, .als, .dawproject e .flm
 3. Mais de 100 instrumentos e efeitos embutidos
 4. Carrega plugins VST3, CLAP e VST2, opcionalmente isolados em processo próprio
 5. Áudio com baixa latência: ASIO, WASAPI compartilhado e exclusivo
@@ -66,6 +72,11 @@ LYNX SHARE 0.1.30: mais leve do que nunca, usando cerca de metade da CPU do FL S
 10. Gratuito e de código aberto (AGPL-3.0): sem conta, sem anúncios, sem telemetria
 11. Hospedagem de plugins ARA 2, editor de notas polifônico e conversão de áudio em MIDI
 12. Abre módulos de tracker (.mod, .xm, .s3m, .it) e edita as notas num tracker embutido
+13. LYNX Model: modelos físicos de marimba, vibrafone, xilofone, glockenspiel, sinos tubulares e kalimba
+14. Moduladores para qualquer knob: LFO, seguidor de envelope, ADSR, passos, aleatório, macro, keytrack e velocity
+15. Faixa de Seções, faixas ocultas ou desativadas e uma busca que encontra todos os comandos
+16. Sessões online: edite um projeto ao vivo com até três amigos, com criptografia de ponta a ponta
+17. Funciona offline: sem conta e sem conexão até você permitir
 
 ## Search terms
 

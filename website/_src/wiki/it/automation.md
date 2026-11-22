@@ -1,5 +1,5 @@
 ---
-source: b96330a448
+source: 1aea1764bf
 ---
 ![L'editor di automazione con una curva che sale in sei battute](/assets/img/wiki/automation.webp)
 
@@ -76,7 +76,7 @@ Attiva la registrazione con `Automazione` spuntato nel filtro di registrazione, 
 
 - `Collega a un controller MIDI (muovi una manopola sul controller)` è trattato in [Controller MIDI](/wiki/midi-controllers/).
 - `Collega a un controller interno` permette a un Envelope, a un Formula o a un Peak Controller del progetto di pilotare il controllo. Aggiungine prima uno.
-- `Modula` collega un modulatore, un LFO o una sorgente casuale che muove una manopola di LYNX SHARE attorno al suo valore. `Strumenti › Modulatori...` li elenca.
+- `Modula con` collega un modulatore che muove il controllo attorno al suo valore: un LFO, un inseguitore d'inviluppo, un inviluppo ADSR, step, una sorgente casuale, una macro, keytrack o velocity. Funziona sulle manopole di LYNX SHARE e sui parametri dei plugin di terze parti. Puoi anche trascinare un modulatore su una manopola, e un anello sulla manopola mostra il movimento. `Strumenti › Modulatori...` li elenca.
 
 ## Corsie di automazione
 
@@ -88,7 +88,8 @@ Le corsie sono disattivate per impostazione predefinita. Attiva `Corsie di autom
 - Più clip sullo stesso controllo suonano ciascuna al proprio posto. Prima della sua prima clip, un controllo mantiene il proprio valore.
 - All'inizio di una clip il controllo raggiunge il nuovo valore in circa 8 ms. FL Studio ci arriva scivolando, quindi un progetto importato può differire leggermente in quei punti.
 - Dove le clip sullo stesso controllo si sovrappongono, quella scelta da LYNX SHARE può differire da quella scelta da FL Studio.
-- I modulatori funzionano solo sulle manopole di LYNX SHARE e vengono lasciati fuori quando esporti in `.flp`.
+- Quando esporti in `.flp`, i modulatori che seguono la posizione del brano diventano clip di automazione (un LFO sincronizzato diventa l'LFO di clip di FL Studio). Gli inseguitori, gli inviluppi, il keytrack e la velocity vengono lasciati fuori, e il report li elenca.
+- Hai mosso un controllo durante la riproduzione senza registrare? `Cattura automazione` nelle opzioni di registrazione trasforma poi gli ultimi movimenti in automazione.
 
 ## Correlati
 

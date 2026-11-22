@@ -1,5 +1,5 @@
 ---
-source: e3c62e25a8
+source: 736421c170
 ---
 ![Prosty układ: ścieżki na osi czasu, gotowy beat i Drum Machine](/assets/img/learn/simple-beat-2.webp)
 
@@ -42,10 +42,12 @@ Wybierz **Prosty układ**. To jedno okno ze ścieżkami na osi czasu, pętlami, 
 | Teksty piosenek | `Tekst piosenki` |
 | Stroik | `Stroik` na pasku narzędzi |
 | Mikser | `F9` |
+| Części utworu (intro, zwrotka, refren) | `Sekcje` na pasku tytułu: części, które przesuwają się, kopiują i powtarzają jako całość |
+| Przyciszanie beatu pod wokalem, wysyłka echa | `Przyciszaj pod` i pokrętło `Echo`, obok `Pogłos` na karcie `Efekty` panelu |
 
 ## Twoje projekty
 
-- **FL Studio Mobile** (`.flm`): otwiera go `Plik › Otwórz...`. Import jest częściowy: przechodzą tempo, ścieżki, patterny, klipy audio, zestawy perkusyjne, DW Sampler, Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw i efekty FLM. Pozostałe instrumenty FLM grają na wbudowanym syntezatorze LYNX SHARE.
+- **FL Studio Mobile** (`.flm`): otwiera go `Plik › Otwórz...`. Import jest częściowy: przechodzą tempo, ścieżki, patterny, klipy audio, zestawy perkusyjne, DW Sampler, Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw i efekty FLM. Pozostałe instrumenty FLM grają na wbudowanym syntezatorze LYNX SHARE. `Plik › Zapisz kopię jako projekt FL Studio Mobile (.flm)...` zapisuje kopię z powrotem dla FL Studio Mobile.
 - **GarageBand** (`.band`, z GarageBand 10 lub GarageBand na iOS): `Plik › Otwórz...` otwiera go jako ścieżki Prostego układu z regionami, tempem, tonacją i miksem. Ścieżki instrumentów grają na wbudowanym syntezatorze i perkusji LYNX SHARE, bo GarageBand nie zapisuje ich brzmień w formie, którą odczytają inne programy.
 - **BandLab** (`.blx`, projekt pobrany przez Cakewalk lub Sonar): `Plik › Otwórz...` otwiera go jako ścieżki Prostego układu z regionami, tempem, tonacją, miksem, automatyką głośności i panoramy oraz popularnymi efektami. Brzmienia instrumentów BandLab i inne efekty są wymienione w raporcie importu.
 - **Stemy z dowolnej aplikacji**: wyeksportuj ścieżki jako pliki audio lub MIDI, włóż je do jednego folderu, kliknij `+ Dodaj ścieżkę`, a potem `Folder...` obok `Importuj`. Każdy plik staje się ścieżką zaczynającą się od początku.

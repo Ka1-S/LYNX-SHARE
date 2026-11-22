@@ -1,5 +1,5 @@
 ---
-source: d980e5fc0f
+source: b05790879f
 ---
 ![Het exportvenster met WAV gekozen: bereik, staart en bestanden links, formaat rechts, mixopties eronder](/assets/img/wiki/export.webp)
 
@@ -67,6 +67,8 @@ De knoppen kiezen het formaat. M4A is er alleen als het systeem een AAC-encoder 
 
 Vink `Ook de volledige mix` aan om de mix naast de stems te krijgen. De regel onderaan toont hoeveel bestanden er geschreven worden.
 
+Als het nummer secties in de sectiebaan heeft, knipt `Eén bestand per sectie` het bij de secties en noemt elk bestand naar zijn sectie. Bij stems krijgt elke sectie een eigen set.
+
 `Bestand › Exporteren › Alle Playlist-tracks` en `Alle Playlist-trackgroepen` schrijven één bestand per Playlist-track of per groep. In het menu van de Mixer opent `Opnemen naar schijf › Gearmde tracks renderen naar wave-bestand(en)...` (`Alt+R`) het exportvenster alleen voor de gearmde inserts.
 
 ## Andere items van het menu Exporteren
@@ -75,7 +77,8 @@ Vink `Ook de volledige mix` aan om de mix naast de stems te krijgen. De regel on
 |---|---|---|
 | `MIDI-bestand...` | `Ctrl+Shift+M` | Schrijft de noten als standaard MIDI-bestand (`.mid`) |
 | `Masteren...` | `Ctrl+Alt+M` | Rendert het project en masterd het op een loudnessdoel in LUFS, op je eigen computer |
-| `Project met samples (.zip)...` | none | Het project en zijn samples in één archief |
+| `Gezipt looppakket...` | none | Het project en elke sample die het gebruikt in één `.zip`, als het gezipte looppakket van FL Studio |
+| `Projectgegevensbestanden...` | none | Kopieert elk bestand dat het project gebruikt naar een map die je kiest; het project blijft zijn eigen bestanden gebruiken |
 | `FL Studio-project...` | none | Een `.flp`, of een gezipt looppakket met elke sample |
 | `Ableton Live-set (.als)...` | none | Een set voor Live 12 of Live 11 |
 | `DAWproject (.dawproject)...` | none | Een project voor Bitwig Studio, Studio One, Cubase en andere apps die DAWproject lezen |
@@ -84,7 +87,7 @@ Vink `Ook de volledige mix` aan om de mix naast de stems te krijgen. De regel on
 
 ## Exporteren naar FL Studio, Ableton Live en DAWproject
 
-De `.flp` is een FL Studio 2026-project. Samplers, audioclips, de eigen generators en effecten van FL Studio, plugins van derden, patterns, de Playlist, de Mixer en automatisering gaan mee met hun instellingen. Voor dingen die FL Studio niet heeft, kies je tussen `Naar audio renderen (klinkt hetzelfde)` en `De dichtstbijzijnde FL-plugin gebruiken (blijft bewerkbaar, kan anders klinken)`. Bij de tweede keuze worden instrumenten die alleen in LYNX bestaan weggelaten. Modulators worden altijd weggelaten. Een rapport toont wat gerenderd, vervangen of weggelaten is. Details staan in [Overstappen van FL Studio](/wiki/coming-from-fl-studio/).
+De `.flp` is een FL Studio 2026-project. Samplers, audioclips, de eigen generators en effecten van FL Studio, plugins van derden, patterns, de Playlist, de Mixer en automatisering gaan mee met hun instellingen. Voor dingen die FL Studio niet heeft, kies je tussen `Naar audio renderen (klinkt hetzelfde)` en `De dichtstbijzijnde FL-plugin gebruiken (blijft bewerkbaar, kan anders klinken)`. Bij de tweede keuze worden instrumenten die alleen in LYNX bestaan weggelaten. Modulators die de songpositie volgen worden automatiseringsclips: een gesynchroniseerde LFO wordt de clip-LFO van FL Studio, en steps, willekeurige bronnen en macro's worden punten. Followers, envelopes, keytrack en velocity worden weggelaten. Een rapport toont wat gerenderd, vervangen of weggelaten is. Details staan in [Overstappen van FL Studio](/wiki/coming-from-fl-studio/).
 
 De `.als` bevat een MIDI-track per kanaal, audiotracks, groepen, returns, sends, racks en Drum Racks, VST2- en VST3-plugins met hun staat, markers, en automatisering van volume, pan en tempo. De eigen instrumenten en effecten van LYNX SHARE worden niet omgezet, maar hun tracks en noten blijven behouden. Helix is de uitzondering: dat wordt de Wavetable van Live. Automatisering van effectparameters en routes van insert naar insert vervallen. Details staan in [Overstappen van Ableton Live](/wiki/coming-from-ableton/).
 

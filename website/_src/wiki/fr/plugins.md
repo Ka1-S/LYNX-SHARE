@@ -1,5 +1,5 @@
 ---
-source: 828f1d5e8c
+source: 70262846ff
 ---
 ![La partie basse du Gestionnaire de plugins, avec sa note disant que chaque fichier de plugin est examiné dans un processus séparé](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -12,7 +12,7 @@ LYNX SHARE héberge des plugins d'instruments et d'effets d'autres éditeurs. Il
 3. Appuyez sur `F8` pour le sélecteur de plugins et tapez une partie du nom du plugin.
 4. Double-cliquez dessus ou appuyez sur `Enter`. Un instrument devient un nouveau canal. Un effet va dans l'insert du Mixer sélectionné.
 
-Au premier démarrage, l'assistant de configuration liste les dossiers de plugins et les analyse en arrière-plan. `Options › Assistant de configuration (langue, audio, dossiers de plugins)...` le rouvre. LYNX SHARE cherche aussi de nouveaux plugins quelques secondes après chaque démarrage.
+Au premier démarrage, LYNX SHARE analyse les dossiers de plugins en arrière-plan pendant que la carte de bienvenue est ouverte. `Options › Assistant de configuration (langue, audio, dossiers de plugins)...` affiche de nouveau les dossiers. LYNX SHARE cherche aussi de nouveaux plugins quelques secondes après chaque démarrage.
 
 ## Formats par système
 

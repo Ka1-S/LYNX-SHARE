@@ -1,5 +1,5 @@
 ---
-source: dd17f63a9b
+source: 4ca4775a35
 ---
 ![클립 실행 레이아웃: 플레이리스트 옆에 장면이 있는 클립 그리드](/assets/img/cliplaunch.webp)
 
@@ -88,6 +88,8 @@ Live와 다른 점:
 - Live 자체 디바이스 중 많은 수는 설정과 오토메이션과 함께 LYNX SHARE 자체의 것으로 들어옵니다. EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Hybrid Reverb, Delay, Echo, Grain Delay, Auto Filter, Saturator, Overdrive, Roar, Erosion, Vinyl Distortion, Corpus, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Spectral Time, Spectral Resonator, Looper, Simpler, Sampler, Drift, Operator, Wavetable, Meld입니다. 나머지는 빠지고 가져오기 보고서에 나열됩니다.
 - Instrument Rack과 Audio Effect Rack은 체인, 존, 매크로와 함께 들어오고, Drum Rack은 LYNX SHARE의 Drum Rack이 됩니다. Live의 Arpeggiator는 채널의 아르페지에이터가 됩니다. Pitch, Velocity, Chord, Note Length와 MIDI Effect Rack은 노트에 기록됩니다.
 - 제외된 항목은 가져오기 보고서에 나열됩니다.
+- 장치 보기에서 랙은 체인의 장치를 인라인으로 보여 주며, Map 모드(랙의 `Map` 버튼)로 Live처럼 장치 파라미터를 매크로에 할당할 수 있습니다.
+- 세션 믹서에는 Live의 솔로 / 큐 스위치가 있고, 헤드폰용 `Cue Out`과 `큐 볼륨`이 있습니다.
 - Live는 내보낸 세트에서 겹치는 오디오 클립을 잘라 냅니다.
 - Live 세트의 워프 마커는 가져올 때 유지되고, 내보낼 때 다시 기록됩니다.
 

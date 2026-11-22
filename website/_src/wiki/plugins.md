@@ -14,7 +14,7 @@ LYNX SHARE hosts instrument and effect plugins from other makers. It finds them 
 3. Press `F8` for the plugin picker and type part of the plugin's name.
 4. Double-click it or press `Enter`. An instrument becomes a new channel. An effect goes into the selected Mixer insert.
 
-On first start, the setup wizard lists the plugin folders and scans them in the background. `Options › Setup wizard (language, audio, plugin folders)...` opens it again. LYNX SHARE also looks for new plugins a few seconds after each start.
+On first start, LYNX SHARE scans the plugin folders in the background while the welcome card is open. `Options › Setup wizard (language, audio, plugin folders)...` shows the folders again. LYNX SHARE also looks for new plugins a few seconds after each start.
 
 ## Formats per system
 
