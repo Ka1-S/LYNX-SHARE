@@ -3012,13 +3012,17 @@ void AudioEngine::setInsertRecordDryToo (int track, bool on)
 
 void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce::MidiMessage& m)
 {
+    handleMidiInput (source, source != nullptr ? source->getName().toStdString() : std::string(), m);
+}
+
+void AudioEngine::handleMidiInput (juce::MidiInput* source, const std::string& deviceName, const juce::MidiMessage& m)
+{
     // MIDI thread: queues and atomics only (and a short copy of the device settings)
     prefs::MidiInputPrefs device;
     auto velocityCurve = prefs::VelocityCurve::linear;
     auto locked = -1; // a channel that "receives notes from" this device (FL's channel lock)
     auto jumpChannel = 0;
     std::uint8_t inputSource = 0; // round 190jl: NoteEvent::source (0 = unknown)
-    const auto deviceName = source != nullptr ? source->getName().toStdString() : std::string();
     {
         const juce::SpinLock::ScopedLockType lock (midiPrefsLock);
         const auto& name = deviceName;

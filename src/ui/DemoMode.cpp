@@ -7,13 +7,21 @@
 #include "ui/DemoMode.h"
 
 #include <atomic>
+#include <iterator>
+#include <memory>
+#include <utility>
+#include <vector>
 #include <optional>
 #include <stdexcept>
 
+#include "core/MixerOps.h"
 #include "core/SessionIds.h"
 #include "engine/LiveSessions.h"
+#include "engine/PluginHost.h"
 #include "ui/I18n.h"
 #include "ui/LiveSessionUi.h"
+#include "ui/ExportDialog.h"
+#include "ui/ModRing.h"
 #include "ui/ClipGridComponent.h"
 #include "ui/MainComponent.h"
 #include "ui/MixerComponent.h"
@@ -26,15 +34,26 @@ namespace demo
 namespace
 {
 std::atomic<bool> on { false };
+juce::File& exportTarget()
+{
+    static juce::File file;
+    return file;
+}
 }
 
 bool active() noexcept { return on.load(); }
 void setActive (bool value) noexcept { on.store (value); }
 
+juce::String virtualKeyboardName() { return "LYNX demo keyboard"; }
+void setExportTarget (const juce::File& file) { exportTarget() = file; }
+juce::File takeExportTarget() { return std::exchange (exportTarget(), juce::File()); }
+
 juce::StringArray operations()
 {
     return { "ui.window", "ui.find", "ui.click", "ui.hover", "ui.list", "ui.layout", "ui.select_track", "ui.show", "ui.welcome", "ui.clipmenu", "ui.polyeditor",
-             "ui.open", "ui.action", "ui.editor", "ui.place", "ui.polynotes", "session.start", "session.status" };
+             "ui.open", "ui.action", "ui.editor", "ui.place", "ui.polynotes", "session.start", "session.status",
+             // round 190pl (tutorial batch 2)
+             "ui.export", "file.export", "file.save", "midi.input", "plugin.scan", "ui.drag", "ui.controlmenu", "mixer.route", "ui.repaint" };
 }
 
 bool isLocalRelay (const juce::String& url)
@@ -169,9 +188,14 @@ juce::Component* findMenuItemIn (juce::Component& root, const juce::String& engl
         if (! c->isVisible())
             continue;
         if (auto* h = c->getAccessibilityHandler(); h != nullptr && h->getRole() == juce::AccessibilityRole::menuItem && ! c->getLocalBounds().isEmpty())
-            if (const auto title = menuText (h->getTitle());
-                title == translated || title == english || title.startsWith (translated + " (") || title.startsWith (english + " (")) // (an item may end in a count: "Create scenes from sections (3)")
+        {
+            const auto title = menuText (h->getTitle());
+            // (an item may end in a count: "Create scenes from sections (3)", or after its dots: "More plugins... (196 effects)")
+            const auto counted = title.endsWithChar (')') && title.contains (" (") ? menuText (title.upToLastOccurrenceOf (" (", false, false)) : juce::String();
+            if (title == translated || title == english || title.startsWith (translated + " (") || title.startsWith (english + " (")
+                || (counted.isNotEmpty() && (counted == translated || counted == english)))
                 return c;
+        }
         if (auto* inner = findMenuItemIn (*c, english, translated))
             return inner;
     }
@@ -206,6 +230,192 @@ juce::Component* findInOtherWindows (juce::Component& window, const juce::String
                     return c;
             }
     return nullptr;
+}
+
+// Round 190pl: a press, moves and a release delivered through a LYNX window's peer, as the system's mouse events arrive
+// (ComponentPeer::handleMouseEvent; nothing reaches the operating system): what is on top at each point gets them, a
+// drag that starts a drag-and-drop (a loop onto the timeline, a plugin onto a slot) drops on what is under its end, a
+// knob turns. `path` in screen pixels, one point per step of `stepMs`; the press at the first, the release at the last.
+class PeerGesture final : private juce::Timer
+{
+public:
+    // A drag: pressed at path's first point, moved with the button down through the others, released at the last
+    static void drag (juce::Component& window, const std::vector<juce::Point<float>>& path, juce::ModifierKeys keys, bool right, int stepMs)
+    {
+        std::vector<Step> steps;
+        for (std::size_t i = 0; i < path.size(); ++i)
+            steps.push_back ({ path[i], i + 1 < path.size() });
+        start (window, std::move (steps), keys, right, stepMs);
+    }
+    // `clicks` presses and releases at one point (2: a double click)
+    static void click (juce::Component& window, juce::Point<float> at, int clicks, juce::ModifierKeys keys, bool right)
+    {
+        std::vector<Step> steps;
+        for (int k = 0; k < clicks; ++k)
+        {
+            steps.push_back ({ at, true });
+            steps.push_back ({ at, false });
+        }
+        start (window, std::move (steps), keys, right, 30);
+    }
+
+private:
+    struct Step
+    {
+        juce::Point<float> at;
+        bool down = false;
+    };
+
+    static void start (juce::Component& window, std::vector<Step> steps, juce::ModifierKeys keys, bool right, int stepMs)
+    {
+        auto* g = new PeerGesture (window, std::move (steps), keys, right);
+        g->step(); // (the press now: a click is pressed by the time the operation answers)
+        if (g->done)
+            delete g;
+        else
+            g->startTimer (juce::jmax (1, stepMs));
+    }
+
+    PeerGesture (juce::Component& w, std::vector<Step> s, juce::ModifierKeys k, bool r)
+        : window (&w), steps (std::move (s)), keys (k), right (r) {}
+
+    void timerCallback() override
+    {
+        step();
+        if (done)
+        {
+            stopTimer();
+            delete this;
+        }
+    }
+
+    void step()
+    {
+        auto* peer = window != nullptr ? window->getPeer() : nullptr;
+        if (peer == nullptr || next >= steps.size())
+        {
+            done = true;
+            return;
+        }
+        const auto button = right ? juce::ModifierKeys::rightButtonModifier : juce::ModifierKeys::leftButtonModifier;
+        const auto& s = steps[next];
+        peer->handleMouseEvent (juce::MouseInputSource::InputSourceType::mouse, peer->globalToLocal (s.at), s.down ? keys.withFlags (button) : keys,
+                                s.down ? 1.0f : 0.0f, 0.0f, juce::Time::currentTimeMillis());
+        // a drag's picture is a window of its own that moves over LYNX's: on an X server without a compositor what it
+        // leaves behind is only painted over by a repaint, so every LYNX window is painted again as it moves and at the end
+        if (steps.size() > 4)
+        {
+            auto& desktop = juce::Desktop::getInstance();
+            for (int i = 0; i < desktop.getNumComponents(); ++i)
+                if (auto* top = desktop.getComponent (i); top != nullptr && top->isShowing())
+                    top->repaint();
+        }
+        if (++next >= steps.size())
+            done = true;
+    }
+
+    juce::Component::SafePointer<juce::Component> window;
+    std::vector<Step> steps;
+    juce::ModifierKeys keys;
+    bool right = false, done = false;
+    std::size_t next = 0;
+};
+
+juce::ModifierKeys keysOf (const juce::var& mods)
+{
+    int flags = 0;
+    if (auto* list = mods.getArray())
+        for (const auto& m : *list)
+        {
+            const auto k = m.toString().toLowerCase();
+            if (k == "shift") flags |= juce::ModifierKeys::shiftModifier;
+            else if (k == "ctrl" || k == "control") flags |= juce::ModifierKeys::ctrlModifier;
+            else if (k == "alt") flags |= juce::ModifierKeys::altModifier;
+            else if (k == "cmd" || k == "command") flags |= juce::ModifierKeys::commandModifier;
+            else fail ("mods: shift, ctrl, alt or cmd");
+        }
+    return juce::ModifierKeys (flags);
+}
+
+// Round 190pl: "param:<what>" targets, a control by the parameter it sets (the knob a right-click on it would automate):
+// param:channel.<c>.<p> (a channel's instrument parameter p), param:channel.<c>.volume / .pan, param:insert.<t>.<slot>.<p>
+// (an insert effect's parameter), param:insert.<t>.volume / .pan (a Mixer track's fader / pan).
+std::optional<AutomationTarget> parseParamTarget (const juce::String& target)
+{
+    juce::StringArray parts;
+    parts.addTokens (target.fromFirstOccurrenceOf ("param:", false, false), ".", {});
+    const auto isNumber = [] (const juce::String& t) { return t.isNotEmpty() && t.containsOnly ("0123456789"); };
+    if (parts.size() == 3 && parts[0] == "channel" && isNumber (parts[1]))
+    {
+        if (parts[2] == "volume") return AutomationTarget { AutomationTargetKind::channelVolume, parts[1].getIntValue(), 0, 0 };
+        if (parts[2] == "pan") return AutomationTarget { AutomationTargetKind::channelPan, parts[1].getIntValue(), 0, 0 };
+        if (isNumber (parts[2])) return AutomationTarget { AutomationTargetKind::channelParam, parts[1].getIntValue(), 0, parts[2].getIntValue() };
+    }
+    if (parts.size() == 3 && parts[0] == "insert" && isNumber (parts[1]))
+    {
+        if (parts[2] == "volume") return AutomationTarget { AutomationTargetKind::mixerVolume, parts[1].getIntValue(), 0, 0 };
+        if (parts[2] == "pan") return AutomationTarget { AutomationTargetKind::mixerPan, parts[1].getIntValue(), 0, 0 };
+    }
+    if (parts.size() == 4 && parts[0] == "insert" && isNumber (parts[1]) && isNumber (parts[2]) && isNumber (parts[3]))
+        return AutomationTarget { AutomationTargetKind::effectParam, parts[1].getIntValue(), parts[2].getIntValue(), parts[3].getIntValue() };
+    return std::nullopt;
+}
+
+// The showing control that sets `target`, in any LYNX window: a knob tagged with it (modring::tagSlider), or the part of
+// a component that paints several knobs (modring::TargetSource: sampled on a 3 px grid) where it answers with it.
+struct ParamControl
+{
+    juce::Component* component = nullptr;
+    juce::Rectangle<int> area; // in the component
+};
+
+bool findParamIn (juce::Component& root, const AutomationTarget& target, ParamControl& out)
+{
+    if (! root.isShowing() || root.getLocalBounds().isEmpty())
+        return false;
+    if (const auto t = modring::taggedTarget (root); t && *t == target)
+    {
+        out = { &root, root.getLocalBounds() };
+        return true;
+    }
+    if (auto* painted = dynamic_cast<demo::ParamSource*> (&root))
+        if (const auto r = painted->demoParamBounds ((int) target.kind, target.index, target.slot, target.param); ! r.isEmpty())
+        {
+            out = { &root, r };
+            return true;
+        }
+    if (auto* source = dynamic_cast<modring::TargetSource*> (&root))
+    {
+        juce::Rectangle<int> hit;
+        constexpr int step = 3;
+        for (int y = step / 2; y < root.getHeight(); y += step)
+            for (int x = step / 2; x < root.getWidth(); x += step)
+                if (const auto t = source->modTargetAt ({ x, y }); t && *t == target)
+                    hit = hit.isEmpty() ? juce::Rectangle<int> (x - step / 2, y - step / 2, step, step)
+                                        : hit.getUnion ({ x - step / 2, y - step / 2, step, step });
+        if (! hit.isEmpty())
+        {
+            out = { &root, hit };
+            return true;
+        }
+    }
+    for (auto* c : root.getChildren())
+        if (c->isVisible() && findParamIn (*c, target, out))
+            return true;
+    return false;
+}
+
+std::optional<ParamControl> findParamControl (juce::Component& window, const AutomationTarget& target)
+{
+    ParamControl found;
+    if (findParamIn (window, target, found))
+        return found;
+    auto& desktop = juce::Desktop::getInstance();
+    for (int i = desktop.getNumComponents(); --i >= 0;)
+        if (auto* top = desktop.getComponent (i); top != nullptr && top != window.getTopLevelComponent() && top->isShowing())
+            if (findParamIn (*top, target, found))
+                return found;
+    return std::nullopt;
 }
 
 juce::String stateName (LiveSessionManager::State s)
@@ -245,6 +455,42 @@ juce::var MainComponent::handleDemoOp (const juce::String& op, const juce::var& 
             return *c;
         fail ("No control showing with the ID or name \"" + target + "\"");
     };
+    // round 190pl: a "param:..." target (parseParamTarget): the control and its area, or an error
+    const auto findParam = [&window] (const juce::String& target) -> ParamControl {
+        const auto t = parseParamTarget (target);
+        if (! t)
+            fail ("param targets: param:channel.<c>.<p>, param:channel.<c>.volume|pan, param:insert.<t>.<slot>.<p>, param:insert.<t>.volume|pan");
+        if (const auto found = findParamControl (window, *t))
+            return *found;
+        fail ("No control showing for \"" + target + "\" (open its editor first)");
+    };
+    // round 190pl: the newest of LYNX's windows that `open` made gets the component ID "editor" (ui.editor)
+    const auto openEditorWindow = [this] (std::function<void()> open) -> juce::Component* {
+        auto& desktop = juce::Desktop::getInstance();
+        juce::Array<juce::Component*> before;
+        for (int i = 0; i < desktop.getNumComponents(); ++i)
+            before.add (desktop.getComponent (i));
+        open();
+        for (int i = desktop.getNumComponents(); --i >= 0;)
+            if (auto* top = desktop.getComponent (i); top != nullptr && ! before.contains (top) && top->isShowing())
+            {
+                for (int k = 0; k < desktop.getNumComponents(); ++k) // (one window carries the ID: the newest)
+                    if (auto* other = desktop.getComponent (k); other != nullptr && other->getComponentID() == "editor")
+                        other->setComponentID ({});
+                top->setComponentID ("editor");
+                // a window taller than the screen is moved up into it (Helix's editor is ~1000 px tall), and painted again
+                // once it is mapped (a private X server without a compositor otherwise shows stale pixels in it for a while)
+                if (const auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect (getScreenBounds()))
+                    top->setBounds (top->getBounds().constrainedWithin (display->userArea));
+                for (const int ms : { 150, 600, 1500 })
+                    juce::Timer::callAfterDelay (ms, [sp = juce::Component::SafePointer<juce::Component> (top)] {
+                        if (sp != nullptr)
+                            sp->repaint();
+                    });
+                return top;
+            }
+        return nullptr;
+    };
 
     if (op == "ui.window")
     {
@@ -253,12 +499,23 @@ juce::var MainComponent::handleDemoOp (const juce::String& op, const juce::var& 
                          { "layout", layoutstyle::id (layoutStyle) }, { "language", i18n::current() } });
     }
     // "cell": { "row", "column" } on a control made of cells (demo::CellSource): that cell's rectangle, in its coordinates
-    const auto cellOf = [this, &args] (juce::Component& c) -> std::optional<juce::Rectangle<int>> {
-        const auto& cell = args["cell"];
+    // (round 190pl: `cellArg` instead of args' "cell": a drag's end)
+    const auto cellOf = [this, &args] (juce::Component& c, const juce::var* cellArg = nullptr) -> std::optional<juce::Rectangle<int>> {
+        const auto& cell = cellArg != nullptr ? *cellArg : args["cell"];
         if (cell.getDynamicObject() == nullptr)
             return std::nullopt;
+        // (round 190pl: "name" instead of "column" on a control that can look its cells up by what they show)
+        if (cell["row"].isInt() && cell["name"].isString())
+        {
+            auto* named = dynamic_cast<demo::CellSource*> (&c);
+            const auto r = named != nullptr ? named->demoCellNamed ((int) cell["row"], cell["name"].toString()).getIntersection (c.getLocalBounds())
+                                            : juce::Rectangle<int>();
+            if (r.isEmpty())
+                fail ("No cell showing \"" + cell["name"].toString() + "\" (or it is scrolled out of view)");
+            return r;
+        }
         if (! cell["row"].isInt() || ! cell["column"].isInt())
-            fail ("cell needs integer row and column");
+            fail ("cell needs integer row and column (or row and name)");
         const auto row = (int) cell["row"], column = (int) cell["column"];
         juce::Rectangle<int> r;
         if (auto* source = dynamic_cast<demo::CellSource*> (&c))
@@ -295,7 +552,10 @@ juce::var MainComponent::handleDemoOp (const juce::String& op, const juce::var& 
         else if (&c == &mixer.getStripsForSnapshot())
         {
             auto& strips = mixer.getStripsForSnapshot();
-            r = row == 0 ? strips.faderRailForSnapshot (column) : row == 1 ? strips.muteAreaForSnapshot (column) : row == 2 ? strips.meterAreaForSnapshot (column) : juce::Rectangle<int>();
+            // (round 190pl: row 3 the route arrow under the track, 4 the fader's cap where it is now, 5 the pan knob, 6 solo, 7 its header)
+            r = row == 0 ? strips.faderRailForSnapshot (column) : row == 1 ? strips.muteAreaForSnapshot (column) : row == 2 ? strips.meterAreaForSnapshot (column)
+              : row == 3 ? strips.routeArrowForSnapshot (column) : row == 4 ? strips.faderCapForSnapshot (column) : row == 5 ? strips.panAreaForSnapshot (column)
+              : row == 6 ? strips.soloAreaForSnapshot (column) : row == 7 ? strips.headerAreaForSnapshot (column) : juce::Rectangle<int>();
         }
         else if (clipGridView != nullptr && &c == clipGridView.get())
         {
@@ -324,6 +584,18 @@ juce::var MainComponent::handleDemoOp (const juce::String& op, const juce::var& 
     if (op == "ui.find")
     {
         const auto target = text (args, "target");
+        if (target.startsWith ("param:"))
+        {
+            if (! parseParamTarget (target))
+                findParam (target); // (the error: the forms it takes)
+            if (const auto found = findParamControl (window, *parseParamTarget (target)))
+            {
+                auto described = describe (window, *found->component);
+                described.getDynamicObject()->setProperty ("screen", rect (found->component->localAreaToGlobal (found->area)));
+                return object ({ { "found", true }, { "control", described } });
+            }
+            return object ({ { "found", false } });
+        }
         if (auto* c = locate (target))
         {
             auto described = describe (window, *c);
@@ -348,6 +620,41 @@ juce::var MainComponent::handleDemoOp (const juce::String& op, const juce::var& 
         listInto (window, *root, list, limit);
         return object ({ { "controls", list } });
     }
+    // round 190pl: a right-click on the control that sets a parameter (a knob's own menu: Create automation clip, Link to
+    // controller, Modulate with...). The parameter as a "param:..." target, or as fields: channel + parameter (an index,
+    // "volume" or "pan"), or insert (+ slot) + parameter. The menu opens where the pointer is, as the knob's own does.
+    if (op == "ui.controlmenu")
+    {
+        juce::String target;
+        if (args["target"].isString())
+            target = text (args, "target");
+        else
+        {
+            const auto& p = args["parameter"];
+            const auto param = p.isString() ? p.toString() : (p.isInt() || p.isInt64()) ? juce::String ((int) p) : juce::String();
+            if (args["channel"].isInt() && param.isNotEmpty())
+                target = "param:channel." + juce::String ((int) args["channel"]) + "." + param;
+            else if (args["insert"].isInt() && args["slot"].isInt() && param.isNotEmpty())
+                target = "param:insert." + juce::String ((int) args["insert"]) + "." + juce::String ((int) args["slot"]) + "." + param;
+            else if (args["insert"].isInt() && param.isNotEmpty())
+                target = "param:insert." + juce::String ((int) args["insert"]) + "." + param;
+            else
+                fail ("ui.controlmenu needs target (param:...), or channel / insert (+ slot) with parameter");
+        }
+        const auto found = findParam (target);
+        const auto area = found.area;
+        pressAndRelease (*found.component, area.toFloat().getCentre(), 1, true);
+        return object ({ { "menu", true }, { "target", target }, { "screen", rect (found.component->localAreaToGlobal (area)) } });
+    }
+    if (op == "ui.click" && text (args, "target").startsWith ("param:"))
+    {
+        const auto found = findParam (text (args, "target"));
+        const auto right = args["right"].isBool() && (bool) args["right"];
+        const auto clicks = args["double"].isBool() && (bool) args["double"] ? 2 : 1;
+        const auto at = pointIn (found.area);
+        pressAndRelease (*found.component, at, clicks, right);
+        return object ({ { "clicked", true }, { "screen", rect (found.component->localAreaToGlobal (found.area)) } });
+    }
     if (op == "ui.click")
     {
         auto& c = find();
@@ -366,6 +673,25 @@ juce::var MainComponent::handleDemoOp (const juce::String& op, const juce::var& 
             h->getActions().invoke (juce::AccessibilityActionType::focus);
             if (! h->getActions().invoke (juce::AccessibilityActionType::showMenu) && ! h->getActions().invoke (juce::AccessibilityActionType::press))
                 fail ("That menu item is disabled");
+            // (round 190pl: a private X server without a compositor keeps a closed menu's pixels on the windows below it
+            // until they are painted again)
+            for (const int ms : { 120, 450 })
+                juce::Timer::callAfterDelay (ms, [] {
+                    auto& desktop = juce::Desktop::getInstance();
+                    for (int i = 0; i < desktop.getNumComponents(); ++i)
+                        if (auto* top = desktop.getComponent (i); top != nullptr && top->isShowing())
+                            top->repaint();
+                });
+            return object ({ { "clicked", true }, { "control", described } });
+        }
+        // round 190pl: "peer": the press and the release go through the window, as the system's mouse would deliver them
+        // (what is on top at that point gets them: a list's row, a table's cell)
+        if (args["peer"].isBool() && (bool) args["peer"])
+        {
+            const auto cell = cellOf (c);
+            const auto local = cell ? pointIn (*cell) : pointIn (c.getLocalBounds());
+            const auto screen = c.localPointToGlobal (local);
+            PeerGesture::click (*c.getTopLevelComponent(), screen, clicks, keysOf (args["mods"]), right);
             return object ({ { "clicked", true }, { "control", described } });
         }
         if (const auto cell = cellOf (c))
@@ -411,34 +737,26 @@ juce::var MainComponent::handleDemoOp (const juce::String& op, const juce::var& 
     // in the Channel rack opens it. The window gets the component ID "editor" (the newest one), so a script can point at it.
     if (op == "ui.editor")
     {
+        // round 190pl: "insert" + "slot": an insert effect's editor, as a double click on the Mixer slot opens it
+        if (args["insert"].isInt() || args["slot"].isInt())
+        {
+            if (! args["insert"].isInt() || ! args["slot"].isInt())
+                fail ("insert and slot must be integers");
+            const auto track = (int) args["insert"], slot = (int) args["slot"];
+            const auto& song = engine.getSong();
+            if (track < 0 || track >= (int) song.mixer.size() || slot < 0 || slot >= (int) song.mixer[(std::size_t) track].effects.size())
+                fail ("No effect in that insert's slot");
+            auto* top = openEditorWindow ([this, track, slot] { mixer.openSlotEditor (track, slot); });
+            return top != nullptr ? object ({ { "insert", track }, { "slot", slot }, { "screen", rect (top->getScreenBounds()) } })
+                                  : object ({ { "insert", track }, { "slot", slot } });
+        }
         if (! args["channel"].isInt())
             fail ("channel must be an integer");
         const auto channel = (int) args["channel"];
         if (channel < 0 || channel >= (int) engine.getSong().channels.size())
             fail ("channel is outside the project's channels");
-        auto& desktop = juce::Desktop::getInstance();
-        juce::Array<juce::Component*> before;
-        for (int i = 0; i < desktop.getNumComponents(); ++i)
-            before.add (desktop.getComponent (i));
-        rack.showEditor (channel);
-        for (int i = desktop.getNumComponents(); --i >= 0;)
-            if (auto* top = desktop.getComponent (i); top != nullptr && ! before.contains (top) && top->isShowing())
-            {
-                for (int k = 0; k < desktop.getNumComponents(); ++k) // (one window carries the ID: the newest)
-                    if (auto* other = desktop.getComponent (k); other != nullptr && other->getComponentID() == "editor")
-                        other->setComponentID ({});
-                top->setComponentID ("editor");
-                // a window taller than the screen is moved up into it (Helix's editor is ~1000 px tall), and painted again
-                // once it is mapped (a private X server without a compositor otherwise shows stale pixels in it for a while)
-                if (const auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect (getScreenBounds()))
-                    top->setBounds (top->getBounds().constrainedWithin (display->userArea));
-                for (const int ms : { 150, 600, 1500 })
-                    juce::Timer::callAfterDelay (ms, [sp = juce::Component::SafePointer<juce::Component> (top)] {
-                        if (sp != nullptr)
-                            sp->repaint();
-                    });
-                return object ({ { "channel", channel }, { "screen", rect (top->getScreenBounds()) } });
-            }
+        if (auto* top = openEditorWindow ([this, channel] { rack.showEditor (channel); }))
+            return object ({ { "channel", channel }, { "screen", rect (top->getScreenBounds()) } });
         return object ({ { "channel", channel } }); // (a window inside the main one, or one that was open already)
     }
     // round 190pg: moves one of LYNX's own windows (a tool window, an editor: by its ID) so that two of them show side by side
@@ -509,8 +827,10 @@ juce::var MainComponent::handleDemoOp (const juce::String& op, const juce::var& 
         else if (what == "welcome") showWelcomeCard (false);
         else if (what == "gettingStarted") showGettingStarted();
         else if (what == "dock" && simpleWorkflow != nullptr) simpleWorkflow->trackSelected (playlist.getCurrentTrack());
+        else if (what == "pluginManager") showPluginManager(); // (round 190pl: ID pluginManager)
+        else if (what == "versions") showVersions();           // (round 190pl: ID versions)
         else
-            fail ("panel must be channelRack, pianoRoll, playlist, mixer, browser, loops, welcome, gettingStarted or dock");
+            fail ("panel must be channelRack, pianoRoll, playlist, mixer, browser, loops, welcome, gettingStarted, dock, pluginManager or versions");
         return object ({ { "shown", what } });
     }
     if (op == "ui.welcome")
@@ -579,6 +899,252 @@ juce::var MainComponent::handleDemoOp (const juce::String& op, const juce::var& 
         if (editor == nullptr)
             fail ("No polyphonic editor is open (ui.polyeditor)");
         return object ({ { "notes", polyEditorNotes (*editor) } });
+    }
+    // ---- round 190pl (tutorial batch 2) ----------------------------------------------------------------------------------
+    // Every LYNX window painted again (a private X server without a compositor can keep a closed menu's pixels on screen)
+    if (op == "ui.repaint")
+    {
+        auto& desktop = juce::Desktop::getInstance();
+        for (int i = 0; i < desktop.getNumComponents(); ++i)
+            if (auto* top = desktop.getComponent (i); top != nullptr && top->isShowing())
+                top->repaint();
+        return object ({ { "repainted", desktop.getNumComponents() } });
+    }
+    const auto formatOf = [&args]() -> int {
+        static const char* names[] { "wav", "mp3", "ogg", "flac", "aiff", "m4a" };
+        const auto f = text (args, "format").toLowerCase();
+        for (int i = 0; i < (int) std::size (names); ++i)
+            if (f == names[i])
+                return i;
+        fail ("format must be wav, mp3, ogg, flac, aiff or m4a");
+    };
+    const auto absoluteFile = [&args] (const char* field) {
+        const auto path = text (args, field);
+        if (! juce::File::isAbsolutePath (path))
+            fail (juce::String (field) + " must be an absolute path");
+        return juce::File (path);
+    };
+    // The Export window of File › Export › <format> file..., whose Export... button then writes `path` (no file dialog).
+    // "run": false only sets the file, for a script that opens the window through the real menu.
+    if (op == "ui.export")
+    {
+        if (args["path"].isString())
+            demo::setExportTarget (absoluteFile ("path"));
+        if (args["run"].isBool() && ! (bool) args["run"])
+            return object ({ { "armed", args["path"].isString() } });
+        exportAudio (formatOf());
+        auto* panel = findInOtherWindows (window, "export.window");
+        return object ({ { "opened", panel != nullptr }, { "screen", panel != nullptr ? rect (panel->getScreenBounds()) : juce::var() } });
+    }
+    // The same render without a window, here and now (checks): { format, path } -> the file's size, length and peak
+    if (op == "file.export")
+    {
+        const auto file = absoluteFile ("path");
+        double seconds = 0.0;
+        float peak = 0.0f;
+        if (const auto error = exportAudioNow (engine, formatOf(), file, seconds, peak); error.isNotEmpty())
+            fail (error);
+        return object ({ { "file", file.getFullPathName() }, { "bytes", (juce::int64) file.getSize() }, { "seconds", seconds },
+                         { "peakDb", juce::Decibels::gainToDecibels (peak) } });
+    }
+    // Save (the project's own file), Save as `path` (no file dialog), or Save new version ("newVersion": true). "run": false
+    // with a path: the next Save as... (the real menu item, Ctrl+Shift+S) writes it.
+    if (op == "file.save")
+    {
+        const auto newVersion = args["newVersion"].isBool() && (bool) args["newVersion"];
+        if (args["path"].isString())
+        {
+            demoSaveTarget = absoluteFile ("path");
+            if (args["run"].isBool() && ! (bool) args["run"])
+                return object ({ { "armed", true } });
+            save (true);
+        }
+        else if (currentFile == juce::File())
+            fail ("The project has no file yet: give path (Save as)");
+        else if (newVersion)
+            saveNewVersion();
+        else
+            save (false);
+        return object ({ { "file", currentFile.getFullPathName() }, { "name", projectName }, { "modified", engine.isModified() } });
+    }
+    // Notes and controllers from the virtual input "LYNX demo keyboard" (listed in Options › MIDI while --demo is on), at
+    // their times from now: { events: [ { type: note, note, velocity (1-127), at (seconds), length (seconds), channel (1-16) },
+    // { type: cc, cc, value, at, channel } ] }. They go through the MIDI settings, recording and Map Mode as a keyboard's.
+    if (op == "midi.input")
+    {
+        auto* list = args["events"].getArray();
+        if (list == nullptr || list->isEmpty() || list->size() > 2000)
+            fail ("events must be a list of 1-2000 events");
+        double last = 0.0;
+        std::vector<std::pair<double, juce::MidiMessage>> messages;
+        for (const auto& e : *list)
+        {
+            const auto type = e["type"].toString();
+            const auto at = juce::jlimit (0.0, 600.0, (double) e["at"]);
+            const auto midiChannel = e["channel"].isInt() ? juce::jlimit (1, 16, (int) e["channel"]) : 1;
+            if (type == "note")
+            {
+                if (! e["note"].isInt() || (int) e["note"] < 0 || (int) e["note"] > 127)
+                    fail ("a note event needs note 0-127");
+                const auto note = (int) e["note"];
+                const auto velocity = e["velocity"].isInt() ? juce::jlimit (1, 127, (int) e["velocity"]) : 100;
+                const auto length = e.hasProperty ("length") ? juce::jlimit (0.01, 60.0, (double) e["length"]) : 0.25;
+                messages.push_back ({ at, juce::MidiMessage::noteOn (midiChannel, note, (juce::uint8) velocity) });
+                messages.push_back ({ at + length, juce::MidiMessage::noteOff (midiChannel, note) });
+                last = juce::jmax (last, at + length);
+            }
+            else if (type == "cc")
+            {
+                if (! e["cc"].isInt() || (int) e["cc"] < 0 || (int) e["cc"] > 127)
+                    fail ("a cc event needs cc 0-127");
+                messages.push_back ({ at, juce::MidiMessage::controllerEvent (midiChannel, (int) e["cc"], juce::jlimit (0, 127, (int) e["value"])) });
+                last = juce::jmax (last, at);
+            }
+            else
+                fail ("event type must be note or cc");
+        }
+        const juce::Component::SafePointer<MainComponent> safe (this);
+        for (const auto& [at, message] : messages)
+        {
+            const auto ms = juce::roundToInt (at * 1000.0);
+            const auto play = [safe, message = message] {
+                if (safe != nullptr)
+                    safe->engine.injectMidiInput (message, demo::virtualKeyboardName());
+            };
+            if (ms <= 0)
+                play();
+            else
+                juce::Timer::callAfterDelay (ms, play);
+        }
+        return object ({ { "device", demo::virtualKeyboardName() }, { "messages", (int) messages.size() }, { "seconds", last } });
+    }
+    // The Plugin manager's scan of `folders` (absolute, existing), added to the plugin folders unless "add" is false; in
+    // the background as the manager's Find new plugins. "status": true answers how the scan is going instead.
+    if (op == "plugin.scan")
+    {
+        auto& host = engine.getPluginHost();
+        if (args["status"].isBool() && (bool) args["status"])
+        {
+            const auto state = host.backgroundScan();
+            return object ({ { "running", state.running }, { "progress", state.progress }, { "found", state.found }, { "finished", state.finished },
+                             { "known", host.getKnownPlugins().getNumTypes() } });
+        }
+        if (host.backgroundScan().running)
+            fail ("A scan is running already");
+        juce::FileSearchPath paths;
+        if (auto* list = args["folders"].getArray())
+            for (const auto& f : *list)
+            {
+                const juce::File folder (f.toString());
+                if (! juce::File::isAbsolutePath (f.toString()) || ! folder.isDirectory())
+                    fail ("folders must be absolute paths of existing folders");
+                paths.addIfNotAlreadyThere (folder);
+            }
+        if (paths.getNumPaths() == 0)
+            paths = host.pluginFolders();
+        else if (! (args["add"].isBool() && ! (bool) args["add"]))
+        {
+            auto all = host.pluginFolders();
+            for (int i = 0; i < paths.getNumPaths(); ++i)
+                all.addIfNotAlreadyThere (paths[i]);
+            host.setPluginFolders (all);
+        }
+        host.startBackgroundScan (paths);
+        juce::StringArray names;
+        for (int i = 0; i < paths.getNumPaths(); ++i)
+            names.add (paths[i].getFullPathName());
+        return object ({ { "started", true }, { "folders", names } });
+    }
+    // A drag through the window, as the mouse makes it: from a point to another over "seconds" (default 0.6), with held
+    // keys ("mods": ["ctrl"]...). Each end is { target, cell?, at? } (as ui.click's). A drag-and-drop (a loop onto the
+    // timeline, a sample onto the rack) drops where it ends; a knob turns. Answers at once; the drag takes its time.
+    if (op == "ui.drag")
+    {
+        const auto pointOf = [&] (const juce::var& end, juce::Component** comp) -> juce::Point<float> {
+            if (! end["target"].isString())
+                fail ("from and to need a target");
+            const auto target = end["target"].toString();
+            if (target.startsWith ("param:"))
+            {
+                const auto found = findParam (target);
+                *comp = found.component;
+                return found.component->localPointToGlobal (found.area.toFloat().getCentre());
+            }
+            auto* c = locate (target);
+            if (c == nullptr)
+                fail ("No control showing with the ID or name \"" + target + "\"");
+            *comp = c;
+            // (the end's own "cell" and "at", read as ui.click reads them)
+            juce::Rectangle<int> area = c->getLocalBounds();
+            if (const auto cell = cellOf (*c, &end["cell"]))
+                area = *cell;
+            auto p = area.toFloat().getCentre();
+            if (const auto& at = end["at"]; at.getDynamicObject() != nullptr)
+                p = { (float) area.getX() + (float) area.getWidth() * (float) juce::jlimit (0.0, 1.0, (double) at["x"]),
+                      (float) area.getY() + (float) area.getHeight() * (float) juce::jlimit (0.0, 1.0, (double) at["y"]) };
+            // ("dx" / "dy": pixels from there, e.g. a knob turned by dragging 40 px up)
+            p += juce::Point<float> ((float) juce::jlimit (-2000.0, 2000.0, (double) end["dx"]), (float) juce::jlimit (-2000.0, 2000.0, (double) end["dy"]));
+            return c->localPointToGlobal (p);
+        };
+        juce::Component* fromComp = nullptr;
+        juce::Component* toComp = nullptr;
+        const auto from = pointOf (args["from"], &fromComp);
+        const auto to = pointOf (args["to"], &toComp);
+        const auto seconds = args.hasProperty ("seconds") ? juce::jlimit (0.1, 10.0, (double) args["seconds"]) : 0.6;
+        constexpr int stepMs = 16;
+        const auto steps = juce::jmax (4, (int) (seconds * 1000.0 / stepMs));
+        std::vector<juce::Point<float>> path;
+        path.push_back (from);
+        path.push_back (from + juce::Point<float> (2.0f, 1.0f)); // (a first small move: the press becomes a drag)
+        for (int k = 1; k <= steps; ++k)
+        {
+            const auto u = (float) k / (float) steps;
+            const auto e = u * u * (3.0f - 2.0f * u);
+            path.push_back (from + (to - from) * e);
+        }
+        path.push_back (to); // (the release, where the drag ends)
+        PeerGesture::drag (*fromComp->getTopLevelComponent(), path, keysOf (args["mods"]), false, stepMs);
+        return object ({ { "from", object ({ { "x", from.x }, { "y", from.y } }) }, { "to", object ({ { "x", to.x }, { "y", to.y } }) },
+                         { "seconds", seconds } });
+    }
+    // A route between Mixer tracks in one undo step, as the route arrow's menu makes it: kind route (a send at unity, or
+    // "level" 0..1.25 linear), routeOnly, sidechain (a level-0 send that the target's compressors listen to), sidechainOnly
+    if (op == "mixer.route")
+    {
+        const auto& song = engine.getSong();
+        if (! args["from"].isInt() || ! args["to"].isInt())
+            fail ("from and to must be Mixer track numbers (0 = Master)");
+        const auto from = (int) args["from"], to = (int) args["to"];
+        if (from <= 0 || from >= (int) song.mixer.size() || to < 0 || to >= (int) song.mixer.size() || from == to)
+            fail ("from must be an insert (1...) and to another track (0 = Master)");
+        using K = mixerops::RouteKind;
+        const auto kindName = args["kind"].isString() ? args["kind"].toString() : juce::String ("route");
+        const auto kind = kindName == "route" ? K::route : kindName == "routeOnly" ? K::routeOnly : kindName == "sidechain" ? K::sidechain
+                        : kindName == "sidechainOnly" ? K::sidechainOnly : (fail ("kind must be route, routeOnly, sidechain or sidechainOnly"), K::route);
+        if ((kind == K::sidechain || kind == K::sidechainOnly) && to == 0)
+            fail ("A sidechain goes to an insert, not to the Master");
+        const auto hasLevel = args.hasProperty ("level");
+        const auto level = hasLevel ? (float) juce::jlimit (0.0, 1.25, (double) args["level"]) : 1.0f;
+        int routed = 0;
+        engine.editSong ([&] (Song& s) {
+            routed = mixerops::routeSelectedTo (s, { from }, to, kind);
+            if (hasLevel && (kind == K::route || kind == K::routeOnly))
+            {
+                auto& track = s.mixer[(std::size_t) from];
+                if (to == 0)
+                    track.masterLevel = level;
+                for (auto& send : track.sends)
+                    if (send.target == to)
+                        send.level = level;
+            }
+        });
+        if (routed == 0)
+            fail ("That route would make a loop (or the track cannot route there)");
+        juce::Array<juce::var> sends;
+        for (const auto& send : engine.getSong().mixer[(std::size_t) from].sends)
+            sends.add (object ({ { "to", send.target }, { "level", send.level } }));
+        return object ({ { "from", from }, { "to", to }, { "kind", kindName }, { "toMaster", engine.getSong().mixer[(std::size_t) from].toMaster },
+                         { "sends", sends } });
     }
     if (op == "session.start" || op == "session.status")
     {

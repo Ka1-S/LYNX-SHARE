@@ -12,6 +12,7 @@
 
 #include "core/MeterBallistics.h"
 #include "core/MixerLayout.h"
+#include "ui/DemoMode.h"
 #include "core/MixerOps.h"
 #include "core/StripInserts.h"
 #include "engine/AudioEngine.h"
@@ -243,6 +244,11 @@ public:
     juce::Rectangle<int> faderRailForSnapshot (int track) const { return faderRail (track); }
     juce::Rectangle<int> muteAreaForSnapshot (int track) const { return muteArea (track); }   // round 190kn
     juce::Rectangle<int> meterAreaForSnapshot (int track) const { return meterArea (track); } // round 190kn
+    // round 190pl (--demo cells of mixer.strips): the fader's cap where it is now, the pan knob, the solo switch
+    juce::Rectangle<int> faderCapForSnapshot (int track) const { return tipArea (Part::fader, track); }
+    juce::Rectangle<int> panAreaForSnapshot (int track) const { return panArea (track); }
+    juce::Rectangle<int> soloAreaForSnapshot (int track) const { return soloArea (track); }
+    juce::Rectangle<int> headerAreaForSnapshot (int track) const { return headerArea (track); }
     // round 190lr (--details190lrshot): one display frame at `nowMs` (the Waveforms view's rows, the meters), the
     // polarity / swap icons and the strip part under a point
     bool frameForSnapshot (double nowMs) { return liveFrame (nowMs); }
@@ -512,6 +518,7 @@ private:
 //    (frequency, width)
 class EffectsPanel final : public juce::Component,
                            public ui::HintSource,
+                           public demo::CellSource,
                            public juce::DragAndDropTarget,
                            public juce::FileDragAndDropTarget,
                            private juce::ChangeListener,
@@ -536,6 +543,8 @@ public:
     void setTrack (int track);
     int getSelectedSlot() const noexcept { return selectedSlot; }
     juce::Rectangle<int> slotBoundsForCheck (int row) const { return slotBounds (row); } // --selftest (ui/MixerBasicsCheck.h)
+    // round 190pl (--demo, ID mixer.slots): column = an insert slot's row (row ignored)
+    juce::Rectangle<int> demoCellBounds (int, int column) const override { return column >= 0 && column < maxEffectSlots ? slotBounds (column) : juce::Rectangle<int>(); }
     // round 190oa (DF-86, --details190oashot): FL's EQ gestures on band `band`'s handle — a right-drag of `dy` px up,
     // or `notches` wheel notches; true while the right-drag paints the curve orange (between press and release)
     bool eqGestureForSnapshot (int band, int dy, int notches);

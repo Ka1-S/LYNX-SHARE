@@ -2,6 +2,7 @@
 #include "ui/RemoteControl.h"
 #include "core/EscClose.h"
 #include "ui/NumBox.h"
+#include "ui/DemoMode.h" // round 190pl
 #include "ui/SettingsPages.h"
 #include "ui/LabelFont.h"
 #include "core/TextSize.h"
@@ -1581,6 +1582,14 @@ public:
         juce::String status;                                        // where the feedback goes
     };
 
+    // round 190pl: the row's controls by component ID for --demo ("<id>.enabled", "<id>.channel", "<id>.plays")
+    void setDemoIds (const juce::String& id)
+    {
+        enabled.setComponentID (id + ".enabled");
+        channel.setComponentID (id + ".channel");
+        plays.setComponentID (id + ".plays");
+    }
+
     MidiInputRow (const juce::String& deviceName, const prefs::MidiInputPrefs& p, const std::vector<std::string>& channels,
                   const Controllers& controllers, std::function<void (const prefs::MidiInputPrefs&)> changed)
         : prefsNow (p), onChange (std::move (changed))
@@ -2231,6 +2240,8 @@ private:
                 names.add (d.name);
         else
             names = sampleDevices;
+        if (persistent && demo::active()) // round 190pl: --demo's virtual input (midi.input plays it), listed as a device
+            names.addIfNotAlreadyThere (demo::virtualKeyboardName());
 
         std::vector<std::string> channels;
         for (const auto& c : engine.getSong().channels)
@@ -2270,6 +2281,10 @@ private:
                                                                        safe->rebuildInputs();
                                                                });
                                                        });
+            // round 190pl: by component ID for --demo: midi.input.<n> (the row), .enabled, .channel, .plays
+            const auto id = "midi.input." + juce::String ((int) rows.size());
+            row->setComponentID (id);
+            row->setDemoIds (id);
             add (*row);
             rows.push_back (std::move (row));
         }

@@ -27,6 +27,7 @@
 #include "engine/AacEncoder.h"
 #include "engine/Exporter.h"
 #include "engine/Text.h"
+#include "ui/DemoMode.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
 #include "ui/SettingsPages.h"
@@ -284,6 +285,12 @@ public:
     }
 
     void setSelected (int index) { if (auto* b = buttons[index]) b->setToggleState (true, juce::dontSendNotification); }
+    // round 190pl: component IDs for --demo ("<prefix><id>" per button, in order)
+    void setIds (const juce::String& prefix, const juce::StringArray& ids)
+    {
+        for (int i = 0; i < buttons.size() && i < ids.size(); ++i)
+            buttons[i]->setComponentID (prefix + ids[i]);
+    }
     int getSelected() const
     {
         for (int i = 0; i < buttons.size(); ++i)
@@ -469,6 +476,13 @@ public:
 
         formatButtons.onChange = [this] (int) { readControls(); };
         addAndMakeVisible (formatButtons);
+        // round 190pl: the window's controls by component ID (--demo, docs/DEMO_MODE.md)
+        setComponentID ("export.window");
+        formatButtons.setIds ("export.format.", { "wav", "mp3", "ogg", "flac", "aiff", "m4a" });
+        exportButton.setComponentID ("export.start");
+        cancelButton.setComponentID ("export.cancel");
+        rangeBox.setComponentID ("export.range");
+        mp3Box.setComponentID ("export.mp3Bitrate");
         // FL ticks several format boxes at once (REA round 139): the other formats written from the same render
         settingsui::styleLabel (alsoLabel, tr ("Also save"));
         addAndMakeVisible (alsoLabel);
@@ -1477,6 +1491,15 @@ private:
                 return;
             }
         }
+
+        // round 190pl (--demo ui.export): a take writes the file its script gave, without the system's file dialog
+        if (demo::active())
+            if (auto target = demo::takeExportTarget(); target != juce::File())
+            {
+                target.getParentDirectory().createDirectory();
+                startExport (target.hasFileExtension (extension) ? target : target.withFileExtension (extension));
+                return;
+            }
 
         auto folder = exportFolder();
         // issue #215 (round 190ng): the name the template gives ("$project" = the project's name, as before)
@@ -2620,6 +2643,29 @@ void showMasterDialog (AudioEngine& engine, const juce::File& suggestedFolder, c
     options.escapeKeyTriggersCloseButton = true;
     if (auto* dialog = options.launchAsync())
         keepAboveMainWindow (*dialog);
+}
+
+juce::String exportAudioNow (AudioEngine& engine, int format, const juce::File& file, double& seconds, float& peak)
+{
+    using namespace exportopts;
+    if (format < 0 || format >= offeredFormats())
+        return "That format cannot be written on this system";
+    // the Export window's remembered choices for that one format, the range as the window would pick it
+    auto o = withSingleFormat (withOfferedFormats (fromText (exportSettingsFile().loadFileAsString().toStdString())), (Format) format);
+    const auto& song = engine.getSong();
+    o.stems = Stems::none;
+    o.sections = o.songSections = false;
+    o.range = song.mode == PlayMode::song && (! song.playlist.empty() || patternblocks::active (song)) ? Range::song : Range::pattern;
+    o.showWhenDone = false;
+    file.getParentDirectory().createDirectory();
+    engine.capturePluginStates(); // (new plugin instances from the saved states, as the command-line exports render)
+    ExportJob job (song, o, file);
+    juce::String error;
+    if (! job.run ([] (double) { return true; }, error))
+        return error.isNotEmpty() ? error : juce::String ("The export failed");
+    seconds = job.getMusicSeconds();
+    peak = job.getPeak();
+    return {};
 }
 
 void showExportDialog (AudioEngine& engine, const juce::File& suggestedFolder, const juce::String& suggestedName, int format)

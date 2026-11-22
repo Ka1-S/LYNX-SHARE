@@ -10,6 +10,10 @@ namespace lynx
 // format(s) of the last export (FL's File › Export › "Last exported format(s)"), 0 WAV, 1 MP3, 2 OGG, 3 FLAC = that
 // format alone (FL's "Wave file...", "MP3 file"...; REA round 139).
 void showExportDialog (AudioEngine& engine, const juce::File& suggestedFolder, const juce::String& suggestedName, int format = -1);
+// Round 190pl (--demo file.export): the song (or the pattern, as the window picks) rendered into `file` in `format` (0 WAV,
+// 1 MP3...) with the Export window's remembered choices, on the calling (message) thread, without a window. `seconds` and
+// `peak` (linear) of the render. Empty = written, else why not.
+juce::String exportAudioNow (AudioEngine& engine, int format, const juce::File& file, double& seconds, float& peak);
 // File › Export › "Master..." (Ctrl+Alt+M; round 168e): the Export window with the render mastered on the computer
 // (core/Mastering.h: a loudness target, −1 dBTP ceiling) where FL sends it to FL Cloud; "<project> (mastered)".
 // File › Export › "Project bones..." (REA round 168e, FUN_011edb50): the project's parts as files in a sub-folder of a

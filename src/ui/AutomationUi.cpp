@@ -2,6 +2,7 @@
 #include "ui/FlMods.h"
 #include "ui/WindowOwner.h"
 #include "ui/AutomationUi.h"
+#include "ui/DemoMode.h" // round 190pl
 #include "ui/RemoteControl.h"
 #include "core/PlaylistOps.h"
 #include "core/LastTweaked.h"
@@ -99,6 +100,7 @@ public:
 
 class AutomationEditor final : public juce::Component,
                                public ui::HintSource,
+                               public demo::CellSource,
                                private juce::ChangeListener
 {
 public:
@@ -106,6 +108,7 @@ public:
         : engine (e),
           automation (index)
     {
+        setComponentID ("automationEditor"); // (round 190pl: --demo, its points as cells)
         engine.addChangeListener (this);
         buildLfoPanel();
         refreshLfoPanel();
@@ -754,6 +757,25 @@ private:
     }
 
     juce::Point<float> pointPosition (const AutomationPoint& p) const { return { (float) tickToX ((double) p.tick), valueToY (p.value) }; }
+    // round 190pl (--demo, ID automationEditor): row 0 = point `column` (0 = the first); row 1 = the grid at 16th `column`
+    // and the value `at` gives (a drag's end, a click that adds a point)
+    juce::Rectangle<int> demoCellBounds (int row, int column) const override
+    {
+        const auto* a = current();
+        if (a == nullptr)
+            return {};
+        const auto& points = editedPoints (*a);
+        if (row == 0)
+            return juce::isPositiveAndBelow (column, (int) points.size())
+                       ? juce::Rectangle<float> (12.0f, 12.0f).withCentre (pointPosition (points[(std::size_t) column])).toNearestInt() : juce::Rectangle<int>();
+        if (row == 1 && column >= 0)
+        {
+            const auto x = (float) tickToX ((double) column * ticksPerStep);
+            const auto top = valueToY (1.0f), bottom = valueToY (0.0f);
+            return juce::Rectangle<float> (x - 2.0f, juce::jmin (top, bottom), 4.0f, std::abs (bottom - top)).toNearestInt();
+        }
+        return {};
+    }
 
     // round 165: the tension handle in the middle of segment i → i+1 (x < 0: too narrow to show one)
     juce::Point<float> handlePosition (int i) const

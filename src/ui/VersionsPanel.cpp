@@ -1,5 +1,6 @@
 #include "ui/VersionsPanel.h"
 
+#include "ui/DemoMode.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 
@@ -49,6 +50,7 @@ juce::String kindText (const Entry& e)
 }
 
 class VersionsPanel final : public juce::Component,
+                            public demo::CellSource,
                             private juce::ListBoxModel,
                             private juce::Timer
 {
@@ -92,9 +94,24 @@ public:
             refresh();
         };
 
+        // round 190pl: by component ID for --demo (docs/DEMO_MODE.md); the list's rows are its cells (row = the list's row)
+        setComponentID ("versions");
+        openButton.setComponentID ("versions.open");
+        showButton.setComponentID ("versions.show");
+        labelButton.setComponentID ("versions.label");
+        newVersionButton.setComponentID ("versions.newVersion");
+        list.setComponentID ("versions.list");
+
         refresh();
         setSize (620, 440);
         startTimer (3000);
+    }
+
+    juce::Rectangle<int> demoCellBounds (int row, int) const override
+    {
+        if (row < 0 || row >= (int) entries.size())
+            return {};
+        return getLocalArea (&list, list.getRowPosition (row, true));
     }
 
     void paint (juce::Graphics& g) override { g.fillAll (theme::colour::bg2); }

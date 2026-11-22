@@ -625,7 +625,10 @@ public:
     juce::File getRecordingFolder() const { return recordingFolder; }
     juce::String getRecordingStem() const { return recordingStem; }
     // A MIDI message as if a controller had sent it (the --bendrectest of round 167a). Message thread.
-    void injectMidiInput (const juce::MidiMessage& message) { handleIncomingMidiMessage (nullptr, message); }
+    void injectMidiInput (const juce::MidiMessage& message) { handleMidiInput (nullptr, {}, message); }
+    // Round 190pl (--demo midi.input): the same as from an input device with this name ("LYNX demo keyboard"), so the
+    // device's MIDI settings (on / off, MIDI channel, what it plays) apply as to hardware. Message thread.
+    void injectMidiInput (const juce::MidiMessage& message, const juce::String& deviceName) { handleMidiInput (nullptr, deviceName.toStdString(), message); }
     static juce::File defaultRecordingFolder();
     // The take files written since LYNX started (or since forgetRecordings), oldest first. UI thread.
     const std::vector<juce::File>& getSessionRecordings() const noexcept { return sessionRecordings; }
@@ -1355,6 +1358,8 @@ private:
     void audioDeviceStopped() override;
     void timerCallback() override;
     void handleIncomingMidiMessage (juce::MidiInput* source, const juce::MidiMessage& message) override;
+    // the input's handling; `deviceName` is the source's name (an injected message: given, or none)
+    void handleMidiInput (juce::MidiInput* source, const std::string& deviceName, const juce::MidiMessage& message);
     void enableAllMidiInputs();
     void saveAudioDeviceState();
     void updateRecording();
