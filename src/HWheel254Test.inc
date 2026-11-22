@@ -1,6 +1,6 @@
     // LYNX --hwheel254test <report.txt> (round 190ou, issue #254): the horizontal wheel (a tilt wheel, a mouse's second
     // wheel) through the real components, off screen, as JUCE delivers it (Windows' WM_MOUSEHWHEEL: deltaX = -/+60/256 a
-    // notch, right / left; X11's buttons 6 / 7 come the same way with the JUCE patch fix 190ou). FL 2026 (checked in this
+    // notch, right / left; X11's buttons 6 / 7 come the same way with the JUCE patch fix 49). FL 2026 (checked in this
     // round on Thief): Playlist and Piano roll 1.5 beats a notch whatever the zoom, the Mixer one insert a notch, the
     // Browser takes it as the vertical wheel (right = up). Shift+wheel, a trackpad's swipe and the vertical wheel keep
     // what they did. The Playlist is checked in the three layouts. Included in the app class of Main.cpp.
@@ -200,7 +200,7 @@
         }
 
        #if JUCE_LINUX
-        // ---- X11 end to end (the JUCE patch fix 190ou): XTest presses buttons 7 and 6 over a window of ours; JUCE must
+        // ---- X11 end to end (the JUCE patch fix 49): XTest presses buttons 7 and 6 over a window of ours; JUCE must
         // deliver them as the horizontal wheel (7 = right = deltaX < 0, 6 = left = deltaX > 0). Needs an X server.
         if (juce::SystemStats::getEnvironmentVariable ("DISPLAY", {}).isNotEmpty())
         {

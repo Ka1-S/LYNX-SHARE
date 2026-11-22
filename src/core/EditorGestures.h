@@ -304,7 +304,7 @@ inline WheelDelta normaliseWheel (double deltaX, double deltaY, bool smooth, boo
 
 // --- the horizontal wheel (issue #254, round 190ou) ---------------------------------------------------------------
 // One notch of a tilt wheel or of a mouse's second (horizontal) wheel: Windows' WM_MOUSEHWHEEL, X11's buttons 6 / 7
-// (JUCE patch fix 190ou), a mouse's horizontal wheel on macOS. It comes as deltaX alone and not smooth. A trackpad's
+// (JUCE patch fix 49), a mouse's horizontal wheel on macOS. It comes as deltaX alone and not smooth. A trackpad's
 // sideways swipe is smooth and keeps its own path, and macOS turns Shift+wheel into deltaX with Shift held: that stays
 // Shift+wheel. +1 = a notch to the right (the view goes later), -1 to the left, 0 = not a horizontal wheel's notch.
 inline int horizontalWheelNotch (double deltaX, double deltaY, bool smooth, bool shift) noexcept

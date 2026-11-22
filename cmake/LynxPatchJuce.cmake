@@ -327,6 +327,7 @@
 #    VST3 editor window's two size conversions (componentToVST3Rect / vst3ToComponentRect) leave the display's scale out
 #    when LYNX marked the editor "lynxScaleEditorDimensions" (FL's "Scale editor dimensions", or a DPI-unaware window):
 #    the size the plugin reports is then taken in logical pixels. An editor LYNX did not mark is sized as before.
+#
 # 48. Windows only ("fix 190os" in round perf6_190os's branch), juce_graphics/native/juce_DirectX_windows.h,
 #    on top of fix 43: the Direct3D 11 device has no driver threads by default when LYNX may use 4 logical CPUs or
 #    fewer (LYNX_D3D_DRIVER_THREADS=1: always the driver's threads; =0: never, as fix 43). Measured with a song that
@@ -335,7 +336,7 @@
 #    audio threads; with no driver threads 51.4 fps and the longest gap 46-70 ms (from 45.0 / 252 ms). With 12 CPUs the
 #    same with or without (69-72 fps): there the driver's threads stay. perf190os/HANDOFF.md.
 #
-# fix 190ou. Linux/BSD only ("fix 190ou" in round bugs_190ou's branch; the integration assigns its number),
+# 49. Linux/BSD only ("fix 190ou" in round bugs_190ou's branch),
 #    juce_gui_basics/native/juce_XWindowSystem_linux.cpp (issue #254): X11 reports a horizontal wheel (a tilt wheel, a
 #    mouse's second wheel, a touchpad's sideways edge) as buttons 6 (left) and 7 (right), which JUCE dropped: the
 #    horizontal wheel did nothing on Linux. They now come as a wheel event with deltaX = +/-50/256 (6 = left = positive,
@@ -518,9 +519,9 @@ function(lynx_patch_juce_file file)
             "    if (configure.window != peerHandle && isParentWindowOf (configure.window, peerHandle))|NL|        dismissBlockingModals (peer);"
             "    // LYNX patch (issue #45): a frame that moved, not a restack|NL|    if (configure.window != peerHandle && isParentWindowOf (configure.window, peerHandle) && lynxWindowMovedOrResized (configure))|NL|        dismissBlockingModals (peer);")
 
-        lynx_juce_fix("horizontal wheel (buttons 6 / 7)" "LYNX patch (fix 190ou, issue #254)"
+        lynx_juce_fix("horizontal wheel (buttons 6 / 7) (fix 49)" "LYNX patch (fix 49, issue #254)"
             "    auto mapIndex = (uint32) (buttonPressEvent.button - Button1);|NL|"
-            "    // LYNX patch (fix 190ou, issue #254): buttons 6 / 7 are the horizontal wheel (a tilt wheel, a second wheel), left /|NL|    // right; JUCE dropped them. deltaX > 0 = left, as Windows' WM_MOUSEHWHEEL comes through JUCE|NL|    if (buttonPressEvent.button == 6 || buttonPressEvent.button == 7)|NL|    {|NL|        MouseWheelDetails wheel;|NL|        wheel.deltaX = buttonPressEvent.button == 6 ? 50.0f / 256.0f : -50.0f / 256.0f;|NL|        wheel.deltaY = 0.0f;|NL|        wheel.isReversed = false;|NL|        wheel.isSmooth = false;|NL|        wheel.isInertial = false;|NL||NL|        peer->handleMouseWheel (MouseInputSource::InputSourceType::mouse, getLogicalMousePos (buttonPressEvent, peer->getPlatformScaleFactor()),|NL|                                getEventTime (buttonPressEvent), wheel);|NL|        return;|NL|    }|NL||NL|    auto mapIndex = (uint32) (buttonPressEvent.button - Button1);|NL|")
+            "    // LYNX patch (fix 49, issue #254): buttons 6 / 7 are the horizontal wheel (a tilt wheel, a second wheel), left /|NL|    // right; JUCE dropped them. deltaX > 0 = left, as Windows' WM_MOUSEHWHEEL comes through JUCE|NL|    if (buttonPressEvent.button == 6 || buttonPressEvent.button == 7)|NL|    {|NL|        MouseWheelDetails wheel;|NL|        wheel.deltaX = buttonPressEvent.button == 6 ? 50.0f / 256.0f : -50.0f / 256.0f;|NL|        wheel.deltaY = 0.0f;|NL|        wheel.isReversed = false;|NL|        wheel.isSmooth = false;|NL|        wheel.isInertial = false;|NL||NL|        peer->handleMouseWheel (MouseInputSource::InputSourceType::mouse, getLogicalMousePos (buttonPressEvent, peer->getPlatformScaleFactor()),|NL|                                getEventTime (buttonPressEvent), wheel);|NL|        return;|NL|    }|NL||NL|    auto mapIndex = (uint32) (buttonPressEvent.button - Button1);|NL|")
     elseif(file MATCHES "juce_CoreGraphicsContext_mac.mm$")
         lynx_juce_fix("no gradient flood from an empty path" "LYNX patch (issue #11): an empty path"
             "        CGContextReplacePathWithStrokedPath (context.get());|NL||NL|    ScopedCGContextState scopedState (context.get());"

@@ -11,7 +11,7 @@ TEST (hwheel254_notches_of_the_horizontal_wheel_only)
     // Windows: a tilt to the right is a negative deltaX (JUCE turns the sign, as for a trackpad): the view goes later
     CHECK (horizontalWheelNotch (-notch, 0.0, false, false) == 1);
     CHECK (horizontalWheelNotch (notch, 0.0, false, false) == -1);
-    // X11's buttons 6 / 7 (JUCE patch fix 190ou): 50 / 256 a press
+    // X11's buttons 6 / 7 (JUCE patch fix 49): 50 / 256 a press
     CHECK (horizontalWheelNotch (-50.0 / 256.0, 0.0, false, false) == 1);
     CHECK (horizontalWheelNotch (50.0 / 256.0, 0.0, false, false) == -1);
     // not a horizontal wheel: the vertical wheel, a trackpad's swipe (smooth), macOS's Shift+wheel (deltaX with Shift),
