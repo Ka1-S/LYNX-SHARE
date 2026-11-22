@@ -12388,6 +12388,8 @@ countries: ru by kz
 "Automation clip: [LMB] open it  [RMB] menu" = "Клип автоматизации: [LMB] открыть  [RMB] меню"
 "Rename automation clip" = "Переименовать клип автоматизации"
 "Indexing folders... {0}" = "Индексация папок... {0}"
+# --- round 190oz: Save a copy for 0.1.30, held FL step notes
+"{0} FL step note(s) on generators end after one step (FL lets them sound on)" = "{0} шаговых нот FL на генераторах заканчиваются через один шаг (в FL они звучат дальше)"
 "Capture automation: nothing to capture (move a control while playing, without recording)" = "Захват автоматизации: нечего захватывать (подвигайте регулятор во время воспроизведения, без записи)"
 "Capture automation: the moves just made without recording become automation" = "Захват автоматизации: движения, сделанные только что без записи, становятся автоматизацией"
 "Capture automation: the moves of {0} control(s) written as automation" = "Захват автоматизации: движения {0} регулятора(ов) записаны как автоматизация"
@@ -12507,3 +12509,6 @@ countries: ru by kz
 "Controls that several patterns' event lanes drive follow only the last pattern's lane in this release: {0}" = "Регуляторы, которые двигают дорожки событий нескольких паттернов, в этой версии следуют только дорожке последнего паттерна: {0}"
 "In Song mode these patterns' notes play without their own pitch / timbre / pressure curves in this release: {0}" = "В режиме Song ноты этих паттернов в этой версии звучат без собственных кривых высоты / тембра / нажима: {0}"
 "ARA plugins on mixer inserts play as ordinary insert effects in this release (the audio clips routed there play without their edits): {0}" = "ARA-плагины на инсертах микшера в этой версии работают как обычные инсертные эффекты (направленные туда аудиоклипы звучат без своих правок): {0}"
+# --- round 190pi: Save a copy for 0.1.30, chord slides and Slide arpeggios
+"{0} slide note(s) over chords or notes of other colours take every held note to the slide note's key (FL moves only its colour's notes, all by one interval)" = "{0} нот(ы) slide поверх аккордов или нот других цветов переносят каждую удерживаемую ноту на клавишу ноты slide (FL сдвигает только ноты её цвета, все на один интервал)"
+"{0} channel(s) with a Slide arpeggio start it at the velocity of the note it plays first, not of the first note held" = "{0} канал(ов) с арпеджио Slide начинают его с velocity первой сыгранной ноты, а не первой удержанной"

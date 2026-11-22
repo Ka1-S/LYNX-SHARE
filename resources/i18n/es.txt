@@ -12388,6 +12388,8 @@ countries: es mx ar co cl pe ve
 "Automation clip: [LMB] open it  [RMB] menu" = "Clip de automatización: [LMB] abrirlo  [RMB] menú"
 "Rename automation clip" = "Renombrar clip de automatización"
 "Indexing folders... {0}" = "Indexando carpetas... {0}"
+# --- round 190oz: Save a copy for 0.1.30, held FL step notes
+"{0} FL step note(s) on generators end after one step (FL lets them sound on)" = "{0} nota(s) de paso de FL en generadores terminan tras un paso (FL las deja sonar)"
 "Capture automation: nothing to capture (move a control while playing, without recording)" = "Capturar automatización: nada que capturar (mueve un control durante la reproducción, sin grabar)"
 "Capture automation: the moves just made without recording become automation" = "Capturar automatización: los movimientos recién hechos sin grabar se convierten en automatización"
 "Capture automation: the moves of {0} control(s) written as automation" = "Capturar automatización: los movimientos de {0} control(es) escritos como automatización"
@@ -12507,3 +12509,6 @@ countries: es mx ar co cl pe ve
 "Controls that several patterns' event lanes drive follow only the last pattern's lane in this release: {0}" = "Los controles que mueven las pistas de eventos de varios patterns siguen solo la pista del último pattern en esta versión: {0}"
 "In Song mode these patterns' notes play without their own pitch / timbre / pressure curves in this release: {0}" = "En el modo Song, las notas de estos patterns suenan sin sus propias curvas de tono / timbre / presión en esta versión: {0}"
 "ARA plugins on mixer inserts play as ordinary insert effects in this release (the audio clips routed there play without their edits): {0}" = "Los plugins ARA en inserts del mezclador suenan como efectos de insert normales en esta versión (los clips de audio enviados allí suenan sin sus ediciones): {0}"
+# --- round 190pi: Save a copy for 0.1.30, chord slides and Slide arpeggios
+"{0} slide note(s) over chords or notes of other colours take every held note to the slide note's key (FL moves only its colour's notes, all by one interval)" = "{0} nota(s) de slide sobre acordes o notas de otros colores llevan cada nota sostenida a la tecla de la nota de slide (FL mueve solo las notas de su color, todas el mismo intervalo)"
+"{0} channel(s) with a Slide arpeggio start it at the velocity of the note it plays first, not of the first note held" = "{0} canal(es) con arpegio Slide lo empiezan con la velocity de la nota que toca primero, no de la primera nota sostenida"

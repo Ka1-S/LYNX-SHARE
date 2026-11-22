@@ -12388,6 +12388,8 @@ countries: id
 "Automation clip: [LMB] open it  [RMB] menu" = "Clip otomasi: [LMB] buka  [RMB] menu"
 "Rename automation clip" = "Ganti nama clip otomasi"
 "Indexing folders... {0}" = "Mengindeks folder... {0}"
+# --- round 190oz: Save a copy for 0.1.30, held FL step notes
+"{0} FL step note(s) on generators end after one step (FL lets them sound on)" = "{0} not step FL pada generator berhenti setelah satu step (FL membiarkannya terus berbunyi)"
 "Capture automation: nothing to capture (move a control while playing, without recording)" = "Tangkap otomasi: tidak ada yang ditangkap (gerakkan kontrol saat memutar, tanpa merekam)"
 "Capture automation: the moves just made without recording become automation" = "Tangkap otomasi: gerakan yang baru dibuat tanpa merekam menjadi otomasi"
 "Capture automation: the moves of {0} control(s) written as automation" = "Tangkap otomasi: gerakan {0} kontrol ditulis sebagai otomasi"
@@ -12507,3 +12509,6 @@ countries: id
 "Controls that several patterns' event lanes drive follow only the last pattern's lane in this release: {0}" = "Kontrol yang digerakkan oleh lajur event beberapa pattern hanya mengikuti lajur pattern terakhir di rilis ini: {0}"
 "In Song mode these patterns' notes play without their own pitch / timbre / pressure curves in this release: {0}" = "Di mode Song, not pattern ini diputar tanpa kurva pitch / timbre / tekanannya sendiri di rilis ini: {0}"
 "ARA plugins on mixer inserts play as ordinary insert effects in this release (the audio clips routed there play without their edits): {0}" = "Plugin ARA pada insert mixer diputar sebagai efek insert biasa di rilis ini (klip audio yang diarahkan ke sana diputar tanpa editannya): {0}"
+# --- round 190pi: Save a copy for 0.1.30, chord slides and Slide arpeggios
+"{0} slide note(s) over chords or notes of other colours take every held note to the slide note's key (FL moves only its colour's notes, all by one interval)" = "{0} not slide di atas akor atau not berwarna lain membawa setiap not yang ditahan ke tuts not slide (FL hanya menggeser not dengan warnanya, semuanya dengan interval yang sama)"
+"{0} channel(s) with a Slide arpeggio start it at the velocity of the note it plays first, not of the first note held" = "{0} channel dengan arpeggio Slide memulainya dengan velocity not yang dimainkan pertama, bukan not pertama yang ditahan"

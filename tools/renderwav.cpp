@@ -206,11 +206,30 @@ int main (int argc, char** argv)
     {
         song = lynx::importFlp (flp::parseProject (bytes), options);
         std::printf ("import: %.0f ms\n", std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - importStart).count());
+        std::size_t held = 0; // FL's held step notes (round 190oz)
+        for (const auto& pat : song.patterns)
+            for (const auto& n : pat.notes)
+                held += n.heldStep() ? 1 : 0;
+        if (held > 0)
+            std::printf ("held step notes: %zu\n", held);
     }
     catch (const flp::Error& e)
     {
         std::fprintf (stderr, "error: %s\n", e.what());
         return 1;
+    }
+
+    // LYNX_SOLO="i j …": only those LYNX channels play (every other channel muted), e.g. one channel's silence check
+    if (const char* e = std::getenv ("LYNX_SOLO"))
+    {
+        std::vector<bool> keep (song.channels.size(), false);
+        std::istringstream list (e);
+        for (int i = 0; list >> i;)
+            if (i >= 0 && i < (int) keep.size())
+                keep[(std::size_t) i] = true;
+        for (std::size_t i = 0; i < song.channels.size(); ++i)
+            if (! keep[i])
+                song.channels[i].muted = true;
     }
 
     // LYNX_SUBSTITUTES=1: third-party effects become their LYNX substitutes, as in the app when none is installed

@@ -1553,7 +1553,7 @@ void toRelease0130 (juce::var& root, Losses& lost)
     // the same pattern (slide notes like the notes they slide sound the same in 0.1.30). Rollup 0.1.31 step 4
     if (drop (o, "slideNoteProps"))
     {
-        int moving = 0;
+        int moving = 0, chords = 0;
         if (auto* patterns = arrayOf (root["patterns"]))
             for (auto& p : *patterns)
             {
@@ -1575,10 +1575,47 @@ void toRelease0130 (juce::var& root, Losses& lost)
                                       && (n.velocity != s.velocity || n.pan != s.pan || n.modX != s.modX || n.modY != s.modY);
                            }))
                         ++moving;
+                // round 190pi: a slide note over a chord (two keys or more of its channel sounding at its start) or over
+                // notes of another colour moves only its colour's held notes, by one interval; 0.1.30 slides every one of
+                // them to the slide note's key
+                struct Span { double start, end; int channel, key, colour; bool slide; };
+                std::vector<Span> spans;
+                for (const auto& n : *notes)
+                    if (n.isArray() && n.size() >= 5)
+                        spans.push_back ({ (double) n[0], (double) n[0] + (double) n[1], (int) n[2], (int) n[3],
+                                           n.size() >= 14 ? (int) n[13] : 0, n.size() >= 9 && (bool) n[8] });
+                for (const auto& s : spans)
+                {
+                    if (! s.slide)
+                        continue;
+                    int first = -1;
+                    for (const auto& n : spans)
+                        if (! n.slide && n.channel == s.channel && n.start <= s.start && n.end > s.start)
+                        {
+                            if (n.colour != s.colour || (first >= 0 && n.key != first))
+                            {
+                                ++chords;
+                                break;
+                            }
+                            first = n.key;
+                        }
+                }
             }
         if (moving > 0)
             lost.push_back ({ TR_NOOP ("{0} slide note(s) move only the pitch: the sounding notes keep their velocity, pan and Mod X / Y (FL's slide of the note properties)"),
                               juce::String (moving), true });
+        if (chords > 0)
+            lost.push_back ({ TR_NOOP ("{0} slide note(s) over chords or notes of other colours take every held note to the slide note's key (FL moves only its colour's notes, all by one interval)"),
+                              juce::String (chords), true });
+        // round 190pi: a Slide arpeggio's voice takes the first held note's velocity and expression; 0.1.30 the note it starts on
+        int slideArps = 0;
+        forEachChannel (root, [&] (juce::DynamicObject& c, int) {
+            if (const auto& fl = c.getProperty ("arpFl"); fl.isObject() && (bool) fl.getProperty ("slide", false))
+                ++slideArps;
+        });
+        if (slideArps > 0)
+            lost.push_back ({ TR_NOOP ("{0} channel(s) with a Slide arpeggio start it at the velocity of the note it plays first, not of the first note held"),
+                              juce::String (slideArps), true });
     }
 
     // round 190oa (DF-21): the toolbar's main volume is FL's monitor volume, on what the audio device plays only (never in
@@ -1653,6 +1690,21 @@ void toRelease0130 (juce::var& root, Losses& lost)
 
     // round 190nu (chord2_190nu): the Piano roll's key markers
     keyMarkersFor0130 (root, lost);
+
+    // round 190oz: FL's step notes on generators, held (a pattern's "heldNotes"); 0.1.30 plays them one step long
+    {
+        int held = 0;
+        if (auto* patterns = arrayOf (root["patterns"]))
+            for (auto& p : *patterns)
+                if (auto* po = objectOf (p))
+                {
+                    if (auto* h = arrayOf (po->getProperty ("heldNotes")))
+                        held += h->size();
+                    drop (*po, "heldNotes");
+                }
+        if (held > 0)
+            lost.push_back ({ TR_NOOP ("{0} FL step note(s) on generators end after one step (FL lets them sound on)"), juce::String (held), true });
+    }
 
     // round 190ol (P1): the Sections lane. 0.1.30 has no sections: each becomes a plain Playlist marker at its start, named
     // after it (unless a plain marker of that name is already there), so the song's parts stay visible and "Sections from

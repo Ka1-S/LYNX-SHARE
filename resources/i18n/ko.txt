@@ -12388,6 +12388,8 @@ countries: kr
 "Automation clip: [LMB] open it  [RMB] menu" = "오토메이션 클립: [LMB] 열기  [RMB] 메뉴"
 "Rename automation clip" = "오토메이션 클립 이름 변경"
 "Indexing folders... {0}" = "폴더 색인 중... {0}"
+# --- round 190oz: Save a copy for 0.1.30, held FL step notes
+"{0} FL step note(s) on generators end after one step (FL lets them sound on)" = "제너레이터의 FL 스텝 노트 {0}개가 한 스텝 후에 끝납니다(FL에서는 계속 울립니다)"
 "Capture automation: nothing to capture (move a control while playing, without recording)" = "오토메이션 캡처: 캡처할 것이 없습니다 (녹음하지 않고 재생 중에 컨트롤을 움직이세요)"
 "Capture automation: the moves just made without recording become automation" = "오토메이션 캡처: 녹음 없이 방금 한 움직임을 오토메이션으로 만듭니다"
 "Capture automation: the moves of {0} control(s) written as automation" = "오토메이션 캡처: 컨트롤 {0}개의 움직임을 오토메이션으로 기록했습니다"
@@ -12507,3 +12509,6 @@ countries: kr
 "Controls that several patterns' event lanes drive follow only the last pattern's lane in this release: {0}" = "여러 패턴의 이벤트 레인이 움직이는 컨트롤은 이 릴리스에서 마지막 패턴의 레인만 따릅니다: {0}"
 "In Song mode these patterns' notes play without their own pitch / timbre / pressure curves in this release: {0}" = "Song 모드에서 이 패턴들의 노트는 이 릴리스에서 노트 자체의 피치 / 음색 / 압력 곡선 없이 연주됩니다: {0}"
 "ARA plugins on mixer inserts play as ordinary insert effects in this release (the audio clips routed there play without their edits): {0}" = "믹서 인서트의 ARA 플러그인은 이 릴리스에서 일반 인서트 이펙트로 동작합니다(그곳으로 라우팅된 오디오 클립은 편집 없이 재생됩니다): {0}"
+# --- round 190pi: Save a copy for 0.1.30, chord slides and Slide arpeggios
+"{0} slide note(s) over chords or notes of other colours take every held note to the slide note's key (FL moves only its colour's notes, all by one interval)" = "코드나 다른 색의 노트 위의 슬라이드 노트 {0}개는 눌린 모든 노트를 슬라이드 노트의 키로 옮깁니다(FL은 같은 색의 노트만 모두 같은 음정만큼 움직입니다)"
+"{0} channel(s) with a Slide arpeggio start it at the velocity of the note it plays first, not of the first note held" = "Slide 아르페지오 채널 {0}개는 처음 누른 노트가 아니라 처음 연주하는 노트의 벨로시티로 시작합니다"

@@ -12388,6 +12388,8 @@ countries: cn sg
 "Automation clip: [LMB] open it  [RMB] menu" = "自动化片段：[LMB] 打开  [RMB] 菜单"
 "Rename automation clip" = "重命名自动化片段"
 "Indexing folders... {0}" = "正在索引文件夹... {0}"
+# --- round 190oz: Save a copy for 0.1.30, held FL step notes
+"{0} FL step note(s) on generators end after one step (FL lets them sound on)" = "生成器上的 {0} 个 FL 步进音符在一步后结束（FL 中会持续发声）"
 "Capture automation: nothing to capture (move a control while playing, without recording)" = "捕获自动化：没有可捕获的内容（在播放时移动控件，不要录音）"
 "Capture automation: the moves just made without recording become automation" = "捕获自动化：刚才未录音时做的动作变为自动化"
 "Capture automation: the moves of {0} control(s) written as automation" = "捕获自动化：{0} 个控件的动作已写为自动化"
@@ -12507,3 +12509,6 @@ countries: cn sg
 "Controls that several patterns' event lanes drive follow only the last pattern's lane in this release: {0}" = "由多个 pattern 的事件轨道驱动的控件在此版本中只跟随最后一个 pattern 的轨道：{0}"
 "In Song mode these patterns' notes play without their own pitch / timbre / pressure curves in this release: {0}" = "在 Song 模式下，这些 pattern 的音符在此版本中不带自身的音高 / 音色 / 压力曲线播放：{0}"
 "ARA plugins on mixer inserts play as ordinary insert effects in this release (the audio clips routed there play without their edits): {0}" = "混音器插入槽上的 ARA 插件在此版本中作为普通插入效果器工作（路由到那里的音频片段不带其编辑播放）：{0}"
+# --- round 190pi: Save a copy for 0.1.30, chord slides and Slide arpeggios
+"{0} slide note(s) over chords or notes of other colours take every held note to the slide note's key (FL moves only its colour's notes, all by one interval)" = "和弦或其他颜色音符上的 {0} 个滑音音符把每个按住的音符都移到滑音音符的键上（FL 只移动同色的音符，全部移动同一个音程）"
+"{0} channel(s) with a Slide arpeggio start it at the velocity of the note it plays first, not of the first note held" = "{0} 个使用 Slide 琶音的通道以最先演奏的音符的力度开始，而不是最先按住的音符"

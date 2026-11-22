@@ -8646,6 +8646,75 @@ private:
             }
         }
 
+        // round 190pi: "Save a copy for 0.1.30" of FL's slide law (Song::slideNoteProps): a slide note over a chord (FL moves
+        // every held note by one interval) and a Slide arpeggio (its voice at the first held note's velocity) each get one
+        // sound line; a project with neither gets none of them; the copy reads back
+        juce::String slides190piResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            song.slideNoteProps = true;
+            if (song.patterns.empty())
+                song.patterns.emplace_back();
+            if (song.channels.empty())
+                song.channels.emplace_back();
+            song.patterns[0].notes.clear();
+            const auto count = [] (const lynx::olderlynx::Copy& copy, const char* start) {
+                return (int) std::count_if (copy.lost.begin(), copy.lost.end(), [start] (const lynx::olderlynx::Loss& l) {
+                    return juce::String (l.text).startsWith (start) && l.sound;
+                });
+            };
+            const auto plain = lynx::olderlynx::forRelease (song, "0.1.30");
+            lynx::Note a, b, slide;
+            a.start = 0, a.length = 4 * lynx::ppq, a.key = 60, a.channel = 0;
+            b = a, b.key = 67;
+            slide = a, slide.start = lynx::ppq, slide.length = lynx::ppq / 2, slide.slide = true;
+            song.patterns[0].notes = { a, b, slide };
+            song.channels[0].arp.direction = 1;
+            song.channels[0].arp.slide = true;
+            const auto copy = lynx::olderlynx::forRelease (song, "0.1.30");
+            juce::String why;
+            const auto back = copy.ok ? lynx::ProjectFile::fromJson (copy.json, why) : std::optional<lynx::Song> {};
+            if (! plain.ok || count (plain, "{0} slide note(s) over chords") != 0 || count (plain, "{0} channel(s) with a Slide arpeggio") != 0)
+                slides190piResult = "ERROR lines for a project without chord slides or Slide arpeggios";
+            else if (! copy.ok || count (copy, "{0} slide note(s) over chords") != 1 || count (copy, "{0} channel(s) with a Slide arpeggio") != 1)
+                slides190piResult = "ERROR the copy's lines " + copy.error;
+            else if (! back || back->slideNoteProps || copy.json.contains ("slideNoteProps"))
+                slides190piResult = "ERROR the copy read back " + why;
+        }
+
+        // round 190oz: FL's held step notes (Note::held) in .lynx ("heldNotes", only when a pattern has one), back from it,
+        // and the copy for 0.1.30 (the marks dropped with one sound line, the notes kept one step long)
+        juce::String heldSteps190ozResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            const auto plainJson = lynx::ProjectFile::toJson (song);
+            if (song.patterns.empty())
+                song.patterns.emplace_back();
+            auto& notes = song.patterns[0].notes;
+            notes.clear();
+            lynx::Note held, plain;
+            held.start = 0, held.channel = 0, held.held = true;
+            plain.start = lynx::ticksPerStep * 4, plain.channel = 0;
+            notes = { held, plain };
+            const auto json = lynx::ProjectFile::toJson (song);
+            juce::String why;
+            const auto back = lynx::ProjectFile::fromJson (json, why);
+            const auto copy = lynx::olderlynx::forRelease (song, "0.1.30");
+            const auto lines = (int) std::count_if (copy.lost.begin(), copy.lost.end(), [] (const lynx::olderlynx::Loss& l) {
+                return juce::String (l.text).startsWith ("{0} FL step note(s) on generators") && l.detail == "1" && l.sound;
+            });
+            juce::String why2;
+            const auto old = copy.ok ? lynx::ProjectFile::fromJson (copy.json, why2) : std::optional<lynx::Song> {};
+            if (plainJson.contains ("heldNotes") || ! json.contains ("heldNotes"))
+                heldSteps190ozResult = "ERROR the .lynx key";
+            else if (! back || back->patterns.empty() || back->patterns[0].notes.size() != 2 || ! back->patterns[0].notes[0].held
+                     || back->patterns[0].notes[1].held || back->patterns[0].notes[0].start != 0)
+                heldSteps190ozResult = "ERROR the .lynx round trip " + why;
+            else if (! copy.ok || copy.json.contains ("heldNotes") || lines != 1 || ! old || old->patterns.empty()
+                     || old->patterns[0].notes.size() != 2 || old->patterns[0].notes[0].held)
+                heldSteps190ozResult = "ERROR the copy for 0.1.30 (" + juce::String (lines) + " lines) " + copy.error + why2;
+        }
+
         // rollup 0.1.31 step 6: "Save a copy for 0.1.30 / 0.1.28" over every round of the step. One project with: 190om's SimSynth
         // (engine revision 2, the velocity law), two patterns' event lanes on one control and a note with a pitch curve in a
         // Playlist clip (decisions 4 / 5: lines only); 190op's hidden track and deactivated insert; 190oq's ARA plugin on an
@@ -9850,6 +9919,8 @@ private:
                << "simpleduck190ot=" << simpleDuck190otResult << "\n"
                << "autolinks190ov=" << autolinks190ovResult << "\n"
                << "sections190ol=" << sections190olResult << "\n"
+               << "heldsteps190oz=" << heldSteps190ozResult << "\n"
+               << "slides190pi=" << slides190piResult << "\n"
                << "renderagain190ou=" << renderAgainResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";

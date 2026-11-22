@@ -1812,6 +1812,11 @@ struct Note
     bool muted = false;       // disabled note (does not play, stays in the pattern)
     bool slide = false;       // glides the sounding note to this pitch (without retriggering), as in FL
     bool porta = false;       // inverts the channel's porta on this note (the note glides from the previous one; as in FL)
+    // FL's step note on a generator (round 190oz, REA_rodada190oz §5): an .flp note of length 0 on a plugin / native
+    // generator channel. FL sends its note-off only when the channel's next note starts (ScheduledNotes), so the last
+    // one sounds on until the instrument ends it. It keeps one step of length for the editors; once that length is
+    // changed it plays as an ordinary note (heldStep()).
+    bool held = false;
     // release velocity 0..1 (FL's "Note release"): the note's "off" carries it to the instruments that take one — hosted
     // plugins (FL's wrapper "Send note release velocity"), a Patcher's and a VFX's voices
     float release = 0.5f;
@@ -1833,6 +1838,7 @@ struct Note
     int chanceGroup = 0;
     bool chanceOne = false;
     bool hasChance() const noexcept { return chance < 1.0f || velocityRange != 0.0f || chanceGroup != 0; }
+    bool heldStep() const noexcept { return held && length == ticksPerStep && ! slide; }
     // MPE stage 2 (issue #108, core/NoteCurves.h): the note's own pitch bend / timbre / pressure curves while it sounds
     // (recorded from an MPE controller, drawn in the Piano roll's MPE lanes, Live's per-note expression); none = the
     // note plays its fine pitch, Mod X and Mod Y alone, as before
