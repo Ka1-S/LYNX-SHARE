@@ -8763,6 +8763,9 @@ private:
                                           "{0} \"Duck under...\" effect(s)", "Automation clips linked to several controls move them 1:1",
                                           "{0} step(s) or note(s) on automation clip rows start no clip", "An automation clip's LFO keeps",
                                           "Muted automation clips lose their target", "These modulators are not in this release" };
+            const auto hasLane = [&simVolume] (const lynx::Pattern& p) {
+                return std::any_of (p.events.begin(), p.events.end(), [&simVolume] (const lynx::PatternEvents& l) { return l.target == simVolume && ! l.events.empty(); });
+            };
             if (! duckSet || kick <= 0 || pad <= 0 || song.channels[(std::size_t) simIndex].engineRev != 2)
                 rollup031s6Result = "ERROR set-up";
             for (const auto* release : { "0.1.30", "0.1.28" })
@@ -8798,8 +8801,8 @@ private:
                     rollup031s6Result = "ERROR SimSynth's revision in the copy for 0.1.30 (" + juce::String (back->channels[(std::size_t) simIndex].engineRev) + ")";
                 else if (! back->mixer[(std::size_t) kick].muted || back->mixer[(std::size_t) kick].deactivated || (back->playlistTracks.size() > 3 && back->playlistTracks[3].hidden))
                     rollup031s6Result = juce::String ("ERROR 190op's units in the copy for ") + release;
-                else if (is130 && (back->patterns.size() < 2 || back->patterns[0].events != song.patterns[0].events || back->patterns[1].events != song.patterns[1].events
-                                   || back->patterns[0].notes.empty() || ! back->patterns[0].notes.back().curves.has()))
+                else if (is130 && (back->patterns.size() < 2 || ! hasLane (back->patterns[0]) || ! hasLane (back->patterns[1])
+                                   || std::none_of (back->patterns[0].notes.begin(), back->patterns[0].notes.end(), [] (const lynx::Note& n) { return n.curves.has(); })))
                     rollup031s6Result = "ERROR the copy for 0.1.30 lost 190om's lanes or curves (lines only)";
                 else if (back->automations.size() < 3 || (is130 && back->automations[(std::size_t) linkedIndex].links.size() != 2)
                          || (! back->automations[(std::size_t) linkedIndex].links.empty() && ! back->automations[(std::size_t) linkedIndex].links[0].scale.empty()) || back->automations.back().target.kind != lynx::AutomationTargetKind::none

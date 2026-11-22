@@ -116,8 +116,9 @@ TEST (pluginexport180b_catalog_needs_no_fl_data)
         {
             const auto* engine = lynx::natives::instrumentEngine (e.synth);
             CHECK (engine != nullptr && engine->needs == lynx::natives::Needs::nothing);
-            const auto channel = lynx::banks::defaultChannel (e.synth, e.name);
-            CHECK (channel.has_value());
+            // (a bank's first preset; Tetra and Braid have no bank and start from their engine's defaults: rollup 0.1.31 step 6)
+            const auto channel = lynx::plugexport::instrumentChannel (e);
+            CHECK (channel.instrument == e.synth && lynx::banks::defaultChannel (e.synth, e.name).has_value() == lynx::banks::hasBank (e.synth));
             CHECK (lynx::modelparams::tableOf (e.synth) != nullptr);
         }
         else
