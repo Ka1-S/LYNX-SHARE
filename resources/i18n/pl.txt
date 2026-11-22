@@ -12467,3 +12467,11 @@ countries: pl
 "under no track yet" = "jeszcze pod żadną ścieżką"
 "Dips this track on every hit of another track (sidechain)." = "Przycisza tę ścieżkę przy każdym uderzeniu innej ścieżki (sidechain)."
 "{0} \"Duck under...\" effect(s) of the Simple layout show as an ordinary Fruity Limiter with its side input (the sound is the same)" = "Efekty „Przyciszaj pod...” układu Simple ({0}) są widoczne jako zwykły Fruity Limiter z wejściem bocznym (brzmienie jest takie samo)"
+
+# round 190ow (PAT-7 rest, DE-123: automation clip rows)
+"Mute the automation clip: it drives nothing while muted" = "Wycisz klip automatyki: wyciszony niczym nie steruje"
+"Select the automation clip row: [LMB] alone  [Ctrl+LMB] add" = "Zaznacz wiersz klipu automatyki: [LMB] tylko ten  [Ctrl+LMB] dodaj"
+"Steps start the automation clip: [LMB] set or clear  [drag] paint" = "Kroki uruchamiają klip automatyki: [LMB] włącz lub usuń  [przeciągnij] maluj"
+"{0} step(s) or note(s) on automation clip rows start no clip (the clips in the Playlist play as before)" = "{0} krok(ów) lub nut na wierszach klipów automatyki nie uruchamia żadnego klipu (klipy w Playlist grają jak wcześniej)"
+"An automation clip's LFO keeps the clip's first range (its MIN / MAX knobs are written into the points)" = "LFO klipu automatyki zachowuje pierwszy zakres klipu (jego pokrętła MIN / MAX są zapisywane w punktach)"
+"Muted automation clips lose their target, so they stay silent: {0}" = "Wyciszone klipy automatyki tracą cel, więc pozostają ciche: {0}"

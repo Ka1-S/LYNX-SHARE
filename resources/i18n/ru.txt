@@ -12467,3 +12467,11 @@ countries: ru by kz
 "under no track yet" = "пока ни под какой дорожкой"
 "Dips this track on every hit of another track (sidechain)." = "Приглушает эту дорожку на каждом ударе другой дорожки (сайдчейн)."
 "{0} \"Duck under...\" effect(s) of the Simple layout show as an ordinary Fruity Limiter with its side input (the sound is the same)" = "Эффекты «Приглушать под...» макета Simple ({0}) показаны как обычный Fruity Limiter с боковым входом (звук тот же)"
+
+# round 190ow (PAT-7 rest, DE-123: automation clip rows)
+"Mute the automation clip: it drives nothing while muted" = "Заглушить клип автоматизации: заглушённый, он ничем не управляет"
+"Select the automation clip row: [LMB] alone  [Ctrl+LMB] add" = "Выбрать строку клипа автоматизации: [LMB] только её  [Ctrl+LMB] добавить"
+"Steps start the automation clip: [LMB] set or clear  [drag] paint" = "Шаги запускают клип автоматизации: [LMB] поставить или убрать  [перетащить] рисовать"
+"{0} step(s) or note(s) on automation clip rows start no clip (the clips in the Playlist play as before)" = "{0} шаг(ов) или нот на строках клипов автоматизации не запускают клипы (клипы в Playlist звучат как раньше)"
+"An automation clip's LFO keeps the clip's first range (its MIN / MAX knobs are written into the points)" = "LFO клипа автоматизации сохраняет первый диапазон клипа (его ручки MIN / MAX записываются в точки)"
+"Muted automation clips lose their target, so they stay silent: {0}" = "Заглушённые клипы автоматизации теряют цель и остаются беззвучными: {0}"

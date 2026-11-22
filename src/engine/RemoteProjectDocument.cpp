@@ -151,10 +151,10 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         add (S::busHead, "bus gain");
         add (S::busHead, "head", S::effect);
         add (S::standIn, "pattern loop path hash length plugin by");
-        add (S::pattern, "name uid length colour loopOn loopStarterGenre loopMode channelLoops markers notes");
+        add (S::pattern, "name uid length colour loopOn loopStarterGenre loopMode channelLoops markers notes autoNotes"); // (autoNotes: round 190ow)
         add (S::pattern, "events", S::events, true);
         add (S::events, "target events");
-        add (S::automation, "name uid target points source curve lfo lfoFl recordLive colour tempoMarkers rackSlot");
+        add (S::automation, "name uid target points source curve lfo lfoFl recordLive colour tempoMarkers rackSlot range muted"); // (range, muted: round 190ow)
         add (S::automation, "links", S::readOnly);
         add (S::modulator, "name shape sync beats hz phase unipolar seed routes");
         add (S::vca, "name colour level muted members parent");

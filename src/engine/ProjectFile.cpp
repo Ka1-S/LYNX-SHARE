@@ -3247,6 +3247,21 @@ juce::String toJson (const Song& song, bool stampVersion)
 
         o->setProperty ("notes", notes);
 
+        // round 190ow (DE-123): FL's steps / notes of the automation clip rows, [start, length, automation, key, velocity
+        // (, muted)]; absent = none, as older files (an older LYNX does not read the key)
+        if (! p.autoNotes.empty())
+        {
+            juce::Array<juce::var> autoNotes;
+            for (const auto& n : p.autoNotes)
+            {
+                juce::Array<juce::var> note { (juce::int64) n.start, (juce::int64) n.length, n.channel, n.key, projectNumber (n.velocity, 1000.0f) };
+                if (n.muted)
+                    note.add (true);
+                autoNotes.add (note);
+            }
+            o->setProperty ("autoNotes", autoNotes);
+        }
+
         // event editor lanes: [kind, index, slot, param] + [[tick, value], ...]
         juce::Array<juce::var> lanes;
         for (const auto& lane : p.events)
@@ -3330,6 +3345,11 @@ juce::String toJson (const Song& song, bool stampVersion)
             o->setProperty ("colour", (juce::int64) a.colour);
         if (a.rackSlot >= 0) // round 190oo (PAT-7): its row in the Channel rack; absent = after the channels, as older files
             o->setProperty ("rackSlot", a.rackSlot);
+        if (a.rangeMin != 0.0f || a.rangeMax != 1.0f || a.pointsMin != 0.0f || a.pointsMax != 1.0f) // round 190ow: FL's MIN / MAX
+            o->setProperty ("range", juce::Array<juce::var> { projectNumber (a.rangeMin, 1.0e6f), projectNumber (a.rangeMax, 1.0e6f),
+                                                              projectNumber (a.pointsMin, 1.0e6f), projectNumber (a.pointsMax, 1.0e6f) });
+        if (a.muted) // round 190ow: the rack row's mute light
+            o->setProperty ("muted", true);
         if (const auto& l = a.lfo; ! l.isDefault()) // round 177b: FL's clip LFO
         {
             juce::Array<juce::var> amp;
@@ -4169,6 +4189,20 @@ std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error,
                         pattern.notes.push_back (note);
                 }
 
+            if (auto* autoNotes = p["autoNotes"].getArray()) // (round 190ow; the automation index is checked once they are read)
+                for (const auto& n : *autoNotes)
+                    if (n.isArray() && n.size() >= 5 && (int) n[2] >= 0)
+                    {
+                        Note note;
+                        note.start = juce::jmax<juce::int64> (0, (juce::int64) n[0]);
+                        note.length = juce::jmax<juce::int64> (0, (juce::int64) n[1]); // (0: FL's step of no length)
+                        note.channel = (int) n[2];
+                        note.key = juce::jlimit (0, 127, (int) n[3]);
+                        note.velocity = juce::jlimit (0.0f, 1.0f, (float) (double) n[4]);
+                        note.muted = n.size() >= 6 && (bool) n[5];
+                        pattern.autoNotes.push_back (note);
+                    }
+
             pattern.sortNotes();
 
             if (auto* lanes = p["events"].getArray())
@@ -4215,6 +4249,14 @@ std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error,
             automation.recordLive = (bool) a["recordLive"];
             automation.colour = (std::uint32_t) (juce::int64) a.getProperty ("colour", 0);
             automation.rackSlot = juce::jmax (-1, (int) a.getProperty ("rackSlot", -1)); // (round 190oo, PAT-7)
+            if (const auto& r = a["range"]; r.isArray() && r.size() >= 4) // (round 190ow)
+            {
+                automation.rangeMin = juce::jlimit (0.0f, 1.0f, (float) (double) r[0]);
+                automation.rangeMax = juce::jlimit (0.0f, 1.0f, (float) (double) r[1]);
+                automation.pointsMin = juce::jlimit (0.0f, 1.0f, (float) (double) r[2]);
+                automation.pointsMax = juce::jlimit (0.0f, 1.0f, (float) (double) r[3]);
+            }
+            automation.muted = (bool) a.getProperty ("muted", false); // (round 190ow)
             automation.tempoMarkers = (bool) a["tempoMarkers"] && automation.target.kind == AutomationTargetKind::tempo; // (round 190hq)
             if (auto* links = a["links"].getArray()) // round 190gw
                 for (const auto& l : *links)
@@ -4277,6 +4319,11 @@ std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error,
             }
             song.automations.push_back (std::move (automation));
         }
+
+    for (auto& p : song.patterns) // round 190ow: an automation clip row's notes need their automation
+        p.autoNotes.erase (std::remove_if (p.autoNotes.begin(), p.autoNotes.end(),
+                                           [&song] (const Note& n) { return n.channel >= (int) song.automations.size(); }),
+                           p.autoNotes.end());
 
     song.clipEnvelopes = clipEnvelopesFromVar (root["clipEnvelopes"]); // (round 190gi; before every clip list)
     song.araDocuments.clear(); // round 190kx

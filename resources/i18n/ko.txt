@@ -12467,3 +12467,11 @@ countries: kr
 "under no track yet" = "아직 기준 트랙 없음"
 "Dips this track on every hit of another track (sidechain)." = "다른 트랙이 칠 때마다 이 트랙을 낮춥니다 (사이드체인)."
 "{0} \"Duck under...\" effect(s) of the Simple layout show as an ordinary Fruity Limiter with its side input (the sound is the same)" = "심플 레이아웃의 \"덕킹 기준...\" 이펙트 {0}개는 사이드 입력이 있는 일반 Fruity Limiter로 표시됩니다 (소리는 같습니다)"
+
+# round 190ow (PAT-7 rest, DE-123: automation clip rows)
+"Mute the automation clip: it drives nothing while muted" = "오토메이션 클립 뮤트: 뮤트 중에는 아무것도 움직이지 않습니다"
+"Select the automation clip row: [LMB] alone  [Ctrl+LMB] add" = "오토메이션 클립 행 선택: [LMB] 이 행만  [Ctrl+LMB] 추가"
+"Steps start the automation clip: [LMB] set or clear  [drag] paint" = "스텝이 오토메이션 클립을 시작합니다: [LMB] 설정 또는 해제  [드래그] 칠하기"
+"{0} step(s) or note(s) on automation clip rows start no clip (the clips in the Playlist play as before)" = "오토메이션 클립 행의 스텝/노트 {0}개는 클립을 시작하지 않습니다 (플레이리스트의 클립은 이전처럼 재생됩니다)"
+"An automation clip's LFO keeps the clip's first range (its MIN / MAX knobs are written into the points)" = "오토메이션 클립의 LFO는 클립의 처음 범위를 유지합니다 (MIN / MAX 노브 값은 포인트에 기록됩니다)"
+"Muted automation clips lose their target, so they stay silent: {0}" = "뮤트된 오토메이션 클립은 대상을 잃어 무음으로 남습니다: {0}"

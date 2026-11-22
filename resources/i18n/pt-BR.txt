@@ -12601,3 +12601,11 @@ countries: br
 "under no track yet" = "sob nenhuma faixa ainda"
 "Dips this track on every hit of another track (sidechain)." = "Abaixa esta faixa a cada batida de outra faixa (sidechain)."
 "{0} \"Duck under...\" effect(s) of the Simple layout show as an ordinary Fruity Limiter with its side input (the sound is the same)" = "{0} efeito(s) \"Abaixar sob...\" do layout Simples aparecem como um Fruity Limiter comum com sua entrada lateral (o som é o mesmo)"
+
+# round 190ow (PAT-7 rest, DE-123: automation clip rows)
+"Mute the automation clip: it drives nothing while muted" = "Silenciar o clipe de automação: mudo, ele não move nada"
+"Select the automation clip row: [LMB] alone  [Ctrl+LMB] add" = "Selecionar a linha do clipe de automação: [LMB] só ela  [Ctrl+LMB] adicionar"
+"Steps start the automation clip: [LMB] set or clear  [drag] paint" = "Os steps iniciam o clipe de automação: [LMB] liga ou desliga  [arrastar] pinta"
+"{0} step(s) or note(s) on automation clip rows start no clip (the clips in the Playlist play as before)" = "{0} step(s) ou nota(s) em linhas de clipes de automação não iniciam nenhum clipe (os clipes na Playlist tocam como antes)"
+"An automation clip's LFO keeps the clip's first range (its MIN / MAX knobs are written into the points)" = "O LFO de um clipe de automação mantém a primeira faixa do clipe (os knobs MIN / MAX são gravados nos pontos)"
+"Muted automation clips lose their target, so they stay silent: {0}" = "Clipes de automação mudos perdem o alvo e continuam em silêncio: {0}"

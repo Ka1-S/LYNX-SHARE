@@ -2020,6 +2020,63 @@ void RackState::buildMidiRoutes()
     }
 }
 
+// round 190ow (details DE-123, core/RackAutomation.h): FL's triggered automation clips. A step / note on an automation
+// clip row starts the clip from its beginning and plays it while the note is held (FL's manual: "Triggering"); the clip
+// then holds the value it reached. In Song mode each pattern clip of the Playlist plays its pattern's steps / notes
+// where its notes play (the clip's offset and its passes when it loops); a note the clip's end cuts plays on to its own
+// end, as FL does (round 190ow's FL /R probes p13_cut, p15_cutnote).
+static std::int64_t triggerLength (const Automation& a, const Note& n) noexcept
+{
+    return n.length > 0 ? n.length : a.length(); // (FL's step of no length: the clip once, to its last point)
+}
+
+void RackState::buildTriggerClips (int count)
+{
+    triggerClips.clear();
+    triggered.clear();
+    patternTriggers = false;
+    for (const auto& p : song.patterns)
+        patternTriggers = patternTriggers || ! p.autoNotes.empty();
+    if (! patternTriggers)
+        return;
+    triggerClips.assign ((std::size_t) count, {});
+    triggered.assign ((std::size_t) count, 0);
+    for (const auto& p : song.patterns)
+        for (const auto& n : p.autoNotes)
+            if (n.channel >= 0 && n.channel < count && ! n.muted)
+                triggered[(std::size_t) n.channel] = 1;
+    const auto meter = song.meter();
+    const auto zoneEnd = song.performanceZoneEnd();
+    for (const auto& c : song.playlist)
+    {
+        if (c.kind != ClipKind::pattern || c.pattern < 0 || c.pattern >= (int) song.patterns.size() || c.length <= 0 || c.muted
+            || song.isTrackMuted (c.track) || c.start < zoneEnd)
+            continue;
+        const auto& pattern = song.patterns[(std::size_t) c.pattern];
+        if (pattern.autoNotes.empty())
+            continue;
+        const auto passes = clipPasses (c, pattern.effectiveLength (meter));
+        for (auto k = passes.first; k <= passes.last; ++k)
+            for (const auto& n : pattern.autoNotes)
+            {
+                if (n.muted || n.channel < 0 || n.channel >= count || (passes.loops && n.start >= passes.length))
+                    continue;
+                const auto at = c.start - c.offset + (passes.loops ? k * passes.length : 0) + n.start;
+                if (at < c.start || at >= c.end())
+                    continue;
+                Clip t;
+                t.kind = ClipKind::automation;
+                t.automation = n.channel;
+                t.start = at;
+                // (not cut at the pattern clip's end: FL plays the note on, FL 2026 /R probes p13_cut / p15_cutnote)
+                t.length = std::max<std::int64_t> (1, triggerLength (song.automations[(std::size_t) n.channel], n));
+                triggerClips[(std::size_t) n.channel].push_back (t);
+            }
+    }
+    for (auto& clips : triggerClips)
+        std::stable_sort (clips.begin(), clips.end(), [] (const Clip& a, const Clip& b) { return a.start < b.start; });
+}
+
 void RackState::buildAutomationTables()
 {
     const auto& automations = song.automations;
@@ -2046,6 +2103,18 @@ void RackState::buildAutomationTables()
         std::sort (clips.begin(), clips.end(),
                    [this] (int a, int b) { return song.playlist[(std::size_t) a].start < song.playlist[(std::size_t) b].start; });
 
+    // round 190ow (DE-123): the clips the automation clip rows' steps / notes start, and FL's mute light of a clip
+    buildTriggerClips (count);
+    for (int a = 0; a < count; ++a)
+        if (automations[(std::size_t) a].muted)
+        {
+            automationClips[(std::size_t) a].clear();
+            if ((std::size_t) a < triggerClips.size())
+                triggerClips[(std::size_t) a].clear();
+            if ((std::size_t) a < triggered.size())
+                triggered[(std::size_t) a] = 0;
+        }
+
     // round 177b: the lanes of unmuted tracks; a lane automation's own clips (if any) don't play as clips
     laneAutomations.clear();
     for (int t = 0; t < (int) song.playlistTracks.size(); ++t)
@@ -2054,6 +2123,8 @@ void RackState::buildAutomationTables()
                 && ! automations[(std::size_t) lane.automation].points.empty())
             {
                 automationClips[(std::size_t) lane.automation].clear();
+                if ((std::size_t) lane.automation < triggerClips.size()) // (round 190ow)
+                    triggerClips[(std::size_t) lane.automation].clear(), triggered[(std::size_t) lane.automation] = 0;
                 laneAutomations.push_back ({ lane.automation, {} });
             }
     for (auto& lane : laneAutomations)
@@ -2209,7 +2280,7 @@ void RackState::buildAutomationTables()
     automationFollowers.assign ((std::size_t) count, 0);
     const auto playsClips = [&] (int a) {
         const auto& automation = automations[(std::size_t) a];
-        return ! automationClips[(std::size_t) a].empty() && ! automation.isLive() && zoneAutomations[(std::size_t) a] == 0
+        return driven (a) && ! automation.isLive() && zoneAutomations[(std::size_t) a] == 0
                && automation.target.kind != AutomationTargetKind::none && automation.links.empty(); // (190gw: links bind below)
     };
     for (int a = count - 1; a > 0; --a)
@@ -2226,6 +2297,22 @@ void RackState::buildAutomationTables()
         if (! group.empty())
             group.push_back (a);
     }
+
+    // round 190ow: where a triggered automation's value goes (Pattern mode writes it there; Song mode scans the group)
+    triggerSlot.assign ((std::size_t) count, -1);
+    if (! triggerClips.empty() || patternTriggers)
+        for (int a = 0; a < count; ++a)
+        {
+            triggerSlot[(std::size_t) a] = a;
+            if (automationFollowers[(std::size_t) a] != 0)
+                for (int holder = a + 1; holder < count; ++holder)
+                    if (std::find (automationGroups[(std::size_t) holder].begin(), automationGroups[(std::size_t) holder].end(), a)
+                        != automationGroups[(std::size_t) holder].end())
+                    {
+                        triggerSlot[(std::size_t) a] = holder;
+                        break;
+                    }
+        }
 
     // a lane takes the value of its peers' group: a follower computes none, the automation that holds the slot does
     for (auto& lane : laneAutomations)
@@ -2275,7 +2362,7 @@ void RackState::buildAutomationTables()
     for (int a = 0; a < count; ++a)
     {
         if (automationFollowers[(std::size_t) a] != 0
-            || (automationClips[(std::size_t) a].empty() && ! automations[(std::size_t) a].isLive() && zoneAutomations[(std::size_t) a] == 0)
+            || (! driven (a) && ! automations[(std::size_t) a].isLive() && zoneAutomations[(std::size_t) a] == 0)
             || ! automations[(std::size_t) a].links.empty()) // (round 190gw: through its link slots, below)
             continue;
 
@@ -3059,20 +3146,31 @@ float automationValueAt (const RackState& state, int slot, double tick) noexcept
     const Clip* ended = nullptr;
     int playingAutomation = -1, endedAutomation = -1;
 
+    const auto visit = [&] (const Clip& c, int a) {
+        if (tick < (double) c.end())
+        {
+            if (playing == nullptr || c.start > playing->start)
+                playing = &c, playingAutomation = a;
+        }
+        else if (ended == nullptr || c.end() > ended->end() || (c.end() == ended->end() && c.start > ended->start))
+            ended = &c, endedAutomation = a;
+    };
     const auto scan = [&] (int a) {
         for (const auto i : state.automationClips[(std::size_t) a]) // sorted by start
         {
             const auto& c = song.playlist[(std::size_t) i];
             if (tick < (double) c.start)
                 break;
-            if (tick < (double) c.end())
-            {
-                if (playing == nullptr || c.start > playing->start)
-                    playing = &c, playingAutomation = a;
-            }
-            else if (ended == nullptr || c.end() > ended->end() || (c.end() == ended->end() && c.start > ended->start))
-                ended = &c, endedAutomation = a;
+            visit (c, a);
         }
+        // round 190ow (DE-123): the clips its steps / notes start play by the same rule (the one started last wins)
+        if ((std::size_t) a < state.triggerClips.size())
+            for (const auto& c : state.triggerClips[(std::size_t) a]) // sorted by start
+            {
+                if (tick < (double) c.start)
+                    break;
+                visit (c, a);
+            }
     };
 
     if (group.empty())
@@ -3264,8 +3362,16 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
     // in pattern mode the Playlist does not play: values stay as they were
     if (song.mode != PlayMode::song)
     {
+        // round 190ow (DE-123): except the automation clips the current pattern's steps / notes start (FL plays them in
+        // Pattern mode as in Song mode)
+        const auto triggered = state.patternTriggers && updatePatternTriggers (state, startTick);
         compensateTick = -1.0;
         clearOverriddenValues();
+        if (triggered)
+        {
+            applyOrDeferParams (state, 0, true);
+            return;
+        }
         // only the plugin parameters driven by pattern events and by live controllers (links: FL's work in any mode,
         // round 165)
         if (! state.eventLanes.empty() || ! state.liveAutomations.empty())
@@ -3277,7 +3383,7 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
     const auto tick = linearSongTick (liveInput, startTick, length);
 
     for (std::size_t a = 0; a < state.automationClips.size(); ++a)
-        if (! state.automationClips[a].empty() && state.automationFollowers[a] == 0)
+        if (state.positional ((int) a) && state.automationFollowers[a] == 0) // (round 190ow: triggered clips too)
             automationValues[a] = automationValueAt (state, (int) a, tick);
     // round 190gw: an automation's target links take its value through their formulas (NaN: the targets' own values);
     // round 190ov: then their scales, and a target several clips drive takes the one that plays
@@ -3332,6 +3438,61 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
 
 // Round 190kz: in a batched block's serial part (processBatched) the bindings are applied later, by each unit for its
 // piece; elsewhere now, as before
+// Round 190ow (DE-123): Pattern mode plays the current pattern in a loop, and its steps / notes on the automation clip rows
+// start their clips as in Song mode: at position t of the pass, the note started last at or before t (else the last one
+// of the pass before, from the second pass on) plays its clip from its start; before the first one the target keeps its
+// own value. False when the current pattern has none (the values stay as they were).
+bool RackRenderer::updatePatternTriggers (const RackState& state, double startTick) noexcept
+{
+    const auto& song = state.song;
+    const auto current = song.currentPattern;
+    if (current < 0 || current >= (int) song.patterns.size() || song.patterns[(std::size_t) current].autoNotes.empty())
+        return false;
+    const auto& pattern = song.patterns[(std::size_t) current];
+    const auto length = (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.meter()));
+    const auto position = std::max (0.0, startTick);
+    const auto t = std::fmod (position, length);
+    const auto count = std::min<int> ((int) song.automations.size(), RackState::maxAutomations);
+    bool any = false;
+    for (int a = 0; a < count; ++a)
+    {
+        const auto slot = (std::size_t) a < state.triggerSlot.size() ? state.triggerSlot[(std::size_t) a] : -1;
+        const auto& automation = song.automations[(std::size_t) a];
+        if (slot < 0 || automation.muted)
+            continue;
+        const Note* last = nullptr;     // started last at or before t
+        const Note* previous = nullptr; // the pass's last one (for the start of the next pass)
+        for (const auto& n : pattern.autoNotes)
+        {
+            if (n.channel != a || n.muted)
+                continue;
+            if ((double) n.start <= t)
+                last = &n;
+            previous = &n;
+        }
+        if (last == nullptr && previous == nullptr)
+            continue;
+        any = true;
+        double since = 0.0;
+        const Note* playing = last;
+        if (playing != nullptr)
+            since = t - (double) playing->start;
+        else if (position >= length) // (the first pass has nothing before its first note)
+        {
+            playing = previous;
+            since = t + length - (double) playing->start;
+        }
+        if (playing == nullptr)
+        {
+            automationValues[(std::size_t) slot] = std::numeric_limits<float>::quiet_NaN();
+            continue;
+        }
+        const auto held = (double) std::max<std::int64_t> (1, triggerLength (automation, *playing));
+        automationValues[(std::size_t) slot] = automation.playAt (std::min (since, held), position);
+    }
+    return any;
+}
+
 void RackRenderer::applyOrDeferParams (const RackState& state, int firstSlot, bool andLive) noexcept
 {
     if (! deferParams)
@@ -3367,7 +3528,7 @@ float RackRenderer::compensatedAutomation (const RackState& state, int automatio
 {
     if (compensateTicksPerSample <= 0.0 || compensateTick < 0.0 || automation < 0 || std::isnan (current)
         || (std::size_t) track >= state.pdc.slotInput.size() || (std::size_t) slot >= state.pdc.slotInput[(std::size_t) track].size()
-        || (std::size_t) automation >= state.automationClips.size() || state.automationClips[(std::size_t) automation].empty()
+        || ! state.positional (automation)
         || automation >= RackState::maxAutomations || std::isnan (automationValues[(std::size_t) automation]))
         return current;
     const auto lag = state.pdc.slotInput[(std::size_t) track][(std::size_t) slot];
@@ -3381,8 +3542,7 @@ float RackRenderer::automatedLevel (const RackState& state, int automation, floa
 {
     const auto current = automated (automation, base);
     if (! state.song.compensateMixerLevels || compensateTicksPerSample <= 0.0 || compensateTick < 0.0 || automation < 0
-        || automation >= RackState::maxAutomations || (std::size_t) automation >= state.automationClips.size()
-        || state.automationClips[(std::size_t) automation].empty() || std::isnan (automationValues[(std::size_t) automation])
+        || automation >= RackState::maxAutomations || ! state.positional (automation) || std::isnan (automationValues[(std::size_t) automation])
         || (std::size_t) track >= state.pdc.levelLag.size())
         return current;
     const auto lag = state.pdc.levelLag[(std::size_t) track];
@@ -3466,8 +3626,7 @@ void RackRenderer::queueTimedPluginParams (const RackState& state, double startT
         if (a < 0 || a >= RackState::maxAutomations || midictl::isMidiParam (b.param) || std::isnan (automationValues[(std::size_t) a]))
             continue;
         // the sources whose value follows the song position: an automation clip, or a lane without clips over it
-        const auto clip = (std::size_t) a < state.automationClips.size() && ! state.automationClips[(std::size_t) a].empty()
-                          && state.automationFollowers[(std::size_t) a] == 0;
+        const auto clip = state.positional (a) && state.automationFollowers[(std::size_t) a] == 0;
         const RackState::LanePlay* lane = nullptr;
         if (! clip)
             for (const auto& l : state.laneAutomations)
@@ -6739,7 +6898,7 @@ bool RackRenderer::buildLivePlan (const RackState& state) noexcept
     // modulators, pattern events; the tempo, VCAs, the crossfader (their readers are not one unit)
     for (const auto a : state.liveAutomations)
     {
-        if (((std::size_t) a < state.automationClips.size() && ! state.automationClips[(std::size_t) a].empty())
+        if (state.positional (a)
             || ((std::size_t) a < state.zoneAutomations.size() && state.zoneAutomations[(std::size_t) a] != 0)
             || a == state.tempoAutomation || a == state.crossfaderAutomation)
             return no ("clips, zone, tempo or crossfader on a live automation");

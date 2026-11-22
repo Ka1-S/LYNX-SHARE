@@ -341,7 +341,8 @@ std::pair<int, int> colourKey (std::uint32_t argb)
 bool sameContent (const Pattern& a, const Pattern& b)
 {
     return a.notes == b.notes && a.lengthTicks == b.lengthTicks && a.events == b.events && a.loopOn == b.loopOn && a.loopMode == b.loopMode
-           && a.channelLoops == b.channelLoops && a.markers == b.markers && a.loopStarterGenre == b.loopStarterGenre;
+           && a.channelLoops == b.channelLoops && a.markers == b.markers && a.loopStarterGenre == b.loopStarterGenre
+           && a.autoNotes == b.autoNotes; // (round 190ow: the automation clip rows' steps make a pattern different too)
 }
 } // namespace
 
@@ -376,7 +377,8 @@ std::vector<std::vector<int>> identicalPatterns (const Song& song)
     std::vector<char> grouped (song.patterns.size(), 0);
     for (int a = 0; a < (int) song.patterns.size(); ++a)
     {
-        if (grouped[(std::size_t) a] || (song.patterns[(std::size_t) a].notes.empty() && song.patterns[(std::size_t) a].events.empty()))
+        if (grouped[(std::size_t) a] || (song.patterns[(std::size_t) a].notes.empty() && song.patterns[(std::size_t) a].events.empty()
+                                         && song.patterns[(std::size_t) a].autoNotes.empty()))
             continue; // (empty patterns are not duplicates of each other: they are where new parts get written)
         std::vector<int> group { a };
         for (int b = a + 1; b < (int) song.patterns.size(); ++b)

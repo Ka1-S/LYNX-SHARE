@@ -5,6 +5,7 @@
 #include "ui/RemoteControl.h"
 #include "core/PlaylistOps.h"
 #include "core/LastTweaked.h"
+#include "core/RackAutomation.h" // round 190ow (DE-123)
 
 #include <map>
 
@@ -827,6 +828,13 @@ private:
             for (const auto& c : song.playlist)
                 if (c.kind == ClipKind::automation && c.automation == automation && position >= (double) c.start && position < (double) c.end())
                     tick = position - (double) c.start + (double) c.offset;
+        }
+        // round 190ow (details DE-123): a clip its steps / notes start shows its playhead too, in Pattern mode as well
+        if (playing && isShowing() && tick < 0.0 && rackauto::hasTriggers (song, automation))
+        {
+            const auto position = (song.mode == PlayMode::song ? engine.songPlayheadTicks() : engine.getTransport().positionTicks.load (std::memory_order_relaxed))
+                                  + engine.playheadAdvanceTicks();
+            tick = rackauto::triggeredAt (song, automation, position);
         }
 
         if (tick == playhead)

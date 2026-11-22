@@ -117,6 +117,8 @@ public:
     void selectRelative (int delta, bool extend);
     void selectAll();
     bool moveSelected (int delta);
+    const std::vector<int>& selectedAutomationRows() const noexcept { return autoSelected; } // (round 190ow; tests, routes)
+    void clickAutomationSelectorForSnapshot (int automation, bool add); // (round 190ow: the shot route's selection)
     void cloneSelected();
     void deleteSelected();
     // FL's Cut / Copy / Paste of the selected channels' steps and notes in the current pattern (Ctrl+X / C / V)
@@ -238,7 +240,14 @@ public:
 private:
     // autoName / autoRow (round 190oo, PAT-7): an automation clip row's button / the rest of it; `row` is then the
     // automation's index (Song::automations), never a channel
-    enum class Area { none, mute, pan, volume, route, name, select, grid, addRow, laneLevels, lane, loop, zipped, autoName, autoRow };
+    // round 190ow (DE-123): its mute light, MIN / MAX knobs, selector and steps
+    enum class Area { none, mute, pan, volume, route, name, select, grid, addRow, laneLevels, lane, loop, zipped, autoName, autoRow,
+                      autoMute, autoMin, autoMax, autoSelect, autoStep };
+    static bool isAutomationArea (Area a) noexcept
+    {
+        return a == Area::autoName || a == Area::autoRow || a == Area::autoMute || a == Area::autoMin || a == Area::autoMax
+               || a == Area::autoSelect || a == Area::autoStep;
+    }
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
     void timerCallback() override;
@@ -283,6 +292,22 @@ private:
     void paintAutomationSteps (juce::Graphics& g, juce::Rectangle<int> clip);
     void paintAutomationButtons (juce::Graphics& g, juce::Rectangle<int> column);
     void showAutomationMenu (int automation);
+    // round 190ow (PAT-7 rest, DE-123): the automation clip rows in the rack's selection, their steps, mute light and
+    // knobs. The selected rows (Song::automations indices, sorted); `autoOnly`: a plain click on an automation row's
+    // selector selected it alone, so the channels show as not selected (the engine keeps its primary channel for the
+    // Piano roll and the keyboard). A channel selection clears both, except a Ctrl / right click that adds a channel.
+    std::vector<int> autoSelected;
+    bool autoOnly = false;
+    bool keepAutoSelection = false;
+    bool automationSelected (int automation) const noexcept { return std::binary_search (autoSelected.begin(), autoSelected.end(), automation); }
+    void clickAutomationSelector (int automation, const juce::ModifierKeys& mods);
+    bool moveSelectedAutomations (int delta);
+    void deleteSelectedAutomations();
+    void toggleAutomationMute (int automation);
+    void applyAutoPaint (const juce::MouseEvent& e);
+    int autoPaintRow = -1;  // the automation whose steps a drag paints
+    int autoNameDown = -1;  // an automation row's button pressed: opens on release, a drag moves the row
+    bool autoNameDragged = false;
     // round 190mk (DE-38): the rows' places while any channel is zipped (empty: none is, FL's fixed 30 px rows)
     rackzip::Layout zipLayout;
     void refreshZipLayout();

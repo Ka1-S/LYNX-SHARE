@@ -12467,3 +12467,11 @@ countries: nl be
 "under no track yet" = "nog onder geen spoor"
 "Dips this track on every hit of another track (sidechain)." = "Laat dit spoor zakken bij elke tik van een ander spoor (sidechain)."
 "{0} \"Duck under...\" effect(s) of the Simple layout show as an ordinary Fruity Limiter with its side input (the sound is the same)" = "{0} \"Duiken onder...\"-effect(en) van de Simple-indeling verschijnen als een gewone Fruity Limiter met zijn zij-ingang (het geluid blijft gelijk)"
+
+# round 190ow (PAT-7 rest, DE-123: automation clip rows)
+"Mute the automation clip: it drives nothing while muted" = "Automation clip dempen: gedempt stuurt hij niets aan"
+"Select the automation clip row: [LMB] alone  [Ctrl+LMB] add" = "Rij van de automation clip selecteren: [LMB] alleen deze  [Ctrl+LMB] toevoegen"
+"Steps start the automation clip: [LMB] set or clear  [drag] paint" = "Stappen starten de automation clip: [LMB] zetten of wissen  [slepen] tekenen"
+"{0} step(s) or note(s) on automation clip rows start no clip (the clips in the Playlist play as before)" = "{0} stap(pen) of noot/noten op rijen van automation clips starten geen clip (de clips in de Playlist spelen zoals eerst)"
+"An automation clip's LFO keeps the clip's first range (its MIN / MAX knobs are written into the points)" = "De LFO van een automation clip houdt het eerste bereik van de clip (de MIN- / MAX-knoppen worden in de punten geschreven)"
+"Muted automation clips lose their target, so they stay silent: {0}" = "Gedempte automation clips verliezen hun doel en blijven dus stil: {0}"

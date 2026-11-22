@@ -12467,3 +12467,11 @@ countries: cn sg
 "under no track yet" = "尚未闪避于任何轨道"
 "Dips this track on every hit of another track (sidechain)." = "另一条轨道每次敲击时压低这条轨道 (侧链)。"
 "{0} \"Duck under...\" effect(s) of the Simple layout show as an ordinary Fruity Limiter with its side input (the sound is the same)" = "简单布局的 {0} 个“闪避于...”效果显示为带侧链输入的普通 Fruity Limiter (声音相同)"
+
+# round 190ow (PAT-7 rest, DE-123: automation clip rows)
+"Mute the automation clip: it drives nothing while muted" = "将自动化片段静音：静音时不驱动任何参数"
+"Select the automation clip row: [LMB] alone  [Ctrl+LMB] add" = "选择自动化片段行：[LMB] 仅此行  [Ctrl+LMB] 添加"
+"Steps start the automation clip: [LMB] set or clear  [drag] paint" = "步进启动自动化片段：[LMB] 设置或清除  [拖动] 绘制"
+"{0} step(s) or note(s) on automation clip rows start no clip (the clips in the Playlist play as before)" = "自动化片段行上的 {0} 个步进或音符不会启动片段（播放列表中的片段照常播放）"
+"An automation clip's LFO keeps the clip's first range (its MIN / MAX knobs are written into the points)" = "自动化片段的 LFO 保留片段最初的范围（其 MIN / MAX 旋钮写入各点）"
+"Muted automation clips lose their target, so they stay silent: {0}" = "已静音的自动化片段失去目标，因此保持无声：{0}"
