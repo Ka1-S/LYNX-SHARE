@@ -64,6 +64,7 @@
 #include "ui/CrashReporter.h"
 #include "ui/DanceView.h"
 #include "engine/AudioLogger.h"
+#include "engine/JsfxFormat.h"
 #include "ui/PluginSkin.h"
 #include "platform/Paths.h"
 #include "ui/SetupWizard.h"
@@ -8477,6 +8478,8 @@ bool MainComponent::shouldReclaimKeyboardFocus()
 void MainComponent::updateTitle()
 {
     repaint (titleArea); // the project name in the toolbar
+    // round 190pj (issue #241, owner decision 1): JSFX scripts may read files in the open project's folder
+    jsfx::setProjectFolder (currentFile != juce::File() ? currentFile.getParentDirectory() : juce::File());
     // issue #232 stage 2 (round 190nz): what the other windows' Window menu and a pasted copy call this project
     windowclip::setProjectName (projectName);
     windows::update ([this] (windows::Entry& e) { e.project = projectName; });

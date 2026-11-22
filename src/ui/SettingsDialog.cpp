@@ -9,6 +9,7 @@
 #include "core/PlaylistOps.h"
 #include "core/SearchQuery.h"
 #include "engine/PluginHost.h"
+#include "engine/JsfxFormat.h"
 #include "ui/I18n.h"
 #include "ui/MissingFilesDialog.h"
 #include "ui/Theme.h"
@@ -677,6 +678,19 @@ public:
                     PluginHost::settingsFolder().getChildFile ("flm-resources.txt").replaceWithText (list.joinIntoString ("\n"));
             }, persistent);
 
+        // Round 190pj (issue #241): JSFX scripts. Documents/LYNX/JSFX, the bundled pack and REAPER's Effects folder are
+        // always searched; these are the user's other folders
+        jsfxFolders = std::make_unique<FolderList> (
+            tr ("JSFX folders"), tr ("JSFX scripts are also found in Documents/LYNX/JSFX, the bundled pack and REAPER's Effects folder."),
+            [persistent, sample] { return sample (persistent ? jsfx::userFolders() : juce::StringArray(), { "D:\\JSFX\\Saike" }); },
+            [persistent, &host] (const juce::StringArray& list) {
+                if (! persistent)
+                    return;
+                jsfx::setUserFolders (list);
+                // (the scripts there listed by the host's own scan thread: headers only, quick)
+                host.startBackgroundScanOfFiles (JsfxPluginFormat().searchPathsForPlugins (jsfx::roots(), true, false));
+            }, persistent);
+
         // FL's File page has "Manage plugins" next to the plugin settings (REA round 143b)
         if (managePlugins)
             pluginFolders->addExtraButton (tr ("Plugin manager..."), managePlugins);
@@ -684,17 +698,18 @@ public:
         add (*searchFolders);
         add (*browserFolders);
         add (*pluginFolders);
+        add (*jsfxFolders);
         add (*flmResources);
     }
 
 protected:
-    // The four lists share the window's height; none gets less than its heading, two rows and its buttons (below that
+    // The five lists share the window's height; none gets less than its heading, two rows and its buttons (below that
     // the page scrolls)
     int layout (int width) override
     {
         constexpr int padX = 20, padY = 14, gap = 12;
-        FolderList* lists[] = { searchFolders.get(), browserFolders.get(), pluginFolders.get(), flmResources.get() };
-        const auto share = (getHeight() - 2 * padY - 3 * gap) / 4;
+        FolderList* lists[] = { searchFolders.get(), browserFolders.get(), pluginFolders.get(), jsfxFolders.get(), flmResources.get() };
+        const auto share = (getHeight() - 2 * padY - 4 * gap) / 5;
         auto y = padY;
         for (auto* list : lists)
         {
@@ -707,7 +722,7 @@ protected:
     int minimumWidth() const override { return 300; }
 
 private:
-    std::unique_ptr<FolderList> searchFolders, browserFolders, pluginFolders, flmResources;
+    std::unique_ptr<FolderList> searchFolders, browserFolders, pluginFolders, jsfxFolders, flmResources;
 };
 
 // Round 190jp (design190ia FW-19): FL's Settings tabs, their captions a step larger (type::title, was 7 px caps at

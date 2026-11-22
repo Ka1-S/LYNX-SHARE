@@ -400,6 +400,10 @@ target_sources(lynx_core PRIVATE
     src/core/ScriptDialog.cpp
     src/core/PianoRollScript.cpp)
 
+# JSFX scripts' identity, file policy and saved state (round 190pj, issue #241; core/Jsfx.h)
+target_sources(lynx_core PRIVATE
+    src/core/Jsfx.cpp)
+
 # pocketpy 2.2 (MIT; third_party/pocketpy, LYNX's changes marked "LYNX"): a small embeddable Python 3 interpreter,
 # sandboxed (no os module / files) and interruptible (the watchdog)
 add_library(pocketpy STATIC third_party/pocketpy/pocketpy.c)
@@ -408,6 +412,33 @@ target_compile_definitions(pocketpy PUBLIC PK_ENABLE_OS=0 PK_ENABLE_WATCHDOG=1)
 set_target_properties(pocketpy PROPERTIES C_STANDARD 11)
 target_compile_options(pocketpy PRIVATE $<$<NOT:$<C_COMPILER_ID:MSVC>>:-w>)
 target_link_libraries(lynx_core PUBLIC pocketpy)
+
+# ysfx 0.0.47 (Apache-2.0; third_party/ysfx at JoepVanlier/ysfx 5c3452fe, trimmed: no @gfx, no plugin; LYNX's changes
+# marked "LYNX"), with WDL's EEL2 (zlib-style; y.tab.c GPL-2+ with the Bison exception) and dr_libs (Unlicense / MIT-0):
+# the JSFX runtime behind engine/JsfxFormat.h (issue #241, round 190pj). Flags as ysfx's cmake.wdl.txt / cmake.ysfx.txt.
+set(YSFX_DIR third_party/ysfx)
+set(YSFX_WDL ${YSFX_DIR}/thirdparty/WDL/source/WDL)
+file(GLOB YSFX_SOURCES ${YSFX_DIR}/sources/ysfx*.cpp)
+add_library(lynx_ysfx STATIC ${YSFX_SOURCES} ${YSFX_WDL}/fft.c
+    ${YSFX_WDL}/eel2/nseel-caltab.c ${YSFX_WDL}/eel2/nseel-cfunc.c ${YSFX_WDL}/eel2/nseel-compiler.c ${YSFX_WDL}/eel2/nseel-eval.c
+    ${YSFX_WDL}/eel2/nseel-lextab.c ${YSFX_WDL}/eel2/nseel-ram.c ${YSFX_WDL}/eel2/nseel-yylex.c)
+if(WIN32)
+    target_sources(lynx_ysfx PRIVATE ${YSFX_WDL}/win32_utf8.c)
+endif()
+if(NOT MSVC)
+    # the GAS port of EEL2's x86-64 code generator (empty on other CPUs, which have theirs in nseel-compiler.c)
+    target_sources(lynx_ysfx PRIVATE ${YSFX_DIR}/sources/eel2-gas/sources/asm-nseel-x64-sse.S)
+    enable_language(ASM)
+endif()
+target_include_directories(lynx_ysfx PUBLIC ${YSFX_DIR}/include PRIVATE ${YSFX_DIR}/sources ${YSFX_DIR}/thirdparty/WDL/source ${YSFX_DIR}/thirdparty/dr_libs)
+target_compile_definitions(lynx_ysfx PUBLIC YSFX_API= PRIVATE YSFX_NO_GFX WDL_FFT_REALSIZE=8 WDL_LINEPARSE_ATOF=ysfx_wdl_atof NSEEL_ATOF=ysfx_wdl_atof
+    $<$<BOOL:${WIN32}>:NOMINMAX YSFX_NO_FTS _CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_WARNINGS> $<$<NOT:$<BOOL:${WIN32}>>:_FILE_OFFSET_BITS=64>)
+set_target_properties(lynx_ysfx PROPERTIES CXX_STANDARD 17 C_STANDARD 11 POSITION_INDEPENDENT_CODE ON
+    C_VISIBILITY_PRESET hidden CXX_VISIBILITY_PRESET hidden)
+target_compile_options(lynx_ysfx PRIVATE $<$<NOT:$<C_COMPILER_ID:MSVC>>:-fsigned-char -w>)
+find_package(Threads REQUIRED)
+target_link_libraries(lynx_ysfx PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
+target_link_libraries(lynx_core PUBLIC lynx_ysfx)
 
 # Monocypher 4.0.2 (BSD-2 / CC0; third_party/monocypher): Argon2id, BLAKE2b and XChaCha20-Poly1305 for the live
 # sessions' end-to-end encryption (round 169b)
@@ -591,6 +622,8 @@ if(LYNX_BUILD_APP)
         src/platform/LinuxRealtime.cpp
         src/engine/ClapFormat.cpp
         src/engine/Vst2Format.cpp
+        src/engine/JsfxFormat.cpp
+        src/ui/JsfxPanel.cpp
         src/engine/MidiFileIo.cpp
         src/engine/AudioLogger.cpp
         src/engine/MidiSyncIo.cpp

@@ -65,7 +65,7 @@ read -ra WIN_OPT <<< "$LYNX_WIN_OPT"
 WIN_LTO=(); [[ "$LYNX_WIN_LTO" == thin ]] && WIN_LTO=(-flto=thin)
 COMMON=(-target "$TARGET" -std=c++20 "${WIN_OPT[@]}" "${WIN_LTO[@]}" -ffp-contract=off -DNDEBUG=1 -fno-sanitize=undefined
         -include "$OUT/JuceConfig.h" -include cmake/mingw/mingw_compat.h
-        -I"$OUT/shim" -I"$JUCE_DIR/modules" -I"$JUCE_DIR/modules/juce_audio_processors/format_types/VST3_SDK" -Ithird_party/ara -Ithird_party/clap/include -Ithird_party/wavpack/include -Ithird_party/vorbis/include -Ithird_party/lame/include -Ithird_party/asiosdk/common -Ithird_party/sse2neon -Ithird_party/pocketpy -Ithird_party/monocypher -Ithird_party/onnxruntime -Isrc)
+        -I"$OUT/shim" -I"$JUCE_DIR/modules" -I"$JUCE_DIR/modules/juce_audio_processors/format_types/VST3_SDK" -Ithird_party/ara -Ithird_party/clap/include -Ithird_party/wavpack/include -Ithird_party/vorbis/include -Ithird_party/lame/include -Ithird_party/asiosdk/common -Ithird_party/sse2neon -Ithird_party/pocketpy -Ithird_party/monocypher -Ithird_party/onnxruntime -Ithird_party/ysfx/include -DYSFX_API= -Isrc)
 # The plugins (LYNX_BUILD_PLUGINS=1 below) link these objects with --gc-sections: with a section per function and per
 # datum the linker drops what a plugin never reaches (round 180b measured 32 % on Linux). Plugin builds only, so the app's
 # objects and their cache entries stay as they are (LYNX_PLUGIN_SECTIONS=0 turns it off).
@@ -214,7 +214,7 @@ APP_SOURCES=(src/Main.cpp
              src/engine/RemotePluginControl.cpp src/engine/RemoteInstrumentControl.cpp src/engine/RemotePlaylistControl.cpp
              src/engine/GeneratorCatalog.cpp src/ui/RemoteControlSettings.cpp
              src/engine/AudioEngine.cpp src/engine/AudioEngineSession.cpp src/engine/ChannelRackProcessor.cpp src/engine/Metronome.cpp
-             src/engine/SampleLibrary.cpp src/engine/WavPackFormat.cpp src/engine/Mp3Format.cpp src/engine/ProjectFile.cpp src/engine/ProjectDowngrade.cpp src/engine/ProjectPackage.cpp src/engine/PluginHost.cpp src/engine/AraHost.cpp src/engine/AraTest.cpp src/engine/PluginSandbox.cpp src/engine/SandboxWorker.cpp src/engine/Bridge32Test.cpp src/engine/Exporter.cpp src/engine/AacEncoder.cpp src/engine/AacEncoderWindows.cpp src/engine/FlStudioExport.cpp src/engine/StreamPrefetcher.cpp src/engine/DllAsioDevice.cpp src/engine/PipeWireDevice.cpp src/platform/LinuxRealtime.cpp src/engine/ClapFormat.cpp src/engine/Vst2Format.cpp src/engine/MidiFileIo.cpp src/engine/AudioLogger.cpp src/engine/PreviewPlayer.cpp
+             src/engine/SampleLibrary.cpp src/engine/WavPackFormat.cpp src/engine/Mp3Format.cpp src/engine/ProjectFile.cpp src/engine/ProjectDowngrade.cpp src/engine/ProjectPackage.cpp src/engine/PluginHost.cpp src/engine/AraHost.cpp src/engine/AraTest.cpp src/engine/PluginSandbox.cpp src/engine/SandboxWorker.cpp src/engine/Bridge32Test.cpp src/engine/Exporter.cpp src/engine/AacEncoder.cpp src/engine/AacEncoderWindows.cpp src/engine/FlStudioExport.cpp src/engine/StreamPrefetcher.cpp src/engine/DllAsioDevice.cpp src/engine/PipeWireDevice.cpp src/platform/LinuxRealtime.cpp src/engine/ClapFormat.cpp src/engine/Vst2Format.cpp src/engine/JsfxFormat.cpp src/ui/JsfxPanel.cpp src/core/Jsfx.cpp src/engine/MidiFileIo.cpp src/engine/AudioLogger.cpp src/engine/PreviewPlayer.cpp
              src/ui/MainComponent.cpp src/ui/PluginKeysTest.cpp src/ui/ZOrder191Test.cpp src/ui/ChannelRackComponent.cpp src/ui/PianoRollComponent.cpp src/ui/PlaylistComponent.cpp src/ui/AraMenu.cpp src/ui/LoopInfo.cpp src/ui/PatternBlocksView.cpp src/ui/ClipGridComponent.cpp src/ui/GroovePoolComponent.cpp src/ui/DetailView.cpp src/ui/ClipAudioPanel.cpp src/ui/SessionMixer.cpp src/ui/MapMode.cpp src/ui/MidiToolsPanel.cpp src/ui/MixerComponent.cpp src/ui/QuickPick.cpp src/ui/PluginWindow.cpp src/ui/PluginPresetMenu.cpp src/ui/GeneratorPresetMenu.cpp src/ui/ProjectLoading.cpp src/ui/WindowOwner.cpp src/ui/ParametricEqEditor.cpp src/ui/FacetEqEditor.cpp src/ui/ProEditors.cpp src/ui/PluginHeader.cpp src/ui/PluginSkin.cpp src/ui/ExportDialog.cpp src/ui/FlStudioExportDialog.cpp src/ui/AlsExportDialog.cpp src/ui/DawProjectExport.cpp src/ui/FlmExportDialog.cpp src/ui/StemExtract.cpp src/ui/AudioToMidi.cpp src/ui/AutoSamplerDialog.cpp src/ui/AutomationUi.cpp src/ui/ChannelSettings.cpp src/ui/ChordHelper.cpp src/ui/BrowserComponent.cpp src/ui/SampleProperties.cpp src/ui/Theme.cpp src/ui/Icons.cpp src/ui/I18n.cpp src/ui/EditorTools.cpp src/ui/WorkflowExtras.cpp src/ui/KeyFocus.cpp
              src/core/RollingAudioLog.cpp src/core/ChordReadout.cpp src/core/Song.cpp src/core/MarkerPlan.cpp src/core/Scheduler.cpp src/core/ClipLauncher.cpp src/core/SessionOps.cpp src/core/DrawMode.cpp src/core/AutoPointEdit.cpp src/core/RemoteMap.cpp src/core/Groove.cpp src/core/Performance.cpp src/core/Patcherize.cpp src/core/Instruments.cpp src/core/RackRenderer.cpp src/core/LoadTrace.cpp src/core/ModuleWarmup.cpp src/core/RenderAhead.cpp
              src/core/FlpImport.cpp src/core/FlpExport.cpp src/core/XmlLite.cpp src/core/Gzip.cpp src/core/AlsImport.cpp src/core/AlsDevices.cpp src/core/AlsDevicesLot2.cpp src/core/AlsDevicesLot3.cpp src/core/AlsDevicesLot4.cpp src/core/AlsDevicesLot5.cpp src/core/AlsExport.cpp src/core/FlmFormat.cpp src/core/FlmImport.cpp src/core/FlmExport.cpp src/core/ModulatorExport.cpp src/core/BandFormat.cpp src/core/BandImport.cpp src/core/FlmEffects.cpp src/core/FlmNoteFx.cpp src/core/FlmDwSampler.cpp src/core/FlmSlicer.cpp src/flp/FlpWrite.cpp src/core/Effects.cpp src/core/NoteEdit.cpp src/core/Recorder.cpp src/core/TakeRecording.cpp src/core/Comping.cpp src/core/Pdc.cpp src/core/WorkerPool.cpp src/core/OverloadGuard.cpp src/core/TimeStretch.cpp src/core/WarpEngines.cpp src/core/Arpeggiator.cpp src/core/SynthPresets.cpp src/core/Slicer.cpp src/core/AudioToMidi.cpp src/core/Templates.cpp src/core/FlWrapper.cpp src/core/FlEffects.cpp src/core/Effector.cpp src/core/VintagePhaser.cpp src/core/EmphasizerFx.cpp src/core/EmphasisFx.cpp src/core/TransporterFl.cpp src/core/EmphasisEngine.cpp src/core/FreqShifterFl.cpp src/core/LowLifterFl.cpp src/core/FlLegacyFx.cpp src/core/PocketFx.cpp src/core/PocketMultiFx.cpp src/core/PocketFxC.cpp src/core/PocketFxD.cpp src/core/PocketFxE.cpp src/core/PocketReverb.cpp src/core/PocketFxB.cpp src/core/PocketFxA.cpp src/core/Reeverb2.cpp src/core/LuxeVerb.cpp src/core/IldspMath.cpp src/core/ConvolverFx.cpp src/core/EquoFx.cpp src/core/PitchShifterFl.cpp src/core/SimSynth.cpp src/core/Wasp.cpp src/core/Granulizer.cpp src/core/Drumaxx.cpp src/core/FruityFilters.cpp src/core/NewtoneFx.cpp src/core/EdisonFx.cpp src/core/VocalPitch.cpp src/core/LynxTune.cpp src/core/LynxVerbs.cpp src/core/NebulaCloud.cpp src/core/MixSuite.cpp src/core/VoiceMatch.cpp src/core/EchoSuite.cpp src/core/LovePhilter.cpp src/core/DistructorFx.cpp src/core/MultibandDelayFx.cpp src/core/FrequencySplitter.cpp src/core/Slayer.cpp src/core/FlangusFastDist.cpp src/core/FruityPhaser.cpp src/core/FruityDelayBank.cpp src/core/FruityMultiband.cpp src/core/Vocodex.cpp src/core/FruityVocoder.cpp src/core/DelphiMath.cpp src/core/MaximusFx.cpp src/core/ParametricEqFl.cpp src/core/ParametricEqLinear.cpp src/core/FruityBasicFx.cpp src/core/TransistorBass.cpp src/core/GrossBeat.cpp src/core/StereoFx.cpp src/core/FruityDelay.cpp src/core/FruityShapers.cpp src/core/ChorusFx.cpp src/core/FruityDynamics.cpp src/core/FlSamplers.cpp src/core/FlSynths.cpp src/core/FlSytrus.cpp src/core/FlGenerators.cpp src/core/PhysicalModels.cpp src/core/DrumSynthLive.cpp src/core/SytrusEngine.cpp src/core/Harmless.cpp src/core/HarmlessFx.cpp src/core/Harmor.cpp src/core/Gms.cpp src/core/Morphine.cpp src/core/Ogun.cpp src/core/Toxic.cpp src/core/ToxicFx.cpp src/core/FruitKick.cpp src/core/BassDrum.cpp src/core/MiniSynth.cpp src/core/Dx10.cpp src/core/Kepler.cpp src/core/PoiZone.cpp src/core/FlPatcher.cpp src/core/Patcher.cpp src/core/Vfx.cpp src/core/VfxSequencer.cpp src/core/Inflate.cpp src/core/WavPack.cpp src/flp/Flp.cpp src/core/EmberClassic.cpp src/core/RhythmPan.cpp src/core/VoxStrip.cpp src/core/Rack.cpp src/core/Fpc.cpp src/core/FpcInstrument.cpp src/core/FpcEnvelope.cpp src/core/BlxImport.cpp src/core/RegionLoop.cpp src/core/SmartControls.cpp src/core/FactoryContent.cpp src/core/LoopKeywords.cpp src/core/SampleProps.cpp src/core/EdisonView.cpp src/core/HarmorResynth.cpp
@@ -412,6 +412,27 @@ for f in third_party/libxmp-lite/src/*.c third_party/libxmp-lite/src/loaders/*.c
     fi
 done
 
+echo "ysfx + EEL2 (JSFX runtime, round 190pj)..."
+# (as CMakeLists.txt's lynx_ysfx: ysfx's cmake.wdl.txt / cmake.ysfx.txt flags, no @gfx; the GAS x86-64 code generator
+# serves the Win64 ABI too)
+TP_KEY_ysfx="$(tree_hash third_party/ysfx)"
+mkdir -p "$OUT/ysfx"
+YSFX_WDL=third_party/ysfx/thirdparty/WDL/source/WDL
+YSFX_DEFS=(-DYSFX_API= -DYSFX_NO_GFX -DWDL_FFT_REALSIZE=8 -DWDL_LINEPARSE_ATOF=ysfx_wdl_atof -DNSEEL_ATOF=ysfx_wdl_atof -DNOMINMAX -DYSFX_NO_FTS
+           -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_WARNINGS -Ithird_party/ysfx/include -Ithird_party/ysfx/sources
+           -Ithird_party/ysfx/thirdparty/WDL/source -Ithird_party/ysfx/thirdparty/dr_libs)
+for f in third_party/ysfx/sources/ysfx*.cpp "$YSFX_WDL"/fft.c "$YSFX_WDL"/win32_utf8.c "$YSFX_WDL"/eel2/nseel-*.c \
+         third_party/ysfx/sources/eel2-gas/sources/asm-nseel-x64-sse.S; do
+    name="$(basename "$f")"; obj="$OUT/ysfx/${name%.*}.o"
+    if [[ ! -f "$obj" || "$f" -nt "$obj" ]]; then
+        case "$f" in
+            *.cpp) cached "$obj" "$TP_KEY_ysfx" -- "$ZIG" c++ -target "$TARGET" -O2 -w -std=c++17 -fsigned-char "${YSFX_DEFS[@]}" -c "$f" -o "$obj" ;;
+            *.S) cached "$obj" "$TP_KEY_ysfx" -- "$ZIG" cc -target "$TARGET" -O2 -w "${YSFX_DEFS[@]}" -c "$f" -o "$obj" ;;
+            *) cached "$obj" "$TP_KEY_ysfx" -- "$ZIG" cc -target "$TARGET" -O2 -w -std=c11 -fsigned-char "${YSFX_DEFS[@]}" -c "$f" -o "$obj" ;;
+        esac
+    fi
+done
+
 echo "Monocypher (live session encryption, C)..."
 mkdir -p "$OUT/monocypher"
 obj="$OUT/monocypher/monocypher.o"
@@ -466,7 +487,7 @@ APP_LIBS=(-lole32 -loleaut32 -luuid -lwinmm -lws2_32 -lshlwapi -lversion -lwinin
           -ld2d1 -ldcomp -ldwrite -ldxgi -ld3d11 -ldxguid -lwsock32 -lopengl32 -lpropsys -lmfplat -lmfreadwrite -lmfuuid -lksuser -lavrt -lwinhttp -lbcrypt
           -liphlpapi) # (iphlpapi: Ableton Link's network interfaces, round 190gl)
 link_start=$(date +%s)
-LINK_INPUTS=("$OUT"/juce/*.o "${APP_OBJECTS[@]}" "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT"/libxmp/*.o "$OUT/LYNX.res")
+LINK_INPUTS=("$OUT"/juce/*.o "${APP_OBJECTS[@]}" "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT"/libxmp/*.o "$OUT"/ysfx/*.o "$OUT/LYNX.res")
 plain_link() {
     "$ZIG" c++ -target "$TARGET" "${WIN_OPT[@]}" "${WIN_LTO[@]}" -o "$OUT/LYNX.exe" "${LINK_INPUTS[@]}" -Wl,--subsystem,windows "${APP_LIBS[@]}"
 }
@@ -528,7 +549,7 @@ if [[ "${LYNX_BUILD_PLUGINS:-0}" == 1 ]]; then
     }
     plugin_link() { # <output> <objects...>
         local output="$1"; shift
-        "$ZIG" c++ -target "$TARGET" "${WIN_OPT[@]}" "${WIN_LTO[@]}" -shared -s -o "$output" "$@" "$OUT/plugin/ExportProcessor.o" "${PLUGIN_OBJECTS[@]}" "$OUT"/juce/*.o "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT"/libxmp/*.o "$OUT/plugin/LynxPlugin.res" "${PLUGIN_LIBS[@]}" -Wl,--gc-sections
+        "$ZIG" c++ -target "$TARGET" "${WIN_OPT[@]}" "${WIN_LTO[@]}" -shared -s -o "$output" "$@" "$OUT/plugin/ExportProcessor.o" "${PLUGIN_OBJECTS[@]}" "$OUT"/juce/*.o "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT"/libxmp/*.o "$OUT"/ysfx/*.o "$OUT/plugin/LynxPlugin.res" "${PLUGIN_LIBS[@]}" -Wl,--gc-sections
         rm -f "$(dirname "$output")"/*.lib "$(dirname "$output")"/*.pdb # (the linker's import library: not part of a plugin)
     }
     ( cd resources && "$ZIG" rc /fo "$OUT_ABS/plugin/LynxPlugin.res" LynxPlugin.rc )
@@ -547,7 +568,7 @@ if [[ "${LYNX_BUILD_PLUGINS:-0}" == 1 ]]; then
         index=$((index + 1))
     done < <(sed -nE 's/^LYNX_PLUGIN \("([^"]+)", ([01]), [^,]+, [^,]+, "[^"]+", (0x[0-9a-f]+), "([^"]+)", ([12])\)$/\1~\2~\3~\4~\5/p' src/plugin/plugins.def)
     plugin_cxx "$OUT/plugin/plugexporttest.o" tools/plugexporttest.cpp -Wall -Wextra
-    plugin_cxx_link=("$OUT/plugin/plugexporttest.o" "$OUT/plugin/ExportProcessor.o" "${PLUGIN_OBJECTS[@]}" "$OUT"/juce/*.o "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT"/libxmp/*.o "$OUT/LYNX.res")
+    plugin_cxx_link=("$OUT/plugin/plugexporttest.o" "$OUT/plugin/ExportProcessor.o" "${PLUGIN_OBJECTS[@]}" "$OUT"/juce/*.o "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT"/libxmp/*.o "$OUT"/ysfx/*.o "$OUT/LYNX.res")
     "$ZIG" c++ -target "$TARGET" "${WIN_OPT[@]}" "${WIN_LTO[@]}" -o "$OUT/plugexporttest.exe" "${plugin_cxx_link[@]}" "${PLUGIN_LIBS[@]}"
     ls -la "$OUT"/plugins/*.clap "$OUT"/plugins/*/Contents/x86_64-win/*
 fi
