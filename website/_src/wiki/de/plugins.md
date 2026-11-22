@@ -1,5 +1,5 @@
 ---
-source: cb56d9e19e
+source: 13c966d353
 ---
 ![Der untere Teil des Plugin-Managers mit dem Hinweis, dass jede Plugin-Datei in einem separaten Prozess geprüft wird](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -108,7 +108,6 @@ Wenn das FL-Studio-Plugin als `Ladefehler` aufgelistet ist, klicke es in `Option
 Die eigenen Effekte und Instrumente von LYNX SHARE, etwa Facet EQ, Apex Limiter, LYNX Tune und LYNX Model, gibt es auch als Plugins für andere DAWs. Sie sind ein separater, optionaler Download auf der [Release-Seite](https://github.com/Ka1-S/LYNX-SHARE/releases): `LYNX-Plugins-<version>` für Windows, macOS und Linux.
 
 - Alle Plugins stecken in einer CLAP-Datei, `LYNX Plugins.clap`. Eine kurze Liste gibt es auch als VST3.
-- Instrumente im Paket: LYNX FM10, LYNX Model, LYNX Fourfold, LYNX Wavecoil und LYNX Duoloom.
 - Starte das Installationsskript im Archiv (`install.cmd` unter Windows, `install.sh` unter macOS und Linux) und lass deine DAW die Plugins neu suchen.
 - Ein Plugin öffnet denselben Editor wie in LYNX SHARE, und sein Zustand lässt sich in LYNX SHARE als Projekt öffnen.
 

@@ -15,12 +15,11 @@ TEST (pluginpack190ov_later_own_engines_are_in_the_pack)
     for (const auto& [name, kind] : effects)
         CHECK (byName.count (name) == 1 && ! byName[name]->instrument && byName[name]->effect == kind);
     CHECK (byName.count ("LYNX Model") == 1 && byName["LYNX Model"]->instrument && byName["LYNX Model"]->synth == InstrumentKind::lynxModel);
-    // rollup 0.1.31 step 6 (owner decision): Tetra, Helix and Braid under export names of their own, in the CLAP only; the
-    // engines' own names (other makers' products) are never an export name
-    const std::pair<const char*, InstrumentKind> synths[] = { { "LYNX Fourfold", InstrumentKind::tetra }, { "LYNX Wavecoil", InstrumentKind::helix },
-                                                              { "LYNX Duoloom", InstrumentKind::braid } };
-    for (const auto& [name, kind] : synths)
-        CHECK (byName.count (name) == 1 && byName[name]->instrument && byName[name]->synth == kind);
+    // rollup 0.1.31 step 6 (owner decision): Tetra, Helix and Braid have export names of their own (LYNX Fourfold, Wavecoil,
+    // Duoloom in plugins.def), not built until they pass the host tests; the engines' own names (other makers' products)
+    // are never an export name
+    for (const auto& e : plugexport::catalog)
+        CHECK (! e.instrument || (e.synth != InstrumentKind::tetra && e.synth != InstrumentKind::helix && e.synth != InstrumentKind::braid));
     for (const auto& e : plugexport::catalog)
         for (const char* taken : { "Tetra", "Helix", "Braid", "Harmonia" })
             CHECK (std::string (e.name).find (taken) == std::string::npos);

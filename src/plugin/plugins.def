@@ -39,6 +39,9 @@ LYNX_PLUGIN ("LYNX Quell Denoiser", 0, quellDenoiser, dx10, "com.ka1-s.lynx.quel
 // Rollup 0.1.31 step 6 (owner decision): Tetra, Helix and Braid export as LYNX Fourfold, LYNX Wavecoil and LYNX Duoloom
 // (Sequential's Tetra, Line 6's Helix Native and Mutable Instruments' Braids are other makers' products), and Harmonia as
 // LYNX Chimefield (Cherry Audio's Harmonia synth); inside LYNX the engines keep their names. Web search only, 2026-11-21.
+// The three synths stay at 0 (named, not built) until they pass the pack's host tests: CI plugins run 44975814572 found
+// plugexporttest aborting in the CLAP (std::length_error) and clap-validator's state-reproducibility-binary failing on
+// Fourfold and Wavecoil (queued for 0.1.32).
 LYNX_PLUGIN ("LYNX Strike Shaper", 0, strikeShaper, dx10, "com.ka1-s.lynx.strike-shaper", 0x4c6e7873, "Fx|Dynamics", 1)
 LYNX_PLUGIN ("LYNX Anvil Bus", 0, anvilBus, dx10, "com.ka1-s.lynx.anvil-bus", 0x4c6e7862, "Fx|Distortion|Dynamics", 1)
 LYNX_PLUGIN ("LYNX Corrode", 0, corrode, dx10, "com.ka1-s.lynx.corrode", 0x4c6e7872, "Fx|Distortion|Modulation", 1)
@@ -47,9 +50,9 @@ LYNX_PLUGIN ("LYNX Platter", 0, platter, dx10, "com.ka1-s.lynx.platter", 0x4c6e7
 LYNX_PLUGIN ("LYNX Timeprism", 0, timeprism, dx10, "com.ka1-s.lynx.timeprism", 0x4c6e7874, "Fx|Delay", 1)
 LYNX_PLUGIN ("LYNX Chimefield", 0, harmonia, dx10, "com.ka1-s.lynx.chimefield", 0x4c6e7868, "Fx|Filter", 1)
 LYNX_PLUGIN ("LYNX Model", 1, eq, lynxModel, "com.ka1-s.lynx.model", 0x4c6e7837, "Instrument|Synth", 2)
-LYNX_PLUGIN ("LYNX Fourfold", 1, eq, tetra, "com.ka1-s.lynx.fourfold", 0x4c6e7838, "Instrument|Synth", 1)
-LYNX_PLUGIN ("LYNX Wavecoil", 1, eq, helix, "com.ka1-s.lynx.wavecoil", 0x4c6e7839, "Instrument|Synth", 1)
-LYNX_PLUGIN ("LYNX Duoloom", 1, eq, braid, "com.ka1-s.lynx.duoloom", 0x4c6e7830, "Instrument|Synth", 1)
+LYNX_PLUGIN ("LYNX Fourfold", 1, eq, tetra, "com.ka1-s.lynx.fourfold", 0x4c6e7838, "Instrument|Synth", 0)
+LYNX_PLUGIN ("LYNX Wavecoil", 1, eq, helix, "com.ka1-s.lynx.wavecoil", 0x4c6e7839, "Instrument|Synth", 0)
+LYNX_PLUGIN ("LYNX Duoloom", 1, eq, braid, "com.ka1-s.lynx.duoloom", 0x4c6e7830, "Instrument|Synth", 0)
 LYNX_PLUGIN ("LYNX Osc Trio", 1, eq, threeosc, "com.ka1-s.lynx.osc-trio", 0x4c6e7832, "Instrument|Synth", 0)
 LYNX_PLUGIN ("LYNX SimOsc", 1, eq, simsynth, "com.ka1-s.lynx.simosc", 0x4c6e7833, "Instrument|Synth", 0)
 LYNX_PLUGIN ("LYNX Harmlite", 1, eq, harmless, "com.ka1-s.lynx.harmlite", 0x4c6e7834, "Instrument|Synth", 0)

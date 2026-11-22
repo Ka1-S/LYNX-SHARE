@@ -1,5 +1,5 @@
 ---
-source: cb56d9e19e
+source: 13c966d353
 ---
 ![外掛管理器的下半部，附有每個外掛檔案都在獨立處理程序中檢查的說明](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -108,7 +108,6 @@ FL Studio 的原生外掛，例如 Sytrus、Harmor 和 Patcher，只能在 FL St
 LYNX SHARE 自己的效果器與樂器，例如 Facet EQ、Apex Limiter、LYNX Tune 和 LYNX Model，也提供給其他 DAW 使用的外掛版本。它們是[發佈頁面](https://github.com/Ka1-S/LYNX-SHARE/releases)上另外的選用下載：適用於 Windows、macOS 和 Linux 的 `LYNX-Plugins-<version>`。
 
 - 所有外掛都在一個 CLAP 檔案 `LYNX Plugins.clap` 裡。其中一小部分也提供 VST3 版本。
-- 套件中的樂器：LYNX FM10、LYNX Model、LYNX Fourfold、LYNX Wavecoil 和 LYNX Duoloom。
 - 執行壓縮檔裡的安裝腳本（Windows 用 `install.cmd`，macOS 和 Linux 用 `install.sh`），然後在你的 DAW 裡重新掃描外掛。
 - 外掛開啟的編輯器和 LYNX SHARE 裡的一樣，它的狀態可以在 LYNX SHARE 中當作專案開啟。
 

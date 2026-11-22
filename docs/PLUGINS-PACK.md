@@ -33,24 +33,21 @@ plugins use LYNX's own product names, which all start with "LYNX".
 | LYNX Platter | record-wear distortion and crackle | CLAP |
 | LYNX Timeprism | spectral freezer and delay | CLAP |
 | LYNX Chimefield | spectral resonator | CLAP |
-| LYNX Fourfold | 4-operator FM synth | CLAP |
-| LYNX Wavecoil | wavetable synth | CLAP |
-| LYNX Duoloom | two-engine macro synth | CLAP |
 
 The CLAP holds every plugin in one file; each VST3 carries the whole LYNX engine, about 30 MB, so only a short list comes
 as VST3. Audio Units (macOS) are not built yet: Logic users can load the
 CLAP through a CLAP-to-AU host, or wait for a native AU.
 
 New in 0.1.31 (round 190ov): Strike Shaper, Anvil Bus, Corrode, Soundboard, Platter, Timeprism and Chimefield in the CLAP,
-LYNX Model as CLAP and VST3. LYNX's synths Tetra, Helix and Braid come as LYNX Fourfold, LYNX Wavecoil and LYNX Duoloom
-(CLAP), and the Harmonia engine as LYNX Chimefield: other makers sell products of the engines' names. Inside LYNX the
-engines keep their names. LV2 bundles for Linux are built behind an option (`LYNX_PLUGINS_LV2`) but not shipped yet:
+LYNX Model as CLAP and VST3. The Harmonia engine exports as LYNX Chimefield (Cherry Audio sells a Harmonia synth); inside
+LYNX it keeps its name. LV2 bundles for Linux are built behind an option (`LYNX_PLUGINS_LV2`) but not shipped yet:
 they still fail the host test (planned for 0.1.32).
 
 ### Not in the pack yet
 
 | Engine in LYNX | Why |
 |---|---|
+| LYNX Fourfold, LYNX Wavecoil, LYNX Duoloom (the Tetra FM synth, Helix wavetable synth and Braid macro synth; their engine names are other makers' products) | named, but held back until they pass the pack's host tests (a crash in the CLAP test and a state that does not save back byte for byte; planned for 0.1.32) |
 | LYNX Soundfont | it needs a SoundFont file chosen in LYNX's browser |
 | Visualizer, analyser, controllers, hardware insert | no sound of their own, or they need LYNX's mixer |
 | FL Studio's native plugins on LYNX engines | the names are Image-Line's |
