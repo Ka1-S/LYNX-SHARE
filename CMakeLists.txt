@@ -607,6 +607,7 @@ if(LYNX_BUILD_APP)
         src/engine/Bridge32Test.cpp
         src/engine/ClapTeardownTest.cpp
         src/engine/RenderAgainTest.cpp
+        src/engine/Determinism190poTest.cpp
         src/engine/HostingTests.cpp
         src/engine/Modulators190oxTest.cpp
         src/engine/Exporter.cpp

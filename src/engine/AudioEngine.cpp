@@ -811,6 +811,9 @@ RenderStream::Setup AudioEngine::streamSetup (const RenderOptions& options, int 
 
 float AudioEngine::renderOffline (const RenderOptions& options)
 {
+    // round 190po: the render's thread (the main thread of `LYNX --export`, an Export window's or a bounce's own thread)
+    // at the x87's 64-bit precision, as the rack's workers: the same samples whichever thread renders (core/Denormals.h)
+    const ScopedExtendedPrecision precision;
     offlineRendersRunning().fetch_add (1, std::memory_order_acq_rel);
     const juce::ScopeGuard rendered { [] { offlineRendersRunning().fetch_sub (1, std::memory_order_acq_rel); } };
     // (round 190mp: FL's Half speed is a listening state: an export renders at the song's own speed)
