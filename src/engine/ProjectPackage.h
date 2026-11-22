@@ -20,13 +20,24 @@ struct Result
     juce::StringArray missing; // samples the project references that are not on this PC (left out)
 };
 
-// Writes `zip` (replaced only once complete) with "<projectName>.lynx" and its samples.
+// Writes `zip` (replaced only once complete) with "<projectName>.lynx" and its samples beside it, flat (FL's zipped loop
+// package; round 190oq: was a "samples/" folder — opening either kind works, the paths are relative to the project).
 bool exportZip (const Song& song, const juce::String& projectName, const juce::File& zip, Result& result, juce::String& error);
 
 // Copies the project's samples into `folder` (names made unique, existing files are never overwritten); `relink`
 // receives original path -> copy (for applyRelocations). FL's "collect project data files".
 bool collectSamples (const Song& song, const juce::File& folder, std::map<std::string, std::string>& relink, Result& result,
                      juce::String& error);
+
+// Round 190oq (issue #251): FL's Export › Project data files — copies every file the project uses into `folder`, flat,
+// unique names, never overwriting; nothing is re-pointed and no project file is written (FL's own behaviour).
+bool copyDataFiles (const Song& song, const juce::File& folder, Result& result, juce::String& error);
+
+// Round 190oq (issue #251): Live's Collect All and Save — the files outside `projectFolder` are copied into
+// `projectFolder`/Samples/Imported (unique names); `relink` gets original path -> copy (applyRelocations). Files already
+// inside the folder (recordings, earlier collected files) are left alone.
+bool collectIntoProject (const Song& song, const juce::File& projectFolder, std::map<std::string, std::string>& relink, Result& result,
+                         juce::String& error);
 
 // Extracts a package into a new folder under `destinationRoot` (named after the zip, made unique) and returns the
 // project file inside (the first .lynx, else the first .flp; round 190ic: else the first GarageBand .band folder, as

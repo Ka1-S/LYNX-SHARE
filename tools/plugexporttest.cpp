@@ -1,4 +1,4 @@
-// plugexporttest <plugin.vst3 | plugin.clap> <report.txt> [editor picture prefix]
+// plugexporttest <plugin.vst3 | plugin.clap | plugin.lv2 (Linux, round 190ov)> <report.txt> [editor picture prefix]
 // Loads LYNX's exported plugins the way a host does (round 180b, docs/PLUGIN_EXPORT.md) and checks, with no window on screen:
 // the scan, the sound against the same engine run directly in this process (null test), automation, the state (a new
 // instance sounds the same; the state opens as a .lynx project), the editor, memory per instance and CPU.
@@ -562,7 +562,15 @@ int main (int argc, char** argv)
 
     juce::VST3PluginFormat vst3;
     ClapPluginFormat clap;
-    juce::AudioPluginFormat& format = plugin.hasFileExtension ("clap") ? static_cast<juce::AudioPluginFormat&> (clap) : vst3;
+    juce::AudioPluginFormat* chosen = &vst3;
+    if (plugin.hasFileExtension ("clap"))
+        chosen = &clap;
+   #if JUCE_PLUGINHOST_LV2 && JUCE_LINUX
+    juce::LV2PluginFormat lv2; // (round 190ov: a bundle folder; JUCE's LV2 host loads it with lilv)
+    if (plugin.hasFileExtension ("lv2"))
+        chosen = &lv2;
+   #endif
+    juce::AudioPluginFormat& format = *chosen;
     juce::OwnedArray<juce::PluginDescription> found;
     format.findAllTypesForFile (found, plugin.getFullPathName());
     report << "plugin " << plugin.getFileName() << ": " << found.size() << " found\n";

@@ -1,5 +1,5 @@
 ---
-source: 1c440a7810
+source: 13c966d353
 ---
 ![Der untere Teil des Plugin-Managers mit dem Hinweis, dass jede Plugin-Datei in einem separaten Prozess geprüft wird](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -102,6 +102,16 @@ Die nativen Plugins von FL Studio, wie Sytrus, Harmor und Patcher, laufen nur in
 Was du in FL Studio aufbaust, wird mit dem LYNX-SHARE-Projekt gespeichert. `FL Studio VSTi (Multi)` hat 16 Stereoausgänge, die auf getrennten Inserts spielen können (siehe den Abschnitt oben). Deine FL-Studio-Lizenz entscheidet, welche FL-Plugins darin funktionieren. LYNX SHARE lädt die Plugin-Dateien von FL Studio nicht selbst.
 
 Wenn das FL-Studio-Plugin als `Ladefehler` aufgelistet ist, klicke es in `Optionen › Plugin-Manager...` mit der rechten Maustaste an und wähle `Erneut versuchen (diese Datei jetzt prüfen)`.
+
+## Die eigenen Plugins von LYNX in anderen DAWs
+
+Die eigenen Effekte und Instrumente von LYNX SHARE, etwa Facet EQ, Apex Limiter, LYNX Tune und LYNX Model, gibt es auch als Plugins für andere DAWs. Sie sind ein separater, optionaler Download auf der [Release-Seite](https://github.com/Ka1-S/LYNX-SHARE/releases): `LYNX-Plugins-<version>` für Windows, macOS und Linux.
+
+- Alle Plugins stecken in einer CLAP-Datei, `LYNX Plugins.clap`. Eine kurze Liste gibt es auch als VST3.
+- Starte das Installationsskript im Archiv (`install.cmd` unter Windows, `install.sh` unter macOS und Linux) und lass deine DAW die Plugins neu suchen.
+- Ein Plugin öffnet denselben Editor wie in LYNX SHARE, und sein Zustand lässt sich in LYNX SHARE als Projekt öffnen.
+
+Die vollständige Liste steht in [PLUGINS-PACK.md](https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS-PACK.md).
 
 ## Der Ordner Plugin database
 

@@ -302,6 +302,22 @@ inline WheelDelta normaliseWheel (double deltaX, double deltaY, bool smooth, boo
     return { deltaX / windowsWheelNotch / 7.0, deltaY / windowsWheelNotch / 7.0, true };
 }
 
+// --- the horizontal wheel (issue #254, round 190ou) ---------------------------------------------------------------
+// One notch of a tilt wheel or of a mouse's second (horizontal) wheel: Windows' WM_MOUSEHWHEEL, X11's buttons 6 / 7
+// (JUCE patch fix 49), a mouse's horizontal wheel on macOS. It comes as deltaX alone and not smooth. A trackpad's
+// sideways swipe is smooth and keeps its own path, and macOS turns Shift+wheel into deltaX with Shift held: that stays
+// Shift+wheel. +1 = a notch to the right (the view goes later), -1 to the left, 0 = not a horizontal wheel's notch.
+inline int horizontalWheelNotch (double deltaX, double deltaY, bool smooth, bool shift) noexcept
+{
+    if (smooth || shift || deltaY != 0.0 || deltaX == 0.0)
+        return 0;
+    return deltaX < 0.0 ? 1 : -1; // (JUCE: a tilt to the right is a negative deltaX, as on a trackpad)
+}
+
+// FL 2026 (round 190ou, Thief: the Playlist at 15.5 px a bar and the Piano roll at 384 px a bar): a notch of the
+// horizontal wheel moves the view 1.5 beats, whatever the zoom
+constexpr double horizontalWheelBeats = 1.5;
+
 // The zoom factor of one trackpad pinch event (macOS magnifyWithEvent, Windows GID_ZOOM: JUCE's mouseMagnify `scale`,
 // 1 = no change), limited so that one event never jumps more than x2.
 inline double pinchZoomFactor (double scale)

@@ -85,6 +85,7 @@
 #include <cctype>
 #include <cmath>
 #include <map>
+#include <set>
 #include <ctime>
 
 namespace lynx
@@ -319,6 +320,10 @@ std::optional<std::pair<int, int>> flRawRange (flp::ControlId id, const std::str
             return std::pair { -6400, 6400 };
         if (p == 0x1F01) // slot dry/wet
             return std::pair { 0, 12800 };
+        // issue #253 (round 190oq): a route's level (0x2000 + destination, 0 = Master), on the fader's 0…16000 like the
+        // static route levels read below
+        if (p >= flp::ControlId::mixerSendBase && p < flp::ControlId::mixerSendBase + maxMixerTracks)
+            return std::pair { 0, 16000 };
     }
 
     if (p < flp::ControlId::pluginParamBase)
@@ -397,6 +402,13 @@ AutomationTarget automationTargetFor (flp::ControlId id, const std::map<int, int
             t.kind = AutomationTargetKind::mixerVolume;
         else if (p == flp::ControlId::mixerPan)
             t.kind = AutomationTargetKind::mixerPan;
+        // issue #253 (round 190oq): FL's send levels ("To <insert>" / "To Master" knobs, 0x2000 + destination; the same
+        // control ids the project's static route levels use) were left without a target, so their clips played nothing
+        else if (p >= flp::ControlId::mixerSendBase && p < flp::ControlId::mixerSendBase + mixerTracks)
+        {
+            t.kind = AutomationTargetKind::mixerSend;
+            t.slot = p - flp::ControlId::mixerSendBase;
+        }
         else if (p >= flp::ControlId::pluginParamBase)
         {
             t.kind = AutomationTargetKind::effectParam;
@@ -484,7 +496,39 @@ double channelFilterHz (int type, double x)
         default: return 20000.0;
     }
 }
+
 } // namespace
+
+// Round 190ov: a link's scale (Automation::Link::scale) for FL's value → LYNX's `map`, sampled evenly over 0..1. Empty when
+// the map leaves every value alone (most of FL's controls: LYNX keeps their scale); otherwise the fewest points (2, 3, 5,
+// 9 … 1025) whose straight lines give the map at all 1025 sample points within 1e-6 (a straight map: two points, exact),
+// else the 1025 points.
+std::vector<float> flLinkScale (const std::function<float (float)>& map)
+{
+    constexpr int fine = 1024;
+    std::array<float, fine + 1> exact {};
+    bool identity = true;
+    for (int i = 0; i <= fine; ++i)
+    {
+        const auto v = (float) i / (float) fine;
+        exact[(std::size_t) i] = std::clamp (map (v), 0.0f, 1.0f);
+        identity = identity && std::abs (exact[(std::size_t) i] - v) <= 1.0e-7f;
+    }
+    if (identity)
+        return {};
+    for (int segments = 1; segments <= fine; segments *= 2)
+    {
+        Automation::Link probe;
+        for (int k = 0; k <= segments; ++k)
+            probe.scale.push_back (exact[(std::size_t) (k * (fine / segments))]);
+        bool fits = true;
+        for (int i = 0; i <= fine && fits; ++i)
+            fits = std::abs (probe.scaled ((float) i / (float) fine) - exact[(std::size_t) i]) <= 1.0e-6f;
+        if (fits)
+            return probe.scale;
+    }
+    return { exact.begin(), exact.end() };
+}
 
 float filterEnvelopeOctaves (int modX, int type, int amount)
 {
@@ -3570,6 +3614,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     std::map<int, bool> flGenerator;
     for (const auto& c : project.channels)
         flGenerator[c.index] = c.type == flp::ChannelType::instrument || c.type == flp::ChannelType::native;
+    std::set<int> automationChannels; // round 190ow: the FL indices of the automation clip channels with points
+    for (const auto& c : project.channels)
+        if (c.type == flp::ChannelType::automationClip && ! c.automation.empty())
+            automationChannels.insert (c.index);
 
     for (const auto& src : project.patterns)
     {
@@ -3599,7 +3647,22 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             const auto it = channelMap.find (n.channel);
 
             if (it == channelMap.end())
+            {
+                // round 190ow (DE-123): a step / note of an automation clip channel starts that clip (FL's "Triggering");
+                // kept by FL channel index here, turned into the automation's index once the clips are read (below)
+                if (automationChannels.count (n.channel) != 0)
+                {
+                    Note trigger;
+                    trigger.start = rescale (n.position);
+                    trigger.length = n.length > 0 ? rescale (n.length) : 0; // (0: FL's step, no length)
+                    trigger.channel = n.channel;
+                    trigger.key = std::clamp ((int) n.key, 0, 127);
+                    trigger.velocity = std::clamp (n.velocity / 128.0f, 0.0f, 1.0f);
+                    trigger.muted = n.muted();
+                    p.autoNotes.push_back (trigger);
+                }
                 continue;
+            }
 
             Note note;
             note.start = rescale (n.position);
@@ -3628,7 +3691,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
         p.sortNotes();
 
-        if (! p.notes.empty() || ! src.controlEvents.empty() || ! p.markers.empty()) // a pattern of events (or markers) only stays
+        if (! p.notes.empty() || ! src.controlEvents.empty() || ! p.markers.empty() || ! p.autoNotes.empty()) // a pattern of events (or markers) only stays
         {
             patternMap[src.index] = (int) song.patterns.size();
             song.patterns.push_back (std::move (p));
@@ -3924,19 +3987,84 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             a.colour = 0xFF000000u | c.colour;
         std::function<float (float)> valueMap; // FL normalized value -> ours (effect parameters)
 
-        for (const auto& link : project.automationLinks)
-            if (link.channel == c.index)
-            {
-                a.target = resolveTarget (link.target, valueMap);
-                break;
-            }
-
         // the clip's range (round 171e): its channel levels, pan = minimum and volume = maximum of 12800 in the target's
         // whole range (FL's tempo clips: 1250…4250 = 60…180 of FL's 10…522 BPM); a file without them: the whole range,
         // and the tempo FL's usual 60…180
         const auto ranged = c.hasLevels;
-        const auto lo = ranged ? std::clamp (c.pan / 12800.0, 0.0, 1.0) : 0.0;
-        const auto hi = ranged ? std::clamp (c.volume / 12800.0, 0.0, 1.0) : 1.0;
+        auto lo = ranged ? std::clamp (c.pan / 12800.0, 0.0, 1.0) : 0.0;
+        auto hi = ranged ? std::clamp (c.volume / 12800.0, 0.0, 1.0) : 1.0;
+
+        // its links (0xE3, in the file's order). Round 190ov: FL drives every control a clip is linked to (Synth_dfr
+        // Overcome: two sends per clip; 16 of FL's 46 demos have such clips, up to 26 links on one), each through its own
+        // mapping formula (0xE6) and then the control's own range (rea/FL-FACTS-autolinks.md: one clip value, the same for
+        // every link; no range per link); LYNX kept the first, 1:1. One link without a formula: the clip as before (its
+        // points on the target's own scale). Otherwise target links (Automation::links, round 190gw), the points in FL's
+        // clip value (range applied) and each link's formula and scale.
+        bool firstSeen = false, tempoLink = false;
+        std::optional<std::pair<AutomationTarget, std::function<float (float)>>> firstValid;
+        std::vector<Automation::Link> linked;
+        for (const auto& link : project.automationLinks)
+            if (link.channel == c.index)
+            {
+                std::function<float (float)> map;
+                const auto target = resolveTarget (link.target, map);
+                if (! firstSeen)
+                {
+                    firstSeen = true;
+                    a.target = target;
+                    valueMap = map;
+                }
+                if (target.kind == AutomationTargetKind::none)
+                    continue;
+                if (! firstValid)
+                    firstValid = std::make_pair (target, map);
+                // (the tempo is LYNX's tempo map, read from its automations, not an automation slot: no target link)
+                if (target.kind == AutomationTargetKind::tempo)
+                {
+                    tempoLink = true;
+                    continue;
+                }
+                if (std::any_of (linked.begin(), linked.end(), [&target] (const Automation::Link& l) { return l.target == target; }))
+                    continue;
+                Automation::Link l;
+                l.target = target;
+                l.formula = link.formula; // (FL's mapping formula of this link, event 0xE6; "" = "Input")
+                if (map)
+                    l.scale = flLinkScale (map);
+                linked.push_back (std::move (l));
+            }
+        // (one link with a mapping formula: a target link too, the formula before the control's scale as in FL)
+        const auto asLinks = linked.size() > 1 || (linked.size() == 1 && ! linked.front().formula.empty());
+        if (! asLinks && firstValid && ! (firstValid->first == a.target)) // (the first link has no LYNX target, a later one has)
+        {
+            a.target = firstValid->first;
+            valueMap = firstValid->second;
+        }
+        if (asLinks)
+        {
+            a.target = linked.front().target;
+            a.links = std::move (linked);
+            valueMap = {};
+            if (options.report != nullptr)
+            {
+                ++options.report->converted[a.links.size() > 1 ? "Automation clips linked to several controls" : "Automation clips with a mapping formula"];
+                if (tempoLink)
+                    ++options.report->notReproduced["Automation clips: a tempo link next to other links (the clip drives the others)"];
+            }
+        }
+
+        // round 190ow (PAT-7): the range stays as the rack row's MIN / MAX knobs (Automation::rangeMin / rangeMax). The
+        // points keep the played values (pointsMin / pointsMax = the same range: nothing re-ranged, the same bits as
+        // before); a range of no width would flatten them, so those points stay FL's own 0..1 and the clip re-ranges
+        a.rangeMin = a.pointsMin = (float) lo;
+        a.rangeMax = a.pointsMax = (float) hi;
+        if (ranged && hi == lo && a.target.kind != AutomationTargetKind::tempo && ! valueMap)
+        {
+            lo = 0.0;
+            hi = 1.0;
+            a.pointsMin = 0.0f;
+            a.pointsMax = 1.0f;
+        }
         for (std::size_t i = 0; i < c.automation.size(); ++i)
         {
             const auto& p = c.automation[i];
@@ -3944,7 +4072,9 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             auto value = (float) (lo + (hi - lo) * std::clamp (p.value, 0.0, 1.0));
 
             // our tempo target is FL's whole tempo range
-            if (a.target.kind == AutomationTargetKind::tempo)
+            if (! a.links.empty())
+                ; // (several links: FL's clip value; each link takes it onto its own control's scale)
+            else if (a.target.kind == AutomationTargetKind::tempo)
             {
                 if (! ranged)
                     value = valueFromTempo (60.0 + 120.0 * std::clamp (p.value, 0.0, 1.0));
@@ -4005,9 +4135,28 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 break;
             }
 
+        a.muted = ! c.enabled; // round 190ow: the channel's mute light in FL's rack (FL: a muted automation clip drives nothing)
+
         automationMap[c.index] = (int) song.automations.size();
         song.automations.push_back (std::move (a));
     }
+
+    // round 190ow (DE-123): the automation clip channels' steps / notes, from FL channel indices to the automations'
+    for (auto& p : song.patterns)
+        if (! p.autoNotes.empty())
+        {
+            std::vector<Note> kept;
+            for (auto n : p.autoNotes)
+                if (const auto it = automationMap.find (n.channel); it != automationMap.end())
+                {
+                    n.channel = it->second;
+                    kept.push_back (n);
+                }
+            p.autoNotes = std::move (kept);
+            p.sortNotes();
+            if (options.report != nullptr && ! p.autoNotes.empty())
+                options.report->converted["Steps and notes that start automation clips (FL's triggered automation clips)"] += (int) p.autoNotes.size();
+        }
 
     // Controller links (REA_rodada14 §7): Peak Controller in a mixer slot -> live automation of the
     // target (the effect output is read every block). Other controllers are still left out.

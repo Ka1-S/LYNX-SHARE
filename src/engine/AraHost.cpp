@@ -68,6 +68,7 @@ std::shared_ptr<Instrument> AraHost::instrumentFor (const ChannelDef&, double) {
 juce::AudioPluginInstance* AraHost::pluginOf (std::uint64_t) { return nullptr; }
 std::shared_ptr<void> AraHost::ownerOf (std::uint64_t) { return nullptr; }
 void AraHost::showInEditor (std::uint64_t, const std::vector<std::uint64_t>&) {}
+void AraHost::showChannelsInEditor (std::uint64_t, const std::vector<std::uint64_t>&) {}
 std::vector<AraDocumentArchive> AraHost::archives() { return {}; }
 bool AraHost::analysing() { return false; }
 int AraHost::documentCount() const { return 0; }
@@ -186,7 +187,7 @@ struct Timeline
 {
     std::mutex lock;
     std::vector<ara::TempoEntry> tempos { { 0.0, 0.0 }, { 2.0, 4.0 } };
-    int beats = 4, unit = 4;
+    std::vector<ara::BarSignature> bars { {} }; // (round 190oq: the song's time signature markers too)
 };
 
 class ContentAccess final : public ARA::Host::ContentAccessControllerInterface
@@ -212,7 +213,8 @@ public:
             for (const auto& e : timeline->tempos)
                 r->tempos.push_back ({ e.seconds, e.quarters });
         else if (type == ARA::kARAContentTypeBarSignatures)
-            r->bars.push_back ({ timeline->beats, timeline->unit, 0.0 });
+            for (const auto& b : timeline->bars)
+                r->bars.push_back ({ b.numerator, b.denominator, b.quarters });
         return reinterpret_cast<ARA::ARAContentReaderHostRef> (r);
     }
     bool isAudioSourceContentAvailable (ARA::ARAAudioSourceHostRef, ARA::ARAContentType) noexcept override { return false; }
@@ -305,8 +307,27 @@ struct Controller
 
 // One bound plugin instance (an ARA channel's): the channel's instrument renders with it, its window shows its editor.
 // It keeps the document controller alive until it is gone itself.
+struct Binding;
+
+// Round 190oq (issue #243): an ARA instance's play head. The song's (engine/PluginHost.cpp), with the timeline's seconds
+// taken from the tempo map when the tempo moves, so the plugin's playback renderer finds its regions where they were
+// placed (ARA regions are in timeline seconds). At a constant tempo it says exactly what the song's play head says.
+class AraPlayHead final : public juce::AudioPlayHead
+{
+public:
+    explicit AraPlayHead (const Binding& b) : binding (b) {}
+    juce::Optional<PositionInfo> getPosition() const override;
+
+private:
+    const Binding& binding;
+};
+
 struct Binding
 {
+    // (the timeline's map, read by the play head on the audio thread inside the plugin's process call: replaced only
+    // under the plugin's callback lock)
+    std::shared_ptr<const ara::TimeMap> map;
+    AraPlayHead playHead { *this };
     std::shared_ptr<Controller> controller;
     std::unique_ptr<juce::AudioPluginInstance> plugin;
     HM::PlaybackRendererInterface playback;
@@ -342,6 +363,22 @@ struct Binding
         ready = true;
     }
 };
+
+juce::Optional<juce::AudioPlayHead::PositionInfo> AraPlayHead::getPosition() const
+{
+    auto info = songPlayHead().getPosition();
+    const auto* map = binding.map.get();
+    if (! info.hasValue() || map == nullptr || map->constant())
+        return info;
+    if (const auto quarters = info->getPpqPosition())
+    {
+        const auto seconds = map->secondsAt (*quarters * (double) ppq);
+        const auto rate = hostTimeline().sampleRate.load (std::memory_order_relaxed);
+        info->setTimeInSeconds (seconds);
+        info->setTimeInSamples ((juce::int64) std::llround (seconds * rate));
+    }
+    return info;
+}
 
 // The channel's instrument: the bound instance's playback renderer, played from the song's timeline (the play head).
 class AraInstrument final : public Instrument
@@ -438,6 +475,7 @@ struct Doc
     juce::PluginDescription description;
     std::shared_ptr<Controller> controller;
     std::shared_ptr<Timeline> timeline;
+    std::shared_ptr<const ara::TimeMap> map = std::make_shared<const ara::TimeMap> (ara::timeMap (Song::makeDefault()));
     std::unique_ptr<HM::MusicalContext> context;
     std::map<std::uint64_t, std::unique_ptr<Chan>> channels;
     ModelUpdates* updates = nullptr; // (owned by the controller)
@@ -608,21 +646,32 @@ struct AraHost::Impl : private juce::Timer
         return raw;
     }
 
+    // round 190oq (issue #243): the tempo map (tempo entries) and the time signature markers (bar signatures), and the
+    // map the instances' play heads use
     void setTimeline (Doc& doc, const Song& song)
     {
         bool changed = false;
+        auto map = ara::timeMap (song);
+        const auto mapChanged = ! (map == *doc.map);
+        if (mapChanged)
+            doc.map = std::make_shared<const ara::TimeMap> (std::move (map));
         {
             const std::lock_guard<std::mutex> hold (doc.timeline->lock);
-            const auto tempos = ara::tempoEntries (song);
-            const auto m = song.meter();
-            changed = m.beats != doc.timeline->beats || m.unit != doc.timeline->unit || tempos.size() != doc.timeline->tempos.size()
-                      || tempos[1].seconds != doc.timeline->tempos[1].seconds;
+            const auto tempos = ara::tempoEntries (*doc.map);
+            const auto bars = ara::barSignatures (song);
+            changed = tempos != doc.timeline->tempos || bars != doc.timeline->bars;
             doc.timeline->tempos = tempos;
-            doc.timeline->beats = m.beats;
-            doc.timeline->unit = m.unit;
+            doc.timeline->bars = bars;
         }
         if (changed)
             doc.controller->get().updateMusicalContextContent (doc.context->getPluginRef(), nullptr, ARA::ContentUpdateScopes::timelineIsAffected());
+        if (mapChanged)
+            for (auto& [uid, c] : doc.channels)
+                if (c->binding != nullptr && c->binding->plugin != nullptr)
+                {
+                    const juce::ScopedLock hold (c->binding->plugin->getCallbackLock());
+                    c->binding->map = doc.map;
+                }
     }
 
     // the channel's model objects (in an edit); false: its sample is not there
@@ -707,7 +756,8 @@ struct AraHost::Impl : private juce::Timer
         b->playback = extension.getPlaybackRendererInterface();
         b->editor = extension.getEditorRendererInterface();
         b->plugin = std::move (instance);
-        b->plugin->setPlayHead (&songPlayHead());
+        b->map = doc.map;
+        b->plugin->setPlayHead (&b->playHead); // (round 190oq: the tempo map's seconds)
         for (auto& [uid, region] : c.regions)
         {
             b->playback.add (*region);
@@ -843,7 +893,7 @@ void AraHost::sync (const Song& song, double sampleRate)
                 c.seen = true;
                 const auto seconds = c.data->sample->sampleRate > 0.0 ? (double) c.data->sample->frames() / c.data->sample->sampleRate : 0.0;
                 Pending p { &c, {}, {} };
-                if (impl->placeRegions (*doc, c, ara::regionsOf (song, i, seconds), p.added, p.removed))
+                if (impl->placeRegions (*doc, c, ara::regionsOf (song, i, seconds, doc->map.get()), p.added, p.removed))
                     changes.push_back (std::move (p));
                 if (c.binding == nullptr)
                     unbound.push_back (&c);
@@ -1001,6 +1051,35 @@ void AraHost::showInEditor (std::uint64_t channelUid, const std::vector<std::uin
             selection.playbackRegionRefs = refs.data();
             selection.regionSequenceRefsCount = 1;
             selection.regionSequenceRefs = &sequence;
+            selection.timeRange = nullptr;
+            raw->editorViewInterface->notifySelection (raw->editorViewRef, &selection);
+            return;
+        }
+}
+
+void AraHost::showChannelsInEditor (std::uint64_t editorChannel, const std::vector<std::uint64_t>& channelUids)
+{
+    for (auto& [id, doc] : impl->docs)
+        if (auto it = doc->channels.find (editorChannel); it != doc->channels.end() && it->second->binding != nullptr)
+        {
+            const auto* raw = it->second->binding->raw;
+            if (raw == nullptr || raw->editorViewInterface == nullptr || raw->editorViewRef == nullptr)
+                return;
+            std::vector<ARA::ARAPlaybackRegionRef> refs;
+            std::vector<ARA::ARARegionSequenceRef> sequences;
+            for (const auto uid : channelUids)
+                if (auto c = doc->channels.find (uid); c != doc->channels.end() && c->second->sequence != nullptr)
+                {
+                    sequences.push_back (c->second->sequence->getPluginRef());
+                    for (const auto& [clip, region] : c->second->regions)
+                        refs.push_back (region->getPluginRef());
+                }
+            ARA::ARAViewSelection selection {};
+            selection.structSize = ARA::kARAViewSelectionMinSize;
+            selection.playbackRegionRefsCount = refs.size();
+            selection.playbackRegionRefs = refs.data();
+            selection.regionSequenceRefsCount = sequences.size();
+            selection.regionSequenceRefs = sequences.data();
             selection.timeRange = nullptr;
             raw->editorViewInterface->notifySelection (raw->editorViewRef, &selection);
             return;

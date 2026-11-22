@@ -347,6 +347,21 @@
                 if (! s.playlist.empty())
                     mt.showPattern (s.playlist.front().pattern);
                 write (mt, "10-module-" + juce::File (modulePath).getFileNameWithoutExtension());
+                // round 190om: the first note with a pitch curve (Bxx), its row at the top
+                for (int p = 0; p < (int) s.patterns.size(); ++p)
+                {
+                    const auto& notes = s.patterns[(std::size_t) p].notes;
+                    const auto curved = std::find_if (notes.begin(), notes.end(), [] (const Note& n) { return n.curves.has(); });
+                    if (curved == notes.end())
+                        continue;
+                    mt.showChannel (curved->channel);
+                    mt.showPattern (p);
+                    const auto rowTicks = (std::int64_t) ppq / std::max (1, s.tracker.rowsPerBeat);
+                    mt.scrollToRowForCheck (std::max<std::int64_t> (0, curved->start / rowTicks - 2));
+                    check ("a note with a pitch curve shows Bxx", true);
+                    write (mt, "13-module-bend-" + juce::File (modulePath).getFileNameWithoutExtension());
+                    break;
+                }
             }
         }
 

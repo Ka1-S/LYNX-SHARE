@@ -52,6 +52,13 @@ struct ModuleImportSummary
     int volumeChangedNotes = 0;  // played notes whose volume changes while they sound
     int volumeAutomations = 0, volumePoints = 0;
     int splitChannels = 0;       // channels added for an instrument sounding in several module channels at once
+    // round 190om: volume changes as pattern events (exact timing) where a pattern's every play has the same ones, the
+    // channel's automation clip (190ob) where they differ; pitch changes of sounding notes as the notes' pitch curves
+    int volumeEventChannels = 0, volumeEventLanes = 0, volumeEvents = 0;
+    int pitchCurveNotes = 0, pitchCurvePoints = 0, fineTunedNotes = 0;
+    int continuedPortas = 0;     // tone portamentos that slide the sounding note on (no new note)
+    int pitchDifferentPlays = 0; // later plays of a note whose pitch moves otherwise (the first play's curve is kept)
+    int panEventChannels = 0;    // channels whose notes' pans move: the pan offset and the multiplier as pattern events
 };
 
 struct ModuleImportOptions
@@ -61,6 +68,9 @@ struct ModuleImportOptions
     FlpImportReport* report = nullptr; // optional
     ModuleImportSummary* summary = nullptr; // optional
     double maxSeconds = 3600.0;        // a song longer than this (a module that never ends) is cut there
+    // round 190om: a channel's volume changes as pattern events where they are exact (false: every channel's as an
+    // automation clip over the song, round 190ob's way)
+    bool volumeAsPatternEvents = true;
 };
 
 // Whether `name` ends with one of the formats LYNX imports (.mod .xm .s3m .it, any case).

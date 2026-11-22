@@ -27,4 +27,16 @@ void closeSettings();
 
 // The content, for --snapshot mode (`persistent` false: sample folders and devices, nothing saved).
 std::unique_ptr<juce::Component> makeSettingsPanel (AudioEngine& engine, SettingsPage page, bool persistent = false, SettingsHooks hooks = {});
+
+// Issue #247 (round 190oq, shots / tests): types `query` into the Settings panel's find bar and steps `steps` matches on
+// (negative: back); what it found
+struct SettingsFindState
+{
+    int matches = 0, current = -1, page = -1; // page: SettingsPage of the tab shown
+    juce::String text;                          // the match's caption
+    juce::Component* target = nullptr;          // the matched control
+    juce::Component* ring = nullptr;            // the outline (nullptr: none)
+    juce::TextEditor* field = nullptr;          // the find box
+};
+SettingsFindState settingsFindForSnapshot (juce::Component& panel, const juce::String& query, int steps = 0);
 } // namespace lynx

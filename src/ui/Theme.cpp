@@ -1,4 +1,5 @@
 #include "ui/Theme.h"
+#include "ui/ModRing.h"
 #include "ui/LiveLook.h"
 #include "ui/TextCache.h"
 
@@ -2293,12 +2294,24 @@ void LookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int width, 
         look.active = slider.isMouseButtonDown();
         look.enabled = slider.isEnabled();
         skin::knob (g, juce::Rectangle<int> (x, y, width, height).toFloat(), look);
+        if (const auto target = modring::taggedTarget (slider)) // round 190ox: the modulation rings of a tagged knob
+        {
+            const auto b = juce::Rectangle<int> (x, y, width, height).toFloat();
+            const auto size = juce::jmin (b.getWidth(), b.getHeight()) - 2.0f;
+            modring::drawFor (g, b.withSizeKeepingCentre (size, size), pos, *target, look.accent);
+        }
         return;
     }
     auto arc = slider.findColour (juce::Slider::rotarySliderFillColourId);
     if (! slider.isEnabled())
         arc = textDisabled;
-    drawKnob (g, juce::Rectangle<int> (x, y, width, height).toFloat(), pos, bipolar, arc, slider.isMouseOverOrDragging());
+    const auto bounds = juce::Rectangle<int> (x, y, width, height).toFloat();
+    drawKnob (g, bounds, pos, bipolar, arc, slider.isMouseOverOrDragging());
+    if (const auto target = modring::taggedTarget (slider)) // round 190ox: the modulation rings of a tagged knob
+    {
+        const auto size = juce::jmin (bounds.getWidth(), bounds.getHeight()) - 2.0f;
+        modring::drawFor (g, bounds.withSizeKeepingCentre (size, size), pos, *target, arc);
+    }
 }
 
 void LookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int width, int height, float sliderPos, float minSliderPos,

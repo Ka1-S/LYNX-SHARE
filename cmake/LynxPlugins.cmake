@@ -1,4 +1,4 @@
-# LYNX's own plugins as VST3 / CLAP (round 180b, docs/PLUGIN_EXPORT.md). Included from CMakeLists.txt only with
+# LYNX's own plugins as VST3 / CLAP (round 180b, docs/PLUGIN_EXPORT.md; LV2 on Linux behind LYNX_PLUGINS_LV2, round 190ov). Included from CMakeLists.txt only with
 # -DLYNX_BUILD_PLUGINS=ON. One static library holds JUCE and the app's sources (compiled once); each VST3 adds JUCE's wrapper
 # for its catalog entry, and one CLAP module holds every entry.
 
@@ -65,17 +65,24 @@ if(WIN32)
     set(LYNX_VST3_ARCH x86_64-win)
 elseif(APPLE)
     set(LYNX_VST3_ARCH MacOS)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+    set(LYNX_VST3_ARCH aarch64-linux)
 else()
     set(LYNX_VST3_ARCH x86_64-linux)
 endif()
 
 set(LYNX_PLUGIN_OUT "${CMAKE_BINARY_DIR}/plugins")
+# round 190ov: the VST3 short list also as LV2 bundles on Linux (JUCE's LV2 wrapper, plugin/Lv2Entry.cpp). Off: the bundles
+# build, but JUCE's LV2 host in plugexporttest failed on every one (CI run 44955467954); queued for 0.1.32
+option(LYNX_PLUGINS_LV2 "Linux: build the VST3 short list as LV2 bundles too (not shipped yet)" OFF)
 # every built entry of the one table, src/plugin/plugins.def; the index counts the built entries (plugin/ExportCatalog.h).
 # built = 2: a VST3 of its own as well (built = 1: in the CLAP only)
 file(STRINGS src/plugin/plugins.def LYNX_PLUGIN_LINES REGEX "^LYNX_PLUGIN .*, [12][)]$")
 set(index 0)
 set(LYNX_PLUGIN_TARGETS lynx_clap)
 foreach(line IN LISTS LYNX_PLUGIN_LINES)
+    # (round 190ov: the LV2 URI comes from the clap id, read first: a REGEX REPLACE resets CMAKE_MATCH_<n>)
+    string(REGEX REPLACE "^LYNX_PLUGIN [(]\"[^\"]+\", [01], [^,]+, [^,]+, \"com[.]ka1-s[.]lynx[.]([^\"]+)\", .*$" "\\1" lv2_id "${line}")
     if(NOT line MATCHES "^LYNX_PLUGIN [(]\"([^\"]+)\", ([01]), [^,]+, [^,]+, \"[^\"]+\", (0x[0-9a-f]+), \"([^\"]+)\", ([12])[)]$")
         message(FATAL_ERROR "src/plugin/plugins.def: can't read: ${line}")
     endif()
@@ -106,6 +113,29 @@ foreach(line IN LISTS LYNX_PLUGIN_LINES)
             set_target_properties(${target} PROPERTIES SUFFIX ".vst3")
         endif()
         list(APPEND LYNX_PLUGIN_TARGETS ${target})
+
+        # round 190ov: on Linux the same short list as LV2 bundles (JUCE's LV2 wrapper, plugin/Lv2Entry.cpp):
+        # <name with dashes>.lv2/{<name>.so, manifest.ttl, dsp.ttl, ui.ttl}, the .ttl files written by JUCE's juce_lv2_helper
+        if(UNIX AND NOT APPLE AND LYNX_PLUGINS_LV2)
+            set(lv2_defs LYNX_EXPORT_INDEX=${index} JucePlugin_Name="${name}" JucePlugin_IsSynth=${CMAKE_MATCH_2}
+                JucePlugin_PluginCode=${CMAKE_MATCH_3} JucePlugin_Vst3Category="${CMAKE_MATCH_4}"
+                JucePlugin_LV2URI="https://lynx-share.com/plugins/lv2/${lv2_id}")
+            string(REGEX REPLACE "[^A-Za-z0-9]" "-" lv2_name "${name}")
+            set(lv2_target "lynx_lv2_${index}")
+            add_library(${lv2_target} MODULE src/plugin/Lv2Entry.cpp)
+            target_compile_definitions(${lv2_target} PRIVATE ${lv2_defs})
+            target_include_directories(${lv2_target} PRIVATE src/plugin/lv2)
+            target_link_libraries(${lv2_target} PRIVATE juce_lilv_headers)
+            lynx_finish_plugin(${lv2_target})
+            set_target_properties(${lv2_target} PROPERTIES OUTPUT_NAME "${lv2_name}" LIBRARY_OUTPUT_DIRECTORY "${LYNX_PLUGIN_OUT}/${lv2_name}.lv2")
+            if(NOT TARGET lynx_lv2_helper)
+                add_executable(lynx_lv2_helper "${juce_SOURCE_DIR}/modules/juce_audio_plugin_client/LV2/juce_LV2ManifestHelper.cpp")
+                target_compile_features(lynx_lv2_helper PRIVATE cxx_std_17)
+                target_link_libraries(lynx_lv2_helper PRIVATE ${CMAKE_DL_LIBS})
+            endif()
+            add_custom_command(TARGET ${lv2_target} POST_BUILD COMMAND lynx_lv2_helper "$<TARGET_FILE:${lv2_target}>" VERBATIM)
+            list(APPEND LYNX_PLUGIN_TARGETS ${lv2_target})
+        endif()
     endif()
     math(EXPR index "${index} + 1")
 endforeach()

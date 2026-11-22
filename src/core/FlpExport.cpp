@@ -4,7 +4,10 @@
 #include "core/NoteRepeat.h"
 #include "core/PlaylistOps.h"
 #include "core/FlpExport.h"
+#include "core/RackAutomation.h" // round 190ow (PAT-7: FL's channel order)
+#include "core/ModulatorExport.h"
 #include "core/TrackClips.h"
+#include "core/TrackStates.h"
 #include "core/Fpc.h"
 #include "core/SamplerPage.h"
 
@@ -21,6 +24,7 @@
 #include "core/FlStateWrite.h"
 #include "core/FlWrapper.h"
 #include "core/FruityDance.h"
+#include "core/GoalKnobs.h"
 #include "core/PatternBlocks.h"
 #include "core/ThreeOsc.h"
 #include "core/TimeStretch.h"
@@ -748,6 +752,9 @@ struct Converter
     // the FL slot (0..9) of each exported effect: (track, LYNX slot) → FL slot
     std::map<std::pair<int, int>, int> slotMap;
     std::map<std::pair<int, int>, std::string> slotPlugin; // → FL plugin name ("Fruity Wrapper" for hosted plugins)
+    // round 190ot: slots written as FL's own plugin from LYNX's parameters (a Master look, the Simple layout's Duck):
+    // their side input index is set by fixSideInputs as an imported state's is
+    std::set<std::pair<int, int>> ownState;
 
     std::uint32_t ticks (std::int64_t t) const { return (std::uint32_t) std::max<std::int64_t> (0, (t * filePpq + ppq / 2) / ppq); } // (rounded)
     std::string path (const std::string& p) const { return options.samplePath && ! p.empty() ? options.samplePath (p) : p; }
@@ -1393,7 +1400,26 @@ struct Converter
                 continue;
             }
             std::function<float (float)> map;
-            const auto id = controlFor (src.target, &map);
+            auto id = controlFor (src.target, &map);
+            // round 190ov: a clip with target links (FL's clip linked to several controls, or LYNX's "Crossfade with"):
+            // one 0xE3 record per link FL has, its formula in an 0xE6 after it; the points are the clip's own value, which
+            // FL sends each link
+            std::vector<flp::AutomationLink> linkIds; // (channel set below; each with its formula, FL's 0xE6)
+            if (! src.links.empty())
+            {
+                map = {};
+                for (const auto& link : src.links)
+                {
+                    if (const auto linkId = controlFor (link.target))
+                    {
+                        if (std::find_if (linkIds.begin(), linkIds.end(), [&] (const flp::AutomationLink& x) { return x.target.raw == linkId->raw; }) == linkIds.end())
+                            linkIds.push_back ({ 0, *linkId, link.formula });
+                    }
+                    else if (link.target.kind != AutomationTargetKind::none)
+                        report.dropped.push_back ("Automation '" + src.name + "': a target link with no FL equivalent");
+                }
+                id = linkIds.empty() ? std::nullopt : std::optional<flp::ControlId> (linkIds.front().target);
+            }
             if (! id && src.target.kind != AutomationTargetKind::none)
             {
                 report.dropped.push_back ("Automation '" + src.name + "': its target has no FL equivalent");
@@ -1408,22 +1434,34 @@ struct Converter
             // an automation clip's channel levels are its range: pan = minimum, volume = maximum (of 12800, in the
             // target's whole range) [DATA: FL's tempo clips keep 1250…4250 = 60…180 BPM; FL 2026 played a clip written
             // with a channel's default levels over 6400…10000: round 171e, FL render]. Always the whole range here.
+            // Round 190ow (PAT-7): the clip's own MIN / MAX (the rack row's knobs), the points written in FL's 0..1 of the
+            // range they were made in (pointsMin / pointsMax: an FL clip's own levels; a LYNX clip's whole range, which
+            // writes what the earlier export did). FL re-ranges them into MIN..MAX as LYNX does.
             c.hasLevels = true;
-            c.pan = 0;
-            c.volume = 12800;
+            c.pan = iround (std::clamp (src.rangeMin, 0.0f, 1.0f) * 12800.0);
+            c.volume = iround (std::clamp (src.rangeMax, 0.0f, 1.0f) * 12800.0);
+            c.enabled = ! src.muted; // (round 190ow: the mute light)
+            const auto pointsSpan = (double) src.pointsMax - (double) src.pointsMin;
+            const auto unranged = src.pointsMin == 0.0f && src.pointsMax == 1.0f;
+            const auto flValue = [&] (float v) {
+                const auto raw = (double) (map ? map (v) : v);
+                if (unranged)
+                    return std::clamp (raw, 0.0, 1.0);
+                return std::abs (pointsSpan) > 1.0e-9 ? std::clamp ((raw - src.pointsMin) / pointsSpan, 0.0, 1.0) : 0.0;
+            };
             for (std::size_t i = 0; i < src.points.size(); ++i)
             {
                 const auto& pt = src.points[i];
                 flp::AutomationPoint fp;
                 fp.position = (double) pt.tick / ppq;
-                fp.value = std::clamp ((double) (map ? map (pt.value) : pt.value), 0.0, 1.0);
+                fp.value = flValue (pt.value);
                 // FL's curve sits on the segment ending at the point (FlpImport: previous.tension = −p.tension)
                 fp.tension = i > 0 ? 0.0f - src.points[i - 1].tension : 0.0f; // (0 − t: a straight segment writes +0)
                 fp.curve = i > 0 ? flCurveOf (src.points[i - 1]) : (std::uint8_t) 0;
                 c.automation.push_back (fp);
             }
             if (c.automation.empty())
-                c.automation.push_back ({ 0.0, (double) (map ? map (song.targetValue (src.target)) : song.targetValue (src.target)), 0.0f });
+                c.automation.push_back ({ 0.0, flValue (song.targetValue (src.target)), 0.0f });
             // FL's clip LFO (round 177b): the fields back as they were read; the level carries the clip's range (FL scales
             // the LFO by its channel range, written whole here)
             if (const auto& lfo = src.lfo; ! lfo.isDefault())
@@ -1431,7 +1469,10 @@ struct Converter
                 auto& f = c.automationLfo;
                 f.present = true;
                 f.enabled = lfo.on ? -1 : 0;
-                f.level = std::abs (lfo.range - 1.0f) < 1.0e-6f ? lfo.level : (int) std::lround (lfo.level * lfo.range);
+                // (round 190ow: FL scales the level by the channel range written above, MIN..MAX; LYNX's LFO by its
+                // `range` in the points' range, re-ranged with them)
+                const auto lfoScale = unranged || std::abs (pointsSpan) < 1.0e-9 ? (double) lfo.range : (double) lfo.range / pointsSpan;
+                f.level = std::abs (lfoScale - 1.0) < 1.0e-6 ? lfo.level : (int) std::lround (lfo.level * lfoScale);
                 f.mode = lfo.add ? 1 : 0;
                 f.flags = lfo.flags;
                 f.speed = lfo.speed;
@@ -1455,7 +1496,13 @@ struct Converter
                     f.rawPoints = lfo.fl.rawPoints; // unchanged since the import: its records byte for byte
             }
             automationChannel[a] = c.index;
-            if (id)
+            if (! linkIds.empty())
+                for (auto linkId : linkIds)
+                {
+                    linkId.channel = c.index;
+                    out.automationLinks.push_back (std::move (linkId));
+                }
+            else if (id)
                 out.automationLinks.push_back ({ c.index, *id });
             out.channels.push_back (std::move (c));
         }
@@ -1466,6 +1513,131 @@ struct Converter
                 out.initControls.push_back ({ 0, *id, rawValue (v.target, v.value) });
         if (! song.midiLinks.empty())
             report.notes.push_back ("MIDI controller links stay in LYNX (FL keeps them per machine)");
+        // round 190om: a note's own pitch / timbre / pressure curves (MPE, an imported module's slides, vibrato and
+        // arpeggios) have no FL equivalent (FL's notes hold one value each): the notes play their key
+        {
+            int curved = 0;
+            for (const auto& p : song.patterns)
+                for (const auto& n : p.notes)
+                    curved += n.curves.has() ? 1 : 0;
+            if (curved > 0)
+                report.dropped.push_back (std::to_string (curved) + " notes' own pitch / timbre / pressure curves (FL's notes have none)");
+        }
+    }
+
+    // ---- round 190ow (DE-123): the automation clip channels' steps / notes ----
+    void automationNotes()
+    {
+        int written = 0;
+        for (int i = 0; i < (int) song.patterns.size() && i < (int) out.patterns.size(); ++i)
+        {
+            const auto& src = song.patterns[(std::size_t) i];
+            if (src.autoNotes.empty())
+                continue;
+            auto& p = out.patterns[(std::size_t) i];
+            for (const auto& n : src.autoNotes)
+            {
+                const auto it = automationChannel.find (n.channel);
+                if (it == automationChannel.end())
+                    continue;
+                flp::Note f;
+                f.position = ticks (n.start);
+                f.length = n.length > 0 ? std::max<std::uint32_t> (1, ticks (n.length)) : 0; // (0: FL's step)
+                f.channel = (std::uint16_t) it->second;
+                f.key = (std::uint16_t) std::clamp (n.key, 0, 131);
+                f.velocity = (std::uint8_t) std::clamp (iround (n.velocity * 128.0), 0, 128);
+                f.flags = 0x4000;
+                f.extra = (std::uint8_t) (n.muted ? 0x20 : 0);
+                p.notes.push_back (f);
+                ++written;
+            }
+            std::stable_sort (p.notes.begin(), p.notes.end(), [] (const flp::Note& a, const flp::Note& b) { return a.position < b.position; });
+        }
+        if (written > 0)
+            report.exact.push_back (std::to_string (written) + " steps / notes that start automation clips");
+    }
+
+    // ---- round 190ow (PAT-7): FL's channel order = the Channel rack's, the automation clip channels between the others
+    // where their rows are (core/RackAutomation.h). Until here the channels are numbered as LYNX's (automation clips after
+    // them); this renumbers every channel reference of the project. A song whose rows all sit after its channels keeps
+    // the numbers (the file as before).
+    void rackOrder()
+    {
+        const auto count = (int) out.channels.size();
+        std::vector<int> order; // new FL index → old
+        std::vector<char> placed ((std::size_t) count, 0);
+        const auto take = [&] (int old) {
+            if (old >= 0 && old < count && placed[(std::size_t) old] == 0)
+            {
+                placed[(std::size_t) old] = 1;
+                order.push_back (old);
+            }
+        };
+        for (const auto& e : rackauto::order (song))
+        {
+            if (! e.automation)
+                take (e.index);
+            else if (const auto it = automationChannel.find (e.index); it != automationChannel.end())
+                take (it->second);
+        }
+        for (int old = 0; old < count; ++old)
+            take (old);
+        std::vector<int> to ((std::size_t) count, 0); // old → new
+        bool same = true;
+        for (int i = 0; i < count; ++i)
+        {
+            to[(std::size_t) order[(std::size_t) i]] = i;
+            same = same && order[(std::size_t) i] == i;
+        }
+        if (same)
+            return;
+
+        const auto map = [&] (int old) { return old >= 0 && old < count ? to[(std::size_t) old] : old; };
+        const auto mapId = [&] (flp::ControlId& id) {
+            if (id.isChannel() && id.channel() < count)
+                id.raw = ((std::uint32_t) map (id.channel()) << 16) | (id.raw & 0xFFFFu);
+        };
+        for (auto& c : out.channels)
+        {
+            c.index = map (c.index);
+            for (auto& child : c.layerChildren)
+                child = map (child);
+        }
+        std::stable_sort (out.channels.begin(), out.channels.end(), [] (const flp::Channel& a, const flp::Channel& b) { return a.index < b.index; });
+        for (auto& p : out.patterns)
+        {
+            for (auto& n : p.notes)
+                n.channel = (std::uint16_t) map (n.channel);
+            for (auto& l : p.channelLoops)
+                l.first = map (l.first);
+            for (auto& e : p.controlEvents)
+                mapId (e.id);
+        }
+        for (auto& a : out.arrangements)
+        {
+            for (auto& item : a.items)
+                if (item.kind == flp::PlaylistItem::Kind::channelClip)
+                    item.index = map (item.index);
+            for (auto& t : a.tracks)
+                if (t.channel >= 0)
+                    t.channel = map (t.channel);
+        }
+        for (auto& v : out.controls)
+            mapId (v.id);
+        for (auto& v : out.initControls)
+            mapId (v.id);
+        for (auto& l : out.automationLinks)
+        {
+            l.channel = map (l.channel);
+            mapId (l.target);
+        }
+        for (auto& l : out.controllerLinks)
+        {
+            mapId (l.source);
+            mapId (l.target);
+        }
+        for (auto& [a, c] : automationChannel)
+            c = map (c);
     }
 
     // ---- the Playlist ----
@@ -1721,6 +1893,16 @@ struct Converter
                     slot.plugin = native->first;
                     slot.state = native->second;
                     what = native->first;
+                    ownState.insert ({ t, s });
+                }
+                else if (fx.kind == EffectKind::fruityLimiter && fx.goal == goals::duck && ! originMatches (fx))
+                {
+                    // the Simple layout's "Duck under..." (round 190ot): FL's Fruity Limiter with the slot's settings, its
+                    // side input the trigger's place in the insert's inputs (fixSideInputs)
+                    slot.plugin = "Fruity Limiter";
+                    slot.state = flstate::limiter (fx.params, fruityLimiterDefaultState());
+                    what = "Fruity Limiter (Duck, sidechain)";
+                    ownState.insert ({ t, s });
                 }
                 else if (originMatches (fx))
                 {
@@ -1819,10 +2001,11 @@ struct Converter
                 if (found == slotMap.end())
                     continue;
                 const auto& fx = effects[(std::size_t) s];
-                if (! originMatches (fx))
+                const auto own = ownState.count ({ t, s }) > 0;
+                if (! own && ! originMatches (fx))
                     continue;
                 auto slot = std::find_if (m.slots.begin(), m.slots.end(), [row = found->second] (const flp::MixerInsert::Slot& x) { return x.index == row; });
-                if (slot == m.slots.end() || slot->plugin != fx.flOrigin.plugin)
+                if (slot == m.slots.end() || (! own && slot->plugin != fx.flOrigin.plugin))
                     continue;
                 auto& d = slot->state;
                 if (slot->plugin == "Fruity Limiter" && rd (d, 0) >= 6)
@@ -1855,7 +2038,9 @@ struct Converter
         mixer();    // (before the automations: their effect targets need the slots)
         patterns();
         automations();
+        automationNotes();
         arrangements();
+        rackOrder();
         out.mixerTrackCount = 0;
         out.header.channelCount = (std::uint16_t) out.channels.size();
     }
@@ -1879,14 +2064,36 @@ flp::Project toProject (const Song& input, const Options& options, Report& repor
     // automation lanes (round 177b): FL has none; each becomes an automation clip on a free track
     if (const auto n = autolanes::lanesToClips (song); n > 0)
         report.notes.push_back ("Automation lanes: " + std::to_string (n) + " lane(s) written as automation clips (FL has no lanes)");
-    // modulators (round 177b): FL has none; the modulated controls keep their own values
-    for (const auto& m : song.modulators)
-        if (! m.routes.empty())
-            report.dropped.push_back ("Modulator '" + m.name + "' (" + std::to_string (m.routes.size())
-                                      + " target(s)): FL has no modulators; the targets keep their own values");
+    // modulators (round 177b): FL has none. Round 190ox: what follows the song position alone becomes automation clips
+    // (FL's clip LFO for an LFO, points for steps and random, a flat clip for a macro); the rest is listed
+    {
+        auto baked = modexport::bakeForFl (song);
+        if (baked.clips > 0)
+            report.notes.push_back ("Modulators: " + std::to_string (baked.clips) + " route(s) written as automation clips (FL has no modulators)");
+        for (auto& n : baked.notes)
+            report.notes.push_back (std::move (n));
+        for (auto& l : baked.lost)
+            report.dropped.push_back (std::move (l));
+    }
     // track clips (round 190ne, core/TrackClips.h): FL has no such flag, so each is an ordinary pattern on FL's
     // instrument track; identical ones are merged first (the owner's choice: silently), and more patterns than FL's
     // 999 are reported
+    // round 190op (P4, LYNX extras): FL can neither hide a Playlist track nor deactivate a channel or insert. Hidden tracks
+    // are written visible; deactivated units are written active, with the settings and plugin states the project holds
+    if (const auto n = trackstates::hiddenCount (song); n > 0)
+        report.notes.push_back ("Hidden tracks: " + std::to_string (n) + " track(s) written visible (FL cannot hide Playlist tracks)");
+    {
+        std::string units;
+        int count = 0;
+        for (std::size_t i = 0; i < song.channels.size(); ++i)
+            if (song.channels[i].deactivated)
+                units += (count++ > 0 ? ", " : "") + song.channels[i].name;
+        for (std::size_t t = 1; t < song.mixer.size(); ++t)
+            if (song.mixer[t].deactivated)
+                units += (count++ > 0 ? ", " : "") + (song.mixer[t].name.empty() ? "Insert " + std::to_string (t) : song.mixer[t].name);
+        if (count > 0)
+            report.notes.push_back ("Deactivated: " + units + " written active with their settings and plugin states (FL has no deactivated tracks)");
+    }
     trackclips::mergeIdentical (song);
     if ((int) song.patterns.size() > trackclips::flPatternLimit)
         report.notes.push_back ("Warning: " + std::to_string (song.patterns.size()) + " patterns are more than the "

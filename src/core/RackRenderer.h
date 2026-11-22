@@ -86,6 +86,23 @@ struct RackState
     // Indices into song.automations, or -1 = no automation.
     static constexpr int maxAutomations = 1024;
     std::vector<std::vector<int>> automationClips; // per automation: clips in the Playlist
+    // round 190ow (details DE-123): FL's triggered automation clips. Per automation, the clips its steps / notes on its
+    // Channel rack row start in Song mode (Pattern::autoNotes inside the Playlist's pattern clips), as clips of its own in
+    // song time: start = the note's song position, length = how long the note holds the clip, offset 0. Empty = none
+    // (every song without such steps: no work anywhere). `triggerSlot[a]` = the slot that carries automation a's value
+    // (its own, or the group's when it shares its target, issue #97); `patternTriggers` = some pattern has such steps
+    // (Pattern mode plays the current pattern's).
+    std::vector<std::vector<Clip>> triggerClips;
+    std::vector<int> triggerSlot;
+    std::vector<char> triggered; // per automation: steps / notes in some pattern (bound for Pattern mode too)
+    bool patternTriggers = false;
+    // the automation's value follows the song position: clips in the Playlist or triggered ones
+    bool positional (int a) const noexcept
+    {
+        return a >= 0 && (std::size_t) a < automationClips.size()
+               && (! automationClips[(std::size_t) a].empty() || ((std::size_t) a < triggerClips.size() && ! triggerClips[(std::size_t) a].empty()));
+    }
+    bool driven (int a) const noexcept { return positional (a) || (a >= 0 && (std::size_t) a < triggered.size() && triggered[(std::size_t) a] != 0); }
     std::vector<char> zoneAutomations;             // per automation: it has clips in the performance zone
     // round 177b: automation lanes (PlaylistTrack::lanes): the lane automations that play, and per lane the automations
     // of the same target that have clips (where one of their clips plays, it wins over the lane)
@@ -104,8 +121,18 @@ struct RackState
         float base = 0.5f;          // the target's own value
         int modulator = 0;
         float depth = 0.0f;
+        bool hosted = false;        // round 190ox: a hosted plugin's parameter (base = ModRoute::base)
     };
     std::vector<ModPlay> modRoutes;
+    // Round 190ox (modulators stage 2): per modulator, what feeds it — the follower's insert, the notes' channel (−1:
+    // none) — and the slot of an automation that drives a Macro's knob (−1: its own value). Empty without modulators.
+    struct ModFeed
+    {
+        int track = -1, channel = -1, macroSlot = -1;
+    };
+    std::vector<ModFeed> modFeeds;
+    std::vector<char> followedTracks; // per insert: a follower reads its level (empty: none)
+    bool modStateful = false;         // a follower, envelope, keytrack or velocity modulator routes somewhere
     // Several automations with clips on one target play as one (issue #97, FL's rule: docs/analise/REA_rodada177b.md):
     // the last of them holds the slot and lists them all here (ascending; empty = it plays alone); the others are
     // marked as followers: they bind nothing and compute nothing.
@@ -129,14 +156,29 @@ struct RackState
     struct EventLane
     {
         int pattern = 0, lane = 0, slot = 0;
+        int shared = -1; // round 190om: several patterns' lanes of one target — the slot bound to it (else −1)
     };
     std::vector<EventLane> eventLanes;
+    // round 190om: the lanes (indices into eventLanes) of each target that several patterns' lanes drive, the bound slot
+    // first; the pattern whose clip started last drives the target, as in FL (before, only the last lane did)
+    std::vector<std::vector<int>> sharedLanes;
     // round 190gw: automation clips with several target links (FL's "Target links", Automation::links): each link takes
     // a slot after the event lanes whose value is the clip's own through the link's mapping formula
+    // Round 190ov (FL's demos: clips linked to several controls): a link's target that other clips drive too plays them as
+    // one, as issue #97's groups do — the clip that plays (the last one started) or else the last one that ended decides,
+    // through its own link (`link` ≥ 0) or 1:1 (−1: an automation of that one target, which then binds nothing itself).
+    struct LinkMember
+    {
+        int automation = 0, link = -1;
+        linkformula::Formula formula;
+        std::vector<float> scale;
+    };
     struct LinkSlot
     {
         int automation = 0, slot = 0;
         linkformula::Formula formula;
+        std::vector<float> scale;          // round 190ov: Automation::Link::scale
+        std::vector<LinkMember> members;   // round 190ov: empty = this link alone, from its automation's value
     };
     std::vector<LinkSlot> linkSlots;
     std::vector<std::vector<int>> patternClips; // per pattern: its clips in the Playlist, by start
@@ -307,6 +349,7 @@ struct RackState
     void buildTaskGraph (const std::vector<int>& depth);
 
     void buildAutomationTables();
+    void buildTriggerClips (int count); // (round 190ow, DE-123)
     // The automation slots that drive `target` in a snapshot of `song` (its automations, then its pattern event
     // lanes, numbered as buildAutomationTables numbers them). REA round 146: a touched control overrides them.
     static void slotsOfTarget (const Song& song, const AutomationTarget& target, std::vector<int>& out);
@@ -1065,12 +1108,30 @@ private:
     void updateAutomation (const RackState& state, double startTick) noexcept;
     void updateModulators (const RackState& state, double tick, int numSamples) noexcept; // round 177b
     double modSeconds = 0.0; // the free-running modulators' clock
+    // Round 190ox: the stateful modulators' state (envelopes, followers, the last note; audio thread), the followed
+    // inserts' last peak, and per channel the notes struck so far with the last one's key and velocity
+    static constexpr int maxStatefulModulators = 256;
+    std::array<modenv::State, maxStatefulModulators> modStates {};
+    std::array<float, maxMixerTracks> followPeak {};        // [insert]
+    std::array<std::uint32_t, maxChannels> notesStruck {};
+    std::array<std::uint8_t, maxChannels> lastNoteKey {};
+    std::array<float, maxChannels> lastNoteVelocity {};
+    void noteStruck (int channel, int key, float velocity) noexcept
+    {
+        if (channel >= 0 && channel < maxChannels)
+        {
+            ++notesStruck[(std::size_t) channel];
+            lastNoteKey[(std::size_t) channel] = (std::uint8_t) std::clamp (key, 0, 127);
+            lastNoteVelocity[(std::size_t) channel] = velocity;
+        }
+    }
     // ticks from `tick` to the next pattern event (or pattern clip edge) that changes a lane's value; +inf if none
     static double ticksToNextEvent (const RackState& state, double tick) noexcept;
     // bindings from this automation slot on (andLive: and those of live controllers, the links)
     void applyPluginParams (const RackState& state, int firstSlot, bool andLive = false) noexcept;
     void applyPluginParam (const RackState& state, std::size_t index, int firstSlot, bool andLive) noexcept; // (one binding)
     void applyOrDeferParams (const RackState& state, int firstSlot, bool andLive) noexcept;               // (round 190kz)
+    bool updatePatternTriggers (const RackState& state, double startTick) noexcept; // (round 190ow, DE-123)
     // Round 190jg (sample-accurate automation): the automation's changes inside this chunk for hosted CLAP / VST3
     // plugins (Instrument / Effect::setParameterAt), after the chunk's values. Clip automation and lanes (not pattern
     // events: a chunk already ends at each of those). Checked every timedStep samples of the export grid (a ramp moves

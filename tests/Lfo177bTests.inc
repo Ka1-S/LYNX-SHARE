@@ -114,17 +114,25 @@ TEST (lfo177b_flp_round_trip_is_byte_exact)
 
 TEST (lfo177b_export_scales_the_level_by_a_partial_range)
 {
-    // FL scales the LFO by the clip's range (amt = level/128 * range); the export always writes the whole range, so
-    // the range moves into the level. The played amount stays the same, the header byte does not.
+    // FL scales the LFO by the clip's range (amt = level/128 * range). Round 190ow: the export writes the clip's own range
+    // (its MIN / MAX, the rack row's knobs) again, so the level stays as FL wrote it and the event comes back byte for
+    // byte (before, the whole range was written and the range moved into the level: 128 * 3600 / 12800 = 36). A clip
+    // made in LYNX (the whole range) is written as before.
     using namespace lynx;
     const auto file = flp::writeProject (lfo177b::projectWith (lfo177b::lifeLfo(), 6400, 10000));
+    const auto event = lfo177b::automationEvent (file);
     const auto song = importFlp (flp::parseProject (file), fx171e::importOptions());
     CHECK (song.automations.size() == 1);
     CHECK (std::abs (song.automations[0].lfo.range - 0.28125f) < 1e-6f);
+    CHECK (song.automations[0].rangeMin == 0.5f && song.automations[0].rangeMax == 0.78125f && ! song.automations[0].reranged());
     flpexport::Options options;
     flpexport::Report report;
-    const auto again = lfo177b::automationEvent (flpexport::exportFlp (song, options, report));
-    CHECK (again.size() > 8 && again[4] == 36 && again[8] == 1); // 128 * 3600 / 12800, still "add"
+    const auto out = flpexport::exportFlp (song, options, report);
+    const auto again = lfo177b::automationEvent (out);
+    CHECK (again.size() > 8 && again[4] == event[4] && again[8] == 1); // (the level as read, still "add")
+    for (const auto& c : flp::parseProject (out).channels)
+        if (c.type == flp::ChannelType::automationClip)
+            CHECK (c.pan == 6400 && c.volume == 10000);
 }
 
 TEST (lfo177b_rate_and_shape_match_fl)

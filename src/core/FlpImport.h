@@ -79,6 +79,11 @@ struct FlpImportOptions
 // by name. Patterns are rescaled to our PPQ. Plugins not yet.
 Song importFlp (const flp::Project& project, const FlpImportOptions& options = {});
 
+// Round 190ov: the scale of an imported target link (Automation::Link::scale) for FL's value -> LYNX's `map` (the
+// control's own scale), sampled evenly over 0..1: empty when the map leaves every value alone, else the fewest points
+// (2, 3, 5 ... 1025) whose straight lines give the map within 1e-6 at 1025 sample points.
+std::vector<float> flLinkScale (const std::function<float (float)>& map);
+
 // An FL mixer track preset (.fst, flp::parseMixerPreset) as a LYNX mixer track: its effects (converted as an .flp
 // import does), level, pan, stereo separation, EQ, phase/swap, name ("" = the preset has none) and colour (0 = none).
 // nullopt if the bytes are not a mixer preset.

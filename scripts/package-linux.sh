@@ -3,7 +3,8 @@
 # (folder with install.sh for a per-user install). Both carry the .desktop entry, the icon and the .lynx file type.
 #
 # usage: scripts/package-linux.sh <LYNX binary> <label> <output folder> [Demo.lynx]
-# Variables: APPIMAGETOOL (path to appimagetool; downloaded into ~/opt when missing), ARCH (default x86_64)
+# Variables: APPIMAGETOOL (path to appimagetool; downloaded into ~/opt when missing), ARCH (default x86_64; aarch64 for
+# the Linux arm64 build, made on an arm64 machine: appimagetool runs on the machine that packages)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -22,7 +23,11 @@ PKG="$WORK/$NAME"
 mkdir -p "$PKG"
 install -m 755 "$BIN" "$PKG/LYNX"
 strip --strip-unneeded "$PKG/LYNX" 2> /dev/null || true
-./scripts/fetch-onnxruntime.sh linux "$PKG"
+case "$ARCH" in
+    x86_64) ./scripts/fetch-onnxruntime.sh linux "$PKG" ;;
+    aarch64) ./scripts/fetch-onnxruntime.sh linux-aarch64 "$PKG" ;;
+    *) echo "package-linux: unknown ARCH '$ARCH' (x86_64 or aarch64)" >&2; exit 1 ;;
+esac
 install -m 644 resources/linux/lynx.desktop resources/linux/lynx-mime.xml LICENSE THIRD_PARTY.md PRIVACY.md "$PKG/"
 ./scripts/collect-licenses.sh "$PKG/licenses"   # third-party licence texts (round 190nk)
 install -m 644 resources/lynx_icon_256.png "$PKG/lynx.png"
@@ -54,10 +59,11 @@ exec "$here/usr/bin/LYNX" "$@"
 EOF
 chmod 755 "$APPDIR/AppRun"
 
-TOOL="${APPIMAGETOOL:-$HOME/opt/appimagetool-$APPIMAGETOOL_VERSION-x86_64.AppImage}"
+HOST_ARCH="$(uname -m)"
+TOOL="${APPIMAGETOOL:-$HOME/opt/appimagetool-$APPIMAGETOOL_VERSION-$HOST_ARCH.AppImage}"
 if [[ ! -x "$TOOL" ]]; then
     mkdir -p "$(dirname "$TOOL")"
-    curl -fsSL -o "$TOOL" "https://github.com/AppImage/appimagetool/releases/download/$APPIMAGETOOL_VERSION/appimagetool-x86_64.AppImage"
+    curl -fsSL -o "$TOOL" "https://github.com/AppImage/appimagetool/releases/download/$APPIMAGETOOL_VERSION/appimagetool-$HOST_ARCH.AppImage"
     chmod +x "$TOOL"
 fi
 # no FUSE needed to run the tool itself (containers, CI)

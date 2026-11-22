@@ -29,6 +29,7 @@
 #if defined(__SSE__) || defined(_M_X64) || defined(__x86_64__) || defined(__aarch64__) || defined(_M_ARM64) // x86 SSE, or ARM64 through core/Simd.h (sse2neon)
 #include "core/FlControlMenus.h"
 #include "core/LinkFormula.h"
+#include "core/ModulatorExport.h"
 #include "core/Multilink.h"
 #include "core/Simd.h"
 #endif
@@ -14993,6 +14994,7 @@ TEST (simsynth_engine)
     lynx::ChannelDef c;
     c.instrument = lynx::InstrumentKind::simsynth;
     c.pluginState = blobA;
+    c.engineRev = 1; // (round 190om: the revision before the velocity law, every note at Final.Vol 1)
     auto inst = lynx::makeInstrument (lynx::InstrumentKind::simsynth);
     inst->prepare (44100.0);
     inst->configure (c, 120.0);
@@ -17735,6 +17737,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Lfo177bTests.inc"
 #include "Curves190bwTests.inc"
 #include "Mod177bTests.inc"
+#include "Mod190oxTests.inc" // round 190ox: modulators stage 2
 #include "UiFont179aTests.inc"
 #include "Multilink177bTests.inc"
 #include "Issue97Tests.inc"
@@ -18067,6 +18070,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Tracker190nwTests.inc" // round 190nw (0.1.31): the built-in tracker, stage 1 (core/TrackerGrid.h, core/ModuleImport.h)
 #include "CrossPaste190nzTests.inc" // round 190nz: issue #232 stage 2 (copy and paste between windows)
 #include "Issues190odTests.inc" // round 190od: issues #236, #238, #239, #240
+#include "Issues190oqTests.inc" // round 190oq: issues #243 (ARA insert, tempo map), #252 (start page)
 #include "Perf190ofTests.inc" // round 190of: the monitor's Longest / Spikes, the split CPU meter (P24), latency check
 #include "Tracker190obTests.inc" // round 190ob (0.1.31): tracker follow-ups (module volume automation, the default key)
 #include "Gap190ogTests.inc" // round gap190og (0.1.31): Live Duplicate Loop, Crop Clip, velocity Randomize, mappable transport, Edit menu on devices
@@ -18080,6 +18084,15 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Pat6_190ooTests.inc" // round 190oo (design review 2): PAT-6, the Playlist row from FL's vertical zoom (event 0xF2)
 #include "DialogRules190ooTests.inc" // round 190oo: the one dialog system's button order and pixel bands (core/DialogRules.h)
 #include "RackAutomation190ooTests.inc" // round 190oo (design review 2, PAT-7): FL's automation clip channels in the Channel rack
+#include "RackAutomation190owTests.inc" // round 190ow (PAT-7 rest, DE-123): triggered automation clips, MIN / MAX, mute, rack order export
 #include "TextFit190ooTests.inc" // round 190oo (design review 2, fit): translated menu titles give up width before toolbar panels drop, knob captions
 #include "OldSteps190ozTests.inc" // round 190oz: FL <= 11 step grids (0x41 + 0x5B / 0x48 ... in a channel) become step notes
 #include "HeldSteps190ozTests.inc" // round 190oz: FL step notes on generators are held (no note-off)
+#include "Perf190osTests.inc" // round 190os: the safe-overload guard lets go at the stop and within 1 s of the overload's end
+#include "Tracker190omTests.inc" // round 190om (0.1.31): tracker stage 2 (pattern events, pitch curves, Bxx / Vxx), SimSynth velocity
+#include "Rollup031s6Tests.inc" // rollup 0.1.31 step 6: gold sweep for 190om decisions 4-5 (LYNX_SWEEP_DIR)
+#include "TrackStates190opTests.inc" // round 190op (0.1.31): Hide / Deactivate tracks (P4), Capture automation (P7)
+#include "SimpleDuck190otTests.inc" // round 190ot (0.1.31): Simple "Duck under..." (sidechain in one pick) and the shared Echo send (P5)
+#include "HWheel254Tests.inc" // round 190ou: issue #254, the horizontal wheel
+#include "AutoLinks190ovTests.inc" // round 190ov (0.1.31): FL automation clips linked to several controls
+#include "PluginPack190ovTests.inc" // round 190ov (0.1.31): the later LYNX-own engines in the plugin pack

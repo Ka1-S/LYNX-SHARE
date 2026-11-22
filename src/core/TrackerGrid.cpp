@@ -7,6 +7,7 @@
 #include <set>
 #include <sstream>
 
+#include "core/NoteCurves.h"
 #include "core/NoteNames.h"
 
 #ifndef TR_NOOP
@@ -87,7 +88,7 @@ std::int64_t nextStartInColumn (const Layout& layout, const Pattern& pattern, in
 // ------------------------------------------------------------------------------------------------------------- fx
 char fxLetter (Fx fx) noexcept
 {
-    static const char letters[fxKinds] = { 'G', 'P', 'Y', 'R', 'T', 'M', 'C' };
+    static const char letters[fxKinds] = { 'G', 'P', 'Y', 'R', 'T', 'M', 'C', 'B', 'V' };
     return letters[(int) fx];
 }
 
@@ -111,6 +112,8 @@ const char* fxDescription (Fx fx) noexcept
         case Fx::finePitch: return TR_NOOP ("Txx fine pitch, 80 = none, each step one cent");
         case Fx::mute: return TR_NOOP ("Mxx mute the note; 01 muted");
         case Fx::cut: return TR_NOOP ("Cxx the note ends inside its row, after xx ticks");
+        case Fx::bend: return TR_NOOP ("Bxx pitch curve: its end in semitones, 80 = the key");
+        case Fx::volume: return TR_NOOP ("Vxx channel volume from this row, 80 = 100 %");
     }
     return "";
 }
@@ -126,6 +129,8 @@ bool fxActive (const Note& n, Fx fx) noexcept
         case Fx::finePitch: return n.finePitch != 0.0f;
         case Fx::mute: return n.muted;
         case Fx::cut: return false; // (a layout fact: Placed::shortNote)
+        case Fx::bend: return n.curves.has() && ! n.curves->lane (NoteCurveLane::pitch).empty();
+        case Fx::volume: return false; // (the channel's pattern events: Track::volumeSlot)
     }
     return false;
 }
@@ -141,8 +146,33 @@ int fxValueOf (const Note& n, Fx fx, std::int64_t length)
         case Fx::finePitch: return std::clamp ((int) std::lround (n.finePitch) + 0x80, 0x08, 0xF8);
         case Fx::mute: return n.muted ? 1 : 0;
         case Fx::cut: return (int) std::max<std::int64_t> (1, length);
+        case Fx::bend:
+        {
+            const auto& lane = n.curves->lane (NoteCurveLane::pitch);
+            return lane.empty() ? 0x80 : std::clamp ((int) std::lround (lane.back().value / 100.0f) + 0x80, 0x50, 0xB0);
+        }
+        case Fx::volume: return 0;
     }
     return 0;
+}
+
+const PatternEvents* volumeLane (const Pattern& pattern, int channel) noexcept
+{
+    for (const auto& lane : pattern.events)
+        if (lane.target.kind == AutomationTargetKind::channelAdjust && lane.target.param == leveladjust::volume && lane.target.index == channel
+            && ! lane.events.empty())
+            return &lane;
+    return nullptr;
+}
+int volumeValueOf (float eventValue) noexcept { return std::clamp ((int) std::lround (eventValue * 256.0f), 0, 255); }
+float volumeEventValue (int shown) noexcept { return (float) std::clamp (shown, 0, 255) / 256.0f; }
+
+bool isVolumeSlot (const Layout& layout, const Cursor& at) noexcept
+{
+    if (at.track < 0 || at.track >= (int) layout.tracks.size() || at.column != 0 || (at.field != Field::fxLetter && at.field != Field::fxValue))
+        return false;
+    const auto slot = layout.tracks[(std::size_t) at.track].volumeSlot;
+    return slot >= 0 && at.fxSlot == slot;
 }
 
 namespace
@@ -163,6 +193,16 @@ void setFxValue (Note& n, Fx fx, int v, std::int64_t rowTicks)
             n.length = std::clamp<std::int64_t> (v, 1, std::max<std::int64_t> (1, room - 1));
             break;
         }
+        case Fx::bend:
+        {
+            // a typed value: a glide from the key to xx − 80 semitones over the note's first row, then held (an imported
+            // curve shows the pitch it ends at; typing replaces it)
+            auto& lane = n.curves.edit().lane (NoteCurveLane::pitch);
+            lane = { { 0.0f, 0.0f }, { (float) rowTicks, (float) ((std::clamp (v, 0x50, 0xB0) - 0x80) * 100) } };
+            n.curves.tidy();
+            break;
+        }
+        case Fx::volume: break;
     }
 }
 
@@ -184,6 +224,14 @@ void resetFx (Note& n, Fx fx, std::int64_t rowTicks)
             n.length = rowTicks - inRow;
             break;
         }
+        case Fx::bend:
+            if (n.curves.has())
+            {
+                n.curves.edit().lane (NoteCurveLane::pitch).clear();
+                n.curves.tidy();
+            }
+            break;
+        case Fx::volume: break;
     }
 }
 
@@ -198,8 +246,43 @@ int defaultOnValue (Fx fx, std::int64_t rowTicks)
         case Fx::release: return 0x7F;
         case Fx::finePitch: return 0x81;
         case Fx::cut: return (int) std::max<std::int64_t> (1, rowTicks / 2);
+        case Fx::bend: return 0x81;
+        case Fx::volume: return 0x80;
     }
     return 1;
+}
+
+// round 190om: the volume events in row `row` (ticks [from, from + rowTicks)) of the track's channel go; `value` ≥ 0: one
+// event at the row's start takes their place
+bool setVolumeRow (Pattern& pattern, const Layout& layout, int track, std::int64_t row, int value)
+{
+    if (track < 0 || track >= (int) layout.tracks.size() || layout.tracks[(std::size_t) track].group || layout.tracks[(std::size_t) track].channels.empty())
+        return false;
+    const auto channel = layout.tracks[(std::size_t) track].channels.front();
+    PatternEvents* lane = nullptr;
+    for (auto& l : pattern.events)
+        if (l.target.kind == AutomationTargetKind::channelAdjust && l.target.param == leveladjust::volume && l.target.index == channel)
+            lane = &l;
+    if (lane == nullptr)
+    {
+        if (value < 0)
+            return false;
+        pattern.events.push_back ({ { AutomationTargetKind::channelAdjust, channel, 0, leveladjust::volume }, {} });
+        lane = &pattern.events.back();
+    }
+    const auto from = layout.rowStart (row), to = from + layout.rowTicks;
+    const auto before = lane->events;
+    lane->events.erase (std::remove_if (lane->events.begin(), lane->events.end(), [&] (const PatternEvent& e) { return e.tick >= from && e.tick < to; }),
+                        lane->events.end());
+    if (value >= 0)
+    {
+        const auto at = std::lower_bound (lane->events.begin(), lane->events.end(), from, [] (const PatternEvent& e, std::int64_t t) { return e.tick < t; });
+        lane->events.insert (at, { from, volumeEventValue (value) });
+    }
+    const auto changed = lane->events != before;
+    if (lane->events.empty())
+        pattern.events.erase (pattern.events.begin() + (lane - pattern.events.data()));
+    return changed;
 }
 } // namespace
 
@@ -441,12 +524,40 @@ Layout build (const Song& song, int patternIndex, const BuildOptions& options)
         cols.resize ((std::size_t) track.noteColumns);
     }
     // fx columns: as many as a note of the track shows
+    std::vector<int> noteFx (layout.tracks.size(), 0);
     for (const auto& p : layout.placed)
     {
         const auto& n = pattern.notes[(std::size_t) p.note];
         auto count = (int) shownFx (layout, p, n).size();
         auto& t = layout.tracks[(std::size_t) p.track];
         t.fxColumns = std::max (t.fxColumns, count);
+        noteFx[(std::size_t) p.track] = std::max (noteFx[(std::size_t) p.track], count);
+    }
+    // round 190om: a one-channel track whose channel has volume multiplier events in the pattern gets one more fx slot,
+    // the Vxx of each row with an event (the last one in the row: where a slide gets to)
+    for (std::size_t ti = 0; ti < layout.tracks.size(); ++ti)
+    {
+        auto& t = layout.tracks[ti];
+        if (t.group || t.channels.size() != 1)
+            continue;
+        const auto* lane = volumeLane (pattern, t.channels.front());
+        if (lane == nullptr)
+            continue;
+        t.volumeRows.assign ((std::size_t) std::max<std::int64_t> (0, layout.rows), -1);
+        bool any = false;
+        for (const auto& e : lane->events)
+            if (const auto r = layout.rowOf (e.tick); r >= 0 && r < layout.rows)
+            {
+                t.volumeRows[(std::size_t) r] = volumeValueOf (e.value);
+                any = true;
+            }
+        if (! any)
+        {
+            t.volumeRows.clear();
+            continue;
+        }
+        t.volumeSlot = noteFx[ti]; // (after the slots the notes' own fx take)
+        t.fxColumns = std::max (t.fxColumns, t.volumeSlot + 1);
     }
     return layout;
 }
@@ -627,7 +738,7 @@ int maxValue (const Layout& layout, Field field, std::optional<Fx> fx)
         case Field::fxValue:
             if (fx == Fx::cut)
                 return (int) layout.rowTicks - 1;
-            if (fx == Fx::chance || fx == Fx::finePitch)
+            if (fx == Fx::chance || fx == Fx::finePitch || fx == Fx::bend || fx == Fx::volume)
                 return 255;
             if (fx == Fx::release)
                 return 127;
@@ -697,6 +808,8 @@ bool typeOff (Pattern& pattern, const Layout& layout, const Cursor& at)
 
 bool clearCell (Pattern& pattern, const Layout& layout, const Cursor& at)
 {
+    if (isVolumeSlot (layout, at)) // (round 190om: the row's Vxx, whatever the cell holds)
+        return setVolumeRow (pattern, layout, at.track, at.row, -1);
     const auto cell = cellAt (layout, at.track, at.column, at.row);
     if (cell.placed == nullptr || ! validNote (pattern, cell.placed->note))
         return false;
@@ -765,6 +878,8 @@ bool clearCell (Pattern& pattern, const Layout& layout, const Cursor& at)
 
 bool setField (Pattern& pattern, const Layout& layout, const Cursor& at, int value, int channelCount)
 {
+    if (isVolumeSlot (layout, at)) // (round 190om: a Vxx on any row)
+        return at.field == Field::fxValue && setVolumeRow (pattern, layout, at.track, at.row, std::clamp (value, 0, 255));
     const auto cell = cellAt (layout, at.track, at.column, at.row);
     if (cell.placed == nullptr || ! validNote (pattern, cell.placed->note))
         return false;
@@ -819,6 +934,14 @@ bool setField (Pattern& pattern, const Layout& layout, const Cursor& at, int val
 
 bool setFxLetter (Pattern& pattern, const Layout& layout, const Cursor& at, Fx fx)
 {
+    // round 190om: V typed in the track's volume slot sets 100 % on a row without an event; V is not a note's fx
+    if (fx == Fx::volume || isVolumeSlot (layout, at))
+    {
+        const auto& t = layout.tracks[(std::size_t) std::clamp (at.track, 0, std::max (0, (int) layout.tracks.size() - 1))];
+        if (fx != Fx::volume || ! isVolumeSlot (layout, at) || at.row < 0 || at.row >= (std::int64_t) t.volumeRows.size() || t.volumeRows[(std::size_t) at.row] >= 0)
+            return false;
+        return setVolumeRow (pattern, layout, at.track, at.row, defaultOnValue (Fx::volume, layout.rowTicks));
+    }
     const auto* p = layout.placedAt (at.track, at.column, at.row);
     if (p == nullptr || ! validNote (pattern, p->note))
         return false;
@@ -843,6 +966,60 @@ bool inTrack (const Layout& layout, int track, int channel)
 }
 } // namespace
 
+namespace
+{
+// round 190om: a note's curve points from `from` ticks into it on move by `by` (a row inserted, or removed: the points
+// inside the removed span go, the value there is kept by the point at its start)
+void shiftCurves (Note& n, double from, double by)
+{
+    if (! n.curves.has())
+        return;
+    auto& c = n.curves.edit();
+    for (auto& lane : c.lanes)
+    {
+        if (lane.empty())
+            continue;
+        std::vector<NoteCurvePoint> kept;
+        for (const auto& q : lane)
+            if ((double) q.tick < from)
+                kept.push_back (q);
+            else if (by < 0.0 && (double) q.tick < from - by)
+                continue;
+            else
+                kept.push_back ({ (float) ((double) q.tick + by), q.value });
+        lane = std::move (kept);
+    }
+    n.curves.tidy();
+}
+
+// the volume events of the track's channel from `from` on move by `by`; `dropFrom` ≥ 0: those in [dropFrom, from) go
+bool shiftVolumeEvents (Pattern& pattern, const Layout& layout, int track, std::int64_t from, std::int64_t dropFrom, std::int64_t by)
+{
+    if (track < 0 || track >= (int) layout.tracks.size() || layout.tracks[(std::size_t) track].group)
+        return false;
+    bool changed = false;
+    for (auto& lane : pattern.events)
+    {
+        if (lane.target.kind != AutomationTargetKind::channelAdjust || lane.target.param != leveladjust::volume
+            || ! inTrack (layout, track, lane.target.index))
+            continue;
+        const auto before = lane.events.size();
+        if (dropFrom >= 0)
+            lane.events.erase (std::remove_if (lane.events.begin(), lane.events.end(), [&] (const PatternEvent& e) { return e.tick >= dropFrom && e.tick < from; }),
+                               lane.events.end());
+        changed = changed || lane.events.size() != before;
+        for (auto& e : lane.events)
+            if (e.tick >= from)
+            {
+                e.tick += by;
+                changed = true;
+            }
+    }
+    pattern.events.erase (std::remove_if (pattern.events.begin(), pattern.events.end(), [] (const PatternEvents& l) { return l.events.empty(); }), pattern.events.end());
+    return changed;
+}
+} // namespace
+
 bool insertRow (Pattern& pattern, const Layout& layout, int track, std::int64_t row)
 {
     const auto at = layout.rowStart (row), rt = layout.rowTicks;
@@ -859,9 +1036,11 @@ bool insertRow (Pattern& pattern, const Layout& layout, int track, std::int64_t 
         else if (endOf (n) > at)
         {
             n.length += rt;
+            shiftCurves (n, (double) (at - n.start), (double) rt); // (round 190om: its Bxx moves with its rows)
             changed = true;
         }
     }
+    changed = shiftVolumeEvents (pattern, layout, track, at, -1, rt) || changed;
     if (changed)
         pattern.sortNotes();
     return changed;
@@ -888,9 +1067,11 @@ bool deleteRow (Pattern& pattern, const Layout& layout, int track, std::int64_t 
         {
             const auto cut = std::min (endOf (n), to) - from;
             n.length = std::max<std::int64_t> (1, n.length - cut);
+            shiftCurves (n, (double) (from - n.start), -(double) cut);
             changed = true;
         }
     }
+    changed = shiftVolumeEvents (pattern, layout, track, to, from, -rt) || changed;
     changed = changed || ! erase.empty();
     eraseIndices (pattern.notes, erase);
     if (changed)

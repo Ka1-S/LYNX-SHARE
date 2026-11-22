@@ -14,6 +14,9 @@
 #                       AppImage and .tar.gz (scripts/package-linux.sh), offline start check of the AppImage
 #   macos    (macos)    CMake universal (arm64 + x86_64) build, self-test, ad-hoc signature (no Apple Developer ID,
 #                       not notarized), .dmg (scripts/package-macos.sh)
+#   linux-arm64         linux-arm64.yml on GitHub's arm64 runner: the Linux job's steps for aarch64 (round 190oy),
+#                       LYNX-<label>-aarch64.AppImage and LYNX-<label>-linux-aarch64.tar.gz. publish waits for it and
+#                       takes its files when it passed; a failure there does not hold back the other platforms
 #   publish  (ubuntu)   SHA256SUMS.txt over every file; on a tag push attaches everything to the (draft) GitHub release
 #   plugins             the optional plugin download (plugins.yml: LYNX's effects as CLAP + a short VST3 list for Windows,
 #                       Linux and macOS, each checked with plugexporttest, pluginval and clap-validator); never in the
@@ -111,8 +114,10 @@ jobs:
         env:
           LYNX_WIN_OPT: -O2 -Xclang -O3
           LYNX_WIN_LTO: thin
+        # JOBS=2 (queue 0.1.31 item 46, as plugins.yml and round-build.yml): the hosted runner is memory-bound (round 190ov
+        # measured 11.2 / 16 GB + 2.5 / 3 GB swap at two compiles); one per core ran it out of memory ("lost communication")
         run: |
-          ZIG="$HOME/opt/zig-x86_64-linux-$ZIG_VERSION/zig" JUCE_DIR="$HOME/opt/juce-$JUCE_VERSION" OUT=build-win \
+          ZIG="$HOME/opt/zig-x86_64-linux-$ZIG_VERSION/zig" JUCE_DIR="$HOME/opt/juce-$JUCE_VERSION" OUT=build-win JOBS=2 \
             ./scripts/build-windows-zig.sh 2>&1 | grep -v '^1 warning generated\.$'
           sha256sum build-win/LYNX.exe
           ./scripts/fetch-onnxruntime.sh windows build-win
@@ -468,9 +473,16 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
+  linux-arm64:
+    name: Linux arm64
+    needs: version
+    uses: ./.github/workflows/linux-arm64.yml
+    with:
+      label: ${{ needs.version.outputs.label }}
+
   publish:
     name: Checksums and release
-    needs: [version, package, linux, macos]
+    needs: [version, package, linux, macos, linux-arm64]
     if: ${{ !cancelled() && needs.package.result == 'success' && needs.linux.result == 'success' && needs.macos.result == 'success' }}
     runs-on: ubuntu-24.04
     permissions:
@@ -495,6 +507,7 @@ jobs:
       # The in-app updater (src/core/UpdateCheck.cpp, round 166b) picks the release files by these names: keep them stable.
       # LYNX-<label>-setup-x64.exe, LYNX-<label>-windows-x64.zip, LYNX-<label>-macos-universal.dmg (any *.dmg),
       # LYNX-<label>-x86_64.AppImage (+ .zsync; versions up to 0.1.24 find it by this name, later ones through scripts/publish-appimage-update.sh), LYNX-<label>-linux-x86_64.tar.gz,
+      # LYNX-<label>-aarch64.AppImage (+ .zsync) and LYNX-<label>-linux-aarch64.tar.gz (Linux arm64, from 0.1.31),
       # and SHA256SUMS.txt, which every download is checked against (no SHA256SUMS.txt line = no update from that file).
       - name: SHA256SUMS
         run: |

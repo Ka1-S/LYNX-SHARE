@@ -58,11 +58,9 @@ Song makeSong (const Entry& entry)
     song.playlist.clear();
     if (entry.instrument)
     {
-        if (auto channel = banks::defaultChannel (entry.synth, entry.name))
-        {
-            channel->mixerTrack = 0;
-            song.channels.push_back (std::move (*channel));
-        }
+        auto channel = plugexport::instrumentChannel (entry); // (Tetra and Braid: the engine's defaults, no bank)
+        channel.mixerTrack = 0;
+        song.channels.push_back (std::move (channel));
     }
     else
     {

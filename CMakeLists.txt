@@ -14,6 +14,12 @@ if(NOT MSVC)
     add_compile_options(-ffp-contract=off)
 endif()
 
+# Linux on ARM makes a plain `char` unsigned (x86 and Apple arm64: signed). The readers of FL's, Live's and the other
+# formats were written and tested with a signed char: Linux arm64 builds keep it (round 190oy)
+if(NOT MSVC AND NOT APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+    add_compile_options(-fsigned-char)
+endif()
+
 # FL Slayer's exact engine (x87 arithmetic under its own control word): with GCC 15 at -O1 and above, inlining in this
 # file breaks it (some presets silent or NaN against the DLL goldens; Clang and GCC -O0 / -fno-inline are exact; root
 # cause not isolated, REA round 117). Linux GCC builds compile it without inlining (Slayer about 1.7x slower there).
@@ -360,6 +366,7 @@ target_sources(lynx_core PRIVATE
     src/core/PluginMonitor.cpp
     src/core/ProjectContents.cpp
     src/core/PlaylistOps.cpp
+    src/core/ModulatorExport.cpp
     src/core/QuickRender.cpp
     src/core/TempoDetect.cpp
     src/core/AutoWarp.cpp
@@ -566,7 +573,9 @@ if(LYNX_BUILD_APP)
         src/engine/SandboxWorker.cpp
         src/engine/Bridge32Test.cpp
         src/engine/ClapTeardownTest.cpp
+        src/engine/RenderAgainTest.cpp
         src/engine/HostingTests.cpp
+        src/engine/Modulators190oxTest.cpp
         src/engine/Exporter.cpp
         # M4A export through the system's AAC encoder (owner decision D5): each file compiles on its own platform only
         # (Windows: Media Foundation, linked below; macOS: AudioToolbox; elsewhere: not available)
@@ -621,6 +630,7 @@ if(LYNX_BUILD_APP)
         src/ui/OtherAppsExport.cpp
         src/ui/AutoSamplerDialog.cpp
         src/ui/AutomationUi.cpp
+        src/ui/ModRing.cpp
         src/ui/RemoteControl.cpp
         src/ui/ControllerEditors.cpp
         src/ui/MidiOutEditor.cpp
@@ -702,6 +712,8 @@ if(LYNX_BUILD_APP)
         src/ui/ArticulatorTools.cpp
         src/ui/SampleProperties.cpp
         src/ui/ToolWindow.cpp
+        src/ui/DeleteFade.cpp
+        src/ui/StartPage.cpp
         src/ui/SpeechDialog.cpp
         src/ui/TempoTapper.cpp
         src/ui/TempoDetectionDialog.cpp

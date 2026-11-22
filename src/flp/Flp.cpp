@@ -1,6 +1,7 @@
 #include "flp/Flp.h"
 
 #include <algorithm>
+#include <cctype>
 #include <limits>
 #include <cmath>
 #include <cstring>
@@ -91,6 +92,7 @@ enum : std::uint32_t
     evPatternEvents = 0xDF,     // same records: the current pattern's events (event editor)
     evControlValues = 0xE1,     // 12 B records {u32 ?, u32 controlID, i32 value}
     evAutomationLink = 0xE3,    // 20 B records {u32 channel<<16, u32 0, u32 controlID, u32 flags, u32 ?}
+    evLinkFormula = 0xE6,       // round 190ov: the mapping formula of the link record just before it (text; none = "Input")
     evAutomationPoints = 0xEA,  // header 21 B + 24 B per point + 112 B
     evMixerRoutes = 0xEB,       // one byte per destination track
     evChannelLevels = 0xDB,
@@ -596,9 +598,14 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
     // round 190nu: a marker's own events follow its 0x94 (0x21 0x22 0x2E 0x2D 0xA8 0x65 0xCD in FL 2026's files); the key
     // fields are read only there
     bool inMarkerTail = false;
+    // round 190ov (rea/FL-FACTS-autolinks.md): FL writes a link's mapping formula as an 0xE6 right after its 0xE3 record
+    // (FUN_00f40840 / FUN_00f46490); -1 = the last event was no automation clip link
+    int formulaLink = -1;
 
     while (reader.next (e))
     {
+        const auto linkBefore = formulaLink;
+        formulaLink = -1;
         if (inMarkerTail && e.id != evTimeMarkerNumerator && e.id != evTimeMarkerDenominator && e.id != evTimeMarkerName && e.id != 0x2E
             && e.id != 0x2D && e.id != 0xA8 && e.id != 0x65)
             inMarkerTail = false;
@@ -1519,10 +1526,30 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
                         const auto target = normalizeControlId (readLE<std::uint32_t> (e.data, o + 8));
 
                         if ((source & 0xFFFFu) >= 0x8000u) // output of a controller, not a clip
+                        {
                             project.controllerLinks.push_back ({ normalizeControlId (source), target });
+                            formulaLink = -1;
+                        }
                         else
+                        {
                             project.automationLinks.push_back ({ (int) (source >> 16), target });
+                            formulaLink = (int) project.automationLinks.size() - 1;
+                        }
                     }
+                break;
+
+            case evLinkFormula: // round 190ov
+                if (linkBefore >= 0 && linkBefore < (int) project.automationLinks.size())
+                {
+                    auto formula = text (e);
+                    while (! formula.empty() && formula.back() == '\0')
+                        formula.pop_back();
+                    std::string upper;
+                    for (const auto ch : formula)
+                        if (ch != ' ')
+                            upper += (char) std::toupper ((unsigned char) ch);
+                    project.automationLinks[(std::size_t) linkBefore].formula = upper == "INPUT" ? std::string() : formula;
+                }
                 break;
 
             case evAutomationPoints:

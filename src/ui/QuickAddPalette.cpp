@@ -113,7 +113,7 @@ public:
         search.setTextToShowWhenEmpty (tr ("Type to filter (e.g. reverb, synth OR bass, -delay)"), theme::colour::textDisabled);
         search.addListener (this);
         search.addKeyListener (this);
-        search.setWantsKeyboardFocus (true);
+        focusOnOpen (search); // (issue #244: "Find an effect" and the Quick-add palette open with the caret in the search)
         // "Esc closes" (the hint below): the search box used to swallow Esc, so the window stayed open (round 165q)
         search.onEscapeKey = [this] { closeToolWindowOf (*this); };
         addAndMakeVisible (search);

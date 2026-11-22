@@ -70,6 +70,7 @@ TEST (perf190ok_overload_guard_engages_only_when_audio_and_ui_both_starve)
         // the probe ends an overload that only the yield kept going: callbacks that miss their deadline only while
         // yielding (a stopped project's tails, slowed down in audio time) pass the probe, and the guard lets go
         OverloadGuard g;
+        g.configure ("probeevery=2000"); // (off by default since round 190os)
         double now = 1000.0;
         g.uiPulse (now);
         run (g, now, 0.6, 2.0 * budget, false);
@@ -100,7 +101,9 @@ TEST (perf190ok_overload_guard_engages_only_when_audio_and_ui_both_starve)
         OverloadGuard g;
         g.configure ("share=1,max=8,bogus,window=100,late=50");
         CHECK (g.params().yieldShare == 1.0 && g.params().maxYieldMs == 8.0 && g.params().windowMs == 100.0 && g.params().uiLateMs == 50.0
-               && g.params().minYieldMs == 0.5 && g.params().releaseMs == 1500.0);
+               && g.params().minYieldMs == 0.5 && g.params().releaseMs == 500.0 && g.params().probeEveryMs == 0.0);
+        g.configure ("stopgrace=1000,probeevery=2000");
+        CHECK (g.params().stopGraceMs == 1000.0 && g.params().probeEveryMs == 2000.0);
     }
     // the sleep itself: about what was asked (a loose bound: the machine is shared)
     const auto t0 = std::chrono::steady_clock::now();

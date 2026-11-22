@@ -73,6 +73,7 @@
 #include "core/ProjectSafety.h"
 #include "core/SoftClip.h"
 #include "core/Scheduler.h"
+#include "core/TrackStates.h"
 #include "engine/ChannelRackProcessor.h"
 #include "engine/DllAsioDevice.h"
 #include "engine/PipeWireDevice.h"
@@ -826,6 +827,11 @@ float AudioEngine::renderOffline (const RenderOptions& options)
     setHqForAllPlugins (options.hqAllPlugins);
     setPluginsRenderMode (true); // and hosted plugins are told an export is running (FL: "notify about rendering mode")
     transport.sampleRate.store (sampleRate);
+    // Round 190ou: a render plays from the song's start at the song's tempo, as on a new engine. A second render on the
+    // same engine started where the first had stopped (the transport kept its end position, past a pattern's end: a
+    // silent file) and at the tempo the song's tempo automation had reached. The engine's position comes back after.
+    const auto positionBefore = transport.positionTicks.exchange (0.0);
+    transport.bpm.store (song.bpm);
     // round 164c: JUCE's graph builds its render sequence on the message thread. Prepared from the Export window's
     // thread it rebuilt later (asynchronously) and rendered silence until then: the first ~0.05–2 s of the song were
     // lost (the transport kept moving). It is prepared on the message thread, and the render waits for that.
@@ -946,6 +952,16 @@ float AudioEngine::renderOffline (const RenderOptions& options)
 
     stop();
     vfx::script::setSongEnded (false);
+    // Round 190ou: the rack sees the stop, as playback's next block shows it (the notes released, the note tools reset):
+    // a render after this one starts playing from a stopped transport, as on a new engine (one discarded block)
+    {
+        juce::AudioBuffer<float> view (buffer.getArrayOfWritePointers(), 2, blockSize);
+        view.clear();
+        midi.clear();
+        graph.processBlock (view, midi);
+    }
+    transport.positionTicks.store (positionBefore);
+    transport.bpm.store (song.bpm);
 
     if (rackProcessor != nullptr)
     {
@@ -4136,7 +4152,7 @@ bool AudioEngine::setChannelAra (int channel, const std::string& pluginId, const
     editSong ([&] (Song& s) {
         auto& c = s.channels[(std::size_t) channel];
         c.ara = pluginId.empty() ? AraLink {} : AraLink { pluginId, pluginName };
-        if (pluginId.empty() && ! ara::anyAraChannel (s))
+        if (pluginId.empty() && ! ara::anyAraChannel (s) && ! ara::anyAraInsert (s)) // (round 190oq: nor an ARA insert)
             s.araDocuments.clear(); // (the last one: no document is kept)
     });
     return true;
@@ -5506,7 +5522,29 @@ void AudioEngine::publishSong()
     const Song& unprojected = thawedSong ? *thawedSong : song;
     if (standins::hasAny (unprojected))
         projectedSong = standins::project (unprojected, [this] (const PluginRef& ref) { return ! plugins.isInstalled (ref); }, &projected);
-    const Song& played = projectedSong ? *projectedSong : unprojected;
+    // round 190op (P4, LYNX extra): deactivated channels and inserts are not loaded; the engine plays silent placeholders
+    // in their places (core/TrackStates.h deactivate::project). Nothing changes for a project without any.
+    {
+        auto off = deactivate::effective (unprojected);
+        if (off.any)
+        {
+            if (! projectedSong)
+                projectedSong = unprojected;
+            deactivate::project (*projectedSong, off);
+        }
+        deactivatedChannels = std::move (off.channels);
+        deactivatedInserts = std::move (off.inserts);
+    }
+    const Song& playedBeforeAra = projectedSong ? *projectedSong : unprojected;
+    // round 190oq (issue #243): an ARA plugin on a mixer insert plays the audio clip channels routed there (their ARA link
+    // in the song the rack plays; the slot itself is left empty: core/AraRegions.h projectInserts). Only songs with one.
+    std::optional<Song> araInsertSong;
+    if (AraHost::available() && ara::anyAraInsert (playedBeforeAra)) // (an export engine too: it borrows the live ARA instances)
+    {
+        araInsertSong = playedBeforeAra;
+        ara::projectInserts (*araInsertSong);
+    }
+    const Song& played = araInsertSong ? *araInsertSong : playedBeforeAra;
     {
         // round 190ap: the slots whose plugin is switched off ("Open without third-party plugins"), for their badges
         const auto hold = pluginsOff() || pluginHoldOwner.load() == nullptr ? pluginHoldState() : pluginhold::State();
@@ -5536,8 +5574,8 @@ void AudioEngine::publishSong()
                     play();
                 else if (request == 1)
                     stop();
-                else
-                    seek (std::max (0.0, seconds / ara::secondsPerTick (song)));
+                else // (round 190oq: through the tempo map)
+                    seek (std::max (0.0, ara::timeMap (song).ticksAt (seconds)));
             };
         }
         araHost->sync (played, transport.sampleRate.load());
@@ -6029,6 +6067,26 @@ void AudioEngine::updateAutomationRecording (bool active)
     if (! recording)
     {
         commit ({}, std::exchange (sessionAutomationPass, false));
+        // round 190op (P7): playing without recording, the moved controls go into Capture automation's buffer
+        if (transport.playing.load() && ! active && ! touches.empty())
+        {
+            const auto songTick = estimatedPositionNow();
+            for (const auto& t : touches)
+            {
+                const auto value = currentTargetValue (t.target);
+                if (value < 0.0f)
+                    continue;
+                captureauto::Entry e;
+                e.target = t.target;
+                e.ms = now;
+                e.tick = songTick;
+                e.value = juce::jlimit (0.0f, 1.0f, value);
+                e.songMode = song.mode == PlayMode::song;
+                if (! sessionClipOf (t.target, e.clipPattern, e.clipTick, e.clipEnd))
+                    e.clipPattern = -1;
+                automationCapture.add (e);
+            }
+        }
         touches.clear();
         overrideTouched();
         if (! active)
@@ -7250,7 +7308,7 @@ void AudioEngine::capturePluginStatesInto (Song& target, bool requireAll)
 {
     // round 190kx: the ARA plugins' documents (their edits) as they are now; a document not made here (its plugin is
     // missing) keeps what the project had
-    if (araHost != nullptr && ara::anyAraChannel (target))
+    if (araHost != nullptr && (ara::anyAraChannel (target) || ara::anyAraInsert (target))) // (round 190oq: ARA inserts too)
         for (auto& doc : araHost->archives())
         {
             auto it = std::find_if (target.araDocuments.begin(), target.araDocuments.end(), [&doc] (const AraDocumentArchive& a) { return a.pluginId == doc.pluginId; });
@@ -7260,8 +7318,18 @@ void AudioEngine::capturePluginStatesInto (Song& target, bool requireAll)
                 target.araDocuments.push_back (std::move (doc));
         }
 
-    const auto capture = [requireAll] (auto* plugin) {
-        auto state = plugin->captureState();
+    // round 190ox: a modulated parameter of a hosted plugin is saved at its base (the user's value), not mid-swing
+    const auto basesOf = [&target] (AutomationTargetKind kind, int index, int slot) {
+        std::vector<std::pair<int, float>> bases;
+        for (const auto& m : target.modulators)
+            for (const auto& r : m.routes)
+                if (r.target.kind == kind && r.target.index == index && (kind != AutomationTargetKind::effectParam || r.target.slot == slot)
+                    && r.base >= 0.0f && r.depth != 0.0f && r.target.param >= 0)
+                    bases.emplace_back (r.target.param, std::clamp (r.base, 0.0f, 1.0f));
+        return bases;
+    };
+    const auto capture = [requireAll] (auto* plugin, const std::vector<std::pair<int, float>>& bases = {}) {
+        auto state = bases.empty() ? plugin->captureState() : plugin->captureState (bases);
         if (! state && requireAll) throw RemoteError ("failed", "Cannot capture a live device; no project changes were made");
         return state;
     };
@@ -7278,14 +7346,14 @@ void AudioEngine::capturePluginStatesInto (Song& target, bool requireAll)
     for (std::size_t i = 0; i < target.channels.size(); ++i)
         if (auto* p = dynamic_cast<PluginInstrument*> (getChannelInstrument ((int) i).get()))
             if (target.channels[i].plugin.playedBy == 0) // (P5-A1: a plugin shared in a live session keeps no state, only values)
-                if (auto state = capture (p)) // (a plugin that crashed keeps the state saved before)
+                if (auto state = capture (p, basesOf (AutomationTargetKind::channelParam, (int) i, 0))) // (a plugin that crashed keeps the state saved before)
                     target.channels[i].plugin.state = std::move (*state);
 
     for (std::size_t t = 0; t < target.mixer.size(); ++t)
         for (std::size_t s = 0; s < target.mixer[t].effects.size(); ++s)
             if (auto* p = dynamic_cast<PluginEffect*> (getEffect ((int) t, (int) s).get()))
                 if (target.mixer[t].effects[s].plugin.playedBy == 0)
-                    if (auto state = capture (p))
+                    if (auto state = capture (p, basesOf (AutomationTargetKind::effectParam, (int) t, (int) s)))
                         target.mixer[t].effects[s].plugin.state = std::move (*state);
 
     // the plugins inside Patchers (REA_rodada141), nested ones too
@@ -7325,6 +7393,16 @@ void AudioEngine::capturePluginStatesInto (Song& target, bool requireAll)
 
 }
 
+void AudioEngine::setDeactivated (const std::vector<int>& channels, const std::vector<int>& inserts, bool off)
+{
+    if (off)
+        capturePluginStates(); // (their running plugins' settings go into the song before the instances are released)
+    editSong ([&] (Song& s) {
+        deactivate::setChannels (s, channels, off);
+        deactivate::setInserts (s, inserts, off);
+    });
+}
+
 void AudioEngine::capturePluginStates()
 {
     stampWorkTime();
@@ -7332,6 +7410,9 @@ void AudioEngine::capturePluginStates()
     capturePluginStatesInto (song, false);
     lastPublishedShape.song.channels = song.channels;
     lastPublishedShape.song.mixer = song.mixer;
+    // round 190op: the shape keeps the deactivated units' placeholders it was built with (a later build compares with it)
+    if (deactivate::Effective off { deactivatedChannels, deactivatedInserts, true }; ! deactivatedChannels.empty() || ! deactivatedInserts.empty())
+        deactivate::projectUnits (lastPublishedShape.song.channels, lastPublishedShape.song.mixer, off);
 }
 
 Song AudioEngine::snapshotForRemoteControl()
@@ -7787,8 +7868,11 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
                 const auto end = juce::Time::getMillisecondCounterHiRes();
                 engine.rtStats.record (start, end - start, 1000.0 * samples / rate, slowest);
                 // round 190ok (FL's "Safe overloads", TOP25 P24): in a real overload with the UI starving, a slice of the
-                // CPU is given up after the block's output is written (core/OverloadGuard.h)
-                if (const auto yield = engine.overloadGuard.afterCallback (end, end - start, 1000.0 * samples / rate); yield > 0.0)
+                // CPU is given up after the block's output is written (core/OverloadGuard.h; round 190os: never right
+                // after the transport stops, so the tails render at full speed)
+                if (const auto yield = engine.overloadGuard.afterCallback (end, end - start, 1000.0 * samples / rate,
+                                                                           engine.transport.playing.load (std::memory_order_relaxed));
+                    yield > 0.0)
                     OverloadGuard::sleepFor (yield);
             }
         }

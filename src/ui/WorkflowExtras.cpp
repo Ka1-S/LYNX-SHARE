@@ -1,9 +1,12 @@
 #include "ui/WorkflowExtras.h"
+
+#include <utility>
 #include "core/EscClose.h"
 #include "core/RulerGestures.h" // round 190nq (#227)
 #include "core/Sections.h"      // round 190ol (P1)
 
 #include "core/TrackClips.h"
+#include "core/TrackStates.h"
 
 #include "core/LaneView.h"
 #include "core/LayoutStyle.h"
@@ -14,6 +17,8 @@
 #include "core/PlaylistTrackOps.h"
 #include "core/TakeCleanup.h"
 #include "core/TransportEdit.h"
+#include "core/MuteKeys.h"
+#include "core/StartPage.h"
 #include "core/TrackOnly.h"
 #include "core/WheelZones.h"
 #include "engine/AudioEngine.h"
@@ -47,18 +52,29 @@ void offerTracksForEveryInstrument()
 
 void bind (AudioEngine* engine) { boundEngine = engine; }
 
-bool refusesChannelRack()
+bool channelRackOpened()
 {
-    if (! trackonly::active())
+    // issue #246 (round 190oq): the Channel rack opens in Track-only mode too (FL keeps an instrument track's channel in
+    // its Channel rack); a hint says what it lists, once per session
+    static bool told = false;
+    if (! trackonly::active() || std::exchange (told, true))
         return false;
-    ui::postHint ({ tr ("Track-only mode: the Channel rack is off. Each instrument has its own Playlist track (View › Layout style)"), {} }, 3000);
+    ui::postHint ({ tr ("Track-only mode: the Channel rack lists the instruments of the instrument tracks; each plays through its track's mixer track"), {} }, 4000);
     return true;
+}
+
+bool trackOnlySwitchedOn()
+{
+    // (the rack is hidden when the mode comes on, not again at every other switch)
+    static bool last = false;
+    const auto now = trackonly::active();
+    return now && ! std::exchange (last, now);
 }
 
 void addLayoutItems (juce::PopupMenu& menu, bool patternLayout)
 {
     menu.addSeparator();
-    menu.addItem (tr ("Track-only mode (no Channel rack: 1 track = 1 instrument)"), patternLayout, trackonly::enabled(),
+    menu.addItem (tr ("Track-only mode (1 track = 1 instrument, the Channel rack hidden)"), patternLayout, trackonly::enabled(),
                   [] { setExtra ("layout.trackOnly", ! trackonly::enabled()); });
 }
 
@@ -99,6 +115,12 @@ bool readUiOption (const juce::String& key, bool on)
         cliplanes::foldedOnOpen = on;
     else if (key == "liveScaleControl") // round 190oo (O-5, LYNX extra)
         livescale::shown = on;
+    else if (key == "trackStates") // round 190op (P4, LYNX extra): Hide / Deactivate in the Pattern layout's menus
+        trackstates::patternMenus() = on;
+    else if (key == "muteKeyToggles") // issue #249 (round 190oq, LYNX extra)
+        mutekeys::setToggles (on);
+    else if (key == "startPage") // issue #252 (round 190oq; on by default, FL-exact)
+        startpage::setEnabled (on);
     else
         return false;
     return true;
@@ -127,7 +149,10 @@ juce::String uiOptionsText()
            + "\nrulerSeeksAnyTool=" + juce::String (ruler::seekWithAnyTool() ? 1 : 0) // (round 190nq, issue #227)
            + "\nsectionsLane=" + juce::String (sections::patternLaneOn() ? 1 : 0) // (round 190ol, P1)
            + "\nclipLanesFoldedLive=" + juce::String (cliplanes::foldedOnOpen ? 1 : 0) // (round 190oo, CS O-3)
-           + "\nliveScaleControl=" + juce::String (livescale::shown ? 1 : 0); // (round 190oo, O-5)
+           + "\nliveScaleControl=" + juce::String (livescale::shown ? 1 : 0) // (round 190oo, O-5)
+           + "\ntrackStates=" + juce::String (trackstates::patternMenus() ? 1 : 0) // (round 190op, P4)
+           + "\nmuteKeyToggles=" + juce::String (mutekeys::toggles() ? 1 : 0) // (round 190oq, issue #249)
+           + "\nstartPage=" + juce::String (startpage::enabled() ? 1 : 0); // (round 190oq, issue #252)
 }
 
 std::optional<bool> extraOn (std::string_view id)
@@ -160,6 +185,12 @@ std::optional<bool> extraOn (std::string_view id)
         return cliplanes::foldedOnOpen;
     if (id == "controlBar.liveScale") // round 190oo (O-5)
         return livescale::shown;
+    if (id == "playlist.trackStates") // round 190op (P4)
+        return trackstates::patternMenus();
+    if (id == "editing.muteKeyToggles") // round 190oq (issue #249)
+        return mutekeys::toggles();
+    if (id == "general.startPage") // round 190oq (issue #252)
+        return startpage::enabled();
     return std::nullopt;
 }
 
@@ -197,6 +228,12 @@ bool setExtra (std::string_view id, bool on)
         cliplanes::foldedOnOpen = on;
     else if (id == "controlBar.liveScale") // round 190oo (O-5)
         livescale::shown = on;
+    else if (id == "playlist.trackStates") // round 190op (P4)
+        trackstates::patternMenus() = on;
+    else if (id == "editing.muteKeyToggles") // round 190oq (issue #249)
+        mutekeys::setToggles (on);
+    else if (id == "general.startPage") // round 190oq (issue #252)
+        startpage::setEnabled (on);
     else
         return false;
     if (onChanged)

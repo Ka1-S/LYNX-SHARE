@@ -40,6 +40,9 @@ jobs:
           - { os: ubuntu-24.04, compiler: g++ }
           - { os: ubuntu-24.04, compiler: clang++ }
           - { os: macos-15, compiler: clang++ }
+          # Linux arm64 (round 190oy; free arm runner for public repositories). clang++: Ubuntu 24.04's g++ 13.3 fails
+          # 5 checks on arm64 that GCC 13.4 (the release's compiler, linux-arm64.yml) and clang pass
+          - { os: ubuntu-24.04-arm, compiler: clang++ }
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 1500M

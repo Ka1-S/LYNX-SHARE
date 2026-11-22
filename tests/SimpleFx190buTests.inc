@@ -192,7 +192,7 @@ TEST (simplefx190bu_goal_table)
     for (const char* p : { "Output" })
         CHECK (hasParam (EffectKind::ember, p));
     // no goal
-    CHECK (goals::mapping (0, 0.5f).empty() && goals::mapping (9, 0.5f).empty());
+    CHECK (goals::mapping (0, 0.5f).empty() && goals::mapping (goals::lastId + 1, 0.5f).empty());
     CHECK (std::string (goals::name (0)).empty() && goals::idOfName ("Nope") == 0 && goals::idOfName ("") == 0);
     const auto plain = goals::make (0);
     CHECK (plain.goal == 0 && ! goals::active (plain));

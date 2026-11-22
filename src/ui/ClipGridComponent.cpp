@@ -4,6 +4,7 @@
 #include "ui/PaintAB.h"
 #include "ui/PlaylistComponent.h"
 #include "core/SectionOps.h" // round 190ol (P1: scenes from sections)
+#include "ui/PluginOffTag.h"
 #include "core/CrossPaste.h"   // issue #232 stage 2 (round 190nz)
 #include "ui/WindowClipboard.h"
 
@@ -15,6 +16,7 @@
 #include "core/ClipLauncher.h"
 #include "core/ClipLoopOps.h"
 #include "core/Comping.h"
+#include "core/TrackStates.h"
 #include "core/SessionMixer.h"
 #include "core/DetailChain.h"
 #include "core/PlaylistOps.h"
@@ -277,13 +279,19 @@ public:
             // each part draws inside its own box, so the pixels are the same
             const auto cull = ui::paintCache();
             const auto reaches = [&g, cull] (juce::Rectangle<int> box) { return ! cull || g.clipRegionIntersects (box); };
+            // round 190op (P4): deactivated tracks and hidden ones shown (nothing looked up per column while there are none)
+            const auto anyStates = deactivate::anyMarked (song) || (PlaylistComponent::showHiddenTracks && trackstates::hiddenCount (song) > 0);
             for (int t = firstColumn(); t < columns && columnX (t) < cells.getRight(); t = nextShown (t))
             {
                 const auto x = columnX (t);
                 if (! reaches ({ x, 0, columnWidth, cells.getBottom() + statusHeight }))
                     continue;
                 if (reaches ({ x, 0, columnWidth, headerHeight }))
+                {
                     paintHeader (g, song, state, t, { x, 0, columnWidth, headerHeight });
+                    if (anyStates)
+                        paintTrackStateMark (g, song, t, { x, 0, columnWidth, headerHeight });
+                }
                 if (reaches ({ x, cells.getBottom(), columnWidth, statusHeight }))
                     paintStatus (g, song, state, t, { x, cells.getBottom(), columnWidth, statusHeight });
                 juce::Graphics::ScopedSaveState rows (g);
@@ -868,6 +876,7 @@ public:
     }
 
     SessionMixerComponent* sessionMixer() noexcept { return mixer.get(); }
+    void syncMixerForSnapshot() { syncMixer(); }
     void deviceDropForSnapshot (int t) { setDeviceDropTrack (t); }
 
     // The Detail View's listener (round 183a; none in Pattern workflow, where no grid exists).
@@ -1317,6 +1326,7 @@ public:
         std::uint64_t stamp = ~std::uint64_t (0);
         std::size_t tracks = 0, clips = 0;
         const ClipGrid* grid = nullptr;
+        bool showHidden = false; // (round 190op: PlaylistComponent::showHiddenTracks when it was worked out)
     };
     mutable ColumnMap columns_;
     const ColumnMap& columnMap() const
@@ -1324,8 +1334,10 @@ public:
         const auto& song = engine.getSong();
         const auto* grid = gridOf();
         auto& m = columns_;
-        if (m.stamp == engine.getSongStamp() && m.tracks == song.playlistTracks.size() && m.grid == grid && m.clips == grid->clips.size())
+        if (m.stamp == engine.getSongStamp() && m.tracks == song.playlistTracks.size() && m.grid == grid && m.clips == grid->clips.size()
+            && m.showHidden == PlaylistComponent::showHiddenTracks)
             return m;
+        m.showHidden = PlaylistComponent::showHiddenTracks;
         m.stamp = engine.getSongStamp();
         m.tracks = song.playlistTracks.size();
         m.grid = grid;
@@ -1343,7 +1355,9 @@ public:
         for (int t = 0; t < launcher::maxTracks && (t < bound || (int) m.columnTracks.size() < minColumns); ++t)
         {
             // (a lane that holds grid clips keeps its column: nothing in the grid is ever out of reach)
-            const auto lane = ! holdsClips[(std::size_t) t] && comp::isTakeLane (song, t);
+            // (round 190op, P4: a hidden track has no column either, until Show hidden tracks; it still plays)
+            const auto lane = (! holdsClips[(std::size_t) t] && comp::isTakeLane (song, t))
+                              || (! PlaylistComponent::showHiddenTracks && trackstates::isHidden (song, t));
             m.trackColumns.push_back (lane ? -1 : (int) m.columnTracks.size());
             if (! lane)
                 m.columnTracks.push_back (t);
@@ -1558,6 +1572,22 @@ public:
         if (clip.kind == ClipKind::audio && clip.channel >= 0 && clip.channel < (int) song.channels.size())
             return utf8 (song.channels[(std::size_t) clip.channel].name);
         return {};
+    }
+
+    // Round 190op (P4): a deactivated track's title dimmed with the power tag; a hidden track shown again, dimmed
+    void paintTrackStateMark (juce::Graphics& g, const Song& song, int t, juce::Rectangle<int> r) const
+    {
+        const auto off = trackstates::trackDeactivated (song, trackstates::unitsOfTrack (song, t));
+        const auto hidden = PlaylistComponent::showHiddenTracks && trackstates::isHidden (song, t);
+        if (! off && ! hidden)
+            return;
+        g.setColour (theme::colour::bg0.withAlpha (0.45f));
+        g.fillRect (r);
+        if (off && r.getHeight() >= 12)
+        {
+            const auto size = (float) juce::jmin (13, r.getHeight() - 4);
+            ui::drawPluginOffTag (g, { (float) r.getRight() - size - 4.0f, (float) r.getY() + ((float) r.getHeight() - size) * 0.5f, size + 1.0f, size });
+        }
     }
 
     void paintHeader (juce::Graphics& g, const Song& song, const launcher::Runtime* state, int t, juce::Rectangle<int> r) const
@@ -2890,6 +2920,22 @@ public:
             bounceTrackInPlace (engine, channel);
             repaint();
         });
+        // round 190op (P4, LYNX extras; owner decision O-3): Deactivate Track unloads the track's devices (the Track
+        // Activator stays Live's mute); Hide takes the column out of view (Show hidden tracks, Playlist menu)
+        {
+            const auto units = trackstates::unitsOfTrack (song, track);
+            const auto off = trackstates::trackDeactivated (song, units);
+            menu.addItem (off ? tr ("Reactivate Track") : tr ("Deactivate Track"), ! units.empty(), off, [this, track, off] {
+                const auto u = trackstates::unitsOfTrack (engine.getSong(), track);
+                engine.setDeactivated (u.channels, u.inserts, ! off);
+                repaint();
+            });
+            const auto hidden = trackstates::isHidden (song, track);
+            menu.addItem (tr ("Hide Track"), true, hidden, [this, track, hidden] {
+                engine.editSong ([track, hidden] (Song& s) { trackstates::setHidden (s, { track }, ! hidden); });
+                repaint();
+            });
+        }
         menu.addSeparator();
         const auto colour = track < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) track].colour : 0u;
         menu.addSubMenu (tr ("Change color"), ui::colourMenu (colour, [this, track] (std::uint32_t c) {
@@ -3825,6 +3871,12 @@ SessionMixerComponent* clipGridMixer (juce::Component& grid)
 {
     auto* g = dynamic_cast<ClipGridComponent*> (&grid);
     return g != nullptr ? g->sessionMixer() : nullptr;
+}
+
+void syncClipGridMixerForSnapshot (juce::Component& grid) // (round 190ou: off-screen routes run no timer)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        g->syncMixerForSnapshot();
 }
 
 void setClipGridDeviceDropForSnapshot (juce::Component& grid, int track)

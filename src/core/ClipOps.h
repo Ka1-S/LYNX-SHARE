@@ -474,6 +474,32 @@ inline int setClipsMuted (Song& song, const std::vector<int>& selection, bool mu
     return changed;
 }
 
+// Issue #249 (round 190oq): whether every clip Alt+M would act on (the selection, else all; those starting in from..to)
+// is muted already — LYNX's "mute keys toggle" extra then unmutes them (FL's Alt+M only ever mutes: EEMuteAction sets
+// the mute, REA round 190oq). False when there is none.
+inline bool allClipsMuted (const Song& song, const std::vector<int>& selection, std::int64_t from = 0,
+                           std::int64_t to = std::numeric_limits<std::int64_t>::max())
+{
+    int seen = 0;
+    auto muted = [&] (int i) {
+        if (i < 0 || i >= (int) song.playlist.size())
+            return true;
+        const auto& c = song.playlist[(std::size_t) i];
+        if (c.start < from || c.start > to)
+            return true;
+        ++seen;
+        return c.muted;
+    };
+    bool all = true;
+    if (selection.empty())
+        for (int i = 0; i < (int) song.playlist.size(); ++i)
+            all = muted (i) && all;
+    else
+        for (const auto i : selection)
+            all = muted (i) && all;
+    return all && seen > 0;
+}
+
 // Audio "Make unique": the clips get their own copy of the audio channel (so reversing, stretching or renaming
 // them leaves the other clips of that sample alone). Returns the new channel, or -1.
 inline int makeAudioUnique (Song& song, const std::vector<int>& clips)

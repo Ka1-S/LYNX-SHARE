@@ -28,6 +28,7 @@
 #include "ui/ImageReadback.h"
 #include "ui/TextCache.h"
 #include "ui/PlaylistComponent.h"
+#include "core/MuteKeys.h"
 #include "core/TempoMarkers.h"
 #include "core/PaintTemplate.h"
 #include "ui/PaintAB.h" // (round 190md: LYNX_PAINT_SAVINGS=0 paints the end veil as before)
@@ -64,6 +65,7 @@
 #include "core/NoteEdit.h"
 #include "core/PlaylistOps.h"
 #include "core/PlaylistTrackOps.h"
+#include "core/TrackStates.h"
 #include "core/TrackHeaderGestures.h"
 #include "core/FolderDrag.h" // round 190jf (B17)
 #include "core/CrossPaste.h"   // issue #232 stage 2 (round 190nz)
@@ -96,6 +98,7 @@
 #include "ui/ChannelSettings.h"
 #include "ui/Dialogs.h"
 #include "ui/HintBar.h"
+#include "ui/PluginOffTag.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 #include "ui/LabelFont.h"
@@ -1554,6 +1557,8 @@ int PlaylistComponent::heightOf (int track) const
     const auto& tracks = engine.getSong().playlistTracks;
     if (const auto owner = projection.ownerOf (track); owner >= 0 && laneHidden (owner)) // round 190jq: a folded lane
         return 0;
+    if (anyHiddenTracks && ! showHiddenTracks && trackstates::isHidden (engine.getSong(), track)) // round 190op (P4): no row
+        return 0;
     if (noteedit::isFoldedAway (engine.getSong(), track))
         return hideCollapsedGroups ? 0 : foldedHeight; // FL's View › "Hide collapsed grouped tracks" (round 190jf)
     // rollup 0.1.30 step 7 (owner, QA-2): the Simple layout hides imported take lanes (Live's TakeLanes, round
@@ -1633,6 +1638,7 @@ void PlaylistComponent::updateProjection (int count)
         return;
     projectionStamp = stamp;
     const auto& song = engine.getSong();
+    anyHiddenTracks = trackstates::hiddenCount (song) > 0; // (round 190op: heightOf looks no further without any)
     projection = cliplanes::project (song, count, on);
     laneNames.assign ((std::size_t) count, {});
     laneClips.clear(); // (round 190oo, CS-19: rebuilt below while lanes are drawn)
@@ -3172,6 +3178,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 }
             }
 
+            paintTrackStateMarks (g, headers, headerRows); // round 190op (P4: hidden tracks shown, deactivated tracks)
             paintLaneHeaders (g, headers); // round 177b (nothing when lanes are off)
         }
     }
@@ -3484,8 +3491,23 @@ void PlaylistComponent::paintFolderDrop (juce::Graphics& g)
     }
 }
 
+void PlaylistComponent::fadeOut (const std::vector<int>& clips)
+{
+    // issue #250 (round 190oq): each deleted clip in view leaves FL's ghost (nothing at all when Animations are off or
+    // effects reduced: ui/DeleteFade.h)
+    if (! ui::DeleteFade::enabled())
+        return;
+    const auto& song = engine.getSong();
+    const auto grid = gridArea();
+    for (const auto i : clips)
+        if (i >= 0 && i < (int) song.playlist.size())
+            if (const auto r = clipBounds (i); r.intersects (grid))
+                deleteFade.add (r.toFloat(), liveClipColour (song.playlist[(std::size_t) i]));
+}
+
 void PlaylistComponent::paintOverChildren (juce::Graphics& g)
 {
+    deleteFade.paint (g, gridArea()); // (issue #250: nothing while no clip is fading)
     paintDropGhost (g); // (round 190im: a drag's landing place)
     paintFolderDrop (g); // round 190jf (B17)
     if (headerGripLit || drag == Drag::headerWidth) // round 190jq (issue #164): the edge being dragged, in the accent
@@ -4291,7 +4313,7 @@ int PlaylistComponent::laneBlockHeight (int track) const
     if (! autolanes::shown() || track < 0 || track >= (int) song.playlistTracks.size() || simpleAutoOn (track))
         return 0; // (round 190jr: the Simple automation view draws one lane over the track's own row instead)
     const auto& t = song.playlistTracks[(std::size_t) track];
-    if (t.lanes.empty() || t.lanesFolded || t.folded || noteedit::isFoldedAway (song, track))
+    if (t.lanes.empty() || t.lanesFolded || t.folded || noteedit::isFoldedAway (song, track) || (t.hidden && ! showHiddenTracks))
         return 0;
     int h = 0;
     for (const auto& lane : t.lanes)
@@ -6666,6 +6688,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         if (hit >= 0)
         {
             erasedSomething = true;
+            fadeOut ({ hit }); // (issue #250)
             engine.editSong ([hit] (Song& s) { s.playlist.erase (s.playlist.begin() + hit); });
         }
         return;
@@ -6720,7 +6743,10 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             drag = Drag::erase;
             setSelection ({});
             if (hit >= 0)
+            {
+                fadeOut ({ hit }); // (issue #250)
                 engine.editSong ([hit] (Song& s) { s.playlist.erase (s.playlist.begin() + hit); });
+            }
             return;
 
         case EditTool::mute:
@@ -7603,6 +7629,7 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
             if (hit >= 0)
             {
                 erasedSomething = true;
+                fadeOut ({ hit }); // (issue #250)
                 engine.editSong ([hit] (Song& s) { s.playlist.erase (s.playlist.begin() + hit); });
             }
             return;
@@ -9026,6 +9053,9 @@ juce::PopupMenu PlaylistComponent::editMenu()
     m.addSeparator();
     m.addItem (tr ("Mute") + key ("playlist.muteClips"), [this] { runAction ("playlist.muteClips"); });
     m.addItem (tr ("Unmute") + key ("playlist.unmuteClips"), [this] { runAction ("playlist.unmuteClips"); });
+    // issue #249 (round 190oq, LYNX extra): Alt+M switches both ways (FL's only mutes)
+    m.addItem (tr ("Alt+M toggles: pressed again, it unmutes (LYNX)"), true, mutekeys::toggles(),
+               [] { workflowextras::setExtra ("editing.muteKeyToggles", ! mutekeys::toggles()); });
     m.addSeparator();
     m.addItem (tr ("Insert space") + "\tCtrl+Ins", time, false, [this] { insertTimeSelection(); });
     m.addItem (tr ("Slice & insert space") + "\tCtrl+Alt+Ins", time, false, [this] { runAction ("playlist.sliceInsertSpace"); });
@@ -10236,6 +10266,22 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         updateScrollBars();
         repaint();
     });
+    // round 190op (P4, LYNX extra): Hide track (with the selected tracks), and in the Clip-launch / Simple layouts
+    // Deactivate track (its instrument and own insert unloaded, silent; core/TrackStates.h)
+    if (trackStateMenus() || trackstates::isHidden (song, track))
+    {
+        const auto hidden = trackstates::isHidden (song, track);
+        menu.addItem (tr ("Hide track"), true, hidden, [this, hidden, tracks = tracksForMenu (track)] {
+            engine.editSong ([tracks, hidden] (Song& s) { trackstates::setHidden (s, tracks, ! hidden); });
+            if (! hidden && ! showHiddenTracks)
+                setSelection ({});
+            refreshTrackLayout();
+            updateScrollBars();
+            repaint();
+        });
+        if (liveStyle || simpleHeaders)
+            addDeactivateTrackItem (menu, track);
+    }
     menu.addSeparator();
     {
         const auto header = noteedit::groupHeaderOf (song, track);
@@ -10460,6 +10506,85 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
     menu.addItem (theme::mnemonic (tr ("Move up"), 'u'), track > 0, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::swapTracks (s, track, track - 1); }); });
     menu.addItem (theme::mnemonic (tr ("Move down"), 'd'), track + 1 < count, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::swapTracks (s, track, track + 1); }); });
     return menu;
+}
+
+// Round 190op (P4): over the headers, a hidden track shown by "Show hidden tracks" is dimmed with a crossed eye, and a
+// deactivated track (its instrument or own insert, core/TrackStates.h) is dimmed with the power tag. Nothing is drawn
+// (nor looked up per row) while there are none.
+void PlaylistComponent::paintTrackStateMarks (juce::Graphics& g, juce::Rectangle<int> headers, int rows)
+{
+    const auto& song = engine.getSong();
+    const auto hiddenShown = showHiddenTracks && anyHiddenTracks;
+    const auto deactivated = deactivate::anyMarked (song);
+    if (! hiddenShown && ! deactivated)
+        return;
+    const auto plateRight = (float) (headerWidth - rightColumn());
+    for (int t = 0; t < rows; ++t)
+    {
+        const auto y = trackToY (t), h = heightOf (t);
+        if (h <= 0 || y > headers.getBottom() || y + h < headers.getY() || projection.isChild (t))
+            continue;
+        const auto hidden = hiddenShown && trackstates::isHidden (song, t);
+        const auto off = deactivated && trackstates::trackDeactivated (song, trackstates::unitsOfTrack (song, t));
+        if (! hidden && ! off)
+            continue;
+        const auto plate = juce::Rectangle<float> ((float) headerIndent (song, t), (float) y, plateRight - (float) headerIndent (song, t), (float) h - 1.0f);
+        g.setColour (theme::colour::bg0.withAlpha (0.45f));
+        g.fillRect (plate);
+        const auto size = juce::jmin (13.0f, (float) h - 4.0f);
+        if (size < 7.0f)
+            continue;
+        auto x = plate.getRight() - size - 4.0f;
+        const auto top = (float) y + juce::jmin (((float) h - size) * 0.5f, 3.0f);
+        if (off)
+        {
+            ui::drawPluginOffTag (g, { x, top, size + 1.0f, size });
+            x -= size + 4.0f;
+        }
+        if (hidden) // a crossed eye: an almond outline, its pupil and a slash
+        {
+            const auto box = juce::Rectangle<float> (x, top, size, size);
+            const auto c = box.getCentre();
+            juce::Path eye;
+            eye.startNewSubPath (box.getX(), c.y);
+            eye.quadraticTo (c.x, box.getY() + size * 0.1f, box.getRight(), c.y);
+            eye.quadraticTo (c.x, box.getBottom() - size * 0.1f, box.getX(), c.y);
+            eye.closeSubPath();
+            g.setColour (theme::colour::textSecondary);
+            g.strokePath (eye, juce::PathStrokeType (1.2f));
+            g.fillEllipse (juce::Rectangle<float> (size * 0.28f, size * 0.28f).withCentre (c));
+            g.drawLine (box.getX() + 1.0f, box.getBottom() - 1.0f, box.getRight() - 1.0f, box.getY() + 1.0f, 1.3f);
+        }
+    }
+}
+
+// Round 190op (P4): whether the Hide / Deactivate items show (always outside the Pattern layout; there a LYNX extra)
+bool PlaylistComponent::trackStateMenus() const
+{
+    return liveStyle || simpleHeaders || trackstates::patternMenus();
+}
+
+// Round 190op (P4): "Deactivate track" / "Reactivate track" for the track's units (core/TrackStates.h unitsOfTrack);
+// the selected tracks follow the clicked one
+void PlaylistComponent::addDeactivateTrackItem (juce::PopupMenu& menu, int track)
+{
+    const auto& song = engine.getSong();
+    const auto units = trackstates::unitsOfTrack (song, track);
+    const auto off = trackstates::trackDeactivated (song, units);
+    menu.addItem (off ? tr ("Reactivate track") : tr ("Deactivate track"), ! units.empty(), off, [this, off, tracks = tracksForMenu (track)] {
+        const auto& s = engine.getSong();
+        std::vector<int> channels, inserts;
+        for (const auto t : tracks)
+        {
+            const auto u = trackstates::unitsOfTrack (s, t);
+            channels.insert (channels.end(), u.channels.begin(), u.channels.end());
+            inserts.insert (inserts.end(), u.inserts.begin(), u.inserts.end());
+        }
+        engine.setDeactivated (channels, inserts, ! off);
+        ui::postHint ({ off ? tr ("Track reactivated: its plugins load again with their settings")
+                            : tr ("Track deactivated: its plugins are unloaded and it is silent (its settings are kept)"), {}, false, false }, 3000);
+        repaint();
+    });
 }
 
 // round 190fo: the Simple track menu's Freeze, one channel after the other (each freeze runs in the background)
@@ -12730,6 +12855,25 @@ bool PlaylistComponent::runAction (const std::string& id)
             onViewOptionChanged();
     }
     else if (is ("playlist.patternBlocks")) togglePatternBlocks();
+    else if (is ("playlist.showHiddenTracks")) // round 190op (P4): a view option, not the project's
+    {
+        showHiddenTracks = ! showHiddenTracks;
+        refreshTrackLayout();
+        updateScrollBars();
+        repaint();
+        if (onViewOptionChanged)
+            onViewOptionChanged();
+    }
+    else if (is ("playlist.hideUnusedTracks")) // round 190op (P4): one undo step
+    {
+        int hidden = 0;
+        engine.editSong ([&hidden] (Song& s) { hidden = trackstates::hideUnused (s); });
+        ui::postHint ({ tr ("{0} unused tracks hidden (Playlist › Show hidden tracks shows them)", { juce::String (hidden) }), {}, false, false }, 3000);
+        setSelection ({});
+        refreshTrackLayout();
+        updateScrollBars();
+        repaint();
+    }
     else if (is ("playlist.automationLanes")) toggleAutomationLanes();
     else if (is ("playlist.blocksToClips")) turnBlocksIntoClips();
     else if (is ("playlist.follow")) EditorGlobals::get().setFollowing (false, ! EditorGlobals::get().isFollowing (false));
@@ -12760,7 +12904,11 @@ bool PlaylistComponent::runAction (const std::string& id)
         const auto& song = engine.getSong();
         const auto from = song.hasLoop() ? song.loopStart : (std::int64_t) 0;
         const auto to = song.hasLoop() ? song.loopEnd : std::numeric_limits<std::int64_t>::max();
-        engine.editSong ([chosen = selection, mute = is ("playlist.muteClips"), from, to] (Song& s) { clipops::setClipsMuted (s, chosen, mute, from, to); });
+        auto mute = is ("playlist.muteClips");
+        // issue #249 (round 190oq, LYNX extra, off = FL's Alt+M that only mutes): pressed again, it unmutes
+        if (mute && mutekeys::toggles() && clipops::allClipsMuted (song, selection, from, to))
+            mute = false;
+        engine.editSong ([chosen = selection, mute, from, to] (Song& s) { clipops::setClipsMuted (s, chosen, mute, from, to); });
     }
     else if (is ("playlist.mergePatternClips")) mergePatternClipsByKey();
     else if (is ("playlist.mergeSimilarClips")) mergeSimilarClipsByKey();
@@ -13506,6 +13654,7 @@ void PlaylistComponent::deleteSelection()
         return;
 
     auto doomed = selection;
+    fadeOut (doomed); // (issue #250)
     setSelection ({});
     engine.editSong ([&doomed] (Song& s) {
         std::sort (doomed.rbegin(), doomed.rend());
@@ -14705,6 +14854,15 @@ void PlaylistComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::M
         }
         return;
     }
+
+    // issue #254 (round 190ou): a notch of the horizontal wheel (a tilt wheel, a second wheel) moves the view 1.5 beats
+    // sideways whatever the zoom, as in FL 2026 (a trackpad's swipe and Shift+wheel keep their own ways below)
+    if (! ctrl && ! alt)
+        if (const auto notch = gesture::horizontalWheelNotch (wheel.deltaX, wheel.deltaY, wheel.isSmooth, shift); notch != 0)
+        {
+            glideBy (notch * gesture::horizontalWheelBeats * ppq, 0.0);
+            return;
+        }
 
     // issue #154: the wheel scrolls a linked header's effects list when it has more rows than fit
     if (! shift && ! ctrl && ! alt && insertsWheel (e, wheel.deltaY))

@@ -50,8 +50,11 @@ void addPlaylistMenuItems (const std::function<void (const char*, const juce::St
 void bind (AudioEngine* engine);
 
 // --- #191.5 Track-only mode (core/TrackOnly.h) --------------------------------------------------------------------------
-// True (and a hint saying why) while Track-only mode hides the Channel rack: the main window does not show it then.
-bool refusesChannelRack();
+// Issue #246 (round 190oq): the Channel rack was opened; in Track-only mode the first time a hint says what it lists.
+// (Before 0.1.31 the mode refused to show the rack.) Returns whether the hint was shown.
+bool channelRackOpened();
+// Whether Track-only mode has just come on (the main window hides the rack then, and only then)
+bool trackOnlySwitchedOn();
 // View › Layout style: the mode's switch under the three layouts (enabled in the Pattern layout).
 void addLayoutItems (juce::PopupMenu& menu, bool patternLayout);
 

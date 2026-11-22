@@ -76,7 +76,11 @@ void closeAutomationEditors();
 void openModulators (AudioEngine& engine);
 void closeModulators();
 std::unique_ptr<juce::Component> makeModulatorsPanel (AudioEngine& engine); // (--snapshot mode)
+// Round 190ox: the parameter menu's "Modulate with" submenu (every control that can be modulated, hosted plugins' too):
+// the modulators (ticked: routed here) and a new one of each kind.
 void addModulationItems (juce::PopupMenu& menu, AudioEngine& engine, const AutomationTarget& target);
+// A new modulator of `kind`, routed to `target` and placed on its channel / insert when given; its index.
+int addModulator (AudioEngine& engine, ModKind kind, std::optional<AutomationTarget> target = {});
 
 // Just the editor (for --snapshot mode).
 std::unique_ptr<juce::Component> makeAutomationEditor (AudioEngine& engine, int automation);

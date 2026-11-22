@@ -183,6 +183,47 @@ int ensureSharedReverb (Song& song);
 float reverbSend (const Song& song, int insert);
 bool setReverbSend (Song& song, int insert, float level);
 
+// Round 190ot (research190oe P5): the Simple layout's second shared send, an echo (GarageBand's Echo and Reverb sends).
+// The insert named "Echo" whose first effect is Echoform; `ensureSharedEcho` makes it the first time (a free insert,
+// Echoform fully wet, both sides a dotted quarter note at the project's tempo, 35 % feedback, darker repeats without
+// lows, to the Master). −1: none (or no free insert). A track's send to it is an ordinary FL send from the track's
+// insert (linear gain 0…1, up to 0 dB); level 0 removes the send, and a send at 0 never makes the insert.
+int sharedEcho (const Song& song);
+int ensureSharedEcho (Song& song);
+float echoSend (const Song& song, int insert);
+bool setEchoSend (Song& song, int insert, float level);
+
+// Round 190ot (research190oe P5): "Duck under..." — the track dips on every hit of another track (sidechain pumping in
+// one pick; BandLab and GarageBand have none, their users fake it with volume automation). It is FL's own way: a Fruity
+// Limiter at the end of the track's chain, its compressor keyed by the trigger's insert through a level-0 send (FL's
+// "Sidechain to this track"), the slot a one-knob effect (goals::duck) whose knob is the Amount. Every layout, the Mixer,
+// the .flp export and older LYNX releases see an ordinary Fruity Limiter with a side input.
+enum class DuckStyle : std::uint8_t
+{
+    subtle,  // a gentle dip
+    pumping, // the classic pump (a new duck's start)
+    hard     // the track nearly gone on each hit
+};
+const char* duckStyleName (DuckStyle style) noexcept; // "Subtle", "Pumping", "Hard" (English, for tr())
+float duckAmount (DuckStyle style) noexcept;          // the Amount the style sets: 0.3, 0.55, 0.85
+// The duck slot of `insert` (a Fruity Limiter whose goal is goals::duck), −1 when there is none
+int duckSlot (const Song& song, int insert);
+// The insert the duck listens to, −1 when there is no duck (or it listens to nothing)
+int duckTrigger (const Song& song, int insert);
+enum class DuckResult : std::uint8_t
+{
+    set,     // the track ducks under `trigger` (a new slot, or the old one re-keyed)
+    removed, // trigger < 0: the duck slot is gone, with the level-0 send it made when nothing else listens to it
+    cycle,   // `trigger` is fed by the track: a sidechain would make a loop; nothing changed
+    full,    // all 10 slots of the insert are taken; nothing changed
+    invalid  // no such insert, or trigger == insert
+};
+// Ducks insert `insert` under insert `trigger` (−1: no duck). `amount` < 0 keeps the slot's Amount (a new one starts at
+// Pumping). A trigger changed from another insert takes that insert's level-0 send away when nothing else listens to it.
+DuckResult setDuck (Song& song, int insert, int trigger, float amount = -1.0f);
+// Turns the duck's Amount knob; false without a duck
+bool setDuckAmount (Song& song, int insert, float amount);
+
 // "03_Lead Vox" → "Lead Vox", "01 Drums" → "Drums", "12-Bass" → "Bass"; anything else stays (a bare number too).
 std::string stemTrackName (const std::string& fileStem);
 } // namespace lynx::simpletracks

@@ -5,6 +5,7 @@
 #include "ui/RemoteControl.h"
 #include "core/PlaylistOps.h"
 #include "core/LastTweaked.h"
+#include "core/RackAutomation.h" // round 190ow (DE-123)
 
 #include <map>
 
@@ -26,6 +27,7 @@
 #include "ui/Theme.h"
 #include "ui/ValueControl.h"
 #include "ui/ControllerKnob.h"
+#include "ui/ModRing.h"
 
 namespace lynx
 {
@@ -828,6 +830,13 @@ private:
                 if (c.kind == ClipKind::automation && c.automation == automation && position >= (double) c.start && position < (double) c.end())
                     tick = position - (double) c.start + (double) c.offset;
         }
+        // round 190ow (details DE-123): a clip its steps / notes start shows its playhead too, in Pattern mode as well
+        if (playing && isShowing() && tick < 0.0 && rackauto::hasTriggers (song, automation))
+        {
+            const auto position = (song.mode == PlayMode::song ? engine.songPlayheadTicks() : engine.getTransport().positionTicks.load (std::memory_order_relaxed))
+                                  + engine.playheadAdvanceTicks();
+            tick = rackauto::triggeredAt (song, automation, position);
+        }
 
         if (tick == playhead)
             return playing;
@@ -1040,6 +1049,9 @@ juce::String describeAutomationTarget (AudioEngine& engine, const AutomationTarg
 
         case AutomationTargetKind::tempo: return tr ("Tempo");
         case AutomationTargetKind::crossfader: return tr ("Main") + " - " + tr ("Crossfade"); // (round 190kc: Live's Main › Mixer › Crossfade)
+        case AutomationTargetKind::modulatorMacro: // (round 190ox: a Macro modulator's knob)
+            return tr ("Modulator") + " - "
+                   + (t.index >= 0 && t.index < (int) song.modulators.size() ? nameOf (song.modulators[(std::size_t) t.index].name) : tr ("Macro"));
         case AutomationTargetKind::vcaLevel: // (round 177a)
             return t.index >= 0 && t.index < (int) song.vcas.size() ? nameOf (song.vcas[(std::size_t) t.index].name) + " - " + tr ("VCA level")
                                                                    : tr ("VCA level");
@@ -1210,12 +1222,20 @@ std::unique_ptr<juce::Component> makeAutomationEditor (AudioEngine& engine, int 
 }
 
 // --- modulators (round 177b; LYNX's own, relative: docs/analise/REA_rodada177b.md slice 4) ------------------------
+// Round 190ox (stage 2, research 190oe P9): every kind (LFO, envelope follower, ADSR envelope, steps, random, macro,
+// keytrack, velocity), placed on a channel or an insert, hosted plugins' parameters as targets, drag-to-assign from a
+// row's handle, Assign mode (drag a knob to set the depth), the knobs' rings (ui/ModRing.h).
 namespace
 {
 const char* const modShapeNames[] = { TR_NOOP ("Sine"), TR_NOOP ("Triangle"), TR_NOOP ("Saw up"), TR_NOOP ("Saw down"),
                                       TR_NOOP ("Square"), TR_NOOP ("Random"), TR_NOOP ("Smooth random") };
-// the synced rates offered (quarter notes per cycle)
-constexpr double modRates[] = { 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0 };
+const char* const modKindNames[] = { TR_NOOP ("LFO"),   TR_NOOP ("Envelope follower"), TR_NOOP ("ADSR envelope"), TR_NOOP ("Steps"),
+                                     TR_NOOP ("Random"), TR_NOOP ("Macro"),            TR_NOOP ("Keytrack"),      TR_NOOP ("Velocity") };
+static_assert (std::size (modKindNames) == (std::size_t) modKindCount);
+// a new modulator's name (data, as "LFO 1": not translated)
+const char* const modBaseNames[] = { "LFO", "Follower", "Envelope", "Steps", "Random", "Macro", "Keytrack", "Velocity" };
+// the synced rates offered (quarter notes per cycle / per step)
+constexpr double modRates[] = { 0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0 };
 
 juce::String modRateText (double beats)
 {
@@ -1224,83 +1244,266 @@ juce::String modRateText (double beats)
     return "1/" + juce::String (juce::roundToInt (4.0 / beats));
 }
 
-juce::String nextModulatorName (const Song& song)
+juce::String nextModulatorName (const Song& song, ModKind kind = ModKind::lfo)
 {
     for (int n = 1;; ++n)
     {
-        const auto name = "LFO " + std::to_string (n);
+        const auto name = std::string (modBaseNames[(int) kind]) + " " + std::to_string (n);
         if (std::none_of (song.modulators.begin(), song.modulators.end(), [&name] (const Modulator& m) { return m.name == name; }))
             return juce::String (name);
     }
 }
 
-// one modulator: its settings on the first line, its routes (target, depth, remove) under it
+// where a new modulator for `t` sits: the channel or the insert the control belongs to
+AutomationTarget hostFor (const AutomationTarget& t)
+{
+    switch (t.kind)
+    {
+        case AutomationTargetKind::channelVolume:
+        case AutomationTargetKind::channelPan:
+        case AutomationTargetKind::channelParam:
+        case AutomationTargetKind::channelAdjust: return { AutomationTargetKind::channelVolume, t.index, 0, 0 };
+        case AutomationTargetKind::mixerVolume:
+        case AutomationTargetKind::mixerPan:
+        case AutomationTargetKind::effectParam:
+        case AutomationTargetKind::effectMix:
+        case AutomationTargetKind::mixerSend: return { AutomationTargetKind::mixerVolume, t.index, 0, 0 };
+        case AutomationTargetKind::tempo:
+        case AutomationTargetKind::vcaLevel:
+        case AutomationTargetKind::crossfader:
+        case AutomationTargetKind::modulatorMacro:
+        case AutomationTargetKind::none: break;
+    }
+    return {};
+}
+
+juce::String insertLabel (const Song& song, int t)
+{
+    if (t == 0)
+        return tr ("Master");
+    const auto name = t > 0 && t < (int) song.mixer.size() ? nameOf (song.mixer[(std::size_t) t].name) : juce::String();
+    return name.isNotEmpty() ? name : tr ("Insert {0}", { juce::String (t) });
+}
+
+juce::String channelLabel (const Song& song, int c)
+{
+    return c >= 0 && c < (int) song.channels.size() ? nameOf (song.channels[(std::size_t) c].name) : juce::String ("?");
+}
+
+juce::String placeName (const Song& song, const AutomationTarget& host)
+{
+    if (host.kind == AutomationTargetKind::channelVolume)
+        return channelLabel (song, host.index);
+    if (host.kind == AutomationTargetKind::mixerVolume)
+        return insertLabel (song, host.index);
+    return tr ("Not placed");
+}
+
+// the route a menu or a drop makes: 25 %, a hosted plugin's base from its value now
+ModRoute newRoute (AudioEngine& engine, const AutomationTarget& target)
+{
+    ModRoute r { target, 0.25f };
+    if (Modulator::isHostedTarget (engine.getSong(), target))
+        r.base = juce::jlimit (0.0f, 1.0f, engine.currentTargetValue (target));
+    return r;
+}
+
+ui::ValueSpec msSpec (const juce::String& name, double maximum, double def)
+{
+    ui::ValueSpec s;
+    s.name = name;
+    s.minimum = 0.0;
+    s.maximum = maximum;
+    s.defaultValue = def;
+    s.pixelsForRange = 200.0;
+    s.toText = [] (double v) { return v < 1000.0 ? juce::String (v, v < 10.0 ? 1 : 0) + " ms" : juce::String (v / 1000.0, 2) + " s"; };
+    return s;
+}
+
+ui::ValueSpec pctSpec (const juce::String& name, double def)
+{
+    ui::ValueSpec s;
+    s.name = name;
+    s.minimum = 0.0;
+    s.maximum = 100.0;
+    s.defaultValue = def;
+    s.interval = 1.0;
+    s.toText = [] (double v) { return juce::String ((int) std::lround (v)) + "%"; };
+    return s;
+}
+
+// the row's grip: drag it onto a knob to route the modulator there
+class ModHandle final : public juce::Component, public juce::SettableTooltipClient
+{
+public:
+    explicit ModHandle (AudioEngine& e) : engine (e) { setMouseCursor (juce::MouseCursor::DraggingHandCursor); }
+    int index = -1;
+
+    void paint (juce::Graphics& g) override
+    {
+        const auto r = getLocalBounds().toFloat().reduced (3.0f);
+        g.setColour (dragging || isMouseOver() ? modring::colour() : theme::colour::textSecondary);
+        for (int row = 0; row < 3; ++row)
+            for (int col = 0; col < 2; ++col)
+                g.fillEllipse (r.getCentreX() - 4.0f + col * 6.0f, r.getCentreY() - 7.0f + row * 6.0f, 2.5f, 2.5f);
+    }
+    void mouseEnter (const juce::MouseEvent&) override { repaint(); }
+    void mouseExit (const juce::MouseEvent&) override { repaint(); }
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        if (! dragging && e.getDistanceFromDragStart() > 4)
+        {
+            dragging = true;
+            repaint();
+        }
+        if (dragging)
+        {
+            const auto over = modring::targetUnder (e.getScreenPosition());
+            ui::postHint ({ over ? describeAutomationTarget (engine, *over) : tr ("Drop it on a LYNX knob to modulate it"), {} }, 600);
+        }
+    }
+    void mouseUp (const juce::MouseEvent& e) override
+    {
+        if (! std::exchange (dragging, false))
+            return;
+        repaint();
+        const auto target = modring::targetUnder (e.getScreenPosition());
+        if (! target)
+            return;
+        if (modring::assign (index, *target))
+            ui::postHint ({ tr ("Modulated: {0}", { describeAutomationTarget (engine, *target) }), {} }, 2500);
+        else if (! Modulator::canModulate (engine.getSong(), *target))
+            ui::postHint ({ tr ("This control can't be modulated"), describeAutomationTarget (engine, *target) }, 2500);
+    }
+
+private:
+    AudioEngine& engine;
+    bool dragging = false;
+};
+
+// one modulator: the head (grip, name, kind, where it sits, Assign, delete), its settings with a picture, its routes
+// (target, base for a hosted plugin, depth, remove)
 class ModulatorRow final : public juce::Component
 {
 public:
-    ModulatorRow (AudioEngine& e, int i) : engine (e), index (i)
+    ModulatorRow (AudioEngine& e, int i) : engine (e), index (i), handle (e)
     {
+        handle.index = i;
+        handle.setTooltip (tr ("Drag onto a knob to modulate it"));
+        addAndMakeVisible (handle);
         name.onClick = [this] { rename(); };
         name.setTooltip (tr ("Rename"));
         addAndMakeVisible (name);
+        host.setTooltip (tr ("Where the modulator sits"));
+        host.onChange = [this] {
+            const auto id = host.getSelectedId();
+            AutomationTarget t;
+            if (id >= hostInsertBase)
+                t = { AutomationTargetKind::mixerVolume, id - hostInsertBase, 0, 0 };
+            else if (id >= hostChannelBase)
+                t = { AutomationTargetKind::channelVolume, id - hostChannelBase, 0, 0 };
+            edit ([t] (Modulator& m) { m.host = t; });
+        };
+        addAndMakeVisible (host);
+        assign.setButtonText (tr ("Assign"));
+        assign.setTooltip (tr ("Assign mode: drag any LYNX knob to set this modulator's depth on it (click again to stop)"));
+        assign.setColour (juce::TextButton::buttonOnColourId, modring::colour().withAlpha (0.55f));
+        assign.onClick = [this] {
+            modring::setArmed (modring::armed() == index ? -1 : index);
+            refresh();
+        };
+        addAndMakeVisible (assign);
+
         for (int s = 0; s < (int) std::size (modShapeNames); ++s)
             shape.addItem (tr (modShapeNames[s]), s + 1);
         shape.onChange = [this] { edit ([v = shape.getSelectedId() - 1] (Modulator& m) { m.shape = (ModShape) juce::jlimit (0, 6, v); }); };
         shape.setTooltip (tr ("Shape"));
-        addAndMakeVisible (shape);
+        addChildComponent (shape);
         sync.setButtonText (tr ("Sync"));
         sync.setTooltip (tr ("Tempo-synced (off: a rate in Hz)"));
         sync.setColour (juce::TextButton::buttonOnColourId, theme::colour::accent.withAlpha (0.6f));
         sync.onClick = [this] { edit ([] (Modulator& m) { m.sync = ! m.sync; }); };
-        addAndMakeVisible (sync);
+        addChildComponent (sync);
         for (int r = 0; r < (int) std::size (modRates); ++r)
             rate.addItem (modRateText (modRates[r]), r + 1);
         rate.onChange = [this] {
             if (const auto id = rate.getSelectedId(); id > 0)
                 edit ([v = modRates[id - 1]] (Modulator& m) { m.beats = v; });
         };
-        rate.setTooltip (tr ("Cycle length"));
-        addAndMakeVisible (rate);
+        addChildComponent (rate);
+        for (int n = 1; n <= 32; ++n)
+            stepCount.addItem (juce::String (n), n);
+        stepCount.setTooltip (tr ("Steps"));
+        stepCount.onChange = [this] {
+            const auto n = juce::jlimit (1, 32, stepCount.getSelectedId());
+            edit ([n] (Modulator& m) { m.steps.resize ((std::size_t) n, 0.0f); });
+        };
+        addChildComponent (stepCount);
+        source.onChange = [this] {
+            const auto id = source.getSelectedId();
+            const auto* m = mod();
+            if (m == nullptr || id <= 0)
+                return;
+            AutomationTarget t;
+            if (id >= 2)
+                t = { m->kind == ModKind::follower ? AutomationTargetKind::mixerVolume : AutomationTargetKind::channelVolume, id - 2, 0, 0 };
+            edit ([t] (Modulator& x) { x.input = t; });
+        };
+        addChildComponent (source);
+        unipolar.setButtonText (tr ("0..1"));
+        unipolar.setTooltip (tr ("Unipolar: the modulator moves the value one way only (off: both ways)"));
+        unipolar.setColour (juce::TextButton::buttonOnColourId, theme::colour::accent.withAlpha (0.6f));
+        unipolar.onClick = [this] { edit ([] (Modulator& m) { m.unipolar = ! m.unipolar; }); };
+        addChildComponent (unipolar);
+        remove.setButtonText (juce::String::fromUTF8 ("\xc3\x97"));
+        remove.setTooltip (tr ("Delete the modulator"));
+        remove.onClick = [this] {
+            if (modring::armed() == index)
+                modring::setArmed (-1);
+            engine.editSong ([i = index] (Song& s) { s.removeModulator (i); });
+        };
+        addAndMakeVisible (remove);
+
         ui::ValueSpec hzSpec;
         hzSpec.name = tr ("Rate");
         hzSpec.minimum = 0.01;
         hzSpec.maximum = 20.0;
         hzSpec.defaultValue = 1.0;
         hzSpec.toText = [] (double v) { return juce::String (v, v < 1.0 ? 2 : 1) + " Hz"; };
-        hz = std::make_unique<ctlui::Knob> (&engine, hzSpec, [this] { const auto* m = mod(); return m != nullptr ? m->hz : 1.0; },
-                                            [this] (double v) { edit ([v] (Modulator& m) { m.hz = v; }); });
-        addChildComponent (*hz);
+        hz = knob (hzSpec, [] (const Modulator& m) { return m.hz; }, [] (Modulator& m, double v) { m.hz = v; });
         ui::ValueSpec phaseSpec;
         phaseSpec.name = tr ("Phase");
         phaseSpec.minimum = 0.0;
         phaseSpec.maximum = 359.0;
         phaseSpec.interval = 1.0;
         phaseSpec.toText = [] (double v) { return juce::String ((int) v) + juce::String::fromUTF8 ("\xc2\xb0"); };
-        phase = std::make_unique<ctlui::Knob> (&engine, phaseSpec, [this] { const auto* m = mod(); return m != nullptr ? m->phase * 360.0 : 0.0; },
-                                               [this] (double v) { edit ([v] (Modulator& m) { m.phase = (float) (v / 360.0); }); });
-        addAndMakeVisible (*phase);
-        unipolar.setButtonText (tr ("0..1"));
-        unipolar.setTooltip (tr ("Unipolar: the modulator moves the value one way only (off: both ways)"));
-        unipolar.setColour (juce::TextButton::buttonOnColourId, theme::colour::accent.withAlpha (0.6f));
-        unipolar.onClick = [this] { edit ([] (Modulator& m) { m.unipolar = ! m.unipolar; }); };
-        addAndMakeVisible (unipolar);
-        remove.setButtonText (juce::String::fromUTF8 ("\xc3\x97"));
-        remove.setTooltip (tr ("Delete the modulator"));
-        remove.onClick = [this] {
-            engine.editSong ([i = index] (Song& s) {
-                if (i < (int) s.modulators.size())
-                    s.modulators.erase (s.modulators.begin() + i);
-            });
-        };
-        addAndMakeVisible (remove);
+        phase = knob (phaseSpec, [] (const Modulator& m) { return m.phase * 360.0; }, [] (Modulator& m, double v) { m.phase = (float) (v / 360.0); });
+        attack = knob (msSpec (tr ("Attack"), 2000.0, 10.0), [] (const Modulator& m) { return (double) m.attack; }, [] (Modulator& m, double v) { m.attack = (float) v; });
+        decay = knob (msSpec (tr ("Decay"), 5000.0, 300.0), [] (const Modulator& m) { return (double) m.decay; }, [] (Modulator& m, double v) { m.decay = (float) v; });
+        sustain = knob (pctSpec (tr ("Sustain"), 60.0), [] (const Modulator& m) { return m.sustain * 100.0; }, [] (Modulator& m, double v) { m.sustain = (float) (v / 100.0); });
+        release = knob (msSpec (tr ("Release"), 5000.0, 250.0), [] (const Modulator& m) { return (double) m.release; }, [] (Modulator& m, double v) { m.release = (float) v; });
+        ui::ValueSpec gainSpec;
+        gainSpec.name = tr ("Gain");
+        gainSpec.minimum = -24.0;
+        gainSpec.maximum = 24.0;
+        gainSpec.defaultValue = 0.0;
+        gainSpec.toText = [] (double v) { return (v > 0 ? "+" : "") + juce::String (v, 1) + " dB"; };
+        gain = knob (gainSpec, [] (const Modulator& m) { return (double) m.gain; }, [] (Modulator& m, double v) { m.gain = (float) v; });
+        glide = knob (pctSpec (tr ("Glide"), 0.0), [] (const Modulator& m) { return m.glide * 100.0; }, [] (Modulator& m, double v) { m.glide = (float) (v / 100.0); });
+        smooth = knob (pctSpec (tr ("Smooth"), 0.0), [] (const Modulator& m) { return m.smooth * 100.0; }, [] (Modulator& m, double v) { m.smooth = (float) (v / 100.0); });
+        auto macroSpec = pctSpec (tr ("Macro"), 0.0);
+        macroSpec.target = AutomationTarget { AutomationTargetKind::modulatorMacro, index, 0, 0 }; // (automatable, linkable)
+        macroSpec.interval = 0.0;
+        // (the knob shows the song's value: an automation of it moves the targets, not this knob)
+        macro = knob (macroSpec, [] (const Modulator& m) { return m.macro * 100.0; }, [] (Modulator& m, double v) { m.macro = (float) (v / 100.0); });
         refresh();
     }
 
-    static constexpr int headHeight = 58, routeHeight = 52;
+    static constexpr int headHeight = 34, controlHeight = 60, routeHeight = 52;
     int wantedHeight() const
     {
         const auto* m = mod();
-        return headHeight + routeHeight * juce::jmax (1, m != nullptr ? (int) m->routes.size() : 0) + 8;
+        return headHeight + controlHeight + routeHeight * juce::jmax (1, m != nullptr ? (int) m->routes.size() : 0) + 8;
     }
 
     void refresh()
@@ -1308,7 +1511,9 @@ public:
         const auto* m = mod();
         if (m == nullptr)
             return;
+        const auto& song = engine.getSong();
         name.setButtonText (juce::String::fromUTF8 (m->name.c_str()));
+        assign.setToggleState (modring::armed() == index, juce::dontSendNotification);
         shape.setSelectedId ((int) m->shape + 1, juce::dontSendNotification);
         sync.setToggleState (m->sync, juce::dontSendNotification);
         unipolar.setToggleState (m->unipolar, juce::dontSendNotification);
@@ -1317,13 +1522,62 @@ public:
             if (std::abs (modRates[r] - m->beats) < 1.0e-6)
                 id = r + 1;
         rate.setSelectedId (id, juce::dontSendNotification);
-        rate.setVisible (m->sync);
-        hz->setVisible (! m->sync);
+        rate.setTooltip (m->kind == ModKind::lfo ? tr ("Cycle length") : tr ("Step length"));
+        stepCount.setSelectedId (juce::jlimit (1, 32, (int) m->steps.size()), juce::dontSendNotification);
 
-        // the routes: one depth knob each
+        // where it sits / what it follows (the lists follow the song's channels and inserts)
+        host.clear (juce::dontSendNotification);
+        host.addItem (tr ("Not placed"), 1);
+        host.addSectionHeading (tr ("Channels"));
+        for (int c = 0; c < (int) song.channels.size() && c < hostInsertBase - hostChannelBase; ++c)
+            host.addItem (channelLabel (song, c), hostChannelBase + c);
+        host.addSectionHeading (tr ("Mixer"));
+        for (int t = 0; t < (int) song.mixer.size(); ++t)
+            host.addItem (insertLabel (song, t), hostInsertBase + t);
+        host.setSelectedId (m->host.kind == AutomationTargetKind::channelVolume ? hostChannelBase + m->host.index
+                            : m->host.kind == AutomationTargetKind::mixerVolume ? hostInsertBase + m->host.index
+                                                                                : 1,
+                            juce::dontSendNotification);
+        source.clear (juce::dontSendNotification);
+        source.addItem (tr ("Where it sits"), 1);
+        if (m->kind == ModKind::follower)
+        {
+            source.setTooltip (tr ("The insert whose level it follows"));
+            for (int t = 0; t < (int) song.mixer.size(); ++t)
+                source.addItem (insertLabel (song, t), t + 2);
+        }
+        else
+        {
+            source.setTooltip (tr ("The channel whose notes drive it"));
+            for (int c = 0; c < (int) song.channels.size(); ++c)
+                source.addItem (channelLabel (song, c), c + 2);
+        }
+        source.setSelectedId (m->input.kind != AutomationTargetKind::none ? m->input.index + 2 : 1, juce::dontSendNotification);
+
+        const auto k = m->kind;
+        const auto rated = k == ModKind::lfo || k == ModKind::steps || k == ModKind::random;
+        shape.setVisible (k == ModKind::lfo);
+        sync.setVisible (rated);
+        rate.setVisible (rated && m->sync);
+        hz->setVisible (rated && ! m->sync);
+        phase->setVisible (k == ModKind::lfo);
+        stepCount.setVisible (k == ModKind::steps);
+        glide->setVisible (k == ModKind::steps);
+        smooth->setVisible (k == ModKind::random);
+        source.setVisible (k == ModKind::follower || k == ModKind::envelope || k == ModKind::keytrack || k == ModKind::velocity);
+        attack->setVisible (k == ModKind::follower || k == ModKind::envelope);
+        release->setVisible (k == ModKind::follower || k == ModKind::envelope);
+        decay->setVisible (k == ModKind::envelope);
+        sustain->setVisible (k == ModKind::envelope);
+        gain->setVisible (k == ModKind::follower);
+        macro->setVisible (k == ModKind::macro);
+        unipolar.setVisible (k != ModKind::envelope);
+
+        // the routes: a depth knob each (and the base of a hosted plugin's parameter)
         if (routeKnobs.size() != m->routes.size())
         {
             routeKnobs.clear();
+            routeBases.clear();
             routeRemove.clear();
             for (int r = 0; r < (int) m->routes.size(); ++r)
             {
@@ -1333,103 +1587,254 @@ public:
                 spec.maximum = 100.0;
                 spec.interval = 1.0;
                 spec.toText = [] (double v) { return (v > 0 ? "+" : "") + juce::String ((int) v) + "%"; };
-                auto knob = std::make_unique<ctlui::Knob> (&engine, spec,
+                auto depthKnob = std::make_unique<ctlui::Knob> (&engine, spec,
                     [this, r] { const auto* x = mod(); return x != nullptr && r < (int) x->routes.size() ? x->routes[(std::size_t) r].depth * 100.0 : 0.0; },
                     [this, r] (double v) { edit ([r, v] (Modulator& x) { if (r < (int) x.routes.size()) x.routes[(std::size_t) r].depth = (float) (v / 100.0); }); });
-                addAndMakeVisible (*knob);
-                routeKnobs.push_back (std::move (knob));
+                addAndMakeVisible (*depthKnob);
+                routeKnobs.push_back (std::move (depthKnob));
+                auto baseSpec = pctSpec (tr ("Base"), 50.0);
+                baseSpec.interval = 0.0;
+                auto baseKnob = std::make_unique<ctlui::Knob> (&engine, baseSpec,
+                    [this, r] { const auto* x = mod(); return x != nullptr && r < (int) x->routes.size() ? juce::jmax (0.0f, x->routes[(std::size_t) r].base) * 100.0 : 0.0; },
+                    [this, r] (double v) { edit ([r, v] (Modulator& x) { if (r < (int) x.routes.size()) x.routes[(std::size_t) r].base = (float) (v / 100.0); }); });
+                baseKnob->setHelpText (tr ("The parameter's own value: the modulation moves around it (the plugin's knob shows the modulated value)"));
+                addChildComponent (*baseKnob);
+                routeBases.push_back (std::move (baseKnob));
                 auto x = std::make_unique<juce::TextButton> (juce::String::fromUTF8 ("\xc3\x97"));
                 x->setTooltip (tr ("Remove this routing"));
                 x->onClick = [this, r] { edit ([r] (Modulator& mm) { if (r < (int) mm.routes.size()) mm.routes.erase (mm.routes.begin() + r); }); };
                 addAndMakeVisible (*x);
                 routeRemove.push_back (std::move (x));
             }
-            resized();
         }
-        for (auto& k : routeKnobs)
-            k->repaint();
-        hz->repaint();
-        phase->repaint();
+        for (std::size_t r = 0; r < routeBases.size() && r < m->routes.size(); ++r)
+            routeBases[r]->setVisible (m->routes[r].base >= 0.0f);
+        resized();
+        for (auto& kb : routeKnobs)
+            kb->repaint();
         repaint();
     }
 
     void resized() override
     {
         auto head = getLocalBounds().removeFromTop (headHeight).reduced (6, 4);
-        name.setBounds (head.removeFromLeft (90).withSizeKeepingCentre (90, 24));
+        handle.setBounds (head.removeFromLeft (20));
+        head.removeFromLeft (4);
+        name.setBounds (head.removeFromLeft (96).withSizeKeepingCentre (96, 24));
         head.removeFromLeft (6);
-        shape.setBounds (head.removeFromLeft (120).withSizeKeepingCentre (120, 24));
+        kindArea = head.removeFromLeft (124);
         head.removeFromLeft (6);
-        sync.setBounds (head.removeFromLeft (48).withSizeKeepingCentre (48, 24));
-        head.removeFromLeft (6);
-        const auto rateArea = head.removeFromLeft (80);
-        rate.setBounds (rateArea.withSizeKeepingCentre (80, 24));
-        hz->setBounds (rateArea);
-        head.removeFromLeft (6);
-        phase->setBounds (head.removeFromLeft (52));
-        head.removeFromLeft (6);
-        unipolar.setBounds (head.removeFromLeft (44).withSizeKeepingCentre (44, 24));
+        host.setBounds (head.removeFromLeft (150).withSizeKeepingCentre (150, 24));
         remove.setBounds (head.removeFromRight (26).withSizeKeepingCentre (26, 24));
-        head.removeFromRight (8);
-        scope = head.reduced (0, 4);
+        head.removeFromRight (6);
+        assign.setBounds (head.removeFromRight (70).withSizeKeepingCentre (70, 24));
 
-        auto routes = getLocalBounds().withTrimmedTop (headHeight).reduced (6, 0);
+        auto row = getLocalBounds().withTrimmedTop (headHeight).removeFromTop (controlHeight).reduced (6, 2);
+        const auto box = [&row] (juce::Component& c, int w, int h = 24) {
+            if (! c.isVisible())
+                return;
+            c.setBounds (row.removeFromLeft (w).withSizeKeepingCentre (w, h));
+            row.removeFromLeft (6);
+        };
+        const auto dial = [&row] (juce::Component& c) {
+            if (! c.isVisible())
+                return;
+            c.setBounds (row.removeFromLeft (52));
+            row.removeFromLeft (4);
+        };
+        box (source, 150);
+        box (shape, 120);
+        box (stepCount, 56);
+        box (sync, 48);
+        if (rate.isVisible())
+            box (rate, 80);
+        dial (*hz);
+        dial (*phase);
+        dial (*attack);
+        dial (*decay);
+        dial (*sustain);
+        dial (*release);
+        dial (*gain);
+        dial (*glide);
+        dial (*smooth);
+        dial (*macro);
+        box (unipolar, 44);
+        scope = row.reduced (0, 4);
+
+        auto routes = getLocalBounds().withTrimmedTop (headHeight + controlHeight).reduced (6, 0);
         for (std::size_t r = 0; r < routeKnobs.size(); ++r)
         {
-            auto row = routes.removeFromTop (routeHeight);
-            routeRemove[r]->setBounds (row.removeFromRight (24).withSizeKeepingCentre (24, 20));
-            routeKnobs[r]->setBounds (row.removeFromRight (52));
+            auto line = routes.removeFromTop (routeHeight);
+            routeRemove[r]->setBounds (line.removeFromRight (24).withSizeKeepingCentre (24, 20));
+            routeKnobs[r]->setBounds (line.removeFromRight (52));
+            if (r < routeBases.size())
+                routeBases[r]->setBounds (line.removeFromRight (56).withTrimmedRight (4));
         }
     }
 
     void paint (juce::Graphics& g) override
     {
         using namespace theme;
+        const auto* m = mod();
+        const auto armedHere = modring::armed() == index;
         g.setColour (colour::bg2);
         g.fillRoundedRectangle (getLocalBounds().toFloat().reduced (2.0f), radius::md);
-        const auto* m = mod();
+        if (armedHere)
+        {
+            g.setColour (modring::colour().withAlpha (0.8f));
+            g.drawRoundedRectangle (getLocalBounds().toFloat().reduced (2.5f), radius::md, 1.5f);
+        }
         if (m == nullptr)
             return;
+        g.setFont (font (type::small));
+        g.setColour (colour::textSecondary);
+        g.drawText (tr (modKindNames[(int) m->kind]), kindArea, juce::Justification::centredLeft);
 
-        // one cycle of the shape, and where it is now
         if (! scope.isEmpty())
-        {
-            const auto r = scope.toFloat();
-            g.setColour (colour::bg0);
-            g.fillRoundedRectangle (r, radius::sm);
-            juce::Path p;
-            for (int x = 0; x <= (int) r.getWidth(); ++x)
-            {
-                const auto v = m->output ((double) x / juce::jmax (1.0f, r.getWidth()));
-                const auto y = r.getBottom() - 3.0f - (m->unipolar ? v : (v + 1.0f) * 0.5f) * (r.getHeight() - 6.0f);
-                if (x == 0)
-                    p.startNewSubPath (r.getX() + (float) x, y);
-                else
-                    p.lineTo (r.getX() + (float) x, y);
-            }
-            g.setColour (colour::accent);
-            g.strokePath (p, juce::PathStrokeType (1.5f));
-        }
+            paintScope (g, *m, scope.toFloat());
 
         // the routes' targets
-        g.setFont (font (type::small));
-        auto routes = getLocalBounds().withTrimmedTop (headHeight).reduced (12, 0);
+        auto routes = getLocalBounds().withTrimmedTop (headHeight + controlHeight).reduced (12, 0);
         if (m->routes.empty())
         {
             g.setColour (colour::textSecondary);
-            g.drawText (tr ("No target yet: right-click any LYNX knob > Modulate > {0}", { juce::String::fromUTF8 (m->name.c_str()) }),
+            g.drawText (tr ("No target yet: drag the grip onto a knob, use Assign, or right-click a knob > Modulate with"),
                         routes.removeFromTop (routeHeight), juce::Justification::centredLeft);
             return;
         }
         for (const auto& route : m->routes)
         {
             g.setColour (Modulator::canModulate (engine.getSong(), route.target) ? colour::textPrimary : colour::textDisabled);
-            g.drawText (describeAutomationTarget (engine, route.target), routes.removeFromTop (routeHeight).withTrimmedRight (80),
+            g.drawText (describeAutomationTarget (engine, route.target), routes.removeFromTop (routeHeight).withTrimmedRight (140),
                         juce::Justification::centredLeft);
         }
     }
 
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        if (const auto* m = mod(); m != nullptr && m->kind == ModKind::steps && scope.contains (e.getPosition()))
+            drawStep (e.position, true);
+    }
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        if (const auto* m = mod(); m != nullptr && m->kind == ModKind::steps && scope.contains (e.getMouseDownPosition()))
+            drawStep (e.position, false);
+    }
+
 private:
+    static constexpr int hostChannelBase = 100, hostInsertBase = 100000;
+
+    std::unique_ptr<ctlui::Knob> knob (ui::ValueSpec spec, double (*get) (const Modulator&), void (*set) (Modulator&, double))
+    {
+        auto k = std::make_unique<ctlui::Knob> (&engine, std::move (spec), [this, get] { const auto* m = mod(); return m != nullptr ? get (*m) : 0.0; },
+                                                [this, set] (double v) { edit ([set, v] (Modulator& m) { set (m, v); }); });
+        addChildComponent (*k);
+        return k;
+    }
+
+    // the step sequencer's values are drawn with the mouse in the picture (top +1, middle 0, bottom −1)
+    void drawStep (juce::Point<float> p, bool first)
+    {
+        const auto* m = mod();
+        if (m == nullptr || m->steps.empty())
+            return;
+        const auto r = scope.toFloat();
+        const auto count = (int) m->steps.size();
+        const auto k = juce::jlimit (0, count - 1, (int) ((p.x - r.getX()) / juce::jmax (1.0f, r.getWidth()) * (float) count));
+        const auto v = juce::jlimit (-1.0f, 1.0f, 1.0f - 2.0f * (p.y - r.getY()) / juce::jmax (1.0f, r.getHeight()));
+        engine.editSong ([i = index, k, v] (Song& s) {
+            if (i < (int) s.modulators.size() && k < (int) s.modulators[(std::size_t) i].steps.size())
+                s.modulators[(std::size_t) i].steps[(std::size_t) k] = v;
+        }, first);
+    }
+
+    void paintScope (juce::Graphics& g, const Modulator& m, juce::Rectangle<float> r)
+    {
+        using namespace theme;
+        g.setColour (colour::bg0);
+        g.fillRoundedRectangle (r, radius::sm);
+        const auto& song = engine.getSong();
+        const auto yOf = [&] (float v) { // a −1..1 (or 0..1 unipolar) output to the picture
+            return r.getBottom() - 3.0f - (m.unipolar ? v : (v + 1.0f) * 0.5f) * (r.getHeight() - 6.0f);
+        };
+        const auto caption = [&] (const juce::String& text, juce::Justification where = juce::Justification::centredLeft) {
+            g.setColour (colour::textSecondary);
+            g.setFont (font (type::small));
+            g.drawFittedText (text, r.reduced (8.0f, 4.0f).toNearestInt(), where, 2);
+        };
+        const auto whereNotes = [&] {
+            const auto c = m.input.kind == AutomationTargetKind::channelVolume ? m.input.index
+                           : m.host.kind == AutomationTargetKind::channelVolume ? m.host.index : -1;
+            return c >= 0 ? channelLabel (song, c) : tr ("(place it on a channel)");
+        };
+        juce::Path p;
+        switch (m.kind)
+        {
+            case ModKind::lfo:
+            case ModKind::random:
+            {
+                // one cycle of the shape (random: eight steps)
+                const auto span = m.kind == ModKind::lfo ? 1.0 : 8.0;
+                for (int x = 0; x <= (int) r.getWidth(); ++x)
+                {
+                    const auto at = span * x / juce::jmax (1.0f, r.getWidth());
+                    const auto y = yOf (m.kind == ModKind::lfo ? m.output (at) : m.stepOutput (at));
+                    if (x == 0)
+                        p.startNewSubPath (r.getX() + (float) x, y);
+                    else
+                        p.lineTo (r.getX() + (float) x, y);
+                }
+                break;
+            }
+            case ModKind::steps:
+            {
+                const auto count = juce::jmax (1, (int) m.steps.size());
+                const auto w = r.getWidth() / (float) count;
+                const auto zero = yOf (0.0f);
+                for (int k = 0; k < (int) m.steps.size(); ++k)
+                {
+                    const auto v = m.unipolar ? (m.steps[(std::size_t) k] + 1.0f) * 0.5f : m.steps[(std::size_t) k];
+                    const auto y = yOf (v);
+                    g.setColour ((k / 4) % 2 == 0 ? colour::accent.withAlpha (0.75f) : colour::accent.withAlpha (0.5f));
+                    g.fillRect (juce::Rectangle<float>::leftTopRightBottom (r.getX() + w * (float) k + 1.0f, juce::jmin (y, zero), r.getX() + w * (float) (k + 1) - 1.0f,
+                                                                            juce::jmax (y, zero) + 1.0f));
+                }
+                return;
+            }
+            case ModKind::envelope:
+            {
+                // attack, decay to the sustain, a held part, the release: time to scale
+                const auto total = juce::jmax (1.0f, m.attack + m.decay + m.release) * 1.25f;
+                const auto x0 = r.getX() + 3.0f, w = r.getWidth() - 6.0f;
+                const auto xa = x0 + w * m.attack / total, xd = xa + w * m.decay / total, xs = xd + w * 0.2f;
+                p.startNewSubPath (x0, yOf (0.0f));
+                p.lineTo (xa, yOf (1.0f));
+                p.quadraticTo ((xa + xd) * 0.5f, yOf (m.sustain), xd, yOf (m.sustain));
+                p.lineTo (xs, yOf (m.sustain));
+                p.quadraticTo (xs + (x0 + w - xs) * 0.25f, yOf (0.0f), x0 + w, yOf (0.0f));
+                g.setColour (colour::accent);
+                g.strokePath (p, juce::PathStrokeType (1.5f));
+                caption (whereNotes(), juce::Justification::bottomRight);
+                return;
+            }
+            case ModKind::follower:
+            {
+                const auto t = m.input.kind == AutomationTargetKind::mixerVolume ? m.input.index
+                               : m.host.kind == AutomationTargetKind::mixerVolume ? m.host.index
+                               : m.host.kind == AutomationTargetKind::channelVolume && m.host.index >= 0 && m.host.index < (int) song.channels.size()
+                                   ? song.channels[(std::size_t) m.host.index].mixerTrack
+                                   : -1;
+                caption (t >= 0 ? tr ("Follows the level of {0}", { insertLabel (song, t) }) : tr ("(place it on an insert)"));
+                return;
+            }
+            case ModKind::macro: caption (tr ("Move or automate the Macro knob: every target follows it")); return;
+            case ModKind::keytrack: caption (tr ("The last note's key on {0} (C5 = centre)", { whereNotes() })); return;
+            case ModKind::velocity: caption (tr ("The last note's velocity on {0}", { whereNotes() })); return;
+        }
+        g.setColour (colour::accent);
+        g.strokePath (p, juce::PathStrokeType (1.5f));
+    }
+
     const Modulator* mod() const
     {
         const auto& song = engine.getSong();
@@ -1467,12 +1872,13 @@ private:
 
     AudioEngine& engine;
     int index;
-    juce::TextButton name, sync, unipolar, remove;
-    juce::ComboBox shape, rate;
-    std::unique_ptr<ctlui::Knob> hz, phase;
-    std::vector<std::unique_ptr<ctlui::Knob>> routeKnobs;
+    ModHandle handle;
+    juce::TextButton name, sync, unipolar, remove, assign;
+    juce::ComboBox shape, rate, host, source, stepCount;
+    std::unique_ptr<ctlui::Knob> hz, phase, attack, decay, sustain, release, gain, glide, smooth, macro;
+    std::vector<std::unique_ptr<ctlui::Knob>> routeKnobs, routeBases;
     std::vector<std::unique_ptr<juce::TextButton>> routeRemove;
-    juce::Rectangle<int> scope;
+    juce::Rectangle<int> scope, kindArea;
 };
 
 class ModulatorsPanel final : public juce::Component,
@@ -1483,29 +1889,42 @@ public:
     explicit ModulatorsPanel (AudioEngine& e) : engine (e)
     {
         add.setButtonText (tr ("+ Add modulator"));
-        add.onClick = [this] { addModulator (engine); };
+        add.onClick = [this] {
+            juce::PopupMenu menu;
+            for (int k = 0; k < modKindCount; ++k)
+                menu.addItem (tr (modKindNames[k]), [this, k] { addModulator (engine, (ModKind) k); });
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&add));
+        };
         addAndMakeVisible (add);
         viewport.setViewedComponent (&list, false);
         viewport.setScrollBarsShown (true, false);
         addAndMakeVisible (viewport);
         engine.addChangeListener (this);
         rebuild();
-        setSize (720, 360);
+        setSize (860, 420);
         startTimerHz (20);
     }
-    ~ModulatorsPanel() override { engine.removeChangeListener (this); }
+    ~ModulatorsPanel() override
+    {
+        engine.removeChangeListener (this);
+        modring::setArmed (-1); // (Assign mode ends with the window)
+    }
 
-    // a new modulator (synced sine, one bar), optionally routed to `target`; returns its index
-    static int addModulator (AudioEngine& engine, std::optional<AutomationTarget> target = {})
+    // a new modulator of `kind` (its kind's defaults), optionally routed to `target` and placed where it is; its index
+    static int addModulator (AudioEngine& engine, ModKind kind = ModKind::lfo, std::optional<AutomationTarget> target = {})
     {
         int index = -1;
-        const auto name = nextModulatorName (engine.getSong()).toStdString();
+        const auto name = nextModulatorName (engine.getSong(), kind).toStdString();
+        const auto route = target ? std::optional<ModRoute> (newRoute (engine, *target)) : std::nullopt;
         engine.editSong ([&] (Song& s) {
-            Modulator m;
+            auto m = Modulator::make (kind);
             m.name = name;
             m.seed = (std::uint32_t) s.modulators.size() + 1;
-            if (target)
-                m.routes.push_back ({ *target, 0.25f });
+            if (route)
+            {
+                m.routes.push_back (*route);
+                m.host = hostFor (route->target);
+            }
             s.modulators.push_back (std::move (m));
             index = (int) s.modulators.size() - 1;
         });
@@ -1519,7 +1938,7 @@ public:
         {
             g.setColour (theme::colour::textSecondary);
             g.setFont (theme::font (theme::type::body));
-            g.drawFittedText (tr ("Modulators move LYNX knobs around their own value (an automation clip on the same knob still sets that value)."),
+            g.drawFittedText (tr ("Modulators move knobs around their own value (an automation clip on the same knob still sets that value)."),
                               getLocalBounds().withTrimmedTop (44).reduced (16), juce::Justification::centredTop, 3);
         }
     }
@@ -1586,7 +2005,7 @@ public:
         setUsingNativeTitleBar (true);
         setContentOwned (new ModulatorsPanel (engine), true);
         setResizable (true, false);
-        setResizeLimits (560, 200, 4000, 2000);
+        setResizeLimits (640, 200, 4000, 2000);
         centreWithSize (getWidth(), getHeight());
         setVisible (true);
         keepAboveMainWindow (*this);
@@ -1622,6 +2041,11 @@ std::unique_ptr<juce::Component> makeModulatorsPanel (AudioEngine& engine)
     return std::make_unique<ModulatorsPanel> (engine);
 }
 
+int addModulator (AudioEngine& engine, ModKind kind, std::optional<AutomationTarget> target)
+{
+    return ModulatorsPanel::addModulator (engine, kind, target);
+}
+
 void addModulationItems (juce::PopupMenu& menu, AudioEngine& engine, const AutomationTarget& target)
 {
     const auto& song = engine.getSong();
@@ -1637,26 +2061,29 @@ void addModulationItems (juce::PopupMenu& menu, AudioEngine& engine, const Autom
         if (routed)
             label << "  (" << (route->depth > 0 ? "+" : "") << juce::roundToInt (route->depth * 100.0f) << "%)";
         sub.addItem (label, true, routed, [&engine, target, m, routed] {
-            engine.editSong ([target, m, routed] (Song& s) {
+            const auto add = newRoute (engine, target);
+            engine.editSong ([target, m, routed, add] (Song& s) {
                 if (m >= (int) s.modulators.size())
                     return;
                 auto& routes = s.modulators[(std::size_t) m].routes;
                 if (routed)
                     routes.erase (std::remove_if (routes.begin(), routes.end(), [&] (const ModRoute& r) { return r.target == target; }), routes.end());
                 else
-                    routes.push_back ({ target, 0.25f });
+                    routes.push_back (add);
             });
         });
     }
     if (! song.modulators.empty())
         sub.addSeparator();
-    sub.addItem (tr ("New modulator (LFO)"), [&engine, target] {
-        ModulatorsPanel::addModulator (engine, target);
-        openModulators (engine);
-    });
+    for (int k = 0; k < modKindCount; ++k)
+        sub.addItem (tr ("New {0}", { tr (modKindNames[k]) }), [&engine, target, k] {
+            ModulatorsPanel::addModulator (engine, (ModKind) k, target);
+            openModulators (engine);
+        });
+    sub.addSeparator();
     sub.addItem (tr ("Modulators..."), [&engine] { openModulators (engine); });
     menu.addSeparator();
-    menu.addSubMenu (tr ("Modulate"), sub);
+    menu.addSubMenu (tr ("Modulate with"), sub);
 }
 
 std::vector<ControllerOutput> controllerOutputs (const Song& song)

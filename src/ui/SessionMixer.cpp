@@ -7,6 +7,7 @@
 
 #include "core/ClipLauncher.h"
 #include "core/Crossfader.h"
+#include "core/TrackStates.h"
 #include "engine/AudioEngine.h"
 #include "ui/ClipGridComponent.h"
 #include "ui/I18n.h"
@@ -972,8 +973,13 @@ void SessionMixerComponent::paint (juce::Graphics& g)
         {
             juce::Graphics::ScopedSaveState save (g);
             g.reduceClipRegion (juce::Rectangle<int> (0, 0, tracksWidth, getHeight()));
+            const auto veil = deactivate::anyMarked (engine.getSong()); // (round 190ou: nothing looked up while none is)
             for (int t = std::max (0, scroll / std::max (1, columnWidth)); t < columns && stripX (t) < tracksWidth; ++t)
+            {
                 paintStripLive (g, t, selected);
+                if (veil)
+                    paintDeactivatedVeil (g, t);
+            }
         }
         for (int k = 0; k < returnColumns; ++k) // (round 190kc: the return strips)
             paintStripLive (g, returnColumn (k), selected);
@@ -986,8 +992,13 @@ void SessionMixerComponent::paint (juce::Graphics& g)
     {
         juce::Graphics::ScopedSaveState save (g);
         g.reduceClipRegion (juce::Rectangle<int> (0, 0, tracksWidth, getHeight()));
+        const auto veil = deactivate::anyMarked (engine.getSong()); // (round 190ou: nothing looked up while none is)
         for (int t = std::max (0, scroll / std::max (1, columnWidth)); t < columns && stripX (t) < tracksWidth; ++t)
+        {
             paintStrip (g, t);
+            if (veil)
+                paintDeactivatedVeil (g, t);
+        }
     }
     for (int k = 0; k < returnColumns; ++k) // (round 190kc: the return strips)
         paintStrip (g, returnColumn (k));
@@ -1001,6 +1012,18 @@ void SessionMixerComponent::paint (juce::Graphics& g)
     g.fillRect (tracksWidth, 0, 1, getHeight());
     if (returnColumns > 0)
         g.fillRect (stripX (mainColumn), 0, 1, getHeight());
+}
+
+// Round 190ou: a deactivated track's strip is dimmed as its title in the grid is (round 190op, P4: bg0 at 45 % over it),
+// so the whole column reads as unloaded; the Track Activator inside keeps meaning Live's mute
+void SessionMixerComponent::paintDeactivatedVeil (juce::Graphics& g, int column) const
+{
+    const auto& song = engine.getSong();
+    const auto track = trackOf (column);
+    if (track < 0 || ! trackstates::trackDeactivated (song, trackstates::unitsOfTrack (song, track)))
+        return;
+    g.setColour (theme::colour::bg0.withAlpha (0.45f));
+    g.fillRect (stripX (column), 0, stripWidth (column), getHeight());
 }
 
 void SessionMixerComponent::paintStrip (juce::Graphics& g, int column)

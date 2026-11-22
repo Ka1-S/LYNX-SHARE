@@ -28,6 +28,8 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <map>
+#include <set>
 #include <vector>
 
 // TR_NOOP marks the loss texts for translation (tools/i18n_keys.py); the UI translates them
@@ -1080,6 +1082,11 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             if (drop (c, "ara"))
                 edited.add (channelName (juce::var (&c), i));
         });
+        // round 190oq (issue #243): an ARA plugin on a mixer insert is a plain insert effect there
+        forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
+            if (drop (e, "ara"))
+                edited.add (where);
+        });
         drop (o, "araDocuments");
         if (! edited.isEmpty())
             lost.push_back ({ TR_NOOP ("Audio clips edited in an ARA plugin (Melodyne...) play without those edits: {0}"), listOf (edited), false });
@@ -1432,6 +1439,60 @@ void toRelease0130 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("LYNX Model is not in this release: its channels become empty Samplers and play nothing: {0}"), listOf (lynxModel), true });
     }
 
+    // round 190ov: FL automation clips linked to several controls (target links on an FL import). 0.1.30 plays target links
+    // 1:1 (no sixth element: a control's own scale, set where LYNX counts the control differently from FL), and a link's
+    // control always follows the linked clip, even where another clip of that control plays. The scales go (the copy opened
+    // again in a newer LYNX plays what 0.1.30 plays); a line for the clips with a scale or a control shared with another
+    // clip in the Playlist
+    {
+        std::set<int> withClips;
+        forEachClip (root, [&] (juce::Array<juce::var>& c) {
+            if (c.size() >= 7 && (int) c[5] == 2)
+                withClips.insert ((int) c[6]);
+        });
+        const auto key = [] (const juce::var& t) {
+            return t.isArray() && t.size() >= 4 ? t[0].toString() + "/" + t[1].toString() + "/" + t[2].toString() + "/" + t[3].toString() : juce::String();
+        };
+        std::map<juce::String, int> drivers; // control → how many automations with clips drive it
+        if (auto* automations = arrayOf (root["automations"]))
+            for (int i = 0; i < automations->size(); ++i)
+                if (withClips.count (i) != 0)
+                {
+                    const auto& a = (*automations)[i];
+                    if (auto* links = arrayOf (a["links"]); links != nullptr && ! links->isEmpty())
+                    {
+                        std::set<juce::String> own;
+                        for (const auto& l : *links)
+                            own.insert (key (l));
+                        for (const auto& k : own)
+                            ++drivers[k];
+                    }
+                    else if (! a.hasProperty ("source"))
+                        ++drivers[key (a["target"])];
+                }
+        juce::StringArray changed;
+        if (auto* automations = arrayOf (root["automations"]))
+            for (int i = 0; i < automations->size(); ++i)
+                if (auto* links = arrayOf ((*automations)[i]["links"]))
+                {
+                    bool scaled = false, shared = false;
+                    for (auto& l : *links)
+                        if (auto* fields = arrayOf (l))
+                        {
+                            if (fields->size() > 5)
+                            {
+                                fields->resize (5);
+                                scaled = true;
+                            }
+                            shared = shared || (withClips.count (i) != 0 && drivers[key (l)] > 1);
+                        }
+                    if ((scaled && withClips.count (i) != 0) || shared)
+                        changed.add ("\"" + (*automations)[i].getProperty ("name", {}).toString() + "\"");
+                }
+        if (! changed.isEmpty())
+            lost.push_back ({ TR_NOOP ("Automation clips linked to several controls move them 1:1 and win over the other clips of those controls: {0}"), listOf (changed), true });
+    }
+
     // round 190nh: the Kilohearts part-2 laws on Effector (hidden [12] codes 41 … 48; round 190oc: 49, the Nonlinear
     // Filter; set only by the Kilohearts translator). 0.1.30 reads [12] in eighths (round 190nb's five laws, codes 8 … 40,
     // which stay), so codes 41 … 43 would play its Shaper law on these values: [12 …] are cut and Effector plays the
@@ -1541,6 +1602,20 @@ void toRelease0130 (juce::var& root, Losses& lost)
         });
         if (! scratched.isEmpty())
             lost.push_back ({ TR_NOOP ("Gross Beat's scratch offset (Time offset (scratching)) plays without the offset: {0}"), listOf (scratched), true });
+    }
+
+    // round 190om: SimSynth's velocity law (ChannelDef::engineRev 2). 0.1.30 plays every SimSynth note at full level
+    {
+        juce::StringArray simsynth;
+        forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
+            if (c.getProperty ("instrument").toString() == "simsynth" && (int) c.getProperty ("engineRev") >= 2)
+            {
+                c.setProperty ("engineRev", 1);
+                addOnce (simsynth, channelName (juce::var (&c), i));
+            }
+        });
+        if (! simsynth.isEmpty())
+            lost.push_back ({ TR_NOOP ("SimSynth plays every note at full level in this release (the note velocity is left out): {0}"), listOf (simsynth), true });
     }
 
     // round 190nw: the tracker editor's view settings (rows per beat, columns, track groups). A view: the notes are the
@@ -1662,6 +1737,22 @@ void toRelease0130 (juce::var& root, Losses& lost)
                               listOf (editors), false });
     }
 
+    // round 190ot (research190oe P5): the Simple layout's "Duck under..." is a Fruity Limiter whose one-knob goal is 9
+    // (goals::duck), keyed by the trigger through a level-0 send. 0.1.30 knows goals 1 … 8 only: the slot plays exactly
+    // the same (ordinary parameters, side input and send) but its card shows the Limiter's Mix instead of the Amount
+    // knob. The goal stays in the copy (opened again here it is a duck again); a view line, only when there is one.
+    // The shared Echo bus is an ordinary insert with Echoform and ordinary sends: nothing to change
+    {
+        int ducks = 0;
+        forEachEffect (root, [&ducks] (juce::DynamicObject& e, const juce::String&) {
+            if (e.getProperty ("kind").toString() == "fruityLimiter" && (int) e.getProperty ("goal") == 9)
+                ++ducks;
+        });
+        if (ducks > 0)
+            lost.push_back ({ TR_NOOP ("{0} \"Duck under...\" effect(s) of the Simple layout show as an ordinary Fruity Limiter with its side input (the sound is the same)"),
+                              juce::String (ducks), false });
+    }
+
     // round 190ok (D3): EffectSlot::engineRev 2 = LYNX's own devices (Ember, Prism, Crest, Echoform...) compute their
     // per-sample tanh / exp / log / pow / sin with core/FastMath.h. 0.1.30 knows revisions 0 and 1 (Maximus: ">= 1"), so it
     // plays a slot at 2 as at 1, with the C library's maths (190ok's nulls: at most -135 dBFS apart). The copy says 1, so
@@ -1698,6 +1789,192 @@ void toRelease0130 (juce::var& root, Losses& lost)
         for (auto& a : *automations)
             if (auto* ao = objectOf (a))
                 drop (*ao, "rackSlot");
+    // round 190op (P4): hidden Playlist tracks (a view: they show again, nothing they play changes)
+    if (auto* hidden = arrayOf (root["playlistTracksHidden"]))
+    {
+        const auto count = hidden->size();
+        drop (o, "playlistTracksHidden");
+        lost.push_back ({ TR_NOOP ("{0} hidden Playlist track(s) show again"), juce::String (count), false });
+    }
+
+    // round 190op (P4): deactivated channels and inserts. 0.1.30 has no such state: they come back muted, so the mix sounds
+    // the same, and their plugins load again
+    {
+        juce::StringArray units;
+        forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
+            if (drop (c, "deactivated"))
+            {
+                units.add (channelName (juce::var (&c), i));
+                c.setProperty ("muted", true);
+            }
+        });
+        if (auto* mixer = arrayOf (root["mixer"]))
+            for (int t = 0; t < mixer->size(); ++t)
+                if (auto* m = objectOf ((*mixer)[t]); m != nullptr && drop (*m, "deactivated"))
+                {
+                    units.add (insertName (root["mixer"], t));
+                    m->setProperty ("muted", true);
+                }
+        if (! units.isEmpty())
+            lost.push_back ({ TR_NOOP ("Deactivated channels and inserts load their plugins again and come back muted: {0}"), listOf (units), false });
+    }
+
+    // round 190ow (DE-123, core/RackAutomation.h): what the automation clip rows play
+    {
+        // the steps / notes on the rows: 0.1.30 starts no clip from a pattern
+        int triggers = 0;
+        if (auto* patterns = arrayOf (root["patterns"]))
+            for (auto& p : *patterns)
+                if (auto* po = objectOf (p))
+                {
+                    if (auto* notes = arrayOf (po->getProperty ("autoNotes")))
+                        triggers += notes->size();
+                    drop (*po, "autoNotes");
+                }
+        if (triggers > 0)
+            lost.push_back ({ TR_NOOP ("{0} step(s) or note(s) on automation clip rows start no clip (the clips in the Playlist play as before)"),
+                              juce::String (triggers), true });
+
+        // the MIN / MAX knobs: written into the points, so the clips play the same values (an LFO keeps its own range)
+        // and a muted clip: no target, so it drives nothing, as here
+        juce::StringArray muted;
+        bool lfoRange = false;
+        if (auto* automations = arrayOf (root["automations"]))
+            for (auto& a : *automations)
+                if (auto* ao = objectOf (a))
+                {
+                    if (const auto range = ao->getProperty ("range"); range.isArray() && range.size() >= 4)
+                    {
+                        const auto rMin = (double) range[0], rMax = (double) range[1], pMin = (double) range[2], pMax = (double) range[3];
+                        if (rMin != pMin || rMax != pMax)
+                        {
+                            if (auto* points = arrayOf (ao->getProperty ("points")))
+                                for (auto& pt : *points)
+                                    if (auto* fields = arrayOf (pt); fields != nullptr && fields->size() >= 2)
+                                    {
+                                        const auto span = pMax - pMin;
+                                        const auto x = std::abs (span) > 1.0e-9 ? ((double) (*fields)[1] - pMin) / span : 0.0;
+                                        fields->set (1, juce::roundToInt (juce::jlimit (0.0, 1.0, rMin + (rMax - rMin) * x) * 10000.0) / 10000.0);
+                                    }
+                            if (auto* lfo = arrayOf (ao->getProperty ("lfo")); lfo != nullptr && ! lfo->isEmpty() && (bool) (*lfo)[0])
+                                lfoRange = true;
+                        }
+                        drop (*ao, "range");
+                    }
+                    if (drop (*ao, "muted"))
+                    {
+                        muted.add (ao->getProperty ("name").toString());
+                        ao->setProperty ("target", juce::Array<juce::var> { "none", 0, 0, 0 });
+                    }
+                }
+        if (lfoRange)
+            lost.push_back ({ TR_NOOP ("An automation clip's LFO keeps the clip's first range (its MIN / MAX knobs are written into the points)"), {}, true });
+        if (! muted.isEmpty())
+            lost.push_back ({ TR_NOOP ("Muted automation clips lose their target, so they stay silent: {0}"), listOf (muted), false });
+    }
+
+    // round 190ox (modulators stage 2): 0.1.30 has LFO modulators on LYNX's own controls only. The other kinds (they sit
+    // in "modulators190ox", which 0.1.30 does not read) go with a line naming them; an LFO's routes to a hosted
+    // plugin's parameters (which 0.1.30 would refuse) and the stage 2 fields go too; an automation of a Macro's knob
+    // stays as an unlinked clip
+    {
+        juce::StringArray kinds, hosted;
+        if (auto* more = arrayOf (root["modulators190ox"]))
+            for (const auto& m : *more)
+            {
+                const auto kind = (int) m.getProperty ("kind", 0);
+                const auto kindText = juce::String (Modulator::kindName ((ModKind) juce::jlimit (0, modKindCount - 1, kind)));
+                addOnce (kinds, m["name"].toString() + " (" + kindText + ")");
+            }
+        drop (o, "modulators190ox");
+        if (auto* mods = arrayOf (root["modulators"]))
+            for (auto& m : *mods)
+                if (auto* mo = objectOf (m))
+                {
+                    drop (*mo, "at");
+                    drop (*mo, "host");
+                    if (auto* routes = arrayOf (mo->getProperty ("routes")))
+                        for (int i = routes->size(); --i >= 0;)
+                            if ((*routes)[i].size() >= 6) // (a hosted plugin's parameter: its base as the sixth value)
+                            {
+                                routes->remove (i);
+                                addOnce (hosted, mo->getProperty ("name").toString());
+                            }
+                }
+        int macroClips = 0;
+        if (auto* automations = arrayOf (root["automations"]))
+            for (auto& a : *automations)
+                if (auto* ao = objectOf (a))
+                    if (const auto t = ao->getProperty ("target"); t.isArray() && t.size() >= 1 && t[0].toString() == "modulatorMacro")
+                    {
+                        ao->setProperty ("target", juce::Array<juce::var> { "none", 0, 0, 0 });
+                        ++macroClips;
+                    }
+        if (! kinds.isEmpty())
+            lost.push_back ({ TR_NOOP ("These modulators are not in this release (it has LFO modulators only): their targets keep their own values: {0}"),
+                              listOf (kinds), true });
+        if (! hosted.isEmpty())
+            lost.push_back ({ TR_NOOP ("Modulation of hosted plugins' parameters is not in this release: these modulators move LYNX's own controls only: {0}"),
+                              listOf (hosted), true });
+        if (macroClips > 0)
+            lost.push_back ({ TR_NOOP ("{0} automation clip(s) of a Macro modulator's knob stay as unlinked clips"), juce::String (macroClips), true });
+    }
+
+    // rollup 0.1.31 step 6 (round 190oq, issue #243): an ARA plugin on a mixer insert. 0.1.30 hosts ARA on an audio clip
+    // channel only and does not read the slot's "ara": the plugin there is an ordinary insert effect and the routed clips
+    // play without its edits. The key goes with a line (the 0.1.28 step then finds nothing left to drop)
+    {
+        juce::StringArray inserts;
+        forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
+            if (drop (e, "ara"))
+                addOnce (inserts, where);
+        });
+        if (! inserts.isEmpty())
+            lost.push_back ({ TR_NOOP ("ARA plugins on mixer inserts play as ordinary insert effects in this release (the audio clips routed there play without their edits): {0}"),
+                              listOf (inserts), true });
+    }
+
+    // rollup 0.1.31 step 6 (round 190om, decisions 4 and 5): what 0.1.30 plays differently although nothing is dropped.
+    // (a) A control that event lanes of several patterns drive: 0.1.30 binds it to the last pattern's lane only (the other
+    // patterns' events do nothing there); this release plays the lane of the pattern whose clip started last, as FL.
+    // (b) Notes' own curves (MPE, a module's slides) in Playlist clips: 0.1.30 sends them in Pattern mode only, so in Song
+    // mode those notes play their key. Lines only; the copy keeps every event and curve.
+    {
+        std::map<juce::String, juce::StringArray> lanePatterns; // a lane's target (as JSON) -> the patterns with a lane on it
+        juce::StringArray curvedInClips;
+        std::set<int> placed;
+        if (auto* clips = arrayOf (root["playlist"]))
+            for (const auto& c : *clips)
+                if (c.isArray() && c.size() >= 6 && (int) c[5] == 0)
+                    placed.insert ((int) c[0]);
+        if (auto* patterns = arrayOf (root["patterns"]))
+            for (int pi = 0; pi < patterns->size(); ++pi)
+            {
+                const auto& p = (*patterns)[pi];
+                const auto name = p["name"].toString().isNotEmpty() ? p["name"].toString() : "Pattern " + juce::String (pi + 1);
+                if (auto* lanes = arrayOf (p["events"]))
+                    for (const auto& l : *lanes)
+                        if (auto* events = arrayOf (l["events"]); events != nullptr && ! events->isEmpty())
+                            addOnce (lanePatterns[juce::JSON::toString (l["target"], true)], name);
+                if (placed.count (pi) != 0)
+                    if (auto* notes = arrayOf (p["notes"]))
+                        if (std::any_of (notes->begin(), notes->end(), [] (const juce::var& n) {
+                                return n.isArray() && n.size() > 19 && ! n[19].isVoid() && ! n[19].isUndefined();
+                            }))
+                            addOnce (curvedInClips, name);
+            }
+        juce::StringArray shared;
+        for (const auto& [target, names] : lanePatterns)
+            if (names.size() > 1)
+                for (const auto& n : names)
+                    addOnce (shared, n);
+        if (! shared.isEmpty())
+            lost.push_back ({ TR_NOOP ("Controls that several patterns' event lanes drive follow only the last pattern's lane in this release: {0}"),
+                              listOf (shared), true });
+        if (! curvedInClips.isEmpty())
+            lost.push_back ({ TR_NOOP ("In Song mode these patterns' notes play without their own pitch / timbre / pressure curves in this release: {0}"),
+                              listOf (curvedInClips), true });
+    }
 }
 
 struct Step

@@ -893,6 +893,15 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
             e.modY = note.modY;
             e.release = note.release;
             e.colour = (std::int8_t) (note.colour & 15);
+            // round 190om: a note's own curves (issue #108, core/NoteCurves.h; an imported module's pitch slides) play in
+            // the Playlist's clips too — the note starts where its curves are (where the clip cuts in, for a truncated one)
+            // and their moves go to its voices; before, only pattern mode played them. Notes without curves: unchanged.
+            const auto curvedAt = note.curves.has() ? (double) on - (start < clip.offset ? (double) (clip.offset - start) : 0.0) : -1.0;
+            if (curvedAt >= 0.0)
+            {
+                const auto v = curveValuesAt (note, (double) on - curvedAt);
+                e.cents = v.cents, e.modX = v.modX, e.modY = v.modY;
+            }
 
             if (note.slide)
             {
@@ -930,6 +939,18 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
                 s.velocity = 0.0f;
                 emitOccurrences ((double) strikeOff, loop, startTick, endTick, tps, numSamples, s, out, roll);
             });
+            if (curvedAt >= 0.0) // (each repetition of the song's loop that reaches this block)
+            {
+                const auto length = std::max<std::int64_t> (1, off - (std::int64_t) curvedAt);
+                const auto len = (double) loop;
+                for (auto k = len > 0.0 ? std::ceil ((startTick - curvedAt - (double) length) / len) : 0.0; curvedAt + k * len < endTick; k += 1.0)
+                {
+                    if (curvedAt + k * len + (double) length > startTick)
+                        emitCurves (note, curvedAt + k * len, length, startTick, numSamples, tps, out);
+                    if (len <= 0.0)
+                        break;
+                }
+            }
         }
     };
 

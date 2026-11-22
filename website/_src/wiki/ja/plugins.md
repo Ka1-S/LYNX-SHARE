@@ -1,5 +1,5 @@
 ---
-source: 1c440a7810
+source: 13c966d353
 ---
 ![プラグインマネージャーの下部。各プラグインファイルは別プロセスで調べるという注記がある](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -102,6 +102,16 @@ Sytrus、Harmor、PatcherなどFL Studioのネイティブプラグインは、F
 FL Studioの中で作ったものは、LYNX SHAREのプロジェクトと一緒に保存されます。`FL Studio VSTi (Multi)`には16のステレオ出力があり、別々のインサートで鳴らせます (前のセクションを参照)。FL Studioの中でどのFLプラグインが動くかは、お使いのFL Studioのライセンスで決まります。LYNX SHAREがFL Studioのプラグインファイルを単独で読み込むことはありません。
 
 FL Studioプラグインが`読み込み失敗`と表示されている場合は、`オプション › プラグインマネージャー...`で右クリックして、`再試行 (今すぐこのファイルをスキャン)`を選びます。
+
+## LYNXの独自プラグインをほかのDAWで
+
+Facet EQ、Apex Limiter、LYNX Tune、LYNX ModelなどLYNX SHARE独自のエフェクトとインストゥルメントは、ほかのDAW用のプラグインとしても提供されています。[リリースページ](https://github.com/Ka1-S/LYNX-SHARE/releases)にある別の任意のダウンロードで、Windows、macOS、Linux用の`LYNX-Plugins-<version>`です。
+
+- すべてのプラグインが1つのCLAPファイル`LYNX Plugins.clap`に入っています。一部はVST3としても提供されます。
+- アーカイブ内のインストールスクリプト（Windowsは`install.cmd`、macOSとLinuxは`install.sh`）を実行し、DAWでプラグインを再スキャンしてください。
+- プラグインはLYNX SHARE内と同じエディターを開き、その状態はLYNX SHAREでプロジェクトとして開けます。
+
+一覧は[PLUGINS-PACK.md](https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS-PACK.md)にあります。
 
 ## Plugin databaseフォルダー
 

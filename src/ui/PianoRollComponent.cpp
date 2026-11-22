@@ -3,6 +3,7 @@
 #include "ui/Motion.h"
 #include "ui/FileChoosers.h"
 #include "ui/PianoRollComponent.h"
+#include "core/MuteKeys.h"
 #include "core/RulerGestures.h" // round 190nq (#227)
 #include "ui/ChordHelper.h"
 #include "ui/MixerComponent.h"
@@ -3152,6 +3153,7 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
         if (hit >= 0)
         {
             erasedSomething = true;
+            fadeOut ({ hit }); // (issue #250)
             editNotes ([hit] (Pattern& p) { noteedit::remove (p, { hit }); });
         }
         return;
@@ -3190,7 +3192,10 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
             drag = Drag::erase;
             setSelection ({});
             if (hit >= 0)
+            {
+                fadeOut ({ hit }); // (issue #250)
                 editNotes ([hit] (Pattern& p) { noteedit::remove (p, { hit }); });
+            }
             return;
 
         case EditTool::mute:
@@ -3689,6 +3694,7 @@ void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
             if (hit >= 0)
             {
                 erasedSomething = true;
+                fadeOut ({ hit }); // (issue #250)
                 editNotes ([hit] (Pattern& p) { noteedit::remove (p, { hit }); });
             }
             return;
@@ -5798,6 +5804,16 @@ void PianoRollComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::
     const auto ctrl = flmods::ctrl (e.mods), alt = e.mods.isAltDown(), shift = e.mods.isShiftDown();
     const auto overGrid = gridArea().contains (e.getPosition()) || velocityArea().contains (e.getPosition());
 
+    // issue #254 (round 190ou): a notch of the horizontal wheel (a tilt wheel, a second wheel) moves the view 1.5 beats
+    // sideways whatever the zoom, as in FL 2026 (a trackpad's swipe and Shift+wheel keep their own ways below)
+    if (! ctrl && ! alt)
+        if (const auto notch = gesture::horizontalWheelNotch (wheel.deltaX, wheel.deltaY, wheel.isSmooth, shift); notch != 0)
+        {
+            gliding = false;
+            glideBy (notch * gesture::horizontalWheelBeats * ppq, 0.0);
+            return;
+        }
+
     // the wheel over the zoom wheel: one zoom level a notch (FL: the only wheel gesture of the vertical zoom)
     if (zoomWheelArea().contains (e.getPosition()))
     {
@@ -5888,8 +5904,31 @@ void PianoRollComponent::deleteSelection()
         return;
 
     const auto doomed = selection;
+    fadeOut (doomed); // (issue #250)
     setSelection ({});
     editNotes ([&doomed] (Pattern& p) { noteedit::remove (p, doomed); });
+}
+
+void PianoRollComponent::fadeOut (const std::vector<int>& notes)
+{
+    // issue #250 (round 190oq): each deleted note in view leaves FL's ghost (nothing at all when Animations are off or
+    // effects reduced: ui/DeleteFade.h)
+    if (! ui::DeleteFade::enabled())
+        return;
+    const auto& pattern = currentPattern (engine.getSong());
+    const auto grid = gridArea().toFloat();
+    for (const auto i : notes)
+        if (i >= 0 && i < (int) pattern.notes.size())
+        {
+            const auto& n = pattern.notes[(std::size_t) i];
+            if (const auto r = noteRect (n.start, n.length, n.key); r.intersects (grid))
+                deleteFade.add (r, theme::noteGroupColour (n.colour, n.velocity));
+        }
+}
+
+void PianoRollComponent::paintOverChildren (juce::Graphics& g)
+{
+    deleteFade.paint (g, gridArea()); // (issue #250: nothing while no note is fading)
 }
 
 void PianoRollComponent::copySelection()
@@ -6206,7 +6245,17 @@ bool PianoRollComponent::handleKey (const juce::KeyPress& key)
     // Shift+Alt+M unmutes, Ctrl+D deselects. (Ctrl+M stays FL's metronome.)
     if (alt && ! cmd && letter == 'M')
     {
-        setNotesMuted (! shift);
+        auto mute = ! shift;
+        // issue #249 (round 190oq, LYNX extra, off = FL): Alt+M on notes that are all muted unmutes them
+        if (mute && mutekeys::toggles())
+        {
+            const auto& notes = currentPattern (engine.getSong()).notes;
+            const auto target = selectionOrAll();
+            mute = target.empty() || ! std::all_of (target.begin(), target.end(), [&notes] (int i) {
+                return i >= 0 && i < (int) notes.size() && notes[(std::size_t) i].muted;
+            });
+        }
+        setNotesMuted (mute);
         return true;
     }
 

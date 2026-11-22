@@ -23,6 +23,7 @@
 #include "core/TrackClips.h" // round 190ne
 #include "core/SimpleHeaderTarget.h" // round 190oo (CS-24)
 #include "engine/AudioEngine.h"
+#include "ui/DeleteFade.h"
 #include "ui/EditorTools.h"
 #include "ui/FrameTicker.h"
 #include "ui/MotionOverlay.h"
@@ -122,6 +123,10 @@ public:
     // FL's Playlist menu › View › "Hide collapsed grouped tracks" (EEHideCollapsedAction, HideCollapsedSubTracks; FL manual:
     // "Collapsed grouped tracks will be hidden"; round 190jf): the members of a collapsed group get no row at all
     static inline bool hideCollapsedGroups = false;
+    // Round 190op (P4, LYNX extra): the Playlist menu's "Show hidden tracks": hidden tracks (PlaylistTrack::hidden) get
+    // their rows back, drawn dimmed with a crossed eye, so they can be shown again; the Clip-launch grid shows their
+    // columns. A view preference (saved with the UI settings).
+    static inline bool showHiddenTracks = false;
     // #230 (round 190nq): FL 2026's Playlist menu › View › "Show fade previews" (EEEnablePreviewFadesAction, on by default,
     // [SHOT] 190nq f08c / f12c / f13c): an audio clip's waveform is drawn with its fades applied
     static inline bool showFadePreviews = true;
@@ -298,6 +303,8 @@ public:
     juce::Rectangle<int> trackLaneArrowForSnapshot (int track) const { return trackLaneArrow (track); }
     double xOfTickForSnapshot (double tick) const { return tickToX (tick); }
     juce::Rectangle<int> clipBoundsForSnapshot (int clip) const { return clipBounds (clip); } // (round 190gi)
+    ui::DeleteFade& deleteFadeForSnapshot() noexcept { return deleteFade; } // (round 190oq, issue #250)
+    void deleteSelectionForSnapshot() { deleteSelection(); }
     // round 190nx (--demo, ui.clipmenu): selects the clip and opens its context menu at the clip, as a right-click on it does,
     // with no mouse needed. Returns the clip's rectangle on screen, or an empty one when the clip is not in view
     juce::Rectangle<int> openClipMenuForDemo (int clip);
@@ -972,6 +979,10 @@ private:
     void colourTracks (const std::vector<int>& tracks, std::uint32_t colour);
     bool isTrackSelected (int track) const;
     std::vector<int> tracksForMenu (int track) const;
+    bool trackStateMenus() const;                                  // round 190op (P4)
+    void paintTrackStateMarks (juce::Graphics& g, juce::Rectangle<int> headers, int rows); // round 190op (P4)
+    bool anyHiddenTracks = false; // round 190op (P4): the song holds hidden tracks (updateProjection)
+    void addDeactivateTrackItem (juce::PopupMenu& menu, int track); // round 190op (P4)
     // round 190dx: FL's new instrument tracks (core trackmodes::addInstrumentTrack; on an instrument track the
     // generator is replaced, FL's EEPLTrackMorePlugMenuClick)
     juce::PopupMenu buildAddTrackMenu();
@@ -1241,6 +1252,10 @@ private:
     std::unique_ptr<SectionsLaneView> sectionsLane;
     bool simpleSectionsHidden = false; // the Simple "Sections" button hid a lane that has sections (view only)
     int laidOutSectionsHeight = 0;
+
+    // issue #250 (round 190oq): deleted clips fade out as FL's do (ui/DeleteFade.h); `fadeOut` before they go
+    ui::DeleteFade deleteFade { *this, ui::DeleteFade::playlistMs };
+    void fadeOut (const std::vector<int>& clips);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PlaylistComponent)
 };

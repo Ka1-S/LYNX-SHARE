@@ -1,3 +1,4 @@
+#include "ui/ModRing.h"
 #include "ui/SlotWatch.h"
 #include "ui/WindowPlaces.h"
 #include "ui/FrameTicker.h"
@@ -145,6 +146,7 @@ struct PaintCount
 
 class NativeEffectEditor final : public juce::Component,
                                  public ui::HintSource,
+                                 public modring::TargetSource,
                                  private juce::ChangeListener,
                                  private juce::Timer
 {
@@ -437,6 +439,18 @@ public:
             r.removeFromBottom ((hasStyle (item, plugui::showValue) || hasStyle (item, plugui::hoverValue) ? 26.0f : 14.0f) * s);
         const auto d = juce::jmin (r.getWidth(), r.getHeight());
         return r.withSizeKeepingCentre (d, d).withY (r.getY());
+    }
+
+    // round 190ox: drag-to-assign finds the knob under the pointer
+    std::optional<AutomationTarget> modTargetAt (juce::Point<int> local) override
+    {
+        const auto index = itemAt (local.toFloat());
+        if (index < 0)
+            return std::nullopt;
+        const auto& item = activeLayout().items[(std::size_t) index];
+        if (item.type != Item::knob && item.type != Item::vslider && item.type != Item::hslider)
+            return std::nullopt;
+        return specFor (item).target;
     }
 
     int itemAt (juce::Point<float> p) const
@@ -1173,6 +1187,8 @@ public: // (the class stays public from here, as before)
                 if (kind == EffectKind::fruityDelay3)
                     delay3KnobLook (item, value, look, syncDots);
                 skin::knob (g, circle, look);
+                if (param >= 0 && ! node.locate) // round 190ox: the modulation rings of this knob
+                    modring::drawFor (g, circle, value, AutomationTarget { AutomationTargetKind::effectParam, track, slot, param }, look.accent);
                 if (syncDots)
                     paintDelay3StepDots (g, circle, fx.enabled);
                 auto below = r.withTop (circle.getBottom() + 1.0f * s);
@@ -4812,6 +4828,14 @@ public: // (the class stays public from here, as before)
 
         const auto& item = activeLayout().items[(std::size_t) index];
         const auto r = rectOf (item);
+        // round 190ox: a modulator armed in the Modulators panel: a drag on a knob sets that modulator's depth on it
+        if (item.type == Item::knob && modring::armed() >= 0 && ! e.mods.isPopupMenu())
+            if (const auto target = specFor (item).target; target && modring::beginDepthDrag (*target))
+            {
+                modDepthAnchor = e.position.y;
+                dragItem = index;
+                return;
+            }
 
         if (kind == EffectKind::grossBeat && gbMouseDown (e, item, index)) // round 168m: the envelope editor and slot settings
             return;
@@ -5346,6 +5370,12 @@ public: // (the class stays public from here, as before)
 
     void mouseDrag (const juce::MouseEvent& e) override
     {
+        if (modring::depthDragging()) // (round 190ox)
+        {
+            modring::dragDepth (modDepthAnchor - e.position.y, e.mods.isCtrlDown() || e.mods.isShiftDown());
+            repaint();
+            return;
+        }
         if (tpSpeedDragging && dragItem >= 0 && dragItem < (int) activeLayout().items.size()) // round 190lx (DP-31)
         {
             tpSetSpeedAt (activeLayout().items[(std::size_t) dragItem], e.position.y);
@@ -5480,6 +5510,13 @@ public: // (the class stays public from here, as before)
 
     void mouseUp (const juce::MouseEvent& e) override
     {
+        if (modring::depthDragging()) // (round 190ox)
+        {
+            modring::endDepthDrag();
+            dragItem = -1;
+            repaint();
+            return;
+        }
         if (kind == EffectKind::fruityLimiter) // (round 190mf, DP-26: the knee curve goes with the release)
             juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<juce::Component> (this)] { if (safe != nullptr) safe->repaint(); });
         tpSpeedDragging = false;
@@ -6385,6 +6422,7 @@ private:
     const plugui::Layout* layout = nullptr;
     int page = 0;
     int hoverItem = -1, hoverHeader = 0, dragItem = -1;
+    float modDepthAnchor = 0.0f; // (round 190ox: an armed modulator's depth drag)
     juce::Colour accent { skin::colour::crimson }; // the plugin family's accent (ui/PluginSkin.h); the art's when Themed
     juce::Colour familyAccent { skin::colour::crimson };
     std::unique_ptr<skin::ArtLayer> artLayer; // round 170j: the art's moving part

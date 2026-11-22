@@ -328,6 +328,20 @@
 #    when LYNX marked the editor "lynxScaleEditorDimensions" (FL's "Scale editor dimensions", or a DPI-unaware window):
 #    the size the plugin reports is then taken in logical pixels. An editor LYNX did not mark is sized as before.
 #
+# 48. Windows only ("fix 190os" in round perf6_190os's branch), juce_graphics/native/juce_DirectX_windows.h,
+#    on top of fix 43: the Direct3D 11 device has no driver threads by default when LYNX may use 4 logical CPUs or
+#    fewer (LYNX_D3D_DRIVER_THREADS=1: always the driver's threads; =0: never, as fix 43). Measured with a song that
+#    overloads a PC with 2 CPUs (big200 at 64 samples, the safe-overload guard engaged): the message thread spent 80-100 %
+#    of every frame gap over 50 ms waiting in NVIDIA's driver for its own thread, which got the CPU only between the
+#    audio threads; with no driver threads 51.4 fps and the longest gap 46-70 ms (from 45.0 / 252 ms). With 12 CPUs the
+#    same with or without (69-72 fps): there the driver's threads stay. perf190os/HANDOFF.md.
+#
+# 49. Linux/BSD only ("fix 190ou" in round bugs_190ou's branch),
+#    juce_gui_basics/native/juce_XWindowSystem_linux.cpp (issue #254): X11 reports a horizontal wheel (a tilt wheel, a
+#    mouse's second wheel, a touchpad's sideways edge) as buttons 6 (left) and 7 (right), which JUCE dropped: the
+#    horizontal wheel did nothing on Linux. They now come as a wheel event with deltaX = +/-50/256 (6 = left = positive,
+#    as Windows' WM_MOUSEHWHEEL gives it through JUCE) and deltaY 0, not smooth.
+#
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
 
@@ -504,6 +518,10 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("frame moved, not restacked" "LYNX patch (issue #45): a frame that moved"
             "    if (configure.window != peerHandle && isParentWindowOf (configure.window, peerHandle))|NL|        dismissBlockingModals (peer);"
             "    // LYNX patch (issue #45): a frame that moved, not a restack|NL|    if (configure.window != peerHandle && isParentWindowOf (configure.window, peerHandle) && lynxWindowMovedOrResized (configure))|NL|        dismissBlockingModals (peer);")
+
+        lynx_juce_fix("horizontal wheel (buttons 6 / 7) (fix 49)" "LYNX patch (fix 49, issue #254)"
+            "    auto mapIndex = (uint32) (buttonPressEvent.button - Button1);|NL|"
+            "    // LYNX patch (fix 49, issue #254): buttons 6 / 7 are the horizontal wheel (a tilt wheel, a second wheel), left /|NL|    // right; JUCE dropped them. deltaX > 0 = left, as Windows' WM_MOUSEHWHEEL comes through JUCE|NL|    if (buttonPressEvent.button == 6 || buttonPressEvent.button == 7)|NL|    {|NL|        MouseWheelDetails wheel;|NL|        wheel.deltaX = buttonPressEvent.button == 6 ? 50.0f / 256.0f : -50.0f / 256.0f;|NL|        wheel.deltaY = 0.0f;|NL|        wheel.isReversed = false;|NL|        wheel.isSmooth = false;|NL|        wheel.isInertial = false;|NL||NL|        peer->handleMouseWheel (MouseInputSource::InputSourceType::mouse, getLogicalMousePos (buttonPressEvent, peer->getPlatformScaleFactor()),|NL|                                getEventTime (buttonPressEvent), wheel);|NL|        return;|NL|    }|NL||NL|    auto mapIndex = (uint32) (buttonPressEvent.button - Button1);|NL|")
     elseif(file MATCHES "juce_CoreGraphicsContext_mac.mm$")
         lynx_juce_fix("no gradient flood from an empty path" "LYNX patch (issue #11): an empty path"
             "        CGContextReplacePathWithStrokedPath (context.get());|NL||NL|    ScopedCGContextState scopedState (context.get());"
@@ -693,6 +711,14 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("no driver threads for the Direct2D device (fix 43)" "LYNX patch (round 190la, fix 43): no driver threads"
             "        const auto creationFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;"
             "        // LYNX patch (round 190la, fix 43): LYNX_D3D_DRIVER_THREADS=0: no driver threads for these frames (A/B; default as before)|NL|        const auto creationFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT|NL|                                   | (SystemStats::getEnvironmentVariable (\"LYNX_D3D_DRIVER_THREADS\", {}) == \"0\" ? D3D11_CREATE_DEVICE_PREVENT_INTERNAL_THREADING_OPTIMIZATIONS : 0);")
+        lynx_juce_fix("no driver threads with 4 CPUs or fewer (fix 48)" "lynxNoDriverThreads() ? D3D11_CREATE_DEVICE"
+            "                                   | (SystemStats::getEnvironmentVariable (\"LYNX_D3D_DRIVER_THREADS\", {}) == \"0\" ? D3D11_CREATE_DEVICE_PREVENT_INTERNAL_THREADING_OPTIMIZATIONS : 0);"
+            "                                   | (lynxNoDriverThreads() ? D3D11_CREATE_DEVICE_PREVENT_INTERNAL_THREADING_OPTIMIZATIONS : 0);"
+        )
+        lynx_juce_fix("no driver threads with 4 CPUs or fewer, the rule (fix 48)" "LYNX patch (round 190os, fix 48, on fix 43): the rule"
+            "    static Ptr create (ComSmartPtr<ID2D1Factory2> d2dFactory, ComSmartPtr<IDXGIAdapter1> dxgiAdapterIn)|NL|    {"
+            "    // LYNX patch (round 190os, fix 48, on fix 43): the rule. The graphics driver's own threads (NVIDIA's \"threaded optimization\")|NL|    // take the frames' commands off the message thread, which then waits for them at the present; with 4 logical CPUs|NL|    // or fewer for LYNX they compete with the audio threads, and a frame waited 100-250 ms behind them while a song|NL|    // overloaded a 2-CPU PC (round 190os). There the message thread does that work itself. LYNX_D3D_DRIVER_THREADS=1:|NL|    // always the driver's threads; =0: never (fix 43's A/B switch). More CPUs: as JUCE does.|NL|    static bool lynxNoDriverThreads()|NL|    {|NL|        const auto choice = SystemStats::getEnvironmentVariable (\"LYNX_D3D_DRIVER_THREADS\", {});|NL||NL|        if (choice == \"0\" || choice == \"1\")|NL|            return choice == \"0\";|NL||NL|        DWORD_PTR process = 0, system = 0;|NL||NL|        if (! GetProcessAffinityMask (GetCurrentProcess(), &process, &system))|NL|            return false;|NL||NL|        int cpus = 0;|NL||NL|        for (auto mask = process; mask != 0; mask &= mask - 1)|NL|            ++cpus;|NL||NL|        return cpus > 0 && cpus <= 4;|NL|    }|NL||NL|    static Ptr create (ComSmartPtr<ID2D1Factory2> d2dFactory, ComSmartPtr<IDXGIAdapter1> dxgiAdapterIn)|NL|    {"
+        )
         lynx_juce_fix("no WARP device beside a hardware adapter" "LYNX patch (round 190go): a software adapter"
             "        for (UINT i = 0;; ++i)|NL|        {|NL|            ComSmartPtr<IDXGIAdapter1> dxgiAdapter;|NL||NL|            if (factory->EnumAdapters1 (i, dxgiAdapter.resetAndGetPointerAddress()) == DXGI_ERROR_NOT_FOUND)|NL|                break;|NL||NL|            if (const auto adapter = DxgiAdapter::create (d2dFactory, dxgiAdapter))|NL|            {|NL|                adapterArray.add (adapter);|NL|                listeners.call ([adapter] (DxgiAdapterListener& l) { l.adapterCreated (adapter); });|NL|            }|NL|        }|NL|"
             "        // LYNX patch (round 190go): a software adapter (WARP, the \"Microsoft Basic Render Driver\") gets its devices only|NL|        // when no hardware adapter gave any; before, every adapter got a Direct3D 11 + Direct2D device at start-up|NL|        std::vector<ComSmartPtr<IDXGIAdapter1>> lynxSoftwareAdapters;|NL|        const auto lynxAdd = [this] (ComSmartPtr<IDXGIAdapter1> dxgiAdapter)|NL|        {|NL|            if (const auto adapter = DxgiAdapter::create (d2dFactory, dxgiAdapter))|NL|            {|NL|                adapterArray.add (adapter);|NL|                listeners.call ([adapter] (DxgiAdapterListener& l) { l.adapterCreated (adapter); });|NL|            }|NL|        };|NL||NL|        for (UINT i = 0;; ++i)|NL|        {|NL|            ComSmartPtr<IDXGIAdapter1> dxgiAdapter;|NL||NL|            if (factory->EnumAdapters1 (i, dxgiAdapter.resetAndGetPointerAddress()) == DXGI_ERROR_NOT_FOUND)|NL|                break;|NL||NL|            DXGI_ADAPTER_DESC1 lynxDesc {};|NL||NL|            if (dxgiAdapter != nullptr && SUCCEEDED (dxgiAdapter->GetDesc1 (&lynxDesc))|NL|                && ((lynxDesc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0 || (lynxDesc.VendorId == 0x1414 && lynxDesc.DeviceId == 0x8c)))|NL|            {|NL|                lynxSoftwareAdapters.push_back (dxgiAdapter);|NL|                continue;|NL|            }|NL||NL|            lynxAdd (dxgiAdapter);|NL|        }|NL||NL|        if (adapterArray.isEmpty())|NL|            for (auto& dxgiAdapter : lynxSoftwareAdapters)|NL|                lynxAdd (dxgiAdapter);|NL|")

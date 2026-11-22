@@ -6,6 +6,7 @@
 #include "ui/FileChoosers.h"
 #include "ui/ImageReadback.h"
 #include "ui/MixerComponent.h"
+#include "ui/AraMenu.h"
 #include "core/SelectionRename.h"
 #include "core/MixSnapshots.h"
 #include "ui/PluginOffTag.h"
@@ -69,6 +70,8 @@
 #include "core/MiddleEllipsis.h"
 #include "core/MixerRouteArrow.h"
 #include "core/StripInserts.h"
+#include "core/LayoutStyle.h"
+#include "core/TrackStates.h" // round 190op (P4)
 #include "ui/WindowClipboard.h" // issue #232 stage 2 (round 190nz)
 
 namespace lynx
@@ -2012,7 +2015,7 @@ void MixerStrips::paint (juce::Graphics& g)
         // amber R before the name)
         const auto standIn = engine.insertPlaysStandIn (t);
         // round 190ap: opened without third-party plugins, a plugin of this insert is still off (a grey power tag)
-        const auto pluginOff = ! standIn && engine.insertPluginOff (t);
+        const auto pluginOff = ! standIn && (engine.insertPluginOff (t) || engine.insertDeactivated (t)); // (round 190op: deactivated too)
         const auto name = juce::String::fromUTF8 (track.name.c_str());
         if (const auto box = nameArea (t); ! sp.verticalName)
         {
@@ -3237,6 +3240,20 @@ juce::PopupMenu MixerStrips::buildSendMenu (int t)
 
 void MixerStrips::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
 {
+    // issue #254 (round 190ou): a notch of the horizontal wheel (a tilt wheel, a second wheel) scrolls the strips one
+    // insert sideways, as in FL 2026 (Thief: three notches, three inserts), wherever the mouse is over them
+    if (! flmods::ctrl (e.mods) && ! e.mods.isAltDown())
+        if (const auto w = flmods::normalisedWheel (wheel); gesture::horizontalWheelNotch (w.deltaX, w.deltaY, w.isSmooth, e.mods.isShiftDown()) != 0)
+        {
+            const auto notch = gesture::horizontalWheelNotch (w.deltaX, w.deltaY, w.isSmooth, false);
+            if (auto* view = findParentComponentOfClass<juce::Viewport>())
+            {
+                const auto room = juce::jmax (0, getWidth() - view->getViewWidth());
+                view->setViewPosition (juce::jlimit (0, room, view->getViewPositionX() + notch * spec().stripWidth), view->getViewPositionY());
+            }
+            return;
+        }
+
     if (const auto i = vcaAt (e.x); i >= 0 && ! ui::wheelScrolling() && vcaPartAt (i, e.getPosition()) == Part::fader)
     {
         if (const auto v = ui::wheelValue (engine.getSong().vcas[(std::size_t) i].level, e, wheel, vcaSpec (i)))
@@ -3394,6 +3411,8 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
                 h.text = name + " - " + tr ("Stand-in: a plugin of this insert is not installed on this PC, a render of its sound plays (the plugins' settings are kept)");
             else if (engine.insertPluginOff (t)) // round 190ap
                 h.text = name + " - " + tr ("A plugin of this insert is switched off: the project was opened without third-party plugins (its settings are kept; File › Switch plugins back on...)");
+            if (engine.insertDeactivated (t)) // round 190op (P4)
+                h.text = name + " - " + tr ("Deactivated: its effects are unloaded and it carries silence (its settings are kept; [RMB] › Reactivate)");
             break;
         case Part::body:
         case Part::none:
@@ -4131,6 +4150,14 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         menu.addItem (tr ("Unassign from Audio track(s)"), anyLinked, false,
                       [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::unassignAudioTracks (s, targets); }); });
     }
+    // round 190op (P4, LYNX extra; owner decision O-3): Deactivate unloads the insert's effects (and what plays only into
+    // it); it carries silence, its routing stays. Every selected track with it; the Master and the Current track never
+    if (const auto off = song.mixer[(std::size_t) t].deactivated;
+        t > 0 && ! isCurrent && (layoutstyle::current() != layoutstyle::Style::pattern || trackstates::patternMenus() || off))
+        menu.addItem (off ? tr ("Reactivate") : (several ? tr ("Deactivate selected tracks") : tr ("Deactivate")), true, off, [this, targets, off] {
+            engine.setDeactivated ({}, targets, ! off);
+            repaint();
+        });
     menu.addSeparator();
 
     // FL's "File" submenu (REA round 167q, TFXForm's FileMenu): open/save a state, Browse states and the "States" list
@@ -8013,6 +8040,9 @@ juce::Rectangle<int> EffectsPanel::sidechainButtonBounds() const
 
 void EffectsPanel::openPluginWindow (int slot)
 {
+    // round 190oq (issue #243): an ARA insert opens the plugin's editor with the audio clips routed here
+    if (aramenu::isAraSlot (engine, track, slot) && aramenu::openInsertEditor (engine, track))
+        return;
     // Online Sessions P5-A1: an effect the session's host plays on this insert opens its parameter editor
     if (liveui::showHostedEditor ({ { live::Kind::insert, (std::uint64_t) juce::jmax (0, track), 0 }, slot }))
         return;
@@ -8106,6 +8136,10 @@ void EffectsPanel::showAddMenu (int row)
 
 int EffectsPanel::placeEffectAtRow (int row, EffectSlot fx)
 {
+    // round 190oq (issue #243): an ARA plugin put on an insert that audio clip channels go to edits their clips (REAPER,
+    // Logic, Studio One); the slot menu switches it off
+    const auto araOn = fx.kind == EffectKind::plugin && ! fx.ara && aramenu::araByDefault (engine, track, fx.plugin);
+    fx.ara = fx.ara || araOn;
     int at = -1;
     engine.editSong ([t = track, row, &fx, &at] (Song& song) {
         if (t < 0 || t >= (int) song.mixer.size() || (int) song.mixer[(std::size_t) t].effects.size() >= maxEffectSlots)
@@ -8120,6 +8154,8 @@ int EffectsPanel::placeEffectAtRow (int row, EffectSlot fx)
     });
     if (at < 0)
         return at;
+    if (araOn)
+        aramenu::hintSlotAra (engine, track, at, true);
     selectedSlot = at;
     if ((*slots())[(std::size_t) at].kind != EffectKind::plugin) // (plugins: their own window, below)
         openEditor (at); // FL opens the effect's window when it is loaded (round 170h, fl-09)
@@ -8323,6 +8359,8 @@ void EffectsPanel::showSlotMenu (int slot)
                 onHotSwapSlot (t, slot);
         });
     menu.addItem (tr ("Audio editor (record this insert)..."), [this] { openAudioEditorForInsert (engine, track); });
+    // round 190oq (issue #243): an ARA plugin edits the audio clips routed to this mixer track
+    aramenu::addSlotItems (menu, engine, track, slot);
 
     // side inputs: another track's output feeds the compressor's detector, or the vocoder's modulator/carrier. Round
     // 177b: every effect with a side input (plugins with a sidechain bus too) gets the picker, which makes the route
