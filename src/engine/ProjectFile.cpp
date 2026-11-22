@@ -2881,6 +2881,8 @@ juce::var mixerTrackToVar (const MixerTrack& t)
 
     if (! effects.isEmpty())
         o->setProperty ("effects", effects);
+    if (t.slotRows > flEffectSlots) // slot rows added past FL's 10 (feature/more-mixer-slots)
+        o->setProperty ("slotRows", juce::jmin (t.slotRows, maxEffectSlots));
     if (t.chainBlend < 1.0f) // the Simple workflow's Blend (round 190bu)
         o->setProperty ("chainBlend", projectNumber (t.chainBlend, 10000.0f));
     if (! t.chainPreset.empty())
@@ -2941,6 +2943,8 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
     track.compensateMasterLatency = (bool) t.getProperty ("compensateMaster", true);
     track.icon = juce::jlimit (0, 0xFFFF, (int) t.getProperty ("icon", 0));
     track.chainBlend = juce::jlimit (0.0f, 1.0f, (float) (double) t.getProperty ("chainBlend", 1.0));
+    if (const auto rows = (int) t.getProperty ("slotRows", 0); rows > flEffectSlots) // (feature/more-mixer-slots)
+        track.slotRows = juce::jmin (rows, maxEffectSlots);
     track.chainPreset = t.getProperty ("chainPreset", "").toString().toStdString();
     track.smartControls = t.getProperty ("smartControls", "").toString().toStdString();
     track.outputChannel = juce::jlimit (outputDefault, 255, (int) t.getProperty ("output", outputDefault));

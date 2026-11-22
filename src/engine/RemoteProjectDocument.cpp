@@ -128,7 +128,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
              "boost eq ringMix ringFreq stereoDelay cutoff resonance reverb reverbType pogo clip");
         add (S::mixer, "name volume pan muted solo soloSources lockState threaded separator folded dock toMaster masterLevel colour stereo "
              "invertPhase swap input inputMono monitor recordSafe recordTo recordSource recordDryToo latencyMs latencyBypass "
-             "compensateMaster icon output outputMode eq eqBypassed sends lostSends preSends chainBlend chainPreset "
+             "compensateMaster icon output outputMode eq eqBypassed sends lostSends preSends chainBlend chainPreset slotRows "
              "liveReturn returnPre returnSendsOn crossfade smartControls"); // (smartControls: 190ke, rollup step 6)
         add (S::mixer, "deactivated"); // (round 190op, P4)
         add (S::mixer, "effects", S::effect, true);

@@ -3132,13 +3132,13 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             std::vector<flp::MixerInsert::Slot> expanded { original };
             // Fruity Love Philter: the units become parametric EQ + gain/pan (or a parallel container)
             // (only for states the exact engine cannot read: the others go through effectFromFl, REA_rodada66)
-            if (original.plugin == "Fruity Love Philter" && (int) track.effects.size() < maxEffectSlots
+            if (original.plugin == "Fruity Love Philter" && (int) track.effects.size() < flEffectSlots
                 && philter::parse (original.state) == nullptr)
                 if (auto conversion = lovePhilterEffects (original.state))
                 {
                     const auto first = (int) track.effects.size();
                     for (auto& fx : conversion->slots)
-                        if ((int) track.effects.size() < maxEffectSlots)
+                        if ((int) track.effects.size() < flEffectSlots)
                             track.effects.push_back (std::move (fx));
                     effectSlotMap.insert ({ { insert.index, original.index }, { first, original.plugin } });
                     if (conversion->paramMap)
@@ -3163,7 +3163,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 }
 
             // Patcher (REA_rodada141): the slot holds FL's whole graph, run as it is
-            if (lowercase (original.plugin) == "patcher" && (int) track.effects.size() < maxEffectSlots)
+            if (lowercase (original.plugin) == "patcher" && (int) track.effects.size() < flEffectSlots)
                 if (patcherSidechain = -1; auto doc = patcherFromFl (original.state, nullptr))
                 {
                     auto slot = makeEffectSlot (EffectKind::patcher);
@@ -3180,7 +3180,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
             // Patcher with branches (REA_rodada20 §3.3): the audio graph reduced to series/parallel becomes slots and
             // nested parallel containers; splitter nodes enter via the band/bus used
-            if (lowercase (original.plugin) == "patcher" && (int) track.effects.size() < maxEffectSlots)
+            if (lowercase (original.plugin) == "patcher" && (int) track.effects.size() < flEffectSlots)
                 if (const auto graph = parsePatcher (original.state); graph && graph->serialChain.empty() && graph->audio)
                 {
                     std::function<std::vector<EffectSlot> (const PatcherExpr&, float&)> build = [&] (const PatcherExpr& e, float& gain) {
@@ -3246,7 +3246,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                         utility.params[0] = gain <= 0.0f ? 0.0f : std::clamp ((float) (20.0 * std::log10 (gain) / 48.0 + 0.5), 0.0f, 1.0f);
                         chain.push_back (std::move (utility));
                     }
-                    if ((int) (track.effects.size() + chain.size()) > maxEffectSlots) // doesn't fit: a single-branch container
+                    if ((int) (track.effects.size() + chain.size()) > flEffectSlots) // doesn't fit: a single-branch container
                     {
                         auto container = makeEffectSlot (EffectKind::parallel);
                         container.branches.push_back ({ std::move (chain), 1.0f });
@@ -3272,7 +3272,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
             for (const auto& slot : expanded)
             {
-                if ((int) track.effects.size() >= maxEffectSlots)
+                if ((int) track.effects.size() >= flEffectSlots)
                     continue;
 
                 ForeignPlugin foreign;
@@ -3500,7 +3500,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     }
 
                 effectSlotMap.insert ({ { insert.index, slot.index }, { (int) track.effects.size(), slot.plugin } });
-                if (slot.index >= 0 && slot.index < maxEffectSlots)
+                if (slot.index >= 0 && slot.index < flEffectSlots)
                     fx.row = slot.index; // FL's slot place (round 170b): an effect in slot 5 stays in slot 5
                 // Export to FL Studio (round 171e): the FL effect itself, written back while LYNX leaves it as imported (one
                 // FL slot = one LYNX slot here; a hosted plugin travels as its plugin reference)

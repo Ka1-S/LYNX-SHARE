@@ -1230,6 +1230,37 @@ int effectAtRow (const std::vector<EffectSlot>& effects, int row)
     return it == rows.end() ? -1 : (int) (it - rows.begin());
 }
 
+int effectRowCount (const MixerTrack& track)
+{
+    const auto rows = effectRows (track.effects);
+    const auto used = rows.empty() ? 0 : rows.back() + 1;
+    return std::clamp (std::max ({ flEffectSlots, track.slotRows, used }), flEffectSlots, maxEffectSlots);
+}
+
+bool addEffectRow (Song& song, int track)
+{
+    if (track < 0 || track >= (int) song.mixer.size())
+        return false;
+    auto& t = song.mixer[(std::size_t) track];
+    const auto shown = effectRowCount (t);
+    if (shown >= maxEffectSlots)
+        return false;
+    t.slotRows = shown + 1;
+    return true;
+}
+
+bool removeEffectRow (Song& song, int track)
+{
+    if (track < 0 || track >= (int) song.mixer.size())
+        return false;
+    auto& t = song.mixer[(std::size_t) track];
+    const auto shown = effectRowCount (t);
+    if (shown <= flEffectSlots || effectAtRow (t.effects, shown - 1) >= 0)
+        return false;
+    t.slotRows = shown - 1 > flEffectSlots ? shown - 1 : 0;
+    return true;
+}
+
 bool moveEffectToRow (Song& song, int track, int index, int row)
 {
     if (track < 0 || track >= (int) song.mixer.size() || row < 0 || row >= maxEffectSlots)
@@ -1252,7 +1283,8 @@ int moveEffectBy (Song& song, int track, int index, int delta)
     if (track < 0 || track >= (int) song.mixer.size() || index < 0 || index >= (int) song.mixer[(std::size_t) track].effects.size() || delta == 0)
         return -1;
     const auto from = effectRows (song.mixer[(std::size_t) track].effects)[(std::size_t) index];
-    const auto to = ((from + delta) % maxEffectSlots + maxEffectSlots) % maxEffectSlots; // (FL wraps around)
+    const auto count = effectRowCount (song.mixer[(std::size_t) track]);
+    const auto to = ((from + delta) % count + count) % count; // (FL wraps around)
     if (! moveEffectToRow (song, track, index, to))
         return -1;
     return effectAtRow (song.mixer[(std::size_t) track].effects, to); // (the moved effect is the one there now)
