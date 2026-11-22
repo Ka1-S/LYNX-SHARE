@@ -3,6 +3,15 @@
 The short version of each release. The full notes, with measurements, known issues and downloads, are on the
 [GitHub releases page](https://github.com/Ka1-S/LYNX-SHARE/releases).
 
+## 0.1.31 alpha (unreleased: the release round writes the rest of these notes)
+
+**From contributors**
+- Docked channel and plugin windows have a gear in their title bar that hides the header strip (tabs, presets, the
+  channel's controls) and shows it again; the header shows by default and each window keeps its choice with the project.
+  PRs #248 and #256 by @FKHR26.
+- An FL Studio Patcher cable into the a / b / c knobs of a Fruity Formula Controller now comes along on import. PR #257
+  by @codewithamoako.
+
 ## 0.1.30 alpha
 
 **Performance**
