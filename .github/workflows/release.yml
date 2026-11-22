@@ -114,8 +114,10 @@ jobs:
         env:
           LYNX_WIN_OPT: -O2 -Xclang -O3
           LYNX_WIN_LTO: thin
+        # JOBS=2 (queue 0.1.31 item 46, as plugins.yml and round-build.yml): the hosted runner is memory-bound (round 190ov
+        # measured 11.2 / 16 GB + 2.5 / 3 GB swap at two compiles); one per core ran it out of memory ("lost communication")
         run: |
-          ZIG="$HOME/opt/zig-x86_64-linux-$ZIG_VERSION/zig" JUCE_DIR="$HOME/opt/juce-$JUCE_VERSION" OUT=build-win \
+          ZIG="$HOME/opt/zig-x86_64-linux-$ZIG_VERSION/zig" JUCE_DIR="$HOME/opt/juce-$JUCE_VERSION" OUT=build-win JOBS=2 \
             ./scripts/build-windows-zig.sh 2>&1 | grep -v '^1 warning generated\.$'
           sha256sum build-win/LYNX.exe
           ./scripts/fetch-onnxruntime.sh windows build-win
