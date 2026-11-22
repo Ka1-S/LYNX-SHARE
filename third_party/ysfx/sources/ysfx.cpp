@@ -38,6 +38,19 @@
 #include <cstring>
 #include <cassert>
 #include <cmath>
+#include <cfenv> // LYNX (ysfx_lynx_fp_guard)
+
+// LYNX: a script's code leaves the calling thread's floating-point control register changed on aarch64 (FPCR 0 -> 0x2800000,
+// i.e. rounding toward minus infinity and default NaN; LYNX's Linux arm64 self-test, rollup 0.1.31 step 7), and the host's
+// own float work on that thread (parsing, rendering, drawing) then rounds differently. Every entry that compiles or runs
+// EEL code puts the caller's environment back when it returns.
+struct ysfx_lynx_fp_guard {
+    std::fenv_t env;
+    ysfx_lynx_fp_guard() { std::fegetenv(&env); }
+    ~ysfx_lynx_fp_guard() { std::fesetenv(&env); }
+    ysfx_lynx_fp_guard(const ysfx_lynx_fp_guard &) = delete;
+    ysfx_lynx_fp_guard &operator=(const ysfx_lynx_fp_guard &) = delete;
+};
 
 
 static_assert(std::is_same<EEL_F, ysfx_real>::value,
@@ -432,6 +445,7 @@ bool ysfx_load_file(ysfx_t *fx, const char *filepath, uint32_t loadopts)
 
 bool ysfx_compile(ysfx_t *fx, uint32_t compileopts)
 {
+    ysfx_lynx_fp_guard lynx_fp_guard; // LYNX
     ysfx_unload_code(fx);
 
     if (!fx->source.main) {
@@ -599,6 +613,7 @@ void ysfx_unload_source(ysfx_t *fx)
 
 void ysfx_unload_code(ysfx_t *fx)
 {
+    ysfx_lynx_fp_guard lynx_fp_guard; // LYNX
 #if !defined(YSFX_NO_GFX)
     // get rid of gfx first, to prevent a UI thread from trying
     // to access VM and invoke code
@@ -1277,6 +1292,7 @@ void ysfx_delayed_init(ysfx_t *fx)
 
 void ysfx_init(ysfx_t *fx)
 {
+    ysfx_lynx_fp_guard lynx_fp_guard; // LYNX
     if (!fx->code.compiled)
         return;
 
@@ -1487,6 +1503,7 @@ uint64_t ysfx_get_slider_visibility(ysfx_t *fx, uint8_t slider_group_index)
 template <class Real>
 void ysfx_process_generic(ysfx_t *fx, const Real *const *ins, Real *const *outs, uint32_t num_ins, uint32_t num_outs, uint32_t num_frames)
 {
+    ysfx_lynx_fp_guard lynx_fp_guard; // LYNX
     ysfx_set_thread_id(ysfx_thread_id_dsp);
 
     // prepare MIDI input for reading, output for writing
@@ -1783,6 +1800,7 @@ bool ysfx_is_state_equal(ysfx_state_t *state1, ysfx_state_t *state2)
 
 void ysfx_serialize(ysfx_t *fx)
 {
+    ysfx_lynx_fp_guard lynx_fp_guard; // LYNX
     if (fx->code.serialize) {
         if (fx->must_compute_init)
             ysfx_init(fx);

@@ -14,3 +14,8 @@ LYNX's change (marked "LYNX" in the files):
   `ysfx_find_data_file` (what `file_open`, file sliders and `gfx_loadimg` open). LYNX lets scripts read only inside the JSFX
   folders, their Data folders and the open project's folder (src/engine/JsfxFormat.cpp). Without a filter ysfx behaves as
   upstream.
+- `sources/ysfx.cpp`: `ysfx_lynx_fp_guard` (rollup 0.1.31 step 7). EEL2's code left the calling thread's floating-point
+  control register changed on aarch64 (FPCR 0 -> 0x2800000: rounding toward minus infinity, default NaN; found by LYNX's
+  Linux arm64 self-test, whose float round trips, renders and paint tiles after a script ran differed). `ysfx_compile`,
+  `ysfx_unload_code`, `ysfx_init`, the process functions and `ysfx_serialize` put the caller's floating-point environment
+  back when they return (`std::fegetenv` / `std::fesetenv`; once per call, i.e. once per audio block).

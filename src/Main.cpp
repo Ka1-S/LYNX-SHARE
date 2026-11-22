@@ -7177,7 +7177,9 @@ private:
         const auto sidechainResult = lynx::pluginSidechainSelfTest();
         // round 190pj (issue #241): JSFX scripts in slots, their state, PDC, MIDI, file policy, the copy for older releases
         // (rollup 0.1.31 step 7: the message thread's floating-point environment before and after it, reported and put back:
-        // the Linux arm64 self-test's float round trips, renders and paint tiles after this item differed from x86's)
+        // the Linux arm64 self-test's float round trips, renders and paint tiles after this item differed from x86's: EEL2's
+        // code left FPCR at round-toward-minus-infinity; ysfx_lynx_fp_guard in third_party/ysfx/sources/ysfx.cpp now puts the
+        // caller's environment back, and this check counts in result=)
         std::fenv_t fpBeforeJsfx {};
         std::fegetenv (&fpBeforeJsfx);
         const auto fpModeNow = [] {
@@ -10375,7 +10377,7 @@ private:
                         && renderAgainResult.startsWith ("OK")
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK") && modulators190oxResult == "OK"
-                        && generatorSmartResult.startsWith ("OK") && jsfxResult.startsWith ("OK")
+                        && generatorSmartResult.startsWith ("OK") && jsfxResult.startsWith ("OK") && jsfxFpResult == "OK"
                         && danceWindowResult == "OK" && clickActivationResult == "OK" && motionOverlayResult.startsWith ("OK")
                         && editorHolesResult.startsWith ("OK");
 
