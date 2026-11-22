@@ -1162,28 +1162,28 @@ public:
         editor = nullptr; // the editor goes first (the plugin may be released right after the window)
     }
 
-    bool isHeaderCollapsed() const noexcept ( return HeaderCollapsed; )
+    bool isHeaderCollapsed() const noexcept { return headerCollapsed; }
 
     void setHeaderCollapsed (bool collapsed)
     {
         if (headerCollapsed == collapsed)
             return;
         headerCollapsed = collapsed;
-        const auto visible != headerCollapsed;
+        const auto visible = ! headerCollapsed;
         pluginTab.setVisible (visible);
         settingsTab.setVisible (visible);
-        menuArrow.setVisible (visible != presetInTitle);
-        if (channelControl != nullptr)
-            channelControl->setVisible (visible);
-        pin.setVisble (visible && onPin != nullptr);
+        menuArrow.setVisible (visible && ! presetsInTitle);
+        if (channelControls != nullptr)
+            channelControls->setVisible (visible);
+        pin.setVisible (visible && onPin != nullptr);
         sidechain.setVisible (visible && hasSidechain);
         keyboardPriority.setVisible (visible);
-        if (! presetInTitle)
-            preset.setVisible (visible);
+        if (! presetsInTitle)
+            presets.setVisible (visible);
         if (down)
-            setSize (juce::jmax (minimumWidth(), getWidth()), juce::jmax,(150 + currentHeaderHeight(), getHeight()));
+            setSize (juce::jmax (minimumWidth(), getWidth()), juce::jmax (150 + currentHeaderHeight(), getHeight()));
         else if (settings)
-            setSize (juce::jmax (getWidth(), page.getWidth()), juce::jmax,(getHeight(), page.preferredHeight() + currentHeaderHeight()));
+            setSize (juce::jmax (getWidth(), page.getWidth()), juce::jmax (getHeight(), page.preferredHeight() + currentHeaderHeight()));
         else
             fitEditor();
         resized();
@@ -1363,12 +1363,12 @@ private:
     void fitEditor()
     {
         if (down) // (the notice: at least a readable size, the editor's when that is larger)
-            setSize (juce::jmax (minimumWidth(), getWidth()), juce::jmax (150 + currentHeaderHeight, getHeight()));
+            setSize (juce::jmax (minimumWidth(), getWidth()), juce::jmax (150 + currentHeaderHeight(), getHeight()));
         else if (editor != nullptr)
-            setSize (juce::jmax (minimumWidth(), editor->getWidth()), editor->getHeight() + currentHeaderHeight);
+            setSize (juce::jmax (minimumWidth(), editor->getWidth()), editor->getHeight() + currentHeaderHeight());
     }
 
-    int currentHeaderheight() const noexcept { return headerCollapsed ? 0 : headerHeight; }
+    int currentHeaderHeight() const noexcept { return headerCollapsed ? 0 : headerHeight; }
 
     void show (bool showSettings)
     {
@@ -1388,7 +1388,7 @@ private:
                 editor->setTopLeftPosition (-12000, -12000); // (X11 positions are 16-bit, also when scaled)
         }
         if (settings)
-            setSize (juce::jmax (getWidth(), page.getWidth()), juce::jmax (getHeight(), page.preferredHeight() + currentHeaderheight()));
+            setSize (juce::jmax (getWidth(), page.getWidth()), juce::jmax (getHeight(), page.preferredHeight() + currentHeaderHeight()));
         else
             fitEditor();
         resized();
@@ -1892,15 +1892,15 @@ private:
 };
 
 // The gear that shows/hides a docked plugin window's own header strip (the tabs, ▸ menu, presets and so on).
-// Same drawing as the channel settings window's: a Path gear, no glyph font dependency.
+// Same drawing as the channel settings window's: a Path gear.
 class HeaderToggle final : public juce::Button
 {
 public:
-    HeaderToggle() : juce::Button ("HeaderToggle");
+    HeaderToggle() : juce::Button ("headerToggle")
     {
-        setWantKeyboardFocus (false);
+        setWantsKeyboardFocus (false);
         setMouseClickGrabsKeyboardFocus (false);
-        setClickingToggleState (true);
+        setClickingTogglesState (true);
         setTooltip (tr ("Show / hide the header"));
     }
 
@@ -1910,23 +1910,23 @@ public:
         const auto cx = r.getCentreX(), cy = r.getCentreY();
         constexpr float bodyR = 4.5f, holeR = 1.8f, toothlen = 2.2f, toothHalfW = 1.0f;
         juce::Path p;
-        p.addEclipse (cx - bodyR, cy - bodyR, bodyR * 2.0f, bodyR 2.0f);
+        p.addEllipse (cx - bodyR, cy - bodyR, bodyR * 2.0f, bodyR * 2.0f);
         for (int i = 0; i < 8; i++)
         {
             juce::Path tooth;
             tooth.addRectangle (-toothHalfW, -(bodyR + toothlen), toothHalfW * 2.0f, toothlen + 1.0f);
-            toothApplyTransform (juce::AffineTransform::rotation (juce::MathConstant<float>::twoPi * (float) i / 8.0f));
-                                        .translated (cx, cy);
+            tooth.applyTransform (juce::AffineTransform::rotation (juce::MathConstants<float>::twoPi * (float) i / 8.0f)
+                                        .translated (cx, cy));
             p.addPath (tooth);
         }
         juce::Path hole;
-        hole.addEllipse (cx -holeR, cy -holeR, holeR * 2.0f, holeR * 2.0f);
+        hole.addEllipse (cx - holeR, cy - holeR, holeR * 2.0f, holeR * 2.0f);
         p.setUsingNonZeroWinding (false);
         p.addPath (hole);
-        g.setColour (getToggleState() over ? theme::colour::accent : theme::colour::textSecondary);
-        g.filePath (p);
+        g.setColour (getToggleState() || over ? theme::colour::accent : theme::colour::textSecondary);
+        g.fillPath (p);
     }
-}
+};
 
 // FL's docked plugin window (issue #116): the editor in a frame that floats in the desktop, a native child window of the
 // main window, so a clicked panel (also a native child) comes in front of it. FL's title strip: the plugin menu at the
@@ -1962,10 +1962,16 @@ public:
         addAndMakeVisible (*content);
         content->addMouseListener (this, true); // a click anywhere in it brings the frame in front
         // round 190in (design190ia FW-5): FL's title strip holds the preset ◀ name ▶ (the strip under it gives them up)
+        addAndMakeVisible (headerToggle);
+        headerToggle.onClick = [this] {
+            if (auto* wrapped = dynamic_cast<WrappedEditor*> (shownContent))
+                wrapped->setHeaderCollapsed (! headerToggle.getToggleState());
+        };
         if (auto* wrapped = dynamic_cast<WrappedEditor*> (content.get()))
         {
             wrapped->movePresetsTo (*this);
             titlePresets = &wrapped->presetComponent();
+            wrapped->setHeaderCollapsed (true); // starts hidden; click the gear to reveal it
         }
         if (editorResizable)
         {
@@ -2134,6 +2140,7 @@ public:
     {
         auto strip = getLocalBounds().removeFromTop (titleHeight).reduced (3, 2);
         menuButton.setBounds (strip.removeFromLeft (18));
+        headerToggle.setBounds (strip.removeFromLeft (18));
         closeButton.setBounds (strip.removeFromRight (strip.getHeight()));
         strip.removeFromRight (2);
         minimiseButton.setBounds (strip.removeFromRight (strip.getHeight()));
@@ -2198,6 +2205,7 @@ private:
 
     Workspace& workspace;
     wrappermenu::MenuArrow menuButton;
+    HeaderToggle headerToggle;
     IconButton minimiseButton { "minimise", Icon::minimise }, closeButton { "close", Icon::close };
     juce::Component* titlePresets = nullptr; // the wrapper's preset bar, in the title strip (owned by the wrapper)
     juce::ComponentBoundsConstrainer limits;
