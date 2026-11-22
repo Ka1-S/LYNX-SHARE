@@ -7127,7 +7127,7 @@ private:
     AudioEngine& engine;
     int channel;
     bool node = false;
-    bool headerCollapsed = false; // set only by SettingsWindow, only when docked; see setHeaderCollapsed()
+    bool headerCollapsed = false; // set only by SettingsWindow, only when docked (its gear); see setHeaderCollapsed()
     int current = 0;
     std::vector<std::unique_ptr<IconButton>> tabs;
     std::vector<std::unique_ptr<juce::Component>> pages;
@@ -7449,7 +7449,7 @@ public:
         setWantsKeyboardFocus (false);
         setMouseClickGrabsKeyboardFocus (false);
         setClickingTogglesState (true);
-        setTooltip (tr("Show / hide the header"));
+        setTooltip (tr ("Show / hide the header"));
     }
 
     void paintButton (juce::Graphics& g, bool over, bool /*down*/) override
@@ -7564,9 +7564,17 @@ public:
                 getProperties().set ("lynxTitleLeft", 44); // room for both titleMenu and headerToggle
                 titleMenu.onClick = [this, frame] { frame->showWrapperMenu (titleMenu); };
                 Component::addAndMakeVisible (titleMenu);
-                headerToggle.onClick = [this, frame] { frame->setHeaderCollapsed (! headerToggle.getToggleState()); };
+                // the gear (PR #248): the header shows until it hides it; each channel's window keeps the choice (rollup
+                // 0.1.31 step 7, kept with the window places: ui/WindowPlaces.h)
+                if (const auto& song = engine.getSong(); ! modulation && channel >= 0 && channel < (int) song.channels.size())
+                    headerMemory = windowplaces::headerKey ("channel", windowplaces::channelKey (song.channels[(std::size_t) channel].uid, channel));
+                headerToggle.setToggleState (windowplaces::headerHidden (headerMemory), juce::dontSendNotification);
+                headerToggle.onClick = [this, frame] {
+                    frame->setHeaderCollapsed (headerToggle.getToggleState());
+                    windowplaces::setHeaderHidden (headerMemory, headerToggle.getToggleState());
+                };
                 Component::addAndMakeVisible (headerToggle);
-                frame->setHeaderCollapsed (true); // starts hidden; click to reveal it
+                frame->setHeaderCollapsed (headerToggle.getToggleState());
                 frame->movePresetsToTitleBar (*this);
                 titlePresets = frame->presetComponent();
                 getProperties().set ("lynxTitleRight", titlePresets != nullptr ? titlePresetsWidth + 6 : 0);
@@ -7708,7 +7716,8 @@ private:
     ScaledContent* scaled = nullptr; // (owned by the window: its content)
     wrappermenu::MenuArrow titleMenu;               // FL's ▸ in LYNX's title bar (docked)
     juce::Component* titlePresets = nullptr;        // the frame's preset bar, moved into the title bar (owned by the frame)
-    HeaderToggle headerToggle; // shows/hides the frame's own header strip (docked only)
+    HeaderToggle headerToggle; // shows/hides the frame's own header strip (docked only; lit while it is hidden)
+    juce::String headerMemory; // (its key in windowplaces' hidden headers; empty: not remembered)
     static constexpr int titlePresetsWidth = 190; // the frame's preset bar, moved into the title bar (owned by the frame)
 };
 
@@ -7906,6 +7915,32 @@ std::unique_ptr<juce::Component> makeChannelWindowForShot (AudioEngine& engine, 
     if (auto* frame = dynamic_cast<ChannelFrame*> (window->page()))
         frame->showTab (tab < 0 ? frame->tabCount() - 1 : tab);
     return window;
+}
+
+std::optional<bool> channelWindowHeaderShown (juce::Component& root)
+{
+    if (auto* frame = dynamic_cast<ChannelFrame*> (&root))
+        return ! frame->isHeaderCollapsed();
+    for (auto* child : root.getChildren())
+        if (auto shown = channelWindowHeaderShown (*child))
+            return shown;
+    return std::nullopt;
+}
+
+bool pressChannelHeaderGear (juce::Component& root)
+{
+    for (auto* child : root.getChildren())
+        if (auto* gear = dynamic_cast<HeaderToggle*> (child); gear != nullptr && gear->isVisible())
+        {
+            gear->setToggleState (! gear->getToggleState(), juce::dontSendNotification); // (as a click: the state, then onClick)
+            if (gear->onClick)
+                gear->onClick();
+            return true;
+        }
+    for (auto* child : root.getChildren())
+        if (pressChannelHeaderGear (*child))
+            return true;
+    return false;
 }
 
 std::optional<juce::PopupMenu> channelWrapperMenu (juce::Component& root)

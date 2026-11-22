@@ -11,6 +11,7 @@
 // and closing are followed from then on. View state only: no undo step, the Song is untouched.
 
 #include <map>
+#include <set>
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -26,6 +27,26 @@ inline std::map<juce::String, Place>& all()
 {
     static std::map<juce::String, Place> places;
     return places;
+}
+
+// Rollup 0.1.31 step 7 (PRs #248 / #256 by FKHR26): the gear in a docked channel or plugin window's title bar hides the
+// window's header strip (tabs, presets, the channel's controls); shown by default, each window keeps its choice (the window
+// kind and its place key), with the places: in the project as [key, "headerHidden"], an entry older LYNX skips
+inline std::set<juce::String>& hiddenHeaders()
+{
+    static std::set<juce::String> keys;
+    return keys;
+}
+inline juce::String headerKey (const char* kind, const juce::String& placeKey) { return placeKey.isEmpty() ? juce::String() : juce::String (kind) + "|" + placeKey; }
+inline bool headerHidden (const juce::String& key) { return key.isNotEmpty() && hiddenHeaders().count (key) != 0; }
+inline void setHeaderHidden (const juce::String& key, bool hidden)
+{
+    if (key.isEmpty())
+        return;
+    if (hidden)
+        hiddenHeaders().insert (key);
+    else
+        hiddenHeaders().erase (key);
 }
 
 inline juce::String channelKey (std::uint64_t uid, int index) { return uid != 0 ? "ch:" + juce::String ((juce::int64) uid) : "chi:" + juce::String (index); }
@@ -96,15 +117,20 @@ inline juce::var toVar()
     for (const auto& [key, place] : all())
         if (! place.bounds.isEmpty())
             list.add (juce::Array<juce::var> { key, place.bounds.getX(), place.bounds.getY(), place.bounds.getWidth(), place.bounds.getHeight(), place.open });
+    for (const auto& key : hiddenHeaders())
+        list.add (juce::Array<juce::var> { key, "headerHidden" });
     return list.isEmpty() ? juce::var() : juce::var (list);
 }
 
 inline void fromVar (const juce::var& v)
 {
     all().clear();
+    hiddenHeaders().clear();
     if (const auto* list = v.getArray())
         for (const auto& e : *list)
             if (e.isArray() && e.size() == 6)
                 all()[e[0].toString()] = { { (int) e[1], (int) e[2], (int) e[3], (int) e[4] }, (bool) e[5] };
+            else if (e.isArray() && e.size() == 2 && e[1].toString() == "headerHidden")
+                hiddenHeaders().insert (e[0].toString());
 }
 } // namespace lynx::windowplaces

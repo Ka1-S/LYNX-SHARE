@@ -78,6 +78,10 @@ std::unique_ptr<juce::Component> makeChannelHeaderControls (AudioEngine& engine,
 // presets), off the desktop, on tab `tab` (< 0 = Misc); and FL's ▸ wrapper menu of the channel window inside `root`.
 std::unique_ptr<juce::Component> makeChannelWindowForShot (AudioEngine& engine, int channel, int tab);
 std::optional<juce::PopupMenu> channelWrapperMenu (juce::Component& root);
+// Rollup 0.1.31 step 7 (PR #248, tests): whether the channel window `root`'s header strip shows (nullopt: no channel frame),
+// and a press of the gear in its title bar (false: none; docked windows only)
+std::optional<bool> channelWindowHeaderShown (juce::Component& root);
+bool pressChannelHeaderGear (juce::Component& root);
 int channelHeaderControlsWidth() noexcept;
 // The designed plugin page inside a channel window shows page `page` (screenshots, round 169h); returns the page count
 // of its layout (0 = no pages)

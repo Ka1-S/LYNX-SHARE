@@ -1963,15 +1963,16 @@ public:
         content->addMouseListener (this, true); // a click anywhere in it brings the frame in front
         // round 190in (design190ia FW-5): FL's title strip holds the preset ◀ name ▶ (the strip under it gives them up)
         addAndMakeVisible (headerToggle);
+        // the gear (PR #256): the header shows until it hides it (lit while hidden); rememberHeader gives the window its key
         headerToggle.onClick = [this] {
             if (auto* wrapped = dynamic_cast<WrappedEditor*> (shownContent))
-                wrapped->setHeaderCollapsed (! headerToggle.getToggleState());
+                wrapped->setHeaderCollapsed (headerToggle.getToggleState());
+            windowplaces::setHeaderHidden (headerMemory, headerToggle.getToggleState());
         };
         if (auto* wrapped = dynamic_cast<WrappedEditor*> (content.get()))
         {
             wrapped->movePresetsTo (*this);
             titlePresets = &wrapped->presetComponent();
-            wrapped->setHeaderCollapsed (true); // starts hidden; click the gear to reveal it
         }
         if (editorResizable)
         {
@@ -2170,6 +2171,16 @@ public:
             setSize (child->getWidth(), child->getHeight() + titleHeight);
     }
 
+    // rollup 0.1.31 step 7: the window's key for its header choice (the gear, PR #256); a hidden one is hidden again
+    void rememberHeader (const juce::String& key)
+    {
+        headerMemory = key;
+        const auto hidden = windowplaces::headerHidden (key);
+        headerToggle.setToggleState (hidden, juce::dontSendNotification);
+        if (auto* wrapped = dynamic_cast<WrappedEditor*> (shownContent))
+            wrapped->setHeaderCollapsed (hidden);
+    }
+
 private:
     static constexpr int titleHeight = 24;
 
@@ -2208,6 +2219,7 @@ private:
     Workspace& workspace;
     wrappermenu::MenuArrow menuButton;
     HeaderToggle headerToggle;
+    juce::String headerMemory; // (rollup 0.1.31 step 7: its key in windowplaces' hidden headers; empty: not remembered)
     IconButton minimiseButton { "minimise", Icon::minimise }, closeButton { "close", Icon::close };
     juce::Component* titlePresets = nullptr; // the wrapper's preset bar, in the title strip (owned by the wrapper)
     juce::ComponentBoundsConstrainer limits;
@@ -2595,6 +2607,8 @@ void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const
     dpi.reset();
     if (auto* window = dynamic_cast<juce::Component*> (open[&plugin].get()); window != nullptr && placeKey.isNotEmpty())
         windowplaces::tag (*window, placeKey);
+    if (auto* frame = dynamic_cast<DockedPluginFrame*> (open[&plugin].get())) // (the header gear's choice, PR #256)
+        frame->rememberHeader (windowplaces::headerKey ("plugin", placeKey));
     // FL's "Limit the number of open plugin editors" (round 189o, core/EditorLimit.h): past 25, the oldest closes
     editorlimit::opened (&plugin, [k = &plugin] {
         editorlimit::forget (k);
