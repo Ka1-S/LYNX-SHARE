@@ -20,6 +20,9 @@ plugins use LYNX's own product names, which all start with "LYNX".
 | LYNX Tune | vocal pitch correction | CLAP, VST3, LV2 (Linux) |
 | LYNX FM10 | FM instrument | CLAP, VST3, LV2 (Linux) |
 | LYNX Model | physical-model instrument (marimba, vibraphone, xylophone, glockenspiel, tubular bells, kalimba) | CLAP, VST3, LV2 (Linux) |
+| LYNX Fourfold | 4-operator FM synth (LYNX's Tetra engine) | CLAP, VST3, LV2 (Linux) |
+| LYNX Wavecoil | wavetable synth (LYNX's Helix engine) | CLAP, VST3, LV2 (Linux) |
+| LYNX Duoloom | two-engine macro synth (LYNX's Braid engine) | CLAP, VST3, LV2 (Linux) |
 | LYNX Prism Multiband, Sentry Gate, Glow Leveler, Hush De-esser | dynamics | CLAP |
 | LYNX Ridge Strip, Kiln Channel, Fret Channel, Shell Channel | channel strips | CLAP |
 | LYNX Aether, Ember Saturator | air band / exciter, saturation | CLAP |
@@ -42,11 +45,15 @@ New in 0.1.31 (round 190ov): Strike Shaper, Anvil Bus, Corrode, Soundboard, Plat
 LYNX Model as CLAP and VST3. The Harmonia engine exports as LYNX Chimefield (Cherry Audio sells a Harmonia synth); inside
 LYNX it keeps its name. New in 0.1.31: the VST3 list also as LV2 on Linux.
 
+New in 0.1.32 (round 190pq): LYNX Fourfold, LYNX Wavecoil and LYNX Duoloom, LYNX's synths Tetra, Helix and Braid, as
+CLAP, VST3 and LV2 (Linux). Their engine names are other makers' products, so they export under these names; inside LYNX
+the engines keep their names. Fourfold and Duoloom start from the engine's defaults (they have no preset bank), Wavecoil
+from its first preset.
+
 ### Not in the pack yet
 
 | Engine in LYNX | Why |
 |---|---|
-| LYNX Fourfold, LYNX Wavecoil, LYNX Duoloom (the Tetra FM synth, Helix wavetable synth and Braid macro synth; their engine names are other makers' products) | named, but held back until they pass the pack's host tests (a crash in the CLAP test and a state that does not save back byte for byte; planned for 0.1.32) |
 | LYNX Soundfont | it needs a SoundFont file chosen in LYNX's browser |
 | Visualizer, analyser, controllers, hardware insert | no sound of their own, or they need LYNX's mixer |
 | FL Studio's native plugins on LYNX engines | the names are Image-Line's |

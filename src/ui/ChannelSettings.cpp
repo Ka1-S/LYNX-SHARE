@@ -1170,9 +1170,10 @@ public:
         // switches drawn by the panel
         // (a Transistor Bass from a .flm: FL Studio Mobile's build has no sequencer, delay or reverb)
         layout = transistorBassMobile ? plugui::transistorBassFlmLayout() : plugui::instrumentLayout (def.instrument);
+        if (plugui::hostedElsewhere) // (round 190pq: the description names the plugin, also on a page without a layout: Duoloom)
+            hostedName = def.name;
         if (layout != nullptr && plugui::hostedElsewhere) // (round 180b: the plate prints the plugin's name)
         {
-            hostedName = def.name;
             hostedLayout = *layout;
             for (auto& item : hostedLayout.items)
                 if ((item.style & plugui::enginePlate) != 0)
@@ -8030,19 +8031,9 @@ std::unique_ptr<juce::Component> makeChannelSettingsPanel (AudioEngine& engine, 
         return makeHelixEditor (engine, [channel] (Song& s) -> ChannelDef* {
             return channel >= 0 && channel < (int) s.channels.size() ? &s.channels[(std::size_t) channel] : nullptr;
         }, channel); // round 190ja
-    if (const auto kind = engine.getSong().channels[(std::size_t) channel].instrument;
-        kind == InstrumentKind::sakura || kind == InstrumentKind::drumpad || kind == InstrumentKind::boobass
-                 || kind == InstrumentKind::drumsynth || kind == InstrumentKind::harmless || kind == InstrumentKind::harmor
-                 || kind == InstrumentKind::gms || kind == InstrumentKind::morphine
-                 || kind == InstrumentKind::ogun || kind == InstrumentKind::minisynth
-                 || kind == InstrumentKind::dx10 || kind == InstrumentKind::kepler || kind == InstrumentKind::keplerExo || kind == InstrumentKind::poizone
-                 || kind == InstrumentKind::fruitkick || kind == InstrumentKind::bassdrum || kind == InstrumentKind::toxic
-                 || kind == InstrumentKind::threeosc
-                 || kind == InstrumentKind::autogun || kind == InstrumentKind::transistorbass
-                 || kind == InstrumentKind::simsynth || kind == InstrumentKind::wasp || kind == InstrumentKind::plucked
-                 || kind == InstrumentKind::beepmap || kind == InstrumentKind::sawer || kind == InstrumentKind::flkeys
-                 || kind == InstrumentKind::granulizer || kind == InstrumentKind::drumaxx
-                 || kind == InstrumentKind::slayer || kind == InstrumentKind::fruitydance || kind == InstrumentKind::sytrus || kind == InstrumentKind::pocketSuperSaw)
+    // (round 190pq: isModelKind, the one list; this copy of it missed Braid, whose channel window and LYNX Duoloom's
+    // plugin editor showed the Sampler's page instead of round 190ko's knob list)
+    if (isModelKind (engine.getSong().channels[(std::size_t) channel].instrument))
         return std::make_unique<ModelPanel> (engine, ChannelRef::rack (channel));
 
     return std::make_unique<SettingsPanel> (engine, ChannelRef::rack (channel));

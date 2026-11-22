@@ -1,5 +1,5 @@
 ---
-source: 6620e7eee1
+source: 34014064c8
 ---
 ![각 플러그인 파일을 별도 프로세스에서 검사한다는 안내가 있는 플러그인 관리자 아래쪽](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -110,6 +110,7 @@ FL Studio 플러그인이 `불러오기 실패`로 표시되면 `옵션 › 플�
 Facet EQ, Apex Limiter, LYNX Tune, LYNX Model 같은 LYNX SHARE 자체 이펙트와 악기는 다른 DAW용 플러그인으로도 제공됩니다. [릴리스 페이지](https://github.com/Ka1-S/LYNX-SHARE/releases)에서 따로 받는 선택 사항이며, Windows, macOS, Linux용 `LYNX-Plugins-<version>`입니다.
 
 - 모든 플러그인이 CLAP 파일 하나, `LYNX Plugins.clap`에 들어 있습니다. 일부는 VST3로도, Linux에서는 LV2로도 제공됩니다.
+- 팩에 든 악기: LYNX FM10, LYNX Model, LYNX Fourfold, LYNX Wavecoil, LYNX Duoloom.
 - 압축 파일 안의 설치 스크립트(Windows는 `install.cmd`, macOS와 Linux는 `install.sh`)를 실행한 다음 DAW에서 플러그인을 다시 스캔하세요.
 - 플러그인은 LYNX SHARE 안에서와 같은 에디터를 열고, 그 상태는 LYNX SHARE에서 프로젝트로 열립니다.
 

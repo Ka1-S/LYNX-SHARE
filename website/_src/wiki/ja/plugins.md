@@ -1,5 +1,5 @@
 ---
-source: 6620e7eee1
+source: 34014064c8
 ---
 ![プラグインマネージャーの下部。各プラグインファイルは別プロセスで調べるという注記がある](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -110,6 +110,7 @@ FL Studioプラグインが`読み込み失敗`と表示されている場合は
 Facet EQ、Apex Limiter、LYNX Tune、LYNX ModelなどLYNX SHARE独自のエフェクトとインストゥルメントは、ほかのDAW用のプラグインとしても提供されています。[リリースページ](https://github.com/Ka1-S/LYNX-SHARE/releases)にある別の任意のダウンロードで、Windows、macOS、Linux用の`LYNX-Plugins-<version>`です。
 
 - すべてのプラグインが1つのCLAPファイル`LYNX Plugins.clap`に入っています。一部はVST3としても、LinuxではLV2としても提供されます。
+- パックの音源: LYNX FM10、LYNX Model、LYNX Fourfold、LYNX Wavecoil、LYNX Duoloom。
 - アーカイブ内のインストールスクリプト（Windowsは`install.cmd`、macOSとLinuxは`install.sh`）を実行し、DAWでプラグインを再スキャンしてください。
 - プラグインはLYNX SHARE内と同じエディターを開き、その状態はLYNX SHAREでプロジェクトとして開けます。
 

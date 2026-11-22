@@ -1,4 +1,4 @@
-# LYNX's own plugins as CLAP, VST3 and LV2 (rounds 180b, 188b, 190ov, 190pk)
+# LYNX's own plugins as CLAP, VST3 and LV2 (rounds 180b, 188b, 190ov, 190pk, 190pq)
 
 Status: **built by the release workflow as a separate, optional download** (the user's option C, 2026-11-08): every LYNX
 effect in one CLAP, a short list also as VST3 (and on Linux as LV2), for Windows, Linux and macOS. The
@@ -49,6 +49,9 @@ there. Plugin names are LYNX names only, never an FL Studio name (a test checks 
 | LYNX Timeprism | spectral freezer / delay (190ov) | yes | |
 | LYNX Chimefield | spectral resonator (190ov; the Harmonia engine) | yes | |
 | LYNX Model | instrument (physical models, 190ov) | yes | yes |
+| LYNX Fourfold | instrument (4-operator FM: the Tetra engine, 190pq) | yes | yes |
+| LYNX Wavecoil | instrument (wavetable: the Helix engine, 190pq) | yes | yes |
+| LYNX Duoloom | instrument (two-engine macro synth: the Braid engine, 190pq) | yes | yes |
 
 LV2 (Linux; rounds 190ov and 190pk, shipped since 0.1.31): every VST3 of the list is also built as an LV2 bundle on Linux
 (`-DLYNX_PLUGINS_LV2`, on by default; it does nothing elsewhere): JUCE's LV2 wrapper (`src/plugin/Lv2Entry.cpp`, the same
@@ -87,18 +90,44 @@ always carry the "LYNX" prefix.
 Round 190ov added LYNX Model (LYNX's own physical models) and seven later LYNX-own effects. LYNX's own synths Tetra, Helix
 and Braid export under names of their own (owner decision, rollup 0.1.31 step 6), because their engine names are other
 makers' products (Sequential's Tetra synth, Line 6's Helix / Helix Native, Mutable Instruments' Braids, also a Softube
-plugin): **LYNX Fourfold**, **LYNX Wavecoil** and **LYNX Duoloom**. They stay at `0` for now: CI plugins run
-44975814572 built them into the CLAP, but `plugexporttest` aborted in the CLAP (`std::length_error`) and clap-validator's
-state-reproducibility-binary failed on Fourfold and Wavecoil (queued for 0.1.32). Tetra and Braid have no preset bank:
-their plugin starts from the engine's defaults (`plugexport::instrumentChannel`). The Harmonia engine exports as **LYNX
+plugin): **LYNX Fourfold**, **LYNX Wavecoil** and **LYNX Duoloom**, built as CLAP, VST3 and LV2 since round 190pq
+(0.1.32). Tetra and Braid have no preset bank: their plugin starts from the engine's defaults
+(`plugexport::instrumentChannel`). CI plugins run 44975814572 had held them back (step 6) with two failures, both fixed in
+round 190pq:
+- `plugexporttest` aborted in the CLAP (`std::length_error`, `basic_string::_M_create`; a segmentation fault locally):
+  its reference render (`directInstrument`) dereferenced the empty `banks::defaultChannel` of Tetra / Braid and copied a
+  `ChannelDef` from garbage. A bug in the test tool, not in the plugins: it now starts from `plugexport::instrumentChannel`,
+  as the plugin does.
+- clap-validator's state-reproducibility-binary (save, load into a new instance, save again: the same bytes) failed on
+  Fourfold and Wavecoil: every save wrote each host value back into the channel through the parameter's range
+  (raw -> 0..1 -> raw), which moves some values by a float step, and `modelParams` are written with 7 digits, so the
+  second save differed in a last digit (Fourfold `modelParams` 46 and 138, Wavecoil 46 and 63). A save now writes only
+  the values the host moved. `.lynx` loading is unchanged. `plugexporttest` checks the same thing on every plugin
+  and format (every parameter moved, a third instance loads the state and saves it back byte for byte).
+
+With those fixed, the CLAP test went further and found a crash that every LYNX instrument already had (FM10 and Model
+too): an instrument's editor crashed in a host that had removed every LYNX plugin and then added a LYNX instrument
+again. Each plugin instance holds a JUCE initialiser, and the last one to go shuts JUCE down, which deletes
+`WaveformCache` (a `DeletedAtShutdown` singleton). The library stays loaded, because JUCE's own `thread_local` text
+shaping registers a TLS destructor on the host's main thread, and that pins the library until the thread ends. The cache
+was declared "never create again after deletion", so the next instrument editor's `WaveformDisplay` got a null cache.
+It may be created again now (`src/ui/WaveformView.h`); the app deletes it only at its own shutdown. `plugexporttest`'s
+plain-host CLAP pass, which creates and frees one plugin at a time, covers this case. The instrument check also moves
+the engine's first continuous parameter by id under JUCE's LV2 host (that host lists parameters in its own order, and
+its parameter 1 was a stepped on / off switch on the three synths).
+
+The editor pictures `check-plugins.sh` draws showed two more things, both fixed in round 190pq:
+- LYNX Duoloom opened the Sampler's page (File, Time stretching, "No sample loaded"), not Braid's knob list.
+  `makeChannelSettingsPanel` had its own copy of the model-engine list, and round 190ko added Braid only to
+  `isModelKind`. The copy is gone, so the app's channel window for a Braid channel (Pattern layout) also shows the knob
+  list 190ko described, instead of the Sampler's page.
+- LYNX Fourfold's title strip printed "TETRA". As a plugin it prints the plugin's name (FOURFOLD), as the other
+  editors' name plates do; inside LYNX it stays TETRA. The knob-list page names the plugin as its description too. The Harmonia engine exports as **LYNX
 Chimefield** (Cherry Audio sells a Harmonia synth). Inside LYNX the engines keep their names. Instruments that stand in for FL Studio's follow later with their own names (round 188b report: a
 proposed list for the user). Until then they stay at `0`:
 
 | Exported name | Engine inside LYNX | Kind | Built now |
 |---|---|---|---|
-| LYNX Fourfold | Tetra | instrument | no (host tests: rollup 0.1.31 step 6) |
-| LYNX Wavecoil | Helix | instrument | no (host tests) |
-| LYNX Duoloom | Braid | instrument | no (host tests) |
 | LYNX Osc Trio | 3x Osc | instrument | no (needs a host parameter table) |
 | LYNX SimOsc | SimSynth | instrument | no |
 | LYNX Harmlite | Harmless | instrument | no |
@@ -267,6 +296,11 @@ Round 190pk's Linux package (1 CLAP with 36 plugins, 8 VST3, 8 LV2) is 26.3 MB f
 (GCC 15): the 256 MiB window holds
 only about five of its 48 MB binaries, so the LV2 bundles, packed after the VST3s, add their own share.
 
+Round 190pq (1 CLAP with 39 plugins, 11 VST3, 11 LV2; CI run 45058238805): the Linux archive is 27.1 MB (CI's
+artifact, xz inside), 31.7 MB locally; the Windows zip is 195.4 MB (8 VST3: 140.8 MB in round 190ov): each Windows
+VST3 is compressed on its own, so each of the three synths adds about 18 MB there; macOS universal 39.0 MB (34.6 MB).
+The Windows build at JOBS=2 took 1 h 10 min (45 min with 8 VST3), macOS universal 2 h 22 min.
+
 Per instance, measured in plugexporttest:
 
 - memory: 1.2 to 2.2 MB more per extra instance;
@@ -312,6 +346,10 @@ controls stay hidden in the plugins for now.
   (lilv 0.26.2) instantiates, runs 1,024 blocks and frees each. The same run passes every CLAP and VST3 check
   (`plugexporttest`, pluginval strictness 10, clap-validator). Not tried in Ardour, Carla, Qtractor or Zrythm yet, and
   the editor only inside JUCE's host (jalv's command-line host shows no X11 editor).
+- Round 190pq: CI run 45058238805 (Plugins workflow): Linux 46 / 46 checks pass (plugexporttest on the CLAP, 11 VST3 and
+  11 LV2; pluginval strictness 10 on 11 VST3; clap-validator; lv2lint on 11 LV2), Windows and macOS universal 24 / 24
+  each (plugexporttest on the CLAP and 11 VST3, pluginval on 11 VST3, clap-validator). The same 46 pass locally. New in plugexporttest: a state saved again after a load is the
+  same bytes with every parameter moved, on every plugin and format.
 - FL Studio 2026 (Windows), round 180b: Facet EQ and FM10, as CLAP (through `CLAP_PATH`) and as VST3 (from
   `Common Files\VST3`): load, play, both editors, a saved project reopens with its state, FL exits in about 1.4 s.
 - FL Studio 2026 (Windows), round 188b, the release download from CI: ADD > Refresh plugin list (fast scan) lists all 27
