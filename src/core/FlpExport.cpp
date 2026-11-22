@@ -1,4 +1,5 @@
 #include "core/Sections.h"
+#include "core/ChordLaneOps.h"
 #include "core/ClipEnvelope.h"
 #include "core/FlCurve.h"
 #include "core/NoteRepeat.h"
@@ -1643,6 +1644,7 @@ struct Converter
 
     // ---- the Playlist ----
     int sectionMarkers = 0; // (round 190ol)
+    int chordMarkers = 0;   // (round 190pf)
 
     void arrangements()
     {
@@ -1656,10 +1658,13 @@ struct Converter
             a.name = arrangement.name;
             a.rowZoom = polish::flZoomForRowHeight (song.playlistRowHeight); // FL's vertical zoom, event 0xF2 (round 190oo, PAT-6)
             // round 190ol: FL has no Sections lane: each section becomes a plain time marker at its start, named after it
-            int fromSections = 0;
-            for (const auto& m : sections::markersWithSections (current ? song.markers() : arrangement.markers, arrangement.sections, &fromSections))
+            int fromSections = 0, fromChords = 0;
+            // round 190pf: nor a Chord lane: each chord becomes a plain time marker at its start, named after it ("Am7")
+            const auto withSections = sections::markersWithSections (current ? song.markers() : arrangement.markers, arrangement.sections, &fromSections);
+            for (const auto& m : arrangement.chords.empty() ? withSections : chordlane::markersWithChords (withSections, arrangement.chords, &fromChords))
                 a.markers.push_back (marker (m));
             sectionMarkers += fromSections;
+            chordMarkers += fromChords;
             for (const auto& clip : clips)
                 if (auto item = playlistItem (clip))
                     a.items.push_back (*item);
@@ -1672,6 +1677,11 @@ struct Converter
         if (std::any_of (song.arrangements.begin(), song.arrangements.end(), [] (const Arrangement& x) { return ! x.sections.empty(); }))
             report.notes.push_back ("Song sections: FL has no Sections lane; " + std::to_string (sectionMarkers)
                                     + " time marker(s) at the sections' starts, named after them (moving a section in FL moves only its marker)");
+        if (std::any_of (song.arrangements.begin(), song.arrangements.end(), [] (const Arrangement& x) { return ! x.chords.empty(); }))
+            report.notes.push_back ("Chord lane: FL has no chord track; " + std::to_string (chordMarkers)
+                                    + " time marker(s) at the chords' starts, named after them");
+        if (std::any_of (song.channels.begin(), song.channels.end(), [] (const ChannelDef& c) { return c.followChords != 0; }))
+            report.notes.push_back ("Chord lane: the channels that follow it play their patterns' own notes in FL");
     }
 
     std::optional<flp::PlaylistItem> playlistItem (const Clip& clip) const

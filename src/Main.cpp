@@ -5,6 +5,9 @@
 #include "core/SectionOps.h"    // round 190ol (P1: the Sections lane)
 #include "core/SignatureEdit.h" // round 190ol (P6)
 #include "ui/SectionsLane190ol.h" // round 190ol (P1: the shot route drives the lane)
+#include "ui/ChordLane190pf.h"  // round 190pf (P13: the shot route drives the lane)
+#include "ui/SmartTempo190pf.h" // round 190pf (P12)
+#include "core/SmartTempo.h"
 #include "core/Offline.h"
 #include "core/GrooveAudio.h"
 #include "core/SmartDisableTip.h" // (round 190ok: --smarttipshot190ok)
@@ -3376,6 +3379,14 @@ public:
         if (args.contains ("--issuesshot190ht"))
         {
             setApplicationReturnValue (runIssuesShot190ht (args[args.indexOf ("--issuesshot190ht") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
+        // --chordlane190pfshot <prefix> (round 190pf, research190oe P13 / P12): src/ChordLaneShot190pf.inc
+        if (args.contains ("--chordlane190pfshot"))
+        {
+            setApplicationReturnValue (runChordLaneShot190pf (args[args.indexOf ("--chordlane190pfshot") + 1].unquoted()) ? 0 : 1);
             quit();
             return;
         }
@@ -9112,6 +9123,99 @@ private:
             }
         }
 
+        // round 190pf (research190oe P13 / P12): the Chord lane in .lynx (both arrangements; a channel's follow mode; a project
+        // without chords keeps its JSON without the keys), a chord edit and Smart Tempo's write as one undo step each that
+        // restore the song bit for bit, and the copies for 0.1.30 / 0.1.28 (chords become plain markers named after them,
+        // "chords" and "followChords" gone, a line each)
+        juce::String chordlane190pfResult = "OK";
+        {
+            const auto bar = 4 * (std::int64_t) lynx::ppq;
+            auto song = lynx::Song::makeDefault();
+            song.playlistTracks.resize (juce::jmax<std::size_t> (2, song.playlistTracks.size()));
+            lynx::Clip c;
+            c.pattern = 0;
+            c.track = 0;
+            c.length = 2 * bar;
+            song.playlist = { c };
+            const auto chord = [] (int root, int shape, std::int64_t start, std::int64_t length, int bass = -1) {
+                auto x = lynx::chordlane::make (root, shape, bass);
+                x.start = start;
+                x.length = length;
+                return x;
+            };
+            song.chords() = { chord (0, 0, 0, bar), chord (9, 4, bar, bar), chord (7, 2, 2 * bar, bar, 11) };
+            lynx::chordlane::normalize (song.chords());
+            song.addArrangement ("Second", true);
+            song.chords().push_back (chord (5, 3, 4 * bar, bar));
+            lynx::chordlane::normalize (song.chords());
+            song.selectArrangement (0);
+            song.channels.front().followChords = lynx::chordlane::followBass;
+            juce::String why;
+            const auto json = lynx::ProjectFile::toJson (song);
+            const auto back = lynx::ProjectFile::fromJson (json, why);
+            if (! back || back->arrangements.size() != 2 || back->arrangements[0].chords != song.arrangements[0].chords
+                || back->arrangements[1].chords != song.arrangements[1].chords || back->chords().size() != 3 || back->chords()[2].bass != 11
+                || back->channels.front().followChords != lynx::chordlane::followBass)
+                chordlane190pfResult = "ERROR round trip " + why;
+            else if (const auto plain = lynx::ProjectFile::toJson (lynx::Song::makeDefault()); plain.contains ("\"chords\"") || plain.contains ("followChords"))
+                chordlane190pfResult = "ERROR a project without chords writes the keys";
+            if (chordlane190pfResult == "OK")
+            {
+                lynx::AudioEngine e (false);
+                e.setSong (song);
+                const auto before = lynx::ProjectFile::toJson (e.getSong());
+                e.editSong ([bar] (lynx::Song& s) { lynx::chordlane::move (s.chords(), 0, 3 * bar); });
+                const auto moved = e.getSong().chords().back().start == 3 * bar;
+                e.undo();
+                if (! moved || lynx::ProjectFile::toJson (e.getSong()) != before)
+                    chordlane190pfResult = juce::String ("ERROR undo of a chord move (moved ") + (moved ? "yes" : "no") + ")";
+            }
+            for (const auto* release : { "0.1.30", "0.1.28" })
+            {
+                if (chordlane190pfResult != "OK")
+                    break;
+                const auto copy = lynx::olderlynx::forRelease (song, release);
+                const auto lines = std::count_if (copy.lost.begin(), copy.lost.end(), [] (const lynx::olderlynx::Loss& l) {
+                    return juce::String (l.text).contains ("Chord lane");
+                });
+                juce::String why2;
+                const auto old = copy.ok ? lynx::ProjectFile::fromJson (copy.json, why2) : std::nullopt;
+                if (! copy.ok || copy.json.contains ("\"chords\"") || copy.json.contains ("followChords") || lines != 2 || ! old)
+                    chordlane190pfResult = juce::String ("ERROR the copy for ") + release + " (" + juce::String ((int) lines) + " lines)";
+                else if (old->arrangements[0].markers.size() != 3 || old->arrangements[0].markers[1].name != "Am7" || old->arrangements[0].markers[2].name != "G7/B"
+                         || old->arrangements[0].markers[1].tick != bar || old->arrangements[1].markers.size() != 4 || ! old->arrangements[0].chords.empty())
+                    chordlane190pfResult = juce::String ("ERROR the markers in the copy for ") + release;
+            }
+            // Smart Tempo: one undo step, bit for bit (the plan of a steady 120 BPM pulse on a clip at bar 2)
+            if (chordlane190pfResult == "OK")
+            {
+                auto take = lynx::Song::makeDefault();
+                take.playlist.clear();
+                lynx::ChannelDef audio;
+                audio.instrument = lynx::InstrumentKind::audioClip;
+                take.channels.push_back (audio);
+                lynx::Clip a;
+                a.kind = lynx::ClipKind::audio;
+                a.channel = (int) take.channels.size() - 1;
+                a.start = bar;
+                a.length = 8 * bar;
+                take.playlist.push_back (a);
+                std::vector<double> bars;
+                for (int k = 0; k <= 8; ++k)
+                    bars.push_back (0.25 + k * 2.1);
+                const auto plan = lynx::smarttempo::plan (take, 0, bars, 20.0);
+                lynx::AudioEngine e (false);
+                e.setSong (take);
+                const auto before = lynx::ProjectFile::toJson (e.getSong());
+                auto ok = false;
+                e.editSong ([&] (lynx::Song& s) { ok = lynx::smarttempo::apply (s, 0, plan); });
+                const auto written = lynx::tempomarkers::list (e.getSong()).size();
+                e.undo();
+                if (! ok || written != 8 || lynx::ProjectFile::toJson (e.getSong()) != before)
+                    chordlane190pfResult = "ERROR Smart Tempo's undo (" + juce::String ((int) written) + " markers)";
+            }
+        }
+
         // round 190dr: the Session mixer's sections come back from a project (a project without them: Live's defaults);
         // a device dragged to another track and a Warp switch are one undo step each in a real engine
         juce::String livescr190drResult = "OK";
@@ -10041,7 +10145,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && tracker190omResult == "OK" && rackauto190owResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && autolinks190ovResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && renderAgainResult.startsWith ("OK")
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
@@ -10149,6 +10253,7 @@ private:
                << "sections190ol=" << sections190olResult << "\n"
                << "heldsteps190oz=" << heldSteps190ozResult << "\n"
                << "slides190pi=" << slides190piResult << "\n"
+               << "chordlane190pf=" << chordlane190pfResult << "\n"
                << "renderagain190ou=" << renderAgainResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
@@ -39158,6 +39263,7 @@ private:
 #include "ModalShot190mc.inc" // round 190mc
 #include "KeysShot190nu.inc" // round chord2_190nu
 #include "SectionsShot190ol.inc" // round 190ol (research190oe P1 / P6)
+#include "ChordLaneShot190pf.inc" // round 190pf (research190oe P13 / P12)
 #include "PrShot190jv.inc" // round 190jv
 #include "HostPlay190ll.inc" // round 190ll (issue #199)
 #include "IssuesShot190ll.inc" // round 190ll (issues #200, #201, #203)

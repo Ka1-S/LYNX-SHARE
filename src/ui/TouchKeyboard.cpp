@@ -5,6 +5,7 @@
 #include <map>
 #include <set>
 
+#include "core/ChordLaneOps.h" // round 190pf
 #include "core/ChordReadout.h"
 #include "core/HeldNotes.h"
 #include "core/ProjectKey.h"
@@ -652,8 +653,21 @@ private:
         const bool fromSet = settings.projectChords && ! song.keyboardChords.empty();
         // the set the edit starts from: the project's, or the key's diatonic triads
         auto base = fromSet ? song.keyboardChords : key ? scalekeys::diatonicSet (*key) : std::vector<KeyboardChord> {};
+        // round 190pf (research190oe P13): the song's own chords (its Chord lane, core/ChordLane.h), each once in song order
+        const auto laneChords = chordlane::padSet (song.chords());
+        const auto addLaneItem = [this, &menu, laneChords] {
+            menu.addItem (tr ("The song's chords (Chord lane)"), ! laneChords.empty(), false, [this, laneChords] {
+                engine.editSong ([laneChords] (Song& s) { s.keyboardChords = laneChords; });
+                scalekeys::current().projectChords = true;
+                repaint();
+            });
+        };
         if (pad < 0 || pad >= (int) base.size())
+        {
+            if (! laneChords.empty())
+                addLaneItem();
             return menu;
+        }
         menu.addSectionHeader (tr ("Edit chord"));
         juce::PopupMenu roots, qualities;
         auto apply = [this, base, pad] (int root, int quality) {
@@ -689,6 +703,7 @@ private:
             scalekeys::current().projectChords = false;
             repaint();
         });
+        addLaneItem();
         return menu;
     }
 

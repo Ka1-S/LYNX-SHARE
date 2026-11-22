@@ -1,6 +1,7 @@
 #include "engine/ProjectFile.h"
 #include "core/AutomationModes.h" // round 190pa (P21)
 #include "core/Sections.h"
+#include "core/ChordLane.h"
 #include "core/EditorScale.h"
 #include "core/ClipEnvelope.h"
 #include "core/WarpModes.h"
@@ -2103,6 +2104,8 @@ juce::var channelToVar (const ChannelDef& c)
         o->setProperty ("icon", c.icon);
     if (c.editorScale != 0) // the settings window's Scaling (round 190he)
         o->setProperty ("editorScale", c.editorScale);
+    if (c.followChords != 0) // round 190pf: the channel's notes follow the Chord lane (absent = off, as every project before)
+        o->setProperty ("followChords", (int) c.followChords);
         if (c.flWrapperFlags >= 0)
             o->setProperty ("flWrapperFlags", c.flWrapperFlags);
         if (c.smartDisable) // (round 190ok: FL's generator smart disable; absent = off, as every project before it)
@@ -2450,6 +2453,7 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         def.editorScale = editorscale::storedFor (scale);
     def.flWrapperFlags = (int) c.getProperty ("flWrapperFlags", -1);
     def.smartDisable = (bool) c.getProperty ("smartDisable", false); // (round 190ok)
+    def.followChords = (std::uint8_t) juce::jlimit (0, 2, (int) c.getProperty ("followChords", 0)); // (round 190pf)
     if (c.hasProperty ("flOrigin"))
         def.flOrigin = flOriginFromVar (c["flOrigin"]);
     if (const auto& from = c["receiveFrom"]; from.isArray() && from.size() >= 2)
@@ -3921,7 +3925,7 @@ juce::String toJson (const Song& song, bool stampVersion)
     }
 
     const auto anyMarkers = std::any_of (song.arrangements.begin(), song.arrangements.end(),
-                                         [] (const Arrangement& a) { return ! a.markers.empty() || ! a.blocks.empty() || ! a.sections.empty(); });
+                                         [] (const Arrangement& a) { return ! a.markers.empty() || ! a.blocks.empty() || ! a.sections.empty() || ! a.chords.empty(); });
 
     if (song.arrangements.size() > 1 || anyMarkers)
     {
@@ -3965,6 +3969,21 @@ juce::String toJson (const Song& song, bool stampVersion)
                     list.add (juce::Array<juce::var> { (juce::int64) sec.start, (juce::int64) sec.length, str (sec.name), (juce::int64) sec.colour,
                                                        (juce::int64) sec.uid });
                 o->setProperty ("sections", list);
+            }
+
+            // round 190pf: the Chord lane, [start, length, root, quality, [extensions], bass, uid] (bass -1 = the root);
+            // older LYNX skips it
+            if (! a.chords.empty())
+            {
+                juce::Array<juce::var> list;
+                for (const auto& c : a.chords)
+                {
+                    juce::Array<juce::var> ext;
+                    for (const auto e : c.extensions)
+                        ext.add (e);
+                    list.add (juce::Array<juce::var> { (juce::int64) c.start, (juce::int64) c.length, c.root, c.quality, ext, c.bass, (juce::int64) c.uid });
+                }
+                o->setProperty ("chords", list);
             }
 
             arrangements.add (juce::var (o.release()));
@@ -5024,6 +5043,27 @@ std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error,
                                                           v[2].toString().toStdString(), v.size() >= 4 ? (std::uint32_t) (juce::int64) v[3] : 0u,
                                                           v.size() >= 5 ? (std::uint64_t) juce::jmax<juce::int64> (0, (juce::int64) v[4]) : 0u });
                 sections::normalize (arrangement.sections);
+            }
+            if (auto* list = a["chords"].getArray()) // (round 190pf: the Chord lane)
+            {
+                for (const auto& v : *list)
+                    if (v.isArray() && v.size() >= 4)
+                    {
+                        SongChord c;
+                        c.start = juce::jmax<juce::int64> (0, (juce::int64) v[0]);
+                        c.length = juce::jmax<juce::int64> (0, (juce::int64) v[1]);
+                        c.root = (int) v[2];
+                        c.quality = juce::jlimit (0, 6, (int) v[3]);
+                        if (v.size() >= 5)
+                            if (auto* ext = v[4].getArray())
+                                for (const auto& e : *ext)
+                                    if ((int) e > 0 && (int) e < 36)
+                                        c.extensions.push_back ((int) e);
+                        c.bass = v.size() >= 6 ? (int) v[5] : -1;
+                        c.uid = v.size() >= 7 ? (std::uint64_t) juce::jmax<juce::int64> (0, (juce::int64) v[6]) : 0u;
+                        arrangement.chords.push_back (c);
+                    }
+                chordlane::normalize (arrangement.chords);
             }
             song.arrangements.push_back (std::move (arrangement));
         }

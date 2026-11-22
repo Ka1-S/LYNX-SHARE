@@ -5,6 +5,7 @@
 #include "ui/WindowPlaces.h" // (round 190oa, DF-130)
 #include "core/Sections.h"
 #include "core/AutomationModes.h" // round 190pa (P21)
+#include "core/ChordLane.h"
 #include "core/EscClose.h"
 #include "core/DetailChain.h"
 #include "core/MeterScale.h"
@@ -5489,6 +5490,9 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
                 view.addSeparator();
                 view.addItem (tr ("Sections lane") + " (LYNX)", layoutStyle == layoutstyle::Style::pattern, sections::patternLaneOn(),
                               [] { workflowextras::setExtra ("playlist.sectionsLane", ! sections::patternLaneOn()); });
+                // round 190pf (research190oe P13): LYNX's Chord lane, off by default, in every layout
+                view.addItem (tr ("Chord lane") + " (LYNX)", true, chordlane::laneOn(),
+                              [] { workflowextras::setExtra ("playlist.chordLane", ! chordlane::laneOn()); });
                 // round 190oo (design review O-1, a LYNX extra): shade the faded part as the Clip-launch layout does
                 view.addItem (tr ("Shade faded audio (LYNX)"), true, PlaylistComponent::shadeFadedAudio, [this] {
                     PlaylistComponent::shadeFadedAudio = ! PlaylistComponent::shadeFadedAudio;

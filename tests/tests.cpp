@@ -18079,6 +18079,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Gap190ogTests.inc" // round gap190og (0.1.31): Live Duplicate Loop, Crop Clip, velocity Randomize, mappable transport, Edit menu on devices
 #include "Host190ohTests.inc" // round 190oh: plugin host review, FL's wrapper Settings › GUI (P3)
 #include "Sections190olTests.inc" // round 190ol (0.1.31): the Sections lane (P1) and Simple time signature changes (P6)
+#include "ChordLane190pfTests.inc" // round 190pf (0.1.32): the Chord lane (P13) and Smart Tempo (P12)
 #include "Research190onTests.inc" // round 190on: command palette (P2), Tab to transient (P8), stacked lanes (P10), removing a guest
 #include "Perf190okTests.inc" // round 190ok: safe overloads (P24), generator smart disable (D2), the smart-disable tip (D1), fast maths (D3)
 #include "Design190ooTests.inc" // round 190oo (0.1.31): design review 2, the owner's options with rules in core

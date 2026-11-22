@@ -1136,6 +1136,11 @@ struct ChannelDef
     // Round 190lk (core/PolyEdit.h): an audio clip channel's notes edited in LYNX's polyphonic note editor (the analysis
     // and the edits, "LXPE"); its clips play the edited render of the sample. Empty = not edited.
     std::vector<std::uint8_t> polyEdit;
+    // Round 190pf (research190oe P13, core/ChordLane.h): the channel's notes follow the Chord lane while the song plays
+    // (Cubase's Chord Track "Follow", Studio Pro's "Follow chords"; a LYNX extra): 0 off (every project saved before),
+    // 1 chord tones (each note moves to the nearest note of the chord under it), 2 bass (to the chord's bass / root).
+    // The pattern keeps its notes; only what plays moves. Saved as the channel's "followChords" when not 0.
+    std::uint8_t followChords = 0;
     InstanceTag instance; // runtime identity of the channel (never saved)
 
     bool hasKeyRegion() const noexcept { return keyLow > 0 || keyHigh < 127; }
@@ -2643,6 +2648,24 @@ struct TrackRange
     bool operator== (const TrackRange&) const = default;
 };
 
+// A chord of the Chord lane (round 190pf, research190oe P13; Cubase / Logic / Studio Pro's chord track, core/ChordLane.h):
+// [start, start + length) in ticks; the chord as the Chord pad's sets store theirs (Song::keyboardChords, FL Studio
+// Mobile's numbering): `quality` 0 major, 1 minor, 2 augmented, 3 diminished, 4 sus2, 5 sus4, 6 power chord, then
+// `extensions` in semitones above the root (10 = 7, 11 = maj7, 9 = 6, 14 = 9...), `bass` a pitch class played under it
+// (a slash chord) or -1. Sorted by start, no overlaps, gaps allowed. LYNX extra: FL and Live have none (an .flp export
+// writes a time marker per chord, named after it).
+struct SongChord
+{
+    std::int64_t start = 0, length = 0;
+    int root = 0;    // pitch class 0..11
+    int quality = 0;
+    std::vector<int> extensions {};
+    int bass = -1;   // pitch class, -1 = the root
+    std::uint64_t uid = 0;
+    std::int64_t end() const noexcept { return start + length; }
+    bool operator== (const SongChord&) const = default;
+};
+
 struct Arrangement
 {
     std::string name;
@@ -2654,6 +2677,9 @@ struct Arrangement
     // round 190ol: the Sections lane (SongSection), sorted; like the markers, kept here for the current arrangement too.
     // Saved in .lynx as the arrangement's "sections" only when there are some (older LYNX ignores the key)
     std::vector<SongSection> sections {};
+    // round 190pf: the Chord lane (SongChord), sorted; kept here for the current arrangement too. Saved in .lynx as the
+    // arrangement's "chords" only when there are some (older LYNX ignores the key)
+    std::vector<SongChord> chords {};
     bool operator== (const Arrangement&) const = default;
 };
 
@@ -3098,6 +3124,9 @@ struct Song
     // Sections of the current arrangement (round 190ol, core/Sections.h)
     std::vector<SongSection>& sections();
     const std::vector<SongSection>& sections() const;
+    // round 190pf: the current arrangement's Chord lane (core/ChordLane.h)
+    std::vector<SongChord>& chords();
+    const std::vector<SongChord>& chords() const;
 
     // Bars that play in [from, to), taking the markers' time signature changes into account
     // (before the first one, the song's meter applies: beatsPerBar / beatUnit).

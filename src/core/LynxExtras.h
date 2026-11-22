@@ -134,6 +134,13 @@ inline constexpr Item items[] = {
     { "playlist.sectionsLane", TR_NOOP ("Playlist"), TR_NOOP ("Sections lane"),
       TR_NOOP ("A lane under the Playlist's ruler with named song sections (Intro, Verse, Chorus...): drag one to move it with every clip, automation and marker under it, Ctrl+drag to copy it, drop it onto another to swap them. FL Studio has only time markers; an .flp export writes a marker at each section's start. Also in the Playlist menu › View."),
       "ui-options.txt:sectionsLane" },
+    // round 190pf (research190oe P13): Cubase's / Logic's / Studio Pro's chord track (FL and Live have none)
+    { "playlist.chordLane", TR_NOOP ("Playlist"), TR_NOOP ("Chord lane"),
+      TR_NOOP ("A lane under the Playlist's ruler with the song's chords: draw them, pick them from the key's degree chords or detect them from the notes or an audio clip; channels can follow them while the song plays, and the Chord pad can play them. FL Studio has no chord track; an .flp export writes a marker at each chord's start. Also in the Playlist menu › View."),
+      "ui-options.txt:chordLane" },
+    { "pianoRoll.chordHighlight", TR_NOOP ("Piano Roll"), TR_NOOP ("Highlight the Chord lane's chord (LYNX)"),
+      TR_NOOP ("The Piano roll's rows light the notes of the Chord lane's chord at the song position instead of the scale, and switch as the song plays. Also in the Piano roll's View menu."),
+      "ui-options.txt:prChordHighlight" },
     // round 190oo (design review O-1, issue #230): FL 2026 draws only the fade curve; Live (and #230's picture) shade
     { "playlist.shadeFadedAudio", TR_NOOP ("Playlist"), TR_NOOP ("Shade faded audio (LYNX)"),
       TR_NOOP ("The Pattern layout also darkens the part of an audio clip that a fade takes away, as the Clip-launch layout and Live do; FL Studio draws only the fade curve. Also in Playlist › View."),

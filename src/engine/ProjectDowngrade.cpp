@@ -3,6 +3,7 @@
 #include "engine/ProjectFile.h"
 
 #include "core/ApexLimiter.h"
+#include "core/ChordLane.h"
 #include "core/DirectWaveState.h"
 #include "core/DynamicsSuite.h"
 #include "core/EchoSuite.h"
@@ -1743,6 +1744,57 @@ void toRelease0130 (juce::var& root, Losses& lost)
             }
         if (converted > 0)
             lost.push_back ({ TR_NOOP ("{0} song section(s) of the Sections lane become plain Playlist markers at their starts"), juce::String (converted), false });
+    }
+
+    // round 190pf (P13): the Chord lane. 0.1.30 has none: each chord becomes a plain Playlist marker at its start, named
+    // after it ("Am7"), as the .flp export writes them; the channels that follow the lane play their own notes there
+    {
+        int converted = 0;
+        if (auto* arrangements = arrayOf (root["arrangements"]))
+            for (auto& a : *arrangements)
+            {
+                auto* ao = objectOf (a);
+                if (ao == nullptr)
+                    continue;
+                const auto list = ao->getProperty ("chords");
+                if (! drop (*ao, "chords") || ! list.isArray())
+                    continue;
+                juce::Array<juce::var> markers;
+                if (auto* old = arrayOf (ao->getProperty ("markers")))
+                    markers = *old;
+                for (const auto& v : *list.getArray())
+                {
+                    if (! v.isArray() || v.size() < 4)
+                        continue;
+                    SongChord c;
+                    c.root = (int) v[2];
+                    c.quality = juce::jlimit (0, 6, (int) v[3]);
+                    if (v.size() >= 5)
+                        if (auto* ext = v[4].getArray())
+                            for (const auto& e : *ext)
+                                c.extensions.push_back ((int) e);
+                    c.bass = v.size() >= 6 ? (int) v[5] : -1;
+                    const auto tick = (juce::int64) v[0];
+                    const auto name = juce::String (chordlane::name (c));
+                    const auto there = std::any_of (markers.begin(), markers.end(), [&] (const juce::var& m) {
+                        return m.isArray() && m.size() >= 4 && (juce::int64) m[0] == tick && m[1].toString() == name && (int) m[2] == 0;
+                    });
+                    if (! there)
+                        markers.add (juce::Array<juce::var> { tick, name, 0, 4 });
+                    ++converted;
+                }
+                std::stable_sort (markers.begin(), markers.end(), [] (const juce::var& x, const juce::var& y) { return (juce::int64) x[0] < (juce::int64) y[0]; });
+                ao->setProperty ("markers", markers);
+            }
+        if (converted > 0)
+            lost.push_back ({ TR_NOOP ("{0} chord(s) of the Chord lane become plain Playlist markers at their starts"), juce::String (converted), false });
+        int following = 0;
+        if (auto* channels = arrayOf (root["channels"]))
+            for (auto& ch : *channels)
+                if (auto* co = objectOf (ch); co != nullptr && drop (*co, "followChords"))
+                    ++following;
+        if (following > 0)
+            lost.push_back ({ TR_NOOP ("{0} channel(s) followed the Chord lane; they play their patterns' own notes"), juce::String (following), true });
     }
 
     // round 190oh (P3): FL's wrapper Settings › GUI, "DPI aware" (saved only when off) and "Scale editor dimensions" (saved

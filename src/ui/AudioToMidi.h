@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "core/AudioToMidi.h"
+#include "core/ChordLaneOps.h"
 #include "engine/AudioEngine.h"
 
 namespace lynx
@@ -40,6 +41,11 @@ std::unique_ptr<juce::Component> makeConvertOptionsForSnapshot (AudioEngine& eng
 
 // The settings the dialog showed last (this run of LYNX; the channel is not kept between conversions).
 a2m::ConvertOptions& lastConvertOptions();
+
+// Round 190pf (research190oe P13, the Chord lane): the notes an audio clip plays (Basic Pitch, polyphonic; the same worker,
+// progress window and Cancel as Convert to MIDI) in song ticks where the clip plays them, for the lane's chord detection.
+// `done` gets them with the clip's span [from, to) on the message thread; nothing when cancelled or nothing was found.
+void detectClipNotes (AudioEngine& engine, int clipIndex, std::function<void (std::vector<chordlane::TimedNote>, std::int64_t, std::int64_t)> done);
 
 // App shutdown: a conversion still running stops at its next check and is waited for (before the engine goes).
 void shutdownAudioToMidi();

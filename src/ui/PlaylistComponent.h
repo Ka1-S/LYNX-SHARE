@@ -47,6 +47,7 @@ class EffectsPanel;
 class PatternPicker;
 class VideoLanesView;
 class SectionsLaneView;
+class ChordLaneView;
 
 // FL-style Playlist (arrangement): tracks vertically, time horizontally.
 //  - a tool strip (Pencil, Brush, Eraser, Mute, Knife, Lasso, Zoom, Listen, Slip); with the Pencil:
@@ -476,7 +477,7 @@ public:
     // has video tracks. `height` = the section's height (the divider drag; 0 = fit the lanes), clamped to the window.
     void setVideoHeight (int height);
     int videoSectionHeight() const;
-    int tracksTop() const { return headerHeight + sectionsLaneHeight() + videoSectionHeight(); } // the clip tracks' top edge
+    int tracksTop() const { return headerHeight + sectionsLaneHeight() + chordLaneHeight() + videoSectionHeight(); } // the clip tracks' top edge
     // The Sections lane (round 190ol, core/Sections.h; owner decision O-1): a thin lane under the ruler with the song's
     // sections. Simple: shown once the song has a section (the title bar's "Sections" button adds the first one, or hides
     // and shows it again); Pattern: the LYNX extra "Sections lane" (Playlist menu › View), off by default; Clip-launch: off.
@@ -486,6 +487,16 @@ public:
     void toggleSimpleSections();   // the Simple title bar's "Sections" button
     void sectionsLaneChanged();    // the extra switched, a layout change: lay the lane out again
     SectionsLaneView* getSectionsLaneForSnapshot() { return sectionsLane.get(); }
+    // The Chord lane (round 190pf, core/ChordLane.h): chords over the song under the ruler (under the Sections lane when it
+    // shows). A LYNX extra in every layout, off by default (Playlist menu › View, Settings › LYNX extras; the Simple ruler's
+    // menu too).
+    bool chordLaneShown() const;
+    int chordLaneHeight() const; // 0 when hidden
+    static constexpr int chordLaneFlHeight = 18, chordLaneSimpleHeight = 30;
+    void chordLaneChanged();     // the extra switched, a layout change: lay the lane out again
+    ChordLaneView* getChordLaneForSnapshot() { return chordLane.get(); }
+    // Round 190pf (research190oe P12): the audio clip menu's "Make the project tempo follow this clip..." (Smart Tempo)
+    void followClipTempo (int clip);
     VideoLanesView* getVideoLanesForSnapshot() { return videoLanes.get(); }
     static juce::Colour audioClipColour (const ChannelDef& channel);
 
@@ -1316,6 +1327,10 @@ private:
     std::unique_ptr<SectionsLaneView> sectionsLane;
     bool simpleSectionsHidden = false; // the Simple "Sections" button hid a lane that has sections (view only)
     int laidOutSectionsHeight = 0;
+    // The Chord lane (round 190pf)
+    friend class ChordLaneView;
+    std::unique_ptr<ChordLaneView> chordLane;
+    int laidOutChordHeight = 0;
 
     // issue #250 (round 190oq): deleted clips fade out as FL's do (ui/DeleteFade.h); `fadeOut` before they go
     ui::DeleteFade deleteFade { *this, ui::DeleteFade::playlistMs };
