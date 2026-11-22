@@ -12045,3 +12045,4 @@ countries: br
 "Insert a wildcard at the cursor" = "Inserir um curinga no cursor"
 "File:" = "Arquivo:"
 "Stems:" = "Stems:"
+"Show / hide the header" = "Mostrar / ocultar o cabeçalho"

@@ -11916,3 +11916,4 @@ countries: id
 "Insert a wildcard at the cursor" = "Sisipkan wildcard di kursor"
 "File:" = "File:"
 "Stems:" = "Stem:"
+"Show / hide the header" = "Tampilkan / sembunyikan header"

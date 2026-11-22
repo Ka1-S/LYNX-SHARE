@@ -11916,3 +11916,4 @@ countries: fr be ch ca lu
 "Insert a wildcard at the cursor" = "Insérer un joker au curseur"
 "File:" = "Fichier :"
 "Stems:" = "Stems :"
+"Show / hide the header" = "Afficher / masquer l'en-tête"

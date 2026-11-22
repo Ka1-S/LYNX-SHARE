@@ -11916,3 +11916,4 @@ countries: tw hk mo
 "Insert a wildcard at the cursor" = "在游標處插入萬用字元"
 "File:" = "檔案："
 "Stems:" = "分軌："
+"Show / hide the header" = "顯示 / 隱藏標題列"

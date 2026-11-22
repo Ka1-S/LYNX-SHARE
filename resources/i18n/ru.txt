@@ -11916,3 +11916,4 @@ countries: ru by kz
 "Insert a wildcard at the cursor" = "Вставить подстановку в позицию курсора"
 "File:" = "Файл:"
 "Stems:" = "Стемы:"
+"Show / hide the header" = "Показать / скрыть заголовок"
