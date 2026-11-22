@@ -205,7 +205,8 @@ jobs:
           git clone -q https://git.open-music-kontrollers.ch/~hp/lv2lint "$RUNNER_TEMP/lv2lint-src"
           git -C "$RUNNER_TEMP/lv2lint-src" checkout -q "$LV2LINT_COMMIT"
           cd "$RUNNER_TEMP/lv2lint-src"
-          meson setup build -Dbuild-tests=false -Donline-tests=disabled -Delf-tests=disabled -Dx11-tests=disabled --prefix="$RUNNER_TEMP/lv2lint"
+          CC=gcc-13 meson setup build -Dbuild-tests=false -Donline-tests=disabled -Delf-tests=disabled -Dx11-tests=disabled \
+            -Db_lto=false --prefix="$RUNNER_TEMP/lv2lint"
           meson install -C build
           "$RUNNER_TEMP/lv2lint/bin/lv2lint" -v
 
