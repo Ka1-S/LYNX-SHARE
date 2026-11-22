@@ -2326,6 +2326,40 @@ TrackerComponent::BenchResult TrackerComponent::paintBench (BenchFrame kind, int
 
 std::uint64_t TrackerComponent::framePixelsForCheck (bool cached)
 {
+    return pixelHash (frameForCheck (cached));
+}
+
+int TrackerComponent::framesDifferForCheck (const juce::Image& a, const juce::Image& b, int tolerance, int& largest, int& anyDifference)
+{
+    largest = 0;
+    anyDifference = 0;
+    if (a.getBounds() != b.getBounds())
+    {
+        largest = 255;
+        anyDifference = a.getWidth() * a.getHeight();
+        return anyDifference;
+    }
+    const juce::Image::BitmapData da (a, juce::Image::BitmapData::readOnly), db (b, juce::Image::BitmapData::readOnly);
+    int over = 0;
+    for (int y = 0; y < da.height; ++y)
+        for (int x = 0; x < da.width; ++x)
+        {
+            const auto ca = da.getPixelColour (x, y).getARGB(), cb = db.getPixelColour (x, y).getARGB();
+            if (ca == cb)
+                continue;
+            int d = 0;
+            for (int shift = 0; shift < 32; shift += 8)
+                d = std::max (d, std::abs ((int) ((ca >> shift) & 0xff) - (int) ((cb >> shift) & 0xff)));
+            largest = std::max (largest, d);
+            ++anyDifference;
+            if (d > tolerance)
+                ++over;
+        }
+    return over;
+}
+
+juce::Image TrackerComponent::frameForCheck (bool cached)
+{
     // (rollup 0.1.31 step 5: the frame is drawn the way the window draws it. The chunks are images of the platform's own
     // kind (Direct2D bitmaps on Windows) and the window paints with that renderer too, so on Windows a software target
     // compared Direct2D's text and colours in the chunks with the software renderer's in the straight frame: 7,700 text
@@ -2354,7 +2388,7 @@ std::uint64_t TrackerComponent::framePixelsForCheck (bool cached)
             juce::PNGImageFormat().writeImageToStream (image, out);
         }
     }
-    return pixelHash (image);
+    return image;
 }
 
 void TrackerComponent::scrollToRowForCheck (std::int64_t row)
