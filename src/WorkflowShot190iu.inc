@@ -367,6 +367,50 @@
             savePng (shot::paint (frame, theme::panel), prefix + "-settings-extras.png");
         }
 
+        // ---- 9. FL's Playlist: bars in groups of 4, every other group a shade apart (with the lanes' row shades)
+        {
+            const auto bar = song().barTicks();
+            engine.editSong ([bar] (Song& s) { // a clip far out: the end-of-song veil starts past the bars compared
+                Clip far;
+                far.kind = ClipKind::pattern;
+                far.pattern = 0;
+                far.track = 0;
+                far.start = 40 * 4 * bar;
+                far.length = 4 * bar;
+                s.playlist.push_back (far);
+            });
+            pl.setViewForSnapshot (60.0, 1, 0); // (60 px a bar: bars 1 to 8 fit the view)
+            engine.dispatchPendingMessages();
+            const auto image = shot::snapshot (pl);
+            int track = -1; // (an empty lane: its own shade, no clips)
+            for (int t = 0; t < pl.numTracksForSnapshot(); ++t)
+            {
+                const auto row = pl.trackRowForSnapshot (t);
+                if (row.getCentreY() >= image.getHeight() - 4 || row.getHeight() < 8)
+                    continue;
+                const auto empty = std::none_of (song().playlist.begin(), song().playlist.end(), [t] (const Clip& c) { return c.track == t; })
+                                   && (t >= (int) song().playlistTracks.size() || song().playlistTracks[(std::size_t) t].lanes.empty());
+                if (empty)
+                {
+                    track = t;
+                    break;
+                }
+            }
+            check ("playlist_four_bar_shading_finds_an_empty_lane", track >= 0, juce::String (track));
+            if (track >= 0)
+            {
+                const auto y = pl.trackRowForSnapshot (track).getCentreY();
+                const auto at = [&] (double bars) { return juce::jlimit (0, image.getWidth() - 1, (int) std::lround (pl.xOfTickForSnapshot (bars * bar) + 8.0)); };
+                const auto first = image.getPixelAt (at (1.4), y).getBrightness();  // bars 1-4 (the untinted group)
+                const auto second = image.getPixelAt (at (5.4), y).getBrightness(); // bars 5-8 (the tinted one)
+                check ("playlist_four_bar_groups_are_a_shade_apart", std::abs (first - second) > 0.003f,
+                       juce::String (first, 4) + " / " + juce::String (second, 4));
+            }
+            savePng (image, prefix + "-playlist-four-bar-groups.png");
+            engine.undo();
+            engine.dispatchPendingMessages();
+        }
+
         midiFile.deleteFile();
         juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\nresult=" + (allOk ? "OK" : "FAIL") + "\n");
         return allOk;
