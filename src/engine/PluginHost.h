@@ -506,7 +506,9 @@ public:
     // in later scans. Incremental: files already listed and unchanged since are skipped.
     int scan (const juce::FileSearchPath& paths, const std::function<bool (float, const juce::String&)>& progress);
     // The same for a given list of plugin files (targeted scan).
-    int scanFiles (const juce::StringArray& files, const std::function<bool (float, const juce::String&)>& progress);
+    // (round 190ql: saveUnchanged false = plugins.xml is written only when the scan changed the list; the start-up's
+    // JSFX listing used to rewrite the whole file, ~0.5 MB with a large plugin list, at every start)
+    int scanFiles (const juce::StringArray& files, const std::function<bool (float, const juce::String&)>& progress, bool saveUnchanged = true);
     // JSFX scripts (round 190pj, issue #241): writes the bundled pack when this build's is newer, then lists the scripts
     // of the JSFX roots (Settings › File › JSFX folders) in this process — a header is read, nothing runs — and drops
     // the listed scripts that are gone. Returns how many were added. Any thread (as the scans).
