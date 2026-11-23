@@ -794,6 +794,9 @@ public:
     // the renderer must be copied in adoptUnits too.
     void adoptGlobals (const RackRenderer& from) noexcept;
     void adoptUnits (const RackRenderer& from, const char* channels, const char* tracks) noexcept;
+    // (round 190ql) the render-ahead's renderer gets the per-channel note blocks this one makes (off the audio thread),
+    // so adoptUnits finds them on both sides; null: none. Set while neither renders (the render-ahead's lifetime).
+    void setPropsMirror (RackRenderer* mirror);
     // these automations' values (controllers: their value comes from a unit's output), or all of them (nullptr)
     void adoptAutomationValues (const RackRenderer& from, const int* automations, int count) noexcept;
     // the flagged channels' voices end now and their note state is cleared (what render-ahead played for them was dropped)
@@ -1261,8 +1264,24 @@ private:
         int k = 0;
         bool flLaw = false; // an FL native generator: the level moves linearly in FL's volume (InitLevels.Vol), not in velocity
     };
-    std::vector<NoteProps> noteProps;  // maxChannels × 128 (prepare)
-    std::vector<PropSlide> propSlides; // maxChannels (prepare)
+    // Round 190ql (perf 8): one block per channel the songs use (the keys' properties and the slide in progress), made
+    // where the channel buffers are made (prepare, reserveFor, buffersFor's own growth: never in an audio callback) — no
+    // longer maxChannels × 128 at every prepare (3.6 MB per renderer, twice with the render-ahead's). A channel without
+    // its block has none, as a channel past the old vectors' end; process() renders only channels its buffers cover.
+    struct ChannelProps
+    {
+        std::array<NoteProps, 128> notes {};
+        PropSlide slide {};
+    };
+    std::array<std::atomic<ChannelProps*>, maxChannels> channelProps {};
+    std::vector<std::unique_ptr<ChannelProps>> ownedProps; // [channel], channels 0 … propsCount − 1 (under bufferLock)
+    std::atomic<int> propsCount { 0 };
+    RackRenderer* propsMirror = nullptr; // the render-ahead's renderer: gets each block this one makes (adoptUnits copies)
+    void ensureProps (int channels);     // (under bufferLock)
+    ChannelProps* propsOf (std::size_t channel) const noexcept
+    {
+        return channel < (std::size_t) maxChannels ? channelProps[channel].load (std::memory_order_acquire) : nullptr;
+    }
     // (`only`: the keys it moves — round 190pi, the slide note's colour —; null: every held key)
     void startPropSlide (int channel, const NoteEvent& slide, int flTicks, bool flLaw, const NoteMask* only = nullptr) noexcept;
     void stepPropSlide (Instrument& instrument, int channel, int step) noexcept;
