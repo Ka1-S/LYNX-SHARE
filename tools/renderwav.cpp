@@ -8,6 +8,7 @@
 //   LYNX_REALTIME=1   paces the blocks at real time (the workers sleep between blocks, as with a sound card)
 //   LYNX_WARMUP=n     n samples of stopped-transport silence before the song, like FL's render warm-up (1536–2304
 //                     samples, REA round 154): the effects' parameter glides settle as in a running app (round 170i)
+//   LYNX_STRETCH=0    keep-pitch samples unstretched (default since rollup 0.1.31 step 8: stretched to the tempo, as the app)
 //   LYNX_PROFILE=1    per-channel / per-insert-effect CPU time, heaviest first
 //   LYNX_ALLOCS=1     counts the heap allocations made while a block is processed (the audio thread and the
 //                     workers; round 167e) and prints where the first distinct ones came from (Linux: addresses for
@@ -432,18 +433,25 @@ int main (int argc, char** argv)
             std::printf ("  (could not read %s)\n", p.c_str());
         return entry;
     };
-    // LYNX_STRETCH=1 (round 190gn): keep-pitch samples are time-stretched to the tempo as in the app (its sample library
-    // does the same stretch, cached); without it they play unstretched
-    if (const char* e = std::getenv ("LYNX_STRETCH"); e != nullptr && e[0] == '1')
+    // Keep-pitch samples are time-stretched to the tempo as in the app (its sample library does the same stretch, cached;
+    // round 190gn's LYNX_STRETCH=1, the default since rollup 0.1.31 step 8 so measurements match the app: round 190pt found
+    // the Vocodex demo's "silence" was renderwav's unstretched clips). LYNX_STRETCH=0 plays them unstretched (the old default).
+    std::size_t stretchedCount = 0;
+    if (const char* e = std::getenv ("LYNX_STRETCH"); e == nullptr || e[0] != '0')
         factories.stretchedSamples = [&] (const std::string& p, double ratio, lynx::StretchMethod method, double semitones,
                                           const lynx::StretchMap& map, const lynx::StretchOptions& options) -> std::shared_ptr<const lynx::SampleData> {
             const auto original = factories.samples (p);
             if (original == nullptr)
                 return nullptr;
+            ++stretchedCount;
             return map.empty() ? lynx::timeStretch (*original, ratio, method, semitones, options)
                                : lynx::timeStretchMapped (*original, map, method, semitones, options);
         };
     auto state = lynx::RackState::build (song, nullptr, sampleRate, factories);
+    if (factories.stretchedSamples)
+        std::printf ("keep-pitch samples stretched to the tempo: %zu (LYNX_STRETCH=0: unstretched)\n", stretchedCount);
+    else
+        std::printf ("keep-pitch samples NOT stretched (LYNX_STRETCH=0)\n");
     std::printf ("rack build: %.0f ms\n", std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - buildStart).count());
     {
         std::size_t edges = 0, delayed = 0, tracksWithFx = 0;
