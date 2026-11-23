@@ -3,6 +3,13 @@
 The short version of each release. The full notes, with measurements, known issues and downloads, are on the
 [GitHub releases page](https://github.com/Ka1-S/LYNX-SHARE/releases).
 
+## 0.1.32 alpha (unreleased: the release round writes the rest of these notes)
+
+**From contributors**
+- A Mixer insert can hold up to 25 effect slots, as in FL Studio 2026.2: the slot list keeps its ten rows and scrolls, a
+  "+" tab under it adds a slot, and Options › General settings sets how many slots new mixer tracks get. PR #260 by
+  @codewithamoako.
+
 ## 0.1.31 alpha
 
 **Performance**
