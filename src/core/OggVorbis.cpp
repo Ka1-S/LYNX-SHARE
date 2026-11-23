@@ -111,6 +111,27 @@ struct Link
 };
 } // namespace
 
+namespace
+{
+// Round 190px (perf 7): the last Ogg page's granule position (the stream's length in samples per channel for a
+// stream that starts at 0), or 0 when there is none to trust. Only a size hint for the decoded vectors: they used to
+// grow by doubling, so a long stem ended with up to twice its samples' memory reserved (Thief's vocal: 77.7 MB of
+// audio in 128 MB) and was copied at every doubling.
+std::size_t lengthHint (const std::uint8_t* bytes, std::size_t size) noexcept
+{
+    for (std::size_t at = size >= 27 ? size - 27 : 0; at-- > 0;)
+        if (bytes[at] == 'O' && bytes[at + 1] == 'g' && bytes[at + 2] == 'g' && bytes[at + 3] == 'S' && bytes[at + 4] == 0)
+        {
+            std::uint64_t g = 0;
+            for (int k = 7; k >= 0; --k)
+                g = (g << 8) | bytes[at + 6 + (std::size_t) k];
+            // (−1: no packet ends on that page; anything beyond 24 hours at 384 kHz: not a length)
+            return g == ~std::uint64_t { 0 } || g > 384000ull * 86400ull ? 0 : (std::size_t) g;
+        }
+    return 0;
+}
+} // namespace
+
 bool decode (const std::uint8_t* bytes, std::size_t size, Decoded& out)
 {
     out = {};
@@ -163,6 +184,9 @@ bool decode (const std::uint8_t* bytes, std::size_t size, Decoded& out)
             out.channels = channels;
             out.sampleRate = (int) link.info.rate;
             out.data.assign ((std::size_t) channels, {});
+            if (const auto hint = lengthHint (bytes, size); hint > 0)
+                for (auto& d : out.data)
+                    d.reserve (hint + 8192); // (the last packets may run a little past the last granule)
         }
 
         if (vorbis_synthesis_init (&link.dsp, &link.info) != 0)
@@ -204,6 +228,10 @@ bool decode (const std::uint8_t* bytes, std::size_t size, Decoded& out)
         }
     }
 
+    // (round 190px: no large slack kept — a hint too small left the doubling's spare room, a chained file's more)
+    for (auto& d : out.data)
+        if (d.capacity() - d.size() > 16384)
+            d.shrink_to_fit();
     return out.channels > 0;
 }
 } // namespace lynx::oggvorbis
