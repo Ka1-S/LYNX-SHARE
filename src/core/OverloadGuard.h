@@ -101,6 +101,13 @@ public:
     void setEnabled (bool on) noexcept { enabled.store (on, std::memory_order_relaxed); }
     bool isEnabled() const noexcept { return enabled.load (std::memory_order_relaxed); }
 
+    // Round 190pz: audio takes are being recorded (the engine, when its takes open and close). The guard then never
+    // yields: a callback that gives up CPU in an overload finishes later still, and the input of a block the driver
+    // could not hand over in time is lost from the take, while a slow screen only costs frames. It lets go at once
+    // when recording starts and may engage again (by its usual rule) once the takes are closed. Any thread.
+    void setRecordingAudio (bool on) noexcept { recordingAudio.store (on, std::memory_order_relaxed); }
+    bool isRecordingAudio() const noexcept { return recordingAudio.load (std::memory_order_relaxed); }
+
     // Message thread: its 30 Hz pulse (the engine's timer), `nowMs` on the callbacks' clock.
     void uiPulse (double nowMs) noexcept { lastUiMs.store (nowMs, std::memory_order_relaxed); }
 
@@ -157,7 +164,7 @@ public:
         wasPlaying = playing;
 
         auto on = engagedFlag.load (std::memory_order_relaxed);
-        if (! enabled.load (std::memory_order_relaxed))
+        if (! enabled.load (std::memory_order_relaxed) || recordingAudio.load (std::memory_order_relaxed))
             on = false;
         else if (! on)
         {
@@ -261,7 +268,7 @@ private:
     }
 
     Params p;
-    std::atomic<bool> enabled { true }, engagedFlag { false };
+    std::atomic<bool> enabled { true }, engagedFlag { false }, recordingAudio { false };
     std::atomic<int> state { 0 }, releaseReason { notReleased };
     std::atomic<double> releaseAt { 0.0 }, releaseLag { 0.0 };
     std::atomic<double> lastUiMs { 0.0 };

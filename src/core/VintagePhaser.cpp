@@ -94,13 +94,15 @@ struct Upsampler
     }
     void push (float x, float* out) noexcept
     {
-        for (int i = 0; i < taps; ++i)
-        {
-            auto j = pos + i;
-            if (j >= size)
-                j -= size;
-            buf[(std::size_t) j] += x * h[(std::size_t) i];
-        }
+        // round 190pz: the same multiply and add per tap, in two contiguous runs (up to the ring's end, then from its
+        // start) instead of a wrap test per tap, so the compiler can vectorise them: bit-identical, ~3x less work
+        const auto first = std::min (taps, size - pos);
+        float* __restrict b = buf.data();
+        const float* __restrict k = h.data();
+        for (int i = 0; i < first; ++i)
+            b[pos + i] += x * k[i];
+        for (int i = first; i < taps; ++i)
+            b[pos + i - size] += x * k[i];
         for (int i = 0; i < os; ++i)
         {
             const auto j = (pos + i) % size;

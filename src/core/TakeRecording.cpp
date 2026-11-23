@@ -576,12 +576,23 @@ void TakeStream::push (const float* const* data, int n) noexcept
     }
 
     const auto count = (int) std::min<std::int64_t> (n, std::max<std::int64_t> (0, space));
+    // (round 190pz: in at most two pieces, the ring's end and its start, instead of a masked index per sample)
+    const auto at = (std::size_t) (w & mask);
+    const auto first = std::min<std::size_t> ((std::size_t) count, (std::size_t) capacity - at);
     for (int c = 0; c < numChannels; ++c)
     {
         auto* dest = ring.data() + (std::size_t) c * capacity;
         const auto* src = data != nullptr ? data[c] : nullptr;
-        for (int i = 0; i < count; ++i)
-            dest[(std::size_t) ((w + (std::uint64_t) i) & mask)] = src != nullptr ? src[i] : 0.0f;
+        if (src != nullptr)
+        {
+            std::copy (src, src + first, dest + at);
+            std::copy (src + first, src + count, dest);
+        }
+        else
+        {
+            std::fill (dest + at, dest + at + first, 0.0f);
+            std::fill (dest, dest + ((std::size_t) count - first), 0.0f);
+        }
     }
     writeIndex.store (w + (std::uint64_t) count, std::memory_order_release);
 
@@ -654,11 +665,13 @@ int TakeStream::pull (float* const* out, int maxFrames) noexcept
                 }
             break;
         }
+        const auto at = (std::size_t) (r & mask);
+        const auto first = std::min<std::size_t> ((std::size_t) available, (std::size_t) capacity - at);
         for (int c = 0; c < numChannels; ++c)
         {
             const auto* src = ring.data() + (std::size_t) c * capacity;
-            for (int i = 0; i < available; ++i)
-                out[c][done + i] = src[(std::size_t) ((r + (std::uint64_t) i) & mask)];
+            std::copy (src + at, src + at + first, out[c] + done);
+            std::copy (src, src + ((std::size_t) available - first), out[c] + done + first);
         }
         readIndex.store (r + (std::uint64_t) available, std::memory_order_release);
         done += available;
@@ -750,7 +763,8 @@ WavTakeWriter::~WavTakeWriter()
     close();
 }
 
-bool WavTakeWriter::open (const std::string& path, double sampleRate, int channels, SampleFormat f, double syncSeconds)
+bool WavTakeWriter::open (const std::string& path, double sampleRate, int channels, SampleFormat f, double syncSeconds, double durableSeconds,
+                          double durablePhase)
 {
     close();
     numChannels = std::clamp (channels, 1, 2);
@@ -758,6 +772,8 @@ bool WavTakeWriter::open (const std::string& path, double sampleRate, int channe
     rate = sampleRate > 0.0 ? sampleRate : 48000.0;
     written = sinceSync = 0;
     syncFrames = std::max<std::int64_t> (1024, (std::int64_t) (syncSeconds * rate));
+    durableFrames = std::max (syncFrames, (std::int64_t) (durableSeconds * rate));
+    sinceDurable = (std::int64_t) (std::clamp (durablePhase, 0.0, 1.0) * (double) (durableFrames - 1));
     file = openFile (path, "wb");
     if (file == nullptr)
     {
@@ -856,12 +872,20 @@ bool WavTakeWriter::write (const float* const* data, int n)
     }
     written += n;
     sinceSync += n;
-    if (sinceSync >= syncFrames)
+    sinceDurable += n;
+    if (sinceDurable >= durableFrames) // (round 190pz: durable on the disk every durableSeconds, with a fresh header)
+    {
+        sinceDurable = sinceSync = 0;
+        if (! writeHeader())
+            return false;
+        syncToDisk (file);
+    }
+    else if (sinceSync >= syncFrames) // (a crash of LYNX: the system has it)
     {
         sinceSync = 0;
         if (! writeHeader())
             return false;
-        syncToDisk (file);
+        std::fflush (file);
     }
     return true;
 }

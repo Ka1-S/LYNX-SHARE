@@ -704,6 +704,34 @@ struct LfoWave
 // FFT (radix 2, double): real forward / inverse with numpy's conventions (irfft ignores the imaginary parts of the DC
 // and Nyquist bins and divides by N)
 
+// the FFT's twiddles for one size and direction: cos / sin of 2πk/n (round 190pz: the two sizes Sytrus uses, 4 096 and
+// 16 384, are made once per process — Engine::Impl's constructor asks for them off the audio thread — instead of a
+// thread_local cache that each thread, the audio thread and the workers included, filled on its first note; the values
+// are the same)
+std::vector<cd> makeTwiddles (std::size_t n, bool inverse)
+{
+    std::vector<cd> w (n / 2);
+    for (std::size_t k = 0; k < n / 2; ++k)
+    {
+        const auto ang = 2.0 * kPi * (double) k / (double) n * (inverse ? 1.0 : -1.0);
+        w[k] = cd (std::cos (ang), std::sin (ang));
+    }
+    return w;
+}
+
+const std::vector<cd>& twiddles (std::size_t n, bool inverse)
+{
+    static const std::array<std::vector<cd>, 4> common { makeTwiddles (4096, false), makeTwiddles (4096, true), makeTwiddles (16384, false),
+                                                         makeTwiddles (16384, true) };
+    if (n == 4096 || n == 16384)
+        return common[(n == 16384 ? 2u : 0u) + (inverse ? 1u : 0u)];
+    thread_local std::map<std::pair<std::size_t, bool>, std::vector<cd>> other; // (no other size is used)
+    auto& w = other[{ n, inverse }];
+    if (w.size() != n / 2)
+        w = makeTwiddles (n, inverse);
+    return w;
+}
+
 void fft (std::vector<cd>& a, bool inverse)
 {
     const auto n = a.size();
@@ -716,18 +744,7 @@ void fft (std::vector<cd>& a, bool inverse)
         if (i < j)
             std::swap (a[i], a[j]);
     }
-    // twiddles cached per size and direction (FFT lengths are 4 096 and 16 384 only)
-    thread_local std::map<std::pair<std::size_t, bool>, std::vector<cd>> cache;
-    auto& w = cache[{ n, inverse }];
-    if (w.size() != n / 2)
-    {
-        w.resize (n / 2);
-        for (std::size_t k = 0; k < n / 2; ++k)
-        {
-            const auto ang = 2.0 * kPi * (double) k / (double) n * (inverse ? 1.0 : -1.0);
-            w[k] = cd (std::cos (ang), std::sin (ang));
-        }
-    }
+    const auto& w = twiddles (n, inverse);
     for (std::size_t len = 2; len <= n; len <<= 1)
     {
         const auto step = n / len;
@@ -752,9 +769,10 @@ std::vector<cd> rfft (const double* x, std::size_t n)
     return a;
 }
 
-std::vector<double> irfft (const std::vector<cd>& X, std::size_t n)
+// irfft into the caller's buffers (round 190pz: the audio thread's band-limited tables, no allocation once they hold n)
+void irfftInto (const std::vector<cd>& X, std::size_t n, std::vector<cd>& a, std::vector<double>& y)
 {
-    std::vector<cd> a (n);
+    a.assign (n, cd());
     a[0] = cd (X[0].real(), 0.0);
     for (std::size_t k = 1; k < n / 2; ++k)
     {
@@ -763,9 +781,16 @@ std::vector<double> irfft (const std::vector<cd>& X, std::size_t n)
     }
     a[n / 2] = cd (X[n / 2].real(), 0.0);
     fft (a, true);
-    std::vector<double> y (n);
+    y.resize (n);
     for (std::size_t i = 0; i < n; ++i)
         y[i] = a[i].real() / (double) n;
+}
+
+std::vector<double> irfft (const std::vector<cd>& X, std::size_t n)
+{
+    std::vector<cd> a;
+    std::vector<double> y;
+    irfftInto (X, n, a, y);
     return y;
 }
 
@@ -3082,6 +3107,8 @@ struct Engine::Impl
     std::vector<double> Mdl, Mdr, Fdl, Fdr;
     std::vector<BandTable> bands;
     std::uint64_t bandStamp = 0;
+    std::vector<cd> bandX, bandA; // (round 190pz) bandLimited's scratch, sized in configure
+    std::vector<double> bandG, bandY;
     Post post;
     long long fxTail = 0, tailLen = 0, silentOut = 0;
     bool runningTime = false;
@@ -3168,6 +3195,17 @@ struct Engine::Impl
         act.reserve (poolSize);
         bands.clear();
         bands.reserve (32);
+        (void) twiddles (16384, true), (void) twiddles (4096, true); // (round 190pz: made here, off the audio thread)
+        bandX.reserve (16384 / 2 + 1), bandG.reserve (16384 / 2 + 1), bandA.reserve (16384), bandY.reserve (16384);
+        // (round 190pz) bandLimited's table slots made here with their room, empty, so it does not allocate on the audio
+        // thread: an empty slot never matches and has the oldest stamp (0), so it is taken first. The slots are a cache
+        // of pure functions of (operator, band, size): which one is kept or rebuilt never changes a sample. 64: a chord
+        // and a line with their release tails held up to ~45 at once (24 used to be filled before reusing; past them
+        // every table in use got a new slot, allocated); more than 64 at once still adds slots as before
+        bands.reserve (64);
+        bands.resize (64);
+        for (auto& b : bands)
+            b.t.reserve ((std::size_t) (renderMode ? 16384 : 4096) + 1);
         counter = 0;
         noise = 0;
         hasLastPitch = false;
@@ -3240,11 +3278,14 @@ struct Engine::Impl
         auto& b = bands[(std::size_t) pick];
         b.op = u, b.lo = (int) lo, b.hi = (int) hi, b.M = Nb, b.users = 1, b.stamp = ++bandStamp;
         const auto& full = spectrum (u);
-        std::vector<cd> X ((std::size_t) Nb / 2 + 1);
+        // (round 190pz: the scratch buffers below hold the largest size from configure on: no allocation here)
+        auto& X = bandX;
+        X.resize ((std::size_t) Nb / 2 + 1);
         const auto scale = (double) Nb / 16384.0;
         for (int k = 0; k <= Nb / 2; ++k)
             X[(std::size_t) k] = full[(std::size_t) k] * scale;
-        std::vector<double> g ((std::size_t) Nb / 2 + 1, 0.0);
+        auto& g = bandG;
+        g.assign ((std::size_t) Nb / 2 + 1, 0.0);
         for (long long k = 0; k < lo && k <= Nb / 2; ++k)
             g[(std::size_t) k] = 1.0;
         if (lo <= hi)
@@ -3259,7 +3300,8 @@ struct Engine::Impl
                 g[(std::size_t) k] *= ((double) hi * 0.3183098861837907) * std::sin ((double) k * (kPi / (double) hi)) / (double) k;
         for (int k = 0; k <= Nb / 2; ++k)
             X[(std::size_t) k] *= g[(std::size_t) k];
-        const auto y = irfft (X, (std::size_t) Nb);
+        irfftInto (X, (std::size_t) Nb, bandA, bandY);
+        const auto& y = bandY;
         b.t.resize ((std::size_t) Nb + 1);
         for (int i = 0; i < Nb; ++i)
         {

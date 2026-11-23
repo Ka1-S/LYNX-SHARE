@@ -27,6 +27,15 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_
     set_source_files_properties(src/core/Slayer.cpp PROPERTIES COMPILE_OPTIONS "-fno-inline")
 endif()
 
+# Round 190pz: the FL engines whose files say `#pragma GCC optimize ("fp-contract=off", "rounding-math")` give their own
+# functions other optimisation settings than the header templates they call (std::min / std::max / std::clamp ...), and
+# GCC does not inline across that: Kepler called std::min / std::max out of line for ~9 % of its time. The whole file
+# with -frounding-math has one setting, so they inline again (the arithmetic is the same: bit-identical renders).
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set_source_files_properties(src/core/Kepler.cpp src/core/ChorusFx.cpp src/core/MultibandDelayFx.cpp src/core/LovePhilter.cpp
+                                src/core/FlangusFastDist.cpp PROPERTIES COMPILE_OPTIONS "-frounding-math")
+endif()
+
 # The plugins are shared libraries: everything they link must be position independent (the option is declared below)
 if(LYNX_BUILD_PLUGINS)
     set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -506,6 +515,14 @@ target_link_libraries(modrender PRIVATE libxmp_lite)
 add_executable(perfbench tools/perfbench.cpp)
 target_link_libraries(perfbench PRIVATE lynx_core)
 target_include_directories(perfbench PRIVATE tools)
+
+# every LYNX native effect and instrument: CPU per block, silence, automation, memory (round 190pz): nativebench [--fl <Data>] ...
+add_executable(nativebench tools/nativebench.cpp)
+target_link_libraries(nativebench PRIVATE lynx_core)
+target_include_directories(nativebench PRIVATE tools)
+# the recording path (take streams + WAV writers) without an audio device (round 190pz): recbench --dir <folder> [--takes N] ...
+add_executable(recbench tools/recbench.cpp)
+target_link_libraries(recbench PRIVATE lynx_core)
 
 # LYNX Model (round 190ni): renders notes for the timbre score / calibration and measures the cost per voice
 add_executable(physmodrender tools/physmodrender.cpp)

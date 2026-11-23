@@ -2562,7 +2562,10 @@ void AudioEngine::startAudioTake()
         take->playThrough = takes::playbackInsert (song, w.track, w.point);
         // ~22 s at 48 kHz of room between the audio thread and the disk
         take->stream = std::make_unique<takes::TakeStream> (w.channels, 1 << 20);
-        if (! take->writer.open (file.getFullPathName().toStdString(), takeSampleRate, w.channels, format))
+        // (round 190pz: header + flush every second; durable on the disk every 5 s, the takes' syncs spread over those
+        // 5 s instead of all of them at once — core/TakeRecording.h)
+        const auto phase = wanted.size() > 1 ? (double) made.size() / (double) wanted.size() : 0.0;
+        if (! take->writer.open (file.getFullPathName().toStdString(), takeSampleRate, w.channels, format, 1.0, 5.0, phase))
         {
             recordingError = utf8 ("could not create ") + file.getFullPathName();
             continue;
@@ -2595,6 +2598,8 @@ void AudioEngine::startAudioTake()
     takeCount = 0;
     for (auto& take : made)
         takes[(std::size_t) takeCount++] = take.get();
+    // round 190pz: while takes record, "Safe overloads" never yields (core/OverloadGuard.h: their input comes first)
+    overloadGuard.setRecordingAudio (takeCount > 0);
     updateLinearSong();
 }
 
@@ -2632,6 +2637,7 @@ void AudioEngine::finishAudioTake()
         takes.fill (nullptr);
         takeCount = 0;
     }
+    overloadGuard.setRecordingAudio (false); // (round 190pz)
     liveInput.linearSong.store (false);
     liveInput.noLoopRegion.store (false);
     std::vector<std::shared_ptr<Take>> done;
