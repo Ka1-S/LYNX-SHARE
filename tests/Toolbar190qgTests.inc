@@ -144,4 +144,10 @@ TEST (toolbar190qg_one_row_drops_panels_from_the_right_like_fl)
     CHECK (! visible[(std::size_t) Group::chord] && visible[(std::size_t) Group::output]);
     dropUntilFits (visible, widths, 0, 0, 0);
     CHECK (visible[(std::size_t) Group::transport]);
+    // the narrow toolbar (four-column recording panel): the window buttons go before the recording switches (170e5)
+    for (const auto& e : d.entries)
+        visible[(std::size_t) e.group] = e.shown;
+    visible[(std::size_t) Group::chord] = visible[(std::size_t) Group::meters] = visible[(std::size_t) Group::output] = visible[(std::size_t) Group::file] = false;
+    dropUntilFits (visible, widths, 0, 400, 0, true); // (transport, master, record, snap, windows: one must go)
+    CHECK (! visible[(std::size_t) Group::windows] && visible[(std::size_t) Group::record]);
 }

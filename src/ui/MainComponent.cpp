@@ -1706,7 +1706,7 @@ void MainComponent::resized()
             // as FL 2026 does), down to 88 px; only then does a panel go
             if (const auto short_ = usedNow() + menuMin - layoutRoom; short_ > 0 && visible[(std::size_t) Group::output])
                 widths[(std::size_t) Group::output] -= juce::jlimit (0, juce::jmax (0, widths[(std::size_t) Group::output] - 88), short_);
-            toolbarlayout::dropUntilFits (visible, widths, gap, layoutRoom, menuMin);
+            toolbarlayout::dropUntilFits (visible, widths, gap, layoutRoom, menuMin, compactRecord);
         }
         if (visible[(std::size_t) Group::transport] && usedNow() + menuMin > layoutRoom)
         {

@@ -574,9 +574,15 @@ inline std::array<bool, groupCount> fitFromTheRight (const Layout& layout, const
 }
 
 // Round 190qg: the two-row toolbar when the overflow button needs its room: while the panels and the hint column's
-// minimum do not fit `room`, the shown panel with the lowest priority goes too (never the transport).
-inline void dropUntilFits (std::array<bool, groupCount>& visible, const std::array<int, groupCount>& widths, int gap, int room, int minFlexible)
+// minimum do not fit `room`, the shown panel with the lowest priority goes too (never the transport). `windowsFirst`: the
+// narrow toolbar's rule (round 170e5: on a 1280 px window the window buttons go before the recording switches, F5-F9
+// open the same windows).
+inline void dropUntilFits (std::array<bool, groupCount>& visible, const std::array<int, groupCount>& widths, int gap, int room, int minFlexible,
+                           bool windowsFirst = false)
 {
+    const auto priority = [windowsFirst] (int i) {
+        return windowsFirst && (Group) i == Group::windows ? groupPriority (Group::record) - 1 : groupPriority ((Group) i);
+    };
     for (;;)
     {
         int total = 0, lowest = -1;
@@ -584,7 +590,7 @@ inline void dropUntilFits (std::array<bool, groupCount>& visible, const std::arr
             if (visible[(std::size_t) i])
             {
                 total += widths[(std::size_t) i] + gap;
-                if (groupPriority ((Group) i) < 100 && (lowest < 0 || groupPriority ((Group) i) < groupPriority ((Group) lowest)))
+                if (priority (i) < 100 && (lowest < 0 || priority (i) < priority (lowest)))
                     lowest = i;
             }
         if (total + minFlexible <= room || lowest < 0)
