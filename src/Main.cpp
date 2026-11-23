@@ -3502,6 +3502,13 @@ public:
             quit();
             return;
         }
+        // --slots260shot <prefix> (round 190qf, PR #260: FL 2026.2's mixer slots): src/Slots260Shot190qf.inc
+        if (args.contains ("--slots260shot"))
+        {
+            setApplicationReturnValue (runSlots260Shot (args[args.indexOf ("--slots260shot") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
         // --mixer221shot190ng <prefix> (round 190ng, issue #221): src/Mixer221Shot190ng.inc
         if (args.contains ("--mixer221shot190ng"))
         {
@@ -8034,6 +8041,35 @@ private:
                 song.patterns[0].events.push_back (knob);
             }
 
+            // round 190qf (PR #260): a copy for 0.1.30 / 0.1.28 keeps 10 effect slots per insert (those releases hold 10) and
+            // leaves the rest out. The effects [10] … [40] this test lays on insert 16 move to inserts of their own, 10 each
+            // (added at the end), so every law above still reaches the copy; m16[k] below finds effect k where it went.
+            std::vector<int> spread16;
+            for (std::size_t from = 10; from < song.mixer[16].effects.size(); from += 10)
+            {
+                auto& added = song.mixer.emplace_back();
+                added.name = "Insert " + std::to_string (song.mixer.size() - 1);
+                const auto end = std::min (from + 10, song.mixer[16].effects.size());
+                added.effects.assign (song.mixer[16].effects.begin() + (std::ptrdiff_t) from, song.mixer[16].effects.begin() + (std::ptrdiff_t) end);
+                for (auto& fx : added.effects)
+                    fx.row = -1;
+                spread16.push_back ((int) song.mixer.size() - 1);
+            }
+            if (song.mixer[16].effects.size() > 10)
+                song.mixer[16].effects.resize (10);
+            struct Spread16
+            {
+                const juce::var& root;
+                const std::vector<int>& inserts;
+                juce::var operator[] (int k) const
+                {
+                    if (k < 10)
+                        return root["mixer"][16]["effects"][k];
+                    const auto chunk = (std::size_t) (k / 10 - 1);
+                    return chunk < inserts.size() ? root["mixer"][inserts[chunk]]["effects"][k % 10] : juce::var();
+                }
+            };
+
             const auto copy = lynx::olderlynx::forRelease (song, "0.1.28");
             juce::String why;
             const auto back = copy.ok ? lynx::ProjectFile::fromJson (copy.json, why) : std::optional<lynx::Song> {};
@@ -8142,14 +8178,14 @@ private:
                      || parsed["mixer"][16]["effects"][0]["params"].size() > lynx::dyn::crest::busLaw
                      || copy.json.contains ("lockState") || copy.json.contains ("playlistTakeLanes") || copy.json.contains ("recordOwnNotes"))
                 rollup030Result = "ERROR step-7 items";
-            else if (const auto& m16 = parsed["mixer"][16]["effects"];
+            else if (const Spread16 m16 { parsed, spread16 };
                      ! said ("Crest Compressor's styles play their earlier laws") || ! said ("Crest Compressor's FET law")
                      || ! said ("Ridge Strip's measured SSL 4K G / 4K E filters") || ! said ("Echoform's Timeless 3 line law")
                      || ! said ("Lock states of effect slots and Playlist tracks") || copy.json.contains ("playlistTrackSoloLocks")
                      || m16[1]["params"].size() > lynx::dyn::crest::busLaw || m16[2]["params"].size() > lynx::dyn::crest::busLaw
                      || m16[3]["params"].size() > lynx::mixsuite::ridge::k4Pink || m16[4]["params"].size() > lynx::echosuite::echoform::revision)
                 rollup030Result = "ERROR step-8 items";
-            else if (const auto& m16 = parsed["mixer"][16]["effects"];
+            else if (const Spread16 m16 { parsed, spread16 };
                      ! said ("Ember's Saturn styles") || ! said ("Prism Multiband's Pro-MB band law") || ! said ("The Limiter's L2 law")
                      || ! said ("Glow Leveler's cell law") || ! said ("Reeverb 2's measured direct sound") || ! said ("Quell's zero law")
                      || ! said ("Facet EQ's all-pass dispersion") || ! said ("Echoform's H-Delay loop law")
@@ -8159,14 +8195,14 @@ private:
                      || m16[9]["params"].size() > lynx::reeverb2DirectLaw || m16[10]["params"].size() > lynx::voicetools::quell::zeroLaw
                      || m16[11]["params"].size() > lynx::facet::autoThresholdParam0 || m16[12]["params"].size() > lynx::echosuite::echoform::revision)
                 rollup030Result = "ERROR step-9 items";
-            else if (const auto& m16 = parsed["mixer"][16]["effects"];
+            else if (const Spread16 m16 { parsed, spread16 };
                      ! said ("Apex Limiter's styles") || ! said ("Sentry Gate plays its earlier") || ! said ("LuxeVerb's Space engine plays")
                      || ! said ("Echoform's ValhallaDelay loop law") || ! said ("Spiral Echo's Measured loop") || ! said ("{0} scene follow action")
                      || m16[13]["params"].size() > lynx::apex::pRevision || m16[14]["params"].size() > (int) lynx::dyn::sentry::revision
                      || m16[15]["params"].size() > lynx::luxeVerbSpaceDucking || m16[16]["params"].size() > lynx::echosuite::echoform::revision
                      || m16[17]["params"].size() > (int) lynx::echosuite::spiral::rateLaw || parsed["clipGrid"]["scenes"][0].hasProperty ("follow"))
                 rollup030Result = "ERROR step-10 items";
-            else if (const auto& m16 = parsed["mixer"][16]["effects"];
+            else if (const Spread16 m16 { parsed, spread16 };
                      ! said ("Horizon plays its earlier") || ! said ("Nebula's classic modes") || ! said ("Orbit plays its own voices")
                      || ! said ("Prism Multiband's C4 law") || ! said ("Compressor's Renaissance law") || ! said ("Quell's NS1 law")
                      || ! said ("Gemini Doubler's splice law") || ! said ("LYNX Tune's Waves Tune") || ! said ("Facet EQ's PuigTec law")
@@ -8177,7 +8213,7 @@ private:
                      || m16[24]["params"].size() > (int) lynx::voicetools::gemini::spliceLaw || m16[25]["params"].size() > (int) lynx::lynxtune::wavesLaw
                      || m16[26]["params"].size() > lynx::facet::autoThresholdParam0)
                 rollup030Result = "ERROR step-11 items";
-            else if (const auto& m16 = parsed["mixer"][16]["effects"];
+            else if (const Spread16 m16 { parsed, spread16 };
                      ! said ("Facet EQ's Waves design law") || ! said ("Compressor's Vox law") || ! said ("Compressor's bus law")
                      || ! said ("Compressor's channel EQ") || ! said ("Prism Multiband's floating bands") || ! said ("Hush De-esser's Renaissance law")
                      || ! said ("Low Lifter's bass law") || ! said ("Aether's Vitamin law") || ! said ("Ridge Strip's omni law")
@@ -8189,7 +8225,7 @@ private:
                      || m16[35]["params"].size() > (int) lynx::mixsuite::ridge::k4Pink || m16[36].hasProperty ("displayView")
                      || copy.json.contains ("\"zipped\""))
                 rollup030Result = "ERROR step-12 items";
-            else if (const auto& m16 = parsed["mixer"][16]["effects"];
+            else if (const Spread16 m16 { parsed, spread16 };
                      ! said ("Facet EQ's API-560 law") || ! said ("Compressor's RVox type") || ! said ("Compressor's gate")
                      || ! said ("Ridge Strip's G-Channel EQ law") || ! said ("The Current mixer track shows as an ordinary insert")
                      || m16[37]["params"].size() > lynx::facet::autoThresholdParam0 || m16[38]["params"].size() > lynx::compressorRenLaw
@@ -8201,7 +8237,7 @@ private:
                      ! laid.ok || laid.json.contains ("windowLayout")
                      || std::none_of (laid.lost.begin(), laid.lost.end(), [] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).startsWith ("The window layout saved"); }))
                 rollup030Result = "ERROR step-13 window layout";
-            else if (const auto& m16 = parsed["mixer"][16]["effects"];
+            else if (const Spread16 m16 { parsed, spread16 };
                      ! said ("Effector's Kilohearts laws") || ! said ("Launched pattern clips play without their pattern's events")
                      || m16[40]["params"].size() > lynx::khsdsp::lawParam || parsed["patterns"][0]["events"].size() != 1)
                 rollup030Result = juce::String ("ERROR step-14 items (") + (said ("Effector's Kilohearts laws") ? "" : "no Kilohearts line, ")
@@ -9388,6 +9424,9 @@ private:
         // round 190pw (PR #259 by FKHR26): the channel window is the size of the tab it shows, as FL's (FL 2026: Sytrus
         // 860 px wide on its plugin tab, 568 on Misc): a Synth channel's window (docked look) on its plugin tab, then Misc
         // (another size), back (the first size again), and with the header hidden by the gear, each less the header
+        // round 190qf (PR #260 by codewithamoako): FL 2026.2's effect slots, up to 25 per insert (src/Slots260Shot190qf.inc)
+        const auto slots260Result = slots260Checks ({});
+
         juce::String perTab259Result = "OK";
         {
             lynx::AudioEngine e (false);
@@ -10791,7 +10830,7 @@ private:
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
                         && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
-                        && rollup031s7Result == "OK" && rollup031s8Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" // (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
+                        && rollup031s7Result == "OK" && rollup031s8Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" && slots260Result == "OK" // (round 190qf: slots260) (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
                         && flparity190prResult == "OK"
                         && renderAgainResult.startsWith ("OK") && determinismResult.startsWith ("OK")
@@ -10900,6 +10939,7 @@ private:
                << "rollup031s8_copy_for_0130=" << rollup031s8Result << "\n"
                << "headergear248=" << headerGearResult << "\n"
                << "pertab259=" << perTab259Result << "\n"
+               << "slots260=" << slots260Result << "\n"
                << "simpleduck190ot=" << simpleDuck190otResult << "\n"
                << "tracks190pe=" << tracks190peResult << "\n"
                << "issue258=" << issue258Result << "\n"
@@ -20715,6 +20755,7 @@ private:
 #include "Focus218Shot190ng.inc" // round 190ng (issue #218)
 #include "Mixer221Shot190ng.inc" // round 190ng (issue #221)
 #include "MixerQolShot190qh.inc" // round 190qh (research190qa R5, Mixer QoL)
+#include "Slots260Shot190qf.inc" // round 190qf (PR #260)
 #include "IssuesShot190ng.inc" // round 190ng (issues #215, #217, #219, #220, #222)
 #include "TrackClipsShot190ne.inc" // round 190ne
 #include "TrackStatesShot190op.inc" // round 190op

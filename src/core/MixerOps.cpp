@@ -1335,6 +1335,50 @@ int effectAtRow (const std::vector<EffectSlot>& effects, int row)
     return it == rows.end() ? -1 : (int) (it - rows.begin());
 }
 
+int effectRowCount (const MixerTrack& track)
+{
+    const auto rows = effectRows (track.effects);
+    const auto used = rows.empty() ? 0 : rows.back() + 1;
+    const auto asked = track.slotRows > 0 ? track.slotRows : flEffectSlots;
+    return std::clamp (std::max (asked, used), 1, maxEffectSlots);
+}
+
+bool addEffectRow (Song& song, int track)
+{
+    if (track < 0 || track >= (int) song.mixer.size())
+        return false;
+    auto& t = song.mixer[(std::size_t) track];
+    const auto shown = effectRowCount (t);
+    if (shown >= maxEffectSlots)
+        return false;
+    t.slotRows = shown + 1 == flEffectSlots ? 0 : shown + 1;
+    return true;
+}
+
+bool removeEffectRow (Song& song, int track)
+{
+    if (track < 0 || track >= (int) song.mixer.size())
+        return false;
+    auto& t = song.mixer[(std::size_t) track];
+    const auto shown = effectRowCount (t);
+    if (shown <= 1 || effectAtRow (t.effects, shown - 1) >= 0)
+        return false;
+    t.slotRows = shown - 1 == flEffectSlots ? 0 : shown - 1;
+    return true;
+}
+
+int& newTrackSlots() noexcept
+{
+    static int count = flEffectSlots;
+    return count;
+}
+
+void giveNewTrackSlots (MixerTrack& track) noexcept
+{
+    const auto count = std::clamp (newTrackSlots(), 1, maxEffectSlots);
+    track.slotRows = count == flEffectSlots ? 0 : count;
+}
+
 bool moveEffectToRow (Song& song, int track, int index, int row)
 {
     if (track < 0 || track >= (int) song.mixer.size() || row < 0 || row >= maxEffectSlots)
@@ -1357,7 +1401,8 @@ int moveEffectBy (Song& song, int track, int index, int delta)
     if (track < 0 || track >= (int) song.mixer.size() || index < 0 || index >= (int) song.mixer[(std::size_t) track].effects.size() || delta == 0)
         return -1;
     const auto from = effectRows (song.mixer[(std::size_t) track].effects)[(std::size_t) index];
-    const auto to = ((from + delta) % maxEffectSlots + maxEffectSlots) % maxEffectSlots; // (FL wraps around)
+    const auto count = effectRowCount (song.mixer[(std::size_t) track]);
+    const auto to = ((from + delta) % count + count) % count; // (FL wraps around)
     if (! moveEffectToRow (song, track, index, to))
         return -1;
     return effectAtRow (song.mixer[(std::size_t) track].effects, to); // (the moved effect is the one there now)
@@ -1528,7 +1573,10 @@ int insertTracks (Song& song, int at, int count)
     remapTrackReferences (song, [at, count] (int t) { return t >= at ? t + count : t; });
     std::vector<MixerTrack> added ((std::size_t) count);
     for (int i = 0; i < count; ++i)
+    {
         added[(std::size_t) i].name = "Insert " + std::to_string (at + i);
+        giveNewTrackSlots (added[(std::size_t) i]); // (FL 2026.2's "Number of effect slots on new mixer tracks")
+    }
     song.mixer.insert (song.mixer.begin() + at, std::make_move_iterator (added.begin()), std::make_move_iterator (added.end()));
     renumberDefaultNames (song, at + count, count);
     return count;

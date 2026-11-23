@@ -528,7 +528,9 @@ int addMixerTrack (Song& song)
     // inserts reserved for another participant are added as plain inserts and skipped (Song::claimFreeInsert's rule)
     while (true)
     {
-        song.mixer.emplace_back().name = "Insert " + std::to_string (song.mixer.size());
+        auto& added = song.mixer.emplace_back();
+        added.name = "Insert " + std::to_string (song.mixer.size() - 1);
+        mixerops::giveNewTrackSlots (added); // (FL 2026.2's "Number of effect slots on new mixer tracks", round 190qf)
         if (const auto t = (int) song.mixer.size() - 1; ! song.session.reservedForOther (true, t))
             return t;
     }

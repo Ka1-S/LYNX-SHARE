@@ -12721,3 +12721,12 @@ countries: cn sg
 "Off: each meter keeps its own colors (the Mixer: yellow from -6 dB, red from 0 dB)" = "关闭：每个电平表保留自己的颜色（混音器：-6 dB 起黄色，0 dB 起红色）"
 "Yellow from" = "黄色起点"
 "Red from" = "红色起点"
+# --- round 190qf: PR #260 (FL 2026.2's mixer slots, up to 25)
+"Add slot" = "添加槽位"
+"Remove slot" = "移除槽位"
+"Add an effect slot (up to {0})" = "添加一个效果槽位（最多 {0} 个）"
+"{0} slots (the most)" = "{0} 个槽位（最多）"
+"Scroll the effect slots (or the mouse wheel over them; Shift+wheel moves an effect)" = "滚动效果槽位（或在其上滚动鼠标滚轮；Shift+滚轮移动效果）"
+"Number of effect slots on new mixer tracks" = "新混音器轨道的效果槽位数"
+"This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "此版本每个插入通道有 10 个效果槽位：第 10 个之后槽位中的效果将被省略：{0}"
+"This insert has no free slot ({0} effects)" = "此插入通道没有空槽（{0} 个效果）"

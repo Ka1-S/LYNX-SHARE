@@ -9784,12 +9784,12 @@ bool PlaylistComponent::insertsMouseUp (const juce::MouseEvent& e)
             auto moved = -1;
             engine.editSongStructural ([insert, item, target, copy, &moved] (Song& s) { moved = detailchain::moveEffectToInsert (s, insert, item, target, copy); });
             if (moved < 0)
-                ui::postHint ({ tr ("This insert has no free slot (10 effects)"), {} }, 3000);
+                ui::postHint ({ tr ("This insert has no free slot ({0} effects)", { juce::String (maxEffectSlots) }), {} }, 3000);
         }
         else if (target == insert && copy)
         {
             if (engine.getSong().mixer[(std::size_t) insert].effects.size() >= (std::size_t) maxEffectSlots)
-                ui::postHint ({ tr ("This insert has no free slot (10 effects)"), {} }, 3000);
+                ui::postHint ({ tr ("This insert has no free slot ({0} effects)", { juce::String (maxEffectSlots) }), {} }, 3000);
             else
                 engine.editSong ([insert, item, dropAt] (Song& s) { detailchain::duplicateEffect (s, insert, item, dropAt); });
         }
@@ -9852,7 +9852,7 @@ bool PlaylistComponent::insertsDrop (int track, juce::Point<int> p, EffectSlot f
     const auto effects = (int) engine.getSong().mixer[(std::size_t) insert].effects.size();
     if (effects >= maxEffectSlots)
     {
-        ui::postHint ({ tr ("This insert has no free slot (10 effects)"), {} }, 3000);
+        ui::postHint ({ tr ("This insert has no free slot ({0} effects)", { juce::String (maxEffectSlots) }), {} }, 3000);
         return true;
     }
     // between the rows it is dropped on (the Device View's drop), not in place of one

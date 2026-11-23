@@ -12721,3 +12721,12 @@ countries: fr be ch ca lu
 "Off: each meter keeps its own colors (the Mixer: yellow from -6 dB, red from 0 dB)" = "Désactivé : chaque vumètre garde ses couleurs (le mixeur : jaune dès -6 dB, rouge dès 0 dB)"
 "Yellow from" = "Jaune dès"
 "Red from" = "Rouge dès"
+# --- round 190qf: PR #260 (FL 2026.2's mixer slots, up to 25)
+"Add slot" = "Ajouter un slot"
+"Remove slot" = "Retirer le slot"
+"Add an effect slot (up to {0})" = "Ajouter un slot d'effet (jusqu'à {0})"
+"{0} slots (the most)" = "{0} slots (le maximum)"
+"Scroll the effect slots (or the mouse wheel over them; Shift+wheel moves an effect)" = "Faire défiler les slots d'effet (ou la molette au-dessus ; Maj+molette déplace un effet)"
+"Number of effect slots on new mixer tracks" = "Nombre de slots d'effet des nouvelles pistes du mixeur"
+"This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "Cette version a 10 slots d'effet par insert : les effets des slots après le 10e sont omis : {0}"
+"This insert has no free slot ({0} effects)" = "Cet insert n'a plus de slot libre ({0} effets)"

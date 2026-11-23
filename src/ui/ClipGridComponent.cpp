@@ -693,7 +693,7 @@ public:
                 return;
             if (to < (int) engine.getSong().mixer.size() && (int) engine.getSong().mixer[(std::size_t) to].effects.size() >= maxEffectSlots)
             {
-                ui::postHint ({ tr ("This insert has no free slot (10 effects)"), {} }, 3000);
+                ui::postHint ({ tr ("This insert has no free slot ({0} effects)", { juce::String (maxEffectSlots) }), {} }, 3000);
                 return;
             }
             const auto copy = juce::ModifierKeys::currentModifiers.isCommandDown();

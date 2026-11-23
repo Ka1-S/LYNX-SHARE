@@ -234,7 +234,7 @@ inline int writeChords (Song& song, int track, int bars = 4)
 inline bool addOneKnob (Song& song, int track, int goal = goals::room)
 {
     const auto insert = simpletracks::insertOf (song, track);
-    if (insert < 0 || insert >= (int) song.mixer.size() || song.mixer[(std::size_t) insert].effects.size() >= 10)
+    if (insert < 0 || insert >= (int) song.mixer.size() || song.mixer[(std::size_t) insert].effects.size() >= (std::size_t) maxEffectSlots)
         return false;
     song.mixer[(std::size_t) insert].effects.push_back (goals::make (goal));
     return true;

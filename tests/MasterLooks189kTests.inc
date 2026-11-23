@@ -93,10 +93,10 @@ TEST (simple189k_looks_apply_remove_bypass)
     looks::remove (song);
     CHECK (song.mixer[0].effects.size() == 1 && ! looks::present (song) && song.masterLook.id == 0);
     // no room: nothing changes
-    for (int i = 0; i < 8; ++i)
+    for (int i = 0; i < maxEffectSlots - 2; ++i) // (one slot left of maxEffectSlots: 25 since round 190qf)
         song.mixer[0].effects.push_back (makeEffectSlot (EffectKind::eq));
     CHECK (! looks::apply (song, s));
-    CHECK (song.mixer[0].effects.size() == 9 && ! looks::present (song));
+    CHECK (song.mixer[0].effects.size() == (std::size_t) maxEffectSlots - 1 && ! looks::present (song));
     // Auto level
     CHECK (looks::autoInputGainDb (-24.0) == 6.0f && looks::autoInputGainDb (-10.0) == -8.0f && looks::autoInputGainDb (-90.0) == 0.0f);
     CHECK (looks::autoInputGainDb (-60.0) == 18.0f);

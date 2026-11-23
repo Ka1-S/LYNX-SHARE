@@ -12721,3 +12721,12 @@ countries: nl be
 "Off: each meter keeps its own colors (the Mixer: yellow from -6 dB, red from 0 dB)" = "Uit: elke meter houdt zijn eigen kleuren (de mixer: geel vanaf -6 dB, rood vanaf 0 dB)"
 "Yellow from" = "Geel vanaf"
 "Red from" = "Rood vanaf"
+# --- round 190qf: PR #260 (FL 2026.2's mixer slots, up to 25)
+"Add slot" = "Slot toevoegen"
+"Remove slot" = "Slot verwijderen"
+"Add an effect slot (up to {0})" = "Een effectslot toevoegen (tot {0})"
+"{0} slots (the most)" = "{0} slots (het maximum)"
+"Scroll the effect slots (or the mouse wheel over them; Shift+wheel moves an effect)" = "De effectslots scrollen (of het muiswiel erboven; Shift+muiswiel verplaatst een effect)"
+"Number of effect slots on new mixer tracks" = "Aantal effectslots op nieuwe mixertracks"
+"This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "Deze versie heeft 10 effectslots per insert: de effecten in de slots na slot 10 vallen weg: {0}"
+"This insert has no free slot ({0} effects)" = "Deze insert heeft geen vrij slot ({0} effecten)"

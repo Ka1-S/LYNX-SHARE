@@ -228,11 +228,23 @@ bool moveEffectSlot (Song& song, int track, int from, int to);
 std::vector<int> effectRows (const std::vector<EffectSlot>& effects);
 // The index of the effect in `row`, or -1 (an empty slot).
 int effectAtRow (const std::vector<EffectSlot>& effects, int row);
+// The effect slot rows an insert shows (PR #260 / round 190qf, FL 2026.2): MixerTrack::slotRows (0 = FL's 10), or more
+// when an effect sits further down; 1 .. maxEffectSlots.
+int effectRowCount (const MixerTrack& track);
+// FL 2026.2's "+" tab under the slots: one more row (false at maxEffectSlots). removeEffectRow is LYNX's own (FL 2026.2's
+// notes and video show no way to take a slot away; to verify with 2026.2): one row less, only when the last row is empty
+// (false at 1 row).
+bool addEffectRow (Song& song, int track);
+bool removeEffectRow (Song& song, int track);
+// FL 2026.2's General setting "Number of effect slots on new mixer tracks" (10 as in FL; 1 .. maxEffectSlots), given to
+// the inserts the user adds (insertTracks, trackmodes::addMixerTrack, the mixer's "+"); imports and new projects keep 10.
+int& newTrackSlots() noexcept;
+void giveNewTrackSlots (MixerTrack& track) noexcept;
 // FL's move: effect `index` goes to `row`; an effect already there takes its old row (the two swap), an empty row
 // just takes it. The chain order follows the rows; automations follow the effects. False when nothing changed.
 bool moveEffectToRow (Song& song, int track, int index, int row);
-// FL's Move up / Move down and the wheel over a slot: one row up (-1) or down (+1), wrapping around the 10 slots as FL
-// does (slot 1 up = slot 10). Returns the effect's new index, or -1.
+// FL's Move up / Move down and the wheel over a slot: one row up (-1) or down (+1), wrapping around the rows shown as FL
+// does around its 10 (slot 1 up = the last slot; effectRowCount). Returns the effect's new index, or -1.
 int moveEffectBy (Song& song, int track, int index, int delta);
 // Adds `fx` into the empty `row` (FL: a plugin picked on an empty slot lands in that slot). Returns its index, or -1
 // (row taken, insert full).

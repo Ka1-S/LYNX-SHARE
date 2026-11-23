@@ -48,7 +48,7 @@ std::vector<EffectSlot> slots (const Preset& preset);
 // Puts the preset on insert `track`: its slots replace the insert's, Blend and the preset's name are set. False (and
 // nothing changes) for a track the song doesn't have.
 bool apply (Song& song, int track, const Preset& preset);
-// The same for any chain (a user's preset): the slots as they are (at most FL's 10), rows kept when they are valid.
+// The same for any chain (a user's preset): the slots as they are (at most maxEffectSlots), rows kept when they are valid.
 bool applyChain (Song& song, int track, std::vector<EffectSlot> chain, float blend, const std::string& name);
 
 // The insert still holds what its preset put there: a factory preset of that name whose slots and Blend match (the

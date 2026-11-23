@@ -12721,3 +12721,12 @@ countries: ru by kz
 "Off: each meter keeps its own colors (the Mixer: yellow from -6 dB, red from 0 dB)" = "Выкл.: у каждого индикатора свои цвета (микшер: жёлтый от -6 дБ, красный от 0 дБ)"
 "Yellow from" = "Жёлтый от"
 "Red from" = "Красный от"
+# --- round 190qf: PR #260 (FL 2026.2's mixer slots, up to 25)
+"Add slot" = "Добавить слот"
+"Remove slot" = "Удалить слот"
+"Add an effect slot (up to {0})" = "Добавить слот эффекта (до {0})"
+"{0} slots (the most)" = "{0} слотов (максимум)"
+"Scroll the effect slots (or the mouse wheel over them; Shift+wheel moves an effect)" = "Прокрутить слоты эффектов (или колесо мыши над ними; Shift+колесо перемещает эффект)"
+"Number of effect slots on new mixer tracks" = "Число слотов эффектов у новых дорожек микшера"
+"This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "В этой версии 10 слотов эффектов на инсерт: эффекты в слотах после 10-го не сохраняются: {0}"
+"This insert has no free slot ({0} effects)" = "В этом инсерте нет свободного слота ({0} эффектов)"

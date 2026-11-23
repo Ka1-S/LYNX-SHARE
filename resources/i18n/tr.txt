@@ -12721,3 +12721,12 @@ countries: tr
 "Off: each meter keeps its own colors (the Mixer: yellow from -6 dB, red from 0 dB)" = "Kapalı: her ölçer kendi renklerini korur (mikser: -6 dB'den sarı, 0 dB'den kırmızı)"
 "Yellow from" = "Sarı başlangıcı"
 "Red from" = "Kırmızı başlangıcı"
+# --- round 190qf: PR #260 (FL 2026.2's mixer slots, up to 25)
+"Add slot" = "Slot ekle"
+"Remove slot" = "Slotu kaldır"
+"Add an effect slot (up to {0})" = "Bir efekt slotu ekle ({0} adede kadar)"
+"{0} slots (the most)" = "{0} slot (en fazla)"
+"Scroll the effect slots (or the mouse wheel over them; Shift+wheel moves an effect)" = "Efekt slotlarını kaydır (veya üzerlerinde fare tekerleği; Shift+tekerlek bir efekti taşır)"
+"Number of effect slots on new mixer tracks" = "Yeni mikser kanallarındaki efekt slotu sayısı"
+"This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "Bu sürümde insert başına 10 efekt slotu var: 10. slottan sonraki efektler dışarıda kalır: {0}"
+"This insert has no free slot ({0} effects)" = "Bu insertte boş slot yok ({0} efekt)"

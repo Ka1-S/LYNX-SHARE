@@ -345,8 +345,8 @@ TEST (simplefx190bu_chain_presets)
     CHECK (chains::applyChain (song, 2, state.effects, state.chainBlend, "Mine"));
     CHECK (song.mixer[2].effects == song.mixer[1].effects && song.mixer[2].chainBlend == 0.65f && song.mixer[2].chainPreset == "Mine");
     CHECK (chains::unchanged (song, 2)); // (a user's preset: its file is not read here)
-    // more than FL's ten slots are cut, bad rows are laid out again
-    std::vector<EffectSlot> many (13, makeEffectSlot (EffectKind::eq));
+    // more than the insert's slots (maxEffectSlots: 25 since round 190qf, as FL 2026.2) are cut, bad rows are laid out again
+    std::vector<EffectSlot> many ((std::size_t) maxEffectSlots + 3, makeEffectSlot (EffectKind::eq));
     for (auto& m : many)
         m.row = 4;
     CHECK (chains::applyChain (song, 2, many, 2.0f, {}));

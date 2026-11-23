@@ -1540,8 +1540,61 @@ void jsfxFor0130 (juce::var& root, Losses& lost)
                           listOf (where), true });
 }
 
+// PR #260 / round 190qf (0.1.32; FL 2026.2's 25 slots): an insert may show more than 10 effect slots ("slotRows") and
+// hold effects in slots 11 .. 25. 0.1.31 and older hold 10 per insert (they keep the first 10 effects and squeeze their
+// rows into the 10 places): the effects in the slots past 10 are left out (their automation is detached; the slots before
+// them keep their places) and "slotRows" goes. One line names them. Called from toRelease0130 below, until a 0.1.31 step
+// exists (then it belongs there).
+void slotsFor0130 (juce::var& root, Losses& lost)
+{
+    constexpr int oldSlots = 10;
+    auto& o = *objectOf (root);
+    juce::StringArray where;
+    if (auto* mixer = arrayOf (root["mixer"]))
+        for (int t = 0; t < mixer->size(); ++t)
+        {
+            auto* track = objectOf ((*mixer)[t]);
+            if (track == nullptr)
+                continue;
+            drop (*track, "slotRows");
+            auto* fx = arrayOf (track->getProperty ("effects"));
+            if (fx == nullptr)
+                continue;
+            // the rows as LYNX places them (core/MixerOps.cpp effectRows): rising, an effect without a row follows the
+            // one before; never past the last slot
+            const auto n = fx->size();
+            std::vector<int> rows ((std::size_t) n);
+            int previous = -1;
+            for (int i = 0; i < n; ++i)
+            {
+                const auto wanted = objectOf ((*fx)[i]) != nullptr ? (int) (*fx)[i].getProperty ("row", -1) : -1;
+                previous = wanted > previous ? wanted : previous + 1;
+                rows[(std::size_t) i] = previous;
+            }
+            for (int i = n - 1; i >= 0; --i)
+                rows[(std::size_t) i] = std::min (rows[(std::size_t) i], i == n - 1 ? maxEffectSlots - 1 : rows[(std::size_t) i + 1] - 1);
+            int keep = n;
+            for (int i = 0; i < n; ++i)
+                if (rows[(std::size_t) i] >= oldSlots)
+                {
+                    keep = i;
+                    break;
+                }
+            for (int i = keep; i < n; ++i)
+            {
+                where.add (insertName (o.getProperty ("mixer"), t) + juce::String::fromUTF8 (" \u203a ") + juce::String (rows[(std::size_t) i] + 1));
+                detachTargets (root, t, i);
+            }
+            fx->removeRange (keep, n - keep);
+        }
+    if (! where.isEmpty())
+        lost.push_back ({ TR_NOOP ("This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}"), listOf (where), true });
+}
+
 void toRelease0130 (juce::var& root, Losses& lost)
 {
+    slotsFor0130 (root, lost); // (PR #260, round 190qf: first, so the later steps see 10 slots at most)
+
     auto& o = *objectOf (root);
     noteRepeatsFor0130 (root, lost);
 

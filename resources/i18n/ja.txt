@@ -12721,3 +12721,12 @@ countries: jp
 "Off: each meter keeps its own colors (the Mixer: yellow from -6 dB, red from 0 dB)" = "オフ: 各メーターは独自の色のまま（ミキサー: -6 dB から黄、0 dB から赤）"
 "Yellow from" = "黄色の開始"
 "Red from" = "赤の開始"
+# --- round 190qf: PR #260 (FL 2026.2's mixer slots, up to 25)
+"Add slot" = "スロットを追加"
+"Remove slot" = "スロットを削除"
+"Add an effect slot (up to {0})" = "エフェクトスロットを追加（最大 {0}）"
+"{0} slots (the most)" = "{0} スロット（最大）"
+"Scroll the effect slots (or the mouse wheel over them; Shift+wheel moves an effect)" = "エフェクトスロットをスクロール（またはその上でマウスホイール。Shift+ホイールでエフェクトを移動）"
+"Number of effect slots on new mixer tracks" = "新しいミキサートラックのエフェクトスロット数"
+"This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "このバージョンのエフェクトスロットはインサートあたり 10 個です。スロット 10 より後のエフェクトは含まれません: {0}"
+"This insert has no free slot ({0} effects)" = "このインサートには空きスロットがありません（エフェクト {0} 個）"

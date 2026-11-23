@@ -740,6 +740,7 @@ void currentFieldsAllowlist()
     rich.mixer[1].sends[0].pre = true;
     rich.mixer[1].chainBlend = 0.123456791f;
     rich.mixer[1].chainPreset = "Vocal";
+    rich.mixer[1].slotRows = 14; // (PR #260, round 190qf: FL 2026.2's slot rows, editable)
     EffectSlot knob;
     knob.kind = EffectKind::utility;
     knob.look = 1;
@@ -760,7 +761,7 @@ void currentFieldsAllowlist()
     check (p.mpe && ! p.processInactive && p.pinned && p.velocityMode == prefs::pluginVelocityFixed && p.fixedVelocity == 90
            && p.inputs == plugin.inputs && p.playedBy == 7 && p.values == hosted.plugin.values
            && accepted.channels[0].cutOthersOnly && accepted.channels[0].cutAtNoteEnd && accepted.channels[0].simplePad == rich.channels[0].simplePad && accepted.channels[0].editorScale == 150
-           && accepted.mixer[1].sends[0].pre && accepted.mixer[1].chainBlend == 0.123456791f && accepted.mixer[1].chainPreset == "Vocal"
+           && accepted.mixer[1].sends[0].pre && accepted.mixer[1].chainBlend == 0.123456791f && accepted.mixer[1].chainPreset == "Vocal" && accepted.mixer[1].slotRows == 14
            && accepted.mixer[1].effects[0].goalAmount == 0.234567896f && accepted.mixer[1].effects[0].look == 1
            && accepted.beatUnit == 8 && accepted.muteRunsEffects && accepted.flPluginLevels && accepted.loopOff
            && accepted.tempoViewHigh == 150.0 && accepted.clipGrid->scenes[0].beatUnit == 8

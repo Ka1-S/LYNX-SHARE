@@ -1335,7 +1335,12 @@ constexpr EffectKind lastEffectKind = EffectKind::harmonia;
 // round 165x: 160 → 192 (Ember had reached 160; a slot's parameters are 768 bytes, project files store only an engine's
 // own count, so older projects load unchanged). Round 150: 128 → 160 (Prism Multiband 155, Ember 133).
 constexpr int maxEffectParams = 192; // LuxeVerb uses 53 (FL's 49 controls + 4 sync switches); Facet EQ 88 (round 128); Echoform 102 (round 144)
-constexpr int maxEffectSlots = 10; // as in FL
+// More mixer slots (PR #260, round 190qf; FL 2026.2: "FX slots now expanded from 10 to 25 insert slots per track with
+// dynamic allocation"): an insert shows flEffectSlots rows by default (FL's General setting "Number of effect slots on
+// new mixer tracks" may set another count for new tracks) and grows one row per click on the "+" tab under the slots,
+// up to maxEffectSlots. FL's formats up to 2026.1 (.flp / .flm) keep FL's 10 slots.
+constexpr int maxEffectSlots = 25;
+constexpr int flEffectSlots = 10; // FL's slots per insert before 2026.2 (the default rows shown; .flp import / export)
 using EffectParams = std::array<float, maxEffectParams>;
 
 struct EffectSlot;
@@ -1682,6 +1687,10 @@ struct MixerTrack
     // and "Unmute all" leaves its mute as it is
     bool lockState = false;
     std::vector<EffectSlot> effects; // up to maxEffectSlots, processed in order
+    // The effect slot rows the insert shows (FL 2026.2; core/MixerOps.h effectRowCount): 0 = FL's 10, else 1 ..
+    // maxEffectSlots (rows added with the "+" tab, or FL's "Number of effect slots on new mixer tracks"). Rows holding an
+    // effect are always shown. Saved in .lynx ("slotRows") when not 0.
+    int slotRows = 0;
     bool toMaster = true;            // inserts: output to Master (besides the sends)
     float masterLevel = 1.0f;        // level of that route to Master (linear gain, 0..maxFaderGain; FL's route knob)
     float stereo = 0.0f;             // separation: -1 = widest, 0 = normal, +1 = mono (as in FL)

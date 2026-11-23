@@ -34,6 +34,7 @@ struct GeneralOptions
     bool splash = true, startupSound = true, scanAtStart = true;
     bool supportNote = true; // round 190fq: "Show the support note" (ui/SupportLynx.h; the note's own file)
     int startupProject = 1;       // issue #123: FL's "Startup project" (StartupProject: 0 empty, 1 default template, 2 last)
+    int newTrackSlots = 10;       // FL 2026.2's "Number of effect slots on new mixer tracks" (round 190qf; 1 .. 25, 10 as FL)
     juce::String defaultTemplate; // issue #123: TemplateChoice::toText of FL's "Default template" ("" = LYNX's default)
     bool menuEntry = false;     // Linux AppImage: LYNX in the applications menu + the .lynx file type (round 161)
     bool typingPiano = true, keepEditorsOpen = false, rememberSeek = true;

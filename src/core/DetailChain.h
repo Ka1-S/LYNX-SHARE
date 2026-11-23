@@ -134,7 +134,7 @@ inline Chain forTrack (const Song& song, int track)
 // two cards. FL's slot places are kept as far as they go: the effect takes a free row between its neighbours; with none
 // free, the effects after it move one row down where there is room, else the ones before it move up, else the chain
 // is packed from the top. Effects only ever move into empty rows (moveEffectToRow), so automations follow them.
-// Returns the new effect's index, or -1 (no such insert, or all 10 slots taken).
+// Returns the new effect's index, or -1 (no such insert, or all maxEffectSlots slots taken).
 inline int insertEffectAt (Song& song, int track, EffectSlot fx, int position)
 {
     if (track < 0 || track >= (int) song.mixer.size())
@@ -206,7 +206,7 @@ inline int moveEffectBefore (Song& song, int track, int from, int position)
 // Round 190ce: the Device View's Copy / Paste / Duplicate and Ctrl-drag of a card (the reference DAW's Edit commands on
 // a selected device; docs/analise/REA_rodada190ce.md §3). A copy is a new device: a new running instance, its sidechain
 // sources kept, no automation of its own (automation clips stay with the original).
-// Pastes `fx` before the card at effect position `position`; returns its index, or -1 (no such insert, 10 effects).
+// Pastes `fx` before the card at effect position `position`; returns its index, or -1 (no such insert, maxEffectSlots effects).
 inline int pasteEffect (Song& song, int track, EffectSlot fx, int position)
 {
     fx.instance.renew();
@@ -227,7 +227,7 @@ inline int duplicateEffect (Song& song, int track, int index, int position = -1)
 // track: it moves there; with Ctrl it is copied", docs/analise/REA_rodada190dr.md §3). It lands at the end of `to`'s
 // chain. A move keeps the device itself (its running instance, its settings) and what automates or links to it follows
 // it to its new place; a copy is a new device, as pasteEffect makes. A side input that would now be the device's own
-// insert is dropped. Returns its index in `to`, or -1 (the same insert, no such device, or `to` has 10 effects).
+// insert is dropped. Returns its index in `to`, or -1 (the same insert, no such device, or `to` has maxEffectSlots effects).
 inline int moveEffectToInsert (Song& song, int from, int index, int to, bool copy)
 {
     if (from < 0 || from >= (int) song.mixer.size() || to < 0 || to >= (int) song.mixer.size() || from == to)

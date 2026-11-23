@@ -12721,3 +12721,12 @@ countries: id
 "Off: each meter keeps its own colors (the Mixer: yellow from -6 dB, red from 0 dB)" = "Nonaktif: setiap meter memakai warnanya sendiri (Mixer: kuning dari -6 dB, merah dari 0 dB)"
 "Yellow from" = "Kuning dari"
 "Red from" = "Merah dari"
+# --- round 190qf: PR #260 (FL 2026.2's mixer slots, up to 25)
+"Add slot" = "Tambah slot"
+"Remove slot" = "Hapus slot"
+"Add an effect slot (up to {0})" = "Tambah slot efek (hingga {0})"
+"{0} slots (the most)" = "{0} slot (maksimum)"
+"Scroll the effect slots (or the mouse wheel over them; Shift+wheel moves an effect)" = "Gulir slot efek (atau roda mouse di atasnya; Shift+roda memindahkan efek)"
+"Number of effect slots on new mixer tracks" = "Jumlah slot efek pada trek mixer baru"
+"This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "Versi ini punya 10 slot efek per insert: efek di slot setelah slot 10 tidak disertakan: {0}"
+"This insert has no free slot ({0} effects)" = "Insert ini tidak punya slot kosong ({0} efek)"

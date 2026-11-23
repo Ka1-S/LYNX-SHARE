@@ -169,7 +169,7 @@ bool applyChain (Song& song, int track, std::vector<EffectSlot> chain, float ble
         return false;
     if ((int) chain.size() > maxEffectSlots)
         chain.resize ((std::size_t) maxEffectSlots);
-    // rows: kept when they rise and fit FL's 10 places, else packed from the top
+    // rows: kept when they rise and fit the insert's places (maxEffectSlots), else packed from the top
     int last = -1;
     bool valid = true;
     for (const auto& s : chain)

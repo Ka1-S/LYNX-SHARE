@@ -1163,7 +1163,7 @@ private:
     {
         if (effectCount() >= maxEffectSlots)
         {
-            ui::postHint ({ tr ("This insert has no free slot (10 effects)"), {} }, 3000);
+            ui::postHint ({ tr ("This insert has no free slot ({0} effects)", { juce::String (maxEffectSlots) }), {} }, 3000);
             return;
         }
         int added = -1;
@@ -1314,7 +1314,7 @@ private:
             return;
         if (effectCount() >= maxEffectSlots)
         {
-            ui::postHint ({ tr ("This insert has no free slot (10 effects)"), {} }, 3000);
+            ui::postHint ({ tr ("This insert has no free slot ({0} effects)", { juce::String (maxEffectSlots) }), {} }, 3000);
             return;
         }
         int added = -1;
@@ -1330,7 +1330,7 @@ private:
     {
         if (effectCount() >= maxEffectSlots)
         {
-            ui::postHint ({ tr ("This insert has no free slot (10 effects)"), {} }, 3000);
+            ui::postHint ({ tr ("This insert has no free slot ({0} effects)", { juce::String (maxEffectSlots) }), {} }, 3000);
             return;
         }
         engine.capturePluginStates();
