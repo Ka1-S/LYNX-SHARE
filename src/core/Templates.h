@@ -29,6 +29,11 @@ std::string legalProjectName (const std::string& name);
 // when there is no folder. Uses '/' (the caller converts).
 std::string newProjectPath (const NewProjectSetup& setup, const char* extension);
 
+// FL's new projects are named for you: the first of "<base>", "<base> 1", "<base> 2"... whose project file (and, with
+// ownFolder, whose project folder) does not exist in `folder` yet — so a second "Untitled" becomes "Untitled 1" instead
+// of an error, a third "Untitled 2", and so on. An empty or unusable `base` counts as "Untitled".
+std::string freeProjectName (const std::string& folder, const std::string& base, bool ownFolder, const char* extension);
+
 // Applies the time settings (tempo 10..522, beats per bar 1..16) and the credits to a song made from a template.
 void applySetup (Song& song, const NewProjectSetup& setup);
 

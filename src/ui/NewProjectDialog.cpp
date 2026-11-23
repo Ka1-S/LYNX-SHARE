@@ -304,6 +304,14 @@ public:
             genre.setText ("Synthwave", false);
             templates.selectRow (2);
         }
+        else
+        {
+            // the name is filled in for you, as FL names new projects: "Untitled", then "Untitled 1", "Untitled 2"... (a
+            // folder or project file already there takes the next name instead of an "already exists" error)
+            const auto initial = setup();
+            name.setText (juce::String::fromUTF8 (freeProjectName (initial.folder, initial.name, initial.ownFolder, ProjectFile::extension).c_str()),
+                          juce::dontSendNotification);
+        }
         templateChosen();
         setSize (700, 540);
     }
@@ -455,7 +463,9 @@ private:
     {
         ownFolder.setEnabled (saveNow.getToggleState());
         folderValue.setText ("  " + (folderText.isNotEmpty() ? folderText : folder.getFullPathName()), juce::dontSendNotification);
-        const auto path = newProjectPath (setup(), ProjectFile::extension);
+        auto shown = setup();
+        shown.name = freeProjectName (shown.folder, shown.name, shown.ownFolder, ProjectFile::extension);
+        const auto path = newProjectPath (shown, ProjectFile::extension);
         pathNote.setText (path.empty() ? tr ("Not saved until you choose File › Save") : juce::String::fromUTF8 (path.c_str()).replaceCharacter ('/', juce::File::getSeparatorChar()),
                           juce::dontSendNotification);
         create.setEnabled (true);
@@ -479,7 +489,8 @@ private:
         const auto row = templates.getSelectedRow();
         if (row < 0 || row >= (int) templates.items.size())
             return;
-        const auto s = setup();
+        auto s = setup();
+        s.name = freeProjectName (s.folder, s.name, s.ownFolder, ProjectFile::extension); // (never "already exists")
         auto song = makeSong (templates.items[(std::size_t) row]);
         applySetup (song, s);
         if (s.info.title.empty() && name.getText().trim().isEmpty())
