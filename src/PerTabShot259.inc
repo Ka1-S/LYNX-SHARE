@@ -101,6 +101,10 @@
                 juce::StringArray line;
                 juce::Rectangle<int> first;
                 bool pagesFit = true;
+                // round 190qd: FL's Sampler window keeps ONE size on all its tabs (the largest page's); the others per tab
+                const bool oneSize = kind == InstrumentKind::sampler;
+                int largestW = 0, largestH = 0;
+                bool sameSize = true;
                 for (int tab = 0; tab < tabs; ++tab)
                 {
                     showChannelWindowTab (*frame, tab);
@@ -112,8 +116,20 @@
                     if (tab == 0)
                         first = size;
                     line.add (State::text (size) + (page != nullptr ? " (page " + State::text (page->getLocalBounds()) + ")" : juce::String (" (no page)")));
-                    // the window is the shown page under the strip (wider only where the strip needs it)
-                    pagesFit = pagesFit && page != nullptr && size.getHeight() == header + page->getHeight() && size.getWidth() >= page->getWidth();
+                    // the window is the shown page under the strip (wider only where the strip needs it); the Sampler's
+                    // is the same on every tab, each page inside it
+                    if (oneSize)
+                    {
+                        pagesFit = pagesFit && page != nullptr && size.getHeight() >= header + page->getHeight() && size.getWidth() >= page->getWidth();
+                        sameSize = sameSize && size == first;
+                        if (page != nullptr)
+                        {
+                            largestW = juce::jmax (largestW, page->getWidth());
+                            largestH = juce::jmax (largestH, page->getHeight());
+                        }
+                    }
+                    else
+                        pagesFit = pagesFit && page != nullptr && size.getHeight() == header + page->getHeight() && size.getWidth() >= page->getWidth();
                     // the channel's controls (right) clear of the tabs (left): ▸ 20, the tabs 45 each, 8 px, the controls
                     if (size.getWidth() < 20 + 45 * tabs + 8 + channelHeaderControlsWidth())
                         ++overlapping;
@@ -121,7 +137,13 @@
                         ++narrow;
                 }
                 showChannelWindowTab (*frame, 0);
-                st->check ("kind " + juce::String ((int) kind) + ": each tab's size is its page under the strip", pagesFit);
+                if (oneSize)
+                {
+                    st->check ("Sampler (FL): one window size on all " + juce::String (tabs) + " tabs", tabs >= 3 && sameSize);
+                    st->check ("Sampler (FL): that size is the largest page's under the strip",
+                               first.getWidth() == largestW && first.getHeight() == header + largestH);
+                }
+                st->check ("kind " + juce::String ((int) kind) + (oneSize ? ": each tab's page fits the window" : ": each tab's size is its page under the strip"), pagesFit);
                 st->check ("kind " + juce::String ((int) kind) + ": tab 0 again gives tab 0's size", frame->getLocalBounds() == first);
                 st->sizes.add ("kind " + juce::String ((int) kind) + " (" + juce::String (song.channels[(std::size_t) channel].name) + "): " + line.joinIntoString (" | "));
             }
@@ -160,6 +182,37 @@
             }
             else
                 st->check ("a Synth channel window", false);
+
+            // round 190qd: the docked look on a Sampler channel: one size on its Sample, Envelope / instrument and Misc
+            // tabs (FL 2026's Sampler window), also with the header hidden by the gear
+            int sampler = -1;
+            for (const auto& [channel, kind] : channels)
+                if (kind == InstrumentKind::sampler)
+                    sampler = channel;
+            if (auto w = sampler >= 0 ? makeChannelWindowForShot (engine, sampler, 0) : nullptr)
+            {
+                const auto onSample = w->getBounds();
+                savePng (shot::snapshot (*w), shot::fileName (prefix + "-sampler-tab0.png"));
+                showChannelWindowTab (*w, 1);
+                const auto onEnvelope = w->getBounds();
+                savePng (shot::snapshot (*w), shot::fileName (prefix + "-sampler-tab1.png"));
+                showChannelWindowTab (*w, -1);
+                const auto onMisc = w->getBounds();
+                savePng (shot::snapshot (*w), shot::fileName (prefix + "-sampler-misc.png"));
+                showChannelWindowTab (*w, 0);
+                st->sizes.add ("Sampler window (docked look): sample " + State::text (onSample) + ", envelope " + State::text (onEnvelope) + ", misc " + State::text (onMisc));
+                st->check ("Sampler window (FL): Sample, Envelope and Misc tabs one size", onEnvelope == onSample && onMisc == onSample && w->getBounds() == onSample);
+                pressChannelHeaderGear (*w);
+                const auto hiddenSample = w->getBounds();
+                showChannelWindowTab (*w, -1);
+                const auto hiddenMisc = w->getBounds();
+                showChannelWindowTab (*w, 0);
+                st->check ("Sampler window, header hidden: one size, less the header", hiddenSample.getHeight() == onSample.getHeight() - header && hiddenMisc == hiddenSample);
+                pressChannelHeaderGear (*w);
+                st->check ("Sampler window, header shown again: the same size", w->getBounds() == onSample);
+            }
+            else
+                st->check ("a Sampler channel window", false);
             windowplaces::fromVar ({});
             st->engine->setSong (Song::makeDefault());
         }

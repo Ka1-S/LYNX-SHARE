@@ -6927,6 +6927,9 @@ public:
             const auto kind = channel >= 0 && channel < (int) engine.getSong().channels.size()
                                   ? engine.getSong().channels[(std::size_t) channel].instrument
                                   : InstrumentKind::synth;
+            // FL 2026's Sampler window keeps one size on all its tabs (Sample, Envelope / instrument, Misc; checked in
+            // FL, round 190pw); every other channel window takes the shown tab's size (FL, PR #259). Round 190qd.
+            oneSize = kind == InstrumentKind::sampler;
             if (kind == InstrumentKind::sampler || kind == InstrumentKind::audioClip)
                 addPage (std::move (instrumentPage), tr ("Sample"), tr ("Sample settings"), Icon::audioFile);
             else
@@ -7105,7 +7108,7 @@ public:
                 if (now == sizes[i])
                     return;
                 sizes[i] = now;
-                if ((int) i !=  current) // a hidden tab resized itself; apply it only once that tab is shown again
+                if ((int) i !=  current && ! oneSize) // a hidden tab resized itself; apply it only once that tab is shown again
                     return;
                 const auto size = desiredSize();
                 if (size.x != getWidth() || size.y != getHeight())
@@ -7123,6 +7126,16 @@ private:
     // to a smaller tab never shrank the window). showTab() and childBoundsChanged() both resize through this.
     juce::Point<int> desiredSize() const
     {
+        if (oneSize) // the Sampler (FL): one size on every tab, the largest page's; smaller pages sit centred under the strip
+        {
+            int width = 1, height = 1;
+            for (const auto& size : sizes)
+            {
+                width = juce::jmax (width, size.x);
+                height = juce::jmax (height, size.y);
+            }
+            return { width, currentHeaderHeight() + height };
+        }
         if (current < 0 || current >= (int) sizes.size())
             return { 1, currentHeaderHeight() + 1 };
         const auto& size = sizes[(std::size_t) current];
@@ -7132,6 +7145,7 @@ private:
     AudioEngine& engine;
     int channel;
     bool node = false;
+    bool oneSize = false; // the Sampler's window: one size across its tabs (FL), see desiredSize()
     bool headerCollapsed = false; // set only by SettingsWindow, only when docked (its gear); see setHeaderCollapsed()
     int current = 0;
     std::vector<std::unique_ptr<IconButton>> tabs;

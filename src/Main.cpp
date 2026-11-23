@@ -9394,6 +9394,27 @@ private:
             }
             else
                 perTab259Result = "ERROR no window";
+            // round 190qd: FL's Sampler window keeps one size on all its tabs (Sample, Envelope / instrument, Misc)
+            e.editSong ([] (lynx::Song& s) {
+                lynx::ChannelDef d;
+                d.instrument = lynx::InstrumentKind::sampler;
+                d.name = "Sampler";
+                d.mixerTrack = s.claimFreeInsert();
+                s.channels.push_back (d);
+            });
+            e.dispatchPendingMessages();
+            if (auto w = perTab259Result == "OK" ? lynx::makeChannelWindowForShot (e, (int) e.getSong().channels.size() - 1, 0) : nullptr)
+            {
+                const auto first = w->getBounds();
+                lynx::showChannelWindowTab (*w, 1);
+                const auto envelope = w->getBounds();
+                lynx::showChannelWindowTab (*w, -1);
+                const auto misc = w->getBounds();
+                if (envelope != first || misc != first)
+                    perTab259Result = "ERROR Sampler tabs differ " + first.toString() + " / " + envelope.toString() + " / " + misc.toString();
+            }
+            else if (perTab259Result == "OK")
+                perTab259Result = "ERROR no Sampler window";
             lynx::windowplaces::fromVar ({});
         }
 
