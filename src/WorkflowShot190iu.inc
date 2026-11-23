@@ -312,6 +312,51 @@
         }
         ui.setLayoutStyle (layoutstyle::Style::pattern, false);
 
+        // ---- 7b. FL's Playlist: a track switched off (its LED dark) goes dark as a whole; the others stay light
+        {
+            const auto bar = song().barTicks();
+            pl.setViewForSnapshot (60.0, 1, 0);
+            engine.dispatchPendingMessages();
+            int muted = -1, other = -1;
+            for (int t = 0; t < (int) song().playlistTracks.size() && t < pl.numTracksForSnapshot(); ++t)
+            {
+                const auto row = pl.trackRowForSnapshot (t);
+                if (row.getHeight() < 8 || row.getBottom() > pl.getHeight())
+                    continue;
+                const auto empty = std::none_of (song().playlist.begin(), song().playlist.end(), [t] (const Clip& c) { return c.track == t; })
+                                   && song().playlistTracks[(std::size_t) t].lanes.empty();
+                if (! empty)
+                    continue;
+                if (muted < 0)
+                    muted = t;
+                else if ((t % 2) == (muted % 2)) // (the lanes alternate by row: same shade before the veil)
+                {
+                    other = t;
+                    break;
+                }
+            }
+            check ("playlist_mute_has_two_empty_tracks", muted >= 0 && other >= 0, juce::String (muted) + " " + juce::String (other));
+            if (muted >= 0 && other >= 0)
+            {
+                const auto before = shot::snapshot (pl);
+                engine.editSong ([muted] (Song& s) { s.playlistTracks[(std::size_t) muted].muted = true; });
+                engine.dispatchPendingMessages();
+                const auto image = shot::snapshot (pl);
+                const auto x = juce::jlimit (0, image.getWidth() - 1, (int) pl.xOfTickForSnapshot (5.0 * bar) + 8);
+                const auto lit = before.getPixelAt (x, pl.trackRowForSnapshot (muted).getCentreY()).getBrightness();
+                const auto dark = image.getPixelAt (x, pl.trackRowForSnapshot (muted).getCentreY()).getBrightness();
+                const auto otherBefore = before.getPixelAt (x, pl.trackRowForSnapshot (other).getCentreY()).getBrightness();
+                const auto otherAfter = image.getPixelAt (x, pl.trackRowForSnapshot (other).getCentreY()).getBrightness();
+                check ("playlist_muted_track_goes_dark", dark < lit * 0.75f, juce::String (lit, 4) + " -> " + juce::String (dark, 4));
+                check ("playlist_track_left_on_stays_light", std::abs (otherBefore - otherAfter) < 0.004f,
+                       juce::String (otherBefore, 4) + " -> " + juce::String (otherAfter, 4));
+                savePng (image, prefix + "-playlist-muted-track.png");
+                engine.undo(); // (leaves the song as it was)
+                engine.dispatchPendingMessages();
+            }
+        }
+
+
         // ---- 8. Settings › LYNX extras with the new switches
         {
             auto page = makeSettingsPanel (engine, SettingsPage::extras);

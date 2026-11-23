@@ -651,6 +651,9 @@ private:
     double zoomEndMs = -1.0e9;
     juce::TimedCallback zoomSettle { [this] { settleZoom(); } };
     void paintStickyTitles (juce::Graphics& g);
+    // FL (Pattern layout): a track switched off (its LED dark) steps back under a dark veil - its lane, clips and
+    // automation lanes, and its header; drawn over the cached picture (a mute changes without a lane repaint)
+    void paintMutedTracks (juce::Graphics& g);
     void paintHeldClip (juce::Graphics& g, int index); // round 190im: one audio / automation clip as paint() draws it
     struct HeldTitlesKey // round 190ig: what the held clip titles were last found for
     {
