@@ -1455,7 +1455,7 @@ void ChannelRackComponent::paint (juce::Graphics& g)
     if (advancedLoopShown())
         paintLoopColumn (g);
 
-    if (fileDropRow >= 0 && fileDropRow < (int) song.channels.size() && isShown (fileDropRow))
+    if (fileDropRow == newChannelDrop || (fileDropRow >= 0 && fileDropRow < (int) song.channels.size() && isShown (fileDropRow)))
         paintFileDropTarget (g);
 }
 
@@ -4663,105 +4663,103 @@ void ChannelRackComponent::fileDragEnter (const juce::StringArray& files, int x,
     fileDragMove (files, x, y);
 }
 
-void ChannelRackComponent::fileDragMove (const juce::StringArray& files, int x, int y)
+void ChannelRackComponent::fileDragMove (const juce::StringArray&, int x, int y)
 {
+    // FL 2026 (seen in round 190qj, shots/fl/fl-rack-drag-*.png): a file dragged over a channel outlines that channel's
+    // name button (the drop goes into it); below the channels a line under the last one marks where a new channel goes
     int row = 0;
     const auto area = areaAt (x, y, row);
     const auto channels = (int) engine.getSong().channels.size();
-    // over the empty space under the channels (the viewport) the drop goes to the selected channel, as filesDropped does
-    const auto target = area == Area::none || area == Area::addRow || row >= channels ? engine.getSelectedChannel() : row;
-    const auto midi = workflowextras::anyMidiFile (files);
-    const auto shown = target >= 0 && target < channels ? target : -1;
-    if (shown == fileDropRow && midi == fileDropMidi)
+    const auto onRow = ! (area == Area::none || area == Area::addRow || isAutomationArea (area)) && row >= 0 && row < channels;
+    const auto shown = onRow ? row : newChannelDrop; // (the same targets as filesDropped)
+    if (shown == fileDropRow)
         return;
     fileDropRow = shown;
-    fileDropMidi = midi;
-    repaint(); // (a drag move is rare: the rows redrawn with the outline, or only the old and the new one)
+    repaint(); // (a drag move is rare: the old and the new mark)
 }
 
 void ChannelRackComponent::fileDragExit (const juce::StringArray&)
 {
-    if (fileDropRow < 0 && ! fileDropMidi)
+    if (fileDropRow == noDrop)
         return;
-    fileDropRow = -1;
-    fileDropMidi = false;
+    fileDropRow = noDrop;
     repaint();
 }
 
-// A file dragged over the rack: the row it would go to gets an outline, and a MIDI file a tag saying so (the drag's own
-// picture sits under the pointer, so the tag is at the row's right end)
+// The drop mark (FL's): the target channel's name button outlined, or a line under the last channel for a new one
 void ChannelRackComponent::paintFileDropTarget (juce::Graphics& g)
 {
     using namespace theme::colour;
-    const auto row = juce::Rectangle<float> ((float) stickyX, (float) rowY (fileDropRow),
-                                             (float) getWidth() - (float) stickyX, (float) rowHeight).reduced (1.0f);
-    g.setColour (accent.withAlpha (0.16f));
-    g.fillRoundedRectangle (row, theme::radius::sm);
     g.setColour (accent);
-    g.drawRoundedRectangle (row.reduced (0.5f), theme::radius::sm, 2.0f);
-
-    if (! fileDropMidi)
+    if (fileDropRow == newChannelDrop)
+    {
+        const auto y = (float) rowY ((int) engine.getSong().channels.size()) - 1.0f;
+        g.fillRect (juce::Rectangle<float> ((float) (stickyX + nameLeft()), y - 1.0f, (float) nameWidth, 2.0f));
         return;
-
-    const auto text = tr ("Drop the MIDI file here");
-    const auto font = theme::font (theme::type::caption, true);
-    const auto width = juce::GlyphArrangement::getStringWidth (font, text) + 20.0f;
-    const auto tag = juce::Rectangle<float> (juce::jmax ((float) gridLeft() + 6.0f, row.getRight() - width - 8.0f),
-                                             row.getCentreY() - 10.0f, width, 20.0f);
-    theme::fillRoundRect (g, tag, theme::radius::sm, accent);
-    g.setFont (font);
-    g.setColour (onAccent);
-    g.drawFittedText (text, tag.toNearestInt(), juce::Justification::centred, 1);
+    }
+    const auto name = juce::Rectangle<float> ((float) (stickyX + nameLeft()), (float) rowY (fileDropRow) + 3.0f, (float) nameWidth,
+                                              (float) rowHeight - 6.0f);
+    g.drawRoundedRectangle (name.reduced (0.5f), theme::radius::sm, 1.5f);
 }
 
-// A MIDI file dropped on a channel's row: its notes into that channel's part of the current pattern (FL's import into a
-// channel: every track and MIDI channel, no blend), then the channel is selected and the Piano roll shows the notes. The
-// same place the Piano roll's "Import .mid into this channel..." ends up in, without its options window (the drop is the
-// gesture that picks the channel), so a MIDI file from a plugin's own "drag MIDI" area lands on the instrument it was
-// meant for.
-void ChannelRackComponent::importMidiOnChannel (int channel, const juce::File& file)
+// A MIDI file dropped on a channel's row (FL 2026, seen in round 190qj): FL's "Import MIDI data" window for an import into
+// that channel (which tracks / MIDI channels, Blend with existing data, Realign events, Import time signatures, Import
+// zero velocity notes), the same window and import as the Piano roll's "Import .mid into this channel..."; with Shift
+// held FL imports at once with the window's last choices. Dropped below the channels: FL's full window (new channels,
+// File › Import › MIDI file).
+void ChannelRackComponent::importMidiOnChannel (int channel, const juce::File& file, bool withWindow)
 {
+    if (channel < 0)
+    {
+        if (onImportMidiFile)
+            onImportMidiFile (file);
+        return;
+    }
     const auto& song = engine.getSong();
-    if (channel < 0) // (dropped on the rack's empty area: the channel the Piano roll shows)
-        channel = engine.getSelectedChannel();
-
-    if (song.patterns.empty() || channel < 0 || channel >= (int) song.channels.size())
+    if (song.patterns.empty() || channel >= (int) song.channels.size())
         return;
     if (refuseFrozenEdit (channel)) // (a frozen channel plays its rendered audio: notes would not be heard)
         return;
 
     juce::String error;
-    const auto midi = MidiFileIo::parseFile (file, error);
-    if (! midi)
+    const auto parsed = MidiFileIo::parseFile (file, error);
+    if (! parsed)
     {
         ui::postNotice ({ tr ("{0} could not be read: {1}", { file.getFileName(), error }), {} }, 4000);
         return;
     }
-
-    const midiimport::Options options; // FL's defaults
-    if (midiimport::groups (*midi, options).empty()) // (a file with no notes leaves no undo step)
+    const auto midi = *parsed;
+    juce::Component::SafePointer<ChannelRackComponent> safe (this);
+    const auto import = [safe, channel, midi, name = file.getFileName()] (const midiimport::Options& options) {
+        if (safe == nullptr || channel >= (int) safe->engine.getSong().channels.size())
+            return;
+        if (midiimport::groups (midi, options).empty()) // (a file with no notes leaves no undo step)
+        {
+            ui::postNotice ({ tr ("{0} has no notes", { name }), {} }, 4000);
+            return;
+        }
+        std::string err;
+        std::vector<int> added;
+        safe->engine.editSong ([&] (Song& s) { added = midiimport::importIntoChannel (s, channel, midi, options, err); });
+        if (! added.empty())
+            safe->engine.setSelectedChannel (channel);
+    };
+    if (! withWindow)
     {
-        ui::postNotice ({ tr ("{0} has no notes", { file.getFileName() }), {} }, 4000);
+        import (channelMidiImportOptions());
         return;
     }
-
-    std::string err;
-    std::vector<int> added;
-    engine.editSong ([&] (Song& s) { added = midiimport::importIntoChannel (s, channel, *midi, options, err); });
-    if (added.empty())
-        return;
-
-    engine.setSelectedChannel (channel);
-    if (onOpenPianoRoll)
-        onOpenPianoRoll();
+    showMidiImportDialog (file.getFileName(), midi, channelMidiImportOptions(), true, [import] (const midiimport::Options& o) {
+        channelMidiImportOptions() = o; // (FL keeps the window's choices)
+        import (o);
+    });
 }
 
 void ChannelRackComponent::filesDropped (const juce::StringArray& files, int x, int y)
 {
-    if (fileDropRow >= 0 || fileDropMidi) // (the drag's outline goes with the drop, even if no exit arrives)
+    if (fileDropRow != noDrop) // (the drag's mark goes with the drop, even if no exit arrives)
     {
-        fileDropRow = -1;
-        fileDropMidi = false;
+        fileDropRow = noDrop;
         repaint();
     }
     int row = 0;
@@ -4793,9 +4791,10 @@ void ChannelRackComponent::filesDropped (const juce::StringArray& files, int x, 
 
         if (workflowextras::isMidiFile (f))
         {
-            // a MIDI file: into the channel it was dropped on (the first one: several would replace each other)
+            // a MIDI file (FL): FL's import window for the channel it was dropped on (Shift: at once), or below the channels
+            // FL's full window (new channels). The first one only: several would replace each other.
             if (! midiDone)
-                importMidiOnChannel (target, file);
+                importMidiOnChannel (target, file, ! (shiftDropForTests || juce::ModifierKeys::getCurrentModifiersRealtime().isShiftDown()));
             midiDone = true;
             target = -1;
             continue;

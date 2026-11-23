@@ -221,48 +221,108 @@
         }
         workflowextras::setExtra ("playlist.midiDrop", false);
 
-        // ---- 3b. the same .mid dropped on a Channel Rack row: its notes into that channel, shown in the Piano roll
+        // ---- 3b. the same .mid dropped on the Channel Rack (PR #262, FL 2026 as seen in round 190qj): on a channel's row
+        // FL's "Import MIDI data" window for that channel opens (Shift: at once, the window's last choices) and the notes go
+        // into it; below the channels FL's full window (new channels). While dragging, FL outlines the target channel's
+        // name button, or draws a line under the last channel for a new one.
         {
             auto& rack = ui.getRackForSnapshot();
             auto& ws = ui.workspaceForTest();
+            const auto pumpUi = [&engine] {
+#if JUCE_LINUX || JUCE_WINDOWS
+                for (int i = 0; i < 256 && juce::detail::dispatchNextMessageOnSystemQueue (true); ++i) {}
+#endif
+                engine.dispatchPendingMessages();
+            };
+            const auto modals = [] { return juce::ModalComponentManager::getInstance()->getNumModalComponents(); };
             const auto leadChannel = song().playlistTracks[2].channel;
             const auto pattern = song().currentPattern;
             const auto noteCount = [&] (int channel) {
                 const auto& notes = song().patterns[(std::size_t) pattern].notes;
                 return (int) std::count_if (notes.begin(), notes.end(), [channel] (const Note& n) { return n.channel == channel; });
             };
-            // the drag shows where the file would go: that row outlined, and a tag for a MIDI file
             ui.showPanelsForSnapshot ({ workspace::Panel::channelRack });
-            engine.dispatchPendingMessages();
+            pumpUi();
             const auto rowCentre = rack.rowTopForSnapshot (leadChannel) + ChannelRackComponent::rowHeight / 2;
+            const auto shotArea = juce::Rectangle<int> (0, 0, juce::jmin (rack.getWidth(), 1000), rack.getHeight());
             rack.fileDragEnter (files, 10, rowCentre);
-            check ("rack_mid_drag_shows_the_row", rack.fileDropRowForSnapshot() == leadChannel, juce::String (rack.fileDropRowForSnapshot()));
-            check ("rack_mid_drag_knows_it_is_midi", rack.fileDropIsMidiForSnapshot());
-            savePng (shot::snapshot (rack, juce::Rectangle<int> (0, 0, juce::jmin (rack.getWidth(), 1000),
-                                                                 juce::jmin (rowCentre + ChannelRackComponent::rowHeight, rack.getHeight()))),
-                     prefix + "-mid-drag-over-rack.png");
-            // (over the empty space under the channels: the selected channel, where the drop would go)
-            rack.fileDragMove (files, 10, rack.rowTopForSnapshot ((int) song().channels.size() - 1) + 3 * ChannelRackComponent::rowHeight);
-            check ("rack_mid_drag_over_empty_space_shows_the_selected_channel", rack.fileDropRowForSnapshot() == engine.getSelectedChannel());
+            check ("rack_mid_drag_marks_the_channel", rack.fileDropRowForSnapshot() == leadChannel, juce::String (rack.fileDropRowForSnapshot()));
+            savePng (shot::snapshot (rack, shotArea), prefix + "-mid-drag-over-rack.png");
+            savePng (rack.createComponentSnapshot (shotArea, true, 1.5f), prefix + "-mid-drag-over-rack@150.png");
+            const auto belowY = rack.rowTopForSnapshot ((int) song().channels.size() - 1) + 3 * ChannelRackComponent::rowHeight;
+            rack.fileDragMove (files, 10, belowY);
+            check ("rack_mid_drag_below_marks_a_new_channel", rack.fileDropRowForSnapshot() == ChannelRackComponent::newChannelDrop);
+            savePng (shot::snapshot (rack, shotArea), prefix + "-mid-drag-below-rack.png");
             rack.fileDragExit (files);
-            check ("rack_mid_drag_indicator_goes_away", rack.fileDropRowForSnapshot() == -1 && ! rack.fileDropIsMidiForSnapshot());
+            check ("rack_mid_drag_mark_goes_away", rack.fileDropRowForSnapshot() == ChannelRackComponent::noDrop);
 
             check ("rack_takes_mid", rack.isInterestedInFileDrag (files));
-            check ("piano_roll_hidden_before_the_rack_drop", ! ws.isPanelVisible (workspace::Panel::pianoRoll));
             const auto before = noteCount (leadChannel);
             const auto othersBefore = (int) song().patterns[(std::size_t) pattern].notes.size() - before;
-            rack.filesDropped (files, 10, rack.rowTopForSnapshot (leadChannel) + ChannelRackComponent::rowHeight / 2);
-            engine.dispatchPendingMessages();
+            const auto panelsBefore = ws.isPanelVisible (workspace::Panel::pianoRoll);
+            // a plain drop: FL's window first, nothing imported until Accept
+            rack.filesDropped (files, 10, rowCentre);
+            pumpUi();
+            auto* window = juce::Component::getCurrentlyModalComponent();
+            check ("rack_drop_opens_the_import_window", modals() > 0 && window != nullptr && noteCount (leadChannel) == before);
+            if (window != nullptr)
+            {
+                savePng (window->createComponentSnapshot (window->getLocalBounds(), true, 1.0f), prefix + "-mid-drop-window.png");
+                window->exitModalState (1); // (Accept)
+            }
+            pumpUi();
             // (the file's 4 bass and 32 drum notes, both tracks merged into the channel it was dropped on)
             check ("rack_drop_puts_the_notes_in_that_channel", noteCount (leadChannel) == 36, juce::String (noteCount (leadChannel)));
             check ("rack_drop_keeps_the_other_channels", (int) song().patterns[(std::size_t) pattern].notes.size() - noteCount (leadChannel) == othersBefore);
             check ("rack_drop_selects_the_channel", engine.getSelectedChannel() == leadChannel, juce::String (engine.getSelectedChannel()));
-            check ("rack_drop_opens_the_piano_roll", ws.isPanelVisible (workspace::Panel::pianoRoll));
+            check ("rack_drop_leaves_the_panels_as_fl", ws.isPanelVisible (workspace::Panel::pianoRoll) == panelsBefore);
             engine.undo();
-            engine.dispatchPendingMessages();
+            pumpUi();
             check ("rack_drop_is_one_undo_step", noteCount (leadChannel) == before, juce::String (noteCount (leadChannel)));
+            // Cancel: nothing changes
+            rack.filesDropped (files, 10, rowCentre);
+            pumpUi();
+            if (auto* w = juce::Component::getCurrentlyModalComponent())
+                w->exitModalState (0);
+            pumpUi();
+            check ("rack_drop_cancelled_changes_nothing", noteCount (leadChannel) == before && modals() == 0);
+            // Shift held (FL): at once, without the window
+            rack.shiftDropForTests = true;
+            rack.filesDropped (files, 10, rowCentre);
+            pumpUi();
+            rack.shiftDropForTests = false;
+            check ("rack_shift_drop_imports_without_the_window", modals() == 0 && noteCount (leadChannel) == 36, juce::String (noteCount (leadChannel)));
+            engine.undo();
+            pumpUi();
+            // below the channels: FL's full window (new channels); Cancel leaves the rack as it was
+            const auto channels = song().channels.size();
+            rack.filesDropped (files, 10, belowY);
+            pumpUi();
+            check ("rack_drop_below_opens_the_full_window", modals() > 0);
+            if (auto* w = juce::Component::getCurrentlyModalComponent())
+                w->exitModalState (0);
+            pumpUi();
+            check ("rack_drop_below_cancelled_adds_nothing", song().channels.size() == channels && modals() == 0);
             ui.selectTabForSnapshot (2); // (the Playlist again, as the rest of this shot expects it)
-            engine.dispatchPendingMessages();
+            pumpUi();
+        }
+
+        // ---- 3c. PR #266 (FL 2026's Save as window for a new project, round 190qj): the name is filled in as "Project_N"
+        {
+            auto panel = makeNewProjectPanelAsShown();
+            panel->setSize (700, 540);
+            std::function<juce::String (juce::Component&)> filled = [&filled] (juce::Component& c) -> juce::String {
+                if (auto* e = dynamic_cast<juce::TextEditor*> (&c); e != nullptr && e->getText().startsWith ("Project_"))
+                    return e->getText();
+                for (auto* child : c.getChildren())
+                    if (const auto t = filled (*child); t.isNotEmpty())
+                        return t;
+                return {};
+            };
+            const auto name = filled (*panel);
+            check ("new_project_name_is_filled_in_as_fl", name.matchesWildcard ("Project_*", false) && name.substring (8).getIntValue() >= 1, name);
+            savePng (panel->createComponentSnapshot (panel->getLocalBounds(), true, 1.0f), prefix + "-new-project-name.png");
+            savePng (panel->createComponentSnapshot (panel->getLocalBounds(), true, 1.5f), prefix + "-new-project-name@150.png");
         }
 
         // ---- 4. #191.6 the picker's takes and envelopes: the Playlist menu (the Picker panel submenu holds the clean-up)

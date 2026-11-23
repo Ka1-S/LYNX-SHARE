@@ -6336,10 +6336,10 @@ juce::PopupMenu PianoRollComponent::midiMenu()
 void PianoRollComponent::importMidi (const midiimport::ParsedMidi& midi, const juce::String& name)
 {
     // FL's "Import MIDI data" window with Blend (REA round 146b): which tracks / channels / controller
-    static midiimport::Options remembered;
+    auto& remembered = channelMidiImportOptions(); // (round 190qj: shared with the Channel rack's drop)
     juce::Component::SafePointer<PianoRollComponent> safe (this);
     showMidiImportDialog (name, midi, remembered, true, [safe, midi] (const midiimport::Options& o) {
-        remembered = o;
+        channelMidiImportOptions() = o;
         if (safe == nullptr)
             return;
         std::vector<int> added;

@@ -12652,3 +12652,6 @@ countries: cn sg
 "The exported file's name. Wildcards such as $project, $date or $bpm are filled in when you export. A / puts the file in a folder of that name inside the export folder (made when needed)" = "导出文件的名称。导出时会填入 $project、$date 或 $bpm 等通配符。/ 会把文件放进导出文件夹内同名的文件夹（需要时自动创建）"
 "Empty slot: click to add an effect, double-click or middle-click to search for one" = "空插槽：单击添加效果器，双击或中键单击可搜索"
 "Track effects: [LMB] add an effect to its mixer track  [MMB] or double-click: search for one  (drop one from the Browser here too)" = "音轨效果：[LMB] 为其混音器轨道添加效果  [MMB] 或双击：搜索效果（也可从浏览器拖放到这里）"
+"(some clips here play through other mixer tracks: {0}; M mutes this Playlist track too)" = "（这里的部分片段通过其他混音器轨道播放：{0}；M 也会将此播放列表轨道静音）"
+"Tracks take a muted shade of the accent color (LYNX extra)" = "轨道使用强调色的柔和色调（LYNX 附加功能）"
+"Tracks, mixer tracks and channels without a color of their own take a muted shade of the accent. Off, or with LYNX's own red accent: FL's grey. The Tracks dot overrides it." = "没有自身颜色的轨道、混音器轨道和通道使用强调色的柔和色调。关闭时，或使用 LYNX 自带的红色强调色时：FL 的灰色。“轨道”色点优先。"

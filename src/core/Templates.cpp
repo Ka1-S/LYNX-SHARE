@@ -60,7 +60,7 @@ void notes (Pattern& p, int channel, std::initializer_list<std::array<int, 3>> l
 
 // The "Default" new project (the New project window's first entry, and a File > New that follows LYNX's default): the
 // channel set with its inserts and the Master limiter, and EMPTY steps (round 170h2: the four-on-the-floor is the "Basic
-// beat" template). The "Empty" template is FL's: one Sampler channel, added below.
+// beat" template). The "Empty" template is FL's: one Sampler channel on the Master, added below.
 Song defaultChannelsProject()
 {
     auto s = Song::makeDefault();
@@ -81,16 +81,19 @@ Song makeTemplate (int index)
 
     if (index == 0)
     {
-        // FL's Empty template: one Sampler channel with no sample (a sample dropped on it fills it), an empty pattern, the
-        // default inserts and the Master limiter
+        // FL's Empty template (Data/Templates/Empty/Empty.flp, checked in FL 2026 in round 190qj): one Sampler channel with
+        // no sample (a sample dropped on it fills it) on the Master ("---", no insert), an empty pattern, empty inserts,
+        // nothing on the Master (no limiter: that is the "Basic with limiter" template's), 140 BPM
         auto s = Song::makeDefault();
         s.channels.clear();
         ChannelDef sampler;
         sampler.name = "Sampler";
         sampler.instrument = InstrumentKind::sampler;
-        sampler.mixerTrack = 1;
+        sampler.mixerTrack = 0;
         s.channels.push_back (sampler);
         s.patterns[0].notes.clear();
+        s.mixer[0].effects.clear();
+        s.bpm = 140.0;
         return s;
     }
 
@@ -165,14 +168,19 @@ std::string newProjectPath (const NewProjectSetup& setup, const char* extension)
 
 std::string freeProjectName (const std::string& folder, const std::string& base, bool ownFolder, const char* extension)
 {
-    const auto stem = legalProjectName (base);
+    // FL 2026's "Save as" window for a new project (TNewProjForm, seen in round 190qj): the name is filled in as
+    // "Project_1", "Project_2"... (the first whose project folder is not there yet); a name of the user's that is taken
+    // gets FL's "_2", "_3"... (as File › Save new version: "Song" -> "Song_2")
+    const auto series = base.find_first_not_of (" \t") == std::string::npos;
+    const auto stem = series ? std::string ("Project") : legalProjectName (base);
+    const auto candidate = [&] (int n) { return n == 0 ? stem : stem + "_" + std::to_string (series ? n : n + 1); };
     NewProjectSetup setup;
     setup.folder = folder;
     setup.ownFolder = ownFolder;
     std::error_code ec;
-    for (int n = 0; n < 10000; ++n)
+    for (int n = series ? 1 : 0; n < 10000; ++n)
     {
-        setup.name = n == 0 ? stem : stem + " " + std::to_string (n);
+        setup.name = candidate (n);
         const auto path = newProjectPath (setup, extension);
         if (path.empty())
             return setup.name; // (not saved yet: no folder to clash with)
@@ -183,7 +191,7 @@ std::string freeProjectName (const std::string& folder, const std::string& base,
             continue;
         return setup.name;
     }
-    return stem;
+    return candidate (series ? 1 : 0);
 }
 
 void applySetup (Song& song, const NewProjectSetup& setup)

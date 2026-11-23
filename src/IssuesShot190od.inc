@@ -208,6 +208,43 @@
                 pump();
                 write (ui, { 0, 0, 900, 420 }, "238-playlist-fl-grey");
             }
+            // #238 follow-up (round 190qj, LYNX extra): the presets give tracks a muted shade of their accent; the option
+            // keeps FL's grey
+            for (const auto& preset : themes::builtInThemes())
+            {
+                if (preset.name != "Amber" && preset.name != "Ocean" && preset.name != "Violet" && preset.name != "Emerald")
+                    continue;
+                themeui::apply (preset, false);
+                check (("#238 preset " + preset.name + ": tracks take its muted accent").c_str(),
+                       theme::colour::defaultTrack == juce::Colour (themes::mutedAccent (preset.accent)));
+                auto song = Song::makeDefault();
+                song.playlistTracks.resize (8);
+                offline.setSong (song);
+                MainComponent ui (offline, false);
+                ui.setSize (1600, 900);
+                ui.selectTabForSnapshot (2);
+                pump();
+                write (ui, { 0, 0, 900, 420 }, "238-preset-" + juce::String (preset.name).toLowerCase() + "-playlist");
+                ui.selectTabForSnapshot (3);
+                pump();
+                write (ui, { 0, 0, 1200, 520 }, "238-preset-" + juce::String (preset.name).toLowerCase() + "-mixer");
+                auto grey = preset;
+                grey.tracksFromAccent = false;
+                themeui::apply (grey, false);
+                check (("#238 preset " + preset.name + " with the option off: FL's grey").c_str(), theme::colour::defaultTrack == juce::Colour (0xff485156));
+            }
+            {
+                auto amber = themes::builtInThemes()[3];
+                themeui::apply (amber, false);
+                auto page = makeSettingsPanel (offline, SettingsPage::theme);
+                page->setSize (1180, 1400);
+                pump();
+                auto* toggle = dynamic_cast<juce::ToggleButton*> (findId (*page, "theme.tracksFromAccent"));
+                check ("#238 Theme > Options: 'Tracks take a muted shade of the accent color'", toggle != nullptr && toggle->getToggleState());
+                if (toggle != nullptr)
+                    write (*page, toggle->getBoundsInParent().withX (0).withWidth (1180).expanded (0, 150), "238-theme-options-amber");
+            }
+            themeui::apply (before, false);
             auto again = makeSettingsPanel (offline, SettingsPage::theme);
             again->setSize (1180, 1400);
             if (auto* d = dynamic_cast<juce::Button*> (findId (*again, "theme.dot.tracks")); d != nullptr && d->onClick)

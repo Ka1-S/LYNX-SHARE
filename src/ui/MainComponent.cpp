@@ -608,6 +608,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
     // the workspace panels
     rack.onOpenPianoRoll = [this] { openPianoRoll(); };
+    rack.onImportMidiFile = [this] (const juce::File& file) { importMidiFileWithWindow (file); }; // (round 190qj: a .mid below the channels)
     rack.onOpenTracker = [this] (int channel) { openTracker (engine, -1, channel); }; // (round 190ob)
     rack.actionKeyText = [this] (const char* actionId) { return shortcutText (actionId); };
     // round 190mk (DE-33, FL's manual): a click on a channel's piano roll preview shows / hides the Piano roll; a right-click
@@ -10481,19 +10482,27 @@ void MainComponent::importMidiFile()
         const auto file = fc.getResult();
         if (safe == nullptr || file == juce::File())
             return;
-        juce::String error;
-        const auto midi = MidiFileIo::parseFile (file, error);
-        if (! midi)
-        {
-            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not import"), error);
-            return;
-        }
-        static MidiFileIo::ImportOptions remembered; // FL keeps the window's choices
-        showMidiImportDialog (file.getFileName(), *midi, remembered, false, [safe, file] (const MidiFileIo::ImportOptions& o) {
-            remembered = o;
-            if (safe != nullptr)
-                safe->importMidiFile (file, o);
-        });
+        safe->importMidiFileWithWindow (file);
+    });
+}
+
+// FL's "Import MIDI data" window for a file (File › Import › MIDI file, and a .mid dropped on the Channel rack below its
+// channels: FL 2026 opens the same window there, with its new-channel options; round 190qj)
+void MainComponent::importMidiFileWithWindow (const juce::File& file)
+{
+    juce::String error;
+    const auto midi = MidiFileIo::parseFile (file, error);
+    if (! midi)
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not import"), error);
+        return;
+    }
+    static MidiFileIo::ImportOptions remembered; // FL keeps the window's choices
+    juce::Component::SafePointer<MainComponent> safe (this);
+    showMidiImportDialog (file.getFileName(), *midi, remembered, false, [safe, file] (const MidiFileIo::ImportOptions& o) {
+        remembered = o;
+        if (safe != nullptr)
+            safe->importMidiFile (file, o);
     });
 }
 

@@ -120,7 +120,7 @@ void applyDrawingDots (const themes::Spec& spec)
     colour::audioClip = dot (themes::Dot::waves, audioClip);
     colour::stepOn = theme::stepOn = dot (themes::Dot::steps, colour::accent);
     colour::selection = dot (themes::Dot::selection, colour::accent);
-    colour::defaultTrack = dot (themes::Dot::tracks, juce::Colour (0xff485156)); // (issue #238: FL's grey unless set)
+    colour::defaultTrack = juce::Colour (themes::defaultTrackColour (spec)); // (issue #238: the dot, a muted accent or FL's grey)
     // FL's "Audio and automation clips use note colors" (round 190od): the engine's new clips pick from the note colours
     std::array<std::uint32_t, newclipcolours::count> notes {};
     for (int i = 0; i < newclipcolours::count; ++i)
@@ -194,6 +194,8 @@ juce::String toJson (const themes::Spec& spec)
         o->setProperty ("menuStyle", juce::String (themes::menuStyleId (spec.menuStyle)));
     if (spec.clipsUseNoteColours) // (round 190od: FL's OverrideClips)
         o->setProperty ("clipsUseNoteColors", true);
+    if (! spec.tracksFromAccent) // (issue #238, round 190qj: on unless the file says off)
+        o->setProperty ("tracksFromAccent", false);
     return juce::JSON::toString (juce::var (o));
 }
 
@@ -233,6 +235,7 @@ std::optional<themes::Spec> fromJson (const juce::String& json)
         spec.gridIntensity = (float) juce::jlimit (themes::gridIntensityMin, themes::gridIntensityMax, (double) v["gridIntensity"]);
     spec.menuStyle = themes::menuStyleFromId (v["menuStyle"].toString().toStdString());
     spec.clipsUseNoteColours = (bool) v.getProperty ("clipsUseNoteColors", false);
+    spec.tracksFromAccent = (bool) v.getProperty ("tracksFromAccent", true);
     return spec;
 }
 
@@ -626,13 +629,18 @@ public:
                                                                  &dimSlider, &imageListLabel, &imageList, &openBackgrounds, &imageNote, &soundTitle,
                                                                  &soundName, &soundButton, &soundPlay, &soundDefault, &soundNote, &slotA, &slotB, &abNote, &lookTitle,
                                                                  &menuStyleLabel, &menuStyleBox, &gridLabel, &gridSlider, &lookNote,
-                                                                 &optionsTitle, &clipsNoteColours })
+                                                                 &optionsTitle, &clipsNoteColours, &tracksFromAccent })
             add (*c);
         // FL's Theme › Options (round 190od): "Audio and automation clips use note colors"
         clipsNoteColours.setButtonText (tr ("Audio and automation clips use note colors"));
         clipsNoteColours.setTooltip (tr ("Use the note color list to find random colors for new clips"));
         clipsNoteColours.setComponentID ("theme.clipsNoteColours");
         clipsNoteColours.onClick = [this] { edit ([on = clipsNoteColours.getToggleState()] (themes::Spec& s) { s.clipsUseNoteColours = on; }); };
+        // issue #238 (round 190qj, LYNX extra): tracks take a muted shade of the accent (off: FL's grey)
+        tracksFromAccent.setButtonText (tr ("Tracks take a muted shade of the accent color (LYNX extra)"));
+        tracksFromAccent.setTooltip (tr ("Tracks, mixer tracks and channels without a color of their own take a muted shade of the accent. Off, or with LYNX's own red accent: FL's grey. The Tracks dot overrides it."));
+        tracksFromAccent.setComponentID ("theme.tracksFromAccent");
+        tracksFromAccent.onClick = [this] { edit ([on = tracksFromAccent.getToggleState()] (themes::Spec& s) { s.tracksFromAccent = on; }); };
 
         // round 190je: the menus' palette (FL's classic light grey as an option, design190ia FW-16) and how strongly the
         // editors' grid lines show (Live's "Grid Line Intensity", FM-18); presets leave both alone
@@ -868,6 +876,7 @@ private:
         adjustNote.setBounds (row (18));
         optionsTitle.setBounds (row (24)); // (FL's Options, round 190od)
         clipsNoteColours.setBounds (row (24));
+        tracksFromAccent.setBounds (row (24));
 
         coloursTitle.setBounds (row (24));
         {
@@ -1015,7 +1024,7 @@ private:
             case D::meters: return theme::colour::meterLow;
             case D::waves: return theme::colour::audioClip;
             case D::text: return juce::Colour (palette.textPrimary);
-            case D::tracks: return juce::Colour (0xff485156); // (FL's grey)
+            case D::tracks: return juce::Colour (themes::defaultTrackColour (spec)); // (FL's grey or a muted accent, issue #238)
         }
         return juce::Colour (palette.textPrimary);
     }
@@ -1028,6 +1037,7 @@ private:
         workspaceWell.note = spec.workspace == 0 ? tr ("Automatic") : juce::String();
         autoWorkspace.setToggleState (spec.workspace == 0, juce::dontSendNotification);
         clipsNoteColours.setToggleState (spec.clipsUseNoteColours, juce::dontSendNotification);
+        tracksFromAccent.setToggleState (spec.tracksFromAccent, juce::dontSendNotification);
         const auto palette = themes::adjustedPalette (spec);
         for (int i = 0; i < themes::dotCount; ++i)
         {
@@ -1281,6 +1291,7 @@ private:
         soundDefault { tr ("Default") };
     SectionTitle soundTitle { tr ("Startup sound") }, lookTitle { tr ("Menus and grid") }, optionsTitle { tr ("Options") };
     juce::ToggleButton clipsNoteColours;
+    juce::ToggleButton tracksFromAccent; // (issue #238, round 190qj)
     juce::Label menuStyleLabel, gridLabel, lookNote;
     juce::ComboBox menuStyleBox;
     juce::Slider gridSlider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };

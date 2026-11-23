@@ -528,6 +528,12 @@ void showEventLaneMidiImportDialog (const juce::String& fileName, const midiimpo
     keepAboveMainWindow (*window);
 }
 
+midiimport::Options& channelMidiImportOptions()
+{
+    static midiimport::Options remembered;
+    return remembered;
+}
+
 std::unique_ptr<juce::AlertWindow> makeMidiImportDialog()
 {
     midiimport::ParsedMidi midi;

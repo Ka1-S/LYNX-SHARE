@@ -6362,6 +6362,19 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
                 editTrack (track, [] (PlaylistTrack& t) { t.muted = false; });
                 return;
             }
+            // issue #265 (round 190qj): clips on this track that play through other inserts (a pattern whose channels
+            // are routed elsewhere) would keep playing under a lit M: M then mutes the Playlist track too (FL's track
+            // mute, every clip on it), and unmutes both
+            if (onLed && ! simpleHeaders && ! autolink::otherInsertsOnTrack (engine.getSong(), track, insert).empty())
+            {
+                const auto mute = ! engine.getSong().mixer[(std::size_t) insert].muted;
+                engine.editSong ([insert, track, mute] (Song& s) {
+                    s.mixer[(std::size_t) insert].muted = mute;
+                    if (track < (int) s.playlistTracks.size())
+                        s.playlistTracks[(std::size_t) track].muted = mute;
+                });
+                return;
+            }
             if (onLed || trackSolo (track).contains (p))
             {
                 const auto solo = ! onLed;
@@ -14620,6 +14633,15 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
                     : h.volume ? tr ("Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB")
                     : h.pan    ? tr ("Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre")
                                : tr ("Track effects: [LMB] open the effects of its mixer track");
+        // issue #265 (round 190qj): a linked track whose clips also play through other inserts says so
+        if (! simpleHeaders && (h.led || h.volume || h.pan))
+            if (const auto others = autolink::otherInsertsOnTrack (song, h.track, insert); ! others.empty())
+            {
+                juce::StringArray names;
+                for (const auto o : others)
+                    names.add (o == 0 ? tr ("Master") : juce::String (o));
+                hint.text += "  " + tr ("(some clips here play through other mixer tracks: {0}; M mutes this Playlist track too)", { names.joinIntoString (", ") });
+            }
         if (h.volume)
             hint.value = juce::String (juce::Decibels::gainToDecibels (m.volume / unityFader), 1) + " dB";
         else if (h.pan)

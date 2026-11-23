@@ -513,4 +513,22 @@ bool parseHex (const std::string& textIn, std::uint32_t& argb)
     argb = 0xff000000u | value;
     return true;
 }
+std::uint32_t mutedAccent (std::uint32_t accent)
+{
+    // a Material-style muted shade (issue #238): the accent's hue, its saturation brought down (a greyish accent stays
+    // greyish) and the brightness of FL's grey, so white text and the clips on it read as on the grey
+    auto x = toHsv (accent);
+    x.s = std::min (0.35, x.s * 0.45);
+    x.v = toHsv (flTrackGrey).v + 0.03;
+    return fromHsv (x, 0xff000000u);
+}
+
+std::uint32_t defaultTrackColour (const Spec& spec)
+{
+    if (const auto dot = spec.dots[(std::size_t) Dot::tracks]; dot != 0)
+        return dot | 0xff000000u;
+    if (spec.tracksFromAccent && (spec.accent | 0xff000000u) != defaultAccent)
+        return mutedAccent (spec.accent);
+    return flTrackGrey;
+}
 } // namespace lynx::themes

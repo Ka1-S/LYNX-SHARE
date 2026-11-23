@@ -12652,3 +12652,6 @@ countries: jp
 "The exported file's name. Wildcards such as $project, $date or $bpm are filled in when you export. A / puts the file in a folder of that name inside the export folder (made when needed)" = "書き出すファイルの名前です。$project、$date、$bpm などのワイルドカードは書き出し時に置き換えられます。/ を入れると、書き出し先フォルダー内のその名前のフォルダーにファイルを置きます (必要なら作成)"
 "Empty slot: click to add an effect, double-click or middle-click to search for one" = "空きスロット: クリックでエフェクトを追加、ダブルクリックまたは中クリックで検索"
 "Track effects: [LMB] add an effect to its mixer track  [MMB] or double-click: search for one  (drop one from the Browser here too)" = "トラックのエフェクト: [LMB] ミキサートラックにエフェクトを追加  [MMB] またはダブルクリック: 検索  (ブラウザーからここへドロップも可)"
+"(some clips here play through other mixer tracks: {0}; M mutes this Playlist track too)" = "（ここにある一部のクリップは別のミキサートラックを通って再生されます: {0}。M はこのプレイリストトラックもミュートします）"
+"Tracks take a muted shade of the accent color (LYNX extra)" = "トラックにアクセントカラーの落ち着いた色合いを使う（LYNX 独自）"
+"Tracks, mixer tracks and channels without a color of their own take a muted shade of the accent. Off, or with LYNX's own red accent: FL's grey. The Tracks dot overrides it." = "自分の色を持たないトラック、ミキサートラック、チャンネルはアクセントカラーの落ち着いた色合いになります。オフ、または LYNX 本来の赤のアクセントでは FL のグレーです。「トラック」ドットが優先されます。"

@@ -12652,3 +12652,6 @@ countries: kr
 "The exported file's name. Wildcards such as $project, $date or $bpm are filled in when you export. A / puts the file in a folder of that name inside the export folder (made when needed)" = "내보낸 파일의 이름입니다. $project, $date, $bpm 같은 와일드카드는 내보낼 때 채워집니다. / 를 넣으면 내보내기 폴더 안의 그 이름의 폴더에 파일을 넣습니다 (필요하면 만듦)"
 "Empty slot: click to add an effect, double-click or middle-click to search for one" = "빈 슬롯: 클릭하여 이펙트 추가, 더블 클릭 또는 가운데 클릭으로 검색"
 "Track effects: [LMB] add an effect to its mixer track  [MMB] or double-click: search for one  (drop one from the Browser here too)" = "트랙 이펙트: [LMB] 믹서 트랙에 이펙트 추가  [MMB] 또는 더블 클릭: 검색  (브라우저에서 여기로 드롭해도 됨)"
+"(some clips here play through other mixer tracks: {0}; M mutes this Playlist track too)" = "(여기 있는 일부 클립은 다른 믹서 트랙을 통해 재생됩니다: {0}; M은 이 플레이리스트 트랙도 음소거합니다)"
+"Tracks take a muted shade of the accent color (LYNX extra)" = "트랙에 강조 색의 차분한 색조 사용 (LYNX 추가 기능)"
+"Tracks, mixer tracks and channels without a color of their own take a muted shade of the accent. Off, or with LYNX's own red accent: FL's grey. The Tracks dot overrides it." = "자체 색이 없는 트랙, 믹서 트랙, 채널은 강조 색의 차분한 색조를 사용합니다. 끄거나 LYNX 기본 빨강 강조 색이면 FL의 회색입니다. 트랙 점이 우선합니다."

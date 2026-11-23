@@ -29,9 +29,10 @@ std::string legalProjectName (const std::string& name);
 // when there is no folder. Uses '/' (the caller converts).
 std::string newProjectPath (const NewProjectSetup& setup, const char* extension);
 
-// FL's new projects are named for you: the first of "<base>", "<base> 1", "<base> 2"... whose project file (and, with
-// ownFolder, whose project folder) does not exist in `folder` yet — so a second "Untitled" becomes "Untitled 1" instead
-// of an error, a third "Untitled 2", and so on. An empty or unusable `base` counts as "Untitled".
+// FL's new projects are named for you (FL 2026's Save as window for a new project, round 190qj): with no name of the
+// user's (`base` empty) the first of "Project_1", "Project_2"... whose project file (and, with ownFolder, whose project
+// folder) is not in `folder` yet; a name of the user's that is taken gets "_2", "_3"... (FL's Save new version). Never an
+// "already exists" error. Characters a file name can't hold become '_' (legalProjectName).
 std::string freeProjectName (const std::string& folder, const std::string& base, bool ownFolder, const char* extension);
 
 // Applies the time settings (tempo 10..522, beats per bar 1..16) and the credits to a song made from a template.

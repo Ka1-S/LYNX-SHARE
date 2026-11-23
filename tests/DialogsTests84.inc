@@ -425,9 +425,13 @@ TEST (empty_template_is_one_sampler)
     {
         CHECK (empty.channels[0].instrument == InstrumentKind::sampler);
         CHECK (empty.channels[0].name == "Sampler");
-        CHECK (empty.channels[0].mixerTrack == 1);
+        CHECK (empty.channels[0].mixerTrack == 0); // (FL 2026: "---", the Master; round 190qj)
+        CHECK (empty.channels[0].samplePath.empty());
     }
     CHECK (empty.patterns.size() == 1 && empty.patterns[0].notes.empty());
+    // FL's Empty.flp (round 190qj): nothing on the Master, 140 BPM; the default new project keeps its limiter
+    CHECK (empty.mixer[0].effects.empty() && empty.bpm == 140.0);
+    CHECK (! makeNewProject().mixer[0].effects.empty());
     CHECK (makeNewProject (builtInTemplateIndex ("Empty")).channels.size() == 1);
     // the default new project: still the channel set, with empty steps
     const auto defaults = makeNewProject();
@@ -520,8 +524,9 @@ TEST (clipprops_bar_beat_tick_text)
         CHECK (parsePosition (formatPosition (t, lynx::Meter (4, 4)), lynx::Meter (4, 4)) == t && parseLength (formatLength (t, lynx::Meter (7, 4)), lynx::Meter (7, 4)) == t);
 }
 
-// FL names new projects for you: "Untitled", then "Untitled 1", "Untitled 2"... — the first free name in the folder,
-// never an "already exists" error (core/Templates.cpp freeProjectName, the New project window's Name field).
+// FL names new projects for you (FL 2026's Save as window for a new project, seen in round 190qj: "Project_1" where a
+// "Project_1" folder was missing, "Project_2" where one was there) — the first free name in the folder, never an "already
+// exists" error (core/Templates.cpp freeProjectName, the New project window's Name field). PR #266, FL-exact in 190qj.
 TEST (new_project_names_are_filled_in_and_never_clash)
 {
     namespace fs = std::filesystem;
@@ -537,28 +542,31 @@ TEST (new_project_names_are_filled_in_and_never_clash)
     };
 
     // nothing there: the name the window shows
-    CHECK (freeProjectName (dir, "", true, ".lynx") == "Untitled");
-    // its folder and file taken: "Untitled 1", then "Untitled 2"
-    write (dir + "/Untitled/Untitled.lynx");
-    CHECK (freeProjectName (dir, "", true, ".lynx") == "Untitled 1");
-    write (dir + "/Untitled 1/Untitled 1.lynx");
-    CHECK (freeProjectName (dir, "", true, ".lynx") == "Untitled 2");
+    CHECK (freeProjectName (dir, "", true, ".lynx") == "Project_1");
+    CHECK (freeProjectName (dir, "  ", true, ".lynx") == "Project_1");
+    // its folder and file taken: "Project_2", then "Project_3"
+    write (dir + "/Project_1/Project_1.lynx");
+    CHECK (freeProjectName (dir, "", true, ".lynx") == "Project_2");
+    write (dir + "/Project_2/Project_2.lynx");
+    CHECK (freeProjectName (dir, "", true, ".lynx") == "Project_3");
     // an empty folder counts as taken too: the new project gets a folder of its own
-    fs::create_directories (dir + "/Untitled 2", ec);
-    CHECK (freeProjectName (dir, "", true, ".lynx") == "Untitled 3");
+    fs::create_directories (dir + "/Project_3", ec);
+    CHECK (freeProjectName (dir, "", true, ".lynx") == "Project_4");
 
     // without the project's own folder only the project file matters
-    write (dir + "/flat/Untitled.lynx");
-    CHECK (freeProjectName (dir + "/flat", "Untitled", false, ".lynx") == "Untitled 1");
-    CHECK (freeProjectName (dir + "/flat", "Untitled 2", false, ".lynx") == "Untitled 2");
+    write (dir + "/flat/Project_1.lynx");
+    CHECK (freeProjectName (dir + "/flat", "", false, ".lynx") == "Project_2");
+    CHECK (freeProjectName (dir + "/flat", "Sketch", false, ".lynx") == "Sketch");
 
-    // a name typed by the user follows the same rule; characters the file system refuses become '_'
+    // a name typed by the user that is taken gets FL's "_2", "_3"; characters the file system refuses become '_'
     write (dir + "/My Song/My Song.lynx");
-    CHECK (freeProjectName (dir, "My Song", true, ".lynx") == "My Song 1");
+    CHECK (freeProjectName (dir, "My Song", true, ".lynx") == "My Song_2");
+    write (dir + "/My Song_2/My Song_2.lynx");
+    CHECK (freeProjectName (dir, "My Song", true, ".lynx") == "My Song_3");
     CHECK (freeProjectName (dir, "My: Song?", true, ".lynx") == "My_ Song_");
 
     // no folder yet: the name as it is (the save window comes later)
-    CHECK (freeProjectName ({}, "", true, ".lynx") == "Untitled");
+    CHECK (freeProjectName ({}, "", true, ".lynx") == "Project_1");
     CHECK (freeProjectName ({}, "Sketch", true, ".lynx") == "Sketch");
     fs::remove_all (dir, ec);
 }
