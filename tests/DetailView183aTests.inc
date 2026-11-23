@@ -179,11 +179,15 @@ TEST (detail183a_drop_between_cards_keeps_the_slot_places)
     CHECK (detailchain::insertEffectAt (s, 1, detail183a::marker(), 0) == 0);
     CHECK ((detail183a::order (s) == std::vector<float> { 0.99f, 0.0f, 0.1f }));
 
-    // after the last, which sits in slot 10: the ones before move up
+    // after the last, which sits in slot 10: it goes into slot 11 (round 190qf: up to 25 slots, as FL 2026.2); after the
+    // last slot of all, the ones before move up
     s = detail183a::insertWith ({ 0, 8, 9 });
     CHECK (detailchain::insertEffectAt (s, 1, detail183a::marker(), 3) == 3);
     CHECK ((detail183a::order (s) == std::vector<float> { 0.0f, 0.1f, 0.2f, 0.99f }));
-    CHECK ((mixerops::effectRows (s.mixer[1].effects) == std::vector<int> { 0, 7, 8, 9 }));
+    CHECK ((mixerops::effectRows (s.mixer[1].effects) == std::vector<int> { 0, 8, 9, 10 }));
+    s = detail183a::insertWith ({ 0, maxEffectSlots - 2, maxEffectSlots - 1 });
+    CHECK (detailchain::insertEffectAt (s, 1, detail183a::marker(), 3) == 3);
+    CHECK ((mixerops::effectRows (s.mixer[1].effects) == std::vector<int> { 0, maxEffectSlots - 3, maxEffectSlots - 2, maxEffectSlots - 1 }));
 
     // the middle of a chain packed at both ends: packed from the top
     s = detail183a::insertWith ({ 0, 1, 2, 3, 6, 7, 8, 9 });
@@ -192,10 +196,14 @@ TEST (detail183a_drop_between_cards_keeps_the_slot_places)
     CHECK ((detail183a::order (s) == std::vector<float> { 0.0f, 0.1f, 0.99f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f }));
     CHECK (s.mixer[1].effects.size() == 9);
 
-    // nine effects: the tenth goes in anywhere; then the insert is full
+    // nine effects: the tenth goes in anywhere; then up to maxEffectSlots, and the insert is full
     s = detail183a::insertWith ({ 0, 1, 2, 3, 4, 5, 6, 7, 8 });
     CHECK (detailchain::insertEffectAt (s, 1, detail183a::marker(), 4) == 4);
     CHECK (s.mixer[1].effects.size() == 10);
+    while ((int) s.mixer[1].effects.size() < maxEffectSlots)
+        if (detailchain::insertEffectAt (s, 1, detail183a::marker(), (int) s.mixer[1].effects.size()) < 0)
+            break;
+    CHECK (s.mixer[1].effects.size() == (std::size_t) maxEffectSlots);
     CHECK (detailchain::insertEffectAt (s, 1, detail183a::marker(), 0) == -1);
     CHECK (detailchain::insertEffectAt (s, 5, detail183a::marker(), 0) == -1); // (no such insert)
 

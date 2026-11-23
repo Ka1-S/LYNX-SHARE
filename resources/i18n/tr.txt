@@ -12647,3 +12647,13 @@ countries: tr
 "Automation of Harmor's filter frequencies and Mod X / Y / Z does nothing in this release: {0}" = "Harmor'un filtre frekanslarının ve Mod X / Y / Z'nin otomasyonu bu sürümde hiçbir şey yapmaz: {0}"
 "Sytrus plays every note at the default Mod X / Y in this release: {0}" = "Bu sürümde Sytrus her notayı varsayılan Mod X / Y ile çalar: {0}"
 "The export plays the song straight through in this release (from bar 1, past the skip markers)" = "Bu sürümde dışa aktarım şarkıyı baştan sona çalar (1. ölçüden, atlama işaretçilerini geçerek)"
+
+# --- round 190qf: PR #260 (FL 2026.2's mixer slots, up to 25)
+"Add slot" = "Slot ekle"
+"Remove slot" = "Slotu kaldır"
+"Add an effect slot (up to {0})" = "Bir efekt slotu ekle ({0} adede kadar)"
+"{0} slots (the most)" = "{0} slot (en fazla)"
+"Scroll the effect slots (or the mouse wheel over them; Shift+wheel moves an effect)" = "Efekt slotlarını kaydır (veya üzerlerinde fare tekerleği; Shift+tekerlek bir efekti taşır)"
+"Number of effect slots on new mixer tracks" = "Yeni mikser kanallarındaki efekt slotu sayısı"
+"This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "Bu sürümde insert başına 10 efekt slotu var: 10. slottan sonraki efektler dışarıda kalır: {0}"
+"This insert has no free slot ({0} effects)" = "Bu insertte boş slot yok ({0} efekt)"

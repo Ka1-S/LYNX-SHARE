@@ -1234,7 +1234,8 @@ int effectRowCount (const MixerTrack& track)
 {
     const auto rows = effectRows (track.effects);
     const auto used = rows.empty() ? 0 : rows.back() + 1;
-    return std::clamp (std::max ({ flEffectSlots, track.slotRows, used }), flEffectSlots, maxEffectSlots);
+    const auto asked = track.slotRows > 0 ? track.slotRows : flEffectSlots;
+    return std::clamp (std::max (asked, used), 1, maxEffectSlots);
 }
 
 bool addEffectRow (Song& song, int track)
@@ -1245,7 +1246,7 @@ bool addEffectRow (Song& song, int track)
     const auto shown = effectRowCount (t);
     if (shown >= maxEffectSlots)
         return false;
-    t.slotRows = shown + 1;
+    t.slotRows = shown + 1 == flEffectSlots ? 0 : shown + 1;
     return true;
 }
 
@@ -1255,10 +1256,22 @@ bool removeEffectRow (Song& song, int track)
         return false;
     auto& t = song.mixer[(std::size_t) track];
     const auto shown = effectRowCount (t);
-    if (shown <= flEffectSlots || effectAtRow (t.effects, shown - 1) >= 0)
+    if (shown <= 1 || effectAtRow (t.effects, shown - 1) >= 0)
         return false;
-    t.slotRows = shown - 1 > flEffectSlots ? shown - 1 : 0;
+    t.slotRows = shown - 1 == flEffectSlots ? 0 : shown - 1;
     return true;
+}
+
+int& newTrackSlots() noexcept
+{
+    static int count = flEffectSlots;
+    return count;
+}
+
+void giveNewTrackSlots (MixerTrack& track) noexcept
+{
+    const auto count = std::clamp (newTrackSlots(), 1, maxEffectSlots);
+    track.slotRows = count == flEffectSlots ? 0 : count;
 }
 
 bool moveEffectToRow (Song& song, int track, int index, int row)
@@ -1455,7 +1468,10 @@ int insertTracks (Song& song, int at, int count)
     remapTrackReferences (song, [at, count] (int t) { return t >= at ? t + count : t; });
     std::vector<MixerTrack> added ((std::size_t) count);
     for (int i = 0; i < count; ++i)
+    {
         added[(std::size_t) i].name = "Insert " + std::to_string (at + i);
+        giveNewTrackSlots (added[(std::size_t) i]); // (FL 2026.2's "Number of effect slots on new mixer tracks")
+    }
     song.mixer.insert (song.mixer.begin() + at, std::make_move_iterator (added.begin()), std::make_move_iterator (added.end()));
     renumberDefaultNames (song, at + count, count);
     return count;

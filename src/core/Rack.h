@@ -144,7 +144,7 @@ bool groupChannel (Song& song, int channel, const std::function<float (int node,
 // value the macro gives it now; automation of a macro with one full-range mapping onto the instrument's parameter moves
 // onto that parameter; other macro, selector and morph automation is dropped (the macros go). False, song untouched: not
 // such a rack (a Drum Rack, several chains, no instrument first, a second instrument), effects but no insert of its own
-// (Master) or no room for them (10 slots).
+// (Master) or no room for them (maxEffectSlots).
 bool canUngroupChannel (const Song& song, int channel);
 bool ungroupChannel (Song& song, int channel);
 

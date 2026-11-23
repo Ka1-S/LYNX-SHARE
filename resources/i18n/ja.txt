@@ -12647,3 +12647,13 @@ countries: jp
 "Automation of Harmor's filter frequencies and Mod X / Y / Z does nothing in this release: {0}" = "Harmor のフィルター周波数と Mod X / Y / Z のオートメーションは、このリリースでは何もしません: {0}"
 "Sytrus plays every note at the default Mod X / Y in this release: {0}" = "このリリースでは Sytrus はすべてのノートを既定の Mod X / Y で再生します: {0}"
 "The export plays the song straight through in this release (from bar 1, past the skip markers)" = "このリリースではエクスポートは曲を通しで再生します(1 小節目から、スキップのマーカーを無視)"
+
+# --- round 190qf: PR #260 (FL 2026.2's mixer slots, up to 25)
+"Add slot" = "スロットを追加"
+"Remove slot" = "スロットを削除"
+"Add an effect slot (up to {0})" = "エフェクトスロットを追加（最大 {0}）"
+"{0} slots (the most)" = "{0} スロット（最大）"
+"Scroll the effect slots (or the mouse wheel over them; Shift+wheel moves an effect)" = "エフェクトスロットをスクロール（またはその上でマウスホイール。Shift+ホイールでエフェクトを移動）"
+"Number of effect slots on new mixer tracks" = "新しいミキサートラックのエフェクトスロット数"
+"This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "このバージョンのエフェクトスロットはインサートあたり 10 個です。スロット 10 より後のエフェクトは含まれません: {0}"
+"This insert has no free slot ({0} effects)" = "このインサートには空きスロットがありません（エフェクト {0} 個）"

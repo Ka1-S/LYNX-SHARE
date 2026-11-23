@@ -12647,3 +12647,13 @@ countries: kr
 "Automation of Harmor's filter frequencies and Mod X / Y / Z does nothing in this release: {0}" = "Harmor 필터 주파수와 Mod X / Y / Z의 오토메이션은 이 릴리스에서 아무 동작도 하지 않습니다: {0}"
 "Sytrus plays every note at the default Mod X / Y in this release: {0}" = "이 릴리스에서 Sytrus는 모든 노트를 기본 Mod X / Y로 재생합니다: {0}"
 "The export plays the song straight through in this release (from bar 1, past the skip markers)" = "이 릴리스에서는 내보내기가 곡을 처음부터 끝까지 재생합니다(1마디부터, 건너뛰기 마커 무시)"
+
+# --- round 190qf: PR #260 (FL 2026.2's mixer slots, up to 25)
+"Add slot" = "슬롯 추가"
+"Remove slot" = "슬롯 제거"
+"Add an effect slot (up to {0})" = "이펙트 슬롯 추가 (최대 {0})"
+"{0} slots (the most)" = "슬롯 {0}개 (최대)"
+"Scroll the effect slots (or the mouse wheel over them; Shift+wheel moves an effect)" = "이펙트 슬롯 스크롤 (또는 그 위에서 마우스 휠, Shift+휠은 이펙트를 이동)"
+"Number of effect slots on new mixer tracks" = "새 믹서 트랙의 이펙트 슬롯 수"
+"This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "이 버전은 인서트당 이펙트 슬롯이 10개입니다. 10번 이후 슬롯의 이펙트는 빠집니다: {0}"
+"This insert has no free slot ({0} effects)" = "이 인서트에는 빈 슬롯이 없습니다 (이펙트 {0}개)"

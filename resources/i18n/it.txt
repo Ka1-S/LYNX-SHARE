@@ -12647,3 +12647,13 @@ countries: it ch sm
 "Automation of Harmor's filter frequencies and Mod X / Y / Z does nothing in this release: {0}" = "L'automazione delle frequenze dei filtri e di Mod X / Y / Z di Harmor non fa nulla in questa versione: {0}"
 "Sytrus plays every note at the default Mod X / Y in this release: {0}" = "In questa versione Sytrus suona ogni nota con il Mod X / Y predefinito: {0}"
 "The export plays the song straight through in this release (from bar 1, past the skip markers)" = "In questa versione l'esportazione riproduce il brano di seguito (dalla battuta 1, senza seguire i marker di salto)"
+
+# --- round 190qf: PR #260 (FL 2026.2's mixer slots, up to 25)
+"Add slot" = "Aggiungi slot"
+"Remove slot" = "Rimuovi slot"
+"Add an effect slot (up to {0})" = "Aggiungi uno slot effetto (fino a {0})"
+"{0} slots (the most)" = "{0} slot (il massimo)"
+"Scroll the effect slots (or the mouse wheel over them; Shift+wheel moves an effect)" = "Scorri gli slot effetto (o la rotellina sopra di essi; Maiusc+rotellina sposta un effetto)"
+"Number of effect slots on new mixer tracks" = "Numero di slot effetto delle nuove tracce del mixer"
+"This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "Questa versione ha 10 slot effetto per insert: gli effetti negli slot dopo il 10 sono esclusi: {0}"
+"This insert has no free slot ({0} effects)" = "Questo insert non ha slot liberi ({0} effetti)"

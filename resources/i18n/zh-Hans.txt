@@ -12647,3 +12647,13 @@ countries: cn sg
 "Automation of Harmor's filter frequencies and Mod X / Y / Z does nothing in this release: {0}" = "Harmor 滤波器频率和 Mod X / Y / Z 的自动化在此版本中不起作用：{0}"
 "Sytrus plays every note at the default Mod X / Y in this release: {0}" = "在此版本中，Sytrus 以默认的 Mod X / Y 演奏每个音符：{0}"
 "The export plays the song straight through in this release (from bar 1, past the skip markers)" = "在此版本中，导出会从头到尾播放歌曲（从第 1 小节开始，忽略跳过标记）"
+
+# --- round 190qf: PR #260 (FL 2026.2's mixer slots, up to 25)
+"Add slot" = "添加槽位"
+"Remove slot" = "移除槽位"
+"Add an effect slot (up to {0})" = "添加一个效果槽位（最多 {0} 个）"
+"{0} slots (the most)" = "{0} 个槽位（最多）"
+"Scroll the effect slots (or the mouse wheel over them; Shift+wheel moves an effect)" = "滚动效果槽位（或在其上滚动鼠标滚轮；Shift+滚轮移动效果）"
+"Number of effect slots on new mixer tracks" = "新混音器轨道的效果槽位数"
+"This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "此版本每个插入通道有 10 个效果槽位：第 10 个之后槽位中的效果将被省略：{0}"
+"This insert has no free slot ({0} effects)" = "此插入通道没有空槽（{0} 个效果）"

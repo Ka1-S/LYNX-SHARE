@@ -1589,7 +1589,7 @@ bool MixerStrips::insertsMouseUp (const juce::MouseEvent& e)
     if (insert < 0 || insert >= (int) engine.getSong().mixer.size())
         return true;
     const auto copy = flmods::ctrl (e.mods);
-    const auto full = [] { ui::postHint ({ tr ("This insert has no free slot (10 effects)"), {} }, 3000); };
+    const auto full = [] { ui::postHint ({ tr ("This insert has no free slot ({0} effects)", { juce::String (maxEffectSlots) }), {} }, 3000); };
     if (dragged)
     {
         const auto target = item >= 0 ? dropTrack : -1; // (outside a list: nothing changes)
@@ -2497,6 +2497,7 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
                 return;
             auto& track = s.mixer.emplace_back();
             track.name = "Insert " + std::to_string (s.mixer.size() - 1);
+            mixerops::giveNewTrackSlots (track); // (FL 2026.2's "Number of effect slots on new mixer tracks", round 190qf)
         });
         if (added < (int) engine.getSong().mixer.size())
         {
@@ -5551,6 +5552,8 @@ void EffectsPanel::timerCallback()
 
 void EffectsPanel::setTrack (int t)
 {
+    if (t != track)
+        slotScroll = 0; // (round 190qf: another insert's list starts at its first slot)
     track = t;
     const auto* s = slots();
     selectedSlot = s != nullptr && ! s->empty() ? 0 : -1;
@@ -6282,36 +6285,97 @@ void showMenu (AudioEngine& engine, int track, juce::Component* target, juce::Re
 }
 } // namespace mixeroutput
 
+// FL 2026.2's effect slots (PR #260 by codewithamoako, round 190qf; FL's video "Coming to FL Studio 2026.2: Mixer
+// updates"): the list keeps the height of FL's 10 rows and scrolls when the insert has more (a thin bar on its right);
+// the "+" tab centred under it adds one slot and shows it. A row scrolled out of view has empty bounds.
+constexpr int slotScrollBarWidth = 6, addTabHeight = 12;
+
 juce::Rectangle<int> EffectsPanel::slotBounds (int slot) const
 {
-    return { 8, slotsTop + slot * slotHeight, getWidth() - 16, slotHeight - 3 };
+    const auto first = firstRow();
+    if (slot < first || slot >= first + flEffectSlots)
+        return {};
+    return { 8, slotsTop + (slot - first) * slotHeight, getWidth() - 16 - (slotsScroll() ? slotScrollBarWidth + 2 : 0), slotHeight - 3 };
 }
 
-// More mixer slots (feature/more-mixer-slots): the rows shown, and the row below them with "+ Add slot" (left) and
-// "Remove slot" (right, when the last row is empty and more than FL's 10 are shown)
 int EffectsPanel::rowCount() const
 {
     const auto& song = engine.getSong();
     return track >= 0 && track < (int) song.mixer.size() ? mixerops::effectRowCount (song.mixer[(std::size_t) track]) : flEffectSlots;
 }
 
+int EffectsPanel::firstRow() const
+{
+    return juce::jlimit (0, juce::jmax (0, rowCount() - flEffectSlots), slotScroll);
+}
+
+juce::Rectangle<int> EffectsPanel::listBounds() const
+{
+    return { 8, slotsTop, getWidth() - 16, flEffectSlots * slotHeight - 3 };
+}
+
+juce::Rectangle<int> EffectsPanel::slotScrollBounds() const
+{
+    if (! slotsScroll())
+        return {};
+    return listBounds().removeFromRight (slotScrollBarWidth);
+}
+
+juce::Rectangle<int> EffectsPanel::addTabBounds() const
+{
+    const auto list = listBounds();
+    return { list.getCentreX() - 30, list.getBottom() + 2, 60, addTabHeight };
+}
+
 int EffectsPanel::slotsBottom() const
 {
-    return slotsTop + (rowCount() + 1) * slotHeight;
+    return listBounds().getBottom() + 3 + addTabHeight;
 }
 
-juce::Rectangle<int> EffectsPanel::addRowBounds() const
+void EffectsPanel::scrollSlotsTo (int first)
 {
-    return { 8, slotsTop + rowCount() * slotHeight, getWidth() - 16, slotHeight - 3 };
+    const auto was = firstRow();
+    slotScroll = juce::jlimit (0, juce::jmax (0, rowCount() - flEffectSlots), first);
+    if (firstRow() != was)
+    {
+        hoverSlot = -1;
+        repaint (listBounds().expanded (2));
+    }
 }
 
-juce::Rectangle<int> EffectsPanel::removeRowBounds() const
+void EffectsPanel::revealRow (int row)
 {
-    const auto& song = engine.getSong();
+    const auto first = firstRow();
+    if (row < first)
+        scrollSlotsTo (row);
+    else if (row >= first + flEffectSlots)
+        scrollSlotsTo (row - flEffectSlots + 1);
+}
+
+void EffectsPanel::addSlotRow()
+{
+    bool added = false;
+    engine.editSong ([t = track, &added] (Song& song) { added = mixerops::addEffectRow (song, t); });
+    if (added)
+        revealRow (rowCount() - 1); // (FL shows the new slot)
+    refit();
+    repaint();
+}
+
+void EffectsPanel::showAddTabMenu()
+{
+    // LYNX's own (FL 2026.2's notes and video show no way to take a slot away): a right-click on the "+" tab removes the
+    // last slot when it is empty
     const auto rows = rowCount();
-    if (track < 0 || track >= (int) song.mixer.size() || rows <= flEffectSlots || effectIn (rows - 1) >= 0)
-        return {};
-    return addRowBounds().removeFromRight (juce::jmin (110, addRowBounds().getWidth() / 2));
+    juce::PopupMenu menu;
+    menu.addItem (tr ("Add slot"), rows < maxEffectSlots, false, [this] { addSlotRow(); });
+    menu.addItem (tr ("Remove slot"), rows > 1 && effectIn (rows - 1) < 0, false, [this] {
+        engine.editSong ([t = track] (Song& song) { mixerops::removeEffectRow (song, t); });
+        scrollSlotsTo (slotScroll);
+        refit();
+        repaint();
+    });
+    menu.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
 }
 
 namespace
@@ -6662,9 +6726,9 @@ void EffectsPanel::paint (juce::Graphics& g)
 
     g.setFont (font (type::body));
 
-    // the slots (FL's 10, or the rows added past them), as FL draws them: options arrow, name ("Slot N" when empty), mix knob, LED
-    // (rows: FL's slot places, an effect may sit below empty slots, round 170b)
-    for (int row = 0; row < rowCount(); ++row)
+    // the slots, as FL draws them: options arrow, name ("Slot N" when empty), mix knob, LED (rows: FL's slot places, an
+    // effect may sit below empty slots, round 170b); the 10 rows in view (FL 2026.2's list scrolls past them, round 190qf)
+    for (int row = firstRow(), end = juce::jmin (rowCount(), firstRow() + flEffectSlots); row < end; ++row)
     {
         const auto i = effectIn (row); // the effect shown here, -1 = empty
         const auto r = slotBounds (row);
@@ -6771,21 +6835,33 @@ void EffectsPanel::paint (juce::Graphics& g)
         }
     }
 
+    // FL 2026.2's slot list scroll bar (a thin bar on the right) and the "+" tab under the list (round 190qf; LYNX vectors)
+    if (const auto bar = slotScrollBounds(); ! bar.isEmpty())
     {
-        // "+ Add slot" / "Remove slot" (feature/more-mixer-slots)
-        const auto r = addRowBounds();
+        const auto rows = rowCount();
+        theme::fillRoundRect (g, bar.toFloat(), 3.0f, colour::bg0);
+        const auto h = juce::jmax (12.0f, (float) bar.getHeight() * (float) flEffectSlots / (float) rows);
+        const auto y = (float) bar.getY() + ((float) bar.getHeight() - h) * (float) firstRow() / (float) juce::jmax (1, rows - flEffectSlots);
+        theme::fillRoundRect (g, juce::Rectangle<float> ((float) bar.getX() + 1.0f, y, (float) bar.getWidth() - 2.0f, h), 2.5f,
+                              slotScrollDrag ? colour::textSecondary : colour::borderStrong);
+    }
+    {
+        const auto tab = addTabBounds().toFloat();
         const auto canAdd = rowCount() < maxEffectSlots;
-        const auto remove = removeRowBounds();
-        g.setColour (colour::border.withAlpha (0.6f));
-        g.drawRoundedRectangle (r.toFloat().reduced (0.5f), radius::sm, 1.0f);
-        g.setColour (canAdd ? colour::textSecondary : colour::textDisabled);
-        textcache::drawText (g, canAdd ? tr ("+ Add slot") : tr ("{0} slots (the most)", { juce::String (maxEffectSlots) }),
-                             r.withTrimmedLeft (20).withTrimmedRight (remove.getWidth()), juce::Justification::centredLeft);
-        if (! remove.isEmpty())
-        {
-            g.setColour (colour::textSecondary);
-            textcache::drawText (g, tr ("Remove slot"), remove.withTrimmedRight (8), juce::Justification::centredRight);
-        }
+        juce::Path shape; // a trapezoid, wide side up, as FL's tab
+        shape.startNewSubPath (tab.getX() + 0.5f, tab.getY() + 0.5f);
+        shape.lineTo (tab.getRight() - 0.5f, tab.getY() + 0.5f);
+        shape.lineTo (tab.getRight() - 6.0f, tab.getBottom() - 0.5f);
+        shape.lineTo (tab.getX() + 6.0f, tab.getBottom() - 0.5f);
+        shape.closeSubPath();
+        const auto tint = ! canAdd ? colour::textDisabled : hoverAddTab ? colour::accent.brighter (0.2f) : colour::accent;
+        g.setColour (hoverAddTab && canAdd ? colour::accent.withAlpha (0.18f) : colour::bg2);
+        g.fillPath (shape);
+        g.setColour (tint);
+        g.strokePath (shape, juce::PathStrokeType (1.2f, juce::PathStrokeType::curved));
+        const auto c = tab.getCentre().translated (0.0f, -0.5f);
+        g.fillRect (juce::Rectangle<float> (7.0f, 1.6f).withCentre (c));
+        g.fillRect (juce::Rectangle<float> (1.6f, 7.0f).withCentre (c));
     }
 
     paintEq (g);
@@ -7041,17 +7117,22 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
-    if (addRowBounds().contains (e.getPosition()) && e.mods.isLeftButtonDown()) // (feature/more-mixer-slots)
+    // FL 2026.2's "+" tab (round 190qf): a click adds a slot; LYNX's right-click menu can also remove an empty last one
+    if (addTabBounds().contains (e.getPosition()) && track >= 0)
     {
-        const auto remove = removeRowBounds().contains (e.getPosition());
-        engine.editSong ([t = track, remove] (Song& song) {
-            if (remove)
-                mixerops::removeEffectRow (song, t);
-            else
-                mixerops::addEffectRow (song, t);
-        });
-        refit();
-        repaint();
+        if (flmods::popup (e.mods))
+            showAddTabMenu();
+        else if (e.mods.isLeftButtonDown())
+            addSlotRow();
+        return;
+    }
+    // the slot list's scroll bar: a click or a drag puts the thumb under the mouse
+    if (const auto bar = slotScrollBounds(); ! bar.isEmpty() && bar.expanded (1, 0).contains (e.getPosition()) && e.mods.isLeftButtonDown())
+    {
+        slotScrollDrag = true;
+        const auto spare = rowCount() - flEffectSlots;
+        scrollSlotsTo (juce::roundToInt ((float) spare * (float) (e.y - bar.getY()) / (float) juce::jmax (1, bar.getHeight())));
+        repaint (bar.expanded (2));
         return;
     }
 
@@ -7460,8 +7541,19 @@ void EffectsPanel::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseW
         return;
     }
 
+    // FL 2026.2 (round 190qf): over a slot list longer than its 10 rows the wheel scrolls it, and Shift+wheel moves the
+    // effect ("(Shift+Mouse-Wheel) moves effect slots again"). With 10 rows the plain wheel still moves it, as FL 2026.1
+    // (to verify with 2026.2).
+    if (slotsScroll() && ! e.mods.isShiftDown() && listBounds().contains (e.getPosition()))
+    {
+        const auto delta = (wheel.isReversed ? -1.0 : 1.0) * (wheel.deltaY != 0.0f ? wheel.deltaY : -wheel.deltaX);
+        if (const auto steps = controls::slotWheelSteps (slotScrollWheel, delta, wheel.isSmooth, wheel.isInertial); steps != 0)
+            scrollSlotsTo (firstRow() + (steps > 0 ? -1 : 1) * std::abs (steps));
+        return;
+    }
+
     // FL (REA FUN_012ab750): the wheel over a slot moves its effect one slot up or down (into an empty slot too,
-    // wrapping around the 10 slots) and the mouse pointer follows it. A trackpad's small steps add up to one move.
+    // wrapping around the rows) and the mouse pointer follows it. A trackpad's small steps add up to one move.
     if (const auto slot = slotAt (e.getPosition()); slot >= 0)
     {
         const auto delta = (wheel.isReversed ? -1.0 : 1.0) * (wheel.deltaY != 0.0f ? wheel.deltaY : -wheel.deltaX);
@@ -7477,6 +7569,7 @@ void EffectsPanel::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseW
         if (now >= 0)
         {
             selectedSlot = wheelSlot = now;
+            revealRow (rowOf (now)); // (round 190qf: a move past the rows in view scrolls the list)
             const auto target = slotBounds (rowOf (now));
             juce::Desktop::getInstance().getMainMouseSource().setScreenPosition (localPointToGlobal (juce::Point<int> (e.x, target.getCentreY())).toFloat());
         }
@@ -7570,6 +7663,19 @@ ui::Hint EffectsPanel::hintAt (juce::Point<int> p)
         return h;
     }
 
+    if (addTabBounds().contains (p)) // (round 190qf)
+    {
+        h.text = rowCount() < maxEffectSlots ? tr ("Add an effect slot (up to {0})", { juce::String (maxEffectSlots) })
+                                             : tr ("{0} slots (the most)", { juce::String (maxEffectSlots) });
+        h.hasMenu = true;
+        return h;
+    }
+    if (slotScrollBounds().contains (p))
+    {
+        h.text = tr ("Scroll the effect slots (or the mouse wheel over them; Shift+wheel moves an effect)");
+        return h;
+    }
+
     for (int i = 0; i < rowCount(); ++i)
         if (slotBounds (i).contains (p))
         {
@@ -7594,11 +7700,24 @@ ui::Hint EffectsPanel::hintAt (juce::Point<int> p)
 
 void EffectsPanel::mouseDrag (const juce::MouseEvent& e)
 {
+    if (slotScrollDrag)
+    {
+        const auto bar = slotScrollBounds();
+        const auto spare = rowCount() - flEffectSlots;
+        scrollSlotsTo (juce::roundToInt ((float) spare * (float) (e.y - bar.getY()) / (float) juce::jmax (1, bar.getHeight())));
+        return;
+    }
     if (dragSlot >= 0)
     {
         if (e.getDistanceFromDragStart() > 4)
         {
-            const auto target = juce::jlimit (0, rowCount() - 1, (e.y - slotsTop) / slotHeight); // (empty slots too, as FL)
+            // past the list's top or bottom edge, the list scrolls one row a step (round 190qf)
+            if (e.y < slotsTop && firstRow() > 0)
+                scrollSlotsTo (firstRow() - 1);
+            else if (e.y >= listBounds().getBottom() && e.y < slotsBottom() + slotHeight && firstRow() + flEffectSlots < rowCount())
+                scrollSlotsTo (firstRow() + 1);
+            const auto target = juce::jlimit (firstRow(), juce::jmin (rowCount(), firstRow() + flEffectSlots) - 1,
+                                              firstRow() + (e.y - slotsTop) / slotHeight); // (empty slots too, as FL)
             if (target != dropSlot)
             {
                 dropSlot = target;
@@ -7728,6 +7847,11 @@ void EffectsPanel::mouseMove (const juce::MouseEvent& e)
         hoverSidechain = ! hoverSidechain;
         repaint (sc);
     }
+    if (const auto tab = addTabBounds(); tab.contains (p) != hoverAddTab) // (round 190qf)
+    {
+        hoverAddTab = ! hoverAddTab;
+        repaint (tab.expanded (2));
+    }
 
     if (slot != hoverSlot || param != hoverParam || led != hoverLed || input != hoverInput || eq != hoverEq || output != hoverOutput || arrow != hoverArrow)
     {
@@ -7744,6 +7868,8 @@ void EffectsPanel::mouseMove (const juce::MouseEvent& e)
 
 void EffectsPanel::mouseExit (const juce::MouseEvent&)
 {
+    if (std::exchange (hoverAddTab, false))
+        repaint (addTabBounds().expanded (2));
     if (hoverSlot >= 0 || hoverParam != -1 || hoverInput != 0 || hoverEq != 0 || hoverOutput || hoverArrow)
     {
         hoverEq = 0;
@@ -7782,6 +7908,11 @@ void EffectsPanel::mouseUp (const juce::MouseEvent& e)
 {
     if (std::exchange (eqLevelDrag, false)) // (round 190oa: the curve's own colour again)
         repaint (eqGraphBounds());
+    if (std::exchange (slotScrollDrag, false))
+    {
+        repaint (slotScrollBounds().expanded (2));
+        return;
+    }
     // a click on the slot's name (not a drag, not the second click of a double-click) shows or hides its window (FL)
     if (dragSlot >= 0 && dropSlot < 0 && ! e.mouseWasDraggedSinceMouseDown() && e.getNumberOfClicks() == 1)
     {

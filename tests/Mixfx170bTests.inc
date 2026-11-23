@@ -195,17 +195,18 @@ TEST (mixfx170b_plugin_menus_group_by_fl_category_lynx_first)
     CHECK (pc::allItems (tree).size() == builtins.size());
 }
 
-// More mixer slots (feature/more-mixer-slots): an insert shows FL's 10 rows, grows row by row up to maxEffectSlots,
-// always shows the rows holding effects, and shrinks only over an empty last row; Move up / down wraps over the rows shown
+// More mixer slots (PR #260, round 190qf; FL 2026.2: 10 slots, up to 25 with the "+" tab): an insert shows FL's 10 rows,
+// grows row by row up to maxEffectSlots, always shows the rows holding effects, and shrinks only over an empty last row;
+// Move up / down wraps over the rows shown; FL's "Number of effect slots on new mixer tracks"
 TEST (more_mixer_slots_rows_grow_and_shrink)
 {
     namespace mo = lynx::mixerops;
+    CHECK (lynx::maxEffectSlots == 25 && lynx::flEffectSlots == 10); // (FL 2026.2's cap)
     lynx::Song song;
     song.mixer.resize (2);
     auto& t = song.mixer[1];
     CHECK (mo::effectRowCount (t) == lynx::flEffectSlots);
-    CHECK (! mo::removeEffectRow (song, 1)); // (never below FL's 10)
-    CHECK (mo::addEffectRow (song, 1) && mo::effectRowCount (t) == lynx::flEffectSlots + 1);
+    CHECK (mo::addEffectRow (song, 1) && mo::effectRowCount (t) == lynx::flEffectSlots + 1 && t.slotRows == 11);
     CHECK (mo::addEffectRow (song, 1) && mo::effectRowCount (t) == lynx::flEffectSlots + 2);
     // an effect in the last row keeps it
     CHECK (mo::insertEffectAtRow (song, 1, lynx::EffectSlot {}, lynx::flEffectSlots + 1) == 0);
@@ -215,11 +216,33 @@ TEST (more_mixer_slots_rows_grow_and_shrink)
     CHECK (mo::moveEffectBy (song, 1, 0, -1) == 0 && mo::effectRows (t.effects)[0] == lynx::flEffectSlots + 1);
     mo::removeEffectKeepRows (song, 1, 0);
     CHECK (mo::removeEffectRow (song, 1) && mo::effectRowCount (t) == lynx::flEffectSlots + 1);
-    CHECK (mo::removeEffectRow (song, 1) && mo::effectRowCount (t) == lynx::flEffectSlots && t.slotRows == 0);
+    CHECK (mo::removeEffectRow (song, 1) && mo::effectRowCount (t) == lynx::flEffectSlots && t.slotRows == 0); // (10 = the default, 0)
+    // LYNX's own Remove slot goes below 10 over empty rows, never below 1
+    CHECK (mo::removeEffectRow (song, 1) && mo::effectRowCount (t) == 9 && t.slotRows == 9);
+    while (mo::removeEffectRow (song, 1)) {}
+    CHECK (mo::effectRowCount (t) == 1 && t.slotRows == 1);
+    CHECK (mo::addEffectRow (song, 1) && mo::effectRowCount (t) == 2);
+    t.slotRows = 0;
     // an effect further down than the rows asked for shows its row; the cap holds
     CHECK (mo::insertEffectAtRow (song, 1, lynx::EffectSlot {}, 20) >= 0 && mo::effectRowCount (t) == 21);
     while (mo::addEffectRow (song, 1)) {}
-    CHECK (mo::effectRowCount (t) == lynx::maxEffectSlots);
+    CHECK (mo::effectRowCount (t) == lynx::maxEffectSlots && t.slotRows == lynx::maxEffectSlots);
     CHECK (mo::insertEffectAtRow (song, 1, lynx::EffectSlot {}, lynx::maxEffectSlots) < 0);
-    CHECK (lynx::lowlatency::bypassed ({ lynx::lowlatency::SlotMask { 1u } << 31 }, 0, 31));
+    CHECK (mo::insertEffectAtRow (song, 1, lynx::EffectSlot {}, lynx::maxEffectSlots - 1) >= 0);
+    CHECK (mo::effectRows (t.effects).back() == lynx::maxEffectSlots - 1);
+    // the low-latency mask holds every slot
+    CHECK (lynx::lowlatency::bypassed ({ lynx::lowlatency::SlotMask { 1u } << (lynx::maxEffectSlots - 1) }, 0, lynx::maxEffectSlots - 1));
+    CHECK (! lynx::lowlatency::bypassed ({ ~lynx::lowlatency::SlotMask { 0 } }, 0, lynx::maxEffectSlots));
+
+    // FL 2026.2's "Number of effect slots on new mixer tracks": the inserts the user adds get it, 10 = nothing saved
+    const auto keep = mo::newTrackSlots();
+    mo::newTrackSlots() = 16;
+    CHECK (mo::insertTracks (song, 2, 2) == 2 && song.mixer[2].slotRows == 16 && mo::effectRowCount (song.mixer[3]) == 16);
+    mo::newTrackSlots() = 5;
+    CHECK (mo::insertTracks (song, 4, 1) == 1 && mo::effectRowCount (song.mixer[4]) == 5);
+    mo::newTrackSlots() = 10;
+    CHECK (mo::insertTracks (song, 5, 1) == 1 && song.mixer[5].slotRows == 0);
+    mo::newTrackSlots() = 99;
+    CHECK (mo::insertTracks (song, 6, 1) == 1 && song.mixer[6].slotRows == lynx::maxEffectSlots);
+    mo::newTrackSlots() = keep;
 }

@@ -119,7 +119,7 @@ and, as LYNX extras, tracks can be hidden, or deactivated to free CPU and memory
 <td width="50%" valign="top">
 <img src="docs/img/mixer.png" alt="Mixer">
 
-**Mixer.** Up to 500 inserts with 10 effect slots each, sends, sidechain, a built-in EQ per track, VCA faders and
+**Mixer.** Up to 500 inserts with 10 effect slots each (up to 25, as FL Studio 2026.2), sends, sidechain, a built-in EQ per track, VCA faders and
 groups, delay compensation and smart disable, a loudness meter, Edison on any slot, ARA plugins on an insert, and any
 insert to any hardware output.
 

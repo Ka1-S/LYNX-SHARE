@@ -176,7 +176,7 @@ public:
 
         for (auto* c : std::initializer_list<juce::Component*> { &workflowTitle, &layoutStyleLabel, &layoutStyleBox, &layoutStyleNote, &alsSessionLabel, &alsSessionBox, &languageTitle, &displayTitle, &startupTitle, &editingTitle, &backupTitle,
                                                                  &pluginsTitle, &languageLabel, &languageBox, &languageNote, &scaleLabel, &scaleBox, &menuLabel, &menuBox,
-                                                                 &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &rackStepColour, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &uiAnimations, &animationLabel, &animationBox, &animationNote, &gpuRendering, &editorsInMain, &templateLabel, &templateBox, &templateNote, &startupProjectLabel, &startupProjectBox, &splash, &startupSound, &scanAtStart, &supportNoteBox, &menuEntry,
+                                                                 &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &rackStepColour, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &uiAnimations, &animationLabel, &animationBox, &animationNote, &gpuRendering, &editorsInMain, &templateLabel, &templateBox, &templateNote, &startupProjectLabel, &startupProjectBox, &newTrackSlotsLabel, &newTrackSlotsBox, &splash, &startupSound, &scanAtStart, &supportNoteBox, &menuEntry,
                                                                  &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &monoPaint, &altMeterScale, &autoSelectLinked, &noTypingPriority, &hoverValues, &escCloses, &editInLabel, &editInBox, &undoLabel,
                                                                  &undoBox, &alternateUndo, &hintsTitle, &manageMessages, &messagesNote, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &backupQuiet, &longestWaitLabel, &longestWaitBox, &unusedTakes, &detachNew,
                                                                  &sandboxLabel, &sandboxBox, &sandboxNote, &substitutes, &substitutesNote, &sampleAccurate, &limitEditors, &managePlugins, &manageShortcuts, &shortcutsNote,
@@ -350,6 +350,13 @@ public:
         startupProjectBox.addItem (tr ("Last used project"), 3);
         startupProjectBox.setSelectedId (juce::jlimit (0, 2, options.startupProject) + 1, juce::dontSendNotification);
         startupProjectBox.onChange = [this] { change ([&] { options.startupProject = startupProjectBox.getSelectedId() - 1; }); };
+        // FL 2026.2's General setting under Startup project (round 190qf; FL's label; 10 as in FL). The counts FL lists
+        // below 5 are to verify with 2026.2: LYNX lists 1 .. 25
+        styleLabel (newTrackSlotsLabel, tr ("Number of effect slots on new mixer tracks"));
+        for (int n = 1; n <= maxEffectSlots; ++n)
+            newTrackSlotsBox.addItem (juce::String (n), n);
+        newTrackSlotsBox.setSelectedId (juce::jlimit (1, maxEffectSlots, options.newTrackSlots), juce::dontSendNotification);
+        newTrackSlotsBox.onChange = [this] { change ([&] { options.newTrackSlots = newTrackSlotsBox.getSelectedId(); }); };
         styleNote (templateNote, tr ("The default template opens with File › New, and at start-up when Startup project is \"Default template\", "
                                      "as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own."));
         toggle (splash, tr ("Show the splash screen at startup"), options.splash, [this] (bool on) { options.splash = on; });
@@ -599,7 +606,7 @@ public:
         for (auto* c : std::initializer_list<juce::Component*> { &updatesTitle, &checkUpdates, &checkNow, &updatesNote, &previousLabel, &goBack })
             c->setVisible (updater::offered());
 
-        for (auto* b : { &templateBox, &startupProjectBox, &longestWaitBox, &languageBox, &fontBox, &textSizeBox, &scaleBox, &menuBox, &wavesBox, &noteNamesBox, &blackNotesBox, &pluginStyleBox, &animationBox, &editInBox, &undoBox, &longestWaitBox, &autosaveBox, &keepBox, &crashBox, &sandboxBox, &dataSizeBox })
+        for (auto* b : { &templateBox, &startupProjectBox, &newTrackSlotsBox, &longestWaitBox, &languageBox, &fontBox, &textSizeBox, &scaleBox, &menuBox, &wavesBox, &noteNamesBox, &blackNotesBox, &pluginStyleBox, &animationBox, &editInBox, &undoBox, &longestWaitBox, &autosaveBox, &keepBox, &crashBox, &sandboxBox, &dataSizeBox })
             styleCombo (*b);
         juce::ignoreUnused (engine, persistent);
     }
@@ -660,6 +667,7 @@ private:
         templateBox.setBounds (r.row (templateLabel, 260));
         startupProjectBox.setBounds (r.row (startupProjectLabel, 260));
         templateNote.setBounds (r.indentedNote (templateNote, 32).translated (0, -3)); // (round 190oj WG-3)
+        newTrackSlotsBox.setBounds (r.row (newTrackSlotsLabel, 80)); // (FL 2026.2, round 190qf)
         for (auto* t : { &projectLayout, &splash, &startupSound, &scanAtStart, &supportNoteBox })
             t->setBounds (r.full (24));
         if (menuEntry.isVisible())
@@ -883,8 +891,8 @@ private:
     juce::Label fontLabel, fontPreview, fontNote, textSizeLabel, boldLabel;
     juce::ComboBox fontBox, textSizeBox, boldBox;
     juce::ToggleButton condensedLabels;
-    juce::Label templateLabel, templateNote, startupProjectLabel;
-    juce::ComboBox templateBox, startupProjectBox;
+    juce::Label templateLabel, templateNote, startupProjectLabel, newTrackSlotsLabel;
+    juce::ComboBox templateBox, startupProjectBox, newTrackSlotsBox;
     std::vector<TemplateChoice> templateChoices; // templateBox's item id - 1
     juce::TextButton fontReset { tr ("Reset to default") };
     juce::StringArray fontNames;

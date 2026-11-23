@@ -509,8 +509,9 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MixerStrips)
 };
 
-// Effects panel for the selected track, in FL's layout (REA round 104): the audio input row, 10 slots, the
-// knobs of the chosen slot (LYNX), then the insert's built-in 3-band EQ and its audio output target.
+// Effects panel for the selected track, in FL's layout (REA round 104): the audio input row, the effect slots (FL's 10;
+// up to 25 as FL 2026.2, round 190qf), the knobs of the chosen slot (LYNX), then the insert's built-in 3-band EQ and its
+// audio output target.
 //  - click an empty slot ("Slot N"): choose an effect; click an occupied one: edit its knobs; double click: its window
 //  - the arrow on the left of a slot (or right-click): the slot's options (add / replace, move, delete...)
 //  - on the right of a slot: the mix knob (drag; double-click resets to 100%) and the LED (on/off, bypass)
@@ -543,6 +544,10 @@ public:
     void setTrack (int track);
     int getSelectedSlot() const noexcept { return selectedSlot; }
     juce::Rectangle<int> slotBoundsForCheck (int row) const { return slotBounds (row); } // --selftest (ui/MixerBasicsCheck.h)
+    // --slots260shot / --selftest slots260 (round 190qf): the slot list's first row in view, the "+" tab and the scroll bar
+    int firstRowForCheck() const { return firstRow(); }
+    juce::Rectangle<int> addTabForCheck() const { return addTabBounds(); }
+    juce::Rectangle<int> slotScrollForCheck() const { return slotScrollBounds(); }
     // round 190pl (--demo, ID mixer.slots): column = an insert slot's row (row ignored)
     juce::Rectangle<int> demoCellBounds (int, int column) const override { return column >= 0 && column < maxEffectSlots ? slotBounds (column) : juce::Rectangle<int>(); }
     // round 190oa (DF-86, --details190oashot): FL's EQ gestures on band `band`'s handle — a right-drag of `dy` px up,
@@ -673,10 +678,19 @@ private:
     void armSecondClick (const juce::MouseEvent& e, int row);
     void disarmSecondClick();
     juce::Rectangle<int> pluginButtonBounds() const;
-    int rowCount() const;                         // the slot rows shown (feature/more-mixer-slots)
-    int slotsBottom() const;                      // below them and the "+ Add slot" row
-    juce::Rectangle<int> addRowBounds() const;    // "+ Add slot"
-    juce::Rectangle<int> removeRowBounds() const; // "Remove slot" (empty when the last row can't go)
+    // FL 2026.2's effect slots (PR #260, round 190qf): the list keeps the height of FL's 10 rows and scrolls when the
+    // insert has more (up to 25); the "+" tab under it adds one row. slotBounds() is empty for a row scrolled out of view.
+    int rowCount() const;                          // the insert's slot rows (mixerops::effectRowCount)
+    int firstRow() const;                          // the first row in view
+    bool slotsScroll() const { return rowCount() > flEffectSlots; }
+    juce::Rectangle<int> listBounds() const;       // the slot list (10 rows high)
+    juce::Rectangle<int> slotScrollBounds() const; // its scroll bar (empty when it does not scroll)
+    juce::Rectangle<int> addTabBounds() const;     // FL 2026.2's "+" tab under the list
+    int slotsBottom() const;                       // below the list and the tab
+    void scrollSlotsTo (int first);
+    void revealRow (int row);
+    void addSlotRow();
+    void showAddTabMenu();
     void openEditor (int slot);
     // Freeze (round 190ff): a track freeze holds this insert's effects (not loaded): a click, wheel or drop on the slots
     // (the FX switch, the side-chain button) is refused with a notice; the EQ, fader and routing stay live. True = refused.
@@ -698,6 +712,10 @@ private:
     int effectIn (int row) const;
     double wheelAccumulator = 0.0; // a trackpad's small wheel steps over a slot, added up
     int wheelSlot = -1;
+    int slotScroll = 0;            // the slot list's first row in view (round 190qf; firstRow() keeps it in range)
+    double slotScrollWheel = 0.0;  // a trackpad's small steps scrolling the list, added up
+    bool slotScrollDrag = false;   // dragging the list's scroll bar
+    bool hoverAddTab = false;
     juce::uint32 wheelTime = 0;
     // A/B compare: a spare state per (insert, slot), swapped with the live one on request (not saved); shared by every
     // panel (round 183a: the Device View's cards reach the same B as the Mixer)

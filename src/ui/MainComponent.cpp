@@ -3543,6 +3543,8 @@ void MainComponent::loadUiSettings()
         }
         else if (key == "altMeterScale") // round 190lx (DF-61): FL's "Alternate meter scale"
             meterscale::alternate() = on;
+        else if (key == "newTrackSlots") // round 190qf: FL 2026.2's "Number of effect slots on new mixer tracks"
+            mixerops::newTrackSlots() = juce::jlimit (1, maxEffectSlots, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "prPreviewPlaying") // issue #183: the Piano roll's "Preview notes while playing" (off)
             PianoRollComponent::previewWhilePlaying = on;
         else if (key == "limitEditors") // FL's LimitEditors (round 189o; on unless saved off)
@@ -3983,6 +3985,7 @@ void MainComponent::saveUiSettings()
                                       + "\nselFirstChanPatChanges=" + juce::String (ChannelRackComponent::selectFirstChannelWithNotes ? 1 : 0)
                                       + "\nprPaintMode=" + juce::String (PianoRollComponent::monophonicPainting ? 1 : 0)
                                       + "\naltMeterScale=" + juce::String (meterscale::alternate() ? 1 : 0)
+                                      + "\nnewTrackSlots=" + juce::String (mixerops::newTrackSlots())
                                       + "\nprPreviewPlaying=" + juce::String (PianoRollComponent::previewWhilePlaying ? 1 : 0)
                                       + "\nlimitEditors=" + juce::String (editorlimit::enabled() ? 1 : 0)
                                       + "\nsampleAccurateAutomation=" + juce::String (sampleAccurateAutomation() ? 1 : 0)
@@ -9987,6 +9990,7 @@ SettingsHooks MainComponent::settingsHooks()
         o.selectFirstChannelWithNotes = ChannelRackComponent::selectFirstChannelWithNotes;
         o.monophonicPainting = PianoRollComponent::monophonicPainting;
         o.alternateMeterScale = meterscale::alternate();
+        o.newTrackSlots = mixerops::newTrackSlots(); // (round 190qf)
         o.detachNewPlugins = safe->engine.detachesNewPlugins();
         o.autoSelectLinked = ChannelRackComponent::autoSelectLinked;
         o.alternateUndo = safe->alternateUndo;
@@ -10089,6 +10093,7 @@ SettingsHooks MainComponent::settingsHooks()
         ChannelRackComponent::keepEditorsOpen = o.keepEditorsOpen;
         ChannelRackComponent::selectFirstChannelWithNotes = o.selectFirstChannelWithNotes;
         PianoRollComponent::monophonicPainting = o.monophonicPainting;
+        mixerops::newTrackSlots() = juce::jlimit (1, maxEffectSlots, o.newTrackSlots); // (round 190qf; saved with the UI options below)
         if (std::exchange (meterscale::alternate(), o.alternateMeterScale) != o.alternateMeterScale) // (round 190lx: the meters' scale changed)
             self.repaint();
         self.engine.setDetachNewPlugins (o.detachNewPlugins);
