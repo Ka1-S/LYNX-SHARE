@@ -162,7 +162,7 @@
         offline.dispatchPendingMessages();
         check ("chips: S and M lit", chips.lookOf (true) == MixerSwitchChips::Look::lit && chips.lookOf (false) == MixerSwitchChips::Look::lit);
         write (ui, mixerArea(), "mixer-chips-lit");
-        const auto chipArea = ui.getLocalArea (&chips, chips.getLocalBounds()).expanded (130, 6).withX (ui.getLocalArea (&chips, chips.getLocalBounds()).getX() - 20);
+        const auto chipArea = ui.getLocalArea (&chips, chips.getLocalBounds()).expanded (6, 6).withTrimmedLeft (-180);
         write (ui, chipArea, "chips-lit");
         click (chips, chips.chipBounds (true).getCentre());
         check ("S chip: every solo cleared, the chip in its restore look", ! mixerops::anySolo (song) && chips.lookOf (true) == MixerSwitchChips::Look::restore);

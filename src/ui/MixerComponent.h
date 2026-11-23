@@ -805,7 +805,7 @@ private:
     MixerStrips& strips;
 };
 
-// Round 190qh (D2-MX1, a LYNX extra after Studio One): the S and M chips left of the layout box in the Mixer's title bar.
+// Round 190qh (D2-MX1, a LYNX extra after Studio One): the S and M chips right of the layout box in the Mixer's title bar.
 // "S" lights while an insert is soloed, "M" while one is muted (a locked mute aside); a click clears them all and
 // remembers them (Un-solo / Un-mute all), and the chip, outlined then, brings them back. Nothing shows while there is
 // nothing to clear or restore.
@@ -829,7 +829,8 @@ private:
     MixerStrips& strips;
 };
 
-// The Mixer's title bar tools (round 190qh): the S / M chips, then FL's layout box
+// The Mixer's title bar tools (round 190qh): FL's layout box where it always was, then the S / M chips (nothing drawn
+// while hidden: the title bar looks as before)
 class MixerTitleTools final : public juce::Component
 {
 public:
@@ -841,8 +842,8 @@ public:
     void resized() override
     {
         auto r = getLocalBounds();
-        chips.setBounds (r.removeFromLeft (MixerSwitchChips::width));
-        layout.setBounds (r);
+        layout.setBounds (r.removeFromLeft (MixerLayoutBox::width));
+        chips.setBounds (r);
     }
     static constexpr int width = MixerSwitchChips::width + MixerLayoutBox::width;
 
