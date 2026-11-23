@@ -1819,7 +1819,8 @@ void RackState::buildPdc (const RackState* previous)
             if (previous != nullptr && t < previous->sendDelays.size() && k < previous->sendDelays[t].size())
                 old = &previous->sendDelays[t][k];
 
-            sendDelays[t][k] = line (pdc.sendDelay[t][k], old, sameTrack (t) && previous->sendDelays[t].size() == pdc.sendDelay[t].size());
+            sendDelays[t][k] = line (pdc.sendDelay[t][k], old,
+                                     old != nullptr && sameTrack (t) && previous->sendDelays[t].size() == pdc.sendDelay[t].size());
         }
     }
 

@@ -9446,6 +9446,7 @@ private:
         juce::String mixerqol190qhResult = "OK";
         {
             lynx::AudioEngine e (false);
+            const auto before = e.getLatencySamples(); // (the default song's own: its Master limiter)
             e.editSong ([] (lynx::Song& s) {
                 auto limiter = lynx::makeEffectSlot (lynx::EffectKind::fruityLimiter);
                 limiter.params[3] = 0.401f; // (FL's look-ahead, about 11 ms: round 188e)
@@ -9459,8 +9460,9 @@ private:
                 s.mixer[1].muted = true;
             });
             const auto muted = e.getLatencySamples();
-            if (on <= 0 || off != 0 || muted != on)
-                mixerqol190qhResult = "ERROR PDC on / off / muted " + juce::String (on) + " / " + juce::String (off) + " / " + juce::String (muted);
+            if (on <= before || off != before || muted != on)
+                mixerqol190qhResult = "ERROR PDC before / on / off / muted " + juce::String (before) + " / " + juce::String (on) + " / " + juce::String (off) + " / "
+                                      + juce::String (muted);
 
             lynx::themes::Spec spec;
             const auto plain = lynx::themeui::toJson (spec);
