@@ -551,13 +551,18 @@ void MainComponent::layoutOneRowToolbar (juce::Rectangle<int> bar, int menuWidth
     }
 
     // 2. the panels, in the user's order; the spare room before the run of right-end panels (FL: before its CPU panel)
-    const auto rightRun = toolbarlayout::firstOfRightRun (toolbarLayout, visible);
+    // (counted on the panels the user shows, so a panel that went to the overflow does not pull another one to the right
+    // end: FL at 1280 px keeps its monitor next to the time, raw/fs-1280.png)
+    std::array<bool, toolbarlayout::groupCount> userShown {};
+    for (const auto& e : toolbarLayout.entries)
+        userShown[(std::size_t) e.group] = e.shown;
+    const auto rightRun = toolbarlayout::firstOfRightRun (toolbarLayout, userShown);
     for (int index = 0; index < (int) toolbarLayout.entries.size(); ++index)
     {
         const auto group = toolbarLayout.entries[(std::size_t) index].group;
         if (! visible[(std::size_t) group])
             continue;
-        if (index == rightRun && spare > 0)
+        if (rightRun >= 0 && index >= rightRun && spare > 0)
         {
             toolbar.removeFromLeft (spare);
             spare = 0;
