@@ -660,6 +660,10 @@ private:
     void armSecondClick (const juce::MouseEvent& e, int row);
     void disarmSecondClick();
     juce::Rectangle<int> pluginButtonBounds() const;
+    int rowCount() const;                         // the slot rows shown (feature/more-mixer-slots)
+    int slotsBottom() const;                      // below them and the "+ Add slot" row
+    juce::Rectangle<int> addRowBounds() const;    // "+ Add slot"
+    juce::Rectangle<int> removeRowBounds() const; // "Remove slot" (empty when the last row can't go)
     void openEditor (int slot);
     // Freeze (round 190ff): a track freeze holds this insert's effects (not loaded): a click, wheel or drop on the slots
     // (the FX switch, the side-chain button) is refused with a notice; the EQ, fader and routing stay live. True = refused.

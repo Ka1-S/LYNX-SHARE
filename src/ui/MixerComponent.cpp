@@ -6177,6 +6177,33 @@ juce::Rectangle<int> EffectsPanel::slotBounds (int slot) const
     return { 8, slotsTop + slot * slotHeight, getWidth() - 16, slotHeight - 3 };
 }
 
+// More mixer slots (feature/more-mixer-slots): the rows shown, and the row below them with "+ Add slot" (left) and
+// "Remove slot" (right, when the last row is empty and more than FL's 10 are shown)
+int EffectsPanel::rowCount() const
+{
+    const auto& song = engine.getSong();
+    return track >= 0 && track < (int) song.mixer.size() ? mixerops::effectRowCount (song.mixer[(std::size_t) track]) : flEffectSlots;
+}
+
+int EffectsPanel::slotsBottom() const
+{
+    return slotsTop + (rowCount() + 1) * slotHeight;
+}
+
+juce::Rectangle<int> EffectsPanel::addRowBounds() const
+{
+    return { 8, slotsTop + rowCount() * slotHeight, getWidth() - 16, slotHeight - 3 };
+}
+
+juce::Rectangle<int> EffectsPanel::removeRowBounds() const
+{
+    const auto& song = engine.getSong();
+    const auto rows = rowCount();
+    if (track < 0 || track >= (int) song.mixer.size() || rows <= flEffectSlots || effectIn (rows - 1) >= 0)
+        return {};
+    return addRowBounds().removeFromRight (juce::jmin (110, addRowBounds().getWidth() / 2));
+}
+
 namespace
 {
 // parameters shown as knobs: in the rhythmic envelope, only those of the points in use
@@ -6198,7 +6225,7 @@ juce::Rectangle<int> EffectsPanel::knobBounds (int param) const
 
 juce::Rectangle<int> EffectsPanel::knobBoundsIn (int param, int areaBottom) const
 {
-    auto top = slotsTop + maxEffectSlots * slotHeight + 40;
+    auto top = slotsBottom() + 40;
     // many parameters (Effector: 12): 4 columns and shorter rows to fit the height
     int count = 0;
     if (const auto* s = slots(); ! gateSelected() && s != nullptr && selectedSlot >= 0 && selectedSlot < (int) s->size())
@@ -6226,8 +6253,8 @@ juce::Rectangle<int> EffectsPanel::knobBoundsIn (int param, int areaBottom) cons
 
 int EffectsPanel::selectedEffectBottom() const
 {
-    const auto slotsBottom = slotsTop + maxEffectSlots * slotHeight;
-    auto bottom = slotsBottom + 64; // the effect's title row
+    const auto slotsEnd = slotsBottom();
+    auto bottom = slotsEnd + 64; // the effect's title row
     const auto* s = slots();
     if (s == nullptr || selectedSlot < 0 || selectedSlot >= (int) s->size())
         return bottom;
@@ -6253,7 +6280,7 @@ bool EffectsPanel::gateSelected() const
 
 juce::Rectangle<int> EffectsPanel::gateStepsBounds() const
 {
-    return { 10, slotsTop + maxEffectSlots * slotHeight + 40, getWidth() - 20, 90 };
+    return { 10, slotsBottom() + 40, getWidth() - 20, 90 };
 }
 
 void EffectsPanel::setGateStep (juce::Point<int> p)
@@ -6280,7 +6307,7 @@ bool EffectsPanel::tuneSelected() const
 
 juce::Rectangle<int> EffectsPanel::tuneKeysBounds() const
 {
-    return { 10, slotsTop + maxEffectSlots * slotHeight + 40, getWidth() - 20, 54 };
+    return { 10, slotsBottom() + 40, getWidth() - 20, 54 };
 }
 
 namespace
@@ -6321,7 +6348,7 @@ void EffectsPanel::toggleTuneNote (juce::Point<int> p)
 
 juce::Rectangle<int> EffectsPanel::bandLevelsBounds() const
 {
-    return { 10, slotsTop + maxEffectSlots * slotHeight + 40, getWidth() - 20, 70 };
+    return { 10, slotsBottom() + 40, getWidth() - 20, 70 };
 }
 
 namespace
@@ -6525,9 +6552,9 @@ void EffectsPanel::paint (juce::Graphics& g)
 
     g.setFont (font (type::body));
 
-    // the 10 slots, as FL draws them: options arrow, name ("Slot N" when empty), mix knob, LED
+    // the slots (FL's 10, or the rows added past them), as FL draws them: options arrow, name ("Slot N" when empty), mix knob, LED
     // (rows: FL's slot places, an effect may sit below empty slots, round 170b)
-    for (int row = 0; row < maxEffectSlots; ++row)
+    for (int row = 0; row < rowCount(); ++row)
     {
         const auto i = effectIn (row); // the effect shown here, -1 = empty
         const auto r = slotBounds (row);
@@ -6631,6 +6658,23 @@ void EffectsPanel::paint (juce::Graphics& g)
             g.setFont (juce::Font (font (type::body)).italicised());
             textcache::drawText (g, tr ("Slot {0}", { juce::String (row + 1) }), textArea, juce::Justification::centredLeft);
             g.setFont (font (type::body));
+        }
+    }
+
+    {
+        // "+ Add slot" / "Remove slot" (feature/more-mixer-slots)
+        const auto r = addRowBounds();
+        const auto canAdd = rowCount() < maxEffectSlots;
+        const auto remove = removeRowBounds();
+        g.setColour (colour::border.withAlpha (0.6f));
+        g.drawRoundedRectangle (r.toFloat().reduced (0.5f), radius::sm, 1.0f);
+        g.setColour (canAdd ? colour::textSecondary : colour::textDisabled);
+        textcache::drawText (g, canAdd ? tr ("+ Add slot") : tr ("{0} slots (the most)", { juce::String (maxEffectSlots) }),
+                             r.withTrimmedLeft (20).withTrimmedRight (remove.getWidth()), juce::Justification::centredLeft);
+        if (! remove.isEmpty())
+        {
+            g.setColour (colour::textSecondary);
+            textcache::drawText (g, tr ("Remove slot"), remove.withTrimmedRight (8), juce::Justification::centredRight);
         }
     }
 
@@ -6863,7 +6907,7 @@ bool EffectsPanel::refuseFrozenSlots (juce::Point<int> p)
     if (channel < 0)
         return false;
     bool inSlots = fxSwitchBounds().contains (p) || sidechainButtonBounds().contains (p) || knobAt (p) >= 0;
-    for (int row = 0; row < maxEffectSlots && ! inSlots; ++row)
+    for (int row = 0; row < rowCount() && ! inSlots; ++row)
         inSlots = slotBounds (row).contains (p);
     if (! inSlots)
         return false;
@@ -6884,6 +6928,20 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
     if (const auto sc = sidechainButtonBounds(); ! sc.isEmpty() && sc.contains (e.getPosition()))
     {
         pluginheader::showSidechainPicker (engine, track, selectedSlot, this, sc);
+        return;
+    }
+
+    if (addRowBounds().contains (e.getPosition()) && e.mods.isLeftButtonDown()) // (feature/more-mixer-slots)
+    {
+        const auto remove = removeRowBounds().contains (e.getPosition());
+        engine.editSong ([t = track, remove] (Song& song) {
+            if (remove)
+                mixerops::removeEffectRow (song, t);
+            else
+                mixerops::addEffectRow (song, t);
+        });
+        refit();
+        repaint();
         return;
     }
 
@@ -6966,7 +7024,7 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
-    for (int row = 0; row < maxEffectSlots; ++row)
+    for (int row = 0; row < rowCount(); ++row)
     {
         const auto r = slotBounds (row);
 
@@ -7378,7 +7436,7 @@ ui::Hint EffectsPanel::hintAt (juce::Point<int> p)
         return h;
     }
 
-    for (int i = 0; i < maxEffectSlots; ++i)
+    for (int i = 0; i < rowCount(); ++i)
         if (slotBounds (i).contains (p))
         {
             const auto used = effectIn (i) >= 0;
@@ -7406,7 +7464,7 @@ void EffectsPanel::mouseDrag (const juce::MouseEvent& e)
     {
         if (e.getDistanceFromDragStart() > 4)
         {
-            const auto target = juce::jlimit (0, maxEffectSlots - 1, (e.y - slotsTop) / slotHeight); // (empty slots too, as FL)
+            const auto target = juce::jlimit (0, rowCount() - 1, (e.y - slotsTop) / slotHeight); // (empty slots too, as FL)
             if (target != dropSlot)
             {
                 dropSlot = target;
@@ -7493,7 +7551,7 @@ void EffectsPanel::mouseMove (const juce::MouseEvent& e)
     auto param = -1;
     auto led = false;
 
-    for (int i = 0; i < maxEffectSlots; ++i)
+    for (int i = 0; i < rowCount(); ++i)
         if (slotBounds (i).contains (p))
             slot = i;
 
@@ -7511,7 +7569,7 @@ void EffectsPanel::mouseMove (const juce::MouseEvent& e)
     const auto eq = eqControlAt (p);
     const auto output = outputBounds().contains (p);
     auto arrow = false;
-    for (int i = 0; i < maxEffectSlots; ++i)
+    for (int i = 0; i < rowCount(); ++i)
         if (arrowBounds (i).contains (p))
         {
             slot = i;
@@ -7596,7 +7654,7 @@ void EffectsPanel::mouseDoubleClick (const juce::MouseEvent& e)
 
     // issue #206: a double-click on an empty slot that reached the panel (no menu came between the clicks)
     if (! e.mods.isAnyModifierKeyDown())
-        for (int row = 0; row < maxEffectSlots; ++row)
+        for (int row = 0; row < rowCount(); ++row)
             if (slotBounds (row).contains (e.getPosition()) && effectIn (row) < 0)
             {
                 juce::PopupMenu::dismissAllActiveMenus();
@@ -7703,7 +7761,7 @@ bool EffectsPanel::dropEffect (EffectSlot fx, juce::Point<int> position)
         return false;
 
     auto target = -1, emptyRow = -1;
-    for (int row = 0; row < maxEffectSlots; ++row)
+    for (int row = 0; row < rowCount(); ++row)
         if (slotBounds (row).contains (position))
         {
             target = effectIn (row);
@@ -7766,7 +7824,7 @@ void EffectsPanel::toggleAllWindows()
 
 juce::Rectangle<int> EffectsPanel::pluginButtonBounds() const
 {
-    return { 20, slotsTop + maxEffectSlots * slotHeight + 30, getWidth() - 40, 30 };
+    return { 20, slotsBottom() + 30, getWidth() - 40, 30 };
 }
 
 void EffectsPanel::openEditor (int slot)
@@ -8004,7 +8062,7 @@ std::unique_ptr<juce::Component> EffectsPanel::makeSlotSearch (int row)
 void EffectsPanel::showSlotSearch (int row)
 {
     disarmSecondClick();
-    if (row < 0 || row >= maxEffectSlots || effectIn (row) >= 0)
+    if (row < 0 || row >= rowCount() || effectIn (row) >= 0)
         return; // (the slot was filled meanwhile)
     openToolWindow (makeSlotSearch (row), tr ("Find an effect"), "slotsearch");
 }

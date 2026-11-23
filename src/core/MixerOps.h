@@ -192,11 +192,18 @@ bool moveEffectSlot (Song& song, int track, int from, int to);
 std::vector<int> effectRows (const std::vector<EffectSlot>& effects);
 // The index of the effect in `row`, or -1 (an empty slot).
 int effectAtRow (const std::vector<EffectSlot>& effects, int row);
+// The slot rows an insert shows (feature/more-mixer-slots): FL's 10, or more when the user added rows
+// (MixerTrack::slotRows) or an effect sits further down; at most maxEffectSlots.
+int effectRowCount (const MixerTrack& track);
+// "+ Add slot" / "Remove empty slot" (feature/more-mixer-slots): one more row shown (false at maxEffectSlots), or one
+// less (false when the last row holds an effect or only FL's 10 are shown).
+bool addEffectRow (Song& song, int track);
+bool removeEffectRow (Song& song, int track);
 // FL's move: effect `index` goes to `row`; an effect already there takes its old row (the two swap), an empty row
 // just takes it. The chain order follows the rows; automations follow the effects. False when nothing changed.
 bool moveEffectToRow (Song& song, int track, int index, int row);
-// FL's Move up / Move down and the wheel over a slot: one row up (-1) or down (+1), wrapping around the 10 slots as FL
-// does (slot 1 up = slot 10). Returns the effect's new index, or -1.
+// FL's Move up / Move down and the wheel over a slot: one row up (-1) or down (+1), wrapping around the rows shown as FL
+// does around its 10 (slot 1 up = the last slot; effectRowCount). Returns the effect's new index, or -1.
 int moveEffectBy (Song& song, int track, int index, int delta);
 // Adds `fx` into the empty `row` (FL: a plugin picked on an empty slot lands in that slot). Returns its index, or -1
 // (row taken, insert full).

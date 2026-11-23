@@ -3,6 +3,7 @@
 #include "core/NoteRepeat.h"
 #include "core/PlaylistOps.h"
 #include "core/FlpExport.h"
+#include "core/ProjectContents.h"
 #include "core/Fpc.h"
 #include "core/SamplerPage.h"
 
@@ -1660,8 +1661,13 @@ struct Converter
             {
                 const auto& fx = track.effects[(std::size_t) s];
                 const auto row = std::max (next, fx.row >= 0 ? fx.row : next);
-                if (row >= maxEffectSlots)
+                if (row >= flEffectSlots) // (FL has 10 slots per insert: the effects in the rows added past them are left out)
+                {
+                    for (int k = s; k < (int) track.effects.size(); ++k)
+                        report.dropped.push_back (insertLabel (song, t) + ": " + projectcontents::effectSlotName (track.effects[(std::size_t) k])
+                                                  + " (in a slot past FL's 10)");
                     break;
+                }
                 flp::MixerInsert::Slot slot;
                 slot.index = row;
                 slot.wrapperFlags = fx.smartDisable ? 0x160 : 0x140;
