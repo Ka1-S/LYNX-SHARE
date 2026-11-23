@@ -173,6 +173,7 @@ RenderAhead::RenderAhead (RackRenderer& liveRenderer)
     ahead->shareTimesWith (live);
     ahead->setLiveInput (aheadInput.get());
     ahead->setHostTimeline (aheadTimeline.get());
+    live.setPropsMirror (ahead.get()); // (round 190ql: the live renderer's per-channel note blocks, made here too)
     for (int e = 0; e < maxEntries; ++e)
         entries.push_back (std::make_unique<Entry>());
 }
@@ -183,6 +184,7 @@ RenderAhead::~RenderAhead()
     wake->release();
     if (worker.joinable())
         worker.join();
+    live.setPropsMirror (nullptr);
 }
 
 void RenderAhead::setWorkerPool (WorkerPool* p, std::function<void()> onThreadStart)
