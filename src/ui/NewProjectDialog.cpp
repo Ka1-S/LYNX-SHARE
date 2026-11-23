@@ -38,7 +38,7 @@ Remembered loadRemembered()
     const auto kv = prefs::parseKeyValues (newProjectSettingsFile().loadFileAsString().toStdString());
     auto get = [&kv] (const char* key) { const auto it = kv.find (key); return it == kv.end() ? juce::String() : juce::String::fromUTF8 (it->second.c_str()); };
     r.show = get ("show") != "0";
-    r.folder = get ("folder");
+    r.folder = juce::String::fromUTF8 (prefs::decodeSettingsPath (get ("folder").toStdString()).c_str());
     r.author = get ("author");
     r.ownFolder = get ("ownFolder") != "0";
     r.defaultTemplate = get ("defaultTemplate");
@@ -49,7 +49,8 @@ Remembered loadRemembered()
 void saveRemembered (const Remembered& r)
 {
     juce::String text;
-    text << "show=" << (r.show ? 1 : 0) << "\nfolder=" << r.folder << "\nauthor=" << r.author << "\nownFolder=" << (r.ownFolder ? 1 : 0) << "\n";
+    text << "show=" << (r.show ? 1 : 0) << "\nfolder=" << juce::String::fromUTF8 (prefs::encodeSettingsPath (r.folder.toStdString()).c_str())
+         << "\nauthor=" << r.author << "\nownFolder=" << (r.ownFolder ? 1 : 0) << "\n";
     if (r.defaultTemplate.isNotEmpty())
         text << "defaultTemplate=" << r.defaultTemplate << "\n";
     if (r.startupProject.isNotEmpty())

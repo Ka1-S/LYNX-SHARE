@@ -15,6 +15,11 @@ namespace lynx::prefs
 // Lines "key=value" (spaces around both trimmed); blank lines and lines without '=' are ignored, the last of a
 // repeated key wins.
 std::map<std::string, std::string> parseKeyValues (const std::string& text);
+// A path in such a file (the New project window's folder): parseKeyValues trims the values, so a folder name that ends
+// in a space (".../lunx ") would come back as ".../lunx" - another folder, and a second "lunx" in Finder. The encoder
+// marks such a path with a trailing separator and the decoder takes it off again; every other path is left as it is.
+std::string encodeSettingsPath (const std::string& path);
+std::string decodeSettingsPath (const std::string& value);
 
 // --- autosave (General page) ------------------------------------------------------------------------------------
 // The choices for "Save a backup copy every": 0 = never, else minutes.
