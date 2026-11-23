@@ -23,7 +23,7 @@ settings folders keep "LYNX" so existing installs, links and AppImage updates ke
   `scripts/make-sbom.sh` from THIRD_PARTY.md and the packages' `licenses/` folder; the script stops when a THIRD_PARTY.md
   row or a licence file has no SBOM entry.
 - `LYNX.exe` and `SHA256SUMS.txt` (SHA-256 of every file above).
-- The optional plugin download (round 188b, `.github/workflows/plugins.yml`, docs/PLUGIN_EXPORT.md): `LYNX-Plugins-x.y.z-win-x64.zip`, `LYNX-Plugins-x.y.z-linux-x86_64.tar.xz`, `LYNX-Plugins-x.y.z-macos-universal.tar.xz` and their own `LYNX-Plugins-x.y.z-SHA256SUMS.txt`. Attached to the draft release by the `plugins-publish` job; not in `SHA256SUMS.txt`, and never picked by the updater.
+- The optional plugin download (round 188b, `.github/workflows/plugins.yml`, docs/PLUGIN_EXPORT.md): `LYNX-Plugins-x.y.z-win-x64.zip` and `LYNX-Plugins-x.y.z-win-x64.7z` (the same files, about 10 times smaller), `LYNX-Plugins-x.y.z-linux-x86_64.tar.xz`, `LYNX-Plugins-x.y.z-macos-universal.tar.xz` and their own `LYNX-Plugins-x.y.z-SHA256SUMS.txt`. Attached to the draft release by the `plugins-publish` job; not in `SHA256SUMS.txt`, and never picked by the updater.
 
 `workflow_dispatch` (Actions → Release → Run workflow, or `gh workflow run release.yml --ref <branch>`) builds and
 checks everything without a tag and keeps the files as workflow artifacts only.

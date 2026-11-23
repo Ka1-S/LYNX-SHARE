@@ -3,6 +3,7 @@
 # OS, never inside the app's installer. The names must not end like the app's files (the updater picks those by suffix,
 # core/UpdateCheck.cpp; tests/PluginExport180bTests.inc checks it):
 #   LYNX-Plugins-<label>-win-x64.zip           (windows)
+#   LYNX-Plugins-<label>-win-x64.7z            (windows, the same folder in one solid LZMA2 stream; round 190pu)
 #   LYNX-Plugins-<label>-linux-x86_64.tar.xz   (linux)
 #   LYNX-Plugins-<label>-macos-universal.tar.xz   (macos)
 # Inside: LYNX-Plugins-<label>/{CLAP/LYNX Plugins.clap, VST3/*.vst3, LV2/*.lv2 (Linux, round 190ov), PLUGINS.txt, README.txt, install script, LICENSE,
@@ -17,7 +18,7 @@ if [[ "${1:-}" == --sums ]]; then
     label="$2" dist="$3"
     cd "$dist"
     shopt -s nullglob
-    files=(LYNX-Plugins-"$label"-*.zip LYNX-Plugins-"$label"-*.tar.xz)
+    files=(LYNX-Plugins-"$label"-*.zip LYNX-Plugins-"$label"-*.7z LYNX-Plugins-"$label"-*.tar.xz)
     (( ${#files[@]} > 0 )) || { echo "no plugin archives for $label in $dist" >&2; exit 1; }
     sha256sum -- "${files[@]}" > "LYNX-Plugins-$label-SHA256SUMS.txt"
     cat "LYNX-Plugins-$label-SHA256SUMS.txt"
@@ -92,7 +93,17 @@ fi
 
 rm -f "${dist:?}/$archive"
 case "$os" in
-    windows) ( cd "$work" && zip -q -r -9 -X "$dist/$archive" "$top" ) ;;
+    # (a zip compresses every file alone, so its 12 binaries, which share nearly all their bytes, cost 12 times as much; the
+    # .7z next to it is one solid LZMA2 stream (128 MiB dictionary, about 1.5 GB to pack, 128 MB to unpack), the same trick as the tar.xz
+    # below: 195 MB -> 20 MB in round 190pu. The zip stays for Explorer and every older unpacker)
+    windows)
+        ( cd "$work" && zip -q -r -9 -X "$dist/$archive" "$top" )
+        sevenz="$(command -v 7zz || command -v 7z || command -v 7za || true)"
+        [[ -n "$sevenz" ]] || { echo "no 7zz / 7z: needed for the .7z next to the zip (apt install 7zip)" >&2; exit 1; }
+        archive7="${archive%.zip}.7z"
+        rm -f "${dist:?}/$archive7"
+        ( cd "$work" && "$sevenz" a -t7z -mx=9 -m0=lzma2 -md=128m -mfb=273 -ms=on -mmt=1 -bso0 -bsp0 "$dist/$archive7" "$top" )
+        ls -la "$dist/$archive7" ;;
     # (one solid stream with a dictionary larger than a plugin: the VST3s share most of their bytes with the CLAP; macOS'
     # Archive Utility opens it too, and the bundles' signatures are files inside them)
     linux|macos) tar -C "$work" -cf - "$top" | xz -T1 --lzma2=preset=9e,dict=256MiB > "$dist/$archive" ;;

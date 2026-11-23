@@ -301,6 +301,14 @@ artifact, xz inside), 31.7 MB locally; the Windows zip is 195.4 MB (8 VST3: 140.
 VST3 is compressed on its own, so each of the three synths adds about 18 MB there; macOS universal 39.0 MB (34.6 MB).
 The Windows build at JOBS=2 took 1 h 10 min (45 min with 8 VST3), macOS universal 2 h 22 min.
 
+Round 190pu (shrinking the Windows pack; audit in lynx-work/packsize_190pu/AUDIT.md): the zip's cost is its method, not the
+binaries: 12 files of 37 MB (the CLAP and 11 VST3, each 16.3 MB deflated, differing from each other by under 0.5 %). The same
+folder as one solid LZMA2 stream (`.7z`, 128 MiB dictionary) is 20 MB, the same files byte for byte (CI diffs the two). So
+the Windows pack is now offered twice: `LYNX-Plugins-<v>-win-x64.zip` (195 MB, opens everywhere) and `...-win-x64.7z` (20 MB,
+Windows 11 Explorer or 7-Zip). Tried and not taken: ICF (zig's linker driver rejects `--icf`), a shared runtime DLL or several
+classes in one VST3 (option B above: it needs a patch of JUCE's VST3 wrapper, whose class ids, bus layout and MIDI mode are
+compile-time macros; the owner chose C in round 188b).
+
 Per instance, measured in plugexporttest:
 
 - memory: 1.2 to 2.2 MB more per extra instance;
