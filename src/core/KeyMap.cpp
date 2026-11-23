@@ -528,6 +528,11 @@ std::vector<Action> makeActions()
         // an effect, except with the slot's menu open (issue #11, handled by that menu). The effect action stays, unbound.
         { "mixer.deleteTracks", TR_NOOP ("Delete the selected mixer tracks"), Context::mixer, { chord (del) } },
         { "mixer.deleteEffect", TR_NOOP ("Delete the selected effect slot's plugin"), Context::mixer, {} },
+        // round 190qh (D2-MX1, D2-MX8; LYNX extras, no key by default): Studio One's clear-and-restore of every solo / mute
+        // (also a click on the lit S / M chip in the Mixer's title bar), and the selected insert's input monitoring
+        { "mixer.unsoloAll", TR_NOOP ("Un-solo all / restore (mixer)"), Context::global, {} },
+        { "mixer.unmuteAll", TR_NOOP ("Un-mute all / restore (mixer)"), Context::global, {} },
+        { "mixer.inputMonitoring", TR_NOOP ("Input monitoring on/off (selected mixer track)"), Context::global, {} },
     };
 
     // numeric keypad 1-9: select patterns 1-9

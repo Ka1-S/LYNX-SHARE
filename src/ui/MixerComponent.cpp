@@ -37,6 +37,7 @@
 #include "ui/ExportDialog.h"
 
 #include <cmath>
+#include <limits>
 #include <complex>
 
 #include "core/Biquad.h"
@@ -168,6 +169,14 @@ ui::ValueSpec sendSpec (const juce::String& name)
     auto spec = ui::faderSpec (name, unityFader);
     spec.pixelsForRange = 120.0;
     return spec;
+}
+
+// Round 190qh (D2-MX7): a level's colour with the theme's own meter thresholds
+juce::Colour meterZoneColour (float gain) noexcept
+{
+    using namespace theme;
+    const auto db = juce::Decibels::gainToDecibels (gain, -100.0f);
+    return db >= colour::meterRedDb ? colour::meterClip : db >= colour::meterYellowDb ? colour::meterMid : colour::meterLow;
 }
 } // namespace
 
@@ -585,6 +594,12 @@ MixerStrips::Rows MixerStrips::rows() const noexcept
         r.insertsHeight = stripinserts::height (stripinserts::flExtraLarge, stripinserts::rowsFor (getHeight()));
         r.insertsTop = laneTop() - arrowRowHeight - 2 - r.insertsHeight;
         bottom = r.insertsTop - r.readoutHeight - 4;
+    }
+    // round 190qh: the correlation bar and the peak value box (LYNX extras, off by default) under the dB read-out
+    if (const auto extras = extrasHeight(); extras > 0)
+    {
+        bottom -= extras;
+        r.extrasTop = bottom + r.readoutHeight + 2;
     }
     if (compact)
     {
@@ -1310,6 +1325,26 @@ juce::Rectangle<int> MixerStrips::faderArea (int t) const
 juce::Rectangle<int> MixerStrips::meterArea (int t) const
 {
     return faderArea (t).withWidth (spec().meterWidth * 2 + 2);
+}
+
+// Round 190qh (D2-MX3, D2-VF5): under the dB read-out, as wide as the strip's plate (the meters alone are too narrow for
+// a number), the correlation bar first, then the peak value box
+juce::Rectangle<int> MixerStrips::correlationArea (int t) const
+{
+    if (! showCorrelation)
+        return {};
+    const auto r = rows();
+    const auto fader = faderArea (t);
+    return { fader.getX(), r.extrasTop + 1, fader.getWidth(), correlationRowHeight - 2 };
+}
+
+juce::Rectangle<int> MixerStrips::peakValueArea (int t) const
+{
+    if (! showPeakValues)
+        return {};
+    const auto r = rows();
+    const auto fader = faderArea (t);
+    return { fader.getX(), r.extrasTop + (showCorrelation ? correlationRowHeight : 0), fader.getWidth(), peakRowHeight - 1 };
 }
 
 juce::Rectangle<int> MixerStrips::grArea (int t) const
@@ -2143,6 +2178,21 @@ void MixerStrips::paint (juce::Graphics& g)
             }
             if (! cachePainting && meterWaveforms) // round 190lr (DF-60): FL's Waveforms view instead of the two bars
                 paintMeterWave (g, t, meters.withWidth (2 * sp.meterWidth + 2));
+            // round 190qh: the correlation bar and the peak value box (their values over a cached picture, as the levels)
+            if (showCorrelation)
+            {
+                if (cachePainting)
+                    theme::fillRoundRect (g, correlationArea (t).toFloat(), 1.5f, colour::bg0);
+                else
+                    paintCorrelation (g, t);
+            }
+            if (showPeakValues)
+            {
+                if (cachePainting)
+                    theme::fillRoundRect (g, peakValueArea (t).toFloat(), 2.0f, colour::bg0);
+                else
+                    paintPeakValue (g, t);
+            }
 
             if (hovered (Part::meter))
             {
@@ -2529,7 +2579,14 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
         if (flmods::popup (e.mods)) // FL: "Record <insert> to" (round 167a); the input box keeps the input menu
             mixerinput::chooseRecordTo (engine, t);
         else
+        {
             mixerinput::toggleArm (engine, t, this);
+            // round 190qh (D2-MX12, a LYNX extra): on a strip of a multi-selection, the other selected inserts follow
+            if (const auto armed = engine.isInsertArmed (t); selection.size() > 1 && std::binary_search (selection.begin(), selection.end(), t))
+                for (const auto other : selection)
+                    if (other > 0 && other != t && other < (int) engine.getSong().mixer.size() && engine.isInsertArmed (other) != armed)
+                        engine.setInsertArmed (other, armed);
+        }
         repaint();
         return;
     }
@@ -2540,6 +2597,24 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
+    // round 190qh (D2-MX2, Pro Tools' Alt+C as a gesture): Alt+click on a meter (or a peak value box) clears every meter
+    if ((part == Part::meter || peakValueArea (t).contains (e.getPosition())) && e.mods.isAltDown() && ! flmods::popup (e.mods)
+        && ! flmods::ctrl (e.mods))
+    {
+        resetAllMeters();
+        ui::postHint ({ tr ("Every meter's clip light and peak hold cleared"), {}, false, false }, 2000);
+        return;
+    }
+    if (peakValueArea (t).contains (e.getPosition()) && ! flmods::popup (e.mods)) // round 190qh (D2-VF5): a click resets it
+    {
+        if ((std::size_t) t < peakHeld.size())
+            peakHeld[(std::size_t) t] = 0.0f;
+        for (int ch = 0; ch < 2; ++ch)
+            if (const auto i = (std::size_t) t * 2 + (std::size_t) ch; i < levels.size())
+                levels[i].resetClip();
+        repaint (meterArea (t).expanded (2).getUnion (peakValueArea (t)));
+        return;
+    }
     if (part == Part::meter && ! flmods::popup (e.mods)) // clears the clip latch and the peak hold, and selects (as FL)
     {
         for (int ch = 0; ch < 2; ++ch)
@@ -2698,23 +2773,35 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
     }
 
     const auto& track = engine.getSong().mixer[(std::size_t) t];
+    // round 190qh (D2-MX12, a LYNX extra like the faders and pans that already move together): a switch clicked on a
+    // strip of a multi-selection sets every selected strip to the clicked one's new state
+    const auto group = selection.size() > 1 && std::binary_search (selection.begin(), selection.end(), t) ? selection : std::vector<int> { t };
+    auto setAll = [this, &group] (bool MixerTrack::*field, bool on, bool inserts) {
+        engine.editSong ([&group, field, on, inserts] (Song& s) {
+            for (const auto g : group)
+                if (g >= (inserts ? 1 : 0) && g < (int) s.mixer.size())
+                    s.mixer[(std::size_t) g].*field = on;
+        });
+        if (onSwitchesChanged)
+            onSwitchesChanged();
+    };
 
     switch (part)
     {
         case Part::mute:
-            engine.editSong ([t] (Song& s) { s.mixer[(std::size_t) t].muted = ! s.mixer[(std::size_t) t].muted; });
+            setAll (&MixerTrack::muted, ! track.muted, false);
             return;
 
         case Part::invert: // round 190lr (DF-80)
-            engine.editSong ([t] (Song& s) { s.mixer[(std::size_t) t].invertPhase = ! s.mixer[(std::size_t) t].invertPhase; });
+            setAll (&MixerTrack::invertPhase, ! track.invertPhase, false);
             return;
 
         case Part::swap:
-            engine.editSong ([t] (Song& s) { s.mixer[(std::size_t) t].swapChannels = ! s.mixer[(std::size_t) t].swapChannels; });
+            setAll (&MixerTrack::swapChannels, ! track.swapChannels, false);
             return;
 
         case Part::solo:
-            engine.editSong ([t] (Song& s) { s.mixer[(std::size_t) t].solo = ! s.mixer[(std::size_t) t].solo; });
+            setAll (&MixerTrack::solo, ! track.solo, true);
             return;
 
         case Part::header:
@@ -3332,6 +3419,19 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
     const auto name = juce::String::fromUTF8 (song.mixer[(std::size_t) t].name.c_str());
     const auto gesture = ui::valueGestures();
 
+    // round 190qh: the peak value box and the correlation bar (LYNX extras)
+    if (! active && peakValueArea (t).contains (p))
+    {
+        h.text = name + " - " + tr ("Highest peak since the last reset  [LMB] reset  [Alt]+[LMB] reset every meter");
+        return h;
+    }
+    if (! active && correlationArea (t).expanded (0, 1).contains (p))
+    {
+        h.text = name + " - " + tr ("Stereo correlation: +1 = mono, 0 = wide, below 0 = out of phase (mono playback loses sound)");
+        h.value = juce::String (shownCorrelation (t), 2);
+        return h;
+    }
+
     // the channels that play into this insert (FL shows them by the insert; LYNX in the hint)
     auto feeds = [&song, t, tracks = (int) song.mixer.size()] {
         juce::StringArray names;
@@ -3383,7 +3483,7 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
         case Part::swap: h.text = name + " - " + tr ("Swap left and right"); h.value = song.mixer[(std::size_t) t].swapChannels ? tr ("On") : tr ("Off"); break;
         case Part::meter:
         {
-            h.text = name + " - " + tr ("Peak meter (left/right) with peak hold  [LMB] selects the track and clears the clip light");
+            h.text = name + " - " + tr ("Peak meter (left/right) with peak hold  [LMB] selects the track and clears the clip light  [Alt]+[LMB] clears every meter");
             // FL: "hovering your cursor over most peak meters will show the value at the pointer position" (round 190kn)
             const auto m = meterArea (t);
             const auto pos = juce::jlimit (0.0f, 1.0f, (float) (m.getBottom() - p.y) / (float) juce::jmax (1, m.getHeight()));
@@ -4618,6 +4718,19 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
             if (mixeroptions::changed)
                 mixeroptions::changed();
         });
+        // round 190qh: LYNX extras (off by default), and every meter's clip light at once (also Alt+click on a meter)
+        view.addSeparator();
+        view.addItem (tr ("Peak values under meters (LYNX)"), true, showPeakValues, [this] {
+            setShowPeakValues (! showPeakValues);
+            if (mixeroptions::changed)
+                mixeroptions::changed();
+        });
+        view.addItem (tr ("Correlation bars (LYNX)"), true, showCorrelation, [this] {
+            setShowCorrelation (! showCorrelation);
+            if (mixeroptions::changed)
+                mixeroptions::changed();
+        });
+        view.addItem (tr ("Clear every meter's clip light") + "\t" + tr ("Alt+click a meter"), [this] { resetAllMeters(); });
         menu.addSubMenu (tr ("View"), view);
     }
     menu.addSubMenu (tr ("Mixer layout"), MixerLayoutBox::menu (*this)); // as the title bar's drop-down (issue #52)
@@ -4697,6 +4810,8 @@ void MixerStrips::changeListenerCallback (juce::ChangeBroadcaster*)
         selection = { selected };
     updateSize();
     repaint();
+    if (onSwitchesChanged) // (round 190qh: the title bar's S / M chips follow every solo / mute)
+        onSwitchesChanged();
 }
 
 float MixerStrips::shownVolume (int t) const
@@ -4829,6 +4944,178 @@ float loudnessBarPosition (float lufs) noexcept
 }
 constexpr int loudnessRowsTop = 24, loudnessRowHeight = 16;
 } // namespace
+
+void MixerStrips::paintCorrelation (juce::Graphics& g, int t) const
+{
+    using namespace theme;
+    const auto area = correlationArea (t);
+    if (area.isEmpty())
+        return;
+    theme::fillRoundRect (g, area.toFloat(), 1.5f, colour::bg0);
+    const auto mid = (float) area.getCentreX();
+    const auto half = (float) area.getWidth() * 0.5f - 1.0f;
+    const auto v = juce::jlimit (-1.0f, 1.0f, shownCorrelation (t));
+    if (std::abs (v) >= 0.02f)
+    {
+        // (+1 mono, 0 wide: the meters' green; below 0, out of phase: their red)
+        g.setColour ((v >= 0.0f ? colour::meterLow : colour::meterClip).withAlpha (isSilenced (t) ? 0.45f : 0.9f));
+        const auto w = half * std::abs (v);
+        g.fillRect (juce::Rectangle<float> (v >= 0.0f ? mid : mid - w, (float) area.getY(), w, (float) area.getHeight()));
+    }
+    g.setColour (colour::textDisabled);
+    g.fillRect (juce::Rectangle<float> (mid - 0.5f, (float) area.getY() - 1.0f, 1.0f, (float) area.getHeight() + 2.0f));
+}
+
+void MixerStrips::paintPeakValue (juce::Graphics& g, int t) const
+{
+    using namespace theme;
+    const auto area = peakValueArea (t);
+    if (area.isEmpty())
+        return;
+    theme::fillRoundRect (g, area.toFloat(), 2.0f, colour::bg0);
+    const auto peak = heldPeak (t);
+    g.setFont (font (9.0f, true));
+    if (peak <= 1.0e-5f)
+    {
+        g.setColour (colour::textDisabled);
+        textcache::drawText (g, juce::String::fromUTF8 ("\xe2\x80\x94"), area, juce::Justification::centred, false); // (nothing yet)
+        return;
+    }
+    const auto db = juce::Decibels::gainToDecibels (peak, -100.0f);
+    g.setColour (db >= colour::meterRedAt (0.0f) ? colour::meterClip : db >= colour::meterYellowAt (-6.0f) ? colour::meterMid : colour::textSecondary);
+    textcache::drawFittedText (g, (db > 0.05f ? "+" : "") + juce::String (db, 1), area, juce::Justification::centred, 1, 0.7f);
+}
+
+void MixerStrips::setShowPeakValues (bool on)
+{
+    showPeakValues = on;
+    peakShown.clear();
+    updateSize();
+    repaint();
+}
+
+void MixerStrips::setShowCorrelation (bool on)
+{
+    showCorrelation = on;
+    engine.getMeters().correlationWanted.store (on, std::memory_order_relaxed);
+    correlation.clear();
+    correlationShown.clear();
+    updateSize();
+    repaint();
+}
+
+void MixerStrips::setCorrelationForSnapshot (int t, float value)
+{
+    if (t < 0)
+        return;
+    if ((std::size_t) t >= correlation.size())
+        correlation.resize ((std::size_t) t + 1, 0.0f);
+    correlation[(std::size_t) t] = value;
+    repaint (correlationArea (t).expanded (1));
+}
+
+void MixerStrips::resetAllMeters()
+{
+    for (auto& m : levels)
+        m.resetClip();
+    std::fill (peakHeld.begin(), peakHeld.end(), 0.0f);
+    peakShown.clear();
+    repaint();
+}
+
+// The meters' extras each frame (round 190qh): the highest peak per strip (from the frame's peaks, as the bars), and
+// the correlation from the tap's sums, smoothed (about 300 ms); only a box whose shown value changes is repainted
+void MixerStrips::advanceExtras (float elapsedMs, juce::Rectangle<int>& dirty, bool showing)
+{
+    const auto tracks = engine.getSong().mixer.size();
+    if (showCorrelation)
+    {
+        auto& bank = engine.getMeters();
+        bank.correlationWanted.store (true, std::memory_order_relaxed);
+        bank.correlationReadMs = juce::Time::getMillisecondCounter();
+        correlation.resize (tracks, 0.0f);
+        correlationShown.resize (tracks, 0);
+        const auto keep = std::exp (-elapsedMs / 300.0f);
+        for (std::size_t t = 0; t < tracks; ++t)
+        {
+            float lr = 0.0f, ll = 0.0f, rr = 0.0f;
+            bank.takeCorrelationSums ((int) t, lr, ll, rr);
+            // (silence: the bar falls back to the middle; a one-sided signal reads 0, as on a hardware meter)
+            const auto now = ll > 1.0e-9f && rr > 1.0e-9f ? juce::jlimit (-1.0f, 1.0f, lr / std::sqrt (ll * rr)) : 0.0f;
+            correlation[t] = now + (correlation[t] - now) * keep;
+            if (std::abs (correlation[t]) < 1.0e-3f)
+                correlation[t] = 0.0f;
+            const auto area = correlationArea ((int) t);
+            const auto px = juce::roundToInt (correlation[t] * (float) area.getWidth() * 0.5f);
+            if (px != correlationShown[t])
+            {
+                correlationShown[t] = px;
+                if (showing && ! isHidden ((int) t) && ! isFoldTab ((int) t))
+                    dirty = dirty.isEmpty() ? area.expanded (0, 1) : dirty.getUnion (area.expanded (0, 1));
+            }
+        }
+    }
+    if (showPeakValues)
+    {
+        peakShown.resize (tracks, std::numeric_limits<int>::min());
+        for (std::size_t t = 0; t < tracks; ++t)
+        {
+            const auto peak = t < peakHeld.size() ? peakHeld[t] : 0.0f;
+            const auto tenths = peak <= 1.0e-5f ? std::numeric_limits<int>::min() + 1 : juce::roundToInt (10.0f * juce::Decibels::gainToDecibels (peak, -100.0f));
+            if (tenths != peakShown[t])
+            {
+                peakShown[t] = tenths;
+                if (showing && ! isHidden ((int) t) && ! isFoldTab ((int) t))
+                    dirty = dirty.isEmpty() ? peakValueArea ((int) t) : dirty.getUnion (peakValueArea ((int) t));
+            }
+        }
+    }
+}
+
+void MixerStrips::unsoloAllOrRestore()
+{
+    auto result = mixerops::SwitchRestore::nothing;
+    auto memory = soloMemory;
+    engine.editSong ([&] (Song& s) { result = mixerops::unsoloAllOrRestore (s, memory); });
+    soloMemory = memory;
+    ui::postHint ({ result == mixerops::SwitchRestore::cleared   ? tr ("Un-solo all: every solo cleared (again: restore them)")
+                    : result == mixerops::SwitchRestore::restored ? tr ("Solos restored")
+                                                                  : tr ("No solo to clear or restore"), {}, false, false }, 2500);
+    if (onSwitchesChanged)
+        onSwitchesChanged();
+}
+
+void MixerStrips::unmuteAllOrRestore()
+{
+    auto result = mixerops::SwitchRestore::nothing;
+    auto memory = muteMemory;
+    engine.editSong ([&] (Song& s) { result = mixerops::unmuteAllOrRestore (s, memory); });
+    muteMemory = memory;
+    ui::postHint ({ result == mixerops::SwitchRestore::cleared   ? tr ("Un-mute all: every mute cleared, locked tracks kept (again: restore them)")
+                    : result == mixerops::SwitchRestore::restored ? tr ("Mutes restored")
+                                                                  : tr ("No mute to clear or restore"), {}, false, false }, 2500);
+    if (onSwitchesChanged)
+        onSwitchesChanged();
+}
+
+void MixerStrips::toggleInputMonitoring()
+{
+    const auto t = juce::jlimit (0, juce::jmax (0, (int) engine.getSong().mixer.size() - 1), selected);
+    if (t >= (int) engine.getSong().mixer.size())
+        return;
+    const auto now = engine.getSong().mixer[(std::size_t) t].monitor;
+    const auto it = monitorBefore.find (t);
+    const auto next = mixerops::toggledMonitor (engine.getSong(), t, it != monitorBefore.end() ? it->second : InputMonitor::whenArmed);
+    if (next == InputMonitor::on)
+        monitorBefore[t] = now;
+    else
+        monitorBefore.erase (t);
+    engine.setInsertMonitor (t, next);
+    const auto name = juce::String::fromUTF8 (engine.getSong().mixer[(std::size_t) t].name.c_str());
+    ui::postHint ({ tr ("Input monitoring"), name + ": " + (next == InputMonitor::on ? tr ("On") : next == InputMonitor::off ? tr ("Off") : next == InputMonitor::automatic ? tr ("Auto (when armed, not while playing back)") : tr ("When armed")), false, false },
+                  2500);
+    repaint();
+}
 
 void MixerStrips::setShowLoudness (bool on)
 {
@@ -5024,7 +5311,8 @@ void MixerStrips::paintMeterWave (juce::Graphics& g, int t, juce::Rectangle<int>
         if (l <= 1.0e-4f && r <= 1.0e-4f)
             continue;
         const auto loud = juce::jmax (l, r);
-        g.setColour (tone (loud >= 1.0f ? theme::colour::meterClip : loud >= meters::flTickOrange ? theme::colour::meterMid : theme::colour::meterLow));
+        g.setColour (tone (theme::colour::meterZonesOwn ? meterZoneColour (loud) // (round 190qh)
+                                                        : loud >= 1.0f ? theme::colour::meterClip : loud >= meters::flTickOrange ? theme::colour::meterMid : theme::colour::meterLow));
         const auto wl = half * meterPosition (l), wr = half * meterPosition (r);
         g.fillRect (juce::Rectangle<float> (mid - wl, (float) (area.getY() + y), wl + wr, 1.0f));
     }
@@ -5044,9 +5332,11 @@ void MixerStrips::paintMeterLevel (juce::Graphics& g, int t, int ch, juce::Recta
         const auto lit = bar.withTop (bar.getBottom() - h);
         // (vertical: every meter of the same height shares one gradient, so JUCE's Direct2D brush cache hits)
         juce::ColourGradient gradient (tone (colour::meterClip), 0.0f, (float) bar.getY(), tone (colour::meterLow), 0.0f, (float) bar.getBottom(), false);
-        gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (0.0f)), tone (colour::meterClip)); // above 0 dB: clip zone
-        gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (-6.0f)), tone (colour::meterMid));
-        gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (-18.0f)), tone (colour::meterLow));
+        // (round 190qh: the theme's own thresholds when set; green blends up to 12 dB under the yellow, as FL's -18 / -6)
+        const auto yellowDb = colour::meterYellowAt (-6.0f), redDb = colour::meterRedAt (0.0f);
+        gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (redDb)), tone (colour::meterClip)); // above 0 dB: clip zone
+        gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (yellowDb)), tone (colour::meterMid));
+        gradient.addColour (1.0 - meterPosition (juce::Decibels::decibelsToGain (yellowDb - 12.0f)), tone (colour::meterLow));
         g.setGradientFill (gradient);
         g.fillRect (lit);
     }
@@ -5056,7 +5346,8 @@ void MixerStrips::paintMeterLevel (juce::Graphics& g, int t, int ch, juce::Recta
         const auto peakY = bar.getBottom() - (int) (meterPosition (meter.peak) * (float) bar.getHeight());
         // FL's peak tick is in the meter's own colour (its lime; details190if fl-mixer-meters-strips-3frames.png; round 190io),
         // orange above about -3 dB (live check 190iw Q6, round 190jd)
-        g.setColour (tone (meter.peak >= 1.0f ? colour::meterClip : meter.peak >= meters::flTickOrange ? colour::meterMid : colour::meterLow));
+        g.setColour (tone (colour::meterZonesOwn ? meterZoneColour (meter.peak) // (round 190qh)
+                                                 : meter.peak >= 1.0f ? colour::meterClip : meter.peak >= meters::flTickOrange ? colour::meterMid : colour::meterLow));
         g.fillRect (bar.getX(), juce::jmax (bar.getY(), peakY - 1), bar.getWidth(), 2);
     }
 
@@ -5102,6 +5393,20 @@ void MixerStrips::paintMeterLevels (juce::Graphics& g) const
         const auto bars = nameBars (t);
         const auto meterShown = meters.intersects (clip) && g.clipRegionIntersects (meters);
         const auto barsShown = ! bars.isEmpty() && bars.intersects (clip) && g.clipRegionIntersects (bars);
+        // round 190qh: the correlation bar and the peak value box over the picture
+        const auto corr = correlationArea (t), peakBox = peakValueArea (t);
+        const auto extrasShown = (! corr.isEmpty() && g.clipRegionIntersects (corr)) || (! peakBox.isEmpty() && g.clipRegionIntersects (peakBox));
+        if (extrasShown)
+        {
+            const juce::Graphics::ScopedSaveState state (g);
+            if (dockOf (t) == MixerDock::middle)
+                for (const auto& r : pinned)
+                    g.excludeClipRegion (r);
+            if (! corr.isEmpty())
+                paintCorrelation (g, t);
+            if (! peakBox.isEmpty())
+                paintPeakValue (g, t);
+        }
         if (! meterShown && ! barsShown)
             continue;
         const juce::Graphics::ScopedSaveState state (g);
@@ -5200,7 +5505,14 @@ bool MixerStrips::liveFrame (double nowMs)
         auto& m = levels[i];
         const auto before = m;
         const auto peak = meters.takePeak ((int) (i / 2), (int) (i % 2));
-        m.advanceFl (peak, elapsed); // ~20 dB/s bar falloff; FL's 2.6 s peak hold, then an accelerating fall (round 190jd)
+        m.advanceFl (peak, elapsed);
+        if (showPeakValues) // round 190qh (D2-VF5): the strip's highest peak since a reset
+        {
+            if (peakHeld.size() < levels.size() / 2)
+                peakHeld.resize (levels.size() / 2, 0.0f);
+            auto& held = peakHeld[i / 2];
+            held = juce::jmax (held, std::isfinite (peak) ? peak : 0.0f);
+        } // ~20 dB/s bar falloff; FL's 2.6 s peak hold, then an accelerating fall (round 190jd)
         if (meterWaveforms && i < waveFrameMax.size()) // (round 190lr: the frame's peak for the waveform's next row)
             waveFrameMax[i] = juce::jmax (waveFrameMax[i], peak);
         // "Show only used inserts" (round 190am): an insert that receives audio always shows, whatever feeds it
@@ -5260,6 +5572,11 @@ bool MixerStrips::liveFrame (double nowMs)
                 }
                 was = level;
             }
+    }
+    if (showPeakValues || showCorrelation) // round 190qh
+    {
+        advanceExtras ((float) elapsed, dirty, showing);
+        moving = moving || std::any_of (correlation.begin(), correlation.end(), [] (float c) { return c != 0.0f; });
     }
     if (meterWaveforms) // round 190lr (DF-60)
     {
@@ -7149,10 +7466,20 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
             // FL's slot LED: "Solo/Unsolo - (Ctrl+Left-Click), (Alt/Opt+Left-Click)" (round 190kn)
             engine.editSong ([t = track, i] (Song& song) { mixerops::soloSlot (song, t, i); });
         else if (ledBounds (row).contains (e.getPosition())) // LED: bypass
-            engine.editSong ([t = track, i] (Song& song) {
-                auto& slot = song.mixer[(std::size_t) t].effects[(std::size_t) i];
-                slot.enabled = ! slot.enabled;
+        {
+            // round 190qh (D2-MX12, a LYNX extra): with several strips selected (this insert among them), the same slot of
+            // every selected insert takes the clicked LED's new state
+            auto targets = selectedInserts ? selectedInserts() : std::vector<int> {};
+            if (targets.size() < 2 || std::find (targets.begin(), targets.end(), track) == targets.end())
+                targets = { track };
+            engine.editSong ([t = track, i, row = rowOf (i), targets] (Song& song) {
+                auto& clicked = song.mixer[(std::size_t) t].effects[(std::size_t) i];
+                clicked.enabled = ! clicked.enabled;
+                auto others = targets;
+                others.erase (std::remove (others.begin(), others.end(), t), others.end());
+                mixerops::setSlotEnabledOn (song, others, row, clicked.enabled); // (the same mixer slot, FL's place)
             });
+        }
         else
             dragSlot = i; // dragging the name moves the effect to another slot (a click shows its window)
         return;
@@ -8887,6 +9214,82 @@ void MixerLayoutBox::mouseDown (const juce::MouseEvent&)
     menu (strips).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
 }
 
+MixerSwitchChips::MixerSwitchChips (AudioEngine& e, MixerStrips& s)
+    : engine (e),
+      strips (s)
+{
+    setMouseCursor (juce::MouseCursor::PointingHandCursor);
+}
+
+juce::Rectangle<int> MixerSwitchChips::chipBounds (bool solo) const
+{
+    auto r = getLocalBounds().reduced (2, 4);
+    const auto w = (r.getWidth() - 4) / 2;
+    return solo ? r.removeFromLeft (w) : r.removeFromRight (w);
+}
+
+MixerSwitchChips::Look MixerSwitchChips::lookOf (bool solo) const
+{
+    const auto& song = engine.getSong();
+    if (solo ? mixerops::anySolo (song) : mixerops::anyMute (song))
+        return Look::lit;
+    return mixerops::canRestore (song, solo ? MixerStrips::soloMemory : MixerStrips::muteMemory) ? Look::restore : Look::hidden;
+}
+
+void MixerSwitchChips::paint (juce::Graphics& g)
+{
+    using namespace theme;
+    const auto mouse = getMouseXYRelative();
+    for (const auto solo : { true, false })
+    {
+        const auto look = lookOf (solo);
+        if (look == Look::hidden)
+            continue;
+        const auto chip = chipBounds (solo).toFloat();
+        const auto hot = isMouseOver() && chipBounds (solo).contains (mouse);
+        if (look == Look::lit) // (S in the strips' solo colour; M in the meters' amber: something is silenced)
+        {
+            const auto fill = solo ? colour::accent : colour::meterMid;
+            theme::fillRoundRect (g, chip, radius::sm, hot ? fill.brighter (0.2f) : fill);
+            g.setColour (solo ? colour::onAccent : colour::bg0);
+        }
+        else // restore: outlined
+        {
+            theme::fillRoundRect (g, chip, radius::sm, hot ? colour::bg4 : colour::bg2);
+            g.setColour (hot ? colour::textPrimary : colour::textSecondary);
+            g.drawRoundedRectangle (chip.reduced (0.5f), radius::sm, 1.0f);
+        }
+        g.setFont (font (type::caption, true));
+        textcache::drawText (g, solo ? "S" : "M", chip.toNearestInt(), juce::Justification::centred);
+    }
+}
+
+juce::String MixerSwitchChips::getTooltip()
+{
+    const auto solo = getMouseXYRelative().x < getWidth() / 2;
+    switch (lookOf (solo))
+    {
+        case Look::lit: return solo ? tr ("Un-solo all (click again to restore)") : tr ("Un-mute all (click again to restore)");
+        case Look::restore: return solo ? tr ("Restore the solos") : tr ("Restore the mutes");
+        case Look::hidden: break;
+    }
+    return {};
+}
+
+void MixerSwitchChips::mouseDown (const juce::MouseEvent& e)
+{
+    for (const auto solo : { true, false })
+        if (chipBounds (solo).contains (e.getPosition()) && lookOf (solo) != Look::hidden)
+        {
+            if (solo)
+                strips.unsoloAllOrRestore();
+            else
+                strips.unmuteAllOrRestore();
+            repaint();
+            return;
+        }
+}
+
 MixerComponent::MixerComponent (AudioEngine& e)
     : engine (e),
       strips (e),
@@ -8915,6 +9318,14 @@ MixerComponent::MixerComponent (AudioEngine& e)
             onInstrumentDropped (track, std::move (c));
     };
     effects.onInstrumentDropped = strips.onInstrumentDropped;
+    // round 190qh (D2-MX12): a slot LED acts on the same slot of every selected insert; (D2-MX1) the title bar's chips
+    effects.selectedInserts = [this] { return strips.getSelection(); };
+    strips.onSwitchesChanged = [safe = juce::Component::SafePointer<MixerSwitchChips> (&switchChips)] {
+        if (safe != nullptr)
+            safe->repaint();
+    };
+    if (MixerStrips::showCorrelation) // (a saved option: the tap sums while the bars show)
+        engine.getMeters().correlationWanted.store (true, std::memory_order_relaxed);
 }
 
 bool MixerComponent::runAction (const std::string& id)
@@ -8957,6 +9368,12 @@ bool MixerComponent::runAction (const std::string& id)
         strips.deleteSelectedTracks();
     else if (id == "mixer.deleteEffect") // FL: Delete on the selected effect slot (issue #11)
         effects.deleteSlot (effects.getSelectedSlot());
+    else if (id == "mixer.unsoloAll") // round 190qh (D2-MX1)
+        strips.unsoloAllOrRestore();
+    else if (id == "mixer.unmuteAll")
+        strips.unmuteAllOrRestore();
+    else if (id == "mixer.inputMonitoring") // round 190qh (D2-MX8)
+        strips.toggleInputMonitoring();
     else
         return false;
 

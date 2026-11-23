@@ -125,6 +125,37 @@ public:
         return frames > 0;
     }
 
+    // Round 190qh (D2-MX3, a LYNX extra: the Mixer's View › "Correlation bars"): per insert, the sums of L·R, L² and R²
+    // since the last read, from the same tap as the peaks. Summed only while the bars show (`correlationWanted`, cleared a
+    // second after the last read like powerWanted), so nothing is computed otherwise.
+    std::atomic<bool> correlationWanted { false };
+    std::uint32_t correlationReadMs = 0;
+    void expireCorrelation (std::uint32_t nowMs) noexcept
+    {
+        if (correlationWanted.load (std::memory_order_relaxed) && nowMs - correlationReadMs > 1000u)
+            correlationWanted.store (false, std::memory_order_relaxed);
+    }
+    void accumulateCorrelation (int track, float products, float squaresLeft, float squaresRight) noexcept
+    {
+        if (track < 0 || track >= maxMixerTracks)
+            return;
+        auto& t = tracks[(std::size_t) track];
+        addTo (t.correlation[0], products);
+        addTo (t.correlation[1], squaresLeft);
+        addTo (t.correlation[2], squaresRight);
+    }
+    // the sums since the last read (all 0: nothing came)
+    void takeCorrelationSums (int track, float& products, float& squaresLeft, float& squaresRight) noexcept
+    {
+        products = squaresLeft = squaresRight = 0.0f;
+        if (track < 0 || track >= maxMixerTracks)
+            return;
+        auto& t = tracks[(std::size_t) track];
+        products = t.correlation[0].exchange (0.0f, std::memory_order_relaxed);
+        squaresLeft = t.correlation[1].exchange (0.0f, std::memory_order_relaxed);
+        squaresRight = t.correlation[2].exchange (0.0f, std::memory_order_relaxed);
+    }
+
     // A fifth reader, of the Master only (round 190jj: BandLab's master meter behind the master volume in the Simple top
     // bar), so it takes no peaks from the Mixer's Master strip.
     float takeMasterBarPeak (int channel) noexcept { return masterBar[(std::size_t) (channel & 1)].exchange (0.0f, std::memory_order_relaxed); }
@@ -165,7 +196,9 @@ private:
         std::array<std::atomic<float>, 2> peak {}, view {}, session {}, activity {};
         std::array<std::atomic<float>, 2> power {}; // (round 190lr: sums of squares, only while powerWanted)
         std::atomic<int> powerFrames { 0 };
+        std::array<std::atomic<float>, 3> correlation {}; // (round 190qh: L·R, L², R², only while correlationWanted)
     };
+    static_assert (sizeof (TrackPeaks) == 64);
     std::array<TrackPeaks, maxMixerTracks> tracks {};
     std::array<std::atomic<float>, 2> masterBar {};
 };

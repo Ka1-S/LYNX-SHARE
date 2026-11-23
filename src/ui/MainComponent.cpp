@@ -785,7 +785,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         place (rackLoopStarterButton, 24, 4, 1);
     };
     workspace.setTitleAccessory (Panel::channelRack, &rackTitleTools, rackTitleToolsWidth);
-    workspace.setTitleAccessory (Panel::mixer, &mixer.getLayoutBox(), MixerLayoutBox::width); // FL's "Mixer layout" (issue #52)
+    // FL's "Mixer layout" (issue #52), after LYNX's S / M chips (round 190qh)
+    workspace.setTitleAccessory (Panel::mixer, &mixer.getTitleTools(), MixerTitleTools::width);
     mixer.getStripsForSnapshot().onLayoutChanged = [this] {
         mixer.getLayoutBox().repaint();
         mixer.selectTrack (mixer.getStripsForSnapshot().getSelectedTrack()); // keep the selected strip in view
@@ -3947,6 +3948,10 @@ void MainComponent::loadUiSettings()
             MixerStrips::meterWaveforms = line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue() != 0;
         else if (key == "mixerUsedOnly")
             MixerStrips::showUsedOnly = on;
+        else if (key == "mixerPeakValues") // round 190qh (D2-VF5)
+            MixerStrips::showPeakValues = on;
+        else if (key == "mixerCorrelation") // round 190qh (D2-MX3)
+            MixerStrips::showCorrelation = on;
         else if (key == "mixerLoudness") // round 190am (also starts the measurement)
             mixer.getStripsForSnapshot().setShowLoudness (on);
         else if (key == "grossBeatFlLocator") // round 190jd: Gross Beat's locator in FL's colours
@@ -4166,7 +4171,7 @@ void MainComponent::saveUiSettings()
                                       + "\nmetronomeOn=" + juce::String (engine.getTransport().metronome.load() ? 1 : 0)
                                       + "\nrecordCatchWindow=" + juce::String (engine.getRecordOptions().catchWindow)
                                       + "\nrecordCompensateOutput=" + juce::String (engine.getRecordOptions().compensateOutput ? 1 : 0)
-                                      + "\nrecordPostRoll=" + juce::String (engine.getRecordOptions().postRollBars) + "\nmixerUsedOnly=" + juce::String (MixerStrips::showUsedOnly ? 1 : 0) + "\nmixerWaveforms=" + juce::String (MixerStrips::meterWaveforms ? 1 : 0) + "\nmixerLoudness=" + juce::String (MixerStrips::showLoudness ? 1 : 0) + "\nmixerStripInserts=" + juce::String (MixerStrips::showStripInserts ? 1 : 0) + "\ngrossBeatFlLocator=" + juce::String (gblocator::flStyle() ? 1 : 0) + "\nmixerKeepLostLinks=" + juce::String (MixerStrips::keepLostLinks ? 1 : 0) + "\nmixerFollowPlaylist=" + juce::String (MixerStrips::followPlaylist ? 1 : 0) + "\nmixerLayout=" + juce::String ((int) MixerStrips::layout)
+                                      + "\nrecordPostRoll=" + juce::String (engine.getRecordOptions().postRollBars) + "\nmixerUsedOnly=" + juce::String (MixerStrips::showUsedOnly ? 1 : 0) + "\nmixerWaveforms=" + juce::String (MixerStrips::meterWaveforms ? 1 : 0) + "\nmixerPeakValues=" + juce::String (MixerStrips::showPeakValues ? 1 : 0) + "\nmixerCorrelation=" + juce::String (MixerStrips::showCorrelation ? 1 : 0) + "\nmixerLoudness=" + juce::String (MixerStrips::showLoudness ? 1 : 0) + "\nmixerStripInserts=" + juce::String (MixerStrips::showStripInserts ? 1 : 0) + "\ngrossBeatFlLocator=" + juce::String (gblocator::flStyle() ? 1 : 0) + "\nmixerKeepLostLinks=" + juce::String (MixerStrips::keepLostLinks ? 1 : 0) + "\nmixerFollowPlaylist=" + juce::String (MixerStrips::followPlaylist ? 1 : 0) + "\nmixerLayout=" + juce::String ((int) MixerStrips::layout)
                                       + "\nquantizeSongJumps=" + juce::String (engine.quantizeSongJumps.load()) + "\n"
                                       + juce::String (newProjectDefaults().toText()));
 }
@@ -8173,6 +8178,7 @@ void MainComponent::timerCallback()
     const uitrace::Scope trace ("MainComponent timer", false);
     smartTipTick(); // (round 190ok, D1)
     engine.getMeters().expirePower (juce::Time::getMillisecondCounter()); // (round 190lr: the RMS sums stop with their reader)
+    engine.getMeters().expireCorrelation (juce::Time::getMillisecondCounter()); // (round 190qh: the correlation sums too)
     {
         const uitrace::Scope part ("timer: toolbar displays", false);
         masterVolume.update();

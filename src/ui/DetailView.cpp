@@ -1999,7 +1999,8 @@ private:
             const auto& m = levels[(std::size_t) side];
             const auto db = juce::Decibels::gainToDecibels (m.level, -60.0f);
             const auto h = juce::roundToInt ((float) bar.getHeight() * juce::jlimit (0.0f, 1.0f, (db + 60.0f) / 66.0f));
-            g.setColour (m.level >= 1.0f ? colour::meterClip : db > -6.0f ? colour::meterMid : colour::meterLow);
+            g.setColour (colour::meterZonesOwn ? (db >= colour::meterRedDb ? colour::meterClip : db >= colour::meterYellowDb ? colour::meterMid : colour::meterLow) // (round 190qh)
+                                               : m.level >= 1.0f ? colour::meterClip : db > -6.0f ? colour::meterMid : colour::meterLow);
             g.fillRect (bar.withTop (bar.getBottom() - h));
         }
     }

@@ -12,6 +12,7 @@
 // skips those delays while the transport is stopped or recording.
 
 #include <array>
+#include <atomic>
 #include <memory>
 #include <vector>
 
@@ -64,13 +65,29 @@ int manualLatencySamples (const MixerTrack& track, double sampleRate) noexcept;
 // nothing inside the insert. 0 for a track the plan doesn't have.
 int insertEffectsLatency (const PdcPlan& plan, const Song& song, int track, double sampleRate) noexcept;
 
+// Round 190qh (D2-MX9): the samples a live PDC change or an effect slot's on / off switch takes to move from the old
+// sound to the new one. A linear crossfade of N samples between two signals a and b adds at most |b − a| / N ≤ 2 / N
+// (full scale) to any step of the output: out(k+1) − out(k) = (1 − g)·Δa + g·Δb + (b − a)·Δg. N = rate / (100 π) keeps
+// that added step under the steepest step of a full-scale 100 Hz sine (2π · 100 / rate): no click, in 3.2 ms
+// (141 samples at 44.1 kHz, 153 at 48 kHz). tests/MixerQol190qhTests.inc measures it.
+int switchFadeSamples (double sampleRate) noexcept;
+
 // Stereo delay line with an integer delay, allocated on creation. process() does not allocate.
 class DelayLine
 {
 public:
     explicit DelayLine (int delaySamples);
+    // Round 190qh (D2-MX9, FL: a switched-off slot leaves the PDC at once): the line that takes over from `previous` (the
+    // same edge's line in the snapshot before; nullptr = the edge had no delay) when a live edit changed this edge's
+    // delay. It starts from what `previous` holds and moves from `previousDelay` to `delaySamples` with a crossfade of
+    // `fadeSamples`: a shorter delay at once, a longer one as soon as the line holds that much audio (the old delay
+    // plays until then). `delaySamples` may be 0: the edge needs no delay any more, and once moved the line lets the
+    // audio through untouched. A first build (an export, a render) never makes one, so renders stay bit for bit.
+    DelayLine (int delaySamples, std::shared_ptr<DelayLine> previous, int previousDelay, int fadeSamples);
 
     int length() const noexcept { return delay; }
+    // (audio thread, round 190qh) a line whose move to no delay is over: it changes nothing any more
+    bool passesThrough() const noexcept { return delay == 0 && ! moving; }
     void process (float* left, float* right, int n) noexcept; // in place
 
     // Delays `source * level` and adds it into `dest`, in a single pass. With a null source (silent
@@ -81,12 +98,30 @@ public:
     // goes back to being compensated, so it starts from silence instead of replaying what it held.
     void clear() noexcept;
     // Only silence inside (what comes out next is silence until something non-silent goes in).
-    bool silent() const noexcept { return quiet >= delay; }
+    bool silent() const noexcept { return quiet >= capacity; }
+
+    // (round 190qh, the UI thread's next build) the move from the line before is over: the audio took over its
+    // history and the crossfade ended (a line made with the first constructor always is)
+    bool settled() const noexcept { return settledFlag.load (std::memory_order_acquire); }
+    // (the UI thread) lets the line before go once the audio no longer reads it
+    void dropPrevious() noexcept;
 
 private:
-    int delay;
+    int delay;      // what the line delays by (0: a line made by a live change that passes the audio through once moved)
+    int capacity;   // the ring's length: the delay, or the longer of the two delays of a move
     std::vector<float> left, right; // planar ring
     int position = 0;
-    int quiet = 0; // consecutive silent samples already written (up to delay)
+    int quiet = 0; // consecutive silent samples already written (up to capacity)
+    // round 190qh: the move from the line before (audio thread, but `previous` and `from`, set by the UI thread)
+    std::shared_ptr<DelayLine> previous;
+    int from = 0;                 // the delay the line before played
+    int wait = 0;                 // samples before the crossfade starts (a longer delay: the line fills first)
+    int fadeLeft = 0, fadeLength = 0;
+    bool moving = false;
+    std::atomic<bool> adopted { true };     // the line before's history is in the ring (or there was none)
+    std::atomic<bool> settledFlag { true };
+    void adopt() noexcept;
+    float historyAt (int age, int side) const noexcept; // the sample that went in `age` samples ago (1 = the last)
+    void runMove (const float* sl, const float* sr, float level, float* dl, float* dr, bool add, int n) noexcept;
 };
 } // namespace lynx

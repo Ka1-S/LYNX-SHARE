@@ -260,6 +260,37 @@ void soloSelected (Song& song, const std::vector<int>& targets, bool alt);
 // FL's mute-switch modifiers (manual "Mixer › Mute Switch", round 190kn): Ctrl+right-click = "Unmute All" (every insert
 // unmuted and every solo cleared; a track with its state locked keeps its mute), Shift+click = "Lock/Unlock State".
 void unmuteAll (Song& song);
+
+// Round 190qh (D2-MX1, a LYNX extra after Studio One's Ctrl+Shift+S / M): "Un-solo all / restore" and "Un-mute all /
+// restore". With a solo (a mute) on, the call clears every one and remembers them in `memory`; with none on, it brings
+// the remembered ones back (an insert counts only while it keeps its place and name). Mutes: the inserts and the
+// Master; a track whose state is locked (FL's Shift+click) keeps its mute, as FL's Unmute All. Returns what it did.
+struct SwitchMemory
+{
+    struct Entry
+    {
+        int track = 0;
+        std::string name;
+        bool soloSources = true; // (solos: FL's alt solo)
+    };
+    std::vector<Entry> entries;
+};
+enum class SwitchRestore { nothing, cleared, restored };
+bool anySolo (const Song& song) noexcept;
+bool anyMute (const Song& song) noexcept; // (a locked mute doesn't count: the action leaves it)
+SwitchRestore unsoloAllOrRestore (Song& song, SwitchMemory& memory);
+SwitchRestore unmuteAllOrRestore (Song& song, SwitchMemory& memory);
+// The remembered entries that would come back now (the chip shows "restore" while there are some)
+bool canRestore (const Song& song, const SwitchMemory& memory) noexcept;
+
+// Round 190qh (D2-MX8, a LYNX extra): "Input monitoring on/off" for one track. Off → On; On → the mode it had before
+// (`before`, kept by the caller; When armed for an insert without one, Off for the Master). Returns the new mode.
+InputMonitor toggledMonitor (const Song& song, int track, InputMonitor before) noexcept;
+
+// Round 190qh (D2-MX12, a LYNX extra): the same effect slot's LED on several selected inserts. `on` is the state the
+// clicked slot takes; every target insert with an effect in the mixer slot `row` (FL's slot place, effectRows: an
+// imported insert may have empty slots before its effects) takes it too (a locked slot keeps its state).
+void setSlotEnabledOn (Song& song, const std::vector<int>& tracks, int row, bool on);
 void toggleLockState (Song& song, int track);
 // FL's effect-slot LED: Ctrl/Alt+click = "Solo/Unsolo" the slot (manual "Mute/Disable LED - The same as for the Mixer
 // Track mute LEDs"): only this effect of the insert stays on; again on a soloed slot turns every effect of it on.

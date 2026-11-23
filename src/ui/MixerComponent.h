@@ -203,6 +203,61 @@ public:
     // (LUFS) and the true peak (dBTP) of the Master's output, and a Reset button (core/MasterLoudness.h).
     static inline bool showLoudness = false;
     void setShowLoudness (bool on);
+    // Round 190qh (LYNX extras, off by default; ui-options.txt "mixerPeakValues" / "mixerCorrelation"): View › "Peak
+    // values under meters" (D2-VF5: each strip's highest peak since a reset, in dBFS, in a box under its meter; a click
+    // resets it, Alt+click every one) and View › "Correlation bars" (D2-MX3: the stereo correlation of each strip's
+    // output, −1 … +1, a thin bar under its meter; summed from the meters' tap only while shown)
+    static inline bool showPeakValues = false;
+    static inline bool showCorrelation = false;
+    static constexpr int correlationRowHeight = 6, peakRowHeight = 13;
+    static int extrasHeight() noexcept { return (showCorrelation ? correlationRowHeight : 0) + (showPeakValues ? peakRowHeight : 0); }
+    void setShowPeakValues (bool on);
+    void setShowCorrelation (bool on);
+    // Round 190qh (D2-MX2): every meter's clip latch and peak hold (and the peak values) back to nothing (Alt+click on a
+    // meter, the Mixer menu's View)
+    void resetAllMeters();
+    // Round 190qh (D2-MX1, D2-MX8; LYNX extras): Studio One's "un-solo all / restore", "un-mute all / restore", and the
+    // selected insert's input monitoring on / off (the key map's mixer.unsoloAll / unmuteAll / inputMonitoring and the
+    // title bar's S / M chips). The memories last for the session.
+    static inline mixerops::SwitchMemory soloMemory, muteMemory;
+    void unsoloAllOrRestore();
+    void unmuteAllOrRestore();
+    void toggleInputMonitoring();
+    std::function<void()> onSwitchesChanged; // a solo or mute changed (the title bar's chips repaint)
+    // (round 190qh) for the shot route and tests: a strip's peak value box and correlation bar ({} while off)
+    juce::Rectangle<int> peakValueAreaForSnapshot (int track) const { return peakValueArea (track); }
+    juce::Rectangle<int> correlationAreaForSnapshot (int track) const { return correlationArea (track); }
+    float shownCorrelation (int track) const noexcept
+    {
+        return (std::size_t) track < correlation.size() ? correlation[(std::size_t) track] : 0.0f;
+    }
+    float heldPeak (int track) const noexcept { return (std::size_t) track < peakHeld.size() ? peakHeld[(std::size_t) track] : 0.0f; }
+    void setCorrelationForSnapshot (int track, float value); // (the shot route: a value without audio)
+    void setPeakForSnapshot (int track, float gain)
+    {
+        if (track < 0)
+            return;
+        if ((std::size_t) track >= peakHeld.size())
+            peakHeld.resize ((std::size_t) track + 1, 0.0f);
+        peakHeld[(std::size_t) track] = gain;
+        repaint();
+    }
+    void latchClipForSnapshot (int track)
+    {
+        for (int ch = 0; ch < 2; ++ch)
+            if (const auto i = (std::size_t) track * 2 + (std::size_t) ch; i < levels.size())
+            {
+                levels[i].clipped = true;
+                levels[i].peak = 1.2f;
+            }
+        repaint();
+    }
+    bool clipLatchedForSnapshot (int track) const
+    {
+        const auto i = (std::size_t) track * 2;
+        return i + 1 < levels.size() && (levels[i].clipped || levels[i + 1].clipped);
+    }
+    juce::Rectangle<int> faderAreaForSnapshot (int track) const { return faderArea (track); }
     // Mixer menu › "Insert effects on the strips (LYNX)" (issue #154 part 2, round 190io; ui-options.txt
     // "mixerStripInserts"; off by default = FL's Mixer): each strip lists its insert's effects under its header band, the
     // linked track headers' list (core/StripInserts.h, core/TrackInserts.h) with the same edits.
@@ -369,6 +424,7 @@ private:
         int faderTop = 0, faderBottom = 0, readoutHeight = 0;
         int armY = -1;                                  // compact layouts: the arm button's row under the fader
         int insertsTop = 0, insertsHeight = 0;          // issue #154 part 2: the insert effects list (0: the view is off)
+        int extrasTop = 0;                              // round 190qh: the correlation bar and the peak value box, under the read-out
     };
     Rows rows() const noexcept;
     juce::Rectangle<int> nameArea (int track) const;
@@ -493,6 +549,16 @@ private:
     ui::ValueDrag drag;
 
     std::vector<meters::PeakHold> levels; // per track*2: bar, peak hold and clip latch
+    // round 190qh: the peak values (linear, the highest since a reset) and the correlation bars (smoothed), per track,
+    // and what each shows now (tenths of a dB, pixels: a change repaints only its box)
+    std::vector<float> peakHeld, correlation;
+    std::vector<int> peakShown, correlationShown;
+    std::map<int, InputMonitor> monitorBefore; // (round 190qh) the mode each insert had before "Input monitoring on"
+    juce::Rectangle<int> peakValueArea (int track) const;
+    juce::Rectangle<int> correlationArea (int track) const;
+    void paintPeakValue (juce::Graphics& g, int track) const;
+    void paintCorrelation (juce::Graphics& g, int track) const;
+    void advanceExtras (float elapsedMs, juce::Rectangle<int>& dirty, bool showing);
     std::vector<float> inputLevels;       // per track: input level (decaying)
     // round 190lr (DF-60): the waveform view's history, one row per 1/70 s: waveRing[row * meters + meter] (meter = track
     // * 2 + side), the newest row at waveHead; each meter's rows since its last sound (no repaint once all have scrolled out)
@@ -543,6 +609,7 @@ public:
     void setTrack (int track);
     int getSelectedSlot() const noexcept { return selectedSlot; }
     juce::Rectangle<int> slotBoundsForCheck (int row) const { return slotBounds (row); } // --selftest (ui/MixerBasicsCheck.h)
+    juce::Rectangle<int> ledBoundsForCheck (int row) const { return ledBounds (row); } // (round 190qh's shot route)
     // round 190pl (--demo, ID mixer.slots): column = an insert slot's row (row ignored)
     juce::Rectangle<int> demoCellBounds (int, int column) const override { return column >= 0 && column < maxEffectSlots ? slotBounds (column) : juce::Rectangle<int>(); }
     // round 190oa (DF-86, --details190oashot): FL's EQ gestures on band `band`'s handle — a right-drag of `dy` px up,
@@ -575,6 +642,8 @@ public:
     void armSlotSearchOnSecondClick (const juce::MouseEvent& e, int row) { armSecondClick (e, row); }
     std::unique_ptr<juce::Component> makeSlotSearch (int row); // (the shot route shows it in a window of its own)
     std::function<void (juce::PopupMenu&, int slot)> extendSlotMenu; // items put first in a slot's menu (nullptr: none)
+    // round 190qh (D2-MX12): the Mixer's selected inserts (a slot LED then acts on all of them); nullptr: this insert only
+    std::function<std::vector<int>()> selectedInserts;
     static inline juce::PopupMenu* slotMenuForSnapshot = nullptr;    // the shot routes: the next slot menu goes here instead of opening
     // Round 190ce: the slot menu's "Hot-swap in the Browser" (set once by the main window; nullptr: no such item)
     static inline std::function<void (int track, int slot)> onHotSwapSlot;
@@ -736,6 +805,52 @@ private:
     MixerStrips& strips;
 };
 
+// Round 190qh (D2-MX1, a LYNX extra after Studio One): the S and M chips left of the layout box in the Mixer's title bar.
+// "S" lights while an insert is soloed, "M" while one is muted (a locked mute aside); a click clears them all and
+// remembers them (Un-solo / Un-mute all), and the chip, outlined then, brings them back. Nothing shows while there is
+// nothing to clear or restore.
+class MixerSwitchChips final : public juce::Component,
+                               public juce::TooltipClient
+{
+public:
+    MixerSwitchChips (AudioEngine& engine, MixerStrips& strips);
+    void paint (juce::Graphics& g) override;
+    void mouseDown (const juce::MouseEvent& e) override;
+    void mouseMove (const juce::MouseEvent&) override { repaint(); }
+    void mouseExit (const juce::MouseEvent&) override { repaint(); }
+    juce::String getTooltip() override;
+    static constexpr int width = 46;
+    enum class Look { hidden, lit, restore };
+    Look lookOf (bool solo) const; // (also for the shot route)
+    juce::Rectangle<int> chipBounds (bool solo) const;
+
+private:
+    AudioEngine& engine;
+    MixerStrips& strips;
+};
+
+// The Mixer's title bar tools (round 190qh): the S / M chips, then FL's layout box
+class MixerTitleTools final : public juce::Component
+{
+public:
+    MixerTitleTools (MixerSwitchChips& c, MixerLayoutBox& l) : chips (c), layout (l)
+    {
+        addAndMakeVisible (chips);
+        addAndMakeVisible (layout);
+    }
+    void resized() override
+    {
+        auto r = getLocalBounds();
+        chips.setBounds (r.removeFromLeft (MixerSwitchChips::width));
+        layout.setBounds (r);
+    }
+    static constexpr int width = MixerSwitchChips::width + MixerLayoutBox::width;
+
+private:
+    MixerSwitchChips& chips;
+    MixerLayoutBox& layout;
+};
+
 class MixerComponent final : public juce::Component
 {
 public:
@@ -779,6 +894,8 @@ public:
     std::function<void (int, ChannelDef)> onInstrumentDropped;
     MixerStrips& getStripsForSnapshot() { return strips; }
     MixerLayoutBox& getLayoutBox() { return layoutBox; } // the main window puts it in the Mixer's title bar
+    MixerTitleTools& getTitleTools() { return titleTools; } // (round 190qh: the S / M chips and the layout box)
+    MixerSwitchChips& getSwitchChips() { return switchChips; }
 
     static constexpr int effectsWidth = 300;
 
@@ -789,5 +906,7 @@ private:
     juce::Viewport effectsView; // the effects panel scrolls when the mixer is short (round 163)
     EffectsPanel effects;
     MixerLayoutBox layoutBox { strips };
+    MixerSwitchChips switchChips { engine, strips };
+    MixerTitleTools titleTools { switchChips, layoutBox };
 };
 } // namespace lynx
