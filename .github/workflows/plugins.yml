@@ -100,8 +100,13 @@ jobs:
       - name: Package
         shell: bash
         run: |
+          command -v 7zz > /dev/null || command -v 7z > /dev/null || { sudo apt-get update -q && sudo apt-get install -y -q 7zip; }
           ./scripts/package-plugins.sh windows build-win/plugins "$LABEL" dist
           mkdir -p tool && cp build-win/plugexporttest.exe tool/
+          # (round 190pu: the .7z next to the zip must unpack to exactly the zip's files)
+          mkdir z s && unzip -q "dist/LYNX-Plugins-$LABEL-win-x64.zip" -d z && "$(command -v 7zz || command -v 7z)" x -bso0 -bsp0 "dist/LYNX-Plugins-$LABEL-win-x64.7z" -os
+          diff -r z s && echo ".7z and .zip hold the same files"
+          ls -la dist
 
       - uses: actions/upload-artifact@v7
         with:

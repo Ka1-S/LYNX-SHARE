@@ -233,7 +233,7 @@ TEST (pluginexport188b_plugin_downloads_are_never_taken_for_the_app)
     // pick one for an app update, and their checksum file is not the app's SHA256SUMS.txt
     using namespace lynx::update;
     std::vector<Asset> assets;
-    for (const char* name : { "LYNX-Plugins-0.1.26-win-x64.zip", "LYNX-Plugins-0.1.26-linux-x86_64.tar.xz",
+    for (const char* name : { "LYNX-Plugins-0.1.26-win-x64.zip", "LYNX-Plugins-0.1.26-win-x64.7z", "LYNX-Plugins-0.1.26-linux-x86_64.tar.xz",
                               "LYNX-Plugins-0.1.26-macos-universal.tar.xz", "LYNX-Plugins-0.1.26-SHA256SUMS.txt" })
         assets.push_back ({ name, std::string ("https://example.invalid/") + name, 1 });
     for (const auto f : { Flavour::windowsInstaller, Flavour::windowsPortable, Flavour::macos, Flavour::linuxAppImage, Flavour::linuxTarball })
