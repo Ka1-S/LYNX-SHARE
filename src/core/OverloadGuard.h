@@ -100,6 +100,24 @@ public:
     // Message thread: its 30 Hz pulse (the engine's timer), `nowMs` on the callbacks' clock.
     void uiPulse (double nowMs) noexcept { lastUiMs.store (nowMs, std::memory_order_relaxed); }
 
+    // Round 190px (perf 7): the UI starves right now — "Safe overloads" on and the 30 Hz pulse late by uiLateMs. Any
+    // thread (the render-ahead thread paces its catch-up with it: after an overload, the callbacks keep their deadline
+    // while render-ahead refills its window with the workers on both CPUs of a small PC, which the callbacks' windows
+    // above never see; 190os measured 90-130 ms frame gaps there).
+    bool uiStarving (double nowMs) const noexcept
+    {
+        const auto ui = lastUiMs.load (std::memory_order_relaxed);
+        return enabled.load (std::memory_order_relaxed) && ui > 0.0 && nowMs - ui > p.uiLateMs;
+    }
+    // what the render-ahead thread gave up that way (for --uiperf and the tests)
+    void notePaced (double ms) noexcept
+    {
+        pacedUs.fetch_add ((std::uint64_t) (ms * 1000.0), std::memory_order_relaxed);
+        pacedCount.fetch_add (1, std::memory_order_relaxed);
+    }
+    double pacedMs() const noexcept { return (double) pacedUs.load (std::memory_order_relaxed) / 1000.0; }
+    std::uint64_t timesPaced() const noexcept { return pacedCount.load (std::memory_order_relaxed); }
+
     // Audio thread, after every device callback (its output written): `usedMs` its processing time, `budgetMs` its
     // deadline, `playing` whether the transport runs (round 190os). Returns how long to yield now (ms, 0 = none). No
     // lock, no allocation.
@@ -244,6 +262,7 @@ private:
     std::atomic<double> releaseAt { 0.0 }, releaseLag { 0.0 };
     std::atomic<double> lastUiMs { 0.0 };
     std::atomic<std::uint64_t> engagements { 0 }, yieldedUs { 0 };
+    std::atomic<std::uint64_t> pacedUs { 0 }, pacedCount { 0 }; // (round 190px)
     // audio thread only
     double windowStartMs = 0.0, lastOverloadMs = -1.0e12;
     int windowCalls = 0, windowOver = 0;

@@ -1,4 +1,5 @@
 #include "core/RenderAhead.h"
+#include "core/OverloadGuard.h"
 
 #include <algorithm>
 #include <cmath>
@@ -810,7 +811,9 @@ void RenderAhead::threadLoop (std::function<void()> onStart)
         // (the workers when the window runs thin, or for good while one thread can't keep up — a serial block now and
         // then, with the window comfortable, measures that again)
         const auto heavy = serialLoad >= serialLimit && ! (jobsSinceSerial >= 256 && fill >= targetFill / 2);
-        const auto useWorkers = pool != nullptr && (fill < std::max (1, targetFill / 3) || heavy);
+        // round 190px: while the UI starves ("Safe overloads"), the workers only when the ring is about to run dry
+        const auto starving = uiGuard != nullptr && uiClock != nullptr && uiGuard->uiStarving (uiClock());
+        const auto useWorkers = pool != nullptr && (starving ? fill < 2 : (fill < std::max (1, targetFill / 3) || heavy));
        #endif
         const auto jobStart = ProcessTimes::now();
         const auto jobCpu = WorkerPool::threadCpuNs();
@@ -835,6 +838,19 @@ void RenderAhead::threadLoop (std::function<void()> onStart)
             pool->park(); // (the window is full: the workers sleep instead of spinning)
         writeIndex.store (w + 1, std::memory_order_release);
         owner.store (0, std::memory_order_release);
+       #if ! defined(__APPLE__)
+        // round 190px (perf 7, fluidity): the UI starving while two or more blocks wait in the ring — the callbacks are
+        // served — the thread gives the screen as long as the block took (0.5 … 4 ms), so a window refilled after an
+        // overload no longer keeps both CPUs of a small PC busy (the samples rendered are the same; only when)
+        if (starving && fill + 1 >= 2 && ! sb.last)
+        {
+            const auto ms = std::clamp ((double) jobNs * 1.0e-6, 0.5, 4.0);
+            if (useWorkers)
+                pool->park();
+            OverloadGuard::sleepFor (ms);
+            uiGuard->notePaced (ms);
+        }
+       #endif
     }
 }
 

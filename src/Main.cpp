@@ -16183,7 +16183,9 @@ private:
                     // round 190ok (P24): Settings › Audio › "Safe overloads" (core/OverloadGuard.h), since the start
                     const auto& guard = app.engine->getOverloadGuard();
                     text << "    safe overloads " << (guard.isEnabled() ? "on" : "off") << ": engaged " << (juce::int64) guard.timesEngaged()
-                         << " times" << (guard.engaged() ? " (now)" : "") << ", yielded " << juce::String (guard.yieldedMs(), 0) << " ms";
+                         << " times" << (guard.engaged() ? " (now)" : "") << ", yielded " << juce::String (guard.yieldedMs(), 0) << " ms"
+                         // round 190px: the render-ahead thread's catch-up paced while the UI starved
+                         << ", render-ahead paced " << (juce::int64) guard.timesPaced() << " times (" << juce::String (guard.pacedMs(), 0) << " ms)";
                     // round 190os: the last release in this step — why, and how long after the callbacks kept their
                     // deadline again
                     if (const auto at = guard.lastReleaseAtMs(); at >= wallStart && guard.lastReleaseReason() != lynx::OverloadGuard::notReleased)

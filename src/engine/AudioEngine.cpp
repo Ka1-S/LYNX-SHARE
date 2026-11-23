@@ -758,6 +758,8 @@ void AudioEngine::buildInitialGraph()
     if (rackProcessor != nullptr)
     {
         rackProcessor->setRenderAheadTargets (&renderAheadTargets); // (round 190gq)
+        // round 190px: the render-ahead thread sees the "Safe overloads" guard's view of the UI (the guard's own clock)
+        rackProcessor->setUiGuard (&overloadGuard, [] () noexcept { return juce::Time::getMillisecondCounterHiRes(); });
         rackProcessor->setLiveInput (&liveInput);
         rackProcessor->setHardwareOutput (&hwOutput);
         rackProcessor->setPerformance (performanceLive.get());
