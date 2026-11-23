@@ -81,6 +81,7 @@ public:
     // at its end (FL's own "copy any value" is the controls' Copy value, which LYNX's value menus have too)
     void mouseDown (const juce::MouseEvent& e) override;
     juce::PopupMenu copyMenu() const; // (tests / shots)
+    juce::PopupMenu rightClickMenu() const; // what the right-click opens: onMenu's menu, a separator, copyMenu's items
     std::function<juce::PopupMenu()> onMenu;
     // Round 190jo (design190ia FM-7, the Pattern toolbar only): the hint a step larger and brighter, as FL's (cap 8 on one
     // line, cap 7 on two; FL cap 11 / 9); the other toolbars and windows keep the smaller text

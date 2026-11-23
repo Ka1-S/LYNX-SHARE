@@ -67,7 +67,8 @@
             check ("CPU panel hint names the double-click", cpuHint.text.contains (lynx::tr ("[Double-click] plugin performance monitor  [RMB] refresh rate")));
             menuShot (cpu.makeMenu(), "CPU", "tb-cpu-menu");
             int rows = 0;
-            for (juce::PopupMenu::MenuItemIterator it (cpu.makeMenu()); it.next();)
+            const auto cpuMenu = cpu.makeMenu(); // (issue #269: an iterator must not walk a temporary menu)
+            for (juce::PopupMenu::MenuItemIterator it (cpuMenu); it.next();)
                 rows += it.getItem().isSeparator || it.getItem().isSectionHeader ? 0 : 1;
             // (rollup step 8: round 190ld added FL's Misc rows View voice count, View FPS and the thread count: --details190ldshot)
             check ("CPU menu: Slow, Medium, Fast, the monitor and round 190ld's three Misc rows (" + juce::String (rows) + " items)", rows == 7);
@@ -79,13 +80,39 @@
                 if (first.isEmpty())
                     first = it.getItem().text;
             check ("hint bar menu: \"" + first + "\"", first.contains ("-3.2 dB"));
+            // the right-click as the hint bar builds it (issue #269: its own builder, not a copy of it): FL's toolbars menu
+            // (FL 2026 opens it there), then LYNX's copy items
+            menuShot (ui.getHintBarForSnapshot().rightClickMenu(), "Hint bar", "hint-copy-menu");
             {
-                // the right-click as the hint bar builds it: FL's toolbars menu (FL 2026 opens it there), then LYNX's copy items
-                auto whole = ui.getToolbarMenuForSnapshot();
-                whole.addSeparator();
-                for (juce::PopupMenu::MenuItemIterator it (copy); it.next();)
-                    whole.addItem (it.getItem());
-                menuShot (whole, "Hint bar", "hint-copy-menu");
+                // issue #269 (round 190qm): the right-click's menu in the bar's states (the user's Mixer hint, a value
+                // only, an empty bar, the idle hint), built again and again: the toolbars menu's items, one separator,
+                // then Copy value / Copy text with the bar's own value and text
+                int toolbarItems = 0;
+                const auto toolbarMenu = ui.getToolbarMenuForSnapshot();
+                for (juce::PopupMenu::MenuItemIterator it (toolbarMenu); it.next();)
+                    ++toolbarItems;
+                const ui::Hint states[] = {
+                    { "Current - the selected track's output goes through this track's effects and EQ, its meter shows the result  [LMB] select: its effects", "Track 7", false, false },
+                    { "", "-3.2 dB", false, false },
+                    { "", "", false, false },
+                    { "Point at anything for help  [F1] shortcuts  [F5]-[F9] windows  [Space] play/stop", "", false, false },
+                };
+                for (const auto& state : states)
+                    for (int round = 0; round < 3; ++round)
+                    {
+                        ui.setHintForSnapshot (state);
+                        const auto menu = ui.getHintBarForSnapshot().rightClickMenu();
+                        juce::StringArray texts;
+                        for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                            texts.add (it.getItem().isSeparator ? juce::String ("--") : it.getItem().text);
+                        const auto value = ui::plainHint (state.value).trim();
+                        const auto ok = texts.size() == toolbarItems + 3 && texts[toolbarItems] == "--"
+                                        && texts[toolbarItems + 1] == (value.isEmpty() ? lynx::tr ("Copy value") : lynx::tr ("Copy value: {0}", { value }))
+                                        && texts[toolbarItems + 2] == lynx::tr ("Copy text");
+                        if (round == 2 || ! ok)
+                            check ("issue #269: the hint bar's right-click menu (\"" + state.text.substring (0, 24) + "\" | \"" + state.value + "\"): "
+                                       + juce::String (texts.size()) + " rows, ends with \"" + texts[texts.size() - 2] + "\", \"" + texts[texts.size() - 1] + "\"", ok);
+                    }
             }
 
             // the Mixer: a locked track (2), a soloed one (1), the hint at a mute switch and at a strip meter
