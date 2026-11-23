@@ -4,6 +4,7 @@
 #include "core/SytrusEngine.h"
 #include "core/Harmor.h"
 #include "core/TrackStates.h"
+#include "core/NoteChance.h"
 #include "core/LynxVerbs.h"
 #include "core/PolyEdit.h"
 #include "core/Dropouts.h"
@@ -6177,6 +6178,8 @@ void RackRenderer::chunkPrelude (const RackState& state, bool playing, double st
     events.clear();
 
     const auto songPlaying = playing && song.mode == PlayMode::song;
+    // round 190pm (P19): Fill for the notes' Conditions — live playback only (renders and exports play with it off)
+    const auto fill = liveInput != nullptr && chance::fillSwitch().load (std::memory_order_relaxed);
     // The launchers: Performance mode's clips (round 165m) and the clip grid (round 181a). Without either, this is the
     // one test a block makes for them, the one Performance mode always made.
     if (songPlaying && (state.launchers || launchersRunning))
@@ -6190,7 +6193,7 @@ void RackRenderer::chunkPrelude (const RackState& state, bool playing, double st
                 state.clipLauncher->clock = startTick;
             runningLauncher = state.clipLauncher;
             launcher::playBlock (*state.clipLauncher, song, *song.clipGrid, state.gridIndex, startTick, numSamples, tps, events, resumeAudio,
-                                 &state.schedule, wrap, chaseNotes, *scheduledNotes);
+                                 &state.schedule, wrap, chaseNotes, *scheduledNotes, fill);
         }
         else
         {
@@ -6199,7 +6202,7 @@ void RackRenderer::chunkPrelude (const RackState& state, bool playing, double st
                 runningLauncher->player.stopAll (runningLauncher);
                 runningLauncher = nullptr;
             }
-            scheduleSong (song, startTick, numSamples, tps, events, resumeAudio, &state.schedule, wrap, chaseNotes);
+            scheduleSong (song, startTick, numSamples, tps, events, resumeAudio, &state.schedule, wrap, chaseNotes, fill);
         }
         // Performance mode (round 165m): the launched clips, on the Player's steady clock (the transport's ticks from
         // where playback started, never wrapping with the song loop)
@@ -6209,7 +6212,7 @@ void RackRenderer::chunkPrelude (const RackState& state, bool playing, double st
                 perfClock = startTick;
             perfRunning = true;
             perfPlayer.process (song, state.performanceZone, perfLive, perfClock, startTick, numSamples * tps, true);
-            schedulePerformance (song, perfPlayer, perfClock, numSamples, tps, events, &state.schedule);
+            schedulePerformance (song, perfPlayer, perfClock, numSamples, tps, events, &state.schedule, fill);
             perfClock += numSamples * tps;
         }
         else if (perfLive != nullptr)
@@ -6222,7 +6225,7 @@ void RackRenderer::chunkPrelude (const RackState& state, bool playing, double st
     {
         if (songPlaying)
             scheduleSong (song, startTick, numSamples, ticksPerSample (bpm, sampleRate), events, resumeAudio, &state.schedule,
-                          liveInput == nullptr || ! liveInput->linearSong.load (std::memory_order_relaxed), chaseNotes);
+                          liveInput == nullptr || ! liveInput->linearSong.load (std::memory_order_relaxed), chaseNotes, fill);
         if (launchersRunning || (perfLive != nullptr && perfLive->anyPlaying.load (std::memory_order_relaxed)))
         {
             perfPlayer.process (song, state.performanceZone, perfLive, perfClock, startTick, 0.0, false);
@@ -6249,7 +6252,7 @@ void RackRenderer::chunkPrelude (const RackState& state, bool playing, double st
         const auto& pattern = song.patterns[(std::size_t) patternIndex];
         schedulePatternLoop (pattern, pattern.effectiveLength (song.meter()), startTick, numSamples,
                              ticksPerSample (bpm, sampleRate), events, song.swing, &song.channels, chaseNotes,
-                             liveInput != nullptr ? liveInput->patternOrigin.load (std::memory_order_relaxed) : -1.0, song.chanceSeed);
+                             liveInput != nullptr ? liveInput->patternOrigin.load (std::memory_order_relaxed) : -1.0, song.chanceSeed, fill);
     }
 
     // each started note ends where it was going to, whatever was edited meanwhile (FL, round 169d)

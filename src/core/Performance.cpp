@@ -458,6 +458,7 @@ void Player::process (const Song& song, const std::vector<int>& zone, Live* live
             auto& v = virtuals[(std::size_t) numVirtual++];
             v.clip = clip;
             v.playlistIndex = (std::size_t) index;
+            v.pass = (std::int64_t) std::max (0.0, k);
             v.clip.start = (std::int64_t) std::llround (vs);
             v.clip.length = std::max<std::int64_t> (1, (std::int64_t) std::llround (ve) - v.clip.start);
             v.clip.offset = clip.offset + (std::int64_t) std::llround (vs - ws);
@@ -514,14 +515,14 @@ void Player::process (const Song& song, const std::vector<int>& zone, Live* live
 }
 
 void schedulePerformance (const Song& song, const Player& player, double clock, int numSamples, double tps, EventBuffer& out,
-                          const ScheduleIndex* index) noexcept
+                          const ScheduleIndex* index, bool fill) noexcept
 {
     if (player.virtualCount() == 0)
         return;
     for (int i = 0; i < player.virtualCount(); ++i)
     {
         const auto& v = player.virtualClip (i);
-        scheduleSingleClip (song, v.clip, v.playlistIndex, clock, numSamples, tps, out, index);
+        scheduleSingleClip (song, v.clip, v.playlistIndex, clock, numSamples, tps, out, index, v.pass, fill);
     }
     out.sortByOffset();
 }

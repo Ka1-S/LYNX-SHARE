@@ -7,6 +7,8 @@
 #include "core/NoteEdit.h"
 #include "core/NoteTools.h"
 #include "core/NoteRepeat.h"
+#include "core/NoteConditions.h"
+#include "ui/PianoRollComponent.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
@@ -940,6 +942,44 @@ public:
         // Live 12's note Chance and Velocity Range (round 187c, LYNX additions)
         addRow (chance, TR_NOOP ("Chance"), 0.0, 100.0, "%");
         addRow (velocityRange, TR_NOOP ("Vel. range"), -100.0, 100.0, "%");
+        // round 190pm (research190oe P19): ratchets, their velocity bend and the Condition (LYNX additions)
+        addRow (ratchets, TR_NOOP ("Ratchets"), 1.0, (double) noterepeat::maxRatchets, "");
+        ratchets.slider.textFromValueFunction = [] (double v) {
+            const auto n = juce::roundToInt (v);
+            return n <= 1 ? tr ("None") : tr ("{0} strikes", { juce::String (n) });
+        };
+        ratchets.slider.setTextBoxStyle (juce::Slider::TextBoxRight, true, 110, 20);
+        ratchets.slider.setTooltip (tr ("Strikes the note this many times in even parts of its length (LYNX; FL's Repeat wins when set)"));
+        addRow (ratchetVelocity, TR_NOOP ("Ratchet vel."), -100.0, 100.0, "%");
+        ratchetVelocity.slider.setTooltip (tr ("The last strike's velocity change, the strikes between in a line (LYNX)"));
+        addRow (condition, TR_NOOP ("Condition"), 0.0, (double) (noteconditions::presetCount - 1), "");
+        condition.slider.textFromValueFunction = [this] (double v) {
+            if (juce::roundToInt (v) == 0 && cycle.editor.getText().isNotEmpty()) // (a cycle of its own, e.g. 2+4:4)
+                return cycle.editor.getText();
+            Note n;
+            noteconditions::apply (n, noteconditions::preset (juce::roundToInt (v)));
+            return PianoRollComponent::conditionText (n);
+        };
+        condition.slider.setTextBoxStyle (juce::Slider::TextBoxRight, true, 110, 20);
+        condition.slider.setTooltip (tr ("The loop passes the note plays on: first pass, not first, with Fill, or pass A of every B (LYNX)"));
+        cycle.label.setText (tr ("Cycle passes"), juce::dontSendNotification);
+        cycle.label.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        cycle.label.setFont (theme::font (theme::type::small));
+        cycle.editor.setFont (theme::monoFont (theme::type::body));
+        cycle.editor.setTooltip (tr ("The passes of a cycle the note plays on, e.g. 2:4 or 2+4:4 (empty: every pass)"));
+        cycle.editor.onTextChange = [this] {
+            cycle.touched = true;
+            condition.slider.updateText();
+        };
+        condition.slider.onValueChange = [this] {
+            condition.touched = true;
+            Note n;
+            noteconditions::apply (n, noteconditions::preset (juce::roundToInt (condition.slider.getValue())));
+            cycle.editor.setText (juce::String (noteconditions::cycleText (n.cycle, n.cycleMask)), juce::dontSendNotification);
+            cycle.touched = false;
+        };
+        addAndMakeVisible (cycle.label);
+        addAndMakeVisible (cycle.editor);
         chance.slider.setTooltip (tr ("How likely the note is to play each time it comes round (LYNX; Live's note Chance)"));
         velocityRange.slider.setTooltip (tr ("Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)"));
         release.slider.setTooltip (tr ("Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)"));
@@ -985,7 +1025,9 @@ public:
         addAndMakeVisible (resetButton);
 
         load();
-        setSize (320, 34 + 10 * rowHeight + rowHeight + (single ? 2 * rowHeight : 0) + 44);
+        for (auto* row : { &repeat, &ratchets, &condition }) // (round 190pm: their words, also for a value load() didn't change)
+            row->slider.updateText();
+        setSize (320, 34 + 14 * rowHeight + rowHeight + (single ? 2 * rowHeight : 0) + 44);
     }
 
     void paint (juce::Graphics& g) override
@@ -998,11 +1040,16 @@ public:
         auto area = getLocalBounds().reduced (12, 8);
         title.setBounds (area.removeFromTop (26));
 
-        for (auto* row : { &velocity, &pan, &release, &finePitch, &modX, &modY, &repeat, &colour, &chance, &velocityRange })
+        for (auto* row : { &velocity, &pan, &release, &finePitch, &modX, &modY, &repeat, &colour, &chance, &velocityRange, &ratchets, &ratchetVelocity, &condition })
         {
             auto r = area.removeFromTop (rowHeight);
             row->label.setBounds (r.removeFromLeft (80));
             row->slider.setBounds (r);
+        }
+        {
+            auto r = area.removeFromTop (rowHeight);
+            cycle.label.setBounds (r.removeFromLeft (110));
+            cycle.editor.setBounds (r.reduced (0, 2));
         }
 
         auto toggles = area.removeFromTop (rowHeight);
@@ -1040,6 +1087,11 @@ public:
         set (chance, 100.0);
         set (velocityRange, 0.0);
         set (repeat, 0.0);
+        set (ratchets, 1.0);
+        set (ratchetVelocity, 0.0);
+        set (condition, 0.0);
+        cycle.editor.setText ({}, juce::dontSendNotification);
+        cycle.touched = true;
     }
 
 private:
@@ -1089,6 +1141,12 @@ private:
         set (colour, (double) (shown.colour + 1));
         set (chance, std::round (shown.chance * 100.0f));
         set (velocityRange, std::round (shown.velocityRange * 100.0f));
+        set (ratchets, (double) juce::jlimit (1, noterepeat::maxRatchets, shown.ratchets));
+        set (ratchetVelocity, std::round (shown.ratchetVelocity * 100.0f));
+        set (condition, (double) juce::jmax (0, noteconditions::presetOf (shown)));
+        cycle.editor.setText (juce::String (noteconditions::cycleText (shown.cycle, shown.cycleMask)), juce::dontSendNotification);
+        cycle.touched = false;
+        cycle.editor.setColour (juce::TextEditor::outlineColourId, theme::colour::borderStrong);
         slide.setToggleState (shown.slide, juce::dontSendNotification);
         porta.setToggleState (shown.porta, juce::dontSendNotification);
         slideTouched = portaTouched = false;
@@ -1115,6 +1173,14 @@ private:
         if (single && length.touched && (! noteedit::parseTime (length.editor.getText().toStdString(), bpb, len, true) || len <= 0))
         {
             length.editor.setColour (juce::TextEditor::outlineColourId, theme::colour::warning);
+            ok = false;
+        }
+
+        std::uint8_t cycleLength = 0;
+        std::uint16_t cycleMask = 0;
+        if (cycle.touched && ! noteconditions::parseCycle (cycle.editor.getText().toStdString(), cycleLength, cycleMask))
+        {
+            cycle.editor.setColour (juce::TextEditor::outlineColourId, theme::colour::warning);
             ok = false;
         }
 
@@ -1149,6 +1215,14 @@ private:
                 if (colour.touched) n.colour = juce::jlimit (0, noteColourCount - 1, (int) colour.slider.getValue() - 1);
                 if (chance.touched) n.chance = (float) chance.slider.getValue() / 100.0f;
                 if (velocityRange.touched) n.velocityRange = (float) velocityRange.slider.getValue() / 100.0f;
+                if (ratchets.touched) n.ratchets = juce::roundToInt (ratchets.slider.getValue()) > 1 ? juce::roundToInt (ratchets.slider.getValue()) : 0;
+                if (ratchetVelocity.touched) n.ratchetVelocity = (float) ratchetVelocity.slider.getValue() / 100.0f;
+                if (condition.touched) noteconditions::apply (n, noteconditions::preset (juce::roundToInt (condition.slider.getValue())));
+                if (cycle.touched)
+                {
+                    n.cycle = cycleLength;
+                    n.cycleMask = cycleLength > 1 ? cycleMask : 0;
+                }
                 if (slideTouched) n.slide = slide.getToggleState();
                 if (portaTouched) n.porta = porta.getToggleState();
                 if (single)
@@ -1175,9 +1249,9 @@ private:
     Note shown;
     bool single = false, slideTouched = false, portaTouched = false;
     juce::Label title;
-    SliderRow velocity, pan, release, finePitch, modX, modY, repeat, colour, chance, velocityRange;
+    SliderRow velocity, pan, release, finePitch, modX, modY, repeat, colour, chance, velocityRange, ratchets, ratchetVelocity, condition;
     juce::ToggleButton slide, porta;
-    TextRow time, length;
+    TextRow time, length, cycle;
     juce::TextButton applyButton, revertButton, resetButton;
 };
 } // namespace

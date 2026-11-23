@@ -6084,6 +6084,8 @@ ui::Hint PlaylistComponent::hoverForSnapshot()
 
 void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
 {
+    if (touchInput.mouseDown (e)) // round 190pm (P23): a finger in Touch mode is held back until it means something
+        return;
     const AudioEngine::UndoGesture undoGesture (engine, AudioEngine::UndoGesture::begin); // (round 190jv: one undo step per gesture)
     followEditStamp = engine.getPublishCount(); // (round 190im, R15)
     downMods = e.mods;
@@ -7201,6 +7203,8 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
 
 void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
 {
+    if (touchInput.mouseDrag (e)) // round 190pm (P23)
+        return;
     if (insertsMouseDrag (e)) // issue #154: an effect dragged from a linked header's list
         return;
     if (drag == Drag::range || drag == Drag::rangeMove) // round 190pa (P14)
@@ -8112,6 +8116,8 @@ ui::Hint PlaylistComponent::fadeDragHintForSnapshot (int index, int target)
 
 void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
 {
+    if (touchInput.mouseUp (e)) // round 190pm (P23)
+        return;
     const AudioEngine::UndoGesture undoGesture (engine, AudioEngine::UndoGesture::end); // (closes when mouseUp returns)
     // round 190im (R15): a gesture that changed the song is an edit by hand: Follow pauses (when that option is on)
     EditorGlobals::get().pauseFollowIfEdited (EditorGlobals::FollowView::playlist, followEditStamp, engine.getPublishCount());
@@ -15090,6 +15096,53 @@ void PlaylistComponent::glideFrame()
     glideX.current = scrollTicks;
     gliding = glideX.isMoving() || glideY.isMoving();
     repaintScrolled();
+}
+
+// Round 190pm (research190oe P23, ui/TouchInput.h): Touch mode's gestures on the Playlist. A long press on a clip opens
+// its menu (FL's right click deletes: that stays on the mouse's right button), anywhere else it is the right click there
+// (a header's menu, the ruler's); two fingers pan (Simple layout) and a pinch zooms the time around their centre.
+void PlaylistComponent::touchLongPress (const juce::MouseEvent& rightClick)
+{
+    bool right = false, left = false;
+    const auto hit = rightClick.x >= headerWidth ? clipAt (rightClick.x, rightClick.y, right, left) : -1;
+    if (hit >= 0)
+    {
+        lastTouchActionForSnapshot = "clip menu " + juce::String (hit);
+        if (! ui::showingForShots())
+            showClipMenu (hit);
+        return;
+    }
+    lastTouchActionForSnapshot = "right click";
+    const juce::Component::SafePointer<PlaylistComponent> safe (this);
+    mouseDown (rightClick);
+    if (safe != nullptr && drag != Drag::erase)
+        mouseUp (rightClick);
+    else if (safe != nullptr)
+    {
+        drag = Drag::none; // (an empty place: nothing to delete, the right drag ends here)
+        mouseUp (rightClick);
+    }
+}
+
+void PlaylistComponent::touchPan (float dx, float dy)
+{
+    gliding = false;
+    scrollTicks = juce::jmax (0.0, scrollTicks - (double) dx / pixelsPerTick);
+    scrollY = juce::jmax (0, scrollY - juce::roundToInt (dy));
+    updateScrollBars();
+    repaint();
+}
+
+void PlaylistComponent::touchPinch (float scale, juce::Point<float> centre)
+{
+    gliding = false;
+    const auto anchorPixels = (double) juce::jmax (0.0f, centre.x - (float) headerWidth);
+    const auto zoomed = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), pixelsPerTick * (double) scale);
+    scrollTicks = gesture::zoomAnchored (scrollTicks, pixelsPerTick, zoomed, anchorPixels);
+    pixelsPerTick = zoomed;
+    zoomBeforeAll = 0.0;
+    updateScrollBars();
+    repaint();
 }
 
 void PlaylistComponent::mouseMagnify (const juce::MouseEvent& e, float scale)

@@ -123,6 +123,18 @@ inline juce::var toValue (const Note& n)
              { "chanceGroup", n.chanceGroup }, { "chanceOne", n.chanceOne }, { "expression", detail::curvesValue (n) },
              { "repeat", n.repeat } })
         result->setProperty (name, value);
+    // round 190pm (P19): the ratchets and the Condition, only when set (optional on the way in, as "repeat")
+    if (n.ratchets != 0 || n.ratchetVelocity != 0.0f)
+    {
+        result->setProperty ("ratchets", n.ratchets);
+        result->setProperty ("ratchetVelocity", (double) n.ratchetVelocity);
+    }
+    if (n.hasCondition() || n.cycleMask != 0)
+    {
+        result->setProperty ("condition", (int) n.condition);
+        result->setProperty ("cycle", (int) n.cycle);
+        result->setProperty ("cycleMask", (int) n.cycleMask);
+    }
     return result;
 }
 
@@ -136,7 +148,11 @@ inline Note fromValue (const juce::var& value, std::size_t channels)
             detail::invalid (juce::String ("Every replacement note must include ") + field + "; read the complete notes first");
     // "repeat" (issue #208, FL's note repeat rate 0..14) is optional: clients written before it may leave it out
     const auto withRepeat = value.hasProperty ("repeat");
-    if (object->getProperties().size() != (int) detail::fields.size() + (withRepeat ? 1 : 0))
+    // round 190pm: "ratchets" / "ratchetVelocity" and "condition" / "cycle" / "cycleMask", optional too
+    int optional = withRepeat ? 1 : 0;
+    for (const auto* field : { "ratchets", "ratchetVelocity", "condition", "cycle", "cycleMask" })
+        optional += value.hasProperty (field) ? 1 : 0;
+    if (object->getProperties().size() != (int) detail::fields.size() + optional)
         detail::invalid ("Replacement note contains an unsupported field");
     if (channels == 0)
         detail::invalid ("Cannot add a note without a channel");
@@ -165,6 +181,16 @@ inline Note fromValue (const juce::var& value, std::size_t channels)
     n.curves = detail::curvesFrom (value);
     if (withRepeat)
         n.repeat = (int) detail::integer (value, "repeat", 0, 14);
+    if (value.hasProperty ("ratchets"))
+        n.ratchets = (int) detail::integer (value, "ratchets", 0, 8);
+    if (value.hasProperty ("ratchetVelocity"))
+        n.ratchetVelocity = (float) detail::number (value, "ratchetVelocity", -1, 1);
+    if (value.hasProperty ("condition"))
+        n.condition = (std::uint8_t) detail::integer (value, "condition", 0, notecondition::count - 1);
+    if (value.hasProperty ("cycle"))
+        n.cycle = (std::uint8_t) detail::integer (value, "cycle", 0, 16);
+    if (value.hasProperty ("cycleMask"))
+        n.cycleMask = (std::uint16_t) detail::integer (value, "cycleMask", 0, 65535);
     return n;
 }
 } // namespace lynx::remote_notes

@@ -12,7 +12,8 @@ bool sameNote (const Note& a, const Note& b) noexcept
            && a.pan == b.pan && a.finePitch == b.finePitch && a.muted == b.muted && a.slide == b.slide && a.porta == b.porta && a.held == b.held
            && a.release == b.release && a.modX == b.modX && a.modY == b.modY && a.colour == b.colour && a.group == b.group && a.repeat == b.repeat
            && a.chance == b.chance && a.velocityRange == b.velocityRange && a.chanceGroup == b.chanceGroup && a.chanceOne == b.chanceOne
-           && a.curves == b.curves;
+           && a.curves == b.curves && a.ratchets == b.ratchets && a.ratchetVelocity == b.ratchetVelocity && a.condition == b.condition
+           && a.cycle == b.cycle && a.cycleMask == b.cycleMask;
 }
 
 bool sameNotes (const std::vector<Note>& a, const std::vector<Note>& b) noexcept

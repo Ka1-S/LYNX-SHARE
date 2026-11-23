@@ -164,6 +164,10 @@ public:
     // each style keeps its own workspace layout. The Simple workflow's parts are made when it is first chosen.
     void setLayoutStyle (layoutstyle::Style style, bool swapLayout = true);
     void setSimpleLargeControls (bool on); // round 190jc: View › Large controls (touch size), Simple layout
+    // round 190pm (research190oe P23): Touch mode (ui/TouchInput.h) and its suggestion card
+    void setTouchMode (bool on);
+    void suggestTouchMode();
+    juce::Component* touchSuggestionForSnapshot() const noexcept { return touchSuggestion.get(); }
     layoutstyle::Style getLayoutStyle() const noexcept { return layoutStyle; }
     SimpleWorkflow* getSimpleWorkflowForSnapshot() noexcept { return simpleWorkflow.get(); } // --simpleshot
     // round 190fc (B1): how many Simple workflow objects were still alive when the last MainComponent's destructor body
@@ -1179,6 +1183,19 @@ private:
     void onboardingTick(); // (from the window's timer, only while the Next-3 card shows)
     void next3Act (onboarding::Item item);
     void checkRecordTip(); // Record (audio) with no input to record from: one tip
+
+    // round 190pm (P23): the Touch mode suggestion (the first finger seen on any window of the app)
+    struct TouchWatcher final : public juce::MouseListener
+    {
+        explicit TouchWatcher (MainComponent& o) : owner (o) {}
+        void mouseDown (const juce::MouseEvent& e) override;
+        MainComponent& owner;
+    };
+    TouchWatcher touchWatcher { *this };
+    std::unique_ptr<juce::Component> touchSuggestion;
+    bool touchMadeLarge = false; // Touch mode switched Large controls on (and switches them off again)
+    void hideTouchSuggestion();
+    void placeTouchSuggestion();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
 };

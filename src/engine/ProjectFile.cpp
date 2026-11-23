@@ -18,6 +18,7 @@
 #include "core/PlaylistOps.h"
 #include "core/NoteEdit.h" // round 190jf: normalizeFolders
 #include "core/NoteRepeat.h" // issue #208
+#include "core/NoteConditions.h" // round 190pm
 
 #include <algorithm>
 #include <tuple>
@@ -3204,7 +3205,10 @@ juce::String toJson (const Song& song, bool stampVersion)
             // [.., chance group, play one, curves] (issue #108, MPE stage 2: core/NoteCurves.h): the note's pitch / timbre /
             // pressure curves, each a flat [tick, value, tick, value, ...] list (ticks from the note's start), only with curves
             // [.., curves, repeat] (issue #208: FL's note repeat; the curves slot is null without curves)
-            const auto repeated = n.repeat != 0;
+            // [.., repeat, ratchets, ratchet velocity, condition, cycle, cycle mask] (round 190pm, research190oe P19; only with
+            // ratchets or a Condition: the repeat slot is then written, 0 without one)
+            const auto extended = n.ratchets != 0 || n.ratchetVelocity != 0.0f || n.condition != 0 || n.cycle != 0 || n.cycleMask != 0;
+            const auto repeated = n.repeat != 0 || extended;
             const auto curved = n.curves.has();
             const auto chanced = n.hasChance() || (exactNumbers && n.chanceOne) || curved || repeated;
             const auto extra = n.release != 0.5f || n.modX != 0.5f || n.modY != 0.5f || n.colour != 0 || n.group != 0 || chanced;
@@ -3249,6 +3253,14 @@ juce::String toJson (const Song& song, bool stampVersion)
                     note.add (juce::var());
                 if (repeated)
                     note.add (n.repeat);
+                if (extended)
+                {
+                    note.add (n.ratchets);
+                    note.add (projectNumber (n.ratchetVelocity, 1000.0f));
+                    note.add ((int) n.condition);
+                    note.add ((int) n.cycle);
+                    note.add ((int) n.cycleMask);
+                }
             }
 
             if (n.held) // (round 190oz: FL's held step notes, by their place in "notes")
@@ -4317,6 +4329,14 @@ std::optional<Song> fromJsonImpl (const juce::String& json, juce::String& error,
                             }
                         if (n.size() >= 21) // (issue #208: FL's note repeat)
                             note.repeat = juce::jlimit (0, noterepeat::rateCount, (int) n[20]);
+                        if (n.size() >= 26) // (round 190pm: ratchets and the Condition)
+                        {
+                            note.ratchets = juce::jlimit (0, noterepeat::maxRatchets, (int) n[21]);
+                            note.ratchetVelocity = juce::jlimit (-1.0f, 1.0f, (float) (double) n[22]);
+                            note.condition = (std::uint8_t) juce::jlimit (0, (int) notecondition::count - 1, (int) n[23]);
+                            note.cycle = (std::uint8_t) juce::jlimit (0, noteconditions::maxCycle, (int) n[24]);
+                            note.cycleMask = (std::uint16_t) juce::jlimit (0, 65535, (int) n[25]);
+                        }
                     }
 
                     note.held = std::binary_search (heldAt.begin(), heldAt.end(), noteAt);

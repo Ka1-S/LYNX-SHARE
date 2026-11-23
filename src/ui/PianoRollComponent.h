@@ -3,6 +3,8 @@
 #include "core/ChordLane.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include "ui/TouchInput.h"
+
 #include "core/EventPaneSplit.h"
 #include "ui/LiveClipLook.h"
 #include "core/KeyRegions.h"
@@ -85,6 +87,13 @@ public:
     void feedMagicLasso (juce::Point<int> p, bool buttonDown); // FL's Magic lasso (round 190mp, DE-71)
     // trackpad pinch (macOS; Windows touch screens): time zoom around the pointer, with Alt the vertical zoom (round 170e)
     void mouseMagnify (const juce::MouseEvent& e, float scale) override;
+    // Touch mode (round 190pm, research190oe P23; ui/TouchInput.h): the editor's fingers (long press = context menu; in the
+    // Simple layout two fingers pan and pinch)
+    ui::touchmode::Deferral& touchInputForTests() noexcept { return touchInput; }
+    void touchPan (float dx, float dy);
+    void touchPinch (float scale, juce::Point<float> centre);
+    void touchLongPress (const juce::MouseEvent& rightClick);
+    juce::String lastTouchActionForSnapshot; // ("clip menu 3", "note inspector 2", "menu", "right click")
 
     // Editing shortcuts; the main window forwards keys when the Piano Roll is visible.
     bool handleKey (const juce::KeyPress& key);
@@ -300,7 +309,9 @@ public:
     static constexpr int laneVelocity = 1, lanePan = 2, laneFinePitch = 3, laneRelease = 4, laneModX = 5, laneModY = 6, laneChance = 7,
                          laneVelocityRange = 8,
                          // MPE stage 2 (issue #108, core/NoteCurves.h): the notes' own pitch bend / slide / pressure curves
-                         laneMpePitch = 9, laneMpeSlide = 10, laneMpePressure = 11, laneLast = 11;
+                         laneMpePitch = 9, laneMpeSlide = 10, laneMpePressure = 11,
+                         // Note Repeats and Conditions (round 190pm, research190oe P19; core/NoteConditions.h)
+                         laneRatchets = 12, laneRatchetVelocity = 13, laneCondition = 14, laneLast = 14;
     static constexpr bool isMpeLane (int id) noexcept { return id >= laneMpePitch && id <= laneMpePressure; }
     // The Clip-launch layout's MPE tab (Live 11+'s note expression editor, round 190hy): the bottom lane becomes the three
     // expression lanes stacked (pitch bend, slide, pressure) and the notes show their pitch curves
@@ -558,6 +569,13 @@ private:
     };
     std::vector<juce::Rectangle<int>> laneAreas() const; // stacked lanes top to bottom, then the bottom lane
     int laneId() const noexcept { return laneOverride != 0 ? laneOverride : laneBox.getSelectedId(); }
+    juce::String laneValueText (float value) const; // round 190pm
+public:
+    juce::PopupMenu repeatsMenu(); // round 190pm: Ratchets, Condition, Fill (also --snapshot)
+private:
+public:
+    static juce::String conditionText (const Note& n); // round 190pm: "Always", "First pass", "2:4", "Not first, 1:2"
+private:
     juce::String laneName() const;
     int stackedLaneId (const StackedLane& lane) const;
     int stackedLaneAt (juce::Point<int> p) const;  // -1: none
@@ -955,6 +973,10 @@ private:
     // issue #250 (round 190oq): deleted notes fade out as FL's do (ui/DeleteFade.h); `fadeOut` before they go
     ui::DeleteFade deleteFade { *this, ui::DeleteFade::pianoRollMs };
     void fadeOut (const std::vector<int>& notes);
+
+    ui::touchmode::Deferral touchInput { ui::touchmode::Deferral::Hooks { this, [this] (const juce::MouseEvent& e) { touchLongPress (e); },
+                                                                         [this] (float dx, float dy) { touchPan (dx, dy); },
+                                                                         [this] (float scale, juce::Point<float> c) { touchPinch (scale, c); } } };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PianoRollComponent)
     std::unique_ptr<ui::TimerWhileShowing> showingTimer; // the polling timer, only while on screen (round 174f)

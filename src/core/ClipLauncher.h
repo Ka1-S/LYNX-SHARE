@@ -136,6 +136,7 @@ struct VirtualClip
 {
     Clip clip;
     int slot = -1;
+    std::int64_t pass = 0; // round 190pm: the clip's loops played before this one since it was launched (notes' Conditions)
 };
 
 class Runtime;
@@ -300,5 +301,6 @@ public:
 // One block of the song while the project has a grid: the commands, then what the Playlist plays around the taken tracks,
 // then the grid's passes; ends what was cut. `clock` advances. Audio thread; `index` the song's schedule index.
 void playBlock (Runtime& runtime, const Song& song, const ClipGrid& grid, const GridIndex& gridIndex, double startTick, int numSamples,
-                double tps, EventBuffer& out, bool resume, const ScheduleIndex* index, bool wrap, bool chase, ScheduledNotes& notes) noexcept;
+                double tps, EventBuffer& out, bool resume, const ScheduleIndex* index, bool wrap, bool chase, ScheduledNotes& notes,
+                bool fill = false) noexcept;
 } // namespace lynx::launcher

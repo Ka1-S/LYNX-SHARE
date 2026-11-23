@@ -202,7 +202,8 @@ void schedulePatternLoop (const Pattern& pattern,
                           const std::vector<ChannelDef>* channels,
                           bool chase,
                           double linearOrigin,
-                          std::uint32_t chanceSeed) noexcept
+                          std::uint32_t chanceSeed,
+                          bool fill) noexcept
 {
     if (numSamples <= 0 || patternLength <= 0 || tps <= 0.0)
         return;
@@ -240,8 +241,9 @@ void schedulePatternLoop (const Pattern& pattern,
         const auto& note = pattern.notes[noteIndex];
         if ((! linear && note.start >= patternLength) || note.muted)
             continue; // outside the loop / muted note
-        const chance::Roll noteRoll { place, &note, &pattern.notes, noteIndex };
-        roll = note.hasChance() ? &noteRoll : nullptr;
+        chance::Roll noteRoll { place, &note, &pattern.notes, noteIndex };
+        noteRoll.fill = fill; // (round 190pm: a note's Condition sees the pattern's pass, emitOccurrences' count)
+        roll = chance::rolls (note) ? &noteRoll : nullptr;
 
         NoteEvent on;
         on.type = NoteEvent::Type::on;
@@ -278,16 +280,30 @@ void schedulePatternLoop (const Pattern& pattern,
             continue;
         }
 
-        // FL's note repeat (issue #208, core/NoteRepeat.h): each strike is a note of its own, to the next strike
-        noterepeat::forEachStrike (note, start, timing.length, [&] (std::int64_t strikeStart, std::int64_t strikeLength, int) {
+        // FL's note repeat (issue #208, core/NoteRepeat.h): each strike is a note of its own, to the next strike. Round 190pm:
+        // the note's ratchets too, each strike at its velocity bend (a roll of its own for the drawn velocity)
+        const auto strikes = note.ratchetVelocity != 0.0f ? noterepeat::strikeCount (note, timing.length) : 1;
+        const auto* const noteRollOf = roll;
+        chance::Roll strikeRoll;
+        noterepeat::forEachStrike (note, start, timing.length, [&] (std::int64_t strikeStart, std::int64_t strikeLength, int k) {
+            const auto gain = noterepeat::strikeGain (note, k, strikes);
+            roll = noteRollOf;
+            if (gain != 1.0f && roll != nullptr)
+            {
+                strikeRoll = *roll;
+                strikeRoll.gain = gain;
+                roll = &strikeRoll;
+            }
             on.lengthTicks = (float) strikeLength;
-            emit ((double) strikeStart, on);
+            auto struck = on;
+            struck.velocity = noterepeat::strikeVelocity (on.velocity, gain);
+            emit ((double) strikeStart, struck);
             if (chase && (double) strikeStart + tps <= position && (double) (strikeStart + strikeLength) > position)
             {
-                auto chased = on;
+                auto chased = struck;
                 chased.sampleOffset = 0; // a note crossing the start position ("Play truncated notes on transport")
                 chased.lengthTicks = (float) ((double) (strikeStart + strikeLength) - position);
-                auto velocity = on.velocity;
+                auto velocity = struck.velocity;
                 if (roll == nullptr || chance::plays (*roll, linear ? 0 : passAt (startTick, (double) patternLength), velocity))
                 {
                     chased.velocity = velocity;
@@ -307,6 +323,7 @@ void schedulePatternLoop (const Pattern& pattern,
                 emit ((double) (strikeStart + strikeLength), cut);
             }
         });
+        roll = noteRollOf;
         if (curved)
         {
             // the note's repetitions sounding in this block (a loop: every pass; once: at the origin)
@@ -739,11 +756,19 @@ void forClipsInBlock (const Song& song, const ScheduleIndex* index, std::int64_t
     }
 }
 
+// Round 190pm (P19): what a pattern clip's notes with a Condition see — the passes of a launched clip before this one
+// (Clip-launch / Performance loops, 0 in the Playlist) and Fill
+struct NotePasses
+{
+    std::int64_t launch = 0;
+    bool fill = false;
+};
+
 // One clip of the Playlist (or a performance-mode launch, played as a clip of its own), its events in the block.
 // [loopStart, loopEnd) = the block within the song loop of length `loop`.
 void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, double startTick, double endTick, int numSamples,
                    double tps, std::int64_t loop, double loopStart, double loopEnd, bool resume, const ScheduleIndex* index,
-                   EventBuffer& out, bool chase = false, const std::int64_t* takeoverZoneEnd = nullptr) noexcept
+                   EventBuffer& out, bool chase = false, const std::int64_t* takeoverZoneEnd = nullptr, NotePasses passes = {}) noexcept
 {
     // takeoverZoneEnd: FL's pattern clip takeover applies (stopsAtFor with that zone end), else never. Round 190ge: worked
     // out only for a pattern clip the block reaches (it was found for every clip of the Playlist at every block: the
@@ -837,13 +862,20 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
 
         // the draws of this clip's pass (round 187c): its own, apart from the other clips of the pattern
         const auto place = chance::context (song.chanceSeed, ((std::uint64_t) clip.track << 44) ^ (std::uint64_t) clip.start, shift);
+        // round 190pm: a Condition counts the clip's passes as heard — the passes of a launched clip's loops before this
+        // one, this pass of its repeats, and (emitOccurrences' count) each song loop going round again
+        const auto passCount = lastPass - firstPass + 1;
+        const auto clipPass = (repeats ? shift / period - firstPass : 0) + passes.launch * passCount;
         for (auto it = first; it != last; ++it)
         {
             const auto& note = *it;
             if (repeats && note.start >= period) // a pass is the pattern's length
                 continue;
-            const chance::Roll noteRoll { place, &note, &notes, (std::size_t) (it - notes.begin()) };
-            const auto* roll = note.hasChance() ? &noteRoll : nullptr;
+            chance::Roll noteRoll { place, &note, &notes, (std::size_t) (it - notes.begin()) };
+            noteRoll.passBase = clipPass;
+            noteRoll.passStride = passCount;
+            noteRoll.fill = passes.fill;
+            const auto* roll = chance::rolls (note) ? &noteRoll : nullptr;
             const auto start = note.start + shift; // where the note is in the clip's passes
 
             if (note.muted || start >= clip.offset + clip.length)
@@ -920,11 +952,24 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
                 continue;
             }
 
-            // FL's note repeat (issue #208, core/NoteRepeat.h): each strike a note of its own, to the next strike
-            noterepeat::forEachStrike (note, on, off - on, [&] (std::int64_t strikeOn, std::int64_t strikeLength, int) {
+            // FL's note repeat (issue #208, core/NoteRepeat.h): each strike a note of its own, to the next strike. Round 190pm:
+            // the ratchets too (split over the note's whole length: the end of the clip cuts them), at their velocity bend
+            const auto strikes = note.ratchetVelocity != 0.0f ? noterepeat::strikeCount (note, timing.length) : 1;
+            const auto* const noteRollOf = roll;
+            chance::Roll strikeRoll;
+            noterepeat::forEachStrike (note, on, off - on, [&] (std::int64_t strikeOn, std::int64_t strikeLength, int k) {
+                const auto gain = noterepeat::strikeGain (note, k, strikes);
+                const auto* roll = noteRollOf;
+                if (gain != 1.0f && roll != nullptr)
+                {
+                    strikeRoll = *roll;
+                    strikeRoll.gain = gain;
+                    roll = &strikeRoll;
+                }
                 const auto strikeOff = strikeOn + strikeLength;
                 auto s = e;
                 s.lengthTicks = (float) strikeLength;
+                s.velocity = noterepeat::strikeVelocity (e.velocity, gain);
                 emitOccurrences ((double) strikeOn, loop, startTick, endTick, tps, numSamples, s, out, roll);
                 if (chase && (double) strikeOn + tps <= loopStart && (double) strikeOff > loopStart)
                 {
@@ -941,7 +986,7 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
                 s.type = NoteEvent::Type::off;
                 s.velocity = 0.0f;
                 emitOccurrences ((double) strikeOff, loop, startTick, endTick, tps, numSamples, s, out, roll);
-            });
+            }, 4096, start < clip.offset ? -1 : timing.length);
             if (curvedAt >= 0.0) // (each repetition of the song's loop that reaches this block)
             {
                 const auto length = std::max<std::int64_t> (1, off - (std::int64_t) curvedAt);
@@ -974,18 +1019,19 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
 } // namespace
 
 void scheduleSingleClip (const Song& song, const Clip& clip, std::size_t clipIndex, double startTick, int numSamples, double tps,
-                         EventBuffer& out, const ScheduleIndex* index) noexcept
+                         EventBuffer& out, const ScheduleIndex* index, std::int64_t pass, bool fill) noexcept
 {
     if (numSamples <= 0 || tps <= 0.0)
         return;
     const auto endTick = startTick + numSamples * tps;
     // a "loop" longer than anything played: the clip plays once, where it is
     const auto loop = (std::max<std::int64_t> ((std::int64_t) std::ceil (endTick), clip.end()) + 1) * 2;
-    scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, startTick, endTick, false, index, out);
+    scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, startTick, endTick, false, index, out, false, nullptr,
+                  NotePasses { pass, fill });
 }
 
 void scheduleSong (const Song& song, double startTick, int numSamples, double tps, EventBuffer& out, bool resume,
-                   const ScheduleIndex* index, bool wrap, bool chase) noexcept
+                   const ScheduleIndex* index, bool wrap, bool chase, bool fill) noexcept
 {
     if (numSamples <= 0 || tps <= 0.0 || song.playlist.empty())
         return;
@@ -1009,16 +1055,17 @@ void scheduleSong (const Song& song, double startTick, int numSamples, double tp
         if (! clipPlaysInSong (song, clip, zoneEnd))
             return;
 
-        scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, resume, index, out, chase, &zoneEnd);
+        scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, resume, index, out, chase, &zoneEnd,
+                      NotePasses { 0, fill });
     });
 
     out.sortByOffset();
 }
 void scheduleSongAround (const Song& song, const TrackMask& taken, const TrackMask& givenBack, double startTick, int numSamples,
-                         double tps, EventBuffer& out, bool resume, const ScheduleIndex* index, bool wrap, bool chase) noexcept
+                         double tps, EventBuffer& out, bool resume, const ScheduleIndex* index, bool wrap, bool chase, bool fill) noexcept
 {
     if (taken.none() && givenBack.none())
-        return scheduleSong (song, startTick, numSamples, tps, out, resume, index, wrap, chase);
+        return scheduleSong (song, startTick, numSamples, tps, out, resume, index, wrap, chase, fill);
     if (numSamples <= 0 || tps <= 0.0 || song.playlist.empty())
         return;
 
@@ -1039,7 +1086,8 @@ void scheduleSongAround (const Song& song, const TrackMask& taken, const TrackMa
         {
             // only the ends: what the track was sounding still stops
             const auto first = out.size();
-            scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, false, index, out, false, &zoneEnd);
+            scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, false, index, out, false, &zoneEnd,
+                          NotePasses { 0, fill });
             auto kept = first;
             for (int i = first; i < out.size(); ++i)
                 if (out[i].type == NoteEvent::Type::off)
@@ -1049,7 +1097,7 @@ void scheduleSongAround (const Song& song, const TrackMask& taken, const TrackMa
         }
         const auto back = inMask && givenBack[(std::size_t) clip.track];
         scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, resume || back, index, out, chase || back,
-                      &zoneEnd);
+                      &zoneEnd, NotePasses { 0, fill });
     });
     out.sortByOffset();
 }

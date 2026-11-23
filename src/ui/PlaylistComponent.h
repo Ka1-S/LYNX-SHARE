@@ -10,6 +10,8 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include "ui/TouchInput.h"
+
 #include "core/ArrangeOps.h"
 #include "core/RangeEdit.h"
 #include "core/AutoPointEdit.h"
@@ -162,6 +164,14 @@ public:
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
     // trackpad pinch (macOS; Windows touch screens): time zoom around the pointer, with Alt the vertical zoom (round 170e)
     void mouseMagnify (const juce::MouseEvent& e, float scale) override;
+    // Touch mode (round 190pm, research190oe P23; ui/TouchInput.h): the editor's fingers (long press = context menu; in the
+    // Simple layout two fingers pan and pinch)
+    ui::touchmode::Deferral& touchInputForTests() noexcept { return touchInput; }
+    void touchPan (float dx, float dy);
+    void touchPinch (float scale, juce::Point<float> centre);
+    void touchLongPress (const juce::MouseEvent& rightClick);
+    juce::String lastTouchActionForSnapshot; // ("clip menu 3", "note inspector 2", "menu", "right click")
+    double pixelsPerTickForTests() const noexcept { return pixelsPerTick; }
 
     // Editing shortcuts; the main window forwards keys when the Playlist is visible.
     bool handleKey (const juce::KeyPress& key);
@@ -1336,6 +1346,10 @@ private:
     // issue #250 (round 190oq): deleted clips fade out as FL's do (ui/DeleteFade.h); `fadeOut` before they go
     ui::DeleteFade deleteFade { *this, ui::DeleteFade::playlistMs };
     void fadeOut (const std::vector<int>& clips);
+
+    ui::touchmode::Deferral touchInput { ui::touchmode::Deferral::Hooks { this, [this] (const juce::MouseEvent& e) { touchLongPress (e); },
+                                                                         [this] (float dx, float dy) { touchPan (dx, dy); },
+                                                                         [this] (float scale, juce::Point<float> c) { touchPinch (scale, c); } } };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PlaylistComponent)
 };
