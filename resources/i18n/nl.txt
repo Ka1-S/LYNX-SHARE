@@ -12647,3 +12647,8 @@ countries: nl be
 "Automation of Harmor's filter frequencies and Mod X / Y / Z does nothing in this release: {0}" = "Automatisering van de filterfrequenties en Mod X / Y / Z van Harmor doet in deze versie niets: {0}"
 "Sytrus plays every note at the default Mod X / Y in this release: {0}" = "In deze versie speelt Sytrus elke noot met de standaard-Mod X / Y: {0}"
 "The export plays the song straight through in this release (from bar 1, past the skip markers)" = "In deze versie speelt de export het nummer in één keer door (vanaf maat 1, over de skipmarkers heen)"
+
+# round 190qb: issue follow-ups #206 (middle-click / double-click effect search), #215 (folders in the export name)
+"The exported file's name. Wildcards such as $project, $date or $bpm are filled in when you export. A / puts the file in a folder of that name inside the export folder (made when needed)" = "De naam van het geëxporteerde bestand. Jokertekens zoals $project, $date of $bpm worden ingevuld bij het exporteren. Een / zet het bestand in een map met die naam in de exportmap (wordt zo nodig gemaakt)"
+"Empty slot: click to add an effect, double-click or middle-click to search for one" = "Leeg slot: klik om een effect toe te voegen, dubbelklik of middelklik om er een te zoeken"
+"Track effects: [LMB] add an effect to its mixer track  [MMB] or double-click: search for one  (drop one from the Browser here too)" = "Spooreffecten: [LMB] een effect aan het mixerspoor toevoegen  [MMB] of dubbelklik: er een zoeken  (een effect uit de Browser kan hier ook neergezet worden)"

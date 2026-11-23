@@ -7096,6 +7096,13 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
         const auto i = effectIn (row);
         if (i < 0)
         {
+            // issue #206 follow-up (round 190qb, LYNX extra): a middle-click goes straight to the effect search, with no
+            // plugin menu flashing up first (a double-click's first press opens FL's menu)
+            if (e.mods.isMiddleButtonDown() && ! e.mods.isLeftButtonDown() && ! e.mods.isRightButtonDown())
+            {
+                showSlotSearch (row);
+                return;
+            }
             // issue #206: a second press soon after, on the menu, is a double-click: the effect search instead
             if (e.mods.isLeftButtonDown() && ! e.mods.isAnyModifierKeyDown())
                 armSecondClick (e, row);
@@ -7527,7 +7534,7 @@ ui::Hint EffectsPanel::hintAt (juce::Point<int> p)
             h.text = used ? (arrowBounds (i).contains (p) ? tr ("Effect slot options: replace, move, delete...")
                              : ledBounds (i).contains (p) ? tr ("Effect on/off: click bypasses.  Ctrl+click or Alt+click: solo this effect (again: all on).  Shift+click: lock its state")
                                                           : tr ("Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options"))
-                          : tr ("Empty slot: click to add an effect");
+                          : tr ("Empty slot: click to add an effect, double-click or middle-click to search for one");
             h.hasMenu = used;
         }
 

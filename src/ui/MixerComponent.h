@@ -570,6 +570,9 @@ public:
     // palette with the effects alone, its search box focused); the chosen effect lands in that slot. FL's single click
     // (the plugin menu at once) stays: the menu is closed when the second click comes.
     void showSlotSearch (int row);
+    // issue #206 follow-up (round 190qb): the Playlist header's "+ Add" (its insert effects column) opens this insert's
+    // add menu on a click; a second press on that menu soon after is a double-click: the effect search for `row`
+    void armSlotSearchOnSecondClick (const juce::MouseEvent& e, int row) { armSecondClick (e, row); }
     std::unique_ptr<juce::Component> makeSlotSearch (int row); // (the shot route shows it in a window of its own)
     std::function<void (juce::PopupMenu&, int slot)> extendSlotMenu; // items put first in a slot's menu (nullptr: none)
     static inline juce::PopupMenu* slotMenuForSnapshot = nullptr;    // the shot routes: the next slot menu goes here instead of opening

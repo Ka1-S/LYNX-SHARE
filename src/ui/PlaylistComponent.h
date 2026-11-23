@@ -969,6 +969,7 @@ private:
     int insertsFirst (int track) const; // the first row shown (the list's scroll)
     void paintInserts (juce::Graphics& g, int track, bool hovered);
     bool insertsMouseDown (const juce::MouseEvent& e);
+    bool insertsAddSearch (juce::Point<int> p); // issue #206 follow-up: a middle-click on "+ Add" -> the effect search
     bool insertsMouseDrag (const juce::MouseEvent& e);
     bool insertsMouseUp (const juce::MouseEvent& e);
     bool insertsWheel (const juce::MouseEvent& e, float deltaY);

@@ -12647,3 +12647,8 @@ countries: es mx ar co cl pe ve
 "Automation of Harmor's filter frequencies and Mod X / Y / Z does nothing in this release: {0}" = "La automatización de las frecuencias de filtro y de Mod X / Y / Z de Harmor no hace nada en esta versión: {0}"
 "Sytrus plays every note at the default Mod X / Y in this release: {0}" = "En esta versión Sytrus toca cada nota con el Mod X / Y por defecto: {0}"
 "The export plays the song straight through in this release (from bar 1, past the skip markers)" = "En esta versión la exportación reproduce la canción de corrido (desde el compás 1, sin seguir los marcadores de salto)"
+
+# round 190qb: issue follow-ups #206 (middle-click / double-click effect search), #215 (folders in the export name)
+"The exported file's name. Wildcards such as $project, $date or $bpm are filled in when you export. A / puts the file in a folder of that name inside the export folder (made when needed)" = "El nombre del archivo exportado. Los comodines como $project, $date o $bpm se rellenan al exportar. Una / pone el archivo en una carpeta con ese nombre dentro de la carpeta de exportación (se crea si hace falta)"
+"Empty slot: click to add an effect, double-click or middle-click to search for one" = "Slot vacío: haz clic para añadir un efecto, doble clic o clic central para buscar uno"
+"Track effects: [LMB] add an effect to its mixer track  [MMB] or double-click: search for one  (drop one from the Browser here too)" = "Efectos de la pista: [LMB] añadir un efecto a su pista del mezclador  [MMB] o doble clic: buscar uno  (también se puede soltar uno del Navegador aquí)"
