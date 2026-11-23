@@ -69,6 +69,8 @@ jobs:
       - name: Build dependencies (Ubuntu 22.04 + GCC 13 from ppa:ubuntu-toolchain-r/test)
         run: |
           uname -m
+          # (round 190qd) Launchpad's PPA answered 503 on half the requests during the 0.1.31 release: apt retries
+          echo 'Acquire::Retries "30";' > /etc/apt/apt.conf.d/80-lynx-retries
           apt-get update -q
           apt-get install -y -q --no-install-recommends ca-certificates curl git gnupg software-properties-common
           add-apt-repository -y ppa:ubuntu-toolchain-r/test
@@ -200,6 +202,8 @@ jobs:
     steps:
       - name: GCC 13 (ppa:ubuntu-toolchain-r/test)
         run: |
+          # (round 190qd) Launchpad's PPA answered 503 on half the requests during the 0.1.31 release: apt retries
+          echo 'Acquire::Retries "30";' > /etc/apt/apt.conf.d/80-lynx-retries
           apt-get update -q
           apt-get install -y -q --no-install-recommends ca-certificates curl git gnupg software-properties-common python3
           add-apt-repository -y ppa:ubuntu-toolchain-r/test

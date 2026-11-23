@@ -1,0 +1,313 @@
+# One-off fallback (round 190qd, the 0.1.31 release): builds the Linux files of an existing release tag (x86_64
+# AppImage / tar.gz, arm64 AppImage / tar.gz, the Linux plugin pack) with the jobs of release.yml, linux-arm64.yml
+# and plugins.yml (copied, checkout at the tag) and attaches them, updating SHA256SUMS.txt and the plugin pack's
+# SHA256SUMS. Written when Launchpad's PPA failed the release run's Linux jobs; release.yml now retries apt.
+name: Release Linux files
+'on':
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: release tag (v...) whose Linux files are built from the tag and attached
+        type: string
+        required: true
+permissions:
+  contents: read
+env:
+  ZIG_VERSION: 0.14.1
+  ZIG_SHA256: 24aeeec8af16c381934a6cd7d95c807a8cb2cf7df9fa40d359aa884195c4716c
+  JUCE_VERSION: 8.0.4
+  JUCE_SHA256: 0effe9823a6fd8a4f98e5c08be7d308350e417b2d15dcf34011e778fefbbf005
+  PLUGINVAL_VERSION: v1.0.4
+  LV2LINT_COMMIT: 9661902c922650de99bd68e69ee0380d299aed3e
+  CLAP_VALIDATOR: https://github.com/free-audio/clap-validator/releases/download/0.4.1/clap-validator-0.4.1-127-g152b982
+jobs:
+  version:
+    name: Version
+    runs-on: ubuntu-24.04
+    outputs:
+      label: ${{ steps.v.outputs.label }}
+    steps:
+    - name: Label
+      id: v
+      shell: bash
+      env:
+        TAG: ${{ inputs.tag }}
+      run: '[[ "$TAG" == v* ]] || { echo "::error::a release tag (v...) is required"; exit 1; }
+
+        echo "label=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+        '
+  linux:
+    name: Linux (AppImage, tar.gz)
+    needs: version
+    runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:22.04
+      options: --cap-add=SYS_ADMIN
+    env:
+      LABEL: ${{ needs.version.outputs.label }}
+      DEBIAN_FRONTEND: noninteractive
+      MAX_GLIBC: '2.35'
+    steps:
+    - name: Build dependencies (Ubuntu 22.04 + GCC 13 from ppa:ubuntu-toolchain-r/test)
+      run: "# (round 190qd) Launchpad's PPA answered 503 on half the requests during the 0.1.31 release: apt retries\necho 'Acquire::Retries \"\
+        30\";' > /etc/apt/apt.conf.d/80-lynx-retries\napt-get update -q\napt-get install -y -q --no-install-recommends ca-certificates curl git\
+        \ gnupg software-properties-common\nadd-apt-repository -y ppa:ubuntu-toolchain-r/test\napt-get update -q\napt-get install -y -q gcc-13\
+        \ g++-13 cmake ninja-build pkg-config file binutils xvfb xauth x11-utils \\\n  fonts-dejavu-core libasound2-dev libjack-jackd2-dev libx11-dev\
+        \ libxrandr-dev libxinerama-dev \\\n  libxcursor-dev libxext-dev libxcomposite-dev libfreetype-dev libfontconfig1-dev libgl-dev desktop-file-utils\
+        \ zsync\nldd --version | head -1\ng++-13 --version | head -1\n"
+    - uses: actions/checkout@v5
+      with:
+        ref: ${{ inputs.tag }}
+    - name: JUCE (checksum verified)
+      run: 'git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+        curl -fsSL -o juce.tar.gz "https://github.com/juce-framework/JUCE/archive/refs/tags/$JUCE_VERSION.tar.gz"
+
+        echo "$JUCE_SHA256  juce.tar.gz" | sha256sum -c -
+
+        mkdir -p "$RUNNER_TEMP/juce" && tar xzf juce.tar.gz -C "$RUNNER_TEMP/juce" --strip-components 1 && rm juce.tar.gz
+
+        '
+    - name: Build
+      run: "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DFETCHCONTENT_SOURCE_DIR_JUCE=\"$RUNNER_TEMP/juce\" \\\n  -DCMAKE_C_COMPILER=gcc-13\
+        \ -DCMAKE_CXX_COMPILER=g++-13\ncmake --build build --target LYNX -- -k 0\nsha256sum build/LYNX_artefacts/Release/LYNX\n"
+    - name: Runs on glibc ${{ env.MAX_GLIBC }} without the system's libstdc++
+      run: ./scripts/check-linux-compat.sh build/LYNX_artefacts/Release/LYNX "$MAX_GLIBC"
+    - name: Self-test and demo project
+      run: 'bin=build/LYNX_artefacts/Release/LYNX
+
+        xvfb-run -a "$bin" --selftest "$PWD/selftest.txt" "$PWD/selftest-demo.lynx" || true
+
+        cat selftest.txt
+
+        grep -q ''^result=OK'' selftest.txt
+
+        xvfb-run -a "$bin" --opentest "$PWD/opentest.txt" || true
+
+        tail -3 opentest.txt; grep -E ''FAIL|HANG'' opentest.txt || true
+
+        grep -q ''^result=OK'' opentest.txt
+
+        xvfb-run -a "$bin" --showcase "$PWD/Demo.lynx" || true
+
+        test -s Demo.lynx
+
+        '
+    - name: Package
+      run: ./scripts/package-linux.sh build/LYNX_artefacts/Release/LYNX "$LABEL" dist Demo.lynx
+    - name: AppImage starts offline and shows its window
+      run: REQUIRE_OFFLINE=1 ./scripts/check-appimage-start.sh "dist/LYNX-$LABEL-x86_64.AppImage"
+    - name: AppImage starts on a system without fonts
+      run: FONTS=none ./scripts/check-appimage-start.sh "dist/LYNX-$LABEL-x86_64.AppImage"
+    - name: Upload package
+      uses: actions/upload-artifact@v7
+      with:
+        name: LYNX-${{ env.LABEL }}-linux-x86_64
+        path: dist/*
+        if-no-files-found: error
+  linux-arm64:
+    name: Linux arm64 (AppImage, tar.gz)
+    needs: version
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 180
+    container:
+      image: ubuntu:22.04
+      options: --cap-add=SYS_ADMIN
+    env:
+      LABEL: ${{ needs.version.outputs.label }}
+      DEBIAN_FRONTEND: noninteractive
+      MAX_GLIBC: '2.35'
+      ARCH: aarch64
+    steps:
+    - name: Build dependencies (Ubuntu 22.04 + GCC 13 from ppa:ubuntu-toolchain-r/test)
+      run: "uname -m\n# (round 190qd) Launchpad's PPA answered 503 on half the requests during the 0.1.31 release: apt retries\necho 'Acquire::Retries\
+        \ \"30\";' > /etc/apt/apt.conf.d/80-lynx-retries\napt-get update -q\napt-get install -y -q --no-install-recommends ca-certificates curl\
+        \ git gnupg software-properties-common\nadd-apt-repository -y ppa:ubuntu-toolchain-r/test\napt-get update -q\napt-get install -y -q gcc-13\
+        \ g++-13 cmake ninja-build pkg-config file binutils xvfb xauth x11-utils python3 \\\n  fonts-dejavu-core libasound2-dev libjack-jackd2-dev\
+        \ libx11-dev libxrandr-dev libxinerama-dev \\\n  libxcursor-dev libxext-dev libxcomposite-dev libfreetype-dev libfontconfig1-dev libgl-dev\
+        \ desktop-file-utils zsync\nldd --version | head -1\ng++-13 --version | head -1\n"
+    - uses: actions/checkout@v5
+      with:
+        ref: ${{ inputs.tag }}
+    - name: JUCE (checksum verified)
+      run: 'git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+        curl -fsSL -o juce.tar.gz "https://github.com/juce-framework/JUCE/archive/refs/tags/$JUCE_VERSION.tar.gz"
+
+        echo "$JUCE_SHA256  juce.tar.gz" | sha256sum -c -
+
+        mkdir -p "$RUNNER_TEMP/juce" && tar xzf juce.tar.gz -C "$RUNNER_TEMP/juce" --strip-components 1 && rm juce.tar.gz
+
+        '
+    - name: Build
+      run: "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DFETCHCONTENT_SOURCE_DIR_JUCE=\"$RUNNER_TEMP/juce\" \\\n  -DCMAKE_C_COMPILER=gcc-13\
+        \ -DCMAKE_CXX_COMPILER=g++-13\ncmake --build build --target LYNX -- -k 0 -j3\nfile build/LYNX_artefacts/Release/LYNX\nsha256sum build/LYNX_artefacts/Release/LYNX\n"
+    - name: Runs on glibc ${{ env.MAX_GLIBC }} without the system's libstdc++
+      run: ./scripts/check-linux-compat.sh build/LYNX_artefacts/Release/LYNX "$MAX_GLIBC"
+    - name: Self-test and demo project
+      run: 'bin=build/LYNX_artefacts/Release/LYNX
+
+        xvfb-run -a "$bin" --selftest "$PWD/selftest.txt" "$PWD/selftest-demo.lynx" || true
+
+        cat selftest.txt
+
+        grep -q ''^result=OK'' selftest.txt
+
+        xvfb-run -a "$bin" --opentest "$PWD/opentest.txt" || true
+
+        tail -3 opentest.txt; grep -E ''FAIL|HANG'' opentest.txt || true
+
+        grep -q ''^result=OK'' opentest.txt
+
+        xvfb-run -a "$bin" --showcase "$PWD/Demo.lynx" || true
+
+        test -s Demo.lynx
+
+        '
+    - name: Package
+      run: ./scripts/package-linux.sh build/LYNX_artefacts/Release/LYNX "$LABEL" dist Demo.lynx
+    - name: AppImage starts offline and shows its window
+      run: REQUIRE_OFFLINE=1 ./scripts/check-appimage-start.sh "dist/LYNX-$LABEL-aarch64.AppImage" 20
+    - name: AppImage starts on a system without fonts
+      run: FONTS=none ./scripts/check-appimage-start.sh "dist/LYNX-$LABEL-aarch64.AppImage" 20
+    - name: Upload package
+      uses: actions/upload-artifact@v7
+      with:
+        name: LYNX-${{ env.LABEL }}-linux-aarch64
+        path: dist/*
+        if-no-files-found: error
+    - name: Upload the self-test reports
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: arm64-selftest-${{ env.LABEL }}
+        path: 'selftest.txt
+
+          opentest.txt
+
+          opentest-hang/*
+
+          '
+        retention-days: 14
+        if-no-files-found: ignore
+  plugins-linux:
+    name: Linux x86_64
+    needs: version
+    runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:22.04
+    env:
+      LABEL: ${{ needs.version.outputs.label }}
+      DEBIAN_FRONTEND: noninteractive
+      MAX_GLIBC: '2.35'
+    steps:
+    - name: Build dependencies (Ubuntu 22.04 + GCC 13 from ppa:ubuntu-toolchain-r/test)
+      run: "# (round 190qd) Launchpad's PPA answered 503 on half the requests during the 0.1.31 release: apt retries\necho 'Acquire::Retries \"\
+        30\";' > /etc/apt/apt.conf.d/80-lynx-retries\napt-get update -q\napt-get install -y -q --no-install-recommends ca-certificates curl git\
+        \ gnupg software-properties-common\nadd-apt-repository -y ppa:ubuntu-toolchain-r/test\napt-get update -q\napt-get install -y -q gcc-13\
+        \ g++-13 cmake ninja-build pkg-config file binutils xvfb xauth x11-utils unzip xz-utils \\\n  fonts-dejavu-core libasound2-dev libjack-jackd2-dev\
+        \ libx11-dev libxrandr-dev libxinerama-dev \\\n  libxcursor-dev libxext-dev libxcomposite-dev libfreetype-dev libfontconfig1-dev libgl-dev\
+        \ libcurl4 \\\n  lv2-dev liblilv-dev libxxhash-dev python3-pip\n"
+    - uses: actions/checkout@v5
+      with:
+        ref: ${{ inputs.tag }}
+    - name: JUCE (checksum verified)
+      run: 'git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+        curl -fsSL -o juce.tar.gz "https://github.com/juce-framework/JUCE/archive/refs/tags/$JUCE_VERSION.tar.gz"
+
+        echo "$JUCE_SHA256  juce.tar.gz" | sha256sum -c -
+
+        mkdir -p "$RUNNER_TEMP/juce" && tar xzf juce.tar.gz -C "$RUNNER_TEMP/juce" --strip-components 1 && rm juce.tar.gz
+
+        '
+    - name: Build
+      run: "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DFETCHCONTENT_SOURCE_DIR_JUCE=\"$RUNNER_TEMP/juce\" \\\n  -DCMAKE_C_COMPILER=gcc-13\
+        \ -DCMAKE_CXX_COMPILER=g++-13 -DLYNX_BUILD_PLUGINS=ON -DLYNX_LTO=OFF\ncmake --build build --target lynx_plugins -- -k 0\n"
+    - name: Package
+      run: ./scripts/package-plugins.sh linux build/plugins "$LABEL" dist
+    - name: Runs on glibc ${{ env.MAX_GLIBC }} without the system's libstdc++
+      run: 'mkdir pkg && tar xJf "dist/LYNX-Plugins-$LABEL-linux-x86_64.tar.xz" -C pkg
+
+        find pkg -type f \( -name ''*.so'' -o -name ''*.clap'' \) -print0 | xargs -0 -n1 ./scripts/check-linux-compat.sh
+
+        '
+    - name: lv2lint
+      run: "pip3 install -q meson\ngit clone -q https://git.open-music-kontrollers.ch/~hp/lv2lint \"$RUNNER_TEMP/lv2lint-src\"\ngit -C \"$RUNNER_TEMP/lv2lint-src\"\
+        \ checkout -q \"$LV2LINT_COMMIT\"\ncd \"$RUNNER_TEMP/lv2lint-src\"\nCC=gcc-13 meson setup build -Dbuild-tests=false -Donline-tests=disabled\
+        \ -Delf-tests=disabled -Dx11-tests=disabled \\\n  -Db_lto=false --prefix=\"$RUNNER_TEMP/lv2lint\"\nmeson install -C build\n\"$RUNNER_TEMP/lv2lint/bin/lv2lint\"\
+        \ -v\n"
+    - name: Host test, pluginval, clap-validator, lv2lint (on what the archive holds)
+      shell: bash
+      env:
+        LYNX_TEST_MODE: '1'
+      run: 'curl -fsSL -o pv.zip "https://github.com/Tracktion/pluginval/releases/download/$PLUGINVAL_VERSION/pluginval_Linux.zip" && unzip -q
+        pv.zip -d pv
+
+        curl -fsSL -o cv.zip "$CLAP_VALIDATOR-ubuntu-22.04.zip" && unzip -q cv.zip -d cv
+
+        for t in cv/*.tar.gz; do [ -e "$t" ] && tar xzf "$t" -C cv; done   # (the Linux zip holds a tarball)
+
+        chmod +x pv/pluginval "$(find cv -name clap-validator -type f | head -1)"
+
+        ls pkg/LYNX-Plugins-"$LABEL"/LV2/*.lv2/manifest.ttl   # (the archive holds the LV2 bundles)
+
+        export LV2LINT="$RUNNER_TEMP/lv2lint/bin/lv2lint" LV2_PATH=/usr/lib/lv2
+
+        xvfb-run -a ./scripts/check-plugins.sh "pkg/LYNX-Plugins-$LABEL" build/plugexporttest pv/pluginval "$(find cv -name clap-validator -type
+        f | head -1)" reports pictures
+
+        '
+    - uses: actions/upload-artifact@v7
+      with:
+        name: LYNX-Plugins-${{ env.LABEL }}-linux-x86_64
+        path: dist/*
+        if-no-files-found: error
+    - uses: actions/upload-artifact@v7
+      if: ${{ !cancelled() }}
+      with:
+        name: plugin-reports-linux
+        path: reports/*
+  attach:
+    name: Attach to the release
+    needs:
+    - version
+    - linux
+    - linux-arm64
+    - plugins-linux
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      LABEL: ${{ needs.version.outputs.label }}
+      TAG: ${{ inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+    - uses: actions/download-artifact@v8
+      with:
+        pattern: LYNX-${{ env.LABEL }}-linux-*
+        path: dist
+        merge-multiple: true
+    - uses: actions/download-artifact@v8
+      with:
+        name: LYNX-Plugins-${{ env.LABEL }}-linux-x86_64
+        path: plugins
+    - name: Upload the Linux files and update both SHA256SUMS files
+      run: 'set -euo pipefail
+
+        ls -la dist plugins
+
+        gh release download "$TAG" -p SHA256SUMS.txt -p "LYNX-Plugins-$LABEL-SHA256SUMS.txt" -D old
+
+        (cd dist && { grep -v -E -- "-(linux-x86_64\.tar\.gz|x86_64\.AppImage(\.zsync)?|linux-aarch64\.tar\.gz|aarch64\.AppImage(\.zsync)?)$"
+        ../old/SHA256SUMS.txt || true; sha256sum -- *; } > ../SHA256SUMS.txt)
+
+        (cd plugins && { grep -v -- "-linux-x86_64\.tar\.xz$" "../old/LYNX-Plugins-$LABEL-SHA256SUMS.txt" || true; sha256sum -- *; } > "../LYNX-Plugins-$LABEL-SHA256SUMS.txt")
+
+        cat SHA256SUMS.txt "LYNX-Plugins-$LABEL-SHA256SUMS.txt"
+
+        gh release upload "$TAG" dist/* plugins/* SHA256SUMS.txt "LYNX-Plugins-$LABEL-SHA256SUMS.txt" --clobber
+
+        '

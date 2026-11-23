@@ -70,6 +70,11 @@ COMPONENTS = {
         ("IJG libjpeg", "IJG", "https://ijg.org"),
         ("zlib", "Zlib", "https://zlib.net")]),
     "sse2neon": dict(version=NOA, concluded="MIT", folders=["sse2neon"]),
+    # round 190qd (0.1.31): the tracker module reader, the JSFX host and the bundled JSFX pack
+    "libxmp-lite 4.7.4": dict(concluded="MIT", folders=["libxmp-lite"]),
+    "ysfx 0.0.47": dict(name="ysfx (with Cockos WDL / EEL2, the EEL2 GAS port and dr_libs)",
+                        concluded="Apache-2.0 AND Zlib AND (Unlicense OR MIT-0)", folders=["ysfx"]),
+    "chokehold JSFX": dict(version="f6d175d8", concluded="MIT", folders=["jsfx-chokehold"]),
     "Open Sans": dict(concluded="OFL-1.1", folders=[], extra=["open-sans-OFL.txt"]),
     "Open Sans Condensed": dict(concluded="OFL-1.1", folders=[], extra=["open-sans-OFL.txt"]),
 }
