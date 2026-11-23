@@ -772,6 +772,7 @@ public:
                                 juce::AffineTransform::scale ((float) bounds.getWidth() / (float) imageBounds.getWidth(),
                                                               (float) bounds.getHeight() / (float) imageBounds.getHeight()),
                                 false);
+        owner.paintTrackSelectionDim (g); // (over the picture: the selection changes without the lanes being painted again)
         owner.paintStickyTitles (g);
         if (! owner.gpuPlayhead.isShowing()) // (round 190ip: the GPU moves it while playing)
             owner.paintPlayhead (g);
@@ -2516,6 +2517,9 @@ void PlaylistComponent::paint (juce::Graphics& g)
             g.fillPath (dashed);
         }
 
+        if (! cachePainting) // (the cached picture gets it from PlayheadCache::paint)
+            paintTrackSelectionDim (g);
+
         if (! cachePainting) // round 190ig: FL's held clip titles, last before the playhead (as over the cached picture)
             paintStickyTitles (g);
 
@@ -3316,6 +3320,31 @@ void PlaylistComponent::paintOverview (juce::Graphics& g, juce::Rectangle<float>
 // draws them without the cache
 // Round 190ig (FL look, Pattern layout): the titles of the audio and automation clips that start left of the view, held at
 // its left edge, drawn last before the playhead (paint() and over the cached picture alike, so both look the same).
+void PlaylistComponent::paintTrackSelectionDim (juce::Graphics& g)
+{
+    if (selectedTracks.empty() || ! flClipLook())
+        return;
+
+    const auto grid = gridArea();
+    if (grid.isEmpty())
+        return;
+
+    juce::Graphics::ScopedSaveState state (g);
+    if (! g.reduceClipRegion (grid))
+        return;
+
+    g.setColour (juce::Colours::black.withAlpha (0.20f));
+    for (int t = 0; t < numTracks(); ++t)
+        if (! isTrackSelected (t))
+        {
+            const auto height = heightOf (t);
+            if (height <= 0)
+                continue;
+            g.fillRect (grid.getX(), trackToY (t), grid.getWidth(), height + laneBlockHeight (t)); // (the lanes and clips)
+            g.fillRect (0, trackToY (t), headerWidth, height);                                      // (the header too)
+        }
+}
+
 void PlaylistComponent::paintStickyTitles (juce::Graphics& g)
 {
     if (! flClipLook())

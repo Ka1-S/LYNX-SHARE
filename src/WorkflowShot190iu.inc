@@ -416,6 +416,44 @@
         }
         ui.setLayoutStyle (layoutstyle::Style::pattern, false);
 
+        // ---- 7b. FL's Playlist: with a track selected, the other tracks step back (a dark veil over their rows)
+        {
+            const auto bar = song().barTicks();
+            pl.setViewForSnapshot (60.0, 1, 0);
+            engine.dispatchPendingMessages();
+            int selected = -1, other = -1;
+            for (int t = 0; t < pl.numTracksForSnapshot(); ++t)
+            {
+                const auto row = pl.trackRowForSnapshot (t);
+                if (row.getHeight() < 8 || row.getBottom() > pl.getHeight())
+                    continue;
+                const auto empty = std::none_of (song().playlist.begin(), song().playlist.end(), [t] (const Clip& c) { return c.track == t; })
+                                   && (t >= (int) song().playlistTracks.size() || song().playlistTracks[(std::size_t) t].lanes.empty());
+                if (! empty)
+                    continue;
+                if (selected < 0)
+                    selected = t;
+                else if ((t % 2) == (selected % 2)) // (the lanes alternate by row: same shade before the veil)
+                {
+                    other = t;
+                    break;
+                }
+            }
+            check ("playlist_dim_has_two_empty_tracks", selected >= 0 && other >= 0, juce::String (selected) + " " + juce::String (other));
+            if (selected >= 0 && other >= 0)
+            {
+                pl.selectTrack (selected);
+                engine.dispatchPendingMessages();
+                const auto image = shot::snapshot (pl);
+                const auto x = juce::jlimit (0, image.getWidth() - 1, (int) pl.xOfTickForSnapshot (5.0 * bar) + 8);
+                const auto lit = image.getPixelAt (x, pl.trackRowForSnapshot (selected).getCentreY()).getBrightness();
+                const auto dark = image.getPixelAt (x, pl.trackRowForSnapshot (other).getCentreY()).getBrightness();
+                check ("playlist_selected_track_leaves_the_others_darker", lit > dark + 0.006f, juce::String (lit, 4) + " / " + juce::String (dark, 4));
+                savePng (image, prefix + "-playlist-selected-track.png");
+            }
+        }
+
+
         // ---- 8. Settings › LYNX extras with the new switches
         {
             auto page = makeSettingsPanel (engine, SettingsPage::extras);
