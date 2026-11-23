@@ -232,12 +232,20 @@ enum class SampleFormat : std::uint8_t { pcm24, float32, pcm16 };
 constexpr int bytesPerSample (SampleFormat f) noexcept { return f == SampleFormat::pcm16 ? 2 : f == SampleFormat::pcm24 ? 3 : 4; }
 
 // A WAV writer for takes: the header is valid from the start and rewritten with the current length every
-// `syncSeconds` (and the file flushed), so a crash leaves a playable file missing at most that much.
+// `syncSeconds` (and the file flushed to the system), so a crash of LYNX leaves a playable file missing at most that
+// much.
+// Round 190pz: the file is also made durable on the disk itself (fsync / _commit: what survives a power cut or a crash
+// of the system), with a fresh header, every `durableSeconds` (≥ syncSeconds), starting `durablePhase` (0..1) of that
+// period early. Until 0.1.31 every 1-second flush was durable: on Windows each _commit (FlushFileBuffers) took 2-17 ms
+// on a SATA SSD and ~50 ms (up to 330 ms) on a hard disk, so 16 takes kept the one recording thread busy 28 % / 91 % of
+// the time with stalls past 1 s (nativeperf_190pz/RECORDING.md), and a busier disk would fill the takes' rings. The
+// engine gives its takes phases k / count, so their durable syncs come one at a time, not in one burst.
 class WavTakeWriter
 {
 public:
     ~WavTakeWriter();
-    bool open (const std::string& path, double sampleRate, int channels, SampleFormat format, double syncSeconds = 1.0);
+    bool open (const std::string& path, double sampleRate, int channels, SampleFormat format, double syncSeconds = 1.0,
+               double durableSeconds = 5.0, double durablePhase = 0.0);
     bool write (const float* const* data, int n); // planar
     // Another sample format for a file opened but not written to yet (round 190bj, issue B3: the next take's files are
     // made when the previous take ends, with the format of that moment; a change made before its first sample now
@@ -257,6 +265,7 @@ private:
     SampleFormat format = SampleFormat::pcm24;
     double rate = 48000.0;
     std::int64_t written = 0, sinceSync = 0, syncFrames = 48000;
+    std::int64_t sinceDurable = 0, durableFrames = 5 * 48000; // (round 190pz)
     std::vector<unsigned char> buffer;
     std::string problem;
 };
