@@ -10,7 +10,7 @@
 "u.0.1.31.n6": "<strong>自動化和調變</strong>：Touch、Latch 和 Write 寫入模式、擷取自動化，以及適用於任一旋鈕的調變器（LFO、波封追隨器、ADSR、步進、隨機、巨集、keytrack、力度），第三方外掛上也可使用。",
 "u.0.1.31.n7": "<strong>片段啟動工作流程</strong>：Live 的機架裝置內嵌在裝置檢視中，帶 Macro Map 模式，還有 Live 的 Solo / Cue。<strong>簡易工作流程</strong>：閃避於、殘響和回聲傳送、段落和拍號變化。",
 "u.0.1.31.n8": "<strong>格式和外掛</strong>：FL Studio Mobile .flm 匯出、壓縮循環包和全部收集並儲存、從另一個專案匯入的軌道、混音插入軌上的 ARA，以及包含 39 個外掛的外掛包，在 Linux 上也有 LV2，在 Windows 上是 20 MB 的 .7z。",
-"u.0.1.31.b0": "<strong>效能</strong>，在一台 Windows 電腦上再次與 FL Studio 2026 對比量測：Thief 播放時佔用一個核心的 34.4 %（FL Studio：93.9 %），Exoplanet 佔用 44.2 %（FL Studio：125.7 %）。安全過載會在歌曲停止後立即釋放。",
+"u.0.1.31.b0": "<strong>效能</strong>，在一台 Windows 電腦上再次與 FL Studio 2026 對比量測：Thief 播放時佔用一個核心的 34.4 %，Exoplanet 佔用 44.2 %。安全過載會在歌曲停止後立即釋放。",
 "u.0.1.31.b1": "<strong>FL 一致性</strong>：又增加八個 Kilohearts 定律和 Nonlinear Filter（Kilohearts Essentials 5.88 → 6.85，Nonlinear Filter 4.62 → 9.43）；FL 的滑音定律、Sytrus、Ogun 和 SimSynth 的力度、Harmor 自動化和多目標自動化片段；通道機架中 FL 的自動化片段列。",
 "u.0.1.31.b2": "<strong>來自貢獻者</strong>：FKHR26 提供的可隱藏停靠視窗標題列的齒輪（PR #248 和 #256），以及視窗採用所顯示分頁的大小（PR #259）；codewithamoako 提供的接入 Formula Controller 的 Patcher 連線（PR #257）。",
 "u.0.1.31.f0": "約 30 個 GitHub 問題：#193、#206、#215、#218、#222、#225–#244、#246、#247 和 #249–#254，其中有 #233（離線啟動）、#243（混音插入軌上的 ARA）、#251（連同所有媒體儲存）、#253（FL 的傳送自動化）和 #254（水平滑鼠滾輪）。",

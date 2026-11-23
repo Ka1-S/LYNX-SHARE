@@ -10,7 +10,7 @@
 "u.0.1.31.n6": "<strong>オートメーションとモジュレーション</strong>: Touch、Latch、Writeの書き込みモード、Capture automation、そして任意のノブ用のモジュレーター (LFO、エンベロープフォロワー、ADSR、ステップ、ランダム、マクロ、キートラック、ベロシティ) で、サードパーティのプラグインでも使えます。",
 "u.0.1.31.n7": "<strong>クリップ起動ワークフロー</strong>: LiveのラックデバイスをDevice Viewにインライン表示し、Macro Mapモードと、LiveのSolo / Cueを備えます。<strong>シンプルワークフロー</strong>: ダッキング元、リバーブとエコーのセンド、セクションと拍子の変更。",
 "u.0.1.31.n8": "<strong>形式とプラグイン</strong>: FL Studio Mobileの.flmエクスポート、Zip ループパッケージ、すべて集めて保存、他のプロジェクトから取り込んだトラック、ミキサーインサートでのARA、39個のプラグインのプラグインパック (LinuxではLV2も、Windowsでは20 MBの.7zも)。",
-"u.0.1.31.b0": "<strong>パフォーマンス</strong>を、Windows PC 1台でFL Studio 2026とあらためて比較しました。Thiefは1コアの34.4 %で再生され (FL Studio: 93.9 %)、Exoplanetは44.2 %です (FL Studio: 125.7 %)。安全なオーバーロードは、曲が止まるとすぐに解除されます。",
+"u.0.1.31.b0": "<strong>パフォーマンス</strong>を、Windows PC 1台でFL Studio 2026とあらためて比較しました。Thiefは1コアの34.4 %で再生され、Exoplanetは44.2 %です。安全なオーバーロードは、曲が止まるとすぐに解除されます。",
 "u.0.1.31.b1": "<strong>FLとの一致</strong>: Kilohearts のルールをさらに8つとNonlinear Filter (Kilohearts Essentials 5.88 → 6.85、Nonlinear Filter 4.62 → 9.43)、FLのスライドの法則、Sytrus、Ogun、SimSynthのベロシティ、Harmorのオートメーションと複数ターゲットのオートメーションクリップ、チャンネルラックのFLのオートメーションクリップの行。",
 "u.0.1.31.b2": "<strong>コントリビューターから</strong>: ドッキングしたウィンドウのヘッダーを隠す歯車 (PR #248と#256) と、表示中のタブの大きさになるウィンドウ (PR #259) はFKHR26さん、Formula ControllerへのPatcherケーブル (PR #257) はcodewithamoakoさんによるものです。",
 "u.0.1.31.f0": "約30件のGitHub issue: #193、#206、#215、#218、#222、#225–#244、#246、#247、#249–#254。たとえば #233 (オフラインで起動)、#243 (ミキサーインサートでのARA)、#251 (すべてのメディアと一緒に保存)、#253 (FLのセンドオートメーション)、#254 (水平マウスホイール)。",

@@ -6,9 +6,12 @@ The short version of each release. The full notes, with measurements, known issu
 ## 0.1.31 alpha
 
 **Performance**
-- Measured again against FL Studio 2026 on one Windows PC in a quiet-machine run: while FL's *Thief* demo plays, LYNX
-  SHARE uses 34.4 % of one CPU core (FL Studio: 93.9 %) and *Exoplanet* 44.2 % (FL Studio:
-  125.7 %); *Thief* takes 564 MB of memory (FL Studio: 905 MB).
+- Measured again on one Windows PC in a quiet-machine run: while FL's *Thief* demo plays, LYNX SHARE uses 34.4 % of one
+  CPU core (0.1.30 in the same session: 32.0 %) and *Exoplanet* 44.2 % (0.1.30: 46.7 %); *Thief* takes 564 MB of memory
+  (FL Studio 2026: 905 MB) and opens in 4.3 s (FL Studio: 7.1 s). FL Studio's own CPU load varied between sessions on
+  this PC, so it isn't compared.
+- Known, being investigated for 0.1.32: on Windows *Thief* takes 24 MB more memory than in 0.1.30 (540 → 564 MB), and an
+  empty project idles at 7.2 % of a core instead of 5.3 %.
 - *Safe overloads* lets go as soon as the transport stops, the CPU meter shows the live part and the part rendered ahead,
   the plugin performance monitor lists each plugin's longest block and spikes, Windows PCs with four logical CPUs or fewer
   no longer start graphics-driver threads for drawing, Atrium's dense tank only takes memory where it runs (Live's
