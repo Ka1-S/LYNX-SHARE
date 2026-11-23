@@ -1421,11 +1421,11 @@ void keyMarkersFor0130 (juce::var& root, Losses& lost)
                           juce::String (keyMarkers), false });
 }
 
-// Round 190pm (research190oe P19): a note's ratchets and Condition (note array [21 … 25]). 0.1.30 reads up to [20], FL's
-// repeat. Ratchets become their strikes as notes of their own (the same sound: even parts of the note, each at its
+// Round 190pm (research190oe P19): a note's ratchets and Condition (note array [21 … 25]). 0.1.31 and 0.1.30 read up to
+// [20], FL's repeat (rollup 0.1.32 step 1: called from toRelease0131). Ratchets become their strikes as notes of their own (the same sound: even parts of the note, each at its
 // velocity bend; FL's repeat, when set, wins as in this release, so those notes just lose the extra fields); a Condition
 // can't be kept: the note plays on every pass there.
-void noteRepeatsFor0130 (juce::var& root, Losses& lost)
+void noteRepeatsFor0131 (juce::var& root, Losses& lost)
 {
     int ratcheted = 0, conditioned = 0;
     if (auto* patterns = arrayOf (root["patterns"]))
@@ -1543,9 +1543,9 @@ void jsfxFor0130 (juce::var& root, Losses& lost)
 // PR #260 / round 190qf (0.1.32; FL 2026.2's 25 slots): an insert may show more than 10 effect slots ("slotRows") and
 // hold effects in slots 11 .. 25. 0.1.31 and older hold 10 per insert (they keep the first 10 effects and squeeze their
 // rows into the 10 places): the effects in the slots past 10 are left out (their automation is detached; the slots before
-// them keep their places) and "slotRows" goes. One line names them. Called from toRelease0130 below, until a 0.1.31 step
-// exists (then it belongs there).
-void slotsFor0130 (juce::var& root, Losses& lost)
+// them keep their places) and "slotRows" goes. One line names them. Rollup 0.1.32 step 1: called from toRelease0131 (the
+// copy for 0.1.31; the older copies run that step first).
+void slotsFor0131 (juce::var& root, Losses& lost)
 {
     constexpr int oldSlots = 10;
     auto& o = *objectOf (root);
@@ -1593,10 +1593,9 @@ void slotsFor0130 (juce::var& root, Losses& lost)
 
 void toRelease0130 (juce::var& root, Losses& lost)
 {
-    slotsFor0130 (root, lost); // (PR #260, round 190qf: first, so the later steps see 10 slots at most)
-
     auto& o = *objectOf (root);
-    noteRepeatsFor0130 (root, lost);
+    // (rollup 0.1.32 step 1: PR #260's slots past 10 and round 190pm's ratchets / Conditions are the 0.1.31 step's now,
+    // toRelease0131 below, which every copy for 0.1.30 and older runs first)
 
     jsfxFor0130 (root, lost); // (round 190pj)
 
@@ -2363,9 +2362,38 @@ void toRelease0130 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("Sytrus plays every note at the default Mod X / Y in this release: {0}"), listOf (sytrusNotes), true });
     }
 
-    // round 190py: (a) FL's channel PITCH knob as an automation target (channelParam channelPitchParam) — 0.1.30 has no such
+    // rollup 0.1.31 step 8: every other channel at engine revision 3 (FL imports and new channels since round 190pr) is
+    // written at 2. Revision 3 changes only Harmor and Sytrus (both written at 2 above) and revision 2 only SimSynth and
+    // Ogun / Autogun (written at 1 above), so the copy plays the same here and in newer LYNX, and a channel 0.1.30 later
+    // turns into a Harmor or Sytrus cannot carry revision 3's laws back into a newer LYNX. 0.1.28 drops the key.
+    // (Round 190py's revision 4 is written at 3 by the 0.1.31 step, toRelease0131, which runs first.)
+    forEachChannel (root, [&] (juce::DynamicObject& c, int) {
+        if (c.hasProperty ("engineRev") && (int) c.getProperty ("engineRev") > 2)
+            c.setProperty ("engineRev", 2);
+    });
+}
+
+// --- 0.1.32 → 0.1.31 ------------------------------------------------------------------------------------------------------
+// Rollup 0.1.32 step 1 (round 190qn): what the 0.1.32 rounds save that 0.1.31 cannot hold, each loss reported only when the
+// project has it. A copy for an older release runs this step first, so the later steps never see these.
+// - PR #260 / round 190qf: effects in the slots past 10 and "slotRows" (slotsFor0131);
+// - round 190pm: a note's ratchets and Condition (noteRepeatsFor0131);
+// - round 190py: the channel PITCH target and a desktop 3x Osc's live automation (lines), ChannelDef::engineRev 4 written at
+//   3 (revision 4 changes only that 3x Osc automation, so every channel plays the same in 0.1.31);
+// - round 190py-khs: Effector's hidden Kilohearts laws 50 Flanger, 51 Dual Delay, 52 Ensemble (0.1.31 reads codes 41 … 49
+//   only: a newer code plays Effector's visible Type there): [12 …] are cut with 0.1.30's lines for them.
+// Not in projects, so nothing to change here: round 190px's caches (a stretched copy with identical channels has header
+// channels −2, which 0.1.31 refuses and stretches again; the stream cache's .R.same marker leaves no .R.pcm, which 0.1.31
+// takes for a missing cache and decodes again), 190qh's views (ui-options), Touch mode (ui-options), the new-track slot
+// count (ui-options), 190pz's recording sync.
+void toRelease0131 (juce::var& root, Losses& lost)
+{
+    slotsFor0131 (root, lost); // (first, so the later steps see 10 slots at most)
+    noteRepeatsFor0131 (root, lost);
+
+    // round 190py: (a) FL's channel PITCH knob as an automation target (channelParam channelPitchParam) — 0.1.31 has no such
     // target: the clip plays nothing there; (b) a desktop 3x Osc follows FL's automation of its parameters from
-    // ChannelDef::engineRev 4 on, 0.1.30 ignores it (written at 2 below). Lines; the data stays
+    // ChannelDef::engineRev 4 on, 0.1.31 ignores it (written at 3 below). Lines; the data stays
     {
         juce::StringArray pitchClips, oscClips;
         std::set<int> oscChannels;
@@ -2404,14 +2432,29 @@ void toRelease0130 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("Automation of 3x Osc's parameters does nothing in this release: {0}"), listOf (oscClips), true });
     }
 
-    // rollup 0.1.31 step 8: every other channel at engine revision 3 (FL imports and new channels since round 190pr) is
-    // written at 2. Revision 3 changes only Harmor and Sytrus (both written at 2 above) and revision 2 only SimSynth and
-    // Ogun / Autogun (written at 1 above), so the copy plays the same here and in newer LYNX, and a channel 0.1.30 later
-    // turns into a Harmor or Sytrus cannot carry revision 3's laws back into a newer LYNX. 0.1.28 drops the key.
-    // (Round 190py: revision 4 changes only a desktop 3x Osc's automation — its line above.)
+    {
+        juce::StringArray ensemble, flangerDelay;
+        forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
+            auto* params = arrayOf (e.getProperty ("params"));
+            if (params == nullptr || e.getProperty ("kind").toString() != "effector" || params->size() <= khsdsp::lawParam)
+                return;
+            const auto law = khsdsp::lawOf ((float) (double) (*params)[khsdsp::lawParam]);
+            if (law != khsdsp::Law::flanger && law != khsdsp::Law::dualDelay && law != khsdsp::Law::ensemble2)
+                return;
+            addOnce (law == khsdsp::Law::ensemble2 ? ensemble : flangerDelay, where);
+            params->removeRange (khsdsp::lawParam, params->size() - khsdsp::lawParam);
+        });
+        if (! ensemble.isEmpty())
+            lost.push_back ({ TR_NOOP ("Effector's newer Kilohearts laws (the Comb Filter, Chorus, Trance Gate, Phaser, Distortion, Bitcrush, Frequency Shifter and Ensemble stand-ins) play Effector's own algorithm: {0}"),
+                              listOf (ensemble), true });
+        if (! flangerDelay.isEmpty())
+            lost.push_back ({ TR_NOOP ("Effector's Kilohearts Flanger and Dual Delay laws (the kHs Flanger and kHs Dual Delay stand-ins) play Effector's own Flanger and Delay: {0}"),
+                              listOf (flangerDelay), true });
+    }
+
     forEachChannel (root, [&] (juce::DynamicObject& c, int) {
-        if (c.hasProperty ("engineRev") && (int) c.getProperty ("engineRev") > 2)
-            c.setProperty ("engineRev", 2);
+        if (c.hasProperty ("engineRev") && (int) c.getProperty ("engineRev") > 3)
+            c.setProperty ("engineRev", 3);
     });
 }
 
@@ -2421,7 +2464,7 @@ struct Step
     void (*apply) (juce::var&, Losses&);
 };
 // newest first: a copy for release R runs every step down to R's
-constexpr Step steps[] = { { "0.1.30", toRelease0130 }, { "0.1.28", toRelease0128 }, { "0.1.27", toRelease0127 } };
+constexpr Step steps[] = { { "0.1.31", toRelease0131 }, { "0.1.30", toRelease0130 }, { "0.1.28", toRelease0128 }, { "0.1.27", toRelease0127 } };
 } // namespace
 
 juce::StringArray releases()

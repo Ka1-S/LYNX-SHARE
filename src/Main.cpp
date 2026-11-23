@@ -96,6 +96,7 @@
 #include "core/MasterLooks.h"
 #include "core/Harmor.h"
 #include "core/KiloheartsDsp.h" // (rollup step 14: the copy for 0.1.28 self-test)
+#include "core/ThreeOsc.h" // (rollup 0.1.32 step 1: the copy for 0.1.31 self-test)
 #include "core/WavetableSynth.h" // (round 190oc: the copy for 0.1.30 self-test)
 #include "core/AutoLook.h" // (rollup 0.1.31 step 4: the copy for 0.1.30 self-test)
 #include "flp/Flp.h"
@@ -8312,7 +8313,7 @@ private:
                                     "Live's Solo/Cue settings" };
             if (! copy.ok || ! back)
                 rollup031Result = "ERROR copy " + copy.error + why;
-            else if (! parsed["savedBy"].toString().equalsIgnoreCase ("0.1.30") || lynx::olderlynx::releases()[0] != "0.1.30")
+            else if (! parsed["savedBy"].toString().equalsIgnoreCase ("0.1.30") || lynx::olderlynx::releases()[1] != "0.1.30") // (rollup 0.1.32: 0.1.31 is [0])
                 rollup031Result = "ERROR release list / stamp";
             else if (bars != "sampler")
                 rollup031Result = "ERROR LYNX Model channel: " + bars;
@@ -9374,6 +9375,222 @@ private:
                     rollup031s8Result = "ERROR 190pr's lines for a project saved before it";
                 else if (const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.30"); ! plain.ok || ! plain.lost.empty())
                     rollup031s8Result = "ERROR lines for the default song (" + juce::String ((int) plain.lost.size()) + ")";
+            }
+        }
+
+        // rollup 0.1.32 step 1 (round 190qn): Save a copy for 0.1.31 (the new first step, toRelease0131) and the chain under it.
+        // One project with every 0.1.32 format addition: 12 effects on an insert with 14 rows and an automation of slot 12 (PR
+        // #260), a note with 4 ratchets and one with a Condition (190pm), a 3x Osc at revision 4 with an automation of one of
+        // its FL parameters and a channel PITCH clip (190py), Effector at the Kilohearts Flanger (50) and Ensemble (52) laws
+        // (190py-khs). The copy for 0.1.31: 10 effects and no slotRows, the ratchets as 4 notes and no note past [20], every
+        // channel at revision 3 or lower, Effector's [12 …] cut, each line once, stamped 0.1.31; the copies for 0.1.30 and
+        // 0.1.28 run it first: each line once there too, revisions 2 / none. The default song: no line. Round 190px's caches are
+        // not in projects: a stretched copy of a stereo file with identical channels is written with header channels -2 (one
+        // channel; 0.1.31 accepts only 1 / 2 and stretches again) and reads back as both channels; a streamed one (over 30 s)
+        // keeps .L.pcm + .R.same and no .R.pcm (0.1.31 wants both .pcm files, so it decodes again).
+        juce::String rollup032Result = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            if (song.mixer.size() < 3)
+                song.mixer = lynx::Song::defaultMixer (4);
+            auto& bus = song.mixer[1];
+            bus.name = "Bus 190qn";
+            bus.effects.clear();
+            for (int i = 0; i < 12; ++i)
+            {
+                auto fx = lynx::makeEffectSlot (i == 0 ? lynx::EffectKind::effector : i == 1 ? lynx::EffectKind::effector : lynx::EffectKind::utility);
+                fx.row = i;
+                if (i < 2)
+                    fx.params[(std::size_t) lynx::khsdsp::lawParam] = lynx::khsdsp::lawValue (i == 0 ? lynx::khsdsp::Law::flanger : lynx::khsdsp::Law::ensemble2);
+                bus.effects.push_back (fx);
+            }
+            bus.slotRows = 14;
+            lynx::Automation slotGain;
+            slotGain.name = "Slot 12 gain 190qn";
+            slotGain.target = { lynx::AutomationTargetKind::effectParam, 1, 11, 0 };
+            slotGain.points = { { 0, 0.25f }, { lynx::ppq, 0.75f } };
+            song.automations.push_back (slotGain);
+
+            const auto first = (int) song.channels.size();
+            lynx::ChannelDef osc;
+            osc.name = "3x Osc 190qn";
+            osc.instrument = lynx::InstrumentKind::threeosc;
+            song.channels.push_back (osc);
+            int oscParam = -1;
+            for (int k = 0; k < 120 && oscParam < 0; ++k)
+                if (lynx::threeosc::isFlTarget (k))
+                    oscParam = k;
+            lynx::Automation oscClip, pitchClip;
+            oscClip.name = "3x Osc param 190qn";
+            oscClip.target = { lynx::AutomationTargetKind::channelParam, first, 0, oscParam };
+            oscClip.points = { { 0, 0.2f }, { lynx::ppq, 0.8f } };
+            pitchClip.name = "Pitch 190qn";
+            pitchClip.target = { lynx::AutomationTargetKind::channelParam, 0, 0, lynx::channelPitchParam };
+            pitchClip.points = { { 0, 0.5f }, { lynx::ppq, 0.75f } };
+            song.automations.push_back (oscClip);
+            song.automations.push_back (pitchClip);
+
+            if (song.patterns.empty())
+                song.patterns.emplace_back();
+            auto& notes = song.patterns[0].notes;
+            notes.clear();
+            lynx::Note ratchet, conditioned;
+            ratchet.channel = 0, ratchet.key = 60, ratchet.start = 0, ratchet.length = lynx::ppq, ratchet.ratchets = 4;
+            conditioned.channel = 0, conditioned.key = 64, conditioned.start = 2 * lynx::ppq, conditioned.length = lynx::ppq;
+            conditioned.cycle = 4, conditioned.cycleMask = 2; // 2:4
+            notes.push_back (ratchet);
+            notes.push_back (conditioned);
+
+            const char* const lines[] = { "This release holds 10 effect slots", "{0} note(s) with ratchets become their strikes",
+                                          "{0} note(s) with a Condition", "Automation of a channel's Pitch knob does nothing",
+                                          "Automation of 3x Osc's parameters does nothing", "Effector's newer Kilohearts laws",
+                                          "Effector's Kilohearts Flanger and Dual Delay laws" };
+            const auto countOf = [] (const lynx::olderlynx::Copy& c, const char* begin) {
+                return (int) std::count_if (c.lost.begin(), c.lost.end(), [begin] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).startsWith (begin); });
+            };
+            const auto rels = lynx::olderlynx::releases();
+            if (oscParam < 0)
+                rollup032Result = "ERROR set-up: no 3x Osc FL target";
+            else if (song.channels[(std::size_t) first].engineRev != 4)
+                rollup032Result = "ERROR set-up: a new channel is not at revision 4";
+            else if (rels.size() != 4 || rels[0] != "0.1.31" || rels[1] != "0.1.30" || rels[2] != "0.1.28" || rels[3] != "0.1.27")
+                rollup032Result = "ERROR the release list: " + rels.joinIntoString (" ");
+            for (const auto* release : { "0.1.31", "0.1.30", "0.1.28" })
+            {
+                if (rollup032Result != "OK")
+                    break;
+                const auto rel = juce::String (release);
+                const auto copy = lynx::olderlynx::forRelease (song, rel);
+                const auto root = juce::JSON::parse (copy.json);
+                juce::String why;
+                const auto old = copy.ok ? lynx::ProjectFile::fromJson (copy.json, why) : std::optional<lynx::Song> {};
+                if (! copy.ok || ! old)
+                {
+                    rollup032Result = "ERROR copy " + rel + " " + copy.error + why;
+                    break;
+                }
+                for (const auto* l : lines)
+                    if (countOf (copy, l) != 1)
+                    {
+                        rollup032Result = "ERROR the copy for " + rel + ": \"" + l + "\" " + juce::String (countOf (copy, l)) + " times";
+                        break;
+                    }
+                if (rollup032Result != "OK")
+                    break;
+                const auto& fx = root["mixer"][1]["effects"];
+                int longest = 0, struck = 0;
+                if (const auto* ns = root["patterns"][0]["notes"].getArray())
+                    for (const auto& n : *ns)
+                    {
+                        longest = std::max (longest, n.size());
+                        struck += (int) n[3] == 60 ? 1 : 0;
+                    }
+                bool detached = false;
+                if (const auto* autos = root["automations"].getArray())
+                    for (const auto& a : *autos)
+                        if (a["name"].toString() == "Slot 12 gain 190qn")
+                            detached = a["target"][0].toString() == "none";
+                const auto maxRev = rel == "0.1.31" ? 3 : rel == "0.1.30" ? 2 : 0;
+                const auto revOk = std::all_of (old->channels.begin(), old->channels.end(), [maxRev] (const lynx::ChannelDef& c) { return c.engineRev <= maxRev; })
+                                   && (rel != "0.1.28" || ! copy.json.contains ("engineRev"))
+                                   && (rel != "0.1.31" || old->channels[(std::size_t) first].engineRev == 3);
+                if (! root["savedBy"].toString().equalsIgnoreCase (rel))
+                    rollup032Result = "ERROR the copy for " + rel + " is stamped " + root["savedBy"].toString();
+                else if (fx.size() != 10 || copy.json.contains ("slotRows") || ! detached)
+                    rollup032Result = "ERROR the copy for " + rel + ": slots (" + juce::String (fx.size()) + " effects)";
+                else if (longest > 21 || struck != 4)
+                    rollup032Result = "ERROR the copy for " + rel + ": notes (longest " + juce::String (longest) + ", strikes " + juce::String (struck) + ")";
+                else if (fx[0]["params"].size() > lynx::khsdsp::lawParam || fx[1]["params"].size() > lynx::khsdsp::lawParam)
+                    rollup032Result = "ERROR the copy for " + rel + ": Effector's [12] is left";
+                else if (! revOk)
+                    rollup032Result = "ERROR the copy for " + rel + ": engine revisions";
+            }
+            if (rollup032Result == "OK")
+                if (const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.31"); ! plain.ok || ! plain.lost.empty())
+                    rollup032Result = "ERROR lines for the default song (" + juce::String ((int) plain.lost.size()) + ")";
+
+            // round 190px's caches (not in projects; what 0.1.31 does with them)
+            if (rollup032Result == "OK")
+            {
+                const auto dir = lynx::SampleLibrary::cacheFolder().getParentDirectory().getChildFile ("selftest-190qn");
+                dir.deleteRecursively();
+                dir.createDirectory();
+                const auto writeSame = [&dir] (const juce::String& name, int frames) {
+                    const auto wav = dir.getChildFile (name);
+                    juce::WavAudioFormat format;
+                    juce::AudioBuffer<float> audio (2, frames);
+                    for (int i = 0; i < frames; ++i)
+                    {
+                        const auto v = 0.4f * std::sin (0.031f * (float) i) + 0.2f * std::sin (0.0071f * (float) i);
+                        audio.setSample (0, i, v);
+                        audio.setSample (1, i, v);
+                    }
+                    std::unique_ptr<juce::OutputStream> out (wav.createOutputStream().release());
+                    if (auto* w = format.createWriterFor (out.get(), 44100.0, 2, 16, {}, 0))
+                    {
+                        out.release();
+                        std::unique_ptr<juce::AudioFormatWriter> writer (w);
+                        writer->writeFromAudioSampleBuffer (audio, 0, frames);
+                    }
+                    return wav;
+                };
+                const auto cache = lynx::SampleLibrary::cacheFolder();
+                const auto newest = [&cache] (const juce::String& pattern, juce::Time since) {
+                    juce::File found;
+                    for (const auto& f : cache.findChildFiles (juce::File::findFiles, false, pattern))
+                        if (f.getLastModificationTime() >= since && (found == juce::File() || f.getLastModificationTime() > found.getLastModificationTime()))
+                            found = f;
+                    return found;
+                };
+                const auto since = juce::Time::getCurrentTime() - juce::RelativeTime::seconds (2.0);
+                lynx::SampleLibrary library;
+                const auto shortWav = writeSame ("same 190qn.wav", 44100);
+                const auto stretched = library.loadStretched (shortWav.getFullPathName(), 1.25);
+                // (the copy is written by the cache's writer thread: the new .str file whose frames are this copy's)
+                juce::File str;
+                juce::MemoryBlock bytes;
+                std::int32_t channels = 0;
+                std::int64_t frames = 0;
+                for (int tries = 0; tries < 200 && str == juce::File() && stretched != nullptr; ++tries)
+                {
+                    juce::Thread::sleep (50);
+                    for (const auto& f : cache.findChildFiles (juce::File::findFiles, false, "*.str"))
+                    {
+                        juce::MemoryBlock b;
+                        std::int64_t n = 0;
+                        if (f.getLastModificationTime() < since || ! f.loadFileAsData (b) || b.getSize() < 32)
+                            continue;
+                        std::memcpy (&n, static_cast<const char*> (b.getData()) + 16, 8);
+                        if (n != (std::int64_t) stretched->frames() || (juce::int64) b.getSize() < 32 + n * (juce::int64) sizeof (float))
+                            continue;
+                        str = f, bytes = b, frames = n;
+                        std::memcpy (&channels, static_cast<const char*> (b.getData()) + 24, 4);
+                        break;
+                    }
+                }
+                // 0.1.31's acceptance (SampleLibrary.cpp readStretched at v0.1.31-alpha): channels 1 or 2 and the size they make
+                const auto acceptedBy0131 = frames > 0 && (channels == 1 || channels == 2)
+                                            && (juce::int64) bytes.getSize() == 32 + frames * channels * (juce::int64) sizeof (float);
+                if (stretched == nullptr || ! stretched->isStereo() || str == juce::File())
+                    rollup032Result = "ERROR stretch cache: nothing written";
+                else if (channels != -2 || frames != (std::int64_t) stretched->frames() || (juce::int64) bytes.getSize() != 32 + frames * (juce::int64) sizeof (float)
+                         || std::memcmp (static_cast<const char*> (bytes.getData()) + 32, stretched->leftData(), (std::size_t) frames * sizeof (float)) != 0
+                         || std::memcmp (stretched->leftData(), stretched->rightData(), (std::size_t) frames * sizeof (float)) != 0)
+                    rollup032Result = "ERROR stretch cache: header channels " + juce::String (channels) + ", frames " + juce::String ((juce::int64) frames);
+                else if (acceptedBy0131)
+                    rollup032Result = "ERROR stretch cache: 0.1.31 would read the one-channel file";
+                if (rollup032Result == "OK")
+                {
+                    const auto longWav = writeSame ("same long 190qn.wav", 44100 * 31);
+                    const auto streamed = library.load (longWav.getFullPathName());
+                    const auto same = newest ("*.R.same", since);
+                    const auto key = same.getFileName().upToFirstOccurrenceOf (".R.same", false, false);
+                    if (streamed == nullptr || ! streamed->isMapped() || ! streamed->isStereo() || streamed->rightData() != streamed->leftData())
+                        rollup032Result = "ERROR stream cache: not mapped as one channel";
+                    else if (same == juce::File() || ! cache.getChildFile (key + ".L.pcm").existsAsFile() || cache.getChildFile (key + ".R.pcm").existsAsFile())
+                        rollup032Result = "ERROR stream cache files (" + same.getFileName() + ")";
+                }
+                dir.deleteRecursively();
             }
         }
 
@@ -10830,7 +11047,7 @@ private:
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
                         && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
-                        && rollup031s7Result == "OK" && rollup031s8Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" && slots260Result == "OK" // (round 190qf: slots260) (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
+                        && rollup031s7Result == "OK" && rollup031s8Result == "OK" && rollup032Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" && slots260Result == "OK" // (round 190qf: slots260) (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
                         && flparity190prResult == "OK"
                         && renderAgainResult.startsWith ("OK") && determinismResult.startsWith ("OK")
@@ -10937,6 +11154,7 @@ private:
                << "rollup031s6_copy_for_0130=" << rollup031s6Result << "\n"
                << "rollup031s7_copy_for_0130=" << rollup031s7Result << "\n"
                << "rollup031s8_copy_for_0130=" << rollup031s8Result << "\n"
+               << "rollup032_copy_for_0131=" << rollup032Result << "\n"
                << "headergear248=" << headerGearResult << "\n"
                << "pertab259=" << perTab259Result << "\n"
                << "slots260=" << slots260Result << "\n"

@@ -20,7 +20,7 @@
 
 namespace lynx::olderlynx
 {
-// The releases a copy can be saved for, newest first ("0.1.30", "0.1.28", "0.1.27").
+// The releases a copy can be saved for, newest first ("0.1.31", "0.1.30", "0.1.28", "0.1.27").
 juce::StringArray releases();
 
 // One thing the copy loses or changes. `text` is an English UI string (TR_NOOP) with an optional "{0}" filled by
