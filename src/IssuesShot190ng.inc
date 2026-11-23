@@ -213,8 +213,9 @@
             check ("stems: $track names each stem file", preview.contains ("MySong_Kick.wav"));
             auto plain = makeExportPanelWithName (engine, "MySong", "", when, preview, resolved);
             check ("empty template: the project's name, as before", resolved == "MySong");
-            auto unsafe = makeExportPanelWithName (engine, "My:Song?", "$project/$format", when, preview, resolved);
-            check ("unsafe characters become \"_\"", resolved == "My_Song__WAV");
+            auto unsafe = makeExportPanelWithName (engine, "My:Song?", "$project $format", when, preview, resolved);
+            check ("unsafe characters become \"_\"", resolved == "My_Song_ WAV");
+            // (round 190qb, #215 follow-up: a "/" typed in the template is a folder now, --issuesshot190qb)
         }
 
         juce::File (prefix + "-checks.txt").replaceWithText (checks + "result=" + (allOk ? "OK" : "FAIL") + "\n");

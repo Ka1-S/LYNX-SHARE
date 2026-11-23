@@ -18107,3 +18107,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Tracks190peTests.inc" // round 190pe (0.1.31): track versions (P20) and the import of tracks from another project (P11)
 #include "Jsfx190pjTests.inc" // round 190pj (0.1.32): JSFX support stages 1-2 (issue #241)
 #include "Issue258_190pvTests.inc" // round 190pv: issue #258, a cloned channel's own automation drives its sound
+#include "Issues190qbTests.inc" // round 190qb: issue follow-ups (#215 folders in the export name)

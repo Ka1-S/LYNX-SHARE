@@ -587,7 +587,7 @@ public:
         nameEditor.setIndents (6, 0);
         nameEditor.setJustification (juce::Justification::centredLeft);
         nameEditor.setTextToShowWhenEmpty (exportnaming::defaultTemplate, theme::colour::textSecondary);
-        nameEditor.setTooltip (tr ("The exported file's name. Wildcards such as $project, $date or $bpm are filled in when you export"));
+        nameEditor.setTooltip (tr ("The exported file's name. Wildcards such as $project, $date or $bpm are filled in when you export. A / puts the file in a folder of that name inside the export folder (made when needed)"));
         nameEditor.onTextChange = [this] {
             options.nameTemplate = nameEditor.getText().toStdString();
             refreshName();
@@ -1504,18 +1504,42 @@ private:
         auto folder = exportFolder();
         // issue #215 (round 190ng): the name the template gives ("$project" = the project's name, as before)
         const auto name = naming ? resolvedName() : suggestedName;
-        chooser = lynx::ui::makeFileChooser (tr ("Export audio"), folder.getChildFile (name + extension), "*" + extension);
+        // issue #215 follow-up (round 190qb): a template with folders ("BOUNCE/$project") makes them inside the export
+        // folder, so the file dialog opens there; folders made for a dialog that is cancelled are taken away again
+        const auto target = folder.getChildFile (name + extension);
+        const auto made = makeFoldersFor (target, folder);
+        chooser = lynx::ui::makeFileChooser (tr ("Export audio"), target, "*" + extension);
         lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
-                              [this, extension] (const juce::FileChooser& fc) {
+                              [this, extension, made] (const juce::FileChooser& fc) {
                                   auto file = fc.getResult();
 
                                   if (file == juce::File())
+                                  {
+                                      for (const auto& dir : made) // (innermost first; only while still empty)
+                                          if (dir.isDirectory() && dir.getNumberOfChildFiles (juce::File::findFilesAndDirectories | juce::File::ignoreHiddenFiles) == 0)
+                                              dir.deleteFile();
                                       return;
+                                  }
 
                                   if (! file.hasFileExtension (extension))
                                       file = file.withFileExtension (extension);
                                   startExport (file);
                               });
+    }
+
+    // issue #215 follow-up (round 190qb): makes the folders between `base` and `file` that don't exist yet; the ones it
+    // made, innermost first (nothing for a file right in `base`, or one outside it)
+    static juce::Array<juce::File> makeFoldersFor (const juce::File& file, const juce::File& base)
+    {
+        juce::Array<juce::File> missing;
+        for (auto dir = file.getParentDirectory(); dir != base && dir.isAChildOf (base); dir = dir.getParentDirectory())
+            if (! dir.isDirectory())
+                missing.add (dir);
+        juce::Array<juce::File> made;
+        for (int i = missing.size(); --i >= 0;)
+            if (missing[i].createDirectory().wasOk())
+                made.insert (0, missing[i]);
+        return made;
     }
 
     // Renders to `file` with the window's choices (the file dialog's result, or "Same as last time"). Closes the window.
