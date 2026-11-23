@@ -1,5 +1,5 @@
 ---
-source: a29416cb8c
+source: 532b2eee04
 ---
 `Datei › Öffnen...` (`Ctrl+O`) öffnet die eigenen `.lynx`-Projekte von LYNX SHARE und außerdem `.flp`-, `.als`-, `.flm`-, `.dawproject`-, `.band`-, `.blx`- und `.mid`-Dateien. Ein Projekt aus einem anderen Programm ist ein Import: Es wird zu einem neuen, ungespeicherten LYNX-SHARE-Projekt, und die Originaldatei wird nie beschrieben.
 
@@ -22,7 +22,7 @@ source: a29416cb8c
 | `.band` (GarageBand 10, GarageBand für iOS) | Spuren, MIDI- und Audio-Regionen, Tempo, Taktart, Tonart, Abschnitte als Marker, Pegel, Pan und Mute, als Spuren im Einfachen Arbeitsablauf. Sampler-Instrumente, die in GarageBand für iOS gemacht wurden | Instrumentenspuren spielen den eingebauten Synth und die Drums. Drummer-Regionen, Take-Ordner und Tempowechsel werden aufgelistet. Projekte aus GarageBand 11 und älter sind nicht lesbar |
 | `.blx` (BandLab) | Spuren, MIDI- und Audio-Regionen mit ihren Loops, Tempo, Taktart, Tonart, Lautstärke, Pan und Mute, Lautstärke- und Pan-Automation und die gängigen Effekte, als Spuren im Einfachen Arbeitsablauf | Instrumentenspuren spielen den eingebauten Synth und die Drums. Andere Effekte und das Mastering-Preset entfallen und werden aufgelistet. Nur mit ausgedachten Projekten getestet |
 | `.mid` | Noten, Taktarten und jeder Tempowechsel | Eine MIDI-Datei enthält keine Klänge: Kanäle bekommen den LYNX-SHARE-Synth oder einen MIDI-Out-Kanal |
-| `.mod`, `.xm`, `.s3m`, `.it` (Tracker-Module) | Instrumente als Sampler-Kanäle mit ihren Samples, Patterns, die Reihenfolgeliste als Playlist, Speed und Tempo, Notenlautstärke, Pan, Delay und Cut; Lautstärke- und Pan-Änderungen als Events des Kanals (MOD und XM) sowie Slides, Vibrato, Arpeggios und Tonhöhenhüllkurven als Tonhöhenkurven der Noten | Andere Effekte und Instrumentenhüllkurven werden im Importbericht gezählt. `Ansicht › Fenster und Werkzeuge › Tracker` bearbeitet die Noten auf Tracker-Art |
+| `.mod`, `.xm`, `.s3m`, `.it` (Tracker-Module) | Instrumente als Sampler-Kanäle mit ihren Samples, Patterns, die Reihenfolgeliste als Playlist, Speed und Tempo, Notenlautstärke, Pan, Delay und Cut; Lautstärke- und Pan-Änderungen als Events des Kanals (MOD und XM) sowie Slides, Vibrato, Arpeggios und Tonhöhenhüllkurven als Tonhöhenkurven der Noten | Andere Effekte und Instrumentenhüllkurven werden im Importbericht gezählt. `Ansicht › Tracker` bearbeitet die Noten auf Tracker-Art |
 | `.zip` | Das gezippte Loop-Paket von FL Studio oder ein mit Samples exportiertes Projekt: in einen eigenen Ordner entpackt, dann öffnet sich das Projekt darin mit seinen Samples | |
 
 Plugins von Drittanbietern (VST2, VST3 und CLAP in einer `.flp` oder einer `.dawproject`, VST2 und VST3 in einer `.als`) laden mit ihrem gespeicherten Zustand, wenn dasselbe Plugin auf deinem Computer installiert ist.

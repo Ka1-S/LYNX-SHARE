@@ -1,5 +1,5 @@
 ---
-source: a29416cb8c
+source: 532b2eee04
 ---
 `Bestand › Openen...` (`Ctrl+O`) opent de eigen `.lynx`-projecten van LYNX SHARE en ook `.flp`-, `.als`-, `.flm`-, `.dawproject`-, `.band`-, `.blx`- en `.mid`-bestanden. Een project uit een ander programma is een import: het wordt een nieuw, niet-opgeslagen LYNX SHARE-project, en het originele bestand wordt nooit overschreven.
 
@@ -22,7 +22,7 @@ source: a29416cb8c
 | `.band` (GarageBand 10, GarageBand voor iOS) | Tracks, MIDI- en audioregio's, tempo, maatsoort, toonsoort, secties als markers, niveau, pan en mute, als tracks van de Eenvoudige lay-out. Sampler-instrumenten die in GarageBand voor iOS zijn gemaakt | Instrumenttracks spelen de ingebouwde synth en drums. Drummer-regio's, take-mappen en tempowijzigingen worden vermeld. Projecten van GarageBand 11 en ouder zijn niet leesbaar |
 | `.blx` (BandLab) | Tracks, MIDI- en audioregio's met hun loops, tempo, maatsoort, toonsoort, volume, pan en mute, volume- en panautomatisering en de gebruikelijke effecten, als tracks van de Eenvoudige lay-out | Instrumenttracks spelen de ingebouwde synth en drums. Andere effecten en de Mastering-preset worden weggelaten en vermeld. Alleen getest op verzonnen projecten |
 | `.mid` | Noten, maatsoorten en elke tempowijziging | Een MIDI-bestand bevat geen geluiden: kanalen krijgen de LYNX SHARE-synth of een MIDI Out-kanaal |
-| `.mod`, `.xm`, `.s3m`, `.it` (trackermodules) | Instrumenten als Sampler-kanalen met hun samples, patterns, de volgordelijst als de Playlist, snelheid en tempo, notenvolume, pan, delay en cut; volume- en panwijzigingen als events van het kanaal (MOD en XM), en slides, vibrato, arpeggio's en toonhoogte-envelopes als toonhoogtecurves van de noten | Andere effecten en instrument-envelopes worden geteld in het importrapport. `Beeld › Vensters en hulpmiddelen › Tracker` bewerkt de noten op trackermanier |
+| `.mod`, `.xm`, `.s3m`, `.it` (trackermodules) | Instrumenten als Sampler-kanalen met hun samples, patterns, de volgordelijst als de Playlist, snelheid en tempo, notenvolume, pan, delay en cut; volume- en panwijzigingen als events van het kanaal (MOD en XM), en slides, vibrato, arpeggio's en toonhoogte-envelopes als toonhoogtecurves van de noten | Andere effecten en instrument-envelopes worden geteld in het importrapport. `Beeld › Tracker` bewerkt de noten op trackermanier |
 | `.zip` | Het gezipte looppakket van FL Studio, of een project dat met zijn samples is geëxporteerd: uitgepakt in een eigen map, waarna het project erin opent met zijn samples | |
 
 Plugins van derden in VST2-, VST3- en CLAP-formaat in een `.flp` of een `.dawproject`, en VST2- en VST3-plugins in een `.als`, laden met hun opgeslagen staat als dezelfde plugin op je computer is geïnstalleerd.

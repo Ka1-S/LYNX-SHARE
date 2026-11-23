@@ -1,5 +1,5 @@
 ---
-source: 736421c170
+source: 5e5d2e8e05
 ---
 ![De Eenvoudige lay-out: tracks op een tijdlijn, een startbeat en de Drum Machine](/assets/img/learn/simple-beat-2.webp)
 
@@ -7,7 +7,7 @@ Kies de **Eenvoudige lay-out**. Het is één venster met je tracks op een tijdli
 
 ## Je eerste drie dingen
 
-1. **Kies de lay-out.** De eerste keer dat LYNX SHARE start, vraagt een welkomstkaart waar je van komt (0.1.31). Klik op `BandLab, FL Studio Mobile of GarageBand`: het venster schakelt over naar de Eenvoudige lay-out, met een startbeat op een Drums-track. In 0.1.30 kies je `Beeld › Lay-outstijl › Eenvoudige lay-out`.
+1. **Kies de lay-out.** De eerste keer dat LYNX SHARE start, vraagt een welkomstkaart waar je van komt. Klik op `BandLab, FL Studio Mobile of GarageBand`: het venster schakelt over naar de Eenvoudige lay-out, met een startbeat op een Drums-track. Later schakel je op elk moment over met `Beeld › Lay-outstijl › Eenvoudige lay-out`.
 2. **Maak een beat.** Klik op de vakjes van de Drum Machine onder de tijdlijn. Zie [Maak een beat in de Eenvoudige lay-out](/learn/simple-beat/).
 3. **Voeg een loop en je stem toe.** `Loops` opent het loopspaneel: sleep een loop naar de tijdlijn. [Neem daarna je stem op](/learn/record-voice/) op een Voice-track.
 

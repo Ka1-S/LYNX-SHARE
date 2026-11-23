@@ -1,5 +1,5 @@
 ---
-source: c22e3487eb
+source: 6cdabe8ca5
 ---
 ## Antes de empezar
 
@@ -14,7 +14,7 @@ source: c22e3487eb
 2. Haz clic en `Voz / audio`. Aparece una pista de voz bajo las demás, armada para grabar desde la primera entrada de tu dispositivo de audio.
 3. El dock bajo la línea de tiempo muestra la pista, con su medidor `Nivel de entrada` a la derecha. Canta una nota y mira cómo se mueve.
 
-El botón `+ Pista de voz` de la tarjeta `Siguiente: 3 cosas que probar` hace lo mismo (0.1.31).
+El botón `+ Pista de voz` de la tarjeta `Siguiente: 3 cosas que probar` hace lo mismo.
 
 ## Graba una toma
 

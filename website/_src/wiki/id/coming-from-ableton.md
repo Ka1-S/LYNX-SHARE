@@ -1,5 +1,5 @@
 ---
-source: 4ca4775a35
+source: 37920663db
 ---
 ![Layout Clip-launch: kisi klip dengan scene di samping Playlist](/assets/img/cliplaunch.webp)
 
@@ -9,7 +9,7 @@ Halaman ini juga untuk pengguna Bitwig Studio: kisi klip bekerja dengan cara yan
 
 ## Langkah pertamamu
 
-1. **Pilih tata letak.** Saat LYNX SHARE pertama kali dijalankan, sebuah kartu sambutan menanyakan dari mana kamu datang (0.1.31). Klik `Ableton Live atau Bitwig`: tata letak peluncuran klip terbuka. Di 0.1.30, pilih `Tampilan › Gaya tata letak › Alur kerja peluncuran klip`.
+1. **Pilih tata letak.** Saat LYNX SHARE pertama kali dijalankan, sebuah kartu sambutan menanyakan dari mana kamu datang. Klik `Ableton Live atau Bitwig`: tata letak peluncuran klip terbuka. Nanti, `Tampilan › Gaya tata letak › Alur kerja peluncuran klip` beralih ke sana kapan saja.
 2. **Isi sebuah slot.** Seret sample atau pattern dari Browser ke sebuah slot, atau klik kanan slot kosong dan pilih `Taruh pattern di sini`.
 3. **Luncurkan.** Klik segitiga di kiri sebuah klip, atau segitiga sebuah scene di kolom `Scene` untuk meluncurkan seluruh barisnya. Atau buka salah satu set `.als`-mu (di bawah).
 

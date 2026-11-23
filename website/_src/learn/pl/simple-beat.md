@@ -1,14 +1,14 @@
 ---
-source: 4ebe52e456
+source: 2116c7d24c
 ---
 ## Wybierz Prosty układ
 
 ![Karta powitalna pyta, skąd przychodzisz](/assets/img/learn/simple-beat-1.webp)
 
-1. Uruchom LYNX SHARE. Za pierwszym razem karta powitalna pyta, skąd przychodzisz (0.1.31).
+1. Uruchom LYNX SHARE. Za pierwszym razem karta powitalna pyta, skąd przychodzisz.
 2. Kliknij `BandLab, FL Studio Mobile lub GarageBand`. Okno przełącza się na Prosty układ, a na ścieżce Drums pojawia się gotowy beat.
 
-W 0.1.30 wybierz `Widok › Styl układu › Prosty układ`, kliknij `+ Dodaj ścieżkę`, potem `Perkusja` i wybierz jeden z gotowych beatów. To samo menu przełącza układy w każdej chwili. Projekt zostaje taki, jaki jest.
+Bez karty wybierz `Widok › Styl układu › Prosty układ`, kliknij `+ Dodaj ścieżkę`, potem `Perkusja` i wybierz jeden z gotowych beatów. To samo menu przełącza układy w każdej chwili. Projekt zostaje taki, jaki jest.
 
 ## Odtwórz beat
 
@@ -40,7 +40,7 @@ Litera obok każdego wiersza to jego klawisz na klawiaturze komputera: naciśnij
 
 ![Panel Loops obok osi czasu](/assets/img/learn/simple-beat-5.webp)
 
-- Karta `Dalej: 3 rzeczy do wypróbowania` (0.1.31) sama odhacza każdy krok. `Otwórz pętle` otwiera panel Loops: przeciągnij pętlę na oś czasu. Pętla trzyma tempo i tonację projektu.
+- Karta `Dalej: 3 rzeczy do wypróbowania` sama odhacza każdy krok. `Otwórz pętle` otwiera panel Loops: przeciągnij pętlę na oś czasu. Pętla trzyma tempo i tonację projektu.
 - [Nagraj swój głos](/learn/record-voice/) na ścieżce Voice.
 - `Zakończ` zapisuje utwór jako WAV lub MP3.
 

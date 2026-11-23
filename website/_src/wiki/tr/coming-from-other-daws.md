@@ -1,11 +1,11 @@
 ---
-source: 20cf7fed48
+source: c82c79e958
 ---
 LYNX SHARE'in üç yerleşimi vardır. Logic, Cubase, Reaper, Pro Tools veya Studio One'dan geliyorsanız, **Mixer'ın elinizin altında olduğu Basit yerleşimle** başlayın: bildiğiniz gibi, zaman çizelgesinde her enstrüman veya ses için bir iz. Pattern yerleşimi, yani FL Studio'nun çalışma biçimi, pattern istediğinizde orada durur.
 
 ## İlk adımlarınız
 
-1. **Yerleşimi seçin.** LYNX SHARE ilk açıldığında bir karşılama kartı nereden geldiğinizi sorar (0.1.31). `Logic, Cubase, Reaper, Pro Tools veya Studio One` düğmesine tıklayın: Basit yerleşim New track kartıyla açılır ve Mixer ilk izinizle birlikte gelir. 0.1.30'da `Görünüm › Yerleşim stili › Basit iş akışı` yolunu seçin ve Mixer'ı `F9` ile açın.
+1. **Yerleşimi seçin.** LYNX SHARE ilk açıldığında bir karşılama kartı nereden geldiğinizi sorar. `Logic, Cubase, Reaper, Pro Tools veya Studio One` düğmesine tıklayın: Basit yerleşim New track kartıyla açılır ve Mixer ilk izinizle birlikte gelir. Daha sonra `Görünüm › Yerleşim stili › Basit iş akışı` istediğiniz zaman ona geçirir ve `F9` Mixer'ı açar.
 2. **Bir iz ekleyin.** `+ Parça ekle` şunları sunar: `Ses / audio`, `Enstrüman`, `Davullar`, `Sampler`, `Gitar / bas`, `İçe aktar` ve `Döngüler`. Bir enstrüman izini bilgisayar tuşlarıyla, ekran klavyesiyle veya bir MIDI klavyeyle çalın.
 3. **Kaydedin.** `Seçenekler › Ses ayarları...` içinden ses aygıtınızı seçin, sonra bkz. [Sesinizi kaydedin](/learn/record-voice/).
 

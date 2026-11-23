@@ -1,5 +1,5 @@
 ---
-source: 4ca4775a35
+source: 37920663db
 ---
 ![Klip başlatma yerleşimi: Playlist'in yanında sahneli bir klip ızgarası](/assets/img/cliplaunch.webp)
 
@@ -9,7 +9,7 @@ Bu sayfa Bitwig Studio kullanıcıları için de geçerlidir: klip ızgarası ay
 
 ## İlk adımlarınız
 
-1. **Yerleşimi seçin.** LYNX SHARE ilk açıldığında bir karşılama kartı nereden geldiğinizi sorar (0.1.31). `Ableton Live veya Bitwig` düğmesine tıklayın: Klip başlatma yerleşimi açılır. 0.1.30'da `Görünüm › Yerleşim stili › Klip başlatma iş akışı` yolunu seçin.
+1. **Yerleşimi seçin.** LYNX SHARE ilk açıldığında bir karşılama kartı nereden geldiğinizi sorar. `Ableton Live veya Bitwig` düğmesine tıklayın: Klip başlatma yerleşimi açılır. Daha sonra `Görünüm › Yerleşim stili › Klip başlatma iş akışı` istediğiniz zaman ona geçirir.
 2. **Bir yuvayı doldurun.** Browser'dan bir sample'ı veya pattern'i bir yuvaya sürükleyin ya da boş bir yuvaya sağ tıklayıp `Buraya bir pattern koy` seçeneğini seçin.
 3. **Başlatın.** Bir klibin solundaki üçgene ya da tüm satırı başlatmak için `Sahneler` sütunundaki bir sahnenin üçgenine tıklayın. Ya da `.als` set'lerinizden birini açın (aşağıda).
 

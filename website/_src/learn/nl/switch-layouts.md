@@ -1,11 +1,11 @@
 ---
-source: fffb2dce40
+source: ebe3befa50
 ---
 ## Kies waar je vandaan komt
 
 ![De welkomstkaart vraagt waar je vandaan komt](/assets/img/learn/switch-layouts-1.webp)
 
-1. Start LYNX SHARE. De eerste keer vraagt een welkomstkaart waar je vandaan komt (0.1.31).
+1. Start LYNX SHARE. De eerste keer vraagt een welkomstkaart waar je vandaan komt.
 2. Elk antwoord kiest een lay-out:
    - `BandLab, FL Studio Mobile of GarageBand`: de Eenvoudige lay-out, één venster met tracks, loops en snel opnemen.
    - `FL Studio`: de Pattern-lay-out, met Channel Rack, Piano Roll, Playlist en Mixer.

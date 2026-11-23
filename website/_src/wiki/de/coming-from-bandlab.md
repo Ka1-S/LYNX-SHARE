@@ -1,5 +1,5 @@
 ---
-source: 736421c170
+source: 5e5d2e8e05
 ---
 ![Das Einfache Layout: Spuren auf einer Zeitleiste, ein Starter-Beat und die Drum Machine](/assets/img/learn/simple-beat-2.webp)
 
@@ -7,7 +7,7 @@ Wähle das **Einfache Layout**. Es ist ein Fenster mit deinen Spuren auf einer Z
 
 ## Deine ersten drei Schritte
 
-1. **Wähle das Layout.** Beim ersten Start von LYNX SHARE fragt eine Willkommenskarte, woher du kommst (0.1.31). Klicke auf `BandLab, FL Studio Mobile oder GarageBand`: Das Fenster wechselt zum Einfachen Layout, mit einem Starter-Beat auf einer Drums-Spur. In 0.1.30 wähle `Ansicht › Layout-Stil › Einfacher Arbeitsablauf`.
+1. **Wähle das Layout.** Beim ersten Start von LYNX SHARE fragt eine Willkommenskarte, woher du kommst. Klicke auf `BandLab, FL Studio Mobile oder GarageBand`: Das Fenster wechselt zum Einfachen Layout, mit einem Starter-Beat auf einer Drums-Spur. Später wechselt `Ansicht › Layout-Stil › Einfacher Arbeitsablauf` jederzeit dorthin.
 2. **Mach einen Beat.** Klicke die Quadrate der Drum Machine unter der Zeitleiste an. Siehe [Einen Beat im Einfachen Layout machen](/learn/simple-beat/).
 3. **Füge einen Loop und deine Stimme hinzu.** `Loops` öffnet das Loop-Panel: Ziehe einen Loop auf die Zeitleiste. Dann [nimm deine Stimme auf](/learn/record-voice/), auf einer Stimmenspur.
 

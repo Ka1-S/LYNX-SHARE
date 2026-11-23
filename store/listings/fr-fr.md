@@ -51,7 +51,15 @@ LYNX SHARE est en version alpha : attendez-vous à quelques imperfections, et me
 
 ## What's new
 
-LYNX SHARE 0.1.30 : plus léger que jamais, avec environ la moitié du CPU de FL Studio 2026 pendant que la démo Thief de FL tourne sur notre PC de test ; hébergement ARA 2, pour que Melodyne et d'autres plugins ARA éditent les clips audio directement ; un éditeur de notes polyphonique et une conversion audio vers MIDI polyphonique ; un Newtone plus naturel ; Helix, un nouveau synthé wavetable, et Tetra, un synthé FM à 4 opérateurs ; un assistant d'accords ; une boîte à rythmes façon BandLab, un accordeur et un Loop Browser dans le Flux simple ; des pistes de retour, des départs et un crossfader dans le Flux par lancement de clips ; MPE et sortie MIDI matérielle ; un éditeur DirectWave ; les projets DAWproject, GarageBand et BandLab, les instruments et samples .gig, .dwp et .ncw, et l'export AIFF et M4A ; plus de 40 remplaçants de plugins refaits ; et des corrections pour environ 40 problèmes signalés.
+LYNX SHARE 0.1.31 : un Tracker intégré qui ouvre aussi les modules tracker (.mod, .xm, .s3m, .it) ; LYNX Model, des
+modèles physiques de marimba, vibraphone, xylophone, glockenspiel, cloches tubulaires et kalimba ; des scripts JSFX
+d'effets et d'instruments ; une carte de bienvenue qui prépare la bonne disposition et une page d'accueil avec vos
+projets récents ; une recherche qui trouve chaque commande ; deux projets côte à côte avec copier-coller entre eux ;
+une piste des sections, une piste d'accords avec Smart Tempo et des versions de piste ; des modes d'écriture de
+l'automation, Capture automation et des modulateurs pour n'importe quel bouton ; l'export .flm pour FL Studio Mobile ;
+les appareils de rack de Live en ligne avec une Macro Map et Solo / Cue dans la disposition par lancement de clips ;
+Atténuer sous et des départs Écho dans la disposition simple ; des plugins ARA sur une insertion du mixer ; des
+projets FL Studio qui jouent plus près de FL ; et des corrections pour environ 30 problèmes signalés.
 
 ## Features
 

@@ -1,11 +1,11 @@
 ---
-source: fffb2dce40
+source: ebe3befa50
 ---
 ## Scegli da dove vieni
 
 ![La scheda di benvenuto chiede da dove vieni](/assets/img/learn/switch-layouts-1.webp)
 
-1. Avvia LYNX SHARE. La prima volta, una scheda di benvenuto chiede da dove vieni (0.1.31).
+1. Avvia LYNX SHARE. La prima volta, una scheda di benvenuto chiede da dove vieni.
 2. Ogni risposta sceglie un layout:
    - `BandLab, FL Studio Mobile o GarageBand`: il layout semplice, una sola finestra con tracce, loop e registrazione rapida.
    - `FL Studio`: il layout Pattern, con Channel Rack, Piano Roll, Playlist e Mixer.

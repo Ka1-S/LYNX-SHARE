@@ -1,11 +1,11 @@
 ---
-source: 20cf7fed48
+source: c82c79e958
 ---
 LYNX SHARE hat drei Layouts. Wenn du von Logic, Cubase, Reaper, Pro Tools oder Studio One kommst, starte mit dem **Einfachen Layout mit dem Mixer griffbereit**: eine Spur pro Instrument oder Stimme auf einer Zeitleiste, wie du es kennst. Das Pattern-Layout, die Arbeitsweise von FL Studio, ist da, wenn du Patterns willst.
 
 ## Deine ersten Schritte
 
-1. **Wähle das Layout.** Beim ersten Start von LYNX SHARE fragt eine Willkommenskarte, woher du kommst (0.1.31). Klicke auf `Logic, Cubase, Reaper, Pro Tools oder Studio One`: Das Einfache Layout öffnet sich mit seiner Karte „Neue Spur“, und der Mixer erscheint mit deiner ersten Spur. In 0.1.30 wähle `Ansicht › Layout-Stil › Einfacher Arbeitsablauf` und öffne den Mixer mit `F9`.
+1. **Wähle das Layout.** Beim ersten Start von LYNX SHARE fragt eine Willkommenskarte, woher du kommst. Klicke auf `Logic, Cubase, Reaper, Pro Tools oder Studio One`: Das Einfache Layout öffnet sich mit seiner Karte „Neue Spur“, und der Mixer erscheint mit deiner ersten Spur. Später wechselt `Ansicht › Layout-Stil › Einfacher Arbeitsablauf` jederzeit dorthin, und `F9` öffnet den Mixer.
 2. **Füge eine Spur hinzu.** `+ Spur hinzufügen` bietet `Stimme / Audio`, `Instrument`, `Drums`, `Sampler`, `Gitarre / Bass`, `Importieren` und `Loops`. Spiele eine Instrumentenspur mit den Computertasten, der Bildschirmtastatur oder einem MIDI-Keyboard.
 3. **Nimm auf.** Wähle dein Audiogerät unter `Optionen › Audioeinstellungen...`, dann siehe [Nimm deine Stimme auf](/learn/record-voice/).
 

@@ -1,11 +1,11 @@
 ---
-source: 20cf7fed48
+source: c82c79e958
 ---
 LYNX SHARE a trois dispositions. Si vous venez de Logic, Cubase, Reaper, Pro Tools ou Studio One, commencez par la **disposition simple avec le Mixer à portée de main** : une piste par instrument ou par voix sur une timeline, comme vous la connaissez. La disposition Patterns, la façon de travailler de FL Studio, est là quand vous voulez des patterns.
 
 ## Vos premiers pas
 
-1. **Choisissez la disposition.** Au premier démarrage de LYNX SHARE, une carte de bienvenue demande d'où vous venez (0.1.31). Cliquez sur `Logic, Cubase, Reaper, Pro Tools ou Studio One` : la disposition simple s'ouvre sur sa carte New track, et le Mixer apparaît avec votre première piste. En 0.1.30, choisissez `Vue › Style de disposition › Disposition simple`, et ouvrez le Mixer avec `F9`.
+1. **Choisissez la disposition.** Au premier démarrage de LYNX SHARE, une carte de bienvenue demande d'où vous venez. Cliquez sur `Logic, Cubase, Reaper, Pro Tools ou Studio One` : la disposition simple s'ouvre sur sa carte New track, et le Mixer apparaît avec votre première piste. Plus tard, `Vue › Style de disposition › Disposition simple` y bascule à tout moment, et `F9` ouvre le Mixer.
 2. **Ajoutez une piste.** `+ Ajouter une piste` propose `Voix / audio`, `Instrument`, `Batterie`, `Sampler`, `Guitare / basse`, `Importer` et `Boucles`. Jouez une piste d'instrument avec les touches de l'ordinateur, le clavier à l'écran ou un clavier MIDI.
 3. **Enregistrez.** Choisissez votre périphérique audio dans `Options › Réglages audio...`, puis voyez [Enregistrer votre voix](/learn/record-voice/).
 

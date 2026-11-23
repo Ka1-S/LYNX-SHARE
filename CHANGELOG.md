@@ -3,14 +3,75 @@
 The short version of each release. The full notes, with measurements, known issues and downloads, are on the
 [GitHub releases page](https://github.com/Ka1-S/LYNX-SHARE/releases).
 
-## 0.1.31 alpha (unreleased: the release round writes the rest of these notes)
+## 0.1.31 alpha
+
+**Performance**
+- Measured again against FL Studio 2026 on one Windows PC in a quiet-machine run: while FL's *Thief* demo plays, LYNX
+  SHARE uses {{PERF_THIEF_CPU}} % of one CPU core (FL Studio: {{PERF_THIEF_CPU_FL}} %) and *Exoplanet* {{PERF_EXO_CPU}} % (FL Studio:
+  {{PERF_EXO_CPU_FL}} %); *Thief* takes {{PERF_THIEF_RAM}} MB of memory (FL Studio: {{PERF_THIEF_RAM_FL}} MB).
+- *Safe overloads* lets go as soon as the transport stops, the CPU meter shows the live part and the part rendered ahead,
+  the plugin performance monitor lists each plugin's longest block and spikes, Windows PCs with four logical CPUs or fewer
+  no longer start graphics-driver threads for drawing, Atrium's dense tank only takes memory where it runs (Live's
+  *Patience* set), and on Linux a hosted plugin's memory is faulted in while it loads, off the audio thread.
+
+**New**
+- Linux arm64 builds (AppImage and tar.gz), for a Raspberry Pi 4 / 5 with a 64-bit OS and other arm64 machines.
+- First start: a welcome card asks where you are coming from and sets up the matching layout; later starts open on a
+  start page with recent projects and templates (#252).
+- *Search actions...* (`?` or Ctrl+Shift+Y) finds and runs any command, menu item, LYNX extra, Settings page or recent
+  project (#228); Settings has its own find bar (Ctrl+F, #247).
+- *File › Open in new window*: a second project beside the first, with copy and paste between the windows (#232).
+- The built-in **Tracker** (Shift+F7, *Edit in tracker* in a channel's menu) and tracker module import.
+- **LYNX Model**, a physical-model instrument: marimba, vibraphone, xylophone, glockenspiel, tubular bells and kalimba.
+- Playlist: a **Sections lane** for whole song parts, a **Chord lane** with **Smart Tempo**, **Track versions**, *Clips own
+  their notes* on instrument tracks, hide and deactivate tracks, the song position to an audio clip's next transient,
+  FL's automation clip rows in the Channel rack (steps and notes trigger them, MIN / MAX knobs), FL's fade previews (#230), FL's delete fade (#250).
+- Automation: write modes Touch, Latch and Write, *Capture automation*, and modulators (LFO, envelope follower, ADSR,
+  steps, random, macro, keytrack, velocity) for any knob, also on third-party plugins.
+- Piano roll: key regions, a *Scale degree chord* stamp and pinned relationships in the Chord helper (discussion #105),
+  stacked controller lanes, slide notes that move velocity, pan and Mod X / Y as in FL (#236).
+- Clip-launch layout: Live's rack devices inline in the Device View with a Macro Map mode, Live's Solo / Cue, and range
+  edits on chosen tracks.
+- Simple layout: *Duck under*, Reverb and Echo sends, sections, and time signature changes.
+- ARA plugins on a mixer insert, and the tempo map and time signatures sent to ARA plugins (#243).
+- **JSFX**: REAPER's effect and instrument scripts in slots and as instruments, with 31 free scripts (#241).
+- *Zipped loop package*, *Project data files* and *Collect all and save* (#251); *Import › Tracks from another
+  project...*.
+- Online Sessions: the host can remove a guest. `LYNX_OFFLINE=1` / `--offline` turns off every connection of LYNX's own
+  (#233).
+- The plugin pack has 39 plugins, LYNX Model, LYNX Fourfold, LYNX Wavecoil and LYNX Duoloom among them, and comes as
+  LV2 on Linux too; the Windows pack also comes as a `.7z` of about 20 MB (the `.zip` is about 195 MB, same files).
+- A details pass (the last open rows of FL Studio, Live and BandLab behaviours) and a second design review.
+
+**Formats**
+- Opens `.flp` (also FL's zipped loop packages), `.als`, `.flm` (partial), `.dawproject`, GarageBand `.band` (partial),
+  BandLab `.blx` (partial), **tracker modules `.mod`, `.xm`, `.s3m`, `.it`** (partial) and MIDI; exports `.flp` (also as a
+  zipped loop package), `.als`, `.dawproject`, **`.flm`** (*Save a copy as FL Studio Mobile project*) and MIDI.
+- FL imports: automation clips linked to several controls drive all of them, send-level automation (#253), FL 11 and
+  older step grids and parameter numbers, Patcher's Control Surface and X-Y-Z links.
+
+**Plugin parity**
+- Eight more Kilohearts laws on Effector (Comb Filter, Chorus, Trance Gate, Phaser, Distortion, Bitcrush, Frequency
+  Shifter, Ensemble): Kilohearts Essentials 5.88 → 6.85 over 1,648 test files, and the Nonlinear Filter 4.62 → 9.43.
+- FL's slide law on every generator, Sytrus slide velocity and main-page automation, Ogun / Autogun link velocity,
+  SimSynth velocity, Harmor automation: FL's *Overcome* demo is within 3 dB of FL in 96.4 % of its windows (before:
+  90.5 %).
+- Helix: unison on the granular and spectral oscillators, reverse grains, a partials view. Projects saved earlier keep
+  their sound.
+
+**Fixed**
+- #193, #218, #222, #225–#244, #246, #247, #249–#254, discussion #202 (Transistor Bass *Copy as MIDI*).
 
 **From contributors**
 - Docked channel and plugin windows have a gear in their title bar that hides the header strip (tabs, presets, the
   channel's controls) and shows it again; the header shows by default and each window keeps its choice with the project.
   PRs #248 and #256 by @FKHR26.
+- Channel and plugin windows take the size of the tab they show, as in FL Studio; the Sampler's window keeps one size
+  on all its tabs, as FL's does. PR #259 by @FKHR26.
 - An FL Studio Patcher cable into the a / b / c knobs of a Fruity Formula Controller now comes along on import. PR #257
   by @codewithamoako.
+- Thanks to yannikthegenius, mysteditors26, eugenialoli, kubapl2004gmail, esiowry, subhankardas15071992-cloud,
+  HamonTeacher, veinhusk and Jan12139 for reporting.
 
 ## 0.1.30 alpha
 

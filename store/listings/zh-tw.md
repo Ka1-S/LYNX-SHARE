@@ -43,7 +43,7 @@ LYNX SHARE 目前為 Alpha 版：難免有不夠完善之處，遇到問題請�
 
 ## What's new
 
-LYNX SHARE 0.1.30：前所未有地輕量，在我們的測試電腦上播放FL的Thief示範時，CPU用量約為FL Studio 2026的一半；支援ARA 2主機，Melodyne等ARA外掛可直接在音訊片段上編輯；複音音符編輯器和複音音訊轉MIDI；更自然的Newtone；全新波表合成器Helix和4運算子FM合成器Tetra；和弦助手；簡易工作流程中的BandLab風格鼓機、調音器和循環瀏覽器；片段啟動工作流程中的回送軌道、傳送和交叉漸變器；MPE和硬體MIDI輸出；DirectWave編輯器；DAWproject、GarageBand和BandLab專案，.gig、.dwp和.ncw樂器與取樣，以及AIFF和M4A輸出；40多個重新打磨的外掛替身；並修正了約40個已回報的問題。
+LYNX SHARE 0.1.31：內建追蹤器，還能開啟追蹤器模組（.mod、.xm、.s3m、.it）；LYNX Model，馬林巴、顫音琴、木琴、鐘琴、管鐘和卡林巴的物理模型；JSFX 效果器和樂器腳本；會設定合適版面的歡迎卡片，以及帶最近專案的起始頁；可找到每個指令的搜尋；並排的兩個專案，之間可複製貼上；段落軌、帶Smart Tempo的和弦軌和軌道版本；自動化寫入模式、擷取自動化和適用於任一旋鈕的調變器；FL Studio Mobile .flm匯出；片段啟動工作流程中內嵌顯示的Live機架裝置，帶Macro Map和Solo / Cue；簡易工作流程中的閃避於和回聲傳送；混音插入軌上的ARA外掛；播放效果更接近FL的FL Studio專案；並修正了約30個已回報的問題。
 
 ## Features
 

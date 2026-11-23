@@ -1,11 +1,11 @@
 ---
-source: fffb2dce40
+source: ebe3befa50
 ---
 ## Escolha de onde você vem
 
 ![O cartão de boas-vindas pergunta de onde você vem](/assets/img/learn/switch-layouts-1.webp)
 
-1. Abra o LYNX SHARE. Na primeira vez, um cartão de boas-vindas pergunta de onde você vem (0.1.31).
+1. Abra o LYNX SHARE. Na primeira vez, um cartão de boas-vindas pergunta de onde você vem.
 2. Cada resposta escolhe um layout:
    - `BandLab, FL Studio Mobile ou GarageBand`: o Layout Simple, uma janela só com faixas, loops e gravação rápida.
    - `FL Studio`: o Layout Pattern, com Channel Rack, Piano Roll, Playlist e Mixer.

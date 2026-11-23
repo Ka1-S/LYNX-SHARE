@@ -1,11 +1,11 @@
 ---
-source: fffb2dce40
+source: ebe3befa50
 ---
 ## Choisir d'où vous venez
 
 ![La carte de bienvenue demande d'où vous venez](/assets/img/learn/switch-layouts-1.webp)
 
-1. Lancez LYNX SHARE. La première fois, une carte de bienvenue demande d'où vous venez (0.1.31).
+1. Lancez LYNX SHARE. La première fois, une carte de bienvenue demande d'où vous venez.
 2. Chaque réponse choisit une disposition :
    - `BandLab, FL Studio Mobile ou GarageBand` : la disposition Simple, une seule fenêtre avec pistes, loops et enregistrement rapide.
    - `FL Studio` : la disposition Pattern, avec Channel Rack, Piano Roll, Playlist et Mixer.

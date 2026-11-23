@@ -49,7 +49,14 @@ LYNX SHARE is in alfa: verwacht nog wat ruwe randjes en meld problemen alsjeblie
 
 ## What's new
 
-LYNX SHARE 0.1.30: lichter dan ooit, met ongeveer de helft van de CPU van FL Studio 2026 terwijl de Thief-demo van FL op onze test-pc speelt; ARA 2-hosting, zodat Melodyne en andere ARA-plugins audioclips ter plekke bewerken; een polyfone noteneditor en polyfone audio-naar-MIDI; een natuurlijkere Newtone; Helix, een nieuwe wavetable-synth, en Tetra, een FM-synth met 4 operators; een akkoordhulp; een drummachine in BandLab-stijl, een stemapparaat en een Loop Browser in de Eenvoudige werkwijze; returntracks, sends en een crossfader in de Clipstart-werkwijze; MPE en hardware-MIDI-uitgang; een DirectWave-editor; DAWproject-, GarageBand- en BandLab-projecten, .gig-, .dwp- en .ncw-instrumenten en -samples, en AIFF- en M4A-export; meer dan 40 vernieuwde plugin-vervangers; en fixes voor ongeveer 40 gemelde problemen.
+LYNX SHARE 0.1.31: een ingebouwde Tracker die ook trackermodules (.mod, .xm, .s3m, .it) opent; LYNX Model, fysieke
+modellen van marimba, vibrafoon, xylofoon, glockenspiel, buisklokken en kalimba; JSFX-effect- en instrumentscripts;
+een welkomstkaart die de juiste lay-out instelt en een startpagina met je recente projecten; een zoekfunctie die elk
+commando vindt; twee projecten naast elkaar met kopiëren en plakken ertussen; een Sectiebaan, een Akkoordspoor met
+Smart Tempo en Trackversies; schrijfmodi voor automatisering, Automatisering vastleggen en modulators voor elke knop;
+FL Studio Mobile .flm-export; de rackdevices van Live inline met een Macro Map en Solo / Cue in de Clipstart-lay-out;
+Duiken onder en Echo-sends in de Eenvoudige lay-out; ARA-plugins op een mixer-insert; FL Studio-projecten die dichter
+bij FL spelen; en fixes voor ongeveer 30 gemelde problemen.
 
 ## Features
 

@@ -1,14 +1,14 @@
 ---
-source: 4ebe52e456
+source: 2116c7d24c
 ---
 ## Scegli il layout semplice
 
 ![La scheda di benvenuto chiede da dove vieni](/assets/img/learn/simple-beat-1.webp)
 
-1. Avvia LYNX SHARE. La prima volta, una scheda di benvenuto chiede da dove vieni (0.1.31).
+1. Avvia LYNX SHARE. La prima volta, una scheda di benvenuto chiede da dove vieni.
 2. Clicca `BandLab, FL Studio Mobile o GarageBand`. La finestra passa al layout semplice, e un beat di partenza viene messo su una traccia Drums.
 
-Nella 0.1.30, scegli `Vista › Stile del layout › Flusso semplice`, clicca `+ Aggiungi traccia`, poi `Batteria`, e scegli uno dei beat di partenza. Lo stesso menu cambia layout in qualsiasi momento. Il progetto resta com'è.
+Senza la scheda, scegli `Vista › Stile del layout › Flusso semplice`, clicca `+ Aggiungi traccia`, poi `Batteria`, e scegli uno dei beat di partenza. Lo stesso menu cambia layout in qualsiasi momento. Il progetto resta com'è.
 
 ## Riproduci il beat
 
@@ -40,7 +40,7 @@ La lettera accanto a ogni riga è il suo tasto sulla tastiera del computer: prem
 
 ![Il pannello Loops accanto alla timeline](/assets/img/learn/simple-beat-5.webp)
 
-- La scheda `Prossimo: 3 cose da provare` (0.1.31) spunta da sola ogni passaggio. `Apri i Loop` apre il pannello Loops: trascina un loop sulla timeline. Un loop segue il tempo e la tonalità del progetto.
+- La scheda `Prossimo: 3 cose da provare` spunta da sola ogni passaggio. `Apri i Loop` apre il pannello Loops: trascina un loop sulla timeline. Un loop segue il tempo e la tonalità del progetto.
 - [Registra la tua voce](/learn/record-voice/) su una traccia Voce.
 - `Fine` salva il brano come WAV o MP3.
 

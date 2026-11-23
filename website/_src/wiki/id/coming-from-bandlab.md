@@ -1,5 +1,5 @@
 ---
-source: 736421c170
+source: 5e5d2e8e05
 ---
 ![Tata letak sederhana: track di linimasa, beat awal, dan Drum Machine](/assets/img/learn/simple-beat-2.webp)
 
@@ -7,7 +7,7 @@ Pilih **tata letak sederhana**. Isinya satu jendela dengan track-mu di linimasa,
 
 ## Tiga hal pertamamu
 
-1. **Pilih tata letak.** Saat LYNX SHARE pertama kali dijalankan, sebuah kartu sambutan menanyakan dari mana kamu datang (0.1.31). Klik `BandLab, FL Studio Mobile, atau GarageBand`: jendela beralih ke tata letak sederhana, dengan beat awal di track Drums. Di 0.1.30, pilih `Tampilan › Gaya tata letak › Alur kerja sederhana`.
+1. **Pilih tata letak.** Saat LYNX SHARE pertama kali dijalankan, sebuah kartu sambutan menanyakan dari mana kamu datang. Klik `BandLab, FL Studio Mobile, atau GarageBand`: jendela beralih ke tata letak sederhana, dengan beat awal di track Drums. Nanti, `Tampilan › Gaya tata letak › Alur kerja sederhana` beralih ke sana kapan saja.
 2. **Buat beat.** Klik kotak-kotak Drum Machine di bawah linimasa. Lihat [Membuat beat di tata letak sederhana](/learn/simple-beat/).
 3. **Tambahkan loop dan suaramu.** `Loop` membuka panel loop: seret sebuah loop ke linimasa. Lalu [rekam suaramu](/learn/record-voice/) di track Voice.
 

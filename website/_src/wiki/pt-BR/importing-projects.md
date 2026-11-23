@@ -1,5 +1,5 @@
 ---
-source: a29416cb8c
+source: 532b2eee04
 ---
 `Arquivo › Abrir...` (`Ctrl+O`) abre os projetos `.lynx` do próprio LYNX SHARE e também arquivos `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx` e `.mid`. Um projeto de outro programa é uma importação: ele vira um projeto novo do LYNX SHARE, ainda não salvo, e o arquivo original nunca é gravado.
 
@@ -22,7 +22,7 @@ source: a29416cb8c
 | `.band` (GarageBand 10, GarageBand para iOS) | Faixas, regiões MIDI e de áudio, andamento, fórmula de compasso, tom, seções como marcadores, nível, pan e mudo, como faixas do layout Simple. Instrumentos Sampler feitos no GarageBand para iOS | As faixas de instrumento tocam no sintetizador e na bateria embutidos. Regiões do Drummer, pastas de takes e mudanças de andamento são listadas. Projetos do GarageBand 11 e mais antigos não são legíveis |
 | `.blx` (BandLab) | Faixas, regiões MIDI e de áudio com seus loops, andamento, fórmula de compasso, tom, volume, pan e mudo, automação de volume e pan e os efeitos comuns, como faixas do layout Simple | As faixas de instrumento tocam no sintetizador e na bateria embutidos. Outros efeitos e o preset de Mastering ficam de fora e são listados. Testado só com projetos fictícios |
 | `.mid` | Notas, fórmulas de compasso e todas as mudanças de tempo | Um arquivo MIDI não traz sons: os canais recebem o sintetizador do LYNX SHARE ou um canal MIDI Out |
-| `.mod`, `.xm`, `.s3m`, `.it` (módulos tracker) | Instrumentos como canais Sampler com seus samples, patterns, a lista de ordem como a Playlist, velocidade e andamento, volume da nota, pan, delay e corte; mudanças de volume e pan como eventos do canal (MOD e XM), e slides, vibrato, arpejos e envelopes de pitch como as curvas de pitch das notas | Outros efeitos e envelopes de instrumento são contados no relatório de importação. `Exibir › Janelas e ferramentas › Tracker` edita as notas do jeito tracker |
+| `.mod`, `.xm`, `.s3m`, `.it` (módulos tracker) | Instrumentos como canais Sampler com seus samples, patterns, a lista de ordem como a Playlist, velocidade e andamento, volume da nota, pan, delay e corte; mudanças de volume e pan como eventos do canal (MOD e XM), e slides, vibrato, arpejos e envelopes de pitch como as curvas de pitch das notas | Outros efeitos e envelopes de instrumento são contados no relatório de importação. `Exibir › Tracker` edita as notas do jeito tracker |
 | `.zip` | O pacote zipado de loop do FL Studio, ou um projeto exportado com seus samples: extraído para uma pasta própria, depois o projeto de dentro abre com seus samples | |
 
 Plugins VST2, VST3 e CLAP de terceiros em um `.flp` ou um `.dawproject`, e plugins VST2 e VST3 em um `.als`, carregam com o estado salvo se o mesmo plugin estiver instalado no seu computador.

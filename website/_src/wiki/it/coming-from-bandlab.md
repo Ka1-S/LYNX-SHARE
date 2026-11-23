@@ -1,5 +1,5 @@
 ---
-source: 736421c170
+source: 5e5d2e8e05
 ---
 ![Il layout semplice: tracce su una timeline, un beat di partenza e la Drum Machine](/assets/img/learn/simple-beat-2.webp)
 
@@ -7,7 +7,7 @@ Scegli il **layout semplice**. È una sola finestra con le tue tracce su una tim
 
 ## Le prime tre cose
 
-1. **Scegli il layout.** La prima volta che LYNX SHARE si avvia, una scheda di benvenuto chiede da dove vieni (0.1.31). Clicca `BandLab, FL Studio Mobile o GarageBand`: la finestra passa al layout semplice, con un beat di partenza su una traccia Drums. Nella 0.1.30, scegli `Vista › Stile del layout › Flusso semplice`.
+1. **Scegli il layout.** La prima volta che LYNX SHARE si avvia, una scheda di benvenuto chiede da dove vieni. Clicca `BandLab, FL Studio Mobile o GarageBand`: la finestra passa al layout semplice, con un beat di partenza su una traccia Drums. Più tardi, `Vista › Stile del layout › Flusso semplice` passa ad esso in qualsiasi momento.
 2. **Crea un beat.** Clicca i quadratini della Drum Machine sotto la timeline. Vedi [Crea un beat nel layout semplice](/learn/simple-beat/).
 3. **Aggiungi un loop e la tua voce.** `Loop` apre il pannello dei loop: trascina un loop sulla timeline. Poi [registra la tua voce](/learn/record-voice/) su una traccia Voce.
 

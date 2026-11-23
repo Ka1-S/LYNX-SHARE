@@ -1,5 +1,5 @@
 ---
-source: 736421c170
+source: 5e5d2e8e05
 ---
 ![La disposition simple : des pistes sur une timeline, un beat de départ et la Drum Machine](/assets/img/learn/simple-beat-2.webp)
 
@@ -7,7 +7,7 @@ Choisissez la **disposition simple**. C'est une seule fenêtre avec vos pistes s
 
 ## Vos trois premières actions
 
-1. **Choisissez la disposition.** Au premier démarrage de LYNX SHARE, une carte de bienvenue demande d'où vous venez (0.1.31). Cliquez sur `BandLab, FL Studio Mobile ou GarageBand` : la fenêtre passe à la disposition simple, avec un beat de départ sur une piste Drums. En 0.1.30, choisissez `Vue › Style de disposition › Disposition simple`.
+1. **Choisissez la disposition.** Au premier démarrage de LYNX SHARE, une carte de bienvenue demande d'où vous venez. Cliquez sur `BandLab, FL Studio Mobile ou GarageBand` : la fenêtre passe à la disposition simple, avec un beat de départ sur une piste Drums. Plus tard, `Vue › Style de disposition › Disposition simple` y bascule à tout moment.
 2. **Faites un beat.** Cliquez sur les cases de la Drum Machine sous la timeline. Voir [Faire un beat dans la disposition simple](/learn/simple-beat/).
 3. **Ajoutez une boucle et votre voix.** `Boucles` ouvre le panneau des boucles : glissez une boucle sur la timeline. Ensuite, [enregistrez votre voix](/learn/record-voice/) sur une piste Voice.
 

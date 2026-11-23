@@ -1,5 +1,5 @@
 ---
-source: 34014064c8
+source: 933ca35b0b
 ---
 ![Plugin yöneticisinin alt kısmı; her plugin dosyasının ayrı bir süreçte incelendiğini belirten notla](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -111,6 +111,7 @@ LYNX SHARE'in kendi efektleri ve enstrümanları, örneğin Facet EQ, Apex Limit
 
 - Bütün pluginler tek bir CLAP dosyasında, `LYNX Plugins.clap` içindedir. Kısa bir liste VST3 olarak, Linux'ta ise LV2 olarak da gelir.
 - Paketteki enstrümanlar: LYNX FM10, LYNX Model, LYNX Fourfold, LYNX Wavecoil ve LYNX Duoloom.
+- Windows'ta `LYNX-Plugins-<version>-win-x64.7z` dosyasını alın (yaklaşık 20 MB). `.zip` (yaklaşık 195 MB) aynı dosyaları içerir.
 - Arşivdeki kurulum betiğini çalıştırın (Windows'ta `install.cmd`, macOS ve Linux'ta `install.sh`), ardından DAW'ınızda pluginleri yeniden tarayın.
 - Bir plugin LYNX SHARE içindekiyle aynı editörü açar ve durumu LYNX SHARE'de proje olarak açılır.
 

@@ -1,5 +1,5 @@
 ---
-source: 736421c170
+source: 5e5d2e8e05
 ---
 ![Prosty układ: ścieżki na osi czasu, gotowy beat i Drum Machine](/assets/img/learn/simple-beat-2.webp)
 
@@ -7,7 +7,7 @@ Wybierz **Prosty układ**. To jedno okno ze ścieżkami na osi czasu, pętlami, 
 
 ## Twoje pierwsze trzy kroki
 
-1. **Wybierz układ.** Przy pierwszym uruchomieniu LYNX SHARE karta powitalna pyta, skąd przychodzisz (0.1.31). Kliknij `BandLab, FL Studio Mobile lub GarageBand`: okno przełączy się na Prosty układ z gotowym beatem na ścieżce Drums. W 0.1.30 wybierz `Widok › Styl układu › Prosty układ`.
+1. **Wybierz układ.** Przy pierwszym uruchomieniu LYNX SHARE karta powitalna pyta, skąd przychodzisz. Kliknij `BandLab, FL Studio Mobile lub GarageBand`: okno przełączy się na Prosty układ z gotowym beatem na ścieżce Drums. Później przełączysz się na ten układ w każdej chwili przez `Widok › Styl układu › Prosty układ`.
 2. **Zrób beat.** Klikaj kwadraty Drum Machine pod osią czasu. Zobacz [Zrób beat w Prostym układzie](/learn/simple-beat/).
 3. **Dodaj pętlę i swój głos.** `Pętle` otwiera panel pętli: przeciągnij pętlę na oś czasu. Potem [nagraj swój głos](/learn/record-voice/) na ścieżce Voice.
 

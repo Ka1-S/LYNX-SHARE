@@ -1,11 +1,11 @@
 ---
-source: fffb2dce40
+source: ebe3befa50
 ---
 ## Wybierz, skąd przychodzisz
 
 ![Karta powitalna pyta, skąd przychodzisz](/assets/img/learn/switch-layouts-1.webp)
 
-1. Uruchom LYNX SHARE. Za pierwszym razem karta powitalna pyta, skąd przychodzisz (0.1.31).
+1. Uruchom LYNX SHARE. Za pierwszym razem karta powitalna pyta, skąd przychodzisz.
 2. Każda odpowiedź wybiera układ:
    - `BandLab, FL Studio Mobile lub GarageBand`: Prosty układ, jedno okno ze ścieżkami, pętlami i szybkim nagrywaniem.
    - `FL Studio`: układ Pattern z Channel Rack, Piano Roll, Playlist i Mixer.

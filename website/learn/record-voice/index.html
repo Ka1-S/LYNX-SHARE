@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="d77a6b65";
+window.LYNX_LANG=lang;window.LYNX_V="ad1d0fe1";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=d77a6b65">
+<link rel="stylesheet" href="/assets/site.css?v=ad1d0fe1">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -94,7 +94,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <h2 id="add-a-voice-track">Add a Voice track</h2>
 <figure><a class="shot" href="/assets/img/learn/record-voice-1.webp"><img src="/assets/img/learn/record-voice-1.webp" alt="The New track chooser with Voice / audio first" loading="lazy" width="700" height="540"></a></figure>
 <ol><li>In the Simple layout, click <code>+ Add track</code>.</li><li>Click <code>Voice / audio</code>. A Voice track appears under the others, armed to record from the first input of your audio device.</li><li>The dock under the timeline shows the track, with its <code>Input Level</code> meter on the right. Sing a note and watch it move.</li></ol>
-<p>The <code>+ Voice track</code> button of the <code>Next: 3 things to try</code> card does the same (0.1.31).</p>
+<p>The <code>+ Voice track</code> button of the <code>Next: 3 things to try</code> card does the same.</p>
 <h2 id="record-a-take">Record a take</h2>
 <figure><a class="shot" href="/assets/img/learn/record-voice-2.webp"><img src="/assets/img/learn/record-voice-2.webp" alt="The Recording window: what would you like to record?" loading="lazy" width="540" height="400"></a></figure>
 <ol><li>Press Record in the toolbar.</li><li>The first time, a window asks what to record. Choose <code>Audio, into the Playlist as an audio clip</code>. Tick <code>Don't ask again</code> to keep that choice.</li><li>Press Play, then sing or speak. The take is drawn on the Voice track while you record.</li><li>Press Stop. The take is now an audio clip on the timeline.</li><li>Press Record once more to switch recording off, so the next Play only plays.</li></ol>
@@ -115,8 +115,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=d77a6b65" defer></script>
-<script src="/assets/learn.js?v=d77a6b65" defer></script>
-<script src="/assets/motion.js?v=d77a6b65" defer></script>
+<script src="/assets/site.js?v=ad1d0fe1" defer></script>
+<script src="/assets/learn.js?v=ad1d0fe1" defer></script>
+<script src="/assets/motion.js?v=ad1d0fe1" defer></script>
 </body>
 </html>

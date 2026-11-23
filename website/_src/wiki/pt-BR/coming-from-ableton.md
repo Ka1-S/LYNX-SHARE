@@ -1,5 +1,5 @@
 ---
-source: 4ca4775a35
+source: 37920663db
 ---
 ![O layout de disparo de clipes: uma grade de clipes com cenas ao lado da Playlist](/assets/img/cliplaunch.webp)
 
@@ -9,7 +9,7 @@ Esta página serve também para quem usa o Bitwig Studio: a grade de clipes func
 
 ## Seus primeiros passos
 
-1. **Escolha o layout.** Na primeira vez que o LYNX SHARE abre, um cartão de boas-vindas pergunta de onde você vem (0.1.31). Clique em `Ableton Live ou Bitwig`: o Layout de lançamento de clipes abre. Na 0.1.30, escolha `Exibir › Estilo de layout › Layout de lançamento de clipes`.
+1. **Escolha o layout.** Na primeira vez que o LYNX SHARE abre, um cartão de boas-vindas pergunta de onde você vem. Clique em `Ableton Live ou Bitwig`: o Layout de lançamento de clipes abre. Depois, `Exibir › Estilo de layout › Layout de lançamento de clipes` troca para ele a qualquer momento.
 2. **Preencha um slot.** Arraste um sample ou um pattern do Browser para um slot, ou clique com o botão direito num slot vazio e escolha `Colocar um padrão aqui`.
 3. **Dispare.** Clique no triângulo à esquerda de um clipe, ou no triângulo de uma cena na coluna `Cenas` para disparar a linha toda. Ou abra um dos seus sets `.als` (abaixo).
 

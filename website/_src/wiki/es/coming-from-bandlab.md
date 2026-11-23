@@ -1,5 +1,5 @@
 ---
-source: 736421c170
+source: 5e5d2e8e05
 ---
 ![El Diseño simple: pistas en una línea de tiempo, un beat inicial y la Drum Machine](/assets/img/learn/simple-beat-2.webp)
 
@@ -7,7 +7,7 @@ Elige el **Diseño simple**. Es una sola ventana con tus pistas en una línea de
 
 ## Tus tres primeras cosas
 
-1. **Elige el diseño.** La primera vez que arranca LYNX SHARE, una tarjeta de bienvenida pregunta de dónde vienes (0.1.31). Haz clic en `BandLab, FL Studio Mobile o GarageBand`: la ventana cambia al Diseño simple, con un beat inicial en una pista de batería. En la 0.1.30, elige `Ver › Estilo de diseño › Diseño simple`.
+1. **Elige el diseño.** La primera vez que arranca LYNX SHARE, una tarjeta de bienvenida pregunta de dónde vienes. Haz clic en `BandLab, FL Studio Mobile o GarageBand`: la ventana cambia al Diseño simple, con un beat inicial en una pista de batería. Más tarde, `Ver › Estilo de diseño › Diseño simple` cambia a él en cualquier momento.
 2. **Haz un beat.** Haz clic en los cuadros de la Drum Machine bajo la línea de tiempo. Consulta [Haz un beat en el Diseño simple](/learn/simple-beat/).
 3. **Añade un loop y tu voz.** `Loops` abre el panel de loops: arrastra un loop a la línea de tiempo. Luego [graba tu voz](/learn/record-voice/) en una pista de voz.
 

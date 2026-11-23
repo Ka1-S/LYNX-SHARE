@@ -1,5 +1,5 @@
 ---
-source: c22e3487eb
+source: 6cdabe8ca5
 ---
 ## Bevor du anfängst
 
@@ -14,7 +14,7 @@ source: c22e3487eb
 2. Klicke auf `Stimme / Audio`. Eine Stimmenspur erscheint unter den anderen, scharfgeschaltet zur Aufnahme vom ersten Eingang deines Audiogeräts.
 3. Das Dock unter der Zeitleiste zeigt die Spur, mit ihrer Anzeige `Eingangspegel` rechts. Sing einen Ton und sieh zu, wie sie sich bewegt.
 
-Die Schaltfläche `+ Stimme-Spur` auf der Karte `Als Nächstes: 3 Dinge zum Ausprobieren` macht dasselbe (0.1.31).
+Die Schaltfläche `+ Stimme-Spur` auf der Karte `Als Nächstes: 3 Dinge zum Ausprobieren` macht dasselbe.
 
 ## Nimm einen Take auf
 

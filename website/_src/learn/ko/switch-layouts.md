@@ -1,11 +1,11 @@
 ---
-source: fffb2dce40
+source: ebe3befa50
 ---
 ## 어디서 넘어오는지 고르기
 
 ![환영 카드가 어디서 넘어오는지 묻습니다](/assets/img/learn/switch-layouts-1.webp)
 
-1. LYNX SHARE를 시작합니다. 처음에는 환영 카드가 어디서 넘어오는지 묻습니다(0.1.31).
+1. LYNX SHARE를 시작합니다. 처음에는 환영 카드가 어디서 넘어오는지 묻습니다.
 2. 답에 따라 레이아웃이 정해집니다.
    - `BandLab, FL Studio Mobile 또는 GarageBand`: 간단한 레이아웃. 트랙, 루프, 빠른 녹음이 한 창에 모여 있습니다.
    - `FL Studio`: 패턴 레이아웃. 채널 랙, 피아노 롤, 플레이리스트, 믹서가 있습니다.

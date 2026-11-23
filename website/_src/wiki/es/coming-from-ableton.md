@@ -1,5 +1,5 @@
 ---
-source: 4ca4775a35
+source: 37920663db
 ---
 ![El diseño de lanzamiento de clips: una cuadrícula de clips con escenas junto a la Playlist](/assets/img/cliplaunch.webp)
 
@@ -9,7 +9,7 @@ Esta página también es para quienes usan Bitwig Studio: la cuadrícula de clip
 
 ## Tus primeros pasos
 
-1. **Elige el diseño.** La primera vez que arranca LYNX SHARE, una tarjeta de bienvenida pregunta de dónde vienes (0.1.31). Haz clic en `Ableton Live o Bitwig`: se abre el Diseño de lanzamiento de clips. En la 0.1.30, elige `Ver › Estilo de diseño › Diseño de lanzamiento de clips`.
+1. **Elige el diseño.** La primera vez que arranca LYNX SHARE, una tarjeta de bienvenida pregunta de dónde vienes. Haz clic en `Ableton Live o Bitwig`: se abre el Diseño de lanzamiento de clips. Más tarde, `Ver › Estilo de diseño › Diseño de lanzamiento de clips` cambia a él en cualquier momento.
 2. **Llena una ranura.** Arrastra un sample o un patrón del Browser a una ranura, o haz clic derecho en una ranura vacía y elige `Poner un patrón aquí`.
 3. **Lanza.** Haz clic en el triángulo a la izquierda de un clip, o en el triángulo de una escena en la columna `Escenas` para lanzar toda la fila. O abre uno de tus sets `.als` (abajo).
 

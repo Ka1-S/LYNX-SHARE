@@ -1,11 +1,11 @@
 ---
-source: 20cf7fed48
+source: c82c79e958
 ---
 O LYNX SHARE tem três layouts. Se você vem do Logic, Cubase, Reaper, Pro Tools ou Studio One, comece pelo **Layout Simple com o Mixer à mão**: uma faixa por instrumento ou voz numa linha do tempo, como você já conhece. O Layout Pattern, o jeito de trabalhar do FL Studio, está lá para quando você quiser patterns.
 
 ## Seus primeiros passos
 
-1. **Escolha o layout.** Na primeira vez que o LYNX SHARE abre, um cartão de boas-vindas pergunta de onde você vem (0.1.31). Clique em `Logic, Cubase, Reaper, Pro Tools ou Studio One`: o Layout Simple abre no cartão de nova faixa, e o Mixer aparece com a sua primeira faixa. Na 0.1.30, escolha `Exibir › Estilo de layout › Layout Simple` e abra o Mixer com `F9`.
+1. **Escolha o layout.** Na primeira vez que o LYNX SHARE abre, um cartão de boas-vindas pergunta de onde você vem. Clique em `Logic, Cubase, Reaper, Pro Tools ou Studio One`: o Layout Simple abre no cartão de nova faixa, e o Mixer aparece com a sua primeira faixa. Depois, `Exibir › Estilo de layout › Layout Simple` troca para ele a qualquer momento, e `F9` abre o Mixer.
 2. **Adicione uma faixa.** `+ Adicionar faixa` oferece `Voz / áudio`, `Instrumento`, `Bateria`, `Sampler`, `Guitarra / baixo`, `Importar` e `Loops`. Toque uma faixa de instrumento com as teclas do computador, o teclado na tela ou um teclado MIDI.
 3. **Grave.** Escolha o seu dispositivo de áudio em `Opções › Configurações de áudio...` e veja [Grave sua voz](/learn/record-voice/).
 

@@ -1,11 +1,11 @@
 ---
-source: 20cf7fed48
+source: c82c79e958
 ---
 LYNX SHARE punya tiga tata letak. Kalau kamu datang dari Logic, Cubase, Reaper, Pro Tools, atau Studio One, mulailah dengan **tata letak sederhana dengan Mixer di dekatmu**: satu track per instrumen atau suara di linimasa, seperti yang kamu kenal. Tata letak Pattern, cara kerja FL Studio, tersedia kalau kamu ingin pattern.
 
 ## Langkah pertamamu
 
-1. **Pilih tata letak.** Saat LYNX SHARE pertama kali dijalankan, sebuah kartu sambutan menanyakan dari mana kamu datang (0.1.31). Klik `Logic, Cubase, Reaper, Pro Tools, atau Studio One`: tata letak sederhana terbuka di kartu New track-nya, dan Mixer muncul bersama track pertamamu. Di 0.1.30, pilih `Tampilan › Gaya tata letak › Alur kerja sederhana`, dan buka Mixer dengan `F9`.
+1. **Pilih tata letak.** Saat LYNX SHARE pertama kali dijalankan, sebuah kartu sambutan menanyakan dari mana kamu datang. Klik `Logic, Cubase, Reaper, Pro Tools, atau Studio One`: tata letak sederhana terbuka di kartu New track-nya, dan Mixer muncul bersama track pertamamu. Nanti, `Tampilan › Gaya tata letak › Alur kerja sederhana` beralih ke sana kapan saja, dan `F9` membuka Mixer.
 2. **Tambahkan track.** `+ Tambah trek` menawarkan `Vokal / audio`, `Instrumen`, `Drum`, `Sampler`, `Gitar / bass`, `Impor`, dan `Loop`. Mainkan track instrumen dengan tombol komputer, keyboard di layar, atau keyboard MIDI.
 3. **Rekam.** Pilih perangkat audiomu di `Opsi › Pengaturan audio...`, lalu lihat [Rekam suaramu](/learn/record-voice/).
 

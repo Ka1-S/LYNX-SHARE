@@ -15,7 +15,7 @@ summary: Add a Voice track in the Simple layout, record a take over the beat, pu
 2. Click `Voice / audio`. A Voice track appears under the others, armed to record from the first input of your audio device.
 3. The dock under the timeline shows the track, with its `Input Level` meter on the right. Sing a note and watch it move.
 
-The `+ Voice track` button of the `Next: 3 things to try` card does the same (0.1.31).
+The `+ Voice track` button of the `Next: 3 things to try` card does the same.
 
 ## Record a take
 

@@ -1,14 +1,14 @@
 ---
-source: 4ebe52e456
+source: 2116c7d24c
 ---
 ## Kies de Eenvoudige lay-out
 
 ![De welkomstkaart vraagt waar je van komt](/assets/img/learn/simple-beat-1.webp)
 
-1. Start LYNX SHARE. De eerste keer vraagt een welkomstkaart waar je van komt (0.1.31).
+1. Start LYNX SHARE. De eerste keer vraagt een welkomstkaart waar je van komt.
 2. Klik op `BandLab, FL Studio Mobile of GarageBand`. Het venster schakelt over naar de Eenvoudige lay-out en er komt een startbeat op een Drums-track.
 
-In 0.1.30 kies je `Beeld › Lay-outstijl › Eenvoudige lay-out`, klik je op `+ Spoor toevoegen`, dan op `Drums`, en kies je een van de startbeats. Hetzelfde menu wisselt op elk moment van lay-out. Het project blijft zoals het is.
+Zonder de kaart kies je `Beeld › Lay-outstijl › Eenvoudige lay-out`, klik je op `+ Spoor toevoegen`, dan op `Drums`, en kies je een van de startbeats. Hetzelfde menu wisselt op elk moment van lay-out. Het project blijft zoals het is.
 
 ## Speel de beat af
 
@@ -40,7 +40,7 @@ De letter naast elke rij is de toets op het computertoetsenbord: druk erop om da
 
 ![Het Loops-paneel naast de tijdlijn](/assets/img/learn/simple-beat-5.webp)
 
-- De kaart `Hierna: 3 dingen om te proberen` (0.1.31) vinkt elke stap zelf af. `Loops openen` opent het Loops-paneel: sleep een loop naar de tijdlijn. Een loop volgt het tempo en de toonsoort van het project.
+- De kaart `Hierna: 3 dingen om te proberen` vinkt elke stap zelf af. `Loops openen` opent het Loops-paneel: sleep een loop naar de tijdlijn. Een loop volgt het tempo en de toonsoort van het project.
 - [Neem je stem op](/learn/record-voice/) op een Voice-track.
 - `Voltooien` slaat het nummer op als WAV of MP3.
 

@@ -92,7 +92,7 @@ Round 190ov added LYNX Model (LYNX's own physical models) and seven later LYNX-o
 and Braid export under names of their own (owner decision, rollup 0.1.31 step 6), because their engine names are other
 makers' products (Sequential's Tetra synth, Line 6's Helix / Helix Native, Mutable Instruments' Braids, also a Softube
 plugin): **LYNX Fourfold**, **LYNX Wavecoil** and **LYNX Duoloom**, built as CLAP, VST3 and LV2 since round 190pq
-(0.1.32). Tetra and Braid have no preset bank: their plugin starts from the engine's defaults
+(0.1.31). Tetra and Braid have no preset bank: their plugin starts from the engine's defaults
 (`plugexport::instrumentChannel`). CI plugins run 44975814572 had held them back (step 6) with two failures, both fixed in
 round 190pq:
 - `plugexporttest` aborted in the CLAP (`std::length_error`, `basic_string::_M_create`; a segmentation fault locally):

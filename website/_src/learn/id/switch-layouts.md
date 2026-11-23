@@ -1,11 +1,11 @@
 ---
-source: fffb2dce40
+source: ebe3befa50
 ---
 ## Pilih dari mana kamu datang
 
 ![Kartu sambutan menanyakan dari mana kamu datang](/assets/img/learn/switch-layouts-1.webp)
 
-1. Jalankan LYNX SHARE. Saat pertama kali, sebuah kartu sambutan menanyakan dari mana kamu datang (0.1.31).
+1. Jalankan LYNX SHARE. Saat pertama kali, sebuah kartu sambutan menanyakan dari mana kamu datang.
 2. Setiap jawaban memilih satu tata letak:
    - `BandLab, FL Studio Mobile, atau GarageBand`: tata letak sederhana, satu jendela berisi track, loop, dan perekaman cepat.
    - `FL Studio`: tata letak Pattern, dengan Channel Rack, Piano Roll, Playlist, dan Mixer.

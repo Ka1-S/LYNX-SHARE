@@ -6,10 +6,10 @@ summary: From the first start to a beat of your own in about a minute: the start
 
 ![The welcome card asks where you are coming from](/assets/img/learn/simple-beat-1.webp)
 
-1. Start LYNX SHARE. The first time, a welcome card asks where you are coming from (0.1.31).
+1. Start LYNX SHARE. The first time, a welcome card asks where you are coming from.
 2. Click `BandLab, FL Studio Mobile or GarageBand`. The window switches to the Simple layout, and a starter beat is placed on a Drums track.
 
-In 0.1.30, choose `View › Layout style › Simple layout`, click `+ Add track`, then `Drums`, and pick one of the starter beats. The same menu switches layouts at any time. The project stays as it is.
+Without the card, choose `View › Layout style › Simple layout`, click `+ Add track`, then `Drums`, and pick one of the starter beats. The same menu switches layouts at any time. The project stays as it is.
 
 ## Play the beat
 
@@ -41,7 +41,7 @@ The letter beside each row is its key on the computer keyboard: press it to play
 
 ![The Loops panel next to the timeline](/assets/img/learn/simple-beat-5.webp)
 
-- The `Next: 3 things to try` card (0.1.31) ticks each step off by itself. `Open Loops` opens the Loops panel: drag a loop onto the timeline. A loop follows the project's tempo and key.
+- The `Next: 3 things to try` card ticks each step off by itself. `Open Loops` opens the Loops panel: drag a loop onto the timeline. A loop follows the project's tempo and key.
 - [Record your voice](/learn/record-voice/) on a Voice track.
 - `Finish` saves the song as WAV or MP3.
 

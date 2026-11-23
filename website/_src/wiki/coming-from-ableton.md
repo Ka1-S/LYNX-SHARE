@@ -11,7 +11,7 @@ This page is for Bitwig Studio users too: the clip grid works the same way, and 
 
 ## Your first steps
 
-1. **Pick the layout.** The first time LYNX SHARE starts, a welcome card asks where you are coming from (0.1.31). Click `Ableton Live or Bitwig`: the Clip-launch layout opens. In 0.1.30, choose `View › Layout style › Clip-launch layout`.
+1. **Pick the layout.** The first time LYNX SHARE starts, a welcome card asks where you are coming from. Click `Ableton Live or Bitwig`: the Clip-launch layout opens. Later, `View › Layout style › Clip-launch layout` switches to it at any time.
 2. **Fill a slot.** Drag a sample or a pattern from the Browser into a slot, or right-click an empty slot and choose `Put a pattern here`.
 3. **Launch.** Click the triangle at the left of a clip, or the triangle of a scene in the `Scenes` column to launch the whole row. Or open one of your `.als` sets (below).
 

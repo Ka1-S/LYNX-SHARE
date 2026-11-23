@@ -43,7 +43,7 @@ LYNX SHARE는 알파 버전입니다. 다듬어지지 않은 부분이 있을 �
 
 ## What's new
 
-LYNX SHARE 0.1.30: 그 어느 때보다 가볍게. 테스트 PC에서 FL의 Thief 데모를 재생할 때 CPU 사용량이 FL Studio 2026의 약 절반입니다. ARA 2 호스팅으로 Melodyne 등 ARA 플러그인이 오디오 클립을 그 자리에서 편집합니다. 폴리포닉 노트 에디터와 폴리포닉 오디오-MIDI 변환. 더 자연스러워진 Newtone. 새 웨이브테이블 신스 Helix와 4오퍼레이터 FM 신스 Tetra. 코드 도우미. 간단한 워크플로에는 BandLab 스타일 드럼 머신, 튜너, 루프 브라우저. 클립 실행 워크플로에는 리턴 트랙, 센드, 크로스페이더. MPE와 하드웨어 MIDI Out. DirectWave 에디터. DAWproject, GarageBand, BandLab 프로젝트, .gig, .dwp, .ncw 악기와 샘플, AIFF와 M4A 내보내기. 40개가 넘는 플러그인 대체품을 새로 다듬었고, 보고된 약 40건의 문제를 수정했습니다.
+LYNX SHARE 0.1.31: 트래커 모듈(.mod, .xm, .s3m, .it)도 여는 내장 트래커. 마림바, 비브라폰, 실로폰, 글로켄슈필, 튜뷸러 벨, 칼림바의 물리 모델 LYNX Model. JSFX 이펙트와 악기 스크립트. 맞는 레이아웃을 설정하는 환영 카드와 최근 프로젝트가 있는 시작 페이지. 모든 명령을 찾는 검색. 복사와 붙여넣기가 되는 두 프로젝트 나란히 보기. 섹션 레인, Smart Tempo가 있는 코드 레인, 트랙 버전. 오토메이션 쓰기 모드, 오토메이션 캡처, 모든 노브용 모듈레이터. FL Studio Mobile .flm 내보내기. 클립 실행 레이아웃에는 Live의 랙 디바이스 인라인 표시와 Macro Map, Solo / Cue. 간단한 레이아웃에는 덕킹 기준과 에코 센드. 믹서 인서트의 ARA 플러그인. FL에 더 가깝게 재생되는 FL Studio 프로젝트. 그리고 보고된 약 30건의 문제 수정.
 
 ## Features
 

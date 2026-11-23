@@ -1,5 +1,5 @@
 ---
-source: 736421c170
+source: 5e5d2e8e05
 ---
 ![Basit yerleşim: zaman çizelgesinde izler, bir başlangıç beat'i ve Drum Machine](/assets/img/learn/simple-beat-2.webp)
 
@@ -7,7 +7,7 @@ source: 736421c170
 
 ## İlk üç adımınız
 
-1. **Yerleşimi seçin.** LYNX SHARE ilk açıldığında bir karşılama kartı nereden geldiğinizi sorar (0.1.31). `BandLab, FL Studio Mobile veya GarageBand` düğmesine tıklayın: pencere, Drums izinde bir başlangıç beat'i olan Basit yerleşime geçer. 0.1.30'da `Görünüm › Yerleşim stili › Basit iş akışı` yolunu seçin.
+1. **Yerleşimi seçin.** LYNX SHARE ilk açıldığında bir karşılama kartı nereden geldiğinizi sorar. `BandLab, FL Studio Mobile veya GarageBand` düğmesine tıklayın: pencere, Drums izinde bir başlangıç beat'i olan Basit yerleşime geçer. Daha sonra `Görünüm › Yerleşim stili › Basit iş akışı` istediğiniz zaman ona geçirir.
 2. **Bir beat yapın.** Zaman çizelgesinin altındaki Drum Machine karelerine tıklayın. Bkz. [Basit yerleşimde bir beat yapın](/learn/simple-beat/).
 3. **Bir loop ve sesinizi ekleyin.** `Döngüler` loop panelini açar: bir loop'u zaman çizelgesine sürükleyin. Sonra bir Voice izinde [sesinizi kaydedin](/learn/record-voice/).
 

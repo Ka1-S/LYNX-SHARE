@@ -1,14 +1,14 @@
 ---
-source: 4ebe52e456
+source: 2116c7d24c
 ---
 ## Basit yerleşimi seçin
 
 ![Karşılama kartı nereden geldiğinizi sorar](/assets/img/learn/simple-beat-1.webp)
 
-1. LYNX SHARE'i başlatın. İlk açılışta bir karşılama kartı nereden geldiğinizi sorar (0.1.31).
+1. LYNX SHARE'i başlatın. İlk açılışta bir karşılama kartı nereden geldiğinizi sorar.
 2. `BandLab, FL Studio Mobile veya GarageBand` düğmesine tıklayın. Pencere Basit yerleşime geçer ve bir Drums izine bir başlangıç beat'i yerleştirilir.
 
-0.1.30'da `Görünüm › Yerleşim stili › Basit iş akışı` yolunu seçin, `+ Parça ekle` düğmesine, sonra `Davullar` düğmesine tıklayın ve başlangıç beat'lerinden birini seçin. Aynı menü yerleşimleri istediğiniz zaman değiştirir. Proje olduğu gibi kalır.
+Kart olmadan `Görünüm › Yerleşim stili › Basit iş akışı` yolunu seçin, `+ Parça ekle` düğmesine, sonra `Davullar` düğmesine tıklayın ve başlangıç beat'lerinden birini seçin. Aynı menü yerleşimleri istediğiniz zaman değiştirir. Proje olduğu gibi kalır.
 
 ## Beat'i çalın
 
@@ -40,7 +40,7 @@ Her satırın yanındaki harf, bilgisayar klavyesindeki tuşudur: o sesi çalmak
 
 ![Zaman çizelgesinin yanındaki Loops paneli](/assets/img/learn/simple-beat-5.webp)
 
-- `Sıradaki: denemeniz gereken 3 şey` kartı (0.1.31) her adımı kendiliğinden işaretler. `Döngüleri aç` Loops panelini açar: bir loop'u zaman çizelgesine sürükleyin. Bir loop projenin tempo ve tonuna uyar.
+- `Sıradaki: denemeniz gereken 3 şey` kartı her adımı kendiliğinden işaretler. `Döngüleri aç` Loops panelini açar: bir loop'u zaman çizelgesine sürükleyin. Bir loop projenin tempo ve tonuna uyar.
 - Bir Voice izinde [sesinizi kaydedin](/learn/record-voice/).
 - `Bitir` şarkıyı WAV veya MP3 olarak kaydeder.
 

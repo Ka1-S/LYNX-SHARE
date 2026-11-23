@@ -77,7 +77,7 @@ Yes, through the FL Studio plugin that comes with FL Studio. FL Studio installs 
 
 Yes. `File › Open...` reads DAWproject files (`.dawproject`) with their tracks, folders, clips, automation, mixer and plugins, and can write them back. GarageBand projects (`.band`, from GarageBand 10 or GarageBand for iOS) and BandLab projects downloaded by Cakewalk or Sonar (`.blx`) open as Simple-layout tracks with their regions, tempo, key and mix; their instrument sounds are not stored in a readable form, so instrument tracks play LYNX SHARE's built-in synth and drums. Sampler instruments also open: DirectWave programs (`.dwp`, `.dwb`), `.gig` instruments and Kontakt's `.ncw` samples.
 
-Tracker modules (`.mod`, `.xm`, `.s3m`, `.it`) open too: their instruments become Sampler channels with their samples, the song becomes patterns in the Playlist with its tempo changes, and `View › Windows and tools › Tracker` edits the notes. Volume and pan changes, slides, vibrato and arpeggios come in as the channel's events or the notes' pitch curves, and what is left out is listed in the import report.
+Tracker modules (`.mod`, `.xm`, `.s3m`, `.it`) open too: their instruments become Sampler channels with their samples, the song becomes patterns in the Playlist with its tempo changes, and `View › Tracker` edits the notes. Volume and pan changes, slides, vibrato and arpeggios come in as the channel's events or the notes' pitch curves, and what is left out is listed in the import report.
 
 ## Does it work without an internet connection?
 

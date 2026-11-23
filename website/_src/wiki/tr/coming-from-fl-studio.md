@@ -1,5 +1,5 @@
 ---
-source: 7342d4fb1f
+source: f6f0977999
 ---
 LYNX SHARE bildiğiniz iş akışını korur: Channel Rack, pattern'ler, Playlist ve Mixer, aynı tuşlarla. `.flp` projelerini doğrudan açar ve geri yazabilir.
 
@@ -7,7 +7,7 @@ LYNX SHARE bağımsız bir programdır. Image-Line ile bağlantısı yoktur, Ima
 
 ## İlk adımlarınız
 
-1. **Yerleşimi seçin.** LYNX SHARE ilk açıldığında bir karşılama kartı nereden geldiğinizi sorar (0.1.31). `FL Studio` düğmesine tıklayın: Channel Rack, Piano roll, Playlist ve Mixer ile varsayılan olan Pattern yerleşimini alırsınız. Kartta Skip da aynı sonucu verir.
+1. **Yerleşimi seçin.** LYNX SHARE ilk açıldığında bir karşılama kartı nereden geldiğinizi sorar. `FL Studio` düğmesine tıklayın: Channel Rack, Piano roll, Playlist ve Mixer ile varsayılan olan Pattern yerleşimini alırsınız. Kartta Skip da aynı sonucu verir.
 2. **Bir proje açın.** `.flp` projelerinizden birini açın (aşağıda) ya da bir beat yapmak için Channel Rack'teki adımlara tıklayın.
 3. **Plugin'lerinizi bulun.** LYNX SHARE alışılmış plugin klasörlerini arka planda tarar. Kendi klasörünüz için `Seçenekler › Plugin yöneticisi...` açın, `Plugin klasörleri...` düğmesine tıklayın, klasörü ekleyin ve `Yeni plugin bul` düğmesine tıklayın.
 

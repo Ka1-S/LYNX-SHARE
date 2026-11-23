@@ -1,5 +1,5 @@
 ---
-source: a29416cb8c
+source: 532b2eee04
 ---
 `Dosya › Aç...` (`Ctrl+O`), LYNX SHARE'in kendi `.lynx` projelerini ve ayrıca `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx` ve `.mid` dosyalarını açar. Başka bir programdan gelen proje bir içe aktarmadır: yeni, kaydedilmemiş bir LYNX SHARE projesi olur ve özgün dosyaya asla yazılmaz.
 
@@ -22,7 +22,7 @@ source: a29416cb8c
 | `.band` (GarageBand 10, iOS için GarageBand) | Track'ler, MIDI ve ses region'ları, tempo, ölçü işareti, tonalite, işaretçi olarak bölümler, seviye, pan ve mute, Basit iş akışı track'leri olarak. iOS için GarageBand'de yapılan Sampler enstrümanları | Enstrüman track'leri dahili synth'i ve davulları çalar. Drummer region'ları, take klasörleri ve tempo değişiklikleri listelenir. GarageBand 11 ve öncesinin projeleri okunamaz |
 | `.blx` (BandLab) | Loop'larıyla track'ler, MIDI ve ses region'ları, tempo, ölçü işareti, tonalite, ses seviyesi, pan ve mute, ses seviyesi ve pan otomasyonu ve yaygın efektler, Basit iş akışı track'leri olarak | Enstrüman track'leri dahili synth'i ve davulları çalar. Diğer efektler ve Mastering preset'i dışarıda bırakılır ve listelenir. Yalnızca uydurma projelerde test edildi |
 | `.mid` | Notalar, ölçü işaretleri ve her tempo değişikliği | Bir MIDI dosyası ses taşımaz: kanallar LYNX SHARE synth'ini ya da bir MIDI Out kanalı alır |
-| `.mod`, `.xm`, `.s3m`, `.it` (tracker modülleri) | Sample'larıyla Sampler kanalları olarak enstrümanlar, pattern'ler, Playlist olarak sıra listesi, hız ve tempo, nota ses düzeyi, pan, gecikme ve kesme; kanalın olayları olarak ses düzeyi ve pan değişiklikleri (MOD ve XM), notaların perde eğrileri olarak kayma, vibrato, arpej ve perde zarfları | Diğer efektler ve enstrüman zarfları içe aktarma raporunda sayılır. `Görünüm › Pencereler ve araçlar › Tracker` notaları tracker usulüyle düzenler |
+| `.mod`, `.xm`, `.s3m`, `.it` (tracker modülleri) | Sample'larıyla Sampler kanalları olarak enstrümanlar, pattern'ler, Playlist olarak sıra listesi, hız ve tempo, nota ses düzeyi, pan, gecikme ve kesme; kanalın olayları olarak ses düzeyi ve pan değişiklikleri (MOD ve XM), notaların perde eğrileri olarak kayma, vibrato, arpej ve perde zarfları | Diğer efektler ve enstrüman zarfları içe aktarma raporunda sayılır. `Görünüm › Tracker` notaları tracker usulüyle düzenler |
 | `.zip` | FL Studio'nun sıkıştırılmış loop paketi veya sample'larıyla dışa aktarılmış bir proje: kendi klasörüne çıkarılır, sonra içindeki proje sample'larıyla açılır | |
 
 Bir `.flp` veya `.dawproject` içindeki üçüncü taraf VST2, VST3 ve CLAP plugin'leri ile bir `.als` içindeki VST2 ve VST3 plugin'leri, aynı plugin bilgisayarınızda kuruluysa kaydedilmiş durumlarıyla yüklenir.

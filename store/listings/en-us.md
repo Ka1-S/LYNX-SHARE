@@ -63,13 +63,14 @@ LYNX SHARE is in alpha: expect rough edges, and please report problems on GitHub
 
 ## What's new
 
-LYNX SHARE 0.1.30: lighter than ever, using about half the CPU of FL Studio 2026 while FL's Thief demo plays on our test
-PC; ARA 2 hosting, so Melodyne and other ARA plugins edit audio clips in place; a polyphonic note editor and polyphonic
-audio to MIDI; a more natural Newtone; Helix, a new wavetable synth, and Tetra, a 4-operator FM synth; a Chord helper; a
-BandLab-style Drum Machine, a tuner and a Loop Browser in the Simple layout; return tracks, sends and a crossfader in
-the Clip-launch layout; MPE and hardware MIDI Out; a DirectWave editor; DAWproject, GarageBand and BandLab projects,
-.gig, .dwp and .ncw instruments and samples, and AIFF and M4A export; more than 40 refitted plugin stand-ins; and fixes
-for around 40 reported issues.
+LYNX SHARE 0.1.31: a built-in Tracker that also opens tracker modules (.mod, .xm, .s3m, .it); LYNX Model, physical
+models of marimba, vibraphone, xylophone, glockenspiel, tubular bells and kalimba; JSFX effect and instrument scripts; a
+welcome card that sets up the right layout and a start page with your recent projects; a search that finds every command;
+two projects side by side with copy and paste between them; a Sections lane, a Chord lane with Smart Tempo and Track
+versions; automation write modes, Capture automation and modulators for any knob; FL Studio Mobile .flm export; Live's
+rack devices inline with a Macro Map and Solo / Cue in the Clip-launch layout; Duck under and Echo sends in the Simple
+layout; ARA plugins on a mixer insert; FL Studio projects that play closer to FL; and fixes for around 30 reported
+issues.
 
 ## Features
 
