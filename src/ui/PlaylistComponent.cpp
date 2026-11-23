@@ -6208,6 +6208,10 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
     // issue #154 (round 190ht, LYNX extra): the linked header's insert effects column
     if (! e.mods.isMiddleButtonDown() && insertsMouseDown (e))
         return;
+    // issue #206 follow-up (round 190qb, LYNX extra): a middle-click on its "+ Add" opens the effect search for that
+    // insert's next free slot (as a middle-click on an empty Mixer slot)
+    if (e.mods.isMiddleButtonDown() && ! e.mods.isLeftButtonDown() && ! e.mods.isRightButtonDown() && insertsAddSearch (e.getPosition()))
+        return;
 
     // the resize band at the bottom of a header (FL AUTracksPanelMouseDown, round 190ft): drag resizes the track (and
     // every selected track when it is one of them; LYNX's Shift: every track); Alt+click or a middle click = 100 %
@@ -9715,6 +9719,20 @@ bool PlaylistComponent::insertsMouseDown (const juce::MouseEvent& e)
     return true;
 }
 
+bool PlaylistComponent::insertsAddSearch (juce::Point<int> p)
+{
+    if (p.x >= headerWidth || p.y < tracksTop() || p.y >= gridArea().getBottom())
+        return false;
+    const auto track = yToTrack (p.y);
+    if (! trackInserts (track).contains (p) || insertsItemAt (track, p) != trackinserts::addRow)
+        return false;
+    const auto insert = simpleInsert (track);
+    if (insert <= 0)
+        return false;
+    insertActions (insert).showSlotSearch (trackinserts::nextFreeRow (engine.getSong().mixer[(std::size_t) insert].effects));
+    return true;
+}
+
 bool PlaylistComponent::insertsMouseDrag (const juce::MouseEvent& e)
 {
     if (insertsPressTrack < 0)
@@ -9776,7 +9794,12 @@ bool PlaylistComponent::insertsMouseUp (const juce::MouseEvent& e)
     }
     if (item == trackinserts::addRow)
     {
-        insertActions (insert).showAddMenuFor (trackinserts::nextFreeRow (engine.getSong().mixer[(std::size_t) insert].effects));
+        const auto row = trackinserts::nextFreeRow (engine.getSong().mixer[(std::size_t) insert].effects);
+        auto& actions = insertActions (insert);
+        // issue #206 follow-up (round 190qb): a second press on the menu soon after is a double-click: the effect search
+        if (! e.mods.isAnyModifierKeyDown())
+            actions.armSlotSearchOnSecondClick (e, row);
+        actions.showAddMenuFor (row);
         return true;
     }
     if (item < 0)
@@ -14548,7 +14571,7 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
         const auto& m = song.mixer[(std::size_t) simpleInsert (h.track)];
         if (h.insertItem == trackinserts::addRow)
         {
-            hint.text = tr ("Track effects: [LMB] add an effect to its mixer track  (drop one from the Browser here too)");
+            hint.text = tr ("Track effects: [LMB] add an effect to its mixer track  [MMB] or double-click: search for one  (drop one from the Browser here too)");
             hint.value = m.name.empty() ? tr ("Insert {0}", { juce::String (simpleInsert (h.track)) }) : juce::String::fromUTF8 (m.name.c_str());
         }
         else

@@ -3549,6 +3549,13 @@ public:
             quit();
             return;
         }
+        // --issuesshot190qb <prefix> (round 190qb, follow-ups of issues #206 and #215): src/IssuesShot190qb.inc
+        if (args.contains ("--issuesshot190qb"))
+        {
+            setApplicationReturnValue (runIssuesShot190qb (args[args.indexOf ("--issuesshot190qb") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
         // --issuesshot190oq <prefix> (round 190oq, issues #243-#252): src/IssuesShot190oq.inc
         if (args.contains ("--issuesshot190oq"))
         {
@@ -20513,6 +20520,7 @@ private:
 #include "Design190ojShot.inc" // round 190oj (design review of every view)
 #include "Design190ooShot.inc" // round 190oo (design review 2: the owner's options and the round's fixes)
 #include "IssuesShot190oq.inc" // round 190oq (issues #243-#252)
+#include "IssuesShot190qb.inc" // round 190qb (follow-ups of issues #206, #215)
 #include "RackAuto190owShot.inc" // round 190ow (PAT-7 rest, DE-123: the automation clip rows at work)
 #include "DetailsShot190kn.inc" // round 190kn
 #include "SmartTipShot190ok.inc" // round 190ok (D1)
