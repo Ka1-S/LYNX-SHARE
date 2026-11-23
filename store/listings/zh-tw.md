@@ -86,3 +86,4 @@ LYNX SHARE 0.1.30：前所未有地輕量，在我們的測試電腦上播放FL�
 - 07-chord-helper.png — 和弦助手為選取的和弦推薦相關調性與借用和弦
 - 08-drum-machine.png — 在簡易工作流程的BandLab風格鼓機中編排節拍
 - 09-helix-plus.png — 波表合成器Helix與Helix+：第三個振盪器、顆粒與頻譜層、8個巨集、可繪製的LFO與效果器
+- 10-song-lanes-tracker.png — 用於歌曲段落與和弦的段落軌和和弦軌、內建的追蹤器（Tracker），以及可驅動任意旋鈕的調變器

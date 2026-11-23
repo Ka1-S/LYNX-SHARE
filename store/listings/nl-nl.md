@@ -92,3 +92,4 @@ LYNX SHARE 0.1.30: lichter dan ooit, met ongeveer de helft van de CPU van FL Stu
 - 07-chord-helper.png — De akkoordhulp stelt verwante toonsoorten en geleende akkoorden voor bij het geselecteerde akkoord
 - 08-drum-machine.png — Programmeer een beat in de drummachine in BandLab-stijl van de Eenvoudige lay-out
 - 09-helix-plus.png — Helix, de wavetable-synth, met Helix+: een derde oscillator, granulaire en spectrale lagen, 8 macro's, getekende LFO's en effecten
+- 10-song-lanes-tracker.png — De sectiebaan en het akkoordspoor voor de delen en akkoorden van het nummer, de ingebouwde tracker en modulators die elke knop bewegen

@@ -112,3 +112,4 @@ for around 40 reported issues.
 - 07-chord-helper.png — The Chord helper suggests related keys and borrowed chords for the selected chord
 - 08-drum-machine.png — Program a beat in the BandLab-style Drum Machine of the Simple layout
 - 09-helix-plus.png — Helix, the wavetable synth, with Helix+: a third oscillator, granular and spectral layers, 8 macros, drawn LFOs and effects
+- 10-song-lanes-tracker.png — The Sections lane and the Chord lane for the song's parts and chords, the built-in tracker, and modulators that move any knob

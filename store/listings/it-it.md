@@ -93,3 +93,4 @@ LYNX SHARE 0.1.30: più leggero che mai, con circa la metà della CPU di FL Stud
 - 07-chord-helper.png — L'assistente per gli accordi suggerisce tonalità vicine e accordi presi in prestito per l'accordo selezionato
 - 08-drum-machine.png — Programma un ritmo nella drum machine in stile BandLab del Flusso semplice
 - 09-helix-plus.png — Helix, il sintetizzatore wavetable, con Helix+: un terzo oscillatore, livelli granulare e spettrale, 8 macro, LFO disegnati ed effetti
+- 10-song-lanes-tracker.png — La corsia delle sezioni e la traccia accordi per le parti e gli accordi del brano, il tracker integrato e modulatori che muovono qualsiasi manopola

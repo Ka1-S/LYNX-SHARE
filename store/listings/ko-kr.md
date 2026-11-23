@@ -86,3 +86,4 @@ LYNX SHARE 0.1.30: 그 어느 때보다 가볍게. 테스트 PC에서 FL의 Thie
 - 07-chord-helper.png — 코드 도우미가 선택한 코드에 맞는 관련 키와 차용 화음을 제안합니다
 - 08-drum-machine.png — 간단한 레이아웃의 BandLab 스타일 드럼 머신으로 비트를 찍어 보세요
 - 09-helix-plus.png — 웨이브테이블 신스 Helix와 Helix+: 세 번째 오실레이터, 그래뉼러·스펙트럴 레이어, 매크로 8개, 직접 그리는 LFO, 이펙트
+- 10-song-lanes-tracker.png — 곡의 구성과 코드를 담는 섹션 레인과 코드 레인, 내장 트래커, 어떤 노브든 움직이는 모듈레이터

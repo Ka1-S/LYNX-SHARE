@@ -94,3 +94,4 @@ LYNX SHARE 0.1.30 : plus léger que jamais, avec environ la moitié du CPU de FL
 - 07-chord-helper.png — L'assistant d'accords propose des tonalités voisines et des accords d'emprunt pour l'accord sélectionné
 - 08-drum-machine.png — Programmez un rythme dans la boîte à rythmes façon BandLab de la disposition simple
 - 09-helix-plus.png — Helix, le synthé wavetable, avec Helix+ : un troisième oscillateur, des couches granulaire et spectrale, 8 macros, des LFO dessinés et des effets
+- 10-song-lanes-tracker.png — La piste des sections et la piste d'accords pour les parties et les accords du morceau, le tracker intégré et des modulateurs qui animent n'importe quel bouton

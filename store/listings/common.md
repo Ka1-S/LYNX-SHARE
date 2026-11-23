@@ -51,6 +51,7 @@ Windows 10 version 1809 or newer, 64-bit (x64)
 07-chord-helper.png
 08-drum-machine.png
 09-helix-plus.png
+10-song-lanes-tracker.png
 
 ## StoreLogo300x300
 
