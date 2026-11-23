@@ -8,7 +8,7 @@
 <meta property="og:title" content="Third-party plugins · LYNX SHARE">
 <meta property="og:description" content="Plugin formats per system, scanning, the Plugin manager, separate processes and 32-bit plugins.">
 <meta property="og:site_name" content="LYNX SHARE">
-<meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.30">
+<meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.31">
 <meta property="og:url" content="https://lynx-share.com/wiki/plugins/">
 <meta property="og:locale" content="en_US">
 <meta property="og:locale:alternate" content="zh_CN">
@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="d77a6b65";
+window.LYNX_LANG=lang;window.LYNX_V="6328eee5";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=d77a6b65">
+<link rel="stylesheet" href="/assets/site.css?v=6328eee5">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -116,7 +116,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <h2 id="32-bit-plugins-windows-only">32-bit plugins (Windows only)</h2>
 <p>On Windows, 32-bit VST2 and VST3 plugins run through a bridge (<code>LYNX-bridge32.exe</code>). The bridge adds no latency. A plugin that crashes in it stops on its own while LYNX SHARE keeps playing. A bridged plugin's editor opens in its own window and cannot be docked or pinned. When both a 32-bit and a 64-bit build of a plugin are installed, <code>Bit size</code> in the plugin window's <code>Wrapper settings</code> chooses which one loads.</p>
 <h2 id="plugin-performance-monitor">Plugin performance monitor</h2>
-<figure><a class="shot" href="/assets/img/wiki/plugin-monitor.webp"><img src="/assets/img/wiki/plugin-monitor.webp" srcset="/assets/img/wiki/plugin-monitor.webp 1x, /assets/img/wiki/plugin-monitor@2x.webp 2x" alt="The Plugin performance monitor: one row per instrument and effect with its share of processing time" loading="lazy" width="720" height="380"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/plugin-monitor.webp"><img src="/assets/img/wiki/plugin-monitor.webp" srcset="/assets/img/wiki/plugin-monitor.webp 1x, /assets/img/wiki/plugin-monitor@2x.webp 2x" alt="The Plugin performance monitor: one row per instrument and effect with its share of processing time" loading="lazy" width="840" height="380"></a></figure>
 <p><code>Tools › Plugin performance monitor...</code> lists every instrument and effect with the processing time it takes: now, on average and at its peak. 100% means one processor core busy for the whole time the audio lasts.</p>
 <div class="tablewrap"><table><thead><tr><th>Setting</th><th>What it does</th></tr></thead><tbody><tr><td><code>Find</code></td><td>Filters by plugin, channel or insert</td></tr><tr><td><code>Plugins only</code></td><td>Hides LYNX SHARE's own instruments and effects</td></tr><tr><td><code>Freeze</code></td><td>Stops updating the numbers</td></tr><tr><td><code>Reset on play</code></td><td>Starts averages and peaks again each time playback starts</td></tr><tr><td><code>Reset</code></td><td>Clears averages and peaks now</td></tr></tbody></table></div>
 <h2 id="send-an-instrument-s-outputs-to-separate-inserts">Send an instrument's outputs to separate inserts</h2>
@@ -151,8 +151,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=d77a6b65" defer></script>
-<script src="/assets/wiki.js?v=d77a6b65" defer></script>
-<script src="/assets/motion.js?v=d77a6b65" defer></script>
+<script src="/assets/site.js?v=6328eee5" defer></script>
+<script src="/assets/wiki.js?v=6328eee5" defer></script>
+<script src="/assets/motion.js?v=6328eee5" defer></script>
 </body>
 </html>

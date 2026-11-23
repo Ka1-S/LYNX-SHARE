@@ -47,7 +47,9 @@ TOP = {
     "automation": ("snap/s-automation.png", None),
     "synth": ("snap/s-synth.png", None),
     "eq": ("art/facet-eq-after", None),
-    "cliplaunch": ("grid/g-both.png", None),
+    # (round 190qd: the clip grid, scenes and Playlist only: the demo grid's tracks have no mixer inserts, so the Session
+    # mixer below them would show only "No mixer track" strips)
+    "cliplaunch": ("grid/g-both.png", (0, 0, 1920, 573)),
 }
 # the README's pictures (docs/img/<name>.png): the 1600 x 900 window for the wide ones, as the README had them
 README_PICTURES = {
@@ -60,7 +62,7 @@ README_PICTURES = {
     "synth": ("snap/s-synth.png", None),
     "eq": ("art/facet-eq-after", None),
     "automation": ("snap/s-automation.png", None),
-    "clip-launch": ("grid1600/g-both.png", None),
+    "clip-launch": ("grid1600/g-both.png", (0, 0, 1600, 393)),  # (the grid part, as "cliplaunch" above)
 }
 # the Microsoft Store listing's screenshots (store/screenshots/<name>.png, 1920 x 1080, 1x only); 05-instruments-effects is
 # put together by hand (Channel Rack + a synth + Parametric EQ) and is not written here

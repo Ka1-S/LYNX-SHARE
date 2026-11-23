@@ -8,7 +8,7 @@
 <meta property="og:title" content="Features · LYNX SHARE">
 <meta property="og:description" content="What LYNX SHARE does in the current release: the windows, its three layouts (FL Studio, Clip-launch and Simple), .flp, .als, .flm, .dawproject, .band and .blx projects, built-in instruments and effects, and the plugin formats it hosts.">
 <meta property="og:site_name" content="LYNX SHARE">
-<meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.30">
+<meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.31">
 <meta property="og:url" content="https://lynx-share.com/features/">
 <meta property="og:locale" content="en_US">
 <meta property="og:locale:alternate" content="zh_CN">
@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="d77a6b65";
+window.LYNX_LANG=lang;window.LYNX_V="6328eee5";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=d77a6b65">
+<link rel="stylesheet" href="/assets/site.css?v=6328eee5">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -108,7 +108,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
     </div>
 
     <div class="frow narrow flip">
-      <figure><a class="shot" href="/assets/img/rack.webp?v=0.1.30"><img src="/assets/img/rack.webp?v=0.1.30" srcset="/assets/img/rack.webp?v=0.1.30 1x, /assets/img/rack@2x.webp?v=0.1.30 2x" alt="Channel rack" loading="lazy" width="1074" height="420"></a></figure>
+      <figure><a class="shot" href="/assets/img/rack.webp?v=0.1.31"><img src="/assets/img/rack.webp?v=0.1.31" srcset="/assets/img/rack.webp?v=0.1.31 1x, /assets/img/rack@2x.webp?v=0.1.31 2x" alt="Channel rack" loading="lazy" width="1074" height="420"></a></figure>
       <div><h3>Channel rack</h3>
         <p data-i18n="fe.crP">A step sequencer with one row per instrument. Each channel has volume, pan, mute and solo, and each pattern its own name, colour and length.</p>
         <ul><li data-i18n="fe.crA">Swing, cut groups, an arpeggiator and layer channels</li><li data-i18n="fe.crB">The PC keyboard plays notes like a piano</li><li data-i18n="fe.crC">Freeze: a channel plays as audio and its instrument is unloaded</li><li data-i18n="fe.crD">Automation clips as rows of the rack, with steps that start them and range knobs, as in FL Studio</li><li data-i18n="fe.crE">Deactivate: a channel's instrument is unloaded until you need it again</li></ul>
@@ -116,7 +116,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
     </div>
 
     <div class="frow">
-      <figure><a class="shot" href="/assets/img/pianoroll.webp?v=0.1.30"><img src="/assets/img/pianoroll.webp?v=0.1.30" srcset="/assets/img/pianoroll.webp?v=0.1.30 1x, /assets/img/pianoroll@2x.webp?v=0.1.30 2x" alt="Piano roll" loading="lazy" width="1920" height="1080"></a></figure>
+      <figure><a class="shot" href="/assets/img/pianoroll.webp?v=0.1.31"><img src="/assets/img/pianoroll.webp?v=0.1.31" srcset="/assets/img/pianoroll.webp?v=0.1.31 1x, /assets/img/pianoroll@2x.webp?v=0.1.31 2x" alt="Piano roll" loading="lazy" width="1920" height="1080"></a></figure>
       <div><h3>Piano roll</h3>
         <p data-i18n="fe.prP">Configurable snap, chords and scales, 16 note colours, note groups, and slide and porta notes.</p>
         <ul><li data-i18n="fe.prA">Lanes for velocity, pan and pitch under the notes</li><li data-i18n="fe.prB">Ghost notes from other channels</li><li data-i18n="fe.prC">Quantize, strum, arpeggiate and randomize tools</li><li data-i18n="fe.prD">.mid import and export</li><li data-i18n="fe.prE">Note chance, velocity range and Piano roll scripts</li><li data-i18n="fe.prF">Limit to a scale or chord, Scale levels, Flip and Randomize, as in FL Studio</li><li data-i18n="fe.prG">Key markers that change the key along the song, and a Scale degree chord stamp</li><li data-i18n="fe.prH">The Chord helper: related keys and borrowed chords for the selected chord, with favourites</li><li data-i18n="fe.prI">Up to five controller lanes stacked at once (a LYNX extra)</li></ul>
@@ -132,7 +132,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
     </div>
 
     <div class="frow narrow">
-      <figure><a class="shot" href="/assets/img/automation.webp?v=0.1.30"><img src="/assets/img/automation.webp?v=0.1.30" srcset="/assets/img/automation.webp?v=0.1.30 1x, /assets/img/automation@2x.webp?v=0.1.30 2x" alt="Automation" data-i18n-alt="alt.auto" loading="lazy" width="760" height="300"></a></figure>
+      <figure><a class="shot" href="/assets/img/automation.webp?v=0.1.31"><img src="/assets/img/automation.webp?v=0.1.31" srcset="/assets/img/automation.webp?v=0.1.31 1x, /assets/img/automation@2x.webp?v=0.1.31 2x" alt="Automation" data-i18n-alt="alt.auto" loading="lazy" width="760" height="300"></a></figure>
       <div><h3 data-i18n="fe.auT">Automation and controllers</h3>
         <p data-i18n="fe.auP">Any knob or fader of a channel, the mixer, an effect or a plugin can become a clip with points and curves. MIDI controllers can be linked to any parameter, and modulators move a knob around its own value.</p>
         <p data-i18n="fe.auP3">Modulators come in eight kinds: an LFO, an envelope follower, an ADSR envelope, steps, a random source, a macro, keytrack and velocity. Drag one onto a knob, or pick it with Modulate with in a control's menu, also for third-party plugins, and a ring shows the movement. <i>Capture automation</i> turns the moves you made while playing, without recording, into automation afterwards.</p>
@@ -233,8 +233,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <div class="wrap">
     <h2 data-i18n="fe.boxT">Instruments and effects</h2>
     <div class="frow">
-      <figure><a class="shot" href="/assets/img/synth.webp?v=0.1.30"><img src="/assets/img/synth.webp?v=0.1.30" srcset="/assets/img/synth.webp?v=0.1.30 1x, /assets/img/synth@2x.webp?v=0.1.30 2x" alt="Synth" data-i18n-alt="alt.synth" loading="lazy" width="720" height="510"></a><figcaption data-i18n="fe.synC">The built-in synth: 3 oscillators, a multimode filter with keytracking, FM and ring modulation, envelopes and 4 LFOs.</figcaption></figure>
-      <figure><a class="shot" href="/assets/img/eq.webp?v=0.1.30"><img src="/assets/img/eq.webp?v=0.1.30" srcset="/assets/img/eq.webp?v=0.1.30 1x, /assets/img/eq@2x.webp?v=0.1.30 2x" alt="Facet EQ" data-i18n-alt="alt.eq" loading="lazy" width="960" height="560"></a><figcaption data-i18n="fe.eqC">Facet EQ: 8 bands, cuts up to 96 dB/oct, dynamic bands and a pre/post analyser, at zero latency.</figcaption></figure>
+      <figure><a class="shot" href="/assets/img/synth.webp?v=0.1.31"><img src="/assets/img/synth.webp?v=0.1.31" srcset="/assets/img/synth.webp?v=0.1.31 1x, /assets/img/synth@2x.webp?v=0.1.31 2x" alt="Synth" data-i18n-alt="alt.synth" loading="lazy" width="720" height="510"></a><figcaption data-i18n="fe.synC">The built-in synth: 3 oscillators, a multimode filter with keytracking, FM and ring modulation, envelopes and 4 LFOs.</figcaption></figure>
+      <figure><a class="shot" href="/assets/img/eq.webp?v=0.1.31"><img src="/assets/img/eq.webp?v=0.1.31" srcset="/assets/img/eq.webp?v=0.1.31 1x, /assets/img/eq@2x.webp?v=0.1.31 2x" alt="Facet EQ" data-i18n-alt="alt.eq" loading="lazy" width="960" height="560"></a><figcaption data-i18n="fe.eqC">Facet EQ: 8 bands, cuts up to 96 dB/oct, dynamic bands and a pre/post analyser, at zero latency.</figcaption></figure>
     </div>
     <div class="cols" style="margin-top:34px">
       <div><h3 data-i18n="fe.insT">Instruments</h3><ul>
@@ -290,7 +290,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
     <h2 data-i18n="fe.demoT">The demo song</h2>
     <p class="lead" data-i18n="fe.demoL">The demo project comes with the program. Every sound in it is from LYNX SHARE's own synths, drums and effects, and the audio below was exported by LYNX SHARE.</p>
     <div class="media">
-      <div class="video"><video id="tour" src="/assets/media/lynx-tour.mp4?v=0.1.23" poster="/assets/media/poster.jpg?v=0.1.30" preload="none" controls playsinline></video></div>
+      <div class="video"><video id="tour" src="/assets/media/lynx-tour.mp4?v=0.1.23" poster="/assets/media/poster.jpg?v=0.1.31" preload="none" controls playsinline></video></div>
       <div class="player">
         <h3>Demo.lynx</h3>
         <p data-i18n="media.songp">124 BPM · kick, clap, reese bass, pad, pluck and supersaw. Click the waveform to seek.</p>
@@ -345,8 +345,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=d77a6b65" defer></script>
-<script src="/assets/features.js?v=d77a6b65" defer></script>
-<script src="/assets/motion.js?v=d77a6b65" defer></script>
+<script src="/assets/site.js?v=6328eee5" defer></script>
+<script src="/assets/features.js?v=6328eee5" defer></script>
+<script src="/assets/motion.js?v=6328eee5" defer></script>
 </body>
 </html>
