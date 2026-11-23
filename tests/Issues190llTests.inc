@@ -122,3 +122,21 @@ TEST (issues190ll_199_fixed_blocks_tell_where_they_began)
     fixed.run (io, 192, false, [&] (float* const*, int) { ++calls; });
     CHECK (calls == 2);
 }
+
+// #203 (round 190ll, follow-up): the FL layout's scale box opens FL's View › Scale highlighting menu itself, not the
+// box's own item list. ComboBox marks the box as having a menu open before showPopup() and clears that mark from the
+// result callback of the menu it shows -- for the box's own menu that callback never ran, so the box ignored every click
+// after the first one (the menu did not open again). The box now closes its own menu through ComboBox::hidePopup().
+// (A real click needs the message loop and the GUI, so this guards the wiring in the source.)
+TEST (issues190ll_203_scale_box_opens_its_menu_again)
+{
+    using namespace i18ntest;
+    const auto header = readFile ("src/ui/PianoRollComponent.h");
+    const auto box = header.find ("class ScaleBox final : public IconComboBox");
+    CHECK (box != std::string::npos);
+    CHECK (header.find ("std::function<juce::PopupMenu()> onPopup;", box) != std::string::npos); // (the menu to open)
+    CHECK (header.find ("onPopup().showMenuAsync", box) != std::string::npos);                   // (the box shows it)
+    CHECK (header.find ("[box] (int) { if (box != nullptr) box->hidePopup(); }", box) != std::string::npos); // (and closes it)
+    CHECK (readFile ("src/ui/PianoRollComponent.cpp")
+               .find ("scaleBox.onPopup = [this] { return scaleHighlightMenu(); };") != std::string::npos);
+}

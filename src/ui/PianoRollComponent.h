@@ -497,13 +497,21 @@ private:
     {
     public:
         using IconComboBox::IconComboBox;
-        std::function<void()> onPopup;
+        // The menu a click opens instead of the box's item list (issue #203, FL's View › Scale highlighting menu). The box
+        // shows it itself, so it also has to close it: ComboBox::showPopupIfNotActive() marks the box as having a menu
+        // open before showPopup(), and ComboBox clears that mark from the result callback of the menu *it* shows. With a
+        // menu of our own, a click after the first one did nothing (the mark stayed set).
+        std::function<juce::PopupMenu()> onPopup;
         void showPopup() override
         {
-            if (onPopup)
-                onPopup();
-            else
+            if (onPopup == nullptr)
+            {
                 IconComboBox::showPopup();
+                return;
+            }
+            const juce::Component::SafePointer<ScaleBox> box (this);
+            onPopup().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMinimumWidth (getWidth()),
+                                     [box] (int) { if (box != nullptr) box->hidePopup(); });
         }
     };
     ScaleBox scaleBox { Icon::keyboard };

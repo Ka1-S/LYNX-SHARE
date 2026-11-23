@@ -333,9 +333,7 @@ PianoRollComponent::PianoRollComponent (AudioEngine& e)
     scaleSnapButton.setEnabled (false); // until a scale is chosen
     scaleBox.setTooltip (tr ("Highlights the notes of a scale"));
     // issue #203 (round 190ll): the FL layout's click opens FL's Scale highlighting menu (root and scale apart)
-    scaleBox.onPopup = [this] {
-        scaleHighlightMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&scaleBox).withMinimumWidth (scaleBox.getWidth()));
-    };
+    scaleBox.onPopup = [this] { return scaleHighlightMenu(); };
     // docked (Clip-launch: Live's Clip View Scale; Simple: BandLab's Smart View): a root box and a scale box
     for (int root = 0; root < 12; ++root)
         scaleRootBox.addItem (juce::String (notenames::pitchName (root)), root + 1);
