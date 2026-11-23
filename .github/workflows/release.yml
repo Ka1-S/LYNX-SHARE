@@ -12,8 +12,8 @@
 #                       docs/STORE.md), which it installs and self-tests with a test identity
 #   linux    (ubuntu)   CMake + GCC 13 build in an Ubuntu 22.04 container (glibc 2.35), glibc check, self-test,
 #                       AppImage and .tar.gz (scripts/package-linux.sh), offline start check of the AppImage
-#   macos    (macos)    CMake universal (arm64 + x86_64) build, self-test, ad-hoc signature (no Apple Developer ID,
-#                       not notarized), .dmg (scripts/package-macos.sh)
+#   macos    (macos)    macos-app.yml: arm64 and x86_64 built on two runners in parallel, merged with lipo (round 190qd),
+#                       self-test, ad-hoc signature (no Apple Developer ID, not notarized), .dmg (scripts/package-macos.sh)
 #   linux-arm64         linux-arm64.yml on GitHub's arm64 runner: the Linux job's steps for aarch64 (round 190oy),
 #                       LYNX-<label>-aarch64.AppImage and LYNX-<label>-linux-aarch64.tar.gz. publish waits for it and
 #                       takes its files when it passed; a failure there does not hold back the other platforms
@@ -428,50 +428,16 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
+  # round 190qd: each architecture on its own runner, merged with lipo (one universal job compiled everything twice and
+  # neared GitHub's 6 h job limit); see macos-app.yml
   macos:
-    name: macOS (universal dmg)
+    name: macOS
     needs: version
-    runs-on: macos-15
-    env:
-      LABEL: ${{ needs.version.outputs.label }}
-      VERSION: ${{ needs.version.outputs.version }}
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Build dependencies
-        run: brew list ninja > /dev/null 2>&1 || brew install ninja
-
-      - name: JUCE (checksum verified)
-        run: |
-          curl -fsSL -o juce.tar.gz "https://github.com/juce-framework/JUCE/archive/refs/tags/$JUCE_VERSION.tar.gz"
-          echo "$JUCE_SHA256  juce.tar.gz" | shasum -a 256 -c -
-          mkdir -p "$RUNNER_TEMP/juce" && tar xzf juce.tar.gz -C "$RUNNER_TEMP/juce" --strip-components 1 && rm juce.tar.gz
-
-      - name: Build (universal)
-        run: |
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DFETCHCONTENT_SOURCE_DIR_JUCE="$RUNNER_TEMP/juce" \
-            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
-          cmake --build build --target LYNX -- -k 0
-          lipo -info build/LYNX_artefacts/Release/LYNX.app/Contents/MacOS/LYNX
-
-      - name: Self-test and demo project
-        run: |
-          bin=build/LYNX_artefacts/Release/LYNX.app/Contents/MacOS/LYNX
-          "$bin" --selftest "$PWD/selftest.txt" "$PWD/selftest-demo.lynx" || true
-          cat selftest.txt
-          grep -q '^result=OK' selftest.txt
-          "$bin" --showcase "$PWD/Demo.lynx" || true
-          test -s Demo.lynx
-
-      - name: Package
-        run: ./scripts/package-macos.sh build/LYNX_artefacts/Release/LYNX.app "$LABEL" dist Demo.lynx
-
-      - name: Upload package
-        uses: actions/upload-artifact@v7
-        with:
-          name: LYNX-${{ env.LABEL }}-macos-universal
-          path: dist/*
-          if-no-files-found: error
+    permissions:
+      contents: write   # (macos-app.yml's attach job asks for it; it runs only on a manual run of macos-app.yml)
+    uses: ./.github/workflows/macos-app.yml
+    with:
+      label: ${{ needs.version.outputs.label }}
 
   linux-arm64:
     name: Linux arm64

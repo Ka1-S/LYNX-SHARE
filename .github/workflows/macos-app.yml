@@ -1,0 +1,185 @@
+# LYNX SHARE for macOS (universal dmg), round 190qd (the 0.1.31 release). A universal build in ONE job compiled every
+# translation unit twice (arm64 + x86_64) on one runner, and the big ones (src/Main.cpp) took about 2 h per architecture
+# on Apple clang: 0.1.30's job ran 3 h 25 min, 0.1.31's went past 4 h, close to GitHub's 6 h job limit. So each
+# architecture now builds on its own runner, in parallel, and a small job merges them with lipo.
+#
+#   version   the package label (input, or CMakeLists.txt's version + the commit)
+#   build     (macos-15, matrix arm64 / x86_64)  CMake + Ninja, one architecture each; the LYNX.app goes on as an artifact
+#   universal (macos-15)  lipo -create of every Mach-O file of the two apps into one universal LYNX.app, self-test and
+#             demo project on it (native arm64), scripts/package-macos.sh (ad-hoc signs the merged bundle) ->
+#             LYNX-<label>-macos-universal.dmg
+#   attach    (workflow_dispatch with a tag only)  attaches the dmg to that tag's GitHub release and adds its line to the
+#             release's SHA256SUMS.txt (the in-app updater checks every download against it)
+#
+# release.yml calls it (workflow_call); a manual run (workflow_dispatch) builds `ref` (a tag: the dmg goes to its release).
+name: macOS app
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'tag or commit to build (a tag v*: the dmg is attached to its release)'
+        type: string
+        required: true
+  workflow_call:
+    inputs:
+      label:
+        description: 'package label (release.yml passes its own)'
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+env:
+  JUCE_VERSION: 8.0.4
+  JUCE_SHA256: 0effe9823a6fd8a4f98e5c08be7d308350e417b2d15dcf34011e778fefbbf005
+
+jobs:
+  version:
+    name: Version
+    runs-on: ubuntu-24.04
+    outputs:
+      label: ${{ steps.version.outputs.label }}
+      ref: ${{ steps.version.outputs.ref }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+      - name: Label
+        id: version
+        shell: bash
+        env:
+          INPUT_LABEL: ${{ inputs.label }}
+          INPUT_REF: ${{ inputs.ref }}
+        run: |
+          version="$(sed -n 's/^project(LYNX VERSION \([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' CMakeLists.txt)"
+          [[ -n "$version" ]] || { echo "::error::no version in CMakeLists.txt"; exit 1; }
+          sha="$(git rev-parse HEAD)"
+          if [[ -n "$INPUT_LABEL" ]]; then label="$INPUT_LABEL"
+          elif [[ "$INPUT_REF" == v* ]]; then label="${INPUT_REF#v}"
+          else label="$version-${sha::7}"; fi
+          echo "label=$label" >> "$GITHUB_OUTPUT"
+          echo "ref=$sha" >> "$GITHUB_OUTPUT"
+          echo "LYNX macOS $label ($sha)"
+
+  build:
+    name: macOS (${{ matrix.arch }})
+    needs: version
+    runs-on: macos-15
+    timeout-minutes: 300
+    strategy:
+      matrix:
+        arch: [arm64, x86_64]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.version.outputs.ref }}
+
+      - name: Build dependencies
+        run: brew list ninja > /dev/null 2>&1 || brew install ninja
+
+      - name: JUCE (checksum verified)
+        run: |
+          curl -fsSL -o juce.tar.gz "https://github.com/juce-framework/JUCE/archive/refs/tags/$JUCE_VERSION.tar.gz"
+          echo "$JUCE_SHA256  juce.tar.gz" | shasum -a 256 -c -
+          mkdir -p "$RUNNER_TEMP/juce" && tar xzf juce.tar.gz -C "$RUNNER_TEMP/juce" --strip-components 1 && rm juce.tar.gz
+
+      - name: Build (${{ matrix.arch }})
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DFETCHCONTENT_SOURCE_DIR_JUCE="$RUNNER_TEMP/juce" \
+            -DCMAKE_OSX_ARCHITECTURES="${{ matrix.arch }}"
+          cmake --build build --target LYNX -- -k 0
+          lipo -info build/LYNX_artefacts/Release/LYNX.app/Contents/MacOS/LYNX
+          # (a tar keeps the bundle's symbolic links and modes through the artifact)
+          tar -C build/LYNX_artefacts/Release -cf "LYNX-app-${{ matrix.arch }}.tar" LYNX.app
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-app-${{ matrix.arch }}
+          path: LYNX-app-${{ matrix.arch }}.tar
+          if-no-files-found: error
+          retention-days: 3
+
+  universal:
+    name: macOS (universal dmg)
+    needs: [version, build]
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      LABEL: ${{ needs.version.outputs.label }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.version.outputs.ref }}
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: macos-app-*
+          path: apps
+          merge-multiple: true
+
+      - name: Merge the two apps (lipo)
+        run: |
+          mkdir -p apps/arm64 apps/x86_64 merged
+          tar -C apps/arm64 -xf apps/LYNX-app-arm64.tar
+          tar -C apps/x86_64 -xf apps/LYNX-app-x86_64.tar
+          cp -R apps/arm64/LYNX.app merged/LYNX.app
+          n=0
+          while IFS= read -r -d '' f; do
+            rel="${f#apps/arm64/}"
+            if file -b "$f" | grep -q 'Mach-O'; then
+              [[ -f "apps/x86_64/$rel" ]] || { echo "::error::$rel has no x86_64 twin"; exit 1; }
+              lipo -create "$f" "apps/x86_64/$rel" -output "merged/$rel"
+              n=$((n + 1))
+            fi
+          done < <(find apps/arm64/LYNX.app -type f -print0)
+          echo "merged $n Mach-O files"
+          lipo -info merged/LYNX.app/Contents/MacOS/LYNX
+          lipo -info merged/LYNX.app/Contents/MacOS/LYNX | grep -q 'x86_64 arm64\|arm64 x86_64'
+
+      - name: Self-test and demo project
+        run: |
+          bin=merged/LYNX.app/Contents/MacOS/LYNX
+          "$bin" --selftest "$PWD/selftest.txt" "$PWD/selftest-demo.lynx" || true
+          cat selftest.txt
+          grep -q '^result=OK' selftest.txt
+          "$bin" --showcase "$PWD/Demo.lynx" || true
+          test -s Demo.lynx
+
+      - name: Package
+        run: ./scripts/package-macos.sh merged/LYNX.app "$LABEL" dist Demo.lynx
+
+      - name: Upload package
+        uses: actions/upload-artifact@v7
+        with:
+          name: LYNX-${{ env.LABEL }}-macos-universal
+          path: dist/*
+          if-no-files-found: error
+
+  attach:
+    name: Attach to the release
+    needs: [version, universal]
+    if: ${{ github.event_name == 'workflow_dispatch' && startsWith(inputs.ref, 'v') }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      LABEL: ${{ needs.version.outputs.label }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ inputs.ref }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: LYNX-${{ env.LABEL }}-macos-universal
+          path: dist
+      - name: Upload the dmg and update SHA256SUMS.txt
+        run: |
+          cd dist
+          ls -la
+          gh release download "$TAG" -p SHA256SUMS.txt -D old
+          grep -v -- '-macos-universal\.dmg$' old/SHA256SUMS.txt > SHA256SUMS.txt || true
+          sha256sum -- *.dmg >> SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          gh release upload "$TAG" ./*.dmg SHA256SUMS.txt --clobber
